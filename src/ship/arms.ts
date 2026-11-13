@@ -63,7 +63,6 @@ export function createArms(light: Light, capacity: number) {
     })();
     const mesh = new Mesh(g, m);
     mesh.frustumCulled = false;
-    mesh.visible = false;
     mesh.name = `gun ${kind}`;
     return { kind, mesh, geometry: g, buffer };
   });
@@ -92,7 +91,6 @@ export function createArms(light: Light, capacity: number) {
           d.buffer.needsUpdate = true;
         }
         d.geometry.instanceCount = n;
-        d.mesh.visible = n > 0;
       }
     },
   };

@@ -257,6 +257,8 @@ export function createWake(view: View, sky: Sky, capacity: number) {
     mesh.frustumCulled = false;
     scene.add(mesh);
   }
+  // (none drawn until there is something to draw: a draw of no indices is one WebGPU warns of)
+  trails.count = patches.count = 0;
 
   /** Where world position p lies on the map, how much of its marks are left there, and the chart's axes at p. */
   const place = (p: Vec3Node) => {
@@ -378,8 +380,9 @@ export function createWake(view: View, sky: Sky, capacity: number) {
       });
       trailGeometry.setDrawRange(0, triangle * 3);
       // (a ship at rest lays no ribbon: then there is no trail to draw)
-      trails.visible = triangle > 0;
+      trails.count = triangle > 0 ? 1 : 0;
       patchGeometry.setDrawRange(0, near * 6);
+      patches.count = near > 0 ? 1 : 0;
       shadowGeometry.instanceCount = near;
       // only what was written goes up: the buffers hold the most ships' worth
       ([[trailAt, vertex], [trailMark, vertex], [trailLaid, vertex], [trailGeometry.index!, triangle * 3], [patchAt, near * 4], [patchMark, near * 4], [poses, near]] as const)

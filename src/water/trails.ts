@@ -119,7 +119,8 @@ export function createTrails(sky: Sky, surface: (up: Vec3Node, cell: FloatNode) 
   mesh.frustumCulled = false;
   // after the sea
   mesh.renderOrder = 1;
-  mesh.visible = false;
+  // drawn once (count) only while there is a trail: a draw of no indices is one WebGPU warns of
+  mesh.count = 0;
 
   /** Ribbons ended and still fading; the open trails as last seen, by ship, each a copy of its own (kept up by adding
    *  the points new since: a trail's points only grow while its serial holds), and the frame each was last seen in. */
@@ -141,7 +142,7 @@ export function createTrails(sky: Sky, surface: (up: Vec3Node, cell: FloatNode) 
       }
       if (!sea) {
         geometry.setDrawRange(0, 0);
-        mesh.visible = false;
+        mesh.count = 0;
         return;
       }
       time.value = now;
@@ -221,7 +222,7 @@ export function createTrails(sky: Sky, surface: (up: Vec3Node, cell: FloatNode) 
       index.addUpdateRange(0, n);
       index.needsUpdate = true;
       geometry.setDrawRange(0, n);
-      mesh.visible = n > 0;
+      mesh.count = n > 0 ? 1 : 0;
     },
   };
 }

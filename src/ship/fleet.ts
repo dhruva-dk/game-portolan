@@ -69,7 +69,6 @@ function drawOf(p: Packed, instances: InstancedInterleavedBuffer, material: Mate
   g.instanceCount = 0;
   const mesh = new Mesh(g as BufferGeometry, material);
   mesh.frustumCulled = false;
-  mesh.visible = false;
   // the blended ropes after the sea, which reads what is behind it from what was drawn before it
   mesh.renderOrder = material.transparent ? 1 : 0;
   return mesh;
@@ -175,10 +174,7 @@ export function createFleet(light: Light, wind: Wind, capacity: number) {
         instances[k].addUpdateRange(0, filled[k] * STRIDE);
         instances[k].needsUpdate = true;
       }
-      for (const mesh of three) {
-        (mesh.geometry as InstancedBufferGeometry).instanceCount = filled[k];
-        mesh.visible = filled[k] > 0;
-      }
+      for (const mesh of three) (mesh.geometry as InstancedBufferGeometry).instanceCount = filled[k];
     });
     return { cloth: canvas };
   }

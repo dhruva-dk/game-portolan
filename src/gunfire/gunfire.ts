@@ -109,7 +109,6 @@ function ballMesh(pixel: FloatNode) {
   m.colorNode = mix(vec3(...SPARK).mul(hot), vec3(...CORE), smoothstep(RIM - 0.12, RIM + 0.12, facing).max(float(1).sub(hot.min(1))));
   const mesh = new Mesh(g, m);
   mesh.frustumCulled = false;
-  mesh.visible = false;
 
   // the tracer: a ribbon facing the eye, from the ball back along its way, x across it (−1…1) and y back (0…1)
   const t = new InstancedBufferGeometry();
@@ -132,7 +131,6 @@ function ballMesh(pixel: FloatNode) {
   const tracer = new Mesh(t, tm);
   tracer.frustumCulled = false;
   tracer.renderOrder = 3;
-  tracer.visible = false;
   return { mesh, tracer, buffer, geometry: g, trail: t };
 }
 
@@ -165,7 +163,6 @@ function markMesh(pixel: FloatNode, now: FloatNode) {
   const mesh = new Mesh(g, m);
   mesh.frustumCulled = false;
   mesh.renderOrder = 2;
-  mesh.visible = false;
   return { mesh, buffer, geometry: g };
 }
 
@@ -215,7 +212,6 @@ function puffMesh(light: Light, now: FloatNode) {
   mesh.frustumCulled = false;
   // after the sea, which reads what was drawn before it
   mesh.renderOrder = 2;
-  mesh.visible = false;
   return { mesh, buffer, geometry: g };
 }
 
@@ -358,12 +354,9 @@ export function createGunfire(light: Light) {
       drawn = time;
       balls.buffer.needsUpdate = n > 0;
       balls.geometry.instanceCount = balls.trail.instanceCount = n;
-      balls.mesh.visible = balls.tracer.visible = n > 0;
       marks.buffer.needsUpdate = k > 0;
       marks.geometry.instanceCount = k;
-      marks.mesh.visible = k > 0;
       puffs.geometry.instanceCount = laid;
-      puffs.mesh.visible = laid > 0;
       send();
     },
     /** Each frame, after the camera has moved: the drawing buffer's height, pixels. */

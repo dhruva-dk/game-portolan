@@ -150,7 +150,6 @@ export function createLoot(light: Light) {
     })();
     const mesh = new Mesh(geometry, m);
     mesh.frustumCulled = false;
-    mesh.visible = false;
     return { mesh, geometry };
   };
 
@@ -197,7 +196,6 @@ export function createLoot(light: Light) {
   })();
   const beamMesh = new Mesh(beamGeometry, bm);
   beamMesh.frustumCulled = false;
-  beamMesh.visible = false;
   // after the sea, which reads what was drawn before it (as the gunfire's puffs)
   beamMesh.renderOrder = 2;
 
@@ -230,7 +228,6 @@ export function createLoot(light: Light) {
     if (counts.get(buffer) === n) return;
     counts.set(buffer, n);
     drawn.geometry.instanceCount = n;
-    drawn.mesh.visible = n > 0;
   };
   const shields = (l: LootDraw) => l.kind === 'smallShield' || l.kind === 'bigShield';
 

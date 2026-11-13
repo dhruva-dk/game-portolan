@@ -1,4 +1,6 @@
-import { Color, Mesh, NoToneMapping, PerspectiveCamera, RenderPipeline, Scene, Vector2, Vector3, type Object3D, type WebGPURenderer } from 'three/webgpu';
+import {
+  Color, NoToneMapping, PerspectiveCamera, RenderPipeline, Scene, Vector2, Vector3, type MRTNode, type Object3D, type WebGPURenderer,
+} from 'three/webgpu';
 import {
   Fn, float, getViewPosition, length, normalize, pass, rtt, screenUV, select, uniform, vec3, vec4,
 } from 'three/tsl';
@@ -47,7 +49,7 @@ const PLANES = { air: [0.5, 2000], space: [50, 4000] } as const;
 const SPACE = [0.0015, 0.002, 0.004] as const;
 const AIR = 400;
 /**
- * The eyes the frame warms its shaders from (render): each kind's, looking at the planet's centre from where the whole
+ * The eyes the frame builds its shaders from (prime): each kind's, looking at the planet's centre from where the whole
  * planet is inside its lens and its far plane, so every mesh on it is in view.
  */
 const WARM: readonly Eye[] = [
@@ -161,7 +163,7 @@ export function createFrame(renderer: WebGPURenderer, world: World, options: Fra
       const position = getViewPosition(screenUV, depth, projectionInverse);
       return { color, depth, dir: normalize(world.mul(vec4(position, 0)).xyz), metres: length(position) };
     };
-    return { seen, depth: scenePass.getTextureNode('depth') };
+    return { seen, depth: scenePass.getTextureNode('depth'), pass: scenePass };
   };
   /**
    * The post chain over a view's light (linear, per unit sun) and the depth it was seen at: drawn once to a texture,
@@ -210,40 +212,18 @@ export function createFrame(renderer: WebGPURenderer, world: World, options: Fra
   })();
 
   const eyes = {
-    air: { camera: airCamera, ...pipelineOf(airPost, airSeen.depth) },
-    space: { camera: spaceCamera, ...pipelineOf(spacePost, spaceSeen.depth) },
+    air: { camera: airCamera, scene: airSeen.pass, ...pipelineOf(airPost, airSeen.depth) },
+    space: { camera: spaceCamera, scene: spaceSeen.pass, ...pipelineOf(spacePost, spaceSeen.depth) },
   };
 
   /** Runs compute passes, in order. */
   const compute = (passes: readonly Compute[]) => {
     for (const p of passes) renderer.compute(p);
   };
-  /** Whether the frame is warming its shaders (render): everything hidden in what it draws is shown. */
-  let warming = false;
-  /** Shows everything hidden under `root`; returns what puts each back. A mesh with an empty draw range is shown with
-   *  a count of none, so its pipeline is built but nothing drawn (three skips a draw of no instances; one of no
-   *  indices it makes, and WebGPU warns of it). */
-  const reveal = (root: Object3D) => {
-    const hidden: Object3D[] = [], empty: [Mesh, number][] = [];
-    root.traverse((o) => {
-      if (o instanceof Mesh && o.geometry.drawRange.count === 0) {
-        empty.push([o, o.count]);
-        o.count = 0;
-      }
-      if (o.visible) return;
-      hidden.push(o);
-      o.visible = true;
-    });
-    return () => {
-      hidden.forEach((o) => (o.visible = false));
-      empty.forEach(([o, count]) => (o.count = count));
-    };
-  };
   const clearColor = new Color();
   /** Draws an offscreen scene into its target, if it is due. */
   const draw = (d: Draw | null) => {
     if (!d) return;
-    const back = warming ? reveal(d.scene) : null;
     renderer.setRenderTarget(d.target);
     if (d.clear) {
       renderer.getClearColor(clearColor);
@@ -255,7 +235,18 @@ export function createFrame(renderer: WebGPURenderer, world: World, options: Fra
       renderer.render(d.scene, d.camera);
     }
     renderer.setRenderTarget(null);
-    back?.();
+  };
+  /** Builds the shaders and pipelines of all `scene` can draw seen by `camera` into `target` (with its `mrt`), what
+   *  is hidden in it too (a system hides what it has none of by drawing none of it: a count of none), in the
+   *  background between frames. The target is the renderer's only while the build is laid out. */
+  const build = (scene: Object3D, camera: Draw['camera'], target: Draw['target'], mrt: MRTNode | null = null) => {
+    const [was, wasMrt] = [renderer.getRenderTarget(), renderer.getMRT()];
+    renderer.setRenderTarget(target);
+    renderer.setMRT(mrt);
+    const built = renderer.compileAsync(scene, camera);
+    renderer.setRenderTarget(was);
+    renderer.setMRT(wasMrt);
+    return built;
   };
 
   // 0. once
@@ -308,24 +299,40 @@ export function createFrame(renderer: WebGPURenderer, world: World, options: Fra
   }
 
   /**
-   * Draws the world as the snapshot has it, dt seconds after the last frame.
-   *
-   * The first two frames are first drawn from each kind of eye (WARM), still, with everything hidden in what is drawn
-   * shown (those with nothing to draw draw nothing), and the ships' marks drawn though none is near, so every shader the frame can draw with is built and its pipeline
-   * made then, as the world loads: the view from space, the other ships, the loot, the trails, the guns' work and the
-   * ships' marks are first seen only once a match is under way, and a shader first built then costs that frame tens of
-   * milliseconds (more on the phone).
+   * Builds every shader the frame can draw with, and its pipeline, once the ground is baked and before the first
+   * frame (ready): the view from space, the other ships, the loot, the trails, the guns' work and the ships' marks are
+   * first seen only once a match is under way, and a shader first built then costs that frame tens of milliseconds
+   * (more on the phone). Each eye's post is drawn at two frames from its WARM eye, its passes set up (a post's pass
+   * inside another is set up again as the outer is built, which remakes its draw at the next); then its scene is built from
+   * there, and the ships' marks into their map, one after another (three's builds share the renderer's state).
    */
-  let cold = 2;
-  function render(s: Snapshot, dt: number) {
-    if (cold > 0) {
-      // at the first two frames: a post's pass inside another is set up again as the outer is built, which remakes
-      // its draw at the next frame's
-      cold--;
-      warming = true;
-      for (const eye of WARM) drawFrom(s, eye, 0);
-      warming = false;
+  const nothing = new Scene();
+  async function prime() {
+    for (let k = 0; k < 2; k++) {
+      // (a frame apart: what a pass does once a frame is done again only at the renderer's next)
+      if (k > 0) await new Promise(requestAnimationFrame);
+      for (const eye of WARM) {
+        cameraFor(eye);
+        eyes[eye.kind].pipeline.render();
+      }
     }
+    for (const eye of WARM) {
+      const { camera, scene: seen } = eyes[eye.kind];
+      cameraFor(eye);
+      // nothing drawn into the pass's target first (its pass draws all of it each frame), so the build's context
+      // knows its target: three's build leaves it unset, and the sea's read of what is behind it would copy the canvas
+      renderer.setRenderTarget(seen.renderTarget);
+      renderer.setMRT(seen.getMRT());
+      renderer.render(nothing, camera);
+      renderer.setRenderTarget(null);
+      renderer.setMRT(null);
+      await build(scene, camera, seen.renderTarget, seen.getMRT());
+    }
+    await build(water.marks.scene, water.marks.camera, water.marks.target);
+  }
+
+  /** Draws the world as the snapshot has it, dt seconds after the last frame. */
+  function render(s: Snapshot, dt: number) {
     drawFrom(s, s.eye, dt);
   }
 
@@ -350,26 +357,25 @@ export function createFrame(renderer: WebGPURenderer, world: World, options: Fra
     if (island) islandSun.set(...sunAt(env.sunPlaces, env.timeOfDay, island.chart.at));
     const islandShadow = shadow.update(islandSun, island);
 
-    const back = warming ? reveal(scene) : null;
-
     // 1. offscreen, what is due
     compute(air.tables);
     compute(air.clouds);
     compute(air.reflection);
     compute(sea.waves);
-    draw(warming ? water.marks : sea.wake);
+    draw(sea.wake);
     draw(islandShadow);
     compute(ships.cloth);
     // 2, 3. the scene and its post, from the eye; the light shafts only in the air
     eyes[seen.kind].shafts.update(eye, env.sunDirection, seen.kind === 'air' ? shaftsFor(rise) : 0);
     eyes[seen.kind].pipeline.render();
-    back?.();
   }
 
   return {
     resize,
     render,
-    ready: ground.ready,
+    /** Resolves once the ground is baked and every shader the frame can draw with built (prime), to how long the
+     *  bake took, ms. */
+    ready: ground.ready.then(async (ms) => (await prime(), ms)),
     /** The sea's anchors (world/lattice.ts), as the frame's sea is laid on them: the CPU's copy of the long waves
      *  (world/swell.ts) must read the very charts the GPU's do. */
     anchors: water.anchors,
