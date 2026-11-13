@@ -1,6 +1,6 @@
 // The screen's answer to a blow: 0117's flash, vignette and low-hull heartbeat (juice/screen.ts, its recipes' screen
-// parts). A flash washes the whole screen in a colour for a moment (`add` lightens what is under it, `tint` lays the
-// colour over it); a vignette darkens the screen's rim in a colour, drawn toward where a blow came from; while her hull
+// parts). A flash washes the whole screen in a colour for a moment (`add` a pale wash of light, `tint` the colour laid
+// over it); a vignette darkens the screen's rim in a colour, drawn toward where a blow came from; while her hull
 // is low, a heartbeat of rubric beats at the rim, faster the lower it is.
 //
 // Photosensitivity (WCAG 2.3.1): no more than BIG flashes stronger than SAFE in any second; past that a flash is held
@@ -69,10 +69,11 @@ export function createFlash(parent: HTMLElement) {
     parent.prepend(el);
     return el;
   };
+  // the wash laid over in plain alpha, not blended: its colours are near white, where the two are all but one, and a
+  // full-screen blend is costly to composite on the phone
   const wash = layer(''), tint = layer(''), rim = layer(''), heart = layer('');
-  wash.style.mixBlendMode = 'screen';
-  /** When the big flashes of the last second played (s on the page's clock). */
-  let big: number[] = [], beat = 0, low = 0;
+  /** When the big flashes of the last second played (s on the page's clock); the heartbeat's inner edge as laid. */
+  let big: number[] = [], beat = 0, low = 0, reached = -1;
   const now = () => performance.now() / 1000;
 
   return {
@@ -109,8 +110,10 @@ export function createFlash(parent: HTMLElement) {
       beat += dt;
       const b = heartbeat(beat, bpm, LOW_HULL.dub), reach = LOW_HULL.reach[0] + (LOW_HULL.reach[1] - LOW_HULL.reach[0]) * low;
       const alpha = (LOW_HULL.rest[0] + (LOW_HULL.rest[1] - LOW_HULL.rest[0]) * low) + (LOW_HULL.beat[0] + (LOW_HULL.beat[1] - LOW_HULL.beat[0]) * low) * b;
-      heart.style.background = `radial-gradient(ellipse at 50% 50%, transparent ${Math.round((1 - reach) * 100)}%, ${LOW_HULL.colour} 135%)`;
-      heart.style.opacity = Math.min(1, alpha * low).toFixed(3);
+      // the gradient laid anew only as its reach moves on (a whole percent), its beat in opacity alone
+      const inner = Math.round((1 - reach) * 100), opacity = Math.min(1, alpha * low).toFixed(3);
+      if (inner !== reached) heart.style.background = `radial-gradient(ellipse at 50% 50%, transparent ${(reached = inner)}%, ${LOW_HULL.colour} 135%)`;
+      if (heart.style.opacity !== opacity) heart.style.opacity = opacity;
     },
   };
 }

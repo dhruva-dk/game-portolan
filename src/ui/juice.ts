@@ -1,7 +1,7 @@
 // The HUD's answer to what happens (player.ts Moment): 0117's juice (app/juice.ts react, its recipes' screen and HUD
 // parts), as far as this game has what it answered. Each moment is answered once (by its seq), and only those that
 // befall her or that she dealt; the camera's part is the game's (play/shake.ts), the sound's the sound's.
-//   her gun fired       a warm flash; the Fire disc knocked in
+//   her gun fired       a warm flash; the Fire disc knocked in (no oftener than FIRED_APART)
 //   her ball home       the cross round the reticle (hits.ts) and the figure rising off the ship; a flash, the
 //                       stronger where it broke a shield
 //   a blow on her       the arc toward who dealt it; rubric (or azure, on her shield) at the rim toward it; the vitals
@@ -26,6 +26,10 @@ export interface Parts { vitals: HTMLElement; fire: HTMLElement; gust: HTMLEleme
 /** A piece's flight to its slot (0117's FLY): its burst out, its flight, and its size along the way. */
 export const FLY = { burst: 0.24, flight: 0.56, scale: [0.35, 1.15, 0.7] } as const;
 
+/** The fewest ms between answers to her firing: the repeater's run of shots (one every 100 ms) flashes and knocks
+ *  the Fire disc at half its rate, not with every shot. */
+const FIRED_APART = 180;
+
 /** A blow she dealt: its cross over the reticle (hits.ts), and its look (flash.ts). */
 const DEALT = {
   broke: { cross: 'break', look: SCREEN.shieldBreak },
@@ -35,7 +39,8 @@ const DEALT = {
 
 export function createJuice(body: HTMLElement, parts: Parts) {
   const flash = createFlash(body), hits = createHits(body);
-  let heard = 0, then = performance.now();
+  /** The last moment answered; the page's clock (ms) at this frame, and when her firing was last answered. */
+  let heard = 0, then = performance.now(), fired = -Infinity;
 
   /** A piece knocked: scaled to `k` and back on a spring, or shaken side to side. */
   const pop = (el: HTMLElement, k: number, ms = 260) =>
@@ -69,7 +74,8 @@ export function createJuice(body: HTMLElement, parts: Parts) {
     const middle = { x: w / 2, y: h / 2 };
     switch (m.kind) {
       case 'fired':
-        if (m.ship !== HER) return;
+        if (m.ship !== HER || then - fired < FIRED_APART) return;
+        fired = then;
         flash.flash(SCREEN.fire.flash);
         pop(parts.fire, 0.86, 220);
         return;
