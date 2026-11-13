@@ -23,8 +23,8 @@
 // shadows where the sun's ray through the water meets the sea's level, softened). The
 // hulls of the few nearest the eye cut the surface away inside them and shade the water against them (hulls.ts).
 //
-// Who holds the sea is drawn in it (claims.ts): the water dyed its holder's colour, her border a fine glowing line over
-// a line of foam, and the changes sweeping over it.
+// Who holds the sea is drawn in it (claims.ts): the water tinted its holder's colour, her border a hard glowing line,
+// and the changes sweeping over it.
 //
 // The light off the water is optics.ts's. Fog and clouds come from the frame's post pass, as for anything solid.
 
@@ -212,8 +212,6 @@ export function createWater(view: View, sky: Sky, ground: Ground, wind: Wind, sh
     const storm = sky.storm(p);
     variance.addAssign(storm.mul(STORM_ROUGH));
     foam.assign(mix(foam, max(foam, smoothstep(0.55, 1, phase)), storm.mul(STORM_FOAM)));
-    // the border's line of foam
-    foam.assign(max(foam, held.foam.mul(0.8)));
     const v = normalize(cameraPosition.sub(positionWorld));
     // Toward the horizon the eye looks along the sea, and the filtered slopes turn some of it away from the eye. The
     // eye can't see a face turned away (only the faces of those waves toward it), so such normals are bent back

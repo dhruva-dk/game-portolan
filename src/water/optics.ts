@@ -113,26 +113,45 @@ export type Sparkle = (D: FloatNode, nh: FloatNode, hl: FloatNode) => FloatNode;
 export interface Ships { lit: FloatNode; glow: FloatNode; air: FloatNode }
 
 /**
- * Who holds the water here (water/claims.ts): its dye (rgb the holder's colour, a how far the water's body is turned
- * toward it, its brightness kept) and the light its border's line gives off, per unit of what a white surface gets.
+ * Who holds the water here (water/claims.ts): its tint (rgb the holder's colour, a how far the water gives up its own
+ * colour for it, its brightness kept) and the line drawn over it (rgb its light per unit of what a white surface gets,
+ * premultiplied; a its cover).
  */
-export interface Held { dye: Vec4Node; shine: Vec3Node }
+export interface Held { dye: Vec4Node; ink: Vec4Node }
 
-/** How much colour a wash gives the water, as a share of its brightness. */
-const WASH_CHROMA = 0.8;
-const luminance = (c: Vec3Node) => dot(c, vec3(0.2126, 0.7152, 0.0722));
+/** How much colour a tint gives the water: at most TINT_CHROMA of the water's own chroma (Oklab), for a holder's colour
+ *  whose chroma is TINT_RICH of its lightness or more. */
+const TINT_CHROMA = 1.5, TINT_RICH = 0.3;
+/** Oklab (Ottosson 2020) of linear light c, and back: lightness, then the two opponent axes. */
+const oklab = (c: Vec3Node): Vec3Node => {
+  const l = pow(max(dot(c, vec3(0.4122214708, 0.5363325363, 0.0514459929)), 0), 1 / 3);
+  const m = pow(max(dot(c, vec3(0.2119034982, 0.6806995451, 0.1073969566)), 0), 1 / 3);
+  const s = pow(max(dot(c, vec3(0.0883024619, 0.2817188376, 0.6299787005)), 0), 1 / 3);
+  const lms = vec3(l, m, s);
+  return vec3(dot(lms, vec3(0.2104542553, 0.793617785, -0.0040720468)), dot(lms, vec3(1.9779984951, -2.428592205, 0.4505937099)),
+    dot(lms, vec3(0.0259040371, 0.7827717662, -0.808675766)));
+};
+const linear = (lab: Vec3Node): Vec3Node => {
+  const l = pow(dot(lab, vec3(1, 0.3963377774, 0.2158037573)), 3);
+  const m = pow(dot(lab, vec3(1, -0.1055613458, -0.0638541728)), 3);
+  const s = pow(dot(lab, vec3(1, -0.0894841775, -1.291485548)), 3);
+  const lms = vec3(l, m, s);
+  return max(vec3(dot(lms, vec3(4.0767416621, -3.3077115913, 0.2309699292)), dot(lms, vec3(-1.2684380046, 2.6097574011, -0.3413193965)),
+    dot(lms, vec3(-0.0041960863, -0.7034186147, 1.707614701))), 0);
+};
 /**
- * Light c with its hue turned a share a toward colour's, its luminance kept: its colour apart from its brightness (its
- * chroma) is swung toward the holder's, kept as strong as the two's mix, so turning teal toward scarlet never passes
- * through grey and never darkens.
+ * Light c tinted a share a toward colour's hue (Oklab), its lightness kept and its chroma's strength too, so the sea's
+ * own play of colour (rich in its body, pale where it mirrors a cloud) still shows, turned to her hue: as strong as
+ * the water's for a colour as rich as hers is for her lightness at TINT_RICH, less for a paler one. The water's own hue
+ * is let go faster than hers comes in ((1 − a)³ of it kept against a of hers), not mixed half and half: blue water and
+ * scarlet so mixed would be magenta, and this way scarlet holds its hue over turquoise and deep blue alike.
  */
-function washed(c: Vec3Node, colour: Vec3Node, a: FloatNode): Vec3Node {
-  const L = luminance(c), C = c.sub(L);
-  const t = colour.sub(luminance(colour));
-  // never paler than the water was, so a hue near the sea's own still shows
-  const T = t.div(max(length(t), 1e-4)).mul(max(L.mul(WASH_CHROMA), length(C).mul(1.2)));
-  const m = mix(C, T, a), want = mix(length(C), length(T), a);
-  return max(m.mul(min(want.div(max(length(m), 1e-5)), 4)).add(L), 0);
+function tinted(c: Vec3Node, colour: Vec3Node, a: FloatNode): Vec3Node {
+  const lab = oklab(c), hers = oklab(colour), chroma = length(hers.yz);
+  const rich = min(chroma.div(max(hers.x, 1e-3)).div(TINT_RICH), 1).mul(TINT_CHROMA);
+  const want = hers.yz.div(max(chroma, 1e-4)).mul(length(lab.yz).mul(rich));
+  const keep = float(1).sub(a);
+  return linear(vec3(lab.x, lab.yz.mul(keep.mul(keep).mul(keep)).add(want.mul(a))));
 }
 
 /**
@@ -159,7 +178,7 @@ function facets(nh: FloatNode, nl: FloatNode, nv: FloatNode, alpha: FloatNode): 
  *   path   metres from the surface to it through the water (Infinity for open sea)
  *   sparkle how the sun's glint gathers into flashes
  *   ships  what the ships do to the light here
- *   held   who holds the water here: what comes up out of it is dyed her colour, and her border glows
+ *   held   who holds the water here: the water tinted her colour, and her border's line drawn over it
  */
 function seaRadiance(
   sky: Sky, view: View, p: Vec3Node, n: Vec3Node, v: Vec3Node, alpha: FloatNode, crest: FloatNode, foam: FloatNode, behind: Vec3Node,
@@ -196,15 +215,12 @@ function seaRadiance(
   const dim = exp(absorption.mul(path).add(ships.air.mul(AIR_VEIL)).negate());
   const through = behind.mul(dim).div(N_WATER * N_WATER);
   const glow = body.add(crests).mul(float(1).sub(dim.mul(dim)));
-  // the light up out of the water, and half as much the sky in it, turned toward the holder's hue at their own brightness
-  let under = through.add(glow);
-  let mirrored = reflected;
+  let water = reflected.add(through.add(glow).mul(float(1).sub(F)));
   if (held) {
-    under = washed(under, held.dye.xyz, held.dye.w);
-    mirrored = washed(seen, held.dye.xyz, held.dye.w.mul(0.5)).add(glint).mul(F);
+    // all of it tinted but the sun's glint, and the border's line over it
+    water = tinted(seen.mul(F).add(through.add(glow).mul(float(1).sub(F))), held.dye.xyz, held.dye.w).add(glint.mul(F));
+    water = water.mul(float(1).sub(held.ink.w)).add(held.ink.xyz.mul(irradiance));
   }
-  let water = mirrored.add(under.mul(float(1).sub(F)));
-  if (held) water = water.add(held.shine.mul(irradiance));
   const froth = sun.mul(nl).div(Math.PI).add(sky.ambient(p, n)).mul(FOAM_ALBEDO);
   return mix(water, froth, foam);
 }
