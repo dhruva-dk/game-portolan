@@ -63,7 +63,7 @@ export const STORM = tones('#9483D4', '#574790');
 export const STORM_FOOT = ink('#F5C67A');
 export const LIGHTNING = ink('#D9C2FF');
 /** A fair-weather cloud: cream where the sun lights it, a warm tan beneath (art/target/idea.png's golden cumulus). */
-export const CLOUD = tones('#FFD6A6', '#D2A88E');
+export const CLOUD = tones('#FFD6A6', '#DAB7A6');
 /** Powder smoke: a cloud's cream, and a deeper rose in its shadow. */
 export const SMOKE = tones('#FFF1D6', '#D9907C');
 
