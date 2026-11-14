@@ -49,7 +49,7 @@ const FULL = 0.35;
  * of sky in cloud, but gathered into a few big masses, as tall as they are broad, rather than a field of small puffs.
  * At this size they read as shapes at the phone's resolution, and their sunlit sides as broad blocks of light.
  */
-const MASS = 3;
+const MASS = 5;
 /** How far the large-scale field moves the threshold either way at middling cover, km of potential. */
 const FIELD_SHIFT = 0.3;
 /** How far below zero the threshold sinks at full cover, km: a little over BILLOW, so overcast is unbroken. */
