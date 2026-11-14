@@ -79,7 +79,7 @@ const CHURN = 1.6, SPREAD = 0.3;
 const ARM = 0.18, ARM_LIFE = 22, ARM_FADE = 10, ROUGH = 0.45;
 /** An arm's half-width as it leaves her stem, metres, and how fast it widens, metres a second per metre a second of
  * her speed then. */
-const ARM_WIDTH = 0.6, WIDEN = 0.03;
+const ARM_WIDTH = 0.9, WIDEN = 0.05;
 /** The bow wave's foam along the arms: how long it lasts, seconds (fading by e each); and how white the streaks its
  *  crests leave behind it are. Bold, so her wake reads as a long white V (art/target/idea.png). */
 const BOW_LIFE = 4, STREAK = 0.6;
@@ -91,7 +91,7 @@ const ROUGHEST = 14;
 /** On the inside of a turn, the ribbon reaches this share of the way to its centre. */
 const INSIDE = 0.8;
 /** Foam round a waterline at rest, and the bow wave's height at full speed, metres. */
-const LAPPING = 0.7, BOW = 0.45;
+const LAPPING = 0.5, BOW = 0.45;
 /** The patch round a hull: metres astern of her transom, ahead of her stem and out from her side. */
 const PATCH = { astern: 7, ahead: 4, out: 4.5 };
 /** The least the sun's rays may lie along the sea for her shadow: low suns stretch it no further. */
