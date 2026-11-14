@@ -25,7 +25,7 @@ const RAGGED = 0.5;
 const RUBBLE = 0.7, GRASS = 0.65, FALLEN = 0.5;
 /** Ground steeper than a cliff's face (ISLANDS.bare, rise over run) is bare rock: the cosine of its tilt. Its strata
  *  this many metres thick. */
-const BARE = 1 / Math.hypot(1, ISLANDS.bare), STRATA = 1.4;
+const BARE = 1 / Math.hypot(1, ISLANDS.bare), STRATA = 2.2;
 
 export type Sand = (p: Vec3Node, n: Vec3Node, litter: FloatNode | null) => Vec3Node;
 
@@ -58,7 +58,7 @@ export function createSand(view: View, ground: Ground, light: Light): Sand {
     // a cliff's face: bare rock above the sea, in strata of two tones
     const bare = cut(float(1).sub(dot(n, view.up(p))), 1 - BARE).mul(cut(height, SHORE));
     lay(ROCK, bare);
-    lay(STRATUM, bare.mul(cut(fract(level.div(STRATA)), 0.5)));
+    lay(STRATUM, bare.mul(cut(fract(level.div(STRATA)), 0.65)));
     if (litter) lay(LITTER, cut(litter.add(mottle.mul(0.6)), FALLEN).mul(cut(height, BEACH)));
     return light.floor(p, n, lit, shadow);
   };

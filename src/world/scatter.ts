@@ -168,7 +168,7 @@ const field = (noise: ReturnType<typeof createNoise3>, x: number, z: number, siz
 
 export function scatterPalms(isle: Isle, rocks: Rock[], seed = 1): Palm[] {
   const { site } = isle;
-  if (site.kind === 'rocks') return [];
+  if (site.kind === 'rocks' || site.kind === 'mesa') return [];
   const rand = random(seed * 104729 + 3), noise = createNoise3(seed + 71);
   const palms: Palm[] = [], count = perArea(site, PALMS);
   for (let tries = 0; palms.length < count && tries < count * 200; tries++) {

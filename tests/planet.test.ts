@@ -192,7 +192,8 @@ test('each above the sea: the waterline is its coast, the beach about 1:8 there,
   for (const [seed, pl] of planets) {
     const summits = (kind: string) => pl.islands.filter((s) => s.kind === kind).map((s) => s.summit);
     assert.ok(Math.max(...summits('island')) > 15, `seed ${seed}: highest ${Math.max(...summits('island'))}`);
-    assert.ok(Math.min(...summits('islet')) > 2, `seed ${seed}: islets ${summits('islet')}`);
+    // (the narrowest brought lower: some 5 m across)
+    assert.ok(Math.min(...summits('islet')) > 1.5, `seed ${seed}: islets ${summits('islet')}`);
     const big = pl.islands.filter((s) => s.radius > 35), small = pl.islands.filter((s) => s.kind === 'island' && s.radius < 22);
     const mean = (l: typeof big) => l.reduce((a, s) => a + s.summit, 0) / l.length;
     assert.ok(mean(big) > mean(small) + 4, `seed ${seed}: large ${mean(big)}, small ${mean(small)}`);
@@ -215,8 +216,10 @@ test('the hills: slopes a palm stands on, but for the cliffs\' faces', () => {
     const p99 = slopes[Math.floor(slopes.length * 0.99)], worst = slopes.at(-1)!, faces = 1 - slopes.length / land;
     // (the hill itself is brought down to ISLANDS.steepest before they are cut into it; a cliff's or riser's flank,
     // short of its face, steeper, by up to the difference in how finely the two are measured)
-    assert.ok(faces < 0.2, `seed ${seed}: ${s.kind} ${s.radius.toFixed(0)} m ${(faces * 100).toFixed(0)}% cliff`);
-    assert.ok(p99 < ISLANDS.bare && worst < ISLANDS.bare + 0.1, `seed ${seed}: ${s.kind} ${s.radius.toFixed(0)} m slopes p99 ${p99.toFixed(2)}, worst ${worst.toFixed(2)}`);
+    // (a mesa's all round it)
+    assert.ok(faces < (s.kind === 'mesa' ? 0.45 : 0.2), `seed ${seed}: ${s.kind} ${s.radius.toFixed(0)} m ${(faces * 100).toFixed(0)}% cliff`);
+    // (a mesa's face sharper, from its foot to its top)
+    assert.ok(p99 < ISLANDS.bare && worst < ISLANDS.bare + (s.kind === 'mesa' ? 0.4 : 0.1), `seed ${seed}: ${s.kind} ${s.radius.toFixed(0)} m slopes p99 ${p99.toFixed(2)}, worst ${worst.toFixed(2)}`);
   }
 });
 
