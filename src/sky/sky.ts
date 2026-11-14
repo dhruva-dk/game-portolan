@@ -88,7 +88,7 @@ const HAZE_SPECTRUM = [0.85, 1, 1.12] as const, HAZE_TINT = [1.45, 1, 0.45] as c
 const HAZE_ABOVE = [110, 200] as const;
 /** The sky's blue drawn richer than the air's: its colour this many times as far from its grey (the target painting's
  *  deep blue overhead, art/target/idea.png), the disc and its glow left as they are. */
-const SKY_SATURATION = 1.45;
+const SKY_SATURATION = 2.2;
 /** Past this many metres a ray has met nothing: the frame hands the sky's pixels this far or further. */
 export const SKY_METRES = 1e4;
 

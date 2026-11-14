@@ -82,7 +82,7 @@ const EDGE_AT = 0.2, EDGE_WIDTH = 0.12;
 const LIGHT_TAP = 0.15, SHADE_AT = 0.35, SHADE_EDGE = 0.08;
 /** How much of the sun's own colour the cloud's lit tone keeps (the rest is the palette's cream at the sun's
  *  brightness); and how bright its shadow tone is, of what a white surface in the open gets. */
-const WARMED = 0.5, UNDERLIT = 0.7;
+const WARMED = 0.8, UNDERLIT = 0.7;
 const LUMA = vec3(0.2126, 0.7152, 0.0722);
 
 
