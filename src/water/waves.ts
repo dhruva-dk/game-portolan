@@ -40,6 +40,14 @@ import { workgroupArrayOf, type FloatNode, type UintNode, type Vec2Node, type Ve
 export const CURVED = [1, 2];
 /** Cascades whose waves break: the first this many. */
 export const FOAMING = 2;
+/** The wind, m/s, over which the whitecaps come in. Under it the sea breaks too thinly (Monahan's share at the match's
+ *  usual breeze is a few in a thousand) to show but as lone white specks a lobe across on the blue, where a painter
+ *  draws none; over it, the white horses of a fresh breeze. */
+const WHITE_HORSES = [9, 12] as const;
+const smooth = (a: number, b: number, x: number) => {
+  const t = Math.min(Math.max((x - a) / (b - a), 0), 1);
+  return t * t * (3 - 2 * t);
+};
 
 const HALF = SIZE / 2;
 const AREA = SIZE * SIZE;
@@ -213,9 +221,10 @@ export function createWaves() {
       }
       if (Math.abs(now - gusting) > 0.01) {
         gusting = now;
-        // each breaking cascade lays its share of the whitecaps
+        // each breaking cascade lays its share of the whitecaps, none in a breeze under WHITE_HORSES
+        const share = whitecaps(now) * smooth(WHITE_HORSES[0], WHITE_HORSES[1], now);
         for (let c = 0; c < FOAMING; c++) {
-          breaking[c].value.set(1 + normalQuantile(Math.max(whitecaps(now) / FOAMING, 1e-6)) * spreads[c], spreads[c]);
+          breaking[c].value.set(1 + normalQuantile(Math.max(share / FOAMING, 1e-6)) * spreads[c], spreads[c]);
         }
       }
       // foam lasts longer the harder the wind blows: τ from a second to five (the residual foam a whitecap leaves,
