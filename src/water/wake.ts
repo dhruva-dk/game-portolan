@@ -46,7 +46,7 @@ import {
   OneFactor, OrthographicCamera, RGBAFormat, RenderTarget, Scene,
 } from 'three/webgpu';
 import {
-  Fn, abs, attribute, cos, cross, dot, exp, float, length as lengthN, max, min, mx_noise_float, normalize, saturate, select, sin, smoothstep,
+  Fn, abs, attribute, cos, cross, dot, exp, float, length as lengthN, max, min, mix, mx_noise_float, normalize, saturate, select, sin, smoothstep,
   step, texture, uniform, vec2, vec3, vec4,
 } from 'three/tsl';
 import type { Environment } from '../environment';
@@ -74,6 +74,9 @@ const LENGTH = WATERLINE.stem - WATERLINE.stern;
 
 /** The churned water astern: its half-width under her transom, and how fast it spreads, metres a second. */
 const CHURN = 1.6, SPREAD = 0.3;
+/** The churn's foam in tongues, as art/target/idea.png's wake: TONGUE metres apart along her track, slanting back
+ *  TONGUE_SLANT metres a metre out, its cover times TONGUE_CREST on them and TONGUE_LANE in the blue lanes between. */
+const TONGUE = 3.5, TONGUE_SLANT = 1.2, TONGUE_CREST = 1.35, TONGUE_LANE = 0.2;
 /** The wedge's arms: their crests' height at full speed, metres, and how long they last in a calm, seconds (fading by
  * e each FADE); the share of that a rough sea takes. */
 const ARM = 0.18, ARM_LIFE = 22, ARM_FADE = 10, ROUGH = 0.45;
@@ -88,6 +91,10 @@ const BOW_LIFE = 18, BOW_FOAM = 1.5, STREAK = 0.6, STREAK_WIDEST = 1.4;
  *  BOW_FOAM wide, and inside it the crests curling in, feathered, CURL_REACH of it, with blue between: neither loose
  *  flecks (review27) nor one flat band, nor the chains of separate blobs review30 saw. */
 const RIM_SHARE = 0.3, CURL_REACH = 1.8;
+/** The crests' feathering: where along each crest's wave (its cosine, −1…1) its foam begins and is whole. */
+const FEATHER = [0.1, 0.6] as const;
+/** The curls' cover, of the rim's: more than whole, so each crest prints white well in from the rim. */
+const CURL = 1.8;
 /** The ribbon reaches this many of an arm's half-widths past its crest (and at least ARM_ROOM metres), and at least
  * this many of the churn's half-widths. */
 const ARM_REACH = 4, ARM_ROOM = 4, CHURN_ROOM = 2.6;
@@ -175,7 +182,10 @@ export function createWake(view: View, sky: Sky, capacity: number) {
     const churned = exp(sq(across.div(spread)).negate()).mul(smoothstep(LENGTH - 1, LENGTH + 3, run)).mul(pace);
     const worn = age.div(24).add(rough.mul(0.2));
     const churnLeft = smoothstep(worn.sub(0.45), worn.sub(0.1), patchy(3, 1.5));
-    const foam = churned.mul(exp(age.div(-3)).mul(0.42).add(exp(age.div(-12)).mul(0.25).mul(churnLeft))).toVar();
+    // its foam in tongues slanting out and back from her track, fixed in the water, blue lanes between them
+    const tongue = cos(laid.add(abs(across).mul(TONGUE_SLANT)).add(patchy(2, 4.5).mul(1.5)).mul(2 * Math.PI / TONGUE));
+    const tongues = mix(float(TONGUE_LANE), float(TONGUE_CREST), smoothstep(-0.25, 0.25, tongue));
+    const foam = churned.mul(exp(age.div(-3)).mul(0.55).add(exp(age.div(-12)).mul(0.25).mul(churnLeft))).mul(tongues).toVar();
     const air = churned.mul(exp(age.div(-10)));
     // the arms: metres outside each's line, its half-width, and what is left of it
     const off = abs(across).sub(v.mul(age).mul(KELVIN));
@@ -190,11 +200,11 @@ export function createWake(view: View, sky: Sky, capacity: number) {
     const height = band.mul(slant(run)).mul(groups).mul(life).mul(ARM).div(v.mul(age).mul(0.06).add(1).sqrt());
     // the bow wave breaks white along the arms near her, feathered along its crests; the foam it leaves widens, and
     // breaks up into patches the farther back it lies, and the rougher the sea
-    const feathers = smoothstep(-0.2, 0.8, slant(laid));
+    const feathers = smoothstep(FEATHER[0], FEATHER[1], slant(laid));
     // a whole white rim along the arm's line, and inside it the crests curling in, feathered, blue between them
     const rim = exp(sq(off.div(BOW_FOAM * RIM_SHARE)).negate());
     const curls = exp(sq(off.div(BOW_FOAM * CURL_REACH)).negate()).mul(step(off, 0)).mul(feathers);
-    foam.addAssign(max(rim, curls).mul(pace).mul(exp(age.div(-BOW_LIFE)).mul(0.9)));
+    foam.addAssign(max(rim, curls.mul(CURL)).mul(pace).mul(exp(age.div(-BOW_LIFE)).mul(0.9)));
     const streak = min(width.mul(0.5).add(0.6), STREAK_WIDEST), gone = age.div(calm.mul(ARM_LIFE)).add(rough.mul(0.2));
     const left = smoothstep(gone.sub(0.55), gone.sub(0.15), patchy(4, 2.5).mul(0.7).add(patchy(1.5, 3.5).mul(0.3)));
     foam.addAssign(exp(sq(off.div(streak)).negate()).mul(float(1.2).div(streak).sqrt()).mul(life).mul(feathers).mul(left).mul(STREAK));
