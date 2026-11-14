@@ -48,6 +48,9 @@ const SWELL = 0.35, FACETS = 2.5;
 /** The sun's glints: the cosine between the surface's normal and the half vector past which it mirrors the sun to the
  *  eye, the width of that edge, and the glint's light of what a white surface gets from the sun square on. */
 const GLINT = 0.9998, GLINT_EDGE = 0.0001, GLINT_LIGHT = 0.4;
+/** How much of the fair-weather clouds' shadow falls on the sea: some, so their shade passes over it without leaving
+ *  dark blotches on the deep blue (art/target/idea.png's sea is one blue under the scattered clouds). */
+const CLOUD_SHADE = 0.4;
 
 const absorption = vec3(...ABSORPTION);
 
@@ -159,7 +162,8 @@ function seaRadiance(
   const l = sky.sun(p), up = view.up(p);
   const nv = max(n.dot(v), 1e-4);
   const F = fresnel(nv).mul(MIRROR);
-  const sun = sky.sunIlluminance(p).mul(sky.cloudShadow(p)).mul(ships.lit);
+  const clouded = mix(float(1), sky.cloudCover(p), CLOUD_SHADE).mul(sky.stormSun(p));
+  const sun = sky.sunIlluminance(p).mul(clouded).mul(ships.lit);
 
   // what a white surface lying on the sea would give back (ambient() is the sky's radiance, so its E/π is itself):
   // the water's colours are tones under it, as a solid's are under its level (sky/light.ts)
