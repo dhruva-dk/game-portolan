@@ -35,9 +35,10 @@ const CRISP = 0.03;
 /** The swash's band: water thinner than LINE over the sand (metres) is its foam, fading to nothing over the last
  * EDGE at its very edge. */
 const LINE = 0.5, EDGE = 0.012;
-/** The last bore's line beyond it: a band of foam where the water is BORE[0]…BORE[1] m over the sand, at BORE[2] of
- *  full cover, so the lobes part it into separate rounds with water between it and the swash (as a painter's surf). */
-const BORE = [0.85, 1.35, 0.62] as const;
+/** Beyond LINE the band's cover tapers to nothing by REACH metres of water, so the lobes cut its outer edge into
+ *  scallops while it stays whole along the sand: art/target/idea.png's one white band, not the dashed ring of
+ *  separate rounds review33 saw. */
+const REACH = 1.2;
 /** The air under a whitecap, at most, as a share of a wake's thickest (optics.ts); the depth its cloud reaches down,
  * metres: in thinner water there is less of it. */
 const AIR = 0.7, PLUME = 1;
@@ -54,8 +55,7 @@ export function createFoam(waves: Waves) {
       whitecap = whitecap.add(texture(waves.displacement[k], c.q.div(L)).grad(c.dx.div(L), c.dy.div(L)).w);
     });
     const cover = saturate(whitecap.add(other));
-    const bore = smoothstep(BORE[0], BORE[0] + 0.15, thickness).mul(smoothstep(BORE[1], BORE[1] - 0.15, thickness));
-    const swash = smoothstep(0, EDGE, thickness).mul(smoothstep(LINE, LINE * 0.3, thickness)).add(bore.mul(BORE[2]));
+    const swash = smoothstep(0, EDGE, thickness).mul(smoothstep(REACH, LINE, thickness));
     const all = saturate(max(cover, swash));
     // the lobes: two rows of arcs crossing, each bent by the other; 0 in the cusps between them … 1 at their middles
     const u = c.q.mul(Math.PI / LOBE);
