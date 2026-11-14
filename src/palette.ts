@@ -59,6 +59,8 @@ export const FOAM = ink('#FFF9EC');
 
 // ---- the sky
 export const STORM = tones('#7A4FB8', '#3D2670');
+/** The gold of the sunlit calm's light along the storm wall's foot. */
+export const STORM_FOOT = ink('#F5C67A');
 export const LIGHTNING = ink('#D9C2FF');
 /** A fair-weather cloud: cream where the sun lights it, a warm mauve beneath. */
 export const CLOUD = tones('#FFF1D6', '#C4A8BC');

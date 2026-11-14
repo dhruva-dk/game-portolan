@@ -22,6 +22,7 @@
 import { Break, If, acos, atan, clamp, cos, dot, exp, float, length, max, min, mix, normalize, pow, select, sin, smoothstep, texture3D, vec3 } from 'three/tsl';
 import type { Storage3DTexture } from 'three/webgpu';
 import { R } from '../world/sphere';
+import { STORM_FOOT } from '../palette';
 import { loop, type FloatNode, type Vec3Node } from '../tsl';
 
 /** The cloud's base, metres up, and how far its rolls lift and lower it, each ROLL_WIDTH metres across. */
@@ -59,6 +60,11 @@ const CALM = 0.3;
 /** The sun's light on the cloud, as a share of a white surface's, and on its thin edges seen against the sun (the
  * silver lining). */
 const SUNLIT = 0.55, LINING = 0.15;
+/** Two tones, as the world's solids (sky/light.ts): the cloud is in its crown's light or its base's, the edge between
+ *  where its height and its facing the sun together cross TONE_AT, over TONE_EDGE, so it follows the billows. */
+const TONE_AT = 0.5, TONE_EDGE = 0.04;
+/** The rain's front, FOOT metres up from the sea, gold in the sunlit calm's light, this share of the sun's. */
+const FOOT = 30, FOOT_LIGHT = 1.6;
 
 /** The storm's state as the shaders read it (storm.ts's uniforms). */
 export interface Cap {
@@ -127,12 +133,14 @@ export function createStormField(cap: Cap, shape: Storage3DTexture) {
     const amplitude = select(onTop, float(CROWN_BILLOW), select(onBase, float(5), c.reach.mul(FACE)));
     const normal = normalize(flat.sub(slope.mul(amplitude)));
     const high = smoothstep(BASE, CROWN, h);
+    const facing = clamp(dot(normal, lit.toward), 0, 1);
+    const tone = smoothstep(TONE_AT - TONE_EDGE, TONE_AT + TONE_EDGE, high.mul(0.75).add(facing.mul(0.35)).add(c.lift.mul(0.08)));
     // the sky's light from above (the sea's, under the base), less in the hollows between the billows
     const sky = max(dot(normal, up).mul(0.45).add(0.6), 0.3).mul(clamp(c.lift.mul(0.3).add(0.9), 0.7, 1.2));
     // and the light of the open, sunlit calm, coming in level under the shelf
-    const calm = clamp(dot(normal, out.negate()), 0, 1).mul(CALM);
-    const air = lit.air.mul(mix(DARK, BRIGHT, high).mul(sky).add(calm));
-    const sun = lit.sun.mul(clamp(dot(normal, lit.toward), 0, 1).mul(high).mul(SUNLIT / Math.PI));
+    const toCalm = clamp(dot(normal, out.negate()), 0, 1);
+    const air = lit.air.mul(mix(DARK, BRIGHT, tone).mul(sky).add(toCalm.mul(CALM)));
+    const sun = lit.sun.mul(tone.mul(high).mul(SUNLIT / Math.PI));
     // against the sun, its light through the billows' thin edges
     const lining = lit.sun.mul(hg(dot(d, lit.toward), 0.6).mul(LINING * 4 * Math.PI)).mul(high).mul(float(1).sub(clamp(dot(normal, d.negate()), 0, 1)));
     return air.add(sun).add(lining).add(lit.glow(q));
@@ -196,7 +204,9 @@ export function createStormField(cap: Cap, shape: Storage3DTexture) {
           step.assign(select(rho.greaterThan(1e-6), inStep, max(min(inside.negate().mul(0.6), rainOff.add(inStep)), least)));
           If(rho.greaterThan(1e-6), () => {
             // a heavy shaft darker than the thinner rain round it, its streaks paler; darker up toward the base
-            const S = lit.air.mul(RAIN_LIGHT).mul(mix(1.25, 0.55, shaft)).mul(streak.mul(0.35).add(0.85)).mul(mix(1.15, 0.6, smoothstep(0, BASE, h))).add(lit.glow(q));
+            // and its front low over the sea gold, lit from the sunlit calm
+            const foot = lit.sun.mul(vec3(...STORM_FOOT)).mul(smoothstep(FOOT, 0, h).mul(smoothstep(RAIN_RAMP, 0, e)).mul(FOOT_LIGHT / Math.PI));
+            const S = lit.air.mul(RAIN_LIGHT).mul(mix(1.25, 0.55, shaft)).mul(streak.mul(0.35).add(0.85)).mul(mix(1.15, 0.6, smoothstep(0, BASE, h))).add(foot).add(lit.glow(q));
             const stepT = exp(rho.mul(step).negate());
             L.addAssign(S.mul(T.mul(float(1).sub(stepT))));
             T.mulAssign(stepT);
