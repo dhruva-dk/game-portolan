@@ -33,6 +33,8 @@ const ROLL = 0.5, ROLL_WIDTH = 26;
  *  underside, which a flatter base drew as one dark striped sheet (review30-31); heaped, it is art/target/idea.png's
  *  lumpy dark bases. */
 const UNDER = 25;
+/** The face and the base are joined round over about this many metres (a smooth minimum of the two). */
+const JOIN = 12;
 /** How far the base's front stands out over the calm (metres, negative: in the calm), and how far the face leans back
  * a metre up; how far its billows reach either side of it. Flush with the rain and near upright, with big billows down
  * to its foot (`reach`), so the wall heaps up as art/target/idea.png's rather than overhanging in the shelf and sloping
@@ -151,7 +153,10 @@ export function createStormField(cap: Cap, shape: Storage3DTexture) {
     const under = h.sub(base).add(lift.mul(UNDER)).mul(1.5);
     // the base's slope across its rolls (metres up a metre in)
     const rolling = cos(roll).mul((ROLL * 2 * Math.PI) / ROLL_WIDTH);
-    return { lift, reach, face, top, under, rolling, inside: min(min(face, top), under) };
+    // the face and the base joined round, not in a crease (the seam review36 saw a third of the way up)
+    const join = clamp(face.sub(under).div(JOIN * 2).add(0.5), 0, 1);
+    const body = mix(face, under, join).sub(join.mul(float(1).sub(join)).mul(JOIN));
+    return { lift, reach, face, top, under, rolling, join, inside: min(body, top) };
   };
 
   /** The cloud's light at q on its surface, seen along d. */
@@ -161,10 +166,12 @@ export function createStormField(cap: Cap, shape: Storage3DTexture) {
     // the surface: the crown's top (up), the base (down) or the face (out over the calm, leaning up), bent by the
     // billows' slope
     const out = normalize(up.mul(dot(up, cap.centre)).sub(cap.centre));
-    const onTop = c.top.lessThan(min(c.face, c.under)), onBase = c.under.lessThan(c.face);
-    const flat = select(onTop, up, select(onBase, normalize(up.negate().add(out.mul(c.rolling))), normalize(up.mul(LEAN).sub(out))));
+    const onTop = c.top.lessThan(min(c.face, c.under));
+    // across the join, the face's surface turning into the base's
+    const sides = normalize(mix(normalize(up.mul(LEAN).sub(out)), normalize(up.negate().add(out.mul(c.rolling))), c.join));
+    const flat = select(onTop, up, sides);
     const slope = vec3(billows(q.add(vec3(SLOPE, 0, 0))), billows(q.add(vec3(0, SLOPE, 0))), billows(q.add(vec3(0, 0, SLOPE)))).sub(c.lift).div(SLOPE);
-    const amplitude = select(onTop, float(CROWN_BILLOW), select(onBase, float(UNDER), c.reach.mul(FACE)));
+    const amplitude = select(onTop, float(CROWN_BILLOW), mix(c.reach.mul(FACE), float(UNDER), c.join));
     const normal = normalize(flat.sub(slope.mul(amplitude)));
     const high = smoothstep(BASE, CROWN, h);
     const facing = clamp(dot(normal, lit.toward), 0, 1);
