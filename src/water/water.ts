@@ -76,6 +76,9 @@ const STORM_FOAM = 0.45, STORM_DARK = 0.3;
  * in the open shows (over 1, so the bloom takes it).
  */
 const FOOT = [6, 26] as const, EDGE_LINE = 0.3, EDGE_LIGHT = 0.9, EDGE_FAR = [0.4, 2] as const;
+/** The middle cascade's crests in the water's tones: the height (of the sea's amplitude) that is a full crest, and
+ *  how much of the crest the tones read they take. */
+const CHOP = [0.3, 0.6] as const;
 /** The calm's water along the wall's foot gold (art/target/idea.png), out to GOLD metres from its edge, at most GOLD_SHARE
  *  of the way to the palette's gold as bright as a white surface in the open, rising as the square of nearness so it is
  *  a soft glow along the wall rather than a hard pale seam. */
@@ -187,7 +190,7 @@ export function createWater(view: View, sky: Sky, ground: Ground, wind: Wind, sh
     // sea's, and no pixel is whiter than a whitecap; so too the air.
     // The long cascades' slope alone, too: the sun's glints are mirrored off it, so they lie in a few broad shapes
     // along the long waves' faces rather than a glitter of pixels off the ripples.
-    const slope = marks.slope.toVar(), broad = marks.slope.toVar(), foam = float(0).toVar(), bubbles = float(0).toVar();
+    const slope = marks.slope.toVar(), broad = marks.slope.toVar(), foam = float(0).toVar(), bubbles = float(0).toVar(), chop = float(0).toVar();
     charts.each(p, (c) => {
       const read = (t: Texture, k: FloatNode) => texture(t, c.q.mul(k)).grad(c.dx.mul(k), c.dy.mul(k));
       let s2: Vec2Node = vec2(0), l2: Vec2Node = vec2(0), h: FloatNode = float(0);
@@ -196,7 +199,9 @@ export function createWater(view: View, sky: Sky, ground: Ground, wind: Wind, sh
         s2 = s2.add(s.xy.mul(m));
         if (k < 2) {
           l2 = l2.add(s.xy.mul(m));
-          h = h.add(read(waves.displacement[k], float(1 / L)).y.mul(m));
+          const y = read(waves.displacement[k], float(1 / L)).y.mul(m);
+          h = h.add(y);
+          if (k === 1) chop.addAssign(y.mul(c.w));
         }
       });
       // the sea is Σ w·h, so its slope is Σ w·∇h + h·∇w: across the band, where the weights change, the second
@@ -223,7 +228,10 @@ export function createWater(view: View, sky: Sky, ground: Ground, wind: Wind, sh
     const n = normalize(tilted.add(v.mul(max(float(FACING).sub(dot(tilted, v)), 0))));
     const smooth = normalize(up.sub(broad));
     const g = normalize(smooth.add(v.mul(max(float(FACING).sub(dot(smooth, v)), 0))));
-    const crest = saturate(height.div(waves.amplitude));
+    // where on its waves the water is, for its tones (optics.ts): the swell's, and more the middle cascade's, whose
+    // crests lie a few metres apart, so the troughs' tone falls in rows across the sea, as a painter's, rather than in
+    // the swell's broad patches (far off its waves are under the pixel and it settles to its middle)
+    const crest = mix(saturate(height.div(waves.amplitude)), saturate(chop.div(waves.amplitude.mul(CHOP[0])).mul(0.5).add(0.5)), CHOP[1]);
 
     // What lies behind the surface, where the eye's ray goes once refracted (Snell): followed down through the water
     // here to the floor's depth and looked up where that lands on the screen. If the look-up lands on something in
