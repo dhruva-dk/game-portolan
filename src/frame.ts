@@ -135,6 +135,7 @@ export function createFrame(renderer: WebGPURenderer, world: World, options: Fra
   const seabed = createSeabed(view, ground, sand);
   const islands = createIslands(world.planet, world.seed, view, light, sand);
   shadow.cast(...islands.casters);
+  shadow.ground(islands.grounds);
   const fleet = createFleet(light, world.wind, options.fleet);
   fleet.pin(options.lod);
   fleet.simulate(options.cloth);

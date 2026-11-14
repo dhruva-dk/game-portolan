@@ -1,4 +1,4 @@
-// The sun's shadows on an island: what stands on it (rocks, palms, shrubs), seen from the sun into a depth map over
+// The sun's shadows on an island: what stands on it (rocks, palms, shrubs) and its ground, seen from the sun into a depth map over
 // the island. One map, over the nearest island in view (site.ts orders them): on a globe each island faces the sun
 // its own way and the islands lie hundreds of metres apart, so one map round one island keeps its texels small,
 // and the others, farther off, go without. Nothing on the islands moves, so the map is drawn again only when the sun
@@ -9,8 +9,8 @@
 // which come first among each caster's instances.
 
 import {
-  DepthTexture, DoubleSide, FloatType, InstancedMesh, LessEqualCompare, Matrix4, MeshBasicNodeMaterial,
-  OrthographicCamera, RedFormat, RenderTarget, Scene, Vector3, WebGPUCoordinateSystem,
+  BufferGeometry, DepthTexture, DoubleSide, FloatType, InstancedMesh, LessEqualCompare, Matrix4, Mesh,
+  MeshBasicNodeMaterial, OrthographicCamera, RedFormat, RenderTarget, Scene, Vector3, WebGPUCoordinateSystem,
 } from 'three/webgpu';
 import { float, select, texture, uniform, vec2, vec3, vec4 } from 'three/tsl';
 import type { Draw } from '../gpu';
@@ -37,6 +37,8 @@ export interface Shadow {
   visible(p: Vec3Node, n: Vec3Node): FloatNode;
   /** Adds things that cast shadows. */
   cast(...casters: Instances[]): void;
+  /** The islands' ground, each island's own mesh: the map's island's casts on it (a cliff's shade, a hill's). */
+  ground(grounds: readonly { site: IslandSite; mesh: Mesh }[]): void;
   /** The map's draw if it is due: if the sun has moved or the island has changed (sun: unit vector toward it; island:
    * the nearest in view, or null); else null. */
   update(sun: Vector3, island: IslandSite | null): Draw | null;
@@ -58,6 +60,11 @@ export function createShadow(): Shadow {
   // a depth texture reads as a float (NodeUtils getTextureType), as does its comparison
   const map = texture<'float'>(target.depthTexture);
   const stands: { stand: InstancedMesh; caster: Instances }[] = [];
+  // the ground's stand-in, given the map's island's mesh
+  const land = new Mesh(new BufferGeometry(), black);
+  land.frustumCulled = false;
+  scene.add(land);
+  let grounds: readonly { site: IslandSite; mesh: Mesh }[] = [];
   const centre = new Vector3(), up = new Vector3(), north = new Vector3(), last = new Vector3();
   let covered: IslandSite | null = null;
 
@@ -87,6 +94,9 @@ export function createShadow(): Shadow {
         scene.add(stand);
       }
     },
+    ground(all) {
+      grounds = all;
+    },
     update(sun, island) {
       if (!island || (island === covered && sun.angleTo(last) < MOVED)) return null;
       if (island !== covered) {
@@ -98,6 +108,7 @@ export function createShadow(): Shadow {
         centre.set(...place(island.chart.at, 0));
         up.set(...island.chart.at);
         north.copy(up).cross(new Vector3(...island.chart.axis));
+        land.geometry = grounds.find((g) => g.site === island)?.mesh.geometry ?? new BufferGeometry();
       }
       for (const { stand, caster } of stands) stand.count = caster.near;
       last.copy(sun);
