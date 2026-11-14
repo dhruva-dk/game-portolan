@@ -1,7 +1,7 @@
 # Working
 
 How work is done on this repo by an orchestrating agent and its subagents. `CLAUDE.md` comes first; this adds what
-it does not say. `docs/decisions.md` holds what the owner has decided about the game.
+it does not say.
 
 ## With the owner
 
