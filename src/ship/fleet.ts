@@ -21,14 +21,14 @@
 // (motion.ts) handed to the cloth, before it is moved on. Every other ship's are the drawn shape the shader fills.
 
 import {
-  BufferAttribute, BufferGeometry, DynamicDrawUsage, Frustum, InstancedBufferGeometry, InstancedInterleavedBuffer, InterleavedBufferAttribute,
-  Matrix4, Mesh, Sphere, Vector3, type Material, type PerspectiveCamera,
+  BufferAttribute, BufferGeometry, DynamicDrawUsage, InstancedBufferGeometry, InstancedInterleavedBuffer, InterleavedBufferAttribute,
+  Mesh, Sphere, Vector3, type Material,
 } from 'three/webgpu';
 import { uniform } from 'three/tsl';
 import type { Compute } from '../gpu';
 import type { Look } from '../snapshot';
 import type { Light } from '../sky/light';
-import { pixelSize } from '../view/view';
+import type { Eye } from '../view/view';
 import type { ShipPose } from '../world/pose';
 import { add, length, scale, type Vec3 } from '../world/sphere';
 import type { Wind } from '../world/wind';
@@ -102,7 +102,7 @@ export function createFleet(light: Light, wind: Wind, capacity: number) {
   let count = 0, pinned = -1, own = -1;
   let berths: (Berth | null)[] = new Array(BERTHS).fill(null), simulating = true;
   const motions: (Motion | null)[] = new Array(BERTHS).fill(null);
-  const frustum = new Frustum(), sphere = new Sphere(), m = new Matrix4();
+  const sphere = new Sphere();
 
   /** The ship i's pose, look and velocity (metres per second, world space), and whether she floats; ships 0…count−1
    * are drawn, but those dropped. */
@@ -143,13 +143,12 @@ export function createFleet(light: Light, wind: Wind, capacity: number) {
   }
 
   /**
-   * Each frame, after the camera has moved: windSpeed in metres per second; height the screen's, CSS pixels (frame.ts); dt
-   * the seconds since the last. Returns what is due: the near ships' canvas as cloth.
+   * Each frame, once the eye has moved (view.ts): windSpeed in metres per second; dt the seconds since the last.
+   * Returns what is due: the near ships' canvas as cloth.
    */
-  function update(camera: PerspectiveCamera, windSpeed: number, height: number, dt: number): { cloth: Compute[] } {
-    pixel.value = pixelSize(camera, height);
-    frustum.setFromProjectionMatrix(m.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
-    const eye = camera.getWorldPosition(new Vector3());
+  function update(seen: Readonly<Eye>, windSpeed: number, dt: number): { cloth: Compute[] } {
+    pixel.value = seen.pixel;
+    const eye = new Vector3(...seen.position);
     const canvas = sail(eye, windSpeed, dt);
     const shares = new Map(berths.flatMap((b, k) => (b ? [[b.ship, [k, b.share]] as const] : [])));
     const filled = new Array<number>(levels).fill(0);
@@ -158,7 +157,7 @@ export function createFleet(light: Light, wind: Wind, capacity: number) {
       if (!shown[i]) { was[i] = -1; continue; }
       const middle = add(pose.position, pose.up, MIDDLE);
       sphere.set(new Vector3(...middle), RADIUS);
-      if (!frustum.intersectsSphere(sphere)) { was[i] = -1; continue; }
+      if (!seen.frustum.intersectsSphere(sphere)) { was[i] = -1; continue; }
       // (the player's own ship always whole: the chase camera holds her at the finest level's edge)
       const k = pinned >= 0 ? pinned : i === own ? 0 : chooseDetail(was[i], eye.distanceTo(sphere.center), pixel.value);
       was[i] = k;

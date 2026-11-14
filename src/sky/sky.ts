@@ -23,7 +23,7 @@
 //   veil(c, dir, m)  the same through the storm's rain and cloud: last, over everything, the sky and clouds too
 //   deck(c, dir, m)  the storm seen from high over it instead (the full map's view from space): its cloud's top
 
-import { Vector3, type PerspectiveCamera } from 'three/webgpu';
+import { Vector3 } from 'three/webgpu';
 import { Fn, abs, cross, dot, exp, float, length, luminance, max, mix, normalWorldGeometry, normalize, pow, select, smoothstep, sqrt, uniform, vec3 } from 'three/tsl';
 import type { Environment } from '../environment';
 import type { Cap } from '../sim/storm';
@@ -233,12 +233,12 @@ export function createSky(view: View, bolt: boolean) {
     /** The clouds' patterns' passes, to be run once before the first frame. */
     bake: clouds.bake,
     /**
-     * Readies the sky for this frame, seen from `camera`, and returns the passes due from each part of it. An eye in
-     * space sees the clouds from outside: they are neither marched nor moved on (their history stays the air's), they
-     * cast no shadow, and the sea mirrors the sky alone.
+     * Readies the sky for this frame, seen from the eye (view.ts, already moved), and returns the passes due from each
+     * part of it. An eye in space sees the clouds from outside: they are neither marched nor moved on (their history
+     * stays the air's), they cast no shadow, and the sea mirrors the sky alone. The screen is width × height CSS pixels.
      */
-    update(env: Environment, cap: Cap, camera: PerspectiveCamera, kind: Eye['kind'], dt: number, width: number, height: number): { tables: Compute[]; clouds: Compute[]; reflection: Compute[] } {
-      storm.update(cap, env.clock, [camera.position.x, camera.position.y, camera.position.z]);
+    update(env: Environment, cap: Cap, kind: Eye['kind'], dt: number, width: number, height: number): { tables: Compute[]; clouds: Compute[]; reflection: Compute[] } {
+      storm.update(cap, env.clock, view.eye.position);
       sun.value.set(...env.sunDirection);
       origin.value.set(...env.sunPlaces.origin);
       there.value.set(...sunAtOrigin(env.sunPlaces, env.timeOfDay));
@@ -250,7 +250,7 @@ export function createSky(view: View, bolt: boolean) {
       if (kind === 'space') return { tables: air, clouds: [], reflection: reflection.update(true) };
       // the clouds drift over the eye with the prevailing wind there (Environment.windDirection), on the eye's east and south
       const w = env.windDirection, f = view.eye.frame, along = (a: readonly number[]) => env.windSpeed * (w[0] * a[0] + w[1] * a[1] + w[2] * a[2]);
-      const cover = clouds.update({ coverage: env.cloudCoverage, wind: { x: along(f.east), y: -along(f.north) }, sunDirection: skySun.value }, camera, dt, width, height);
+      const cover = clouds.update({ coverage: env.cloudCoverage, wind: { x: along(f.east), y: -along(f.north) }, sunDirection: skySun.value }, dt, width, height);
       return { tables: air, clouds: cover, reflection: reflection.update(false) };
     },
   };

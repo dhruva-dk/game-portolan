@@ -14,9 +14,11 @@
 //   chart(c)     a reader for a fixed chart: where p lies on it, and its axes carried to p
 //   rings(...)   a grid of rings round the point under the eye, laid on the sphere out to the horizon
 //
-// The eye's frame is worked out once a frame from the camera (update), on the CPU and into uniforms.
+// The eye is worked out once a frame from the camera (update), on the CPU and into uniforms: the one place outside
+// the frame that reads the camera. The systems take the eye (Eye) instead: where it stands, what it sees (frustum),
+// how wide a pixel is, and the camera's matrices for the clouds' reprojection.
 
-import { BufferGeometry, Float32BufferAttribute, Vector3, type Camera, type PerspectiveCamera, type UniformNode } from 'three/webgpu';
+import { BufferGeometry, Float32BufferAttribute, Frustum, Matrix4, Vector3, type PerspectiveCamera, type UniformNode } from 'three/webgpu';
 import {
   asin, atan, clamp, cos, cross, dot, length, max, normalize, positionGeometry, select, sin, sqrt, uniform, vec2, vec3,
 } from 'three/tsl';
@@ -31,10 +33,16 @@ export interface Eye {
   height: number;
   /** How far below the level the sea's horizon lies, radians. */
   dip: number;
+  /** How wide a pixel of the screen is at the middle of the view, per metre away. */
+  pixel: number;
+  /** What the eye sees. */
+  frustum: Frustum;
+  /** The camera's projection and its inverse; camera to world; and world to clip. */
+  projection: Matrix4;
+  projectionInverse: Matrix4;
+  world: Matrix4;
+  viewProjection: Matrix4;
 }
-
-/** How wide a pixel is at the middle of the camera's view, per metre away (height: the drawing buffer's, pixels). */
-export const pixelSize = (camera: PerspectiveCamera, height: number) => (2 * Math.tan(((camera.fov / camera.zoom) * Math.PI) / 360)) / height;
 
 /** A point's place on a chart (metres), the chart's x and z axes carried to it, up there, and its arc from the centre (radians). */
 export interface Charted { q: Vec2Node; e1: Vec3Node; e2: Vec3Node; up: Vec3Node; theta: FloatNode }
@@ -71,7 +79,10 @@ export function createView() {
   const south = uniform(new Vector3(0, 0, 1));
   const height = uniform(10);
   const dip = uniform(0);
-  const eye: Eye = { position: [0, R + 10, 0], frame: frameAt([0, 1, 0]), height: 10, dip: 0 };
+  const eye: Eye = {
+    position: [0, R + 10, 0], frame: frameAt([0, 1, 0]), height: 10, dip: 0, pixel: 0.001, frustum: new Frustum(),
+    projection: new Matrix4(), projectionInverse: new Matrix4(), world: new Matrix4(), viewProjection: new Matrix4(),
+  };
 
   const up = (p: Vec3Node): Vec3Node => normalize(p);
   const altitude = (p: Vec3Node): FloatNode => length(p).sub(R);
@@ -161,9 +172,16 @@ export function createView() {
     chart: (c: Chart) => chartNodes(v3(c.at), v3(c.axis), v3(crossV(c.axis, c.at))),
     rings,
     /** The eye on the CPU, as of the last update. */
-    eye,
-    update(camera: Camera) {
+    eye: eye as Readonly<Eye>,
+    /** Each frame, once the camera is placed: the eye it gives, on a screen `screen` CSS pixels high. */
+    update(camera: PerspectiveCamera, screen: number) {
       const p = camera.getWorldPosition(new Vector3());
+      eye.pixel = (2 * Math.tan(((camera.fov / camera.zoom) * Math.PI) / 360)) / screen;
+      eye.projection.copy(camera.projectionMatrix);
+      eye.projectionInverse.copy(camera.projectionMatrixInverse);
+      eye.world.copy(camera.matrixWorld);
+      eye.viewProjection.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+      eye.frustum.setFromProjectionMatrix(eye.viewProjection);
       eye.position = [p.x, p.y, p.z];
       eye.frame = frameAt(eye.position);
       eye.height = Math.hypot(p.x, p.y, p.z) - R;

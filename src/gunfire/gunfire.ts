@@ -27,7 +27,7 @@
 
 import {
   AddEquation, BufferAttribute, CustomBlending, DoubleSide, DynamicDrawUsage, IcosahedronGeometry, InstancedBufferGeometry,
-  InstancedInterleavedBuffer, InterleavedBufferAttribute, Mesh, MeshBasicNodeMaterial, OneFactor, OneMinusSrcAlphaFactor, type PerspectiveCamera,
+  InstancedInterleavedBuffer, InterleavedBufferAttribute, Mesh, MeshBasicNodeMaterial, OneFactor, OneMinusSrcAlphaFactor,
 } from 'three/webgpu';
 import {
   Fn, abs, atan, attribute, cameraPosition, cos, cross, exp, float, max, mix, normalize, pow, select, sin, smoothstep, uniform, varying, vec3,
@@ -36,7 +36,7 @@ import { KINDS, gunOrder, type GunKind } from '../kinds';
 import { DUST, FOAM, SMOKE, SOOT, TIMBER } from '../palette';
 import type { Light } from '../sky/light';
 import type { BallDraw } from '../snapshot';
-import { pixelSize } from '../view/view';
+import type { Eye } from '../view/view';
 import { random } from '../world/random';
 import { R, add, dot as vdot, normalize as vnormalize, scale, type Vec3 } from '../world/sphere';
 import type { FloatNode, Vec2Node } from '../tsl';
@@ -386,9 +386,9 @@ export function createGunfire(light: Light) {
       puffs.geometry.instanceCount = laid;
       send();
     },
-    /** Each frame, after the camera has moved: the drawing buffer's height, pixels. */
-    update(camera: PerspectiveCamera, height: number) {
-      pixel.value = pixelSize(camera, height);
+    /** Each frame, once the eye has moved (view.ts). */
+    update(eye: Readonly<Eye>) {
+      pixel.value = eye.pixel;
     },
   };
 }

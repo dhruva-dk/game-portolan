@@ -20,7 +20,7 @@
 import {
   AddEquation, BufferAttribute, BufferGeometry, CustomBlending, CylinderGeometry, DoubleSide, DynamicDrawUsage,
   InstancedBufferGeometry, InstancedInterleavedBuffer, InterleavedBufferAttribute, LatheGeometry, Matrix4, Mesh,
-  MeshBasicNodeMaterial, OctahedronGeometry, OneFactor, Vector2, type PerspectiveCamera,
+  MeshBasicNodeMaterial, OctahedronGeometry, OneFactor, Vector2,
 } from 'three/webgpu';
 import { Fn, abs, attribute, cameraPosition, clamp, cos, cross, dot, float, max, mix, normalize, pow, select, sin, smoothstep, uniform, varying, vec3 } from 'three/tsl';
 import { GILDING, GLINT, ICE, TAR, TIMBER } from '../palette';
@@ -29,7 +29,7 @@ import { GLOW } from '../rarity';
 import { KINDS, type GunKind, type LootKind } from '../kinds';
 import { gunShape, gunSurface } from '../ship/gun';
 import type { LootDraw } from '../snapshot';
-import { pixelSize } from '../view/view';
+import type { Eye } from '../view/view';
 import type { Vec3Node } from '../tsl';
 
 /** The most pieces drawn at once. */
@@ -237,9 +237,9 @@ export function createLoot(light: Light) {
       fill(casks, caskMesh, pieces, (l) => (l.kind === 'repairKit' || l.kind === 'fullRepair') && near(l));
       fill(beams, { mesh: beamMesh, geometry: beamGeometry }, pieces, () => true);
     },
-    /** Each frame, after the camera has moved: the drawing buffer's height, pixels. */
-    update(camera: PerspectiveCamera, height: number) {
-      pixel.value = pixelSize(camera, height);
+    /** Each frame, once the eye has moved (view.ts). */
+    update(eye: Readonly<Eye>) {
+      pixel.value = eye.pixel;
     },
   };
 }

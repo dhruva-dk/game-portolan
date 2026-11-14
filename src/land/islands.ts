@@ -6,7 +6,7 @@
 // (the shadow map covers it: shadow.ts, in view or not), and the instances rewritten when that changes. The rocks of
 // islands more than FAR metres off are drawn at their coarser level (rocks.ts).
 
-import { Frustum, Matrix4, Sphere, Vector3, type Camera } from 'three/webgpu';
+import { Sphere, Vector3 } from 'three/webgpu';
 import type { Eye, View } from '../view/view';
 import type { IslandSite, Planet } from '../world/planet';
 import { isle, litter, scatterPalms, scatterRocks, scatterShrubs } from '../world/scatter';
@@ -48,15 +48,12 @@ export function createIslands(planet: Planet, seed: number, view: View, light: L
     const low = -FOOT - (s.shelf + LEANS) ** 2 / (2 * R), high = Math.max(s.summit, 0) + TOPS;
     return new Sphere(new Vector3(...place(s.chart.at, (low + high) / 2)), Math.hypot(s.shelf + LEANS, (high - low) / 2));
   });
-  const frustum = new Frustum(), m = new Matrix4();
-
   return {
     meshes: [...lands, ...casters.map((c) => c.mesh), ...rocky.far.map((c) => c.mesh)],
     /** What casts shadows: each kind's instances. */
     casters,
-    /** Draws the islands the eye (seeing through `camera`) can see; returns the nearest of them above the sea, in
-     *  view or not (null if none). */
-    update(eye: Eye, camera: Camera): IslandSite | null {
+    /** Draws the islands the eye can see; returns the nearest of them above the sea, in view or not (null if none). */
+    update(eye: Readonly<Eye>): IslandSite | null {
       const horizon = horizonDistance(eye.height);
       const off = sites.map((s) => distance(eye.position, s.chart.at) - s.radius);
       const order = sites
@@ -65,8 +62,7 @@ export function createIslands(planet: Planet, seed: number, view: View, light: L
         .sort((a, b) => off[a] - off[b]);
       // (the nearest that stands out of the sea: nothing on a shoal casts a shadow)
       const nearest = order.find((i) => sites[i].summit > 0);
-      frustum.setFromProjectionMatrix(m.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
-      const drawn = order.filter((i) => i !== nearest && frustum.intersectsSphere(bounds[i]));
+      const drawn = order.filter((i) => i !== nearest && eye.frustum.intersectsSphere(bounds[i]));
       if (nearest !== undefined) drawn.unshift(nearest);
       const near = drawn.filter((i) => i === nearest || Math.hypot(off[i], eye.height) < FAR), far = drawn.filter((i) => !near.includes(i));
       const key = `${near.join()}|${far.join()}`;

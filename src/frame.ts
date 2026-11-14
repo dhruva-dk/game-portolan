@@ -167,7 +167,7 @@ export function createFrame(renderer: WebGPURenderer, world: World, options: Fra
    * The post chain over a view's light (linear, per unit sun): drawn once to a texture, its bloom added, graded,
    * encoded for the display, dithered, anti-aliased.
    */
-  const pipelineOf = (post: Vec4Node): { pipeline: RenderPipeline } => {
+  const pipelineOf = (post: Vec4Node): RenderPipeline => {
     const light = rtt(post, null, null, { depthBuffer: false });
     const glow = bloom(light, gain);
     const storm = sky.light.storm(view.position);
@@ -178,7 +178,7 @@ export function createFrame(renderer: WebGPURenderer, world: World, options: Fra
     // the grade encodes for the display itself, dithered before the anti-aliasing
     const p = new RenderPipeline(renderer, fxaa(graded));
     p.outputColorTransform = false;
-    return { pipeline: p };
+    return p;
   };
 
   // In the air: haze by distance, the clouds over whatever they stand in front of, the storm over all of it.
@@ -209,8 +209,8 @@ export function createFrame(renderer: WebGPURenderer, world: World, options: Fra
   })();
 
   const eyes = {
-    air: { camera: airCamera, scene: airSeen.pass, ...pipelineOf(airPost) },
-    space: { camera: spaceCamera, scene: spaceSeen.pass, ...pipelineOf(spacePost) },
+    air: { camera: airCamera, scene: airSeen.pass, pipeline: pipelineOf(airPost) },
+    space: { camera: spaceCamera, scene: spaceSeen.pass, pipeline: pipelineOf(spacePost) },
   };
 
   /** Runs compute passes, in order. */
@@ -328,29 +328,26 @@ export function createFrame(renderer: WebGPURenderer, world: World, options: Fra
     await build(water.marks.scene, water.marks.camera, water.marks.target);
   }
 
-  /** Draws the world as the snapshot has it, dt seconds after the last frame. */
+  /** Draws the world as the snapshot has it, from its eye, dt seconds after the last frame. */
   function render(s: Snapshot, dt: number) {
-    drawFrom(s, s.eye, dt);
-  }
-
-  /** The world as the snapshot has it, seen from `seen`, dt seconds after the last frame. */
-  function drawFrom(s: Snapshot, seen: Eye, dt: number) {
-    const eye = cameraFor(seen);
+    const seen = s.eye;
     const env = environmentAt(world, s.clock, seen.position);
     stage(s);
-    // the CPU's work, each system's after what it reads: the view first; the ships' yards before the marks they cast
-    view.update(eye);
-    // the systems are handed the screen's size in CSS pixels, not the frame's (SCALE): the ships' and the guns' detail
-    // and the clouds' march are the screen's, so the frame's scale costs only the passes drawn at it
+    // the CPU's work, each system's after what it reads: the view first; the ships' yards before the marks they cast.
+    // The eye is given the screen's size in CSS pixels, not the frame's (SCALE): the ships' and the guns' detail and
+    // the clouds' march are the screen's, so the frame's scale costs only the passes drawn at it
+    const camera = cameraFor(seen);
     renderer.getSize(size);
-    const air = sky.update(env, s.storm, eye, seen.kind, dt, size.x, size.y);
-    const ships = fleet.update(eye, env.windSpeed, size.y, dt);
-    gunfire.update(eye, size.y);
-    loot.update(eye, size.y);
+    view.update(camera, size.y);
+    const eye = view.eye;
+    const air = sky.update(env, s.storm, seen.kind, dt, size.x, size.y);
+    const ships = fleet.update(eye, env.windSpeed, dt);
+    gunfire.update(eye);
+    loot.update(eye);
     const sea = water.update(env, dt, fleet.ships, s);
     seabed.update();
     // the island's shadows fall along the sun over it, which stays put however the eye moves
-    const island = islands.update(view.eye, eye);
+    const island = islands.update(eye);
     if (island) islandSun.set(...sunAt(env.sunPlaces, env.timeOfDay, island.chart.at));
     const islandShadow = shadow.update(islandSun, island);
 

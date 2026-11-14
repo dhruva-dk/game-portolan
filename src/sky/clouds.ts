@@ -9,7 +9,6 @@
 
 import {
   ClampToEdgeWrapping, HalfFloatType, LinearFilter, Matrix4, NearestFilter, StorageTexture, Vector2, Vector3,
-  type PerspectiveCamera,
 } from 'three/webgpu';
 import {
   Fn, If, abs, clamp, dot, float, floor, fract, instanceIndex, int, ivec2, max, min, mix, normalize, select,
@@ -262,7 +261,7 @@ export function createClouds(view: View, tables: Tables) {
 
     /** Readies this frame's march, and returns the passes due: the march, its resolve, and every fourth frame the
      * shadow map. */
-    update(inputs: CloudInputs, camera: PerspectiveCamera, dt: number, width: number, height: number) {
+    update(inputs: CloudInputs, dt: number, width: number, height: number) {
       if (width !== size[0] || height !== size[1]) {
         size = [width, height];
         // (three frees a texture's memory and a kernel's pipeline and bindings once it is disposed)
@@ -292,8 +291,8 @@ export function createClouds(view: View, tables: Tables) {
       last = position;
       // a cloud at q now was at q + step − carry from where the eye was then
       cam.shift.value.set(step[0] - carry[0], climb, step[1] - carry[1]);
-      cam.projectionInverse.value.copy(camera.projectionMatrixInverse);
-      cam.cameraWorld.value.copy(camera.matrixWorld);
+      cam.projectionInverse.value.copy(view.eye.projectionInverse);
+      cam.cameraWorld.value.copy(view.eye.world);
       cam.frameIndex.value = frame;
       // last frame's camera and eye, for the resolve to find where a cloud was seen then; and this frame's, for the next
       cam.previousViewProjection.value.copy(seen.viewProjection);
@@ -301,7 +300,7 @@ export function createClouds(view: View, tables: Tables) {
       cam.previousFrame.up.value.set(seen.up[0], seen.up[1], seen.up[2]);
       cam.previousFrame.south.value.set(seen.south[0], seen.south[1], seen.south[2]);
       cam.previousFrame.dip.value = seen.dip;
-      seen.viewProjection.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+      seen.viewProjection.copy(view.eye.viewProjection);
       seen.east = [...f.east];
       seen.up = [...f.up];
       seen.south = [-f.north[0], -f.north[1], -f.north[2]];
