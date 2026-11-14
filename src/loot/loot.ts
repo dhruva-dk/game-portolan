@@ -45,7 +45,7 @@ const RIDE = 2.2, BOB = 0.25, BOB_RATE = 2, SPIN = 1.4, ROCK = 0.15, SINK = 2, R
 /** The fewest pixels across a piece and a beam are drawn; a piece's size, m, it grows from. */
 const SHAPE_PIXELS = 14, BEAM_PIXELS = 3, SHAPE_ACROSS = 3.5;
 /** How far the beam's core goes from its gold to the glint's white-hot light (art/target/idea.png's pale shaft). */
-const HOT = 0.7;
+const HOT = 0.4;
 /** The beam's light: the gilding's, deepened (to the power DEEPEN, at its own luminance), so added over the sea it
  *  stays gold rather than washing to pale yellow — but not so deep (squared) that it turns orange. */
 const DEEPEN = 1.3;
@@ -53,11 +53,15 @@ const [gr, gg, gb] = GILDING.lit;
 const BEAM_GOLD = tint([gr ** DEEPEN, gg ** DEEPEN, gb ** DEEPEN], 0.2126 * gr + 0.7152 * gg + 0.0722 * gb);
 /** The beam: its height for the commonest and more for each rarity up, m; its radius at the foot and the head. */
 const TALL = 30, TALLER = 14, FOOT = 0.3, HEAD = 0.18;
+/** How the beam's light falls off up it (the power of what is left of its height) and across it (of the cosine to its
+ *  axis): slow up it and tight across, a long even line of light with a hot core (art/target/idea.png's shaft), not a
+ *  soft cone. */
+const FADE = 1.2, CORE = 4;
 /** A beam fades out as its foot sinks this far (m) under the eye's horizon, gone by then. */
 const HORIZON = 8;
 /** How bright a piece's rim, a beam and its ring glow, of what the sun and the sky give a white surface; and how far
  *  a face must turn from the eye (0 facing it … 1 edge on) to be in the rim. */
-const EMIT = 1.3, BEAM_EMIT = 3, HALO_EMIT = 1.2, RIM = 0.62;
+const EMIT = 1.3, BEAM_EMIT = 4, HALO_EMIT = 1.2, RIM = 0.62;
 /** How much of what lies behind a beam or its ring hides, per unit of its brightness. */
 const COVER = 0.8;
 /** Each kind's size: the guns', the shields' and repairs' small and big. */
@@ -195,7 +199,7 @@ export function createLoot(light: Light) {
   // and gone once its foot is over the horizon (the eye under the sea's level there), so it doesn't stand tilted in
   // the sky past it
   const near = varying(smoothstep(10, 55, far).mul(smoothstep(-HORIZON, 0, dot(cameraPosition.sub(at.xyz), up))));
-  const column = pow(float(1).sub(v), 2.2).mul(sin(v.mul(40).sub(now.mul(6))).mul(0.25).add(0.75)).mul(core.mul(core)).mul(near);
+  const column = pow(float(1).sub(v), FADE).mul(sin(v.mul(40).sub(now.mul(6))).mul(0.25).add(0.75)).mul(pow(core, CORE)).mul(near);
   // the ring: a bright band at its edge round a pool of light falling off from the middle
   const d = xz.length(), band = smoothstep(0.62, 0.8, d).mul(smoothstep(1, 0.86, d));
   const pool = pow(saturate(float(1).sub(d)), 1.5).mul(POOL);
