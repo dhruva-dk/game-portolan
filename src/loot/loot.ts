@@ -46,10 +46,11 @@ const RIDE = 2.2, BOB = 0.25, BOB_RATE = 2, SPIN = 1.4, ROCK = 0.15, SINK = 2, R
 const SHAPE_PIXELS = 14, BEAM_PIXELS = 3, SHAPE_ACROSS = 3.5;
 /** How far the beam's core goes from its gold to the glint's white-hot light (art/target/idea.png's pale shaft). */
 const HOT = 0.7;
-/** The beam's light: the gilding's, deepened (squared, at its own luminance), so added over the sea it stays gold
- *  rather than washing to pale yellow. */
+/** The beam's light: the gilding's, deepened (to the power DEEPEN, at its own luminance), so added over the sea it
+ *  stays gold rather than washing to pale yellow — but not so deep (squared) that it turns orange. */
+const DEEPEN = 1.3;
 const [gr, gg, gb] = GILDING.lit;
-const BEAM_GOLD = tint([gr * gr, gg * gg, gb * gb], 0.2126 * gr + 0.7152 * gg + 0.0722 * gb);
+const BEAM_GOLD = tint([gr ** DEEPEN, gg ** DEEPEN, gb ** DEEPEN], 0.2126 * gr + 0.7152 * gg + 0.0722 * gb);
 /** The beam: its height for the commonest and more for each rarity up, m; its radius at the foot and the head. */
 const TALL = 30, TALLER = 14, FOOT = 0.3, HEAD = 0.18;
 /** A beam fades out as its foot sinks this far (m) under the eye's horizon, gone by then. */
