@@ -62,8 +62,9 @@ export const STORM = tones('#9483D4', '#574790');
 /** The gold of the sunlit calm's light along the storm wall's foot. */
 export const STORM_FOOT = ink('#F5C67A');
 export const LIGHTNING = ink('#D9C2FF');
-/** A fair-weather cloud: cream where the sun lights it, a warm tan beneath (art/target/idea.png's golden cumulus). */
-export const CLOUD = tones('#FFD6A6', '#DAB7A6');
+/** A fair-weather cloud: a pale cream where the sun lights it, a cool lilac grey beneath (art/target/idea.png's
+ *  cumulus: white-topped, not the even salmon review32 saw). */
+export const CLOUD = tones('#FFE2B8', '#B4A6BC');
 /** Powder smoke: a cloud's cream, and a deeper rose in its shadow. */
 export const SMOKE = tones('#FFF1D6', '#D9907C');
 
