@@ -38,6 +38,10 @@ const CLOUDY = 0.2;
 const AIRED = 0.6, AIR_VEIL = 2;
 /** The troughs' tone, of the water's, and where between trough and crest (0…1) its edge lies. */
 const TROUGH = 0.8, TROUGH_AT = 0.4;
+/** What sets a point in the troughs' tone: the swell's crest (0…1) by SWELL of its range about its middle, and the
+ *  short waves' facets by FACETS: one turned from the sun (n against the long waves' g) is in it, so the tone falls
+ *  in small crisp marks across the sea, as a painter's ripples, rather than in the swell's broad patches. */
+const SWELL = 0.35, FACETS = 5;
 /** The sun's glints: the cosine between the surface's normal and the half vector past which it mirrors the sun to the
  *  eye, the width of that edge, and the glint's light of what a white surface gets from the sun square on. */
 const GLINT = 0.9998, GLINT_EDGE = 0.0001, GLINT_LIGHT = 0.4;
@@ -160,7 +164,8 @@ function seaRadiance(
   // the water's own tone by how much of it the eye looks through, paler where a wake has worked air into it, and a
   // second, deeper tone in the troughs between the waves, its edge crisp
   const own = mix(mix(vec3(...SEA_SHALLOW), vec3(...SEA_MIDDLE), smoothstep(0, MIDDLE_AT, depth)), vec3(...SEA_DEEP), smoothstep(MIDDLE_AT, DEEP_AT, depth));
-  const tone = mix(own, vec3(...SEA_SHALLOW), ships.air.mul(AIRED)).mul(mix(float(TROUGH), float(1), cut(crest, TROUGH_AT)));
+  const lifted = mix(float(0.5), crest, SWELL).add(dot(n.sub(g), l).mul(FACETS));
+  const tone = mix(own, vec3(...SEA_SHALLOW), ships.air.mul(AIRED)).mul(mix(float(TROUGH), float(1), cut(lifted, TROUGH_AT)));
   const body = tone.mul(irradiance).mul(ships.glow);
 
   // The sky, along the reflected ray, blurred to broad shapes. A ray reflected down (below the horizon here, by the up
