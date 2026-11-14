@@ -46,7 +46,7 @@ import {
   OneFactor, OrthographicCamera, RGBAFormat, RenderTarget, Scene,
 } from 'three/webgpu';
 import {
-  Fn, abs, attribute, cos, cross, dot, exp, float, length as lengthN, max, mx_noise_float, normalize, saturate, select, sin, smoothstep,
+  Fn, abs, attribute, cos, cross, dot, exp, float, length as lengthN, max, min, mx_noise_float, normalize, saturate, select, sin, smoothstep,
   step, texture, uniform, vec2, vec3, vec4,
 } from 'three/tsl';
 import type { Environment } from '../environment';
@@ -81,8 +81,9 @@ const ARM = 0.18, ARM_LIFE = 22, ARM_FADE = 10, ROUGH = 0.45;
  * her speed then. */
 const ARM_WIDTH = 0.9, WIDEN = 0.05;
 /** The bow wave's foam along the arms: how long it lasts, seconds (fading by e each), and its half-width, metres; and
- *  how white the streaks its crests leave behind it are. Bold, so her wake reads as a long white V (art/target/idea.png). */
-const BOW_LIFE = 18, BOW_FOAM = 1.5, STREAK = 0.6;
+ *  how white the streaks its crests leave behind it are, and how wide at most (metres): bold, so her wake reads as a
+ *  long white V (art/target/idea.png), but lines, not the broad smears review33 saw at speed. */
+const BOW_LIFE = 18, BOW_FOAM = 1.5, STREAK = 0.6, STREAK_WIDEST = 1.4;
 /** The bow wave's foam as art/target/idea.png draws a wake: a whole white rim along each arm's line, RIM_SHARE of
  *  BOW_FOAM wide, and inside it the crests curling in, feathered, CURL_REACH of it, with blue between: neither loose
  *  flecks (review27) nor one flat band, nor the chains of separate blobs review30 saw. */
@@ -174,7 +175,7 @@ export function createWake(view: View, sky: Sky, capacity: number) {
     const churned = exp(sq(across.div(spread)).negate()).mul(smoothstep(LENGTH - 1, LENGTH + 3, run)).mul(pace);
     const worn = age.div(24).add(rough.mul(0.2));
     const churnLeft = smoothstep(worn.sub(0.45), worn.sub(0.1), patchy(3, 1.5));
-    const foam = churned.mul(exp(age.div(-3)).mul(0.55).add(exp(age.div(-12)).mul(0.25).mul(churnLeft))).toVar();
+    const foam = churned.mul(exp(age.div(-3)).mul(0.42).add(exp(age.div(-12)).mul(0.25).mul(churnLeft))).toVar();
     const air = churned.mul(exp(age.div(-10)));
     // the arms: metres outside each's line, its half-width, and what is left of it
     const off = abs(across).sub(v.mul(age).mul(KELVIN));
@@ -194,7 +195,7 @@ export function createWake(view: View, sky: Sky, capacity: number) {
     const rim = exp(sq(off.div(BOW_FOAM * RIM_SHARE)).negate());
     const curls = exp(sq(off.div(BOW_FOAM * CURL_REACH)).negate()).mul(step(off, 0)).mul(feathers);
     foam.addAssign(max(rim, curls).mul(pace).mul(exp(age.div(-BOW_LIFE)).mul(0.9)));
-    const streak = width.mul(0.5).add(0.6), gone = age.div(calm.mul(ARM_LIFE)).add(rough.mul(0.2));
+    const streak = min(width.mul(0.5).add(0.6), STREAK_WIDEST), gone = age.div(calm.mul(ARM_LIFE)).add(rough.mul(0.2));
     const left = smoothstep(gone.sub(0.55), gone.sub(0.15), patchy(4, 2.5).mul(0.7).add(patchy(1.5, 3.5).mul(0.3)));
     foam.addAssign(exp(sq(off.div(streak)).negate()).mul(float(1.2).div(streak).sqrt()).mul(life).mul(feathers).mul(left).mul(STREAK));
     return vec4(foam, height, air, 0);
