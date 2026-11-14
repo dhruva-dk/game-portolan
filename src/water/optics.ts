@@ -28,13 +28,16 @@ export const N_WATER = 1.34;
 /** Reflectance at normal incidence, ((n − 1)/(n + 1))². */
 const F0 = 0.02;
 /** How much of what Fresnel gives the sea's mirror keeps: the sea stays its own colour out to the horizon. */
-const MIRROR = 0.2;
+const MIRROR = 0.1;
 /** Water turquoise to SHALLOW_TO metres deep, the middle blue by MIDDLE_AT, the deep by DEEP_AT: so the shallow ring
  *  hugs the shore, and open-sea banks a few metres further down are blue, not turquoise blotches (art/target/idea.png). */
 const SHALLOW_TO = 2.5, MIDDLE_AT = 6, DEEP_AT = 11;
 /** The deep water seen from overhead: LOOK_DOWN of the way to the middle tone, from where the eye's ray stands
  *  LOOK_FROM (cosine) off the level to straight down. */
 const LOOK_DOWN = 0.25, LOOK_FROM = 0.3;
+/** The depth the tones read is the floor's, times GRAZE[2] where the eye looks along the sea (cosine under GRAZE[0])
+ *  easing to itself by GRAZE[1]: so the far banks are navy, as art/target/idea.png's far sea, not teal (review29). */
+const GRAZE = [0.08, 0.4, 3] as const;
 /** How fast the water's own tone veils what lies under it, per metre of the eye's path through it. */
 const CLOUDY = 0.12;
 /** How far a wake's air at its thickest takes the water toward the shallows' tone; and how much it veils what lies
@@ -178,7 +181,9 @@ function seaRadiance(
   // horizon, so the open sea runs from teal at the eye's feet to royal blue far off
   const down = smoothstep(LOOK_FROM, 1, dot(v, up)).mul(LOOK_DOWN);
   const deep = mix(vec3(...SEA_DEEP), vec3(...SEA_MIDDLE), down);
-  const own = mix(mix(vec3(...SEA_SHALLOW), vec3(...SEA_MIDDLE), smoothstep(SHALLOW_TO, MIDDLE_AT, depth)), deep, smoothstep(MIDDLE_AT, DEEP_AT, depth));
+  // the eye's path down to the floor lengthens as it looks along the sea: far off, the banks are the deep's navy
+  const looked = depth.mul(mix(float(GRAZE[2]), float(1), smoothstep(GRAZE[0], GRAZE[1], dot(v, up))));
+  const own = mix(mix(vec3(...SEA_SHALLOW), vec3(...SEA_MIDDLE), smoothstep(SHALLOW_TO, MIDDLE_AT, looked)), deep, smoothstep(MIDDLE_AT, DEEP_AT, looked));
   const lifted = mix(float(0.5), crest, SWELL);
   const tone = mix(own, vec3(...SEA_SHALLOW), ships.air.mul(AIRED)).mul(mix(float(TROUGH), float(1), cut(lifted, TROUGH_AT))).mul(mix(float(1), float(CREST), cut(lifted, CREST_AT)));
   const body = tone.mul(irradiance).mul(ships.glow);
