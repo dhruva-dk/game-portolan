@@ -23,9 +23,10 @@ const SHORE = -0.15, BEACH = 0.45, DRY = 2.6;
 const RAGGED = 0.5;
 /** The ground's cover (0…1) past which rubble lies on the floor, and sea grass; and litter under the trees. */
 const RUBBLE = 0.7, GRASS = 0.65, FALLEN = 0.5;
-/** Ground steeper than a cliff's face (ISLANDS.bare, rise over run) is bare rock: the cosine of its tilt. Its strata
- *  this many metres thick. */
-const BARE = 1 / Math.hypot(1, ISLANDS.bare), STRATA = 2.2;
+/** Ground steeper than a cliff's face (ISLANDS.bare, rise over run) by SHEER is bare rock: the cosine of its tilt; so a
+ *  dune's steep scraps stay sand and only the cliffs stand bare, as the painting's calm sand (art/target/idea.png).
+ *  Its strata this many metres thick. */
+const SHEER = 1.5, BARE = 1 / Math.hypot(1, ISLANDS.bare * SHEER), STRATA = 2.2;
 /** Sand is lit as if this share flatter than it lies, so a dune's slopes stay in the sun as the painting's flat sand
  *  does (art/target/idea.png), turning to their shadow tone only where steep against it; a cliff's rock as it lies. */
 const FLAT = 0.6;
