@@ -88,7 +88,7 @@ const CHOP_CASCADE = 1, ROWS_MIP = 4;
 const FINE = 2.5, FINE_FADE = [0.06, 0.2] as const;
 /** The crests read for the tones are averaged (seven taps) this many metres to each side along the screen's level, so they lie in
  *  level rows, as art/target/idea.png's painted waves, rather than in blotches with no direction (review26). */
-const STROKE = 12;
+const STROKE = 32;
 /** Nor more than this many pixels: near a low eye 12 m spans hundreds of them, and the five offset copies of the crests
  *  printed as stair-stepped patches (review25). */
 const STROKE_PX = 60;
