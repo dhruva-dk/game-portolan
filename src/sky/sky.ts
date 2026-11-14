@@ -33,6 +33,7 @@ import type { View } from '../view/view';
 import { R, toSky } from '../world/sphere';
 import { sunAtOrigin, sunInSky } from '../world/sun';
 import { MIE_EXTINCTION, MIE_SCALE_HEIGHT, MIE_SCATTERING, RAYLEIGH_SCATTERING, SEA_ALBEDO } from './atmosphere';
+import { STORM, tint } from '../palette';
 import { createClouds } from './clouds';
 import { createReflection } from './reflection';
 import { createStormLook, type StormLight } from './storm';
@@ -63,11 +64,13 @@ const SUN_RADIANCE = 8, EDGE = 0.3, HALO = 0.04, WIDTH = 0.6;
 const PEAK_SHARE = 0.05, PEAK_G = 0.95;
 /**
  * In the storm, the share of the sun its cloud lets through, and of the sky's glow; and the light in the storm's
- * own air: SUN_IN of the sun's light (scattered every way, over 4π) and AIR_IN of the sky's glow, tinted a dark violet.
+ * own air: SUN_IN of the sun's light (scattered every way, over 4π) and AIR_IN of the sky's glow, tinted the storm's
+ * shadow violet (palette.ts).
  */
-const STORM_SUN = 0.08, STORM_SKY = 0.35, SUN_IN = 0.6, AIR_IN = 0.3, STORM_TINT = [0.56, 0.38, 0.86] as const;
-/** The sun on the storm's cloud: its luminance, in a pale violet, so the crown is lit whatever the hour, never red. */
-const STORM_SUNLIT = [0.86, 0.8, 1.08] as const;
+const STORM_SUN = 0.08, STORM_SKY = 0.35, SUN_IN = 0.6, AIR_IN = 0.3, STORM_TINT = tint(STORM.shadow, 0.45);
+/** The sun on the storm's cloud: its luminance, in the storm's lit violet, so the crown is lit whatever the hour,
+ *  never red. */
+const STORM_SUNLIT = tint(STORM.lit, 0.85);
 /**
  * The haze, drawn to the planet's scale rather than Earth's: on a sea whose horizon is 150 m off, Earth's air would
  * leave it as clear as a room, so the far field is swallowed by a haze of its own. Its optical depth is HAZE_DEPTH a

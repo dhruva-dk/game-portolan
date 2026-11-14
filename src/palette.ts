@@ -16,6 +16,11 @@ const ink = (hex: string): Rgb => {
   return [channel(0), channel(1), channel(2)];
 };
 const tones = (lit: string, shadow: string): Tones => ({ lit: ink(lit), shadow: ink(shadow) });
+/** A colour as the tint of a light: its hue and saturation, at luminance y. */
+export const tint = (c: Rgb, y: number): Rgb => {
+  const k = y / (0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]);
+  return [c[0] * k, c[1] * k, c[2] * k];
+};
 
 // ---- the land
 export const SAND = tones('#F2B632', '#C9772A');

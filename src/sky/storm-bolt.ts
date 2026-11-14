@@ -8,6 +8,7 @@
 
 import { Vector3 } from 'three/webgpu';
 import { abs, cross, dot, exp, float, fract, length, max, min, normalize, smoothstep, uniform, vec3 } from 'three/tsl';
+import { LIGHTNING, tint } from '../palette';
 import type { Cap } from '../sim/storm';
 import { R, add, cross as crossV, dot as dotV, length as lengthV, normalize as normalizeV, scale, type Vec3 } from '../world/sphere';
 import { BASE } from './storm-field';
@@ -25,8 +26,8 @@ const IN = 30, ALONG = 0.7, NEAR = 50, DISTANCE = [70, 200] as const;
  * light's luminance; the stroke's own channel: its radiance in the same units, its width (metres, and at least this
  * many radians, about a pixel), and how far it zigzags either side (metres, over two scales of its height). */
 const REACH = 50, FLASH = 9, CHANNEL = 260, WIDTH = 0.35, PIXEL = 0.0016, ZIG = [6, 3, 1.1] as const, ZIG_LONG = [21, 8.3, 2.9] as const;
-/** The flash's colour, against the storm's own light's (its luminance kept). */
-const TINT = [0.88, 0.86, 1.08] as const;
+/** The flash's colour, against the storm's own light's (its luminance kept): the palette's lightning. */
+const TINT = tint(LIGHTNING, 0.88);
 const LUMA = vec3(0.2126, 0.7152, 0.0722);
 
 /** A steady pseudo-random number in [0, 1) for an integer and a stream. */

@@ -12,9 +12,10 @@
 // Light. Per unit sun at the top of the air: the sun through the cloud toward it (a short cone of taps), scattered
 // once with a two-lobed phase (the silver lining toward the sun) and many times — Wrenninge's octaves near the
 // surface, and the diffused light of a two-stream slab, a radiance of 1/π (a white surface's) at the lit face falling
-// off only as 1/(1 + ¾(1−g)τ), so lit sides are white and bases a light grey; the sky's light through the nearer of
-// the cloud's top and side, and the sea's from below, through the cloud between. Then the air between the eye and the cloud: its extinction integrated in closed form up to the
-// cloud's height, and its glow, so far clouds sink into the haze.
+// off only as 1/(1 + ¾(1−g)τ); the light of the sky through the nearer of the cloud's top and side, and of the sea
+// from below, through the cloud between. The two are coloured by the palette (CLOUD): the sun's share its cream, the
+// rest its rose, so lit sides are cream and bases rose. Then the air between the eye and the cloud: its extinction
+// integrated in closed form up to the cloud's height, and its glow, so far clouds sink into the haze.
 //
 // The shell is the eye's, like the sky (view.toSky): Earth's curvature under it, its directions the sky's (x east, y
 // up, z south, elevations stretched to put its horizon on the sea's). Its map slides under the eye as the eye moves
@@ -26,8 +27,9 @@ import {
   texture, texture3D, uniform, vec3, vec4,
 } from 'three/tsl';
 import {
-  BOTTOM, MIE_EXTINCTION, MIE_SCALE_HEIGHT, RAYLEIGH_SCALE_HEIGHT, RAYLEIGH_SCATTERING, SEA_ALBEDO,
+  BOTTOM, MIE_EXTINCTION, MIE_SCALE_HEIGHT, RAYLEIGH_SCALE_HEIGHT, RAYLEIGH_SCATTERING,
 } from './atmosphere';
+import { CLOUD } from '../palette';
 import { POTENTIAL_DECILES, WEATHER_TILE, remap, type CloudNoise } from './cloud-noise';
 import { loop, type FloatNode, type Vec3Node, type Vec4Node } from '../tsl';
 import type { Tables } from './tables';
@@ -78,6 +80,10 @@ const STEP = 0.06;
 export const DIFFUSION = 0.75 * (1 - 0.85);
 /** Taps toward the sun, km, spaced wider as they go. */
 const TAPS = [0.05, 0.15, 0.35, 0.8];
+/** How much of the sun's own colour the cloud's lit tone keeps (the rest is the palette's cream at the sun's
+ *  brightness); and how bright its shadow tone is, of what a white surface in the open gets. */
+const WARMED = 0.5, UNDERLIT = 0.7;
+const LUMA = vec3(0.2126, 0.7152, 0.0722);
 
 const hg = (c: FloatNode, g: number): FloatNode =>
   float((1 - g * g) / (4 * Math.PI)).div(pow(float(1 + g * g).sub(c.mul(2 * g)), 1.5));
@@ -202,8 +208,9 @@ export function createCloudField(tables: Tables, noise: CloudNoise) {
     const cosSun = dot(d, sunDir);
     const single = phase(cosSun, 1).toVar();
     const weightSum = float(0).toVar(), distSum = float(0).toVar();
-    // the sea's light, from the sun and the sky on it, seen from above (its radiance, E·albedo/π)
-    const sea = sunTransmittance(float(BOTTOM), sunDir.y).mul(max(sunDir.y, 0)).mul(1 / Math.PI).add(skyAmbientUp).mul(SEA_ALBEDO);
+    // what a white surface in the open gets from the sun and the sky (its radiance, E/π), in the cloud's shadow tone
+    const open = sunTransmittance(float(BOTTOM), sunDir.y).mul(max(sunDir.y, 0)).mul(1 / Math.PI).add(skyAmbientUp);
+    const under = vec3(dot(open, LUMA)).mul(vec3(...CLOUD.shadow)).mul(UNDERLIT).toVar();
     // the sea hides the shell below the horizon
     If(d.y.greaterThan(-0.002).and(near.lessThan(MAX_DISTANCE)), () => {
       loop('cs', steps, (i) => {
@@ -243,8 +250,12 @@ export function createCloudField(tables: Tables, noise: CloudNoise) {
             // this density up to the cloud's top and down to its base
             const above = min(float(TOP - BASE).mul(max(c.top.sub(c.h), 0)), max(c.inside, 0)).mul(rho).mul(SIGMA * DIFFUSION).add(1);
             const below = float(TOP - BASE).mul(c.h).mul(rho).mul(SIGMA * DIFFUSION).add(1);
-            const S = sunLight.mul(exp(tau.negate()).mul(single).add(ms.mul(powder)))
-              .add(skyAmbientUp.mul(0.5).div(above)).add(sea.mul(0.5).div(below));
+            // In the palette's two tones (CLOUD): the sun's light in the cloud's cream (keeping WARMED of the sun's own
+            // colour, so a low sun still warms it), and the light from the sky above and the sea below, half of each
+            // hemisphere's, in its rose, as bright as UNDERLIT of what a white surface in the open gets.
+            const sunTone = mix(vec3(dot(sunLight, LUMA)), sunLight, WARMED).mul(vec3(...CLOUD.lit));
+            const S = sunTone.mul(exp(tau.negate()).mul(single).add(ms.mul(powder)))
+              .add(under.mul(float(0.5).div(above).add(float(0.5).div(below))));
             const stepT = exp(rho.mul(-SIGMA).mul(dt));
             const absorbed = T.mul(float(1).sub(stepT));
             L.addAssign(S.mul(absorbed));

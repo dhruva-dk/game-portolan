@@ -35,6 +35,7 @@ import {
   screenUV, select, smoothstep, sqrt, step, tanh, texture, varying, vec2, vec3, vec4, viewportDepthTexture, viewportSharedTexture,
 } from 'three/tsl';
 import type { Environment } from '../environment';
+import { LIGHTNING } from '../palette';
 import type { Snapshot } from '../snapshot';
 import type { Compute, Draw } from '../gpu';
 import type { Ground } from '../land/ground';
@@ -76,9 +77,10 @@ const GATHER = 0.8;
 const STORM_ROUGH = 0.03, STORM_FOAM = 0.45, STORM_DARK = 0.3;
 /**
  * The storm's foot: the sea churned white from its edge out to FOOT (fading over the second) metres; and its edge's
- * line, EDGE_LINE m to each side (or most of a pixel), glowing a pale violet (light per unit sun, so the bloom takes it).
+ * line, EDGE_LINE m to each side (or most of a pixel), the palette's lightning at EDGE_LIGHT of what a white surface
+ * in the open shows (over 1, so the bloom takes it).
  */
-const FOOT = [6, 26] as const, EDGE_LINE = 0.3, EDGE_LIGHT = [0.11, 0.06, 0.2] as const;
+const FOOT = [6, 26] as const, EDGE_LINE = 0.3, EDGE_LIGHT = 1.6;
 /** The least mean square slope the surface is shaded with: a film of water on sand is still rippled. */
 const SMOOTHEST = 1e-4;
 /**
@@ -253,7 +255,7 @@ export function createWater(view: View, sky: Sky, ground: Ground, wind: Wind, sh
     // drawn black along every beach.
     const alpha = sqrt(max(variance.mul(float(1).sub(air.mul(0.6))), SMOOTHEST));
     const sea = optics.seaRadiance(positionWorld, n, v, alpha, crest, foam, behind, path, near, held).mul(float(1).sub(storm.mul(STORM_DARK)));
-    return mix(sea, vec3(...EDGE_LIGHT), edgeLine);
+    return mix(sea, vec3(...LIGHTNING).mul(dot(sky.open, vec3(0.2126, 0.7152, 0.0722)).mul(EDGE_LIGHT)), edgeLine);
   })();
   // the charts' weights as red, green and blue, about as bright on the screen as they are after the frame's exposure
   if (shows === 'charts') material.colorNode = Fn(() => charts.debug(rest).mul(0.1))();
