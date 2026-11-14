@@ -17,8 +17,9 @@ import type { Sky } from './sky';
 export interface Below { sun(p: Vec3Node): Vec3Node; sky(p: Vec3Node): Vec3Node; focus(p: Vec3Node): FloatNode }
 
 /** A thin thing's two sides: 1 where the sun reaches the side facing n, and where it comes through from the other;
- *  and 1 where nothing casts a shadow on it, whichever way it faces. */
-export interface Sides { front: FloatNode; back: FloatNode; open: FloatNode }
+ *  1 where the side facing n is turned squarely to the sun; and 1 where nothing casts a shadow on it, whichever way it
+ *  faces. */
+export interface Sides { front: FloatNode; full: FloatNode; back: FloatNode; open: FloatNode }
 
 export interface Light {
   /** The radiance of a surface at world position p facing n (unit), of tone `lit` in the sun and `shadow` out of it. */
@@ -42,6 +43,8 @@ export interface Light {
 const TURN = 0.1, EDGE = 0.04;
 /** The same for the sun through a thin thing from behind: only where it stands well behind it. */
 const THROUGH = 0.35;
+/** Where a thin thing's sunlit side is turned squarely enough to the sun to be in its full light (Sides.full). */
+const FULL = 0.25;
 /** A cast shadow's edge: the share of the sun (0…1) at which a point is in it, and half the edge's width; the clouds'
  *  shadow's likewise. */
 const CAST = 0.5, CAST_EDGE = 0.12, CLOUDED = 0.55, CLOUD_EDGE = 0.06;
@@ -67,7 +70,7 @@ export function createLighting(sky: Sky, below: Below, visible: (p: Vec3Node, n:
   const band = (p: Vec3Node, n: Vec3Node): FloatNode => turned(dot(n, sky.sun(p)), TURN).mul(open(p, n));
   const sides = (p: Vec3Node, n: Vec3Node): Sides => {
     const nl = dot(n, sky.sun(p)).toVar(), clear = open(p, n).toVar();
-    return { front: turned(nl, TURN).mul(clear), back: turned(nl.negate(), THROUGH).mul(clear), open: clear };
+    return { front: turned(nl, TURN).mul(clear), full: turned(nl, FULL).mul(clear), back: turned(nl.negate(), THROUGH).mul(clear), open: clear };
   };
   /** The brightness at p, its sun's share times `focus`. */
   const levelUnder = (p: Vec3Node, focus: FloatNode | null): Vec3Node => {

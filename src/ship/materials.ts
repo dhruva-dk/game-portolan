@@ -55,6 +55,8 @@ const STRIPES = 5, FRINGE = 0.2;
 const UNSEEN = 0.06;
 /** How far toward its sunlit dye a sail's shadow tone is where the sun only grazes it (nothing shading it). */
 const GRAZED = 0.6;
+/** The sunlit canvas's second tone, of its dye, where it curves away from the sun (light.ts Sides.full). */
+const CURVED = 0.8;
 /** How far a sail may be blown aback (of its full belly), so it doesn't fold through its mast. */
 const ABACK = 0.3;
 /** A pennant flaps this many times a second in a fresh breeze, its waves this many to its length. */
@@ -204,7 +206,10 @@ export function createShipMaterials(light: Light, pixel: FloatNode, canvas: Clot
     // with the sun edge on to the canvas, its wrinkles would fall to dark blotches: unshadowed, it is GRAZED of the way
     // to its dye in the sun, and only what the island or a cloud shades is its full shadow tone
     const dark = mix(shaded(albedo), albedo, side.open.mul(GRAZED));
-    return mix(mix(dark, glow, side.back), albedo, side.front).mul(light.level(positionWorld));
+    // in the sun, a second step: where the belly curves away from it, a little under the full dye, so the canvas
+    // shows its shape in two lit tones as a painter's sail does
+    const lit = mix(albedo.mul(CURVED), albedo, side.full);
+    return mix(mix(dark, glow, side.back), lit, side.front).mul(light.level(positionWorld));
   })();
   // ---- the ropes: blended, so drawn after the sea (fleet.ts)
   const ropes = new MeshBasicNodeMaterial({ transparent: true });
