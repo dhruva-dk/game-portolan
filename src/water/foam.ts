@@ -29,7 +29,7 @@ import type { FloatNode } from '../tsl';
 const LOBE = 3.2, BENT = 0.9;
 /** How far the lobes move the foam's edge, as a share of the cover: the edge is where cover + SCALLOP·(field − ½)
  *  passes ½, so full cover is whole whatever the field, and none is none. */
-const SCALLOP = 0.8;
+const SCALLOP = 0.45;
 /** Half the edge's width (of the cover) seen close, and how it widens with the pixel's footprint over a lobe. */
 const CRISP = 0.03;
 /** The swash's band: water thinner than LINE over the sand (metres) is its foam, fading to nothing over the last
