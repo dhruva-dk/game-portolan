@@ -196,6 +196,8 @@ export function createWaves() {
   const spreads = CASCADES.map(() => 0);
 
   return {
+    /** The waves' clock, seconds, wrapped every PERIOD (world/cascades.ts). */
+    time,
     displacement,
     slopes,
     /** For CURVED's cascades, in that order. */
