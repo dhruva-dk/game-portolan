@@ -30,17 +30,17 @@ const F0 = 0.02;
 /** How much of what Fresnel gives the sea's mirror keeps: the sea stays its own colour out to the horizon. */
 const MIRROR = 0.45;
 /** The water's depth over the floor, metres, at which its tone is the middle one, and the deep one. */
-const MIDDLE_AT = 4, DEEP_AT = 14;
+const MIDDLE_AT = 6, DEEP_AT = 20;
 /** How fast the water's own tone veils what lies under it, per metre of the eye's path through it. */
-const CLOUDY = 0.32;
+const CLOUDY = 0.2;
 /** How far a wake's air at its thickest takes the water toward the shallows' tone; and how much it veils what lies
  *  under it, as an optical depth. */
 const AIRED = 0.6, AIR_VEIL = 2;
 /** The troughs' tone, of the water's, and where between trough and crest (0…1) its edge lies. */
-const TROUGH = 0.88, TROUGH_AT = 0.4;
+const TROUGH = 0.78, TROUGH_AT = 0.4;
 /** The sun's glints: the cosine between the surface's normal and the half vector past which it mirrors the sun to the
  *  eye, the width of that edge, and the glint's light of what a white surface gets from the sun square on. */
-const GLINT = 0.9985, GLINT_EDGE = 0.0006, GLINT_LIGHT = 0.5;
+const GLINT = 0.9996, GLINT_EDGE = 0.0002, GLINT_LIGHT = 0.5;
 
 const absorption = vec3(...ABSORPTION);
 
@@ -74,10 +74,10 @@ export function createOptics(sky: Sky, view: View) {
     skyBelow,
     /** The light leaving the sea toward the eye (seaRadiance, below). */
     seaRadiance: (
-      p: Vec3Node, n: Vec3Node, v: Vec3Node, crest: FloatNode, foam: FloatNode, behind: Vec3Node, path: FloatNode,
+      p: Vec3Node, n: Vec3Node, g: Vec3Node, v: Vec3Node, crest: FloatNode, foam: FloatNode, behind: Vec3Node, path: FloatNode,
       depth: FloatNode, ships: Ships, held?: Held,
     ): Vec3Node =>
-      seaRadiance(sky, view, p, n, v, crest, foam, behind, path, depth, ships, held),
+      seaRadiance(sky, view, p, n, g, v, crest, foam, behind, path, depth, ships, held),
   };
 }
 
@@ -136,6 +136,7 @@ function tinted(c: Vec3Node, colour: Vec3Node, a: FloatNode, far: FloatNode): Ve
 /**
  * The light leaving the sea at world position p toward the eye.
  *   n      the surface's normal          v      unit vector from p to the eye
+ *   g      its normal over the long waves alone, which the sun's glints are mirrored off
  *   crest  0 in the troughs … 1 at the tops of the waves
  *   foam   the share of the pixel covered in foam
  *   behind the radiance of whatever lies behind the surface (the sea floor; the sky's if nothing)
@@ -145,7 +146,7 @@ function tinted(c: Vec3Node, colour: Vec3Node, a: FloatNode, far: FloatNode): Ve
  *   held   who holds the water here: the water tinted her colour, and her border's line drawn over it
  */
 function seaRadiance(
-  sky: Sky, view: View, p: Vec3Node, n: Vec3Node, v: Vec3Node, crest: FloatNode, foam: FloatNode, behind: Vec3Node,
+  sky: Sky, view: View, p: Vec3Node, n: Vec3Node, g: Vec3Node, v: Vec3Node, crest: FloatNode, foam: FloatNode, behind: Vec3Node,
   path: FloatNode, depth: FloatNode, ships: Ships, held?: Held,
 ): Vec3Node {
   const l = sky.sun(p), up = view.up(p);
@@ -170,7 +171,7 @@ function seaRadiance(
   const above = sky.reflect(normalize(r.sub(up.mul(min(below, 0)))));
   const seen = mix(body, above, fresnel(below.negate()));
   // the sun's glints: flat shapes of light where the surface mirrors it to the eye
-  const nh = n.dot(normalize(l.add(v)));
+  const nh = g.dot(normalize(l.add(v)));
   const edge = max(fwidth(nh), GLINT_EDGE);
   const glint = vec3(...FOAM).mul(sun).mul(smoothstep(float(GLINT).sub(edge), float(GLINT).add(edge), nh).mul(GLINT_LIGHT));
 

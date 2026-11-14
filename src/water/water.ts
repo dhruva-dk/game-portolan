@@ -77,7 +77,7 @@ const STORM_FOAM = 0.45, STORM_DARK = 0.3;
  */
 const FOOT = [6, 26] as const, EDGE_LINE = 0.3, EDGE_LIGHT = 1.6;
 /** A wake's foam (wake.ts) drawn this much fuller than it is kept: bold lobes of white along her sides and astern. */
-const WAKE_BOLD = 2;
+const WAKE_BOLD = 3;
 /**
  * The swash: each wave's bore runs on up the beach after it breaks, RUNUP of its crest's height offshore above the
  * still water, and drains back BACKWASH of its trough's below it, on ground from SWASH_FROM metres down up the beach.
@@ -178,20 +178,24 @@ export function createWater(view: View, sky: Sky, ground: Ground, wind: Wind, sh
     // drawn by foam.ts. Cover is no Gaussian height: summed with weights w it could pass one sea's, or a whitecap's 1.
     // Weighted by w² (Σw² = 1), each chart's foam fades across the band as its waves do, the mean cover stays one
     // sea's, and no pixel is whiter than a whitecap; so too the air.
-    const slope = marks.slope.toVar(), foam = float(0).toVar(), bubbles = float(0).toVar();
+    // The long cascades' slope alone, too: the sun's glints are mirrored off it, so they lie in a few broad shapes
+    // along the long waves' faces rather than a glitter of pixels off the ripples.
+    const slope = marks.slope.toVar(), broad = marks.slope.toVar(), foam = float(0).toVar(), bubbles = float(0).toVar();
     charts.each(p, (c) => {
       const read = (t: Texture, k: FloatNode) => texture(t, c.q.mul(k)).grad(c.dx.mul(k), c.dy.mul(k));
-      let s2: Vec2Node = vec2(0), h: FloatNode = float(0);
+      let s2: Vec2Node = vec2(0), l2: Vec2Node = vec2(0), h: FloatNode = float(0);
       CASCADES.forEach((L, k) => {
         const s = read(waves.slopes[k], float(1 / L)), m = scale(k);
         s2 = s2.add(s.xy.mul(m));
         if (k < 2) {
+          l2 = l2.add(s.xy.mul(m));
           h = h.add(read(waves.displacement[k], float(1 / L)).y.mul(m));
         }
       });
       // the sea is Σ w·h, so its slope is Σ w·∇h + h·∇w: across the band, where the weights change, the second
       // tilts it too (the long cascades' height; the shortest's is too small to matter)
       slope.addAssign(c.e1.mul(s2.x).add(c.e2.mul(s2.y)).mul(c.w).add(c.dw.mul(h)));
+      broad.addAssign(c.e1.mul(l2.x).add(c.e2.mul(l2.y)).mul(c.w).add(c.dw.mul(h)));
       const froth = foamOn(c, surf.add(wakeFoam), thickness, footprint);
       foam.addAssign(froth.foam.mul(c.w.mul(c.w)));
       bubbles.addAssign(froth.air.mul(c.w.mul(c.w)));
@@ -208,6 +212,8 @@ export function createWater(view: View, sky: Sky, ground: Ground, wind: Wind, sh
     // until the eye just sees them.
     const tilted = normalize(up.sub(slope));
     const n = normalize(tilted.add(v.mul(max(float(FACING).sub(dot(tilted, v)), 0))));
+    const smooth = normalize(up.sub(broad));
+    const g = normalize(smooth.add(v.mul(max(float(FACING).sub(dot(smooth, v)), 0))));
     const crest = saturate(height.div(waves.amplitude));
 
     // What lies behind the surface, where the eye's ray goes once refracted (Snell): followed down through the water
@@ -232,7 +238,7 @@ export function createWater(view: View, sky: Sky, ground: Ground, wind: Wind, sh
 
     // the ships' shadows, the hulls' shade and the wakes' air
     const near = { lit: float(1).sub(wake.shade(positionWorld)), glow: hull.glow, air: max(max(air, bubbles), held.drain.mul(0.6)) };
-    const sea = optics.seaRadiance(positionWorld, n, v, crest, foam, behind, path, max(ground.height(rest).negate(), 0), near, held).mul(float(1).sub(storm.mul(STORM_DARK)));
+    const sea = optics.seaRadiance(positionWorld, n, g, v, crest, foam, behind, path, max(ground.height(rest).negate(), 0), near, held).mul(float(1).sub(storm.mul(STORM_DARK)));
     return mix(sea, vec3(...LIGHTNING).mul(dot(sky.open, vec3(0.2126, 0.7152, 0.0722)).mul(EDGE_LIGHT)), edgeLine);
   })();
   // the charts' weights as red, green and blue, about as bright on the screen as they are after the frame's exposure
