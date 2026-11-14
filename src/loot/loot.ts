@@ -43,6 +43,8 @@ const RIDE = 2.2, BOB = 0.25, BOB_RATE = 2, SPIN = 1.4, ROCK = 0.15, SINK = 2, R
 const SHAPE_PIXELS = 14, BEAM_PIXELS = 3, SHAPE_ACROSS = 3.5;
 /** The beam: its height for the commonest and more for each rarity up, m; its radius at the foot and the head. */
 const TALL = 30, TALLER = 14, FOOT = 0.3, HEAD = 0.18;
+/** A beam fades out as its foot sinks this far (m) under the eye's horizon, gone by then. */
+const HORIZON = 8;
 /** How bright a piece's rim, a beam and its ring glow, of what the sun and the sky give a white surface; and how far
  *  a face must turn from the eye (0 facing it … 1 edge on) to be in the rim. */
 const EMIT = 1.3, BEAM_EMIT = 3, HALO_EMIT = 1.2, RIM = 0.62;
@@ -178,7 +180,9 @@ export function createLoot(light: Light) {
   bm.positionNode = select(ring.greaterThan(0.5), ringAt.mul(ringShown), beamAt.mul(beamShown).mul(pop));
   const v = varying(uv.y), xz = varying(local.xz), isRing = varying(ring), tint = varying(glow.rgb), r = varying(glow.w), base = varying(at.xyz);
   const core = varying(abs(dot(normalize(e1.mul(normal.x).add(e2.mul(normal.z))), normalize(cameraPosition.sub(at.xyz)))));
-  const near = varying(smoothstep(10, 55, far));
+  // and gone once its foot is over the horizon (the eye under the sea's level there), so it doesn't stand tilted in
+  // the sky past it
+  const near = varying(smoothstep(10, 55, far).mul(smoothstep(-HORIZON, 0, dot(cameraPosition.sub(at.xyz), up))));
   bm.colorNode = Fn(() => {
     const lit = light.level(base);
     const column = pow(float(1).sub(v), 2.2).mul(sin(v.mul(40).sub(now.mul(6))).mul(0.25).add(0.75)).mul(core.mul(core)).mul(near);
