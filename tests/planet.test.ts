@@ -118,7 +118,8 @@ test('islands of every kind: counted by the area, in ORDER, apart, spread evenly
     assert.equal(pl.islands[0].kind, 'island');
     for (const kind of ORDER) {
       const radii = pl.islands.filter((s) => s.kind === kind).map((s) => s.radius), K = KINDS[kind];
-      assert.ok(radii.length >= 4, `seed ${seed}: ${radii.length} ${kind}`);
+      // (at least half as many as its density asks for: the later kinds find less room)
+      assert.ok(radii.length >= Math.max(2, Math.round(4 * Math.PI * R * R * K.density) / 2), `seed ${seed}: ${radii.length} ${kind}`);
       assert.ok(Math.min(...radii) >= K.radius[0] && Math.max(...radii) <= K.radius[1], `${kind} radii ${radii}`);
       assert.ok(radii.every((r, i) => i === 0 || r <= radii[i - 1]), `${kind}: largest first`);
     }

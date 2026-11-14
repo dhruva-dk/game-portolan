@@ -92,7 +92,8 @@ export function scatterRocks(isle: Isle, bigShapes: number, boulderShapes: numbe
     rocks.every((r) => Math.hypot(r.x - x, r.z - z) > (r.size + size) * (r.big && big ? HEAPED : 0.85));
   /** Whether a rock there reaches no farther out than the water too shallow for a ship. */
   const ashore = (x: number, z: number, size: number) => site.shore(x, z) + FOOT * size < WADE - 1;
-  const outcrops = Math.max(1, Math.round((2 * Math.PI * site.radius) / COAST_PER_OUTCROP));
+  // (an atoll's ring is sand and coral: one)
+  const outcrops = site.kind === 'atoll' ? 1 : Math.max(1, Math.round((2 * Math.PI * site.radius) / COAST_PER_OUTCROP));
   // the coast's outcrops, then one heaped on each offshore rock but a sea stack (centre, smallest and largest mass)
   const heaps = [
     ...Array.from({ length: outcrops }, (_, o) => ({ centre: ((o + 0.3 + rand() * 0.4) / outcrops) * 2 * Math.PI, at: null as [number, number] | null, most: BIG[1] })),
@@ -159,6 +160,8 @@ export interface Palm {
 /** How many palms (on a 70 m island), at least how far apart, metres, and where: from the beach's top to well
  * inland (from the waterline). */
 export const PALMS = 20;
+/** How many times as many on an atoll. */
+const ATOLL_PALMS = 3;
 const SPACING = 3.5;
 const BEACH_TOP = -4, INNERMOST = -50;
 
@@ -170,7 +173,8 @@ export function scatterPalms(isle: Isle, rocks: Rock[], seed = 1): Palm[] {
   const { site } = isle;
   if (site.kind === 'rocks' || site.kind === 'mesa') return [];
   const rand = random(seed * 104729 + 3), noise = createNoise3(seed + 71);
-  const palms: Palm[] = [], count = perArea(site, PALMS);
+  // (an atoll's ring, a narrow strip of its area, thick with them)
+  const palms: Palm[] = [], count = perArea(site, PALMS) * (site.kind === 'atoll' ? ATOLL_PALMS : 1);
   for (let tries = 0; palms.length < count && tries < count * 200; tries++) {
     const t = rand() * 2 * Math.PI, [x, z] = onCoast(site, t, BEACH_TOP + rand() * (INNERMOST - BEACH_TOP)), d = site.shore(x, z);
     if (Math.hypot(x, z) < 5 || d > BEACH_TOP) continue;

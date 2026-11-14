@@ -1,10 +1,11 @@
 // The planet's islands: sand islands rising from the banks into rounded hills, each worked out flat on its own chart
-// (sphere.ts) and laid into the sea floor by planet.ts. Four kinds, every one standing out of the sea, their hills
+// (sphere.ts) and laid into the sea floor by planet.ts. Five kinds, every one standing out of the sea, their hills
 // no steeper than a palm stands on but for the cliffs raised on an island's: round its headland and along stretches
 // of its coast behind the beach, and on some the hill stepped in terraces (bare rock on their faces, nothing standing
 // there):
 //   island  18–55 m round, a hill 7–22 m high by its size, palms and shrubs and outcrops of rock; now and then a
 //           lagoon or an offshore rock or two
+//   atoll   28–40 m round, a low ring of sand 8–12 m broad and 1.6–2.6 m high round a shallow lagoon, palms along it
 //   mesa    15–30 m round, a flat top 11–18 m up behind a cliff all round it, shrubs on it, no palms
 //   islet   7–15 m round, a hump 2.5–6 m high, a palm or two
 //   rocks   a knoll 4–7 m round and a metre or so high, heaped with rock (world/scatter.ts)
@@ -26,7 +27,7 @@ import { random } from './random.ts';
 import type { Noise3 } from './noise3.ts';
 import { blob, coastline, distanceField, radiusAt, within, type Loop } from './island-shape.ts';
 
-export type Kind = 'island' | 'mesa' | 'islet' | 'rocks';
+export type Kind = 'island' | 'atoll' | 'mesa' | 'islet' | 'rocks';
 
 /** One kind: how many per square metre of the planet; mean coast radii, metres, the smallest's and the largest's,
  *  and how strongly drawn toward the smallest (the power on a uniform draw); summits, metres; how far drawn out long
@@ -40,13 +41,14 @@ interface KindOf {
 
 export const KINDS: Record<Kind, KindOf> = {
   island: { density: 4.4e-6, radius: [18, 55], skew: 2.2, summit: [7, 22], long: [0.05, 0.35], wear: [0.12, 0.22], apron: [24, 48], flank: 0.22, clearance: 40 },
+  atoll: { density: 1.1e-6, radius: [28, 40], skew: 1.2, summit: [1.6, 2.6], long: [0.03, 0.12], wear: [0.1, 0.16], apron: [18, 28], flank: 0.25, clearance: 25 },
   mesa: { density: 1.3e-6, radius: [15, 30], skew: 1.5, summit: [11, 18], long: [0.05, 0.3], wear: [0.08, 0.14], apron: [16, 28], flank: 0.25, clearance: 25 },
   islet: { density: 4.4e-6, radius: [7, 15], skew: 1.3, summit: [2.8, 6], long: [0.05, 0.4], wear: [0.1, 0.18], apron: [15, 24], flank: 0.3, clearance: 20 },
   rocks: { density: 1.6e-6, radius: [4, 7], skew: 1, summit: [0.9, 1.4], long: [0.05, 0.3], wear: [0.05, 0.09], apron: [10, 15], flank: 0.35, clearance: 15 },
 };
 
 /** The order they are placed in: those that need the most room first. */
-export const ORDER: readonly Kind[] = ['island', 'mesa', 'islet', 'rocks'];
+export const ORDER: readonly Kind[] = ['island', 'atoll', 'mesa', 'islet', 'rocks'];
 
 /**
  * How far out from the waterline the water may be too shallow for a ship (a keel 2.2 m down: sim/handling.ts), metres,
@@ -68,12 +70,14 @@ export const ISLANDS = {
   /** The share of the larger islands (`from` to `to` metres: the largest keep their hills whole) with a lagoon, how deep
    *  it is, and how broad (a share of the radius). */
   lagoon: { share: 0.35, from: 30, to: 45, depth: [1, 1.8], radius: [0.2, 0.32] },
+  /** An atoll's ring of land round its lagoon: how broad at its narrowest, metres. */
+  atoll: { ring: [8, 12] },
   /** The share of islands and islets with an offshore rock or two; their radii, and how far out past the beach, metres. */
   offshore: {
     share: 0.45, radius: [2.5, 4.5], out: [9, 18],
     /** Sea stacks: the share of a mesa's with offshore rocks (all of them stacks), and of an island's offshore rocks
-     *  that are; how wide and high they stand, metres, their sides falling from `top` of the way out to the edge. */
-    stacks: { mesa: 0.8, share: 0.5, radius: [4, 6], height: [6, 9], top: 0.3 },
+     *  that are; how wide and high they stand, metres, rising to it over `rise` metres in from their waterline. */
+    stacks: { mesa: 0.8, share: 0.5, radius: [4, 6], height: [6, 9], rise: 3 },
   },
   /** The share of islands with a long spit, and of islands and islets bent round a broad bay. */
   spit: 0.25, bent: 0.3,
@@ -84,7 +88,7 @@ export const ISLANDS = {
   /** The steepest the hills may be (a palm stands on it), rise over run, among all but the steepest hundredth of the
    *  land: a hill that would be steeper is brought lower. An islet's hump may be a little steeper. Measured before
    *  the cliffs and terraces are cut into it. */
-  steepest: { island: 0.8, mesa: 0.8, islet: 0.85, rocks: 0.75 },
+  steepest: { island: 0.8, atoll: 0.8, mesa: 0.8, islet: 0.85, rocks: 0.75 },
   /** Ground steeper than this (rise over run) is a cliff's face: bare rock, nothing standing on it. */
   bare: 1.2,
   /** Cliffed headlands: round an island's headland (where its coast reaches farthest out, a share `cape` of its radius
@@ -178,7 +182,7 @@ export function createIslandSite(kind: Kind, chart: Chart, radius: number, noise
     long: lerp(K.long[0], K.long[1], rand() ** 1.5),
     headlands: kind === 'island' ? 1 + Math.floor(rand() * 3) : kind === 'islet' || kind === 'mesa' ? Math.floor(rand() * 3) : 0,
     coves: kind === 'island' ? 1 + Math.floor(rand() * 3) : kind === 'islet' || kind === 'mesa' ? Math.floor(rand() * 2) : 0,
-    bent: kind !== 'rocks' && rand() < I.bent,
+    bent: kind !== 'rocks' && kind !== 'atoll' && rand() < I.bent,
     spit: kind === 'island' && rand() < I.spit,
     wear: lerp(K.wear[0], K.wear[1], rand()),
     size: Math.min(Math.max(radius * 0.8, 4), 32),
@@ -186,19 +190,21 @@ export function createIslandSite(kind: Kind, chart: Chart, radius: number, noise
   const coast = (t: number) => radiusAt(main, t);
   const width = lerp(K.apron[0], K.apron[1], size) * lerp(0.85, 1.15, rand());
   // a lagoon well inside the land where it is broadest, drawn out along the coast, clear of the centre (which stays
-  // land): shrunk until it is, or none
+  // land): shrunk until it is, or none. An atoll's is round its centre, all but a ring of land.
   let lagoon: Loop | null = null;
   // (the headland: where the coast reaches farthest out)
   let cape = 0;
   for (let k = 0; k < 64; k++) if (coast((k / 64) * 2 * Math.PI) > coast(cape)) cape = (k / 64) * 2 * Math.PI;
-  if (kind === 'island' && radius >= I.lagoon.from && radius <= I.lagoon.to && rand() < I.lagoon.share) {
-    const t = cape;
-    for (let lr = radius * lerp(I.lagoon.radius[0], I.lagoon.radius[1], rand()); lr >= 5 && !lagoon; lr *= 0.9) {
-      const out = 10 + lr * 0.8, cx = Math.cos(t) * out, cz = Math.sin(t) * out;
-      const l = blob(cx, cz, lr, rand, { long: 0.3, turn: t + Math.PI / 2 });
+  const atoll = kind === 'atoll';
+  if (atoll || (kind === 'island' && radius >= I.lagoon.from && radius <= I.lagoon.to && rand() < I.lagoon.share)) {
+    const t = cape, ring = atoll ? lerp(I.atoll.ring[0], I.atoll.ring[1], rand()) : 10;
+    let lr = atoll ? radius - ring : radius * lerp(I.lagoon.radius[0], I.lagoon.radius[1], rand());
+    for (; lr >= 5 && !lagoon; lr *= atoll ? 0.95 : 0.9) {
+      const out = atoll ? 0 : 10 + lr * 0.8, cx = Math.cos(t) * out, cz = Math.sin(t) * out;
+      const l = blob(cx, cz, lr, rand, { long: atoll ? 0.1 : 0.3, turn: t + Math.PI / 2 });
       const inside = Array.from({ length: 64 }, (_, k) => (k / 64) * 2 * Math.PI).every((a) => {
         const r = radiusAt(l, a), x = cx + Math.cos(a) * r, z = cz + Math.sin(a) * r;
-        return Math.hypot(x, z) < coast(Math.atan2(z, x)) - 10 && Math.hypot(x, z) > 8;
+        return Math.hypot(x, z) < coast(Math.atan2(z, x)) - ring && (atoll || Math.hypot(x, z) > 8);
       });
       if (inside) lagoon = l;
     }
@@ -254,7 +260,7 @@ export function createIslandSite(kind: Kind, chart: Chart, radius: number, noise
   const dome = target - berm;
   let relief = 1;
   // (the largest, seen from farthest off, one broad hill: a dome or a ridge)
-  const form = kind === 'rocks' || mesa ? 'dome' : FORMS[Math.floor(rand() * (radius >= 45 ? 2 : FORMS.length))];
+  const form = kind === 'rocks' || mesa || atoll ? 'dome' : FORMS[Math.floor(rand() * (radius >= 45 ? 2 : FORMS.length))];
   /** How much of the hill is the ridge along the land's middle, the rest the form's mounds. */
   const along = { dome: 0.35, ridge: 1, saddle: 0.25, offset: 0.3 }[form];
   const land = Array.from({ length: field.land.length / 2 }, (_, k) => ({ x: field.land[2 * k], z: field.land[2 * k + 1] }))
@@ -313,9 +319,8 @@ export function createIslandSite(kind: Kind, chart: Chart, radius: number, noise
     let h = berm * (1 - Math.exp((-u * I.beach) / berm)) + relief * dome * raised;
     for (const o of humps) {
       const d2 = ((x - o.x) ** 2 + (z - o.z) ** 2) / (o.radius * o.radius);
-      // (a stack flat-topped, its sides steep from near its middle to its edge)
-      const shape = o.stack ? 1 - smoothstep(S.top, 1.1, Math.sqrt(d2)) : Math.max(1 - d2 / 1.5, 0) ** 2;
-      if (d2 < 1.5) h += o.height * shape * smoothstep(0, 1.5, u);
+      // (a stack rising sheer from its waterline to its flat top)
+      if (d2 < 1.5) h += o.height * (o.stack ? smoothstep(0, S.rise, u) : Math.max(1 - d2 / 1.5, 0) ** 2 * smoothstep(0, 1.5, u));
     }
     const ds = I.dunes.size;
     const dunes = noise.value(x / ds + dunesAt[0], z / ds + dunesAt[1], dunesAt[2]) + 0.5 * noise.value((2 * x) / ds + dunesAt[1], (2 * z) / ds + dunesAt[2], dunesAt[0]);
