@@ -24,8 +24,9 @@ import { CASCADES } from '../world/cascades';
 import { FOAMING, type Waves } from './waves';
 import type { FloatNode } from '../tsl';
 
-/** A lobe of the scallops is about this many metres across; each row of them is bent this far (radians) by the other. */
-const LOBE = 1.6, BENT = 0.9;
+/** A lobe of the scallops is about this many metres across (broad enough to read from the match's camera, at about half
+ *  a metre a pixel); each row of them is bent this far (radians) by the other. */
+const LOBE = 3.2, BENT = 0.9;
 /** How far the lobes move the foam's edge, as a share of the cover: the edge is where cover + SCALLOP·(field − ½)
  *  passes ½, so full cover is whole whatever the field, and none is none. */
 const SCALLOP = 0.8;
