@@ -8,7 +8,7 @@
 // Everything is a function of the world position alone (the sea floor's mesh slides along under the eye).
 // Lit like everything else (sky/light.ts).
 
-import { dot, float, floor, fract, mix, sin, vec3 } from 'three/tsl';
+import { dot, float, floor, fract, mix, normalize, sin, vec3 } from 'three/tsl';
 import { LITTER, ROCK, SAND, SAND_DRY, SAND_SHORE, SEABED_SAND, SEABED_STONE, SEABED_WEED, STRATUM, type Tones } from '../palette';
 import type { View } from '../view/view';
 import type { Ground } from './ground';
@@ -26,6 +26,9 @@ const RUBBLE = 0.7, GRASS = 0.65, FALLEN = 0.5;
 /** Ground steeper than a cliff's face (ISLANDS.bare, rise over run) is bare rock: the cosine of its tilt. Its strata
  *  this many metres thick. */
 const BARE = 1 / Math.hypot(1, ISLANDS.bare), STRATA = 2.2;
+/** Sand is lit as if this share flatter than it lies, so a dune's slopes stay in the sun as the painting's flat sand
+ *  does (art/target/idea.png), turning to their shadow tone only where steep against it; a cliff's rock as it lies. */
+const FLAT = 0.6;
 
 export type Sand = (p: Vec3Node, n: Vec3Node, litter: FloatNode | null) => Vec3Node;
 
@@ -62,6 +65,6 @@ export function createSand(view: View, ground: Ground, light: Light): Sand {
     const bed = level.div(STRATA).add(sin(level.mul(0.45)).mul(0.6));
     lay(STRATUM, bare.mul(cut(fract(bed), sin(floor(bed).mul(2.4)).mul(0.2).add(0.65))));
     if (litter) lay(LITTER, cut(litter.add(mottle.mul(0.6)), FALLEN).mul(cut(height, BEACH)));
-    return light.floor(p, n, lit, shadow);
+    return light.floor(p, normalize(mix(n, view.up(p), bare.oneMinus().mul(FLAT))), lit, shadow);
   };
 }
