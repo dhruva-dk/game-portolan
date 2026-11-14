@@ -7,7 +7,7 @@ import { createAudio } from './audio/audio';
 import { scenario, type Played, type Setup, type Stage } from './debug';
 import { createWorld } from './environment';
 import { createFrame } from './frame';
-import { createMeter } from './meter';
+import { createFps, createMeter } from './meter';
 import { createGame } from './play/game';
 import { createPlaceholder } from './play/placeholder';
 import { createReferee } from './play/referee';
@@ -54,6 +54,8 @@ async function stage(setup: Setup): Promise<Stage> {
   const world = createWorld(setup.seed, setup.mean, setup.swing, setup.hours);
   const frame = createFrame(renderer, world, setup.drawing);
   const meter = setup.meter ? createMeter(renderer, meterEl) : null;
+  // without the meter, the frame rate alone, top left under the vitals
+  const fps = meter ? null : createFps(document.getElementById('fps')!);
 
   return {
     world, start: startOf(world.planet), canvas: renderer.domElement, anchors: frame.anchors, ready: frame.ready,
@@ -72,6 +74,7 @@ async function stage(setup: Setup): Promise<Stage> {
         const rendered = performance.now() - begun;
         drawn?.(renderer.domElement);
         meter?.sample(performance.now() - now, rendered);
+        fps?.(performance.now() - now);
       });
     },
   };
