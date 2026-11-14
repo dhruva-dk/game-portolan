@@ -84,11 +84,11 @@ const STORM_SUNLIT = tint(STORM.lit, 0.85);
  * hand-over from the space eye's air to this haze shows no step.
  */
 const HAZE_DEPTH = 0.06, HAZE_DISTANCE = 270, HAZE_SHAPE = 6, HAZE_HEIGHT = 8, HAZE_BAND = 0.07, REFERENCE_EYE = 77;
-const HAZE_SPECTRUM = [0.85, 1, 1.12] as const, HAZE_TINT = [1.45, 1, 0.45] as const, HAZE_SUN = 0.35, HAZE_G = 0.72;
+const HAZE_SPECTRUM = [0.85, 1, 1.12] as const, HAZE_TINT = [0.85, 0.72, 0.9] as const, HAZE_SUN = 0.35, HAZE_G = 0.72;
 const HAZE_ABOVE = [110, 200] as const;
-/** The band along the sky's foot is this many times as deep as the sea's haze at HAZE_DISTANCE: a golden glow along
- *  the horizon, as art/target/idea.png's, rather than a pale blue one. */
-const HAZE_BAND_DEPTH = 6;
+/** The band along the sky's foot is this many times as deep as the sea's haze at HAZE_DISTANCE: a dusky lilac along
+ *  the horizon, as art/target/idea.png's (#988CAE…#CAB1BC), rather than the pale peach review33 saw. */
+const HAZE_BAND_DEPTH = 3;
 /** The sky's blue drawn richer than the air's: its colour this many times as far from its grey (the target painting's
  *  deep blue overhead, art/target/idea.png), the disc and its glow left as they are. */
 const SKY_SATURATION = 2.2;
