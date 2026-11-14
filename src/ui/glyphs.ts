@@ -1,5 +1,5 @@
-// The woodcut glyphs the UI draws, as data: the old game's icon sets (game-portolan-0117 src/icons/sets/*) baked to
-// their primitives on a 24-unit square, as the approved UI sheet (docs/ui-sheet) draws them. ink.ts cuts them.
+// The woodcut glyphs the UI draws, as data: the old game's icon sets (commit ae981b6: src/icons/sets/*) baked to
+// their primitives on a 24-unit square. ink.ts cuts them.
 //   k: 'f' a filled shape, hatched in its ink and outlined; 's' a stroke of width w
 //   cut: drawn in the paper's colour over the rest (a white line cut into the block); top: drawn last
 //   fine: only at 40 units and up; bold: only below; tr: an SVG transform; op: opacity

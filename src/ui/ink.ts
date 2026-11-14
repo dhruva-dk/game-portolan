@@ -2,8 +2,7 @@
 // world (paper slips with rough-cut edges, paper discs, woodcut glyphs, ruled bars, italic numerals). Each is SVG
 // markup in the piece's own units; a piece sets it into an <svg>, and the page carries DEFS once (ui.ts).
 //
-// After the approved UI sheet (docs/ui-sheet), which drew the old game's instruments (game-portolan-0117
-// src/chart/inks.ts, screens/instruments.ts) this way.
+// After the old game's instruments (commit ae981b6: src/chart/inks.ts, screens/instruments.ts).
 
 import { GLYPHS, type Glyph, type Prim } from './glyphs';
 

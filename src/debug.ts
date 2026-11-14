@@ -3,7 +3,7 @@
 // as released and opens at the title. The scenario drives the game, its referee and the screens' flow only through
 // what they offer anyone (main.ts builds them; this only sets them going).
 //
-// ?mood= puts the whole look on one of the art direction's alternates (docs/art-direction.md): dawn, a low morning sun
+// ?mood= puts the whole look on one of its alternates: dawn, a low morning sun
 // in a rose mist; warm, a low evening sun over a deeper sea; noon, a high sun, bright and saturated (MOODS: the hour and the haze; the grade, light shafts and
 // haze follow the sun's height). ?t=hours sets the time of day (the same everywhere: world/sun.ts); ?wind=m/s the wind's speed, ?haze= the air's
 // aerosol and ?cloud= the cloud cover (0–1) each hold at that instead of drifting (world/weather.ts); ?seed= the

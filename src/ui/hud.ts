@@ -1,4 +1,4 @@
-// The match's HUD, laid on the world as the chartmaker's slips (docs/ui-sheet, as the owner reworked it):
+// The match's HUD, laid on the world as the chartmaker's slips:
 //   top left    the vitals slip: shield (azure) over hull, each with its numeral
 //   top centre  the Storm's clock (its spiral, m:ss; in the Storm's violet under 30 s) and the ships afloat (a ship, a count)
 //   top right   the minimap (minimap.ts), north up: who holds the sea, the islands, the Storm's calm and the next, the
