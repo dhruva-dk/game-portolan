@@ -73,9 +73,9 @@ const STORM_FOAM = 0.45, STORM_DARK = 0.3;
 /**
  * The storm's foot: the sea churned white from its edge out to FOOT (fading over the second) metres; and its edge's
  * line, EDGE_LINE m to each side (or most of a pixel), the calm's gold at its foot (STORM_FOOT) at EDGE_LIGHT of what a white surface
- * in the open shows (over 1, so the bloom takes it).
+ * in the open shows: under the bloom, so it is a drawn line, not the hard bright band review28 saw.
  */
-const FOOT = [6, 26] as const, EDGE_LINE = 0.3, EDGE_LIGHT = 0.9, EDGE_FAR = [0.4, 2] as const;
+const FOOT = [6, 26] as const, EDGE_LINE = 0.3, EDGE_LIGHT = 0.5, EDGE_FAR = [0.4, 2] as const;
 /** The middle cascade's crests in the water's tones: the height (of the sea's amplitude) that is a full crest, and
  *  how much of the crest the tones read they take. */
 const CHOP = [0.15, 0.85] as const;
@@ -95,7 +95,7 @@ const STROKE_PX = 60;
 /** The calm's water along the wall's foot gold (art/target/idea.png), out to GOLD metres from its edge, at most GOLD_SHARE
  *  of the way to the palette's gold as bright as a white surface in the open, rising as the square of nearness so it is
  *  a soft glow along the wall rather than a hard pale seam. */
-const GOLD = 15, GOLD_SHARE = 0.5;
+const GOLD = 15, GOLD_SHARE = 0.3;
 /** How much of the sun a ship's shadow takes from the water: some, so she sits on the sea, but not a dark smear
  *  across it (art/target/idea.png's ships cast barely any). */
 const SHIP_SHADE = 0.5;
@@ -235,7 +235,7 @@ export function createWater(view: View, sky: Sky, ground: Ground, wind: Wind, sh
     const storm = sky.storm(p), past = sky.stormEdge(p);
     // the storm's foot churned white along its edge, over the crests
     const foot = smoothstep(-2, 2, past).mul(float(1).sub(smoothstep(FOOT[0], FOOT[1], past)));
-    foam.assign(max(mix(foam, max(foam, smoothstep(0.55, 1, phase)), storm.mul(STORM_FOAM)), foot.mul(smoothstep(0.2, 0.8, phase)).mul(0.8)));
+    foam.assign(max(mix(foam, max(foam, smoothstep(0.55, 1, phase)), storm.mul(STORM_FOAM)), foot.mul(smoothstep(0.2, 0.8, phase)).mul(0.4)));
     // and its line on the water: so wide in metres near, never under a pixel and a half; fading out where a pixel
     // spans metres (EDGE_FAR), so along the horizon the gold band's glow is left, not a hard seam
     const edgeLine = float(1).sub(smoothstep(0, max(footprint, 0.05), abs(past).sub(max(float(EDGE_LINE), footprint.mul(0.75)))))
