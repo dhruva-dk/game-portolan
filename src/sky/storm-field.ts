@@ -49,9 +49,10 @@ const FINE = 0.29, SLOPE = 5;
 const PUFF = 1.5, PUFF_MID = 0.75, CREASE = 0.25;
 /** The round heads over the heaps (the coarse Worley's cells, domed): how far they reach, in the billows' units, and
  *  their mean (so the wall stands where it did). */
-const HEADS = 0.8, HEAD_MID = 0.5;
-/** The heads' pattern's tile as a share of the billows' (its cells a quarter of it: about 240 m, as the wall's height). */
-const HEAD_TILE = 2.5;
+const HEADS = 1.0, HEAD_MID = 0.5;
+/** The heads' pattern's tile as a share of the billows' (its cells a quarter of it: about 115 m, so the crown is a bank
+ *  of many heads, as art/target/idea.png's, rather than a few the wall's height that read as one slab). */
+const HEAD_TILE = 1.2;
 /** The rain's pattern: across (its shafts a quarter of it), along its fall, how far it leans a metre down, how fast it
  * falls (m/s); and how far in from the edge it thickens. */
 const RAIN_TILE = 90, RAIN_LONG = 520, RAIN_LEAN = 0.25, FALL = 11, RAIN_RAMP = 10;
