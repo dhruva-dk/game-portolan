@@ -8,7 +8,7 @@
 // Everything is a function of the world position alone (the sea floor's mesh slides along under the eye).
 // Lit like everything else (sky/light.ts).
 
-import { dot, float, fract, mix, vec3 } from 'three/tsl';
+import { dot, float, floor, fract, mix, sin, vec3 } from 'three/tsl';
 import { LITTER, ROCK, SAND, SAND_DRY, SAND_SHORE, SEABED_SAND, SEABED_STONE, SEABED_WEED, STRATUM, type Tones } from '../palette';
 import type { View } from '../view/view';
 import type { Ground } from './ground';
@@ -58,7 +58,9 @@ export function createSand(view: View, ground: Ground, light: Light): Sand {
     // a cliff's face: bare rock above the sea, in strata of two tones
     const bare = cut(float(1).sub(dot(n, view.up(p))), 1 - BARE).mul(cut(height, SHORE));
     lay(ROCK, bare);
-    lay(STRATUM, bare.mul(cut(fract(level.div(STRATA)), 0.65)));
+    // the bands unevenly laid: the beds bunched and spread up the face, and each pale band its own thickness
+    const bed = level.div(STRATA).add(sin(level.mul(0.45)).mul(0.6));
+    lay(STRATUM, bare.mul(cut(fract(bed), sin(floor(bed).mul(2.4)).mul(0.2).add(0.65))));
     if (litter) lay(LITTER, cut(litter.add(mottle.mul(0.6)), FALLEN).mul(cut(height, BEACH)));
     return light.floor(p, n, lit, shadow);
   };
