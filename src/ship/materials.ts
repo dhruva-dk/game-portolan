@@ -32,6 +32,7 @@ import type { Light } from '../sky/light';
 import { BELLY_UNIT, PENNANT_LENGTH, PIVOT_Z, RADIUS_UNIT, UV_RANGE } from './build';
 import { breath, type Cloth } from './cloth';
 import { CLOTH } from './kit';
+import { TOPSAILS } from './sails';
 import { CREAM, DYE_GLOW, TAR } from '../palette';
 import { createWood, shaded } from './wood';
 import { line, type FloatNode, type Vec3Node } from '../tsl';
@@ -160,6 +161,10 @@ export function createShipMaterials(light: Light, pixel: FloatNode, canvas: Clot
   const drawn = select(isPennant, across, filled), drawnNormal = normalize(drawn);
   const clothNormal = varying(turn(brace(mix(drawnNormal, simulatedNormal, share), false)));
   const clothKind = varying(kind);
+  // a topsail is plain dye: her mark and stripes are on the courses alone, so at a distance her canvas reads as a few
+  // big sails rather than many small flags
+  const gridIndex = nrm.w.mul(127).round();
+  const topsail = varying(select(TOPSAILS.slice(1).reduce((t, i) => t.or(gridIndex.equal(i)), gridIndex.equal(TOPSAILS[0])), float(1), float(0)));
   clothMaterial.colorNode = Fn(() => {
     const uvs = attribute('uv', 'vec2').mul(UV_RANGE);
     // seams between the cloths, and the boltrope round the edges, each about a pixel wide and fading out once too
@@ -181,7 +186,7 @@ export function createShipMaterials(light: Light, pixel: FloatNode, canvas: Clot
       return select(square.and(armX.or(armY)), float(1), float(0));
     };
     const mark = cross(0);
-    const marked = max(band, max(mark, stripe.mul(float(1).sub(cross(FRINGE)))));
+    const marked = max(band, max(mark, stripe.mul(float(1).sub(cross(FRINGE))))).mul(float(1).sub(topsail));
     // a mark as dark or as light as its canvas would not show: it is drawn in cream instead
     const luma = vec3(0.2126, 0.7152, 0.0722);
     const ink = select(abs(dot(paint.rgb, luma).sub(dot(cloth.rgb, luma))).lessThan(UNSEEN), vec3(...CREAM), paint.rgb);

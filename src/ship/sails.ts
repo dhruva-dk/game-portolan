@@ -36,6 +36,9 @@ export const YARDS: readonly Yard[] = [
   { mast: 'fore', y: MASTS.fore.cross - 1.15, len: 11.7, r: 0.12, sail: { drop: 8.6, foot: 15.6, belly: 1.6, scallop: 0.5 } },
 ];
 
+/** Which of buildSails' grids are topsails (it lays the square sails first, in YARDS' order). */
+export const TOPSAILS: readonly number[] = YARDS.flatMap((Y, i) => (Y.y > MASTS[Y.mast].top ? [i] : []));
+
 /** The yard's centre line, unbraced: how far forward of its mast's axis it hangs. */
 export const yardZ = (Y: Yard): number => mastZ(Y.mast) + MASTS[Y.mast].r + Y.r + 0.15;
 /** A point x metres out along the yard (to port, +x). */
