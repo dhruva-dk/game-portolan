@@ -82,7 +82,7 @@ const ARM = 0.18, ARM_LIFE = 22, ARM_FADE = 10, ROUGH = 0.45;
 const ARM_WIDTH = 0.9, WIDEN = 0.05;
 /** The bow wave's foam along the arms: how long it lasts, seconds (fading by e each); and how white the streaks its
  *  crests leave behind it are. Bold, so her wake reads as a long white V (art/target/idea.png). */
-const BOW_LIFE = 4, STREAK = 0.6;
+const BOW_LIFE = 10, STREAK = 0.6;
 /** The ribbon reaches this many of an arm's half-widths past its crest (and at least ARM_ROOM metres), and at least
  * this many of the churn's half-widths. */
 const ARM_REACH = 4, ARM_ROOM = 4, CHURN_ROOM = 2.6;
