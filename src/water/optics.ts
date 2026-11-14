@@ -41,7 +41,7 @@ const CLOUDY = 0.12;
  *  under it, as an optical depth. */
 const AIRED = 0.6, AIR_VEIL = 2;
 /** The troughs' tone, of the water's, and where between trough and crest (0…1) its edge lies. */
-const TROUGH = 0.8, TROUGH_AT = 0.4;
+const TROUGH = 0.8, TROUGH_AT = 0.47;
 /** What sets a point in the troughs' tone: the swell's crest (0…1), by this much of its range about its middle. The
  *  short waves' facets are left out of it: their marks fell in grain along the tone's edge, where art/target/idea.png
  *  draws its water's shapes with clean edges. */
