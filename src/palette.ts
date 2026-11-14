@@ -55,7 +55,9 @@ export const IRON = tones('#4A4450', '#2A2233');
 export const SEA_SHALLOW = ink('#22B4B6');
 export const SEA_MIDDLE = ink('#1C7AB6');
 export const SEA_DEEP = ink('#244C92');
-export const FOAM = ink('#FFF9EC');
+/** A cool white, so under the warm sun foam prints white as art/target/idea.png's, not the cream review34 saw merging
+ *  into the sand. */
+export const FOAM = ink('#EEF6FF');
 
 // ---- the sky
 export const STORM = tones('#9483D4', '#574790');

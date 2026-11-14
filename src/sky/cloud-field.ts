@@ -82,15 +82,13 @@ const STEP = 0.06;
 export const DIFFUSION = 0.75 * (1 - 0.85);
 /** The cloud's edge: where its density (of the full) crosses EDGE_AT, over EDGE_WIDTH either way. */
 const EDGE_AT = 0.2, EDGE_WIDTH = 0.12;
-/** The one tap toward the sun, km; the cloud there (of the full) past which a point is in shadow, and the edge's width. */
-const LIGHT_TAP = 0.15, SHADE_AT = 0.35, SHADE_EDGE = 0.08;
+/** The one tap toward the sun, km; the cloud there (of the full) past which a point is in shadow, and the edge's width:
+ *  high enough that most of a cumulus is in the sun, cream over small cool bases as art/target/idea.png's, not the
+ *  grey-mauve with thin cream rims review34 saw. */
+const LIGHT_TAP = 0.1, SHADE_AT = 0.8, SHADE_EDGE = 0.1;
 /** How much of the sun's own colour the cloud's lit tone keeps (the rest is the palette's cream at the sun's
  *  brightness); and how bright its shadow tone is, of what a white surface in the open gets. */
 const WARMED = 0.8, UNDERLIT = 0.7;
-/** The shadow tone's modelling: times UNDER_THIN where the cloud is thin (THICK[0] of the full), UNDER_THICK where it
- *  is THICK[1] times the full, so a base seen from beneath shows its billows' thin rims and dark cores, not the flat
- *  slab review33 saw. */
-const UNDER_THIN = 1.5, UNDER_THICK = 0.65, THICK = [0.6, 1.6] as const;
 const LUMA = vec3(0.2126, 0.7152, 0.0722);
 
 
@@ -236,8 +234,7 @@ export function createCloudField(tables: Tables, noise: CloudNoise) {
             const radius = length(vec3(q.x, q.y.add(eye.y).add(BOTTOM), q.z));
             const sunLight = sunTransmittance(radius, dot(normalize(vec3(q.x, q.y.add(eye.y).add(BOTTOM), q.z)), sunDir));
             const sunTone = mix(vec3(dot(sunLight, LUMA)), sunLight, WARMED).mul(vec3(...CLOUD.lit));
-            const thick = smoothstep(THICK[0], THICK[1], c.dense.div(FULL));
-            const S = under.mul(mix(float(UNDER_THIN), float(UNDER_THICK), thick)).add(sunTone.mul(lit.mul(1 / Math.PI)));
+            const S = under.add(sunTone.mul(lit.mul(1 / Math.PI)));
             const stepT = exp(rho.mul(-SIGMA).mul(dt));
             const absorbed = T.mul(float(1).sub(stepT));
             L.addAssign(S.mul(absorbed));
