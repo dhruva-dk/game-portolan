@@ -24,8 +24,9 @@ not its every pixel.
 - **Clear shallows.** Turquoise water with the bed and its stones seen through it, deepening quickly to
   ultramarine.
 - **Foam as flat white shapes:** a thick band where water meets shore, and a bold scalloped wake.
-- **Ships read by their sails.** Each enemy is one strong colour, hull and canvas alike. The player's is cream
-  canvas with a vermilion cross over a vermilion and timber hull.
+- **Ships read by their sails.** Each enemy is one strong colour, hull and canvas alike. The player's differs from
+  the target by the owner's choice: vermilion sails with the emblem on them in cream, over a vermilion and timber
+  hull.
 - **The storm is a violet wall** with lightning in it, and the fair-weather clouds are cream with rose undersides.
 - **Territory is a thin bright line** in the owner's colour with only a faint tint inside.
 - **Loot is the gilded gun itself** under a thin beam of light.
@@ -222,8 +223,10 @@ old `light(p, n)`, `glossy` or `rim` any more, delete each with what only it use
 
 ### Step 9. The ships' colours
 
-- **`play/colours.ts`:** the player's ship is canvas sails with a vermilion cross and vermilion paint, pattern
-  `plain`. The others' paints and sails come from the palette: each ship one strong colour, hull and canvas of the
+- **`play/colours.ts`:** the player's ship has vermilion sails and vermilion paint, pattern `plain`, with her
+  emblem (the cross the sails carry today) in cream. `ship/materials.ts` already draws a mark in cream when its
+  paint is as dark as its canvas (`UNSEEN`, `CREAM`): use that rule, with the cream from the palette. Her sails are
+  the only red ones at sea. The others' paints and sails come from the palette: each ship one strong colour, hull and canvas of the
   same family (ochre, verdigris, ultramarine, murrey, charcoal and so on). None is a blue or green near the sea's.
   No other ship is vermilion. `seaColourOf` follows.
 - **`loot/loot.ts`:** the floating gun in gilding, two tones and the hard highlight; the beam thin and gold.
