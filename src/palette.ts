@@ -65,8 +65,9 @@ export const STORM = tones('#9483D4', '#574790');
 export const STORM_FOOT = ink('#F5C67A');
 export const LIGHTNING = ink('#D9C2FF');
 /** A fair-weather cloud: a pale cream where the sun lights it, a cool lilac grey beneath (art/target/idea.png's
- *  cumulus: white-topped, not the even salmon review32 saw). */
-export const CLOUD = tones('#FFE2B8', '#B4A6BC');
+ *  cumulus: white-topped, not the even salmon review32 saw); both warm, as the sky's lilac adds its blue (review36
+ *  saw them pink). */
+export const CLOUD = tones('#FFE6A0', '#BCA8B0');
 /** Powder smoke: a cloud's cream, and a deeper rose in its shadow. */
 export const SMOKE = tones('#FFF1D6', '#D9907C');
 
