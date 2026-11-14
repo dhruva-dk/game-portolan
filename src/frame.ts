@@ -37,9 +37,10 @@ import type { Vec4Node } from './tsl';
 const BLOOM = 0.22;
 /**
  * The frame's pixels per CSS pixel, whatever the screen's own: the phone's is 3, and the browser scales the frame up to
- * it. At 1 its 956×440 smeared her hull and rigging; 1.5 (1434×660) is what the phone's GPU affords at 30–40 FPS.
+ * it. At 1 its 956×440 smeared her hull and rigging; 1.5 (1434×660) read soft; 2 (1912×880) is on trial against the
+ * 30–40 FPS budget.
  */
-const SCALE = 1.5;
+const SCALE = 2;
 const shaftsFor = (rise: number) => 0.6 * (1 - 0.5 * Math.min(1, Math.max(0, (rise - 0.2) / 0.6)));
 /** The eye's near and far planes, metres: in the air, past the far side of the planet from as high as it goes; from
  *  space, round the whole planet from as far out as the full map goes. */
@@ -92,7 +93,7 @@ export interface FrameOptions {
  *                 the guns' smoke, flashes and spray (gunfire/gunfire.ts), blended over it
  *   3. post     — clouds over whatever they stand in front of, the haze by distance over both (sky.ts fog), the
  *                 storm's rain and cloud over all of it (sky/storm.ts: a short march, from where the ray meets its cone), drawn
- *                 once to a full-size texture of light; then, at the phone's 956×440 drawn at SCALE (1434×660, the
+ *                 once to a full-size texture of light; then, at the phone's 956×440 drawn at SCALE (1912×880, the
  *                 browser scaling the frame up to the screen):
  *        bloom        7 passes, the largest a quarter size (359×165), 4–5 taps each: ~0.4 M taps (post/bloom.ts)
  *        shafts       3 passes at a quarter size, 2 + 16 + 16 taps: ~2 M taps (post/shafts.ts)
