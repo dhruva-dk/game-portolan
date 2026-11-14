@@ -297,7 +297,8 @@ function rudder(acc: Acc, D: Detail): void {
 
 function beakhead(acc: Acc, D: Detail): void {
   const stem = (y: number) => V(0, y, zOf(1, y) + 0.1);
-  const tip = V(0, 3.75, zOf(1, 3.5) + 4.8);
+  // short, so she isn't drawn as riding a sled
+  const tip = V(0, 3.85, zOf(1, 3.5) + 3.3);
   const n = D.fittings ? 10 : 5;
   // the knee of the head: a deep timber from the cutwater sweeping forward and up to the beak's tip, planked and oiled
   // as the hull is (in pitch it stood off her bow as a black boat of its own)
@@ -317,7 +318,7 @@ function beakhead(acc: Acc, D: Detail): void {
   acc.with({ kind: KIND.paint }, () => tube(acc, range(0, 1, n).map(bez), 0.1, Math.max(3, D.waleSides), { caps: true }));
   // the beak's platform, narrowing to the tip
   const yb = 3.6, z0 = zOf(1, yb) - 0.4;
-  const plat = [V(-1.15, yb, z0), V(1.15, yb, z0), V(0.25, tip.y, tip.z - 0.3), V(-0.25, tip.y, tip.z - 0.3)];
+  const plat = [V(-0.9, yb, z0), V(0.9, yb, z0), V(0.2, tip.y, tip.z - 0.3), V(-0.2, tip.y, tip.z - 0.3)];
   acc.with({ kind: KIND.deck }, () => fan(acc, plat, V(0, 1, 0), 1.5));
   if (!D.fittings) return;
   acc.with({ kind: KIND.spar }, () => {

@@ -140,9 +140,10 @@ function lateenLines(ropes: Acc, D: Detail): void {
 
 // ---------------------------------------------------------------- shrouds and stays
 
-/** A deadeye: a round block of dark wood, turned to face out of the shroud's plane. */
+/** A deadeye: a round block of wood, the spars' (dark ones read as a row of holes along her side), turned to face out
+ *  of the shroud's plane. */
 function deadeye(acc: Acc, at: Vector3, dir: Vector3, side: number): void {
-  acc.with({ kind: KIND.dark }, () => lathe(acc, [[0, -0.06], [0.18, -0.03], [0.18, 0.03], [0, 0.06]], 5, along(at, V(side, 0, 0), dir)));
+  acc.with({ kind: KIND.spar }, () => lathe(acc, [[0, -0.06], [0.18, -0.03], [0.18, 0.03], [0, 0.06]], 5, along(at, V(side, 0, 0), dir)));
 }
 
 function shrouds(body: Acc, ropes: Acc, D: Detail, name: MastName): void {
