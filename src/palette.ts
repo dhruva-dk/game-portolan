@@ -37,8 +37,8 @@ export const PALM_LEAF_OLD = tones('#A8B03A', '#5E6A3A');
 export const PALM_NUT = tones('#B8862E', '#6E4A2A');
 export const PALM_TRUNK = tones('#8A5630', '#55303A');
 export const SHRUB = tones('#6FAE3C', '#2C6A4A');
-export const SEABED_SAND = tones('#E8D08A', '#B89A6A');
-export const SEABED_STONE = tones('#8FA08A', '#55707A');
+export const SEABED_SAND = tones('#EADDB4', '#B8A27C');
+export const SEABED_STONE = tones('#5E6A5A', '#344A55');
 export const SEABED_WEED = tones('#4F9A6E', '#2E6A62');
 
 // ---- the ships

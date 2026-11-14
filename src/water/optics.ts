@@ -29,7 +29,6 @@ export const N_WATER = 1.34;
 const F0 = 0.02;
 /** How much of what Fresnel gives the sea's mirror keeps: the sea stays its own colour out to the horizon. */
 const MIRROR = 0.2;
-/** The water's depth over the floor, metres, at which its tone is the middle one, and the deep one. */
 /** Water turquoise to SHALLOW_TO metres deep, the middle blue by MIDDLE_AT, the deep by DEEP_AT: so the shallow ring
  *  hugs the shore, and open-sea banks a few metres further down are blue, not turquoise blotches (art/target/idea.png). */
 const SHALLOW_TO = 2.5, MIDDLE_AT = 6, DEEP_AT = 11;
@@ -37,7 +36,7 @@ const SHALLOW_TO = 2.5, MIDDLE_AT = 6, DEEP_AT = 11;
  *  LOOK_FROM (cosine) off the level to straight down. */
 const LOOK_DOWN = 0.25, LOOK_FROM = 0.3;
 /** How fast the water's own tone veils what lies under it, per metre of the eye's path through it. */
-const CLOUDY = 0.2;
+const CLOUDY = 0.12;
 /** How far a wake's air at its thickest takes the water toward the shallows' tone; and how much it veils what lies
  *  under it, as an optical depth. */
 const AIRED = 0.6, AIR_VEIL = 2;
