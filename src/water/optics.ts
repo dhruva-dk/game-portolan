@@ -31,9 +31,9 @@ const F0 = 0.02;
 const MIRROR = 0.45;
 /** The roughness the sky's reflection is blurred to at the least: a few broad shapes of cloud and sky, no detail. */
 const BLURRED = 0.55;
-/** Water turquoise to SHALLOW_TO metres deep, the middle blue by MIDDLE_AT, the deep by DEEP_AT: so the shallow ring
- *  hugs the shore, and open-sea banks a few metres further down (SEA.bank, 3 m and more) are the deep's blue. */
-const SHALLOW_TO = 2, MIDDLE_AT = 3.5, DEEP_AT = 6;
+/** Water turquoise to SHALLOW_TO metres deep, the middle blue by MIDDLE_AT, the deep by DEEP_AT: the turquoise eases
+ *  into the middle blue over the first few metres, and that into the deep over the next ten. */
+const SHALLOW_TO = 0, MIDDLE_AT = 4, DEEP_AT = 14;
 /** How fast the water's own tone veils what lies under it, per metre of the eye's path through it: a bank's sand 8 m
  *  down is a sixth of what the eye sees. */
 const CLOUDY = 0.22;
