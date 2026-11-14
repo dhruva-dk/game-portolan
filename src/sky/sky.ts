@@ -83,7 +83,7 @@ const STORM_SUNLIT = tint(STORM.lit, 0.85);
  * gone by the height the arrival's eye comes down into the air from space (play/arrival.ts ARRIVAL.air), so the
  * hand-over from the space eye's air to this haze shows no step.
  */
-const HAZE_DEPTH = 0.25, HAZE_DISTANCE = 270, HAZE_SHAPE = 10, HAZE_HEIGHT = 8, HAZE_BAND = 0.035, REFERENCE_EYE = 77;
+const HAZE_DEPTH = 0.12, HAZE_DISTANCE = 270, HAZE_SHAPE = 10, HAZE_HEIGHT = 8, HAZE_BAND = 0.035, REFERENCE_EYE = 77;
 const HAZE_SPECTRUM = [0.85, 1, 1.12] as const, HAZE_TINT = [1.45, 1, 0.45] as const, HAZE_SUN = 0.22, HAZE_G = 0.72;
 const HAZE_ABOVE = [110, 200] as const;
 /** The sky's blue drawn richer than the air's: its colour this many times as far from its grey (the target painting's
