@@ -44,7 +44,7 @@ const SHAPE_SCALE = 1.0, DETAIL_SCALE = 0.4;
 export const SIGMA = 60;
 /** The air between the eye and a cloud is taken as this share of its length: a painter's horizon cumulus stays crisp
  *  to its base (art/target/idea.png) where the whole air's would grey its lower half (review26). */
-const CLOUD_AIR = 0.5;
+const CLOUD_AIR = 0.25;
 /** The shaped noise's density past which the cloud is at its densest. */
 const FULL = 0.35;
 /**
