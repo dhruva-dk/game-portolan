@@ -30,7 +30,7 @@ const F0 = 0.02;
 /** How much of what Fresnel gives the sea's mirror keeps: the sea stays its own colour out to the horizon. */
 const MIRROR = 0.2;
 /** The water's depth over the floor, metres, at which its tone is the middle one, and the deep one. */
-const MIDDLE_AT = 6, DEEP_AT = 30;
+const MIDDLE_AT = 6, DEEP_AT = 16;
 /** How fast the water's own tone veils what lies under it, per metre of the eye's path through it. */
 const CLOUDY = 0.2;
 /** How far a wake's air at its thickest takes the water toward the shallows' tone; and how much it veils what lies
@@ -40,7 +40,7 @@ const AIRED = 0.6, AIR_VEIL = 2;
 const TROUGH = 0.65, TROUGH_AT = 0.4;
 /** The sun's glints: the cosine between the surface's normal and the half vector past which it mirrors the sun to the
  *  eye, the width of that edge, and the glint's light of what a white surface gets from the sun square on. */
-const GLINT = 0.9996, GLINT_EDGE = 0.0002, GLINT_LIGHT = 0.5;
+const GLINT = 0.9998, GLINT_EDGE = 0.0001, GLINT_LIGHT = 0.4;
 
 const absorption = vec3(...ABSORPTION);
 
