@@ -20,6 +20,8 @@ import {
 const PLANK_TILE = 3.4;
 /** The decks' runs across: the inboard faces see less of the sky. */
 const DECK_AO = 0.75, INBOARD_AO = 0.8;
+/** How far over the main deck the band in the captain's colour along her topsides reaches. */
+const TOPSIDE = 0.5;
 
 export function buildHull(body: Acc, D: Detail): void {
   skin(body, D);
@@ -118,13 +120,12 @@ function strakes(acc: Acc, D: Detail): void {
     wale(acc, D, (s) => md(s) + 2.25 - 0.25 + 0.4 * sm(0.8, 1, s), 0.81, 0.975, 0.08);
     wale(acc, D, (s) => md(s) + 4.3 - 0.3, 0.0, 0.13, 0.08);
   });
-  // the painted strakes just over each wale, and a band along the waist's sheer: the captain's colour. Twice the
-  // drawings' height where there is no wale to show them, so they still read from afar.
+  // the painted strakes just over each wale, the main wale's a broad band along her topsides that reads from afar,
+  // as the painting has it: the captain's colour. Twice the drawings' height where there is no wale to show them.
   const k = D.waleSides ? 1 : 2;
   acc.with({ kind: KIND.paint }, () => {
-    strake(acc, D, (s) => md(s) - 0.2, (s) => md(s) - 0.2 + 0.12 * k, 0.0, 0.975);
+    strake(acc, D, (s) => md(s) - 0.2, (s) => md(s) + TOPSIDE, 0.0, 0.975);
     strake(acc, D, (s) => md(s) - 1.22, (s) => md(s) - 1.22 + 0.1 * k, 0.0, 0.96);
-    strake(acc, D, (s) => md(s) + 0.3, (s) => md(s) + 0.3 + 0.1 * k, 0.42, 0.75);
     strake(acc, D, (s) => md(s) + 2.0, (s) => md(s) + 2.0 + 0.1 * k, 0.0, 0.37);
     strake(acc, D, (s) => md(s) + 2.45 + 0.4 * sm(0.8, 1, s), (s) => md(s) + 2.45 + 0.1 * k + 0.4 * sm(0.8, 1, s), 0.81, 0.97);
     strake(acc, D, (s) => md(s) + 4.45, (s) => md(s) + 4.45 + 0.1 * k, 0.0, 0.14);
@@ -143,8 +144,8 @@ function bulwarks(acc: Acc, D: Detail): void {
       sheet(acc, grid, grid.map((row) => row.map((p): [number, number] => [p.z / PLANK_TILE, p.y / PLANK_TILE])), V(-side, 0, 0));
     }
   });
-  // the cap rail over the side's top, outer edge to inner, from the stern to the stem
-  acc.with({ kind: KIND.spar }, () => {
+  // the cap rail over the side's top, outer edge to inner, from the stern to the stem: gilt, as the transom's rails
+  acc.with({ kind: KIND.gilt }, () => {
     for (const side of [1, -1]) {
       const grid = range(0.0, 0.992, D.run * 2).map((s) => {
         const y = sideTop(s), o = onSkin(s, y, side);
