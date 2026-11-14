@@ -89,6 +89,10 @@ const HAZE_ABOVE = [110, 200] as const;
 /** The band along the sky's foot is this many times as deep as the sea's haze at HAZE_DISTANCE: a dusky lilac along
  *  the horizon, as art/target/idea.png's (#988CAE…#CAB1BC), rather than the pale peach review33 saw. */
 const HAZE_BAND_DEPTH = 3;
+/** And under it, along the sea's rim, where a ray grazes the sea through the most of the low air: this optical depth
+ *  where it skims the water, thinning by e each LIMB_HEIGHT metres it passes over it, its glow tinted LIMB_TINT: the
+ *  thin gold line along art/target/idea.png's horizon, under the lilac (review36 saw none). */
+const LIMB_DEPTH = 2, LIMB_HEIGHT = 3, LIMB_TINT = [1.8, 1.35, 0.75] as const;
 /** The sky's blue drawn richer than the air's: its colour this many times as far from its grey (the target painting's
  *  deep blue overhead, art/target/idea.png), the disc and its glow left as they are. */
 const SKY_SATURATION = 2.2;
@@ -160,12 +164,12 @@ export function createSky(view: View, bolt: boolean) {
 
   /** What the haze glows with along world direction dir: the sky's glow at the horizon under it, and the sun's light
    *  scattered forward by the droplets, warm round the sun and cool away from it. */
-  const hazeColor = (dir: Vec3Node): Vec3Node => {
+  const hazeColor = (dir: Vec3Node, tint: Vec3Node = vec3(...HAZE_TINT)): Vec3Node => {
     const d = view.toSky(dir);
     const horizon = skyRadiance(normalize(vec3(d.x, 0.02, d.z)), skySun);
     const forward = hg(dot(normalize(vec3(d.x, max(d.y, 0), d.z)), skySun), HAZE_G);
     const sunlight = sunTransmittance(VIEW_RADIUS, rise).mul(max(rise, 0.05));
-    return horizon.mul(vec3(...HAZE_TINT)).add(sunlight.mul(forward).mul(HAZE_SUN));
+    return horizon.mul(tint).add(sunlight.mul(forward).mul(HAZE_SUN));
   };
   /** The low air's mean density between two heights over the sea (metres), as a share of the sea's. */
   const meanDensity = (a: FloatNode, b: FloatNode): FloatNode => {
@@ -185,9 +189,17 @@ export function createSky(view: View, bolt: boolean) {
     const density = meanDensity(view.height, length(end).sub(R)).div(reference);
     const near = hazeDepth.mul(pow(metres.div(HAZE_DISTANCE), HAZE_SHAPE)).mul(density);
     const band = hazeDepth.mul(HAZE_BAND_DEPTH).mul(exp(max(view.toSky(dir).y, 0).div(-HAZE_BAND)));
-    const tau = select(metres.greaterThan(SKY_METRES), band, near).mul(float(1).sub(smoothstep(HAZE_ABOVE[0], HAZE_ABOVE[1], view.height)));
+    const low = float(1).sub(smoothstep(HAZE_ABOVE[0], HAZE_ABOVE[1], view.height));
+    const sky = metres.greaterThan(SKY_METRES);
+    const tau = select(sky, band, near).mul(low);
     const T = exp(vec3(...HAZE_SPECTRUM).mul(tau).negate());
-    return color.mul(T).add(hazeColor(dir).mul(vec3(1).sub(T)));
+    const hazed = color.mul(T).add(hazeColor(dir).mul(vec3(1).sub(T)));
+    // a ray past the sea's rim: how near the water it passes (it has passed its nearest when it leaves the eye rising)
+    const o = view.position, past = dot(o, dir);
+    const skim = select(past.lessThan(0), length(cross(o, dir)), length(o)).sub(R);
+    const limb = select(sky, exp(max(skim, 0).div(-LIMB_HEIGHT)).mul(LIMB_DEPTH).mul(low), float(0));
+    const L = exp(vec3(...HAZE_SPECTRUM).mul(limb).negate());
+    return hazed.mul(L).add(hazeColor(dir, vec3(...LIMB_TINT)).mul(vec3(1).sub(L)));
   };
 
   const background = Fn(() => {
