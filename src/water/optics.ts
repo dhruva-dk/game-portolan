@@ -44,14 +44,15 @@ const CLOUDY = 0.12;
  *  under it, as an optical depth. */
 const AIRED = 0.3, AIR_VEIL = 2;
 /** The troughs' tone, of the water's, and where between trough and crest (0…1) its edge lies. */
-const TROUGH = 0.88, TROUGH_AT = 0.47;
+const TROUGH = 0.94, TROUGH_AT = 0.47;
 /** And the crests' tops, paler, past CREST_AT: the light rows of art/target/idea.png's painted waves. */
-const CREST = 1.18, CREST_AT = 0.6;
+const CREST = 1.06, CREST_AT = 0.6;
 /** And along that edge a pale line RIM[0] pixels wide, RIM[1] brighter: the thin light rims art/target/idea.png draws
  *  along each swell's top, so the sea reads as painted strokes, not blotches (review30); only where the edge lies
  *  level on the screen, the crest below it (its share of the change across the pixel along the screen's height past
- *  RIM[2] … RIM[3]), so they are open strokes, not rings round each patch. */
-const RIM = [1.5, 0.35, 0.4, 0.8] as const;
+ *  RIM[2] … RIM[3]), so they are open strokes, not rings round each patch. The lines carry the waves; the troughs'
+ *  and crests' tones under them are faint, else they print as the blotches review32 saw. */
+const RIM = [2, 0.7, 0.3, 0.8] as const;
 /** What sets a point in the troughs' tone: the swell's crest (0…1), by this much of its range about its middle. The
  *  short waves' facets are left out of it: their marks fell in grain along the tone's edge, where art/target/idea.png
  *  draws its water's shapes with clean edges. */
