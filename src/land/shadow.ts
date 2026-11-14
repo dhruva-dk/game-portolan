@@ -11,7 +11,7 @@
 import {
   DepthTexture, DoubleSide, FloatType, InstancedMesh, LessEqualCompare, Matrix4, MeshBasicNodeMaterial, OrthographicCamera, RedFormat, RenderTarget, Scene, Vector3, WebGPUCoordinateSystem,
 } from 'three/webgpu';
-import { float, select, texture, uniform, vec2, vec3, vec4 } from 'three/tsl';
+import { clamp, float, fwidth, max, select, texture, uniform, vec2, vec3, vec4 } from 'three/tsl';
 import type { Draw } from '../gpu';
 import type { IslandSite } from '../world/planet';
 import { place } from '../world/sphere';
@@ -28,6 +28,8 @@ const SPAN = 200;
  * (of the map's depth range), so a surface doesn't shadow itself. */
 const OFFSET = 0.12;
 const BIAS = 0.3 / (2 * SPAN);
+/** The most texels the look-ups spread to, where a pixel covers many of them. */
+const SPREAD = 4;
 /** Redrawn once the sun has moved this far, radians. */
 const MOVED = 0.002;
 
@@ -65,10 +67,12 @@ export function createShadow(): Shadow {
       const clip = matrix.mul(vec4(p.add(n.mul(OFFSET)), 1));
       const uv = vec2(clip.x.mul(0.5).add(0.5), clip.y.mul(-0.5).add(0.5));
       const ref = clip.z.sub(BIAS);
-      // four filtered look-ups a texel apart: soft-edged over about four texels
-      const texel = 1 / SIZE;
+      // four filtered look-ups a texel and a half apart, or as far as the pixel reaches over the map (to SPREAD texels):
+      // seen from afar a frond's leaflets, finer than the pixel, shade it evenly rather than in hatched stripes
+      const texel = 1 / SIZE, pixel = fwidth(uv);
+      const spread = clamp(max(pixel.x, pixel.y).mul(0.5), texel * 0.75, texel * SPREAD);
       const lit = [[-1, -1], [1, -1], [-1, 1], [1, 1]]
-        .map(([x, y]): FloatNode => map.sample(uv.add(vec2(x * texel * 0.75, y * texel * 0.75))).compare(ref))
+        .map(([x, y]): FloatNode => map.sample(uv.add(vec2(x, y).mul(spread))).compare(ref))
         .reduce((a, b) => a.add(b)).mul(0.25);
       // in the map's box: its square across, and its depth along the sun's rays. The square alone is a column through
       // the whole planet, and where it came out again, far past the map's depth, every point read as shadowed: a
