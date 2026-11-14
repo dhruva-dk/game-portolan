@@ -90,8 +90,10 @@ const ARM_REACH = 4, ARM_ROOM = 4, CHURN_ROOM = 2.6;
 const ROUGHEST = 14;
 /** On the inside of a turn, the ribbon reaches this share of the way to its centre. */
 const INSIDE = 0.8;
-/** Foam round a waterline at rest, and the bow wave's height at full speed, metres. */
-const LAPPING = 0.5, BOW = 0.45;
+/** Foam round a waterline at rest: a thin collar, whole against her side, out LAPPING_OUT m; past it the water she
+ *  stirs, AIR_OUT m out, pale with air at most LAPPING_AIR (optics.ts), so the white fades through turquoise to the
+ *  sea rather than ending as a cut-out band. And the bow wave's height at full speed, metres. */
+const LAPPING = 0.85, LAPPING_OUT = 0.6, AIR_OUT = 3, LAPPING_AIR = 0.6, BOW = 0.45;
 /** The patch round a hull: metres astern of her transom, ahead of her stem and out from her side. */
 const PATCH = { astern: 7, ahead: 4, out: 4.5 };
 /** The least the sun's rays may lie along the sea for her shadow: low suns stretch it no further. */
@@ -200,13 +202,14 @@ export function createWake(view: View, sky: Sky, capacity: number) {
     const m = attribute('mark', 'vec4'), across = m.x, ahead = m.y, pace = m.z;
     const d = outside(across, ahead);
     const fore = smoothstep(0.35, 0.95, ahead.sub(WATERLINE.stern).div(LENGTH));
-    const ring = exp(sq(max(d, 0).div(pace.mul(fore).mul(1.4).add(0.8))).negate()).mul(smoothstep(-0.8, 0, d));
+    const ring = exp(sq(max(d, 0).div(pace.mul(fore).mul(1.4).add(LAPPING_OUT))).negate()).mul(smoothstep(-0.8, 0, d));
     // under her transom the water she drags along boils up
     const astern = float(WATERLINE.stern).sub(ahead);
     const boil = exp(sq(astern.sub(1.5).div(2.5)).negate()).mul(exp(sq(across.div(1.8)).negate())).mul(pace);
     const foam = ring.mul(pace.mul(fore.mul(0.9).add(0.35)).add(LAPPING)).add(boil.mul(0.5));
     const height = exp(sq(max(d, 0).div(1.8)).negate()).mul(fore.mul(fore)).mul(pace.mul(pace)).mul(BOW);
-    return vec4(foam, height, ring.mul(pace).mul(0.7).add(boil), 0);
+    const stirred = exp(sq(max(d, 0).div(AIR_OUT)).negate()).mul(smoothstep(-0.8, 0, d)).mul(LAPPING_AIR);
+    return vec4(foam, height, max(ring.mul(pace).mul(0.7).add(boil), stirred), 0);
   })()));
 
   // ---- the shadows: each ship's third level pressed onto the sea along the sun (its sails bellied, as the farthest
