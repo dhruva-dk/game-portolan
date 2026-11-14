@@ -85,8 +85,10 @@ const ARM = 0.18, ARM_LIFE = 22, ARM_FADE = 10, ROUGH = 0.45;
 const ARM_WIDTH = 0.9, WIDEN = 0.05;
 /** The bow wave's foam along the arms: how long it lasts, seconds (fading by e each), and its half-width, metres; and
  *  how white the streaks its crests leave behind it are, and how wide at most (metres): bold, so her wake reads as a
- *  long white V (art/target/idea.png), but lines, not the broad smears review33 saw at speed. */
-const BOW_LIFE = 18, BOW_FOAM = 1.5, STREAK = 0.6, STREAK_WIDEST = 1.4;
+ *  short, wide white V hugging her stern (art/target/idea.png), not the two long thin arms review34 saw running to the
+ *  horizon: the streaks only a faint tail (water.ts draws foam WAKE_BOLD fuller, and the lobes cut it at about 0.28).
+ */
+const BOW_LIFE = 3, BOW_FOAM = 2.4, STREAK = 0.12, STREAK_WIDEST = 1.4;
 /** The bow wave's foam as art/target/idea.png draws a wake: a whole white rim along each arm's line, RIM_SHARE of
  *  BOW_FOAM wide, and inside it the crests curling in, feathered, CURL_REACH of it, with blue between: neither loose
  *  flecks (review27) nor one flat band, nor the chains of separate blobs review30 saw. */
@@ -185,7 +187,8 @@ export function createWake(view: View, sky: Sky, capacity: number) {
     // its foam in tongues slanting out and back from her track, fixed in the water, blue lanes between them
     const tongue = cos(laid.add(abs(across).mul(TONGUE_SLANT)).add(patchy(2, 4.5).mul(1.5)).mul(2 * Math.PI / TONGUE));
     const tongues = mix(float(TONGUE_LANE), float(TONGUE_CREST), smoothstep(-0.25, 0.25, tongue));
-    const foam = churned.mul(exp(age.div(-3)).mul(0.55).add(exp(age.div(-12)).mul(0.25).mul(churnLeft))).mul(tongues).toVar();
+    // (what lingers kept under the foam's half, so it ends cleanly, not in the detached specks review34 saw)
+    const foam = churned.mul(exp(age.div(-3)).mul(0.55).add(exp(age.div(-12)).mul(0.1).mul(churnLeft))).mul(tongues).toVar();
     const air = churned.mul(exp(age.div(-10)));
     // the arms: metres outside each's line, its half-width, and what is left of it
     const off = abs(across).sub(v.mul(age).mul(KELVIN));
