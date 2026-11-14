@@ -3,7 +3,7 @@
 // The storm stands at the safe cap's edge (sim/storm.ts), and everything here is laid out by how far past that edge a
 // point lies (e, metres along the sea; negative in the calm) and how high it is (h, metres over the sea):
 //   rain       from the edge in, under the cloud's base: shafts of heavier rain in thinner, streaked, falling
-//   the base   BASE metres up, rolled into long tubes along the edge (a shelf cloud), its front out over the calm
+//   the base   BASE metres up, all but level (rolls along the edge any deeper read as stripes), its front out over the calm
 //   the cloud  over the base, its face leaning back LEAN metres a metre up, so the eye in the calm sees the towers
 //              rise behind one another to a crown of billows at CROWN against the sky; along the edge the towers
 //              stand forward and back in bays and headlands
@@ -25,9 +25,10 @@ import { R } from '../world/sphere';
 import { STORM_FOOT } from '../palette';
 import { loop, type FloatNode, type Vec3Node } from '../tsl';
 
-/** The cloud's base, metres up, and how far its rolls lift and lower it, each ROLL_WIDTH metres across. */
+/** The cloud's base, metres up, and how far its rolls lift and lower it, each ROLL_WIDTH metres across: barely, since
+ *  deeper rolls, seen from the calm, lie as rows of wood-grain stripes over the wall's foot (review21–23). */
 export const BASE = 58;
-const ROLL = 9, ROLL_WIDTH = 26;
+const ROLL = 0.5, ROLL_WIDTH = 26;
 /** How far the base's front stands out over the calm (metres, negative: in the calm), and how far the face leans back
  * a metre up; how far its billows reach either side of it. */
 const SHELF = -12, LEAN = 0.8, FACE = 60;
