@@ -19,7 +19,7 @@
 // The march: from where the ray enters the storm (or the eye), the step is the distance to the nearest cloud or rain
 // while there is none (the bounds below, then the billows' own surface), and STEP, growing with distance, in the rain.
 
-import { Break, If, acos, atan, clamp, cos, dot, exp, float, length, max, min, mix, normalize, pow, select, sin, smoothstep, texture3D, vec3 } from 'three/tsl';
+import { Break, If, abs, acos, atan, clamp, cos, dot, exp, float, length, max, min, mix, normalize, pow, select, sin, smoothstep, texture3D, vec3 } from 'three/tsl';
 import type { Storage3DTexture } from 'three/webgpu';
 import { R } from '../world/sphere';
 import { STORM_FOOT } from '../palette';
@@ -43,6 +43,8 @@ const CLOUD_TILE = 380, CHURN = [0.6, 0.35, 0.2] as const;
 /** The finer billows on them: their pattern's tile, as a share of the coarser's. Their slope is read across SLOPE
  * metres. */
 const FINE = 0.29, SLOPE = 5;
+/** The billows folded into heaps: their fold scaled by PUFF and lowered by PUFF_MID, back to about −1…1. */
+const PUFF = 2.2, PUFF_MID = 0.9;
 /** The rain's pattern: across (its shafts a quarter of it), along its fall, how far it leans a metre down, how fast it
  * falls (m/s); and how far in from the edge it thickens. */
 const RAIN_TILE = 90, RAIN_LONG = 520, RAIN_LEAN = 0.25, FALL = 11, RAIN_RAMP = 10;
@@ -98,7 +100,8 @@ export function createStormField(cap: Cap, shape: Storage3DTexture) {
   const billows = (q: Vec3Node): FloatNode => {
     const n = texture3D(shape, q.add(churn).div(CLOUD_TILE)).level(float(0));
     const f = texture3D(shape, q.sub(churn).div(CLOUD_TILE * FINE)).level(float(0));
-    return n.r.mul(0.55).add(n.b.mul(0.15)).add(f.r.mul(0.3)).sub(0.4).mul(2.8);
+    // folded about its middle: rounded heads with sharp creases between, as cumulus heaps
+    return abs(n.r.mul(0.55).add(n.b.mul(0.15)).add(f.r.mul(0.3)).sub(0.4).mul(2.8)).mul(PUFF).sub(PUFF_MID);
   };
 
   /** The cloud at q (up: its unit vector, h: its height, e: past the edge): how far in from its surface q is
@@ -134,7 +137,7 @@ export function createStormField(cap: Cap, shape: Storage3DTexture) {
     const normal = normalize(flat.sub(slope.mul(amplitude)));
     const high = smoothstep(BASE, CROWN, h);
     const facing = clamp(dot(normal, lit.toward), 0, 1);
-    const tone = smoothstep(TONE_AT - TONE_EDGE, TONE_AT + TONE_EDGE, high.mul(0.6).add(facing.mul(0.3)).add(c.lift.mul(0.3)));
+    const tone = smoothstep(TONE_AT - TONE_EDGE, TONE_AT + TONE_EDGE, high.mul(0.35).add(facing.mul(0.55)).add(c.lift.mul(0.3)));
     // the sky's light from above (the sea's, under the base), less in the hollows between the billows
     const sky = max(dot(normal, up).mul(0.45).add(0.6), 0.3).mul(clamp(c.lift.mul(0.3).add(0.9), 0.7, 1.2));
     // and the light of the open, sunlit calm, coming in level under the shelf
