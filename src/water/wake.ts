@@ -83,9 +83,10 @@ const ARM_WIDTH = 0.9, WIDEN = 0.05;
 /** The bow wave's foam along the arms: how long it lasts, seconds (fading by e each), and its half-width, metres; and
  *  how white the streaks its crests leave behind it are. Bold, so her wake reads as a long white V (art/target/idea.png). */
 const BOW_LIFE = 18, BOW_FOAM = 1.5, STREAK = 0.6;
-/** How much of the bow wave's foam lies only on its crests: the rest of it whole between them. So the arms are white
- *  crests with blue showing between (art/target/idea.png), neither loose flecks (0.7 read so, review27) nor one flat band. */
-const SCALLOP = 0.5;
+/** The bow wave's foam as art/target/idea.png draws a wake: a whole white rim along each arm's line, RIM_SHARE of
+ *  BOW_FOAM wide, and inside it the crests curling in, feathered, CURL_REACH of it, with blue between: neither loose
+ *  flecks (review27) nor one flat band, nor the chains of separate blobs review30 saw. */
+const RIM_SHARE = 0.3, CURL_REACH = 1.8;
 /** The ribbon reaches this many of an arm's half-widths past its crest (and at least ARM_ROOM metres), and at least
  * this many of the churn's half-widths. */
 const ARM_REACH = 4, ARM_ROOM = 4, CHURN_ROOM = 2.6;
@@ -189,7 +190,10 @@ export function createWake(view: View, sky: Sky, capacity: number) {
     // the bow wave breaks white along the arms near her, feathered along its crests; the foam it leaves widens, and
     // breaks up into patches the farther back it lies, and the rougher the sea
     const feathers = smoothstep(-0.2, 0.8, slant(laid));
-    foam.addAssign(exp(sq(off.div(BOW_FOAM)).negate()).mul(pace).mul(exp(age.div(-BOW_LIFE)).mul(0.9)).mul(feathers.mul(SCALLOP).add(1 - SCALLOP)));
+    // a whole white rim along the arm's line, and inside it the crests curling in, feathered, blue between them
+    const rim = exp(sq(off.div(BOW_FOAM * RIM_SHARE)).negate());
+    const curls = exp(sq(off.div(BOW_FOAM * CURL_REACH)).negate()).mul(step(off, 0)).mul(feathers);
+    foam.addAssign(max(rim, curls).mul(pace).mul(exp(age.div(-BOW_LIFE)).mul(0.9)));
     const streak = width.mul(0.5).add(0.6), gone = age.div(calm.mul(ARM_LIFE)).add(rough.mul(0.2));
     const left = smoothstep(gone.sub(0.55), gone.sub(0.15), patchy(4, 2.5).mul(0.7).add(patchy(1.5, 3.5).mul(0.3)));
     foam.addAssign(exp(sq(off.div(streak)).negate()).mul(float(1.2).div(streak).sqrt()).mul(life).mul(feathers).mul(left).mul(STREAK));
