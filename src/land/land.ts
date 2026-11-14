@@ -15,21 +15,23 @@ import type { Isle } from '../world/scatter';
 import type { Sand } from './sand';
 import { SHALLOWEST } from './seabed';
 import { onSphere } from './site';
+import { WADE } from '../world/planet-islands';
 
 /** The island's mesh reaches out to where the ground is this deep (the sea floor's begins at SHALLOWEST). */
 const DEEPEST = SHALLOWEST + 1;
 /** Past that, metres; and the skirt's drop. */
 const MARGIN = 2, SKIRT = 1.5;
-/** Metres between spokes at the coast, and between rings across the beach. */
-const SPOKE = 1.2, RING = 1.2;
+/** Metres between spokes at the coast, and between rings across the beach; how far out past the coast they stay that
+ *  close (over the ledge and the water a ship can't sail, WADE), then how much farther apart each is than the last. */
+const SPOKE = 1.2, RING = 1.2, GROW = 1.12;
 
 /** How far out from the coast each ring lies, metres (negative inland), for an island out to `out` past its coast. */
 function rings(radius: number, out: number): number[] {
   const ds: number[] = [];
   const near = Math.min(24, radius);
-  for (let d = -radius; d < -near; d += 2) ds.push(d);
-  for (let d = -near; d < 24; d += RING) ds.push(d);
-  for (let d = 24, step = RING; d < out; d += step, step *= 1.04) ds.push(d);
+  for (let d = -radius; d < -near; d += 3) ds.push(d);
+  for (let d = -near; d < WADE; d += RING) ds.push(d);
+  for (let d = WADE, step = RING; d < out; d += step, step *= GROW) ds.push(d);
   ds.push(out);
   return ds;
 }
