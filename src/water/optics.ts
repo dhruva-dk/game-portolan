@@ -49,7 +49,7 @@ const TROUGH = 0.8, TROUGH_AT = 0.4;
 const SWELL = 0.45;
 /** The sun's glints: the cosine between the surface's normal and the half vector past which it mirrors the sun to the
  *  eye, the width of that edge, and the glint's light of what a white surface gets from the sun square on. */
-const GLINT = 0.9998, GLINT_EDGE = 0.0001, GLINT_LIGHT = 0.4;
+const GLINT = 0.99993, GLINT_EDGE = 0.0001, GLINT_LIGHT = 0.4;
 /** How much of the fair-weather clouds' shadow falls on the sea: some, so their shade passes over it without leaving
  *  dark blotches on the deep blue (art/target/idea.png's sea is one blue under the scattered clouds). */
 const CLOUD_SHADE = 0.4;
