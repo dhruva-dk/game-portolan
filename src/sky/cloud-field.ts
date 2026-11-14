@@ -37,7 +37,7 @@ const fall = (a: number, b: number, x: FloatNode): FloatNode => float(1).sub(smo
 // ------------------------------------------------------------------ constants
 
 /** The shell, km above the sea: fair-weather cumulus, the trade wind's, capped by its inversion. */
-export const BASE = 1.2, TOP = 2.0;
+export const BASE = 1.2, TOP = 2.6;
 /** Tile sizes of the billows (250–60 m) and the erosion (100–25 m), km. The cells are cloud-noise.ts's. */
 const SHAPE_SCALE = 1.0, DETAIL_SCALE = 0.4;
 /** Extinction of the densest cloud, per km (cumulus: 50–100). */
@@ -55,11 +55,11 @@ const FIELD_SHIFT = 0.3;
 /** How far below zero the threshold sinks at full cover, km: a little over BILLOW, so overcast is unbroken. */
 const LAYER = 0.3;
 /**
- * A cloud's top: DOME·p^¾ km where it lies p km of potential inside its edge — a third as tall as wide for a cloud of
- * 1–1.5 km, the most fair weather grows (cumulus humilis; mediocris would want towers this caps), flatter still for
- * the small puffs.
+ * A cloud's top: DOME·p^¾ km where it lies p km of potential inside its edge — about half as tall as wide for a cloud
+ * of 1–1.5 km (cumulus mediocris: art/target/idea.png's heaped clouds, where humilis read as flat smears, review25),
+ * flatter still for the small puffs.
  */
-const DOME = 0.85;
+const DOME = 1.4;
 /** How far a cloud's base lifts at its edge, km, and how far in it has come down to the shell's base, km of potential. */
 const LIFT = 0.15, MARGIN = 0.3;
 /** Height over which a cloud's base thins out to nothing, km: the condensation level is a few tens of metres deep. */
