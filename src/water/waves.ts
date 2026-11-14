@@ -16,8 +16,8 @@
 //                                 variance, so J is about 1 ± √mss; the threshold is set so that the share of the sea
 //                                 breaking is what is seen at sea at that wind (Monahan). The two larger cascades
 //                                 only: the 16 m patch's ripples don't break.
-//                   slopes        (∂h/∂x, ∂h/∂z): the mipmaps three builds from them hold the slopes' mean over any
-//                                 footprint
+//                   slopes        (∂h/∂x, ∂h/∂z, and their squares), so that the mipmaps three builds from them hold
+//                                 the slopes' mean and mean square, and so their variance, over any footprint
 //
 // ω is rounded to multiples of 2π/PERIOD, so the sea repeats every PERIOD seconds and time can wrap without a jump.
 // The waves run on the world's clock (Environment.clock), so the CPU's copy of the long waves (world/swell.ts) can be
@@ -33,21 +33,15 @@ import {
 } from 'three/tsl';
 import type { Compute } from '../gpu';
 import { BANDS, CASCADES, CHOP, PERIOD, SIZE } from '../world/cascades';
-import { G, initialSpectrum, meanSquareSlope, normalQuantile, seaState, whitecaps, type Sea } from '../world/spectrum';
+import { G, coxMunk, initialSpectrum, meanSquareSlope, normalQuantile, seaState, whitecaps, type Sea } from '../world/spectrum';
 import { workgroupArrayOf, type FloatNode, type UintNode, type Vec2Node, type Vec4Node } from '../tsl';
 
 /** Cascades whose curvature focuses caustics: the shorter waves, a few metres and less. */
 export const CURVED = [1, 2];
 /** Cascades whose waves break: the first this many. */
 export const FOAMING = 2;
-/** The wind, m/s, over which the whitecaps come in. Under it the sea breaks too thinly (Monahan's share at the match's
- *  usual breeze is a few in a thousand) to show but as lone white specks a lobe across on the blue, where a painter
- *  draws none; over it, the white horses of a fresh breeze. */
-const WHITE_HORSES = [9, 12] as const;
-const smooth = (a: number, b: number, x: number) => {
-  const t = Math.min(Math.max((x - a) / (b - a), 0), 1);
-  return t * t * (3 - 2 * t);
-};
+/** The ripples' mean square slope is never taken below this, however much the cascades hold. */
+const RIPPLE_FLOOR = 4e-4;
 
 const HALF = SIZE / 2;
 const AREA = SIZE * SIZE;
@@ -77,6 +71,10 @@ export function createWaves() {
   const time = uniform(0);
   /** Half the sea's significant height: about how high a crest stands. */
   const amplitude = uniform(1);
+  /** The mean square slope of the ripples no cascade holds, for the surface's roughness. */
+  const ripples = uniform(0.01);
+  /** The rms slope along one axis of the waves the cascades hold. */
+  const steepness = uniform(0.1);
   // the eight fields' spectra for every cascade, then (in place) their surfaces
   const fieldsA = instancedArray(AREA * COUNT, 'vec4');
   const fieldsB = instancedArray(AREA * COUNT, 'vec4');
@@ -169,7 +167,7 @@ export function createWaves() {
       kept.assign(froth);
     }
     textureStore(displacement[c], uvec2(x, y), vec4(a.y.mul(CHOP), a.x, a.z.mul(CHOP), froth));
-    textureStore(slopes[c], uvec2(x, y), vec4(a.w, b.x, 0, 0));
+    textureStore(slopes[c], uvec2(x, y), vec4(a.w, b.x, a.w.mul(a.w), b.x.mul(b.x)));
   })().compute(AREA, [64]));
 
   // The two smaller cascades' curvature, (∂²h/∂x², ∂²h/∂z², ∂²h/∂x∂z), from their slopes' differences across
@@ -192,20 +190,20 @@ export function createWaves() {
   /** A frame's passes, in order, each its own. */
   const passes: Compute[] = [spectrumKernel, rowsKernel, columnsKernel, ...assembleKernels, ...curvatureKernels];
 
-  let wind = -1, gusting = -1;
+  let wind = -1, gusting = -1, held = 0;
   const spreads = CASCADES.map(() => 0);
 
   return {
-    /** The waves' clock, seconds, wrapped every PERIOD (world/cascades.ts). */
-    time,
     displacement,
     slopes,
     /** For CURVED's cascades, in that order. */
     curvature,
     amplitude,
+    ripples,
+    steepness,
     /**
      * sea: the sea the wind has raised (its mean over the match: waves take hours to grow); now: the wind blowing
-     * now, m/s, which the whitecaps and the foam follow within seconds; clock: the world's, seconds; dt:
+     * now, m/s, which the whitecaps, the ripples and the foam follow within seconds; clock: the world's, seconds; dt:
      * since the last update, for the foam's fading. Returns the passes due: every one, every frame.
      */
     update(sea: Sea, now: number, clock: number, dt: number): Compute[] {
@@ -213,21 +211,25 @@ export function createWaves() {
       if (Math.abs(sea.wind - wind) > 0.05) {
         wind = sea.wind;
         const data = initial.image.data as Float32Array;
+        held = 0;
         CASCADES.forEach((L, c) => {
           data.set(initialSpectrum(SIZE, L, sea, c + 1, BANDS[c]), c * AREA * 4);
-          spreads[c] = Math.sqrt(meanSquareSlope(SIZE, L, sea, BANDS[c])) * CHOP;
+          const mss = meanSquareSlope(SIZE, L, sea, BANDS[c]);
+          held += mss;
+          spreads[c] = Math.sqrt(mss) * CHOP;
         });
         initial.needsUpdate = true;
         amplitude.value = seaState(sea.wind, sea.fetch).hs / 2;
+        steepness.value = Math.sqrt(held / 2);
         gusting = -1;
       }
       if (Math.abs(now - gusting) > 0.01) {
         gusting = now;
-        // each breaking cascade lays its share of the whitecaps, none in a breeze under WHITE_HORSES
-        const share = whitecaps(now) * smooth(WHITE_HORSES[0], WHITE_HORSES[1], now);
+        // each breaking cascade lays its share of the whitecaps
         for (let c = 0; c < FOAMING; c++) {
-          breaking[c].value.set(1 + normalQuantile(Math.max(share / FOAMING, 1e-6)) * spreads[c], spreads[c]);
+          breaking[c].value.set(1 + normalQuantile(Math.max(whitecaps(now) / FOAMING, 1e-6)) * spreads[c], spreads[c]);
         }
+        ripples.value = Math.max(coxMunk(now) - held, RIPPLE_FLOOR);
       }
       // foam lasts longer the harder the wind blows: τ from a second to five (the residual foam a whitecap leaves,
       // Monahan's stage B, a few seconds)

@@ -24,20 +24,16 @@ import { CASCADES } from '../world/cascades';
 import { FOAMING, type Waves } from './waves';
 import type { FloatNode } from '../tsl';
 
-/** A lobe of the scallops is about this many metres across (broad enough to read from the match's camera, at about half
- *  a metre a pixel); each row of them is bent this far (radians) by the other. */
-const LOBE = 3.2, BENT = 0.9;
+/** A lobe of the scallops is about this many metres across; each row of them is bent this far (radians) by the other. */
+const LOBE = 1.6, BENT = 0.9;
 /** How far the lobes move the foam's edge, as a share of the cover: the edge is where cover + SCALLOP·(field − ½)
  *  passes ½, so full cover is whole whatever the field, and none is none. */
-const SCALLOP = 0.45;
+const SCALLOP = 0.8;
 /** Half the edge's width (of the cover) seen close, and how it widens with the pixel's footprint over a lobe. */
 const CRISP = 0.03;
 /** The swash's band: water thinner than LINE over the sand (metres) is its foam, fading to nothing over the last
  * EDGE at its very edge. */
-const LINE = 0.5, EDGE = 0.012;
-/** Beyond LINE the band's cover tapers to nothing by REACH metres of water, so the lobes cut its outer edge into
- *  scallops while it stays whole along the sand: one white band, not a dashed ring of separate rounds. */
-const REACH = 1.2;
+const LINE = 0.3, EDGE = 0.012;
 /** The air under a whitecap, at most, as a share of a wake's thickest (optics.ts); the depth its cloud reaches down,
  * metres: in thinner water there is less of it. */
 const AIR = 0.7, PLUME = 1;
@@ -54,7 +50,7 @@ export function createFoam(waves: Waves) {
       whitecap = whitecap.add(texture(waves.displacement[k], c.q.div(L)).grad(c.dx.div(L), c.dy.div(L)).w);
     });
     const cover = saturate(whitecap.add(other));
-    const swash = smoothstep(0, EDGE, thickness).mul(smoothstep(REACH, LINE, thickness));
+    const swash = smoothstep(0, EDGE, thickness).mul(smoothstep(LINE, LINE * 0.3, thickness));
     const all = saturate(max(cover, swash));
     // the lobes: two rows of arcs crossing, each bent by the other; 0 in the cusps between them … 1 at their middles
     const u = c.q.mul(Math.PI / LOBE);

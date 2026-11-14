@@ -9,11 +9,13 @@
 // thin scrap whose base lifts toward its edge. A Perlin-Worley volume gives the billows, which carve top, sides and
 // base alike; a Worley volume erodes their edges: wisps toward the base, cauliflower higher up.
 //
-// Light, as a painter's cumulus: two tones with a crisp edge between, and a crisp edge to the cloud itself. A point is
-// lit where little cloud stands toward the sun (one tap), in the palette's cream (CLOUD) as bright as a white surface
-// square to the sun; else in its rose, as bright as UNDERLIT of a white surface in the open. So lit sides are cream
-// and bases rose. Then the air between the eye and the cloud: its extinction integrated in closed form up to the
-// cloud's height, and its glow, so far clouds sink into the haze.
+// Light. Per unit sun at the top of the air: the sun through the cloud toward it (a short cone of taps), scattered
+// once with a two-lobed phase (the silver lining toward the sun) and many times — Wrenninge's octaves near the
+// surface, and the diffused light of a two-stream slab, a radiance of 1/π (a white surface's) at the lit face falling
+// off only as 1/(1 + ¾(1−g)τ); the light of the sky through the nearer of the cloud's top and side, and of the sea
+// from below, through the cloud between. The two are coloured by the palette (CLOUD): the sun's share its cream, the
+// rest its rose, so lit sides are cream and bases rose. Then the air between the eye and the cloud: its extinction
+// integrated in closed form up to the cloud's height, and its glow, so far clouds sink into the haze.
 //
 // The shell is the eye's, like the sky (view.toSky): Earth's curvature under it, its directions the sky's (x east, y
 // up, z south, elevations stretched to put its horizon on the sea's). Its map slides under the eye as the eye moves
@@ -21,7 +23,7 @@
 
 import { Vector3 } from 'three/webgpu';
 import {
-  Break, If, ceil, clamp, dot, exp, float, int, length, luminance, max, min, mix, normalize, pow, select, smoothstep, sqrt,
+  Break, If, ceil, clamp, dot, exp, float, int, length, max, min, mix, normalize, pow, select, smoothstep, sqrt,
   texture, texture3D, uniform, vec3, vec4,
 } from 'three/tsl';
 import {
@@ -37,14 +39,11 @@ const fall = (a: number, b: number, x: FloatNode): FloatNode => float(1).sub(smo
 // ------------------------------------------------------------------ constants
 
 /** The shell, km above the sea: fair-weather cumulus, the trade wind's, capped by its inversion. */
-export const BASE = 1.2, TOP = 2.6;
+export const BASE = 1.2, TOP = 2.0;
 /** Tile sizes of the billows (250–60 m) and the erosion (100–25 m), km. The cells are cloud-noise.ts's. */
 const SHAPE_SCALE = 1.0, DETAIL_SCALE = 0.4;
 /** Extinction of the densest cloud, per km (cumulus: 50–100). */
 export const SIGMA = 60;
-/** The air between the eye and a cloud is taken as this share of its length: a painter's horizon cumulus stays crisp
- *  to its base, where the whole air's would grey its lower half. */
-const CLOUD_AIR = 0.25;
 /** The shaped noise's density past which the cloud is at its densest. */
 const FULL = 0.35;
 /**
@@ -52,18 +51,17 @@ const FULL = 0.35;
  * of sky in cloud, but gathered into a few big masses, as tall as they are broad, rather than a field of small puffs.
  * At this size they read as shapes at the phone's resolution, and their sunlit sides as broad blocks of light.
  */
-const MASS = 5;
+const MASS = 3;
 /** How far the large-scale field moves the threshold either way at middling cover, km of potential. */
 const FIELD_SHIFT = 0.3;
 /** How far below zero the threshold sinks at full cover, km: a little over BILLOW, so overcast is unbroken. */
 const LAYER = 0.3;
 /**
- * A cloud's top: about DOME·p^¾ km where it lies p km of potential inside its edge, easing into the shell's ceiling
- * (exponentially) — about half as tall as wide for a cloud
- * of 1–1.5 km (cumulus mediocris: heaped clouds, where humilis read as flat smears),
- * flatter still for the small puffs.
+ * A cloud's top: DOME·p^¾ km where it lies p km of potential inside its edge — a third as tall as wide for a cloud of
+ * 1–1.5 km, the most fair weather grows (cumulus humilis; mediocris would want towers this caps), flatter still for
+ * the small puffs.
  */
-const DOME = 1.4;
+const DOME = 0.6;
 /** How far a cloud's base lifts at its edge, km, and how far in it has come down to the shell's base, km of potential. */
 const LIFT = 0.15, MARGIN = 0.3;
 /** Height over which a cloud's base thins out to nothing, km: the condensation level is a few tens of metres deep. */
@@ -80,16 +78,17 @@ const DETAIL_DISTANCE = 25;
 const STEP = 0.06;
 /** Two-stream diffusion through cloud of asymmetry g: transmitted share 1/(1 + ¾(1−g)τ). */
 export const DIFFUSION = 0.75 * (1 - 0.85);
-/** The cloud's edge: where its density (of the full) crosses EDGE_AT, over EDGE_WIDTH either way. */
-const EDGE_AT = 0.2, EDGE_WIDTH = 0.12;
-/** The one tap toward the sun, km; the cloud there (of the full) past which a point is in shadow, and the edge's width:
- *  high enough that most of a cumulus is in the sun, cream over small cool bases rather than grey-mauve with thin
- *  cream rims; a short tap, so a cloud's sides are lit too and cream is most of it. */
-const LIGHT_TAP = 0.06, SHADE_AT = 0.95, SHADE_EDGE = 0.1;
+/** Taps toward the sun, km, spaced wider as they go. */
+const TAPS = [0.05, 0.15, 0.35, 0.8];
 /** How much of the sun's own colour the cloud's lit tone keeps (the rest is the palette's cream at the sun's
  *  brightness); and how bright its shadow tone is, of what a white surface in the open gets. */
-const WARMED = 0.8, UNDERLIT = 0.7;
+const WARMED = 0.5, UNDERLIT = 0.7;
+const LUMA = vec3(0.2126, 0.7152, 0.0722);
 
+const hg = (c: FloatNode, g: number): FloatNode =>
+  float((1 - g * g) / (4 * Math.PI)).div(pow(float(1 + g * g).sub(c.mul(2 * g)), 1.5));
+/** Cloud's phase: a strong forward lobe and a weak back one (Hillaire 2016). */
+const phase = (c: FloatNode, k: number): FloatNode => mix(hg(c, -0.3 * k), hg(c, 0.8 * k), 0.7);
 
 export type CloudField = ReturnType<typeof createCloudField>;
 
@@ -147,9 +146,7 @@ export function createCloudField(tables: Tables, noise: CloudNoise) {
     // within BILLOW of its surface, top, side or base, the billows decide whether a point is cloud, so they carve the
     // whole outline (Schneider 2017's dimensional profile)
     const z = h.mul(TOP - BASE);
-    // eased into the shell's ceiling rather than cut at it, so the broad ones' crowns round off instead of standing
-    // flat-topped with sheer sides, as boxes
-    const top = float(1).sub(exp(pow(max(inside, 0), 0.75).mul(-DOME / (TOP - BASE)))).mul(TOP - BASE);
+    const top = min(pow(max(inside, 0), 0.75).mul(DOME), TOP - BASE);
     const bottom = min(fall(0, MARGIN, inside).mul(LIFT), top.mul(0.5));
     const reach = clamp(min(min(top.sub(z), z.sub(bottom).mul(2)), inside).div(BILLOW), 0, 1);
     const dense = float(0).toVar();
@@ -208,10 +205,12 @@ export function createCloudField(tables: Tables, noise: CloudNoise) {
     const span = max(far.sub(near), 0);
     const steps = int(clamp(ceil(span.div(STEP)), 8, maxSteps)).toVar();
     const dt = span.div(float(steps)).toVar();
+    const cosSun = dot(d, sunDir);
+    const single = phase(cosSun, 1).toVar();
     const weightSum = float(0).toVar(), distSum = float(0).toVar();
     // what a white surface in the open gets from the sun and the sky (its radiance, E/π), in the cloud's shadow tone
     const open = sunTransmittance(float(BOTTOM), sunDir.y).mul(max(sunDir.y, 0)).mul(1 / Math.PI).add(skyAmbientUp);
-    const under = vec3(luminance(open)).mul(vec3(...CLOUD.shadow)).mul(UNDERLIT).toVar();
+    const under = vec3(dot(open, LUMA)).mul(vec3(...CLOUD.shadow)).mul(UNDERLIT).toVar();
     // the sea hides the shell below the horizon
     If(d.y.greaterThan(-0.002).and(near.lessThan(MAX_DISTANCE)), () => {
       loop('cs', steps, (i) => {
@@ -221,19 +220,42 @@ export function createCloudField(tables: Tables, noise: CloudNoise) {
         If(c.dense.greaterThan(0.001), () => {
           const rho = c.dense.toVar();
           if (detail) If(t.lessThan(DETAIL_DISTANCE), () => { rho.assign(erode(c.dense, q, c.h)); });
-          // the cloud's edge crisp: its density rises from nothing to full over a narrow step of the noise's
-          rho.assign(smoothstep(EDGE_AT - EDGE_WIDTH, EDGE_AT + EDGE_WIDTH, rho.div(FULL)));
+          rho.assign(clamp(rho.div(FULL), 0, 1));
           If(rho.greaterThan(0.001), () => {
-            // Two tones, as a painter's cumulus: lit where little cloud stands between the point and the sun (one tap
-            // toward it), the edge between crisp; the sun's light in the cloud's cream (keeping WARMED of the sun's
-            // own colour, so a low sun still warms it), as bright as a white surface square to it, over the shadow
-            // tone, the palette's rose as bright as UNDERLIT of what a white surface in the open gets.
-            const toward = clamp(coarse(q.add(sunDir.mul(LIGHT_TAP))).dense.div(FULL), 0, 1);
-            const lit = float(1).sub(smoothstep(SHADE_AT - SHADE_EDGE, SHADE_AT + SHADE_EDGE, toward));
+            // the nearest tap sees the eroded cloud, so the small billows shade one another
+            const q1 = q.add(sunDir.mul(TAPS[0]));
+            const c1 = coarse(q1);
+            const first = c1.dense.toVar();
+            if (detail) If(t.lessThan(DETAIL_DISTANCE).and(first.greaterThan(0)), () => { first.assign(erode(c1.dense, q1, c1.h)); });
+            let tau: FloatNode = clamp(first.div(FULL), 0, 1).mul(SIGMA * TAPS[0]);
+            for (let k = 1; k < TAPS.length; k++) {
+              tau = tau.add(clamp(coarse(q.add(sunDir.mul(TAPS[k]))).dense.div(FULL), 0, 1).mul(SIGMA * (TAPS[k] - TAPS[k - 1])));
+            }
+            // multiple scattering: octaves near the surface, each weaker, reaching deeper and less forward (a = b = c),
+            // and deep inside the diffused light of a slab of that depth; built up only past the first mean free paths
+            let ms: FloatNode = float(0);
+            for (let k = 1; k < 4; k++) {
+              const a = 0.6 ** k;
+              ms = ms.add(exp(tau.mul(-a)).mul(phase(cosSun, a)).mul(a));
+            }
+            // the slab's diffuse light is a radiance of E·T/π (T its transmitted share), as off a white surface: a deep
+            // cloud scatters back nearly all the light on it, which a few octaves fall well short of
+            ms = max(ms, float(1 / Math.PI).div(tau.mul(DIFFUSION).add(1)));
+            // thin cloud has had little depth to build the scattered light up in (the powder effect): darker at the
+            // edges seen away from the sun, while toward it the light through them shines (Schneider 2015)
+            const powder = float(1).sub(exp(rho.mul(-SIGMA * 0.08)).mul(float(0.25).sub(cosSun.mul(0.25))));
             const radius = length(vec3(q.x, q.y.add(eye.y).add(BOTTOM), q.z));
             const sunLight = sunTransmittance(radius, dot(normalize(vec3(q.x, q.y.add(eye.y).add(BOTTOM), q.z)), sunDir));
-            const sunTone = mix(vec3(luminance(sunLight)), sunLight, WARMED).mul(vec3(...CLOUD.lit));
-            const S = under.add(sunTone.mul(lit.mul(1 / Math.PI)));
+            // the sky above and the sea below, half of each hemisphere's light, through the cloud between as a slab of
+            // this density up to the cloud's top and down to its base
+            const above = min(float(TOP - BASE).mul(max(c.top.sub(c.h), 0)), max(c.inside, 0)).mul(rho).mul(SIGMA * DIFFUSION).add(1);
+            const below = float(TOP - BASE).mul(c.h).mul(rho).mul(SIGMA * DIFFUSION).add(1);
+            // In the palette's two tones (CLOUD): the sun's light in the cloud's cream (keeping WARMED of the sun's own
+            // colour, so a low sun still warms it), and the light from the sky above and the sea below, half of each
+            // hemisphere's, in its rose, as bright as UNDERLIT of what a white surface in the open gets.
+            const sunTone = mix(vec3(dot(sunLight, LUMA)), sunLight, WARMED).mul(vec3(...CLOUD.lit));
+            const S = sunTone.mul(exp(tau.negate()).mul(single).add(ms.mul(powder)))
+              .add(under.mul(float(0.5).div(above).add(float(0.5).div(below))));
             const stepT = exp(rho.mul(-SIGMA).mul(dt));
             const absorbed = T.mul(float(1).sub(stepT));
             L.addAssign(S.mul(absorbed));
@@ -253,7 +275,7 @@ export function createCloudField(tables: Tables, noise: CloudNoise) {
     });
     distance.assign(select(weightSum.greaterThan(1e-4), distSum.div(max(weightSum, 1e-4)), float(MAX_DISTANCE)));
     // the air between the eye and the cloud: what the cloud hides of the far sky is replaced by the air's own glow
-    const Tair = airTransmittance(d, distance.mul(CLOUD_AIR));
+    const Tair = airTransmittance(d, distance);
     const glow = skyRadiance(normalize(vec3(d.x, max(d.y, 0), d.z)), sunDir);
     const seen = L.mul(Tair).add(glow.mul(float(1).sub(T)).mul(float(1).sub(Tair)));
     // at the march's reach what little the haze leaves fades out
