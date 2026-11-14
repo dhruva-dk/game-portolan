@@ -242,20 +242,25 @@ export function createStormField(cap: Cap, shape: Storage3DTexture) {
       last.assign(step);
       t.addAssign(step);
     });
-    // the cloud where the ray met it, or its soft edge where the ray passed by
-    const cover = select(hit.greaterThan(0), float(1), float(1).sub(smoothstep(0, 1, miss))).toVar();
-    If(cover.greaterThan(0), () => {
-      L.addAssign(shade(where, d, lit).mul(T.mul(cover)));
-      T.mulAssign(float(1).sub(cover));
-    });
-    // a march that ran out of steps grazing the billows, its ray still in the cloud's body: the rest of it is cloud
+    // a march that ran out of steps grazing the billows, its ray still in the cloud's body: the rest of it is cloud, lit
+    // as its surface where the ray got to (it was closing on it), so the billows there keep their relief rather than
+    // all such rays printing one flat tone, a slab over the face (review26)
     const reached = min(t, to).toVar();
     const end = o.add(d.mul(reached)), up = normalize(end), h = length(end).sub(R);
     const solid = smoothstep(-FACE, FACE * 0.3, edge(up).sub(float(SHELF).add(max(h.sub(BASE), 0).mul(LEAN))))
       .mul(smoothstep(BASE - ROLL, BASE + ROLL, h)).mul(smoothstep(CROWN + CROWN_BILLOW * 0.5, CROWN - CROWN_BILLOW * 0.5, h))
       .mul(select(t.lessThan(to), float(1), float(0)));
-    const body = lit.air.mul(mix(DARK, BRIGHT, smoothstep(BASE, CROWN, h)).mul(0.6));
-    return { light: L.add(body.mul(T.mul(solid))), T: T.mul(float(1).sub(solid)), reached, atMark };
+    // the cloud where the ray met it, or its soft edge where the ray passed by, or where it ran out in the body
+    const edged = float(1).sub(smoothstep(0, 1, miss));
+    If(hit.equal(0).and(solid.greaterThan(edged)), () => {
+      where.assign(end);
+    });
+    const cover = select(hit.greaterThan(0), float(1), max(edged, solid)).toVar();
+    If(cover.greaterThan(0), () => {
+      L.addAssign(shade(where, d, lit).mul(T.mul(cover)));
+      T.mulAssign(float(1).sub(cover));
+    });
+    return { light: L, T, reached, atMark };
   };
 
   return { edge, march, OUTERMOST };
