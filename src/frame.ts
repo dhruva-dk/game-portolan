@@ -124,9 +124,9 @@ export function createFrame(renderer: WebGPURenderer, world: World, options: Fra
   renderer.toneMapping = NoToneMapping;
   // the sun's height, and whether it rises (east of the meridian: a morning)
   const [east, rise] = sunInSky(world.climate.timeOfDay);
-  const { grade, gain } = createGrade(rise, east > 0);
   const view = createView();
   const sky = createSky(view, options.bolt);
+  const { grade, gain } = createGrade(rise, east > 0, sky.light.open);
   const scene = new Scene();
   scene.backgroundNode = sky.background;
   // the ground baked for the shaders in a worker, while the islands are built here

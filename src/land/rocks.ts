@@ -8,7 +8,7 @@
 // islands.ts), where a mass is a few pixels across, each shape at a coarser level of the same lumps: 720 and 180.
 
 import { Euler, Matrix4, MeshBasicNodeMaterial, Quaternion, Vector3 } from 'three/webgpu';
-import { Fn, cross, dFdx, dFdy, dot, float, mix, normalWorld, normalize, positionWorld, sign, vec3 } from 'three/tsl';
+import { Fn, attribute, cross, dFdx, dFdy, dot, float, mix, normalWorld, normalize, positionWorld, sign, vec3 } from 'three/tsl';
 import { ROCK } from '../palette';
 import type { View } from '../view/view';
 import type { Rock } from '../world/scatter';
@@ -22,6 +22,8 @@ import { cut } from '../tsl';
 export const KINDS = { big: { shapes: 4, detail: 11, far: 5 }, boulder: { shapes: 4, detail: 4, far: 2 } };
 /** A rock is wet up to this many metres over the sea, and darker there by this much. */
 const WET_TO = 0.3, WET = 0.72;
+/** How deep in a crack (0…1) a rock is drawn in its shadow tone whatever the sun. */
+const CAVITY = 0.5;
 
 /** rocks[i]: those on island i, whose chart is charts[i]: each shape's instances near and far. */
 export function createRocks(rocks: Rock[][], charts: Chart[], view: View, light: Light) {
@@ -32,7 +34,9 @@ export function createRocks(rocks: Rock[][], charts: Chart[], view: View, light:
     const face = normalize(cross(dFdx(p), dFdy(p)));
     const n = face.mul(sign(dot(face, normalWorld)));
     const wet = mix(float(WET), float(1), cut(view.altitude(p), WET_TO));
-    return light.toon(p, n, vec3(...ROCK.lit).mul(wet), vec3(...ROCK.shadow).mul(wet));
+    // deep in a crack or under a ledge (rock-shape.ts cavity) the sun never reaches: the shadow tone, lit or not
+    const shadow = vec3(...ROCK.shadow).mul(wet);
+    return light.toon(p, n, mix(vec3(...ROCK.lit).mul(wet), shadow, cut(attribute('cavity', 'float'), CAVITY)), shadow);
   })();
 
   const m = new Matrix4(), q = new Quaternion(), e = new Euler(), s = new Vector3(), zero = new Vector3();

@@ -1,24 +1,29 @@
-// The grade: the frame's exposure, its tone curve (AgX) and a colourist's look, as one step of the post chain.
+// The grade: the frame's exposure, its tone curve and a colourist's look, as one step of the post chain.
 //
-// A look is what a colourist would set on a shot (after 0117's colour script, src/render/gpu/grade.ts): white balance
-// (warm to cool, green to magenta), contrast about middle grey, split toning (one colour pushed into the shadows,
-// another into the highlights, each holding its luminance), saturation overall and by hue for what the game shows
-// most (the warm of sails, hulls and sand; the sea's teal; the sky's blue), and a lift of the blacks toward a colour,
-// so no shadow is ever crushed. Looks are keyed on the sun's height, which is fixed for a match (world/sun.ts), so the
-// day's look is baked once into a 33³ table; the storm's is baked into another, and the two are mixed by how deep in
-// the storm the eye is. The table is read with the display's encoded value after AgX and gives display-linear colour.
+// The world's colours are chosen (palette.ts), so the grade's first duty is to leave them as chosen. The exposure sets
+// a surface in the open at its tone exactly (the scene's light is the tone times the place's level: sky/light.ts);
+// the curve is the light itself up to a knee near the display's white, and only what is brighter (a glint, a flash,
+// lightning, the bloom) is rolled off toward it, by its brightest channel so its hue holds.
+//
+// A look is then a light hand on the whole: white balance (warm to cool, green to magenta), contrast about middle
+// grey, saturation overall and by hue (the warm of sails, hulls and sand; the sea's teal; the sky's blue), and a lift
+// of the blacks toward a colour. No split toning: it would tint the chosen shadows. Looks are keyed on the sun's
+// height, which is fixed for a match (world/sun.ts), so the day's look is baked once into a 33³ table; the storm's is
+// baked into another, and the two are mixed by how deep in the storm the eye is. The table is read with the display's
+// encoded value after the curve and gives display-linear colour.
 //
 // Exposure and the vignette act on the scene's light before the curve.
 
 import { ClampToEdgeWrapping, Data3DTexture, DataUtils, HalfFloatType, LinearFilter, RGBAFormat } from 'three/webgpu';
-import { clamp, float, length, log2, max, mix, pow, screenUV, smoothstep, step, texture3D, uniform, vec2, vec3 } from 'three/tsl';
+import { clamp, dot, exp, float, length, max, mix, pow, screenUV, select, smoothstep, step, texture3D, uniform, vec2, vec3 } from 'three/tsl';
 import type { FloatNode, Vec3Node } from '../tsl';
 
 type RGB = readonly [number, number, number];
 
-/** A look. Split tones and the lift are small offsets in linear light. */
+/** A look. The lift is a small offset in linear light. */
 export interface Look {
-  /** Stops of exposure, on the scene's light per unit sun (frame.ts). */
+  /** Stops of exposure over what shows a tone in the open exactly as chosen (0: a white surface there is the
+   *  display's white). */
   exposure: number;
   /** White balance: + warm, − cool; + green, − magenta. */
   temp: number; tint: number;
@@ -27,8 +32,6 @@ export interface Look {
   saturation: number;
   /** Saturation of the warm hues (reds to yellows), the sea's (greens to cyans) and the sky's (blues), on top. */
   warm: number; sea: number; sky: number;
-  /** Split toning: each channel's gain in the shadows and in the highlights, a tenth of it. */
-  shadows: RGB; highlights: RGB;
   /** Lifts the blacks toward fadeTo by this much. */
   fade: number; fadeTo: RGB;
   /** How much the corners darken. */
@@ -37,28 +40,22 @@ export interface Look {
 
 /** The day's looks, by the sine of the sun's height they are set for. */
 const DAY: readonly (readonly [number, Look])[] = [
-  // the golden hour: amber lights against teal shadows, the sea deep, the corners dark
-  [0.17, { exposure: 2.2, temp: 0.6, tint: 0.03, contrast: 1.15, saturation: 1.3, warm: 1.38, sea: 1.3, sky: 1.1,
-    shadows: [-0.012, 0.004, 0.018], highlights: [0.055, 0.016, -0.02], fade: 0.012, fadeTo: [0.02, 0.05, 0.08], vignette: 0.38 }],
-  // the trade-wind afternoon: rich and saturated, the sea turquoise and the sky clean blue (the white balance only
-  // a touch warm: warming it further greys the teal), the shadows a clear blue-green, never black
-  [0.47, { exposure: 2.4, temp: 0.12, tint: 0.01, contrast: 1.1, saturation: 1.32, warm: 1.22, sea: 1.38, sky: 1.22,
-    shadows: [-0.008, 0.003, 0.01], highlights: [0.022, 0.008, -0.01], fade: 0.01, fadeTo: [0.01, 0.05, 0.07], vignette: 0.26 }],
-  // noon in the tropics: high-key and punchy, white light, the sea at its most turquoise, hard clean shadows
-  [0.97, { exposure: 2.15, temp: -0.02, tint: 0, contrast: 1.16, saturation: 1.38, warm: 1.1, sea: 1.5, sky: 1.3,
-    shadows: [-0.006, 0.004, 0.012], highlights: [0, 0.002, 0.004], fade: 0.006, fadeTo: [0.02, 0.05, 0.07], vignette: 0.14 }],
+  // the golden hour: the light a little amber (the level's own warmth besides), the corners a touch darker
+  [0.17, { exposure: 0, temp: 0.2, tint: 0.02, contrast: 1, saturation: 1, warm: 1.05, sea: 1, sky: 1, fade: 0, fadeTo: [0, 0, 0], vignette: 0.2 }],
+  // the trade-wind afternoon: the palette as it is
+  [0.47, { exposure: 0, temp: 0.04, tint: 0, contrast: 1, saturation: 1, warm: 1, sea: 1, sky: 1, fade: 0, fadeTo: [0, 0, 0], vignette: 0.14 }],
+  // noon in the tropics: the same, the corners all but open
+  [0.97, { exposure: 0, temp: 0, tint: 0, contrast: 1, saturation: 1, warm: 1, sea: 1, sky: 1, fade: 0, fadeTo: [0, 0, 0], vignette: 0.1 }],
 ];
-/** A morning's low sun, against the evening's amber: rose lights over violet-blue shadows, the blacks lifted to a
- *  lavender mist, softer. Mixed in under a rising sun, most at the golden hour's height, gone by the afternoon's. */
+/** A morning's low sun, against the evening's amber: a rose cast, the blacks lifted a little to a lavender mist.
+ *  Mixed in under a rising sun, most at the golden hour's height, gone by the afternoon's. */
 const DAWN: Look = {
-  exposure: 2.35, temp: -0.04, tint: -0.07, contrast: 1.04, saturation: 1.16, warm: 1.32, sea: 1.15, sky: 1.08,
-  shadows: [0.006, -0.002, 0.018], highlights: [0.04, 0.01, 0.016], fade: 0.035, fadeTo: [0.12, 0.1, 0.15], vignette: 0.28,
+  exposure: 0, temp: -0.02, tint: -0.06, contrast: 1, saturation: 1, warm: 1.05, sea: 1, sky: 1, fade: 0.02, fadeTo: [0.12, 0.1, 0.15], vignette: 0.16,
 };
-/** In the storm: cold and a little flat, pushed toward violet (magenta in the tint, violet shadows), its blacks
- *  lifted to a slate violet, the corners darker; opened a little. Its colour is kept: the ships' dyes still read. */
+/** In the storm: cooler and dimmer, pushed toward violet (magenta in the tint), its blacks lifted to a slate violet,
+ *  the corners darker. Its colour is kept: the ships' dyes still read. */
 const STORM: Look = {
-  exposure: 2.75, temp: -0.2, tint: -0.12, contrast: 1.08, saturation: 0.95, warm: 1, sea: 0.85, sky: 0.9,
-  shadows: [0.004, -0.004, 0.012], highlights: [0.004, 0, 0.008], fade: 0.035, fadeTo: [0.13, 0.1, 0.19], vignette: 0.45,
+  exposure: 1.6, temp: -0.15, tint: -0.1, contrast: 1, saturation: 0.92, warm: 1, sea: 0.9, sky: 0.95, fade: 0.03, fadeTo: [0.13, 0.1, 0.19], vignette: 0.32,
 };
 
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
@@ -71,7 +68,7 @@ function between(a: Look, b: Look, t: number): Look {
     const u = a[k], v = b[k];
     if (typeof u === 'number' && typeof v === 'number') (out[k] as number) = lerp(u, v, t);
   }
-  return { ...out, shadows: lerp3(a.shadows, b.shadows, t), highlights: lerp3(a.highlights, b.highlights, t), fadeTo: lerp3(a.fadeTo, b.fadeTo, t) };
+  return { ...out, fadeTo: lerp3(a.fadeTo, b.fadeTo, t) };
 }
 
 /** The day's look for a sun whose height has this sine, rising (the morning's) or not: between the looks on either
@@ -85,22 +82,20 @@ export function dayLook(rise: number, rising = false): Look {
   return rising ? between(day, DAWN, 1 - smooth(DAY[0][0], DAY[1][0], rise)) : day;
 }
 
-/** A 3×3 matrix by its columns, applied to c. */
-const apply = (m: readonly RGB[], c: Vec3Node): Vec3Node => vec3(...m[0]).mul(c.x).add(vec3(...m[1]).mul(c.y)).add(vec3(...m[2]).mul(c.z));
-/** sRGB's primaries to Rec. 2020's and back, and AgX's inset and outset (Sobotka; Blender's, as three has them). */
-const TO_2020: RGB[] = [[0.6274, 0.0691, 0.0164], [0.3293, 0.9195, 0.088], [0.0433, 0.0113, 0.8956]];
-const FROM_2020: RGB[] = [[1.6605, -0.1246, -0.0182], [-0.5876, 1.1329, -0.1006], [-0.0728, -0.0083, 1.1187]];
-const INSET: RGB[] = [[0.856627153315983, 0.137318972929847, 0.11189821299995], [0.0951212405381588, 0.761241990602591, 0.0767994186031903],
-  [0.0482516061458583, 0.101439036467562, 0.811302368396859]];
-const OUTSET: RGB[] = [[1.1271005818144368, -0.1413297634984383, -0.14132976349843826], [-0.11060664309660323, 1.157823702216272, -0.11060664309660294],
-  [-0.016493938717834573, -0.016493938717834257, 1.2519364065950405]];
-/** AgX: scene-linear light to display-linear, the highlights desaturating toward white rather than clipping. */
-const agx = (light: Vec3Node): Vec3Node => {
-  const c = apply(INSET, apply(TO_2020, light));
-  const x = clamp(log2(max(c, vec3(1e-10))).add(12.47393).div(16.5), 0, 1);
-  const x2 = x.mul(x), x4 = x2.mul(x2);
-  const curve = x4.mul(x2).mul(15.5).sub(x4.mul(x).mul(40.14)).add(x4.mul(31.96)).sub(x2.mul(x).mul(6.868)).add(x2.mul(0.4298)).add(x.mul(0.1191)).sub(0.00232);
-  return clamp(apply(FROM_2020, pow(max(apply(OUTSET, curve), vec3(0)), vec3(2.2))), 0, 1);
+/** The curve's knee, of the display's white: light under it is shown as it is. */
+const KNEE = 0.85;
+/** How far over white (in the brightest channel) a light has lost WHITENED of its colour to white: a flash burns out. */
+const BURNT = 6, WHITENED = 0.7;
+/**
+ * The tone curve: scene-linear light to display-linear. As it is up to KNEE; over it, its brightest channel rolled
+ * off toward white (1 − e^(−x) of the room left) and the others scaled with it, so a bright colour keeps its hue and
+ * its saturation rather than clipping to another; far over white it burns out toward white.
+ */
+const curve = (light: Vec3Node): Vec3Node => {
+  const c = max(light, vec3(0)), top = max(max(c.x, c.y), max(c.z, 1e-6));
+  const rolled = float(1).sub(exp(top.sub(KNEE).div(KNEE - 1))).mul(1 - KNEE).add(KNEE);
+  const held = c.mul(select(top.greaterThan(KNEE), rolled.div(top), float(1)));
+  return clamp(mix(held, vec3(1), smoothstep(1, BURNT, top).mul(WHITENED)), 0, 1);
 };
 /** Display-linear to the display's sRGB encoding. */
 export const encode = (c: Vec3Node): Vec3Node =>
@@ -119,12 +114,6 @@ function graded(l: Look, r: number, g: number, b: number): RGB {
   let R = lin(r) * (1 + l.temp * 0.09 - l.tint * 0.02), G = lin(g) * (1 + l.tint * 0.05), B = lin(b) * (1 - l.temp * 0.09 - l.tint * 0.02);
   const k = l.contrast, c = (x: number) => 0.18 * (Math.max(x, 1e-6) / 0.18) ** k;
   [R, G, B] = [c(R), c(G), c(B)];
-  const Y = 0.2126 * R + 0.7152 * G + 0.0722 * B;
-  const ws = 1 - smooth(0, 0.25, Y), wh = smooth(0.2, 0.8, Y);
-  const gain = (i: number) => 1 + (l.shadows[i] * ws + l.highlights[i] * wh) * 10;
-  [R, G, B] = [R * gain(0), G * gain(1), B * gain(2)];
-  const Yt = 0.2126 * R + 0.7152 * G + 0.0722 * B;
-  if (Yt > 1e-6) [R, G, B] = [R * (Y / Yt), G * (Y / Yt), B * (Y / Yt)];
   // saturation, overall and by hue
   const mx = Math.max(R, G, B), mn = Math.min(R, G, B), chroma = mx - mn;
   let hue = 0;
@@ -156,21 +145,23 @@ function table(l: Look): Data3DTexture {
 }
 
 /**
- * The grade for a match whose sun stands at a height of this sine, rising or not: grade(c, storm) takes the scene's
- * light at a pixel (per unit sun) and how deep in the storm the eye is (0…1), and gives display-linear colour; gain is
- * the day's exposure, as a factor on that light.
+ * The grade for a match whose sun stands at a height of this sine, rising or not, under a sky that gives a white
+ * surface in the open `open` (sky.ts Sky.open): grade(c, storm) takes the scene's light at a pixel (per unit sun) and
+ * how deep in the storm the eye is (0…1), and gives display-linear colour; gain is the day's exposure, as a factor on
+ * that light.
  */
-export function createGrade(rise: number, rising: boolean) {
+export function createGrade(rise: number, rising: boolean, open: Vec3Node) {
   const day = dayLook(rise, rising);
   const days = texture3D(table(day)), storms = texture3D(table(STORM));
-  const exposure = uniform(2 ** day.exposure), stormExposure = 2 ** STORM.exposure;
   const vignette = uniform(day.vignette);
+  // what brings a white surface in the open to the display's white, whatever the hour
+  const gain = float(2 ** day.exposure).div(max(dot(open, vec3(0.2126, 0.7152, 0.0722)), 1e-4));
   const grade = (color: Vec3Node, storm: FloatNode): Vec3Node => {
     const v = length(screenUV.sub(0.5).mul(vec2(1.4, 1.1)));
     const corner = float(1).sub(smoothstep(0.15, 0.8, v).mul(mix(vignette, STORM.vignette, storm)));
-    const toned = agx(color.mul(corner).mul(mix(exposure, stormExposure, storm)));
+    const toned = curve(color.mul(corner).mul(gain).mul(mix(float(1), float(2 ** (STORM.exposure - day.exposure)), storm)));
     const at = pow(max(toned, vec3(0)), vec3(1 / 2.2)).mul((N - 1) / N).add(0.5 / N);
     return mix(days.sample(at).level(float(0)).rgb, storms.sample(at).level(float(0)).rgb, storm);
   };
-  return { grade, gain: 2 ** day.exposure };
+  return { grade, gain };
 }

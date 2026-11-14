@@ -10,7 +10,7 @@ import {
   BufferGeometry, DoubleSide, Float32BufferAttribute, Matrix4,
   MeshBasicNodeMaterial, Quaternion, Vector3,
 } from 'three/webgpu';
-import { Fn, attribute, faceDirection, mix, normalWorld, normalize, positionWorld, vec3 } from 'three/tsl';
+import { Fn, attribute, mix, normalWorldGeometry, normalize, positionWorld, vec3 } from 'three/tsl';
 import { SHRUB } from '../palette';
 import { random } from '../world/random';
 import type { Shrub } from '../world/scatter';
@@ -26,7 +26,7 @@ const LEAVES = 450;
 const LEAF = 0.095;
 /** How much one shrub's green differs from the next's; and how deep in its mass (0.7 the deepest … 1.05 on its
  *  surface) a leaf is drawn in its shadow tone. */
-const VARIED = 0.3, SHADED = 0.8;
+const VARIED = 0.3, SHADED = 0.76;
 
 /** One shrub, 1 across at its widest, standing on y = 0. */
 function shape(seed: number): BufferGeometry {
@@ -73,12 +73,14 @@ function shape(seed: number): BufferGeometry {
 export function createShrubs(shrubs: Shrub[][], charts: Chart[], light: Light) {
   const material = new MeshBasicNodeMaterial({ side: DoubleSide });
   material.colorNode = Fn(() => {
-    const p = positionWorld, n = normalize(normalWorld).mul(faceDirection);
+    // the normal as the shape has it, bent toward its mass's, whichever side of the leaf is seen: the bush is lit as
+    // one rounded thing
+    const p = positionWorld, n = normalize(normalWorldGeometry);
     // each shrub a little paler or darker than the next; and deep in a mass, where less of the sky reaches, a leaf
     // keeps its shadow tone
     const own = attribute('tint', 'float').sub(0.5).mul(VARIED).add(1);
     const shadow = vec3(...SHRUB.shadow).mul(own);
-    return light.leaf(p, n, mix(shadow, vec3(...SHRUB.lit).mul(own), cut(attribute('depth', 'float'), SHADED)), shadow);
+    return light.toon(p, n, mix(shadow, vec3(...SHRUB.lit).mul(own), cut(attribute('depth', 'float'), SHADED)), shadow);
   })();
 
   const m = new Matrix4(), q = new Quaternion(), s = new Vector3(), zero = new Vector3(), up = new Vector3(0, 1, 0);

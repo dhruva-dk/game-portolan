@@ -59,7 +59,7 @@ const none = (found: string[], rule: string) => assert.deepEqual(found, [], `${r
 const NEUTRAL = ['snapshot.ts', 'player.ts', 'environment.ts', 'kinds.ts'];
 /** What every render folder may draw on: three, the world, the GPU's plumbing, the plain seams, the palette, and the
  *  shared light. */
-const RENDER = ['three', 'world/', 'gpu.ts', 'tsl.ts', 'textures.ts', 'palette.ts', 'snapshot.ts', 'environment.ts', 'sky/light.ts'];
+const RENDER = ['three', 'world/', 'gpu.ts', 'tsl.ts', 'palette.ts', 'snapshot.ts', 'environment.ts', 'sky/light.ts'];
 const LAYERS: Record<string, readonly string[]> = {
   // the world and the simulation: pure, headless, deterministic (test g)
   'world/': ['world/'],
@@ -94,7 +94,6 @@ const LAYERS: Record<string, readonly string[]> = {
   'water/': ['water/', ...RENDER, 'view/', 'sky/sky.ts', 'land/ground.ts', 'ship/build.ts', 'ship/materials.ts', 'ship/waterline.ts', 'sim/wake.ts'],
   'gpu.ts': ['three'],
   'tsl.ts': ['three'],
-  'textures.ts': ['three'],
   'frame.ts': ['three', 'gpu.ts', 'tsl.ts', 'snapshot.ts', 'environment.ts', 'world/', 'view/', 'sky/', 'land/', 'water/', 'ship/', 'gunfire/', 'loot/', 'post/'],
   'meter.ts': ['three'],
   // the debug tools, and the switches that drive the game through what it offers anyone
@@ -217,7 +216,7 @@ test('i. the game touches no page: src/play neither reads nor makes the DOM (ui/
 
 test('i2. the UI draws plain data: src/ui imports nothing from play/, three or what draws the world', () => {
   const found: string[] = [];
-  const RENDER = ['sky', 'water', 'land', 'ship', 'gunfire', 'view', 'post'], FILES = ['frame.ts', 'gpu.ts', 'tsl.ts', 'textures.ts'];
+  const RENDER = ['sky', 'water', 'land', 'ship', 'gunfire', 'view', 'post'], FILES = ['frame.ts', 'gpu.ts', 'tsl.ts'];
   for (const f of files.filter((f) => f.rel.startsWith('ui/'))) {
     code(f.text).forEach((line, i) => {
       const spec = /(?:\bfrom\s*|\bimport\s*\(?\s*)['"]([^'"]+)['"]/.exec(line)?.[1];

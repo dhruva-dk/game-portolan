@@ -1,68 +1,48 @@
-// How light leaves the sea toward the eye, given the surface's normal and roughness there. Units are the sky's:
-// radiance per unit sun illuminance at the top of the air.
+// How light leaves the sea toward the eye, given the surface's normal there. Units are the sky's: radiance per unit
+// sun illuminance at the top of the air. The sea is painted, as the land is (sky/light.ts): its colours are the
+// palette's (palette.ts), under the brightness of the place and the hour.
 //
-//   reflected  the sky and clouds (sky.reflect, prefiltered to the surface's roughness) and the sun (Beckmann
-//              facets), weighted by Fresnel for water (F0 = 0.02)
-//   body       light scattered back up out of deep water: the irradiance from the sun and sky, times the water's
-//              reflectance R(u), u = b_b/(a + b_b) (Gordon et al. 1975's cubic, which the linear 0.33u falls short of
-//              once backscatter rivals absorption, as it does in the blue here), through the surface twice and spread
-//              by n² on the way out
+//   body       the water's own tone: turquoise where the eye looks through little of it, through a middle blue to
+//              ultramarine where it looks through much, so the turquoise hugs the shores; a deeper tone of the same in
+//              the troughs between the waves, its edge crisp
 //   below      what lies under shallow water (the sea floor, already lit by what light reaches it: sunBelow, skyBelow),
-//              dimmed along the eye's path through the water and spread by n² on the way out, with the water's own
-//              glow in front of it growing toward the deep water's over the path
-//   crests     sunlight passing through the thin water at the top of a wave toward an eye looking into the sun: the
-//              same water's colour after a couple of metres (exp(−a·d)), the turquoise in the faces of the waves
-//   foam       over all of it where the waves break: white and rough, lit by the sun and the sky like any matte surface
+//              coloured along the eye's path through the water and veiled by the water's own tone as the path grows
+//   reflected  the sky and clouds (sky.reflect) in a few broad shapes, by a share of Fresnel for water (F0 = 0.02)
+//   glints     flat shapes of light where the surface mirrors the sun to the eye
+//   foam       over all of it: flat white (foam.ts)
 //
 // "Up" and the sun's elevation are those at the point itself (view.up), so the sea is lit as the planet turns under the
 // sun; depths are heights below the sea's level there (view.altitude).
-//
-// The water is the clear water over the tropics' carbonate banks (Jerlov's oceanic IB): absorption mostly pure
-// water's (Pope & Fry 1997), and backscatter pure water's plus the fine carbonate silt the waves keep stirred up,
-// b_bp ≈ 0.03 m⁻¹ at 550 nm, rising toward the blue as λ⁻¹: the upper end of what was measured over the Bahamas Banks
-// (0.003–0.04, Dierssen et al. 2009), where the trade wind keeps the ooid silt in suspension. It is what turns their
-// deep water a bright, saturated blue and their shallows turquoise, where the open ocean's clearest water is navy.
 
 import { dot, exp, float, length, max, min, mix, normalize, pow, saturate, smoothstep, sqrt, vec3 } from 'three/tsl';
+import { FOAM, SEA_DEEP, SEA_MIDDLE, SEA_SHALLOW } from '../palette';
 import type { Sky } from '../sky/sky';
 import type { View } from '../view/view';
 import type { FloatNode, Vec3Node, Vec4Node } from '../tsl';
 
-/** Absorption per metre, red/green/blue (680, 550, 440 nm). */
+/** Absorption per metre, red/green/blue (680, 550, 440 nm): pure water's (Pope & Fry 1997). It colours the light that
+ *  reaches the floor and what the eye sees of the floor through the water. */
 const ABSORPTION = [0.45, 0.068, 0.025];
-/** Backscatter per metre: pure sea water's, and the silt's (0.03 at 550 nm, as 550/λ). */
-const BACKSCATTER = [0.0012 + 0.0243, 0.0018 + 0.03, 0.0032 + 0.0375];
 /** Refractive index of sea water. */
 export const N_WATER = 1.34;
 /** Reflectance at normal incidence, ((n − 1)/(n + 1))². */
 const F0 = 0.02;
-/** How far the sun's light runs through a crest before it leaves toward the eye, metres. */
-const CREST_PATH = 2;
-/** The share of that light scattered out toward the eye. */
-const CREST_SCATTER = 0.06;
-
-/** Foam's albedo: bubbles scatter almost everything back (whitecaps reflect ~50–60%; fresh foam more). */
-const FOAM_ALBEDO = 0.8;
-/**
- * Backscatter per metre of the air a ship's wake works into the water, at its thickest, all colours alike (bubbles
- * are far larger than the light's wavelength): with it the deep blue goes a pale turquoise.
- */
-const AIR_BACKSCATTER = 0.2;
-/** How much a wake at its thickest veils what lies under it: as an optical depth. */
-const AIR_VEIL = 2;
-
-/**
- * What comes back out of deep water per unit irradiance on it, with `air` (0…1) worked into it by a wake: R·(1 − F)²/n²
- * (F ≈ F0 for light near normal), R the irradiance reflectance just below the surface for u = b_b/(a + b_b) (Gordon
- * et al. 1975's cubic, sun-lit).
- */
-const deep = (air: FloatNode): Vec3Node => {
-  const bb = vec3(...BACKSCATTER).add(air.mul(AIR_BACKSCATTER));
-  const u = bb.div(vec3(...ABSORPTION).add(bb));
-  return u.mul(u.mul(u.mul(0.1308).add(0.1425)).add(0.3244)).add(0.0001).mul((1 - F0) ** 2 / (N_WATER * N_WATER));
-};
-/** The water's colour after the light's path through a crest. */
-const CREST = vec3(...ABSORPTION.map((a) => Math.exp(-a * CREST_PATH) * CREST_SCATTER));
+/** How much of what Fresnel gives the sea's mirror keeps: the sea stays its own colour out to the horizon. */
+const MIRROR = 0.45;
+/** The roughness the sky's reflection is blurred to at the least: a few broad shapes of cloud and sky, no detail. */
+const BLURRED = 0.55;
+/** The eye's path through the water, metres, at which its tone is the middle one, and the deep one. */
+const MIDDLE_AT = 3.5, DEEP_AT = 11;
+/** How fast the water's own tone veils what lies under it, per metre of the eye's path through it. */
+const CLOUDY = 0.32;
+/** How far a wake's air at its thickest takes the water toward the shallows' tone; and how much it veils what lies
+ *  under it, as an optical depth. */
+const AIRED = 0.6, AIR_VEIL = 2;
+/** The troughs' tone, of the water's, and where between trough and crest (0…1) its edge lies. */
+const TROUGH = 0.88, TROUGH_AT = 0.4;
+/** The sun's glints: the cosine between the surface's normal and the half vector past which it mirrors the sun to the
+ *  eye, the width of that edge, and the glint's light of what a white surface gets from the sun square on. */
+const GLINT = 0.9985, GLINT_EDGE = 0.0006, GLINT_LIGHT = 0.5;
 
 const absorption = vec3(...ABSORPTION);
 
@@ -97,14 +77,11 @@ export function createOptics(sky: Sky, view: View) {
     /** The light leaving the sea toward the eye (seaRadiance, below). */
     seaRadiance: (
       p: Vec3Node, n: Vec3Node, v: Vec3Node, alpha: FloatNode, crest: FloatNode, foam: FloatNode, behind: Vec3Node, path: FloatNode,
-      sparkle: Sparkle, ships: Ships, held?: Held,
+      ships: Ships, held?: Held,
     ): Vec3Node =>
-      seaRadiance(sky, view, p, n, v, alpha, crest, foam, behind, path, sparkle, ships, held),
+      seaRadiance(sky, view, p, n, v, alpha, crest, foam, behind, path, ships, held),
   };
 }
-
-/** How the glint off the unresolved ripples gathers into flashes (glitter.ts), given D, n·h and h·l: its multiplier. */
-export type Sparkle = (D: FloatNode, nh: FloatNode, hl: FloatNode) => FloatNode;
 
 /**
  * What the ships do to the light here (water/wake.ts, water/hulls.ts), each 0…1: the share of the sun their shadows
@@ -159,72 +136,52 @@ function tinted(c: Vec3Node, colour: Vec3Node, a: FloatNode, far: FloatNode): Ve
 }
 
 /**
- * The sea's facets' distribution D and visibility V, for roughness α, the root of the mean square slope over both
- * axes. The slopes are Gaussian (Cox & Munk 1954), so D is Beckmann's; V is the height-correlated Smith term in
- * GGX's closed form, which differs from Beckmann's by little at these slopes. (GGX's long tails would spread the
- * sun's glint far off its path.)
- */
-function facets(nh: FloatNode, nl: FloatNode, nv: FloatNode, alpha: FloatNode): { D: FloatNode; V: FloatNode } {
-  const a2 = alpha.mul(alpha), c2 = max(nh.mul(nh), 1e-4);
-  const D = exp(float(1).sub(c2).div(c2.mul(a2)).negate()).div(a2.mul(c2.mul(c2)).mul(Math.PI));
-  const vl = nv.mul(sqrt(nl.mul(nl).mul(float(1).sub(a2)).add(a2)));
-  const vv = nl.mul(sqrt(nv.mul(nv).mul(float(1).sub(a2)).add(a2)));
-  return { D, V: float(0.5).div(max(vl.add(vv), 1e-5)) };
-}
-
-/**
  * The light leaving the sea at world position p toward the eye.
  *   n      the surface's normal          v      unit vector from p to the eye
  *   alpha  roughness, √(mean square slope) (the slopes the pixel can't resolve, plus the ripples no cascade holds)
- *   crest  0 in the troughs … 1 at the tops of the waves, where the water is thinnest
+ *   crest  0 in the troughs … 1 at the tops of the waves
  *   foam   the share of the pixel covered in foam
  *   behind the radiance of whatever lies behind the surface (the sea floor; the sky's if nothing)
  *   path   metres from the surface to it through the water (Infinity for open sea)
- *   sparkle how the sun's glint gathers into flashes
  *   ships  what the ships do to the light here
  *   held   who holds the water here: the water tinted her colour, and her border's line drawn over it
  */
 function seaRadiance(
   sky: Sky, view: View, p: Vec3Node, n: Vec3Node, v: Vec3Node, alpha: FloatNode, crest: FloatNode, foam: FloatNode, behind: Vec3Node,
-  path: FloatNode, sparkle: Sparkle, ships: Ships, held?: Held,
+  path: FloatNode, ships: Ships, held?: Held,
 ): Vec3Node {
   const l = sky.sun(p), up = view.up(p);
-  const nv = max(n.dot(v), 1e-4), nl = saturate(n.dot(l));
-  const F = fresnel(nv);
+  const nv = max(n.dot(v), 1e-4);
+  const F = fresnel(nv).mul(MIRROR);
   const sun = sky.sunIlluminance(p).mul(sky.cloudShadow(p)).mul(ships.lit);
 
-  // radiance off a reflectance R under irradiance E is R·E/π; ambient() is the sky's radiance, so its E/π is itself
+  // what a white surface lying on the sea would give back (ambient() is the sky's radiance, so its E/π is itself):
+  // the water's colours are tones under it, as a solid's are under its level (sky/light.ts)
   const irradiance = sun.mul(max(dot(l, up), 0)).div(Math.PI).add(sky.ambient(p, up));
-  const body = deep(ships.air).mul(irradiance).mul(ships.glow);
+  // the water's own tone by how much of it the eye looks through, paler where a wake has worked air into it, and a
+  // second, deeper tone in the troughs between the waves, its edge crisp
+  const depth = mix(mix(vec3(...SEA_SHALLOW), vec3(...SEA_MIDDLE), smoothstep(0, MIDDLE_AT, path)), vec3(...SEA_DEEP), smoothstep(MIDDLE_AT, DEEP_AT, path));
+  const tone = mix(depth, vec3(...SEA_SHALLOW), ships.air.mul(AIRED)).mul(mix(float(TROUGH), float(1), smoothstep(TROUGH_AT - 0.03, TROUGH_AT + 0.03, crest)));
+  const body = tone.mul(irradiance).mul(ships.glow);
 
-  // The sky, along the reflected ray, blurred to the roughness (sky/reflection.ts takes √α, as three's PMREM did). A
-  // ray reflected down (below the horizon here, by the up here) from a facet turned away from the eye meets the next
-  // wave instead, at about the angle it points down: glancing, that wave mirrors the sky at its horizon; steeper, the
-  // light comes through it, the sea's own colour. Fresnel weighs the two.
+  // The sky, along the reflected ray, blurred to broad shapes. A ray reflected down (below the horizon here, by the up
+  // here) from a facet turned away from the eye meets the next wave instead, at about the angle it points down:
+  // glancing, that wave mirrors the sky at its horizon; steeper, the light comes through it, the sea's own colour.
   const r = v.negate().reflect(n);
   const below = dot(r, up);
-  const above = sky.reflect(normalize(r.sub(up.mul(min(below, 0)))), sqrt(alpha));
+  const above = sky.reflect(normalize(r.sub(up.mul(min(below, 0)))), max(sqrt(alpha), BLURRED));
   const seen = mix(body, above, fresnel(below.negate()));
-  const h = normalize(l.add(v));
-  const nh = saturate(n.dot(h)), { D, V } = facets(nh, nl, nv, alpha);
-  const glint = sun.mul(D.mul(V).mul(nl)).mul(sparkle(D, nh, saturate(h.dot(l))));
-  const reflected = seen.add(glint).mul(F);
+  // the sun's glints: flat shapes of light where the surface mirrors it to the eye
+  const nh = n.dot(normalize(l.add(v)));
+  const glint = vec3(...FOAM).mul(sun).mul(smoothstep(GLINT, GLINT + GLINT_EDGE, nh).mul(GLINT_LIGHT));
 
-  // toward the sun the crests glow; side-on a little, from the light scattered out sideways
-  const into = saturate(v.negate().dot(normalize(l.sub(up.mul(dot(l, up))))));
-  const crests = CREST.mul(sun).mul(mix(float(0.3), float(1), crest)).mul(mix(float(0.15), float(1), pow(into, 4)));
-  // what lies behind, seen through `path` metres of water: dimmed by it, while the water's own glow (and the
-  // crests') builds toward the deep's — over the path there and back, so twice the absorption. A wake's bubbles
-  // veil it further, as so much more water would.
-  const dim = exp(absorption.mul(path).add(ships.air.mul(AIR_VEIL)).negate());
-  const through = behind.mul(dim).div(N_WATER * N_WATER);
-  const glow = body.add(crests).mul(float(1).sub(dim.mul(dim)));
-  let water = reflected.add(through.add(glow).mul(float(1).sub(F)));
-  if (held) {
-    // all of it tinted but the sun's glint, and the border's line over it
-    water = tinted(seen.mul(F).add(through.add(glow).mul(float(1).sub(F))), held.dye.xyz, held.dye.w, held.far).add(glint.mul(F));
-    water = water.mul(float(1).sub(held.ink.w)).add(held.ink.xyz.mul(irradiance));
-  }
-  const froth = sun.mul(nl).div(Math.PI).add(sky.ambient(p, n)).mul(FOAM_ALBEDO);
-  return mix(water, froth, foam);
+  // what lies behind, seen through `path` metres of water: dimmed and coloured by it, and veiled by the water's own
+  // tone as the path grows (and by a wake's bubbles, as so much more water would)
+  const veil = float(1).sub(exp(path.mul(-CLOUDY).sub(ships.air.mul(AIR_VEIL))));
+  const through = behind.mul(exp(absorption.mul(path).negate())).div(N_WATER * N_WATER);
+  const under = mix(through, body, veil);
+  let water = seen.mul(F).add(under.mul(float(1).sub(F)));
+  if (held) water = tinted(water, held.dye.xyz, held.dye.w, held.far).mul(float(1).sub(held.ink.w)).add(held.ink.xyz.mul(irradiance));
+  // foam: its flat white, as bright as the place
+  return mix(water.add(glint), vec3(...FOAM).mul(irradiance), foam);
 }

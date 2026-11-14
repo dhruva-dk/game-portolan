@@ -30,7 +30,7 @@
 
 import { DoubleSide, Mesh, MeshBasicNodeMaterial, type Texture } from 'three/webgpu';
 import {
-  Discard, Fn, If, abs, cameraPosition, cross, cameraProjectionMatrix, cameraProjectionMatrixInverse, cameraViewMatrix, dFdx, dFdy, dot, float,
+  Discard, Fn, If, abs, cameraPosition, cameraProjectionMatrix, cameraProjectionMatrixInverse, cameraViewMatrix, dFdx, dFdy, dot, float,
   getScreenPosition, getViewPosition, length, log2, max, min, mix, normalize, positionView, positionWorld, saturate,
   screenUV, select, smoothstep, sqrt, step, tanh, texture, varying, vec2, vec3, vec4, viewportDepthTexture, viewportSharedTexture,
 } from 'three/tsl';
@@ -48,7 +48,6 @@ import { createCaustics } from './caustics';
 import { createClaims } from './claims';
 import { createTrails } from './trails';
 import { createFoam } from './foam';
-import { glitter } from './glitter';
 import { createHulls } from './hulls';
 import { N_WATER, createOptics } from './optics';
 import { likeness } from '../world/spectrum';
@@ -191,9 +190,7 @@ export function createWater(view: View, sky: Sky, ground: Ground, wind: Wind, sh
     // the sky sharply, the faces blur it, about the same mean.
     const slope = marks.slope.toVar(), variance = float(0).toVar(), foam = float(0).toVar(), bubbles = float(0).toVar();
     const lean = float(0).toVar();
-    const q = vec2(0).toVar();
-    charts.each(p, (c, slot) => {
-      if (slot === 0) q.assign(c.q);
+    charts.each(p, (c) => {
       const read = (t: Texture, k: FloatNode) => texture(t, c.q.mul(k)).grad(c.dx.mul(k), c.dy.mul(k));
       let s2: Vec2Node = vec2(0), v: FloatNode = float(0), h: FloatNode = float(0);
       CASCADES.forEach((L, k) => {
@@ -249,14 +246,13 @@ export function createWater(view: View, sky: Sky, ground: Ground, wind: Wind, sh
     const path = select(depthBehind.greaterThanEqual(1), float(1e4), length(behindAt(uv).sub(positionView)));
     const behind = viewportSharedTexture(uv).rgb;
 
-    const sparkle = (D: FloatNode, nh: FloatNode, hl: FloatNode) => glitter(q, length(cross(dp[0], dp[1])), footprint, D, nh, hl);
     // the ships' shadows, the hulls' shade and the wakes' air
     const near = { lit: float(1).sub(wake.shade(positionWorld)), glow: hull.glow, air: max(max(air, bubbles), held.drain.mul(0.6)) };
     // the facets' α² is the mean square slope over both axes; a wake's air calms the ripples over it. Never quite a
     // mirror: at the waterline the depth cuts every wave away, and with α² = 0 the facets' D is 0/0, a line of NaN
     // drawn black along every beach.
     const alpha = sqrt(max(variance.mul(float(1).sub(air.mul(0.6))), SMOOTHEST));
-    const sea = optics.seaRadiance(positionWorld, n, v, alpha, crest, foam, behind, path, sparkle, near, held).mul(float(1).sub(storm.mul(STORM_DARK)));
+    const sea = optics.seaRadiance(positionWorld, n, v, alpha, crest, foam, behind, path, near, held).mul(float(1).sub(storm.mul(STORM_DARK)));
     return mix(sea, vec3(...EDGE_LIGHT), edgeLine);
   })();
   // the charts' weights as red, green and blue, about as bright on the screen as they are after the frame's exposure

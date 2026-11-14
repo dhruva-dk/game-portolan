@@ -11,6 +11,8 @@
 //   cloudShadow(p)   the fraction of it the clouds let through to p: the fair-weather clouds' share (cloudCover)
 //                    times the storm's (stormSun)
 //   ambient(p, n)    the sky's light on a surface at p facing n, as radiance (multiply by albedo)
+//   open             what the sun and the sky give a white surface facing up in the open, out of every shadow and of
+//                    the storm, as radiance: the same everywhere, by the hour. The frame's exposure is set by it
 //   reflect(d, r)    the sky and clouds seen along world direction d off a surface of roughness r
 //   storm(p)         0…1, how deep in the storm (storm.ts) world position p lies; the sun and the sky's glow there are
 //                    already dimmed by it
@@ -95,6 +97,7 @@ export interface Sky {
   cloudCover(p: Vec3Node): FloatNode;
   stormSun(p: Vec3Node): FloatNode;
   ambient(p: Vec3Node, n: Vec3Node): Vec3Node;
+  open: Vec3Node;
   reflect(dir: Vec3Node, roughness: FloatNode): Vec3Node;
   storm(p: Vec3Node): FloatNode;
   stormEdge(p: Vec3Node): FloatNode;
@@ -204,7 +207,8 @@ export function createSky(view: View, bolt: boolean) {
   const cloudShadow = (p: Vec3Node): FloatNode => cloudCover(p).mul(stormSun(p));
   // what a surface mirrors is the sky beyond the storm: seen from the eye, which is near enough the mirror
   const reflect = (dir: Vec3Node, roughness: FloatNode): Vec3Node => storm.dim(reflection.reflect(dir, roughness), dir, stormLight);
-  const light: Sky = { sun: sunOver, sunIlluminance, cloudShadow, cloudCover, stormSun, ambient, reflect, storm: storm.depth, stormEdge: storm.edge };
+  const open = sunlight.div(Math.PI).add(skyAmbientUp);
+  const light: Sky = { sun: sunOver, sunIlluminance, cloudShadow, cloudCover, stormSun, ambient, open, reflect, storm: storm.depth, stormEdge: storm.edge };
 
   return {
     background,

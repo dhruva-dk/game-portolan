@@ -1,5 +1,6 @@
-// Bloom: the brightest light in the frame (sunlit canvas, the glint, foam, flashes, the sun) spilling softly round
-// itself, as it does in a lens and in the eye. A dual filter at low resolution: the scene's light over a soft knee is
+// Bloom: light brighter than any surface (the loot's beams, lightning, a gun's flash, the sun and its glints on the
+// sea) spilling softly round itself, as it does in a lens and in the eye. A surface in the sun, however pale, is under
+// its knee: flat colours stay flat. A dual filter at low resolution: the scene's light over a soft knee is
 // taken down to a quarter of the frame's size in one step of four bilinear taps (a 4×4 box), each tap weighted by
 // 1/(1 + its brightness) so a single sparkling pixel of glint cannot flash a whole block (Karis); then halved three
 // times more with the same four taps, and brought back up, each level a tent of four taps over the one below plus
@@ -9,11 +10,11 @@
 
 import type { TextureNode } from 'three/webgpu';
 import { Fn, abs, dFdx, dFdy, float, luminance, rtt, smoothstep, uv, vec2, vec4 } from 'three/tsl';
-import type { Vec4Node } from '../tsl';
+import type { FloatNode, Vec4Node } from '../tsl';
 
 /** The soft knee, in the scene's light per unit sun times the exposure's 2^stops (so in what the eye sees): bloom
- *  starts at KNEE[0] and takes everything past KNEE[1]. */
-const KNEE = [0.55, 1.6] as const;
+ *  starts at KNEE[0] and takes everything past KNEE[1]. White foam in the open is 1. */
+const KNEE = [1.15, 2.4] as const;
 
 /** Four bilinear taps at the corners of a square round uv, `spread` of this pass's own pixels out: in a source twice
  *  as fine (spread ½: one of its texels), a 4×4 box of it; in one half as fine (spread 1), a tent. */
@@ -26,8 +27,8 @@ const four = (t: TextureNode, spread: number, karis: boolean): Vec4Node => {
   return vec4(sum.div(w[0].add(w[1]).add(w[2]).add(w[3])), 1);
 };
 
-/** The bloom of `scene` (the frame's linear light, full size) at `gain` (the exposure, 2^stops). */
-export function bloom(scene: TextureNode, gain: number): TextureNode {
+/** The bloom of `scene` (the frame's linear light, full size) at `gain` (the exposure, a factor on that light). */
+export function bloom(scene: TextureNode, gain: FloatNode): TextureNode {
   const knee = Fn(() => {
     const c = four(scene, 1 / 4, true).rgb;
     const y = luminance(c).mul(gain);
