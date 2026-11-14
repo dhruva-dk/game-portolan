@@ -29,6 +29,10 @@ import { loop, type FloatNode, type Vec3Node } from '../tsl';
  *  deeper rolls, seen from the calm, lie as rows of wood-grain stripes over the wall's foot (review21–23). */
 export const BASE = 58;
 const ROLL = 0.5, ROLL_WIDTH = 26;
+/** How far the billows push the base up and down, metres: across the planet's curve a far wall shows the eye its
+ *  underside, which a flatter base drew as one dark striped sheet (review30-31); heaped, it is art/target/idea.png's
+ *  lumpy dark bases. */
+const UNDER = 25;
 /** How far the base's front stands out over the calm (metres, negative: in the calm), and how far the face leans back
  * a metre up; how far its billows reach either side of it. */
 const SHELF = -12, LEAN = 0.8, FACE = 60;
@@ -135,7 +139,7 @@ export function createStormField(cap: Cap, shape: Storage3DTexture) {
     const front = float(SHELF).add(max(h.sub(base), 0).mul(LEAN)).add(bay.mul(mix(0.4, 1, smoothstep(BASE, BASE + 50, h))));
     const face = e.sub(front).add(lift.mul(FACE).mul(reach));
     const top = float(CROWN).add(lift.mul(CROWN_BILLOW)).sub(h);
-    const under = h.sub(base).add(lift.mul(5)).mul(1.5);
+    const under = h.sub(base).add(lift.mul(UNDER)).mul(1.5);
     // the base's slope across its rolls (metres up a metre in)
     const rolling = cos(roll).mul((ROLL * 2 * Math.PI) / ROLL_WIDTH);
     return { lift, reach, face, top, under, rolling, inside: min(min(face, top), under) };
@@ -151,7 +155,7 @@ export function createStormField(cap: Cap, shape: Storage3DTexture) {
     const onTop = c.top.lessThan(min(c.face, c.under)), onBase = c.under.lessThan(c.face);
     const flat = select(onTop, up, select(onBase, normalize(up.negate().add(out.mul(c.rolling))), normalize(up.mul(LEAN).sub(out))));
     const slope = vec3(billows(q.add(vec3(SLOPE, 0, 0))), billows(q.add(vec3(0, SLOPE, 0))), billows(q.add(vec3(0, 0, SLOPE)))).sub(c.lift).div(SLOPE);
-    const amplitude = select(onTop, float(CROWN_BILLOW), select(onBase, float(5), c.reach.mul(FACE)));
+    const amplitude = select(onTop, float(CROWN_BILLOW), select(onBase, float(UNDER), c.reach.mul(FACE)));
     const normal = normalize(flat.sub(slope.mul(amplitude)));
     const high = smoothstep(BASE, CROWN, h);
     const facing = clamp(dot(normal, lit.toward), 0, 1);
