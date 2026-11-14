@@ -82,10 +82,10 @@ const ARM = 0.18, ARM_LIFE = 22, ARM_FADE = 10, ROUGH = 0.45;
 const ARM_WIDTH = 0.9, WIDEN = 0.05;
 /** The bow wave's foam along the arms: how long it lasts, seconds (fading by e each), and its half-width, metres; and
  *  how white the streaks its crests leave behind it are. Bold, so her wake reads as a long white V (art/target/idea.png). */
-const BOW_LIFE = 18, BOW_FOAM = 0.8, STREAK = 0.6;
+const BOW_LIFE = 18, BOW_FOAM = 1.5, STREAK = 0.6;
 /** How much of the bow wave's foam lies only on its crests: the rest of it whole between them. So the arms are white
- *  crests with blue showing between (art/target/idea.png), neither one flat band (half) nor loose flecks (0.9). */
-const SCALLOP = 0.7;
+ *  crests with blue showing between (art/target/idea.png), neither loose flecks (0.7 read so, review27) nor one flat band. */
+const SCALLOP = 0.5;
 /** The ribbon reaches this many of an arm's half-widths past its crest (and at least ARM_ROOM metres), and at least
  * this many of the churn's half-widths. */
 const ARM_REACH = 4, ARM_ROOM = 4, CHURN_ROOM = 2.6;
