@@ -2,6 +2,12 @@
 
 Portolan is a fun naval battle royale game for mobile devices.
 
+## Phone
+
+    npm run build && npx cap sync ios && sh tools/phone.sh
+
+`npm run shot` screenshots the phone to `captures/phone.png`.
+
 ## The old game
 
 The previous battle royale is commit `ae981b6`, an ancestor of main. Features it had that this game does not, and
