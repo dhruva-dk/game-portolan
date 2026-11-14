@@ -90,7 +90,7 @@ const GOLD = 15, GOLD_SHARE = 0.5;
  *  across it (art/target/idea.png's ships cast barely any). */
 const SHIP_SHADE = 0.5;
 /** A wake's foam (wake.ts) drawn this much fuller than it is kept: bold lobes of white along her sides and astern. */
-const WAKE_BOLD = 3;
+const WAKE_BOLD = 1.8;
 /**
  * The swash: each wave's bore runs on up the beach after it breaks, RUNUP of its crest's height offshore above the
  * still water, and drains back BACKWASH of its trough's below it, on ground from SWASH_FROM metres down up the beach.
