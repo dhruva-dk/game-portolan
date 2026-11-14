@@ -78,7 +78,7 @@ const STORM_FOAM = 0.45, STORM_DARK = 0.3;
 const FOOT = [6, 26] as const, EDGE_LINE = 0.3, EDGE_LIGHT = 1.6;
 /** The calm's water along the wall's foot gold (art/target/idea.png), out to GOLD metres from its edge, at most GOLD_SHARE
  *  of the way to the palette's gold as bright as a white surface in the open. */
-const GOLD = 60, GOLD_SHARE = 0.95;
+const GOLD = 18, GOLD_SHARE = 0.95;
 /** A wake's foam (wake.ts) drawn this much fuller than it is kept: bold lobes of white along her sides and astern. */
 const WAKE_BOLD = 3;
 /**
