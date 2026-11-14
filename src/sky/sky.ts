@@ -24,7 +24,7 @@
 //   deck(c, dir, m)  the storm seen from high over it instead (the full map's view from space): its cloud's top
 
 import { Vector3, type PerspectiveCamera } from 'three/webgpu';
-import { Fn, abs, cross, dot, exp, float, length, max, mix, normalWorldGeometry, normalize, pow, select, smoothstep, sqrt, uniform, vec3 } from 'three/tsl';
+import { Fn, abs, cross, dot, exp, float, length, luminance, max, mix, normalWorldGeometry, normalize, pow, select, smoothstep, sqrt, uniform, vec3 } from 'three/tsl';
 import type { Environment } from '../environment';
 import type { Cap } from '../sim/storm';
 import type { Compute } from '../gpu';
@@ -33,7 +33,7 @@ import type { View } from '../view/view';
 import { R, toSky } from '../world/sphere';
 import { sunAtOrigin, sunInSky } from '../world/sun';
 import { MIE_EXTINCTION, MIE_SCALE_HEIGHT, MIE_SCATTERING, RAYLEIGH_SCATTERING, SEA_ALBEDO } from './atmosphere';
-import { STORM, tint } from '../palette';
+import { HAZE, STORM, tint } from '../palette';
 import { createClouds } from './clouds';
 import { createReflection } from './reflection';
 import { createStormLook, type StormLight } from './storm';
@@ -67,34 +67,28 @@ const PEAK_SHARE = 0.05, PEAK_G = 0.95;
  * own air: SUN_IN of the sun's light (scattered every way, over 4π) and AIR_IN of the sky's glow, tinted the storm's
  * shadow violet (palette.ts).
  */
-const STORM_SUN = 0.08, STORM_SKY = 0.35, SUN_IN = 0.6, AIR_IN = 0.3, STORM_TINT = tint(STORM.shadow, 0.8);
+const STORM_SUN = 0.08, STORM_SKY = 0.35, SUN_IN = 0.6, AIR_IN = 0.3, STORM_TINT = tint(STORM.shadow, 0.45);
 /** The sun on the storm's cloud: its luminance, in the storm's lit violet, so the crown is lit whatever the hour,
  *  never red. */
 const STORM_SUNLIT = tint(STORM.lit, 0.85);
 /**
  * The haze, drawn to the planet's scale rather than Earth's: on a sea whose horizon is 150 m off, Earth's air would
  * leave it as clear as a room, so the far field is swallowed by a haze of its own. Its optical depth is HAZE_DEPTH a
- * unit of the air's aerosol (Environment.haze: about 1.3 on a mean day) at HAZE_DISTANCE metres along the sea from the
- * chase camera's height, growing as the distance to the power HAZE_SHAPE, so the near water stays clear and the far
- * dissolves; it lies in a layer HAZE_HEIGHT metres deep, so a ship's canvas stands out of it over her hull, and the
- * sky gets it as a band HAZE_BAND (the sine of its height) deep along the horizon. Red goes through a little further
- * than blue (HAZE_SPECTRUM). Its glow is the horizon's (tinted HAZE_TINT) and the sun's light scattered forward
+ * unit of the air's aerosol (Environment.haze: about 1.3 on a mean day) at HAZE_DISTANCE metres along the sea from an
+ * eye REFERENCE_EYE metres up (the chase eye's height: play/chase.ts FOCUS + BOOM·sin PITCH), growing as the distance
+ * to the power HAZE_SHAPE, so the near water stays clear and the far dissolves; it lies in a layer HAZE_HEIGHT metres
+ * deep, so a ship's canvas stands out of it over her hull, and the sky gets it as a band HAZE_BAND (the sine of its
+ * height) deep along the horizon, HAZE_BAND_DEPTH times as thick. Red goes through a little further than blue
+ * (HAZE_SPECTRUM). Its glow is the horizon's (tinted the palette's HAZE) and the sun's light scattered forward
  * (HAZE_SUN of it, Henyey-Greenstein HAZE_G). An eye higher than HAZE_ABOVE (from, to) metres leaves it below:
  * gone by the height the arrival's eye comes down into the air from space (play/arrival.ts ARRIVAL.air), so the
  * hand-over from the space eye's air to this haze shows no step.
  */
-const HAZE_DEPTH = 0.06, HAZE_DISTANCE = 270, HAZE_SHAPE = 6, HAZE_HEIGHT = 8, HAZE_BAND = 0.07, REFERENCE_EYE = 77;
-const HAZE_SPECTRUM = [0.85, 1, 1.12] as const, HAZE_TINT = [0.85, 0.72, 0.9] as const, HAZE_SUN = 0.35, HAZE_G = 0.72;
+const HAZE_DEPTH = 0.06, HAZE_DISTANCE = 270, HAZE_SHAPE = 6, HAZE_HEIGHT = 8, HAZE_BAND = 0.07, REFERENCE_EYE = 51;
+const HAZE_SPECTRUM = [0.85, 1, 1.12] as const, HAZE_SUN = 0.35, HAZE_G = 0.72, HAZE_BAND_DEPTH = 3;
 const HAZE_ABOVE = [110, 200] as const;
-/** The band along the sky's foot is this many times as deep as the sea's haze at HAZE_DISTANCE: a dusky lilac along
- *  the horizon, as art/target/idea.png's (#988CAE…#CAB1BC), rather than the pale peach review33 saw. */
-const HAZE_BAND_DEPTH = 3;
-/** And under it, along the sea's rim, where a ray grazes the sea through the most of the low air: this optical depth
- *  where it skims the water, thinning by e each LIMB_HEIGHT metres it passes over it, its glow tinted LIMB_TINT: the
- *  thin gold line along art/target/idea.png's horizon, under the lilac (review36 saw none). */
-const LIMB_DEPTH = 2, LIMB_HEIGHT = 3, LIMB_TINT = [1.8, 1.35, 0.75] as const;
-/** The sky's blue drawn richer than the air's: its colour this many times as far from its grey (the target painting's
- *  deep blue overhead, art/target/idea.png), the disc and its glow left as they are. */
+/** The sky's blue drawn richer than the air's: its colour this many times as far from its grey, the disc and its glow
+ *  left as they are. The backdrop and what the sea mirrors both take it (skyColour), so the mirror matches the sky. */
 const SKY_SATURATION = 2.2;
 /** Past this many metres a ray has met nothing: the frame hands the sky's pixels this far or further. */
 export const SKY_METRES = 1e4;
@@ -132,7 +126,12 @@ export function createSky(view: View, bolt: boolean) {
   /** 1 while the eye is in the air, under the clouds; 0 from space, where they are not drawn and cast no shadow. */
   const under = uniform(1);
   const clouds = createClouds(view, tables);
-  const reflection = createReflection(view, skyRadiance, skySun, clouds.along);
+  /** The sky's colour along direction d (the eye's sky) under the sun toward s: the air's, richer (SKY_SATURATION). */
+  const skyColour = (d: Vec3Node, s: Vec3Node): Vec3Node => {
+    const air = skyRadiance(d, s);
+    return max(mix(vec3(luminance(air)), air, SKY_SATURATION), 0);
+  };
+  const reflection = createReflection(view, skyColour, skySun, clouds.along);
   const storm = createStormLook(view, clouds.shape, bolt);
 
   /** The sun over p: the sun over the origin turned with the rotation that takes the origin to p (sun.ts's carry). */
@@ -153,7 +152,7 @@ export function createSky(view: View, bolt: boolean) {
   const sunlight = sunTransmittance(VIEW_RADIUS, rise).mul(max(rise, 0));
   const stormLight: StormLight = {
     air: sunlight.mul(SUN_IN / (4 * Math.PI)).add(skyAmbientUp.mul(AIR_IN)).mul(vec3(...STORM_TINT)),
-    sun: vec3(dot(sunlight, vec3(0.2126, 0.7152, 0.0722))).mul(vec3(...STORM_SUNLIT)),
+    sun: vec3(luminance(sunlight)).mul(vec3(...STORM_SUNLIT)),
     toward: sun,
   };
 
@@ -168,12 +167,12 @@ export function createSky(view: View, bolt: boolean) {
 
   /** What the haze glows with along world direction dir: the sky's glow at the horizon under it, and the sun's light
    *  scattered forward by the droplets, warm round the sun and cool away from it. */
-  const hazeColor = (dir: Vec3Node, tint: Vec3Node = vec3(...HAZE_TINT)): Vec3Node => {
+  const hazeColor = (dir: Vec3Node): Vec3Node => {
     const d = view.toSky(dir);
     const horizon = skyRadiance(normalize(vec3(d.x, 0.02, d.z)), skySun);
     const forward = hg(dot(normalize(vec3(d.x, max(d.y, 0), d.z)), skySun), HAZE_G);
     const sunlight = sunTransmittance(VIEW_RADIUS, rise).mul(max(rise, 0.05));
-    return horizon.mul(tint).add(sunlight.mul(forward).mul(HAZE_SUN));
+    return horizon.mul(vec3(...HAZE)).add(sunlight.mul(forward).mul(HAZE_SUN));
   };
   /** The low air's mean density between two heights over the sea (metres), as a share of the sea's. */
   const meanDensity = (a: FloatNode, b: FloatNode): FloatNode => {
@@ -193,25 +192,16 @@ export function createSky(view: View, bolt: boolean) {
     const density = meanDensity(view.height, length(end).sub(R)).div(reference);
     const near = hazeDepth.mul(pow(metres.div(HAZE_DISTANCE), HAZE_SHAPE)).mul(density);
     const band = hazeDepth.mul(HAZE_BAND_DEPTH).mul(exp(max(view.toSky(dir).y, 0).div(-HAZE_BAND)));
-    const low = float(1).sub(smoothstep(HAZE_ABOVE[0], HAZE_ABOVE[1], view.height));
-    const sky = metres.greaterThan(SKY_METRES);
-    const tau = select(sky, band, near).mul(low);
+    const tau = select(metres.greaterThan(SKY_METRES), band, near).mul(float(1).sub(smoothstep(HAZE_ABOVE[0], HAZE_ABOVE[1], view.height)));
     const T = exp(vec3(...HAZE_SPECTRUM).mul(tau).negate());
-    const hazed = color.mul(T).add(hazeColor(dir).mul(vec3(1).sub(T)));
-    // a ray past the sea's rim: how near the water it passes (it has passed its nearest when it leaves the eye rising)
-    const o = view.position, past = dot(o, dir);
-    const skim = select(past.lessThan(0), length(cross(o, dir)), length(o)).sub(R);
-    const limb = select(sky, exp(max(skim, 0).div(-LIMB_HEIGHT)).mul(LIMB_DEPTH).mul(low), float(0));
-    const L = exp(vec3(...HAZE_SPECTRUM).mul(limb).negate());
-    return hazed.mul(L).add(hazeColor(dir, vec3(...LIMB_TINT)).mul(vec3(1).sub(L)));
+    return color.mul(T).add(hazeColor(dir).mul(vec3(1).sub(T)));
   };
 
   const background = Fn(() => {
     const dir = normalize(normalWorldGeometry);
     const d = view.toSky(dir);
     // below the horizon there is only more sea, beyond the troughs at its edge, and glancing it mirrors the horizon
-    const air = skyRadiance(normalize(vec3(d.x, max(d.y, 0), d.z)), skySun);
-    const sky = max(mix(vec3(dot(air, vec3(0.2126, 0.7152, 0.0722))), air, SKY_SATURATION), 0);
+    const sky = skyColour(normalize(vec3(d.x, max(d.y, 0), d.z)), skySun);
     const c = dot(dir, sun);
     const T = sunTransmittance(VIEW_RADIUS, d.y);
     // the disc, its soft edge and its halo; its angle off the sun's centre from 1 − cos, which keeps its precision so close

@@ -55,16 +55,16 @@ export const IRON = tones('#4A4450', '#2A2233');
 export const SEA_SHALLOW = ink('#22B4B6');
 export const SEA_MIDDLE = ink('#1C7AB6');
 export const SEA_DEEP = ink('#244C92');
-/** A cool white, so under the warm sun foam prints white as art/target/idea.png's, not the cream review34 saw merging
- *  into the sand. */
+/** A cool white, so under the warm sun foam prints white, not a cream lost against the sand. */
 export const FOAM = ink('#EEF6FF');
 
 // ---- the sky
 export const STORM = tones('#7A4FB8', '#3D2670');
 export const LIGHTNING = ink('#D9C2FF');
-/** A fair-weather cloud: a pale cream where the sun lights it, a cool lilac grey beneath (art/target/idea.png's
- *  cumulus: white-topped, not the even salmon review32 saw); both warm, as the sky's lilac adds its blue (review36
- *  saw them pink). */
+/** The haze's glow is the horizon's sky times this: a dusky lilac. */
+export const HAZE: Rgb = [0.85, 0.72, 0.9];
+/** A fair-weather cloud: a pale cream where the sun lights it, a cool lilac grey beneath; both warm, as the sky's
+ *  lilac haze adds its blue. */
 export const CLOUD = tones('#FFE6A0', '#BCA8B0');
 /** Powder smoke: a cloud's cream, and a deeper rose in its shadow. */
 export const SMOKE = tones('#FFF1D6', '#D9907C');
