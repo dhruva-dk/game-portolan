@@ -30,7 +30,7 @@ export const BASE = 58;
 const ROLL = 9, ROLL_WIDTH = 26;
 /** How far the base's front stands out over the calm (metres, negative: in the calm), and how far the face leans back
  * a metre up; how far its billows reach either side of it. */
-const SHELF = -12, LEAN = 0.8, FACE = 34;
+const SHELF = -12, LEAN = 0.8, FACE = 60;
 /** Along the edge the towers stand forward and back over the base, in bays and headlands: by up to BAY metres, the
  * swells WAVES metres apart (two, crossing). */
 const BAY = 40, WAVES = [140, 61] as const;
@@ -39,7 +39,7 @@ const CROWN = 250, CROWN_BILLOW = 95;
 /** The storm's air ends this high, over its tallest billows. */
 export const TOP = CROWN + CROWN_BILLOW + 10;
 /** The billows' pattern repeats every this many metres (its largest cells a quarter of it), and drifts this fast. */
-const CLOUD_TILE = 210, CHURN = [0.6, 0.35, 0.2] as const;
+const CLOUD_TILE = 380, CHURN = [0.6, 0.35, 0.2] as const;
 /** The finer billows on them: their pattern's tile, as a share of the coarser's. Their slope is read across SLOPE
  * metres. */
 const FINE = 0.29, SLOPE = 5;
@@ -134,7 +134,7 @@ export function createStormField(cap: Cap, shape: Storage3DTexture) {
     const normal = normalize(flat.sub(slope.mul(amplitude)));
     const high = smoothstep(BASE, CROWN, h);
     const facing = clamp(dot(normal, lit.toward), 0, 1);
-    const tone = smoothstep(TONE_AT - TONE_EDGE, TONE_AT + TONE_EDGE, high.mul(0.75).add(facing.mul(0.35)).add(c.lift.mul(0.08)));
+    const tone = smoothstep(TONE_AT - TONE_EDGE, TONE_AT + TONE_EDGE, high.mul(0.6).add(facing.mul(0.3)).add(c.lift.mul(0.3)));
     // the sky's light from above (the sea's, under the base), less in the hollows between the billows
     const sky = max(dot(normal, up).mul(0.45).add(0.6), 0.3).mul(clamp(c.lift.mul(0.3).add(0.9), 0.7, 1.2));
     // and the light of the open, sunlit calm, coming in level under the shelf
