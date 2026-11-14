@@ -85,7 +85,7 @@ const STROKE = 7;
 /** The calm's water along the wall's foot gold (art/target/idea.png), out to GOLD metres from its edge, at most GOLD_SHARE
  *  of the way to the palette's gold as bright as a white surface in the open, rising as the square of nearness so it is
  *  a soft glow along the wall rather than a hard pale seam. */
-const GOLD = 30, GOLD_SHARE = 0.8;
+const GOLD = 15, GOLD_SHARE = 0.5;
 /** How much of the sun a ship's shadow takes from the water: some, so she sits on the sea, but not a dark smear
  *  across it (art/target/idea.png's ships cast barely any). */
 const SHIP_SHADE = 0.5;
