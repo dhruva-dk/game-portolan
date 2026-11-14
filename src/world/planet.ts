@@ -15,7 +15,8 @@
 
 import { R, distance, type Vec3 } from './sphere.ts';
 import { createNoise3 } from './noise3.ts';
-import { charter, placeIslands, type IslandSite } from './planet-islands.ts';
+import type { IslandSite } from './planet-islands.ts';
+import { charter, placeIslands } from './island-place.ts';
 import { random } from './random.ts';
 
 export type { IslandSite } from './planet-islands.ts';

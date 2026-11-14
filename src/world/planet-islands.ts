@@ -17,16 +17,11 @@
 // of metres down, which steps down into a wide clear apron 4.2–7.5 m deep, deepening outward, where a ship sails over
 // pale sand; past the apron's edge (wandering in lobes and bays) its flank falls gently to the depth of the banks, then
 // steeply on past the deepest floor, so by its reach it is below every floor and the sea floor there is the bank's
-// alone. A lagoon is shallow.
-//
-// Where they lie: spread evenly over the whole planet, as many of each kind as its area holds at its density, the
-// largest first, each where the most water is left between its apron and every other's (the farthest point, a
-// little shaken by the seed so they don't fall in rows), on the banks clear of the deeps, and never nearer another's
-// apron than `gap`. Each kind's radii are drawn more small than large.
+// alone. A lagoon is shallow. Where they lie is island-place.ts.
 //
 // Pure arithmetic: no three, so it runs in node for the tests.
 
-import { R, add, cross, dot, frameAt, scale, type Chart, type Vec3 } from './sphere.ts';
+import type { Chart, Vec3 } from './sphere.ts';
 import { random } from './random.ts';
 import type { Noise3 } from './noise3.ts';
 import { blob, coastline, distanceField, radiusAt, within, type Loop } from './island-shape.ts';
@@ -74,7 +69,12 @@ export const ISLANDS = {
    *  it is, and how broad (a share of the radius). */
   lagoon: { share: 0.35, from: 30, to: 45, depth: [1, 1.8], radius: [0.2, 0.32] },
   /** The share of islands and islets with an offshore rock or two; their radii, and how far out past the beach, metres. */
-  offshore: { share: 0.45, radius: [2.5, 4.5], out: [9, 18] },
+  offshore: {
+    share: 0.45, radius: [2.5, 4.5], out: [9, 18],
+    /** Sea stacks: the share of a mesa's with offshore rocks (all of them stacks), and of an island's offshore rocks
+     *  that are; how wide and high they stand, metres, their sides falling from `top` of the way out to the edge. */
+    stacks: { mesa: 0.8, share: 0.5, radius: [4, 6], height: [6, 9], top: 0.3 },
+  },
   /** The share of islands with a long spit, and of islands and islets bent round a broad bay. */
   spit: 0.25, bent: 0.3,
   /** How far the flank eases into its slope, metres. */
@@ -129,7 +129,8 @@ type Form = 'dome' | 'ridge' | 'saddle' | 'offset';
 const FORMS: readonly Form[] = ['dome', 'ridge', 'saddle', 'offset'];
 
 /** An offshore rock: its centre on the island's chart and its radius, metres. */
-export interface Offshore { x: number; z: number; radius: number }
+/** An offshore rock: a low hump, or a sea stack standing up sheer out of the water. */
+export interface Offshore { x: number; z: number; radius: number; stack: boolean }
 
 export interface IslandSite {
   kind: Kind;
@@ -168,7 +169,7 @@ const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 const ramp = (x: number, e: number) => (x <= 0 ? 0 : x < e ? (x * x) / (2 * e) : x - e / 2);
 
 /** One island of a kind on `chart`, its coast `radius` metres out on average; no sea floor is deeper than `deepest` metres. */
-function createIslandSite(kind: Kind, chart: Chart, radius: number, noise: Noise3, seed: number, deepest: number): IslandSite {
+export function createIslandSite(kind: Kind, chart: Chart, radius: number, noise: Noise3, seed: number, deepest: number): IslandSite {
   const rand = random(seed * 7919 + 101);
   const I = ISLANDS, K = KINDS[kind];
   const size = (radius - K.radius[0]) / (K.radius[1] - K.radius[0]);
@@ -203,15 +204,17 @@ function createIslandSite(kind: Kind, chart: Chart, radius: number, noise: Noise
     }
   }
   // offshore rocks out in the apron, past the beach's shallows
-  const offshore: Offshore[] = [];
-  if (kind !== 'rocks' && rand() < I.offshore.share) {
+  const offshore: Offshore[] = [], mesa = kind === 'mesa';
+  if (kind !== 'rocks' && rand() < (mesa ? I.offshore.stacks.mesa : I.offshore.share)) {
     for (let k = 0, n = 1 + +(rand() < 0.3); k < n; k++) {
-      const t = rand() * 2 * Math.PI, r = lerp(I.offshore.radius[0], I.offshore.radius[1], rand());
+      const stack = mesa || (kind === 'island' && rand() < I.offshore.stacks.share);
+      const [r0, r1] = stack ? I.offshore.stacks.radius : I.offshore.radius;
+      const t = rand() * 2 * Math.PI, r = lerp(r0, r1, rand());
       const out = Math.min(lerp(I.offshore.out[0], I.offshore.out[1], rand()), width - r - 10);
       if (out < I.offshore.out[0]) continue;
       const d = coast(t) + r + out;
       if (offshore.some((o) => Math.hypot(o.x - Math.cos(t) * d, o.z - Math.sin(t) * d) < o.radius + r + 12)) continue;
-      offshore.push({ x: Math.cos(t) * d, z: Math.sin(t) * d, radius: r });
+      offshore.push({ x: Math.cos(t) * d, z: Math.sin(t) * d, radius: r, stack });
     }
   }
   const rocks = offshore.map((o) => blob(o.x, o.z, o.radius, rand));
@@ -245,7 +248,6 @@ function createIslandSite(kind: Kind, chart: Chart, radius: number, noise: Noise
   // the form's mounds, each faded in from the beach), scaled by `relief` once measured to bring the summit to its
   // target, unless that would be too steep; each offshore rock a hump. (A mesa's hill is its top's low rise: its
   // cliff raises it to its summit.)
-  const mesa = kind === 'mesa';
   const peak = Math.max(K.summit[0], lerp(K.summit[0], K.summit[1], size) * lerp(0.9, 1.1, rand()));
   const berm = Math.min(lerp(I.berm[0], I.berm[1], rand()), K.summit[0] * 0.6);
   const target = mesa ? berm + I.mesa.top : peak;
@@ -293,7 +295,8 @@ function createIslandSite(kind: Kind, chart: Chart, radius: number, noise: Noise
     for (const m of mounds) v += (1 - along) * m.height * slope(Math.max(1 - Math.hypot(x - m.x, z - m.z) / m.foot, 0), 0.2, 0.45);
     return v;
   };
-  const humps = offshore.map((o) => ({ ...o, height: lerp(0.7, 1.2, rand()) }));
+  const S = I.offshore.stacks;
+  const humps = offshore.map((o) => ({ ...o, height: o.stack ? lerp(S.height[0], S.height[1], rand()) : lerp(0.7, 1.2, rand()) }));
   const dunesAt: Vec3 = [rand() * 256, rand() * 256, rand() * 256];
 
   /** The ground before the cliffs and terraces are cut into it. */
@@ -310,7 +313,9 @@ function createIslandSite(kind: Kind, chart: Chart, radius: number, noise: Noise
     let h = berm * (1 - Math.exp((-u * I.beach) / berm)) + relief * dome * raised;
     for (const o of humps) {
       const d2 = ((x - o.x) ** 2 + (z - o.z) ** 2) / (o.radius * o.radius);
-      if (d2 < 1.5) h += o.height * Math.max(1 - d2 / 1.5, 0) ** 2 * smoothstep(0, 1.5, u);
+      // (a stack flat-topped, its sides steep from near its middle to its edge)
+      const shape = o.stack ? 1 - smoothstep(S.top, 1.1, Math.sqrt(d2)) : Math.max(1 - d2 / 1.5, 0) ** 2;
+      if (d2 < 1.5) h += o.height * shape * smoothstep(0, 1.5, u);
     }
     const ds = I.dunes.size;
     const dunes = noise.value(x / ds + dunesAt[0], z / ds + dunesAt[1], dunesAt[2]) + 0.5 * noise.value((2 * x) / ds + dunesAt[1], (2 * z) / ds + dunesAt[2], dunesAt[0]);
@@ -345,19 +350,24 @@ function createIslandSite(kind: Kind, chart: Chart, radius: number, noise: Noise
     return out;
   };
 
-  /** The highest point, over every node on land. */
-  const highest = (ground = mound) => {
+  /** The highest point, over every node on land (or only `nodes`). */
+  const highest = (ground = mound, nodes: ArrayLike<number> = field.land) => {
     let top = -Infinity;
-    for (let k = 0; k < field.land.length; k += 2) top = Math.max(top, ground(field.land[k], field.land[k + 1]));
+    for (let k = 0; k < nodes.length; k += 2) top = Math.max(top, ground(nodes[k], nodes[k + 1]));
     return top;
   };
+  // the hill is fitted on the island itself, not its offshore rocks (a sea stack is steep, and may stand higher)
+  const ashore: number[] = [];
+  for (let k = 0; k < field.land.length; k += 2) {
+    if (!rocks.some((l) => within(l, field.land[k], field.land[k + 1]))) ashore.push(field.land[k], field.land[k + 1]);
+  }
   // (solved over a few rounds: the dunes' share doesn't scale with it)
-  for (let round = 0; round < 3; round++) relief = Math.min(Math.max((relief * (target - berm)) / Math.max(highest(plain) - berm, 0.1), 0.2), 5);
+  for (let round = 0; round < 3; round++) relief = Math.min(Math.max((relief * (target - berm)) / Math.max(highest(plain, ashore) - berm, 0.1), 0.2), 5);
   // no steeper than a palm stands on: the hill brought lower until it isn't (the berm's own rise is the beach's)
   for (let round = 0; round < 3; round++) {
     const slopes: number[] = [];
-    for (let k = 0; k < field.land.length; k += 2) {
-      const x = field.land[k], z = field.land[k + 1], e = 0.5;
+    for (let k = 0; k < ashore.length; k += 2) {
+      const x = ashore[k], z = ashore[k + 1], e = 0.5;
       slopes.push(Math.hypot(plain(x + e, z) - plain(x - e, z), plain(x, z + e) - plain(x, z - e)) / (2 * e));
     }
     slopes.sort((p, q) => p - q);
@@ -375,71 +385,4 @@ function createIslandSite(kind: Kind, chart: Chart, radius: number, noise: Noise
     return Math.hypot(mound(x + e, z) - mound(x - e, z), mound(x, z + e) - mound(x, z - e)) / (2 * e) > I.bare;
   };
   return { kind, chart, radius, shelf: most, apron: width, reach, summit, offshore, coast, shore: field.at, mound, ceiling, face };
-}
-
-/** The sea floor at unit direction p before any island: how far from the deep water's edge (negative inside it), metres. */
-export type Ground = (p: Vec3) => { clearance: number };
-
-/** Points spread evenly over the sphere, `count` of them (a Fibonacci lattice). */
-function lattice(count: number): Vec3[] {
-  const golden = Math.PI * (3 - Math.sqrt(5));
-  return Array.from({ length: count }, (_, i) => {
-    const y = 1 - (2 * (i + 0.5)) / count, s = Math.sqrt(1 - y * y), a = i * golden;
-    return [Math.cos(a) * s, y, Math.sin(a) * s] as Vec3;
-  });
-}
-
-/** Metres between the places looked at for an island, and how much the seed shakes each one's water left, metres. */
-const SPACING = 20, SHAKE = 30;
-
-/** The islands for a planet whose deeps are `ground`, its floor nowhere deeper than `deepest` metres: every kind's in
- *  ORDER, each kind's largest first, spread evenly. */
-export function placeIslands(ground: Ground, noise: Noise3, seed: number, deepest: number): IslandSite[] {
-  const rand = random(seed * 15485863 + 7);
-  const area = 4 * Math.PI * R * R;
-  const candidates = lattice(Math.ceil(area / (SPACING * SPACING))).map((p) => ({ p, clear: ground(p).clearance }));
-  /** For each candidate, the water between it and the nearest apron placed, metres. */
-  const room = new Float64Array(candidates.length).fill(Infinity);
-  const placed: IslandSite[] = [];
-  let n = 0;
-  for (const kind of ORDER) {
-    const K = KINDS[kind], count = Math.max(kind === 'island' ? 1 : 0, Math.round(area * K.density));
-    const radii = Array.from({ length: count }, () => lerp(K.radius[0], K.radius[1], rand() ** K.skew)).sort((a, b) => b - a);
-    for (const radius of radii) {
-      // the island's shape is its own; only its chart says where it lies
-      const shape = createIslandSite(kind, { at: [0, 1, 0], axis: [1, 0, 0] }, radius, noise, seed * 31 + ++n, deepest);
-      let best = -1, most = -Infinity;
-      candidates.forEach((c, i) => {
-        const shaken = rand() * SHAKE;
-        if (c.clear <= shape.shelf + K.clearance) return;
-        const water = (placed.length ? room[i] - shape.shelf : 0) + shaken;
-        if (water > most) [best, most] = [i, water];
-      });
-      if (best < 0 || (placed.length && most - SHAKE < ISLANDS.gap)) continue;
-      const spot = candidates[best].p, { up, east, north } = frameAt(spot), turn = rand() * 2 * Math.PI;
-      placed.push({ ...shape, chart: { at: up, axis: add(scale(east, Math.cos(turn)), north, Math.sin(turn)) } });
-      candidates.forEach((c, i) => {
-        room[i] = Math.min(room[i], Math.acos(Math.min(1, Math.max(-1, dot(c.p, spot)))) * R - shape.shelf);
-      });
-    }
-  }
-  return placed;
-}
-
-/**
- * sphere.ts toChart for one chart, without its allocations: where unit vector p lies on the chart, and how far
- * from its centre, metres, written into `out` as x, z, r.
- */
-export function charter(chart: Chart): (p: Vec3, out: Float64Array) => void {
-  const [ax, ay, az] = chart.at, [ex, ey, ez] = chart.axis, [fx, fy, fz] = cross(chart.axis, chart.at);
-  return (p, out) => {
-    const c = p[0] * ax + p[1] * ay + p[2] * az;
-    const dx = p[0] - ax * c, dy = p[1] - ay * c, dz = p[2] - az * c;
-    const s = Math.sqrt(dx * dx + dy * dy + dz * dz);
-    if (s < 1e-12) { out[0] = out[1] = out[2] = 0; return; }
-    const k = (Math.atan2(s, c) * R) / s;
-    out[0] = (dx * ex + dy * ey + dz * ez) * k;
-    out[1] = (dx * fx + dy * fy + dz * fz) * k;
-    out[2] = s * k;
-  };
 }

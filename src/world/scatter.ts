@@ -93,10 +93,10 @@ export function scatterRocks(isle: Isle, bigShapes: number, boulderShapes: numbe
   /** Whether a rock there reaches no farther out than the water too shallow for a ship. */
   const ashore = (x: number, z: number, size: number) => site.shore(x, z) + FOOT * size < WADE - 1;
   const outcrops = Math.max(1, Math.round((2 * Math.PI * site.radius) / COAST_PER_OUTCROP));
-  // the coast's outcrops, then one heaped on each offshore rock (centre, smallest and largest mass)
+  // the coast's outcrops, then one heaped on each offshore rock but a sea stack (centre, smallest and largest mass)
   const heaps = [
     ...Array.from({ length: outcrops }, (_, o) => ({ centre: ((o + 0.3 + rand() * 0.4) / outcrops) * 2 * Math.PI, at: null as [number, number] | null, most: BIG[1] })),
-    ...site.offshore.map((o) => ({ centre: 0, at: [o.x, o.z] as [number, number], most: Math.max(BIG[0], Math.min(BIG[1], o.radius)) })),
+    ...site.offshore.filter((o) => !o.stack).map((o) => ({ centre: 0, at: [o.x, o.z] as [number, number], most: Math.max(BIG[0], Math.min(BIG[1], o.radius)) })),
   ];
   for (const heap of heaps) {
     // (a rock knoll and an offshore rock are all outcrop: heaped on the crown, out no farther than the waterline's shallows)
