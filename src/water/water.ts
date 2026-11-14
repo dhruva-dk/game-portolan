@@ -117,7 +117,7 @@ export function createWater(view: View, sky: Sky, ground: Ground, wind: Wind, sh
     return {
       long: saturate(min(hs, depth.mul(BREAKER)).div(hs)),
       short: saturate(depth.div(0.3)),
-      breaking: saturate(hs.div(max(depth.mul(BREAKER), 0.01)).sub(1).mul(0.4)).mul(smoothstep(0, 0.05, depth)),
+      breaking: saturate(hs.div(max(depth.mul(BREAKER), 0.01)).sub(1).mul(0.8)).mul(smoothstep(0, 0.05, depth)),
     };
   };
   // The water's move at rest point `up`, along each chart's axes and up (xyz), and the waves' height there unscaled by
@@ -170,7 +170,7 @@ export function createWater(view: View, sky: Sky, ground: Ground, wind: Wind, sh
     const thickness = ground.height(rest).negate().add(height);
     // surf: the breaking waves' fronts white, from the crest down the face; the troughs between keep what the
     // whitecaps' fading leaves
-    const surf = breaking.mul(smoothstep(0.4, 0.85, phase)).mul(0.7);
+    const surf = breaking.mul(smoothstep(0.25, 0.75, phase)).mul(0.9);
 
     // Per chart: the slopes, filtered over the pixel's footprint by the mips; as a tangent vector they sum with the
     // charts' weights.

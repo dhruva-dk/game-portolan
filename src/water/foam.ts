@@ -33,7 +33,7 @@ const SCALLOP = 0.8;
 const CRISP = 0.03;
 /** The swash's band: water thinner than LINE over the sand (metres) is its foam, fading to nothing over the last
  * EDGE at its very edge. */
-const LINE = 0.3, EDGE = 0.012;
+const LINE = 0.5, EDGE = 0.012;
 /** The air under a whitecap, at most, as a share of a wake's thickest (optics.ts); the depth its cloud reaches down,
  * metres: in thinner water there is less of it. */
 const AIR = 0.7, PLUME = 1;
