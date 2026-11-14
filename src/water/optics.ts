@@ -30,7 +30,7 @@ const F0 = 0.02;
 /** How much of what Fresnel gives the sea's mirror keeps: the sea stays its own colour out to the horizon. */
 const MIRROR = 0.2;
 /** The water's depth over the floor, metres, at which its tone is the middle one, and the deep one. */
-const MIDDLE_AT = 6, DEEP_AT = 16;
+const MIDDLE_AT = 4.5, DEEP_AT = 11;
 /** How fast the water's own tone veils what lies under it, per metre of the eye's path through it. */
 const CLOUDY = 0.2;
 /** How far a wake's air at its thickest takes the water toward the shallows' tone; and how much it veils what lies
