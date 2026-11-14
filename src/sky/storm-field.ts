@@ -67,13 +67,14 @@ const STEP = 5, GROW = 0.035, STEPS = 28;
 /** The cloud's edge, where the ray passes close by it, is soft over this many metres, and this share of the distance
  * more (about a pixel). */
 const SOFT = 1, SOFT_FAR = 0.004;
-/** The cloud's light, as shares of the storm's air light: at its base and its crown; the rain's. */
-const DARK = 0.45, BRIGHT = 2.6, RAIN_LIGHT = 0.95;
+/** The cloud's light, as shares of the storm's air light: at its base and its crown (the crown with the sun's, below,
+ *  art/target/idea.png's #8564C1); the rain's. */
+const DARK = 0.45, BRIGHT = 2, RAIN_LIGHT = 0.95;
 /** The light from the calm on whatever of the cloud faces it, as a share of the storm's air light. */
 const CALM = 0.3;
 /** The sun's light on the cloud, as a share of a white surface's, and on its thin edges seen against the sun (the
  * silver lining). */
-const SUNLIT = 0.55, LINING = 0.15;
+const SUNLIT = 0.4, LINING = 0.15;
 /** Two tones, as the world's solids (sky/light.ts): the cloud is in its crown's light or its base's, the edge between
  *  where its height and its facing the sun together cross TONE_AT, over TONE_EDGE, so it follows the billows. */
 const TONE_AT = 0.4, TONE_EDGE = 0.04;

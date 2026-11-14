@@ -73,9 +73,10 @@ const STORM_FOAM = 0.45, STORM_DARK = 0.3;
 /**
  * The storm's foot: the sea churned white from its edge out to FOOT (fading over the second) metres; and its edge's
  * line, EDGE_LINE m to each side (or most of a pixel), the calm's gold at its foot (STORM_FOOT) at EDGE_LIGHT of what a white surface
- * in the open shows: under the bloom, so it is a drawn line, not the hard bright band review28 saw.
+ * in the open shows: under the bloom and the glow (GOLD), so it is a drawn line, not the hard bright band review28 and
+ * review32 saw.
  */
-const FOOT = [6, 26] as const, EDGE_LINE = 0.3, EDGE_LIGHT = 0.5, EDGE_FAR = [0.4, 2] as const;
+const FOOT = [6, 26] as const, EDGE_LINE = 0.3, EDGE_LIGHT = 0.25, EDGE_FAR = [0.4, 2] as const;
 /** The middle cascade's crests in the water's tones: the height (of the sea's amplitude) that is a full crest, and
  *  how much of the crest the tones read they take. */
 const CHOP = [0.15, 0.85] as const;
@@ -94,8 +95,8 @@ const STROKE = 32;
 const STROKE_PX = 60;
 /** The calm's water along the wall's foot gold (art/target/idea.png), out to GOLD metres from its edge, at most GOLD_SHARE
  *  of the way to the palette's gold as bright as a white surface in the open, rising as the square of nearness so it is
- *  a soft glow along the wall rather than a hard pale seam. */
-const GOLD = 15, GOLD_SHARE = 0.3;
+ *  a soft glow along the wall, as wide as the target's, rather than the hard pale seam review32 saw. */
+const GOLD = 40, GOLD_SHARE = 0.45;
 /** How much of the sun a ship's shadow takes from the water: some, so she sits on the sea, but not a dark smear
  *  across it (art/target/idea.png's ships cast barely any). */
 const SHIP_SHADE = 0.5;
