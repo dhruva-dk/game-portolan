@@ -83,9 +83,12 @@ const STORM_SUNLIT = tint(STORM.lit, 0.85);
  * gone by the height the arrival's eye comes down into the air from space (play/arrival.ts ARRIVAL.air), so the
  * hand-over from the space eye's air to this haze shows no step.
  */
-const HAZE_DEPTH = 0.6, HAZE_DISTANCE = 150, HAZE_SHAPE = 3.2, HAZE_HEIGHT = 8, HAZE_BAND = 0.06, REFERENCE_EYE = 20;
-const HAZE_SPECTRUM = [0.85, 1, 1.12] as const, HAZE_TINT = [1.08, 0.9, 0.7] as const, HAZE_SUN = 0.22, HAZE_G = 0.72;
-const HAZE_ABOVE = [40, 200] as const;
+const HAZE_DEPTH = 0.25, HAZE_DISTANCE = 220, HAZE_SHAPE = 6, HAZE_HEIGHT = 8, HAZE_BAND = 0.025, REFERENCE_EYE = 77;
+const HAZE_SPECTRUM = [0.85, 1, 1.12] as const, HAZE_TINT = [1.3, 0.95, 0.55] as const, HAZE_SUN = 0.22, HAZE_G = 0.72;
+const HAZE_ABOVE = [110, 200] as const;
+/** The sky's blue drawn richer than the air's: its colour this many times as far from its grey (the target painting's
+ *  deep blue overhead, art/target/idea.png), the disc and its glow left as they are. */
+const SKY_SATURATION = 1.45;
 /** Past this many metres a ray has met nothing: the frame hands the sky's pixels this far or further. */
 export const SKY_METRES = 1e4;
 
@@ -188,7 +191,8 @@ export function createSky(view: View, bolt: boolean) {
     const dir = normalize(normalWorldGeometry);
     const d = view.toSky(dir);
     // below the horizon there is only more sea, beyond the troughs at its edge, and glancing it mirrors the horizon
-    const sky = skyRadiance(normalize(vec3(d.x, max(d.y, 0), d.z)), skySun);
+    const air = skyRadiance(normalize(vec3(d.x, max(d.y, 0), d.z)), skySun);
+    const sky = max(mix(vec3(dot(air, vec3(0.2126, 0.7152, 0.0722))), air, SKY_SATURATION), 0);
     const c = dot(dir, sun);
     const T = sunTransmittance(VIEW_RADIUS, d.y);
     // the disc, its soft edge and its halo; its angle off the sun's centre from 1 − cos, which keeps its precision so close
