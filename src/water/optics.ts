@@ -37,7 +37,7 @@ const CLOUDY = 0.2;
  *  under it, as an optical depth. */
 const AIRED = 0.6, AIR_VEIL = 2;
 /** The troughs' tone, of the water's, and where between trough and crest (0…1) its edge lies. */
-const TROUGH = 0.65, TROUGH_AT = 0.4;
+const TROUGH = 0.8, TROUGH_AT = 0.4;
 /** The sun's glints: the cosine between the surface's normal and the half vector past which it mirrors the sun to the
  *  eye, the width of that edge, and the glint's light of what a white surface gets from the sun square on. */
 const GLINT = 0.9998, GLINT_EDGE = 0.0001, GLINT_LIGHT = 0.4;

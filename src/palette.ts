@@ -23,12 +23,12 @@ export const tint = (c: Rgb, y: number): Rgb => {
 };
 
 // ---- the land
-export const SAND = tones('#EDC650', '#C99442');
+export const SAND = tones('#E9B44C', '#C98A3A');
 /** The sand along the waterline, paler; the dry sand high up the beach, deeper; and where fronds have fallen on it. */
 export const SAND_SHORE = tones('#F6DE8E', '#D8AE62');
 export const SAND_DRY = tones('#E6C25A', '#BF8E40');
 export const LITTER = tones('#C98A3A', '#96552E');
-export const ROCK = tones('#A8472E', '#6B2C26');
+export const ROCK = tones('#C0603A', '#7E3A2C');
 /** A cliff's paler strata, sandstone between the rock's red bands. */
 export const STRATUM = tones('#C98552', '#83432F');
 export const PALM_LEAF = tones('#4DA63A', '#1F6148');
