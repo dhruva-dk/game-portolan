@@ -34,7 +34,7 @@ const SHELF = -12, LEAN = 0.8, FACE = 34;
  * swells WAVES metres apart (two, crossing). */
 const BAY = 40, WAVES = [140, 61] as const;
 /** The crown's mean height, metres, and how far its billows rise and fall about it. */
-const CROWN = 260, CROWN_BILLOW = 60;
+const CROWN = 250, CROWN_BILLOW = 95;
 /** The storm's air ends this high, over its tallest billows. */
 export const TOP = CROWN + CROWN_BILLOW + 10;
 /** The billows' pattern repeats every this many metres (its largest cells a quarter of it), and drifts this fast. */
