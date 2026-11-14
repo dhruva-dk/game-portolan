@@ -1,7 +1,8 @@
 // The whole planet's ground: one function of direction, metres above sea level, seeded and the same every time.
 //
 // Most of the planet is a shallow bank of pale sand, 3–15 m down, rising and falling broadly, crossed in stretches
-// by long sand waves, and everywhere by small ripples. Deep channels wind between the banks and open here and
+// by long sand waves, and everywhere by small ripples; over its shallower stretches wind sandbars, ridges whose crests
+// show pale through the water but lie deeper than a ship's draught. Deep channels wind between the banks and open here and
 // there into basins, 30–60 m down: the channels follow the zero line of a noise field (so they join up into a
 // network rather than lying about as specks), their width measured in metres by the field's own gradient, wider
 // where they are deeper; their sides fall over tens of metres. Islands (planet-islands.ts) are spread evenly over the
@@ -25,6 +26,12 @@ export const SEA = {
   bank: { depth: [3, 15], size: 380 },
   /** Long sand waves: how far apart the bands' bends are, how many bands across one, how high. */
   sandWaves: { size: 260, bands: 5, height: 0.7 },
+  /**
+   * Sandbars: long ridges along the zero line of their own field, how far apart they wind, their crest's half-width
+   * and each side's fall, metres; they rise to `crest` m down (past a ship's draught, so pale under clear water but
+   * sailable) on the banks shallower than `on` (shallowest to none), none in the deeps.
+   */
+  sandbar: { size: 340, half: 5, side: 35, crest: 2.9, on: [6, 10] },
   /** Small ripples of relief on every floor under water, not on the beaches. */
   ripples: { size: 14, height: 0.25 },
   /** The channels: how far apart they wind, their floor's mean half-width, and how wide each side's fall is. */
@@ -114,7 +121,7 @@ export function createPlanet(seed: number): Planet {
   const rand = random(seed * 92821 + 13);
   // each field reads the noise from its own place in it
   const shift = () => [rand() * 256, rand() * 256, rand() * 256] as const;
-  const at = { bank: shift(), bank2: shift(), sand: shift(), ripple: shift(), channel: shift(), channel2: shift(), deep: shift(), grass: shift(), grass2: shift(), rubble: shift(), rubble2: shift(), mottle: shift(), clump: shift() };
+  const at = { bank: shift(), bank2: shift(), sand: shift(), ripple: shift(), channel: shift(), channel2: shift(), deep: shift(), grass: shift(), grass2: shift(), rubble: shift(), rubble2: shift(), mottle: shift(), clump: shift(), bar: shift() };
   type At = readonly [number, number, number];
   // the point being worked on: its direction, and its position in metres from the centre (direction × R)
   let px = 0, py = 0, pz = 0, qx = 0, qy = 0, qz = 0;
@@ -143,7 +150,7 @@ export function createPlanet(seed: number): Planet {
   const floor = (p: Vec3) => {
     px = p[0]; py = p[1]; pz = p[2];
     qx = px * R; qy = py * R; qz = pz * R;
-    const { bank, sandWaves, channel, basin, deep } = SEA;
+    const { bank, sandWaves, sandbar, channel, basin, deep } = SEA;
     const fine = read(bank.size / 2, at.bank2);
     const bankDepth = bank.depth[0] + (bank.depth[1] - bank.depth[0]) * sat(0.5 + 0.75 * (read(bank.size, at.bank) + 0.5 * fine));
     // the deeps: deeper where they are wider, and deepest in the basins
@@ -154,8 +161,12 @@ export function createPlanet(seed: number): Planet {
     const toChannel = Math.abs(toLevel(channel.size, at.channel, 0, at.channel2)) - channel.half * (0.4 + 1.2 * deepness) + SEA.ragged * fine;
     const deepShare = Math.max(1 - smoothstep(0, channel.side, toChannel), 1 - smoothstep(0, basin.side, toBasin));
     f.depth = bankDepth + (deepDepth - bankDepth) * deepShare;
-    // the sand waves, in stretches (where the banks' finer swell is up), none in the deeps
-    const stretch = sat(0.5 + 2 * fine) * (1 - deepShare);
+    // the sandbars, on the shallower banks
+    const toBar = Math.abs(toLevel(sandbar.size, at.bar, 0, null));
+    const bar = (1 - smoothstep(sandbar.half, sandbar.half + sandbar.side, toBar)) * (1 - smoothstep(sandbar.on[0], sandbar.on[1], bankDepth)) * (1 - deepShare);
+    f.depth += (Math.min(sandbar.crest, f.depth) - f.depth) * bar;
+    // the sand waves, in stretches (where the banks' finer swell is up), none in the deeps or on the bars
+    const stretch = sat(0.5 + 2 * fine) * (1 - deepShare) * (1 - bar);
     const waves = stretch > 0 ? sandWaves.height * stretch * Math.sin(2 * Math.PI * sandWaves.bands * read(sandWaves.size, at.sand)) : 0;
     f.height = waves - f.depth;
     f.deep = deepShare;
