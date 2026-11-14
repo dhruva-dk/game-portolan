@@ -92,8 +92,9 @@ const ARM_WIDTH = 0.9, WIDEN = 0.05;
 const BOW_LIFE = 3, BOW_FOAM = 2.4, STREAK = 0.12, STREAK_WIDEST = 1.4, BOW_REACH = 1.5, AIR_REACH = 1.5;
 /** The bow wave's foam as art/target/idea.png draws a wake: a whole white rim along each arm's line, RIM_SHARE of
  *  BOW_FOAM wide, and inside it the crests curling in, feathered, CURL_REACH of it, with blue between: neither loose
- *  flecks (review27) nor one flat band, nor the chains of separate blobs review30 saw. */
-const RIM_SHARE = 0.3, CURL_REACH = 1.8;
+ *  flecks (review27) nor one flat band, nor the chains of separate blobs review30 saw; the curls near the rim, so seen
+ *  from astern the V is two white arms with blue inside, not the white sheet review36 saw. */
+const RIM_SHARE = 0.3, CURL_REACH = 0.9;
 /** The crests' feathering: where along each crest's wave (its cosine, −1…1) its foam begins and is whole. */
 const FEATHER = [0.1, 0.6] as const;
 /** The curls' cover, of the rim's: more than whole, so each crest prints white well in from the rim. */
@@ -189,7 +190,7 @@ export function createWake(view: View, sky: Sky, capacity: number) {
     const tongue = cos(laid.add(abs(across).mul(TONGUE_SLANT)).add(patchy(2, 4.5).mul(1.5)).mul(2 * Math.PI / TONGUE));
     const tongues = mix(float(TONGUE_LANE), float(TONGUE_CREST), smoothstep(-0.25, 0.25, tongue));
     // (what lingers kept under the foam's half, so it ends cleanly, not in the detached specks review34 saw)
-    const foam = churned.mul(exp(age.div(-3)).mul(0.55).add(exp(age.div(-12)).mul(0.1).mul(churnLeft))).mul(tongues).toVar();
+    const foam = churned.mul(exp(age.div(-3)).mul(0.3).add(exp(age.div(-12)).mul(0.1).mul(churnLeft))).mul(tongues).toVar();
     // (metres astern of her transom)
     const behind = max(run.sub(LENGTH), 0);
     const air = churned.mul(exp(age.div(-10))).mul(exp(behind.div(-AIR_REACH * LENGTH)));
