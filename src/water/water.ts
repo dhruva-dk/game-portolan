@@ -78,10 +78,17 @@ const STORM_FOAM = 0.45, STORM_DARK = 0.3;
 const FOOT = [6, 26] as const, EDGE_LINE = 0.3, EDGE_LIGHT = 0.9, EDGE_FAR = [0.4, 2] as const;
 /** The middle cascade's crests in the water's tones: the height (of the sea's amplitude) that is a full crest, and
  *  how much of the crest the tones read they take. */
-const CHOP = [0.3, 0.85] as const;
+const CHOP = [0.15, 0.85] as const;
+/** The cascade whose crests the tones read; less its mean over this mip's texels (2⁴ of its 0.5 m), so its longest
+ *  waves, whose troughs lay in broad blotches, are left out and its short ones draw the rows (review27). */
+const CHOP_CASCADE = 1, ROWS_MIP = 4;
+/** And the shortest cascade's crests, this many times their height: near a low eye they draw the rows, small and
+ *  dense, where the middle's are tens of pixels across; gone by where a pixel spans FINE_FADE metres, before they
+ *  print as grain. */
+const FINE = 2.5, FINE_FADE = [0.06, 0.2] as const;
 /** The crests read for the tones are averaged (seven taps) this many metres to each side along the screen's level, so they lie in
  *  level rows, as art/target/idea.png's painted waves, rather than in blotches with no direction (review26). */
-const STROKE = 24;
+const STROKE = 12;
 /** Nor more than this many pixels: near a low eye 12 m spans hundreds of them, and the five offset copies of the crests
  *  printed as stair-stepped patches (review25). */
 const STROKE_PX = 60;
@@ -203,16 +210,18 @@ export function createWater(view: View, sky: Sky, ground: Ground, wind: Wind, sh
       CASCADES.forEach((L, k) => {
         const s = read(waves.slopes[k], float(1 / L)), m = scale(k);
         s2 = s2.add(s.xy.mul(m));
+        const y = read(waves.displacement[k], float(1 / L)).y.mul(m);
+        if (k === 2) chop.addAssign(y.mul(c.w).mul(float(FINE).mul(float(1).sub(smoothstep(FINE_FADE[0], FINE_FADE[1], footprint)))));
         if (k < 2) {
           l2 = l2.add(s.xy.mul(m));
-          const y = read(waves.displacement[k], float(1 / L)).y.mul(m);
           h = h.add(y);
-          if (k === 1) {
-            const along = c.dx.div(max(length(c.dx), 1e-9)).mul(min(float(STROKE), length(c.dx).mul(STROKE_PX)).div(L));
-            const side = (o: number) => texture(waves.displacement[k], c.q.div(L).add(along.mul(o))).grad(c.dx.div(L), c.dy.div(L)).y;
-            const taps = side(-1).add(side(1)).add(side(-2 / 3)).add(side(2 / 3)).add(side(-1 / 3)).add(side(1 / 3));
-            chop.addAssign(y.add(taps.mul(m)).div(7).mul(c.w));
-          }
+        }
+        if (k === CHOP_CASCADE) {
+          const along = c.dx.div(max(length(c.dx), 1e-9)).mul(min(float(STROKE), length(c.dx).mul(STROKE_PX)).div(L));
+          const side = (o: number) => texture(waves.displacement[k], c.q.div(L).add(along.mul(o))).grad(c.dx.div(L), c.dy.div(L)).y;
+          const taps = side(-1).add(side(1)).add(side(-2 / 3)).add(side(2 / 3)).add(side(-1 / 3)).add(side(1 / 3));
+          const coarse = texture(waves.displacement[k], c.q.div(L)).level(float(ROWS_MIP)).y.mul(m);
+          chop.addAssign(y.add(taps.mul(m)).div(7).sub(coarse).mul(c.w));
         }
       });
       // the sea is Σ w·h, so its slope is Σ w·∇h + h·∇w: across the band, where the weights change, the second
