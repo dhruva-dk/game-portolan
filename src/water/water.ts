@@ -218,7 +218,8 @@ export function createWater(view: View, sky: Sky, ground: Ground, wind: Wind, sh
         }
         if (k === CHOP_CASCADE) {
           const along = c.dx.div(max(length(c.dx), 1e-9)).mul(min(float(STROKE), length(c.dx).mul(STROKE_PX)).div(L));
-          const side = (o: number) => texture(waves.displacement[k], c.q.div(L).add(along.mul(o))).grad(c.dx.div(L), c.dy.div(L)).y;
+          // each tap filtered (anisotropically) over the third of the stroke to the next, so they join in one smear
+          const side = (o: number) => texture(waves.displacement[k], c.q.div(L).add(along.mul(o))).grad(along.div(3), c.dy.div(L)).y;
           const taps = side(-1).add(side(1)).add(side(-2 / 3)).add(side(2 / 3)).add(side(-1 / 3)).add(side(1 / 3));
           const coarse = texture(waves.displacement[k], c.q.div(L)).level(float(ROWS_MIP)).y.mul(m);
           chop.addAssign(y.add(taps.mul(m)).div(7).sub(coarse).mul(c.w));
