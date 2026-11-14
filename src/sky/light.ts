@@ -16,8 +16,9 @@ import type { Sky } from './sky';
  *  onto the floor there (water.below). */
 export interface Below { sun(p: Vec3Node): Vec3Node; sky(p: Vec3Node): Vec3Node; focus(p: Vec3Node): FloatNode }
 
-/** A thin thing's two sides: 1 where the sun reaches the side facing n, and where it comes through from the other. */
-export interface Sides { front: FloatNode; back: FloatNode }
+/** A thin thing's two sides: 1 where the sun reaches the side facing n, and where it comes through from the other;
+ *  and 1 where nothing casts a shadow on it, whichever way it faces. */
+export interface Sides { front: FloatNode; back: FloatNode; open: FloatNode }
 
 export interface Light {
   /** The radiance of a surface at world position p facing n (unit), of tone `lit` in the sun and `shadow` out of it. */
@@ -66,7 +67,7 @@ export function createLighting(sky: Sky, below: Below, visible: (p: Vec3Node, n:
   const band = (p: Vec3Node, n: Vec3Node): FloatNode => turned(dot(n, sky.sun(p)), TURN).mul(open(p, n));
   const sides = (p: Vec3Node, n: Vec3Node): Sides => {
     const nl = dot(n, sky.sun(p)).toVar(), clear = open(p, n).toVar();
-    return { front: turned(nl, TURN).mul(clear), back: turned(nl.negate(), THROUGH).mul(clear) };
+    return { front: turned(nl, TURN).mul(clear), back: turned(nl.negate(), THROUGH).mul(clear), open: clear };
   };
   /** The brightness at p, its sun's share times `focus`. */
   const levelUnder = (p: Vec3Node, focus: FloatNode | null): Vec3Node => {
