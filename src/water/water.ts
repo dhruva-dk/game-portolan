@@ -35,7 +35,7 @@ import {
   screenUV, select, smoothstep, step, texture, varying, vec2, vec3, vec4, viewportDepthTexture, viewportSharedTexture,
 } from 'three/tsl';
 import type { Environment } from '../environment';
-import { LIGHTNING } from '../palette';
+import { LIGHTNING, STORM_FOOT } from '../palette';
 import type { Snapshot } from '../snapshot';
 import type { Compute, Draw } from '../gpu';
 import type { Ground } from '../land/ground';
@@ -76,6 +76,9 @@ const STORM_FOAM = 0.45, STORM_DARK = 0.3;
  * in the open shows (over 1, so the bloom takes it).
  */
 const FOOT = [6, 26] as const, EDGE_LINE = 0.3, EDGE_LIGHT = 1.6;
+/** The calm's water along the wall's foot gold (art/target/idea.png), out to GOLD metres from its edge, at most GOLD_SHARE
+ *  of the way to the palette's gold as bright as a white surface in the open. */
+const GOLD = 60, GOLD_SHARE = 0.95;
 /** A wake's foam (wake.ts) drawn this much fuller than it is kept: bold lobes of white along her sides and astern. */
 const WAKE_BOLD = 3;
 /**
@@ -238,7 +241,9 @@ export function createWater(view: View, sky: Sky, ground: Ground, wind: Wind, sh
 
     // the ships' shadows, the hulls' shade and the wakes' air
     const near = { lit: float(1).sub(wake.shade(positionWorld)), glow: hull.glow, air: max(max(air, bubbles), held.drain.mul(0.6)) };
-    const sea = optics.seaRadiance(positionWorld, n, g, v, crest, foam, behind, path, max(ground.height(rest).negate(), 0), near, held).mul(float(1).sub(storm.mul(STORM_DARK)));
+    const lit = optics.seaRadiance(positionWorld, n, g, v, crest, foam, behind, path, max(ground.height(rest).negate(), 0), near, held).mul(float(1).sub(storm.mul(STORM_DARK)));
+    const open = dot(sky.open, vec3(0.2126, 0.7152, 0.0722));
+    const sea = mix(lit, vec3(...STORM_FOOT).mul(open), smoothstep(-GOLD, 0, past).mul(float(1).sub(smoothstep(0, 4, past))).mul(GOLD_SHARE));
     return mix(sea, vec3(...LIGHTNING).mul(dot(sky.open, vec3(0.2126, 0.7152, 0.0722)).mul(EDGE_LIGHT)), edgeLine);
   })();
   // the charts' weights as red, green and blue, about as bright on the screen as they are after the frame's exposure

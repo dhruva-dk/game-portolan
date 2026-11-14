@@ -22,7 +22,6 @@
 import { Break, If, acos, atan, clamp, cos, dot, exp, float, length, max, min, mix, normalize, pow, select, sin, smoothstep, texture3D, vec3 } from 'three/tsl';
 import type { Storage3DTexture } from 'three/webgpu';
 import { R } from '../world/sphere';
-import { STORM_FOOT } from '../palette';
 import { loop, type FloatNode, type Vec3Node } from '../tsl';
 
 /** The cloud's base, metres up, and how far its rolls lift and lower it, each ROLL_WIDTH metres across. */
@@ -63,9 +62,6 @@ const SUNLIT = 0.55, LINING = 0.15;
 /** Two tones, as the world's solids (sky/light.ts): the cloud is in its crown's light or its base's, the edge between
  *  where its height and its facing the sun together cross TONE_AT, over TONE_EDGE, so it follows the billows. */
 const TONE_AT = 0.5, TONE_EDGE = 0.04;
-/** The rain's front, FOOT metres up from the sea, gold in the sunlit calm's light, this share of the sun's. */
-const FOOT = 30, FOOT_LIGHT = 1.6;
-
 /** The storm's state as the shaders read it (storm.ts's uniforms). */
 export interface Cap {
   centre: Vec3Node;
@@ -204,9 +200,7 @@ export function createStormField(cap: Cap, shape: Storage3DTexture) {
           step.assign(select(rho.greaterThan(1e-6), inStep, max(min(inside.negate().mul(0.6), rainOff.add(inStep)), least)));
           If(rho.greaterThan(1e-6), () => {
             // a heavy shaft darker than the thinner rain round it, its streaks paler; darker up toward the base
-            // and its front low over the sea gold, lit from the sunlit calm
-            const foot = lit.sun.mul(vec3(...STORM_FOOT)).mul(smoothstep(FOOT, 0, h).mul(smoothstep(RAIN_RAMP, 0, e)).mul(FOOT_LIGHT / Math.PI));
-            const S = lit.air.mul(RAIN_LIGHT).mul(mix(1.25, 0.55, shaft)).mul(streak.mul(0.35).add(0.85)).mul(mix(1.15, 0.6, smoothstep(0, BASE, h))).add(foot).add(lit.glow(q));
+            const S = lit.air.mul(RAIN_LIGHT).mul(mix(1.25, 0.55, shaft)).mul(streak.mul(0.35).add(0.85)).mul(mix(1.15, 0.6, smoothstep(0, BASE, h))).add(lit.glow(q));
             const stepT = exp(rho.mul(step).negate());
             L.addAssign(S.mul(T.mul(float(1).sub(stepT))));
             T.mulAssign(stepT);
