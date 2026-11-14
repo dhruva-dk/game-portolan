@@ -73,6 +73,9 @@ const SUNLIT = 0.55, LINING = 0.15;
 /** Two tones, as the world's solids (sky/light.ts): the cloud is in its crown's light or its base's, the edge between
  *  where its height and its facing the sun together cross TONE_AT, over TONE_EDGE, so it follows the billows. */
 const TONE_AT = 0.4, TONE_EDGE = 0.04;
+/** And a third: the heads' caps, where that measure passes CAP_AT, CAP_LIGHT times the crown's tone; the rest of the
+ *  lit cloud MID of it, so each head is a bright cap over lavender sides (art/target/idea.png), not one flat tone. */
+const CAP_AT = 0.75, CAP_LIGHT = 1.35, MID = 0.8;
 /** How much a billow's facing the sky lifts it toward the crown's tone, so each head is lit over and dark under. */
 const SKYWARD = 0.8;
 /** The warm rim along the face's foot: the sunlit calm's gold light (palette STORM_FOOT) thrown up onto whatever of
@@ -152,13 +155,15 @@ export function createStormField(cap: Cap, shape: Storage3DTexture) {
     const normal = normalize(flat.sub(slope.mul(amplitude)));
     const high = smoothstep(BASE, CROWN, h);
     const facing = clamp(dot(normal, lit.toward), 0, 1);
-    const tone = smoothstep(TONE_AT - TONE_EDGE, TONE_AT + TONE_EDGE, high.mul(0.35).add(facing.mul(0.55)).add(c.lift.mul(0.3)).add(dot(normal, up).mul(SKYWARD)));
+    const measure = high.mul(0.35).add(facing.mul(0.55)).add(c.lift.mul(0.3)).add(dot(normal, up).mul(SKYWARD));
+    const tone = smoothstep(TONE_AT - TONE_EDGE, TONE_AT + TONE_EDGE, measure);
+    const head = mix(float(MID), float(CAP_LIGHT), smoothstep(CAP_AT - TONE_EDGE, CAP_AT + TONE_EDGE, measure));
     // the sky's light from above (the sea's, under the base), less in the hollows between the billows
     const sky = max(dot(normal, up).mul(0.45).add(0.6), 0.3).mul(clamp(c.lift.mul(0.3).add(0.9), 0.7, 1.2));
     // and the light of the open, sunlit calm, coming in level under the shelf
     const toCalm = clamp(dot(normal, out.negate()), 0, 1);
-    const air = lit.air.mul(mix(DARK, BRIGHT, tone).mul(sky).add(toCalm.mul(CALM)));
-    const sun = lit.sun.mul(tone.mul(high).mul(SUNLIT / Math.PI));
+    const air = lit.air.mul(mix(float(DARK), head.mul(BRIGHT), tone).mul(sky).add(toCalm.mul(CALM)));
+    const sun = lit.sun.mul(tone.mul(head).mul(high).mul(SUNLIT / Math.PI));
     // against the sun, its light through the billows' thin edges
     const lining = lit.sun.mul(hg(dot(d, lit.toward), 0.6).mul(LINING * 4 * Math.PI)).mul(high).mul(float(1).sub(clamp(dot(normal, d.negate()), 0, 1)));
     const rim = lit.sun.mul(vec3(...STORM_FOOT)).mul(toCalm.mul(float(1).sub(smoothstep(BASE, BASE + RIM_UP, h))).mul(RIM / Math.PI));
