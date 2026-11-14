@@ -23,7 +23,7 @@ import {
   MeshBasicNodeMaterial, OctahedronGeometry, OneFactor, Vector2, type PerspectiveCamera,
 } from 'three/webgpu';
 import { Fn, abs, attribute, cameraPosition, clamp, cos, cross, dot, float, max, mix, normalize, pow, select, sin, smoothstep, uniform, varying, vec3 } from 'three/tsl';
-import { GILDING, GLINT, ICE, TAR, TIMBER } from '../palette';
+import { GILDING, GLINT, ICE, TAR, TIMBER, tint } from '../palette';
 import type { Light } from '../sky/light';
 import { GLOW } from '../rarity';
 import { KINDS, type GunKind, type LootKind } from '../kinds';
@@ -40,7 +40,11 @@ const BEAM = 520, SHAPE = 320, HALO = 140;
  *  (rad/s) and rocks this far (rad); rises this far up out of the water as it comes, over 1/RISE s. */
 const RIDE = 2.2, BOB = 0.25, BOB_RATE = 2, SPIN = 1.4, ROCK = 0.15, SINK = 2, RISE = 2.5;
 /** The fewest pixels across a piece and a beam are drawn; a piece's size, m, it grows from. */
-const SHAPE_PIXELS = 14, BEAM_PIXELS = 3, SHAPE_ACROSS = 3.5;
+const SHAPE_PIXELS = 14, BEAM_PIXELS = 2, SHAPE_ACROSS = 3.5;
+/** The beam's light: the gilding's, deepened (squared, at its own luminance), so added over the sea it stays gold
+ *  rather than washing to pale yellow. */
+const [gr, gg, gb] = GILDING.lit;
+const BEAM_GOLD = tint([gr * gr, gg * gg, gb * gb], 0.2126 * gr + 0.7152 * gg + 0.0722 * gb);
 /** The beam: its height for the commonest and more for each rarity up, m; its radius at the foot and the head. */
 const TALL = 30, TALLER = 14, FOOT = 0.3, HEAD = 0.18;
 /** A beam fades out as its foot sinks this far (m) under the eye's horizon, gone by then. */
@@ -190,7 +194,7 @@ export function createLoot(light: Light) {
     // the beam gold whatever the piece; its ring on the water in its rarity's light
     const isBeam = isRing.lessThanEqual(0.5);
     const brightness = select(isBeam, column.mul(BEAM_EMIT).mul(r.mul(0.18).add(0.35)), band.mul(HALO_EMIT));
-    return select(isBeam, vec3(...GILDING.lit), tint).mul(lit).mul(brightness);
+    return select(isBeam, vec3(...BEAM_GOLD), tint).mul(lit).mul(brightness);
   })();
   const beamMesh = new Mesh(beamGeometry, bm);
   beamMesh.frustumCulled = false;
