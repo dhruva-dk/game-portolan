@@ -50,16 +50,16 @@ export const CREAM = ink('#F3E6C8');
 export const IRON = tones('#4A4450', '#2A2233');
 
 // ---- the sea
-export const SEA_SHALLOW = ink('#2FC2A8');
+export const SEA_SHALLOW = ink('#38D9A8');
 export const SEA_MIDDLE = ink('#1E86B8');
-export const SEA_DEEP = ink('#1F4FA8');
+export const SEA_DEEP = ink('#1F3F8F');
 export const FOAM = ink('#FFF9EC');
 
 // ---- the sky
 export const STORM = tones('#7A4FB8', '#3D2670');
 export const LIGHTNING = ink('#D9C2FF');
-/** A fair-weather cloud: cream where the sun lights it, rose beneath. */
-export const CLOUD = tones('#FFF1D6', '#E8A58C');
+/** A fair-weather cloud: cream where the sun lights it, lavender-grey beneath. */
+export const CLOUD = tones('#FFF1D6', '#B4ADCF');
 /** Powder smoke: a cloud's cream, and a deeper rose in its shadow. */
 export const SMOKE = tones('#FFF1D6', '#D9907C');
 

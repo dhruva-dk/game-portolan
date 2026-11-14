@@ -28,7 +28,7 @@ export const N_WATER = 1.34;
 /** Reflectance at normal incidence, ((n − 1)/(n + 1))². */
 const F0 = 0.02;
 /** How much of what Fresnel gives the sea's mirror keeps: the sea stays its own colour out to the horizon. */
-const MIRROR = 0.45;
+const MIRROR = 0.2;
 /** The water's depth over the floor, metres, at which its tone is the middle one, and the deep one. */
 const MIDDLE_AT = 6, DEEP_AT = 20;
 /** How fast the water's own tone veils what lies under it, per metre of the eye's path through it. */
