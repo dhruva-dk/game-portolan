@@ -87,6 +87,10 @@ const SKYWARD = 0.8;
 /** The warm rim along the face's foot: the sunlit calm's gold light (palette STORM_FOOT) thrown up onto whatever of
  *  the face looks out over it, as a share of the sun's on a white surface, fading out RIM_UP metres over the base. */
 const RIM = 0.5, RIM_UP = 45;
+/** And the rain's foot lit by it, as a share of the sun's on a white surface: brightest at the sea and the rain's
+ *  front, gone FOOT_UP metres up and FOOT_IN metres in, so the wall stands on a band of peach light along the sea as
+ *  art/target/idea.png's does, not on the sea's blue (review35 saw no band). */
+const FOOT = 2.4, FOOT_UP = 16, FOOT_IN = 45;
 /** The storm's state as the shaders read it (storm.ts's uniforms). */
 export interface Cap {
   centre: Vec3Node;
@@ -235,7 +239,8 @@ export function createStormField(cap: Cap, shape: Storage3DTexture) {
           If(rho.greaterThan(1e-6), () => {
             // a heavy shaft a little darker than the thinner rain round it, its streaks a little paler (bolder, they hung
             // as the vertical streaks over the wall review34 saw); darker up toward the base
-            const S = lit.air.mul(RAIN_LIGHT).mul(mix(1.05, 0.85, shaft)).mul(streak.mul(0.1).add(0.95)).mul(mix(1.15, 0.6, smoothstep(0, BASE, h))).add(lit.glow(q));
+            const S = lit.air.mul(RAIN_LIGHT).mul(mix(1.05, 0.85, shaft)).mul(streak.mul(0.1).add(0.95)).mul(mix(1.15, 0.6, smoothstep(0, BASE, h))).add(lit.glow(q))
+              .add(lit.sun.mul(vec3(...STORM_FOOT)).mul(smoothstep(FOOT_UP, 0, h).mul(smoothstep(FOOT_IN, 0, e)).mul(FOOT / Math.PI)));
             const stepT = exp(rho.mul(step).negate());
             L.addAssign(S.mul(T.mul(float(1).sub(stepT))));
             T.mulAssign(stepT);
