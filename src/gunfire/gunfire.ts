@@ -21,7 +21,8 @@
 //   a ball in sea  a column of spray thrown up and falling back, and mist off it; on land, dust
 //   a ball home    a flash, splinters thrown out of her side and falling, and dark smoke
 //   a ram          splinters
-// Lit by the sun and the sky as everything else is (sky/light.ts), and blended premultiplied: a flash is all added
+// Smoke and spray are flat shapes in two tones (palette.ts: powder smoke cream, rose beneath; spray the foam's
+// white), as bright as the place and the hour (sky/light.ts level), and blended premultiplied: a flash is all added
 // light, smoke and spray cover what is behind them.
 
 import {
@@ -32,6 +33,7 @@ import {
   Fn, abs, atan, attribute, cameraPosition, cos, cross, exp, float, max, mix, normalize, pow, select, sin, smoothstep, uniform, varying, vec3,
 } from 'three/tsl';
 import { KINDS, gunOrder, type GunKind } from '../kinds';
+import { DUST, FOAM, SMOKE, SOOT, TIMBER } from '../palette';
 import type { Light } from '../sky/light';
 import type { BallDraw } from '../snapshot';
 import { pixelSize } from '../view/view';
@@ -67,7 +69,7 @@ const STREAK = 0.02, CORE: Vec3 = [0.015, 0.013, 0.012], SPARK: Vec3 = [6, 3, 0.
  *  nothing at its tail. */
 const TRACER_WIDE = 0.22, TRACER_PIXELS = 3, TRACER_GLOW: Vec3 = [5, 2.2, 0.6];
 /** Its trail (0117's smoke ribbon): its puffs' growth (m/s), life (s), ink and opacity. */
-const TRAIL_GROW = 1.4, TRAIL_LIFE = 1.6, TRAIL_INK: Vec3 = [0.78, 0.77, 0.75], TRAIL_OPACITY = 0.26;
+const TRAIL_GROW = 1.4, TRAIL_LIFE = 1.6, TRAIL_INK: Vec3 = SMOKE.lit, TRAIL_OPACITY = 0.26;
 /** Each kind's firing: its flashes, their size, its puffs of smoke, how wide they spread, and how dense. */
 const FIRING: Record<GunKind, readonly [number, number, number, number, number]> = {
   cannon: [3, 0.9, 12, 1.2, 0.5], scatter: [4, 1.2, 14, 3, 0.5], repeater: [1, 0.55, 2, 0.6, 0.35],
@@ -83,6 +85,12 @@ const FLIGHT = 5;
  *  it to its shader). */
 const byKind = (k: FloatNode, f: (s: Shot) => number): FloatNode =>
   KINDS.slice(0, -1).reduceRight<FloatNode>((rest, kind, i) => select(k.lessThan(i + 0.5), float(f(SHOT[kind])), rest), float(f(SHOT[KINDS[KINDS.length - 1]])));
+
+/** A puff's flat shape: its edge's radius on its sprite and half that edge's width; how far its lobes scallop it; how
+ *  far below its middle its shadow tone begins; and how many times its opacity it covers until it thins away. */
+const SHAPE = 0.86, CRISP = 0.04, SCALLOP = 0.2, UNDER = -0.18, SOLID = 2.5;
+/** A puff's shadow tone, of its ink: as powder smoke's cream goes to its rose (palette.ts SMOKE). */
+const SHADE: Vec3 = [SMOKE.shadow[0] / SMOKE.lit[0], SMOKE.shadow[1] / SMOKE.lit[1], SMOKE.shadow[2] / SMOKE.lit[2]];
 
 /** One puff as it is laid: where it starts (metres) and its velocity (m/s), its size (m, radius) and how fast it grows
  * (m/s), its drag (per second) and pull (m/s² down; negative rises), life (s), colour (linear; a glow's is radiance
@@ -195,17 +203,24 @@ function puffMesh(light: Light, now: FloatNode) {
   const turned = vec3(local.x.mul(c).sub(local.y.mul(s)), local.x.mul(s).add(local.y.mul(c)), 0);
   const m = new MeshBasicNodeMaterial({ transparent: true, depthWrite: false });
   m.positionNode = centre.add(right.mul(turned.x).add(upward.mul(turned.y)).mul(size));
-  const uv = varying(local.xy), mid = varying(centre), facing = varying(normalize(up.add(eye.mul(0.6))));
+  // (its place on the sprite as the eye sees it, y up the world: its underside is its shadow's)
+  const uv = varying(local.xy), upright = varying(turned.y), mid = varying(centre);
   const tv = varying(t);
-  // a drop's hard disc, or a cloud's soft one billowed round its edge by a few lobes (its own, by its seed)
+  // a flat shape with a crisp edge: a drop's disc, or a cloud's, scalloped round its edge by a few lobes (its own, by
+  // its seed); a glow's stays soft, as light is
   const lobes = (uvv: Vec2Node) => sin(atan(uvv.y, uvv.x).mul(5).add(look.y.mul(40))).mul(0.5).add(sin(atan(uvv.y, uvv.x).mul(3).sub(look.y.mul(17))).mul(0.5));
-  const shapeOf = (r: FloatNode): FloatNode => mix(smoothstep(1, 0.55, r), exp(r.mul(r).mul(-2.5)).mul(smoothstep(1, 0.55, r.mul(float(1).sub(lobes(uv).mul(0.18))))), look.z);
+  const billowed = (r: FloatNode): FloatNode => r.mul(float(1).sub(lobes(uv).mul(look.z).mul(SCALLOP)));
+  const shapeOf = (r: FloatNode): FloatNode => smoothstep(SHAPE, SHAPE - CRISP, billowed(r));
+  const glowOf = (r: FloatNode): FloatNode => exp(r.mul(r).mul(-2.5)).mul(smoothstep(1, 0.55, r));
   const fade = (tt: FloatNode) => smoothstep(0, max(look.w, 1e-3), tt).mul(pow(float(1).sub(tt).max(0), 1.5));
-  const alpha = Fn(() => look.x.mul(shapeOf(uv.length())).mul(fade(tv)))();
+  // it thins only at the end of its life: until then the shape is whole, as painted
+  const alpha = Fn(() => shapeOf(uv.length()).mul(look.x.mul(fade(tv)).mul(SOLID).min(1)))();
   m.colorNode = Fn(() => {
     const r = uv.length();
-    const lit = light(mid, normalize(facing));
-    return ink.rgb.mul(lit).mul(alpha).add(ink.rgb.mul(ink.w).mul(shapeOf(r)).mul(fade(tv)));
+    // two tones: its ink, and on its underside its shadow's (a cloud's rose: palette.ts SMOKE)
+    const under = smoothstep(UNDER + CRISP, UNDER - CRISP, upright.add(lobes(uv).mul(0.12)));
+    const tone = ink.rgb.mul(mix(vec3(1), vec3(...SHADE), under));
+    return tone.mul(light.level(mid)).mul(alpha).add(ink.rgb.mul(ink.w).mul(glowOf(r)).mul(fade(tv)));
   })();
   m.opacityNode = alpha;
   // premultiplied: a glow adds its light, smoke covers what is behind
@@ -272,7 +287,7 @@ export function createGunfire(light: Light) {
     ({ at, way: scale(any(), u(speed / 2, speed)), size: u(0.18, 0.34), grow: 0, drag: 1.6, pull: 2, life: u(0.35, 0.7), ink: AZURE, glow: 4, opacity: 0, soft: 0.2, fadeIn: 0 });
   const splinter = (at: Vec3, up: Vec3): Puff => {
     const d = vnormalize(add(any(), up, 1.2));
-    return { at, way: scale(d, u(4, 13)), size: u(0.12, 0.22), grow: 0, drag: 0.4, pull: 9.8, life: u(1, 1.8), ink: [0.16, 0.1, 0.06], glow: 0, opacity: 1, soft: 0, fadeIn: 0 };
+    return { at, way: scale(d, u(4, 13)), size: u(0.12, 0.22), grow: 0, drag: 0.4, pull: 9.8, life: u(1, 1.8), ink: TIMBER.shadow, glow: 0, opacity: 1, soft: 0, fadeIn: 0 };
   };
 
   return {
@@ -284,7 +299,7 @@ export function createGunfire(light: Light) {
       const [flashes, size, puffs, spread, ink] = FIRING[gun];
       for (let i = 0; i < flashes; i++) lay(time, flash(add(add(from, dir, 0.6 + 0.5 * i), any(), gun === 'scatter' ? 0.5 : 0), scale(dir, u(3, 9)), size + 0.3 * i));
       for (let i = 0; i < puffs; i++) {
-        lay(time, smoke(add(from, dir, 0.8), add(scale(dir, u(2, 16)), any(), spread), [0.8, 0.79, 0.76], ink, u(2.5, 4.5), gun === 'mortar' ? 1.2 : 0.8));
+        lay(time, smoke(add(from, dir, 0.8), add(scale(dir, u(2, 16)), any(), spread), SMOKE.lit, ink, u(2.5, 4.5), gun === 'mortar' ? 1.2 : 0.8));
       }
     },
     /** A ball of `gun` come down at `at` (a unit vector), in the sea or on the land: a scatter's pellet or a repeater's
@@ -293,17 +308,17 @@ export function createGunfire(light: Light) {
       const p = scale(at, R), [k, wide] = gun === 'mortar' ? [2.5, MARK / 2] : gun === 'scatter' || gun === 'repeater' ? [0.25, 0.3] : [1, 0.8];
       if (gun === 'mortar') for (let i = 0; i < 3; i++) lay(time, flash(add(p, at, 1), scale(any(), 4), 5));
       if (land) {
-        for (let i = 0; i < 10 * k; i++) lay(time, smoke(add(p, across(at), u(0, wide)), add(scale(at, u(1, 5)), across(at), u(0.5, 2.5)), [0.42, 0.36, 0.27], 0.55, u(1.5, 3), 0.6));
+        for (let i = 0; i < 10 * k; i++) lay(time, smoke(add(p, across(at), u(0, wide)), add(scale(at, u(1, 5)), across(at), u(0.5, 2.5)), DUST, 0.55, u(1.5, 3), 0.6));
         return;
       }
       for (let i = 0; i < 40 * k; i++) {
         lay(time, {
           at: add(p, across(at), u(0, wide)), way: add(scale(at, u(6, 16)), across(at), u(0.3, 3)), size: u(0.4, 0.8), grow: 0.5,
-          drag: 0.15, pull: 9.8, life: u(1.4, 2.6), ink: [0.9, 0.92, 0.93], glow: 0, opacity: 0.9, soft: 0.3, fadeIn: 0,
+          drag: 0.15, pull: 9.8, life: u(1.4, 2.6), ink: FOAM, glow: 0, opacity: 0.9, soft: 0.3, fadeIn: 0,
         });
       }
       for (let i = 0; i < 12 * k; i++) {
-        lay(time, { ...smoke(add(p, across(at), u(0, wide)), add(scale(at, u(1, 6)), across(at), u(0.5, 2.5)), [0.95, 0.96, 0.97], 0.35, u(1.8, 3), 1.4), grow: 2.6, pull: -0.1, drag: 1.2 });
+        lay(time, { ...smoke(add(p, across(at), u(0, wide)), add(scale(at, u(1, 6)), across(at), u(0.5, 2.5)), FOAM, 0.35, u(1.8, 3), 1.4), grow: 2.6, pull: -0.1, drag: 1.2 });
       }
     },
     /** A ball home in a hull at `at` (a unit vector), or a ram; whether her shield took all of it (a glint of azure
@@ -318,7 +333,7 @@ export function createGunfire(light: Light) {
       for (let i = 0; i < (ram ? 10 : 24); i++) lay(time, splinter(p, at));
       if (ram) return;
       for (let i = 0; i < 3; i++) lay(time, flash(p, scale(any(), 2), 2.4));
-      for (let i = 0; i < 14; i++) lay(time, smoke(p, add(scale(at, u(1, 5)), any(), 2), [0.24, 0.22, 0.2], 0.7, u(2.5, 4), 1));
+      for (let i = 0; i < 14; i++) lay(time, smoke(p, add(scale(at, u(1, 5)), any(), 2), SOOT, 0.7, u(2.5, 4), 1));
     },
     /** A ship gone down at `at` (a unit vector): her timbers thrown, the sea heaved white over her, a pall of smoke. */
     sink(time: number, at: Vec3) {
@@ -328,10 +343,10 @@ export function createGunfire(light: Light) {
       for (let i = 0; i < 40; i++) {
         lay(time, {
           at: add(scale(at, R), across(at), u(0, 6)), way: add(scale(at, u(4, 12)), across(at), u(1, 5)), size: u(0.6, 1.1), grow: 0.6,
-          drag: 0.2, pull: 9.8, life: u(1.6, 2.8), ink: [0.9, 0.92, 0.93], glow: 0, opacity: 0.9, soft: 0.3, fadeIn: 0,
+          drag: 0.2, pull: 9.8, life: u(1.6, 2.8), ink: FOAM, glow: 0, opacity: 0.9, soft: 0.3, fadeIn: 0,
         });
       }
-      for (let i = 0; i < 16; i++) lay(time, smoke(add(p, across(at), u(0, 4)), add(scale(at, u(2, 7)), any(), 2), [0.2, 0.19, 0.18], 0.75, u(4, 7), 2));
+      for (let i = 0; i < 16; i++) lay(time, smoke(add(p, across(at), u(0, 4)), add(scale(at, u(2, 7)), any(), 2), SOOT, 0.75, u(4, 7), 2));
     },
     /** Each frame: the world's clock now (s), and every ball in flight. */
     draw(time: number, flying: readonly BallDraw[]) {

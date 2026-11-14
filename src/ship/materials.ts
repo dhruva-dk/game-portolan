@@ -16,7 +16,8 @@
 // drawn, filled by her sails' wind (sails.ts's belly scaled by it, breathing with its gusts), with a ripple and, as the
 // wind slackens or comes along the sail, a luff travelling across it to leeward, its normal tilted to match; and
 // simulated, each vertex at its place on its sail's grid read from the particles (bilinearly, so every level samples
-// the same sheet) with the particles' own normal. Lit on both sides with light through the canvas. The pennants stream
+// the same sheet) with the particles' own normal. Lit in flat tones on both sides: its dye in the sun, a darker, redder
+// one out of it, and a glow where the sun stands behind the canvas. The pennants stream
 // down the same wind, drawn or simulated alike. The ropes: widened to a pixel and a half across far off so the rigging
 // stays a line rather than breaking into dashes, and blended over what is behind them by how much of that width the
 // rope itself would cover — so a distant ship's rigging is the faint web it is, not a black one — their edges soft, as
@@ -31,13 +32,12 @@ import type { Light } from '../sky/light';
 import { BELLY_UNIT, PENNANT_LENGTH, PIVOT_Z, RADIUS_UNIT, UV_RANGE } from './build';
 import { breath, type Cloth } from './cloth';
 import { CLOTH } from './kit';
-import { createWood } from './wood';
-import type { FloatNode, Vec3Node } from '../tsl';
+import { CREAM, DYE_GLOW, TAR } from '../palette';
+import { createWood, shaded } from './wood';
+import { line, type FloatNode, type Vec3Node } from '../tsl';
 
-/** Tarred hemp, weathered grey. */
-const ROPE = [0.13, 0.11, 0.085];
-/** How much of the light on a sail's far side comes through the canvas: a sail with the sun behind it glows, in its
- *  dye's colour deepened by the cloth it passed through (the albedo twice over, renormalised by its brightness). */
+/** How much of the sun on a sail's far side comes through the canvas: its shadow on the sea is the lighter by it
+ *  (water/wake.ts), and a sail with the sun behind it glows (palette.ts DYE_GLOW). */
 export const THROUGH = 0.55;
 /**
  * Every ship's mark on her square sails, in her paint: a cross pattée, its arms flaring from ARM at the middle to
@@ -50,12 +50,10 @@ const CLOTHS = 26;
 /** A striped sail's stripes across it, odd so its two edges match; and the canvas border round the cross on it (of
  *  REACH, as ARM and FLARE are). */
 const STRIPES = 5, FRINGE = 0.2;
-/** A mark whose paint is within this much of its canvas's luminance is drawn in CREAM (linear). */
-const UNSEEN = 0.06, CREAM = [0.9, 0.84, 0.66];
+/** A mark whose paint is within this much of its canvas's luminance is drawn in cream (palette.ts CREAM). */
+const UNSEEN = 0.06;
 /** How far a sail may be blown aback (of its full belly), so it doesn't fold through its mast. */
 const ABACK = 0.3;
-/** Inside a sail's bag, the most of the light on it that its own canvas takes, and how deep the bag is then, metres. */
-const HOLLOW = 0.35, DEEP = 1.6;
 /** A pennant flaps this many times a second in a fresh breeze, its waves this many to its length. */
 const FLAP = 2.2, WAVES = 1.6;
 /** A rope is widened to at least this many pixels in radius (below about a pixel and a half across, a line at a slant
@@ -162,18 +160,10 @@ export function createShipMaterials(light: Light, pixel: FloatNode, canvas: Clot
   const drawn = select(isPennant, across, filled), drawnNormal = normalize(drawn);
   const clothNormal = varying(turn(brace(mix(drawnNormal, simulatedNormal, share), false)));
   const clothKind = varying(kind);
-  // how far the canvas here stands out of its flat, metres (the side it bellies to: +), and which way that is
-  const standOff = varying(select(isPennant, float(0), dot(shaped.sub(local), out)));
-  const outward = varying(turn(brace(out, false)));
   clothMaterial.colorNode = Fn(() => {
     const uvs = attribute('uv', 'vec2').mul(UV_RANGE);
     // seams between the cloths, and the boltrope round the edges, each about a pixel wide and fading out once too
     // fine to draw
-    const line = (t: FloatNode, every: number) => {
-      const f = t.mul(every), w = fwidth(f);
-      const d = min(fract(f), float(1).sub(fract(f))).div(max(w, 1e-4));
-      return float(1).sub(clamp(d, 0, 1)).mul(clamp(float(1).sub(w.mul(2)), 0, 1));
-    };
     const seams = select(clothKind.lessThan(CLOTH.lateen + 0.5), line(uvs.x, CLOTHS).mul(0.12), float(0));
     const edge = max(smoothstep(0.02, 0, min(uvs.x, float(1).sub(uvs.x))), smoothstep(0.03, 0, min(uvs.y, float(1).sub(uvs.y)))).mul(0.25);
     const banded = select(abs(paint.w.sub(1)).lessThan(0.5), float(1), float(0));
@@ -197,14 +187,14 @@ export function createShipMaterials(light: Light, pixel: FloatNode, canvas: Clot
     const ink = select(abs(dot(paint.rgb, luma).sub(dot(cloth.rgb, luma))).lessThan(UNSEEN), vec3(...CREAM), paint.rgb);
     let albedo = mix(cloth.rgb, ink, marked);
     albedo = select(clothKind.greaterThan(CLOTH.pennant - 0.5), paint.rgb, albedo.mul(float(1).sub(seams).sub(edge)));
-    // Seen from inside its bag, a sail's own canvas hides some of the sky and the sun from it, the more the deeper
-    // the bag; what comes through the canvas comes through all the same.
+    // three flat tones: the dye in the sun; where the sun stands behind the canvas its glow, the dye deepened by the
+    // cloth the light passed through (twice over, renormalised by its brightness) and brighter, the paint on it
+    // letting less through; and its shadow tone
     const n = normalize(clothNormal).mul(faceDirection);
-    const inside = dot(n, outward).mul(standOff).lessThan(0);
-    const hollow = select(inside, smoothstep(0.1, DEEP, abs(standOff)).mul(HOLLOW), float(0));
-    const dyed = albedo.mul(albedo).div(max(dot(albedo, vec3(0.2126, 0.7152, 0.0722)), 0.05));
-    const through = light(positionWorld, n.negate()).mul(dyed).mul(mix(float(THROUGH), float(THROUGH * PAINTED), marked));
-    return albedo.mul(light(positionWorld, n)).mul(float(1).sub(hollow)).add(through);
+    const side = light.sides(positionWorld, n);
+    const dyed = albedo.mul(albedo).div(max(dot(albedo, luma), 0.05));
+    const glow = mix(albedo, dyed, DYE_GLOW.deepen).mul(mix(float(DYE_GLOW.gain), float(DYE_GLOW.gain * PAINTED), marked));
+    return mix(mix(shaded(albedo), glow, side.back), albedo, side.front).mul(light.level(positionWorld));
   })();
   // ---- the ropes: blended, so drawn after the sea (fleet.ts)
   const ropes = new MeshBasicNodeMaterial({ transparent: true });
@@ -214,7 +204,7 @@ export function createShipMaterials(light: Light, pixel: FloatNode, canvas: Clot
   const wide = max(cameraPosition.distance(ropeAt).mul(pixel).mul(ROPE_PIXELS), radius);
   ropes.positionNode = ropeAt.add(ropeNormal.mul(wide.sub(radius)));
   const ropeN = varying(ropeNormal), cover = varying(radius.div(wide));
-  ropes.colorNode = Fn(() => vec3(...ROPE).mul(light(positionWorld, normalize(ropeN))))();
+  ropes.colorNode = Fn(() => light.toon(positionWorld, normalize(ropeN), vec3(...TAR.lit), vec3(...TAR.shadow)))();
   // across the rope, how squarely its surface faces the eye: the edges, seen edge on, cover less of their pixels
   const facing = abs(dot(normalize(ropeN), normalize(cameraPosition.sub(positionWorld))));
   ropes.opacityNode = cover.mul(smoothstep(0, 0.6, facing));

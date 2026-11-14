@@ -1,7 +1,8 @@
 // Loot on the water as it is seen: 0117's before its crates (render/actors/loot.ts and tsl/loot.ts at c79ef49^). Each
 // piece is the thing itself, hanging RIDE m over the waves where the snapshot has it, bobbing, slowly turning and
 // rocking: a gun the gun of its kind a ship carries (ship/gun.ts), its muzzle cocked up; a shield a crystal of ice, the big one
-// taller; a repair a cask, the full one bigger. Each is lit as everything is (sky/light.ts) and glows round its
+// taller; a repair a cask, the full one bigger. Each is lit as everything is (sky/light.ts: two flat tones, and a hard
+// highlight on a gun's gilding and on ice) and glows round its
 // outline in its rarity's light (rarity.ts GLOW), the more where it turns from the eye, so the bloom catches it. A
 // piece put on the water during the match rises up out of it as it comes (born).
 //
@@ -23,13 +24,14 @@ import {
   MeshBasicNodeMaterial, OctahedronGeometry, OneFactor, Vector2, type PerspectiveCamera,
 } from 'three/webgpu';
 import { Fn, abs, attribute, cameraPosition, clamp, cos, cross, dot, float, max, mix, normalize, pow, select, sin, smoothstep, uniform, varying, vec3 } from 'three/tsl';
+import { GLINT, ICE, TAR, TIMBER } from '../palette';
 import type { Light } from '../sky/light';
 import { GLOW } from '../rarity';
 import { KINDS, type GunKind, type LootKind } from '../kinds';
 import { gunShape, gunSurface } from '../ship/gun';
 import type { LootDraw } from '../snapshot';
 import { pixelSize } from '../view/view';
-import type { FloatNode, Vec3Node } from '../tsl';
+import type { Vec3Node } from '../tsl';
 
 /** The most pieces drawn at once. */
 const PIECES = 512;
@@ -48,10 +50,6 @@ const EMIT = 3.2, BEAM_EMIT = 1.6, HALO_EMIT = 1.2;
 const SIZE: Record<LootKind, number> = {
   cannon: 2.3, scatter: 2.1, repeater: 2.2, harpoon: 2.4, mortar: 2.1, smallShield: 1.7, bigShield: 2.25, repairKit: 1.6, fullRepair: 2.1,
 };
-/** Surfaces (linear albedo): ice, and a cask's weathered wood and the iron of its hoops (a gun's: ship/gun.ts). */
-const ICE: [number, number, number] = [0.33, 0.78, 0.95];
-const WOOD: [number, number, number] = [0.26, 0.15, 0.08], HOOP: [number, number, number] = [0.05, 0.045, 0.04];
-
 /** Linear rgb of 0xrrggbb. */
 const linear = (hex: number): [number, number, number] => {
   const c = (byte: number) => Math.pow(byte / 255, 2.2);
@@ -146,7 +144,7 @@ export function createLoot(light: Light) {
     m.colorNode = Fn(() => {
       const nn = normalize(n), eye = normalize(cameraPosition.sub(p));
       const edge = pow(float(1).sub(abs(dot(nn, eye))), 2).mul(1.4).add(0.3);
-      return surface(p, nn, l).add(tint.mul(edge).mul(light(base, normalize(base)).mul(EMIT)));
+      return surface(p, nn, l).add(tint.mul(edge).mul(light.level(base).mul(EMIT)));
     })();
     const mesh = new Mesh(geometry, m);
     mesh.frustumCulled = false;
@@ -156,13 +154,11 @@ export function createLoot(light: Light) {
   // each gun as a ship carries it: bronze, oak and iron (ship/gun.ts gunSurface)
   const made = varying(attribute('metal', 'float'));
   const gunMeshes = KINDS.map((kind, i) => piece(instanced(gun(kind), guns[i]), (p, n) => gunSurface(light, p, n, made)));
-  const crystalMesh = piece(instanced(new OctahedronGeometry(0.6).scale(0.8, 1.3, 0.8), crystals), (p, n) => {
-    const g = light.glossy(p, n, float(0.12), vec3(0.06, 0.06, 0.06));
-    return vec3(...ICE).mul(g.diffuse).add(g.specular.mul(2));
-  });
+  const crystalMesh = piece(instanced(new OctahedronGeometry(0.6).scale(0.8, 1.3, 0.8), crystals),
+    (p, n) => light.polished(p, n, vec3(...ICE.lit), vec3(...ICE.shadow), vec3(...GLINT)));
   const caskMesh = piece(instanced(cask(), casks), (p, n, l) => {
     const hoop = smoothstep(0.035, 0.015, abs(abs(l.y).sub(0.33))).max(smoothstep(0.035, 0.015, abs(abs(l.y).sub(0.47))));
-    return mix(vec3(...WOOD), vec3(...HOOP), hoop).mul(light(p, n));
+    return light.toon(p, n, mix(vec3(...TIMBER.lit), vec3(...TAR.lit), hoop), mix(vec3(...TIMBER.shadow), vec3(...TAR.shadow), hoop));
   });
 
   // the beam, a column standing on the piece's water, and its ring about it on the water
@@ -183,7 +179,7 @@ export function createLoot(light: Light) {
   const core = varying(abs(dot(normalize(e1.mul(normal.x).add(e2.mul(normal.z))), normalize(cameraPosition.sub(at.xyz)))));
   const near = varying(smoothstep(10, 55, far));
   bm.colorNode = Fn(() => {
-    const lit = light(base, normalize(base));
+    const lit = light.level(base);
     const column = pow(float(1).sub(v), 2.2).mul(sin(v.mul(40).sub(now.mul(6))).mul(0.25).add(0.75)).mul(core.mul(core)).mul(near);
     const d = xz.length(), band = smoothstep(0.55, 0.8, d).mul(smoothstep(1, 0.82, d));
     const brightness = select(isRing.greaterThan(0.5), band.mul(HALO_EMIT), column.mul(BEAM_EMIT).mul(r.mul(0.18).add(0.35)));

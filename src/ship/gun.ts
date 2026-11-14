@@ -12,8 +12,9 @@
 // for the shaders, and gunSurface lights it so for both who draw it. Built with the ship's kit (kit.ts), so it runs
 // in node.
 
-import { float, select, vec3 } from 'three/tsl';
+import { select, vec3 } from 'three/tsl';
 import type { GunKind } from '../kinds.ts';
+import { CREAM, GILDING, IRON, TIMBER, type Rgb, type Tones } from '../palette.ts';
 import type { Light } from '../sky/light.ts';
 import type { FloatNode, Vec3Node } from '../tsl.ts';
 import { Acc, V, beam, box, lathe, rod, trs } from './kit.ts';
@@ -28,16 +29,14 @@ export const MUZZLE: Record<GunKind, number> = { cannon: 0.98, scatter: 0.535, r
 /** What a gun's part is made of. */
 export const METAL = { bronze: 0, oak: 1, iron: 2 } as const;
 
-/** Each METAL's linear albedo. */
-const BRONZE = [0.5, 0.31, 0.1] as const, OAK = [0.2, 0.11, 0.05] as const, IRON = [0.035, 0.033, 0.03] as const;
-
 /** A gun's colour at world place `p`, normal `n` (unit), its part made of `made` (METAL), lit as everything is
- *  (sky/light.ts): the bronze and the iron glossy, the oak not. For a material's colorNode, inside its Fn. */
+ *  (sky/light.ts), in two tones: the bronze gilded and the iron gunmetal, each with its hard highlight; the oak
+ *  timber, with none. For a material's colorNode, inside its Fn. */
 export function gunSurface(light: Light, p: Vec3Node, n: Vec3Node, made: FloatNode): Vec3Node {
   const iron = made.greaterThan(METAL.iron - 0.5), oak = made.greaterThan(METAL.oak - 0.5).and(iron.not());
-  const albedo = select(iron, vec3(...IRON), vec3(...BRONZE));
-  const g = light.glossy(p, n, select(iron, float(0.35), float(0.45)), select(iron, vec3(0.18, 0.18, 0.18), albedo.mul(2.2)));
-  return select(oak, vec3(...OAK).mul(light(p, n)), albedo.mul(g.diffuse).add(g.specular));
+  const tone = (of: (t: Tones) => Rgb): Vec3Node => select(iron, vec3(...of(IRON)), select(oak, vec3(...of(TIMBER)), vec3(...of(GILDING))));
+  const lit = tone((t) => t.lit);
+  return light.polished(p, n, lit, tone((t) => t.shadow), select(oak, lit, vec3(...CREAM)));
 }
 
 /** The cannon's barrel: [radius, distance along it from the trunnions], breech to muzzle, m. */

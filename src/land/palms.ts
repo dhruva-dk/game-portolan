@@ -2,23 +2,23 @@
 // every palm of about its lean on the islands in view (site.ts), turned to its heading and scaled to its height.
 //
 // The trunk: a tapering tube up a curve that leans from the foot and recurves toward the vertical, flared at the
-// foot, ambientCG Bark015 scaled to the grey-brown of a palm's trunk and ringed by the scars of fallen fronds. Under
+// foot, in the trunk's two tones (palette.ts) and ringed by the scars of fallen fronds, drawn as thin lines. Under
 // the crown, a cluster of nuts.
 //
 // The crown: sixteen fronds in every direction from the young, pointing up, to the old, drooping, each a rachis
 // that arches out and bends under its own weight with leaflets down both sides — every leaflet its own few
 // triangles, so the leaves need no cut-out texture (an alpha test would cost the phone's GPU its hidden-surface
-// removal). Lit on both sides, and glowing through from behind as leaves do.
+// removal). Lit on both sides, and from behind as leaves are (sky/light.ts leaf), in two flat greens.
 
 import { BufferGeometry, DoubleSide, Float32BufferAttribute, Matrix4, MeshBasicNodeMaterial, Quaternion, Vector3 } from 'three/webgpu';
-import { Fn, attribute, faceDirection, float, fract, mix, normalWorld, normalize, positionWorld, smoothstep, texture, uv, vec3 } from 'three/tsl';
-import { loadTexture } from '../textures';
+import { Fn, attribute, faceDirection, float, mix, normalWorld, normalize, positionWorld, uv, vec3 } from 'three/tsl';
+import { PALM_LEAF, PALM_LEAF_OLD, PALM_NUT, PALM_TRUNK, type Rgb, type Tones } from '../palette';
 import { random } from '../world/random';
 import type { Palm } from '../world/scatter';
 import type { Chart } from '../world/sphere';
-import { type Light, leafLight } from '../sky/light';
+import type { Light } from '../sky/light';
 import { createInstances, standing, type Placed } from './site';
-import type { Vec3Node } from '../tsl';
+import { cut, line, type Vec3Node } from '../tsl';
 
 /** The shapes' leans at the foot, radians: each palm is drawn as the nearest. */
 const LEANS = [0.08, 0.2, 0.32, 0.46];
@@ -26,20 +26,13 @@ const LEANS = [0.08, 0.2, 0.32, 0.46];
 const HEIGHT = 10;
 const TRUNK_ALONG = 28, TRUNK_AROUND = 9;
 const FRONDS = 16, LEAFLETS = 28, RACHIS = 10;
-/** The bark texture's mean colour, linear (measured), and the trunk's mean albedo it is scaled to. */
-const BARK_MEAN = [0.271, 0.206, 0.094];
-const BARK_ALBEDO = [0.3, 0.27, 0.22];
-/** Leaf scars ring the trunk every this many metres. */
-const RING = 0.09;
-/** Leaves' albedo: young fronds' green, old ones' yellowing, and the nuts'. Brighter and greener than a measured
- * frond's: at the phone's resolution a crown is a few dozen pixels, and it must read as green, not as a dark blot. */
-const LEAF = [0.06, 0.15, 0.03];
-const OLD_LEAF = [0.22, 0.19, 0.05];
-const NUT = [0.16, 0.14, 0.04];
-/** How much of the light falling on a leaf's far side comes through it. */
-const THROUGH = 0.45;
-/** Of the sky's light, the share that reaches a leaflet at a frond's base, in the crown's heart (all reaches its tip). */
-const HEART = 0.4;
+/** Leaf scars ring the trunk every this many metres, each drawn this dark. */
+const RING = 0.45, SCAR = 0.35;
+/** A frond past this age (0 the youngest … 1 the oldest) has yellowed. */
+const OLD = 0.8;
+/** Of the sky's light, the share that reaches a leaflet at a frond's base, in the crown's heart (all reaches its
+ *  tip); and the share under which a leaflet is drawn in its shadow tone. */
+const HEART = 0.4, SHADED = 0.62;
 
 interface Shape { trunk: BufferGeometry; crown: BufferGeometry }
 
@@ -160,18 +153,13 @@ function shape(lean: number, seed: number): Shape {
 
 /** palms[i]: those on island i, whose chart is charts[i]. */
 export function createPalms(palms: Palm[][], charts: Chart[], light: Light) {
-  const bark = loadTexture('bark.jpg', true);
-
   const trunkMaterial = new MeshBasicNodeMaterial();
   trunkMaterial.colorNode = Fn(() => {
-    const p = positionWorld, n = normalize(normalWorld);
-    const grain = texture(bark, uv()).rgb;
-    let albedo: Vec3Node = grain.div(vec3(...BARK_MEAN)).mul(vec3(...BARK_ALBEDO));
-    // the scars of fallen fronds: a narrow dark ring every RING metres up the trunk
-    const scar = smoothstep(0.75, 0.95, fract(uv().y.div(RING)));
-    albedo = albedo.mul(float(1).sub(scar.mul(0.35)));
-    albedo = mix(albedo, vec3(...NUT), attribute('nut', 'float'));
-    return albedo.mul(light(p, n));
+    const p = positionWorld, n = normalize(normalWorld), nut = attribute('nut', 'float');
+    // the scars of fallen fronds: a thin dark ring every RING metres up the trunk
+    const scar = float(1).sub(line(uv().y, 1 / RING).mul(SCAR)).mul(float(1).sub(nut)).add(nut);
+    const tone = (of: (t: Tones) => Rgb): Vec3Node => mix(vec3(...of(PALM_TRUNK)).mul(scar), vec3(...of(PALM_NUT)), nut);
+    return light.toon(p, n, tone((t) => t.lit), tone((t) => t.shadow));
   })();
 
   const crownMaterial = new MeshBasicNodeMaterial({ side: DoubleSide });
@@ -179,8 +167,11 @@ export function createPalms(palms: Palm[][], charts: Chart[], light: Light) {
     const p = positionWorld, leaf = attribute('leaf', 'vec2');
     // the side facing the eye
     const n = normalize(normalWorld).mul(faceDirection);
-    const albedo = mix(vec3(...LEAF), vec3(...OLD_LEAF), smoothstep(0.55, 1, leaf.x)).mul(leaf.y);
-    return albedo.mul(leafLight(light, p, n, THROUGH));
+    // old fronds yellowed; and in the crown's heart, where little light reaches, a leaflet keeps its shadow tone
+    const old = cut(leaf.x, OLD);
+    const tone = (of: (t: Tones) => Rgb): Vec3Node => mix(vec3(...of(PALM_LEAF)), vec3(...of(PALM_LEAF_OLD)), old);
+    const shadow = tone((t) => t.shadow);
+    return light.leaf(p, n, mix(shadow, tone((t) => t.lit), cut(leaf.y, SHADED)), shadow);
   })();
 
   const shapes = LEANS.map((lean, k) => shape(lean, k + 11));

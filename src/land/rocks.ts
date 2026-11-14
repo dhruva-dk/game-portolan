@@ -1,64 +1,38 @@
 // The islands' rocks (scatter.ts says where): big masses heaped into outcrops and the boulders round them. A handful
 // of shapes of each (rock-shape.ts), each drawn once for all its rocks on the islands in view (site.ts).
 //
-// Textured by projecting ambientCG Rock030 along the world's three axes and blending by the surface's facing (no
-// seams, no UVs to unwrap: any three axes do, so the world's serve), scaled to a warm red-brown, paler on the tops
-// the sun and rain bleach, dark in the cracks and under the ledges; darker where wet, filmed with algae below the
-// waterline; lit like everything else (sky/light.ts).
+// Terracotta in the sun and plum out of it (palette.ts), each facet one flat tone: the facets' own normals, never the
+// shape's smoothed ones. Darker in a band where the sea wets them. Lit like everything else (sky/light.ts).
 //
 // Triangles: 20 × (detail + 1)² a shape: 2880 for a mass, 500 for a boulder; on the islands far from the eye (FAR:
 // islands.ts), where a mass is a few pixels across, each shape at a coarser level of the same lumps: 720 and 180.
 
 import { Euler, Matrix4, MeshBasicNodeMaterial, Quaternion, Vector3 } from 'three/webgpu';
-import { Fn, abs, attribute, dot, float, mix, normalWorld, normalize, positionWorld, smoothstep, texture, vec3 } from 'three/tsl';
-import { loadTexture } from '../textures';
+import { Fn, cross, dFdx, dFdy, dot, float, mix, normalWorld, normalize, positionWorld, sign, vec3 } from 'three/tsl';
+import { ROCK } from '../palette';
 import type { View } from '../view/view';
 import type { Rock } from '../world/scatter';
 import type { Chart } from '../world/sphere';
 import type { Light } from '../sky/light';
 import { rockShape } from './rock-shape';
 import { createInstances, standing, type Placed } from './site';
-import type { Vec2Node, Vec3Node } from '../tsl';
+import { cut } from '../tsl';
 
 /** How many shapes of each kind, and how finely each is made, near and far. */
 export const KINDS = { big: { shapes: 4, detail: 11, far: 5 }, boulder: { shapes: 4, detail: 4, far: 2 } };
-/** The texture repeats every this many metres. */
-const ROCK_TILE = 2.5;
-/** Its mean colour, linear (measured), and the weathered rock's mean albedo it is scaled to: a warm red-brown. */
-const ROCK_MEAN = [0.084, 0.079, 0.066];
-const ROCK_ALBEDO = [0.27, 0.15, 0.085];
-/** The bleached tops' albedo. */
-const BLEACHED = [0.44, 0.32, 0.21];
-/** Deep in a crack or under a ledge, the share of the albedo left: it stands for the light that doesn't reach in. */
-const CAVITY = 0.3;
-/** Wet rock reflects about half as much; below the waterline it is filmed with algae. */
-const WET = 0.5;
-const ALGAE = [0.06, 0.07, 0.04];
+/** A rock is wet up to this many metres over the sea, and darker there by this much. */
+const WET_TO = 0.3, WET = 0.72;
 
 /** rocks[i]: those on island i, whose chart is charts[i]: each shape's instances near and far. */
 export function createRocks(rocks: Rock[][], charts: Chart[], view: View, light: Light) {
-  const colour = loadTexture('rock.jpg', true), bumps = loadTexture('rock-normal.jpg', false);
-
   const material = new MeshBasicNodeMaterial();
   material.colorNode = Fn(() => {
-    const p = positionWorld, g = normalize(normalWorld), height = view.altitude(p);
-    // the texture along each axis, weighed by how squarely the surface faces it
-    let w: Vec3Node = abs(g).pow(4);
-    w = w.div(w.x.add(w.y).add(w.z));
-    const ux = p.zy.div(ROCK_TILE), uy = p.xz.div(ROCK_TILE), uz = p.xy.div(ROCK_TILE);
-    const grain = texture(colour, ux).rgb.mul(w.x).add(texture(colour, uy).rgb.mul(w.y)).add(texture(colour, uz).rgb.mul(w.z));
-    // each projection's normal map tilts the surface along that projection's two axes
-    const t = (uv: Vec2Node) => texture(bumps, uv).xy.mul(2).sub(1);
-    const tx = t(ux), ty = t(uy), tz = t(uz);
-    const tilt = vec3(0, tx.y, tx.x).mul(w.x).add(vec3(ty.x, 0, ty.y).mul(w.y)).add(vec3(tz.x, tz.y, 0).mul(w.z));
-    const n = normalize(g.add(tilt));
-
-    const tone = grain.div(vec3(...ROCK_MEAN));
-    let albedo: Vec3Node = mix(vec3(...ROCK_ALBEDO), vec3(...BLEACHED), smoothstep(0.55, 0.95, dot(g, view.up(p)))).mul(tone);
-    albedo = albedo.mul(mix(float(1), float(CAVITY), attribute('cavity', 'float')));
-    albedo = albedo.mul(mix(float(1), float(WET), smoothstep(0.5, 0.1, height)));
-    albedo = mix(albedo, vec3(...ALGAE).mul(tone), smoothstep(-0.1, -0.6, height).mul(0.6));
-    return albedo.mul(light(p, n));
+    const p = positionWorld;
+    // each face one tone: its own normal, from how the surface lies across the pixel, turned the way the shape faces
+    const face = normalize(cross(dFdx(p), dFdy(p)));
+    const n = face.mul(sign(dot(face, normalWorld)));
+    const wet = mix(float(WET), float(1), cut(view.altitude(p), WET_TO));
+    return light.toon(p, n, vec3(...ROCK.lit).mul(wet), vec3(...ROCK.shadow).mul(wet));
   })();
 
   const m = new Matrix4(), q = new Quaternion(), e = new Euler(), s = new Vector3(), zero = new Vector3();

@@ -1,82 +1,89 @@
-// How anything standing on the island is lit: the sky's sun (through the clouds' shadow, and the shadows of what
-// stands on the island) and its ambient light; below the water, only what of them the water lets down to that depth.
-// A glossy surface (a ship's oiled timber, her paint, her gilding) also reflects them toward the eye: the sun as a
-// GGX highlight, the sky as its GGX-filtered reflection (sky/reflection.ts), both at the same exposure as the rest.
+// How every solid thing is lit: in two tones. A surface has a colour where the sun reaches it and another, chosen for
+// it (palette.ts), where it does not, with a crisp edge between: where it turns from the sun, and where a shadow is
+// cast on it (the island's, the clouds'), which is the same edge and shows the same shadow colour. Over both lies one
+// brightness for the place and the hour (level): the sun and the sky on a white surface facing straight up there, so
+// the frame's exposure holds at every height of the sun, the storm darkens what is in it, and the water dims what is
+// under it, while a shadow keeps its chosen colour and never takes the sky's blue.
+//
+// A polished thing (gilding, a gun's metal) has a third tone: one small hard highlight where it mirrors the sun. A
+// thin thing (a leaf, a sail) is lit from either side: its far side's sun shows through it.
 
-import { cameraPosition, dot, float, max, min, normalize, pow, reflect, saturate, vec2, vec3, vec4 } from 'three/tsl';
+import { cameraPosition, dot, float, fwidth, max, mix, normalize, saturate, smoothstep, vec3 } from 'three/tsl';
 import type { FloatNode, Vec3Node } from '../tsl';
 import type { Sky } from './sky';
 
 /** The light under the water at a point, as a share of what is above it (water.below). */
 export interface Below { sun(p: Vec3Node): Vec3Node; sky(p: Vec3Node): Vec3Node }
 
-/** A glossy surface's light: what reaches it per unit albedo (for its diffuse part), and the radiance it reflects
- * toward the eye. */
-export interface Gloss { diffuse: Vec3Node; specular: Vec3Node }
+/** A thin thing's two sides: 1 where the sun reaches the side facing n, and where it comes through from the other. */
+export interface Sides { front: FloatNode; back: FloatNode }
 
-/** Light reaching a matte surface at world position p facing n, as radiance per unit albedo. */
 export interface Light {
-  (p: Vec3Node, n: Vec3Node): Vec3Node;
-  /** The same for a surface of roughness r (perceptual, 0…1) and reflectance f0 face on (rgb: a metal's colour). */
-  glossy(p: Vec3Node, n: Vec3Node, r: FloatNode, f0: Vec3Node): Gloss;
-  /**
-   * The rim: the sun's light caught along an outline, where the surface at p facing n turns away from the eye, the
-   * more as the sun stands behind it; radiance per unit albedo. A painter's light rather than a physical one: at the
-   * phone's resolution a lit edge reads where a thin dark one is lost, so the ships are cut out of the sea by it.
-   */
-  rim(p: Vec3Node, n: Vec3Node): Vec3Node;
+  /** The radiance of a surface at world position p facing n (unit), of tone `lit` in the sun and `shadow` out of it. */
+  toon(p: Vec3Node, n: Vec3Node, lit: Vec3Node, shadow: Vec3Node): Vec3Node;
+  /** The same for a polished surface: `shine` where it mirrors the sun toward the eye. */
+  polished(p: Vec3Node, n: Vec3Node, lit: Vec3Node, shadow: Vec3Node, shine: Vec3Node): Vec3Node;
+  /** The same for a leaf: lit where the sun reaches either side of it. */
+  leaf(p: Vec3Node, n: Vec3Node, lit: Vec3Node, shadow: Vec3Node): Vec3Node;
+  /** 0 in shadow … 1 in the sun, the edge between crisp: a surface at p facing n. */
+  band(p: Vec3Node, n: Vec3Node): FloatNode;
+  /** The band on each side of a thin surface at p whose near side faces n. */
+  sides(p: Vec3Node, n: Vec3Node): Sides;
+  /** The brightness at p: what a tone is multiplied by to give radiance. */
+  level(p: Vec3Node): Vec3Node;
 }
 
-/** The rim's strength (of the sun's light at p, as a white surface square to it would give), how fast it narrows to
- *  the outline, how much of it a surface lit from the front keeps, and its warmth. */
-const RIM = 1.2, RIM_POWER = 3, FRONT = 0.3, RIM_TINT = [1.1, 0.95, 0.75] as const;
-
-/** The smoothest a surface is taken to be for the sun: a smoother one's highlight would be smaller than the disc. */
-const SMOOTHEST = 0.06;
-
-/**
- * The environment's share of a glossy reflection, integrated over the hemisphere: Karis's fit for mobile ("Physically
- * Based Shading on Mobile", 2014), f0 scaled and biased by roughness and the angle of view.
- */
-const envBRDF = (f0: Vec3Node, r: FloatNode, nv: FloatNode): Vec3Node => {
-  const c0 = vec4(-1, -0.0275, -0.572, 0.022), c1 = vec4(1, 0.0425, 1.04, -0.04);
-  const q = c0.mul(r).add(c1);
-  const a004 = min(q.x.mul(q.x), pow(float(2), nv.mul(-9.28))).mul(q.x).add(q.y);
-  const ab = vec2(-1.04, 1.04).mul(a004).add(q.zw);
-  return f0.mul(ab.x).add(ab.y);
-};
+/** Where a surface turns to its shadow tone (n · l), and half the width of the edge there: a pixel or two on a near
+ *  ship, and never finer than the pixel (a far ship's normals turn within one). */
+const TURN = 0.1, EDGE = 0.04;
+/** The same for the sun through a thin thing from behind: only where it stands well behind it. */
+const THROUGH = 0.35;
+/** A cast shadow's edge: the share of the sun (0…1) at which a point is in it, and half the edge's width; the clouds'
+ *  shadow's likewise. */
+const CAST = 0.5, CAST_EDGE = 0.12, CLOUDED = 0.55, CLOUD_EDGE = 0.06;
+/** How much of the light's own colour the level keeps: none would hold every tone as chosen at every hour, all of it
+ *  would turn the tones amber under a low sun and blue in the shade. A low sun warms them by this much. */
+const TINTED = 0.4;
+/** A polished surface's highlight: where n · h passes this, half its edge's width. */
+const SHINE = 0.94, SHINE_EDGE = 0.012;
+const LUMA = [0.2126, 0.7152, 0.0722] as const;
 
 /** visible(p, n): 0…1, how much of the sun reaches p past what stands on the island (shadow.visible). */
 export function createLighting(sky: Sky, below: Below, visible: (p: Vec3Node, n: Vec3Node) => FloatNode): Light {
-  const sunAt = (p: Vec3Node, n: Vec3Node): Vec3Node => sky.sunIlluminance(p).mul(sky.cloudShadow(p)).mul(visible(p, n)).mul(below.sun(p));
-  const ambient = (p: Vec3Node, n: Vec3Node): Vec3Node => sky.ambient(p, n).mul(below.sky(p));
-  const light = (p: Vec3Node, n: Vec3Node): Vec3Node => sunAt(p, n).mul(saturate(n.dot(sky.sun(p)))).div(Math.PI).add(ambient(p, n));
-  light.glossy = (p: Vec3Node, n: Vec3Node, r: FloatNode, f0: Vec3Node): Gloss => {
-    const l = sky.sun(p).toVar();
-    const sun = sunAt(p, n).toVar(), nl = saturate(n.dot(l));
-    const v = normalize(cameraPosition.sub(p)), nv = max(dot(n, v), 1e-4);
-    // the sun: GGX, Smith's height-correlated visibility (Hammon's fit), Schlick's Fresnel
-    const rough = max(r, SMOOTHEST), a = rough.mul(rough), a2 = a.mul(a);
-    const h = normalize(v.add(l)), nh = saturate(dot(n, h)), vh = saturate(dot(v, h));
-    const d = nh.mul(nh).mul(a2.sub(1)).add(1);
-    const D = a2.div(d.mul(d).mul(Math.PI));
-    const V = float(0.5).div(nl.mul(nv).mul(2).mul(float(1).sub(a)).add(nl.add(nv).mul(a)).add(1e-5));
-    const F = f0.add(vec3(1).sub(f0).mul(pow(float(1).sub(vh), 5)));
-    const glint = sun.mul(F).mul(D.mul(V).mul(nl));
-    // the sky, reflected
-    const mirrored = sky.reflect(reflect(v.negate(), n), rough).mul(envBRDF(f0, rough, nv)).mul(below.sky(p));
-    return { diffuse: sun.mul(nl).div(Math.PI).add(ambient(p, n)), specular: glint.add(mirrored) };
+  /** 1 where no shadow is cast on p: the island's and the clouds', each cut to a crisp edge. */
+  const open = (p: Vec3Node, n: Vec3Node): FloatNode =>
+    smoothstep(CAST - CAST_EDGE, CAST + CAST_EDGE, visible(p, n)).mul(smoothstep(CLOUDED - CLOUD_EDGE, CLOUDED + CLOUD_EDGE, sky.cloudCover(p)));
+  const turned = (nl: FloatNode, at: number): FloatNode => {
+    const w = max(fwidth(nl), EDGE);
+    return smoothstep(w.negate(), w, nl.sub(at));
   };
-  light.rim = (p: Vec3Node, n: Vec3Node): Vec3Node => {
-    const v = normalize(cameraPosition.sub(p)), l = sky.sun(p);
-    const edge = pow(float(1).sub(saturate(dot(n, v))), RIM_POWER);
-    const behind = saturate(dot(v.negate(), l)).mul(1 - FRONT).add(FRONT);
-    // only where the sky's sun reaches (its shadows, and none under water), and on the side of the outline toward it
-    const facing = saturate(dot(n, l).mul(0.5).add(0.6));
-    return sunAt(p, n).mul(edge.mul(behind).mul(facing).mul(RIM / Math.PI)).mul(vec3(...RIM_TINT));
+  const band = (p: Vec3Node, n: Vec3Node): FloatNode => turned(dot(n, sky.sun(p)), TURN).mul(open(p, n));
+  const sides = (p: Vec3Node, n: Vec3Node): Sides => {
+    const nl = dot(n, sky.sun(p)).toVar(), clear = open(p, n).toVar();
+    return { front: turned(nl, TURN).mul(clear), back: turned(nl.negate(), THROUGH).mul(clear) };
   };
-  return light;
+  const level = (p: Vec3Node): Vec3Node => {
+    const up = normalize(p);
+    const sun = sky.sunIlluminance(p).mul(sky.stormSun(p)).mul(below.sun(p)).mul(saturate(dot(up, sky.sun(p)))).div(Math.PI);
+    const all = sun.add(sky.ambient(p, up).mul(below.sky(p)));
+    return mix(vec3(dot(all, vec3(...LUMA))), all, TINTED);
+  };
+  const toon = (p: Vec3Node, n: Vec3Node, lit: Vec3Node, shadow: Vec3Node): Vec3Node => mix(shadow, lit, band(p, n)).mul(level(p));
+  return {
+    toon,
+    band,
+    sides,
+    level,
+    polished(p, n, lit, shadow, shine) {
+      const l = sky.sun(p), sunlit = band(p, n).toVar();
+      const nh = dot(n, normalize(normalize(cameraPosition.sub(p)).add(l)));
+      const w = max(fwidth(nh), SHINE_EDGE);
+      const glint = smoothstep(float(SHINE).sub(w), float(SHINE).add(w), nh).mul(sunlit);
+      return mix(mix(shadow, lit, sunlit), shine, glint).mul(level(p));
+    },
+    leaf(p, n, lit, shadow) {
+      const s = sides(p, n);
+      return mix(shadow, lit, max(s.front, s.back)).mul(level(p));
+    },
+  };
 }
-
-/** A leaf facing n (the side toward the eye): lit on that side, and by the share `through` of what falls on the other. */
-export const leafLight = (light: Light, p: Vec3Node, n: Vec3Node, through: number): Vec3Node => light(p, n).add(light(p, n.negate()).mul(through));

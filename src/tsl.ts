@@ -2,7 +2,9 @@
 // inputs and outputs say what they hold. And the few places three's own types (@types/three 0.187) fall short of its
 // public TSL API, each bridged once here, typed, and named with the gap it covers.
 
-import { Loop, float, nodeObject, workgroupArray } from 'three/tsl';
+// And the two marks a flat look is drawn with, a shape's crisp edge (cut) and a thin line (line), for every material.
+
+import { Loop, clamp, float, fract, fwidth, max, min, nodeObject, saturate, workgroupArray } from 'three/tsl';
 import { MathNode, type Node } from 'three/webgpu';
 
 export type FloatNode = Node<'float'>;
@@ -18,6 +20,18 @@ export type Mat4Node = Node<'mat4'>;
 /** float(x) for x either a number or a float node: three's float() takes each, as separate overloads, so a value that
  * may be either has to be told apart before the call. */
 export const toFloat = (x: FloatNode | number): FloatNode => (typeof x === 'number' ? float(x) : float(x));
+
+/** 0 where x is under `at` … 1 where it is over, the edge between them a pixel wide however far off it is seen: the
+ *  edge of a flat shape. In a fragment's shader only (it reads x's change across the pixel). */
+export const cut = (x: FloatNode, at: FloatNode | number): FloatNode => saturate(x.sub(at).div(max(fwidth(x), 1e-6)).add(0.5));
+
+/** Lines `every` to a unit of t (1 on a line, 0 off it), each about a pixel wide and fading out once too fine to
+ *  draw. In a fragment's shader only. */
+export const line = (t: FloatNode, every: number): FloatNode => {
+  const f = t.mul(every), w = fwidth(f);
+  const d = min(fract(f), float(1).sub(fract(f))).div(max(w, 1e-4));
+  return float(1).sub(clamp(d, 0, 1)).mul(clamp(float(1).sub(w.mul(2)), 0, 1));
+};
 
 /**
  * clamp() of integers (an ivec2, say): the node three's clamp() makes (MathNode.js: `new MathNode(MathNode.CLAMP, …)`,

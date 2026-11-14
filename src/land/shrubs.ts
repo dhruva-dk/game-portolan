@@ -11,24 +11,22 @@ import {
   MeshBasicNodeMaterial, Quaternion, Vector3,
 } from 'three/webgpu';
 import { Fn, attribute, faceDirection, mix, normalWorld, normalize, positionWorld, vec3 } from 'three/tsl';
+import { SHRUB } from '../palette';
 import { random } from '../world/random';
 import type { Shrub } from '../world/scatter';
 import type { Chart } from '../world/sphere';
-import { type Light, leafLight } from '../sky/light';
+import type { Light } from '../sky/light';
 import { createInstances, standing, type Placed } from './site';
-import type { Vec3Node } from '../tsl';
+import { cut } from '../tsl';
 
 /** How many shapes the shrubs come in. */
 export const SHAPES = 4;
 const LEAVES = 450;
 /** A leaf's length, as a share of the shrub's size. */
 const LEAF = 0.095;
-/** Leaves' albedo: the shrubs' fleshy green, and the paler, yellower and the darker ends of their range. */
-const GREEN = [0.055, 0.14, 0.03];
-const PALE = [0.14, 0.19, 0.045];
-const DARK = [0.03, 0.085, 0.03];
-/** How much of the light on a leaf's far side comes through it: fleshy leaves pass less than a palm's. */
-const THROUGH = 0.4;
+/** How much one shrub's green differs from the next's; and how deep in its mass (0.7 the deepest … 1.05 on its
+ *  surface) a leaf is drawn in its shadow tone. */
+const VARIED = 0.3, SHADED = 0.8;
 
 /** One shrub, 1 across at its widest, standing on y = 0. */
 function shape(seed: number): BufferGeometry {
@@ -76,11 +74,11 @@ export function createShrubs(shrubs: Shrub[][], charts: Chart[], light: Light) {
   const material = new MeshBasicNodeMaterial({ side: DoubleSide });
   material.colorNode = Fn(() => {
     const p = positionWorld, n = normalize(normalWorld).mul(faceDirection);
-    const tint = attribute('tint', 'float');
-    let albedo: Vec3Node = mix(mix(vec3(...DARK), vec3(...GREEN), tint.mul(2).clamp(0, 1)), vec3(...PALE), tint.mul(2).sub(1).clamp(0, 1));
-    // deeper in, less of the sky
-    albedo = albedo.mul(attribute('depth', 'float').sub(0.7).mul(1.6).add(0.45));
-    return albedo.mul(leafLight(light, p, n, THROUGH));
+    // each shrub a little paler or darker than the next; and deep in a mass, where less of the sky reaches, a leaf
+    // keeps its shadow tone
+    const own = attribute('tint', 'float').sub(0.5).mul(VARIED).add(1);
+    const shadow = vec3(...SHRUB.shadow).mul(own);
+    return light.leaf(p, n, mix(shadow, vec3(...SHRUB.lit).mul(own), cut(attribute('depth', 'float'), SHADED)), shadow);
   })();
 
   const m = new Matrix4(), q = new Quaternion(), s = new Vector3(), zero = new Vector3(), up = new Vector3(0, 1, 0);

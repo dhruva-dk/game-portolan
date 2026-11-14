@@ -1,56 +1,31 @@
-// The ground's look, wherever it is: coral sand all over, rippled, wet and darker near and below the waterline (with
-// a sheen where it is wet above it), mottled, with rubble and sea grass where the ground's cover says (ground.ts),
-// stones and weed strewn over the floor (strewn.ts), and on the islands fallen fronds and leaves.
+// The ground's look, wherever it is: sand in flat bands by height, each of two tones (palette.ts) with a crisp edge
+// to the next: the sea floor's pale sand, with rubble and sea grass where the ground's cover says (ground.ts) and
+// stones and weed strewn over it (strewn.ts); a paler band along the waterline; the beach; the deeper, drier sand
+// higher up; and under the trees, where fronds have fallen, a darker patch. The bands' edges wander with the ground's
+// mottling, so none is a contour line.
 // The islands' meshes and the sea floor's both shade with this, so where they overlap they look the same.
 //
-// Everything is a function of the world position alone (the sea floor's mesh slides along under the eye): the
-// textures are laid on the world's three axes and blended by which way up faces there (sharply, so nearly
-// everywhere one of them shows alone; any three axes do, so the world's serve), the cover read from the ground.
-//
+// Everything is a function of the world position alone (the sea floor's mesh slides along under the eye).
 // Lit like everything else (sky/light.ts).
 
-import { If, abs, cameraPosition, float, mix, normalize, reflect, smoothstep, texture, vec2, vec3 } from 'three/tsl';
-import type { Texture } from 'three/webgpu';
-import { loadTexture } from '../textures';
+import { mix, vec3 } from 'three/tsl';
+import { LITTER, SAND, SAND_DRY, SAND_SHORE, SEABED_SAND, SEABED_STONE, SEABED_WEED, type Tones } from '../palette';
 import type { View } from '../view/view';
 import type { Ground } from './ground';
 import type { Light } from '../sky/light';
-import { SHALLOWEST } from './seabed';
 import { createStrewn } from './strewn';
-import type { FloatNode, Vec2Node, Vec3Node, Vec4Node } from '../tsl';
+import { cut, type FloatNode, type Vec3Node } from '../tsl';
 
-/** The sand texture (ambientCG Ground055S) repeats every this many metres; its ripples are laid again this many
- * times larger (twice, crossing), the wind's broader ripples that show from afar. */
-const SAND_TILE = 4, BROAD = 4.3;
-/** Its mean colour, linear (measured), and the coral sand's mean albedo it is scaled to: a warm beige (dry carbonate
- * sand reflects 0.4–0.5, less toward the blue). */
-const SAND_MEAN = [0.345, 0.315, 0.221];
-const SAND_ALBEDO = [0.56, 0.48, 0.34];
-/**
- * Wet sand reflects less: the water between and over the grains sends back WET of the light that would leave it
- * (the diffuse reflectance of water's surface from below, total internal reflection past 49°), to the sand again
- * (Lekner & Dorf 1988). It is damp to this height, metres, about as far up as the swash runs, and glistens below
- * SWASH, where it runs most often.
- */
-const WET = 0.6, DAMP = 0.6, SWASH = 0.3;
-/** The wet sand's sheen: the water film's reflectance face on, and the share of the sand it films. */
-const FILM = 0.02, FILMED = 0.5;
-/** Sea grass's albedo, and the most it covers the sand: thin, with the sand between its blades. */
-const GRASS = [0.1, 0.11, 0.055], GRASS_COVER = 0.7;
-/** Coral and rubble's: browns and olives, darker than the sand. */
-const CORAL = [0.15, 0.115, 0.08];
-/** The litter texture (ambientCG Ground053) repeats every this many metres; its mean colour, linear (measured), and
- * the dry fronds' and leaves' mean albedo it is scaled to. */
-const LITTER_TILE = 3;
-const LITTER_MEAN = [0.173, 0.106, 0.065];
-const LITTER_ALBEDO = [0.13, 0.095, 0.06];
-/** How sharply the three projections hand over to each other. */
-const SHARP = 8;
+/** Where each band begins, metres over the sea: the shore's pale sand, the beach, the dry sand. */
+const SHORE = -0.15, BEACH = 0.45, DRY = 2.6;
+/** How far up or down the ground's mottling moves a band's edge, metres. */
+const RAGGED = 0.5;
+/** The ground's cover (0…1) past which rubble lies on the floor, and sea grass; and litter under the trees. */
+const RUBBLE = 0.7, GRASS = 0.65, FALLEN = 0.5;
 
 export type Sand = (p: Vec3Node, n: Vec3Node, litter: FloatNode | null) => Vec3Node;
 
 export function createSand(view: View, ground: Ground, light: Light): Sand {
-  const sand = loadTexture('sand.jpg', true), sandNormal = loadTexture('sand-normal.jpg', false), leaves = loadTexture('litter.jpg', true);
   const strewn = createStrewn();
 
   /**
@@ -58,76 +33,25 @@ export function createSand(view: View, ground: Ground, light: Light): Sand {
    * lie there (null on the sea floor's mesh, where none can).
    */
   return (p, n, litter) => {
-    const up = view.up(p), height = view.altitude(p);
-    let w: Vec3Node = abs(up).pow(SHARP);
-    w = w.div(w.x.add(w.y).add(w.z));
-    // each axis's projection of a texture, blended
-    const tri = (t: Texture, tile: number, shift = 0): Vec4Node => {
-      const q = p.div(tile).add(shift);
-      return texture(t, q.zy).mul(w.x).add(texture(t, q.xz).mul(w.y)).add(texture(t, q.xy).mul(w.z));
+    const height = view.altitude(p), cover = ground.cover(p);
+    const mottle = cover.z.sub(0.5);
+    const level = height.add(mottle.mul(RAGGED));
+    let lit: Vec3Node = vec3(...SEABED_SAND.lit), shadow: Vec3Node = vec3(...SEABED_SAND.shadow);
+    const lay = (t: Tones, share: FloatNode) => {
+      lit = mix(lit, vec3(...t.lit), share);
+      shadow = mix(shadow, vec3(...t.shadow), share);
     };
-    const grain = tri(sand, SAND_TILE).rgb;
-    let albedo: Vec3Node = grain.div(vec3(...SAND_MEAN)).mul(vec3(...SAND_ALBEDO));
-    const cover = ground.cover(p);
-    // mottled: damper hollows and drier, paler rises
-    albedo = albedo.mul(cover.z.sub(0.5).mul(0.3).add(1));
-    // the damp band ends raggedly, higher on the hollows
-    const wet = smoothstep(DAMP, DAMP - 0.25, height.add(cover.z.sub(0.5).mul(0.4)));
-    // wetted, an albedo a becomes (1 − WET)·a / (1 − WET·a): darker, the darker colours more, so a deeper beige
-    albedo = mix(albedo, albedo.mul(1 - WET).div(float(1).sub(albedo.mul(WET))), wet);
-    // rubble, mottled by the sand's pattern and its own
-    const coral = smoothstep(0.25, 0.8, cover.y.add(grain.r.sub(SAND_MEAN[0]).mul(2))).mul(0.85);
-    albedo = mix(albedo, vec3(...CORAL).mul(grain.div(vec3(...SAND_MEAN))).mul(cover.z.mul(0.6).add(0.7)), coral);
-    // sea grass in soft-edged clumps, thin enough to show the sand between
-    const lumpy = cover.w.sub(0.5).mul(1.1);
-    const clumps = smoothstep(-0.3, 0.45, lumpy.add(grain.g.sub(SAND_MEAN[1]).mul(2)));
-    const grass = smoothstep(0.1, 0.8, cover.x).mul(clumps).mul(GRASS_COVER);
-    albedo = mix(albedo, vec3(...GRASS).mul(grain.g.div(SAND_MEAN[1])), grass);
-    // stones and weed on the floor
-    const stones = strewn(p, height, cover);
-    albedo = mix(albedo, stones.rgb, stones.a);
-
-    let bare: FloatNode = float(1);
-    if (litter) {
-      // litter on the dry sand, thinning out raggedly at its edges
-      const fallen = tri(leaves, LITTER_TILE).rgb;
-      const lying = smoothstep(0.15, 0.85, litter.add(cover.z.sub(0.5).mul(0.6)).add(fallen.r.sub(LITTER_MEAN[0]).mul(2)))
-        .mul(smoothstep(0.3, 1, height)).mul(0.85);
-      // its own pattern's contrast halved: dead fronds and leaves, not pale gravel
-      albedo = mix(albedo, mix(vec3(1), fallen.div(vec3(...LITTER_MEAN)), 0.5).mul(vec3(...LITTER_ALBEDO)), lying);
-      bare = float(1).sub(lying);
-    }
-
-    // the ripples' normal map, each projection's tilting the surface along its own two axes, the map turned by `turn`
-    // radians on each (and its tilt turned back); none under the litter, the grass nor the stones
-    const ripples = (tile: number, warp: FloatNode, turn: number): Vec3Node => {
-      const c = Math.cos(turn), s = Math.sin(turn);
-      const b = (q: Vec2Node): Vec2Node => {
-        const t = texture(sandNormal, vec2(q.x.mul(c).sub(q.y.mul(s)), q.x.mul(s).add(q.y.mul(c)))).xy.mul(2).sub(1);
-        return vec2(t.x.mul(c).add(t.y.mul(s)), t.y.mul(c).sub(t.x.mul(s)));
-      };
-      const q = p.div(tile).add(warp), bx = b(q.zy), by = b(q.xz), bz = b(q.xy);
-      return vec3(0, bx.y, bx.x).mul(w.x).add(vec3(by.x, 0, by.y).mul(w.y)).add(vec3(bz.x, bz.y, 0).mul(w.z));
-    };
-    let tilt = ripples(SAND_TILE, float(0), 0).mul(1.2);
-    if (litter) {
-      // on the islands' ground the broad ones too, two sets crossing, bent about by the lumpy noise: dimpled, their
-      // crests wandering. They fade out before the sea floor's mesh begins (they don't show through that much water),
-      // so where the two meshes overlap they agree.
-      const broad = ripples(SAND_TILE * BROAD, lumpy.mul(0.12), 0).add(ripples(SAND_TILE * BROAD * 0.8, lumpy.mul(-0.1), 1.2));
-      tilt = tilt.add(broad.mul(smoothstep(-SHALLOWEST, -0.5, height).mul(0.4)));
-    }
-    const shown = normalize(n.add(tilt.mul(bare.mul(float(1).sub(grass)).mul(float(1).sub(stones.a)))));
-
-    // where the waves wash up, the wet sand's film mirrors the sky, more as the view grazes it
-    const sheen = smoothstep(SWASH, 0.05, height).mul(smoothstep(-0.02, 0.06, height)).mul(FILMED);
-    const mirrored = vec3(0).toVar();
-    If(sheen.greaterThan(0), () => {
-      const eye = normalize(p.sub(cameraPosition));
-      const fresnel = float(FILM).add(float(1 - FILM).mul(float(1).add(eye.dot(shown)).clamp(0, 1).pow(5)));
-      mirrored.assign(light(p, reflect(eye, shown)).mul(fresnel).mul(sheen));
-    });
-
-    return albedo.mul(light(p, shown)).add(mirrored);
+    // on the floor: rubble and sea grass in patches, stones and weed over them
+    lay(SEABED_STONE, cut(cover.y.add(mottle.mul(0.3)), RUBBLE));
+    lay(SEABED_WEED, cut(cover.x.add(cover.w.sub(0.5).mul(0.3)), GRASS));
+    const strewed = strewn(p, height, cover);
+    lay(SEABED_STONE, strewed.x);
+    lay(SEABED_WEED, strewed.y);
+    // up the beach
+    lay(SAND_SHORE, cut(level, SHORE));
+    lay(SAND, cut(level, BEACH));
+    lay(SAND_DRY, cut(level, DRY));
+    if (litter) lay(LITTER, cut(litter.add(mottle.mul(0.6)), FALLEN).mul(cut(height, BEACH)));
+    return light.toon(p, n, lit, shadow);
   };
 }
