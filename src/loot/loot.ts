@@ -6,7 +6,8 @@
 // from the eye. A piece put on the water during the match rises up out of it as it comes (born).
 //
 // Over each stands its beam: a thin column of gold light, (14 + 7 × rarity) m tall, fading up its height and
-// pulsing upward, with a ring of its rarity's light on the water about it within HALO m; never narrower than
+// pulsing upward, with a pool of its gold on the water about it, ringed in its rarity's light, within HALO m (as the
+// painting's lit ring, art/target/idea.png); never narrower than
 // BEAM_PIXELS, and never fainter near than it should be (it fades in past the first tens of metres, so the piece
 // beside her is not lost in it). Drawn to BEAM m; the pieces to SHAPE m, never smaller on the screen than
 // SHAPE_PIXELS across, so they read to the haze's edge (about 250 m), where the haze takes them as everything else
@@ -22,7 +23,7 @@ import {
   InstancedBufferGeometry, InstancedInterleavedBuffer, InterleavedBufferAttribute, LatheGeometry, Matrix4, Mesh,
   MeshBasicNodeMaterial, OctahedronGeometry, OneFactor, Vector2, type PerspectiveCamera,
 } from 'three/webgpu';
-import { Fn, abs, attribute, cameraPosition, clamp, cos, cross, dot, float, max, mix, normalize, pow, select, sin, smoothstep, uniform, varying, vec3 } from 'three/tsl';
+import { Fn, abs, attribute, cameraPosition, clamp, cos, cross, dot, float, max, mix, normalize, pow, saturate, select, sin, smoothstep, uniform, varying, vec3 } from 'three/tsl';
 import { GILDING, GLINT, ICE, TAR, TIMBER, tint } from '../palette';
 import type { Light } from '../sky/light';
 import { GLOW } from '../rarity';
@@ -35,7 +36,9 @@ import type { Vec3Node } from '../tsl';
 /** The most pieces drawn at once. */
 const PIECES = 512;
 /** Metres out to which the beams and the pieces are drawn, and the rings on the water about them. */
-const BEAM = 520, SHAPE = 320, HALO = 140;
+const BEAM = 520, SHAPE = 320, HALO = 260;
+/** The ring's radius on the water, m (and never fewer than HALO_PIXELS across), and how much of its glow fills it. */
+const RING = 3.5, HALO_PIXELS = 18, POOL = 0.7;
 /** A piece hangs this high over the water at its mean, bobbing this much at this rate (rad/s); turns at this rate
  *  (rad/s) and rocks this far (rad); rises this far up out of the water as it comes, over 1/RISE s. */
 const RIDE = 2.2, BOB = 0.25, BOB_RATE = 2, SPIN = 1.4, ROCK = 0.15, SINK = 2, RISE = 2.5;
@@ -178,8 +181,8 @@ export function createLoot(light: Light) {
   const ring = attribute('part', 'float'), uv = attribute('uv', 'vec2');
   const tall = float(TALL).add(glow.w.mul(TALLER)), wide = max(float(1), far.mul(pixel).mul(BEAM_PIXELS / (2 * HEAD)));
   const beamAt = at.xyz.add(e1.mul(local.x.mul(wide))).add(e2.mul(local.z.mul(wide))).add(up.mul(local.y.mul(tall)));
-  const halo = float(1.6).add(sin(now.mul(3).add(id)).mul(0.15));
-  const ringAt = at.xyz.add(up.mul(0.12)).add(e1.mul(local.x.mul(halo))).add(e2.mul(local.z.mul(halo)));
+  const halo = max(float(RING), far.mul(pixel).mul(HALO_PIXELS / 2)).mul(sin(now.mul(3).add(id)).mul(0.06).add(1));
+  const ringAt = at.xyz.add(up.mul(0.6)).add(e1.mul(local.x.mul(halo))).add(e2.mul(local.z.mul(halo)));
   const beamShown = select(far.lessThan(BEAM), float(1), float(0)), ringShown = select(far.lessThan(HALO), float(1), float(0));
   bm.positionNode = select(ring.greaterThan(0.5), ringAt.mul(ringShown), beamAt.mul(beamShown).mul(pop));
   const v = varying(uv.y), xz = varying(local.xz), isRing = varying(ring), tint = varying(glow.rgb), r = varying(glow.w), base = varying(at.xyz);
@@ -190,11 +193,13 @@ export function createLoot(light: Light) {
   bm.colorNode = Fn(() => {
     const lit = light.level(base);
     const column = pow(float(1).sub(v), 2.2).mul(sin(v.mul(40).sub(now.mul(6))).mul(0.25).add(0.75)).mul(core.mul(core)).mul(near);
-    const d = xz.length(), band = smoothstep(0.55, 0.8, d).mul(smoothstep(1, 0.82, d));
-    // the beam gold whatever the piece; its ring on the water in its rarity's light
+    // the ring: a bright band at its edge round a pool of light falling off from the middle
+    const d = xz.length(), band = smoothstep(0.62, 0.8, d).mul(smoothstep(1, 0.86, d));
+    const pool = pow(saturate(float(1).sub(d)), 1.5).mul(POOL);
+    // the beam and its pool gold whatever the piece; the ring's band in its rarity's light over the gold
     const isBeam = isRing.lessThanEqual(0.5);
-    const brightness = select(isBeam, column.mul(BEAM_EMIT).mul(r.mul(0.18).add(0.35)), band.mul(HALO_EMIT));
-    return select(isBeam, vec3(...BEAM_GOLD), tint).mul(lit).mul(brightness);
+    const brightness = select(isBeam, column.mul(BEAM_EMIT).mul(r.mul(0.18).add(0.35)), band.add(pool).mul(HALO_EMIT));
+    return select(isBeam, vec3(...BEAM_GOLD), mix(vec3(...BEAM_GOLD), tint, band.mul(0.5))).mul(lit).mul(brightness);
   })();
   const beamMesh = new Mesh(beamGeometry, bm);
   beamMesh.frustumCulled = false;
