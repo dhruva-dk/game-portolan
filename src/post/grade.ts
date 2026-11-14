@@ -55,7 +55,7 @@ const DAWN: Look = {
 /** In the storm: cooler and dimmer, pushed toward violet (magenta in the tint), its blacks lifted to a slate violet,
  *  the corners darker. Its colour is kept: the ships' dyes still read. */
 const STORM: Look = {
-  exposure: 1.6, temp: -0.15, tint: -0.1, contrast: 1, saturation: 0.92, warm: 1, sea: 0.9, sky: 0.95, fade: 0.03, fadeTo: [0.13, 0.1, 0.19], vignette: 0.32,
+  exposure: 0.8, temp: -0.15, tint: -0.1, contrast: 1, saturation: 0.92, warm: 1, sea: 0.9, sky: 0.95, fade: 0.03, fadeTo: [0.13, 0.1, 0.19], vignette: 0.32,
 };
 
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;

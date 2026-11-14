@@ -51,8 +51,11 @@ const LUMA = [0.2126, 0.7152, 0.0722] as const;
 /** visible(p, n): 0…1, how much of the sun reaches p past what stands on the island (shadow.visible). */
 export function createLighting(sky: Sky, below: Below, visible: (p: Vec3Node, n: Vec3Node) => FloatNode): Light {
   /** 1 where no shadow is cast on p: the island's and the clouds', each cut to a crisp edge. */
-  const open = (p: Vec3Node, n: Vec3Node): FloatNode =>
-    smoothstep(CAST - CAST_EDGE, CAST + CAST_EDGE, visible(p, n)).mul(smoothstep(CLOUDED - CLOUD_EDGE, CLOUDED + CLOUD_EDGE, sky.cloudCover(p)));
+  const open = (p: Vec3Node, n: Vec3Node): FloatNode => {
+    // never finer than the pixel, or the shadow map's texels would show as steps far off
+    const seen = visible(p, n).toVar(), w = max(fwidth(seen), CAST_EDGE);
+    return smoothstep(w.negate(), w, seen.sub(CAST)).mul(smoothstep(CLOUDED - CLOUD_EDGE, CLOUDED + CLOUD_EDGE, sky.cloudCover(p)));
+  };
   const turned = (nl: FloatNode, at: number): FloatNode => {
     const w = max(fwidth(nl), EDGE);
     return smoothstep(w.negate(), w, nl.sub(at));

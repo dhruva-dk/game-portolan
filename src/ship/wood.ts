@@ -3,7 +3,7 @@
 // is (sky/light.ts): no grain, no gloss. What detail there is is drawn: the planks' seams as thin dark lines a strake
 // apart, the wet timber as a darker band along her waterline, and one hard highlight on the gilding.
 
-import { float, positionWorld, select, vec3 } from 'three/tsl';
+import { float, mix, positionWorld, select, vec3 } from 'three/tsl';
 import type { Node } from 'three/webgpu';
 import { CREAM, DECK, DYE_SHADE, GILDING, TAR, TIMBER, type Rgb, type Tones } from '../palette';
 import type { Light } from '../sky/light';
@@ -32,8 +32,9 @@ export function createWood(light: Light) {
     const seam = select(planked, line(uv.y, STRAKES).mul(SEAM), float(0));
     // wet along the waterline: a band with a hard edge
     const wet = float(1).sub(cut(height, WET_TO));
-    const drawn = float(1).sub(seam).mul(float(1).sub(wet.mul(1 - WET))).mul(ao);
-    const lit = tone((t) => t.lit, paint).mul(drawn), shadow = tone((t) => t.shadow, shaded(paint)).mul(drawn);
+    const drawn = float(1).sub(seam).mul(float(1).sub(wet.mul(1 - WET)));
+    // where less of the sky reaches (ao), the lit tone gives way to the shadow tone, which stays as chosen
+    const shadow = tone((t) => t.shadow, shaded(paint)).mul(drawn), lit = mix(shadow, tone((t) => t.lit, paint).mul(drawn), ao);
     // the gilding alone mirrors the sun: on the rest the highlight is the lit tone itself
     const gilt = kind.greaterThan(KIND.gilt - 0.5).and(kind.lessThan(KIND.gilt + 0.5));
     return light.polished(p, n, lit, shadow, select(gilt, vec3(...CREAM), lit));

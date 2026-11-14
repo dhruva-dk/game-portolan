@@ -18,7 +18,7 @@
 // foam, a thick band that follows the waterline up and down the sand, and over the last centimetre at its very edge
 // it thins away to nothing, so the water meets the sand with no line drawn between them.
 
-import { abs, float, max, mix, saturate, sin, smoothstep, texture } from 'three/tsl';
+import { abs, float, max, min, mix, saturate, sin, smoothstep, texture } from 'three/tsl';
 import type { Read } from '../view/charts';
 import { CASCADES } from '../world/cascades';
 import { FOAMING, type Waves } from './waves';
@@ -58,7 +58,8 @@ export function createFoam(waves: Waves) {
     // far off the lobes are finer than the pixel: their mean, and an edge as wide as the pixel makes it
     const fine = smoothstep(LOBE * 0.25, LOBE * 1.5, footprint);
     const cutAt = all.add(mix(field, float(0.4), fine).sub(0.5).mul(SCALLOP)).sub(0.5);
-    const w = mix(float(CRISP), float(0.5), fine);
+    // never finer than the pixel: the field crosses its range in half a lobe
+    const w = min(max(mix(float(CRISP), float(0.5), fine), footprint.mul(SCALLOP / LOBE)), 0.5);
     const foam = smoothstep(w.negate(), w, cutAt).mul(smoothstep(0, 0.05, all));
     return { foam, air: cover.mul(AIR).mul(saturate(thickness.div(PLUME))) };
   };

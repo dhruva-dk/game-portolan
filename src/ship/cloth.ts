@@ -24,7 +24,7 @@
 
 import { Vector4, type StorageBufferNode } from 'three/webgpu';
 import {
-  Fn, If, Return, abs, cos, cross, dot, float, instanceIndex, int, length, max, min, normalize, select, sin, uniform, uniformArray,
+  Fn, If, Return, abs, cos, cross, dot, float, instanceIndex, int, length, max, normalize, select, sin, uniform, uniformArray,
   vec3, vec4, instancedArray,
 } from 'three/tsl';
 import type { Compute } from '../gpu';

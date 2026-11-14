@@ -43,7 +43,6 @@ export const SEABED_WEED = tones('#4F9A6E', '#2E6A62');
 export const TIMBER = tones('#9A5A2C', '#5A2F2E');
 export const DECK = tones('#D9A86A', '#9A6548');
 export const TAR = tones('#3A2A2E', '#221827');
-export const CANVAS = tones('#F3E6C8', '#C9A98A');
 export const GILDING = tones('#F5C542', '#B8792A');
 /** The hard highlight on gilding and gunmetal, and the mark on a sail whose own paint would not show: cream. */
 export const CREAM = ink('#F3E6C8');
@@ -80,8 +79,9 @@ export const DYE_SHADE: Rgb = [0.56, 0.4, 0.42];
 export const DYE_GLOW = { deepen: 0.35, gain: 1.25 } as const;
 export const VERMILION = ink('#D2332A');
 export const OCHRE = ink('#E8A21C');
-/** A yellow green, far from the sea's; and a hull's brown under cream canvas. */
+/** A yellow green, far from the sea's; a pale pink no one takes for her red; and a clear yellow. */
 export const MOSS = ink('#7F9A2A');
-export const UMBER = ink('#7A4A2A');
+export const ROSE = ink('#F2A0B4');
+export const LEMON = ink('#F4E06A');
 export const MURREY = ink('#8A2A6A');
 export const CHARCOAL = ink('#2E2A33');

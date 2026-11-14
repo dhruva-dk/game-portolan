@@ -8,7 +8,7 @@
 // islands.ts), where a mass is a few pixels across, each shape at a coarser level of the same lumps: 720 and 180.
 
 import { Euler, Matrix4, MeshBasicNodeMaterial, Quaternion, Vector3 } from 'three/webgpu';
-import { Fn, attribute, cross, dFdx, dFdy, dot, float, mix, normalWorld, normalize, positionWorld, sign, vec3 } from 'three/tsl';
+import { Fn, attribute, cross, dFdx, dFdy, dot, float, length, max, mix, normalWorld, positionWorld, select, vec3 } from 'three/tsl';
 import { ROCK } from '../palette';
 import type { View } from '../view/view';
 import type { Rock } from '../world/scatter';
@@ -31,8 +31,9 @@ export function createRocks(rocks: Rock[][], charts: Chart[], view: View, light:
   material.colorNode = Fn(() => {
     const p = positionWorld;
     // each face one tone: its own normal, from how the surface lies across the pixel, turned the way the shape faces
-    const face = normalize(cross(dFdx(p), dFdy(p)));
-    const n = face.mul(sign(dot(face, normalWorld)));
+    const across = cross(dFdx(p), dFdy(p));
+    const face = across.div(max(length(across), 1e-12));
+    const n = face.mul(select(dot(face, normalWorld).lessThan(0), float(-1), float(1)));
     const wet = mix(float(WET), float(1), cut(view.altitude(p), WET_TO));
     // deep in a crack or under a ledge (rock-shape.ts cavity) the sun never reaches: the shadow tone, lit or not
     const shadow = vec3(...ROCK.shadow).mul(wet);

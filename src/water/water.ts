@@ -81,6 +81,8 @@ const STORM_ROUGH = 0.03, STORM_FOAM = 0.45, STORM_DARK = 0.3;
  * in the open shows (over 1, so the bloom takes it).
  */
 const FOOT = [6, 26] as const, EDGE_LINE = 0.3, EDGE_LIGHT = 1.6;
+/** A wake's foam (wake.ts) drawn this much fuller than it is kept: bold lobes of white along her sides and astern. */
+const WAKE_BOLD = 2;
 /** The least mean square slope the surface is shaded with: a film of water on sand is still rippled. */
 const SMOOTHEST = 1e-4;
 /**
@@ -170,7 +172,7 @@ export function createWater(view: View, sky: Sky, ground: Ground, wind: Wind, sh
     const footprint = max(length(dp[0]), length(dp[1]));
     const marks = wake.read(p);
     const held = claims.at(p, dp[0], dp[1]);
-    const wakeFoam = marks.marks.x, air = saturate(marks.marks.z);
+    const wakeFoam = marks.marks.x.mul(WAKE_BOLD), air = saturate(marks.marks.z);
     // the water over the ground here, as the waves lift it and let it fall: the swash's
     const thickness = ground.height(rest).negate().add(height);
     // surf: the breaking waves' fronts white, from the crest down the face; the troughs between keep what the
@@ -254,7 +256,7 @@ export function createWater(view: View, sky: Sky, ground: Ground, wind: Wind, sh
     // mirror: at the waterline the depth cuts every wave away, and with α² = 0 the facets' D is 0/0, a line of NaN
     // drawn black along every beach.
     const alpha = sqrt(max(variance.mul(float(1).sub(air.mul(0.6))), SMOOTHEST));
-    const sea = optics.seaRadiance(positionWorld, n, v, alpha, crest, foam, behind, path, near, held).mul(float(1).sub(storm.mul(STORM_DARK)));
+    const sea = optics.seaRadiance(positionWorld, n, v, alpha, crest, foam, behind, path, max(ground.height(rest).negate(), 0), near, held).mul(float(1).sub(storm.mul(STORM_DARK)));
     return mix(sea, vec3(...LIGHTNING).mul(dot(sky.open, vec3(0.2126, 0.7152, 0.0722)).mul(EDGE_LIGHT)), edgeLine);
   })();
   // the charts' weights as red, green and blue, about as bright on the screen as they are after the frame's exposure
