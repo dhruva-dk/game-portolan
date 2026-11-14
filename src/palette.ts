@@ -52,7 +52,7 @@ export const CREAM = ink('#F3E6C8');
 export const IRON = tones('#4A4450', '#2A2233');
 
 // ---- the sea
-export const SEA_SHALLOW = ink('#38D9A8');
+export const SEA_SHALLOW = ink('#2CC2A2');
 export const SEA_MIDDLE = ink('#1C7AB6');
 export const SEA_DEEP = ink('#1F4AA3');
 export const FOAM = ink('#FFF9EC');

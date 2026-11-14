@@ -30,7 +30,7 @@ const F0 = 0.02;
 /** How much of what Fresnel gives the sea's mirror keeps: the sea stays its own colour out to the horizon. */
 const MIRROR = 0.2;
 /** The water's depth over the floor, metres, at which its tone is the middle one, and the deep one. */
-const MIDDLE_AT = 4.5, DEEP_AT = 11;
+const MIDDLE_AT = 6.5, DEEP_AT = 14;
 /** The deep water seen from overhead: LOOK_DOWN of the way to the middle tone, from where the eye's ray stands
  *  LOOK_FROM (cosine) off the level to straight down. */
 const LOOK_DOWN = 0.25, LOOK_FROM = 0.3;
