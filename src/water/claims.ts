@@ -12,12 +12,11 @@
 // reached each: the new holder's tint floods in behind a bright line running over the water (a loop closed, a home
 // laid), or the old drains away from the edge in, the water churned white behind it.
 //
-// What the water does with it (water.ts, optics.ts): a flat tint over all the holder's water, the water's own hue given
-// up for hers at its own brightness (so scarlet stays scarlet over turquoise shallows and deep blue alike, and the
-// waves, foam, glitter and depth still show through), hers stronger; and a hard, thin line along every border in the
-// holder's colour, drawn over the water like ink and glowing a little round it: so wide in metres near, never under a
-// pixel or so far off, its edges smoothed over exactly a pixel. Where two holders meet, each side of the line is its
-// own holder's. Hers is wider and brighter.
+// What the water does with it (water.ts, optics.ts): a faint, even tint over all the holder's water, the water's own
+// hue given up for hers at its own brightness (the waves, foam and depth still show through), hers a little stronger;
+// and a hard, thin, bright line along every border in the holder's colour, drawn over the water like ink: the same
+// width on the screen near and far, its edges smoothed over exactly a pixel. Where two holders meet, each side of the
+// line is its own holder's. Hers is wider.
 //
 // Cost: one read of two words (the cell and its moment) per pixel over settled water; nine of each within a few cells
 // of a border or a change, and the cells' state before worked out only where one changed in the last HOLD s. The
@@ -26,37 +25,27 @@
 import { StorageBufferAttribute, Vector4 } from 'three/webgpu';
 import {
   If, abs, atan, clamp, dot, exp, float, floor, int, length, max, min, mix, select, smoothstep, storage, uniform, uniformArray,
-  vec2, vec3, vec4,
+  vec2, vec4,
 } from 'three/tsl';
 import { N } from '../world/cells';
-import { R } from '../world/sphere';
 import type { Sea } from '../snapshot';
 import { type BoolNode, type FloatNode, type IntNode, type UintNode, type Vec2Node, type Vec3Node, type Vec4Node } from '../tsl';
 import { gnomonic } from '../view/cube';
 import { HOLD, SIDE, WORDS, createClaimed } from './claimed';
 
-/** Metres a cell is across, about (the cube's cells are of near equal angle: a quarter of a great circle in N). */
-const CELL = ((Math.PI / 2) * R) / N;
 /** The tint: how far the water's colour is given up for its holder's (0…1), the others' and hers; seen from afar (a
  *  cell under a pixel or two: the full map's), more, so the holders read from space. */
-const TINT = 0.1, OWN_TINT = 0.12, FAR_TINT = 0.9;
-/** Along the inside of every border a band of the holder's colour, as a chartmaker washes a coast: the tint raised to
- *  BAND at the line, falling off over BAND_M metres in (inside the few cells from a border, where it is known). */
-const BAND = 0.68, BAND_M = 4.2;
-/** Her own border's line and glow, this many times as bright as the others' (the emphasis each colour's w carries). */
-const OWN_LINE = 1.7;
-/** The line's half width, m (hers OWN_WIDE times it), and the least, in pixels, it is drawn at far off: there its
- *  light falls with the width it should have, to no less than FAINTEST of it. */
-const HALF = 0.14, OWN_WIDE = 1.3, THINNEST = 0.6, FAINTEST = 0.5;
-/** The glow round the line: its reach, m (and the least, pixels), and how far it tints the water there. */
-const GLOW_REACH = 1.1, GLOW_PX = 2, GLOW_TINT = 0.4;
-/** The line's light and its glow's, as a share of what the sun and sky give a white surface, once the colour is raised
- *  to a luminance of 1. */
-const INK = 0.85, GLOW = 0.07;
+const TINT = 0.1, OWN_TINT = 0.14, FAR_TINT = 0.9;
+/** The emphasis her own colour's w carries (the others' 1): her line is the wider. */
+const OWN_LINE = 2;
+/** The line's half width, pixels, the same near and far (hers OWN_WIDE times it); from afar (a cell under a pixel or
+ *  two) it is FAINTEST of itself, the tint telling the holders apart there. */
+const HALF = 1.1, OWN_WIDE = 1.5, FAINTEST = 0.5;
+/** The line's light, as a share of what the sun and sky give a white surface, once the colour's brightest channel is
+ *  raised to 1: the holder's colour at its brightest, flat, under what the bloom takes. */
+const INK = 1;
 /** The flood's front: its width, seconds of its sweep, and its light. */
 const CREST = 0.03, CREST_GAIN = 1.2;
-/** Luminance's weights (linear Rec. 709). */
-const LUMA = vec3(0.2126, 0.7152, 0.0722);
 
 /** What the sea is at a point: its tint (rgb the holder's colour, a how far the water gives up its own for it), the
  *  line over it (rgb its light per unit of a white surface's, premultiplied; a its cover), a drained change's churn
@@ -178,10 +167,10 @@ export function createClaims(ships: number) {
           const o = select(x.id.lessThan(y.id), float(1), float(-1));
           const v = select(lone, s.base.add(s.eA).mul(2).sub(1), x.e.sub(y.e).mul(o));
           const gv = select(lone, s.gBase.add(s.gA).mul(2), x.g.sub(y.g).mul(o));
-          return { v, px: max(toScreen(gv), 1e-6), cell: max(length(gv), 1e-6), lo: select(lone, s.a, min(x.id, y.id)), hi: select(lone, s.a, max(x.id, y.id)) };
+          return { v, px: max(toScreen(gv), 1e-6), lo: select(lone, s.a, min(x.id, y.id)), hi: select(lone, s.a, max(x.id, y.id)) };
         };
-        // its tint (premultiplied: a the cover, across the border over a pixel) and how strong; its line, drawn over
-        // the water (rgb its light, premultiplied, a its cover), and the glow round it (how far it tints the water there)
+        // its tint (premultiplied: a the cover, across the border over a pixel) and how strong; and its line, drawn
+        // over the water (rgb its light, premultiplied, a its cover)
         const shade = (f: ReturnType<typeof field>) => {
           const t = clamp(f.v.div(f.px).add(0.5), 0, 1);
           const lo = colourOf(f.lo), hi = colourOf(f.hi);
@@ -189,17 +178,13 @@ export function createClaims(ships: number) {
           const tint = vec4(mix(hi.xyz.mul(aHi), lo.xyz.mul(aLo), t), mix(aHi, aLo, t));
           // the line's colour each side its own holder's (on open sea's side, the holder's)
           const side = select(f.lo.greaterThan(0), mix(hi, lo, t), hi);
-          // distance to the border in pixels, and metres a pixel across it
-          const d = abs(f.v).div(f.px), mpp = f.px.div(f.cell).mul(CELL);
-          // the wash along the border, each side its holder's (less from afar, where the whole is tinted more)
-          const band = exp(d.mul(mpp).div(-BAND_M)).mul(float(1).sub(far));
-          const strength = mix(aHi.mul(max(tintOf(hi.w), band.mul(BAND))), aLo.mul(max(tintOf(lo.w), band.mul(BAND))), t);
-          const wide = float(HALF).mul(mix(float(1), float(OWN_WIDE), hers(max(hi.w, lo.w.mul(aLo))))).div(mpp);
-          const cover = clamp(max(wide, THINNEST).sub(d).add(0.5), 0, 1).mul(max(min(wide.div(THINNEST), 1), FAINTEST)).mul(aHi);
-          const reach = float(GLOW_REACH).div(mpp);
-          const glow = exp(d.div(max(reach, GLOW_PX)).pow(2).negate()).mul(min(reach.div(GLOW_PX), 1)).mul(aHi);
-          const light = side.xyz.div(max(dot(side.xyz, LUMA), 0.02)).mul(max(side.w, 1));
-          return { tint, strength, ink: vec4(light.mul(cover.mul(INK).add(glow.mul(GLOW))), cover), glow: glow.mul(GLOW_TINT), colour: side.xyz, light };
+          // distance to the border in pixels; the tint even over all her water, each side its holder's
+          const d = abs(f.v).div(f.px);
+          const strength = mix(aHi.mul(tintOf(hi.w)), aLo.mul(tintOf(lo.w)), t);
+          const wide = float(HALF).mul(mix(float(1), float(OWN_WIDE), hers(max(hi.w, lo.w.mul(aLo)))));
+          const cover = clamp(wide.sub(d).add(0.5), 0, 1).mul(mix(float(1), float(FAINTEST), far)).mul(aHi);
+          const light = side.xyz.div(max(max(side.x, side.y), max(side.z, 0.02))).mul(INK);
+          return { tint, strength, ink: vec4(light.mul(cover), cover), colour: side.xyz, light };
         };
         const fN = field(now), fB = field(before), sN = shade(fN), sB = shade(fB);
         // the front: seconds since it passed, and how sharply that changes across the pixel
@@ -208,7 +193,7 @@ export function createClaims(ships: number) {
         // water going back to open sea fades out ahead of the front drawing back
         const fade = mix(float(1), smoothstep(0, 0.6, since.negate()), float(1).sub(sN.tint.w));
         const tc = mix(sB.tint.mul(fade), sN.tint, tf);
-        const strength = mix(sB.strength.mul(fade), sN.strength, tf), glow = mix(sB.glow.mul(fade), sN.glow, tf);
+        const strength = mix(sB.strength.mul(fade), sN.strength, tf);
         const colour = select(tc.w.greaterThan(1e-3), tc.xyz.div(max(tc.w, 1e-3)), mix(sB.colour, sN.colour, tf));
         // the flood's front running over the water as a line; the drained water churned behind the front drawing back
         const changing = select(length(sN.tint.sub(sB.tint)).greaterThan(1e-3), float(1), float(0));
@@ -216,7 +201,7 @@ export function createClaims(ships: number) {
         drain.assign(float(1).sub(sN.tint.w).mul(sB.tint.w).mul(select(since.lessThan(0), float(1).sub(fade), exp(since.mul(-3)))));
         const lines = mix(sB.ink.mul(fade), sN.ink, tf);
         ink.assign(lines.add(vec4(sN.light.mul(crest.mul(INK)), crest).mul(float(1).sub(lines.w))));
-        dye.assign(vec4(colour, max(strength, glow)));
+        dye.assign(vec4(colour, strength));
       });
       return { dye, ink, drain, far };
     },

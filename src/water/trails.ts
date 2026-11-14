@@ -1,7 +1,7 @@
 // The open trails (snapshot.ts Sea trails): each a line in her colour along her trail near the eye, laid on the water as
-// the waves move it and run on from its last point to her stern: drawn as the border is (claims.ts), a hard line its
-// width in metres near and never under a pixel far, edges smoothed over a pixel, with a narrow glow, but broken into
-// dashes that march along it toward her, so it reads as a border still being drawn. A trail ended by a loop closed
+// the waves move it and run on from its last point to her stern: drawn as the border is (claims.ts), a hard bright
+// line the same width on the screen near and far, edges smoothed over a pixel, but broken into dashes that march
+// along it toward her, so it reads as a border still being drawn. A trail ended by a loop closed
 // joins up into a solid line and sinks into the new border as her colour floods in behind its front (ABSORB s); one
 // cut, or its ship sunk, breaks up, its dashes shrinking away (DISSOLVE s).
 //
@@ -15,8 +15,8 @@ import {
   Vector4,
 } from 'three/webgpu';
 import {
-  Fn, attribute, cameraPosition, clamp, dot, exp, float, fract, fwidth, int, max, min, mix, normalize, select, smoothstep, sqrt, uniform,
-  uniformArray, varying, vec3, vec4,
+  Fn, attribute, cameraPosition, clamp, dot, float, fract, fwidth, int, max, min, mix, normalize, select, smoothstep, sqrt, uniform,
+  uniformArray, varying, vec4,
 } from 'three/tsl';
 import type { Sky } from '../sky/sky';
 import type { Sea, ShipDraw } from '../snapshot';
@@ -31,12 +31,9 @@ const HALF = 0.6, LIFT = 0.05, BIAS = 0.3;
 /** Radians a pixel spans, about (the chase camera's field over the phone's 440 pixels), and the pixels the ribbon keeps
  *  each side of its middle far off, however foreshortened. */
 const PIXEL = 0.0026, KEEP_PX = 4;
-/** The line, as the border's (claims.ts): its half width, m (hers OWN_WIDE times it), the least it is drawn at, pixels,
- *  and the least share of its light kept when thinner; its glow's reach, m, and least, pixels; their light, as a share
- *  of what the sun and sky give a white surface once the colour is raised to a luminance of 1. */
-const LINE = 0.2, OWN_WIDE = 1.4, THINNEST = 0.6, FAINTEST = 0.45, GLOW_REACH = 1.2, GLOW_PX = 2, INK = 0.45, GLOW = 0.1;
-/** Her own line this many times as bright as the others'. */
-const OWN_LINE = 1.7;
+/** The line, as the border's (claims.ts): its half width, pixels (hers OWN_WIDE times it), and its light, as a share
+ *  of what the sun and sky give a white surface once the colour's brightest channel is raised to 1. */
+const LINE = 1.1, OWN_WIDE = 1.5, INK = 1;
 /** The dashes: a dash and its gap every DASH m, the dash DUTY of it, marching toward her at MARCH m/s. */
 const DASH = 5, DUTY = 0.65, MARCH = 3;
 /** Trails are drawn within this many metres of the point under the eye. */
@@ -80,23 +77,19 @@ export function createTrails(sky: Sky, surface: (up: Vec3Node, cell: FloatNode) 
   const dir = normalize(a4.xyz.add(x4.xyz.mul(a4.w.mul(width).div(R))));
   const water = surface(dir, float(1)).add(dir.mul(LIFT));
   m.positionNode = water.add(normalize(cameraPosition.sub(water)).mul(BIAS));
-  const sideV = varying(a4.w), wide = varying(width), arc = varying(r4.x), head = varying(r4.y), slot = varying(r4.z), modeV = varying(mode);
+  const sideV = varying(a4.w), arc = varying(r4.x), head = varying(r4.y), slot = varying(r4.z), modeV = varying(mode);
   const ageV = varying(age), place = varying(water), up = varying(dir);
   m.colorNode = Fn(() => {
     const t = time, s = arc;
     const team = colours.element(int(slot.add(0.5)));
     const mine = team.w;
-    const lum = max(dot(team.xyz, vec3(0.2126, 0.7152, 0.0722)), 0.02);
     // what the sun and sky give a white surface here: the line's light is set against it
     const l = sky.sun(place);
     const white = sky.sunIlluminance(place).mul(max(dot(l, up), 0)).div(Math.PI).add(sky.ambient(place, up));
-    const light = team.xyz.div(lum).mul(mix(float(1), float(OWN_LINE), mine)).mul(white);
-    // across: metres from the middle, and a pixel's worth of them
-    const off = sideV.abs().mul(wide), px = max(fwidth(sideV).mul(wide), 1e-4);
-    const half = float(LINE).mul(mix(float(1), float(OWN_WIDE), mine));
-    const cover = clamp(max(half, px.mul(THINNEST)).sub(off).div(px).add(0.5), 0, 1).mul(max(min(half.div(px.mul(THINNEST)), 1), FAINTEST));
-    const reach = float(GLOW_REACH).div(px);
-    const glow = exp(off.div(px).div(max(reach, GLOW_PX)).pow(2).negate()).mul(min(reach.div(GLOW_PX), 1));
+    const light = team.xyz.div(max(max(team.x, team.y), max(team.z, 0.02))).mul(INK).mul(white);
+    // across: pixels from the middle
+    const off = sideV.abs().div(max(fwidth(sideV), 1e-6));
+    const cover = clamp(float(LINE).mul(mix(float(1), float(OWN_WIDE), mine)).sub(off).add(0.5), 0, 1);
     // along: the dashes marching toward her, joined once the loop closes, shrinking away once cut; seen from so far
     // that a dash is under a pixel or so, their mean
     const absorbed = modeV.equal(ABSORBED), dissolving = modeV.equal(DISSOLVING);
@@ -109,7 +102,7 @@ export function createTrails(sky: Sky, surface: (up: Vec3Node, cell: FloatNode) 
     // the newest part rises out of her wake, the oldest leaves the border cleanly; sinking into the border, it fades
     const ends = smoothstep(0, 2, head.sub(s)).mul(smoothstep(0, 1, s)).mul(select(absorbed, float(1).sub(smoothstep(JOIN, 1, k)), float(1)));
     const a = cover.mul(dash).mul(ends);
-    return vec4(light.mul(cover.mul(INK).add(glow.mul(GLOW))).mul(dash).mul(ends), a);
+    return vec4(light.mul(a), a);
   })();
   m.blending = CustomBlending;
   m.blendEquation = AddEquation;

@@ -2,12 +2,11 @@
 // piece is the thing itself, hanging RIDE m over the waves where the snapshot has it, bobbing, slowly turning and
 // rocking: a gun the gun of its kind a ship carries (ship/gun.ts), its muzzle cocked up; a shield a crystal of ice, the big one
 // taller; a repair a cask, the full one bigger. Each is lit as everything is (sky/light.ts: two flat tones, and a hard
-// highlight on a gun's gilding and on ice) and glows round its
-// outline in its rarity's light (rarity.ts GLOW), the more where it turns from the eye, so the bloom catches it. A
-// piece put on the water during the match rises up out of it as it comes (born).
+// highlight on a gun's gilding and on ice), with a flat rim of its rarity's light (rarity.ts GLOW) where it turns
+// from the eye. A piece put on the water during the match rises up out of it as it comes (born).
 //
-// Over each stands its beam: a column of its rarity's light, (14 + 7 × rarity) m tall, fading up its height and
-// pulsing upward, with a ring of the same light on the water about it within HALO m; never narrower than
+// Over each stands its beam: a thin column of gold light, (14 + 7 × rarity) m tall, fading up its height and
+// pulsing upward, with a ring of its rarity's light on the water about it within HALO m; never narrower than
 // BEAM_PIXELS, and never fainter near than it should be (it fades in past the first tens of metres, so the piece
 // beside her is not lost in it). Drawn to BEAM m; the pieces to SHAPE m, never smaller on the screen than
 // SHAPE_PIXELS across, so they read to the haze's edge (about 250 m), where the haze takes them as everything else
@@ -24,7 +23,7 @@ import {
   MeshBasicNodeMaterial, OctahedronGeometry, OneFactor, Vector2, type PerspectiveCamera,
 } from 'three/webgpu';
 import { Fn, abs, attribute, cameraPosition, clamp, cos, cross, dot, float, max, mix, normalize, pow, select, sin, smoothstep, uniform, varying, vec3 } from 'three/tsl';
-import { GLINT, ICE, TAR, TIMBER } from '../palette';
+import { GILDING, GLINT, ICE, TAR, TIMBER } from '../palette';
 import type { Light } from '../sky/light';
 import { GLOW } from '../rarity';
 import { KINDS, type GunKind, type LootKind } from '../kinds';
@@ -43,9 +42,10 @@ const RIDE = 2.2, BOB = 0.25, BOB_RATE = 2, SPIN = 1.4, ROCK = 0.15, SINK = 2, R
 /** The fewest pixels across a piece and a beam are drawn; a piece's size, m, it grows from. */
 const SHAPE_PIXELS = 22, BEAM_PIXELS = 3, SHAPE_ACROSS = 3.5;
 /** The beam: its height for the commonest and more for each rarity up, m; its radius at the foot and the head. */
-const TALL = 14, TALLER = 7, FOOT = 0.8, HEAD = 0.5;
-/** How bright a piece's rim, a beam and its ring glow, of what the sun and the sky give a white surface. */
-const EMIT = 3.2, BEAM_EMIT = 1.6, HALO_EMIT = 1.2;
+const TALL = 14, TALLER = 7, FOOT = 0.3, HEAD = 0.18;
+/** How bright a piece's rim, a beam and its ring glow, of what the sun and the sky give a white surface; and how far
+ *  a face must turn from the eye (0 facing it … 1 edge on) to be in the rim. */
+const EMIT = 1.3, BEAM_EMIT = 3, HALO_EMIT = 1.2, RIM = 0.62;
 /** Each kind's size: the guns', the shields' and repairs' small and big. */
 const SIZE: Record<LootKind, number> = {
   cannon: 2.3, scatter: 2.1, repeater: 2.2, harpoon: 2.4, mortar: 2.1, smallShield: 1.7, bigShield: 2.25, repairKit: 1.6, fullRepair: 2.1,
@@ -143,8 +143,9 @@ export function createLoot(light: Light) {
     const p = varying(centre.add(turn(local).mul(grow))), n = varying(turn(normal)), l = varying(local), tint = varying(glow.rgb), base = varying(centre);
     m.colorNode = Fn(() => {
       const nn = normalize(n), eye = normalize(cameraPosition.sub(p));
-      const edge = pow(float(1).sub(abs(dot(nn, eye))), 2).mul(1.4).add(0.3);
-      return surface(p, nn, l).add(tint.mul(edge).mul(light.level(base).mul(EMIT)));
+      // a flat rim of its rarity's light where it turns from the eye
+      const edge = smoothstep(RIM - 0.03, RIM + 0.03, float(1).sub(abs(dot(nn, eye))));
+      return mix(surface(p, nn, l), tint.mul(light.level(base).mul(EMIT)), edge);
     })();
     const mesh = new Mesh(geometry, m);
     mesh.frustumCulled = false;
@@ -182,8 +183,10 @@ export function createLoot(light: Light) {
     const lit = light.level(base);
     const column = pow(float(1).sub(v), 2.2).mul(sin(v.mul(40).sub(now.mul(6))).mul(0.25).add(0.75)).mul(core.mul(core)).mul(near);
     const d = xz.length(), band = smoothstep(0.55, 0.8, d).mul(smoothstep(1, 0.82, d));
-    const brightness = select(isRing.greaterThan(0.5), band.mul(HALO_EMIT), column.mul(BEAM_EMIT).mul(r.mul(0.18).add(0.35)));
-    return tint.mul(lit).mul(brightness);
+    // the beam gold whatever the piece; its ring on the water in its rarity's light
+    const isBeam = isRing.lessThanEqual(0.5);
+    const brightness = select(isBeam, column.mul(BEAM_EMIT).mul(r.mul(0.18).add(0.35)), band.mul(HALO_EMIT));
+    return select(isBeam, vec3(...GILDING.lit), tint).mul(lit).mul(brightness);
   })();
   const beamMesh = new Mesh(beamGeometry, bm);
   beamMesh.frustumCulled = false;

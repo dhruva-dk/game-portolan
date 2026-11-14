@@ -1,5 +1,5 @@
-// The palette: every colour of the world, named once, in linear RGB. A sea chart's inks: vermilion, ochre, verdigris,
-// ultramarine, gold and parchment cream, against a violet storm. Each solid thing has two tones, the one it shows
+// The palette: every colour of the world, named once, in linear RGB. A sea chart's inks: vermilion, ochre, murrey,
+// moss, gold and parchment cream, on a sea of turquoise and ultramarine, against a violet storm. Each solid thing has two tones, the one it shows
 // where the sun reaches it and the one it shows where it does not (sky/light.ts toon): the shadow is a colour chosen
 // for it, warm and saturated, never the lit one greyed. Written as the display's sRGB, as a painter would pick them.
 
@@ -80,7 +80,8 @@ export const DYE_SHADE: Rgb = [0.56, 0.4, 0.42];
 export const DYE_GLOW = { deepen: 0.35, gain: 1.25 } as const;
 export const VERMILION = ink('#D2332A');
 export const OCHRE = ink('#E8A21C');
-export const VERDIGRIS = ink('#1F8F5A');
-export const ULTRAMARINE = ink('#2447B8');
+/** A yellow green, far from the sea's; and a hull's brown under cream canvas. */
+export const MOSS = ink('#7F9A2A');
+export const UMBER = ink('#7A4A2A');
 export const MURREY = ink('#8A2A6A');
 export const CHARCOAL = ink('#2E2A33');

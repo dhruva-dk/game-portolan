@@ -12,7 +12,7 @@ import {
   type PerspectiveCamera,
 } from 'three/webgpu';
 import {
-  Fn, If, abs, clamp, dot, exp, float, floor, fract, instanceIndex, int, ivec2, max, min, mix, normalize, select,
+  Fn, If, abs, clamp, dot, float, floor, fract, instanceIndex, int, ivec2, max, min, mix, normalize, select,
   smoothstep, texture, textureLoad, textureStore, uniform, uvec2, vec2, vec3, vec4,
 } from 'three/tsl';
 import type { Compute } from '../gpu';

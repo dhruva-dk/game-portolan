@@ -16,7 +16,7 @@
 //   deck(c, dir, m)    the same seen from high over its top (the full map's eye, in space)
 
 import { Vector3, type Storage3DTexture, type UniformNode } from 'three/webgpu';
-import { Fn, If, abs, clamp, dot, exp, float, interleavedGradientNoise, max, min, mix, mx_noise_float, normalize, screenCoordinate, select, smoothstep, sqrt, uniform, vec3 } from 'three/tsl';
+import { Fn, If, abs, clamp, dot, exp, float, interleavedGradientNoise, max, min, mx_noise_float, normalize, screenCoordinate, select, smoothstep, sqrt, uniform, vec3 } from 'three/tsl';
 import type { Cap } from '../sim/storm';
 import type { View } from '../view/view';
 import { R, type Vec3 } from '../world/sphere';

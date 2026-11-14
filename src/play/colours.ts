@@ -1,26 +1,27 @@
-// The ships' colours (snapshot.ts Look), by id: hers, then the others' from a small palette.
+// The ships' colours (snapshot.ts Look), by id: hers, then the others' from the palette's dyes (palette.ts).
 
+import { CHARCOAL, CREAM, MOSS, MURREY, OCHRE, UMBER, VERMILION } from '../palette.ts';
 import type { Look } from '../snapshot.ts';
 import type { Vec3 } from '../world/sphere.ts';
 
-/** The player's colours: a scarlet hull, and her canvas striped scarlet and unbleached cream, the cross counterchanged
- *  over the stripes: the boldest sails at sea. */
-export const LOOK: Look = { paint: [0.6, 0.015, 0.03], sail: [0.95, 0.88, 0.7], pattern: 'stripes' };
-/** The others' hulls (and the marks on their sails), and their sails, each dyed a strong, clear colour of its own
- *  (linear): woad, saffron, verdigris, madder, charcoal, murrey, ochre. */
-const PAINTS: Vec3[] = [[0.6, 0.5, 0.3], [0.03, 0.06, 0.2], [0.02, 0.02, 0.02], [0.55, 0.42, 0.18], [0.3, 0.03, 0.02], [0.04, 0.12, 0.06]];
-const SAILS: Vec3[] = [
-  [0.06, 0.2, 0.68], [0.85, 0.45, 0.03], [0.04, 0.45, 0.3], [0.62, 0.1, 0.035], [0.1, 0.09, 0.09], [0.4, 0.06, 0.32], [0.7, 0.42, 0.1],
+const dye = (c: readonly [number, number, number]): Vec3 => [c[0], c[1], c[2]];
+
+/** The player's colours: vermilion paint and vermilion canvas, plain, her cross on them in cream (her paint would not
+ *  show on her own canvas: ship/materials.ts UNSEEN). The only red sails at sea. */
+export const LOOK: Look = { paint: dye(VERMILION), sail: dye(VERMILION), pattern: 'plain' };
+/** The others': each one strong colour, her hull's paint and her canvas of one family (cream canvas over an umber
+ *  hull). None a red, and none a blue or green near the sea's. */
+const DYES: readonly { paint: Vec3; sail: Vec3 }[] = [
+  { paint: dye(OCHRE), sail: dye(OCHRE) },
+  { paint: dye(MURREY), sail: dye(MURREY) },
+  { paint: dye(UMBER), sail: dye(CREAM) },
+  { paint: dye(CHARCOAL), sail: dye(CHARCOAL) },
+  { paint: dye(MOSS), sail: dye(MOSS) },
 ];
 
 /** A ship's colours by her id (0: the player's). */
 export const lookOf = (id: number): Look =>
-  (id === 0 ? LOOK : { paint: PAINTS[(id - 1) % PAINTS.length], sail: SAILS[(id - 1) % SAILS.length], pattern: id % 4 === 3 ? 'band' : 'plain' });
+  (id === 0 ? LOOK : { ...DYES[(id - 1) % DYES.length], pattern: id % 4 === 3 ? 'band' : 'plain' });
 
-/** The others' colours on the sea, by their sails: each sail's dye, but madder's, a red too near her scarlet to tell
- *  apart on the water, which holds it in a lime instead. */
-const SEAS: Vec3[] = SAILS.map((c, i) => (i === 3 ? [0.3, 0.52, 0.03] : c));
-
-/** A ship's colour on the sea she holds (snapshot.ts Sea), by her id: hers the scarlet of her hull, the others' their
- *  sails' dye (SEAS). */
-export const seaColourOf = (id: number): Vec3 => (id === 0 ? LOOK.paint : SEAS[(id - 1) % SEAS.length]);
+/** A ship's colour on the sea she holds (snapshot.ts Sea), by her id: her canvas's dye. */
+export const seaColourOf = (id: number): Vec3 => lookOf(id).sail;
