@@ -14,7 +14,7 @@
 // "Up" and the sun's elevation are those at the point itself (view.up), so the sea is lit as the planet turns under the
 // sun; depths are heights below the sea's level there (view.altitude).
 
-import { dot, exp, float, fwidth, length, max, min, mix, normalize, pow, saturate, smoothstep, sqrt, vec3 } from 'three/tsl';
+import { abs, dFdy, dot, exp, float, fwidth, length, max, min, mix, normalize, pow, saturate, smoothstep, sqrt, vec3 } from 'three/tsl';
 import { FOAM, SEA_DEEP, SEA_MIDDLE, SEA_SHALLOW } from '../palette';
 import type { Sky } from '../sky/sky';
 import type { View } from '../view/view';
@@ -47,6 +47,11 @@ const AIRED = 0.6, AIR_VEIL = 2;
 const TROUGH = 0.88, TROUGH_AT = 0.47;
 /** And the crests' tops, paler, past CREST_AT: the light rows of art/target/idea.png's painted waves. */
 const CREST = 1.18, CREST_AT = 0.6;
+/** And along that edge a pale line RIM[0] pixels wide, RIM[1] brighter: the thin light rims art/target/idea.png draws
+ *  along each swell's top, so the sea reads as painted strokes, not blotches (review30); only where the edge lies
+ *  level on the screen, the crest below it (its share of the change across the pixel along the screen's height past
+ *  RIM[2] … RIM[3]), so they are open strokes, not rings round each patch. */
+const RIM = [1.5, 0.35, 0.4, 0.8] as const;
 /** What sets a point in the troughs' tone: the swell's crest (0…1), by this much of its range about its middle. The
  *  short waves' facets are left out of it: their marks fell in grain along the tone's edge, where art/target/idea.png
  *  draws its water's shapes with clean edges. */
@@ -185,7 +190,9 @@ function seaRadiance(
   const looked = depth.mul(mix(float(GRAZE[2]), float(1), smoothstep(GRAZE[0], GRAZE[1], dot(v, up))));
   const own = mix(mix(vec3(...SEA_SHALLOW), vec3(...SEA_MIDDLE), smoothstep(SHALLOW_TO, MIDDLE_AT, looked)), deep, smoothstep(MIDDLE_AT, DEEP_AT, looked));
   const lifted = mix(float(0.5), crest, SWELL);
-  const tone = mix(own, vec3(...SEA_SHALLOW), ships.air.mul(AIRED)).mul(mix(float(TROUGH), float(1), cut(lifted, TROUGH_AT))).mul(mix(float(1), float(CREST), cut(lifted, CREST_AT)));
+  const tone = mix(own, vec3(...SEA_SHALLOW), ships.air.mul(AIRED)).mul(mix(float(TROUGH), float(1), cut(lifted, TROUGH_AT))).mul(mix(float(1), float(CREST), cut(lifted, CREST_AT)))
+    .mul(saturate(float(1).sub(abs(lifted.sub(CREST_AT)).div(max(fwidth(lifted).mul(RIM[0]), 1e-6))))
+      .mul(smoothstep(RIM[2], RIM[3], dFdy(lifted).negate().div(max(fwidth(lifted), 1e-6)))).mul(RIM[1]).add(1));
   const body = tone.mul(irradiance).mul(ships.glow);
 
   // The sky, along the reflected ray, blurred to broad shapes. A ray reflected down (below the horizon here, by the up
