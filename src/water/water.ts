@@ -93,10 +93,15 @@ const STROKE = 32;
 /** Nor more than this many pixels: near a low eye 12 m spans hundreds of them, and the five offset copies of the crests
  *  printed as stair-stepped patches (review25). */
 const STROKE_PX = 60;
-/** The calm's water along the wall's foot gold (art/target/idea.png), out to GOLD metres from its edge, at most GOLD_SHARE
- *  of the way to the palette's gold as bright as a white surface in the open, rising as the square of nearness so it is
- *  a soft glow along the wall, as wide as the target's, rather than the hard pale seam review32 saw. */
-const GOLD = 40, GOLD_SHARE = 0.45;
+/** The calm's water along the wall's foot gold (art/target/idea.png), out to GOLD metres from its edge: the palette's
+ *  gold as bright as a white surface in the open, GOLD_SHARE of it at most, added to the water's light (mixed in, it
+ *  greyed the blue into the tan stripe review33 saw), rising as the square of nearness so it is a soft glow along the
+ *  wall rather than the hard pale seam review32 saw. */
+const GOLD = 40, GOLD_SHARE = 0.3;
+/** The gold is the calm's light off the water, so it shows at a glancing look (the far wall's foot on the horizon),
+ *  whole while the eye's look meets the sea at a sine under GLANCE[0], gone by GLANCE[1]: looking down onto a near wall's
+ *  foot it would mix with the blue into the tan stripe review33 saw. */
+const GLANCE = [0.1, 0.3] as const;
 /** How much of the sun a ship's shadow takes from the water: some, so she sits on the sea, but not a dark smear
  *  across it (art/target/idea.png's ships cast barely any). */
 const SHIP_SHADE = 0.5;
@@ -279,7 +284,8 @@ export function createWater(view: View, sky: Sky, ground: Ground, wind: Wind, sh
     const near = { lit: float(1).sub(wake.shade(positionWorld).mul(SHIP_SHADE)),glow: hull.glow, air: max(max(air, bubbles), held.drain.mul(0.6)) };
     const lit = optics.seaRadiance(positionWorld, n, g, v, crest, foam, behind, path, max(ground.height(rest).negate(), 0), near, held).mul(float(1).sub(storm.mul(STORM_DARK)));
     const open = dot(sky.open, vec3(0.2126, 0.7152, 0.0722));
-    const sea = mix(lit, vec3(...STORM_FOOT).mul(open), pow(smoothstep(-GOLD, 0, past), 2).mul(float(1).sub(smoothstep(0, 4, past))).mul(GOLD_SHARE));
+    const glancing = float(1).sub(smoothstep(GLANCE[0], GLANCE[1], dot(v, up)));
+    const sea = lit.add(vec3(...STORM_FOOT).mul(open).mul(pow(smoothstep(-GOLD, 0, past), 2).mul(float(1).sub(smoothstep(0, 4, past))).mul(glancing).mul(GOLD_SHARE)));
     return mix(sea, vec3(...STORM_FOOT).mul(dot(sky.open, vec3(0.2126, 0.7152, 0.0722)).mul(EDGE_LIGHT)), edgeLine);
   })();
   // the charts' weights as red, green and blue, about as bright on the screen as they are after the frame's exposure
