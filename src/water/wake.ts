@@ -47,7 +47,7 @@ import {
 } from 'three/webgpu';
 import {
   Fn, abs, attribute, cos, cross, dot, exp, float, length as lengthN, max, mx_noise_float, normalize, saturate, select, sin, smoothstep,
-  texture, uniform, vec2, vec3, vec4,
+  step, texture, uniform, vec2, vec3, vec4,
 } from 'three/tsl';
 import type { Environment } from '../environment';
 import type { Draw } from '../gpu';
@@ -97,6 +97,8 @@ const INSIDE = 0.8;
  *  stirs, AIR_OUT m out, pale with air at most LAPPING_AIR (optics.ts), so the white fades through turquoise to the
  *  sea rather than ending as a cut-out band. And the bow wave's height at full speed, metres. */
 const LAPPING = 0.85, LAPPING_OUT = 0.6, AIR_OUT = 3, LAPPING_AIR = 0.6, BOW = 0.45;
+/** The collar's reach swells and shrinks along her side by LAP_SCALLOP of itself, LAP_WAVE radians a metre. */
+const LAP_SCALLOP = 0.6, LAP_WAVE = 2.1;
 /** The patch round a hull: metres astern of her transom, ahead of her stem and out from her side. */
 const PATCH = { astern: 7, ahead: 4, out: 4.5 };
 /** The least the sun's rays may lie along the sea for her shadow: low suns stretch it no further. */
@@ -205,7 +207,9 @@ export function createWake(view: View, sky: Sky, capacity: number) {
     const m = attribute('mark', 'vec4'), across = m.x, ahead = m.y, pace = m.z;
     const d = outside(across, ahead);
     const fore = smoothstep(0.35, 0.95, ahead.sub(WATERLINE.stern).div(LENGTH));
-    const ring = exp(sq(max(d, 0).div(pace.mul(fore).mul(1.4).add(LAPPING_OUT))).negate()).mul(smoothstep(-0.8, 0, d));
+    // the collar at rest scalloped along her side (each side its own), so it laps rather than lying as one cut ellipse
+    const scallop = sin(ahead.mul(LAP_WAVE).add(step(0, across).mul(1.7))).mul(LAP_SCALLOP).add(1 - LAP_SCALLOP);
+    const ring = exp(sq(max(d, 0).div(pace.mul(fore).mul(1.4).add(scallop.mul(LAPPING_OUT)))).negate()).mul(smoothstep(-0.8, 0, d));
     // under her transom the water she drags along boils up
     const astern = float(WATERLINE.stern).sub(ahead);
     const boil = exp(sq(astern.sub(1.5).div(2.5)).negate()).mul(exp(sq(across.div(1.8)).negate())).mul(pace);
