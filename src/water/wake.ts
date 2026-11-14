@@ -87,8 +87,9 @@ const ARM_WIDTH = 0.9, WIDEN = 0.05;
  *  how white the streaks its crests leave behind it are, and how wide at most (metres): bold, so her wake reads as a
  *  short, wide white V hugging her stern (art/target/idea.png), not the two long thin arms review34 saw running to the
  *  horizon: the streaks only a faint tail (water.ts draws foam WAKE_BOLD fuller, and the lobes cut it at about 0.28).
- */
-const BOW_LIFE = 3, BOW_FOAM = 2.4, STREAK = 0.12, STREAK_WIDEST = 1.4;
+ *  Both fade by how far astern they lie, by e each BOW_REACH of her lengths, so whatever her speed her V is about
+ *  three lengths long (review35 saw ten); the air astern by e each AIR_REACH, so no pale trail outruns it. */
+const BOW_LIFE = 3, BOW_FOAM = 2.4, STREAK = 0.12, STREAK_WIDEST = 1.4, BOW_REACH = 1.5, AIR_REACH = 1.5;
 /** The bow wave's foam as art/target/idea.png draws a wake: a whole white rim along each arm's line, RIM_SHARE of
  *  BOW_FOAM wide, and inside it the crests curling in, feathered, CURL_REACH of it, with blue between: neither loose
  *  flecks (review27) nor one flat band, nor the chains of separate blobs review30 saw. */
@@ -189,7 +190,10 @@ export function createWake(view: View, sky: Sky, capacity: number) {
     const tongues = mix(float(TONGUE_LANE), float(TONGUE_CREST), smoothstep(-0.25, 0.25, tongue));
     // (what lingers kept under the foam's half, so it ends cleanly, not in the detached specks review34 saw)
     const foam = churned.mul(exp(age.div(-3)).mul(0.55).add(exp(age.div(-12)).mul(0.1).mul(churnLeft))).mul(tongues).toVar();
-    const air = churned.mul(exp(age.div(-10)));
+    // (metres astern of her transom)
+    const behind = max(run.sub(LENGTH), 0);
+    const air = churned.mul(exp(age.div(-10))).mul(exp(behind.div(-AIR_REACH * LENGTH)));
+    const astern = exp(behind.div(-BOW_REACH * LENGTH));
     // the arms: metres outside each's line, its half-width, and what is left of it
     const off = abs(across).sub(v.mul(age).mul(KELVIN));
     const width = v.mul(age).mul(WIDEN).add(ARM_WIDTH);
@@ -207,10 +211,10 @@ export function createWake(view: View, sky: Sky, capacity: number) {
     // a whole white rim along the arm's line, and inside it the crests curling in, feathered, blue between them
     const rim = exp(sq(off.div(BOW_FOAM * RIM_SHARE)).negate());
     const curls = exp(sq(off.div(BOW_FOAM * CURL_REACH)).negate()).mul(step(off, 0)).mul(feathers);
-    foam.addAssign(max(rim, curls.mul(CURL)).mul(pace).mul(exp(age.div(-BOW_LIFE)).mul(0.9)));
+    foam.addAssign(max(rim, curls.mul(CURL)).mul(pace).mul(exp(age.div(-BOW_LIFE)).mul(0.9)).mul(astern));
     const streak = min(width.mul(0.5).add(0.6), STREAK_WIDEST), gone = age.div(calm.mul(ARM_LIFE)).add(rough.mul(0.2));
     const left = smoothstep(gone.sub(0.55), gone.sub(0.15), patchy(4, 2.5).mul(0.7).add(patchy(1.5, 3.5).mul(0.3)));
-    foam.addAssign(exp(sq(off.div(streak)).negate()).mul(float(1.2).div(streak).sqrt()).mul(life).mul(feathers).mul(left).mul(STREAK));
+    foam.addAssign(exp(sq(off.div(streak)).negate()).mul(float(1.2).div(streak).sqrt()).mul(life).mul(feathers).mul(left).mul(STREAK).mul(astern));
     return vec4(foam, height, air, 0);
   })()));
 
