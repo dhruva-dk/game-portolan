@@ -42,6 +42,9 @@ export const BASE = 1.2, TOP = 2.6;
 const SHAPE_SCALE = 1.0, DETAIL_SCALE = 0.4;
 /** Extinction of the densest cloud, per km (cumulus: 50–100). */
 export const SIGMA = 60;
+/** The air between the eye and a cloud is taken as this share of its length: a painter's horizon cumulus stays crisp
+ *  to its base (art/target/idea.png) where the whole air's would grey its lower half (review26). */
+const CLOUD_AIR = 0.5;
 /** The shaped noise's density past which the cloud is at its densest. */
 const FULL = 0.35;
 /**
@@ -246,7 +249,7 @@ export function createCloudField(tables: Tables, noise: CloudNoise) {
     });
     distance.assign(select(weightSum.greaterThan(1e-4), distSum.div(max(weightSum, 1e-4)), float(MAX_DISTANCE)));
     // the air between the eye and the cloud: what the cloud hides of the far sky is replaced by the air's own glow
-    const Tair = airTransmittance(d, distance);
+    const Tair = airTransmittance(d, distance.mul(CLOUD_AIR));
     const glow = skyRadiance(normalize(vec3(d.x, max(d.y, 0), d.z)), sunDir);
     const seen = L.mul(Tair).add(glow.mul(float(1).sub(T)).mul(float(1).sub(Tair)));
     // at the march's reach what little the haze leaves fades out
