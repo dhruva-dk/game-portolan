@@ -46,6 +46,9 @@ const FINE = 0.29, SLOPE = 5;
 /** The billows folded into heaps: their fold scaled by PUFF and lowered by PUFF_MID, back to about −1…1; the crease
  *  between heaps rounded over CREASE of the fold. */
 const PUFF = 1.5, PUFF_MID = 0.75, CREASE = 0.25;
+/** The round heads over the heaps (the coarse Worley's cells, domed): how far they reach, in the billows' units, and
+ *  their mean (so the wall stands where it did). */
+const HEADS = 0.8, HEAD_MID = 0.5;
 /** The rain's pattern: across (its shafts a quarter of it), along its fall, how far it leans a metre down, how fast it
  * falls (m/s); and how far in from the edge it thickens. */
 const RAIN_TILE = 90, RAIN_LONG = 520, RAIN_LEAN = 0.25, FALL = 11, RAIN_RAMP = 10;
@@ -66,6 +69,8 @@ const SUNLIT = 0.55, LINING = 0.15;
 /** Two tones, as the world's solids (sky/light.ts): the cloud is in its crown's light or its base's, the edge between
  *  where its height and its facing the sun together cross TONE_AT, over TONE_EDGE, so it follows the billows. */
 const TONE_AT = 0.4, TONE_EDGE = 0.04;
+/** How much a billow's facing the sky lifts it toward the crown's tone, so each head is lit over and dark under. */
+const SKYWARD = 0.5;
 /** The warm rim along the face's foot: the sunlit calm's gold light (palette STORM_FOOT) thrown up onto whatever of
  *  the face looks out over it, as a share of the sun's on a white surface, fading out RIM_UP metres over the base. */
 const RIM = 0.5, RIM_UP = 45;
@@ -104,7 +109,10 @@ export function createStormField(cap: Cap, shape: Storage3DTexture) {
     // folded about its middle, the fold rounded (so the march, which steps by the field, doesn't terrace it): rounded
     // heads with creases between, as cumulus heaps
     const x = n.r.mul(0.55).add(n.b.mul(0.15)).add(f.r.mul(0.3)).sub(0.4).mul(2.8);
-    return sqrt(x.mul(x).add(CREASE * CREASE)).mul(PUFF).sub(PUFF_MID);
+    // and over them the coarse Worley's cells as round heads (a dome over each: the cell's inverted distance,
+    // rounded), so the wall stands as heaped cumulus rather than a sheet
+    const g = clamp(n.g, 0, 1), dome = sqrt(g.mul(float(2).sub(g)));
+    return sqrt(x.mul(x).add(CREASE * CREASE)).mul(PUFF).sub(PUFF_MID).add(dome.sub(HEAD_MID).mul(HEADS));
   };
 
   /** The cloud at q (up: its unit vector, h: its height, e: past the edge): how far in from its surface q is
@@ -140,7 +148,7 @@ export function createStormField(cap: Cap, shape: Storage3DTexture) {
     const normal = normalize(flat.sub(slope.mul(amplitude)));
     const high = smoothstep(BASE, CROWN, h);
     const facing = clamp(dot(normal, lit.toward), 0, 1);
-    const tone = smoothstep(TONE_AT - TONE_EDGE, TONE_AT + TONE_EDGE, high.mul(0.35).add(facing.mul(0.55)).add(c.lift.mul(0.3)));
+    const tone = smoothstep(TONE_AT - TONE_EDGE, TONE_AT + TONE_EDGE, high.mul(0.35).add(facing.mul(0.55)).add(c.lift.mul(0.3)).add(dot(normal, up).mul(SKYWARD)));
     // the sky's light from above (the sea's, under the base), less in the hollows between the billows
     const sky = max(dot(normal, up).mul(0.45).add(0.6), 0.3).mul(clamp(c.lift.mul(0.3).add(0.9), 0.7, 1.2));
     // and the light of the open, sunlit calm, coming in level under the shelf
