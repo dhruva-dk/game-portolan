@@ -23,19 +23,22 @@ import type { ShipPose } from '../world/pose.ts';
 import { R, add, cross, dot, length, normalize, place, scale, transport, type Vec3 } from '../world/sphere.ts';
 import { lookAt, rotate, slerp, type Turn } from '../world/turn.ts';
 
-/** The boom: metres back along the look from its focus, which stands FOCUS metres over the sea and SHOULDER metres to
- *  starboard of her as the look goes. Long and high (the eye some 49 m up and 58 m astern of her; at 60 m she stood too tall to keep her trucks under the reticle and
- *  her stern above the foot), so she is seen
- *  whole, low in the frame, left of the middle with her trucks under the reticle, and the look runs over her rig to
- *  what she fights and on to the round of the horizon (at 70 m, the eye 51 m up and 64 m astern, she read small and the sea
- *  flat; at 40 m and 12 m up, her rig stood over the middle of the screen and her stern was cut by its foot). */
-export const BOOM = 64;
+/** The boom: metres back along the look from its focus, which stands FOCUS metres over the sea, SHOULDER metres to
+ *  starboard of her and LEAD metres ahead of her as the look goes. Long and high (the eye some 77 m up and 40 m astern
+ *  of her), so she is seen whole, low in the frame, left of the middle with her trucks under the reticle, and the look
+ *  runs over her rig down onto the sea she fights on, the round of the horizon high in the frame (at 64 m her stern
+ *  was cut by the screen's foot; at 40 m and 12 m up, with a flatter look, her rig stood over the middle of the screen). */
+export const BOOM = 80;
 const FOCUS = 22, SHOULDER = 14;
-/** The look's tilt below the level, radians: where it starts, and its highest and steepest. It starts on the sea about
- *  55 m ahead (the horizon, some 250 m off from the eye, an eighth of the screen above the middle), so a gun laid as it
- *  starts, a lobbed one above all, comes down where she sees it: at 0.17, an older start, the look passed over the
- *  horizon into the sky and a gun's fall was laid at its range, out of sight over the sea's curve. */
-export const PITCH = 0.43;
+/** The focus stands this many metres ahead of her along the look, so the look, steep as it is, meets the sea beyond
+ *  a lobbed gun's least reach and she stands low in the frame. */
+const LEAD = 12;
+/** The look's tilt below the level, radians: where it starts, and its highest and steepest. It starts steeply down
+ *  onto the sea some 41 m ahead of her, past a lobbed gun's least reach, so the sea about her fills the frame and the
+ *  horizon stands in its top quarter, as in the target painting (art/target/idea.png); a gun laid as it starts comes
+ *  down where she sees it. At 0.43 the horizon stood near the middle; at 0.17, older still, the look passed over the horizon into
+ *  the sky and a gun's fall was laid at its range, out of sight over the sea's curve. */
+export const PITCH = 0.72;
 const HIGHEST = -0.12, STEEPEST = 1.0;
 /** Radians a pixel of the look's drag, across and down. */
 const TURN = 0.0056, TILT = 0.0046;
@@ -90,7 +93,7 @@ export function createChase(ground: (p: Vec3) => number, sea: (p: Vec3, time: nu
   function put(time: number, dt: number, rate: (drawing: boolean) => number, shot: Shot) {
     const ahead = view(), right = cross(ahead, at), tilt = Math.min(STEEPEST, pitch + (shot.tilt ?? 0));
     const dir = normalize(add(scale(ahead, Math.cos(tilt)), at, -Math.sin(tilt)));
-    const deck = place(at, FOCUS), boom = shot.boom ?? BOOM;
+    const deck = add(place(at, FOCUS), ahead, LEAD), boom = shot.boom ?? BOOM;
     /** The eye with the boom and shoulder `k` of the way out. */
     const eyeAt = (k: number) => add(add(deck, right, SHOULDER * k), dir, -boom * k);
     const clear = (k: number) => {

@@ -60,7 +60,7 @@ test('the middle of the screen is the line of sight, and it passes clear of her 
     // her own body (hull and rig) is never on the line
     assert.ok(offSight(s, shipAt(up, heading))!.angle > 0, `her heading ${off}° off the look: the line on her`);
   }
-  assert.ok(PITCH > 0.1 && PITCH < 0.5);
+  assert.ok(PITCH > 0.1 && PITCH < 0.8);
 });
 
 test('as it starts, she is seen whole, low and left in the frame, her trucks under the reticle and her stern above the foot', () => {
@@ -74,7 +74,7 @@ test('as it starts, she is seen whole, low and left in the frame, her trucks und
   };
   const truck = seen(0, 21.5), stern = seen(-9.5, 4), bow = seen(12, 4);
   assert.ok(truck.y > 220, `her mainmast's truck at ${truck.y.toFixed(0)}, over the reticle`);
-  assert.ok(stern.y < 380,`her stern at ${stern.y.toFixed(0)}, cut by the foot`);
+  assert.ok(stern.y < 400, `her stern at ${stern.y.toFixed(0)}, cut by the foot`);
   assert.ok(stern.y - truck.y < 0.4 * 440, `she stands ${(stern.y - truck.y).toFixed(0)} px tall`);
   for (const q of [truck, stern, bow]) assert.ok(q.x > 100 && q.x < 478 - 40, `${q.x.toFixed(0)}: left of the reticle, on the screen`);
 });
