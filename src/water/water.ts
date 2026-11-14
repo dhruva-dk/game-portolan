@@ -75,11 +75,14 @@ const STORM_FOAM = 0.45, STORM_DARK = 0.3;
  * line, EDGE_LINE m to each side (or most of a pixel), the calm's gold at its foot (STORM_FOOT) at EDGE_LIGHT of what a white surface
  * in the open shows (over 1, so the bloom takes it).
  */
-const FOOT = [6, 26] as const, EDGE_LINE = 0.3, EDGE_LIGHT = 1.6;
+const FOOT = [6, 26] as const, EDGE_LINE = 0.3, EDGE_LIGHT = 0.9;
 /** The calm's water along the wall's foot gold (art/target/idea.png), out to GOLD metres from its edge, at most GOLD_SHARE
  *  of the way to the palette's gold as bright as a white surface in the open, rising as the square of nearness so it is
  *  a soft glow along the wall rather than a hard pale seam. */
 const GOLD = 30, GOLD_SHARE = 0.8;
+/** How much of the sun a ship's shadow takes from the water: some, so she sits on the sea, but not a dark smear
+ *  across it (art/target/idea.png's ships cast barely any). */
+const SHIP_SHADE = 0.5;
 /** A wake's foam (wake.ts) drawn this much fuller than it is kept: bold lobes of white along her sides and astern. */
 const WAKE_BOLD = 3;
 /**
@@ -241,7 +244,7 @@ export function createWater(view: View, sky: Sky, ground: Ground, wind: Wind, sh
     const behind = viewportSharedTexture(uv).rgb;
 
     // the ships' shadows, the hulls' shade and the wakes' air
-    const near = { lit: float(1).sub(wake.shade(positionWorld)), glow: hull.glow, air: max(max(air, bubbles), held.drain.mul(0.6)) };
+    const near = { lit: float(1).sub(wake.shade(positionWorld).mul(SHIP_SHADE)),glow: hull.glow, air: max(max(air, bubbles), held.drain.mul(0.6)) };
     const lit = optics.seaRadiance(positionWorld, n, g, v, crest, foam, behind, path, max(ground.height(rest).negate(), 0), near, held).mul(float(1).sub(storm.mul(STORM_DARK)));
     const open = dot(sky.open, vec3(0.2126, 0.7152, 0.0722));
     const sea = mix(lit, vec3(...STORM_FOOT).mul(open), pow(smoothstep(-GOLD, 0, past), 2).mul(float(1).sub(smoothstep(0, 4, past))).mul(GOLD_SHARE));

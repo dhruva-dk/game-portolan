@@ -44,7 +44,7 @@ const TROUGH = 0.72, TROUGH_AT = 0.4;
 /** What sets a point in the troughs' tone: the swell's crest (0…1) by SWELL of its range about its middle, and the
  *  short waves' facets by FACETS: one turned from the sun (n against the long waves' g) is in it, so the tone falls
  *  in small crisp marks across the sea, as a painter's ripples, rather than in the swell's broad patches. */
-const SWELL = 0.6, FACETS = 1;
+const SWELL = 0.45, FACETS = 1;
 /** The sun's glints: the cosine between the surface's normal and the half vector past which it mirrors the sun to the
  *  eye, the width of that edge, and the glint's light of what a white surface gets from the sun square on. */
 const GLINT = 0.9998, GLINT_EDGE = 0.0001, GLINT_LIGHT = 0.4;
