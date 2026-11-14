@@ -1,6 +1,6 @@
 # Portolan
 
-Portolan is a fun naval battle royale game for mobile devices.
+Portolan is a fun naval battle royale and management game for mobile devices.
 
 ## Phone
 
