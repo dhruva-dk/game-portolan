@@ -79,7 +79,7 @@ export const DIFFUSION = 0.75 * (1 - 0.85);
 /** The cloud's edge: where its density (of the full) crosses EDGE_AT, over EDGE_WIDTH either way. */
 const EDGE_AT = 0.2, EDGE_WIDTH = 0.07;
 /** The one tap toward the sun, km; the cloud there (of the full) past which a point is in shadow, and the edge's width. */
-const LIGHT_TAP = 0.15, SHADE_AT = 0.35, SHADE_EDGE = 0.04;
+const LIGHT_TAP = 0.15, SHADE_AT = 0.35, SHADE_EDGE = 0.08;
 /** How much of the sun's own colour the cloud's lit tone keeps (the rest is the palette's cream at the sun's
  *  brightness); and how bright its shadow tone is, of what a white surface in the open gets. */
 const WARMED = 0.5, UNDERLIT = 0.7;
