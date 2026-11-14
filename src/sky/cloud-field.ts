@@ -84,8 +84,9 @@ export const DIFFUSION = 0.75 * (1 - 0.85);
 const EDGE_AT = 0.2, EDGE_WIDTH = 0.12;
 /** The one tap toward the sun, km; the cloud there (of the full) past which a point is in shadow, and the edge's width:
  *  high enough that most of a cumulus is in the sun, cream over small cool bases as art/target/idea.png's, not the
- *  grey-mauve with thin cream rims review34 saw. */
-const LIGHT_TAP = 0.1, SHADE_AT = 0.8, SHADE_EDGE = 0.1;
+ *  grey-mauve with thin cream rims review34 saw; a short tap, so a cloud's sides are lit too and cream is most of it
+ *  (review35 saw them mauve). */
+const LIGHT_TAP = 0.06, SHADE_AT = 0.95, SHADE_EDGE = 0.1;
 /** How much of the sun's own colour the cloud's lit tone keeps (the rest is the palette's cream at the sun's
  *  brightness); and how bright its shadow tone is, of what a white surface in the open gets. */
 const WARMED = 0.8, UNDERLIT = 0.7;
