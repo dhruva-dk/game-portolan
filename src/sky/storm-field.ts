@@ -68,13 +68,14 @@ const STEP = 5, GROW = 0.035, STEPS = 28;
  * more (about a pixel). */
 const SOFT = 1, SOFT_FAR = 0.004;
 /** The cloud's light, as shares of the storm's air light: at its base and its crown (the crown with the sun's, below,
- *  art/target/idea.png's #8564C1); the rain's. */
-const DARK = 0.45, BRIGHT = 2, RAIN_LIGHT = 0.95;
+ *  art/target/idea.png's #8564C1, not the pale #B886FF review34 saw: over the grade's knee its hue held but its light
+ *  pegged at white, so it showed no relief); the rain's. */
+const DARK = 0.45, BRIGHT = 0.6, RAIN_LIGHT = 0.8;
 /** The light from the calm on whatever of the cloud faces it, as a share of the storm's air light. */
 const CALM = 0.3;
 /** The sun's light on the cloud, as a share of a white surface's, and on its thin edges seen against the sun (the
  * silver lining). */
-const SUNLIT = 0.4, LINING = 0.15;
+const SUNLIT = 0.1, LINING = 0.15;
 /** Two tones, as the world's solids (sky/light.ts): the cloud is in its crown's light or its base's, the edge between
  *  where its height and its facing the sun together cross TONE_AT, over TONE_EDGE, so it follows the billows. */
 const TONE_AT = 0.4, TONE_EDGE = 0.04;
@@ -232,8 +233,9 @@ export function createStormField(cap: Cap, shape: Storage3DTexture) {
           // in the rain, the step; short of the cloud's billows (and clear of the rain): toward their surface
           step.assign(select(rho.greaterThan(1e-6), inStep, max(min(inside.negate().mul(0.6), rainOff.add(inStep)), least)));
           If(rho.greaterThan(1e-6), () => {
-            // a heavy shaft darker than the thinner rain round it, its streaks paler; darker up toward the base
-            const S = lit.air.mul(RAIN_LIGHT).mul(mix(1.25, 0.55, shaft)).mul(streak.mul(0.35).add(0.85)).mul(mix(1.15, 0.6, smoothstep(0, BASE, h))).add(lit.glow(q));
+            // a heavy shaft a little darker than the thinner rain round it, its streaks a little paler (bolder, they hung
+            // as the vertical streaks over the wall review34 saw); darker up toward the base
+            const S = lit.air.mul(RAIN_LIGHT).mul(mix(1.05, 0.85, shaft)).mul(streak.mul(0.1).add(0.95)).mul(mix(1.15, 0.6, smoothstep(0, BASE, h))).add(lit.glow(q));
             const stepT = exp(rho.mul(step).negate());
             L.addAssign(S.mul(T.mul(float(1).sub(stepT))));
             T.mulAssign(stepT);
