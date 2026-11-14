@@ -35,7 +35,7 @@ export function refuse(command, cwd = '') {
     }
     if (/^git\s.*\bpush\b.*(--force|-f\b|--force-with-lease)/.test(first)) return 'No force pushes.';
     if (/^git\s.*\bstash\s*(pop|drop|clear)?\s*$/.test(first)) return 'No bare git stash / pop: the stash is shared across worktrees. Use a WIP commit.';
-    if (/^(sudo|caffeinate|open)\b/.test(first)) return `${word} is not allowed here (no visible browsers, no caffeinate, no sudo).`;
+    if (/^(sudo|caffeinate)\b/.test(first)) return `${word} is not allowed here (no caffeinate, no sudo).`;
   }
   return null;
 }
