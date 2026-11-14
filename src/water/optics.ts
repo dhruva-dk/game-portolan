@@ -30,16 +30,18 @@ const F0 = 0.02;
 /** How much of what Fresnel gives the sea's mirror keeps: the sea stays its own colour out to the horizon. */
 const MIRROR = 0.1;
 /** Water turquoise to SHALLOW_TO metres deep, the middle blue by MIDDLE_AT, the deep by DEEP_AT: so the shallow ring
- *  hugs the shore, and open-sea banks a few metres further down are blue, not turquoise blotches (art/target/idea.png). */
-const SHALLOW_TO = 2.5, MIDDLE_AT = 6, DEEP_AT = 11;
+ *  hugs the shore, and open-sea banks a few metres further down (SEA.bank, 3 m and more) are deep blue, as
+ *  art/target/idea.png's open sea (#164B7E), not the cyan review35 saw. */
+const SHALLOW_TO = 2, MIDDLE_AT = 3.5, DEEP_AT = 6;
 /** The deep water seen from overhead: LOOK_DOWN of the way to the middle tone, from where the eye's ray stands
  *  LOOK_FROM (cosine) off the level to straight down. */
 const LOOK_DOWN = 0.25, LOOK_FROM = 0.3;
 /** The depth the tones read is the floor's, times GRAZE[2] where the eye looks along the sea (cosine under GRAZE[0])
  *  easing to itself by GRAZE[1]: so the far banks are navy, as art/target/idea.png's far sea, not teal (review29). */
 const GRAZE = [0.08, 0.4, 3] as const;
-/** How fast the water's own tone veils what lies under it, per metre of the eye's path through it. */
-const CLOUDY = 0.12;
+/** How fast the water's own tone veils what lies under it, per metre of the eye's path through it: a bank's sand 8 m
+ *  down is a sixth of what the eye sees, not the third that printed cyan. */
+const CLOUDY = 0.22;
 /** How far a wake's air at its thickest takes the water toward the shallows' tone; and how much it veils what lies
  *  under it, as an optical depth. */
 const AIRED = 0.3, AIR_VEIL = 2;
