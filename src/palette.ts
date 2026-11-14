@@ -58,7 +58,7 @@ export const SEA_DEEP = ink('#244C92');
 export const FOAM = ink('#FFF9EC');
 
 // ---- the sky
-export const STORM = tones('#9483D4', '#3A2E7C');
+export const STORM = tones('#9483D4', '#574790');
 /** The gold of the sunlit calm's light along the storm wall's foot. */
 export const STORM_FOOT = ink('#F5C67A');
 export const LIGHTNING = ink('#D9C2FF');

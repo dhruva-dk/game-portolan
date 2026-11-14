@@ -67,7 +67,7 @@ const PEAK_SHARE = 0.05, PEAK_G = 0.95;
  * own air: SUN_IN of the sun's light (scattered every way, over 4π) and AIR_IN of the sky's glow, tinted the storm's
  * shadow violet (palette.ts).
  */
-const STORM_SUN = 0.08, STORM_SKY = 0.35, SUN_IN = 0.6, AIR_IN = 0.3, STORM_TINT = tint(STORM.shadow, 0.45);
+const STORM_SUN = 0.08, STORM_SKY = 0.35, SUN_IN = 0.6, AIR_IN = 0.3, STORM_TINT = tint(STORM.shadow, 0.8);
 /** The sun on the storm's cloud: its luminance, in the storm's lit violet, so the crown is lit whatever the hour,
  *  never red. */
 const STORM_SUNLIT = tint(STORM.lit, 0.85);
