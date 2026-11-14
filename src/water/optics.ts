@@ -42,11 +42,11 @@ const CLOUDY = 0.2;
  *  under it, as an optical depth. */
 const AIRED = 0.6, AIR_VEIL = 2;
 /** The troughs' tone, of the water's, and where between trough and crest (0…1) its edge lies. */
-const TROUGH = 0.72, TROUGH_AT = 0.4;
-/** What sets a point in the troughs' tone: the swell's crest (0…1) by SWELL of its range about its middle, and the
- *  short waves' facets by FACETS: one turned from the sun (n against the long waves' g) is in it, so the tone falls
- *  in small crisp marks across the sea, as a painter's ripples, rather than in the swell's broad patches. */
-const SWELL = 0.45, FACETS = 1;
+const TROUGH = 0.8, TROUGH_AT = 0.4;
+/** What sets a point in the troughs' tone: the swell's crest (0…1), by this much of its range about its middle. The
+ *  short waves' facets are left out of it: their marks fell in grain along the tone's edge, where art/target/idea.png
+ *  draws its water's shapes with clean edges. */
+const SWELL = 0.45;
 /** The sun's glints: the cosine between the surface's normal and the half vector past which it mirrors the sun to the
  *  eye, the width of that edge, and the glint's light of what a white surface gets from the sun square on. */
 const GLINT = 0.9998, GLINT_EDGE = 0.0001, GLINT_LIGHT = 0.4;
@@ -177,9 +177,7 @@ function seaRadiance(
   const down = smoothstep(LOOK_FROM, 1, dot(v, up)).mul(LOOK_DOWN);
   const deep = mix(vec3(...SEA_DEEP), vec3(...SEA_MIDDLE), down);
   const own = mix(mix(vec3(...SEA_SHALLOW), vec3(...SEA_MIDDLE), smoothstep(SHALLOW_TO, MIDDLE_AT, depth)), deep, smoothstep(MIDDLE_AT, DEEP_AT, depth));
-  // the facets' marks only where a pixel holds less than one of them: finer, they would fall to grain, so fade out
-  const facet = dot(n.sub(g), l).mul(FACETS);
-  const lifted = mix(float(0.5), crest, SWELL).add(facet.mul(saturate(float(1).sub(fwidth(facet).mul(2)))));
+  const lifted = mix(float(0.5), crest, SWELL);
   const tone = mix(own, vec3(...SEA_SHALLOW), ships.air.mul(AIRED)).mul(mix(float(TROUGH), float(1), cut(lifted, TROUGH_AT)));
   const body = tone.mul(irradiance).mul(ships.glow);
 
