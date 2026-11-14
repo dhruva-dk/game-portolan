@@ -75,7 +75,7 @@ const STORM_FOAM = 0.45, STORM_DARK = 0.3;
  * line, EDGE_LINE m to each side (or most of a pixel), the calm's gold at its foot (STORM_FOOT) at EDGE_LIGHT of what a white surface
  * in the open shows (over 1, so the bloom takes it).
  */
-const FOOT = [6, 26] as const, EDGE_LINE = 0.3, EDGE_LIGHT = 0.9;
+const FOOT = [6, 26] as const, EDGE_LINE = 0.3, EDGE_LIGHT = 0.9, EDGE_FAR = [0.4, 2] as const;
 /** The calm's water along the wall's foot gold (art/target/idea.png), out to GOLD metres from its edge, at most GOLD_SHARE
  *  of the way to the palette's gold as bright as a white surface in the open, rising as the square of nearness so it is
  *  a soft glow along the wall rather than a hard pale seam. */
@@ -211,8 +211,10 @@ export function createWater(view: View, sky: Sky, ground: Ground, wind: Wind, sh
     // the storm's foot churned white along its edge, over the crests
     const foot = smoothstep(-2, 2, past).mul(float(1).sub(smoothstep(FOOT[0], FOOT[1], past)));
     foam.assign(max(mix(foam, max(foam, smoothstep(0.55, 1, phase)), storm.mul(STORM_FOAM)), foot.mul(smoothstep(0.2, 0.8, phase)).mul(0.8)));
-    // and its line on the water: so wide in metres near, never under a pixel and a half far off
-    const edgeLine = float(1).sub(smoothstep(0, max(footprint, 0.05), abs(past).sub(max(float(EDGE_LINE), footprint.mul(0.75)))));
+    // and its line on the water: so wide in metres near, never under a pixel and a half; fading out where a pixel
+    // spans metres (EDGE_FAR), so along the horizon the gold band's glow is left, not a hard seam
+    const edgeLine = float(1).sub(smoothstep(0, max(footprint, 0.05), abs(past).sub(max(float(EDGE_LINE), footprint.mul(0.75)))))
+      .mul(float(1).sub(smoothstep(EDGE_FAR[0], EDGE_FAR[1], footprint)));
     const v = normalize(cameraPosition.sub(positionWorld));
     // Toward the horizon the eye looks along the sea, and the filtered slopes turn some of it away from the eye. The
     // eye can't see a face turned away (only the faces of those waves toward it), so such normals are bent back
