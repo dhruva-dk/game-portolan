@@ -59,7 +59,7 @@ const LAYER = 0.3;
  * 1–1.5 km, the most fair weather grows (cumulus humilis; mediocris would want towers this caps), flatter still for
  * the small puffs.
  */
-const DOME = 0.6;
+const DOME = 0.85;
 /** How far a cloud's base lifts at its edge, km, and how far in it has come down to the shell's base, km of potential. */
 const LIFT = 0.15, MARGIN = 0.3;
 /** Height over which a cloud's base thins out to nothing, km: the condensation level is a few tens of metres deep. */
@@ -77,7 +77,7 @@ const STEP = 0.06;
 /** Two-stream diffusion through cloud of asymmetry g: transmitted share 1/(1 + ¾(1−g)τ). */
 export const DIFFUSION = 0.75 * (1 - 0.85);
 /** The cloud's edge: where its density (of the full) crosses EDGE_AT, over EDGE_WIDTH either way. */
-const EDGE_AT = 0.2, EDGE_WIDTH = 0.04;
+const EDGE_AT = 0.2, EDGE_WIDTH = 0.07;
 /** The one tap toward the sun, km; the cloud there (of the full) past which a point is in shadow, and the edge's width. */
 const LIGHT_TAP = 0.15, SHADE_AT = 0.35, SHADE_EDGE = 0.04;
 /** How much of the sun's own colour the cloud's lit tone keeps (the rest is the palette's cream at the sun's
