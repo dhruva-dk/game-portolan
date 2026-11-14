@@ -79,9 +79,9 @@ const FOOT = [6, 26] as const, EDGE_LINE = 0.3, EDGE_LIGHT = 0.9, EDGE_FAR = [0.
 /** The middle cascade's crests in the water's tones: the height (of the sea's amplitude) that is a full crest, and
  *  how much of the crest the tones read they take. */
 const CHOP = [0.3, 0.85] as const;
-/** The crests read for the tones are averaged (five taps) this many metres to each side along the screen's level, so they lie in
- *  short level strokes, as art/target/idea.png's painted waves, rather than in blotches with no direction. */
-const STROKE = 12;
+/** The crests read for the tones are averaged (seven taps) this many metres to each side along the screen's level, so they lie in
+ *  level rows, as art/target/idea.png's painted waves, rather than in blotches with no direction (review26). */
+const STROKE = 24;
 /** Nor more than this many pixels: near a low eye 12 m spans hundreds of them, and the five offset copies of the crests
  *  printed as stair-stepped patches (review25). */
 const STROKE_PX = 60;
@@ -210,7 +210,8 @@ export function createWater(view: View, sky: Sky, ground: Ground, wind: Wind, sh
           if (k === 1) {
             const along = c.dx.div(max(length(c.dx), 1e-9)).mul(min(float(STROKE), length(c.dx).mul(STROKE_PX)).div(L));
             const side = (o: number) => texture(waves.displacement[k], c.q.div(L).add(along.mul(o))).grad(c.dx.div(L), c.dy.div(L)).y;
-            chop.addAssign(y.add(side(-1).add(side(1)).add(side(-0.5)).add(side(0.5)).mul(m)).div(5).mul(c.w));
+            const taps = side(-1).add(side(1)).add(side(-2 / 3)).add(side(2 / 3)).add(side(-1 / 3)).add(side(1 / 3));
+            chop.addAssign(y.add(taps.mul(m)).div(7).mul(c.w));
           }
         }
       });
