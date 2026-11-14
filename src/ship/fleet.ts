@@ -35,13 +35,12 @@ import type { Wind } from '../world/wind';
 import { BERTHS, moor, type Berth } from './berths';
 import { buildShip, type Packed } from './build';
 import { createCloth } from './cloth';
+import { SLOTS, STRIDE, pack } from './instance';
 import { DETAILS, chooseDetail } from './detail';
 import { createShipMaterials } from './materials';
 import { feeling, filling, hauled, inFrame, moved, trim, type Motion } from './motion';
 
-/** Floats an instance: at, fwd, up, paint, cloth and berth, each a vec4 (materials.ts). */
-const STRIDE = 24;
-/** A sails' pattern as the instance carries it (materials.ts shipPaint's w). */
+/** A sails' pattern as the instance carries it (instance.ts). */
 const PATTERNS: Record<Look['pattern'], number> = { plain: 0, band: 1, stripes: 2 };
 /** Her middle, above the waterline, metres, and a sphere round her whole rig from there. */
 const MIDDLE = 9, RADIUS = 18;
@@ -64,7 +63,7 @@ function drawOf(p: Packed, instances: InstancedInterleavedBuffer, material: Mate
   if (p.uv) g.setAttribute('uv', new BufferAttribute(p.uv, 2, true));
   g.setAttribute('part', new BufferAttribute(p.part, 4, true));
   g.setIndex(new BufferAttribute(p.index, 1));
-  ['shipAt', 'shipFwd', 'shipUp', 'shipPaint', 'shipCloth', 'shipBerth'].forEach((name, i) =>
+  SLOTS.forEach((name, i) =>
     g.setAttribute(name, new InterleavedBufferAttribute(instances, 4, i * 4)));
   g.instanceCount = 0;
   const mesh = new Mesh(g as BufferGeometry, material);
@@ -163,9 +162,11 @@ export function createFleet(light: Light, wind: Wind, capacity: number) {
       was[i] = k;
       // her sails' wind, as a share of FULL across her and along her
       const w = share(sails[i]);
-      const a = instances[k].array as Float32Array, o = filled[k]++ * STRIDE;
-      a.set([...pose.position, braces[i], ...pose.forward, w[0], ...pose.up, w[2],
-        ...look.paint, PATTERNS[look.pattern], ...look.sail, phaseOf(i), ...(shares.get(i) ?? [0, 0]), 0, 0], o);
+      const [berth, part] = shares.get(i) ?? [0, 0];
+      pack(instances[k].array as Float32Array, filled[k]++ * STRIDE, {
+        position: pose.position, forward: pose.forward, up: pose.up, brace: braces[i], wind: [w[0], w[2]],
+        paint: look.paint, sail: look.sail, pattern: PATTERNS[look.pattern], phase: phaseOf(i), berth, share: part,
+      });
     }
     draws.forEach((three, k) => {
       // (only the ships written go up: the buffer holds the most ships' worth)
