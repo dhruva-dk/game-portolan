@@ -30,10 +30,10 @@ export interface Yard {
 }
 
 export const YARDS: readonly Yard[] = [
-  { mast: 'main', y: MASTS.main.top - 2.7, len: 17.6, r: 0.21, sail: { drop: 7.4, foot: 17.0, belly: 1.9 } },
-  { mast: 'main', y: MASTS.main.cross - 1.25, len: 10.2, r: 0.13, sail: { drop: 3.6, foot: 11.6, belly: 0.9, scallop: 0.55 } },
-  { mast: 'fore', y: MASTS.fore.top - 2.5, len: 15.4, r: 0.19, sail: { drop: 5.8, foot: 15.0, belly: 1.6 } },
-  { mast: 'fore', y: MASTS.fore.cross - 1.15, len: 9.0, r: 0.12, sail: { drop: 3.3, foot: 10.4, belly: 0.8, scallop: 0.5 } },
+  { mast: 'main', y: MASTS.main.top - 2.7, len: 21.2, r: 0.21, sail: { drop: 7.4, foot: 20.6, belly: 2.6 } },
+  { mast: 'main', y: MASTS.main.cross - 1.25, len: 13.2, r: 0.13, sail: { drop: 5.4, foot: 15.6, belly: 1.4, scallop: 0.55 } },
+  { mast: 'fore', y: MASTS.fore.top - 2.5, len: 18.6, r: 0.19, sail: { drop: 5.8, foot: 18.2, belly: 2.2 } },
+  { mast: 'fore', y: MASTS.fore.cross - 1.15, len: 11.7, r: 0.12, sail: { drop: 5.0, foot: 13.8, belly: 1.2, scallop: 0.5 } },
 ];
 
 /** The yard's centre line, unbraced: how far forward of its mast's axis it hangs. */

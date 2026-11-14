@@ -53,7 +53,7 @@ test('she is a galleon at 0.6×: about 26 m from beak to taffrail, the mainmast 
     assert.ok(length > 24 && length < 28, `length ${length}`);
     assert.ok(height > 19.5 && height < 23, `height ${height}`);
     assert.ok(draught > 1.6 && draught < 2.6, `draught ${draught}`);
-    assert.ok(max[0] < 6 && min[0] > -6, `breadth with the yards ${min[0]}…${max[0]}`);
+    assert.ok(max[0] < 7 && min[0] > -7, `breadth with the yards ${min[0]}…${max[0]}`);
   }
 });
 
