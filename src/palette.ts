@@ -23,7 +23,7 @@ export const tint = (c: Rgb, y: number): Rgb => {
 };
 
 // ---- the land
-export const SAND = tones('#E9B44C', '#C98A3A');
+export const SAND = tones('#ECBD55', '#CD9A4A');
 /** The sand along the waterline, paler; the dry sand high up the beach, deeper; and where fronds have fallen on it. */
 export const SAND_SHORE = tones('#F6DE8E', '#D8AE62');
 export const SAND_DRY = tones('#E6C25A', '#BF8E40');
@@ -58,7 +58,7 @@ export const SEA_DEEP = ink('#1F4AA3');
 export const FOAM = ink('#FFF9EC');
 
 // ---- the sky
-export const STORM = tones('#7A4FB8', '#3D2670');
+export const STORM = tones('#9483D4', '#3A2E7C');
 /** The gold of the sunlit calm's light along the storm wall's foot. */
 export const STORM_FOOT = ink('#F5C67A');
 export const LIGHTNING = ink('#D9C2FF');

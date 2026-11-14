@@ -40,7 +40,7 @@ const BEAM = 520, SHAPE = 320, HALO = 140;
  *  (rad/s) and rocks this far (rad); rises this far up out of the water as it comes, over 1/RISE s. */
 const RIDE = 2.2, BOB = 0.25, BOB_RATE = 2, SPIN = 1.4, ROCK = 0.15, SINK = 2, RISE = 2.5;
 /** The fewest pixels across a piece and a beam are drawn; a piece's size, m, it grows from. */
-const SHAPE_PIXELS = 22, BEAM_PIXELS = 3, SHAPE_ACROSS = 3.5;
+const SHAPE_PIXELS = 14, BEAM_PIXELS = 3, SHAPE_ACROSS = 3.5;
 /** The beam: its height for the commonest and more for each rarity up, m; its radius at the foot and the head. */
 const TALL = 30, TALLER = 14, FOOT = 0.3, HEAD = 0.18;
 /** How bright a piece's rim, a beam and its ring glow, of what the sun and the sky give a white surface; and how far

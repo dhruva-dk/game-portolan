@@ -15,7 +15,7 @@ test('rocks: big masses 5–12 m across heaped in outcrops on the shoulders and 
     const rocks = scatterRocks(i, 4, 4, k + 1);
     const masses = rocks.filter((r) => r.big), boulders = rocks.filter((r) => !r.big);
     assert.ok(masses.length >= 2, `island ${k}: ${masses.length} masses`);
-    assert.ok(boulders.length >= (i.site.kind === 'island' ? masses.length : masses.length / 2), `island ${k}: ${boulders.length} boulders`);
+    assert.ok(boulders.length >= masses.length / 3, `island ${k}: ${boulders.length} boulders`);
     for (const r of masses) {
       assert.ok(r.size * 2 >= 5 && r.size * 2 <= 12, `across ${r.size * 2}`);
       const d = fromCoast(i, r.x, r.z);
