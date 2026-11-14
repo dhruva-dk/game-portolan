@@ -47,8 +47,9 @@ const TROUGH = 0.8, TROUGH_AT = 0.4;
  *  draws its water's shapes with clean edges. */
 const SWELL = 0.45;
 /** The sun's glints: the cosine between the surface's normal and the half vector past which it mirrors the sun to the
- *  eye, the width of that edge, and the glint's light of what a white surface gets from the sun square on. */
-const GLINT = 0.99993, GLINT_EDGE = 0.0001, GLINT_LIGHT = 0.4;
+ *  eye, the width of that edge, and the glint's light, of what a white surface square on to the sun gives back: a
+ *  pale lift on the water's blue, as art/target/idea.png's lit wave tops, not white specks taken for foam. */
+const GLINT = 0.99993, GLINT_EDGE = 0.0001, GLINT_LIGHT = 0.08;
 /** How much of the fair-weather clouds' shadow falls on the sea: some, so their shade passes over it without leaving
  *  dark blotches on the deep blue (art/target/idea.png's sea is one blue under the scattered clouds). */
 const CLOUD_SHADE = 0.4;
@@ -190,7 +191,7 @@ function seaRadiance(
   // the sun's glints: flat shapes of light where the surface mirrors it to the eye
   const nh = g.dot(normalize(l.add(v)));
   const edge = max(fwidth(nh), GLINT_EDGE);
-  const glint = vec3(...FOAM).mul(sun).mul(smoothstep(float(GLINT).sub(edge), float(GLINT).add(edge), nh).mul(GLINT_LIGHT));
+  const glint = vec3(...FOAM).mul(sun).mul(smoothstep(float(GLINT).sub(edge), float(GLINT).add(edge), nh).mul(GLINT_LIGHT / Math.PI));
 
   // what lies behind, seen through `path` metres of water: dimmed and coloured by it, and veiled by the water's own
   // tone as the path grows (and by a wake's bubbles, as so much more water would)
