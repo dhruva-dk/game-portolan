@@ -178,7 +178,7 @@ export function scatterPalms(isle: Isle, rocks: Rock[], seed = 1): Palm[] {
     const grove = Math.min(Math.max((field(noise, x, z, 16, 0.5) - 0.2) / 0.3, 0), 1) ** 2;
     const coastal = Math.exp(d / 15);
     if (rand() > grove * (0.25 + 0.75 * coastal)) continue;
-    if (palms.some((p) => Math.hypot(p.x - x, p.z - z) < SPACING) || onRock(rocks, x, z, 1)) continue;
+    if (palms.some((p) => Math.hypot(p.x - x, p.z - z) < SPACING) || onRock(rocks, x, z, 1) || site.face(x, z)) continue;
     const y = isle.height(x, z);
     if (y < 0.5) continue;
     palms.push({
@@ -221,7 +221,7 @@ export function scatterShrubs(isle: Isle, rocks: Rock[], shapes: number, seed = 
     const clump = Math.min(Math.max((field(noise, x, z, 10, 5.5) - 0.05) / 0.25, 0), 1) * 0.6;
     if (rand() > Math.max(hedge, clump)) continue;
     const size = 1.8 + 3.2 * rand() ** 2;
-    if (shrubs.some((s) => Math.hypot(s.x - x, s.z - z) < (s.size + size) * 0.35) || onRock(rocks, x, z, size * 0.3)) continue;
+    if (shrubs.some((s) => Math.hypot(s.x - x, s.z - z) < (s.size + size) * 0.35) || onRock(rocks, x, z, size * 0.3) || site.face(x, z)) continue;
     const y = isle.height(x, z);
     if (y < 0.6) continue;
     shrubs.push({ x, z, y, size, yaw: rand() * 2 * Math.PI, shape: Math.floor(rand() * shapes), tint: rand() });

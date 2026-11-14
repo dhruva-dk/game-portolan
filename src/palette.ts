@@ -29,6 +29,8 @@ export const SAND_SHORE = tones('#F8D675', '#D9984A');
 export const SAND_DRY = tones('#EBA532', '#BF6A2A');
 export const LITTER = tones('#C98A3A', '#96552E');
 export const ROCK = tones('#B8553A', '#74304A');
+/** A cliff's paler strata, sandstone between the rock's red bands. */
+export const STRATUM = tones('#D08A55', '#86424C');
 export const PALM_LEAF = tones('#4DA63A', '#1F6148');
 /** A palm's old fronds, yellowing; and its nuts. */
 export const PALM_LEAF_OLD = tones('#A8B03A', '#5E6A3A');

@@ -46,7 +46,7 @@ test('the same for a seed, different across seeds', () => {
   assert.ok(differ > points.length / 2, `${differ} of ${points.length} differ`);
 });
 
-test('the ground is continuous: no steps anywhere, and steep only on a channel\'s side', () => {
+test('the ground is continuous: no steps anywhere, and steep only on a channel\'s side or a cliff\'s face', () => {
   const step = 0.1, rand = random(99);
   for (const seed of SEEDS) {
     const pl = planets.get(seed)!;
@@ -68,7 +68,7 @@ test('the ground is continuous: no steps anywhere, and steep only on a channel\'
     for (const isl of pl.islands) for (let i = 0; i < 3000; i++) pair(onIsland(isl, rand() * 2 * Math.PI, rand() * isl.reach * 1.1));
     slopes.sort((a, b) => a - b);
     const worst = slopes[slopes.length - 1], p99 = slopes[Math.floor(slopes.length * 0.99)];
-    assert.ok(worst < 2.5, `seed ${seed}: steepest ${worst.toFixed(2)} over ${step} m`);
+    assert.ok(worst < 3.5, `seed ${seed}: steepest ${worst.toFixed(2)} over ${step} m`);
     assert.ok(p99 < 1, `seed ${seed}: 99th percentile slope ${p99.toFixed(2)}`);
   }
 });
@@ -77,8 +77,9 @@ test('an island\'s centre has no seam where its coast\'s angle wraps', () => {
   for (const s of planet.islands) {
     const top = planet.height(s.chart.at);
     for (let i = 0; i < 32; i++) {
+      // (5 cm off it, at no more than a terrace's riser's slope: 2.5)
       const h = planet.height(onIsland(s, (i / 32) * 2 * Math.PI, 0.05));
-      assert.ok(Math.abs(h - top) < 0.05, `centre ${top} vs ${h}`);
+      assert.ok(Math.abs(h - top) < 0.125, `centre ${top} vs ${h}`);
     }
   }
 });
@@ -169,7 +170,8 @@ test('each above the sea: the waterline is its coast, the beach about 1:8 there,
     }
     assert.ok(off <= checked * 0.05, `seed ${seed}: ${s.kind} beach gentler than 1:11 at ${off} of ${checked}`);
     let top = 0;
-    for (let i = 0; i < 3000; i++) top = Math.max(top, pl.height(onIsland(s, i * 2.39996, Math.sqrt(i / 3000) * s.radius)));
+    // (out to its headland, which reaches past its radius)
+    for (let i = 0; i < 6000; i++) top = Math.max(top, pl.height(onIsland(s, i * 2.39996, Math.sqrt(i / 6000) * s.radius * 1.4)));
     // within its kind's range, unless the land is too narrow for so high a hill at a palm's slope: then brought lower
     // until its steepest (all but the steepest hundredth) is at that slope
     const [low, high] = KINDS[s.kind].summit;
@@ -197,18 +199,24 @@ test('each above the sea: the waterline is its coast, the beach about 1:8 there,
   }
 });
 
-test('the hills: no cliffs, slopes a palm stands on', () => {
+test('the hills: slopes a palm stands on, but for the cliffs\' faces', () => {
   for (const [seed, pl] of planets) for (const s of pl.islands) {
     const slopes: number[] = [];
+    let land = 0;
     for (let i = 0; i < 4000; i++) {
       const t = i * 2.39996, r = Math.sqrt(i / 4000) * s.radius * 1.6, x = Math.cos(t) * r, z = Math.sin(t) * r;
       if (s.shore(x, z) > -0.5) continue;
+      land++;
+      if (s.face(x, z)) continue;
       const e = 0.4, at = (a: number, b: number) => pl.height(fromChart(s.chart, a, b));
       slopes.push(Math.hypot(at(x + e, z) - at(x - e, z), at(x, z + e) - at(x, z - e)) / (2 * e));
     }
     slopes.sort((a, b) => a - b);
-    const p99 = slopes[Math.floor(slopes.length * 0.99)], worst = slopes.at(-1)!;
-    assert.ok(p99 < ISLANDS.steepest[s.kind] + 0.08 && worst < 1.1, `seed ${seed}: ${s.kind} ${s.radius.toFixed(0)} m slopes p99 ${p99.toFixed(2)}, worst ${worst.toFixed(2)}`);
+    const p99 = slopes[Math.floor(slopes.length * 0.99)], worst = slopes.at(-1)!, faces = 1 - slopes.length / land;
+    // (the hill itself is brought down to ISLANDS.steepest before they are cut into it; a cliff's or riser's flank,
+    // short of its face, steeper, by up to the difference in how finely the two are measured)
+    assert.ok(faces < 0.2, `seed ${seed}: ${s.kind} ${s.radius.toFixed(0)} m ${(faces * 100).toFixed(0)}% cliff`);
+    assert.ok(p99 < ISLANDS.bare && worst < ISLANDS.bare + 0.1, `seed ${seed}: ${s.kind} ${s.radius.toFixed(0)} m slopes p99 ${p99.toFixed(2)}, worst ${worst.toFixed(2)}`);
   }
 });
 

@@ -1,6 +1,7 @@
 // The planet's islands: sand islands rising from the banks into rounded hills, each worked out flat on its own chart
-// (sphere.ts) and laid into the sea floor by planet.ts. Three kinds, every one standing out of the sea, no cliffs
-// anywhere (no slope steeper than a palm stands on):
+// (sphere.ts) and laid into the sea floor by planet.ts. Three kinds, every one standing out of the sea, their hills
+// no steeper than a palm stands on but for the cliffs cut into an island's: stretches of its coast rising sheer from
+// the waterline, and on some the hill stepped in terraces (bare rock on their faces, nothing standing there):
 //   island  18–55 m round, a hill 7–22 m high by its size, palms and shrubs and outcrops of rock; now and then a
 //           lagoon or an offshore rock or two
 //   islet   7–15 m round, a hump 2.5–6 m high, a palm or two
@@ -78,8 +79,21 @@ export const ISLANDS = {
   /** Fine dune relief inland, metres high and across. */
   dunes: { height: 0.4, size: 9 },
   /** The steepest the hills may be (a palm stands on it), rise over run, among all but the steepest hundredth of the
-   *  land: a hill that would be steeper is brought lower. An islet's hump may be a little steeper. */
+   *  land: a hill that would be steeper is brought lower. An islet's hump may be a little steeper. Measured before
+   *  the cliffs and terraces are cut into it. */
   steepest: { island: 0.8, islet: 0.85, rocks: 0.75 },
+  /** Ground steeper than this (rise over run) is a cliff's face: bare rock, nothing standing on it. */
+  bare: 1.2,
+  /** Cliffed headlands: round an island's headland (where its coast reaches farthest out, a share `cape` of its radius
+   *  either side),
+   *  and along stretches of its coast where a noise over it (`around` metres across) passes `above` (and full height
+   *  `ends` past that: the cliff's ends sloping down to the beach), the ground is raised in a cliff behind the beach
+   *  from `foot` metres inland: `height` metres (no more than a share `most` of its summit), over `run` metres for
+   *  each metre high (its face at its steepest 1.5 / run, rise over run), its top falling back to the hill between
+   *  `back` and twice that inland, metres. */
+  cliffs: { cape: 0.6, above: 0.1, ends: 0.35, around: 40, height: [3, 8], most: 0.7, foot: 3, run: 0.9, back: 14 },
+  /** The share of islands whose hill rises in terraces: steps `step` metres high, a share `riser` of each its riser. */
+  terraces: { share: 0.45, step: [2.5, 4], riser: 0.5 },
   /** At least this much water between any two aprons, metres. */
   gap: 45,
   /** How deep the bank under an island may be at most, metres: the flank falls gently this far. */
@@ -135,6 +149,8 @@ export interface IslandSite {
   mound(x: number, z: number): number;
   /** The highest the mound can be r metres from the centre (+Infinity within the apron's farthest reach). */
   ceiling(r: number): number;
+  /** Whether chart (x, z) is on a cliff's face (steeper than ISLANDS.bare): nothing stands there. */
+  face(x: number, z: number): boolean;
 }
 
 const smoothstep = (a: number, b: number, x: number) => {
@@ -165,9 +181,11 @@ function createIslandSite(kind: Kind, chart: Chart, radius: number, noise: Noise
   // a lagoon well inside the land where it is broadest, drawn out along the coast, clear of the centre (which stays
   // land): shrunk until it is, or none
   let lagoon: Loop | null = null;
+  // (the headland: where the coast reaches farthest out)
+  let cape = 0;
+  for (let k = 0; k < 64; k++) if (coast((k / 64) * 2 * Math.PI) > coast(cape)) cape = (k / 64) * 2 * Math.PI;
   if (kind === 'island' && radius >= I.lagoon.from && radius <= I.lagoon.to && rand() < I.lagoon.share) {
-    let t = 0;
-    for (let k = 0; k < 64; k++) if (coast((k / 64) * 2 * Math.PI) > coast(t)) t = (k / 64) * 2 * Math.PI;
+    const t = cape;
     for (let lr = radius * lerp(I.lagoon.radius[0], I.lagoon.radius[1], rand()); lr >= 5 && !lagoon; lr *= 0.9) {
       const out = 10 + lr * 0.8, cx = Math.cos(t) * out, cz = Math.sin(t) * out;
       const l = blob(cx, cz, lr, rand, { long: 0.3, turn: t + Math.PI / 2 });
@@ -269,7 +287,8 @@ function createIslandSite(kind: Kind, chart: Chart, radius: number, noise: Noise
   const humps = offshore.map((o) => ({ ...o, height: lerp(0.7, 1.2, rand()) }));
   const dunesAt: Vec3 = [rand() * 256, rand() * 256, rand() * 256];
 
-  const mound = (x: number, z: number) => {
+  /** The ground before the cliffs and terraces are cut into it. */
+  const plain = (x: number, z: number) => {
     const exact = field.at(x, z);
     if (exact >= 0) {
       if (lagoon && within(lagoon, x, z)) return -shelve(exact, shallow);
@@ -289,20 +308,50 @@ function createIslandSite(kind: Kind, chart: Chart, radius: number, noise: Noise
     return h + I.dunes.height * dunes * ridge * smoothstep(0, 6, u);
   };
 
+  // the cliffs along stretches of the coast, and the terraces, if it has them
+  const C = I.cliffs, T = I.terraces;
+  const cliffAt: Vec3 = [rand() * 256, rand() * 256, rand() * 256];
+  const cliffTop = kind === 'island' ? Math.min(lerp(C.height[0], C.height[1], rand()), target * C.most) : 0;
+  const step = rand() < T.share && kind === 'island' ? lerp(T.step[0], T.step[1], rand()) : 0;
+  // (the cliff round the headland, or across from it if the lagoon lies there)
+  const cliffSide = lagoon ? cape + Math.PI : cape;
+  const capeX = Math.cos(cliffSide) * coast(cliffSide), capeZ = Math.sin(cliffSide) * coast(cliffSide);
+  /** 0…1: how much of a cliff the coast has near chart (x, z): round the headland, and where the noise says. */
+  const cliffy = (x: number, z: number) => Math.max(
+    smoothstep(C.above, C.above + C.ends, noise.value(x / C.around + cliffAt[0], z / C.around + cliffAt[1], cliffAt[2])),
+    1 - smoothstep(C.cape * 0.4 * radius, C.cape * radius, Math.hypot(x - capeX, z - capeZ)),
+  );
+  /** Height h stepped: flat treads, and between them risers a share T.riser of each step. */
+  const terraced = (h: number) => {
+    const f = h / step, k = Math.floor(f);
+    return step * (k + smoothstep(1 - T.riser, 1, f - k));
+  };
+  const mound = (x: number, z: number) => {
+    const h = plain(x, z), u = -field.at(x, z);
+    if (u <= 0 || rocks.some((l) => within(l, x, z))) return h;
+    // (the terraces begin behind the beach, where a cliff would)
+    let out = step > 0 && h > berm ? lerp(h, berm + terraced(h - berm), smoothstep(C.foot, 2 * C.foot, u)) : h;
+    if (cliffTop > 0) {
+      const lip = cliffTop * cliffy(x, z) * smoothstep(C.foot, C.foot + C.run * cliffTop, u) * (1 - smoothstep(C.back, 2 * C.back, u));
+      out += lip;
+    }
+    return out;
+  };
+
   /** The highest point, over every node on land. */
-  const highest = () => {
+  const highest = (ground = mound) => {
     let top = -Infinity;
-    for (let k = 0; k < field.land.length; k += 2) top = Math.max(top, mound(field.land[k], field.land[k + 1]));
+    for (let k = 0; k < field.land.length; k += 2) top = Math.max(top, ground(field.land[k], field.land[k + 1]));
     return top;
   };
   // (solved over a few rounds: the dunes' share doesn't scale with it)
-  for (let round = 0; round < 3; round++) relief = Math.min(Math.max((relief * (target - berm)) / Math.max(highest() - berm, 0.1), 0.2), 5);
+  for (let round = 0; round < 3; round++) relief = Math.min(Math.max((relief * (target - berm)) / Math.max(highest(plain) - berm, 0.1), 0.2), 5);
   // no steeper than a palm stands on: the hill brought lower until it isn't (the berm's own rise is the beach's)
   for (let round = 0; round < 3; round++) {
     const slopes: number[] = [];
     for (let k = 0; k < field.land.length; k += 2) {
       const x = field.land[k], z = field.land[k + 1], e = 0.5;
-      slopes.push(Math.hypot(mound(x + e, z) - mound(x - e, z), mound(x, z + e) - mound(x, z - e)) / (2 * e));
+      slopes.push(Math.hypot(plain(x + e, z) - plain(x - e, z), plain(x, z + e) - plain(x, z - e)) / (2 * e));
     }
     slopes.sort((p, q) => p - q);
     const steep = slopes[Math.floor(slopes.length * 0.99)] ?? 0;
@@ -314,7 +363,11 @@ function createIslandSite(kind: Kind, chart: Chart, radius: number, noise: Noise
   const reach = most + I.flankEase + (I.floor - outer) / K.flank + (deepest - I.floor) / I.steep;
   // past the farthest apron, the water's edge is at least r − far away and the flank at least r − most beyond it
   const ceiling = (r: number) => (r <= most ? Infinity : -flankDepth(0, r - most));
-  return { kind, chart, radius, shelf: most, apron: width, reach, summit, offshore, coast, shore: field.at, mound, ceiling };
+  const face = (x: number, z: number) => {
+    const e = 0.25;
+    return Math.hypot(mound(x + e, z) - mound(x - e, z), mound(x, z + e) - mound(x, z - e)) / (2 * e) > I.bare;
+  };
+  return { kind, chart, radius, shelf: most, apron: width, reach, summit, offshore, coast, shore: field.at, mound, ceiling, face };
 }
 
 /** The sea floor at unit direction p before any island: how far from the deep water's edge (negative inside it), metres. */

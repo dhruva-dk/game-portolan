@@ -2,19 +2,20 @@
 // to the next: the sea floor's pale sand, with rubble and sea grass where the ground's cover says (ground.ts) and
 // stones and weed strewn over it (strewn.ts); a paler band along the waterline; the beach; the deeper, drier sand
 // higher up; and under the trees, where fronds have fallen, a darker patch. The bands' edges wander with the ground's
-// mottling, so none is a contour line.
+// mottling, so none is a contour line. Where the ground is steeper than sand lies, a cliff's bare rock in strata.
 // The islands' meshes and the sea floor's both shade with this, so where they overlap they look the same.
 //
 // Everything is a function of the world position alone (the sea floor's mesh slides along under the eye).
 // Lit like everything else (sky/light.ts).
 
-import { mix, vec3 } from 'three/tsl';
-import { LITTER, SAND, SAND_DRY, SAND_SHORE, SEABED_SAND, SEABED_STONE, SEABED_WEED, type Tones } from '../palette';
+import { dot, float, fract, mix, vec3 } from 'three/tsl';
+import { LITTER, ROCK, SAND, SAND_DRY, SAND_SHORE, SEABED_SAND, SEABED_STONE, SEABED_WEED, STRATUM, type Tones } from '../palette';
 import type { View } from '../view/view';
 import type { Ground } from './ground';
 import type { Light } from '../sky/light';
 import { createStrewn } from './strewn';
 import { cut, type FloatNode, type Vec3Node } from '../tsl';
+import { ISLANDS } from '../world/planet-islands';
 
 /** Where each band begins, metres over the sea: the shore's pale sand, the beach, the dry sand. */
 const SHORE = -0.15, BEACH = 0.45, DRY = 2.6;
@@ -22,6 +23,9 @@ const SHORE = -0.15, BEACH = 0.45, DRY = 2.6;
 const RAGGED = 0.5;
 /** The ground's cover (0…1) past which rubble lies on the floor, and sea grass; and litter under the trees. */
 const RUBBLE = 0.7, GRASS = 0.65, FALLEN = 0.5;
+/** Ground steeper than a cliff's face (ISLANDS.bare, rise over run) is bare rock: the cosine of its tilt. Its strata
+ *  this many metres thick. */
+const BARE = 1 / Math.hypot(1, ISLANDS.bare), STRATA = 1.4;
 
 export type Sand = (p: Vec3Node, n: Vec3Node, litter: FloatNode | null) => Vec3Node;
 
@@ -51,6 +55,10 @@ export function createSand(view: View, ground: Ground, light: Light): Sand {
     lay(SAND_SHORE, cut(level, SHORE));
     lay(SAND, cut(level, BEACH));
     lay(SAND_DRY, cut(level, DRY));
+    // a cliff's face: bare rock above the sea, in strata of two tones
+    const bare = cut(float(1).sub(dot(n, view.up(p))), 1 - BARE).mul(cut(height, SHORE));
+    lay(ROCK, bare);
+    lay(STRATUM, bare.mul(cut(fract(level.div(STRATA)), 0.5)));
     if (litter) lay(LITTER, cut(litter.add(mottle.mul(0.6)), FALLEN).mul(cut(height, BEACH)));
     return light.floor(p, n, lit, shadow);
   };
