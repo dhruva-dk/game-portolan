@@ -240,7 +240,6 @@ test('f3. the view owns the eye: a perspective camera is named only in src/frame
 /** The files that may take a colour toward its grey (a desaturation), and why: the rest leave the palette's colours as chosen. */
 const DESATURATE: Record<string, string> = {
   'post/grade.ts': "the look's saturation, overall and by hue",
-  'sky/sky.ts': "the sky's own colour (skyColour), shared by its backdrop and the sea's mirror",
   'sky/light.ts': "how much of the sky's tint the light carries (TINTED)",
   'sky/cloud-field.ts': "how much of the sun's colour a cloud's lit side takes (WARMED)",
 };
@@ -251,6 +250,8 @@ test('k. colour: every colour of the world is named in src/palette.ts, luma is t
   // (the palette's tint works on the CPU, before any shader)
   none(hits(/0\.2126|0\.7152|\b0\.299\b|\b0\.587\b/, (rel) => rel !== 'palette.ts'), "hand-written luma weights (three's luminance())");
   none(hits(/mix\(\s*vec3\(\s*(luminance|dot)\(/, (rel) => !(rel in DESATURATE)), 'a desaturation outside DESATURATE');
+  const desaturating = new Set(hits(/mix\(\s*vec3\(\s*(luminance|dot)\(/, () => true).map((h) => h.split(':')[0].replace(/^src\//, '')));
+  none(Object.keys(DESATURATE).filter((rel) => !desaturating.has(rel)), 'a DESATURATE entry with no desaturation left in it');
 });
 
 test('l. comments say why, not which review or reference asked: no review rounds or reference images named in src or tools', () => {

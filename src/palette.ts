@@ -23,10 +23,10 @@ export const tint = (c: Rgb, y: number): Rgb => {
 };
 
 // ---- the land
-export const SAND = tones('#F6C64E', '#C68A42');
+export const SAND = tones('#F2B632', '#C9772A');
 /** The sand along the waterline, paler; the dry sand high up the beach, deeper; and where fronds have fallen on it. */
-export const SAND_SHORE = tones('#F3D688', '#D6A65E');
-export const SAND_DRY = tones('#F0BC48', '#B87C3A');
+export const SAND_SHORE = tones('#F8D675', '#D9984A');
+export const SAND_DRY = tones('#EBA532', '#BF6A2A');
 export const LITTER = tones('#C98A3A', '#96552E');
 export const ROCK = tones('#B8553A', '#74304A');
 /** A cliff's paler strata, sandstone between the rock's red bands. */
@@ -37,8 +37,8 @@ export const PALM_LEAF_OLD = tones('#A8B03A', '#5E6A3A');
 export const PALM_NUT = tones('#B8862E', '#6E4A2A');
 export const PALM_TRUNK = tones('#8A5630', '#55303A');
 export const SHRUB = tones('#6FAE3C', '#2C6A4A');
-export const SEABED_SAND = tones('#EADDB4', '#B8A27C');
-export const SEABED_STONE = tones('#C9BE84', '#6E7458');
+export const SEABED_SAND = tones('#E8D08A', '#B89A6A');
+export const SEABED_STONE = tones('#8FA08A', '#55707A');
 export const SEABED_WEED = tones('#4F9A6E', '#2E6A62');
 
 // ---- the ships
@@ -53,21 +53,19 @@ export const IRON = tones('#4A4450', '#2A2233');
 
 // ---- the sea
 export const SEA_SHALLOW = ink('#22B4B6');
-export const SEA_MIDDLE = ink('#1C7AB6');
-export const SEA_DEEP = ink('#244C92');
-/** A cool white, so under the warm sun foam prints white, not a cream lost against the sand. */
-export const FOAM = ink('#EEF6FF');
+export const SEA_MIDDLE = ink('#1E86B8');
+export const SEA_DEEP = ink('#1F4FA8');
+export const FOAM = ink('#FFF9EC');
 
 // ---- the sky
 export const STORM = tones('#7A4FB8', '#3D2670');
 export const LIGHTNING = ink('#D9C2FF');
-/** The haze's glow is the horizon's sky times this: a dusky lilac. */
-export const HAZE: Rgb = [0.85, 0.72, 0.9];
+/** The haze's glow is the horizon's sky times this: warm. */
+export const HAZE: Rgb = [1.08, 0.9, 0.7];
 /** Past the planet's limb, seen from space: all but black, a little blue (linear light, before exposure). */
 export const SPACE: Rgb = [0.0015, 0.002, 0.004];
-/** A fair-weather cloud: a pale cream where the sun lights it, a cool lilac grey beneath; both warm, as the sky's
- *  lilac haze adds its blue. */
-export const CLOUD = tones('#FFE6A0', '#BCA8B0');
+/** A fair-weather cloud: cream where the sun lights it, rose beneath. */
+export const CLOUD = tones('#FFF1D6', '#E8A58C');
 /** Powder smoke: a cloud's cream, and a deeper rose in its shadow. */
 export const SMOKE = tones('#FFF1D6', '#D9907C');
 

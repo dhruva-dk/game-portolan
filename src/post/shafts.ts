@@ -6,7 +6,7 @@
 //
 // Cost at the phone's 956×440: 3 passes at 239×110 — one of 2 taps, two of 16 — about 0.9 M taps a frame.
 
-import { Vector2, Vector3, type PerspectiveCamera, type TextureNode } from 'three/webgpu';
+import { Vector2, Vector3, type Matrix4, type TextureNode } from 'three/webgpu';
 import { Fn, dot, exp, float, int, interleavedGradientNoise, max, min, rtt, screenCoordinate, uniform, uv, vec2, vec3, vec4 } from 'three/tsl';
 import { loop, type FloatNode, type Vec2Node, type Vec3Node, type Vec4Node } from '../tsl';
 
@@ -23,6 +23,15 @@ const DECAY = 0.93;
 /** With the sun off the screen by `off` (in half-screens past its edge), AROUND and THIN are loosened by
  *  (1 + LOOSEN·off)², and the shafts fade as exp(−OFF_FADE·off). */
 const LOOSEN = 1.5, OFF_FADE = 0.8;
+
+/** What the shafts need of the eye (view/view.ts Eye): where it stands (world), camera to world, its projection, and
+ *  world to clip. */
+export interface Seen {
+  readonly position: readonly number[];
+  readonly world: Matrix4;
+  readonly projection: Matrix4;
+  readonly viewProjection: Matrix4;
+}
 
 /**
  * Shafts from `scene` (linear light, full size) where `depth` (the scene's, 1 for the sky) says nothing stands. The
@@ -59,21 +68,23 @@ export function createShafts(scene: TextureNode, depth: TextureNode) {
   const second = q(blur(first, 1, float(0)));
   const shafts = q(blur(second, 1 / TAPS, thinning));
 
-  const ahead = new Vector3(), toward = new Vector3();
+  const ahead = new Vector3(), toward = new Vector3(), p = new Vector3();
   return {
     /** The shafts' light at this pixel of the frame, to add to the scene's. */
     light: (): Vec3Node => shafts.sample(uv()).rgb.mul(strength),
     /**
-     * Places the sun on the screen as `camera` sees it along `sunDirection` (world) and sets the shafts' strength:
+     * Places the sun on the screen as the eye sees it along `sunDirection` (world) and sets the shafts' strength:
      * `amount`, faded out as the sun leaves the screen or goes behind the eye.
      */
-    update(camera: PerspectiveCamera, sunDirection: readonly number[], amount: number) {
+    update(eye: Seen, sunDirection: readonly number[], amount: number) {
       toward.set(sunDirection[0], sunDirection[1], sunDirection[2]);
-      camera.getWorldDirection(ahead);
+      // (the eye looks down its own −z)
+      ahead.setFromMatrixColumn(eye.world, 2).negate().normalize();
       const facing = ahead.dot(toward);
-      const p = toward.clone().multiplyScalar(1000).add(camera.position).project(camera);
+      p.copy(toward).multiplyScalar(1000).add(new Vector3(...eye.position)).applyMatrix4(eye.viewProjection);
       sun.value.set((p.x + 1) / 2, (1 - p.y) / 2);
-      aspect.value = camera.aspect;
+      // (width over height: the projection's y scale over its x)
+      aspect.value = eye.projection.elements[5] / eye.projection.elements[0];
       // past the screen's edge the light is taken from further round it, so the sky along the edge nearest the sun
       // still streams into the frame
       const off = Math.max(Math.abs(p.x) - 1, Math.abs(p.y) - 1, 0), loose = (1 + off * LOOSEN) ** 2;

@@ -23,8 +23,6 @@ const SHORE = -0.15, BEACH = 0.45, DRY = 2.6;
 const RAGGED = 0.5;
 /** The ground's cover (0…1) past which rubble lies on the floor, and sea grass; and litter under the trees. */
 const RUBBLE = 0.7, GRASS = 0.65, FALLEN = 0.5;
-/** Rubble and grass lie only in water shallower than this, metres: deeper, the open sea's floor is bare sand. */
-const PATCHES = 2.5;
 /** Ground steeper than a cliff's face (ISLANDS.bare, rise over run) by SHEER is bare rock (BARE: the cosine of its
  *  tilt), so a dune's steep scraps stay sand; its strata this many metres apart, the pale band this share of each. */
 const SHEER = 2.2, BARE = 1 / Math.hypot(1, ISLANDS.bare * SHEER), STRATA = 2.2, STRATUM_SHARE = 0.35;
@@ -48,9 +46,8 @@ export function createSand(view: View, ground: Ground, light: Light): Sand {
       shadow = mix(shadow, vec3(...t.shadow), share);
     };
     // on the floor: rubble and sea grass in patches, stones and weed over them
-    const shallow = cut(level, -PATCHES);
-    lay(SEABED_STONE, cut(cover.y.add(mottle.mul(0.3)), RUBBLE).mul(shallow));
-    lay(SEABED_WEED, cut(cover.x.add(cover.w.sub(0.5).mul(0.3)), GRASS).mul(shallow));
+    lay(SEABED_STONE, cut(cover.y.add(mottle.mul(0.3)), RUBBLE));
+    lay(SEABED_WEED, cut(cover.x.add(cover.w.sub(0.5).mul(0.3)), GRASS));
     const strewed = strewn(p, height, cover);
     lay(SEABED_STONE, strewed.x);
     lay(SEABED_WEED, strewed.y);

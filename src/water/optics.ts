@@ -28,7 +28,9 @@ export const N_WATER = 1.34;
 /** Reflectance at normal incidence, ((n − 1)/(n + 1))². */
 const F0 = 0.02;
 /** How much of what Fresnel gives the sea's mirror keeps: the sea stays its own colour out to the horizon. */
-const MIRROR = 0.1;
+const MIRROR = 0.45;
+/** The roughness the sky's reflection is blurred to at the least: a few broad shapes of cloud and sky, no detail. */
+const BLURRED = 0.55;
 /** Water turquoise to SHALLOW_TO metres deep, the middle blue by MIDDLE_AT, the deep by DEEP_AT: so the shallow ring
  *  hugs the shore, and open-sea banks a few metres further down (SEA.bank, 3 m and more) are the deep's blue. */
 const SHALLOW_TO = 2, MIDDLE_AT = 3.5, DEEP_AT = 6;
@@ -37,13 +39,12 @@ const SHALLOW_TO = 2, MIDDLE_AT = 3.5, DEEP_AT = 6;
 const CLOUDY = 0.22;
 /** How far a wake's air at its thickest takes the water toward the shallows' tone; and how much it veils what lies
  *  under it, as an optical depth. */
-const AIRED = 0.3, AIR_VEIL = 2;
+const AIRED = 0.6, AIR_VEIL = 2;
 /** The troughs' tone, of the water's, and where between trough and crest (0…1) its edge lies. */
 const TROUGH = 0.88, TROUGH_AT = 0.4;
 /** The sun's glints: the cosine between the surface's normal and the half vector past which it mirrors the sun to the
- *  eye, the width of that edge, and the glint's light, of what a white surface square on to the sun gives back: a
- *  pale lift on the water's blue, not white specks taken for foam. */
-const GLINT = 0.99993, GLINT_EDGE = 0.0001, GLINT_LIGHT = 0.08;
+ *  eye, the width of that edge, and the glint's light of what a white surface gets from the sun square on. */
+const GLINT = 0.9985, GLINT_EDGE = 0.0006, GLINT_LIGHT = 0.5;
 
 const absorption = vec3(...ABSORPTION);
 
@@ -84,8 +85,9 @@ export function createOptics(sky: Sky, view: View) {
 export interface Surface {
   /** World position, and the unit vector from it to the eye. */
   p: Vec3Node; v: Vec3Node;
-  /** The surface's normal; and its normal over the long waves alone, which the sun's glints are mirrored off. */
-  n: Vec3Node; g: Vec3Node;
+  /** The surface's normal; and its roughness, √(mean square slope) (the slopes the pixel can't resolve, plus the
+   *  ripples no cascade holds). */
+  n: Vec3Node; alpha: FloatNode;
   /** 0 in the troughs … 1 at the tops of the waves; and the share of the pixel covered in foam. */
   crest: FloatNode; foam: FloatNode;
   /** The radiance of whatever lies behind the surface (the sea floor; the sky's if nothing), and metres from the
@@ -152,7 +154,7 @@ function tinted(c: Vec3Node, colour: Vec3Node, a: FloatNode, far: FloatNode): Ve
  * holds the water there: the water tinted her colour, and her border's line drawn over it.
  */
 function seaRadiance(sky: Sky, view: View, s: Surface, ships: Ships, held?: Held): Vec3Node {
-  const { p, v, n, g, crest, foam, behind, path, depth } = s;
+  const { p, v, n, alpha, crest, foam, behind, path, depth } = s;
   const l = sky.sun(p), up = view.up(p);
   const nv = max(n.dot(v), 1e-4);
   const F = fresnel(nv).mul(MIRROR);
@@ -172,12 +174,12 @@ function seaRadiance(sky: Sky, view: View, s: Surface, ships: Ships, held?: Held
   // glancing, that wave mirrors the sky at its horizon; steeper, the light comes through it, the sea's own colour.
   const r = v.negate().reflect(n);
   const below = dot(r, up);
-  const above = sky.reflect(normalize(r.sub(up.mul(min(below, 0)))));
+  const above = sky.reflect(normalize(r.sub(up.mul(min(below, 0)))), max(sqrt(alpha), BLURRED));
   const seen = mix(body, above, fresnel(below.negate()));
   // the sun's glints: flat shapes of light where the surface mirrors it to the eye
-  const nh = g.dot(normalize(l.add(v)));
+  const nh = n.dot(normalize(l.add(v)));
   const edge = max(fwidth(nh), GLINT_EDGE);
-  const glint = vec3(...FOAM).mul(sun).mul(smoothstep(float(GLINT).sub(edge), float(GLINT).add(edge), nh).mul(GLINT_LIGHT / Math.PI));
+  const glint = vec3(...FOAM).mul(sun).mul(smoothstep(float(GLINT).sub(edge), float(GLINT).add(edge), nh).mul(GLINT_LIGHT));
 
   // what lies behind, seen through `path` metres of water: dimmed and coloured by it, and veiled by the water's own
   // tone as the path grows (and by a wake's bubbles, as so much more water would)

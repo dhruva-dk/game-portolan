@@ -8,7 +8,7 @@
 // fresh.
 
 import {
-  ClampToEdgeWrapping, HalfFloatType, LinearFilter, Matrix4, NearestFilter, StorageTexture, Vector2, Vector3,
+  ClampToEdgeWrapping, HalfFloatType, LinearFilter, Matrix4, NearestFilter, StorageTexture, Vector3,
 } from 'three/webgpu';
 import {
   Fn, If, abs, clamp, dot, float, floor, fract, instanceIndex, int, ivec2, max, min, mix, normalize, select,
@@ -34,8 +34,6 @@ function target(w: number, h: number, filter: typeof LinearFilter | typeof Neare
 const MAX_STEPS = 64;
 /** How much of a fresh sample goes into the history. */
 const BLEND = 0.25;
-/** The clouds are read through a tent this many of their (half-resolution) texels each way. */
-const TENT = 0.75;
 /** The 2×2 cell each frame takes, in an order that spreads them. */
 const LATTICE = [[0, 0], [1, 1], [1, 0], [0, 1]];
 
@@ -157,8 +155,6 @@ function createPasses(width: number, height: number, view: View, field: CloudFie
 
   return {
     history, historyDistance, cell, marchKernel, resolveKernels,
-    /** The history's size, texels. */
-    size: [HW, HH] as const,
     /** Frees the textures and the kernels' pipelines (for a new size). */
     dispose() {
       for (const t of [marched, marchedDistance, ...history, ...historyDistance]) t.dispose();
@@ -236,20 +232,12 @@ export function createClouds(view: View, tables: Tables) {
   const seen = { viewProjection: new Matrix4(), east: [1, 0, 0], up: [0, 1, 0], south: [0, 0, 1], dip: 0 };
   const historyTexture = texture(passes.history[0]);
   const historyDistanceTexture = texture(passes.historyDistance[0]);
-  /** One texel of the history, in uv. */
-  const texel = uniform(new Vector2(1, 1));
 
   return {
-    /**
-     * The clouds seen through the screen at uv: their light (rgb) and what survives behind them (a); and metres to
-     * them. Read through a tent TENT texels each way (four bilinear taps), so the march's grid left in a cloud's edge
-     * is smoothed out, not stepped.
-     */
+    /** The clouds seen through the screen at uv, at half resolution: their light (rgb) and what survives behind them
+     *  (a); and metres to them. */
     at(uv: Vec2Node): { color: Vec4Node; metres: FloatNode } {
-      const t = texel.mul(TENT), s = vec2(t.x, t.y.negate());
-      const color = historyTexture.sample(uv.add(t)).add(historyTexture.sample(uv.sub(t)))
-        .add(historyTexture.sample(uv.add(s))).add(historyTexture.sample(uv.sub(s))).mul(0.25);
-      return { color, metres: historyDistanceTexture.sample(uv).x.mul(1000) };
+      return { color: historyTexture.sample(uv), metres: historyDistanceTexture.sample(uv).x.mul(1000) };
     },
     shadow: shadow.at,
     /** The clouds along a sky direction, coarser, for the reflection. */
@@ -267,7 +255,6 @@ export function createClouds(view: View, tables: Tables) {
         // (three frees a texture's memory and a kernel's pipeline and bindings once it is disposed)
         passes.dispose();
         passes = createPasses(width, height, view, field, cam);
-        texel.value.set(1 / passes.size[0], 1 / passes.size[1]);
         frame = 0;
       }
       coverage.set(inputs.coverage);

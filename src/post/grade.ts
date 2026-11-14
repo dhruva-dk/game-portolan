@@ -39,11 +39,11 @@ export interface Look {
 /** The day's looks, by the sine of the sun's height they are set for. */
 const DAY: readonly (readonly [number, Look])[] = [
   // the golden hour: the light a little amber (the level's own warmth besides), the corners a touch darker
-  [0.17, { exposure: 0, temp: 0.2, tint: 0.02, contrast: 1.1, saturation: 1.15, warm: 1.05, sea: 1.1, sky: 1.1, fade: 0, fadeTo: [0, 0, 0], vignette: 0.2 }],
-  // the trade-wind afternoon: rich and firm
-  [0.47, { exposure: 0, temp: 0.04, tint: 0, contrast: 1.1, saturation: 1.15, warm: 1, sea: 1.1, sky: 1.1, fade: 0, fadeTo: [0, 0, 0], vignette: 0.14 }],
+  [0.17, { exposure: 0, temp: 0.2, tint: 0.02, contrast: 1, saturation: 1, warm: 1.05, sea: 1, sky: 1, fade: 0, fadeTo: [0, 0, 0], vignette: 0.2 }],
+  // the trade-wind afternoon: the palette as it is
+  [0.47, { exposure: 0, temp: 0.04, tint: 0, contrast: 1, saturation: 1, warm: 1, sea: 1, sky: 1, fade: 0, fadeTo: [0, 0, 0], vignette: 0.14 }],
   // noon in the tropics: the same, the corners all but open
-  [0.97, { exposure: 0, temp: 0, tint: 0, contrast: 1.1, saturation: 1.15, warm: 1, sea: 1.1, sky: 1.1, fade: 0, fadeTo: [0, 0, 0], vignette: 0.1 }],
+  [0.97, { exposure: 0, temp: 0, tint: 0, contrast: 1, saturation: 1, warm: 1, sea: 1, sky: 1, fade: 0, fadeTo: [0, 0, 0], vignette: 0.1 }],
 ];
 /** A morning's low sun, against the evening's amber: a rose cast, the blacks lifted a little to a lavender mist.
  *  Mixed in under a rising sun, most at the golden hour's height, gone by the afternoon's. */

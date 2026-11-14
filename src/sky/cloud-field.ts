@@ -23,7 +23,7 @@
 
 import { Vector3 } from 'three/webgpu';
 import {
-  Break, If, ceil, clamp, dot, exp, float, int, length, max, min, mix, normalize, pow, select, smoothstep, sqrt,
+  Break, If, ceil, clamp, dot, exp, float, int, length, luminance, max, min, mix, normalize, pow, select, smoothstep, sqrt,
   texture, texture3D, uniform, vec3, vec4,
 } from 'three/tsl';
 import {
@@ -83,7 +83,6 @@ const TAPS = [0.05, 0.15, 0.35, 0.8];
 /** How much of the sun's own colour the cloud's lit tone keeps (the rest is the palette's cream at the sun's
  *  brightness); and how bright its shadow tone is, of what a white surface in the open gets. */
 const WARMED = 0.5, UNDERLIT = 0.7;
-const LUMA = vec3(0.2126, 0.7152, 0.0722);
 
 const hg = (c: FloatNode, g: number): FloatNode =>
   float((1 - g * g) / (4 * Math.PI)).div(pow(float(1 + g * g).sub(c.mul(2 * g)), 1.5));
@@ -210,7 +209,7 @@ export function createCloudField(tables: Tables, noise: CloudNoise) {
     const weightSum = float(0).toVar(), distSum = float(0).toVar();
     // what a white surface in the open gets from the sun and the sky (its radiance, E/π), in the cloud's shadow tone
     const open = sunTransmittance(float(BOTTOM), sunDir.y).mul(max(sunDir.y, 0)).mul(1 / Math.PI).add(skyAmbientUp);
-    const under = vec3(dot(open, LUMA)).mul(vec3(...CLOUD.shadow)).mul(UNDERLIT).toVar();
+    const under = vec3(luminance(open)).mul(vec3(...CLOUD.shadow)).mul(UNDERLIT).toVar();
     // the sea hides the shell below the horizon
     If(d.y.greaterThan(-0.002).and(near.lessThan(MAX_DISTANCE)), () => {
       loop('cs', steps, (i) => {
@@ -253,7 +252,7 @@ export function createCloudField(tables: Tables, noise: CloudNoise) {
             // In the palette's two tones (CLOUD): the sun's light in the cloud's cream (keeping WARMED of the sun's own
             // colour, so a low sun still warms it), and the light from the sky above and the sea below, half of each
             // hemisphere's, in its rose, as bright as UNDERLIT of what a white surface in the open gets.
-            const sunTone = mix(vec3(dot(sunLight, LUMA)), sunLight, WARMED).mul(vec3(...CLOUD.lit));
+            const sunTone = mix(vec3(luminance(sunLight)), sunLight, WARMED).mul(vec3(...CLOUD.lit));
             const S = sunTone.mul(exp(tau.negate()).mul(single).add(ms.mul(powder)))
               .add(under.mul(float(0.5).div(above).add(float(0.5).div(below))));
             const stepT = exp(rho.mul(-SIGMA).mul(dt));
