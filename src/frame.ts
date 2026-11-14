@@ -93,7 +93,7 @@ export interface FrameOptions {
  *                 once to a full-size texture of light; then, at the phone's 956×440 drawn at SCALE (1912×880, the
  *                 browser scaling the frame up to the screen):
  *        bloom        7 passes, the largest a quarter size (478×220), 4–5 taps each: ~0.7 M taps (post/bloom.ts)
- *        grade        exposure, vignette, the tone curve, two reads of 33³ looks (the day's, the storm's), sRGB; a
+ *        grade        exposure, vignette, the tone curve, the look (the day's mixed to the storm's), sRGB; a
  *                     dither (post/grade.ts, post/film.ts) — one full-size pass with the bloom's read
  *        FXAA         on the graded image (its edge test wants the screen's values), for the edges of the sea's
  *                     crests and the islands against the sky

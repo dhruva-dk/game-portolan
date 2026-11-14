@@ -8,14 +8,12 @@
 // A look is then a light hand on the whole: white balance (warm to cool, green to magenta), contrast about middle
 // grey, saturation overall and by hue (the warm of sails, hulls and sand; the sea's teal; the sky's blue), and a lift
 // of the blacks toward a colour. No split toning: it would tint the chosen shadows. Looks are keyed on the sun's
-// height, which is fixed for a match (world/sun.ts), so the day's look is baked once into a 33³ table; the storm's is
-// baked into another, and the two are mixed by how deep in the storm the eye is. The table is read with the display's
-// encoded value after the curve and gives display-linear colour.
+// height, which is fixed for a match (world/sun.ts); the storm has its own, and the two looks' numbers are mixed by
+// how deep in the storm the eye is. The look is a few lines of arithmetic on display-linear colour after the curve.
 //
 // Exposure and the vignette act on the scene's light before the curve.
 
-import { ClampToEdgeWrapping, Data3DTexture, DataUtils, HalfFloatType, LinearFilter, RGBAFormat } from 'three/webgpu';
-import { clamp, dot, exp, float, length, max, mix, pow, screenUV, select, smoothstep, step, texture3D, uniform, vec2, vec3 } from 'three/tsl';
+import { abs, clamp, dot, exp, float, length, max, min, mix, mod, pow, screenUV, select, smoothstep, step, uniform, vec2, vec3 } from 'three/tsl';
 import type { FloatNode, Vec3Node } from '../tsl';
 
 type RGB = readonly [number, number, number];
@@ -101,47 +99,42 @@ const curve = (light: Vec3Node): Vec3Node => {
 export const encode = (c: Vec3Node): Vec3Node =>
   mix(c.mul(12.92), pow(max(c, vec3(0)), vec3(1 / 2.4)).mul(1.055).sub(0.055), step(vec3(0.0031308), c));
 
-/** Texels along each side of the table. */
-const N = 33;
 const smooth = (a: number, b: number, x: number) => {
   const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
   return t * t * (3 - 2 * t);
 };
 
-/** One texel of the table: from the display's encoded value (its steps along the table) to display-linear colour. */
-function graded(l: Look, r: number, g: number, b: number): RGB {
-  const lin = (i: number) => (i / (N - 1)) ** 2.2;
-  let R = lin(r) * (1 + l.temp * 0.09 - l.tint * 0.02), G = lin(g) * (1 + l.tint * 0.05), B = lin(b) * (1 - l.temp * 0.09 - l.tint * 0.02);
-  const k = l.contrast, c = (x: number) => 0.18 * (Math.max(x, 1e-6) / 0.18) ** k;
-  [R, G, B] = [c(R), c(G), c(B)];
-  // saturation, overall and by hue
-  const mx = Math.max(R, G, B), mn = Math.min(R, G, B), chroma = mx - mn;
-  let hue = 0;
-  if (chroma > 1e-6) hue = 60 * (mx === R ? ((G - B) / chroma + 6) % 6 : mx === G ? (B - R) / chroma + 2 : (R - G) / chroma + 4);
-  const band = (centre: number, width: number) => Math.max(0, 1 - Math.abs(((hue - centre + 540) % 360) - 180) / width);
-  const s = l.saturation * (1 + (l.warm - 1) * band(35, 50) + (l.sea - 1) * band(175, 45) + (l.sky - 1) * band(220, 40));
-  const y = 0.2126 * R + 0.7152 * G + 0.0722 * B;
-  [R, G, B] = [y + (R - y) * s, y + (G - y) * s, y + (B - y) * s];
-  const lift = (x: number, i: number) => Math.max(0, x * (1 - l.fade) + l.fadeTo[i] * l.fade);
-  return [lift(R, 0), lift(G, 1), lift(B, 2)];
+/** Each number of a look, the day's mixed toward the storm's by how deep in it the eye is. */
+type Mixed = { [K in keyof Look]: Look[K] extends number ? FloatNode : Vec3Node };
+function mixed(a: Look, b: Look, t: FloatNode): Mixed {
+  const out: Partial<Record<keyof Look, FloatNode | Vec3Node>> = {};
+  for (const k of Object.keys(a) as (keyof Look)[]) {
+    const u = a[k], v = b[k];
+    out[k] = typeof u === 'number' && typeof v === 'number' ? mix(float(u), float(v), t) : mix(vec3(...a.fadeTo), vec3(...b.fadeTo), t);
+  }
+  return out as Mixed;
 }
 
-/** A look baked into a table. */
-function table(l: Look): Data3DTexture {
-  const data = new Uint16Array(N * N * N * 4);
-  for (let z = 0; z < N; z++) for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
-    const c = graded(l, x, y, z), o = ((z * N + y) * N + x) * 4;
-    for (let i = 0; i < 3; i++) data[o + i] = DataUtils.toHalfFloat(c[i]);
-    data[o + 3] = DataUtils.toHalfFloat(1);
-  }
-  const t = new Data3DTexture(data, N, N, N);
-  t.format = RGBAFormat;
-  t.type = HalfFloatType;
-  t.minFilter = t.magFilter = LinearFilter;
-  t.wrapS = t.wrapT = t.wrapR = ClampToEdgeWrapping;
-  t.unpackAlignment = 1;
-  t.needsUpdate = true;
-  return t;
+/** The look on display-linear colour: white balance, contrast about middle grey, saturation overall and by hue (in
+ *  bands of hue, degrees, about the warm hues, the sea's and the sky's), and the blacks lifted. */
+function looked(l: Mixed, colour: Vec3Node): Vec3Node {
+  const balance = vec3(
+    float(1).add(l.temp.mul(0.09)).sub(l.tint.mul(0.02)),
+    float(1).add(l.tint.mul(0.05)),
+    float(1).sub(l.temp.mul(0.09)).sub(l.tint.mul(0.02)),
+  );
+  const c = pow(max(colour.mul(balance), vec3(1e-6)).div(0.18), vec3(l.contrast)).mul(0.18);
+  const mx = max(max(c.x, c.y), c.z), chroma = max(mx.sub(min(min(c.x, c.y), c.z)), 1e-6);
+  const hue = select(mx.equal(c.x), mod(c.y.sub(c.z).div(chroma).add(6), 6),
+    select(mx.equal(c.y), c.z.sub(c.x).div(chroma).add(2), c.x.sub(c.y).div(chroma).add(4))).mul(60);
+  const band = (centre: number, width: number) => max(float(1).sub(abs(mod(hue.sub(centre - 540), 360).sub(180)).div(width)), 0);
+  const s = l.saturation.mul(float(1)
+    .add(l.warm.sub(1).mul(band(35, 50)))
+    .add(l.sea.sub(1).mul(band(175, 45)))
+    .add(l.sky.sub(1).mul(band(220, 40))));
+  const y = dot(c, vec3(0.2126, 0.7152, 0.0722));
+  const saturated = mix(vec3(y), c, s);
+  return max(mix(saturated, l.fadeTo, l.fade), vec3(0));
 }
 
 /**
@@ -152,7 +145,6 @@ function table(l: Look): Data3DTexture {
  */
 export function createGrade(rise: number, rising: boolean, open: Vec3Node) {
   const day = dayLook(rise, rising);
-  const days = texture3D(table(day)), storms = texture3D(table(STORM));
   const vignette = uniform(day.vignette);
   // what brings a white surface in the open to the display's white, whatever the hour
   const gain = float(2 ** day.exposure).div(max(dot(open, vec3(0.2126, 0.7152, 0.0722)), 1e-4));
@@ -160,8 +152,7 @@ export function createGrade(rise: number, rising: boolean, open: Vec3Node) {
     const v = length(screenUV.sub(0.5).mul(vec2(1.4, 1.1)));
     const corner = float(1).sub(smoothstep(0.15, 0.8, v).mul(mix(vignette, STORM.vignette, storm)));
     const toned = curve(color.mul(corner).mul(gain).mul(mix(float(1), float(2 ** (STORM.exposure - day.exposure)), storm)));
-    const at = pow(max(toned, vec3(0)), vec3(1 / 2.2)).mul((N - 1) / N).add(0.5 / N);
-    return mix(days.sample(at).level(float(0)).rgb, storms.sample(at).level(float(0)).rgb, storm);
+    return looked(mixed(day, STORM, storm), toned);
   };
   return { grade, gain };
 }
