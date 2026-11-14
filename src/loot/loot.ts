@@ -21,7 +21,7 @@
 import {
   AddEquation, BufferAttribute, BufferGeometry, CustomBlending, CylinderGeometry, DoubleSide, DynamicDrawUsage,
   InstancedBufferGeometry, InstancedInterleavedBuffer, InterleavedBufferAttribute, LatheGeometry, Matrix4, Mesh,
-  MeshBasicNodeMaterial, OctahedronGeometry, OneFactor, Vector2, type PerspectiveCamera,
+  MeshBasicNodeMaterial, OctahedronGeometry, OneFactor, OneMinusSrcAlphaFactor, Vector2, type PerspectiveCamera,
 } from 'three/webgpu';
 import { Fn, abs, attribute, cameraPosition, clamp, cos, cross, dot, float, max, mix, normalize, pow, saturate, select, sin, smoothstep, uniform, varying, vec3 } from 'three/tsl';
 import { GILDING, GLINT, ICE, TAR, TIMBER, tint } from '../palette';
@@ -55,6 +55,8 @@ const HORIZON = 8;
 /** How bright a piece's rim, a beam and its ring glow, of what the sun and the sky give a white surface; and how far
  *  a face must turn from the eye (0 facing it … 1 edge on) to be in the rim. */
 const EMIT = 1.3, BEAM_EMIT = 3, HALO_EMIT = 1.2, RIM = 0.62;
+/** How much of what lies behind a beam or its ring hides, per unit of its brightness. */
+const COVER = 0.8;
 /** Each kind's size: the guns', the shields' and repairs' small and big. */
 const SIZE: Record<LootKind, number> = {
   cannon: 2.3, scatter: 2.1, repeater: 2.2, harpoon: 2.4, mortar: 2.1, smallShield: 1.7, bigShield: 2.25, repairKit: 1.6, fullRepair: 2.1,
@@ -177,7 +179,7 @@ export function createLoot(light: Light) {
   bm.blending = CustomBlending;
   bm.blendEquation = AddEquation;
   bm.blendSrc = OneFactor;
-  bm.blendDst = OneFactor;
+  bm.blendDst = OneMinusSrcAlphaFactor;
   const ring = attribute('part', 'float'), uv = attribute('uv', 'vec2');
   const tall = float(TALL).add(glow.w.mul(TALLER)), wide = max(float(1), far.mul(pixel).mul(BEAM_PIXELS / (2 * HEAD)));
   const beamAt = at.xyz.add(e1.mul(local.x.mul(wide))).add(e2.mul(local.z.mul(wide))).add(up.mul(local.y.mul(tall)));
@@ -190,17 +192,17 @@ export function createLoot(light: Light) {
   // and gone once its foot is over the horizon (the eye under the sea's level there), so it doesn't stand tilted in
   // the sky past it
   const near = varying(smoothstep(10, 55, far).mul(smoothstep(-HORIZON, 0, dot(cameraPosition.sub(at.xyz), up))));
-  bm.colorNode = Fn(() => {
-    const lit = light.level(base);
-    const column = pow(float(1).sub(v), 2.2).mul(sin(v.mul(40).sub(now.mul(6))).mul(0.25).add(0.75)).mul(core.mul(core)).mul(near);
-    // the ring: a bright band at its edge round a pool of light falling off from the middle
-    const d = xz.length(), band = smoothstep(0.62, 0.8, d).mul(smoothstep(1, 0.86, d));
-    const pool = pow(saturate(float(1).sub(d)), 1.5).mul(POOL);
-    // the beam and its pool gold whatever the piece; the ring's band in its rarity's light over the gold
-    const isBeam = isRing.lessThanEqual(0.5);
-    const brightness = select(isBeam, column.mul(BEAM_EMIT).mul(r.mul(0.18).add(0.35)), band.add(pool).mul(HALO_EMIT));
-    return select(isBeam, vec3(...BEAM_GOLD), mix(vec3(...BEAM_GOLD), tint, band.mul(0.5))).mul(lit).mul(brightness);
-  })();
+  const column = pow(float(1).sub(v), 2.2).mul(sin(v.mul(40).sub(now.mul(6))).mul(0.25).add(0.75)).mul(core.mul(core)).mul(near);
+  // the ring: a bright band at its edge round a pool of light falling off from the middle
+  const d = xz.length(), band = smoothstep(0.62, 0.8, d).mul(smoothstep(1, 0.86, d));
+  const pool = pow(saturate(float(1).sub(d)), 1.5).mul(POOL);
+  // the beam and its pool gold whatever the piece; the ring's band in its rarity's light over the gold
+  const isBeam = isRing.lessThanEqual(0.5);
+  const brightness = select(isBeam, column.mul(BEAM_EMIT).mul(r.mul(0.18).add(0.35)), band.add(pool).mul(HALO_EMIT));
+  bm.colorNode = select(isBeam, vec3(...BEAM_GOLD), mix(vec3(...BEAM_GOLD), tint, band.mul(0.5))).mul(light.level(base)).mul(brightness);
+  // over what lies behind, hiding it as much as it is bright (premultiplied): gold over the sea stays gold, where
+  // added to its blue it would wash pale
+  bm.opacityNode = saturate(brightness.mul(COVER));
   const beamMesh = new Mesh(beamGeometry, bm);
   beamMesh.frustumCulled = false;
   // after the sea, which reads what was drawn before it (as the gunfire's puffs)
