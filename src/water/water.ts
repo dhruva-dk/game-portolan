@@ -32,7 +32,7 @@ import { DoubleSide, Mesh, MeshBasicNodeMaterial, type Texture } from 'three/web
 import {
   Discard, Fn, If, abs, cameraPosition, cameraProjectionMatrix, cameraProjectionMatrixInverse, cameraViewMatrix, dFdx, dFdy, dot, float,
   getScreenPosition, getViewPosition, length, log2, max, min, mix, normalize, positionView, positionWorld, saturate,
-  screenUV, select, smoothstep, sqrt, step, tanh, texture, varying, vec2, vec3, vec4, viewportDepthTexture, viewportSharedTexture,
+  screenUV, select, smoothstep, step, texture, varying, vec2, vec3, vec4, viewportDepthTexture, viewportSharedTexture,
 } from 'three/tsl';
 import type { Environment } from '../environment';
 import { LIGHTNING } from '../palette';
@@ -66,15 +66,10 @@ const MAX_REFRACT_DEPTH = 20;
 /** The winds (m/s) at which neighbouring charts' seas are kept unlike: from a breeze to a gale. */
 const LIKENESS_WINDS = [5, 10, 15, 20];
 /**
- * How much the waves the cascades hold gather the ripples onto their faces downwind and strip them from their backs:
- * the ripples' mean square slope is (1 − GATHER·tanh(s/σ)) of its mean, s the slope along the wind and σ its rms.
+ * In the storm (sky/storm.ts) the sea's whitecaps cover STORM_FOAM of it, and the rain on it and the dark over it
+ * take STORM_DARK of its light.
  */
-const GATHER = 0.8;
-/**
- * In the storm (sky/storm.ts) the wind's gusts roughen the sea by STORM_ROUGH more mean square slope, its whitecaps
- * cover STORM_FOAM of it, and the rain on it and the dark over it take STORM_DARK of its light.
- */
-const STORM_ROUGH = 0.03, STORM_FOAM = 0.45, STORM_DARK = 0.3;
+const STORM_FOAM = 0.45, STORM_DARK = 0.3;
 /**
  * The storm's foot: the sea churned white from its edge out to FOOT (fading over the second) metres; and its edge's
  * line, EDGE_LINE m to each side (or most of a pixel), the palette's lightning at EDGE_LIGHT of what a white surface
@@ -83,8 +78,6 @@ const STORM_ROUGH = 0.03, STORM_FOAM = 0.45, STORM_DARK = 0.3;
 const FOOT = [6, 26] as const, EDGE_LINE = 0.3, EDGE_LIGHT = 1.6;
 /** A wake's foam (wake.ts) drawn this much fuller than it is kept: bold lobes of white along her sides and astern. */
 const WAKE_BOLD = 2;
-/** The least mean square slope the surface is shaded with: a film of water on sand is still rippled. */
-const SMOOTHEST = 1e-4;
 /**
  * The swash: each wave's bore runs on up the beach after it breaks, RUNUP of its crest's height offshore above the
  * still water, and drains back BACKWASH of its trough's below it, on ground from SWASH_FROM metres down up the beach.
@@ -179,28 +172,19 @@ export function createWater(view: View, sky: Sky, ground: Ground, wind: Wind, sh
     // whitecaps' fading leaves
     const surf = breaking.mul(smoothstep(0.4, 0.85, phase)).mul(0.7);
 
-    // Per chart: the slopes, filtered over the pixel's footprint by the mips; what the filtering averages away (the
-    // slopes' variance within the footprint) becomes roughness, as do the ripples too small for any cascade. The
-    // slopes, as a tangent vector, sum with the charts' weights; the variances, independent, with their squares.
+    // Per chart: the slopes, filtered over the pixel's footprint by the mips; as a tangent vector they sum with the
+    // charts' weights.
     // The foam from the breaking cascades' cover (averaged over the footprint by their mips), and the air under it,
     // drawn by foam.ts. Cover is no Gaussian height: summed with weights w it could pass one sea's, or a whitecap's 1.
     // Weighted by w² (Σw² = 1), each chart's foam fades across the band as its waves do, the mean cover stays one
     // sea's, and no pixel is whiter than a whitecap; so too the air.
-    // The ripples are not spread evenly: the wind raises them most on the faces of the longer waves that lie downwind
-    // of a crest, where the surface converges, and the waves' orbital currents sweep them off the backs (the
-    // hydrodynamic and aerodynamic modulation of short waves by long: Keller & Wright 1975, whose measured modulation is
-    // tens of percent per percent of slope). So the ripples' roughness follows the slope along the wind, as filtered
-    // over the pixel (where the waves are too small to see it averages out, and the ripples with it): the backs mirror
-    // the sky sharply, the faces blur it, about the same mean.
-    const slope = marks.slope.toVar(), variance = float(0).toVar(), foam = float(0).toVar(), bubbles = float(0).toVar();
-    const lean = float(0).toVar();
+    const slope = marks.slope.toVar(), foam = float(0).toVar(), bubbles = float(0).toVar();
     charts.each(p, (c) => {
       const read = (t: Texture, k: FloatNode) => texture(t, c.q.mul(k)).grad(c.dx.mul(k), c.dy.mul(k));
-      let s2: Vec2Node = vec2(0), v: FloatNode = float(0), h: FloatNode = float(0);
+      let s2: Vec2Node = vec2(0), h: FloatNode = float(0);
       CASCADES.forEach((L, k) => {
         const s = read(waves.slopes[k], float(1 / L)), m = scale(k);
         s2 = s2.add(s.xy.mul(m));
-        v = v.add(max(s.z.sub(s.x.mul(s.x)), 0).add(max(s.w.sub(s.y.mul(s.y)), 0)).mul(m.mul(m)));
         if (k < 2) {
           h = h.add(read(waves.displacement[k], float(1 / L)).y.mul(m));
         }
@@ -208,15 +192,11 @@ export function createWater(view: View, sky: Sky, ground: Ground, wind: Wind, sh
       // the sea is Σ w·h, so its slope is Σ w·∇h + h·∇w: across the band, where the weights change, the second
       // tilts it too (the long cascades' height; the shortest's is too small to matter)
       slope.addAssign(c.e1.mul(s2.x).add(c.e2.mul(s2.y)).mul(c.w).add(c.dw.mul(h)));
-      variance.addAssign(v.mul(c.w.mul(c.w)));
-      lean.addAssign(s2.x.mul(c.w));
       const froth = foamOn(c, surf.add(wakeFoam), thickness, footprint);
       foam.addAssign(froth.foam.mul(c.w.mul(c.w)));
       bubbles.addAssign(froth.air.mul(c.w.mul(c.w)));
     }, dp);
-    variance.addAssign(waves.ripples.mul(short).mul(float(1).sub(tanh(lean.div(waves.steepness)).mul(GATHER))));
     const storm = sky.storm(p), past = sky.stormEdge(p);
-    variance.addAssign(storm.mul(STORM_ROUGH));
     // the storm's foot churned white along its edge, over the crests
     const foot = smoothstep(-2, 2, past).mul(float(1).sub(smoothstep(FOOT[0], FOOT[1], past)));
     foam.assign(max(mix(foam, max(foam, smoothstep(0.55, 1, phase)), storm.mul(STORM_FOAM)), foot.mul(smoothstep(0.2, 0.8, phase)).mul(0.8)));
@@ -252,11 +232,7 @@ export function createWater(view: View, sky: Sky, ground: Ground, wind: Wind, sh
 
     // the ships' shadows, the hulls' shade and the wakes' air
     const near = { lit: float(1).sub(wake.shade(positionWorld)), glow: hull.glow, air: max(max(air, bubbles), held.drain.mul(0.6)) };
-    // the facets' α² is the mean square slope over both axes; a wake's air calms the ripples over it. Never quite a
-    // mirror: at the waterline the depth cuts every wave away, and with α² = 0 the facets' D is 0/0, a line of NaN
-    // drawn black along every beach.
-    const alpha = sqrt(max(variance.mul(float(1).sub(air.mul(0.6))), SMOOTHEST));
-    const sea = optics.seaRadiance(positionWorld, n, v, alpha, crest, foam, behind, path, max(ground.height(rest).negate(), 0), near, held).mul(float(1).sub(storm.mul(STORM_DARK)));
+    const sea = optics.seaRadiance(positionWorld, n, v, crest, foam, behind, path, max(ground.height(rest).negate(), 0), near, held).mul(float(1).sub(storm.mul(STORM_DARK)));
     return mix(sea, vec3(...LIGHTNING).mul(dot(sky.open, vec3(0.2126, 0.7152, 0.0722)).mul(EDGE_LIGHT)), edgeLine);
   })();
   // the charts' weights as red, green and blue, about as bright on the screen as they are after the frame's exposure
@@ -286,10 +262,12 @@ export function createWater(view: View, sky: Sky, ground: Ground, wind: Wind, sh
     ribbons: trails.mesh,
     /** The sea's charts (world/lattice.ts), for its CPU copy (world/swell.ts). */
     anchors: charts.anchors,
-    /** The light under the water at world position p, as a share of what is above it: the sun's and the sky's. */
+    /** The light under the water at world position p, as a share of what is above it: the sun's and the sky's; and
+     *  how the waves above focus the sun's onto the floor there (caustics.ts). */
     below: {
-      sun: (p: Vec3Node): Vec3Node => optics.sunBelow(p).mul(caustics(p)),
+      sun: (p: Vec3Node): Vec3Node => optics.sunBelow(p),
       sky: (p: Vec3Node): Vec3Node => optics.skyBelow(p),
+      focus: (p: Vec3Node): FloatNode => caustics(p),
     },
     /** The ships' marks' draw, due or not (update gives it only when due): for the frame to build its shaders before
      *  any ship is near. */

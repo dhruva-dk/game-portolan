@@ -52,6 +52,6 @@ export function createSand(view: View, ground: Ground, light: Light): Sand {
     lay(SAND, cut(level, BEACH));
     lay(SAND_DRY, cut(level, DRY));
     if (litter) lay(LITTER, cut(litter.add(mottle.mul(0.6)), FALLEN).mul(cut(height, BEACH)));
-    return light.toon(p, n, lit, shadow);
+    return light.floor(p, n, lit, shadow);
   };
 }

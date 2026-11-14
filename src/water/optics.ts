@@ -29,8 +29,6 @@ export const N_WATER = 1.34;
 const F0 = 0.02;
 /** How much of what Fresnel gives the sea's mirror keeps: the sea stays its own colour out to the horizon. */
 const MIRROR = 0.45;
-/** The roughness the sky's reflection is blurred to at the least: a few broad shapes of cloud and sky, no detail. */
-const BLURRED = 0.55;
 /** The water's depth over the floor, metres, at which its tone is the middle one, and the deep one. */
 const MIDDLE_AT = 4, DEEP_AT = 14;
 /** How fast the water's own tone veils what lies under it, per metre of the eye's path through it. */
@@ -76,10 +74,10 @@ export function createOptics(sky: Sky, view: View) {
     skyBelow,
     /** The light leaving the sea toward the eye (seaRadiance, below). */
     seaRadiance: (
-      p: Vec3Node, n: Vec3Node, v: Vec3Node, alpha: FloatNode, crest: FloatNode, foam: FloatNode, behind: Vec3Node, path: FloatNode,
+      p: Vec3Node, n: Vec3Node, v: Vec3Node, crest: FloatNode, foam: FloatNode, behind: Vec3Node, path: FloatNode,
       depth: FloatNode, ships: Ships, held?: Held,
     ): Vec3Node =>
-      seaRadiance(sky, view, p, n, v, alpha, crest, foam, behind, path, depth, ships, held),
+      seaRadiance(sky, view, p, n, v, crest, foam, behind, path, depth, ships, held),
   };
 }
 
@@ -138,7 +136,6 @@ function tinted(c: Vec3Node, colour: Vec3Node, a: FloatNode, far: FloatNode): Ve
 /**
  * The light leaving the sea at world position p toward the eye.
  *   n      the surface's normal          v      unit vector from p to the eye
- *   alpha  roughness, √(mean square slope) (the slopes the pixel can't resolve, plus the ripples no cascade holds)
  *   crest  0 in the troughs … 1 at the tops of the waves
  *   foam   the share of the pixel covered in foam
  *   behind the radiance of whatever lies behind the surface (the sea floor; the sky's if nothing)
@@ -148,7 +145,7 @@ function tinted(c: Vec3Node, colour: Vec3Node, a: FloatNode, far: FloatNode): Ve
  *   held   who holds the water here: the water tinted her colour, and her border's line drawn over it
  */
 function seaRadiance(
-  sky: Sky, view: View, p: Vec3Node, n: Vec3Node, v: Vec3Node, alpha: FloatNode, crest: FloatNode, foam: FloatNode, behind: Vec3Node,
+  sky: Sky, view: View, p: Vec3Node, n: Vec3Node, v: Vec3Node, crest: FloatNode, foam: FloatNode, behind: Vec3Node,
   path: FloatNode, depth: FloatNode, ships: Ships, held?: Held,
 ): Vec3Node {
   const l = sky.sun(p), up = view.up(p);
@@ -158,7 +155,7 @@ function seaRadiance(
 
   // what a white surface lying on the sea would give back (ambient() is the sky's radiance, so its E/π is itself):
   // the water's colours are tones under it, as a solid's are under its level (sky/light.ts)
-  const irradiance = sun.mul(max(dot(l, up), 0)).div(Math.PI).add(sky.ambient(p, up));
+  const irradiance = sun.mul(max(dot(l, up), 0)).div(Math.PI).add(sky.ambient(p));
   // the water's own tone by how much of it the eye looks through, paler where a wake has worked air into it, and a
   // second, deeper tone in the troughs between the waves, its edge crisp
   const own = mix(mix(vec3(...SEA_SHALLOW), vec3(...SEA_MIDDLE), smoothstep(0, MIDDLE_AT, depth)), vec3(...SEA_DEEP), smoothstep(MIDDLE_AT, DEEP_AT, depth));
@@ -170,7 +167,7 @@ function seaRadiance(
   // glancing, that wave mirrors the sky at its horizon; steeper, the light comes through it, the sea's own colour.
   const r = v.negate().reflect(n);
   const below = dot(r, up);
-  const above = sky.reflect(normalize(r.sub(up.mul(min(below, 0)))), max(sqrt(alpha), BLURRED));
+  const above = sky.reflect(normalize(r.sub(up.mul(min(below, 0)))));
   const seen = mix(body, above, fresnel(below.negate()));
   // the sun's glints: flat shapes of light where the surface mirrors it to the eye
   const nh = n.dot(normalize(l.add(v)));

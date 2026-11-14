@@ -25,14 +25,12 @@ import { sunAt, sunInSky } from './world/sun';
 import { BLOOM_LEVELS, bloom } from './post/bloom';
 import { film } from './post/film';
 import { createGrade, encode } from './post/grade';
-import { createShafts, type Shafts } from './post/shafts';
 import { SKY_METRES } from './sky/sky';
 import type { Vec4Node } from './tsl';
 
 /**
- * How strongly the bloom (post/bloom.ts: the light over its knee, spread) is added to the frame's light; and the
- * light shafts' (post/shafts.ts), by the sun's height: strongest low, and still there high. The exposure, the tone
- * curve and the look are the grade's (post/grade.ts), set by the sun's height.
+ * How strongly the bloom (post/bloom.ts: the light over its knee, spread) is added to the frame's light. The
+ * exposure, the tone curve and the look are the grade's (post/grade.ts), set by the sun's height.
  */
 const BLOOM = 0.22;
 /**
@@ -41,7 +39,6 @@ const BLOOM = 0.22;
  * 30–40 FPS budget.
  */
 const SCALE = 2;
-const shaftsFor = (rise: number) => 0.6 * (1 - 0.5 * Math.min(1, Math.max(0, (rise - 0.2) / 0.6)));
 /** The eye's near and far planes, metres: in the air, past the far side of the planet from as high as it goes; from
  *  space, round the whole planet from as far out as the full map goes. */
 const PLANES = { air: [0.5, 2000], space: [50, 4000] } as const;
@@ -95,10 +92,9 @@ export interface FrameOptions {
  *                 storm's rain and cloud over all of it (sky/storm.ts: a short march, from where the ray meets its cone), drawn
  *                 once to a full-size texture of light; then, at the phone's 956×440 drawn at SCALE (1912×880, the
  *                 browser scaling the frame up to the screen):
- *        bloom        7 passes, the largest a quarter size (359×165), 4–5 taps each: ~0.4 M taps (post/bloom.ts)
- *        shafts       3 passes at a quarter size, 2 + 16 + 16 taps: ~2 M taps (post/shafts.ts)
- *        grade        exposure, vignette, AgX, two reads of 33³ looks (the day's, the storm's), sRGB; grain and dither
- *                     (post/grade.ts, post/film.ts) — one full-size pass with the bloom's and shafts' reads
+ *        bloom        7 passes, the largest a quarter size (478×220), 4–5 taps each: ~0.7 M taps (post/bloom.ts)
+ *        grade        exposure, vignette, the tone curve, two reads of 33³ looks (the day's, the storm's), sRGB; a
+ *                     dither (post/grade.ts, post/film.ts) — one full-size pass with the bloom's read
  *        FXAA         on the graded image (its edge test wants the screen's values), for the edges of the sea's
  *                     crests and the islands against the sky
  * Each frame every system first does its CPU work, in the order one reads another, and says what of its GPU work is
@@ -164,25 +160,24 @@ export function createFrame(renderer: WebGPURenderer, world: World, options: Fra
       const position = getViewPosition(screenUV, depth, projectionInverse);
       return { color, depth, dir: normalize(world.mul(vec4(position, 0)).xyz), metres: length(position) };
     };
-    return { seen, depth: scenePass.getTextureNode('depth'), pass: scenePass };
+    return { seen, pass: scenePass };
   };
   /**
-   * The post chain over a view's light (linear, per unit sun) and the depth it was seen at: drawn once to a texture,
-   * its bloom and light shafts added, graded, encoded for the display, anti-aliased, grained.
+   * The post chain over a view's light (linear, per unit sun): drawn once to a texture, its bloom added, graded,
+   * encoded for the display, dithered, anti-aliased.
    */
-  const pipelineOf = (post: Vec4Node, depth: ReturnType<typeof look>['depth']): { pipeline: RenderPipeline; shafts: Shafts } => {
+  const pipelineOf = (post: Vec4Node): { pipeline: RenderPipeline } => {
     const light = rtt(post, null, null, { depthBuffer: false });
     const glow = bloom(light, gain);
-    const shafts = createShafts(light, depth);
     const storm = sky.light.storm(view.position);
     const graded = Fn(() => {
-      const c = light.sample(screenUV).rgb.add(glow.sample(screenUV).rgb.mul(BLOOM / BLOOM_LEVELS)).add(shafts.light());
+      const c = light.sample(screenUV).rgb.add(glow.sample(screenUV).rgb.mul(BLOOM / BLOOM_LEVELS));
       return film(encode(grade(c, storm)));
     })();
-    // the grade encodes for the display itself, grained before the anti-aliasing so its dither reaches the screen
+    // the grade encodes for the display itself, dithered before the anti-aliasing
     const p = new RenderPipeline(renderer, fxaa(graded));
     p.outputColorTransform = false;
-    return { pipeline: p, shafts };
+    return { pipeline: p };
   };
 
   // In the air: haze by distance, the clouds over whatever they stand in front of, the storm over all of it.
@@ -213,8 +208,8 @@ export function createFrame(renderer: WebGPURenderer, world: World, options: Fra
   })();
 
   const eyes = {
-    air: { camera: airCamera, scene: airSeen.pass, ...pipelineOf(airPost, airSeen.depth) },
-    space: { camera: spaceCamera, scene: spaceSeen.pass, ...pipelineOf(spacePost, spaceSeen.depth) },
+    air: { camera: airCamera, scene: airSeen.pass, ...pipelineOf(airPost) },
+    space: { camera: spaceCamera, scene: spaceSeen.pass, ...pipelineOf(spacePost) },
   };
 
   /** Runs compute passes, in order. */
@@ -366,8 +361,7 @@ export function createFrame(renderer: WebGPURenderer, world: World, options: Fra
     draw(sea.wake);
     draw(islandShadow);
     compute(ships.cloth);
-    // 2, 3. the scene and its post, from the eye; the light shafts only in the air
-    eyes[seen.kind].shafts.update(eye, env.sunDirection, seen.kind === 'air' ? shaftsFor(rise) : 0);
+    // 2, 3. the scene and its post, from the eye
     eyes[seen.kind].pipeline.render();
   }
 

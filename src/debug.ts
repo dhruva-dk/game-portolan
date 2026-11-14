@@ -4,7 +4,7 @@
 // what they offer anyone (main.ts builds them; this only sets them going).
 //
 // ?mood= puts the whole look on one of its alternates: dawn, a low morning sun
-// in a rose mist; warm, a low evening sun over a deeper sea; noon, a high sun, bright and saturated (MOODS: the hour and the haze; the grade, light shafts and
+// in a rose mist; warm, a low evening sun over a deeper sea; noon, a high sun, bright and saturated (MOODS: the hour and the haze; the grade and the
 // haze follow the sun's height). ?t=hours sets the time of day (the same everywhere: world/sun.ts); ?wind=m/s the wind's speed, ?haze= the air's
 // aerosol and ?cloud= the cloud cover (0–1) each hold at that instead of drifting (world/weather.ts); ?seed= the
 // planet's (world/planet.ts; SEED by default). ?debug=charts colours the sea by its charts' weights, ?debug=wake shows

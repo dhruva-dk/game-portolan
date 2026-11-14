@@ -14,7 +14,7 @@
 // waves longer than about twice that width shape the net; the shorter average away, and far off, where the floor's
 // footprint is wide, the net fades into an even light of itself.
 
-import { Fn, dFdx, dFdy, dot, float, length, log2, max, mix, smoothstep, sqrt, texture, vec2, vec3 } from 'three/tsl';
+import { Fn, If, dFdx, dFdy, dot, float, length, log2, max, mix, smoothstep, sqrt, texture, vec2, vec3 } from 'three/tsl';
 import type { Sky } from '../sky/sky';
 import type { Charts } from '../view/charts';
 import type { View } from '../view/view';
@@ -44,7 +44,8 @@ export function createCaustics(view: View, sky: Sky, waves: Waves, charts: Chart
     const footprint = max(length(dFdx(p)), length(dFdy(p)));
     const width = max(footprint.mul(PIXELS), depth.mul(BLUR));
     const E1 = vec3(1, 0, 0).toVar(), E2 = vec3(0, 0, 1).toVar(), H = vec3(0).toVar();
-    charts.each(p, (c, slot) => {
+    // only under water: the dry ground is spared the charts and their reads
+    If(depth.greaterThan(0), () => charts.each(p, (c, slot) => {
       if (slot === 0) {
         E1.assign(c.e1);
         E2.assign(c.e2);
@@ -63,7 +64,7 @@ export function createCaustics(view: View, sky: Sky, waves: Waves, charts: Chart
         h.x.mul(e.mul(e)).add(h.y.mul(d.mul(d))).add(h.z.mul(e.mul(d).mul(2))),
         h.x.mul(a.mul(e)).add(h.y.mul(b.mul(d))).add(h.z.mul(a.mul(d).add(b.mul(e)))),
       ).mul(c.w));
-    });
+    }));
     const f = depth.div(sqrt(float(1).add(depth.div(FOCUS).pow(2)))).mul(1 - 1 / N_WATER);
     const J = float(1).add(f.mul(H.x)).mul(float(1).add(f.mul(H.y))).sub(f.mul(H.z).mul(f.mul(H.z)));
     return mix(float(1), float(1).div(max(J.abs(), 0.15)), smoothstep(0, 0.3, depth));
