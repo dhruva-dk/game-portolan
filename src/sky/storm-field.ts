@@ -49,6 +49,8 @@ const PUFF = 1.5, PUFF_MID = 0.75, CREASE = 0.25;
 /** The round heads over the heaps (the coarse Worley's cells, domed): how far they reach, in the billows' units, and
  *  their mean (so the wall stands where it did). */
 const HEADS = 0.8, HEAD_MID = 0.5;
+/** The heads' pattern's tile as a share of the billows' (its cells a quarter of it: about 240 m, as the wall's height). */
+const HEAD_TILE = 2.5;
 /** The rain's pattern: across (its shafts a quarter of it), along its fall, how far it leans a metre down, how fast it
  * falls (m/s); and how far in from the edge it thickens. */
 const RAIN_TILE = 90, RAIN_LONG = 520, RAIN_LEAN = 0.25, FALL = 11, RAIN_RAMP = 10;
@@ -70,7 +72,7 @@ const SUNLIT = 0.55, LINING = 0.15;
  *  where its height and its facing the sun together cross TONE_AT, over TONE_EDGE, so it follows the billows. */
 const TONE_AT = 0.4, TONE_EDGE = 0.04;
 /** How much a billow's facing the sky lifts it toward the crown's tone, so each head is lit over and dark under. */
-const SKYWARD = 0.5;
+const SKYWARD = 0.8;
 /** The warm rim along the face's foot: the sunlit calm's gold light (palette STORM_FOOT) thrown up onto whatever of
  *  the face looks out over it, as a share of the sun's on a white surface, fading out RIM_UP metres over the base. */
 const RIM = 0.5, RIM_UP = 45;
@@ -111,7 +113,7 @@ export function createStormField(cap: Cap, shape: Storage3DTexture) {
     const x = n.r.mul(0.55).add(n.b.mul(0.15)).add(f.r.mul(0.3)).sub(0.4).mul(2.8);
     // and over them the coarse Worley's cells as round heads (a dome over each: the cell's inverted distance,
     // rounded), so the wall stands as heaped cumulus rather than a sheet
-    const g = clamp(n.g, 0, 1), dome = sqrt(g.mul(float(2).sub(g)));
+    const g = clamp(texture3D(shape, q.add(churn).div(CLOUD_TILE * HEAD_TILE)).level(float(0)).g, 0, 1), dome = sqrt(g.mul(float(2).sub(g)));
     return sqrt(x.mul(x).add(CREASE * CREASE)).mul(PUFF).sub(PUFF_MID).add(dome.sub(HEAD_MID).mul(HEADS));
   };
 
