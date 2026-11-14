@@ -42,7 +42,7 @@ const GRAZE = [0.08, 0.4, 3] as const;
 const CLOUDY = 0.12;
 /** How far a wake's air at its thickest takes the water toward the shallows' tone; and how much it veils what lies
  *  under it, as an optical depth. */
-const AIRED = 0.6, AIR_VEIL = 2;
+const AIRED = 0.3, AIR_VEIL = 2;
 /** The troughs' tone, of the water's, and where between trough and crest (0…1) its edge lies. */
 const TROUGH = 0.88, TROUGH_AT = 0.47;
 /** And the crests' tops, paler, past CREST_AT: the light rows of art/target/idea.png's painted waves. */
