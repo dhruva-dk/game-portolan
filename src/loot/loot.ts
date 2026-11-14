@@ -43,7 +43,9 @@ const RING = 3.5, HALO_PIXELS = 18, POOL = 0.7;
  *  (rad/s) and rocks this far (rad); rises this far up out of the water as it comes, over 1/RISE s. */
 const RIDE = 2.2, BOB = 0.25, BOB_RATE = 2, SPIN = 1.4, ROCK = 0.15, SINK = 2, RISE = 2.5;
 /** The fewest pixels across a piece and a beam are drawn; a piece's size, m, it grows from. */
-const SHAPE_PIXELS = 14, BEAM_PIXELS = 2, SHAPE_ACROSS = 3.5;
+const SHAPE_PIXELS = 14, BEAM_PIXELS = 3, SHAPE_ACROSS = 3.5;
+/** How far the beam's core goes from its gold to the glint's white-hot light (art/target/idea.png's pale shaft). */
+const HOT = 0.7;
 /** The beam's light: the gilding's, deepened (squared, at its own luminance), so added over the sea it stays gold
  *  rather than washing to pale yellow. */
 const [gr, gg, gb] = GILDING.lit;
@@ -199,7 +201,9 @@ export function createLoot(light: Light) {
   // the beam and its pool gold whatever the piece; the ring's band in its rarity's light over the gold
   const isBeam = isRing.lessThanEqual(0.5);
   const brightness = select(isBeam, column.mul(BEAM_EMIT).mul(r.mul(0.18).add(0.35)), band.add(pool).mul(HALO_EMIT));
-  bm.colorNode = select(isBeam, vec3(...BEAM_GOLD), mix(vec3(...BEAM_GOLD), tint, band.mul(0.5))).mul(light.level(base)).mul(brightness);
+  // the beam's core pale, as white-hot gold, deepening to the gold at its edges
+  const hot = mix(vec3(...BEAM_GOLD), vec3(...GLINT), pow(core, 6).mul(HOT));
+  bm.colorNode = select(isBeam, hot, mix(vec3(...BEAM_GOLD), tint, band.mul(0.5))).mul(light.level(base)).mul(brightness);
   // over what lies behind, hiding it as much as it is bright (premultiplied): gold over the sea stays gold, where
   // added to its blue it would wash pale
   bm.opacityNode = saturate(brightness.mul(COVER));
