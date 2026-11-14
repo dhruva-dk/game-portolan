@@ -31,6 +31,9 @@ const F0 = 0.02;
 const MIRROR = 0.2;
 /** The water's depth over the floor, metres, at which its tone is the middle one, and the deep one. */
 const MIDDLE_AT = 4.5, DEEP_AT = 11;
+/** The deep water seen from overhead: LOOK_DOWN of the way to the middle tone, from where the eye's ray stands
+ *  LOOK_FROM (cosine) off the level to straight down. */
+const LOOK_DOWN = 0.5, LOOK_FROM = 0.3;
 /** How fast the water's own tone veils what lies under it, per metre of the eye's path through it. */
 const CLOUDY = 0.2;
 /** How far a wake's air at its thickest takes the water toward the shallows' tone; and how much it veils what lies
@@ -163,7 +166,11 @@ function seaRadiance(
   const irradiance = sun.mul(max(dot(l, up), 0)).div(Math.PI).add(sky.ambient(p));
   // the water's own tone by how much of it the eye looks through, paler where a wake has worked air into it, and a
   // second, deeper tone in the troughs between the waves, its edge crisp
-  const own = mix(mix(vec3(...SEA_SHALLOW), vec3(...SEA_MIDDLE), smoothstep(0, MIDDLE_AT, depth)), vec3(...SEA_DEEP), smoothstep(MIDDLE_AT, DEEP_AT, depth));
+  // looked down into, the deep water is LOOK_DOWN of the way to the middle tone, deepening to its own toward the
+  // horizon, so the open sea runs from teal at the eye's feet to royal blue far off
+  const down = smoothstep(LOOK_FROM, 1, dot(v, up)).mul(LOOK_DOWN);
+  const deep = mix(vec3(...SEA_DEEP), vec3(...SEA_MIDDLE), down);
+  const own = mix(mix(vec3(...SEA_SHALLOW), vec3(...SEA_MIDDLE), smoothstep(0, MIDDLE_AT, depth)), deep, smoothstep(MIDDLE_AT, DEEP_AT, depth));
   // the facets' marks only where a pixel holds less than one of them: finer, they would fall to grain, so fade out
   const facet = dot(n.sub(g), l).mul(FACETS);
   const lifted = mix(float(0.5), crest, SWELL).add(facet.mul(saturate(float(1).sub(fwidth(facet).mul(2)))));
