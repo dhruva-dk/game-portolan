@@ -164,6 +164,8 @@ export function createShipMaterials(light: Light, pixel: FloatNode, canvas: Clot
   clothMaterial.positionNode = at.xyz.add(turn(brace(shaped, true)));
   const drawn = select(isPennant, across, filled), drawnNormal = normalize(drawn);
   const clothNormal = varying(turn(brace(mix(drawnNormal, simulatedNormal, share), false)));
+  // the belly's own curve, without the cloth's wrinkles: what sets the sunlit canvas's two tones
+  const bellyNormal = varying(turn(brace(drawnNormal, false)));
   const clothKind = varying(kind);
   // a topsail is plain dye: her mark and stripes are on the courses alone, so at a distance her canvas reads as a few
   // big sails rather than many small flags
@@ -200,7 +202,7 @@ export function createShipMaterials(light: Light, pixel: FloatNode, canvas: Clot
     // cloth the light passed through (twice over, renormalised by its brightness) and brighter, the paint on it
     // letting less through; and its shadow tone
     const n = normalize(clothNormal).mul(faceDirection);
-    const side = light.sides(positionWorld, n);
+    const side = light.sides(positionWorld, n, normalize(bellyNormal).mul(faceDirection));
     const dyed = albedo.mul(albedo).div(max(dot(albedo, luma), 0.05));
     const glow = mix(albedo, dyed, DYE_GLOW.deepen).mul(mix(float(DYE_GLOW.gain), float(DYE_GLOW.gain * PAINTED), marked));
     // with the sun edge on to the canvas, its wrinkles would fall to dark blotches: unshadowed, it is GRAZED of the way

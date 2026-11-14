@@ -32,8 +32,9 @@ export interface Light {
   leaf(p: Vec3Node, n: Vec3Node, lit: Vec3Node, shadow: Vec3Node): Vec3Node;
   /** 0 in shadow … 1 in the sun, the edge between crisp: a surface at p facing n. */
   band(p: Vec3Node, n: Vec3Node): FloatNode;
-  /** The band on each side of a thin surface at p whose near side faces n. */
-  sides(p: Vec3Node, n: Vec3Node): Sides;
+  /** The band on each side of a thin surface at p whose near side faces n; shape, the surface's normal smoothed of
+   *  its small folds, sets where it is in full light (n if not given). */
+  sides(p: Vec3Node, n: Vec3Node, shape?: Vec3Node): Sides;
   /** The brightness at p: what a tone is multiplied by to give radiance. */
   level(p: Vec3Node): Vec3Node;
 }
@@ -68,9 +69,9 @@ export function createLighting(sky: Sky, below: Below, visible: (p: Vec3Node, n:
     return smoothstep(w.negate(), w, nl.sub(at));
   };
   const band = (p: Vec3Node, n: Vec3Node): FloatNode => turned(dot(n, sky.sun(p)), TURN).mul(open(p, n));
-  const sides = (p: Vec3Node, n: Vec3Node): Sides => {
+  const sides = (p: Vec3Node, n: Vec3Node, shape: Vec3Node = n): Sides => {
     const nl = dot(n, sky.sun(p)).toVar(), clear = open(p, n).toVar();
-    return { front: turned(nl, TURN).mul(clear), full: turned(nl, FULL).mul(clear), back: turned(nl.negate(), THROUGH).mul(clear), open: clear };
+    return { front: turned(nl, TURN).mul(clear), full: turned(dot(shape, sky.sun(p)), FULL).mul(clear), back: turned(nl.negate(), THROUGH).mul(clear), open: clear };
   };
   /** The brightness at p, its sun's share times `focus`. */
   const levelUnder = (p: Vec3Node, focus: FloatNode | null): Vec3Node => {
