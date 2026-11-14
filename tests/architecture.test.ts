@@ -94,7 +94,7 @@ const LAYERS: Record<string, readonly string[]> = {
   'water/': ['water/', ...RENDER, 'view/', 'sky/sky.ts', 'land/ground.ts', 'ship/build.ts', 'ship/materials.ts', 'ship/waterline.ts', 'sim/wake.ts'],
   'gpu.ts': ['three'],
   'tsl.ts': ['three'],
-  'frame.ts': ['three', 'gpu.ts', 'tsl.ts', 'snapshot.ts', 'environment.ts', 'world/', 'view/', 'sky/', 'land/', 'water/', 'ship/', 'gunfire/', 'loot/', 'post/'],
+  'frame.ts': ['three', 'gpu.ts', 'tsl.ts', 'palette.ts', 'snapshot.ts', 'environment.ts', 'world/', 'view/', 'sky/', 'land/', 'water/', 'ship/', 'gunfire/', 'loot/', 'post/'],
   'meter.ts': ['three'],
   // the debug tools, and the switches that drive the game through what it offers anyone
   'fly.ts': ['three', 'world/', 'snapshot.ts'],
@@ -228,6 +228,84 @@ test('i2. the UI draws plain data: src/ui imports nothing from play/, three or w
     });
   }
   none(found, 'src/ui importing play/, three or a render module');
+});
+
+test('f3. the view owns the eye: a perspective camera is named only in src/frame.ts and src/view/, and only they, the meter and the systems with cameras of their own read one', () => {
+  none(hits(/\bPerspectiveCamera\b/, (rel) => rel !== 'frame.ts' && !rel.startsWith('view/')), 'PerspectiveCamera outside src/frame.ts and src/view/ (take the eye: view.eye)');
+  // the shadow map's and the wake's cameras are their own, orthographic, looking down on what they map
+  const own = ['frame.ts', 'meter.ts', 'land/shadow.ts', 'water/wake.ts'];
+  none(hits(/\b(projectionMatrix|matrixWorldInverse|projectionMatrixInverse|getWorldPosition)\b/, (rel) => !own.includes(rel) && !rel.startsWith('view/')), "a camera's matrices read outside src/frame.ts and src/view/ (view.eye has them)");
+});
+
+/** The files that may take a colour toward its grey (a desaturation), and why: the rest leave the palette's colours as chosen. */
+const DESATURATE: Record<string, string> = {
+  'post/grade.ts': "the look's saturation, overall and by hue",
+  'sky/sky.ts': "the sky's own colour (skyColour), shared by its backdrop and the sea's mirror",
+  'sky/light.ts': "how much of the sky's tint the light carries (TINTED)",
+  'sky/cloud-field.ts': "how much of the sun's colour a cloud's lit side takes (WARMED)",
+};
+
+test('k. colour: every colour of the world is named in src/palette.ts, luma is three\'s luminance(), and only DESATURATE moves a colour toward its grey', () => {
+  // the HUD's inks are its own (src/ui), drawn on paper, not lit
+  none(hits(/['"`]#[0-9A-Fa-f]{6}\b/, (rel) => rel !== 'palette.ts' && !rel.startsWith('ui/')), 'a hex colour outside src/palette.ts and src/ui (name it in the palette)');
+  // (the palette's tint works on the CPU, before any shader)
+  none(hits(/0\.2126|0\.7152|\b0\.299\b|\b0\.587\b/, (rel) => rel !== 'palette.ts'), "hand-written luma weights (three's luminance())");
+  none(hits(/mix\(\s*vec3\(\s*(luminance|dot)\(/, (rel) => !(rel in DESATURATE)), 'a desaturation outside DESATURATE');
+});
+
+test('l. comments say why, not which review or reference asked: no review rounds or reference images named in src or tools', () => {
+  const found = [...files, ...read('tools')].flatMap((f) => f.text.split('\n').flatMap((line, i) =>
+    /\breview\s*#?\d|\bround\s*#?\d+\b(?!\s*(trip|off|up|down))|idea\.png|art\/target|reference image|\btarget\.png\b/i.test(line) ? [`${f.at}:${i + 1}: ${line.trim()}`] : []));
+  none(found, 'a review round or reference image named');
+});
+
+/** The parameters of a parenthesised list starting at text[open] ('('): its top-level commas, plus one if not empty. */
+const parameters = (text: string, open: number) => {
+  let depth = 0, count = 0, any = false;
+  for (let i = open; i < text.length; i++) {
+    const c = text[i];
+    if (c === '=' && text[i + 1] === '>') { i++; continue; }
+    if ('([{<'.includes(c)) depth++;
+    else if (')]}>'.includes(c)) { if (--depth === 0) return any ? count + 1 : 0; }
+    else if (c === ',' && depth === 1) count++;
+    else if (depth === 1 && !/\s/.test(c)) any = true;
+  }
+  return count;
+};
+/** The most parameters an exported function takes: past this, the caller passes a named record (water/optics.ts Surface). */
+const MOST = 5;
+/** Those that took more when the rule came in, at what they took: a ratchet. Each may come down (and leave the list),
+ *  never go up; nothing new joins it. */
+const OVER: Record<string, number> = {
+  'audio/dsp.ts design': 6, 'audio/dsp.ts filter': 7, 'audio/dsp.ts slips': 6, 'audio/dsp.ts bubbles': 7, 'audio/dsp.ts crackle': 6,
+  'audio/sounds/blows.ts timber': 7, 'land/site.ts standing': 6,
+  'ship/kit.ts rod': 8, 'ship/kit.ts rope': 7, 'ship/kit.ts box': 6, 'ship/kit.ts beam': 7,
+  'sim/battle.ts stepBattle': 8, 'sim/bot.ts think': 6, 'sim/gun.ts chosen': 6, 'sim/gun.ts laid': 9, 'sim/gunner.ts ring': 8,
+  'sim/gunner.ts aimAndFire': 9, 'sim/ride.ts settled': 6, 'sim/shot.ts loosed': 7, 'sim/stores.ts stored': 9, 'sim/stores.ts spilled': 6,
+  'sim/utility.ts choose': 6, 'ui/disc.ts laid': 7, 'ui/flow.ts createFlow': 6, 'ui/ink.ts bar': 6, 'ui/ink.ts ring': 6, 'ui/marks.ts plate': 6,
+  'water/water.ts createWater': 7, 'world/cells.ts trace': 6, 'world/lattice.ts weighInto': 7,
+  'world/planet-islands.ts createIslandSite': 6, 'world/sphere.ts chartAt': 6,
+};
+
+test('m. an exported function takes at most MOST parameters, but those in OVER, which only come down', () => {
+  const seen = new Map<string, number>();
+  for (const f of files) {
+    const text = code(f.text).join('\n');
+    for (const m of text.matchAll(/\bexport\s+(?:async\s+)?function\s+(\w+)\s*(?:<[^(]*>)?\s*\(|\bexport\s+const\s+(\w+)\s*=\s*(?:async\s+)?\(/g)) {
+      seen.set(`${f.rel} ${m[1] ?? m[2]}`, parameters(text, m.index + m[0].length - 1));
+    }
+  }
+  const found = [...seen].flatMap(([name, n]) => (n > (OVER[name] ?? MOST) ? [`src/${name} takes ${n} (at most ${OVER[name] ?? MOST})`] : []));
+  none(found, `exported functions over ${MOST} parameters, or over what they took (OVER)`);
+  const stale = Object.entries(OVER).filter(([name, n]) => (seen.get(name) ?? 0) < n).map(([name]) => name);
+  none(stale, 'OVER entries that came down or went: lower or remove them');
+});
+
+test('n. the lighting interface is the six ways a surface is lit (sky/light.ts Light): a new look is a tone, not a new member', () => {
+  const text = files.find((f) => f.rel === 'sky/light.ts')!.text;
+  const body = /export interface Light \{([\s\S]*?)\n\}/.exec(text)![1];
+  const members = [...body.matchAll(/^\s{2}(\w+)\s*[(:]/gm)].map((m) => m[1]);
+  assert.deepEqual(members, ['toon', 'polished', 'leaf', 'band', 'sides', 'level']);
 });
 
 /** The files that may say they stand in for something, and why. */

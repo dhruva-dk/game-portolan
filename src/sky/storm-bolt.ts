@@ -7,7 +7,7 @@
 // bright its flicker is now.
 
 import { Vector3 } from 'three/webgpu';
-import { abs, cross, dot, exp, float, fract, length, max, min, normalize, smoothstep, uniform, vec3 } from 'three/tsl';
+import { abs, cross, dot, exp, float, fract, length, luminance, max, min, normalize, smoothstep, uniform, vec3 } from 'three/tsl';
 import { LIGHTNING, tint } from '../palette';
 import type { Cap } from '../sim/storm';
 import { R, add, cross as crossV, dot as dotV, length as lengthV, normalize as normalizeV, scale, type Vec3 } from '../world/sphere';
@@ -28,7 +28,6 @@ const IN = 30, ALONG = 0.7, NEAR = 50, DISTANCE = [70, 200] as const;
 const REACH = 50, FLASH = 9, CHANNEL = 260, WIDTH = 0.35, PIXEL = 0.0016, ZIG = [6, 3, 1.1] as const, ZIG_LONG = [21, 8.3, 2.9] as const;
 /** The flash's colour, against the storm's own light's (its luminance kept): the palette's lightning. */
 const TINT = tint(LIGHTNING, 0.88);
-const LUMA = vec3(0.2126, 0.7152, 0.0722);
 
 /** A steady pseudo-random number in [0, 1) for an integer and a stream. */
 const hash = (n: number, k: number) => {
@@ -50,7 +49,7 @@ export function createBolt(held: boolean) {
     flash,
     /** The flash's light at world position q, radiance (air: the storm's air light). */
     glow: (air: Vec3Node, q: Vec3Node): Vec3Node =>
-      vec3(dot(air, LUMA)).mul(vec3(...TINT)).mul(flash.mul(exp(length(q.sub(centre())).div(REACH).pow(2).negate())).mul(FLASH)),
+      vec3(luminance(air)).mul(vec3(...TINT)).mul(flash.mul(exp(length(q.sub(centre())).div(REACH).pow(2).negate())).mul(FLASH)),
     /** How far along the ray from o along unit d it passes the stroke, m. */
     nearest: (o: Vec3Node, d: Vec3Node): FloatNode => {
       const w = o.sub(foot.mul(R)), b = dot(d, foot);
@@ -70,7 +69,7 @@ export function createBolt(held: boolean) {
       const miss = abs(off.sub(jag)).div(width);
       const core = exp(miss.mul(miss).negate()).add(exp(miss.negate().mul(0.25)).mul(0.08));
       const along = smoothstep(-2, 2, s).mul(smoothstep(BASE + 10, BASE - 5, s)).mul(smoothstep(0, 1, metres.sub(t)));
-      return vec3(dot(air, LUMA)).mul(vec3(...TINT)).mul(core.mul(along).mul(through).mul(flash).mul(CHANNEL).mul(min(float(WIDTH).div(width), 1)));
+      return vec3(luminance(air)).mul(vec3(...TINT)).mul(core.mul(along).mul(through).mul(flash).mul(CHANNEL).mul(min(float(WIDTH).div(width), 1)));
     },
     /** The stroke now (sim/storm.ts's cap; seconds: the world's clock; eye: where the eye is, world m). */
     update(cap: Cap, seconds: number, eye: Vec3, whole: boolean) {

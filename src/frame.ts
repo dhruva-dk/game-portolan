@@ -26,6 +26,7 @@ import { BLOOM_LEVELS, bloom } from './post/bloom';
 import { film } from './post/film';
 import { createGrade, encode } from './post/grade';
 import { SKY_METRES } from './sky/sky';
+import { SPACE } from './palette';
 import type { Vec4Node } from './tsl';
 
 /**
@@ -42,9 +43,7 @@ const SCALE = 1.5;
 /** The eye's near and far planes, metres: in the air, past the far side of the planet from as high as it goes; from
  *  space, round the whole planet from as far out as the full map goes. */
 const PLANES = { air: [0.5, 2000], space: [50, 4000] } as const;
-/** The view from space: the colour past the planet's limb (linear, before exposure), and how high over the sea the
- *  air it sees the planet through reaches, metres. */
-const SPACE = [0.0015, 0.002, 0.004] as const;
+/** The view from space: how high over the sea the air it sees the planet through reaches, metres. */
 const AIR = 400;
 /**
  * The eyes the frame builds its shaders from (prime): each kind's, looking at the planet's centre from where the whole

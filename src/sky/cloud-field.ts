@@ -21,7 +21,7 @@
 
 import { Vector3 } from 'three/webgpu';
 import {
-  Break, If, ceil, clamp, dot, exp, float, int, length, max, min, mix, normalize, pow, select, smoothstep, sqrt,
+  Break, If, ceil, clamp, dot, exp, float, int, length, luminance, max, min, mix, normalize, pow, select, smoothstep, sqrt,
   texture, texture3D, uniform, vec3, vec4,
 } from 'three/tsl';
 import {
@@ -89,7 +89,6 @@ const LIGHT_TAP = 0.06, SHADE_AT = 0.95, SHADE_EDGE = 0.1;
 /** How much of the sun's own colour the cloud's lit tone keeps (the rest is the palette's cream at the sun's
  *  brightness); and how bright its shadow tone is, of what a white surface in the open gets. */
 const WARMED = 0.8, UNDERLIT = 0.7;
-const LUMA = vec3(0.2126, 0.7152, 0.0722);
 
 
 export type CloudField = ReturnType<typeof createCloudField>;
@@ -212,7 +211,7 @@ export function createCloudField(tables: Tables, noise: CloudNoise) {
     const weightSum = float(0).toVar(), distSum = float(0).toVar();
     // what a white surface in the open gets from the sun and the sky (its radiance, E/π), in the cloud's shadow tone
     const open = sunTransmittance(float(BOTTOM), sunDir.y).mul(max(sunDir.y, 0)).mul(1 / Math.PI).add(skyAmbientUp);
-    const under = vec3(dot(open, LUMA)).mul(vec3(...CLOUD.shadow)).mul(UNDERLIT).toVar();
+    const under = vec3(luminance(open)).mul(vec3(...CLOUD.shadow)).mul(UNDERLIT).toVar();
     // the sea hides the shell below the horizon
     If(d.y.greaterThan(-0.002).and(near.lessThan(MAX_DISTANCE)), () => {
       loop('cs', steps, (i) => {
@@ -233,7 +232,7 @@ export function createCloudField(tables: Tables, noise: CloudNoise) {
             const lit = float(1).sub(smoothstep(SHADE_AT - SHADE_EDGE, SHADE_AT + SHADE_EDGE, toward));
             const radius = length(vec3(q.x, q.y.add(eye.y).add(BOTTOM), q.z));
             const sunLight = sunTransmittance(radius, dot(normalize(vec3(q.x, q.y.add(eye.y).add(BOTTOM), q.z)), sunDir));
-            const sunTone = mix(vec3(dot(sunLight, LUMA)), sunLight, WARMED).mul(vec3(...CLOUD.lit));
+            const sunTone = mix(vec3(luminance(sunLight)), sunLight, WARMED).mul(vec3(...CLOUD.lit));
             const S = under.add(sunTone.mul(lit.mul(1 / Math.PI)));
             const stepT = exp(rho.mul(-SIGMA).mul(dt));
             const absorbed = T.mul(float(1).sub(stepT));

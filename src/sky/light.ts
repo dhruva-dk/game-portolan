@@ -8,7 +8,7 @@
 // A polished thing (gilding, a gun's metal) has a third tone: one small hard highlight where it mirrors the sun. A
 // thin thing (a leaf, a sail) is lit from either side: its far side's sun shows through it.
 
-import { cameraPosition, dot, float, fwidth, max, mix, normalize, saturate, smoothstep, vec3 } from 'three/tsl';
+import { cameraPosition, dot, float, fwidth, luminance, max, mix, normalize, saturate, smoothstep, vec3 } from 'three/tsl';
 import type { FloatNode, Vec3Node } from '../tsl';
 import type { Sky } from './sky';
 
@@ -46,7 +46,6 @@ const CAST = 0.5, CAST_EDGE = 0.12, CLOUDED = 0.55, CLOUD_EDGE = 0.06;
 const TINTED = 0.4;
 /** A polished surface's highlight: where n · h passes this, half its edge's width. */
 const SHINE = 0.94, SHINE_EDGE = 0.012;
-const LUMA = [0.2126, 0.7152, 0.0722] as const;
 
 /** visible(p, n): 0…1, how much of the sun reaches p past what stands on the island (shadow.visible). */
 export function createLighting(sky: Sky, below: Below, visible: (p: Vec3Node, n: Vec3Node) => FloatNode): Light {
@@ -69,7 +68,7 @@ export function createLighting(sky: Sky, below: Below, visible: (p: Vec3Node, n:
     const up = normalize(p);
     const sun = sky.sunIlluminance(p).mul(sky.stormSun(p)).mul(below.sun(p)).mul(saturate(dot(up, sky.sun(p)))).div(Math.PI);
     const all = sun.add(sky.ambient(p, up).mul(below.sky(p)));
-    return mix(vec3(dot(all, vec3(...LUMA))), all, TINTED);
+    return mix(vec3(luminance(all)), all, TINTED);
   };
   const toon = (p: Vec3Node, n: Vec3Node, lit: Vec3Node, shadow: Vec3Node): Vec3Node => mix(shadow, lit, band(p, n)).mul(level(p));
   return {

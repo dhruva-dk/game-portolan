@@ -13,7 +13,7 @@
 //
 // Exposure and the vignette act on the scene's light before the curve.
 
-import { abs, clamp, dot, exp, float, length, max, min, mix, mod, pow, screenUV, select, smoothstep, step, uniform, vec2, vec3 } from 'three/tsl';
+import { abs, clamp, exp, float, length, luminance, max, min, mix, mod, pow, screenUV, select, smoothstep, step, uniform, vec2, vec3 } from 'three/tsl';
 import type { FloatNode, Vec3Node } from '../tsl';
 
 type RGB = readonly [number, number, number];
@@ -132,8 +132,7 @@ function looked(l: Mixed, colour: Vec3Node): Vec3Node {
     .add(l.warm.sub(1).mul(band(35, 50)))
     .add(l.sea.sub(1).mul(band(175, 45)))
     .add(l.sky.sub(1).mul(band(220, 40))));
-  const y = dot(c, vec3(0.2126, 0.7152, 0.0722));
-  const saturated = mix(vec3(y), c, s);
+  const saturated = mix(vec3(luminance(c)), c, s);
   return max(mix(saturated, l.fadeTo, l.fade), vec3(0));
 }
 
@@ -147,7 +146,7 @@ export function createGrade(rise: number, rising: boolean, open: Vec3Node) {
   const day = dayLook(rise, rising);
   const vignette = uniform(day.vignette);
   // what brings a white surface in the open to the display's white, whatever the hour
-  const gain = float(2 ** day.exposure).div(max(dot(open, vec3(0.2126, 0.7152, 0.0722)), 1e-4));
+  const gain = float(2 ** day.exposure).div(max(luminance(open), 1e-4));
   const grade = (color: Vec3Node, storm: FloatNode): Vec3Node => {
     const v = length(screenUV.sub(0.5).mul(vec2(1.4, 1.1)));
     const corner = float(1).sub(smoothstep(0.15, 0.8, v).mul(mix(vignette, STORM.vignette, storm)));

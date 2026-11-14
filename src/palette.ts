@@ -63,6 +63,8 @@ export const STORM = tones('#7A4FB8', '#3D2670');
 export const LIGHTNING = ink('#D9C2FF');
 /** The haze's glow is the horizon's sky times this: a dusky lilac. */
 export const HAZE: Rgb = [0.85, 0.72, 0.9];
+/** Past the planet's limb, seen from space: all but black, a little blue (linear light, before exposure). */
+export const SPACE: Rgb = [0.0015, 0.002, 0.004];
 /** A fair-weather cloud: a pale cream where the sun lights it, a cool lilac grey beneath; both warm, as the sky's
  *  lilac haze adds its blue. */
 export const CLOUD = tones('#FFE6A0', '#BCA8B0');
