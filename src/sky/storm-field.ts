@@ -22,6 +22,7 @@
 import { Break, If, acos, atan, clamp, cos, dot, exp, float, length, max, min, mix, normalize, pow, select, sin, smoothstep, texture3D, vec3 } from 'three/tsl';
 import type { Storage3DTexture } from 'three/webgpu';
 import { R } from '../world/sphere';
+import { STORM_FOOT } from '../palette';
 import { loop, type FloatNode, type Vec3Node } from '../tsl';
 
 /** The cloud's base, metres up, and how far its rolls lift and lower it, each ROLL_WIDTH metres across. */
@@ -61,7 +62,10 @@ const CALM = 0.3;
 const SUNLIT = 0.55, LINING = 0.15;
 /** Two tones, as the world's solids (sky/light.ts): the cloud is in its crown's light or its base's, the edge between
  *  where its height and its facing the sun together cross TONE_AT, over TONE_EDGE, so it follows the billows. */
-const TONE_AT = 0.5, TONE_EDGE = 0.04;
+const TONE_AT = 0.4, TONE_EDGE = 0.04;
+/** The warm rim along the face's foot: the sunlit calm's gold light (palette STORM_FOOT) thrown up onto whatever of
+ *  the face looks out over it, as a share of the sun's on a white surface, fading out RIM_UP metres over the base. */
+const RIM = 0.5, RIM_UP = 45;
 /** The storm's state as the shaders read it (storm.ts's uniforms). */
 export interface Cap {
   centre: Vec3Node;
@@ -139,7 +143,8 @@ export function createStormField(cap: Cap, shape: Storage3DTexture) {
     const sun = lit.sun.mul(tone.mul(high).mul(SUNLIT / Math.PI));
     // against the sun, its light through the billows' thin edges
     const lining = lit.sun.mul(hg(dot(d, lit.toward), 0.6).mul(LINING * 4 * Math.PI)).mul(high).mul(float(1).sub(clamp(dot(normal, d.negate()), 0, 1)));
-    return air.add(sun).add(lining).add(lit.glow(q));
+    const rim = lit.sun.mul(vec3(...STORM_FOOT)).mul(toCalm.mul(float(1).sub(smoothstep(BASE, BASE + RIM_UP, h))).mul(RIM / Math.PI));
+    return air.add(sun).add(lining).add(rim).add(lit.glow(q));
   };
 
   /**
