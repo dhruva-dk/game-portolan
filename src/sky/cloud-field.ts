@@ -58,7 +58,8 @@ const FIELD_SHIFT = 0.3;
 /** How far below zero the threshold sinks at full cover, km: a little over BILLOW, so overcast is unbroken. */
 const LAYER = 0.3;
 /**
- * A cloud's top: DOME·p^¾ km where it lies p km of potential inside its edge — about half as tall as wide for a cloud
+ * A cloud's top: about DOME·p^¾ km where it lies p km of potential inside its edge, easing into the shell's ceiling
+ * (exponentially) — about half as tall as wide for a cloud
  * of 1–1.5 km (cumulus mediocris: art/target/idea.png's heaped clouds, where humilis read as flat smears, review25),
  * flatter still for the small puffs.
  */
@@ -145,7 +146,9 @@ export function createCloudField(tables: Tables, noise: CloudNoise) {
     // within BILLOW of its surface, top, side or base, the billows decide whether a point is cloud, so they carve the
     // whole outline (Schneider 2017's dimensional profile)
     const z = h.mul(TOP - BASE);
-    const top = min(pow(max(inside, 0), 0.75).mul(DOME), TOP - BASE);
+    // eased into the shell's ceiling rather than cut at it, so the broad ones' crowns round off instead of standing
+    // flat-topped with sheer sides, as boxes (review27's stepped clouds)
+    const top = float(1).sub(exp(pow(max(inside, 0), 0.75).mul(-DOME / (TOP - BASE)))).mul(TOP - BASE);
     const bottom = min(fall(0, MARGIN, inside).mul(LIFT), top.mul(0.5));
     const reach = clamp(min(min(top.sub(z), z.sub(bottom).mul(2)), inside).div(BILLOW), 0, 1);
     const dense = float(0).toVar();
