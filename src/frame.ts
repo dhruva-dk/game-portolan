@@ -2,7 +2,7 @@ import {
   Color, NoToneMapping, PerspectiveCamera, RenderPipeline, Scene, Vector2, Vector3, type MRTNode, type Object3D, type WebGPURenderer,
 } from 'three/webgpu';
 import {
-  Fn, float, getViewPosition, length, normalize, pass, rtt, screenSize, screenUV, select, uniform, vec2, vec3, vec4,
+  Fn, float, getViewPosition, length, normalize, pass, rtt, screenUV, select, uniform, vec3, vec4,
 } from 'three/tsl';
 import { fxaa } from 'three/examples/jsm/tsl/display/FXAANode.js';
 import { environmentAt, type World } from './environment';
@@ -46,9 +46,6 @@ const PLANES = { air: [0.5, 2000], space: [50, 4000] } as const;
  *  air it sees the planet through reaches, metres. */
 const SPACE = [0.0015, 0.002, 0.004] as const;
 const AIR = 400;
-/** The clouds (marched on a quarter-resolution grid, gathered at half) are read through a tent this many pixels each
- *  way, so their edges are soft rather than stepped on that grid. */
-const CLOUD_TENT = 1.5;
 /**
  * The eyes the frame builds its shaders from (prime): each kind's, looking at the planet's centre from where the whole
  * planet is inside its lens and its far plane, so every mesh on it is in view.
@@ -190,12 +187,9 @@ export function createFrame(renderer: WebGPURenderer, world: World, options: Fra
   const airPost = Fn(() => {
     const { color, depth, dir, metres } = airSeen.seen();
     const open = depth.greaterThanEqual(1);
-    // clouds in front of whatever the pixel shows: read through a tent CLOUD_TENT pixels each way (four filtered
-    // taps), so what is left of the march's grid in their edges is smoothed out, not stepped
-    const t = vec2(CLOUD_TENT).div(screenSize);
-    const cloud = sky.clouds.color.sample(screenUV.add(t)).add(sky.clouds.color.sample(screenUV.sub(t)))
-      .add(sky.clouds.color.sample(screenUV.add(vec2(t.x, t.y.negate())))).add(sky.clouds.color.sample(screenUV.add(vec2(t.x.negate(), t.y)))).mul(0.25);
-    const inFront = open.or(sky.clouds.distance.sample(screenUV).x.mul(1000).lessThan(metres));
+    // clouds in front of whatever the pixel shows
+    const { color: cloud, metres: cloudAt } = sky.clouds.at(screenUV);
+    const inFront = open.or(cloudAt.lessThan(metres));
     const clouded = select(inFront, color.rgb.mul(cloud.a).add(cloud.rgb), color.rgb);
     // then the haze, by distance; over the sky and its clouds, its band along the horizon
     const hazed = sky.fog(clouded, dir, select(open, float(SKY_METRES * 2), metres));
