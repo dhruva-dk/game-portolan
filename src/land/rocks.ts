@@ -4,8 +4,9 @@
 // Terracotta in the sun and plum out of it (palette.ts), each facet one flat tone: the facets' own normals, never the
 // shape's smoothed ones. Darker in a band where the sea wets them. Lit like everything else (sky/light.ts).
 //
-// Triangles: 20 × (detail + 1)² a shape: 2880 for a mass, 500 for a boulder; on the islands far from the eye (FAR:
-// islands.ts), where a mass is a few pixels across, each shape at a coarser level of the same lumps: 720 and 180.
+// Triangles: 20 × (detail + 1)² a shape: 720 for a mass, 180 for a boulder, coarse enough that each facet is a broad
+// flat plane, as a painter cuts a boulder; on the islands far from the eye (FAR: islands.ts) a coarser level of the
+// same lumps: 320 and 80.
 
 import { Euler, Matrix4, MeshBasicNodeMaterial, Quaternion, Vector3 } from 'three/webgpu';
 import { Fn, attribute, cross, dFdx, dFdy, dot, float, length, max, mix, normalWorld, positionWorld, select, vec3 } from 'three/tsl';
@@ -19,7 +20,7 @@ import { createInstances, standing, type Placed } from './site';
 import { cut } from '../tsl';
 
 /** How many shapes of each kind, and how finely each is made, near and far. */
-export const KINDS = { big: { shapes: 4, detail: 11, far: 5 }, boulder: { shapes: 4, detail: 4, far: 2 } };
+export const KINDS = { big: { shapes: 4, detail: 5, far: 3 }, boulder: { shapes: 4, detail: 2, far: 1 } };
 /** A rock is wet up to this many metres over the sea, and darker there by this much. */
 const WET_TO = 0.3, WET = 0.72;
 /** How deep in a crack (0…1) a rock is drawn in its shadow tone whatever the sun. */
