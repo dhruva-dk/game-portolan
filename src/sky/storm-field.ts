@@ -34,8 +34,10 @@ const ROLL = 0.5, ROLL_WIDTH = 26;
  *  lumpy dark bases. */
 const UNDER = 25;
 /** How far the base's front stands out over the calm (metres, negative: in the calm), and how far the face leans back
- * a metre up; how far its billows reach either side of it. */
-const SHELF = -12, LEAN = 0.8, FACE = 60;
+ * a metre up; how far its billows reach either side of it. Flush with the rain and near upright, with big billows down
+ * to its foot (`reach`), so the wall heaps up as art/target/idea.png's rather than overhanging in the shelf and sloping
+ * roof review35 saw as a cliff. */
+const SHELF = 0, LEAN = 0.45, FACE = 60;
 /** Along the edge the towers stand forward and back over the base, in bays and headlands: by up to BAY metres, the
  * swells WAVES metres apart (two, crossing). */
 const BAY = 40, WAVES = [140, 61] as const;
@@ -139,7 +141,7 @@ export function createStormField(cap: Cap, shape: Storage3DTexture) {
     const roll = e.mul((2 * Math.PI) / ROLL_WIDTH).add(lift.mul(2));
     const base = float(BASE).add(sin(roll).mul(ROLL));
     // the billows grow with height: small and tight over the shelf, towers higher up, which stand forward and back
-    const reach = mix(0.45, 1, smoothstep(BASE, CROWN * 0.7, h));
+    const reach = mix(0.8, 1, smoothstep(BASE, CROWN * 0.7, h));
     const along = atan(dot(up, cap.across[0]), dot(up, cap.across[1])).mul(cap.size);
     const bay = sin(along.div(WAVES[0])).mul(0.6).add(sin(along.div(WAVES[1]).add(1.3)).mul(0.4)).add(0.4).mul(BAY);
     const front = float(SHELF).add(max(h.sub(base), 0).mul(LEAN)).add(bay.mul(mix(0.4, 1, smoothstep(BASE, BASE + 50, h))));
@@ -203,7 +205,7 @@ export function createStormField(cap: Cap, shape: Storage3DTexture) {
       // how far q is from anywhere cloud or rain can be (half-spaces round each: the face at its furthest out, over
       // the crown's highest, under the base's lowest; the rain's front, over the base's highest)
       const frontOut = float(OUTERMOST).add(max(h.sub(BASE + ROLL), 0).mul(LEAN));
-      const cloudOff = max(max(frontOut.sub(e).mul(1 / Math.hypot(1, LEAN)), h.sub(CROWN + CROWN_BILLOW)), float(BASE - ROLL - 4).sub(h));
+      const cloudOff = max(max(frontOut.sub(e).mul(1 / Math.hypot(1, LEAN)), h.sub(CROWN + CROWN_BILLOW)), float(BASE - ROLL - UNDER - 4).sub(h));
       const rainOff = max(float(-RAIN_RAMP * 0.5).sub(e), h.sub(BASE + ROLL));
       const step = max(min(cloudOff, rainOff), least).toVar();
       const inside = float(-1e4).toVar();
