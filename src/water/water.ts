@@ -31,11 +31,11 @@
 import { DoubleSide, Mesh, MeshBasicNodeMaterial, type Texture } from 'three/webgpu';
 import {
   Discard, Fn, If, abs, cameraPosition, cameraProjectionMatrix, cameraProjectionMatrixInverse, cameraViewMatrix, dFdx, dFdy, dot, float,
-  getScreenPosition, getViewPosition, length, log2, max, min, mix, normalize, positionView, positionWorld, pow, saturate,
+  getScreenPosition, getViewPosition, length, log2, luminance, max, min, mix, normalize, positionView, positionWorld, saturate,
   screenUV, select, smoothstep, step, texture, varying, vec2, vec3, vec4, viewportDepthTexture, viewportSharedTexture,
 } from 'three/tsl';
 import type { Environment } from '../environment';
-import { STORM_FOOT } from '../palette';
+import { LIGHTNING } from '../palette';
 import type { Snapshot } from '../snapshot';
 import type { Compute, Draw } from '../gpu';
 import type { Ground } from '../land/ground';
@@ -72,39 +72,10 @@ const LIKENESS_WINDS = [5, 10, 15, 20];
 const STORM_FOAM = 0.45, STORM_DARK = 0.3;
 /**
  * The storm's foot: the sea churned white from its edge out to FOOT (fading over the second) metres; and its edge's
- * line, EDGE_LINE m to each side (or most of a pixel), the calm's gold at its foot (STORM_FOOT) at EDGE_LIGHT of what a white surface
- * in the open shows: under the bloom and the glow (GOLD), so it is a drawn line, not the hard bright band review28 and
- * review32 saw.
+ * line, EDGE_LINE m to each side (or most of a pixel), the palette's lightning at EDGE_LIGHT of what a white surface
+ * in the open shows (over 1, so the bloom takes it).
  */
-const FOOT = [6, 26] as const, EDGE_LINE = 0.3, EDGE_LIGHT = 0.25, EDGE_FAR = [0.4, 2] as const;
-/** The middle cascade's crests in the water's tones: the height (of the sea's amplitude) that is a full crest, and
- *  how much of the crest the tones read they take. */
-const CHOP = [0.15, 0.85] as const;
-/** The cascade whose crests the tones read; less its mean over this mip's texels (2⁴ of its 0.5 m), so its longest
- *  waves, whose troughs lay in broad blotches, are left out and its short ones draw the rows (review27). */
-const CHOP_CASCADE = 1, ROWS_MIP = 4;
-/** And the shortest cascade's crests, this many times their height: near a low eye they draw the rows, small and
- *  dense, where the middle's are tens of pixels across; gone by where a pixel spans FINE_FADE metres, before they
- *  print as grain. */
-const FINE = 2.5, FINE_FADE = [0.06, 0.2] as const;
-/** The crests read for the tones are averaged (seven taps) this many metres to each side along the screen's level, so they lie in
- *  level rows, as art/target/idea.png's painted waves, rather than in blotches with no direction (review26). */
-const STROKE = 32;
-/** Nor more than this many pixels: near a low eye 12 m spans hundreds of them, and the five offset copies of the crests
- *  printed as stair-stepped patches (review25). */
-const STROKE_PX = 60;
-/** The calm's water along the wall's foot gold (art/target/idea.png), out to GOLD metres from its edge: the palette's
- *  gold as bright as a white surface in the open, GOLD_SHARE of it at most, added to the water's light (mixed in, it
- *  greyed the blue into the tan stripe review33 saw), rising as the square of nearness so it is a soft glow along the
- *  wall rather than the hard pale seam review32 saw. */
-const GOLD = 40, GOLD_SHARE = 0.3;
-/** The gold is the calm's light off the water, so it shows at a glancing look (the far wall's foot on the horizon),
- *  whole while the eye's look meets the sea at a sine under GLANCE[0], gone by GLANCE[1]: looking down onto a near wall's
- *  foot it would mix with the blue into the tan stripe review33 saw. */
-const GLANCE = [0.1, 0.3] as const;
-/** How much of the sun a ship's shadow takes from the water: some, so she sits on the sea, but not a dark smear
- *  across it (art/target/idea.png's ships cast barely any). */
-const SHIP_SHADE = 0.5;
+const FOOT = [6, 26] as const, EDGE_LINE = 0.3, EDGE_LIGHT = 1.6;
 /** A wake's foam (wake.ts) drawn this much fuller than it is kept: bold lobes of white along her sides and astern. */
 const WAKE_BOLD = 1.8;
 /**
@@ -209,26 +180,16 @@ export function createWater(view: View, sky: Sky, ground: Ground, wind: Wind, sh
     // sea's, and no pixel is whiter than a whitecap; so too the air.
     // The long cascades' slope alone, too: the sun's glints are mirrored off it, so they lie in a few broad shapes
     // along the long waves' faces rather than a glitter of pixels off the ripples.
-    const slope = marks.slope.toVar(), broad = marks.slope.toVar(), foam = float(0).toVar(), bubbles = float(0).toVar(), chop = float(0).toVar();
+    const slope = marks.slope.toVar(), broad = marks.slope.toVar(), foam = float(0).toVar(), bubbles = float(0).toVar();
     charts.each(p, (c) => {
       const read = (t: Texture, k: FloatNode) => texture(t, c.q.mul(k)).grad(c.dx.mul(k), c.dy.mul(k));
       let s2: Vec2Node = vec2(0), l2: Vec2Node = vec2(0), h: FloatNode = float(0);
       CASCADES.forEach((L, k) => {
         const s = read(waves.slopes[k], float(1 / L)), m = scale(k);
         s2 = s2.add(s.xy.mul(m));
-        const y = read(waves.displacement[k], float(1 / L)).y.mul(m);
-        if (k === 2) chop.addAssign(y.mul(c.w).mul(float(FINE).mul(float(1).sub(smoothstep(FINE_FADE[0], FINE_FADE[1], footprint)))));
         if (k < 2) {
           l2 = l2.add(s.xy.mul(m));
-          h = h.add(y);
-        }
-        if (k === CHOP_CASCADE) {
-          const along = c.dx.div(max(length(c.dx), 1e-9)).mul(min(float(STROKE), length(c.dx).mul(STROKE_PX)).div(L));
-          // each tap filtered (anisotropically) over the third of the stroke to the next, so they join in one smear
-          const side = (o: number) => texture(waves.displacement[k], c.q.div(L).add(along.mul(o))).grad(along.div(3), c.dy.div(L)).y;
-          const taps = side(-1).add(side(1)).add(side(-2 / 3)).add(side(2 / 3)).add(side(-1 / 3)).add(side(1 / 3));
-          const coarse = texture(waves.displacement[k], c.q.div(L)).level(float(ROWS_MIP)).y.mul(m);
-          chop.addAssign(y.add(taps.mul(m)).div(7).sub(coarse).mul(c.w));
+          h = h.add(read(waves.displacement[k], float(1 / L)).y.mul(m));
         }
       });
       // the sea is Σ w·h, so its slope is Σ w·∇h + h·∇w: across the band, where the weights change, the second
@@ -242,11 +203,9 @@ export function createWater(view: View, sky: Sky, ground: Ground, wind: Wind, sh
     const storm = sky.storm(p), past = sky.stormEdge(p);
     // the storm's foot churned white along its edge, over the crests
     const foot = smoothstep(-2, 2, past).mul(float(1).sub(smoothstep(FOOT[0], FOOT[1], past)));
-    foam.assign(max(mix(foam, max(foam, smoothstep(0.55, 1, phase)), storm.mul(STORM_FOAM)), foot.mul(smoothstep(0.2, 0.8, phase)).mul(0.4)));
-    // and its line on the water: so wide in metres near, never under a pixel and a half; fading out where a pixel
-    // spans metres (EDGE_FAR), so along the horizon the gold band's glow is left, not a hard seam
-    const edgeLine = float(1).sub(smoothstep(0, max(footprint, 0.05), abs(past).sub(max(float(EDGE_LINE), footprint.mul(0.75)))))
-      .mul(float(1).sub(smoothstep(EDGE_FAR[0], EDGE_FAR[1], footprint)));
+    foam.assign(max(mix(foam, max(foam, smoothstep(0.55, 1, phase)), storm.mul(STORM_FOAM)), foot.mul(smoothstep(0.2, 0.8, phase)).mul(0.8)));
+    // and its line on the water: so wide in metres near, never under a pixel and a half far off
+    const edgeLine = float(1).sub(smoothstep(0, max(footprint, 0.05), abs(past).sub(max(float(EDGE_LINE), footprint.mul(0.75)))));
     const v = normalize(cameraPosition.sub(positionWorld));
     // Toward the horizon the eye looks along the sea, and the filtered slopes turn some of it away from the eye. The
     // eye can't see a face turned away (only the faces of those waves toward it), so such normals are bent back
@@ -255,10 +214,7 @@ export function createWater(view: View, sky: Sky, ground: Ground, wind: Wind, sh
     const n = normalize(tilted.add(v.mul(max(float(FACING).sub(dot(tilted, v)), 0))));
     const smooth = normalize(up.sub(broad));
     const g = normalize(smooth.add(v.mul(max(float(FACING).sub(dot(smooth, v)), 0))));
-    // where on its waves the water is, for its tones (optics.ts): the swell's, and more the middle cascade's, whose
-    // crests lie a few metres apart, so the troughs' tone falls in rows across the sea, as a painter's, rather than in
-    // the swell's broad patches (far off its waves are under the pixel and it settles to its middle)
-    const crest = mix(saturate(height.div(waves.amplitude)), saturate(chop.div(waves.amplitude.mul(CHOP[0])).mul(0.5).add(0.5)), CHOP[1]);
+    const crest = saturate(height.div(waves.amplitude));
 
     // What lies behind the surface, where the eye's ray goes once refracted (Snell): followed down through the water
     // here to the floor's depth and looked up where that lands on the screen. If the look-up lands on something in
@@ -281,12 +237,10 @@ export function createWater(view: View, sky: Sky, ground: Ground, wind: Wind, sh
     const behind = viewportSharedTexture(uv).rgb;
 
     // the ships' shadows, the hulls' shade and the wakes' air
-    const near = { lit: float(1).sub(wake.shade(positionWorld).mul(SHIP_SHADE)),glow: hull.glow, air: max(max(air, bubbles), held.drain.mul(0.6)) };
-    const lit = optics.seaRadiance(positionWorld, n, g, v, crest, foam, behind, path, max(ground.height(rest).negate(), 0), near, held).mul(float(1).sub(storm.mul(STORM_DARK)));
-    const open = dot(sky.open, vec3(0.2126, 0.7152, 0.0722));
-    const glancing = float(1).sub(smoothstep(GLANCE[0], GLANCE[1], dot(v, up)));
-    const sea = lit.add(vec3(...STORM_FOOT).mul(open).mul(pow(smoothstep(-GOLD, 0, past), 2).mul(float(1).sub(smoothstep(0, 4, past))).mul(glancing).mul(GOLD_SHARE)));
-    return mix(sea, vec3(...STORM_FOOT).mul(dot(sky.open, vec3(0.2126, 0.7152, 0.0722)).mul(EDGE_LIGHT)), edgeLine);
+    const near = { lit: float(1).sub(wake.shade(positionWorld)), glow: hull.glow, air: max(max(air, bubbles), held.drain.mul(0.6)) };
+    const depth = max(ground.height(rest).negate(), 0);
+    const sea = optics.seaRadiance({ p: positionWorld, v, n, g, crest, foam, behind, path, depth }, near, held).mul(float(1).sub(storm.mul(STORM_DARK)));
+    return mix(sea, vec3(...LIGHTNING).mul(luminance(sky.open)).mul(EDGE_LIGHT), edgeLine);
   })();
   // the charts' weights as red, green and blue, about as bright on the screen as they are after the frame's exposure
   if (shows === 'charts') material.colorNode = Fn(() => charts.debug(rest).mul(0.1))();

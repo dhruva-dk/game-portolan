@@ -61,8 +61,6 @@ export const FOAM = ink('#EEF6FF');
 
 // ---- the sky
 export const STORM = tones('#7A4FB8', '#3D2670');
-/** The gold of the sunlit calm's light along the storm wall's foot. */
-export const STORM_FOOT = ink('#F5C67A');
 export const LIGHTNING = ink('#D9C2FF');
 /** A fair-weather cloud: a pale cream where the sun lights it, a cool lilac grey beneath (art/target/idea.png's
  *  cumulus: white-topped, not the even salmon review32 saw); both warm, as the sky's lilac adds its blue (review36
