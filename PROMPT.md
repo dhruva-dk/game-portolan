@@ -529,10 +529,16 @@ marketability (0 to 100), a hidden improvability (0 to 1), a peak age, and up to
   full staff.
 - About sixty free agents across all roles.
 - The player founds a crew that takes the place of the weakest crew in League Three: they choose its name, its two
-  colours and its emblem. They inherit that crew's staff, contracts and facilities. Of its two captains, the weaker
-  becomes the reserve.
-- **A ship with no one to sail her.** If a crew's captain is gone on race day, its reserve sails. If it has no
-  reserve either, a free agent is signed for that race at their asking wage. The player cannot start a race with
+  colours and its emblem. They inherit that crew's staff, contracts and facilities. That crew had two captains and a
+  reserve, as every crew does: the player takes ship one, the stronger captain keeps ship two, the reserve stays, and
+  the weaker captain is released to the market.
+- **Every crew has a reserve,** the player's and the rivals' alike. The only difference between them is that the
+  player sails ship one where a rival has a second hired captain.
+- **Injury and illness.** A captain may be unfit for a number of races: a small seeded chance when her ship is
+  sunk, and by events from the inbox. An unfit captain cannot be picked in the race plan; rivals follow the same
+  rule.
+- **A ship with no one to sail her.** If a crew's captain is unfit or gone on race day, its reserve sails. If it has
+  no reserve either, a free agent is signed for that race at their asking wage. The player cannot start a race with
   ship two empty: Continue opens the Crew screen and says why.
 - **When the player is dismissed and joins another crew,** that crew's stronger captain is released to the market
   and the player takes ship one.
