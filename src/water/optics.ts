@@ -33,18 +33,18 @@ const MIRROR = 0.2;
 const MIDDLE_AT = 4.5, DEEP_AT = 11;
 /** The deep water seen from overhead: LOOK_DOWN of the way to the middle tone, from where the eye's ray stands
  *  LOOK_FROM (cosine) off the level to straight down. */
-const LOOK_DOWN = 0.5, LOOK_FROM = 0.3;
+const LOOK_DOWN = 0.25, LOOK_FROM = 0.3;
 /** How fast the water's own tone veils what lies under it, per metre of the eye's path through it. */
 const CLOUDY = 0.2;
 /** How far a wake's air at its thickest takes the water toward the shallows' tone; and how much it veils what lies
  *  under it, as an optical depth. */
 const AIRED = 0.6, AIR_VEIL = 2;
 /** The troughs' tone, of the water's, and where between trough and crest (0…1) its edge lies. */
-const TROUGH = 0.8, TROUGH_AT = 0.4;
+const TROUGH = 0.72, TROUGH_AT = 0.4;
 /** What sets a point in the troughs' tone: the swell's crest (0…1) by SWELL of its range about its middle, and the
  *  short waves' facets by FACETS: one turned from the sun (n against the long waves' g) is in it, so the tone falls
  *  in small crisp marks across the sea, as a painter's ripples, rather than in the swell's broad patches. */
-const SWELL = 0.35, FACETS = 2.5;
+const SWELL = 0.6, FACETS = 2.5;
 /** The sun's glints: the cosine between the surface's normal and the half vector past which it mirrors the sun to the
  *  eye, the width of that edge, and the glint's light of what a white surface gets from the sun square on. */
 const GLINT = 0.9998, GLINT_EDGE = 0.0001, GLINT_LIGHT = 0.4;
