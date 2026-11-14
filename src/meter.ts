@@ -74,20 +74,6 @@ const lines = (map: Map<string, Tally>, frames: number) => [...map]
   .map(([k, t]) => `${k}: ${(t.draws / frames).toFixed(1)} draws ${(t.tris / frames / 1000).toFixed(1)}k tri ${(t.runs / frames).toFixed(2)}×`)
   .join('\n');
 
-/** The release's counter: frames per second and the frame's CPU ms, a half second's mean; no GPU timing, no inspector. */
-export function createFps(el: HTMLElement) {
-  let frames = 0, cpu = 0, last = performance.now();
-  return (cpuMs: number) => {
-    frames++;
-    cpu += cpuMs;
-    const now = performance.now();
-    if (now - last < 500) return;
-    el.textContent = `${Math.round((frames * 1000) / (now - last))} fps  ${(cpu / frames).toFixed(1)} ms`;
-    frames = cpu = 0;
-    last = now;
-  };
-}
-
 export function createMeter(renderer: WebGPURenderer, el: HTMLElement) {
   const gpu = renderer.hasFeature('timestamp-query');
   const info = renderer.info;

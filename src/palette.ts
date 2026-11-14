@@ -28,7 +28,7 @@ export const SAND = tones('#F6C64E', '#C68A42');
 export const SAND_SHORE = tones('#F3D688', '#D6A65E');
 export const SAND_DRY = tones('#F0BC48', '#B87C3A');
 export const LITTER = tones('#C98A3A', '#96552E');
-export const ROCK = tones('#C0603A', '#7E3A2C');
+export const ROCK = tones('#B8553A', '#74304A');
 /** A cliff's paler strata, sandstone between the rock's red bands. */
 export const STRATUM = tones('#C98552', '#83432F');
 export const PALM_LEAF = tones('#4DA63A', '#1F6148');
@@ -60,7 +60,7 @@ export const SEA_DEEP = ink('#244C92');
 export const FOAM = ink('#EEF6FF');
 
 // ---- the sky
-export const STORM = tones('#9483D4', '#574790');
+export const STORM = tones('#7A4FB8', '#3D2670');
 /** The gold of the sunlit calm's light along the storm wall's foot. */
 export const STORM_FOOT = ink('#F5C67A');
 export const LIGHTNING = ink('#D9C2FF');

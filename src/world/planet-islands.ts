@@ -1,8 +1,6 @@
 // The planet's islands: sand islands rising from the banks into rounded hills, each worked out flat on its own chart
 // (sphere.ts) and laid into the sea floor by planet.ts. Five kinds, every one standing out of the sea, their hills
-// no steeper than a palm stands on but for the cliffs raised on an island's: round its headland and along stretches
-// of its coast behind the beach, and on some the hill stepped in terraces (bare rock on their faces, nothing standing
-// there):
+// no steeper than a palm stands on but for a mesa's cliff and a sea stack's sides (bare rock, nothing standing there):
 //   island  18–55 m round, a hill 7–22 m high by its size, palms and shrubs and outcrops of rock; now and then a
 //           lagoon or an offshore rock or two
 //   atoll   28–40 m round, a low ring of sand 8–12 m broad and 1.6–2.6 m high round a shallow lagoon, palms along it
@@ -86,24 +84,14 @@ export const ISLANDS = {
   /** Fine dune relief inland, metres high and across. */
   dunes: { height: 0.4, size: 9 },
   /** The steepest the hills may be (a palm stands on it), rise over run, among all but the steepest hundredth of the
-   *  land: a hill that would be steeper is brought lower. An islet's hump may be a little steeper. Measured before
-   *  the cliffs and terraces are cut into it. */
+   *  land: a hill that would be steeper is brought lower. An islet's hump may be a little steeper. A mesa's is
+   *  measured before its cliff raises it. */
   steepest: { island: 0.8, atoll: 0.8, mesa: 0.8, islet: 0.85, rocks: 0.75 },
   /** Ground steeper than this (rise over run) is a cliff's face: bare rock, nothing standing on it. */
   bare: 1.2,
-  /** Cliffed headlands: round an island's headland (where its coast reaches farthest out, a share `cape` of its radius
-   *  either side),
-   *  and along stretches of its coast where a noise over it (`around` metres across) passes `above` (and full height
-   *  `ends` past that: the cliff's ends sloping down to the beach), the ground is raised in a cliff behind the beach
-   *  from `foot` metres inland: `height` metres (no more than a share `most` of its summit), over `run` metres for
-   *  each metre high (its face at its steepest 1.5 / run, rise over run), its top falling back to the hill between
-   *  `back` and twice that inland, metres. */
-  cliffs: { cape: 0.6, above: 0.1, ends: 0.35, around: 40, height: [3, 8], most: 0.7, foot: 3, run: 0.9, back: 14 },
-  /** A mesa: its top rising no more than `top` metres over the berm, and its cliff all the way round, `run` metres for
-   *  each metre high, up to its summit. */
-  mesa: { top: 2, run: 0.5 },
-  /** The share of islands whose hill rises in terraces: steps `step` metres high, a share `riser` of each its riser. */
-  terraces: { share: 0.45, step: [2.5, 4], riser: 0.5 },
+  /** A mesa: its top rising no more than `top` metres over the berm, and its cliff all the way round from `foot`
+   *  metres inland, `run` metres for each metre high, up to its summit. */
+  mesa: { top: 2, foot: 3, run: 0.5 },
   /** At least this much water between any two aprons, metres. */
   gap: 45,
   /** How deep the bank under an island may be at most, metres: the flank falls gently this far. */
@@ -305,7 +293,7 @@ export function createIslandSite(kind: Kind, chart: Chart, radius: number, noise
   const humps = offshore.map((o) => ({ ...o, height: o.stack ? lerp(S.height[0], S.height[1], rand()) : lerp(0.7, 1.2, rand()) }));
   const dunesAt: Vec3 = [rand() * 256, rand() * 256, rand() * 256];
 
-  /** The ground before the cliffs and terraces are cut into it. */
+  /** The ground before a mesa's cliff raises it. */
   const plain = (x: number, z: number) => {
     const exact = field.at(x, z);
     if (exact >= 0) {
@@ -327,32 +315,12 @@ export function createIslandSite(kind: Kind, chart: Chart, radius: number, noise
     return h + I.dunes.height * dunes * ridge * smoothstep(0, 6, u);
   };
 
-  // the cliffs along stretches of the coast (a mesa's all round), and the terraces, if it has them
-  const C = I.cliffs, T = I.terraces;
-  const cliffAt: Vec3 = [rand() * 256, rand() * 256, rand() * 256];
-  const cliffTop = kind === 'island' ? Math.min(lerp(C.height[0], C.height[1], rand()), target * C.most) : mesa ? peak - target : 0;
-  const run = (mesa ? I.mesa.run : C.run) * cliffTop;
-  const step = rand() < T.share && kind === 'island' ? lerp(T.step[0], T.step[1], rand()) : 0;
-  // (the cliff round the headland, or across from it if the lagoon lies there)
-  const cliffSide = lagoon ? cape + Math.PI : cape;
-  const capeX = Math.cos(cliffSide) * coast(cliffSide), capeZ = Math.sin(cliffSide) * coast(cliffSide);
-  /** 0…1: how much of a cliff the coast has near chart (x, z): round the headland, and where the noise says. */
-  const cliffy = (x: number, z: number) => mesa ? 1 : Math.max(
-    smoothstep(C.above, C.above + C.ends, noise.value(x / C.around + cliffAt[0], z / C.around + cliffAt[1], cliffAt[2])),
-    1 - smoothstep(C.cape * 0.4 * radius, C.cape * radius, Math.hypot(x - capeX, z - capeZ)),
-  );
-  /** Height h stepped: flat treads, and between them risers a share T.riser of each step. */
-  const terraced = (h: number) => {
-    const f = h / step, k = Math.floor(f);
-    return step * (k + smoothstep(1 - T.riser, 1, f - k));
-  };
+  // a mesa's cliff, all round it behind the beach, raising its top to its summit
+  const M = I.mesa, cliff = mesa ? peak - target : 0;
   const mound = (x: number, z: number) => {
     const h = plain(x, z), u = -field.at(x, z);
-    if (u <= 0 || rocks.some((l) => within(l, x, z))) return h;
-    // (the terraces begin behind the beach, where a cliff would)
-    let out = step > 0 && h > berm ? lerp(h, berm + terraced(h - berm), smoothstep(C.foot, 2 * C.foot, u)) : h;
-    if (cliffTop > 0) out += cliffTop * cliffy(x, z) * smoothstep(C.foot, C.foot + run, u) * (mesa ? 1 : 1 - smoothstep(C.back, 2 * C.back, u));
-    return out;
+    if (cliff === 0 || u <= 0 || rocks.some((l) => within(l, x, z))) return h;
+    return h + cliff * smoothstep(M.foot, M.foot + M.run * cliff, u);
   };
 
   /** The highest point, over every node on land (or only `nodes`). */

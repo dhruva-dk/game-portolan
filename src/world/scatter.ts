@@ -58,7 +58,7 @@ const BIG = [2.5, 6] as const, BIG_COUNT = [4, 7] as const;
 /** How far apart two masses' centres may come, as a share of their radii's sum: they overlap into one heap. */
 const HEAPED = 0.6;
 /** Boulders' radii, metres, most small; per outcrop, how many. */
-const BOULDER = [0.3, 1.6] as const, BOULDERS = [3, 7] as const;
+const BOULDER = [0.3, 1.6] as const, BOULDERS = [6, 14] as const;
 /** Where outcrops lie, metres from the waterline (negative inland): on the shoulders, or at the waterline reaching
  * out into the shallows. */
 const SHOULDER = [-14, -5] as const, WATERLINE = [-3, 3] as const, KNOLL = [-4, -1] as const;

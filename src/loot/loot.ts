@@ -6,8 +6,7 @@
 // from the eye. A piece put on the water during the match rises up out of it as it comes (born).
 //
 // Over each stands its beam: a thin column of gold light, (14 + 7 × rarity) m tall, fading up its height and
-// pulsing upward, with a pool of its gold on the water about it, ringed in its rarity's light, within HALO m (as the
-// painting's lit ring, art/target/idea.png); never narrower than
+// pulsing upward, with a ring of its rarity's light on the water about it within HALO m; never narrower than
 // BEAM_PIXELS, and never fainter near than it should be (it fades in past the first tens of metres, so the piece
 // beside her is not lost in it). Drawn to BEAM m; the pieces to SHAPE m, never smaller on the screen than
 // SHAPE_PIXELS across, so they read to the haze's edge (about 250 m), where the haze takes them as everything else
@@ -21,10 +20,10 @@
 import {
   AddEquation, BufferAttribute, BufferGeometry, CustomBlending, CylinderGeometry, DoubleSide, DynamicDrawUsage,
   InstancedBufferGeometry, InstancedInterleavedBuffer, InterleavedBufferAttribute, LatheGeometry, Matrix4, Mesh,
-  MeshBasicNodeMaterial, OctahedronGeometry, OneFactor, OneMinusSrcAlphaFactor, Vector2, type PerspectiveCamera,
+  MeshBasicNodeMaterial, OctahedronGeometry, OneFactor, Vector2, type PerspectiveCamera,
 } from 'three/webgpu';
-import { Fn, abs, attribute, cameraPosition, clamp, cos, cross, dot, float, max, mix, normalize, pow, saturate, select, sin, smoothstep, uniform, varying, vec3 } from 'three/tsl';
-import { GILDING, GLINT, ICE, TAR, TIMBER, tint } from '../palette';
+import { Fn, abs, attribute, cameraPosition, clamp, cos, cross, dot, float, max, mix, normalize, pow, select, sin, smoothstep, uniform, varying, vec3 } from 'three/tsl';
+import { GILDING, GLINT, ICE, TAR, TIMBER } from '../palette';
 import type { Light } from '../sky/light';
 import { GLOW } from '../rarity';
 import { KINDS, type GunKind, type LootKind } from '../kinds';
@@ -36,34 +35,17 @@ import type { Vec3Node } from '../tsl';
 /** The most pieces drawn at once. */
 const PIECES = 512;
 /** Metres out to which the beams and the pieces are drawn, and the rings on the water about them. */
-const BEAM = 520, SHAPE = 320, HALO = 260;
-/** The ring's radius on the water, m (and never fewer than HALO_PIXELS across), and how much of its glow fills it. */
-const RING = 3.5, HALO_PIXELS = 18, POOL = 0.7;
+const BEAM = 520, SHAPE = 320, HALO = 140;
 /** A piece hangs this high over the water at its mean, bobbing this much at this rate (rad/s); turns at this rate
  *  (rad/s) and rocks this far (rad); rises this far up out of the water as it comes, over 1/RISE s. */
 const RIDE = 2.2, BOB = 0.25, BOB_RATE = 2, SPIN = 1.4, ROCK = 0.15, SINK = 2, RISE = 2.5;
 /** The fewest pixels across a piece and a beam are drawn; a piece's size, m, it grows from. */
-const SHAPE_PIXELS = 14, BEAM_PIXELS = 3, SHAPE_ACROSS = 3.5;
-/** How far the beam's core goes from its gold to the glint's white-hot light (art/target/idea.png's pale shaft). */
-const HOT = 0.4;
-/** The beam's light: the gilding's, deepened (to the power DEEPEN, at its own luminance), so added over the sea it
- *  stays gold rather than washing to pale yellow — but not so deep (squared) that it turns orange. */
-const DEEPEN = 1.3;
-const [gr, gg, gb] = GILDING.lit;
-const BEAM_GOLD = tint([gr ** DEEPEN, gg ** DEEPEN, gb ** DEEPEN], 0.2126 * gr + 0.7152 * gg + 0.0722 * gb);
+const SHAPE_PIXELS = 22, BEAM_PIXELS = 3, SHAPE_ACROSS = 3.5;
 /** The beam: its height for the commonest and more for each rarity up, m; its radius at the foot and the head. */
-const TALL = 30, TALLER = 14, FOOT = 0.3, HEAD = 0.18;
-/** How the beam's light falls off up it (the power of what is left of its height) and across it (of the cosine to its
- *  axis): slow up it and tight across, a long even line of light with a hot core (art/target/idea.png's shaft), not a
- *  soft cone. */
-const FADE = 1.2, CORE = 4;
-/** A beam fades out as its foot sinks this far (m) under the eye's horizon, gone by then. */
-const HORIZON = 8;
+const TALL = 14, TALLER = 7, FOOT = 0.3, HEAD = 0.18;
 /** How bright a piece's rim, a beam and its ring glow, of what the sun and the sky give a white surface; and how far
  *  a face must turn from the eye (0 facing it … 1 edge on) to be in the rim. */
-const EMIT = 1.3, BEAM_EMIT = 4, HALO_EMIT = 1.2, RIM = 0.62;
-/** How much of what lies behind a beam or its ring hides, per unit of its brightness. */
-const COVER = 0.8;
+const EMIT = 1.3, BEAM_EMIT = 3, HALO_EMIT = 1.2, RIM = 0.62;
 /** Each kind's size: the guns', the shields' and repairs' small and big. */
 const SIZE: Record<LootKind, number> = {
   cannon: 2.3, scatter: 2.1, repeater: 2.2, harpoon: 2.4, mortar: 2.1, smallShield: 1.7, bigShield: 2.25, repairKit: 1.6, fullRepair: 2.1,
@@ -186,32 +168,26 @@ export function createLoot(light: Light) {
   bm.blending = CustomBlending;
   bm.blendEquation = AddEquation;
   bm.blendSrc = OneFactor;
-  bm.blendDst = OneMinusSrcAlphaFactor;
+  bm.blendDst = OneFactor;
   const ring = attribute('part', 'float'), uv = attribute('uv', 'vec2');
   const tall = float(TALL).add(glow.w.mul(TALLER)), wide = max(float(1), far.mul(pixel).mul(BEAM_PIXELS / (2 * HEAD)));
   const beamAt = at.xyz.add(e1.mul(local.x.mul(wide))).add(e2.mul(local.z.mul(wide))).add(up.mul(local.y.mul(tall)));
-  const halo = max(float(RING), far.mul(pixel).mul(HALO_PIXELS / 2)).mul(sin(now.mul(3).add(id)).mul(0.06).add(1));
-  const ringAt = at.xyz.add(up.mul(0.6)).add(e1.mul(local.x.mul(halo))).add(e2.mul(local.z.mul(halo)));
+  const halo = float(1.6).add(sin(now.mul(3).add(id)).mul(0.15));
+  const ringAt = at.xyz.add(up.mul(0.12)).add(e1.mul(local.x.mul(halo))).add(e2.mul(local.z.mul(halo)));
   const beamShown = select(far.lessThan(BEAM), float(1), float(0)), ringShown = select(far.lessThan(HALO), float(1), float(0));
   bm.positionNode = select(ring.greaterThan(0.5), ringAt.mul(ringShown), beamAt.mul(beamShown).mul(pop));
   const v = varying(uv.y), xz = varying(local.xz), isRing = varying(ring), tint = varying(glow.rgb), r = varying(glow.w), base = varying(at.xyz);
   const core = varying(abs(dot(normalize(e1.mul(normal.x).add(e2.mul(normal.z))), normalize(cameraPosition.sub(at.xyz)))));
-  // and gone once its foot is over the horizon (the eye under the sea's level there), so it doesn't stand tilted in
-  // the sky past it
-  const near = varying(smoothstep(10, 55, far).mul(smoothstep(-HORIZON, 0, dot(cameraPosition.sub(at.xyz), up))));
-  const column = pow(float(1).sub(v), FADE).mul(sin(v.mul(40).sub(now.mul(6))).mul(0.25).add(0.75)).mul(pow(core, CORE)).mul(near);
-  // the ring: a bright band at its edge round a pool of light falling off from the middle
-  const d = xz.length(), band = smoothstep(0.62, 0.8, d).mul(smoothstep(1, 0.86, d));
-  const pool = pow(saturate(float(1).sub(d)), 1.5).mul(POOL);
-  // the beam and its pool gold whatever the piece; the ring's band in its rarity's light over the gold
-  const isBeam = isRing.lessThanEqual(0.5);
-  const brightness = select(isBeam, column.mul(BEAM_EMIT).mul(r.mul(0.18).add(0.35)), band.add(pool).mul(HALO_EMIT));
-  // the beam's core pale, as white-hot gold, deepening to the gold at its edges
-  const hot = mix(vec3(...BEAM_GOLD), vec3(...GLINT), pow(core, 6).mul(HOT));
-  bm.colorNode = select(isBeam, hot, mix(vec3(...BEAM_GOLD), tint, band.mul(0.5))).mul(light.level(base)).mul(brightness);
-  // over what lies behind, hiding it as much as it is bright (premultiplied): gold over the sea stays gold, where
-  // added to its blue it would wash pale
-  bm.opacityNode = saturate(brightness.mul(COVER));
+  const near = varying(smoothstep(10, 55, far));
+  bm.colorNode = Fn(() => {
+    const lit = light.level(base);
+    const column = pow(float(1).sub(v), 2.2).mul(sin(v.mul(40).sub(now.mul(6))).mul(0.25).add(0.75)).mul(core.mul(core)).mul(near);
+    const d = xz.length(), band = smoothstep(0.55, 0.8, d).mul(smoothstep(1, 0.82, d));
+    // the beam gold whatever the piece; its ring on the water in its rarity's light
+    const isBeam = isRing.lessThanEqual(0.5);
+    const brightness = select(isBeam, column.mul(BEAM_EMIT).mul(r.mul(0.18).add(0.35)), band.mul(HALO_EMIT));
+    return select(isBeam, vec3(...GILDING.lit), tint).mul(lit).mul(brightness);
+  })();
   const beamMesh = new Mesh(beamGeometry, bm);
   beamMesh.frustumCulled = false;
   // after the sea, which reads what was drawn before it (as the gunfire's puffs)

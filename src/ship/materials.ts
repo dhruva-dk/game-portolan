@@ -32,7 +32,6 @@ import type { Light } from '../sky/light';
 import { BELLY_UNIT, PENNANT_LENGTH, PIVOT_Z, RADIUS_UNIT, UV_RANGE } from './build';
 import { breath, type Cloth } from './cloth';
 import { CLOTH } from './kit';
-import { TOPSAILS } from './sails';
 import { CREAM, DYE_GLOW, TAR } from '../palette';
 import { createWood, shaded } from './wood';
 import { line, type FloatNode, type Vec3Node } from '../tsl';
@@ -53,10 +52,6 @@ const CLOTHS = 26;
 const STRIPES = 5, FRINGE = 0.2;
 /** A mark whose paint is within this much of its canvas's luminance is drawn in cream (palette.ts CREAM). */
 const UNSEEN = 0.06;
-/** How far toward its sunlit dye a sail's shadow tone is where the sun only grazes it (nothing shading it). */
-const GRAZED = 0.6;
-/** The sunlit canvas's second tone, of its dye, where it curves away from the sun (light.ts Sides.full). */
-const CURVED = 0.8;
 /** How far a sail may be blown aback (of its full belly), so it doesn't fold through its mast. */
 const ABACK = 0.3;
 /** A pennant flaps this many times a second in a fresh breeze, its waves this many to its length. */
@@ -164,13 +159,7 @@ export function createShipMaterials(light: Light, pixel: FloatNode, canvas: Clot
   clothMaterial.positionNode = at.xyz.add(turn(brace(shaped, true)));
   const drawn = select(isPennant, across, filled), drawnNormal = normalize(drawn);
   const clothNormal = varying(turn(brace(mix(drawnNormal, simulatedNormal, share), false)));
-  // the belly's own curve, without the cloth's wrinkles: what sets the sunlit canvas's two tones
-  const bellyNormal = varying(turn(brace(drawnNormal, false)));
   const clothKind = varying(kind);
-  // a topsail is plain dye: her mark and stripes are on the courses alone, so at a distance her canvas reads as a few
-  // big sails rather than many small flags
-  const gridIndex = nrm.w.mul(127).round();
-  const topsail = varying(select(TOPSAILS.slice(1).reduce((t, i) => t.or(gridIndex.equal(i)), gridIndex.equal(TOPSAILS[0])), float(1), float(0)));
   clothMaterial.colorNode = Fn(() => {
     const uvs = attribute('uv', 'vec2').mul(UV_RANGE);
     // seams between the cloths, and the boltrope round the edges, each about a pixel wide and fading out once too
@@ -192,7 +181,7 @@ export function createShipMaterials(light: Light, pixel: FloatNode, canvas: Clot
       return select(square.and(armX.or(armY)), float(1), float(0));
     };
     const mark = cross(0);
-    const marked = max(band, max(mark, stripe.mul(float(1).sub(cross(FRINGE))))).mul(float(1).sub(topsail));
+    const marked = max(band, max(mark, stripe.mul(float(1).sub(cross(FRINGE)))));
     // a mark as dark or as light as its canvas would not show: it is drawn in cream instead
     const luma = vec3(0.2126, 0.7152, 0.0722);
     const ink = select(abs(dot(paint.rgb, luma).sub(dot(cloth.rgb, luma))).lessThan(UNSEEN), vec3(...CREAM), paint.rgb);
@@ -202,16 +191,10 @@ export function createShipMaterials(light: Light, pixel: FloatNode, canvas: Clot
     // cloth the light passed through (twice over, renormalised by its brightness) and brighter, the paint on it
     // letting less through; and its shadow tone
     const n = normalize(clothNormal).mul(faceDirection);
-    const side = light.sides(positionWorld, n, normalize(bellyNormal).mul(faceDirection));
+    const side = light.sides(positionWorld, n);
     const dyed = albedo.mul(albedo).div(max(dot(albedo, luma), 0.05));
     const glow = mix(albedo, dyed, DYE_GLOW.deepen).mul(mix(float(DYE_GLOW.gain), float(DYE_GLOW.gain * PAINTED), marked));
-    // with the sun edge on to the canvas, its wrinkles would fall to dark blotches: unshadowed, it is GRAZED of the way
-    // to its dye in the sun, and only what the island or a cloud shades is its full shadow tone
-    const dark = mix(shaded(albedo), albedo, side.open.mul(GRAZED));
-    // in the sun, a second step: where the belly curves away from it, a little under the full dye, so the canvas
-    // shows its shape in two lit tones as a painter's sail does
-    const lit = mix(albedo.mul(CURVED), albedo, side.full);
-    return mix(mix(dark, glow, side.back), lit, side.front).mul(light.level(positionWorld));
+    return mix(mix(shaded(albedo), glow, side.back), albedo, side.front).mul(light.level(positionWorld));
   })();
   // ---- the ropes: blended, so drawn after the sea (fleet.ts)
   const ropes = new MeshBasicNodeMaterial({ transparent: true });

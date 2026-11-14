@@ -22,9 +22,6 @@ import type { FloatNode, Vec3Node } from '../tsl';
  */
 const BOLT = 4.5, FLICKER = [[0, 0.07, 1], [0.1, 0.15, 0.4], [0.21, 0.34, 0.85]] as const;
 const IN = 30, ALONG = 0.7, NEAR = 50, DISTANCE = [70, 200] as const;
-/** The places along the wall a stroke may stand (shares of that reach, either way), and how near the eye's look a
- *  place must lie for the eye to see it (the cosine of the angle off its look). */
-const AROUND = [-1, -0.75, -0.5, -0.25, 0, 0.25, 0.5, 0.75, 1], IN_VIEW = 0.8;
 /** How far round the stroke the cloud and rain are lit, metres (a Gaussian's width), and how brightly, as a multiple of the storm's air
  * light's luminance; the stroke's own channel: its radiance in the same units, its width (metres, and at least this
  * many radians, about a pixel), and how far it zigzags either side (metres, over two scales of its height). */
@@ -75,9 +72,8 @@ export function createBolt(held: boolean) {
       const along = smoothstep(-2, 2, s).mul(smoothstep(BASE + 10, BASE - 5, s)).mul(smoothstep(0, 1, metres.sub(t)));
       return vec3(dot(air, LUMA)).mul(vec3(...TINT)).mul(core.mul(along).mul(through).mul(flash).mul(CHANNEL).mul(min(float(WIDTH).div(width), 1)));
     },
-    /** The stroke now (sim/storm.ts's cap; seconds: the world's clock; eye: where the eye is, world m; look: the way it
-     *  looks, a unit vector). */
-    update(cap: Cap, seconds: number, eye: Vec3, look: Vec3, whole: boolean) {
+    /** The stroke now (sim/storm.ts's cap; seconds: the world's clock; eye: where the eye is, world m). */
+    update(cap: Cap, seconds: number, eye: Vec3, whole: boolean) {
       const n = Math.floor(seconds / BOLT), since = seconds - (n + hash(n, 0) * 0.8) * BOLT;
       const lit = held ? FLICKER[0] : FLICKER.find(([from, to]) => since >= from && since < to);
       flash.value = !whole && lit ? lit[2] : 0;
@@ -92,19 +88,10 @@ export function createBolt(held: boolean) {
         const far = DISTANCE[0] + hash(n, 2) * (DISTANCE[1] - DISTANCE[0]), way = add(scale(out, Math.cos(turn * Math.PI)), side, Math.sin(turn * Math.PI));
         at = normalizeV(add(u, way, far / R));
       } else {
-        // in the calm: IN metres into the wall, along it either way from the eye's nearest point of it, among the
-        // stretch of it the eye looks toward (any of it, if it looks away)
-        const a = cap.radius + IN / R, reach = Math.max(NEAR, -off * ALONG) / (R * Math.max(Math.sin(a), 0.05));
-        const place = (k: number) => {
-          const round = k * reach, way = add(scale(out, Math.cos(round)), side, Math.sin(round));
-          return normalizeV(add(scale(c, Math.cos(a)), way, Math.sin(a)));
-        };
-        const facing = (p: Vec3) => {
-          const to = add(scale(p, R + BASE * 0.5), eye, -1);
-          return dotV(to, look) / Math.max(lengthV(to), 1e-6);
-        };
-        const seen = AROUND.filter((k) => facing(place(k)) > IN_VIEW);
-        at = place(seen.length ? seen[Math.floor(hash(n, 1) * seen.length)] : turn);
+        // in the calm: IN metres into the wall, along it either way from the eye's nearest point of it
+        const a = cap.radius + IN / R, round = (turn * Math.max(NEAR, -off * ALONG)) / (R * Math.max(Math.sin(a), 0.05));
+        const way = add(scale(out, Math.cos(round)), side, Math.sin(round));
+        at = normalizeV(add(scale(c, Math.cos(a)), way, Math.sin(a)));
       }
       if (Number.isFinite(lengthV(at))) foot.value.set(...at);
       else flash.value = 0;

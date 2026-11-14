@@ -46,7 +46,7 @@ test('the same for a seed, different across seeds', () => {
   assert.ok(differ > points.length / 2, `${differ} of ${points.length} differ`);
 });
 
-test('the ground is continuous: no steps anywhere, and steep only on a channel\'s side, a cliff\'s face or a sea stack\'s', () => {
+test('the ground is continuous: no steps anywhere, and steep only on a channel\'s side, a mesa\'s cliff or a sea stack\'s', () => {
   const step = 0.1, rand = random(99);
   for (const seed of SEEDS) {
     const pl = planets.get(seed)!;
@@ -77,9 +77,8 @@ test('an island\'s centre has no seam where its coast\'s angle wraps', () => {
   for (const s of planet.islands) {
     const top = planet.height(s.chart.at);
     for (let i = 0; i < 32; i++) {
-      // (5 cm off it, at no more than a terrace's riser's slope: 2.5)
       const h = planet.height(onIsland(s, (i / 32) * 2 * Math.PI, 0.05));
-      assert.ok(Math.abs(h - top) < 0.125, `centre ${top} vs ${h}`);
+      assert.ok(Math.abs(h - top) < 0.05, `centre ${top} vs ${h}`);
     }
   }
 });
@@ -194,7 +193,7 @@ test('each above the sea: the waterline is its coast, the beach about 1:8 there,
   for (const [seed, pl] of planets) {
     const summits = (kind: string) => pl.islands.filter((s) => s.kind === kind).map((s) => s.summit);
     assert.ok(Math.max(...summits('island')) > 15, `seed ${seed}: highest ${Math.max(...summits('island'))}`);
-    // (the narrowest brought lower: some 5 m across)
+    // (the narrowest brought lower to keep a palm's slope: some 5 m across)
     assert.ok(Math.min(...summits('islet')) > 1.5, `seed ${seed}: islets ${summits('islet')}`);
     const big = pl.islands.filter((s) => s.radius > 35), small = pl.islands.filter((s) => s.kind === 'island' && s.radius < 22);
     const mean = (l: typeof big) => l.reduce((a, s) => a + s.summit, 0) / l.length;
@@ -202,7 +201,7 @@ test('each above the sea: the waterline is its coast, the beach about 1:8 there,
   }
 });
 
-test('the hills: slopes a palm stands on, but for the cliffs\' faces', () => {
+test('the hills: slopes a palm stands on, but for a mesa\'s cliff', () => {
   for (const [seed, pl] of planets) for (const s of pl.islands) {
     const slopes: number[] = [];
     let land = 0;
@@ -217,12 +216,14 @@ test('the hills: slopes a palm stands on, but for the cliffs\' faces', () => {
     }
     slopes.sort((a, b) => a - b);
     const p99 = slopes[Math.floor(slopes.length * 0.99)], worst = slopes.at(-1)!, faces = 1 - slopes.length / land;
-    // (the hill itself is brought down to ISLANDS.steepest before they are cut into it; a cliff's or riser's flank,
-    // short of its face, steeper, by up to the difference in how finely the two are measured)
-    // (a mesa's all round it)
-    assert.ok(faces < (s.kind === 'mesa' ? 0.45 : 0.25), `seed ${seed}: ${s.kind} ${s.radius.toFixed(0)} m ${(faces * 100).toFixed(0)}% cliff`);
-    // (a mesa's face sharper, from its foot to its top)
-    assert.ok(p99 < ISLANDS.bare && worst < ISLANDS.bare + (s.kind === 'mesa' ? 0.4 : 0.15), `seed ${seed}: ${s.kind} ${s.radius.toFixed(0)} m slopes p99 ${p99.toFixed(2)}, worst ${worst.toFixed(2)}`);
+    const say = `seed ${seed}: ${s.kind} ${s.radius.toFixed(0)} m slopes p99 ${p99.toFixed(2)}, worst ${worst.toFixed(2)}, ${(faces * 100).toFixed(0)}% cliff`;
+    if (s.kind === 'mesa') {
+      // its cliff all round it; short of the face, its flank steeper than a hill by up to how finely the two are measured
+      assert.ok(faces < 0.45 && p99 < ISLANDS.bare && worst < ISLANDS.bare + 0.4, say);
+    } else {
+      // no cliff at all
+      assert.ok(faces === 0 && p99 < ISLANDS.steepest[s.kind] + 0.08 && worst < 1.1, say);
+    }
   }
 });
 

@@ -128,8 +128,6 @@ export function createSky(view: View, bolt: boolean) {
   /** The sun's field (world/sun.ts): its origin, the sun over that, and the sine of its height over every place. */
   const origin = uniform(new Vector3(0, 1, 0));
   const there = uniform(new Vector3(0, 1, 0));
-  /** The way the camera looks this frame (scratch). */
-  const looking = new Vector3();
   const rise = uniform(1);
   /** 1 while the eye is in the air, under the clouds; 0 from space, where they are not drawn and cast no shadow. */
   const under = uniform(1);
@@ -246,8 +244,7 @@ export function createSky(view: View, bolt: boolean) {
      * cast no shadow, and the sea mirrors the sky alone.
      */
     update(env: Environment, cap: Cap, camera: PerspectiveCamera, kind: Eye['kind'], dt: number, width: number, height: number): { tables: Compute[]; clouds: Compute[]; reflection: Compute[] } {
-      const look = camera.getWorldDirection(looking);
-      storm.update(cap, env.clock, [camera.position.x, camera.position.y, camera.position.z], [look.x, look.y, look.z]);
+      storm.update(cap, env.clock, [camera.position.x, camera.position.y, camera.position.z]);
       sun.value.set(...env.sunDirection);
       origin.value.set(...env.sunPlaces.origin);
       there.value.set(...sunAtOrigin(env.sunPlaces, env.timeOfDay));
