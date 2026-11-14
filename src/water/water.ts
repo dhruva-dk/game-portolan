@@ -315,12 +315,16 @@ export function createWater(view: View, sky: Sky, ground: Ground, wind: Wind, sh
     ribbons: trails.mesh,
     /** The sea's charts (world/lattice.ts), for its CPU copy (world/swell.ts). */
     anchors: charts.anchors,
-    /** The light under the water at world position p, as a share of what is above it: the sun's and the sky's; and
-     *  how the waves above focus the sun's onto the floor there (caustics.ts). */
+    /** The light under the water at world position p, as a share of what is above it: the sun's and the sky's. */
     below: {
       sun: (p: Vec3Node): Vec3Node => optics.sunBelow(p),
       sky: (p: Vec3Node): Vec3Node => optics.skyBelow(p),
-      focus: (p: Vec3Node): FloatNode => caustics(p),
+    },
+    /** The same on the sea floor, the sun's focused by the waves above (caustics.ts): kept to the ground's shaders,
+     *  where it shows, so every other lit thing compiles without it. */
+    floor: {
+      sun: (p: Vec3Node): Vec3Node => optics.sunBelow(p).mul(caustics(p)),
+      sky: (p: Vec3Node): Vec3Node => optics.skyBelow(p),
     },
     /** The ships' marks' draw, due or not (update gives it only when due): for the frame to build its shaders before
      *  any ship is near. */

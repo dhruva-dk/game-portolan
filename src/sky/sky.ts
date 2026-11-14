@@ -10,7 +10,7 @@
 //   sunIlluminance(p) the sun's light at world position p, after the air (per unit sun at the top of the air)
 //   cloudShadow(p)   the fraction of it the clouds let through to p: the fair-weather clouds' share (cloudCover)
 //                    times the storm's (stormSun)
-//   ambient(p)       the sky's light on a surface at p facing up, as radiance (multiply by albedo)
+//   ambient(p, n)    the sky's light on a surface at p facing n, as radiance (multiply by albedo)
 //   open             what the sun and the sky give a white surface facing up in the open, out of every shadow and of
 //                    the storm, as radiance: the same everywhere, by the hour. The frame's exposure is set by it
 //   reflect(d)       the sky and clouds a surface mirrors along world direction d, blurred to a few broad shapes
@@ -32,7 +32,7 @@ import type { Eye } from '../snapshot';
 import type { View } from '../view/view';
 import { R, toSky } from '../world/sphere';
 import { sunAtOrigin, sunInSky } from '../world/sun';
-import { MIE_EXTINCTION, MIE_SCALE_HEIGHT, MIE_SCATTERING, RAYLEIGH_SCATTERING } from './atmosphere';
+import { MIE_EXTINCTION, MIE_SCALE_HEIGHT, MIE_SCATTERING, RAYLEIGH_SCATTERING, SEA_ALBEDO } from './atmosphere';
 import { STORM, tint } from '../palette';
 import { createClouds } from './clouds';
 import { createReflection } from './reflection';
@@ -109,7 +109,7 @@ export interface Sky {
   cloudShadow(p: Vec3Node): FloatNode;
   cloudCover(p: Vec3Node): FloatNode;
   stormSun(p: Vec3Node): FloatNode;
-  ambient(p: Vec3Node): Vec3Node;
+  ambient(p: Vec3Node, n: Vec3Node): Vec3Node;
   open: Vec3Node;
   reflect(dir: Vec3Node): Vec3Node;
   storm(p: Vec3Node): FloatNode;
@@ -145,7 +145,11 @@ export function createSky(view: View, bolt: boolean) {
   /** The same everywhere: the sun stands as high over every place. */
   const sunIlluminance = (_p: Vec3Node): Vec3Node => sunTransmittance(VIEW_RADIUS, rise);
 
-  const ambient = (p: Vec3Node): Vec3Node => skyAmbientUp.mul(mix(1, STORM_SKY, storm.depth(p)));
+  const ambient = (p: Vec3Node, n: Vec3Node): Vec3Node => {
+    const up = view.up(p);
+    const bounce = sunIlluminance(p).mul(max(rise, 0)).add(skyAmbientUp).mul(SEA_ALBEDO);
+    return mix(bounce, skyAmbientUp, dot(n, up).mul(0.5).add(0.5)).mul(mix(1, STORM_SKY, storm.depth(p)));
+  };
   const sunlight = sunTransmittance(VIEW_RADIUS, rise).mul(max(rise, 0));
   const stormLight: StormLight = {
     air: sunlight.mul(SUN_IN / (4 * Math.PI)).add(skyAmbientUp.mul(AIR_IN)).mul(vec3(...STORM_TINT)),

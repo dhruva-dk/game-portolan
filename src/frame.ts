@@ -134,7 +134,8 @@ export function createFrame(renderer: WebGPURenderer, world: World, options: Fra
   const water = createWater(view, sky.light, ground, world.wind, options.fleet, options.length, options.sea);
   const shadow = createShadow();
   const light = createLighting(sky.light, water.below, shadow.visible);
-  const sand = createSand(view, ground, light);
+  // (the ground's own, with the caustics on the sea floor)
+  const sand = createSand(view, ground, createLighting(sky.light, water.floor, shadow.visible));
   const seabed = createSeabed(view, ground, sand);
   const islands = createIslands(world.planet, world.seed, view, light, sand);
   shadow.cast(...islands.casters);

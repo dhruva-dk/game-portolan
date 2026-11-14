@@ -29,7 +29,7 @@ export function probeMeshes(sky: Sky, eye: Vec3): Mesh[] {
   const material = new MeshBasicNodeMaterial();
   const albedo = vec3(0.5);
   const p = positionWorld;
-  material.colorNode = albedo.mul(sky.sunIlluminance(p).mul(sky.cloudShadow(p)).mul(max(dot(normalWorld, sky.sun(p)), 0)).add(sky.ambient(p)));
+  material.colorNode = albedo.mul(sky.sunIlluminance(p).mul(sky.cloudShadow(p)).mul(max(dot(normalWorld, sky.sun(p)), 0)).add(sky.ambient(p, normalWorld)));
   for (const [metres, x] of [[30, -12], [60, 25], [100, -40], [150, 60]]) {
     const size = metres / 10;
     stand(new Mesh(new BoxGeometry(size, size * 1.5, size), material), metres, x, size * 0.75 - 1);

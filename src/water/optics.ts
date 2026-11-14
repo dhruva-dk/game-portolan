@@ -182,7 +182,7 @@ function seaRadiance(
 
   // what a white surface lying on the sea would give back (ambient() is the sky's radiance, so its E/π is itself):
   // the water's colours are tones under it, as a solid's are under its level (sky/light.ts)
-  const irradiance = sun.mul(max(dot(l, up), 0)).div(Math.PI).add(sky.ambient(p));
+  const irradiance = sun.mul(max(dot(l, up), 0)).div(Math.PI).add(sky.ambient(p, up));
   // the water's own tone by how much of it the eye looks through, paler where a wake has worked air into it, and a
   // second, deeper tone in the troughs between the waves, its edge crisp
   // looked down into, the deep water is LOOK_DOWN of the way to the middle tone, deepening to its own toward the

@@ -85,7 +85,7 @@ export function createTrails(sky: Sky, surface: (up: Vec3Node, cell: FloatNode) 
     const mine = team.w;
     // what the sun and sky give a white surface here: the line's light is set against it
     const l = sky.sun(place);
-    const white = sky.sunIlluminance(place).mul(max(dot(l, up), 0)).div(Math.PI).add(sky.ambient(place));
+    const white = sky.sunIlluminance(place).mul(max(dot(l, up), 0)).div(Math.PI).add(sky.ambient(place, up));
     const light = team.xyz.div(max(max(team.x, team.y), max(team.z, 0.02))).mul(INK).mul(white);
     // across: pixels from the middle
     const off = sideV.abs().div(max(fwidth(sideV), 1e-6));

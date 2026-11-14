@@ -12,29 +12,23 @@ import { cameraPosition, dot, float, fwidth, max, mix, normalize, saturate, smoo
 import type { FloatNode, Vec3Node } from '../tsl';
 import type { Sky } from './sky';
 
-/** The light under the water at a point, as a share of what is above it, and how the waves above focus the sun's
- *  onto the floor there (water.below). */
-export interface Below { sun(p: Vec3Node): Vec3Node; sky(p: Vec3Node): Vec3Node; focus(p: Vec3Node): FloatNode }
+/** The light under the water at a point, as a share of what is above it (water.below). */
+export interface Below { sun(p: Vec3Node): Vec3Node; sky(p: Vec3Node): Vec3Node }
 
-/** A thin thing's two sides: 1 where the sun reaches the side facing n, and where it comes through from the other;
- *  1 where the side facing n is turned squarely to the sun; and 1 where nothing casts a shadow on it, whichever way it
- *  faces. */
-export interface Sides { front: FloatNode; full: FloatNode; back: FloatNode; open: FloatNode }
+/** A thin thing's two sides: 1 where the sun reaches the side facing n, and where it comes through from the other. */
+export interface Sides { front: FloatNode; back: FloatNode }
 
 export interface Light {
   /** The radiance of a surface at world position p facing n (unit), of tone `lit` in the sun and `shadow` out of it. */
   toon(p: Vec3Node, n: Vec3Node, lit: Vec3Node, shadow: Vec3Node): Vec3Node;
-  /** The same for the ground, which under the sea lies in the net of light the waves focus onto it. */
-  floor(p: Vec3Node, n: Vec3Node, lit: Vec3Node, shadow: Vec3Node): Vec3Node;
   /** The same for a polished surface: `shine` where it mirrors the sun toward the eye. */
   polished(p: Vec3Node, n: Vec3Node, lit: Vec3Node, shadow: Vec3Node, shine: Vec3Node): Vec3Node;
   /** The same for a leaf: lit where the sun reaches either side of it. */
   leaf(p: Vec3Node, n: Vec3Node, lit: Vec3Node, shadow: Vec3Node): Vec3Node;
   /** 0 in shadow … 1 in the sun, the edge between crisp: a surface at p facing n. */
   band(p: Vec3Node, n: Vec3Node): FloatNode;
-  /** The band on each side of a thin surface at p whose near side faces n; shape, the surface's normal smoothed of
-   *  its small folds, sets where it is in full light (n if not given). */
-  sides(p: Vec3Node, n: Vec3Node, shape?: Vec3Node): Sides;
+  /** The band on each side of a thin surface at p whose near side faces n. */
+  sides(p: Vec3Node, n: Vec3Node): Sides;
   /** The brightness at p: what a tone is multiplied by to give radiance. */
   level(p: Vec3Node): Vec3Node;
 }
@@ -44,8 +38,6 @@ export interface Light {
 const TURN = 0.1, EDGE = 0.04;
 /** The same for the sun through a thin thing from behind: only where it stands well behind it. */
 const THROUGH = 0.35;
-/** Where a thin thing's sunlit side is turned squarely enough to the sun to be in its full light (Sides.full). */
-const FULL = 0.25;
 /** A cast shadow's edge: the share of the sun (0…1) at which a point is in it, and half the edge's width; the clouds'
  *  shadow's likewise. */
 const CAST = 0.5, CAST_EDGE = 0.12, CLOUDED = 0.55, CLOUD_EDGE = 0.06;
@@ -69,22 +61,19 @@ export function createLighting(sky: Sky, below: Below, visible: (p: Vec3Node, n:
     return smoothstep(w.negate(), w, nl.sub(at));
   };
   const band = (p: Vec3Node, n: Vec3Node): FloatNode => turned(dot(n, sky.sun(p)), TURN).mul(open(p, n));
-  const sides = (p: Vec3Node, n: Vec3Node, shape: Vec3Node = n): Sides => {
+  const sides = (p: Vec3Node, n: Vec3Node): Sides => {
     const nl = dot(n, sky.sun(p)).toVar(), clear = open(p, n).toVar();
-    return { front: turned(nl, TURN).mul(clear), full: turned(dot(shape, sky.sun(p)), FULL).mul(clear), back: turned(nl.negate(), THROUGH).mul(clear), open: clear };
+    return { front: turned(nl, TURN).mul(clear), back: turned(nl.negate(), THROUGH).mul(clear) };
   };
-  /** The brightness at p, its sun's share times `focus`. */
-  const levelUnder = (p: Vec3Node, focus: FloatNode | null): Vec3Node => {
+  const level = (p: Vec3Node): Vec3Node => {
     const up = normalize(p);
     const sun = sky.sunIlluminance(p).mul(sky.stormSun(p)).mul(below.sun(p)).mul(saturate(dot(up, sky.sun(p)))).div(Math.PI);
-    const all = (focus ? sun.mul(focus) : sun).add(sky.ambient(p).mul(below.sky(p)));
+    const all = sun.add(sky.ambient(p, up).mul(below.sky(p)));
     return mix(vec3(dot(all, vec3(...LUMA))), all, TINTED);
   };
-  const level = (p: Vec3Node): Vec3Node => levelUnder(p, null);
   const toon = (p: Vec3Node, n: Vec3Node, lit: Vec3Node, shadow: Vec3Node): Vec3Node => mix(shadow, lit, band(p, n)).mul(level(p));
   return {
     toon,
-    floor: (p, n, lit, shadow) => mix(shadow, lit, band(p, n)).mul(levelUnder(p, below.focus(p))),
     band,
     sides,
     level,
