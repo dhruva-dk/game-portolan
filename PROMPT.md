@@ -35,7 +35,7 @@ The player enjoys sailing and shooting. Nothing may make that worse.
 | D1 | The look is `art/target/race.png`: two-tone toon shading, a sea-chart palette, clear shallows, no photo textures. |
 | D2 | The UI is parchment with inked serif type and woodcut icons, the existing chartmaker's hand (`src/ui/ink.ts`). |
 | D3 | The management UI copies Motorsport Manager's structure: a navigation bar across the top, a dashboard as home, date, money and Continue at top right. Controls are sized for a finger. |
-| D4 | The target device is an iPad with an M1. The phone is no longer the target. |
+| D4 | The target device is the iPad Air with an M1, at 30 to 40 frames a second (`CLAUDE.md`). The phone is no longer the target. |
 | D5 | Territory stays. A crew's held water is its pit. |
 | D6 | The rank seals, the career level and the rank screen are deleted. |
 | D7 | Three leagues, ten crews each, two ships per crew, twenty ships a race. Champion up, last place down. |
@@ -58,24 +58,24 @@ The player enjoys sailing and shooting. Nothing may make that worse.
 | D24 | The save is an append-only journal with checksummed snapshots and a backup. |
 | D25 | The work must show engineering fundamentals: edge cases, crash consistency, failure handling, backups. |
 | D26 | Clean architecture first. No three.js hacks, no reaching past a library's public interface, no workarounds kept. |
+| D27 | The layout page is 1180 × 820 CSS px (the iPad Air in landscape), scaled to fit. |
+| D28 | The world is drawn at 1.0 × CSS size to start. It is raised only after the owner measures headroom on the device. |
+| D29 | If the app is killed mid-race, on relaunch the race is offered again from its start, on the same planet and plan. |
+| D30 | The currency is "Coin". |
+| D31 | Contracts, negotiation, patience and the star formula are as section 6.3 and 6.1 have them: our own design, not Motorsport Manager's numbers. |
+| D32 | The rookery's buildings are the nine of section 6.6. |
+| D33 | Flight gulls have contracts and wages like everyone else. |
+| D34 | `frame.dispose` is added to the names test `f2` lets callers use, with a comment saying why (section 5.10). |
+| D35 | A crewmate's water counts as a ship's own for closing a loop. The cells' owner does not change. |
+| D36 | The other leagues' races run in a Worker, one at a time, while the player's race is drawn. If `npm run hitch` or the device shows a cost, they run after the result instead. |
+| D37 | The top bar has eight tabs. Standings and the Admiralty share the League tab; the ledger and patrons share Finance. |
 
-### 2.2 Not yet decided: ask the owner before building on any of these
+### 2.2 Still open: both need the owner's eyes, and neither stops Phases 0, A or B
 
-| # | Question | Recommendation, used in this brief until the owner answers |
+| # | Question | What agents do until the owner answers |
 |---|---|---|
-| Q1 | Which iPad (Air 10.9", Pro 11", Pro 12.9")? | Lay out for 1194 × 834 CSS px and scale to fit. |
-| Q2 | Render size on the iPad. | Start at 1.0 × CSS size and raise it only after the owner measures headroom. |
-| Q3 | The app is killed mid-race. | On relaunch the race is offered again from its start, on the same seed. |
-| Q4 | Final palette and UI mock approval. | Section 9's values; more image targets will be added to `art/target/`. |
-| Q5 | The currency's name. | "Coin". |
-| Q6 | Race length and season length. | About five minutes; ten races. |
-| Q7 | Contract terms, patience, rejection, star formula. | Section 6.3, our own design. |
-| Q8 | The list of rookery buildings. | Section 6.6. |
-| Q9 | Whether flight gulls have contracts and wages. | Yes, like everyone else. |
-| Q10 | `CLAUDE.md` still names the iPhone 16 Pro Max and Poly Haven textures. D1 and D4 replace both, but only the owner edits that file. | Treat D1 and D4 as the rule; ask the owner to update `CLAUDE.md` before Phase 0 lands. |
-| Q11 | Section 5.10 needs `frame.dispose()`, which test `f2` forbids today. Widening a gate needs the owner's yes. | Add `dispose` to the names `f2` allows, with a comment saying why. |
-| Q12 | Whether a crew may close a loop against a crewmate's water. | Yes: a crewmate's water counts as her own for closing a loop; the cells' owner does not change. |
-| Q13 | Whether the other leagues' races may run in Workers while the player's race is drawn. | Yes, one at a time. If `npm run hitch` or the device shows a cost, run them after the result instead. |
+| Q4 | Final palette and the approval of the UI's look. | Use the values in `PROMPT-art.md` and section 7's grammar. Phase C's first screen (`home`) and each step of Phase D are shown to the owner as captures before the next is started. |
+| Q6 | Race length and season length. | About five minutes and ten races, from section 5.5's starting values. The owner tunes them on the device. |
 
 ### 2.3 Rules for deciding
 
@@ -277,7 +277,9 @@ No new runtime dependency is added for any of this. The dependencies stay three 
 - The frame budget is `npm run budget`: at most 100 draws, 900k triangles, 20 passes.
 - `npm run hitch`: at most one frame over 50 ms and four over 33 ms.
 - Work that does not need the live match's state runs in a Worker, as `play/sounding.ts` and `land/bake.ts` do:
-  other leagues' races, save compaction, world generation. One such Worker at a time while a race is drawn (Q13).
+  other leagues' races, save compaction, world generation. One such Worker at a time while a race is drawn (D36).
+- The race holds 30 to 40 frames a second on the iPad Air M1 (D4). Only the owner can measure that; say so plainly
+  when a change may cost frames, and never claim a device result from the Mac.
 - Work on the live match's state stays on the main thread in slices of at most 8 ms a frame: Skip to result
   (section 5.6).
 - Management screens are DOM. They must not run a layout pass while a race is being drawn.
@@ -319,7 +321,7 @@ checks.
 - **Side water.** Cells stay owned per ship. `Waters` in `sim/holding.ts` gains what it needs for `atHome` to be
   true in water held by either ship of her side; shield regeneration and the home speed bonus apply there. In
   `sim/territory.ts` a ship of her side crossing a trail does not cut it, and in closing a loop her side's water
-  counts as her own, the cells' owner unchanged (Q12).
+  counts as her own, the cells' owner unchanged (D35).
 - **Colours.** Both ships of a side share hull paint and sail dye. Ship `2k` carries the `plain` pattern and ship
   `2k + 1` the `band`, so the two are told apart. `play/colours.ts` makes each `Look` from the card.
 
@@ -479,7 +481,7 @@ Today `main.ts` builds one world and one frame for the page's life. A race on a 
   build the world and frame for a new seed, then lift the parchment once the first frames are drawn.
 - Each render system gets a `dispose()` that releases what it made, through three's public `dispose` methods only,
   and the frame a `dispose()` that calls them. Test `f2` lets callers use only `frame.resize`, `render`, `ready` and
-  `anchors` today: adding `dispose` needs the owner's yes (Q11).
+  `anchors` today: add `dispose` to them (D34).
 - **Made once and kept:** the renderer, the canvas, the resize listener, the animation loop, the UI layer, the
   input, the stick, the HUD, the flow, the audio's mixer and sounds.
 - **Made again for each planet,** all of which `main.ts` builds once today: the world (`createWorld`), the frame
@@ -638,9 +640,50 @@ Tapping a building opens its card. A building under construction shows scaffoldi
 
 ### 6.9 The inbox
 
-Messages and dilemmas arrive by date: an approach for one of your gulls, a scout's report, a part ready, an
-inspection result, a patron's offer, the elder's verdict. A dilemma has two or three options with stated costs.
-Each is data: a trigger, a text, options and effects.
+Messages and dilemmas arrive by date. A dilemma has two or three options with stated costs. Each is data in
+`career/events.ts`: a trigger, a text with slots for names, options and effects. Nothing about an event is written
+in a screen.
+
+**Messages,** one for each of these, sent when it happens: a scout's report is ready; a gull answers an offer; a
+rival crew approaches one of your gulls; a contract enters its last 60 days; a design is finished; a part is built;
+a building is finished; an inspection's result; a patron's offer; a patron's objective met or missed; a vote is
+due; a vote's result; a captain is unfit, and fit again; the elder's word after each race (only when confidence
+crosses 75, 50 or 25); the other leagues' results for the round; a gull retires; a trait gained or lost.
+
+**Dilemmas,** the first set. At most one arrives between two races, drawn by seed from those whose trigger holds:
+
+| Dilemma | Trigger | Options |
+|---|---|---|
+| A captain asks for a rise | Morale below 40 with a year or more left | Pay 15% more; refuse (morale −15); promise a podium bonus |
+| The two ships argue over the new part | A new part fitted to one ship | Give it to the other (morale swaps); hold firm (the loser's morale −10) |
+| A bosun and their captain fall out | Bond at level 0 after five races | Swap the bosuns (both bonds reset); send them to dinner (coin; bond +1); leave it |
+| A shipwright offers a grey component | Any design in hand | Take it (performance up, risk up); refuse; report it (marketability +5) |
+| A patron wants a guest aboard | Any fixed-sum patron | Agree (coin now; ship two's Consistency −2 next race); decline (the patron's renewal less likely) |
+| The flight is worn out | Any flight gull's fatigue above 75 | Rest them (their job is done at half rate next race); push on (botch chance up); hire cover for one race (coin) |
+| A rival offers a part swap | A rival ranks higher in one type and lower in another | Swap; decline |
+| The press asks about the elder | Confidence below 40 | Back the elder (confidence +5, marketability −5); speak freely (the reverse); say nothing |
+| A young gull asks for a trial | A free agent under 20 with high potential | Sign as reserve at a low wage; scout them free; decline |
+| Storm damage at the rookery | Once a season at most | Repair now (coin); repair slowly (one building's effect halved for 20 days) |
+| An unfit captain wants to sail | A captain unfit for one more race | Let them (Stamina −6 that race; a chance of two more races out); rest them |
+| The Admiralty offers a testing exemption | Lowest two crews in the league | Take it (yard points +20% for 30 days; marketability −5); decline |
+
+Every number above is a starting value in `career/tuning.ts`.
+
+### 6.11 Names and looks
+
+Nothing is named or drawn by hand, one at a time (section 10).
+
+- **Gulls:** a given name and a family name, each built by seed from tables of syllables in `career/names.ts`, with
+  a home colony from a table of about forty. No two living gulls share a full name.
+- **Crews:** "<place> <noun>" from two tables (for example "Saltmarsh Corsairs"). No two crews share either word.
+- **Patrons:** a family name and a trade from a table ("Harrow & Daughters, Chandlers").
+- **Planets:** one word from a syllable table, seeded by the planet's seed.
+- **Crew colours:** thirty pairs dealt from the palette so that no two crews in one league are near each other and
+  none is near the sea's colours. The player's choice at founding takes its pair out of the deal.
+- **Emblems:** twelve woodcut glyphs added to `ui/glyphs.ts`; a crew's is dealt by seed.
+- **Rival crews vote** (section 6.8) for the option that scores best on a simple measure of their own state: a
+  crew strong in a part type votes against making it spec; a crew short of coin votes for a flatter prize spread;
+  a crew with weak gunners votes for banning what it is sunk by most.
 
 ### 6.10 The calendar and the season
 
@@ -653,48 +696,252 @@ Each is data: a trigger, a text, options and effects.
 
 ## 7. Screens and flows
 
-The layout page is 1194 × 834 CSS px (Q1), scaled to the screen. `ui/screens.ts` `W` and `H` change to this. Every
-tappable thing is at least 44 px. Screens are DOM elements styled with the inks, paper and serif from `ui/ink.ts`;
-icons, portraits and ornaments are SVG. No UI framework is added.
+Every management screen follows the grammar in 7.1 to 7.3 and its own spec in 7.4. Where a spec is silent, follow
+the grammar; where both are silent, copy the nearest specified screen and say so in the commit. The structure is
+Motorsport Manager's (D3); the dress is the chartmaker's (D2).
 
-### 7.1 The screen table
+### 7.1 The page
 
-`ui/ways.ts` stays the one table of screens and ways.
+- **Size.** The layout page is 1180 × 820 CSS px (D27), landscape only, scaled to fit the screen. `W` and `H` in
+  `ui/screens.ts` change to this.
+- **Top bar:** the full width, 64 px high (7.3).
+- **Body:** below the bar, with a 16 px margin: 1148 × 724 px. A grid of **12 columns** with 16 px gutters (a column
+  is 81 px). Specs give a panel's place as columns, for example "1–4".
+- **A screen never scrolls as a whole.** A table or list inside a panel scrolls within its panel.
+- **How it is built.** Management screens are HTML elements (layout, text, scrolling). Frames, rules, icons, bars
+  and portraits are SVG made by `ui/ink.ts`, `ui/glyphs.ts` and `ui/marks.ts`. The match HUD and the existing title
+  stay as they are built today. No UI framework and no CSS library.
+- **Type.** The serif of `ui/ink.ts` (`FIGURES`) everywhere. Screen title 28 px; panel heading 20 px small caps;
+  body 16 px; small 13 px. Nothing smaller than 13 px. Numbers are tabular and right-aligned in tables.
+- **Colour.** Paper ground (`PAPER`); text and lines in the inks of `INK`; fills in the washes of `WASH`. No colour
+  is written in a screen's file: add a named ink or wash if one is missing. The player's crew colours appear only
+  on their emblem, their rows and their ships.
+- **Touch.** Every tappable thing is at least 44 × 44 px with 8 px between neighbours. No hover states, no
+  drag-and-drop, no long-press, no keyboard shortcuts. A pressed control darkens by one wash.
+- **Motion.** Screens change by the existing `fade`. Nothing else animates except a bar filling to a new value
+  (200 ms).
 
-| Screen | Reached from | Shows |
-|---|---|---|
-| `title` | launch | The rose over parchment while loading; a tap goes on. |
-| `found` | title, when no save exists | Name, colours, emblem for the new crew. Confirm creates the career. |
-| `recover` | title, when the save fails to load | What was found, what was lost, and the choices of section 4.3. |
-| `home` | title, any tab | Next race; ships one and two with captains; the yard; the table; the inbox. |
-| `crew` | tab | Every gull on the crew by role; tap for a profile. |
-| `profile` | crew, market, standings | Portrait, stats, traits, contract, history; Scout, Make Offer, Renew, Dismiss. |
-| `offer` | profile | The negotiation: terms, the gull's answer, patience left. |
-| `ship` | tab | Both ships' fitted parts; Design; the yard's work split. |
-| `design` | ship | Type, component slots, result preview, cost and days. |
-| `rookery` | tab | The campus from orbit; building cards. |
-| `scouting` | tab | The market, filters, scouting slots. |
-| `standings` | tab | Captains and crews, all three leagues. |
-| `ledger` | tab | Transactions, projection. |
-| `patrons` | tab | Slots, offers. |
-| `admiralty` | tab | Current rules, the next vote. |
-| `inbox` | tab | Messages and dilemmas. |
-| `plan` | home on race day | Section 6.4. |
-| `match`, `sinking`, `sunk`, `spectate`, `won` | plan → Sail | As today, with the crewmate first to watch and Skip to result. |
-| `result` | race end | Finishing order, points, sinkings, sea held, faults, flight stops, patron objective. |
-| `season` | after the last race | The season's end, step by step (section 6.10). |
-| `dismissed` | elder's confidence at zero | Offers from other crews. |
-| `settings` | home | Sound, look sensitivity, backup and restore. |
+### 7.2 The parts every screen is made of
 
-### 7.2 The top bar, on every management screen
+Each is one small file in `ui/kit/`, a function that returns an element and a way to update it. Build each once,
+before the first screen, and use only these.
 
-Left: the crew's emblem and name. Middle: the tabs Home, Crew, Ship, Rookery, Scouting, Standings, Ledger, Patrons,
-Admiralty, Inbox, with a count on Inbox. Right: the date, coin, and **Continue**.
+| Part | What it is |
+|---|---|
+| **Panel** | A paper rectangle with a rough inked border (`roughRect`) and a heading line. Every region of every screen is a panel. |
+| **Sub-tabs** | A strip of two to four segments under the top bar, at the body's top left, 48 px high. Used where one tab holds several screens. |
+| **Segmented choice** | Two to five joined buttons, one chosen. For filters and small enumerations. |
+| **Table** | A header row (tap a heading to sort; the sorted one carries an arrow) and rows 56 px high. Draws only the rows in view. A row may be tappable as a whole. The player's rows carry their crew colour as a 6 px bar at the left. |
+| **Portrait** | A gull drawn from their seed (`ui/gull.ts`), in three sizes: 40, 96 and 240 px. Sunglasses always. |
+| **Stars** | Five stars in halves. A range is drawn as filled stars to the low value and outlined stars to the high. Potential is a second, smaller row. |
+| **Stat bar** | A label, a figure 0 to 20, and an inked bar (`bar`). An arrow up or down beside the figure if it changed this season. Hidden stats draw a hatched bar and "?". |
+| **Meter** | A bar for 0 to 100 (morale, confidence, fatigue, condition), with three washes: low, middle, high. |
+| **Coin** | A coin glyph and an amount with thin spaces between thousands. Negative amounts in the red ink with a minus. |
+| **Tag** | A small inked label: a trait, "Spec", "Unfit 2 races", "Approached", "Risk". |
+| **Part tile** | 176 × 96 px: the part's glyph and type, performance as a figure and a bar against its maximum, reliability the same, condition as a meter, and tags. |
+| **Card** | 240 × 320 px, for choices (D19): a title, a picture or glyph, three to five lines of consequences with figures, and a Choose button. Cards are always shown two to four in a row, never one. |
+| **Button** | 48 px high. Three kinds: primary (filled ink, one per screen at most), plain (outlined), danger (red ink, always opens a dialog). A disabled button is pale and shows why in 13 px text beneath it. |
+| **Stepper** | A figure between − and + buttons, with its limits. Holding is not needed: each tap moves one step, and the step grows with the amount (1, 10, 100, 1000 by magnitude). |
+| **Dialog** | A panel 560 px wide centred over a paper wash that dims the screen. A title, a sentence saying exactly what will happen and what it costs, and two buttons: the action and Cancel. Used for every spend above zero that cannot be undone and every danger button. |
+| **Notice** | One line across the top of the body for 4 s: a command refused (with its reason), a save failed. Never used for news; news goes to the inbox. |
+| **Empty state** | A panel with nothing to list says so in one sentence and offers the one button that fixes it, if there is one. |
+| **Chart disc** | The race's planet as a small drawn chart: its islands' coasts and the storm's opening cap, drawn as `ui/minimap.ts` draws them. |
 
-**Continue** sends `Advance`. If something blocks it (an unanswered dilemma, an empty seat on race day), it opens
-that item instead and says why.
+### 7.3 The top bar, on every management screen
 
-### 7.3 Flows, step by step
+- **Left, 200 px:** the crew's emblem (40 px) and name. Tapping it goes `home`.
+- **Middle, 680 px:** eight tabs of 85 px, each a woodcut glyph over a 13 px small-caps label: **Home, Crew, Ship,
+  Rookery, Scouting, League, Finance, Inbox.** The open tab is underlined in the crew's colour. Inbox carries a
+  count of unread messages; a waiting dilemma makes the count red.
+- **League** holds `standings` and `admiralty` as sub-tabs. **Finance** holds `ledger` and `patrons`.
+- **Right, 300 px:** the date ("Day 12, Season 1"), the coin, and **Continue** (primary).
+- **Continue** sends `Advance`. Its label says what it will do: "Continue" between races, "Race plan" on race day.
+  If something blocks it (an unanswered dilemma, an empty seat on race day, a vote due), it opens that item and a
+  notice says why.
+- The bar is not shown on `title`, `found`, `recover`, in a race, or on `season` and `dismissed`.
+- A gear at the far right of `home`'s body opens `settings`.
+
+### 7.4 Each screen
+
+Every screen is one file in `ui/office/`, `create<Name>(send)`, which returns its element and `show(view)`. It
+draws one view model from `office.ts` and sends `Command`s; it keeps no career state of its own and never works
+out a rule (whether a button is allowed, what something costs): the view model says. The view models are built in
+`career/views.ts` and unit-tested there. Each screen opens directly from the page's query (`?screen=<name>` with a
+fixture career from `debug.ts`) so `tools/capture.ts` can photograph it.
+
+**`title`** (launch). As today: the rose over parchment while loading; a tap goes on.
+
+**`found`** (from `title`, when no save exists).
+- *1–7, the form.* The crew's name (a text field, 1 to 24 characters, filled with a generated name; a Reroll
+  button beside it). First colour and second colour, each chosen from twelve swatches of the palette; a swatch
+  already taken by the other is disabled. An emblem from twelve woodcut emblems in a 6 × 2 grid.
+- *8–12, the preview.* The galleon (`galleon` in `ui/ink.ts`) in the chosen colours, the emblem and the name as
+  they will appear in the top bar; under it one line on the crew being replaced (its league and its elder).
+- **Found the crew** (primary) sends `Found`. A name that is empty or already a crew's shows why under the field.
+
+**`recover`** (from `title`, when the save does not verify). One panel, 3–10. It says in plain words what was
+found and what is lost (for example "The last 3 actions since Day 41 could not be read"). One plain button for
+each way forward that section 4.3 allows, in its order: continue from the last good entry; restore the backup
+(with its date); start a new career (danger). Nothing is chosen for the player.
+
+**`home`** (the Home tab; where every launch lands).
+- *1–5, top 320 px: Next race.* "Round 4 of 10", the planet's name, the chart disc, days to go, the elder's target
+  for the season and the confidence meter, and the patron objective if one is set. On race day the heading reads
+  Race Day.
+- *6–12, top 320 px: The ships.* Two halves. Ship one: "You", her bosun's portrait (40) and name, six small part
+  marks (type glyph, with a red mark on any part below half condition). Ship two: her captain's portrait (96),
+  name, stars, morale meter and any tag (unfit, approached), her bosun, and the same six marks. A half is tappable:
+  ship one's opens `ship`, ship two's the captain's `profile`.
+- *1–4, below: The yard.* The design in hand with days left, or "Nothing on the board" and a Design button; the
+  day's work points and how they are split.
+- *5–8, below: The table.* The crews' standings: the two rows above the player's crew, the player's, and the two
+  below, with points. Tapping opens `standings`.
+- *9–12, below: Inbox.* The four newest messages (unread in bold; dilemmas tagged). Tapping one opens it in
+  `inbox`.
+
+**`crew`** (the Crew tab).
+- *1–9: a table* of every gull on the crew, grouped under role headings in the order captain, reserve, bosuns,
+  shipwright, flight. Columns: portrait (40), name, age, stars with potential, morale, wage per race, contract's
+  end, tags. Tapping a row opens `profile`. The player's own row heads the captains: "You, ship one", no stats.
+- *10–12: the roster's summary.* Wages per race in total; each empty role with a Find button that opens
+  `scouting` filtered to it; the flight's four jobs with who holds each and their fatigue.
+
+**`profile`** (from any row or portrait of a gull).
+- *1–4: who they are.* Portrait (240), name, age, home colony, role, stars and potential (a range if unscouted),
+  traits as tags (tapping one shows its effect in a line beneath), morale and marketability meters.
+- *5–9: what they can do.* The role's stats as stat bars: a captain's nine and their style; a bosun's six and
+  their bond with their captain (a meter with the three perks, locked ones pale); a shipwright's six part ratings
+  and their known components; a flight gull's job, rating and fatigue. Unscouted: hatched bars. Beneath, their
+  history as a table: season, crew, league, races, best finish, points, sinkings.
+- *10–12: contract and actions.* Their crew, wage, the contract's end, the break clause. Then the buttons that
+  apply, each disabled with its reason when it cannot be used: **Scout** (days it will take; needs a free slot),
+  **Make offer** (opens `offer`), **Renew** (opens `offer` with their present terms), **Dismiss** (danger; the
+  dialog states the wage still owed).
+- A Back button at the body's top left returns to where the player came from.
+
+**`offer`** (from `profile`).
+- *1–7: the terms.* Role (ship two or reserve; segmented), wage per race, signing fee, length (1, 2 or 3 seasons;
+  segmented), bonus per podium, break clause: each a stepper. When the gull has countered, their figure stands
+  beside each field as "asks 1 200". Beneath: what this costs now and per race, and the coin left after it.
+- *8–12: the gull.* Portrait (96), name, stars; what they care about, as up to three lines with glyphs; patience
+  as three pips; their last answer in a sentence; earlier offers as a short list.
+- **Send offer** (primary) sends `OfferContract`. With a counter on the table: **Accept their terms**. Always:
+  **Withdraw**.
+- *States.* Waiting: the form is locked and a line says which day the answer is due. Refused to talk: locked, with
+  the day they will listen again. Signed: a line says the day they join, and the screen returns to `profile`.
+
+**`ship`** (the Ship tab).
+- *1–4: ship one. 5–8: ship two.* Each a column of six part tiles under the ship's name and who sails her. Tapping
+  a tile opens a dialog listing the crew's parts of that type as part tiles, with **Fit** on each; a spec part's
+  tile carries the Spec tag and does nothing.
+- *9–12: the yard.* Work points a day and where they come from. For each fitted part that is not spec, two
+  steppers: points to performance and points to reliability; a line shows points left to give. Beneath: the design
+  in hand with days left, or **Design a part** (opens `design`).
+- *Across the bottom, 96 px: against the league.* For each of the six part types, the crew's best part's place
+  among the league's ten crews ("Sails 4th").
+
+**`design`** (from `ship`).
+- *1–3: the type.* The six types as a list; spec types are disabled with the Spec tag.
+- *4–9: the components.* One slot for each the drawing loft allows. Tapping an empty slot opens three cards
+  (D19) dealt from the components the shipwright knows and the buildings allow; choosing one fills the slot. A
+  filled slot may be emptied until Confirm.
+- *10–12: what it will be.* Performance at the start and at most, reliability at the start and at most, risk,
+  cost, days to design and days to build. **Confirm** (primary; a dialog states cost and days) sends
+  `StartDesign`.
+- *Blocked:* a design is already in hand; not enough coin. Each says so under Confirm.
+
+**`rookery`** (the Rookery tab).
+- *1–8: the campus.* From Phase E, the rookery's planet from orbit behind a clear panel, each building standing on
+  its island; a tap on a building selects it. Before Phase E, a drawn chart of the island with a glyph for each
+  building in its place, tappable the same way.
+- *9–12: the buildings.* A list of the nine: name, level as three pips, what it gives now, and "Building: 6 days"
+  if under way. Selecting one shows its card beneath the list: what the next level gives, cost, days, upkeep, and
+  **Build** or **Upgrade** (a dialog states the cost). Any number may be under way at once.
+
+**`scouting`** (the Scouting tab).
+- *1–9: the market.* Above the table, filters: role (segmented), league, contract (any, out of contract, last 60
+  days), and "scouted only". Columns: portrait (40), name, age, role, crew, stars (a range if unscouted), asking
+  wage ("?" if unscouted), contract's end. Tapping a row opens `profile`.
+- *10–12: the scouts.* One row for each slot the crow's nest gives: the gull being scouted with days left and a
+  Cancel button, or "Free". There is no queue.
+
+**`standings`** (the League tab, first sub-tab).
+- Two segmented choices at the top: league (One, Two, Three; the player's is chosen first) and Crews or Captains.
+- *1–8: the table.* Crews: place, emblem, name, points, wins, sinkings, the last five races' places. Lines mark
+  the promotion and relegation places. Captains: place, portrait (40), name, crew, points, wins, sinkings; the
+  player is listed as "You". A captain's row opens `profile`; a crew's row opens a dialog with its staff's stars
+  and its parts' places.
+- *9–12: the calendar.* The season's ten rounds: number, planet, day, and the winner once sailed. The next round
+  is marked.
+
+**`admiralty`** (the League tab, second sub-tab).
+- *1–6: the rules in force,* each field of `Rules` as a sentence, those that differ from last season tagged New.
+- *7–12: the next vote.* Its day and the proposal in a sentence. When the vote is due: two cards, For and Against,
+  each stating what it would change for the player's crew; choosing sends `Vote`. Once cast, the cards give way to
+  "You voted For"; the result comes by inbox. Beneath: past votes and how they went.
+
+**`ledger`** (the Finance tab, first sub-tab).
+- *Across the top, 96 px:* five figures: coin now, income a race, costs a race, the projection at season's end,
+  and the debt floor.
+- *1–8: the transactions,* newest first: day, what it was, amount, balance. A segmented filter: all, wages,
+  parts, buildings, patrons, prizes, fines.
+- *9–12: this season by kind,* as labelled bars, income above costs.
+
+**`patrons`** (the Finance tab, second sub-tab).
+- *The slots,* as cards in a row. A signed patron: name, emblem, what they pay (a sum a race, or a bonus for an
+  objective), and races left. An empty slot: "Open".
+- *Beneath: offers,* as cards: the patron, their terms, the length, and the marketability they ask. **Sign** (a
+  dialog states the length) sends `SignPatron`. With no free slot the buttons are disabled and say so.
+
+**`inbox`** (the Inbox tab).
+- *1–4: the list,* newest first: a glyph for the kind, the title, the day; unread in bold; a dilemma tagged
+  Decision.
+- *5–12: the message.* Its text; a button to the gull, part or screen it concerns; and, for a dilemma, its options
+  as cards, each stating its costs and effects in figures. Choosing sends `AnswerDilemma`. An answered dilemma
+  shows what was chosen.
+
+**`plan`** (from Continue on race day).
+- *1–4: the planet.* Its name, the chart disc at 240 px, its traits (islands, wind, how long the storm takes to
+  close), and any rule new this season that bears on the race.
+- *5–9: the ships.* Ship one: "You". Ship two: a segmented choice between the captain and the reserve, an unfit
+  gull disabled with the tag. Under each ship her six part marks; where the crew owns two of a type, a Swap button
+  between the two ships' marks. Then ship two's orders (section 5.9) as four cards.
+- *10–12: the flight and the patron.* The four jobs in order, each row with Up and Down buttons. If an objective
+  patron is signed: the objectives as cards, harder paying more. At the bottom right, **Sail** (primary).
+- Every change sends `SetPlan`. Sail sends `RaceStarted`. *Blocked:* ship two has no one to sail her.
+
+**In the race** (`match`, `sinking`, `sunk`, `spectate`, `won`). As today, laid out for the new page with each
+piece kept in its present corner. New on the HUD:
+- *The crewmate,* beside the player's own hull bar: portrait (40), her hull as a bar, and a word for her state
+  (sailing, in crew water, sunk).
+- *The order toggle,* beside it: "With me" or her plan's name.
+- *The flight button,* above the gun buttons: a gull glyph. Pale outside crew water; a ring fills while the flight
+  is on its way; while they work, the job's name stands beside it and a botch shakes it once.
+- *Faults,* under the hull bar: the failed part's glyph in the red ink.
+- `sunk` gains two buttons: **Watch** (her crewmate first) and **Skip to result**.
+- Capture the HUD on the device's size and show the owner before settling where these sit.
+
+**`result`** (when the race ends).
+- *1–7: the finishing order,* all twenty: place, the crew's colour, the ship's captain, how and by whom she sank
+  (or "Afloat"), sinkings, points. The player's crew's two rows carry their colour.
+- *8–12: what it meant.* The crew's points from this race, by source (places, sinkings, sea held); the sea held by
+  the three leading sides, as bars; faults; flight stops and botches; the patron objective, met or missed, with
+  its coin; and the crew's place in the table before and after.
+- **Continue** (primary).
+
+**`season`** (after round ten's result). One panel, 3–10, one step of section 6.10 at a time, with a row of pips
+for the nine steps. Each step is a heading, a table or a sentence of what happened, and Continue. The step for
+next season's hull shows three rows of three cards (timber, canvas, cordage) and waits for a choice in each.
+
+**`dismissed`** (when the elder's confidence reaches zero).
+- *1–5: the elder's letter.*
+- *6–12: offers,* as cards: the crew, its league, its elder's target, its coin, its staff's stars. There is always
+  at least one, from the lowest league. Choosing sends `TakeOffer`.
+
+**`settings`** (a dialog over `home`). Sound and look sensitivity as sliders, as today. **Back up now**, with the
+day of the last backup. **Restore the backup** (danger).
+
+### 7.5 Flows, step by step
 
 **First launch.** Title → no save → `found` → the player names the crew and picks colours and emblem → the world is
 generated from a new seed, the journal's first entry is written → `home`. If that first write fails, the player
@@ -724,7 +971,7 @@ toggle, the flight button, part faults.
 for the Worker if it is not done, with a line saying so) → inspections → a snapshot is saved → `home`.
 
 **Killed mid-race.** The journal has a `RaceStarted` entry with no `RecordRace` for the player's race. On launch →
-`home` shows Race Day again with the same planet and plan (Q3).
+`home` shows Race Day again with the same planet and plan (D29).
 
 **Killed after the player's race is recorded, before the other leagues' are.** The round is still open. On launch
 the Worker runs the awaited races again from their cards, and `home` says the round is being settled until they are
@@ -769,7 +1016,10 @@ their folders appear. The game still plays as today.
 9. Season's end and the off-season.
 10. The IndexedDB adapter, migrations, backup and restore.
 
-**Phase C: the screens.** In this order, each wired to the career through `office.ts`: top bar and `home`; `found`;
+**Phase C: the screens.** First the kit of section 7.2 and the gull portrait, each captured on one sheet for the
+owner. `ui/ways.ts` stays the one table of screens and ways: every screen of 7.4 is added to it. Then the screens in
+this order, each wired to the career through `office.ts`, `home` shown to the owner before the rest: top bar and
+`home`; `found`;
 `plan` and `result`; `standings`; `crew` and `profile`; `scouting` and `offer`; `ship` and `design`; `ledger` and
 `patrons`; `inbox`; `admiralty`; `season` and `dismissed`; `recover` and `settings`.
 
@@ -778,6 +1028,10 @@ their folders appear. The game still plays as today.
 **Phase E: the rookery in 3D,** the flight drawn as gulls, and biomes.
 
 ## 9. The look
+
+**`PROMPT-art.md` is the full brief for the race's look** and stands alone: an agent doing Phase D reads that file,
+and this section only for what the manager adds (crew looks, the campus, biomes). Where the two differ on the race's
+look, `PROMPT-art.md` is right.
 
 The target is `art/target/race.png`. Further targets (the dashboard, a profile, the rookery) will be added to
 `art/target/` by the owner. Judge by eye against them, with `node tools/hero.ts`, and let the owner judge on the
