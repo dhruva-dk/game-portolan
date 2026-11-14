@@ -30,7 +30,9 @@ const F0 = 0.02;
 /** How much of what Fresnel gives the sea's mirror keeps: the sea stays its own colour out to the horizon. */
 const MIRROR = 0.2;
 /** The water's depth over the floor, metres, at which its tone is the middle one, and the deep one. */
-const MIDDLE_AT = 6.5, DEEP_AT = 14;
+/** Water turquoise to SHALLOW_TO metres deep, the middle blue by MIDDLE_AT, the deep by DEEP_AT: so the shallow ring
+ *  hugs the shore, and open-sea banks a few metres further down are blue, not turquoise blotches (art/target/idea.png). */
+const SHALLOW_TO = 2.5, MIDDLE_AT = 6, DEEP_AT = 11;
 /** The deep water seen from overhead: LOOK_DOWN of the way to the middle tone, from where the eye's ray stands
  *  LOOK_FROM (cosine) off the level to straight down. */
 const LOOK_DOWN = 0.25, LOOK_FROM = 0.3;
@@ -174,7 +176,7 @@ function seaRadiance(
   // horizon, so the open sea runs from teal at the eye's feet to royal blue far off
   const down = smoothstep(LOOK_FROM, 1, dot(v, up)).mul(LOOK_DOWN);
   const deep = mix(vec3(...SEA_DEEP), vec3(...SEA_MIDDLE), down);
-  const own = mix(mix(vec3(...SEA_SHALLOW), vec3(...SEA_MIDDLE), smoothstep(0, MIDDLE_AT, depth)), deep, smoothstep(MIDDLE_AT, DEEP_AT, depth));
+  const own = mix(mix(vec3(...SEA_SHALLOW), vec3(...SEA_MIDDLE), smoothstep(SHALLOW_TO, MIDDLE_AT, depth)), deep, smoothstep(MIDDLE_AT, DEEP_AT, depth));
   // the facets' marks only where a pixel holds less than one of them: finer, they would fall to grain, so fade out
   const facet = dot(n.sub(g), l).mul(FACETS);
   const lifted = mix(float(0.5), crest, SWELL).add(facet.mul(saturate(float(1).sub(fwidth(facet).mul(2)))));
