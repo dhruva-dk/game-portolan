@@ -74,7 +74,7 @@ const LENGTH = WATERLINE.stem - WATERLINE.stern;
 
 /** The churned water astern: its half-width under her transom, and how fast it spreads, metres a second. */
 const CHURN = 1.6, SPREAD = 0.3;
-/** The churn's foam in tongues, as art/target/idea.png's wake: TONGUE metres apart along her track, slanting back
+/** The churn's foam in tongues: TONGUE metres apart along her track, slanting back
  *  TONGUE_SLANT metres a metre out, its cover times TONGUE_CREST on them and TONGUE_LANE in the blue lanes between. */
 const TONGUE = 3.5, TONGUE_SLANT = 1.2, TONGUE_CREST = 1.35, TONGUE_LANE = 0.2;
 /** The wedge's arms: their crests' height at full speed, metres, and how long they last in a calm, seconds (fading by
@@ -85,15 +85,15 @@ const ARM = 0.18, ARM_LIFE = 22, ARM_FADE = 10, ROUGH = 0.45;
 const ARM_WIDTH = 0.9, WIDEN = 0.05;
 /** The bow wave's foam along the arms: how long it lasts, seconds (fading by e each), and its half-width, metres; and
  *  how white the streaks its crests leave behind it are, and how wide at most (metres): bold, so her wake reads as a
- *  short, wide white V hugging her stern (art/target/idea.png), not the two long thin arms review34 saw running to the
- *  horizon: the streaks only a faint tail (water.ts draws foam WAKE_BOLD fuller, and the lobes cut it at about 0.28).
- *  Both fade by how far astern they lie, by e each BOW_REACH of her lengths, so whatever her speed her V is about
- *  three lengths long (review35 saw ten); the air astern by e each AIR_REACH, so no pale trail outruns it. */
+ *  short, wide white V hugging her stern, not two long thin arms running to the horizon: the streaks only a faint
+ *  tail (water.ts draws foam WAKE_BOLD fuller, and the lobes cut it at about 0.28). Both fade by how far astern they
+ *  lie, by e each BOW_REACH of her lengths, so whatever her speed her V is about three lengths long; the air astern
+ *  by e each AIR_REACH, so no pale trail outruns it. */
 const BOW_LIFE = 3, BOW_FOAM = 2.4, STREAK = 0.12, STREAK_WIDEST = 1.4, BOW_REACH = 1.5, AIR_REACH = 1.5;
-/** The bow wave's foam as art/target/idea.png draws a wake: a whole white rim along each arm's line, RIM_SHARE of
- *  BOW_FOAM wide, and inside it the crests curling in, feathered, CURL_REACH of it, with blue between: neither loose
- *  flecks (review27) nor one flat band, nor the chains of separate blobs review30 saw; the curls near the rim, so seen
- *  from astern the V is two white arms with blue inside, not the white sheet review36 saw. */
+/** The bow wave's foam: a whole white rim along each arm's line, RIM_SHARE of BOW_FOAM wide, and inside it the crests
+ *  curling in, feathered, CURL_REACH of it, with blue between: neither loose flecks nor one flat band nor a chain of
+ *  separate blobs; the curls near the rim, so seen from astern the V is two white arms with blue inside, not a white
+ *  sheet. */
 const RIM_SHARE = 0.3, CURL_REACH = 0.9;
 /** The crests' feathering: where along each crest's wave (its cosine, −1…1) its foam begins and is whole. */
 const FEATHER = [0.1, 0.6] as const;
@@ -189,7 +189,7 @@ export function createWake(view: View, sky: Sky, capacity: number) {
     // its foam in tongues slanting out and back from her track, fixed in the water, blue lanes between them
     const tongue = cos(laid.add(abs(across).mul(TONGUE_SLANT)).add(patchy(2, 4.5).mul(1.5)).mul(2 * Math.PI / TONGUE));
     const tongues = mix(float(TONGUE_LANE), float(TONGUE_CREST), smoothstep(-0.25, 0.25, tongue));
-    // (what lingers kept under the foam's half, so it ends cleanly, not in the detached specks review34 saw)
+    // (what lingers kept under the foam's half, so it ends cleanly, not in detached specks)
     const foam = churned.mul(exp(age.div(-3)).mul(0.3).add(exp(age.div(-12)).mul(0.1).mul(churnLeft))).mul(tongues).toVar();
     // (metres astern of her transom)
     const behind = max(run.sub(LENGTH), 0);

@@ -36,8 +36,7 @@ const CRISP = 0.03;
  * EDGE at its very edge. */
 const LINE = 0.5, EDGE = 0.012;
 /** Beyond LINE the band's cover tapers to nothing by REACH metres of water, so the lobes cut its outer edge into
- *  scallops while it stays whole along the sand: art/target/idea.png's one white band, not the dashed ring of
- *  separate rounds review33 saw. */
+ *  scallops while it stays whole along the sand: one white band, not a dashed ring of separate rounds. */
 const REACH = 1.2;
 /** The air under a whitecap, at most, as a share of a wake's thickest (optics.ts); the depth its cloud reaches down,
  * metres: in thinner water there is less of it. */

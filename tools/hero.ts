@@ -2,11 +2,10 @@
 //   node tools/hero.ts <dir> [query] [--dpr=3]      e.g. node tools/hero.ts captures/round1 mood=warm
 // Writes <dir>/1.png … <dir>/8.png and <dir>/sheet.png, all eight on one contact sheet labelled only by number:
 // 1 the chase in open sea, the sun over her quarter; 2 the same sailing into the sun; 3 near the start's island; 4 a
-// crowd of ships; 5 at the storm's edge; 6 the lobby; 7 the planet from space, as the map shows it; 8 the target
-// painting's view (art/target/idea.png): her own ship before an island, others and loot about her, the storm's wall
-// on the horizon. The query is
-// added to each (a mood, a seed); the islands and weather follow the seed, so the shots are of kinds of view, not of
-// one island. Headless, as every tool here.
+// crowd of ships; 5 at the storm's edge; 6 the lobby; 7 the planet from space, as the map shows it; 8 a match's
+// whole scene: her own ship before an island, others and loot about her, the storm's wall on the horizon. The query
+// is added to each (a mood, a seed); the islands and weather follow the seed, so the shots are of kinds of view, not
+// of one island. Headless, as every tool here.
 
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';

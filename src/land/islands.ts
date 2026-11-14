@@ -52,8 +52,7 @@ export function createIslands(planet: Planet, seed: number, view: View, light: L
 
   return {
     meshes: [...lands, ...casters.map((c) => c.mesh), ...rocky.far.map((c) => c.mesh)],
-    /** What casts shadows: each kind's instances (the ground casts none: its slopes are shaded by their facing alone,
-     *  so the sand lies flat and sunlit as the painting's, art/target/idea.png). */
+    /** What casts shadows: each kind's instances. */
     casters,
     /** Draws the islands the eye (seeing through `camera`) can see; returns the nearest of them above the sea, in
      *  view or not (null if none). */

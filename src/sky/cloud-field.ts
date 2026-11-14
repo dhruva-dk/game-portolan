@@ -43,7 +43,7 @@ const SHAPE_SCALE = 1.0, DETAIL_SCALE = 0.4;
 /** Extinction of the densest cloud, per km (cumulus: 50–100). */
 export const SIGMA = 60;
 /** The air between the eye and a cloud is taken as this share of its length: a painter's horizon cumulus stays crisp
- *  to its base (art/target/idea.png) where the whole air's would grey its lower half (review26). */
+ *  to its base, where the whole air's would grey its lower half. */
 const CLOUD_AIR = 0.25;
 /** The shaped noise's density past which the cloud is at its densest. */
 const FULL = 0.35;
@@ -60,7 +60,7 @@ const LAYER = 0.3;
 /**
  * A cloud's top: about DOME·p^¾ km where it lies p km of potential inside its edge, easing into the shell's ceiling
  * (exponentially) — about half as tall as wide for a cloud
- * of 1–1.5 km (cumulus mediocris: art/target/idea.png's heaped clouds, where humilis read as flat smears, review25),
+ * of 1–1.5 km (cumulus mediocris: heaped clouds, where humilis read as flat smears),
  * flatter still for the small puffs.
  */
 const DOME = 1.4;
@@ -83,9 +83,8 @@ export const DIFFUSION = 0.75 * (1 - 0.85);
 /** The cloud's edge: where its density (of the full) crosses EDGE_AT, over EDGE_WIDTH either way. */
 const EDGE_AT = 0.2, EDGE_WIDTH = 0.12;
 /** The one tap toward the sun, km; the cloud there (of the full) past which a point is in shadow, and the edge's width:
- *  high enough that most of a cumulus is in the sun, cream over small cool bases as art/target/idea.png's, not the
- *  grey-mauve with thin cream rims review34 saw; a short tap, so a cloud's sides are lit too and cream is most of it
- *  (review35 saw them mauve). */
+ *  high enough that most of a cumulus is in the sun, cream over small cool bases rather than grey-mauve with thin
+ *  cream rims; a short tap, so a cloud's sides are lit too and cream is most of it. */
 const LIGHT_TAP = 0.06, SHADE_AT = 0.95, SHADE_EDGE = 0.1;
 /** How much of the sun's own colour the cloud's lit tone keeps (the rest is the palette's cream at the sun's
  *  brightness); and how bright its shadow tone is, of what a white surface in the open gets. */
@@ -150,7 +149,7 @@ export function createCloudField(tables: Tables, noise: CloudNoise) {
     // whole outline (Schneider 2017's dimensional profile)
     const z = h.mul(TOP - BASE);
     // eased into the shell's ceiling rather than cut at it, so the broad ones' crowns round off instead of standing
-    // flat-topped with sheer sides, as boxes (review27's stepped clouds)
+    // flat-topped with sheer sides, as boxes
     const top = float(1).sub(exp(pow(max(inside, 0), 0.75).mul(-DOME / (TOP - BASE)))).mul(TOP - BASE);
     const bottom = min(fall(0, MARGIN, inside).mul(LIFT), top.mul(0.5));
     const reach = clamp(min(min(top.sub(z), z.sub(bottom).mul(2)), inside).div(BILLOW), 0, 1);
