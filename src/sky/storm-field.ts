@@ -71,10 +71,11 @@ const STEP = 5, GROW = 0.035, STEPS = 28;
 const SOFT = 1, SOFT_FAR = 0.004;
 /** The cloud's light, as shares of the storm's air light: at its base and its crown (the crown with the sun's, below,
  *  art/target/idea.png's #8564C1, not the pale #B886FF review34 saw: over the grade's knee its hue held but its light
- *  pegged at white, so it showed no relief); the rain's. */
-const DARK = 0.45, BRIGHT = 0.6, RAIN_LIGHT = 0.8;
+ *  pegged at white, so it showed no relief); the rain's. The base far under the crown, so the body is dark under lit
+ *  heads, not the even lavender review36 saw. */
+const DARK = 0.2, BRIGHT = 0.7, RAIN_LIGHT = 0.8;
 /** The light from the calm on whatever of the cloud faces it, as a share of the storm's air light. */
-const CALM = 0.3;
+const CALM = 0.12;
 /** The sun's light on the cloud, as a share of a white surface's, and on its thin edges seen against the sun (the
  * silver lining). */
 const SUNLIT = 0.1, LINING = 0.15;
