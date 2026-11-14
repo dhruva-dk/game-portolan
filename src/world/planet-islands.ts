@@ -6,7 +6,7 @@
 //   island  18–55 m round, a hill 7–22 m high by its size, palms and shrubs and outcrops of rock; now and then a
 //           lagoon or an offshore rock or two
 //   atoll   28–40 m round, a low ring of sand 8–12 m broad and 1.6–2.6 m high round a shallow lagoon, palms along it
-//   mesa    15–30 m round, a flat top 11–18 m up behind a cliff all round it, shrubs on it, no palms
+//   mesa    15–30 m round, a flat top 8–13 m up behind a cliff all round it, shrubs on it, no palms
 //   islet   7–15 m round, a hump 2.5–6 m high, a palm or two
 //   rocks   a knoll 4–7 m round and a metre or so high, heaped with rock (world/scatter.ts)
 // Nothing lies hidden under open-looking water: the only water too shallow for a ship is the last few metres off a
@@ -42,7 +42,7 @@ interface KindOf {
 export const KINDS: Record<Kind, KindOf> = {
   island: { density: 4.4e-6, radius: [18, 55], skew: 2.2, summit: [7, 22], long: [0.05, 0.35], wear: [0.12, 0.22], apron: [24, 48], flank: 0.22, clearance: 40 },
   atoll: { density: 1.1e-6, radius: [28, 40], skew: 1.2, summit: [1.6, 2.6], long: [0.03, 0.12], wear: [0.1, 0.16], apron: [18, 28], flank: 0.25, clearance: 25 },
-  mesa: { density: 1.3e-6, radius: [15, 30], skew: 1.5, summit: [11, 18], long: [0.05, 0.3], wear: [0.08, 0.14], apron: [16, 28], flank: 0.25, clearance: 25 },
+  mesa: { density: 1.3e-6, radius: [15, 30], skew: 1.5, summit: [8, 13], long: [0.05, 0.3], wear: [0.08, 0.14], apron: [16, 28], flank: 0.25, clearance: 25 },
   islet: { density: 4.4e-6, radius: [7, 15], skew: 1.3, summit: [2.8, 6], long: [0.05, 0.4], wear: [0.1, 0.18], apron: [15, 24], flank: 0.3, clearance: 20 },
   rocks: { density: 1.6e-6, radius: [4, 7], skew: 1, summit: [0.9, 1.4], long: [0.05, 0.3], wear: [0.05, 0.09], apron: [10, 15], flank: 0.35, clearance: 15 },
 };
