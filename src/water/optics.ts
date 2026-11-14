@@ -42,6 +42,8 @@ const CLOUDY = 0.12;
 const AIRED = 0.6, AIR_VEIL = 2;
 /** The troughs' tone, of the water's, and where between trough and crest (0…1) its edge lies. */
 const TROUGH = 0.8, TROUGH_AT = 0.47;
+/** And the crests' tops, paler, past CREST_AT: the light rows of art/target/idea.png's painted waves. */
+const CREST = 1.3, CREST_AT = 0.6;
 /** What sets a point in the troughs' tone: the swell's crest (0…1), by this much of its range about its middle. The
  *  short waves' facets are left out of it: their marks fell in grain along the tone's edge, where art/target/idea.png
  *  draws its water's shapes with clean edges. */
@@ -178,7 +180,7 @@ function seaRadiance(
   const deep = mix(vec3(...SEA_DEEP), vec3(...SEA_MIDDLE), down);
   const own = mix(mix(vec3(...SEA_SHALLOW), vec3(...SEA_MIDDLE), smoothstep(SHALLOW_TO, MIDDLE_AT, depth)), deep, smoothstep(MIDDLE_AT, DEEP_AT, depth));
   const lifted = mix(float(0.5), crest, SWELL);
-  const tone = mix(own, vec3(...SEA_SHALLOW), ships.air.mul(AIRED)).mul(mix(float(TROUGH), float(1), cut(lifted, TROUGH_AT)));
+  const tone = mix(own, vec3(...SEA_SHALLOW), ships.air.mul(AIRED)).mul(mix(float(TROUGH), float(1), cut(lifted, TROUGH_AT))).mul(mix(float(1), float(CREST), cut(lifted, CREST_AT)));
   const body = tone.mul(irradiance).mul(ships.glow);
 
   // The sky, along the reflected ray, blurred to broad shapes. A ray reflected down (below the horizon here, by the up
