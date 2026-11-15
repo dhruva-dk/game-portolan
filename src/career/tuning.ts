@@ -6,7 +6,7 @@
 // A pair [a, b] is a line in u = stat / 20: a + b × u. A triple by league is League One's, Two's, Three's.
 
 /** Bump with any change to TUNING (and pin the new hash in the test). */
-export const TUNING_VERSION = 4;
+export const TUNING_VERSION = 5;
 
 const ROLE_YEARS = {
   manager: [40, 55], captain: [26, 31], bosun: [28, 34], flight: [28, 34], shipwright: [35, 45], scout: [35, 45], elder: [45, 60],
@@ -126,9 +126,15 @@ export const TUNING = {
   /** What an elder's stats do (Phase B section 7). */
   elder: {
     ambition: 3,                                     // places the target is moved up, × u
-    perPlace: 1.5, fall: -8, rise: 6,                // confidence a race: clamp(perPlace × (target − standing), fall, rise)
+    perPlace: 0.6, fall: -4, rise: 4,                // confidence a race: perPlace a place past the slack (to fall) or ahead (to rise)
+    slack: 3,                                        // places behind the target an elder lets pass
+    met: 1,                                          // confidence a race at or above the target
+    settle: 5,                                       // races before the standings weigh in full (the first weighs 1/settle)
     patience: [1.3, -0.6],                           // a fall × this
-    debt: -3, pastFloor: -10,                        // a race while coin is below zero, past the floor
+    recover: 0.25,                                   // at a season's start confidence moves this share back toward the start's
+    verdict: 35,                                     // at the season's end a target missed sacks only below this confidence
+    grace: 0.5,                                      // seasons a new manager serves before they can be sacked
+    debt: 0, pastFloor: -0.5,                        // a race while coin is below zero, past the floor
     generosity: 0.3,                                 // Coin added at the season's start, × u × the league's budget
     floor: [0.3, 0.4],                               // the debt floor, × the league's budget, below zero
     meddling: [0.2, 0.6],                            // the chance an elder's dilemma is the one drawn

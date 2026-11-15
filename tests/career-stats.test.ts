@@ -187,13 +187,14 @@ test('manager: Negotiation bids lower, Talent Eye weighs potential, Finance comm
 test('elder: Ambition raises the target, Patience softens falls, Generosity gives and lowers the floor, Meddling meddles', () => {
   falls((a) => lead.targetPlace(a, 20), 'Ambition (target place, lower is higher)');
   assert.equal(lead.targetPlace(20, 2), 1);
-  const fall = (p: number) => lead.confidenceMove(p, 5, 15);
+  const fall = (p: number) => lead.confidenceMove(p, 5, 15, 10);
   assert.ok(fall(LOW) < fall(HIGH), 'the patient lose less confidence');
-  assert.equal(lead.confidenceMove(LOW, 10, 2), lead.confidenceMove(HIGH, 10, 2), 'a rise is not scaled by Patience');
-  assert.equal(lead.confidenceMove(10, 10, 2), 6, 'a rise is capped at 6');
-  assert.ok(lead.confidenceMove(0, 1, 40) >= -8 * 1.3 - 1e-9);
-  assert.equal(lead.debtMove(-10, -100), -3);
-  assert.equal(lead.debtMove(-200, -100), -10);
+  assert.equal(lead.confidenceMove(LOW, 10, 2, 10), lead.confidenceMove(HIGH, 10, 2, 10), 'a rise is not scaled by Patience');
+  assert.equal(lead.confidenceMove(10, 10, 2, 10), 4, 'a rise is capped at 4');
+  assert.ok(lead.confidenceMove(0, 1, 40, 10) >= -5 * 1.3 - 1e-9);
+  assert.equal(lead.debtMove(-10, -100), TUNING.elder.debt);
+  assert.equal(lead.debtMove(-200, -100), TUNING.elder.pastFloor);
+  assert.ok(TUNING.elder.pastFloor < 0, 'past the floor costs confidence');
   assert.equal(lead.debtMove(5, -100), 0);
   rises((g) => lead.endowment(g, 1000), 'Generosity (endowment)');
   falls((g) => lead.debtFloor(g, 1000), 'Generosity (floor, lower is deeper)');

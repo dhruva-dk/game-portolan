@@ -121,14 +121,21 @@ function makeCrew(g: Gathering, rand: Rand, id: number, league: number, name: st
   };
 }
 
-/** Each crew of a league's target: its rank by staff stars, moved up by its elder's Ambition. */
+/** Each crew of a league's target: its expected place (by the mean of its rank by staff stars and its rank by the
+ *  fitted parts' performance), moved up by its elder's Ambition. */
 export function targets(crews: readonly Crew[], gulls: readonly Gull[]): Crew[] {
-  const strength = (c: Crew) => staffStars([c.staff.manager, ...c.staff.ships.flatMap((h) => [h.captain, h.bosun]), c.staff.reserve, c.staff.shipwright, ...c.staff.scouts, ...c.staff.flight]
+  const stars = (c: Crew) => staffStars([c.staff.manager, ...c.staff.ships.flatMap((h) => [h.captain, h.bosun]), c.staff.reserve, c.staff.shipwright, ...c.staff.scouts, ...c.staff.flight]
     .filter((x): x is number => x !== null).map((i) => gulls[i]));
-  const ranked = [...crews].sort((a, b) => strength(b) - strength(a) || a.id - b.id);
+  const perf = (c: Crew) => c.parts.reduce((a, p) => a + (p.ship === null ? 0 : p.perf), 0);
+  const rankBy = (f: (c: Crew) => number) => {
+    const order = [...crews].sort((a, b) => f(b) - f(a) || a.id - b.id);
+    return new Map(order.map((c, i) => [c.id, i]));
+  };
+  const byStars = rankBy(stars), byParts = rankBy(perf);
+  const expected = [...crews].sort((a, b) => byStars.get(a.id)! + byParts.get(a.id)! - byStars.get(b.id)! - byParts.get(b.id)! || byStars.get(a.id)! - byStars.get(b.id)!);
   return crews.map((c) => {
     const elder = gulls[c.staff.elder] as GullOf<'elder'>;
-    return { ...c, target: targetPlace(elder.stats.ambition, ranked.indexOf(c) + 1) };
+    return { ...c, target: targetPlace(elder.stats.ambition, expected.indexOf(c) + 1) };
   });
 }
 

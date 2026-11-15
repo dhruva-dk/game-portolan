@@ -6,18 +6,32 @@
 import type { Captain, RaceCard, RaceResult, RaceShip } from '../src/race.ts';
 import { random } from '../src/world/random.ts';
 
-/** How strong a ship looks on paper: her handling's top speed and hull, her captain's helm, gunnery and seamanship. */
-function strength(ship: RaceShip, player: number): number {
-  const h = ship.handling;
+/** Her captain's sailing (helm, gunnery, seamanship, 0..1); `player` for the player's own ship (captain null). */
+function sailor(ship: RaceShip, player: number): number {
   const c: Captain['stats'] | null = ship.captain?.stats ?? null;
-  const sailor = c ? (c.helm + c.gunnery + c.seamanship) / 60 : player;
-  return h.top / 10 + h.hull / 400 + sailor * 2;
+  return c ? (c.helm + c.gunnery + c.seamanship) / 60 : player;
 }
 
-/** A result for a card. `player`: the strength (0..1) the player's own ship (captain null) sails with. */
+/** Her parts as her handling shows them: top speed and hull. */
+const build = (ship: RaceShip): number => ship.handling.top / 10 + ship.handling.hull / 400;
+
+/** Each value as standard scores across the card (0 when all are equal). */
+function scored(xs: readonly number[]): number[] {
+  const mean = xs.reduce((a, b) => a + b, 0) / xs.length;
+  const sd = Math.sqrt(xs.reduce((a, b) => a + (b - mean) ** 2, 0) / xs.length);
+  return xs.map((x) => (sd > 1e-9 ? (x - mean) / sd : 0));
+}
+
+/** Weights of a ship's captain and parts, in standard scores across the card, and the race's luck (its sd). */
+const CAPTAIN = 0.65, PARTS = 0.35, LUCK = 0.8;
+
+/** A result for a card: ships ordered by their captain and parts across the card, plus luck about as large (a race is
+ *  won by the stronger crew more often than not, never always). `player`: the sailing (0..1) of the player's ship. */
 export function synthetic(card: RaceCard, player = 0.5): RaceResult {
   const rand = random((card.seed ^ 0x5eed) >>> 0);
-  const score = new Map(card.ships.map((s) => [s.id, s.forfeit ? -1e9 : strength(s, player) + rand() * 3]));
+  const sailors = scored(card.ships.map((s) => sailor(s, player))), builds = scored(card.ships.map(build));
+  const luck = () => (rand() + rand() + rand() + rand() - 2) * Math.sqrt(3) * LUCK;
+  const score = new Map(card.ships.map((s, i) => [s.id, s.forfeit ? -1e9 : CAPTAIN * sailors[i] + PARTS * builds[i] + luck()]));
   const order = [...card.ships].sort((a, b) => score.get(b.id)! - score.get(a.id)! || a.id - b.id).map((s) => s.id);
   const sinkings: RaceResult['sinkings'][number][] = [];
   order.forEach((id, place) => {

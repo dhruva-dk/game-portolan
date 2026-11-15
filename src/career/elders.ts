@@ -1,22 +1,24 @@
 // Elders and the managers' market (Phase B section 7, D22): each elder sets a target at the season's start (Ambition)
-// and adds Coin and a debt floor (Generosity); their confidence moves after each race (Patience) and their word comes
-// by mail as it crosses 75, 50 or 25; at 0 they sack the manager at once, and at the season's end if the target was
-// missed by more than 5 places. The elder then hires: the best manager whose reputation fits the league, from the free
-// agents or a lower league's crews, or offers the post to the player. The player is a manager like any other here.
+// and adds Coin and a debt floor (Generosity); their confidence moves after each race (Patience), only with a run of
+// races behind the target, and carries into the next season; their word comes by mail as it crosses 75, 50 or 25. A
+// manager past their grace and behind the target is sacked at 0 at once, and at the season's end if the target was
+// missed by more than 5 places with confidence low. The elder then hires: the best manager whose reputation fits the
+// league, from the free agents or a lower league's crews, or offers the post to the player. The player is a manager
+// like any other here.
 
 import type { Offer } from '../office.ts';
 import { askFee, askSeasons, askWage } from './asks.ts';
-import { signed, released } from './contracts.ts';
+import { contractEnds, signed, released } from './contracts.ts';
 import { between, within, type Dice } from './dice.ts';
 import { endTalk } from './hiring.ts';
-import { confidenceMove, debtFloor, debtMove, endowment } from './leadership.ts';
+import { confidenceCarried, confidenceMove, debtFloor, debtMove, endowment } from './leadership.ts';
 import { fullName } from './names.ts';
 import { mine, post } from './post.ts';
 import { schedule, unscheduled } from './queue.ts';
 import { makeGull } from './recruit.ts';
 import type { Gull, GullOf } from './roles.ts';
-import { age, stars } from './stars.ts';
-import type { CareerState, Crew, JobOffer } from './state.ts';
+import { YEAR, age, stars } from './stars.ts';
+import { withGulls, type CareerState, type Crew, type JobOffer } from './state.ts';
 import { TUNING } from './tuning.ts';
 import { targets } from './world.ts';
 
@@ -49,12 +51,27 @@ export function afterRace(s: CareerState, crew: number, roll: Dice): CareerState
   const c = s.crews[crew];
   if (c.staff.manager === null) return s;
   const patience = elderOf(s, c).stats.patience;
-  const move = confidenceMove(patience, c.target, standingOf(s, crew)) + debtMove(c.coin, c.debtFloor);
+  const standing = standingOf(s, crew);
+  const move = confidenceMove(patience, c.target, standing, s.round + 1) + debtMove(c.coin, c.debtFloor);
   const confidence = Math.round(Math.min(100, Math.max(0, c.confidence + move)) * 10) / 10;
   let out = withCrew(s, { ...c, confidence });
   const word = wordAt(c.confidence, confidence);
   if (word !== null) out = post(out, { crew, category: 'elder', sender: c.staff.elder, kind: 'elderWord', slots: { level: word, rising: confidence > c.confidence ? 1 : 0 }, links: [] });
-  return confidence <= 0 ? sacked(out, crew, roll) : out;
+  return confidence <= 0 && standing - c.target > E.slack && served(s, c) ? sacked(out, crew, roll) : out;
+}
+
+/** Whether a crew's manager has served long enough to be sacked: `grace` seasons since they signed. */
+export function served(s: CareerState, c: Crew): boolean {
+  const m = c.staff.manager;
+  const since = m === null ? null : s.gulls[m].contract?.signed ?? null;
+  return since !== null && s.day - since >= E.grace * YEAR;
+}
+
+/** Whether the elder sacks the manager at the season's end: they have served their grace, missed the target by more
+ *  than `missedBy` places, and confidence is below `verdict` (a crew that met its target is never judged). */
+export function sacksAtEnd(s: CareerState, crew: number): boolean {
+  const c = s.crews[crew];
+  return c.staff.manager !== null && served(s, c) && standingOf(s, crew) - c.target > E.missedBy && c.confidence < E.verdict;
 }
 
 /** A state with a crew's manager sacked: a rival manager to the free agents, the player out of a crew (shown offers);
@@ -155,7 +172,8 @@ export function sackedOffers(s: CareerState): CareerState {
 export function seasonStart(s: CareerState): CareerState {
   const crews = s.crews.map((c) => {
     const g = elderOf(s, c).stats.generosity;
-    return { ...c, coin: Math.round(c.coin + endowment(g, c.budget)), debtFloor: Math.round(debtFloor(g, c.budget)) };
+    return { ...c, coin: Math.round(c.coin + endowment(g, c.budget)), debtFloor: Math.round(debtFloor(g, c.budget)),
+      confidence: Math.round(confidenceCarried(c.confidence, TUNING.crew.confidence) * 10) / 10 };
   });
   const out = s.leagues.flatMap((l) => targets(l.crews.map((i) => crews[i]), s.gulls));
   for (const c of out) crews[c.id] = c;
@@ -174,9 +192,7 @@ export function verdicts(s: CareerState, roll: Dice): CareerState {
       out = hireManager(out, c.id, roll, true);
     }
   }
-  for (const c of out.crews) {
-    if (out.crews[c.id].staff.manager !== null && standingOf(out, c.id) - c.target > E.missedBy) out = sacked(out, c.id, roll);
-  }
+  for (const c of out.crews) if (sacksAtEnd(out, c.id)) out = sacked(out, c.id, roll);
   for (const c of out.crews) {
     const m = c.staff.manager;
     const p = out.player;
@@ -184,6 +200,21 @@ export function verdicts(s: CareerState, roll: Dice): CareerState {
     if (out.gulls[m].reputation < p.reputation && mayOffer(out, c.id)) out = offerJob(out, c.id);
   }
   return out;
+}
+
+/** A state with each rival manager whose contract runs out this season renewed by their elder, if the elder's
+ *  confidence is at least `verdict`: for their age's length, at their ask in the crew's league; their tenure (`signed`)
+ *  kept. Others leave as their contract ends. Section 13 calls it at the season's end, before contracts expire. */
+export function managersRenewed(s: CareerState): CareerState {
+  const changed: Gull[] = [];
+  for (const c of s.crews) {
+    const m = c.staff.manager;
+    const g = m === null ? null : s.gulls[m];
+    if (!g || g.player || g.retired !== null || !g.contract || g.contract.ends === null || g.contract.ends > s.season || c.confidence < E.verdict) continue;
+    const contract = { ...g.contract, wage: askWage(g, c.league), ends: contractEnds(s, askSeasons(age(g, s.day))) };
+    changed.push({ ...g, contract });
+  }
+  return changed.length === 0 ? s : withGulls(s, changed);
 }
 
 /** A state with each retired elder succeeded by a new one of the crew's colony (an elder's post never stands open). */

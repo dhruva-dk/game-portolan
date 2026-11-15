@@ -42,12 +42,21 @@ export const sway = (politics: number, reputation: number): number => reputation
 /** Ambition: the target place from the expected place (1 best), moved up. */
 export const targetPlace = (ambition: number, expected: number): number => Math.max(1, expected - Math.round(E.ambition * unit(ambition)));
 
-/** Patience: confidence's move after a race from the target and the standing (places, 1 best). A fall is scaled by
- *  1.3 − 0.6u (the patient fall less); a rise is not. */
-export function confidenceMove(patience: number, target: number, standing: number): number {
-  const move = Math.min(E.rise, Math.max(E.fall, E.perPlace * (target - standing)));
-  return move < 0 ? move * lin(E.patience, unit(patience)) : move;
+/** Patience: confidence's move after a race from the target and the standing (places, 1 best), `sailed` races into
+ *  the season. At or above the target it rises; within `slack` places behind it holds; further behind it falls, scaled
+ *  by 1.3 − 0.6u (the patient fall less). Early standings say little, so the move grows to full over `settle` races:
+ *  only a run of poor races, not one, brings confidence down. */
+export function confidenceMove(patience: number, target: number, standing: number, sailed: number): number {
+  const weight = Math.min(1, Math.max(1, sailed) / E.settle);
+  const behind = standing - target;
+  if (behind <= 0) return Math.min(E.rise, E.met + E.perPlace * -behind) * weight;
+  if (behind <= E.slack) return 0;
+  return Math.max(E.fall, -E.perPlace * (behind - E.slack)) * lin(E.patience, unit(patience)) * weight;
 }
+
+/** Confidence at a season's start: moved part of the way back toward the start's (a poor season is remembered, so a
+ *  second one costs more than the first). */
+export const confidenceCarried = (confidence: number, start: number): number => confidence + (start - confidence) * E.recover;
 
 /** Confidence's move a race for the crew's coin: below zero, and past the debt floor. */
 export const debtMove = (coin: number, floor: number): number => (coin < floor ? E.pastFloor : coin < 0 ? E.debt : 0);

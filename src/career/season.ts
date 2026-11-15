@@ -1,9 +1,9 @@
 // The season's end and start (Phase B section 13). At the end, in order: prize money; the crews' season reputations
-// and the player's mail of their place; retirements; new gulls; contracts expire; the rules turn; the elders'
-// verdicts, sackings and hirings (on the season's standings, before the leagues change); promotion and relegation
-// (four each way); knowledge marked; growth; traits; suppliers cleared; next season's parts (under the new league's
-// rules); then the new season: its calendar, the elders' money and targets, its events. On the new season's first day
-// the player is mailed its planets and the suppliers' choice.
+// and the player's mail of their place; retirements; new gulls; trusted managers renewed; contracts expire; the rules
+// turn; the elders' verdicts, sackings and hirings (on the season's standings, before the leagues change); promotion
+// and relegation (four each way); knowledge marked; growth; traits; suppliers cleared; next season's parts (under the
+// new league's rules); then the new season: its calendar, the elders' money and targets, its events. On the new
+// season's first day the player is mailed its planets and the suppliers' choice.
 
 import type { EventHandler } from './advance.ts';
 import { newsworthy, retirements, seasonGrowth, traitTurns } from './ageing.ts';
@@ -11,7 +11,7 @@ import { rulesTurned } from './admiralty.ts';
 import { makeCalendar, nextStart, scheduleSeason } from './calendar.ts';
 import { expired, scoutingStopped, talksEnded, youngGulls } from './contracts.ts';
 import type { Dice } from './dice.ts';
-import { seasonStart, standingOf, verdicts } from './elders.ts';
+import { managersRenewed, seasonStart, standingOf, verdicts } from './elders.ts';
 import { knowledgeTurned } from './knowledge.ts';
 import { prizeAt, prizes } from './money.ts';
 import { carried } from './parts.ts';
@@ -70,7 +70,7 @@ function turnover(s: CareerState, roll: Dice): CareerState {
   let out = r.state;
   for (const id of r.retired) out = scoutingStopped(talksEnded(out, id, null), id);
   for (const id of r.retired) if (newsworthy(s, s.gulls[id])) out = post(out, { crew: null, category: 'crew', sender: null, kind: 'retired', slots: { gull: id }, links: [{ to: 'gull', id }] });
-  return expired(youngGulls(out, roll));
+  return expired(managersRenewed(youngGulls(out, roll)));
 }
 
 /** Traits turned, the player told of their own gulls' and the famous. */

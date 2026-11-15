@@ -11,7 +11,8 @@ import { raceCards } from '../src/career/card.ts';
 import { DILEMMAS } from '../src/career/events.ts';
 import { TEMPLATES } from '../src/career/mail.ts';
 import { askOf } from '../src/career/market.ts';
-import { stars } from '../src/career/stars.ts';
+import { YEAR, stars } from '../src/career/stars.ts';
+import { TUNING } from '../src/career/tuning.ts';
 import { standingOf } from '../src/career/elders.ts';
 import { staffOf } from '../src/career/state.ts';
 import type { Command } from '../src/office.ts';
@@ -60,14 +61,45 @@ const tables: string[] = [];
 let managers = s.crews.map((c) => c.staff.manager);
 let crewOf = s.gulls.map((g) => g.contract?.crew ?? null);
 
-/** Managers sacked and hired, and gulls moved between crews, since the last look. */
-function tallied(): void {
+// A post that changed hands is a sacking only if its manager is left free (not retired, not gone to another crew).
+const sacks = { bySeason: [] as number[], midSeason: 0, early: 0, afterOne: 0, afterTwo: 0, moved: 0, retired: 0, expired: 0 };
+/** Each crew's seasons in a row finished more than the elder's slack behind its target, as of the last table. */
+let poor = s.crews.map(() => 0);
+
+/** The day each crew's manager took the post, and the last season of their contract. */
+const tenure = s.crews.map(() => 0);
+let leagueAt = s.crews.map((c) => c.league);
+let lastSeasonOf = s.crews.map((c) => (c.staff.manager === null ? null : s.gulls[c.staff.manager].contract?.ends ?? null));
+
+/** Managers sacked and hired, and gulls moved between crews, since the last look: after a race day (`ended` false; a
+ *  sacking then is an elder's confidence run out) or an Advance that crossed a season's end (the verdicts). */
+function tallied(ended = false): void {
   const now = s.crews.map((c) => c.staff.manager);
   now.forEach((m, i) => {
     if (m === managers[i]) return;
-    if (managers[i] !== null) counts.sackings += 1;
+    const old = managers[i];
     if (m !== null) counts.hirings += 1;
+    if (old === null) return;
+    const g = s.gulls[old];
+    if (g.retired !== null) sacks.retired += 1;
+    else if (ended && lastSeasonOf[i] !== null && lastSeasonOf[i]! < s.season) sacks.expired += 1;
+    // poached: hired by a crew a league above (elders poach only upward); the player taking another post, or displacing
+    // a manager by taking theirs
+    else if ((g.contract !== null && g.contract.crew !== i && (g.player || leagueAt[g.contract.crew] < leagueAt[i])) || (m !== null && s.gulls[m].player)) sacks.moved += 1;
+    else {
+      counts.sackings += 1;
+      const season = ended ? s.season - 1 : s.season;
+      sacks.bySeason[season] = (sacks.bySeason[season] ?? 0) + 1;
+      if (!ended) sacks.midSeason += 1;
+      if (s.day - tenure[i] < YEAR / 2) sacks.early += 1;
+      const seasonsPoor = ended ? poor[i] : poor[i] + 1;
+      if (seasonsPoor >= 2) sacks.afterTwo += 1;
+      else sacks.afterOne += 1;
+    }
   });
+  now.forEach((m, i) => { if (m !== managers[i]) tenure[i] = s.day; });
+  leagueAt = s.crews.map((c) => c.league);
+  lastSeasonOf = now.map((m) => (m === null ? null : s.gulls[m].contract?.ends ?? null));
   managers = now;
   const crews = s.gulls.map((g) => g.contract?.crew ?? null);
   crews.forEach((c, i) => { if (c !== null && i < crewOf.length && crewOf[i] !== null && crewOf[i] !== c) counts.transfers += 1; });
@@ -141,6 +173,7 @@ function seasonTables(): void {
       + ` ship-one parts' mean ${Math.round(perf.reduce((a, b) => a + b, 0) / perf.length)}`);
   }
   tables.push(...lines);
+  poor = s.crews.map((c, i) => (standingOf(s, c.id) - c.target > TUNING.elder.slack ? poor[i] + 1 : 0));
 }
 
 const start0 = performance.now();
@@ -186,6 +219,7 @@ while (s.season < seasons) {
   must({ kind: 'Advance' });
   const took = performance.now() - t;
   (s.season === before ? times : ends).push(took);
+  tallied(s.season !== before);
   if (took > 100) console.log(`slow Advance: ${took.toFixed(0)} ms, day ${from} to ${s.day}`);
   if (s.season !== lastSeason) {
     lastSeason = s.season;
@@ -201,6 +235,10 @@ const dilemmaIds = new Set(DILEMMAS.map((d) => d.id));
 console.log(tables.join('\n'));
 console.log(`\n${seasons} seasons in ${((performance.now() - start0) / 1000).toFixed(1)} s, day ${s.day}`);
 console.log(`managers sacked ${counts.sackings}, hired ${counts.hirings}; gulls moved between crews ${counts.transfers}; forfeits ${counts.forfeits}`);
+const per = Array.from({ length: seasons }, (_, k) => sacks.bySeason[k] ?? 0);
+console.log(`sackings a season ${per.join(' ')} (mean ${(counts.sackings / seasons).toFixed(1)}): ${sacks.midSeason} in a season, ${counts.sackings - sacks.midSeason} at its end;`
+  + ` ${sacks.early} within half a season of the post; ${sacks.afterOne} in a crew's first poor season, ${sacks.afterTwo} in its second or later;`
+  + ` posts left for another crew ${sacks.moved}, by retirement ${sacks.retired}, at a contract's end ${sacks.expired}`);
 const timing = (xs: number[]) => {
   const sorted = [...xs].sort((a, b) => a - b), at = (q: number) => (sorted[Math.min(sorted.length - 1, Math.floor(q * sorted.length))] ?? 0).toFixed(1);
   return `${xs.length} calls, mean ${(xs.reduce((a, b) => a + b, 0) / Math.max(1, xs.length)).toFixed(1)} ms, 95th ${at(0.95)} ms, most ${at(1)} ms (call ${xs.indexOf(sorted[sorted.length - 1])})`;

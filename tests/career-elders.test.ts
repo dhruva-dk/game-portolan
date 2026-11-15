@@ -6,8 +6,11 @@ import type { Personality } from '../src/office.ts';
 import type { CareerState } from '../src/career/career.ts';
 import { released } from '../src/career/contracts.ts';
 import { dice } from '../src/career/dice.ts';
-import { afterRace, bestManager, hireManager, managerCandidates, mayOffer, offerJob, sacked, seasonStart, standingOf, verdicts, wordAt } from '../src/career/elders.ts';
+import { afterRace, bestManager, hireManager, managerCandidates, managersRenewed, mayOffer, offerJob, sacked, sacksAtEnd, seasonStart, served, standingOf, verdicts, wordAt } from '../src/career/elders.ts';
 import { learned } from '../src/career/knowledge.ts';
+import { confidenceCarried, confidenceMove } from '../src/career/leadership.ts';
+import { YEAR } from '../src/career/stars.ts';
+import { random } from '../src/world/random.ts';
 import { decide, mindOf, rowsFor, ROWS } from '../src/career/rivals.ts';
 import { staffOf } from '../src/career/state.ts';
 import { TUNING } from '../src/career/tuning.ts';
@@ -64,14 +67,25 @@ test('the elder\'s word comes as confidence crosses 75, 50 or 25, either way', (
   assert.equal(wordAt(30, 20), 25);
 });
 
-test('a rival manager whose elder\'s confidence falls to nothing is sacked, and the elder hires the best manager who fits', () => {
-  const s = founded();
-  // the crew last in its league, its target first
-  const c = s.crews.filter((x) => !x.player && x.staff.manager !== null).sort((a, b) => standingOf(s, b.id) - standingOf(s, a.id))[0];
-  const was = c.staff.manager!;
+/** A founded world half a season or more on: every manager there at founding has served their grace. */
+const pastGrace = (): CareerState => ({ ...founded(), day: Math.ceil(TUNING.elder.grace * YEAR) });
+
+/** A state with one crew's fields changed. */
+const withCrewSet = (s: CareerState, crew: number, set: Partial<CareerState['crews'][number]>): CareerState => {
   const crews = [...s.crews];
-  crews[c.id] = { ...c, target: 1, confidence: 0.01 };
-  const t = afterRace({ ...s, crews }, c.id, roll(s));
+  crews[crew] = { ...crews[crew], ...set };
+  return { ...s, crews };
+};
+
+/** The rival crew last in its league (all level at founding: the highest id of its league). */
+const lastRival = (s: CareerState) => s.crews.filter((x) => !x.player && x.staff.manager !== null).sort((a, b) => standingOf(s, b.id) - standingOf(s, a.id))[0];
+
+test('a rival manager whose elder\'s confidence falls to nothing is sacked, and the elder hires the best manager who fits', () => {
+  const s = pastGrace();
+  // the crew last in its league, its target first
+  const c = lastRival(s);
+  const was = c.staff.manager!;
+  const t = afterRace(withCrewSet(s, c.id, { target: 1, confidence: 0.01 }), c.id, roll(s));
   assert.equal(t.crews[c.id].confidence, TUNING.crew.confidence, 'the new manager starts at the usual confidence');
   assert.notEqual(t.crews[c.id].staff.manager, was);
   assert.notEqual(t.crews[c.id].staff.manager, null);
@@ -153,18 +167,85 @@ test('a crew\'s post offered to a player of enough reputation; TakeJob moves the
   assert.equal(v.queue.some((e) => e.kind === 'jobExpires' && e.crew === c.id), false);
 });
 
-test('at a season\'s start elders add Coin and set targets; at its end a target missed by more than 5 places sacks', () => {
-  const s = founded();
+test('at a season\'s start elders add Coin and set targets; at its end a target missed by more than 5 places sacks, if confidence is low', () => {
+  const s = pastGrace();
   const t = seasonStart(s);
   for (const c of t.crews) assert.ok(c.coin >= s.crews[c.id].coin);
   const league = t.leagues[0];
   const last = [...league.crews].filter((i) => !t.crews[i].player).sort((a, b) => standingOf(t, b) - standingOf(t, a))[0];
-  const crews = [...t.crews];
-  crews[last] = { ...crews[last], target: 1 };
-  const u = { ...t, crews };
+  const u = withCrewSet(t, last, { target: 1, confidence: TUNING.elder.verdict - 1 });
   assert.ok(standingOf(u, last) - 1 > TUNING.elder.missedBy);
   const was = u.crews[last].staff.manager;
   const v = verdicts(u, roll(u));
   assert.notEqual(v.crews[last].staff.manager, was);
   invariants(v);
+  const trusted = withCrewSet(t, last, { target: 1, confidence: TUNING.elder.verdict });
+  assert.equal(verdicts(trusted, roll(trusted)).crews[last].staff.manager, was, 'an elder who still trusts them keeps them');
+});
+
+test('a new manager has half a season\'s grace: not sacked at confidence 0 or by the verdict until it has passed', () => {
+  const s = pastGrace();
+  const c = lastRival(s);
+  const was = c.staff.manager!;
+  const gulls = [...s.gulls];
+  gulls[was] = { ...gulls[was], contract: { ...gulls[was].contract!, signed: s.day - 1 } };
+  const fresh = withCrewSet({ ...s, gulls }, c.id, { target: 1, confidence: 0.01 });
+  assert.ok(standingOf(fresh, c.id) - 1 > TUNING.elder.missedBy);
+  assert.equal(served(fresh, fresh.crews[c.id]), false);
+  assert.equal(afterRace(fresh, c.id, roll(fresh)).crews[c.id].staff.manager, was, 'no sacking at 0 in the grace');
+  assert.equal(sacksAtEnd(fresh, c.id), false, 'no verdict in the grace');
+  assert.equal(verdicts(fresh, roll(fresh)).crews[c.id].staff.manager, was);
+  const later = { ...fresh, day: fresh.day + Math.ceil(TUNING.elder.grace * YEAR) };
+  assert.equal(served(later, later.crews[c.id]), true);
+  assert.notEqual(afterRace(later, c.id, roll(later)).crews[c.id].staff.manager, was, 'past the grace, confidence at 0 sacks');
+});
+
+test('a manager meeting their target is never sacked, at any confidence, coin or patience', () => {
+  const s = pastGrace();
+  const rand = random(7);
+  for (const c of s.crews.filter((x) => !x.player && x.staff.manager !== null).slice(0, 40)) {
+    const standing = standingOf(s, c.id);
+    const target = standing + Math.floor(rand() * 4);
+    const t = withCrewSet(s, c.id, { target, confidence: rand() < 0.5 ? 0 : rand() * 5, coin: -1e6 });
+    assert.equal(afterRace(t, c.id, roll(t)).crews[c.id].staff.manager, c.staff.manager, `crew ${c.id} at ${standing}, target ${target}`);
+    assert.equal(sacksAtEnd(t, c.id), false);
+    assert.equal(verdicts(t, roll(t)).crews[c.id].staff.manager, c.staff.manager);
+  }
+});
+
+test('confidence falls only with sustained under-performance: not within the slack, little for one early race, a run costs', () => {
+  const E = TUNING.elder;
+  for (const patience of [0, 10, 20]) {
+    for (let behind = -10; behind <= E.slack; behind++) {
+      for (let sailed = 1; sailed <= 10; sailed++) assert.ok(confidenceMove(patience, 10, 10 + behind, sailed) >= 0, 'at, above or within the slack of the target');
+    }
+    assert.ok(confidenceMove(patience, 1, 40, 1) >= (E.fall * 1.3) / E.settle - 1e-9, 'the first race weighs a fifth');
+  }
+  // one bad race in a season otherwise on target: confidence ends where it began or higher
+  let one = 70;
+  for (let r = 1; r <= 10; r++) one += confidenceMove(10, 10, r === 1 ? 30 : 10, r);
+  assert.ok(one >= 70);
+  // a whole season ten places behind costs a run's worth, but a patient elder keeps a first poor season's manager
+  let run = 70;
+  for (let r = 1; r <= 10; r++) run += confidenceMove(20, 10, 20, r);
+  assert.ok(run < 70 - 15, `a poor season costs (${run})`);
+  assert.ok(run >= E.verdict, `but not the post, the first time (${run})`);
+  // and the next poor season, from where the first left off, does
+  let second = confidenceCarried(run, TUNING.crew.confidence);
+  for (let r = 1; r <= 10; r++) second += confidenceMove(20, 10, 22, r);
+  assert.ok(second < E.verdict, `a second poor season costs the post (${second})`);
+});
+
+test('an elder renews a trusted manager whose contract runs out, keeping their tenure; not one they doubt', () => {
+  const s = pastGrace();
+  const [a, b] = s.crews.filter((x) => !x.player && x.staff.manager !== null);
+  const gulls = [...s.gulls];
+  for (const c of [a, b]) gulls[c.staff.manager!] = { ...gulls[c.staff.manager!], contract: { ...gulls[c.staff.manager!].contract!, ends: s.season, signed: 3 } };
+  let t = withCrewSet({ ...s, gulls }, a.id, { confidence: TUNING.elder.verdict });
+  t = withCrewSet(t, b.id, { confidence: TUNING.elder.verdict - 1 });
+  const u = managersRenewed(t);
+  const ga = u.gulls[a.staff.manager!].contract!, gb = u.gulls[b.staff.manager!].contract!;
+  assert.ok(ga.ends! > s.season, 'renewed');
+  assert.equal(ga.signed, 3, 'tenure kept');
+  assert.equal(gb.ends, s.season, 'left to run out');
 });
