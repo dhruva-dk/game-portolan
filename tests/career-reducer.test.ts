@@ -9,7 +9,7 @@ import { dice } from '../src/career/dice.ts';
 import { ordered, schedule, scheduled, unscheduled, type Event } from '../src/career/queue.ts';
 import { stopsFor } from '../src/career/advance.ts';
 import type { Command } from '../src/office.ts';
-import { FOUND, founded, invariants, must, refused, someCommand } from './career-kit.ts';
+import { FOUND, founded, invariants, must, refused, someCommand, spendKept } from './career-kit.ts';
 
 test('apply never throws on a malformed command, and refuses it', () => {
   const s = founded();
@@ -133,7 +133,10 @@ test('a long random session holds every invariant and never faults', () => {
     const c = someCommand(s, rand);
     const r = apply(s, c, { debug: true });
     if (!r.ok) assert.notEqual(r.reason.code, 'fault', r.reason.sentence);
-    else s = r.state;
+    else {
+      spendKept(s, r.state, c);
+      s = r.state;
+    }
   }
   invariants(s);
   assert.equal(s.seed, FOUND.seed);

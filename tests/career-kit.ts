@@ -9,8 +9,10 @@ import { random } from '../src/world/random.ts';
 import { allowed, fullName, words } from '../src/career/names.ts';
 import { ordered } from '../src/career/queue.ts';
 import { ROLE_STATS } from '../src/career/roles.ts';
-import { staffOf } from '../src/career/state.ts';
-import type { Job } from '../src/race.ts';
+import { staffOf, type Crew } from '../src/career/state.ts';
+import type { Job, PartType } from '../src/race.ts';
+import type { Building } from '../src/office.ts';
+import { TRADES, supplierCards } from '../src/career/suppliers.ts';
 
 /** The Found command of the tests' usual career. */
 export const FOUND: Extract<Command, { kind: 'Found' }> = {
@@ -27,6 +29,13 @@ export function founded(seed = FOUND.seed): CareerState {
   made.set(seed, r.state);
   return r.state;
 }
+
+/** A state with a crew changed. */
+export const withCrew = (s: CareerState, id: number, f: (c: Crew) => Crew): CareerState => {
+  const crews = [...s.crews];
+  crews[id] = f(s.crews[id]);
+  return { ...s, crews };
+};
 
 /** Applies a command that must be accepted. */
 export function must(s: CareerState, c: Command): CareerState {
@@ -84,7 +93,59 @@ export function someCommand(s: CareerState, rand: () => number): Command {
   const offers = s.player?.offers.map((o) => o.crew) ?? [];
   if (r < 0.88) return { kind: 'TakeJob', crew: one(rand, offers, Math.floor(rand() * s.crews.length)) };
   if (r < 0.9) return { kind: 'DeclineJob', crew: one(rand, offers, Math.floor(rand() * s.crews.length)) };
-  return { kind: 'DebugCoin', coin: 100 };
+  if (r < 0.91) return { kind: 'DebugCoin', coin: 100 };
+  return worksCommand(s, rand);
+}
+
+const TYPES: readonly PartType[] = ['sails', 'rigging', 'rudder', 'hull', 'keel', 'mounts'];
+const BUILDINGS: readonly Building[] = ['factory', 'drawingLoft', 'testTank', 'foundry', 'sailingSchool', 'flightLoft', 'crowsNest', 'fishMarket', 'landingPad'];
+
+/** A command of sections 8–11 a player might send: the yard, fitting, designing, building, suppliers, patrons, votes. */
+function worksCommand(s: CareerState, rand: () => number): Command {
+  const crew = s.player && !s.player.sacked ? s.crews[s.player.crew] : null;
+  const parts = crew?.parts ?? [];
+  const part = () => one(rand, parts.map((p) => p.id), Math.floor(rand() * 2000));
+  const type = () => TYPES[Math.floor(rand() * TYPES.length)];
+  const r = rand();
+  if (r < 0.12) {
+    const fitted = parts.filter((p) => p.ship !== null && rand() < 0.4);
+    let left = 1;
+    return { kind: 'SetYard', shares: fitted.map((p) => {
+      const perf = Math.floor(rand() * left * 100) / 100;
+      left -= perf;
+      const reliability = Math.floor(rand() * left * 100) / 100;
+      left -= reliability;
+      return { part: p.id, perf, reliability };
+    }) };
+  }
+  if (r < 0.24) return { kind: 'FitPart', part: part(), ship: rand() < 0.1 ? null : rand() < 0.5 ? 0 : 1 };
+  if (r < 0.38) return { kind: 'DealComponents', type: type(), slot: Math.floor(rand() * 4) };
+  if (r < 0.5) {
+    const t = crew?.draft?.type ?? type();
+    const cards = (crew?.draft?.deals ?? []).map((d) => one(rand, d.cards, 'x'));
+    return { kind: 'StartDesign', type: t, components: cards, forNext: rand() < 0.2 };
+  }
+  if (r < 0.62) return { kind: 'Build', building: BUILDINGS[Math.floor(rand() * BUILDINGS.length)] };
+  if (r < 0.72) {
+    const trade = TRADES[Math.floor(rand() * TRADES.length)];
+    const cards = crew ? supplierCards(s.seed, crew.id, s.season, trade).map((x) => x.id) : [];
+    return { kind: 'ChooseSupplier', trade, supplier: one(rand, cards, 'nobody') };
+  }
+  if (r < 0.84) return { kind: 'SignPatron', offer: one(rand, crew?.offers.map((o) => o.patron.id) ?? [], 0), slot: Math.floor(rand() * 4) };
+  const proposals = crew ? s.leagues[crew.league].proposals.map((p) => p.id) : [];
+  const side = (['for', 'against', 'abstain'] as const)[Math.floor(rand() * 3)];
+  if (r < 0.92) return { kind: 'Vote', proposal: one(rand, proposals, 0), side };
+  return { kind: 'Lobby', proposal: one(rand, proposals, 0), side: side === 'abstain' ? 'for' : side, coin: Math.floor(rand() * 400) };
+}
+
+/** No accepted command but Advance and the debug ones takes a crew's coin past its elder's floor: owed payments
+ *  (wages, upkeep, fines) are made on Advance and may, but a spend never does. */
+export function spendKept(before: CareerState, after: CareerState, c: Command): void {
+  if (c.kind === 'Advance' || c.kind.startsWith('Debug')) return;
+  for (const x of after.crews) {
+    const was = before.crews[x.id]?.coin ?? x.coin;
+    if (x.coin < was) assert.ok(x.coin >= x.debtFloor, `${c.kind} took crew ${x.id}'s coin to ${x.coin}, past its floor ${x.debtFloor}`);
+  }
 }
 
 /** A seeded run of commands for a session. */
@@ -130,6 +191,31 @@ export function invariants(s: CareerState): void {
   }
   assert.ok(ordered(s.queue), 'the queue is out of order');
   market(s);
+  works(s);
+}
+
+/** The parts' and money's rules (sections 8–11): each part on at most one ship and each ship one of each type; spec
+ *  parts never improved past the standard; a crew's patrons in three slots. */
+function works(s: CareerState): void {
+  const ids = new Set<number>();
+  for (const c of s.crews) {
+    for (const ship of [0, 1] as const) {
+      const types = c.parts.filter((p) => p.ship === ship).map((p) => p.type).sort();
+      assert.deepEqual(types, [...TYPES].sort(), `crew ${c.id}'s ship ${ship} carries ${types.join(', ')}`);
+    }
+    for (const p of c.parts) {
+      assert.ok(!ids.has(p.id), `part ${p.id} is held twice`);
+      ids.add(p.id);
+      assert.ok(p.ship === null || p.ship === 0 || p.ship === 1, `part ${p.id} is fitted to ship ${p.ship}`);
+      assert.ok(p.condition >= 0 && p.condition <= 1, `part ${p.id} has condition ${p.condition}`);
+      assert.ok(p.perf <= p.perfMax && p.reliability <= p.reliabilityMax + 1e-9, `part ${p.id} is past its ceiling`);
+      if (p.spec) {
+        const st = TUNING.parts.standard;
+        assert.ok(p.perf <= st.perf && p.reliability <= st.reliability, `spec part ${p.id} was improved to ${p.perf}/${p.reliability}`);
+      }
+    }
+    assert.equal(c.patrons.length, TUNING.patrons.slots, `crew ${c.id} has ${c.patrons.length} patron slots`);
+  }
 }
 
 /** The market's rules (sections 4, 5, 7): talks and patience consistent, scouts at work on their own crew's staff,
