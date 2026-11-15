@@ -48,7 +48,7 @@ import type { Call, RaceResult } from '../race.ts';
 import { botOf, command } from './orders.ts';
 import { createUpkeep, type Kept, type Upkept } from './upkeep.ts';
 import { gustOf } from '../sim/gust.ts';
-import { ruled, tideAt } from '../sim/rule.ts';
+import { ruled, tideAt, tided } from '../sim/rule.ts';
 
 export { PARTS, bearing, fleetOf, type Afloat, type Berth, type Match, type Part, type Sinking, type Stepped, type Waters } from './match.ts';
 
@@ -67,7 +67,7 @@ export function createState(planet: Planet, sea: Hull, { chart, water }: Waters,
   // the depth under a ship: the floor's, and where the tide runs (sim/rule.ts) the tide's over it, set each step
   const rule = planet.biome.rule, still = remembered((p: Vec3) => -planet.height(p)), rises = risesOf(planet.islands);
   let tide = 0;
-  const depth = rule === 'tide' ? (p: Vec3) => still(p) + tide : still;
+  const depth = tided(rule, still, () => tide);
   const ground = { depth, rises };
   let match = first;
   const seedOf = (id: number) => seedIn(match, id);

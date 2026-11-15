@@ -75,3 +75,8 @@ export function tideAt(rule: Rule, seconds: number): number {
   const { range, period } = RULES.tide;
   return range * Math.sin((2 * Math.PI * seconds) / period);
 }
+
+/** The depth under a ship where the tide runs: the floor's (`still`) and the tide's over it now (`tide()`, metres);
+ *  `still` itself under any other rule. */
+export const tided = (rule: Rule, still: Depth, tide: () => number): Depth =>
+  rule === 'tide' ? (p) => still(p) + tide() : still;

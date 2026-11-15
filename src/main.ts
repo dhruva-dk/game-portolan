@@ -28,6 +28,7 @@ import { createStick } from './ui/stick';
 import { uiLayer } from './ui/ui';
 import { SEED } from './world/planet';
 import { hash } from './world/random';
+import { anyPlanet } from './world/biome';
 import { MEAN, SWING } from './world/weather';
 
 /** The release's setup. The frame is made once for the most ships a match puts to sea (SHIPS, a race card's eighty);
@@ -132,8 +133,8 @@ async function gameOn(s: Stage) {
 async function play(s: Stage): Promise<Played> {
   let on = await gameOn(s), planets = 0;
   const first = s.world.seed;
-  // (under 2^20: the noise's seeding multiplies it, world/noise3.ts, and keeps every bit only below 2^53)
-  const restage = (seed = hash(first, ++planets) % 2 ** 20) => s.restage(seed, async () => {
+  // (any biome's: world/biome.ts anyPlanet; the ground's own seed stays under 2^20, as the noise needs)
+  const restage = (seed = anyPlanet(hash(first, ++planets))) => s.restage(seed, async () => {
     on.close();
     on = await gameOn(s);
   });
