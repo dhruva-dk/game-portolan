@@ -36,6 +36,9 @@ import { deepest, steer } from './helmsman.ts';
 import { healUrge, lootAct, lootUrge, purse, PURSER } from './purser.ts';
 import { claimAct, claimUrge, cutAct, cutUrge, homeAct, homeUrge, sound } from './claimer.ts';
 import { NOTHING, type Ask } from './stores.ts';
+import { CREWMATE } from './handling.ts';
+import { FLIGHT, calls, serviceAct, serviceUrge } from './flight.ts';
+import { attackUrge, calledFoe, heed, holdAct, holdUrge, shadowAct, shadowUrge, stanceOn } from './crewmate.ts';
 
 export { BOT, byTemper, mind, rammed, shot, type Hand, type Memory, type Mode, type Sea, type Seen } from './captain.ts';
 
@@ -44,10 +47,11 @@ export { BOT, byTemper, mind, rammed, shot, type Hand, type Memory, type Mode, t
  * memory after. `own` is her own ship, `others` every other ship afloat (she sees only those in her sight), `sea` what
  * she knows of the water, the storm and the loot, `hand` what she sails by (her seed and temperament).
  */
-export function think(own: Seen, others: readonly Seen[], sea: Sea, memory: Memory, hand: Hand, dt = STEP): { helm: Helm; order: Order; ask: Ask; memory: Memory } {
+export function think(own: Seen, others: readonly Seen[], sea: Sea, memory: Memory, hand: Hand, dt = STEP): { helm: Helm; order: Order; ask: Ask; memory: Memory; flight: boolean } {
   const m: Memory = { ...memory, clock: memory.clock + dt, since: memory.since + dt, think: memory.think - 1, lootT: memory.mode === 'loot' ? memory.lootT + dt : memory.lootT };
   const c: Ctx = { own, others, sea, m, t: hand.t, foe: null, foeD: Infinity, seed: hand.seed, hand };
   sound(c);
+  heed(c);
   if (m.think <= 0) {
     m.think = BOT.every;
     perceive(c);
@@ -62,7 +66,7 @@ export function think(own: Seen, others: readonly Seen[], sea: Sea, memory: Memo
   // her stores asked on the steps she thinks (0117's); the gun for the range taken in hand whenever it changes
   const ask = m.think === BOT.every ? purse(c) : NOTHING;
   const arm = own.crew && ask.take === null && ask.tap === null && !own.crew.hold.using ? armFor(own.crew, seen ? c.foeD : null) : null;
-  return { helm, order, ask: arm === null ? ask : { ...ask, arm }, memory: m };
+  return { helm, order, ask: arm === null ? ask : { ...ask, arm }, memory: m, flight: calls(c) };
 }
 
 // ---------------------------------------------------------------- seeing
@@ -84,6 +88,13 @@ export const evades = (unwilling: number, helm: number) => utility(unwilling, 0.
 /** Notes the nearest ship she can see, not of her side; a foe out of sight is followed to where she was last seen, then let go. */
 function perceive(c: Ctx): void {
   const { m, own } = c;
+  // a call's foe, or ship one's while she shadows her, before her own eyes'
+  const called = calledFoe(c, BOT.sightMax);
+  if (called) {
+    if (called.id !== m.foe) m.react = m.clock + reactTime(c.t.lookout);
+    [m.foe, m.seen, m.last] = [called.id, m.clock, called.ship.at];
+    return;
+  }
   let best: Seen | null = null, bd = noticed(c.t);
   for (const o of c.others) {
     if (mates(own, o) || apart(own.ship.at, o.ship.at, BOT.sightMax)) continue;
@@ -212,8 +223,11 @@ interface Choice extends Option<Ctx> { readonly mode: Mode; act(c: Ctx): void }
 
 // (0117's shelter, 5.2, from weather, came after the storm; its hunt (to the sound of guns), raid and claiming water
 // belong to things this sea hasn't got; claiming is claimer.ts's.)
+/** An option's score as her stance weighs it (crewmate.ts; none: as it is). */
+const stanced = (mode: Mode, score: (c: Ctx) => number) => (c: Ctx) => (c.hand.stance ? stanceOn(c.hand.stance, mode) * score(c) : score(c));
+
 const ROAM: Choice = {
-  name: 'roam', weight: 1, mode: 'roam', score: () => 0.15, act: (c) => {
+  name: 'roam', weight: 1, mode: 'roam', score: stanced('roam', () => 0.15), act: (c) => {
     const { m } = c;
     if (m.mode !== 'roam' || m.since > BOT.roam || distance(c.own.ship.at, m.goal) < BOT.arrive) {
       m.since = 0;
@@ -226,13 +240,19 @@ const OPTIONS: readonly Choice[] = [
   // mending where she is, or clear of a foe about (0117's heal)
   { name: 'heal', weight: 3.5, mode: 'heal', score: healUrge, act: (c) => { c.m.goal = c.foe ? keptInside(c, away(c, c.m.last, PURSER.clear)) : c.own.ship.at; } },
   { name: 'flee', weight: 3.3, mode: 'flee', score: (c) => Math.max(losing(c), evading(c)), act: (c) => { c.m.goal = keptInside(c, away(c, c.m.last, BOT.run)); } },
-  { name: 'fight', weight: 2.6, mode: 'fight', score: fightUrge, act: (c) => { c.m.goal = c.m.last; } },
-  { name: 'loot', weight: 1.8, mode: 'loot', score: lootUrge, act: lootAct },
+  { name: 'fight', weight: 2.6, mode: 'fight', score: stanced('fight', fightUrge), act: (c) => { c.m.goal = c.m.last; } },
+  { name: 'loot', weight: 1.8, mode: 'loot', score: stanced('loot', lootUrge), act: lootAct },
   // her water (claimer.ts): home to get her shield back, across another's trail, a loop to claim more
-  { name: 'home', weight: 2, mode: 'home', score: homeUrge, act: homeAct },
+  { name: 'home', weight: 2, mode: 'home', score: stanced('home', homeUrge), act: homeAct },
   { name: 'cut', weight: 2, mode: 'cut', score: cutUrge, act: cutAct },
-  { name: 'claim', weight: 1.5, mode: 'claim', score: claimUrge, act: claimAct },
+  { name: 'claim', weight: 1.5, mode: 'claim', score: stanced('claim', claimUrge), act: claimAct },
   ROAM,
+  // a race's (#58 section 8): her flight called in her side's water; a crewmate's calls and shadowing (crewmate.ts),
+  // an attack fought as any fight is
+  { name: 'service', weight: FLIGHT.weight, mode: 'service', score: serviceUrge, act: serviceAct },
+  { name: 'attack', weight: CREWMATE.call, mode: 'fight', score: (c) => attackUrge(c, losing(c)), act: (c) => { c.m.goal = c.m.last; } },
+  { name: 'shadow', weight: CREWMATE.call, mode: 'shadow', score: shadowUrge, act: shadowAct },
+  { name: 'hold', weight: CREWMATE.call, mode: 'hold', score: holdUrge, act: holdAct },
 ];
 
 function decide(c: Ctx): void {

@@ -4,6 +4,7 @@
 // ui/hud.ts), with what she carries (Kit), and how her match ended (End).
 
 import type { GunKind, LootKind } from './kinds';
+import type { Call, Job, PartType } from './race';
 import type { Vec3 } from './world/sphere';
 
 /** Her hands, as read for a frame. */
@@ -83,6 +84,9 @@ export const HOTBAR = { guns: 2, items: 3 } as const;
  *             went to (HOTBAR)
  *   mended    ship finished mending with what she used (only hers)
  *   gust      ship spent a gust (only hers)
+ *   faulted   a part of ship failed (only hers and her crewmate's)
+ *   repaired  a failed part of ship was repaired by her flight (only hers and her crewmate's)
+ *   flight    ship's flight came (job null) or began a job, botched or not (only hers)
  */
 export type Deed = { seq: number; time: number; at: Vec3; ship: number } & (
   | { kind: 'fired' | 'winding' | 'reloading' | 'reloaded' | 'swapped'; gun: GunKind }
@@ -92,11 +96,16 @@ export type Deed = { seq: number; time: number; at: Vec3; ship: number } & (
   | { kind: 'took'; piece: LootKind; rarity: number; slot: number }
   | { kind: 'mended'; piece: LootKind }
   | { kind: 'gust' }
+  | { kind: 'faulted' | 'repaired'; part: PartType }
+  | { kind: 'flight'; job: Job | null; botched: boolean }
 );
 
 /** Metres over the sea a deed is placed, by its kind: a blow on a hull at her side, a gun at her muzzle, the rest at
  *  the water. Where it is seen (play/moments.ts) and heard from (audio/audio.ts). */
-export const LIFT: Record<Deed['kind'], number> = { fired: 3, winding: 3, reloading: 3, reloaded: 3, swapped: 3, fell: 0, struck: 2, sank: 2, took: 0.5, mended: 2, gust: 2 };
+export const LIFT: Record<Deed['kind'], number> = {
+  fired: 3, winding: 3, reloading: 3, reloaded: 3, swapped: 3, fell: 0, struck: 2, sank: 2, took: 0.5, mended: 2, gust: 2,
+  faulted: 2, repaired: 2, flight: 6,
+};
 
 /** The screens (ui/ways.ts, the ways between them): named here for the sound too, which hears which is shown. */
 export const SCREENS = ['title', 'lobby', 'settings', 'match', 'sinking', 'sunk', 'spectate', 'won', 'result'] as const;

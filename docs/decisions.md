@@ -177,3 +177,20 @@ decisions are in #56, section 2.
   `think` takes `Hand` (seed and temper) in place of the seed; `Sea` did not gain the clock, as nothing in the sim reads
   it once the temper is made outside. **Why:** "made once at launch, refreshed only by the clock", with no per-step
   random draws.
+- **Question:** where parts, faults and the flight live (steps 7, 8.1). **Choice:** `sim/wear.ts` (parts, wear, faults,
+  leak) and `sim/flight.ts` (the stop's state machine, FLIGHT and SERVICE, moved there from `play/deal.ts`), both pure;
+  `play/upkeep.ts` keeps each carded ship's parts and stop and the calls, stepped after the fighting each step;
+  `state.ts` only wires it. Wear counts the hull points of the blows she took that step (not the storm's). A card-less
+  match keeps no upkeep, so its results stay identical. Dealt cards now carry six parts each `WEAR.dealt` (0.85)
+  reliable and new. **Why:** `state.ts` stays under its line limit, and each rule is tested on its own.
+- **Question:** what a botch's draw is keyed by and what "under fire" means (step 8.1). **Choice:** one draw per job
+  begun, keyed by the race's seed, her id, the jobs begun in the race and in the stop; under fire is a blow taken in
+  the last FLIGHT.fire (5) s. **Why:** seeded and stable, no per-step draws.
+- **Question:** whose stance counts, and what a call's lead is (step 8.2). **Choice:** only a crewmate's (a side's
+  second ship, odd id) stance weighs her options; a side's first ship sails by her style alone. A crewmate's lead is
+  ship 2k: the player's calls for side 0; other sides' first ships give none. What ship one "fights" is her bot's foe,
+  or for the player the last ship she struck within 20 s. The calls are options appended to the bot's list (shadow,
+  attack, hold) at weight `CREWMATE.call` (4), above flee and under the storm. **Why:** the card has a stance for every
+  ship, but D39 makes it the crewmate's; appended options scoring zero keep card-less results identical.
+- **Question:** `player.ts` needs the race's part, job and call types (step 8.3). **Choice:** `race.ts` added to
+  `player.ts`'s row in tests/architecture.test.ts (types only). **Why:** the HUD names parts and calls as the seam does.

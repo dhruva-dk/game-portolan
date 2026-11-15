@@ -8,11 +8,15 @@
 
 import { GUST } from './handling.ts';
 
-/** Her gust: charges ready, seconds toward the next coming back, and seconds left of one blowing (0: none). */
-export interface Gust { charges: number; recharge: number; blowing: number }
+/** Her gust: charges ready, seconds toward the next coming back, and seconds left of one blowing (0: none); and the
+ *  seconds a charge takes her to come back (GUST.recharge unless her bosun's bond says otherwise: race.ts Service). */
+export interface Gust { charges: number; recharge: number; blowing: number; every?: number }
 
-/** As she puts to sea: every charge ready. */
-export const gustOf = (): Gust => ({ charges: GUST.charges, recharge: 0, blowing: 0 });
+/** As she puts to sea: every charge ready, each coming back in `every` s if given. */
+export const gustOf = (every?: number): Gust => (every === undefined ? { charges: GUST.charges, recharge: 0, blowing: 0 } : { charges: GUST.charges, recharge: 0, blowing: 0, every });
+
+/** The seconds a charge of hers takes to come back. */
+const everyOf = (g: Gust) => g.every ?? GUST.recharge;
 
 /** Whether she may spend one now. */
 export const ready = (g: Gust) => g.charges > 0 && g.blowing <= 0;
@@ -26,10 +30,13 @@ export function spent(g: Gust): { gust: Gust; blew: boolean } {
 /** dt seconds on: the one blowing dies down, and charges come back. */
 export function stepGust(g: Gust, dt: number): Gust {
   const blowing = Math.max(0, g.blowing - dt);
-  if (g.charges >= GUST.charges) return { charges: g.charges, recharge: 0, blowing };
+  if (g.charges >= GUST.charges) return { ...g, charges: g.charges, recharge: 0, blowing };
   const recharge = g.recharge + dt;
-  return recharge >= GUST.recharge ? { charges: g.charges + 1, recharge: 0, blowing } : { charges: g.charges, recharge, blowing };
+  return recharge >= everyOf(g) ? { ...g, charges: g.charges + 1, recharge: 0, blowing } : { ...g, charges: g.charges, recharge, blowing };
 }
 
+/** A charge given her (the flight's), up to her most. */
+export const charged = (g: Gust): Gust => (g.charges >= GUST.charges ? g : { ...g, charges: g.charges + 1, recharge: 0 });
+
 /** How far the next charge has come back, 0…1 (1 with every charge ready). */
-export const charging = (g: Gust) => (g.charges >= GUST.charges ? 1 : g.recharge / GUST.recharge);
+export const charging = (g: Gust) => (g.charges >= GUST.charges ? 1 : g.recharge / everyOf(g));

@@ -20,7 +20,7 @@ import { flat } from '../src/world/swell.ts';
 import { lookAt } from '../src/world/turn.ts';
 
 const at: Vec3 = [0, 0, 1];
-const none: Done = { shots: [], splashes: [], strikes: [], sunk: [], took: [], mended: [], blew: [], cues: [], her: at };
+const none: Done = { shots: [], splashes: [], strikes: [], sunk: [], took: [], mended: [], blew: [], cues: [], kept: [], her: at };
 const counter = () => {
   let n = 0;
   return () => ++n;

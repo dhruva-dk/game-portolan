@@ -133,16 +133,29 @@ export const PACE = { storm: 1 } as const;
 export const CAPTAIN = { nerve: 0.4, storm: 1, tire: 4 } as const;
 
 /**
+ * Parts' wear (wear.ts, #58 step 7): each part's condition falls (`base` − u) / `per` a second (u her captain's
+ * Seamanship over 20; `player` for the player's ship, who has no captain) and `hull` for each hull point she loses. A
+ * part repaired is set `after` over the threshold it failed at. A sprung plank leaks `plank` hull points a second, down
+ * to `floor`. Each fault's handling factor (the issue's table). A dealt card's parts (play/deal.ts, until the career
+ * fits them) are each `dealt` reliable, in condition 1. Starting values.
+ */
+export const WEAR = {
+  base: 1.5, per: 600, hull: 1 / 200, player: 0.5, after: 0.2, plank: 1, floor: 1, dealt: 0.85,
+  torn: 0.7, fouled: 0.5, jammed: 0.6, ballast: 1.5, seized: 1.5,
+} as const;
+
+/**
  * The crewmate (#58 section 8.2, D39): the share each stance multiplies her options' weights by (sim/bot.ts), the most
  * she strays from ship one shadowing (`near`, m), how long she takes to notice a call (`notice` × (1.2 − Lookout's
  * u), s), how long a call lasts (`lasts`, s), and the Nerve below which she may break off an attack to run (`breaks`).
- * The calls' weights: what an obeyed call is worth against her other options. Starting values.
+ * `call`: the weight of an obeyed call against her other options (above flee's 3.3, under the storm's 6); `stanced`:
+ * the share of it shadowing by her stance alone is worth. Starting values.
  */
 export const CREWMATE = {
   stance: {
     hunt: { fight: 1.5, roam: 1.5 }, hold: { claim: 1.6, home: 1.6 }, loot: { loot: 1.6, fight: 0.6 }, shadow: {},
   } as Readonly<Record<'hunt' | 'hold' | 'loot' | 'shadow', Readonly<Partial<Record<string, number>>>>>,
-  near: 150, notice: 1.5, lasts: 60, breaks: 8, call: 4,
+  near: 150, notice: 1.5, lasts: 60, breaks: 8, call: 4, stanced: 0.6,
 } as const;
 
 /** One kind of gun (GUNS). */

@@ -56,7 +56,7 @@ export function sound(c: Ctx): void {
 }
 
 /** Whether she lies in her own water. */
-const inOwn = (c: Ctx) => hers(c, c.own.ship.at);
+export const inOwn = (c: Ctx) => hers(c, c.own.ship.at);
 /** Whether her trail is open: she is out of her water laying one. */
 const outward = (c: Ctx) => !!c.sea.holdings && c.sea.holdings.trail(c.own.id).points.length > 0;
 /** The distance to the nearest other ship. */
@@ -140,7 +140,7 @@ export function homeAct(c: Ctx): void {
 
 /** A mark `round` m ahead and turned to her side, in her own water and open: she keeps way on in it, no sitting target
  *  (the other side, else straight on, if none to her side is). */
-function circle(c: Ctx): Vec3 {
+export function circle(c: Ctx): Vec3 {
   const p = c.own.ship.at, f = c.own.ship.heading, side = c.m.rand & 1 ? 1 : -1;
   for (const a of [0.6, 1.1, 1.7, -0.6, -1.1, -1.7, 2.4, -2.4]) {
     const q = along(p, rotate(p, f, side * a), CLAIMER.round).p;

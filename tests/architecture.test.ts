@@ -78,7 +78,7 @@ const LAYERS: Record<string, readonly string[]> = {
   // the plain-data seams: what the frame draws (snapshot.ts), what passes between the player and the game (player.ts),
   // and the world as built for a match (environment.ts)
   'snapshot.ts': ['world/', 'sim/storm.ts', 'kinds.ts'],
-  'player.ts': ['world/', 'kinds.ts'],
+  'player.ts': ['world/', 'kinds.ts', 'race.ts'],
   // the rarities' inks, for the two that draw them
   'rarity.ts': [],
   // every colour of the world, named once: a leaf, for what draws the world and for the ships' colours (play/colours.ts)

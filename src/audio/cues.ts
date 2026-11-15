@@ -100,5 +100,9 @@ export function cueOf(h: Happening, own: number | null): Cue | null {
     case 'took': return !hers ? null : isGun(h.piece) ? 'swap' : 'took';
     case 'mended': return !hers ? null : h.piece === 'smallShield' || h.piece === 'bigShield' ? 'mendWard' : 'mendHull';
     case 'gust': return hers ? 'gust' : null;
+    // her parts: one failing breaks like her ward, one repaired mends like her hull; her flight come rings ready
+    case 'faulted': return hers ? 'shatter' : null;
+    case 'repaired': return hers ? 'mendHull' : null;
+    case 'flight': return hers && h.job === null ? 'ready' : null;
   }
 }

@@ -51,6 +51,16 @@ test('a race run whole: over with one side afloat, every ship placed once, the h
   assert.deepEqual(runRace(c, planet, waters), r, 'the same card, the same result');
 });
 
+test("a race's parts fail and its flights work (#58 steps 7, 8): the faults and stops in the result, the same twice", () => {
+  // parts worn and unreliable, so some fail within the race
+  const c = card(31, (k) => ({ ...k, ships: k.ships.map((s) => ({ ...s, parts: s.parts.map((p) => ({ ...p, reliability: 0.3, condition: 0.72 })) })) }));
+  const r = runRace(c, planet, waters);
+  assert.ok(r.faults.length > 0, 'parts failed');
+  assert.ok(r.faults.every((f) => f.id >= 0 && f.id < c.ships.length && f.second >= 0 && f.second <= r.seconds));
+  assert.ok(r.stops.length > 0, `${r.stops.length} jobs begun by the flights`);
+  assert.deepEqual(runRace(c, planet, waters), r, 'the same card, the same result');
+});
+
 test('the live path, on a wavy sea with her helm in hand, ends as runRace does with her helm replayed', () => {
   const c = card(47);
   // a sea that heaves and rolls (no rule reads it: it only lifts the ships as drawn)

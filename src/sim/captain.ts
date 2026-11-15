@@ -15,6 +15,7 @@ import type { Chart, Route } from './route.ts';
 import type { Depth } from './shoal.ts';
 import type { Storm } from './storm.ts';
 import { temper, type Temper } from './temper.ts';
+import type { Call, Service, Stance } from '../race.ts';
 import type { Crew } from './battle.ts';
 import type { Loot } from './loot.ts';
 import type { Holdings } from './claimer.ts';
@@ -95,8 +96,12 @@ export const BOT = {
 /** A ship as a bot sees her: who she is, how she sails, the shove she is carried on by, her hull and shield (health.ts;
  *  whole and none when not given), whether she carries a gun, her handling (fit.ts; the tables' when not given) and
  *  her side (contact.ts Vessel; her own when not given); and her own, what she carries (battle.ts Crew: her hold and
- *  gust), without which she pays her stores no heed. */
-export interface Seen { id: number; ship: ShipState; shove?: Vec3; hull?: number; shield?: number; armed?: boolean; fit?: Handling; side?: number; crew?: Crew }
+ *  gust), without which she pays her stores no heed, her parts failed (wear.ts) and whether her flight is with her or
+ *  coming (flight.ts). */
+export interface Seen {
+  id: number; ship: ShipState; shove?: Vec3; hull?: number; shield?: number; armed?: boolean; fit?: Handling; side?: number; crew?: Crew;
+  faults?: number; served?: boolean;
+}
 
 /** A ship's handling as a bot sees her. */
 export const fitOf = (s: Seen): Handling => s.fit ?? SPEC;
@@ -109,7 +114,7 @@ export const mates = (a: Seen, b: Seen) => a.id !== b.id && (a.side ?? a.id) ===
  *  the loot on the water (loot.ts); and who holds it (territory.ts), without which she claims none. */
 export interface Sea { depth: Depth; chart?: Chart | null; storm?: Storm | null; loot?: readonly Loot[]; holdings?: Holdings | null }
 
-export type Mode = 'roam' | 'fight' | 'flee' | 'storm' | 'heal' | 'loot' | 'claim' | 'home' | 'cut';
+export type Mode = 'roam' | 'fight' | 'flee' | 'storm' | 'heal' | 'loot' | 'claim' | 'home' | 'cut' | 'service' | 'shadow' | 'attack' | 'hold';
 
 /** What a bot carries from one step to the next, her gunnery's with it. */
 export interface Memory extends Gunner {
@@ -153,13 +158,21 @@ export interface Memory extends Gunner {
   bite: Vec3[] | null;
   leg: number;
   rested: number;
+  /** A call from ship one (crewmate.ts): the last she was given (its seq), the call she obeys and the ship it names (an
+   *  attack's), the clock she notices it at and the clock it lapses at. */
+  heard: number;
+  call: Call | null;
+  callFor: number;
+  callFrom: number;
+  callTo: number;
 }
 
 /** A new mind for a ship at `at`, by her seed. Bots think on different steps, by their seeds. */
 export const mind = (seed: number, at: Vec3): Memory => ({
   rand: (seed * 0x9e3779b1) >>> 0, clock: 0, think: 1 + (seed >>> 0) % BOT.every, mode: 'roam', since: 0, goal: at,
   foe: -1, seen: -Infinity, last: at, hitBy: -1, hitT: -Infinity, shotBy: -1, shotT: -Infinity, avoid: 0, backT: 0, stuckT: 0, strafe: 1, recoil: 0, was: at,
-  route: null, loot: -1, target: -1, lootT: 0, shun: -1, haven: at, bite: null, leg: 0, rested: 0, ...gunner(),
+  route: null, loot: -1, target: -1, lootT: 0, shun: -1, haven: at, bite: null, leg: 0, rested: 0,
+  heard: 0, call: null, callFor: -1, callFrom: Infinity, callTo: -Infinity, ...gunner(),
 });
 
 /** Her memory once `by` has rammed her (the game tells her, from contact.ts's blows). */
@@ -168,9 +181,15 @@ export const rammed = (m: Memory, by: number): Memory => ({ ...m, hitBy: by, hit
 /** Her memory once a ball of `by`'s has struck her (the game tells her, from battle.ts's strikes that aren't rams). */
 export const shot = (m: Memory, by: number): Memory => ({ ...m, shotBy: by, shotT: m.clock });
 
+/** What her side's first ship asks of her, as plain input like a helm (#58 section 8.2; play/ passes it each step):
+ *  who leads her side (ship one), the ship ship one fights (her aim, or last aim; −1 none), and the last call given her,
+ *  numbered (`seq`, from 1; 0 none), with the ship ship one fought when it was given. */
+export interface Lead { id: number; target: number; call: Call | null; seq: number; at: number }
+
 /** What a bot sails by: her seed, for good, and her temperament (temper.ts: `temper(seed)`, or her card's captain's
- *  `temperOf`, made at launch and refreshed by the match's clock). */
-export interface Hand { seed: number; t: Temper }
+ *  `temperOf`, made at launch and refreshed by the match's clock); and, in a race, her captain's Nerve (0–20), what her
+ *  flight can do (race.ts Service; none: she has none), her stance (crewmate.ts) and her lead (a crewmate's). */
+export interface Hand { seed: number; t: Temper; nerve?: number; service?: Service; stance?: Stance; lead?: Lead }
 
 /** What a temper by her seed alone sails by (a card-less bot's). */
 export const byTemper = (seed: number): Hand => ({ seed, t: temper(seed) });

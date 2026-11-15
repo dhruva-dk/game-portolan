@@ -17,6 +17,7 @@ import { HOTBAR, LIFT, type Deed, type Moment } from '../player.ts';
 import { R, add, length, normalize, scale, type Vec3 } from '../world/sphere.ts';
 import { inverse, rotate } from '../world/turn.ts';
 import { onScreen } from './lens.ts';
+import type { Kept } from './upkeep.ts';
 
 /** Seconds of deeds the match keeps, on the world's clock. */
 export const KEEP = 1;
@@ -33,6 +34,7 @@ export interface Done {
   took: readonly Taken[];
   mended: readonly Mended[];
   blew: readonly number[];
+  kept: readonly Kept[];
   her: Vec3 | null;
 }
 
@@ -62,6 +64,11 @@ export function deedsOf(done: Done, me: number, next: () => number, time: number
   if (!her) return out;
   for (const m of done.mended) if (m.ship === me) out.push({ seq: next(), time, at: her, ship: me, kind: 'mended', piece: m.use });
   if (done.blew.includes(me)) out.push({ seq: next(), time, at: her, ship: me, kind: 'gust' });
+  // her parts and her crewmate's, her flight (upkeep.ts)
+  for (const k of done.kept) {
+    if (k.kind === 'flight' ? k.id !== me : k.id >> 1 !== me >> 1) continue;
+    out.push({ seq: next(), time, at: her, ship: k.id, ...(k.kind === 'flight' ? { kind: 'flight', job: k.job, botched: k.botched } : { kind: k.kind, part: k.part }) });
+  }
   return out;
 }
 

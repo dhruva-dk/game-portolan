@@ -2,7 +2,8 @@
 // landed on another and taken, and her share of the sea as she last held it afloat; then, once it is over, the
 // finishing order. The order (#58): the ships afloat at the end first, by the sinkings credited to each, then her own
 // share of the sea, then the lower id; then the sunk, the last sunk highest (a forfeit, sunk at second 0, so last).
-// A ram is no ball: it counts in none of the hits. Faults and the flight's stops are steps 7 and 8's.
+// A ram is no ball: it counts in none of the hits. Faults and the flight's stops are kept by upkeep.ts, and state.ts
+// adds them to the result.
 
 import type { Cause, RaceCard, RaceResult } from '../race.ts';
 import type { Shot, Strike } from '../sim/battle.ts';
