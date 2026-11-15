@@ -1,7 +1,9 @@
 // Over the rookery's view (play/rookery.ts): a paper slip over each building under way, its days left in the italic
-// numerals, ruled under in gold; and the tap that picks a building, the nearest of their anchors within PICK px.
+// numerals, ruled under in gold, slips that would overlap stacked (settled); and the tap that picks a building, the
+// nearest of their anchors within PICK px.
 
 import { FIGURES, INK, PAPER } from './ink';
+import { settled, slipWidth } from './stack';
 
 /** How far from a building's anchor a tap still picks it, CSS px. */
 export const PICK = 60;
@@ -46,12 +48,17 @@ export function createRookeryLabels(layer: HTMLElement) {
   return {
     /** This frame's slips: over each building under way, its days left (none: the rookery not shown). */
     update(labels: readonly { x: number; y: number; days: number }[] | null) {
+      const texts = (labels ?? []).map((l) => {
+        const days = Math.max(0, Math.ceil(l.days));
+        return days === 1 ? '1 day' : `${days} days`;
+      });
+      const at = settled((labels ?? []).map((l, i) => ({ x: l.x, y: l.y, w: slipWidth(texts[i]) })), root.clientWidth || Infinity);
       let n = 0;
-      for (const l of labels ?? []) {
-        const el = slip(n++), days = Math.max(0, Math.ceil(l.days)), text = days === 1 ? '1 day' : `${days} days`;
-        if (el.textContent !== text) el.textContent = text;
-        el.style.left = `${l.x.toFixed(0)}px`;
-        el.style.top = `${l.y.toFixed(0)}px`;
+      for (const [i, p] of at.entries()) {
+        const el = slip(n++);
+        if (el.textContent !== texts[i]) el.textContent = texts[i];
+        el.style.left = `${p.x.toFixed(0)}px`;
+        el.style.top = `${p.y.toFixed(0)}px`;
         el.style.display = '';
       }
       for (let i = n; i < slips.length; i++) slips[i].style.display = 'none';
