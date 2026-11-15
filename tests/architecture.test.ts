@@ -195,7 +195,9 @@ test('f2. the frame draws a snapshot: it alone makes the camera, works out the e
   none(hits(/\btypeof\s+createFrame\b/, notFrame), 'the frame\'s type named outside src/frame.ts');
   // what the rest of the game may ask of the frame: no camera, scene, sky, fleet or gunfire of its to reach into
   const caller = (rel: string) => rel === 'main.ts' || rel === 'debug.ts' || rel.startsWith('play/') || rel.startsWith('ui/');
-  none(hits(/\bframe\s*\??\.\s*(?!(resize|render|ready|anchors)\b)\w/, caller), 'frame.<x> other than resize, render, ready and anchors');
+  // (dispose: a new planet per race (#58 step 9) frees the old frame's GPU work whole before the next is built; it
+  // reaches into nothing, and the frame alone knows what it made)
+  none(hits(/\bframe\s*\??\.\s*(?!(resize|render|ready|anchors|dispose)\b)\w/, caller), 'frame.<x> other than resize, render, ready, anchors and dispose');
   // the environment is plain data built each frame, written by nobody
   none(hits(/\benv\s*\.\s*\w+\s*(\+|-|\*|\/)?=(?!=)/), 'a write to the environment');
 });

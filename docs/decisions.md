@@ -194,3 +194,35 @@ decisions are in #56, section 2.
   ship, but D39 makes it the crewmate's; appended options scoring zero keep card-less results identical.
 - **Question:** `player.ts` needs the race's part, job and call types (step 8.3). **Choice:** `race.ts` added to
   `player.ts`'s row in tests/architecture.test.ts (types only). **Why:** the HUD names parts and calls as the seam does.
+- **Question:** when a new planet is made (step 9). **Choice:** on the way home from a race (LEAVE, under the parchment
+  that already covers it: `flow` home → `main.ts restage`), so every PLAY is on a planet no race has used; the first
+  race after load is on the planet the page opened on. **Why:** the parchment is the one cover the game has for a
+  change of world, and the ground's bake (some 3–5 s) fits under it; PLAY stays the instant cross-fade it is, and the
+  hitch gate (a fresh lobby's PLAY) measures what it did.
+- **Question:** the new planet's seed (step 9). **Choice:** `hash(first, n) % 2^20` (world/random.ts), `first` the
+  page's planet, `n` the count of planets made since load. **Why:** deterministic from a counter, independent of the
+  card's dealing; under 2^20 because `noise3.ts` multiplies the seed by 2654435761 and keeps every bit only below 2^53.
+- **Question:** what is made once and what per planet (step 9). **Choice:** per planet: the world, frame, matches,
+  sounding Worker (the last terminated: `watersOf` gains `close`), game, referee and the coasts. Once: renderer,
+  canvas, loop, input, stick, HUD, globe, flow, audio. `main.ts play` keeps the planet's in one `on`; the input, HUD,
+  minimap and globe read it through getters (`createHud`, `createMinimap`, `createGlobe` take `() => Coast[]`; the
+  minimap re-bakes its islands when the list changes), the audio its height through `s.world`. `Stage`'s world,
+  start, anchors, ready and matches and `Played`'s game and referee are getters. The globe is kept, not remade (the
+  brief listed it per planet): it holds DOM and listeners, and reads only the coasts. **Why:** nothing made once
+  holds a planet, and no module-level variable holds one.
+- **Question:** freeing the frame (step 9). **Choice:** every system gets `dispose()` through three's public dispose
+  methods (`gpu.ts release`: geometries, materials, InstancedMesh, textures, render targets, storage attributes, compute
+  nodes, RTT and pass nodes, RenderPipeline); `frame.dispose` calls them, allowed by architecture test f2. Three
+  things needed care: three's backdrop sphere for `scene.backgroundNode` is freed by disposing that node
+  (`sky.dispose`); `fxaa` makes its input's RTT itself, so the frame makes it (`convertToTexture`) and frees it; and a
+  viewport depth or colour node keeps a copy of its texture for each target drawn into, so the sea reads one node of
+  each (`.sample(uv)`, three copying each once a frame where it had copied depth three times) and frees each copy by
+  `getTextureForReference(target).dispose()` for the eyes' scene targets and the canvas's. After `frame.dispose`
+  three holds 0 textures and 1 geometry (its shared quad). Nothing three keeps was beyond its public interface, so no
+  `decision` issue was opened.
+- **Question:** what tools/restage.ts judges (step 9). **Choice:** ten restages onto one seed (the page's own;
+  `--fresh` for the game's own next planets, whose geometries differ by their islands), each drawn 2 s; geometries,
+  textures and the heap less V8's compiled code (a heap snapshot's `code` nodes) within 5% from the first to the tenth.
+  **Why:** the heap as V8 reports it grows some 0.3 MB a restage, all of it compiled code (machine code, feedback
+  vectors, inline-cache handlers) as the game's code warms; the objects the page keeps grow some 17 KB a restage
+  (0.4% over ten). Both are printed.

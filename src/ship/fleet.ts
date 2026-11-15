@@ -25,7 +25,7 @@ import {
   Mesh, Sphere, Vector3, type Material,
 } from 'three/webgpu';
 import { uniform } from 'three/tsl';
-import type { Compute } from '../gpu';
+import { release, type Compute } from '../gpu';
 import type { Look } from '../snapshot';
 import type { Light } from '../sky/light';
 import type { Eye } from '../view/view';
@@ -183,6 +183,11 @@ export function createFleet(light: Light, wind: Wind, capacity: number) {
     meshes,
     set,
     update,
+    /** Frees every level's draws and the cloth. */
+    dispose() {
+      release(...meshes);
+      cloth.dispose();
+    },
     /** Ship i is the player's own (or none, for null): she is always drawn at the finest level. */
     own(i: number | null) { own = i ?? -1; },
     /** Ship i is gone: not drawn till she is set again. */

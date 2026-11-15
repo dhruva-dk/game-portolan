@@ -11,6 +11,7 @@ import {
   MeshBasicNodeMaterial,
 } from 'three/webgpu';
 import { Fn, attribute, cross, normalize, varying } from 'three/tsl';
+import { release } from '../gpu';
 import { KINDS, gunOrder, type GunKind } from '../kinds';
 import type { Light } from '../sky/light';
 import type { ShipDraw } from '../snapshot';
@@ -62,6 +63,7 @@ export function createArms(light: Light, capacity: number) {
 
   return {
     meshes: drawn.map((d) => d.mesh),
+    dispose: () => release(...drawn.map((d) => d.mesh)),
     /** Each frame: the ships drawn, and where the eye is. */
     update(ships: readonly ShipDraw[], eye: Vec3) {
       filled.fill(0);

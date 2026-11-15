@@ -223,5 +223,9 @@ export function createClaims(ships: number) {
         if (id + 1 < values.length) values[id + 1].set(c[0], c[1], c[2], id === own ? OWN_LINE : 1);
       });
     },
+    dispose() {
+      cellsAttr.dispose();
+      revealAttr.dispose();
+    },
   };
 }

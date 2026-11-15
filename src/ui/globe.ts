@@ -98,7 +98,8 @@ function project(e: Eye, q: Vec3): { x: number; y: number; facing: number } {
   return { x: e.cx + (e.f * dot(v, e.right)) / z, y: e.cy - (e.f * dot(v, e.up)) / z, facing: dot(u, e.c) * e.d - 1 };
 }
 
-export function createGlobe(coasts: readonly Coast[]) {
+/** coasts: the planet's now (a new planet's each race: main.ts). */
+export function createGlobe(coasts: () => readonly Coast[]) {
   const root = document.createElement('div');
   root.className = 'screen press';
   // over the HUD; touches are the map's, not the page's
@@ -236,7 +237,7 @@ export function createGlobe(coasts: readonly Coast[]) {
     ctx.strokeStyle = INK.iron;
     ctx.globalAlpha = 0.55;
     ctx.lineWidth = 1;
-    for (const coast of coasts) {
+    for (const coast of coasts()) {
       if (dot(coast.centre, e.c) * e.d < 0.9) continue;
       trace(e, coast.ring, true);
       ctx.stroke();

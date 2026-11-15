@@ -223,6 +223,14 @@ export function createSky(view: View, bolt: boolean) {
     deck: (color: Vec3Node, dir: Vec3Node, metres: FloatNode): Vec3Node => storm.deck(color, dir, metres, stormLight),
     /** The clouds' patterns' passes, to be run once before the first frame. */
     bake: clouds.bake,
+    /** Frees the air's tables, the clouds and the reflection (the storm holds only uniforms); and the backdrop three
+     *  draws behind a scene for `background` (its sphere freed as the node is: Node.dispose). */
+    dispose() {
+      background.dispose();
+      tables.dispose();
+      clouds.dispose();
+      reflection.dispose();
+    },
     /**
      * Readies the sky for this frame, seen from the eye (view.ts, already moved), and returns the passes due from each
      * part of it. An eye in space sees the clouds from outside: they are neither marched nor moved on (their history

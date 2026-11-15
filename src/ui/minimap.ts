@@ -46,8 +46,8 @@ export interface More {
 /** An arrowhead's path, its tip `l` up from (0, 0). */
 const head = (l: number) => `M0 ${-l}L${l * 0.62} ${l * 0.7}L0 ${l * 0.32}L${-l * 0.62} ${l * 0.7}Z`;
 
-/** size: the disc's diameter, CSS px. */
-export function createMinimap(host: HTMLElement, size: number, coasts: readonly Coast[]) {
+/** size: the disc's diameter, CSS px; coasts: the planet's now (a new planet's each race: main.ts). */
+export function createMinimap(host: HTMLElement, size: number, coasts: () => readonly Coast[]) {
   const r = size / 2, inner = r - 8;
   host.style.width = host.style.height = `${size}px`;
   // the brass rim, graduated, and the paper under the sea
@@ -74,15 +74,25 @@ export function createMinimap(host: HTMLElement, size: number, coasts: readonly 
   const her = over.querySelector('#her')!;
   const ctx = canvas.getContext('2d')!;
   const held = createHeld(SPAN * 1.15);
-  const isles = new Map<Coast, Isle>();
+  let isles = new Map<Coast, Isle>(), baking: readonly Coast[] = [];
   // every island baked one at a time while the page is idle, so none is baked mid-match as she nears it
-  const bake = (i: number) => {
-    const coast = coasts[i];
-    if (!coast) return;
+  const bake = (of: readonly Coast[], i: number) => {
+    const coast = of[i];
+    if (!coast || of !== baking) return;
     if (!isles.has(coast)) isles.set(coast, bakeIsle(coast.site));
-    setTimeout(() => bake(i + 1), 0);
+    setTimeout(() => bake(of, i + 1), 0);
   };
-  bake(0);
+  /** The planet's coasts now: a new planet's baked afresh, the last one's let go. */
+  const current = () => {
+    const now = coasts();
+    if (now !== baking) {
+      baking = now;
+      isles = new Map();
+      bake(now, 0);
+    }
+    return now;
+  };
+  current();
   const rings = new Map<string, Vec3[]>();
   const ringOf = (s: Storm) => {
     const key = `${s.centre.join()}|${s.radius}`;
@@ -223,7 +233,7 @@ export function createMinimap(host: HTMLElement, size: number, coasts: readonly 
   /** The islands near her: each baked the first time it comes near, laid on its own chart, its coast inked. */
   function islands(lay: (o: Vec3, e: Vec3, n: Vec3, w: number, h: number, m: number) => void,
     trace: (ring: readonly Vec3[], closed: boolean) => void, near: (q: Vec3, reach: number) => boolean) {
-    for (const coast of coasts) {
+    for (const coast of current()) {
       if (!near(coast.centre, SPAN * 1.45 + coast.site.shelf)) continue;
       let isle = isles.get(coast);
       if (!isle) isles.set(coast, (isle = bakeIsle(coast.site)));

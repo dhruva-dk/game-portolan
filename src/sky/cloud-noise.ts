@@ -9,7 +9,7 @@ import {
   Fn, clamp, dot, float, floor, fract, instanceIndex, length, max, min, mix, mod, normalize, select, sin, smoothstep,
   textureStore, uvec2, uvec3, vec2, vec3, vec4,
 } from 'three/tsl';
-import type { Compute } from '../gpu';
+import { release, type Compute } from '../gpu';
 import type { FloatNode, Vec2Node, Vec3Node } from '../tsl';
 
 const SHAPE_N = 64, DETAIL_N = 64, WEATHER_N = 1024;
@@ -147,5 +147,5 @@ export function createCloudNoise() {
   weather.type = HalfFloatType;
   weather.generateMipmaps = false;
   const bake: Compute[] = [shapeKernel(shape), detailKernel(detail), weatherKernel(weather)];
-  return { shape, detail, weather, bake };
+  return { shape, detail, weather, bake, dispose: () => release(shape, detail, weather, ...bake.flat()) };
 }

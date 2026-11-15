@@ -92,6 +92,10 @@ export function createShafts(scene: TextureNode, depth: TextureNode) {
       thinning.value = THIN / loose;
       strength.value = facing <= 0 ? 0 : amount * Math.min(1, facing * 3) * Math.exp(-off * OFF_FADE);
     },
+    /** Frees its three passes' targets (three's RTTNode dispose). */
+    dispose() {
+      for (const t of [first, second, shafts]) t.dispose();
+    },
   };
 }
 

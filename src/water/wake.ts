@@ -50,7 +50,7 @@ import {
   step, texture, uniform, vec2, vec3, vec4,
 } from 'three/tsl';
 import type { Environment } from '../environment';
-import type { Draw } from '../gpu';
+import { release, type Draw } from '../gpu';
 import { PIVOT_Z, buildShip } from '../ship/build';
 import { THROUGH } from '../ship/materials';
 import { WATERLINE } from '../ship/waterline';
@@ -426,5 +426,6 @@ export function createWake(view: View, sky: Sky, capacity: number) {
       live.value = near > 0 ? 1 : 0;
       return near > 0 ? draw : null;
     },
+    dispose: () => release(scene, target),
   };
 }

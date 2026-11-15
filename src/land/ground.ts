@@ -31,6 +31,8 @@ export interface Ground {
   normal(p: Vec3Node): Vec3Node;
   /** Resolves once the faces are baked and uploaded; how long the bake took, ms. */
   ready: Promise<number>;
+  /** Frees the faces (and stops a bake still under way). */
+  dispose(): void;
 }
 
 function layers(data: Uint16Array | Uint8Array, rgba: boolean) {
@@ -83,5 +85,10 @@ export function createGround(seed: number): Ground {
       return normalize(u.sub(t1.mul(d1)).sub(t2.mul(d2)));
     },
     ready,
+    dispose() {
+      worker.terminate();
+      heights.dispose();
+      covers.dispose();
+    },
   };
 }

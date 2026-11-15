@@ -1,5 +1,6 @@
-// The page: the world built once and the frame that draws it (stage), the game on it with the UI over it (play), and
-// a frame drawn each time the screen is ready for one. How it is set up is the release's (RELEASE), and it opens at the
+// The page: the world and the frame that draws it (stage), the game on it with the UI over it (play), and a frame drawn
+// each time the screen is ready for one; on each way home from a race a new planet made in the old one's place
+// (restage), the renderer, the UI and the sound made once and kept. How it is set up is the release's (RELEASE), and it opens at the
 // title; only the page's debug switches change either (debug.ts scenario, the one way in).
 
 import { WebGPUCoordinateSystem, WebGPURenderer } from 'three/webgpu';
@@ -22,6 +23,7 @@ import { createInput } from './ui/input';
 import { createStick } from './ui/stick';
 import { uiLayer } from './ui/ui';
 import { SEED } from './world/planet';
+import { hash } from './world/random';
 import { MEAN, SWING } from './world/weather';
 
 /** The release's setup. The frame is made once for the most ships a match puts to sea (SHIPS, a race card's eighty);
@@ -34,7 +36,15 @@ const RELEASE: Setup = {
 
 const meterEl = document.getElementById('meter')!;
 
-/** The world built on a setup, the frame that draws it, and the matches dealt on it. */
+/** A planet of `seed` on a setup: its world, the frame that draws it, where she lies at the start, the matches dealt on
+ *  it. */
+function planetOf(renderer: WebGPURenderer, setup: Setup, seed: number) {
+  const world = createWorld(seed, setup.mean, setup.swing, setup.hours);
+  const frame = createFrame(renderer, world, setup.drawing);
+  return { world, frame, start: startOf(world.planet), matches: createMatches(seed, world.planet, setup.hold, setup.gun) };
+}
+
+/** The renderer, made once; on it the planet of the setup's seed, and each one after it in its place (restage). */
 async function stage(setup: Setup): Promise<Stage> {
   if (!navigator.gpu) {
     meterEl.textContent = 'no WebGPU';
@@ -50,20 +60,36 @@ async function stage(setup: Setup): Promise<Stage> {
     throw new Error('WebGPU unavailable: three fell back to WebGL');
   }
 
-  // The world, built once and handed to the frame that draws it and the game that runs on it.
-  const world = createWorld(setup.seed, setup.mean, setup.swing, setup.hours);
-  const frame = createFrame(renderer, world, setup.drawing);
+  // The world, handed to the frame that draws it and the game that runs on it; a new one each race (restage). While
+  // one is put away and the next made, nothing is drawn (held).
+  let planet = planetOf(renderer, setup, setup.seed), held = false;
   const meter = setup.meter ? createMeter(renderer, meterEl) : null;
 
   return {
-    world, start: startOf(world.planet), canvas: renderer.domElement, anchors: frame.anchors, ready: frame.ready,
-    matches: createMatches(setup.seed, world.planet, setup.hold, setup.gun),
+    get world() { return planet.world; },
+    get start() { return planet.start; },
+    get anchors() { return planet.frame.anchors; },
+    get ready() { return planet.frame.ready; },
+    get matches() { return planet.matches; },
+    canvas: renderer.domElement,
+    memory: () => ({ geometries: renderer.info.memory.geometries, textures: renderer.info.memory.textures }),
+    async restage(seed: number, then: () => Promise<void>) {
+      held = true;
+      planet.frame.dispose();
+      planet = planetOf(renderer, setup, seed);
+      await then();
+      console.info(`planet ${seed}: ground baked in ${(await planet.frame.ready).toFixed(0)} ms`);
+      planet.frame.resize(innerWidth, innerHeight);
+      held = false;
+    },
     async draw(next: (dt: number) => Snapshot, drawn?: (canvas: HTMLCanvasElement) => void) {
-      console.info(`ground baked in ${(await frame.ready).toFixed(0)} ms`);
-      frame.resize(innerWidth, innerHeight);
-      addEventListener('resize', () => frame.resize(innerWidth, innerHeight));
+      console.info(`ground baked in ${(await planet.frame.ready).toFixed(0)} ms`);
+      planet.frame.resize(innerWidth, innerHeight);
+      addEventListener('resize', () => held || planet.frame.resize(innerWidth, innerHeight));
       let last = performance.now();
       renderer.setAnimationLoop(() => {
+        if (held) return;
+        const frame = planet.frame;
         const now = performance.now();
         const dt = Math.min((now - last) / 1000, 0.1);
         last = now;
@@ -77,54 +103,69 @@ async function stage(setup: Setup): Promise<Stage> {
   };
 }
 
-/** The game on the stage, opening on the lobby's quiet sea, and its UI over the world, at the title. */
-async function play(s: Stage): Promise<Played> {
-  // the water sounded, for the bots' routes round land (sim/route.ts) and the ships' berths (sim/spawn.ts): in a
-  // worker while the ground's bakes in another (frame.ready), in a fraction of its time
-  const { waters, ms, berth } = await watersOf(s.world.seed);
+/** The game on the stage's planet, at anchor in the lobby's quiet sea: the water sounded, for the bots' routes round land
+ *  (sim/route.ts) and the ships' berths (sim/spawn.ts), in a worker while the ground's bakes in another (frame.ready),
+ *  in a fraction of its time, and kept to berth each match ahead of PLAY; the referee; the coasts for the maps. */
+async function gameOn(s: Stage) {
+  const { waters, ms, berth, close } = await watersOf(s.world.seed);
   console.info(`water sounded in ${ms.toFixed(0)} ms`);
-  // (each match's berths worked out in that worker ahead of PLAY)
   s.matches.berthBy(berth);
   const game = createGame(s.world, s.anchors, waters, s.start, s.matches.first);
-  const referee = createReferee(game);
+  return { game, referee: createReferee(game), coasts: traceCoasts(s.world.planet.islands), close };
+}
+
+/** The game on the stage, opening on the lobby's quiet sea, and its UI over the world, at the title. Each way home
+ *  from a race puts the planet away under the parchment and makes the next (its seed the first's hashed with the count
+ *  of planets: the first race is on the planet the page opened on); what is made once reads the planet's through `on`. */
+async function play(s: Stage): Promise<Played> {
+  let on = await gameOn(s), planets = 0;
+  const first = s.world.seed;
+  // (under 2^20: the noise's seeding multiplies it, world/noise3.ts, and keeps every bit only below 2^53)
+  const restage = (seed = hash(first, ++planets) % 2 ** 20) => s.restage(seed, async () => {
+    on.close();
+    on = await gameOn(s);
+  });
 
   // Her hands on the canvas, the stick drawn under the UI; the match's HUD over the world, fed by the game.
-  const input = createInput(s.canvas, () => game.steering());
+  const input = createInput(s.canvas, () => on.game.steering());
   const layer = uiLayer();
   const stick = createStick(layer);
-  const coasts = traceCoasts(s.world.planet.islands);
-  const globe = createGlobe(coasts);
-  const hudState = (): HudState => ({ ...game.status(s.canvas.clientWidth, s.canvas.clientHeight), ...game.kit() });
+  const globe = createGlobe(() => on.coasts);
+  const hudState = (): HudState => ({ ...on.game.status(s.canvas.clientWidth, s.canvas.clientHeight), ...on.game.kit() });
   const map = () => globe.show(hudState());
-  const hud = createHud(layer, coasts, { slot: input.tap, gust: input.gust, fire: input.fire, map, flight: input.flight, call: input.call });
+  const hud = createHud(layer, () => on.coasts, { slot: input.tap, gust: input.gust, fire: input.fire, map, flight: input.flight, call: input.call });
   // the sound, begun on her first touch; a tick for each tap on something of the UI's
-  const audio = createAudio(s.world.planet.height);
+  const audio = createAudio((p) => s.world.planet.height(p));
   layer.addEventListener('pointerdown', (e) => {
     if (e.target instanceof Element && e.target.closest('.press')) audio.tap(flow.screen);
   }, true);
   const deal = () => {
-    game.start(s.matches.deal());
-    referee.begin();
+    on.game.start(s.matches.deal());
+    on.referee.begin();
   };
   const flow = createFlow(hud, globe, 'title', {
     play: deal,
     home() {
-      referee.end();
-      game.anchor();
+      on.referee.end();
+      // (drawn again, the new planet's lobby, once its ground is baked: the parchment lifts after its first frames)
+      void restage();
     },
-    watch: () => referee.watch(),
-    switch: (by) => referee.switch(by),
-    skip: () => referee.skip(),
+    watch: () => on.referee.watch(),
+    switch: (by) => on.referee.switch(by),
+    skip: () => on.referee.skip(),
   });
   void s.ready.then(() => flow.ready());
 
   return {
-    game, referee, flow, play: deal, map,
+    get game() { return on.game; },
+    get referee() { return on.referee; },
+    flow, play: deal, map, restage,
     // the full map just opened, or a cross-fade waiting, holds the game's frame the moment it is drawn; the way home
     // counts the lobby's frames
     drawn: (canvas) => flow.drawn(canvas),
     next(dt: number): Snapshot {
       const hands = input.read();
+      const { game, referee } = on;
       stick(game.steering() ? hands.stick : null);
       game.step(dt, hands);
       // her end, sunk or won, as the screens follow it

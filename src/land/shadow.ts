@@ -13,7 +13,7 @@ import {
   OrthographicCamera, RedFormat, RenderTarget, Scene, Vector3, WebGPUCoordinateSystem,
 } from 'three/webgpu';
 import { float, select, texture, uniform, vec2, vec3, vec4 } from 'three/tsl';
-import type { Draw } from '../gpu';
+import { release, type Draw } from '../gpu';
 import type { IslandSite } from '../world/planet';
 import { place } from '../world/sphere';
 import type { Instances } from './site';
@@ -40,6 +40,8 @@ export interface Shadow {
   /** The map's draw if it is due: if the sun has moved or the island has changed (sun: unit vector toward it; island:
    * the nearest in view, or null); else null. */
   update(sun: Vector3, island: IslandSite | null): Draw | null;
+  /** Frees the map and its stand-ins (the casters' own meshes are their makers'). */
+  dispose(): void;
 }
 
 export function createShadow(): Shadow {
@@ -109,5 +111,6 @@ export function createShadow(): Shadow {
       matrix.value.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
       return draw;
     },
+    dispose: () => release(scene, target),
   };
 }

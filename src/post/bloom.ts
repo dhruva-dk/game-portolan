@@ -27,8 +27,9 @@ const four = (t: TextureNode, spread: number, karis: boolean): Vec4Node => {
   return vec4(sum.div(w[0].add(w[1]).add(w[2]).add(w[3])), 1);
 };
 
-/** The bloom of `scene` (the frame's linear light, full size) at `gain` (the exposure, a factor on that light). */
-export function bloom(scene: TextureNode, gain: FloatNode): TextureNode {
+/** The bloom of `scene` (the frame's linear light, full size) at `gain` (the exposure, a factor on that light): its
+ *  glow, and the freeing of its passes' targets (three's RTTNode dispose). */
+export function bloom(scene: TextureNode, gain: FloatNode): { glow: TextureNode; dispose(): void } {
   const knee = Fn(() => {
     const c = four(scene, 1 / 4, true).rgb;
     const y = luminance(c).mul(gain);
@@ -38,8 +39,13 @@ export function bloom(scene: TextureNode, gain: FloatNode): TextureNode {
   const d1 = q(knee, 1 / 4), d2 = q(four(d1, 1 / 2, false), 1 / 8), d3 = q(four(d2, 1 / 2, false), 1 / 16), d4 = q(four(d3, 1 / 2, false), 1 / 32);
   const up = (low: TextureNode, same: TextureNode, scale: number) =>
     q(vec4(four(low, 1, false).rgb.add(same.sample(uv()).rgb), 1), scale);
-  const u3 = up(d4, d3, 1 / 16), u2 = up(u3, d2, 1 / 8);
-  return up(u2, d1, 1 / 4);
+  const u3 = up(d4, d3, 1 / 16), u2 = up(u3, d2, 1 / 8), u1 = up(u2, d1, 1 / 4);
+  return {
+    glow: u1,
+    dispose() {
+      for (const t of [d1, d2, d3, d4, u3, u2, u1]) t.dispose();
+    },
+  };
 }
 
 /** The bloom's levels, summed in what bloom() gives: divide by this for their mean. */

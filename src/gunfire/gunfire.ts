@@ -32,6 +32,7 @@ import {
 import {
   Fn, abs, atan, attribute, cameraPosition, cos, cross, exp, float, max, mix, normalize, pow, select, sin, smoothstep, uniform, varying, vec3,
 } from 'three/tsl';
+import { release } from '../gpu';
 import { KINDS, gunOrder, type GunKind } from '../kinds';
 import { DUST, FOAM, SMOKE, SOOT, TIMBER } from '../palette';
 import type { Light } from '../sky/light';
@@ -292,6 +293,7 @@ export function createGunfire(light: Light) {
 
   return {
     meshes: [balls.mesh, balls.tracer, marks.mesh, puffs.mesh],
+    dispose: () => release(balls.mesh, balls.tracer, marks.mesh, puffs.mesh),
     /** A gun of `gun` fired at `time` (the world's clock, s) from `from` (metres, from the centre) along `dir` (unit):
      *  the cannon's flash and bank of smoke; the scatter's wide burst; the repeater's small quick flash and a wisp; the
      *  harpoon's no fire, a kick of dust off its stock; the mortar's flash and a great bank thrown up. */

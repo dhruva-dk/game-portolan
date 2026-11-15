@@ -14,7 +14,7 @@ import {
   Fn, If, abs, clamp, dot, float, floor, fract, instanceIndex, int, ivec2, max, min, mix, normalize, select,
   smoothstep, texture, textureLoad, textureStore, uniform, uvec2, vec2, vec3, vec4,
 } from 'three/tsl';
-import type { Compute } from '../gpu';
+import { release, type Compute } from '../gpu';
 import type { View } from '../view/view';
 import { createCloudNoise } from './cloud-noise';
 import { BASE, DIFFUSION, SIGMA, TOP, createCloudField, type CloudField } from './cloud-field';
@@ -197,6 +197,7 @@ function createShadow(view: View, field: CloudField) {
   return {
     kernel,
     centre,
+    dispose: () => release(map, kernel),
     /** Fraction of the sun's light the clouds let through to world position p (metres), read where p lies on the eye's chart. */
     at: (p: Vec3Node): FloatNode => {
       const uv = view.local(p).mul(0.001).add(eye.xz).sub(centre.xz).div(SHADOW_EXTENT).add(0.5);
@@ -246,6 +247,12 @@ export function createClouds(view: View, tables: Tables) {
     bake: noise.bake,
     /** Their Perlin-Worley volume (cloud-noise.ts), which the storm's cloud and rain are drawn from too. */
     shape: noise.shape,
+    /** Frees the march's and the shadow's textures and kernels, and the patterns. */
+    dispose() {
+      passes.dispose();
+      shadow.dispose();
+      noise.dispose();
+    },
 
     /** Readies this frame's march, and returns the passes due: the march, its resolve, and every fourth frame the
      * shadow map. */

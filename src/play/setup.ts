@@ -26,9 +26,9 @@ export function startOf(planet: Planet): { at: Vec3; bearing: number } {
 export type Berther = (match: number, count: number) => Promise<Spawn[]>;
 
 /** The water of a planet of this seed as the match reads it (state.ts Waters), sounded in a worker (sounding.ts)
- *  while the ground's bakes in its own (land/bake.ts); the milliseconds the sounding took; and the worker kept to berth
- *  each match on it. */
-export function watersOf(seed: number): Promise<{ waters: Waters; ms: number; berth: Berther }> {
+ *  while the ground's bakes in its own (land/bake.ts); the milliseconds the sounding took; the worker kept to berth
+ *  each match on it; and its ending, once the planet is left (a berth asked of it then is never answered). */
+export function watersOf(seed: number): Promise<{ waters: Waters; ms: number; berth: Berther; close(): void }> {
   const worker = new Worker(new URL('./sounding.ts', import.meta.url), { type: 'module' });
   const asked = new Map<number, (spawns: Spawn[]) => void>();
   const berth: Berther = (match, count) => new Promise((resolve) => {
@@ -45,7 +45,7 @@ export function watersOf(seed: number): Promise<{ waters: Waters; ms: number; be
         return;
       }
       const b = e.data.berths, points = Array.from({ length: b.length / 3 }, (_, i) => vec(b, 3 * i));
-      resolve({ waters: { chart: charted(e.data), water: { points } }, ms: e.data.ms, berth });
+      resolve({ waters: { chart: charted(e.data), water: { points } }, ms: e.data.ms, berth, close: () => worker.terminate() });
     };
     worker.onerror = (e) => reject(new Error(e.message));
     worker.postMessage({ seed });

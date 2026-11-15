@@ -23,6 +23,7 @@ import {
   MeshBasicNodeMaterial, OctahedronGeometry, OneFactor, Vector2,
 } from 'three/webgpu';
 import { Fn, abs, attribute, cameraPosition, clamp, cos, cross, dot, float, max, mix, normalize, pow, select, sin, smoothstep, uniform, varying, vec3 } from 'three/tsl';
+import { release } from '../gpu';
 import { GILDING, GLINT, ICE, TAR, TIMBER } from '../palette';
 import type { Light } from '../sky/light';
 import { GLOW } from '../rarity';
@@ -225,8 +226,10 @@ export function createLoot(light: Light) {
   };
   const shields = (l: LootDraw) => l.kind === 'smallShield' || l.kind === 'bigShield';
 
+  const meshes = [...gunMeshes.map((g) => g.mesh), crystalMesh.mesh, caskMesh.mesh, beamMesh];
   return {
-    meshes: [...gunMeshes.map((g) => g.mesh), crystalMesh.mesh, caskMesh.mesh, beamMesh],
+    meshes,
+    dispose: () => release(...meshes),
     /** Each frame: the world's clock now (s), the pieces near the eye, and where the eye is (those past SHAPE m of it
      *  sent as beams alone). */
     draw(time: number, pieces: readonly LootDraw[], eye: readonly [number, number, number]) {

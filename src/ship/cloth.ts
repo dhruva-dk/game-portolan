@@ -27,7 +27,7 @@ import {
   Fn, If, Return, abs, cos, cross, dot, float, instanceIndex, int, length, max, normalize, select, sin, uniform, uniformArray,
   vec3, vec4, instancedArray,
 } from 'three/tsl';
-import type { Compute } from '../gpu';
+import { release, type Compute } from '../gpu';
 import type { Vec3 } from '../world/sphere';
 import { BERTHS } from './berths';
 import { cutCanvas } from './canvas';
@@ -270,5 +270,7 @@ export function createCloth() {
       live = false;
       return [steps];
     },
+    /** Frees the particles' buffers, the canvas as cut and the kernels. */
+    dispose: () => release(...[X, Vel, P, Nrm, tRest, tGrid, tCell, tMast].map((b) => b.value), predict, solve, normals),
   };
 }

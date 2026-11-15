@@ -28,7 +28,7 @@
 //
 // The light off the water is optics.ts's. Fog and clouds come from the frame's post pass, as for anything solid.
 
-import { DoubleSide, Mesh, MeshBasicNodeMaterial, type Texture } from 'three/webgpu';
+import { DoubleSide, Mesh, MeshBasicNodeMaterial, type CanvasTarget, type RenderTarget, type Texture } from 'three/webgpu';
 import {
   Discard, Fn, If, abs, cameraPosition, cameraProjectionMatrix, cameraProjectionMatrixInverse, cameraViewMatrix, dFdx, dFdy, dot, float,
   getScreenPosition, getViewPosition, length, log2, luminance, max, min, mix, normalize, positionView, positionWorld, saturate,
@@ -37,7 +37,7 @@ import {
 import type { Environment } from '../environment';
 import { LIGHTNING } from '../palette';
 import type { Snapshot } from '../snapshot';
-import type { Compute, Draw } from '../gpu';
+import { release, type Compute, type Draw } from '../gpu';
 import type { Ground } from '../land/ground';
 import type { Sky } from '../sky/sky';
 import { createCharts } from '../view/charts';
@@ -108,6 +108,9 @@ export function createWater(view: View, sky: Sky, ground: Ground, wind: Wind, sh
   const each = LIKENESS_WINDS.flatMap((wind) => CASCADES.map((L, c) => likeness(SIZE, L, { wind, fetch: FETCH }, BANDS[c])));
   const charts = createCharts(CASCADES[0], (x, z) => Math.max(...each.map((f) => Math.abs(f(x, z)))), wind);
   const material = new MeshBasicNodeMaterial();
+  // What is behind the sea, as drawn before it: the frame's depth and colour, each one node sampled wherever it is read,
+  // so three copies each once a frame into one texture of its own for each target drawn into (freed: dispose).
+  const seen = { depth: viewportDepthTexture(), colour: viewportSharedTexture() };
 
   // The water under this vertex at rest, and where the waves have moved it. Each cascade is read at the mip whose
   // texels are as wide as the grid's cell here, so waves too short for the grid to draw average away, not alias.
@@ -243,12 +246,12 @@ export function createWater(view: View, sky: Sky, ground: Ground, wind: Wind, sh
     const off = landed.sub(screenUV);
     const room = mix(screenUV, vec2(1).sub(screenUV), step(0, off));
     const shifted = screenUV.add(off.mul(min(room.div(max(off.abs().mul(2), 1e-6)), 1)));
-    const behindAt = (uv: Vec2Node) => getViewPosition(uv, viewportDepthTexture(uv).x, cameraProjectionMatrixInverse);
+    const behindAt = (uv: Vec2Node) => getViewPosition(uv, seen.depth.sample(uv).x, cameraProjectionMatrixInverse);
     const inFront = behindAt(shifted).z.greaterThan(positionView.z);
     const uv = select(inFront, screenUV, shifted);
-    const depthBehind = viewportDepthTexture(uv).x;
+    const depthBehind = seen.depth.sample(uv).x;
     const path = select(depthBehind.greaterThanEqual(1), float(1e4), length(behindAt(uv).sub(positionView)));
-    const behind = viewportSharedTexture(uv).rgb;
+    const behind = seen.colour.sample(uv).rgb;
 
     // the ships' shadows, the hulls' shade and the wakes' air
     const near = { lit: float(1).sub(wake.shade(positionWorld)), glow: hull.glow, air: max(max(air, bubbles), held.drain.mul(0.6)) };
@@ -313,6 +316,15 @@ export function createWater(view: View, sky: Sky, ground: Ground, wind: Wind, sh
       // past the horizon, as far as a crest could still show over it; the charts that can weigh in out to there
       charts.update(view.eye.position, grid.update(waves.amplitude.value * 2));
       return { waves: swell, wake: marks };
+    },
+    /** Frees the sea, its trails, the waves, the marks' map and who holds the sea; and the copies of what is behind the
+     *  sea made for each of `targets` (the render targets and the canvas's it was drawn into: three keeps one each). */
+    dispose(targets: readonly (RenderTarget | CanvasTarget)[]) {
+      for (const t of targets) for (const n of [seen.depth, seen.colour]) n.getTextureForReference(t).dispose();
+      release(mesh, trails.mesh);
+      waves.dispose();
+      wake.dispose();
+      claims.dispose();
     },
   };
 }

@@ -12,6 +12,7 @@
 
 import { Mesh, MeshBasicNodeMaterial } from 'three/webgpu';
 import { Fn, min, positionWorld } from 'three/tsl';
+import { release } from '../gpu';
 import type { View } from '../view/view';
 import type { Ground } from './ground';
 import type { Sand } from './sand';
@@ -34,5 +35,6 @@ export function createSeabed(view: View, ground: Ground, sand: Sand) {
     update() {
       grid.update(0);
     },
+    dispose: () => release(mesh),
   };
 }

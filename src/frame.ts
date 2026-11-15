@@ -2,11 +2,11 @@ import {
   Color, NoToneMapping, PerspectiveCamera, RenderPipeline, Scene, Vector2, Vector3, type MRTNode, type Object3D, type WebGPURenderer,
 } from 'three/webgpu';
 import {
-  Fn, float, getViewPosition, length, normalize, pass, rtt, screenUV, select, uniform, vec3, vec4,
+  Fn, convertToTexture, float, getViewPosition, length, normalize, pass, rtt, screenUV, select, uniform, vec3, vec4,
 } from 'three/tsl';
 import { fxaa } from 'three/examples/jsm/tsl/display/FXAANode.js';
 import { environmentAt, type World } from './environment';
-import type { Compute, Draw } from './gpu';
+import { release, type Compute, type Draw } from './gpu';
 import type { Eye, Snapshot } from './snapshot';
 import { createSky, type Sky } from './sky/sky';
 import { createGround } from './land/ground';
@@ -145,7 +145,8 @@ export function createFrame(renderer: WebGPURenderer, world: World, options: Fra
   const arms = createArms(light, options.fleet);
   const gunfire = createGunfire(light);
   const loot = createLoot(light);
-  scene.add(seabed.mesh, ...islands.meshes, ...fleet.meshes, ...arms.meshes, water.mesh, water.ribbons, ...gunfire.meshes, ...loot.meshes, ...(options.extras?.(sky.light, world) ?? []));
+  const extras = options.extras?.(sky.light, world) ?? [];
+  scene.add(seabed.mesh, ...islands.meshes, ...fleet.meshes, ...arms.meshes, water.mesh, water.ribbons, ...gunfire.meshes, ...loot.meshes, ...extras);
   // (named for the meter's split: meter.ts)
   scene.name = 'world';
   [seabed.mesh.name, water.mesh.name, water.ribbons.name] = ['seabed', 'sea', 'trails'];
@@ -170,19 +171,27 @@ export function createFrame(renderer: WebGPURenderer, world: World, options: Fra
    * The post chain over a view's light (linear, per unit sun) and the depth it was seen at: drawn once to a texture,
    * its bloom and light shafts added, graded, encoded for the display, dithered, anti-aliased.
    */
-  const pipelineOf = (post: Vec4Node, depth: ReturnType<typeof look>['depth']): { pipeline: RenderPipeline; shafts: Shafts } => {
+  const pipelineOf = (post: Vec4Node, depth: ReturnType<typeof look>['depth']): { pipeline: RenderPipeline; shafts: Shafts; dispose(): void } => {
     const light = rtt(post, null, null, { depthBuffer: false });
     const glow = bloom(light, gain);
     const shafts = createShafts(light, depth);
     const storm = sky.light.storm(view.position);
-    const graded = Fn(() => {
-      const c = light.sample(screenUV).rgb.add(glow.sample(screenUV).rgb.mul(BLOOM / BLOOM_LEVELS)).add(shafts.light());
+    const graded = convertToTexture(Fn(() => {
+      const c = light.sample(screenUV).rgb.add(glow.glow.sample(screenUV).rgb.mul(BLOOM / BLOOM_LEVELS)).add(shafts.light());
       return film(encode(grade(c, storm)));
-    })();
-    // the grade encodes for the display itself, dithered before the anti-aliasing
+    })());
+    // the grade encodes for the display itself, dithered before the anti-aliasing (fxaa reads it as a texture: made
+    // here, as fxaa would make it, so it can be freed)
     const p = new RenderPipeline(renderer, fxaa(graded));
     p.outputColorTransform = false;
-    return { pipeline: p, shafts };
+    return {
+      pipeline: p, shafts,
+      dispose() {
+        release(p, light, graded);
+        glow.dispose();
+        shafts.dispose();
+      },
+    };
   };
 
   // In the air: haze by distance, the clouds over whatever they stand in front of, the storm over all of it.
@@ -368,9 +377,34 @@ export function createFrame(renderer: WebGPURenderer, world: World, options: Fra
     eyes[seen.kind].pipeline.render();
   }
 
+  /**
+   * Frees all the frame made, each system by its own dispose and each through three's public dispose methods (gpu.ts
+   * release): a new planet's frame is built in its place (main.ts). The renderer and its canvas are not the frame's;
+   * draw nothing more with it.
+   */
+  function dispose() {
+    // (the sea drawn into each eye's scene, and into the canvas as the shaders are built)
+    water.dispose([...Object.values(eyes).map((e) => e.scene.renderTarget), renderer.getCanvasTarget()]);
+    for (const e of Object.values(eyes)) {
+      e.dispose();
+      release(e.scene);
+    }
+    sky.dispose();
+    ground.dispose();
+    shadow.dispose();
+    seabed.dispose();
+    islands.dispose();
+    fleet.dispose();
+    arms.dispose();
+    gunfire.dispose();
+    loot.dispose();
+    release(...extras);
+  }
+
   return {
     resize,
     render,
+    dispose,
     /** Resolves once the ground is baked and every shader the frame can draw with built (prime), to how long the
      *  bake took, ms. */
     ready: ground.ready.then(async (ms) => (await prime(), ms)),

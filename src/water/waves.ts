@@ -31,7 +31,7 @@ import {
   Fn, cos, float, floor, instanceIndex, instancedArray, length, localId, max, select, sin, smoothstep, sqrt, textureLoad, textureStore,
   uint, uniform, uvec2, vec2, vec4, workgroupBarrier, workgroupId,
 } from 'three/tsl';
-import type { Compute } from '../gpu';
+import { release, type Compute } from '../gpu';
 import { BANDS, CASCADES, CHOP, PERIOD, SIZE } from '../world/cascades';
 import { G, coxMunk, initialSpectrum, meanSquareSlope, normalQuantile, seaState, whitecaps, type Sea } from '../world/spectrum';
 import { workgroupArrayOf, type FloatNode, type UintNode, type Vec2Node, type Vec4Node } from '../tsl';
@@ -237,5 +237,9 @@ export function createWaves() {
       time.value = clock % PERIOD;
       return passes;
     },
+    /** Frees the spectra, the fields, the foam, the surfaces and the kernels. */
+    dispose: () => release(
+      initial, ...displacement, ...slopes, ...curvature, fieldsA.value, fieldsB.value, foam.value, ...passes.flat(),
+    ),
   };
 }

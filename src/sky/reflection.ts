@@ -16,7 +16,7 @@ import {
   Fn, Loop, abs, cos, cross, dot, equirectUV, float, instanceIndex, max, normalize, select, sin, storageTexture,
   texture, textureLoad, textureStore, uniformArray, uvec2, vec3, vec4,
 } from 'three/tsl';
-import type { Compute } from '../gpu';
+import { release, type Compute } from '../gpu';
 import type { View } from '../view/view';
 import type { FloatNode, UintNode, Vec3Node, Vec4Node } from '../tsl';
 import type { Tables } from './tables';
@@ -166,5 +166,6 @@ export function createReflection(
       wasClear = clear;
       return frame++ % EVERY === 0 ? [clear ? passes.clear : passes.cloudy] : [];
     },
+    dispose: () => release(panorama, reduced, reflection, passes.cloudy[0], ...passes.clear),
   };
 }

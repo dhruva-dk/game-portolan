@@ -75,7 +75,8 @@ export const clock = (s: number) => {
   return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`;
 };
 
-export function createHud(layer: HTMLElement, coasts: readonly Coast[], act: HudActions) {
+/** coasts: the planet's now (a new planet's each race: main.ts). */
+export function createHud(layer: HTMLElement, coasts: () => readonly Coast[], act: HudActions) {
   const root = document.createElement('div');
   root.className = 'screen';
   layer.appendChild(root);

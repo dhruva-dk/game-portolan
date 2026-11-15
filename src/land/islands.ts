@@ -7,6 +7,7 @@
 // islands more than FAR metres off are drawn at their coarser level (rocks.ts).
 
 import { Sphere, Vector3 } from 'three/webgpu';
+import { release } from '../gpu';
 import type { Eye, View } from '../view/view';
 import type { IslandSite, Planet } from '../world/planet';
 import { isle, litter, scatterPalms, scatterRocks, scatterShrubs } from '../world/scatter';
@@ -48,8 +49,11 @@ export function createIslands(planet: Planet, seed: number, view: View, light: L
     const low = -FOOT - (s.shelf + LEANS) ** 2 / (2 * R), high = Math.max(s.summit, 0) + TOPS;
     return new Sphere(new Vector3(...place(s.chart.at, (low + high) / 2)), Math.hypot(s.shelf + LEANS, (high - low) / 2));
   });
+  const meshes = [...lands, ...casters.map((c) => c.mesh), ...rocky.far.map((c) => c.mesh)];
   return {
-    meshes: [...lands, ...casters.map((c) => c.mesh), ...rocky.far.map((c) => c.mesh)],
+    meshes,
+    /** Frees every island's meshes (they sample no texture of their own). */
+    dispose: () => release(...meshes),
     /** What casts shadows: each kind's instances. */
     casters,
     /** Draws the islands the eye can see; returns the nearest of them above the sea, in view or not (null if none). */

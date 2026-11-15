@@ -54,6 +54,9 @@
 // The playtest tools (PLAYTEST) have their switches named here, each built in the phase that can: ?bots overlays each
 // bot's intent, target, temper and stats; ?coin gives the player's crew Coin; ?reveal shows every stat of every gull;
 // ?raceday skips the career to its next race day and ?seasonend to its season's end; ?screen (above) opens a screen.
+// ?restage puts window.restage(seed?) (a new planet made, as the way home makes it, the next of the page's or one of
+// that seed; resolves to the GPU's geometries and textures held then) and window.memory() on the page, for
+// tools/restage.ts.
 
 import type { Anchor } from './world/lattice';
 import type { World } from './environment';
@@ -94,17 +97,25 @@ const kindOf = (name: string | null): GunKind => KINDS.find((k) => k === name) ?
  *  on, the sea's anchors and the ground's bake (frame.ts), the matches dealt; and the drawing begun, each frame from
  *  `next` (given the seconds since the last, the world as it is to be drawn), once the ground is baked. */
 export interface Stage {
-  world: World; start: { at: Vec3; bearing: number }; canvas: HTMLElement;
-  anchors: readonly Anchor[]; ready: Promise<number>; matches: Matches;
+  readonly world: World; readonly start: { at: Vec3; bearing: number }; canvas: HTMLElement;
+  readonly anchors: readonly Anchor[]; readonly ready: Promise<number>; readonly matches: Matches;
   draw(next: (dt: number) => Snapshot, drawn?: (canvas: HTMLCanvasElement) => void): Promise<void>;
+  /** The planet put away and one of `seed` made in its place (the world and all above read anew), `then` (the game on
+   *  it) made, and the drawing taken up once its ground is baked. */
+  restage(seed: number, then: () => Promise<void>): Promise<void>;
+  /** The GPU's geometries and textures held now (three's renderer.info.memory). */
+  memory(): { geometries: number; textures: number };
 }
 
 /** The game on a stage with its UI over it, as main.ts builds it: the game, its referee and the screens' flow; PLAY
  *  (a match dealt, every ship at her berth); the full map opened (the HUD's tap); a frame of it, and what follows once it is drawn (the canvas then holds it). */
 export interface Played {
-  game: Game; referee: Referee; flow: Flow;
+  readonly game: Game; readonly referee: Referee; flow: Flow;
   play(): void;
   map(): void;
+  /** A new planet in this one's place, as the way home makes it, without the parchment: the next of the page's, or one
+   *  of `seed`. */
+  restage(seed?: number): Promise<void>;
   next(dt: number): Snapshot;
   drawn(canvas: HTMLCanvasElement): void;
 }
@@ -167,6 +178,8 @@ export async function scenario(release: Setup, stage: (setup: Setup) => Promise<
   const room = setup.drawing.fleet;
   if (flying) return s.draw(flyer(s.canvas, s.start.at, demoShips(s.start.at, room), s.matches.storm));
   const p = await play(s);
+  // ?restage: the page's restage and the GPU's holdings, for tools/restage.ts
+  if (params.has('restage')) Object.assign(window, { restage: async (seed?: number) => (await p.restage(seed), s.memory()), memory: () => s.memory() });
   safeArea(uiLayer());
   p.game.debug.tag(params.has('bots'));
   open(p, demoShips(s.start.at, room - 1));

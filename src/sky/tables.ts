@@ -11,7 +11,7 @@ import {
   Fn, If, Loop, abs, acos, clamp, cos, dot, exp, float, instanceIndex, length, max, normalize, pow, select,
   sin, sqrt, texture, textureStore, uniform, uvec2, vec2, vec3, vec4,
 } from 'three/tsl';
-import type { Compute } from '../gpu';
+import { release, type Compute } from '../gpu';
 import { loop, toFloat, type FloatNode, type Vec2Node, type Vec3Node } from '../tsl';
 import * as A from './atmosphere';
 
@@ -295,5 +295,8 @@ export function createTables() {
       due.push(skyViewKernel, ambientKernel);
       return due;
     },
+    dispose: () => release(
+      transmittanceTable, multipleTable, skyViewTable, ambientTable, transmittanceKernel, multipleKernel, skyViewKernel, ambientKernel,
+    ),
   };
 }
