@@ -333,6 +333,8 @@ export function createState(planet: Planet, sea: Hull, { chart, water }: Waters,
     vessels: (): readonly Vessel[] => fleet,
     /** A ship's crew: her health and her gun (sim/battle.ts). */
     crew: (id: number) => battle.crews.find((k) => k.id === id)!,
+    /** The race's card (race.ts RaceCard); null in a card-less match. */
+    card: () => match.card ?? null,
     /** A ship's most hull: her card's. */
     hullOf: (id: number) => fitIn(match, id).hull,
     /** A ship's handling (sim/fit.ts): her own afloat, the tables' once sunk. */

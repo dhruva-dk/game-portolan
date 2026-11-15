@@ -2,6 +2,7 @@
 // side's water nearest her, coming as the sim's stop comes; the drawing reads the sim and changes nothing in it.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { raceOf } from '../src/play/crewing.ts';
 import { deal } from '../src/play/deal.ts';
 import { edgeOf } from '../src/play/flights.ts';
 import { matchOf } from '../src/play/race.ts';
@@ -52,4 +53,17 @@ test('her flight drawn: from her water\'s edge, coming as the stop does, then wo
 
 test('drawing the flights changes nothing in the race', () => {
   assert.deepEqual(sail(30 * 12, true).ships, sail(30 * 12, false).ships);
+});
+
+test("her crewmate's face is the race card's: its seed and her ship's colours, the same for the same card", () => {
+  const faceIn = (seed: number) => {
+    const c = deal(seed, 10), m = matchOf(c, planet), state = createState(planet, still, waters, m);
+    state.start(m);
+    return { face: raceOf(state)?.mate?.face, colours: c.ships[PLAYER + 1].colours };
+  };
+  const a = faceIn(5), again = faceIn(5), other = faceIn(6);
+  assert.ok(a.face, 'a face');
+  assert.deepEqual(a.face!.colours, a.colours, "her ship's colours");
+  assert.deepEqual(again.face, a.face, 'the same card, the same face');
+  assert.notEqual(other.face!.seed, a.face!.seed, 'another card, another face');
 });

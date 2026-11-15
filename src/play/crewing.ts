@@ -9,15 +9,20 @@ import type { BotTag, Race } from '../player.ts';
 import { PLAYER } from '../sim/match.ts';
 import type { State } from './state.ts';
 import { onScreen } from './lens.ts';
+import { hash } from '../world/random.ts';
 
 /** Her race's own, as it stands; null outside a race. */
 export function raceOf(state: State): Race | null {
   const hers = state.upkept(PLAYER);
   if (!hers) return null;
-  const id = PLAYER + 1, mate = state.crew(id), there = state.upkept(id);
+  const id = PLAYER + 1, mate = state.crew(id), there = state.upkept(id), card = state.card(), ship = card?.ships[id];
   return {
     mate: mate && state.sideOf(id) === state.sideOf(PLAYER)
-      ? { hull: Math.max(0, mate.health.hull), hullMax: state.hullOf(id), where: mate.health.hull <= 0 ? 'sunk' : there?.home ? 'home' : 'sailing' }
+      ? {
+        hull: Math.max(0, mate.health.hull), hullMax: state.hullOf(id), where: mate.health.hull <= 0 ? 'sunk' : there?.home ? 'home' : 'sailing',
+        // (her face from the card's seed and her ship's id: the same gull for the same race, wherever it is replayed)
+        face: card && ship ? { seed: hash(card.seed, id), colours: ship.colours } : null,
+      }
       : null,
     call: state.called(),
     flight: { can: hers.can, coming: hers.stop?.coming ?? null, job: hers.stop?.job ?? null, botched: hers.stop?.botched ?? false },

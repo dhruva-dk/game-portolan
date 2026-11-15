@@ -4,7 +4,7 @@
 // ui/hud.ts), with what she carries (Kit), and how her match ended (End).
 
 import type { GunKind, LootKind } from './kinds';
-import type { Call, Job, PartType } from './race';
+import type { Call, Colours, Job, PartType } from './race';
 import type { Vec3 } from './world/sphere';
 
 /** Her hands, as read for a frame. */
@@ -31,9 +31,10 @@ export const IDLE: Hands = { stick: null, look: { x: 0, y: 0, held: false }, fir
 /** Her race's own, as the HUD reads it: her crewmate (ship 1; null with none): her hull and its most, and whether she
  *  sails, lies in their side's water or has sunk; the call in force (null: none, or free); her flight: whether she may
  *  call it (in her side's water, not being served), how far it has come (0…1; null: not called), the job in hand (null:
- *  none yet) and whether a botch holds it; and her parts failed. */
+ *  none yet) and whether a botch holds it; and her parts failed. The crewmate's face is drawn from `face`, her seed
+ *  taken from the race card's (never the career's), in her ship's colours. */
 export interface Race {
-  mate: { hull: number; hullMax: number; where: 'sailing' | 'home' | 'sunk' } | null;
+  mate: { hull: number; hullMax: number; where: 'sailing' | 'home' | 'sunk'; face: { seed: number; colours: Colours } | null } | null;
   call: Call | null;
   flight: { can: boolean; coming: number | null; job: Job | null; botched: boolean };
   faults: readonly PartType[];

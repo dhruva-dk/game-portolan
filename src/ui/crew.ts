@@ -1,7 +1,7 @@
 // The HUD's race pieces (#58 step 8.3), laid as its other slips are (hud.ts):
 //   top left, under the vitals   her parts failed, each its mark in rubric
-//   left, under them             her crewmate's slip: a frame for her headshot (empty until the career draws faces:
-//                                the `headshot` element), her hull's bar, and a mark of where she is: under sail
+//   left, under them             her crewmate's slip: her headshot (ui/gull.ts, from the race card's seed: the
+//                                `headshot` element), her hull's bar, and a mark of where she is: under sail
 //                                (iron), in their side's water (azure), sunk (struck through in rubric)
 //   under it                     the call wheel: four 48 px buttons (with me, attack, hold, free), the call in force
 //                                inked gold
@@ -15,6 +15,7 @@ import type { Race } from '../player';
 import type { Glyph } from './glyphs';
 import { INK, WASH, bar, glyph, paperDisc, ring, slip, svg } from './ink';
 import { onTap, piece } from './ui';
+import { headshot as face } from './gull';
 
 export interface CrewActions { flight(): void; call(c: Call): void }
 
@@ -32,9 +33,9 @@ export function createCrew(body: HTMLElement, act: CrewActions) {
   faults.style.marginTop = `${FAULTS_TOP}px`;
   const mate = piece(body, 'top left');
   mate.style.marginTop = `${MATE_TOP}px`;
-  // her crewmate's face goes in this frame (Phase C): an element of its own, under the slip's ink
+  // her crewmate's face in this frame: an element of its own, over the slip's frame
   const headshot = document.createElement('div');
-  headshot.style.cssText = 'position:absolute;left:7px;top:7px;width:42px;height:42px;overflow:hidden';
+  headshot.style.cssText = 'position:absolute;left:8px;top:8px;width:40px;height:40px;overflow:hidden';
   const card = document.createElement('div');
   mate.append(card, headshot);
   const wheel = piece(body, 'top left');
@@ -60,7 +61,7 @@ export function createCrew(body: HTMLElement, act: CrewActions) {
   const all = [faults, mate, wheel, flight];
 
   return {
-    /** The element her crewmate's headshot is set in (empty until the career draws one). */
+    /** The element her crewmate's headshot is drawn in (from the race card's seed; empty in a card-less match). */
     headshot,
     /** A frame: her race's own (null: none, or hidden). */
     update(r: Race | null) {
@@ -72,6 +73,9 @@ export function createCrew(body: HTMLElement, act: CrewActions) {
 
       const m = r.mate, hull = m ? Math.round(m.hull) : 0;
       mate.style.display = m ? '' : 'none';
+      // (her crewmate's captain: an age between 22 and 57, as her seed falls)
+      const who = m?.face;
+      draw(headshot, who ? `${who.seed}` : '', () => (who ? face({ seed: who.seed, role: 'captain', age: 22 + (who.seed % 36), colours: who.colours, emblem: null }, 40) : ''));
       draw(card, m ? `${hull}/${m.hullMax} ${m.where}` : '', () => (m ? svg(160, 56,
         slip(1, 1, 158, 54)
         + `<rect x="7" y="7" width="42" height="42" fill="none" stroke="${INK.iron}" stroke-width="1.4" opacity=".7"/>`
