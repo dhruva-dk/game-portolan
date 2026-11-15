@@ -98,6 +98,8 @@ const LAYERS: Record<string, readonly string[]> = {
   'campus/': ['campus/', ...RENDER, 'view/view.ts', 'view/cube.ts'],
   'ship/': ['ship/', ...RENDER, 'view/view.ts', 'kinds.ts'],
   'gunfire/': ['gunfire/', ...RENDER, 'view/view.ts', 'kinds.ts'],
+  // the flight drawn as gulls, standing where her lines put her rail, poop, hatch and mainmast
+  'gulls/': ['gulls/', ...RENDER, 'ship/lines.ts'],
   // the post chain's steps (grade, bloom, film): nodes over the frame's light, composed by the frame
   'post/': ['post/', 'three', 'tsl.ts'],
   // the loot on the water, its pieces and their beacons
@@ -105,7 +107,7 @@ const LAYERS: Record<string, readonly string[]> = {
   'water/': ['water/', ...RENDER, 'view/', 'sky/sky.ts', 'land/ground.ts', 'ship/build.ts', 'ship/materials.ts', 'ship/waterline.ts', 'sim/wake.ts'],
   'gpu.ts': ['three'],
   'tsl.ts': ['three'],
-  'frame.ts': ['three', 'gpu.ts', 'tsl.ts', 'palette.ts', 'snapshot.ts', 'environment.ts', 'world/', 'view/', 'sky/', 'land/', 'water/', 'ship/', 'gunfire/', 'loot/', 'campus/', 'post/'],
+  'frame.ts': ['three', 'gpu.ts', 'tsl.ts', 'palette.ts', 'snapshot.ts', 'environment.ts', 'world/', 'view/', 'sky/', 'land/', 'water/', 'ship/', 'gunfire/', 'loot/', 'campus/', 'gulls/', 'post/'],
   'meter.ts': ['three'],
   // the debug tools, and the switches that drive the game through what it offers anyone
   'fly.ts': ['three', 'world/', 'snapshot.ts'],
@@ -229,7 +231,7 @@ test('i. the game touches no page: src/play neither reads nor makes the DOM (ui/
 
 test('i2. the UI draws plain data: src/ui imports nothing from play/, three or what draws the world', () => {
   const found: string[] = [];
-  const RENDER = ['sky', 'water', 'land', 'campus', 'ship', 'gunfire', 'view', 'post'], FILES = ['frame.ts', 'gpu.ts', 'tsl.ts'];
+  const RENDER = ['sky', 'water', 'land', 'campus', 'ship', 'gunfire', 'gulls', 'view', 'post'], FILES = ['frame.ts', 'gpu.ts', 'tsl.ts'];
   for (const f of files.filter((f) => f.rel.startsWith('ui/'))) {
     code(f.text).forEach((line, i) => {
       const spec = /(?:\bfrom\s*|\bimport\s*\(?\s*)['"]([^'"]+)['"]/.exec(line)?.[1];

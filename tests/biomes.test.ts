@@ -7,7 +7,8 @@ import { byTemper, mind, type Seen } from '../src/sim/captain.ts';
 import { SHIP } from '../src/sim/handling.ts';
 import { leeAt, ruled, tideAt, tided, type Ground } from '../src/sim/rule.ts';
 import { shipAt, step, type Helm } from '../src/sim/ship.ts';
-import { BIOMES, SPAN, anyPlanet, biomeOf, groundOf, seedIn, type Rule } from '../src/world/biome.ts';
+import { BIOMES, SPAN, anyPlanet, biomeOf, groundOf, seedIn, traitsOf, type Rule } from '../src/world/biome.ts';
+import { GROUNDS } from '../src/palette.ts';
 import { createPlanet, risesOf, type Planet } from '../src/world/planet.ts';
 import { cross, fromChart, normalize, type Vec3 } from '../src/world/sphere.ts';
 
@@ -23,6 +24,13 @@ test('every seed under 2^20 is palm keys, its ground its own seed; above it, eac
   });
   assert.equal(BIOMES[0].rule, 'none', 'palm keys has no rule');
   assert.equal(new Set(BIOMES.map((b) => b.rule)).size, BIOMES.length, 'each biome its own rule');
+  for (const b of BIOMES) {
+    const t = traitsOf(seedIn(b.name, 3));
+    assert.equal(t.biome, b.name);
+    assert.equal(t.rule, b.rule);
+    assert.ok(t.title.length > 0 && t.says.length > 0, `${b.name} is named, and its rule`);
+    assert.ok(GROUNDS[b.name], `${b.name} has its ground's colours`);
+  }
   const drawn = new Set(Array.from({ length: 600 }, (_, n) => biomeOf(anyPlanet(Math.imul(n + 1, 0x9e3779b1))).name));
   assert.equal(drawn.size, BIOMES.length, 'a new planet may be of any biome');
 });

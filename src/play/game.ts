@@ -208,7 +208,7 @@ export function createGame(world: World, anchors: readonly Anchor[], waters: Wat
         eye: seen,
         clock: time, storm: state.storm(between),
         ships: state.drawn(between), own: PLAYER, balls: state.balls(between), loot, blasts: state.blasts(),
-        sea: state.sea(between),
+        sea: state.sea(between), flights: state.flights(),
       };
     },
     /** What she carries, as the hotbar shows it. */

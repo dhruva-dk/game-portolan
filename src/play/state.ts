@@ -33,7 +33,8 @@ import { asked, crewed, NOTHING, spilled, stored, type Ask } from '../sim/stores
 import { shipAt, type Helm, type ShipState } from '../sim/ship.ts';
 import { calm, type Storm } from '../sim/storm.ts';
 import { createTerritory, type Move, type Territory } from '../sim/territory.ts';
-import type { BallDraw, Blast, Look, Sea, ShipDraw } from '../snapshot.ts';
+import type { BallDraw, Blast, FlightDraw, Look, Sea, ShipDraw } from '../snapshot.ts';
+import { createFlights } from './flights.ts';
 import type { Deed } from '../player.ts';
 import type { Hull } from '../world/swell.ts';
 import { remembered, risesOf, type Planet } from '../world/planet.ts';
@@ -107,7 +108,7 @@ export function createState(planet: Planet, sea: Hull, { chart, water }: Waters,
   /** The race's tally (result.ts), and its result once it is over (every ship afloat of one side, or none). */
   let tally = createTally(0), ended: RaceResult | null = null;
   /** The race's parts, flights and calls (upkeep.ts), and what it did in the step under way. */
-  const upkeep = createUpkeep();
+  const upkeep = createUpkeep(), flights = createFlights();
   let upkept: Kept[] = [];
 
   /** Puts a ship to sea: a bot's unless she is the player's (and `manned`) or her helm is lashed. */
@@ -356,6 +357,8 @@ export function createState(planet: Planet, sea: Hull, { chart, water }: Waters,
     bots: () => [...aboard].flatMap(([id, a]) => (a.mind && a.bot ? [{ id, mode: a.mind.mode, foe: a.mind.foe, captain: a.bot.captain }] : [])),
     /** Ship `id`'s flight and parts, for the HUD; null outside a race. */
     upkept: (id: number): Upkept | null => (match.card && territory ? upkeep.upkept(id, fleet.find((v) => v.id === id), territory) : null),
+    /** Every flight under way, for the gulls (flights.ts); none outside a race. */
+    flights: (): FlightDraw[] => (match.card ? flights.drawn(fleet, territory, (v) => upkeep.upkept(v.id, v, territory)) : []),
     /** Every ship of the match, afloat or sunk, as she stands now, in order of her id. */
     ships: (): Afloat[] => {
       const afloatNow = new Map(fleet.map((v) => [v.id, v.ship]));

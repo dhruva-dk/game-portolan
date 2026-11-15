@@ -22,6 +22,7 @@ import { createGunfire } from './gunfire/gunfire';
 import { createArms, muzzle } from './ship/arms';
 import { createLoot } from './loot/loot';
 import { createCampus } from './campus/campus';
+import { createGulls } from './gulls/gulls';
 import { sunAt, sunInSky } from './world/sun';
 import { BLOOM_LEVELS, bloom } from './post/bloom';
 import { film } from './post/film';
@@ -149,8 +150,9 @@ export function createFrame(renderer: WebGPURenderer, world: World, options: Fra
   const arms = createArms(light, options.fleet);
   const gunfire = createGunfire(light);
   const loot = createLoot(light);
+  const gulls = createGulls(light);
   const extras = options.extras?.(sky.light, world) ?? [];
-  scene.add(seabed.mesh, ...islands.meshes, ...(campus?.meshes ?? []), ...fleet.meshes, ...arms.meshes, water.mesh, water.ribbons, ...gunfire.meshes, ...loot.meshes, ...extras);
+  scene.add(seabed.mesh, ...islands.meshes, ...(campus?.meshes ?? []), ...fleet.meshes, ...arms.meshes, water.mesh, water.ribbons, ...gunfire.meshes, ...loot.meshes, ...gulls.meshes, ...extras);
   // (named for the meter's split: meter.ts)
   scene.name = 'world';
   [seabed.mesh.name, water.mesh.name, water.ribbons.name] = ['seabed', 'sea', 'trails'];
@@ -309,6 +311,7 @@ export function createFrame(renderer: WebGPURenderer, world: World, options: Fra
     laid = Math.max(laid, ...s.blasts.map((b) => b.time));
     gunfire.draw(s.clock, s.balls);
     loot.draw(s.clock, s.loot, s.eye.position);
+    gulls.draw(s.clock, s.flights ?? [], s.ships);
     arms.update(s.ships, s.eye.position);
     campus?.update(s.campus, s.clock);
   }
@@ -404,6 +407,7 @@ export function createFrame(renderer: WebGPURenderer, world: World, options: Fra
     gunfire.dispose();
     loot.dispose();
     campus?.dispose();
+    gulls.dispose();
     release(...extras);
   }
 

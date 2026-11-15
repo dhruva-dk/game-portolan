@@ -115,6 +115,15 @@ export interface CampusDraw {
   emblem: number;
 }
 
+/** A flight's job on deck (race.ts Job, named again here for the frame). */
+export type FlightJob = 'mend' | 'gust' | 'stores' | 'part';
+
+/** A ship's flight under way (sim/flight.ts Stop), as the gulls draw it: whose, where they set out (a unit vector: the
+ *  edge of her side's water nearest her when she called), how far they have come (0…1; 1 on deck), the job in hand (null
+ *  between jobs, or still coming) and whether a botch has it paused. A flight no longer listed has ended: its gulls fly
+ *  off. */
+export interface FlightDraw { id: number; from: Vec3; coming: number; job: FlightJob | null; botched: boolean }
+
 /** Everything the frame draws, for one frame. */
 export interface Snapshot {
   eye: Eye;
@@ -139,6 +148,8 @@ export interface Snapshot {
   sea?: Sea;
   /** The crew's rookery, on a campus planet (frame.ts draws it only there). */
   campus?: CampusDraw;
+  /** Every ship's flight under way (none outside a race). */
+  flights?: readonly FlightDraw[];
 }
 
 /** The orientation of an eye at `eye` looking at `at`, `up` up the screen (as three turns a camera to look at a point). */

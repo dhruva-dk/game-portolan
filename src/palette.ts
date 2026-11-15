@@ -104,6 +104,13 @@ export const ROOTS = tones('#8A6E4E', '#4A3838');
 /** A crater's steam. */
 export const STEAM = tones('#FFF6E8', '#C8B4C0');
 
+// ---- the flight's gulls (gulls/gull.ts): white feathers, grey wings (their tips in the crew's paint, a scarf in her
+// sail's colour), a yellow beak and legs, and dark sunglasses
+export const FEATHER = tones('#FFFDF6', '#B8B2CE');
+export const WING = tones('#C4CAD6', '#7E80A0');
+export const BEAK = tones('#F5B93A', '#B8663A');
+export const SHADES = tones('#2A2633', '#120F18');
+
 // ---- the ships
 export const TIMBER = tones('#9A5A2C', '#5A2F2E');
 export const DECK = tones('#D9A86A', '#9A6548');

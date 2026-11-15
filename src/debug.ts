@@ -42,7 +42,7 @@
 // At sea, ?kit (?kit=seconds: then) puts stores under her for her to sweep up (two guns, a cannon and a scatter, unless
 // ?gun arms her, and three slots of stores), with a better gun beside them, a mortar, offered; ?use=1…3,seconds sets
 // her mending from that slot so many seconds into the frames
-// drawn, ?gust=seconds spends a gust then, ?fire=seconds fires then and ?down=seconds sinks one by her then; ?loot strews a piece of each kind and rarity in a fan ahead
+// drawn, ?flight=seconds calls her flight then (?job= and ?flown= for the gulls: gullsAt), ?gust=seconds spends a gust then, ?fire=seconds fires then and ?down=seconds sinks one by her then; ?loot strews a piece of each kind and rarity in a fan ahead
 // of her, 25 m out to 420 m (?loot=m: every kind of gun, each of another rarity, and the stores, in a row across the look m metres out); ?swing=px,px,seconds drags the look that far right and down and lets it go, so many
 // seconds into the frames drawn (0 by default; the look stays where it is put: play/chase.ts); ?slow=k runs the game at k of its speed (for catching a ball in flight).
 // ?flood=seconds, after ?drive='s legs, steers her back to where she began until her loop closes (her trail back into
@@ -74,7 +74,7 @@ import { KINDS, type GunKind } from './kinds';
 import { SHIP } from './sim/handling';
 import { PLAYER } from './sim/match';
 import type { Cap } from './sim/storm';
-import type { ShipDraw, Snapshot } from './snapshot';
+import type { FlightJob, ShipDraw, Snapshot } from './snapshot';
 import type { Flow } from './ui/flow';
 import { uiLayer } from './ui/ui';
 import type { Weather } from './world/weather';
@@ -218,6 +218,8 @@ export async function scenario(release: Setup, stage: (setup: Setup) => Promise<
     ...(slot > 0 ? [{ at: use || 0, hands: { tap: item + slot } }, { at: use || 0, hands: { tap: item + slot } }] : []),
     ...(tap ? [{ at: tap[1] || 0, hands: { tap: tap[0] || 0 } }] : []),
     ...(params.has('gust') ? [{ at: number('gust', 0), hands: { gust: true } }] : []),
+    // (in a race, ?screen=play: her flight called)
+    ...(params.has('flight') ? [{ at: number('flight', 0), hands: { flight: true } }] : []),
     ...(params.get('fire') ? [{ at: fireAt || 0, hands: { fire: true } }] : []),
     ...(swing ? [{ at: swing[2] || 0, hands: { look: { x: swing[0] || 0, y: swing[1] || 0, held: false } } }] : []),
   ];
@@ -238,8 +240,18 @@ export async function scenario(release: Setup, stage: (setup: Setup) => Promise<
     if (held > 0 && drawn > fireAt && drawn <= fireAt + held) p.game.step(0, { ...IDLE, fire: true });
     for (const e of ends) if (drawn <= e.at && drawn + dt > e.at) e.act();
     drawn += dt;
-    return frame;
+    return frame && gullsAt(frame, drawn);
   }, p.drawn);
+}
+
+/** The flights as drawn, for judging the gulls by eye: ?job= sets every flight on deck at a job (mend, gust, stores or
+ *  part; botch: the last of them botched), ?flown= ends them all that many seconds into the frames drawn. Only the
+ *  drawing is changed: the race runs on as it would. */
+function gullsAt(shot: Snapshot, drawn: number): Snapshot {
+  const job = params.get('job'), flown = params.has('flown') && drawn > number('flown', 0);
+  if (!shot.flights || (!job && !flown)) return shot;
+  const at = job === 'botch' ? 'part' : (job as FlightJob | null);
+  return { ...shot, flights: flown ? [] : shot.flights.map((f) => (f.coming < 1 || !at ? f : { ...f, job: at, botched: job === 'botch' })) };
 }
 
 /** Opens the game where ?screen= says, among `others` at sea; then sails it on ?ahead= seconds. */

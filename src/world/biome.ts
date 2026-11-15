@@ -203,3 +203,22 @@ export const seedIn = (name: BiomeName, n: number): number =>
 
 /** Any planet's seed from any 32-bit number, every biome as likely. */
 export const anyPlanet = (n: number): number => (n >>> 0) % (BIOMES.length * SPAN);
+
+/** A planet's traits as a screen names them (Phase C's plan screen, through main.ts's PlanetSketch): its biome and
+ *  that biome's rule, by name and in a line of the sea's own words. */
+export interface Traits { biome: BiomeName; title: string; rule: Rule; says: string }
+
+const TITLES: Readonly<Record<BiomeName, { title: string; says: string }>> = {
+  palmKeys: { title: 'Palm keys', says: 'Fair winds and open water.' },
+  coralAtolls: { title: 'Coral atolls', says: 'Reef flats: a ship slows over the shallows.' },
+  basaltFjords: { title: 'Basalt fjords', says: 'Wind shadow: the wind falls under the cliffs.' },
+  mangroveDelta: { title: 'Mangrove delta', says: 'Rooted shallows: Gust drives her less there.' },
+  volcanicArc: { title: 'Volcanic arc', says: 'Ash: a poor lookout sees little.' },
+  chalkDowns: { title: 'Chalk downs', says: 'Strong tides open and close the shallow passages.' },
+};
+
+/** The traits of the planet of `seed`, from its seed alone (no planet made). */
+export function traitsOf(seed: number): Traits {
+  const b = biomeOf(seed);
+  return { biome: b.name, rule: b.rule, ...TITLES[b.name] };
+}
