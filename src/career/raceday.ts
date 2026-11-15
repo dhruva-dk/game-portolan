@@ -7,7 +7,7 @@ import type { Plan } from '../office.ts';
 import type { EventHandler } from './advance.ts';
 import { accept, refuse, whole, why, type Check, type Handlers } from './command.ts';
 import { drawn } from './dilemmas.ts';
-import { flagged } from './flags.ts';
+import { flagged, today } from './flags.ts';
 import { lineups, maySail, sides, STANCES } from './lineup.ts';
 import { fitCheck, fitted } from './parts.ts';
 import { mine, post } from './post.ts';
@@ -121,6 +121,7 @@ export const RACING: Handlers = {
     if (s.race === null || c.round !== s.race.round) return refuse('round', 'That is not today\'s race.');
     if (!s.race.started) return refuse('notStarted', 'Your race has not begun.');
     if (s.race.results[s.crews[me].league] !== null) return refuse('recorded', 'That race is recorded already.');
+    if (today(s, `forfeit:${me}`)) return refuse('forfeited', 'Your crew has forfeited this race already.');
     const out = flagged(s, `forfeit:${me}`, s.day);
     return accept(post(out, { crew: me, category: 'league', sender: null, kind: 'forfeit', slots: {}, links: [] }));
   },
