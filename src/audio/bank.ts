@@ -7,7 +7,7 @@ import type { Samples } from './dsp.ts';
 import { GUNS, ready, reload, report, select, swap, wind, type GunKind } from './sounds/guns.ts';
 import { hurt, ring, shatter, sink, splash, strike, thud, whistle } from './sounds/blows.ts';
 import { claim, closing, cut, enter, gust, leave, mendHull, mendWard, rope, took } from './sounds/sea.ts';
-import { close, launch, lost, open, salute, tap } from './sounds/ui.ts';
+import { close, coin, launch, lost, open, salute, stamp, tap } from './sounds/ui.ts';
 import { cry, wings } from './sounds/gulls.ts';
 
 /**
@@ -62,6 +62,8 @@ const SOUND = {
   launch: { make: launch, takes: 1, level: -7, priority: 9, reach: 0 },
   lost: { make: lost, takes: 1, level: -6, priority: 9, reach: 0 },
   salute: { make: salute, takes: 1, level: -5, priority: 9, reach: 0 },
+  stamp: { make: stamp, takes: 2, level: -10, priority: 6, reach: 0 },
+  coin: { make: coin, takes: 2, level: -14, priority: 6, reach: 0 },
 } as const satisfies Record<string, Sound>;
 
 /** A sound's name: a gun's kind, or one of the rest. */

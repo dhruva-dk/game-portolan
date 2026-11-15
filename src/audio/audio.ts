@@ -104,6 +104,10 @@ export function createEngine(ctx: BaseAudioContext, ground: (p: Vec3) => number)
     tap(screen: Screen, eye: Hearing['scene']['eye'], at: number) {
       if (screen !== 'match') play({ cue: 'tap', at: null, gain: 1 }, eye, at);
     },
+    /** A sound of the office's: a stamp pressed, Coin spent. */
+    office(cue: 'stamp' | 'coin', eye: Hearing['scene']['eye'], at: number) {
+      play({ cue, at: null, gain: 1 }, eye, at);
+    },
   };
 }
 
@@ -145,6 +149,10 @@ export function createAudio(ground: (p: Vec3) => number) {
     /** A tap on something of the UI's, on `screen`. */
     tap(screen: Screen) {
       if (eye && ctx.state === 'running') engine.tap(screen, eye, ctx.currentTime);
+    },
+    /** A stamp pressed onto a document, or Coin spent. */
+    office(cue: 'stamp' | 'coin') {
+      if (eye && ctx.state === 'running') engine.office(cue, eye, ctx.currentTime);
     },
   };
 }

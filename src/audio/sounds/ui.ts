@@ -14,6 +14,28 @@ export function tap(rate: number, seed: number): Samples {
   return normal(finish(t, 0.0005, 0.02)).x;
 }
 
+/** A stamp pressed onto a document: the block's knock on the desk through paper, a short wooden body under it. */
+export function stamp(rate: number, seed: number): Samples {
+  const t = take(0.3, rate, seed);
+  noise(t, ar(0.001, 0.018));
+  filter(t, 'lowpass', 1400 + 300 * t.r(), 0.8);
+  modes(t, [[210, 0.12, 0.7], [380, 0.08, 0.4], [820, 0.03, 0.15]], 0.002, 0.05);
+  const paper = layer(t);
+  noise(paper, fall(0.01));
+  filter(paper, 'bandpass', 2600, 0.9);
+  mix(t, paper, 0, 0.3);
+  return normal(finish(t, 0.0005, 0.06)).x;
+}
+
+/** Coin spent: two coins chinking as they are counted out. */
+export function coin(rate: number, seed: number): Samples {
+  const t = take(0.45, rate, seed);
+  const f = 3400 + 500 * t.r();
+  modes(t, [[f, 0.18, 0.5], [f * 1.51, 0.12, 0.35], [f * 2.32, 0.07, 0.2]], 0, 0.04);
+  modes(t, [[f * 0.92, 0.16, 0.4], [f * 1.43, 0.1, 0.3]], 0.07, 0.04);
+  return normal(finish(t, 0.0005, 0.08)).x;
+}
+
 /** Parchment handled: crinkle and rustle over `seconds`, from `at`. */
 const parchment = (t: Take, at: number, seconds: number, grains: number) => {
   const p = layer(t);

@@ -21,7 +21,7 @@ export const DEEDS = ['fired', 'winding', 'reloading', 'reloaded', 'swapped', 'f
 export const CUE_NAMES = [
   'fire', 'fired', 'wind', 'wound', 'reload', 'splash', 'thud', 'strike', 'hurt', 'ring', 'shatter', 'sank', 'sunk',
   'took', 'swap', 'mendWard', 'mendHull', 'gust', 'ready', 'select', 'whistle', 'claim', 'cut', 'enter', 'leave',
-  'closing', 'rope', 'wings', 'cry', 'tap', 'open', 'close', 'launch', 'lost', 'salute',
+  'closing', 'rope', 'wings', 'cry', 'tap', 'open', 'close', 'launch', 'lost', 'salute', 'stamp', 'coin',
 ] as const;
 export type Cue = (typeof CUE_NAMES)[number];
 
@@ -82,6 +82,8 @@ export const CUES: Record<Cue, CueSound> = {
   launch: { sound: 'launch', level: 0, bus: 'ui' },
   lost: { sound: 'lost', level: 0, bus: 'ui' },
   salute: { sound: 'salute', level: 0, bus: 'ui' },
+  stamp: { sound: 'stamp', level: 0, bus: 'ui' },
+  coin: { sound: 'coin', level: 0, bus: 'ui' },
 };
 
 /** The cue for a blow on her. */

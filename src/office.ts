@@ -94,6 +94,79 @@ export type Command =
 export type CommandKind = Command['kind'];
 export type CommandOf<K extends CommandKind> = Extract<Command, { kind: K }>;
 
+// ---- the screens' view models (Phase C): plain data, every figure with its comparison and its explanation, built by
+// career/views.ts. A screen draws one and sends Commands; it keeps no career state and works out no rule.
+
+/** A line of a figure's breakdown, as its explanation slip lists it: "800 stars". */
+export interface Line { label: string; amount: string }
+/** What a figure is made of: its lines, summing to it. */
+export interface Explanation { title: string; lines: readonly Line[] }
+/** What a figure is set against: its rank ("4th of 40"), its change this season, or a rival's figure beside it. */
+export type Comparison =
+  | { kind: 'rank'; place: number; of: number }
+  | { kind: 'change'; by: number; text: string }
+  | { kind: 'rival'; label: string; text: string };
+/** A number as a screen shows it: its value, its text, what it is set against, and what it is made of. */
+export interface Figure { value: number; text: string; against: Comparison | null; explain: Explanation | null }
+
+/** What a gull's headshot is drawn from (ui/gull.ts): their seed, role, age in years, and their crew's colours and
+ *  emblem (null: a free agent, on paper). */
+export interface Face { seed: number; role: Role; age: number; colours: Colours | null; emblem: number | null }
+
+/** What stops Continue, and the screen that answers it. */
+export interface Blocker { screen: string; sentence: string }
+
+/** The top bar (Phase C section 5): the player, their crew, the date, the Coin, and Continue. */
+export interface TopBar {
+  name: string; face: Face; crew: string; emblem: number; colours: Colours;
+  date: string; coin: Figure;
+  unread: number; dilemma: boolean;
+  /** Continue's label ("Continue", "Race plan"), and what stops it (null: nothing). */
+  go: { label: string; raceDay: boolean; blocker: Blocker | null };
+}
+
+/** A part as its mark shows it on a ship: its type, and whether its condition is below half. */
+export interface PartMark { type: PartType; low: boolean; fitted: boolean }
+/** A gull as a line names them: id, face, full name. */
+export interface Named { id: number; face: Face; name: string }
+/** Half of home's Ships panel. */
+export interface ShipHalf {
+  ship: Ship; you: boolean;
+  captain: (Named & { stars: number; potential: number; morale: Figure; tags: readonly string[] }) | null;
+  bosun: Named | null; bond: Figure; parts: readonly PartMark[];
+}
+/** A line of a league table: place, crew, points and the gap to the line above. */
+export interface StandingLine { place: number; crew: number; name: string; emblem: number; colours: Colours; points: number; gap: string; mine: boolean }
+/** A letter as a list shows it. */
+export interface LetterLine { id: number; day: number; subject: string; from: string; face: Face | null; category: MailCategory; unread: boolean; sealed: boolean }
+
+/** `home`, the dashboard. */
+export interface HomeView {
+  top: TopBar;
+  race: {
+    heading: string; round: string; planet: { seed: number; name: string }; days: Figure;
+    target: Figure; confidence: Figure; patron: string | null;
+  } | null;
+  ships: readonly [ShipHalf, ShipHalf];
+  yard: { design: { type: PartType; days: Figure } | null; points: Figure; works: readonly { building: Building; level: number; days: number }[] };
+  table: { league: string; lines: readonly StandingLine[] };
+  mail: { letters: readonly LetterLine[]; unread: number };
+}
+
+/** `found`: what the founding form offers and the line on the crew it replaces. */
+export interface FoundView {
+  seed: number; crew: string; given: string; family: string; headshot: number;
+  swatches: readonly string[]; emblems: number;
+  limits: { crew: number; gull: number };
+  replacing: string;
+}
+
+/** `recover`: what the load found and lost, and each way forward it allows. */
+export interface RecoverView { found: string; lost: string; ways: readonly { way: 'retry' | 'carry' | 'restore'; label: string }[] }
+
+/** `settings`: the day of the last backup, if any. */
+export interface SettingsView { backup: string }
+
 /** A proposal's change, as Phase B section 11 lists them. */
 export type Change =
   | { measure: 'spec'; type: PartType; spec: boolean }
