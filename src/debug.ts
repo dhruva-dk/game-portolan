@@ -78,6 +78,8 @@ import type { ShipDraw, Snapshot } from './snapshot';
 import type { Flow } from './ui/flow';
 import { uiLayer } from './ui/ui';
 import type { Weather } from './world/weather';
+import { BUILDINGS, type Building, type Rookery } from './world/rookery';
+import { BARE } from './ui/rookery';
 import { R, add, cross, dot, frameAt, along, normalize, scale, type Vec3 } from './world/sphere';
 
 /** How the page is set up (main.ts RELEASE, or as the switches change it): the planet's seed, the weather's mean and
@@ -101,8 +103,9 @@ export interface Stage {
   readonly anchors: readonly Anchor[]; readonly ready: Promise<number>; readonly matches: Matches;
   draw(next: (dt: number) => Snapshot | null, drawn?: (canvas: HTMLCanvasElement) => void): Promise<void>;
   /** The planet put away and one of `seed` made in its place (the world and all above read anew), `then` (the game on
-   *  it) made, and the drawing taken up once its ground is baked. */
-  restage(seed: number, then: () => Promise<void>): Promise<void>;
+   *  it) made, and the drawing taken up once its ground is baked; `campus`: a crew's campus planet (world/rookery.ts),
+   *  on which no match is dealt (start and matches are the last race planet's). */
+  restage(seed: number, then: () => Promise<void>, campus?: boolean): Promise<void>;
   /** The GPU's geometries and textures held now (three's renderer.info.memory). */
   memory(): { geometries: number; textures: number };
 }
@@ -119,6 +122,26 @@ export interface Played {
   /** (null: nothing drawn this frame, the world covered: Skip's parchment) */
   next(dt: number): Snapshot | null;
   drawn(canvas: HTMLCanvasElement): void;
+  /** A crew's rookery in 3D (play/rookery.ts), for the rookery's screen. */
+  rookery: {
+    /** Shows a crew's rookery: its campus planet staged under the passage if it is not already (resolves once it is
+     *  drawn), its view drawn in place of the game's from then on. */
+    open(r: Rookery): Promise<void>;
+    /** The rookery changed (levels, what is under way, the days left, colours): drawn as it now is. */
+    show(r: Rookery): void;
+    /** Selects a building, the view easing to it; null, back out over the whole campus. */
+    select(b: Building | null): void;
+    readonly selected: Building | null;
+    /** Each building standing or under way, where it is on the screen now (CSS px). */
+    anchors(): { building: Building; x: number; y: number }[];
+    /** The building a tap at (x, y) picks: the nearest anchor within 60 px, or null. */
+    pick(x: number, y: number): Building | null;
+    /** The view no longer shown (the campus kept staged, for opening again at once). */
+    close(): void;
+    readonly shown: boolean;
+  };
+  /** A race planet staged again in the campus's place, if the campus is staged (a race needs one: before PLAY). */
+  racing(): Promise<void>;
 }
 
 /** Whether debugging is on: the dev server, or ?debug in the query. */
@@ -182,6 +205,7 @@ export async function scenario(release: Setup, stage: (setup: Setup) => Promise<
   // ?restage: the page's restage and the GPU's holdings, for tools/restage.ts
   if (params.has('restage')) Object.assign(window, { restage: async (seed?: number) => (await p.restage(seed), s.memory()), memory: () => s.memory() });
   safeArea(uiLayer());
+  if (params.get('screen') === 'rookery-3d') return rookery3d(s, p);
   p.game.debug.tag(params.has('bots'));
   open(p, demoShips(s.start.at, room - 1));
   const paused = params.has('pause'), slow = number('slow', 1);
@@ -249,6 +273,32 @@ function open(p: Played, others: readonly Berth[]) {
     referee.update(0.1);
   }
   if (screen === 'map' || params.has('map')) p.map();
+}
+
+/**
+ * ?screen=rookery-3d: a crew's rookery shown alone, the UI's screens put away (only its days-left slips over it). The
+ * crew: ?crew= its seed (7), ?colours=first,second (0,13: vermilion and aqua), ?emblem= (5, the star); ?levels= every
+ * building's level, or nine of them in world/rookery.ts BUILDINGS' order (3); ?under= the buildings under way, each a
+ * level under its next (foundry, flight loft, crow's nest: at 2, rising to 3), ?share= how much of each is built
+ * (0.3, 0.6, 0.85 by turns), ?days= days left (4, 9, 15); ?select= a building selected. window.rookery is the view's
+ * API (Played.rookery) and window.crew(changes) shows the crew changed, for tools/rookery.ts.
+ */
+async function rookery3d(s: Stage, p: Played) {
+  uiLayer().classList.add(BARE);
+  await s.ready;
+  void s.draw(p.next, p.drawn);
+  const list = (name: string, fallback: string) => (params.get(name) ?? fallback).split(',').filter(Boolean);
+  const levels = list('levels', '3').map(Number), under = list('under', 'foundry,flightLoft,crowsNest') as Building[];
+  const shares = list('share', '0.3,0.6,0.85').map(Number), days = list('days', '4,9,15').map(Number);
+  const [first, second] = list('colours', '0,13').map(Number);
+  const crew: Rookery = {
+    seed: number('crew', 7), colours: { first, second }, emblem: number('emblem', 5),
+    levels: Object.fromEntries(BUILDINGS.map((b, i) => [b, under.includes(b) ? Math.min(levels[i] ?? levels[0], 2) : (levels[i] ?? levels[0])])) as Rookery['levels'],
+    under: Object.fromEntries(under.map((b, i) => [b, { share: shares[i % shares.length], days: days[i % days.length] }])),
+  };
+  await p.rookery.open(crew);
+  if (params.has('select')) p.rookery.select(params.get('select') as Building);
+  Object.assign(window, { rookery: p.rookery, crew: (changes: Partial<Rookery>) => p.rookery.show({ ...crew, ...changes }) });
 }
 
 /** Sinks her by the first other ship afloat (?by=storm: by the Storm). */

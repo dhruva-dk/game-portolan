@@ -6,7 +6,8 @@
 // the coast), in widths shared out round the coast by how wide each building grows at its third level (FOOTPRINT), so
 // no two meet. The two that work the water (the sailing school and the fish market) stand at the waterline with their
 // piers running out over it; the crew's quay is a jetty running out past the shallows, its two berths on either side.
-// Every plot is levelled into a terrace: its top the highest of the ground under it, its foot the lowest.
+// Every plot is levelled into a terrace, the ground under it cut and built up to it and eased back into the hill round
+// it (terraced): its top the middle of the ground that was there, cut no more than CAMPUS.cut into the hill.
 //
 // Pure arithmetic: no three, so it runs in node for the tests.
 
@@ -26,15 +27,29 @@ export type Building = (typeof BUILDINGS)[number];
  * (its origin at the waterline, all of `front` a pier over the sea). Every level's form stands inside it (campus/).
  */
 export const FOOTPRINT: Readonly<Record<Building, { half: number; back: number; front: number; water: boolean }>> = {
-  factory: { half: 12.5, back: 7.5, front: 7.5, water: false },
-  drawingLoft: { half: 7, back: 5, front: 5, water: false },
-  testTank: { half: 12.5, back: 6.5, front: 6.5, water: false },
-  foundry: { half: 11.5, back: 7.5, front: 7.5, water: false },
+  factory: { half: 13, back: 8, front: 8, water: false },
+  drawingLoft: { half: 7.5, back: 5, front: 5, water: false },
+  testTank: { half: 13, back: 6, front: 6, water: false },
+  foundry: { half: 12, back: 7.5, front: 7.5, water: false },
   sailingSchool: { half: 11, back: 7, front: 16, water: true },
-  flightLoft: { half: 6.5, back: 6.5, front: 6.5, water: false },
-  crowsNest: { half: 5, back: 5, front: 5, water: false },
+  flightLoft: { half: 5.5, back: 5.5, front: 5.5, water: false },
+  crowsNest: { half: 4, back: 4, front: 4, water: false },
   fishMarket: { half: 11, back: 6, front: 16, water: true },
-  landingPad: { half: 11, back: 7, front: 7, water: false },
+  landingPad: { half: 12, back: 9, front: 12, water: false },
+};
+
+/** How tall each building stands over its terrace at each of its levels (1–3), metres, its flagpoles' heads and all
+ *  (campus/buildings.ts builds it so: tests/campus.test.ts): where the view looks and a building is picked. */
+export const TALL: Readonly<Record<Building, readonly [number, number, number]>> = {
+  factory: [6.9, 9.5, 16.4],
+  drawingLoft: [6.4, 10.4, 18.5],
+  testTank: [5.9, 8.4, 12.4],
+  foundry: [7, 13.2, 20.2],
+  sailingSchool: [6.4, 8.4, 18.4],
+  flightLoft: [6.4, 12.2, 19.8],
+  crowsNest: [9.7, 16.4, 21.8],
+  fishMarket: [5.9, 7.4, 15.8],
+  landingPad: [5.4, 7.6, 16.6],
 };
 
 /** The crew's quay: a jetty this wide (half), running out this far from the waterline, its berths this far out and to
@@ -45,9 +60,12 @@ export const QUAY = { half: 2.2, back: 3, front: 34, berth: { out: 20, side: 7.2
  *  that (shares of it); how many islets (at least, at most) and how far out from the main island's apron they lie; the
  *  gap between plots round the coast, a land plot's front's inset from the waterline and a water plot's origin's,
  *  metres; how much of the hill a terrace is cut into at its back at most, metres; of how many main islands drawn the
- *  one whose terraces stand lowest is taken, and of how many orders of the plots round its coast. */
+ *  one whose terraces stand lowest is taken, and of how many orders of the plots round its coast; how far a plot's
+ *  plinth stands proud of the ground levelled under it, and over how many metres round it that ground eases back into
+ *  the hill. */
 export const CAMPUS = {
   radius: [50, 55], round: [0.6, 1.35], islets: [3, 8], out: [15, 90], gap: 3, inset: 1.5, water: 2.5, cut: 2.5, draws: 3, orders: 16,
+  course: 0.25, ease: 4,
 } as const;
 
 /** A plot: its chart (centre at its origin, axis its x along the coast; its z, axis × at, out to sea), the terrace's
@@ -60,6 +78,20 @@ export interface Site {
 }
 /** A building's plot. */
 export interface Plot extends Site { building: Building }
+
+/**
+ * A crew's rookery, as the rookery's screen shows it (Phase C's, from the career's office.ts): the crew's seed (its
+ * campus planet's: under 2^20), its colours (race.ts Colours: indices into the palette's CREW swatches) and emblem
+ * (0–11); each building's level (0: none yet, 1–3); and each building under way, how much of its next level is built
+ * (0–1) and how many days it has left.
+ */
+export interface Rookery {
+  seed: number;
+  colours: { first: number; second: number };
+  emblem: number;
+  levels: Readonly<Record<Building, number>>;
+  under: Readonly<Partial<Record<Building, { share: number; days: number }>>>;
+}
 
 /** The campus: the main island's centre and how far its apron reaches, metres; the nine plots in BUILDINGS' order;
  *  the crew's quay (a plot of its own), and its two berths (where a ship lies, the way her bow points). */
@@ -139,8 +171,8 @@ function laid(site: IslandSite, order: readonly Stand[], from: number): Stood[] 
 }
 
 /** The ground kept clear on the main island for the plots and the quay: round each, as far as it reaches. */
-export function clearingsOf(site: IslandSite, seed: number): Clearing[] {
-  return standsOn(site, seed).map((s) => {
+function clearingsOf(stands: readonly Stood[]): Clearing[] {
+  return stands.map((s) => {
     const f = footprintOf(s.stand), reach = f.water ? f.back : Math.max(f.back, f.front);
     return { x: s.x, z: s.z, radius: Math.hypot(f.half, reach) + 2.5 };
   });
@@ -181,7 +213,8 @@ export function placeCampus(ground: Ground, noise: Noise3, seed: number, deepest
   const best = candidates.reduce((a, b) => (b.clear > a.clear ? b : a));
   const turn = rand() * 2 * Math.PI, { up, east, north } = frameAt(best.p);
   const home: IslandSite = { ...main, chart: { at: up, axis: add(scale(east, Math.cos(turn)), north, Math.sin(turn)) } };
-  const placed: IslandSite[] = [{ ...home, clearings: clearingsOf(home, seed) }];
+  const stands = standsOn(home, seed).map((s) => ({ ...s, ...terrace(home, s, footprintOf(s.stand)) }));
+  const placed: IslandSite[] = [{ ...home, mound: terraced(home, stands), clearings: clearingsOf(stands), stands }];
   const arc = (a: Vec3, b: Vec3) => Math.acos(Math.min(1, Math.max(-1, dot(a, b)))) * R;
   const islets = CAMPUS.islets[0] + Math.floor(rand() * (CAMPUS.islets[1] - CAMPUS.islets[0] + 1));
   const K = KINDS.islet;
@@ -218,6 +251,26 @@ function terrace(site: IslandSite, s: { x: number; z: number; out: readonly [num
   return { top: Math.max(middle, f.water ? 1.6 : 0.8) + 0.25, low: heights[0] };
 }
 
+/** The main island's ground with its plots levelled into it: under each, its terrace's top less a stone's course
+ *  (the plinth laid on it stands that much proud: campus/), eased back into the hill over CAMPUS.ease metres round it. */
+function terraced(site: IslandSite, stands: readonly (Stood & { top: number })[]): IslandSite['mound'] {
+  const plots = stands.map((s) => ({ s, f: footprintOf(s.stand), level: s.top - CAMPUS.course }));
+  return (x, z) => {
+    const h = site.mound(x, z);
+    let w = 0, to = h;
+    for (const { s, f, level } of plots) {
+      // (how far outside the plot's ground, in its own axes: x along the coast, z out to sea)
+      const dx = x - s.x, dz = z - s.z, b = dx * s.out[0] + dz * s.out[1], a = -dx * s.out[1] + dz * s.out[0];
+      const out = Math.hypot(Math.max(Math.abs(a) - f.half, 0), Math.max(-f.back - b, b - (f.water ? 0 : f.front), 0));
+      const k = 1 - Math.min(out / CAMPUS.ease, 1);
+      if (k > w) [w, to] = [k, level];
+    }
+    // (smoothly: no crease at the plot's edge)
+    const e = w * w * (3 - 2 * w);
+    return h + (to - h) * e;
+  };
+}
+
 /** A stand's chart on the sphere: its centre at its origin, its x along the coast, its z out to sea. */
 function chartOf(site: IslandSite, s: { x: number; z: number; out: readonly [number, number] }): Chart {
   const at = fromChart(site.chart, s.x, s.z), [e1, e2] = chartBasis(site.chart, at);
@@ -225,12 +278,12 @@ function chartOf(site: IslandSite, s: { x: number; z: number; out: readonly [num
   return { at, axis: normalize(cross(at, seaward)) };
 }
 
-/** The campus on a campus planet (its first island the main one: placeCampus) of this seed. */
-export function campusOf(islands: readonly IslandSite[], seed: number): Campus {
-  const site = islands[0], stands = standsOn(site, seed);
+/** The campus on a campus planet (its first island the main one, its stands placed: placeCampus). */
+export function campusOf(islands: readonly IslandSite[]): Campus {
+  const site = islands[0], stands = site.stands ?? [];
   const siteOf = (stand: Stand): Site => {
-    const s = stands.find((k) => k.stand === stand)!, f = footprintOf(stand);
-    return { chart: chartOf(site, s), ...terrace(site, s, f), ...f };
+    const s = stands.find((k) => k.stand === stand)!;
+    return { chart: chartOf(site, s), top: s.top, low: s.low, ...footprintOf(stand) };
   };
   const plots = BUILDINGS.map((building) => ({ building, ...siteOf(building) }));
   const quay = siteOf('quay');

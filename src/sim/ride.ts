@@ -131,8 +131,15 @@ export function knocked(r: Ride, s: ShipState, jolt: Vec3): Ride {
 /** Her ride as a gust lifts her off the water (gust.ts; 0117's hop): heaving up at GUST.hop m/s. */
 export const hopped = (r: Ride): Ride => ({ ...r, heaveRate: r.heaveRate + GUST.hop });
 
+/** Where she lies moored at `at` heading `heading` (a ship at a quay: the rookery's), riding the water as it is there
+ *  at `time`. */
+export function moored(at: Vec3, heading: Vec3, sea: Sea, time: number): ShipPose {
+  const w = water(at, heading, sea, time);
+  return pose({ at, heading }, { ...w, heel: 0 });
+}
+
 /** Where she lies: on her ride's level over where she is, pitched, then rolled and heeled. */
-export function pose(s: ShipState, r: Ride): ShipPose {
+export function pose(s: Pick<ShipState, 'at' | 'heading'>, r: Pick<Ride, 'heave' | 'pitch' | 'roll' | 'heel'>): ShipPose {
   const port = cross(s.at, s.heading);
   const cp = Math.cos(r.pitch), sp = Math.sin(r.pitch), lean = r.roll + r.heel;
   const forward = add(scale(s.heading, cp), s.at, sp);

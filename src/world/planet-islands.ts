@@ -153,6 +153,9 @@ export interface IslandSite {
   /** Circles on its chart kept clear of rocks, palms and shrubs (x, z, radius, metres): a campus's plots
    *  (rookery.ts). */
   clearings?: readonly { x: number; z: number; radius: number }[];
+  /** A campus's plots and its quay where they stand on its chart (rookery.ts Stood): what stands there, its origin, the
+   *  way out to sea (unit, on the chart) and its terrace's top and the lowest ground that was under it, metres. */
+  stands?: readonly { stand: string; x: number; z: number; out: readonly [number, number]; top: number; low: number }[];
 }
 
 const smoothstep = (a: number, b: number, x: number) => {

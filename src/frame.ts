@@ -21,6 +21,7 @@ import { createFleet } from './ship/fleet';
 import { createGunfire } from './gunfire/gunfire';
 import { createArms, muzzle } from './ship/arms';
 import { createLoot } from './loot/loot';
+import { createCampus } from './campus/campus';
 import { sunAt, sunInSky } from './world/sun';
 import { BLOOM_LEVELS, bloom } from './post/bloom';
 import { film } from './post/film';
@@ -130,7 +131,7 @@ export function createFrame(renderer: WebGPURenderer, world: World, options: Fra
   const scene = new Scene();
   scene.backgroundNode = sky.background;
   // the ground baked for the shaders in a worker, while the islands are built here
-  const ground = createGround(world.seed);
+  const ground = createGround(world.seed, world.campus !== null);
   const water = createWater(view, sky.light, ground, world.wind, options.fleet, options.length, options.sea);
   const shadow = createShadow();
   const light = createLighting(sky.light, water.below, shadow.visible);
@@ -139,6 +140,9 @@ export function createFrame(renderer: WebGPURenderer, world: World, options: Fra
   const seabed = createSeabed(view, ground, sand);
   const islands = createIslands(world.planet, world.seed, view, light, sand);
   shadow.cast(...islands.casters);
+  // a crew's rookery, on its campus planet only
+  const campus = world.campus && createCampus(world.campus, light, world.wind);
+  if (campus) shadow.cast(...campus.casters);
   const fleet = createFleet(light, world.wind, options.fleet);
   fleet.pin(options.lod);
   fleet.simulate(options.cloth);
@@ -146,7 +150,7 @@ export function createFrame(renderer: WebGPURenderer, world: World, options: Fra
   const gunfire = createGunfire(light);
   const loot = createLoot(light);
   const extras = options.extras?.(sky.light, world) ?? [];
-  scene.add(seabed.mesh, ...islands.meshes, ...fleet.meshes, ...arms.meshes, water.mesh, water.ribbons, ...gunfire.meshes, ...loot.meshes, ...extras);
+  scene.add(seabed.mesh, ...islands.meshes, ...(campus?.meshes ?? []), ...fleet.meshes, ...arms.meshes, water.mesh, water.ribbons, ...gunfire.meshes, ...loot.meshes, ...extras);
   // (named for the meter's split: meter.ts)
   scene.name = 'world';
   [seabed.mesh.name, water.mesh.name, water.ribbons.name] = ['seabed', 'sea', 'trails'];
@@ -306,6 +310,7 @@ export function createFrame(renderer: WebGPURenderer, world: World, options: Fra
     gunfire.draw(s.clock, s.balls);
     loot.draw(s.clock, s.loot, s.eye.position);
     arms.update(s.ships, s.eye.position);
+    campus?.update(s.campus, s.clock);
   }
 
   /**
@@ -398,6 +403,7 @@ export function createFrame(renderer: WebGPURenderer, world: World, options: Fra
     arms.dispose();
     gunfire.dispose();
     loot.dispose();
+    campus?.dispose();
     release(...extras);
   }
 

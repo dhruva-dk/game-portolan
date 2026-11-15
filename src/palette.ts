@@ -73,6 +73,23 @@ export const SMOKE = tones('#FFF1D6', '#D9907C');
 export const DUST = ink('#C9A06A');
 export const SOOT = ink('#5A4A55');
 
+// ---- the rookery's buildings (campus/): limestone and whitewash under terracotta and slate, brick for the works,
+// verdigris on the copper, dark panes that catch the sun
+export const STONE = tones('#E0C99A', '#9A6458');
+export const PLASTER = tones('#F4E4C2', '#C08A74');
+export const BRICK = tones('#B5533A', '#6A2838');
+export const ROOF_TILE = tones('#D2603C', '#82303E');
+export const SLATE = tones('#647490', '#323A5C');
+export const COPPER = tones('#5FBFA4', '#2C6A70');
+export const GLASS = tones('#35587A', '#1C2646');
+export const CANVAS = tones('#F2E6C8', '#B48C78');
+/** The test tank's water, and a doorway's dark. */
+export const TANK = tones('#3EC2C8', '#1E7090');
+export const DOORWAY = tones('#4A2E36', '#2A1A2A');
+/** A gull: white, its shadow a cool grey; and the foundry's coal smoke, greyer than powder smoke. */
+export const GULL = tones('#FFF8EC', '#9CA2C0');
+export const COAL_SMOKE = tones('#D8CCC4', '#7A6070');
+
 // ---- the loot
 export const ICE = tones('#8FE0F5', '#3F8FC9');
 /** A highlight on ice: white. */

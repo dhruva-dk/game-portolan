@@ -11,8 +11,12 @@ import { createFrame } from './frame';
 import { createMeter } from './meter';
 import { createGame } from './play/game';
 import { createReferee } from './play/referee';
+import { createRookeryView, type RookeryView } from './play/rookery';
 import { createMatches, startOf, watersOf } from './play/setup';
 import { SHIP } from './sim/handling';
+import { RIDE } from './sim/ride';
+import { createRookeryLabels, nearest } from './ui/rookery';
+import { createSwell } from './world/swell';
 import { SHIPS } from './sim/match';
 import type { Snapshot } from './snapshot';
 import { traceCoasts } from './ui/coasts';
@@ -44,6 +48,13 @@ function planetOf(renderer: WebGPURenderer, setup: Setup, seed: number) {
   return { world, frame, start: startOf(world.planet), matches: createMatches(seed, world.planet, setup.hold, setup.gun) };
 }
 
+/** A crew's campus planet of `seed` (world/rookery.ts) on a setup: its world and the frame that draws it, and what a
+ *  race planet has kept from `was` (no match is dealt on a campus). */
+function campusOf(renderer: WebGPURenderer, setup: Setup, seed: number, was: ReturnType<typeof planetOf>) {
+  const world = createWorld(seed, setup.mean, setup.swing, setup.hours, true);
+  return { ...was, world, frame: createFrame(renderer, world, setup.drawing) };
+}
+
 /** The renderer, made once; on it the planet of the setup's seed, and each one after it in its place (restage). */
 async function stage(setup: Setup): Promise<Stage> {
   if (!navigator.gpu) {
@@ -73,10 +84,10 @@ async function stage(setup: Setup): Promise<Stage> {
     get matches() { return planet.matches; },
     canvas: renderer.domElement,
     memory: () => ({ geometries: renderer.info.memory.geometries, textures: renderer.info.memory.textures }),
-    async restage(seed: number, then: () => Promise<void>) {
+    async restage(seed: number, then: () => Promise<void>, campus = false) {
       held = true;
       planet.frame.dispose();
-      planet = planetOf(renderer, setup, seed);
+      planet = campus ? campusOf(renderer, setup, seed, planet) : planetOf(renderer, setup, seed);
       await then();
       console.info(`planet ${seed}: ground baked in ${(await planet.frame.ready).toFixed(0)} ms`);
       planet.frame.resize(innerWidth, innerHeight);
@@ -157,15 +168,58 @@ async function play(s: Stage): Promise<Played> {
   });
   void s.ready.then(() => flow.ready());
 
+  // The rookery (play/rookery.ts): a crew's campus planet staged in the race planet's place (a race planet staged again
+  // only once a race needs it: racing), its view drawn in place of the game's while it is shown, the slips over it
+  let campus: { seed: number; view: RookeryView } | null = null, shown = false, clock = 0;
+  const slips = createRookeryLabels(layer);
+  const size = () => [s.canvas.clientWidth, s.canvas.clientHeight] as const;
+  const rookery: Played['rookery'] = {
+    async open(r) {
+      const seed = r.seed % 2 ** 20;
+      if (campus?.seed !== seed) {
+        await s.restage(seed, async () => {
+          const sea = createSwell(s.anchors, s.world.planet.height, s.world.climate.seaWind, { shortest: RIDE.shortest });
+          campus = { seed, view: createRookeryView(s.world.campus!, sea.hull) };
+        }, true);
+      }
+      campus!.view.show(r);
+      shown = true;
+    },
+    show: (r) => campus?.view.show(r),
+    select: (b) => campus?.view.select(b),
+    get selected() { return campus?.view.selected ?? null; },
+    anchors: () => campus?.view.anchors(...size()) ?? [],
+    pick: (x, y) => nearest(rookery.anchors(), x, y)?.building ?? null,
+    close() {
+      shown = false;
+      slips.update(null);
+    },
+    get shown() { return shown; },
+  };
+  const racing = async () => {
+    if (!campus) return;
+    rookery.close();
+    campus = null;
+    await restage();
+  };
+
   return {
     get game() { return on.game; },
     get referee() { return on.referee; },
-    flow, play: deal, map, restage,
+    flow, play: deal, map, restage, rookery, racing,
     // the full map just opened, or a cross-fade waiting, holds the game's frame the moment it is drawn; the way home
     // counts the lobby's frames
     drawn: (canvas) => flow.drawn(canvas),
     next(dt: number): Snapshot | null {
       const hands = input.read();
+      if (shown && campus) {
+        // the rookery's view, turned by the look's drag; the game not stepped meanwhile
+        stick(null);
+        campus.view.look(hands.look.x, hands.look.y);
+        campus.view.step(dt);
+        slips.update(campus.view.labels(...size()));
+        return campus.view.snapshot((clock += dt));
+      }
       const { game, referee } = on;
       stick(game.steering() ? hands.stick : null);
       game.step(dt, hands);

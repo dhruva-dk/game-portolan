@@ -101,6 +101,20 @@ export interface Sea {
   colours: readonly Vec3[];
 }
 
+/**
+ * A crew's rookery as the frame draws it on its campus planet (world/rookery.ts, campus/): each building's level (0:
+ * none yet, 1–3) and how much of its next level is built while one is under way (0–1; null: none under way), in
+ * world/rookery.ts BUILDINGS' order; the crew's colours (linear rgb), its first on the doors, hulls and flags' fields and
+ * its second on the awnings, sails and emblems; its emblem (0–11).
+ */
+export interface CampusDraw {
+  levels: readonly number[];
+  rising: readonly (number | null)[];
+  first: Vec3;
+  second: Vec3;
+  emblem: number;
+}
+
 /** Everything the frame draws, for one frame. */
 export interface Snapshot {
   eye: Eye;
@@ -123,6 +137,8 @@ export interface Snapshot {
   blasts: readonly Blast[];
   /** Who holds the sea, if anyone does (none before a match). */
   sea?: Sea;
+  /** The crew's rookery, on a campus planet (frame.ts draws it only there). */
+  campus?: CampusDraw;
 }
 
 /** The orientation of an eye at `eye` looking at `at`, `up` up the screen (as three turns a camera to look at a point). */

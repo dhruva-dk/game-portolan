@@ -29,7 +29,7 @@ export interface World { seed: number; planet: Planet; wind: Wind; climate: Clim
 export function createWorld(seed: number, mean: Weather, swing: Weather, hours: number, campus = false): World {
   const planet = createPlanet(seed, campus);
   return {
-    seed, planet, wind: createWind(seed), campus: campus ? campusOf(planet.islands, seed) : null,
+    seed, planet, wind: createWind(seed), campus: campus ? campusOf(planet.islands) : null,
     climate: { timeOfDay: hours, sunPlaces: sunPlaces(planet.islands), weather: createWeather(seed, mean, swing), seaWind: mean.wind },
   };
 }

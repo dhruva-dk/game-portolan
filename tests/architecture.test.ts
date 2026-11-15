@@ -105,13 +105,13 @@ const LAYERS: Record<string, readonly string[]> = {
   'water/': ['water/', ...RENDER, 'view/', 'sky/sky.ts', 'land/ground.ts', 'ship/build.ts', 'ship/materials.ts', 'ship/waterline.ts', 'sim/wake.ts'],
   'gpu.ts': ['three'],
   'tsl.ts': ['three'],
-  'frame.ts': ['three', 'gpu.ts', 'tsl.ts', 'palette.ts', 'snapshot.ts', 'environment.ts', 'world/', 'view/', 'sky/', 'land/', 'water/', 'ship/', 'gunfire/', 'loot/', 'post/'],
+  'frame.ts': ['three', 'gpu.ts', 'tsl.ts', 'palette.ts', 'snapshot.ts', 'environment.ts', 'world/', 'view/', 'sky/', 'land/', 'water/', 'ship/', 'gunfire/', 'loot/', 'campus/', 'post/'],
   'meter.ts': ['three'],
   // the debug tools, and the switches that drive the game through what it offers anyone
   'fly.ts': ['three', 'world/', 'snapshot.ts'],
   'probe.ts': ['three', 'world/', 'sky/sky.ts'],
   'debug.ts': [
-    'play/colours.ts', 'play/game.ts', 'play/referee.ts', 'play/setup.ts', 'play/state.ts', 'ui/flow.ts', 'ui/ui.ts', ...NEUTRAL, 'frame.ts', 'world/',
+    'play/colours.ts', 'play/game.ts', 'play/referee.ts', 'play/setup.ts', 'play/state.ts', 'ui/flow.ts', 'ui/ui.ts', 'ui/rookery.ts', ...NEUTRAL, 'frame.ts', 'world/',
     'sim/fixed.ts', 'sim/handling.ts', 'sim/match.ts', 'sim/storm.ts', 'fly.ts', 'probe.ts',
   ],
   'main.ts': ['*'],

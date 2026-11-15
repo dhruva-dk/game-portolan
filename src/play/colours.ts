@@ -23,12 +23,14 @@ export const lookOf = (id: number): Look => {
   return { paint: c, sail: c, pattern: id % 4 === 3 ? 'band' : 'plain' };
 };
 
+/** A crew's swatch (race.ts Colours' indices into the palette's CREW), linear rgb. */
+export const swatch = (i: number): Vec3 => dye(CREW[((i % CREW.length) + CREW.length) % CREW.length].rgb);
+
 /** A ship's colours in a match dealt `card` (none: lookOf): her hull painted her side's first swatch, her canvas its
  *  second; the side's first ship (2k) plain, its second (2k + 1) banded. */
 export const lookIn = (card: RaceCard | undefined, id: number): Look => {
   const s = card?.ships.find((k) => k.id === id);
   if (!s) return lookOf(id);
-  const swatch = (i: number) => dye(CREW[((i % CREW.length) + CREW.length) % CREW.length].rgb);
   return { paint: swatch(s.colours.first), sail: swatch(s.colours.second), pattern: id % 2 === 0 ? 'plain' : 'band' };
 };
 
