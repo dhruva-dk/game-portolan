@@ -1,6 +1,6 @@
 // Stars, age, growth and retirement (Phase B section 2.2).
 
-import type { Role } from '../office.ts';
+import type { Building, Role } from '../office.ts';
 import { seeded, type Rand } from './dice.ts';
 import { stat, withStats, type Gull } from './roles.ts';
 import { TUNING } from './tuning.ts';
@@ -39,7 +39,7 @@ function share(g: Gull, season: number, i: number): number {
 export interface Schooling { school: number; mentor: boolean; sailingSchool: number }
 
 /** The building whose level schools each role (Phase B section 2.2); managers and elders have none. */
-export const SCHOOL: Readonly<Record<Role, string | null>> = {
+export const SCHOOL: Readonly<Record<Role, Building | null>> = {
   captain: 'sailingSchool', flight: 'flightLoft', bosun: 'factory', shipwright: 'drawingLoft', scout: 'crowsNest', manager: null, elder: null,
 };
 

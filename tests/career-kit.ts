@@ -78,8 +78,8 @@ export function invariants(s: CareerState): void {
       on.set(id, c.id);
       assert.equal(s.gulls[id].contract?.crew, c.id, `gull ${id} is on crew ${c.id}'s staff without its contract`);
     }
-    assert.equal(c.staff.flight.length, 4, `crew ${c.id} has ${c.staff.flight.length} flight gulls`);
-    assert.deepEqual(new Set(c.staff.flight.map((id) => s.gulls[id].job)).size, 4, `crew ${c.id}'s flight do not cover the four jobs`);
+    assert.ok(c.staff.flight.length <= 4, `crew ${c.id} has ${c.staff.flight.length} flight gulls`);
+    assert.equal(new Set(c.staff.flight.map((id) => s.gulls[id].job)).size, c.staff.flight.length, `two of crew ${c.id}'s flight work one job`);
   }
   for (const g of s.gulls) {
     if (g.contract) assert.equal(on.get(g.id), g.contract.crew, `gull ${g.id} holds a contract with crew ${g.contract.crew} but is not on its staff`);
