@@ -34,7 +34,9 @@
 // watches; won sinks every other, the last by her; result sinks her and all but one other, so the match is over.
 // ?sink=seconds sinks her so many seconds into the frames drawn, ?win=seconds every other ship then, so she wins;
 // ?leave=seconds taps LEAVE then (home to the lobby under the parchment, where her screen has that way: ui/passage.ts);
-// ?skip=seconds taps SKIP then (sunk, the race run on to its result).
+// ?skip=seconds taps SKIP then (sunk, the race run on to its result). ?spectate=bot,seconds sinks her then and watches
+// that bot (by its id; with screen=play, a race's: its flights called as its bot calls them; ?spectate=flight,seconds
+// the first bot whose flight is under way then).
 // ?ships= sets them on the sea ahead of her (demoShips), ?way=m/s gives them a straight
 // course at that speed, their helms lashed, and ?heading=deg turns them all. ?ahead=seconds sails the game on that
 // long before the first frame, and ?pause holds it there from then on (the frame still draws: the arrival's stills).
@@ -162,7 +164,11 @@ export async function scenario(release: Setup, stage: (setup: Setup) => Promise<
     ...(params.get('fire') ? [{ at: fireAt || 0, hands: { fire: true } }] : []),
     ...(swing ? [{ at: swing[2] || 0, hands: { look: { x: swing[0] || 0, y: swing[1] || 0, held: false } } }] : []),
   ];
-  // ?sink and ?win: her end, and ?down: one sunk by her, so many seconds into the frames drawn; ?leave: her tap on LEAVE
+  // ?sink and ?win: her end, and ?down: one sunk by her, so many seconds into the frames drawn; ?leave: her tap on LEAVE;
+  // ?spectate=bot,seconds: sunk then, watching that bot (?spectate=flight,seconds: the first whose flight is under way)
+  const [watched, watchAt] = (params.get('spectate') ?? '').split(',').map(Number);
+  let last: Snapshot | null = null;
+  const flown = () => last?.flights?.find((f) => f.id !== PLAYER)?.id ?? PLAYER + 1;
   const ends = [
     ...(params.has('leave') ? [{ at: number('leave', 0), act: () => p.flow.tap('leave') }] : []),
     ...(params.has('skip') ? [{ at: number('skip', 0), act: () => p.flow.tap('skip') }] : []),
@@ -170,10 +176,12 @@ export async function scenario(release: Setup, stage: (setup: Setup) => Promise<
     ...(params.has('win') ? [{ at: number('win', 0), act: () => winHer(p.game) }] : []),
     ...(params.has('down') ? [{ at: number('down', 0), act: () => downOne(p.game) }] : []),
     ...(params.get('kit') ? [{ at: number('kit', 0), act: () => kit(p.game) }] : []),
+    ...(params.has('spectate') ? [{ at: watchAt || 0, act: () => spectate(p, Number.isNaN(watched) ? flown() : watched) }] : []),
   ];
   let drawn = 0;
   return s.draw((real) => {
     const dt = paused ? 0 : real * slow, frame = p.next(dt);
+    last = frame ?? last;
     for (const t of timed) if (drawn <= t.at && drawn + dt > t.at) p.game.step(STEP, { ...IDLE, ...t.hands });
     // ?fire's trigger held: pressed for the frames' next steps
     if (held > 0 && drawn > fireAt && drawn <= fireAt + held) p.game.step(0, { ...IDLE, fire: true });
@@ -273,6 +281,16 @@ async function rookery3d(s: Stage, p: Played) {
 function sinkHer(game: Game) {
   const by = game.alive().find((id) => id !== PLAYER);
   game.debug.sink(PLAYER, by !== undefined && params.get('by') !== 'storm' ? by : null);
+}
+
+/** Sinks her and watches ship `id` (?spectate=), as she would watch once sunk: a bot's race (her flight called, her
+ *  gulls at work on her deck) seen as hers is. */
+function spectate(p: Played, id: number) {
+  sinkHer(p.game);
+  p.referee.update(0);
+  p.referee.watch();
+  p.referee.turnTo(id);
+  p.flow.go('spectate');
 }
 
 /** The first other ship afloat, sunk by her. */

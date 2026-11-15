@@ -45,6 +45,13 @@ export function createReferee(game: Game) {
       m = switched(m, game.alive(), by);
       aim(m);
     },
+    /** Watching, she turns ship by ship to ship `id`, if it is afloat (debug.ts ?spectate=). */
+    turnTo(id: number) {
+      if (!m || !watching || !game.alive().includes(id)) return;
+      const alive = game.alive();
+      for (let k = 0; k < alive.length && m.watch !== id; k++) m = switched(m, alive, 1);
+      aim(m);
+    },
     /** The match after a frame of dt seconds: her end as the screens show it, or null while she fights or with no
      *  match. */
     update(dt: number): End | null {
