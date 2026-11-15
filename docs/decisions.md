@@ -142,3 +142,17 @@ decisions are in #56, section 2.
   Worker and on the page's thread. Worker and page agree to the bit; node does not, from the planet's ground on: V8's
   `Math.sin`, `cos`, `atan2`, `exp` and the like differ in their last bits between node 26.11 and Chromium 156. Left
   open as #62 (accept per-engine results, or our own math in sim and world); the tool still exits 1 on it.
+- **Question:** #62, node and Chromium differing in the last bits. **Choice (the orchestrator's ruling):** a race's
+  result must be identical within one engine only. `tools/league.ts` checks the Worker against the page, and node
+  against node (the race run twice, each on a planet built afresh), and exits 1 only if either pair differs; where
+  node and the browser part is still printed, for the record. No hand-written maths in sim/ or world/. **Why:** the
+  game runs races only in the browser, and the journal stores each RaceResult rather than re-running it.
+- **Question:** Skip to result with 80 ships ran about 4× real time. **Choice (the orchestrator's ruling):** Skip runs
+  under the parchment passage (`ui/passage.ts`) with the world not drawn and a progress line, in slices of up to 25 ms
+  a frame, then the parchment lifts onto the result. Watch keeps the world drawn as before. **Why:** nothing is drawn
+  under the parchment, so the race may take three times the slice the live match may.
+- **Question:** `play/state.ts` was at 447 of 450 lines before steps 6–9 add to it. **Choice (the orchestrator's
+  ruling, split by responsibility):** each ship's orders for a step (the bots' thinking) moved to `play/orders.ts
+  command` (`Bridge` in, helms and orders out; `Hand` is what a bot sails by); what is kept aboard each ship and how
+  the ships are drawn between two steps (`Aboard`, `Wreck`, the sea's colours, `drawnShips`, `drawnPose`) to
+  `play/aboard.ts`. state.ts keeps the step's order and the match's bookkeeping. Results unchanged to the bit.
