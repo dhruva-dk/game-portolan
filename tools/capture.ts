@@ -7,11 +7,14 @@
 // half of frames, writes captures/<query>.png.
 // Each shot also checks the page: every element of the UI layer (each HTML element, each sheet's <svg>, and each
 // press-able region drawn in one) must lie within the 1180 × 820 page. One that does not is named, and the tool fails
-// (exit 1) once every shot is taken.
+// (exit 1) once every shot is taken. A shot of the office's page is checked further (checks.ts: no scrolling, tap
+// targets 44 × 44 and 8 px apart, text 13 px and up at 7 : 1), and the screens' files for colour literals; any failure
+// fails the tool. e.g. node tools/capture.ts screen=home screen=found screen=kit
 // The frame rate is uncapped, so the FPS printed is a cost measure; GPU timestamps read 0 when uncapped.
 // --passes prints the meter's split of a frame's draw calls by pass and by what is drawn (src/meter.ts).
 
 import { mkdirSync } from 'node:fs';
+import { literals, officeChecks } from './checks.ts';
 import { DEVICE, launch } from './launch.ts';
 
 const flag = (name: string, fallback: number) => Number(process.argv.find((a) => a.startsWith(`--${name}=`))?.split('=')[1] ?? fallback);
@@ -26,7 +29,7 @@ const SLACK = 0.5;
 
 const { browser, url, close } = await launch();
 mkdirSync(out, { recursive: true });
-let outside = 0;
+let outside = 0, failed = 0;
 
 try {
   for (const q of queries) {
@@ -51,18 +54,25 @@ try {
         const r = el.getBoundingClientRect();
         if (r.width === 0 || r.height === 0) return [];
         if (r.left >= -slack && r.top >= -slack && r.right <= w + slack && r.bottom <= h + slack) return [];
+        // (a list's rows scrolled out of its panel are inside the page: the panel scrolls them in)
+        for (let a = el.parentElement; a; a = a.parentElement) if (/(auto|scroll)/.test(getComputedStyle(a).overflowY)) return [];
         const name = `${el.tagName.toLowerCase()}${el.id ? `#${el.id}` : ''}${el.getAttribute('class') ? `.${el.getAttribute('class')!.trim().replace(/\s+/g, '.')}` : ''}`;
         return [`${name} at ${r.left.toFixed(0)},${r.top.toFixed(0)} to ${r.right.toFixed(0)},${r.bottom.toFixed(0)}`];
       }), { w: DEVICE.width, h: DEVICE.height, slack: SLACK });
       for (const o of off) console.error(`[${q}] outside the page: ${o}`);
       outside += off.length;
+      // the office's page: scrolling, tap targets, text size and contrast (checks.ts)
+      const office = await officeChecks(page);
+      for (const o of office) console.error(`[${q}] ${o}`);
+      failed += office.length;
     }
     await page.close();
   }
 } finally {
   await close();
 }
-if (outside > 0) {
-  console.error(`${outside} element(s) of the UI outside the ${DEVICE.width} × ${DEVICE.height} page`);
-  process.exit(1);
-}
+const named = literals();
+for (const l of named) console.error(l);
+if (outside > 0) console.error(`${outside} element(s) of the UI outside the ${DEVICE.width} × ${DEVICE.height} page`);
+if (failed + named.length > 0) console.error(`${failed + named.length} failure(s) of the office's checks`);
+if (outside + failed + named.length > 0) process.exit(1);

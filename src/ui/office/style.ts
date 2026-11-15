@@ -7,7 +7,7 @@ const CSS = `
 .o-root { position: absolute; inset: 0; background: ${DESK}; overflow: hidden; }
 .o-top { position: absolute; left: 0; top: 0; width: 1180px; height: 64px; display: grid; grid-template-columns: 220px 680px 280px;
   background: ${PAPER}; border-bottom: 3px double ${INK.iron}; z-index: 20; }
-.o-who { display: flex; align-items: center; gap: 8px; padding: 0 8px 0 12px; min-width: 0; }
+.o-who { display: flex; align-items: center; gap: 8px; padding: 0 2px 0 8px; min-width: 0; margin-right: 8px; }
 .o-id { min-width: 0; line-height: 1.15; }
 .o-id > div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .o-crew { display: flex; align-items: center; gap: 4px; color: ${TEXT.faint}; }
@@ -35,7 +35,8 @@ const CSS = `
 .o-emblem { width: 52px; height: 52px; border: 1px solid ${INK.iron}; background: ${PAPER}; display: flex; align-items: center; justify-content: center; }
 .o-emblem.on { outline: 3px double ${INK.iron}; outline-offset: 2px; background: ${PALE.sand}; }
 .o-label { font-size: ${TYPE.small}px; color: ${TEXT.faint}; font-variant: small-caps; letter-spacing: .05em; margin: 10px 0 6px; }
-.o-lines { display: grid; grid-template-columns: 1fr auto; column-gap: 12px; row-gap: 4px; align-items: baseline; }
+.o-lines { display: grid; grid-template-columns: 1fr auto; column-gap: 12px; row-gap: 8px; align-items: baseline; }
+.o-lines + .o-lines { margin-top: 8px; }
 .o-ways { display: flex; flex-direction: column; gap: 10px; align-items: stretch; }
 .o-ways .k-btn { justify-content: flex-start; }
 .k-range { width: 100%; height: 44px; accent-color: ${INK.iron}; pointer-events: auto; }

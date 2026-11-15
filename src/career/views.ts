@@ -116,7 +116,7 @@ function tableWindow(s: CareerState, c: Crew): StandingLine[] {
   const from = Math.max(0, Math.min(rows.length - 5, at - 2));
   return rows.slice(from, from + 5).map((r, i) => {
     const above = from + i > 0 ? rows[from + i - 1] : null, k = s.crews[r.crew];
-    return { place: r.place, crew: r.crew, name: r.name, emblem: k.emblem, colours: k.colours, points: r.points, gap: above ? `−${above.points - r.points}` : '', mine: r.mine };
+    return { place: r.place, crew: r.crew, name: r.name, emblem: k.emblem, colours: k.colours, points: r.points, gap: !above ? '' : above.points === r.points ? 'level' : `−${above.points - r.points}`, mine: r.mine };
   });
 }
 

@@ -129,7 +129,8 @@ export function createFound(send: Send): Screen<FoundView> {
     face.set(faceOf(k));
     ship.innerHTML = svg(300, 250, `<rect x="0" y="0" width="300" height="250" fill="${crewWash(k.colours.second)}"/>`
       + galleon(150, 120, 230, { sail: crewInk(k.colours.second), hull: crewInk(k.colours.first), waves: true })
-      + emblem(k.emblem, 268, 32, 40, { ink: crewInk(k.colours.first), ground: PAPER }));
+      // (the crew's mark on a roundel on the mainsail)
+      + emblem(k.emblem, 150, 92, 34, { ink: crewInk(k.colours.first), ground: PAPER }));
     Object.assign((ship.firstElementChild as SVGElement).style, { width: '100%', height: '250px', marginBottom: '14px', border: '1px solid currentColor' });
     barFace.set(faceOf(k));
     barName.textContent = `${k.given} ${k.family}`.trim() || 'Your name';

@@ -62,7 +62,7 @@ const CSS = `
 .k-face { display: block; flex: none; }
 .k-stars { display: inline-flex; gap: 1px; vertical-align: middle; }
 
-.k-stat { display: grid; grid-template-columns: 1fr 120px 44px; align-items: center; gap: 10px; min-height: 26px; }
+.k-stat { display: grid; grid-template-columns: minmax(5.5em, max-content) minmax(64px, 1fr) 3em; align-items: center; gap: 10px; min-height: 26px; }
 .k-bar { position: relative; height: 12px; border: 1px solid ${INK.iron}; background: ${PAPER}; }
 .k-bar > i { position: absolute; left: 1px; top: 1px; bottom: 1px; width: 0; transition: width ${MOTION.bar}ms ease-out; }
 .k-bar > b { position: absolute; top: -4px; bottom: -4px; width: 0; border-left: 2px solid ${INK.iron}; }
@@ -71,7 +71,7 @@ const CSS = `
 .k-meter .k-bar { grid-column: 1 / 3; height: 14px; }
 
 .k-fig { display: inline-grid; grid-template-columns: auto; row-gap: 0; }
-.k-fig .v { font-size: ${TYPE.heading}px; font-weight: 700; text-align: right; }
+.k-fig .v { font-size: ${TYPE.heading}px; font-weight: 700; text-align: right; white-space: nowrap; }
 .k-fig .c { font-size: ${TYPE.small}px; color: ${TEXT.faint}; text-align: right; }
 .k-fig.press .v { text-decoration: underline dotted; text-underline-offset: 4px; }
 
@@ -92,7 +92,8 @@ const CSS = `
 .k-plate .k-stat { grid-column: 1 / 3; }
 .k-card { display: grid; grid-template-columns: auto 1fr; column-gap: 12px; align-items: start; }
 .k-card .lines { display: grid; grid-template-columns: 1fr auto; column-gap: 12px; }
-.k-letter { border-left: 6px double ${INK.iron}; }
+.k-letter { border-left: 6px double ${INK.iron}; display: grid; grid-template-columns: 40px 1fr; column-gap: 10px; min-height: 44px;
+  align-content: start; flex: none; }
 .k-letter.unread .subj { font-weight: 700; }
 .k-letter .seal { color: ${TEXT.harm}; }
 .k-letter .meta { display: flex; justify-content: space-between; font-size: ${TYPE.small}px; color: ${TEXT.faint}; }
@@ -126,7 +127,8 @@ const CSS = `
 .k-empty .h { font-size: ${TYPE.heading}px; }
 .k-fig.press { min-height: 44px; min-width: 44px; }
 
-.k-field { display: flex; flex-direction: column; gap: 4px; }
+.k-field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.k-field input { width: 100%; min-width: 0; }
 .k-field label { font-size: ${TYPE.small}px; color: ${TEXT.faint}; font-variant: small-caps; letter-spacing: .05em; }
 .k-field input { font: inherit; font-size: ${TYPE.body}px; min-height: 44px; padding: 0 12px; background: ${PAPER}; color: ${TEXT.iron};
   border: 0; border-bottom: 1.5px solid ${INK.iron}; outline: none; pointer-events: auto; user-select: text; -webkit-user-select: text; }

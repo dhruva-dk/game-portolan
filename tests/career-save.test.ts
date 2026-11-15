@@ -150,7 +150,8 @@ test('a torn tail is dropped, the player told what was lost, and the store cut b
   if (!opened.ok) return;
   same(opened.kept, kept);
   assert.deepEqual(opened.lost, { actions: 1, since: kept.state.day });
-  assert.equal(lostSentence({ actions: 3, since: 41 }), 'The last 3 actions since Day 41 could not be read and were lost.');
+  assert.equal(lostSentence({ actions: 3, since: 41 }, 30), 'The last 3 actions, since Day 12, could not be read and were lost.');
+  assert.equal(lostSentence({ actions: 1, since: 0 }), 'The last action, since Day 1, could not be read and was lost.');
   assert.equal(disk.entries.length, kept.seq, 'the torn entry is gone from the store');
   const more = await run(memoryStore(disk), SHORT.slice(10, 20), opened.kept);
   const again = await open(memoryStore(disk), true);

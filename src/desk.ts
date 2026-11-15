@@ -26,7 +26,7 @@ export async function createDesk(shelf: Shelf, debug = false): Promise<Desk> {
     found: (seed: number, colours: Colours) => foundView(seed, colours),
     foundErrors,
     recover: () => recoverView({
-      from: opened.ok ? opened.from : 'new', lost: opened.ok && opened.lost ? lostSentence(opened.lost) : 'Nothing was lost.', failed: opened.ok ? null : opened.sentence,
+      from: opened.ok ? opened.from : 'new', lost: opened.ok && opened.lost ? lostSentence(opened.lost, opened.kept.state.calendar?.start) : 'Nothing was lost.', failed: opened.ok ? null : opened.sentence,
     }),
     settings: () => settingsView(shelf.backupDay.get()),
     async send(c: Command) {

@@ -183,7 +183,7 @@ async function settle(store: Store, found: Found): Promise<Found | null> {
 }
 
 /** The day a lost tail began and how many actions, as the player reads it. */
-export const lostSentence = (lost: Lost): string =>
-  `The last ${lost.actions} ${lost.actions === 1 ? 'action' : 'actions'} since Day ${lost.since} could not be read and were lost.`;
+export const lostSentence = (lost: Lost, seasonStart = 0): string => (lost.actions === 1 ? 'The last action' : `The last ${lost.actions} actions`)
+  + `, since Day ${lost.since - seasonStart + 1}, could not be read and ${lost.actions === 1 ? 'was' : 'were'} lost.`;
 
 export type { Entry } from './store.ts';

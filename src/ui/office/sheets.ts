@@ -115,7 +115,7 @@ export function kitSheet(): HTMLElement {
     fg.set(f);
     row.appendChild(fg.el);
   }
-  const disc = chartDisc(128);
+  const disc = chartDisc(96);
   disc.set(20261115);
   const pl = plate();
   pl.set({ type: 'sails', name: 'Lateen Mk II', tags: [{ text: 'Light' }], perf: 14, perfMax: 20, reliability: 9, reliabilityMax: 20, condition: 0.42 });

@@ -10,6 +10,7 @@ import { emblem } from '../emblem';
 import { PAPER, crewInk, glyph, svg } from '../ink';
 import { button } from '../kit/button';
 import { chartDisc } from '../kit/disc';
+import { empty } from '../kit/empty';
 import { figure } from '../kit/figure';
 import { headshot } from '../kit/headshot';
 import { letter } from '../kit/letter';
@@ -151,8 +152,10 @@ export function createHome(send: Send): Screen<HomeView> {
   const mail = panel({ from: 9, to: 12, top: 336, height: 388 }, { title: 'Mail' });
   const letters = Array.from({ length: 4 }, () => letter(() => send.tap('mail')));
   for (const l of letters) mail.body.appendChild(l.el);
-  Object.assign(mail.body.style, { display: 'flex', flexDirection: 'column', gap: '6px' });
-  const noMail = make('p', 'faint', mail.body, 'No letters yet.');
+  Object.assign(mail.body.style, { display: 'flex', flexDirection: 'column', gap: '8px', overflowY: 'auto', overscrollBehavior: 'contain' });
+  const noMail = empty();
+  noMail.set({ mark: 'tab.mail', title: 'No letters yet', sentence: 'Letters come as the days pass: offers, the yard, the elder.' });
+  mail.body.appendChild(noMail.el);
 
   el.append(race.el, ships.el, yard.el, league.el, mail.el);
 
@@ -189,7 +192,7 @@ export function createHome(send: Send): Screen<HomeView> {
         l.el.style.display = line ? '' : 'none';
         if (line) l.set({ line });
       });
-      noMail.style.display = v.mail.letters.length ? 'none' : '';
+      noMail.el.style.display = v.mail.letters.length ? 'none' : '';
     },
   };
 }
