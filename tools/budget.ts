@@ -24,6 +24,10 @@ const VIEWS: { name: string; q: string; own?: Partial<Budget> }[] = [
   // against the 0.4–0.5 million of the views at sea. It is held to that, not to the sea's limit: a planet with more
   // land, or a finer mesh, shows here.
   { name: 'map', q: 'screen=match&map', own: { triangles: 1_000_000 } },
+  // A crew's rookery (debug.ts ?screen=rookery-3d) from orbit over its campus, six buildings at their third level and
+  // three under way, then eased in to one of them; its own planet, so none of it is in the views above
+  { name: 'rookery', q: 'screen=rookery-3d' },
+  { name: 'rookery-near', q: 'screen=rookery-3d&select=foundry' },
 ];
 
 const { browser, url, close } = await launch();
@@ -45,7 +49,7 @@ try {
     const seen = { draws: Number(m[1]), triangles: Number(m[2]) * 1000, passes: Number(m[3]) };
     const breaches = MEASURES.filter((k) => seen[k] > limit[k]);
     over ||= breaches.length > 0;
-    console.log(`${breaches.length ? 'OVER' : 'ok  '} ${name.padEnd(6)} ${seen.draws} draws  ${m[2]}k tri  ${seen.passes} passes` +
+    console.log(`${breaches.length ? 'OVER' : 'ok  '} ${name.padEnd(12)} ${seen.draws} draws  ${m[2]}k tri  ${seen.passes} passes` +
       (breaches.length ? `  (over: ${breaches.join(', ')})` : '') + (own ? `  (its own: ${limit.triangles / 1000}k tri)` : ''));
   }
 } finally {

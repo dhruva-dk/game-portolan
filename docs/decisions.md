@@ -241,3 +241,38 @@ decisions are in #56, section 2.
   **Why:** the heap as V8 reports it grows some 0.3 MB a restage, all of it compiled code (machine code, feedback
   vectors, inline-cache handlers) as the game's code warms; the objects the page keeps grow some 17 KB a restage
   (0.4% over ten). Both are printed.
+
+## 2026-11-15, Phase D (#61)
+
+- **Question:** what the campus planet is (section 1). **Choice:** a race planet's generator with a campus flag
+  (`createPlanet(seed, true)`, `world/rookery.ts placeCampus`): the same radius, the same land, sea, sky and bake; one
+  main island (of three round draws with no offshore rock, the one whose terraces stand lowest) and three to eight
+  islets, these only for the view from orbit. **Why:** the rookery is seen with the race's own eye and look, so it
+  reuses every system; a smaller planet would need its own sea and eye tuning.
+- **Question:** where all nine plots stand. **Choice:** round the main island's coast, each on a terrace levelled into
+  the planet's mound (`terraced`: cut at most 2.5 m into the hill, eased over 4 m round it), the plots' ground kept
+  clear of rocks, palms and shrubs. The test bounds a terrace at 10 m over the sea (seed 1234 has one at 9.7 m).
+  **Why:** a building on a slope would float or sink; levelling the ground keeps the buildings' forms flat-bottomed and
+  their plinths short.
+- **Question:** where `Building` and `Rookery` (what a crew's campus is) live before Phase B's office. **Choice:**
+  `world/rookery.ts`, with each building's footprint and its heights per level (`FOOTPRINT`, `TALL`); Phase B's
+  `office.ts` may re-export them. **Why:** the planet's placement needs them, and world/ is below everything.
+- **Question:** how a building under way is drawn and what it takes. **Choice:** the next level's form inside
+  scaffolding, cut off at the share built (a mask on its height); the share is an input (`under[b].share`) beside the
+  days left. **Why:** Phase B gives only the day work is done; the share is what is drawn, and Phase C has both.
+- **Question:** screen anchors for the UI (section 1). **Choice:** `play/lens.ts onScreen` from the snapshot's eye
+  (`play/rookery.ts anchors`), not a new member of the frame. **Why:** the eye is the snapshot's, so the projection
+  already exists in play/; architecture test f2 (the frame's callers) is unchanged.
+- **Question:** the eye. **Choice:** the space eye over the campus, switched to the air eye under 160 m above the sea,
+  as the arrival does; orbit by yaw and tilt about a focus, eased (`VIEW`). **Why:** the space eye's near plane is 50 m,
+  too far to look at a building.
+- **Question:** the gulls over the flight loft. **Choice:** a simple flock in `campus/life.ts` (circling, wings beating
+  in the vertex shader), the seam where the flight-gull model goes when it lands. **Why:** the parallel agent's model
+  was not on manager; the flock takes a centre and a radius only.
+- **Question:** what runs on the campus. **Choice:** no game, referee or sounding; `restage(seed, then, true)` keeps the
+  last race planet's start and matches; `racing()` restages a race planet before PLAY if the campus is staged.
+  **Why:** the rookery is a view; a race restages anyway.
+- **Question:** what the budget and hitch tools judge for the rookery. **Choice:** two views in `tools/budget.ts`
+  (from orbit and near the foundry; some 59 draws and 323k triangles) and a window in `tools/hitch.ts` (the view eased
+  between buildings, levels changed); none of the campus is made on a race planet, so the race views are unchanged
+  (the map stays at 998k). **Why:** the brief asked for both to hold on the rookery's own view.

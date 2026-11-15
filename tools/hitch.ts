@@ -55,6 +55,11 @@ function traceEvents(trace: Buffer): TraceEvent[] {
   return events;
 }
 
+declare global {
+  /** What ?screen=rookery-3d puts on the page (debug.ts). */
+  interface Window { rookery: { shown: boolean; select(b: string | null): void }; crew(changes: object): void }
+}
+
 const { browser, url, close } = await launch();
 let failed = false;
 try {
@@ -187,6 +192,35 @@ try {
   console.log(`\n  ${strip.join(' · ')}`);
   failed = after.over50 > LIMIT.over50 || after.over33 > LIMIT.over33;
   console.log(`\n${failed ? 'OVER' : 'ok'}: from PLAY at most ${LIMIT.over50} frames over 50 ms and ${LIMIT.over33} over 33 ms (at --slow=1)`);
+
+  // The rookery's own view (debug.ts ?screen=rookery-3d), once it is drawn: the view eased from building to building,
+  // a building's level changed and work begun on another (its forms laid anew), the view turned; held to the same LIMIT
+  const rook = await browser.newPage({ viewport: { width: DEVICE.width, height: DEVICE.height }, deviceScaleFactor: DEVICE.dpr });
+  rook.on('pageerror', (e) => console.error(`[rookery] ${e.message}`));
+  await rook.goto(`${url}?screen=rookery-3d`);
+  await rook.waitForFunction(() => window.rookery?.shown, null, { timeout: 120000 });
+  await rook.waitForTimeout(2000);
+  const rcdp = await rook.context().newCDPSession(rook);
+  await rcdp.send('Emulation.setCPUThrottlingRate', { rate: slow });
+  await rook.evaluate(() => {
+    const tick = (t: number) => {
+      performance.mark('hitch:rookery', { startTime: t });
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  });
+  for (const [k, b] of ['factory', 'flightLoft', 'fishMarket', 'crowsNest', null].entries()) {
+    await rook.evaluate((b) => window.rookery.select(b), b);
+    if (k === 2) await rook.evaluate(() => window.crew({ levels: { factory: 1, drawingLoft: 2, testTank: 3, foundry: 2, sailingSchool: 1, flightLoft: 2, crowsNest: 2, fishMarket: 2, landingPad: 1 }, under: { landingPad: { share: 0.5, days: 6 } } }));
+    await rook.waitForTimeout(1600);
+  }
+  const rtimes = await rook.evaluate(() => performance.getEntriesByName('hitch:rookery').map((e) => e.startTime));
+  await rook.close();
+  const rframes = rtimes.slice(1).map((t, i) => ({ at: t, ms: t - rtimes[i], from: rtimes[i] }));
+  const viewed = report('the rookery', rframes, rtimes[0] ?? 0);
+  const rfailed = viewed.over50 > LIMIT.over50 || viewed.over33 > LIMIT.over33;
+  console.log(`${rfailed ? 'OVER' : 'ok'}: the rookery at most ${LIMIT.over50} frames over 50 ms and ${LIMIT.over33} over 33 ms`);
+  failed ||= rfailed;
 } finally {
   await close();
 }
