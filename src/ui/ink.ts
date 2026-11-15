@@ -4,7 +4,8 @@
 //
 // After the old game's instruments (commit ae981b6: src/chart/inks.ts, screens/instruments.ts).
 
-import { GLYPHS, type Glyph, type Prim } from './glyphs';
+import { CREW } from '../palette.ts';
+import { GLYPHS, type Glyph, type Prim } from './glyphs.ts';
 
 /** Inks: iron for outlines and figures, rubric for harm, the Storm's violet for the Storm alone, gold for the chosen and
  * the won. Lead white only ever over an iron halo, so it holds on bright water. */
@@ -23,6 +24,49 @@ export const PAPER = '#f1e4c8';
 export const CUT = '#f4e8cf';
 /** The numerals' face: an italic old style, the iPhone's own. */
 export const FIGURES = '"Iowan Old Style", "Palatino", Georgia, serif';
+
+// ---- the office's hand (Phase C): the management screens are a chartmaker's desk of papers. Text is set only on
+// paper and its washes, in inks deep enough to read at 7:1 (tools/capture.ts checks every screen).
+
+/** Text inks, deep enough to read on PAPER and every PALE wash at 7:1: iron for all ordinary text, `faint` for what
+ *  is said second, `harm` for the bad (a loss, a part failing, the dangerous button), `good` for the good, `sea` for
+ *  links and the chosen. */
+export const TEXT = {
+  iron: INK.iron, faint: 'rgb(74,54,36)', harm: 'rgb(132,28,12)', good: 'rgb(30,72,36)', sea: 'rgb(24,52,104)',
+} as const;
+export type TextInk = keyof typeof TEXT;
+/** Pale washes laid under text: a row picked, a warning, a field in error, a good thing. */
+export const PALE = {
+  sand: '#e9d7ad', rose: '#f0cdbd', moss: '#d5dfbf', sky: '#d3dce6', gold: '#ecd9a0',
+} as const;
+/** The desk the papers lie on (no text is set on it directly). */
+export const DESK = '#cdb385';
+/** A gull's colours, for the headshots (ui/gull.ts): white feathers grown, mottled brown young, grey old; the wings'
+ *  grey and their black tips; the yellow beak and its red spot; brass and gold for their fittings. */
+export const PLUMAGE = {
+  white: 'rgb(250,248,240)', grey: 'rgb(200,200,204)', young: 'rgb(178,150,116)', fleck: 'rgb(118,92,66)',
+  wing: 'rgb(170,176,190)', tip: 'rgb(30,28,32)', beak: 'rgb(240,190,60)', spot: 'rgb(200,40,30)', shade: 'rgb(150,140,130)',
+  brass: 'rgb(186,146,64)', glint: 'rgba(255,255,255,.75)',
+} as const;
+/** The office's type: its one face (an old style, never a sans), and its four sizes, px. Nothing smaller than small. */
+export const FACE = '"Iowan Old Style", "Palatino", "Book Antiqua", Georgia, serif';
+export const TYPE = { title: 28, heading: 20, body: 16, small: 13 } as const;
+/** The office's motion, ms: a stamp pressed, a bar filled; screens change by ui.ts fade. */
+export const MOTION = { stamp: 150, bar: 200 } as const;
+
+const srgb = (v: number) => Math.round(255 * (v <= 0.0031308 ? v * 12.92 : 1.055 * v ** (1 / 2.4) - 0.055));
+/** A crew's swatch (palette.ts CREW, by race.ts Colours index) as the screens' CSS colour. */
+export function crewInk(i: number): string {
+  const c = CREW[((i % CREW.length) + CREW.length) % CREW.length].rgb;
+  return `rgb(${srgb(c[0])},${srgb(c[1])},${srgb(c[2])})`;
+}
+/** A crew's swatch washed pale over the paper (a fifth of it), light enough to set iron text on at 7:1. */
+export function crewWash(i: number): string {
+  const c = CREW[((i % CREW.length) + CREW.length) % CREW.length].rgb, p = [241, 228, 200];
+  return `rgb(${[0, 1, 2].map((k) => Math.round(0.22 * srgb(c[k]) + 0.78 * p[k])).join(',')})`;
+}
+/** A swatch's name ("vermilion"). */
+export const crewName = (i: number) => CREW[((i % CREW.length) + CREW.length) % CREW.length].name;
 
 /** The shared defs: the paper's gradient, the slips' shadow, a hatch per ink (and a denser one for large glyphs). */
 export const DEFS = (() => {

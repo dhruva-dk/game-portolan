@@ -37,6 +37,16 @@ export const GLYPHS = {
   'part.hull': [{ k: 'f', d: 'M2 10.6H22L19.4 17.6Q18.8 19.2 17.2 19.2H6.8Q5.2 19.2 4.6 17.6Z' },{ k: 's', d: 'M4.2 14.4H19.8', w: 1.2, cut: true }],
   'part.keel': [{ k: 'f', d: 'M3 5.4H21L17.4 11.4H6.6Z' },{ k: 'f', d: 'M10.6 11.4H13.4L14.2 18.6Q12 21.2 9.8 18.6Z' }],
   'part.mounts': [{ k: 'f', d: 'M3.4 11.2L17.4 8.2L18.2 11.6L4.2 14.6Z' },{ k: 'f', d: 'M6.4 16.6a2.6 2.6 0 1 1 5.2 0a2.6 2.6 0 1 1 -5.2 0ZM13.4 16.6a2.6 2.6 0 1 1 5.2 0a2.6 2.6 0 1 1 -5.2 0Z' }],
+  // the office's tabs (Phase C section 5): the chartmaker's house, a gull's head, a hull, the rookery's tower, a pair of
+  // scales, a pennant, a coin, a letter; and the Coin itself
+  'tab.home': [{ k: 'f', d: 'M3 11.4L12 3.4L21 11.4V20.6H3Z' },{ k: 'f', d: 'M9.6 20.6V14.4H14.4V20.6Z', cut: true },{ k: 's', d: 'M1.6 12.4L12 3L22.4 12.4', w: 1.8 }],
+  'tab.crew': [{ k: 'f', d: 'M5 19.6Q4.6 11 9.6 7.6Q13.6 5 17.2 7.4Q19.4 9 19.4 12Q19.4 15.6 15.2 16.4L13.6 19.6Z' },{ k: 'f', d: 'M17.8 11.4L23 12.6L17.6 13.8Z' },{ k: 'f', d: 'M14.2 10.4a1.2 1.2 0 1 1 2.4 0a1.2 1.2 0 1 1 -2.4 0Z', cut: true }],
+  'tab.ship': [{ k: 'f', d: 'M2.4 14.4H21.6L18.6 19.6H5.4Z' },{ k: 's', d: 'M12 14.4V2.8', w: 1.6 },{ k: 'f', d: 'M12.8 4L19.4 12.4H12.8Z' },{ k: 'f', d: 'M11.2 5.4L5.6 12.4H11.2Z' }],
+  'tab.rookery': [{ k: 'f', d: 'M7.4 21V8.4H16.6V21Z' },{ k: 'f', d: 'M6 8.4L12 2.6L18 8.4Z' },{ k: 'f', d: 'M10.6 21V16.4Q12 14.8 13.4 16.4V21Z', cut: true },{ k: 'f', d: 'M10.8 10.4H13.2V13H10.8Z', cut: true },{ k: 's', d: 'M2.4 21.2H21.6', w: 1.6 }],
+  'tab.market': [{ k: 's', d: 'M12 3V20.4M8 20.6H16M3.6 6.4H20.4', w: 1.8 },{ k: 'f', d: 'M1.6 12.4Q4.6 15.6 7.6 12.4L4.6 6.4Z' },{ k: 'f', d: 'M16.4 12.4Q19.4 15.6 22.4 12.4L19.4 6.4Z' }],
+  'tab.league': [{ k: 's', d: 'M5 2.6V21.6', w: 2 },{ k: 'f', d: 'M6 3.4H20.6L16.6 8L20.6 12.6H6Z' },{ k: 's', d: 'M2.4 21.4H8.6', w: 1.8 }],
+  'tab.finance': [{ k: 'f', d: 'M3 12a9 9 0 1 1 18 0a9 9 0 1 1 -18 0Z' },{ k: 's', d: 'M5.6 12a6.4 6.4 0 1 1 12.8 0a6.4 6.4 0 1 1 -12.8 0', w: 1, cut: true },{ k: 's', d: 'M14 8.6Q12 7.4 10.6 8.4Q9.4 9.6 11 11.2L13 12.8Q14.6 14.4 13.4 15.6Q12 16.6 10 15.4M12 6.6V17.4', w: 1.5, cut: true }],
+  'tab.mail': [{ k: 'f', d: 'M2.4 5.6H21.6V18.4H2.4Z' },{ k: 's', d: 'M2.8 6L12 13.2L21.2 6', w: 1.6, cut: true },{ k: 'f', d: 'M10 11.6a2 2 0 1 1 4 0a2 2 0 1 1 -4 0Z', top: true }],
 } satisfies Record<string, Prim[]>;
 
 export type Glyph = keyof typeof GLYPHS;
