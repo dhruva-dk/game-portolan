@@ -1,6 +1,7 @@
 // What is heard from what she sees and holds as it changes, frame to frame (the deeds on the sea are the match's
 // moments: status.moments, her guns' among them): a slot of her stores taken in hand, a ball passing near the eye, her water (a loop closed, her trail cut, her own
-// water left and entered), the storm beginning to close, her rigging at an end of her roll, and the
+// water left and entered), the storm beginning to close, her rigging at an end of her roll, every ship's flight's gulls
+// (hearFlights), and the
 // screens (a folio opened and closed, PLAY, her end); and what the bed follows (Bed): her speed, the wind in her rig,
 // her heave and roll, the nearest coast, the storm's wall, her hull, and how much of the sea is heard at all (and how
 // much the screens cover it).
@@ -9,7 +10,7 @@
 // ground in a ring round her, a few points a frame.
 
 import { HOTBAR, type GunKind, type Kit, type Screen, type Status } from '../player.ts';
-import type { ShipDraw, Snapshot } from '../snapshot.ts';
+import type { FlightDraw, ShipDraw, Snapshot } from '../snapshot.ts';
 import { R, type Vec3 } from '../world/sphere.ts';
 import type { Cue } from './cues.ts';
 
@@ -67,6 +68,7 @@ export function createListen(ground: (p: Vec3) => number) {
   const bed: Bed = { speed: 0, wind: 0, heave: 0, roll: 0, coast: Infinity, wall: Infinity, hull: 1, presence: 0, muffle: 0, covered: 0, clock: 0 };
   let screen: Screen | null = null, map = false, generation = -1, seq = 0, trail = false, closing = false;
   let chosen = 0;
+  const flights = new Map<number, Flown>();
   let lift = NaN, roll = 0, rolling = 0, turned = 0, side = 1, whistled = -Infinity;
   /** Land found on the ring (1) or not (0), each way and distance; the next to sound. */
   const land = new Uint8Array(RING.length * WAYS);
@@ -138,6 +140,8 @@ export function createListen(ground: (p: Vec3) => number) {
         if (!fresh && !open && trail && !claimed && own) call('enter');
         trail = open;
       }
+      if (fresh) flights.clear();
+      hearFlights(scene, flights, call);
       if (s.closing && !closing && FOUGHT(shown)) call('closing');
       closing = s.closing;
 
@@ -189,6 +193,35 @@ export function createListen(ground: (p: Vec3) => number) {
       return bed;
     },
   };
+}
+
+/** A flight as last heard: how far it had come, its job, whether botched, and where her ship was (world metres). */
+interface Flown { coming: number; job: FlightDraw['job']; botched: boolean; at: Vec3 }
+/** Metres over the sea a flight is heard crying from as it sets out (gulls/gulls.ts SET_OUT). */
+const SET_OUT = 30;
+
+/** Every ship's flight (scene.flights) as it changes: its gulls crying as they set out, beating aboard as they come,
+ *  crying at each job begun (louder at a botch), and beating away and crying as it ends. `heard` is what was. */
+function hearFlights(scene: Snapshot, heard: Map<number, Flown>, call: (cue: Cue, at: Vec3 | null, gain?: number) => void) {
+  const now = new Set<number>();
+  for (const f of scene.flights ?? []) {
+    const ship = scene.ships.find((s) => s.id === f.id);
+    if (!ship) continue;
+    now.add(f.id);
+    const at = ship.pose.position, was = heard.get(f.id);
+    if (!was) call('cry', [f.from[0] * (R + SET_OUT), f.from[1] * (R + SET_OUT), f.from[2] * (R + SET_OUT)], 0.8);
+    else {
+      if (f.coming >= 1 && was.coming < 1) call('wings', at);
+      if (f.job && f.job !== was.job) call('cry', at, 0.6);
+      if (f.botched && !was.botched) call('cry', at, 1.2);
+    }
+    heard.set(f.id, { coming: f.coming, job: f.job, botched: f.botched, at });
+  }
+  for (const [id, was] of heard) if (!now.has(id)) {
+    call('wings', was.at);
+    call('cry', was.at, 0.5);
+    heard.delete(id);
+  }
 }
 
 /** The screens where the storm is heard closing: a match still being fought. Not ui/ways.ts IN_MATCH, which holds

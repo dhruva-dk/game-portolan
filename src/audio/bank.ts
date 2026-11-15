@@ -8,6 +8,7 @@ import { GUNS, ready, reload, report, select, swap, wind, type GunKind } from '.
 import { hurt, ring, shatter, sink, splash, strike, thud, whistle } from './sounds/blows.ts';
 import { claim, closing, cut, enter, gust, leave, mendHull, mendWard, rope, took } from './sounds/sea.ts';
 import { close, launch, lost, open, salute, tap } from './sounds/ui.ts';
+import { cry, wings } from './sounds/gulls.ts';
 
 /**
  * A sound:
@@ -53,6 +54,8 @@ const SOUND = {
   enter: { make: enter, takes: 1, level: -20, priority: 3, reach: 0 },
   leave: { make: leave, takes: 1, level: -24, priority: 3, reach: 0 },
   closing: { make: closing, takes: 1, level: -10, priority: 5, reach: 0 },
+  wings: { make: wings, takes: 2, level: -13, priority: 3, reach: 140 },
+  cry: { make: cry, takes: 3, level: -12, priority: 3, reach: 260 },
   tap: { make: tap, takes: 2, level: -16, priority: 5, reach: 0 },
   open: { make: open, takes: 1, level: -16, priority: 5, reach: 0 },
   close: { make: close, takes: 1, level: -12, priority: 5, reach: 0 },

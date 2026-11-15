@@ -21,7 +21,7 @@ export const DEEDS = ['fired', 'winding', 'reloading', 'reloaded', 'swapped', 'f
 export const CUE_NAMES = [
   'fire', 'fired', 'wind', 'wound', 'reload', 'splash', 'thud', 'strike', 'hurt', 'ring', 'shatter', 'sank', 'sunk',
   'took', 'swap', 'mendWard', 'mendHull', 'gust', 'ready', 'select', 'whistle', 'claim', 'cut', 'enter', 'leave',
-  'closing', 'rope', 'tap', 'open', 'close', 'launch', 'lost', 'salute',
+  'closing', 'rope', 'wings', 'cry', 'tap', 'open', 'close', 'launch', 'lost', 'salute',
 ] as const;
 export type Cue = (typeof CUE_NAMES)[number];
 
@@ -72,6 +72,9 @@ export const CUES: Record<Cue, CueSound> = {
   closing: { sound: 'closing', level: 0, bus: 'own' },
   // her rigging on the roll
   rope: { sound: 'rope', level: 0, bus: 'own' },
+  // a flight's gulls, hers or another's, from where they are: beating aboard and away, crying at a job or a botch
+  wings: { sound: 'wings', level: 0, bus: 'world' },
+  cry: { sound: 'cry', level: 0, bus: 'world' },
   // the screens
   tap: { sound: 'tap', level: 0, bus: 'ui' },
   open: { sound: 'open', level: 0, bus: 'ui' },

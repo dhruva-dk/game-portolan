@@ -9,7 +9,7 @@ import { VOICES, claim, playing, pool } from '../src/audio/voices.ts';
 import { breakers, galeOf, levels, levelsOf } from '../src/audio/bed.ts';
 import { KINDS } from '../src/kinds.ts';
 import { HOTBAR, type GunKind, type Kit, type Status } from '../src/player.ts';
-import type { BallDraw, Blast, Eye, ShipDraw, Snapshot } from '../src/snapshot.ts';
+import type { BallDraw, Blast, Eye, FlightJob, ShipDraw, Snapshot } from '../src/snapshot.ts';
 import { R, normalize, scale, type Vec3 } from '../src/world/sphere.ts';
 import { inverse, lookAt, rotate } from '../src/world/turn.ts';
 
@@ -200,6 +200,25 @@ test('listen: a ball passing near whistles once; a slot of her stores taken in h
   // the way home's parchment: the bed follows how much of the world it covers
   assert.equal(l.listen(hearing(scene(3.5), status(), 'result', false, 0.4), dt, out).covered, 0.4);
   assert.equal(l.listen(hearing(scene(3.6), status(), 'lobby', false, 0), dt, out).covered, 0);
+});
+
+test('listen: a flight\'s gulls cry as it sets out, beat aboard, cry at each job and louder at a botch, beat away as it ends', () => {
+  const l = createListen(() => -20), out: Call[] = [], dt = 1 / 30;
+  const heard = (t: number, flights: Snapshot['flights']) => {
+    out.length = 0;
+    l.listen(hearing({ ...scene(t), flights }, status()), dt, out);
+    return out.map((c) => `${c.cue}${c.gain > 1 ? '!' : ''}`);
+  };
+  const f = (coming: number, job: FlightJob | null = null, botched = false) => [{ id: 0, from: at, coming, job, botched }];
+  assert.deepEqual(heard(0, []), []);
+  assert.deepEqual(heard(0.1, f(0.01)), ['cry']);
+  assert.deepEqual(heard(0.2, f(0.5)), []);
+  assert.deepEqual(heard(0.3, f(1)), ['wings']);
+  assert.deepEqual(heard(0.4, f(1, 'mend')), ['cry']);
+  assert.deepEqual(heard(0.5, f(1, 'mend', true)), ['cry!']);
+  assert.deepEqual(heard(0.6, f(1, 'mend')), []);
+  assert.deepEqual(heard(0.7, []), ['wings', 'cry']);
+  assert.deepEqual(heard(0.8, []), []);
 });
 
 test('the bed: the storm heard from afar and all about her inside; surf only near a coast; levels bounded', () => {
