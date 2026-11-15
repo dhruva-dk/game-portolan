@@ -26,7 +26,7 @@ import { SHIP } from '../sim/handling.ts';
 import { sunk, whole } from '../sim/health.ts';
 import type { RaceCard } from '../race.ts';
 import { homed, regain } from '../sim/holding.ts';
-import { PLAYER, credited, type Cause } from '../sim/match.ts';
+import { PLAYER, credited, oneSide, type Cause } from '../sim/match.ts';
 import { berths } from '../sim/spawn.ts';
 import { hopped, knocked, pose, ride, settled, type Ride } from '../sim/ride.ts';
 import { berthed, overboard, strewn, type Flotsam, type Goods } from '../sim/loot.ts';
@@ -43,6 +43,8 @@ import { add, scale, type Vec3 } from '../world/sphere.ts';
 import { LOOK, lookIn, seaColourOf } from './colours.ts';
 import { bearing, fitIn, fleetOf, seedIn, sideIn, type Afloat, type Berth, type Match, type Sinking, type Stepped, type Part, type Waters } from './match.ts';
 import { blastsOf, deedsOf, kept as keptDeeds } from './moments.ts';
+import { createTally } from './result.ts';
+import type { RaceResult } from '../race.ts';
 import { sinking } from './sinking.ts';
 
 export { PARTS, bearing, fleetOf, type Afloat, type Berth, type Match, type Part, type Sinking, type Stepped, type Waters } from './match.ts';
@@ -110,6 +112,8 @@ export function createState(planet: Planet, sea: Hull, { chart, water }: Waters,
   let territory: Territory | null = null;
   /** Which match's sea it is (snapshot.ts Sea generation): one more for each sea cleared. */
   let generation = 0;
+  /** The race's tally (result.ts), and its result once it is over (every ship afloat of one side, or none). */
+  let tally = createTally(0), ended: RaceResult | null = null;
 
   /** Puts a ship to sea: a bot's unless she is the player's (and `manned`) or her helm is lashed. */
   const launch = (id: number, ship: ShipState, look: Look, lashed: Helm | null = null, manned = true) => {
@@ -137,6 +141,7 @@ export function createState(planet: Planet, sea: Hull, { chart, water }: Waters,
     battle = battleOf(ids.map((id) => ({ ...crew(id), side: sideIn(m, id), health: whole(fitIn(m, id).hull) })), match.seed);
     const count = Math.max(...ids) + 1;
     territory = held ? createTerritory(count, Array.from({ length: count }, (_, id) => sideIn(m, id))) : null;
+    [tally, ended] = [createTally(count), null];
     generation++;
     begun = tick;
     quiet = false;
@@ -153,6 +158,7 @@ export function createState(planet: Planet, sea: Hull, { chart, water }: Waters,
     if (!a || !v) return;
     sinkings.push({ id, by, cause, time: time(), at: v.ship.at, heading: v.ship.heading });
     lostNow.push({ id, by, at: v.ship.at });
+    tally.sank(id, territory?.share(id) ?? 0);
     territory?.sink(id, tick * STEP);
     wrecks.push({ id, look: a.look, pose: a.after, tick, side: seedOf(id) & 1 ? 1 : -1 });
     aboard.delete(id);
@@ -264,6 +270,19 @@ export function createState(planet: Planet, sea: Hull, { chart, water }: Waters,
     wrecks = wrecks.filter((w) => wreckAt(w, clock(0)));
   };
 
+  /** A ship sunk where she lies, with nothing spilled: hers at no one's hand, by `cause`. */
+  const scuttle = (id: number, by: number | null, cause: Cause) => {
+    battle = { ...battle, crews: battle.crews.map((c) => (c.id === id ? { ...c, health: { ...c.health, hull: 0, shield: 0 } } : c)) };
+    founder(id, by, cause);
+  };
+
+  /** The race's result kept the step it ends: every ship afloat of one side, or none (a match's sea only). */
+  const settle = () => {
+    const alive = battle.crews.filter((c) => !sunk(c.health)).map((c) => c.id);
+    if (ended || !territory || !oneSide(alive, (id) => sideIn(match, id))) return;
+    ended = tally.result(match, alive, sinkings, (id) => territory?.share(id) ?? 0, time());
+  };
+
   /** What the step did kept (moments.ts), with any ship sunk in it: its deeds, numbered on, and what the guns did, to
    *  be drawn from this step on. */
   const record = (done: Parameters<typeof deedsOf>[0]) => {
@@ -291,6 +310,8 @@ export function createState(planet: Planet, sea: Hull, { chart, water }: Waters,
       rideOn(met, wants.blew);
       lap?.('ride');
       founderAll(lost, fought);
+      tally.step(fought.shots, fought.strikes);
+      settle();
       lap?.('founder');
       record({ ...fought, cues: [...wants.cues, ...fought.cues], sunk: lostNow, took: kept.took, mended: kept.mended, blew: wants.blew, her: fleet.find((v) => v.id === PLAYER)?.ship.at ?? null });
       lap?.('keep');
@@ -359,6 +380,10 @@ export function createState(planet: Planet, sea: Hull, { chart, water }: Waters,
     alive: () => battle.crews.filter((c) => !sunk(c.health)).map((c) => c.id),
     /** Every ship sunk so far, in the order they went down (a new entry is a ship just sunk). */
     sinkings: (): readonly Sinking[] => sinkings,
+    /** A ship's side (race.ts RaceShip; her id in a card-less match). */
+    sideOf: (id: number) => sideIn(match, id),
+    /** The race's result (result.ts), once it is over: as it stood the step it ended; else null. */
+    result: (): RaceResult | null => ended,
     /** Every ship of the match, afloat or sunk, as she stands now, in order of her id. */
     ships: (): Afloat[] => {
       const afloatNow = new Map(fleet.map((v) => [v.id, v.ship]));
@@ -377,7 +402,10 @@ export function createState(planet: Planet, sea: Hull, { chart, water }: Waters,
       flotsam = berthed(flotsam, at.map((b) => b.at), m.seed, depth);
       at.forEach((b, id) => launch(id, shipAt(b.at, b.heading), lookIn(m.card, id), null, manned));
       territory?.begin(at.map((b) => b.at), tick * STEP);
-      return aboard.get(PLAYER)!.after;
+      // her ship forfeit (race.ts RaceShip; only hers is ever): sunk at second 0, at no one's hand
+      const her = aboard.get(PLAYER)!.after;
+      if (m.card?.ships[PLAYER]?.forfeit) scuttle(PLAYER, null, 'forfeit');
+      return her;
     },
     /** A quiet sea for the lobby: her ship alone at `start`. Returns her pose. */
     anchor(start: { at: Vec3; bearing: number }): ShipPose {
@@ -408,9 +436,8 @@ export function createState(planet: Planet, sea: Hull, { chart, water }: Waters,
         if (!aboard.has(id)) return;
         const before = flotsam.next, s = spilled(battle.crews, flotsam, fleet, [id], match.seed);
         for (let n = before; n < s.flotsam.next; n++) born.set(n, tick * STEP);
-        flotsam = s.flotsam;
-        battle = { ...battle, crews: s.crews.map((c) => (c.id === id ? { ...c, health: { ...c.health, hull: 0, shield: 0 } } : c)) };
-        founder(id, by, by === null ? 'storm' : 'shot');
+        [flotsam, battle] = [s.flotsam, { ...battle, crews: s.crews }];
+        scuttle(id, by, by === null ? 'storm' : 'shot');
         record({ shots: [], splashes: [], strikes: [], cues: [], sunk: lostNow, took: [], mended: [], blew: [], her: null });
       },
     },

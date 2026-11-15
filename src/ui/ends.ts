@@ -2,10 +2,10 @@
 //   result   sunk, a band across the top: her place in its laurel over how many began (17 over 80), what sank her (a
 //            ball, a ram, the Storm) in a paper disc, and the sea she held (her share of the planet's water); the
 //            middle of the screen, her ship going down, left clear. Won, her place gilt in a sunburst beside the sea
-//            she held. At the foot her ways on, each a banner: the spyglass (watch the match on: spectate) while ships
-//            still fight, and the anchor (home)
-//   watching small marks at the edges while she watches another ship: the anchor's disc at the top left (home), and
-//            at the foot the spyglass between the arrows that turn her to the next ship or the one before
+//            she held. At the foot her ways on, each a banner: the spyglass (watch the match on: spectate) and the
+//            skip's chevrons (the race run on to its end) while ships still fight, and the anchor (home)
+//   watching small marks at the edges while she watches another ship: the anchor's disc at the top left (home), the
+//            skip's beside it, and at the foot the spyglass between the arrows that turn her to the next ship or the one before
 // No words; numerals only.
 
 import type { End } from '../player';
@@ -57,10 +57,17 @@ export const anchor = (x: number, y: number, s: number) => {
 const chevron = (x: number, y: number, side: number) =>
   `<path d="M${x - 6 * side} ${y - 11}L${x + 6 * side} ${y}L${x - 6 * side} ${y + 11}" fill="none" stroke="${INK.iron}" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>`;
 
-/** What sank her, in a paper disc: a gun for a ball, two hulls met for a ram, the Storm's whirl. */
+/** Skip to the result: two chevrons to the right, run together, and a bar at their head; `s` its width. */
+export const skipMark = (x: number, y: number, s: number) => {
+  const k = s / 40, line = `fill="none" stroke="${INK.iron}" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"`;
+  return `<g transform="translate(${x} ${y}) scale(${k})"><path d="M-18 -12L-4 0L-18 12M-4 -12L10 0L-4 12" ${line}/>`
+    + `<path d="M17 -12V12" ${line}/></g>`;
+};
+
+/** What sank her, in a paper disc: a gun for a ball, two hulls met for a ram, the Storm's whirl; nothing, forfeit. */
 const cause = (x: number, y: number, how: End['how']) => {
   const r = 22;
-  const mark = how === 'shot' ? glyph('weapon.cannon', x, y, 32)
+  const mark = how === 'forfeit' ? '' : how === 'shot' ? glyph('weapon.cannon', x, y, 32)
     : how === 'storm' ? glyph('hud.storm', x, y, 32, { ink: 'storm' })
       : `<g transform="translate(${x} ${y})" stroke="${INK.iron}" stroke-width="1.4" stroke-linejoin="round">`
         + `<path d="M-17 -2L-3 -2L1 2L-3 7L-15 7Z" fill="url(#h-iron)"/><path d="M17 -2L3 -2L-1 2L3 7L15 7Z" fill="url(#h-iron)" transform="scale(1 -1) translate(0 -5)"/>`
@@ -90,7 +97,7 @@ const sunburst = (x: number, y: number, r: number) => {
 const AT = { x: W / 2, band: 30, line: 88, sun: 116, foot: H - 100 } as const;
 
 /** Her result over the world: what it shows, and its ways on (watch: null while there is no match on to watch). */
-export function createResult(act: { watch(): void; leave(): void }) {
+export function createResult(act: { watch(): void; skip(): void; leave(): void }) {
   const s = sheet(false, false);
   // shade at the top and the foot, under the band and the ways on; the middle, where her ship is, left clear
   s.root.style.background = 'linear-gradient(to bottom, rgba(20,12,6,.42), rgba(20,12,6,0) 30%, rgba(20,12,6,0) 76%, rgba(20,12,6,.42))';
@@ -114,11 +121,16 @@ export function createResult(act: { watch(): void; leave(): void }) {
         + `<path d="M${l + 130} ${AT.band + 16}V${AT.band + 100}" stroke="${INK.iron}" stroke-width=".8" opacity=".6"/>`
         + cause(l + 166, y, end.how) + held(l + 220, y, 16) + figure(l + 242, y, percent(end.share), 26, { anchor: 'start' });
     const ways = watching
-      ? `<g id="watch">${banner(x - 98, foot, 176, spyglass(x - 102, foot - 4, 68))}</g><g id="leave">${banner(x + 98, foot, 176, anchor(x + 94, foot - 4, 52))}</g>`
+      ? `<g id="watch">${banner(x - 184, foot, 166, spyglass(x - 188, foot - 4, 64))}</g>`
+        + `<g id="skip">${banner(x, foot, 166, skipMark(x - 4, foot - 4, 46))}</g>`
+        + `<g id="leave">${banner(x + 184, foot, 166, anchor(x + 180, foot - 4, 50))}</g>`
       : `<g id="leave">${banner(x, foot, 196, anchor(x - 4, foot - 4, 56), won)}</g>`;
     const el = s.set(body + ways);
     region(el, 'leave', act.leave);
-    if (watching) region(el, 'watch', act.watch);
+    if (watching) {
+      region(el, 'watch', act.watch);
+      region(el, 'skip', act.skip);
+    }
   };
   return {
     /** Shows her end, with WATCH while the match goes on; or hides it. Shown already, it only loses WATCH once the
@@ -126,10 +138,11 @@ export function createResult(act: { watch(): void; leave(): void }) {
     show(on: boolean, end?: End) {
       if (on && end && !shown) draw(end);
       else if (on && end?.over && watching) {
-        // the match ended under it: WATCH fades, LEAVE stays where it is
-        const w = s.root.querySelector<SVGGElement>('#watch');
-        w?.classList.remove('press');
-        w?.setAttribute('style', 'transition: opacity .3s; opacity: 0');
+        // the match ended under it: WATCH and SKIP fade, LEAVE stays where it is
+        s.root.querySelectorAll<SVGGElement>('#watch, #skip').forEach((w) => {
+          w.classList.remove('press');
+          w.setAttribute('style', 'transition: opacity .3s; opacity: 0');
+        });
         watching = false;
       }
       shown = on;
@@ -143,9 +156,9 @@ export function createResult(act: { watch(): void; leave(): void }) {
   };
 }
 
-/** While she watches: the anchor's disc (home) at the top left, and at the foot the spyglass between the arrows that
- *  turn her to the ship before (−1) or the next (+1). */
-export function createWatching(act: { leave(): void; switch(by: number): void }) {
+/** While she watches: the anchor's disc (home) at the top left and the skip's disc beside it (the race run on to its
+ *  end), and at the foot the spyglass between the arrows that turn her to the ship before (−1) or the next (+1). */
+export function createWatching(act: { leave(): void; switch(by: number): void; skip(): void }) {
   const root = document.createElement('div');
   root.className = 'screen';
   root.style.display = 'none';
@@ -153,6 +166,10 @@ export function createWatching(act: { leave(): void; switch(by: number): void })
   const leave = piece(root, 'top left', true);
   leave.innerHTML = svg(56, 56, paperDisc(28, 28, 25) + anchor(28, 28, 36));
   onTap(leave, act.leave);
+  const skip = piece(root, 'top left', true);
+  skip.style.marginLeft = '62px';
+  skip.innerHTML = svg(56, 56, paperDisc(28, 28, 25) + skipMark(28, 28, 30));
+  onTap(skip, act.skip);
   const foot = piece(root, 'bottom centre');
   foot.innerHTML = svg(196, 60, slip(64, 10, 68, 42) + spyglass(98, 31, 52));
   for (const by of [-1, 1]) {

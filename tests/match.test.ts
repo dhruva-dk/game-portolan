@@ -3,8 +3,26 @@ import assert from 'node:assert/strict';
 import { CREDIT, PLAYER, credited, startMatch, stepMatch, switched, type MatchState, type Sunk } from '../src/sim/match.ts';
 
 /** Steps a match through frames of `dt`, each with what the game reports then. */
-const run = (m: MatchState, frames: { sinkings: Sunk[]; alive: number[]; share?: number }[], dt = 1 / 30) =>
+const run = (m: MatchState, frames: { sinkings: Sunk[]; alive: number[]; share?: number; sideOf?: (id: number) => number }[], dt = 1 / 30) =>
   frames.reduce((s, f) => stepMatch(s, f, dt), m);
+
+test('a race of sides (#58): over once every ship afloat is of one side; she watches her crewmate first; won is afloat at the end', () => {
+  const sideOf = (id: number) => id >> 1;
+  // her side and side 2 afloat: on. Ship 4 sinks: only her side afloat, she with it: won, over
+  let m = run(startMatch(), [{ sinkings: [], alive: [0, 1, 4], sideOf }]);
+  assert.deepEqual([m.phase, m.over], ['fighting', false]);
+  m = run(m, [{ sinkings: [{ id: 4, by: 1, cause: 'shot' }], alive: [0, 1], sideOf }]);
+  assert.deepEqual([m.phase, m.over], ['won', true]);
+  // she sinks with her crewmate afloat and a foe: she watches her mate, not the ship that sank her; on until one side
+  const down: Sunk[] = [{ id: PLAYER, by: 4, cause: 'shot' }];
+  m = run(startMatch(), [{ sinkings: down, alive: [1, 4, 5], sideOf }]);
+  assert.deepEqual([m.phase, m.watch, m.over], ['spectating', 1, false]);
+  m = run(m, [{ sinkings: [...down, { id: 1, by: 5, cause: 'ram' }], alive: [4, 5], sideOf }]);
+  assert.deepEqual([m.watch, m.over], [5, true]);
+  // her crewmate the last afloat: over, and she, sunk, has not won
+  m = run(startMatch(), [{ sinkings: down, alive: [1, 4], sideOf }, { sinkings: [...down, { id: 4, by: 1, cause: 'shot' }], alive: [1], sideOf }]);
+  assert.deepEqual([m.phase, m.over], ['spectating', true]);
+});
 
 test('sunk, she places one behind the ships still afloat, and watches the one that sank her', () => {
   const sinkings: Sunk[] = [{ id: 4, by: 2, cause: 'shot' }, { id: 5, by: null, cause: 'storm' }];
@@ -86,11 +104,11 @@ test('sunk in the same step as others, the sinkings count one by one in the orde
   // she and two more go down in one step, she second of the three: one sunk after her, two afloat
   const sinkings: Sunk[] = [{ id: 4, by: 1, cause: 'shot' }, { id: PLAYER, by: 1, cause: 'ram' }, { id: 5, by: null, cause: 'storm' }];
   assert.equal(run(startMatch(), [{ sinkings, alive: [1, 2] }]).place, 4);
-  // the last two afloat sinking at once: she sank second, so she is the last afloat, and wins (not first by the ships
-  // afloat after the step, which would place her first however the two went down)
+  // the last two afloat sinking at once: she sank second, so she is first (not first by the ships afloat after the
+  // step, which would place her first however the two went down); but sunk, so not won (#58: won is afloat at the end)
   const both: Sunk[] = [{ id: 1, by: PLAYER, cause: 'ram' }, { id: PLAYER, by: 1, cause: 'ram' }];
   const m = run(startMatch(), [{ sinkings: both, alive: [] }]);
-  assert.deepEqual([m.phase, m.place], ['won', 1]);
+  assert.deepEqual([m.phase, m.place, m.over], ['spectating', 1, true]);
   // sinking first of the two, she is second
   const first = run(startMatch(), [{ sinkings: [both[1], both[0]], alive: [] }]);
   assert.deepEqual([first.phase, first.place], ['spectating', 2]);

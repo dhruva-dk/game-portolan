@@ -137,12 +137,12 @@ export interface Kit {
   gust: number; gusts: number; blowing: boolean;
 }
 
-/** Her match's end, as the screens show it: how it came (she won, or what sank her: a ball, a ram, the Storm), her
- *  place of how many began, the share of the planet's water she held (0…1), the ships still afloat; whether the
- *  camera has had its beat on her end (play/finale.ts), so her result may be laid over the world; whether the match
- *  is over (she won, or one ship or none is afloat). */
+/** Her match's end, as the screens show it: how it came (she won, or what sank her: a ball, a ram, the Storm; or she
+ *  forfeit the race), her place of how many began (the race's order once it is over), the share of the planet's water
+ *  she held (0…1), the ships still afloat; whether the camera has had its beat on her end (play/finale.ts), so her
+ *  result may be laid over the world; whether the race is over (every ship afloat of one side, or none). */
 export interface End {
-  how: 'won' | 'shot' | 'ram' | 'storm';
+  how: 'won' | 'shot' | 'ram' | 'storm' | 'forfeit';
   place: number; of: number; share: number; afloat: number;
   settled: boolean; over: boolean;
 }

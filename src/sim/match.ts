@@ -1,15 +1,17 @@
 // The match's course for the player, as 0117 ran it (app.ts follow, session.ts spectate/rewatch):
 //   fighting   at sea, from the start (every ship begins afloat: spawn.ts)
-//   spectating she has sunk: who she would watch is the ship that sank her, or else the one afloat with the most
-//              sinkings to her name; when that one sinks, the one that sank her, and so on; she may turn to another
-//              afloat (switched)
-//   won        she is the last afloat
-// Nothing moves on by itself: the match is over (over) once she has won or, she sunk, one ship or none is afloat, and
-// what follows is hers to choose (ui/flow.ts). Her place, as 0117 settled it (sim/end.ts sink): the ships not yet sunk
-// as she sank, herself among them, the sinkings of one step counted one by one in the order the game reports them; so,
-// the last ships all sunk at once, the last of them to sink is first and wins. With her place, how she sank and at
-// whose hand: the Storm's sinking goes to the ship that last struck her if it did so within CREDIT seconds
-// (credited). Pure: a value stepped by what the game reports.
+//   spectating she has sunk: who she would watch is her crewmate while she is afloat, else the ship that sank her,
+//              or else the one afloat with the most sinkings to her name; when that one sinks, the one that sank her,
+//              and so on; she may turn to another afloat (switched)
+//   won        the race ended with her afloat
+// The race ends (over) when every ship afloat is of one side, or none is (#58: ships 2k and 2k + 1 are side k; with
+// no sides given, each ship is a side of her own). What follows is hers to choose (ui/flow.ts). Her place as she
+// sinks, as 0117 settled it (sim/end.ts sink): the ships not yet sunk as she sank, herself among them, the sinkings
+// of one step counted one by one in the order the game reports them (the race's whole order is play/result.ts's).
+// With her place, how she sank and at whose hand: the Storm's sinking goes to the ship that last struck her if it did
+// so within CREDIT seconds (credited). Pure: a value stepped by what the game reports.
+
+import type { Cause as RaceCause } from '../race.ts';
 
 export type Phase = 'fighting' | 'spectating' | 'won';
 
@@ -20,8 +22,15 @@ export const PLAYER = 0;
  *  MATCH.ships was 20). */
 export const SHIPS = 80;
 
-/** How a ship sank: by a ball, a ram, or the Storm. */
-export type Cause = 'shot' | 'ram' | 'storm';
+/** How a ship sank: by a ball, a ram, or the Storm; or she never sailed (race.ts: forfeit). */
+export type Cause = RaceCause;
+
+/** Each ship's side (race.ts RaceShip), by id: her own id when none is given. */
+export type SideOf = (id: number) => number;
+const own: SideOf = (id) => id;
+
+/** Whether every ship of `alive` is of one side (true of none): the race is over. */
+export const oneSide = (alive: readonly number[], sideOf: SideOf = own) => alive.every((id) => sideOf(id) === sideOf(alive[0]));
 
 /** A ship sunk: who, who sank her (null: the storm, or none), and how. */
 export interface Sunk { id: number; by: number | null; cause: Cause }
@@ -44,7 +53,7 @@ export interface MatchState {
   watch: number;
   /** Seconds since her end (sunk or won); 0 while she fights. */
   since: number;
-  /** The match is over: she has won, or she has sunk and one ship or none is afloat. */
+  /** The race is over: every ship afloat is of one side, or none is afloat. */
   over: boolean;
   /** How many of the game's sinkings this has read. */
   read: number;
@@ -53,9 +62,9 @@ export interface MatchState {
   share: number;
 }
 
-/** What the game reports each frame: every sinking so far in order, the ids of every ship not sunk, and her share of
- *  the planet's water now (0…1). */
-export interface Report { sinkings: readonly Sunk[]; alive: readonly number[]; share?: number }
+/** What the game reports each frame: every sinking so far in order, the ids of every ship not sunk, her share of
+ *  the planet's water now (0…1), and each ship's side (each her own if not given). */
+export interface Report { sinkings: readonly Sunk[]; alive: readonly number[]; share?: number; sideOf?: SideOf }
 
 export const startMatch = (): MatchState => ({
   phase: 'fighting', place: null, sunk: null, watch: PLAYER, since: 0, over: false, read: 0, share: 0,
@@ -76,17 +85,16 @@ function next(by: number | null, r: Report): number {
 /** The match after a frame of dt seconds and what the game reports. */
 export function stepMatch(m: MatchState, r: Report, dt: number): MatchState {
   let s: MatchState = { ...m, read: r.sinkings.length };
-  const fresh = r.sinkings.slice(m.read);
+  const fresh = r.sinkings.slice(m.read), side = r.sideOf ?? own, over = oneSide(r.alive, side);
   const mine = fresh.find((k) => k.id === PLAYER);
   // (the step she sinks, her water is already draining: what she held is the step before's)
   if (s.phase === 'fighting' && !mine) s.share = r.share ?? s.share;
   if (s.phase !== 'fighting') s.since += dt;
   if (mine && s.phase === 'fighting') {
     const place = r.alive.length + r.sinkings.length - r.sinkings.indexOf(mine);
-    const watch = next(mine.by, r);
-    s = place === 1 && r.alive.length === 0
-      ? { ...s, phase: 'won', place, sunk: mine }
-      : { ...s, phase: 'spectating', place, sunk: mine, watch: watch < 0 ? PLAYER : watch };
+    const mate = r.alive.find((id) => id !== PLAYER && side(id) === side(PLAYER));
+    const watch = mate ?? next(mine.by, r);
+    s = { ...s, phase: 'spectating', place, sunk: mine, watch: watch < 0 ? PLAYER : watch };
   } else if (s.phase === 'spectating') {
     // the ship watched has sunk: on to the one that sank her
     const gone = fresh.find((k) => k.id === s.watch);
@@ -94,10 +102,11 @@ export function stepMatch(m: MatchState, r: Report, dt: number): MatchState {
       const watch = next(gone.by, r);
       if (watch >= 0) s = { ...s, watch };
     }
-  } else if (s.phase === 'fighting' && fresh.length > 0 && r.alive.length === 1 && r.alive[0] === PLAYER) {
+  } else if (s.phase === 'fighting' && fresh.length > 0 && over && r.alive.includes(PLAYER)) {
+    // (her place among her side afloat is the race's order's: play/result.ts; first until it is read)
     s = { ...s, phase: 'won', place: 1 };
   }
-  s.over = s.phase === 'won' || (s.phase === 'spectating' && r.alive.length <= 1);
+  s.over = s.phase === 'won' || (s.phase === 'spectating' && over);
   return s;
 }
 

@@ -32,6 +32,13 @@ export function createReferee(game: Game) {
       watching = true;
       aim(m);
     },
+    /** Sunk, she skips to the race's result: she watches (as watch()) while it runs on to its end, fast. */
+    skip() {
+      if (!m || m.phase !== 'spectating') return;
+      watching = true;
+      aim(m);
+      game.skip();
+    },
     /** Watching, she turns to the next ship afloat (+1) or the one before (−1). */
     switch(by: number) {
       if (!m || !watching) return;
@@ -43,12 +50,14 @@ export function createReferee(game: Game) {
     update(dt: number): End | null {
       if (!m) return null;
       const was = m;
-      m = stepMatch(m, { sinkings: game.sinkings(), alive: game.alive(), share: game.share() }, dt);
+      m = stepMatch(m, { sinkings: game.sinkings(), alive: game.alive(), share: game.share(), sideOf: game.sideOf }, dt);
       if (m.watch !== was.watch || m.phase !== was.phase) aim(m);
       if (m.phase === 'fighting' || m.place === null) return null;
       const how = m.phase === 'won' ? 'won' : m.sunk?.cause ?? 'shot';
+      // once the race is over, her place is its finishing order's (play/result.ts)
+      const order = game.result()?.order, place = m.over && order ? order.indexOf(PLAYER) + 1 : m.place;
       return {
-        how, place: m.place, of, share: m.share, afloat: game.alive().length,
+        how, place, of, share: m.share, afloat: game.alive().length,
         settled: m.since >= FINALE[m.phase === 'won' ? 'won' : 'sunk'].beat, over: m.over,
       };
     },

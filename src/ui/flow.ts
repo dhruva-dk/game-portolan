@@ -37,8 +37,8 @@ function saveSettings(s: Settings) {
 }
 
 /** What the screens ask of the game: a new match (PLAY), home to the lobby's quiet sea, and, sunk, to watch the match
- *  on and to turn to another ship. */
-export interface FlowActions { play(): void; home(): void; watch(): void; switch(by: number): void }
+ *  on, to turn to another ship, and to skip to the race's result (watching it run on to its end). */
+export interface FlowActions { play(): void; home(): void; watch(): void; switch(by: number): void; skip(): void }
 
 export function createFlow(hud: ReturnType<typeof createHud>, globe: ReturnType<typeof createGlobe>, start: Screen, act: FlowActions) {
   let screen: Screen = start, settings = loadSettings();
@@ -52,8 +52,8 @@ export function createFlow(hud: ReturnType<typeof createHud>, globe: ReturnType<
     settings = s;
     saveSettings(s);
   }, () => tap('close'));
-  const result = createResult({ watch: () => tap('watch'), leave: () => tap('leave') });
-  const watching = createWatching({ leave: () => tap('leave'), switch: (by) => tap('switch', by) });
+  const result = createResult({ watch: () => tap('watch'), skip: () => tap('skip'), leave: () => tap('leave') });
+  const watching = createWatching({ leave: () => tap('leave'), switch: (by) => tap('switch', by), skip: () => tap('skip') });
   const passage = createPassage();
   hud.root.style.display = 'none';
 
@@ -80,6 +80,7 @@ export function createFlow(hud: ReturnType<typeof createHud>, globe: ReturnType<
       });
     } else {
       if (t === 'watch') act.watch();
+      if (t === 'skip') act.skip();
       if (t === 'switch') act.switch(by);
       go(next);
     }

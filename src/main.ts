@@ -114,6 +114,7 @@ async function play(s: Stage): Promise<Played> {
     },
     watch: () => referee.watch(),
     switch: (by) => referee.switch(by),
+    skip: () => referee.skip(),
   });
   void s.ready.then(() => flow.ready());
 

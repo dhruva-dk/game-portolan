@@ -114,3 +114,31 @@ decisions are in #56, section 2.
   few balls strike past 100 m (nearer, a ship crossing at 27 m/s sails into half the balls laid just ahead of her).
 - **Question:** the debug sea about her (`?atsea`) once PLAY deals cards. **Choice:** it clears card-less, every ship
   a side of her own. **Why:** its lashed ships are targets to shoot.
+- **Question:** when a race is over and what `won` means (step 5). **Choice:** `sim/match.ts oneSide`: over once every
+  ship afloat is of one side, or none is (`Report.sideOf`, a ship her own side without it). `won` is the race ended
+  with her afloat (her mate may be afloat too); sunk, she always spectates, watching her mate first if afloat. **Why:**
+  the issue; a lone-ship match is unchanged (each her own side).
+- **Question:** where the result is made (step 5). **Choice:** `play/result.ts createTally`, kept by `state.ts`, frozen
+  (`state.result()`) at the step the race ends; runRace and the live path read that one result, so they cannot part.
+  The referee's place, once over, is the order's. `RaceResult` unchanged (no seam fields added).
+- **Question:** finishing order and `seaHeld` (step 5). **Choice:** `result.ts finishing`: afloat first by sinkings
+  credited, then her share now, then lower id; then the sunk, the last sunk highest. `seaHeld` is her share now if
+  afloat, else her share the step she sank (before her water is freed).
+- **Question:** what `hits` count (step 5). **Choice:** `fired` each ball loosed (a scatter's every ball); `landed` and
+  `taken` each ball or burst that struck a ship of another (a ram is not a hit). Strikes on a sidemate do nothing and
+  are not reported, so never counted.
+- **Question:** forfeit (step 5). **Choice:** only the player's ship (`card.ships[PLAYER].forfeit`): at `start` she is
+  scuttled at second 0, cause `'forfeit'`, no sinker, and so placed last. A bot's flag is ignored. `player.ts
+  End.how` gains `'forfeit'` (no cause mark drawn).
+- **Question:** runRace on a flat sea (step 5). **Choice:** `play/race.ts runRace(card, planet, waters, pilot?)` with
+  `world/swell.ts flat`; no rule reads the sea's height (it feeds only `ride.ts` poses). `tests/race.test.ts` runs the
+  live path on a wavy Hull with her helm in hand and replays the recorded helm through runRace: the same result to the
+  bit. A race still on 600 s after the storm's last close throws.
+- **Question:** skip to result (step 5). **Choice:** `game.skip()` (only once she has sunk): each frame runs the
+  frame's steps and then more until `SKIP = 8` ms of it have passed or the result is in; the moments of skipped steps
+  are not answered by the camera. A new Tap `'skip'` (sunk and spectate → spectate); a banner between WATCH and LEAVE,
+  a disc beside the anchor while watching; `?skip=seconds` taps it (debug.ts).
+- **Question:** node and the Worker (step 5). **Choice:** `tools/league.ts` runs the race in node, in the league's
+  Worker and on the page's thread. Worker and page agree to the bit; node does not, from the planet's ground on: V8's
+  `Math.sin`, `cos`, `atan2`, `exp` and the like differ in their last bits between node 26.11 and Chromium 156. Left
+  open as #62 (accept per-engine results, or our own math in sim and world); the tool still exits 1 on it.

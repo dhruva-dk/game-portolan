@@ -9,9 +9,9 @@
 //   match     the arrival, then her hands on her ship; she sinks → sinking; she is the last afloat → won
 //   sinking   the camera held on her ship going down, the HUD gone; the beat done → sunk, or → result if the match
 //             is over
-//   sunk      her result over the live world, with WATCH → spectate and LEAVE → lobby (by the parchment: HOME); the
-//             match over → result
-//   spectate  watching another ship: turn to the next or the one before; LEAVE → lobby; the match over → result
+//   sunk      her result over the live world, with WATCH → spectate, SKIP → spectate (the race run on to its end as
+//             fast as a frame allows) and LEAVE → lobby (by the parchment: HOME); the race over → result
+//   spectate  watching another ship: turn to the next or the one before; SKIP; LEAVE → lobby; the race over → result
 //   won       the camera circling her, the HUD gone; the beat done → result
 //   result    her result over the live world, one way on: LEAVE → lobby
 
@@ -20,7 +20,7 @@ import { SCREENS, type Screen } from '../player.ts';
 export { SCREENS, type Screen };
 
 /** What moves a screen on: her taps, and the match's own course. */
-export const TAPS = ['begin', 'play', 'settings', 'close', 'watch', 'switch', 'leave'] as const;
+export const TAPS = ['begin', 'play', 'settings', 'close', 'watch', 'skip', 'switch', 'leave'] as const;
 export const EVENTS = ['sunk', 'won', 'settled', 'over'] as const;
 export type Tap = (typeof TAPS)[number];
 export type Event = (typeof EVENTS)[number];
@@ -33,8 +33,8 @@ export const WAYS: Record<Screen, Partial<Record<Trigger, Screen>>> = {
   settings: { close: 'lobby' },
   match: { sunk: 'sinking', won: 'won' },
   sinking: { settled: 'sunk' },
-  sunk: { watch: 'spectate', leave: 'lobby', over: 'result' },
-  spectate: { switch: 'spectate', leave: 'lobby', over: 'result' },
+  sunk: { watch: 'spectate', skip: 'spectate', leave: 'lobby', over: 'result' },
+  spectate: { switch: 'spectate', skip: 'spectate', leave: 'lobby', over: 'result' },
   won: { settled: 'result' },
   result: { leave: 'lobby' },
 };

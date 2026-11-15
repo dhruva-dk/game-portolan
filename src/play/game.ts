@@ -63,6 +63,8 @@ const DEAD = 0.15;
 /** Loot is drawn within DRAWN m of the eye (so none from space), floating on the waves within RIDES m of the eye's
  *  ship. (Never on the disc: as in Fortnite, the sea is searched by eye.) */
 const DRAWN = 700, RIDES = 320;
+/** Milliseconds of a frame the race may be run on for, skipping to its result (the world still drawn each frame). */
+const SKIP = 8;
 /** Seconds before the match a piece strewn at its start is taken to have come onto the water: long since bobbed up. */
 const LONG_AGO = 1e3;
 /** How far a gun is through reloading (0…1), or null when it isn't; `hers` her own reload (sim/fit.ts). */
@@ -97,6 +99,8 @@ export function createGame(world: World, anchors: readonly Anchor[], waters: Wat
   /** The camera's answer to what happens, the match's time held on a blow, and the last moment they answered. */
   const shake = createShake(), stops = createStops();
   let answered = 0;
+  /** Whether she has asked to skip to the race's result (once she has sunk). */
+  let skipping = false;
 
   /** The hands' orders: the stick's push as a heading across the sea as the camera sees it. */
   const orders = (stick: Hands['stick']): Helm => {
@@ -124,6 +128,7 @@ export function createGame(world: World, anchors: readonly Anchor[], waters: Wat
     answered = state.deeds().at(-1)?.seq ?? answered;
     held = null;
     arrival = null;
+    skipping = false;
     last = her;
     chase.reset(last, state.clock(1));
   };
@@ -156,7 +161,9 @@ export function createGame(world: World, anchors: readonly Anchor[], waters: Wat
       }
       shake.update(dt);
       const time = clock(stops.update(dt));
-      for (let i = 0; i < time.steps; i++) {
+      // skipping to the result: the race run on as far as SKIP ms of the frame allow, what it did unanswered
+      const until = skipping && !state.result() ? performance.now() + SKIP : 0;
+      for (let i = 0; i < time.steps || (until > 0 && !state.result() && performance.now() < until); i++) {
         const v = state.mine();
         const helm = !v ? { course: null, throttle: 0 } : held ? held(v.ship) : orders(hands.stick);
         // a gun slot tapped is taken in hand; an item slot's tap is the hold's (1–3)
@@ -164,6 +171,7 @@ export function createGame(world: World, anchors: readonly Anchor[], waters: Wat
         state.advance(helm, { aim: chase.sight(), fire: !!v && pulled }, { tap, arm, gust: gusted, take: null });
         [tapped, gusted] = [null, false];
       }
+      if (until > 0) answered = state.deeds().at(-1)?.seq ?? answered;
       // the trigger held through all of a frame's steps
       if (time.steps > 0) pulled = false;
       between = time.between;
@@ -249,6 +257,13 @@ export function createGame(world: World, anchors: readonly Anchor[], waters: Wat
     share: () => state.share(PLAYER),
     ships: state.ships,
     alive: state.alive,
+    sideOf: state.sideOf,
+    /** The race's result, kept the step it ended (null while it is on). */
+    result: state.result,
+    /** Skip to the result: from the next frame the race runs on as fast as SKIP ms a frame allow, until it is over. */
+    skip() {
+      if (!state.mine()) skipping = true;
+    },
     /** A new match: every ship afloat at her berth, hers the first, and the eye coming down onto her from space. */
     start(m: Match) {
       restart(state.start(m));

@@ -113,7 +113,7 @@ for (let g = 0; g < games; g++) {
       }
     }
   }
-  const ms = performance.now() - t1, causes = { shot: 0, ram: 0, storm: 0 };
+  const ms = performance.now() - t1, causes = { shot: 0, ram: 0, storm: 0, forfeit: 0 };
   let credited = 0;
   for (const k of state.sinkings()) {
     causes[k.cause]++;

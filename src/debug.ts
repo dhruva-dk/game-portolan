@@ -33,7 +33,8 @@
 // screens follow her end as the match would bring it (the camera's beat, then her result); spectate sinks her and
 // watches; won sinks every other, the last by her; result sinks her and all but one other, so the match is over.
 // ?sink=seconds sinks her so many seconds into the frames drawn, ?win=seconds every other ship then, so she wins;
-// ?leave=seconds taps LEAVE then (home to the lobby under the parchment, where her screen has that way: ui/passage.ts).
+// ?leave=seconds taps LEAVE then (home to the lobby under the parchment, where her screen has that way: ui/passage.ts);
+// ?skip=seconds taps SKIP then (sunk, the race run on to its result).
 // ?ships= sets them on the sea ahead of her (demoShips), ?way=m/s gives them a straight
 // course at that speed, their helms lashed, and ?heading=deg turns them all. ?ahead=seconds sails the game on that
 // long before the first frame, and ?pause holds it there from then on (the frame still draws: the arrival's stills).
@@ -184,6 +185,7 @@ export async function scenario(release: Setup, stage: (setup: Setup) => Promise<
   // ?sink and ?win: her end, and ?down: one sunk by her, so many seconds into the frames drawn; ?leave: her tap on LEAVE
   const ends = [
     ...(params.has('leave') ? [{ at: number('leave', 0), act: () => p.flow.tap('leave') }] : []),
+    ...(params.has('skip') ? [{ at: number('skip', 0), act: () => p.flow.tap('skip') }] : []),
     ...(params.has('sink') ? [{ at: number('sink', 0), act: () => sinkHer(p.game) }] : []),
     ...(params.has('win') ? [{ at: number('win', 0), act: () => winHer(p.game) }] : []),
     ...(params.has('down') ? [{ at: number('down', 0), act: () => downOne(p.game) }] : []),
