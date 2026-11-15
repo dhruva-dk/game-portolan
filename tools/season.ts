@@ -18,7 +18,7 @@ import type { Command } from '../src/office.ts';
 import type { RaceCard, RaceResult } from '../src/race.ts';
 import { SPEC } from '../src/sim/fit.ts';
 import { random } from '../src/world/random.ts';
-import { FOUND, invariants, someCommand, somePlan } from '../tests/career-kit.ts';
+import { FOUND, invariants, someCommand, someOffer, somePlan } from '../tests/career-kit.ts';
 import { synthetic } from './synthetic.ts';
 
 const args = process.argv.slice(2);
@@ -54,7 +54,7 @@ must({ ...FOUND, seed });
 
 const times: number[] = [], ends: number[] = [];
 let tabled = -1;
-const counts = { sackings: 0, hirings: 0, transfers: 0, forfeits: 0, topped: 0 };
+const counts = { sackings: 0, hirings: 0, transfers: 0, forfeits: 0, topped: 0, gaps: 0, wright: 0 };
 const coinLog: string[] = [];
 const tables: string[] = [];
 let managers = s.crews.map((c) => c.staff.manager);
@@ -81,6 +81,8 @@ const BUILDINGS = ['factory', 'drawingLoft', 'testTank', 'foundry', 'sailingScho
  *  taken), a building now and then, and its free scouts sent to free captains. */
 function works(): void {
   const c = s.crews[s.player!.crew];
+  counts.gaps++;
+  if (c.staff.shipwright !== null) counts.wright++;
   // a new part better than ship one's goes on her
   for (const p of c.parts) {
     const on = c.parts.find((x) => x.ship === 0 && x.type === p.type);
@@ -92,7 +94,7 @@ function works(): void {
     // the weakest free shipwrights first: they ask least and want a post most
     const pool = s.gulls.filter((g) => g.role === 'shipwright' && g.contract === null && g.retired === null && !g.player && s.day >= g.silentUntil)
       .sort((a, b) => stars(a) - stars(b) || a.id - b.id);
-    for (const g of pool.slice(0, 5)) {
+    for (const g of pool.slice(0, 12)) {
       const ask = askOf(s, g, c);
       // a crew past its floor cannot sign: the bot tops it up with DebugCoin to sign one (counted apart from the ledger)
       const short = Math.ceil(s.crews[c.id].debtFloor + ask.fee + ask.wage * 2 - s.crews[c.id].coin);
@@ -101,7 +103,7 @@ function works(): void {
         podium: 0, sinking: 0, breakClause: null, replaces: null } })) break;
     }
   }
-  if (c.design === null) {
+  if (c.design === null && s.crews[c.id].staff.shipwright !== null) {
     const spec = s.leagues[c.league].rules.spec;
     const open = TYPES.filter((t) => !spec.includes(t)).sort(() => rand() - 0.5);
     for (const type of open) {
@@ -111,7 +113,16 @@ function works(): void {
     }
   }
   if (rand() < 0.15) tryIt({ kind: 'Build', building: BUILDINGS[Math.floor(rand() * BUILDINGS.length)] });
-  const free = s.gulls.filter((g) => g.role === 'captain' && g.contract === null && g.retired === null && !g.player);
+  // the market: a low offer to a gull a rival is talking to (they sign with the rival, or lose patience and fall silent)
+  const theirs = s.talks.filter((t) => t.crew !== c.id && !s.talks.some((u) => u.crew === c.id && u.gull === t.gull));
+  if (theirs.length > 0) {
+    const t = theirs[Math.floor(rand() * theirs.length)], o = someOffer(s, t.gull, rand);
+    const wright = s.crews[c.id].staff.shipwright;
+    if (o.role !== 'shipwright' && (o.replaces === null || o.replaces !== wright)) {
+      tryIt({ kind: 'OfferContract', gull: t.gull, offer: { ...o, wage: Math.round(askOf(s, s.gulls[t.gull], s.crews[c.id]).wage * 0.5) } });
+    }
+  }
+  const free =s.gulls.filter((g) => g.role === 'captain' && g.contract === null && g.retired === null && !g.player);
   for (const scout of s.crews[c.id].staff.scouts) if (free.length > 0) tryIt({ kind: 'StartScout', scout, gull: free[Math.floor(rand() * free.length)].id });
 }
 
@@ -162,7 +173,8 @@ while (s.season < seasons) {
   for (let k = 0; k < 4; k++) {
     const c = someCommand(s, rand);
     // the bot keeps its shipwright (it designs every season)
-    const keeps = c.kind === 'Dismiss' && c.gull === s.crews[s.player!.crew].staff.shipwright;
+    const wright = s.crews[s.player!.crew].staff.shipwright;
+    const keeps = (c.kind === 'Dismiss' && c.gull === wright) || (c.kind === 'OfferContract' && c.offer?.replaces === wright && wright !== null);
     if (c.kind !== 'Advance' && !c.kind.startsWith('Debug') && c.kind !== 'Snapshot' && !keeps) tryIt(c);
   }
   if (s.player!.sacked || s.race !== null) continue;
@@ -194,7 +206,7 @@ const timing = (xs: number[]) => {
   return `${xs.length} calls, mean ${(xs.reduce((a, b) => a + b, 0) / Math.max(1, xs.length)).toFixed(1)} ms, 95th ${at(0.95)} ms, most ${at(1)} ms (call ${xs.indexOf(sorted[sorted.length - 1])})`;
 };
 console.log(`Advance between race days: ${timing(times)}; through a season's end: ${timing(ends)}`);
-console.log(`ledger of the player's crew: ${coinLog.join('; ')}; the bot's DebugCoin top-ups to sign a shipwright: ${counts.topped}`);
+console.log(`ledger of the player's crew: ${coinLog.join('; ')}; the bot's DebugCoin top-ups to sign a shipwright: ${counts.topped}; with a shipwright ${counts.wright} of ${counts.gaps} gaps`);
 console.log('mail kinds:', [...mailKinds].sort().map(([k, n]) => `${k} ${n}`).join(', '));
 const missingMail = Object.keys(TEMPLATES).filter((k) => !mailKinds.has(k));
 const missingDilemmas = [...dilemmaIds].filter((k) => !mailKinds.has(k));
