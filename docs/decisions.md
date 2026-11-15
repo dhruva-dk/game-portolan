@@ -638,3 +638,26 @@ decisions are in #56, section 2.
   ms (was 96–133), between race days most 58.2 ms; its sackings line identical to before; the new test checks the
   index against a full scan across states read out of order. tools/season.ts now exits 1 when any Advance, between
   race days or across a season's end, takes over 100 ms.
+- **Question:** the rookery's flock was a stand-in bird of its own. **Choice:** campus/life.ts only works out where
+  each of its 11 gulls wheels (`FlockGull`: place, heading, up, the crew's two colours, size) and frame.ts hands them
+  to the flights' one instanced draw (gulls/gulls.ts `draw(..., free)`), so they are the flight's gull, its node
+  material and wingbeat, wingtips and scarves in the crew's colours; campus/ still never imports gulls/ (the
+  architecture test). The stand-in's mesh, material and the palette's GULL tones are gone: one draw fewer (rookery 59
+  draws, 330k tri).
+- **Question:** some buildings' third levels did not grow from their second (the factory lost its saw-tooth, the
+  drawing loft swapped its tiled hip roof for a mansard, the sailing school's roof changed colour). **Choice:** each
+  third level keeps the second's form and adds to it: the factory's saw-tooth north lights deeper over two storeys, a
+  lower third bay, the chimney raised and a round stack beside it; the drawing loft's hipped tile roof a storey up
+  with a glazed lantern, its domed tower taller; the sailing school's roof in tile. TALL follows (factory 16 m,
+  drawing loft 20 m at level 3). All nine reviewed level by level in tools/rookery.ts's captures.
+- **Question:** a first level stood small on a plot laid out for its third. **Choice:** campus/dressing.ts lays a
+  working yard with it at level 1 only: a fence with its gate to the front, a gravel path to the door, and the trade's
+  things (timber, crates, barrels, a handcart, a jib crane, a coal heap, perches, a boat on trestles, nets drying);
+  tested inside the footprint, on the land for a water plot, under the building, 50–1,200 triangles a yard.
+- **Question:** the days-left slips overlapped where buildings stand close, and were cut at the screen's edge.
+  **Choice:** ui/stack.ts (pure, tested) settles them nearest the viewer first, each lifted just over any it would
+  cover, and keeps a slip wholly on the screen when its building is on it.
+- **Question:** #61 wanted every biome captured. **Choice:** tools/biomes.ts captures `seedIn(name, 7)` of each
+  biome (the planets `budget.ts --biomes` judges) from orbit (the arrival's first frame) and at sea level in the race,
+  her flight called and mending on her deck, the look swung to her beam so the gulls, her ship and the land show
+  together; the UI hidden. All six read right; the haze in two sea views is the low sun ahead.
