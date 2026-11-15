@@ -129,7 +129,7 @@ function slotText(s: CareerState, key: string, value: string | number): string {
     case 'measure': return MEASURES[value as Measure] ?? String(value);
     case 'objective': return OBJECTIVES[String(value)] ?? String(value);
     case 'supplier': return supplier(String(value))?.name ?? String(value);
-    case 'place': return ORDINAL(n);
+    case 'place': case 'standing': return ORDINAL(n);
     case 'rising': return n ? 'risen' : 'fallen';
     case 'carried': return n ? 'carried' : 'lost';
     case 'moved': return n > 0 ? 'We are promoted.' : n < 0 ? 'We are relegated.' : '';
