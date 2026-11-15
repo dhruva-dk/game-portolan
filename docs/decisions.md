@@ -594,3 +594,32 @@ decisions are in #56, section 2.
   `preview`, `dilemmaView`, pure over the state. **Why:** Phase C draws from them as given.
 - **Question:** tuning. **Choice:** TUNING_VERSION 4 (prizes, elder.standing, rivals.scoutLooks, dilemmas.worn and
   chance). **Why:** D36's pin.
+
+## 2026-11-15, fix-ups before Phase C (manager-fix)
+
+- **Question:** sackings were far too frequent (the earlier "recorded, not tuned" decision above is overturned).
+  **Cause:** in career/elders.ts and leadership.ts, not only the synthetic results: confidence moved after every race
+  by 1.5 a place behind the target from the first race on (when standings are noise), with no band of tolerance and a
+  target pushed up by Ambition, so most crews drifted down; −10 a race past the debt floor, where many rival crews
+  sit for whole seasons, emptied it by itself; a new manager could be sacked at once (confidence reset to 70, then
+  the same slide), so crews sacked twice a season; the verdict sacked any target missed by 5 places whatever the
+  elder thought. **Choice:** confidence holds within `slack` (3) places behind the target, falls `perPlace` (0.6) a
+  place beyond it to at most −4 (× Patience), rises `met` (1) plus 0.6 a place ahead to at most 4, and every move
+  weighs `sailed / settle` (5) so one early race barely counts; it carries into the next season, a quarter of the way
+  back to 70 (`recover`), so a second poor season costs the post where the first warns; a manager has `grace` (half a
+  season from their contract's `signed`) before any sacking; sacked at 0 only if more than the slack behind; the
+  season's verdict also needs confidence under `verdict` (35); debt costs nothing above the floor and −0.5 a race past
+  it; an elder renews its manager's contract at its end if confidence is at least `verdict` (`managersRenewed`,
+  tenure kept), since no one renewed managers and ~16 a season walked out at contract's end. Targets are now ranked
+  by staff stars and part ranks together, as section 7 says (they were by staff stars only). TUNING_VERSION 5.
+  **Synthetic results:** strength was sd ~0.17 against luck of sd ~0.87 (results were nearly pure luck, and parts
+  showed in less than 1% of it); now 0.65 × the captain's sailing and 0.35 × the parts (handling), each as standard
+  scores across the card, plus normal luck of sd 0.8. **Numbers** (`node tools/season.ts 20`, which now counts a
+  sacking apart from a manager poached upward, retired, or whose contract ran out): before, 76.8 sackings a season
+  (135, 156, 118 … 18; 1,027 mid-season, 734 within half a season of taking the post; the old tool's 2,163 counted
+  every change of manager); after, 9.8 a season on the default seed (11 14 20 10 13 16 14 14 12 13 11 9 8 7 4 6 4 5
+  3 2), 10.4 with `--seed=2` (4 to 16); none within half a season of the post; 134 in a crew's second or later poor
+  season against 62 in its first; 3 mid-season, the rest at the season's end. **Why:** the brief's believable rate
+  (5–15 a season of 120 crews), more in a second poor season, almost never early, never a manager meeting targets;
+  unit-tested in tests/career-elders.test.ts. Rival crews spending whole seasons past their floor is the money
+  balance the owner tunes; it no longer decides sackings.
