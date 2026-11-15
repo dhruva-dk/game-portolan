@@ -25,7 +25,7 @@ test('apply never throws on a malformed command, and refuses it', () => {
 });
 
 test('a command no section handles yet is refused plainly, not guessed at', () => {
-  refused(founded(), { kind: 'Dismiss', gull: 1 }, 'unavailable');
+  refused(founded(), { kind: 'SetYard', shares: [] }, 'unavailable');
   refused(founded(), { kind: 'DebugReveal' }, 'unavailable');
   const r = apply(founded(), { kind: 'DebugReveal' });
   assert.equal(r.ok ? '' : r.reason.code, 'debug', 'debug commands are refused unless debug is on');
@@ -45,11 +45,13 @@ test('Advance: from founding to the first race day, which stops it until the rac
   const s = founded();
   assert.equal(s.day, 0);
   assert.equal(s.race, null);
-  const t = must(s, { kind: 'Advance' });
+  // the rivals' reviews and scouting run on the way; none of them needs the player unless it approaches their gulls
+  let t = must(s, { kind: 'Advance' });
+  while (t.race === null) t = must(t, { kind: 'Advance' });
   assert.equal(t.day, 14);
   assert.deepEqual(t.race, { round: 0, started: false, results: [null, null, null] });
-  assert.equal(t.queue[0].kind, 'race');
-  assert.equal(t.queue.length, s.queue.length - 1);
+  assert.ok(!t.queue.some((e) => e.kind === 'race' && e.round === 0), 'race day is off the queue');
+  assert.ok(t.queue.every((e) => e.day >= 14));
   refused(t, { kind: 'Advance' }, 'raceDay');
 });
 
@@ -60,6 +62,8 @@ test('the queue: ordered by (day, seq); scheduling keeps the order; the season\'
   assert.equal(races.length, 10);
   assert.deepEqual(races.map((e) => e.day), [14, 28, 42, 56, 70, 84, 98, 112, 126, 140]);
   assert.equal(s.queue[s.queue.length - 1].kind, 'seasonEnd');
+  assert.equal(s.queue.filter((e) => e.kind === 'review').length, 120, 'every crew\'s first review');
+  assert.deepEqual(s.queue.filter((e) => e.kind === 'closing' || e.kind === 'silence').map((e) => [e.kind, e.day]), [['closing', 80], ['silence', 110]]);
   let t = s;
   const rand = random(3);
   for (let i = 0; i < 200; i++) t = schedule(t, Math.floor(rand() * 300), { kind: 'review', crew: i % 120 });
@@ -68,7 +72,7 @@ test('the queue: ordered by (day, seq); scheduling keeps the order; the season\'
   const q = scheduled(scheduled([], { kind: 'review', crew: 1, day: 5, seq: 9 }), { kind: 'review', crew: 2, day: 5, seq: 3 });
   assert.deepEqual(q.map((e: Event) => e.seq), [3, 9]);
   const u = unscheduled(t, (e) => e.kind === 'review');
-  assert.equal(u.queue.length, s.queue.length);
+  assert.equal(u.queue.length, s.queue.length - 120);
 });
 
 test('stops: race day and a job offer\'s deadline always; a dilemma or an answer only when it is the player\'s', () => {
@@ -85,7 +89,8 @@ test('every event a founded career schedules has a handler; every handled comman
   const s = founded();
   const kinds = new Set(s.queue.map((e) => e.kind));
   for (const k of kinds) if (k !== 'seasonEnd') assert.ok(EVENTS[k], `no handler for '${k}'`);
-  assert.deepEqual(Object.keys(COMMANDS).sort(), ['Advance', 'Found', 'MoveFlightJob']);
+  assert.deepEqual(Object.keys(COMMANDS).sort(), ['AcceptCounter', 'Advance', 'CancelScout', 'DeclineJob', 'Dismiss', 'Found', 'MoveFlightJob',
+    'OfferContract', 'StartScout', 'TakeJob', 'WithdrawOffer']);
 });
 
 test('MoveFlightJob: a flight gull moves to a job, swapping with whoever worked it; each refusal', () => {

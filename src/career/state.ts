@@ -14,7 +14,7 @@ export interface Hands { captain: number | null; bosun: number | null }
 
 /** Who works for a crew, by gull id. Every gull listed here has a contract with this crew, and no other is listed. */
 export interface Staff {
-  manager: number;
+  manager: number | null;                            // null while the post is open (section 7)
   elder: number;
   ships: readonly [Hands, Hands];
   reserve: number | null;

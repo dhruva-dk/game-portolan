@@ -116,7 +116,7 @@ async function writesOf(commands: readonly Command[]): Promise<number> {
   return store.writes();
 }
 
-const SHORT = script(23, 70);
+const SHORT = script(23, 80);
 
 for (const fault of ['kill', 'tear', 'fail'] as Fault[]) {
   test(`${fault} at every write of a scripted session, then reload: the state the player was last told was saved, never more lost`, async () => {
@@ -166,7 +166,9 @@ const flip = (text: string, at: number) => text.slice(0, at) + (text[at] === '1'
 
 test('corrupt an entry: the chain ends there; the entries before it load, the rest are reported lost', async () => {
   const { disk, kept } = await saved();
-  const k = disk.entries.length - 5;
+  // an entry after the newest snapshot (one before it would be passed over by loading from the snapshot)
+  const k = Math.max(Math.max(...disk.snapshots.map((x) => x.at)), disk.entries.length - 5);
+  assert.ok(k < disk.entries.length);
   const e: Entry = JSON.parse(disk.entries[k]);
   disk.entries[k] = JSON.stringify({ ...e, command: { ...e.command, kind: 'Advance' === e.command.kind ? 'Snapshot' : 'Advance' } });
   const opened = await open(memoryStore(disk), true);
@@ -244,5 +246,7 @@ test('a save of schema 1 (the fixture) loads; a save from a newer schema is not 
   const newer = snapshotOf({ ...fresh().state, schema: 99 }, 0, ORIGIN);
   const d2: Disk = { snapshots: [newer], entries: [...disk.entries], backup: null };
   const o2 = await open(memoryStore(d2), true);
-  assert.ok(o2.ok && o2.from === 'journal');
+  // the fixture's entries were written under tuning 1: once the tuning moves on, its journal is never replayed whole (D36)
+  if (fixture.entries.every((e: Entry) => e.tuning === TUNING_VERSION)) assert.ok(o2.ok && o2.from === 'journal');
+  else assert.equal(o2.ok, false, 'a journal of an older tuning is not replayed whole');
 });

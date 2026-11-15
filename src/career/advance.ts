@@ -29,12 +29,18 @@ export const stopsFor: Stops = (s, e) => {
   if (ALWAYS_STOP.has(e.kind)) return true;
   const mine = s.player?.crew;
   if (e.kind === 'dilemma') return e.crew === mine;
-  if (e.kind === 'answer') return s.talks.find((t) => t.id === e.talk)?.crew === mine;
+  // an answer to the player's offer: by now the talk is gone (signed or refused) or carries a counter, and the player
+  // has mail of it naming the talk (a gull answers every offer due that day on the first one's event; each other
+  // offer's own event still comes, and stops if the offer was the player's)
+  if (e.kind === 'answer') return s.mail.some((m) => m.day === s.day && m.slots.talk === e.talk);
+  // a rival's review that approached one of the player's gulls: they may answer it with a renewal before the gull decides
+  if (e.kind === 'review') return s.talks.some((t) => t.crew === e.crew && t.made === s.day && s.gulls[t.gull].contract?.crew === mine);
   return false;
 };
 
 /** Why Advance cannot move, or null. */
 export function advanceCheck(s: CareerState): { code: string; sentence: string } | null {
+  if (s.player?.sacked) return { code: 'sacked', sentence: 'You have no crew: take one of the posts offered.' };
   if (s.race !== null) return { code: 'raceDay', sentence: 'It is race day: set the race plan and sail.' };
   if (s.queue.length === 0) return { code: 'nothing', sentence: 'Nothing lies ahead on the calendar.' };
   return null;

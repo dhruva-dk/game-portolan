@@ -81,7 +81,7 @@ export function found(c: CommandOf<'Found'>, roll: Dice): { ok: true; state: Car
   const [a, b] = taking.staff.ships.map((h) => h.captain as number);
   const [stronger, weaker] = stars(gulls[b]) > stars(gulls[a]) ? [b, a] : [a, b];
   const free = (id: number) => { gulls[id] = { ...gulls[id], contract: null }; };
-  free(taking.staff.manager);
+  if (taking.staff.manager !== null) free(taking.staff.manager);
   free(weaker);
   const strongerGull = gulls[stronger];
   if (strongerGull.contract) gulls[stronger] = { ...strongerGull, contract: { ...strongerGull.contract, status: 'ship' } };

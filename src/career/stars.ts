@@ -8,11 +8,19 @@ import { TUNING } from './tuning.ts';
 /** Days a season lasts: a gull ages a year a season. */
 export const YEAR = TUNING.calendar.rounds * TUNING.calendar.gap + TUNING.calendar.off;
 
+/** Stars of each stats object already read: states are immutable, so a stats object's stars never change (the rivals'
+ *  reviews read the same gulls' stars many times a week). */
+const read = new WeakMap<object, number>();
+
 /** Stars, 0 to 5 in halves, from a set of role stats: their mean / 4. */
 export function starsOf(stats: Readonly<Record<string, number>>): number {
+  const hit = read.get(stats);
+  if (hit !== undefined) return hit;
   const values = Object.values(stats);
   const mean = values.length === 0 ? 0 : values.reduce((a, b) => a + b, 0) / values.length;
-  return Math.min(5, Math.max(0, Math.round((mean / 4) * 2) / 2));
+  const out = Math.min(5, Math.max(0, Math.round((mean / 4) * 2) / 2));
+  read.set(stats, out);
+  return out;
 }
 
 /** A gull's stars now. */

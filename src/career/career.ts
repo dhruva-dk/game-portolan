@@ -12,6 +12,10 @@ import { refuse, type Applied, type Handler, type Handlers } from './command.ts'
 import { CREWING } from './crewing.ts';
 import { dice } from './dice.ts';
 import { FOUNDING } from './found.ts';
+import { HIRING, closingOpens, hear, lapse, silenceFalls } from './hiring.ts';
+import { JOBS_TAKEN, jobLapses } from './jobs.ts';
+import { RIVAL_EVENTS } from './rivals.ts';
+import { SCOUTING } from './scouting.ts';
 import { SCHEMA } from './migrate.ts';
 import { beginning, type CareerState } from './state.ts';
 
@@ -19,10 +23,12 @@ export type { Applied } from './command.ts';
 export type { CareerState } from './state.ts';
 
 /** Every event kind's handler. */
-export const EVENTS: EventHandlers = { ...TIME_EVENTS };
+export const EVENTS: EventHandlers = {
+  ...TIME_EVENTS, ...RIVAL_EVENTS, answer: hear, lapse, closing: closingOpens, silence: silenceFalls, jobExpires: jobLapses,
+};
 
 /** Every command kind's handler. */
-export const COMMANDS: Handlers = { ...FOUNDING, ...timeHandlers(EVENTS), ...CREWING };
+export const COMMANDS: Handlers = { ...FOUNDING, ...timeHandlers(EVENTS), ...CREWING, ...SCOUTING, ...HIRING, ...JOBS_TAKEN };
 
 /** The commands only a debug build takes (D42). */
 const DEBUG: ReadonlySet<CommandKind> = new Set<CommandKind>(['DebugCoin', 'DebugReveal', 'DebugToRaceDay', 'DebugToSeasonEnd']);

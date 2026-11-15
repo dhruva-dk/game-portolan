@@ -26,9 +26,21 @@ export function makeCalendar(season: number, start: number, rand: Rand): Calenda
 /** The day the season after one starting on `start` starts. */
 export const nextStart = (start: number): number => start + YEAR;
 
-/** A state with a calendar's race days and its season's end scheduled. */
+/** A state with a calendar's race days, its contracts' last days (and the day silence costs morale) and its season's
+ *  end scheduled. */
 export function scheduleSeason(s: CareerState, calendar: Calendar): CareerState {
+  const M = TUNING.market;
   let out = s;
   calendar.rounds.forEach((r, round) => { out = schedule(out, r.day, { kind: 'race', round }); });
+  out = schedule(out, calendar.end - M.closingDays, { kind: 'closing', season: calendar.season });
+  out = schedule(out, calendar.end - M.closingDays + M.silenceDays, { kind: 'silence', season: calendar.season });
   return schedule(out, calendar.end, { kind: 'seasonEnd' });
+}
+
+/** The day of a crew's first review (Phase B section 6): staggered by crew id over the week. */
+export const firstReview = (crew: number, from: number): number => from + 1 + (crew % TUNING.rivals.review);
+
+/** A state with every crew's first review scheduled from a day; each review schedules the next. */
+export function reviewsScheduled(s: CareerState, from: number): CareerState {
+  return s.crews.reduce((acc, c) => schedule(acc, firstReview(c.id, from), { kind: 'review', crew: c.id }), s);
 }

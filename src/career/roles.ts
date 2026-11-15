@@ -44,8 +44,10 @@ export interface Contract {
   signed: number;                                    // the day
 }
 
-/** What a crew knows of a gull once scouted (Phase B section 4): the day, and their stars at the last season's end. */
-export interface Known { day: number; last: number }
+/** What a crew knows of a gull once scouted (Phase B section 4): the day, their stars at the last season's end (a
+ *  screen's arrow is stars now against these), the scout whose report it was (null: their own staff), and whether
+ *  that report's Persuasion has been spent on an offer. */
+export interface Known { day: number; last: number; by: number | null; used: boolean }
 
 /** A season of a gull's history: their crew and what they did (races sailed, or worked, for every role). */
 export interface SeasonLine {

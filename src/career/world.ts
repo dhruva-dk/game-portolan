@@ -6,7 +6,7 @@
 import { SWATCHES, type Colours, type PartType, type Rules } from '../race.ts';
 import type { Building, Role, Status } from '../office.ts';
 import { askFee, askSeasons, askWage } from './asks.ts';
-import { makeCalendar, scheduleSeason } from './calendar.ts';
+import { makeCalendar, reviewsScheduled, scheduleSeason } from './calendar.ts';
 import { between, pick, shuffled, type Dice, type Rand } from './dice.ts';
 import { debtFloor, targetPlace } from './leadership.ts';
 import { NOUNS, colony, crewName, place } from './names.ts';
@@ -165,7 +165,7 @@ export function makeWorld(seed: number, theirs: Colours, roll: Dice): CareerStat
   addFreeAgents(g, rand);
   const calendar = makeCalendar(0, 0, rand);
   const base: CareerState = { ...beginning(0), seed, colonies, gulls: g.gulls, crews, leagues, calendar, ids: { part: crews.length * 12, mail: 0, talk: 0, proposal: 0 } };
-  return scheduleSeason(base, calendar);
+  return reviewsScheduled(scheduleSeason(base, calendar), 0);
 }
 
 /** The free agents: 300 across every role, 30 of them managers. */

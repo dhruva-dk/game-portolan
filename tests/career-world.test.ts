@@ -100,7 +100,7 @@ test('founding: the crew takes the weakest of League Three, its manager and weak
   assert.ok(Object.values(me.stats).every((v) => v === 0), 'the player has no stats (D8)');
   assert.equal(crew.staff.manager, me.id);
   // the inheritance
-  assert.equal(s.gulls[was.staff.manager].contract, null, 'its manager goes to the free agents');
+  assert.equal(s.gulls[was.staff.manager!].contract, null, 'its manager goes to the free agents');
   const [a, b] = was.staff.ships.map((h) => h.captain!);
   const [strong, weak] = stars(world.gulls[b]) > stars(world.gulls[a]) ? [b, a] : [a, b];
   assert.equal(crew.staff.ships[0].captain, null, 'the player sails ship one');

@@ -6,7 +6,7 @@
 // A pair [a, b] is a line in u = stat / 20: a + b × u. A triple by league is League One's, Two's, Three's.
 
 /** Bump with any change to TUNING (and pin the new hash in the test). */
-export const TUNING_VERSION = 1;
+export const TUNING_VERSION = 2;
 
 const ROLE_YEARS = {
   manager: [40, 55], captain: [26, 31], bosun: [28, 34], flight: [28, 34], shipwright: [35, 45], scout: [35, 45], elder: [45, 60],
@@ -132,6 +132,56 @@ export const TUNING = {
     generosity: 0.3,                                 // Coin added at the season's start, × u × the league's budget
     floor: [0.3, 0.4],                               // the debt floor, × the league's budget, below zero
     meddling: [0.2, 0.6],                            // the chance an elder's dilemma is the one drawn
+    words: [75, 50, 25],                             // confidence crossing these sends the elder's word
+    missedBy: 5,                                     // places past the target at the season's end that sack the manager
+    fit: [55, 30, 0],                                // the manager's reputation an elder looks for, by league
+    jobs: [70, 45, 0],                               // the player's reputation a league's crews offer their post at
+    ambitious: 14,                                   // an elder's Ambition at or above which, at the season's end, they court a better manager
+    offerDays: 7,                                    // a job offer stands this long
+  },
+
+  /** Rival managers' decisions (Phase B section 6), and what each personality weighs. */
+  rivals: {
+    review: 7,                                       // days between a crew's reviews, staggered by crew id
+    better: 1, betterGambler: 0.5,                   // stars a known candidate must be better by to replace the weakest
+    bigBid: 1.1,                                     // a gambler's bids × this
+    counterMost: 1.25,                               // a counter is met if its wage is at most the ask × this, and payable
+    breakRaces: 12,                                  // a rival's break clause, in races' wage; none at Negotiation u ≥ 0.5
+    renewBelow: 0.75,                                // renews staff whose worth is at least this share of the best of their role on the crew
+    openFirst: 3,                                    // worth added, in scouting, to a candidate for an open post: open posts are scouted first
+    /** Each personality's weights over the section 6 table's rows (higher acts first), the share of its Finance
+     *  commitment it spends, and the contract length it offers the young (under the market's young age) and others. */
+    personalities: {
+      spender: { order: { fill: 3, build: 2.8, replace: 2.5, design: 2.2, renew: 2, patrons: 1.8, yard: 1.6, poach: 1.5, scout: 1 }, spend: 1.3, young: 2, other: 2 },
+      youthBuilder: { order: { fill: 3, renew: 2.5, scout: 2.2, yard: 2, design: 1.8, patrons: 1.7, replace: 1.5, build: 1.2, poach: 1 }, spend: 1, young: 3, other: 2 },
+      poacher: { order: { poach: 3.2, fill: 3, replace: 2, patrons: 1.8, renew: 1.5, yard: 1.4, design: 1.3, scout: 1, build: 0.8 }, spend: 1.1, young: 1, other: 1 },
+      engineer: { order: { yard: 3.5, design: 3.4, fill: 3, build: 2.4, renew: 2, patrons: 1.6, replace: 1.5, scout: 1, poach: 0.5 }, spend: 0.9, young: 2, other: 2 },
+      gambler: { order: { fill: 3, replace: 2.6, design: 2.5, poach: 2, yard: 1.8, scout: 1.5, patrons: 1.4, build: 1.2, renew: 1 }, spend: 1.2, young: 1, other: 2 },
+      steady: { order: { fill: 3, renew: 2.5, patrons: 2.2, yard: 2, design: 1.6, replace: 1.5, scout: 1.2, build: 1, poach: 0.5 }, spend: 0.7, young: 2, other: 3 },
+    },
+    talentYouth: 0.2,                                // a youth builder's Talent Eye weight on potential, added
+  },
+
+  /** The market (Phase B section 5). */
+  market: {
+    answerDays: 2,                                   // a gull answers an offer this long after it is made
+    approachDays: 7,                                 // an approach to another crew's gull is answered this long after
+    counterDays: 7,                                  // a counter stands this long
+    accept: 1, counterFrom: 0.85, most: 1.2,         // the score that accepts, that counters; a want's most
+    weights: [0.5, 0.3, 0.2],                        // the three wants' weights, first most
+    lowball: 0.8,                                    // a wage below this share of the ask costs a patience
+    silentDays: 30,                                  // with patience gone they will not talk for this long
+    patienceMost: 4,                                 // patience with a scout's Persuasion
+    closingDays: 60,                                 // a contract's last days, in which others may approach
+    silenceDays: 30,                                 // into those days with no renewal offered, morale pays once
+    expect: { podium: 0.06, sinking: 0.4 },          // the podiums and sinkings a race an offer's bonuses are worth
+    reserve: 0.3,                                    // status's score for a captain offered the reserve
+    leagueBelow: 0.6, leagueFree: 0.4,               // league's score one below their level; two below when out of contract
+    levelStars: [3, 2.1],                            // a free agent's level by stars: League One at or above the first, Two the second
+    ambitionSpan: 50,                                // ambition: 1 at the crew's reputation equal to theirs, ± this per 1
+    securityStep: 0.35,                              // security's score lost a season from the length they ask
+    away: 0.5,                                       // home's score at a crew of another colony
+    young: { count: 150, stars: [0.5, 1.5] },        // new gulls each season (ages TUNING.ages.young)
   },
 
   /** Wages (Phase B section 5): base a race by role, × 1.6^stars × league × (1 + marketability / 200). */

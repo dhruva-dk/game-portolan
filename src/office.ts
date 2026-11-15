@@ -36,6 +36,7 @@ export interface Offer {
   podium: number;
   sinking: number;
   breakClause: number | null;
+  replaces: number | null;                           // the gull of the crew whose post they take (released on signing), or null for an open post
 }
 
 /** The race plan of the player's crew (Phase B section 13). */

@@ -16,7 +16,9 @@ export type Happening =
   | { kind: 'building'; crew: number; building: string }              // section 9: works finished
   | { kind: 'answer'; talk: number }                                  // section 5: a gull answers an offer
   | { kind: 'report'; crew: number; scout: number }                   // section 4: a scout reports
-  | { kind: 'closing'; gull: number }                                 // section 5: a contract's last days open
+  | { kind: 'closing'; season: number }                               // section 5: the last days of contracts ending this season open
+  | { kind: 'silence'; season: number }                               // section 5: those still offered no renewal lose heart
+  | { kind: 'lapse'; talk: number }                                   // section 5: a counter not taken lapses
   | { kind: 'jobExpires'; crew: number }                              // section 7: a job offer lapses (needs the player)
   | { kind: 'vote'; league: number; proposal: number }                // section 11
   | { kind: 'patronOffer'; crew: number }                             // section 10
