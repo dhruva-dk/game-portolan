@@ -24,7 +24,8 @@ import { uiLayer } from './ui/ui';
 import { SEED } from './world/planet';
 import { MEAN, SWING } from './world/weather';
 
-/** The release's setup. */
+/** The release's setup. The frame is made once for the most ships a match puts to sea (SHIPS, a race card's eighty);
+ *  each match's own count is its own (play/match.ts fleetOf). */
 const RELEASE: Setup = {
   seed: SEED, mean: MEAN, swing: SWING, hours: 16.3,
   drawing: { sea: 'water', fleet: SHIPS, length: SHIP.length, lod: null, cloth: true, bolt: false },

@@ -1,5 +1,5 @@
 // Whole matches of bots, no browser needed: how they arm themselves from the loot, and how they end.
-//   node tools/matches.ts [matches=3] [seed]
+//   node tools/matches.ts [matches=3] [seed] [ships=80]
 // Each match is the game's own (play/state.ts start and advance, the matches dealt as play/setup.ts deals them), every
 // ship a bot, hers too, on a flat sea (the waves only lift the drawn ships). Prints, per match, the share of ships
 // afloat that are armed at 30, 60 and 120 s and the share with a shield or something to mend with, how the ships were
@@ -13,6 +13,7 @@ import { STEP } from '../src/sim/fixed.ts';
 import { KINDS } from '../src/kinds.ts';
 import { GUNS, SHIP } from '../src/sim/handling.ts';
 import { LOOT } from '../src/sim/loot.ts';
+import { SHIPS } from '../src/sim/match.ts';
 import { chart } from '../src/sim/route.ts';
 import { berthing } from '../src/sim/spawn.ts';
 import { STORM } from '../src/sim/storm.ts';
@@ -24,7 +25,7 @@ import { flat } from '../src/world/swell.ts';
 
 /** A bot is stuck if she moves less than STUCK m in WINDOW s. */
 const STUCK = 15, WINDOW = 30, AGROUND = 2;
-const games = Number(process.argv[2] ?? 3), seed = Number(process.argv[3] ?? SEED);
+const games = Number(process.argv[2] ?? 3), seed = Number(process.argv[3] ?? SEED), fleet = Number(process.argv[4] ?? SHIPS);
 const t0 = performance.now();
 const planet = createPlanet(seed);
 const depth = (p: Vec3) => -planet.height(p);
@@ -36,7 +37,7 @@ const end = STORM.phases.reduce((t, p) => t + p.wait + p.close, 0) + 120;
 const idle = { course: null, throttle: 0 }, still = { aim: null, fire: false };
 
 for (let g = 0; g < games; g++) {
-  const m = matches.deal();
+  const m = { ...matches.deal(), ships: fleet };
   state.start(m, false);
   const loot = state.loot().pieces, shallow = loot.filter((l) => depth(l.at) < SHIP.draught + LOOT.open).length;
   const marks: string[] = [], track = new Map<number, { at: Vec3; speed: number }[]>();

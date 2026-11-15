@@ -37,7 +37,7 @@
 // ?ships= sets them on the sea ahead of her (demoShips), ?way=m/s gives them a straight
 // course at that speed, their helms lashed, and ?heading=deg turns them all. ?ahead=seconds sails the game on that
 // long before the first frame, and ?pause holds it there from then on (the frame still draws: the arrival's stills).
-// The ships in a match are sim/match.ts SHIPS; the frame has room for that many, or for ?ships= more.
+// The frame has room for the most ships a match puts to sea (main.ts RELEASE), or for ?ships= more.
 // At sea, ?kit (?kit=seconds: then) puts stores under her for her to sweep up (two guns, a cannon and a scatter, unless
 // ?gun arms her, and three slots of stores), with a better gun beside them, a mortar, offered; ?use=1…3,seconds sets
 // her mending from that slot so many seconds into the frames
@@ -68,7 +68,7 @@ import { probeMeshes } from './probe';
 import { STEP } from './sim/fixed';
 import { KINDS, type GunKind } from './kinds';
 import { SHIP } from './sim/handling';
-import { PLAYER, SHIPS } from './sim/match';
+import { PLAYER } from './sim/match';
 import type { Cap } from './sim/storm';
 import type { ShipDraw, Snapshot } from './snapshot';
 import type { Flow } from './ui/flow';
@@ -161,8 +161,9 @@ export async function scenario(release: Setup, stage: (setup: Setup) => Promise<
     return s.draw(p.next, p.drawn);
   }
   for (const [name, built] of Object.entries(PLAYTEST)) if (params.has(name) && !built) console.info(`?${name} is not built yet`);
-  const s = await stage(setupOf(release));
-  const room = Math.max(SHIPS, number('ships', 0) + 1);
+  const setup = setupOf(release), s = await stage(setup);
+  // (the frame's room: a match's ships, or ?ships= more)
+  const room = setup.drawing.fleet;
   if (flying) return s.draw(flyer(s.canvas, s.start.at, demoShips(s.start.at, room), s.matches.storm));
   const p = await play(s);
   safeArea(uiLayer());

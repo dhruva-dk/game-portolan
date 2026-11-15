@@ -2,13 +2,12 @@
 // debugging), the planet's water sounded for the bots' chart and the ships' berths, and the matches dealt one after
 // another, each with its storm, its berths and its bots' minds.
 
-import { SHIPS } from '../sim/match.ts';
 import { charted } from '../sim/route.ts';
 import type { Spawn } from '../sim/spawn.ts';
 import { createStorm, type Storm } from '../sim/storm.ts';
 import type { Planet } from '../world/planet.ts';
 import { along, frameAt, scale, toChart, type Vec3 } from '../world/sphere.ts';
-import type { Match, Waters } from './state.ts';
+import { fleetOf, type Match, type Waters } from './match.ts';
 
 /** Metres off the coast she lies at the start. */
 const START = 80;
@@ -21,8 +20,8 @@ export function startOf(planet: Planet): { at: Vec3; bearing: number } {
   return { at: along(largest.chart.at, southward, largest.coast(Math.atan2(cz, cx)) + START).p, bearing: 0 };
 }
 
-/** A match's berths worked out off the main thread, by its seed. */
-export type Berther = (match: number) => Promise<Spawn[]>;
+/** A match's berths worked out off the main thread, by its seed and how many ships it puts to sea. */
+export type Berther = (match: number, count: number) => Promise<Spawn[]>;
 
 /** The water of a planet of this seed as the match reads it (state.ts Waters), sounded in a worker (sounding.ts)
  *  while the ground's bakes in its own (land/bake.ts); the milliseconds the sounding took; and the worker kept to berth
@@ -30,9 +29,9 @@ export type Berther = (match: number) => Promise<Spawn[]>;
 export function watersOf(seed: number): Promise<{ waters: Waters; ms: number; berth: Berther }> {
   const worker = new Worker(new URL('./sounding.ts', import.meta.url), { type: 'module' });
   const asked = new Map<number, (spawns: Spawn[]) => void>();
-  const berth: Berther = (match) => new Promise((resolve) => {
+  const berth: Berther = (match, count) => new Promise((resolve) => {
     asked.set(match, resolve);
-    worker.postMessage({ match, count: SHIPS });
+    worker.postMessage({ match, count });
   });
   const vec = (b: Float64Array, i: number): Vec3 => [b[i], b[i + 1], b[i + 2]];
   return new Promise((resolve, reject) => {
@@ -68,7 +67,7 @@ export function createMatches(seed: number, planet: Planet, hold: number | null,
   let ahead: { seed: number; berths: Spawn[] } | null = null;
   const prepare = () => {
     const s = next();
-    void berth?.(s).then((berths) => {
+    void berth?.(s, fleetOf(match(s))).then((berths) => {
       if (s === next()) ahead = { seed: s, berths };
     });
   };

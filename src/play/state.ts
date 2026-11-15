@@ -23,66 +23,33 @@ import { STEP, blendPose } from '../sim/fixed.ts';
 import { gunOf } from '../sim/gun.ts';
 import { SHIP } from '../sim/handling.ts';
 import { sunk } from '../sim/health.ts';
-import { homed, regain, type Regained } from '../sim/holding.ts';
-import { PLAYER, SHIPS, credited, type Cause } from '../sim/match.ts';
-import { berths, type Berthing, type Spawn } from '../sim/spawn.ts';
+import { homed, regain } from '../sim/holding.ts';
+import { PLAYER, credited, type Cause } from '../sim/match.ts';
+import { berths } from '../sim/spawn.ts';
 import { hopped, knocked, pose, ride, settled, type Ride } from '../sim/ride.ts';
-import { berthed, overboard, strewn, type Arms, type Flotsam, type Goods } from '../sim/loot.ts';
+import { berthed, overboard, strewn, type Flotsam, type Goods } from '../sim/loot.ts';
 import { asked, crewed, NOTHING, spilled, stored, type Ask } from '../sim/stores.ts';
-import type { Chart } from '../sim/route.ts';
 import { shipAt, type Helm, type ShipState } from '../sim/ship.ts';
 import { calm, type Storm } from '../sim/storm.ts';
-import { createTerritory, type Move, type Outcome, type Territory } from '../sim/territory.ts';
+import { createTerritory, type Move, type Territory } from '../sim/territory.ts';
 import type { BallDraw, Blast, Look, Sea, ShipDraw } from '../snapshot.ts';
 import type { Deed } from '../player.ts';
 import type { Hull } from '../world/swell.ts';
 import { remembered, risesOf, type Planet } from '../world/planet.ts';
 import type { ShipPose } from '../world/pose.ts';
 import { hash } from '../world/random.ts';
-import { add, frameAt, scale, type Vec3 } from '../world/sphere.ts';
+import { add, scale, type Vec3 } from '../world/sphere.ts';
 import { LOOK, lookOf, seaColourOf } from './colours.ts';
+import { bearing, fleetOf, type Afloat, type Berth, type Match, type Sinking, type Stepped, type Part, type Waters } from './match.ts';
 import { blastsOf, deedsOf, kept as keptDeeds } from './moments.ts';
 import { sinking } from './sinking.ts';
+
+export { PARTS, bearing, fleetOf, type Afloat, type Berth, type Match, type Part, type Sinking, type Stepped, type Waters } from './match.ts';
 
 /** No way on and the rudder amidships. */
 const AMIDSHIPS: Helm = { course: null, throttle: 0 };
 /** What a sea is cleared for: a match's, with loot strewn over it and who holds it kept; the lobby's, neither. */
 const MATCH = { loot: true, held: true }, LOBBY = { loot: false, held: false };
-
-/** A bearing (radians clockwise from north at a point) as a direction there. */
-export const bearing = (at: Vec3, b: number): Vec3 => {
-  const f = frameAt(at);
-  return add(scale(f.north, Math.cos(b)), f.east, Math.sin(b));
-};
-
-/** A ship put to sea about her in a match at sea: where she lies and heads, her colours, and her helm lashed (she holds
- * it from the start, making the way its throttle asks, and nobody steers her), or null for a bot at it. */
-export interface Berth { at: Vec3; heading: Vec3; look: Look; lashed: Helm | null }
-
-/** The match: its seed (each bot's mind comes from it and her slot), its storm by the match's clock (s), and the
- * gun every ship is armed with, or null for none (as every ship puts to sea in a match: 0117's). */
-export interface Match {
-  seed: number; storm: (seconds: number) => Storm; gun: Arms | null;
-  /** Its ships' berths (sim/spawn.ts berths, SHIPS of them), when worked out ahead of its start (play/setup.ts). */
-  berths?: readonly Spawn[];
-}
-
-/** A ship sunk: who she was, who sank her (the ship whose ball or ram dealt the last blow; null for the storm), how,
- * when, on the match's clock (s), and where she went down and the way she headed. */
-export interface Sinking { id: number; by: number | null; cause: Cause; time: number; at: Vec3; heading: Vec3 }
-
-/** A ship as the match's flow reads her: who she is (0 the player's), where she is and heads, her hit points, whether
- * she carries a gun, and whether she is still afloat. */
-export interface Afloat { id: number; at: Vec3; heading: Vec3; hull: number; shield: number; armed: boolean; afloat: boolean }
-
-/** What a step did to who holds the sea: its loops closed and trails cut (sim/territory.ts; null outside a match), and
- *  the shield each ship's own water gave back (sim/holding.ts). */
-export interface Stepped { held: Outcome | null; regained: readonly Regained[] }
-
-/** A step's parts, in the order they run: the orders (the bots' thinking), the fleet sailed, the fighting, who holds
- *  the sea, the ships riding the swell, the sunk taken off, and what it all did kept (advance's `lap`). */
-export const PARTS = ['command', 'sail', 'fight', 'hold', 'ride', 'founder', 'keep'] as const;
-export type Part = (typeof PARTS)[number];
 
 /** What the fleet's step, the stores' and the fighting's hand on within a step. */
 type Met = ReturnType<typeof stepFleet>;
@@ -102,10 +69,6 @@ const colours = (count: number): Vec3[] => {
   colourTables.set(count, t);
   return t;
 };
-
-/** The planet's water as the match reads it, sounded once (play/sounding.ts): the bots' chart of open water for their
- *  routes (sim/route.ts), and the open water ships are berthed in at a match's start (sim/spawn.ts). */
-export interface Waters { chart: Chart; water: Berthing }
 
 /** planet: the world's; sea: its waves, which the ships ride; waters: its water, sounded. */
 export function createState(planet: Planet, sea: Hull, { chart, water }: Waters, first: Match) {
@@ -397,13 +360,13 @@ export function createState(planet: Planet, sea: Hull, { chart, water }: Waters,
         return { id: c.id, at: s.at, heading: s.heading, hull: c.health.hull, shield: c.health.shield, armed: armed(c), afloat: !sunk(c.health) };
       });
     },
-    /** A new match: SHIPS ships, hers the first, the rest bots, every one afloat at her berth (sim/spawn.ts) with a
-     *  gun in reach of it (sim/loot.ts berthed). Returns her pose. manned: false puts a bot at her helm too (for
+    /** A new match: its ships (fleetOf), hers the first, the rest bots, every one afloat at her berth (sim/spawn.ts)
+     *  with a gun in reach of it (sim/loot.ts berthed). Returns her pose. manned: false puts a bot at her helm too (for
      *  tools/matches.ts, whole matches of bots). */
     start(m: Match, manned = true): ShipPose {
-      const ids = Array.from({ length: SHIPS }, (_, i) => i);
+      const count = fleetOf(m), ids = Array.from({ length: count }, (_, i) => i);
       clear(m, ids, MATCH);
-      const at = m.berths ?? berths(water, m.seed, SHIPS, depth);
+      const at = m.berths?.length === count ? m.berths : berths(water, m.seed, count, depth);
       flotsam = berthed(flotsam, at.map((b) => b.at), m.seed, depth);
       at.forEach((b, id) => launch(id, shipAt(b.at, b.heading), lookOf(id), null, manned));
       territory?.begin(at.map((b) => b.at), tick * STEP);
