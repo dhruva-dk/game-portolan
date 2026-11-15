@@ -264,7 +264,8 @@ export const TUNING = {
   },
 
   /** Money (Phase B section 10): each league's prize pool at the season's end, shared by place by rules.prizeSpread. */
-  money: { prize: [24000, 12000, 6000] },
+  //   Sized so a median crew's prize is about a third of its season's wages and upkeep (the patrons bring about half).
+  money: { prize: [520000, 200000, 105000] },
   /** Reputation (Phase B section 10), 0..100. */
   reputation: {
     perPoint: 0.1, most: 3,                          // a crew's a race: × (its points − its league's mean), to ± most
@@ -277,10 +278,11 @@ export const TUNING = {
   /** Patrons (Phase B section 10). */
   patrons: {
     slots: 3, every: 42, offers: 2, stand: 14,       // offers a crew gets every so many days, standing so long
-    perRace: 0.8,                                    // a fixed patron's Coin a race × the crew's marketability
+    perRace: 4.6,                                    // a fixed patron's Coin a race × the crew's marketability × its league's factor
+    league: [1.7, 1, 1],                             //   (League One's wages outrun its marketability)
     tier: [1, 1.6, 2.4],                             // × by the offer's tier (the landing pad's level at most)
     races: [3, 10],
-    bonus: 2.2,                                      // an objective patron's bonus × the crew's marketability × the objective's weight
+    bonus: 7,                                        // an objective patron's bonus × the crew's marketability × league × the objective's weight
     objectives: { top10: 1, sinkTwo: 1.6, afloat: 1.2, mostSea: 1.8 },
     objectiveShare: 0.5,                             // the share of offers that pay for objectives
     better: [1.5, -0.5],                             // a rival replaces a patron for one worth this × as much (Finance u)

@@ -442,3 +442,74 @@ decisions are in #56, section 2.
   wording picked by `seeded(seed, mail id)` of 2. **Why:** rivals read state, not mail.
 - **Question:** the young each season. **Choice:** 150 free agents aged 16–19 of 0.5–1.5 stars, roles in the start's
   shares, colonies even, on the 'young' stream. **Why:** section 5's number; low stars so potential matters.
+
+## 2026-11-15, Phase B (#59), sections 8–11
+
+- **Question:** where this part is published (the shell guard bans force pushes, and manager-b had to be rebased onto
+  Phase A). **Choice:** the orchestrator's ruling: the rebased branch is pushed as `manager-b3`, and every later commit
+  too; origin/manager-b is left as it was. The part 4 agent starts from manager-b3. **Why:** no force push, no lost history.
+- **Question:** what DealComponents names. **Choice:** `{ type, slot }`: the draft is of one type; dealing a new type
+  starts a new draft. Each slot is dealt three cards seeded by (seed, crew, its design count, slot, deal, type), so no
+  state but the cards is kept; one redeal a slot. **Why:** the cards depend on the type's pool; seeded draws use no stream.
+- **Question:** the components table. **Choice:** 54 (`career/components.ts`): each type and tier has a steady gain, a
+  sound one (reliability) and a grey one (risk 0.08 × the tier's scale 1, 1.8, 2.8, for about twice the gain); odd
+  types trade the steady one for a quick one (fewer days, more Coin). Sails, rigging and keel tiers open by the test
+  tank's level, rudder, hull and mounts by the foundry's. A shipwright knows `componentsKnown(stars)` of tiers 1–2,
+  dealt by `seeded(seed, 'comp')` in makeGull. **Why:** section 8.2 as data; no stream so the world's draws are unchanged.
+- **Question:** a design's numbers. **Choice:** start = the crew's best of the type + shipwright's type stat × 8 +
+  components + supplier's start; maximum + 100 headroom; reliability 0.5, maximum 0.8, plus components and supplier;
+  risk their sum to 0.9. Cost = type base × tier factor (1, 1.6, 2.4, by the highest tier used) × supplier's cost +
+  components' Coin. Days 14 × Speed × the loft's factor + components; build 7 − factory level. Accuracy draws the
+  final perf and max on stream `design:<crew>`; Innovation may teach an open component the shipwright lacks. **Why:**
+  section 8.3's terms with numbers the owner can tune.
+- **Question:** FitPart with ship null. **Choice:** refused (`bare`): a ship always carries one part of each type, so a
+  part comes off only by fitting another (it goes to the spares, or swaps between ships). **Why:** a ship with no keel
+  cannot be raced; the invariant holds by construction.
+- **Question:** a new part and the two ships' politics. **Choice:** a part from the spares is new if it beats the other
+  ship's of its type; `lastNew[type]` records the ship; a second in a row to ship one costs ship two's captain 5 morale;
+  `flags['newPart:<crew>']` holds the day for section 12's dilemma. **Why:** section 8.6.
+- **Question:** the yard's reckoning. **Choice:** closed form from `yardDay` to now (`yardTo`), called before anything
+  reads or changes parts: points restore fitted parts' condition first, the most worn first, then the split's shares;
+  bosuns' factors are read when reckoned. **Why:** D41; condition only rises between races, so the closed form is exact.
+- **Question:** a confiscated part. **Choice:** the ship fits the crew's best spare of the type, or a stand-in
+  (perf 300, reliability 0.7, not spec); the race's points are struck from the standings; fined (1 + risk) × 20% of
+  its design cost. **Why:** the invariant (one part of each type a ship) holds and the penalty is still felt.
+- **Question:** the season's carry-over. **Choice:** designs for next season whole; other parts × 0.6 of perf and
+  maximum, risk stripped, condition full; fitted parts and the best spare a type kept; spec types replaced by standard
+  parts, and a standard part whose type leaves spec becomes ordinary at its numbers. A rival refits its best. **Why:**
+  section 8.7; spares are pruned so parts don't pile up over seasons.
+- **Question:** suppliers' window and memory. **Choice:** chosen while `round === 0` and before race day, once a trade,
+  paid once; the three cards are seeded by (seed, season, crew, trade) so nothing is stored but the choice;
+  `suppliersCleared` at the season's end. With none chosen, terms are even. **Why:** section 8.7's off-season choice.
+- **Question:** money's numbers (the brief: wages may outrun income). **Choice:** prize pools 520,000, 200,000 and
+  105,000 Coin, shared by (n + 1 − place)^spread; fixed patrons 4.6 × crew marketability × tier × league (1.7, 1, 1)
+  a race, objective patrons a bonus of 7 × the same × the objective's weight. Measured at founding: a median League One
+  crew's wages and upkeep ≈ 3,760 a race; three patrons ≈ 1,800, fish ≈ 220, its prize ≈ 13,000 a season. Most crews
+  run into debt mid-season and recover at the prize. **Why:** a median crew about balances; the owner tunes the rest.
+- **Question:** wages below the floor. **Choice:** owed payments (wages, upkeep, fines) are paid even past the floor;
+  every spend is checked by `canSpend`. **Why:** section 10's floor limits choices, not obligations.
+- **Question:** reputation and marketability numbers. **Choice:** a crew's ± 0.1 a point against the league's mean
+  (to ± 3) a race, + 10 a title, + 6 promotion, − 8 relegation; a manager's ± 0.5 a place better than target (to ± 2);
+  the player's also ± 0.15 a point of their own ship against a ship's mean, + 0.5 a sinking (to ± 3), and the player's
+  reputation is their manager gull's. Marketability: + 3 a podium, + 1 a sinking, drifting 10% a race toward its anchor
+  (stars and youth; the player's reputation). A crew's = 0.4 reputation + 0.6 its two sailors' mean. **Why:** section 10.
+- **Question:** patrons' offers. **Choice:** a `patronOffer` event a crew every 42 days (first staggered over the first
+  two weeks), two offers standing 14 days, tier 1 to the landing pad's level, 3 to 10 races, half paying for
+  objectives (2 or 3 of top 10, sink two, both afloat, the most sea). Signing into a filled slot replaces that patron.
+  The objective chosen is by slot in the race plan (`Plan.objectives`), the first if none. **Why:** section 10.
+- **Question:** the Admiralty's calendar and count. **Choice:** a `proposal` event 12 days before round indexes 3 and 7
+  each league; one measure by seed on stream 'admiralty'; its `vote` event the day before that race. Rivals vote by
+  `measure.ts lean` (abstain within 0.2 of even); the player's silence abstains; abstaining rivals join the side with
+  more sway with a chance of the margin's share. Sway = reputation × Politics u (the player's reputation), plus Coin
+  lobbied × 0.1. More for than against carries; ties keep the rule. Carried changes go to `league.next`; `rulesTurned`
+  puts them in force at the season's end. **Why:** section 11.
+- **Question:** a rival's measure where a result can't say it. **Choice:** banning a gun kind leans on the crew's
+  captains' mean Gunnery (results name no gun kind); sea-held point on homesteader and turtle captains' share; prize
+  spread on coin against half the budget; inspection on the crew's fitted risk. **Why:** each from state a rival has.
+- **Question:** the rivals' rows. **Choice:** `career/works.ts`: yard (split by rank in the league × room left,
+  Development's evenness), design (worst-ranked non-spec type; each slot's best card by worth per Coin, risk by
+  personality; next season's late), build (personality's order, up to 0.6 of room), patrons (fill empty slots; replace
+  for 1.5 − 0.5 × Finance u more), suppliers (personality's weights), vote (measure). Rows `suppliers` and `vote` join
+  every personality's order at 0.6 and 0.5. **Why:** section 6's table; every row acts through the player's checks.
+- **Question:** schema. **Choice:** Crew, Patron, Proposal and Design fields changed without a SCHEMA bump, as earlier
+  agents did before release; TUNING_VERSION 3. **Why:** no saves outside tests exist yet.

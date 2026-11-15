@@ -26,7 +26,7 @@ export const patronWorth = (p: Patron): number =>
 /** A patron's offers made to a crew today: `count` of them, drawn. */
 export function patronOffers(s: CareerState, c: Crew, rand: () => number, count: number): { offers: PatronOffer[]; next: number } {
   let id = s.ids.patron;
-  const market = crewMarketability(s, c);
+  const market = crewMarketability(s, c) * P.league[Math.min(P.league.length - 1, c.league)];
   const offers: PatronOffer[] = [];
   for (let i = 0; i < count; i++) {
     const tier = between(rand, 1, Math.max(1, patronTier(c)));

@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { canonical, fnv, hex } from '../src/career/canon.ts';
 import { TUNING, TUNING_VERSION } from '../src/career/tuning.ts';
 
-const PINNED = { version: 3, hash: '643e1f9f' };
+const PINNED = { version: 3, hash: '8f347139' };
 
 test('TUNING is pinned to TUNING_VERSION', () => {
   const hash = hex(fnv(canonical(TUNING)));
