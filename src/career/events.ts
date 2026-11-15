@@ -105,8 +105,10 @@ export const DILEMMAS: readonly Dilemma[] = [
   {
     id: 'bondFallOut', category: 'crew', elder: false, options: ['swap', 'dinner', 'leave'], rival: [1, 2, 2, 0, 0, 2],
     trigger: (s, c) => {
+      // a bond gains 1 to 2 a race, so after five races every pair is past level 1's 5 points: the pair that falls out
+      // is one still short of level 2 (docs/decisions.md)
       if (s.round < 5) return null;
-      const k = c.staff.ships.findIndex((h, i) => h.bosun !== null && h.captain !== null && bondLevel(c.bonds[i]) === 0);
+      const k = c.staff.ships.findIndex((h, i) => h.bosun !== null && h.captain !== null && bondLevel(c.bonds[i]) <= 1);
       return k < 0 ? null : { ship: k, bosun: c.staff.ships[k].bosun!, gull: c.staff.ships[k].captain! };
     },
     answer: (s, c, slots, o) => {
@@ -148,9 +150,10 @@ export const DILEMMAS: readonly Dilemma[] = [
   },
   {
     id: 'flightWorn', category: 'crew', elder: false, options: ['rest', 'push', 'cover'], rival: [2, 0, 1, 0, 1, 0],
+    // the fatigue the last race left them (a race adds at most ~49 and the days between take 140 or more, so "above 75"
+    // never holds of fatigue now; docs/decisions.md)
     trigger: (s, c) => {
-      const loft = c.buildings.flightLoft.level;
-      const g = c.staff.flight.map((id) => s.gulls[id]).find((x) => fatigueOn(x, s.day, loft) > D.worn);
+      const g = c.staff.flight.map((id) => s.gulls[id]).find((x) => x.fatigue > D.worn);
       return g && nextRace(s) !== null ? { gull: g.id, job: g.job ?? 'mend' } : null;
     },
     answer: (s, c, slots, o) => {

@@ -35,11 +35,15 @@ function rivalOption(s: CareerState, c: Crew, d: Dilemma): number {
   return i < 0 ? d.options.length - 1 : d.rival[i];
 }
 
-/** The dilemmas whose trigger holds for a crew, and how much each weighs in the draw. */
+/** The dilemmas whose trigger holds for a crew, and how much each weighs in the draw: an elder's by its Meddling; for
+ *  the player, each the less the more often it has come to them (the career's mail keeps count), so the rare ones
+ *  are not drowned by those that nearly always hold. */
 function candidates(s: CareerState, c: Crew, rand: Rand): { d: Dilemma; weight: number }[] {
   const elder = s.gulls[c.staff.elder] as GullOf<'elder'>;
   const meddle = meddleChance(effective(elder, null).meddling);
-  return DILEMMAS.filter((d) => d.trigger(s, c, rand) !== null).map((d) => ({ d, weight: d.elder ? meddle : 1 }));
+  const seen = new Map<string, number>();
+  if (c.player) for (const m of s.mail) if (m.dilemma) seen.set(m.dilemma.id, (seen.get(m.dilemma.id) ?? 0) + 1);
+  return DILEMMAS.filter((d) => d.trigger(s, c, rand) !== null).map((d) => ({ d, weight: (d.elder ? meddle : 1) / (1 + (seen.get(d.id) ?? 0)) }));
 }
 
 /** A state with the player's unanswered dilemmas lapsed to their last option. */

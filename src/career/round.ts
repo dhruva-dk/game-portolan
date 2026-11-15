@@ -12,7 +12,7 @@ import { effective } from './effective.ts';
 import { afterRace, standingOf } from './elders.ts';
 import { flagsCleared, today } from './flags.ts';
 import { inspected } from './inspection.ts';
-import { leadershipMorale } from './service.ts';
+import { leadershipFatigue, leadershipMorale } from './service.ts';
 import { lineups, sides, type Sailing } from './lineup.ts';
 import { bonusesPaid, raceMoney } from './money.ts';
 import { bondMove, injury, moraleIn, resultMove, statusMove, wageMove, wantsOut } from './morale.ts';
@@ -161,9 +161,12 @@ function spirits(s: CareerState, crew: number, sailing: Sailing): CareerState {
   const bonds = c.staff.ships.map((h, k) => (h.bosun !== null && h.captain !== null && bosuns[k] ? Math.round((c.bonds[k] + bondGain(bosuns[k]!.chemistry)) * 100) / 100 : c.bonds[k]));
   const gulls = [...out.gulls];
   const loft = c.buildings.flightLoft.level;
+  // the flight serves both ships: the leading bosun's Leadership (ship one's, else ship two's) sets how it tires
+  const leader = bosuns[0] ?? bosuns[1];
+  const tires = leader ? leadershipFatigue(leader.leadership) : 1;
   for (const id of c.staff.flight) {
     const g = gulls[id] as GullOf<'flight'>;
-    gulls[id] = { ...g, fatigue: Math.min(100, Math.round((fatigueOn(g, out.day, loft) + fatigueGained(effective(g, null).stamina)) * 10) / 10), fatigueDay: out.day };
+    gulls[id] = { ...g, fatigue: Math.min(100, Math.round((fatigueOn(g, out.day, loft) + fatigueGained(effective(g, null).stamina) * tires) * 10) / 10), fatigueDay: out.day };
   }
   const crews = [...out.crews];
   crews[crew] = { ...out.crews[crew], bonds: [bonds[0], bonds[1]] };

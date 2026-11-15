@@ -10,6 +10,7 @@ import { apply, start, type CareerState } from '../src/career/career.ts';
 import { raceCards } from '../src/career/card.ts';
 import { DILEMMAS } from '../src/career/events.ts';
 import { TEMPLATES } from '../src/career/mail.ts';
+import { askOf } from '../src/career/market.ts';
 import { stars } from '../src/career/stars.ts';
 import { standingOf } from '../src/career/elders.ts';
 import { staffOf } from '../src/career/state.ts';
@@ -42,16 +43,18 @@ const must = (c: Command): void => {
   if (!r.ok) throw new Error(`${c.kind} refused on day ${s.day}: ${r.reason.sentence}`);
   s = r.state;
 };
+const refusals = new Map<string, number>();
 const tryIt = (c: Command): boolean => {
   const r = apply(s, c, { debug: true });
   if (r.ok) s = r.state;
+  else refusals.set(`${c.kind}:${r.reason.code}`, (refusals.get(`${c.kind}:${r.reason.code}`) ?? 0) + 1);
   return r.ok;
 };
 must({ ...FOUND, seed });
 
 const times: number[] = [], ends: number[] = [];
 let tabled = -1;
-const counts = { sackings: 0, hirings: 0, transfers: 0, forfeits: 0 };
+const counts = { sackings: 0, hirings: 0, transfers: 0, forfeits: 0, topped: 0 };
 const coinLog: string[] = [];
 const tables: string[] = [];
 let managers = s.crews.map((c) => c.staff.manager);
@@ -69,6 +72,47 @@ function tallied(): void {
   const crews = s.gulls.map((g) => g.contract?.crew ?? null);
   crews.forEach((c, i) => { if (c !== null && i < crewOf.length && crewOf[i] !== null && crewOf[i] !== c) counts.transfers += 1; });
   crewOf = crews;
+}
+
+const TYPES = ['sails', 'rigging', 'rudder', 'hull', 'keel', 'mounts'] as const;
+const BUILDINGS = ['factory', 'drawingLoft', 'testTank', 'foundry', 'sailingSchool', 'flightLoft', 'crowsNest', 'fishMarket', 'landingPad'] as const;
+
+/** What a manager means to do between race days: a design under way when none is (each slot dealt, its first card
+ *  taken), a building now and then, and its free scouts sent to free captains. */
+function works(): void {
+  const c = s.crews[s.player!.crew];
+  // a new part better than ship one's goes on her
+  for (const p of c.parts) {
+    const on = c.parts.find((x) => x.ship === 0 && x.type === p.type);
+    if (p.ship === null && !p.forNext && (!on || p.perf > on.perf)) tryIt({ kind: 'FitPart', part: p.id, ship: 0 });
+  }
+  // a shipwright's counter is met
+  for (const t of s.talks) if (t.crew === c.id && t.counter !== null && s.gulls[t.gull].role === 'shipwright') tryIt({ kind: 'AcceptCounter', gull: t.gull });
+  if (c.staff.shipwright === null && !s.talks.some((t) => t.crew === c.id && s.gulls[t.gull].role === 'shipwright')) {
+    // the weakest free shipwrights first: they ask least and want a post most
+    const pool = s.gulls.filter((g) => g.role === 'shipwright' && g.contract === null && g.retired === null && !g.player && s.day >= g.silentUntil)
+      .sort((a, b) => stars(a) - stars(b) || a.id - b.id);
+    for (const g of pool.slice(0, 5)) {
+      const ask = askOf(s, g, c);
+      // a crew past its floor cannot sign: the bot tops it up with DebugCoin to sign one (counted apart from the ledger)
+      const short = Math.ceil(s.crews[c.id].debtFloor + ask.fee + ask.wage * 2 - s.crews[c.id].coin);
+      if (short > 0 && short <= 1e6 && tryIt({ kind: 'DebugCoin', coin: short })) counts.topped += short;
+      if (tryIt({ kind: 'OfferContract', gull: g.id, offer: { role: 'shipwright', status: 'staff', wage: Math.round(ask.wage * 1.5), fee: ask.fee, seasons: ask.seasons,
+        podium: 0, sinking: 0, breakClause: null, replaces: null } })) break;
+    }
+  }
+  if (c.design === null) {
+    const spec = s.leagues[c.league].rules.spec;
+    const open = TYPES.filter((t) => !spec.includes(t)).sort(() => rand() - 0.5);
+    for (const type of open) {
+      for (let slot = 0; slot < 4; slot++) tryIt({ kind: 'DealComponents', type, slot });
+      const d = s.crews[c.id].draft;
+      if (d && d.type === type && tryIt({ kind: 'StartDesign', type, components: d.deals.map((x) => x.cards[0]), forNext: rand() < 0.2 })) break;
+    }
+  }
+  if (rand() < 0.15) tryIt({ kind: 'Build', building: BUILDINGS[Math.floor(rand() * BUILDINGS.length)] });
+  const free = s.gulls.filter((g) => g.role === 'captain' && g.contract === null && g.retired === null && !g.player);
+  for (const scout of s.crews[c.id].staff.scouts) if (free.length > 0) tryIt({ kind: 'StartScout', scout, gull: free[Math.floor(rand() * free.length)].id });
 }
 
 const median = (xs: number[]) => [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)];
@@ -114,9 +158,12 @@ while (s.season < seasons) {
     invariants(s);
     continue;
   }
-  for (let k = 0; k < 2; k++) {
+  works();
+  for (let k = 0; k < 4; k++) {
     const c = someCommand(s, rand);
-    if (c.kind !== 'Advance' && !c.kind.startsWith('Debug') && c.kind !== 'Snapshot') tryIt(c);
+    // the bot keeps its shipwright (it designs every season)
+    const keeps = c.kind === 'Dismiss' && c.gull === s.crews[s.player!.crew].staff.shipwright;
+    if (c.kind !== 'Advance' && !c.kind.startsWith('Debug') && c.kind !== 'Snapshot' && !keeps) tryIt(c);
   }
   if (s.player!.sacked || s.race !== null) continue;
   if (s.round >= 10 && tabled !== s.season) {
@@ -147,9 +194,10 @@ const timing = (xs: number[]) => {
   return `${xs.length} calls, mean ${(xs.reduce((a, b) => a + b, 0) / Math.max(1, xs.length)).toFixed(1)} ms, 95th ${at(0.95)} ms, most ${at(1)} ms (call ${xs.indexOf(sorted[sorted.length - 1])})`;
 };
 console.log(`Advance between race days: ${timing(times)}; through a season's end: ${timing(ends)}`);
-console.log(`ledger of the player's crew: ${coinLog.join('; ')}`);
+console.log(`ledger of the player's crew: ${coinLog.join('; ')}; the bot's DebugCoin top-ups to sign a shipwright: ${counts.topped}`);
 console.log('mail kinds:', [...mailKinds].sort().map(([k, n]) => `${k} ${n}`).join(', '));
 const missingMail = Object.keys(TEMPLATES).filter((k) => !mailKinds.has(k));
 const missingDilemmas = [...dilemmaIds].filter((k) => !mailKinds.has(k));
 console.log(`mail kinds never sent: ${missingMail.join(', ') || 'none'}`);
 console.log(`dilemmas never drawn for the player: ${missingDilemmas.join(', ') || 'none'}`);
+console.log(`the bot's refusals: ${[...refusals].sort((a, b) => b[1] - a[1]).slice(0, 16).map(([k, v]) => `${k} ${v}`).join(', ')}`);

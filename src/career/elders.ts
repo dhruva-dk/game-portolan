@@ -102,12 +102,14 @@ export function bestManager(s: CareerState, crew: number, barred: number | null 
 }
 
 /** Whether a crew may offer its post to the player now: the player's reputation reaches its league's threshold, the
- *  crew is not theirs, and no offer of its is standing. */
+ *  crew is not theirs, and no offer of its is standing; while the player has a crew, only a crew of their league or a
+ *  better one offers, and no more than `standing` offers stand at once (a post below them is no offer). */
 export function mayOffer(s: CareerState, crew: number): boolean {
   const p = s.player;
   if (!p) return false;
   const c = s.crews[crew];
-  return !c.player && p.reputation >= E.jobs[c.league] && !p.offers.some((o) => o.crew === crew);
+  if (c.player || p.reputation < E.jobs[c.league] || p.offers.some((o) => o.crew === crew)) return false;
+  return p.sacked || (c.league <= s.crews[p.crew].league && p.offers.length < E.standing);
 }
 
 /** A state with a crew's post offered to the player: 7 days to answer (no lapse while they are out of a crew). */

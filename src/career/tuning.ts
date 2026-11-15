@@ -138,6 +138,7 @@ export const TUNING = {
     jobs: [70, 45, 0],                               // the player's reputation a league's crews offer their post at
     ambitious: 14,                                   // an elder's Ambition at or above which, at the season's end, they court a better manager
     offerDays: 7,                                    // a job offer stands this long
+    standing: 2,                                     // the most job offers standing at once while the player has a crew
   },
 
   /** Rival managers' decisions (Phase B section 6), and what each personality weighs. */
@@ -304,13 +305,13 @@ export const TUNING = {
   race: { top: [25, 22, 20, 18, 16], last: 20, swap: 4, standIn: 1 }, // standIn: a stand-in captain's fee a race × their ask
   /** The dilemmas (Phase B section 12, career/events.ts): the chance a crew draws one after a round, and their numbers. */
   dilemmas: {
-    chance: 0.3, after: [2, 9],                      // a player's comes this many days after the round closes
+    chance: 0.6, after: [2, 9],                     // a player's comes this many days after the round closes
     rise: 0.15, riseMorale: 10, refuse: -15, promise: 0.5, promiseMorale: 5, // a rise, the refusal, a podium bonus × wage
     argue: 5, argueLost: -10,                        // morale: the part given over, or the loser's when held
     dinner: 150, dinnerBond: 5,                      // Coin, bond points
     grey: { perf: 40, risk: 0.15 }, report: 5,       // a grey component's numbers; marketability for reporting it
     guest: 2,                                        // ship two's Consistency lost with a guest aboard
-    worn: 75, rest: 0.5, restFatigue: 30, push: 0.1, cover: 120, // fatigue that triggers; rest's rate ×; push's botch +; cover's Coin
+    worn: 30, rest: 0.5, restFatigue: 30, push: 0.1, cover: 120, // fatigue that triggers; rest's rate ×; push's botch +; cover's Coin
     press: 5, low: 40,                               // confidence and marketability moved; below this confidence the press asks
     trialAge: 20, trialPotential: 3.5, trialWage: 0.5, // a young free agent's age under, potential from; wage × their ask
     repair: 400, slowDays: 20, slow: 0.5,            // Coin a building level to repair now; else the factory at × slow for slowDays
