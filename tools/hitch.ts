@@ -6,7 +6,8 @@
 //   node tools/hitch.ts [--slow=1] [--seconds=15] [--worst=8] [--trace=file.json] [--seed=n]     (npm run hitch)
 // --slow is Chrome's CPU throttling (1: none); --seconds the window after PLAY (over 15, neither the JS nor the GPU
 // process is traced: the trace would outgrow what node can read); --trace keeps Chrome's trace for its Performance panel;
-// --seed the planet raced on (its biome's: world/biome.ts seedIn), the page's own if none.
+// --seed the planet raced on (its biome's: world/biome.ts seedIn), the page's own if none. Then the rookery's own view,
+// and the office over the drawn world (its tabs tapped, three Advances), each held to the same LIMIT.
 //
 // What it can and cannot say: the frame rate is uncapped, so a frame's time is its own cost (the main thread's work,
 // then the GPU's); throttling slows the page's JS, layout and style, not the GPU process (its shader and pipeline
@@ -223,6 +224,39 @@ try {
   const rfailed = viewed.over50 > LIMIT.over50 || viewed.over33 > LIMIT.over33;
   console.log(`${rfailed ? 'OVER' : 'ok'}: the rookery at most ${LIMIT.over50} frames over 50 ms and ${LIMIT.over33} over 33 ms`);
   failed ||= rfailed;
+
+  // The office over the drawn world (debug.ts ?screen=home, the lobby's sea under its page): every tab of the top bar
+  // tapped in turn, Home again, then Continue three times (each an Advance, its save and the redraw); held to LIMIT
+  const desk = await browser.newPage({ viewport: { width: DEVICE.width, height: DEVICE.height }, deviceScaleFactor: DEVICE.dpr, hasTouch: true });
+  desk.on('pageerror', (e) => console.error(`[office] ${e.message}`));
+  await desk.goto(`${url}?screen=home`);
+  await desk.waitForSelector('.o-tab', { timeout: 120000 });
+  await desk.waitForTimeout(3000);
+  const dcdp = await desk.context().newCDPSession(desk);
+  await dcdp.send('Emulation.setCPUThrottlingRate', { rate: slow });
+  await desk.evaluate(() => {
+    const tick = (t: number) => {
+      performance.mark('hitch:office', { startTime: t });
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  });
+  const tabs = await desk.locator('.o-tab').count();
+  for (let k = 0; k <= tabs; k++) {
+    await desk.locator('.o-tab').nth(k % tabs).click();
+    await desk.waitForTimeout(700);
+  }
+  for (let k = 0; k < 3; k++) {
+    await desk.locator('.o-go').click();
+    await desk.waitForTimeout(1200);
+  }
+  const dtimes = await desk.evaluate(() => performance.getEntriesByName('hitch:office').map((e) => e.startTime));
+  await desk.close();
+  const dframes = dtimes.slice(1).map((t, i) => ({ at: t, ms: t - dtimes[i], from: dtimes[i] }));
+  const worked = report('the office', dframes, dtimes[0] ?? 0);
+  const dfailed = worked.over50 > LIMIT.over50 || worked.over33 > LIMIT.over33;
+  console.log(`${dfailed ? 'OVER' : 'ok'}: the office at most ${LIMIT.over50} frames over 50 ms and ${LIMIT.over33} over 33 ms`);
+  failed ||= dfailed;
 } finally {
   await close();
 }
