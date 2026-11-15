@@ -1,5 +1,5 @@
-// What a closed loop takes (the first game's claim, agent-initial src/sim.ts): her own water and her trail are the
-// fence; every connected stretch of the rest of the planet but the largest becomes hers. On a sphere every loop cuts
+// What a closed loop takes (the first game's claim, agent-initial src/sim.ts): her own water (and her side's) and her
+// trail are the fence; every connected stretch of the rest of the planet but the largest becomes hers. On a sphere every loop cuts
 // the world in two, so this is the smaller side, with every pocket the fence shuts off besides: whatever lies there,
 // others' water and islands too.
 //
@@ -19,11 +19,12 @@ const TURN = 16;
 
 /**
  * The cells a loop gives ship `me` (owner value: her id + 1), given who holds each cell and her trail's cells in the
- * order laid: the trail's own first (`loop` of them), then those it encloses.
+ * order laid: the trail's own first (`loop` of them), then those it encloses. `ours` says which owner values fence
+ * with hers (her side's water: territory.ts; hers alone if not given).
  */
-export function enclose(owner: Uint8Array, me: number, trail: readonly number[]): { cells: Int32Array; loop: number } {
+export function enclose(owner: Uint8Array, me: number, trail: readonly number[], ours: (o: number) => boolean = (o) => o === me): { cells: Int32Array; loop: number } {
   for (const c of trail) MARK[c] = 1;
-  const fenced = (c: number) => owner[c] === me || MARK[c] === 1;
+  const fenced = (c: number) => ours(owner[c]) || MARK[c] === 1;
   const parent: number[] = [], queue: number[][] = [], head: number[] = [], area: number[] = [];
   const visited: number[] = [];
   const find = (r: number) => {

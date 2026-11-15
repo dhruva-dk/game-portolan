@@ -90,12 +90,16 @@ export const BOT = {
 } as const;
 
 /** A ship as a bot sees her: who she is, how she sails, the shove she is carried on by, her hull and shield (health.ts;
- *  whole and none when not given), whether she carries a gun, and her handling (fit.ts; the tables' when not given);
- *  and her own, what she carries (battle.ts Crew: her hold and gust), without which she pays her stores no heed. */
-export interface Seen { id: number; ship: ShipState; shove?: Vec3; hull?: number; shield?: number; armed?: boolean; fit?: Handling; crew?: Crew }
+ *  whole and none when not given), whether she carries a gun, her handling (fit.ts; the tables' when not given) and
+ *  her side (contact.ts Vessel; her own when not given); and her own, what she carries (battle.ts Crew: her hold and
+ *  gust), without which she pays her stores no heed. */
+export interface Seen { id: number; ship: ShipState; shove?: Vec3; hull?: number; shield?: number; armed?: boolean; fit?: Handling; side?: number; crew?: Crew }
 
 /** A ship's handling as a bot sees her. */
 export const fitOf = (s: Seen): Handling => s.fit ?? SPEC;
+
+/** Whether two ships are of one side: no foes to each other, their trails and water each other's. */
+export const mates = (a: Seen, b: Seen) => a.id !== b.id && (a.side ?? a.id) === (b.side ?? b.id);
 
 /** What a bot knows of the sea besides the ships on it: how deep it is; its chart (route.ts), without which she finds
  *  no routes round land, only feels her way along it; the storm now (storm.ts), without which she pays it no heed; and

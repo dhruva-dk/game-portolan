@@ -31,7 +31,7 @@ import type { Helm } from './ship.ts';
 import { STORM, toEdge, type Cap } from './storm.ts';
 import { temper } from './temper.ts';
 import { choose, logistic, momentum, ramp, utility, type Option } from './utility.ts';
-import { BOT, between, fitOf, inSight, open, roll, rotate, toward, type Ctx, type Memory, type Mode, type Sea, type Seen } from './captain.ts';
+import { BOT, between, fitOf, inSight, mates, open, roll, rotate, toward, type Ctx, type Memory, type Mode, type Sea, type Seen } from './captain.ts';
 import { deepest, steer } from './helmsman.ts';
 import { healUrge, lootAct, lootUrge, purse, PURSER } from './purser.ts';
 import { claimAct, claimUrge, cutAct, cutUrge, homeAct, homeUrge, sound } from './claimer.ts';
@@ -75,12 +75,12 @@ function hidden(c: Ctx, a: Vec3, b: Vec3): boolean {
   return false;
 }
 
-/** Notes the nearest ship she can see; a foe out of sight is followed to where she was last seen, then let go. */
+/** Notes the nearest ship she can see, not of her side; a foe out of sight is followed to where she was last seen, then let go. */
 function perceive(c: Ctx): void {
   const { m, own } = c;
   let best: Seen | null = null, bd = c.t.notice * (0.8 + 0.4 * c.t.skill);
   for (const o of c.others) {
-    if (apart(own.ship.at, o.ship.at, BOT.sightMax)) continue;
+    if (mates(own, o) || apart(own.ship.at, o.ship.at, BOT.sightMax)) continue;
     const d = distance(own.ship.at, o.ship.at);
     if (d > BOT.sightMax) continue;
     const score = o.id === m.hitBy && m.clock - m.hitT < BOT.grudge ? d * BOT.nearer : d;

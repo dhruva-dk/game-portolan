@@ -15,9 +15,10 @@
 // Pure arithmetic: no three, so it runs in node for the tests; deterministic for the same inputs, to the bit.
 
 import { apart, distance, along, type Vec3 } from '../world/sphere.ts';
+import { ours, type Waters } from './holding.ts';
 import { STORM, toEdge } from './storm.ts';
 import { ramp, utility } from './utility.ts';
-import { BOT, between, fitOf, open, rotate, toward, type Ctx } from './captain.ts';
+import { BOT, between, fitOf, mates, open, rotate, toward, type Ctx } from './captain.ts';
 
 /** Everything a bot's water is tuned by. Metres and seconds; new, as 0117's captains held none. */
 export const CLAIMER = {
@@ -40,21 +41,22 @@ export const CLAIMER = {
   reach: 130, stride: 3, lead: 2, past: 10, least: 6, cut: 0.6,
 } as const;
 
-/** Who holds the sea, as a bot knows it (territory.ts): who holds the water at a point (her id, −1 none), and each
- *  ship's open trail. */
-export interface Holdings {
-  ownerAt(p: Vec3): number;
+/** Who holds the sea, as a bot knows it (territory.ts): who holds the water at a point (her id, −1 none) and of what
+ *  side (holding.ts Waters), and each ship's open trail. Her side's water is her own. */
+export interface Holdings extends Waters {
   trail(id: number): { readonly serial: number; readonly points: readonly Vec3[] };
 }
 
+/** Whether the water at p is hers (or her side's). */
+const hers = (c: Ctx, p: Vec3) => !!c.sea.holdings && ours(c.sea.holdings, p, c.own);
+
 /** Notes where she last lay in her own water (each step). */
 export function sound(c: Ctx): void {
-  const h = c.sea.holdings;
-  if (h && h.ownerAt(c.own.ship.at) === c.own.id) c.m.haven = c.own.ship.at;
+  if (hers(c, c.own.ship.at)) c.m.haven = c.own.ship.at;
 }
 
 /** Whether she lies in her own water. */
-const inOwn = (c: Ctx) => !!c.sea.holdings && c.sea.holdings.ownerAt(c.own.ship.at) === c.own.id;
+const inOwn = (c: Ctx) => hers(c, c.own.ship.at);
 /** Whether her trail is open: she is out of her water laying one. */
 const outward = (c: Ctx) => !!c.sea.holdings && c.sea.holdings.trail(c.own.id).points.length > 0;
 /** The distance to the nearest other ship. */
@@ -73,7 +75,7 @@ export function claimUrge(c: Ctx): number {
 
 /** Plans a bite out from her water at p along a bearing that is open and inside the storm, or null if she finds none. */
 function plan(c: Ctx, p: Vec3): Vec3[] | null {
-  const h = c.sea.holdings!, s = c.sea.storm, greed = c.t.claim, f = c.own.ship.heading;
+  const s = c.sea.storm, greed = c.t.claim, f = c.own.ship.heading;
   const depth = CLAIMER.depth[0] + (CLAIMER.depth[1] - CLAIMER.depth[0]) * greed * between(c.m, 0.6, 1);
   const width = CLAIMER.width[0] + (CLAIMER.width[1] - CLAIMER.width[0]) * greed * between(c.m, 0.6, 1);
   const kept = (q: Vec3) => open(c, q) && (!s || toEdge(q, s) > c.t.margin);
@@ -81,7 +83,7 @@ function plan(c: Ctx, p: Vec3): Vec3[] | null {
   for (let k = 0; k < 8; k++) {
     const dir = rotate(p, f, start + (k * Math.PI) / 4);
     let edge = CLAIMER.probe;
-    while (edge < CLAIMER.edgeMost && h.ownerAt(along(p, dir, edge).p) === c.own.id) edge += CLAIMER.probe;
+    while (edge < CLAIMER.edgeMost && hers(c, along(p, dir, edge).p)) edge += CLAIMER.probe;
     if (edge >= CLAIMER.edgeMost) continue;
     const gate = along(p, dir, edge).p, out = along(p, dir, edge + depth);
     const across = toward(out.p, gate), side = across && rotate(out.p, across, (flank * Math.PI) / 2);
@@ -139,10 +141,10 @@ export function homeAct(c: Ctx): void {
 /** A mark `round` m ahead and turned to her side, in her own water and open: she keeps way on in it, no sitting target
  *  (the other side, else straight on, if none to her side is). */
 function circle(c: Ctx): Vec3 {
-  const p = c.own.ship.at, f = c.own.ship.heading, side = c.m.rand & 1 ? 1 : -1, h = c.sea.holdings!;
+  const p = c.own.ship.at, f = c.own.ship.heading, side = c.m.rand & 1 ? 1 : -1;
   for (const a of [0.6, 1.1, 1.7, -0.6, -1.1, -1.7, 2.4, -2.4]) {
     const q = along(p, rotate(p, f, side * a), CLAIMER.round).p;
-    if (h.ownerAt(q) === c.own.id && open(c, q)) return q;
+    if (hers(c, q) && open(c, q)) return q;
   }
   return along(p, f, CLAIMER.round).p;
 }
@@ -156,7 +158,7 @@ function prey(c: Ctx): { at: Vec3; score: number } | null {
   const p = c.own.ship.at;
   let best: { at: Vec3; score: number } | null = null;
   for (const o of c.others) {
-    if (apart(p, o.ship.at, BOT.sightMax + CLAIMER.reach) || distance(p, o.ship.at) > BOT.sightMax + CLAIMER.reach) continue;
+    if (mates(c.own, o) || apart(p, o.ship.at, BOT.sightMax + CLAIMER.reach) || distance(p, o.ship.at) > BOT.sightMax + CLAIMER.reach) continue;
     const pts = h.trail(o.id).points;
     if (pts.length < CLAIMER.least) continue;
     const back = distance(o.ship.at, pts[0]) / (fitOf(o).top * 1.1);

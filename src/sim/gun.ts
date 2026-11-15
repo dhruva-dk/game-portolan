@@ -4,7 +4,7 @@
 //
 // Each is aimed along a line of sight (sight.ts): the player's camera, through the middle of the screen, or a bot's
 // eye aloft. Laying it is made easy for a thumb: of the ships within its range whose body stands within the assist
-// cone of that line (seen from the eye), the gun takes the one nearest the line (the nearer of two counting a little),
+// cone of that line (seen from the eye), not of her side, the gun takes the one nearest the line (the nearer of two counting a little),
 // and leads her: where she will be when the ball comes down, sailing on as she sails now, the ball's flight being had
 // in closed form (shot.ts), and that found again from there until it settles. A ship behind the land the line meets
 // is not taken. With no ship in the cone it is laid on the point the line meets the sea or the land, or at full range
@@ -139,7 +139,7 @@ export function laid(
   const g = GUNS[gun.kind], from = muzzle(shooter), up = normalize(from);
   const s = sight ?? { from, dir: shooter.ship.heading };
   const meet = meets(s, depth, rises), land = meet !== null && length(pointOn(s, meet)) - R > 0.01;
-  const mark = chosen(s, from, GUN.assist[gun.rarity], others.filter((o) => o.id !== shooter.id), g.range, land ? meet! : Infinity);
+  const mark = chosen(s, from, GUN.assist[gun.rarity], others.filter((o) => o.id !== shooter.id && o.side !== shooter.side), g.range, land ? meet! : Infinity);
   const at = mark && lead(gun.kind, from, mark);
   // with no ship: the point the sight meets, or one far along it
   const point = at ?? normalize(pointOn(s, meet ?? BEYOND));

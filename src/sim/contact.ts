@@ -34,14 +34,15 @@ import { step, type Helm, type ShipState } from './ship.ts';
 import { clearance, hullAt, moved, type Depth } from './shoal.ts';
 
 /** A ship in a fleet: who she is (an id no other in the fleet has), how she sails, the shove she is carried on by (m/s,
- * a tangent at her place), the ships she has rammed or been rammed by and not yet drawn clear of, and her own handling
- * (fit.ts). */
+ * a tangent at her place), the ships she has rammed or been rammed by and not yet drawn clear of, her own handling
+ * (fit.ts), and her side: ships of one side do each other no harm (a ship alone is a side of her own, her id). */
 export interface Vessel {
   id: number;
   ship: ShipState;
   shove: Vec3;
   engaged: readonly number[];
   fit: Handling;
+  side: number;
 }
 
 /** Where a blow lands on her. */
@@ -63,8 +64,9 @@ export interface Blow {
   at: Vec3;
 }
 
-/** A ship in a fleet, under no shove and engaged with none, by her own handling (the tables' if not given). */
-export const afloat = (id: number, ship: ShipState, fit: Handling = SPEC): Vessel => ({ id, ship, shove: [0, 0, 0], engaged: [], fit });
+/** A ship in a fleet, under no shove and engaged with none, by her own handling (the tables' if not given), on her
+ *  side (her own if not given). */
+export const afloat = (id: number, ship: ShipState, fit: Handling = SPEC, side = id): Vessel => ({ id, ship, shove: [0, 0, 0], engaged: [], fit, side });
 
 /** Her hull's half-width, and how far ahead and astern of amidships its rounded ends are centred. */
 export const RADIUS = SHIP.beam / 2;
@@ -164,7 +166,7 @@ function part(l: Laid, out: P): Part {
 }
 
 /** A ship as the step works on her. */
-interface Working { id: number; ship: ShipState; shove: Vec3; engaged: number[]; jolt: Vec3; fit: Handling }
+interface Working { id: number; ship: ShipState; shove: Vec3; engaged: number[]; jolt: Vec3; fit: Handling; side: number }
 
 /** Her way through the water and her shove together, on the chart, and at a point of her (r from amidships). */
 function velocity(w: Working, m: Meeting, r: P): P {
@@ -185,7 +187,8 @@ function jolted(w: Working, m: Meeting, dv: P, turn: number): void {
   w.jolt = add(w.jolt, d);
 }
 
-/** The blow between a and b, met as `m`, if they are closing: their velocities changed, and the ram it was, if any. */
+/** The blow between a and b, met as `m`, if they are closing: their velocities changed, and the ram it was, if any
+ *  (none between sidemates: their hulls meet and part, and do each other no harm). */
 function strike(a: Working, b: Working, m: Meeting): Blow | null {
   const ra = sub(m.c, m.a.centre), rb = sub(m.c, m.b.centre);
   const va = velocity(a, m, ra), vb = velocity(b, m, rb);
@@ -203,7 +206,7 @@ function strike(a: Working, b: Working, m: Meeting): Blow | null {
   }
   jolted(a, m, scale2(given(m.a, j), -1), -cross2(ra, j) / k2);
   jolted(b, m, given(m.b, j), cross2(rb, j) / k2);
-  if (closing <= RAM.least || a.engaged.includes(b.id)) return null;
+  if (closing <= RAM.least || a.side === b.side || a.engaged.includes(b.id)) return null;
   // a ram: shared by how little of the closing was each one's own, and by where on her it landed
   a.engaged.push(b.id);
   b.engaged.push(a.id);
@@ -261,7 +264,7 @@ function sailed(v: Vessel, helm: Helm, dt: number, depth: Depth): Working {
   }
   shove = scale(shove, Math.exp(-RAM.ease * dt));
   if (length(shove) < RAM.still) shove = [0, 0, 0];
-  return { id: v.id, ship, shove, engaged: [...v.engaged], jolt: [0, 0, 0], fit: v.fit };
+  return { id: v.id, ship, shove, engaged: [...v.engaged], jolt: [0, 0, 0], fit: v.fit, side: v.side };
 }
 
 /**
@@ -312,7 +315,7 @@ export function stepFleet(fleet: readonly Vessel[], helms: readonly Helm[], dt: 
   for (const w of ws) w.engaged = w.engaged.filter((id) => byId.has(id) && gap(w.ship, byId.get(id)!.ship) <= RAM.rearm);
   const result = fleet.map((v) => byId.get(v.id)!);
   return {
-    fleet: result.map(({ id, ship, shove, engaged, fit }) => ({ id, ship, shove, engaged, fit })),
+    fleet: result.map(({ id, ship, shove, engaged, fit, side }) => ({ id, ship, shove, engaged, fit, side })),
     blows,
     jolts: result.map((w) => w.jolt),
   };

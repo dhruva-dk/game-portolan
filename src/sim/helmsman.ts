@@ -19,7 +19,7 @@ import { ring } from './gunner.ts';
 import { offCourse, turned, type Helm } from './ship.ts';
 import { course as routed } from './route.ts';
 import { PURSER } from './purser.ts';
-import { BOT, between, fitOf, inSight, open, roll, rotate, toward, unitHash, velocity, type Ctx, type Seen } from './captain.ts';
+import { BOT, between, fitOf, inSight, mates, open, roll, rotate, toward, unitHash, velocity, type Ctx, type Seen } from './captain.ts';
 
 /** Where to steer to ram `foe` on her side: led for where she will be, by way of her beam when she is end on. A tangent
  *  at her place. */
@@ -116,7 +116,7 @@ export function steer(c: Ctx, dt: number): Helm {
 function answer(c: Ctx): number | null {
   const { m, own } = c, p = own.ship.at, mine = velocity(own);
   for (const o of c.others) {
-    if (apart(p, o.ship.at, BOT.threat)) continue;
+    if (mates(own, o) || apart(p, o.ship.at, BOT.threat)) continue;
     const d = distance(p, o.ship.at), t = toward(p, o.ship.at);
     if (d > BOT.threat || !t) continue;
     const r = scale(t, d), rel = add(transport(velocity(o), o.ship.at, p), mine, -1), closing = -dot(t, rel);

@@ -23,7 +23,8 @@ import { STEP, blendPose } from '../sim/fixed.ts';
 import { gunOf } from '../sim/gun.ts';
 import { SPEC, type Handling } from '../sim/fit.ts';
 import { SHIP } from '../sim/handling.ts';
-import { sunk } from '../sim/health.ts';
+import { sunk, whole } from '../sim/health.ts';
+import type { RaceCard } from '../race.ts';
 import { homed, regain } from '../sim/holding.ts';
 import { PLAYER, credited, type Cause } from '../sim/match.ts';
 import { berths } from '../sim/spawn.ts';
@@ -38,10 +39,9 @@ import type { Deed } from '../player.ts';
 import type { Hull } from '../world/swell.ts';
 import { remembered, risesOf, type Planet } from '../world/planet.ts';
 import type { ShipPose } from '../world/pose.ts';
-import { hash } from '../world/random.ts';
 import { add, scale, type Vec3 } from '../world/sphere.ts';
-import { LOOK, lookOf, seaColourOf } from './colours.ts';
-import { bearing, fleetOf, type Afloat, type Berth, type Match, type Sinking, type Stepped, type Part, type Waters } from './match.ts';
+import { LOOK, lookIn, seaColourOf } from './colours.ts';
+import { bearing, fitIn, fleetOf, seedIn, sideIn, type Afloat, type Berth, type Match, type Sinking, type Stepped, type Part, type Waters } from './match.ts';
 import { blastsOf, deedsOf, kept as keptDeeds } from './moments.ts';
 import { sinking } from './sinking.ts';
 
@@ -63,11 +63,12 @@ interface Aboard { look: Look; mind: Memory | null; steady: Helm; ride: Ride; be
 /** A ship going down: her pose when she sank and the step she sank at, listing to `side`. */
 interface Wreck { id: number; look: Look; pose: ShipPose; tick: number; side: number }
 
-/** Each ship's colour on the sea, by id, for `count` ships (made once for each count). */
-const colourTables = new Map<number, Vec3[]>();
-const colours = (count: number): Vec3[] => {
-  const t = colourTables.get(count) ?? Array.from({ length: count }, (_, id) => seaColourOf(id));
-  colourTables.set(count, t);
+/** Each ship's colour on the sea, by id, for `count` ships of a match dealt `card` (made once for each). */
+const colourTables = new Map<number, Vec3[]>(), cardTables = new WeakMap<RaceCard, Vec3[]>();
+const colours = (count: number, card?: RaceCard): Vec3[] => {
+  const t = (card ? cardTables.get(card) : colourTables.get(count)) ?? Array.from({ length: count }, (_, id) => seaColourOf(id, card));
+  if (card) cardTables.set(card, t);
+  else colourTables.set(count, t);
   return t;
 };
 
@@ -75,7 +76,7 @@ const colours = (count: number): Vec3[] => {
 export function createState(planet: Planet, sea: Hull, { chart, water }: Waters, first: Match) {
   const depth = remembered((p: Vec3) => -planet.height(p)), rises = risesOf(planet.islands);
   let match = first;
-  const seedOf = (id: number) => hash(match.seed, id);
+  const seedOf = (id: number) => seedIn(match, id);
   let fleet: Vessel[] = [];
   const aboard = new Map<number, Aboard>();
   let battle: Battle = battleOf([], match.seed);
@@ -112,7 +113,7 @@ export function createState(planet: Planet, sea: Hull, { chart, water }: Waters,
 
   /** Puts a ship to sea: a bot's unless she is the player's (and `manned`) or her helm is lashed. */
   const launch = (id: number, ship: ShipState, look: Look, lashed: Helm | null = null, manned = true) => {
-    const v = afloat(id, ship);
+    const v = afloat(id, ship, fitIn(match, id), sideIn(match, id));
     fleet.push(v);
     const r = settled(v, sea, tick * STEP, id), p = pose(ship, r);
     const bot = (id !== PLAYER || !manned) && !lashed;
@@ -132,8 +133,10 @@ export function createState(planet: Planet, sea: Hull, { chart, water }: Waters,
     sinkings.length = 0;
     struck.clear();
     const gun = match.gun;
-    battle = battleOf(ids.map((id) => (gun ? crewOf(id, gunOf(gun.kind, gun.rarity)) : crewOf(id))), match.seed);
-    territory = held ? createTerritory(Math.max(...ids) + 1) : null;
+    const crew = (id: number) => (gun ? crewOf(id, gunOf(gun.kind, gun.rarity)) : crewOf(id));
+    battle = battleOf(ids.map((id) => ({ ...crew(id), side: sideIn(m, id), health: whole(fitIn(m, id).hull) })), match.seed);
+    const count = Math.max(...ids) + 1;
+    territory = held ? createTerritory(count, Array.from({ length: count }, (_, id) => sideIn(m, id))) : null;
     generation++;
     begun = tick;
     quiet = false;
@@ -231,7 +234,7 @@ export function createState(planet: Planet, sea: Hull, { chart, water }: Waters,
 
   /** Who holds the sea after the step (each trail laid, each loop closed), and in her own water her shield coming
    *  back: of the ships still afloat, those sunk in the step (`lost`) laying, closing and cutting nothing in it. */
-  const hold = (from: ReadonlyMap<number, Vec3>, storm: Storm, lost: readonly number[]): Stepped => {
+  const hold = (from: ReadonlyMap<number, Vec3>, storm: Storm, lost: readonly number[]): Pick<Stepped, 'held' | 'regained'> => {
     if (!territory) return { held: null, regained: [] };
     const sailing = lost.length ? fleet.filter((v) => !lost.includes(v.id)) : fleet;
     const held = territory.step(sailing.map((v): Move => ({ id: v.id, from: from.get(v.id) ?? v.ship.at, to: v.ship.at })), tick * STEP, storm);
@@ -272,7 +275,7 @@ export function createState(planet: Planet, sea: Hull, { chart, water }: Waters,
   return {
     /** One step: the player's helm, gun and stores, everyone else's from her bot or her lashed helm; then the fleet's
      *  step and the fighting's, who holds the sea, and what it all did kept to be drawn. Returns what it did to who
-     *  holds the sea. `lap`, if given, is told as each of its parts is done (tools/steps.ts times them). */
+     *  holds the sea and the guns' shots and strikes. `lap`, if given, is told as each of its parts is done (tools/steps.ts times them). */
     advance(helm: Helm, gun: Order, ask: Ask = NOTHING, lap?: (part: Part) => void): Stepped {
       const storm = stormAt(time());
       const { helms, orders, asks } = command(helm, gun, ask, storm);
@@ -291,7 +294,7 @@ export function createState(planet: Planet, sea: Hull, { chart, water }: Waters,
       lap?.('founder');
       record({ ...fought, cues: [...wants.cues, ...fought.cues], sunk: lostNow, took: kept.took, mended: kept.mended, blew: wants.blew, her: fleet.find((v) => v.id === PLAYER)?.ship.at ?? null });
       lap?.('keep');
-      return did;
+      return { ...did, shots: fought.shots, strikes: fought.strikes };
     },
 
     /** The match's clock: seconds since it began. */
@@ -339,7 +342,7 @@ export function createState(planet: Planet, sea: Hull, { chart, water }: Waters,
     sea(between: number): Sea | undefined {
       if (!territory) return undefined;
       const trails = territory.trails().flatMap((t, id) => (t.points.length ? [{ id, serial: t.serial, points: t.points }] : []));
-      return { generation, owner: territory.owner, seq: territory.last(), changes: territory.changes(), trails, colours: colours(territory.trails().length) };
+      return { generation, owner: territory.owner, seq: territory.last(), changes: territory.changes(), trails, colours: colours(territory.trails().length, match.card) };
     },
     /** A ship's share of the planet's water now, 0…1 (none outside a match). */
     share: (id: number) => territory?.share(id) ?? 0,
@@ -372,7 +375,7 @@ export function createState(planet: Planet, sea: Hull, { chart, water }: Waters,
       clear(m, ids, MATCH);
       const at = m.berths?.length === count ? m.berths : berths(water, m.seed, count, depth);
       flotsam = berthed(flotsam, at.map((b) => b.at), m.seed, depth);
-      at.forEach((b, id) => launch(id, shipAt(b.at, b.heading), lookOf(id), null, manned));
+      at.forEach((b, id) => launch(id, shipAt(b.at, b.heading), lookIn(m.card, id), null, manned));
       territory?.begin(at.map((b) => b.at), tick * STEP);
       return aboard.get(PLAYER)!.after;
     },
@@ -387,7 +390,8 @@ export function createState(planet: Planet, sea: Hull, { chart, water }: Waters,
     debug: {
       /** A match at sea about her: hers at `start`, heading `bearing` (radians), and the others. Returns her pose. */
       atSea(start: { at: Vec3; bearing: number }, others: readonly Berth[]): ShipPose {
-        clear(match, [PLAYER, ...others.map((_, i) => i + 1)], MATCH);
+        // (card-less: each a side of her own, so every one is hers to shoot)
+        clear({ ...match, card: undefined }, [PLAYER, ...others.map((_, i) => i + 1)], MATCH);
         launch(PLAYER, shipAt(start.at, bearing(start.at, start.bearing)), LOOK);
         others.forEach((o, i) => launch(i + 1, { ...shipAt(o.at, o.heading), speed: (o.lashed?.throttle ?? 0) * SHIP.top }, o.look, o.lashed));
         territory?.begin(fleet.map((v) => v.ship.at), tick * STEP);

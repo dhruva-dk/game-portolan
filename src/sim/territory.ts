@@ -6,7 +6,9 @@
 // (enclose.ts). A trail is cut, not deadly: another ship crossing it, or she herself, breaks it, and she loses it, no
 // water gained; she must start again from her own water. A sunk ship's water drains back to open sea, and the storm
 // takes every cell outside its cap. A ship left with no water is not sunk: she lays a new home patch round her
-// wherever she is on open sea (her open trail, if any, given up), and claims again from there.
+// wherever she is on open sea (her open trail, if any, given up), and claims again from there. In a race of sides
+// (#58), the cells stay each ship's own, but her side's water is her own to leave and come home to, and her
+// sidemate crossing her trail doesn't cut it.
 //
 // What changed is logged (Change) for the frame to draw: a claim flooding in from its loop, a home patch, water
 // draining, a trail cut. The grid itself, one byte a cell, is kept in place and read by reference.
@@ -60,10 +62,15 @@ export interface Outcome { cut: { id: number; by: number | null }[]; claimed: { 
 
 type Logged = Change extends infer C ? (C extends Change ? Omit<C, 'seq'> : never) : never;
 
-/** The sea of `count` ships (ids 0 … count − 1), none holding any yet. */
-export function createTerritory(count: number) {
+/** The sea of `count` ships (ids 0 … count − 1), none holding any yet; `sides[id]` her side (each her own if not
+ *  given). Her side's water is her own: she lays no trail in it and closes her loop on it, and a sidemate crossing
+ *  her trail doesn't cut it. */
+export function createTerritory(count: number, sides?: readonly number[]) {
+  const side = Int32Array.from({ length: count }, (_, id) => sides?.[id] ?? id);
   /** Who holds each cell: 0 open sea, else her id + 1. */
   const owner = new Uint8Array(CELLS);
+  /** Whether owner value `o` is ship `id`'s side's (hers or a sidemate's). */
+  const oursBy = (id: number) => (o: number) => o !== 0 && side[o - 1] === side[id];
   /** Whose open trail runs through each cell: 0 none, else her id + 1. */
   const laid = new Uint8Array(CELLS);
   const area = new Float64Array(count);
@@ -119,11 +126,11 @@ export function createTerritory(count: number) {
   /** Starts her trail where she crossed out of her water between `from` and `to` (found by halving), or at `from`
    *  if her water went from under her. */
   const open = (id: number, lost: boolean, from: Vec3, to: Vec3) => {
-    const me = id + 1;
+    const ours = oursBy(id);
     let lo = from, hi = to;
     for (let i = 0; i < 8 && !lost; i++) {
       const m = normalize([lo[0] + hi[0], lo[1] + hi[1], lo[2] + hi[2]]);
-      if (owner[cellOf(m)] === me) lo = m;
+      if (ours(owner[cellOf(m)])) lo = m;
       else hi = m;
     }
     const t = trails[id];
@@ -135,7 +142,7 @@ export function createTerritory(count: number) {
   /** Closes her loop: the trail and what it encloses become hers. Returns the square metres it took. */
   const claim = (id: number, time: number): number => {
     const me = id + 1, before = area[id];
-    const { cells, loop } = enclose(owner, me, trails[id].cells);
+    const { cells, loop } = enclose(owner, me, trails[id].cells, oursBy(id));
     for (const c of cells) set(c, me);
     drop(id);
     log({ kind: 'claim', time, ship: id, cells, loop });
@@ -190,7 +197,9 @@ export function createTerritory(count: number) {
         for (let k = 1; k < walk.length; k++) {
           const o = laid[walk[k]] - 1;
           if (o < 0 || cut.has(o)) continue;
-          if (o !== id) cut.set(o, id);
+          if (o !== id) {
+            if (side[o] !== side[id]) cut.set(o, id);
+          }
           else if (mine.lastIndexOf(walk[k]) < mine.length - TERRITORY.grace) cut.set(id, id);
         }
       });
@@ -203,11 +212,11 @@ export function createTerritory(count: number) {
       }
       // trails laid, opened and closed
       ordered.forEach(({ id, from, to }, m) => {
-        const me = id + 1, walk = walks[m], t = trails[id];
+        const me = id + 1, walk = walks[m], t = trails[id], ours = oursBy(id);
         for (let k = 0; k < walk.length; k++) {
           const c = walk[k], going = t.points.length > 0;
           if (k === 0 && going) continue;
-          if (owner[c] === me) {
+          if (ours(owner[c])) {
             adrift[id] = 0;
             if (going) outcome.claimed.push({ id, metres: claim(id, time) });
           } else if (going || !adrift[id]) {
@@ -247,6 +256,11 @@ export function createTerritory(count: number) {
 
     /** Who holds the water at p (any vector from the centre): her id, or −1 for open sea. */
     ownerAt: (p: Vec3) => owner[cellOf(p)] - 1,
+    /** The side of who holds the water at p: −1 for open sea. */
+    sideAt: (p: Vec3) => {
+      const o = owner[cellOf(p)];
+      return o ? side[o - 1] : -1;
+    },
     /** Her share of the planet, 0…1. */
     share: (id: number) => area[id] / PLANET_QUANTA,
     /** Whether she holds any water. */

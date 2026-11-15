@@ -3,6 +3,7 @@
 //
 // Pure arithmetic: no three, so it runs in node for the tests; the same for a seed every time.
 
+import type { Captain, Style } from '../race.ts';
 import { random } from '../world/random.ts';
 
 /** A captain's temperament (0117's Style, what applies of it): how readily she fights, 0–1; how far off she notices a
@@ -25,6 +26,19 @@ const STYLES: readonly Omit<Temper, 'skill' | 'aggro'>[] = [
   { fight: 0.3, notice: 120, run: 40, margin: 30, standoff: 1.15, loot: 1, lootReach: 220, mend: 60, claim: 0.5 },
   { fight: 1, notice: 220, run: 15, margin: 15, standoff: 0.7, loot: 0.3, lootReach: 90, mend: 40, claim: 0.2 },
 ];
+
+/** The six by name, in STYLES' order (race.ts Style). */
+const NAMES: readonly Style[] = ['hunter', 'homesteader', 'raider', 'turtle', 'scavenger', 'brawler'];
+
+/** The captain whose bot `temper(seed)` sails (a card's captain for today's bot): her seed, her style as it draws it,
+ *  and stats on the 0–20 scale. Gunnery, Helm and Lookout are her skill (0.35 + 0.55 u at stat 20 u); the rest are
+ *  middling (10). Until the bots read the stats (#58 step 6), only the seed sails her. */
+export function captainOf(seed: number): Captain {
+  const u = random(seed ^ 0x51a7e), style = NAMES[Math.floor(u() * STYLES.length)];
+  const skill = temper(seed).skill, x = (20 * (skill - 0.35)) / 0.55;
+  const stats = { gunnery: x, helm: x, seamanship: 10, nerve: 10, consistency: 10, stormcraft: 10, stamina: 10, feedback: 10, lookout: x };
+  return { seed, style, stats };
+}
 
 /** A bot's temperament, by her seed: one of the six, varied a little as 0117 varied each captain's (but her loot and
  *  mending, 0117's own, which it never varied); her skill as 0117 drew it (0.35–0.9), and her mood (0.2–1). */

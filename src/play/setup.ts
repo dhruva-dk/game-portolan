@@ -2,11 +2,13 @@
 // debugging), the planet's water sounded for the bots' chart and the ships' berths, and the matches dealt one after
 // another, each with its storm, its berths and its bots' minds.
 
+import { SHIPS } from '../sim/match.ts';
 import { charted } from '../sim/route.ts';
 import type { Spawn } from '../sim/spawn.ts';
 import { createStorm, type Storm } from '../sim/storm.ts';
 import type { Planet } from '../world/planet.ts';
 import { along, frameAt, scale, toChart, type Vec3 } from '../world/sphere.ts';
+import { deal } from './deal.ts';
 import { fleetOf, type Match, type Waters } from './match.ts';
 
 /** Metres off the coast she lies at the start. */
@@ -53,13 +55,13 @@ export function watersOf(seed: number): Promise<{ waters: Waters; ms: number; be
 /**
  * The matches on a planet of this seed: the first on the planet's own seed, each next one dealt a seed of its own (its
  * storm and its bots' minds come from it). hold: seconds the storm is held at, or null to let it run; gun: the gun
- * every ship is armed with, or null for none.
+ * every ship is armed with, or null for none. Each is a race dealt from its seed (play/deal.ts) of `count` ships.
  */
-export function createMatches(seed: number, planet: Planet, hold: number | null, gun: Match['gun']) {
+export function createMatches(seed: number, planet: Planet, hold: number | null, gun: Match['gun'], count: number = SHIPS) {
   const depth = (p: Vec3) => -planet.height(p);
   const match = (s: number): Match => {
     const closing = createStorm(s, depth);
-    return { seed: s, storm: (t) => closing(hold ?? t), gun };
+    return { seed: s, storm: (t) => closing(hold ?? t), gun, card: deal(s, count) };
   };
   let played = 0, berth: Berther | null = null;
   /** The next match's seed, and its berths once worked out ahead of its deal. */

@@ -1,4 +1,4 @@
-// Her own water (territory.ts) as the rules have it: in it she sails faster (handling.ts HOLDING speed: her helm's
+// Her own water (territory.ts; her side's is hers) as the rules have it: in it she sails faster (handling.ts HOLDING speed: her helm's
 // home), and her shield comes back (HOLDING shield, hit points a second).
 //
 // Pure arithmetic: no three, so it runs in node for the tests; deterministic for the same inputs, to the bit.
@@ -9,14 +9,19 @@ import { healed } from './health.ts';
 import type { Helm } from './ship.ts';
 import type { Vec3 } from '../world/sphere.ts';
 
-/** Who holds the water at a point (her id, −1 open sea): sim/territory.ts ownerAt. */
-export interface Waters { ownerAt(p: Vec3): number }
+/** Who holds the water at a point (her id, −1 open sea): sim/territory.ts ownerAt; and the side of who holds it
+ *  (sideAt, −1 open sea; if not given, each ship is a side of her own). */
+export interface Waters { ownerAt(p: Vec3): number; sideAt?(p: Vec3): number }
 
-/** A ship as her water reads her: who she is and where she lies. */
-export interface Lying { id: number; ship: { at: Vec3 } }
+/** A ship as her water reads her: who she is, where she lies, and her side (her own if not given). */
+export interface Lying { id: number; ship: { at: Vec3 }; side?: number }
 
-/** Whether she lies in her own water (none outside a match). */
-export const atHome = (waters: Waters | null, v: Lying): boolean => !!waters && waters.ownerAt(v.ship.at) === v.id;
+/** Whether the water at p is hers or a sidemate's: her side's water is her own. */
+export const ours = (waters: Waters, p: Vec3, v: { id: number; side?: number }): boolean =>
+  waters.sideAt ? waters.sideAt(p) === (v.side ?? v.id) : waters.ownerAt(p) === v.id;
+
+/** Whether she lies in her own water, or a sidemate's (none outside a match). */
+export const atHome = (waters: Waters | null, v: Lying): boolean => !!waters && ours(waters, v.ship.at, v);
 
 /** Her helm as her water has it: in her own, she sails faster. */
 export const homed = (helm: Helm, waters: Waters | null, v: Lying): Helm => ({ ...helm, home: atHome(waters, v) });

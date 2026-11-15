@@ -91,3 +91,14 @@ export const ROSE = ink('#F2A0B4');
 export const LEMON = ink('#F4E06A');
 export const MURREY = ink('#8A2A6A');
 export const CHARCOAL = ink('#2E2A33');
+
+// ---- the crews' swatches: a side's colours (race.ts Colours index them). Starting values: twelve hues round the
+// wheel, each deep and light; the first, vermilion, the player's.
+export const CREW: readonly { readonly name: string; readonly rgb: Rgb }[] = ([
+  ['vermilion', '#C8322A'], ['coral', '#EE8A7E'], ['amber', '#C0702A'], ['apricot', '#F0B47C'],
+  ['mustard', '#B09E22'], ['primrose', '#F0DC7C'], ['olive', '#6E9A24'], ['lime', '#B8E07C'],
+  ['green', '#2E9A3A'], ['mint', '#8CD892'], ['jade', '#24946A'], ['seafoam', '#7CD8B4'],
+  ['teal', '#22908E'], ['aqua', '#7CD6D4'], ['azure', '#2A6AB0'], ['sky', '#7CAEE8'],
+  ['indigo', '#3A3AB0'], ['periwinkle', '#9090E8'], ['violet', '#6E34B0'], ['lavender', '#B48AE8'],
+  ['magenta', '#A0309A'], ['orchid', '#E07CD8'], ['crimson', '#B02E62'], ['pink', '#E87CA6'],
+] as const).map(([name, hex]) => ({ name, rgb: ink(hex) }));

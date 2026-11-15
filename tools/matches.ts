@@ -1,7 +1,7 @@
 // Whole matches of bots, no browser needed: how they arm themselves from the loot, and how they end.
 //   node tools/matches.ts [matches=3] [seed] [ships=80]
-// Each match is the game's own (play/state.ts start and advance, the matches dealt as play/setup.ts deals them), every
-// ship a bot, hers too, on a flat sea (the waves only lift the drawn ships). Prints, per match, the share of ships
+// Each match is the game's own (play/state.ts start and advance, the races dealt as play/setup.ts deals them, two
+// ships a side, until one side is left), every ship a bot, hers too, on a flat sea (the waves only lift the drawn ships). Prints, per match, the share of ships
 // afloat that are armed at 30, 60 and 120 s and the share with a shield or something to mend with, how the ships were
 // sunk, how and when it ended, the balls fired and how many struck home, and the bots stuck: any that moved less than STUCK m in WINDOW s, told apart by her
 // speed over it: aground (under AGROUND m/s), or sailing round in circles (fighting round a foe, going for a piece
@@ -30,14 +30,14 @@ const t0 = performance.now();
 const planet = createPlanet(seed);
 const depth = (p: Vec3) => -planet.height(p);
 const waters = { chart: chart(depth), water: berthing(depth) };
-const matches = createMatches(seed, planet, null, null);
+const matches = createMatches(seed, planet, null, null, fleet);
 const state = createState(planet, flat, waters, matches.first);
 console.log(`planet, chart and berths in ${(performance.now() - t0).toFixed(0)} ms`);
 const end = STORM.phases.reduce((t, p) => t + p.wait + p.close, 0) + 120;
 const idle = { course: null, throttle: 0 }, still = { aim: null, fire: false };
 
 for (let g = 0; g < games; g++) {
-  const m = { ...matches.deal(), ships: fleet };
+  const m = matches.deal();
   state.start(m, false);
   const loot = state.loot().pieces, shallow = loot.filter((l) => depth(l.at) < SHIP.draught + LOOT.open).length;
   const marks: string[] = [], track = new Map<number, { at: Vec3; speed: number }[]>();
@@ -60,7 +60,8 @@ for (let g = 0; g < games; g++) {
   let lastShot = 0, quiet = 0;
   let seen = -Infinity;
   const t1 = performance.now();
-  while (state.alive().length > 1 && state.time() < end) {
+  // on until every ship afloat is of one side
+  while (new Set(state.vessels().map((v) => v.side)).size > 1 && state.time() < end) {
     const did = state.advance(idle, still);
     for (const k of did.held?.claimed ?? []) [loops.closed, loops.metres] = [loops.closed + 1, loops.metres + k.metres];
     for (const k of did.held?.cut ?? []) {
@@ -118,7 +119,7 @@ for (let g = 0; g < games; g++) {
     if (k.cause === 'storm' && k.by !== null) credited++;
   }
   const left = state.alive();
-  console.log(`match ${g + 1} (seed ${m.seed}): ${left.length} left at ${state.time().toFixed(0)} s${left.length === 1 ? ` (ship ${left[0]} wins)` : ''};`
+  console.log(`match ${g + 1} (seed ${m.seed}): ${left.length} left at ${state.time().toFixed(0)} s${left.length ? ` (side ${state.vessels()[0].side} wins: ${left.join(', ')})` : ''};`
     + ` sunk by shot ${causes.shot}, ram ${causes.ram}, storm ${causes.storm} (${credited} credited); ${(ms / steps).toFixed(2)} ms a step`);
   console.log(`  balls: ${balls.fired} fired, ${balls.struck} struck home (${((100 * balls.struck) / Math.max(1, balls.fired)).toFixed(0)}%)`);
   console.log(`  by kind: ${[...kinds].map(([k, n]) => `${k} ${n.shots} shots ${n.balls ? (100 * (1 - n.fell / n.balls)).toFixed(0) : '-'}% home`).join(', ')}`);

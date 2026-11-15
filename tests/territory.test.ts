@@ -277,3 +277,31 @@ test('the worst loop to close (half the planet) costs tens of milliseconds, not 
   console.log(`a hemisphere's loop: its step ${best.toFixed(1)} ms`);
   assert.ok(best < 80, `${best} ms`);
 });
+
+// ------------------------------------------------------------------ sides (#58 step 3)
+
+test('a sidemate crossing her open trail does not cut it; a foe on the same course does', () => {
+  const pole: Vec3 = [1, 0, 0], theta = 0.15, path = circlePath(pole, theta), far = onCircle(pole, theta + 0.3, Math.PI);
+  const across = line(onCircle(pole, theta + 0.05, Math.PI * 0.3), onCircle(pole, theta + 0.05, Math.PI * 1.3));
+  const half = Math.floor(path.length / 2);
+  for (const [sides, cut] of [[[0, 0], []], [[0, 1], [1]]] as const) {
+    const t = createTerritory(2, sides);
+    t.begin([path[0], far], 0);
+    sail(t, path.slice(0, half));
+    assert.deepEqual(sail(t, across, 1).cut, cut, `sides ${sides}`);
+    assert.equal(t.trail(0).points.length > 0, cut.length === 0, 'her trail open only if not cut');
+  }
+});
+
+test("closing a loop counts her side's water as her own: sailing from hers into her mate's closes it", () => {
+  const a: Vec3 = normalize([1, 0.02, 0]), b: Vec3 = normalize([1, 0.02, 0.25]);
+  for (const [sides, closes] of [[[0, 0], true], [[0, 1], false]] as const) {
+    const t = createTerritory(2, sides);
+    t.begin([a, b], 0);
+    assert.equal(t.sideAt(b), sides[1]);
+    const { claimed } = sail(t, line(a, b));
+    assert.equal(claimed.length > 0, closes, `sides ${sides}: ${claimed}`);
+    // the cells stay each ship's own: her mate's water is still her mate's
+    assert.equal(t.ownerAt(b), 1);
+  }
+});

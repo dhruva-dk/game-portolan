@@ -6,7 +6,8 @@
 // once EQUIP has passed; held on the trigger it fires at its kind's interval while the magazine lasts, a heavy gun
 // winding up first and firing when wound, wherever it is laid by then; emptied, it reloads, and it fires again full.
 // A ship sunk takes no more, fires no more, and is no longer laid on or struck; her crew is kept, sunk, for the game to
-// take her off the sea. A blow that strikes breaks off whatever she was mending with (hold.ts); a gun fired in a gust
+// take her off the sea. Ships of one side do each other no harm: a ball stops on a sidemate's hull, a burst spares her,
+// a gun is never laid on her (gun.ts), and they don't ram (contact.ts). A blow that strikes breaks off whatever she was mending with (hold.ts); a gun fired in a gust
 // goes off wider (gust.ts).
 //
 // The storm (storm.ts) wears at every ship outside its cap, a share of a full hull a second, past the shield as the old
@@ -31,9 +32,10 @@ import type { Depth } from './shoal.ts';
 
 /** A ship's crew: who she is (her Vessel's id), her hit points, the guns she carries (CARRIED slots, null empty) and
  * the slot in hand, seconds till the gun in hand may fire after she took it up (EQUIP), her hold (hold.ts) and her
- * gust (gust.ts). */
+ * gust (gust.ts); and her side (contact.ts Vessel side), kept once she has sunk, for her balls still in flight. */
 export interface Crew {
   id: number;
+  side: number;
   health: Health;
   guns: readonly (Gun | null)[];
   hand: number;
@@ -95,9 +97,9 @@ export interface Splash {
 export interface Cue { ship: number; at: Vec3; kind: 'winding' | 'reloading' | 'reloaded' | 'swapped'; gun: GunKind }
 
 /** A crew as she puts to sea: whole, an empty hold, every gust ready, and with the guns given (none by default), the
- * first in hand. */
+ * first in hand; a side of her own (a match of sides sets it, and her hull: `{ ...crewOf(id), side, health }`). */
 export const crewOf = (id: number, ...guns: Gun[]): Crew => ({
-  id, health: whole(), guns: Array.from({ length: CARRIED }, (_, i) => guns[i] ?? null), hand: 0, equip: 0, hold: emptyHold(), gust: gustOf(),
+  id, side: id, health: whole(), guns: Array.from({ length: CARRIED }, (_, i) => guns[i] ?? null), hand: 0, equip: 0, hold: emptyHold(), gust: gustOf(),
 });
 
 /** The gun in her hand, or null. */
@@ -153,12 +155,13 @@ export function stepBattle(
   b: Battle, fleet: readonly Vessel[], orders: readonly Order[], blows: readonly Blow[], dt: number, depth: Depth, rises?: readonly Rise[],
 ): { battle: Battle; shots: Shot[]; strikes: Strike[]; splashes: Splash[]; cues: Cue[]; sunk: number[] } {
   const crews = new Map(b.crews.map((c) => [c.id, { ...c }]));
-  for (const v of fleet) if (!crews.has(v.id)) crews.set(v.id, { ...crewOf(v.id), health: whole(v.fit.hull) });
+  for (const v of fleet) if (!crews.has(v.id)) crews.set(v.id, { ...crewOf(v.id), side: v.side, health: whole(v.fit.hull) });
   const afloat = (id: number) => { const c = crews.get(id); return !!c && !sunk(c.health); };
   const strikes: Strike[] = [], sunkNow: number[] = [];
+  // a ball or a burst does a ship of the shooter's own side no harm (a ball still stops on her hull)
   const deal = (by: number, id: number, damage: number, at: Vec3, ram: boolean) => {
     const c = crews.get(id);
-    if (!c || sunk(c.health)) return;
+    if (!c || sunk(c.health) || (by !== id && crews.get(by)?.side === c.side)) return;
     const harm = harmed(c.health, damage);
     c.health = harm.health;
     c.hold = broken(c.hold);

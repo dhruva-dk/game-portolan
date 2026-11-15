@@ -21,6 +21,18 @@ test('she is at home only in her own water, and never outside a match', () => {
   assert.equal(atHome(null, lying(0, east)), false);
 });
 
+test("in her sidemate's water she is at home too: her shield comes back there and her helm is homed", () => {
+  // ships 0 and 1 one side (7), ship 2 another
+  const sideOf = [7, 7, 3], sided: Waters = { ...waters, sideAt: (p) => { const o = waters.ownerAt(p); return o < 0 ? -1 : sideOf[o]; } };
+  const at = (id: number, p: Vec3) => ({ ...lying(id, p), side: sideOf[id] });
+  assert.equal(atHome(sided, at(1, east)), true, "her mate's water");
+  assert.equal(atHome(sided, at(2, east)), false, "a foe's water");
+  assert.equal(atHome(sided, at(0, between)), false, 'open sea');
+  assert.equal(homed({ course: null, throttle: 1 }, sided, at(1, east)).home, true);
+  const r = regain([shielded(1, 10)], [at(1, east)], sided, 1);
+  assert.equal(r.crews[0].health.shield, 10 + HOLDING.shield);
+});
+
 test('in her own water her helm asks for HOLDING.speed times her top speed, and gets it', () => {
   const helm = { course: null, throttle: 1 };
   assert.deepEqual(homed(helm, waters, lying(0, east)), { ...helm, home: true });
