@@ -29,17 +29,26 @@ import { yardCheck, yardSet } from './yard.ts';
 
 const W = TUNING.works;
 
-/** How a part ranks among the league's fitted parts of its type: 0 the best .. 1 the worst. */
-function rankAmong(s: CareerState, c: Crew, p: Part): number {
-  let better = 0, all = 0;
+/** The league's fitted parts' perf by type (one pass, for many ranks). */
+function fittedPerf(s: CareerState, c: Crew): Map<PartType, number[]> {
+  const by = new Map<PartType, number[]>();
   for (const id of s.leagues[c.league].crews) {
     for (const q of s.crews[id].parts) {
-      if (q.type !== p.type || q.ship === null) continue;
-      all++;
-      if (q.perf > p.perf) better++;
+      if (q.ship === null) continue;
+      const xs = by.get(q.type);
+      if (xs) xs.push(q.perf);
+      else by.set(q.type, [q.perf]);
     }
   }
-  return all <= 1 ? 0.5 : better / (all - 1);
+  return by;
+}
+
+/** How a part ranks among the league's fitted parts of its type: 0 the best .. 1 the worst. */
+function rankAmong(fitted: Map<PartType, number[]>, p: Part): number {
+  const all = fitted.get(p.type) ?? [];
+  let better = 0;
+  for (const perf of all) if (perf > p.perf) better++;
+  return all.length <= 1 ? 0.5 : better / (all.length - 1);
 }
 
 /** Yard: the split toward the parts ranked worst, by the room left in them. */
@@ -47,7 +56,8 @@ export const yard: Decide = (s, mind) => {
   const c = s.crews[mind.crew];
   const parts = c.parts.filter((p) => p.ship !== null && !p.spec);
   if (parts.length === 0) return { state: s, mind };
-  const needs = parts.map((p) => (0.25 + rankAmong(s, c, p)) * Math.max(0, p.perfMax - p.perf + 500 * (p.reliabilityMax - p.reliability)));
+  const fitted = fittedPerf(s, c);
+  const needs = parts.map((p) => (0.25 + rankAmong(fitted, p)) * Math.max(0, p.perfMax - p.perf + 500 * (p.reliabilityMax - p.reliability)));
   const split = yardSplit(mind.stats.development, needs);
   const shares = parts.map((p, i) => {
     const rel = p.reliability < W.reliabilityBelow && p.reliability < p.reliabilityMax ? 0.3 : 0;
@@ -70,10 +80,11 @@ function cardWorth(id: string, riskMost: number): number | null {
 function worstType(s: CareerState, c: Crew): PartType | null {
   const spec = s.leagues[c.league].rules.spec;
   let worst: PartType | null = null, at = -1;
+  const fitted = fittedPerf(s, c);
   for (const type of TYPES) {
     if (spec.includes(type)) continue;
     const best = c.parts.filter((p) => p.type === type && p.ship !== null).sort((a, b) => b.perf - a.perf)[0];
-    const r = best ? rankAmong(s, c, best) : 1;
+    const r = best ? rankAmong(fitted, best) : 1;
     if (r > at) [worst, at] = [type, r];
   }
   return worst;

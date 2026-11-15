@@ -68,7 +68,7 @@ const talking = (s: CareerState, crew: number, gull: number): boolean => s.talks
 
 /** Gulls a crew knows who are not its own, alive and of a hired role: the candidates it may bid for. */
 function knownCandidates(s: CareerState, mind: Mind, employed: boolean | null): Gull[] {
-  return mind.known.map((id) => s.gulls[id]).filter((g) => g.retired === null && g.contract?.crew !== mind.crew && HIRED.includes(g.role)
+  return mind.known().map((id) => s.gulls[id]).filter((g) => g.retired === null && g.contract?.crew !== mind.crew && HIRED.includes(g.role)
     && (employed === null || (g.contract !== null) === employed) && !talking(s, mind.crew, g.id));
 }
 
@@ -183,6 +183,15 @@ export const renew: Decide = (s, mind0, roll) => {
   return { state, mind };
 };
 
+/** The candidates a crew's review looks over: all of them, or, in a crowded market (the days off, when contracts have
+ *  ended), an evenly spread sample of `scoutLooks` from a drawn offset. */
+function looked<T>(pool: readonly T[], roll: Dice): readonly T[] {
+  const n = R.scoutLooks;
+  if (pool.length <= n) return pool;
+  const step = pool.length / n, from = roll.roll('scout')() * step;
+  return Array.from({ length: n }, (_, i) => pool[Math.floor(from + i * step)]);
+}
+
 /** Scout: each free scout is sent to the unknown candidate of highest expected worth (the middle of the ranges the
  *  crew sees) among the roles it needs: open posts first, then any whose weakest the candidate would clear by the bar. */
 export const scout: Decide = (s, mind, roll) => {
@@ -206,9 +215,10 @@ export const scout: Decide = (s, mind, roll) => {
     if (!reached.has(league)) reached.set(league, reaches.some((r) => inReach(r, c.league, league)));
     return reached.get(league)!;
   };
-  const ranked = s.gulls
-    .filter((g) => g.retired === null && !g.player && floors.has(g.role) && inSome(leagueOf(s, g)) && !knows(s, mind.crew, g) && !scouted.has(g.id)
-      && (g.contract === null || closing(s, g.contract) || g.contract.breakClause !== null))
+  const pool = s.gulls
+    .filter((g) => floors.has(g.role) && g.retired === null && !g.player && !scouted.has(g.id)
+      && (g.contract === null || g.contract.breakClause !== null || closing(s, g.contract)) && !knows(s, mind.crew, g) && inSome(leagueOf(s, g)));
+  const ranked = looked(pool, roll)
     .map((g) => {
       const v = view(s, mind.crew, g.id, sight);
       return { g, w: worthTo(mind, { stars: middle(v.stars), potential: middle(v.potential) }) + (open.has(g.role) ? R.openFirst : 0) };

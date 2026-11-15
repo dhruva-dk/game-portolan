@@ -6,7 +6,7 @@
 // A pair [a, b] is a line in u = stat / 20: a + b × u. A triple by league is League One's, Two's, Three's.
 
 /** Bump with any change to TUNING (and pin the new hash in the test). */
-export const TUNING_VERSION = 3;
+export const TUNING_VERSION = 4;
 
 const ROLE_YEARS = {
   manager: [40, 55], captain: [26, 31], bosun: [28, 34], flight: [28, 34], shipwright: [35, 45], scout: [35, 45], elder: [45, 60],
@@ -149,6 +149,7 @@ export const TUNING = {
     breakRaces: 12,                                  // a rival's break clause, in races' wage; none at Negotiation u ≥ 0.5
     renewBelow: 0.75,                                // renews staff whose worth is at least this share of the best of their role on the crew
     openFirst: 3,                                    // worth added, in scouting, to a candidate for an open post: open posts are scouted first
+    scoutLooks: 240,                                 // the most candidates a review's scouting looks over (an even sample of a crowded market)
     /** Each personality's weights over the section 6 table's rows (higher acts first), the share of its Finance
      *  commitment it spends, and the contract length it offers the young (under the market's young age) and others. */
     personalities: {
@@ -265,7 +266,7 @@ export const TUNING = {
 
   /** Money (Phase B section 10): each league's prize pool at the season's end, shared by place by rules.prizeSpread. */
   //   Sized so a median crew's prize is about a third of its season's wages and upkeep (the patrons bring about half).
-  money: { prize: [520000, 200000, 105000] },
+  money: { prize: [1040000, 400000, 210000] },
   /** Reputation (Phase B section 10), 0..100. */
   reputation: {
     perPoint: 0.1, most: 3,                          // a crew's a race: × (its points − its league's mean), to ± most
@@ -297,6 +298,24 @@ export const TUNING = {
     spread: 0.25, spreadRange: [0, 2],
     inspection: 1 / 6, inspectionRange: [0, 2 / 3],
     points: [0, 3],
+  },
+  /** Race day (Phase B section 13, D20): points for places 1 to 5, then 21 − place to place 20; the leagues that swap at
+   *  the season's end each way. */
+  race: { top: [25, 22, 20, 18, 16], last: 20, swap: 4, standIn: 1 }, // standIn: a stand-in captain's fee a race × their ask
+  /** The dilemmas (Phase B section 12, career/events.ts): the chance a crew draws one after a round, and their numbers. */
+  dilemmas: {
+    chance: 0.3, after: [2, 9],                      // a player's comes this many days after the round closes
+    rise: 0.15, riseMorale: 10, refuse: -15, promise: 0.5, promiseMorale: 5, // a rise, the refusal, a podium bonus × wage
+    argue: 5, argueLost: -10,                        // morale: the part given over, or the loser's when held
+    dinner: 150, dinnerBond: 5,                      // Coin, bond points
+    grey: { perf: 40, risk: 0.15 }, report: 5,       // a grey component's numbers; marketability for reporting it
+    guest: 2,                                        // ship two's Consistency lost with a guest aboard
+    worn: 75, rest: 0.5, restFatigue: 30, push: 0.1, cover: 120, // fatigue that triggers; rest's rate ×; push's botch +; cover's Coin
+    press: 5, low: 40,                               // confidence and marketability moved; below this confidence the press asks
+    trialAge: 20, trialPotential: 3.5, trialWage: 0.5, // a young free agent's age under, potential from; wage × their ask
+    repair: 400, slowDays: 20, slow: 0.5,            // Coin a building level to repair now; else the factory at × slow for slowDays
+    stamina: 6, relapse: 0.3, relapseRaces: 2,       // an unfit captain who sails: Stamina lost, the chance of more races out
+    exemptDays: 30, exempt: 0.2, exemptCost: 5, lowest: 2, // the testing exemption's yard points +, days, marketability; for the lowest crews
   },
   /** What rivals weigh in the works (Phase B section 6): risk accepted by personality, buildings in order. */
   works: {

@@ -10,6 +10,7 @@ import type { Dice } from './dice.ts';
 import { effective } from './effective.ts';
 import { bidShare, commitment } from './leadership.ts';
 import { answer, askOf, lowball, score } from './market.ts';
+import { roomOf } from './money.ts';
 import { moraleIn, silenceMove, wantsOut } from './morale.ts';
 import { mine, post } from './post.ts';
 import { schedule, unscheduled, type Event } from './queue.ts';
@@ -127,7 +128,7 @@ export function meetsCounter(s: CareerState, t: Talk, counter: Offer): boolean {
   const g = s.gulls[t.gull];
   const ask = askOf(s, g, c).wage;
   const stats = effective(manager as GullOf<'manager'>, null);
-  const room = commitment(stats.finance, c.coin, c.debtFloor);
+  const room = Math.min(roomOf(s, t.crew, stats.finance), commitment(stats.finance, c.coin, c.debtFloor));
   const cost = counter.fee + breakCost(s, g, t.crew);
   const most = ask * TUNING.rivals.counterMost * (bidShare(stats.negotiation) / bidShare(0));
   return counter.wage <= most && cost <= room && signableCheck(s, t.crew, t.gull, counter) === null;

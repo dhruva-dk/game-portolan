@@ -1,7 +1,12 @@
 // Helpers for the career's tests (not a test file itself: the runner takes tests/*.test.ts). Later sections add their
 // commands to `someCommand` and their rules to `invariants`.
 import assert from 'node:assert/strict';
-import type { Command, Offer } from '../src/office.ts';
+import type { Command, Offer, Plan } from '../src/office.ts';
+import { raceCards } from '../src/career/card.ts';
+import { lineups } from '../src/career/lineup.ts';
+import { TEMPLATES } from '../src/career/mail.ts';
+import { SPEC } from '../src/sim/fit.ts';
+import { synthetic } from '../tools/synthetic.ts';
 import { askOf } from '../src/career/market.ts';
 import { TUNING } from '../src/career/tuning.ts';
 import { apply, start, type CareerState } from '../src/career/career.ts';
@@ -71,6 +76,8 @@ export function someOffer(s: CareerState, gull: number, rand: () => number): Off
 
 /** A command a player might send in this state, good or bad, drawn from a generator. */
 export function someCommand(s: CareerState, rand: () => number): Command {
+  // on race day, mostly the race's own commands (Advance waits for it to be sailed)
+  if (s.race !== null && rand() < (s.race.started ? 0.85 : 0.5)) return raceCommand(s, rand);
   const r = rand();
   if (r < 0.15) return { kind: 'Advance' };
   if (r < 0.18) return { kind: 'Snapshot' };
@@ -94,7 +101,62 @@ export function someCommand(s: CareerState, rand: () => number): Command {
   if (r < 0.88) return { kind: 'TakeJob', crew: one(rand, offers, Math.floor(rand() * s.crews.length)) };
   if (r < 0.9) return { kind: 'DeclineJob', crew: one(rand, offers, Math.floor(rand() * s.crews.length)) };
   if (r < 0.91) return { kind: 'DebugCoin', coin: 100 };
+  if (r < 0.95) return raceCommand(s, rand);
   return worksCommand(s, rand);
+}
+
+/** The spec ship the tests' race cards are built on. */
+export const SPEC_SHIP = SPEC;
+
+/** A race plan the player might set: mostly sound, its captain sometimes another's or unfit. */
+export function somePlan(s: CareerState, rand: () => number): Plan {
+  const c = s.player ? s.crews[s.player.crew] : s.crews[0];
+  const free = s.gulls.filter((g) => g.role === 'captain' && g.contract === null && g.retired === null && !g.player).map((g) => g.id);
+  const mine = [c.staff.ships[1].captain, c.staff.reserve].filter((x): x is number => x !== null);
+  const captain = rand() < 0.75 ? one(rand, mine, one(rand, free, 0)) : rand() < 0.5 ? one(rand, free, 0) : Math.floor(rand() * s.gulls.length);
+  const order = [...JOBS].sort(() => rand() - 0.5);
+  const flight = [...c.staff.flight].sort(() => rand() - 0.5);
+  const jobs = { mend: flight[0], gust: flight[1], stores: flight[2], part: flight[3] };
+  const parts = c.parts.filter((p) => !p.forNext && rand() < 0.3).map((p) => ({ part: p.id, ship: (rand() < 0.5 ? 0 : 1) as 0 | 1 }));
+  return { captain, parts, stance: (['hunt', 'hold', 'loot', 'shadow'] as const)[Math.floor(rand() * 4)], order, jobs,
+    objectives: c.patrons.map((p) => (p && p.objectives.length > 0 ? Math.floor(rand() * p.objectives.length) : null)), call: 'withMe' };
+}
+
+/** A race day's command: the plan, the start, a league's result, a forfeit, the mail. */
+function raceCommand(s: CareerState, rand: () => number): Command {
+  const r = rand();
+  if (r < 0.2 && !s.race?.started) return { kind: 'SetPlan', plan: somePlan(s, rand) };
+  if (r < 0.4 && !s.race?.started) return { kind: 'RaceStarted', round: s.race?.round ?? s.round };
+  if (r < 0.75 && s.race) {
+    // mostly a league not yet recorded, sometimes any (a second result is refused)
+    const cards = raceCards(s, SPEC), open = cards.filter((_, league) => s.race!.results[league] === null);
+    return { kind: 'RecordRace', result: synthetic(rand() < 0.85 ? one(rand, open, cards[0]) : cards[Math.floor(rand() * cards.length)]) };
+  }
+  if (r < 0.8) return { kind: 'Forfeit', round: s.race?.round ?? s.round };
+  const dilemmas = s.mail.filter((m) => m.dilemma && m.dilemma.answer === null);
+  if (r < 0.9 && dilemmas.length > 0) {
+    const m = one(rand, dilemmas, dilemmas[0]);
+    return { kind: 'AnswerDilemma', mail: m.id, option: Math.floor(rand() * (m.dilemma!.options.length + 1)) };
+  }
+  return { kind: 'MarkRead', mail: Math.floor(rand() * (s.mail.length + 2)) };
+}
+
+/** A race day sailed: the player's race begun, the three leagues' synthetic results recorded. */
+export function sailed(s: CareerState, player = 0.5): CareerState {
+  let out = s.race?.started ? s : must(s, { kind: 'RaceStarted', round: s.race!.round });
+  const cards = raceCards(out, SPEC);
+  for (const card of cards) out = must(out, { kind: 'RecordRace', result: synthetic(card, player) });
+  return out;
+}
+
+/** A state advanced to the next race day (answering nothing on the way: dilemmas lapse, offers stand). */
+export function toRaceDay(s: CareerState): CareerState {
+  let out = s;
+  for (let i = 0; i < 200 && out.race === null; i++) {
+    if (out.player?.sacked) out = must(out, { kind: 'TakeJob', crew: out.player.offers[0].crew });
+    out = must(out, { kind: 'Advance' });
+  }
+  return out;
 }
 
 const TYPES: readonly PartType[] = ['sails', 'rigging', 'rudder', 'hull', 'keel', 'mounts'];
@@ -141,7 +203,10 @@ function worksCommand(s: CareerState, rand: () => number): Command {
 /** No accepted command but Advance and the debug ones takes a crew's coin past its elder's floor: owed payments
  *  (wages, upkeep, fines) are made on Advance and may, but a spend never does. */
 export function spendKept(before: CareerState, after: CareerState, c: Command): void {
-  if (c.kind === 'Advance' || c.kind.startsWith('Debug')) return;
+  // Advance and a race's close pay what is owed (wages, upkeep, fines, stand-ins' fees), past the floor if need be; on
+  // TakeJob and DeclineJob the crews the player leaves or turns down have their elders hire a manager, as an elder's
+  // hire on Advance does
+  if (['Advance', 'RecordRace', 'TakeJob', 'DeclineJob'].includes(c.kind) || c.kind.startsWith('Debug')) return;
   for (const x of after.crews) {
     const was = before.crews[x.id]?.coin ?? x.coin;
     if (x.coin < was) assert.ok(x.coin >= x.debtFloor, `${c.kind} took crew ${x.id}'s coin to ${x.coin}, past its floor ${x.debtFloor}`);
@@ -192,6 +257,34 @@ export function invariants(s: CareerState): void {
   assert.ok(ordered(s.queue), 'the queue is out of order');
   market(s);
   works(s);
+  raceDay(s);
+}
+
+/** Race day's and the mail's rules (sections 12, 13): on race day every ship has someone to sail her (the player's ship
+ *  one the player), no gull sails two ships, none sails unfit; every message has its words; a dilemma's answer is one
+ *  of its options; the standings name each league's crews once. */
+function raceDay(s: CareerState): void {
+  if (s.race !== null) {
+    const aboard = new Set<number>();
+    for (const x of lineups(s)) {
+      x.ships.forEach((a, ship) => {
+        const theirs = s.crews[x.crew].player && ship === 0;
+        assert.ok(theirs ? a.captain === null : a.captain !== null && !a.forfeit, `crew ${x.crew}'s ship ${ship} has no one to sail her`);
+        if (a.captain === null) return;
+        assert.ok(!aboard.has(a.captain), `gull ${a.captain} sails two ships`);
+        aboard.add(a.captain);
+        assert.equal(s.gulls[a.captain].unfit, 0, `gull ${a.captain} sails unfit`);
+      });
+    }
+  }
+  for (const m of s.mail) {
+    assert.ok(TEMPLATES[m.kind], `mail ${m.id} of kind '${m.kind}' has no template`);
+    if (m.dilemma && m.dilemma.answer !== null) assert.ok(m.dilemma.answer >= 0 && m.dilemma.answer < m.dilemma.options.length, `dilemma ${m.id}'s answer`);
+  }
+  for (const l of s.leagues) {
+    assert.deepEqual(l.standings.map((x) => x.crew).sort((a, b) => a - b), [...l.crews].sort((a, b) => a - b), `league ${l.id}'s standings`);
+    for (const id of l.crews) assert.equal(s.crews[id].league, l.id, `crew ${id} is listed in league ${l.id}`);
+  }
 }
 
 /** The parts' and money's rules (sections 8–11): each part on at most one ship and each ship one of each type; spec

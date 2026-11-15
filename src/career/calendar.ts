@@ -26,11 +26,13 @@ export function makeCalendar(season: number, start: number, rand: Rand): Calenda
 /** The day the season after one starting on `start` starts. */
 export const nextStart = (start: number): number => start + YEAR;
 
-/** A state with a calendar's race days, its contracts' last days (and the day silence costs morale) and its season's
- *  end scheduled. */
+/** A state with a calendar's opening (its planets mailed, halfway between the last season's end and its first race,
+ *  or at once for the first season), race days, its contracts' last days (and the day silence costs morale) and its
+ *  season's end scheduled. */
 export function scheduleSeason(s: CareerState, calendar: Calendar): CareerState {
   const M = TUNING.market;
-  let out = s;
+  const opening = Math.floor((calendar.start - TUNING.calendar.off + calendar.rounds[0].day) / 2);
+  let out = schedule(s, Math.max(s.day, opening), { kind: 'seasonStart' });
   calendar.rounds.forEach((r, round) => { out = schedule(out, r.day, { kind: 'race', round }); });
   out = schedule(out, calendar.end - M.closingDays, { kind: 'closing', season: calendar.season });
   out = schedule(out, calendar.end - M.closingDays + M.silenceDays, { kind: 'silence', season: calendar.season });

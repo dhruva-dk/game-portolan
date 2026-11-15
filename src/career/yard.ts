@@ -11,6 +11,7 @@
 import type { YardShare } from '../office.ts';
 import { accept, refuse, why, type Check, type Handlers } from './command.ts';
 import { effective } from './effective.ts';
+import { within } from './flags.ts';
 import { mine } from './post.ts';
 import type { GullOf } from './roles.ts';
 import { factoryPoints } from './rookery.ts';
@@ -36,6 +37,15 @@ export function yardPoints(s: CareerState, crew: number): number {
     if (b) points += (b.reliability + b.perf) * Y.bosun;
   }
   return points;
+}
+
+/** A crew's yard points over the days [from, to): each day's points, the factory's at × slow on the days storm damage
+ *  is mended slowly, and all × (1 + exempt) on the days of a testing exemption (career/events.ts). */
+export function yardWork(s: CareerState, crew: number, from: number, to: number): number {
+  const D = TUNING.dilemmas;
+  const daily = yardPoints(s, crew);
+  const slow = within(s, `slow:${crew}`, D.slowDays, from, to), exempt = within(s, `exempt:${crew}`, D.exemptDays, from, to);
+  return (to - from) * daily - slow * factoryPoints(s.crews[crew]) * (1 - D.slow) + exempt * daily * D.exempt;
 }
 
 /** Parts after some points of work: condition restored first (most worn first), then the rest by the shares. */
@@ -71,7 +81,7 @@ export function yardTo(s: CareerState, crew: number): CareerState {
     const yard = termsFor(c.suppliers, p.type).yard;
     return { perf: perfYard(b?.perf ?? 0) * yard, reliability: reliabilityYard(b?.reliability ?? 0) * yard };
   };
-  const parts = worked(c.parts, days * yardPoints(s, crew), c.yard, factors);
+  const parts = worked(c.parts, yardWork(s, crew, c.yardDay, s.day), c.yard, factors);
   const crews = [...s.crews];
   crews[crew] = { ...c, parts, yardDay: s.day };
   return { ...s, crews };

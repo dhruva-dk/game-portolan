@@ -16,7 +16,8 @@ const read = new WeakMap<object, number>();
 export function starsOf(stats: Readonly<Record<string, number>>): number {
   const hit = read.get(stats);
   if (hit !== undefined) return hit;
-  const values = Object.values(stats);
+  // summed in key order, so a state loaded from a save (its keys sorted) sums the same floats in the same order
+  const values = Object.keys(stats).sort().map((k) => stats[k]);
   const mean = values.length === 0 ? 0 : values.reduce((a, b) => a + b, 0) / values.length;
   const out = Math.min(5, Math.max(0, Math.round((mean / 4) * 2) / 2));
   read.set(stats, out);

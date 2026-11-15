@@ -24,11 +24,11 @@ test('apply never throws on a malformed command, and refuses it', () => {
   assert.equal(apply(start(), unfounded).ok, false);
 });
 
-test('a command no section handles yet is refused plainly, not guessed at', () => {
-  refused(founded(), { kind: 'AnswerDilemma', mail: 0, option: 0 }, 'unavailable');
-  refused(founded(), { kind: 'DebugReveal' }, 'unavailable');
+test('every command kind has a handler; debug commands are refused unless debug is on', () => {
   const r = apply(founded(), { kind: 'DebugReveal' });
   assert.equal(r.ok ? '' : r.reason.code, 'debug', 'debug commands are refused unless debug is on');
+  const unknown: Command = JSON.parse('{"kind":"Sing"}');
+  refused(founded(), unknown, 'unavailable');
 });
 
 test('the same state and command give the same result; a refusal changes nothing', () => {
@@ -80,18 +80,23 @@ test('stops: race day and a job offer\'s deadline always; a dilemma or an answer
   const mine = s.player!.crew;
   assert.equal(stopsFor(s, { kind: 'race', round: 0, day: 1, seq: 0 }), true);
   assert.equal(stopsFor(s, { kind: 'jobExpires', crew: 3, day: 1, seq: 0 }), true);
-  assert.equal(stopsFor(s, { kind: 'dilemma', id: 'x', crew: mine, day: 1, seq: 0 }), true);
-  assert.equal(stopsFor(s, { kind: 'dilemma', id: 'x', crew: (mine + 1) % 120, day: 1, seq: 0 }), false);
+  // a dilemma stops only once its mail came (its trigger still held when it fell due)
+  assert.equal(stopsFor(s, { kind: 'dilemma', id: 'x', crew: mine, day: 1, seq: 0 }), false);
+  const waiting = { ...s, mail: [{ id: 0, day: s.day, category: 'crew' as const, sender: null, kind: 'x', wording: 0, slots: {}, links: [], read: false, dilemma: { id: 'x', options: ['a'], answer: null } }] };
+  assert.equal(stopsFor(waiting, { kind: 'dilemma', id: 'x', crew: mine, day: 1, seq: 0 }), true);
+  assert.equal(stopsFor(waiting, { kind: 'dilemma', id: 'x', crew: (mine + 1) % 120, day: 1, seq: 0 }), false);
   assert.equal(stopsFor(s, { kind: 'review', crew: mine, day: 1, seq: 0 }), false);
 });
 
 test('every event a founded career schedules has a handler; every handled command kind is a Command', () => {
   const s = founded();
   const kinds = new Set(s.queue.map((e) => e.kind));
-  for (const k of kinds) if (k !== 'seasonEnd') assert.ok(EVENTS[k], `no handler for '${k}'`);
-  for (const k of ['designed', 'built', 'building', 'patronOffer', 'proposal', 'vote'] as const) assert.ok(EVENTS[k], `no handler for '${k}'`);
-  assert.deepEqual(Object.keys(COMMANDS).sort(), ['AcceptCounter', 'Advance', 'Build', 'CancelScout', 'ChooseSupplier', 'DealComponents', 'DeclineJob',
-    'Dismiss', 'FitPart', 'Found', 'Lobby', 'MoveFlightJob', 'OfferContract', 'SetYard', 'SignPatron', 'StartDesign', 'StartScout', 'TakeJob', 'Vote',
+  for (const k of kinds) assert.ok(EVENTS[k], `no handler for '${k}'`);
+  for (const k of ['designed', 'built', 'building', 'patronOffer', 'proposal', 'vote', 'dilemma', 'seasonEnd', 'seasonStart'] as const) assert.ok(EVENTS[k], `no handler for '${k}'`);
+  // every Command but Snapshot (the session's own: career/session.ts)
+  assert.deepEqual(Object.keys(COMMANDS).sort(), ['AcceptCounter', 'Advance', 'AnswerDilemma', 'Build', 'CancelScout', 'ChooseSupplier', 'DealComponents',
+    'DebugCoin', 'DebugReveal', 'DebugToRaceDay', 'DebugToSeasonEnd', 'DeclineJob', 'Dismiss', 'FitPart', 'Forfeit', 'Found', 'Lobby', 'MarkRead',
+    'MoveFlightJob', 'OfferContract', 'RaceStarted', 'RecordRace', 'SetPlan', 'SetYard', 'SignPatron', 'StartDesign', 'StartScout', 'TakeJob', 'Vote',
     'WithdrawOffer']);
 });
 

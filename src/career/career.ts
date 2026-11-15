@@ -8,7 +8,7 @@
 
 import type { Command, CommandKind } from '../office.ts';
 import { ADMIRALTY, counted, proposalPut } from './admiralty.ts';
-import { TIME_EVENTS, timeHandlers, type EventHandlers } from './advance.ts';
+import { timeHandlers, type EventHandlers } from './advance.ts';
 import { DESIGNING, built, drawn } from './design.ts';
 import { FITTING } from './parts.ts';
 import { PATRONS, offersCome } from './patrons.ts';
@@ -23,6 +23,10 @@ import { HIRING, closingOpens, hear, lapse, silenceFalls } from './hiring.ts';
 import { JOBS_TAKEN, jobLapses } from './jobs.ts';
 import { RIVAL_EVENTS } from './rivals.ts';
 import { SCOUTING } from './scouting.ts';
+import { MAIL, dilemmaComes } from './dilemmas.ts';
+import { debugHandlers } from './playtest.ts';
+import { RACING, raceDay } from './raceday.ts';
+import { seasonBegun, seasonEnded } from './season.ts';
 import { SCHEMA } from './migrate.ts';
 import { beginning, type CareerState } from './state.ts';
 
@@ -31,18 +35,23 @@ export type { CareerState } from './state.ts';
 
 /** Every event kind's handler. */
 export const EVENTS: EventHandlers = {
-  ...TIME_EVENTS, ...RIVAL_EVENTS, answer: hear, lapse, closing: closingOpens, silence: silenceFalls, jobExpires: jobLapses,
+  ...RIVAL_EVENTS, answer: hear, lapse, closing: closingOpens, silence: silenceFalls, jobExpires: jobLapses,
   designed: drawn, built, building: finished, patronOffer: offersCome, proposal: proposalPut, vote: counted,
+  race: raceDay, seasonEnd: seasonEnded, seasonStart: seasonBegun, dilemma: dilemmaComes,
 };
 
 /** Every command kind's handler. */
 export const COMMANDS: Handlers = {
   ...FOUNDING, ...timeHandlers(EVENTS), ...CREWING, ...SCOUTING, ...HIRING, ...JOBS_TAKEN,
-  ...YARD, ...FITTING, ...DESIGNING, ...BUILDING, ...SUPPLYING, ...PATRONS, ...ADMIRALTY,
+  ...YARD, ...FITTING, ...DESIGNING, ...BUILDING, ...SUPPLYING, ...PATRONS, ...ADMIRALTY, ...RACING, ...MAIL, ...debugHandlers(EVENTS),
 };
 
 /** The commands only a debug build takes (D42). */
 const DEBUG: ReadonlySet<CommandKind> = new Set<CommandKind>(['DebugCoin', 'DebugReveal', 'DebugToRaceDay', 'DebugToSeasonEnd']);
+
+/** What the career takes while the player's race is under way: its result, and the mail read. Nothing else may change
+ *  who sails or how (career/lineup.ts reads the state as it stands). */
+const RACING_TAKES: ReadonlySet<CommandKind> = new Set<CommandKind>(['RecordRace', 'Forfeit', 'MarkRead']);
 
 /** The state a career begins from, before Found. */
 export const start = (): CareerState => beginning(SCHEMA);
@@ -57,6 +66,7 @@ export function apply(s: CareerState, command: Command, allow: Allow = { debug: 
   if (s.player === null && command.kind !== 'Found') return refuse('unfounded', 'Found a crew first.');
   const handler = COMMANDS[command.kind] as Handler<CommandKind> | undefined;
   if (!handler) return refuse('unavailable', 'The career does not take that order.');
+  if (s.race?.started && !RACING_TAKES.has(command.kind)) return refuse('racing', 'The race is under way.');
   const roll = dice(s.player === null && command.kind === 'Found' ? command.seed : s.seed, s.streams);
   let out: Applied;
   try {

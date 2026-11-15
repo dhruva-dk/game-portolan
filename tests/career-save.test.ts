@@ -69,10 +69,12 @@ test('a session saves and reloads to the same state; snapshots every 50 entries;
   assert.ok(kept.seq > EVERY, `${kept.seq} entries`);
   assert.equal(store.disk.entries.length, kept.seq);
   assert.ok(store.disk.snapshots.length >= 1 && store.disk.snapshots.length <= 3);
-  // without Snapshot requests, one every EVERY entries
+  // without Snapshot requests, one at each race's end and never more than EVERY entries apart
   const quiet = memoryStore();
   const q = await run(quiet, SESSION.filter((c) => c.kind !== 'Snapshot'));
-  assert.deepEqual(quiet.disk.snapshots.map((s) => s.at), Array.from({ length: Math.floor(q.kept.seq / EVERY) }, (_, i) => (i + 1) * EVERY).reverse().slice(0, 3));
+  const at = quiet.disk.snapshots.map((s) => s.at);
+  assert.ok(at.length >= 1 && at.length <= 3 && q.kept.seq - at[0] < EVERY, `snapshots at ${at.join(', ')} of ${q.kept.seq}`);
+  for (let i = 1; i < at.length; i++) assert.ok(at[i - 1] - at[i] > 0 && at[i - 1] - at[i] <= EVERY, `snapshots at ${at.join(', ')}`);
   const opened = await open(store, true);
   assert.ok(opened.ok);
   if (!opened.ok) return;

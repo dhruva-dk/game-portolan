@@ -14,21 +14,19 @@ export type EventHandlers = { readonly [K in EventKind]?: EventHandler<K> };
 /** Whether an event stops Advance for the player once applied. */
 export type Stops = (s: CareerState, event: Event) => boolean;
 
-/** Race day: the round's races are due. Advance stops; the race plan and the results follow (section 13). */
-const raceDay: EventHandler<'race'> = (s, e) => ({ ...s, round: e.round, race: { round: e.round, started: false, results: s.leagues.map(() => null) } });
-
-/** The handlers of the kinds this module knows; sections join theirs in career/career.ts. */
-export const TIME_EVENTS: EventHandlers = { race: raceDay };
-
-/** The kinds that always need the player. Others may need them by the state (a dilemma for the player's crew). */
+/** The kinds that always need the player. Others may need them by the state (a dilemma for the player's crew). A new
+ *  season's first day stops too: its planets and suppliers wait, and it splits the forty-four days off in two. */
 const ALWAYS_STOP: ReadonlySet<EventKind> = new Set<EventKind>(['race', 'jobExpires']);
 
-/** The default stop rule: race day, a job offer's deadline, and anything addressed to the player's crew that leaves
+/** The default stop rule: race day, a job offer's deadline, a season's first day, and anything addressed to the player's crew that leaves
  *  them a choice (an answer to their offer, a dilemma of theirs). */
 export const stopsFor: Stops = (s, e) => {
   if (ALWAYS_STOP.has(e.kind)) return true;
+  // the first season opens on the founding day itself: nothing to stop for
+  if (e.kind === 'seasonStart') return s.season > 0;
   const mine = s.player?.crew;
-  if (e.kind === 'dilemma') return e.crew === mine;
+  // a dilemma of the player's crew whose mail came (its trigger still held: career/dilemmas.ts)
+  if (e.kind === 'dilemma') return e.crew === mine && s.mail.some((m) => m.day === s.day && m.dilemma?.id === e.id && m.dilemma.answer === null);
   // an answer to the player's offer: by now the talk is gone (signed or refused) or carries a counter, and the player
   // has mail of it naming the talk (a gull answers every offer due that day on the first one's event; each other
   // offer's own event still comes, and stops if the offer was the player's)
@@ -56,7 +54,8 @@ export function advance(s: CareerState, roll: Dice, events: EventHandlers): Appl
     const handler = events[event.kind] as EventHandler<EventKind> | undefined;
     if (!handler) throw new Error(`Advance: no handler for a '${event.kind}' event`);
     state = handler({ ...state, queue: rest, day: Math.max(state.day, event.day) }, event as Extract<Event, { kind: EventKind }>, roll);
-    if (stopsFor(state, event)) break;
+    // the player sacked (an elder's verdict at the season's end) needs them at once: the posts offered wait
+    if (stopsFor(state, event) || state.player?.sacked) break;
   }
   return accept(state);
 }

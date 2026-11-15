@@ -11,6 +11,7 @@ import { paid } from './coin.ts';
 import { racesLeft } from './contracts.ts';
 import { payCoin } from './effective.ts';
 import { standingOf } from './elders.ts';
+import { commitment } from './leadership.ts';
 import { fishCoin, upkeep } from './rookery.ts';
 import { staffOf, type CareerState, type Crew } from './state.ts';
 import { TUNING } from './tuning.ts';
@@ -77,6 +78,11 @@ export function prizes(s: CareerState): CareerState {
   }
   return out;
 }
+
+/** The Coin a rival manager will commit (Finance's share) of what its crew's season is projected to leave above the
+ *  debt floor: wages run on to the season's end, so a manager plans by the projection, not only the coin in hand. */
+export const roomOf = (s: CareerState, crew: number, finance: number): number =>
+  commitment(finance, projection(s, crew).end, s.crews[crew].debtFloor);
 
 /** The ledger's projection: coin at the season's end from what is committed, with its lines. */
 export interface Projection { coin: number; races: number; perRace: PerRace; prize: number; end: number }
