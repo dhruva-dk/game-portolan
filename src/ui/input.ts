@@ -4,10 +4,12 @@
 // own reach inside the screen's edges) and staying there until it is let go: pushed past the rim it reads as fully
 // pushed that way. Any other finger drags the look.
 // WASD or the arrows push the stick all the way while no finger holds it. The gun's trigger is held by the HUD's Fire
-// (fire) or Space, a slot of the hotbar tapped (tap) and Gust pressed (gust), with a finger or a click. What they mean is the
+// (fire) or Space, a slot of the hotbar tapped (tap) and Gust pressed (gust), with a finger or a click; in a race, her
+// flight called (flight) and a call to her crewmate (call) from the HUD's buttons. What they mean is the
 // game's business (play/game.ts step); this only reports them.
 
 import type { Hands } from '../player';
+import type { Call } from '../race';
 
 /** The stick's reach from its centre, CSS pixels. */
 export const STICK = 56;
@@ -22,6 +24,7 @@ export function createInput(element: HTMLElement, steers: () => boolean) {
   const fingers = new Map<number, Finger>();
   const keys = new Set<string>();
   let lookX = 0, lookY = 0, fired = false, holding = false, tapped: number | null = null, gusted = false;
+  let flown = false, given: Call | null = null;
 
   element.addEventListener('pointerdown', (e) => {
     element.setPointerCapture(e.pointerId);
@@ -71,9 +74,17 @@ export function createInput(element: HTMLElement, steers: () => boolean) {
       const look = { x: lookX, y: lookY, held: held.some((f) => !f.stick) };
       lookX = lookY = 0;
       // the trigger: held while Fire or Space is down, and a press since the last read counted though let go before it
-      const fire = fired || holding || keys.has('Space'), tap = tapped, gust = gusted;
-      [fired, tapped, gusted] = [false, null, false];
-      return { stick, look, fire, tap, gust };
+      const fire = fired || holding || keys.has('Space'), tap = tapped, gust = gusted, flight = flown, call = given;
+      [fired, tapped, gusted, flown, given] = [false, null, false, false, null];
+      return { stick, look, fire, tap, gust, flight, call };
+    },
+    /** Her flight called, read once. */
+    flight() {
+      flown = true;
+    },
+    /** A call to her crewmate, read once. */
+    call(c: Call) {
+      given = c;
     },
     /** Fire pressed (down) or let go: her gun fires while it is held, at its kind's interval. */
     fire(down: boolean) {

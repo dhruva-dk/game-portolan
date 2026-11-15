@@ -57,6 +57,7 @@ import { seenOf } from './moments';
 import { answerTo, createShake } from './shake';
 import { createStops, stopFor } from './stops';
 import { bearing, createState, type Berth, type Match, type Waters } from './state';
+import { botTags, raceOf } from './crewing';
 
 /** How little of the stick's push counts as none. */
 const DEAD = 0.15;
@@ -99,8 +100,8 @@ export function createGame(world: World, anchors: readonly Anchor[], waters: Wat
   /** The camera's answer to what happens, the match's time held on a blow, and the last moment they answered. */
   const shake = createShake(), stops = createStops();
   let answered = 0;
-  /** Whether she has asked to skip to the race's result (once she has sunk). */
-  let skipping = false;
+  /** Whether she has asked to skip to the race's result (once she has sunk); whether the bots are labelled (`?bots`). */
+  let skipping = false, tagged = false;
 
   /** The hands' orders: the stick's push as a heading across the sea as the camera sees it. */
   const orders = (stick: Hands['stick']): Helm => {
@@ -147,6 +148,9 @@ export function createGame(world: World, anchors: readonly Anchor[], waters: Wat
       pulled ||= hands.fire;
       gusted ||= hands.gust;
       if (hands.tap !== null) tapped = hands.tap;
+      // her flight called and her calls to her crewmate, at once: neither is a step's order
+      if (hands.flight) state.summon();
+      if (hands.call) state.call(hands.call);
       // what happened since the last frame, answered from where the camera now looks
       const me = view.watch, lens = chase.eye();
       for (const d of state.deeds()) {
@@ -250,6 +254,8 @@ export function createGame(world: World, anchors: readonly Anchor[], waters: Wat
         outside: v ? Math.max(0, -toEdge(v.ship.at, s)) : 0,
         reticle: lay && g && { fall, reach: lay.reached, spread, lob: GUNS[g.kind].lob > 0 },
         moments: state.deeds().map((d) => seenOf(d, eye, width, height)),
+        race: raceOf(state),
+        ...(tagged ? { bots: botTags(state, eye, width, height) } : {}),
       };
     },
     sinkings: state.sinkings,
@@ -292,6 +298,10 @@ export function createGame(world: World, anchors: readonly Anchor[], waters: Wat
       },
       sink: state.debug.sink,
       strew: state.debug.strew,
+      /** Labels every bot in her status (the `?bots` overlay). */
+      tag(on: boolean) {
+        tagged = on;
+      },
     },
   };
 }

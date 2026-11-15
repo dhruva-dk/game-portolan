@@ -18,6 +18,7 @@
 //               three of stores; the one in hand gilt and raised, a gold ring running round it while it is used, and a
 //               gold mark bobbing over the slot a tap would swap for what lies within reach (0117's hotbar). A tap on
 //               the other gun takes it in hand; on the one in hand, reloads it
+//   race        her crewmate's slip, the call wheel, her faults and her flight's disc (crew.ts)
 //   rim         washed the Storm's violet while she is outside its calm, the deeper the further out (0117's)
 //   blows       what happens answered (juice.ts): the hit cross round the reticle, the figures off a struck ship, the
 //               arcs toward a blow on her, the screen's flashes and rims, the pieces knocked, a piece taken up flown
@@ -38,11 +39,14 @@ import { createJuice } from './juice';
 import { createMinimap } from './minimap';
 import { RARITY } from '../rarity';
 import { onTap, piece } from './ui';
+import { createCrew, type CrewActions } from './crew';
+import { createTags } from './tags';
+import { createTeaching } from './teach';
 
 /** What the HUD shows: the match as the game reports it, and what she carries. */
 export type HudState = Status & Kit;
 
-export interface HudActions { slot(i: number): void; gust(): void; map(): void; fire(down: boolean): void }
+export interface HudActions extends CrewActions { slot(i: number): void; gust(): void; map(): void; fire(down: boolean): void }
 
 /** A slot's side, the gap between slots and between the guns' and the stores', px. */
 const SLOT = 50, GAP = 6, APART = 16;
@@ -122,6 +126,7 @@ export function createHud(layer: HTMLElement, coasts: readonly Coast[], act: Hud
   hotbar.style.width = `${LEFT(SLOTS - 1) + SLOT}px`;
   hotbar.style.height = `${SLOT}px`;
   const juice = createJuice(body, { vitals, fire, gust, slots });
+  const crew = createCrew(body, act), tags = createTags(root), teaching = createTeaching();
 
   const keys = new Map<HTMLElement, string>();
   /** Sets `el`'s markup when `key` (what it shows) has changed. */
@@ -137,6 +142,8 @@ export function createHud(layer: HTMLElement, coasts: readonly Coast[], act: Hud
 
   return {
     root,
+    /** The frame her crewmate's headshot is set in (crew.ts). */
+    headshot: crew.headshot,
     watch(on: boolean) {
       watching = on;
       for (const el of [vitals, gust, fire, reticle, fall, hotbar, rim]) el.style.display = on ? 'none' : '';
@@ -245,11 +252,15 @@ export function createHud(layer: HTMLElement, coasts: readonly Coast[], act: Hud
       });
 
       juice.update(s, !watching && s.arriving <= 0);
+      crew.update(watching ? null : s.race);
+      if (s.arriving <= 0) teaching.update(watching ? null : s.race);
+      tags.update(s.bots);
 
       // the rim's wash, outside the calm
       rim.style.opacity = s.outside > 0 && !watching ? (RIM[0] + (RIM[1] - RIM[0]) * Math.min(1, s.outside / RIM_DEEP)).toFixed(2) : '0';
 
-      drawMap(s.at, s.heading, { gilt: watching, calm: s.eye, next: s.next, sea, own });
+      const lines = s.bots?.flatMap((b) => (b.to ? [[b.at, b.to] as const] : []));
+      drawMap(s.at, s.heading, { gilt: watching, calm: s.eye, next: s.next, sea, own, lines });
     },
   };
 }

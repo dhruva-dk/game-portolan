@@ -122,7 +122,7 @@ export function createLobby(act: { play(): void; settings(): void }) {
 }
 
 /** A folio laid over the lobby, its close mark at its top right corner; a tap outside it closes it too. */
-function folio(x: number, y: number, w: number, h: number, close: () => void) {
+export function folio(x: number, y: number, w: number, h: number, close: () => void) {
   const s = sheet(false);
   s.root.style.zIndex = '1';
   onTap(s.root, close);

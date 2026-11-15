@@ -119,7 +119,7 @@ const degrees = Math.PI / 180;
 const flying = params.has('fly') || ['lat', 'lon', 'alt', 'wall'].some((k) => params.has(k));
 
 /** The playtest tools' switches (the header's), and whether each is built yet: one asked for and not built says so. */
-const PLAYTEST = { bots: false, coin: false, reveal: false, raceday: false, seasonend: false, screen: true } as const;
+const PLAYTEST = { bots: true, coin: false, reveal: false, raceday: false, seasonend: false, screen: true } as const;
 
 /** The art direction's alternates (?mood=): the hour, and the haze's mean as a share of the release's. */
 const MOODS: Record<string, { hours: number; haze: number }> = {
@@ -168,6 +168,7 @@ export async function scenario(release: Setup, stage: (setup: Setup) => Promise<
   if (flying) return s.draw(flyer(s.canvas, s.start.at, demoShips(s.start.at, room), s.matches.storm));
   const p = await play(s);
   safeArea(uiLayer());
+  p.game.debug.tag(params.has('bots'));
   open(p, demoShips(s.start.at, room - 1));
   const paused = params.has('pause'), slow = number('slow', 1);
   // ?use: the item's slot tapped twice (chosen, then used); ?tap's slot tapped; ?gust and ?fire pressed; ?swing's

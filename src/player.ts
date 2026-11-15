@@ -20,10 +20,29 @@ export interface Hands {
   tap: number | null;
   /** Whether Gust has been pressed since the last read. */
   gust: boolean;
+  /** In a race: whether her flight has been called since the last read, and the last call to her crewmate given since
+   *  (null: none). */
+  flight?: boolean; call?: Call | null;
 }
 
 /** No hand on anything. */
 export const IDLE: Hands = { stick: null, look: { x: 0, y: 0, held: false }, fire: false, tap: null, gust: false };
+
+/** Her race's own, as the HUD reads it: her crewmate (ship 1; null with none): her hull and its most, and whether she
+ *  sails, lies in their side's water or has sunk; the call in force (null: none, or free); her flight: whether she may
+ *  call it (in her side's water, not being served), how far it has come (0…1; null: not called), the job in hand (null:
+ *  none yet) and whether a botch holds it; and her parts failed. */
+export interface Race {
+  mate: { hull: number; hullMax: number; where: 'sailing' | 'home' | 'sunk' } | null;
+  call: Call | null;
+  flight: { can: boolean; coming: number | null; job: Job | null; botched: boolean };
+  faults: readonly PartType[];
+}
+
+/** A bot as the debug overlay (`?bots`) labels her: her id, her captain's sort (race.ts Style; null: card-less), what
+ *  she is about (sim/captain.ts Mode) and the ship she has in her eye (−1 none), her captain's stats in brief, and where
+ *  she is on the screen (CSS px; null off it) and on the sea (a unit vector, for the minimap's lines), and her target's. */
+export interface BotTag { id: number; sort: string | null; mode: string; target: number; stats: string; seen: { x: number; y: number } | null; at: Vec3; to: Vec3 | null }
 
 /** The match as the HUD reads it: a plain snapshot, made fresh each time it is asked for. */
 export interface Status {
@@ -56,6 +75,10 @@ export interface Status {
   /** What happened in about the last second, oldest first (Moment): what the HUD answers her with, and what sound
    *  will play. A reader keeps the last seq it took and takes those past it. */
   moments: readonly Moment[];
+  /** Her race's own (Race), in a race; else null. */
+  race: Race | null;
+  /** The bots labelled for the debug overlay (BotTag), when it is on. */
+  bots?: readonly BotTag[];
 }
 
 /** Her ship's id in what the match reports (Deed: sim/match.ts PLAYER). */

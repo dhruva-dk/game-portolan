@@ -205,7 +205,7 @@ export async function passage(level = 0.8, name = 'passage', SCRIPT: Script = PA
       at: radial, heading: forward, facing: forward, arriving: 0, ...harm(t, SCRIPT.strikes), hullMax: 100, shieldMax: 50,
       gun: { kind: 'cannon', rarity: 0, rounds: 8, ready: Math.min(1, (t - lastShot) / 2), charge: null, swapping: 0, locked: false }, afloat: 4, sunk: false,
       storm: 30, closing: t >= storm.closing, eye: { centre: radial, radius: wall }, next: null, outside: Math.max(0, -wall),
-      reticle: null, moments, guns: [{ kind: 'cannon', rarity: 0, rounds: 8, mag: 8, reload: null }, null],
+      reticle: null, moments, race: null, guns: [{ kind: 'cannon', rarity: 0, rounds: 8, mag: 8, reload: null }, null],
       items: [t >= pickup && t < mend[1] ? { item: 'item.smallShield', count: 1 } : null, null, null],
       chosen: t >= select ? HOTBAR.guns : 0, using: mending ? (t - mend[0]) / (mend[1] - mend[0]) : null, offer: null,
       gust: 2, gusts: 2, blowing: t >= gust[0] && t < gust[1],

@@ -159,7 +159,7 @@ function scene(t: number, blasts: Blast[] = [], ships: ShipDraw[] = [], balls: S
 const status = (over: Partial<Status & Kit> = {}): Status & Kit => ({
   at, heading: [1, 0, 0], facing: [1, 0, 0], arriving: 0, hull: 100, hullMax: 100, shield: 30, shieldMax: 50,
   gun: { kind: 'cannon', rarity: 0, rounds: 8, ready: 1, charge: null, swapping: 0, locked: false }, afloat: 2, sunk: false, storm: 30, closing: false,
-  eye: { centre: at, radius: 2000 }, next: null, outside: 0, reticle: null, moments: [], guns: [{ kind: 'cannon', rarity: 0, rounds: 8, mag: 8, reload: null }, null],
+  eye: { centre: at, radius: 2000 }, next: null, outside: 0, reticle: null, moments: [], race: null, guns: [{ kind: 'cannon', rarity: 0, rounds: 8, mag: 8, reload: null }, null],
   items: [null, null, null], chosen: 0, using: null, offer: null, gust: 2, gusts: 2, blowing: false, ...over,
 });
 

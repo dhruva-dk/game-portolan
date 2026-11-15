@@ -326,6 +326,8 @@ export function createState(planet: Planet, sea: Hull, { chart, water }: Waters,
     vessels: (): readonly Vessel[] => fleet,
     /** A ship's crew: her health and her gun (sim/battle.ts). */
     crew: (id: number) => battle.crews.find((k) => k.id === id)!,
+    /** A ship's most hull: her card's. */
+    hullOf: (id: number) => fitIn(match, id).hull,
     /** A ship's handling (sim/fit.ts): her own afloat, the tables' once sunk. */
     handling: (id: number): Handling => fleet.find((v) => v.id === id)?.fit ?? SPEC,
     /** Her ship on the sea, or null once sunk. */
@@ -344,8 +346,10 @@ export function createState(planet: Planet, sea: Hull, { chart, water }: Waters,
     call: (c: Call) => upkeep.call(c, -1, time()),
     /** Her last call to her crewmate (null: none, or free). */
     called: () => upkeep.lastCall(),
-    /** Ship `id`'s flight and parts, for the HUD. */
-    upkept: (id: number): Upkept => upkeep.upkept(id, fleet.find((v) => v.id === id), territory),
+    /** Every bot afloat as she thinks (the `?bots` overlay): her mode, her foe and her captain. */
+    bots: () => [...aboard].flatMap(([id, a]) => (a.mind && a.bot ? [{ id, mode: a.mind.mode, foe: a.mind.foe, captain: a.bot.captain }] : [])),
+    /** Ship `id`'s flight and parts, for the HUD; null outside a race. */
+    upkept: (id: number): Upkept | null => (match.card && territory ? upkeep.upkept(id, fleet.find((v) => v.id === id), territory) : null),
     /** Every ship of the match, afloat or sunk, as she stands now, in order of her id. */
     ships: (): Afloat[] => {
       const afloatNow = new Map(fleet.map((v) => [v.id, v.ship]));

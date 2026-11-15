@@ -96,7 +96,7 @@ async function play(s: Stage): Promise<Played> {
   const globe = createGlobe(coasts);
   const hudState = (): HudState => ({ ...game.status(s.canvas.clientWidth, s.canvas.clientHeight), ...game.kit() });
   const map = () => globe.show(hudState());
-  const hud = createHud(layer, coasts, { slot: input.tap, gust: input.gust, fire: input.fire, map });
+  const hud = createHud(layer, coasts, { slot: input.tap, gust: input.gust, fire: input.fire, map, flight: input.flight, call: input.call });
   // the sound, begun on her first touch; a tick for each tap on something of the UI's
   const audio = createAudio(s.world.planet.height);
   layer.addEventListener('pointerdown', (e) => {

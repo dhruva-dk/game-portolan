@@ -22,10 +22,10 @@ export type Kept =
   | { id: number; kind: 'faulted' | 'repaired'; part: PartType }
   | { id: number; kind: 'flight'; job: Job | null; botched: boolean };
 
-/** Her flight and parts as the HUD reads them: whether she may call it (in her side's water, not being served), the
+/** Her flight and parts as the HUD reads them: whether she lies in her side's water; whether she may call it (in her side's water, not being served), the
  *  stop if one is under way (how far the flight has come, 0…1; the job in hand; whether it is paused by a botch), and
  *  the parts failed. */
-export interface Upkept { can: boolean; stop: { coming: number; job: Job | null; botched: boolean } | null; failed: readonly PartType[] }
+export interface Upkept { home: boolean; can: boolean; stop: { coming: number; job: Job | null; botched: boolean } | null; failed: readonly PartType[] }
 
 /** Seconds ship one's last blow on a ship counts as her fighting it, when ship one is the player's. */
 const FIGHTING = 20;
@@ -134,9 +134,9 @@ export function createUpkeep() {
 
     /** Ship `id`'s flight and parts for the HUD, lying in `waters` as `v` (undefined: sunk). */
     upkept(id: number, v: Vessel | undefined, waters: Waters | null): Upkept {
-      const stop = stops.get(id), ship = shipOf(id);
+      const stop = stops.get(id), ship = shipOf(id), home = !!v && atHome(waters, v);
       return {
-        can: !!ship && !!v && !stop && atHome(waters, v),
+        home, can: !!ship && !stop && home,
         stop: stop && ship ? { coming: coming(stop, ship.service), job: stop.come ? stop.job : null, botched: stop.paused > 0 } : null,
         failed: (parts.get(id) ?? []).filter((p) => p.failed).map((p) => p.type),
       };

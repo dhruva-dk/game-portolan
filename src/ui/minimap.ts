@@ -39,6 +39,8 @@ export function stormRing(storm: Storm, n = 96): Vec3[] {
  *  next closes to (radius in metres); who holds the sea, and her number in it (her id). */
 export interface More {
   gilt?: boolean; calm?: Storm; next?: Storm | null; sea?: Sea; own?: number | null;
+  /** The `?bots` overlay's: a line from each bot to the ship she has in her eye. */
+  lines?: readonly (readonly [Vec3, Vec3])[];
 }
 
 /** An arrowhead's path, its tip `l` up from (0, 0). */
@@ -102,7 +104,8 @@ export function createMinimap(host: HTMLElement, size: number, coasts: readonly 
     const bearing = (t: Vec3) => (Math.atan2(dot(t, l.right), dot(t, l.ahead)) * 180) / Math.PI;
     const sea = more.sea, seq = sea?.changes.at(-1)?.seq, trail = sea?.trails.find((t) => t.id === more.own);
     const key = `${at.map((v) => v.toFixed(6))}${bearing(heading).toFixed(1)}${!!more.gilt}`
-      + `${more.calm?.radius}${more.calm?.centre[0]}${more.next?.radius}${seq}${trail?.points.length}`;
+      + `${more.calm?.radius}${more.calm?.centre[0]}${more.next?.radius}${seq}${trail?.points.length}`
+      + (more.lines ? more.lines.map(([a, b]) => `${a[0].toFixed(5)}${b[0].toFixed(5)}`).join() : '');
     if (key === last) return;
     last = key;
     then = now;
@@ -196,6 +199,14 @@ export function createMinimap(host: HTMLElement, size: number, coasts: readonly 
         ctx.stroke();
         ctx.fill();
       }
+    }
+    // the overlay's lines, each bot to her target, in rubric
+    for (const [a, b] of more.lines ?? []) {
+      if (!near(a, SPAN * 1.5)) continue;
+      trace([a, b], false);
+      ctx.strokeStyle = INK.rubric;
+      ctx.lineWidth = 1.2 * dpr;
+      ctx.stroke();
     }
     stats.draws++;
     stats.ms += performance.now() - now;
