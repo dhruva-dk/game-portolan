@@ -4,9 +4,10 @@
 // and sets how much of its Finance commitment the crew spends. Every offer and scouting goes through the player's own
 // checks (hiring.ts offerCheck, scouting.ts scoutCheck) and the same `offered` and `sent`.
 //
-// The hiring rows (fill, replace, renew, poach, bid, scout) are career/bidding.ts's. The rows of parts, buildings and
-// patrons (yard, design, build, patrons) join ROWS from their sections' modules; the race plan (section 13) and the
-// vote (section 11) are decided on their own events with the same Mind.
+// The hiring rows (fill, replace, renew, poach, bid, scout) are career/bidding.ts's. The rows of parts, buildings,
+// patrons, suppliers and the Admiralty's vote (yard, design, build, patrons, suppliers, vote) are career/works.ts's;
+// a rival yet to vote when the count comes votes by its measure then (admiralty.ts counted). The race plan
+// (section 13) is decided on its own event with the same Mind.
 
 import type { Personality } from '../office.ts';
 import { fill, poach, renew, replace, scout } from './bidding.ts';
@@ -19,6 +20,7 @@ import type { GullOf, StatsOf } from './roles.ts';
 import { reported } from './scouting.ts';
 import type { CareerState } from './state.ts';
 import { TUNING } from './tuning.ts';
+import { build, design, patrons, suppliers, vote, yard } from './works.ts';
 
 const R = TUNING.rivals;
 
@@ -39,8 +41,8 @@ export interface Mind {
 /** A row: the state after the decision, and the Mind with what it spent taken off. */
 export type Decide = (s: CareerState, mind: Mind, roll: Dice) => { state: CareerState; mind: Mind };
 
-/** The rows a review runs. A section adds its rows here (yard, design, build, patrons). */
-export const ROWS: Readonly<Partial<Record<Row, Decide>>> = { fill, replace, renew, poach, scout };
+/** The rows a review runs. */
+export const ROWS: Readonly<Partial<Record<Row, Decide>>> = { fill, replace, renew, poach, scout, yard, design, build, patrons, suppliers, vote };
 
 /** A crew's manager's mind, or null if the post is open (the elder hires first) or the crew is the player's. */
 export function mindOf(s: CareerState, crew: number): Mind | null {

@@ -43,7 +43,11 @@ export interface Part {
   cost: number;                                      // its design's cost, for fines
 }
 
-/** A design in hand (Phase B section 8.3): designed by `designed`, built by `built`. */
+/** A part's numbers as a design projects them, or as built. */
+export interface Numbers { perf: number; perfMax: number; reliability: number; reliabilityMax: number; risk: number }
+
+/** A design in hand (Phase B section 8.3): designed by `designed`, built by `built`. `projected` is fixed at its start;
+ *  `drawn` by the shipwright's Accuracy when it is designed. */
 export interface Design {
   type: PartType;
   components: readonly string[];
@@ -52,11 +56,22 @@ export interface Design {
   designed: number;
   built: number;
   cost: number;
-  deals: readonly { slot: number; cards: readonly string[]; redealt: boolean }[];
+  projected: Numbers;
+  drawn: Numbers | null;
 }
 
-/** A patron signed to a crew (Phase B section 10). */
-export interface Patron { name: string; perRace: number; objectives: readonly string[]; bonus: number; races: number }
+/** A design's cards before it starts (D18): its type, and each slot's deal (the cards, whether redealt once). */
+export interface Draft { type: PartType; deals: readonly { slot: number; cards: readonly string[]; redealt: boolean }[] }
+
+/** A patron's objective in a race (Phase B section 10). */
+export type Objective = 'top10' | 'sinkTwo' | 'afloat' | 'mostSea';
+
+/** A patron, offered or signed (Phase B section 10): a fixed sum a race (no objectives), or a bonus for the objective
+ *  chosen in each race plan from its list; for so many races; of a tier (the landing pad's level it needs). */
+export interface Patron { id: number; name: string; perRace: number; objectives: readonly Objective[]; bonus: number; races: number; tier: number }
+
+/** A patron's offer standing until a day. */
+export interface PatronOffer { patron: Patron; expires: number }
 
 /** A crew (Phase B section 3). */
 export interface Crew {
@@ -76,19 +91,25 @@ export interface Crew {
   buildings: Readonly<Record<Building, Works>>;
   parts: readonly Part[];
   design: Design | null;
+  draft: Draft | null;
+  designs: number;                                   // designs ever started: seeds each design's deals
   yard: readonly YardShare[];
+  yardDay: number;                                   // the day the yard's work is reckoned to (closed form, career/yard.ts)
   lastNew: Readonly<Record<PartType, Ship | null>>;  // who got the last new part of each type
   bonds: readonly [number, number];                  // each ship's bosun and captain
   suppliers: Readonly<Record<Trade, string | null>>;
-  patrons: readonly Patron[];
+  patrons: readonly (Patron | null)[];               // by slot, three
+  offers: readonly PatronOffer[];
   plan: Plan | null;
   player: boolean;
 }
 
 export interface Standing { crew: number; points: number; wins: number; podiums: number; sinkings: number }
 
-/** An Admiralty proposal (Phase B section 11). */
-export interface Proposal { id: number; round: number; change: Change; votes: Readonly<Record<string, 'for' | 'against' | 'abstain'>>; sway: { for: number; against: number }; decided: boolean | null }
+/** An Admiralty proposal (Phase B section 11): voted before `round`, on day `closes`. `votes` by crew id; `lobbied`
+ *  the sway Coin has added to each side; `decided` true (carried), false (the rule kept), null (open). */
+export interface Proposal { id: number; round: number; closes: number; change: Change; votes: Readonly<Record<string, Side>>; lobbied: { for: number; against: number }; decided: boolean | null }
+export type Side = 'for' | 'against' | 'abstain';
 
 export interface League {
   id: number;
@@ -156,7 +177,7 @@ export interface CareerState {
   scouting: readonly Scouting[];
   queue: readonly Event[];
   seq: number;                                       // the next event's seq
-  ids: { part: number; mail: number; talk: number; proposal: number };
+  ids: { part: number; mail: number; talk: number; proposal: number; patron: number };
   flags: Readonly<Record<string, number>>;           // once-a-season markers (e.g. the storm-damage dilemma), by name
 }
 
@@ -165,7 +186,7 @@ export function beginning(schema: number): CareerState {
   return {
     schema, seed: 0, day: 0, season: 0, round: 0, streams: {}, player: null, colonies: [], gulls: [], crews: [], leagues: [],
     calendar: null, race: null, mail: [], ledger: [], talks: [], scouting: [], queue: [], seq: 0,
-    ids: { part: 0, mail: 0, talk: 0, proposal: 0 }, flags: {},
+    ids: { part: 0, mail: 0, talk: 0, proposal: 0, patron: 0 }, flags: {},
   };
 }
 

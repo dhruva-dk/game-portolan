@@ -20,7 +20,8 @@ export type Happening =
   | { kind: 'silence'; season: number }                               // section 5: those still offered no renewal lose heart
   | { kind: 'lapse'; talk: number }                                   // section 5: a counter not taken lapses
   | { kind: 'jobExpires'; crew: number }                              // section 7: a job offer lapses (needs the player)
-  | { kind: 'vote'; league: number; proposal: number }                // section 11
+  | { kind: 'proposal'; league: number; round: number }               // section 11: the Admiralty puts a proposal
+  | { kind: 'vote'; league: number; proposal: number }                // section 11: its votes are counted
   | { kind: 'patronOffer'; crew: number }                             // section 10
   | { kind: 'dilemma'; id: string; crew: number };                    // section 12
 

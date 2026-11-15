@@ -24,7 +24,7 @@ test('each personality runs every hiring row, in its own order; the review is th
     const order = TUNING.rivals.personalities[p].order as Readonly<Record<string, number>>;
     for (let i = 1; i < rows.length; i++) assert.ok((order[rows[i - 1]] ?? 0) >= (order[rows[i]] ?? 0));
   }
-  assert.deepEqual(Object.keys(ROWS).sort(), ['fill', 'poach', 'renew', 'replace', 'scout']);
+  assert.deepEqual(Object.keys(ROWS).sort(), ['build', 'design', 'fill', 'patrons', 'poach', 'renew', 'replace', 'scout', 'suppliers', 'vote', 'yard']);
   assert.notDeepEqual(rowsFor('poacher'), rowsFor('steady'));
 });
 

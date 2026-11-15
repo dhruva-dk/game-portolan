@@ -46,7 +46,7 @@ export interface Plan {
   stance: Stance;                                    // ship two's
   order: readonly Job[];                             // the flight's job order
   jobs: Readonly<Record<Job, number>>;               // which flight gull works which job
-  objective: number | null;                          // the patron objective chosen, by index into the patron's list
+  objectives: readonly (number | null)[];            // by patron slot: the objective chosen, by index into that patron's list
   call: Call;                                        // the wheel's call at the start
 }
 
@@ -71,9 +71,9 @@ export type Command =
   | { kind: 'SetYard'; shares: readonly YardShare[] }
   | { kind: 'FitPart'; part: number; ship: Ship | null }
   | { kind: 'StartDesign'; type: PartType; components: readonly string[]; forNext: boolean }
-  | { kind: 'DealComponents'; slot: number }
+  | { kind: 'DealComponents'; type: PartType; slot: number }
   | { kind: 'Build'; building: Building }
-  | { kind: 'SignPatron'; offer: number; slot: number }
+  | { kind: 'SignPatron'; offer: number; slot: number }               // offer: the patron's id
   | { kind: 'ChooseSupplier'; trade: Trade; supplier: string }
   | { kind: 'Vote'; proposal: number; side: 'for' | 'against' | 'abstain' }
   | { kind: 'Lobby'; proposal: number; side: 'for' | 'against'; coin: number }

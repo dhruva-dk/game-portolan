@@ -34,7 +34,19 @@ export function scheduleSeason(s: CareerState, calendar: Calendar): CareerState 
   calendar.rounds.forEach((r, round) => { out = schedule(out, r.day, { kind: 'race', round }); });
   out = schedule(out, calendar.end - M.closingDays, { kind: 'closing', season: calendar.season });
   out = schedule(out, calendar.end - M.closingDays + M.silenceDays, { kind: 'silence', season: calendar.season });
+  // the Admiralty's proposals, each league's, standing `open` days before the rounds they are voted before
+  for (const round of TUNING.admiralty.rounds) {
+    for (let league = 0; league < s.leagues.length; league++) {
+      out = schedule(out, calendar.rounds[round].day - TUNING.admiralty.open, { kind: 'proposal', league, round });
+    }
+  }
   return schedule(out, calendar.end, { kind: 'seasonEnd' });
+}
+
+/** A state with every crew's first patron offers scheduled from a day, staggered by crew id over two weeks; each
+ *  offer schedules the next (career/patrons.ts). */
+export function patronsScheduled(s: CareerState, from: number): CareerState {
+  return s.crews.reduce((acc, c) => schedule(acc, from + 1 + (c.id % TUNING.calendar.gap), { kind: 'patronOffer', crew: c.id }), s);
 }
 
 /** The day of a crew's first review (Phase B section 6): staggered by crew id over the week. */

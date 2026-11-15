@@ -25,7 +25,7 @@ test('apply never throws on a malformed command, and refuses it', () => {
 });
 
 test('a command no section handles yet is refused plainly, not guessed at', () => {
-  refused(founded(), { kind: 'SetYard', shares: [] }, 'unavailable');
+  refused(founded(), { kind: 'AnswerDilemma', mail: 0, option: 0 }, 'unavailable');
   refused(founded(), { kind: 'DebugReveal' }, 'unavailable');
   const r = apply(founded(), { kind: 'DebugReveal' });
   assert.equal(r.ok ? '' : r.reason.code, 'debug', 'debug commands are refused unless debug is on');
@@ -89,8 +89,10 @@ test('every event a founded career schedules has a handler; every handled comman
   const s = founded();
   const kinds = new Set(s.queue.map((e) => e.kind));
   for (const k of kinds) if (k !== 'seasonEnd') assert.ok(EVENTS[k], `no handler for '${k}'`);
-  assert.deepEqual(Object.keys(COMMANDS).sort(), ['AcceptCounter', 'Advance', 'CancelScout', 'DeclineJob', 'Dismiss', 'Found', 'MoveFlightJob',
-    'OfferContract', 'StartScout', 'TakeJob', 'WithdrawOffer']);
+  for (const k of ['designed', 'built', 'building', 'patronOffer', 'proposal', 'vote'] as const) assert.ok(EVENTS[k], `no handler for '${k}'`);
+  assert.deepEqual(Object.keys(COMMANDS).sort(), ['AcceptCounter', 'Advance', 'Build', 'CancelScout', 'ChooseSupplier', 'DealComponents', 'DeclineJob',
+    'Dismiss', 'FitPart', 'Found', 'Lobby', 'MoveFlightJob', 'OfferContract', 'SetYard', 'SignPatron', 'StartDesign', 'StartScout', 'TakeJob', 'Vote',
+    'WithdrawOffer']);
 });
 
 test('MoveFlightJob: a flight gull moves to a job, swapping with whoever worked it; each refusal', () => {

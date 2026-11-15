@@ -6,7 +6,7 @@
 // A pair [a, b] is a line in u = stat / 20: a + b × u. A triple by league is League One's, Two's, Three's.
 
 /** Bump with any change to TUNING (and pin the new hash in the test). */
-export const TUNING_VERSION = 2;
+export const TUNING_VERSION = 3;
 
 const ROLE_YEARS = {
   manager: [40, 55], captain: [26, 31], bosun: [28, 34], flight: [28, 34], shipwright: [35, 45], scout: [35, 45], elder: [45, 60],
@@ -152,12 +152,12 @@ export const TUNING = {
     /** Each personality's weights over the section 6 table's rows (higher acts first), the share of its Finance
      *  commitment it spends, and the contract length it offers the young (under the market's young age) and others. */
     personalities: {
-      spender: { order: { fill: 3, build: 2.8, replace: 2.5, design: 2.2, renew: 2, patrons: 1.8, yard: 1.6, poach: 1.5, scout: 1 }, spend: 1.3, young: 2, other: 2 },
-      youthBuilder: { order: { fill: 3, renew: 2.5, scout: 2.2, yard: 2, design: 1.8, patrons: 1.7, replace: 1.5, build: 1.2, poach: 1 }, spend: 1, young: 3, other: 2 },
-      poacher: { order: { poach: 3.2, fill: 3, replace: 2, patrons: 1.8, renew: 1.5, yard: 1.4, design: 1.3, scout: 1, build: 0.8 }, spend: 1.1, young: 1, other: 1 },
-      engineer: { order: { yard: 3.5, design: 3.4, fill: 3, build: 2.4, renew: 2, patrons: 1.6, replace: 1.5, scout: 1, poach: 0.5 }, spend: 0.9, young: 2, other: 2 },
-      gambler: { order: { fill: 3, replace: 2.6, design: 2.5, poach: 2, yard: 1.8, scout: 1.5, patrons: 1.4, build: 1.2, renew: 1 }, spend: 1.2, young: 1, other: 2 },
-      steady: { order: { fill: 3, renew: 2.5, patrons: 2.2, yard: 2, design: 1.6, replace: 1.5, scout: 1.2, build: 1, poach: 0.5 }, spend: 0.7, young: 2, other: 3 },
+      spender: { order: { fill: 3, build: 2.8, replace: 2.5, design: 2.2, renew: 2, patrons: 1.8, yard: 1.6, poach: 1.5, scout: 1, suppliers: 0.6, vote: 0.5 }, spend: 1.3, young: 2, other: 2 },
+      youthBuilder: { order: { fill: 3, renew: 2.5, scout: 2.2, yard: 2, design: 1.8, patrons: 1.7, replace: 1.5, build: 1.2, poach: 1, suppliers: 0.6, vote: 0.5 }, spend: 1, young: 3, other: 2 },
+      poacher: { order: { poach: 3.2, fill: 3, replace: 2, patrons: 1.8, renew: 1.5, yard: 1.4, design: 1.3, scout: 1, build: 0.8, suppliers: 0.6, vote: 0.5 }, spend: 1.1, young: 1, other: 1 },
+      engineer: { order: { yard: 3.5, design: 3.4, fill: 3, build: 2.4, renew: 2, patrons: 1.6, replace: 1.5, scout: 1, poach: 0.5, suppliers: 0.6, vote: 0.5 }, spend: 0.9, young: 2, other: 2 },
+      gambler: { order: { fill: 3, replace: 2.6, design: 2.5, poach: 2, yard: 1.8, scout: 1.5, patrons: 1.4, build: 1.2, renew: 1, suppliers: 0.6, vote: 0.5 }, spend: 1.2, young: 1, other: 2 },
+      steady: { order: { fill: 3, renew: 2.5, patrons: 2.2, yard: 2, design: 1.6, replace: 1.5, scout: 1.2, build: 1, poach: 0.5, suppliers: 0.6, vote: 0.5 }, spend: 0.7, young: 2, other: 3 },
     },
     talentYouth: 0.2,                                // a youth builder's Talent Eye weight on potential, added
   },
@@ -222,6 +222,95 @@ export const TUNING = {
 
   /** A gull's patience in talks (Phase B section 5). */
   patience: 3,
+
+  /** Parts (Phase B section 8). */
+  parts: {
+    handling: 0.15,                                  // a part's Handling: spec × (1 ± this × perf / 1000)
+    standard: { perf: 500, reliability: 0.9 },       // a spec type's standard part
+    spare: { perf: 300, reliability: 0.7 },          // what a ship sails with when her part of a type is confiscated and no spare is left
+    wear: 0.1, faultWear: 0.05,                      // condition lost a race sailed, and more a fault
+    carry: 0.6,                                      // a part's performance and maximum carried into the next season
+    spares: 1,                                       // unfitted parts kept a type at the season's end (the best)
+    newPartMorale: 5,                                // ship two's captain's morale lost at a second new part in a row to ship one
+    fine: 0.2,                                       // an inspection's fine: (1 + risk) × this × the part's design cost
+  },
+  /** The yard (Phase B section 8.4): points a day, and what a point does. */
+  yard: { condition: 0.01, perf: 1, reliability: 0.002, bosun: 0.25 },
+  /** Designing (Phase B section 8.3). */
+  design: {
+    days: 14, build: 7, headroom: 100, reliability: 0.5, reliabilityMax: 0.8, riskMost: 0.9, deal: 3, forNextFrom: 4,
+    cost: { sails: 300, rigging: 260, rudder: 240, hull: 340, keel: 280, mounts: 260 },
+    tier: [1, 1.6, 2.4],                             // the cost × this by the highest tier among its components
+  },
+  /** The rookery (Phase B section 9): each building's cost, days and upkeep a race, by level 1..3 (level 1 is every
+   *  crew's from the start, so its cost and days are never paid). */
+  rookery: {
+    works: {
+      factory: { cost: [0, 2400, 6000], days: [0, 30, 50], upkeep: [10, 25, 50] },
+      drawingLoft: { cost: [0, 2000, 5000], days: [0, 25, 45], upkeep: [8, 20, 40] },
+      testTank: { cost: [0, 2200, 5500], days: [0, 30, 50], upkeep: [8, 20, 40] },
+      foundry: { cost: [0, 2200, 5500], days: [0, 30, 50], upkeep: [8, 20, 40] },
+      sailingSchool: { cost: [0, 1800, 4500], days: [0, 25, 40], upkeep: [6, 15, 30] },
+      flightLoft: { cost: [0, 1200, 3000], days: [0, 20, 35], upkeep: [5, 12, 25] },
+      crowsNest: { cost: [0, 1200, 3000], days: [0, 20, 35], upkeep: [5, 12, 25] },
+      fishMarket: { cost: [0, 1500, 4000], days: [0, 20, 35], upkeep: [0, 0, 0] },
+      landingPad: { cost: [0, 1600, 4200], days: [0, 25, 40], upkeep: [5, 12, 25] },
+    },
+    points: [10, 20, 30],                            // the factory's yard points a day
+    slots: [2, 3, 4],                                // the drawing loft's design slots
+    loft: [1, 0.85, 0.7],                            // the drawing loft's design days ×
+    fish: [120, 80, 50],                             // Coin a race the fish market brings at level 1, by league
+    fishLevel: [1, 1.8, 2.6],                        //   × this by its level
+  },
+
+  /** Money (Phase B section 10): each league's prize pool at the season's end, shared by place by rules.prizeSpread. */
+  money: { prize: [24000, 12000, 6000] },
+  /** Reputation (Phase B section 10), 0..100. */
+  reputation: {
+    perPoint: 0.1, most: 3,                          // a crew's a race: × (its points − its league's mean), to ± most
+    title: 10, promoted: 6, relegated: -8,           // a crew's at the season's end
+    perPlace: 0.5, managerMost: 2,                   // a manager's a race: × (target − standing), to ± managerMost
+    playerPerPoint: 0.15, playerSinking: 0.5, playerMost: 3, // the player's own ship: × (her points − a ship's mean), + a sinking
+  },
+  /** Marketability's moves a race (Phase B section 10): a podium, a sinking, and the drift back toward what stars and youth give. */
+  marketMoves: { podium: 3, sinking: 1, drift: 0.1, crew: 0.4 },
+  /** Patrons (Phase B section 10). */
+  patrons: {
+    slots: 3, every: 42, offers: 2, stand: 14,       // offers a crew gets every so many days, standing so long
+    perRace: 0.8,                                    // a fixed patron's Coin a race × the crew's marketability
+    tier: [1, 1.6, 2.4],                             // × by the offer's tier (the landing pad's level at most)
+    races: [3, 10],
+    bonus: 2.2,                                      // an objective patron's bonus × the crew's marketability × the objective's weight
+    objectives: { top10: 1, sinkTwo: 1.6, afloat: 1.2, mostSea: 1.8 },
+    objectiveShare: 0.5,                             // the share of offers that pay for objectives
+    better: [1.5, -0.5],                             // a rival replaces a patron for one worth this × as much (Finance u)
+  },
+  /** The Admiralty (Phase B section 11). */
+  admiralty: {
+    rounds: [3, 7],                                  // the votes come before these rounds (0 the first)
+    open: 12,                                        // days a proposal stands before its vote
+    abstain: 0.2,                                    // a measure nearer even than this abstains
+    lobby: 0.1,                                      // sway a Coin lobbied
+    pace: 0.1, paceRange: [0.6, 1.6],
+    spread: 0.25, spreadRange: [0, 2],
+    inspection: 1 / 6, inspectionRange: [0, 2 / 3],
+    points: [0, 3],
+  },
+  /** What rivals weigh in the works (Phase B section 6): risk accepted by personality, buildings in order. */
+  works: {
+    risk: { spender: 0.15, youthBuilder: 0.1, poacher: 0.15, engineer: 0.2, gambler: 0.4, steady: 0.05 },
+    build: {
+      spender: ['fishMarket', 'landingPad', 'factory', 'drawingLoft', 'testTank', 'foundry', 'sailingSchool', 'crowsNest', 'flightLoft'],
+      youthBuilder: ['sailingSchool', 'crowsNest', 'flightLoft', 'drawingLoft', 'factory', 'testTank', 'foundry', 'fishMarket', 'landingPad'],
+      poacher: ['crowsNest', 'landingPad', 'fishMarket', 'factory', 'sailingSchool', 'flightLoft', 'drawingLoft', 'testTank', 'foundry'],
+      engineer: ['factory', 'drawingLoft', 'testTank', 'foundry', 'flightLoft', 'sailingSchool', 'crowsNest', 'fishMarket', 'landingPad'],
+      gambler: ['testTank', 'foundry', 'landingPad', 'factory', 'drawingLoft', 'fishMarket', 'sailingSchool', 'crowsNest', 'flightLoft'],
+      steady: ['fishMarket', 'factory', 'flightLoft', 'sailingSchool', 'drawingLoft', 'crowsNest', 'landingPad', 'testTank', 'foundry'],
+    },
+    buildShare: 0.6,                                 // a building is begun if it costs at most this of the room
+    designShare: 0.5,                                // a design likewise
+    reliabilityBelow: 0.8,                           // the yard gives reliability a share while a part's is below this
+  },
 } as const;
 
 export type Tuning = typeof TUNING;

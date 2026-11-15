@@ -6,7 +6,7 @@
 import { SWATCHES, type Colours, type PartType, type Rules } from '../race.ts';
 import type { Building, Role, Status } from '../office.ts';
 import { askFee, askSeasons, askWage } from './asks.ts';
-import { makeCalendar, reviewsScheduled, scheduleSeason } from './calendar.ts';
+import { makeCalendar, patronsScheduled, reviewsScheduled, scheduleSeason } from './calendar.ts';
 import { between, pick, shuffled, type Dice, type Rand } from './dice.ts';
 import { debtFloor, targetPlace } from './leadership.ts';
 import { NOUNS, colony, crewName, place } from './names.ts';
@@ -115,9 +115,9 @@ function makeCrew(g: Gathering, rand: Rand, id: number, league: number, name: st
     staff: { manager, elder, ships, reserve, shipwright, scouts, flight },
     coin: C.coin[league], budget, debtFloor: Math.round(debtFloor(elderGull.stats.generosity, budget)),
     reputation: Math.round(Math.min(100, Math.max(0, C.reputation[league] + (rand() - 0.5) * C.reputationSpread))),
-    confidence: C.confidence, target: 1, buildings, parts: startingParts(rand, league, id * 12), design: null, yard: [],
-    lastNew: { sails: null, rigging: null, rudder: null, hull: null, keel: null, mounts: null }, bonds: [0, 0],
-    suppliers: { timber: null, canvas: null, cordage: null }, patrons: [], plan: null, player: false,
+    confidence: C.confidence, target: 1, buildings, parts: startingParts(rand, league, id * 12), design: null, draft: null, designs: 0,
+    yard: [], yardDay: 0, lastNew: { sails: null, rigging: null, rudder: null, hull: null, keel: null, mounts: null }, bonds: [0, 0],
+    suppliers: { timber: null, canvas: null, cordage: null }, patrons: [null, null, null], offers: [], plan: null, player: false,
   };
 }
 
@@ -164,8 +164,8 @@ export function makeWorld(seed: number, theirs: Colours, roll: Dice): CareerStat
   for (const c of targeted) crews[c.id] = c;
   addFreeAgents(g, rand);
   const calendar = makeCalendar(0, 0, rand);
-  const base: CareerState = { ...beginning(0), seed, colonies, gulls: g.gulls, crews, leagues, calendar, ids: { part: crews.length * 12, mail: 0, talk: 0, proposal: 0 } };
-  return reviewsScheduled(scheduleSeason(base, calendar), 0);
+  const base: CareerState = { ...beginning(0), seed, colonies, gulls: g.gulls, crews, leagues, calendar, ids: { part: crews.length * 12, mail: 0, talk: 0, proposal: 0, patron: 0 } };
+  return patronsScheduled(reviewsScheduled(scheduleSeason(base, calendar), 0), 0);
 }
 
 /** The free agents: 300 across every role, 30 of them managers. */

@@ -7,7 +7,14 @@
 // yet is refused, never guessed at.
 
 import type { Command, CommandKind } from '../office.ts';
+import { ADMIRALTY, counted, proposalPut } from './admiralty.ts';
 import { TIME_EVENTS, timeHandlers, type EventHandlers } from './advance.ts';
+import { DESIGNING, built, drawn } from './design.ts';
+import { FITTING } from './parts.ts';
+import { PATRONS, offersCome } from './patrons.ts';
+import { BUILDING, finished } from './rookery.ts';
+import { SUPPLYING } from './suppliers.ts';
+import { YARD } from './yard.ts';
 import { refuse, type Applied, type Handler, type Handlers } from './command.ts';
 import { CREWING } from './crewing.ts';
 import { dice } from './dice.ts';
@@ -25,10 +32,14 @@ export type { CareerState } from './state.ts';
 /** Every event kind's handler. */
 export const EVENTS: EventHandlers = {
   ...TIME_EVENTS, ...RIVAL_EVENTS, answer: hear, lapse, closing: closingOpens, silence: silenceFalls, jobExpires: jobLapses,
+  designed: drawn, built, building: finished, patronOffer: offersCome, proposal: proposalPut, vote: counted,
 };
 
 /** Every command kind's handler. */
-export const COMMANDS: Handlers = { ...FOUNDING, ...timeHandlers(EVENTS), ...CREWING, ...SCOUTING, ...HIRING, ...JOBS_TAKEN };
+export const COMMANDS: Handlers = {
+  ...FOUNDING, ...timeHandlers(EVENTS), ...CREWING, ...SCOUTING, ...HIRING, ...JOBS_TAKEN,
+  ...YARD, ...FITTING, ...DESIGNING, ...BUILDING, ...SUPPLYING, ...PATRONS, ...ADMIRALTY,
+};
 
 /** The commands only a debug build takes (D42). */
 const DEBUG: ReadonlySet<CommandKind> = new Set<CommandKind>(['DebugCoin', 'DebugReveal', 'DebugToRaceDay', 'DebugToSeasonEnd']);

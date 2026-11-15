@@ -4,7 +4,8 @@
 
 import type { Style } from '../race.ts';
 import type { Personality, Role } from '../office.ts';
-import { between, pick, within, type Rand } from './dice.ts';
+import { dealtKnown } from './components.ts';
+import { between, pick, seeded, within, type Rand } from './dice.ts';
 import { drawWants } from './asks.ts';
 import { family, fullName, given } from './names.ts';
 import { ROLE_STATS, gullOf, stat, type Gull, type GullCore } from './roles.ts';
@@ -14,6 +15,8 @@ import { TUNING } from './tuning.ts';
 
 const STYLES: readonly Style[] = ['hunter', 'homesteader', 'raider', 'turtle', 'scavenger', 'brawler'];
 const PERSONALITIES: readonly Personality[] = ['spender', 'youthBuilder', 'poacher', 'engineer', 'gambler', 'steady'];
+/** The fixed key of a shipwright's deal of known components. */
+const KNOWN = 0x636f6d70;
 
 /** What a new gull is made from. */
 export interface Making {
@@ -92,7 +95,8 @@ export function makeGull(m: Making, rand: Rand, taken: Set<string>): Gull {
     fatigue: 0,
     fatigueDay: m.day,
     job: null,
-    components: [],
+    // a shipwright's known components, by their own seed (no stream's turn), so every new shipwright is dealt alike
+    components: m.role === 'shipwright' ? dealtKnown(seeded(seed, KNOWN), starsOf(stats)) : [],
     unfit: 0,
     grudge: null,
     patience: TUNING.patience,
