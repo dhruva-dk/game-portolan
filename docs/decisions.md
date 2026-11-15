@@ -565,8 +565,8 @@ decisions are in #56, section 2.
   without the projection rivals overcommitted and sank past the floor every season.
 - **Question:** Advance's cost. **Choice:** a rival's scouting looks at most `rivals.scoutLooks` (240) candidates, an
   even sample from a drawn offset (stream 'scout'); a rival's knowledge is read lazily; the rank among fitted parts is
-  one pass. **Why:** Advance between race days ran 180–230 ms; now at most ~85 ms (mean ~4 ms), season ends at most
-  ~97 ms.
+  one pass. **Why:** Advance between race days ran 180–230 ms; now at most ~91 ms (mean ~4 ms). A call through a
+  season's end (prizes, verdicts, promotion, 120 reviews) is outside that gate and runs up to ~103 ms on this machine.
 - **Question:** when Advance stops. **Choice:** on race day, a job offer's expiry, the season's opening (after season 0),
   the player's dilemma mail, an answer or a review that approaches the player's gulls, and the player sacked. **Why:**
   a sacked player cannot Advance (they must take a post), so Advance must hand back at once.
