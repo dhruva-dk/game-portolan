@@ -48,23 +48,33 @@ const factory: Builder = (k, level) => {
     k.flag(-11.2, 4.5, 0, 9);
     return;
   }
-  // the great hall over the slip, its gantry crane over the yard, its annex and stacks
-  k.box(-12, 0, -7, 7, 7.5, 7, T.plaster);
-  k.gable(-12, -7, 7, 7, 7.5, 12, T.tile, T.plaster);
-  k.panesX(-11, 6, 7, 1, 4.6, 6.6, 7, 1.4);
-  k.panesX(-11, 6, -7, -1, 4.6, 6.6, 7, 1.4);
-  k.panesX(-4.5, -0.5, 7, 1, 0, 4.2, 1, 4, T.first);
-  k.box(-12.5, 7.5, -7.5, 7.5, 8, 7.5, T.stone);
-  k.box(7, 0, -6, 12, 5, 0, T.brick);
-  k.hip(7, -6, 12, 0, 5, 7, T.slate, 0.3);
-  k.drum(9.5, -4, 0.9, 0, 15, T.brick, 8);
-  k.smoke(9.5, 15, -4);
+  // the works grown: its brick hall deeper and of two storeys under the same row of north lights, a third bay lower at
+  // its end, the old chimney raised and a round stack beside it, a gantry crane over the yard
+  k.box(-12, 0, -6.5, 7, 6.4, 6.5, T.brick);
+  k.box(-12.1, 3, -6.6, 7.1, 3.35, 6.6, T.stone);
+  for (let i = 0; i < 4; i++) {
+    const x = -12 + i * 4.75;
+    k.gable(x, -6.5, x + 4.75, 6.5, 6.4, 9.4, T.slate, T.glass, 'z', 0.2);
+  }
+  k.panesX(-11, -5, 6.5, 1, 0.9, 2.5, 3, 1.4);
+  k.panesX(0, 6, 6.5, 1, 0.9, 2.5, 3, 1.4);
+  k.panesX(-11, 6, 6.5, 1, 4, 5.6, 7, 1.4);
+  k.panesX(-11, 6, -6.5, -1, 4, 5.6, 7, 1.4);
+  k.panesX(-4.5, -0.5, 6.5, 1, 0, 2.9, 1, 3.4, T.first);
+  k.box(7, 0, -6, 12, 4.6, 1.5, T.brick);
+  k.gable(7, -6, 12, 1.5, 4.6, 7.2, T.slate, T.glass, 'z', 0.2);
+  k.panesX(7.6, 11.4, 1.5, 1, 1, 2.8, 2, 1.3);
+  k.box(9, 0, -5.6, 11, 13.5, -3.6, T.brick);
+  k.box(8.8, 13.1, -5.8, 11.2, 13.5, -3.4, T.stone);
+  k.smoke(10, 13.5, -4.6);
+  k.drum(10, -0.6, 0.95, 0, 16, T.brick, 10, 0.8);
+  for (const y of [7, 12]) k.drum(10, -0.6, 0.98 - y * 0.011, y, y + 0.35, T.iron, 10);
+  k.smoke(10, 16, -0.6);
   // the gantry: two legs and a beam, its trolley in the crew's colour
   for (const x of [8, 12]) k.box(x - 0.3, 0, 5.5, x + 0.3, 11, 6.1, T.iron);
   k.box(7.4, 11, 5.3, 12.6, 11.8, 6.3, T.iron);
   k.box(9.4, 10.4, 5.2, 10.6, 11.2, 6.4, T.second);
-  k.flag(-2.5, -7.5, 12, 4);
-  k.flag(-12.4, 7.4, 0, 9);
+  k.flag(-12.6, 0, 0, 11);
 };
 
 const drawingLoft: Builder = (k, level) => {
@@ -88,19 +98,25 @@ const drawingLoft: Builder = (k, level) => {
     k.flag(5.8, -3, 0, 10);
     return;
   }
-  // the loft itself: a tall hall glazed to the north light, a domed tower at its corner
-  k.box(-6.5, 0, -4.5, 3.5, 8, 4.5, T.plaster);
-  k.box(-6.6, 3.8, -4.6, 3.6, 4.2, 4.6, T.stone);
-  k.gable(-6.5, -4.5, 3.5, 4.5, 8, 11.5, T.glass, T.plaster, 'x', 0.3);
-  k.panesX(-5.8, 2.8, 4.5, 1, 1, 3, 4, 1.2);
-  k.panesX(-5.8, 2.8, 4.5, 1, 5, 7, 4, 1.2);
-  k.panesX(-1.6, -0.4, 4.5, 1, 0, 2.6, 1, 1.4, T.first);
-  k.drum(5, 1, 2, 0, 12.5, T.stone, 12);
-  k.box(4.85, 0, 2.85, 5.15, 12.5, 3.1, T.stone);
-  k.drum(5, 1, 2.3, 12.5, 13, T.stone, 12);
-  k.panesX(4.2, 5.8, 3.0, 1, 9.5, 11.5, 1, 0.8);
-  k.dome(5, 1, 2, 13, T.copper, 2.2);
-  k.flag(5, 1, 15.1, 3);
+  // the loft itself: the house grown a storey under the same hipped roof, a glazed lantern on its ridge for the north
+  // light, a domed tower at its corner
+  k.box(-6.5, 0, -4.5, 3.5, 9, 4.5, T.plaster);
+  for (const y of [2.9, 5.9]) k.box(-6.6, y, -4.6, 3.6, y + 0.3, 4.6, T.stone);
+  k.hip(-6.5, -4.5, 3.5, 4.5, 9, 12.2, T.tile);
+  k.panesX(-5.8, -2.2, 4.5, 1, 1, 2.4, 2, 1.1);
+  k.panesX(0.4, 2.8, 4.5, 1, 1, 2.4, 2, 1.1);
+  for (const y of [4, 7]) k.panesX(-5.8, 2.8, 4.5, 1, y, y + 1.4, 4, 1.1);
+  k.panesZ(-3.6, 3.6, -6.5, -1, 4, 5.4, 3, 1);
+  k.panesZ(-3.6, 3.6, -6.5, -1, 7, 8.4, 3, 1);
+  k.panesX(-1.6, -0.4, 4.5, 1, 0, 2.4, 1, 1.2, T.first);
+  k.box(-4, 11.2, -1.1, 1, 12.5, 1.1, T.glass);
+  k.gable(-4, -1.1, 1, 1.1, 12.5, 13.4, T.tile, T.tile, 'x', 0.25);
+  k.drum(5, 1, 2, 0, 14, T.stone, 12);
+  k.box(4.85, 0, 2.85, 5.15, 14, 3.1, T.stone);
+  k.drum(5, 1, 2.3, 14, 14.5, T.stone, 12);
+  k.panesX(4.2, 5.8, 3.0, 1, 11, 13, 1, 0.8);
+  k.dome(5, 1, 2, 14.5, T.copper, 2.2);
+  k.flag(5, 1, 16.6, 3);
 };
 
 const testTank: Builder = (k, level) => {
@@ -214,7 +230,7 @@ const sailingSchool: Builder = (k, level) => {
   // the academy: a hall of two storeys, a mast with its yard for drills, a T-headed pier and its fleet of dinghies
   k.box(-10.5, 0, -6.5, 3, 6.6, -0.5, T.plaster);
   k.box(-10.6, 3.2, -6.6, 3.1, 3.5, -0.4, T.stone);
-  k.hip(-10.5, -6.5, 3, -0.5, 6.6, 9.5, T.slate);
+  k.hip(-10.5, -6.5, 3, -0.5, 6.6, 9.5, T.tile);
   k.panesX(-9.8, 2.2, -0.5, 1, 1, 2.6, 6, 1.1);
   k.panesX(-9.8, 2.2, -0.5, 1, 4.2, 5.8, 6, 1.1);
   k.box(-10.5, 0, -0.5, 3, 0.3, 2.4, T.deck);

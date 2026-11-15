@@ -41,8 +41,8 @@ export const FOOTPRINT: Readonly<Record<Building, { half: number; back: number; 
 /** How tall each building stands over its terrace at each of its levels (1–3), metres, its flagpoles' heads and all
  *  (campus/buildings.ts builds it so: tests/campus.test.ts): where the view looks and a building is picked. */
 export const TALL: Readonly<Record<Building, readonly [number, number, number]>> = {
-  factory: [6.9, 9.5, 16.4],
-  drawingLoft: [6.4, 10.4, 18.5],
+  factory: [6.9, 9.5, 16],
+  drawingLoft: [6.4, 10.4, 20],
   testTank: [5.9, 8.4, 12.4],
   foundry: [7, 13.2, 20.2],
   sailingSchool: [6.4, 8.4, 18.4],
