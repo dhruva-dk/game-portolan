@@ -41,11 +41,11 @@ import type { ShipPose } from '../world/pose.ts';
 import { add, type Vec3 } from '../world/sphere.ts';
 import { drawnPose, drawnShips, seaColours, wreckAt, type Aboard, type Wreck } from './aboard.ts';
 import { LOOK, lookIn } from './colours.ts';
-import { bearing, fitIn, fleetOf, seedIn, sideIn, type Afloat, type Berth, type Match, type Sinking, type Stepped, type Part, type Waters } from './match.ts';
+import { bearing, fitIn, fleetOf, lengthIn, seedIn, sideIn, type Afloat, type Berth, type Match, type Sinking, type Stepped, type Part, type Waters } from './match.ts';
 import { blastsOf, deedsOf, kept as keptDeeds } from './moments.ts';
 import { createTally } from './result.ts';
 import type { RaceResult } from '../race.ts';
-import { command } from './orders.ts';
+import { botOf, command } from './orders.ts';
 
 export { PARTS, bearing, fleetOf, type Afloat, type Berth, type Match, type Part, type Sinking, type Stepped, type Waters } from './match.ts';
 
@@ -106,8 +106,8 @@ export function createState(planet: Planet, sea: Hull, { chart, water }: Waters,
     fleet.push(v);
     const r = settled(v, sea, tick * STEP, id), p = pose(ship, r);
     const bot = (id !== PLAYER || !manned) && !lashed;
-    const hand = bot ? { seed: seedOf(id) } : null;
-    aboard.set(id, { look, mind: hand && mind(hand.seed, ship.at), hand, steady: lashed ?? AMIDSHIPS, ride: r, before: p, after: p });
+    const b = bot ? botOf(match, id) : null;
+    aboard.set(id, { look, mind: b && mind(b.seed, ship.at), bot: b, steady: lashed ?? AMIDSHIPS, ride: r, before: p, after: p });
   };
 
   /** Clears the sea for a new match: its loot strewn over it if `loot`, who holds it kept if `held`. */
@@ -255,7 +255,7 @@ export function createState(planet: Planet, sea: Hull, { chart, water }: Waters,
     advance(helm: Helm, gun: Order, ask: Ask = NOTHING, lap?: (part: Part) => void): Stepped {
       const storm = stormAt(time());
       const sea = { depth, chart, storm, loot: flotsam.pieces, holdings: territory };
-      const { helms, orders } = command({ fleet, aboard, crews: byId(battle.crews), sea, hers: { helm, gun, ask } }, asks);
+      const { helms, orders } = command({ fleet, aboard, crews: byId(battle.crews), sea, hers: { helm, gun, ask }, clock: time(), length: lengthIn(match) }, asks);
       fleet.forEach((v, i) => aims.set(v.id, orders[i]?.aim?.dir ?? null));
       lap?.('command');
       const { wants, met, from } = sail(helms, asks);

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { armed, battleOf, crewOf, stepBattle, weathered, type Battle, type Crew } from '../src/sim/battle.ts';
-import { mind, think, type Memory, type Seen } from '../src/sim/bot.ts';
+import { byTemper, mind, think, type Memory, type Seen } from '../src/sim/bot.ts';
 import { afloat, stepFleet, type Vessel } from '../src/sim/contact.ts';
 import { STEP } from '../src/sim/fixed.ts';
 import { gunOf } from '../src/sim/gun.ts';
@@ -31,7 +31,7 @@ function sail(at: Vec3[], seeds: number[], crews: Crew[], flotsam: Flotsam, seco
     const seen: Seen[] = fleet.map((v) => ({ ...v, crew: by.get(v.id)!, hull: by.get(v.id)!.health.hull, shield: by.get(v.id)!.health.shield, armed: armed(by.get(v.id)!) }));
     const helms: Helm[] = [], asks = new Map<number, Ask>();
     fleet.forEach((v, i) => {
-      const r = think(seen[i], seen.filter((o) => o.id !== v.id), { depth: deep, loot: f.pieces }, minds[v.id], seeds[v.id]);
+      const r = think(seen[i], seen.filter((o) => o.id !== v.id), { depth: deep, loot: f.pieces }, minds[v.id], byTemper(seeds[v.id]));
       minds[v.id] = r.memory;
       helms[i] = r.helm;
       asks.set(v.id, r.ask);

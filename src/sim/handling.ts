@@ -123,6 +123,28 @@ export const GUST = {
  *  value; the owner sets the race's length by playing. */
 export const PACE = { storm: 1 } as const;
 
+/**
+ * What a captain's stats (race.ts CaptainStats, 0–20; u a stat over 20) do to her temper (temper.ts temperOf), as shifts
+ * from a middling stat's (u = 0.5, which changes nothing). Starting values (#58 step 6), but `tire`, the issue's.
+ * - Nerve: her will to fight and her mood rise by `nerve` × (u − ½); the hull she runs below falls by (u − ½) of itself.
+ * - Stormcraft: her margin inside the storm's edge shrinks by `storm` × (u − ½) of itself.
+ * - Stamina: from half the race's expected length to its end, Gunnery and Helm fall by up to `tire` × (1 − u) points.
+ */
+export const CAPTAIN = { nerve: 0.4, storm: 1, tire: 4 } as const;
+
+/**
+ * The crewmate (#58 section 8.2, D39): the share each stance multiplies her options' weights by (sim/bot.ts), the most
+ * she strays from ship one shadowing (`near`, m), how long she takes to notice a call (`notice` × (1.2 − Lookout's
+ * u), s), how long a call lasts (`lasts`, s), and the Nerve below which she may break off an attack to run (`breaks`).
+ * The calls' weights: what an obeyed call is worth against her other options. Starting values.
+ */
+export const CREWMATE = {
+  stance: {
+    hunt: { fight: 1.5, roam: 1.5 }, hold: { claim: 1.6, home: 1.6 }, loot: { loot: 1.6, fight: 0.6 }, shadow: {},
+  } as Readonly<Record<'hunt' | 'hold' | 'loot' | 'shadow', Readonly<Partial<Record<string, number>>>>>,
+  near: 150, notice: 1.5, lasts: 60, breaks: 8, call: 4,
+} as const;
+
 /** One kind of gun (GUNS). */
 export interface Bore {
   /** Hit points a ball takes off (each pellet's), and the balls (pellets) a shot throws. */

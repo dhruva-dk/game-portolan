@@ -166,6 +166,9 @@ export function createStorm(seed: number, depth: Depth, plan: StormPlan = { pace
   };
 }
 
+/** A race's expected length, s: until the storm's last cap has closed, on the race's pace. */
+export const closedBy = (plan: StormPlan): number => plan.pace * STORM.phases.reduce((t, p) => t + p.wait + p.close, 0);
+
 /** Metres along the surface from p (any vector from the centre) in to the cap's edge: negative outside it. */
 export const toEdge = (p: Vec3, cap: Cap) => (cap.radius - between(normalize(p), cap.centre)) * R;
 

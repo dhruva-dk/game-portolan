@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import type { GunKind } from '../src/kinds.ts';
 import { HEALTH } from '../src/sim/handling.ts';
 import { armed, battleOf, crewOf, stepBattle, type Battle, type Order } from '../src/sim/battle.ts';
-import { mind, shot, think, type Memory } from '../src/sim/bot.ts';
+import { byTemper, mind, shot, think, type Memory } from '../src/sim/bot.ts';
 import { afloat, stepFleet, type Vessel } from '../src/sim/contact.ts';
 import { STEP } from '../src/sim/fixed.ts';
 import { gunOf, type Gun } from '../src/sim/gun.ts';
@@ -53,7 +53,7 @@ function battle(fleet: Vessel[], seeds: (number | null)[], guns: (number | Gun[]
     fleet.forEach((v, i) => {
       const m = minds[i];
       if (!m) { helms.push(held); orders.push({ aim: null, fire }); return; }
-      const r = think(seen[i], seen.filter((o) => o.id !== v.id), { depth: deep, storm }, m, seeds[i]!);
+      const r = think(seen[i], seen.filter((o) => o.id !== v.id), { depth: deep, storm }, m, byTemper(seeds[i]!));
       minds[i] = r.memory;
       helms.push(r.helm);
       orders.push(r.order);

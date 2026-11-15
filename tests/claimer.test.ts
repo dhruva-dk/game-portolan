@@ -2,7 +2,7 @@
 // home when hurt but not into the storm, and across another's open trail.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mind, think, type Memory } from '../src/sim/bot.ts';
+import { byTemper, mind, think, type Memory } from '../src/sim/bot.ts';
 import { shot } from '../src/sim/captain.ts';
 import { afloat, stepFleet, type Vessel } from '../src/sim/contact.ts';
 import { STEP } from '../src/sim/fixed.ts';
@@ -50,7 +50,7 @@ function voyage(fleet: Seen[], seeds: (number | null)[], seconds: number, t: Ter
     const helms = fleet.map((v, i) => {
       const m = minds[i];
       if (!m) return o.held!(v);
-      const r = think(v, fleet.filter((k) => k.id !== v.id), { depth: deep, storm: o.storm ?? null, holdings: t }, m, seeds[i]!);
+      const r = think(v, fleet.filter((k) => k.id !== v.id), { depth: deep, storm: o.storm ?? null, holdings: t }, m, byTemper(seeds[i]!));
       minds[i] = r.memory;
       return r.helm;
     });

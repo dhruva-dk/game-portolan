@@ -9,7 +9,7 @@ import type { Order } from '../sim/battle.ts';
 import { STEP } from '../sim/fixed.ts';
 import type { Helm } from '../sim/ship.ts';
 import { NOTHING, type Ask } from '../sim/stores.ts';
-import { STORM, createStorm } from '../sim/storm.ts';
+import { closedBy, createStorm } from '../sim/storm.ts';
 import type { Planet } from '../world/planet.ts';
 import type { Vec3 } from '../world/sphere.ts';
 import { flat } from '../world/swell.ts';
@@ -34,7 +34,7 @@ const OVERTIME = 600;
 export function runRace(card: RaceCard, planet: Planet, waters: Waters, pilot?: (step: number) => Hands): RaceResult {
   const m = matchOf(card, planet), state = createState(planet, flat, waters, m);
   state.start(m, !!pilot);
-  const last = card.rules.storm.pace * STORM.phases.reduce((t, p) => t + p.wait + p.close, 0) + OVERTIME;
+  const last = closedBy(card.rules.storm) + OVERTIME;
   for (let step = 0; !state.result() && step * STEP < last; step++) {
     const h = pilot?.(step) ?? IDLE;
     state.advance(h.helm, h.gun, h.ask);

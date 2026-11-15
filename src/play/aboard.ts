@@ -14,11 +14,11 @@ import type { ShipPose } from '../world/pose.ts';
 import { add, scale, type Vec3 } from '../world/sphere.ts';
 import { seaColourOf } from './colours.ts';
 import { sinking } from './sinking.ts';
-import type { Hand } from './orders.ts';
+import type { Bot } from './orders.ts';
 
 /** What is kept of a ship afloat beside her Vessel: her colours, her bot (null: the player's, or a lashed ship's) and
- *  what she sails by (orders.ts Hand), the helm a lashed ship holds, how she rides the sea, and her last two poses. */
-export interface Aboard { look: Look; mind: Memory | null; hand: Hand | null; steady: Helm; ride: Ride; before: ShipPose; after: ShipPose }
+ *  what she sails by (orders.ts Bot), the helm a lashed ship holds, how she rides the sea, and her last two poses. */
+export interface Aboard { look: Look; mind: Memory | null; bot: Bot | null; steady: Helm; ride: Ride; before: ShipPose; after: ShipPose }
 /** A ship going down: her pose when she sank and the step she sank at (`at`, s on the world's clock), listing to `side`. */
 export interface Wreck { id: number; look: Look; pose: ShipPose; at: number; side: number }
 

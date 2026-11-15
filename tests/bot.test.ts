@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mind, rammed, think, type Memory } from '../src/sim/bot.ts';
+import { byTemper, mind, rammed, think, type Memory } from '../src/sim/bot.ts';
 import { temper } from '../src/sim/temper.ts';
 import { afloat, stepFleet, type Blow, type Vessel } from '../src/sim/contact.ts';
 import { STEP } from '../src/sim/fixed.ts';
@@ -32,7 +32,7 @@ function sail(fleet: Vessel[], seeds: (number | null)[], seconds: number, depth:
     const helms = fleet.map((v, i) => {
       const m = minds[i];
       if (!m) return held!(v, fleet);
-      const r = think(v, fleet.filter((o) => o.id !== v.id), { depth, storm: storm?.(n * STEP) }, m, seeds[i]!);
+      const r = think(v, fleet.filter((o) => o.id !== v.id), { depth, storm: storm?.(n * STEP) }, m, byTemper(seeds[i]!));
       minds[i] = r.memory;
       return r.helm;
     });

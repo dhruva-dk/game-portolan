@@ -14,7 +14,7 @@ import type { ShipState } from './ship.ts';
 import type { Chart, Route } from './route.ts';
 import type { Depth } from './shoal.ts';
 import type { Storm } from './storm.ts';
-import type { Temper } from './temper.ts';
+import { temper, type Temper } from './temper.ts';
 import type { Crew } from './battle.ts';
 import type { Loot } from './loot.ts';
 import type { Holdings } from './claimer.ts';
@@ -168,9 +168,16 @@ export const rammed = (m: Memory, by: number): Memory => ({ ...m, hitBy: by, hit
 /** Her memory once a ball of `by`'s has struck her (the game tells her, from battle.ts's strikes that aren't rams). */
 export const shot = (m: Memory, by: number): Memory => ({ ...m, shotBy: by, shotT: m.clock });
 
+/** What a bot sails by: her seed, for good, and her temperament (temper.ts: `temper(seed)`, or her card's captain's
+ *  `temperOf`, made at launch and refreshed by the match's clock). */
+export interface Hand { seed: number; t: Temper }
+
+/** What a temper by her seed alone sails by (a card-less bot's). */
+export const byTemper = (seed: number): Hand => ({ seed, t: temper(seed) });
+
 /** What a think and a step weigh: her, the others afloat, the sea, her memory (written to), her temperament, her foe
- *  as she sees her now and how far off, and her seed. */
-export interface Ctx { own: Seen; others: readonly Seen[]; sea: Sea; m: Memory; t: Temper; foe: Seen | null; foeD: number; seed: number }
+ *  as she sees her now and how far off, her seed, and what she sails by. */
+export interface Ctx { own: Seen; others: readonly Seen[]; sea: Sea; m: Memory; t: Temper; foe: Seen | null; foeD: number; seed: number; hand: Hand }
 
 // ---------------------------------------------------------------- the sphere
 

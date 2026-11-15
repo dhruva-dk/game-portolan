@@ -4,7 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { battleOf, crewOf, stepBattle, type Crew, type Strike } from '../src/sim/battle.ts';
-import { mind, think } from '../src/sim/bot.ts';
+import { byTemper, mind, think } from '../src/sim/bot.ts';
 import { afloat, gap, stepFleet, type Vessel } from '../src/sim/contact.ts';
 import { STEP } from '../src/sim/fixed.ts';
 import { SPEC } from '../src/sim/fit.ts';
@@ -122,7 +122,7 @@ test('a bot never takes her sidemate for a foe; the same ship of another side sh
   for (const [side, foe] of [[0, -1], [5, 1]] as const) {
     const own = afloat(0, lying(centre, 0), SPEC, 0), other = afloat(1, lying(out(centre, 0, 60), Math.PI), SPEC, side);
     let m = mind(3, own.ship.at);
-    for (let i = 0; i < 60; i++) m = think(own, [other], { depth: deep }, m, 3).memory;
+    for (let i = 0; i < 60; i++) m = think(own, [other], { depth: deep }, m, byTemper(3)).memory;
     assert.equal(m.foe, foe, `side ${side}`);
   }
 });

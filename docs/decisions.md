@@ -156,3 +156,24 @@ decisions are in #56, section 2.
   command` (`Bridge` in, helms and orders out; `Hand` is what a bot sails by); what is kept aboard each ship and how
   the ships are drawn between two steps (`Aboard`, `Wreck`, the sea's colours, `drawnShips`, `drawnPose`) to
   `play/aboard.ts`. state.ts keeps the step's order and the match's bookkeeping. Results unchanged to the bit.
+- **Question:** how a card's captain's stats reach the bot (step 6). **Choice:** `Temper` gains `gunnery`, `helm` and
+  `lookout`, each on skill's scale (0.35 + 0.55 u); `temper(seed)` sets all three to its skill, so a card-less bot is
+  today's to the bit. `temperOf(captain, clock, length)` draws temper(seed)'s numbers from the captain's seed in her
+  own style, then: Gunnery for every skill read in `gunner.ts` (aim error, spread, the ring's weave); Helm for the
+  helmsman's seeing a ram and for `evading`; Lookout for the notice range (`noticed`: notice × (0.8 + 0.4 lookout)) and
+  `reactTime`; Nerve shifts `fight` and `aggro` by 0.4 (u − ½) and `run` by (u − ½) of itself; Stormcraft shrinks
+  `margin` by (u − ½) of itself; Stamina's fall (`tired`) comes off Gunnery and Helm points; the general `skill` is the
+  mean of the three. The shifts are `sim/handling.ts CAPTAIN` (starting values). A stat of 10 changes nothing, so
+  captainOf's mapping sails as temper(seed) but for the skills' last bits (a test holds them within 1e-12). **Why:**
+  every read named in the issue moves; a middling stat is today's bot.
+- **Question:** the issue says `notice` "falls" with Lookout and Helm grows "the ram-evasion distance". **Choice:**
+  Lookout widens the range at which she notices a ship and shortens the delay before she fires on one just seen (her
+  "answer"); Helm raises the chance of seeing a ram coming (`seesRam`) and how much she wants to get clear
+  (`evades`). The tests show those directions. **Why:** a longer notice range is the better lookout; no distance in
+  the sim reads her helm, and adding one would change every card-less result, which must stay identical.
+- **Question:** where the temper is refreshed by the clock and where the race's length comes from (step 6).
+  **Choice:** the bot (`play/orders.ts Bot`) carries her captain and temper; `command` makes it again once a whole
+  second from half the race's expected length (`sim/storm.ts closedBy`: the storm's last close on the race's pace).
+  `think` takes `Hand` (seed and temper) in place of the seed; `Sea` did not gain the clock, as nothing in the sim reads
+  it once the temper is made outside. **Why:** "made once at launch, refreshed only by the clock", with no per-step
+  random draws.

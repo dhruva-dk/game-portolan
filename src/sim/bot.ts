@@ -29,24 +29,24 @@ import { STEP } from './fixed.ts';
 import { aimAndFire, armFor, reactTime } from './gunner.ts';
 import type { Helm } from './ship.ts';
 import { STORM, toEdge, type Cap } from './storm.ts';
-import { temper } from './temper.ts';
+import type { Temper } from './temper.ts';
 import { choose, logistic, momentum, ramp, utility, type Option } from './utility.ts';
-import { BOT, between, fitOf, inSight, mates, open, roll, rotate, toward, type Ctx, type Memory, type Mode, type Sea, type Seen } from './captain.ts';
+import { BOT, between, fitOf, inSight, mates, open, roll, rotate, toward, type Ctx, type Hand, type Memory, type Mode, type Sea, type Seen } from './captain.ts';
 import { deepest, steer } from './helmsman.ts';
 import { healUrge, lootAct, lootUrge, purse, PURSER } from './purser.ts';
 import { claimAct, claimUrge, cutAct, cutUrge, homeAct, homeUrge, sound } from './claimer.ts';
 import { NOTHING, type Ask } from './stores.ts';
 
-export { BOT, mind, rammed, shot, type Memory, type Mode, type Sea, type Seen } from './captain.ts';
+export { BOT, byTemper, mind, rammed, shot, type Hand, type Memory, type Mode, type Sea, type Seen } from './captain.ts';
 
 /**
  * One step of dt seconds of a bot's mind: what she orders her helm and her gun, what she asks of her stores, and her
  * memory after. `own` is her own ship, `others` every other ship afloat (she sees only those in her sight), `sea` what
- * she knows of the water, the storm and the loot, `seed` hers for good.
+ * she knows of the water, the storm and the loot, `hand` what she sails by (her seed and temperament).
  */
-export function think(own: Seen, others: readonly Seen[], sea: Sea, memory: Memory, seed: number, dt = STEP): { helm: Helm; order: Order; ask: Ask; memory: Memory } {
+export function think(own: Seen, others: readonly Seen[], sea: Sea, memory: Memory, hand: Hand, dt = STEP): { helm: Helm; order: Order; ask: Ask; memory: Memory } {
   const m: Memory = { ...memory, clock: memory.clock + dt, since: memory.since + dt, think: memory.think - 1, lootT: memory.mode === 'loot' ? memory.lootT + dt : memory.lootT };
-  const c: Ctx = { own, others, sea, m, t: temper(seed), foe: null, foeD: Infinity, seed };
+  const c: Ctx = { own, others, sea, m, t: hand.t, foe: null, foeD: Infinity, seed: hand.seed, hand };
   sound(c);
   if (m.think <= 0) {
     m.think = BOT.every;
@@ -57,7 +57,7 @@ export function think(own: Seen, others: readonly Seen[], sea: Sea, memory: Memo
   c.foeD = c.foe ? distance(own.ship.at, c.foe.ship.at) : Infinity;
   const helm = steer(c, dt);
   const held = own.crew ? inHand(own.crew) : null, seen = inSight(c) ? c.foe : null;
-  const order: Order = held ? aimAndFire(m, own.ship, seen, held.kind, m.clock, c.t.skill, () => roll(m), dt, holdsFire(c)) : { aim: null, fire: false };
+  const order: Order = held ? aimAndFire(m, own.ship, seen, held.kind, m.clock, c.t.gunnery, () => roll(m), dt, holdsFire(c)) : { aim: null, fire: false };
   m.was = own.ship.at;
   // her stores asked on the steps she thinks (0117's); the gun for the range taken in hand whenever it changes
   const ask = m.think === BOT.every ? purse(c) : NOTHING;
@@ -75,10 +75,16 @@ function hidden(c: Ctx, a: Vec3, b: Vec3): boolean {
   return false;
 }
 
+/** How far off she notices a ship, m: her temperament's notice by her Lookout. */
+export const noticed = (t: Temper) => t.notice * (0.8 + 0.4 * t.lookout);
+
+/** How much she wants to get clear of a ram, given how little she wants to fight: by her Helm. */
+export const evades = (unwilling: number, helm: number) => utility(unwilling, 0.3 + 0.7 * helm);
+
 /** Notes the nearest ship she can see, not of her side; a foe out of sight is followed to where she was last seen, then let go. */
 function perceive(c: Ctx): void {
   const { m, own } = c;
-  let best: Seen | null = null, bd = c.t.notice * (0.8 + 0.4 * c.t.skill);
+  let best: Seen | null = null, bd = noticed(c.t);
   for (const o of c.others) {
     if (mates(own, o) || apart(own.ship.at, o.ship.at, BOT.sightMax)) continue;
     const d = distance(own.ship.at, o.ship.at);
@@ -87,7 +93,7 @@ function perceive(c: Ctx): void {
     if (score >= bd || hidden(c, own.ship.at, o.ship.at)) continue;
     [bd, best] = [score, o];
   }
-  if (best && best.id !== m.foe) m.react = m.clock + reactTime(c.t.skill);
+  if (best && best.id !== m.foe) m.react = m.clock + reactTime(c.t.lookout);
   if (best) [m.foe, m.seen, m.last] = [best.id, m.clock, best.ship.at];
   else if (m.foe >= 0 && (m.clock - m.seen > BOT.forget || !c.others.some((o) => o.id === m.foe))) m.foe = -1;
 }
@@ -199,7 +205,7 @@ const losing = (c: Ctx) => (c.foe ? utility(ramp(c.own.hull ?? fitOf(c.own).hull
 function evading(c: Ctx): number {
   const { m } = c;
   if (!c.foe || c.foeD >= 140 || m.hitBy !== c.foe.id || m.clock - m.hitT > BOT.fresh) return 0;
-  return utility(1 - fightUrge(c), 0.3 + 0.7 * c.t.skill);
+  return evades(1 - fightUrge(c), c.t.helm);
 }
 
 interface Choice extends Option<Ctx> { readonly mode: Mode; act(c: Ctx): void }

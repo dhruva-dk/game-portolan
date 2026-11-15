@@ -76,7 +76,7 @@ export function steer(c: Ctx, dt: number): Helm {
   } else {
     // armed, she makes for a mark on the ring round her foe (gunner.ts); land in the way, by a route round it (route.ts)
     const held = own.crew ? inHand(own.crew) : null;
-    mark = foe && held ? ring(m, ship.at, foe, held.kind, c.t.standoff, c.t.skill, () => roll(m), dt) : null;
+    mark = foe && held ? ring(m, ship.at, foe, held.kind, c.t.standoff, c.t.gunnery, () => roll(m), dt) : null;
     if (mark) toD = distance(ship.at, mark);
     const r = c.sea.chart && routed(c.sea.chart, ship.at, mark ?? (foe ? foe.ship.at : m.goal), m.route, dt);
     m.route = r ? r.route : null;
@@ -111,6 +111,9 @@ export function steer(c: Ctx, dt: number): Helm {
   return stuck(c, dt, course) ?? order(turn, Math.min(easy, tight));
 }
 
+/** The chance she sees a ram coming at her in each BOT.warn s, by her Helm (Temper.helm). */
+export const seesRam = (helm: number) => 0.2 + 0.75 * helm;
+
 /** A ram coming at her: the turn that lays her bow or her stern to it, whichever is the nearer, or null if none she
  *  sees. Not one she is driving into bow on herself. */
 function answer(c: Ctx): number | null {
@@ -127,7 +130,7 @@ function answer(c: Ctx): number | null {
     if (length(add(r, rel, when)) > BOT.miss) continue;
     const bearing = offCourse(own.ship, t);
     if (m.mode === 'fight' && o.id === m.foe && Math.abs(bearing) < 0.5) continue;
-    if (unitHash(c.seed, o.id * 7919 + Math.floor(m.clock / BOT.warn)) > 0.2 + 0.75 * c.t.skill) continue;
+    if (unitHash(c.seed, o.id * 7919 + Math.floor(m.clock / BOT.warn)) > seesRam(c.t.helm)) continue;
     return Math.abs(bearing) < Math.PI / 2 ? bearing : bearing - Math.sign(bearing) * Math.PI;
   }
   return null;

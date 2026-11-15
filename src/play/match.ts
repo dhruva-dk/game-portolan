@@ -2,7 +2,8 @@
 // about her for debugging, and what the match's flow reads of its ships and sinkings. Plain types and the few
 // functions on them.
 
-import type { RaceCard, RaceShip } from '../race.ts';
+import type { Captain, RaceCard, RaceShip } from '../race.ts';
+import { closedBy } from '../sim/storm.ts';
 import { SPEC, type Handling } from '../sim/fit.ts';
 import type { Shot, Strike } from '../sim/battle.ts';
 import type { Arms } from '../sim/loot.ts';
@@ -50,6 +51,10 @@ export const fitIn = (m: Match, id: number): Handling => shipIn(m, id)?.handling
 export const sideIn = (m: Match, id: number): number => shipIn(m, id)?.side ?? id;
 /** Her bot's seed: her captain's, else the match's and her slot's. */
 export const seedIn = (m: Match, id: number): number => shipIn(m, id)?.captain?.seed ?? hash(m.seed, id);
+/** Her captain (race.ts Captain): the card's, else none (her bot sails by temper(seed)). */
+export const captainIn = (m: Match, id: number): Captain | null => shipIn(m, id)?.captain ?? null;
+/** The race's expected length, s (sim/storm.ts closedBy): the card's; 0 for a card-less match, whose captains don't tire. */
+export const lengthIn = (m: Match): number => (m.card ? closedBy(m.card.rules.storm) : 0);
 
 /** A ship sunk: who she was, who sank her (the ship whose ball or ram dealt the last blow; null for the storm), how,
  * when, on the match's clock (s), and where she went down and the way she headed. */
