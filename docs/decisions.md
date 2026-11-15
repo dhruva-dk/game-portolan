@@ -194,6 +194,21 @@ decisions are in #56, section 2.
   ship, but D39 makes it the crewmate's; appended options scoring zero keep card-less results identical.
 - **Question:** `player.ts` needs the race's part, job and call types (step 8.3). **Choice:** `race.ts` added to
   `player.ts`'s row in tests/architecture.test.ts (types only). **Why:** the HUD names parts and calls as the seam does.
+- **Question:** how the HUD shows the flight's job, the calls and failed parts with no words (step 8.3). **Choice:** a
+  glyph each (`ui/glyphs.ts`: `hud.flight`, `call.*`, `part.*`; the jobs reuse the repair kit's, Gust's and the
+  shield's); the flight's disc sits over Gust, pale outside her side's water, a gold ring filling while the gull comes,
+  shaking on a botch; the crewmate's slip carries an empty 42 px headshot frame (`hud.headshot`) for Phase C's gulls.
+  **Why:** the HUD has no words (the UI sheet), and each glyph is the same one the cards will use.
+- **Question:** the four teaching folios' form and when each shows (step 8.3). **Choice:** `ui/teach.ts`, the
+  settings folio's frame (`screens.ts folio`, now exported), centred over the match, drawn without words: the crewmate
+  and no friendly fire when she first sails with one; the calls once that one is closed; faults on her first failed
+  part; the flight the first time she may call it. One at a time, each once on the device (`portolan.taught`), put away
+  as her match screen is left. **Why:** "in the form of the existing ones"; the only folio is the settings one.
+- **Question:** how Skip runs under the parchment (the orchestrator's ruling, done). **Choice:** the passage
+  (`ui/passage.ts`) takes a `Running` (over, progress, lifted): it holds until the race is over (`wayHome`'s `ready`),
+  a gold line under the rose filling with the ships sunk since the tap; while held, `flow.hiding` makes `main.ts next`
+  return no snapshot, and the stage skips the render but counts the frame; `play/game.ts SKIP` is 25 ms; as it lifts the
+  flow goes to the result. Headless: 80 ships' race to its end in some 5 s, no draws under the parchment.
 - **Question:** when a new planet is made (step 9). **Choice:** on the way home from a race (LEAVE, under the parchment
   that already covers it: `flow` home → `main.ts restage`), so every PLAY is on a planet no race has used; the first
   race after load is on the planet the page opened on. **Why:** the parchment is the one cover the game has for a

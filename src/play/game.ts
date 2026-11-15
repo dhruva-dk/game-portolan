@@ -64,8 +64,9 @@ const DEAD = 0.15;
 /** Loot is drawn within DRAWN m of the eye (so none from space), floating on the waves within RIDES m of the eye's
  *  ship. (Never on the disc: as in Fortnite, the sea is searched by eye.) */
 const DRAWN = 700, RIDES = 320;
-/** Milliseconds of a frame the race may be run on for, skipping to its result (the world still drawn each frame). */
-const SKIP = 8;
+/** Milliseconds of a frame the race may be run on for, skipping to its result (under the parchment, the world not
+ *  drawn: ui/passage.ts; the orchestrator's ruling). */
+const SKIP = 25;
 /** Seconds before the match a piece strewn at its start is taken to have come onto the water: long since bobbed up. */
 const LONG_AGO = 1e3;
 /** How far a gun is through reloading (0…1), or null when it isn't; `hers` her own reload (sim/fit.ts). */

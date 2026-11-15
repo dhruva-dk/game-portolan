@@ -44,6 +44,8 @@ export function createFlow(hud: ReturnType<typeof createHud>, globe: ReturnType<
   let screen: Screen = start, settings = loadSettings();
   /** Her end as last reported (null while she fights). */
   let end: End | null = null;
+  /** Ships afloat in the match, as the HUD last read it (Skip's progress). */
+  let afloat = 0;
 
   const veil = createVeil();
   const title = createTitle(() => tap('begin'));
@@ -78,9 +80,22 @@ export function createFlow(hud: ReturnType<typeof createHud>, globe: ReturnType<
         end = null;
         go(next);
       });
+    } else if (t === 'skip') {
+      // under the parchment, the world not drawn, until the race is over; lifted off her result
+      result.hide(HOME.cover);
+      watching.show(false, HOME.cover);
+      fade(hud.root, false, HOME.cover);
+      const from = afloat;
+      passage.cover(() => {
+        act.skip();
+        go(next);
+      }, {
+        over: () => !!end?.over,
+        progress: () => (from > 1 ? (from - afloat) / (from - 1) : 1),
+        lifted: () => go(course(screen, events(end))),
+      });
     } else {
       if (t === 'watch') act.watch();
-      if (t === 'skip') act.skip();
       if (t === 'switch') act.switch(by);
       go(next);
     }
@@ -96,7 +111,10 @@ export function createFlow(hud: ReturnType<typeof createHud>, globe: ReturnType<
     const shown = next === 'match' || next === 'spectate';
     if (shown) hud.watch(next === 'spectate');
     fade(hud.root, shown, shown ? undefined : DRY);
-    if (next !== 'match') globe.close();
+    if (next !== 'match') {
+      globe.close();
+      hud.unteach();
+    }
     watching.show(next === 'spectate');
     const over = next === 'sunk' || next === 'result';
     if (over && end) result.show(true, end);
@@ -125,6 +143,10 @@ export function createFlow(hud: ReturnType<typeof createHud>, globe: ReturnType<
     get covered() {
       return passage.covered;
     },
+    /** Whether the world is not to be drawn this frame: Skip's parchment held over it while the race runs on. */
+    get hiding() {
+      return passage.hiding;
+    },
     /** Opens the UI at `next` (the debug switches' way in: src/debug.ts). */
     go,
     /** Her tap on a way on, as if on what is drawn for it (the debug switches': src/debug.ts). */
@@ -132,6 +154,7 @@ export function createFlow(hud: ReturnType<typeof createHud>, globe: ReturnType<
     /** A frame: what the HUD reads, and who holds the sea (her id in it) as the frame draws it. */
     update(s: HudState, sea?: Sea, own?: number | null) {
       if (IN_MATCH.includes(screen)) {
+        afloat = s.afloat;
         // the full map's window would show the HUD under it
         hud.root.style.visibility = globe.open ? 'hidden' : '';
         hud.update(s, sea, own);

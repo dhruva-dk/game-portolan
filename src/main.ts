@@ -82,7 +82,7 @@ async function stage(setup: Setup): Promise<Stage> {
       planet.frame.resize(innerWidth, innerHeight);
       held = false;
     },
-    async draw(next: (dt: number) => Snapshot, drawn?: (canvas: HTMLCanvasElement) => void) {
+    async draw(next: (dt: number) => Snapshot | null, drawn?: (canvas: HTMLCanvasElement) => void) {
       console.info(`ground baked in ${(await planet.frame.ready).toFixed(0)} ms`);
       planet.frame.resize(innerWidth, innerHeight);
       addEventListener('resize', () => held || planet.frame.resize(innerWidth, innerHeight));
@@ -93,8 +93,9 @@ async function stage(setup: Setup): Promise<Stage> {
         const now = performance.now();
         const dt = Math.min((now - last) / 1000, 0.1);
         last = now;
+        // (none: the world is covered and not drawn this frame; the frame still counts for what waits on it)
         const snapshot = next(dt), begun = performance.now();
-        frame.render(snapshot, dt);
+        if (snapshot) frame.render(snapshot, dt);
         const rendered = performance.now() - begun;
         drawn?.(renderer.domElement);
         meter?.sample(performance.now() - now, rendered);
@@ -163,7 +164,7 @@ async function play(s: Stage): Promise<Played> {
     // the full map just opened, or a cross-fade waiting, holds the game's frame the moment it is drawn; the way home
     // counts the lobby's frames
     drawn: (canvas) => flow.drawn(canvas),
-    next(dt: number): Snapshot {
+    next(dt: number): Snapshot | null {
       const hands = input.read();
       const { game, referee } = on;
       stick(game.steering() ? hands.stick : null);
@@ -175,6 +176,8 @@ async function play(s: Stage): Promise<Played> {
       flow.update(status, scene.sea, scene.own);
       // heard from the game's eye, even with the full map open over it; the sea going as the screens cover it
       audio.update({ scene, status, screen: flow.screen, map: globe.open, covered: flow.covered }, flow.settings.sound, dt);
+      // Skip's parchment held over the world: the race run on under it, the world not drawn
+      if (flow.hiding) return null;
       return { ...scene, eye: globe.step(dt, scene.storm) ?? scene.eye };
     },
   };

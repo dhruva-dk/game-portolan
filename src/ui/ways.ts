@@ -9,8 +9,9 @@
 //   match     the arrival, then her hands on her ship; she sinks → sinking; she is the last afloat → won
 //   sinking   the camera held on her ship going down, the HUD gone; the beat done → sunk, or → result if the match
 //             is over
-//   sunk      her result over the live world, with WATCH → spectate, SKIP → spectate (the race run on to its end as
-//             fast as a frame allows) and LEAVE → lobby (by the parchment: HOME); the race over → result
+//   sunk      her result over the live world, with WATCH → spectate, SKIP → spectate (the race run on to its end under
+//             the parchment, the world not drawn, then lifted off her result) and LEAVE → lobby (by the parchment:
+//             HOME); the race over → result
 //   spectate  watching another ship: turn to the next or the one before; SKIP; LEAVE → lobby; the race over → result
 //   won       the camera circling her, the HUD gone; the beat done → result
 //   result    her result over the live world, one way on: LEAVE → lobby
@@ -56,8 +57,8 @@ export type Leg = 'cover' | 'hold' | 'lift' | 'home';
 
 /** The way home, begun at `start` ms (its parchment set coming over the match then), moved on by the frames drawn:
  *  covered, the change is made under it; held until the lobby is ready (HOME.frames of its frames drawn) and at least
- *  HOME.hold; then lifted. Nothing lifts it on a clock alone. */
-export function wayHome(start: number) {
+ *  HOME.hold, and until `ready` (Skip's: the race over); then lifted. Nothing lifts it on a clock alone. */
+export function wayHome(start: number, ready: () => boolean = () => true) {
   let leg: Leg = 'cover', since = start, frames = 0;
   const into = (next: Leg, now: number) => {
     leg = next;
@@ -72,7 +73,7 @@ export function wayHome(start: number) {
      *  the parchment and after this frame; every frame drawn after it is the lobby's. */
     drawn(now: number): Leg | null {
       if (leg === 'cover') return now - since >= HOME.cover ? into('hold', now) : null;
-      if (leg === 'hold') return ++frames >= HOME.frames && now - since >= HOME.hold ? into('lift', now) : null;
+      if (leg === 'hold') return ++frames >= HOME.frames && now - since >= HOME.hold && ready() ? into('lift', now) : null;
       if (leg === 'lift') return now - since >= HOME.lift ? into('home', now) : null;
       return null;
     },

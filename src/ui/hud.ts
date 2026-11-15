@@ -145,6 +145,8 @@ export function createHud(layer: HTMLElement, coasts: () => readonly Coast[], ac
     root,
     /** The frame her crewmate's headshot is set in (crew.ts). */
     headshot: crew.headshot,
+    /** Her match left behind (her end, the way home): a teaching folio still open is put away. */
+    unteach: teaching.close,
     watch(on: boolean) {
       watching = on;
       for (const el of [vitals, gust, fire, reticle, fall, hotbar, rim]) el.style.display = on ? 'none' : '';

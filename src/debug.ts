@@ -99,7 +99,7 @@ const kindOf = (name: string | null): GunKind => KINDS.find((k) => k === name) ?
 export interface Stage {
   readonly world: World; readonly start: { at: Vec3; bearing: number }; canvas: HTMLElement;
   readonly anchors: readonly Anchor[]; readonly ready: Promise<number>; readonly matches: Matches;
-  draw(next: (dt: number) => Snapshot, drawn?: (canvas: HTMLCanvasElement) => void): Promise<void>;
+  draw(next: (dt: number) => Snapshot | null, drawn?: (canvas: HTMLCanvasElement) => void): Promise<void>;
   /** The planet put away and one of `seed` made in its place (the world and all above read anew), `then` (the game on
    *  it) made, and the drawing taken up once its ground is baked. */
   restage(seed: number, then: () => Promise<void>): Promise<void>;
@@ -116,7 +116,8 @@ export interface Played {
   /** A new planet in this one's place, as the way home makes it, without the parchment: the next of the page's, or one
    *  of `seed`. */
   restage(seed?: number): Promise<void>;
-  next(dt: number): Snapshot;
+  /** (null: nothing drawn this frame, the world covered: Skip's parchment) */
+  next(dt: number): Snapshot | null;
   drawn(canvas: HTMLCanvasElement): void;
 }
 

@@ -104,5 +104,11 @@ export function createTeaching() {
     },
     /** Whether a lesson is open (the match goes on under it). */
     open: () => open !== null,
+    /** Her match left behind (her end, the way home): an open lesson put away. */
+    close() {
+      if (!open) return;
+      open = null;
+      f.show(false);
+    },
   };
 }
