@@ -389,3 +389,56 @@ decisions are in #56, section 2.
   `SWATCHES = 24`, matching #58 step 3's 24 palette swatches; the deal is unchanged (every unordered pair but the
   player's, shuffled by seed: 276 pairs, forty a league). **Why:** one count on both sides of the seam; the career's
   deal and Phase A's palette must agree.
+- **Question:** what a crew knows of a gull, and since when. **Choice:** `gull.known[crew] = { day, last, by, used }`:
+  the report's day, stars at the last season's end (the arrow), the scout who reported (null when signed or met), and
+  whether that scout's Persuasion was spent. A crew knows its own staff without a report. **Why:** the arrow and
+  Persuasion's 30-day window both need the day and the scout; per-crew so rivals' knowledge is the same data.
+- **Question:** patience, where section 5 leaves it open. **Choice:** kept on the gull, not per crew. Each lowball
+  (wage under 0.8 × ask) costs one when answered; at 0 the gull refuses every offer of that day, sets `silentUntil` =
+  day + 30 and patience back to 3. Persuasion's +1 caps at 4. Signing resets it to 3. **Why:** the rivals bid at
+  least 0.8 × ask, so only a player's lowballs spend it, as the spec intends; one number is easier to show.
+- **Question:** when answers come. **Choice:** 2 days after a free agent's offer; 7 after an approach to another
+  crew's gull (its crew is mailed `approached`), so the player can renew first. Offers due the same day are answered
+  together: of those accepted the best score signs; with none, each offer from 0.85 is countered and a rival meets its
+  counter at once if its manager's Finance and Negotiation allow (ask × 1.25 at most); the player's counter lapses
+  after 7 days. Later answer events for a talk already answered do nothing. **Why:** one answer per gull per day keeps
+  "the highest offer wins" without an auction; the week gives the defending crew its renewal.
+- **Question:** the last 60 days and pre-contracts. **Choice:** `closing` (season end − 60) and `silence`
+  (season end − 30) are events. From `closing`, gulls whose contracts end this season may be approached without a
+  break clause; a signing moves them at once (no pre-contract). At `silence`, those offered no renewal lose morale
+  once (`silenced`). **Why:** no pre-contract state to keep consistent; the race calendar still runs on.
+- **Question:** a counter's shape. **Choice:** raise the wage to the least that scores 1 (binary search to 1.2 ×
+  ask); failing that, at the most money, a captain's status raised to ship, then the length made the asked one; null
+  (a refusal) if nothing reaches 1. **Why:** section 5's order (money, status, length) with numbers.
+- **Question:** wants' satisfaction numbers. **Choice:** money = (wage + fee/races + bonuses expected) / ask, capped
+  1.2 (podium expected 0.06 a race, sinking 0.4); a reserve post 0.3; league one below 0.6, more than one 0 under
+  contract and 0.4 free; ambition 1 + (crew reputation − the gull's marketability, a manager's reputation) / 50;
+  security 1 − 0.35 × |seasons − asked|; facilities the school building's level / 3; home 1 or 0.5 away. Weights
+  0.5, 0.3, 0.2. Level of a gull: their crew's league, a free agent's by stars (≥3 League One, ≥2.1 Two). **Why:**
+  section 5 names the wants and weights; these make the ask score exactly 1 for an average crew.
+- **Question:** what an offer names, and seats. **Choice:** `Offer.replaces: number | null`: the one whose post they
+  take (dismissed with the season's wage on signing). With none, an open seat of the role and status must exist
+  (`career/seats.ts`): the player's ship one has no captain seat. **Why:** a full crew must say whom a signing displaces.
+- **Question:** a manager's post. **Choice:** `Staff.manager: number | null`; managers are hired only by elders
+  (OfferContract refuses managers and elders). An elder hires the best manager whose reputation fits the league (75, 50,
+  0 for Leagues One to Three): free agents first at equal standing, or poaches a lower league's (that crew then hires
+  in turn), or offers the post to the player if their reputation (70, 45, 0) reaches it and is at least the best
+  candidate's. An elder never takes back the manager it just sacked. A poached manager's break clause, if any, is
+  paid to their crew as for any signing.
+  **Why:** D22; the cascade fills every post in one step.
+- **Question:** the sacked player. **Choice:** Advance is refused while sacked; the offers shown don't lapse; every
+  open post that may offer does, and always the League Three crew whose elder trusts its manager least. The last offer
+  cannot be declined. **Why:** a career never stalls with no crew.
+- **Question:** TakeJob. **Choice:** the player sails the new crew's ship one; its stronger captain sails two and the
+  weaker is released; its manager goes to the free agents; both crews' talks end; the old crew's elder hires; colours
+  and emblem stay with the old crew. **Why:** D22; the player is always ship one's captain.
+- **Question:** the rival managers' table. **Choice:** each crew reviews every 7 days, first reviews staggered by crew
+  id over the first week; rows fill, replace, renew, poach, scout in an order and spending share set by personality
+  (`TUNING.rivals.personalities`); a report runs fill, replace and poach at once. Bids: ask × (1 + Negotiation's
+  share) for gamblers × 1.1, ceiled; length by personality (young/other); a break clause unless Negotiation rolls
+  ≥ 0.5. Worth: Talent Eye mixes stars and potential (youthBuilder weighs potential 0.2 more). Rows of parts,
+  buildings and patrons join `ROWS` in `career/rivals.ts`. **Why:** section 6 in one table; same checks as the player.
+- **Question:** wordings, and mail to rivals. **Choice:** `post` mails only the player's crew (or all, crew null), the
+  wording picked by `seeded(seed, mail id)` of 2. **Why:** rivals read state, not mail.
+- **Question:** the young each season. **Choice:** 150 free agents aged 16–19 of 0.5–1.5 stars, roles in the start's
+  shares, colonies even, on the 'young' stream. **Why:** section 5's number; low stars so potential matters.
