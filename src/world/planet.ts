@@ -17,6 +17,7 @@ import { createNoise3 } from './noise3.ts';
 import type { IslandSite } from './planet-islands.ts';
 import { charter, placeIslands } from './island-place.ts';
 import { random } from './random.ts';
+import { placeCampus } from './rookery.ts';
 
 export type { IslandSite } from './planet-islands.ts';
 
@@ -110,7 +111,9 @@ function cellOf(x: number, y: number, z: number): number {
 /** What the sea floor's fields give at a point before any island. */
 interface Floor { height: number; depth: number; deep: number; clearance: number }
 
-export function createPlanet(seed: number): Planet {
+/** A planet of `seed`: a race's (its islands spread over it), or a crew's campus (rookery.ts: one main island and a
+ *  few islets round it). */
+export function createPlanet(seed: number, campus = false): Planet {
   const noise = createNoise3(seed);
   const rand = random(seed * 92821 + 13);
   // each field reads the noise from its own place in it
@@ -164,7 +167,7 @@ export function createPlanet(seed: number): Planet {
     return f;
   };
 
-  const islands = placeIslands((p) => floor(unit(p)), noise, seed, SEA.deep.depth[1] + SEA.meet);
+  const islands = (campus ? placeCampus : placeIslands)((p) => floor(unit(p)), noise, seed, SEA.deep.depth[1] + SEA.meet);
   const near = islands.map((s) => Math.cos(s.reach / R)), charts = islands.map((s) => charter(s.chart));
   /** Within this of an island's centre (as a dot product), the rubble round its foot. */
   const feet = islands.map((s) => Math.cos((s.shelf + FOOT[1]) / R));

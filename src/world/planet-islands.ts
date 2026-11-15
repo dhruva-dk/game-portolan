@@ -150,6 +150,9 @@ export interface IslandSite {
   ceiling(r: number): number;
   /** Whether chart (x, z) is on a cliff's face (steeper than ISLANDS.bare): nothing stands there. */
   face(x: number, z: number): boolean;
+  /** Circles on its chart kept clear of rocks, palms and shrubs (x, z, radius, metres): a campus's plots
+   *  (rookery.ts). */
+  clearings?: readonly { x: number; z: number; radius: number }[];
 }
 
 const smoothstep = (a: number, b: number, x: number) => {

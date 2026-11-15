@@ -1,4 +1,5 @@
 import { createPlanet, type Planet } from './world/planet';
+import { campusOf, type Campus } from './world/rookery';
 import type { Vec3 } from './world/sphere';
 import { sunAt, sunPlaces, type SunPlaces } from './world/sun';
 import { createWeather, type Weather } from './world/weather';
@@ -21,13 +22,14 @@ export interface Climate {
 
 /** The world a match is set in: its planet, the planet's prevailing wind and the climate, from one seed. Built once
  *  (main.ts) and handed to both the game and the frame. */
-export interface World { seed: number; planet: Planet; wind: Wind; climate: Climate }
+export interface World { seed: number; planet: Planet; wind: Wind; climate: Climate; campus: Campus | null }
 
-/** seed: the planet's (world/planet.ts); mean, swing: the weather's (world/weather.ts); hours: the time of day. */
-export function createWorld(seed: number, mean: Weather, swing: Weather, hours: number): World {
-  const planet = createPlanet(seed);
+/** seed: the planet's (world/planet.ts); mean, swing: the weather's (world/weather.ts); hours: the time of day; campus:
+ *  whether it is a crew's campus (world/rookery.ts: its islands and the buildings' plots on them) or a race's planet. */
+export function createWorld(seed: number, mean: Weather, swing: Weather, hours: number, campus = false): World {
+  const planet = createPlanet(seed, campus);
   return {
-    seed, planet, wind: createWind(seed),
+    seed, planet, wind: createWind(seed), campus: campus ? campusOf(planet.islands, seed) : null,
     climate: { timeOfDay: hours, sunPlaces: sunPlaces(planet.islands), weather: createWeather(seed, mean, swing), seaWind: mean.wind },
   };
 }

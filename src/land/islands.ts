@@ -31,9 +31,12 @@ export function createIslands(planet: Planet, seed: number, view: View, light: L
   const sites = planet.islands, isles = sites.map((s) => isle(s, planet.height)), charts = sites.map((s) => s.chart);
   // each island's own seed, from the planet's
   const own = (k: number) => seed * 1009 + k + 1;
-  const rocks = isles.map((i, k) => scatterRocks(i, KINDS.big.shapes, KINDS.boulder.shapes, own(k)));
-  const palms = isles.map((i, k) => scatterPalms(i, rocks[k], own(k)));
-  const shrubs = isles.map((i, k) => scatterShrubs(i, rocks[k], SHAPES, own(k)));
+  // (none on an island's clearings: a campus's plots, world/rookery.ts)
+  const open = (k: number) => <T extends { x: number; z: number }>(list: T[]) =>
+    list.filter((t) => !sites[k].clearings?.some((c) => Math.hypot(t.x - c.x, t.z - c.z) < c.radius));
+  const rocks = isles.map((i, k) => open(k)(scatterRocks(i, KINDS.big.shapes, KINDS.boulder.shapes, own(k))));
+  const palms = isles.map((i, k) => open(k)(scatterPalms(i, rocks[k], own(k))));
+  const shrubs = isles.map((i, k) => open(k)(scatterShrubs(i, rocks[k], SHAPES, own(k))));
   const lands = createLand(isles, isles.map((_, k) => litter(palms[k], shrubs[k])), sand);
   const rocky = createRocks(rocks, charts, view, light);
   const kinds = { rocks: rocky.near, palms: createPalms(palms, charts, light), shrubs: createShrubs(shrubs, charts, light), 'rocks far': rocky.far };
