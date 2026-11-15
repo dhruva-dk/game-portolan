@@ -23,7 +23,7 @@ export interface Call { cue: Cue; at: Vec3 | null; gain: number; gun?: GunKind }
 
 /**
  * What the bed follows (bed.ts):
- *   speed     her speed, a share of her top (1 at 13.5 m/s)
+ *   speed     her speed, a share of her top (1 at 27 m/s)
  *   wind      the wind in her rig, 0…1 (her way through the air, and a gust)
  *   heave     her rise and fall, m/s (up +)
  *   roll      her roll, radians
@@ -42,7 +42,7 @@ export interface Bed {
 
 /** Her top speed, m/s: sim/handling.ts SHIP.top, which the sound may not import (tests/audio.test.ts holds them
  *  equal). */
-export const TOP = 13.5;
+export const TOP = 27;
 /** The ring the coast is sounded on: metres out, and how many ways round. */
 const RING = [25, 60, 110, 200] as const, WAYS = 8;
 /** A ball passing within this many metres of the eye is heard, its whistle at its closest WHISTLE s into it; one

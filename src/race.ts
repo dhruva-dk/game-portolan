@@ -12,6 +12,7 @@ export type Job = 'mend' | 'gust' | 'stores' | 'part';
 export type Stance = 'hunt' | 'hold' | 'loot' | 'shadow';
 export type Call = 'withMe' | 'attack' | 'hold' | 'free';
 export interface Colours { first: number; second: number }          // indices into palette CREW swatches
+export const SWATCHES = 24;                                          // palette CREW's length (#58 step 3)
 export interface Handling { top: number; gather: number; turn: number; answer: number; hull: number; spread: number; reload: number }
 export interface Fitted { type: PartType; reliability: number; condition: number }  // both 0..1; condition at the start
 export interface Captain { stats: CaptainStats; style: Style; seed: number }

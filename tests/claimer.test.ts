@@ -6,6 +6,7 @@ import { mind, think, type Memory } from '../src/sim/bot.ts';
 import { shot } from '../src/sim/captain.ts';
 import { afloat, stepFleet, type Vessel } from '../src/sim/contact.ts';
 import { STEP } from '../src/sim/fixed.ts';
+import { SHIP } from '../src/sim/handling.ts';
 import type { Depth } from '../src/sim/shoal.ts';
 import { shipAt, type Helm } from '../src/sim/ship.ts';
 import type { Storm } from '../src/sim/storm.ts';
@@ -107,7 +108,8 @@ test('a bot sails across another\'s open trail she can reach before its ship is 
     // his water at the start, hers far to the south; he sails north 15 s, laying his trail, out of her sight
     const t = createTerritory(2);
     t.begin([along(start, way(start, Math.PI), 600).p, start], 0);
-    const him = voyage([afloat(1, shipAt(start, north))], [null], 15, t, { held: helm }).fleet[0];
+    // (15 s at 13.5 m/s, the top this was laid out for before #58 doubled it: 7.5 s at 27)
+    const him = voyage([afloat(1, shipAt(start, north))], [null], (15 * 13.5) / SHIP.top, t, { held: helm }).fleet[0];
     // she lies 70 m off its middle, abeam of it; he is some 100 m on and 180 m from home: she reaches it long before
     const mid = along(start, north, 90).p, at = along(mid, way(mid, Math.PI / 2), 70).p;
     let cut = 0;

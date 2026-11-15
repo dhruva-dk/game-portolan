@@ -17,7 +17,7 @@ import { createHeld } from './held';
 import { INK, PAPER, WASH, svg } from './ink';
 import { bakeIsle, zOf, type Isle } from './isles';
 
-/** Metres from her to the disc's rim: at her 13.5 m/s some 19 s of sailing, past a cannon's 200 m reach. */
+/** Metres from her to the disc's rim: at her 27 m/s some 10 s of sailing, past a cannon's 200 m reach. */
 export const SPAN = 260;
 /** The most redraws a second. */
 const RATE = 30;

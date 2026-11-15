@@ -84,5 +84,33 @@ decisions are in #56, section 2.
   and light (starting values); side 0 vermilion on vermilion; side k ≥ 1 two of the other 23 (`coloursOf`), no two
   sides alike; the side's first ship plain, its second banded; paint the first swatch, canvas the second. **Why:**
   the brief; vermilion stays the player's alone.
+- **Question:** a swatch-count constant (the orchestrator's note: Phase B added `SWATCHES = 12` to race.ts).
+  **Choice:** `race.ts` gains `export const SWATCHES = 24` (an addition to the seam); `deal.ts coloursOf` reads it, and
+  a test holds `CREW.length === SWATCHES`. **Why:** the issue's 24; both branches then agree when they meet.
+- **Question:** what scales with the doubled speed (step 4, D13). **Choice:** SHIP.top 27, turn 0.94, answer 5.6
+  (both doubled: the turning circle, top / turn, and the steering's damping are unchanged, the turn taken in half the
+  time). RAM.least 13, past 9.31, damage 1.1815 (0117's by 27 / 14.5; the most, 45, kept); GUST.speed 24.2, accel 52,
+  shed 8.4 (likewise). Also scaled, as their comments derive them: BOT.crawl 0.93 → 1.86 (by top), BOT.rate 0.56 →
+  1.11 (by turn), RIDE.heel 0.35 → 0.175 and RIDE.knock 0.07 → 0.035 (the same heel in a hard turn and under a full-
+  speed ram), the audio's TOP 27. The guns, HOLDING, the minimap's span untouched. **Why:** the issue's list; the rest
+  keeps what the comments promise.
+- **Question:** BOT.feel, run, letGo and the roam distances (step 4). **Choice:** feel kept (it already adds her
+  speed × 1 s); run 120, letGo 90, roam near 60 / far 160 / arrive 20 kept. New: a temperament's storm margin is
+  scaled by her top over `BOT.tuned` (13.5), so it is as many seconds' sailing as before; a roaming mark is kept that
+  margin plus her turning radius inside the edge. **Why:** tests/bot.test.ts caught a careful-less captain (margin 13
+  m) 23 m outside a 120 m cap at 27 m/s, roaming to a mark at its edge and coming about past it; with both, every
+  captain stays 20 m or more inside. tools/matches.ts 3 (seed SEED), before → after: race 431/431/435 s →
+  408/391/381 s; first shot 6.2/6.1/5.9 s → 4.4/2.3/3.5 s; sunk shot/ram/storm 78/1/0, 74/4/1, 75/3/1 → 77/2/0,
+  72/7/0, 75/2/2; a gun found, median 10 s → 5 s; loops closed 212–277 → 516–700; stuck 28–32 → 26–37 ships, none
+  aground. Not otherwise tuned (no batches of races).
+- **Question:** the storm's pace (step 4). **Choice:** `createStorm(seed, depth, plan = { pace: PACE.storm })`,
+  `handling.ts PACE.storm = 1` (a starting value); pace multiplies every phase's wait and close; `play/setup.ts` passes
+  the card's `rules.storm`. **Why:** the issue.
+- **Question:** tests whose set-ups assumed 13.5 m/s. **Choice:** each set-up rescaled, no bound loosened in meaning:
+  sailing's course test runs 810 m (60 s × 13.5 / top: a fixed course vector means less further round the planet); the
+  shore-slide rates are shares of her top; "led with no spread" goes out to 150 m (from 170: one running at 27 m/s
+  from 160 m is led past the cannon's 200); the gunner's far test runs 6 s (she reaches scatter range sooner); the
+  claimer's trail is laid in 7.5 s (the same 200 m); the assist's 5° test asserts the assist never lays on her and
+  few balls strike past 100 m (nearer, a ship crossing at 27 m/s sails into half the balls laid just ahead of her).
 - **Question:** the debug sea about her (`?atsea`) once PLAY deals cards. **Choice:** it clears card-less, every ship
   a side of her own. **Why:** its lashed ships are targets to shoot.

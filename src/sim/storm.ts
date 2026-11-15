@@ -17,6 +17,8 @@
 
 import { R, add, along, cross, dot, normalize, scale, type Vec3 } from '../world/sphere.ts';
 import { random } from '../world/random.ts';
+import type { StormPlan } from '../race.ts';
+import { PACE } from './handling.ts';
 import type { Depth } from './shoal.ts';
 
 /** One phase: it holds for `wait` seconds, then closes over `close` seconds to a cap of `radius` metres (along the
@@ -27,8 +29,9 @@ export const STORM = {
   /**
    * The phases in order. The first cap is the whole planet (π·R, 1740 m), so the first wait is only a warning: it
    * shows where the storm is headed. The first close is the long one (the far side of the planet is 940 m outside
-   * its next cap: 70 s at a ship's best 13.5 m/s, 134 at an ordinary 7); after it the edge moves at 3–7 m/s, a
-   * ship's easy pace, as the old game's did. The last cap, 25 m, holds two or three ships' lengths: a fight.
+   * its next cap: 70 s at the old best of 13.5 m/s, 35 at her 27 since #58); after it the edge moves at 3–7 m/s, a
+   * ship's easy pace, as the old game's did. The last cap, 25 m, holds two or three ships' lengths: a fight (at 27 m/s
+   * her turning circle, 29 m round, is wider than it: a race is mostly over before it closes).
    */
   phases: [
     { wait: 60, close: 70, radius: 800, damage: 0.01 },
@@ -136,10 +139,12 @@ export function planStorm(seed: number, depth: Depth): Vec3[] {
 
 /**
  * The match's storm: storm(seconds) at that time on its clock (negative times are the start). seed: the match's;
- * depth: water over the floor at a point, metres (shoal.ts).
+ * depth: water over the floor at a point, metres (shoal.ts); plan: the race's (race.ts StormPlan), whose pace
+ * multiplies every phase's wait and close (handling.ts PACE's if not given).
  */
-export function createStorm(seed: number, depth: Depth) {
-  const centres = planStorm(seed, depth), phases = STORM.phases, n = phases.length;
+export function createStorm(seed: number, depth: Depth, plan: StormPlan = { pace: PACE.storm }) {
+  const centres = planStorm(seed, depth), n = STORM.phases.length;
+  const phases = STORM.phases.map((p) => ({ ...p, wait: p.wait * plan.pace, close: p.close * plan.pace }));
   /** The cap phase k holds at before it closes: the whole planet's for the first. */
   const held = (k: number): Cap => (k === 0 ? { centre: centres[0], radius: WHOLE } : { centre: centres[k - 1], radius: angle(phases[k - 1].radius) });
   const target = (k: number): Cap => ({ centre: centres[k], radius: angle(phases[k].radius) });

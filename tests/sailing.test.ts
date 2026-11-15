@@ -89,7 +89,8 @@ test('she comes round onto a course without swinging past it', () => {
     const s0 = { ...shipAt(start, north), speed };
     const course = turned(s0, angle * deg);
     let worst = 0, settled = Infinity;
-    run(s0, () => ({ course, throttle: speed / SHIP.top }), 60, deep, (s) => {
+    // (810 m at her top: a course is a direction where she starts, which further round the planet means less and less)
+    run(s0, () => ({ course, throttle: speed / SHIP.top }), (60 * 13.5) / SHIP.top, deep, (s) => {
       // past the course: the error's sign has flipped
       worst = Math.max(worst, -Math.sign(angle) * offCourse(s, course));
       if (Math.abs(offCourse(s, course)) > 0.5 * deg) settled = Infinity;
@@ -125,7 +126,9 @@ test('she never sails into water shallower than her draught, at any angle, and s
     assert.ok(least >= 0, `${angle}°: ${least} m under her keel`);
     const off = offshore(b.at) - DRY, rate = distance(a.at, b.at) / 30;
     assert.ok(off < 15, `${angle}°: ${off} m off the contour`);
-    assert.ok(rate >= [0, 0.5, 1.5, 3.5][[0, 20, 45, 70].indexOf(angle)] && (angle > 0 || rate < 0.5), `${angle}°: ${rate} m/s`);
+    // (the rates found at a top of 13.5 m/s, as shares of her top)
+    const top = SHIP.top / 13.5;
+    assert.ok(rate >= top * [0, 0.5, 1.5, 3.5][[0, 20, 45, 70].indexOf(angle)] && (angle > 0 || rate < top * 0.5), `${angle}°: ${rate} m/s`);
   }
 });
 

@@ -24,6 +24,20 @@ test('the same seed gives the same storm', () => {
   assert.notDeepEqual(createStorm(4, depthOf(4))(DURATION).centre, a(DURATION).centre);
 });
 
+test("a race's pace stretches every phase's wait and close alike: the same caps, at `pace` times the seconds", () => {
+  const one = createStorm(3, depthOf(3)), slow = createStorm(3, depthOf(3), { pace: 1.5 }), fast = createStorm(3, depthOf(3), { pace: 0.5 });
+  assert.deepEqual(createStorm(3, depthOf(3), { pace: 1 })(200), one(200));
+  for (const t of [0, 30, 61, 130.5, 200, 333.3, DURATION - 1]) {
+    for (const [s, pace] of [[slow, 1.5], [fast, 0.5]] as const) {
+      const a = one(t), b = s(t * pace);
+      assert.equal(b.phase, a.phase, `${t} s at ${pace}`);
+      assert.equal(b.closing, a.closing);
+      assert.ok(Math.abs(b.radius - a.radius) < 1e-9 && between(a.centre, b.centre) < 1e-9, `${t} s at ${pace}`);
+      assert.ok(Math.abs(b.secondsToNext - a.secondsToNext * pace) < 1e-6);
+    }
+  }
+});
+
 test('the match runs six to eight minutes, and its phases add up to it', () => {
   assert.ok(DURATION >= 360 && DURATION <= 480, `${DURATION} s`);
   const storm = createStorm(3, depthOf(3));

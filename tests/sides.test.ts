@@ -23,6 +23,7 @@ import { coloursOf, deal } from '../src/play/deal.ts';
 import { startOf } from '../src/play/setup.ts';
 import { createState, type Match } from '../src/play/state.ts';
 import { CREW } from '../src/palette.ts';
+import { SWATCHES } from '../src/race.ts';
 import { SEED, createPlanet } from '../src/world/planet.ts';
 import { hash } from '../src/world/random.ts';
 import { R, add, along, frameAt, fromLatLon, normalize, scale, type Vec3 } from '../src/world/sphere.ts';
@@ -151,7 +152,8 @@ test('the dealt race: forty sides of two, every ship on SPEC, her side 0 with a 
 
 test('colours: a side wears its swatches, its first ship plain and its second banded; a card-less match as today', () => {
   const card = deal(5, 8);
-  assert.equal(CREW.length, 24);
+  assert.equal(CREW.length, SWATCHES);
+  assert.equal(SWATCHES, 24);
   for (const id of [2, 3]) {
     const look = lookIn(card, id), c = card.ships[id].colours;
     assert.deepEqual(look.paint, [...CREW[c.first].rgb]);

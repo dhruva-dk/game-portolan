@@ -163,8 +163,9 @@ test('a green bot\'s balls spread wider than a sharp one\'s, and hit less', () =
 
 test('a bot with two guns takes in hand the one for the range: a scatter close, a harpoon far off', () => {
   for (const seed of bold) {
-    // the scatter in hand to begin with, her foe far off; then the harpoon in hand, her foe close
-    const far = battle([placed(0, 0, 0, 90 * deg), placed(1, 0, 200, 0)], [seed, null], [[gunOf('scatter', 0), gunOf('harpoon', 0)], null], 12);
+    // the scatter in hand to begin with, her foe far off (for 6 s: at 27 m/s she sails into the scatter's range sooner
+    // than she did at 13.5 in 12); then the harpoon in hand, her foe close
+    const far = battle([placed(0, 0, 0, 90 * deg), placed(1, 0, 200, 0)], [seed, null], [[gunOf('scatter', 0), gunOf('harpoon', 0)], null], 6);
     const near = battle([placed(0, 0, 0, 90 * deg), placed(1, 0, 30, 0)], [seed, null], [[gunOf('harpoon', 0), gunOf('scatter', 0)], null], 6);
     const kinds = (r: ReturnType<typeof battle>) => [...new Set(r.fired.filter((f) => f.id === 0).map((f) => f.gun))];
     console.log(`# seed ${seed}: far ${kinds(far)}, near ${kinds(near)}`);

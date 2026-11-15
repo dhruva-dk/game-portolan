@@ -4,8 +4,7 @@
 // card-less match's. The player's ship is 0, on side 0 with a bot crewmate (ship 1); she has no captain. Each side's
 // colours are two of the palette's CREW swatches: side 0 vermilion, the player's, and no other side has it.
 
-import { CREW } from '../palette.ts';
-import type { Colours, RaceCard, RaceShip, Rules, Service } from '../race.ts';
+import { SWATCHES, type Colours, type RaceCard, type RaceShip, type Rules, type Service } from '../race.ts';
 import { SPEC } from '../sim/fit.ts';
 import { PLAYER, SHIPS } from '../sim/match.ts';
 import { captainOf } from '../sim/temper.ts';
@@ -26,7 +25,7 @@ export const SERVICE: Service = {
 /** Side k's colours: side 0 vermilion on vermilion; every other side two of the other swatches, no two sides alike. */
 export function coloursOf(k: number): Colours {
   if (k === 0) return { first: 0, second: 0 };
-  const n = CREW.length - 1, i = k - 1;
+  const n = SWATCHES - 1, i = k - 1;
   return { first: 1 + (i % n), second: 1 + ((i * 7 + Math.floor(i / n) * 3) % n) };
 }
 

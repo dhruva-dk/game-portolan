@@ -57,7 +57,7 @@ for (let g = 0; g < games; g++) {
   const kinds = new Map(KINDS.map((k) => [k, { shots: 0, balls: 0, fell: 0 }]));
   /** Each ship's first second with a gun, and with two of different kinds; the quiet longest after the first 30 s. */
   const first = new Map<number, number>(), second = new Map<number, number>();
-  let lastShot = 0, quiet = 0;
+  let lastShot = 0, quiet = 0, firstShot = NaN;
   let seen = -Infinity;
   const t1 = performance.now();
   // on until every ship afloat is of one side
@@ -79,6 +79,7 @@ for (let g = 0; g < games; g++) {
         k.balls += GUNS[b.gun].pellets;
         const now = state.time();
         if (now > 30) quiet = Math.max(quiet, now - Math.max(30, lastShot));
+        if (Number.isNaN(firstShot)) firstShot = now;
         lastShot = now;
       } else if (b.kind === 'strike' && !b.ram) balls.struck++;
       else if (b.kind === 'splash') kinds.get(b.gun)!.fell++;
@@ -121,6 +122,7 @@ for (let g = 0; g < games; g++) {
   const left = state.alive();
   console.log(`match ${g + 1} (seed ${m.seed}): ${left.length} left at ${state.time().toFixed(0)} s${left.length ? ` (side ${state.vessels()[0].side} wins: ${left.join(', ')})` : ''};`
     + ` sunk by shot ${causes.shot}, ram ${causes.ram}, storm ${causes.storm} (${credited} credited); ${(ms / steps).toFixed(2)} ms a step`);
+  console.log(`  race: ${state.time().toFixed(0)} s long, the first shot at ${firstShot.toFixed(1)} s; sunk by shot ${causes.shot}, ram ${causes.ram}, storm ${causes.storm}`);
   console.log(`  balls: ${balls.fired} fired, ${balls.struck} struck home (${((100 * balls.struck) / Math.max(1, balls.fired)).toFixed(0)}%)`);
   console.log(`  by kind: ${[...kinds].map(([k, n]) => `${k} ${n.shots} shots ${n.balls ? (100 * (1 - n.fell / n.balls)).toFixed(0) : '-'}% home`).join(', ')}`);
   const median = (xs: number[]) => xs.sort((a, b) => a - b)[xs.length >> 1] ?? NaN, ships = state.ships().length;

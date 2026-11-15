@@ -33,8 +33,8 @@ function sightOn(v: Vessel, o: Vessel, off: number): Sight {
 }
 
 /** The share of N balls from a gun of `rarity` that strike a ship `metres` off crossing at top speed, the reticle `off`
- *  radians from her, the spread `k` times the gun's. */
-function rate(rarity: number, metres: number, off = 0, k = 1): number {
+ *  radians from her, the spread `k` times the gun's; or, `led`, the share the assist lays on her. */
+function rate(rarity: number, metres: number, off = 0, k = 1, led = false): number {
   let hits = 0;
   for (let n = 0; n < N; n++) {
     const bearing = 0.3 + n * 0.031, side = n % 2 ? 1 : -1;
@@ -43,6 +43,10 @@ function rate(rarity: number, metres: number, off = 0, k = 1): number {
     let fleet: Vessel[] = [afloat(1, a), afloat(2, { ...b, heading: turned(b, bearing + (side * Math.PI) / 2), speed: SHIP.top })];
     const gun = { ...gunOf('cannon', rarity), fired: n };
     const lay = laid(fleet[0], gun, sightOn(fleet[0], fleet[1], off * side), fleet, 11, deep, spreadOf(gun) * k);
+    if (led) {
+      if (lay.target === 2) hits++;
+      continue;
+    }
     let battle = { ...battleOf([crewOf(1), crewOf(2)], 0), balls: [loosed(1, 'cannon', lay.from, lay.dirs[0], lay.speed, 1)] }, struck = false;
     for (let i = 0; i < 300 && battle.balls.length && !struck; i++) {
       fleet = stepFleet(fleet, [{ course: null, throttle: 0 }, { course: null, throttle: 1 }], STEP, deep).fleet;
@@ -69,10 +73,14 @@ test('the reticle on a crossing ship: a common gun strikes her 9 balls in 10 or 
 
 test('the assist: a thumb\'s slip (2° off her body) is led onto her; well off her (5°) it is not', () => {
   const slip = row((m) => rate(0, m, 2 * (Math.PI / 180))), wide = row((m) => rate(0, m, 5 * (Math.PI / 180)));
+  const wideLed = row((m) => rate(0, m, 5 * (Math.PI / 180), 1, true));
   console.log(`# common, 2° off: ${show(slip)}`);
-  console.log(`# common, 5° off: ${show(wide)}`);
+  console.log(`# common, 5° off: ${show(wide)} struck, ${show(wideLed)} laid on her`);
   for (let i = 0; i < 4; i++) assert.ok(slip[i] >= 0.85, show(slip));
-  for (const r of wide) assert.ok(r <= 0.25, show(wide));
+  // well off her the assist never lays on her; and past 100 m few balls strike her. (Nearer, at her top of 27 m/s she
+  // sails some 10 m in a ball's flight, and into half of those laid ahead of her: since #58 doubled it, 49% at 60 m.)
+  for (const r of wideLed) assert.equal(r, 0, show(wideLed));
+  for (const r of wide.slice(2)) assert.ok(r <= 0.25, show(wide));
 });
 
 test('a bot\'s unsteady hand: a green captain\'s balls strike less often than a sharp one\'s', () => {

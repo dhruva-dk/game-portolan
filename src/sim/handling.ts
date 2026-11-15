@@ -3,21 +3,25 @@
 // from rest (bite 0.25 → 0.45) after the first drive on the phone, and the speed at which the rudder bites fully kept
 // the same share of top speed; then, by the owner ("a little faster and more nimble"), 12.5% faster (12 → 13.5 m/s),
 // 12% quicker to turn (0.42 → 0.47 rad/s), gathering way (0.8 → 0.9) and answering her helm (2.5 → 2.8) to suit.
-// Whatever was brought down from 0117's top of 14.5 m/s by her top's share (RAM, GUST, the guns' muzzle speeds) is now
-// brought down by 13.5 / 14.5. What her hull does when she meets another's is beside it.
+// Whatever was brought down from 0117's top of 14.5 m/s by her top's share (RAM, GUST, the guns' muzzle speeds) was
+// brought down by 13.5 / 14.5. Then, for the races (#58 D13), twice as fast: top 13.5 → 27 m/s, turning twice as fast
+// (0.47 → 0.94 rad/s) and answering her helm twice as quick (2.8 → 5.6), so she sails the same turning circle by the
+// same path; RAM's and GUST's speeds are now 0117's by 27 / 14.5. The guns are left as they were. What her hull does
+// when she meets another's is beside it.
 
 import type { GunKind } from '../kinds.ts';
 
 /** Everything her handling is tuned by. Rates are per second. */
 export const SHIP = {
   /** Top speed, m/s. */
-  top: 13.5,
+  top: 27,
   /** The share of the gap to the speed asked for that she makes up a second, gathering way and losing it. */
   gather: 0.9,
   drag: 0.35,
-  /** Her fastest turn, rad/s; and how fast her turn follows the rudder. */
-  turn: 0.47,
-  answer: 2.8,
+  /** Her fastest turn, rad/s; and how fast her turn follows the rudder (both twice the old, with her top: her turning
+   *  circle, top / turn, 28.7 m, and the path she comes round by, unchanged). */
+  turn: 0.94,
+  answer: 5.6,
   /** The rudder bites this much at rest, and fully from `fullBite` of top speed on. */
   bite: 0.45,
   fullBite: 0.32,
@@ -40,17 +44,17 @@ export const SHIP = {
 } as const;
 
 /**
- * Ships meeting (contact.ts): 0117's ramming (src/sim/tables.ts SHIP, sailing.ts collide) with its speeds brought down
- * from her top of 14.5 m/s to 13.5, so the same share of top speed does the same damage, in its hit points (a ship
- * there had 100 of hull behind 100 of shield).
+ * Ships meeting (contact.ts): 0117's ramming (src/sim/tables.ts SHIP, sailing.ts collide) with its speeds scaled from
+ * her top of 14.5 m/s to 27, so the same share of top speed does the same damage, in its hit points (a ship there had
+ * 100 of hull behind 100 of shield).
  */
 export const RAM = {
-  /** Closing faster than this, m/s, where they meet, is a ram (0117: 7). */
-  least: 6.5,
-  /** A ram's damage: hit points for each m/s of closing past `past` (0117: 2.2 past 5); the most one ram takes off a
-   * ship (0117's cap). */
-  damage: 2.363,
-  past: 4.655,
+  /** Closing faster than this, m/s, where they meet, is a ram (0117: 7; 6.5 at a top of 13.5). */
+  least: 13,
+  /** A ram's damage: hit points for each m/s of closing past `past` (0117: 2.2 past 5; 2.363 past 4.655 at a top of
+   * 13.5); the most one ram takes off a ship (0117's cap). */
+  damage: 1.1815,
+  past: 9.31,
   most: 45,
   /** Each ship takes `bear` of it, and the rest by the other's share of the closing, so the one driving in takes the
    * less (0117). */
@@ -93,7 +97,7 @@ export const HEALTH = {
 /**
  * Her own water (territory.ts): inside it her shield comes back `shield` hit points a second, well under what a
  * common cannon takes off a second held on her (GUNS.cannon), so a fight can't be won by sitting at home, but 20–30 s
- * there after one puts back 60–90 of it; and she sails `speed` times her top speed (+9%, 14.7 m/s).
+ * there after one puts back 60–90 of it; and she sails `speed` times her top speed (+9%, 29.4 m/s).
  */
 export const HOLDING = {
   shield: 3,
@@ -104,16 +108,20 @@ export const HOLDING = {
  * Gust, her one ability (gust.ts): 0117's (tables.ts GUST, sailing.ts gust), a burst of wind in her canvas and a hop
  * off the water. Two charges, each coming back `recharge` s after the last came back; spent, for `time` s her speed
  * asked rises by `speed` and is reached at `accel` m/s², and her turn by `turn`; her balls go off `spread` times as
- * wide. Its speeds brought down by her top speed's share as RAM's are (14.5 → 13.5: 13 → 12.1 m/s, 28 → 26 m/s²);
- * after it, speed over her top is shed at 0117's deceleration, likewise (4.5 → 4.2 m/s²). The hop: up at `hop` m/s
- * under 0117's gravity (9.8), some 2 m and 1.3 s.
+ * wide. Its speeds scaled by her top speed's share as RAM's are (14.5 → 27, twice what they were at 13.5: 13 → 24.2
+ * m/s, 28 → 52 m/s²); after it, speed over her top is shed at 0117's deceleration, likewise (4.5 → 8.4 m/s²). The hop:
+ * up at `hop` m/s under 0117's gravity (9.8), some 2 m and 1.3 s.
  */
 export const GUST = {
   charges: 2, recharge: 6.5, time: 1.15,
-  speed: 12.1, accel: 26, shed: 4.2, turn: 1.35, spread: 1.6,
+  speed: 24.2, accel: 52, shed: 8.4, turn: 1.35, spread: 1.6,
   hop: 6.3, gravity: 9.8,
 } as const;
 
+
+/** A race's pace (race.ts StormPlan's default): the storm's every wait and close times `storm` (storm.ts). A starting
+ *  value; the owner sets the race's length by playing. */
+export const PACE = { storm: 1 } as const;
 
 /** One kind of gun (GUNS). */
 export interface Bore {

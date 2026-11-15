@@ -60,8 +60,8 @@ export function watersOf(seed: number): Promise<{ waters: Waters; ms: number; be
 export function createMatches(seed: number, planet: Planet, hold: number | null, gun: Match['gun'], count: number = SHIPS) {
   const depth = (p: Vec3) => -planet.height(p);
   const match = (s: number): Match => {
-    const closing = createStorm(s, depth);
-    return { seed: s, storm: (t) => closing(hold ?? t), gun, card: deal(s, count) };
+    const card = deal(s, count), closing = createStorm(s, depth, card.rules.storm);
+    return { seed: s, storm: (t) => closing(hold ?? t), gun, card };
   };
   let played = 0, berth: Berther | null = null;
   /** The next match's seed, and its berths once worked out ahead of its deal. */

@@ -97,6 +97,10 @@ function perceive(c: Ctx): void {
 /** Metres the cap reaches along the surface from its centre. */
 const reach = (cap: Cap) => cap.radius * R;
 
+/** Her temperament's margin inside the storm's edge, metres: the temper's, which was tuned at a top of BOT.tuned m/s,
+ *  by her own top's share of that (so it is as many seconds' sailing at any speed). */
+const marginOf = (c: Ctx) => (c.t.margin * fitOf(c.own).top) / BOT.tuned;
+
 /** Whether the next cap is closing, or will start to within BOT.late s (0117's `late`). */
 const late = (c: Ctx) => !!c.sea.storm && (c.sea.storm.closing || c.sea.storm.secondsToNext < BOT.late);
 
@@ -106,7 +110,7 @@ const late = (c: Ctx) => !!c.sea.storm && (c.sea.storm.closing || c.sea.storm.se
 function stormUrge(c: Ctx): number {
   const s = c.sea.storm;
   if (!s) return 0;
-  const p = c.own.ship.at, margin = c.t.margin;
+  const p = c.own.ship.at, margin = marginOf(c);
   const pressed = late(c) && toEdge(p, s.next) < margin * BOT.inNext && s.phase < STORM.phases.length;
   return Math.max(ramp(toEdge(p, s), margin * BOT.ease[0], margin * BOT.ease[1]), pressed ? 1 : 0);
 }
@@ -135,7 +139,7 @@ function inward(c: Ctx, p: Vec3, centre: Vec3, r: number): Vec3 {
 
 /** The cap she makes for in the storm: the one she is in, while it isn't late or she is near its edge; else the next. */
 function stormGoal(c: Ctx): Vec3 {
-  const s = c.sea.storm!, margin = c.t.margin, p = c.own.ship.at;
+  const s = c.sea.storm!, margin = marginOf(c), p = c.own.ship.at;
   const cap: Cap = toEdge(p, s) < margin * BOT.nearEdge || !late(c) ? s : s.next;
   return inward(c, p, cap.centre, Math.max(0, reach(cap) - margin));
 }
@@ -143,8 +147,8 @@ function stormGoal(c: Ctx): Vec3 {
 /** Pulls a mark she would make for that lies nearer the edge than her margin in to that margin inside it (0117's
  *  keepInside). */
 const keptInside = (c: Ctx, q: Vec3): Vec3 => {
-  const s = c.sea.storm;
-  return s && toEdge(q, s) < c.t.margin ? inward(c, q, s.centre, Math.max(0, reach(s) - c.t.margin)) : q;
+  const s = c.sea.storm, margin = marginOf(c);
+  return s && toEdge(q, s) < margin ? inward(c, q, s.centre, Math.max(0, reach(s) - margin)) : q;
 };
 
 // ---------------------------------------------------------------- deciding
@@ -251,7 +255,10 @@ function away(c: Ctx, from: Vec3, d: number): Vec3 {
  *  is late: new, as this storm's edge closes at up to 8 m/s, 0117's at 4); failing that, in from the edge if she is
  *  near it, or else toward the deepest water round her. */
 function roamGoal(c: Ctx): Vec3 {
-  const p = c.own.ship.at, f = c.own.ship.heading, s = c.sea.storm, margin = c.t.margin;
+  // her margin, and her turning circle's radius more: she comes about at the mark without crossing the edge (new with
+  // #58's doubled speed, at which she reaches a mark before she has turned for the next)
+  const fit = fitOf(c.own), margin = marginOf(c) + fit.top / fit.turn;
+  const p = c.own.ship.at, f = c.own.ship.heading, s = c.sea.storm;
   const keep = s && (late(c) ? s.next : s);
   for (let tries = 0; tries < 8; tries++) {
     let q = along(p, rotate(p, f, between(c.m, -Math.PI, Math.PI)), between(c.m, BOT.near, BOT.far)).p;

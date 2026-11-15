@@ -41,12 +41,14 @@ export const RIDE = {
   /** Steps between her reads of the water (a fifth of a second's): between them she takes it as running evenly from one
    *  read to the next. The water she feels changes over seconds, and her springs smooth what changes faster. */
   every: Math.round(0.2 / STEP),
-  /** Her lean into a turn at top speed, radians per rad/s of turn; and how fast she takes it up. */
-  heel: 0.35,
+  /** Her lean into a turn at top speed, radians per rad/s of turn (0.35 at her old turn of 0.47 rad/s, halved when it
+   *  was doubled: the same 9° at her hardest); and how fast she takes it up. */
+  heel: 0.175,
   lean: 2.5,
   /** A blow sets her rolling at this many rad/s for each m/s it shoves her across her deck: some 7° over at its most
-   * for a ram square into her side at full speed, the rammer pressing on. */
-  knock: 0.07,
+   * for a ram square into her side at full speed, the rammer pressing on (0.07 at her old top of 13.5 m/s, halved when
+   * it was doubled). */
+  knock: 0.035,
 } as const;
 
 /** Her motion on the sea: metres above sea level, radians (bow up; starboard down), and how fast each changes. */
