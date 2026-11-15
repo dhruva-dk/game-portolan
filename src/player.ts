@@ -130,8 +130,11 @@ export const LIFT: Record<Deed['kind'], number> = {
   faulted: 2, repaired: 2, flight: 6,
 };
 
+/** The management screens (Phase C: ui/office/), drawn on the office's page over the world. */
+export const OFFICE = ['found', 'recover', 'home', 'career', 'crew', 'profile', 'offer', 'market', 'ship', 'rookery', 'finance', 'league', 'mail', 'plan', 'season', 'jobs'] as const;
+export type OfficeScreen = (typeof OFFICE)[number];
 /** The screens (ui/ways.ts, the ways between them): named here for the sound too, which hears which is shown. */
-export const SCREENS = ['title', 'lobby', 'settings', 'match', 'sinking', 'sunk', 'spectate', 'won', 'result'] as const;
+export const SCREENS = ['title', 'lobby', 'settings', 'match', 'sinking', 'sunk', 'spectate', 'won', 'result', ...OFFICE] as const;
 export type Screen = (typeof SCREENS)[number];
 
 /** What a blow (a Deed 'struck') did, as the screen, the camera, the hit-stop and the sound each answer it: broke a

@@ -58,16 +58,16 @@
 // that seed; resolves to the GPU's geometries and textures held then) and window.memory() on the page, for
 // tools/restage.ts.
 
-import type { Anchor } from './world/lattice';
-import type { World } from './environment';
-import type { FrameOptions } from './frame';
 import { createFly } from './fly';
 import type { Game } from './play/game';
-import type { Referee } from './play/referee';
 import { lookOf } from './play/colours';
-import { startOf, type Matches } from './play/setup';
+import { startOf } from './play/setup';
+import type { Played, Setup, Stage } from './stage';
+import { FOUNDING, fixture, type Fixture } from './fixtures';
+import { headshotSheet, kitSheet } from './ui/office/sheets';
+import { FIRST } from './ui/office/screens';
 import { bearing, type Berth } from './play/state';
-import { HOTBAR, IDLE, type Hands } from './player';
+import { HOTBAR, IDLE, OFFICE, type Hands, type OfficeScreen } from './player';
 import { probeMeshes } from './probe';
 import { STEP } from './sim/fixed';
 import { KINDS, type GunKind } from './kinds';
@@ -75,74 +75,13 @@ import { SHIP } from './sim/handling';
 import { PLAYER } from './sim/match';
 import type { Cap } from './sim/storm';
 import type { FlightJob, ShipDraw, Snapshot } from './snapshot';
-import type { Flow } from './ui/flow';
 import { uiLayer } from './ui/ui';
-import type { Weather } from './world/weather';
 import { BUILDINGS, type Building, type Rookery } from './world/rookery';
 import { BARE } from './ui/rookery';
 import { R, add, cross, dot, frameAt, along, normalize, scale, type Vec3 } from './world/sphere';
 
-/** How the page is set up (main.ts RELEASE, or as the switches change it): the planet's seed, the weather's mean and
- *  swing (world/weather.ts) and the time of day (hours); how the frame draws; whether the meter shows the frame's cost;
- *  the seconds the storm is held at (null: it runs) and the gun every ship is armed with (null: none). */
-export interface Setup {
-  seed: number; mean: Weather; swing: Weather; hours: number;
-  drawing: FrameOptions;
-  meter: boolean;
-  hold: number | null; gun: { kind: GunKind; rarity: number } | null;
-}
-
 /** ?kind's gun kind, a cannon by default. */
 const kindOf = (name: string | null): GunKind => KINDS.find((k) => k === name) ?? 'cannon';
-
-/** The world on a setup, as main.ts builds it: the world, where she lies at the start, the canvas the world is drawn
- *  on, the sea's anchors and the ground's bake (frame.ts), the matches dealt; and the drawing begun, each frame from
- *  `next` (given the seconds since the last, the world as it is to be drawn), once the ground is baked. */
-export interface Stage {
-  readonly world: World; readonly start: { at: Vec3; bearing: number }; canvas: HTMLElement;
-  readonly anchors: readonly Anchor[]; readonly ready: Promise<number>; readonly matches: Matches;
-  draw(next: (dt: number) => Snapshot | null, drawn?: (canvas: HTMLCanvasElement) => void): Promise<void>;
-  /** The planet put away and one of `seed` made in its place (the world and all above read anew), `then` (the game on
-   *  it) made, and the drawing taken up once its ground is baked; `campus`: a crew's campus planet (world/rookery.ts),
-   *  on which no match is dealt (start and matches are the last race planet's). */
-  restage(seed: number, then: () => Promise<void>, campus?: boolean): Promise<void>;
-  /** The GPU's geometries and textures held now (three's renderer.info.memory). */
-  memory(): { geometries: number; textures: number };
-}
-
-/** The game on a stage with its UI over it, as main.ts builds it: the game, its referee and the screens' flow; PLAY
- *  (a match dealt, every ship at her berth); the full map opened (the HUD's tap); a frame of it, and what follows once it is drawn (the canvas then holds it). */
-export interface Played {
-  readonly game: Game; readonly referee: Referee; flow: Flow;
-  play(): void;
-  map(): void;
-  /** A new planet in this one's place, as the way home makes it, without the parchment: the next of the page's, or one
-   *  of `seed`. */
-  restage(seed?: number): Promise<void>;
-  /** (null: nothing drawn this frame, the world covered: Skip's parchment) */
-  next(dt: number): Snapshot | null;
-  drawn(canvas: HTMLCanvasElement): void;
-  /** A crew's rookery in 3D (play/rookery.ts), for the rookery's screen. */
-  rookery: {
-    /** Shows a crew's rookery: its campus planet staged under the passage if it is not already (resolves once it is
-     *  drawn), its view drawn in place of the game's from then on. */
-    open(r: Rookery): Promise<void>;
-    /** The rookery changed (levels, what is under way, the days left, colours): drawn as it now is. */
-    show(r: Rookery): void;
-    /** Selects a building, the view easing to it; null, back out over the whole campus. */
-    select(b: Building | null): void;
-    readonly selected: Building | null;
-    /** Each building standing or under way, where it is on the screen now (CSS px). */
-    anchors(): { building: Building; x: number; y: number }[];
-    /** The building a tap at (x, y) picks: the nearest anchor within 60 px, or null. */
-    pick(x: number, y: number): Building | null;
-    /** The view no longer shown (the campus kept staged, for opening again at once). */
-    close(): void;
-    readonly shown: boolean;
-  };
-  /** A race planet staged again in the campus's place, if the campus is staged (a race needs one: before PLAY). */
-  racing(): Promise<void>;
-}
 
 /** Whether debugging is on: the dev server, or ?debug in the query. */
 const DEBUG = import.meta.env.DEV || new URLSearchParams(location.search).has('debug');
@@ -154,7 +93,7 @@ const degrees = Math.PI / 180;
 const flying = params.has('fly') || ['lat', 'lon', 'alt', 'wall'].some((k) => params.has(k));
 
 /** The playtest tools' switches (the header's), and whether each is built yet: one asked for and not built says so. */
-const PLAYTEST = { bots: true, coin: false, reveal: false, raceday: false, seasonend: false, screen: true } as const;
+const PLAYTEST = { bots: true, coin: false, reveal: false, raceday: true, seasonend: false, screen: true } as const;
 
 /** The art direction's alternates (?mood=): the hour, and the haze's mean as a share of the release's. */
 const MOODS: Record<string, { hours: number; haze: number }> = {
@@ -258,7 +197,9 @@ function gullsAt(shot: Snapshot, drawn: number): Snapshot {
 function open(p: Played, others: readonly Berth[]) {
   const { game, referee, flow } = p;
   const screen = params.get('screen') ?? 'match';
-  if (screen === 'title' || screen === 'lobby' || screen === 'settings') flow.go(screen);
+  if (screen === 'settings' || (OFFICE as readonly string[]).includes(screen)) void office(p, screen as OfficeScreen | 'settings');
+  else if (screen === 'kit' || screen === 'headshots') sheet(screen);
+  else if (screen === 'title' || screen === 'lobby') flow.go(screen);
   else if (screen === 'play') {
     p.play();
     flow.go('match');
@@ -285,6 +226,21 @@ function open(p: Played, others: readonly Berth[]) {
     referee.update(0.1);
   }
   if (screen === 'map' || params.has('map')) p.map();
+}
+
+/** An office screen (?screen=home, found, recover, settings or any later one's stub) over its fixture's career
+ *  (fixtures.ts): none yet for found, a damaged save for recover, ?raceday's on race day, else one just founded. */
+async function office(p: Played, screen: OfficeScreen | 'settings') {
+  const which: Fixture = screen === 'found' || screen === 'recover' ? screen : params.has('raceday') ? 'raceday' : 'home';
+  FIRST.seed = FOUNDING.seed;
+  await p.flow.office.load(fixture(which));
+  p.flow.go(screen);
+}
+
+/** ?screen=kit, every part of the office's kit on one sheet; ?screen=headshots, 48 gulls' headshots. */
+function sheet(name: 'kit' | 'headshots') {
+  const el = name === 'kit' ? kitSheet() : headshotSheet();
+  uiLayer().appendChild(el);
 }
 
 /**

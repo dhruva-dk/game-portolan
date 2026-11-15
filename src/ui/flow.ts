@@ -10,7 +10,8 @@ import type { HudState, createHud } from './hud';
 import type { End } from '../player';
 import type { Sea } from '../snapshot';
 import { createResult, createWatching } from './ends';
-import { createLobby, createSettings, createTitle, type Settings } from './screens';
+import { createOffice } from './office/office';
+import { createLobby, createTitle, type Settings } from './screens';
 import { fade } from './ui';
 import { createPassage } from './passage';
 import { createVeil } from './veil';
@@ -50,10 +51,13 @@ export function createFlow(hud: ReturnType<typeof createHud>, globe: ReturnType<
   const veil = createVeil();
   const title = createTitle(() => tap('begin'));
   const lobby = createLobby({ play: () => tap('play'), settings: () => tap('settings') });
-  const settingsFolio = createSettings(() => settings, (s) => {
-    settings = s;
-    saveSettings(s);
-  }, () => tap('close'));
+  const office = createOffice((t) => tap(t), {
+    get: () => settings,
+    set(s) {
+      settings = s;
+      saveSettings(s);
+    },
+  });
   const result = createResult({ watch: () => tap('watch'), skip: () => tap('skip'), leave: () => tap('leave') });
   const watching = createWatching({ leave: () => tap('leave'), switch: (by) => tap('switch', by), skip: () => tap('skip') });
   const passage = createPassage();
@@ -63,7 +67,8 @@ export function createFlow(hud: ReturnType<typeof createHud>, globe: ReturnType<
    *  change waits: PLAY's on the next frame drawn, held over it and cross-fading (veil.ts); home's under the parchment,
    *  the match's pieces fading with the match as it comes over (passage.ts). */
   function tap(t: Tap, by = 0) {
-    const next = way(screen, t);
+    // (the title's tap opens the office where the desk says: found, recover or home; nothing until the career loads)
+    const next = t === 'begin' && screen === 'title' ? office.desk?.where() ?? null : way(screen, t);
     if (!next || veil.waiting || passage.going) return;
     if (t === 'play') {
       veil.cover(() => {
@@ -105,8 +110,8 @@ export function createFlow(hud: ReturnType<typeof createHud>, globe: ReturnType<
   function go(next: Screen) {
     screen = next;
     title.show(next === 'title');
-    lobby.show(next === 'lobby' || next === 'settings');
-    settingsFolio.show(next === 'settings');
+    lobby.show(next === 'lobby');
+    office.show(next);
     // the HUD: the match's, or only its clock, count and disc while she watches; gone as her end begins
     const shown = next === 'match' || next === 'spectate';
     if (shown) hud.watch(next === 'spectate');
@@ -147,6 +152,8 @@ export function createFlow(hud: ReturnType<typeof createHud>, globe: ReturnType<
     get hiding() {
       return passage.hiding;
     },
+    /** The office: its career loaded into it (main.ts: the device's; debug.ts: a fixture's). */
+    office,
     /** Opens the UI at `next` (the debug switches' way in: src/debug.ts). */
     go,
     /** Her tap on a way on, as if on what is drawn for it (the debug switches': src/debug.ts). */

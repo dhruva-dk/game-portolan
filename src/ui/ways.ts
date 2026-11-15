@@ -2,10 +2,8 @@
 // taken by her tap on something drawn for it, or by the match's own course (the game's), never by a clock of the
 // UI's own. Each screen fades or cross-fades into the next (FADE); none is cut to. Home from a match, the parchment
 // comes over it and lifts off the lobby once it is drawn (HOME, wayHome).
-//   title     the chart over the world loading; once ready, a tap anywhere          → lobby
-//   lobby     over her ship at anchor: PLAY → match (the world cross-fades to the eye coming down from space); the
-//             wheel → settings
-//   settings  a folio over the lobby, with its close mark (a tap outside closes it too) → lobby
+//   title     the chart over the world loading; once ready, a tap anywhere          → the office (below)
+//   lobby     over her ship at anchor: PLAY → match (the world cross-fades to the eye coming down from space)
 //   match     the arrival, then her hands on her ship; she sinks → sinking; she is the last afloat → won
 //   sinking   the camera held on her ship going down, the HUD gone; the beat done → sunk, or → result if the match
 //             is over
@@ -16,22 +14,48 @@
 //   won       the camera circling her, the HUD gone; the beat done → result
 //   result    her result over the live world, one way on: LEAVE → lobby
 
-import { SCREENS, type Screen } from '../player.ts';
+//
+// The office (Phase C, ui/office/): the management screens on one page over the world, the top bar's tabs on each.
+//   title     a tap → home (founded), found (no career yet) or recover (the save damaged): the desk says which
+//   found     founding the crew → home;  recover: each way forward → home, a new career → found
+//   home …    the top bar's tabs (home, crew, ship, rookery, market, league, finance, mail), the player's name
+//             (career), Continue (plan on race day, jobs when sacked), the gear (settings)
+//   settings  a dialog over home: close → home
+//   plan      the race plan: to the anchorage → lobby (PLAY from there, until batch 4's race plan sails it)
+//   lobby     her ship at anchor: PLAY → match; the gear → settings; the office → home
 
-export { SCREENS, type Screen };
+import { OFFICE, SCREENS, type OfficeScreen, type Screen } from '../player.ts';
 
+export { OFFICE, SCREENS, type OfficeScreen, type Screen };
+
+/** The top bar's eight tabs, in order: each a tap of the same name. */
+export const TABS = ['home', 'crew', 'ship', 'rookery', 'market', 'league', 'finance', 'mail'] as const;
 /** What moves a screen on: her taps, and the match's own course. */
-export const TAPS = ['begin', 'play', 'settings', 'close', 'watch', 'skip', 'switch', 'leave'] as const;
+export const TAPS = ['begin', 'play', 'settings', 'close', 'watch', 'skip', 'switch', 'leave',
+  ...TABS, 'career', 'profile', 'offer', 'plan', 'season', 'jobs', 'found', 'recover', 'anchorage'] as const;
 export const EVENTS = ['sunk', 'won', 'settled', 'over'] as const;
 export type Tap = (typeof TAPS)[number];
 export type Event = (typeof EVENTS)[number];
 export type Trigger = Tap | Event;
 
+/** The top bar's ways, from every office screen it shows on. */
+const TOP = {
+  home: 'home', crew: 'crew', ship: 'ship', rookery: 'rookery', market: 'market', league: 'league', finance: 'finance', mail: 'mail',
+  career: 'career', settings: 'settings', plan: 'plan', jobs: 'jobs', profile: 'profile',
+} as const satisfies Partial<Record<Tap, Screen>>;
+
 /** Every way on from each screen: what takes it, and where to. */
 export const WAYS: Record<Screen, Partial<Record<Trigger, Screen>>> = {
-  title: { begin: 'lobby' },
-  lobby: { play: 'match', settings: 'settings' },
-  settings: { close: 'lobby' },
+  title: { begin: 'home', found: 'found', recover: 'recover' },
+  found: { home: 'home' },
+  recover: { home: 'home', found: 'found' },
+  home: TOP, career: TOP, crew: TOP, profile: { ...TOP, offer: 'offer' }, offer: TOP, market: TOP, ship: TOP, rookery: TOP,
+  finance: TOP, league: { ...TOP, season: 'season' }, mail: TOP,
+  plan: { ...TOP, anchorage: 'lobby' },
+  season: { home: 'home' },
+  jobs: { home: 'home' },
+  lobby: { play: 'match', settings: 'settings', home: 'home' },
+  settings: { close: 'home' },
   match: { sunk: 'sinking', won: 'won' },
   sinking: { settled: 'sunk' },
   sunk: { watch: 'spectate', skip: 'spectate', leave: 'lobby', over: 'result' },

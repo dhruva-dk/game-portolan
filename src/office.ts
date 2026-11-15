@@ -155,10 +155,34 @@ export interface HomeView {
 
 /** `found`: what the founding form offers and the line on the crew it replaces. */
 export interface FoundView {
-  seed: number; crew: string; given: string; family: string; headshot: number;
-  swatches: readonly string[]; emblems: number;
+  seed: number; crew: string; given: string; family: string; headshot: number; age: number;
+  colours: Colours; emblem: number;
+  swatches: number; emblems: number;
   limits: { crew: number; gull: number };
   replacing: string;
+}
+/** What the founding form gets wrong, by field (a field missing is right). */
+export interface FoundErrors { crew?: string; colours?: string; emblem?: string; gull?: string }
+
+/** What the office asks of the career: the session on its store, the views, and the commands. main.ts makes one
+ *  (desk.ts); a fixture is a desk on a memory store. */
+export interface Desk {
+  /** Where the load left the career: founded, unfounded, or needing recovery. */
+  where(): 'home' | 'found' | 'recover';
+  home(): HomeView;
+  top(): TopBar;
+  found(seed: number, colours: Colours): FoundView;
+  /** What a founding would be refused for, field by field (empty: it would be taken). */
+  foundErrors(c: CommandOf<'Found'>): FoundErrors;
+  recover(): RecoverView;
+  settings(): SettingsView;
+  /** Applies a command and journals it; the refusal's sentence, or null. */
+  send(c: Command): Promise<string | null>;
+  /** The way forward from recover. */
+  recoverBy(way: 'retry' | 'carry' | 'restore' | 'new'): Promise<string | null>;
+  backup(): Promise<string | null>;
+  /** Called after every change the desk makes. */
+  changed: (() => void) | null;
 }
 
 /** `recover`: what the load found and lost, and each way forward it allows. */

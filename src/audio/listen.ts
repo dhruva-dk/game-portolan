@@ -55,7 +55,7 @@ const ROPE = 0.02, TURNS = 0.8;
 /** What a screen shown says, by the screen it came from: the folio opened, closed; PLAY; her end. */
 function screenCue(from: Screen, to: Screen): Cue | null {
   if (to === 'settings') return 'open';
-  if (from === 'settings' && to === 'lobby') return 'close';
+  if (from === 'settings') return 'close';
   if (from === 'lobby' && to === 'match') return 'launch';
   if (to === 'sunk' && from === 'sinking') return 'lost';
   if (to === 'won') return 'salute';

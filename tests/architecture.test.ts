@@ -115,8 +115,13 @@ const LAYERS: Record<string, readonly string[]> = {
   'probe.ts': ['three', 'world/', 'sky/sky.ts'],
   'debug.ts': [
     'play/colours.ts', 'play/game.ts', 'play/referee.ts', 'play/setup.ts', 'play/state.ts', 'ui/flow.ts', 'ui/ui.ts', 'ui/rookery.ts', ...NEUTRAL, 'frame.ts', 'world/',
-    'sim/fixed.ts', 'sim/handling.ts', 'sim/match.ts', 'sim/storm.ts', 'fly.ts', 'probe.ts',
+    'sim/fixed.ts', 'sim/handling.ts', 'sim/match.ts', 'sim/storm.ts', 'fly.ts', 'probe.ts', 'stage.ts', 'fixtures.ts', 'player.ts', 'ui/kit/', 'ui/office/',
   ],
+  // the career's session on its store, as the office asks for it; and the fixtures' careers, on memory
+  'desk.ts': ['career/', 'store/', 'office.ts', 'race.ts'],
+  'fixtures.ts': ['desk.ts', 'career/', 'store/', 'office.ts', 'race.ts'],
+  // what debug.ts hands main.ts and main.ts hands back: the stage and the game played on it
+  'stage.ts': ['play/', 'ui/flow.ts', 'frame.ts', 'environment.ts', 'world/', ...NEUTRAL],
   'main.ts': ['*'],
 };
 

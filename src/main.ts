@@ -5,7 +5,8 @@
 
 import { WebGPUCoordinateSystem, WebGPURenderer } from 'three/webgpu';
 import { createAudio } from './audio/audio';
-import { scenario, type Played, type Setup, type Stage } from './debug';
+import { scenario } from './debug';
+import type { Played, Setup, Stage } from './stage';
 import { createWorld } from './environment';
 import { createFrame } from './frame';
 import { createMeter } from './meter';
@@ -21,7 +22,9 @@ import { SHIPS } from './sim/match';
 import type { Snapshot } from './snapshot';
 import { traceCoasts } from './ui/coasts';
 import { createGlobe } from './ui/globe';
+import { createDesk, deviceShelf } from './desk';
 import { createFlow } from './ui/flow';
+import { SOUND_EVENT, type OfficeSound } from './ui/kit/part';
 import { createHud, type HudState } from './ui/hud';
 import { createInput } from './ui/input';
 import { createStick } from './ui/stick';
@@ -152,6 +155,7 @@ async function play(s: Stage): Promise<Played> {
   layer.addEventListener('pointerdown', (e) => {
     if (e.target instanceof Element && e.target.closest('.press')) audio.tap(flow.screen);
   }, true);
+  layer.addEventListener(SOUND_EVENT, (e) => audio.office((e as CustomEvent<OfficeSound>).detail));
   const deal = () => {
     on.game.start(s.matches.deal());
     on.referee.begin();
@@ -168,6 +172,8 @@ async function play(s: Stage): Promise<Played> {
     skip: () => on.referee.skip(),
   });
   void s.ready.then(() => flow.ready());
+  // the career on this device, loaded and verified as the world loads (a debug fixture, loaded after, takes its place)
+  void flow.office.load(createDesk(deviceShelf())).catch((e) => console.error('The career could not be opened.', e));
 
   // The rookery (play/rookery.ts): a crew's campus planet staged in the race planet's place (a race planet staged again
   // only once a race needs it: racing), its view drawn in place of the game's while it is shown, the slips over it

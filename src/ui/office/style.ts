@@ -1,0 +1,52 @@
+// The office's own look, over the kit's (kit/style.ts): the page on the desk, the top bar, and what the screens share.
+// Every colour is ink.ts's, and the screens' files name none (tools/capture.ts checks).
+
+import { DESK, INK, PALE, PAPER, TEXT, TYPE } from '../ink';
+
+const CSS = `
+.o-root { position: absolute; inset: 0; background: ${DESK}; overflow: hidden; }
+.o-top { position: absolute; left: 0; top: 0; width: 1180px; height: 64px; display: grid; grid-template-columns: 220px 680px 280px;
+  background: ${PAPER}; border-bottom: 3px double ${INK.iron}; z-index: 20; }
+.o-who { display: flex; align-items: center; gap: 8px; padding: 0 8px 0 12px; min-width: 0; }
+.o-id { min-width: 0; line-height: 1.15; }
+.o-id > div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.o-crew { display: flex; align-items: center; gap: 4px; color: ${TEXT.faint}; }
+.o-crew svg { flex: none; }
+.o-tabs { display: grid; grid-template-columns: repeat(8, 85px); border-left: 1px solid ${INK.iron}; border-right: 1px solid ${INK.iron}; }
+.o-tab { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+  font-size: ${TYPE.small}px; border-bottom: 5px solid transparent; padding-top: 4px; }
+.o-tab.open { border-bottom-color: var(--crew, ${INK.iron}); font-weight: 700; background: ${PALE.sand}; }
+.o-count { position: absolute; top: 3px; right: 14px; font-size: ${TYPE.small}px; font-weight: 700; }
+.o-count.sealed { color: ${TEXT.harm}; }
+.o-right { display: grid; grid-template-columns: 1fr auto; grid-template-rows: auto auto; align-items: center; column-gap: 10px;
+  padding: 0 10px 0 12px; }
+.o-date { grid-column: 1; text-align: left; white-space: nowrap; }
+.o-right .k-coin { grid-column: 1; grid-row: 2; }
+.o-go { grid-column: 2; grid-row: 1 / 3; }
+.o-gear { position: absolute; z-index: 5; }
+
+.o-field-row { display: flex; gap: 12px; align-items: flex-end; }
+.o-field-row .k-field { flex: 1; }
+.o-swatches { display: grid; grid-template-columns: repeat(12, 44px); gap: 8px; }
+.o-swatch { width: 44px; height: 44px; border: 1.5px solid ${INK.iron}; position: relative; }
+.o-swatch.on { outline: 3px double ${INK.iron}; outline-offset: 2px; }
+.o-swatch.on::after { content: ''; position: absolute; inset: 12px; border: 3px solid ${PAPER}; outline: 1.5px solid ${INK.iron}; }
+.o-emblems { display: grid; grid-template-columns: repeat(6, 52px); gap: 8px; }
+.o-emblem { width: 52px; height: 52px; border: 1px solid ${INK.iron}; background: ${PAPER}; display: flex; align-items: center; justify-content: center; }
+.o-emblem.on { outline: 3px double ${INK.iron}; outline-offset: 2px; background: ${PALE.sand}; }
+.o-label { font-size: ${TYPE.small}px; color: ${TEXT.faint}; font-variant: small-caps; letter-spacing: .05em; margin: 10px 0 6px; }
+.o-lines { display: grid; grid-template-columns: 1fr auto; column-gap: 12px; row-gap: 4px; align-items: baseline; }
+.o-ways { display: flex; flex-direction: column; gap: 10px; align-items: stretch; }
+.o-ways .k-btn { justify-content: flex-start; }
+.k-range { width: 100%; height: 44px; accent-color: ${INK.iron}; pointer-events: auto; }
+`;
+
+let set = false;
+/** Sets the office's stylesheet into the page, once. */
+export function officeStyle() {
+  if (set) return;
+  set = true;
+  const s = document.createElement('style');
+  s.textContent = CSS;
+  document.head.appendChild(s);
+}

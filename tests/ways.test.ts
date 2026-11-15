@@ -40,8 +40,11 @@ test('her result and the folios each have their own drawn way on: home, or close
   assert.equal(way('sunk', 'watch'), 'spectate');
   assert.equal(way('spectate', 'leave'), 'lobby');
   assert.equal(way('result', 'leave'), 'lobby');
-  assert.equal(way('settings', 'close'), 'lobby');
-  assert.equal(way('title', 'begin'), 'lobby');
+  assert.equal(way('settings', 'close'), 'home');
+  assert.equal(way('title', 'begin'), 'home');
+  assert.equal(way('title', 'found'), 'found');
+  assert.equal(way('plan', 'anchorage'), 'lobby');
+  assert.equal(way('lobby', 'home'), 'home');
   assert.equal(way('lobby', 'play'), 'match');
   // a tap that is not one of the screen's ways does nothing
   assert.equal(way('match', 'leave'), null);
