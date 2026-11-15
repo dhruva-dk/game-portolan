@@ -3,9 +3,10 @@
 // in for the device's (the iPad's page, launch.ts DEVICE). Prints the frames over 33 ms and over 50 ms in each window, the worst frames, and what ran in
 // each of the worst on the page's main thread (Chrome's trace: its sampled JS by function, garbage collection, style
 // and layout) and on the GPU process's. Fails (exit 1) if the window from PLAY drops more frames than LIMIT allows.
-//   node tools/hitch.ts [--slow=1] [--seconds=15] [--worst=8] [--trace=file.json]      (npm run hitch)
+//   node tools/hitch.ts [--slow=1] [--seconds=15] [--worst=8] [--trace=file.json] [--seed=n]     (npm run hitch)
 // --slow is Chrome's CPU throttling (1: none); --seconds the window after PLAY (over 15, neither the JS nor the GPU
-// process is traced: the trace would outgrow what node can read); --trace keeps Chrome's trace for its Performance panel.
+// process is traced: the trace would outgrow what node can read); --trace keeps Chrome's trace for its Performance panel;
+// --seed the planet raced on (its biome's: world/biome.ts seedIn), the page's own if none.
 //
 // What it can and cannot say: the frame rate is uncapped, so a frame's time is its own cost (the main thread's work,
 // then the GPU's); throttling slows the page's JS, layout and style, not the GPU process (its shader and pipeline
@@ -24,6 +25,7 @@ export const LIMIT = { over50: 1, over33: 4 };
 const flag = (name: string, fallback: number) => Number(process.argv.find((a) => a.startsWith(`--${name}=`))?.split('=')[1] ?? fallback);
 const slow = flag('slow', 1), seconds = flag('seconds', 15), worst = flag('worst', 8), lobbyFor = 3;
 const traceTo = process.argv.find((a) => a.startsWith('--trace='))?.slice(8);
+const seed = process.argv.find((a) => a.startsWith('--seed='))?.slice(7);
 
 interface CallFrame { functionName: string; url: string }
 interface ProfileNode { id: number; callFrame: CallFrame; parent?: number }
@@ -65,7 +67,7 @@ let failed = false;
 try {
   const page = await browser.newPage({ viewport: { width: DEVICE.width, height: DEVICE.height }, deviceScaleFactor: DEVICE.dpr, hasTouch: true });
   page.on('pageerror', (e) => console.error(`[page] ${e.message}`));
-  await page.goto(`${url}?screen=lobby`);
+  await page.goto(`${url}?screen=lobby${seed ? `&seed=${seed}` : ''}`);
   await page.waitForFunction(() => document.getElementById('meter')?.textContent, null, { timeout: 120000 });
   // the lobby's own first frames (its shaders compiled) are not in either window
   await page.waitForTimeout(2000);

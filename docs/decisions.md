@@ -276,3 +276,43 @@ decisions are in #56, section 2.
   (from orbit and near the foundry; some 59 draws and 323k triangles) and a window in `tools/hitch.ts` (the view eased
   between buildings, levels changed); none of the campus is made on a race planet, so the race views are unchanged
   (the map stays at 998k). **Why:** the brief asked for both to hold on the rookery's own view.
+- **Question:** how a planet's seed names its biome, and keeps palm keys (section 3). **Choice:** `world/biome.ts`:
+  the biome is `BIOMES[floor(seed / 2^20) % 6]`; the ground's noise is seeded by `groundOf(seed)`: a palm keys seed
+  (any under 2^20, every seed the game made before) is its own, so today's planets are the same to the bit; any other
+  by `hash(seed mod 2^20, biome) % 2^20` (noise3.ts keeps every bit only below 2^53). A new planet per race is
+  `anyPlanet(hash(first, n))`, every biome as likely; the page's first planet is still today's. **Why:** every test,
+  every capture and `tools/matches.ts 3` stay as they were on palm keys, and the seed alone still makes the planet.
+- **Question:** each biome's sailing rule and its first numbers (section 3). **Choice:** one rule per biome, read by
+  the sim through the helm and the sea (`sim/rule.ts`, numbers in `handling.ts RULES`), none on palm keys: coral atolls'
+  reef (in water under 6 m her way is 0.62 of her top), basalt fjords' lee (within 45 m to leeward of an island over
+  12 m tall, her way falls to 0.55 at the cliff's foot), the mangrove delta's roots (in water under 8 m a gust drives
+  her 0.4 as hard), the volcanic arc's ash (a bot's notice range by her Lookout, 0.62 of it at a middling one, 0.7 to
+  1.3 across the range), and chalk downs' tide (the depth the sim reads rises and falls ±1.3 m over a 150 s period).
+  **Why:** each is a starting value to tune in play, not by batches of headless races; `tests/biomes.test.ts` holds
+  that each changes the sim on its own planet and on no other.
+- **Question:** whether the tide moves the drawn sea (section 3). **Choice:** no: the tide is applied to the depth the
+  sim reads (`rule.ts tided`), not to the water drawn. **Why:** the sea's level is a constant through the frame, the
+  water, the wake, the ground's bake and the sounding; moving it is a frame-wide change for a few metres of shallows.
+  The tide shows in what she can sail over, which is what it is for. Left for Phase C's plan screen to say.
+- **Question:** the full map's triangles once the biomes added trees and taller ground (section 3). **Choice:** levels
+  of detail in `land/`: an island's ground at a coarse grain (land.ts COARSE: spokes 3.6, rings 3) past 500 m of the eye
+  (not the nearest island), and its rocks at a third, coarser level (`rocks distant`) past it; the 1M map limit is not
+  raised. **Why:** from orbit the fine ground's triangles are under a pixel. Palm keys' map went from 910k to 816k
+  triangles; every biome's is under 900k.
+- **Question:** where the gulls set out from, and what the sim knows of them (section 2). **Choice:** the edge of her
+  side's water nearest her when she called (`play/flights.ts edgeOf`: sixteen bearings, 4 m steps to 360 m), found
+  once the first time the stop is drawn and kept while it lasts; `Snapshot.flights` gives each stop's `from`,
+  `coming`, `job` and `botched`. The sim gains nothing; the frame keeps the gulls flying off once a stop is gone.
+  **Why:** the brief's "the drawing reads the stop events and the ship's pose"; `tests/flights.test.ts` holds that
+  reading them changes nothing.
+- **Question:** the gulls' size and the stern's station (section 2). **Choice:** a gull about 2.1 m beak to tail, 4 m
+  across the wings; for a gust they hover in a row off her stern rather than standing on the poop. **Why:** at the
+  chase's distance a life-sized gull is a few pixels; and the poop is under 4 m across, too narrow for four beating
+  wings.
+- **Question:** a planet's traits for the plan screen (section 3). **Choice:** `world/biome.ts traitsOf(seed)`: the
+  biome's name, its title, its rule and a line naming it, from the seed alone; `main.ts` puts it on the PlanetSketch
+  when Phase C makes one. **Why:** the sketch is made from `world/`, and no planet need be built to name its biome.
+- **Question:** a crew's campus once planets have biomes. **Choice:** a campus is always palm keys
+  (`createPlanet(seed, true)` takes `BIOMES[0]`; its ground still from `groundOf(seed)`), and `placeCampus` takes the
+  biome's laying as `placeIslands` does. **Why:** the rookery's plots and terraces were tuned on palm keys' hills; a
+  cliff or a cone under them is a change to the rookery, not to the biomes.
