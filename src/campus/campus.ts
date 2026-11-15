@@ -18,6 +18,7 @@ import type { Wind } from '../world/wind';
 import { formOf } from './buildings';
 import { createFlags } from './flags';
 import type { Form } from './kit';
+import { dressingOf } from './dressing';
 import { createLife } from './life';
 import { createMaterials } from './material';
 import { plinthOf, quayOf, scaffoldOf } from './yard';
@@ -65,10 +66,11 @@ export function createCampus(campus: Campus, light: Light, wind: Wind) {
   const forms = BUILDINGS.map((b) => ([1, 2, 3] as const).map((l) => formOf(b, l)));
   const count = (f: Form) => f.position.length / 3;
   // room for the most each mesh can hold: every building at its largest, with its scaffold, the plinths and the quay
-  const plinths = campus.plots.map(plinthOf), quay = quayOf(campus.quay);
+  const plinths = campus.plots.map(plinthOf), quay = quayOf(campus.quay), yards = campus.plots.map((p) => dressingOf(p.building));
   const largest = forms.map((l) => Math.max(...l.map(count)));
   const scaffolds = forms.map((l, i) => l.map((f) => scaffoldOf(f, campus.plots[i].water)));
-  const most = largest.reduce((a, b, i) => a + b + Math.max(...scaffolds[i].map(count)), 0) + plinths.reduce((a, f) => a + count(f), 0) + count(quay);
+  const most = largest.reduce((a, b, i) => a + b + count(yards[i]) + Math.max(...scaffolds[i].map(count)), 0)
+    + plinths.reduce((a, f) => a + count(f), 0) + count(quay);
   const whole = buffers(most, false), rising = buffers(largest.reduce((a, b) => a + b, 0), true);
   const wholeMesh = new InstancedMesh(whole.geometry, materials.whole, 1);
   const risingMesh = new InstancedMesh(rising.geometry, materials.rising, 1);
@@ -99,6 +101,8 @@ export function createCampus(campus: Campus, light: Light, wind: Wind) {
       if (level > 0) {
         const f = forms[i][level - 1];
         whole.lay(f, site);
+        // a small first building on a plot laid out for its third: its yard dressed as a working one
+        if (level === 1) whole.lay(yards[i], site);
         heads.push(...f.flags.map((p) => at(p, site)));
         mouths.push(...f.smoke.map((p) => at(p, site)));
         if (site.building === 'flightLoft') loft.over = at([0, f.top + 3, 0], site);

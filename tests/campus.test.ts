@@ -4,6 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { formOf } from '../src/campus/buildings.ts';
+import { dressingOf } from '../src/campus/dressing.ts';
 import { boundsOf } from '../src/campus/kit.ts';
 import { BUILDINGS, FOOTPRINT, TALL } from '../src/world/rookery.ts';
 
@@ -25,5 +26,14 @@ test('each level of each building is a form of its own, inside its footprint, as
       }
     });
     if (b === 'foundry') assert.ok(forms.every((form) => form.smoke.length > 0), 'a foundry without smoke');
+  }
+});
+
+test('each first level\'s yard is dressed inside its footprint, on the land, lower than the building, in few triangles', () => {
+  for (const b of BUILDINGS) {
+    const f = FOOTPRINT[b], yard = dressingOf(b), { min, max } = boundsOf(yard), tris = yard.position.length / 9;
+    assert.ok(tris > 50 && tris < 1200, `${b}: ${tris} triangles in its yard`);
+    assert.ok(min[0] >= -f.half && max[0] <= f.half && min[2] >= -f.back && max[2] <= (f.water ? 0.5 : f.front), `${b}: its yard out of its footprint`);
+    assert.ok(max[1] < TALL[b][0], `${b}: its yard taller than its first level`);
   }
 });
