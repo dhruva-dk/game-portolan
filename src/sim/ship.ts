@@ -38,6 +38,10 @@ export interface Helm {
   gust?: boolean;
   /** Whether she is in her own water this step (territory.ts; handling.ts HOLDING): her top speed is higher there. */
   home?: boolean;
+  /** The share of her top the water and the wind let her make here (rule.ts: a reef's, a lee's), 1 if not given. */
+  way?: number;
+  /** The share of a gust's speed over her own it drives her here (rule.ts: the roots'), 1 if not given. */
+  lift?: number;
 }
 
 /** A ship lying still at `at`, her bow along `heading` (made a unit tangent there). */
@@ -68,11 +72,11 @@ export function turned(s: ShipState, angle: number): Vec3 {
 export function step(s: ShipState, helm: Helm, dt: number, depth: Depth, fit: Handling = SPEC): ShipState {
   const rudder = helm.course && length(helm.course) > 0 ? Math.max(-1, Math.min(1, SHIP.steer * offCourse(s, helm.course))) : 0;
   const turn = s.turn + (rudder * fit.turn * (helm.gust ? GUST.turn : 1) * bite(s.speed, fit.top) - s.turn) * close(fit.answer, dt);
-  const top = fit.top * (helm.home ? HOLDING.speed : 1);
+  const top = fit.top * (helm.home ? HOLDING.speed : 1) * (helm.way ?? 1);
   const want = Math.max(0, Math.min(1, helm.throttle)) * top;
   let speed: number;
   // a gust drives her on hard toward its speed over what she asks; after it, what she has over her top is shed at a rate
-  if (helm.gust) speed = s.speed + Math.max(-GUST.accel * dt, Math.min(GUST.accel * dt, want + GUST.speed - s.speed));
+  if (helm.gust) speed = s.speed + Math.max(-GUST.accel * dt, Math.min(GUST.accel * dt, want + GUST.speed * (helm.lift ?? 1) - s.speed));
   else if (s.speed > top) speed = Math.max(top, s.speed - GUST.shed * dt);
   else speed = s.speed + (want - s.speed) * close(want > s.speed ? fit.gather : SHIP.drag, dt);
   return navigate({ ...s, speed, turn }, turned(s, turn * dt), dt, depth);

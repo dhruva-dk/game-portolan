@@ -18,6 +18,7 @@ import type { IslandSite } from './planet-islands.ts';
 import { charter, placeIslands } from './island-place.ts';
 import { random } from './random.ts';
 import { placeCampus } from './rookery.ts';
+import { BIOMES, biomeOf, groundOf, type Biome } from './biome.ts';
 
 export type { IslandSite } from './planet-islands.ts';
 
@@ -59,6 +60,8 @@ export interface Cover {
 }
 
 export interface Planet {
+  /** Its biome (biome.ts): its land, what grows on it, its rule. */
+  biome: Biome;
   islands: IslandSite[];
   /** Metres above sea level at direction p (negative under water). */
   height(p: Vec3): number;
@@ -112,8 +115,10 @@ function cellOf(x: number, y: number, z: number): number {
 interface Floor { height: number; depth: number; deep: number; clearance: number }
 
 /** A planet of `seed`: a race's (its islands spread over it), or a crew's campus (rookery.ts: one main island and a
- *  few islets round it). */
-export function createPlanet(seed: number, campus = false): Planet {
+ *  few islets round it, always palm keys'). */
+export function createPlanet(planetSeed: number, campus = false): Planet {
+  // (its biome from the seed's high part, its fields from the low: biome.ts)
+  const biome = campus ? BIOMES[0] : biomeOf(planetSeed), seed = groundOf(planetSeed), bank = biome.land.bank;
   const noise = createNoise3(seed);
   const rand = random(seed * 92821 + 13);
   // each field reads the noise from its own place in it
@@ -147,9 +152,9 @@ export function createPlanet(seed: number, campus = false): Planet {
   const floor = (p: Vec3) => {
     px = p[0]; py = p[1]; pz = p[2];
     qx = px * R; qy = py * R; qz = pz * R;
-    const { bank, sandWaves, channel, basin, deep } = SEA;
-    const fine = read(bank.size / 2, at.bank2);
-    const bankDepth = bank.depth[0] + (bank.depth[1] - bank.depth[0]) * sat(0.5 + 0.75 * (read(bank.size, at.bank) + 0.5 * fine));
+    const { sandWaves, channel, basin, deep } = SEA, size = SEA.bank.size;
+    const fine = read(size / 2, at.bank2);
+    const bankDepth = bank[0] + (bank[1] - bank[0]) * sat(0.5 + 0.75 * (read(size, at.bank) + 0.5 * fine));
     // the deeps: deeper where they are wider, and deepest in the basins
     const toBasin = -toLevel(deep.size, at.deep, basin.above, null) + SEA.ragged * fine;
     const deepness = sat(0.5 + 1.2 * level);
@@ -167,7 +172,7 @@ export function createPlanet(seed: number, campus = false): Planet {
     return f;
   };
 
-  const islands = (campus ? placeCampus : placeIslands)((p) => floor(unit(p)), noise, seed, SEA.deep.depth[1] + SEA.meet);
+  const islands = (campus ? placeCampus : placeIslands)((p) => floor(unit(p)), noise, seed, { deepest: SEA.deep.depth[1] + SEA.meet, land: biome.land });
   const near = islands.map((s) => Math.cos(s.reach / R)), charts = islands.map((s) => charter(s.chart));
   /** Within this of an island's centre (as a dot product), the rubble round its foot. */
   const feet = islands.map((s) => Math.cos((s.shelf + FOOT[1]) / R));
@@ -214,6 +219,7 @@ export function createPlanet(seed: number, campus = false): Planet {
   };
 
   return {
+    biome,
     islands,
     height: (p) => ground(unit(p), null),
     cover: (p) => {
@@ -233,11 +239,11 @@ const OVER_SUMMIT = 1;
 /** Where the land can stand above the sea: within `reach` m of `at` (a unit vector), no higher than `top` m. Past every
  *  island's shelf (the farthest its apron reaches) its flank and the floor lie under the sea, some 2 m down at the
  *  shallowest (SEA). */
-export interface Rise { at: Vec3; reach: number; top: number }
+export interface Rise { at: Vec3; reach: number; top: number; coast: number }
 
-/** The rises of the land, an island's each. */
+/** The rises of the land, an island's each; `coast` its coast's mean distance from `at`, metres. */
 export const risesOf = (islands: readonly IslandSite[]): Rise[] =>
-  islands.map((s) => ({ at: s.chart.at, reach: s.shelf, top: s.summit + OVER_SUMMIT }));
+  islands.map((s) => ({ at: s.chart.at, reach: s.shelf, top: s.summit + OVER_SUMMIT, coast: s.radius }));
 
 /**
  * The planet baked onto the six cube faces (sphere.ts faceDir), n × n nodes each from corner to corner (so

@@ -8,7 +8,7 @@
 import { R, add, cross, dot, frameAt, scale, type Chart, type Vec3 } from './sphere.ts';
 import { random } from './random.ts';
 import type { Noise3 } from './noise3.ts';
-import { ISLANDS, KINDS, ORDER, createIslandSite, type IslandSite } from './planet-islands.ts';
+import { KINDS, ORDER, createIslandSite, type IslandSite, type Laying } from './planet-islands.ts';
 
 /** The sea floor at unit direction p before any island: how far from the deep water's edge (negative inside it), metres. */
 export type Ground = (p: Vec3) => { clearance: number };
@@ -27,8 +27,9 @@ const SPACING = 20, SHAKE = 30;
 
 /** The islands for a planet whose deeps are `ground`, its floor nowhere deeper than `deepest` metres: every kind's in
  *  ORDER, each kind's largest first, spread evenly. */
-export function placeIslands(ground: Ground, noise: Noise3, seed: number, deepest: number): IslandSite[] {
+export function placeIslands(ground: Ground, noise: Noise3, seed: number, laying: Laying): IslandSite[] {
   const rand = random(seed * 15485863 + 7);
+  const { land } = laying;
   const area = 4 * Math.PI * R * R;
   const candidates = lattice(Math.ceil(area / (SPACING * SPACING))).map((p) => ({ p, clear: ground(p).clearance }));
   /** For each candidate, the water between it and the nearest apron placed, metres. */
@@ -36,11 +37,11 @@ export function placeIslands(ground: Ground, noise: Noise3, seed: number, deepes
   const placed: IslandSite[] = [];
   let n = 0;
   for (const kind of ORDER) {
-    const K = KINDS[kind], count = Math.max(kind === 'island' ? 1 : 0, Math.round(area * K.density));
+    const K = { ...KINDS[kind], ...land.kinds[kind] }, count = Math.max(kind === 'island' ? 1 : 0, Math.round(area * K.density));
     const radii = Array.from({ length: count }, () => K.radius[0] + (K.radius[1] - K.radius[0]) * rand() ** K.skew).sort((a, b) => b - a);
     for (const radius of radii) {
       // the island's shape is its own; only its chart says where it lies
-      const shape = createIslandSite(kind, { at: [0, 1, 0], axis: [1, 0, 0] }, radius, noise, seed * 31 + ++n, deepest);
+      const shape = createIslandSite(kind, { at: [0, 1, 0], axis: [1, 0, 0] }, radius, noise, seed * 31 + ++n, laying);
       let best = -1, most = -Infinity;
       candidates.forEach((c, i) => {
         const shaken = rand() * SHAKE;
@@ -48,7 +49,7 @@ export function placeIslands(ground: Ground, noise: Noise3, seed: number, deepes
         const water = (placed.length ? room[i] - shape.shelf : 0) + shaken;
         if (water > most) [best, most] = [i, water];
       });
-      if (best < 0 || (placed.length && most - SHAKE < ISLANDS.gap)) continue;
+      if (best < 0 || (placed.length && most - SHAKE < land.gap)) continue;
       const spot = candidates[best].p, { up, east, north } = frameAt(spot), turn = rand() * 2 * Math.PI;
       placed.push({ ...shape, chart: { at: up, axis: add(scale(east, Math.cos(turn)), north, Math.sin(turn)) } });
       candidates.forEach((c, i) => {

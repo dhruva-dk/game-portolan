@@ -28,9 +28,11 @@ export interface World { seed: number; planet: Planet; wind: Wind; climate: Clim
  *  whether it is a crew's campus (world/rookery.ts: its islands and the buildings' plots on them) or a race's planet. */
 export function createWorld(seed: number, mean: Weather, swing: Weather, hours: number, campus = false): World {
   const planet = createPlanet(seed, campus);
+  // (the ash's haze: world/biome.ts)
+  const air = { ...mean, haze: mean.haze * planet.biome.haze };
   return {
     seed, planet, wind: createWind(seed), campus: campus ? campusOf(planet.islands) : null,
-    climate: { timeOfDay: hours, sunPlaces: sunPlaces(planet.islands), weather: createWeather(seed, mean, swing), seaWind: mean.wind },
+    climate: { timeOfDay: hours, sunPlaces: sunPlaces(planet.islands), weather: createWeather(seed, air, swing), seaWind: mean.wind },
   };
 }
 

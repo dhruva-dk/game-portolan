@@ -19,6 +19,7 @@ import type { Call, Service, Stance } from '../race.ts';
 import type { Crew } from './battle.ts';
 import type { Loot } from './loot.ts';
 import type { Holdings } from './claimer.ts';
+import type { Rule } from '../world/biome.ts';
 
 /** Everything a bot is tuned by. Seconds and metres; 0117's values unless said. */
 export const BOT = {
@@ -112,7 +113,7 @@ export const mates = (a: Seen, b: Seen) => a.id !== b.id && (a.side ?? a.id) ===
 /** What a bot knows of the sea besides the ships on it: how deep it is; its chart (route.ts), without which she finds
  *  no routes round land, only feels her way along it; the storm now (storm.ts), without which she pays it no heed; and
  *  the loot on the water (loot.ts); and who holds it (territory.ts), without which she claims none. */
-export interface Sea { depth: Depth; chart?: Chart | null; storm?: Storm | null; loot?: readonly Loot[]; holdings?: Holdings | null }
+export interface Sea { depth: Depth; chart?: Chart | null; storm?: Storm | null; loot?: readonly Loot[]; holdings?: Holdings | null; rule?: Rule }
 
 export type Mode = 'roam' | 'fight' | 'flee' | 'storm' | 'heal' | 'loot' | 'claim' | 'home' | 'cut' | 'service' | 'shadow' | 'attack' | 'hold';
 

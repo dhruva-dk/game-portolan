@@ -14,7 +14,7 @@
 import { R, add, chartBasis, cross, dot, frameAt, fromChart, normalize, scale, type Chart, type Vec3 } from './sphere.ts';
 import { random } from './random.ts';
 import type { Noise3 } from './noise3.ts';
-import { ISLANDS, KINDS, createIslandSite, type IslandSite } from './planet-islands.ts';
+import { ISLANDS, KINDS, createIslandSite, type IslandSite, type Laying } from './planet-islands.ts';
 import type { Ground } from './island-place.ts';
 
 /** The nine buildings of a crew's rookery (Phase B's, office.ts Building), in their order everywhere. */
@@ -184,7 +184,7 @@ function clearingsOf(stands: readonly Stood[]): Clearing[] {
  * between it and the rest. The main island is drawn again from the seed until it has no offshore rock (a pier or the
  * quay would run into one); it carries its plots' clearings.
  */
-export function placeCampus(ground: Ground, noise: Noise3, seed: number, deepest: number): IslandSite[] {
+export function placeCampus(ground: Ground, noise: Noise3, seed: number, laying: Laying): IslandSite[] {
   const rand = random(seed * 7368787 + 11);
   // the candidates: points spread evenly over the sphere, 20 m apart, with the deeps' clearance at each
   const count = Math.ceil((4 * Math.PI * R * R) / 400), golden = Math.PI * (3 - Math.sqrt(5));
@@ -203,7 +203,7 @@ export function placeCampus(ground: Ground, noise: Noise3, seed: number, deepest
   }));
   let main: IslandSite | null = null, lowest = Infinity;
   for (let n = 0, fit = 0; fit < CAMPUS.draws && n < 24; n++) {
-    const s = createIslandSite('island', { at: [0, 1, 0], axis: [1, 0, 0] }, radius, noise, seed * 31 + 1 + 977 * n, deepest);
+    const s = createIslandSite('island', { at: [0, 1, 0], axis: [1, 0, 0] }, radius, noise, seed * 31 + 1 + 977 * n, laying);
     if (s.offshore.length > 0 || !round(s)) continue;
     fit++;
     const h = steepest(s);
@@ -220,7 +220,7 @@ export function placeCampus(ground: Ground, noise: Noise3, seed: number, deepest
   const K = KINDS.islet;
   for (let i = 0; i < islets; i++) {
     const r = K.radius[0] + (K.radius[1] - K.radius[0]) * rand() ** K.skew;
-    const shape = createIslandSite('islet', { at: [0, 1, 0], axis: [1, 0, 0] }, r, noise, seed * 31 + 100 + i, deepest);
+    const shape = createIslandSite('islet', { at: [0, 1, 0], axis: [1, 0, 0] }, r, noise, seed * 31 + 100 + i, laying);
     let spot: Vec3 | null = null, most = -Infinity;
     for (const c of candidates) {
       const fromHome = arc(c.p, home.chart.at) - home.shelf - shape.shelf;

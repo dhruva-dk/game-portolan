@@ -133,6 +133,25 @@ export const PACE = { storm: 1 } as const;
 export const CAPTAIN = { nerve: 0.4, storm: 1, tire: 4 } as const;
 
 /**
+ * The biomes' rules (world/biome.ts Rule; sim/rule.ts applies them), #61 section 3. Starting values.
+ * - reef: under `depth` m of water (the reef flats round the atolls) her way is `way` of her top.
+ * - lee: within `reach` m of the coast of land `tall` m high or more, the wind falls: her way eases down to `way` of her
+ *   top at the cliff's foot.
+ * - roots: under `depth` m of water a gust drives her `lift` of its speed over her own.
+ * - ash: she notices a ship `sight` as far off, times from `poor` (her Lookout's u 0) to `good` (u 1): a middling
+ *   lookout sees 62% as far as in clear air, the best 81%, the worst 43%.
+ * - tide: the sea rises and falls `range` m either side of its mean, once every `period` s (from slack water at the
+ *   race's start), opening and closing the banks' shallowest passages.
+ */
+export const RULES = {
+  reef: { depth: 6, way: 0.62 },
+  lee: { tall: 12, reach: 45, way: 0.55 },
+  roots: { depth: 8, lift: 0.4 },
+  ash: { sight: 0.62, poor: 0.7, good: 1.3 },
+  tide: { range: 1.3, period: 150 },
+} as const;
+
+/**
  * Parts' wear (wear.ts, #58 step 7): each part's condition falls (`base` − u) / `per` a second (u her captain's
  * Seamanship over 20; `player` for the player's ship, who has no captain) and `hull` for each hull point she loses. A
  * part repaired is set `after` over the threshold it failed at. A sprung plank leaks `plank` hull points a second, down

@@ -38,6 +38,7 @@ import { claimAct, claimUrge, cutAct, cutUrge, homeAct, homeUrge, sound } from '
 import { NOTHING, type Ask } from './stores.ts';
 import { CREWMATE } from './handling.ts';
 import { FLIGHT, calls, serviceAct, serviceUrge } from './flight.ts';
+import { sighted } from './rule.ts';
 import { attackUrge, calledFoe, heed, holdAct, holdUrge, shadowAct, shadowUrge, stanceOn } from './crewmate.ts';
 
 export { BOT, byTemper, mind, rammed, shot, type Hand, type Memory, type Mode, type Sea, type Seen } from './captain.ts';
@@ -95,7 +96,8 @@ function perceive(c: Ctx): void {
     [m.foe, m.seen, m.last] = [called.id, m.clock, called.ship.at];
     return;
   }
-  let best: Seen | null = null, bd = noticed(c.t);
+  // (in the ash she sees less far: rule.ts)
+  let best: Seen | null = null, bd = noticed(c.t) * sighted(c.sea.rule ?? 'none', c.t.lookout);
   for (const o of c.others) {
     if (mates(own, o) || apart(own.ship.at, o.ship.at, BOT.sightMax)) continue;
     const d = distance(own.ship.at, o.ship.at);

@@ -48,6 +48,7 @@ import type { Call, RaceResult } from '../race.ts';
 import { botOf, command } from './orders.ts';
 import { createUpkeep, type Kept, type Upkept } from './upkeep.ts';
 import { gustOf } from '../sim/gust.ts';
+import { ruled, tideAt } from '../sim/rule.ts';
 
 export { PARTS, bearing, fleetOf, type Afloat, type Berth, type Match, type Part, type Sinking, type Stepped, type Waters } from './match.ts';
 
@@ -63,7 +64,11 @@ type Fought = ReturnType<typeof stepBattle>;
 
 /** planet: the world's; sea: its waves, which the ships ride; waters: its water, sounded. */
 export function createState(planet: Planet, sea: Hull, { chart, water }: Waters, first: Match) {
-  const depth = remembered((p: Vec3) => -planet.height(p)), rises = risesOf(planet.islands);
+  // the depth under a ship: the floor's, and where the tide runs (sim/rule.ts) the tide's over it, set each step
+  const rule = planet.biome.rule, still = remembered((p: Vec3) => -planet.height(p)), rises = risesOf(planet.islands);
+  let tide = 0;
+  const depth = rule === 'tide' ? (p: Vec3) => still(p) + tide : still;
+  const ground = { depth, rises };
   let match = first;
   const seedOf = (id: number) => seedIn(match, id);
   let fleet: Vessel[] = [];
@@ -172,7 +177,7 @@ export function createState(planet: Planet, sea: Hull, { chart, water }: Waters,
     const wants = asked(battle.crews, fleet, flotsam, asks);
     battle = { ...battle, crews: wants.crews };
     const manned = byId(wants.crews);
-    fleet.forEach((v, i) => { helms[i] = homed(crewed(helms[i], manned.get(v.id)), territory, v); });
+    fleet.forEach((v, i) => { helms[i] = ruled(rule, homed(crewed(helms[i], manned.get(v.id)), territory, v), v.ship.at, ground); });
     from.clear();
     for (const v of fleet) from.set(v.id, v.ship.at);
     const met = stepFleet(fleet, helms, STEP, depth);
@@ -266,7 +271,8 @@ export function createState(planet: Planet, sea: Hull, { chart, water }: Waters,
      *  holds the sea and the guns' shots and strikes. `lap`, if given, is told as each of its parts is done (tools/steps.ts times them). */
     advance(helm: Helm, gun: Order, ask: Ask = NOTHING, lap?: (part: Part) => void): Stepped {
       const storm = stormAt(time());
-      const sea = { depth, chart, storm, loot: flotsam.pieces, holdings: territory };
+      tide = quiet ? 0 : tideAt(rule, time());
+      const sea = { depth, chart, storm, loot: flotsam.pieces, holdings: territory, rule };
       const { helms, orders, flights } = command({ fleet, aboard, crews: byId(battle.crews), sea, hers: { helm, gun, ask }, clock: time(), length: lengthIn(match), upkeep }, asks);
       for (const id of flights) upkeep.summon(id, fleet.find((v) => v.id === id), territory);
       fleet.forEach((v, i) => aims.set(v.id, orders[i]?.aim?.dir ?? null));
