@@ -203,7 +203,7 @@ const railsAt = () => {
   return [mainDeck(0) - 0.4, qd - 0.15, qd + 0.45, pd - 0.25, sideTop(0) - 0.05];
 };
 /** Panels across each tier between two rails; one is a frieze in the captain's colour. */
-const TIERS = [2, 1, 3, 3], FRIEZE = 1;
+const PANELS = [2, 1, 3, 3], FRIEZE = 1;
 
 /** A flat panel on the transom between heights y0 and y1, from fraction a to b of its breadth, `out` proud of it. */
 function panel(acc: Acc, y0: number, y1: number, a: number, b: number, inset: number, out: number, upright: boolean): void {
@@ -235,7 +235,7 @@ function stern(acc: Acc): void {
       tube(acc, [V(-h, y, zT(y) - 0.02), V(h, y, zT(y) - 0.02)], 0.07, 5, { caps: true });
     }
   });
-  TIERS.forEach((n, i) => {
+  PANELS.forEach((n, i) => {
     const y0 = rails[i], y1 = rails[i + 1];
     acc.with({ kind: KIND.dark }, () => {
       for (let k = 1; k < n; k++) {

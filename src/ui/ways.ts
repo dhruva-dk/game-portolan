@@ -3,9 +3,9 @@
 // UI's own. Each screen fades or cross-fades into the next (FADE); none is cut to. Home from a match, the parchment
 // comes over it and lifts off the lobby once it is drawn (HOME, wayHome).
 //   title     the chart over the world loading; once ready, a tap anywhere          → lobby
-//   lobby     over her ship at anchor: PLAY → match (the world cross-fades to the eye coming down from space); her
-//             plate → rank; the wheel → settings
-//   rank, settings  folios over the lobby, each with its close mark (a tap outside closes it too) → lobby
+//   lobby     over her ship at anchor: PLAY → match (the world cross-fades to the eye coming down from space); the
+//             wheel → settings
+//   settings  a folio over the lobby, with its close mark (a tap outside closes it too) → lobby
 //   match     the arrival, then her hands on her ship; she sinks → sinking; she is the last afloat → won
 //   sinking   the camera held on her ship going down, the HUD gone; the beat done → sunk, or → result if the match
 //             is over
@@ -20,7 +20,7 @@ import { SCREENS, type Screen } from '../player.ts';
 export { SCREENS, type Screen };
 
 /** What moves a screen on: her taps, and the match's own course. */
-export const TAPS = ['begin', 'play', 'rank', 'settings', 'close', 'watch', 'switch', 'leave'] as const;
+export const TAPS = ['begin', 'play', 'settings', 'close', 'watch', 'switch', 'leave'] as const;
 export const EVENTS = ['sunk', 'won', 'settled', 'over'] as const;
 export type Tap = (typeof TAPS)[number];
 export type Event = (typeof EVENTS)[number];
@@ -29,8 +29,7 @@ export type Trigger = Tap | Event;
 /** Every way on from each screen: what takes it, and where to. */
 export const WAYS: Record<Screen, Partial<Record<Trigger, Screen>>> = {
   title: { begin: 'lobby' },
-  lobby: { play: 'match', rank: 'rank', settings: 'settings' },
-  rank: { close: 'lobby' },
+  lobby: { play: 'match', settings: 'settings' },
   settings: { close: 'lobby' },
   match: { sunk: 'sinking', won: 'won' },
   sinking: { settled: 'sunk' },

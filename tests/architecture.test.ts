@@ -63,7 +63,16 @@ const RENDER = ['three', 'world/', 'gpu.ts', 'tsl.ts', 'palette.ts', 'snapshot.t
 const LAYERS: Record<string, readonly string[]> = {
   // the world and the simulation: pure, headless, deterministic (test g)
   'world/': ['world/'],
-  'sim/': ['sim/', 'world/', 'kinds.ts'],
+  'sim/': ['sim/', 'world/', 'kinds.ts', 'race.ts'],
+  // the management game: pure, headless, deterministic (test g); it reaches a match only through race.ts and the
+  // screens only through office.ts
+  'career/': ['career/', 'world/random.ts', 'race.ts', 'office.ts', 'kinds.ts'],
+  // the seam between the career and a match (a RaceCard in, a RaceResult out), and between the career and the
+  // screens (their view models and the Command union): types and constants only
+  'race.ts': ['kinds.ts'],
+  'office.ts': ['kinds.ts', 'race.ts'],
+  // the career's persistence adapters, behind its port
+  'store/': ['store/', 'career/store.ts'],
   // the kinds of gun and of loot, named once for all who tell them apart: a leaf
   'kinds.ts': [],
   // the plain-data seams: what the frame draws (snapshot.ts), what passes between the player and the game (player.ts),
@@ -76,15 +85,17 @@ const LAYERS: Record<string, readonly string[]> = {
   'palette.ts': [],
   'environment.ts': ['world/'],
   // the UI draws plain data: of the sim only the storm's Cap (the full map inks it)
-  'ui/': ['ui/', 'world/', 'sim/storm.ts', 'snapshot.ts', 'player.ts', 'rarity.ts', 'kinds.ts'],
+  'ui/': ['ui/', 'world/', 'sim/storm.ts', 'snapshot.ts', 'player.ts', 'rarity.ts', 'kinds.ts', 'office.ts', 'race.ts'],
   // the sound: hears what the frame draws and the HUD reads, and the screen shown (player.ts Screen)
   'audio/': ['audio/', 'world/', 'snapshot.ts', 'player.ts', 'kinds.ts'],
   // the game runs the sim and says what to draw and show, as plain data
-  'play/': ['play/', 'sim/', 'world/', 'palette.ts', ...NEUTRAL],
+  'play/': ['play/', 'sim/', 'world/', 'palette.ts', 'race.ts', ...NEUTRAL],
   // what draws the world; each sideways import named
   'view/': ['view/', ...RENDER],
   'sky/': ['sky/', ...RENDER, 'view/view.ts', 'sim/storm.ts'],
   'land/': ['land/', ...RENDER, 'view/view.ts', 'view/cube.ts'],
+  // the rookery's buildings, drawn as land/ draws the islands
+  'campus/': ['campus/', ...RENDER, 'view/view.ts', 'view/cube.ts'],
   'ship/': ['ship/', ...RENDER, 'view/view.ts', 'kinds.ts'],
   'gunfire/': ['gunfire/', ...RENDER, 'view/view.ts', 'kinds.ts'],
   // the post chain's steps (grade, bloom, film): nodes over the frame's light, composed by the frame
@@ -189,10 +200,10 @@ test('f2. the frame draws a snapshot: it alone makes the camera, works out the e
   none(hits(/\benv\s*\.\s*\w+\s*(\+|-|\*|\/)?=(?!=)/), 'a write to the environment');
 });
 
-test('g. src/world and src/sim are deterministic and headless', () => {
+test('g. src/world, src/sim and src/career are deterministic and headless', () => {
   none(
-    hits(/\bMath\.random\b|\bDate\b|\bperformance\b|\b(document|window|self|globalThis|navigator|location)\b/, (rel) => rel.startsWith('world/') || rel.startsWith('sim/')),
-    'Math.random, Date, performance or a browser global in src/world or src/sim',
+    hits(/\bMath\.random\b|\bDate\b|\bperformance\b|\b(document|window|self|globalThis|navigator|location)\b/, (rel) => ['world/', 'sim/', 'career/'].some((p) => rel.startsWith(p))),
+    'Math.random, Date, performance or a browser global in src/world, src/sim or src/career',
   );
 });
 
@@ -216,7 +227,7 @@ test('i. the game touches no page: src/play neither reads nor makes the DOM (ui/
 
 test('i2. the UI draws plain data: src/ui imports nothing from play/, three or what draws the world', () => {
   const found: string[] = [];
-  const RENDER = ['sky', 'water', 'land', 'ship', 'gunfire', 'view', 'post'], FILES = ['frame.ts', 'gpu.ts', 'tsl.ts'];
+  const RENDER = ['sky', 'water', 'land', 'campus', 'ship', 'gunfire', 'view', 'post'], FILES = ['frame.ts', 'gpu.ts', 'tsl.ts'];
   for (const f of files.filter((f) => f.rel.startsWith('ui/'))) {
     code(f.text).forEach((line, i) => {
       const spec = /(?:\bfrom\s*|\bimport\s*\(?\s*)['"]([^'"]+)['"]/.exec(line)?.[1];
@@ -283,7 +294,7 @@ const OVER: Record<string, number> = {
   'ship/kit.ts rod': 8, 'ship/kit.ts rope': 7, 'ship/kit.ts box': 6, 'ship/kit.ts beam': 7,
   'sim/battle.ts stepBattle': 8, 'sim/bot.ts think': 6, 'sim/gun.ts chosen': 6, 'sim/gun.ts laid': 9, 'sim/gunner.ts ring': 8,
   'sim/gunner.ts aimAndFire': 9, 'sim/ride.ts settled': 6, 'sim/shot.ts loosed': 7, 'sim/stores.ts stored': 9, 'sim/stores.ts spilled': 6,
-  'sim/utility.ts choose': 6, 'ui/disc.ts laid': 7, 'ui/flow.ts createFlow': 6, 'ui/ink.ts bar': 6, 'ui/ink.ts ring': 6, 'ui/marks.ts plate': 6,
+  'sim/utility.ts choose': 6, 'ui/disc.ts laid': 7, 'ui/ink.ts bar': 6, 'ui/ink.ts ring': 6,
   'water/water.ts createWater': 7, 'world/cells.ts trace': 6, 'world/lattice.ts weighInto': 7,
   'world/planet-islands.ts createIslandSite': 6, 'world/sphere.ts chartAt': 6,
 };
@@ -309,15 +320,9 @@ test('n. the lighting interface is the six ways a surface is lit (sky/light.ts L
   assert.deepEqual(members, ['toon', 'polished', 'leaf', 'band', 'sides', 'level']);
 });
 
-/** The files that may say they stand in for something, and why. */
-const STAND_INS: Record<string, string> = {
-  'play/placeholder.ts': 'what the game shows that nothing in it keeps yet (her career), held in one place',
-};
-
-test('j. nothing in src says it is temporary or a hack, comments included, but the stand-ins (STAND_INS)', () => {
-  // raw text, comments and all; a stand-in named by its path (an import, a reference) is not the word
-  const named = (line: string) => Object.keys(STAND_INS).reduce((l, p) => l.replaceAll(p.replace(/\.ts$/, ''), ''), line);
-  const found = files.filter((f) => !(f.rel in STAND_INS)).flatMap((f) => f.text.split('\n').flatMap((line, i) =>
-    /\b(temporary|for now|placeholders?|hacks?|hacky|workarounds?|fixme|todo)\b/i.test(named(line)) ? [`src/${f.rel}:${i + 1}: ${line.trim()}`] : []));
+test('j. nothing in src says it is temporary or a hack, comments included', () => {
+  // raw text, comments and all
+  const found = files.flatMap((f) => f.text.split('\n').flatMap((line, i) =>
+    /\b(temporary|for now|placeholders?|hacks?|hacky|workarounds?|fixme|todo)\b/i.test(line) ? [`src/${f.rel}:${i + 1}: ${line.trim()}`] : []));
   none(found, 'words of temporary work (TEMPORARY, for now, placeholder, hack, workaround, FIXME, TODO)');
 });

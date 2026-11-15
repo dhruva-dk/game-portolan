@@ -1,6 +1,6 @@
 // The frames dropped as she goes to sea: the lobby, her tap on PLAY, and the first seconds of the match (the eye coming
 // down from space onto her berth, then her hands on her ship), timed in headless Chromium with the CPU slowed to stand
-// in for the phone's. Prints the frames over 33 ms and over 50 ms in each window, the worst frames, and what ran in
+// in for the device's (the iPad's page, launch.ts DEVICE). Prints the frames over 33 ms and over 50 ms in each window, the worst frames, and what ran in
 // each of the worst on the page's main thread (Chrome's trace: its sampled JS by function, garbage collection, style
 // and layout) and on the GPU process's. Fails (exit 1) if the window from PLAY drops more frames than LIMIT allows.
 //   node tools/hitch.ts [--slow=1] [--seconds=15] [--worst=8] [--trace=file.json]      (npm run hitch)
@@ -15,7 +15,7 @@
 // swell, world/swell.ts) fills the frame by itself, so every frame is over and the start's own hitches are lost in it.
 
 import { writeFileSync } from 'node:fs';
-import { launch } from './launch.ts';
+import { DEVICE, launch } from './launch.ts';
 
 /** The most frames over 50 ms and over 33 ms the window from PLAY may hold (at --slow=1; some 2 over 33 ms, none over
  *  50, the worst some 45 ms, when it was set). */
@@ -58,7 +58,7 @@ function traceEvents(trace: Buffer): TraceEvent[] {
 const { browser, url, close } = await launch();
 let failed = false;
 try {
-  const page = await browser.newPage({ viewport: { width: 956, height: 440 }, deviceScaleFactor: 3, hasTouch: true });
+  const page = await browser.newPage({ viewport: { width: DEVICE.width, height: DEVICE.height }, deviceScaleFactor: DEVICE.dpr, hasTouch: true });
   page.on('pageerror', (e) => console.error(`[page] ${e.message}`));
   await page.goto(`${url}?screen=lobby`);
   await page.waitForFunction(() => document.getElementById('meter')?.textContent, null, { timeout: 120000 });

@@ -1,4 +1,4 @@
-// The screens' order, as ways.ts tables it: the title, the lobby with its folios, the match, and her end over the live
+// The screens' order, as ways.ts tables it: the title, the lobby with its settings folio, the match, and her end over the live
 // world (the camera's beat on it, then her result with its ways on: watch the match on, or home). Every way is her tap
 // on something drawn for it, or the match's own course as the game reports it (player.ts End); nothing moves on by a
 // clock of its own. Every screen fades in and out; where the world itself changes at once it cross-fades (PLAY:
@@ -7,10 +7,10 @@
 
 import type { createGlobe } from './globe';
 import type { HudState, createHud } from './hud';
-import type { Career, End } from '../player';
+import type { End } from '../player';
 import type { Sea } from '../snapshot';
 import { createResult, createWatching } from './ends';
-import { createLobby, createRank, createSettings, createTitle, type Settings } from './screens';
+import { createLobby, createSettings, createTitle, type Settings } from './screens';
 import { fade } from './ui';
 import { createPassage } from './passage';
 import { createVeil } from './veil';
@@ -40,21 +40,14 @@ function saveSettings(s: Settings) {
  *  on and to turn to another ship. */
 export interface FlowActions { play(): void; home(): void; watch(): void; switch(by: number): void }
 
-/** Her career now, and what a match ended in `place` of `of`, holding `share` of the sea, adds to it. */
-export interface Careers { now(): Career; credit(place: number, of: number, share: number): { from: Career; to: Career } }
-
-export function createFlow(
-  hud: ReturnType<typeof createHud>, globe: ReturnType<typeof createGlobe>, career: Careers,
-  start: Screen, act: FlowActions,
-) {
+export function createFlow(hud: ReturnType<typeof createHud>, globe: ReturnType<typeof createGlobe>, start: Screen, act: FlowActions) {
   let screen: Screen = start, settings = loadSettings();
-  /** Her end as last reported (null while she fights), and what this match added to her career, once shown. */
-  let end: End | null = null, gain: { from: Career; to: Career } | null = null;
+  /** Her end as last reported (null while she fights). */
+  let end: End | null = null;
 
   const veil = createVeil();
   const title = createTitle(() => tap('begin'));
-  const lobby = createLobby({ play: () => tap('play'), rank: () => tap('rank'), settings: () => tap('settings') });
-  const rank = createRank(() => tap('close'));
+  const lobby = createLobby({ play: () => tap('play'), settings: () => tap('settings') });
   const settingsFolio = createSettings(() => settings, (s) => {
     settings = s;
     saveSettings(s);
@@ -73,7 +66,7 @@ export function createFlow(
     if (t === 'play') {
       veil.cover(() => {
         act.play();
-        end = gain = null;
+        end = null;
         go(next);
       });
     } else if (t === 'leave') {
@@ -82,7 +75,7 @@ export function createFlow(
       fade(hud.root, false, HOME.cover);
       passage.cover(() => {
         act.home();
-        end = gain = null;
+        end = null;
         go(next);
       });
     } else {
@@ -96,8 +89,7 @@ export function createFlow(
   function go(next: Screen) {
     screen = next;
     title.show(next === 'title');
-    lobby.show(next === 'lobby' || next === 'rank' || next === 'settings', career.now());
-    rank.show(next === 'rank', career.now());
+    lobby.show(next === 'lobby' || next === 'settings');
     settingsFolio.show(next === 'settings');
     // the HUD: the match's, or only its clock, count and disc while she watches; gone as her end begins
     const shown = next === 'match' || next === 'spectate';
@@ -106,10 +98,8 @@ export function createFlow(
     if (next !== 'match') globe.close();
     watching.show(next === 'spectate');
     const over = next === 'sunk' || next === 'result';
-    if (over && end) {
-      gain ??= career.credit(end.place, end.of, end.share);
-      result.show(true, end, gain);
-    } else result.show(false);
+    if (over && end) result.show(true, end);
+    else result.show(false);
   }
   go(start);
 
@@ -138,15 +128,14 @@ export function createFlow(
     go,
     /** Her tap on a way on, as if on what is drawn for it (the debug switches': src/debug.ts). */
     tap,
-    /** A frame of dt seconds: what the HUD reads, and who holds the sea (her id in it) as the frame draws it. */
-    update(dt: number, s: HudState, sea?: Sea, own?: number | null) {
+    /** A frame: what the HUD reads, and who holds the sea (her id in it) as the frame draws it. */
+    update(s: HudState, sea?: Sea, own?: number | null) {
       if (IN_MATCH.includes(screen)) {
         // the full map's window would show the HUD under it
         hud.root.style.visibility = globe.open ? 'hidden' : '';
         hud.update(s, sea, own);
         globe.update(s);
       }
-      result.update(dt);
     },
     /** The frame just drawn (the world's canvas), for what holds it: the full map just opened, a cross-fade waiting;
      *  and the way home, which waits on the lobby's frames drawn. */

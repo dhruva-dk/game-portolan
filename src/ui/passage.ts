@@ -5,20 +5,20 @@
 
 import { svg } from './ink';
 import { rose } from './marks';
-import { sheet } from './screens';
+import { H, W, sheet } from './screens';
 import { HOME, wayHome } from './ways';
 
 /** Seconds the rose takes to turn once. */
 const TURN = 16;
 /** The rose's box in the page's own units (screens.ts W × H, scaled to fit the screen alike), and its radius in it. */
-const BOX = 220, RADIUS = 100;
+const BOX = 330, RADIUS = 150;
 
 export function createPassage() {
   const s = sheet(true);
   s.root.style.zIndex = '3';
   // the rose in a box of its own, centred and scaled as the screens' page is, turned whole (no repaint of its marks)
   const box = document.createElement('div');
-  box.style.cssText = `position:absolute;left:50%;top:50%;width:min(${(BOX / 9.56).toFixed(2)}vw,${(BOX / 4.4).toFixed(2)}vh);`
+  box.style.cssText = `position:absolute;left:50%;top:50%;width:min(${((BOX / W) * 100).toFixed(2)}vw,${((BOX / H) * 100).toFixed(2)}vh);`
     + 'aspect-ratio:1;transform:translate(-50%,-50%)';
   box.innerHTML = svg(BOX, BOX, rose(BOX / 2, BOX / 2, RADIUS));
   const mark = box.firstElementChild;

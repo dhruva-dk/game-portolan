@@ -27,7 +27,7 @@
 // frame's cost. ?safe=top,right,bottom,left px stands in for the phone's safe-area insets (iPhone 16 Pro Max in
 // landscape: ?safe=0,62,21,62). ?lod=0…3 draws every ship at that level of detail; ?cloth=0 draws every ship's canvas
 // as the wind fills it, none simulated (ship/fleet.ts).
-// ?screen= opens the UI at a screen (title, lobby, rank, settings, match, sunk, spectate, won, result; ui/ways.ts; also
+// ?screen= opens the UI at a screen (title, lobby, settings, match, sunk, spectate, won, result; ui/ways.ts; also
 // map), at sea among ?ships=n others by default: play starts a match as PLAY does (every ship at her berth, the eye
 // coming down from space: play/arrival.ts); sunk sinks her by the first other ship (?by=storm: by the storm) and the
 // screens follow her end as the match would bring it (the camera's beat, then her result); spectate sinks her and
@@ -50,6 +50,9 @@
 // steers her back to where she began in the frames drawn, her loop closing in view. ?map opens
 // the full map once ?ahead= has run (with screen=play, the whole match's water from space).
 // `node tools/planet-map.ts <seed>` charts a planet and lists its islands.
+// The playtest tools (PLAYTEST) have their switches named here, each built in the phase that can: ?bots overlays each
+// bot's intent, target, temper and stats; ?coin gives the player's crew Coin; ?reveal shows every stat of every gull;
+// ?raceday skips the career to its next race day and ?seasonend to its season's end; ?screen (above) opens a screen.
 
 import type { Anchor } from './world/lattice';
 import type { World } from './environment';
@@ -114,6 +117,9 @@ const degrees = Math.PI / 180;
 /** The debug camera flies instead of the game. */
 const flying = params.has('fly') || ['lat', 'lon', 'alt', 'wall'].some((k) => params.has(k));
 
+/** The playtest tools' switches (the header's), and whether each is built yet: one asked for and not built says so. */
+const PLAYTEST = { bots: false, coin: false, reveal: false, raceday: false, seasonend: false, screen: true } as const;
+
 /** The art direction's alternates (?mood=): the hour, and the haze's mean as a share of the release's. */
 const MOODS: Record<string, { hours: number; haze: number }> = {
   dawn: { hours: 6.8, haze: 1.6 }, warm: { hours: 17.4, haze: 1.2 }, noon: { hours: 12.6, haze: 0.7 },
@@ -154,6 +160,7 @@ export async function scenario(release: Setup, stage: (setup: Setup) => Promise<
     const p = await play(s);
     return s.draw(p.next, p.drawn);
   }
+  for (const [name, built] of Object.entries(PLAYTEST)) if (params.has(name) && !built) console.info(`?${name} is not built yet`);
   const s = await stage(setupOf(release));
   const room = Math.max(SHIPS, number('ships', 0) + 1);
   if (flying) return s.draw(flyer(s.canvas, s.start.at, demoShips(s.start.at, room), s.matches.storm));
@@ -197,7 +204,7 @@ export async function scenario(release: Setup, stage: (setup: Setup) => Promise<
 function open(p: Played, others: readonly Berth[]) {
   const { game, referee, flow } = p;
   const screen = params.get('screen') ?? 'match';
-  if (screen === 'title' || screen === 'lobby' || screen === 'rank' || screen === 'settings') flow.go(screen);
+  if (screen === 'title' || screen === 'lobby' || screen === 'settings') flow.go(screen);
   else if (screen === 'play') {
     p.play();
     flow.go('match');

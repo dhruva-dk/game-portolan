@@ -10,6 +10,7 @@
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { chromium } from 'playwright';
+import { DEVICE } from './launch.ts';
 
 const [dir = 'captures/hero', extra = ''] = process.argv.slice(2).filter((a) => !a.startsWith('--'));
 const flags = process.argv.slice(2).filter((a) => a.startsWith('--'));
@@ -29,8 +30,8 @@ mkdirSync(dir, { recursive: true });
 execFileSync('node', ['tools/capture.ts', `--out=${dir}`, ...flags, ...SHOTS], { stdio: 'inherit' });
 SHOTS.forEach((q, i) => renameSync(`${dir}/${q.replace(/[^\w.=-]+/g, '_')}.png`, `${dir}/${i + 1}.png`));
 
-// the sheet: two across, each shot at the phone's CSS size, its number in a corner
-const W = 956, H = 440, GAP = 8;
+// the sheet: two across, each shot at the device's CSS size, its number in a corner
+const { width: W, height: H } = DEVICE, GAP = 8;
 const cells = SHOTS.map((_, i) => {
   const png = readFileSync(`${dir}/${i + 1}.png`).toString('base64');
   return `<div style="position:relative;width:${W}px;height:${H}px"><img src="data:image/png;base64,${png}"

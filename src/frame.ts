@@ -38,11 +38,11 @@ import type { Vec4Node } from './tsl';
 const BLOOM = 0.22;
 const shaftsFor = (rise: number) => 0.6 * (1 - 0.5 * Math.min(1, Math.max(0, (rise - 0.2) / 0.6)));
 /**
- * The frame's pixels per CSS pixel, whatever the screen's own: the phone's is 3, and the browser scales the frame up to
- * it. At 1 its 956×440 smeared her hull and rigging; 1.5 (1434×660) reads a little soft but holds the 30–40 FPS budget;
- * 2 (1912×880) cost every full-size pass 1.78× the pixels.
+ * The frame's pixels per CSS pixel, whatever the screen's own: the iPad Air's is 2, and the browser scales the frame up
+ * to it. Its page of 1180×820 drawn at 1 is about the pixels the phone's 956×440 was drawn at 1.5 (1434×660), which
+ * held the 30–40 FPS budget; 2 would cost every full-size pass 4× the pixels.
  */
-const SCALE = 1.5;
+const SCALE = 1;
 /** The eye's near and far planes, metres: in the air, past the far side of the planet from as high as it goes; from
  *  space, round the whole planet from as far out as the full map goes. */
 const PLANES = { air: [0.5, 2000], space: [50, 4000] } as const;
@@ -92,9 +92,9 @@ export interface FrameOptions {
  *                 the guns' smoke, flashes and spray (gunfire/gunfire.ts), blended over it
  *   3. post     — clouds over whatever they stand in front of, the haze by distance over both (sky.ts fog), the
  *                 storm's rain and cloud over all of it (sky/storm.ts: a short march, from where the ray meets its cone), drawn
- *                 once to a full-size texture of light; then, at the phone's 956×440 drawn at SCALE (1434×660, the
- *                 browser scaling the frame up to the screen):
- *        bloom        7 passes, the largest a quarter size (358×165), 4–5 taps each: ~0.4 M taps (post/bloom.ts)
+ *                 once to a full-size texture of light; then, at the iPad's 1180×820 drawn at SCALE (the browser
+ *                 scaling the frame up to the screen):
+ *        bloom        7 passes, the largest a quarter size (295×205), 4–5 taps each: ~0.4 M taps (post/bloom.ts)
  *        shafts       3 passes at a quarter size, 2 + 16 + 16 taps: ~2 M taps (post/shafts.ts)
  *        grade        exposure, vignette, the tone curve, the look (the day's mixed to the storm's), sRGB; a
  *                     dither (post/grade.ts, post/film.ts) — one full-size pass with the bloom's and shafts' reads
