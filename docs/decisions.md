@@ -661,3 +661,50 @@ decisions are in #56, section 2.
   biome (the planets `budget.ts --biomes` judges) from orbit (the arrival's first frame) and at sea level in the race,
   her flight called and mending on her deck, the look swung to her beam so the gulls, her ship and the land show
   together; the UI hidden. All six read right; the haze in two sea views is the low sun ahead.
+
+## 2026-11-15, Phase C (#60), batch 1: the kit and the office shell (manager-c1)
+
+- **Question:** where Settings lives now the office has a top bar. **Choice:** an office dialog (ui/office/settings.ts)
+  over home: `?screen=settings` and the gear on home's race panel open it; Done closes it. The lobby is still reached
+  through the plan stub's "To the anchorage" and its own gear leads to the same dialog over home. The old
+  screens.ts settings folio is no longer used by flow.ts. **Why:** one place for the career's backups; the lobby is a
+  race's antechamber, not the office's.
+- **Question:** where the title's Begin goes. **Choice:** `desk.where()`: recover if the load lost or replaced
+  anything, found if no player yet, else home. **Why:** the player hears about a damaged save before anything else.
+- **Question:** what `?screen=kit` and `?screen=headshots` are. **Choice:** debug sheets (ui/office/sheets.ts, added to
+  the UI layer by debug.ts), not screens: they are not in ways.ts or OFFICE. Each wears the office page so
+  tools/checks.ts judges it as it judges a screen.
+- **Question:** what the found screen's view carries. **Choice:** FoundView gives the swatches as a count (the palette
+  is ink.ts's to draw) and the player's age; crew names are limited to 24 characters. `foundErrors` judges each field
+  by substituting it into a valid founding, so each error sits under its own field.
+- **Question:** where the last backup's day is kept. **Choice:** localStorage (desk.ts deviceShelf `backupDay`), beside
+  the store, not in the career: a backup is the device's act, not the game's, and the journal must not change for it.
+  Lost with site data; the settings say "Never backed up." then.
+- **Question:** how screens take colours. **Choice:** only from ink.ts (palette.ts through it); a colour literal in
+  src/ui/office/ fails tools/capture.ts (`literals()`). The emblem takes `{ ink, ground }` so a screen passes ink.ts's
+  colours. The kit's sounds go up as a DOM event (`office-sound`, part.ts SOUND_EVENT) that main.ts hands to audio,
+  so ui/ never imports audio/.
+- **Question:** contrast of greyed controls. **Choice:** exempt from the 7:1 check (`.off`, `aria-disabled`,
+  `disabled`): greying is how the control says it cannot be used, and its label is also read out in the explanation.
+- **Question:** `Desk.send` and refusals. **Choice:** it resolves to null or the sentence the notice says (the
+  reducer's refusal, or a failed save), so screens never format errors.
+- **Question:** which screens are stubs. **Choice:** career, crew, profile, offer, market, ship, rookery, finance,
+  league, mail, plan, season and jobs: each a full panel with an empty state naming it and the later batch, and a way
+  out (plan: To the anchorage; season and jobs: Home). Batches 2–4 replace their rows in ui/office/screens.ts.
+- **Question:** the standings' gap when points are equal. **Choice:** "level" (career/views.ts), not "0" or "−0".
+- **Question:** tap targets of one control abutting (a table's rows, tabs, a segmented's options) fail the 8 px gap
+  rule. **Choice:** checks.ts treats siblings that touch (gap under 0.5 px) as cells of one control; 1–7 px apart
+  still fails. **Why:** a ruled table or a tab strip is one control with rules between; gaps between rows would waste
+  the density the brief asks for.
+- **Question:** "outside the page" flagged a scrolling list's rows below its fold. **Choice:** capture.ts skips an
+  element inside a scrolling box: the panel scrolls it in. Home's mail list scrolls in its panel.
+- **Question:** the lost-actions sentence said "since Day 0" in the career's absolute days. **Choice:** the day as
+  the season counts it (Day 1 first) and singular agreement ("The last action, since Day 1, … was lost").
+- **Question:** who loads the device's career. **Choice:** main.ts loads `createDesk(deviceShelf())` into the office
+  on launch; a debug fixture loaded afterwards wins (`office.load`: the latest call's desk is kept).
+- **Question:** where her crewmate's headshot comes from in a race. **Choice:** play/crewing.ts gives `mate.face`:
+  `hash(card.seed, id)` and her ship's colours from the race card (state.ts `card()`); ui/crew.ts draws it at 40 as a
+  captain aged 22–57 by the seed. Never the career's gulls: sim/ and play/ do not read career/.
+- **Question:** #61's last item, a bot's flight. **Choice:** `?spectate=bot,seconds` (debug.ts) sinks her then and
+  watches the bot through the referee's new `turnTo` (steps `switched()`; no sim change); `?spectate=flight,seconds`
+  takes the first bot whose flight is under way. Captured (bot #9 in service, gulls on deck); #61 closed.
