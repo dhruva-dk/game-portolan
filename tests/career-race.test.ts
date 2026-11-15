@@ -10,6 +10,7 @@ import { lineups } from '../src/career/lineup.ts';
 import { placePoints, tally } from '../src/career/round.ts';
 import { movesOf } from '../src/career/season.ts';
 import { YEAR } from '../src/career/stars.ts';
+import { TUNING } from '../src/career/tuning.ts';
 import { synthetic } from '../tools/synthetic.ts';
 import { SPEC_SHIP, founded, invariants, must, refused, sailed, toRaceDay } from './career-kit.ts';
 
@@ -149,7 +150,11 @@ test('the season ends: prizes, four up and four down, standings reset, the next 
   assert.deepEqual(s.leagues.map((l) => l.crews.length), sizes);
   assert.ok(s.leagues.every((l) => l.standings.every((x) => x.points === 0)));
   assert.equal(s.calendar?.start, YEAR);
-  assert.ok(s.queue.some((e) => e.kind === 'seasonEnd') && s.queue.some((e) => e.kind === 'seasonStart'));
+  assert.ok(s.queue.some((e) => e.kind === 'seasonEnd'));
+  const opening = s.queue.find((e) => e.kind === 'seasonStart')!;
+  assert.equal(opening.day, Math.floor((YEAR - TUNING.calendar.off + s.calendar!.rounds[0].day) / 2), 'the season opens midway through the off-season');
+  const stopped = must(s, { kind: 'Advance' });
+  assert.ok(stopped.day <= opening.day, 'Advance stops at the season\'s opening (or before)');
   assert.ok(s.mail.some((m) => m.kind === 'seasonEnded'));
   invariants(s);
 });

@@ -6,7 +6,7 @@ import type { Personality } from '../src/office.ts';
 import type { CareerState } from '../src/career/career.ts';
 import { released } from '../src/career/contracts.ts';
 import { dice } from '../src/career/dice.ts';
-import { afterRace, bestManager, hireManager, managerCandidates, sacked, seasonStart, standingOf, verdicts, wordAt } from '../src/career/elders.ts';
+import { afterRace, bestManager, hireManager, managerCandidates, mayOffer, offerJob, sacked, seasonStart, standingOf, verdicts, wordAt } from '../src/career/elders.ts';
 import { learned } from '../src/career/knowledge.ts';
 import { decide, mindOf, rowsFor, ROWS } from '../src/career/rivals.ts';
 import { staffOf } from '../src/career/state.ts';
@@ -113,6 +113,24 @@ test('the player sacked: out of a crew, Advance refused, offers shown (one from 
   assert.equal(v.crews[last].staff.manager, v.player!.gull);
   assert.equal(v.crews[last].staff.ships[0].captain, null, 'the player sails ship one');
   invariants(v);
+});
+
+test('posts offered to a player with a crew: only from their league or better, two at most standing; any while sacked', () => {
+  // the player's crew read as League Two's, so there is a league either side
+  const s0 = founded(), mine = 1;
+  const s = { ...s0, player: { ...s0.player!, reputation: 100 }, crews: s0.crews.map((c) => (c.player ? { ...c, league: mine } : c)) };
+  const above = s.crews.find((c) => c.league < mine)!, same = s.crews.find((c) => c.league === mine && !c.player)!;
+  const below = s.crews.find((c) => c.league > mine && !c.player)!;
+  assert.ok(mayOffer(s, above.id) && mayOffer(s, same.id));
+  assert.equal(mayOffer(s, below.id), false, 'a post below them is no offer');
+  assert.equal(mayOffer(s, me(s)), false, 'never their own');
+  const two = offerJob(offerJob(s, above.id), same.id);
+  assert.equal(mayOffer(two, s.crews.find((c) => c.league <= mine && !c.player && c.id !== above.id && c.id !== same.id)!.id), false, 'two stand already');
+  assert.equal(mayOffer(offerJob(s, above.id), above.id), false, 'one offer a crew');
+  const out = { ...s, player: { ...s.player!, sacked: true } };
+  assert.ok(mayOffer(out, below.id), 'out of a crew, any league offers');
+  const low = { ...s, player: { ...s.player!, reputation: 0 } };
+  assert.equal(mayOffer(low, above.id), false, 'under the league\'s reputation threshold');
 });
 
 test('a crew\'s post offered to a player of enough reputation; TakeJob moves them and the old crew\'s elder hires', () => {
