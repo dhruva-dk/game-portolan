@@ -382,3 +382,10 @@ decisions are in #56, section 2.
 - **Question:** what a new shipwright knows at the start. **Choice:** `components` stays empty until section 8's
   `career/components.ts` exists; its agent deals `3 + round(stars)` (`staff.ts componentsKnown`) at founding and to new
   shipwrights. **Why:** the components are section 8's data.
+
+## 2026-11-15, Phase B (#59), sections 4–7
+
+- **Question:** how many crew swatches (the orchestrator's ruling on the entry above). **Choice:** `race.ts`
+  `SWATCHES = 24`, matching #58 step 3's 24 palette swatches; the deal is unchanged (every unordered pair but the
+  player's, shuffled by seed: 276 pairs, forty a league). **Why:** one count on both sides of the seam; the career's
+  deal and Phase A's palette must agree.

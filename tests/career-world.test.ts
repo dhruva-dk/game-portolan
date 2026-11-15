@@ -59,6 +59,10 @@ test('colours: two different swatches, no two crews of a league with the same pa
     assert.equal(new Set(pairs).size, 40);
     assert.ok(!pairs.includes(theirs));
   }
+  assert.equal(SWATCHES, 24, 'Phase A builds 24 crew swatches in the palette (#58 step 3)');
+  // the deal reaches every swatch: 276 pairs over 120 crews leave none of the 24 unused
+  const used = new Set(world.crews.flatMap((c) => [c.colours.first, c.colours.second]));
+  assert.equal(used.size, SWATCHES);
   for (const c of world.crews) assert.ok(c.emblem >= 0 && c.emblem < 12);
 });
 
