@@ -17,6 +17,7 @@
     "restage": "node tools/restage.ts",
     "steps": "node tools/steps.ts",
     "audio": "node tools/audio.ts",
+    "indexed": "node tools/indexed.ts",
     "icon": "node tools/appicon.ts",
     "shot": "xcrun devicectl device capture screenshot --device 00008140-000268A80140801C --destination captures/phone.png"
   },
