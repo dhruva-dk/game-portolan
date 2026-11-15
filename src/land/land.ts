@@ -21,24 +21,28 @@ import { WADE } from '../world/planet-islands';
 const DEEPEST = SHALLOWEST + 1;
 /** Past that, metres; and the skirt's drop. */
 const MARGIN = 2, SKIRT = 1.5;
-/** Metres between spokes at the coast, and between rings across the beach; how far out past the coast they stay that
- *  close (over the ledge and the water a ship can't sail, WADE), then how much farther apart each is than the last. */
-const SPOKE = 1.2, RING = 1.2, GROW = 1.12;
+/** A mesh's grain: metres between spokes at the coast, and between rings across the beach; how far out past the coast
+ *  they stay that close (over the ledge and the water a ship can't sail, WADE), then how much farther apart each is than
+ *  the last; and metres between rings far inland. */
+interface Grain { spoke: number; ring: number; grow: number; inland: number }
+/** The mesh an island is drawn with near the eye; and far from it (islands.ts), where a metre is under a pixel. */
+const FINE: Grain = { spoke: 1.2, ring: 1.2, grow: 1.12, inland: 3 };
+const COARSE: Grain = { spoke: 3.6, ring: 3, grow: 1.3, inland: 8 };
 
 /** How far out from the coast each ring lies, metres (negative inland), for an island out to `out` past its coast. */
-function rings(radius: number, out: number): number[] {
+function rings(radius: number, out: number, g: Grain): number[] {
   const ds: number[] = [];
   const near = Math.min(24, radius);
-  for (let d = -radius; d < -near; d += 3) ds.push(d);
-  for (let d = -near; d < WADE; d += RING) ds.push(d);
-  for (let d = WADE, step = RING; d < out; d += step, step *= GROW) ds.push(d);
+  for (let d = -radius; d < -near; d += g.inland) ds.push(d);
+  for (let d = -near; d < WADE; d += g.ring) ds.push(d);
+  for (let d = WADE, step = g.ring; d < out; d += step, step *= g.grow) ds.push(d);
   ds.push(out);
   return ds;
 }
 
-function geometry(isle: Isle, litter: (x: number, z: number) => number): BufferGeometry {
+function geometry(isle: Isle, litter: (x: number, z: number) => number, grain: Grain): BufferGeometry {
   const { site, height } = isle;
-  const spokes = Math.max(48, Math.round((2 * Math.PI * site.radius) / SPOKE));
+  const spokes = Math.max(48, Math.round((2 * Math.PI * site.radius) / grain.spoke));
   const angle = (s: number) => (s / spokes) * 2 * Math.PI;
   // how far past the coast each spoke must reach: the farthest the ground is still shallower than DEEPEST
   const raw = Array.from({ length: spokes }, (_, s) => {
@@ -48,7 +52,7 @@ function geometry(isle: Isle, litter: (x: number, z: number) => number): BufferG
     return last;
   });
   const reach = raw.map((_, s) => Math.max(...Array.from({ length: 13 }, (_, k) => raw[(s + k - 6 + spokes) % spokes])) + MARGIN);
-  const ds = rings(site.radius, Math.max(...reach));
+  const ds = rings(site.radius, Math.max(...reach), grain);
 
   const positions: number[] = [], normals: number[] = [], fallen: number[] = [];
   const n = new Vector3(), e = 0.5;
@@ -80,9 +84,13 @@ function geometry(isle: Isle, litter: (x: number, z: number) => number): BufferG
   return g;
 }
 
-/** litters[i](x, z): 0…1, how thickly fallen fronds and leaves cover island i's ground (scatter.litter). */
-export function createLand(isles: Isle[], litters: ((x: number, z: number) => number)[], sand: Sand): Mesh[] {
+/** litters[i](x, z): 0…1, how thickly fallen fronds and leaves cover island i's ground (scatter.litter). Each island's
+ *  mesh near the eye, and far from it. */
+export function createLand(isles: Isle[], litters: ((x: number, z: number) => number)[], sand: Sand): { near: Mesh[]; far: Mesh[] } {
   const material = new MeshBasicNodeMaterial();
   material.colorNode = Fn(() => sand(positionWorld, normalize(normalWorld), attribute('litter', 'float')))();
-  return isles.map((isle, i) => new Mesh(geometry(isle, litters[i]), material));
+  return {
+    near: isles.map((isle, i) => new Mesh(geometry(isle, litters[i], FINE), material)),
+    far: isles.map((isle, i) => new Mesh(geometry(isle, litters[i], COARSE), material)),
+  };
 }

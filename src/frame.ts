@@ -28,7 +28,7 @@ import { film } from './post/film';
 import { createGrade, encode } from './post/grade';
 import { createShafts, type Shafts } from './post/shafts';
 import { SKY_METRES } from './sky/sky';
-import { SPACE } from './palette';
+import { GROUNDS, SPACE } from './palette';
 import type { Vec4Node } from './tsl';
 
 /**
@@ -136,7 +136,7 @@ export function createFrame(renderer: WebGPURenderer, world: World, options: Fra
   const shadow = createShadow();
   const light = createLighting(sky.light, water.below, shadow.visible);
   // (the ground's own, with the caustics on the sea floor)
-  const sand = createSand(view, ground, createLighting(sky.light, water.floor, shadow.visible));
+  const sand = createSand(view, ground, createLighting(sky.light, water.floor, shadow.visible), GROUNDS[world.planet.biome.name]);
   const seabed = createSeabed(view, ground, sand);
   const islands = createIslands(world.planet, world.seed, view, light, sand);
   shadow.cast(...islands.casters);

@@ -41,6 +41,69 @@ export const SEABED_SAND = tones('#E8D08A', '#B89A6A');
 export const SEABED_STONE = tones('#8FA08A', '#55707A');
 export const SEABED_WEED = tones('#4F9A6E', '#2E6A62');
 
+/** A biome's ground (world/biome.ts, by its name; land/sand.ts lays it): its beach's three sands, the litter under its
+ *  growth, its cliffs' rock and their paler strata, its sea floor's sand, rubble and weed, its shrubs' green, and the
+ *  turf that covers its ground from `from` m over the sea (to `to` m, if it gives out), if any. */
+export interface Grounds {
+  readonly sand: Tones; readonly shore: Tones; readonly dry: Tones; readonly litter: Tones;
+  readonly rock: Tones; readonly stratum: Tones;
+  readonly seabed: Tones; readonly stone: Tones; readonly weed: Tones;
+  readonly shrub: Tones;
+  readonly turf: { readonly tones: Tones; readonly from: number; readonly to: number } | null;
+}
+const TODAY: Grounds = {
+  sand: SAND, shore: SAND_SHORE, dry: SAND_DRY, litter: LITTER, rock: ROCK, stratum: STRATUM,
+  seabed: SEABED_SAND, stone: SEABED_STONE, weed: SEABED_WEED, shrub: SHRUB, turf: null,
+};
+export const GROUNDS: Readonly<Record<string, Grounds>> = {
+  palmKeys: TODAY,
+  // white coral sand, coral-pink rock, the reef flats' pale floor and its coral heads
+  coralAtolls: {
+    sand: tones('#F7E2A8', '#D9A46A'), shore: tones('#FFF3CF', '#E6BC86'), dry: tones('#F0D08A', '#CC955A'), litter: tones('#C99A4E', '#97653A'),
+    rock: tones('#E39A7E', '#A5586A'), stratum: tones('#F0BE98', '#B87566'),
+    seabed: tones('#F5E9C2', '#C9B08A'), stone: tones('#E08A78', '#A0566C'), weed: tones('#5FAE8A', '#2E7A6A'),
+    shrub: tones('#7DB84A', '#2F6E4A'), turf: null,
+  },
+  // black sand and dark basalt in columns, green turf over the tops
+  basaltFjords: {
+    sand: tones('#7A6E68', '#3E3448'), shore: tones('#988A7C', '#54485A'), dry: tones('#6A5E58', '#352B40'), litter: tones('#5E5A3A', '#3A3436'),
+    rock: tones('#545468', '#25213A'), stratum: tones('#6A687C', '#332F4A'),
+    seabed: tones('#9C9A8E', '#626478'), stone: tones('#62707A', '#3A4258'), weed: tones('#3E7E5E', '#24524E'),
+    shrub: tones('#5E9A3E', '#24543E'), turf: { tones: tones('#78A848', '#2C5C40'), from: 2.2, to: Infinity },
+  },
+  // grey-brown mud, wet at the waterline, and the low ground's rank grass
+  mangroveDelta: {
+    sand: tones('#A8925E', '#6E5442'), shore: tones('#8C7C58', '#56483E'), dry: tones('#9A8A52', '#62553A'), litter: tones('#6E6034', '#463C2C'),
+    rock: tones('#8A7058', '#54404A'), stratum: tones('#A08668', '#644E48'),
+    seabed: tones('#B0A274', '#786E58'), stone: tones('#8C8A6A', '#5A5E58'), weed: tones('#5A8E4A', '#2E5E42'),
+    shrub: tones('#6AA040', '#2A5E40'), turf: { tones: tones('#86AA42', '#3A663A'), from: 0.55, to: Infinity },
+  },
+  // ash beaches, black lava, rust-red tuff in the cuts; green only on the lower flanks
+  volcanicArc: {
+    sand: tones('#5C5054', '#2E2436'), shore: tones('#7A6C6A', '#443848'), dry: tones('#4E4248', '#2A2032'), litter: tones('#5A4A36', '#33283A'),
+    rock: tones('#443C48', '#1E1828'), stratum: tones('#8A4E3A', '#4A283A'),
+    seabed: tones('#8A8478', '#545066'), stone: tones('#4E4A52', '#2C2838'), weed: tones('#3E7258', '#244A48'),
+    shrub: tones('#6A9E3A', '#285640'), turf: { tones: tones('#6E9A3E', '#2C5440'), from: 1.6, to: 9 },
+  },
+  // white chalk cliffs over a shingle beach, banded with flint, and the downs' short turf
+  chalkDowns: {
+    sand: tones('#D9C9A4', '#9A887E'), shore: tones('#E8DCBE', '#AC9C8E'), dry: tones('#C9B88C', '#8E7C70'), litter: tones('#8E8A4E', '#5A5440'),
+    rock: tones('#F4F0E2', '#B4AAC2'), stratum: tones('#E6DFCF', '#A99FB8'),
+    seabed: tones('#E2DABA', '#A8A08E'), stone: tones('#B8B4A8', '#7A7A86'), weed: tones('#4F9A6E', '#2E6A62'),
+    shrub: tones('#6EA642', '#2C6444'), turf: { tones: tones('#8CBC4E', '#3A6E42'), from: 1.4, to: Infinity },
+  },
+};
+
+/** The trees of the biomes that have them (land/trees.ts): a conifer's, a broadleaf's and a mangrove's leaves; the
+ *  bark of each; a mangrove's roots. */
+export const CONIFER = tones('#3E8A4E', '#173E3E');
+export const BROADLEAF = tones('#6EAE3E', '#24583E');
+export const MANGROVE = tones('#5C9E3E', '#20503C');
+export const BARK = tones('#7A5236', '#3E2834');
+export const ROOTS = tones('#8A6E4E', '#4A3838');
+/** A crater's steam. */
+export const STEAM = tones('#FFF6E8', '#C8B4C0');
+
 // ---- the ships
 export const TIMBER = tones('#9A5A2C', '#5A2F2E');
 export const DECK = tones('#D9A86A', '#9A6548');

@@ -40,11 +40,13 @@ export type Profile =
   | { kind: 'cone'; crater: number }
   | { kind: 'flat' };
 
-/** What grows where (world/scatter.ts): palms and shrubs as many as today's times these; trees of a form, `count` on a
- *  70 m island, `height` m (least, most), standing only on ground no steeper than `flat` (rise over run), `from`…`to` m
- *  from the waterline (negative inland), in clumps of the noise's `clump` m; the rocks' outcrops times `rocks`. */
+/** What grows where (world/scatter.ts): palms and shrubs as many as today's times these, palms no higher than `high` m;
+ *  trees of a form, `count` on a 70 m island, `height` m (least, most), standing only on ground no steeper than `flat`
+ *  (rise over run), `from`…`to` m from the waterline (negative inland), in clumps of the noise's `clump` m; the rocks'
+ *  outcrops times `rocks`. */
 export interface Growth {
   palms: number;
+  high: number;
   shrubs: number;
   trees: { form: 'conifer' | 'broadleaf' | 'mangrove'; count: number; height: readonly [number, number]; flat: number; from: number; to: number; clump: number } | null;
   rocks: number;
@@ -82,7 +84,7 @@ const TODAY: Land = { kinds: {}, coast: { wear: 1, headlands: 0, coves: 0 }, pro
 
 /** The six, in the order a seed's high part counts them. Their numbers are starting values. */
 export const BIOMES: readonly Biome[] = [
-  { name: 'palmKeys', land: TODAY, growth: { palms: 1, shrubs: 1, trees: null, rocks: 1 }, rule: 'none', haze: 1, steam: false },
+  { name: 'palmKeys', land: TODAY, growth: { palms: 1, high: Infinity, shrubs: 1, trees: null, rocks: 1 }, rule: 'none', haze: 1, steam: false },
   {
     // rings of low reef round lagoons, wide pale reef flats about them; few high islands
     name: 'coralAtolls',
@@ -98,7 +100,7 @@ export const BIOMES: readonly Biome[] = [
       apron: { inner: [2.9, 3.4], outer: [3.6, 4.6] },
       bank: [8, 17],
     },
-    growth: { palms: 1.4, shrubs: 0.7, trees: null, rocks: 0.5 },
+    growth: { palms: 1.4, high: Infinity, shrubs: 0.7, trees: null, rocks: 0.5 },
     rule: 'reef', haze: 1, steam: false,
   },
   {
@@ -118,7 +120,7 @@ export const BIOMES: readonly Biome[] = [
       apron: { inner: [5, 6], outer: [7, 9] },
       gap: 14,
     },
-    growth: { palms: 0, shrubs: 0.6, trees: { form: 'conifer', count: 34, height: [7, 13], flat: 0.32, from: -60, to: -4, clump: 14 }, rocks: 1.6 },
+    growth: { palms: 0, high: Infinity, shrubs: 0.6, trees: { form: 'conifer', count: 34, height: [7, 13], flat: 0.32, from: -60, to: -4, clump: 14 }, rocks: 1.2 },
     rule: 'lee', haze: 1, steam: false,
   },
   {
@@ -139,7 +141,7 @@ export const BIOMES: readonly Biome[] = [
       gap: 16,
       bank: [3.5, 11],
     },
-    growth: { palms: 0, shrubs: 0.8, trees: { form: 'mangrove', count: 70, height: [4.5, 8], flat: 0.25, from: -16, to: 1.2, clump: 9 }, rocks: 0 },
+    growth: { palms: 0, high: Infinity, shrubs: 0.8, trees: { form: 'mangrove', count: 70, height: [4.5, 8], flat: 0.25, from: -16, to: 1.2, clump: 9 }, rocks: 0 },
     rule: 'roots', haze: 1, steam: false,
   },
   {
@@ -157,7 +159,7 @@ export const BIOMES: readonly Biome[] = [
       coast: { wear: 1.2, headlands: 0, coves: 0 },
       profile: { kind: 'cone', crater: 0.12 },
     },
-    growth: { palms: 0.45, shrubs: 0.6, trees: null, rocks: 1.4 },
+    growth: { palms: 0.6, high: 7, shrubs: 0.6, trees: null, rocks: 1.4 },
     rule: 'ash', haze: 1.9, steam: true,
   },
   {
@@ -176,7 +178,7 @@ export const BIOMES: readonly Biome[] = [
       profile: { kind: 'cliff', foot: 1.4, run: 0.14, top: [4, 7], terrace: null },
       bank: [2.6, 13],
     },
-    growth: { palms: 0, shrubs: 0.9, trees: { form: 'broadleaf', count: 26, height: [6, 10], flat: 0.22, from: -70, to: -8, clump: 18 }, rocks: 0.7 },
+    growth: { palms: 0, high: Infinity, shrubs: 0.9, trees: { form: 'broadleaf', count: 26, height: [6, 10], flat: 0.22, from: -70, to: -8, clump: 18 }, rocks: 0.7 },
     rule: 'tide', haze: 1, steam: false,
   },
 ];

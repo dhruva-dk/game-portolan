@@ -103,7 +103,7 @@ export const ISLANDS = {
 
 /** A cone's crater rim, as a share of the way in from its beach to its middle; and the steepest its flanks may be (rise
  *  over run, as ISLANDS.steepest): ash and bare rock, nothing standing high on it but on its low flats. */
-const RIM = 0.86, CONE = 1.05;
+const RIM = 0.86, CONE = 1.35, CONCAVE = 1.4;
 
 /** A hill on the land: its crest on the island's chart, how far its foot spreads round it and its height (a share
  *  of the whole), metres. */
@@ -304,7 +304,7 @@ export function createIslandSite(kind: Kind, chart: Chart, radius: number, noise
   const hill = (x: number, z: number, u: number) => {
     const t = Math.min(Math.max(-field.soft(x, z), 0) / field.inmost, 1);
     // a cone's flanks steepen up to the crater's rim, and fall into it
-    if (P.kind === 'cone' && cone) return (Math.min(t, RIM) / RIM) ** 1.7 * smoothstep(0, 5, u) - P.crater * smoothstep(RIM, 1, t);
+    if (P.kind === 'cone' && cone) return (Math.min(t, RIM) / RIM) ** CONCAVE * smoothstep(0, 5, u) - P.crater * smoothstep(RIM, 1, t);
     let v = along * slope(t) * smoothstep(0, 5, u);
     for (const m of mounds) v += (1 - along) * m.height * slope(Math.max(1 - Math.hypot(x - m.x, z - m.z) / m.foot, 0), 0.2, 0.45);
     return v;

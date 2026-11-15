@@ -21,6 +21,7 @@ import { createNoise3 } from './noise3.ts';
 import { WADE, type IslandSite } from './planet-islands.ts';
 import { hash, random } from './random.ts';
 import { fromChart, type Vec3 } from './sphere.ts';
+import type { Biome } from './biome.ts';
 
 /** An island and its ground on its chart: metres above the sea at (x, z). */
 export interface Isle {
@@ -83,9 +84,11 @@ const seat = (isle: Isle, x: number, z: number, size: number, sunk: number) => {
   return low - sunk * size;
 };
 
-/** bigShapes, boulderShapes: how many shapes each kind of rock comes in. */
-export function scatterRocks(isle: Isle, bigShapes: number, boulderShapes: number, seed = 1): Rock[] {
+/** bigShapes, boulderShapes: how many shapes each kind of rock comes in; `share`: the outcrops as many as today's
+ *  times this (the biome's growth, world/biome.ts; none at 0). */
+export function scatterRocks(isle: Isle, bigShapes: number, boulderShapes: number, seed = 1, share = 1): Rock[] {
   const { site } = isle;
+  if (share === 0) return [];
   const rand = random(hash(seed, 0x726f636b)); // "rock": a stream of its own
   const rocks: Rock[] = [];
   const clear = (x: number, z: number, size: number, big: boolean) =>
@@ -93,7 +96,7 @@ export function scatterRocks(isle: Isle, bigShapes: number, boulderShapes: numbe
   /** Whether a rock there reaches no farther out than the water too shallow for a ship. */
   const ashore = (x: number, z: number, size: number) => site.shore(x, z) + FOOT * size < WADE - 1;
   // (an atoll's ring is sand and coral: one)
-  const outcrops = site.kind === 'atoll' ? 1 : Math.max(1, Math.round((2 * Math.PI * site.radius) / COAST_PER_OUTCROP));
+  const outcrops = site.kind === 'atoll' ? 1 : Math.max(1, Math.round(((2 * Math.PI * site.radius) / COAST_PER_OUTCROP) * share));
   // the coast's outcrops, then one heaped on each offshore rock but a sea stack (centre, smallest and largest mass)
   const heaps = [
     ...Array.from({ length: outcrops }, (_, o) => ({ centre: ((o + 0.3 + rand() * 0.4) / outcrops) * 2 * Math.PI, at: null as [number, number] | null, most: BIG[1] })),
@@ -169,12 +172,13 @@ const BEACH_TOP = -4, INNERMOST = -50;
 const field = (noise: ReturnType<typeof createNoise3>, x: number, z: number, size: number, k: number) =>
   noise.value(x / size, z / size, k) + 0.5 * noise.value((2 * x) / size, (2 * z) / size, k + 17.3);
 
-export function scatterPalms(isle: Isle, rocks: Rock[], seed = 1): Palm[] {
+/** `share`: as many as today's times this, none higher than `below` metres (the biome's growth). */
+export function scatterPalms(isle: Isle, rocks: Rock[], seed = 1, share = 1, below = Infinity): Palm[] {
   const { site } = isle;
-  if (site.kind === 'rocks' || site.kind === 'mesa') return [];
+  if (site.kind === 'rocks' || site.kind === 'mesa' || share === 0) return [];
   const rand = random(seed * 104729 + 3), noise = createNoise3(seed + 71);
   // (an atoll's ring, a narrow strip of its area, thick with them)
-  const palms: Palm[] = [], count = perArea(site, PALMS) * (site.kind === 'atoll' ? ATOLL_PALMS : 1);
+  const palms: Palm[] = [], count = Math.round(perArea(site, PALMS) * (site.kind === 'atoll' ? ATOLL_PALMS : 1) * share);
   for (let tries = 0; palms.length < count && tries < count * 200; tries++) {
     const t = rand() * 2 * Math.PI, [x, z] = onCoast(site, t, BEACH_TOP + rand() * (INNERMOST - BEACH_TOP)), d = site.shore(x, z);
     if (Math.hypot(x, z) < 5 || d > BEACH_TOP) continue;
@@ -184,7 +188,7 @@ export function scatterPalms(isle: Isle, rocks: Rock[], seed = 1): Palm[] {
     if (rand() > grove * (0.25 + 0.75 * coastal)) continue;
     if (palms.some((p) => Math.hypot(p.x - x, p.z - z) < SPACING) || onRock(rocks, x, z, 1) || site.face(x, z)) continue;
     const y = isle.height(x, z);
-    if (y < 0.5) continue;
+    if (y < 0.5 || y > below) continue;
     palms.push({
       x, z, y: y - 0.2,
       height: 7 + rand() * 6,
@@ -212,11 +216,12 @@ export interface Shrub {
 export const SHRUBS = 50;
 const HEDGE = [-14, -5], INMOST_SHRUB = -45;
 
-export function scatterShrubs(isle: Isle, rocks: Rock[], shapes: number, seed = 1): Shrub[] {
+/** `share`: as many as today's times this (the biome's growth). */
+export function scatterShrubs(isle: Isle, rocks: Rock[], shapes: number, seed = 1, share = 1): Shrub[] {
   const { site } = isle;
-  if (site.kind === 'rocks') return [];
+  if (site.kind === 'rocks' || share === 0) return [];
   const rand = random(seed * 15485863 + 5), noise = createNoise3(seed + 83);
-  const shrubs: Shrub[] = [], count = perArea(site, SHRUBS);
+  const shrubs: Shrub[] = [], count = Math.round(perArea(site, SHRUBS) * share);
   for (let tries = 0; shrubs.length < count && tries < count * 200; tries++) {
     const t = rand() * 2 * Math.PI, [x, z] = onCoast(site, t, HEDGE[1] + rand() * (INMOST_SHRUB - HEDGE[1])), d = site.shore(x, z);
     if (Math.hypot(x, z) < 3 || d > HEDGE[1]) continue;
@@ -233,14 +238,62 @@ export function scatterShrubs(isle: Isle, rocks: Rock[], shapes: number, seed = 
   return shrubs;
 }
 
-/** How far past a palm's foot its litter reaches (about its crown's reach), and past a shrub's middle (by its size). */
-const PALM_LITTER = 4.5, SHRUB_LITTER = 0.4;
+export interface Tree {
+  x: number;
+  /** Its foot: the ground's height (a mangrove's, the water's or the mud's, whichever is higher), less a little. */
+  y: number;
+  z: number;
+  /** Metres from its foot to its top. */
+  height: number;
+  yaw: number;
+  /** Which of the shapes it is. */
+  shape: number;
+  /** 0…1: a little paler or darker than the rest. */
+  tint: number;
+}
+
+/** A biome's trees (world/biome.ts Growth.trees). */
+export type Trees = NonNullable<Biome['growth']['trees']>;
+
+/** How far apart two trees' feet stand at least, as a share of their heights' mean; how deep under the sea's level a
+ *  mangrove may stand (its roots in the water); and how far (metres) the slope is read either side of a foot. */
+const TREE_SPACING = 0.32, WADING = 0.9, SLOPE_SPAN = 1.5;
+
+/** Trees standing only on ground no steeper than the biome's `flat`, in clumps where the noise says, `from`…`to` m from
+ *  the waterline; none on a cliff's face, a rock, or a rocks knoll. */
+export function scatterTrees(isle: Isle, rocks: Rock[], trees: Trees, shapes: number, seed = 1): Tree[] {
+  const { site } = isle;
+  if (site.kind === 'rocks') return [];
+  const rand = random(hash(seed, 0x74726565)), noise = createNoise3((seed + 97) % 1048576); // "tree"
+  const out: Tree[] = [], count = perArea(site, trees.count), mangrove = trees.form === 'mangrove';
+  const slope = (x: number, z: number) => {
+    const e = SLOPE_SPAN;
+    return Math.hypot(isle.height(x + e, z) - isle.height(x - e, z), isle.height(x, z + e) - isle.height(x, z - e)) / (2 * e);
+  };
+  for (let tries = 0; out.length < count && tries < count * 120; tries++) {
+    const t = rand() * 2 * Math.PI, [x, z] = onCoast(site, t, trees.to + rand() * (trees.from - trees.to)), d = site.shore(x, z);
+    if (d > trees.to || d < trees.from || Math.hypot(x, z) < 2) continue;
+    const clump = Math.min(Math.max((field(noise, x, z, trees.clump, 2.5) + 0.05) / 0.3, 0), 1);
+    if (rand() > clump) continue;
+    const height = trees.height[0] + (trees.height[1] - trees.height[0]) * rand();
+    const ground = isle.height(x, z);
+    if (ground < (mangrove ? -WADING : 0.6) || slope(x, z) > trees.flat || site.face(x, z) || onRock(rocks, x, z, 1)) continue;
+    if (out.some((o) => Math.hypot(o.x - x, o.z - z) < (o.height + height) * 0.5 * TREE_SPACING)) continue;
+    out.push({ x, z, y: Math.max(ground, mangrove ? 0 : -Infinity) - 0.15, height, yaw: rand() * 2 * Math.PI, shape: Math.floor(rand() * shapes), tint: rand() });
+  }
+  return out;
+}
+
+/** How far past a palm's foot its litter reaches (about its crown's reach), and past a shrub's middle (by its size), and
+ *  a tree's (by its height). */
+const PALM_LITTER = 4.5, SHRUB_LITTER = 0.4, TREE_LITTER = 0.3;
 
 /** 0…1: how thickly litter covers the ground at (x, z). */
-export function litter(palms: Palm[], shrubs: Shrub[]): (x: number, z: number) => number {
+export function litter(palms: Palm[], shrubs: Shrub[], trees: Tree[] = []): (x: number, z: number) => number {
   const spots = [
     ...palms.map((p) => ({ x: p.x, z: p.z, r: PALM_LITTER })),
     ...shrubs.map((s) => ({ x: s.x, z: s.z, r: s.size * SHRUB_LITTER })),
+    ...trees.map((s) => ({ x: s.x, z: s.z, r: s.height * TREE_LITTER })),
   ];
   return (x, z) => {
     let sum = 0;

@@ -3,9 +3,12 @@
 // (src/meter.ts) once it has settled: a displayed frame's draw calls, triangles and render passes, each a second's
 // mean. Fails (exit 1) if any view is over its budget (BUDGET, or the view's own). The counts are three's, so they do not depend on the machine: they move only when what is
 // drawn changes (or the islands do: a new planet's land moves the triangles a little, not the draws).
-//   node tools/budget.ts        (npm run budget)
+//   node tools/budget.ts                (npm run budget: the page's planet)
+//   node tools/budget.ts --seed=<n>     (that planet's)
+//   node tools/budget.ts --biomes       (a planet of each biome, world/biome.ts: seedIn(name, 7))
 
 import { DEVICE, launch } from './launch.ts';
+import { BIOMES, seedIn } from '../src/world/biome.ts';
 
 /** Per displayed frame, every pass summed. The device pays CPU for each draw before the GPU does anything. */
 export const BUDGET = { draws: 100, triangles: 900_000, passes: 20 };
@@ -30,14 +33,20 @@ const VIEWS: { name: string; q: string; own?: Partial<Budget> }[] = [
   { name: 'rookery-near', q: 'screen=rookery-3d&select=foundry' },
 ];
 
+const asked = process.argv.find((a) => a.startsWith('--seed='))?.slice(7);
+const planets: { label: string; q: string }[] = process.argv.includes('--biomes')
+  ? BIOMES.map((b) => ({ label: `${b.name} (seed ${seedIn(b.name, 7)})`, q: `&seed=${seedIn(b.name, 7)}` }))
+  : [{ label: asked ? `seed ${asked}` : '', q: asked ? `&seed=${asked}` : '' }];
+
 const { browser, url, close } = await launch();
 let over = false;
 try {
-  for (const { name, q, own } of VIEWS) {
+  for (const planet of planets) for (const { name, q, own } of VIEWS) {
+    if (planet.label && name === VIEWS[0].name) console.log(planet.label);
     const limit: Budget = { ...BUDGET, ...own };
     const page = await browser.newPage({ viewport: { width: DEVICE.width, height: DEVICE.height } });
     page.on('pageerror', (e) => console.error(`[${name}] ${e.message}`));
-    await page.goto(`${url}?${q}&pause`);
+    await page.goto(`${url}?${q}${planet.q}&pause`);
     await page.waitForFunction(() => document.getElementById('meter')?.textContent, null, { timeout: 60000 });
     // the first reading holds the shaders' compiling; the second is a settled second's
     const first = await page.textContent('#meter');

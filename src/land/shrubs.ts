@@ -11,7 +11,7 @@ import {
   MeshBasicNodeMaterial, Quaternion, Vector3,
 } from 'three/webgpu';
 import { Fn, attribute, mix, normalWorldGeometry, normalize, positionWorld, vec3 } from 'three/tsl';
-import { SHRUB } from '../palette';
+import type { Tones } from '../palette';
 import { random } from '../world/random';
 import type { Shrub } from '../world/scatter';
 import type { Chart } from '../world/sphere';
@@ -69,8 +69,9 @@ function shape(seed: number): BufferGeometry {
   return g;
 }
 
-/** shrubs[i]: those on island i, whose chart is charts[i]; each one of SHAPES shapes. */
-export function createShrubs(shrubs: Shrub[][], charts: Chart[], light: Light) {
+/** shrubs[i]: those on island i, whose chart is charts[i]; each one of SHAPES shapes, in the biome's green (palette.ts
+ *  GROUNDS). */
+export function createShrubs(shrubs: Shrub[][], charts: Chart[], light: Light, leaf: Tones) {
   const material = new MeshBasicNodeMaterial({ side: DoubleSide });
   material.colorNode = Fn(() => {
     // the normal as the shape has it, bent toward its mass's, whichever side of the leaf is seen: the bush is lit as
@@ -79,8 +80,8 @@ export function createShrubs(shrubs: Shrub[][], charts: Chart[], light: Light) {
     // each shrub a little paler or darker than the next; and deep in a mass, where less of the sky reaches, a leaf
     // keeps its shadow tone
     const own = attribute('tint', 'float').sub(0.5).mul(VARIED).add(1);
-    const shadow = vec3(...SHRUB.shadow).mul(own);
-    return light.toon(p, n, mix(shadow, vec3(...SHRUB.lit).mul(own), cut(attribute('depth', 'float'), SHADED)), shadow);
+    const shadow = vec3(...leaf.shadow).mul(own);
+    return light.toon(p, n, mix(shadow, vec3(...leaf.lit).mul(own), cut(attribute('depth', 'float'), SHADED)), shadow);
   })();
 
   const m = new Matrix4(), q = new Quaternion(), s = new Vector3(), zero = new Vector3(), up = new Vector3(0, 1, 0);
