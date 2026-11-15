@@ -78,7 +78,7 @@ export function sacked(s: CareerState, crew: number, roll: Dice): CareerState {
     return sackedOffers(out);
   }
   out = released(out, m);
-  return hireManager(out, crew, roll, true);
+  return hireManager(out, crew, roll, true, m);
 }
 
 /** Whether a manager's reputation fits a league. */
@@ -86,17 +86,17 @@ const fits = (g: Gull, league: number): boolean => g.reputation >= E.fit[league]
 
 /** The managers an elder may hire: the free agents, and the managers of lower leagues' crews (poached). The player's
  *  gull is never among them: posts reach the player only as offers. */
-export function managerCandidates(s: CareerState, crew: number): Gull[] {
+export function managerCandidates(s: CareerState, crew: number, barred: number | null = null): Gull[] {
   const league = s.crews[crew].league;
-  return s.gulls.filter((g) => g.role === 'manager' && !g.player && g.retired === null
+  return s.gulls.filter((g) => g.role === 'manager' && !g.player && g.retired === null && g.id !== barred
     && (g.contract === null || s.crews[g.contract.crew].league > league));
 }
 
 /** The best manager for a crew: of those who fit, the best reputation, then stars, then the free before the poached,
- *  then the lower id; if none fits, the best free agent by the same order. */
-export function bestManager(s: CareerState, crew: number): Gull | null {
+ *  then the lower id; if none fits, the best free agent by the same order. `barred`: the manager just sacked. */
+export function bestManager(s: CareerState, crew: number, barred: number | null = null): Gull | null {
   const league = s.crews[crew].league;
-  const all = managerCandidates(s, crew);
+  const all = managerCandidates(s, crew, barred);
   const order = (a: Gull, b: Gull) => b.reputation - a.reputation || stars(b) - stars(a) || Number(a.contract !== null) - Number(b.contract !== null) || a.id - b.id;
   return all.filter((g) => fits(g, league)).sort(order)[0] ?? all.filter((g) => g.contract === null).sort(order)[0] ?? null;
 }
@@ -122,11 +122,11 @@ export function offerJob(s: CareerState, crew: number): CareerState {
 
 /** A state with a crew's open post filled: offered to the player if they may take it and stand at least as high as the
  *  best candidate (when `player` allows); else the best candidate signed (a poached manager's crew then hires in turn).
- *  Nothing while an offer of the post to the player stands. */
-export function hireManager(s: CareerState, crew: number, roll: Dice, player: boolean): CareerState {
+ *  Nothing while an offer of the post to the player stands. An elder never takes back the manager it sacked (`barred`). */
+export function hireManager(s: CareerState, crew: number, roll: Dice, player: boolean, barred: number | null = null): CareerState {
   const c = s.crews[crew];
   if (c.staff.manager !== null || s.player?.offers.some((o) => o.crew === crew)) return s;
-  const best = bestManager(s, crew);
+  const best = bestManager(s, crew, barred);
   if (player && s.player && !s.player.sacked && mayOffer(s, crew) && s.player.reputation >= (best?.reputation ?? 0)) return offerJob(s, crew);
   if (!best) return s;
   const from = best.contract?.crew ?? null;
