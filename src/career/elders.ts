@@ -18,7 +18,7 @@ import { schedule, unscheduled } from './queue.ts';
 import { makeGull } from './recruit.ts';
 import type { Gull, GullOf } from './roles.ts';
 import { YEAR, age, stars } from './stars.ts';
-import { withGulls, type CareerState, type Crew, type JobOffer } from './state.ts';
+import { withGulls, type CareerState, type Crew, type JobOffer, type Standing } from './state.ts';
 import { TUNING } from './tuning.ts';
 import { targets } from './world.ts';
 
@@ -31,11 +31,19 @@ const withCrew = (s: CareerState, c: Crew): CareerState => {
   return { ...s, crews };
 };
 
+/** Each league's places by crew, for each standings list already read (immutable, so its order never changes). */
+const placed = new WeakMap<readonly Standing[], ReadonlyMap<number, number>>();
+
 /** A crew's place in its league (1 best): by points, then wins, then the lower id. */
 export function standingOf(s: CareerState, crew: number): number {
-  const l = s.leagues[s.crews[crew].league];
-  const sorted = [...l.standings].sort((a, b) => b.points - a.points || b.wins - a.wins || a.crew - b.crew);
-  return sorted.findIndex((x) => x.crew === crew) + 1;
+  const standings = s.leagues[s.crews[crew].league].standings;
+  let places = placed.get(standings);
+  if (!places) {
+    const sorted = [...standings].sort((a, b) => b.points - a.points || b.wins - a.wins || a.crew - b.crew);
+    places = new Map(sorted.map((x, i) => [x.crew, i + 1]));
+    placed.set(standings, places);
+  }
+  return places.get(crew) ?? 0;
 }
 
 /** The elder's word, if confidence crossed one of 75, 50, 25 (either way): the level crossed. */
@@ -105,8 +113,18 @@ const fits = (g: Gull, league: number): boolean => g.reputation >= E.fit[league]
  *  gull is never among them: posts reach the player only as offers. */
 export function managerCandidates(s: CareerState, crew: number, barred: number | null = null): Gull[] {
   const league = s.crews[crew].league;
-  return s.gulls.filter((g) => g.role === 'manager' && !g.player && g.retired === null && g.id !== barred
-    && (g.contract === null || s.crews[g.contract.crew].league > league));
+  return managersIn(s.gulls).filter((g) => g.id !== barred && (g.contract === null || s.crews[g.contract.crew].league > league));
+}
+
+/** The working managers (not retired, not the player) of each gulls list already read (lists are immutable). */
+const managers = new WeakMap<readonly Gull[], readonly Gull[]>();
+function managersIn(gulls: readonly Gull[]): readonly Gull[] {
+  let out = managers.get(gulls);
+  if (!out) {
+    out = gulls.filter((g) => g.role === 'manager' && !g.player && g.retired === null);
+    managers.set(gulls, out);
+  }
+  return out;
 }
 
 /** The best manager for a crew: of those who fit, the best reputation, then stars, then the free before the poached,

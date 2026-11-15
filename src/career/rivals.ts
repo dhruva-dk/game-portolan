@@ -14,6 +14,7 @@ import { fill, poach, renew, replace, scout } from './bidding.ts';
 import type { Dice } from './dice.ts';
 import { effective } from './effective.ts';
 import { hireManager } from './elders.ts';
+import { knownTo } from './knowledge.ts';
 import { commitment } from './leadership.ts';
 import { roomOf } from './money.ts';
 import { schedule, type Event } from './queue.ts';
@@ -54,10 +55,11 @@ export function mindOf(s: CareerState, crew: number): Mind | null {
   const stats = effective(g as GullOf<'manager'>, null);
   const personality = g.personality ?? 'steady';
   const room = Math.min(roomOf(s, crew, stats.finance), commitment(stats.finance, c.coin, c.debtFloor)) * R.personalities[personality].spend;
-  const key = String(crew);
   let seen: readonly number[] | null = null;
-  const known = (): readonly number[] =>
-    (seen ??= s.gulls.filter((x) => x.known[key] !== undefined && x.contract?.crew !== crew && x.retired === null && !x.player).map((x) => x.id));
+  const known = (): readonly number[] => (seen ??= knownTo(s, crew).filter((id) => {
+    const x = s.gulls[id];
+    return x.contract?.crew !== crew && x.retired === null && !x.player;
+  }));
   return { crew, manager: g.id, stats, personality, room, known };
 }
 

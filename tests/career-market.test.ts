@@ -7,13 +7,13 @@ import { apply, type CareerState } from '../src/career/career.ts';
 import { breakCost, dismissalCost, expired, youngGulls } from '../src/career/contracts.ts';
 import { dice } from '../src/career/dice.ts';
 import { answerDay, hear, lapse, offerCheck, offered } from '../src/career/hiring.ts';
-import { knowledgeTurned, knows, learned, view } from '../src/career/knowledge.ts';
+import { knowledgeTurned, knownTo, knows, learned, view } from '../src/career/knowledge.ts';
 import { answer, askOf, counterTo, lowball, score } from '../src/career/market.ts';
 import { withStats } from '../src/career/roles.ts';
 import { seatOf, seatRole } from '../src/career/seats.ts';
 import { staffOf } from '../src/career/state.ts';
 import { TUNING } from '../src/career/tuning.ts';
-import { founded, invariants, must, refused } from './career-kit.ts';
+import { founded, invariants, must, refused, sailed } from './career-kit.ts';
 
 const M = TUNING.market;
 const roll = (s: CareerState) => dice(s.seed, s.streams);
@@ -118,6 +118,19 @@ test('knowledge turns at a season\'s end: next season shows the change in stars 
   const up = Object.fromEntries(Object.entries(g.stats).map(([k, v]) => [k, Math.min(20, v + 4)]));
   gulls[g.id] = withStats(t.gulls[g.id], up);
   assert.ok((view({ ...t, gulls }, crew, g.id).arrow ?? 0) > 0);
+});
+
+test('the gulls a crew knows, kept between states, match a scan of every gull in any state read, in any order', () => {
+  const scan = (s: CareerState, crew: number) => s.gulls.filter((g) => g.known[String(crew)] !== undefined).map((g) => g.id);
+  let s = founded();
+  const states: CareerState[] = [s];
+  for (let k = 0; k < 6; k++) {
+    s = s.race === null ? must(s, { kind: 'Advance' }) : sailed(s);
+    states.push(s);
+  }
+  s = learned(learned(s, 0, s.gulls.length - 1, null), 3, 5, null);
+  states.push(s, states[1], states[4]);
+  for (const t of states) for (const crew of [0, 3, 17, 60]) assert.deepEqual(knownTo(t, crew), scan(t, crew));
 });
 
 test('a gull\'s answer: their ask is accepted; less money scores lower; from 0.85 a counter that scores 1; below it a refusal', () => {

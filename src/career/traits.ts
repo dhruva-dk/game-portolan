@@ -117,8 +117,21 @@ export function turned(role: Role, held: readonly string[], rand: Rand): string[
   return out;
 }
 
+/** The unconditional modifier of each traits list already read: states are immutable, so a gull's list never changes
+ *  (asks and marketability read it many times a review). Read only, never changed. */
+const unconditional = new WeakMap<readonly string[], Modifier>();
+
 /** What a gull's traits add up to in a setting (only those whose condition holds). Null setting: the unconditional. */
 export function modifier(held: readonly string[], setting: Setting | null): Modifier {
+  if (setting !== null) return summed(held, setting);
+  const hit = unconditional.get(held);
+  if (hit) return hit;
+  const out = summed(held, null);
+  unconditional.set(held, out);
+  return out;
+}
+
+function summed(held: readonly string[], setting: Setting | null): Modifier {
   const out: Modifier = { stats: {}, all: 0, morale: 0, marketability: 0, wage: 0, coin: 0, growth: 0, wants: null };
   const stats: Record<string, number> = {};
   for (const id of held) {

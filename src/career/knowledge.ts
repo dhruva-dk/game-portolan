@@ -26,6 +26,39 @@ export const leagueOf = (s: CareerState, g: Gull): number | null => (g.contract 
 /** Whether a crew knows a gull exactly: its own, or scouted. */
 export const knows = (s: CareerState, crew: number, g: Gull): boolean => g.contract?.crew === crew || g.known[crew] !== undefined;
 
+/** The ids of the gulls with an entry for each crew in their `known`, for the last gulls list read. States share every
+ *  gull they did not change, so a new list is brought up to date by comparing it with that one and reading again only
+ *  the gulls that differ: a crew's reviews then look over the few dozen gulls it knows, not every gull there is. */
+let indexed: readonly Gull[] = [];
+const byCrew = new Map<string, Set<number>>();
+
+function reindexed(gulls: readonly Gull[]): void {
+  if (gulls === indexed) return;
+  const both = Math.min(gulls.length, indexed.length);
+  for (let i = 0; i < both; i++) {
+    const was = indexed[i], now = gulls[i];
+    if (was === now || was.known === now.known) continue;
+    for (const k of Object.keys(was.known)) byCrew.get(k)?.delete(i);
+    entered(now);
+  }
+  for (let i = both; i < indexed.length; i++) for (const k of Object.keys(indexed[i].known)) byCrew.get(k)?.delete(i);
+  for (let i = both; i < gulls.length; i++) entered(gulls[i]);
+  indexed = gulls;
+}
+
+function entered(g: Gull): void {
+  for (const k of Object.keys(g.known)) {
+    const ids = byCrew.get(k) ?? new Set<number>();
+    byCrew.set(k, ids.add(g.id));
+  }
+}
+
+/** The ids of the gulls a crew has an entry for (its scouts' reports, its signings), in id order. */
+export function knownTo(s: CareerState, crew: number): number[] {
+  reindexed(s.gulls);
+  return [...(byCrew.get(String(crew)) ?? [])].sort((a, b) => a - b);
+}
+
 /** A crew's eyes: the best Judgement and Insight among its scouts with a league (null: the free agents) in Reach. */
 export type Sight = (league: number | null) => { judgement: number; insight: number };
 

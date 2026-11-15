@@ -18,19 +18,25 @@ export type Stops = (s: CareerState, event: Event) => boolean;
  *  season's first day stops too: its planets and suppliers wait, and it splits the forty-four days off in two. */
 const ALWAYS_STOP: ReadonlySet<EventKind> = new Set<EventKind>(['race', 'jobExpires']);
 
-/** The default stop rule: race day, a job offer's deadline, a season's first day, and anything addressed to the player's crew that leaves
- *  them a choice (an answer to their offer, a dilemma of theirs). */
+/** Whether any of today's mail meets a test (mail is kept in the order it came, so only its tail is read). */
+function mailedToday(s: CareerState, test: (m: CareerState['mail'][number]) => boolean): boolean {
+  for (let i = s.mail.length - 1; i >= 0 && s.mail[i].day === s.day; i--) if (test(s.mail[i])) return true;
+  return false;
+}
+
+/** The default stop rule: race day, a job offer's deadline, a season's first day, and anything addressed to the
+ *  player's crew that leaves them a choice (an answer to their offer, a dilemma of theirs). */
 export const stopsFor: Stops = (s, e) => {
   if (ALWAYS_STOP.has(e.kind)) return true;
   // the first season opens on the founding day itself: nothing to stop for
   if (e.kind === 'seasonStart') return s.season > 0;
   const mine = s.player?.crew;
   // a dilemma of the player's crew whose mail came (its trigger still held: career/dilemmas.ts)
-  if (e.kind === 'dilemma') return e.crew === mine && s.mail.some((m) => m.day === s.day && m.dilemma?.id === e.id && m.dilemma.answer === null);
+  if (e.kind === 'dilemma') return e.crew === mine && mailedToday(s, (m) => m.dilemma?.id === e.id && m.dilemma.answer === null);
   // an answer to the player's offer: by now the talk is gone (signed or refused) or carries a counter, and the player
   // has mail of it naming the talk (a gull answers every offer due that day on the first one's event; each other
   // offer's own event still comes, and stops if the offer was the player's)
-  if (e.kind === 'answer') return s.mail.some((m) => m.day === s.day && m.slots.talk === e.talk);
+  if (e.kind === 'answer') return mailedToday(s, (m) => m.slots.talk === e.talk);
   // a rival's review that approached one of the player's gulls: they may answer it with a renewal before the gull decides
   if (e.kind === 'review') return s.talks.some((t) => t.crew === e.crew && t.made === s.day && s.gulls[t.gull].contract?.crew === mine);
   return false;

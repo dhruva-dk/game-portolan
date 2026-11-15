@@ -66,10 +66,16 @@ function tryOffer(s: CareerState, mind: Mind, g: Gull, o: Offer, roll: Dice): { 
 /** Whether a crew is already talking with a gull. */
 const talking = (s: CareerState, crew: number, gull: number): boolean => s.talks.some((t) => t.crew === crew && t.gull === gull);
 
-/** Gulls a crew knows who are not its own, alive and of a hired role: the candidates it may bid for. */
-function knownCandidates(s: CareerState, mind: Mind, employed: boolean | null): Gull[] {
+/** The gulls a crew is talking with, as a set (a row adds those it makes offers to as it goes). */
+const talkingWith = (s: CareerState, crew: number): Set<number> => new Set(s.talks.filter((t) => t.crew === crew).map((t) => t.gull));
+
+/** Gulls a crew knows who are not its own, alive and of a hired role, each with their worth to the manager, best
+ *  first: the candidates it may bid for. */
+function knownCandidates(s: CareerState, mind: Mind, employed: boolean | null): { g: Gull; w: number }[] {
+  const busy = talkingWith(s, mind.crew);
   return mind.known().map((id) => s.gulls[id]).filter((g) => g.retired === null && g.contract?.crew !== mind.crew && HIRED.includes(g.role)
-    && (employed === null || (g.contract !== null) === employed) && !talking(s, mind.crew, g.id));
+    && (employed === null || (g.contract !== null) === employed) && !busy.has(g.id))
+    .map((g) => ({ g, w: knownWorth(mind, g) })).sort((a, b) => b.w - a.w || a.g.id - b.g.id);
 }
 
 /** A crew's open seats, less those its talks will fill: each as the role and status an offer names. */
@@ -112,13 +118,15 @@ export const fill: Decide = (s, mind0, roll) => {
   let state = s, mind = mind0;
   const posts = openPosts(s, s.crews[mind.crew]);
   if (posts.length === 0) return { state, mind };
-  const pool = knownCandidates(s, mind, null).sort((a, b) => knownWorth(mind, b) - knownWorth(mind, a) || a.id - b.id);
+  const pool = knownCandidates(s, mind, null);
+  const busy = talkingWith(s, mind.crew);
   for (const post of posts) {
-    const ranked = pool.filter((g) => g.role === post.role && !talking(state, mind.crew, g.id));
-    for (const g of ranked) {
+    for (const { g } of pool) {
+      if (g.role !== post.role || busy.has(g.id)) continue;
       const r = tryOffer(state, mind, g, bid(state, mind, g, { status: post.status, replaces: null }), roll);
       if (!r) continue;
       ({ state, mind } = r);
+      busy.add(g.id);
       break;
     }
   }
@@ -149,8 +157,7 @@ function upgrade(employed: boolean): Decide {
       const seat = seatOf(state.crews[mind.crew], low.id, (id) => state.gulls[id].job);
       if (!seat) continue;
       const floor = knownWorth(mind, low) + bar(mind);
-      const ranked = pool.filter((g) => g.role === role && knownWorth(mind, g) >= floor && !talking(state, mind.crew, g.id))
-        .sort((a, b) => knownWorth(mind, b) - knownWorth(mind, a) || a.id - b.id);
+      const ranked = pool.filter((x) => x.g.role === role && x.w >= floor && !talking(state, mind.crew, x.g.id)).map((x) => x.g);
       for (const g of ranked) {
         const r = tryOffer(state, mind, g, bid(state, mind, g, { status: seatRole(seat).status, replaces: low.id }), roll);
         if (!r) continue;

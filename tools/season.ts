@@ -2,8 +2,9 @@
 // coin by crew, stars by league, parts' ranks, every mail kind's count and every dilemma's. Results are synthetic
 // (tools/synthetic.ts, seeded from each card) unless --real, which sails each race with runRace (slow, for the record).
 // A bot plays the player: it sets a plan now and then, answers its dilemmas, takes a post when sacked, and sends a few
-// of the random commands the tests send. It asserts the invariants after every race day and reports Advance's time.
-// It gates nothing about balance: it exits 1 only on a thrown error or a broken invariant.
+// of the random commands the tests send. It asserts the invariants after every race day and times every Advance,
+// between race days and across a season's end. It gates nothing about balance: it exits 1 only on a thrown error, a
+// broken invariant, or an Advance over ADVANCE_MS (the whole world's limit in node).
 //   node tools/season.ts [seasons=2] [--seed=n] [--real]
 
 import { apply, start, type CareerState } from '../src/career/career.ts';
@@ -27,6 +28,7 @@ const seasons = Number(args.find((a) => /^\d+$/.test(a)) ?? 2);
 const seed = Number(args.find((a) => a.startsWith('--seed='))?.slice(7) ?? FOUND.seed);
 const real = args.includes('--real');
 const rand = random(seed ^ 0xb07);
+const ADVANCE_MS = 100;
 
 /** A race's result: synthetic, or sailed whole in node. */
 async function resultOf(s: CareerState, card: RaceCard): Promise<RaceResult> {
@@ -220,7 +222,7 @@ while (s.season < seasons) {
   const took = performance.now() - t;
   (s.season === before ? times : ends).push(took);
   tallied(s.season !== before);
-  if (took > 100) console.log(`slow Advance: ${took.toFixed(0)} ms, day ${from} to ${s.day}`);
+  if (took > ADVANCE_MS) console.log(`slow Advance: ${took.toFixed(0)} ms, day ${from} to ${s.day}`);
   if (s.season !== lastSeason) {
     lastSeason = s.season;
     const me = s.player!.crew;
@@ -244,6 +246,12 @@ const timing = (xs: number[]) => {
   return `${xs.length} calls, mean ${(xs.reduce((a, b) => a + b, 0) / Math.max(1, xs.length)).toFixed(1)} ms, 95th ${at(0.95)} ms, most ${at(1)} ms (call ${xs.indexOf(sorted[sorted.length - 1])})`;
 };
 console.log(`Advance between race days: ${timing(times)}; through a season's end: ${timing(ends)}`);
+// the whole world must advance within ADVANCE_MS in node, between race days and across a season's end alike
+const slowest = Math.max(0, ...times, ...ends);
+if (slowest > ADVANCE_MS) {
+  console.error(`an Advance took ${slowest.toFixed(1)} ms: over the ${ADVANCE_MS} ms limit`);
+  process.exitCode = 1;
+}
 console.log(`ledger of the player's crew: ${coinLog.join('; ')}; the bot's DebugCoin top-ups to sign a shipwright: ${counts.topped}; with a shipwright ${counts.wright} of ${counts.gaps} gaps`);
 console.log('mail kinds:', [...mailKinds].sort().map(([k, n]) => `${k} ${n}`).join(', '));
 const missingMail = Object.keys(TEMPLATES).filter((k) => !mailKinds.has(k));

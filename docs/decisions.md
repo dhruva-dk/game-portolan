@@ -623,3 +623,18 @@ decisions are in #56, section 2.
   (5–15 a season of 120 crews), more in a second poor season, almost never early, never a manager meeting targets;
   unit-tested in tests/career-elders.test.ts. Rival crews spending whole seasons past their floor is the money
   balance the owner tunes; it no longer decides sackings.
+- **Question:** Advance across a season's end reached 103 ms (up to 133 ms in later runs), over the 100 ms limit for
+  the whole world in node. **Cause:** the crossing is ~22 days and ~360 rival reviews, and each review scanned every
+  gull there has ever been (3,647 by season 11, a thousand of them retired): `mindOf().known()` filtered the whole
+  list for the crew's key, `fill`/`replace` re-sorted their pool by worth inside the comparator and scanned `s.talks`
+  per candidate, `managerCandidates` filtered every gull for each open post, `standingOf` re-sorted a league per call,
+  and traits' modifier was rebuilt on every ask. **Choice:** caches of pure values only, no rule changed:
+  career/knowledge.ts keeps an index of the gulls known to each crew, brought up to date by comparing a new gulls
+  list with the last one read (states share the gulls they did not change, so 1–9 differ an event) and read through
+  `knownTo`; bidding.ts reads worth once a candidate and the crew's talks as a set; elders.ts keeps the working
+  managers and each league's places per (immutable) list in WeakMaps; traits.ts keeps the unconditional modifier per
+  traits list; advance.ts's stop rule reads only today's tail of the mail. **Numbers:** the season-11 crossing
+  (scratch bench, 10 runs) from 89–107 ms to 62–65 ms; `node tools/season.ts 20`: through a season's end most 67.3
+  ms (was 96–133), between race days most 58.2 ms; its sackings line identical to before; the new test checks the
+  index against a full scan across states read out of order. tools/season.ts now exits 1 when any Advance, between
+  race days or across a season's end, takes over 100 ms.
