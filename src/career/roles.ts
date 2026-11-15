@@ -96,9 +96,6 @@ export type GullOf<R extends Role> = GullCore & { role: R; stats: StatsOf<R>; ce
 /** A gull: their role's stats now and at their projected peak (ceiling, from which their potential is read). */
 export type Gull = { [R in Role]: GullOf<R> }[Role];
 
-/** The stats of a gull as plain numbers by name. */
-export const statsOf = (g: Gull): Readonly<Record<string, number>> => g.stats;
-
 /** A stat's u (stat / 20), clamped to 0..1. */
 export const unit = (stat: number): number => Math.min(1, Math.max(0, stat / 20));
 

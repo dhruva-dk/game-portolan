@@ -1,0 +1,38 @@
+{
+ "schema": 1,
+ "snapshots": [
+  {
+   "at": 0,
+   "state": "{\"state\":{\"calendar\":null,\"colonies\":[],\"crews\":[],\"day\":0,\"flags\":{},\"gulls\":[],\"ids\":{\"mail\":0,\"part\":0,\"proposal\":0,\"talk\":0},\"leagues\":[],\"ledger\":[],\"mail\":[],\"player\":null,\"queue\":[],\"race\":null,\"round\":0,\"schema\":1,\"scouting\":[],\"season\":0,\"seed\":0,\"seq\":0,\"streams\":{},\"talks\":[]},\"tip\":\"811c9dc5\"}",
+   "sum": "16dad336"
+  }
+ ],
+ "entries": [
+  {
+   "seq": 1,
+   "tuning": 1,
+   "command": {
+    "kind": "Found",
+    "seed": 7,
+    "crew": "Inkwell Quillers",
+    "colours": {
+     "first": 0,
+     "second": 1
+    },
+    "emblem": 0,
+    "given": "Ada",
+    "family": "Holt",
+    "headshot": 1
+   },
+   "sum": "822255ed"
+  },
+  {
+   "seq": 2,
+   "tuning": 1,
+   "command": {
+    "kind": "Advance"
+   },
+   "sum": "86cc6e63"
+  }
+ ]
+}

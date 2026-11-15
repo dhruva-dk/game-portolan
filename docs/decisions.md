@@ -316,3 +316,69 @@ decisions are in #56, section 2.
   (`createPlanet(seed, true)` takes `BIOMES[0]`; its ground still from `groundOf(seed)`), and `placeCampus` takes the
   biome's laying as `placeIslands` does. **Why:** the rookery's plots and terraces were tuned on palm keys' hills; a
   cliff or a cone under them is a change to the rookery, not to the biomes.
+
+## 2026-11-15, Phase B (#59), sections 1–3
+
+- **Question:** the bosun's Performance stat and a part's performance, when test `g` bans the word `performance` in
+  `career/` (it is a browser global). **Choice:** named `perf` in code (`perf`, `perfMax`, the bosun's `perf`); screens
+  show "Performance". **Why:** keeps test `g` whole without weakening it.
+- **Question:** how many crew swatches the career deals colours from (palette.ts names none yet, and career/ may not
+  import it). **Choice:** `race.ts` gains `SWATCHES = 12` (added, nothing renamed); the palette's crew swatches must
+  number that many. **Why:** both the career and the drawing read the seam; 12 swatches give 66 pairs, enough for
+  forty crews a league with the player's pair taken out.
+- **Question:** how a torn tail leaves the store, when the port of section 1 has no way to drop the newest entries.
+  **Choice:** the port gains `truncate(from)`; a load that drops a tail cuts the store back after telling the player.
+  **Why:** otherwise the torn entry would sit before every later one and be reported lost on every load.
+- **Question:** how a snapshot's tail is checked once the entries before it are compacted away. **Choice:** a
+  snapshot's text is the canonical JSON of `{ state, tip }`, `tip` the journal's sum at its seq. **Why:** the chain of
+  the entries after it starts from that sum.
+- **Question:** is `Snapshot` journaled? **Choice:** no: `career/session.ts` writes the snapshot and journals nothing.
+  **Why:** it changes no state; replay needs no record of it.
+- **Question:** a command journaled but its snapshot write failing. **Choice:** the command stands (`snapshotFailed`
+  is reported); the next checkpoint tries again. **Why:** the journal already holds it, so nothing unsaved goes on.
+- **Question:** when compaction runs. **Choice:** after each backup (each season's end, before a migration, the
+  player's backup), dropping entries before the previous snapshot. **Why:** section 1 says after a snapshot and a
+  backup; between backups the journal keeps every entry, so the whole-journal replay stays possible until then.
+- **Question:** when the whole journal may be replayed. **Choice:** only if its first readable entry is seq 1 (not
+  compacted) and every readable entry carries the present tuning; a journal of nothing but a torn first entry loads as
+  the beginning with that action reported lost. **Why:** D36, and never a silent new career.
+- **Question:** where the world seed lives and when the world is made. **Choice:** `Found` carries the seed (main.ts
+  draws it) and makes the world; the first journal entry is `Found`. **Why:** rivals' colours are dealt around the
+  player's (D32), so the world cannot exist before the player picks; replay needs only the journal.
+- **Question:** age and the calendar. **Choice:** a season is a year of a gull's age: `YEAR` = 10 × 14 + 30 = 170 days.
+  Race days fall on the season's start + 14, 28, … 140; its end on the last race day, after the race. **Why:** gulls
+  age, grow and retire once a season, as section 2.2 reads.
+- **Question:** what the player's gull is (D8, D35). **Choice:** a manager whose stats are all 0 and never read, aged
+  35 at founding, manager reputation 10 (*starting values*). **Why:** a gull with a name, face and record, and no stats.
+- **Question:** names the player gives. **Choice:** 1 to 32 (crew) or 20 (gull) letters, spaces, hyphens and
+  apostrophes; refused if it holds a banned word (D34) or a word of another crew's name. **Why:** the owner banned the
+  word; crews never share a word.
+- **Question:** a gull's potential's form. **Choice:** each gull holds `ceiling`, their stats at peak; potential is
+  its stars; growth moves each stat toward its ceiling. **Why:** "each stat moves toward its potential value" needs a
+  value a stat.
+- **Question:** Persuasion's size (section 2.1 says only what it does). **Choice:** the first offer within 30 days of
+  the scout's report gives +1 patience with chance u. **Why:** a stat shown must change something (D15).
+- **Question:** the manager stats section 6 names without numbers. **Choice:** Talent Eye weighs potential
+  `0.2 + 0.6u`; Finance commits `0.25 + 0.5u` of the coin above the floor; Development sharpens the yard's split by
+  the exponent `0.5 + 2u`; Tactics takes the best race-plan choice with chance `0.4 + 0.6u`; Politics sways
+  `reputation × u` (`career/leadership.ts`). **Why:** each stat in one pure function with a direction test, for the
+  rivals' agent to call.
+- **Question:** Mentor's "+0.25 growth". **Choice:** the young captain's growth × 1.25. **Why:** growth is a rate.
+- **Question:** morale's moves section 2.3 names without sizes. **Choice:** result `2` a place of the crew's standing
+  against its target, to ±6; wage `4 × (wage / ask − 1)`, to ±2 a race; bond `+0.5` a level a race. **Why:** small
+  steady moves next to the named ±10 talks.
+- **Question:** the thirty traits. **Choice:** 32 in `career/traits.ts` (the nine required and 23 more over the
+  conditions named), five clashing pairs never held together; a season's end gains (8%) or loses (6%) one. **Why:**
+  section 2.3.
+- **Question:** a command kind no section handles yet. **Choice:** refused with code `unavailable`; a handler that
+  throws is caught and refused as `fault` (the tests hold every generated command clear of it). An event kind with no
+  handler throws inside Advance (caught the same way). **Why:** `apply` never throws, and no command is guessed at.
+- **Question:** debug commands in the journal. **Choice:** `apply` takes `{ debug }`; replay applies with debug on
+  (only accepted commands were journaled). **Why:** D42 says they are journaled like any other.
+- **Question:** contracts at the start. **Choice:** each at the gull's ask in their league, ending by seed within the
+  length they ask (young 1, middle 2, old 3 seasons), half with a break clause of 8 to 20 races' wage; captains a podium
+  bonus of half a race's wage and a sinking bonus of a tenth. Elders and the player hold a contract of no wage and no
+  end. **Why:** varied expiries so the first off-season's market is alive.
+- **Question:** what a new shipwright knows at the start. **Choice:** `components` stays empty until section 8's
+  `career/components.ts` exists; its agent deals `3 + round(stars)` (`staff.ts componentsKnown`) at founding and to new
+  shipwrights. **Why:** the components are section 8's data.

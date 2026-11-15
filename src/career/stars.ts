@@ -45,7 +45,7 @@ export const SCHOOL: Readonly<Record<Role, string | null>> = {
 
 /** A gull grown (or declined) by a season's end, at their age then. Below peak each stat moves toward its ceiling by
  *  0.35 × improvability × school × gap; past it each loses 0.3 + 0.2 × years past peak; each spread by seed. */
-export function grown(g: Gull, years: number, season: number, schooling: Schooling): Gull {
+export function grown<G extends Gull>(g: G, years: number, season: number, schooling: Schooling): G {
   const out: Record<string, number> = {};
   const ceiling: Readonly<Record<string, number>> = g.ceiling;
   const keys = Object.keys(g.stats);
@@ -62,7 +62,7 @@ export function grown(g: Gull, years: number, season: number, schooling: Schooli
       out[k] = stat(s - (TUNING.growth.decline + TUNING.growth.declineYear * (years - g.peak)) * share(g, season, i));
     }
   });
-  return withStats(g, out);
+  return withStats(g, out) as G;
 }
 
 /** The chance a gull of an age retires at a season's end: 0 at the role's first retirement age, rising to 1 at its last. */

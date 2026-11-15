@@ -3,7 +3,7 @@
 // plain JSON (career/canon.ts Json): a snapshot is its canonical text. Ids are indices: gull i is gulls[i], crew i is
 // crews[i]. Nothing is ever removed from gulls (the retired keep their history) or crews.
 
-import type { Colours, Job, PartType, RaceResult, Rules } from '../race.ts';
+import type { Colours, PartType, RaceResult, Rules } from '../race.ts';
 import type { Building, Change, MailCategory, Offer, Plan, Ship, Trade, YardShare } from '../office.ts';
 import type { Streams } from './dice.ts';
 import type { Event } from './queue.ts';
@@ -191,6 +191,3 @@ export function staffOf(c: Crew): number[] {
   const ids = [manager, elder, ...ships.flatMap((h) => [h.captain, h.bosun]), reserve, shipwright, ...scouts, ...flight];
   return ids.filter((id): id is number => id !== null);
 }
-
-/** A flight gull's job by id, read from the gulls. */
-export const jobOf = (s: CareerState, id: number): Job | null => s.gulls[id].job;

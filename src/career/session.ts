@@ -122,8 +122,11 @@ function recover(saved: Saved, debug: boolean): Found | null {
       from: i === 0 ? 'snapshot' : 'older', migratedFrom: m.from === SCHEMA ? null : m.from,
     });
   }
-  const current = entries.filter(shaped).every((e) => e.tuning === TUNING_VERSION);
-  if (entries.length === 0 || !current) return null;
+  // the whole journal: only if it begins at the beginning (compaction has not dropped its start) and every entry was
+  // written under the present tuning (D36)
+  // (a journal of nothing but one torn first entry loads as the beginning, the torn action reported lost)
+  const readable = entries.filter(shaped);
+  if (entries.length === 0 || (readable.length > 0 && readable[0].seq !== 1) || !readable.every((e) => e.tuning === TUNING_VERSION)) return null;
   return resume(start(), entries, { seq: 0, tip: ORIGIN, snapshots: [], debug }, { from: 'journal', migratedFrom: null });
 }
 
