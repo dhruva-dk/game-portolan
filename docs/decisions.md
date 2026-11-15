@@ -513,3 +513,84 @@ decisions are in #56, section 2.
   every personality's order at 0.6 and 0.5. **Why:** section 6's table; every row acts through the player's checks.
 - **Question:** schema. **Choice:** Crew, Patron, Proposal and Design fields changed without a SCHEMA bump, as earlier
   agents did before release; TUNING_VERSION 3. **Why:** no saves outside tests exist yet.
+
+## 2026-11-15, Phase B (#59), sections 12–16
+
+- **Question:** who sails each ship on race day. **Choice:** `career/lineup.ts lineups(s)`, a pure function of the state
+  read by the cards and the round's close alike: the player's ship one is theirs; ship two takes the plan's captain if
+  fit, else her own captain, else the reserve, else a stand-in (the best fit free captain not yet engaged, the player's
+  crew first, then by crew id, paid their ask for the one race); with none she is forfeit (sunk at the start). While the
+  player's race is under way the career takes only RecordRace, Forfeit and MarkRead (`racing`), so the lineup cannot
+  change under the race. **Why:** "never start a race with a ship that has no one to sail her" holds by construction.
+- **Question:** what a Forfeit forfeits. **Choice:** the player's own ship (ship one) counts sunk at the start; ship two
+  is simulated and sails on. A second Forfeit of the same race is refused (`forfeited`). **Why:** D27 is about the
+  player leaving their race; ship two was never theirs to sail.
+- **Question:** the order of the season's end. **Choice:** prizes, then the elders' verdicts (targets missed by more
+  than 5 places sack), then promotion and relegation (four up, four down), then the new calendar a YEAR on, rules
+  turned. DebugToSeasonEnd runs past every stop but race days (a race's result is the match's to give). **Why:** a
+  verdict reads the season as sailed, in the league it was sailed in.
+- **Question:** when the next season opens. **Choice:** its `seasonStart` event falls midway between the season's end
+  and the first race (`floor((start − off + first race) / 2)`), and stops Advance after the first season. **Why:** it
+  splits the long off-season (every review of 120 crews in one call) so Advance stays under 100 ms, and gives the
+  player a beat to read the season's mail.
+- **Question:** the twelve dilemmas' loose ends. **Choice:** `pressElder` is the elder's dilemma (weighted by Meddling);
+  `stormDamage` always hits the factory; `partSwap` exchanges two parts' numbers (perf, reliability, risk, components,
+  cost), not their ids, so fitted slots stand; a dilemma unanswered lapses to its last option at the next round's draw;
+  rivals answer at once by personality (the last option if theirs cannot be taken). **Why:** the spec leaves each open;
+  each choice keeps parts and staff invariants simple.
+- **Question:** dilemma frequency. **Choice:** chance 0.6 a crew a round (was 0.3); for the player each candidate's
+  weight is divided by 1 + how often it has come to them. **Why:** at 0.3 with the common triggers (patronGuest,
+  partSwap) nearly always holding, the rare dilemmas did not come in twenty seasons.
+- **Question:** `flightWorn`'s trigger. **Choice:** a flight gull whose fatigue *after the last race* is over 30
+  (`dilemmas.worn`, was 75 on today's fatigue). **Why:** a race adds at most ~49 fatigue and the 14 days between races
+  recover all of it, so "over 75" could never hold on any day.
+- **Question:** `bondFallOut` after five races. **Choice:** a captain–bosun pair still at bond level 1 or lower (not 0).
+  **Why:** a bond gains 1–2 a race, so after five races every pair is past level 0; the trigger could never hold.
+- **Question:** Leadership's fatigue factor. **Choice:** the flight's fatigue gain is multiplied by
+  `leadershipFatigue(bosun's Leadership)` (ship one's bosun, else ship two's). **Why:** a rule of section 2.1 the round's
+  close had left out.
+- **Question:** biome traits and morale. **Choice:** biome traits are never read by the career (they stay the race's);
+  each staff gull's morale after a race is the sum of the standing against the crew's target, their traits' morale,
+  their wage against their ask, for a captain whether they sailed (more if they want status), the ship's bond level
+  for her captain and bosun, and for the flight the bosuns' Leadership; the dilemmas' answers move it apart. Race
+  records are kept for captains only. **Why:** career/ cannot import sim/; the race's traits stay in the race.
+- **Question:** money's scale over two seasons (`node tools/season.ts 2`, the default seed). **Choice:** prize pools
+  doubled (League One 1,040,000; Two 400,000; Three 210,000); nothing else changed. Observed before the season's prizes:
+  crews' coin median −22,434 (League One), −8,265 (Two), −4,724 (Three) in season 1; −7,661, −4,864, −5,293 in season 2;
+  the player's crew started seasons 1 and 2 with 1,485 and 2,612. Over twenty seasons the player's start coin ran
+  between about −6,700 and +210,000. **Why:** before the doubling a median League One crew lost ~26,000 a season with no
+  way back; now a median crew about balances once prizes and patrons are paid, as section 10 asks.
+- **Question:** a rival's room to spend. **Choice:** `money.ts roomOf` = commitment of its finance to the season's
+  projected end over the debt floor, and a rival never plans past `min(roomOf, commitment of its coin now)`. **Why:**
+  without the projection rivals overcommitted and sank past the floor every season.
+- **Question:** Advance's cost. **Choice:** a rival's scouting looks at most `rivals.scoutLooks` (240) candidates, an
+  even sample from a drawn offset (stream 'scout'); a rival's knowledge is read lazily; the rank among fitted parts is
+  one pass. **Why:** Advance between race days ran 180–230 ms; now at most ~85 ms (mean ~4 ms), season ends at most
+  ~97 ms.
+- **Question:** when Advance stops. **Choice:** on race day, a job offer's expiry, the season's opening (after season 0),
+  the player's dilemma mail, an answer or a review that approaches the player's gulls, and the player sacked. **Why:**
+  a sacked player cannot Advance (they must take a post), so Advance must hand back at once.
+- **Question:** job offers. **Choice:** while the player has a crew only crews of their league or better offer, two at
+  most standing (`elder.standing`), one an offer a crew; while sacked any league offers. **Why:** before this, ~14,000
+  offers in twenty seasons drowned the mail.
+- **Question:** replay determinism of stars. **Choice:** `starsOf` sums the stats in sorted key order. **Why:** a save
+  sorts keys; summing floats in insertion order gave a different last bit after a reload, and the replay diverged.
+- **Question:** the spend invariant. **Choice:** `spendKept` exempts Advance, RecordRace, TakeJob, DeclineJob and the
+  debug commands. **Why:** these pay obligations (wages, stand-ins, an elder's hire), not choices the floor limits.
+- **Question:** sackings. **Choice:** recorded, not tuned: ~100 managers a season of 120 crews in `tools/season.ts`.
+  **Why:** the synthetic results are noise around stars, so targets are missed far more than in sailed races; section
+  15 gates nothing about balance.
+- **Question:** rare mail in twenty seasons. **Choice:** recorded, not forced. With the default seed every mail kind and
+  dilemma comes but `captainUnfit` and `unfitWantsSail` (both need a captain of the player's injured: 4% a sinking, the
+  spec's number); with `--seed=2`, `componentLearned`, `shipsArgue`, `bondFallOut`, `greyComponent` do not. Every
+  dilemma's trigger and answers are met and tested in `tests/career-dilemmas.test.ts`. **Why:** the bot is not a
+  player; bending the spec's chances to fill a table would hide the game's real rarity.
+- **Question:** the IndexedDB store. **Choice:** `store/indexed.ts`: object stores `entries` (JSON text keyed by seq),
+  `snapshots` (keyed by the seq they hold, newest three kept) and `backup` (one record); every write one transaction.
+  The store suite (`tests/store-suite.ts`) runs on memory and faulty in `npm test` and on IndexedDB in headless
+  Chromium (`npm run indexed`). A tear cannot happen inside an IndexedDB transaction, so its kill test is "killed
+  before a write" at every write. **Why:** section 16.
+- **Question:** the screens' selectors. **Choice:** `career/read.ts`: `mailView`, `unread`, `table`, `fixtures`,
+  `preview`, `dilemmaView`, pure over the state. **Why:** Phase C draws from them as given.
+- **Question:** tuning. **Choice:** TUNING_VERSION 4 (prizes, elder.standing, rivals.scoutLooks, dilemmas.worn and
+  chance). **Why:** D36's pin.
