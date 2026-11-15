@@ -156,8 +156,7 @@ export const CANVAS = tones('#F2E6C8', '#B48C78');
 /** The test tank's water, and a doorway's dark. */
 export const TANK = tones('#3EC2C8', '#1E7090');
 export const DOORWAY = tones('#4A2E36', '#2A1A2A');
-/** A gull: white, its shadow a cool grey; and the foundry's coal smoke, greyer than powder smoke. */
-export const GULL = tones('#FFF8EC', '#9CA2C0');
+/** The foundry's coal smoke, greyer than powder smoke. */
 export const COAL_SMOKE = tones('#D8CCC4', '#7A6070');
 
 // ---- the loot

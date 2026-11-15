@@ -6,8 +6,8 @@
 // forms under way into another (cut off at the share built: material.ts), their vertices written in world metres
 // into buffers made once for the most the campus can hold, so a change rebuilds no shader and makes no new buffer. The
 // finished mesh casts into the island's shadow map (land/shadow.ts: it stands on the nearest island); what is under
-// way does not. The flags fly from every flagpole up, the gulls wheel over the flight loft once it stands, smoke rises
-// from the stacks.
+// way does not. The flags fly from every flagpole up, the gulls wheel over the flight loft once it stands (drawn by
+// the flight's gulls: life.ts), smoke rises from the stacks.
 
 import { BufferAttribute, BufferGeometry, InstancedMesh } from 'three/webgpu';
 import type { Light } from '../sky/light';
@@ -92,7 +92,7 @@ export function createCampus(campus: Campus, light: Light, wind: Wind) {
     whole.begin();
     rising.begin();
     const heads: ReturnType<typeof at>[] = [], mouths: ReturnType<typeof at>[] = [];
-    let over: ReturnType<typeof at> | null = null;
+    const loft: { over: ReturnType<typeof at> | null } = { over: null };
     campus.plots.forEach((site, i) => {
       whole.lay(plinths[i], site);
       const level = Math.min(Math.max(Math.round(draw.levels[i] ?? 0), 0), 3), share = draw.rising[i];
@@ -101,7 +101,7 @@ export function createCampus(campus: Campus, light: Light, wind: Wind) {
         whole.lay(f, site);
         heads.push(...f.flags.map((p) => at(p, site)));
         mouths.push(...f.smoke.map((p) => at(p, site)));
-        if (site.building === 'flightLoft') over = at([0, f.top + 3, 0], site);
+        if (site.building === 'flightLoft') loft.over = at([0, f.top + 3, 0], site);
       }
       if (share !== null && share !== undefined && level < 3) {
         const next = level as 0 | 1 | 2;
@@ -114,7 +114,7 @@ export function createCampus(campus: Campus, light: Light, wind: Wind) {
     whole.end();
     rising.end();
     flags.fly(heads, downwind);
-    life.set(over, mouths, downwind);
+    life.set(loft.over && { ...loft.over, paint: draw.first, sail: draw.second }, mouths, downwind);
   }
 
   return {
@@ -132,6 +132,8 @@ export function createCampus(campus: Campus, light: Light, wind: Wind) {
       flags.tick(clock);
       life.tick(clock);
     },
+    /** The gulls wheeling over the flight loft, as of the last update: the frame has the flight's gulls draw them. */
+    flock: life.flock,
     dispose() {
       whole.geometry.dispose();
       rising.geometry.dispose();

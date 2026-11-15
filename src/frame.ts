@@ -311,9 +311,10 @@ export function createFrame(renderer: WebGPURenderer, world: World, options: Fra
     laid = Math.max(laid, ...s.blasts.map((b) => b.time));
     gunfire.draw(s.clock, s.balls);
     loot.draw(s.clock, s.loot, s.eye.position);
-    gulls.draw(s.clock, s.flights ?? [], s.ships);
-    arms.update(s.ships, s.eye.position);
     campus?.update(s.campus, s.clock);
+    // the flights' gulls and the rookery's flock, one draw
+    gulls.draw(s.clock, s.flights ?? [], s.ships, campus?.flock() ?? []);
+    arms.update(s.ships, s.eye.position);
   }
 
   /**

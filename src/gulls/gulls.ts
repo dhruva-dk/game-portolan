@@ -8,7 +8,8 @@
 // Every gull of every flight is one instanced draw, placed in the vertex stage from a buffer of its place, frame,
 // wingbeat and colours, written in place each frame (gull motion is a few dozen birds: worked out here, from the
 // snapshot's clock); its wings fold and flap about their shoulders in the shader (no render hook). The sim knows
-// nothing of them: they read the stop and the ship's pose.
+// nothing of them: they read the stop and the ship's pose. The rookery's flock flies in the same draw (`free`), so
+// the race and the rookery show one gull.
 
 import { DynamicDrawUsage, InstancedBufferGeometry, InstancedInterleavedBuffer, InterleavedBufferAttribute, Mesh, MeshBasicNodeMaterial } from 'three/webgpu';
 import { Fn, abs, attribute, cos, cross, float, normalize, select, sin, uniform, varying, vec3 } from 'three/tsl';
@@ -40,6 +41,10 @@ const SETTLE = 5, HOP = 0.2;
 /** The buffer: per gull a vec4 of its place (metres) and phase, of ahead and its wings' spread (0 folded … 1 flying),
  *  of up and its wingbeat (rad/s), of its crew's paint and its size, of her sail's colour. */
 const STRIDE = 20;
+
+/** A gull flying free of any flight (the rookery's flock, worked out where it wheels: campus/life.ts): its place,
+ *  ahead and up (world), its colours (wingtips and scarf) and its size. */
+export interface Wheeling { at: Vec3; ahead: Vec3; up: Vec3; paint: Vec3; sail: Vec3; size: number }
 
 /** A gull as it was last drawn: its place, ahead and up (world), and where on deck it stands (her frame, metres). */
 interface Gull { at: Vec3; ahead: Vec3; up: Vec3; deck: Vec3 | null }
@@ -173,8 +178,8 @@ export function createGulls(light: Light) {
   return {
     meshes: [mesh],
     dispose: () => release(mesh),
-    /** Each frame: the world's clock (s), the flights under way, and the ships drawn. */
-    draw(clock: number, flights: readonly FlightDraw[], ships: readonly ShipDraw[]) {
+    /** Each frame: the world's clock (s), the flights under way, the ships drawn, and the gulls flying free of them. */
+    draw(clock: number, flights: readonly FlightDraw[], ships: readonly ShipDraw[], free: readonly Wheeling[] = []) {
       now.value = clock;
       const dt = Math.min(0.1, Math.max(0, clock - last));
       last = clock;
@@ -199,14 +204,16 @@ export function createGulls(light: Light) {
       }
       const array = buffer.array as Float32Array;
       let n = 0;
+      /** One gull into the buffer (past the most drawn, none). */
+      const put = (g: { at: Vec3; ahead: Vec3; up: Vec3 }, spread: number, beat: number, look: { paint: Vec3; sail: Vec3; size: number }) => {
+        if (n >= MOST) return;
+        array.set([...g.at, (n * 1.7) % 6.283, ...g.ahead, spread, ...g.up, beat, ...look.paint, look.size, ...look.sail, 0], n * STRIDE);
+        n++;
+      };
       for (const [id, bird] of birds) {
-        fly(bird, bird.gone === null ? byId.get(id) : undefined, clock, dt, (g, spread, beat, size) => {
-          if (n >= MOST) return;
-          const o = n * STRIDE;
-          array.set([...g.at, (n * 1.7) % 6.283, ...g.ahead, spread, ...g.up, beat, ...bird.paint, size, ...bird.sail, 0], o);
-          n++;
-        });
+        fly(bird, bird.gone === null ? byId.get(id) : undefined, clock, dt, (g, spread, beat, size) => put(g, spread, beat, { ...bird, size }));
       }
+      for (const g of free) put(g, 1, BEAT, g);
       if (n > 0) {
         buffer.clearUpdateRanges();
         buffer.addUpdateRange(0, n * STRIDE);
