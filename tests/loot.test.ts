@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { battleOf, crewOf, stepBattle, weathered, type Crew } from '../src/sim/battle.ts';
-import type { Vessel } from '../src/sim/contact.ts';
+import { afloat, type Vessel } from '../src/sim/contact.ts';
 import { STEP } from '../src/sim/fixed.ts';
 import { gunOf, reloadOf } from '../src/sim/gun.ts';
 import { charging, gustOf, ready, spent, stepGust } from '../src/sim/gust.ts';
@@ -19,7 +19,7 @@ const deep: Depth = () => 30;
 const c0 = fromLatLon(0.1, 0.2);
 const east = frameAt(c0).east;
 const at = (m: number) => along(c0, east, m).p;
-const vessel = (id: number, p: Vec3): Vessel => ({ id, ship: shipAt(p, frameAt(p).north), shove: [0, 0, 0], engaged: [] });
+const vessel = (id: number, p: Vec3): Vessel => afloat(id, shipAt(p, frameAt(p).north));
 const piece = (id: number, p: Vec3, goods: Loot['goods'], from = -1, age = 10): Loot => ({ id, at: p, goods, from, age, way: [0, 0, 0] });
 const lying = (...pieces: Loot[]): Flotsam => ({ pieces, next: 100 });
 

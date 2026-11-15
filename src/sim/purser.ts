@@ -23,7 +23,8 @@ import { isArms, type Loot } from './loot.ts';
 import { NOTHING, type Ask } from './stores.ts';
 import { toEdge } from './storm.ts';
 import { ramp, utility } from './utility.ts';
-import type { Ctx } from './captain.ts';
+import { HEALTH } from './handling.ts';
+import { fitOf, type Ctx } from './captain.ts';
 
 /** Everything a bot's stores are tuned by: 0117's unless said. */
 export const PURSER = {
@@ -53,11 +54,11 @@ const WORTH: Record<Use, (c: Crew) => number> = {
   smallShield: (c) => (c.health.shield < 50 ? 2 : 0),
 };
 
-/** The item slot (1–3) she should use now, or -1. */
-export function healSlot(c: Crew): number {
+/** The item slot (1–3) she should use now, or -1; her most hull `most` (fit.ts). */
+export function healSlot(c: Crew, most: number = HEALTH.hull): number {
   let best = -1, bv = 0;
   c.hold.items.forEach((s, i) => {
-    if (!s || s.count <= 0 || !useful(c.health, s.kind)) return;
+    if (!s || s.count <= 0 || !useful(c.health, s.kind, most)) return;
     const v = WORTH[s.kind](c);
     if (v > bv) [bv, best] = [v, i + 1];
   });
@@ -73,7 +74,7 @@ export function mendNeed(c: Ctx, crew: Crew): number {
 /** The heal option's score: something to mend with, need of it, and no foe close. */
 export const healUrge = (c: Ctx) => {
   const crew = c.own.crew;
-  return !crew || healSlot(crew) < 0 ? 0 : utility(mendNeed(c, crew), ramp(c.foeD, 55, 90));
+  return !crew || healSlot(crew, fitOf(c.own).hull) < 0 ? 0 : utility(mendNeed(c, crew), ramp(c.foeD, 55, 90));
 };
 
 /** What a pair of guns is worth to her: the better, and PURSER.other of the other if it is of another kind (one for
@@ -158,7 +159,7 @@ export function purse(c: Ctx): Ask {
   if (!crew) return NOTHING;
   let tap: number | null = null, take: number | null = null, arm: number | null = null, gust = false;
   if (m.mode === 'heal' && !crew.hold.using) {
-    const s = healSlot(crew);
+    const s = healSlot(crew, fitOf(c.own).hull);
     if (s >= 0) tap = s;
   }
   if (m.mode === 'loot' && m.target >= 0 && crew.guns.every((g) => g !== null)) {

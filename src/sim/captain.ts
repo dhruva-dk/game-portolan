@@ -7,6 +7,7 @@
 import { add, cross, dot, length, scale, type Vec3 } from '../world/sphere.ts';
 import { random } from '../world/random.ts';
 import { STEP } from './fixed.ts';
+import { SPEC, type Handling } from './fit.ts';
 import { SHIP } from './handling.ts';
 import { gunner, type Gunner } from './gunner.ts';
 import type { ShipState } from './ship.ts';
@@ -89,9 +90,12 @@ export const BOT = {
 } as const;
 
 /** A ship as a bot sees her: who she is, how she sails, the shove she is carried on by, her hull and shield (health.ts;
- *  whole and none when not given), and whether she carries a gun; and her own, what she carries (battle.ts Crew: her
- *  hold and gust), without which she pays her stores no heed. */
-export interface Seen { id: number; ship: ShipState; shove?: Vec3; hull?: number; shield?: number; armed?: boolean; crew?: Crew }
+ *  whole and none when not given), whether she carries a gun, and her handling (fit.ts; the tables' when not given);
+ *  and her own, what she carries (battle.ts Crew: her hold and gust), without which she pays her stores no heed. */
+export interface Seen { id: number; ship: ShipState; shove?: Vec3; hull?: number; shield?: number; armed?: boolean; fit?: Handling; crew?: Crew }
+
+/** A ship's handling as a bot sees her. */
+export const fitOf = (s: Seen): Handling => s.fit ?? SPEC;
 
 /** What a bot knows of the sea besides the ships on it: how deep it is; its chart (route.ts), without which she finds
  *  no routes round land, only feels her way along it; the storm now (storm.ts), without which she pays it no heed; and

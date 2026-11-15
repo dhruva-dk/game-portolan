@@ -20,8 +20,8 @@ export interface Harm {
   hull: number;
 }
 
-/** A ship as she puts to sea. */
-export const whole = (): Health => ({ hull: HEALTH.hull, shield: HEALTH.start });
+/** A ship as she puts to sea: her hull at its most (her own, fit.ts; the tables' if not given). */
+export const whole = (most: number = HEALTH.hull): Health => ({ hull: most, shield: HEALTH.start });
 
 /** Sunk: no hull left. */
 export const sunk = (h: Health) => h.hull <= 0;
@@ -34,7 +34,8 @@ export function harmed(h: Health, damage: number, past = false): Harm {
   return { health: { hull: h.hull - hull, shield: h.shield - shield }, shield, hull };
 }
 
-/** `amount` hit points mended into her hull or her shield, up to `cap` (its most by default); nothing once sunk. */
+/** `amount` hit points mended into her hull or her shield, up to `cap` (the tables' most by default; her own most hull
+ *  is her handling's, fit.ts, which the caller gives); nothing once sunk. */
 export function healed(h: Health, amount: number, to: 'hull' | 'shield', cap: number = HEALTH[to]): Health {
   if (sunk(h) || !(amount > 0) || h[to] >= cap) return h;
   return { ...h, [to]: Math.min(cap, h[to] + amount) };

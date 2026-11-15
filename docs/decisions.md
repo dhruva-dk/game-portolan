@@ -37,3 +37,28 @@ decisions are in #56, section 2.
   element, every sheet's `<svg>`, and every press-able region drawn inside one, with a box; it must lie within the
   page (0.5 px slack). Shapes inside an `<svg>` are clipped by it, so only the regions a finger must reach are checked
   among them (the title's rhumb lines run past the page on purpose). **Why:** that is what can be lost off the page.
+
+## 2026-11-15, Phase A (#58)
+
+- **Question:** where a match's fleet size lives before cards exist (step 1). **Choice:** `Match.ships` (optional,
+  `play/match.ts fleetOf`, `SHIPS` by default); the frame is still made for `SHIPS`; `tools/matches.ts` takes the count
+  as its third argument. The match types moved from `play/state.ts` to `play/match.ts`. **Why:** the count is the
+  match's; state.ts was at its 450-line cap.
+- **Question:** where a ship's handling lives in the sim (step 2). **Choice:** `Vessel.fit: Handling` (the seam's
+  type, re-exported by `sim/fit.ts`, whose `SPEC` is the tables' ship: SHIP's top, gather, turn, answer, HEALTH's hull,
+  spread and reload 1). `afloat(id, ship, fit = SPEC)`; `step(..., fit)` reads top, gather, turn, answer from it (the
+  rudder's bite against her own top). Whatever changes a ship's handling mid-race (faults) replaces `vessel.fit`.
+  **Why:** one source, carried with the ship through every step; SPEC keeps every result bit-identical.
+- **Question:** what `hull` means per ship. **Choice:** her most hull: she puts to sea with it (`whole(most)`), mends
+  to no more than it (`hold.ts` caps at `min(use's cap, most)`), the storm wears `storm.damage` of it a second, and the
+  HUD's `hullMax` reads it (`state.handling(id)`). A bot reads an unknown hull as the ship's own (`Seen.fit`, `fitOf`).
+  **Why:** a sturdier hull should be sturdier in every rule that names the whole hull.
+- **Question:** what `spread` and `reload` multiply. **Choice:** what the gun's kind and rarity give (`spreadOf(g,
+  hers)`, `reloadOf(g, hers)`), in firing, in a reload she asks for, and on the HUD. A bot's rating of a gun
+  (`gunner.ts suits`) keeps the gun's own numbers: the factor is the same for both her guns. **Why:** a ship's guns
+  crew, not the gun, is what a card's handling describes.
+- **Question:** the ride and the bots' sense of speed. **Choice:** `ride.ts settled` and `ride` take `{ship, fit}` (a
+  Vessel) in place of the ShipState, so her heel is against her own top (parameter counts unchanged). The helmsman's
+  ram lead and slowing to turn, and the claimer's race to a trail, use the ships' own top and turn. `BOT.outrun`,
+  `outran` and the audio's `TOP` keep the tables' top. **Why:** these are her own sailing; the rest are tuning
+  constants that read SHIP.top only as a scale.

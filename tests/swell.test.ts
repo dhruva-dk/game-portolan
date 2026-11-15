@@ -4,6 +4,7 @@ import { BANDS, CASCADES, FETCH, PERIOD, SIZE } from '../src/world/cascades.ts';
 import { initialSpectrum, seaState } from '../src/world/spectrum.ts';
 import { createSwell, longModes, type Hull, type Surface } from '../src/world/swell.ts';
 import { STEP } from '../src/sim/fixed.ts';
+import { SPEC } from '../src/sim/fit.ts';
 import { pose, ride, settled, RIDE, type Ride } from '../src/sim/ride.ts';
 import { shipAt, type ShipState } from '../src/sim/ship.ts';
 import { FREQUENCY, anchors, icosphere } from '../src/world/lattice.ts';
@@ -80,12 +81,12 @@ function voyages(sea: Hull, every: number, seconds: number) {
   return Array.from({ length: 6 }, (_, k) => {
     const p = fromLatLon(Math.asin(2 * ((k * 0.618) % 1) - 1) * 0.9, k * 2.4), f = frameAt(p), b = k * 1.1;
     let s: ShipState = { ...shipAt(p, add(scale(f.north, Math.cos(b)), f.east, Math.sin(b))), speed: 2 + 2.5 * k };
-    let r: Ride = settled(s, sea, 0, k, every);
+    let r: Ride = settled({ ship: s, fit: SPEC }, sea, 0, k, every);
     const out: number[][] = [];
     for (let i = 1; i < seconds / STEP; i++) {
       const on = along(s.at, s.heading, s.speed * STEP);
       s = { ...s, at: on.p, heading: on.t };
-      r = ride(r, s, sea, i * STEP, STEP);
+      r = ride(r, { ship: s, fit: SPEC }, sea, i * STEP, STEP);
       out.push([r.heave, r.pitch, r.roll]);
     }
     return out;
@@ -115,11 +116,11 @@ test('the hull rides the swell: her level follows the water under her, her pitch
   for (const wind of [10, 15]) {
     const swell = createSwell(all, open, wind, { shortest: RIDE.shortest }).hull;
     const s = shipAt(fromLatLon(0.3, 1.1), frameAt(fromLatLon(0.3, 1.1)).north);
-    let r = settled(s, swell, 0);
+    let r = settled({ ship: s, fit: SPEC }, swell, 0);
     const level: number[] = [], miss: number[] = [], pitch: number[] = [], pitchMiss: number[] = [], roll: number[] = [], rolled: number[] = [];
     for (let i = 1; i < 60 / STEP; i++) {
       const t = i * STEP;
-      r = ride(r, s, swell, t, STEP);
+      r = ride(r, { ship: s, fit: SPEC }, swell, t, STEP);
       const { bow, stern, port, starboard } = swell(s.at, s.heading, RIDE.reach, RIDE.rail, t);
       const under = (bow + stern + port + starboard) / 4;
       roll.push(Math.atan2(port - starboard, 2 * RIDE.rail));

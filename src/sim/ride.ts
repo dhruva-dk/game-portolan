@@ -17,6 +17,7 @@ import type { ShipPose } from '../world/pose.ts';
 import { R, add, along, cross, dot, scale, type Vec3 } from '../world/sphere.ts';
 import type { Hull } from '../world/swell.ts';
 import { STEP } from './fixed.ts';
+import type { Handling } from './fit.ts';
 import { GUST, SHIP } from './handling.ts';
 import type { ShipState } from './ship.ts';
 
@@ -74,15 +75,18 @@ function water(at: Vec3, heading: Vec3, sea: Sea, time: number): Water {
   };
 }
 
-/** The lean a turn asks for, starboard down: into the turn, more the faster she goes. */
-const lean = (s: ShipState) => -RIDE.heel * s.turn * Math.min(1, s.speed / SHIP.top);
+/** A ship as her ride reads her: how she sails, and her own handling (fit.ts), whose top speed sets her lean. */
+export interface Sailing { ship: ShipState; fit: Handling }
+
+/** The lean a turn asks for, starboard down: into the turn, more the faster she goes against her top speed. */
+const lean = (s: ShipState, top: number) => -RIDE.heel * s.turn * Math.min(1, s.speed / top);
 
 /** At rest on the water as it is: each motion where the water puts it. She reads the water `every` steps from now on;
  *  `slot` (her id) sets which, so a fleet's reads are spread over the steps. */
-export function settled(s: ShipState, sea: Sea, time: number, slot = 0, every: number = RIDE.every, dt = STEP): Ride {
-  const w = water(s.at, s.heading, sea, time), left = slot % every;
+export function settled(v: Sailing, sea: Sea, time: number, slot = 0, every: number = RIDE.every, dt = STEP): Ride {
+  const s = v.ship, w = water(s.at, s.heading, sea, time), left = slot % every;
   return {
-    heave: w.heave, heaveRate: 0, pitch: w.pitch, pitchRate: 0, roll: w.roll, rollRate: 0, heel: lean(s), water: w,
+    heave: w.heave, heaveRate: 0, pitch: w.pitch, pitchRate: 0, roll: w.roll, rollRate: 0, heel: lean(s, v.fit.top), water: w,
     read: { from: w, to: left ? ahead(s, sea, time, left, dt) : w, left, span: left, every },
   };
 }
@@ -94,7 +98,8 @@ function ahead(s: ShipState, sea: Sea, time: number, steps: number, dt: number):
 }
 
 /** One step of dt seconds for the ship as she now is, on the sea at `time`. */
-export function ride(r: Ride, s: ShipState, sea: Sea, time: number, dt: number): Ride {
+export function ride(r: Ride, v: Sailing, sea: Sea, time: number, dt: number): Ride {
+  const s = v.ship;
   let { from, to, left, span } = r.read;
   const every = r.read.every;
   if (left <= 0) [from, to, left, span] = [to, ahead(s, sea, time, every, dt), every, every];
@@ -111,7 +116,7 @@ export function ride(r: Ride, s: ShipState, sea: Sea, time: number, dt: number):
   const [heave, heaveRate] = spring(r.heave, r.heaveRate, w.heave, r.water.heave, RIDE.heave);
   const [pitch, pitchRate] = spring(r.pitch, r.pitchRate, w.pitch, r.water.pitch, RIDE.pitch);
   const [roll, rollRate] = spring(r.roll, r.rollRate, w.roll, r.water.roll, RIDE.roll);
-  const heel = r.heel + (lean(s) - r.heel) * (1 - Math.exp(-RIDE.lean * dt));
+  const heel = r.heel + (lean(s, v.fit.top) - r.heel) * (1 - Math.exp(-RIDE.lean * dt));
   return { heave, heaveRate, pitch, pitchRate, roll, rollRate, heel, water: w, read: { from, to, left: left - 1, span, every } };
 }
 

@@ -19,14 +19,14 @@ import { ring } from './gunner.ts';
 import { offCourse, turned, type Helm } from './ship.ts';
 import { course as routed } from './route.ts';
 import { PURSER } from './purser.ts';
-import { BOT, between, inSight, open, roll, rotate, toward, unitHash, velocity, type Ctx, type Seen } from './captain.ts';
+import { BOT, between, fitOf, inSight, open, roll, rotate, toward, unitHash, velocity, type Ctx, type Seen } from './captain.ts';
 
 /** Where to steer to ram `foe` on her side: led for where she will be, by way of her beam when she is end on. A tangent
  *  at her place. */
 function ramCourse(c: Ctx, foe: Seen): Vec3 {
   const p = c.own.ship.at, d = c.foeD, t = toward(p, foe.ship.at);
   if (!t) return c.own.ship.heading;
-  const r = scale(t, d), v = transport(velocity(foe), foe.ship.at, p), s = SHIP.top;
+  const r = scale(t, d), v = transport(velocity(foe), foe.ship.at, p), s = fitOf(c.own).top;
   // the soonest she can be where the foe is: |r + v·τ| = s·τ
   const a = dot(v, v) - s * s, b = 2 * dot(r, v), disc = b * b - 4 * a * d * d;
   let tau = d / s;
@@ -105,9 +105,9 @@ export function steer(c: Ctx, dt: number): Helm {
   // going for loot or mending, she eases up near where she makes for (0117's)
   const easy = (m.mode === 'loot' || m.mode === 'heal' || m.mode === 'home') && toD < PURSER.near ? PURSER.slow : 1;
   // a mark (not a ship; the ring's round a foe is one) inside the circle she turns at her speed she would only sail
-  // round: slowed to turn to it, the circle through it r = d / (2 sin off), the speed that turns it r × SHIP.turn
-  const off = Math.abs(course), r = toD / (2 * (off > Math.PI / 2 ? 1 : Math.max(0.05, Math.sin(off))));
-  const tight = foe && !mark ? 1 : Math.max(BOT.leastWay, Math.min(1, (BOT.tighten * r * SHIP.turn) / SHIP.top));
+  // round: slowed to turn to it, the circle through it r = d / (2 sin off), the speed that turns it r × her turn
+  const off = Math.abs(course), r = toD / (2 * (off > Math.PI / 2 ? 1 : Math.max(0.05, Math.sin(off)))), fit = fitOf(own);
+  const tight = foe && !mark ? 1 : Math.max(BOT.leastWay, Math.min(1, (BOT.tighten * r * fit.turn) / fit.top));
   return stuck(c, dt, course) ?? order(turn, Math.min(easy, tight));
 }
 

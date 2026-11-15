@@ -280,12 +280,12 @@ test('the ram scaled from 0117: a full-speed ram square into a still ship does w
 
 test('rammed square in her side, she heels away from the blow, a few degrees, and the rammer not at all', () => {
   let fleet = approach(90 * deg, SHIP.top);
-  let rides = fleet.map((v) => settled(v.ship, flat, 0));
+  let rides = fleet.map((v) => settled(v, flat, 0));
   let most = [0, 0];
   for (let i = 0; i < Math.round(8 / STEP); i++) {
     const r = stepFleet(fleet, holding(1, 0)(fleet), STEP, deep);
     fleet = r.fleet;
-    rides = rides.map((m, k) => ride(knocked(m, fleet[k].ship, r.jolts[k]), fleet[k].ship, flat, i * STEP, STEP));
+    rides = rides.map((m, k) => ride(knocked(m, fleet[k].ship, r.jolts[k]), fleet[k], flat, i * STEP, STEP));
     most = most.map((x, k) => (Math.abs(rides[k].roll) > Math.abs(x) ? rides[k].roll : x));
   }
   // she was struck on her starboard side (the rammer came from her starboard), so heels to port: roll negative

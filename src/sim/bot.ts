@@ -31,7 +31,7 @@ import type { Helm } from './ship.ts';
 import { STORM, toEdge, type Cap } from './storm.ts';
 import { temper } from './temper.ts';
 import { choose, logistic, momentum, ramp, utility, type Option } from './utility.ts';
-import { BOT, between, inSight, open, roll, rotate, toward, type Ctx, type Memory, type Mode, type Sea, type Seen } from './captain.ts';
+import { BOT, between, fitOf, inSight, open, roll, rotate, toward, type Ctx, type Memory, type Mode, type Sea, type Seen } from './captain.ts';
 import { deepest, steer } from './helmsman.ts';
 import { healUrge, lootAct, lootUrge, purse, PURSER } from './purser.ts';
 import { claimAct, claimUrge, cutAct, cutUrge, homeAct, homeUrge, sound } from './claimer.ts';
@@ -155,7 +155,7 @@ function fightUrge(c: Ctx): number {
   if (!foe) return 0;
   const d = c.foeD;
   let will = t.fight * (0.6 + 0.4 * t.aggro);
-  const strength = (s: Seen) => (s.hull ?? 100) + (s.shield ?? 0);
+  const strength = (s: Seen) => (s.hull ?? fitOf(s).hull) + (s.shield ?? 0);
   will += ((0.1 + 0.5 * t.skill) * (strength(own) - strength(foe))) / 100;
   if (m.hitBy === foe.id) will += BOT.roused * ramp(m.clock - m.hitT, BOT.grudge + BOT.cool, BOT.cool);
   for (const o of c.others) if (o.id !== foe.id && distance(own.ship.at, o.ship.at) < BOT.crowd) will -= BOT.crowding * t.skill;
@@ -188,7 +188,7 @@ const holdsFire = (c: Ctx) =>
   c.m.mode !== 'fight' && holdBack(c) > 0 && !(c.foe && c.m.shotBy === c.foe.id && c.m.clock - c.m.shotT < BOT.shotFresh && c.foeD < BOT.letGo);
 
 /** Losing a fight: her hull down past where her temperament runs, with the foe close (0117's; a seam for health.ts). */
-const losing = (c: Ctx) => (c.foe ? utility(ramp(c.own.hull ?? 100, c.t.run + 8, c.t.run - 4), ramp(c.foeD, 160, 130)) : 0);
+const losing = (c: Ctx) => (c.foe ? utility(ramp(c.own.hull ?? fitOf(c.own).hull,c.t.run + 8, c.t.run - 4), ramp(c.foeD, 160, 130)) : 0);
 
 /** Rammed by a ship she doesn't want to fight (0117's: shot by one): the less she wants to, and the sharper she is,
  *  the more she gets clear. */

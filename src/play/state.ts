@@ -21,6 +21,7 @@ import { mind, rammed, shot, think, type Memory, type Seen } from '../sim/bot.ts
 import { afloat, stepFleet, type Vessel } from '../sim/contact.ts';
 import { STEP, blendPose } from '../sim/fixed.ts';
 import { gunOf } from '../sim/gun.ts';
+import { SPEC, type Handling } from '../sim/fit.ts';
 import { SHIP } from '../sim/handling.ts';
 import { sunk } from '../sim/health.ts';
 import { homed, regain } from '../sim/holding.ts';
@@ -111,8 +112,9 @@ export function createState(planet: Planet, sea: Hull, { chart, water }: Waters,
 
   /** Puts a ship to sea: a bot's unless she is the player's (and `manned`) or her helm is lashed. */
   const launch = (id: number, ship: ShipState, look: Look, lashed: Helm | null = null, manned = true) => {
-    fleet.push(afloat(id, ship));
-    const r = settled(ship, sea, tick * STEP, id), p = pose(ship, r);
+    const v = afloat(id, ship);
+    fleet.push(v);
+    const r = settled(v, sea, tick * STEP, id), p = pose(ship, r);
     const bot = (id !== PLAYER || !manned) && !lashed;
     aboard.set(id, { look, mind: bot ? mind(seedOf(id), ship.at) : null, steady: lashed ?? AMIDSHIPS, ride: r, before: p, after: p });
   };
@@ -243,7 +245,7 @@ export function createState(planet: Planet, sea: Hull, { chart, water }: Waters,
     fleet.forEach((v, i) => {
       const a = aboard.get(v.id)!;
       if (blew.includes(v.id)) a.ride = hopped(a.ride);
-      a.ride = ride(knocked(a.ride, v.ship, met.jolts[i]), v.ship, sea, tick * STEP, STEP);
+      a.ride = ride(knocked(a.ride, v.ship, met.jolts[i]), v, sea, tick * STEP, STEP);
       [a.before, a.after] = [a.after, pose(v.ship, a.ride)];
     });
   };
@@ -346,6 +348,8 @@ export function createState(planet: Planet, sea: Hull, { chart, water }: Waters,
     vessels: (): readonly Vessel[] => fleet,
     /** A ship's crew: her health and her gun (sim/battle.ts). */
     crew: (id: number) => battle.crews.find((k) => k.id === id)!,
+    /** A ship's handling (sim/fit.ts): her own afloat, the tables' once sunk. */
+    handling: (id: number): Handling => fleet.find((v) => v.id === id)?.fit ?? SPEC,
     /** Her ship on the sea, or null once sunk. */
     mine: () => fleet.find((v) => v.id === PLAYER) ?? null,
     /** The ids of every ship not sunk. */

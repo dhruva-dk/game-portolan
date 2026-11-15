@@ -14,6 +14,7 @@
 // Pure arithmetic: no three, so it runs in node for the tests; deterministic for the same inputs.
 
 import type { Use } from '../kinds.ts';
+import { HEALTH } from './handling.ts';
 import { healed, sunk, type Health } from './health.ts';
 
 /** What mends: 0117's four consumables (kinds.ts). */
@@ -65,40 +66,41 @@ export function stowed(h: Hold, kind: Use, count: number): { hold: Hold; left: n
   return { hold: { ...h, items }, left: n };
 }
 
-/** Whether using `kind` would do anything for her now (0117's useful). */
-export const useful = (health: Health, kind: Use) => {
-  const u = USES[kind];
-  return !sunk(health) && (u.shield > 0 ? health.shield < u.cap : health.hull < u.cap);
-};
+/** The most a use of `kind` mends her to: its cap, and a hull's no more than her own most (`most`, fit.ts). */
+const capOf = (kind: Use, most: number) => (USES[kind].shield > 0 ? USES[kind].cap : Math.min(USES[kind].cap, most));
+
+/** Whether using `kind` would do anything for her now (0117's useful), her most hull `most`. */
+export const useful = (health: Health, kind: Use, most: number = HEALTH.hull) =>
+  !sunk(health) && (USES[kind].shield > 0 ? health.shield : health.hull) < capOf(kind, most);
 
 /** What a tap on slot `slot` (0 the gun's, 1–3 the items') does (0117's hotbar): another slot is taken in hand,
  *  breaking off what she is using; the slot in hand, if it holds something that would mend her, is begun. */
-export function tapped(h: Hold, slot: number, health: Health): Hold {
+export function tapped(h: Hold, slot: number, health: Health, most: number = HEALTH.hull): Hold {
   if (slot < 0 || slot > SLOTS) return h;
   if (slot !== h.chosen) return { ...h, chosen: slot, using: null };
-  return slot === 0 ? h : begun(h, slot, health);
+  return slot === 0 ? h : begun(h, slot, health, most);
 }
 
 /** Item slot `slot` (1–3) begun, if it holds something that would mend her and she isn't using anything. */
-export function begun(h: Hold, slot: number, health: Health): Hold {
+export function begun(h: Hold, slot: number, health: Health, most: number = HEALTH.hull): Hold {
   const s = h.items[slot - 1];
-  if (h.using || !s || s.count <= 0 || !useful(health, s.kind)) return h;
+  if (h.using || !s || s.count <= 0 || !useful(health, s.kind, most)) return h;
   return { ...h, chosen: slot, using: { slot, left: USES[s.kind].time } };
 }
 
 /** What she is using broken off (a blow struck her). */
 export const broken = (h: Hold): Hold => (h.using ? { ...h, using: null } : h);
 
-/** dt seconds of using: once it is done, its shield or hull given her and one gone from its stack. The hold and her
- *  health after. */
-export function stepUse(h: Hold, health: Health, dt: number): { hold: Hold; health: Health; done: Use | null } {
+/** dt seconds of using: once it is done, its shield or hull given her (her hull no more than `most`) and one gone from
+ *  its stack. The hold and her health after. */
+export function stepUse(h: Hold, health: Health, dt: number, most: number = HEALTH.hull): { hold: Hold; health: Health; done: Use | null } {
   if (!h.using) return { hold: h, health, done: null };
   const left = h.using.left - dt;
   if (left > 1e-9) return { hold: { ...h, using: { ...h.using, left } }, health, done: null };
   const i = h.using.slot - 1, s = h.items[i];
   if (!s) return { hold: { ...h, using: null }, health, done: null };
   const u = USES[s.kind];
-  const mended = u.shield > 0 ? healed(health, u.shield, 'shield', u.cap) : healed(health, u.hull, 'hull', u.cap);
+  const mended = u.shield > 0 ? healed(health, u.shield, 'shield', u.cap) : healed(health, u.hull, 'hull', capOf(s.kind, most));
   const items = [...h.items];
   items[i] = s.count > 1 ? { ...s, count: s.count - 1 } : null;
   return { hold: { ...h, items, using: null }, health: mended, done: s.kind };

@@ -46,10 +46,11 @@ export const gunOf = (kind: GunKind, rarity: number): Gun => ({
   kind, rarity: Math.max(0, Math.min(GUN.rarities.length - 1, Math.round(rarity))), rounds: GUNS[kind].mag, cool: 0, reload: 0, windup: 0, fired: 0,
 });
 
-/** Hit points a ball of `gun` takes off, before its fall-off; seconds its reload takes; its spread (half-angle). */
+/** Hit points a ball of `gun` takes off, before its fall-off; seconds its reload takes; its spread (half-angle). The
+ *  reload and the spread by its kind and rarity, times her own (fit.ts Handling reload and spread; 1 if not given). */
 export const damageOf = (g: Pick<Gun, 'kind' | 'rarity'>) => GUNS[g.kind].damage * GUN.damageBy[g.rarity];
-export const reloadOf = (g: Pick<Gun, 'kind' | 'rarity'>) => GUNS[g.kind].reload * GUN.reloadBy[g.rarity];
-export const spreadOf = (g: Pick<Gun, 'kind' | 'rarity'>) => GUNS[g.kind].spread * GUN.spreadBy[g.rarity];
+export const reloadOf = (g: Pick<Gun, 'kind' | 'rarity'>, hers = 1) => GUNS[g.kind].reload * GUN.reloadBy[g.rarity] * hers;
+export const spreadOf = (g: Pick<Gun, 'kind' | 'rarity'>, hers = 1) => GUNS[g.kind].spread * GUN.spreadBy[g.rarity] * hers;
 
 /** The share of its damage a ball of `kind` keeps, struck `metres` from where it was fired (FALLOFF; 1 for a kind
  *  whose bite holds). */

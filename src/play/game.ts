@@ -65,8 +65,8 @@ const DEAD = 0.15;
 const DRAWN = 700, RIDES = 320;
 /** Seconds before the match a piece strewn at its start is taken to have come onto the water: long since bobbed up. */
 const LONG_AGO = 1e3;
-/** How far a gun is through reloading (0…1), or null when it isn't. */
-const reloading = (g: Gun): number | null => (g.reload > 0 ? 1 - g.reload / reloadOf(g) : null);
+/** How far a gun is through reloading (0…1), or null when it isn't; `hers` her own reload (sim/fit.ts). */
+const reloading = (g: Gun, hers: number): number | null => (g.reload > 0 ? 1 - g.reload / reloadOf(g, hers) : null);
 
 /** What the camera does, as the match's flow sets it (play/referee.ts): the ship it follows; whether the hands steer
  * and look; and her end's shot, held on her ship (finale.ts), or none. */
@@ -200,10 +200,10 @@ export function createGame(world: World, anchors: readonly Anchor[], waters: Wat
     },
     /** What she carries, as the hotbar shows it. */
     kit(): Kit {
-      const c = state.crew(PLAYER), v = state.mine(), h = c.hold, item = HOTBAR.guns - 1;
+      const c = state.crew(PLAYER), v = state.mine(), h = c.hold, item = HOTBAR.guns - 1, fit = state.handling(PLAYER);
       const items = h.items.map((k): Slot | null => k && { item: `item.${k.kind}`, count: k.count });
       const guns = c.guns.map((g): GunSlot | null => g && {
-        kind: g.kind, rarity: g.rarity, rounds: g.rounds, mag: GUNS[g.kind].mag, reload: reloading(g),
+        kind: g.kind, rarity: g.rarity, rounds: g.rounds, mag: GUNS[g.kind].mag, reload: reloading(g, fit.reload),
       });
       const o = v ? offered(c, v.ship.at, state.loot()) : { gun: null, item: null };
       return {
@@ -215,11 +215,11 @@ export function createGame(world: World, anchors: readonly Anchor[], waters: Wat
     },
     /** What the HUD reads of the match, on a view `width` × `height` CSS px (where the ball will come down). */
     status(width = 0, height = 0): Status {
-      const c = state.crew(PLAYER), v = state.mine(), s = state.storm(between), g = inHand(c), eye = chase.eye();
+      const c = state.crew(PLAYER), v = state.mine(), s = state.storm(between), g = inHand(c), eye = chase.eye(), fit = state.handling(PLAYER);
       const lay = g && v && steering() ? aimed(v, g) : null;
       const fall = lay && width > 0 ? onScreen(eye, lay.fall, width, height, GUN.up) : null;
       // her balls' spread where they come down, as px on the screen there
-      const off = lay && v && g ? distance(v.ship.at, lay.fall) * spreadOf(g) : 0, seen = lay ? length(add(scale(lay.fall, R + GUN.up), eye.position, -1)) : 1;
+      const off = lay && v && g ? distance(v.ship.at, lay.fall) * spreadOf(g, fit.spread) : 0, seen = lay ? length(add(scale(lay.fall, R + GUN.up), eye.position, -1)) : 1;
       const spread = (off * height) / (2 * Math.max(1, seen) * Math.tan((eye.fov * Math.PI) / 360));
       const radius = Math.round(s.radius * R);
       if (radius !== calm.radius || s.centre.some((x, i) => Math.abs(x - calm.centre[i]) * R > 1)) calm = { centre: s.centre, radius };
@@ -231,9 +231,9 @@ export function createGame(world: World, anchors: readonly Anchor[], waters: Wat
       return {
         at, heading: watched?.heading ?? v?.ship.heading ?? last.forward, facing: chase.axes().ahead,
         arriving: arrival === null ? 0 : Math.max(0, 1 - arrival / ARRIVAL.seconds),
-        hull: c.health.hull, hullMax: HEALTH.hull, shield: c.health.shield, shieldMax: HEALTH.shield,
+        hull: c.health.hull, hullMax: fit.hull, shield: c.health.shield, shieldMax: HEALTH.shield,
         gun: g && {
-          kind: g.kind, rarity: g.rarity, rounds: g.rounds, ready: reloading(g) ?? 1,
+          kind: g.kind, rarity: g.rarity, rounds: g.rounds, ready: reloading(g, fit.reload) ?? 1,
           charge: g.windup > 0 ? 1 - g.windup / GUNS[g.kind].windup : null, swapping: c.equip / EQUIP, locked: lay?.target != null,
         },
         afloat: state.alive().length, sunk: sunk(c.health),

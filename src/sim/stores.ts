@@ -38,7 +38,7 @@ export const NOTHING: Ask = { tap: null, arm: null, gust: false, take: null };
 
 /** Her crew after a tap on gun slot `slot`, with what is offered her: the swap asked for (0) if a gun is offered for
  *  the one in hand, and what her gun did (cues). */
-function armed(crew: Crew, slot: number, gunOffered: boolean, cue: (c: Omit<Cue, 'at'>) => void): { crew: Crew; take: boolean } {
+function armed(crew: Crew, slot: number, gunOffered: boolean, cue: (c: Omit<Cue, 'at'>) => void, hers = 1): { crew: Crew; take: boolean } {
   if (slot < 0 || slot >= CARRIED) return { crew, take: false };
   const hold = crew.hold.chosen !== 0 ? { ...crew.hold, chosen: 0, using: null } : crew.hold, g = crew.guns[slot];
   if (slot !== crew.hand) {
@@ -52,7 +52,7 @@ function armed(crew: Crew, slot: number, gunOffered: boolean, cue: (c: Omit<Cue,
   if (hold !== crew.hold) return { crew: { ...crew, hold }, take: false };
   if (!g || g.rounds >= GUNS[g.kind].mag || g.reload > 0 || g.windup > 0) return { crew, take: false };
   cue({ ship: crew.id, kind: 'reloading', gun: g.kind });
-  return { crew: { ...crew, guns: crew.guns.map((k, i) => (i === slot ? { ...g, reload: reloadOf(g) } : k)) }, take: false };
+  return { crew: { ...crew, guns: crew.guns.map((k, i) => (i === slot ? { ...g, reload: reloadOf(g, hers) } : k)) }, take: false };
 }
 
 /**
@@ -61,21 +61,21 @@ function armed(crew: Crew, slot: number, gunOffered: boolean, cue: (c: Omit<Cue,
  */
 export function asked(crews: readonly Crew[], fleet: readonly Vessel[], flotsam: Flotsam, asks: ReadonlyMap<number, Ask>): { crews: Crew[]; takes: Map<number, number>; blew: number[]; cues: Cue[] } {
   const takes = new Map<number, number>(), blew: number[] = [], cues: Cue[] = [];
-  const at = new Map(fleet.map((v) => [v.id, v.ship.at]));
+  const vessels = new Map(fleet.map((v) => [v.id, v]));
   const after = crews.map((c) => {
-    const ask = asks.get(c.id), p = at.get(c.id);
-    if (!ask || !p || sunk(c.health)) return c;
+    const ask = asks.get(c.id), v = vessels.get(c.id), p = v?.ship.at;
+    if (!ask || !v || !p || sunk(c.health)) return c;
     let crew = c;
     if (ask.take !== null) takes.set(c.id, ask.take);
     const arm = ask.arm ?? (ask.tap === 0 ? crew.hand : null);
     if (arm !== null) {
-      const a = armed(crew, arm, offered(crew, p, flotsam).gun !== null, (k) => cues.push({ ...k, at: p }));
+      const a = armed(crew, arm, offered(crew, p, flotsam).gun !== null, (k) => cues.push({ ...k, at: p }), v.fit.reload);
       crew = a.crew;
       if (a.take) takes.set(c.id, 0);
     } else if (ask.tap !== null) {
       const o = offered(crew, p, flotsam);
       if (ask.tap > 0 && ask.tap === crew.hold.chosen && o.item) takes.set(c.id, ask.tap);
-      else crew = { ...crew, hold: tapped(crew.hold, ask.tap, crew.health) };
+      else crew = { ...crew, hold: tapped(crew.hold, ask.tap, crew.health, v.fit.hull) };
     }
     if (ask.gust && !crew.hold.using) {
       const g = spent(crew.gust);
@@ -107,10 +107,10 @@ export function stored(
   sunkNow: readonly number[], dt: number, depth: Depth, seed: number,
 ): { crews: Crew[]; flotsam: Flotsam; took: Taken[]; mended: Mended[] } {
   let f = drifted(flotsam, dt, depth);
-  const mended: Mended[] = [];
+  const mended: Mended[] = [], most = new Map(fleet.map((v) => [v.id, v.fit.hull]));
   const stepped = crews.map((c): Crew => {
     if (sunk(c.health)) return c;
-    const u = stepUse(c.hold, c.health, dt);
+    const u = stepUse(c.hold, c.health, dt, most.get(c.id));
     if (u.done) mended.push({ ship: c.id, use: u.done });
     return { ...c, hold: u.hold, health: u.health, gust: stepGust(c.gust, dt) };
   });

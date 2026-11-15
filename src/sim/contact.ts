@@ -28,17 +28,20 @@
 // Pure arithmetic: no three, so it runs in node for the tests; deterministic for the same inputs.
 
 import { R, add, dot, frameAt, length, normalize, scale, transport, type Vec3 } from '../world/sphere.ts';
+import { SPEC, type Handling } from './fit.ts';
 import { RAM, SHIP } from './handling.ts';
 import { step, type Helm, type ShipState } from './ship.ts';
 import { clearance, hullAt, moved, type Depth } from './shoal.ts';
 
 /** A ship in a fleet: who she is (an id no other in the fleet has), how she sails, the shove she is carried on by (m/s,
- * a tangent at her place), and the ships she has rammed or been rammed by and not yet drawn clear of. */
+ * a tangent at her place), the ships she has rammed or been rammed by and not yet drawn clear of, and her own handling
+ * (fit.ts). */
 export interface Vessel {
   id: number;
   ship: ShipState;
   shove: Vec3;
   engaged: readonly number[];
+  fit: Handling;
 }
 
 /** Where a blow lands on her. */
@@ -60,8 +63,8 @@ export interface Blow {
   at: Vec3;
 }
 
-/** A ship in a fleet, under no shove and engaged with none. */
-export const afloat = (id: number, ship: ShipState): Vessel => ({ id, ship, shove: [0, 0, 0], engaged: [] });
+/** A ship in a fleet, under no shove and engaged with none, by her own handling (the tables' if not given). */
+export const afloat = (id: number, ship: ShipState, fit: Handling = SPEC): Vessel => ({ id, ship, shove: [0, 0, 0], engaged: [], fit });
 
 /** Her hull's half-width, and how far ahead and astern of amidships its rounded ends are centred. */
 export const RADIUS = SHIP.beam / 2;
@@ -161,7 +164,7 @@ function part(l: Laid, out: P): Part {
 }
 
 /** A ship as the step works on her. */
-interface Working { id: number; ship: ShipState; shove: Vec3; engaged: number[]; jolt: Vec3 }
+interface Working { id: number; ship: ShipState; shove: Vec3; engaged: number[]; jolt: Vec3; fit: Handling }
 
 /** Her way through the water and her shove together, on the chart, and at a point of her (r from amidships). */
 function velocity(w: Working, m: Meeting, r: P): P {
@@ -245,7 +248,7 @@ function heldApart(a: Working, b: Working, m: Meeting, depth: Depth): void {
 
 /** Her own step under her helm, then on along her shove, as far as the shallows let her; the shove dying away. */
 function sailed(v: Vessel, helm: Helm, dt: number, depth: Depth): Working {
-  let ship = step(v.ship, helm, dt, depth);
+  let ship = step(v.ship, helm, dt, depth, v.fit);
   let shove = transport(v.shove, v.ship.at, ship.at);
   const metres = length(shove) * dt;
   if (metres > 0) {
@@ -258,7 +261,7 @@ function sailed(v: Vessel, helm: Helm, dt: number, depth: Depth): Working {
   }
   shove = scale(shove, Math.exp(-RAM.ease * dt));
   if (length(shove) < RAM.still) shove = [0, 0, 0];
-  return { id: v.id, ship, shove, engaged: [...v.engaged], jolt: [0, 0, 0] };
+  return { id: v.id, ship, shove, engaged: [...v.engaged], jolt: [0, 0, 0], fit: v.fit };
 }
 
 /**
@@ -309,7 +312,7 @@ export function stepFleet(fleet: readonly Vessel[], helms: readonly Helm[], dt: 
   for (const w of ws) w.engaged = w.engaged.filter((id) => byId.has(id) && gap(w.ship, byId.get(id)!.ship) <= RAM.rearm);
   const result = fleet.map((v) => byId.get(v.id)!);
   return {
-    fleet: result.map(({ id, ship, shove, engaged }) => ({ id, ship, shove, engaged })),
+    fleet: result.map(({ id, ship, shove, engaged, fit }) => ({ id, ship, shove, engaged, fit })),
     blows,
     jolts: result.map((w) => w.jolt),
   };

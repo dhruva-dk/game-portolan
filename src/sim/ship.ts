@@ -12,6 +12,7 @@
 // Pure arithmetic: no three, so it runs in node for the tests; deterministic for the same inputs.
 
 import { add, cross, dot, length, normalize, scale, type Vec3 } from '../world/sphere.ts';
+import { SPEC, type Handling } from './fit.ts';
 import { GUST, HOLDING, SHIP } from './handling.ts';
 import { navigate, type Depth } from './shoal.ts';
 
@@ -52,8 +53,8 @@ export function offCourse(s: ShipState, course: Vec3): number {
   return ahead === 0 && across === 0 ? 0 : Math.atan2(across, ahead);
 }
 
-/** How hard the rudder bites at a speed, 0–1. */
-const bite = (speed: number) => Math.min(1, SHIP.bite + ((1 - SHIP.bite) * speed) / (SHIP.fullBite * SHIP.top));
+/** How hard the rudder bites at a speed, 0–1, on a ship of top speed `top`. */
+const bite = (speed: number, top: number) => Math.min(1, SHIP.bite + ((1 - SHIP.bite) * speed) / (SHIP.fullBite * top));
 
 /** The share of a gap closed in dt at `rate` per second. */
 const close = (rate: number, dt: number) => 1 - Math.exp(-rate * dt);
@@ -63,16 +64,16 @@ export function turned(s: ShipState, angle: number): Vec3 {
   return normalize(add(scale(s.heading, Math.cos(angle)), cross(s.at, s.heading), Math.sin(angle)));
 }
 
-/** One step of dt seconds under `helm`, in water `depth` deep (metres at a point). */
-export function step(s: ShipState, helm: Helm, dt: number, depth: Depth): ShipState {
+/** One step of dt seconds under `helm`, in water `depth` deep (metres at a point), by her own handling (fit.ts). */
+export function step(s: ShipState, helm: Helm, dt: number, depth: Depth, fit: Handling = SPEC): ShipState {
   const rudder = helm.course && length(helm.course) > 0 ? Math.max(-1, Math.min(1, SHIP.steer * offCourse(s, helm.course))) : 0;
-  const turn = s.turn + (rudder * SHIP.turn * (helm.gust ? GUST.turn : 1) * bite(s.speed) - s.turn) * close(SHIP.answer, dt);
-  const top = SHIP.top * (helm.home ? HOLDING.speed : 1);
+  const turn = s.turn + (rudder * fit.turn * (helm.gust ? GUST.turn : 1) * bite(s.speed, fit.top) - s.turn) * close(fit.answer, dt);
+  const top = fit.top * (helm.home ? HOLDING.speed : 1);
   const want = Math.max(0, Math.min(1, helm.throttle)) * top;
   let speed: number;
   // a gust drives her on hard toward its speed over what she asks; after it, what she has over her top is shed at a rate
   if (helm.gust) speed = s.speed + Math.max(-GUST.accel * dt, Math.min(GUST.accel * dt, want + GUST.speed - s.speed));
   else if (s.speed > top) speed = Math.max(top, s.speed - GUST.shed * dt);
-  else speed = s.speed + (want - s.speed) * close(want > s.speed ? SHIP.gather : SHIP.drag, dt);
+  else speed = s.speed + (want - s.speed) * close(want > s.speed ? fit.gather : SHIP.drag, dt);
   return navigate({ ...s, speed, turn }, turned(s, turn * dt), dt, depth);
 }
