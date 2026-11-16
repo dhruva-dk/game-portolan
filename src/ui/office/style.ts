@@ -58,6 +58,12 @@ const CSS = `
 .o-costs > .o-lines { grid-template-columns: 1fr; row-gap: 2px; margin-top: 0; }
 .o-costs > .o-lines > span:first-child { font-variant: small-caps; color: ${TEXT.faint}; }
 .o-costs .k-fig { justify-self: start; text-align: left; }
+.k-seg.o-vseg { display: flex; flex-direction: column; }
+.k-seg.o-vseg > div { text-align: left; }
+.k-seg.o-vseg > div + div { border-left: 0; border-top: 1px solid ${INK.iron}; }
+.k-seg.o-wrap > div { padding-left: 9px; padding-right: 9px; }
+.o-pin { padding: 6px 0; border-bottom: 1px solid ${INK.iron}; cursor: pointer; }
+.o-seats i { width: 20px; height: 20px; }
 .o-signed { position: absolute; right: 40px; top: 120px; font-size: ${TYPE.title}px; }
 .o-row { display: grid; align-items: center; column-gap: 10px; }
 .o-pips { display: inline-flex; gap: 4px; }

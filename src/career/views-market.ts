@@ -11,8 +11,8 @@ import type { Gull, GullOf } from './roles.ts';
 import { inReach } from './staff.ts';
 import { stars } from './stars.ts';
 import type { CareerState, Crew } from './state.ts';
-import { ROLE_NAMES, ageOf, dayText, endsText, openPosts, seen, wageText, whereText } from './views-gull.ts';
-import { crewOf, faceOf, fig, line, nameOf, rival, topBar } from './views.ts';
+import { ROLE_NAMES, ageOf, dayText, openPosts, seen, whereText } from './views-gull.ts';
+import { coinText, crewOf, faceOf, fig, line, nameOf, rival, topBar } from './views.ts';
 
 /** The roles a market lists (managers and elders are hired by elders, not offered contracts). */
 const ROLES: readonly Role[] = ['captain', 'bosun', 'shipwright', 'scout', 'flight'];
@@ -39,7 +39,8 @@ function row(s: CareerState, c: Crew, g: Gull): MarketRow {
   const v = seen(s, c.id, g.id), talk = s.talks.find((t) => t.crew === c.id && t.gull === g.id);
   return {
     id: g.id, face: faceOf(s, g), name: nameOf(g), age: ageOf(s, g), stars: v.stars, potential: v.potential,
-    crew: whereText(s, g).crew, contract: g.contract ? endsText(s, g) : 'Free', ask: wageText(askOf(s, g, c).wage),
+    crew: whereText(s, g).crew, contract: !g.contract ? 'Free' : g.contract.ends === null ? 'Open' : `S${g.contract.ends + 1}${closing(s, g.contract) ? ' · ending' : ''}`,
+    ask: coinText(askOf(s, g, c).wage),
     talk: talk ? (talk.counter ? 'Countered' : `Answer ${dayText(s, talk.answer)}`) : s.day < g.silentUntil ? 'Silent' : null,
   };
 }

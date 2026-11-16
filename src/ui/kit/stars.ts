@@ -9,16 +9,19 @@ export interface Rating { stars: number; potential?: number; hi?: number }
 
 const STAR = 'M8 1.2L10 6L15.2 6.4L11.2 9.8L12.4 14.8L8 12.2L3.6 14.8L4.8 9.8L0.8 6.4L6 6Z';
 
+/** Each set of stars' own clip ids (a clip shared by id with stars in a hidden panel clips nothing). */
+let made = 0;
+
 /** Five stars `size` px each. */
 export function stars(size = 16): Part<Rating> {
-  const el = make('span', 'k-stars');
+  const el = make('span', 'k-stars'), own = `st${made++}`;
   return {
     el,
     set({ stars: s, potential, hi }) {
       const at = (i: number, v: number) => Math.max(0, Math.min(1, v - i));
       let html = '';
       for (let i = 0; i < 5; i++) {
-        const full = at(i, s), pot = at(i, Math.max(potential ?? s, hi ?? s)), maybe = at(i, hi ?? s), id = `st${i}${Math.round(full * 2)}`, mid = `${id}m${Math.round(maybe * 2)}`;
+        const full = at(i, s), pot = at(i, Math.max(potential ?? s, hi ?? s)), maybe = at(i, hi ?? s), id = `${own}_${i}`, mid = `${id}m`;
         html += `<svg viewBox="0 0 16 16" width="${size}" height="${size}"><clipPath id="${id}"><rect width="${16 * full}" height="16"/></clipPath>`
           + `<clipPath id="${mid}"><rect width="${16 * maybe}" height="16"/></clipPath>`
           + `<path d="${STAR}" fill="none" stroke="${INK.iron}" stroke-width="${pot > 0 ? 1.1 : 0.6}" stroke-dasharray="${pot > 0 ? '' : '1.5 1.5'}"/>`

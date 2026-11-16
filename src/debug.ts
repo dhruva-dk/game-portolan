@@ -251,6 +251,7 @@ async function office(p: Played, screen: OfficeScreen | 'settings') {
   const who = params.get('who') as keyof typeof PICKED | null;
   FOCUS.gull = who && who in PICKED ? PICKED[who] : screen === 'profile' ? PICKED.scouted : screen === 'offer' ? PICKED.talks : null;
   FOCUS.back = 'crew';
+  FOCUS.shortlist = screen === 'market' ? [PICKED.scouted, PICKED.talks] : [];
   FOCUS.tab = params.get('tab') ?? '';
   await p.flow.office.load(desk);
   p.flow.go(screen);
