@@ -47,6 +47,7 @@ const CSS = `
 .o-who-cell > div > div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .k-stat.o-mini { grid-template-columns: 0 minmax(40px, 1fr) 2.6em; column-gap: 6px; width: 100%; }
 .k-stat.o-mini > span:first-child { display: none; }
+.k-meter.o-bare > span { display: none; }
 .o-row { display: grid; align-items: center; column-gap: 10px; }
 .o-pips { display: inline-flex; gap: 4px; }
 .o-pips i { width: 12px; height: 12px; border: 1.5px solid ${INK.iron}; border-radius: 50%; }

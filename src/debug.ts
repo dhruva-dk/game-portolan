@@ -240,7 +240,7 @@ function open(p: Played, others: readonly Berth[]) {
 /** An office screen (?screen=home, found, recover, settings or any later one's stub) over its fixture's career
  *  (fixtures.ts): none yet for found, a damaged save for recover, ?raceday's on race day, the people screens' past
  *  the first race with scouting and talks under way (profile: the rival scouted; offer: the gull in talks), jobs and
- *  ?sacked's dismissed, else one just founded. ?gull= opens profile or offer on that gull instead. */
+ *  ?sacked's dismissed, else one just founded. ?who= (scouted, unknown, talks, captain: fixtures.ts PICKED) opens them on another; ?tab= a sub-tab. */
 async function office(p: Played, screen: OfficeScreen | 'settings') {
   const people = ['crew', 'profile', 'offer', 'market', 'career'].includes(screen);
   const which: Fixture = screen === 'found' || screen === 'recover' ? screen : params.has('raceday') ? 'raceday'
@@ -248,7 +248,8 @@ async function office(p: Played, screen: OfficeScreen | 'settings') {
   FIRST.seed = FOUNDING.seed;
   const desk = fixture(which);
   await desk;
-  FOCUS.gull = params.has('gull') ? number('gull', 0) : screen === 'profile' ? PICKED.scouted : screen === 'offer' ? PICKED.talks : null;
+  const who = params.get('who') as keyof typeof PICKED | null;
+  FOCUS.gull = who && who in PICKED ? PICKED[who] : screen === 'profile' ? PICKED.scouted : screen === 'offer' ? PICKED.talks : null;
   FOCUS.back = 'crew';
   FOCUS.tab = params.get('tab') ?? '';
   await p.flow.office.load(desk);

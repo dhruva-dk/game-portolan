@@ -1,7 +1,7 @@
 // Stars: a rating out of five in half stars, inked gold; the potential beyond it in outline (a gull's, a building's).
 // A rating not yet known is a range: gold to its low end, hatched in a pale wash to its high end.
 
-import { INK, PALE } from '../ink';
+import { INK, WASH } from '../ink';
 import { make, type Part } from './part';
 
 /** `hi`: the top of a range a scout has not yet narrowed (the rating is its low end). */
@@ -22,7 +22,7 @@ export function stars(size = 16): Part<Rating> {
         html += `<svg viewBox="0 0 16 16" width="${size}" height="${size}"><clipPath id="${id}"><rect width="${16 * full}" height="16"/></clipPath>`
           + `<clipPath id="${mid}"><rect width="${16 * maybe}" height="16"/></clipPath>`
           + `<path d="${STAR}" fill="none" stroke="${INK.iron}" stroke-width="${pot > 0 ? 1.1 : 0.6}" stroke-dasharray="${pot > 0 ? '' : '1.5 1.5'}"/>`
-          + (hi != null ? `<path d="${STAR}" fill="${PALE.gold}" stroke="${INK.iron}" stroke-width="1.1" stroke-dasharray="2 1" clip-path="url(#${mid})"/>` : '')
+          + (hi != null ? `<path d="${STAR}" fill="${WASH.sand}" stroke="${INK.iron}" stroke-width="1.1" stroke-dasharray="2 1" clip-path="url(#${mid})"/>` : '')
           + `<path d="${STAR}" fill="${INK.gold}" stroke="${INK.iron}" stroke-width="1.1" clip-path="url(#${id})"/></svg>`;
       }
       el.innerHTML = html;

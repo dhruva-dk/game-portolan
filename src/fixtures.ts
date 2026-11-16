@@ -1,7 +1,7 @@
 // The office's fixtures: careers on a memory store, made by the commands a player would send (Found, Advance, StartScout,
 // OfferContract, a race recorded), for ?screen= (debug.ts) and tools/capture.ts. Nothing here touches the device's own
 // career. `people` is a career past its first race: one rival captain scouted, another being scouted, and a free agent's
-// talks under way (its answer a counter); `sacked` is that career with the elder's patience gone (its state set, then
+// talks under way (a lowball, its answer due); `sacked` is that career with the elder's patience gone (its state set, then
 // snapshotted: no run of races reliably ends in a sacking).
 
 import type { Command, Desk } from './office';
@@ -64,8 +64,9 @@ const haggle = (s: CareerState): Command[] => {
 /** A day on, unless `done` (or race day). */
 const until = (done: (s: CareerState) => boolean) => (s: CareerState): Command[] => (done(s) || topBar(s).go.raceDay ? [] : [{ kind: 'Advance' }]);
 
-/** The people fixture's gulls: the rival captain scouted, and the free agent in talks (for ?screen=profile, offer). */
-export const PICKED = { scouted: -1, talks: -1 };
+/** The people fixture's gulls (for ?screen=profile, offer and ?who=): the rival captain scouted, the one being scouted,
+ *  the free agent in talks, and ship two's captain. */
+export const PICKED = { scouted: -1, unknown: -1, talks: -1, captain: -1 };
 const PEOPLE: readonly Step[] = [
   FOUNDING, { kind: 'DebugCoin', coin: 6400 },
   (s) => {
@@ -74,13 +75,16 @@ const PEOPLE: readonly Step[] = [
   },
   { kind: 'Advance' }, raced,
   ...Array.from({ length: 6 }, () => until((s) => seen(s, mine(s), PICKED.scouted).known)),
-  scouted(0),
+  (s) => {
+    PICKED.unknown = stranger(s, 0).id;
+    PICKED.captain = s.crews[mine(s)].staff.ships[1].captain ?? -1;
+    return scouted(0)(s);
+  },
   (s) => {
     const c = haggle(s);
     PICKED.talks = c[0]?.kind === 'OfferContract' ? c[0].gull : -1;
     return c;
   },
-  { kind: 'Advance' },
 ];
 
 const COMMANDS: Readonly<Record<Fixture, readonly Step[]>> = {

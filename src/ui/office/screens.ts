@@ -4,7 +4,9 @@
 import type { OfficeScreen } from '../ways';
 import { createCrew } from './crew';
 import { createFound } from './found';
+import { FOCUS } from './focus';
 import { createHome } from './home';
+import { createProfile } from './profile';
 import { createRecover } from './recover';
 import { register, type Registered, type Send } from './screen';
 import { createStub } from './stub';
@@ -16,7 +18,7 @@ export const SCREENS: Readonly<Record<OfficeScreen, (send: Send) => Registered>>
   home: register(createHome, (d) => d.home()),
   career: register(createStub('career'), () => null),
   crew: register(createCrew, (d) => d.crew()),
-  profile: register(createStub('profile'), () => null),
+  profile: register(createProfile, (d) => d.profile(FOCUS.gull)),
   offer: register(createStub('offer'), () => null),
   market: register(createStub('market'), () => null),
   ship: register(createStub('ship'), () => null),

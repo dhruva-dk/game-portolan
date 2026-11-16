@@ -40,11 +40,11 @@ export function askOffer(s: CareerState, c: Crew, g: Gull): Offer {
 function specifics(s: CareerState, g: Gull): { label: string; figure: ReturnType<typeof fig> }[] {
   const st = effective(g as GullOf<typeof g.role>, null) as Readonly<Record<string, number>>;
   const one = (label: string, v: number, text: string, against: string, lines: [string, string | number][]) =>
-    ({ label, figure: fig(v, text, rival('at 10', against), { title: label, lines: lines.map(([a, b]) => line(a, b)) }) });
+    ({ label, figure: fig(v, text, rival('average', against), { title: label, lines: lines.map(([a, b]) => line(a, b)) }) });
   switch (g.role) {
     case 'captain': return [
       one('Feedback a race', feedbackPoints(st.feedback), feedbackPoints(st.feedback).toFixed(1), feedbackPoints(10).toFixed(1), [['Feedback', st.feedback]]),
-      { label: 'Unfit', figure: fig(g.unfit, g.unfit ? `${g.unfit} races` : 'Fit', rival('of', 'the season'), { title: 'Unfit', lines: [line('Races to miss', g.unfit)] }) },
+      { label: 'Fitness', figure: fig(g.unfit, g.unfit ? 'Unfit' : 'Fit', rival('misses', g.unfit ? `${g.unfit} races` : 'none'), { title: 'Unfit', lines: [line('Races to miss', g.unfit)] }) },
     ];
     case 'bosun': return [
       one('Repairs', repairsFactor(st.repairs), `×${repairsFactor(st.repairs).toFixed(2)}`, `×${repairsFactor(10).toFixed(2)}`, [['Repairs', st.repairs]]),
@@ -85,7 +85,7 @@ export function profileView(s: CareerState, gull: number | null): ProfileView {
   const draft = askOffer(s, c, g);
   const offerNo = offerCheck(s, c.id, id, draft);
   const blocks = ['silent', 'waiting', 'retired', 'role', 'contracted', 'league', 'who', 'leaving'];
-  const offerWhy = mine ? 'Already yours.' : offerNo && blocks.includes(offerNo.code) ? offerNo.sentence : null;
+  const offerWhy = mine ? 'Already yours.' : offerNo?.code === 'waiting' ? 'Awaiting their answer.' : offerNo && blocks.includes(offerNo.code) ? offerNo.sentence : null;
   const renewWhy = !mine || you ? 'Not yours to renew.' : g.role === 'elder' || g.role === 'manager' ? 'Elders and managers are the elder\'s.'
     : g.contract?.ends === null || !closing(s, g.contract!) ? `Opens in the contract's last ${TUNING.market.closingDays} days.` : offerNo?.sentence ?? null;
   const owed = dismissalCost(s, g);
