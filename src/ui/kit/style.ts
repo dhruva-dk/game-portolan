@@ -62,7 +62,9 @@ const CSS = `
 .k-face { display: block; flex: none; }
 .k-stars { display: inline-flex; gap: 1px; vertical-align: middle; }
 
-.k-stat { display: grid; grid-template-columns: minmax(5.5em, max-content) minmax(64px, 1fr) 3em; align-items: center; gap: 10px; min-height: 26px; }
+.k-arrow { display: inline-block; width: 1.1em; margin-left: 2px; font-size: ${TYPE.small}px; text-align: center; }
+.k-arrow.good { color: ${TEXT.good}; } .k-arrow.harm { color: ${TEXT.harm}; }
+.k-stat { display: grid; grid-template-columns: minmax(5.5em, max-content) minmax(64px, 1fr) 4em; align-items: center; gap: 10px; min-height: 26px; }
 .k-bar { position: relative; height: 12px; border: 1px solid ${INK.iron}; background: ${PAPER}; }
 .k-bar > i { position: absolute; left: 1px; top: 1px; bottom: 1px; width: 0; transition: width ${MOTION.bar}ms ease-out; }
 .k-bar > b { position: absolute; top: -4px; bottom: -4px; width: 0; border-left: 2px solid ${INK.iron}; }

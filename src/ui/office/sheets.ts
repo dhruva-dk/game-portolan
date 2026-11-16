@@ -94,13 +94,15 @@ export function kitSheet(): HTMLElement {
   faces.append(big.el, small.el);
   const rating = stars(16);
   rating.set({ stars: 3.5, potential: 4.5 });
+  const unknown = stars(16);
+  unknown.set({ stars: 2, hi: 3.5 });
   const sb1 = statBar(), sb2 = statBar(), mood = meter();
-  sb1.set({ label: 'Seamanship', value: 14, max: 20, mark: 16 });
-  sb2.set({ label: 'Nerve', value: 6, max: 20 });
+  sb1.set({ label: 'Seamanship', value: 14, max: 20, mark: 16, arrow: 1 });
+  sb2.set({ label: 'Nerve', value: 6, max: 20, arrow: -1 });
   mood.set({ label: 'Morale', value: 28 });
   const c = card(() => say.say('The card opens the profile.'));
   c.set({ face: faceOf(5), name: 'Henrietta Gale', line: 'Captain, 31', rating: { stars: 3, potential: 4 }, tags: [{ text: 'Free agent' }], lines: [{ label: 'Asks', amount: '900 a race' }] });
-  b.body.append(rating.el, sb1.el, sb2.el, mood.el, c.el);
+  b.body.append(rating.el, unknown.el, sb1.el, sb2.el, mood.el, c.el);
   Object.assign(b.body.style, { display: 'flex', flexDirection: 'column', gap: '10px' });
 
   const cc = panel({ from: 7, to: 9, top: 0, height: 724 }, { title: 'Figures and Parts' });
@@ -120,7 +122,7 @@ export function kitSheet(): HTMLElement {
   const pl = plate();
   pl.set({ type: 'sails', name: 'Lateen Mk II', tags: [{ text: 'Light' }], perf: 14, perfMax: 20, reliability: 9, reliabilityMax: 20, condition: 0.42 });
   const nothing = empty();
-  nothing.set({ mark: 'tab.mail', title: 'No letters', sentence: 'Letters come as the days pass.' });
+  nothing.set({ mark: 'tab.mail', title: 'No letters', sentence: '' });
   cc.body.append(disc.el, pl.el, nothing.el);
   Object.assign(cc.body.style, { display: 'flex', flexDirection: 'column', gap: '10px' });
 
