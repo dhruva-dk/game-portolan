@@ -6,6 +6,7 @@ import { createCrew } from './crew';
 import { createFound } from './found';
 import { FOCUS } from './focus';
 import { createHome } from './home';
+import { createOffer } from './offer';
 import { createProfile } from './profile';
 import { createRecover } from './recover';
 import { register, type Registered, type Send } from './screen';
@@ -19,7 +20,7 @@ export const SCREENS: Readonly<Record<OfficeScreen, (send: Send) => Registered>>
   career: register(createStub('career'), () => null),
   crew: register(createCrew, (d) => d.crew()),
   profile: register(createProfile, (d) => d.profile(FOCUS.gull)),
-  offer: register(createStub('offer'), () => null),
+  offer: register(createOffer, (d) => d.offer(FOCUS.gull, FOCUS.draft)),
   market: register(createStub('market'), () => null),
   ship: register(createStub('ship'), () => null),
   rookery: register(createStub('rookery'), () => null),

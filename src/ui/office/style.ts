@@ -48,6 +48,17 @@ const CSS = `
 .k-stat.o-mini { grid-template-columns: 0 minmax(40px, 1fr) 2.6em; column-gap: 6px; width: 100%; }
 .k-stat.o-mini > span:first-child { display: none; }
 .k-meter.o-bare > span { display: none; }
+.o-terms { display: grid; grid-template-columns: 150px 1fr 96px; row-gap: 10px; column-gap: 12px; align-items: center; margin: 14px 0 4px; }
+.o-term { display: contents; }
+.o-term-l { font-variant: small-caps; letter-spacing: .04em; white-space: nowrap; }
+.o-term > :nth-child(2) { justify-self: start; }
+.o-term > :nth-child(3) { text-align: right; }
+.o-locked { opacity: .55; pointer-events: none; }
+.o-costs { display: grid; grid-template-columns: repeat(3, 1fr); column-gap: 20px; padding-top: 10px; margin-top: 8px; border-top: 1px solid ${INK.iron}; }
+.o-costs > .o-lines { grid-template-columns: 1fr; row-gap: 2px; margin-top: 0; }
+.o-costs > .o-lines > span:first-child { font-variant: small-caps; color: ${TEXT.faint}; }
+.o-costs .k-fig { justify-self: start; text-align: left; }
+.o-signed { position: absolute; right: 40px; top: 120px; font-size: ${TYPE.title}px; }
 .o-row { display: grid; align-items: center; column-gap: 10px; }
 .o-pips { display: inline-flex; gap: 4px; }
 .o-pips i { width: 12px; height: 12px; border: 1.5px solid ${INK.iron}; border-radius: 50%; }
