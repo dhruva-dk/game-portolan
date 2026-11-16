@@ -39,6 +39,19 @@ const CSS = `
 .o-lines + .o-lines { margin-top: 8px; }
 .o-ways { display: flex; flex-direction: column; gap: 10px; align-items: stretch; }
 .o-ways .k-btn { justify-content: flex-start; }
+.o-sub { position: absolute; left: 0; top: 0; }
+.k-tr.o-head { background: ${PALE.sand}; font-variant: small-caps; font-weight: 700; letter-spacing: .05em; }
+.k-tr.o-open { color: ${TEXT.faint}; font-style: italic; }
+.o-who-cell { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.o-who-cell > div { min-width: 0; line-height: 1.15; }
+.o-who-cell > div > div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.k-stat.o-mini { grid-template-columns: 0 minmax(40px, 1fr) 2.6em; column-gap: 6px; width: 100%; }
+.k-stat.o-mini > span:first-child { display: none; }
+.o-row { display: grid; align-items: center; column-gap: 10px; }
+.o-pips { display: inline-flex; gap: 4px; }
+.o-pips i { width: 12px; height: 12px; border: 1.5px solid ${INK.iron}; border-radius: 50%; }
+.o-pips i.on { background: ${INK.iron}; }
+.o-big { font-size: ${TYPE.title}px; font-weight: 700; line-height: 1.1; }
 .k-range { width: 100%; height: 44px; accent-color: ${INK.iron}; pointer-events: auto; }
 `;
 

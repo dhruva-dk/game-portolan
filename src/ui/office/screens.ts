@@ -2,6 +2,7 @@
 // ui/office/ (createName(send) returning its element and show(view)), and put its line here in place of its stub.
 
 import type { OfficeScreen } from '../ways';
+import { createCrew } from './crew';
 import { createFound } from './found';
 import { createHome } from './home';
 import { createRecover } from './recover';
@@ -14,7 +15,7 @@ export const SCREENS: Readonly<Record<OfficeScreen, (send: Send) => Registered>>
   recover: register(createRecover, (d) => d.recover()),
   home: register(createHome, (d) => d.home()),
   career: register(createStub('career'), () => null),
-  crew: register(createStub('crew'), () => null),
+  crew: register(createCrew, (d) => d.crew()),
   profile: register(createStub('profile'), () => null),
   offer: register(createStub('offer'), () => null),
   market: register(createStub('market'), () => null),

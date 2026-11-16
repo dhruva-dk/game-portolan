@@ -58,9 +58,9 @@ function flightRow(s: CareerState, c: Crew, g: GullOf<'flight'>, four: readonly 
   const rate = jobRate(r, tired), fresh = jobRate(r, 0), botch = jobBotch(st.precision, tired), rested = jobBotch(st.precision, 0);
   return {
     id: g.id, face: faceOf(s, g), name: nameOf(g), job, jobName: JOB_NAMES[job],
-    rating: fig(Math.round(r * 100), String(Math.round(r * 100)), best.x.id === g.id ? rival('the', 'best of the four here') : rival(`${nameOf(best.x)} rates`, String(Math.round(best.r * 100))),
-      { title: `${JOB_NAMES[job]} rating`, lines: Object.entries(weights).map(([k, w]) => line(`${k[0].toUpperCase()}${k.slice(1)} ${(st as Readonly<Record<string, number>>)[k]} × ${w}`, Math.round(w * (st as Readonly<Record<string, number>>)[k] / 20 * 100))) }),
-    fatigue: fig(Math.round(tired), String(Math.round(tired)), rival('recovers a day', String(Math.round(TUNING.flight.recovery * (1 + loft)))),
+    rating: fig(Math.round(r * 100), String(Math.round(r * 100)), rival('best', String(Math.round(best.r * 100))),
+      { title: `${JOB_NAMES[job]} rating`, lines: [line(`Best of the four: ${nameOf(best.x)}`, Math.round(best.r * 100)), ...Object.entries(weights).map(([k, w]) => line(`${k[0].toUpperCase()}${k.slice(1)} ${(st as Readonly<Record<string, number>>)[k]} × ${w}`, Math.round(w * (st as Readonly<Record<string, number>>)[k] / 20 * 100)))] }),
+    fatigue: fig(Math.round(tired), String(Math.round(tired)), rival('a day', `−${Math.round(TUNING.flight.recovery * (1 + loft))}`),
       { title: 'Fatigue', lines: [line('After the last race', Math.round(g.fatigue)), line('Recovered since', Math.round(g.fatigue - tired)), line('Flight loft level', loft)] }),
     rate: fig(rate, rate.toFixed(2), rival('rested', fresh.toFixed(2)),
       { title: 'Work rate', lines: [line('Base', TUNING.flight.base), line('Rating', r.toFixed(2)), line('Lost to fatigue', `−${pct(TUNING.flight.tired * tired / 100)}`)] }),

@@ -121,7 +121,7 @@ const LAYERS: Record<string, readonly string[]> = {
   ],
   // the career's session on its store, as the office asks for it; and the fixtures' careers, on memory
   'desk.ts': ['career/', 'store/', 'office.ts', 'office-people.ts', 'race.ts'],
-  'fixtures.ts': ['desk.ts', 'career/', 'store/', 'office.ts', 'office-people.ts', 'race.ts'],
+  'fixtures.ts': ['desk.ts', 'career/', 'store/', 'office.ts', 'office-people.ts', 'race.ts', 'sim/fit.ts'],
   // what debug.ts hands main.ts and main.ts hands back: the stage and the game played on it
   'stage.ts': ['play/', 'ui/flow.ts', 'frame.ts', 'environment.ts', 'world/', ...NEUTRAL],
   'main.ts': ['*'],

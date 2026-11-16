@@ -13,9 +13,11 @@ export interface Focus {
   filter: MarketFilter | null;
   shortlist: number[];
   draft: Offer | null;
+  /** The sub-tab a screen opens on (crew: roster, flight; market: gulls, scouts). */
+  tab: string;
 }
 
-export const FOCUS: Focus = { gull: null, back: 'crew', filter: null, shortlist: [], draft: null };
+export const FOCUS: Focus = { gull: null, back: 'crew', filter: null, shortlist: [], draft: null, tab: '' };
 
 /** Opens a gull's profile from `back`. */
 export function openProfile(tap: (t: Tap) => void, gull: number, back: Tap) {
