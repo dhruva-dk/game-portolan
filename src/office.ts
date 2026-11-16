@@ -6,6 +6,7 @@
 
 import type { GunKind } from './kinds';
 import type { Call, Colours, Job, PartType, RaceResult, Stance } from './race';
+import type { PeopleDesk } from './office-people';
 
 /** The roles every gull has one of (D37). A reserve captain is a captain whose contract's status is 'reserve'. */
 export type Role = 'manager' | 'captain' | 'bosun' | 'shipwright' | 'scout' | 'flight' | 'elder';
@@ -166,7 +167,7 @@ export interface FoundErrors { crew?: string; colours?: string; emblem?: string;
 
 /** What the office asks of the career: the session on its store, the views, and the commands. main.ts makes one
  *  (desk.ts); a fixture is a desk on a memory store. */
-export interface Desk {
+export interface Desk extends PeopleDesk {
   /** Where the load left the career: founded, unfounded, or needing recovery. */
   where(): 'home' | 'found' | 'recover';
   home(): HomeView;

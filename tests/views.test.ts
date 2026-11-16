@@ -3,8 +3,16 @@ import assert from 'node:assert/strict';
 import { apply, start } from '../src/career/career.ts';
 import { coinText, foundErrors, foundView, homeView, letters, ordinal, recoverView, settingsView, topBar } from '../src/career/views.ts';
 import { table } from '../src/career/read.ts';
-import { FOUND, founded, toRaceDay } from './career-kit.ts';
-import type { Figure } from '../src/office.ts';
+import { FOUND, founded, must, sailed, toRaceDay } from './career-kit.ts';
+import type { Figure, Offer } from '../src/office.ts';
+import type { CareerState } from '../src/career/state.ts';
+import { sackedOffers } from '../src/career/elders.ts';
+import { careerView, jobsView } from '../src/career/views-career.ts';
+import { crewView, planDraft } from '../src/career/views-crew.ts';
+import { seen } from '../src/career/views-gull.ts';
+import { marketView } from '../src/career/views-market.ts';
+import { offerView } from '../src/career/views-offer.ts';
+import { profileView } from '../src/career/views-profile.ts';
 
 /** Every figure of a view carries what it is set against and what it is made of. */
 function figures(v: unknown, out: Figure[] = []): Figure[] {
@@ -119,4 +127,116 @@ test('recover and settings say what happened', () => {
   assert.ok(replayed.ways.some((w) => w.way === 'carry'));
   assert.equal(settingsView(null).backup, 'Never backed up.');
   assert.match(settingsView({ day: 12, season: 0 }).backup, /Day 12, Season 1/);
+});
+
+// ---- the people screens (Phase C batch 2)
+
+/** Every figure of a view set against something and explained. */
+function explained(v: unknown): void {
+  for (const f of figures(v)) {
+    assert.ok(f.against, `${f.text} has nothing it is set against`);
+    assert.ok(f.explain && f.explain.lines.length > 0, `${f.text} has no explanation`);
+  }
+}
+/** Advances (sailing each race day) until a test holds (at most n days). */
+function until(s: CareerState, done: (s: CareerState) => boolean, n = 40): CareerState {
+  for (let i = 0; i < n && !done(s); i++) s = topBar(s).go.raceDay ? sailed(s) : must(s, { kind: 'Advance' });
+  return s;
+}
+/** A free agent the player could sign today, and the offer at their ask (naming whom they replace, if need be). */
+function signable(s: CareerState): { gull: number; offer: Offer } {
+  for (const g of s.gulls) {
+    if (g.contract || g.retired !== null || g.player || g.role === 'manager' || g.role === 'elder') continue;
+    const v = offerView(s, g.id, null);
+    for (const r of v.replaces) {
+      const offer = { ...v.draft, replaces: r.id };
+      if (offerView(s, g.id, offer).send.ok) return { gull: g.id, offer };
+    }
+  }
+  throw new Error('no one to sign');
+}
+
+test('crew: the roster by role with the player heading the captains, the flight at four jobs, the order movable', () => {
+  const s = founded(), v = crewView(s), c = s.crews[s.player!.crew];
+  assert.equal(v.roster[0].kind, 'head');
+  assert.equal(v.roster[1].you, true);
+  assert.deepEqual(v.roster.filter((r) => r.kind === 'head').map((r) => r.title), ['Captains', 'Bosuns', 'Shipwright', 'Scouts', 'Flight', 'Elder']);
+  assert.equal(v.flight.length, c.staff.flight.length);
+  assert.equal(v.order.length, 4);
+  assert.equal(v.order[0].up, null);
+  assert.equal(v.order[3].down, null);
+  explained(v);
+  const plan = v.order[1].up;
+  assert.ok(plan, v.orderWhy ?? '');
+  const moved = must(s, { kind: 'SetPlan', plan });
+  assert.deepEqual(crewView(moved).order.map((o) => o.job), [v.order[1].job, v.order[0].job, v.order[2].job, v.order[3].job]);
+  assert.equal(planDraft(moved, moved.crews[c.id]), moved.crews[c.id].plan);
+});
+
+test('profile: a rival unknown in ranges, scouted then known; one of her own may be dismissed, she may not', () => {
+  const s = founded(), c = s.crews[s.player!.crew];
+  const stranger = s.gulls.find((g) => g.contract && g.contract.crew !== c.id && s.crews[g.contract.crew].league === c.league && g.role === 'captain' && !seen(s, c.id, g.id).known)!;
+  const p = profileView(s, stranger.id);
+  assert.equal(p.known, false);
+  assert.equal(p.wants, null);
+  assert.equal(p.stats.length, 0);
+  assert.ok(p.stars.lo < p.stars.hi);
+  explained(p);
+  assert.ok(p.scout.ok, p.scout.why);
+  const sent = must(s, { kind: 'StartScout', scout: p.scout.scout!, gull: stranger.id });
+  assert.equal(profileView(sent, stranger.id).scout.ok, false);
+  const q = profileView(until(sent, (x) => seen(x, c.id, stranger.id).known), stranger.id);
+  assert.equal(q.known, true);
+  assert.equal(q.wants?.length, 3);
+  assert.ok(q.stats.length > 0);
+  const own = profileView(s, c.staff.ships[1].captain);
+  assert.equal(own.mine, true);
+  assert.equal(own.dismiss.ok, true);
+  assert.ok(own.dismiss.owed.value > 0);
+  assert.equal(own.offer.ok, false);
+  const me = profileView(s, s.player!.gull);
+  assert.equal(me.you, true);
+  assert.equal(me.dismiss.ok, false);
+  assert.equal(me.renew.ok, false);
+});
+
+test('offer: drawn at the ask, sent and locked while waiting, then answered', () => {
+  const s = must(founded(), { kind: 'DebugCoin', coin: 50000 }), { gull, offer } = signable(s);
+  const v = offerView(s, gull, offer);
+  assert.equal(v.state, 'open');
+  assert.ok(v.cost.now.value >= offer.fee);
+  explained(v);
+  const sent = must(s, { kind: 'OfferContract', gull, offer });
+  const w = offerView(sent, gull, null);
+  assert.equal(w.state, 'waiting');
+  assert.equal(w.send.ok, false);
+  assert.equal(w.withdraw.ok, true);
+  const a = offerView(until(sent, (x) => offerView(x, gull, null).state !== 'waiting'), gull, null);
+  assert.ok(['signed', 'countered', 'open', 'silent'].includes(a.state), a.state);
+  assert.ok(a.last, 'the answer is on file');
+  if (a.state === 'countered') assert.equal(a.accept.ok, true);
+});
+
+test('market: the filter lets through only its role, its league and its contracts; the shortlist kept', () => {
+  const s = founded(), v = marketView(s, { role: 'flight', league: 3, contract: 'free', known: false, stars: 0 }, [s.player!.gull]);
+  assert.ok(v.rows.length > 0);
+  for (const r of v.rows) assert.equal(s.gulls[r.id].role, 'flight');
+  for (const r of v.rows) assert.equal(s.gulls[r.id].contract, null);
+  assert.equal(v.shortlist.length, 1);
+  assert.equal(v.count, String(v.rows.length));
+  const all = marketView(s, null, []);
+  assert.ok(all.rows.every((r) => s.gulls[r.id].contract?.crew !== s.player!.crew));
+  explained(all);
+});
+
+test('career and jobs: reputation ranked among managers; sacked, the old elder writes and the offers wait', () => {
+  const s = founded(), v = careerView(s);
+  assert.equal(v.rank.against?.kind, 'rank');
+  explained(v);
+  const j = jobsView(sackedOffers({ ...s, player: { ...s.player!, sacked: true } }));
+  assert.equal(j.sacked, true);
+  assert.match(j.letter.title, /dismissed/);
+  assert.ok(j.offers.length > 0);
+  assert.ok(j.offers.every((o) => o.expires === 'Until taken'));
+  explained(j);
 });

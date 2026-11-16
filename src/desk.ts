@@ -7,6 +7,11 @@ import type { Command, Desk } from './office';
 import { backupNow, lostSentence, open, send, type Kept, type Opened } from './career/session';
 import type { Store } from './career/store';
 import { foundErrors, foundView, homeView, recoverView, settingsView, topBar } from './career/views';
+import { careerView, jobsView } from './career/views-career';
+import { crewView } from './career/views-crew';
+import { marketView } from './career/views-market';
+import { offerView } from './career/views-offer';
+import { profileView } from './career/views-profile';
 import { indexedStore, openDatabase } from './store/indexed';
 
 /** Where the career is kept: a store opened, and wiped for a new career. */
@@ -29,6 +34,12 @@ export async function createDesk(shelf: Shelf, debug = false): Promise<Desk> {
       from: opened.ok ? opened.from : 'new', lost: opened.ok && opened.lost ? lostSentence(opened.lost, opened.kept.state.calendar?.start) : 'Nothing was lost.', failed: opened.ok ? null : opened.sentence,
     }),
     settings: () => settingsView(shelf.backupDay.get()),
+    crew: () => crewView(must().state),
+    profile: (gull) => profileView(must().state, gull),
+    offer: (gull, draft) => offerView(must().state, gull, draft),
+    market: (filter, shortlist) => marketView(must().state, filter, shortlist),
+    career: () => careerView(must().state),
+    jobs: () => jobsView(must().state),
     async send(c: Command) {
       const r = await send(store, must(), c);
       if (!r.ok) return r.reason.sentence;

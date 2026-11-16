@@ -23,9 +23,12 @@ import { yardPoints } from './yard.ts';
 export const ordinal = (n: number) => `${n}${n % 100 >= 11 && n % 100 <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] ?? 'th'}`;
 /** Coin as a figure's text: grouped by thousands, signed when asked. */
 export const coinText = (n: number, signed = false) => `${signed && n > 0 ? '+' : n < 0 ? '−' : ''}${Math.abs(Math.round(n)).toLocaleString('en-GB')}`;
-const line = (label: string, amount: string | number): Line => ({ label, amount: String(amount) });
-const fig = (value: number, text: string, against: Comparison | null, explain: Explanation | null): Figure => ({ value, text, against, explain });
-const rival = (label: string, text: string): Comparison => ({ kind: 'rival', label, text });
+/** A line of an explanation. */
+export const line = (label: string, amount: string | number): Line => ({ label, amount: String(amount) });
+/** A figure: value, text, what it is set against, what it is made of. */
+export const fig = (value: number, text: string, against: Comparison | null, explain: Explanation | null): Figure => ({ value, text, against, explain });
+/** A figure set beside another's. */
+export const rival = (label: string, text: string): Comparison => ({ kind: 'rival', label, text });
 
 /** A gull's name, as the office writes it. */
 export const nameOf = (g: { given: string; family: string }) => `${g.given} ${g.family}`;
@@ -34,10 +37,11 @@ export function faceOf(s: CareerState, g: Gull): Face {
   const crew = g.contract ? s.crews[g.contract.crew] : null;
   return { seed: g.seed, role: g.role, age: age(g, s.day), colours: crew ? crew.colours : null, emblem: crew ? crew.emblem : null };
 }
-const named = (s: CareerState, id: number | null): Named | null => (id === null ? null : { id, face: faceOf(s, s.gulls[id]), name: nameOf(s.gulls[id]) });
+/** A gull as a line names them, or null. */
+export const named = (s: CareerState, id: number | null): Named | null => (id === null ? null : { id, face: faceOf(s, s.gulls[id]), name: nameOf(s.gulls[id]) });
 
 /** The player's crew: the one they manage, or the one they left when sacked. */
-const crewOf = (s: CareerState): Crew => s.crews[(s.player as NonNullable<CareerState['player']>).crew];
+export const crewOf = (s: CareerState): Crew => s.crews[(s.player as NonNullable<CareerState['player']>).crew];
 
 /** The Coin and its change this season, from the ledger. */
 function coinFigure(s: CareerState, c: Crew): Figure {
@@ -150,7 +154,8 @@ export function homeView(s: CareerState): HomeView {
     mail: { letters: letters(s, 4), unread: unread(s) },
   };
 }
-const LEAGUES = ['League One', 'League Two', 'League Three'];
+/** The leagues' names. */
+export const LEAGUES = ['League One', 'League Two', 'League Three'];
 
 /** Founding's defaults for a seed: a crew name whose words clash with no crew's, a name for the player, a face. */
 const founding = new Map<string, { replacing: string; names: string[] }>();

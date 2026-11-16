@@ -66,11 +66,13 @@ const LAYERS: Record<string, readonly string[]> = {
   'sim/': ['sim/', 'world/', 'kinds.ts', 'race.ts'],
   // the management game: pure, headless, deterministic (test g); it reaches a match only through race.ts and the
   // screens only through office.ts
-  'career/': ['career/', 'world/random.ts', 'race.ts', 'office.ts', 'kinds.ts'],
+  'career/': ['career/', 'world/random.ts', 'race.ts', 'office.ts', 'office-people.ts', 'kinds.ts'],
   // the seam between the career and a match (a RaceCard in, a RaceResult out), and between the career and the
   // screens (their view models and the Command union): types and constants only
   'race.ts': ['kinds.ts'],
-  'office.ts': ['kinds.ts', 'race.ts'],
+  'office.ts': ['kinds.ts', 'race.ts', 'office-people.ts'],
+  // the seam's people views (crew, profile, offer, market, career, jobs), beside office.ts
+  'office-people.ts': ['race.ts', 'office.ts'],
   // the career's persistence adapters, behind its port
   'store/': ['store/', 'career/store.ts'],
   // the kinds of gun and of loot, named once for all who tell them apart: a leaf
@@ -86,7 +88,7 @@ const LAYERS: Record<string, readonly string[]> = {
   'environment.ts': ['world/'],
   // the UI draws plain data: of the sim only the storm's Cap (the full map inks it); the crews' swatches from the
   // palette, as the office draws them (ui/ink.ts crewInk)
-  'ui/': ['ui/', 'world/', 'sim/storm.ts', 'snapshot.ts', 'player.ts', 'rarity.ts', 'kinds.ts', 'office.ts', 'race.ts', 'palette.ts'],
+  'ui/': ['ui/', 'world/', 'sim/storm.ts', 'snapshot.ts', 'player.ts', 'rarity.ts', 'kinds.ts', 'office.ts', 'office-people.ts', 'race.ts', 'palette.ts'],
   // the sound: hears what the frame draws and the HUD reads, and the screen shown (player.ts Screen)
   'audio/': ['audio/', 'world/', 'snapshot.ts', 'player.ts', 'kinds.ts'],
   // the game runs the sim and says what to draw and show, as plain data
@@ -118,8 +120,8 @@ const LAYERS: Record<string, readonly string[]> = {
     'sim/fixed.ts', 'sim/handling.ts', 'sim/match.ts', 'sim/storm.ts', 'fly.ts', 'probe.ts', 'stage.ts', 'fixtures.ts', 'player.ts', 'ui/kit/', 'ui/office/',
   ],
   // the career's session on its store, as the office asks for it; and the fixtures' careers, on memory
-  'desk.ts': ['career/', 'store/', 'office.ts', 'race.ts'],
-  'fixtures.ts': ['desk.ts', 'career/', 'store/', 'office.ts', 'race.ts'],
+  'desk.ts': ['career/', 'store/', 'office.ts', 'office-people.ts', 'race.ts'],
+  'fixtures.ts': ['desk.ts', 'career/', 'store/', 'office.ts', 'office-people.ts', 'race.ts'],
   // what debug.ts hands main.ts and main.ts hands back: the stage and the game played on it
   'stage.ts': ['play/', 'ui/flow.ts', 'frame.ts', 'environment.ts', 'world/', ...NEUTRAL],
   'main.ts': ['*'],
