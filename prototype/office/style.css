@@ -1,0 +1,150 @@
+/* PROTOTYPE (throwaway): the office screens after Motorsport Manager's structure, in Portolan's hand. */
+:root, [data-theme="parchment"] {
+  --base: #c9b48d;        /* the desk the panels lie on */
+  --panel: #f2e7cf;
+  --step-dark: #e6d5b2;   /* a sub-region a tone darker */
+  --step-light: #faf3e3;  /* a sub-region a tone lighter */
+  --ink: #241b13;
+  --ink-2: #6d5a43;
+  --rule: rgba(36, 27, 19, 0.16);
+  --on-fill: #fff8ea;
+  --go: #2b4fa0;          /* ultramarine: go somewhere, selected */
+  --bad: #b3302a;         /* vermilion: loss, cancel */
+  --good: #2c7a4c;        /* verdigris: gain, ready */
+  --warn: #c7860f;        /* ochre: under way */
+  --gold: #c6951a;
+  --continue: #d8691c;
+  --track: rgba(36, 27, 19, 0.10);
+  --bar-dark: #1f2836;    /* top and bottom bars */
+  --bar-ink: #efe4cc;
+  --bar-ink-2: #9aa0a8;
+}
+[data-theme="dark"] {
+  --base: #121822;
+  --panel: #1c2531;
+  --step-dark: #171f2a;
+  --step-light: #243041;
+  --ink: #efe6d2;
+  --ink-2: #96a0ab;
+  --rule: rgba(255, 255, 255, 0.08);
+  --on-fill: #fff8ea;
+  --go: #3767c4;
+  --bad: #cf3f37;
+  --good: #33925a;
+  --warn: #dba12a;
+  --gold: #e2bb45;
+  --continue: #e4801f;
+  --track: rgba(255, 255, 255, 0.07);
+  --bar-dark: #0d121a;
+  --bar-ink: #efe6d2;
+  --bar-ink-2: #7f8994;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; background: #0b0f15; overflow: hidden; }
+body { font-family: "Iowan Old Style", "Palatino", Georgia, serif; color: var(--ink); -webkit-font-smoothing: antialiased; }
+#stage { position: fixed; inset: 0; display: grid; place-items: center; }
+#page { width: 1180px; height: 820px; position: relative; background: var(--base); overflow: hidden; transform-origin: center; display: grid; grid-template-rows: 56px 1fr 60px; }
+.num { font-variant-numeric: tabular-nums lining-nums; }
+button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; }
+
+/* ── top bar ───────────────────────────────────────────── */
+.top { background: var(--bar-dark); color: var(--bar-ink); display: flex; align-items: stretch; gap: 6px; padding: 0 6px 0 0; }
+.ident { display: flex; align-items: center; gap: 10px; padding: 0 16px 0 12px; background: rgba(255,255,255,0.04); border-left: 6px solid var(--crew1); min-width: 236px; }
+.ident .crest { width: 38px; height: 38px; display: grid; place-items: center; background: var(--crew1); }
+.ident b { font-size: 17px; letter-spacing: 0.04em; display: block; }
+.ident small { font-size: 13px; color: var(--bar-ink-2); }
+.title { display: flex; align-items: center; padding: 0 18px; font-size: 22px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; border-right: 1px solid rgba(255,255,255,0.08); }
+.widgets { margin-left: auto; display: flex; gap: 6px; align-items: center; }
+.widget { height: 44px; display: flex; align-items: center; gap: 8px; padding: 0 12px; background: rgba(255,255,255,0.05); font-size: 15px; }
+.widget small { display: block; font-size: 13px; color: var(--bar-ink-2); line-height: 1.1; }
+.widget .pill { padding: 6px 12px; font-weight: 700; }
+.coin-pill { background: var(--good); color: var(--on-fill); display: flex; align-items: center; gap: 6px; }
+.bell { position: relative; width: 48px; justify-content: center; flex: none; }
+.widgets > * { flex: none; }
+.badge { position: absolute; top: 4px; right: 6px; min-width: 20px; height: 20px; border-radius: 10px; background: var(--bad); color: #fff; font-size: 13px; font-weight: 700; display: grid; place-items: center; padding: 0 5px; }
+
+/* ── bottom bar ────────────────────────────────────────── */
+.bottom { background: var(--bar-dark); color: var(--bar-ink-2); display: flex; align-items: stretch; }
+.hist { display: flex; gap: 2px; padding: 8px; }
+.hist button { width: 40px; background: rgba(255,255,255,0.06); color: var(--bar-ink); font-size: 18px; }
+.tab { width: 82px; position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; font-size: 13px; letter-spacing: 0.06em; text-transform: uppercase; }
+.tab svg { width: 24px; height: 24px; }
+.tab.on { background: var(--go); color: var(--on-fill); }
+.tab .badge { top: 5px; right: 18px; }
+.tab .busy { position: absolute; left: 14px; right: 14px; bottom: 0; height: 5px; background: repeating-linear-gradient(-45deg, var(--warn) 0 6px, #1a1a1a 6px 12px); }
+.date { margin-left: auto; align-self: center; height: 44px; padding: 0 14px; white-space: nowrap; display: flex; align-items: center; gap: 8px; background: var(--go); color: var(--on-fill); font-size: 15px; }
+.continue { align-self: center; margin: 0 8px; height: 44px; width: 184px; background: var(--continue); color: #fff; font-size: 18px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; display: flex; align-items: center; justify-content: center; gap: 12px; }
+
+/* ── body and panels ───────────────────────────────────── */
+.body { padding: 12px; display: grid; gap: 12px; min-height: 0; }
+.panel { background: var(--panel); display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+.ph { font-size: 15px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; text-align: center; padding: 12px 12px 10px; position: relative; }
+.ph .aside { position: absolute; right: 12px; top: 10px; font-size: 13px; letter-spacing: 0.06em; font-weight: 400; color: var(--ink-2); }
+.dark { background: var(--step-dark); }
+.light { background: var(--step-light); }
+.label { font-size: 13px; color: var(--ink-2); letter-spacing: 0.05em; }
+.strip { background: var(--step-dark); text-align: center; padding: 5px; font-size: 13px; color: var(--ink-2); letter-spacing: 0.05em; }
+
+.btn { height: 40px; padding: 0 16px; background: var(--go); color: var(--on-fill); font-size: 15px; letter-spacing: 0.03em; display: inline-flex; align-items: center; justify-content: center; }
+.btn.bad { background: var(--bad); }
+.btn.good { background: var(--good); }
+.btn.wide { width: 100%; }
+.btn.ghost { background: transparent; color: var(--ink); box-shadow: inset 0 0 0 2px var(--ink-2); }
+
+.seg { display: inline-flex; background: var(--step-dark); }
+.seg span { padding: 7px 16px; font-size: 14px; color: var(--ink-2); }
+.seg span.on { background: var(--go); color: var(--on-fill); }
+
+.stamp { display: inline-block; padding: 4px 12px; font-size: 22px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; border: 3px solid currentColor; transform: rotate(-4deg); }
+.word { font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+.good-t { color: var(--good); } .bad-t { color: var(--bad); } .warn-t { color: var(--warn); } .go-t { color: var(--go); } .gold-t { color: var(--gold); }
+
+.tag { display: inline-block; padding: 2px 8px; font-size: 13px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--on-fill); background: var(--ink-2); }
+.tag.bad { background: var(--bad); } .tag.good { background: var(--good); } .tag.warn { background: var(--warn); } .tag.go { background: var(--go); } .tag.gold { background: var(--gold); }
+
+.hero { position: relative; background-size: cover; background-repeat: no-repeat; overflow: hidden; }
+.hero .plate { position: absolute; background: rgba(18, 22, 30, 0.72); color: #f5ecd8; padding: 6px 12px; }
+.hero .slash { position: absolute; top: 0; bottom: 0; width: 70px; background: var(--crew1); opacity: 0.85; }
+
+.portrait { display: block; background: radial-gradient(circle at 50% 40%, color-mix(in srgb, var(--wash) 55%, white) 0%, var(--wash) 75%); }
+.portrait.round { border-radius: 50%; }
+
+/* hatched progress rows: the row is the bar */
+.work { position: relative; height: 52px; display: flex; align-items: center; gap: 8px; padding: 0 8px; background: var(--step-dark); margin: 0 12px 6px; }
+.work .fill { position: absolute; left: 0; top: 0; bottom: 0; background: repeating-linear-gradient(-45deg, var(--warn) 0 10px, color-mix(in srgb, var(--warn) 80%, black) 10px 20px); }
+.work > *:not(.fill) { position: relative; }
+.work .name { background: rgba(20, 16, 12, 0.78); color: #f6eedb; padding: 4px 10px; font-size: 15px; display: flex; align-items: center; gap: 8px; }
+.work .days { margin-left: auto; font-size: 15px; font-weight: 700; padding: 0 6px; }
+.work .btn { height: 36px; padding: 0 12px; font-size: 14px; }
+
+/* tables */
+.tbl { width: 100%; border-collapse: collapse; font-size: 15px; }
+.tbl th { font-size: 13px; font-weight: 400; color: var(--ink-2); text-align: left; padding: 6px 8px; background: var(--step-dark); letter-spacing: 0.05em; }
+.tbl td { padding: 0 8px; height: 40px; border-bottom: 1px solid var(--rule); }
+.tbl .r { text-align: right; }
+.tbl tr.me td { background: var(--step-light); font-weight: 700; }
+.tbl tr.cut td { border-bottom: 3px solid var(--good); }
+.tbl tr.drop td { border-bottom: 3px solid var(--bad); }
+.cbar { width: 6px; padding: 0 !important; }
+.cbar i { display: block; width: 6px; height: 40px; }
+.form i { display: inline-block; width: 26px; height: 22px; margin-right: 2px; font-style: normal; font-size: 13px; text-align: center; line-height: 22px; color: var(--on-fill); font-weight: 700; }
+
+/* stat bars: blocks coloured by value */
+.stat { display: grid; grid-template-columns: 130px 1fr 34px 18px; align-items: center; gap: 10px; height: 34px; }
+.stat .track { height: 16px; background: var(--track); display: grid; grid-template-columns: repeat(20, 1fr); gap: 2px; }
+.stat .track i { background: transparent; }
+.stat b { text-align: right; font-size: 17px; }
+.arrow { font-size: 13px; }
+
+.meter { height: 12px; background: var(--track); position: relative; }
+.meter i { position: absolute; left: 0; top: 0; bottom: 0; }
+
+.stars { color: var(--gold); letter-spacing: 1px; font-size: 18px; }
+.stars.small { font-size: 13px; opacity: 0.8; }
+
+/* floating prototype switcher: not part of the design */
+.proto { position: fixed; left: 50%; bottom: 84px; transform: translateX(-50%); z-index: 99; display: flex; align-items: center; gap: 4px; background: #ff2d8a; color: #fff; padding: 6px; border-radius: 999px; font: 600 14px/1 system-ui, sans-serif; box-shadow: 0 4px 18px rgba(0,0,0,0.4); }
+.proto button { color: #fff; padding: 8px 12px; border-radius: 999px; font: inherit; }
+.proto button:hover { background: rgba(255,255,255,0.2); }
+.proto span { padding: 0 8px; }

@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "play": "vite --open",
+    "proto:office": "vite --open /prototype/office/",
     "build": "tsc --noEmit && vite build",
     "ios": "npm run build && cap run ios",
     "check": "tsc --noEmit && tsc --noEmit -p tsconfig.node.json",
