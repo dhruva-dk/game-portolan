@@ -2,12 +2,16 @@
 // name, a line under it), stars from a Range, a button shut with its reason beside it, and a row of a figure.
 
 import type { Face, Figure } from '../../office';
-import type { Act, Range } from '../../office-people';
+import type { Act, JobCard, Range } from '../../office-people';
+import { emblem } from '../emblem';
+import { PAPER, crewInk, svg } from '../ink';
 import { button, type ButtonKind } from '../kit/button';
+import { card } from '../kit/card';
 import { figure } from '../kit/figure';
 import { headshot } from '../kit/headshot';
 import { make } from '../kit/part';
 import { stars } from '../kit/stars';
+import type { Send } from './screen';
 
 /** A gull in a table's cell: their headshot at 40, their name, and a faint line under it. */
 export function whoCell(el: HTMLElement, face: Face | null, name: string, under: string) {
@@ -51,6 +55,27 @@ export function figRow(parent: HTMLElement, label: string, page: () => HTMLEleme
   const l = make('span', '', row, label), f = figure(page);
   row.appendChild(f.el);
   return { row, set: (fig: Figure, text = label) => { l.textContent = text; f.set(fig); } };
+}
+
+/** A crew's offer of its manager's post: its emblem and name, its elder, league, standing and target, budget and
+ *  when the offer lapses; Take (shut with its reason) and Decline. */
+export function jobCard(parent: HTMLElement, j: JobCard, send: Send) {
+  const el = make('div', 'o-job', parent);
+  const head = make('div', 'o-job-head', el);
+  head.innerHTML = svg(44, 44, emblem(j.emblem, 22, 22, 40, { ink: crewInk(j.colours.first), ground: PAPER }));
+  const title = make('div', '', head);
+  make('div', 'bold o-job-name', title, j.name);
+  make('div', 'small faint', title, `${j.league} · ${j.standing}`);
+  const elder = card();
+  elder.set({ face: j.elderFace, name: j.elder, line: 'Elder', rating: null, tags: [{ text: `Target ${j.target}` }], lines: [{ label: 'Expires', amount: j.expires }] });
+  el.appendChild(elder.el);
+  const budget = figRow(el, 'Budget', () => send.page());
+  budget.set(j.budget);
+  const ways = make('div', 'o-job-ways', el);
+  const take = actButton('Take the post', () => void send.command({ kind: 'TakeJob', crew: j.crew }), 'primary');
+  take.set(j.take);
+  ways.append(take.el, button('Decline', () => void send.command({ kind: 'DeclineJob', crew: j.crew }), 'quiet').el);
+  return el;
 }
 
 /** A column laid out top to bottom with `gap` px between. */
