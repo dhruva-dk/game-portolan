@@ -103,7 +103,9 @@ document.body.prepend(renderer.domElement);
 addEventListener('resize', () => renderer.setSize(innerWidth, innerHeight));
 
 // drag the body to turn it; it drifts round on its own when left
-let turn = -0.5, dragging = false, lastX = 0, idle = 0;
+// ?turn=<radians> holds the body at one angle (for checking the side and back)
+const held = params.has('turn');
+let turn = held ? Number(params.get('turn')) : -0.5, dragging = false, lastX = 0, idle = 0;
 const body = views[0].slot;
 body.addEventListener('pointerdown', e => { dragging = true; lastX = e.clientX; body.setPointerCapture(e.pointerId); });
 body.addEventListener('pointermove', e => { if (dragging) { turn += (e.clientX - lastX) * 0.01; lastX = e.clientX; idle = 0; } });
@@ -114,7 +116,7 @@ renderer.setAnimationLoop((ms: number) => {
   const dt = Math.min((ms - last) / 1000, 0.1);
   last = ms;
   idle += dt;
-  if (!dragging && idle > 2) turn += dt * 0.4;
+  if (!dragging && !held && idle > 2) turn += dt * 0.4;
   views[0].bird.rotation.y = turn;
   renderer.setScissorTest(true);
   renderer.setViewport(0, 0, innerWidth, innerHeight);

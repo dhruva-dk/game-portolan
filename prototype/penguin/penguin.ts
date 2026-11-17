@@ -2,7 +2,7 @@
 // by position in TSL, then eyes, a two-part beak, flippers, feet, a crew scarf and (some styles) a crest.
 import {
   CapsuleGeometry, CatmullRomCurve3, Group, LatheGeometry, Mesh, MeshStandardNodeMaterial, SphereGeometry,
-  SplineCurve, TorusGeometry, TubeGeometry, Vector2, Vector3, type BufferGeometry,
+  SplineCurve, TubeGeometry, Vector2, Vector3, type BufferGeometry,
 } from 'three/webgpu';
 import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import { color, float, fwidth, length, max, mix, positionLocal, smoothstep, vec2, vec3, type Node } from 'three/tsl';
@@ -115,8 +115,11 @@ export function buildPenguin(s: Style, crew: Crew): Group {
   const p = positionLocal;
   const shift = float(s.lean).mul(smoothstep(s.neck - 0.08, s.neck + 0.1, p.y));
   const front = p.z.sub(shift).div(max(length(vec2(p.x, p.z.sub(shift))), 1e-4));
-  const bibTop = float(s.bib).sub(float(0.07).mul(float(1).sub(front)));
-  let white: Node = aa(front.sub(s.bibWide)).mul(aa(bibTop.sub(p.y)));
+  // the white wraps furthest round at the feet and narrows to the chest; its top edge curves down the sides
+  const edge = float(s.bibWide).add(smoothstep(0.1, s.neck, p.y).mul(0.45));
+  const back = float(1).sub(front);
+  const bibTop = float(s.bib).sub(back.mul(back).mul(0.12));
+  let white: Node = aa(front.sub(edge)).mul(aa(bibTop.sub(p.y)));
   if (s.eye.ring > 0) {
     const ring = (e: Vector3) => aa(float(s.eye.ring).sub(length(p.sub(vec3(e.x, e.y, e.z)))));
     white = max(white, max(ring(eyeR), ring(eyeL)));
@@ -198,7 +201,7 @@ export function buildPenguin(s: Style, crew: Crew): Group {
   beak.rotation.x = 0.1;
   g.add(beak);
 
-  // flippers: flat teardrops from the shoulders
+  // flippers: flat teardrops from the shoulders, bent to lie along the flank and lifting off it toward the tip
   const f = s.flipper;
   const flipPts = Array.from({ length: 24 }, (_, i) => {
     const t = i / 23;
@@ -206,47 +209,62 @@ export function buildPenguin(s: Style, crew: Crew): Group {
   });
   const flipGeo = lathe(flipPts, 32);
   flipGeo.scale(0.24, 1, 1);
+  const thick = f.width * 0.24;
   for (const side of [1, -1]) {
-    const arm = new Group();
-    const at = surface(s, pts, f.y, side * 90 * deg);
-    arm.position.set(at.x + side * 0.004, f.y, at.z + 0.01);
-    arm.rotation.z = side * 0.42;
-    arm.rotation.x = -0.12;
-    arm.add(new Mesh(flipGeo, standard(FEATHER, 0.6)));
-    g.add(arm);
+    const geo = flipGeo.clone();
+    const fp = geo.attributes.position;
+    for (let i = 0; i < fp.count; i++) {
+      const t = -fp.getY(i) / f.length;
+      const y = f.y + fp.getY(i) * 0.97;
+      const lift = 0.004 + thick + 0.05 * t * t;
+      const z = fp.getZ(i) - 0.03 * t + s.lean * smooth(s.neck - 0.08, s.neck + 0.1, y);
+      fp.setXYZ(i, side * (radiusAt(pts, y) + lift) + fp.getX(i), y, z);
+    }
+    geo.computeVertexNormals();
+    g.add(new Mesh(geo, standard(FEATHER, 0.48)));
   }
 
-  // feet, three toes each, and a short tail
+  // feet, three toes each, peeping out from under the belly, and a short wedge of tail
   const foot = standard(s.feet, 0.5);
+  const fz = radiusAt(pts, 0.05) * s.belly - 0.05;
   for (const side of [1, -1]) {
     const pad = new Mesh(new SphereGeometry(1, 24, 12), foot);
     pad.scale.set(0.07, 0.03, 0.09);
-    pad.position.set(side * 0.09, 0.025, 0.1);
+    pad.position.set(side * 0.09, 0.025, fz);
     g.add(pad);
     for (const yaw of [-0.4, 0, 0.4]) {
       const toe = new Mesh(new CapsuleGeometry(0.022, 0.06, 4, 12), foot);
       toe.rotation.order = 'YXZ';
       toe.rotation.set(Math.PI / 2, side * 0.15 + yaw, 0);
       toe.scale.set(1, 1, 0.7);
-      toe.position.set(side * 0.09 + Math.sin(side * 0.15 + yaw) * 0.08, 0.02, 0.1 + Math.cos(yaw) * 0.08);
+      toe.position.set(side * 0.09 + Math.sin(side * 0.15 + yaw) * 0.07, 0.02, fz + Math.cos(yaw) * 0.07);
       g.add(toe);
     }
   }
-  const tail = new Mesh(new CapsuleGeometry(0.05, 0.1, 4, 12), standard(FEATHER, 0.6));
-  tail.scale.set(1.4, 1, 0.5);
-  tail.rotation.x = 0.9;
-  tail.position.set(0, 0.07, surface(s, pts, 0.1, Math.PI).z - 0.03);
+  const tail = new Mesh(new CapsuleGeometry(0.04, 0.05, 4, 12), standard(FEATHER, 0.6));
+  tail.scale.set(1.5, 1, 0.45);
+  tail.rotation.x = 1.1;
+  tail.position.set(0, 0.08, surface(s, pts, 0.1, Math.PI).z + 0.01);
   g.add(tail);
 
-  // the crew scarf: a knitted ring in the crew's colour, a tail with its second colour at the end
-  const sy = s.scarf;
-  const sr = radiusAt(pts, sy);
-  const sShift = s.lean * smooth(s.neck - 0.08, s.neck + 0.1, sy);
-  const ring = new Mesh(new TorusGeometry(sr * 0.99, 0.03, 16, 96), standard(crew.primary, 0.85));
-  ring.rotation.x = Math.PI / 2;
-  ring.scale.set(1, 1 + (s.belly - 1) * 0.15, 0.55);
-  ring.position.set(0, sy, sShift + sr * (s.belly - 1) * 0.5);
-  g.add(ring);
+  // the crew scarf: a knitted band wound on the neck (lathed from the body's own profile, so it hugs it),
+  // two tails with the second colour at the end
+  const sy = s.scarf, sh = 0.045;
+  const bandPts = Array.from({ length: 17 }, (_, i) => {
+    const u = i / 16, y = sy - sh + 2 * sh * u;
+    return new Vector2(radiusAt(pts, y) - 0.004 + 0.024 * Math.sqrt(Math.sin(Math.PI * u)), y);
+  });
+  const band = new LatheGeometry(bandPts, 96);
+  const bp = band.attributes.position;
+  for (let i = 0; i < bp.count; i++) {
+    const d = deform(s, new Vector3(bp.getX(i), bp.getY(i), bp.getZ(i)));
+    bp.setXYZ(i, d.x, d.y, d.z);
+  }
+  band.deleteAttribute('uv');
+  band.deleteAttribute('normal');
+  const bandGeo = mergeVertices(band);
+  bandGeo.computeVertexNormals();
+  g.add(new Mesh(bandGeo, standard(crew.primary, 0.85)));
   const end = new MeshStandardNodeMaterial({ roughness: 0.85 });
   end.colorNode = mix(color(crew.primary), color(crew.secondary), aa(positionLocal.y.negate().sub(0.06)));
   for (const [dx, tilt, len] of [[0.05, 0.12, 0.2], [0.11, 0.32, 0.16]] as const) {
@@ -255,7 +273,7 @@ export function buildPenguin(s: Style, crew: Crew): Group {
     const t = new Mesh(tailGeo, end);
     t.scale.set(1, 1, 0.45);
     const at = surface(s, pts, sy, 0.45);
-    t.position.set(at.x + dx - 0.05, sy - 0.02, at.z + 0.02);
+    t.position.set(at.x + dx - 0.05, sy - sh * 0.5, at.z + 0.02);
     t.rotation.z = tilt;
     t.rotation.x = -0.25;
     g.add(t);
@@ -265,30 +283,33 @@ export function buildPenguin(s: Style, crew: Crew): Group {
   if (s.crest) {
     const plume = standard('#f2c32e', 0.5);
     for (const side of [1, -1]) {
+      // rooted over the eye, they stand off the head sideways and droop behind it
       const from = surface(s, pts, eyeY + 0.035, side * (eyeA - 18 * deg));
+      const out = new Vector3(side, 0.25, -0.2);
       for (let k = 0; k < 6; k++) {
-        const out = normalAt(s, pts, eyeY + 0.035, side * eyeA);
         const pts3 = [
           from.clone(),
-          from.clone().add(new Vector3(side * 0.03, 0.03 + k * 0.004, -0.05)).addScaledVector(out, 0.02),
-          from.clone().add(new Vector3(side * (0.09 + k * 0.012), 0.02 - k * 0.012, -0.12 - k * 0.008)).addScaledVector(out, 0.03),
-          from.clone().add(new Vector3(side * (0.13 + k * 0.02), -0.04 - k * 0.022, -0.16 - k * 0.012)),
+          from.clone().add(new Vector3(side * 0.02, 0.035 + k * 0.004, -0.03)).addScaledVector(out, 0.025),
+          from.clone().add(new Vector3(side * (0.05 + k * 0.01), 0.03 - k * 0.01, -0.08 - k * 0.008)).addScaledVector(out, 0.045),
+          from.clone().add(new Vector3(side * (0.07 + k * 0.015), -0.03 - k * 0.02, -0.12 - k * 0.012)).addScaledVector(out, 0.05),
         ];
         g.add(new Mesh(new TubeGeometry(new CatmullRomCurve3(pts3), 20, 0.0075 - k * 0.0005, 6), plume));
       }
     }
     const tuft = standard(FEATHER, 0.6);
-    // a spiky fan on the crown, splayed sideways and swept back
+    // a spiky tuft on the crown: spikes rooted over a small disc (golden-angle spread), each leaning out from
+    // the middle and swept back, so it reads as a tuft from every side
     const top = pts[pts.length - 1].y;
-    for (let k = 0; k < 9; k++) {
-      const a = (k - 4) / 4;
-      const base = new Vector3(a * 0.05, top - 0.012, s.lean - 0.02 - Math.abs(a) * 0.015);
+    for (let k = 0; k < 12; k++) {
+      const phi = k * 2.39996, rr = 0.045 * Math.sqrt((k + 0.5) / 12);
+      const dx = Math.cos(phi) * rr, dz = Math.sin(phi) * rr;
+      const base = new Vector3(dx, top - 0.02 - rr * 0.3, s.lean - 0.015 + dz);
       const curve = new CatmullRomCurve3([
-        base.clone().add(new Vector3(0, -0.01, 0)),
-        base.clone().add(new Vector3(a * 0.03, 0.035, -0.015)),
-        base.clone().add(new Vector3(a * 0.07, 0.055 - Math.abs(a) * 0.02, -0.05)),
+        base.clone(),
+        base.clone().add(new Vector3(dx * 0.6, 0.04, dz * 0.6 - 0.015)),
+        base.clone().add(new Vector3(dx * 1.6, 0.065 - rr * 0.4, dz * 1.6 - 0.045)),
       ]);
-      g.add(new Mesh(new TubeGeometry(curve, 12, 0.006, 6), tuft));
+      g.add(new Mesh(new TubeGeometry(curve, 10, 0.0055, 6), tuft));
     }
   }
   return g;
