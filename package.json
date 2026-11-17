@@ -7,6 +7,7 @@
     "dev": "vite",
     "play": "vite --open",
     "proto:office": "vite --open /prototype/office/",
+    "proto:penguin": "vite --open /prototype/penguin/",
     "build": "tsc --noEmit && vite build",
     "ios": "npm run build && cap run ios",
     "check": "tsc --noEmit && tsc --noEmit -p tsconfig.node.json",

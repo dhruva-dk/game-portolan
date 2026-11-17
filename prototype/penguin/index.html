@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Penguin Prototype</title>
+  <!-- PROTOTYPE (throwaway): three penguin designs, switchable via ?variant=A|B|C, on /prototype/penguin/. -->
+  <style>
+    :root { --paper: #e9dfc8; --deep: #d8cbae; --ink: #2a2320; --soft: #6b5d50; --sea: #3f7fa6; --face: "Iowan Old Style", Palatino, Georgia, serif; }
+    html { background: var(--paper); }
+    html, body { margin: 0; height: 100%; overflow: hidden; font-family: var(--face); color: var(--ink); }
+    /* the canvas sits above the cards (it is clear outside its views); only the round crops sit above it */
+    canvas { position: fixed; inset: 0; z-index: 1; display: block; pointer-events: none; }
+    #ui { position: absolute; inset: 0; display: grid; grid-template-columns: 1fr 470px; grid-template-rows: 64px 1fr; gap: 16px; padding: 16px; box-sizing: border-box; }
+    header { grid-column: 1 / -1; display: flex; align-items: baseline; gap: 16px; background: var(--ink); color: var(--paper); padding: 0 20px; }
+    header h1 { margin: 0; font-size: 22px; letter-spacing: 0.12em; text-transform: uppercase; line-height: 64px; }
+    header .state { font-size: 15px; color: #c9bba0; }
+    #body { position: relative; touch-action: none; cursor: grab; }
+    #body .label { z-index: 2; position: absolute; left: 0; right: 0; bottom: 12px; text-align: center; font-size: 15px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--soft); pointer-events: none; }
+    .side { display: flex; flex-direction: column; gap: 16px; }
+    .card { background: var(--deep); padding: 14px 16px; }
+    .card h2 { margin: 0 0 10px; text-align: center; font-size: 16px; letter-spacing: 0.14em; text-transform: uppercase; }
+    .hero { display: flex; align-items: center; gap: 18px; }
+    .crop { position: relative; z-index: 2; overflow: hidden; flex: none; }
+    .crop .hole { position: absolute; inset: 0; border-radius: 50%; box-shadow: inset 0 0 0 4px var(--ink), 0 0 0 400px var(--deep); }
+    .who .name { font-size: 22px; font-weight: 700; }
+    .who .role { font-size: 15px; color: var(--soft); text-transform: uppercase; letter-spacing: 0.1em; margin-top: 4px; }
+    .who .num { font-size: 40px; font-weight: 700; margin-top: 8px; }
+    .crews { display: flex; justify-content: space-between; }
+    .crews figure { margin: 0; text-align: center; font-size: 14px; }
+    .race { display: flex; align-items: center; gap: 22px; background: var(--sea); color: #eef3f6; padding: 10px 16px; }
+    .race .slot { flex: none; }
+    .race p { margin: 0; font-size: 14px; letter-spacing: 0.1em; text-transform: uppercase; }
+    #switch { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); z-index: 3; display: flex; align-items: center; gap: 4px; background: #ff2d87; color: #fff; border-radius: 999px; padding: 4px; font: 600 15px system-ui, sans-serif; box-shadow: 0 6px 20px rgba(0,0,0,.35); }
+    #switch button { width: 44px; height: 44px; border: 0; border-radius: 50%; background: rgba(255,255,255,.18); color: #fff; font-size: 20px; cursor: pointer; }
+    #switch span { padding: 0 14px; min-width: 220px; text-align: center; }
+  </style>
+</head>
+<body>
+  <div id="ui">
+    <header><h1>Penguin</h1><span class="state" id="state"></span></header>
+    <div id="body" data-view="body"><div class="label">Drag to turn</div></div>
+    <div class="side">
+      <div class="card">
+        <h2>Captain</h2>
+        <div class="hero">
+          <div class="crop" style="width:220px;height:220px"><div class="hole" data-view="portrait"></div></div>
+          <div class="who"><div class="name">Ottoline Brack</div><div class="role">Captain · Ultramarine</div><div class="num">4th</div></div>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Crews</h2>
+        <div class="crews" id="crews"></div>
+      </div>
+      <div class="race">
+        <div class="slot" style="width:72px;height:72px" data-view="race72"></div>
+        <div class="slot" style="width:40px;height:40px" data-view="race40"></div>
+        <div class="slot" style="width:24px;height:24px" data-view="race24"></div>
+        <p>Race size</p>
+      </div>
+    </div>
+  </div>
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>
