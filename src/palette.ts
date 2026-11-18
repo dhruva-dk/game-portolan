@@ -37,8 +37,9 @@ export const STRATUM = tones('#C98552', '#83432F');
 /** Where the land's tones lie (land/sand.ts; tools/terrain-map.ts): the heights over the sea, metres, where the shore's
  *  pale sand, the beach and the dry sand begin, and past which the dunes'; the ground's cover past which the sand is
  *  earthier (its growth: where the shrubs grow), and past which rubble lies (on the land's tops, bare rock); how far up
- *  or down the ground's mottling moves a band's edge, metres (the dunes' six times as far). */
-export const BANDS = { shore: -0.15, beach: 0.45, dry: 2.6, dune: 9, loam: 0.5, rubble: 0.7, ragged: 0.5 } as const;
+ *  or down the ground's mottling moves a band's edge, metres (the dunes' six times as far). On the terrain the dunes
+ *  begin `dunes` of the way up to its summit instead (its land runs higher than an island's). */
+export const BANDS = { shore: -0.15, beach: 0.45, dry: 2.6, dune: 9, dunes: 0.5, loam: 0.5, rubble: 0.7, ragged: 0.5 } as const;
 export const PALM_LEAF = tones('#4DA63A', '#1F6148');
 /** A palm's old fronds, yellowing; and its nuts. */
 export const PALM_LEAF_OLD = tones('#A8B03A', '#5E6A3A');

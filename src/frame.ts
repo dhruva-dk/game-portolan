@@ -29,7 +29,7 @@ import { film } from './post/film';
 import { createGrade, encode } from './post/grade';
 import { createShafts, type Shafts } from './post/shafts';
 import { SKY_METRES } from './sky/sky';
-import { SPACE } from './palette';
+import { BANDS, SPACE } from './palette';
 import type { Vec4Node } from './tsl';
 
 /**
@@ -136,11 +136,12 @@ export function createFrame(renderer: WebGPURenderer, world: World, options: Fra
   const water = createWater(view, sky.light, ground, world.wind, options.fleet, options.length, options.sea);
   const shadow = createShadow();
   const light = createLighting(sky.light, water.below, shadow.visible);
+  const terrain = world.land.kind === 'terrain' ? world.land.terrain : null;
   // (the ground's own, with the caustics on the sea floor)
-  const sand = createSand(view, ground, createLighting(sky.light, water.floor, shadow.visible));
+  const dune = terrain ? BANDS.dunes * terrain.stats.summit : BANDS.dune;
+  const sand = createSand(view, ground, createLighting(sky.light, water.floor, shadow.visible), dune);
   // the ground under the sea, and the land's own where the land is the terrain's (the islands draw theirs); and what
   // stands on the land, the terrain's tiles' or the islands'
-  const terrain = world.land.kind === 'terrain' ? world.land.terrain : null;
   const seabed = terrain ? createTerrainMesh(view, ground, sand, terrain) : createSeabed(view, ground, sand);
   const islands = terrain ? createGroves(terrain, world.planet, world.seed, view, light) : createIslands(world.planet, world.seed, view, light, sand);
   shadow.cast(...islands.casters);

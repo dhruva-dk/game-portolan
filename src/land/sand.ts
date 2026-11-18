@@ -4,7 +4,8 @@
 // higher up; and under the trees, where fronds have fallen, a darker patch. The bands' edges wander with the ground's
 // mottling, so none is a contour line. Where the ground is steeper than sand lies, a cliff's bare rock in strata.
 // Where the land is the terrain's its cover carries the land's own (world/planet-terrain.ts): earthier sand in patches
-// where the shrubs grow, and the tops' bare rock; the islands' land has none. Above DUNE, on either, the pale dunes.
+// where the shrubs grow, and the tops' bare rock; the islands' land has none. High up, on either, the pale dunes
+// (past 9 m on the islands, halfway to the summit on the terrain: palette.ts BANDS).
 // The islands' meshes and the sea floor's both shade with this, so where they overlap they look the same.
 //
 // Everything is a function of the world position alone (the sea floor's mesh slides along under the eye).
@@ -20,7 +21,7 @@ import { cut, type FloatNode, type Vec3Node } from '../tsl';
 import { ISLANDS } from '../world/planet-islands';
 
 /** Where each band lies (palette.ts BANDS). */
-const { shore: SHORE, beach: BEACH, dry: DRY, dune: DUNE, loam: LOAM_AT, rubble: RUBBLE, ragged: RAGGED } = BANDS;
+const { shore: SHORE, beach: BEACH, dry: DRY, loam: LOAM_AT, rubble: RUBBLE, ragged: RAGGED } = BANDS;
 /** The ground's cover (0…1) past which sea grass grows on the floor; and litter under the trees. */
 const GRASS = 0.65, FALLEN = 0.5;
 /** Ground steeper than a cliff's face (ISLANDS.bare, rise over run) by SHEER is bare rock (BARE: the cosine of its
@@ -29,7 +30,8 @@ const SHEER = 2.2, BARE = 1 / Math.hypot(1, ISLANDS.bare * SHEER), STRATA = 2.2,
 
 export type Sand = (p: Vec3Node, n: Vec3Node, litter: FloatNode | null) => Vec3Node;
 
-export function createSand(view: View, ground: Ground, light: Light): Sand {
+/** dune: the height past which the sand is the dunes', metres (BANDS). */
+export function createSand(view: View, ground: Ground, light: Light, dune: number = BANDS.dune): Sand {
   const strewn = createStrewn();
 
   /**
@@ -58,7 +60,7 @@ export function createSand(view: View, ground: Ground, light: Light): Sand {
     // inland, earthier sand in patches where the shrubs grow (the cover's growth, ragged by the clumps); and high up,
     // the pale sand the wind has bleached and heaped
     lay(SAND_LOAM, cut(cover.x.add(cover.w.sub(0.5).mul(0.25)), LOAM_AT).mul(cut(level, DRY)));
-    lay(SAND_DUNE, cut(level.add(mottle.mul(RAGGED * 6)), DUNE));
+    lay(SAND_DUNE, cut(level.add(mottle.mul(RAGGED * 6)), dune));
     // a cliff's face, or the bare rock of the tops: rock above the sea, in strata of two tones
     const cliff = cut(float(1).sub(dot(n, view.up(p))), 1 - BARE);
     const tops = cut(cover.y.add(mottle.mul(0.3)), RUBBLE).mul(cut(level, DRY));

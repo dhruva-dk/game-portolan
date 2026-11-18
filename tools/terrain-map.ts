@@ -33,8 +33,8 @@ const step = (v: number, at: number) => (v >= at ? 1 : 0);
 /** Linear to the display's sRGB, 0…255. */
 const srgb = (v: number) => Math.round(255 * (v <= 0.0031308 ? 12.92 * v : 1.055 * Math.pow(Math.min(v, 1), 1 / 2.4) - 0.055));
 
-/** The land's two tones at height h over its cover, laid in land/sand.ts's order. */
-function land(h: number, c: Cover): Tones {
+/** The land's two tones at height h over its cover, laid in land/sand.ts's order; dunes past `dune` metres. */
+function land(h: number, c: Cover, dune: number): Tones {
   const mottle = c.mottle - 0.5, level = h + mottle * BANDS.ragged;
   let lit = SAND_SHORE.lit, shadow = SAND_SHORE.shadow;
   const lay = (t: Tones, share: number) => {
@@ -44,7 +44,7 @@ function land(h: number, c: Cover): Tones {
   lay(SAND, step(level, BANDS.beach));
   lay(SAND_DRY, step(level, BANDS.dry));
   lay(SAND_LOAM, step(c.grass + (c.clump - 0.5) * 0.25, BANDS.loam) * step(level, BANDS.dry));
-  lay(SAND_DUNE, step(level + mottle * BANDS.ragged * 6, BANDS.dune));
+  lay(SAND_DUNE, step(level + mottle * BANDS.ragged * 6, dune));
   lay(ROCK, step(c.rubble + mottle * 0.3, BANDS.rubble) * step(level, BANDS.dry));
   return { lit, shadow };
 }
@@ -67,7 +67,7 @@ function globes(t: Terrain, seed: number, size: number, marks: boolean): Uint8Ar
       const p: Vec3 = g === 0 ? [x, y1, z1] : [-x, y1, -z1];
       const u = normalize(p), k = j * W + g * size + i;
       hs[k] = planet.sample(u, cover); cs[k] = cellOf(u); zs[k] = z;
-      tones[k] = land(hs[k], cover);
+      tones[k] = land(hs[k], cover, BANDS.dunes * t.stats.summit);
     }
   }
   const rgb = new Uint8Array(W * H * 3).fill(18), mpp = R / r;
