@@ -1,5 +1,6 @@
-import { createPlanet, type Planet } from './world/planet';
-import type { Vec3 } from './world/sphere';
+import { landOf, planetOf, type Land, type LandKind } from './world/land';
+import type { Planet } from './world/planet';
+import { scale, type Vec3 } from './world/sphere';
 import { sunAt, sunPlaces, type SunPlaces } from './world/sun';
 import { createWeather, type Weather } from './world/weather';
 import { createWind, type Wind } from './world/wind';
@@ -19,16 +20,20 @@ export interface Climate {
   seaWind: number;
 }
 
-/** The world a match is set in: its planet, the planet's prevailing wind and the climate, from one seed. Built once
- *  (main.ts) and handed to both the game and the frame. */
-export interface World { seed: number; planet: Planet; wind: Wind; climate: Climate }
+/** The world a match is set in: its planet and what its land is made of (world/land.ts: for the workers that make the
+ *  planet again), the planet's prevailing wind and the climate, from one seed. Built once (main.ts) and handed to both
+ *  the game and the frame. */
+export interface World { seed: number; land: Land; planet: Planet; wind: Wind; climate: Climate }
 
-/** seed: the planet's (world/planet.ts); mean, swing: the weather's (world/weather.ts); hours: the time of day. */
-export function createWorld(seed: number, mean: Weather, swing: Weather, hours: number): World {
-  const planet = createPlanet(seed);
+/** seed: the planet's (world/planet.ts); kind: its land's; mean, swing: the weather's (world/weather.ts); hours: the
+ *  time of day. */
+export function createWorld(seed: number, kind: LandKind, mean: Weather, swing: Weather, hours: number): World {
+  const land = landOf(seed, kind), planet = planetOf(seed, land);
+  // (the sun set by the islands, or where she starts where there are none)
+  const sun = planet.islands.length > 0 ? sunPlaces(planet.islands) : { anchor: planet.start.at, origin: scale(planet.start.at, -1) };
   return {
-    seed, planet, wind: createWind(seed),
-    climate: { timeOfDay: hours, sunPlaces: sunPlaces(planet.islands), weather: createWeather(seed, mean, swing), seaWind: mean.wind },
+    seed, land, planet, wind: createWind(seed),
+    climate: { timeOfDay: hours, sunPlaces: sun, weather: createWeather(seed, mean, swing), seaWind: mean.wind },
   };
 }
 

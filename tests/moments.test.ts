@@ -6,7 +6,6 @@ import { HER, HOTBAR, type Deed } from '../src/player.ts';
 import { KEEP, bearingFrom, deedsOf, kept, seenOf, type Done } from '../src/play/moments.ts';
 import { CAMERA, answerTo, createShake, envelope, noise } from '../src/play/shake.ts';
 import { STOPS, createStops, stopFor } from '../src/play/stops.ts';
-import { startOf } from '../src/play/setup.ts';
 import { bearing, createState, type Match } from '../src/play/state.ts';
 import { LOOK } from '../src/play/colours.ts';
 import { PLAYER } from '../src/sim/match.ts';
@@ -86,7 +85,7 @@ test('as she sees it: the bearing clockwise from the look, its distance, and on 
 });
 
 test('the match records its deeds: a ship sunk is told once, with a sink blast to draw', () => {
-  const planet = createPlanet(SEED), depth = (p: Vec3) => -planet.height(p), start = startOf(planet);
+  const planet = createPlanet(SEED), depth = (p: Vec3) => -planet.height(p), start = planet.start;
   const match: Match = { seed: 1, gun: null, storm: () => calm(start.at) };
   const state = createState(planet, flat, { chart: chart(depth), water: berthing(depth) }, match);
   const before = state.deeds().at(-1)?.seq ?? 0;

@@ -11,7 +11,7 @@ import { createMeter } from './meter';
 import { createGame } from './play/game';
 import { createPlaceholder } from './play/placeholder';
 import { createReferee } from './play/referee';
-import { createMatches, startOf, watersOf } from './play/setup';
+import { createMatches, watersOf } from './play/setup';
 import { SHIP } from './sim/handling';
 import { SHIPS } from './sim/match';
 import type { Snapshot } from './snapshot';
@@ -27,7 +27,7 @@ import { MEAN, SWING } from './world/weather';
 
 /** The release's setup. */
 const RELEASE: Setup = {
-  seed: SEED, mean: MEAN, swing: SWING, hours: 16.3,
+  seed: SEED, land: 'islands', mean: MEAN, swing: SWING, hours: 16.3,
   drawing: { sea: 'water', fleet: SHIPS, length: SHIP.length, lod: null, cloth: true, bolt: false },
   meter: false, hold: null, gun: null,
 };
@@ -51,12 +51,12 @@ async function stage(setup: Setup): Promise<Stage> {
   }
 
   // The world, built once and handed to the frame that draws it and the game that runs on it.
-  const world = createWorld(setup.seed, setup.mean, setup.swing, setup.hours);
+  const world = createWorld(setup.seed, setup.land, setup.mean, setup.swing, setup.hours);
   const frame = createFrame(renderer, world, setup.drawing);
   const meter = setup.meter ? createMeter(renderer, meterEl) : null;
 
   return {
-    world, start: startOf(world.planet), canvas: renderer.domElement, anchors: frame.anchors, ready: frame.ready,
+    world, start: world.planet.start, canvas: renderer.domElement, anchors: frame.anchors, ready: frame.ready,
     matches: createMatches(setup.seed, world.planet, setup.hold, setup.gun),
     async draw(next: (dt: number) => Snapshot, drawn?: (canvas: HTMLCanvasElement) => void) {
       console.info(`ground baked in ${(await frame.ready).toFixed(0)} ms`);
@@ -81,7 +81,7 @@ async function stage(setup: Setup): Promise<Stage> {
 async function play(s: Stage): Promise<Played> {
   // the water sounded, for the bots' routes round land (sim/route.ts) and the ships' berths (sim/spawn.ts): in a
   // worker while the ground's bakes in another (frame.ready), in a fraction of its time
-  const { waters, ms, berth } = await watersOf(s.world.seed);
+  const { waters, ms, berth } = await watersOf(s.world.seed, s.world.land);
   console.info(`water sounded in ${ms.toFixed(0)} ms`);
   // (each match's berths worked out in that worker ahead of PLAY)
   s.matches.berthBy(berth);

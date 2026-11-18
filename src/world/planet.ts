@@ -12,7 +12,7 @@
 //
 // Pure arithmetic: no three, so it runs in node for the tests.
 
-import { R, distance, type Vec3 } from './sphere.ts';
+import { R, along, distance, frameAt, scale, toChart, type Vec3 } from './sphere.ts';
 import { createNoise3 } from './noise3.ts';
 import type { IslandSite } from './planet-islands.ts';
 import { charter, placeIslands } from './island-place.ts';
@@ -46,6 +46,9 @@ export const SEA = {
  */
 export const SEED = 3;
 
+/** Metres off the coast she lies at the start. */
+export const START = 80;
+
 export interface Cover {
   /** 0…1: sea grass patches. */
   grass: number;
@@ -58,7 +61,13 @@ export interface Cover {
 }
 
 export interface Planet {
+  /** Its islands, placed (none where the land is the terrain's: planet-terrain.ts). */
   islands: IslandSite[];
+  /** Where land can stand above the sea, for the sights (sim/sight.ts): wherever there is land, a rise holds it. */
+  rises: Rise[];
+  /** Where her ship lies at the start: on the water START metres off a coast, heading (bearing, radians clockwise from
+   *  north) toward the land. */
+  start: { at: Vec3; bearing: number };
   /** Metres above sea level at direction p (negative under water). */
   height(p: Vec3): number;
   /** What lies on the ground at direction p. */
@@ -210,8 +219,15 @@ export function createPlanet(seed: number): Planet {
     return h;
   };
 
+  // she starts south of the largest island, heading north toward it
+  const largest = islands[0], southward = scale(frameAt(largest.chart.at).north, -1);
+  const [cx, cz] = toChart(largest.chart, along(largest.chart.at, southward, 1).p);
+  const start = { at: along(largest.chart.at, southward, largest.coast(Math.atan2(cz, cx)) + START).p, bearing: 0 };
+
   return {
     islands,
+    rises: risesOf(islands),
+    start,
     height: (p) => ground(unit(p), null),
     cover: (p) => {
       const c: Cover = { grass: 0, rubble: 0, mottle: 0, clump: 0 };

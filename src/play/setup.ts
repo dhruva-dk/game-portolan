@@ -1,33 +1,22 @@
-// How a match is set up on the world: where her ship lies in the lobby's quiet sea (and a match at sea about her, for
-// debugging), the planet's water sounded for the bots' chart and the ships' berths, and the matches dealt one after
+// How a match is set up on the world: the planet's water sounded for the bots' chart and the ships' berths, and the matches dealt one after
 // another, each with its storm, its berths and its bots' minds.
 
 import { SHIPS } from '../sim/match.ts';
 import { charted } from '../sim/route.ts';
 import type { Spawn } from '../sim/spawn.ts';
 import { createStorm, type Storm } from '../sim/storm.ts';
+import type { Land } from '../world/land.ts';
 import type { Planet } from '../world/planet.ts';
-import { along, frameAt, scale, toChart, type Vec3 } from '../world/sphere.ts';
+import type { Vec3 } from '../world/sphere.ts';
 import type { Match, Waters } from './state.ts';
-
-/** Metres off the coast she lies at the start. */
-const START = 80;
-
-/** Where her ship lies at the start: on the water south of the largest island, START metres off its coast, heading
- *  north toward it (bearing 0). */
-export function startOf(planet: Planet): { at: Vec3; bearing: number } {
-  const largest = planet.islands[0], southward = scale(frameAt(largest.chart.at).north, -1);
-  const [cx, cz] = toChart(largest.chart, along(largest.chart.at, southward, 1).p);
-  return { at: along(largest.chart.at, southward, largest.coast(Math.atan2(cz, cx)) + START).p, bearing: 0 };
-}
 
 /** A match's berths worked out off the main thread, by its seed. */
 export type Berther = (match: number) => Promise<Spawn[]>;
 
-/** The water of a planet of this seed as the match reads it (state.ts Waters), sounded in a worker (sounding.ts)
- *  while the ground's bakes in its own (land/bake.ts); the milliseconds the sounding took; and the worker kept to berth
- *  each match on it. */
-export function watersOf(seed: number): Promise<{ waters: Waters; ms: number; berth: Berther }> {
+/** The water of a planet of this seed and land as the match reads it (state.ts Waters), sounded in a worker
+ *  (sounding.ts) while the ground's bakes in its own (land/bake.ts); the milliseconds the sounding took; and the worker
+ *  kept to berth each match on it. */
+export function watersOf(seed: number, land: Land): Promise<{ waters: Waters; ms: number; berth: Berther }> {
   const worker = new Worker(new URL('./sounding.ts', import.meta.url), { type: 'module' });
   const asked = new Map<number, (spawns: Spawn[]) => void>();
   const berth: Berther = (match) => new Promise((resolve) => {
@@ -47,7 +36,7 @@ export function watersOf(seed: number): Promise<{ waters: Waters; ms: number; be
       resolve({ waters: { chart: charted(e.data), water: { points } }, ms: e.data.ms, berth });
     };
     worker.onerror = (e) => reject(new Error(e.message));
-    worker.postMessage({ seed });
+    worker.postMessage({ seed, land });
   });
 }
 

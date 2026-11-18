@@ -1,7 +1,6 @@
 // The match afloat (play/state.ts), as the game steps it: who holds the sea through a step, and a match after another.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { startOf } from '../src/play/setup.ts';
 import { bearing, createState, type Match } from '../src/play/state.ts';
 import { PLAYER } from '../src/sim/match.ts';
 import { chart } from '../src/sim/route.ts';
@@ -15,7 +14,7 @@ import { flat } from '../src/world/swell.ts';
 const planet = createPlanet(SEED);
 const depth = (p: Vec3) => -planet.height(p);
 const waters = { chart: chart(depth), water: berthing(depth) };
-const start = startOf(planet);
+const start = planet.start;
 const still = { aim: null, fire: false };
 const degrees = Math.PI / 180;
 

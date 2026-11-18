@@ -36,7 +36,7 @@ import { createTerritory, type Move, type Outcome, type Territory } from '../sim
 import type { BallDraw, Blast, Look, Sea, ShipDraw } from '../snapshot.ts';
 import type { Deed } from '../player.ts';
 import type { Hull } from '../world/swell.ts';
-import { remembered, risesOf, type Planet } from '../world/planet.ts';
+import { remembered, type Planet } from '../world/planet.ts';
 import type { ShipPose } from '../world/pose.ts';
 import { hash } from '../world/random.ts';
 import { add, frameAt, scale, type Vec3 } from '../world/sphere.ts';
@@ -109,7 +109,7 @@ export interface Waters { chart: Chart; water: Berthing }
 
 /** planet: the world's; sea: its waves, which the ships ride; waters: its water, sounded. */
 export function createState(planet: Planet, sea: Hull, { chart, water }: Waters, first: Match) {
-  const depth = remembered((p: Vec3) => -planet.height(p)), rises = risesOf(planet.islands);
+  const depth = remembered((p: Vec3) => -planet.height(p)), rises = planet.rises;
   let match = first;
   const seedOf = (id: number) => hash(match.seed, id);
   let fleet: Vessel[] = [];

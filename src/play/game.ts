@@ -42,7 +42,6 @@ import { PLAYER } from '../sim/match';
 import type { Vessel } from '../sim/contact';
 import type { Helm, ShipState } from '../sim/ship';
 import type { Eye, LootDraw, Snapshot } from '../snapshot';
-import { risesOf } from '../world/planet';
 import { createSwell } from '../world/swell';
 import type { Anchor } from '../world/lattice';
 import type { ShipPose } from '../world/pose';
@@ -76,7 +75,7 @@ export interface View { watch: number; hands: boolean; end: Ending | null }
  *  water sounded (state.ts); start: where she lies in the lobby and the bearing she heads (radians); first: the match
  *  in hand until another is dealt. */
 export function createGame(world: World, anchors: readonly Anchor[], waters: Waters, start: { at: Vec3; bearing: number }, first: Match) {
-  const ground = world.planet.height, depth = (p: Vec3) => -ground(p), rises = risesOf(world.planet.islands);
+  const ground = world.planet.height, depth = (p: Vec3) => -ground(p), rises = world.planet.rises;
   const sea = createSwell(anchors, ground, world.climate.seaWind, { shortest: RIDE.shortest });
   const state = createState(world.planet, sea.hull, waters, first);
   const chase = createChase(ground, sea.at);

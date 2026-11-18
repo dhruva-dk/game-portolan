@@ -1,15 +1,16 @@
 // A module Worker: bakes the planet's ground onto the cube's faces (world/planet.ts bakeFaces) off the main thread,
 // heights as half floats, and hands the buffers back.
-//   in:  { seed, n }
+//   in:  { seed, land (world/land.ts), n }
 //   out: { height: Uint16Array (6 faces of n × n, half floats), cover: Uint8Array (6 faces of n × n RGBA), ms }
 
 import { DataUtils } from 'three/webgpu';
-import { bakeFaces, createPlanet } from '../world/planet';
+import { planetOf, type Land } from '../world/land';
+import { bakeFaces } from '../world/planet';
 
-self.onmessage = (e: MessageEvent<{ seed: number; n: number }>) => {
-  const { seed, n } = e.data;
+self.onmessage = (e: MessageEvent<{ seed: number; land: Land; n: number }>) => {
+  const { seed, land, n } = e.data;
   const t = performance.now();
-  const faces = bakeFaces(createPlanet(seed), n);
+  const faces = bakeFaces(planetOf(seed, land), n);
   const height = new Uint16Array(6 * n * n), cover = new Uint8Array(6 * n * n * 4);
   faces.height.forEach((h, f) => {
     for (let k = 0; k < h.length; k++) height[f * n * n + k] = DataUtils.toHalfFloat(h[k]);

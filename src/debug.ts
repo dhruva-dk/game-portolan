@@ -7,7 +7,8 @@
 // in a rose mist; warm, a low evening sun over a deeper sea; noon, a high sun, bright and saturated (MOODS: the hour and the haze; the grade and the
 // haze follow the sun's height). ?t=hours sets the time of day (the same everywhere: world/sun.ts); ?wind=m/s the wind's speed, ?haze= the air's
 // aerosol and ?cloud= the cloud cover (0–1) each hold at that instead of drifting (world/weather.ts); ?seed= the
-// planet's (world/planet.ts; SEED by default). ?debug=charts colours the sea by its charts' weights, ?debug=wake shows
+// planet's (world/planet.ts; SEED by default). ?terrain grows the planet's land from the terrain (world/terrain.ts)
+// instead of placing islands. ?debug=charts colours the sea by its charts' weights, ?debug=wake shows
 // the ships' marks on it (water/water.ts).
 // ?lat=&lon= degrees put the camera over a point of the planet and ?alt= metres above the sea; ?yaw=deg turns it
 // (clockwise from north: 90 east) and ?look=deg pitches it. The planet is 554 m in radius, so a degree is 9.67 m.
@@ -58,7 +59,7 @@ import { createFly } from './fly';
 import type { Game } from './play/game';
 import type { Referee } from './play/referee';
 import { lookOf } from './play/colours';
-import { startOf, type Matches } from './play/setup';
+import type { Matches } from './play/setup';
 import { bearing, type Berth } from './play/state';
 import { HOTBAR, IDLE, type Hands } from './player';
 import { probeMeshes } from './probe';
@@ -70,6 +71,7 @@ import type { Cap } from './sim/storm';
 import type { ShipDraw, Snapshot } from './snapshot';
 import type { Flow } from './ui/flow';
 import { uiLayer } from './ui/ui';
+import type { LandKind } from './world/land';
 import type { Weather } from './world/weather';
 import { R, add, cross, dot, frameAt, along, normalize, scale, type Vec3 } from './world/sphere';
 
@@ -77,7 +79,7 @@ import { R, add, cross, dot, frameAt, along, normalize, scale, type Vec3 } from 
  *  swing (world/weather.ts) and the time of day (hours); how the frame draws; whether the meter shows the frame's cost;
  *  the seconds the storm is held at (null: it runs) and the gun every ship is armed with (null: none). */
 export interface Setup {
-  seed: number; mean: Weather; swing: Weather; hours: number;
+  seed: number; land: LandKind; mean: Weather; swing: Weather; hours: number;
   drawing: FrameOptions;
   meter: boolean;
   hold: number | null; gun: { kind: GunKind; rarity: number } | null;
@@ -126,7 +128,7 @@ function setupOf(release: Setup): Setup {
   for (const k of ['wind', 'cloud', 'haze'] as const) if (params.has(k)) [mean[k], swing[k]] = [number(k, 0), 0];
   const sea = params.get('debug');
   return {
-    seed: number('seed', release.seed), mean, swing, hours: number('t', mood?.hours ?? release.hours),
+    seed: number('seed', release.seed), land: params.has('terrain') ? 'terrain' : release.land, mean, swing, hours: number('t', mood?.hours ?? release.hours),
     drawing: {
       sea: sea === 'charts' || sea === 'wake' ? sea : release.drawing.sea,
       // (room for ?ships= past a match's, for judging the frame with more)
@@ -135,7 +137,7 @@ function setupOf(release: Setup): Setup {
       lod: params.has('lod') ? number('lod', 0) : release.drawing.lod,
       cloth: params.get('cloth') !== '0' && release.drawing.cloth,
       bolt: params.has('bolt') || release.drawing.bolt,
-      extras: params.has('probe') ? (light, world) => probeMeshes(light, startOf(world.planet).at) : release.drawing.extras,
+      extras: params.has('probe') ? (light, world) => probeMeshes(light, world.planet.start.at) : release.drawing.extras,
     },
     meter: true,
     hold: params.has('storm') ? number('storm', 0) : release.hold,

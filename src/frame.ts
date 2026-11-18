@@ -130,7 +130,7 @@ export function createFrame(renderer: WebGPURenderer, world: World, options: Fra
   const scene = new Scene();
   scene.backgroundNode = sky.background;
   // the ground baked for the shaders in a worker, while the islands are built here
-  const ground = createGround(world.seed);
+  const ground = createGround(world.seed, world.land);
   const water = createWater(view, sky.light, ground, world.wind, options.fleet, options.length, options.sea);
   const shadow = createShadow();
   const light = createLighting(sky.light, water.below, shadow.visible);

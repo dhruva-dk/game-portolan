@@ -14,6 +14,7 @@
 import { ClampToEdgeWrapping, DataArrayTexture, HalfFloatType, LinearFilter, RGBAFormat, RedFormat, UnsignedByteType } from 'three/webgpu';
 import { abs, cross, float, normalize, select, texture, vec3 } from 'three/tsl';
 import { faceUV } from '../view/cube';
+import type { Land } from '../world/land';
 import { R } from '../world/sphere';
 import type { FloatNode, Vec3Node, Vec4Node } from '../tsl';
 
@@ -43,7 +44,7 @@ function layers(data: Uint16Array | Uint8Array, rgba: boolean) {
   return t;
 }
 
-export function createGround(seed: number): Ground {
+export function createGround(seed: number, land: Land): Ground {
   const heights = layers(new Uint16Array(6 * NODES * NODES), false);
   const covers = layers(new Uint8Array(6 * NODES * NODES * 4), true);
   const worker = new Worker(new URL('./bake.ts', import.meta.url), { type: 'module' });
@@ -57,7 +58,7 @@ export function createGround(seed: number): Ground {
     };
     worker.onerror = (e) => reject(new Error(e.message));
   });
-  worker.postMessage({ seed, n: NODES });
+  worker.postMessage({ seed, land, n: NODES });
 
   /** The texel coordinates on its face of direction p, and the face. */
   const at = (p: Vec3Node) => {
