@@ -12,7 +12,7 @@
 // same. A tap on the panel does nothing; a tap off it, or on the roundel, shuts it. The window is cut once, for the
 // whole planet seen from the farthest the eye goes (the eye's field of view set to fit), and a pinch zooms within it.
 //
-// Over the window, placed each frame by projecting world points with the eye's numbers: the islands' coasts, inked
+// Over the window, placed each frame by projecting world points with the eye's numbers: the coasts (coasts.ts), inked
 // lightly over their real ground; the Storm's edge in its violet (the Storm itself is the world's own, its cloud seen from
 // above); her galleon, gilt. Whatever is on the planet's far side is not shown. Beside the window, the two readings
 // that matter: ships afloat and the Storm's clock.
@@ -238,7 +238,7 @@ export function createGlobe(coasts: readonly Coast[]) {
     ctx.lineWidth = 1;
     for (const coast of coasts) {
       if (dot(coast.centre, e.c) * e.d < 0.9) continue;
-      trace(e, coast.ring, true);
+      trace(e, coast.ring, coast.closed);
       ctx.stroke();
     }
     ctx.globalAlpha = 1;

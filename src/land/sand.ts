@@ -11,7 +11,7 @@
 // Lit like everything else (sky/light.ts).
 
 import { dot, float, fract, max, mix, vec3 } from 'three/tsl';
-import { LITTER, ROCK, SAND, SAND_DRY, SAND_DUNE, SAND_LOAM, SAND_SHORE, SEABED_SAND, SEABED_STONE, SEABED_WEED, STRATUM, type Tones } from '../palette';
+import { BANDS, LITTER, ROCK, SAND, SAND_DRY, SAND_DUNE, SAND_LOAM, SAND_SHORE, SEABED_SAND, SEABED_STONE, SEABED_WEED, STRATUM, type Tones } from '../palette';
 import type { View } from '../view/view';
 import type { Ground } from './ground';
 import type { Light } from '../sky/light';
@@ -19,14 +19,10 @@ import { createStrewn } from './strewn';
 import { cut, type FloatNode, type Vec3Node } from '../tsl';
 import { ISLANDS } from '../world/planet-islands';
 
-/** Where each band begins, metres over the sea: the shore's pale sand, the beach, the dry sand. */
-const SHORE = -0.15, BEACH = 0.45, DRY = 2.6;
-/** On land: the cover's growth past which the sand is earthier; the height (metres) past which it is the dunes'. */
-const LOAM_AT = 0.5, DUNE = 9;
-/** How far up or down the ground's mottling moves a band's edge, metres. */
-const RAGGED = 0.5;
-/** The ground's cover (0…1) past which rubble lies on the floor, and sea grass; and litter under the trees. */
-const RUBBLE = 0.7, GRASS = 0.65, FALLEN = 0.5;
+/** Where each band lies (palette.ts BANDS). */
+const { shore: SHORE, beach: BEACH, dry: DRY, dune: DUNE, loam: LOAM_AT, rubble: RUBBLE, ragged: RAGGED } = BANDS;
+/** The ground's cover (0…1) past which sea grass grows on the floor; and litter under the trees. */
+const GRASS = 0.65, FALLEN = 0.5;
 /** Ground steeper than a cliff's face (ISLANDS.bare, rise over run) by SHEER is bare rock (BARE: the cosine of its
  *  tilt), so a dune's steep scraps stay sand; its strata this many metres apart, the pale band this share of each. */
 const SHEER = 2.2, BARE = 1 / Math.hypot(1, ISLANDS.bare * SHEER), STRATA = 2.2, STRATUM_SHARE = 0.35;

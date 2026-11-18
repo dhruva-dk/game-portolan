@@ -15,7 +15,7 @@ import { createMatches, watersOf } from './play/setup';
 import { SHIP } from './sim/handling';
 import { SHIPS } from './sim/match';
 import type { Snapshot } from './snapshot';
-import { traceCoasts } from './ui/coasts';
+import { shoresOf } from './ui/coasts';
 import { createGlobe } from './ui/globe';
 import { createFlow } from './ui/flow';
 import { createHud, type HudState } from './ui/hud';
@@ -94,11 +94,11 @@ async function play(s: Stage): Promise<Played> {
   const layer = uiLayer();
   const stick = createStick(layer);
   const pending = createPlaceholder();
-  const coasts = traceCoasts(s.world.planet.islands);
-  const globe = createGlobe(coasts);
+  const shores = shoresOf(s.world.planet, s.world.land);
+  const globe = createGlobe(shores.coasts);
   const hudState = (): HudState => ({ ...game.status(s.canvas.clientWidth, s.canvas.clientHeight), ...game.kit() });
   const map = () => globe.show(hudState());
-  const hud = createHud(layer, coasts, { slot: input.tap, gust: input.gust, fire: input.fire, map });
+  const hud = createHud(layer, shores, { slot: input.tap, gust: input.gust, fire: input.fire, map });
   // the sound, begun on her first touch; a tick for each tap on something of the UI's
   const audio = createAudio(s.world.planet.height);
   layer.addEventListener('pointerdown', (e) => {

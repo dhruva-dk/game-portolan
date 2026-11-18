@@ -31,7 +31,7 @@
 
 import { HOTBAR, type GunKind, type Kit, type Status } from '../player';
 import type { Sea } from '../snapshot';
-import type { Coast } from './coasts';
+import type { Shores } from './coasts';
 import type { Glyph } from './glyphs';
 import { INK, PAPER, WASH, bar, figure, glyph, paperDisc, ring as sweep, slip, svg } from './ink';
 import { createJuice } from './juice';
@@ -71,7 +71,7 @@ export const clock = (s: number) => {
   return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`;
 };
 
-export function createHud(layer: HTMLElement, coasts: readonly Coast[], act: HudActions) {
+export function createHud(layer: HTMLElement, shores: Shores, act: HudActions) {
   const root = document.createElement('div');
   root.className = 'screen';
   layer.appendChild(root);
@@ -106,7 +106,7 @@ export function createHud(layer: HTMLElement, coasts: readonly Coast[], act: Hud
   const hotbar = piece(body, 'bottom');
   hotbar.style.left = 'calc(50% - 12px)';
 
-  const drawMap = createMinimap(map, MINIMAP, coasts);
+  const drawMap = createMinimap(map, MINIMAP, shores);
   onTap(map, () => act.map());
   onTap(gust, () => act.gust());
 

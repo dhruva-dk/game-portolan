@@ -1,6 +1,7 @@
 // The islands as the minimap draws them, each baked once to a small image on its own chart the first time it comes near
 // her: its apron an even pale wash on the sea, its land parchment deepening to ochre up its hills with a faint sepia
-// contour every few metres, its coast inked over it as a line by the minimap.
+// contour every few metres, its coast inked over it as a line by the minimap. The terrain's land is painted alike
+// (ground.ts).
 
 import type { IslandSite } from '../world/planet';
 import { cross } from '../world/sphere';
@@ -25,16 +26,24 @@ export function bakeIsle(site: IslandSite): Isle {
   const canvas = document.createElement('canvas');
   canvas.width = canvas.height = w;
   const g = canvas.getContext('2d')!;
-  const image = g.createImageData(w, w), d = image.data;
+  const image = g.createImageData(w, w);
   const h = new Float32Array(w * w);
   for (let j = 0; j < w; j++) {
     for (let i = 0; i < w; i++) h[j * w + i] = site.mound((i + 0.5 - half) * TEXEL, -(j + 0.5 - half) * TEXEL);
   }
-  const top = Math.max(site.summit, 1);
+  paint(h, w, site.summit, image.data);
+  g.putImageData(image, 0, 0);
+  return { canvas, w, h: w, m: TEXEL };
+}
+
+/** Land's colours on a chart, from heights over the sea on a square grid `w` across, its hilltops `top` metres high:
+ *  past APRON down nothing, the apron a pale wash, the land parchment to ochre with a contour every CONTOUR. */
+export function paint(h: Float32Array, w: number, top: number, d: Uint8ClampedArray) {
+  top = Math.max(top, 1);
   for (let j = 0; j < w; j++) {
     for (let i = 0; i < w; i++) {
       const k = j * w + i, a = k * 4, v = h[k];
-      if (v <= -APRON) {
+      if (!(v > -APRON)) {
         d[a + 3] = 0;
         continue;
       }
@@ -44,7 +53,7 @@ export function bakeIsle(site: IslandSite): Isle {
         d[a + 3] = 255 * (0.72 - 0.12 * (-v / APRON));
         continue;
       }
-      // a contour where a step of CONTOUR is crossed between this texel and the one right or below
+      // a contour where a step of CONTOUR is crossed between this texel and one beside it
       const band = Math.floor(v / CONTOUR);
       const crossed = band > 0 && ((i + 1 < w && Math.floor(h[k + 1] / CONTOUR) < band) || (j + 1 < w && Math.floor(h[k + w] / CONTOUR) < band)
         || (i > 0 && Math.floor(h[k - 1] / CONTOUR) < band) || (j > 0 && Math.floor(h[k - w] / CONTOUR) < band));
@@ -53,8 +62,6 @@ export function bakeIsle(site: IslandSite): Isle {
       d[a + 3] = 255;
     }
   }
-  g.putImageData(image, 0, 0);
-  return { canvas, w, h: w, m: TEXEL };
 }
 
 /** The island's chart's second axis (its z: sphere.ts fromChart). */
