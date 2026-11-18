@@ -25,8 +25,8 @@
 // drawn, ?fire=seconds,held holds its trigger that long; ?tap=slot,seconds taps that slot of the hotbar then (0–1 her
 // guns', 2–4 her items': a swap, or a reload); ?storm=seconds holds the storm at
 // that moment of its clock. ?probe stands grey blocks and mirrors ahead (probe.ts). The meter (meter.ts) shows the
-// frame's cost. ?safe=top,right,bottom,left px stands in for the phone's safe-area insets (iPhone 16 Pro Max in
-// landscape: ?safe=0,62,21,62). ?lod=0…3 draws every ship at that level of detail; ?cloth=0 draws every ship's canvas
+// frame's cost. ?safe=top,right,bottom,left px stands in for the device's safe-area insets (the iPad Air in
+// landscape: ?safe=0,0,20,0, the home indicator's). ?lod=0…3 draws every ship at that level of detail; ?cloth=0 draws every ship's canvas
 // as the wind fills it, none simulated (ship/fleet.ts).
 // ?screen= opens the UI at a screen (title, lobby, rank, settings, match, sunk, spectate, won, result; ui/ways.ts; also
 // map), at sea among ?ships=n others by default: play starts a match as PLAY does (every ship at her berth, the eye

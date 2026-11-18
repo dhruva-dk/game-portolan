@@ -18,9 +18,9 @@ import { lookAt } from '../world/turn.ts';
 export const LOBBY = { quarter: 0.95, boom: 30, pitch: 0.1, height: 7, drift: 0.26, period: 90 } as const;
 
 /** How far a finger takes it: the boom's tilt either way (radians); radians a pixel of drag across and up (0117: a
- *  swipe across the phone's 956 px turns her 1.5π, and down its 440 px tilts 1.2); the share of the way back to rest
- *  closed a second once let go. */
-export const ORBIT = { pitch: [-0.07, 0.42], turn: (Math.PI * 1.5) / 956, tilt: 1.2 / 440, back: 0.9 } as const;
+ *  swipe across the screen turns her 1.5π, and down it tilts 1.2: the iPad's 1180 × 820 px); the share of the way back
+ *  to rest closed a second once let go. */
+export const ORBIT = { pitch: [-0.07, 0.42], turn: (Math.PI * 1.5) / 1180, tilt: 1.2 / 820, back: 0.9 } as const;
 
 /** The camera never comes nearer the sea or the land under it than this, metres. */
 const CLEAR = 1.5;

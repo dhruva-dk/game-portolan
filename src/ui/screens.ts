@@ -1,5 +1,6 @@
-// The screens round the lobby, after the UI sheet as the owner reworked it. Each is laid out in the phone's own page,
-// 956 × 440 CSS px with the sheet's safe insets (62 each end, 20 at the bottom), and scaled to fit any other screen;
+// The screens round the lobby, after the UI sheet as the owner reworked it. Each is laid out in the sheet's page,
+// 956 × 440 CSS px with its safe insets (62 each end, 20 at the bottom), and scaled to fit the screen (the iPad's
+// 1180 × 820 shows it 1.23× across its width, centred);
 // each fades in and out (ways.ts FADE), never cut to.
 //   title   an opaque sheet over the world loading: rhumb lines, the rose whose needle swings while the world loads and
 //           settles north when it is ready, her galleon gilt below; once ready, a gilt ring breathes round the rose
@@ -20,7 +21,7 @@ export const W = 956, H = 440;
 
 export interface Settings { sound: number; look: number }
 
-/** A full-screen sheet: an <svg> of the phone's page scaled to the screen. `opaque` lays parchment under it; `press`
+/** A full-screen sheet: an <svg> of the sheet's page scaled to the screen. `opaque` lays parchment under it; `press`
  *  makes the whole sheet take touches (else only its regions do, and the rest reach the world under it). */
 export function sheet(opaque: boolean, press = true) {
   const root = document.createElement('div');

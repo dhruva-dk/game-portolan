@@ -52,7 +52,7 @@ const SLOTS = HOTBAR.guns + HOTBAR.items, LEFT = (i: number) => i * (SLOT + GAP)
 const mark = (k: GunKind): Glyph => `weapon.${k}`;
 const MINIMAP = 132;
 /** Fire's radius, px, and its centre from the safe area's right and bottom edges; Gust's centre from Fire's (the old
- * game's, chart/layout.ts: 802, 317 on the phone's 956 × 440). */
+ * game's, chart/layout.ts: 802, 317 on a 956 × 440 page). */
 const FIRE = 40, FIRE_RIGHT = 92, FIRE_BOTTOM = 102, GUST_RIGHT = 6, GUST_UP = 86;
 /** The reticle's radius, px (the old game's), and drawn in to this share of it with the assist on a ship; the radius
  *  of the ring where the ball will come down. */

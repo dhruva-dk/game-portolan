@@ -1,15 +1,15 @@
 // Screenshots of the game in headless Chromium with WebGPU, for judging changes by eye.
 //   node tools/capture.ts [--shots=n --every=ms] [query ...]      e.g. node tools/capture.ts t=10 t=15 t=18.6
 // --shots takes n screenshots of each page, `every` ms apart (default 1), named <query>-<k>.png past the first.
-// --dpr=3 shows the page at the phone's own pixel density: the frame is still drawn at its internal resolution (1.5
-// pixels a CSS pixel, frame.ts SCALE) and the browser scales it up, as the phone does. --out=dir writes there (captures/).
+// The page is the iPad Air's landscape screen (launch.ts VIEW). --dpr=2 shows it at the iPad's own pixel density: the
+// frame is still drawn at its internal resolution (frame.ts SCALE) and the browser scales it up, as the iPad does. --out=dir writes there (captures/).
 // Starts the Vite dev server, opens one page per query, waits for a second and a half of frames, writes
 // captures/<query>.png.
 // The frame rate is uncapped, so the FPS printed is a cost measure; GPU timestamps read 0 when uncapped.
 // --passes prints the meter's split of a frame's draw calls by pass and by what is drawn (src/meter.ts).
 
 import { mkdirSync } from 'node:fs';
-import { launch } from './launch.ts';
+import { VIEW, launch } from './launch.ts';
 
 const flag = (name: string, fallback: number) => Number(process.argv.find((a) => a.startsWith(`--${name}=`))?.split('=')[1] ?? fallback);
 const shots = flag('shots', 1), every = flag('every', 500), dpr = flag('dpr', 1);
@@ -23,8 +23,7 @@ mkdirSync(out, { recursive: true });
 
 try {
   for (const q of queries) {
-    // iPhone 16 Pro Max in landscape, CSS pixels
-    const page = await browser.newPage({ viewport: { width: 956, height: 440 }, deviceScaleFactor: dpr });
+    const page = await browser.newPage({ viewport: VIEW, deviceScaleFactor: dpr });
     page.on('console', (m) => ['error', 'warning'].includes(m.type()) && console.error(`[${q}] ${m.text()}`));
     page.on('pageerror', (e) => console.error(`[${q}] ${e.message}`));
     await page.goto(`${url}?${q}`);

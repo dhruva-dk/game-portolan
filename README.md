@@ -2,11 +2,13 @@
 
 Portolan is a fun naval battle royale for mobile devices.
 
-## Phone
+## iPad
 
-    npm run build && npx cap sync ios && sh tools/phone.sh
+The game targets the iPad only (the iPad Air, M1, in landscape: 1180 × 820 CSS px at 2×).
 
-`npm run shot` screenshots the phone to `captures/phone.png`.
+    npm run build && npx cap sync ios && sh tools/ipad.sh
+
+`npm run shot` screenshots the iPad to `captures/ipad.png`.
 
 ## The old game
 

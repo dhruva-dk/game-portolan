@@ -11,7 +11,7 @@
 
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { launch } from './launch.ts';
+import { VIEW, launch } from './launch.ts';
 import { png } from './png.ts';
 import type { Rendered } from './audio-page.ts';
 
@@ -215,7 +215,7 @@ try {
   if (process.argv.includes('--cpu')) {
     // the meter's cpu (ms a frame, the whole of a frame's game, sound and drawing) in a busy scene: a dozen ships about
     // her firing, the sound not yet begun (no touch); then begun by a touch
-    const cpu = await browser.newPage({ viewport: { width: 956, height: 440 } });
+    const cpu = await browser.newPage({ viewport: VIEW });
     cpu.on('console', (m) => m.text().startsWith('sound') && console.log(`  [${m.text()}]`));
     await cpu.goto(`${url}?screen=match&ships=12&gun=0&meter&ahead=2`);
     await cpu.waitForFunction(() => document.getElementById('meter')?.textContent?.includes('cpu'), null, { timeout: 60000 });

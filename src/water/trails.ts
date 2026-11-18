@@ -28,9 +28,9 @@ import type { FloatNode, Vec3Node } from '../tsl';
 const POINTS = 16384;
 /** The ribbon's half width near, m; lifted this high over the water, and drawn this much nearer the eye. */
 const HALF = 0.6, LIFT = 0.05, BIAS = 0.3;
-/** Radians a pixel spans, about (the chase camera's field over the phone's 440 pixels), and the pixels the ribbon keeps
- *  each side of its middle far off, however foreshortened. */
-const PIXEL = 0.0026, KEEP_PX = 4;
+/** Radians a pixel spans, about (the chase camera's 60° field over the iPad's 820 pixels), and the pixels the ribbon
+ *  keeps each side of its middle far off, however foreshortened. */
+const PIXEL = 0.0014, KEEP_PX = 4;
 /** The line, as the border's (claims.ts): its half width, pixels (hers OWN_WIDE times it), and its light, as a share
  *  of what the sun and sky give a white surface once the colour's brightest channel is raised to 1. */
 const LINE = 1.1, OWN_WIDE = 1.5, INK = 1;

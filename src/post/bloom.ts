@@ -6,7 +6,7 @@
 // times more with the same four taps, and brought back up, each level a tent of four taps over the one below plus
 // its own. What comes out is a quarter of the frame's size, read bilinearly.
 //
-// Cost at the phone's 956×440: 7 passes of 4–5 taps, the largest 239×110 — about 0.2 M taps a frame.
+// Cost at the iPad's 1180×820: 7 passes of 4–5 taps, the largest 295×205 — about 0.4 M taps a frame.
 
 import type { TextureNode } from 'three/webgpu';
 import { Fn, abs, dFdx, dFdy, float, luminance, rtt, smoothstep, uv, vec2, vec4 } from 'three/tsl';

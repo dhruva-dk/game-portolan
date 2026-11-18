@@ -1,5 +1,5 @@
 // The hero shots, captured together for judging the look round by round.
-//   node tools/hero.ts <dir> [query] [--dpr=3]      e.g. node tools/hero.ts captures/before mood=warm
+//   node tools/hero.ts <dir> [query] [--dpr=2]      e.g. node tools/hero.ts captures/before mood=warm
 // Writes <dir>/1.png … <dir>/8.png and <dir>/sheet.png, all eight on one contact sheet labelled only by number:
 // 1 the chase in open sea, the sun over her quarter; 2 the same sailing into the sun; 3 near the start's island; 4 a
 // crowd of ships; 5 at the storm's edge; 6 the lobby; 7 the planet from space, as the map shows it; 8 a match's
@@ -10,6 +10,7 @@
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { chromium } from 'playwright';
+import { VIEW } from './launch.ts';
 
 const [dir = 'captures/hero', extra = ''] = process.argv.slice(2).filter((a) => !a.startsWith('--'));
 const flags = process.argv.slice(2).filter((a) => a.startsWith('--'));
@@ -29,8 +30,8 @@ mkdirSync(dir, { recursive: true });
 execFileSync('node', ['tools/capture.ts', `--out=${dir}`, ...flags, ...SHOTS], { stdio: 'inherit' });
 SHOTS.forEach((q, i) => renameSync(`${dir}/${q.replace(/[^\w.=-]+/g, '_')}.png`, `${dir}/${i + 1}.png`));
 
-// the sheet: two across, each shot at the phone's CSS size, its number in a corner
-const W = 956, H = 440, GAP = 8;
+// the sheet: two across, each shot at the iPad's CSS size, its number in a corner
+const { width: W, height: H } = VIEW, GAP = 8;
 const cells = SHOTS.map((_, i) => {
   const png = readFileSync(`${dir}/${i + 1}.png`).toString('base64');
   return `<div style="position:relative;width:${W}px;height:${H}px"><img src="data:image/png;base64,${png}"

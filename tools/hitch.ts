@@ -15,7 +15,7 @@
 // swell, world/swell.ts) fills the frame by itself, so every frame is over and the start's own hitches are lost in it.
 
 import { writeFileSync } from 'node:fs';
-import { launch } from './launch.ts';
+import { DPR, VIEW, launch } from './launch.ts';
 
 /** The most frames over 50 ms and over 33 ms the window from PLAY may hold (at --slow=1; some 2 over 33 ms, none over
  *  50, the worst some 45 ms, when it was set). */
@@ -58,7 +58,7 @@ function traceEvents(trace: Buffer): TraceEvent[] {
 const { browser, url, close } = await launch();
 let failed = false;
 try {
-  const page = await browser.newPage({ viewport: { width: 956, height: 440 }, deviceScaleFactor: 3, hasTouch: true });
+  const page = await browser.newPage({ viewport: VIEW, deviceScaleFactor: DPR, hasTouch: true });
   page.on('pageerror', (e) => console.error(`[page] ${e.message}`));
   await page.goto(`${url}?screen=lobby`);
   await page.waitForFunction(() => document.getElementById('meter')?.textContent, null, { timeout: 120000 });

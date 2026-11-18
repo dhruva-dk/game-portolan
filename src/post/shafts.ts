@@ -4,7 +4,7 @@
 // geometry stands, is blurred along the rays from the sun's place on the screen, two passes of TAPS taps (the second
 // a TAPS-th of the first's span, filling its gaps: TAPS² taps effective), at a quarter of the frame's size.
 //
-// Cost at the phone's 956×440: 3 passes at 239×110 — one of 2 taps, two of 16 — about 0.9 M taps a frame.
+// Cost at the iPad's 1180×820: 3 passes at 295×205 — one of 2 taps, two of 16 — about 2 M taps a frame.
 
 import { Vector2, Vector3, type Matrix4, type TextureNode } from 'three/webgpu';
 import { Fn, dot, exp, float, int, interleavedGradientNoise, max, min, rtt, screenCoordinate, uniform, uv, vec2, vec3, vec4 } from 'three/tsl';

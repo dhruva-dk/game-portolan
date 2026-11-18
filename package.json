@@ -17,7 +17,7 @@
     "steps": "node tools/steps.ts",
     "audio": "node tools/audio.ts",
     "icon": "node tools/appicon.ts",
-    "shot": "xcrun devicectl device capture screenshot --device 00008140-000268A80140801C --destination captures/phone.png"
+    "shot": "xcrun devicectl device capture screenshot --device 00008103-000249563621A01E --destination captures/ipad.png"
   },
   "dependencies": {
     "@capacitor/core": "8.6.0",

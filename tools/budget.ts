@@ -5,9 +5,9 @@
 // drawn changes (or the islands do: a new planet's land moves the triangles a little, not the draws).
 //   node tools/budget.ts        (npm run budget)
 
-import { launch } from './launch.ts';
+import { VIEW, launch } from './launch.ts';
 
-/** Per displayed frame, every pass summed. The phone pays CPU for each draw before the GPU does anything. */
+/** Per displayed frame, every pass summed. The iPad pays CPU for each draw before the GPU does anything. */
 export const BUDGET = { draws: 100, triangles: 900_000, passes: 20 };
 
 type Budget = typeof BUDGET;
@@ -31,7 +31,7 @@ let over = false;
 try {
   for (const { name, q, own } of VIEWS) {
     const limit: Budget = { ...BUDGET, ...own };
-    const page = await browser.newPage({ viewport: { width: 956, height: 440 } });
+    const page = await browser.newPage({ viewport: VIEW });
     page.on('pageerror', (e) => console.error(`[${name}] ${e.message}`));
     await page.goto(`${url}?${q}&pause`);
     await page.waitForFunction(() => document.getElementById('meter')?.textContent, null, { timeout: 60000 });
