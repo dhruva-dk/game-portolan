@@ -14,6 +14,7 @@ import { createIslands } from './land/islands';
 import { createLighting } from './sky/light';
 import { createSand } from './land/sand';
 import { createSeabed } from './land/seabed';
+import { createTerrainMesh } from './land/terrain-mesh';
 import { createShadow } from './land/shadow';
 import { createView } from './view/view';
 import { createWater, type SeaShows } from './water/water';
@@ -136,7 +137,8 @@ export function createFrame(renderer: WebGPURenderer, world: World, options: Fra
   const light = createLighting(sky.light, water.below, shadow.visible);
   // (the ground's own, with the caustics on the sea floor)
   const sand = createSand(view, ground, createLighting(sky.light, water.floor, shadow.visible));
-  const seabed = createSeabed(view, ground, sand);
+  // the ground under the sea, and the land's own where the land is the terrain's (the islands draw theirs)
+  const seabed = world.land.kind === 'terrain' ? createTerrainMesh(view, ground, sand, world.land.terrain) : createSeabed(view, ground, sand);
   const islands = createIslands(world.planet, world.seed, view, light, sand);
   shadow.cast(...islands.casters);
   const fleet = createFleet(light, world.wind, options.fleet);
@@ -239,15 +241,22 @@ export function createFrame(renderer: WebGPURenderer, world: World, options: Fra
   };
   /** Builds the shaders and pipelines of all `scene` can draw seen by `camera` into `target` (with its `mrt`), what
    *  is hidden in it too (a system hides what it has none of by drawing none of it: a count of none), in the
-   *  background between frames. The target is the renderer's only while the build is laid out. */
+   *  background between frames. The target is the renderer's only while the build is laid out: it is given back as it
+   *  was both then and once the build is done, since compileAsync takes and restores the renderer's state where it
+   *  resumes, after its own awaits (left alone, a frame with no offscreen draw before its own, as when there are no
+   *  ships and no islands, would draw into the last build's target). Frames are drawn whole between tasks, so neither
+   *  lands in one. */
   const build = (scene: Object3D, camera: Draw['camera'], target: Draw['target'], mrt: MRTNode | null = null) => {
     const [was, wasMrt] = [renderer.getRenderTarget(), renderer.getMRT()];
+    const restore = () => {
+      renderer.setRenderTarget(was);
+      renderer.setMRT(wasMrt);
+    };
     renderer.setRenderTarget(target);
     renderer.setMRT(mrt);
     const built = renderer.compileAsync(scene, camera);
-    renderer.setRenderTarget(was);
-    renderer.setMRT(wasMrt);
-    return built;
+    restore();
+    return built.then(restore);
   };
 
   // 0. once
@@ -349,7 +358,7 @@ export function createFrame(renderer: WebGPURenderer, world: World, options: Fra
     gunfire.update(eye);
     loot.update(eye);
     const sea = water.update(env, dt, fleet.ships, s);
-    seabed.update();
+    seabed.update(eye);
     // the island's shadows fall along the sun over it, which stays put however the eye moves
     const island = islands.update(eye);
     if (island) islandSun.set(...sunAt(env.sunPlaces, env.timeOfDay, island.chart.at));

@@ -10,12 +10,12 @@
 //
 // Pure arithmetic: no three, so it runs in node for the tests; deterministic for the terrain and the seed.
 
-import { CELLS, N, beyond, centreOf } from './cells.ts';
+import { CELLS, N, centreOf } from './cells.ts';
 import { createNoise3 } from './noise3.ts';
 import { START, type Cover, type Planet, type Rise } from './planet.ts';
 import { R, add, distance, dot, frameAt, normalize, type Vec3 } from './sphere.ts';
 import { CELL, between, locate, taps } from './terrain-grid.ts';
-import { profile, type Terrain } from './terrain.ts';
+import { heightBounds, profile, type Terrain } from './terrain.ts';
 
 /** Where the land's cover changes, metres: grass begins this far in past the beach; rubble lies round the land's foot
  *  under water between these distances out. */
@@ -29,19 +29,18 @@ const smoothstep = (a: number, b: number, x: number) => {
 };
 const sat = (x: number) => Math.min(Math.max(x, 0), 1);
 
-/** The rises of the land: one for each block of BLOCK² cells that land may stand in, as high as its highest cell (and
- *  those whose readings reach into it, two cells round) and as wide as its farthest cell, and a cell more. */
+/** The rises of the land: one for each block of BLOCK² cells that land may stand in, as high as the block's ground
+ *  (terrain.ts heightBounds) and as wide as its farthest cell, and two cells more. */
 function risesOf(t: Terrain): Rise[] {
-  const rises: Rise[] = [], blocks = N / BLOCK;
+  const rises: Rise[] = [], blocks = N / BLOCK, tops = heightBounds(t, blocks).hi;
   for (let face = 0; face < 6; face++) for (let bj = 0; bj < blocks; bj++) for (let bi = 0; bi < blocks; bi++) {
-    let top = -Infinity;
-    for (let j = bj * BLOCK - 2; j < (bj + 1) * BLOCK + 2; j++) for (let i = bi * BLOCK - 2; i < (bi + 1) * BLOCK + 2; i++) top = Math.max(top, t.height[beyond(face, i, j)]);
-    if (top < -1) continue;
+    const top = tops[(face * blocks + bj) * blocks + bi];
+    if (top < 0) continue;
     const corner = (i: number, j: number) => centreOf(face * N * N + j * N + i);
     const lo = bi * BLOCK, hi = lo + BLOCK - 1, low = bj * BLOCK, high = low + BLOCK - 1;
     const at = normalize([lo, hi].flatMap((i) => [low, high].map((j) => corner(i, j))).reduce((a, b) => add(a, b), [0, 0, 0] as Vec3));
     const reach = Math.max(...[[lo, low], [hi, low], [lo, high], [hi, high]].map(([i, j]) => distance(at, corner(i, j)))) + 2 * CELL;
-    rises.push({ at, reach, top: Math.max(top, 0) + 1 });
+    rises.push({ at, reach, top });
   }
   return rises;
 }

@@ -3,13 +3,15 @@
 // stones and weed strewn over it (strewn.ts); a paler band along the waterline; the beach; the deeper, drier sand
 // higher up; and under the trees, where fronds have fallen, a darker patch. The bands' edges wander with the ground's
 // mottling, so none is a contour line. Where the ground is steeper than sand lies, a cliff's bare rock in strata.
+// Where the land is the terrain's its cover carries the land's own (world/planet-terrain.ts): grass in patches past the
+// beach, dry above DRY_GRASS, and the tops' bare rock; the islands' land has none, so their look is unchanged.
 // The islands' meshes and the sea floor's both shade with this, so where they overlap they look the same.
 //
 // Everything is a function of the world position alone (the sea floor's mesh slides along under the eye).
 // Lit like everything else (sky/light.ts).
 
-import { dot, float, fract, mix, vec3 } from 'three/tsl';
-import { LITTER, ROCK, SAND, SAND_DRY, SAND_SHORE, SEABED_SAND, SEABED_STONE, SEABED_WEED, STRATUM, type Tones } from '../palette';
+import { dot, float, fract, max, mix, vec3 } from 'three/tsl';
+import { LITTER, MEADOW, MEADOW_DRY, ROCK, SAND, SAND_DRY, SAND_SHORE, SEABED_SAND, SEABED_STONE, SEABED_WEED, STRATUM, type Tones } from '../palette';
 import type { View } from '../view/view';
 import type { Ground } from './ground';
 import type { Light } from '../sky/light';
@@ -19,6 +21,8 @@ import { ISLANDS } from '../world/planet-islands';
 
 /** Where each band begins, metres over the sea: the shore's pale sand, the beach, the dry sand. */
 const SHORE = -0.15, BEACH = 0.45, DRY = 2.6;
+/** On land: the cover's grass past which grass grows; the height (metres) past which it is dry. */
+const MEADOW_AT = 0.5, DRY_GRASS = 9;
 /** How far up or down the ground's mottling moves a band's edge, metres. */
 const RAGGED = 0.5;
 /** The ground's cover (0…1) past which rubble lies on the floor, and sea grass; and litter under the trees. */
@@ -55,8 +59,14 @@ export function createSand(view: View, ground: Ground, light: Light): Sand {
     lay(SAND_SHORE, cut(level, SHORE));
     lay(SAND, cut(level, BEACH));
     lay(SAND_DRY, cut(level, DRY));
-    // a cliff's face: bare rock above the sea, in strata of two tones
-    const bare = cut(float(1).sub(dot(n, view.up(p))), 1 - BARE).mul(cut(height, SHORE));
+    // on the land's slopes past the beach, grass in patches (its cover ragged by the clumps), bleaching high up
+    const meadow = cut(cover.x.add(cover.w.sub(0.5).mul(0.25)), MEADOW_AT).mul(cut(level, BEACH));
+    lay(MEADOW, meadow);
+    lay(MEADOW_DRY, meadow.mul(cut(level.add(mottle.mul(RAGGED * 6)), DRY_GRASS)));
+    // a cliff's face, or the bare rock of the tops: rock above the sea, in strata of two tones
+    const cliff = cut(float(1).sub(dot(n, view.up(p))), 1 - BARE);
+    const tops = cut(cover.y.add(mottle.mul(0.3)), RUBBLE).mul(cut(level, DRY));
+    const bare = max(cliff, tops).mul(cut(height, SHORE));
     lay(ROCK, bare);
     lay(STRATUM, bare.mul(cut(fract(level.div(STRATA)), 1 - STRATUM_SHARE)));
     if (litter) lay(LITTER, cut(litter.add(mottle.mul(0.6)), FALLEN).mul(cut(height, BEACH)));

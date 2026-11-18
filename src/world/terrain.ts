@@ -19,7 +19,7 @@
 // A Terrain is plain data (typed arrays and numbers), so it can be built once and handed to a worker whole.
 // Pure arithmetic: no three, so it runs in node for the tests; deterministic for the seed.
 
-import { CELLS, PLANET_QUANTA, areaQuanta, neighbor } from './cells.ts';
+import { CELLS, N, PLANET_QUANTA, areaQuanta, beyond, neighbor } from './cells.ts';
 import { R, type Vec3 } from './sphere.ts';
 import { createNoise3 } from './noise3.ts';
 import { CELL, areaOf, between, centres, components, disc, heap, locate, seaLevel, shoreOf, taps } from './terrain-grid.ts';
@@ -204,6 +204,27 @@ export function heightAt(t: Terrain): (p: Vec3) => number {
     locate(p, at);
     return profile(t, between(t.relief, at), between(t.shore, at));
   };
+}
+
+/**
+ * The lowest and highest the ground stands over each of n × n blocks of a cube face's cells (row j, column i, face by
+ * face), metres: from the cells in the block and two round it (heightAt's reading reaches that far), and half a metre
+ * either way for what the reading makes between them. For drawing: a block's bounds, never its shape.
+ */
+export function heightBounds(t: Terrain, n: number): { lo: Float32Array; hi: Float32Array } {
+  const lo = new Float32Array(6 * n * n), hi = new Float32Array(6 * n * n), B = N / n;
+  for (let face = 0; face < 6; face++) for (let bj = 0; bj < n; bj++) for (let bi = 0; bi < n; bi++) {
+    let a = Infinity, b = -Infinity;
+    for (let j = bj * B - 2; j < (bj + 1) * B + 2; j++) for (let i = bi * B - 2; i < (bi + 1) * B + 2; i++) {
+      const h = t.height[beyond(face, i, j)];
+      a = Math.min(a, h);
+      b = Math.max(b, h);
+    }
+    const k = (face * n + bj) * n + bi;
+    lo[k] = a - 0.5;
+    hi[k] = b + 0.5;
+  }
+  return { lo, hi };
 }
 
 /** The planet's terrain for `seed`. */
