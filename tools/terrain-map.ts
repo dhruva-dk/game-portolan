@@ -7,7 +7,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { R, normalize, type Vec3 } from '../src/world/sphere.ts';
 import { cellOf } from '../src/world/cells.ts';
-import { TERRAIN, createTerrain, type Terrain } from '../src/world/terrain.ts';
+import { TERRAIN, createTerrain, heightAt, type Terrain } from '../src/world/terrain.ts';
 import { png } from './png.ts';
 
 const seeds = (process.argv[2] ?? '1,2,3,4,5,6').split(',').map(Number);
@@ -30,7 +30,7 @@ function colour(h: number): RGB {
 /** The planet from the front and the back, tilted 25° to show a pole, `size` pixels a globe. */
 function globes(t: Terrain, size: number, marks: boolean): Uint8Array {
   const W = size * 2, H = size, r = size / 2 - 2, tilt = (25 * Math.PI) / 180;
-  const hs = new Float32Array(W * H).fill(NaN), cs = new Int32Array(W * H).fill(-1), zs = new Float32Array(W * H);
+  const hs = new Float32Array(W * H).fill(NaN), cs = new Int32Array(W * H).fill(-1), zs = new Float32Array(W * H), h = heightAt(t);
   for (let g = 0; g < 2; g++) {
     for (let j = 0; j < H; j++) for (let i = 0; i < size; i++) {
       const x = (i - size / 2) / r, y = (size / 2 - j) / r, d = x * x + y * y;
@@ -39,8 +39,8 @@ function globes(t: Terrain, size: number, marks: boolean): Uint8Array {
       // tilted toward the viewer, then the far side turned round
       const y1 = y * Math.cos(tilt) + z * Math.sin(tilt), z1 = -y * Math.sin(tilt) + z * Math.cos(tilt);
       const p: Vec3 = g === 0 ? [x, y1, z1] : [-x, y1, -z1];
-      const c = cellOf(normalize(p)), k = j * W + g * size + i;
-      hs[k] = t.height[c]; cs[k] = c; zs[k] = z;
+      const u = normalize(p), k = j * W + g * size + i;
+      hs[k] = h(u); cs[k] = cellOf(u); zs[k] = z;
     }
   }
   const rgb = new Uint8Array(W * H * 3).fill(18), mpp = R / r;
