@@ -1,8 +1,8 @@
-// The sun's shadows on an island: what stands on it (rocks, palms, shrubs), seen from the sun into a depth map over
-// the island. One map, over the nearest island in view (site.ts orders them): on a globe each island faces the sun
-// its own way and the islands lie hundreds of metres apart, so one map round one island keeps its texels small,
-// and the others, farther off, go without. Nothing on the islands moves, so the map is drawn again only when the sun
-// has moved or the nearest island has changed.
+// The sun's shadows on the land: what stands on it (rocks, palms, shrubs), seen from the sun into a depth map over
+// one place (a Shade): the nearest island in view (site.ts orders them), or the terrain's tiles round the eye
+// (groves.ts). On a globe each place faces the sun its own way, so one map over one place keeps its texels small,
+// and those farther off go without. Nothing on the land moves, so the map is drawn again only when the sun has moved
+// or the place has changed.
 //
 // It draws stand-ins for the casters (each shares its caster's geometry and instance matrices, plain black), so the
 // casters themselves are untouched and the depth pass costs no more than their vertices: just the nearest island's,
@@ -14,15 +14,12 @@ import {
 } from 'three/webgpu';
 import { float, select, texture, uniform, vec2, vec3, vec4 } from 'three/tsl';
 import type { Draw } from '../gpu';
-import type { IslandSite } from '../world/planet';
-import { place } from '../world/sphere';
+import { place, type Chart } from '../world/sphere';
 import type { Instances } from './site';
 import type { FloatNode, Vec3Node } from '../tsl';
 
 /** Texels across the map. */
 const SIZE = 2048;
-/** How far past the coast the map reaches, metres: palms lean over the water. */
-const MARGIN = 15;
 /** How far along the sun's ray the map holds casters, either side of the island, metres. */
 const SPAN = 200;
 /** A receiving point is looked up this far off its surface, metres (about a texel), and this much nearer the sun
@@ -32,14 +29,18 @@ const BIAS = 0.3 / (2 * SPAN);
 /** Redrawn once the sun has moved this far, radians. */
 const MOVED = 0.002;
 
+/** What a map covers: a square `reach` metres out each way from its chart's centre, with its things' instances first
+ *  among each caster's (Instances.near). One object for each place, so a place is known again by being the same. */
+export interface Shade { chart: Chart; reach: number }
+
 export interface Shadow {
   /** 0…1: how much of the sun reaches world position p on a surface facing n. */
   visible(p: Vec3Node, n: Vec3Node): FloatNode;
   /** Adds things that cast shadows. */
   cast(...casters: Instances[]): void;
-  /** The map's draw if it is due: if the sun has moved or the island has changed (sun: unit vector toward it; island:
-   * the nearest in view, or null); else null. */
-  update(sun: Vector3, island: IslandSite | null): Draw | null;
+  /** The map's draw if it is due: if the sun has moved or the place has changed (sun: unit vector toward it; place:
+   * what to cover, or null); else null. */
+  update(sun: Vector3, place: Shade | null): Draw | null;
 }
 
 export function createShadow(): Shadow {
@@ -59,7 +60,7 @@ export function createShadow(): Shadow {
   const map = texture<'float'>(target.depthTexture);
   const stands: { stand: InstancedMesh; caster: Instances }[] = [];
   const centre = new Vector3(), up = new Vector3(), north = new Vector3(), last = new Vector3();
-  let covered: IslandSite | null = null;
+  let covered: Shade | null = null;
 
   return {
     visible(p, n) {
@@ -87,17 +88,16 @@ export function createShadow(): Shadow {
         scene.add(stand);
       }
     },
-    update(sun, island) {
-      if (!island || (island === covered && sun.angleTo(last) < MOVED)) return null;
-      if (island !== covered) {
-        // looking down the sun's rays at the island's centre, its up kept up the map's, out past its coast
-        covered = island;
-        const reach = Math.max(...Array.from({ length: 360 }, (_, i) => island.coast((i / 180) * Math.PI))) + MARGIN;
-        camera.left = camera.bottom = -reach;
-        camera.right = camera.top = reach;
-        centre.set(...place(island.chart.at, 0));
-        up.set(...island.chart.at);
-        north.copy(up).cross(new Vector3(...island.chart.axis));
+    update(sun, shade) {
+      if (!shade || (shade === covered && sun.angleTo(last) < MOVED)) return null;
+      if (shade !== covered) {
+        // looking down the sun's rays at the place's centre, its up kept up the map's, out to its reach
+        covered = shade;
+        camera.left = camera.bottom = -shade.reach;
+        camera.right = camera.top = shade.reach;
+        centre.set(...place(shade.chart.at, 0));
+        up.set(...shade.chart.at);
+        north.copy(up).cross(new Vector3(...shade.chart.axis));
       }
       for (const { stand, caster } of stands) stand.count = caster.near;
       last.copy(sun);

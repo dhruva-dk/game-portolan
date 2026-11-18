@@ -141,7 +141,7 @@ export function scatterRocks(isle: Isle, bigShapes: number, boulderShapes: numbe
 }
 
 /** Whether (x, z) lies within `margin` metres of a rock's footprint. */
-const onRock = (rocks: Rock[], x: number, z: number, margin: number) =>
+export const onRock = (rocks: Rock[], x: number, z: number, margin: number) =>
   rocks.some((r) => Math.hypot(r.x - x, r.z - z) < r.size * 1.05 + margin);
 
 export interface Palm {

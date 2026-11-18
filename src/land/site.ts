@@ -29,15 +29,20 @@ export function standing(chart: Chart, x: number, height: number, z: number, loc
   return out.multiplyMatrices(basis, local);
 }
 
+/** Past this many metres from the eye, the palms and shrubs on an island are drawn coarser (palms.ts, shrubs.ts): a
+ *  palm is some sixty pixels tall, its leaflets a pixel or two across. */
+export const DETAIL = 90;
+
 /** One instance: its world matrix, and its tint (0…1) for shapes that take one. */
 export interface Placed { matrix: Matrix4; tint?: number }
 
 export interface Instances {
   mesh: InstancedMesh;
-  /** How many of those drawn stand on the nearest island in view (they come first). */
+  /** How many of those drawn stand on the first `nearby` islands shown (they come first). */
   near: number;
-  /** Draws the instances on these islands (indices into the list it was made with), nearest first. */
-  show(islands: number[]): void;
+  /** Draws the instances on these islands (indices into the list it was made with), nearest first; the first `nearby`
+   *  of them make up `near`. */
+  show(islands: number[], nearby?: number): void;
 }
 
 /** One shape's instances, `placed[i]` those on island i. With tints, the geometry gets an instanced 'tint'. */
@@ -52,19 +57,23 @@ export function createInstances(geometry: BufferGeometry, material: Material, pl
   const self: Instances = {
     mesh,
     near: 0,
-    show(islands) {
+    show(islands, nearby = 1) {
       let k = 0;
+      self.near = 0;
       islands.forEach((i, n) => {
         for (const p of placed[i]) {
           mesh.setMatrixAt(k, p.matrix);
           tint.setX(k++, p.tint ?? 0);
         }
-        if (n === 0) self.near = k;
+        if (n < nearby) self.near = k;
       });
-      if (islands.length === 0) self.near = 0;
       mesh.count = k;
-      mesh.instanceMatrix.needsUpdate = true;
-      tint.needsUpdate = true;
+      // (only what is drawn goes up to the GPU)
+      for (const [a, size] of [[mesh.instanceMatrix, 16], [tint, 1]] as const) {
+        a.clearUpdateRanges();
+        a.addUpdateRange(0, k * size);
+        a.needsUpdate = true;
+      }
     },
   };
   return self;

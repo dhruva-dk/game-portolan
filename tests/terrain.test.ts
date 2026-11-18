@@ -60,7 +60,8 @@ test('the height is continuous and gentle everywhere, across faces too', () => {
     const run = R * Math.hypot(q[0] - p[0], q[1] - p[1], q[2] - p[2]);
     if (run > 1e-3) steepest = Math.max(steepest, Math.abs(h(q) - h(p)) / run);
   }
-  assert.ok(steepest < 0.75, `steepest ${steepest.toFixed(2)}`);
+  // (the relief's grades scale with the summit: 0.75 for a summit of 20 m; a jump at a seam would be many times that)
+  assert.ok(steepest < 0.0375 * t.options.summit, `steepest ${steepest.toFixed(2)}`);
 });
 
 test('the profile meets the sea at 0 from either side, and rises inland and falls offshore', () => {

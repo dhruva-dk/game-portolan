@@ -36,7 +36,7 @@ export const TERRAIN = {
   /** Sailable water smaller than this, square metres, is filled rather than joined. */
   pond: 3000,
   /** The highest the land stands, metres; the steepest it rises from the coast inward (rise over run). */
-  summit: 20, slope: 0.25,
+  summit: 50, slope: 0.35,
   /** The beach's slope at the waterline, and the berm it levels at, metres. */
   beach: 1 / 8, berm: 1.5,
   /** The banks' depth, shallowest to deepest, metres. */

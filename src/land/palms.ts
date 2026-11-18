@@ -17,15 +17,22 @@ import { random } from '../world/random';
 import type { Palm } from '../world/scatter';
 import type { Chart } from '../world/sphere';
 import type { Light } from '../sky/light';
-import { createInstances, standing, type Placed } from './site';
+import { createInstances, standing, type Instances, type Placed } from './site';
 import { cut, line, type Vec3Node } from '../tsl';
 
 /** The shapes' leans at the foot, radians: each palm is drawn as the nearest. */
 const LEANS = [0.08, 0.2, 0.32, 0.46];
 /** A shape's height, metres: each palm is scaled from it to its own. */
 const HEIGHT = 10;
-const TRUNK_ALONG = 28, TRUNK_AROUND = 9;
-const FRONDS = 16, LEAFLETS = 28, RACHIS = 10;
+/** How much stouter a trunk is than a slender palm's (about 0.3 m across at the crown). */
+const STOUT = 1.3;
+const FRONDS = 16;
+/** How finely a palm is drawn: the trunk's rings along and sides around, a nut's, each frond's rachis segments and
+ *  leaflets down each side. Past DETAIL metres off (site.ts) the same palm, every frond where it was, is drawn
+ *  coarser: fewer, broader leaflets covering as much, about a third of the triangles. */
+interface Detail { along: number; around: number; nut: number; rachis: number; leaflets: number }
+const NEAR: Detail = { along: 28, around: 9, nut: 5, rachis: 10, leaflets: 28 };
+const COARSE: Detail = { along: 7, around: 5, nut: 2, rachis: 4, leaflets: 9 };
 /** Leaf scars ring the trunk every this many metres, each drawn this dark. */
 const RING = 0.45, SCAR = 0.35;
 /** A frond past this age (0 the youngest … 1 the oldest) has yellowed. */
@@ -36,42 +43,47 @@ const HEART = 0.4, SHADED = 0.62;
 
 interface Shape { trunk: BufferGeometry; crown: BufferGeometry }
 
-function shape(lean: number, seed: number): Shape {
-  const rand = random(seed);
+function shape(lean: number, seed: number, detail: Detail): Shape {
+  const { along: ALONG, around: AROUND, rachis: RACHIS, leaflets: LEAFLETS } = detail;
   // ---- the trunk, in the plane x–y, leaning toward +x
   const pos: number[] = [], nrm: number[] = [], uvs: number[] = [], nut: number[] = [];
   const centres: Vector3[] = [], tangents: Vector3[] = [];
   const c = new Vector3();
-  for (let i = 0; i <= TRUNK_ALONG; i++) {
-    const s = i / TRUNK_ALONG, a = lean * (1 - 0.75 * s);
-    centres.push(c.clone());
-    tangents.push(new Vector3(Math.sin(a), Math.cos(a), 0));
-    c.addScaledVector(tangents[i], HEIGHT / TRUNK_ALONG);
+  // (the trunk's curve worked out finely whatever the detail, so a coarse trunk's crown sits where the near one's does)
+  const fine = NEAR.along, step = fine / ALONG;
+  for (let i = 0; i <= fine; i++) {
+    const s = i / fine, a = lean * (1 - 0.75 * s);
+    if (i % step === 0) {
+      centres.push(c.clone());
+      tangents.push(new Vector3(Math.sin(a), Math.cos(a), 0));
+    }
+    c.addScaledVector(new Vector3(Math.sin(a), Math.cos(a), 0), HEIGHT / fine);
   }
-  const radius = (s: number) => 0.16 + 0.06 * (1 - s) + 0.18 * Math.exp(-s * 30);
-  for (let i = 0; i <= TRUNK_ALONG; i++) {
-    const s = i / TRUNK_ALONG, t = tangents[i], u = new Vector3(t.y, -t.x, 0), v = new Vector3(0, 0, 1);
-    for (let j = 0; j <= TRUNK_AROUND; j++) {
-      const f = (j / TRUNK_AROUND) * 2 * Math.PI, out = u.clone().multiplyScalar(Math.cos(f)).addScaledVector(v, Math.sin(f));
+  const radius = (s: number) => STOUT * (0.16 + 0.06 * (1 - s) + 0.18 * Math.exp(-s * 30));
+  for (let i = 0; i <= ALONG; i++) {
+    const s = i / ALONG, t = tangents[i], u = new Vector3(t.y, -t.x, 0), v = new Vector3(0, 0, 1);
+    for (let j = 0; j <= AROUND; j++) {
+      const f = (j / AROUND) * 2 * Math.PI, out = u.clone().multiplyScalar(Math.cos(f)).addScaledVector(v, Math.sin(f));
       pos.push(...centres[i].clone().addScaledVector(out, radius(s)).toArray());
       nrm.push(...out.toArray());
       // twice round per repeat, and the same scale along: the bark's arc length, metres, rides along v
-      uvs.push((j / TRUNK_AROUND) * 2, s * HEIGHT);
+      uvs.push((j / AROUND) * 2, s * HEIGHT);
       nut.push(0);
     }
   }
   const index: number[] = [];
-  const row = TRUNK_AROUND + 1;
-  for (let i = 0; i < TRUNK_ALONG; i++) for (let j = 0; j < TRUNK_AROUND; j++) {
+  const row = AROUND + 1;
+  for (let i = 0; i < ALONG; i++) for (let j = 0; j < AROUND; j++) {
     const a = i * row + j, b = a + 1, d = a + row, e = d + 1;
     index.push(a, d, b, b, d, e);
   }
   // the nuts: little spheres just under the crown
-  const top = centres[TRUNK_ALONG], up = tangents[TRUNK_ALONG];
+  const top = centres[ALONG], up = tangents[ALONG];
+  const nuts = random(seed);
   for (let k = 0; k < 7; k++) {
-    const f = rand() * 2 * Math.PI;
-    const at = top.clone().addScaledVector(up, -0.35 - rand() * 0.25).add(new Vector3(Math.cos(f) * 0.24, 0, Math.sin(f) * 0.24));
-    const base = pos.length / 3, R = 0.12, n = 5;
+    const f = nuts() * 2 * Math.PI;
+    const ring = 0.24 * STOUT, at = top.clone().addScaledVector(up, -0.35 - nuts() * 0.25).add(new Vector3(Math.cos(f) * ring, 0, Math.sin(f) * ring));
+    const base = pos.length / 3, R = 0.12, n = detail.nut;
     for (let i = 0; i <= n; i++) for (let j = 0; j <= n; j++) {
       const th = (i / n) * Math.PI, ph = (j / n) * 2 * Math.PI;
       const o = new Vector3(Math.sin(th) * Math.cos(ph), Math.cos(th), Math.sin(th) * Math.sin(ph));
@@ -101,6 +113,8 @@ function shape(lean: number, seed: number): Shape {
     for (const p of [a, b, d]) { cp.push(p.x, p.y, p.z); cn.push(n.x, n.y, n.z); ca.push(age, shade); }
   };
   for (let i = 0; i < FRONDS; i++) {
+    // (each frond its own draws, so it lies the same at every detail)
+    const rand = random(seed * 131 + i + 1);
     const azimuth = i * 2.39996 + rand() * 0.4;
     const age = Math.min(1, (i + rand() * 2) / FRONDS);
     // young fronds point up; old ones out and down, and bend more under their weight
@@ -130,7 +144,8 @@ function shape(lean: number, seed: number): Shape {
       const at = spine[k].clone().lerp(spine[k + 1], f), t = along[k];
       const side = t.clone().cross(world).normalize(), lift = side.clone().cross(t).normalize();
       // longest mid-frond, short at the base and the tip
-      const len = 1.15 * Math.sin(Math.PI * (0.06 + 0.9 * u)) * (1 - 0.35 * u), w = 0.11 * (1 - 0.4 * u);
+      // (fewer leaflets are broader, so a frond is as full)
+      const len = 1.15 * Math.sin(Math.PI * (0.06 + 0.9 * u)) * (1 - 0.35 * u), w = 0.11 * (NEAR.leaflets / LEAFLETS) * (1 - 0.4 * u);
       for (const sign of [-1, 1]) {
         const dir = side.clone().multiplyScalar(sign * 0.8).addScaledVector(t, 0.45).addScaledVector(lift, -0.15 - 0.25 * age).normalize();
         const across = t.clone().multiplyScalar(w / 2);
@@ -151,8 +166,9 @@ function shape(lean: number, seed: number): Shape {
   return { trunk, crown };
 }
 
-/** palms[i]: those on island i, whose chart is charts[i]. */
-export function createPalms(palms: Palm[][], charts: Chart[], light: Light) {
+/** palms[i]: those on island i, whose chart is charts[i]; the instances of each shape's trunk and crown, near and
+ *  coarse. */
+export function createPalms(palms: Palm[][], charts: Chart[], light: Light): { near: Instances[]; coarse: Instances[] } {
   const trunkMaterial = new MeshBasicNodeMaterial();
   trunkMaterial.colorNode = Fn(() => {
     const p = positionWorld, n = normalize(normalWorld), nut = attribute('nut', 'float');
@@ -174,15 +190,16 @@ export function createPalms(palms: Palm[][], charts: Chart[], light: Light) {
     return light.leaf(p, n, mix(shadow, tone((t) => t.lit), cut(leaf.y, SHADED)), shadow);
   })();
 
-  const shapes = LEANS.map((lean, k) => shape(lean, k + 11));
   const m = new Matrix4(), q = new Quaternion(), s = new Vector3(), zero = new Vector3(), up = new Vector3(0, 1, 0);
   const nearest = (p: Palm) => LEANS.reduce((best, l, j) => (Math.abs(l - p.lean) < Math.abs(LEANS[best] - p.lean) ? j : best), 0);
-  return shapes.flatMap((sh, k) => {
-    // the shape leans toward +x; turn it to the palm's heading, and stand it on the sphere
-    const placed = palms.map((on, i) => on.filter((p) => nearest(p) === k).map((p): Placed => {
-      q.setFromAxisAngle(up, -p.heading);
-      return { matrix: standing(charts[i], p.x, p.y, p.z, m.compose(zero, q, s.setScalar(p.height / HEIGHT)), new Matrix4()) };
-    }));
-    return [createInstances(sh.trunk, trunkMaterial, placed), createInstances(sh.crown, crownMaterial, placed)];
+  // the shape leans toward +x; turn it to the palm's heading, and stand it on the sphere
+  const placed = LEANS.map((_, k) => palms.map((on, i) => on.filter((p) => nearest(p) === k).map((p): Placed => {
+    q.setFromAxisAngle(up, -p.heading);
+    return { matrix: standing(charts[i], p.x, p.y, p.z, m.compose(zero, q, s.setScalar(p.height / HEIGHT)), new Matrix4()) };
+  })));
+  const at = (detail: Detail) => LEANS.flatMap((lean, k) => {
+    const sh = shape(lean, k + 11, detail);
+    return [createInstances(sh.trunk, trunkMaterial, placed[k]), createInstances(sh.crown, crownMaterial, placed[k])];
   });
+  return { near: at(NEAR), coarse: at(COARSE) };
 }

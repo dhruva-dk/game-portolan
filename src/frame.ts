@@ -10,6 +10,7 @@ import type { Compute, Draw } from './gpu';
 import type { Eye, Snapshot } from './snapshot';
 import { createSky, type Sky } from './sky/sky';
 import { createGround } from './land/ground';
+import { createGroves } from './land/groves';
 import { createIslands } from './land/islands';
 import { createLighting } from './sky/light';
 import { createSand } from './land/sand';
@@ -137,9 +138,11 @@ export function createFrame(renderer: WebGPURenderer, world: World, options: Fra
   const light = createLighting(sky.light, water.below, shadow.visible);
   // (the ground's own, with the caustics on the sea floor)
   const sand = createSand(view, ground, createLighting(sky.light, water.floor, shadow.visible));
-  // the ground under the sea, and the land's own where the land is the terrain's (the islands draw theirs)
-  const seabed = world.land.kind === 'terrain' ? createTerrainMesh(view, ground, sand, world.land.terrain) : createSeabed(view, ground, sand);
-  const islands = createIslands(world.planet, world.seed, view, light, sand);
+  // the ground under the sea, and the land's own where the land is the terrain's (the islands draw theirs); and what
+  // stands on the land, the terrain's tiles' or the islands'
+  const terrain = world.land.kind === 'terrain' ? world.land.terrain : null;
+  const seabed = terrain ? createTerrainMesh(view, ground, sand, terrain) : createSeabed(view, ground, sand);
+  const islands = terrain ? createGroves(terrain, world.planet, world.seed, view, light) : createIslands(world.planet, world.seed, view, light, sand);
   shadow.cast(...islands.casters);
   const fleet = createFleet(light, world.wind, options.fleet);
   fleet.pin(options.lod);

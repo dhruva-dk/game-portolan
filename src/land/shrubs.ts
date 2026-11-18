@@ -16,12 +16,13 @@ import { random } from '../world/random';
 import type { Shrub } from '../world/scatter';
 import type { Chart } from '../world/sphere';
 import type { Light } from '../sky/light';
-import { createInstances, standing, type Placed } from './site';
+import { createInstances, standing, type Instances, type Placed } from './site';
 import { cut } from '../tsl';
 
 /** How many shapes the shrubs come in. */
 export const SHAPES = 4;
-const LEAVES = 450;
+/** Its leaves near, and past DETAIL metres off (site.ts): fewer and larger, covering the same masses as much. */
+const LEAVES = 450, COARSE = 70;
 /** A leaf's length, as a share of the shrub's size. */
 const LEAF = 0.095;
 /** How much one shrub's green differs from the next's; and how deep in its mass (0.7 the deepest … 1.05 on its
@@ -29,7 +30,7 @@ const LEAF = 0.095;
 const VARIED = 0.3, SHADED = 0.76;
 
 /** One shrub, 1 across at its widest, standing on y = 0. */
-function shape(seed: number): BufferGeometry {
+function shape(seed: number, leaves: number): BufferGeometry {
   const rand = random(seed);
   const masses = Array.from({ length: 3 + Math.floor(rand() * 3) }, (_, i) => {
     const a = rand() * 2 * Math.PI, r = i === 0 ? 0 : 0.12 + rand() * 0.18;
@@ -38,7 +39,8 @@ function shape(seed: number): BufferGeometry {
   });
   const pos: number[] = [], nrm: number[] = [], depth: number[] = [];
   const dir = new Vector3(), at = new Vector3(), facing = new Vector3(), along = new Vector3(), across = new Vector3();
-  for (let i = 0; i < LEAVES; i++) {
+  const size = LEAF * Math.sqrt(LEAVES / leaves);
+  for (let i = 0; i < leaves; i++) {
     const m = masses[Math.floor(rand() * masses.length)];
     // a direction on the mass, not its underside
     do dir.set(rand() * 2 - 1, rand() * 2 - 1, rand() * 2 - 1); while (dir.lengthSq() > 1 || dir.lengthSq() < 0.01 || dir.y < -0.4);
@@ -50,7 +52,7 @@ function shape(seed: number): BufferGeometry {
     facing.copy(dir).addScaledVector(new Vector3(0, 1, 0), 0.5).add(new Vector3(rand() - 0.5, rand() - 0.5, rand() - 0.5)).normalize();
     along.set(rand() - 0.5, rand() - 0.5, rand() - 0.5).cross(facing).normalize();
     across.copy(facing).cross(along);
-    const len = LEAF * (0.7 + 0.5 * rand());
+    const len = size * (0.7 + 0.5 * rand());
     const base = at.clone().addScaledVector(along, -len / 2), tip = at.clone().addScaledVector(along, len / 2);
     // folded a little along the midrib
     const l = at.clone().addScaledVector(across, len * 0.28).addScaledVector(facing, -len * 0.08);
@@ -69,8 +71,9 @@ function shape(seed: number): BufferGeometry {
   return g;
 }
 
-/** shrubs[i]: those on island i, whose chart is charts[i]; each one of SHAPES shapes. */
-export function createShrubs(shrubs: Shrub[][], charts: Chart[], light: Light) {
+/** shrubs[i]: those on island i, whose chart is charts[i]; each one of SHAPES shapes. The instances of each shape,
+ *  near and coarse. */
+export function createShrubs(shrubs: Shrub[][], charts: Chart[], light: Light): { near: Instances[]; coarse: Instances[] } {
   const material = new MeshBasicNodeMaterial({ side: DoubleSide });
   material.colorNode = Fn(() => {
     // the normal as the shape has it, bent toward its mass's, whichever side of the leaf is seen: the bush is lit as
@@ -84,9 +87,10 @@ export function createShrubs(shrubs: Shrub[][], charts: Chart[], light: Light) {
   })();
 
   const m = new Matrix4(), q = new Quaternion(), s = new Vector3(), zero = new Vector3(), up = new Vector3(0, 1, 0);
-  return Array.from({ length: SHAPES }, (_, k) => createInstances(shape(k + 101), material,
-    shrubs.map((on, i) => on.filter((b) => b.shape === k).map((b): Placed => {
-      m.compose(zero, q.setFromAxisAngle(up, b.yaw), s.set(b.size, b.size * 0.8, b.size));
-      return { matrix: standing(charts[i], b.x, b.y - 0.05 * b.size, b.z, m, new Matrix4()), tint: b.tint };
-    })), true));
+  const placed = Array.from({ length: SHAPES }, (_, k) => shrubs.map((on, i) => on.filter((b) => b.shape === k).map((b): Placed => {
+    m.compose(zero, q.setFromAxisAngle(up, b.yaw), s.set(b.size, b.size * 0.8, b.size));
+    return { matrix: standing(charts[i], b.x, b.y - 0.05 * b.size, b.z, m, new Matrix4()), tint: b.tint };
+  })));
+  const at = (leaves: number) => placed.map((p, k) => createInstances(shape(k + 101, leaves), material, p, true));
+  return { near: at(LEAVES), coarse: at(COARSE) };
 }

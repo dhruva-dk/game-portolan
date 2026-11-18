@@ -5,7 +5,8 @@
 // the height, with noise only to break edges into patches: nothing is placed by hand, so every band follows the land.
 // Under water the cover means what the islands' does (sea grass on the banks, rubble round the land's foot and strewn
 // over the floor); on land its channels carry the land's own (sand.ts lays them):
-//   grass   growth: grass in patches past the beach, thinning as the land rises (patches shrink, they don't fade)
+//   grass   growth: patches inland past the beach where the shrubs grow (terrain-scatter.ts) on earthier sand
+//           (sand.ts), shrinking as the land rises (patches shrink, they don't fade)
 //   rubble  bare rock breaking out toward the tops
 //
 // Pure arithmetic: no three, so it runs in node for the tests; deterministic for the terrain and the seed.
@@ -19,7 +20,7 @@ import { heightBounds, profile, type Terrain } from './terrain.ts';
 
 /** Where the land's cover changes, metres: grass begins this far in past the beach; rubble lies round the land's foot
  *  under water between these distances out. */
-const GRASS_IN = [3, 9] as const, FOOT = [2, 5, 15, 35] as const;
+const GRASS_IN = [20, 45] as const, FOOT = [2, 5, 15, 35] as const;
 /** The cells along a side of a block one rise stands for (sim/sight.ts looks for land only near one). */
 const BLOCK = 16;
 
@@ -79,7 +80,7 @@ export function terrainPlanet(t: Terrain, seed: number): Planet {
       // breaking out above
       const up = sat(h / o.summit);
       const patch = read(9, 11.3) + 0.5 * read(40, 23.9);
-      cover.grass = smoothstep(GRASS_IN[0], GRASS_IN[1], -s) * smoothstep(-0.15, 0.15, patch + 0.35 - 0.9 * up);
+      cover.grass = smoothstep(GRASS_IN[0], GRASS_IN[1], -s) * smoothstep(-0.15, 0.15, patch + 0.15 - 0.6 * up);
       cover.rubble = smoothstep(0.55, 0.8, up + 0.35 * read(25, 37.1));
     } else {
       const depth = -h;
