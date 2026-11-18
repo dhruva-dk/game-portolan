@@ -21,11 +21,12 @@ const KEY = 'portolan.settings';
 const DRY = 600;
 
 /** Settings kept on the device; never required (a private window may refuse them). */
+const SETTINGS: Settings = { sound: 0.8, look: 0.5, stats: false };
 function loadSettings(): Settings {
   try {
-    return { sound: 0.8, look: 0.5, ...JSON.parse(localStorage.getItem(KEY) ?? '{}') };
+    return { ...SETTINGS, ...JSON.parse(localStorage.getItem(KEY) ?? '{}') };
   } catch {
-    return { sound: 0.8, look: 0.5 };
+    return { ...SETTINGS };
   }
 }
 function saveSettings(s: Settings) {

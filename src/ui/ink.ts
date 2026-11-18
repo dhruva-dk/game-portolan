@@ -21,7 +21,7 @@ export const WASH = {
 export const PAPER = '#f1e4c8';
 /** The paper a woodcut's cut lines show. */
 export const CUT = '#f4e8cf';
-/** The numerals' face: an italic old style, the iPhone's own. */
+/** The numerals' face: an italic old style, iOS's own. */
 export const FIGURES = '"Iowan Old Style", "Palatino", Georgia, serif';
 
 /** The shared defs: the paper's gradient, the slips' shadow, a hatch per ink (and a denser one for large glyphs). */

@@ -18,6 +18,9 @@ import {
  * else its type): the meshes shown, in the camera's view if culled by it, with instances to draw, counted as three
  * draws them; what a pass draws besides (its backdrop) is the gap between the two. The means per frame over the
  * last second are in the meter's data-passes and data-objects (tools/capture.ts prints them).
+ *
+ * Shown, it is a panel in the screen's bottom-left corner (index.html #meter), as the settings' stats switch or the
+ * debug page has it.
  */
 interface Tally { draws: number; tris: number; runs: number }
 
@@ -74,11 +77,31 @@ const lines = (map: Map<string, Tally>, frames: number) => [...map]
   .map(([k, t]) => `${k}: ${(t.draws / frames).toFixed(1)} draws ${(t.tris / frames / 1000).toFixed(1)}k tri ${(t.runs / frames).toFixed(2)}×`)
   .join('\n');
 
-export function createMeter(renderer: WebGPURenderer, el: HTMLElement) {
+/** The frame rate the panel reads as on budget (the target's floor, 30), and as falling well short of it. */
+const FPS = { good: 30, poor: 20 } as const;
+
+/** The panel's rows: label, value, and a quieter note after it. */
+function panel(fps: number, cpu: string, inRender: string, gpu: string | null, compute: string, draws: number, ktris: number, passes: number) {
+  const tone = fps >= FPS.good ? 'good' : fps >= FPS.poor ? 'fair' : 'poor';
+  const row = (label: string, value: string, note = '') => `<div><span>${label}</span><b>${value}</b><i>${note}</i></div>`;
+  return `<div class="fps ${tone}"><b>${fps}</b> fps</div>`
+    + row('CPU', `${cpu} ms`, `render ${inRender} ms`)
+    + row('GPU', gpu === null ? 'n/a' : `${gpu} ms`, gpu === null ? '' : `+ ${compute} ms compute`)
+    + row('Draws', `${draws}`, `${passes} passes`)
+    + row('Triangles', `${ktris}k`);
+}
+
+/**
+ * The meter on `el`: shown (show) as a panel of the frame's cost; its terse line, which the tools read, in
+ * el.dataset.line whether shown or not. `split` installs the inspector that splits the draws by pass and by what is
+ * drawn (el.dataset.passes, .objects): debugging only, as it walks each scene every render.
+ */
+export function createMeter(renderer: WebGPURenderer, el: HTMLElement, split: boolean) {
   const gpu = renderer.hasFeature('timestamp-query');
   const info = renderer.info;
   const passes = new Passes(info);
-  renderer.inspector = passes;
+  if (split) renderer.inspector = passes;
+  let shown = false;
   let frames = 0;
   let cpu = 0, inRender = 0, draws = 0, tris = 0, renders = 0;
   let last = performance.now();
@@ -117,16 +140,28 @@ export function createMeter(renderer: WebGPURenderer, el: HTMLElement) {
       const now = performance.now();
       if (now - last < 1000) return;
       const f = (n: number, of: number) => (of > 0 ? (n / of).toFixed(1) : '–');
-      el.textContent =
-        `${Math.round((frames * 1000) / (now - last))}  cpu ${f(cpu, frames)} (${f(inRender, frames)})` +
+      const fps = Math.round((frames * 1000) / (now - last)), d = Math.round(draws / frames);
+      const k = Math.round(tris / frames / 1000), p = Math.round(renders / frames);
+      el.dataset.line =
+        `${fps}  cpu ${f(cpu, frames)} (${f(inRender, frames)})` +
         (gpu ? `  gpu ${f(render, read)} + ${f(compute, computed)}` : '  gpu –') +
-        `  ${Math.round(draws / frames)} draws ${Math.round(tris / frames / 1000)}k tri ${Math.round(renders / frames)} passes`;
-      el.dataset.passes = lines(passes.passes, frames);
-      el.dataset.objects = lines(passes.objects, frames);
+        `  ${d} draws ${k}k tri ${p} passes`;
+      if (shown) el.innerHTML = panel(fps, f(cpu, frames), f(inRender, frames), gpu ? f(render, read) : null, f(compute, computed), d, k, p);
+      if (split) {
+        el.dataset.passes = lines(passes.passes, frames);
+        el.dataset.objects = lines(passes.objects, frames);
+      }
       passes.passes.clear();
       passes.objects.clear();
       frames = cpu = inRender = draws = tris = renders = read = render = computed = compute = 0;
       last = now;
+    },
+    /** Shows the panel or hides it; it fills at the next second's reading. */
+    show(on: boolean) {
+      if (on === shown) return;
+      shown = on;
+      el.hidden = !on;
+      if (!on) el.innerHTML = '';
     },
   };
 }

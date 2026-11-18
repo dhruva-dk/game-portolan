@@ -34,11 +34,11 @@ try {
     const page = await browser.newPage({ viewport: VIEW });
     page.on('pageerror', (e) => console.error(`[${name}] ${e.message}`));
     await page.goto(`${url}?${q}&pause`);
-    await page.waitForFunction(() => document.getElementById('meter')?.textContent, null, { timeout: 60000 });
+    await page.waitForFunction(() => document.getElementById('meter')?.dataset.line, null, { timeout: 60000 });
     // the first reading holds the shaders' compiling; the second is a settled second's
-    const first = await page.textContent('#meter');
-    await page.waitForFunction((t) => document.getElementById('meter')?.textContent !== t, first, { timeout: 10000 });
-    const text = (await page.textContent('#meter')) ?? '';
+    const first = await page.getAttribute('#meter', 'data-line');
+    await page.waitForFunction((t) => document.getElementById('meter')?.dataset.line !== t, first, { timeout: 10000 });
+    const text = (await page.getAttribute('#meter', 'data-line')) ?? '';
     await page.close();
     const m = /(\d+) draws (\d+)k tri (\d+) passes/.exec(text);
     if (!m) throw new Error(`[${name}] the meter reads '${text}'`);

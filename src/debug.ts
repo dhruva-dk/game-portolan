@@ -76,7 +76,8 @@ import type { Weather } from './world/weather';
 import { R, add, cross, dot, frameAt, along, normalize, scale, type Vec3 } from './world/sphere';
 
 /** How the page is set up (main.ts RELEASE, or as the switches change it): the planet's seed, the weather's mean and
- *  swing (world/weather.ts) and the time of day (hours); how the frame draws; whether the meter shows the frame's cost;
+ *  swing (world/weather.ts) and the time of day (hours); how the frame draws; whether the meter always shows the frame's cost, split by pass (the debug page's;
+ *  else only as the settings' stats switch has it);
  *  the seconds the storm is held at (null: it runs) and the gun every ship is armed with (null: none). */
 export interface Setup {
   seed: number; land: LandKind; mean: Weather; swing: Weather; hours: number;
@@ -94,6 +95,8 @@ const kindOf = (name: string | null): GunKind => KINDS.find((k) => k === name) ?
 export interface Stage {
   world: World; start: { at: Vec3; bearing: number }; canvas: HTMLElement;
   anchors: readonly Anchor[]; ready: Promise<number>; matches: Matches;
+  /** Shows the frame's cost in its corner, or hides it (always shown when the setup's meter is). */
+  stats(on: boolean): void;
   draw(next: (dt: number) => Snapshot, drawn?: (canvas: HTMLCanvasElement) => void): Promise<void>;
 }
 

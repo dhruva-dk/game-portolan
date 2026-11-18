@@ -33,30 +33,39 @@ const RELEASE: Setup = {
 };
 
 const meterEl = document.getElementById('meter')!;
+/** Says so in the meter's corner, shown. */
+const say = (text: string) => {
+  meterEl.hidden = false;
+  meterEl.textContent = text;
+};
 
 /** The world built on a setup, the frame that draws it, and the matches dealt on it. */
 async function stage(setup: Setup): Promise<Stage> {
   if (!navigator.gpu) {
-    meterEl.textContent = 'no WebGPU';
+    say('no WebGPU');
     throw new Error('WebGPU unavailable');
   }
-  const renderer = new WebGPURenderer({ antialias: false, trackTimestamp: setup.meter });
+  // timestamps always: the stats may be switched on at any time (settings), and the meter resolves them every frame
+  const renderer = new WebGPURenderer({ antialias: false, trackTimestamp: true });
   document.body.appendChild(renderer.domElement);
   await renderer.init();
   // three's WebGPURenderer always installs a WebGL 2 fallback and takes it, with only a warning, when WebGPU gives it
   // no adapter or device (no option turns that off); this game is WebGPU's alone, so that is a failure
   if (renderer.coordinateSystem !== WebGPUCoordinateSystem) {
-    meterEl.textContent = 'no WebGPU';
+    say('no WebGPU');
     throw new Error('WebGPU unavailable: three fell back to WebGL');
   }
 
   // The world, built once and handed to the frame that draws it and the game that runs on it.
   const world = createWorld(setup.seed, setup.land, setup.mean, setup.swing, setup.hours);
   const frame = createFrame(renderer, world, setup.drawing);
-  const meter = setup.meter ? createMeter(renderer, meterEl) : null;
+  // the frame's cost: always shown on the debug page, split by pass there; else as the settings' stats switch has it
+  const meter = createMeter(renderer, meterEl, setup.meter);
+  meter.show(setup.meter);
 
   return {
     world, start: world.planet.start, canvas: renderer.domElement, anchors: frame.anchors, ready: frame.ready,
+    stats: (on) => meter.show(setup.meter || on),
     matches: createMatches(setup.seed, world.planet, setup.hold, setup.gun),
     async draw(next: (dt: number) => Snapshot, drawn?: (canvas: HTMLCanvasElement) => void) {
       console.info(`ground baked in ${(await frame.ready).toFixed(0)} ms`);
@@ -71,7 +80,7 @@ async function stage(setup: Setup): Promise<Stage> {
         frame.render(snapshot, dt);
         const rendered = performance.now() - begun;
         drawn?.(renderer.domElement);
-        meter?.sample(performance.now() - now, rendered);
+        meter.sample(performance.now() - now, rendered);
       });
     },
   };
@@ -135,6 +144,7 @@ async function play(s: Stage): Promise<Played> {
       flow.update(dt, status, scene.sea, scene.own);
       // heard from the game's eye, even with the full map open over it; the sea going as the screens cover it
       audio.update({ scene, status, screen: flow.screen, map: globe.open, covered: flow.covered }, flow.settings.sound, dt);
+      s.stats(flow.settings.stats);
       return { ...scene, eye: globe.step(dt, scene.storm) ?? scene.eye };
     },
   };

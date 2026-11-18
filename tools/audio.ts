@@ -218,13 +218,13 @@ try {
     const cpu = await browser.newPage({ viewport: VIEW });
     cpu.on('console', (m) => m.text().startsWith('sound') && console.log(`  [${m.text()}]`));
     await cpu.goto(`${url}?screen=match&ships=12&gun=0&meter&ahead=2`);
-    await cpu.waitForFunction(() => document.getElementById('meter')?.textContent?.includes('cpu'), null, { timeout: 60000 });
+    await cpu.waitForFunction(() => document.getElementById('meter')?.dataset.line?.includes('cpu'), null, { timeout: 60000 });
     const read = async (seconds: number) => {
       const seen: number[] = [];
       for (let s = 0; s < seconds; s++) {
-        const before = await cpu.textContent('#meter');
-        await cpu.waitForFunction((t) => document.getElementById('meter')?.textContent !== t, before, { timeout: 10000 });
-        const m = /cpu ([\d.]+)/.exec((await cpu.textContent('#meter')) ?? '');
+        const before = await cpu.getAttribute('#meter', 'data-line');
+        await cpu.waitForFunction((t) => document.getElementById('meter')?.dataset.line !== t, before, { timeout: 10000 });
+        const m = /cpu ([\d.]+)/.exec((await cpu.getAttribute('#meter', 'data-line')) ?? '');
         if (m) seen.push(Number(m[1]));
       }
       seen.sort((a, b) => a - b);

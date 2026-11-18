@@ -28,13 +28,13 @@ try {
     page.on('pageerror', (e) => console.error(`[${q}] ${e.message}`));
     await page.goto(`${url}?${q}`);
     // the meter's first reading: a second of frames has run (the ground's bake comes first)
-    await page.waitForFunction(() => document.getElementById('meter')?.textContent, null, { timeout: 60000 });
+    await page.waitForFunction(() => document.getElementById('meter')?.dataset.line, null, { timeout: 60000 });
     await page.waitForTimeout(1500);
     for (let k = 0; k < shots; k++) {
       if (k > 0) await page.waitForTimeout(every);
       const file = `${out}/${q.replace(/[^\w.=-]+/g, '_') || 'default'}${k > 0 ? `-${k}` : ''}.png`;
       await page.screenshot({ path: file });
-      console.log(file, await page.textContent('#meter'));
+      console.log(file, await page.getAttribute('#meter', 'data-line'));
       if (split) console.log(await page.$eval('#meter', (m) => `${(m as HTMLElement).dataset.passes}\n--\n${(m as HTMLElement).dataset.objects}\n`));
     }
     await page.close();

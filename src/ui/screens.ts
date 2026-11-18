@@ -8,18 +8,20 @@
 //   lobby   over her ship at anchor: the career plate (tap: the rank folio), the wheel (tap: settings), the PLAY
 //           banner with her galleon on it. No tabs. Elsewhere a drag reaches the world: it turns the camera round her.
 //   rank    a folio: her rank's seal and her level's ring, drawn large, and the ladder of ranks
-//   settings a small folio: sound and look speed, each a bar set by a tap along it
+//   settings a small folio: sound and look speed, each a bar set by a tap along it; the stats (the frame's cost in
+//           the bottom-left corner: meter.ts), a box ticked by a tap
 // Each folio has its close mark at its corner; a tap outside it closes it too. Her match's end is ends.ts's.
 // No words anywhere; numerals only.
 
 import type { Career } from '../player';
-import { INK, WASH, bar, galleon, glyph, paperDisc, roughRect, svg } from './ink';
+import { INK, PAPER, WASH, bar, galleon, glyph, paperDisc, roughRect, svg } from './ink';
 import { TIERS, levelRing, plate, rhumbs, rose, seal } from './marks';
 import { fade, onTap, uiLayer } from './ui';
 
 export const W = 956, H = 440;
 
-export interface Settings { sound: number; look: number }
+/** Sound and look speed, each 0–1; whether the frame's cost shows in its corner (meter.ts). */
+export interface Settings { sound: number; look: number; stats: boolean }
 
 /** A full-screen sheet: an <svg> of the sheet's page scaled to the screen. `opaque` lays parchment under it; `press`
  *  makes the whole sheet take touches (else only its regions do, and the rest reach the world under it). */
@@ -121,12 +123,14 @@ export function createLobby(act: { play(): void; rank(): void; settings(): void 
 function folio(x: number, y: number, w: number, h: number, close: () => void) {
   const s = sheet(false);
   s.root.style.zIndex = '1';
+  // the shade over the whole screen, not the page alone (on a screen of another shape the page is centred in it)
+  s.root.style.background = 'rgba(26,16,8,.25)';
   onTap(s.root, close);
   return {
     ...s,
     /** Draws it with `body` inside. */
     draw(body: string) {
-      const el = s.set(`<rect width="${W}" height="${H}" fill="rgba(26,16,8,.25)"/><g id="folio">`
+      const el = s.set(`<g id="folio">`
         + `<path d="${roughRect(x, y, w, h, 9)}" fill="url(#pg)" stroke="${INK.iron}" stroke-width="1" filter="url(#sh)"/>`
         + `<rect x="${x + 10}" y="${y + 10}" width="${w - 20}" height="${h - 20}" fill="none" stroke="${INK.iron}" stroke-width="1.2"/>`
         + `<rect x="${x + 14}" y="${y + 14}" width="${w - 28}" height="${h - 28}" fill="none" stroke="${INK.iron}" stroke-width=".5"/>${body}</g>`
@@ -159,9 +163,10 @@ export function createRank(close: () => void) {
   };
 }
 
-/** Settings, lean: sound and look speed, each a bar; a tap along a bar sets it. */
+/** Settings, lean: sound and look speed, each a bar, a tap along a bar sets it; and the stats, a box ticked or not
+ *  beside an hourglass, a tap on the row turns them on or off. */
 export function createSettings(get: () => Settings, set: (s: Settings) => void, close: () => void) {
-  const x = 560, y = 74, w = 332, h = 168;
+  const x = 560, y = 74, w = 332, h = 208;
   const f = folio(x, y, w, h, close);
   const draw = () => {
     const v = get();
@@ -170,7 +175,22 @@ export function createSettings(get: () => Settings, set: (s: Settings) => void, 
     /** Look speed's mark: a cross-staff's sight. */
     const look = (cy: number) => `<g stroke="${INK.iron}" fill="none" stroke-width="1.6"><circle cx="${x + 54}" cy="${cy}" r="11"/>`
       + `<path d="M${x + 54} ${cy - 17}v8M${x + 54} ${cy + 9}v8M${x + 37} ${cy}h8M${x + 63} ${cy}h8"/></g>`;
-    const el = f.draw(row('sound', 124, glyph('menu.speaker', x + 54, 124, 30), v.sound, WASH.azure) + row('look', 192, look(192), v.look, WASH.ochre));
+    /** The stats' mark: an hourglass, the frame's time. */
+    const glass = (cy: number) => `<g stroke="${INK.iron}" stroke-width="1.6" stroke-linejoin="round"><path d="M${x + 43} ${cy - 15}h22M${x + 43} ${cy + 15}h22" stroke-linecap="round" fill="none"/>`
+      + `<path d="M${x + 46} ${cy - 15}C${x + 46} ${cy - 5} ${x + 52} ${cy - 3} ${x + 52} ${cy}C${x + 52} ${cy + 3} ${x + 46} ${cy + 5} ${x + 46} ${cy + 15}`
+      + `H${x + 62}C${x + 62} ${cy + 5} ${x + 56} ${cy + 3} ${x + 56} ${cy}C${x + 56} ${cy - 3} ${x + 62} ${cy - 5} ${x + 62} ${cy - 15}Z" fill="url(#h-iron)"/>`
+      + `<path d="M${x + 49} ${cy + 13}L${x + 54} ${cy + 6}L${x + 59} ${cy + 13}Z" fill="${WASH.ochre}" stroke="none"/></g>`;
+    /** The stats' box, 28 across, ticked when they show. */
+    const box = (cy: number, on: boolean) => `<path d="${roughRect(x + 96, cy - 14, 28, 28, 5)}" fill="${on ? WASH.viridian : PAPER}" fill-opacity="${on ? 0.85 : 1}" stroke="${INK.iron}" stroke-width=".9"/>`
+      + (on ? `<path d="M${x + 102} ${cy}L${x + 108} ${cy + 7}L${x + 119} ${cy - 7}" fill="none" stroke="${INK.white}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>` : '');
+    const stats = `<g id="stats">${glass(234)}<rect x="${x + 30}" y="${234 - 24}" width="${w - 60}" height="48" fill="transparent"/>${box(234, v.stats)}</g>`;
+    const el = f.draw(row('sound', 118, glyph('menu.speaker', x + 54, 118, 30), v.sound, WASH.azure) + row('look', 176, look(176), v.look, WASH.ochre) + stats);
+    const toggle = el.querySelector<SVGGElement>('#stats')!;
+    toggle.style.pointerEvents = 'auto';
+    toggle.addEventListener('pointerup', () => {
+      set({ ...get(), stats: !get().stats });
+      draw();
+    });
     for (const id of ['sound', 'look'] as const) {
       const g = el.querySelector<SVGGElement>(`#${id}`)!;
       g.style.pointerEvents = 'auto';

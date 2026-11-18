@@ -61,7 +61,7 @@ try {
   const page = await browser.newPage({ viewport: VIEW, deviceScaleFactor: DPR, hasTouch: true });
   page.on('pageerror', (e) => console.error(`[page] ${e.message}`));
   await page.goto(`${url}?screen=lobby`);
-  await page.waitForFunction(() => document.getElementById('meter')?.textContent, null, { timeout: 120000 });
+  await page.waitForFunction(() => document.getElementById('meter')?.dataset.line, null, { timeout: 120000 });
   // the lobby's own first frames (its shaders compiled) are not in either window
   await page.waitForTimeout(2000);
   const cdp = await page.context().newCDPSession(page);
