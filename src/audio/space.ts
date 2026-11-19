@@ -4,8 +4,10 @@
 // distance), and from which side (its bearing from the way the eye looks, as a stereo pan, a little duller behind).
 // Pure: plain numbers in, plain numbers out, written into one object kept for it (no allocation a frame).
 
-import type { Eye } from '../snapshot.ts';
+import { bearingFrom, type Eye } from '../snapshot.ts';
 import type { Vec3 } from '../world/sphere.ts';
+
+export { bearingFrom } from '../snapshot.ts';
 
 /** Metres a second. */
 export const SPEED = 340;
@@ -35,17 +37,6 @@ export const cutoffAt = (metres: number) => Math.max(FLOOR, OPEN / (1 + metres /
 
 /** The pan for a bearing (radians clockwise from ahead): full right at π/2, never quite all in one ear. */
 export const panOf = (bearing: number) => 0.85 * Math.sin(bearing);
-
-/** The bearing of `p` (world metres) from the way `eye` looks: radians clockwise, 0 ahead, ±π behind. The eye looks
- *  down its −z with x to its right (snapshot.ts Eye), so `p` is turned into the eye's frame by the inverse turn. */
-export function bearingFrom(eye: Eye, p: Vec3): number {
-  const [qx, qy, qz, qw] = eye.orientation;
-  const vx = p[0] - eye.position[0], vy = p[1] - eye.position[1], vz = p[2] - eye.position[2];
-  // v' = q⁻¹ v q, with q⁻¹ = (−x, −y, −z, w): t = 2 (−q × v), v' = v + w t + (−q) × t
-  const tx = 2 * -(qy * vz - qz * vy), ty = 2 * -(qz * vx - qx * vz), tz = 2 * -(qx * vy - qy * vx);
-  const x = vx + qw * tx + -(qy * tz - qz * ty), z = vz + qw * tz + -(qx * ty - qy * tx);
-  return Math.atan2(x, -z);
-}
 
 /** How a sound at `p` (world metres) carrying `reach` m is heard from `eye`, written into `out`. */
 export function hear(eye: Eye, p: Vec3, reach: number, out: Heard): Heard {

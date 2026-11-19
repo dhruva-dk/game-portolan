@@ -120,5 +120,17 @@ export interface Snapshot {
   sea?: Sea;
 }
 
+/** The bearing of `p` (world metres) from the way `eye` looks: radians clockwise, 0 ahead, ±π behind. The eye looks
+ *  down its −z with x to its right, so `p` is turned into the eye's frame by the inverse turn (world/turn.ts rotate
+ *  and inverse, written out on plain numbers so that hearing and seeing each frame makes nothing). */
+export function bearingFrom(eye: Eye, p: Vec3): number {
+  const [qx, qy, qz, qw] = eye.orientation;
+  const vx = p[0] - eye.position[0], vy = p[1] - eye.position[1], vz = p[2] - eye.position[2];
+  // v' = q⁻¹ v q, with q⁻¹ = (−x, −y, −z, w): t = 2 (−q × v), v' = v + w t + (−q) × t
+  const tx = 2 * -(qy * vz - qz * vy), ty = 2 * -(qz * vx - qx * vz), tz = 2 * -(qx * vy - qy * vx);
+  const x = vx + qw * tx + -(qy * tz - qz * ty), z = vz + qw * tz + -(qx * ty - qy * tx);
+  return Math.atan2(x, -z);
+}
+
 /** The orientation of an eye at `eye` looking at `at`, `up` up the screen (as three turns a camera to look at a point). */
 export const lookingAt = (eye: Vec3, at: Vec3, up: Vec3): Turn => lookAt(eye, at, up);
