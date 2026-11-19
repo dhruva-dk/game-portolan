@@ -6,11 +6,11 @@
 
 import { LinearFilter, RepeatWrapping, Storage3DTexture, type StorageTexture } from 'three/webgpu';
 import {
-  Fn, clamp, dot, float, floor, fract, instanceIndex, length, max, min, mix, mod, normalize, select, sin, smoothstep,
+  Fn, clamp, dot, float, floor, fract, instanceIndex, length, max, min, mix, mod, normalize, select, smoothstep,
   textureStore, uvec2, uvec3, vec2, vec3, vec4,
 } from 'three/tsl';
 import { storageTable, type Compute } from '../gpu';
-import type { FloatNode, Vec2Node, Vec3Node } from '../tsl';
+import { hash3, type FloatNode, type Vec2Node, type Vec3Node } from '../tsl';
 
 const SHAPE_N = 64, DETAIL_N = 64, WEATHER_N = 1024;
 
@@ -21,8 +21,6 @@ function volume(n: number): Storage3DTexture {
   t.generateMipmaps = false;
   return t;
 }
-const hash33 = (c: Vec3Node): Vec3Node =>
-  fract(sin(vec3(dot(c, vec3(127.1, 311.7, 74.7)), dot(c, vec3(269.5, 183.3, 246.1)), dot(c, vec3(113.5, 271.9, 124.6)))).mul(43758.5453));
 
 /** Tiling Worley noise of the given period, inverted: 1 at feature points. */
 const worley = Fn(([p, period]: [Vec3Node, FloatNode]) => {
@@ -30,7 +28,7 @@ const worley = Fn(([p, period]: [Vec3Node, FloatNode]) => {
   let near: FloatNode = float(4);
   for (let z = -1; z <= 1; z++) for (let y = -1; y <= 1; y++) for (let x = -1; x <= 1; x++) {
     const o = vec3(x, y, z);
-    near = min(near, length(o.add(hash33(mod(cell.add(o), period))).sub(f)));
+    near = min(near, length(o.add(hash3(mod(cell.add(o), period))).sub(f)));
   }
   return clamp(float(1).sub(near), 0, 1);
 }).setLayout({ name: 'worley', type: 'float', inputs: [{ name: 'p', type: 'vec3' }, { name: 'period', type: 'float' }] });
@@ -41,7 +39,7 @@ const perlin = Fn(([p, period]: [Vec3Node, FloatNode]) => {
   const u = f.mul(f).mul(f).mul(f.mul(f.mul(6).sub(15)).add(10));
   const g = (x: number, y: number, z: number): FloatNode => {
     const o = vec3(x, y, z);
-    return dot(normalize(hash33(mod(i.add(o), period)).mul(2).sub(1)), f.sub(o));
+    return dot(normalize(hash3(mod(i.add(o), period)).mul(2).sub(1)), f.sub(o));
   };
   const a = mix(mix(g(0, 0, 0), g(1, 0, 0), u.x), mix(g(0, 1, 0), g(1, 1, 0), u.x), u.y);
   const b = mix(mix(g(0, 0, 1), g(1, 0, 1), u.x), mix(g(0, 1, 1), g(1, 1, 1), u.x), u.y);
@@ -58,7 +56,7 @@ const cells = Fn(([p, period]: [Vec2Node, FloatNode]) => {
   const best = vec2(0, 0).toVar();
   for (let y = -1; y <= 1; y++) for (let x = -1; x <= 1; x++) {
     const o = vec2(x, y);
-    const h = hash33(vec3(mod(cell.add(o), period), period));
+    const h = hash3(vec3(mod(cell.add(o), period), period));
     const v = h.z.mul(h.z).mul(0.9).add(0.1);
     const c = v.sub(length(o.add(h.xy).sub(f)));
     best.assign(select(c.greaterThan(best.x), vec2(c, v), best));

@@ -4,7 +4,7 @@
 
 // And the two marks a flat look is drawn with, a shape's crisp edge (cut) and a thin line (line), for every material.
 
-import { Loop, clamp, float, fract, fwidth, max, min, nodeObject, saturate, workgroupArray } from 'three/tsl';
+import { Fn, Loop, clamp, float, fract, fwidth, int, max, min, nodeObject, saturate, uint, vec3, workgroupArray } from 'three/tsl';
 import { MathNode, type Node } from 'three/webgpu';
 
 export type FloatNode = Node<'float'>;
@@ -19,7 +19,27 @@ export type Mat4Node = Node<'mat4'>;
 
 /** float(x) for x either a number or a float node: three's float() takes each, as separate overloads, so a value that
  * may be either has to be told apart before the call. */
-export const toFloat = (x: FloatNode | number): FloatNode => (typeof x === 'number' ? float(x) : float(x));
+export const toFloat = (x: FloatNode | number): FloatNode => (typeof x === 'number' ? float(x) : x);
+
+/**
+ * Three hashes in [0, 1) of a point of whole numbers (a lattice's cell): pcg3d (Jarzynski and Olano 2020), integer
+ * arithmetic throughout, so it holds the same at any coordinate; for one number, three's `hash` (PCG). A sine hash's
+ * precision runs out as its argument grows, and its noise turns to stripes (post/film.ts).
+ */
+const pcg3 = Fn(([c]: [Vec3Node]) => {
+  // a uint each (three's types give the bit operators to scalars only); an int's bits carried over as they are
+  const [x, y, z] = [c.x, c.y, c.z].map((k) => uint(int(k)).mul(1664525).add(1013904223).toVar());
+  const stir = () => {
+    x.addAssign(y.mul(z));
+    y.addAssign(z.mul(x));
+    z.addAssign(x.mul(y));
+  };
+  stir();
+  for (const v of [x, y, z]) v.assign(v.bitXor(v.shiftRight(16)));
+  stir();
+  return vec3(float(x), float(y), float(z)).mul(1 / 2 ** 32);
+}).setLayout({ name: 'pcg3', type: 'vec3', inputs: [{ name: 'c', type: 'vec3' }] });
+export const hash3 = (c: Vec3Node): Vec3Node => pcg3(c);
 
 /** 0 where x is under `at` … 1 where it is over, the edge between them a pixel wide however far off it is seen: the
  *  edge of a flat shape. In a fragment's shader only (it reads x's change across the pixel). */

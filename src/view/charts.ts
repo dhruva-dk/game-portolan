@@ -16,7 +16,9 @@
 // coordinates across the pixel, worked out from the world position's: dq = (dp·e1, dp·e2).
 
 import { Vector4 } from 'three/webgpu';
-import { If, Loop, acos, clamp, cross, dot, float, fract, int, length, max, normalize, sin, smoothstep, sqrt, uniform, uniformArray, vec2, vec3 } from 'three/tsl';
+import {
+  If, Loop, acos, clamp, cross, dot, float, hash, int, length, max, normalize, smoothstep, sqrt, uint, uniform, uniformArray, vec2, vec3,
+} from 'three/tsl';
 import { FREQUENCY, anchors, band, cover, icosphere, near, type Anchor, type Likeness } from '../world/lattice';
 import { R, type Vec3 } from '../world/sphere';
 import type { Wind } from '../world/wind';
@@ -115,7 +117,7 @@ export function createCharts(span: number, alike: Likeness, wind: Wind) {
    *  lighter or darker than the next. */
   function debug(p: Vec3Node): Vec3Node {
     const { index, weight } = pick(normalize(p));
-    const shade = fract(sin(float(index[0]).mul(12.9898)).mul(43758.5453)).mul(0.5).add(0.5);
+    const shade = hash(uint(index[0])).mul(0.5).add(0.5);
     return vec3(weight[0], weight[1], weight[2]).mul(shade);
   }
 
