@@ -39,6 +39,7 @@ function shape(seed: number, leaves: number): BufferGeometry {
   });
   const pos: number[] = [], nrm: number[] = [], depth: number[] = [];
   const dir = new Vector3(), at = new Vector3(), facing = new Vector3(), along = new Vector3(), across = new Vector3();
+  const up = new Vector3(0, 1, 0), stray = new Vector3();
   const size = LEAF * Math.sqrt(LEAVES / leaves);
   for (let i = 0; i < leaves; i++) {
     const m = masses[Math.floor(rand() * masses.length)];
@@ -49,7 +50,7 @@ function shape(seed: number, leaves: number): BufferGeometry {
     at.copy(dir).multiply(m.size).multiplyScalar(deep).add(m.c);
     if (at.y < 0.03) continue;
     // the leaf faces out from its mass and up, more or less
-    facing.copy(dir).addScaledVector(new Vector3(0, 1, 0), 0.5).add(new Vector3(rand() - 0.5, rand() - 0.5, rand() - 0.5)).normalize();
+    facing.copy(dir).addScaledVector(up, 0.5).add(stray.set(rand() - 0.5, rand() - 0.5, rand() - 0.5)).normalize();
     along.set(rand() - 0.5, rand() - 0.5, rand() - 0.5).cross(facing).normalize();
     across.copy(facing).cross(along);
     const len = size * (0.7 + 0.5 * rand());
@@ -91,6 +92,7 @@ export function createShrubs(shrubs: Shrub[][], charts: Chart[], light: Light): 
     m.compose(zero, q.setFromAxisAngle(up, b.yaw), s.set(b.size, b.size * 0.8, b.size));
     return { matrix: standing(charts[i], b.x, b.y - 0.05 * b.size, b.z, m, new Matrix4()), tint: b.tint };
   })));
-  const at = (leaves: number) => placed.map((p, k) => createInstances(shape(k + 101, leaves), material, p, true));
-  return { near: at(LEAVES), coarse: at(COARSE) };
+  const at = (leaves: number, name: string) =>
+    placed.map((p, k) => createInstances(`${name} ${k}`, shape(k + 101, leaves), material, p, true));
+  return { near: at(LEAVES, 'shrubs'), coarse: at(COARSE, 'shrubs coarse') };
 }

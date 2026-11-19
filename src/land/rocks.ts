@@ -47,10 +47,13 @@ export function createRocks(rocks: Rock[][], charts: Chart[], view: View, light:
     m.compose(zero, q.setFromEuler(e), s.setScalar(r.size));
     return { matrix: standing(chart, r.x, r.y, r.z, m, new Matrix4()) };
   };
-  const placed = (big: boolean, k: number) => rocks.map((on, i) => on.filter((r) => r.big === big && r.shape === k).map((r) => place(r, charts[i])));
+  const placed = (big: boolean, k: number) =>
+    rocks.map((on, i) => on.filter((r) => r.big === big && r.shape === k).map((r) => place(r, charts[i])));
   const kind = (big: boolean, far: boolean) => Array.from({ length: big ? KINDS.big.shapes : KINDS.boulder.shapes }, (_, k) => {
     const { detail, far: coarse } = big ? KINDS.big : KINDS.boulder;
-    return createInstances(rockShape(k + (big ? 1 : 51), far ? coarse : detail, big), material, placed(big, k));
+    // (numbered in turn, the masses' shapes and then the boulders')
+    const name = `${far ? 'rocks far' : 'rocks'} ${k + (big ? 0 : KINDS.big.shapes)}`;
+    return createInstances(name, rockShape(k + (big ? 1 : 51), far ? coarse : detail, big), material, placed(big, k));
   });
   return { near: [...kind(true, false), ...kind(false, false)], far: [...kind(true, true), ...kind(false, true)] };
 }

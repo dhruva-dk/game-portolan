@@ -7,7 +7,7 @@
 //
 // The crown: sixteen fronds in every direction from the young, pointing up, to the old, drooping, each a rachis
 // that arches out and bends under its own weight with leaflets down both sides — every leaflet its own few
-// triangles, so the leaves need no cut-out texture (an alpha test would cost the phone's GPU its hidden-surface
+// triangles, so the leaves need no cut-out texture (an alpha test would cost the iPad's GPU its hidden-surface
 // removal). Lit on both sides, and from behind as leaves are (sky/light.ts leaf), in two flat greens.
 
 import { BufferGeometry, DoubleSide, Float32BufferAttribute, Matrix4, MeshBasicNodeMaterial, Quaternion, Vector3 } from 'three/webgpu';
@@ -26,7 +26,8 @@ const LEANS = [0.08, 0.2, 0.32, 0.46];
 const HEIGHT = 10;
 /** How much stouter a trunk is than a slender palm's (about 0.3 m across at the crown). */
 const STOUT = 1.3;
-const FRONDS = 16;
+/** Its fronds; a nut's radius, metres. */
+const FRONDS = 16, NUT = 0.12;
 /** How finely a palm is drawn: the trunk's rings along and sides around, a nut's, each frond's rachis segments and
  *  leaflets down each side. Past DETAIL metres off (site.ts) the same palm, every frond where it was, is drawn
  *  coarser: fewer, broader leaflets covering as much, about a third of the triangles. */
@@ -82,12 +83,13 @@ function shape(lean: number, seed: number, detail: Detail): Shape {
   const nuts = random(seed);
   for (let k = 0; k < 7; k++) {
     const f = nuts() * 2 * Math.PI;
-    const ring = 0.24 * STOUT, at = top.clone().addScaledVector(up, -0.35 - nuts() * 0.25).add(new Vector3(Math.cos(f) * ring, 0, Math.sin(f) * ring));
-    const base = pos.length / 3, R = 0.12, n = detail.nut;
+    const ring = 0.24 * STOUT;
+    const at = top.clone().addScaledVector(up, -0.35 - nuts() * 0.25).add(new Vector3(Math.cos(f) * ring, 0, Math.sin(f) * ring));
+    const base = pos.length / 3, n = detail.nut;
     for (let i = 0; i <= n; i++) for (let j = 0; j <= n; j++) {
       const th = (i / n) * Math.PI, ph = (j / n) * 2 * Math.PI;
       const o = new Vector3(Math.sin(th) * Math.cos(ph), Math.cos(th), Math.sin(th) * Math.sin(ph));
-      pos.push(...at.clone().addScaledVector(o, R).toArray());
+      pos.push(...at.clone().addScaledVector(o, NUT).toArray());
       nrm.push(...o.toArray());
       uvs.push(0, 0);
       nut.push(1);
@@ -135,7 +137,8 @@ function shape(lean: number, seed: number, detail: Detail): Shape {
       // the rachis: a narrow strip
       const side = along[k].clone().cross(world).normalize().multiplyScalar(0.025 * (1 - k / RACHIS) + 0.008);
       const lift = side.clone().cross(along[k]).normalize();
-      const a = spine[k].clone().add(side), b = spine[k].clone().sub(side), d = spine[k + 1].clone().add(side), e = spine[k + 1].clone().sub(side);
+      const a = spine[k].clone().add(side), b = spine[k].clone().sub(side);
+      const d = spine[k + 1].clone().add(side), e = spine[k + 1].clone().sub(side);
       tri(a, b, d, lift, age, 0.8 * shadeOf(k / RACHIS));
       tri(b, e, d, lift, age, 0.8 * shadeOf(k / RACHIS));
     }
@@ -152,10 +155,11 @@ function shape(lean: number, seed: number, detail: Detail): Shape {
         const sag = (0.15 + 0.35 * age) * len;
         const mid = at.clone().addScaledVector(dir, len * 0.5).addScaledVector(lift, -sag * 0.3);
         const tip = at.clone().addScaledVector(dir, len).addScaledVector(lift, -sag);
-        const s = shadeOf(u);
-        tri(at.clone().sub(across), at.clone().add(across), mid.clone().add(across.clone().multiplyScalar(0.8)), lift, age, s);
-        tri(at.clone().sub(across), mid.clone().add(across.clone().multiplyScalar(0.8)), mid.clone().sub(across.clone().multiplyScalar(0.8)), lift, age, s);
-        tri(mid.clone().sub(across.clone().multiplyScalar(0.8)), mid.clone().add(across.clone().multiplyScalar(0.8)), tip, lift, age, s);
+        const s = shadeOf(u), narrow = across.clone().multiplyScalar(0.8);
+        const foot = at.clone().sub(across), midL = mid.clone().sub(narrow), midR = mid.clone().add(narrow);
+        tri(foot, at.clone().add(across), midR, lift, age, s);
+        tri(foot, midR, midL, lift, age, s);
+        tri(midL, midR, tip, lift, age, s);
       }
     }
   }
@@ -197,9 +201,12 @@ export function createPalms(palms: Palm[][], charts: Chart[], light: Light): { n
     q.setFromAxisAngle(up, -p.heading);
     return { matrix: standing(charts[i], p.x, p.y, p.z, m.compose(zero, q, s.setScalar(p.height / HEIGHT)), new Matrix4()) };
   })));
-  const at = (detail: Detail) => LEANS.flatMap((lean, k) => {
+  const at = (detail: Detail, name: string) => LEANS.flatMap((lean, k) => {
     const sh = shape(lean, k + 11, detail);
-    return [createInstances(sh.trunk, trunkMaterial, placed[k]), createInstances(sh.crown, crownMaterial, placed[k])];
+    return [
+      createInstances(`${name} ${2 * k}`, sh.trunk, trunkMaterial, placed[k]),
+      createInstances(`${name} ${2 * k + 1}`, sh.crown, crownMaterial, placed[k]),
+    ];
   });
-  return { near: at(NEAR), coarse: at(COARSE) };
+  return { near: at(NEAR, 'palms'), coarse: at(COARSE, 'palms coarse') };
 }

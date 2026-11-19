@@ -10,7 +10,7 @@ import { InstancedBufferAttribute, InstancedMesh, Matrix4, Vector3, type BufferG
 import { chartBasis, fromChart, place, type Chart, type Vec3 } from '../world/sphere.ts';
 
 /** The world position `height` metres up at chart point (x, z), and the chart's axes there: x (e1), up, z (e2). */
-export function onSphere(chart: Chart, x: number, height: number, z: number): { p: Vec3; e1: Vec3; up: Vec3; e2: Vec3 } {
+function onSphere(chart: Chart, x: number, height: number, z: number): { p: Vec3; e1: Vec3; up: Vec3; e2: Vec3 } {
   const up = fromChart(chart, x, z);
   const [e1, e2] = chartBasis(chart, up);
   return { p: place(up, height), e1, up, e2 };
@@ -39,15 +39,24 @@ export interface Instances {
   mesh: InstancedMesh;
   /** How many of those drawn stand on the first `nearby` tiles shown (they come first). */
   near: number;
-  /** Draws the instances on these tiles (indices into the list it was made with), nearest first; the first `nearby`
-   *  of them make up `near`. */
-  show(tiles: number[], nearby?: number): void;
+  /** Draws the instances on tiles[from…to) (indices into the list it was made with), nearest first; the first
+   *  `nearby` of them make up `near`. */
+  show(tiles: ArrayLike<number>, from: number, to: number, nearby?: number): void;
 }
 
-/** One shape's instances, `placed[i]` those on tile i. With tints, the geometry gets an instanced 'tint'. */
-export function createInstances(geometry: BufferGeometry, material: Material, placed: Placed[][], tinted = false): Instances {
+/** Sends the first `count` items of an instanced attribute (`size` floats each) up to the GPU, and no more. */
+function send(attribute: InstancedBufferAttribute, count: number, size: number) {
+  attribute.clearUpdateRanges();
+  attribute.addUpdateRange(0, count * size);
+  attribute.needsUpdate = true;
+}
+
+/** One shape's instances, named `name` (for the meter's split: meter.ts), `placed[i]` those on tile i. With tints, the
+ *  geometry gets an instanced 'tint'. */
+export function createInstances(name: string, geometry: BufferGeometry, material: Material, placed: Placed[][], tinted = false): Instances {
   const total = Math.max(1, placed.reduce((n, p) => n + p.length, 0));
   const mesh = new InstancedMesh(geometry, material, total);
+  mesh.name = name;
   const tint = new InstancedBufferAttribute(new Float32Array(total), 1);
   if (tinted) geometry.setAttribute('tint', tint);
   mesh.count = 0;
@@ -56,23 +65,21 @@ export function createInstances(geometry: BufferGeometry, material: Material, pl
   const self: Instances = {
     mesh,
     near: 0,
-    show(tiles, nearby = 1) {
+    show(tiles, from, to, nearby = 1) {
       let k = 0;
       self.near = 0;
-      tiles.forEach((i, n) => {
-        for (const p of placed[i]) {
-          mesh.setMatrixAt(k, p.matrix);
-          tint.setX(k++, p.tint ?? 0);
+      for (let n = from; n < to; n++) {
+        const on = placed[tiles[n]];
+        for (let j = 0; j < on.length; j++) {
+          mesh.setMatrixAt(k, on[j].matrix);
+          tint.setX(k++, on[j].tint ?? 0);
         }
-        if (n < nearby) self.near = k;
-      });
+        if (n - from < nearby) self.near = k;
+      }
       mesh.count = k;
       // (only what is drawn goes up to the GPU)
-      for (const [a, size] of [[mesh.instanceMatrix, 16], [tint, 1]] as const) {
-        a.clearUpdateRanges();
-        a.addUpdateRange(0, k * size);
-        a.needsUpdate = true;
-      }
+      send(mesh.instanceMatrix, k, 16);
+      send(tint, k, 1);
     },
   };
   return self;
