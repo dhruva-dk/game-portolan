@@ -3,6 +3,7 @@
 // rough-cut edges, paper discs, woodcut glyphs, ruled bars, italic numerals). Each mark is SVG markup in the piece's
 // own units; a piece sets it into an <svg>, and the page carries DEFS once (ui.ts).
 
+import { hash01 } from '../world/random.ts';
 import { GLYPHS, type Glyph, type Prim } from './glyphs.ts';
 
 /** Inks: iron for outlines and figures, rubric for harm, the Storm's violet for the Storm alone, gold for the chosen and
@@ -29,6 +30,8 @@ export const LIGHT = {
   warm: '#ffd9a0', white: '#fff1d8', ice: '#cfeeff', azure: '#4fc3ff', gold: '#ffcf5a', red: '#ff2a1a', green: '#7be36b',
   mint: '#c8ffb0',
 } as const;
+/** The land on the minimap: its apron's pale wash, its lowland and its hilltops; its contours sepia (isles.ts). */
+export const LAND = { apron: '#f4f0d6', low: '#ecdcac', high: '#b08c58', contour: INK.sepia } as const;
 /** The frame's meter (index.html): its ground, its words and labels, and a reading good, fair or poor. */
 const METER = { ground: SHADOW, text: PAPER, label: '#b9a98c', good: '#8fd18a', fair: '#e8c35a', poor: '#f07a5e' } as const;
 
@@ -62,16 +65,11 @@ export const DEFS = (() => {
 })();
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
-/** A steady pseudo-random number in [0, 1) for a pair: the same edge every time it is drawn. */
-const hash = (a: number, b: number) => {
-  const s = Math.sin(a * 12.9898 + b * 78.233) * 43758.5453;
-  return s - Math.floor(s);
-};
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
 
 /** A rectangle with a hand-cut edge. */
 export function roughRect(x: number, y: number, w: number, h: number, seed: number) {
-  const pts: [number, number][] = [], jig = (i: number) => (hash(i, seed) - 0.5) * 1.2;
+  const pts: [number, number][] = [], jig = (i: number) => (hash01(i, seed) - 0.5) * 1.2;
   const nw = Math.max(2, Math.round(w / 11)), nh = Math.max(2, Math.round(h / 11));
   for (let i = 0; i <= nw; i++) pts.push([x + (w * i) / nw, y + jig(i)]);
   for (let i = 1; i <= nh; i++) pts.push([x + w + jig(i + 40), y + (h * i) / nh]);
@@ -85,7 +83,7 @@ export function roughCircle(cx: number, cy: number, r: number, seed: number, amp
   const n = Math.max(18, Math.round(r * 1.2));
   let s = '';
   for (let i = 0; i < n; i++) {
-    const a = (i / n) * Math.PI * 2, rr = r + (hash(i, seed) - 0.5) * amp;
+    const a = (i / n) * Math.PI * 2, rr = r + (hash01(i, seed) - 0.5) * amp;
     s += `${i ? 'L' : 'M'}${r2(cx + Math.cos(a) * rr)} ${r2(cy + Math.sin(a) * rr)}`;
   }
   return `${s}Z`;

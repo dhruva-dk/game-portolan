@@ -6,6 +6,7 @@
 // Each holder's water as the sea shows it (water/claims.ts): a flat tint in her colour, hers the deeper, inside a hard
 // line of it along its edge.
 
+import { linearToSrgb } from '../colour';
 import type { Sea } from '../snapshot';
 import { cellOf } from '../world/cells';
 import { distance } from '../world/sphere';
@@ -26,7 +27,7 @@ const BLACK = [0, 0, 0];
 const EVERY = 0.25;
 
 /** A linear colour channel as sRGB, 0…255. */
-const srgb = (v: number) => Math.round(255 * (v <= 0.0031308 ? 12.92 * v : 1.055 * Math.pow(v, 1 / 2.4) - 0.055));
+const srgb = (v: number) => Math.round(255 * linearToSrgb(v));
 
 /** The held water's plate, `span` metres from her to its edge. */
 export function createHeld(span: number) {

@@ -31,14 +31,16 @@
 //
 // It reads a plain HudState each frame and redraws a piece only when what it shows has changed.
 
+import { hexToLinear, linearToCss } from '../colour';
 import { HOTBAR, type GunKind, type Kit, type Status } from '../player';
+import { RARITY } from '../rarity';
 import type { Sea } from '../snapshot';
+import { clamp, lerp } from '../world/scalar';
 import type { Shores } from './coasts';
 import type { Glyph } from './glyphs';
 import { DUSK, GILT, INK, PAPER, WASH, alpha, bar, figure, glyph, paperDisc, ring as sweep, slip, svg } from './ink';
 import { createJuice } from './juice';
 import { createMinimap, type More } from './minimap';
-import { RARITY } from '../rarity';
 import { onTap } from './touch';
 import { piece, show, view } from './ui';
 
@@ -65,8 +67,8 @@ const RETICLE = 10, LOCKED = 0.75, FALL = 4, SPREAD = 48;
 const RIM = [0.35, 1] as const, RIM_DEEP = 80;
 /** The share of the arrival (play/arrival.ts ARRIVAL.seconds, 2.8 s) over whose last the HUD fades in. */
 const FADE = 0.25;
-/** 0xrrggbb as css. */
-const css = (hex: number) => `#${hex.toString(16).padStart(6, '0')}`;
+/** A display colour, 0xrrggbb, as css. */
+const css = (hex: number) => linearToCss(hexToLinear(hex));
 
 /** m:ss */
 export const clock = (s: number) => {
@@ -172,7 +174,7 @@ export function createHud(layer: HTMLElement, shores: Shores, act: HudActions) {
     /** A frame: the match as reported, who holds the sea (and her id in it) as the frame draws it; `covered`, the full
      *  map is open over it (which would show it under its window). */
     update(s: HudState, sea?: Sea, own?: number | null, covered = false) {
-      const shown = Math.min(1, Math.max(0, 1 - s.arriving / FADE)), now = Math.round(shown * 100);
+      const shown = clamp(1 - s.arriving / FADE), now = Math.round(shown * 100);
       if (now !== strength) {
         strength = now;
         body.style.opacity = (now / 100).toFixed(2);
@@ -210,7 +212,7 @@ export function createHud(layer: HTMLElement, shores: Shores, act: HudActions) {
 
       // Fire: the gun in hand's mark and rounds; its reload, or its taking up, a rubric sweep and its winding a gold
       // one, each in steps of a 48th, so it is redrawn a few times a second at most
-      const g = s.gun, c = FIRE + 2, step = (v: number) => Math.floor(Math.min(1, Math.max(0, v)) * 48);
+      const g = s.gun, c = FIRE + 2, step = (v: number) => Math.floor(clamp(v) * 48);
       const loaded = g ? (g.swapping > 0 ? step(1 - g.swapping) : step(g.ready)) : -1, wound = g && g.charge !== null ? step(g.charge) : -1;
       if (changed(fire, g?.kind, g?.rounds, loaded, wound)) {
         fire.innerHTML = svg(2 * c, 2 * c, `<g opacity="${g ? 1 : 0.5}">${paperDisc(c, c, FIRE - 2)}`
@@ -265,7 +267,7 @@ export function createHud(layer: HTMLElement, shores: Shores, act: HudActions) {
       juice.update(s, !watching && s.arriving <= 0);
 
       // the rim's wash, outside the calm
-      const deep = s.outside > 0 && !watching ? Math.round((RIM[0] + (RIM[1] - RIM[0]) * Math.min(1, s.outside / RIM_DEEP)) * 100) : 0;
+      const deep = s.outside > 0 && !watching ? Math.round(lerp(RIM[0], RIM[1], Math.min(1, s.outside / RIM_DEEP)) * 100) : 0;
       if (deep !== wash) {
         wash = deep;
         rim.style.opacity = (deep / 100).toFixed(2);

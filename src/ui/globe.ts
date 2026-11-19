@@ -20,6 +20,7 @@
 
 import type { Cap } from '../sim/storm';
 import { lookingAt, type Eye } from '../snapshot';
+import { clamp } from '../world/scalar';
 import { R, cross, dot, length, normalize, scale, type Vec3 } from '../world/sphere';
 import type { Coast } from './coasts';
 import { GLYPHS, type Prim } from './glyphs';
@@ -36,16 +37,14 @@ import { insets, onResize, screen, view, type Insets } from './ui';
 const PANEL = 0.8, SIDE = 112, WINDOW = 0.37, CLOSE = 50;
 /** The eye's distance from the planet's centre at its farthest (where it opens) and nearest, in radii: from the
  *  farthest the whole planet fills the window; the nearest stays over the Storm's top (sky/storm.ts, 320 m). */
-const FARTHEST = 3.2;
-const NEAREST = 1 + 380 / R;
+const FARTHEST = 3.2, NEAREST = 1 + 380 / R;
 /** How fast the eye goes to the distance the fingers ask, per second; how fast a let-go spin dies, per second. */
-const FLY = 12;
-const DRAG = 2.5;
+const FLY = 12, DRAG = 2.5;
 /** How far north or south the planet can be turned, radians: short of where north up loses its meaning. */
 const MOST_LAT = 1.3;
 /** A latitude kept within MOST_LAT; an eye's distance kept between NEAREST and FARTHEST. */
-const latitude = (lat: number) => Math.max(-MOST_LAT, Math.min(MOST_LAT, lat));
-const reach = (d: number) => Math.max(NEAREST, Math.min(FARTHEST, d));
+const latitude = (lat: number) => clamp(lat, -MOST_LAT, MOST_LAT);
+const reach = (d: number) => clamp(d, NEAREST, FARTHEST);
 /** The Storm's swirls, white over an iron line; the pale halo under its edge. */
 const INKS = { swirl: alpha(INK.white, 0.5), swirlLine: alpha(INK.iron, 0.55), halo: alpha(INK.white, 0.75) } as const;
 /** Degrees in a radian. */

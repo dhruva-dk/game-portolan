@@ -13,6 +13,7 @@
 // Each folio has its close mark at its corner; a tap outside it closes it too. Her match's end is ends.ts's.
 // No words anywhere; numerals only.
 
+import { clamp } from '../world/scalar';
 import { GILT, INK, PAPER, SHADOW, WASH, alpha, bar, galleon, glyph, paperDisc, parchment, roughRect, svgNode } from './ink';
 import { rhumbs, rose } from './marks';
 import { onTap, region } from './touch';
@@ -168,7 +169,7 @@ export function createSettings(get: () => Settings, set: (s: Settings) => void, 
         const row = region(el, id, (e) => {
           // where along the bar: its hit box runs 6 units before the bar's 200 and 8 past it
           const box = row!.getBoundingClientRect(), bx = 6 / 214;
-          const t = Math.min(Math.max(((e.clientX - box.left) / box.width - bx) / (200 / 214), 0), 1);
+          const t = clamp(((e.clientX - box.left) / box.width - bx) / (200 / 214));
           set({ ...get(), [id]: Math.round(t * 20) / 20 });
           draw();
         });

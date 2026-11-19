@@ -9,6 +9,7 @@
 // is the game's business (play/game.ts step); this only reports them.
 
 import type { Hands } from '../player';
+import { clamp } from '../world/scalar';
 import { view } from './ui';
 
 /** The stick's reach from its centre, CSS pixels at the UI's drawn size (ui.ts size: grown with the rest of it). */
@@ -35,7 +36,7 @@ export function createInput(element: HTMLElement, steers: () => boolean) {
   element.addEventListener('pointerdown', (e) => {
     element.setPointerCapture(e.pointerId);
     if (thumb.id < 0 && steers() && e.clientX < view.w * LEFT) {
-      const reach = STICK * view.k, within = (v: number, size: number) => Math.min(Math.max(v, reach), size - reach);
+      const reach = STICK * view.k, within = (v: number, size: number) => clamp(v, reach, size - reach);
       [thumb.id, thumb.x, thumb.y] = [e.pointerId, e.clientX, e.clientY];
       [thumb.cx, thumb.cy] = [within(e.clientX, view.w), within(e.clientY, view.h)];
     } else looks.set(e.pointerId, { x: e.clientX, y: e.clientY });

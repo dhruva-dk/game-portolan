@@ -7,6 +7,7 @@
 //
 // A layer of the HUD under all its pieces (no touch); it runs on the page's clock.
 
+import { clamp } from '../world/scalar.ts';
 import { INK, LIGHT } from './ink.ts';
 
 /** A flash: its colour, strength at its peak (0…1), how long it holds there and fades (s), and how it is laid. */
@@ -60,7 +61,7 @@ export function heartbeat(t: number, bpm: number, dub: number): number {
 
 /** The heartbeat's strength (0…1) and pace (bpm) for her hull's share `share`, 0 above its start. */
 export function lowHull(share: number): { k: number; bpm: number } {
-  const k = Math.max(0, Math.min(1, (LOW_HULL.start - share) / (LOW_HULL.start - LOW_HULL.floor)));
+  const k = clamp((LOW_HULL.start - share) / (LOW_HULL.start - LOW_HULL.floor));
   return { k: share > LOW_HULL.start || share <= 0 ? 0 : k, bpm: LOW_HULL.bpm[0] + (LOW_HULL.bpm[1] - LOW_HULL.bpm[0]) * k };
 }
 
