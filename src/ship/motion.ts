@@ -12,14 +12,16 @@
 // lay them aback while she sails on. So her canvas isn't drawn by that wind but by the one that would drive her (the
 // sails' wind, filling()): at rest, the true wind, weakened, which the slack canvas stirs in; under way, a wind from
 // her quarter on the side the true wind blows to, about square to her braced yards and as strong as the true wind and
-// her speed together, so her sails always draw. Her yards are hauled round toward it (trim()), and that wind comes round with them, so when
-// the true wind crosses her bow or her stern the yards and the bags of her sails swing over together, in seconds. The
-// cloth, the drawn canvas, the pennants and the sails' shadows all take it from here (fleet.ts).
+// her speed together, so her sails always draw. Her yards are hauled round toward it (trim()), and that wind comes
+// round with them, so when the true wind crosses her bow or her stern the yards and the bags of her sails swing over
+// together, in seconds. The cloth, the drawn canvas, the pennants and the sails' shadows all take it from here
+// (fleet.ts).
 //
 // Pure arithmetic: no three, so it runs in node for the tests.
 
 import type { ShipPose } from '../world/pose.ts';
 import { add, cross, distance, dot, length, normalize, scale, type Vec3 } from '../world/sphere.ts';
+import { port } from './mount.ts';
 
 /** Gravity, m/s². */
 const G = 9.81;
@@ -36,7 +38,6 @@ export interface Motion { pose: ShipPose; velocity: Vec3; accel: Vec3; spin: Vec
 /** What she feels now, in her own frame. */
 export interface Feeling { weight: Vec3; spin: Vec3; spinning: Vec3 }
 
-const port = (p: ShipPose) => cross(p.up, p.forward);
 const capped = (v: Vec3, most: number): Vec3 => { const l = Math.hypot(...v); return l > most ? scale(v, most / l) : v; };
 const ease = (from: Vec3, to: Vec3, dt: number): Vec3 => add(from, add(to, from, -1), 1 - Math.exp(-dt / EASE));
 
