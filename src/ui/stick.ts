@@ -24,7 +24,9 @@ export function createStick(layer: HTMLElement) {
       return;
     }
     ring.style.display = 'block';
-    ring.style.transform = `translate(${stick.centre[0] - STICK}px, ${stick.centre[1] - STICK}px)`;
+    // `translate`, not `transform`: the UI's size (`scale`) applies after `translate` but before `transform`, and would
+    // carry her thumb's place off with it
+    ring.style.translate = `${stick.centre[0] - STICK}px ${stick.centre[1] - STICK}px`;
     knob.style.transform = `translate(${stick.x * STICK}px, ${-stick.y * STICK}px)`;
   };
 }
