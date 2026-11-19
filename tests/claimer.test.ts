@@ -43,7 +43,8 @@ type Seen = Vessel & { shield?: number; hull?: number };
  * clock; after each step, `each` is told the fleet, the bots' minds and what the step did to who holds the sea.
  */
 function voyage(fleet: Seen[], seeds: (number | null)[], seconds: number, t: Territory, o: {
-  minds?: (Memory | null)[]; storm?: Storm; since?: number; held?: (v: Vessel) => Helm; each?: (fleet: Seen[], minds: (Memory | null)[], did: Outcome) => void;
+  minds?: (Memory | null)[]; storm?: Storm; since?: number; held?: (v: Vessel) => Helm;
+  each?: (fleet: Seen[], minds: (Memory | null)[], did: Outcome) => void;
 }) {
   const minds = o.minds ?? fleet.map((v, i) => (seeds[i] === null ? null : mind(seeds[i]!, v.ship.at)));
   for (let n = 1; n <= Math.round(seconds / STEP); n++) {

@@ -29,7 +29,9 @@ interface CallFrame { functionName: string; url: string }
 interface ProfileNode { id: number; callFrame: CallFrame; parent?: number }
 interface TraceEvent {
   name: string; cat: string; ph: string; ts: number; dur?: number; pid: number; tid: number; id?: string;
-  args?: { name?: string; data?: { startTime?: number; cpuProfile?: { nodes?: ProfileNode[]; samples?: number[] }; timeDeltas?: number[] } };
+  args?: {
+    name?: string; data?: { startTime?: number; cpuProfile?: { nodes?: ProfileNode[]; samples?: number[] }; timeDeltas?: number[] };
+  };
 }
 
 /** The trace's events, each read from the buffer by itself: the whole trace, as frames come quicker, outgrows the
@@ -122,7 +124,8 @@ try {
   }
   samples.sort((a, b) => a.ts - b.ts);
   // (by name and file: the lines are the served code's, not the source's)
-  const where = (f: CallFrame) => `${f.functionName || '(anonymous)'} ${(f.url ?? '').replace(/^.*?\/(src|node_modules\/\.vite\/deps|node_modules)\//, '$1/').replace(/\?.*$/, '')}`;
+  const where = (f: CallFrame) => `${f.functionName || '(anonymous)'} `
+    + `${(f.url ?? '').replace(/^.*?\/(src|node_modules\/\.vite\/deps|node_modules)\//, '$1/').replace(/\?.*$/, '')}`;
   const idle = new Set(['(idle)', '(program)', '(garbage collector)', '(root)']);
 
   /** What ran on the main thread from a to b (trace µs): JS by function (self, and the game's own by whole call),
@@ -147,7 +150,8 @@ try {
       }
     }
     const busy = (name: RegExp, pid: number, tid?: number) => events
-      .filter((e) => e.ph === 'X' && e.pid === pid && (tid === undefined || e.tid === tid) && name.test(e.name) && e.ts < b && e.ts + (e.dur ?? 0) > a)
+      .filter((e) => e.ph === 'X' && e.pid === pid && (tid === undefined || e.tid === tid)
+        && name.test(e.name) && e.ts < b && e.ts + (e.dur ?? 0) > a)
       .reduce((s, e) => s + (Math.min(b, e.ts + (e.dur ?? 0)) - Math.max(a, e.ts)) / 1000, 0);
     const [gp, gt] = gpu ? gpu.split(':').map(Number) : [-1, -1];
     return {
@@ -163,7 +167,8 @@ try {
   const report = (label: string, list: typeof frames, from: number) => {
     const over33 = list.filter((f) => f.ms > 33.4).length, over50 = list.filter((f) => f.ms > 50).length;
     const sorted = list.map((f) => f.ms).sort((a, b) => a - b), median = sorted[Math.floor(sorted.length / 2)] ?? 0;
-    console.log(`\n${label}: ${list.length} frames, median ${median.toFixed(1)} ms, over 33 ms: ${over33}, over 50 ms: ${over50}, worst ${(sorted.at(-1) ?? 0).toFixed(0)} ms`);
+    console.log(`\n${label}: ${list.length} frames, median ${median.toFixed(1)} ms, over 33 ms: ${over33}, over 50 ms: ${over50},`
+      + ` worst ${(sorted.at(-1) ?? 0).toFixed(0)} ms`);
     return { over33, over50, from };
   };
   const ms = (x: number) => `${x.toFixed(0).padStart(4)} ms`;
@@ -174,7 +179,8 @@ try {
   const after = report('from PLAY', played, tapped);
   for (const f of [...played].sort((x, y) => y.ms - x.ms).slice(0, worst).sort((x, y) => x.at - y.at)) {
     const w = within(toTrace(f.from), toTrace(f.at));
-    console.log(`\n  ${ms(f.ms)} at +${((f.at - tapped) / 1000).toFixed(2)} s   JS ${w.js.toFixed(0)}  GC ${w.gc.toFixed(0)}  style/layout/paint ${w.style.toFixed(0)}  GPU process ${w.gpu.toFixed(0)} (ms)`);
+    console.log(`\n  ${ms(f.ms)} at +${((f.at - tapped) / 1000).toFixed(2)} s   JS ${w.js.toFixed(0)}  GC ${w.gc.toFixed(0)}`
+      + `  style/layout/paint ${w.style.toFixed(0)}  GPU process ${w.gpu.toFixed(0)} (ms)`);
     for (const [k, v] of w.game) console.log(`      ${ms(v)}  ${k}`);
     if (w.top.length) console.log(`      self: ${w.top.map(([k, v]) => `${k} ${v.toFixed(0)}`).join(' | ')}`);
   }
@@ -186,7 +192,8 @@ try {
   }
   console.log(`\n  ${strip.join(' · ')}`);
   failed = after.over50 > LIMIT.over50 || after.over33 > LIMIT.over33;
-  console.log(`\n${failed ? 'OVER' : 'ok'}: from PLAY at most ${LIMIT.over50} frames over 50 ms and ${LIMIT.over33} over 33 ms (at --slow=1)`);
+  console.log(`\n${failed ? 'OVER' : 'ok'}: from PLAY at most ${LIMIT.over50} frames over 50 ms`
+    + ` and ${LIMIT.over33} over 33 ms (at --slow=1)`);
 } finally {
   await close();
 }

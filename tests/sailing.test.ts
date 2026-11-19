@@ -128,7 +128,9 @@ test('she never sails into water shallower than her draught, at any angle, and s
     const off = offshore(b.at) - DRY, rate = distance(a.at, b.at) / 30;
     assert.ok(off < 15, `${angle}°: ${off} m off the contour`);
     // straight at it, she all but stops: a twentieth of her top speed at most
-    assert.ok(rate >= [0, 0.5, 1.5, 3.5][[0, 20, 45, 70].indexOf(angle)] && (angle > 0 || rate < 0.05 * SHIP.top), `${angle}°: ${rate} m/s`);
+    assert.ok(
+      rate >= [0, 0.5, 1.5, 3.5][[0, 20, 45, 70].indexOf(angle)] && (angle > 0 || rate < 0.05 * SHIP.top), `${angle}°: ${rate} m/s`
+    );
   }
 });
 
@@ -149,7 +151,9 @@ test('set down in the shallows, she can work her way out to deep water', () => {
  * and her quarters. */
 const underHull = (s: ShipState, depth: Depth) => {
   let least = Infinity;
-  for (let a = -0.4 * SHIP.length; a <= 0.4 * SHIP.length + 1e-9; a += 0.4 * SHIP.length / 10) least = Math.min(least, depth(hullAt(s.at, s.heading, [a, 0])));
+  for (let a = -0.4 * SHIP.length; a <= 0.4 * SHIP.length + 1e-9; a += 0.4 * SHIP.length / 10) {
+    least = Math.min(least, depth(hullAt(s.at, s.heading, [a, 0])));
+  }
   for (const side of [-1, 1]) least = Math.min(least, depth(hullAt(s.at, s.heading, [-0.3 * SHIP.length, side * 0.3 * SHIP.beam])));
   return least - SHIP.draught;
 };

@@ -25,7 +25,11 @@ const DIAGONAL = (() => {
   for (let j = 0; j < N; j++) {
     for (let i = 0; i < N; i++) {
       const u = (k: number) => (k / N) * 2 - 1;
-      worst = Math.max(worst, distance(faceDir(0, u(i), u(j)), faceDir(0, u(i + 1), u(j + 1))), distance(faceDir(0, u(i + 1), u(j)), faceDir(0, u(i), u(j + 1))));
+      worst = Math.max(
+        worst,
+        distance(faceDir(0, u(i), u(j)), faceDir(0, u(i + 1), u(j + 1))),
+        distance(faceDir(0, u(i + 1), u(j)), faceDir(0, u(i), u(j + 1)))
+      );
     }
   }
   return worst;
@@ -117,7 +121,8 @@ for (const [label, deg, pole] of CIRCLES) {
     const P = 2 * Math.PI * R * Math.sin(theta), rim = Math.PI * TERRITORY.home * DIAGONAL;
     const expected = 2 * Math.PI * R * R * (1 - Math.cos(theta)) + patchOutsideCap(theta);
     const measured = t.share(0) * PLANET, err = measured - expected;
-    console.log(`${label}: ${measured.toFixed(0)} m², expected ${expected.toFixed(0)} (error ${((100 * err) / expected).toFixed(3)}%), allowed [${(-rim).toFixed(0)}, ${(P * DIAGONAL + rim).toFixed(0)}]`);
+    console.log(`${label}: ${measured.toFixed(0)} m², expected ${expected.toFixed(0)} (error ${((100 * err) / expected).toFixed(3)}%),`
+      + ` allowed [${(-rim).toFixed(0)}, ${(P * DIAGONAL + rim).toFixed(0)}]`);
     assert.ok(err >= -rim && err <= P * DIAGONAL + rim, `error ${err.toFixed(0)} m²`);
   });
 }
@@ -145,7 +150,9 @@ test('the closed trail is an unbroken chain of cells, and what it encloses is ta
   assert.equal(t.holds(1), false);
   const claim = t.changes().find((c) => c.kind === 'claim');
   assert.ok(claim && claim.kind === 'claim');
-  for (let k = 1; k < claim.loop; k++) assert.ok(adjacent(claim.cells[k - 1], claim.cells[k]) || claim.cells[k - 1] === claim.cells[k], `trail cells ${k - 1}→${k}`);
+  for (let k = 1; k < claim.loop; k++) {
+    assert.ok(adjacent(claim.cells[k - 1], claim.cells[k]) || claim.cells[k - 1] === claim.cells[k], `trail cells ${k - 1}→${k}`);
+  }
 });
 
 test('another ship crossing her open trail cuts it: no water gained, and she must go home before laying another', () => {
@@ -185,13 +192,18 @@ test('crossing her own open trail cuts it too; and two ships crossing each other
   const u = createTerritory(2), A = normalize([1, 0.2, 0.1]), B = normalize([1, -0.2, 0.1]);
   u.begin([A, B], 0);
   const pa = line(A, normalize([1, 0.2, -0.15])), pb = line(B, normalize([1, -0.2, -0.15]));
-  for (let k = 1; k < Math.min(pa.length, pb.length); k++) u.step([{ id: 0, from: pa[k - 1], to: pa[k] }, { id: 1, from: pb[k - 1], to: pb[k] }], k, WHOLE);
+  for (let k = 1; k < Math.min(pa.length, pb.length); k++) {
+    u.step([{ id: 0, from: pa[k - 1], to: pa[k] }, { id: 1, from: pb[k - 1], to: pb[k] }], k, WHOLE);
+  }
   const ta = u.trail(0), tb = u.trail(1);
   const ca = ta.points[Math.floor(ta.points.length / 2)], cb = tb.points[Math.floor(tb.points.length / 2)];
   const ea = pa[pa.length - 1], eb = pb[pb.length - 1];
   const xa = line(ea, cb), xb = line(eb, ca), moves: Move[][] = [];
   for (let k = 1; k < Math.max(xa.length, xb.length); k++) {
-    moves.push([{ id: 0, from: xa[Math.min(k - 1, xa.length - 1)], to: xa[Math.min(k, xa.length - 1)] }, { id: 1, from: xb[Math.min(k - 1, xb.length - 1)], to: xb[Math.min(k, xb.length - 1)] }]);
+    moves.push([
+      { id: 0, from: xa[Math.min(k - 1, xa.length - 1)], to: xa[Math.min(k, xa.length - 1)] },
+      { id: 1, from: xb[Math.min(k - 1, xb.length - 1)], to: xb[Math.min(k, xb.length - 1)] }
+    ]);
   }
   const cuts = moves.flatMap((m, k) => u.step(m, 100 + k, WHOLE).cut);
   assert.ok(cuts.some((c) => c.id === 0 && c.by === 1) && cuts.some((c) => c.id === 1 && c.by === 0), JSON.stringify(cuts));
@@ -253,7 +265,8 @@ test('determinism: the same moves give the same grid, to the bit; 80 ships cost 
   assert.equal(a.t.hash(), b.t.hash());
   assert.deepEqual(a.t.changes().map((c) => [c.seq, c.kind]), b.t.changes().map((c) => [c.seq, c.kind]));
   assert.ok(a.claims > 0 && a.cuts > 0, `claims ${a.claims}, cuts ${a.cuts}`);
-  console.log(`80 ships, 60 s: ${a.claims} loops closed, ${a.cuts} cut; a step ${a.mean.toFixed(3)} ms on average, ${a.worst.toFixed(2)} ms at worst`);
+  console.log(`80 ships, 60 s: ${a.claims} loops closed, ${a.cuts} cut;`
+    + ` a step ${a.mean.toFixed(3)} ms on average, ${a.worst.toFixed(2)} ms at worst`);
   assert.ok(a.mean < 2, `${a.mean} ms a step`);
 });
 

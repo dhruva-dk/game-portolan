@@ -3,11 +3,11 @@
 // Each match is the game's own (play/state.ts start and advance, the matches dealt as play/setup.ts deals them), every
 // ship a bot, hers too, on a flat sea (the waves only lift the drawn ships). Prints, per match, the share of ships
 // afloat that are armed at 30, 60 and 120 s and the share with a shield or something to mend with, how the ships were
-// sunk, how and when it ended, the balls fired and how many struck home, and the bots stuck: any that moved less than STUCK m in WINDOW s, told apart by her
-// speed over it: aground (under AGROUND m/s), or sailing round in circles (fighting round a foe, going for a piece
-// near her, or roaming, a new mark every few seconds on any bearing). And who holds the sea
-// (sim/territory.ts): the share of the planet held at 30, 60, 120, 240 s and at the end (all ships', and the most
-// any one holds), the loops closed and cut, and the shield their own water gave back.
+// sunk, how and when it ended, the balls fired and how many struck home, and the bots stuck: any that moved less than
+// STUCK m in WINDOW s, told apart by her speed over it: aground (under AGROUND m/s), or sailing round in circles
+// (fighting round a foe, going for a piece near her, or roaming, a new mark every few seconds on any bearing). And who
+// holds the sea (sim/territory.ts): the share of the planet held at 30, 60, 120, 240 s and at the end (all ships', and
+// the most any one holds), the loops closed and cut, and the shield their own water gave back.
 
 import { STEP } from '../src/sim/fixed.ts';
 import { KINDS } from '../src/kinds.ts';
@@ -100,7 +100,9 @@ for (let g = 0; g < games; g++) {
         track.set(v.id, path);
         if (path.length > WINDOW && distance(path[path.length - 1 - WINDOW].at, v.ship.at) < STUCK) {
           const k = stuck.get(v.id), speed = path.slice(-WINDOW).reduce((a, q) => a + q.speed, 0) / WINDOW;
-          stuck.set(v.id, k ? { ...k, seconds: k.seconds + 1, speed: Math.min(k.speed, speed) } : { from: s - WINDOW, seconds: WINDOW, speed });
+          stuck.set(v.id, k
+            ? { ...k, seconds: k.seconds + 1, speed: Math.min(k.speed, speed) }
+            : { from: s - WINDOW, seconds: WINDOW, speed });
         }
       }
       if ([30, 60, 120, 240].includes(s)) held.push(`${s} s ${holding()}`);
@@ -118,13 +120,18 @@ for (let g = 0; g < games; g++) {
     if (k.cause === 'storm' && k.by !== null) credited++;
   }
   const left = state.alive();
-  console.log(`match ${g + 1} (seed ${m.seed}): ${left.length} left at ${state.time().toFixed(0)} s${left.length === 1 ? ` (ship ${left[0]} wins)` : ''};`
-    + ` sunk by shot ${causes.shot}, ram ${causes.ram}, storm ${causes.storm} (${credited} credited); ${(ms / steps).toFixed(2)} ms a step`);
-  console.log(`  balls: ${balls.fired} fired, ${balls.struck} struck home (${((100 * balls.struck) / Math.max(1, balls.fired)).toFixed(0)}%)`);
-  console.log(`  by kind: ${[...kinds].map(([k, n]) => `${k} ${n.shots} shots ${n.balls ? (100 * (1 - n.fell / n.balls)).toFixed(0) : '-'}% home`).join(', ')}`);
+  console.log(`match ${g + 1} (seed ${m.seed}): ${left.length} left at ${state.time().toFixed(0)} s`
+    + `${left.length === 1 ? ` (ship ${left[0]} wins)` : ''};`
+    + ` sunk by shot ${causes.shot}, ram ${causes.ram}, storm ${causes.storm} (${credited} credited);`
+    + ` ${(ms / steps).toFixed(2)} ms a step`);
+  console.log(`  balls: ${balls.fired} fired, ${balls.struck} struck home`
+    + ` (${((100 * balls.struck) / Math.max(1, balls.fired)).toFixed(0)}%)`);
+  console.log(`  by kind: ${[...kinds]
+    .map(([k, n]) => `${k} ${n.shots} shots ${n.balls ? (100 * (1 - n.fell / n.balls)).toFixed(0) : '-'}% home`).join(', ')}`);
   const median = (xs: number[]) => xs.sort((a, b) => a - b)[xs.length >> 1] ?? NaN, ships = state.ships().length;
   const firsts = [...first.values()], seconds2 = [...second.values()];
-  console.log(`  armed: ${firsts.length}/${ships} found a gun, median ${median(firsts)} s, 90% by ${firsts.sort((a, b) => a - b)[Math.floor(0.9 * firsts.length)] ?? NaN} s;`
+  console.log(`  armed: ${firsts.length}/${ships} found a gun, median ${median(firsts)} s,`
+    + ` 90% by ${firsts.sort((a, b) => a - b)[Math.floor(0.9 * firsts.length)] ?? NaN} s;`
     + ` ${seconds2.length} a second kind, median ${median(seconds2)} s; the longest quiet after 30 s, ${quiet.toFixed(0)} s with no shot`);
   console.log(`  loot: ${loot.length} pieces at the start, ${shallow} in water too shoal to reach`);
   for (const k of marks) console.log(`  ${k}`);
@@ -136,6 +143,7 @@ for (let g = 0; g < games; g++) {
   const seconds = all.map((k) => k.seconds).sort((a, b) => a - b), speeds = all.map((k) => k.speed).sort((a, b) => a - b);
   // (a ship circling in her own water, way on, moves little over WINDOW s: her speed tells her from one lying still)
   console.log(`  stuck (<${STUCK} m in ${WINDOW} s): ${all.length} ships, ${aground.length} of them aground;`
-    + ` ${all.filter((k) => k.from < 30).length} from the first 30 s; seconds stuck, median ${seconds[seconds.length >> 1] ?? 0}, most ${seconds.at(-1) ?? 0};`
+    + ` ${all.filter((k) => k.from < 30).length} from the first 30 s;`
+    + ` seconds stuck, median ${seconds[seconds.length >> 1] ?? 0}, most ${seconds.at(-1) ?? 0};`
     + ` their slowest mean speed, median ${(speeds[speeds.length >> 1] ?? 0).toFixed(1)} m/s`);
 }

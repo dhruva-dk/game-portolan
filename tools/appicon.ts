@@ -41,7 +41,9 @@ try {
     }
     console.log(`${resolve(OUT, name)}-{${SIZES.join(',')}}.png`);
   }
-  const contents = { images: [{ filename: FILE, idiom: 'universal', platform: 'ios', size: '1024x1024' }], info: { author: 'xcode', version: 1 } };
+  const contents = {
+    images: [{ filename: FILE, idiom: 'universal', platform: 'ios', size: '1024x1024' }], info: { author: 'xcode', version: 1 }
+  };
   writeFileSync(resolve(SET, 'Contents.json'), `${JSON.stringify(contents, null, 2)}\n`);
   console.log(`installed '${installed}' as ${resolve(SET, FILE)}`);
 } finally {

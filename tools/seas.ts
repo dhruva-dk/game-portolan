@@ -22,7 +22,9 @@ export const seaOf = (t: Territory, generation: number): Sea => ({
 export function match(seed: number, generation: number, steps: number, frame: (sea: Sea, time: number) => void) {
   const draw = random(seed), ships = 6, centre = normalize([0.3, 0.9, 0.2]);
   const [e1, e2] = [normalize(cross(centre, [0, 0, 1])), normalize(cross(centre, normalize(cross(centre, [0, 0, 1]))))];
-  const homes = Array.from({ length: ships }, (_, i): Vec3 => normalize(add(add(centre, e1, (90 * Math.cos(i)) / R), e2, (90 * Math.sin(i * 1.7)) / R)));
+  const homes = Array.from(
+    { length: ships }, (_, i): Vec3 => normalize(add(add(centre, e1, (90 * Math.cos(i)) / R), e2, (90 * Math.sin(i * 1.7)) / R))
+  );
   const t = createTerritory(ships);
   t.begin(homes, 0);
   const at = homes.slice(), plans: Vec3[][] = homes.map(() => []), sunk = new Set<number>();
@@ -32,7 +34,8 @@ export function match(seed: number, generation: number, steps: number, frame: (s
       if (sunk.has(id)) continue;
       if (!plans[id].length) {
         // a bite: out on a bearing drawn, across, and back to her berth
-        const a = draw() * 2 * Math.PI, dir = add(scale(e1, Math.cos(a)), e2, Math.sin(a)), side = add(scale(e1, -Math.sin(a)), e2, Math.cos(a));
+        const a = draw() * 2 * Math.PI, dir = add(scale(e1, Math.cos(a)), e2, Math.sin(a)),
+          side = add(scale(e1, -Math.sin(a)), e2, Math.cos(a));
         const out = normalize(add(at[id], dir, (30 + 80 * draw()) / R)), across = normalize(add(out, side, (20 + 40 * draw()) / R));
         plans[id] = [out, across, homes[id]];
       }
@@ -67,7 +70,9 @@ export function halfLoop() {
   const t = createTerritory(1);
   t.begin([path[0]], 0);
   let time = 0;
-  for (let k = 1; k < path.length && !t.changes().some((c) => c.kind === 'claim'); k++) t.step([{ id: 0, from: path[k - 1], to: path[k] }], (time = k / 30), WHOLE);
+  for (let k = 1; k < path.length && !t.changes().some((c) => c.kind === 'claim'); k++) {
+    t.step([{ id: 0, from: path[k - 1], to: path[k] }], (time = k / 30), WHOLE);
+  }
   const after = seaOf(t, 1), loop = after.changes.at(-1)!, owner = Uint8Array.from(t.owner);
   if (loop.kind !== 'claim') throw new Error(`the loop closed as a ${loop.kind}`);
   for (let k = 0; k < loop.cells.length; k++) owner[loop.cells[k]] = 0;

@@ -14,7 +14,8 @@ const all = anchors(icosphere(FREQUENCY), createWind(3), CASCADES[0]);
 const open = () => -40;
 const rms = (xs: number[]) => Math.sqrt(xs.reduce((s, x) => s + x * x, 0) / xs.length);
 /** Spread points over the sphere, and times. */
-const places = (n: number) => Array.from({ length: n }, (_, i) => ({ p: fromLatLon(Math.asin(2 * ((i * 0.618) % 1) - 1), i * 2.4), t: i * 1.37 }));
+const places = (n: number) =>
+  Array.from({ length: n }, (_, i) => ({ p: fromLatLon(Math.asin(2 * ((i * 0.618) % 1) - 1), i * 2.4), t: i * 1.37 }));
 const DEG = Math.PI / 180;
 
 test('the modes kept hold nearly all the long waves', () => {
@@ -50,7 +51,9 @@ test('the swell is as high as the sea state, repeats every PERIOD, and is cut by
   assert.ok(Math.abs(rms(h) / (seaState(10, FETCH).hs / 4) - 0.95) < 0.12, `${rms(h)}`);
   for (const { p, t } of places(20)) assert.ok(Math.abs(swell(p, t) - swell(p, t + PERIOD)) < 1e-6);
   const shallow = createSwell(all, () => -0.5, 10).at;
-  for (const { p, t } of places(20)) assert.ok(Math.abs(shallow(p, t)) <= Math.abs(swell(p, t)) * (0.5 * 0.78 / seaState(10, FETCH).hs) + 0.05);
+  for (const { p, t } of places(20)) {
+    assert.ok(Math.abs(shallow(p, t)) <= Math.abs(swell(p, t)) * (0.5 * 0.78 / seaState(10, FETCH).hs) + 0.05);
+  }
 });
 
 /** The water under a hull read point by point from the surface, each point's move its own (what the hull read stands
@@ -116,7 +119,8 @@ test('the hull rides the swell: her level follows the water under her, her pitch
     const swell = createSwell(all, open, wind, { shortest: RIDE.shortest }).hull;
     const s = shipAt(fromLatLon(0.3, 1.1), frameAt(fromLatLon(0.3, 1.1)).north);
     let r = settled(s, swell, 0);
-    const level: number[] = [], miss: number[] = [], pitch: number[] = [], pitchMiss: number[] = [], roll: number[] = [], rolled: number[] = [];
+    const level: number[] = [], miss: number[] = [], pitch: number[] = [], pitchMiss: number[] = [], roll: number[] = [],
+      rolled: number[] = [];
     for (let i = 1; i < 60 / STEP; i++) {
       const t = i * STEP;
       r = ride(r, s, swell, t, STEP);
@@ -132,7 +136,9 @@ test('the hull rides the swell: her level follows the water under her, her pitch
     }
     // she lags the water a little, as a hull of her weight does, but never floats clear of it or sinks into it
     assert.ok(rms(miss) < 0.3 * rms(level), `wind ${wind}: level off by ${rms(miss)} m of ${rms(level)} m`);
-    assert.ok(Math.max(...miss.map(Math.abs)) < 0.25 * seaState(wind, FETCH).hs, `wind ${wind}: ${Math.max(...miss.map(Math.abs))} m at worst`);
+    assert.ok(
+      Math.max(...miss.map(Math.abs)) < 0.25 * seaState(wind, FETCH).hs, `wind ${wind}: ${Math.max(...miss.map(Math.abs))} m at worst`
+    );
     assert.ok(rms(pitchMiss) < 0.5 * rms(pitch), `wind ${wind}: pitch off by ${rms(pitchMiss)} of ${rms(pitch)}`);
     // the chop rocks the water under her rails more than it rolls her
     assert.ok(rms(rolled) < rms(roll) && rms(rolled) > 0.5 * rms(roll), `wind ${wind}: rolls ${rms(rolled)} on ${rms(roll)}`);

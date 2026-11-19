@@ -25,7 +25,10 @@ const isle = along(start, frameAt(start).east, 150).p;
 const shores: Depth = (p) => Math.min(20, -6 + offshore(p) / 4, (distance(p, isle) - 70) / 3);
 
 /** Bots `seeds` (null: a ship holding `held`'s orders) sailed `seconds` from `fleet`; the rams there were, told to the struck. */
-function sail(fleet: Vessel[], seeds: (number | null)[], seconds: number, depth: Depth, held?: (v: Vessel, fleet: Vessel[]) => Helm, each?: (f: Vessel[], t: number) => void, storm?: (t: number) => Storm) {
+function sail(
+  fleet: Vessel[], seeds: (number | null)[], seconds: number, depth: Depth,
+  held?: (v: Vessel, fleet: Vessel[]) => Helm, each?: (f: Vessel[], t: number) => void, storm?: (t: number) => Storm
+) {
   let minds: (Memory | null)[] = fleet.map((v, i) => (seeds[i] === null ? null : mind(seeds[i]!, v.ship.at)));
   const blows: Blow[] = [];
   for (let n = 0; n < Math.round(seconds / STEP); n++) {
@@ -69,7 +72,8 @@ test('the same bots from the same places sail the same voyage, to the bit', () =
   assert.deepEqual(a, b);
   // and with a storm closing on them
   const storm = closing(along(start, north, -150).p, 220, 80, 10, 30);
-  const c = sail(fleet(), [1, 2, 3, 4, 5, 6], 60, shores, undefined, undefined, storm), d = sail(fleet(), [1, 2, 3, 4, 5, 6], 60, shores, undefined, undefined, storm);
+  const c = sail(fleet(), [1, 2, 3, 4, 5, 6], 60, shores, undefined, undefined, storm),
+    d = sail(fleet(), [1, 2, 3, 4, 5, 6], 60, shores, undefined, undefined, storm);
   assert.deepEqual(c, d);
   assert.notDeepEqual(a.fleet, c.fleet);
 });
@@ -130,7 +134,8 @@ test('a bot answering a ram takes less of it than a ship holding her course', ()
       const t = f.find((o) => o.id === 2)!.ship.at;
       return { course: [t[0] - v.ship.at[0], t[1] - v.ship.at[1], t[2] - v.ship.at[2]], throttle: 1 };
     };
-    const taken = (blows: Blow[]) => blows.reduce((sum, b) => sum + (b.struck.id === 2 ? b.struck.damage : b.striker.id === 2 ? b.striker.damage : 0), 0);
+    const taken = (blows: Blow[]) =>
+      blows.reduce((sum, b) => sum + (b.struck.id === 2 ? b.struck.damage : b.striker.id === 2 ? b.striker.damage : 0), 0);
     answered += taken(sail([rammer, victim], [null, seed], 20, deep, chase).blows);
     holding += taken(sail([rammer, victim], [null, null], 20, deep, chase).blows);
   }
@@ -161,7 +166,10 @@ function closing(centre: Vec3, from: number, to: number, wait: number, close: nu
   };
 }
 /** Every sort of captain: a seed for each temperament's margin, from the boldest to the most careful, green and sharp. */
-const captains = [...seedsWhere((t) => t.skill < 0.5, 3), ...seedsWhere((t) => t.skill > 0.8, 3), ...seedsWhere((t) => t.margin > 40, 2), ...seedsWhere((t) => t.margin < 15, 2)];
+const captains = [
+  ...seedsWhere((t) => t.skill < 0.5, 3), ...seedsWhere((t) => t.skill > 0.8, 3),
+  ...seedsWhere((t) => t.margin > 40, 2), ...seedsWhere((t) => t.margin < 15, 2)
+];
 
 test('a bot outside the next cap makes for it in time, and is never caught outside the closing one', () => {
   // the next cap, 120 m round a point 400 m off; it starts to close from 600 m in 20 s, over 70 s (its edge at 7 m/s,
@@ -173,7 +181,8 @@ test('a bot outside the next cap makes for it in time, and is never caught outsi
       worst = Math.min(worst, toEdge(f[0].ship.at, storm(t)));
     }, storm);
     const inside = toEdge(r.fleet[0].ship.at, storm(100).next);
-    console.log(`# seed ${seed} (margin ${temper(seed).margin.toFixed(0)} m, skill ${temper(seed).skill.toFixed(2)}): ${inside.toFixed(0)} m inside, never less than ${worst.toFixed(0)} m inside the closing cap`);
+    console.log(`# seed ${seed} (margin ${temper(seed).margin.toFixed(0)} m, skill ${temper(seed).skill.toFixed(2)}):`
+      + ` ${inside.toFixed(0)} m inside, never less than ${worst.toFixed(0)} m inside the closing cap`);
     assert.ok(worst > 0, `${seed}: caught ${(-worst).toFixed(0)} m outside`);
     assert.ok(inside > 0, `${seed}: ${(-inside).toFixed(0)} m outside the next cap`);
   }
@@ -196,6 +205,10 @@ test('a bot inside the cap never leaves it, roaming or with the next one closing
   }
   // without the storm, she roams out past it
   let out = 0;
-  for (const seed of captains) sail([placed(1, seed, 40, seed * 2.3)], [seed], 180, deep, undefined, (f) => { if (toEdge(f[0].ship.at, { centre: start, radius: 260 / R }) < 0) out++; });
+  for (const seed of captains) {
+    sail([placed(1, seed, 40, seed * 2.3)], [seed], 180, deep, undefined, (f) => {
+      if (toEdge(f[0].ship.at, { centre: start, radius: 260 / R }) < 0) out++;
+    });
+  }
   assert.ok(out > 0);
 });

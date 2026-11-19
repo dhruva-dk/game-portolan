@@ -64,7 +64,10 @@ test('looked for only near the land\'s rises, a sight meets what it met looking 
     const base = off ? off.base : anywhere();
     const fb = frameAt(base), a = off ? off.back + 0.6 * (draw() - 0.5) : draw() * 2 * Math.PI;
     const ahead = add(scale(fb.north, Math.cos(a)), fb.east, Math.sin(a));
-    const s = { from: scale(base, R + (ashore ? 2 + 6 * draw() : 3 + 37 * draw())), dir: normalize(add(ahead, base, -(ashore ? 0.02 : 0.15) * draw())) };
+    const s = {
+      from: scale(base, R + (ashore ? 2 + 6 * draw() : 3 + 37 * draw())),
+      dir: normalize(add(ahead, base, -(ashore ? 0.02 : 0.15) * draw()))
+    };
     reads = 0;
     const whole = meets(s, depth);
     all += reads;

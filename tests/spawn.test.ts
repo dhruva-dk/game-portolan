@@ -26,8 +26,11 @@ test('every ship starts afloat in open water, clear of land all round, heading a
       assert.ok(depth(s.at) >= SHIP.draught + SPAWN.depth, `${depth(s.at)} m under her`);
       for (let k = 0; k < 24; k++) {
         const t = along(s.at, s.heading, 1).t, b = (2 * Math.PI * k) / 24;
-        const round = [Math.cos(b), Math.sin(b)] as const, port = [s.at[1] * t[2] - s.at[2] * t[1], s.at[2] * t[0] - s.at[0] * t[2], s.at[0] * t[1] - s.at[1] * t[0]] as const;
-        const dir = [t[0] * round[0] + port[0] * round[1], t[1] * round[0] + port[1] * round[1], t[2] * round[0] + port[2] * round[1]] as const;
+        const round = [Math.cos(b), Math.sin(b)] as const,
+          port = [s.at[1] * t[2] - s.at[2] * t[1], s.at[2] * t[0] - s.at[0] * t[2], s.at[0] * t[1] - s.at[1] * t[0]] as const;
+        const dir = [
+          t[0] * round[0] + port[0] * round[1], t[1] * round[0] + port[1] * round[1], t[2] * round[0] + port[2] * round[1]
+        ] as const;
         assert.ok(depth(along(s.at, dir, SPAWN.clear).p) >= SHIP.draught, 'land within her clearance');
       }
       // the first 40 m ahead of her are open

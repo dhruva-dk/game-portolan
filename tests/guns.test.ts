@@ -31,7 +31,10 @@ const BEST: Record<GunKind, number> = { cannon: 100, scatter: 30, repeater: 80, 
 
 /** The still fleet fought for `seconds` (or till `until`), ship 1 holding her trigger with no spread, laid along her
  *  heading (the assist on what stands there); each step's shots, cues and sinkings, timed. */
-function fight(crews: Crew[], fleet: Vessel[], seconds: number, until: (sunk: number[]) => boolean = () => false, order: Order = { aim: null, fire: true, spread: 0 }) {
+function fight(
+  crews: Crew[], fleet: Vessel[], seconds: number, until: (sunk: number[]) => boolean = () => false,
+  order: Order = { aim: null, fire: true, spread: 0 }
+) {
   let b: Battle = battleOf(crews, 7);
   const shots: number[] = [], cues: { t: number; cue: Cue }[] = [];
   for (let i = 0; i < Math.round(seconds / STEP); i++) {
@@ -48,7 +51,10 @@ function fight(crews: Crew[], fleet: Vessel[], seconds: number, until: (sunk: nu
 /** Seconds a common gun of `kind` takes to sink a still ship of 100 hull and `shield` lying across its line at its best range. */
 function ttk(kind: GunKind, shield: number) {
   const target = { ...crewOf(2), health: { hull: 100, shield } };
-  return fight([crewOf(1, gunOf(kind, 0)), target], [afloat(1, lying(centre, 0)), afloat(2, lying(east(BEST[kind]), Math.PI / 2))], 20, (s) => s.includes(2)).time;
+  return fight(
+    [crewOf(1, gunOf(kind, 0)), target], [afloat(1, lying(centre, 0)), afloat(2, lying(east(BEST[kind]), Math.PI / 2))], 20,
+    (s) => s.includes(2)
+  ).time;
 }
 
 // Every ball home, the flight counted: the scatter quickest close, the repeater quickest through a shield, the harpoon
@@ -73,7 +79,11 @@ test('held, a gun fires its magazine at its interval, reloads, and fires again',
   for (const k of ['cannon', 'scatter', 'repeater'] as const) {
     const g = GUNS[k], { shots, cues } = alone(k, g.interval * g.mag + g.reload + 0.3);
     assert.equal(shots[0], STEP, `${k}: the first at once`);
-    for (let i = 1; i < g.mag; i++) assert.ok(Math.abs(shots[i] - shots[i - 1] - g.interval) < STEP + 1e-9, `${k}: shot ${i} after ${(shots[i] - shots[i - 1]).toFixed(3)} s`);
+    for (let i = 1; i < g.mag; i++) {
+      assert.ok(
+        Math.abs(shots[i] - shots[i - 1] - g.interval) < STEP + 1e-9, `${k}: shot ${i} after ${(shots[i] - shots[i - 1]).toFixed(3)} s`
+      );
+    }
     const gap = shots[g.mag] - shots[g.mag - 1];
     assert.ok(gap >= g.reload && gap <= g.reload + 2 * STEP + 1e-9, `${k}: the reload ${gap.toFixed(3)} s`);
     assert.deepEqual(cues.map((c) => c.cue.kind), ['reloading', 'reloaded'], k);
@@ -84,7 +94,9 @@ test('the harpoon and the mortar wind up before each shot, seen as a cue; their 
   for (const k of ['harpoon', 'mortar'] as const) {
     const g = GUNS[k], { shots, cues } = alone(k, 5);
     assert.equal(cues[0].cue.kind, 'winding');
-    assert.ok(Math.abs(shots[0] - cues[0].t - g.windup) <= STEP + 1e-9, `${k}: the first ${(shots[0] - cues[0].t).toFixed(3)} s after the trigger`);
+    assert.ok(
+      Math.abs(shots[0] - cues[0].t - g.windup) <= STEP + 1e-9, `${k}: the first ${(shots[0] - cues[0].t).toFixed(3)} s after the trigger`
+    );
     const reloads = cues.filter((c) => c.cue.kind === 'reloading').length, windings = cues.filter((c) => c.cue.kind === 'winding').length;
     assert.equal(windings, shots.length + (cues.at(-1)!.cue.kind === 'winding' ? 1 : 0), `${k}: a wind-up for every shot`);
     assert.ok(reloads >= Math.floor(shots.length / g.mag), k);
@@ -117,7 +129,10 @@ test('a mortar\'s fall mark is drawn its splash\'s size (gunfire.ts MARK, which 
 
 test('a mortar\'s shell bursts over its splash: the ship struck takes all of it, one beside her less, the shooter none', () => {
   // laid on ship 2 at 80 m; ship 3 lies 7 m beyond her, ship 4 well clear
-  const fleet = [afloat(1, lying(centre, 0)), afloat(2, lying(east(80), Math.PI / 2)), afloat(3, lying(east(87), Math.PI / 2)), afloat(4, lying(east(110), Math.PI / 2))];
+  const fleet = [
+    afloat(1, lying(centre, 0)), afloat(2, lying(east(80), Math.PI / 2)), afloat(3, lying(east(87), Math.PI / 2)),
+    afloat(4, lying(east(110), Math.PI / 2))
+  ];
   const crews = [crewOf(1, gunOf('mortar', 0)), ...[2, 3, 4].map((id) => ({ ...crewOf(id), health: { hull: 100, shield: 100 } }))];
   const { battle } = fight(crews, fleet, 4, undefined, { aim: null, fire: true, spread: 0 });
   const lost = (id: number) => { const c = battle.crews.find((x) => x.id === id)!; return 200 - c.health.hull - c.health.shield; };
@@ -138,16 +153,22 @@ test('the same guns fight the same way, to the bit', () => {
   const run = () => {
     const fleet = KINDS.map((_, i) => afloat(i + 1, lying(east(i * 40), i % 2 ? Math.PI / 2 : 0)));
     let b: Battle = battleOf(KINDS.map((k, i) => crewOf(i + 1, gunOf(k, i % 5))), 3);
-    for (let i = 0; i < 180; i++) b = stepBattle(b, fleet, fleet.map(() => ({ aim: null, fire: true, spread: 1.5 })), [], STEP, deep).battle;
+    for (let i = 0; i < 180; i++) {
+      b = stepBattle(b, fleet, fleet.map(() => ({ aim: null, fire: true, spread: 1.5 })), [], STEP, deep).battle;
+    }
     return b;
   };
   assert.deepEqual(run(), run());
 });
 
-test('the sea is strewn with some 230–340 pieces, half of them guns, the cannon the commonest, the harpoon and the mortar the rarest', () => {
+test('the sea is strewn with some 230–340 pieces, half of them guns, the cannon the commonest, the harpoon and the mortar the rarest',
+  () => {
   const f = strewn(5, deep), guns = f.pieces.map((p) => p.goods).filter(isArms);
   // about half of the 570 first strewn, from 400 spots
-  assert.ok(f.pieces.length > 0.4 * 570 && f.pieces.length < 0.6 * 570 && f.pieces.length < (1 + LOOT.second + 0.1) * LOOT.spots, `${f.pieces.length}`);
+  assert.ok(
+    f.pieces.length > 0.4 * 570 && f.pieces.length < 0.6 * 570 && f.pieces.length < (1 + LOOT.second + 0.1) * LOOT.spots,
+    `${f.pieces.length}`
+  );
   const count = (k: GunKind) => guns.filter((g) => g.kind === k).length;
   assert.ok(Math.abs(guns.length / f.pieces.length - LOOT.gun) < 0.08, `${guns.length} of ${f.pieces.length}`);
   assert.ok(KINDS.every((k) => k === 'cannon' || count('cannon') > count(k)));

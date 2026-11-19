@@ -36,7 +36,8 @@ test('a drag turns it freely round her, and tilts it only within its limits', ()
   assert.equal(dragged(REST, { x: 0, y: 1e4 }).pitch, ORBIT.pitch[1]);
   assert.equal(dragged(REST, { x: 0, y: -1e4 }).pitch, ORBIT.pitch[0]);
   // dragged right, it goes round to her port side of where it was
-  const before = where(anchorageEye(pose, REST, 0, flat).position).off, after = where(anchorageEye(pose, dragged(REST, { x: 100, y: 0 }), 0, flat).position).off;
+  const before = where(anchorageEye(pose, REST, 0, flat).position).off,
+    after = where(anchorageEye(pose, dragged(REST, { x: 100, y: 0 }), 0, flat).position).off;
   assert.ok(after > before);
 });
 

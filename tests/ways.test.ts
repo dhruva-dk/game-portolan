@@ -1,6 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { EVENTS, HOME, IN_MATCH, SCREENS, TAPS, WAYS, course, events, way, wayHome, type Leg, type Screen, type Trigger } from '../src/ui/ways.ts';
+import {
+  EVENTS, HOME, IN_MATCH, SCREENS, TAPS, WAYS, course, events, way, wayHome, type Leg, type Screen, type Trigger
+} from '../src/ui/ways.ts';
 
 const taps: readonly Trigger[] = TAPS, happenings: readonly Trigger[] = EVENTS;
 const ways = (s: Screen) => Object.entries(WAYS[s]) as [Trigger, Screen][];

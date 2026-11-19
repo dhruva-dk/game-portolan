@@ -37,11 +37,16 @@ const bold = (() => {
 /** Bots `seeds` (null: a ship holding `held`, firing along her heading if `fire`) sailing and fighting `seconds`;
  *  armed as `guns` (a cannon's rarity, the guns she carries, or null); in `storm` if given; bots told of the balls that
  *  strike them, and the guns they ask for taken in hand. */
-function battle(fleet: Vessel[], seeds: (number | null)[], guns: (number | Gun[] | null)[], seconds: number, held: Helm = { course: null, throttle: 0 }, { storm, fire = false }: { storm?: Storm; fire?: boolean } = {}) {
+function battle(
+  fleet: Vessel[], seeds: (number | null)[], guns: (number | Gun[] | null)[], seconds: number, held: Helm = { course: null, throttle: 0 },
+  { storm, fire = false }: { storm?: Storm; fire?: boolean } = {}
+) {
   const minds: (Memory | null)[] = fleet.map((v, i) => (seeds[i] === null ? null : mind(seeds[i]!, v.ship.at)));
   // every ship put to sea with a full shield, as she would be with a few fights' loot in her, so a test runs its length
   const carried = (g: number | Gun[] | null): Gun[] => (g === null ? [] : typeof g === 'number' ? [gunOf('cannon', g)] : g);
-  let b: Battle = battleOf(fleet.map((v, i) => ({ ...crewOf(v.id, ...carried(guns[i])), health: { hull: HEALTH.hull, shield: HEALTH.shield } })), 7);
+  let b: Battle = battleOf(
+    fleet.map((v, i) => ({ ...crewOf(v.id, ...carried(guns[i])), health: { hull: HEALTH.hull, shield: HEALTH.shield } })), 7
+  );
   const fired: { t: number; id: number; gun: GunKind }[] = [], ranges: number[] = [];
   let strikes = 0, blows = 0;
   for (let n = 0; n < Math.round(seconds / STEP); n++) {
@@ -82,7 +87,8 @@ test('an armed bot holds off at her gun\'s range and shoots a steady ship, rathe
     const r = battle([placed(0, 0, 0, 90 * deg), placed(1, 0, 150, 0)], [seed, null], [0, null], 40, { course: null, throttle: 0.4 });
     const later = r.ranges.slice(Math.round(10 / STEP));
     const near = Math.min(...later), far = Math.max(...later);
-    console.log(`# seed ${seed}: ${r.fired.length} shots, ${r.strikes} hits, range ${near.toFixed(0)}–${far.toFixed(0)} m, ${r.blows} rams`);
+    console.log(`# seed ${seed}: ${r.fired.length} shots, ${r.strikes} hits,`
+      + ` range ${near.toFixed(0)}–${far.toFixed(0)} m, ${r.blows} rams`);
     assert.equal(r.blows, 0, `${seed}: rammed`);
     assert.ok(near > 20, `${seed}: closed to ${near.toFixed(0)} m`);
     assert.ok(r.fired.length >= 6, `${seed}: ${r.fired.length} shots`);
@@ -113,7 +119,8 @@ test('an unarmed bot never orders her gun fired', () => {
 
 /** The storm in its first phase (her restraint at its most), or once its last cap has closed (none left). */
 const stormIn = (phase: number): Storm => ({
-  centre: start, radius: Math.PI, next: { centre: start, radius: Math.PI }, closing: false, secondsToNext: phase < 7 ? 60 : Infinity, phase, damage: 0,
+  centre: start, radius: Math.PI, next: { centre: start, radius: Math.PI }, closing: false,
+  secondsToNext: phase < 7 ? 60 : Infinity, phase, damage: 0,
 });
 const mild = (() => {
   const out: number[] = [];
@@ -123,7 +130,8 @@ const mild = (() => {
 
 test('early in a match a mild armed bot keeps out of a fight she would take up late in it', () => {
   for (const seed of mild) {
-    const fights = (phase: number) => battle([placed(0, 0, 0, 0), placed(1, 0, 110, 90 * deg)], [seed, null], [1, null], 30, undefined, { storm: stormIn(phase) });
+    const fights = (phase: number) =>
+      battle([placed(0, 0, 0, 0), placed(1, 0, 110, 90 * deg)], [seed, null], [1, null], 30, undefined, { storm: stormIn(phase) });
     const early = fights(0), late = fights(7);
     console.log(`# seed ${seed}: ${early.fired.length} shots early, ${late.fired.length} late`);
     assert.equal(early.fired.length, 0, `${seed}: fired early`);
@@ -134,7 +142,9 @@ test('early in a match a mild armed bot keeps out of a fight she would take up l
 test('holding back, she still fires back at a ship close by that is shooting her', () => {
   for (const seed of mild) {
     // a ship 70 m off, bow on to her, firing along her heading
-    const r = battle([placed(0, 0, 0, 90 * deg), placed(1, 0, 70, 180 * deg)], [seed, null], [1, 1], 30, undefined, { storm: stormIn(0), fire: true });
+    const r = battle(
+      [placed(0, 0, 0, 90 * deg), placed(1, 0, 70, 180 * deg)], [seed, null], [1, 1], 30, undefined, { storm: stormIn(0), fire: true }
+    );
     const back = r.fired.filter((f) => f.id === 0).length;
     console.log(`# seed ${seed}: ${back} shots back`);
     assert.ok(back > 0, `${seed}: never fired back`);
@@ -153,7 +163,8 @@ test('a green bot\'s balls spread wider than a sharp one\'s, and hit less', () =
   // captains of each (four, since the bore moved aft and up with the drawn plinth, tell them apart by less than the
   // margin: 27% against 13%)
   const share = (seeds: number[]) => {
-    const rs = seeds.map((seed) => battle([placed(0, 0, 0, 90 * deg), placed(1, 0, 150, 0)], [seed, null], [0, null], 15, { course: null, throttle: 0.4 }));
+    const rs = seeds.map((seed) =>
+      battle([placed(0, 0, 0, 90 * deg), placed(1, 0, 150, 0)], [seed, null], [0, null], 15, { course: null, throttle: 0.4 }));
     return rs.reduce((n, r) => n + r.strikes, 0) / Math.max(1, rs.reduce((n, r) => n + r.fired.length, 0));
   };
   const g = share(green), s = share(sharp);
@@ -164,8 +175,12 @@ test('a green bot\'s balls spread wider than a sharp one\'s, and hit less', () =
 test('a bot with two guns takes in hand the one for the range: a scatter close, a harpoon far off', () => {
   for (const seed of bold) {
     // the scatter in hand to begin with, her foe far off; then the harpoon in hand, her foe close
-    const far = battle([placed(0, 0, 0, 90 * deg), placed(1, 0, 200, 0)], [seed, null], [[gunOf('scatter', 0), gunOf('harpoon', 0)], null], 12);
-    const near = battle([placed(0, 0, 0, 90 * deg), placed(1, 0, 30, 0)], [seed, null], [[gunOf('harpoon', 0), gunOf('scatter', 0)], null], 6);
+    const far = battle(
+      [placed(0, 0, 0, 90 * deg), placed(1, 0, 200, 0)], [seed, null], [[gunOf('scatter', 0), gunOf('harpoon', 0)], null], 12
+    );
+    const near = battle(
+      [placed(0, 0, 0, 90 * deg), placed(1, 0, 30, 0)], [seed, null], [[gunOf('harpoon', 0), gunOf('scatter', 0)], null], 6
+    );
     const kinds = (r: ReturnType<typeof battle>) => [...new Set(r.fired.filter((f) => f.id === 0).map((f) => f.gun))];
     console.log(`# seed ${seed}: far ${kinds(far)}, near ${kinds(near)}`);
     assert.deepEqual(kinds(far), ['harpoon'], `${seed}: far off`);

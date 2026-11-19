@@ -73,7 +73,9 @@ export function steps(w: ReturnType<typeof world>, seconds = 60): Steps {
     state.advance(idle, still, undefined, lap);
     times.get('step')!.push(performance.now() - t);
   }
-  return { parts: names.map((k) => [k, costOf(times.get(k)!)]), reads: reads / count, read: (1000 * reading) / Math.max(1, reads), steps: count };
+  return {
+    parts: names.map((k) => [k, costOf(times.get(k)!)]), reads: reads / count, read: (1000 * reading) / Math.max(1, reads), steps: count
+  };
 }
 
 /** What the water's copy of the cells (water/claimed.ts) costs a frame, ms, on the seas of tools/seas.ts: the mean
@@ -130,9 +132,12 @@ if (import.meta.main) {
   const r = steps(w, seconds);
   console.log(`${r.steps} steps (${seconds} s); the swell read under ${r.reads.toFixed(0)} hulls a step, ${r.read.toFixed(1)} µs a hull`);
   console.log('part        median     p95   worst  (ms a step)');
-  for (const [k, c] of r.parts) console.log(`${k.padEnd(10)} ${c.median.toFixed(3).padStart(7)} ${c.p95.toFixed(3).padStart(7)} ${c.worst.toFixed(3).padStart(7)}`);
+  for (const [k, c] of r.parts) {
+    console.log(`${k.padEnd(10)} ${c.median.toFixed(3).padStart(7)} ${c.p95.toFixed(3).padStart(7)} ${c.worst.toFixed(3).padStart(7)}`);
+  }
   const c = claimedCosts();
-  console.log(`the water's cells: ${c.frame.toFixed(3)} ms a frame, ${c.whole.toFixed(2)} ms a frame taking a sea whole, ${c.loop.toFixed(2)} ms the worst frame of a loop round half the planet`);
+  console.log(`the water's cells: ${c.frame.toFixed(3)} ms a frame, ${c.whole.toFixed(2)} ms a frame taking a sea whole,`
+    + ` ${c.loop.toFixed(2)} ms the worst frame of a loop round half the planet`);
   const step = r.parts.find(([k]) => k === 'step')![1].median;
   const over = [
     step >= LIMIT.step && `the median step ${step.toFixed(2)} ms (under ${LIMIT.step})`,
@@ -140,6 +145,9 @@ if (import.meta.main) {
     c.whole >= LIMIT.whole && `the water's frame taking a sea whole ${c.whole.toFixed(2)} ms (under ${LIMIT.whole})`,
     c.loop >= LIMIT.loop && `the water's worst frame of the half-planet loop ${c.loop.toFixed(2)} ms (under ${LIMIT.loop})`,
   ].filter((x) => x);
-  console.log(over.length ? `OVER: ${over.join('; ')}` : `ok: the median step under ${LIMIT.step} ms; the water's frames under ${LIMIT.frame} ms on the mean, ${LIMIT.whole} ms taking a sea whole, ${LIMIT.loop} ms at worst`);
+  console.log(over.length
+    ? `OVER: ${over.join('; ')}`
+    : `ok: the median step under ${LIMIT.step} ms; the water's frames under ${LIMIT.frame} ms on the mean,`
+      + ` ${LIMIT.whole} ms taking a sea whole, ${LIMIT.loop} ms at worst`);
   process.exit(over.length ? 1 : 0);
 }

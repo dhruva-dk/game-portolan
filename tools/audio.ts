@@ -145,7 +145,10 @@ function spectrogram(mono: Float32Array): Buffer {
   return png(W, H, rgb);
 }
 
-interface Measure { name: string; start: number; peak: number; rms: number; lufs: number; max: number; centroid: number; low: number; seconds: number; dc: number; clipped: number }
+interface Measure {
+  name: string; start: number; peak: number; rms: number; lufs: number; max: number; centroid: number; low: number; seconds: number;
+  dc: number; clipped: number;
+}
 
 function measure(name: string, channels: Float32Array[]): Measure {
   const n = channels[0].length, mono = new Float32Array(n);
@@ -176,14 +179,18 @@ function measure(name: string, channels: Float32Array[]): Measure {
   }
   const l = loudness(channels.map((c) => c.subarray(0, active)));
   return {
-    name, start: Math.max(0, first) / RATE, peak: 20 * Math.log10(peak + 1e-12), rms: 10 * Math.log10(rms / (active * channels.length) + 1e-12), lufs: l.integrated, max: l.momentary,
-    centroid: centre / Math.max(1e-12, weight), low: under / Math.max(1e-12, weight), seconds: active / RATE, dc: dc / (n * channels.length), clipped,
+    name, start: Math.max(0, first) / RATE, peak: 20 * Math.log10(peak + 1e-12),
+    rms: 10 * Math.log10(rms / (active * channels.length) + 1e-12), lufs: l.integrated, max: l.momentary,
+    centroid: centre / Math.max(1e-12, weight), low: under / Math.max(1e-12, weight), seconds: active / RATE,
+    dc: dc / (n * channels.length), clipped,
   };
 }
 
 const row = (m: Measure) =>
-  `${m.name.padEnd(13)} ${m.start.toFixed(2).padStart(5)} ${m.peak.toFixed(1).padStart(6)} ${m.rms.toFixed(1).padStart(6)} ${m.lufs.toFixed(1).padStart(6)} ${m.max.toFixed(1).padStart(6)}` +
-  ` ${Math.round(m.centroid).toString().padStart(6)} ${(m.low * 100).toFixed(0).padStart(4)}% ${m.seconds.toFixed(2).padStart(6)} ${m.dc.toExponential(1).padStart(9)} ${m.clipped ? `CLIPPED ${m.clipped}` : 'ok'}`;
+  `${m.name.padEnd(13)} ${m.start.toFixed(2).padStart(5)} ${m.peak.toFixed(1).padStart(6)} ${m.rms.toFixed(1).padStart(6)}` +
+  ` ${m.lufs.toFixed(1).padStart(6)} ${m.max.toFixed(1).padStart(6)}` +
+  ` ${Math.round(m.centroid).toString().padStart(6)} ${(m.low * 100).toFixed(0).padStart(4)}% ${m.seconds.toFixed(2).padStart(6)}` +
+  ` ${m.dc.toExponential(1).padStart(9)} ${m.clipped ? `CLIPPED ${m.clipped}` : 'ok'}`;
 
 mkdirSync(OUT, { recursive: true });
 const { browser, url, close } = await launch();
@@ -203,7 +210,9 @@ try {
     writeFileSync(resolve(OUT, `${r.name}.wav`), wav(channels));
     const mono = new Float32Array(channels[0].length);
     for (let i = 0; i < mono.length; i++) mono[i] = (channels[0][i] + channels[1][i]) / 2;
-    writeFileSync(resolve(OUT, `${r.name}.png`), spectrogram(mono.subarray(0, Math.max(SIZE * 2, Math.ceil(m.seconds * RATE) + RATE / 10))));
+    writeFileSync(
+      resolve(OUT, `${r.name}.png`), spectrogram(mono.subarray(0, Math.max(SIZE * 2, Math.ceil(m.seconds * RATE) + RATE / 10)))
+    );
     bad ||= m.clipped > 0 || Math.abs(m.dc) > 1e-3;
     lines.push(row(m));
   }

@@ -16,7 +16,10 @@ test('sunk, she places one behind the ships still afloat, and watches the one th
 });
 
 test('sunk by the storm, or by a ship since sunk, she watches the ship afloat that has sunk the most', () => {
-  const sinkings: Sunk[] = [{ id: 4, by: 2, cause: 'shot' }, { id: 5, by: 2, cause: 'shot' }, { id: 6, by: 1, cause: 'shot' }, { id: PLAYER, by: null, cause: 'storm' }];
+  const sinkings: Sunk[] = [
+    { id: 4, by: 2, cause: 'shot' }, { id: 5, by: 2, cause: 'shot' }, { id: 6, by: 1, cause: 'shot' },
+    { id: PLAYER, by: null, cause: 'storm' }
+  ];
   const m = run(startMatch(), [{ sinkings, alive: [1, 2, 3] }]);
   assert.deepEqual([m.place, m.watch], [4, 2]);
 });

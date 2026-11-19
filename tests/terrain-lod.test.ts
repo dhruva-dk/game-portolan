@@ -17,7 +17,9 @@ function patches(eye: LodEye): Patch[] {
   for (let k = 0; k < n; k++) {
     const o = k * STRIDE, across = [out[o + 6], out[o + 7], out[o + 8]];
     const face = FACES.findIndex((f) => across[f.across[0]] === f.across[1]);
-    list.push({ face, u: out[o], v: out[o + 1], s: out[o + 2], level: Math.round(Math.log2(2 / out[o + 2])), start: out[o + 4], end: out[o + 5] });
+    list.push({
+      face, u: out[o], v: out[o + 1], s: out[o + 2], level: Math.round(Math.log2(2 / out[o + 2])), start: out[o + 4], end: out[o + 5]
+    });
   }
   return list;
 }

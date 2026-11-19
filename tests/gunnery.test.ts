@@ -26,7 +26,8 @@ function sightOn(v: Vessel, o: Vessel, off: number): Sight {
   chase.reset({ position: scale(v.ship.at, R), forward: toward, up: v.ship.at }, 0);
   const from = chase.sight().from, up = normalize(from);
   const d = normalize(add(scale(o.ship.at, R + GUN.freeboard / 2), from, -1));
-  const swung = (a: number): Sight => ({ from, dir: normalize(add(add(scale(d, Math.cos(a)), cross(up, d), Math.sin(a)), up, dot(up, d) * (1 - Math.cos(a)))) });
+  const swung = (a: number): Sight =>
+    ({ from, dir: normalize(add(add(scale(d, Math.cos(a)), cross(up, d), Math.sin(a)), up, dot(up, d) * (1 - Math.cos(a)))) });
   let a = 0;
   while (off !== 0 && offSight(swung(a), o.ship)!.angle < Math.abs(off)) a += Math.sign(off) * 1e-4;
   return swung(a);
@@ -43,7 +44,8 @@ function rate(rarity: number, metres: number, off = 0, k = 1): number {
     let fleet: Vessel[] = [afloat(1, a), afloat(2, { ...b, heading: turned(b, bearing + (side * Math.PI) / 2), speed: SHIP.top })];
     const gun = { ...gunOf('cannon', rarity), fired: n };
     const lay = laid(fleet[0], gun, sightOn(fleet[0], fleet[1], off * side), fleet, 11, deep, spreadOf(gun) * k);
-    let battle = { ...battleOf([crewOf(1), crewOf(2)], 0), balls: [loosed(1, 'cannon', lay.from, lay.dirs[0], lay.speed, 1)] }, struck = false;
+    let battle = { ...battleOf([crewOf(1), crewOf(2)], 0), balls: [loosed(1, 'cannon', lay.from, lay.dirs[0], lay.speed, 1)] },
+      struck = false;
     for (let i = 0; i < 300 && battle.balls.length && !struck; i++) {
       fleet = stepFleet(fleet, [{ course: null, throttle: 0 }, { course: null, throttle: 1 }], STEP, deep).fleet;
       const r = stepBattle(battle, fleet, fleet.map(() => ({ aim: null, fire: false })), [], STEP, deep);

@@ -97,7 +97,8 @@ export const beds = async (): Promise<Rendered[]> => [
 ];
 
 /** Her hull and ward at `t`, by the blows on her: her ward rings, then breaks with her hull hit, then her hull again. */
-const harm = (t: number, [a, b, c]: readonly number[]) => ({ shield: !(t >= a) ? 30 : !(t >= b) ? 10 : 0, hull: !(t >= b) ? 100 : !(t >= c) ? 85 : 64 });
+const harm = (t: number, [a, b, c]: readonly number[]) =>
+  ({ shield: !(t >= a) ? 30 : !(t >= b) ? 10 : 0, hull: !(t >= b) ? 100 : !(t >= c) ? 85 : 64 });
 
 /** A passage of play (the scripted one by default), at `level` (the settings' sound). */
 export async function passage(level = 0.8, name = 'passage', SCRIPT: Script = PASSAGE): Promise<Rendered> {
@@ -123,7 +124,9 @@ export async function passage(level = 0.8, name = 'passage', SCRIPT: Script = PA
     tell(s + 0.3, (at) => ({ seq: 0, time: s + 0.3, at, ship: 0, kind: 'reloading', gun }));
     tell(s + 2.4, (at) => ({ seq: 0, time: s + 2.4, at, ship: 0, kind: 'reloaded', gun }));
     // her ball home in the ship she was laid on, its flight later
-    tell(s + 0.7, () => ({ seq: 0, time: s + 0.7, at: [0, 0, 1], ship: 1, kind: 'struck', by: 0, shield: 0, hull: 12, broke: false, ram: false }));
+    tell(s + 0.7, () => ({
+      seq: 0, time: s + 0.7, at: [0, 0, 1], ship: 1, kind: 'struck', by: 0, shield: 0, hull: 12, broke: false, ram: false
+    }));
   });
   for (const [k, [id, s]] of SCRIPT.otherShots.entries()) {
     tell(s, () => ({ seq: 0, time: s, at: [0, 0, 1], ship: id, kind: 'fired', gun: KINDS[k % KINDS.length] }));
@@ -176,7 +179,9 @@ export async function passage(level = 0.8, name = 'passage', SCRIPT: Script = PA
       moments = [...moments.filter((x) => x.time > t - 1), m];
     }
     SCRIPT.ownShots.forEach((s, i) => {
-      if (happened(s)) blasts.push({ kind: 'shot', time: t, from: add(add(position, forward, 3), radial, 2), dir: forward, gun: HERS[i % HERS.length] });
+      if (happened(s)) {
+        blasts.push({ kind: 'shot', time: t, from: add(add(position, forward, 3), radial, 2), dir: forward, gun: HERS[i % HERS.length] });
+      }
     });
     for (const [k, [id, s]] of SCRIPT.otherShots.entries()) if (happened(s)) {
       const o = SCRIPT.others.find((x) => x.id === id)!;
@@ -203,7 +208,8 @@ export async function passage(level = 0.8, name = 'passage', SCRIPT: Script = PA
     const mending = t >= mend[0] && t < mend[1];
     const status: Status & Kit = {
       at: radial, heading: forward, facing: forward, arriving: 0, ...harm(t, SCRIPT.strikes), hullMax: 100, shieldMax: 50,
-      gun: { kind: 'cannon', rarity: 0, rounds: 8, ready: Math.min(1, (t - lastShot) / 2), charge: null, swapping: 0, locked: false }, afloat: 4, sunk: false,
+      gun: { kind: 'cannon', rarity: 0, rounds: 8, ready: Math.min(1, (t - lastShot) / 2), charge: null, swapping: 0, locked: false },
+      afloat: 4, sunk: false,
       storm: 30, closing: t >= storm.closing, eye: { centre: radial, radius: wall }, next: null, outside: Math.max(0, -wall),
       reticle: null, moments, guns: [{ kind: 'cannon', rarity: 0, rounds: 8, mag: 8, reload: null }, null],
       items: [t >= pickup && t < mend[1] ? { item: 'item.smallShield', count: 1 } : null, null, null],

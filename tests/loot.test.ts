@@ -8,7 +8,9 @@ import { charging, gustOf, ready, spent, stepGust } from '../src/sim/gust.ts';
 import { KINDS } from '../src/kinds.ts';
 import { EQUIP, GUNS, GUST, HEALTH, SHIP } from '../src/sim/handling.ts';
 import { begun, emptyHold, progress, roomFor, stepUse, stowed, tapped, useful, USES } from '../src/sim/hold.ts';
-import { berthed, cargo, drifted, isArms, LOOT, offered, overboard, rolled, strewn, swept, type Flotsam, type Loot } from '../src/sim/loot.ts';
+import {
+  berthed, cargo, drifted, isArms, LOOT, offered, overboard, rolled, strewn, swept, type Flotsam, type Loot
+} from '../src/sim/loot.ts';
 import { asked, NOTHING, stored } from '../src/sim/stores.ts';
 import { shipAt, step, type ShipState } from '../src/sim/ship.ts';
 import type { Depth } from '../src/sim/shoal.ts';
@@ -65,7 +67,9 @@ test('a ball fired in a gust goes off wider', () => {
     let worst = 0;
     for (let seed = 0; seed < 40; seed++) {
       const b = battleOf([{ ...crewOf(1, gunOf('cannon', 0)), gust: { charges: 1, recharge: 0, blowing } }, crewOf(2)], seed);
-      const r = stepBattle(b, fleet, [{ aim: { from: scale(c0, R + 20), dir: frameAt(c0).north }, fire: true }, { aim: null, fire: false }], [], STEP, deep);
+      const r = stepBattle(
+        b, fleet, [{ aim: { from: scale(c0, R + 20), dir: frameAt(c0).north }, fire: true }, { aim: null, fire: false }], [], STEP, deep
+      );
       worst = Math.max(worst, Math.abs(dot(r.shots[0].dirs[0], east)));
     }
     return worst;
@@ -158,7 +162,10 @@ test('the pieces drawn come in their shares: half of them guns (first three in f
     const share = guns.filter((x) => x.kind === kind).length / guns.length;
     assert.ok(Math.abs(share - LOOT.kinds[i] / total) < 0.02, `${kind}: ${share}`);
   });
-  assert.ok(LOOT.kinds[0] > Math.max(...LOOT.kinds.slice(1)) && LOOT.kinds[3] < LOOT.kinds[1] && LOOT.kinds[4] < LOOT.kinds[1], 'the cannon commonest, the harpoon and mortar rarest');
+  assert.ok(
+    LOOT.kinds[0] > Math.max(...LOOT.kinds.slice(1)) && LOOT.kinds[3] < LOOT.kinds[1] && LOOT.kinds[4] < LOOT.kinds[1],
+    'the cannon commonest, the harpoon and mortar rarest'
+  );
   const small = g.filter((x) => x.kind === 'smallShield');
   assert.ok(small.every((x) => x.kind === 'smallShield' && x.count === 3));
 });
@@ -188,19 +195,26 @@ test('every berth has a gun within reach of it at the start, on open water; one 
   // a shoal bank to the east of the berths: no gun is laid on it
   const depth: Depth = (p) => (dot(p, east) > 0 && distance(p, c0) < 60 ? 1 : 20);
   const berths = [c0, at(400), at(-300)];
-  const f = berthed(lying(piece(0, at(410), { kind: 'cannon', rarity: 1 }), piece(1, at(-300), { kind: 'repairKit', count: 4 })), berths, 9, depth);
+  const f = berthed(
+    lying(piece(0, at(410), { kind: 'cannon', rarity: 1 }), piece(1, at(-300), { kind: 'repairKit', count: 4 })), berths, 9, depth
+  );
   assert.equal(f.pieces.length, 4);
   assert.equal(f.next, 102);
   for (const b of berths) assert.ok(f.pieces.some((l) => isArms(l.goods) && distance(l.at, b) < LOOT.berth));
   for (const l of f.pieces.slice(2)) assert.ok(depth(l.at) >= SHIP.draught + LOOT.open);
-  assert.deepEqual(f, berthed(lying(piece(0, at(410), { kind: 'cannon', rarity: 1 }), piece(1, at(-300), { kind: 'repairKit', count: 4 })), berths, 9, depth));
+  assert.deepEqual(f, berthed(
+    lying(piece(0, at(410), { kind: 'cannon', rarity: 1 }), piece(1, at(-300), { kind: 'repairKit', count: 4 })), berths, 9, depth
+  ));
 });
 
 /** Her guns' kinds and rarities, slot by slot (null: empty). */
 const kinds = (c: Crew) => c.guns.map((g) => g && `${g.kind} ${g.rarity}`);
 
 test('she takes what fits within reach: a gun into each empty gun slot, the one in hand first, stacks into her slots', () => {
-  const f = lying(piece(1, at(5), { kind: 'scatter', rarity: 2 }), piece(2, at(-5), { kind: 'repairKit', count: 4 }), piece(3, at(30), { kind: 'harpoon', rarity: 4 }));
+  const f = lying(
+    piece(1, at(5), { kind: 'scatter', rarity: 2 }), piece(2, at(-5), { kind: 'repairKit', count: 4 }),
+    piece(3, at(30), { kind: 'harpoon', rarity: 4 })
+  );
   const r = swept(f, [crewOf(1)], [vessel(1, c0)], new Map(), 1);
   assert.deepEqual(kinds(r.crews[0]), ['scatter 2', null]);
   assert.equal(r.crews[0].guns[0]?.rounds, GUNS.scatter.mag, 'found with its magazine full');
@@ -233,7 +247,8 @@ test('asked, she swaps the gun in hand for the one offered, and hers goes over t
   assert.deepEqual(kinds(swept(fl, [bare], [vessel(1, c0)], new Map(), 1).crews[0]), ['cannon 0', 'scatter 1']);
 });
 
-test('a tap on her other gun takes it in hand (EQUIP), letting go the wind-up or reload of the one put down; on the one in hand, a reload', () => {
+test('a tap on her other gun takes it in hand (EQUIP), letting go the wind-up or reload of the one put down; on the one in hand, a reload',
+  () => {
   const g = { ...gunOf('harpoon', 0), windup: 0.4 }, c = { ...crewOf(1, g, gunOf('cannon', 2)), hand: 0 };
   const ask = (arm: number | null, crew = c) => asked([crew], [vessel(1, c0)], lying(), new Map([[1, { ...NOTHING, arm }]]));
   const a = ask(1);
@@ -261,9 +276,14 @@ test('with her slots full, a take swaps the stack in hand for what is offered', 
 });
 
 test('a ship sunk spills both her guns and all her stores where she lies, gone from her, kicked out to drift to a stop', () => {
-  const c = { ...crewOf(1, gunOf('cannon', 2), gunOf('mortar', 1)), hold: stowed(stowed(emptyHold(), 'smallShield', 4).hold, 'repairKit', 2).hold };
+  const c = {
+    ...crewOf(1, gunOf('cannon', 2), gunOf('mortar', 1)), hold: stowed(stowed(emptyHold(), 'smallShield', 4).hold, 'repairKit', 2).hold
+  };
   const s = stored([c], lying(), [vessel(1, c0)], new Map(), [1], STEP, deep, 9);
-  assert.deepEqual(s.flotsam.pieces.map((l) => l.goods), [{ kind: 'cannon', rarity: 2 }, { kind: 'mortar', rarity: 1 }, { kind: 'smallShield', count: 4 }, { kind: 'repairKit', count: 2 }]);
+  assert.deepEqual(
+    s.flotsam.pieces.map((l) => l.goods),
+    [{ kind: 'cannon', rarity: 2 }, { kind: 'mortar', rarity: 1 }, { kind: 'smallShield', count: 4 }, { kind: 'repairKit', count: 2 }]
+  );
   assert.deepEqual([kinds(s.crews[0]), s.crews[0].hold.items], [[null, null], [null, null, null]]);
   const goods = cargo(c);
   assert.equal(goods.length, 4);

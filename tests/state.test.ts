@@ -22,7 +22,8 @@ const degrees = Math.PI / 180;
 /** A match whose storm lies calm until `at` s on its clock, then shrinks to nothing and sinks every ship in a step. */
 const deadly = (at: number): Match => ({
   seed: 1, gun: null,
-  storm: (t): Storm => (t < at ? calm(start.at) : { ...calm(start.at), radius: 1e-6, next: { centre: start.at, radius: 1e-6 }, damage: 1e6 }),
+  storm: (t): Storm =>
+    (t < at ? calm(start.at) : { ...calm(start.at), radius: 1e-6, next: { centre: start.at, radius: 1e-6 }, damage: 1e6 }),
 });
 
 /** Her loop sailed alone from her berth in a match at sea (a new one on `state`, if given): south, east, and home;

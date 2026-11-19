@@ -37,7 +37,9 @@ test('the table: every kind of deed, hers, is heard; every cue plays a sound the
     if (c) assert.ok(SOUNDS[soundOf(CUES[c], null)], `${h.kind} → ${c} → a sound`);
   }
   for (const c of CUE_NAMES) assert.ok(SOUNDS[soundOf(CUES[c], null)], `${c} plays ${CUES[c].sound}`);
-  const played = new Set([...CUE_NAMES.map((c) => soundOf(CUES[c], null)), ...KINDS.flatMap((k) => CUE_NAMES.map((c) => soundOf(CUES[c], k)))]);
+  const played = new Set([
+    ...CUE_NAMES.map((c) => soundOf(CUES[c], null)), ...KINDS.flatMap((k) => CUE_NAMES.map((c) => soundOf(CUES[c], k)))
+  ]);
   for (const n of NAMES) assert.ok(played.has(n), `${n} is played by a cue`);
   // a gun's report is its own kind's
   for (const k of KINDS) assert.equal(soundOf(CUES[cueOf(each(5, k)[0], 0)!], k), k);
@@ -52,7 +54,8 @@ test('the table: every kind of deed, hers, is heard; every cue plays a sound the
 });
 
 test('her blows: her ward taking all of one rings, its last breaks it, the rest is on her hull; a gun taken up is the swap', () => {
-  const blow = (shield: number, hull: number, broke: boolean): Happening => ({ seq: 1, time: 0, at, ship: 0, kind: 'struck', by: 1, shield, hull, broke, ram: false });
+  const blow = (shield: number, hull: number, broke: boolean): Happening =>
+    ({ seq: 1, time: 0, at, ship: 0, kind: 'struck', by: 1, shield, hull, broke, ram: false });
   assert.equal(cueOf(blow(20, 0, false), 0), 'ring');
   assert.equal(cueOf(blow(10, 10, true), 0), 'shatter');
   assert.equal(cueOf(blow(0, 20, false), 0), 'hurt');
@@ -138,7 +141,8 @@ test('bearing and pan: ahead 0, right +π/2, behind ±π, as the eye is turned; 
   }
 });
 
-test('voices: never more than VOICES at once; a new sound takes a free slot, else the oldest of the lowest priority no higher than its own', () => {
+test('voices: never more than VOICES at once; a new sound takes a free slot, else the oldest of the lowest priority no higher than its own',
+  () => {
   const p = pool();
   for (let i = 0; i < VOICES; i++) assert.equal(claim(p, 0, 5, i * 0.01, 10), i);
   assert.equal(playing(p, 1), VOICES);
@@ -153,17 +157,26 @@ test('voices: never more than VOICES at once; a new sound takes a free slot, els
 
 /** A plain scene: her ship (id 0) at `at`, others where given, the eye behind her. */
 function scene(t: number, blasts: Blast[] = [], ships: ShipDraw[] = [], balls: Snapshot['balls'] = [], sea?: Snapshot['sea']): Snapshot {
-  const her: ShipDraw = { id: 0, pose: { position: scale(at, R), forward: [1, 0, 0], up: at }, look: { paint: [1, 0, 0], sail: [1, 1, 1], pattern: 'plain' }, velocity: [6, 0, 0], afloat: true, gun: null };
-  return { eye: { kind: 'air', position: [-20, 0, R + 8], orientation: [0, 0, 0, 1], fov: 50 }, clock: t, storm: { centre: at, radius: 1 }, ships: [her, ...ships], own: 0, balls, loot: [], blasts, sea };
+  const her: ShipDraw = {
+    id: 0, pose: { position: scale(at, R), forward: [1, 0, 0], up: at }, look: { paint: [1, 0, 0], sail: [1, 1, 1], pattern: 'plain' },
+    velocity: [6, 0, 0], afloat: true, gun: null
+  };
+  return {
+    eye: { kind: 'air', position: [-20, 0, R + 8], orientation: [0, 0, 0, 1], fov: 50 }, clock: t, storm: { centre: at, radius: 1 },
+    ships: [her, ...ships], own: 0, balls, loot: [], blasts, sea
+  };
 }
 const status = (over: Partial<Status & Kit> = {}): Status & Kit => ({
   at, heading: [1, 0, 0], facing: [1, 0, 0], arriving: 0, hull: 100, hullMax: 100, shield: 30, shieldMax: 50,
-  gun: { kind: 'cannon', rarity: 0, rounds: 8, ready: 1, charge: null, swapping: 0, locked: false }, afloat: 2, sunk: false, storm: 30, closing: false,
-  eye: { centre: at, radius: 2000 }, next: null, outside: 0, reticle: null, moments: [], guns: [{ kind: 'cannon', rarity: 0, rounds: 8, mag: 8, reload: null }, null],
+  gun: { kind: 'cannon', rarity: 0, rounds: 8, ready: 1, charge: null, swapping: 0, locked: false },
+  afloat: 2, sunk: false, storm: 30, closing: false,
+  eye: { centre: at, radius: 2000 }, next: null, outside: 0, reticle: null, moments: [],
+  guns: [{ kind: 'cannon', rarity: 0, rounds: 8, mag: 8, reload: null }, null],
   items: [null, null, null], chosen: 0, using: null, offer: null, gust: 2, gusts: 2, blowing: false, ...over,
 });
 
-const hearing = (s: Snapshot, st: Status & Kit, screen: Hearing['screen'] = 'match', map = false, covered = 0): Hearing => ({ scene: s, status: st, screen, map, covered });
+const hearing = (s: Snapshot, st: Status & Kit, screen: Hearing['screen'] = 'match', map = false, covered = 0): Hearing =>
+  ({ scene: s, status: st, screen, map, covered });
 
 test('listen: a ball passing near whistles once; a slot of her stores taken in hand, not a gun; the screens; her water', () => {
   const l = createListen(() => -20), out: Call[] = [];
@@ -194,7 +207,10 @@ test('listen: a ball passing near whistles once; a slot of her stores taken in h
     ({ generation: 1, owner: [], seq, changes, colours: [], trails: trail ? [{ id: 0, serial: 1, points: [] }] : [] });
   cues(hearing(scene(3, [], [], [], sea(0, false)), status()));
   assert.deepEqual(cues(hearing(scene(3.1, [], [], [], sea(0, true)), status())), ['leave']);
-  assert.deepEqual(cues(hearing(scene(3.2, [], [], [], sea(1, false, [{ seq: 1, time: 3.2, kind: 'claim', ship: 0, cells: [], loop: 0 }])), status())), ['claim']);
+  assert.deepEqual(
+    cues(hearing(scene(3.2, [], [], [], sea(1, false, [{ seq: 1, time: 3.2, kind: 'claim', ship: 0, cells: [], loop: 0 }])), status())),
+    ['claim']
+  );
   assert.deepEqual(cues(hearing(scene(3.3, [], [], [], sea(1, true)), status())), ['leave']);
   assert.deepEqual(cues(hearing(scene(3.4, [], [], [], sea(1, false)), status())), ['enter']);
   // the way home's parchment: the bed follows how much of the world it covers
@@ -207,7 +223,9 @@ test('the bed: the storm heard from afar and all about her inside; surf only nea
   for (let w = 400; w > -100; w -= 10) assert.ok(galeOf(w - 10) >= galeOf(w), `the gale rises toward and into the storm at ${w}`);
   assert.equal(galeOf(-100), 1);
   for (let t = 0; t < 60; t += 0.1) assert.ok(breakers(t) >= 0 && breakers(t) <= 1);
-  const bed = { speed: 1, wind: 1, heave: -1, roll: 0.1, coast: Infinity, wall: 5000, hull: 1, presence: 1, muffle: 0, covered: 0, clock: 3 };
+  const bed = {
+    speed: 1, wind: 1, heave: -1, roll: 0.1, coast: Infinity, wall: 5000, hull: 1, presence: 1, muffle: 0, covered: 0, clock: 3
+  };
   assert.equal(levelsOf(bed, levels()).surf, 0);
   // the sea goes as the screens cover the world, and comes back as they lift
   assert.equal(levelsOf(bed, levels()).uncovered, 1);
@@ -216,5 +234,7 @@ test('the bed: the storm heard from afar and all about her inside; surf only nea
   assert.ok(levelsOf({ ...bed, coast: 25 }, levels()).surf > 0);
   assert.equal(levelsOf(bed, levels()).strain, 0, 'her hull whole, no strain');
   assert.ok(levelsOf({ ...bed, hull: 0.1 }, levels()).strain > 0);
-  for (const v of Object.values(levelsOf({ ...bed, wall: -200, coast: 20, hull: 0, speed: 3 }, levels()))) assert.ok(Number.isFinite(v) && v >= 0);
+  for (const v of Object.values(levelsOf({ ...bed, wall: -200, coast: 20, hull: 0, speed: 3 }, levels()))) {
+    assert.ok(Number.isFinite(v) && v >= 0);
+  }
 });

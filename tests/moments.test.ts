@@ -37,7 +37,11 @@ test('a step\'s deeds: numbered in order, swapped, fired (by kind), wound and re
     splashes: [{ shooter: 2, at, land: false, gun: 'scatter' }],
     strikes: [{ shooter: 0, struck: 2, damage: 30, shield: 10, hull: 20, broke: true, at, ram: false }],
     sunk: [{ id: 2, by: 0, at }],
-    took: [{ ship: 0, goods: { kind: 'harpoon', rarity: 3 }, at, slot: 1 }, { ship: 0, goods: { kind: 'smallShield', count: 3 }, at, slot: 2 }, { ship: 5, goods: { kind: 'repairKit', count: 1 }, at, slot: 1 }],
+    took: [
+      { ship: 0, goods: { kind: 'harpoon', rarity: 3 }, at, slot: 1 },
+      { ship: 0, goods: { kind: 'smallShield', count: 3 }, at, slot: 2 },
+      { ship: 5, goods: { kind: 'repairKit', count: 1 }, at, slot: 1 }
+    ],
     mended: [{ ship: 0, use: 'bigShield' }, { ship: 5, use: 'repairKit' }],
     blew: [0, 5],
     cues: [
@@ -59,7 +63,10 @@ test('a step\'s deeds: numbered in order, swapped, fired (by kind), wound and re
   assert.ok(gun.kind === 'took' && gun.piece === 'harpoon' && gun.rarity === 3 && gun.slot === 1);
   assert.ok(stores.kind === 'took' && stores.piece === 'smallShield' && stores.slot === HOTBAR.guns + 1);
   // sunk, she mends nothing and spends no gust
-  assert.deepEqual(deedsOf({ ...done, her: null }, 0, counter(), 12).map((x) => x.kind), ['swapped', 'fired', 'reloaded', 'winding', 'fell', 'struck', 'sank', 'took', 'took']);
+  assert.deepEqual(
+    deedsOf({ ...done, her: null }, 0, counter(), 12).map((x) => x.kind),
+    ['swapped', 'fired', 'reloaded', 'winding', 'fell', 'struck', 'sank', 'took', 'took']
+  );
 });
 
 test('kept: the last KEEP seconds, then the fresh; nothing new and nothing stale keeps the same list', () => {
@@ -103,7 +110,8 @@ test('the match records its deeds: a ship sunk is told once, with a sink blast t
 });
 
 test('the camera answers: her blows, the blows on her, her sinking of one; others\' blows on others not at all', () => {
-  const struck = (by: number, ship: number, shield: number, hull: number, broke = false): Deed => ({ seq: 1, time: 0, at, ship, kind: 'struck', by, shield, hull, broke, ram: false });
+  const struck = (by: number, ship: number, shield: number, hull: number, broke = false): Deed =>
+    ({ seq: 1, time: 0, at, ship, kind: 'struck', by, shield, hull, broke, ram: false });
   assert.equal(answerTo(struck(0, 2, 0, 20), 0)?.answer, CAMERA.hit);
   assert.equal(answerTo(struck(0, 2, 20, 0), 0)?.answer, CAMERA.shieldHit);
   assert.equal(answerTo(struck(0, 2, 10, 10, true), 0)?.answer, CAMERA.shieldBreak);

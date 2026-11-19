@@ -65,7 +65,9 @@ test('the water\'s copy of the cells keeps up with the sea: loops, drains, the s
   let wait = 0, frames = 0, whole = 0, checked = 0, clock = 0, most = 0;
   const kinds = new Set<string>();
   const same = (owner: ReadCells, label: string) => {
-    for (let c = 0; c < CELLS; c++) if (claimed.ownerOf(c) !== owner[c]) assert.fail(`${label}: cell ${c} is ${claimed.ownerOf(c)}, the sea's ${owner[c]}`);
+    for (let c = 0; c < CELLS; c++) {
+      if (claimed.ownerOf(c) !== owner[c]) assert.fail(`${label}: cell ${c} is ${claimed.ownerOf(c)}, the sea's ${owner[c]}`);
+    }
     checked++;
   };
   const frame = (sea: Sea | undefined, time = clock) => {
@@ -115,7 +117,9 @@ test('a loop round half the planet is drawn over some frames, none over its budg
     claimed.work(time + frames / 60);
     assert.ok(claimed.used() <= SLICES, `${claimed.used()} slices in a frame`);
   }
-  for (let c = 0; c < CELLS; c++) if (claimed.ownerOf(c) !== t.owner[c]) assert.fail(`cell ${c} is ${claimed.ownerOf(c)}, the sea's ${t.owner[c]}`);
+  for (let c = 0; c < CELLS; c++) {
+    if (claimed.ownerOf(c) !== t.owner[c]) assert.fail(`cell ${c} is ${claimed.ownerOf(c)}, the sea's ${t.owner[c]}`);
+  }
   // spread over a second or so of frames: more than a few, fewer than two seconds' at 30 FPS
   assert.ok(claimed.idle() && frames > 3 && frames < 60, `${frames} frames`);
 });

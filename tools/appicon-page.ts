@@ -17,7 +17,8 @@ const CREAM = '#fbf4e2';
 const BOLD = { ...ROSE, weight: 5, breadth: 1.5, chequer: 0.07, needle: null } as const;
 /** A ground of two stops, `inner` at the middle to `outer` at the corners. */
 const ground = (inner: string, outer: string) =>
-  `<defs><radialGradient id="g" cx="50%" cy="46%" r="72%"><stop offset="0" stop-color="${inner}"/><stop offset="1" stop-color="${outer}"/></radialGradient></defs>`
+  `<defs><radialGradient id="g" cx="50%" cy="46%" r="72%">`
+  + `<stop offset="0" stop-color="${inner}"/><stop offset="1" stop-color="${outer}"/></radialGradient></defs>`
   + `<rect width="${SIZE}" height="${SIZE}" fill="url(#g)"/>`;
 
 /** The points in colour: blue cardinals, rubric half-cardinals, green half winds, gilt quarter winds. */

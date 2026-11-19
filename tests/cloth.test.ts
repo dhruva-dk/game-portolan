@@ -112,7 +112,8 @@ test('two ships at about the same distance don\'t trade a berth back and forth',
   assert.ok(held(b).includes(last) && !held(b).includes(BERTHS));
 });
 
-const pose = (forward: Vec3, up: Vec3, at: Vec3 = [0, R, 0]): ShipPose => ({ position: at, forward: normalize(forward), up: normalize(up) });
+const pose = (forward: Vec3, up: Vec3, at: Vec3 = [0, R, 0]): ShipPose =>
+  ({ position: at, forward: normalize(forward), up: normalize(up) });
 
 test('her motion: still, she feels gravity alone, straight down her mast', () => {
   let m: Motion | null = null;

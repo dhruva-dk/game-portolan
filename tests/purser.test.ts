@@ -28,7 +28,9 @@ function sail(at: Vec3[], seeds: number[], crews: Crew[], flotsam: Flotsam, seco
   const modes: string[][] = at.map(() => []);
   for (let n = 0; n < Math.round(seconds / STEP); n++) {
     const by = new Map(battle.crews.map((c) => [c.id, c]));
-    const seen: Seen[] = fleet.map((v) => ({ ...v, crew: by.get(v.id)!, hull: by.get(v.id)!.health.hull, shield: by.get(v.id)!.health.shield, armed: armed(by.get(v.id)!) }));
+    const seen: Seen[] = fleet.map((v) => ({
+      ...v, crew: by.get(v.id)!, hull: by.get(v.id)!.health.hull, shield: by.get(v.id)!.health.shield, armed: armed(by.get(v.id)!)
+    }));
     const helms: Helm[] = [], asks = new Map<number, Ask>();
     fleet.forEach((v, i) => {
       const r = think(seen[i], seen.filter((o) => o.id !== v.id), { depth: deep, loot: f.pieces }, minds[v.id], seeds[v.id]);
@@ -43,7 +45,9 @@ function sail(at: Vec3[], seeds: number[], crews: Crew[], flotsam: Flotsam, seco
     const met = stepFleet(fleet, helms, STEP, deep);
     fleet = met.fleet;
     const fought = stepBattle({ ...battle, crews: w.crews }, fleet, fleet.map(() => ({ aim: null, fire: false })), met.blows, STEP, deep);
-    const k = stored(weathered(fought.battle, fleet, { centre: c0, radius: 4, damage: 0 }, STEP).battle.crews, f, fleet, w.takes, [], STEP, deep, 1);
+    const k = stored(
+      weathered(fought.battle, fleet, { centre: c0, radius: 4, damage: 0 }, STEP).battle.crews, f, fleet, w.takes, [], STEP, deep, 1
+    );
     battle = { ...fought.battle, crews: k.crews };
     f = k.flotsam;
   }
@@ -106,9 +110,14 @@ test('an unarmed bot sails to a gun she sees and takes it; with one, a second ki
   for (const seed of seeds((s) => temper(s).lootReach >= 110, 4)) {
     const r = sail([c0], [seed], [crewOf(0)], { pieces: [piece(1, out(90, 0.7), { kind: 'cannon', rarity: 1 })], next: 2 }, 40);
     assert.deepEqual(kinds(r.crews[0]), ['cannon 1', null], `${seed}: ${r.modes[0]}`);
-    const o = sail([c0], [seed], [crewOf(0, gunOf('cannon', 0))], { pieces: [piece(1, out(60, -1), { kind: 'scatter', rarity: 0 })], next: 2 }, 40);
+    const o = sail(
+      [c0], [seed], [crewOf(0, gunOf('cannon', 0))], { pieces: [piece(1, out(60, -1), { kind: 'scatter', rarity: 0 })], next: 2 }, 40
+    );
     assert.deepEqual(kinds(o.crews[0]), ['cannon 0', 'scatter 0'], `${seed}: a second; ${o.modes[0]}`);
-    const s = sail([c0], [seed], [crewOf(0, gunOf('cannon', 0), gunOf('scatter', 0))], { pieces: [piece(1, out(60, -1), { kind: 'cannon', rarity: 3 })], next: 2 }, 40);
+    const s = sail(
+      [c0], [seed], [crewOf(0, gunOf('cannon', 0), gunOf('scatter', 0))],
+      { pieces: [piece(1, out(60, -1), { kind: 'cannon', rarity: 3 })], next: 2 }, 40
+    );
     assert.deepEqual(kinds(s.crews[0]), ['cannon 3', 'scatter 0'], `${seed}: swapped`);
     assert.deepEqual(s.flotsam.pieces.map((l) => l.goods), [{ kind: 'cannon', rarity: 0 }], `${seed}: hers over the side`);
   }
@@ -125,7 +134,9 @@ test('a gun abeam, inside the circle she turns at her top speed, she slows to co
 test('a hurt bot with something to mend with uses it', () => {
   for (const seed of seeds(() => true, 4)) {
     const hold = stowed(stowed(emptyHold(), 'repairKit', 2).hold, 'smallShield', 2).hold;
-    const r = sail([c0], [seed], [{ ...crewOf(0, gunOf('cannon', 0)), hold, health: { hull: 40, shield: 0 } }], { pieces: [], next: 0 }, 20);
+    const r = sail(
+      [c0], [seed], [{ ...crewOf(0, gunOf('cannon', 0)), hold, health: { hull: 40, shield: 0 } }], { pieces: [], next: 0 }, 20
+    );
     const c = r.crews[0];
     assert.ok(c.health.hull > 40 && c.health.shield > 0, `${seed}: ${JSON.stringify(c.health)} ${r.modes[0]}`);
   }
@@ -133,7 +144,9 @@ test('a hurt bot with something to mend with uses it', () => {
 
 test('bots near one piece do not all pile on it: one takes it, and none goes for it for ever', () => {
   const at = [0, 1, 2, 3, 4, 5].map((k) => out(70, (k * Math.PI) / 3));
-  const r = sail(at, [1, 2, 3, 4, 5, 6], at.map((_, i) => crewOf(i)), { pieces: [piece(1, c0, { kind: 'cannon', rarity: 2 })], next: 2 }, 60);
+  const r = sail(
+    at, [1, 2, 3, 4, 5, 6], at.map((_, i) => crewOf(i)), { pieces: [piece(1, c0, { kind: 'cannon', rarity: 2 })], next: 2 }, 60
+  );
   assert.equal(r.crews.filter(armed).length, 1);
   assert.ok(r.minds.every((m) => m.target !== 1 || m.mode !== 'loot'), 'none still after it');
 });
@@ -142,7 +155,9 @@ test('a piece she can not come to she gives up after a while, and leaves be', ()
   // the piece in a lagoon with no way in: a ring of reef round it
   const lagoon = out(100), reef: Depth = (p) => { const d = distance(p, lagoon); return d > 15 && d < 45 ? -2 : 30; };
   for (const seed of seeds((s) => temper(s).loot >= 0.5, 3)) {
-    const r = sail([c0], [seed], [crewOf(0)], { pieces: [piece(1, lagoon, { kind: 'cannon', rarity: 0 })], next: 2 }, PURSER.patience + 15, reef);
+    const r = sail(
+      [c0], [seed], [crewOf(0)], { pieces: [piece(1, lagoon, { kind: 'cannon', rarity: 0 })], next: 2 }, PURSER.patience + 15, reef
+    );
     assert.equal(r.minds[0].shun, 1, `${seed}: ${r.modes[0]}`);
     assert.notEqual(r.minds[0].mode, 'loot');
   }

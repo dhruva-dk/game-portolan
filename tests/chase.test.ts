@@ -65,7 +65,8 @@ test('the middle of the screen is the line of sight, and it passes clear of her 
   assert.ok(PITCH > 0.1 && PITCH < 0.5);
 });
 
-test('as it starts, she is seen whole, low and left in the frame, her trucks about level with the reticle and her stern above the foot', () => {
+test('as it starts, she is seen whole, low and left in the frame, her trucks about level with the reticle and her stern above the foot',
+  () => {
   const chase = createChase(flat, calm);
   chase.reset(pose(up, north), 0);
   const right = cross(north, up);
@@ -122,7 +123,9 @@ test('by the storm, looked as low as it goes or in her sunk shot, the eye stays 
   };
   // her at the last cap's middle (75 m), the eye some 50 m astern in reach of the cloud's front: as it starts, looked
   // as low as it goes, and in her sunk shot; and her out in the storm
-  for (const [cap, y, shot] of [[calmOf(75, 0), 0, {}], [calmOf(75, 0), 5000, {}], [calmOf(75, 0), 0, finale('sunk', 10)], [calmOf(20, 60), 0, {}]] as const) {
+  for (const [cap, y, shot] of [
+    [calmOf(75, 0), 0, {}], [calmOf(75, 0), 5000, {}], [calmOf(75, 0), 0, finale('sunk', 10)], [calmOf(20, 60), 0, {}]
+  ] as const) {
     const chase = createChase(flat, calm);
     chase.reset(pose(up, north), 0);
     settle(chase, cap, y, shot);

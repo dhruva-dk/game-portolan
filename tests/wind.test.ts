@@ -47,7 +47,9 @@ test('the calms are antipodal triangle centres within 40° of the poles, and the
     for (const c of [north, south]) {
       const t0 = normalize(cross(c, [0.1, 0.2, 0.3]));
       let total = 0;
-      const ring = Array.from({ length: 64 }, (_, k) => along(c, add(scale(t0, Math.cos((k * Math.PI) / 32)), cross(c, t0), Math.sin((k * Math.PI) / 32)), 5).p);
+      const ring = Array.from(
+        { length: 64 }, (_, k) => along(c, add(scale(t0, Math.cos((k * Math.PI) / 32)), cross(c, t0), Math.sin((k * Math.PI) / 32)), 5).p
+      );
       ring.forEach((p, k) => (total += turn(w, p, ring[(k + 1) % 64])));
       assert.ok(Math.abs(total - 360) < 5, `seed ${seed}: the wind turns ${total}° round a calm`);
     }

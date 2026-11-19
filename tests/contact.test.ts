@@ -31,7 +31,8 @@ const run = (fleet: Vessel[], orders: Orders, seconds: number, depth = deep, eac
 /** The open water between two hulls, measured apart from contact.ts: points along each keel every half metre on the
  * sphere, the least distance between them less a beam. */
 const KEEL = SHIP.length / 2 - SHIP.beam / 2;
-const keel = (s: ShipState) => Array.from({ length: Math.round((2 * KEEL) / 0.5) + 1 }, (_, i) => hullAt(s.at, s.heading, [-KEEL + i * 0.5, 0]));
+const keel = (s: ShipState) =>
+  Array.from({ length: Math.round((2 * KEEL) / 0.5) + 1 }, (_, i) => hullAt(s.at, s.heading, [-KEEL + i * 0.5, 0]));
 const between = (a: ShipState, b: ShipState) => {
   if (distance(a.at, b.at) > SHIP.length + 1) return Infinity;
   const ka = keel(a), kb = keel(b);
@@ -73,7 +74,9 @@ test('the same fleet under the same orders meets the same way, to the bit', () =
     const p = along(centre, turned(lying(centre, 0), (k * Math.PI) / 2 + 0.3), 35).p;
     return afloat(10 - k, { ...shipAt(p, add3(centre, p, -1)), speed: 4 + k });
   });
-  const orders: Orders = (f) => f.map((v, i) => ({ course: turned(v.ship, Math.sin(v.ship.speed * 3 + i) * 2), throttle: 0.6 + 0.4 * Math.sin(v.ship.turn * 50 + i) }));
+  const orders: Orders = (f) => f.map((v, i) => ({
+    course: turned(v.ship, Math.sin(v.ship.speed * 3 + i) * 2), throttle: 0.6 + 0.4 * Math.sin(v.ship.turn * 50 + i)
+  }));
   const a = run(four(), orders, 30), b = run(four(), orders, 30);
   assert.ok(a.blows.length > 0, 'they met');
   assert.deepEqual(a, b);
@@ -98,7 +101,8 @@ test('it makes no difference in which order the fleet is listed', () => {
 test('hulls never overlap, from any angle, at any speed, wherever she is struck', () => {
   for (let angle = 0; angle < 360; angle += 30) for (const speed of [3, 12]) for (const aim of [-10, 0, 10]) for (const ahead of [0, 6]) {
     let least = { module: Infinity, apart: Infinity };
-    const { blows } = run(approach(angle * deg, speed, aim, ahead), holding(speed / SHIP.top, ahead / SHIP.top), 45 / speed + 4, deep, (f) => {
+    const { blows } = run(approach(angle * deg, speed, aim, ahead), holding(speed / SHIP.top, ahead / SHIP.top), 45 / speed + 4, deep,
+      (f) => {
       const l = leastOf(f);
       least = { module: Math.min(least.module, l.module), apart: Math.min(least.apart, l.apart) };
     });
@@ -165,7 +169,8 @@ test('a nudge, or lying alongside and leaning on her, does no damage', () => {
   assert.ok(touched);
   assert.equal(nudge.blows.length, 0);
   // alongside her, half a metre off, and steering into her at full speed for half a minute
-  const a = lying(centre, 0, SHIP.top), b = { ...shipAt(along(centre, cross(centre, a.heading), SHIP.beam + 0.5).p, a.heading), speed: SHIP.top };
+  const a = lying(centre, 0, SHIP.top),
+    b = { ...shipAt(along(centre, cross(centre, a.heading), SHIP.beam + 0.5).p, a.heading), speed: SHIP.top };
   const fleet = [afloat(1, a), afloat(2, b)];
   const leaning: Orders = (f) => [{ course: null, throttle: 1 }, { course: turned(f[1].ship, -0.5), throttle: 1 }];
   let least = Infinity;
