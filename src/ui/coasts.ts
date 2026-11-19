@@ -21,7 +21,10 @@ export function shoresOf(planet: Planet, land: Land): Shores {
     let sum: Vec3 = [0, 0, 0];
     for (const p of ring) sum = add(sum, p);
     const centre = normalize(sum);
-    return { centre, reach: Math.max(...ring.map((p) => distance(centre, p))), ring, closed: false };
+    // (a loop, not a spread: a coast may run to more points than a call takes arguments)
+    let reach = 0;
+    for (const p of ring) reach = Math.max(reach, distance(centre, p));
+    return { centre, reach, ring, closed: false };
   });
   return { coasts, ground: { height: planet.height, top: land.stats.summit } };
 }

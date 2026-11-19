@@ -89,11 +89,22 @@ export const way = (screen: Screen, trigger: Trigger): Screen | null => WAYS[scr
 
 /** The match's course as it reaches the screens (player.ts End: null while she fights), as the events it amounts to
  *  so far, in order: she sank or won; the beat on it done (settled); the match over. */
-export function events(end: { how: string; settled: boolean; over: boolean } | null): Event[] {
-  if (!end) return [];
-  return [end.how === 'won' ? 'won' : 'sunk', ...(end.settled ? ['settled' as const] : []), ...(end.settled && end.over ? ['over' as const] : [])];
+export function events(end: { how: string; settled: boolean; over: boolean } | null): readonly Event[] {
+  if (!end) return NONE;
+  const so = end.how === 'won' ? SO_FAR.won : SO_FAR.sunk;
+  return so[end.settled ? (end.over ? 2 : 1) : 0];
 }
 
+/** events' answers, made once (it is read every frame): none; and sunk or won, then settled, then over. */
+const NONE: readonly Event[] = Object.freeze([]);
+const SO_FAR = {
+  won: [['won'], ['won', 'settled'], ['won', 'settled', 'over']],
+  sunk: [['sunk'], ['sunk', 'settled'], ['sunk', 'settled', 'over']],
+} as const satisfies Record<'won' | 'sunk', readonly (readonly Event[])[]>;
+
 /** Where the match's course has taken `screen`: each of its events taken in turn, where it has a way. */
-export const course = (screen: Screen, happened: readonly Event[]): Screen =>
-  happened.reduce((s: Screen, e) => way(s, e) ?? s, screen);
+export function course(screen: Screen, happened: readonly Event[]): Screen {
+  let s = screen;
+  for (const e of happened) s = way(s, e) ?? s;
+  return s;
+}
