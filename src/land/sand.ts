@@ -12,13 +12,13 @@
 import { dot, float, fract, max, mix, vec3 } from 'three/tsl';
 import {
   LITTER, ROCK, SAND, SAND_DRY, SAND_DUNE, SAND_LOAM, SAND_SHORE, SEABED_SAND, SEABED_STONE, SEABED_WEED, STRATUM, type Tones,
-} from '../palette';
-import { BANDS } from '../world/planet-terrain';
-import type { View } from '../view/view';
-import type { Ground } from './ground';
-import type { Light } from '../sky/light';
-import { createStrewn } from './strewn';
-import { cut, type FloatNode, type Vec3Node } from '../tsl';
+} from '../palette.ts';
+import { BANDS } from '../world/planet-terrain.ts';
+import type { View } from '../view/view.ts';
+import type { Ground } from './ground.ts';
+import type { Light } from '../sky/light.ts';
+import { createStrewn } from './strewn.ts';
+import { cut, type FloatNode, type Vec3Node } from '../tsl.ts';
 
 /** Where each band lies (world/planet-terrain.ts BANDS). */
 const { shore: SHORE, beach: BEACH, dry: DRY, loam: LOAM_AT, rubble: RUBBLE, ragged: RAGGED } = BANDS;

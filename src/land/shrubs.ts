@@ -11,13 +11,13 @@ import {
   MeshBasicNodeMaterial, Quaternion, Vector3,
 } from 'three/webgpu';
 import { Fn, attribute, mix, normalWorldGeometry, normalize, positionWorld, vec3 } from 'three/tsl';
-import { SHRUB } from '../palette';
-import { random } from '../world/random';
-import type { Shrub } from '../world/terrain-scatter';
-import type { Chart } from '../world/sphere';
-import type { Light } from '../sky/light';
-import { createInstances, standing, type Instances, type Placed } from './site';
-import { cut } from '../tsl';
+import { SHRUB } from '../palette.ts';
+import { random } from '../world/random.ts';
+import type { Shrub } from '../world/terrain-scatter.ts';
+import type { Chart } from '../world/sphere.ts';
+import type { Light } from '../sky/light.ts';
+import { createInstances, standing, type Instances, type Placed } from './site.ts';
+import { cut } from '../tsl.ts';
 
 /** How many shapes the shrubs come in. */
 export const SHAPES = 4;

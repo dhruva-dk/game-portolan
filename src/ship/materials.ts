@@ -28,14 +28,14 @@ import {
   Fn, abs, attribute, cameraPosition, clamp, cos, cross, dot, float, fract, fwidth, max, min, mix, normalize, positionWorld,
   faceDirection, int, luminance, select, sign, sin, smoothstep, storage, varying, vec3,
 } from 'three/tsl';
-import { read } from './instance';
-import type { Light } from '../sky/light';
-import { BELLY_UNIT, PENNANT_LENGTH, PIVOT_Z, RADIUS_UNIT, UV_RANGE } from './build';
-import { breath, type Cloth } from './cloth';
-import { CLOTH } from './kit';
-import { CREAM, DYE_GLOW, TAR } from '../palette';
-import { createWood, shaded } from './wood';
-import { line, type FloatNode, type Vec3Node } from '../tsl';
+import { read } from './instance.ts';
+import type { Light } from '../sky/light.ts';
+import { BELLY_UNIT, PENNANT_LENGTH, PIVOT_Z, RADIUS_UNIT, UV_RANGE } from './build.ts';
+import { breath, type Cloth } from './cloth.ts';
+import { CLOTH } from './kit.ts';
+import { CREAM, DYE_GLOW, TAR } from '../palette.ts';
+import { createWood, shaded } from './wood.ts';
+import { line, type FloatNode, type Vec3Node } from '../tsl.ts';
 
 /** How much of the sun on a sail's far side comes through the canvas: its shadow on the sea is the lighter by it
  *  (water/wake.ts), and a sail with the sun behind it glows (palette.ts DYE_GLOW). */

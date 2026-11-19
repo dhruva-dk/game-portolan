@@ -27,12 +27,12 @@ import {
   Fn, If, Return, abs, cos, cross, dot, float, instanceIndex, int, length, max, normalize, select, sin, uniform, uniformArray,
   vec3, vec4, instancedArray,
 } from 'three/tsl';
-import type { Compute } from '../gpu';
-import type { Vec3 } from '../world/sphere';
-import { BERTHS } from './berths';
-import { cutCanvas } from './canvas';
-import { CLOTH } from './kit';
-import { maxInt, minInt, type FloatNode, type IntNode, type Vec3Node } from '../tsl';
+import type { Compute } from '../gpu.ts';
+import type { Vec3 } from '../world/sphere.ts';
+import { BERTHS } from './berths.ts';
+import { cutCanvas } from './canvas.ts';
+import { CLOTH } from './kit.ts';
+import { maxInt, minInt, type FloatNode, type IntNode, type Vec3Node } from '../tsl.ts';
 
 /** Steps a frame, each a prediction and one Jacobi pass; and the longest frame they cover, seconds. */
 const SUBSTEPS = 8, LONGEST = 1 / 20;

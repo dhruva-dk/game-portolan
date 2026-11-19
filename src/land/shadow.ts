@@ -12,10 +12,10 @@ import {
   OrthographicCamera, RedFormat, RenderTarget, Scene, Vector3, WebGPUCoordinateSystem,
 } from 'three/webgpu';
 import { float, select, texture, uniform, vec2, vec3, vec4 } from 'three/tsl';
-import type { Draw } from '../gpu';
-import { place, type Chart } from '../world/sphere';
-import type { Instances } from './site';
-import type { FloatNode, Vec3Node } from '../tsl';
+import type { Draw } from '../gpu.ts';
+import { place, type Chart } from '../world/sphere.ts';
+import type { Instances } from './site.ts';
+import type { FloatNode, Vec3Node } from '../tsl.ts';
 
 /** Texels across the map. */
 const SIZE = 2048;

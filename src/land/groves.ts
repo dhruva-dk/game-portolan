@@ -8,17 +8,17 @@
 // (site.ts), past FAR its rocks (rocks.ts), and past BUSHES its shrubs not at all.
 
 import { Sphere, Vector3 } from 'three/webgpu';
-import type { Eye, View } from '../view/view';
-import type { Planet } from '../world/planet';
-import { R, distance, horizonDistance, place } from '../world/sphere';
-import type { Terrain } from '../world/terrain';
-import { scatterTerrain } from '../world/terrain-scatter';
-import type { Light } from '../sky/light';
-import { createPalms } from './palms';
-import { KINDS, createRocks } from './rocks';
-import type { Shade } from './shadow';
-import { SHAPES, createShrubs } from './shrubs';
-import { DETAIL } from './site';
+import type { Eye, View } from '../view/view.ts';
+import type { Planet } from '../world/planet.ts';
+import { R, distance, horizonDistance, place } from '../world/sphere.ts';
+import type { Terrain } from '../world/terrain.ts';
+import { scatterTerrain } from '../world/terrain-scatter.ts';
+import type { Light } from '../sky/light.ts';
+import { createPalms } from './palms.ts';
+import { KINDS, createRocks } from './rocks.ts';
+import type { Shade } from './shadow.ts';
+import { SHAPES, createShrubs } from './shrubs.ts';
+import { DETAIL } from './site.ts';
 
 /** The tallest a palm stands over the ground, metres; how far past a tile its palms lean; how deep under the sea a
  *  rock's foot goes; past how far off a tile's rocks are drawn coarser. */

@@ -9,14 +9,14 @@
 
 import { Euler, Matrix4, MeshBasicNodeMaterial, Quaternion, Vector3 } from 'three/webgpu';
 import { Fn, attribute, cross, dFdx, dFdy, dot, float, length, max, mix, normalWorld, positionWorld, select, vec3 } from 'three/tsl';
-import { ROCK } from '../palette';
-import type { View } from '../view/view';
-import type { Rock } from '../world/terrain-scatter';
-import type { Chart } from '../world/sphere';
-import type { Light } from '../sky/light';
-import { rockShape } from './rock-shape';
-import { createInstances, standing, type Placed } from './site';
-import { cut } from '../tsl';
+import { ROCK } from '../palette.ts';
+import type { View } from '../view/view.ts';
+import type { Rock } from '../world/terrain-scatter.ts';
+import type { Chart } from '../world/sphere.ts';
+import type { Light } from '../sky/light.ts';
+import { rockShape } from './rock-shape.ts';
+import { createInstances, standing, type Placed } from './site.ts';
+import { cut } from '../tsl.ts';
 
 /** How many shapes of each kind, and how finely each is made, near and far. */
 export const KINDS = { big: { shapes: 4, detail: 11, far: 5 }, boulder: { shapes: 4, detail: 4, far: 2 } };

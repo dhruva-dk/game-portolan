@@ -9,7 +9,7 @@
 //   shipBerth  her cloth berth x, its share y
 
 import { attribute, vec2 } from 'three/tsl';
-import type { Vec3 } from '../world/sphere';
+import type { Vec3 } from '../world/sphere.ts';
 
 /** The attributes, in the order they lie in an instance. */
 export const SLOTS = ['shipAt', 'shipFwd', 'shipUp', 'shipPaint', 'shipCloth', 'shipBerth'] as const;

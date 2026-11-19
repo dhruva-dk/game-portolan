@@ -12,13 +12,13 @@
 
 import { BufferGeometry, DoubleSide, Float32BufferAttribute, Matrix4, MeshBasicNodeMaterial, Quaternion, Vector3 } from 'three/webgpu';
 import { Fn, attribute, faceDirection, float, mix, normalWorld, normalize, positionWorld, uv, vec3 } from 'three/tsl';
-import { PALM_LEAF, PALM_LEAF_OLD, PALM_NUT, PALM_TRUNK, type Rgb, type Tones } from '../palette';
-import { random } from '../world/random';
-import type { Palm } from '../world/terrain-scatter';
-import type { Chart } from '../world/sphere';
-import type { Light } from '../sky/light';
-import { createInstances, standing, type Instances, type Placed } from './site';
-import { cut, line, type Vec3Node } from '../tsl';
+import { PALM_LEAF, PALM_LEAF_OLD, PALM_NUT, PALM_TRUNK, type Rgb, type Tones } from '../palette.ts';
+import { random } from '../world/random.ts';
+import type { Palm } from '../world/terrain-scatter.ts';
+import type { Chart } from '../world/sphere.ts';
+import type { Light } from '../sky/light.ts';
+import { createInstances, standing, type Instances, type Placed } from './site.ts';
+import { cut, line, type Vec3Node } from '../tsl.ts';
 
 /** The shapes' leans at the foot, radians: each palm is drawn as the nearest. */
 const LEANS = [0.08, 0.2, 0.32, 0.46];

@@ -25,20 +25,20 @@ import {
   Mesh, Sphere, Vector3, type Material,
 } from 'three/webgpu';
 import { uniform } from 'three/tsl';
-import type { Compute } from '../gpu';
-import type { Look } from '../snapshot';
-import type { Light } from '../sky/light';
-import type { Eye } from '../view/view';
-import type { ShipPose } from '../world/pose';
-import { add, length, scale, type Vec3 } from '../world/sphere';
-import type { Wind } from '../world/wind';
-import { BERTHS, moor, type Berth } from './berths';
-import { buildShip, type Packed } from './build';
-import { createCloth } from './cloth';
-import { SLOTS, STRIDE, pack } from './instance';
-import { DETAILS, chooseDetail } from './detail';
-import { createShipMaterials } from './materials';
-import { feeling, filling, hauled, inFrame, moved, trim, type Motion } from './motion';
+import type { Compute } from '../gpu.ts';
+import type { Look } from '../snapshot.ts';
+import type { Light } from '../sky/light.ts';
+import type { Eye } from '../view/view.ts';
+import type { ShipPose } from '../world/pose.ts';
+import { add, length, scale, type Vec3 } from '../world/sphere.ts';
+import type { Wind } from '../world/wind.ts';
+import { BERTHS, moor, type Berth } from './berths.ts';
+import { buildShip, type Packed } from './build.ts';
+import { createCloth } from './cloth.ts';
+import { SLOTS, STRIDE, pack } from './instance.ts';
+import { DETAILS, chooseDetail } from './detail.ts';
+import { createShipMaterials } from './materials.ts';
+import { feeling, filling, hauled, inFrame, moved, trim, type Motion } from './motion.ts';
 
 /** A sails' pattern as the instance carries it (instance.ts). */
 const PATTERNS: Record<Look['pattern'], number> = { plain: 0, band: 1, stripes: 2 };

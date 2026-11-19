@@ -14,13 +14,13 @@ import {
   Float32BufferAttribute, InstancedBufferGeometry, InstancedInterleavedBuffer, InterleavedBufferAttribute, Mesh, MeshBasicNodeMaterial, Sphere,
 } from 'three/webgpu';
 import { Fn, attribute, clamp, distance, fract, normalize, positionGeometry, positionWorld, tan } from 'three/tsl';
-import type { Vec2Node } from '../tsl';
-import type { Eye, View } from '../view/view';
-import { R } from '../world/sphere';
-import { heightBounds, type Terrain } from '../world/terrain';
-import type { Ground } from './ground';
-import type { Sand } from './sand';
-import { LOD, STRIDE, createLod } from './terrain-lod';
+import type { Vec2Node } from '../tsl.ts';
+import type { Eye, View } from '../view/view.ts';
+import { R } from '../world/sphere.ts';
+import { heightBounds, type Terrain } from '../world/terrain.ts';
+import type { Ground } from './ground.ts';
+import type { Sand } from './sand.ts';
+import { LOD, STRIDE, createLod } from './terrain-lod.ts';
 
 /** The most patches drawn at once (a few hundred from the sea; more from high up, where they are coarse). */
 const MOST = 4096;

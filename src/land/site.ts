@@ -7,7 +7,7 @@
 // buffer is rewritten only when the tiles in view change.
 
 import { InstancedBufferAttribute, InstancedMesh, Matrix4, Vector3, type BufferGeometry, type Material } from 'three/webgpu';
-import { chartBasis, fromChart, place, type Chart, type Vec3 } from '../world/sphere';
+import { chartBasis, fromChart, place, type Chart, type Vec3 } from '../world/sphere.ts';
 
 /** The world position `height` metres up at chart point (x, z), and the chart's axes there: x (e1), up, z (e2). */
 export function onSphere(chart: Chart, x: number, height: number, z: number): { p: Vec3; e1: Vec3; up: Vec3; e2: Vec3 } {

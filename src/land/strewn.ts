@@ -8,7 +8,7 @@
 // mean of the pattern they make (so the floor's tone doesn't change), and are not worked out at all past FAR.
 
 import { Fn, If, cameraPosition, float, floor, fract, length, mix, mx_cell_noise_float, select, smoothstep, vec2, vec3 } from 'three/tsl';
-import type { FloatNode, Vec2Node, Vec3Node, Vec4Node } from '../tsl';
+import type { FloatNode, Vec2Node, Vec3Node, Vec4Node } from '../tsl.ts';
 
 /** Cells of each, metres; the share of cells that hold one; its radius's range, as a share of the cell; and how far
  *  into its ball (0 at its rim … 1 at its middle) its shape's edge is cut, CRISP wide. */

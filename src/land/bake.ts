@@ -4,8 +4,8 @@
 //   out: { height: Uint16Array (6 faces of n × n, half floats), cover: Uint8Array (6 faces of n × n RGBA), ms }
 
 import { DataUtils } from 'three/webgpu';
-import { planetOf, type Land } from '../world/land';
-import { bakeFaces } from '../world/planet';
+import { planetOf, type Land } from '../world/land.ts';
+import { bakeFaces } from '../world/planet.ts';
 
 self.onmessage = (e: MessageEvent<{ seed: number; land: Land; n: number }>) => {
   const { seed, land, n } = e.data;

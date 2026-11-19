@@ -9,9 +9,9 @@
 
 import { Float32BufferAttribute, IcosahedronGeometry, Vector3, type BufferGeometry } from 'three/webgpu';
 import { mergeVertices, toCreasedNormals } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { createNoise3 } from '../world/noise3';
-import { random } from '../world/random';
-import { smoothstep } from '../world/scalar';
+import { createNoise3 } from '../world/noise3.ts';
+import { random } from '../world/random.ts';
+import { smoothstep } from '../world/scalar.ts';
 
 /** Normals are kept apart across bends sharper than this, radians. */
 const CREASE = 0.6;

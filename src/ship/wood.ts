@@ -5,10 +5,10 @@
 
 import { float, mix, positionWorld, select, vec3 } from 'three/tsl';
 import type { Node } from 'three/webgpu';
-import { CREAM, DECK, DYE_SHADE, GILDING, TAR, TIMBER, type Rgb, type Tones } from '../palette';
-import type { Light } from '../sky/light';
-import { cut, line, type FloatNode, type Vec2Node, type Vec3Node } from '../tsl';
-import { KIND } from './kit';
+import { CREAM, DECK, DYE_SHADE, GILDING, TAR, TIMBER, type Rgb, type Tones } from '../palette.ts';
+import type { Light } from '../sky/light.ts';
+import { cut, line, type FloatNode, type Vec2Node, type Vec3Node } from '../tsl.ts';
+import { KIND } from './kit.ts';
 
 /** The planks' seams: this many strakes to a unit of the hull's uv, and how dark a seam is drawn. */
 const STRAKES = 4, SEAM = 0.4;

@@ -11,13 +11,13 @@ import {
   MeshBasicNodeMaterial,
 } from 'three/webgpu';
 import { Fn, attribute, cross, normalize, varying } from 'three/tsl';
-import { KINDS, gunOrder, type GunKind } from '../kinds';
-import type { Light } from '../sky/light';
-import type { ShipDraw } from '../snapshot';
-import type { Vec3Node } from '../tsl';
-import { add, dot, length, normalize as unit, type Vec3 } from '../world/sphere';
-import { MUZZLE, gunShape, gunSurface } from './gun';
-import { GUN_DRAWN, GUN_MOUNT, toWorld } from './mount';
+import { KINDS, gunOrder, type GunKind } from '../kinds.ts';
+import type { Light } from '../sky/light.ts';
+import type { ShipDraw } from '../snapshot.ts';
+import type { Vec3Node } from '../tsl.ts';
+import { add, dot, length, normalize as unit, type Vec3 } from '../world/sphere.ts';
+import { MUZZLE, gunShape, gunSurface } from './gun.ts';
+import { GUN_DRAWN, GUN_MOUNT, toWorld } from './mount.ts';
 
 /** Where a shot of `kind` fired from `from` (the bore, at the trunnions) along `dir` leaves the drawn gun's mouth. */
 export const muzzle = (from: Vec3, dir: Vec3, kind: GunKind): Vec3 => add(from, dir, MUZZLE[kind] * GUN_DRAWN.scale);

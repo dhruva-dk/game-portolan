@@ -13,10 +13,10 @@
 
 import { ClampToEdgeWrapping, DataArrayTexture, HalfFloatType, LinearFilter, RGBAFormat, RedFormat, UnsignedByteType } from 'three/webgpu';
 import { float, normalize, texture } from 'three/tsl';
-import { faceUV } from '../view/cube';
-import type { Land } from '../world/land';
-import { R } from '../world/sphere';
-import { tangentFrame, type FloatNode, type Vec3Node, type Vec4Node } from '../tsl';
+import { faceUV } from '../view/cube.ts';
+import type { Land } from '../world/land.ts';
+import { R } from '../world/sphere.ts';
+import { tangentFrame, type FloatNode, type Vec3Node, type Vec4Node } from '../tsl.ts';
 
 /** Nodes along a face's edge: texels of about (π/2)·R / (n − 1), 1.1 m at R = 554. */
 const NODES = 768;
