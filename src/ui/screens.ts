@@ -1,7 +1,8 @@
 // The screens round the lobby, after the UI sheet as the owner reworked it. Each was drawn on the sheet's page, 956 ×
-// 440 units with a phone's safe insets (62 each end, 20 at the bottom); on any screen the page is scaled as it fits
-// (k: the iPad's 1180 × 820 takes it 1.23×) and grows to the screen's own shape, and each of its pieces keeps to the
-// edge it was drawn against, the screen's safe area there (Page, at): no shape of screen letterboxes it.
+// 440 units with a phone's safe insets (62 each end, 20 at the bottom); on any screen the page is scaled by the UI's
+// size (ui.ts size: the iPad's 1180 × 820 takes it 1.74×, as the HUD) and grows or shrinks to the screen's own shape,
+// and each of its pieces keeps to the edge it was drawn against, the screen's safe area there or the gutter (Page,
+// at): no shape of screen letterboxes it.
 // Each fades in and out (ways.ts FADE), never cut to.
 //   title   an opaque sheet over the world loading: rhumb lines, the rose whose needle swings while the world loads and
 //           settles north when it is ready, her galleon gilt below; it moves on by itself (flow.ts)
@@ -14,7 +15,7 @@
 
 import { INK, PAPER, WASH, bar, galleon, glyph, paperDisc, roughRect, svg } from './ink';
 import { rhumbs, rose } from './marks';
-import { fade, onTap, uiLayer } from './ui';
+import { GUTTER, INSET, fade, onTap, size, uiLayer } from './ui';
 
 export const W = 956, H = 440;
 
@@ -26,8 +27,6 @@ export interface Page { w: number; h: number; left: number; top: number; right: 
 
 /** The edges the screens were drawn against: the phone's safe insets (62, 0, 62, 20) and 2 more. */
 const DRAWN = { left: 64, top: 16, right: W - 64, bottom: H - 22 } as const;
-/** The least an edge stands in from the screen's, in page units, where the safe area leaves no room. */
-const MARGIN = 16;
 
 /** The safe area's insets, as the page has them (--safe-* stand in for them off the device: ui.ts), read off an unseen
  *  element's padding. */
@@ -46,8 +45,8 @@ function insets() {
 /** The page on a screen `width` × `height` CSS px with the given safe insets: scaled as the drawn page fits it, grown
  *  to its shape. */
 export function pageFor(width: number, height: number, safe: { top: number; right: number; bottom: number; left: number }): Page {
-  const k = Math.min(width / W, height / H), w = width / k, h = height / k;
-  const edge = (px: number) => Math.max(px / k + 2, MARGIN);
+  const k = size(width, height), w = width / k, h = height / k;
+  const edge = (px: number) => Math.max(px / k + INSET, GUTTER);
   return { w, h, left: edge(safe.left), top: edge(safe.top), right: w - edge(safe.right), bottom: h - edge(safe.bottom) };
 }
 
@@ -190,7 +189,7 @@ function folio(x: number, y: number, w: number, h: number, place: [Parameters<ty
  *  beside an hourglass, a tap on the row turns them on or off. */
 export function createSettings(get: () => Settings, set: (s: Settings) => void, close: () => void) {
   // (its close mark, standing out past its corner, kept clear of the screen's edge)
-  const x = 540, y = 74, w = 332, h = 208;
+  const x = 540, y = 86, w = 332, h = 208;
   const f = folio(x, y, w, h, ['right', 'top'], close);
   const draw = () => {
     const v = get();

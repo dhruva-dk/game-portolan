@@ -3,7 +3,7 @@
 //   top centre  the Storm's clock (its spiral, m:ss; in the Storm's violet under 30 s) and the ships afloat (a ship, a count)
 //   top right   the minimap (minimap.ts), north up: who holds the sea, the islands, the Storm's calm and the next, the
 //               way in from outside it, her arrow (no other ship, no loot); a tap opens the full map
-//   right       under the right thumb, Fire (the old game's place, chart/layout.ts): the mark of the gun in hand on a
+//   right       under the right thumb, Fire, in the corner: the mark of the gun in hand on a
 //               paper disc, its rounds left under it; while reloading or taking it up a rubric ring running round its
 //               border, while winding up a gold one; faint and struck through with no gun (she is unarmed); held, it
 //               fires at the gun's interval. Gust above it, with a pip for each charge, the next filling as it comes
@@ -13,7 +13,7 @@
 //               assist has a ship (sim/gun.ts), faint when the ball falls short of what it is on; a rubric ring while
 //               reloading and a gold one winding up, running round it; a small ring where the ball will come down, if
 //               clear of it, and for a lobbed gun a cross in a wide ring, the mark to lay on its target; none with no gun
-//   bottom      the hotbar right of centre, out of the stick's side: the two guns' slots (each its kind's mark, its
+//   bottom      the hotbar, centred: the two guns' slots (each its kind's mark, its
 //               rarity's ink under it, its rounds; a rubric ring running round it while it reloads), a gap, then
 //               three of stores; the one in hand gilt and raised, a gold ring running round it while it is used, and a
 //               gold mark bobbing over the slot a tap would swap for what lies within reach (0117's hotbar). A tap on
@@ -22,7 +22,9 @@
 //   blows       what happens answered (juice.ts): the hit cross round the reticle, the figures off a struck ship, the
 //               arcs toward a blow on her, the screen's flashes and rims, the pieces knocked, a piece taken up flown
 //               to its slot
-// No words. The stick is drawn under it (stick.ts); look drags take the rest of the screen.
+// No words. Each piece is drawn at the phone's size and grown by the UI's size (ui.ts size), the same share of the
+// screen's short edge on a phone or an iPad, in the gutter on every side. The stick is drawn under it (stick.ts); look
+// drags take the rest of the screen.
 // Once she has sunk it watches another ship (watch): only the Storm's clock, the ships afloat and the disc stay, her arrow gilt.
 // While the eye comes down from space at a match's start (play/arrival.ts) none of it shows; it fades in over the last
 // of the way down (FADE), as the game reports it (Status.arriving).
@@ -51,9 +53,9 @@ const SLOTS = HOTBAR.guns + HOTBAR.items, LEFT = (i: number) => i * (SLOT + GAP)
 /** A gun's mark. */
 const mark = (k: GunKind): Glyph => `weapon.${k}`;
 const MINIMAP = 132;
-/** Fire's radius, px, and its centre from the safe area's right and bottom edges; Gust's centre from Fire's (the old
- * game's, chart/layout.ts: 802, 317 on a 956 × 440 page). */
-const FIRE = 40, FIRE_RIGHT = 92, FIRE_BOTTOM = 102, GUST_RIGHT = 6, GUST_UP = 86;
+/** Fire's radius, px, in the corner on the gutter's lines, as the minimap over it and the hotbar beside it are; Gust's
+ *  centre from Fire's, left and up (the old game's, chart/layout.ts). */
+const FIRE = 40, GUST_RIGHT = 6, GUST_UP = 86;
 /** The reticle's radius, px (the old game's), and drawn in to this share of it with the assist on a ship; the radius
  *  of the ring where the ball will come down. */
 const RETICLE = 10, LOCKED = 0.75, FALL = 4;
@@ -80,14 +82,19 @@ export function createHud(layer: HTMLElement, shores: Shores, act: HudActions) {
   body.className = 'screen';
   root.appendChild(body);
 
-  const vitals = piece(body, 'top left');
-  const readings = piece(body, 'top centre');
-  const map = piece(body, 'top right', true);
-  // (each piece stands 4 px in from the safe area's edge: ui.ts)
-  const gust = piece(body, 'right bottom', true);
-  gust.style.margin = `0 ${FIRE_RIGHT - GUST_RIGHT - 30 - 4}px ${FIRE_BOTTOM + GUST_UP - 30 - 4}px 0`;
-  const fire = piece(body, 'right bottom', true);
-  fire.style.cssText = `margin:0 ${FIRE_RIGHT - FIRE - 6}px ${FIRE_BOTTOM - FIRE - 6}px 0;width:${2 * FIRE + 4}px;height:${2 * FIRE + 4}px`;
+  // each piece drawn at the phone's size and grown by the UI's size about its corner, standing in the gutter (ui.ts)
+  const vitals = piece(body, 'top left', false, true);
+  const readings = piece(body, 'top centre', false, true);
+  const map = piece(body, 'top right', true, true);
+  // the right thumb's: Fire in the corner, Gust over it
+  const thumb = piece(body, 'right bottom', false, true);
+  const disc = 2 * FIRE + 4;
+  thumb.style.width = `${disc}px`;
+  thumb.style.height = `${disc / 2 + GUST_UP + 30}px`;
+  const gust = piece(thumb, '', true);
+  gust.style.cssText = `right:${disc / 2 + GUST_RIGHT - 30}px;bottom:${disc / 2 + GUST_UP - 30}px`;
+  const fire = piece(thumb, '', true);
+  fire.style.cssText = `right:0;bottom:0;width:${disc}px;height:${disc}px`;
   const reticle = piece(body, '');
   reticle.style.cssText = `left:50%;top:50%;transform:translate(-50%,-50%)`;
   const fall = piece(body, '');
@@ -103,8 +110,7 @@ export function createHud(layer: HTMLElement, shores: Shores, act: HudActions) {
     act.fire(true);
   });
   for (const lift of ['pointerup', 'pointercancel', 'lostpointercapture'] as const) fire.addEventListener(lift, () => act.fire(false));
-  const hotbar = piece(body, 'bottom');
-  hotbar.style.left = 'calc(50% - 12px)';
+  const hotbar = piece(body, 'bottom centre', false, true);
 
   const drawMap = createMinimap(map, MINIMAP, shores);
   onTap(map, () => act.map());
@@ -139,7 +145,7 @@ export function createHud(layer: HTMLElement, shores: Shores, act: HudActions) {
     root,
     watch(on: boolean) {
       watching = on;
-      for (const el of [vitals, gust, fire, reticle, fall, hotbar, rim]) el.style.display = on ? 'none' : '';
+      for (const el of [vitals, thumb, reticle, fall, hotbar, rim]) el.style.display = on ? 'none' : '';
       map.classList.toggle('press', !on);
     },
     /** A frame: the match as reported, and who holds the sea (and her id in it) as the frame draws it. */

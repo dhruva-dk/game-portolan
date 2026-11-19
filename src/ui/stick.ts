@@ -11,7 +11,7 @@ const KNOB = 22;
 export function createStick(layer: HTMLElement) {
   const ring = document.createElement('div');
   ring.style.cssText = `position:absolute;left:0;top:0;width:${2 * STICK}px;height:${2 * STICK}px;border:2px solid ${INK};
-    border-radius:50%;box-sizing:border-box;display:none`;
+    border-radius:50%;box-sizing:border-box;display:none;scale:var(--k, 1)`;
   const knob = document.createElement('div');
   knob.style.cssText = `position:absolute;left:${STICK - KNOB}px;top:${STICK - KNOB}px;width:${2 * KNOB}px;height:${2 * KNOB}px;
     border:2px solid ${INK};border-radius:50%;box-sizing:border-box;background:rgba(232, 214, 178, 0.3)`;

@@ -9,6 +9,20 @@
 import { DEFS } from './ink';
 import { FADE } from './ways';
 
+/** The phone's screen, CSS px, that the UI is drawn for (landscape, its short edge 440); and the least width it needs
+ *  at its own size (the HUD's top row: the vitals, a gap, then half the readings, to the middle, is 340). */
+export const DRAWN_HIGH = 440, DRAWN_LEAST = 680;
+/** Every piece stands at least GUTTER px (at the drawn size) from the screen's edge, and INSET px in from the safe
+ *  area's. */
+export const GUTTER = 16, INSET = 2;
+
+/**
+ * The UI's size on a screen `width` × `height` CSS px: a factor on the drawn size, so a piece is the same share of the
+ * screen's short edge on any screen (≈1 on the phone it was drawn for, ≈1.74 at 1180 × 820, ≈2 on the iPad Air it was tuned on, 1373 × 954), unless the screen is too
+ * narrow for the drawn pieces side by side at that size.
+ */
+export const size = (width: number, height: number) => Math.min(height / DRAWN_HIGH, width / DRAWN_LEAST);
+
 const STYLE = `
 .ui { position: fixed; inset: 0; pointer-events: none; user-select: none; -webkit-user-select: none;
   -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; font-family: "Iowan Old Style", Georgia, serif; }
@@ -16,12 +30,15 @@ const STYLE = `
 .ui .press, .ui .press * { pointer-events: auto; cursor: pointer; }
 .ui .piece { position: absolute; }
 .ui svg { display: block; }
-/* the safe area's edges, plus a margin (--safe-* stand in for the phone's insets off the phone: debug.ts ?safe) */
-.ui .top { top: calc(var(--safe-top, env(safe-area-inset-top)) + 4px); }
-.ui .bottom { bottom: calc(var(--safe-bottom, env(safe-area-inset-bottom)) + 4px); }
-.ui .left { left: calc(var(--safe-left, env(safe-area-inset-left)) + 4px); }
-.ui .right { right: calc(var(--safe-right, env(safe-area-inset-right)) + 4px); }
-.ui .centre { left: 50%; transform: translateX(-50%); }
+/* the safe area's edges, plus a margin, and never nearer the screen's edge than the gutter (--safe-* stand in for the
+   phone's insets off the phone: debug.ts ?safe); --k is the UI's size (size()) */
+.ui .top { top: max(calc(var(--safe-top, env(safe-area-inset-top)) + ${INSET}px * var(--k, 1)), calc(${GUTTER}px * var(--k, 1))); }
+.ui .bottom { bottom: max(calc(var(--safe-bottom, env(safe-area-inset-bottom)) + ${INSET}px * var(--k, 1)), calc(${GUTTER}px * var(--k, 1))); }
+.ui .left { left: max(calc(var(--safe-left, env(safe-area-inset-left)) + ${INSET}px * var(--k, 1)), calc(${GUTTER}px * var(--k, 1))); }
+.ui .right { right: max(calc(var(--safe-right, env(safe-area-inset-right)) + ${INSET}px * var(--k, 1)), calc(${GUTTER}px * var(--k, 1))); }
+.ui .centre { left: 50%; translate: -50% 0; }
+/* a piece drawn at the phone's size, grown by the UI's size about its own corner of the screen */
+.ui .piece.sized { scale: var(--k, 1); }
 .ui .screen { position: absolute; inset: 0; }
 .ui .screen.press { pointer-events: auto; }
 .ui .gone, .ui .gone * { pointer-events: none !important; }
@@ -71,13 +88,22 @@ export function uiLayer(): HTMLElement {
   layer.className = 'ui';
   layer.append(defs);
   document.body.appendChild(layer);
+  const sized = () => layer?.style.setProperty('--k', size(innerWidth, innerHeight).toFixed(4));
+  sized();
+  addEventListener('resize', sized);
   return layer;
 }
 
-/** A piece of the UI placed by its classes (e.g. 'top left'), holding `html`; `press` makes it take touches. */
-export function piece(parent: HTMLElement, place: string, press = false): HTMLDivElement {
+/** The UI's size on this screen, now (size()). */
+export const sizeNow = () => size(innerWidth, innerHeight);
+
+/** A piece of the UI placed by its classes (e.g. 'top left'), holding `html`; `press` makes it take touches; `sized`
+ *  grows it by the UI's size about the corner (or edge) it is placed at. */
+export function piece(parent: HTMLElement, place: string, press = false, sized = false): HTMLDivElement {
   const el = document.createElement('div');
-  el.className = `piece ${place}${press ? ' press' : ''}`;
+  el.className = `piece ${place}${press ? ' press' : ''}${sized ? ' sized' : ''}`;
+  const has = (c: string) => place.split(' ').includes(c);
+  if (sized) el.style.transformOrigin = `${has('left') ? '0' : has('right') ? '100%' : '50%'} ${has('top') ? '0' : has('bottom') ? '100%' : '50%'}`;
   parent.appendChild(el);
   return el;
 }

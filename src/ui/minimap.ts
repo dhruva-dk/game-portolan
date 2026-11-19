@@ -18,8 +18,9 @@ import { createGround } from './ground';
 import { createHeld } from './held';
 import { INK, PAPER, WASH, svg } from './ink';
 import { bakeIsle, zOf, type Isle } from './isles';
+import { sizeNow } from './ui';
 
-/** Metres from her to the disc's rim: at her 13.5 m/s some 19 s of sailing, past a cannon's 200 m reach. */
+/** Metres from her to the disc's rim: at her 16 m/s some 16 s of sailing, past a cannon's 200 m reach. */
 export const SPAN = 260;
 /** The most redraws a second. */
 const RATE = 30;
@@ -57,7 +58,8 @@ export function createMinimap(host: HTMLElement, size: number, { coasts, ground:
     + `<circle cx="${r}" cy="${r}" r="${inner + 0.5}" fill="${SEA}" stroke="${INK.iron}" stroke-width="1"/>`);
   (host.firstElementChild as SVGSVGElement).style.position = 'absolute';
   const canvas = document.createElement('canvas');
-  const dpr = Math.min(devicePixelRatio, 3);
+  // its pixels as many as it is shown at, grown by the UI's size (ui.ts)
+  const dpr = Math.min(devicePixelRatio * sizeNow(), 4);
   canvas.width = canvas.height = Math.round(inner * 2 * dpr);
   canvas.style.cssText = `position:absolute;left:${r - inner}px;top:${r - inner}px;width:${inner * 2}px;height:${inner * 2}px;border-radius:50%`;
   host.appendChild(canvas);

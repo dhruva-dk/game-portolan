@@ -8,8 +8,9 @@
 // game's business (play/game.ts step); this only reports them.
 
 import type { Hands } from '../player';
+import { sizeNow } from './ui';
 
-/** The stick's reach from its centre, CSS pixels. */
+/** The stick's reach from its centre, CSS pixels at the UI's drawn size (ui.ts size: grown with the rest of it). */
 export const STICK = 56;
 /** The share of the screen's width, from the left, where a finger takes the stick. */
 const LEFT = 0.45;
@@ -26,7 +27,7 @@ export function createInput(element: HTMLElement, steers: () => boolean) {
   element.addEventListener('pointerdown', (e) => {
     element.setPointerCapture(e.pointerId);
     const stick = steers() && e.clientX < innerWidth * LEFT && ![...fingers.values()].some((f) => f.stick);
-    const within = (v: number, size: number) => Math.min(Math.max(v, STICK), size - STICK);
+    const reach = STICK * sizeNow(), within = (v: number, size: number) => Math.min(Math.max(v, reach), size - reach);
     const cx = stick ? within(e.clientX, innerWidth) : e.clientX, cy = stick ? within(e.clientY, innerHeight) : e.clientY;
     fingers.set(e.pointerId, { stick, x: e.clientX, y: e.clientY, cx, cy });
   });
@@ -60,7 +61,8 @@ export function createInput(element: HTMLElement, steers: () => boolean) {
       let stick: Hands['stick'] = null;
       if (thumb) {
         // past the rim she is pushed all the way, no further
-        const x = (thumb.x - thumb.cx) / STICK, y = (thumb.cy - thumb.y) / STICK, over = Math.max(1, Math.hypot(x, y));
+        const reach = STICK * sizeNow();
+        const x = (thumb.x - thumb.cx) / reach, y = (thumb.cy - thumb.y) / reach, over = Math.max(1, Math.hypot(x, y));
         stick = { x: x / over, y: y / over, centre: [thumb.cx, thumb.cy] };
       }
       else {
