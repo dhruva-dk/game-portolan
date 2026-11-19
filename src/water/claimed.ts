@@ -14,8 +14,11 @@
 // The cells go to the GPU as two storage buffers, one word a cell, laid out a face at a time in (N + 2)² words: each
 // face's cells within an apron one cell wide holding the next faces' cells along its edges (cells.ts wrapped), so the
 // shader's 3 × 3 reads never leave a face's tile. What changed is sent as a range of words a face, never the whole.
+//
+// Pure: no three, so it runs in node for the tests (as cursor.ts does); the two name their imports with .ts, as node's
+// do, while the rest of the folder, which only Vite loads, leaves it off.
 
-import type { Sea } from '../snapshot';
+import type { Sea } from '../snapshot.ts';
 import { CELLS, N, beyond, cellOf, columnOf, faceOf, rowOf, wrapped, type ReadCells } from '../world/cells.ts';
 import { createCursor } from './cursor.ts';
 
@@ -23,7 +26,7 @@ import { createCursor } from './cursor.ts';
 export const HOLD = 8;
 /** The least smoothed share a cell keeps of its own holder. */
 const MIN_SHARE = 0.52;
-/** The smoothing's spread, cells: wider than the first game's 1.15, as a ship's home here is only some 18 cells
+/** The smoothing's spread, cells: wider than 1.15, as a ship's home here is only some 18 cells
  *  across, and a narrower one leaves its circle an octagon. */
 const SIGMA = 1.6;
 /** The smoothing window's reach, cells: (2·FLAT + 1)² of them. */

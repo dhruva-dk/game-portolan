@@ -146,7 +146,8 @@ function tinted(c: Vec3Node, colour: Vec3Node, a: FloatNode, far: FloatNode): Ve
   const light = lab.x.mul(mix(float(1), hers.x.div(MIDDLE), a.mul(TINT_LIGHT)));
   const strength = mix(length(lab.yz).mul(min(ratio.div(TINT_RICH), 1).mul(TINT_CHROMA)), light.mul(ratio).mul(FAR_RICH), far);
   const keep = float(1).sub(a);
-  return linear(vec3(light, lab.yz.mul(keep.mul(keep).mul(mix(float(1), keep, far))).add(hers.yz.div(max(chroma, 1e-4)).mul(strength.mul(a)))));
+  const kept = lab.yz.mul(keep.mul(keep).mul(mix(float(1), keep, far)));
+  return linear(vec3(light, kept.add(hers.yz.div(max(chroma, 1e-4)).mul(strength.mul(a)))));
 }
 
 /**
@@ -173,7 +174,8 @@ function seaRadiance(sky: Sky, view: View, s: Surface, ships: Ships, held?: Held
   const irradiance = whiteSurface(sky, p, up, sun);
   // the water's own tone by how much of it the eye looks through, paler where a wake has worked air into it, and a
   // second, deeper tone in the troughs between the waves, its edge crisp
-  const own = mix(mix(vec3(...SEA_SHALLOW), vec3(...SEA_MIDDLE), smoothstep(SHALLOW_TO, MIDDLE_AT, depth)), vec3(...SEA_DEEP), smoothstep(MIDDLE_AT, DEEP_AT, depth));
+  const middle = mix(vec3(...SEA_SHALLOW), vec3(...SEA_MIDDLE), smoothstep(SHALLOW_TO, MIDDLE_AT, depth));
+  const own = mix(middle, vec3(...SEA_DEEP), smoothstep(MIDDLE_AT, DEEP_AT, depth));
   const tone = mix(own, vec3(...SEA_SHALLOW), ships.air.mul(AIRED)).mul(mix(float(TROUGH), float(1), cut(crest, TROUGH_AT)));
   const body = tone.mul(irradiance).mul(ships.glow);
 

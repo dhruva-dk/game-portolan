@@ -5,7 +5,7 @@
 //
 // Pure: no three, so it runs in node for the tests.
 
-import type { Sea } from '../snapshot';
+import type { Sea } from '../snapshot.ts';
 
 /** No sea read (outside a match). */
 const NONE = -1;

@@ -45,7 +45,7 @@ import {
   InterleavedBufferAttribute, LinearFilter, MaxEquation, Mesh, MeshBasicNodeMaterial, OrthographicCamera, RGBAFormat, RenderTarget, Scene,
 } from 'three/webgpu';
 import {
-  Fn, abs, attribute, cos, cross, dot, exp, float, length as lengthN, max, min, mix, mx_noise_float, normalize, saturate, select, sin, smoothstep,
+  Fn, abs, attribute, cos, cross, dot, exp, float, length, max, min, mix, mx_noise_float, normalize, saturate, select, sin, smoothstep,
   step, texture, uniform, vec2, vec3, vec4,
 } from 'three/tsl';
 import type { Environment } from '../environment';
@@ -57,9 +57,10 @@ import { WAKE, laid, type WakePoint } from '../sim/wake';
 import type { Sky } from '../sky/sky';
 import type { View } from '../view/view';
 import type { ShipPose } from '../world/pose';
-import { R, add, along, cross as crossV, distance, dot as dotV, length, normalize as normalizeV, toChart, type Chart, type Vec3 } from '../world/sphere';
-import { outside } from './hulls';
+import { clamp } from '../world/scalar';
+import * as sphere from '../world/sphere';
 import type { FloatNode, Vec2Node, Vec3Node, Vec4Node } from '../tsl';
+import { outside } from './hulls';
 
 /** Texels across the map, and how far it reaches from the point under the eye, metres. */
 const SIZE = 512, REACH = 128;
@@ -124,7 +125,7 @@ const vertices = WAKE.most + 1;
 const sq = (x: FloatNode): FloatNode => x.mul(x);
 
 /** A ship as her marks need her: her pose, her velocity (world, metres a second) and her yards' brace (radians). */
-export interface Afloat { pose: ShipPose; velocity: Vec3; look: { brace: number } }
+export interface Afloat { pose: ShipPose; velocity: sphere.Vec3; look: { brace: number } }
 
 /** A material that draws straight onto the map (the chart's metres in `at`) and adds what it draws to what is there. */
 function marker(at: Vec2Node, mark: Vec4Node): MeshBasicNodeMaterial {
@@ -134,8 +135,11 @@ function marker(at: Vec2Node, mark: Vec4Node): MeshBasicNodeMaterial {
   return m;
 }
 
-/** A dynamic float attribute of `n` items of `size`. */
-const dynamic = (n: number, size: number) => new BufferAttribute(new Float32Array(n * size), size).setUsage(DynamicDrawUsage);
+/** A dynamic float attribute of `n` items of `size`, and the array it is written through. */
+const dynamic = (n: number, size: number) => {
+  const data = new Float32Array(n * size);
+  return { data, attribute: new BufferAttribute(data, size).setUsage(DynamicDrawUsage) };
+};
 
 /** The first `items` items of a buffer marked to go up to the GPU, and no more (none: nothing goes up). */
 function sent(a: BufferAttribute | InstancedInterleavedBuffer, items: number) {
@@ -166,10 +170,12 @@ export function createWake(view: View, sky: Sky, capacity: number) {
   const trailGeometry = new BufferGeometry();
   const trailAt = dynamic(capacity * vertices * 2, 2), trailMark = dynamic(capacity * vertices * 2, 4);
   const trailLaid = dynamic(capacity * vertices * 2, 1);
-  trailGeometry.setAttribute('at', trailAt);
-  trailGeometry.setAttribute('mark', trailMark);
-  trailGeometry.setAttribute('laid', trailLaid);
-  trailGeometry.setIndex(new BufferAttribute(new Uint16Array(capacity * (vertices - 1) * 6), 1).setUsage(DynamicDrawUsage));
+  trailGeometry.setAttribute('at', trailAt.attribute);
+  trailGeometry.setAttribute('mark', trailMark.attribute);
+  trailGeometry.setAttribute('laid', trailLaid.attribute);
+  const trailIndex = new Uint16Array(capacity * (vertices - 1) * 6);
+  const trailIndexAttribute = new BufferAttribute(trailIndex, 1).setUsage(DynamicDrawUsage);
+  trailGeometry.setIndex(trailIndexAttribute);
   const trails = new Mesh(trailGeometry, marker(attribute('at', 'vec2'), Fn(() => {
     // across: metres out from her track (+ to port); age: seconds since she passed; v: her speed then; run: metres
     // along the path from her stem now; laid: metres along the path from where she began it (fixed in the water)
@@ -211,16 +217,19 @@ export function createWake(view: View, sky: Sky, capacity: number) {
     foam.addAssign(max(rim, curls.mul(CURL)).mul(pace).mul(exp(age.div(-BOW_LIFE)).mul(0.9)).mul(astern));
     const streak = min(width.mul(0.5).add(0.6), STREAK_WIDEST), gone = age.div(calm.mul(ARM_LIFE)).add(rough.mul(0.2));
     const left = smoothstep(gone.sub(0.55), gone.sub(0.15), patchy(4, 2.5).mul(0.7).add(patchy(1.5, 3.5).mul(0.3)));
-    foam.addAssign(exp(sq(off.div(streak)).negate()).mul(float(1.2).div(streak).sqrt()).mul(life).mul(feathers).mul(left).mul(STREAK).mul(astern));
+    const streaks = exp(sq(off.div(streak)).negate()).mul(float(1.2).div(streak).sqrt());
+    foam.addAssign(streaks.mul(life).mul(feathers).mul(left).mul(STREAK).mul(astern));
     return vec4(foam, height, air, 0);
   })()));
 
   // ---- what hugs each hull: a patch in her own frame
   const patchGeometry = new BufferGeometry();
   const patchAt = dynamic(capacity * 4, 2), patchMark = dynamic(capacity * 4, 4);
-  patchGeometry.setAttribute('at', patchAt);
-  patchGeometry.setAttribute('mark', patchMark);
-  patchGeometry.setIndex(new BufferAttribute(new Uint16Array(Array.from({ length: capacity }, (_, i) => [0, 1, 2, 0, 2, 3].map((k) => k + 4 * i)).flat()), 1));
+  patchGeometry.setAttribute('at', patchAt.attribute);
+  patchGeometry.setAttribute('mark', patchMark.attribute);
+  const patchIndex = new Uint16Array(capacity * 6);
+  for (let i = 0; i < capacity; i++) patchIndex.set([0, 1, 2, 0, 2, 3].map((k) => k + 4 * i), i * 6);
+  patchGeometry.setIndex(new BufferAttribute(patchIndex, 1));
   const patches = new Mesh(patchGeometry, marker(attribute('at', 'vec2'), Fn(() => {
     // across and along: metres in her frame (to port, forward of her middle); her pace
     const m = attribute('mark', 'vec4'), across = m.x, ahead = m.y, pace = m.z;
@@ -262,8 +271,11 @@ export function createWake(view: View, sky: Sky, capacity: number) {
     shadowGeometry.setAttribute('dark', new BufferAttribute(dark, 1));
     shadowGeometry.setIndex(index);
   }
-  const poses = new InstancedInterleavedBuffer(new Float32Array(capacity * 12), 12).setUsage(DynamicDrawUsage);
-  ['shadowAt', 'shadowFwd', 'shadowUp'].forEach((name, i) => shadowGeometry.setAttribute(name, new InterleavedBufferAttribute(poses, 4, i * 4)));
+  const shadowPoses = new Float32Array(capacity * 12);
+  const poses = new InstancedInterleavedBuffer(shadowPoses, 12).setUsage(DynamicDrawUsage);
+  ['shadowAt', 'shadowFwd', 'shadowUp'].forEach((name, i) => {
+    shadowGeometry.setAttribute(name, new InterleavedBufferAttribute(poses, 4, i * 4));
+  });
   shadowGeometry.instanceCount = 0;
   const shadowOn = Fn(() => {
     const at = attribute('shadowAt', 'vec4'), fwd = attribute('shadowFwd', 'vec4').xyz, up = attribute('shadowUp', 'vec4').xyz;
@@ -277,13 +289,13 @@ export function createWake(view: View, sky: Sky, capacity: number) {
     const p = at.xyz.add(cross(up, fwd).mul(braced.x)).add(up.mul(braced.y)).add(fwd.mul(braced.z));
     // along the sun's ray down to the sea's level at her
     const n = normalize(at.xyz), sun = sky.sun(at.xyz);
-    const drop = dot(p.sub(n.mul(R)), n).div(max(dot(sun, n), LOW_SUN));
+    const drop = dot(p.sub(n.mul(sphere.R)), n).div(max(dot(sun, n), LOW_SUN));
     return view.local(p.sub(sun.mul(drop)));
   })();
   const shadowMarker = marker(shadowOn, vec4(0, 0, 0, attribute('dark', 'float')));
   // the darkest shadow over each texel, not their sum (the other marks leave the shadows' channel as it is)
   shadowMarker.blendEquationAlpha = MaxEquation;
-  const shadows = new Mesh(shadowGeometry as BufferGeometry, shadowMarker);
+  const shadows = new Mesh(shadowGeometry, shadowMarker);
 
   for (const mesh of [trails, patches, shadows]) {
     mesh.frustumCulled = false;
@@ -306,36 +318,63 @@ export function createWake(view: View, sky: Sky, capacity: number) {
   // ---- the CPU's half: each ship's wake laid as she goes, and the map's geometry from it
   const wakes: WakePoint[][] = [];
   /** How far each ship's bow has gone since her wake began, metres; and where it was last frame. */
-  const sailed: number[] = [], stems: (Vec3 | null)[] = [];
-  const index = trailGeometry.index!.array as Uint16Array;
+  const sailed = new Float64Array(capacity);
+  /** Where each ship's bow was last frame (a unit vector). */
+  const stems: (sphere.Vec3 | undefined)[] = [];
+  /** The bow now: the newest point of the ribbon being drawn, which the wake kept so far (sim/wake.ts) goes on from. */
+  const head: WakePoint = { at: [0, 1, 0], time: 0, speed: 0 };
+  /** The chart the map is drawn on: the eye's. */
+  const chart: sphere.Chart = { at: [0, 1, 0], axis: [1, 0, 0] };
+  /** A point on a chart, metres (chartAt's out). */
+  const onChart = new Float64Array(2);
+  const at = trailAt.data, mark = trailMark.data, sailedAt = trailLaid.data;
+  const patch = patchAt.data, patchM = patchMark.data;
 
-  /** One ship's ribbon from her stem now along her wake (`gone`: how far she has sailed it), from vertex `v0`;
-   * returns the vertices it took. */
-  function ribbon(chart: Chart, points: readonly WakePoint[], now: number, gone: number, v0: number): number {
-    const at = trailAt.array as Float32Array, mark = trailMark.array as Float32Array, laid = trailLaid.array as Float32Array;
+  /** The wake's point k: the bow now, then the kept points from `skip`. */
+  const wakePoint = (kept: readonly WakePoint[], skip: number, k: number): WakePoint => (k === 0 ? head : kept[skip + k - 1]);
+
+  /** One ship's ribbon from her stem now along her kept wake (less its first `skip` points), `gone` metres sailed along
+   * it, from vertex `v0`; returns the vertices it took. */
+  function ribbon(chart: sphere.Chart, kept: readonly WakePoint[], skip: number, now: number, gone: number, v0: number): number {
+    const count = 1 + kept.length - skip;
     let run = 0;
-    points.forEach((p, k) => {
-      if (k > 0) run += distance(points[k - 1].at, p.at);
+    for (let k = 0; k < count; k++) {
+      const point = wakePoint(kept, skip, k), p = point.at;
+      if (k > 0) run += sphere.distance(wakePoint(kept, skip, k - 1).at, p);
       // along the path toward her bow, from the points either side
-      const ahead = points[Math.max(k - 1, 0)].at, behind = points[Math.min(k + 1, points.length - 1)].at;
-      const t = add(ahead, behind, -1), side = normalizeV(crossV(p.at, add(t, p.at, -dotV(t, p.at))));
-      const age = now - p.time, reach = p.speed * age * KELVIN;
-      const room = Math.max(ARM_ROOM, ARM_REACH * (ARM_WIDTH + WIDEN * p.speed * age));
+      const ahead = wakePoint(kept, skip, Math.max(k - 1, 0)).at, behind = wakePoint(kept, skip, Math.min(k + 1, count - 1)).at;
+      // the way along the path (ahead less behind), brought into the tangent plane at p, and across it, side = p × that
+      const tx = ahead[0] - behind[0], ty = ahead[1] - behind[1], tz = ahead[2] - behind[2];
+      const along = tx * p[0] + ty * p[1] + tz * p[2];
+      const ux = tx - p[0] * along, uy = ty - p[1] * along, uz = tz - p[2] * along;
+      const sx = p[1] * uz - p[2] * uy, sy = p[2] * ux - p[0] * uz, sz = p[0] * uy - p[1] * ux, sl = 1 / Math.hypot(sx, sy, sz);
+      const age = now - point.time, reach = point.speed * age * KELVIN;
+      const room = Math.max(ARM_ROOM, ARM_REACH * (ARM_WIDTH + WIDEN * point.speed * age));
       const half = Math.max(age < ARM_LIFE ? reach + room : 0, (CHURN + SPREAD * age) * CHURN_ROOM);
       // On the inside of a turn the ribbon reaches no further than most of the way to the turn's centre, past which
       // it would fold back over itself. The turn here: how far the path bends between the stretches either side,
       // over their length (+ to port).
-      const into = add(p.at, behind, -1), out = add(ahead, p.at, -1), lengths = length(into) * length(out);
-      const bend = lengths > 0 ? dotV(crossV(into, out), p.at) / lengths / (((length(into) + length(out)) / 2) * R) : 0;
-      for (const s of [1, -1]) {
+      const ix = p[0] - behind[0], iy = p[1] - behind[1], iz = p[2] - behind[2];
+      const ox = ahead[0] - p[0], oy = ahead[1] - p[1], oz = ahead[2] - p[2];
+      const li = Math.hypot(ix, iy, iz), lo = Math.hypot(ox, oy, oz), lengths = li * lo;
+      const turn = (iy * oz - iz * oy) * p[0] + (iz * ox - ix * oz) * p[1] + (ix * oy - iy * ox) * p[2];
+      const bend = lengths > 0 ? turn / lengths / (((li + lo) / 2) * sphere.R) : 0;
+      for (let s = 1; s >= -1; s -= 2) {
         const i = v0 + 2 * k + (s > 0 ? 0 : 1);
         const reaches = s * bend > 0 ? Math.min(half, INSIDE / Math.abs(bend)) : half;
-        at.set(toChart(chart, along(p.at, side, s * reaches).p), i * 2);
-        mark.set([s * reaches, age, p.speed, run], i * 4);
-        laid[i] = gone - run;
+        // from p, s·reaches metres along the sea in the direction of side (chartAt takes it unnormalised)
+        const angle = (s * reaches) / sphere.R, c = Math.cos(angle), w = Math.sin(angle) * sl;
+        sphere.chartAt(chart, p[0] * c + sx * w, p[1] * c + sy * w, p[2] * c + sz * w, onChart);
+        at[i * 2] = onChart[0];
+        at[i * 2 + 1] = onChart[1];
+        mark[i * 4] = s * reaches;
+        mark[i * 4 + 1] = age;
+        mark[i * 4 + 2] = point.speed;
+        mark[i * 4 + 3] = run;
+        sailedAt[i] = gone - run;
       }
-    });
-    return 2 * points.length;
+    }
+    return 2 * count;
   }
 
   return {
@@ -357,7 +396,7 @@ export function createWake(view: View, sky: Sky, capacity: number) {
     shade(p: Vec3Node): FloatNode {
       // down the sun's ray to the sea's level, as the shadows were cast
       const up = normalize(p), sun = sky.sun(p);
-      const { uv, fade } = place(p.sub(sun.mul(lengthN(p).sub(R).div(max(dot(sun, up), LOW_SUN)))));
+      const { uv, fade } = place(p.sub(sun.mul(length(p).sub(sphere.R).div(max(dot(sun, up), LOW_SUN)))));
       let sum: FloatNode = float(0);
       for (let i = 0; i < SOFT; i++) for (let j = 0; j < SOFT; j++) {
         sum = sum.add(texture(target.texture, uv.add(vec2(i - (SOFT - 1) / 2, j - (SOFT - 1) / 2).div(SIZE))).w);
@@ -373,43 +412,58 @@ export function createWake(view: View, sky: Sky, capacity: number) {
     draw,
     /** Each frame, before the sea is drawn: the ships. Returns the map's draw, or null when no ship is near. */
     update(env: Environment, ships: readonly Afloat[]): Draw | null {
-      const eye = view.eye, chart: Chart = { at: eye.frame.up, axis: eye.frame.east };
-      const now = env.clock;
-      rough.value = Math.min(Math.max((env.windSpeed - ROUGHEST / 4) / (ROUGHEST * 0.75), 0), 1);
-      const patch = patchAt.array as Float32Array, patchM = patchMark.array as Float32Array;
-      const shadow = poses.array as Float32Array;
+      const eye = view.eye, now = env.clock;
+      chart.at = eye.frame.up;
+      chart.axis = eye.frame.east;
+      rough.value = clamp((env.windSpeed - ROUGHEST / 4) / (ROUGHEST * 0.75));
       let vertex = 0, triangle = 0, near = 0;
-      ships.forEach(({ pose, velocity, look }, i) => {
-        const speed = length(velocity);
-        const stem = normalizeV(add(pose.position, pose.forward, WATERLINE.stem));
-        const was = wakes[i];
+      for (let i = 0; i < ships.length; i++) {
+        const { pose, velocity, look } = ships[i], pos = pose.position, fwd = pose.forward, up = pose.up;
+        const speed = sphere.length(velocity);
+        // her bow, a unit vector of its own: the wake keeps it
+        const bx = pos[0] + fwd[0] * WATERLINE.stem, by = pos[1] + fwd[1] * WATERLINE.stem, bz = pos[2] + fwd[2] * WATERLINE.stem;
+        const bl = 1 / Math.hypot(bx, by, bz), stem: sphere.Vec3 = [bx * bl, by * bl, bz * bl];
+        const was = wakes[i], last = stems[i];
         wakes[i] = laid(was ?? [], stem, now, speed);
         // a fresh wake starts the count again (and it goes round every 4 km, to keep its precision; the seam is
         // a jump in the patches' pattern, once in a long while)
-        const fresh = !was?.length || !wakes[i].includes(was[0]) || !stems[i];
-        sailed[i] = fresh ? 0 : (sailed[i] + distance(stems[i]!, stem)) % 4096;
+        const fresh = !was?.length || !wakes[i].includes(was[0]) || !last;
+        sailed[i] = fresh ? 0 : (sailed[i] + sphere.distance(last, stem)) % 4096;
         stems[i] = stem;
         // too far off the map for any of her marks to reach it
-        if (distance(stem, eye.frame.up) > REACH * 1.5 + WAKE.most * 3) return;
-        const points = [{ at: stem, time: now, speed }, ...wakes[i].filter((p, k) => k > 0 || distance(p.at, stem) > 0.05)];
-        const took = ribbon(chart, points, now, sailed[i], vertex);
+        if (sphere.distance(stem, eye.frame.up) > REACH * 1.5 + WAKE.most * 3) continue;
+        head.at = stem;
+        head.time = now;
+        head.speed = speed;
+        const kept = wakes[i], skip = kept.length > 0 && sphere.distance(kept[0].at, stem) <= 0.05 ? 1 : 0;
+        const took = ribbon(chart, kept, skip, now, sailed[i], vertex);
         for (let k = 0; k + 1 < took / 2; k++) {
-          const a = vertex + 2 * k;
-          index.set([a, a + 1, a + 2, a + 1, a + 3, a + 2], triangle * 3);
+          const a = vertex + 2 * k, t = triangle * 3;
+          trailIndex[t] = a, trailIndex[t + 1] = a + 1, trailIndex[t + 2] = a + 2;
+          trailIndex[t + 3] = a + 1, trailIndex[t + 4] = a + 3, trailIndex[t + 5] = a + 2;
           triangle += 2;
         }
         vertex += took;
-        // her patch, its corners in her frame and on the chart
-        const port = crossV(pose.up, pose.forward), wide = WATERLINE.beam / 2 + PATCH.out;
-        [[-wide, WATERLINE.stern - PATCH.astern], [wide, WATERLINE.stern - PATCH.astern], [wide, WATERLINE.stem + PATCH.ahead], [-wide, WATERLINE.stem + PATCH.ahead]]
-          .forEach(([x, z], k) => {
-            const corner = normalizeV(add(add(pose.position, port, x), pose.forward, z));
-            patch.set(toChart(chart, corner), (near * 4 + k) * 2);
-            patchM.set([x, z, Math.min(speed / FULL, 1), 0], (near * 4 + k) * 4);
-          });
-        shadow.set([...pose.position, look.brace, ...pose.forward, 0, ...pose.up, 0], near * 12);
+        // her patch, its corners in her frame (x to port, z forward of her middle) and on the chart
+        const wide = WATERLINE.beam / 2 + PATCH.out, pace = Math.min(speed / FULL, 1);
+        const px = up[1] * fwd[2] - up[2] * fwd[1], py = up[2] * fwd[0] - up[0] * fwd[2], pz = up[0] * fwd[1] - up[1] * fwd[0];
+        for (let k = 0; k < 4; k++) {
+          const x = k === 1 || k === 2 ? wide : -wide, z = k < 2 ? WATERLINE.stern - PATCH.astern : WATERLINE.stem + PATCH.ahead;
+          sphere.chartAt(chart, pos[0] + px * x + fwd[0] * z, pos[1] + py * x + fwd[1] * z, pos[2] + pz * x + fwd[2] * z, onChart);
+          const corner = near * 4 + k;
+          patch[corner * 2] = onChart[0];
+          patch[corner * 2 + 1] = onChart[1];
+          patchM[corner * 4] = x;
+          patchM[corner * 4 + 1] = z;
+          patchM[corner * 4 + 2] = pace;
+          patchM[corner * 4 + 3] = 0;
+        }
+        const o = near * 12;
+        shadowPoses[o] = pos[0], shadowPoses[o + 1] = pos[1], shadowPoses[o + 2] = pos[2], shadowPoses[o + 3] = look.brace;
+        shadowPoses[o + 4] = fwd[0], shadowPoses[o + 5] = fwd[1], shadowPoses[o + 6] = fwd[2], shadowPoses[o + 7] = 0;
+        shadowPoses[o + 8] = up[0], shadowPoses[o + 9] = up[1], shadowPoses[o + 10] = up[2], shadowPoses[o + 11] = 0;
         near++;
-      });
+      }
       trailGeometry.setDrawRange(0, triangle * 3);
       // (a ship at rest lays no ribbon: then there is no trail to draw)
       trails.count = triangle > 0 ? 1 : 0;
@@ -417,8 +471,13 @@ export function createWake(view: View, sky: Sky, capacity: number) {
       patches.count = near > 0 ? 1 : 0;
       shadowGeometry.instanceCount = near;
       // only what was written goes up: the buffers hold the most ships' worth
-      ([[trailAt, vertex], [trailMark, vertex], [trailLaid, vertex], [trailGeometry.index!, triangle * 3], [patchAt, near * 4], [patchMark, near * 4], [poses, near]] as const)
-        .forEach(([a, items]) => sent(a, items));
+      sent(trailAt.attribute, vertex);
+      sent(trailMark.attribute, vertex);
+      sent(trailLaid.attribute, vertex);
+      sent(trailIndexAttribute, triangle * 3);
+      sent(patchAt.attribute, near * 4);
+      sent(patchMark.attribute, near * 4);
+      sent(poses, near);
       live.value = near > 0 ? 1 : 0;
       return near > 0 ? draw : null;
     },
