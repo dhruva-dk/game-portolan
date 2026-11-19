@@ -1,8 +1,8 @@
-// The gun in each ship's hand, on her plinth (mount.ts GUN_MOUNT; drawn twice its size, raised to its bore: GUN_DRAWN),
-// turned on its post to where she aims (ShipDraw.gun:
-// her aim, laid flat on her deck). One instanced mesh for each kind of gun (gun.ts), each drawn once a frame for all
-// the ships carrying that kind within NEAR m of the eye (past that a gun is a few pixels, lost in her rig), and only
-// while some ship does: five draws at most. A ship with no gun in hand, or going down, has none on her plinth.
+// The gun in each ship's hand, on her plinth (mount.ts GUN_MOUNT; drawn 1.7 times its size, raised to its bore:
+// GUN_DRAWN), turned on its post to where she aims (ShipDraw.gun: her aim, laid flat on her deck). One instanced mesh
+// for each kind of gun (gun-shape.ts), each drawn once a frame for all the ships carrying that kind within NEAR m of the
+// eye (past that a gun is a few pixels, lost in her rig), and only while some ship does: five draws at most. A ship
+// with no gun in hand, or going down, has none on her plinth.
 //
 // Each gun is bronze, oak and iron, lit as everything is (gun.ts gunSurface); one material serves every kind.
 
@@ -15,8 +15,9 @@ import { KINDS, gunOrder, type GunKind } from '../kinds.ts';
 import type { Light } from '../sky/light.ts';
 import type { ShipDraw } from '../snapshot.ts';
 import type { Vec3Node } from '../tsl.ts';
-import { add, dot, length, normalize as unit, type Vec3 } from '../world/sphere.ts';
-import { MUZZLE, gunShape, gunSurface } from './gun.ts';
+import { add, dot, length, scale, type Vec3 } from '../world/sphere.ts';
+import { gunSurface } from './gun.ts';
+import { MUZZLE, gunShape } from './gun-shape.ts';
 import { GUN_DRAWN, GUN_MOUNT, toWorld } from './mount.ts';
 
 /** Where a shot of `kind` fired from `from` (the bore, at the trunnions) along `dir` leaves the drawn gun's mouth. */
@@ -24,8 +25,8 @@ export const muzzle = (from: Vec3, dir: Vec3, kind: GunKind): Vec3 => add(from, 
 
 /** Metres from the eye within which the guns are drawn. */
 const NEAR = 360;
-/** Floats an instance: its place, its forward and its up, each a vec4. */
-const STRIDE = 12;
+/** Floats a gun's instance: its place, its forward and its up, each a vec4. */
+const FLOATS = 12;
 
 /** light: how the world is lit (sky/light.ts); capacity: the most ships there will be. */
 export function createArms(light: Light, capacity: number) {
@@ -49,13 +50,15 @@ export function createArms(light: Light, capacity: number) {
     g.setAttribute('normal', new BufferAttribute(s.normal, 3));
     g.setAttribute('metal', new BufferAttribute(s.metal, 1));
     g.setIndex(new BufferAttribute(s.index, 1));
-    const buffer = new InstancedInterleavedBuffer(new Float32Array(capacity * STRIDE), STRIDE).setUsage(DynamicDrawUsage);
+    const list = new Float32Array(capacity * FLOATS);
+    const buffer = new InstancedInterleavedBuffer(list, FLOATS).setUsage(DynamicDrawUsage);
     ['gunAt', 'gunFwd', 'gunUp'].forEach((name, i) => g.setAttribute(name, new InterleavedBufferAttribute(buffer, 4, i * 4)));
     g.instanceCount = 0;
     const mesh = new Mesh(g, m);
     mesh.frustumCulled = false;
+    // (for the meter's split: meter.ts)
     mesh.name = `gun ${kind}`;
-    return { kind, mesh, geometry: g, buffer };
+    return { kind, mesh, geometry: g, buffer, list };
   });
   /** How many of each kind (gunOrder) are drawn this frame. */
   const filled = new Uint32Array(KINDS.length);
@@ -68,10 +71,11 @@ export function createArms(light: Light, capacity: number) {
       for (const sh of ships) {
         if (!sh.afloat || !sh.gun) continue;
         const pose = sh.pose, mount = toWorld(pose, GUN_MOUNT);
-        if (length(add(mount, eye, -1)) > NEAR) continue;
-        const k = gunOrder(sh.gun.kind), a = drawn[k].buffer.array as Float32Array, o = filled[k]++ * STRIDE;
+        if (Math.hypot(mount[0] - eye[0], mount[1] - eye[1], mount[2] - eye[2]) > NEAR) continue;
+        const k = gunOrder(sh.gun.kind), a = drawn[k].list, o = filled[k]++ * FLOATS;
         // her aim laid flat on her deck; straight up or down, her bow
-        const flat = add(sh.gun.aim, pose.up, -dot(sh.gun.aim, pose.up)), toward = length(flat) > 1e-3 ? unit(flat) : pose.forward;
+        const flat = add(sh.gun.aim, pose.up, -dot(sh.gun.aim, pose.up)), size = length(flat);
+        const toward = size > 1e-3 ? scale(flat, 1 / size) : pose.forward;
         for (let j = 0; j < 3; j++) {
           a[o + j] = mount[j];
           a[o + 4 + j] = toward[j];
@@ -83,7 +87,7 @@ export function createArms(light: Light, capacity: number) {
         const d = drawn[k], n = filled[k];
         if (n > 0) {
           d.buffer.clearUpdateRanges();
-          d.buffer.addUpdateRange(0, n * STRIDE);
+          d.buffer.addUpdateRange(0, n * FLOATS);
           d.buffer.needsUpdate = true;
         }
         d.geometry.instanceCount = n;
