@@ -97,11 +97,11 @@ export const WEATHER_TILE = 40;
 /** Spacing of the cells at each of the weather map's three sizes of cloud, km. */
 const CELL_SIZES = [1, 0.5, 0.25] as const;
 /**
- * The map's potential (km) at each tenth of its area, measured by sampling the same construction on the CPU (0 to
- * 100%; the last is the 99.5th percentile; 360 000 points). Cloud stands where the potential passes its value at the
- * share of the map that is to stay clear.
+ * The map's potential (km) at each tenth of its area, measured by sampling the same construction, hash3 and all, on
+ * the CPU (0 to 100%; the last is the 99.5th percentile; a 600 × 600 grid). Cloud stands where the potential passes its
+ * value at the share of the map that is to stay clear.
  */
-export const POTENTIAL_DECILES = [0, 0, 0.0133, 0.0757, 0.1305, 0.1847, 0.241, 0.3057, 0.3897, 0.5153, 0.8973] as const;
+export const POTENTIAL_DECILES = [0, 0, 0.0187, 0.0773, 0.1297, 0.1812, 0.2356, 0.2972, 0.3745, 0.495, 0.8682] as const;
 
 /**
  * How the cells' round outlines are broken up, so that noise rather than the cells draws the clouds: the map is
