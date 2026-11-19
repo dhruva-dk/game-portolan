@@ -4,6 +4,7 @@
 
 import { WebGPUCoordinateSystem, WebGPURenderer } from 'three/webgpu';
 import { createAudio } from './audio/audio';
+import type { Hearing } from './audio/listen';
 import { scenario, type Played, type Setup, type Stage } from './debug';
 import { createWorld } from './environment';
 import { createFrame } from './frame';
@@ -123,14 +124,13 @@ async function play(s: Stage): Promise<Played> {
   const stick = createStick(layer);
   const shores = shoresOf(s.world.planet, s.world.land);
   const globe = createGlobe(shores.coasts);
-  const hudState = (): HudState => ({ ...game.status(s.canvas.clientWidth, s.canvas.clientHeight), ...game.kit() });
+  // what the HUD reads, the match's and her kit's in one object refilled each frame
+  const status: HudState = Object.assign({}, game.status(), game.kit());
+  const hudState = (): HudState => Object.assign(status, game.status(s.canvas.clientWidth, s.canvas.clientHeight), game.kit());
   const map = () => globe.show(hudState());
   const hud = createHud(layer, shores, { slot: input.tap, gust: input.gust, fire: input.fire, map });
-  // the sound, begun on her first touch; a tick for each tap on something of the UI's
+  // the sound, begun on her first touch, hearing what it does in one object refilled each frame
   const audio = createAudio(s.world.planet.height);
-  layer.addEventListener('pointerdown', (e) => {
-    if (e.target instanceof Element && e.target.closest('.press')) audio.tap(flow.screen);
-  }, true);
   const deal = () => {
     game.start(s.matches.deal());
     referee.begin();
@@ -144,11 +144,18 @@ async function play(s: Stage): Promise<Played> {
     watch: () => referee.watch(),
     switch: (by) => referee.switch(by),
   }, title);
+  // a tick for each tap on something of the UI's
+  layer.addEventListener('pointerdown', (e) => {
+    if (e.target instanceof Element && e.target.closest('.press')) audio.tap(flow.screen);
+  }, true);
   void s.ready.then(() => {
     flow.ready();
     loaded('title');
   });
   loaded('play');
+  const hearing: Hearing = { scene: game.snapshot(), status, screen: flow.screen, map: false, covered: 0 };
+  /** Whether the stats are shown, as last told the stage. */
+  let stats: boolean | null = null;
 
   return {
     game, referee, flow, play: deal, map,
@@ -162,12 +169,18 @@ async function play(s: Stage): Promise<Played> {
       // her end, sunk or won, as the screens follow it
       flow.end(referee.update(dt));
       // the world as the game has it, seen from its eye or, while the full map is open, from the map's
-      const scene = game.snapshot(), status = hudState();
-      flow.update(status, scene.sea, scene.own);
+      const scene = game.snapshot();
+      flow.update(hudState(), scene.sea, scene.own);
       // heard from the game's eye, even with the full map open over it; the sea going as the screens cover it
-      audio.update({ scene, status, screen: flow.screen, map: globe.open, covered: flow.covered }, flow.settings.sound, dt);
-      s.stats(flow.settings.stats);
-      return { ...scene, eye: globe.step(dt, scene.storm) ?? scene.eye };
+      hearing.scene = scene;
+      hearing.screen = flow.screen;
+      hearing.map = globe.open;
+      hearing.covered = flow.covered;
+      audio.update(hearing, flow.settings.sound, dt);
+      if (flow.settings.stats !== stats) s.stats((stats = flow.settings.stats));
+      // (the game's snapshot is its own, refilled each frame: its eye is the map's while that is open)
+      scene.eye = globe.step(dt, scene.storm) ?? scene.eye;
+      return scene;
     },
   };
 }

@@ -24,7 +24,8 @@ export interface Hands {
 /** No hand on anything. */
 export const IDLE: Hands = { stick: null, look: { x: 0, y: 0, held: false }, fire: false, tap: null, gust: false };
 
-/** The match as the HUD reads it: a plain snapshot, made fresh each time it is asked for. */
+/** The match as the HUD reads it: plain data, one object refilled each time it is asked for (read it then; what is
+ *  kept of it past the frame, keep by value). */
 export interface Status {
   /** Where the ship the camera follows is (unit sphere) and the way she heads (unit tangent): hers, or once she has
    *  sunk the one she watches. */

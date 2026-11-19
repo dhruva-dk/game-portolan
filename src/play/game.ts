@@ -41,18 +41,19 @@ import { RIDE } from '../sim/ride.ts';
 import { PLAYER } from '../sim/match.ts';
 import type { Vessel } from '../sim/contact.ts';
 import type { Helm, ShipState } from '../sim/ship.ts';
+import type { Use } from '../kinds.ts';
 import type { Eye, LootDraw, Snapshot } from '../snapshot.ts';
 import { createSwell } from '../world/swell.ts';
 import type { Anchor } from '../world/lattice.ts';
 import type { ShipPose } from '../world/pose.ts';
-import { R, add, distance, dot, length, normalize, scale, type Vec3 } from '../world/sphere.ts';
-import { HOTBAR, IDLE, type GunSlot, type Hands, type Kit, type Slot, type Status } from '../player.ts';
+import { R, add, distance, dot, normalize, scale, type Vec3 } from '../world/sphere.ts';
+import { HOTBAR, IDLE, type GunSlot, type Hands, type Item, type Kit, type Moment, type Slot, type Status } from '../player.ts';
 import { REST, anchorageEye, dragged, relaxed, type Orbit } from './anchorage.ts';
 import { ARRIVAL, arriving } from './arrival.ts';
 import { createChase } from './chase.ts';
-import { onScreen } from './lens.ts';
+import { placed, type Point, type View as Viewport } from './lens.ts';
 import { finale, type Ending } from './finale.ts';
-import { seenOf } from './moments.ts';
+import { see, seenOf } from './moments.ts';
 import { answerTo, createShake } from './shake.ts';
 import { createStops, stopFor } from './stops.ts';
 import { bearing, createState, type Berth, type Match, type Waters } from './state.ts';
@@ -60,12 +61,24 @@ import { bearing, createState, type Berth, type Match, type Waters } from './sta
 /** How little of the stick's push counts as none. */
 const DEAD = 0.15;
 /** Loot is drawn within DRAWN m of the eye (so none from space), floating on the waves within RIDES m of the eye's
- *  ship. (Never on the disc: as in Fortnite, the sea is searched by eye.) */
+ *  ship. (Never on the disc: the sea is searched by eye.) */
 const DRAWN = 700, RIDES = 320;
 /** Seconds before the match a piece strewn at its start is taken to have come onto the water: long since bobbed up. */
 const LONG_AGO = 1e3;
 /** How far a gun is through reloading (0…1), or null when it isn't. */
 const reloading = (g: Gun): number | null => (g.reload > 0 ? 1 - g.reload / reloadOf(g) : null);
+/** The hotbar's glyph for stores of each use. */
+const ITEM: Record<Use, Item> = {
+  smallShield: 'item.smallShield', bigShield: 'item.bigShield', repairKit: 'item.repairKit', fullRepair: 'item.fullRepair',
+};
+/** The hotbar's slot (HOTBAR) for the hold's slot `n` (1–3: the items'; sim/hold.ts chosen). */
+const itemSlot = (n: number) => HOTBAR.guns - 1 + n;
+/** A tap on the hotbar's slot `tapped` as her stores are asked it (sim/stores.ts Ask): a gun slot's takes that gun in
+ *  hand (arm), an item slot's is the hold's (tap, 1–3). */
+const tapOf = (tapped: number | null) => ({
+  arm: tapped !== null && tapped < HOTBAR.guns ? tapped : null,
+  tap: tapped !== null && tapped >= HOTBAR.guns ? tapped - HOTBAR.guns + 1 : null,
+});
 
 /** What the camera does, as the match's flow sets it (play/referee.ts): the ship it follows; whether the hands steer
  * and look, or only look (as she watches another ship); and her end's shot, held on her ship (finale.ts), or none. */
@@ -107,6 +120,80 @@ export function createGame(world: World, anchors: readonly Anchor[], waters: Wat
 
   /** The storm's calm as the HUD last read it (a new object only when it has moved or changed by a metre). */
   let calm = { centre: [0, 0, 1] as Vec3, radius: -1 };
+
+  /** What the HUD reads (status), and what she carries (kit), as last reported: one object each, refilled each time,
+   *  with what hangs off them (the gun in hand, the reticle and its fall, the calm the storm next closes to, the
+   *  hotbar's slots, the moments) kept beside them and handed out or not. */
+  const report: Status = {
+    at: start.at, heading: start.at, facing: start.at, arriving: 0, hull: 0, hullMax: HEALTH.hull, shield: 0,
+    shieldMax: HEALTH.shield, gun: null, afloat: 0, sunk: false, storm: 0, closing: false, eye: calm, next: null,
+    outside: 0, reticle: null, moments: [],
+  };
+  const holding: NonNullable<Status['gun']> = {
+    kind: 'cannon', rarity: 0, rounds: 0, ready: 1, charge: null, swapping: 0, locked: false,
+  };
+  const aim: NonNullable<Status['reticle']> = { fall: null, reach: false, spread: 0, lob: false };
+  const fallAt: Point = { x: 0, y: 0 }, screen: Viewport = { width: 0, height: 0 };
+  const closesTo: { centre: Vec3; radius: number } = { centre: start.at, radius: 0 };
+  const gunSlots: GunSlot[] = [], itemSlots: Slot[] = [];
+  const carried: Kit & { guns: [GunSlot | null, GunSlot | null]; items: [Slot | null, Slot | null, Slot | null] } = {
+    guns: [null, null], items: [null, null, null], chosen: 0, using: null, offer: null, gust: 0, gusts: GUST.charges, blowing: false,
+  };
+  for (let i = 0; i < HOTBAR.guns; i++) gunSlots.push({ kind: 'cannon', rarity: 0, rounds: 0, mag: 0, reload: null });
+  for (let i = 0; i < HOTBAR.items; i++) itemSlots.push({ item: ITEM.repairKit });
+  const moments: Moment[] = [];
+
+  /** Her gun in hand, `equip` s through taking it up, `locked` if its assist has a ship to lay on. */
+  const inHandOf = (g: Gun, equip: number, locked: boolean) => {
+    holding.kind = g.kind;
+    holding.rarity = g.rarity;
+    holding.rounds = g.rounds;
+    holding.ready = reloading(g) ?? 1;
+    holding.charge = g.windup > 0 ? 1 - g.windup / GUNS[g.kind].windup : null;
+    holding.swapping = equip / EQUIP;
+    holding.locked = locked;
+    return holding;
+  };
+  /** Her gun's aim as `lay` lays it, its balls going off within `spread` px where they come down. */
+  const reticleOf = (lay: Laying, g: Gun, eye: Eye, spread: number) => {
+    aim.fall = screen.width > 0 ? placed(fallAt, eye, lay.fall, GUN.up, screen) : null;
+    aim.reach = lay.reached;
+    aim.spread = spread;
+    aim.lob = GUNS[g.kind].lob > 0;
+    return aim;
+  };
+  /** The calm the storm next closes to, its radius in whole metres. */
+  const nextOf = (next: { centre: Vec3; radius: number }) => {
+    closesTo.centre = next.centre;
+    closesTo.radius = Math.round(next.radius * R);
+    return closesTo;
+  };
+  /** Whether the calm's centre has moved by more than a metre on any axis. */
+  const moved = (a: Vec3, b: Vec3) => Math.abs(a[0] - b[0]) * R > 1 || Math.abs(a[1] - b[1]) * R > 1 || Math.abs(a[2] - b[2]) * R > 1;
+  /** Metres from the eye to where her ball will come down, at her gun's height over it. */
+  const far = (eye: Eye, fall: Vec3) => {
+    const up = R + GUN.up, e = eye.position, x = fall[0] * up - e[0], y = fall[1] * up - e[1], z = fall[2] * up - e[2];
+    return Math.sqrt(x * x + y * y + z * z);
+  };
+  /** The match's deeds as she sees them through `eye` on the screen: one Moment kept for each while the match keeps
+   *  it, seen again in place each time (moments.ts see). */
+  const momentsSeen = (eye: Eye) => {
+    const deeds = state.deeds();
+    let gone = 0;
+    while (gone < moments.length && (!deeds.length || moments[gone].seq < deeds[0].seq)) gone++;
+    if (gone) moments.splice(0, gone);
+    for (const m of moments) see(m, eye, screen);
+    const seen = moments.length ? moments[moments.length - 1].seq : 0;
+    for (const d of deeds) if (d.seq > seen) moments.push(seenOf(d, eye, screen.width, screen.height));
+    return moments;
+  };
+
+  /** What is drawn (snapshot), as last drawn: one object, refilled each time, the loot near the eye in a list kept
+   *  beside it, one entry kept for each place in it. */
+  const loot: LootDraw[] = [], floating: LootDraw[] = [], spots: [number, number, number][] = [];
+  const drawn: Snapshot = {
+    eye: chase.eye(), clock: 0, storm: state.storm(0), ships: [], own: PLAYER, balls: [], loot, blasts: [],
+  };
 
   /** How her gun would be laid now along the camera's look, with no spread: as the next step would lay it. */
   const aimed = (v: Vessel, gun: Gun): Laying => laid(v, gun, chase.sight(), state.vessels(), 0, depth, 0, rises);
@@ -158,8 +245,7 @@ export function createGame(world: World, anchors: readonly Anchor[], waters: Wat
       for (let i = 0; i < time.steps; i++) {
         const v = state.mine();
         const helm = !v ? { course: null, throttle: 0 } : held ? held(v.ship) : orders(hands.stick);
-        // a gun slot tapped is taken in hand; an item slot's tap is the hold's (1–3)
-        const arm = tapped !== null && tapped < HOTBAR.guns ? tapped : null, tap = tapped !== null && arm === null ? tapped - HOTBAR.guns + 1 : null;
+        const { arm, tap } = tapOf(tapped);
         state.advance(helm, { aim: chase.sight(), fire: !!v && pulled }, { tap, arm, gust: gusted, take: null });
         [tapped, gusted] = [null, false];
       }
@@ -182,68 +268,96 @@ export function createGame(world: World, anchors: readonly Anchor[], waters: Wat
       chase.update(followed, look, dt, state.clock(1), state.storm(1), finale(view.end, ended));
       if (arrival !== null && !arriving((arrival += dt), last, chase.eye())) arrival = null;
     },
-    /** What is drawn now (snapshot.ts). */
+    /** What is drawn now (snapshot.ts): the same object each time, refilled. */
     snapshot(): Snapshot {
       const eye = chase.eye(), time = state.clock(between), near = normalize(last.position);
-      const seen = anchored ? berth ?? anchorageEye(last, orbit, time, ground) : (arrival !== null && arriving(arrival, last, eye)) || shake.on(eye);
-      const loot: LootDraw[] = [];
+      const seen = anchored ? berth ?? anchorageEye(last, orbit, time, ground)
+        : (arrival !== null && arriving(arrival, last, eye)) || shake.on(eye);
+      let n = 0;
       for (const l of state.loot().pieces) {
-        if (distance(seen.position, scale(l.at, R)) > DRAWN) continue;
-        const up = dot(near, l.at) > Math.cos(RIDES / R) ? sea.at(l.at, time) : 0;
-        loot.push({ id: l.id, at: scale(l.at, R + up), kind: l.goods.kind, rarity: rarityOf(l.goods), born: state.born(l.id) ?? -LONG_AGO });
+        if (distance(seen.position, l.at) > DRAWN) continue;
+        const up = dot(near, l.at) > Math.cos(RIDES / R) ? sea.at(l.at, time) : 0, k = R + up;
+        const at = (spots[n] ??= [0, 0, 0]), d = (floating[n] ??= { id: 0, at, kind: 'cannon', rarity: 0, born: 0 });
+        at[0] = l.at[0] * k;
+        at[1] = l.at[1] * k;
+        at[2] = l.at[2] * k;
+        d.id = l.id;
+        d.kind = l.goods.kind;
+        d.rarity = rarityOf(l.goods);
+        d.born = state.born(l.id) ?? -LONG_AGO;
+        loot[n++] = d;
       }
-      return {
-        eye: seen,
-        clock: time, storm: state.storm(between),
-        ships: state.drawn(between), own: PLAYER, balls: state.balls(between), loot, blasts: state.blasts(),
-        sea: state.sea(between),
-      };
+      loot.length = n;
+      drawn.eye = seen;
+      drawn.clock = time;
+      drawn.storm = state.storm(between);
+      drawn.ships = state.drawn(between);
+      drawn.balls = state.balls(between);
+      drawn.blasts = state.blasts();
+      drawn.sea = state.sea(between);
+      return drawn;
     },
-    /** What she carries, as the hotbar shows it. */
+    /** What she carries, as the hotbar shows it: the same object each time, refilled. */
     kit(): Kit {
-      const c = state.crew(PLAYER), v = state.mine(), h = c.hold, item = HOTBAR.guns - 1;
-      const items = h.items.map((k): Slot | null => k && { item: `item.${k.kind}`, count: k.count });
-      const guns = c.guns.map((g): GunSlot | null => g && {
-        kind: g.kind, rarity: g.rarity, rounds: g.rounds, mag: GUNS[g.kind].mag, reload: reloading(g),
-      });
-      const o = v ? offered(c, v.ship.at, state.loot()) : { gun: null, item: null };
-      return {
-        guns: [guns[0] ?? null, guns[1] ?? null],
-        items: [items[0], items[1], items[2]], chosen: h.chosen === 0 ? c.hand : item + h.chosen, using: progress(h),
-        offer: o.gun ? c.hand : o.item ? item + Math.max(1, h.chosen) : null,
-        gust: c.gust.charges + (charging(c.gust) < 1 ? charging(c.gust) : 0), gusts: GUST.charges, blowing: c.gust.blowing > 0,
-      };
+      const c = state.crew(PLAYER), v = state.mine(), h = c.hold, slots = carried.guns, items = carried.items;
+      for (let i = 0; i < slots.length; i++) {
+        const g = c.guns[i], slot = gunSlots[i];
+        if (g) {
+          slot.kind = g.kind;
+          slot.rarity = g.rarity;
+          slot.rounds = g.rounds;
+          slot.mag = GUNS[g.kind].mag;
+          slot.reload = reloading(g);
+        }
+        slots[i] = g ? slot : null;
+      }
+      for (let i = 0; i < items.length; i++) {
+        const k = h.items[i], slot = itemSlots[i];
+        if (k) {
+          slot.item = ITEM[k.kind];
+          slot.count = k.count;
+        }
+        items[i] = k ? slot : null;
+      }
+      const o = v ? offered(c, v.ship.at, state.loot()) : null, charge = charging(c.gust);
+      carried.chosen = h.chosen === 0 ? c.hand : itemSlot(h.chosen);
+      carried.using = progress(h);
+      carried.offer = o?.gun ? c.hand : o?.item ? itemSlot(Math.max(1, h.chosen)) : null;
+      carried.gust = c.gust.charges + (charge < 1 ? charge : 0);
+      carried.blowing = c.gust.blowing > 0;
+      return carried;
     },
-    /** What the HUD reads of the match, on a view `width` × `height` CSS px (where the ball will come down). */
+    /** What the HUD reads of the match, on a view `width` × `height` CSS px (where the ball will come down): the same
+     *  object each time, refilled. */
     status(width = 0, height = 0): Status {
       const c = state.crew(PLAYER), v = state.mine(), s = state.storm(between), g = inHand(c), eye = chase.eye();
+      screen.width = width;
+      screen.height = height;
       const lay = g && v && steering() ? aimed(v, g) : null;
-      const fall = lay && width > 0 ? onScreen(eye, lay.fall, width, height, GUN.up) : null;
       // her balls' spread where they come down, as px on the screen there
-      const off = lay && v && g ? distance(v.ship.at, lay.fall) * spreadOf(g) : 0, seen = lay ? length(add(scale(lay.fall, R + GUN.up), eye.position, -1)) : 1;
-      const spread = (off * height) / (2 * Math.max(1, seen) * Math.tan((eye.fov * Math.PI) / 360));
+      const off = lay && v && g ? distance(v.ship.at, lay.fall) * spreadOf(g) : 0, seen = lay ? far(eye, lay.fall) : 1;
       const radius = Math.round(s.radius * R);
-      if (radius !== calm.radius || s.centre.some((x, i) => Math.abs(x - calm.centre[i]) * R > 1)) calm = { centre: s.centre, radius };
+      if (radius !== calm.radius || moved(s.centre, calm.centre)) calm = { centre: s.centre, radius };
       // once she has sunk, the disc is the watched ship's (ui/hud.ts watch)
-      const watched = view.watch !== PLAYER || sunk(c.health)
-        ? state.vessels().find((k) => k.id === view.watch)?.ship ?? state.sinkings().find((k) => k.id === view.watch)
-        : undefined;
-      const at = watched?.at ?? v?.ship.at ?? normalize(last.position);
-      return {
-        at, heading: watched?.heading ?? v?.ship.heading ?? last.forward, facing: chase.axes().ahead,
-        arriving: arrival === null ? 0 : Math.max(0, 1 - arrival / ARRIVAL.seconds),
-        hull: c.health.hull, hullMax: HEALTH.hull, shield: c.health.shield, shieldMax: HEALTH.shield,
-        gun: g && {
-          kind: g.kind, rarity: g.rarity, rounds: g.rounds, ready: reloading(g) ?? 1,
-          charge: g.windup > 0 ? 1 - g.windup / GUNS[g.kind].windup : null, swapping: c.equip / EQUIP, locked: lay?.target != null,
-        },
-        afloat: state.alive().length, sunk: sunk(c.health),
-        storm: Number.isFinite(s.secondsToNext) ? s.secondsToNext : 0, closing: s.closing, eye: calm,
-        next: s.phase < STORM.phases.length && (s.closing || s.next.radius < s.radius) ? { centre: s.next.centre, radius: Math.round(s.next.radius * R) } : null,
-        outside: v ? Math.max(0, -toEdge(v.ship.at, s)) : 0,
-        reticle: lay && g && { fall, reach: lay.reached, spread, lob: GUNS[g.kind].lob > 0 },
-        moments: state.deeds().map((d) => seenOf(d, eye, width, height)),
-      };
+      const watched = view.watch !== PLAYER || sunk(c.health) ? state.vessel(view.watch)?.ship ?? state.sinking(view.watch) : null;
+      report.at = watched?.at ?? v?.ship.at ?? normalize(last.position);
+      report.heading = watched?.heading ?? v?.ship.heading ?? last.forward;
+      report.facing = chase.axes().ahead;
+      report.arriving = arrival === null ? 0 : Math.max(0, 1 - arrival / ARRIVAL.seconds);
+      report.hull = c.health.hull;
+      report.shield = c.health.shield;
+      report.gun = g ? inHandOf(g, c.equip, lay?.target != null) : null;
+      report.afloat = state.alive().length;
+      report.sunk = sunk(c.health);
+      report.storm = Number.isFinite(s.secondsToNext) ? s.secondsToNext : 0;
+      report.closing = s.closing;
+      report.eye = calm;
+      report.next = s.phase < STORM.phases.length && (s.closing || s.next.radius < s.radius) ? nextOf(s.next) : null;
+      report.outside = v ? Math.max(0, -toEdge(v.ship.at, s)) : 0;
+      const spread = (off * height) / (2 * Math.max(1, seen) * Math.tan((eye.fov * Math.PI) / 360));
+      report.reticle = lay && g ? reticleOf(lay, g, eye, spread) : null;
+      report.moments = momentsSeen(eye);
+      return report;
     },
     sinkings: state.sinkings,
     /** Her share of the planet's water now, 0…1. */
