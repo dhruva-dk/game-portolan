@@ -7,6 +7,7 @@ import { createAudio } from './audio/audio';
 import { scenario, type Played, type Setup, type Stage } from './debug';
 import { createWorld } from './environment';
 import { createFrame } from './frame';
+import { loaded } from './load';
 import { createMeter } from './meter';
 import { createGame } from './play/game';
 import { createPlaceholder } from './play/placeholder';
@@ -32,6 +33,8 @@ const RELEASE: Setup = {
   meter: false, hold: null, gun: null,
 };
 
+loaded('script');
+
 const meterEl = document.getElementById('meter')!;
 /** Says so in the meter's corner, shown. */
 const say = (text: string) => {
@@ -55,10 +58,13 @@ async function stage(setup: Setup): Promise<Stage> {
     say('no WebGPU');
     throw new Error('WebGPU unavailable: three fell back to WebGL');
   }
+  loaded('gpu');
 
   // The world, built once and handed to the frame that draws it and the game that runs on it.
   const world = createWorld(setup.seed, setup.land, setup.mean, setup.swing, setup.hours);
+  loaded('world');
   const frame = createFrame(renderer, world, setup.drawing);
+  loaded('frame');
   // the frame's cost: always shown on the debug page, split by pass there; else as the settings' stats switch has it
   const meter = createMeter(renderer, meterEl, setup.meter);
   meter.show(setup.meter);
@@ -71,7 +77,7 @@ async function stage(setup: Setup): Promise<Stage> {
       console.info(`ground baked in ${(await frame.ready).toFixed(0)} ms`);
       frame.resize(innerWidth, innerHeight);
       addEventListener('resize', () => frame.resize(innerWidth, innerHeight));
-      let last = performance.now();
+      let last = performance.now(), first = true;
       renderer.setAnimationLoop(() => {
         const now = performance.now();
         const dt = Math.min((now - last) / 1000, 0.1);
@@ -81,6 +87,8 @@ async function stage(setup: Setup): Promise<Stage> {
         const rendered = performance.now() - begun;
         drawn?.(renderer.domElement);
         meter.sample(performance.now() - now, rendered);
+        if (first) loaded('first frame');
+        first = false;
       });
     },
   };
@@ -92,6 +100,7 @@ async function play(s: Stage): Promise<Played> {
   // worker while the ground's bakes in another (frame.ready), in a fraction of its time
   const { waters, ms, berth } = await watersOf(s.world.seed, s.world.land);
   console.info(`water sounded in ${ms.toFixed(0)} ms`);
+  loaded('sounded');
   // (each match's berths worked out in that worker ahead of PLAY)
   s.matches.berthBy(berth);
   const game = createGame(s.world, s.anchors, waters, s.start, s.matches.first);
@@ -126,7 +135,11 @@ async function play(s: Stage): Promise<Played> {
     watch: () => referee.watch(),
     switch: (by) => referee.switch(by),
   });
-  void s.ready.then(() => flow.ready());
+  void s.ready.then(() => {
+    flow.ready();
+    loaded('title');
+  });
+  loaded('play');
 
   return {
     game, referee, flow, play: deal, map,

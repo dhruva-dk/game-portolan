@@ -30,6 +30,7 @@ import { createGrade, encode } from './post/grade';
 import { createShafts, type Shafts } from './post/shafts';
 import { SKY_METRES } from './sky/sky';
 import { BANDS, SPACE } from './palette';
+import { loaded } from './load';
 import type { Vec4Node } from './tsl';
 
 /**
@@ -329,6 +330,7 @@ export function createFrame(renderer: WebGPURenderer, world: World, options: Fra
         cameraFor(eye);
         eyes[eye.kind].pipeline.render();
       }
+      loaded(`posts drawn ${k + 1}`);
     }
     for (const eye of WARM) {
       const { camera, scene: seen } = eyes[eye.kind];
@@ -341,8 +343,10 @@ export function createFrame(renderer: WebGPURenderer, world: World, options: Fra
       renderer.setRenderTarget(null);
       renderer.setMRT(null);
       await build(scene, camera, seen.renderTarget, seen.getMRT());
+      loaded(`built ${eye.kind}`);
     }
     await build(water.marks.scene, water.marks.camera, water.marks.target);
+    loaded('built marks');
   }
 
   /** Draws the world as the snapshot has it, from its eye, dt seconds after the last frame. */
@@ -386,7 +390,7 @@ export function createFrame(renderer: WebGPURenderer, world: World, options: Fra
     render,
     /** Resolves once the ground is baked and every shader the frame can draw with built (prime), to how long the
      *  bake took, ms. */
-    ready: ground.ready.then(async (ms) => (await prime(), ms)),
+    ready: ground.ready.then(async (ms) => (loaded('baked'), await prime(), ms)),
     /** The sea's anchors (world/lattice.ts), as the frame's sea is laid on them: the CPU's copy of the long waves
      *  (world/swell.ts) must read the very charts the GPU's do. */
     anchors: water.anchors,
