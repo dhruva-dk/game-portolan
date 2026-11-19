@@ -29,8 +29,8 @@ export const STORM = {
    * shows where the storm is headed. The first close is the long one (the far side of the planet is 940 m outside
    * its next cap: 59 s at a ship's best 16 m/s, 134 at an ordinary 7); after it the edge moves at 3–7 m/s, a
    * ship's easy pace, as the old game's did. The last cap, 75 m, holds a fight and the chase's eye behind her: it
-   * stands some 66 m astern (play/chase.ts BOOM), and at 25 m, the old last cap, and 55, the one before it, the eye
-   * was in the storm's wall wherever she was and saw nothing but its violet.
+   * stands some 54 m astern (play/chase.ts BOOM), and at 25 m, the old last cap, and 55, the one before it, the eye
+   * was over the storm wherever she was (drawn in under its cloud now, CLOUD, but then hard up behind her).
    */
   phases: [
     { wait: 60, close: 70, radius: 800, damage: 0.01 },
@@ -52,6 +52,13 @@ export const STORM = {
   /** Tries at a placement before falling back. */
   tries: 400,
 } as const;
+
+/**
+ * The storm's cloud as it is drawn (sky/storm-field.ts): its base `base` m over the sea, which its rolls and billows
+ * lower to no less than `lowest` m; and its front, over the calm, standing out at most `out` m from the cap's edge.
+ * Under `lowest`, or farther than `out` into the calm, an eye is never in it (the chase keeps it there: play/chase.ts).
+ */
+export const CLOUD = { base: 58, lowest: 40, out: 50 } as const;
 
 /** A cap of the sphere: its centre (a unit vector) and its angular radius, radians. */
 export interface Cap { centre: Vec3; radius: number }

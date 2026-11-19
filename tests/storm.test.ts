@@ -45,7 +45,7 @@ test('it starts as the whole planet and closes to a cap small enough to force a 
   const storm = createStorm(3, depthOf(3));
   assert.equal(storm(0).radius, Math.PI);
   assert.ok(!outside([0, -R, 0], storm(0)) && !outside([0, R, 0], storm(0)));
-  // a fight: no wider than a gun's range across; and the chase's eye, some 66 m astern, inside it with her at its middle
+  // a fight: no wider than a gun's range across; and the chase's eye, some 54 m astern, inside it with her at its middle
   assert.ok(storm(DURATION).radius * R <= 100);
   assert.ok(storm(DURATION).radius * R >= 70);
 });

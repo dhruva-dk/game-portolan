@@ -10,26 +10,30 @@
 // m), and her hull and rig stand left of the middle, clear of the line: a third-person shooter's over-the-shoulder
 // view. The look tilts from a little above the level to steeply down onto the sea about her.
 //
-// It never goes under the waves or into an island: where land stands between her and the eye, or the eye would be
-// under the land or within CLEAR of the water, the boom and the shoulder are drawn in together toward her (quickly),
+// It never goes under the waves, into an island or into the storm's cloud: where land stands between her and the eye,
+// or the eye would be under the land, within CLEAR of the water or where the storm's cloud may stand (over the storm,
+// or near it in the calm, higher than its lowest: sim/storm.ts CLOUD), the boom and the shoulder are drawn in together
+// toward her (quickly),
 // and let out again only slowly once clear (as the old full game did, 0117 src/render/camera.ts), the look's way kept.
 //
 // The match's other shots are this camera given another boom (a Shot): at her end, sunk or won (finale.ts).
 // Moving to another ship it flies there over `flight` seconds, round the planet rather than through it and lifting on
 // a long way (0117 camera.ts's flight).
 
+import { CLOUD, toEdge, type Cap } from '../sim/storm.ts';
 import { AIR_FOV, type Eye } from '../snapshot.ts';
 import type { ShipPose } from '../world/pose.ts';
 import { R, add, cross, dot, length, normalize, place, scale, transport, type Vec3 } from '../world/sphere.ts';
 import { lookAt, rotate, slerp, type Turn } from '../world/turn.ts';
 
 /** The boom: metres back along the look from its focus, which stands FOCUS metres over the sea and SHOULDER metres to
- *  starboard of her as the look goes. Long and high (the eye some 55 m up and 64 m astern of her), so she is seen
- *  whole, small and low in the frame, left of the middle with her trucks under the reticle, and the look runs over
- *  her rig to what she fights and on to the round of the horizon (at 40 m and 12 m up, the old boom, her rig stood
- *  over the middle of the screen and her stern was cut by its foot). */
-export const BOOM = 70;
-const FOCUS = 22, SHOULDER = 14;
+ *  starboard of her as the look goes. The eye some 48 m up and 54 m astern of her, so she is seen whole from her
+ *  trucks, level with the reticle and left of it, to her stern just above the screen's foot, and the look runs over
+ *  her rig to what she fights and on to the round of the horizon. (At 40 m and 12 m up, an old boom, her rig stood
+ *  over the middle of the screen and her stern was cut by its foot; at 70 m and 22 m up, another, she stood a fifth
+ *  smaller.) */
+export const BOOM = 60;
+const FOCUS = 20, SHOULDER = 14;
 /** The look's tilt below the level, radians: where it starts, and its highest and steepest. It starts on the sea about
  *  55 m ahead (the horizon, some 250 m off from the eye, an eighth of the screen above the middle), so a gun laid as it
  *  starts, a lobbed one above all, comes down where she sees it: at 0.17, an older start, the look passed over the
@@ -71,6 +75,12 @@ export function createChase(ground: (p: Vec3) => number, sea: (p: Vec3, time: nu
   let flight: { from: Vec3; look: Turn; aim: Vec3; span: number; done: number } | null = null;
   /** The boom's turn for the shot under way (radians to port). */
   let spin = 0;
+  /** The storm's calm, as last given (none: no storm). */
+  let storm: Cap | null = null;
+
+  /** Whether the storm's cloud may stand at the eye (world metres): over it, or near it in the calm, higher than its
+   *  lowest. The whole planet's calm has none. */
+  const clouded = (eye: Vec3) => !!storm && storm.radius < Math.PI && length(eye) - R > CLOUD.lowest && toEdge(eye, storm) < CLOUD.out;
 
   /** The way the look faces along the surface at her. */
   const view = () => turned(facing, at, spin);
@@ -94,7 +104,7 @@ export function createChase(ground: (p: Vec3) => number, sea: (p: Vec3, time: nu
     const eyeAt = (k: number) => add(add(deck, right, SHOULDER * k), dir, -boom * k);
     const clear = (k: number) => {
       const eye = eyeAt(k), under = normalize(eye);
-      return length(eye) - R > Math.max(ground(under), sea(under, time)) + CLEAR
+      return length(eye) - R > Math.max(ground(under), sea(under, time)) + CLEAR && !clouded(eye)
         && !blocked(deck, add(deck, right, SHOULDER * k)) && !blocked(add(deck, right, SHOULDER * k), eye);
     };
     let need = 1;
@@ -137,6 +147,7 @@ export function createChase(ground: (p: Vec3) => number, sea: (p: Vec3, time: nu
       out = 1;
       flight = null;
       spin = shot.spin ?? 0;
+      storm = null;
       put(time, 1, () => Infinity, shot);
     },
     /** From the next update, flies over `seconds` from where the camera is now to wherever it is then placed (0117
@@ -146,9 +157,10 @@ export function createChase(ground: (p: Vec3) => number, sea: (p: Vec3, time: nu
     },
     /**
      * After a frame of dt seconds: her pose now (the ship it follows), the look's drag (pixels, right and down), the
-     * world's clock, and the boom for the moment (the chase's own, unless given).
+     * world's clock, the storm's calm then, and the boom for the moment (the chase's own, unless given).
      */
-    update(pose: ShipPose, look: { x: number; y: number }, dt: number, time: number, shot: Shot = {}) {
+    update(pose: ShipPose, look: { x: number; y: number }, dt: number, time: number, calm: Cap | null, shot: Shot = {}) {
+      storm = calm;
       // the look carried along with her over the sphere, its bearing against the world kept
       const up = level(pose);
       facing = transport(facing, at, up);

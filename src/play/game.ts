@@ -177,7 +177,7 @@ export function createGame(world: World, anchors: readonly Anchor[], waters: Wat
       }
       const followed = view.watch === PLAYER ? last : state.poseOf(view.watch, between) ?? last;
       ended += dt;
-      chase.update(followed, hands.look, dt, state.clock(1), finale(view.end, ended));
+      chase.update(followed, hands.look, dt, state.clock(1), state.storm(1), finale(view.end, ended));
       if (arrival !== null && !arriving((arrival += dt), last, chase.eye())) arrival = null;
     },
     /** What is drawn now (snapshot.ts). */

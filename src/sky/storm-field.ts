@@ -21,14 +21,17 @@
 
 import { Break, If, acos, atan, clamp, cos, dot, exp, float, length, max, min, mix, normalize, pow, select, sin, smoothstep, texture3D, vec3 } from 'three/tsl';
 import type { Storage3DTexture } from 'three/webgpu';
+import { CLOUD } from '../sim/storm';
 import { R } from '../world/sphere';
 import { loop, type FloatNode, type Vec3Node } from '../tsl';
 
-/** The cloud's base, metres up, and how far its rolls lift and lower it, each ROLL_WIDTH metres across. */
-export const BASE = 58;
+/** The cloud's base, metres up, and how far its rolls lift and lower it, each ROLL_WIDTH metres across. Its rolls and
+ * billows (5 m at most 1.7) take it down to some 40.6 m: sim/storm.ts CLOUD.lowest, which the chase keeps under. */
+export const BASE = CLOUD.base;
 const ROLL = 9, ROLL_WIDTH = 26;
 /** How far the base's front stands out over the calm (metres, negative: in the calm), and how far the face leans back
- * a metre up; how far its billows reach either side of it. */
+ * a metre up; how far its billows reach either side of it. With the bays drawn in and the billows out, the front stands
+ * at most some 47 m out over the calm: sim/storm.ts CLOUD.out. */
 const SHELF = -12, LEAN = 0.8, FACE = 34;
 /** Along the edge the towers stand forward and back over the base, in bays and headlands: by up to BAY metres, the
  * swells WAVES metres apart (two, crossing). */
