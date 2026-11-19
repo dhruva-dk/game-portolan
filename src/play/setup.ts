@@ -1,5 +1,5 @@
-// How a match is set up on the world: the planet's water sounded for the bots' chart and the ships' berths, and the matches dealt one after
-// another, each with its storm, its berths and its bots' minds.
+// How a match is set up on the world: the planet's water sounded for the bots' chart and the ships' berths, and the
+// matches dealt one after another, each with its storm, its berths and its bots' minds.
 
 import { SHIPS } from '../sim/match.ts';
 import { charted } from '../sim/route.ts';
@@ -12,10 +12,16 @@ import type { Match, Waters } from './state.ts';
 
 /** A match's berths worked out off the main thread, by its seed. */
 export type Berther = (match: number) => Promise<Spawn[]>;
+/** What the sounding worker answers: the water sounded (once), or a match's berths (sounding.ts). */
+type Sounded = { open: Uint8Array; clear: Uint8Array; berths: Float64Array; ms: number } | { match: number; spawns: Float64Array };
+
+/** Each next match's seed is the one before's plus this (a prime). */
+const STRIDE = 7919;
 
 /** The water of a planet of this seed and land as the match reads it (state.ts Waters), sounded in a worker
  *  (sounding.ts) while the ground's bakes in its own (land/bake.ts); the milliseconds the sounding took; and the worker
- *  kept to berth each match on it. */
+ *  kept to berth each match on it. The worker lives as long as the page: every match dealt asks it for its berths
+ *  ahead of its start (createMatches berthBy), and it holds the water it sounded to work them out on. */
 export function watersOf(seed: number, land: Land): Promise<{ waters: Waters; ms: number; berth: Berther }> {
   const worker = new Worker(new URL('./sounding.ts', import.meta.url), { type: 'module' });
   const asked = new Map<number, (spawns: Spawn[]) => void>();
@@ -25,10 +31,11 @@ export function watersOf(seed: number, land: Land): Promise<{ waters: Waters; ms
   });
   const vec = (b: Float64Array, i: number): Vec3 => [b[i], b[i + 1], b[i + 2]];
   return new Promise((resolve, reject) => {
-    worker.onmessage = (e: MessageEvent<{ open: Uint8Array; clear: Uint8Array; berths: Float64Array; ms: number } | { match: number; spawns: Float64Array }>) => {
+    worker.onmessage = (e: MessageEvent<Sounded>) => {
       if ('match' in e.data) {
         const { match, spawns: b } = e.data;
-        asked.get(match)?.(Array.from({ length: b.length / 6 }, (_, i): Spawn => ({ at: vec(b, 6 * i), heading: vec(b, 6 * i + 3) })));
+        const spawn = (_: unknown, i: number): Spawn => ({ at: vec(b, 6 * i), heading: vec(b, 6 * i + 3) });
+        asked.get(match)?.(Array.from({ length: b.length / 6 }, spawn));
         asked.delete(match);
         return;
       }
@@ -53,7 +60,7 @@ export function createMatches(seed: number, planet: Planet, hold: number | null,
   };
   let played = 0, berth: Berther | null = null;
   /** The next match's seed, and its berths once worked out ahead of its deal. */
-  const next = () => seed + 7919 * (played + 1);
+  const next = () => seed + STRIDE * (played + 1);
   let ahead: { seed: number; berths: Spawn[] } | null = null;
   const prepare = () => {
     const s = next();
@@ -73,7 +80,7 @@ export function createMatches(seed: number, planet: Planet, hold: number | null,
     },
     /** The next match, for PLAY: its berths with it if they were worked out in time. */
     deal(): Match {
-      const s = seed + 7919 * ++played, berths = ahead?.seed === s ? ahead.berths : undefined;
+      const s = seed + STRIDE * ++played, berths = ahead?.seed === s ? ahead.berths : undefined;
       ahead = null;
       prepare();
       return { ...match(s), berths };

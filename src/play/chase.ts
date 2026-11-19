@@ -10,21 +10,22 @@
 // m), and her hull and rig stand left of the middle, clear of the line: a third-person shooter's over-the-shoulder
 // view. The look tilts from a little above the level to steeply down onto the sea about her.
 //
-// It never goes under the waves, into an island or into the storm's cloud: where land stands between her and the eye,
+// It never goes under the waves, into the land or into the storm's cloud: where land stands between her and the eye,
 // or the eye would be under the land, within CLEAR of the water or where the storm's cloud may stand (over the storm,
 // or near it in the calm, higher than its lowest: sim/storm.ts CLOUD), the boom and the shoulder are drawn in together
-// toward her (quickly),
-// and let out again only slowly once clear (as the old full game did, 0117 src/render/camera.ts), the look's way kept.
+// toward her (quickly), and let out again only slowly once clear, the look's way kept.
 //
 // The match's other shots are this camera given another boom (a Shot): at her end, sunk or won (finale.ts).
 // Moving to another ship it flies there over `flight` seconds, round the planet rather than through it and lifting on
-// a long way (0117 camera.ts's flight).
+// a long way.
 
 import { CLOUD, toEdge, type Cap } from '../sim/storm.ts';
 import { AIR_FOV, type Eye } from '../snapshot.ts';
 import type { ShipPose } from '../world/pose.ts';
 import { smoother } from '../world/scalar.ts';
-import { R, add, arc, cross, distance, length, normalize, place, rotateAbout, scale, tangent, transport, type Vec3 } from '../world/sphere.ts';
+import {
+  R, add, arc, cross, distance, length, normalize, place, rotateAbout, scale, tangent, transport, type Vec3,
+} from '../world/sphere.ts';
 import { lookAt, rotate, slerp, type Turn } from '../world/turn.ts';
 
 /** The boom: metres back along the look from its focus, which stands FOCUS metres over the sea and SHOULDER metres to
@@ -41,7 +42,8 @@ const FOCUS = 20, SHOULDER = 14;
  *  horizon into the sky and a gun's fall was laid at its range, out of sight over the sea's curve. */
 export const PITCH = 0.43;
 const HIGHEST = -0.12, STEEPEST = 1.0;
-/** Radians a pixel of the look's drag, across and down. */
+/** Radians a CSS pixel of the look's drag, across and down: fixed, as the screen it is for is (the target's, the iPad
+ *  Air's landscape 1180 × 820 CSS px: anchorage.ts VIEWPORT), so a drag is not scaled with the window. */
 const TURN = 0.0056, TILT = 0.0046;
 /** Clear of the land: metres over it along the boom; the boom's least share, the steps it is drawn in by, and how fast
  *  it is drawn in and let out (share a second). */
@@ -143,8 +145,8 @@ export function createChase(ground: (p: Vec3) => number, sea: (p: Vec3, time: nu
       storm = null;
       put(time, 1, () => Infinity, shot);
     },
-    /** From the next update, flies over `seconds` from where the camera is now to wherever it is then placed (0117
-     *  camera.ts glide: 1.6 s from one ship to another). */
+    /** From the next update, flies over `seconds` from where the camera is now to wherever it is then placed (1.6 s
+     *  from one ship to another). */
     fly(seconds = 1.6) {
       flight = { from: position, look: orientation, aim: place(at, FOCUS), span: seconds, done: 0 };
     },

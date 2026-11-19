@@ -1,5 +1,4 @@
-// The lobby's camera on her at anchor (0117 app.ts drawWorld, scenes.ts LOBBY_CAMERA, screens/lobby.ts LOBBY_ORBIT):
-// standing off her starboard bow on the quarter, a little above her, looking down its boom at her mainsail's foot so
+// The lobby's camera on her at anchor: standing off her starboard bow on the quarter, a little above her, looking down its boom at her mainsail's foot so
 // the hull sits low and the sails stand whole, and drifting slowly round her and back. A finger dragged anywhere off
 // the lobby's controls turns it round her (freely) and tilts its boom (within ORBIT.pitch, so never under the sea);
 // let go, it eases back to its rest.
@@ -9,19 +8,24 @@
 
 import { AIR_FOV, type Eye } from '../snapshot.ts';
 import type { ShipPose } from '../world/pose.ts';
-import { wrapAngle } from '../world/scalar.ts';
+import { clamp, wrapAngle } from '../world/scalar.ts';
 import { along, normalize, place, rotateAbout, scale, tangent, type Vec3 } from '../world/sphere.ts';
 import { lookAt } from '../world/turn.ts';
 
 /** The camera at rest: off her bow by `quarter` radians round from dead ahead, on a boom `boom` metres long rising
  *  `pitch` radians from a point `height` metres over the sea at her; drifting `drift` radians either way round her,
- *  a sweep each `period` seconds (0117 LOBBY_CAMERA). */
+ *  a sweep each `period` seconds. */
 export const LOBBY = { quarter: 0.95, boom: 30, pitch: 0.1, height: 7, drift: 0.26, period: 90 } as const;
 
-/** How far a finger takes it: the boom's tilt either way (radians); radians a pixel of drag across and up (0117: a
- *  swipe across the screen turns her 1.5π, and down it tilts 1.2: the iPad's 1180 × 820 px); the share of the way back
- *  to rest closed a second once let go. */
-export const ORBIT = { pitch: [-0.07, 0.42], turn: (Math.PI * 1.5) / 1180, tilt: 1.2 / 820, back: 0.9 } as const;
+/** The screen the drags are measured for, CSS px: the target's, the iPad Air's in landscape. */
+export const VIEWPORT = { width: 1180, height: 820 } as const;
+
+/** How far a finger takes it: the boom's tilt either way (radians); radians a pixel of drag across and up (a swipe
+ *  across VIEWPORT turns her 1.5π, and down it tilts 1.2); the share of the way back to rest closed a second once let
+ *  go. */
+export const ORBIT = {
+  pitch: [-0.07, 0.42], turn: (Math.PI * 1.5) / VIEWPORT.width, tilt: 1.2 / VIEWPORT.height, back: 0.9,
+} as const;
 
 /** The camera never comes nearer the sea or the land under it than this, metres. */
 const CLEAR = 1.5;
@@ -32,11 +36,11 @@ export interface Orbit { yaw: number; pitch: number }
 
 export const REST: Orbit = { yaw: 0, pitch: 0 };
 
-/** The orbit after a drag of the look (CSS px: right and down), as 0117's lobby turned it: dragged right, the camera
- *  goes round her toward her stern on the side it stands; dragged down, it rises to look down onto her. */
+/** The orbit after a drag of the look (CSS px: right and down): dragged right, the camera goes round her toward her
+ *  stern on the side it stands; dragged down, it rises to look down onto her. */
 export const dragged = (o: Orbit, look: { x: number; y: number }): Orbit => ({
   yaw: wrapAngle(o.yaw - look.x * ORBIT.turn),
-  pitch: Math.min(ORBIT.pitch[1], Math.max(ORBIT.pitch[0], o.pitch + look.y * ORBIT.tilt)),
+  pitch: clamp(o.pitch + look.y * ORBIT.tilt, ORBIT.pitch[0], ORBIT.pitch[1]),
 });
 
 /** The orbit eased back toward its rest over dt seconds, the short way round. */

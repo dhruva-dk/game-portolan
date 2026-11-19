@@ -1,7 +1,7 @@
 // The camera's shot at her end of the match (play/chase.ts takes it as a Shot), held on her ship whatever she does:
 //   sunk  her ship going down (sinking.ts): the boom drawn slowly back and up, the look tilted down onto her, and
 //         turning a little about her, so the sea she fought on opens round the wreck
-//   won   her ship sailing on: drawn back and circling her (0117 app.ts victory: 0.22 rad/s about her)
+//   won   her ship sailing on: drawn back and circling her (0.22 rad/s about her)
 // Each eases in over `rise` seconds and then holds its distance, still turning. The beat is how long it is shown on the
 // live world before the screens lay her result over it (ui/flow.ts; the referee reports it: play/referee.ts).
 
