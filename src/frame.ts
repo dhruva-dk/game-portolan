@@ -27,7 +27,8 @@ import { film } from './post/film';
 import { createGrade, encode } from './post/grade';
 import { createShafts, type Shafts } from './post/shafts';
 import { SKY_METRES } from './sky/sky';
-import { BANDS, SPACE } from './palette';
+import { SPACE } from './palette';
+import { BANDS } from './world/planet-terrain';
 import { loaded } from './load';
 import type { Vec4Node } from './tsl';
 

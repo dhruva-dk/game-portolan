@@ -13,6 +13,7 @@
 //
 // Pure arithmetic: no three, so it runs in node for the tests.
 
+import { smoothstep } from './scalar.ts';
 import { R, add, along, cross, distance, dot, normalize, scale, toChart, type Vec3 } from './sphere.ts';
 
 /** The icosphere's frequency: each of the icosahedron's edges is cut into this many. */
@@ -163,11 +164,6 @@ export function near(all: Anchor[], p: Vec3, reach: number): number[] {
     .sort((x, y) => x.d - y.d)
     .map((x) => x.i);
 }
-
-const smoothstep = (e0: number, e1: number, x: number) => {
-  const t = Math.min(Math.max((x - e0) / (e1 - e0), 0), 1);
-  return t * t * (3 - 2 * t);
-};
 
 /** Each distance's weight (metres; the nearest counts in full), scaled so Σw² = 1. */
 export function blend(distances: number[], width: number): number[] {

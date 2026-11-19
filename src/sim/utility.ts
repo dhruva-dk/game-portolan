@@ -14,10 +14,10 @@
 //
 // Pure arithmetic: no three, so it runs in node for the tests; deterministic for the same inputs and draws.
 
-export const unit = (x: number): number => (x <= 0 ? 0 : x >= 1 ? 1 : x);
+import { clamp } from '../world/scalar.ts';
 
 /** A ramp: 0 at `lo`, 1 at `hi` and straight between (falling, when lo > hi). */
-export const ramp = (x: number, lo: number, hi: number): number => unit((x - lo) / (hi - lo));
+export const ramp = (x: number, lo: number, hi: number): number => clamp((x - lo) / (hi - lo));
 
 /** The logistic: 1/2 at `mid`, rising by about three quarters of its range over `width` either side. */
 export const logistic = (x: number, mid: number, width: number): number => 1 / (1 + Math.exp((-2 * (x - mid)) / width));
@@ -29,7 +29,7 @@ export function utility(...factors: number[]): number {
   const make = 1 - 1 / n;
   let p = 1;
   for (const f of factors) {
-    const s = unit(f);
+    const s = clamp(f);
     if (s === 0) return 0;
     p *= s + (1 - s) * make * s;
   }
@@ -70,7 +70,7 @@ export function choose<C>(
   const scores = options.map((o, k) => o.weight * o.score(ctx) * (k === current ? held : 1));
   const best = Math.max(0, ...scores);
   if (best <= 0) return -1;
-  const floor = best * (1 - REASON.band * (1 - unit(skill)));
+  const floor = best * (1 - REASON.band * (1 - clamp(skill)));
   if (current >= 0 && scores[current] >= floor) return current;
   let total = 0;
   for (const s of scores) if (s >= floor) total += s;

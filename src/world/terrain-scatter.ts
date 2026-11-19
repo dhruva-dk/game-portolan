@@ -20,6 +20,7 @@ import { N } from './cells.ts';
 import { createNoise3 } from './noise3.ts';
 import type { Cover, Planet } from './planet.ts';
 import { hash, random } from './random.ts';
+import { clamp, smoothstep } from './scalar.ts';
 import { R, add, distance, dot, faceDir, fromChart, normalize, toChart, type Chart, type Vec3 } from './sphere.ts';
 import { CELL, between, locate, taps } from './terrain-grid.ts';
 import { heightBounds, type Terrain } from './terrain.ts';
@@ -102,12 +103,6 @@ const HEDGE = [-14, -5] as const, SHRUB_RATE = 0.3, BARE = 0.7;
 const TOP = 0.6, TOP_OUTCROP = 0.03, TOP_OUTCROPS = 2, COAST_OUTCROP = 0.3;
 const BIG = [2.5, 5.5] as const, BIG_COUNT = [3, 6] as const, HEAPED = 0.6;
 const BOULDER = [0.3, 1.6] as const, BOULDERS = [4, 10] as const, SUNK = { big: 0.15, boulder: 0.3 }, FOOT = 0.8;
-
-const sat = (x: number) => Math.min(Math.max(x, 0), 1);
-const smoothstep = (a: number, b: number, x: number) => {
-  const k = sat((x - a) / (b - a));
-  return k * k * (3 - 2 * k);
-};
 
 export function scatterTerrain(t: Terrain, planet: Planet, seed: number, shapes: Shapes): Tile[] {
   const blocks = N / BLOCK, tops = heightBounds(t, blocks).hi, summit = t.options.summit;
@@ -201,8 +196,8 @@ export function scatterTerrain(t: Terrain, planet: Planet, seed: number, shapes:
       if (t.shore[c] - slack > BEACH_TOP) return;
       const p = within(i, j), s = shoreAt(p);
       if (s > BEACH_TOP) return;
-      const grove = sat((read(p, 16, 0.5) + 0.5 * read(p, 8, 9.1) - 0.1) / 0.3) ** 2;
-      const coastal = Math.exp((s - BEACH_TOP) / INLAND), up = sat(t.height[c] / summit);
+      const grove = clamp((read(p, 16, 0.5) + 0.5 * read(p, 8, 9.1) - 0.1) / 0.3) ** 2;
+      const coastal = Math.exp((s - BEACH_TOP) / INLAND), up = clamp(t.height[c] / summit);
       if (rand() > PALM_RATE * grove * (0.12 + 0.88 * coastal) * (1 - smoothstep(PALM_UP[0], PALM_UP[1], up))) return;
       const [x, z] = toChart(chart, p), y = planet.height(p);
       if (y < LOWEST || palms.some((q) => Math.hypot(q.x - x, q.z - z) < SPACING) || onRock(rocks, x, z, 1)) return;
@@ -224,12 +219,12 @@ export function scatterTerrain(t: Terrain, planet: Planet, seed: number, shapes:
         const p = within(i, j), s = shoreAt(p);
         if (s > HEDGE[1]) continue;
         // the hedge, broken into stretches; inland, clumps where the noise says, kept where the grass grows
-        const hedge = s > HEDGE[0] ? sat((read(p, 14, 3.3) + 0.2) / 0.3) : 0;
-        const clump = sat((read(p, 10, 5.5) - 0.05) / 0.25) * 0.6;
+        const hedge = s > HEDGE[0] ? clamp((read(p, 14, 3.3) + 0.2) / 0.3) : 0;
+        const clump = clamp((read(p, 10, 5.5) - 0.05) / 0.25) * 0.6;
         if (rand() > SHRUB_RATE * Math.max(hedge, clump)) continue;
         const y = planet.sample(p, cover);
         if (y < 0.6 || cover.rubble > BARE || (hedge < clump && rand() > 0.2 + 0.8 * cover.grass)) continue;
-        const up = sat(y / summit), size = (1.8 + 3.2 * rand() ** 2) * (1 - 0.45 * up);
+        const up = clamp(y / summit), size = (1.8 + 3.2 * rand() ** 2) * (1 - 0.45 * up);
         const [x, z] = toChart(chart, p);
         if (shrubs.some((b) => Math.hypot(b.x - x, b.z - z) < (b.size + size) * 0.35) || onRock(rocks, x, z, size * 0.3)) continue;
         if (palms.some((q) => Math.hypot(q.x - x, q.z - z) < 0.6 + size * 0.3)) continue;

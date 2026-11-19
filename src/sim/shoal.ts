@@ -16,6 +16,7 @@
 //
 // Pure arithmetic: no three, so it runs in node for the tests.
 
+import { smoothstep } from '../world/scalar.ts';
 import { add, along, cross, dot, frameAt, length, normalize, scale, transport, type Vec3 } from '../world/sphere.ts';
 import { SHIP } from './handling.ts';
 import type { ShipState } from './ship.ts';
@@ -65,11 +66,6 @@ function deeper(p: Vec3, depth: Depth): Vec3 | null {
   const size = length(g);
   return size > 1e-6 ? scale(g, 1 / size) : null;
 }
-
-const smoothstep = (a: number, b: number, x: number) => {
-  const t = Math.min(Math.max((x - a) / (b - a), 0), 1);
-  return t * t * (3 - 2 * t);
-};
 
 /**
  * How far her turn this step (`angle`, radians to port) moves her amidships when a point of her hull near grounding

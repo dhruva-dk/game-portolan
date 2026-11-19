@@ -4,18 +4,20 @@
 // channels the repair dug in red, the water it filled in violet), and sheet.png beside them (a row a seed, a
 // column a share); prints each one's stats, and fails if any is left with more than one sailable body of water.
 //
-// The land in the game's own tones where the game lays them (palette.ts, as land/sand.ts lays them from the ground's
-// height and cover: world/planet-terrain.ts), lit toward the upper left; the sea by its depth in the palette's blues.
+// The land in the game's own tones (palette.ts) where the game lays them (world/planet-terrain.ts BANDS, as land/sand.ts
+// lays them from the ground's height and cover), lit toward the upper left; the sea by its depth in the palette's blues.
 // Not drawn: what the shader adds at a metre's scale (stones and weed on the floor, strata, a cliff's rock).
 
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { R, normalize, type Vec3 } from '../src/world/sphere.ts';
 import { cellOf } from '../src/world/cells.ts';
 import type { Cover } from '../src/world/planet.ts';
-import { terrainPlanet } from '../src/world/planet-terrain.ts';
+import { BANDS, terrainPlanet } from '../src/world/planet-terrain.ts';
+import { clamp, lerp as mix } from '../src/world/scalar.ts';
 import { TERRAIN, createTerrain, type Terrain } from '../src/world/terrain.ts';
+import { linearToSrgb } from '../src/colour.ts';
 import {
-  BANDS, ROCK, SAND, SAND_DRY, SAND_DUNE, SAND_LOAM, SAND_SHORE, SEABED_SAND, SEA_DEEP, SEA_MIDDLE, SEA_SHALLOW, type Rgb, type Tones,
+  ROCK, SAND, SAND_DRY, SAND_DUNE, SAND_LOAM, SAND_SHORE, SEABED_SAND, SEA_DEEP, SEA_MIDDLE, SEA_SHALLOW, type Rgb, type Tones,
 } from '../src/palette.ts';
 import { png } from './png.ts';
 
@@ -25,13 +27,14 @@ const size = Number(process.argv[4] ?? TERRAIN.size);
 const OUT = `captures/terrain/size${size}`;
 mkdirSync(OUT, { recursive: true });
 
+/** t of the way from colour a to colour b, t held within 0…1. */
 const lerp = (a: Rgb, b: Rgb, t: number): Rgb => {
-  const k = Math.min(Math.max(t, 0), 1);
-  return [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k, a[2] + (b[2] - a[2]) * k];
+  const k = clamp(t);
+  return [mix(a[0], b[0], k), mix(a[1], b[1], k), mix(a[2], b[2], k)];
 };
 const step = (v: number, at: number) => (v >= at ? 1 : 0);
 /** Linear to the display's sRGB, 0…255. */
-const srgb = (v: number) => Math.round(255 * (v <= 0.0031308 ? 12.92 * v : 1.055 * Math.pow(Math.min(v, 1), 1 / 2.4) - 0.055));
+const srgb = (v: number) => Math.round(255 * linearToSrgb(Math.min(v, 1)));
 
 /** The land's two tones at height h over its cover, laid in land/sand.ts's order; dunes past `dune` metres. */
 function land(h: number, c: Cover, dune: number): Tones {
@@ -78,7 +81,7 @@ function globes(t: Terrain, seed: number, size: number, marks: boolean): Uint8Ar
     const dx = (at(Math.min(i + 1, W - 1), j) - at(Math.max(i - 1, 0), j)) / (2 * mpp);
     const dz = (at(i, Math.min(j + 1, H - 1)) - at(i, Math.max(j - 1, 0))) / (2 * mpp);
     // land: its shadow tone turning to its lit as the slope faces the light; the sea flat; both darkening to the limb
-    const light = Math.min(Math.max(0.75 + (-dx + dz) * 1.5, 0), 1), limb = 0.6 + 0.4 * zs[k];
+    const light = clamp(0.75 + (-dx + dz) * 1.5), limb = 0.6 + 0.4 * zs[k];
     let c = hs[k] > 0 ? lerp(tones[k].shadow, tones[k].lit, light) : sea(-hs[k]);
     if (marks && t.changed[cs[k]] === 1) c = lerp(c, [0.8, 0.02, 0.02], 0.75);
     if (marks && t.changed[cs[k]] === 2) c = lerp(c, [0.3, 0.05, 0.65], 0.75);
@@ -90,19 +93,25 @@ function globes(t: Terrain, seed: number, size: number, marks: boolean): Uint8Ar
 const pct = (x: number) => `${(100 * x).toFixed(1)}%`;
 const CELL = 200, sheet = new Uint8Array(shares.length * CELL * 2 * seeds.length * CELL * 3), sheetW = shares.length * CELL * 2;
 let bad = 0;
-console.log('seed land  | before→after land | sailable before→after | water bodies | channels dug (m²) | ponds filled (m²) | landmasses, largest | summit | ms');
+console.log('seed land  | before→after land | sailable before→after | water bodies | channels dug (m²) | ponds filled (m²)'
+  + ' | landmasses, largest | summit | ms');
 for (const [row, seed] of seeds.entries()) {
   for (const [col, land] of shares.entries()) {
     const t0 = performance.now();
     const t = createTerrain(seed, { ...TERRAIN, land, size });
     const ms = performance.now() - t0, s = t.stats;
     if (s.sailableAfter !== 1) bad++;
-    console.log(`${String(seed).padStart(4)} ${land.toFixed(2)} | ${pct(s.landBefore)}→${pct(s.landAfter)} | ${s.sailableBefore}→${s.sailableAfter} | ${s.waterBodies} | ${s.channels} (${s.dugArea.toFixed(0)}) | ${s.filled} (${s.filledArea.toFixed(0)}) | ${s.landmasses}, ${pct(s.largestLand)} | ${s.summit.toFixed(1)} m | ${ms.toFixed(0)}`);
+    console.log(`${String(seed).padStart(4)} ${land.toFixed(2)} | ${pct(s.landBefore)}→${pct(s.landAfter)}`
+      + ` | ${s.sailableBefore}→${s.sailableAfter} | ${s.waterBodies} | ${s.channels} (${s.dugArea.toFixed(0)})`
+      + ` | ${s.filled} (${s.filledArea.toFixed(0)}) | ${s.landmasses}, ${pct(s.largestLand)} | ${s.summit.toFixed(1)} m`
+      + ` | ${ms.toFixed(0)}`);
     const name = `${OUT}/s${seed}-l${land}`;
     writeFileSync(`${name}.png`, png(1024, 512, globes(t, seed, 512, false)));
     writeFileSync(`${name}-marks.png`, png(1024, 512, globes(t, seed, 512, true)));
     const small = globes(t, seed, CELL, true);
-    for (let j = 0; j < CELL; j++) sheet.set(small.subarray(j * CELL * 2 * 3, (j + 1) * CELL * 2 * 3), ((row * CELL + j) * sheetW + col * CELL * 2) * 3);
+    for (let j = 0; j < CELL; j++) {
+      sheet.set(small.subarray(j * CELL * 2 * 3, (j + 1) * CELL * 2 * 3), ((row * CELL + j) * sheetW + col * CELL * 2) * 3);
+    }
   }
 }
 writeFileSync(`${OUT}/sheet.png`, png(sheetW, seeds.length * CELL, sheet));

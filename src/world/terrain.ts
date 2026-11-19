@@ -21,6 +21,7 @@
 // Pure arithmetic: no three, so it runs in node for the tests; deterministic for the seed.
 
 import { CELLS, N, PLANET_QUANTA, areaQuanta, beyond, neighbor } from './cells.ts';
+import { clamp } from './scalar.ts';
 import { R, type Vec3 } from './sphere.ts';
 import { createNoise3 } from './noise3.ts';
 import { CELL, areaOf, between, centres, components, disc, heap, locate, seaLevel, shoreOf, taps } from './terrain-grid.ts';
@@ -176,7 +177,6 @@ function softMin(a: number, b: number) {
   const lo = Math.min(a, b), hi = Math.max(a, b);
   return hi <= 0 ? 0 : lo * (1 + (lo / hi) ** 6) ** (-1 / 6);
 }
-const unit = (x: number) => Math.min(Math.max(x, 0), 1);
 
 /**
  * Metres above the sea, from the relief `f` and the signed distance `s` to the coast (metres, positive at sea). 0 at
@@ -191,10 +191,10 @@ export function profile(t: Pick<Terrain, 'level' | 'lo' | 'hi' | 'options'>, f: 
   const o = t.options;
   if (s < 0) {
     const u = -s, berm = o.berm * (1 - Math.exp((-u * o.beach) / o.berm));
-    const rise = o.summit * unit((f - t.level) / (t.hi - t.level)) ** 1.1;
+    const rise = o.summit * clamp((f - t.level) / (t.hi - t.level)) ** 1.1;
     return berm + softMin(rise, o.slope * (soft(u - 4, 1) - soft(-4, 1)));
   }
-  const bank = o.bank[0] + (o.bank[1] - o.bank[0]) * unit((t.level - f) / (t.level - t.lo));
+  const bank = o.bank[0] + (o.bank[1] - o.bank[0]) * clamp((t.level - f) / (t.level - t.lo));
   const q = s * o.beach + 0.7 * (soft(s - 3, 1) - soft(-3, 1));
   return -bank * (1 - Math.exp(-q / bank));
 }

@@ -4,20 +4,23 @@
 // higher up; and under the trees, where fronds have fallen, a darker patch. The bands' edges wander with the ground's
 // mottling, so none is a contour line. Where the ground is steeper than sand lies, a cliff's bare rock in strata.
 // On land the cover carries the land's own (world/planet-terrain.ts): earthier sand in patches where the shrubs grow,
-// and the tops' bare rock. High up, the pale dunes (halfway to the summit: palette.ts BANDS).
+// and the tops' bare rock. High up, the pale dunes (halfway to the summit: world/planet-terrain.ts BANDS).
 //
 // Everything is a function of the world position alone (the sea floor's mesh slides along under the eye).
 // Lit like everything else (sky/light.ts).
 
 import { dot, float, fract, max, mix, vec3 } from 'three/tsl';
-import { BANDS, LITTER, ROCK, SAND, SAND_DRY, SAND_DUNE, SAND_LOAM, SAND_SHORE, SEABED_SAND, SEABED_STONE, SEABED_WEED, STRATUM, type Tones } from '../palette';
+import {
+  LITTER, ROCK, SAND, SAND_DRY, SAND_DUNE, SAND_LOAM, SAND_SHORE, SEABED_SAND, SEABED_STONE, SEABED_WEED, STRATUM, type Tones,
+} from '../palette';
+import { BANDS } from '../world/planet-terrain';
 import type { View } from '../view/view';
 import type { Ground } from './ground';
 import type { Light } from '../sky/light';
 import { createStrewn } from './strewn';
 import { cut, type FloatNode, type Vec3Node } from '../tsl';
 
-/** Where each band lies (palette.ts BANDS). */
+/** Where each band lies (world/planet-terrain.ts BANDS). */
 const { shore: SHORE, beach: BEACH, dry: DRY, loam: LOAM_AT, rubble: RUBBLE, ragged: RAGGED } = BANDS;
 /** The ground's cover (0…1) past which sea grass grows on the floor; and litter under the trees. */
 const GRASS = 0.65, FALLEN = 0.5;

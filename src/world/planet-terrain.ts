@@ -14,6 +14,7 @@
 import { CELLS, N, centreOf } from './cells.ts';
 import { createNoise3 } from './noise3.ts';
 import { START, type Cover, type Planet, type Rise } from './planet.ts';
+import { clamp, smoothstep } from './scalar.ts';
 import { R, add, distance, dot, frameAt, normalize, type Vec3 } from './sphere.ts';
 import { CELL, between, locate, taps } from './terrain-grid.ts';
 import { heightBounds, profile, type Terrain } from './terrain.ts';
@@ -21,14 +22,14 @@ import { heightBounds, profile, type Terrain } from './terrain.ts';
 /** Where the land's cover changes, metres: grass begins this far in past the beach; rubble lies round the land's foot
  *  under water between these distances out. */
 const GRASS_IN = [20, 45] as const, FOOT = [2, 5, 15, 35] as const;
+/** Where the land's tones lie over its height and cover (land/sand.ts lays them; tools/terrain-map.ts draws them): the
+ *  heights over the sea, metres, where the shore's pale sand, the beach and the dry sand begin; the share of the way up
+ *  to the summit past which the dunes'; the cover past which the sand is earthier (its growth: where the shrubs grow),
+ *  and past which rubble lies (on the land's tops, bare rock); how far up or down the ground's mottling moves a band's
+ *  edge, metres (the dunes' six times as far). */
+export const BANDS = { shore: -0.15, beach: 0.45, dry: 2.6, dunes: 0.5, loam: 0.5, rubble: 0.7, ragged: 0.5 } as const;
 /** The cells along a side of a block one rise stands for (sim/sight.ts looks for land only near one). */
 const BLOCK = 16;
-
-const smoothstep = (a: number, b: number, x: number) => {
-  const t = Math.min(Math.max((x - a) / (b - a), 0), 1);
-  return t * t * (3 - 2 * t);
-};
-const sat = (x: number) => Math.min(Math.max(x, 0), 1);
 
 /** The rises of the land: one for each block of BLOCK² cells that land may stand in, as high as the block's ground
  *  (terrain.ts heightBounds) and as wide as its farthest cell, and two cells more. */
@@ -90,7 +91,7 @@ export function terrainPlanet(t: Terrain, seed: number): Planet {
     if (s < 0) {
       // how high up the land, 0 at the sea to 1 at the summit: grass in patches that shrink as it rises, and rock
       // breaking out above
-      const up = sat(h / o.summit);
+      const up = clamp(h / o.summit);
       const patch = read(9, 11.3) + 0.5 * read(40, 23.9);
       cover.grass = smoothstep(GRASS_IN[0], GRASS_IN[1], -s) * smoothstep(-0.15, 0.15, patch + 0.15 - 0.6 * up);
       cover.rubble = smoothstep(0.55, 0.8, up + 0.35 * read(25, 37.1));
@@ -102,8 +103,8 @@ export function terrainPlanet(t: Terrain, seed: number): Planet {
       const rubble = Math.max(foot, smoothstep(0.45, 0.65, read(30, 79.9))) * smoothstep(0, 0.5, depth);
       cover.rubble = rubble > 0 ? rubble * smoothstep(-0.1, 0.25, read(7, 91.1)) : 0;
     }
-    cover.mottle = sat(0.5 + 1.1 * read(12, 103.7));
-    cover.clump = sat(0.5 + 0.9 * read(2.6, 117.5));
+    cover.mottle = clamp(0.5 + 1.1 * read(12, 103.7));
+    cover.clump = clamp(0.5 + 0.9 * read(2.6, 117.5));
     return h;
   };
 

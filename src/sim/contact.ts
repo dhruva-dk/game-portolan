@@ -27,6 +27,7 @@
 //
 // Pure arithmetic: no three, so it runs in node for the tests; deterministic for the same inputs.
 
+import { clamp } from '../world/scalar.ts';
 import { R, add, dot, frameAt, length, normalize, scale, transport, type Vec3 } from '../world/sphere.ts';
 import { RAM, SHIP } from './handling.ts';
 import { step, type Helm, type ShipState } from './ship.ts';
@@ -76,7 +77,6 @@ const dot2 = (a: P, b: P) => a[0] * b[0] + a[1] * b[1];
 const cross2 = (a: P, b: P) => a[0] * b[1] - a[1] * b[0];
 const along2 = (a: P, b: P, k: number): P => [a[0] + b[0] * k, a[1] + b[1] * k];
 const scale2 = (a: P, k: number): P => [a[0] * k, a[1] * k];
-const clamp01 = (x: number) => Math.min(1, Math.max(0, x));
 
 /** The points nearest each other on the segments p0–p1 and q0–q1, as shares of the way along each. Lying parallel and
  * overlapping, the middle of the overlap, so a hull alongside is met at the middle of where she lies alongside. */
@@ -85,14 +85,14 @@ function nearest(p0: P, p1: P, q0: P, q1: P): [s: number, t: number] {
   const a = dot2(d1, d1), e = dot2(d2, d2), b = dot2(d1, d2), c = dot2(d1, r), f = dot2(d2, r);
   const denom = a * e - b * b;
   let s: number;
-  if (denom > 1e-9 * a * e) s = clamp01((b * f - c * e) / denom);
+  if (denom > 1e-9 * a * e) s = clamp((b * f - c * e) / denom);
   else {
-    const u0 = clamp01(-c / a), u1 = clamp01((b - c) / a);
+    const u0 = clamp(-c / a), u1 = clamp((b - c) / a);
     s = (u0 + u1) / 2;
   }
   let t = (b * s + f) / e;
-  if (t < 0) [t, s] = [0, clamp01(-c / a)];
-  else if (t > 1) [t, s] = [1, clamp01((b - c) / a)];
+  if (t < 0) [t, s] = [0, clamp(-c / a)];
+  else if (t > 1) [t, s] = [1, clamp((b - c) / a)];
   return [s, t];
 }
 

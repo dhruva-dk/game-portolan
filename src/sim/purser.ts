@@ -12,6 +12,7 @@
 //
 // Pure arithmetic: no three, so it runs in node for the tests; deterministic for the same inputs, to the bit.
 
+import { smoothstep } from '../world/scalar.ts';
 import { R, distance, dot } from '../world/sphere.ts';
 import { armed, type Crew } from './battle.ts';
 import { ready } from './gust.ts';
@@ -137,10 +138,7 @@ export function lootUrge(c: Ctx): number {
 }
 
 /** The loot response: smoothly from 0.05 to 0.3 of worth. */
-function ease(x: number): number {
-  const u = ramp(x, 0.05, 0.3);
-  return u * u * (3 - 2 * u);
-}
+const ease = (x: number) => smoothstep(0.05, 0.3, x);
 
 /** Going for the piece lootUrge chose: it becomes her target, and her goal. */
 export function lootAct(c: Ctx): void {
