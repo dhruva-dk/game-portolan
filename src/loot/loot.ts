@@ -18,9 +18,8 @@
 // gun with none near isn't drawn at all.
 
 import {
-  AddEquation, BufferAttribute, BufferGeometry, CustomBlending, CylinderGeometry, DoubleSide, DynamicDrawUsage,
-  InstancedBufferGeometry, InstancedInterleavedBuffer, InterleavedBufferAttribute, LatheGeometry, Matrix4, Mesh,
-  MeshBasicNodeMaterial, OctahedronGeometry, OneFactor, Vector2,
+  BufferAttribute, BufferGeometry, CylinderGeometry, DoubleSide, DynamicDrawUsage, InstancedBufferGeometry, InstancedInterleavedBuffer,
+  InterleavedBufferAttribute, LatheGeometry, Matrix4, Mesh, MeshBasicNodeMaterial, OctahedronGeometry, Vector2,
 } from 'three/webgpu';
 import { Fn, abs, attribute, cameraPosition, clamp, cos, cross, dot, float, max, mix, normalize, pow, select, sin, smoothstep, uniform, varying, vec3 } from 'three/tsl';
 import { GILDING, GLINT, ICE, RARITY_GLOW, TAR, TIMBER } from '../palette';
@@ -29,7 +28,8 @@ import { KINDS, type GunKind, type LootKind } from '../kinds';
 import { gunShape, gunSurface } from '../ship/gun';
 import type { LootDraw } from '../snapshot';
 import type { Eye } from '../view/view';
-import type { Vec3Node } from '../tsl';
+import { additive } from '../gpu';
+import { tangentFrame, type Vec3Node } from '../tsl';
 
 /** The most pieces drawn at once. */
 const PIECES = 512;
@@ -114,8 +114,7 @@ export function createLoot(light: Light) {
   // a piece's frame: up from the planet's centre; turned about it by its own spin, rocked about its across
   const at = attribute('lootAt', 'vec4'), glow = attribute('lootGlow', 'vec4'), life = attribute('lootLife', 'vec4');
   const up = normalize(at.xyz), id = at.w, seed = id.mul(0.618).fract().mul(6.283);
-  const ref = select(abs(up.y).lessThan(0.9), vec3(0, 1, 0), vec3(1, 0, 0));
-  const e1 = normalize(cross(ref, up)), e2 = cross(up, e1);
+  const { e1, e2 } = tangentFrame(up);
   const a = now.mul(SPIN).add(id);
   const ahead = e1.mul(cos(a)).add(e2.mul(sin(a))), side = cross(up, ahead);
   const rock = sin(now.mul(1.3).add(seed)).mul(ROCK), cr = cos(rock), sr = sin(rock);
@@ -157,11 +156,7 @@ export function createLoot(light: Light) {
 
   // the beam, a column standing on the piece's water, and its ring about it on the water
   const beamGeometry = instanced(beamAndRing(), beams);
-  const bm = new MeshBasicNodeMaterial({ transparent: true, depthWrite: false, side: DoubleSide });
-  bm.blending = CustomBlending;
-  bm.blendEquation = AddEquation;
-  bm.blendSrc = OneFactor;
-  bm.blendDst = OneFactor;
+  const bm = additive(new MeshBasicNodeMaterial({ transparent: true, depthWrite: false, side: DoubleSide }));
   const ring = attribute('part', 'float'), uv = attribute('uv', 'vec2');
   const tall = float(TALL).add(glow.w.mul(TALLER)), wide = max(float(1), far.mul(pixel).mul(BEAM_PIXELS / (2 * HEAD)));
   const beamAt = at.xyz.add(e1.mul(local.x.mul(wide))).add(e2.mul(local.z.mul(wide))).add(up.mul(local.y.mul(tall)));

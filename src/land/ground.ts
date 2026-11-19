@@ -12,11 +12,11 @@
 // needs no derivatives in a fragment's branches.
 
 import { ClampToEdgeWrapping, DataArrayTexture, HalfFloatType, LinearFilter, RGBAFormat, RedFormat, UnsignedByteType } from 'three/webgpu';
-import { abs, cross, float, normalize, select, texture, vec3 } from 'three/tsl';
+import { float, normalize, texture } from 'three/tsl';
 import { faceUV } from '../view/cube';
 import type { Land } from '../world/land';
 import { R } from '../world/sphere';
-import type { FloatNode, Vec3Node, Vec4Node } from '../tsl';
+import { tangentFrame, type FloatNode, type Vec3Node, type Vec4Node } from '../tsl';
 
 /** Nodes along a face's edge: texels of about (π/2)·R / (n − 1), 1.1 m at R = 554. */
 const NODES = 768;
@@ -76,8 +76,7 @@ export function createGround(seed: number, land: Land): Ground {
     normal: (p) => {
       // central differences a texel apart, along two tangents
       const u = normalize(p);
-      const side = select(abs(u.y).lessThan(0.9), vec3(0, 1, 0), vec3(1, 0, 0));
-      const t1 = normalize(cross(side, u)), t2 = cross(u, t1);
+      const { e1: t1, e2: t2 } = tangentFrame(u);
       const e = TEXEL / R;
       const d1 = height(u.add(t1.mul(e))).sub(height(u.sub(t1.mul(e)))).div(2 * TEXEL);
       const d2 = height(u.add(t2.mul(e))).sub(height(u.sub(t2.mul(e)))).div(2 * TEXEL);

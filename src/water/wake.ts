@@ -41,16 +41,15 @@
 // meter would read whatever they last held).
 
 import {
-  AddEquation, BufferAttribute, BufferGeometry, CustomBlending, DoubleSide, DynamicDrawUsage, HalfFloatType,
-  InstancedBufferGeometry, InstancedInterleavedBuffer, InterleavedBufferAttribute, LinearFilter, MaxEquation, Mesh, MeshBasicNodeMaterial,
-  OneFactor, OrthographicCamera, RGBAFormat, RenderTarget, Scene,
+  BufferAttribute, BufferGeometry, DoubleSide, DynamicDrawUsage, HalfFloatType, InstancedBufferGeometry, InstancedInterleavedBuffer,
+  InterleavedBufferAttribute, LinearFilter, MaxEquation, Mesh, MeshBasicNodeMaterial, OrthographicCamera, RGBAFormat, RenderTarget, Scene,
 } from 'three/webgpu';
 import {
   Fn, abs, attribute, cos, cross, dot, exp, float, length as lengthN, max, min, mix, mx_noise_float, normalize, saturate, select, sin, smoothstep,
   step, texture, uniform, vec2, vec3, vec4,
 } from 'three/tsl';
 import type { Environment } from '../environment';
-import type { Draw } from '../gpu';
+import { additive, type Draw } from '../gpu';
 import { PIVOT_Z, buildShip } from '../ship/build';
 import { THROUGH } from '../ship/materials';
 import { WATERLINE } from '../ship/waterline';
@@ -129,12 +128,9 @@ export interface Afloat { pose: ShipPose; velocity: Vec3; look: { brace: number 
 
 /** A material that draws straight onto the map (the chart's metres in `at`) and adds what it draws to what is there. */
 function marker(at: Vec2Node, mark: Vec4Node): MeshBasicNodeMaterial {
-  const m = new MeshBasicNodeMaterial({ side: DoubleSide, depthTest: false, depthWrite: false });
+  const m = additive(new MeshBasicNodeMaterial({ side: DoubleSide, depthTest: false, depthWrite: false }));
   m.vertexNode = vec4(at.x.div(REACH), at.y.div(REACH), 0.5, 1);
   m.fragmentNode = mark;
-  m.blending = CustomBlending;
-  m.blendEquation = m.blendEquationAlpha = AddEquation;
-  m.blendSrc = m.blendDst = m.blendSrcAlpha = m.blendDstAlpha = OneFactor;
   return m;
 }
 

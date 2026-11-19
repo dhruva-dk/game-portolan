@@ -26,8 +26,8 @@
 // light, smoke and spray cover what is behind them.
 
 import {
-  AddEquation, BufferAttribute, CustomBlending, DoubleSide, DynamicDrawUsage, IcosahedronGeometry, InstancedBufferGeometry,
-  InstancedInterleavedBuffer, InterleavedBufferAttribute, Mesh, MeshBasicNodeMaterial, OneFactor, OneMinusSrcAlphaFactor,
+  DoubleSide, DynamicDrawUsage, IcosahedronGeometry, InstancedBufferGeometry, InstancedInterleavedBuffer, InterleavedBufferAttribute, Mesh,
+  MeshBasicNodeMaterial,
 } from 'three/webgpu';
 import {
   Fn, abs, atan, attribute, cameraPosition, cos, cross, exp, float, max, mix, normalize, pow, select, sin, smoothstep, uniform, varying, vec3,
@@ -38,8 +38,9 @@ import type { Light } from '../sky/light';
 import type { BallDraw } from '../snapshot';
 import type { Eye } from '../view/view';
 import { random } from '../world/random';
-import { R, add, dot as vdot, normalize as vnormalize, scale, type Vec3 } from '../world/sphere';
-import type { FloatNode, Vec2Node } from '../tsl';
+import { R, add, normalize as vnormalize, scale, tangent, type Vec3 } from '../world/sphere';
+import { additive, premultiplied, quad } from '../gpu';
+import { tangentFrame, type FloatNode, type Vec2Node } from '../tsl';
 
 /** The most balls in flight, fall marks, and puffs alive, at once. */
 const BALLS = 512, MARKS = 64, PUFFS = 4096;
@@ -123,17 +124,11 @@ function ballMesh(pixel: FloatNode) {
   mesh.frustumCulled = false;
 
   // the tracer: a ribbon facing the eye, from the ball back along its way, x across it (−1…1) and y back (0…1)
-  const t = new InstancedBufferGeometry();
-  t.setAttribute('position', new BufferAttribute(new Float32Array([-1, 0, 0, 1, 0, 0, 1, 1, 0, -1, 1, 0]), 3));
-  t.setIndex([0, 1, 2, 0, 2, 3]);
+  const t = quad(new InstancedBufferGeometry(), 0);
   t.setAttribute('ballAt', new InterleavedBufferAttribute(buffer, 4, 0));
   t.setAttribute('ballWay', new InterleavedBufferAttribute(buffer, 4, 4));
   t.instanceCount = 0;
-  const tm = new MeshBasicNodeMaterial({ transparent: true, depthWrite: false, side: DoubleSide });
-  tm.blending = CustomBlending;
-  tm.blendEquation = AddEquation;
-  tm.blendSrc = OneFactor;
-  tm.blendDst = OneFactor;
+  const tm = additive(new MeshBasicNodeMaterial({ transparent: true, depthWrite: false, side: DoubleSide }));
   const wide = max(float(TRACER_WIDE), far.mul(pixel).mul(TRACER_PIXELS)).mul(0.5);
   const across = normalize(cross(along, cameraPosition.sub(at)));
   const back = local.y, taper = float(1).sub(back.mul(0.75)), trails = byKind(kind, (s) => s.tracer);
@@ -149,20 +144,14 @@ function ballMesh(pixel: FloatNode) {
 /** The fall marks: a square on the water about each (−1…1 across), a ring drawn at its edge and a second closing in
  *  on its middle as the shell nears, brighter the nearer. */
 function markMesh(pixel: FloatNode, now: FloatNode) {
-  const g = new InstancedBufferGeometry();
-  g.setAttribute('position', new BufferAttribute(new Float32Array([-1, -1, 0, 1, -1, 0, 1, 1, 0, -1, 1, 0]), 3));
-  g.setIndex([0, 1, 2, 0, 2, 3]);
+  const g = quad(new InstancedBufferGeometry());
   // where it falls (world metres, on the water) and how near the shell is to it (0 just fired … 1 falling)
   const buffer = new InstancedInterleavedBuffer(new Float32Array(MARKS * 4), 4).setUsage(DynamicDrawUsage);
   g.setAttribute('markAt', new InterleavedBufferAttribute(buffer, 4, 0));
   g.instanceCount = 0;
   const mark = attribute('markAt', 'vec4'), at = mark.xyz, up = normalize(at), local = attribute('position', 'vec3');
-  const ref = select(abs(up.y).lessThan(0.9), vec3(0, 1, 0), vec3(1, 0, 0)), e1 = normalize(cross(ref, up)), e2 = cross(up, e1);
-  const m = new MeshBasicNodeMaterial({ transparent: true, depthWrite: false, side: DoubleSide });
-  m.blending = CustomBlending;
-  m.blendEquation = AddEquation;
-  m.blendSrc = OneFactor;
-  m.blendDst = OneFactor;
+  const { e1, e2 } = tangentFrame(up);
+  const m = additive(new MeshBasicNodeMaterial({ transparent: true, depthWrite: false, side: DoubleSide }));
   m.positionNode = at.add(e1.mul(local.x.mul(MARK))).add(e2.mul(local.y.mul(MARK)));
   const far = cameraPosition.sub(at).length(), line = varying(max(float(0.35), far.mul(pixel).mul(MARK_PIXELS)).div(MARK));
   const uv = varying(local.xy), near = varying(mark.w);
@@ -179,9 +168,7 @@ function markMesh(pixel: FloatNode, now: FloatNode) {
 }
 
 function puffMesh(light: Light, now: FloatNode) {
-  const g = new InstancedBufferGeometry();
-  g.setAttribute('position', new BufferAttribute(new Float32Array([-1, -1, 0, 1, -1, 0, 1, 1, 0, -1, 1, 0]), 3));
-  g.setIndex([0, 1, 2, 0, 2, 3]);
+  const g = quad(new InstancedBufferGeometry());
   const buffer = new InstancedInterleavedBuffer(new Float32Array(PUFFS * STRIDE), STRIDE).setUsage(DynamicDrawUsage);
   ['puffAt', 'puffWay', 'puffForm', 'puffInk', 'puffLook'].forEach((name, i) => g.setAttribute(name, new InterleavedBufferAttribute(buffer, 4, i * 4)));
   g.instanceCount = 0;
@@ -223,10 +210,7 @@ function puffMesh(light: Light, now: FloatNode) {
   })();
   m.opacityNode = alpha;
   // premultiplied: a glow adds its light, smoke covers what is behind
-  m.blending = CustomBlending;
-  m.blendEquation = AddEquation;
-  m.blendSrc = OneFactor;
-  m.blendDst = OneMinusSrcAlphaFactor;
+  premultiplied(m);
   const mesh = new Mesh(g, m);
   mesh.frustumCulled = false;
   // after the sea, which reads what was drawn before it
@@ -251,8 +235,8 @@ export function createGunfire(light: Light) {
     const z = u(-1, 1), a = u(0, 2 * Math.PI), s = Math.sqrt(1 - z * z);
     return [s * Math.cos(a), s * Math.sin(a), z];
   };
-  /** A random unit tangent at `up`. */
-  const across = (up: Vec3): Vec3 => vnormalize(add(any(), up, -vdot(any(), up)));
+  /** A random unit tangent at `up`: one random direction, laid in the plane. */
+  const across = (up: Vec3): Vec3 => vnormalize(tangent(any(), up));
 
   function lay(born: number, p: Puff) {
     array.set([...p.at, born, ...p.way, p.life, p.size, p.grow, p.drag, p.pull, ...p.ink, p.glow, p.opacity, draw(), p.soft, p.fadeIn], head * STRIDE);

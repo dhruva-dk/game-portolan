@@ -11,13 +11,13 @@
 // can't hide it while a real crest in front still does. Far off the ribbon is widened to keep a few pixels across.
 
 import {
-  AddEquation, BufferAttribute, BufferGeometry, CustomBlending, DoubleSide, Mesh, MeshBasicNodeMaterial, OneFactor, OneMinusSrcAlphaFactor,
-  Vector4,
+  BufferAttribute, BufferGeometry, DoubleSide, Mesh, MeshBasicNodeMaterial, Vector4,
 } from 'three/webgpu';
 import {
   Fn, attribute, cameraPosition, clamp, dot, float, fract, fwidth, int, max, min, mix, normalize, select, smoothstep, sqrt, uniform,
   uniformArray, varying, vec4,
 } from 'three/tsl';
+import { premultiplied } from '../gpu';
 import type { Sky } from '../sky/sky';
 import type { Sea, ShipDraw } from '../snapshot';
 import { createCursor } from './cursor';
@@ -104,10 +104,7 @@ export function createTrails(sky: Sky, surface: (up: Vec3Node, cell: FloatNode) 
     const a = cover.mul(dash).mul(ends);
     return vec4(light.mul(a), a);
   })();
-  m.blending = CustomBlending;
-  m.blendEquation = AddEquation;
-  m.blendSrc = OneFactor;
-  m.blendDst = OneMinusSrcAlphaFactor;
+  premultiplied(m);
   const mesh = new Mesh(geometry, m);
   mesh.frustumCulled = false;
   // after the sea

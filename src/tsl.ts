@@ -2,9 +2,13 @@
 // inputs and outputs say what they hold. And the few places three's own types (@types/three 0.187) fall short of its
 // public TSL API, each bridged once here, typed, and named with the gap it covers.
 
-// And the two marks a flat look is drawn with, a shape's crisp edge (cut) and a thin line (line), for every material.
+// And the two marks a flat look is drawn with, a shape's crisp edge (cut) and a thin line (line), for every material;
+// and what more than one shader works out, written once: a lattice's hash (hash3), a frame on the tangent plane
+// (tangentFrame) and light's phase in a medium (henyeyGreenstein).
 
-import { Fn, Loop, clamp, float, fract, fwidth, int, max, min, nodeObject, pow, saturate, uint, vec3, workgroupArray } from 'three/tsl';
+import {
+  Fn, Loop, abs, clamp, cross, float, fract, fwidth, int, max, min, nodeObject, normalize, pow, saturate, select, uint, vec3, workgroupArray,
+} from 'three/tsl';
 import { MathNode, type Node } from 'three/webgpu';
 
 export type FloatNode = Node<'float'>;
@@ -40,6 +44,14 @@ const pcg3 = Fn(([c]: [Vec3Node]) => {
   return vec3(float(x), float(y), float(z)).mul(1 / 2 ** 32);
 }).setLayout({ name: 'pcg3', type: 'vec3', inputs: [{ name: 'c', type: 'vec3' }] });
 export const hash3 = (c: Vec3Node): Vec3Node => pcg3(c);
+
+/** Two unit axes square to the unit vector up and to each other (e1 × e2 = up): a frame on the plane tangent at up,
+ *  turned by whichever of the world's y and x axes lies further from up. */
+export function tangentFrame(up: Vec3Node): { e1: Vec3Node; e2: Vec3Node } {
+  const ref = select(abs(up.y).lessThan(0.9), vec3(0, 1, 0), vec3(1, 0, 0));
+  const e1 = normalize(cross(ref, up));
+  return { e1, e2: cross(up, e1) };
+}
 
 /** The Henyey-Greenstein phase, per steradian, of light turned through an angle of cosine c by a lobe of asymmetry g
  *  (forward for g > 0). */
