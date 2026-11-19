@@ -140,6 +140,17 @@ export function transport(t: Vec3, from: Vec3, to: Vec3): Vec3 {
 /** v less its part along the unit vector `up`: v laid in the tangent plane at up (not made unit). */
 export const tangent = (v: Vec3, up: Vec3): Vec3 => add(v, up, -dot(v, up));
 
+/**
+ * The unit tangent at unit vector u at `angle` radians round from a reference fixed for each point, anticlockwise
+ * looking down on it: from east, toward north at a quarter turn (frameAt's), but within some 26° of a pole, where east
+ * turns fast, from x × u's direction instead. For drawing a direction at random, or n evenly round.
+ */
+export function tangentAt(u: Vec3, angle: number): Vec3 {
+  const ref: Vec3 = Math.abs(u[1]) < 0.9 ? [0, 1, 0] : [1, 0, 0];
+  const e1 = normalize(cross(ref, u)), e2 = cross(u, e1);
+  return add(scale(e1, Math.cos(angle)), e2, Math.sin(angle));
+}
+
 /** v turned `angle` radians about the unit vector `axis`, anticlockwise looking down it (Rodrigues): a tangent at up
  *  turned about up goes to port. Its length is kept. */
 export function rotateAbout(v: Vec3, axis: Vec3, angle: number): Vec3 {

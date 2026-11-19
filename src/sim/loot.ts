@@ -17,7 +17,7 @@
 // Pure arithmetic: no three, so it runs in node for the tests; deterministic for the same inputs.
 
 import { random, hash } from '../world/random.ts';
-import { R, add, along, cross, dot, normalize, scale, type Vec3 } from '../world/sphere.ts';
+import { R, add, along, cross, dot, normalize, scale, tangentAt, type Vec3 } from '../world/sphere.ts';
 import type { Crew } from './battle.ts';
 import type { Vessel } from './contact.ts';
 import { gunOf } from './gun.ts';
@@ -94,13 +94,6 @@ export function rolled(draw: () => number): Goods {
   return { kind: 'fullRepair', count: LOOT.counts.fullRepair };
 }
 
-/** A unit tangent at p at angle a from a fixed reference. */
-function tangent(p: Vec3, a: number): Vec3 {
-  const ref: Vec3 = Math.abs(p[1]) < 0.9 ? [0, 1, 0] : [1, 0, 0];
-  const e1 = normalize(cross(ref, p)), e2 = cross(p, e1);
-  return add(scale(e1, Math.cos(a)), e2, Math.sin(a));
-}
-
 /** Whether a piece at p lies where a ship can come to it. */
 const open = (depth: Depth, p: Vec3) => depth(p) >= SHIP.draught + LOOT.open;
 
@@ -110,7 +103,7 @@ function opened(depth: Depth, p: Vec3): Vec3 | null {
   for (let d = LOOT.ring; d <= LOOT.shore; d += LOOT.ring) {
     const n = Math.max(8, Math.round((2 * Math.PI * d) / (2 * LOOT.ring)));
     for (let k = 0; k < n; k++) {
-      const q = along(p, tangent(p, (2 * Math.PI * k) / n), d).p;
+      const q = along(p, tangentAt(p, (2 * Math.PI * k) / n), d).p;
       if (open(depth, q)) return q;
     }
   }
@@ -130,13 +123,13 @@ export function strewn(seed: number, depth: Depth, spots: number = LOOT.spots): 
   for (let k = 0; k < spots; k++) {
     const y = 1 - (2 * (k + 0.5)) / spots, r = Math.sqrt(1 - y * y), phi = k * golden;
     const spot = spin([r * Math.cos(phi), y, r * Math.sin(phi)]);
-    const p = along(spot, tangent(spot, draw() * 2 * Math.PI), draw() * cell * 0.4).p;
+    const p = along(spot, tangentAt(spot, draw() * 2 * Math.PI), draw() * cell * 0.4).p;
     const at = opened(depth, p);
     const goods = rolled(draw), twice = draw() < LOOT.second, side = draw() * 2 * Math.PI;
     if (!at) continue;
     pieces.push({ id: pieces.length, at, goods, from: -1, age: 0, way: STILL });
     if (twice) {
-      const q = along(at, tangent(at, side), 4).p;
+      const q = along(at, tangentAt(at, side), 4).p;
       pieces.push({ id: pieces.length, at: open(depth, q) ? q : at, goods: rolled(draw), from: -1, age: 0, way: STILL });
     }
   }
@@ -153,7 +146,7 @@ export function berthed(f: Flotsam, berths: readonly Vec3[], seed: number, depth
     const a = draw() * 2 * Math.PI, d = LOOT.near + draw() * (LOOT.far - LOOT.near), r = draw(), k = draw();
     if (pieces.some((l) => isArms(l.goods) && dot(l.at, b) > within)) continue;
     // the first of eight bearings round from the one drawn that lies on open water, else the open water nearest it
-    const round = Array.from({ length: 8 }, (_, k) => along(b, tangent(b, a + (k * Math.PI) / 4), d).p);
+    const round = Array.from({ length: 8 }, (_, k) => along(b, tangentAt(b, a + (k * Math.PI) / 4), d).p);
     const at = round.find((q) => open(depth, q)) ?? opened(depth, round[0]) ?? b;
     pieces.push({ id: f.next + pieces.length - f.pieces.length, at, goods: gunned(k, r), from: -1, age: 0, way: STILL });
   }
@@ -165,7 +158,7 @@ export function berthed(f: Flotsam, berths: readonly Vec3[], seed: number, depth
 export function overboard(f: Flotsam, at: Vec3, goods: readonly Goods[], from: number, seed: number): Flotsam {
   const draw = random(hash(seed, f.next));
   const thrown = goods.map((g, k): Loot =>
-    ({ id: f.next + k, at, goods: g, from, age: 0, way: scale(tangent(at, draw() * 2 * Math.PI), LOOT.kick + k) }));
+    ({ id: f.next + k, at, goods: g, from, age: 0, way: scale(tangentAt(at, draw() * 2 * Math.PI), LOOT.kick + k) }));
   return { pieces: [...f.pieces, ...thrown], next: f.next + goods.length };
 }
 

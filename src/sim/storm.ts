@@ -14,7 +14,7 @@
 //
 // Pure arithmetic: no three, so it runs in node for the tests.
 
-import { R, add, along, cross, dot, normalize, scale, type Vec3 } from '../world/sphere.ts';
+import { R, add, along, cross, dot, normalize, scale, tangentAt, type Vec3 } from '../world/sphere.ts';
 import { random } from '../world/random.ts';
 import type { Depth } from './shoal.ts';
 
@@ -87,13 +87,6 @@ export const calm = (centre: Vec3): Storm => ({
 /** Radians between two unit vectors. */
 const between = (a: Vec3, b: Vec3) => Math.atan2(Math.hypot(...cross(a, b)), dot(a, b));
 
-/** A tangent at unit vector u, at angle `bearing` from an arbitrary but fixed reference. */
-function tangent(u: Vec3, bearing: number): Vec3 {
-  const ref: Vec3 = Math.abs(u[1]) < 0.9 ? [0, 1, 0] : [1, 0, 0];
-  const e1 = normalize(cross(ref, u)), e2 = cross(u, e1);
-  return add(scale(e1, Math.cos(bearing)), e2, Math.sin(bearing));
-}
-
 /** The point `f` of the way along the great circle from unit vector a to unit vector b. */
 function slerp(a: Vec3, b: Vec3, f: number): Vec3 {
   const d = between(a, b);
@@ -118,7 +111,7 @@ export function planStorm(seed: number, depth: Depth): Vec3[] {
   const wet = (u: Vec3) => depth(scale(u, R));
   const final = phases[n - 1].radius;
   const rim = (u: Vec3) =>
-    Math.min(...Array.from({ length: 8 }, (_, k) => wet(along(scale(u, R), tangent(u, (k * Math.PI) / 4), final).p)));
+    Math.min(...Array.from({ length: 8 }, (_, k) => wet(along(scale(u, R), tangentAt(u, (k * Math.PI) / 4), final).p)));
   let best: Vec3 = [0, 1, 0], score = -Infinity;
   for (let i = 0; i < STORM.tries; i++) {
     const u = unit();
@@ -133,7 +126,7 @@ export function planStorm(seed: number, depth: Depth): Vec3[] {
     const inner = centres[k + 1], room = angle(phases[k].radius - phases[k + 1].radius) * STORM.wander;
     centres[k] = inner;
     for (let i = 0; i < STORM.tries; i++) {
-      const c = normalize(along(inner, tangent(inner, 2 * Math.PI * rand()), room * R * Math.sqrt(rand())).p);
+      const c = normalize(along(inner, tangentAt(inner, 2 * Math.PI * rand()), room * R * Math.sqrt(rand())).p);
       if (wet(c) > 0) {
         centres[k] = c;
         break;
