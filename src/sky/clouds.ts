@@ -9,7 +9,7 @@
 
 import { Matrix4, NearestFilter, StorageTexture, Vector3 } from 'three/webgpu';
 import {
-  Fn, If, abs, clamp, dot, float, floor, fract, instanceIndex, int, ivec2, max, min, mix, normalize, select,
+  Fn, If, abs, clamp, float, floor, fract, instanceIndex, int, interleavedGradientNoise, ivec2, max, min, mix, normalize, select,
   smoothstep, texture, textureLoad, textureStore, uniform, uvec2, vec2, vec3, vec4,
 } from 'three/tsl';
 import { storageTable, type Compute } from '../gpu';
@@ -26,8 +26,6 @@ const BLEND = 0.25;
 /** The 2×2 cell each frame takes, in an order that spreads them. */
 const LATTICE = [[0, 0], [1, 1], [1, 0], [0, 1]];
 
-/** Interleaved gradient noise (Jimenez 2014), for the march's start. */
-const ign = (p: Vec2Node): FloatNode => fract(float(52.9829189).mul(fract(dot(p, vec2(0.06711056, 0.00583715)))));
 
 /** A texture read at uv with a Catmull-Rom filter, from five bilinear reads (Jimenez 2016); size in texels. */
 function catmullRom(tex: StorageTexture, uv: Vec2Node, size: Vec2Node): Vec4Node {
@@ -91,7 +89,9 @@ function createPasses(width: number, height: number, view: View, field: CloudFie
     const f = float(cam.frameIndex.div(4).mod(4096));
     const d = rayAt(px.add(fract(vec2(f.mul(0.7548777), f.mul(0.5698403)).add(0.5))).div(vec2(HW, HH)));
     const distance = float(0).toVar();
-    const result = field.march(d, MAX_STEPS, fract(ign(px).add(float(cam.frameIndex).mul(0.618034))), distance, true);
+    // the march's start: interleaved gradient noise (Jimenez 2014), stepped on by the golden ratio each frame
+    const start = fract(interleavedGradientNoise(px).add(float(cam.frameIndex).mul(0.618034)));
+    const result = field.march(d, MAX_STEPS, start, distance, true);
     textureStore(marched, uvec2(x, y), result);
     textureStore(marchedDistance, uvec2(x, y), vec4(distance, 0, 0, 1));
   })().compute(MW * MH, [64]);
