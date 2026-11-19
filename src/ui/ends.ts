@@ -11,7 +11,7 @@
 import type { Career, End } from '../player';
 import { INK, PAPER, WASH, figure, glyph, paperDisc, roughCircle, slip, svg } from './ink';
 import { laurel, plate } from './marks';
-import { banner, region, sheet } from './screens';
+import { at, banner, region, sheet } from './screens';
 import { fade, onTap, piece, uiLayer } from './ui';
 
 /** A place's laurel and numeral: gold for the first, silver for the top five, red for the top ten, ink below. */
@@ -125,10 +125,12 @@ export function createResult(act: { watch(): void; leave(): void }) {
     const ways = watching
       ? `<g id="watch">${banner(380, 370, 176, spyglass(376, 366, 68))}</g><g id="leave">${banner(576, 370, 176, anchor(572, 366, 52))}</g>`
       : `<g id="leave">${banner(478, 370, 196, anchor(474, 366, 56), won)}</g>`;
-    const el = s.set(body + '<g id="gain"></g>' + ways);
-    drawPlate();
-    region(el, 'leave', act.leave);
-    if (watching) region(el, 'watch', act.watch);
+    // the band at the top of the screen, the ways on at its foot (on another shape of screen, each kept to its edge)
+    s.set((p) => at(p, 'centre', 'top', body + '<g id="gain"></g>') + at(p, 'centre', 'bottom', ways), (el) => {
+      drawPlate();
+      region(el, 'leave', act.leave);
+      if (watching) region(el, 'watch', act.watch);
+    });
   };
   return {
     /** Shows her end (with the career it took her from and to), with WATCH while the match goes on; or hides it. Shown
