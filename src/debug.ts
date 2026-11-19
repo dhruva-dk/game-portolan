@@ -28,7 +28,7 @@
 // frame's cost. ?safe=top,right,bottom,left px stands in for the device's safe-area insets (the iPad Air in
 // landscape: ?safe=0,0,20,0, the home indicator's). ?lod=0…3 draws every ship at that level of detail; ?cloth=0 draws every ship's canvas
 // as the wind fills it, none simulated (ship/fleet.ts).
-// ?screen= opens the UI at a screen (title, lobby, rank, settings, match, sunk, spectate, won, result; ui/ways.ts; also
+// ?screen= opens the UI at a screen (title, lobby, settings, match, sunk, spectate, won, result; ui/ways.ts; also
 // map), at sea among ?ships=n others by default: play starts a match as PLAY does (every ship at her berth, the eye
 // coming down from space: play/arrival.ts); sunk sinks her by the first other ship (?by=storm: by the storm) and the
 // screens follow her end as the match would bring it (the camera's beat, then her result); spectate sinks her and
@@ -202,7 +202,7 @@ export async function scenario(release: Setup, stage: (setup: Setup) => Promise<
 function open(p: Played, others: readonly Berth[]) {
   const { game, referee, flow } = p;
   const screen = params.get('screen') ?? 'match';
-  if (screen === 'title' || screen === 'lobby' || screen === 'rank' || screen === 'settings') flow.go(screen);
+  if (screen === 'title' || screen === 'lobby' || screen === 'settings') flow.go(screen);
   else if (screen === 'play') {
     p.play();
     flow.go('match');

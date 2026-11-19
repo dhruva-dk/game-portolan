@@ -1,7 +1,7 @@
 // What passes between the player and the game, as plain data: the seam between play/ (the game) and ui/ (what she
 // sees and touches), as snapshot.ts is the seam between the game and the frame. Her hands' orders go in each frame
 // (Hands: read by ui/input.ts, given to play/game.ts step); what the match reports comes out (Status, read by
-// ui/hud.ts), with what she carries (Kit), and her career, which nothing in the game keeps yet (play/placeholder.ts).
+// ui/hud.ts), with what she carries (Kit).
 
 import type { GunKind, LootKind } from './kinds';
 import type { Vec3 } from './world/sphere';
@@ -99,7 +99,7 @@ export type Deed = { seq: number; time: number; at: Vec3; ship: number } & (
 export const LIFT: Record<Deed['kind'], number> = { fired: 3, winding: 3, reloading: 3, reloaded: 3, swapped: 3, fell: 0, struck: 2, sank: 2, took: 0.5, mended: 2, gust: 2 };
 
 /** The screens (ui/ways.ts, the ways between them): named here for the sound too, which hears which is shown. */
-export const SCREENS = ['title', 'lobby', 'rank', 'settings', 'match', 'sinking', 'sunk', 'spectate', 'won', 'result'] as const;
+export const SCREENS = ['title', 'lobby', 'settings', 'match', 'sinking', 'sunk', 'spectate', 'won', 'result'] as const;
 export type Screen = (typeof SCREENS)[number];
 
 /** What a blow (a Deed 'struck') did, as the screen, the camera, the hit-stop and the sound each answer it: broke a
@@ -146,6 +146,3 @@ export interface End {
   place: number; of: number; share: number; afloat: number;
   settled: boolean; over: boolean;
 }
-
-/** Her career, as the lobby and the result show it: her level, how far toward the next (0…1), and her rank's tier. */
-export interface Career { level: number; progress: number; tier: number }

@@ -1,16 +1,16 @@
 // Her match's end, laid over the world as it goes on (never an opaque sheet), after the camera's beat on it:
 //   result   sunk, a band across the top: her place in its laurel over how many began (17 over 80), what sank her (a
-//            ball, a ram, the Storm) in a paper disc, the sea she held (her share of the planet's water), her plate,
-//            its ring filling with what the match added; the middle of the screen, her ship going down, left clear.
-//            Won, her place gilt in a sunburst between the sea she held and her plate. At the foot her ways on, each
+//            ball, a ram, the Storm) in a paper disc, the sea she held (her share of the planet's water); the middle of
+//            the screen, her ship going down, left clear.
+//            Won, her place gilt in a sunburst beside the sea she held. At the foot her ways on, each
 //            a banner: the spyglass (watch the match on: spectate) while ships still fight, and the anchor (home)
 //   watching small marks at the edges while she watches another ship: the anchor's disc at the top left (home), and
 //            at the foot the spyglass between the arrows that turn her to the next ship or the one before
 // No words; numerals only.
 
-import type { Career, End } from '../player';
+import type { End } from '../player';
 import { INK, PAPER, WASH, figure, glyph, paperDisc, roughCircle, slip, svg } from './ink';
-import { laurel, plate } from './marks';
+import { laurel } from './marks';
 import { at, banner, region, sheet } from './screens';
 import { fade, onTap, piece, uiLayer } from './ui';
 
@@ -85,24 +85,13 @@ const sunburst = (x: number, y: number, r: number) => {
     + `<circle cx="${x}" cy="${y}" r="${r * 0.97}" fill="none" stroke="${INK.gold}" stroke-width="1.6"/>`;
 };
 
-/** Seconds the plate waits once shown, and fills over, and the share of a level a second at most. */
-const GAIN = { wait: 0.5, rate: 0.8 } as const;
-
-/** Her result over the world: what it shows, its ways on (watch: null while there is no match on to watch), and the
- *  career it shows filling. */
+/** Her result over the world: what it shows, and its ways on (watch: null while there is no match on to watch). */
 export function createResult(act: { watch(): void; leave(): void }) {
   const s = sheet(false, false);
   // shade at the top and the foot, under the band and the ways on; the middle, where her ship is, left clear
   s.root.style.background = 'linear-gradient(to bottom, rgba(20,12,6,.42), rgba(20,12,6,0) 40%, rgba(20,12,6,0) 66%, rgba(20,12,6,.42))';
-  /** The career as it fills: where it ends and how far it has come (levels and their share, as one number), the
-   *  seconds yet to wait, her rank's tier; where the plate stands. */
-  let gain = { to: 0, at: 0, wait: 0, tier: 0 }, plateAt = { x: 0, y: 0, w: 0 };
   /** Whether it is shown, and with its way to watch. */
   let shown = false, watching = false;
-  const drawPlate = () => {
-    const level = Math.floor(gain.at), g = s.root.querySelector<SVGGElement>('#gain');
-    if (g) g.innerHTML = plate(plateAt.x, plateAt.y, plateAt.w, level, gain.at - level, gain.tier);
-  };
   /** Her place over how many began, in its laurel, `r` across, at (x, y). */
   const place = (x: number, y: number, r: number, end: End) => {
     const [wreath, numeral] = placed(end.place), k = r / 48;
@@ -110,33 +99,30 @@ export function createResult(act: { watch(): void; leave(): void }) {
       + `<path d="M${x - 15 * k} ${y + 16 * k}H${x + 15 * k}" stroke="${INK.iron}" stroke-width="1.4"/>` + figure(x, y + 29 * k, end.of, 17 * k);
   };
   /** Draws her end afresh: sunk, a band across the top of the screen, so the world under it, her ship going down,
-   *  shows whole; won, her place gilt in its sunburst over the sea she held and her plate. Her ways on at the foot. */
-  const draw = (end: End, career: { from: Career; to: Career }) => {
+   *  shows whole; won, her place gilt in its sunburst beside the sea she held. Her ways on at the foot. */
+  const draw = (end: End) => {
     const won = end.how === 'won', y = 72;
     watching = !end.over;
-    gain = { to: career.to.level + career.to.progress, at: career.from.level + career.from.progress, wait: GAIN.wait, tier: career.to.tier };
     const body = won
       ? sunburst(478, 100, 56) + place(478, 100, 66, end)
         + slip(214, 74, 158, 56) + held(244, 102, 16) + figure(266, 102, percent(end.share), 26, { anchor: 'start' })
-      : slip(262, 14, 432, 116, { bold: true }) + place(330, y, 46, end)
-        + `<path d="M392 30V114" stroke="${INK.iron}" stroke-width=".8" opacity=".6"/>`
-        + cause(428, y, end.how) + held(482, y, 16) + figure(504, y, percent(end.share), 26, { anchor: 'start' });
-    plateAt = won ? { x: 586, y: 66, w: 116 } : { x: 576, y: y - 34, w: 108 };
+      : slip(310, 14, 336, 116, { bold: true }) + place(378, y, 46, end)
+        + `<path d="M440 30V114" stroke="${INK.iron}" stroke-width=".8" opacity=".6"/>`
+        + cause(476, y, end.how) + held(530, y, 16) + figure(552, y, percent(end.share), 26, { anchor: 'start' });
     const ways = watching
       ? `<g id="watch">${banner(380, 370, 176, spyglass(376, 366, 68))}</g><g id="leave">${banner(576, 370, 176, anchor(572, 366, 52))}</g>`
       : `<g id="leave">${banner(478, 370, 196, anchor(474, 366, 56), won)}</g>`;
     // the band at the top of the screen, the ways on at its foot (on another shape of screen, each kept to its edge)
-    s.set((p) => at(p, 'centre', 'top', body + '<g id="gain"></g>') + at(p, 'centre', 'bottom', ways), (el) => {
-      drawPlate();
+    s.set((p) => at(p, 'centre', 'top', body) + at(p, 'centre', 'bottom', ways), (el) => {
       region(el, 'leave', act.leave);
       if (watching) region(el, 'watch', act.watch);
     });
   };
   return {
-    /** Shows her end (with the career it took her from and to), with WATCH while the match goes on; or hides it. Shown
-     *  already, it only loses WATCH once the match is over. */
-    show(on: boolean, end?: End, career?: { from: Career; to: Career }) {
-      if (on && end && career && !shown) draw(end, career);
+    /** Shows her end, with WATCH while the match goes on; or hides it. Shown already, it only loses WATCH once the
+     *  match is over. */
+    show(on: boolean, end?: End) {
+      if (on && end && !shown) draw(end);
       else if (on && end?.over && watching) {
         // the match ended under it: WATCH fades, LEAVE stays where it is
         const w = s.root.querySelector<SVGGElement>('#watch');
@@ -151,13 +137,6 @@ export function createResult(act: { watch(): void; leave(): void }) {
     hide(ms: number) {
       shown = false;
       s.show(false, ms);
-    },
-    /** A frame of dt seconds: the plate's ring fills toward what the match added. */
-    update(dt: number) {
-      if (gain.at >= gain.to || s.root.style.display === 'none') return;
-      if ((gain.wait -= dt) > 0) return;
-      gain.at = Math.min(gain.to, gain.at + dt * GAIN.rate);
-      drawPlate();
     },
   };
 }

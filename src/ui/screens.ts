@@ -5,17 +5,15 @@
 // Each fades in and out (ways.ts FADE), never cut to.
 //   title   an opaque sheet over the world loading: rhumb lines, the rose whose needle swings while the world loads and
 //           settles north when it is ready, her galleon gilt below; it moves on by itself (flow.ts)
-//   lobby   over her ship at anchor: the career plate (tap: the rank folio), the wheel (tap: settings), the PLAY
-//           banner with her galleon on it. No tabs. Elsewhere a drag reaches the world: it turns the camera round her.
-//   rank    a folio: her rank's seal and her level's ring, drawn large, and the ladder of ranks
+//   lobby   over her ship at anchor: the wheel (tap: settings) and the PLAY banner with her galleon on it. No tabs.
+//           Elsewhere a drag reaches the world: it turns the camera round her.
 //   settings a small folio: sound and look speed, each a bar set by a tap along it; the stats (the frame's cost in
 //           the bottom-left corner: meter.ts), a box ticked by a tap
 // Each folio has its close mark at its corner; a tap outside it closes it too. Her match's end is ends.ts's.
 // No words anywhere; numerals only.
 
-import type { Career } from '../player';
 import { INK, PAPER, WASH, bar, galleon, glyph, paperDisc, roughRect, svg } from './ink';
-import { TIERS, levelRing, plate, rhumbs, rose, seal } from './marks';
+import { rhumbs, rose } from './marks';
 import { fade, onTap, uiLayer } from './ui';
 
 export const W = 956, H = 440;
@@ -143,16 +141,16 @@ export function createTitle() {
   };
 }
 
-export function createLobby(act: { play(): void; rank(): void; settings(): void }) {
+export function createLobby(act: { play(): void; settings(): void }) {
   // a drag anywhere off its controls turns the camera round her (play/anchorage.ts)
   const s = sheet(false, false);
+  let drawn = false;
   return {
-    show(on: boolean, career?: Career) {
-      if (on && career) {
-        s.set((p) => at(p, 'left', 'top', `<g id="plate">${plate(64, 12, 132, career.level, career.progress, career.tier)}</g>`)
-          + at(p, 'right', 'top', `<g id="wheel"><circle cx="866" cy="40" r="26" fill="url(#pg)" stroke="${INK.iron}" stroke-width="1.6" filter="url(#sh)"/>${glyph('menu.wheel', 866, 40, 34)}</g>`)
+    show(on: boolean) {
+      if (on && !drawn) {
+        drawn = true;
+        s.set((p) => at(p, 'right', 'top', `<g id="wheel"><circle cx="866" cy="40" r="26" fill="url(#pg)" stroke="${INK.iron}" stroke-width="1.6" filter="url(#sh)"/>${glyph('menu.wheel', 866, 40, 34)}</g>`)
           + at(p, 'right', 'bottom', `<g id="play">${banner(777, 318, 210, galleon(777, 314, 78, { waves: true }))}</g>`), (el) => {
-          region(el, 'plate', act.rank);
           region(el, 'wheel', act.settings);
           region(el, 'play', act.play);
         });
@@ -184,25 +182,6 @@ function folio(x: number, y: number, w: number, h: number, place: [Parameters<ty
         region(el, 'close', close);
         bind?.(el);
       });
-    },
-  };
-}
-
-/** The rank folio: her rank's seal and her level, large, and the ladder of ranks with hers marked. */
-export function createRank(close: () => void) {
-  const x = 230, y = 50, w = 496, h = 330;
-  const f = folio(x, y, w, h, ['centre', 'middle'], close);
-  return {
-    show(on: boolean, career?: Career) {
-      if (on && career) {
-        let body = seal(380, 180, 74, career.tier) + levelRing(580, 180, 74, career.level, career.progress);
-        TIERS.forEach((_, t) => {
-          const cx = x + 64 + t * 52.5, here = t === career.tier;
-          body += seal(cx, 316, here ? 20 : 14, t) + (here ? `<path d="M${cx - 6} 286L${cx} 294L${cx + 6} 286Z" fill="${WASH.gold}" stroke="${INK.iron}" stroke-width=".8"/>` : '');
-        });
-        f.draw(body + `<line x1="${x + 40}" y1="316" x2="${x + w - 40}" y2="316" stroke="${INK.iron}" stroke-width=".8" opacity=".5"/>`);
-      }
-      f.show(on);
     },
   };
 }

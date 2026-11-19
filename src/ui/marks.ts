@@ -1,7 +1,7 @@
-// The chart's larger marks, after the UI sheet (and the old game's chart/rose.ts, chart/seal.ts): the compass rose and
-// its rhumb lines, wax seals for rank, the laurel for a place, and the level's ring.
+// The chart's larger marks, after the UI sheet (and the old game's chart/rose.ts): the compass rose and its rhumb
+// lines, and the laurel for a place.
 
-import { INK, PAPER, WASH, arcPath, figure, ring, roughCircle, slip } from './ink';
+import { INK, WASH, arcPath } from './ink';
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
 
@@ -61,22 +61,6 @@ export function rose(cx: number, cy: number, R: number, needle = 0, inks: RoseIn
   return s;
 }
 
-/** A rank's wax: iron, rubric, silver, gold … by tier. */
-export const TIERS = [
-  ['#4a3e36', '#1c1612'], ['#a06a34', '#5e3812'], ['#6f9ad0', '#2c4f86'], ['#f0c86a', '#9a6a1c'],
-  ['#e2e4e8', '#7f848b'], ['#a8e0ee', '#3e8aa0'], ['#8a6a9a', '#4a2a5a'], ['#d65a3c', '#7e1d0f'],
-] as const;
-
-/** A wax seal of `tier`'s colours, radius r. */
-export function seal(x: number, y: number, r: number, tier: number) {
-  const [light, dark] = TIERS[Math.min(Math.max(tier, 0), TIERS.length - 1)];
-  const id = `wax${tier}`;
-  return `<radialGradient id="${id}" cx="40%" cy="35%" r="70%"><stop offset="0" stop-color="${light}"/><stop offset="1" stop-color="${dark}"/></radialGradient>`
-    + `<path d="${roughCircle(x, y, r, x * 2 + y, r * 0.12)}" fill="url(#${id})" filter="url(#sh)"/>`
-    + `<circle cx="${x}" cy="${y}" r="${r2(r * 0.72)}" fill="none" stroke="${dark}" stroke-width="${r2(Math.max(0.8, r * 0.07))}" opacity=".8"/>`
-    + `<circle cx="${x}" cy="${y}" r="${r2(r * 0.86)}" fill="none" stroke="${light}" stroke-width="${r2(r * 0.05)}" opacity=".6"/>`;
-}
-
 /** A laurel of radius r round (cx, cy), open at the top. */
 export function laurel(cx: number, cy: number, r: number, colour: string) {
   let s = '';
@@ -92,18 +76,4 @@ export function laurel(cx: number, cy: number, r: number, colour: string) {
     }
   }
   return s;
-}
-
-/** The level's ring: the level's numeral in a paper ring that fills with gold toward the next; radius r. */
-export function levelRing(x: number, y: number, r: number, level: number, progress: number) {
-  return `<circle cx="${x}" cy="${y}" r="${r}" fill="${PAPER}" stroke="${INK.iron}" stroke-width="1.6"/>`
-    + ring(x, y, r - r * 0.1, progress, WASH.gold, r * 0.14)
-    + `<circle cx="${x}" cy="${y}" r="${r2(r * 0.8)}" fill="none" stroke="${INK.iron}" stroke-width=".6"/>`
-    + figure(x, y + r * 0.04, level, r * 1.36);
-}
-
-/** The career plate: her level's ring and her rank's seal on a slip, `w` wide (h = w × 0.62). */
-export function plate(x: number, y: number, w: number, level: number, progress: number, tier: number) {
-  const h = w * 0.62, k = w / 110;
-  return slip(x, y, w, h) + levelRing(x + w / 2 - 18 * k, y + h / 2, 25 * k, level, progress) + seal(x + w / 2 + 30 * k, y + h / 2, 13 * k, tier);
 }

@@ -285,7 +285,7 @@ const OVER: Record<string, number> = {
   'ship/kit.ts rod': 8, 'ship/kit.ts rope': 7, 'ship/kit.ts box': 6, 'ship/kit.ts beam': 7,
   'sim/battle.ts stepBattle': 8, 'sim/bot.ts think': 6, 'sim/gun.ts chosen': 6, 'sim/gun.ts laid': 9, 'sim/gunner.ts ring': 8,
   'sim/gunner.ts aimAndFire': 9, 'sim/ride.ts settled': 6, 'sim/shot.ts loosed': 7, 'sim/stores.ts stored': 9, 'sim/stores.ts spilled': 6,
-  'sim/utility.ts choose': 6, 'ui/disc.ts laid': 7, 'ui/flow.ts createFlow': 6, 'ui/ink.ts bar': 6, 'ui/ink.ts ring': 6, 'ui/marks.ts plate': 6,
+  'sim/utility.ts choose': 6, 'ui/disc.ts laid': 7, 'ui/ink.ts bar': 6, 'ui/ink.ts ring': 6,
   'water/water.ts createWater': 7, 'world/cells.ts trace': 6, 'world/lattice.ts weighInto': 7,
   'world/planet-islands.ts createIslandSite': 6, 'world/sphere.ts chartAt': 6,
 };
@@ -312,9 +312,7 @@ test('n. the lighting interface is the six ways a surface is lit (sky/light.ts L
 });
 
 /** The files that may say they stand in for something, and why. */
-const STAND_INS: Record<string, string> = {
-  'play/placeholder.ts': 'what the game shows that nothing in it keeps yet (her career), held in one place',
-};
+const STAND_INS: Record<string, string> = {};
 
 test('j. nothing in src says it is temporary or a hack, comments included, but the stand-ins (STAND_INS)', () => {
   // raw text, comments and all; a stand-in named by its path (an import, a reference) is not the word

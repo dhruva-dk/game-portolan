@@ -10,7 +10,6 @@ import { createFrame } from './frame';
 import { loaded } from './load';
 import { createMeter } from './meter';
 import { createGame } from './play/game';
-import { createPlaceholder } from './play/placeholder';
 import { createReferee } from './play/referee';
 import { createMatches, watersOf } from './play/setup';
 import { SHIP } from './sim/handling';
@@ -106,12 +105,10 @@ async function play(s: Stage): Promise<Played> {
   const game = createGame(s.world, s.anchors, waters, s.start, s.matches.first);
   const referee = createReferee(game);
 
-  // Her hands on the canvas, the stick drawn under the UI; the match's HUD over the world, fed by the game; her career
-  // by what stands in for it (play/placeholder.ts: pending).
+  // Her hands on the canvas, the stick drawn under the UI; the match's HUD over the world, fed by the game.
   const input = createInput(s.canvas, () => game.steering());
   const layer = uiLayer();
   const stick = createStick(layer);
-  const pending = createPlaceholder();
   const shores = shoresOf(s.world.planet, s.world.land);
   const globe = createGlobe(shores.coasts);
   const hudState = (): HudState => ({ ...game.status(s.canvas.clientWidth, s.canvas.clientHeight), ...game.kit() });
@@ -126,7 +123,7 @@ async function play(s: Stage): Promise<Played> {
     game.start(s.matches.deal());
     referee.begin();
   };
-  const flow = createFlow(hud, globe, { now: pending.career, credit: pending.credit }, 'title', {
+  const flow = createFlow(hud, globe, 'title', {
     play: deal,
     home() {
       referee.end();
@@ -154,7 +151,7 @@ async function play(s: Stage): Promise<Played> {
       flow.end(referee.update(dt));
       // the world as the game has it, seen from its eye or, while the full map is open, from the map's
       const scene = game.snapshot(), status = hudState();
-      flow.update(dt, status, scene.sea, scene.own);
+      flow.update(status, scene.sea, scene.own);
       // heard from the game's eye, even with the full map open over it; the sea going as the screens cover it
       audio.update({ scene, status, screen: flow.screen, map: globe.open, covered: flow.covered }, flow.settings.sound, dt);
       s.stats(flow.settings.stats);

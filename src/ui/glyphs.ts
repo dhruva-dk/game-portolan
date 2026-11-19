@@ -24,7 +24,6 @@ export const GLYPHS = {
   'menu.close': [{ k: 's', d: 'M5 5L19 19M19 5L5 19', w: 3.2 }],
   'menu.back': [{ k: 's', d: 'M10.6 4.6L3.4 12L10.6 19.4', w: 3 },{ k: 's', d: 'M4.4 12H20.6', w: 3 }],
   'menu.speaker': [{ k: 'f', d: 'M2.6 9.4H7.2L13.2 4.2V19.8L7.2 14.6H2.6Z' },{ k: 's', d: 'M16 8.4C17.8 10.4 17.8 13.6 16 15.6', w: 1.9 },{ k: 's', d: 'M18.8 5.8C22 9.4 22 14.6 18.8 18.2', w: 1.9 }],
-  'menu.rank': [{ k: 'f', d: 'M3.5 4.2Q12 1 20.5 4.2V11.8C20.5 17.4 15.74 21 12 22.2C8.26 21 3.5 17.4 3.5 11.8Z' },{ k: 's', d: 'M6.6 9.6L12 13.2L17.4 9.6', w: 2, cut: true },{ k: 's', d: 'M6.6 14.4L12 18L17.4 14.4', w: 2, cut: true },{ k: 'f', d: 'M12 3.2Q12.72 4.88 14.4 5.6Q12.72 6.32 12 8Q11.28 6.32 9.6 5.6Q11.28 4.88 12 3.2Z', cut: true, fine: true }],
 } satisfies Record<string, Prim[]>;
 
 export type Glyph = keyof typeof GLYPHS;

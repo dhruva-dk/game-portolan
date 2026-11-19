@@ -40,7 +40,6 @@ test('her result and the folios each have their own drawn way on: home, or close
   assert.equal(way('sunk', 'watch'), 'spectate');
   assert.equal(way('spectate', 'leave'), 'lobby');
   assert.equal(way('result', 'leave'), 'lobby');
-  assert.equal(way('rank', 'close'), 'lobby');
   assert.equal(way('settings', 'close'), 'lobby');
   assert.equal(way('title', 'begin'), 'lobby');
   assert.equal(way('lobby', 'play'), 'match');
@@ -145,7 +144,7 @@ test('home: the timings are the owner\'s: a quick cover, at least half a second 
 });
 
 test('outside the match, its course moves nothing', () => {
-  for (const s of ['title', 'lobby', 'rank', 'settings'] as const) {
+  for (const s of ['title', 'lobby', 'settings'] as const) {
     assert.equal(course(s, events({ how: 'shot', settled: true, over: true })), s);
   }
 });

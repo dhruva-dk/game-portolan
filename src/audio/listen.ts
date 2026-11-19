@@ -53,8 +53,8 @@ const PASS = 30, WHISTLE = 0.3, APART = 0.12;
 const ROPE = 0.02, TURNS = 0.8;
 /** What a screen shown says, by the screen it came from: a folio opened, closed; PLAY; her end. */
 function screenCue(from: Screen, to: Screen): Cue | null {
-  if (to === 'rank' || to === 'settings') return 'open';
-  if ((from === 'rank' || from === 'settings') && to === 'lobby') return 'close';
+  if (to === 'settings') return 'open';
+  if (from === 'settings' && to === 'lobby') return 'close';
   if (from === 'lobby' && to === 'match') return 'launch';
   if (to === 'sunk' && from === 'sinking') return 'lost';
   if (to === 'won') return 'salute';
