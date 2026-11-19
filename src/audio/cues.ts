@@ -15,7 +15,9 @@ import type { SoundName } from './bank.ts';
 export type Happening = Deed;
 
 /** Every kind of deed. */
-export const DEEDS = ['fired', 'winding', 'reloading', 'reloaded', 'swapped', 'fell', 'struck', 'sank', 'took', 'mended', 'gust'] as const satisfies readonly Happening['kind'][];
+export const DEEDS = [
+  'fired', 'winding', 'reloading', 'reloaded', 'swapped', 'fell', 'struck', 'sank', 'took', 'mended', 'gust',
+] as const satisfies readonly Happening['kind'][];
 
 /** What is heard. */
 export const CUE_NAMES = [

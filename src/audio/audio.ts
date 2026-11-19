@@ -2,8 +2,9 @@
 // else. Every sound is made in code (sounds/*.ts: neither ambientCG nor Poly Haven offers recordings); no music.
 //
 // The engine (createEngine) runs on any context, the page's or an offline one (tools/audio.ts renders through it):
-// each frame the deeds on the sea (the match's own: status.moments) and the rest of what is heard (listen.ts) become cues (cues.ts CUES, the
-// one table), each played as heard from the eye (space.ts) in a voice (mixer.ts), and the bed follows her (bed.ts).
+// each frame the deeds on the sea (the match's own: status.moments) and the rest of what is heard (listen.ts) become
+// cues (cues.ts CUES, the one table), each played as heard from the eye (space.ts) in a voice (mixer.ts), and the bed
+// follows her (bed.ts).
 // The page's sound (createAudio) has one AudioContext, made with the page and started on the first touch (WebKit plays
 // nothing before one), put to sleep while the app is away and woken when it is back; its sounds are made in a worker
 // (maker.ts), each heard once it is back.

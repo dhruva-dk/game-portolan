@@ -2,7 +2,10 @@
 // the stores she mends with, and her water: a loop closed (the sea rushing as her colour floods it), her trail cut, her
 // own water entered and left, the storm beginning to close.
 
-import { ar, brown, bubbles, crackle, fall, filter, finish, layer, mix, modes, noise, normal, slips, swell, take, tone, type Samples, type Take } from '../dsp.ts';
+import {
+  ar, brown, bubbles, crackle, fall, filter, finish, layer, mix, modes, noise, normal, slips, swell, take, tone, type Samples,
+  type Take,
+} from '../dsp.ts';
 import { timber } from './blows.ts';
 
 /** Her rigging taking the strain: a rope's tight, quick creak in its block. */

@@ -18,14 +18,14 @@ import type { Bed } from './listen.ts';
 
 /** Every number the bed's nodes are set to: each layer's gain, and the filters that move. */
 export interface Levels {
-  swell: number; swellHz: number; wash: number; washHz: number; hiss: number; wind: number; windHz: number; rig: number; rigHz: number;
-  surf: number; surfHz: number; gale: number; galeHz: number; rain: number; strain: number; presence: number; open: number;
-  uncovered: number;
+  swell: number; swellHz: number; wash: number; washHz: number; hiss: number; wind: number; windHz: number; rig: number;
+  rigHz: number; surf: number; surfHz: number; gale: number; galeHz: number; rain: number; strain: number;
+  presence: number; open: number; uncovered: number;
 }
 
 export const levels = (): Levels => ({
-  swell: 0, swellHz: 0, wash: 0, washHz: 0, hiss: 0, wind: 0, windHz: 0, rig: 0, rigHz: 0, surf: 0, surfHz: 0, gale: 0, galeHz: 0,
-  rain: 0, strain: 0, presence: 0, open: 0, uncovered: 1,
+  swell: 0, swellHz: 0, wash: 0, washHz: 0, hiss: 0, wind: 0, windHz: 0, rig: 0, rigHz: 0, surf: 0, surfHz: 0, gale: 0,
+  galeHz: 0, rain: 0, strain: 0, presence: 0, open: 0, uncovered: 1,
 });
 
 /** Seconds the bed's gain under the screens' cover takes to follow it: well inside the cover's own fade, so the sea is
@@ -34,14 +34,19 @@ const COVER = 0.04;
 
 /** Breakers on a shore, 0…1: sets of three swells of their own periods, on the world's clock. */
 export const breakers = (t: number) =>
-  clamp(Math.max(0, Math.sin((2 * Math.PI * t) / 6.7)) ** 6 + 0.7 * Math.max(0, Math.sin((2 * Math.PI * t) / 9.1 + 2)) ** 8 + 0.5 * Math.max(0, Math.sin((2 * Math.PI * t) / 4.3 + 1)) ** 10);
+  clamp(
+    Math.max(0, Math.sin((2 * Math.PI * t) / 6.7)) ** 6
+    + 0.7 * Math.max(0, Math.sin((2 * Math.PI * t) / 9.1 + 2)) ** 8
+    + 0.5 * Math.max(0, Math.sin((2 * Math.PI * t) / 4.3 + 1)) ** 10,
+  );
 
 /** Metres from the storm's wall at which the gale is first heard, and how far into the storm it is all about her. */
 export const GALE_HEARD = 380, GALE_INSIDE = 45;
 
 /** The gale's share for `wall` m to the storm's wall (+ inside the calm), 0…1: a low roar rising as she nears it, all
  *  about her once in it. And the share of it that is about her (rain, the highs), 0…1. */
-export const galeOf = (wall: number) => (wall >= GALE_HEARD ? 0 : wall > 0 ? 0.6 * (1 - wall / GALE_HEARD) : 0.6 + 0.4 * clamp(-wall / GALE_INSIDE));
+export const galeOf = (wall: number) =>
+  (wall >= GALE_HEARD ? 0 : wall > 0 ? 0.6 * (1 - wall / GALE_HEARD) : 0.6 + 0.4 * clamp(-wall / GALE_INSIDE));
 export const insideOf = (wall: number) => clamp(-wall / GALE_INSIDE + 0.15);
 
 /** The bed's levels for `b`, written into `out`. */
@@ -96,13 +101,19 @@ export function createBed(ctx: BaseAudioContext, noise: AudioBuffer, out: AudioN
     node.connect(gain).connect(open);
     return { gain, moving: moves ? filters[0] : null };
   };
-  const swell = layer(0, [{ type: 'lowpass', frequency: 320, Q: 0.5 }, { type: 'peaking', frequency: 180, Q: 1, gain: 4 }, { type: 'highpass', frequency: 60 }], true);
+  const swell = layer(0, [
+    { type: 'lowpass', frequency: 320, Q: 0.5 }, { type: 'peaking', frequency: 180, Q: 1, gain: 4 }, { type: 'highpass', frequency: 60 },
+  ], true);
   const wash = layer(0, [{ type: 'bandpass', frequency: 700, Q: 0.6 }, { type: 'lowpass', frequency: 2500, Q: 0.5 }], true);
-  const hiss = layer(0, [{ type: 'highpass', frequency: 1800, Q: 0.6 }, { type: 'peaking', frequency: 3800, Q: 0.8, gain: 3 }, { type: 'lowpass', frequency: 8000 }], false);
+  const hiss = layer(0, [
+    { type: 'highpass', frequency: 1800, Q: 0.6 }, { type: 'peaking', frequency: 3800, Q: 0.8, gain: 3 }, { type: 'lowpass', frequency: 8000 },
+  ], false);
   const wind = layer(1, [{ type: 'bandpass', frequency: 400, Q: 0.8 }], true);
   const rig = layer(1, [{ type: 'bandpass', frequency: 1100, Q: 3 }], true);
   const surf = layer(2, [{ type: 'lowpass', frequency: 600, Q: 0.6 }, { type: 'highpass', frequency: 70 }], true);
-  const gale = layer(1, [{ type: 'lowpass', frequency: 400, Q: 0.6 }, { type: 'peaking', frequency: 300, Q: 0.9, gain: 6 }, { type: 'highpass', frequency: 70 }], true);
+  const gale = layer(1, [
+    { type: 'lowpass', frequency: 400, Q: 0.6 }, { type: 'peaking', frequency: 300, Q: 0.9, gain: 6 }, { type: 'highpass', frequency: 70 },
+  ], true);
   const rain = layer(2, [{ type: 'bandpass', frequency: 5200, Q: 0.5 }, { type: 'peaking', frequency: 2400, Q: 1, gain: 3 }], false);
   const strain = layer(2, [{ type: 'bandpass', frequency: 270, Q: 6 }, { type: 'peaking', frequency: 540, Q: 4, gain: 6 }], false);
 

@@ -2,7 +2,10 @@
 // ship's, heard from off; hers, heard close and dull), on a ward (its shield: a ring, or its shattering as it breaks),
 // and a ship going down: her timbers' groan and the sea rushing in.
 
-import { ar, brown, bubbles, crackle, fall, filter, finish, layer, mix, modes, noise, normal, saturate, slips, swell, take, tone, type Samples, type Take } from '../dsp.ts';
+import {
+  ar, brown, bubbles, crackle, fall, filter, finish, layer, mix, modes, noise, normal, saturate, slips, swell, take, tone,
+  type Samples, type Take,
+} from '../dsp.ts';
 
 /** A hull's timbers struck: their low modes, a sharp crack over them, splinters after. */
 const hull = (t: Take, weight: number, splinters: number) => {

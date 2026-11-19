@@ -4,6 +4,7 @@
 // Each one-shot sound plays in one of VOICES slots kept wired (a lowpass for the air, a pan, a gain), routed to its bus
 // as it is taken; a new source node is all a sound makes.
 
+import { clamp } from '../world/scalar.ts';
 import { db } from './dsp.ts';
 import type { Bus } from './cues.ts';
 import type { Heard } from './space.ts';
@@ -31,6 +32,8 @@ export function createMixer(ctx: BaseAudioContext) {
   const bus = (d: number) => new GainNode(ctx, { gain: db(d) });
   // the bed and the world each through a duck (her gun)
   const bedDuck = new GainNode(ctx), worldDuck = new GainNode(ctx);
+  /** Each duck and how deep it dips. */
+  const ducks = [[bedDuck, db(-9)], [worldDuck, db(-5)]] as const;
   const buses = { bed: bus(BUS.bed), world: bus(BUS.world), own: bus(BUS.own), ui: bus(BUS.ui) };
   buses.bed.connect(bedDuck).connect(level);
   buses.world.connect(worldDuck).connect(level);
@@ -53,7 +56,7 @@ export function createMixer(ctx: BaseAudioContext) {
     bed: buses.bed,
     /** The player's sound level (0…1, as the settings hold it), from `at`: a square law, near what is heard as half. */
     level(v: number, at: number) {
-      const g = Math.max(0, Math.min(1, v)) ** 2 * db(GAIN);
+      const g = clamp(v) ** 2 * db(GAIN);
       if (g === was) return;
       was = g;
       level.gain.setTargetAtTime(g, at, 0.05);
@@ -86,7 +89,7 @@ export function createMixer(ctx: BaseAudioContext) {
     },
     /** Her gun at `at`: the bed and the world's sounds dip, and come back over most of a second. */
     duck(at: number) {
-      for (const [g, depth] of [[bedDuck, db(-9)], [worldDuck, db(-5)]] as const) {
+      for (const [g, depth] of ducks) {
         g.gain.cancelScheduledValues(at);
         g.gain.setTargetAtTime(depth, at, 0.012);
         g.gain.setTargetAtTime(1, at + 0.18, 0.45);

@@ -2,7 +2,9 @@
 // folded shut; PLAY her canvas filling and the sea taking her; her end, sunk, the sea closing over; her win, a great
 // swell and a salute of guns far off.
 
-import { ar, brown, bubbles, crackle, fall, filter, finish, layer, mix, modes, noise, normal, swell, take, tone, type Samples, type Take } from '../dsp.ts';
+import {
+  ar, brown, bubbles, crackle, fall, filter, finish, layer, mix, modes, noise, normal, swell, take, tone, type Samples, type Take,
+} from '../dsp.ts';
 import { timber } from './blows.ts';
 
 /** A tap: a quill's tick on parchment. */

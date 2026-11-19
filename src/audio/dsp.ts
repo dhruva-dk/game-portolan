@@ -21,7 +21,9 @@ export type Samples = Float32Array<ArrayBuffer>;
 /** A sound being made: its samples, the rate, and its seeded random. */
 export interface Take { x: Samples; rate: number; r: () => number }
 
-export const take = (seconds: number, rate: number, seed: number): Take => ({ x: new Float32Array(Math.ceil(seconds * rate)), rate, r: rng(seed) });
+/** A take `seconds` long at `rate`, its random seeded by `seed`. */
+export const take = (seconds: number, rate: number, seed: number): Take =>
+  ({ x: new Float32Array(Math.ceil(seconds * rate)), rate, r: rng(seed) });
 
 /** A gain in decibels as a factor. */
 export const db = (d: number) => 10 ** (d / 20);
@@ -194,4 +196,7 @@ export const ar = (a: number, tau: number) => (s: number) => (s < a ? s / a : Ma
 export const fall = (tau: number, at = 0) => (s: number) => (s < at ? 0 : Math.exp(-(s - at) / tau));
 /** A swell: up over `up` s (a raised cosine), held, down over `down` s, ending at `end`. */
 export const swell = (up: number, end: number, down: number) => (s: number) =>
-  s < up ? 0.5 - 0.5 * Math.cos((Math.PI * s) / up) : s > end ? 0 : s > end - down ? 0.5 + 0.5 * Math.cos((Math.PI * (s - end + down)) / down) : 1;
+  s < up ? 0.5 - 0.5 * Math.cos((Math.PI * s) / up)
+  : s > end ? 0
+  : s > end - down ? 0.5 + 0.5 * Math.cos((Math.PI * (s - end + down)) / down)
+  : 1;

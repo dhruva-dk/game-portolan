@@ -10,7 +10,10 @@
 // harpoon's thrum of a loosed cable over a soft cough; the mortar's hollow tube note and its long low tail.
 
 import type { GunKind } from '../../player.ts';
-import { ar, brown, crackle, echoes, fall, filter, finish, layer, mix, modes, noise, normal, saturate, slips, take, tone, type Samples, type Take } from '../dsp.ts';
+import {
+  ar, brown, crackle, echoes, fall, filter, finish, layer, mix, modes, noise, normal, saturate, slips, take, tone, type Samples,
+  type Take,
+} from '../dsp.ts';
 
 export type { GunKind };
 
@@ -26,7 +29,10 @@ export type { GunKind };
  *   ring    a note it rings with, Hz, and the seconds it rings (the harpoon's cable, the mortar's tube; 0 none)
  *   bend    how far the ring's note falls as it rings, a share of it
  */
-export interface Report { crack: number; thump: number; body: number; blast: number; tail: number; rattle: number; drive: number; ring: number; ringT: number; bend: number }
+export interface Report {
+  crack: number; thump: number; body: number; blast: number; tail: number; rattle: number; drive: number; ring: number; ringT: number;
+  bend: number;
+}
 
 export const GUNS: Record<GunKind, Report> = {
   cannon: { crack: 1, thump: 105, body: 210, blast: 0.06, tail: 2.2, rattle: 0, drive: 1.6, ring: 0, ringT: 0, bend: 0 },
@@ -46,7 +52,8 @@ export const report = (g: Report) => (rate: number, seed: number): Samples => {
   if (g.ring) {
     // its note: a fundamental and its overtones, falling a little as it rings, a buzz of the cable or the tube on it
     for (const [k, a] of [[1, 0.9], [2, 0.45], [3, 0.3], [5, 0.12]] as const) {
-      tone(t, (s) => k * g.ring * (1 - g.bend * (1 - Math.exp(-s / 0.08))), (s) => a * ar(0.004, g.ringT / (0.6 + 0.4 * k))(s), 0, g.ringT * 2.5);
+      const pitch = (s: number) => k * g.ring * (1 - g.bend * (1 - Math.exp(-s / 0.08)));
+      tone(t, pitch, (s) => a * ar(0.004, g.ringT / (0.6 + 0.4 * k))(s), 0, g.ringT * 2.5);
     }
     const buzz = layer(t, g.ringT * 1.5);
     noise(buzz, ar(0.003, g.ringT * 0.4));

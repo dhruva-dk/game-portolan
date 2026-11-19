@@ -1,12 +1,12 @@
 // What is heard from what she sees and holds as it changes, frame to frame (the deeds on the sea are the match's
-// moments: status.moments, her guns' among them): a slot of her stores taken in hand, a ball passing near the eye, her water (a loop closed, her trail cut, her own
-// water left and entered), the storm beginning to close, her rigging at an end of her roll, and the
-// screens (a folio opened and closed, PLAY, her end); and what the bed follows (Bed): her speed, the wind in her rig,
-// her heave and roll, the nearest coast, the storm's wall, her hull, and how much of the sea is heard at all (and how
-// much the screens cover it).
+// moments: status.moments, her guns' among them): a slot of her stores taken in hand, a ball passing near the eye, her
+// water (a loop closed, her trail cut, her own water left and entered), the storm beginning to close, her rigging at an
+// end of her roll, and the screens (a folio opened and closed, PLAY, her end); and what the bed follows (Bed): her
+// speed, the wind in her rig, her heave and roll, the nearest coast, the storm's wall, her hull, and how much of the sea
+// is heard at all (and how much the screens cover it).
 //
-// Pure: plain data in, cues and the bed out; what it keeps between frames is its own. The coast is found by sounding the
-// ground in a ring round her, a few points a frame.
+// Pure: plain data in, cues and the bed out; what it keeps between frames is its own, and a frame makes nothing but
+// the cues it calls. The coast is found by sounding the ground in a ring round her, a few points a frame.
 
 import { HOTBAR, type GunKind, type Kit, type Screen, type Status } from '../player.ts';
 import type { ShipDraw, Snapshot } from '../snapshot.ts';
@@ -37,8 +37,8 @@ export interface Call { cue: Cue; at: Vec3 | null; gain: number; gun?: GunKind }
  *   clock     the world's clock, s
  */
 export interface Bed {
-  speed: number; wind: number; heave: number; roll: number; coast: number; wall: number; hull: number; presence: number; muffle: number;
-  covered: number; clock: number;
+  speed: number; wind: number; heave: number; roll: number; coast: number; wall: number; hull: number; presence: number;
+  muffle: number; covered: number; clock: number;
 }
 
 /** Her top speed, m/s: sim/handling.ts SHIP.top, which the sound may not import (tests/audio.test.ts holds them
@@ -61,9 +61,13 @@ function screenCue(from: Screen, to: Screen): Cue | null {
   if (to === 'won') return 'salute';
   return null;
 }
+/** A cue called onto `out`. */
+const call = (out: Call[], cue: Cue, at: Vec3 | null = null, gain = 1) => out.push({ cue, at, gain });
 
 export function createListen(ground: (p: Vec3) => number) {
-  const bed: Bed = { speed: 0, wind: 0, heave: 0, roll: 0, coast: Infinity, wall: Infinity, hull: 1, presence: 0, muffle: 0, covered: 0, clock: 0 };
+  const bed: Bed = {
+    speed: 0, wind: 0, heave: 0, roll: 0, coast: Infinity, wall: Infinity, hull: 1, presence: 0, muffle: 0, covered: 0, clock: 0,
+  };
   let screen: Screen | null = null, map = false, generation = -1, seq = 0, trail = false, closing = false;
   let chosen = 0;
   let lift = NaN, roll = 0, rolling = 0, turned = 0, side = 1, whistled = -Infinity;
@@ -83,14 +87,14 @@ export function createListen(ground: (p: Vec3) => number) {
     const l = Math.sqrt(e1x * e1x + e1y * e1y + e1z * e1z);
     const ux = e1x / l, uy = e1y / l, uz = e1z / l;
     const vx = at[1] * uz - at[2] * uy, vy = at[2] * ux - at[0] * uz, vz = at[0] * uy - at[1] * ux;
-    const tx = ux * Math.cos(phi) + vx * Math.sin(phi), ty = uy * Math.cos(phi) + vy * Math.sin(phi), tz = uz * Math.cos(phi) + vz * Math.sin(phi);
-    RING.forEach((m, r) => {
-      const c = Math.cos(m / R), s = Math.sin(m / R);
+    const cp = Math.cos(phi), sp = Math.sin(phi), tx = ux * cp + vx * sp, ty = uy * cp + vy * sp, tz = uz * cp + vz * sp;
+    for (let r = 0; r < RING.length; r++) {
+      const c = Math.cos(RING[r] / R), s = Math.sin(RING[r] / R);
       probe[0] = at[0] * c + tx * s;
       probe[1] = at[1] * c + ty * s;
       probe[2] = at[2] * c + tz * s;
       land[r * WAYS + w] = ground(probe) > 0 ? 1 : 0;
-    });
+    }
     sounding++;
     bed.coast = Infinity;
     for (let i = 0; i < land.length; i++) if (land[i]) bed.coast = Math.min(bed.coast, RING[Math.floor(i / WAYS)]);
@@ -99,13 +103,12 @@ export function createListen(ground: (p: Vec3) => number) {
   return {
     /** A frame of `dt` s: the cues heard, appended to `out`; the bed, as it now is. */
     listen({ scene, status: s, screen: shown, map: open, covered }: Hearing, dt: number, out: Call[]): Bed {
-      const call = (cue: Cue, at: Vec3 | null = null, gain = 1) => out.push({ cue, at, gain });
       // the screens, and the full map
       if (screen !== null && shown !== screen) {
         const cue = screenCue(screen, shown);
-        if (cue) call(cue);
+        if (cue) call(out, cue);
       }
-      if (open !== map) call(open ? 'open' : 'close');
+      if (open !== map) call(out, open ? 'open' : 'close');
       screen = shown;
       map = open;
 
@@ -121,7 +124,7 @@ export function createListen(ground: (p: Vec3) => number) {
       }
 
       // a slot of her stores taken in hand (a gun taken in hand is her deed: swapped)
-      if (!fresh && s.chosen !== chosen && s.chosen >= HOTBAR.guns) call('select');
+      if (!fresh && s.chosen !== chosen && s.chosen >= HOTBAR.guns) call(out, 'select');
       chosen = s.chosen;
 
       // her water: a loop closed, her trail cut; her open trail begun (she left her water) or ended (back in it)
@@ -129,17 +132,18 @@ export function createListen(ground: (p: Vec3) => number) {
         let claimed = false;
         for (const c of sea.changes) {
           if (c.seq <= seq || c.ship !== scene.own) continue;
-          if (c.kind === 'claim') call('claim');
-          if (c.kind === 'cut') call('cut');
+          if (c.kind === 'claim') call(out, 'claim');
+          if (c.kind === 'cut') call(out, 'cut');
           claimed ||= c.kind === 'claim' || c.kind === 'cut';
         }
         seq = sea.seq;
-        const open = sea.trails.some((t) => t.id === scene.own);
-        if (!fresh && open && !trail) call('leave');
-        if (!fresh && !open && trail && !claimed && own) call('enter');
+        let open = false;
+        for (const t of sea.trails) open ||= t.id === scene.own;
+        if (!fresh && open && !trail) call(out, 'leave');
+        if (!fresh && !open && trail && !claimed && own) call(out, 'enter');
         trail = open;
       }
-      if (s.closing && !closing && FOUGHT(shown)) call('closing');
+      if (s.closing && !closing && FOUGHT(shown)) call(out, 'closing');
       closing = s.closing;
 
       // a ball passing near the eye: its whistle begun WHISTLE s before its closest
@@ -150,7 +154,7 @@ export function createListen(ground: (p: Vec3) => number) {
         if (!(tc <= WHISTLE && tc > WHISTLE - dt)) continue;
         const cx = rx + b.way[0] * tc, cy = ry + b.way[1] * tc, cz = rz + b.way[2] * tc;
         if (cx * cx + cy * cy + cz * cz >= PASS * PASS || Math.abs(scene.clock - whistled) < APART) continue;
-        call('whistle', [eye[0] + cx, eye[1] + cy, eye[2] + cz]);
+        call(out, 'whistle', [eye[0] + cx, eye[1] + cy, eye[2] + cz]);
         whistled = scene.clock;
       }
 
@@ -162,7 +166,7 @@ export function createListen(ground: (p: Vec3) => number) {
         const now = Math.asin(clamp((u[0] * sx + u[1] * sy + u[2] * sz) / sl, -1, 1));
         const rate = dt > 0 ? (now - roll) / dt : 0;
         if (dt > 0 && Math.sign(rate) !== Math.sign(rolling) && Math.abs(now) > ROPE && scene.clock - turned > TURNS) {
-          if (side < 0) call('rope', null, Math.min(1, Math.abs(now) / 0.07));
+          if (side < 0) call(out, 'rope', null, Math.min(1, Math.abs(now) / 0.07));
           side = -side;
           turned = scene.clock;
         }
