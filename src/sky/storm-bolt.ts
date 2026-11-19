@@ -10,6 +10,7 @@ import { Vector3 } from 'three/webgpu';
 import { abs, cross, dot, exp, float, fract, length, luminance, max, min, normalize, smoothstep, uniform, vec3 } from 'three/tsl';
 import { LIGHTNING, tint } from '../palette';
 import type { Cap } from '../sim/storm';
+import { hash01 } from '../world/random';
 import { R, add, cross as crossV, dot as dotV, length as lengthV, normalize as normalizeV, scale, type Vec3 } from '../world/sphere';
 import { BASE } from './storm-field';
 import type { FloatNode, Vec3Node } from '../tsl';
@@ -28,12 +29,6 @@ const IN = 30, ALONG = 0.7, NEAR = 50, DISTANCE = [70, 200] as const;
 const REACH = 50, FLASH = 9, CHANNEL = 260, WIDTH = 0.35, PIXEL = 0.0016, ZIG = [6, 3, 1.1] as const, ZIG_LONG = [21, 8.3, 2.9] as const;
 /** The flash's colour, against the storm's own light's (its luminance kept): the palette's lightning. */
 const TINT = tint(LIGHTNING, 0.88);
-
-/** A steady pseudo-random number in [0, 1) for an integer and a stream. */
-const hash = (n: number, k: number) => {
-  const s = Math.sin(n * 127.1 + k * 311.7) * 43758.5453;
-  return s - Math.floor(s);
-};
 
 /** A zigzag, −0.5…0.5, of period 1. */
 const zig = (x: FloatNode): FloatNode => abs(fract(x).sub(0.5)).mul(2).sub(0.5);
@@ -73,18 +68,18 @@ export function createBolt(held: boolean) {
     },
     /** The stroke now (sim/storm.ts's cap; seconds: the world's clock; eye: where the eye is, world m). */
     update(cap: Cap, seconds: number, eye: Vec3, whole: boolean) {
-      const n = Math.floor(seconds / BOLT), since = seconds - (n + hash(n, 0) * 0.8) * BOLT;
+      const n = Math.floor(seconds / BOLT), since = seconds - (n + hash01(n,0) * 0.8) * BOLT;
       const lit = held ? FLICKER[0] : FLICKER.find(([from, to]) => since >= from && since < to);
       flash.value = !whole && lit ? lit[2] : 0;
       if (!flash.value) return;
-      seed.value = hash(n, 3);
+      seed.value = hash01(n,3);
       const u = normalizeV(eye), c = cap.centre, out = normalizeV(add(u, c, -dotV(u, c))), side = crossV(c, out);
       const off = (Math.acos(Math.min(1, Math.max(-1, dotV(u, c)))) - cap.radius) * R;
-      const turn = (hash(n, 1) - 0.5) * 2;
+      const turn = (hash01(n,1) - 0.5) * 2;
       let at: Vec3;
       if (off > 0) {
         // in the storm: a way off the eye, any way round
-        const far = DISTANCE[0] + hash(n, 2) * (DISTANCE[1] - DISTANCE[0]), way = add(scale(out, Math.cos(turn * Math.PI)), side, Math.sin(turn * Math.PI));
+        const far = DISTANCE[0] + hash01(n,2) * (DISTANCE[1] - DISTANCE[0]), way = add(scale(out, Math.cos(turn * Math.PI)), side, Math.sin(turn * Math.PI));
         at = normalizeV(add(u, way, far / R));
       } else {
         // in the calm: IN metres into the wall, along it either way from the eye's nearest point of it

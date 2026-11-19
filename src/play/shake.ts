@@ -14,6 +14,7 @@
 
 import { blowOf, felt, type Blow, type Deed } from '../player.ts';
 import type { Eye } from '../snapshot.ts';
+import { hash01 } from '../world/random.ts';
 import { easeInOut, lerp, smoother } from '../world/scalar.ts';
 import { add, type Vec3 } from '../world/sphere.ts';
 import { axisAngle, multiply, rotate, type Turn } from '../world/turn.ts';
@@ -84,13 +85,9 @@ export function answerTo(d: Deed, me: number): { answer: Answer; strength: numbe
 
 /** Smooth seeded noise in about −1…1, a lattice cell a unit of x (0117's juice/noise.ts). */
 export function noise(x: number, seed: number): number {
-  const hash = (i: number) => {
-    let h = Math.imul(i | 0, 374761393) ^ Math.imul(seed | 0, 668265263);
-    h = Math.imul(h ^ (h >>> 13), 1274126177);
-    h ^= h >>> 16;
-    return (h & 0xffff) / 0x8000 - 1;
-  };
-  const i = Math.floor(x), f = x - i, a = hash(i) * f, b = hash(i + 1) * (f - 1);
+  // a slope at each lattice point, −1…1
+  const slope = (i: number) => hash01(i, seed) * 2 - 1;
+  const i = Math.floor(x), f = x - i, a = slope(i) * f, b = slope(i + 1) * (f - 1);
   return lerp(a, b, smoother(f)) * 2;
 }
 

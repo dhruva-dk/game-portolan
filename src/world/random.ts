@@ -23,3 +23,7 @@ export function hash(a: number, b: number): number {
   h = Math.imul(h, 0xc2b2ae35);
   return (h ^ (h >>> 16)) >>> 0;
 }
+
+/** hash(a, b) as a number in [0, 1): a steady pseudo-random number for a pair of integers (a cell and a stream, a
+ *  step and a seed), the same every time. */
+export const hash01 = (a: number, b: number) => hash(a, b) / 4294967296;
