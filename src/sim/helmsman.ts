@@ -1,12 +1,11 @@
-// A bot's helm, every step (bot.ts decides what she is about; this sails her there), as 0117's helm did
-// (src/sim/captains/brain.ts helm, stuck, answer):
-// - for her goal: the ship she would ram (to strike her side, led for where she will be: new here, as 0117 rammed
-//   only in passing), a mark on the ring round her foe when armed (gunner.ts), or her goal; by a route round land
-//   (route.ts) when the water to it isn't clear and she has a chart;
+// A bot's helm, every step (bot.ts decides what she is about; this sails her there; steer, answer and stuck below):
+// - for her goal: the ship she would ram (to strike her side, led for where she will be, not only in passing), a
+//   mark on the ring round her foe when armed (gunner.ts), or her goal; by a route round land (route.ts) when the
+//   water to it isn't clear and she has a chart;
 // - feeling ahead along that course for shoal water, and turning off toward the side that lies open, holding the turn a
 //   moment once the way clears rather than swing back at what she turned from;
-// - answering a ram coming at her (0117's answer to a gun winding up on her): bow or stern to it, whichever is the
-//   nearer turn, end on where a blow does least; a sharp captain sees it nearly always, a green one often not;
+// - answering a ram coming at her: bow or stern to it, whichever is the nearer turn, end on where a blow does least;
+//   a sharp captain sees it nearly always, a green one often not;
 // - and working off a bank she is stuck against, toward the open side or the deepest water.
 //
 // Pure arithmetic: no three, so it runs in node for the tests; deterministic for the same inputs, to the bit.
@@ -38,7 +37,8 @@ function ramCourse(c: Ctx, foe: Seen): Vec3 {
   const reach = length(aim);
   if (reach > BOT.commit) {
     const h = transport(foe.ship.heading, foe.ship.at, p), port = cross(p, h), back = scale(aim, -1 / reach);
-    if (Math.abs(dot(back, h)) > BOT.abeam) aim = add(aim, port, Math.sign(dot(back, port) || 1) * Math.min(BOT.offMax, Math.max(BOT.offMin, reach / 2)));
+    const aside = Math.min(BOT.offMax, Math.max(BOT.offMin, reach / 2));
+    if (Math.abs(dot(back, h)) > BOT.abeam) aim = add(aim, port, Math.sign(dot(back, port) || 1) * aside);
   }
   return aim;
 }
@@ -91,7 +91,9 @@ export function steer(c: Ctx, dt: number): Helm {
     const port = probe(c, BOT.side, BOT.feelSide + ship.speed), starboard = probe(c, -BOT.side, BOT.feelSide + ship.speed);
     // she keeps turning off the way she began to, unless only the other side lies open
     let way = Math.sign(m.avoid);
-    if (way === 0 || (way > 0 ? !port && starboard : !starboard && port)) way = port !== starboard ? (port ? 1 : -1) : port ? 0 : turn >= 0 ? 1 : -1;
+    if (way === 0 || (way > 0 ? !port && starboard : !starboard && port)) {
+      way = port !== starboard ? (port ? 1 : -1) : port ? 0 : turn >= 0 ? 1 : -1;
+    }
     if (way !== 0) {
       turn = way * (port !== starboard ? BOT.firm : BOT.hard);
       m.avoid = way * BOT.avoid;
@@ -102,7 +104,7 @@ export function steer(c: Ctx, dt: number): Helm {
   }
   const answered = answer(c);
   if (answered !== null) turn = answered;
-  // going for loot or mending, she eases up near where she makes for (0117's)
+  // going for loot or mending, she eases up near where she makes for
   const easy = (m.mode === 'loot' || m.mode === 'heal' || m.mode === 'home') && toD < PURSER.near ? PURSER.slow : 1;
   // a mark (not a ship; the ring's round a foe is one) inside the circle she turns at her speed she would only sail
   // round: slowed to turn to it, the circle through it r = d / (2 sin off), the speed that turns it r × SHIP.turn
@@ -134,7 +136,7 @@ function answer(c: Ctx): number | null {
 }
 
 /**
- * Backs off a bank she is stuck against (0117's stuck), by how far she really sailed last step, not her speed: a hull
+ * Backs off a bank she is stuck against, by how far she really sailed last step, not her speed: a hull
  * pressed into a bank keeps her way on while hardly moving. `course` is the turn she wants, before any off land.
  */
 function stuck(c: Ctx, dt: number, course: number): Helm | null {
@@ -153,7 +155,8 @@ function stuck(c: Ctx, dt: number, course: number): Helm | null {
     if (m.backT + dt > -BOT.wade) m.route = null;
     const deep = deepest(c);
     // (with the way off astern she holds the turn she is in, or she would swing from one side to the other)
-    return order(Math.abs(deep) > Math.PI / 2 && ship.turn * deep < 0 ? Math.sign(ship.turn) * BOT.full : Math.max(-BOT.full, Math.min(BOT.full, 2 * deep)));
+    const holding = Math.abs(deep) > Math.PI / 2 && ship.turn * deep < 0;
+    return order(holding ? Math.sign(ship.turn) * BOT.full : Math.max(-BOT.full, Math.min(BOT.full, 2 * deep)));
   }
   // and if that doesn't float her, she backs off as from a bank
   const gaveUp = m.backT <= -(BOT.wade + BOT.most);

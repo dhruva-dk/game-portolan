@@ -1,4 +1,4 @@
-// Gust, a ship's one ability: 0117's (src/sim/sailing.ts gust, rechargeGust). She carries GUST.charges of it; spent,
+// Gust, a ship's one ability. She carries GUST.charges of it; spent,
 // a burst of wind fills her canvas for GUST.time seconds (ship.ts: her speed asked rises and is reached hard, her turn
 // quickens; battle.ts: her balls go off wider) and she hops off the water (ride.ts hopped). Charges come back one at
 // a time, GUST.recharge seconds each, from the moment she has fewer than her most. One can't be spent while another

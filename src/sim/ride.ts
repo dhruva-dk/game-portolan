@@ -4,12 +4,12 @@
 // floats at, their differences the slope she lies along. It is read five times a second, each read for the moment of
 // the next and where her way will have brought her by then, and taken as running evenly between reads: the swell she
 // feels (the waves at least a quarter of her length) changes over seconds, and her springs smooth anything quicker.
-// Each ship's reads fall on steps of their own (her id's), so a fleet's are spread evenly over the steps. Each of heave, pitch and roll follows its own with a
-// damped spring, as a hull of her weight does. Heave and pitch are damped against the water's own motion, which
-// carries her with it: she rides a long swell without lagging it (tests/swell.test.ts), and only its quick changes
-// are smoothed away. Roll is damped against nothing: her rails are only a beam apart, so the short chop tilts the
-// water under them back and forth, and she answers it slowly. Her lean into a turn follows the turn; a blow from
-// another hull (contact.ts) sets her rolling.
+// Each ship's reads fall on steps of their own (her id's), so a fleet's are spread evenly over the steps. Each of
+// heave, pitch and roll follows its own with a damped spring, as a hull of her weight does. Heave and pitch are
+// damped against the water's own motion, which carries her with it: she rides a long swell without lagging it
+// (tests/swell.test.ts), and only its quick changes are smoothed away. Roll is damped against nothing: her rails are
+// only a beam apart, so the short chop tilts the water under them back and forth, and she answers it slowly. Her lean
+// into a turn follows the turn; a blow from another hull (contact.ts) sets her rolling.
 //
 // Pure arithmetic: no three, so it runs in node for the tests.
 
@@ -102,7 +102,11 @@ export function ride(r: Ride, s: ShipState, sea: Sea, time: number, dt: number):
   if (left <= 0) [from, to, left, span] = [to, ahead(s, sea, time, every, dt), every, every];
   // between reads, the water runs evenly from one to the next
   const f = 1 - left / span;
-  const w = { heave: from.heave + (to.heave - from.heave) * f, pitch: from.pitch + (to.pitch - from.pitch) * f, roll: from.roll + (to.roll - from.roll) * f };
+  const w = {
+    heave: from.heave + (to.heave - from.heave) * f,
+    pitch: from.pitch + (to.pitch - from.pitch) * f,
+    roll: from.roll + (to.roll - from.roll) * f,
+  };
   // semi-implicit Euler: stable for these springs at any step under a tenth of a second
   type Spring = { frequency: number; damping: number; carried: boolean };
   const spring = (x: number, v: number, to: number, from: number, { frequency: f, damping: z, carried }: Spring) => {
@@ -123,7 +127,7 @@ export function knocked(r: Ride, s: ShipState, jolt: Vec3): Ride {
   return { ...r, rollRate: r.rollRate - RIDE.knock * dot(jolt, cross(s.at, s.heading)) };
 }
 
-/** Her ride as a gust lifts her off the water (gust.ts; 0117's hop): heaving up at GUST.hop m/s. */
+/** Her ride as a gust lifts her off the water (gust.ts): heaving up at GUST.hop m/s. */
 export const hopped = (r: Ride): Ride => ({ ...r, heaveRate: r.heaveRate + GUST.hop });
 
 /** Where she lies: on her ride's level over where she is, pitched, then rolled and heeled. */

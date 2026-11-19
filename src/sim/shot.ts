@@ -2,7 +2,7 @@
 //
 // It flies a true orbit about the planet's centre, pulled by MU / r², from the muzzle. On a planet this small a ball
 // fired flat at these speeds would go round it, so each kind of gun (handling.ts GUNS) has its own pull, the one that
-// makes its `carry` the furthest its ball goes at the best elevation (0117 gave each kind its own gravity): the
+// makes its `carry` the furthest its ball goes at the best elevation: the
 // cannon's some 14 g at the sea, its carry its range; the harpoon's far less for its speed, so its bolt flies flat. Its
 // flight is stepped by velocity Verlet on the fixed step; how far it carries and how long it takes are also had in
 // closed form, from the orbit itself, for laying the gun (gun.ts): a ball fired at an elevation comes back down to the
@@ -153,7 +153,8 @@ export function fly(balls: readonly Ball[], marks: readonly Mark[], dt: number, 
     const next = flown(b, dt);
     const span = length(add(next.p, b.p, -1));
     // the ships near enough to the path to be struck by it
-    const near = order.filter((m) => m.id !== b.shooter && length(add(scale(normalize(b.p), R), m.ship.at, -R)) < span + SHIP.length / 2 + GUN.freeboard + 1);
+    const reach = span + SHIP.length / 2 + GUN.freeboard + 1;
+    const near = order.filter((m) => m.id !== b.shooter && length(add(scale(normalize(b.p), R), m.ship.at, -R)) < reach);
     const n = Math.max(1, Math.ceil(span / GUN.probe));
     let fall: Fall | null = null;
     for (let i = 1; i <= n && !fall; i++) {

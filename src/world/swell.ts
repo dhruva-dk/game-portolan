@@ -92,7 +92,9 @@ const EVERY = 0, MOVE = 1, FELT = 2;
  * view/charts.ts uploads them); `ground` gives the height of the floor (planet.ts), for the depth's cut of the long
  * waves.
  */
-export function createSwell(anchors: readonly Anchor[], ground: (p: Vec3) => number, wind: number, { shortest = 0, count = MODES }: SwellOptions = {}): Swell {
+export function createSwell(
+  anchors: readonly Anchor[], ground: (p: Vec3) => number, wind: number, { shortest = 0, count = MODES }: SwellOptions = {}
+): Swell {
   const width = band(FREQUENCY);
   const table = longModes(wind, count);
   const all = Array.from({ length: table.length / STRIDE }, (_, m) => m);

@@ -1,11 +1,11 @@
-// The match's course for the player, as 0117 ran it (app.ts follow, session.ts spectate/rewatch):
+// The match's course for the player:
 //   fighting   at sea, from the start (every ship begins afloat: spawn.ts)
 //   spectating she has sunk: who she would watch is the ship that sank her, or else the one afloat with the most
 //              sinkings to her name; when that one sinks, the one that sank her, and so on; she may turn to another
 //              afloat (switched)
 //   won        she is the last afloat
 // Nothing moves on by itself: the match is over (over) once she has won or, she sunk, one ship or none is afloat, and
-// what follows is hers to choose (ui/flow.ts). Her place, as 0117 settled it (sim/end.ts sink): the ships not yet sunk
+// what follows is hers to choose (ui/flow.ts). Her place: the ships not yet sunk
 // as she sank, herself among them, the sinkings of one step counted one by one in the order the game reports them; so,
 // the last ships all sunk at once, the last of them to sink is first and wins. With her place, how she sank and at
 // whose hand: the Storm's sinking goes to the ship that last struck her if it did so within CREDIT seconds
@@ -16,8 +16,7 @@ export type Phase = 'fighting' | 'spectating' | 'won';
 /** The player's ship's id. */
 export const PLAYER = 0;
 
-/** The ships in a match, hers among them: the one number everything that counts them follows (0117's tables.ts
- *  MATCH.ships was 20). */
+/** The ships in a match, hers among them: the one number everything that counts them follows (20 at first). */
 export const SHIPS = 80;
 
 /** How a ship sank: by a ball, a ram, or the Storm. */
@@ -26,7 +25,7 @@ export type Cause = 'shot' | 'ram' | 'storm';
 /** A ship sunk: who, who sank her (null: the storm, or none), and how. */
 export interface Sunk { id: number; by: number | null; cause: Cause }
 
-/** Seconds a blow is credited with a sinking by the Storm after it (0117 end.ts settle). */
+/** Seconds a blow is credited with a sinking by the Storm after it. */
 export const CREDIT = 8;
 
 /** Who is credited with a sinking by `cause`, the last blow to her `last` (its striker, and seconds since; null: none):

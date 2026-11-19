@@ -1,20 +1,18 @@
 // Loot on the water: guns and things to mend with, strewn over the whole planet at the start of a match and spilled
-// from every ship that sinks; a ship sailing over a piece picks it up. 0117's (src/sim/items.ts, tables.ts LOOT) with
-// its numbers, for two gun slots and three item slots:
-// - strewn: LOOT.spots spots over the planet (0117 had about five a ship, by its regions; here two and a half a ship
-//   for a match of 80, half what it was, laid evenly, each moved off land and shallows to the nearest open water, which
-//   gathers some round every island's coast), each with a piece and LOOT.second of them a second 4 m off; and a gun
-//   laid near any berth with none in reach (berthed), so the match opens on a scramble for the nearest. A piece is a gun
-//   LOOT.gun of the time, its kind drawn by LOOT.kinds (the cannon commonest, the harpoon and the mortar rarest) and its
-//   rarity by LOOT.weights (0117's rollItem), else a consumable by 0117's shares, in its counts;
+// from every ship that sinks; a ship sailing over a piece picks it up. For two gun slots and three item slots:
+// - strewn: LOOT.spots spots over the planet (two and a half a ship for a match of 80, half what it was, laid evenly,
+//   each moved off land and shallows to the nearest open water, which gathers some along the coast), each with a piece
+//   and LOOT.second of them a second 4 m off; and a gun laid near any berth with none in reach (berthed), so the match
+//   opens on a scramble for the nearest. A piece is a gun LOOT.gun of the time, its kind drawn by LOOT.kinds (the cannon
+//   commonest, the harpoon and the mortar rarest) and its rarity by LOOT.weights, else a consumable by LOOT.shares, in
+//   its counts;
 // - picked up: a ship takes every piece within LOOT.reach that fits: a gun into an empty gun slot (the one in hand
 //   first), things to mend with that go on a stack or into an empty slot. What doesn't fit is offered: the nearest gun
 //   with both gun slots full, the nearest other piece with her slots full. Asked to (a take: her gun in hand, or a slot
-//   of items), she swaps it for what she has there, which goes over the side where she is (0117's take for a full
-//   hotbar);
+//   of items), she swaps it for what she has there, which goes over the side where she is;
 // - spilled: a ship sinking puts both her guns and her slots over the side, kicked out a few m/s each a different way
-//   and drifting to a stop (0117's spill and driftLoot); what a ship put over the side she can't pick up again until it
-//   has lain LOOT.settle s and she has sailed clear of it.
+//   and drifting to a stop; what a ship put over the side she can't pick up again until it has lain LOOT.settle s and
+//   she has sailed clear of it.
 //
 // Pure arithmetic: no three, so it runs in node for the tests; deterministic for the same inputs.
 
@@ -28,16 +26,15 @@ import { EQUIP, GUN, SHIP } from './handling.ts';
 import { roomFor, stowed, USES, type Use } from './hold.ts';
 import type { Depth } from './shoal.ts';
 
-/** 0117's loot table (tables.ts LOOT), and its spots. */
+/** The loot table, and its spots. */
 export const LOOT = {
   /** Spots strewn over the planet, and the share with a second piece: some 280 pieces (it was 400 spots, some 570). */
   spots: 200, second: 0.4,
-  /** The share of pieces that are guns (0117's 0.62 brought down so the first is a scramble, most ships armed by
+  /** The share of pieces that are guns (brought down from 0.62 so the first is a scramble, most ships armed by
    *  20–30 s: tools/matches.ts), their kinds' weights (in kinds.ts KINDS' order: cannon, scatter, repeater,
    *  harpoon, mortar), and their rarities' weights, common to legendary. */
   gun: 0.5, kinds: [36, 22, 22, 10, 10], weights: [42, 30, 17, 8, 3],
-  /** The share of the rest of each consumable (0117's rollItem: 0.36, 0.22, 0.28, 0.14), how many come together, and
-   *  the rarity each reads as. */
+  /** The share of the rest of each consumable, how many come together, and the rarity each reads as. */
   shares: { smallShield: 0.36, repairKit: 0.22, bigShield: 0.28, fullRepair: 0.14 } as Record<Use, number>,
   counts: { smallShield: 3, bigShield: 1, repairKit: 4, fullRepair: 1 } as Record<Use, number>,
   rarity: { smallShield: 1, bigShield: 2, repairKit: 1, fullRepair: 3 } as Record<Use, number>,
@@ -83,9 +80,10 @@ function weighed(weights: readonly number[], u: number): number {
 }
 
 /** A gun of the kind and rarity LOOT.kinds and LOOT.weights give uniform draws `u` and `v`. */
-const gunned = (u: number, v: number): Arms => ({ kind: GUN_KINDS[weighed(LOOT.kinds, u)], rarity: Math.min(weighed(LOOT.weights, v), GUN.rarities.length - 1) });
+const gunned = (u: number, v: number): Arms =>
+  ({ kind: GUN_KINDS[weighed(LOOT.kinds, u)], rarity: Math.min(weighed(LOOT.weights, v), GUN.rarities.length - 1) });
 
-/** A piece drawn at random (0117's rollItem). */
+/** A piece drawn at random. */
 export function rolled(draw: () => number): Goods {
   if (draw() < LOOT.gun) return gunned(draw(), draw());
   let r = draw();
@@ -126,11 +124,13 @@ export function strewn(seed: number, depth: Depth, spots: number = LOOT.spots): 
   const pieces: Loot[] = [];
   // the lattice turned at random: a random axis-angle applied to each point
   const axis = normalize([draw() - 0.5, draw() - 0.5, draw() - 0.5]), turn = draw() * 2 * Math.PI;
-  const spin = (v: Vec3): Vec3 => add(add(scale(v, Math.cos(turn)), cross(axis, v), Math.sin(turn)), axis, dot(axis, v) * (1 - Math.cos(turn)));
+  const spin = (v: Vec3): Vec3 =>
+    add(add(scale(v, Math.cos(turn)), cross(axis, v), Math.sin(turn)), axis, dot(axis, v) * (1 - Math.cos(turn)));
   const cell = Math.sqrt((4 * Math.PI * R * R) / spots), golden = Math.PI * (3 - Math.sqrt(5));
   for (let k = 0; k < spots; k++) {
     const y = 1 - (2 * (k + 0.5)) / spots, r = Math.sqrt(1 - y * y), phi = k * golden;
-    const p = along(spin([r * Math.cos(phi), y, r * Math.sin(phi)]), tangent(spin([r * Math.cos(phi), y, r * Math.sin(phi)]), draw() * 2 * Math.PI), draw() * cell * 0.4).p;
+    const spot = spin([r * Math.cos(phi), y, r * Math.sin(phi)]);
+    const p = along(spot, tangent(spot, draw() * 2 * Math.PI), draw() * cell * 0.4).p;
     const at = opened(depth, p);
     const goods = rolled(draw), twice = draw() < LOOT.second, side = draw() * 2 * Math.PI;
     if (!at) continue;
@@ -164,12 +164,13 @@ export function berthed(f: Flotsam, berths: readonly Vec3[], seed: number, depth
  *  `seed`. */
 export function overboard(f: Flotsam, at: Vec3, goods: readonly Goods[], from: number, seed: number): Flotsam {
   const draw = random(hash(seed, f.next));
-  const thrown = goods.map((g, k): Loot => ({ id: f.next + k, at, goods: g, from, age: 0, way: scale(tangent(at, draw() * 2 * Math.PI), LOOT.kick + k) }));
+  const thrown = goods.map((g, k): Loot =>
+    ({ id: f.next + k, at, goods: g, from, age: 0, way: scale(tangent(at, draw() * 2 * Math.PI), LOOT.kick + k) }));
   return { pieces: [...f.pieces, ...thrown], next: f.next + goods.length };
 }
 
 /** dt seconds of the pieces lying: older (while some ship's to leave), and those with way on carried along it as it
- *  dies, stopped by shoal water (0117's driftLoot). A piece lying still and no ship's is left as it is. */
+ *  dies, stopped by shoal water. A piece lying still and no ship's is left as it is. */
 export function drifted(f: Flotsam, dt: number, depth: Depth): Flotsam {
   const k = Math.max(0, 1 - dt * LOOT.drift);
   const pieces = f.pieces.map((l): Loot => {
@@ -226,7 +227,9 @@ export interface Taken { ship: number; goods: Goods; at: Vec3; slot: number }
  * what she has in it, which goes over the side. A piece put over the side lies under its ship until she has sailed clear.
  * The flotsam and the crews after, and what was taken.
  */
-export function swept(f: Flotsam, crews: readonly Crew[], fleet: readonly Vessel[], takes: ReadonlyMap<number, number>, seed: number): { flotsam: Flotsam; crews: Crew[]; took: Taken[] } {
+export function swept(
+  f: Flotsam, crews: readonly Crew[], fleet: readonly Vessel[], takes: ReadonlyMap<number, number>, seed: number
+): { flotsam: Flotsam; crews: Crew[]; took: Taken[] } {
   let pieces = f.pieces.map((l) => l), next = f.next;
   const took: Taken[] = [];
   const by = new Map(crews.map((c) => [c.id, c]));
@@ -261,7 +264,10 @@ export function swept(f: Flotsam, crews: readonly Crew[], fleet: readonly Vessel
         }
         const s = stowed(c.hold, g.kind, g.count);
         c = { ...c, hold: s.hold };
-        if (s.left < g.count) took.push({ ship: v.id, goods: { kind: g.kind, count: g.count - s.left }, at: l.at, slot: 1 + s.hold.items.findIndex((k) => k?.kind === g.kind) });
+        if (s.left < g.count) {
+          const slot = 1 + s.hold.items.findIndex((k) => k?.kind === g.kind);
+          took.push({ ship: v.id, goods: { kind: g.kind, count: g.count - s.left }, at: l.at, slot });
+        }
         if (s.left > 0) kept.push(s.left === g.count ? l : { ...l, goods: { kind: g.kind, count: s.left } });
       }
       pieces = kept;

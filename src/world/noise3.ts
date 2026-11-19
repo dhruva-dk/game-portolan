@@ -6,7 +6,9 @@
 import { random } from './random.ts';
 
 /** The twelve edge directions of a cube, Perlin's gradients, as x, y, z triples. */
-const G = new Float64Array([1, 1, 0, -1, 1, 0, 1, -1, 0, -1, -1, 0, 1, 0, 1, -1, 0, 1, 1, 0, -1, -1, 0, -1, 0, 1, 1, 0, -1, 1, 0, 1, -1, 0, -1, -1]);
+const G = new Float64Array([
+  1, 1, 0, -1, 1, 0, 1, -1, 0, -1, -1, 0, 1, 0, 1, -1, 0, 1, 1, 0, -1, -1, 0, -1, 0, 1, 1, 0, -1, 1, 0, 1, -1, 0, -1, -1,
+]);
 
 export interface Noise3 {
   /** About −1…1, features about one unit apart. */
@@ -44,7 +46,8 @@ export function createNoise3(seed: number): Noise3 {
     const vg = G[g] * fx + G[g + 1] * gy + G[g + 2] * gz;
     const vh = G[h] * gx + G[h + 1] * gy + G[h + 2] * gz;
     // quintic fade
-    const u = fx * fx * fx * (fx * (fx * 6 - 15) + 10), v = fy * fy * fy * (fy * (fy * 6 - 15) + 10), w = fz * fz * fz * (fz * (fz * 6 - 15) + 10);
+    const u = fx * fx * fx * (fx * (fx * 6 - 15) + 10), v = fy * fy * fy * (fy * (fy * 6 - 15) + 10);
+    const w = fz * fz * fz * (fz * (fz * 6 - 15) + 10);
     const k1 = vb - va, k2 = vc - va, k3 = ve - va;
     const k4 = va - vb - vc + vd, k5 = va - vc - ve + vg, k6 = va - vb - ve + vf;
     const k7 = -va + vb + vc - vd + ve - vf - vg + vh;

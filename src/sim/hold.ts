@@ -1,25 +1,24 @@
-// A ship's hold: besides her one gun (gun.ts), three slots of things to mend with, 0117's consumables (src/sim/items.ts,
-// tables.ts USES) with its numbers. A slot holds a stack of one kind, up to that kind's most; what she picks up goes
-// onto a stack of its kind with room, or else into an empty slot (0117's roomFor and give).
+// A ship's hold: besides her one gun (gun.ts), three slots of things to mend with, the consumables, each with its
+// numbers. A slot holds a stack of one kind, up to that kind's most; what she picks up goes onto a stack of its kind
+// with room, or else into an empty slot.
 //
-// Using one takes its time (0117's useTime), and as it is used she sails at USING of her speed (0117's SHIP.using; the
-// game and the bots ask it of her helm). When it is done it tops up her shield or mends her hull by its amount, up to
-// its cap, and one is gone from the stack. One that would do nothing is not begun (0117's useful): a shield at its cap,
-// a hull at its. A blow that strikes (a ball or a ram, not the storm's steady wear: 0117's interrupt and steady), or
-// her choosing another slot, breaks it off and nothing is spent.
+// Using one takes its time, and as it is used she sails at USING of her speed (the game and the bots ask it of her
+// helm). When it is done it tops up her shield or mends her hull by its amount, up to its cap, and one is gone from
+// the stack. One that would do nothing is not begun: a shield at its cap, a hull at its. A blow that strikes (a ball
+// or a ram, not the storm's steady wear), or her choosing another slot, breaks it off and nothing is spent.
 //
 // The slot in hand (`chosen`): 0 her gun's, 1–3 the items'. Her gun fires by its own button whatever is in hand; the
-// slot in hand is the one a second tap uses (0117's hotbar: a tap chooses, a tap on the chosen uses).
+// slot in hand is the one a second tap uses: a tap chooses, a tap on the chosen uses.
 //
 // Pure arithmetic: no three, so it runs in node for the tests; deterministic for the same inputs.
 
 import type { Use } from '../kinds.ts';
 import { healed, sunk, type Health } from './health.ts';
 
-/** What mends: 0117's four consumables (kinds.ts). */
+/** What mends: the four consumables (kinds.ts). */
 export type { Use };
 
-/** 0117's consumables (tables.ts USES): the shield or hull each gives, the cap it gives up to, its time (s), and the
+/** The consumables: the shield or hull each gives, the cap it gives up to, its time (s), and the
  *  most of it a slot holds. */
 export const USES: Readonly<Record<Use, { shield: number; hull: number; cap: number; time: number; stack: number }>> = {
   smallShield: { shield: 25, hull: 0, cap: 50, time: 1, stack: 6 },
@@ -28,7 +27,7 @@ export const USES: Readonly<Record<Use, { shield: number; hull: number; cap: num
   fullRepair: { shield: 0, hull: 100, cap: 100, time: 5, stack: 2 },
 };
 
-/** Her speed while she mends, as a share of what she asks (0117's SHIP.using). */
+/** Her speed while she mends, as a share of what she asks. */
 export const USING = 0.6;
 
 /** The item slots. */
@@ -44,14 +43,14 @@ export interface Hold { items: readonly (Stack | null)[]; chosen: number; using:
 /** An empty hold, her gun's slot in hand. */
 export const emptyHold = (): Hold => ({ items: Array.from({ length: SLOTS }, () => null), chosen: 0, using: null });
 
-/** Where some of `kind` would go: a stack of it with room, else an empty slot; -1 if neither (0117's roomFor). As an
- *  index into the items. */
+/** Where some of `kind` would go: a stack of it with room, else an empty slot; -1 if neither. As an index into the
+ *  items. */
 export function roomFor(h: Hold, kind: Use): number {
   const i = h.items.findIndex((s) => s && s.kind === kind && s.count < USES[kind].stack);
   return i >= 0 ? i : h.items.findIndex((s) => s === null);
 }
 
-/** `count` of `kind` put in the hold, as much as fits: the hold after, and how many are left over (0117's give). */
+/** `count` of `kind` put in the hold, as much as fits: the hold after, and how many are left over. */
 export function stowed(h: Hold, kind: Use, count: number): { hold: Hold; left: number } {
   const items = [...h.items];
   let n = count;
@@ -65,13 +64,13 @@ export function stowed(h: Hold, kind: Use, count: number): { hold: Hold; left: n
   return { hold: { ...h, items }, left: n };
 }
 
-/** Whether using `kind` would do anything for her now (0117's useful). */
+/** Whether using `kind` would do anything for her now. */
 export const useful = (health: Health, kind: Use) => {
   const u = USES[kind];
   return !sunk(health) && (u.shield > 0 ? health.shield < u.cap : health.hull < u.cap);
 };
 
-/** What a tap on slot `slot` (0 the gun's, 1–3 the items') does (0117's hotbar): another slot is taken in hand,
+/** What a tap on slot `slot` (0 the gun's, 1–3 the items') does: another slot is taken in hand,
  *  breaking off what she is using; the slot in hand, if it holds something that would mend her, is begun. */
 export function tapped(h: Hold, slot: number, health: Health): Hold {
   if (slot < 0 || slot > SLOTS) return h;

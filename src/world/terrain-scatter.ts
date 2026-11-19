@@ -155,13 +155,16 @@ export function scatterTerrain(t: Terrain, planet: Planet, seed: number, shapes:
         const size = BIG[0] + (most - BIG[0]) * (n === 0 ? 0.6 + 0.4 * rand() : rand() ** 0.8);
         let x = cx, z = cz;
         if (n > 0) {
-          const m = masses[Math.floor(rand() * masses.length)], a = rand() * 2 * Math.PI, out = (m.size + size) * (HEAPED + 0.02 + 0.15 * rand());
+          const m = masses[Math.floor(rand() * masses.length)], a = rand() * 2 * Math.PI;
+          const out = (m.size + size) * (HEAPED + 0.02 + 0.15 * rand());
           x = m.x + Math.cos(a) * out;
           z = m.z + Math.sin(a) * out;
         }
         // never out where a ship could sail: its foot short of the water too shallow for her
         if (shoreAt(fromChart(chart, x, z)) + FOOT * size > WADE - 1 || !clear(x, z, size, true)) continue;
-        const r: Rock = { x, z, y: seat(x, z, size, SUNK.big), size, yaw: rand() * 2 * Math.PI, big: true, shape: Math.floor(rand() * shapes.big) };
+        const r: Rock = {
+          x, z, y: seat(x, z, size, SUNK.big), size, yaw: rand() * 2 * Math.PI, big: true, shape: Math.floor(rand() * shapes.big),
+        };
         rocks.push(r);
         masses.push(r);
         n++;
@@ -172,7 +175,9 @@ export function scatterTerrain(t: Terrain, planet: Planet, seed: number, shapes:
         const a = rand() * 2 * Math.PI, out = m.size * (0.9 + 0.5 * rand()) + size + rand() * 4;
         const x = m.x + Math.cos(a) * out, z = m.z + Math.sin(a) * out;
         if (!clear(x, z, size, false) || shoreAt(fromChart(chart, x, z)) + FOOT * size > WADE - 1) continue;
-        rocks.push({ x, z, y: seat(x, z, size, SUNK.boulder), size, yaw: rand() * 2 * Math.PI, big: false, shape: Math.floor(rand() * shapes.boulders) });
+        rocks.push({
+          x, z, y: seat(x, z, size, SUNK.boulder), size, yaw: rand() * 2 * Math.PI, big: false, shape: Math.floor(rand() * shapes.boulders),
+        });
         n++;
       }
     };

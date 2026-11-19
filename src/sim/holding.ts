@@ -26,7 +26,9 @@ export interface Regained { id: number; shield: number }
 
 /** The crews after dt seconds in their own water: each of `fleet` lying in hers has her shield come back, at HOLDING
  *  shield a second up to its most; and what each so regained (only those that regained any). */
-export function regain(crews: readonly Crew[], fleet: readonly Lying[], waters: Waters, dt: number): { crews: Crew[]; regained: Regained[] } {
+export function regain(
+  crews: readonly Crew[], fleet: readonly Lying[], waters: Waters, dt: number
+): { crews: Crew[]; regained: Regained[] } {
   const home = new Set(fleet.filter((v) => atHome(waters, v)).map((v) => v.id)), regained: Regained[] = [];
   const after = crews.map((c) => {
     if (!home.has(c.id)) return c;

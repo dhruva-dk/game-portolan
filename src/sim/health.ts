@@ -1,7 +1,6 @@
-// A ship's hit points: her hull, and the shield before it (0117's rule, src/sim/harm.ts). A blow is taken by the shield
-// first and what it can't hold goes on to the hull in the same blow; a blow that is past the shield (0117's storm,
-// trail cuts, flooding) goes to the hull alone. The shield never comes back by itself, only by healing, as the hull.
-// At 0 hull she is sunk, and takes nothing more.
+// A ship's hit points: her hull, and the shield before it. A blow is taken by the shield first and what it can't hold
+// goes on to the hull in the same blow; a blow that is past the shield (the storm's wear) goes to the hull alone.
+// The shield never comes back by itself, only by healing, as the hull. At 0 hull she is sunk, and takes nothing more.
 //
 // Pure arithmetic: no three, so it runs in node for the tests; deterministic for the same inputs.
 

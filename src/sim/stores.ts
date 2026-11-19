@@ -1,12 +1,11 @@
 // What each ship carries, stepped with the fleet: her hold (hold.ts), her gust (gust.ts) and the loot on the water
-// (loot.ts), as one step's work round the fleet's and the fighting's (0117's hotbar input, useTick, gust and pickups,
-// in its order):
+// (loot.ts), as one step's work round the fleet's and the fighting's:
 // - before the fleet sails (asked): what each ship asks of her stores, a player's tap or a bot's, done: a tap on the
-//   gun slot not in hand takes that gun in hand (0117's EQUIP before it fires; its windup or reload let go); a tap on
-//   the gun in hand swaps it for a gun offered (0117's take), else takes the guns back in hand from her items, else
-//   reloads it if its magazine isn't full; a tap on the item slot in hand with something offered and her slots full
-//   swaps it likewise; any other tap chooses that slot, or begins it if it is in hand (hold.ts tapped); a gust asked
-//   for is spent if one may be (not while she mends: 0117's);
+//   gun slot not in hand takes that gun in hand (it fires only after EQUIP; its windup or reload let go); a tap on
+//   the gun in hand swaps it for a gun offered, else takes the guns back in hand from her items, else reloads it if
+//   its magazine isn't full; a tap on the item slot in hand with something offered and her slots full swaps it
+//   likewise; any other tap chooses that slot, or begins it if it is in hand (hold.ts tapped); a gust asked for is
+//   spent if one may be (not while she mends);
 // - her helm as her stores sail her (crewed): a gust blowing drives her on (ship.ts), and mending she sails at
 //   hold.ts USING of the speed she asks;
 // - after the fighting (stored): what she mends with and her gust stepped on, the loot drifted and swept up (and
@@ -59,7 +58,9 @@ function armed(crew: Crew, slot: number, gunOffered: boolean, cue: (c: Omit<Cue,
  * The asks done, before the fleet sails: each ship's crew after her taps and gusts, the swaps asked for (her id to
  * the slot), the ships a gust was spent for, and what their guns did. `asks` by ship id; `fleet` for where each lies.
  */
-export function asked(crews: readonly Crew[], fleet: readonly Vessel[], flotsam: Flotsam, asks: ReadonlyMap<number, Ask>): { crews: Crew[]; takes: Map<number, number>; blew: number[]; cues: Cue[] } {
+export function asked(
+  crews: readonly Crew[], fleet: readonly Vessel[], flotsam: Flotsam, asks: ReadonlyMap<number, Ask>
+): { crews: Crew[]; takes: Map<number, number>; blew: number[]; cues: Cue[] } {
   const takes = new Map<number, number>(), blew: number[] = [], cues: Cue[] = [];
   const at = new Map(fleet.map((v) => [v.id, v.ship.at]));
   const after = crews.map((c) => {
@@ -132,5 +133,7 @@ export function spilled(
   }
   // what she spilled is gone from her
   const gone = new Set(sunkNow);
-  return { crews: crews.map((c) => (gone.has(c.id) ? { ...c, guns: c.guns.map(() => null), hold: { ...c.hold, items: c.hold.items.map(() => null), using: null } } : c)), flotsam: f };
+  const emptied = (c: Crew): Crew =>
+    ({ ...c, guns: c.guns.map(() => null), hold: { ...c.hold, items: c.hold.items.map(() => null), using: null } });
+  return { crews: crews.map((c) => (gone.has(c.id) ? emptied(c) : c)), flotsam: f };
 }

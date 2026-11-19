@@ -18,7 +18,7 @@
 // on the shallows, she stays put rather than go through. So hulls that begin clear of each other stay clear.
 //
 // A blow closing faster than RAM.least is a ram: its damage grows with the closing, each ship takes a share of it by
-// how little of the closing was her own doing (0117's rule) and by where it landed on her, her bow taking it best and
+// how little of the closing was her own doing and by where it landed on her, her bow taking it best and
 // her side worst. A pair that has rammed may not ram again until they have drawn RAM.rearm metres clear: one ram, one
 // blow, however long the rammer then presses on.
 //
@@ -122,7 +122,8 @@ function meet(a: ShipState, b: ShipState): Meeting | null {
   const flat = (p: Vec3): P => [R * dot(p, east), R * dot(p, north)];
   const lay = (s: ShipState): Laid => {
     const x = dot(s.heading, east), y = dot(s.heading, north), l = Math.hypot(x, y);
-    return { centre: flat(s.at), ahead: [x / l, y / l], stern: flat(hullAt(s.at, s.heading, [-KEEL, 0])), stem: flat(hullAt(s.at, s.heading, [KEEL, 0])) };
+    const stern = flat(hullAt(s.at, s.heading, [-KEEL, 0])), stem = flat(hullAt(s.at, s.heading, [KEEL, 0]));
+    return { centre: flat(s.at), ahead: [x / l, y / l], stern, stem };
   };
   const la = lay(a), lb = lay(b);
   const [s, t] = nearest(la.stern, la.stem, lb.stern, lb.stem);
@@ -266,7 +267,9 @@ function sailed(v: Vessel, helm: Helm, dt: number, depth: Depth): Working {
  * the fleet after it (in the same order), the rams there were, and the change of velocity each ship's meetings gave
  * her (m/s, a tangent at her place), for her ride to show.
  */
-export function stepFleet(fleet: readonly Vessel[], helms: readonly Helm[], dt: number, depth: Depth): { fleet: Vessel[]; blows: Blow[]; jolts: Vec3[] } {
+export function stepFleet(
+  fleet: readonly Vessel[], helms: readonly Helm[], dt: number, depth: Depth
+): { fleet: Vessel[]; blows: Blow[]; jolts: Vec3[] } {
   const order = fleet.map((_, i) => i).sort((i, j) => fleet[i].id - fleet[j].id);
   const ws = order.map((i) => sailed(fleet[i], helms[i], dt, depth));
   const pairs = (each: (a: Working, b: Working) => void) => {

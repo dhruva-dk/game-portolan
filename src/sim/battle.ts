@@ -2,15 +2,15 @@
 // crew keeps her hit points (health.ts) and her guns, two at most, one in hand (gun.ts). The step takes the rams the
 // fleet's step reported off both ships, brings every ball in flight on (shot.ts) and takes those that strike off the
 // ship struck (less with the distance flown, for a kind whose bite falls off; a mortar's shell bursting over all within
-// its splash, less toward its rim: 0117's burst), and works the gun in hand (0117's arm): taken in hand it fires only
-// once EQUIP has passed; held on the trigger it fires at its kind's interval while the magazine lasts, a heavy gun
-// winding up first and firing when wound, wherever it is laid by then; emptied, it reloads, and it fires again full.
+// its splash, less toward its rim), and works the gun in hand: taken in hand it fires only once EQUIP has passed;
+// held on the trigger it fires at its kind's interval while the magazine lasts, a heavy gun winding up first and
+// firing when wound, wherever it is laid by then; emptied, it reloads, and it fires again full.
 // A ship sunk takes no more, fires no more, and is no longer laid on or struck; her crew is kept, sunk, for the game to
 // take her off the sea. A blow that strikes breaks off whatever she was mending with (hold.ts); a gun fired in a gust
 // goes off wider (gust.ts).
 //
-// The storm (storm.ts) wears at every ship outside its cap, a share of a full hull a second, past the shield as the old
-// game's did (weathered, after the step).
+// The storm (storm.ts) wears at every ship outside its cap, a share of a full hull a second, past the shield
+// (weathered, after the step).
 //
 // Pure arithmetic: no three, so it runs in node for the tests; deterministic for the same inputs. Crews are kept in
 // order of their ships' ids, so it makes no difference in which order the fleet is listed.
@@ -97,7 +97,8 @@ export interface Cue { ship: number; at: Vec3; kind: 'winding' | 'reloading' | '
 /** A crew as she puts to sea: whole, an empty hold, every gust ready, and with the guns given (none by default), the
  * first in hand. */
 export const crewOf = (id: number, ...guns: Gun[]): Crew => ({
-  id, health: whole(), guns: Array.from({ length: CARRIED }, (_, i) => guns[i] ?? null), hand: 0, equip: 0, hold: emptyHold(), gust: gustOf(),
+  id, health: whole(), guns: Array.from({ length: CARRIED }, (_, i) => guns[i] ?? null), hand: 0, equip: 0,
+  hold: emptyHold(), gust: gustOf(),
 });
 
 /** The gun in her hand, or null. */
@@ -106,9 +107,10 @@ export const inHand = (c: Crew): Gun | null => c.guns[c.hand] ?? null;
 export const armed = (c: Crew) => c.guns.some((g) => g !== null);
 
 /** The fighting before it starts: these crews, no balls, drawing from `seed`. */
-export const battleOf = (crews: readonly Crew[], seed: number): Battle => ({ crews: [...crews].sort((a, b) => a.id - b.id), balls: [], seed });
+export const battleOf = (crews: readonly Crew[], seed: number): Battle =>
+  ({ crews: [...crews].sort((a, b) => a.id - b.id), balls: [], seed });
 
-/** One step of the gun `g` in hand of crew `c` (0117's arm), firing by `loose` (which lays it and puts its balls in
+/** One step of the gun `g` in hand of crew `c`, firing by `loose` (which lays it and puts its balls in
  * flight); its cues told to `cue`. The gun after it. */
 function worked(c: Crew, g: Gun, trigger: boolean, dt: number, loose: (g: Gun) => void, cue: (kind: Cue['kind']) => void): Gun {
   const bore = GUNS[g.kind];
@@ -165,8 +167,12 @@ export function stepBattle(
     const broke = harm.shield > 0 && c.health.shield <= 0;
     // a scatter's pellets on one ship in one step: one strike
     const same = ram ? undefined : strikes.find((s) => !s.ram && s.shooter === by && s.struck === id);
-    if (same) Object.assign(same, { damage: same.damage + harm.shield + harm.hull, shield: same.shield + harm.shield, hull: same.hull + harm.hull, broke: same.broke || broke });
-    else strikes.push({ shooter: by, struck: id, damage: harm.shield + harm.hull, shield: harm.shield, hull: harm.hull, broke, at, ram });
+    if (same) {
+      same.damage += harm.shield + harm.hull;
+      same.shield += harm.shield;
+      same.hull += harm.hull;
+      same.broke ||= broke;
+    } else strikes.push({ shooter: by, struck: id, damage: harm.shield + harm.hull, shield: harm.shield, hull: harm.hull, broke, at, ram });
     if (sunk(c.health)) sunkNow.push(id);
   };
 
@@ -203,7 +209,8 @@ export function stepBattle(
     const g = inHand(c);
     if (!g) return;
     const loose = (gun: Gun) => {
-      const lay = laid(v, gun, order?.aim ?? null, targets, b.seed, depth, spreadOf(gun) * (order?.spread ?? 1) * (c.gust.blowing > 0 ? GUST.spread : 1), rises);
+      const spread = spreadOf(gun) * (order?.spread ?? 1) * (c.gust.blowing > 0 ? GUST.spread : 1);
+      const lay = laid(v, gun, order?.aim ?? null, targets, b.seed, depth, spread, rises);
       for (const dir of lay.dirs) balls.push(loosed(v.id, gun.kind, lay.from, dir, lay.speed, damageOf(gun), lay.fall));
       shots.push({ shooter: v.id, gun: gun.kind, from: lay.from, dirs: lay.dirs, target: lay.target });
     };
@@ -219,7 +226,9 @@ export function stepBattle(
 
 /** The storm's wear over dt seconds on every ship of `fleet` outside its cap: `storm.damage` of a full hull a second,
  * past the shield. The battle after it, and the ships it sank. */
-export function weathered(b: Battle, fleet: readonly Vessel[], storm: Pick<Storm, 'centre' | 'radius' | 'damage'>, dt: number): { battle: Battle; sunk: number[] } {
+export function weathered(
+  b: Battle, fleet: readonly Vessel[], storm: Pick<Storm, 'centre' | 'radius' | 'damage'>, dt: number
+): { battle: Battle; sunk: number[] } {
   const out = new Set(fleet.filter((v) => outside(v.ship.at, storm)).map((v) => v.id));
   if (out.size === 0 || !(storm.damage > 0)) return { battle: b, sunk: [] };
   const sunkNow: number[] = [];

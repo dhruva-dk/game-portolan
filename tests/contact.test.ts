@@ -272,8 +272,8 @@ test('over the pole, the same ram as anywhere', () => {
   assert.ok(distance(there[0].at, pole) < SHIP.length);
 });
 
-test('the ram scaled from 0117: a full-speed ram square into a still ship does what 0117\'s did at its full speed', () => {
-  // 0117: (14.5 − 5) × 2.2 = 20.9 to the struck ship
+test('the ram scaled by top speed: a full-speed ram square into a still ship does what it did at a top of 14.5 m/s', () => {
+  // first tuned for a top of 14.5 m/s: (14.5 − 5) × 2.2 = 20.9 to the struck ship
   const { blows } = run(approach(90 * deg, SHIP.top), holding(1, 0), 6);
   assert.ok(Math.abs(blows[0].struck.damage - (14.5 - 5) * 2.2) < 0.2, `${blows[0].struck.damage}`);
 });

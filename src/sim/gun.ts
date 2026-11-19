@@ -43,7 +43,8 @@ export interface Gun {
 
 /** A gun as it is found: its magazine full. */
 export const gunOf = (kind: GunKind, rarity: number): Gun => ({
-  kind, rarity: Math.max(0, Math.min(GUN.rarities.length - 1, Math.round(rarity))), rounds: GUNS[kind].mag, cool: 0, reload: 0, windup: 0, fired: 0,
+  kind, rarity: Math.max(0, Math.min(GUN.rarities.length - 1, Math.round(rarity))),
+  rounds: GUNS[kind].mag, cool: 0, reload: 0, windup: 0, fired: 0,
 });
 
 /** Hit points a ball of `gun` takes off, before its fall-off; seconds its reload takes; its spread (half-angle). */

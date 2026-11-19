@@ -1,7 +1,6 @@
-// What a closed loop takes (the first game's claim, agent-initial src/sim.ts): her own water and her trail are the
-// fence; every connected stretch of the rest of the planet but the largest becomes hers. On a sphere every loop cuts
-// the world in two, so this is the smaller side, with every pocket the fence shuts off besides: whatever lies there,
-// others' water and islands too.
+// What a closed loop takes: her own water and her trail are the fence; every connected stretch of the rest of the
+// planet but the largest becomes hers. On a sphere every loop cuts the world in two, so this is the smaller side, with
+// every pocket the fence shuts off besides: whatever lies there, others' water and land too.
 //
 // The stretches are flooded from the trail's neighbours in lockstep, a few cells each a round, merging where they
 // meet; the flood stops as soon as one stretch is still growing and already outweighs every one that has finished, so

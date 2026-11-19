@@ -1,8 +1,9 @@
-// The frame's budget, checked headless: five standard views (open sea under way; at the start, near its island; a
+// The frame's budget, checked headless: five standard views (open sea under way; at the start, off its coast; a
 // dozen ships in view; the lobby; the full map open over the start), each held still (?pause) and read off the meter
 // (src/meter.ts) once it has settled: a displayed frame's draw calls, triangles and render passes, each a second's
-// mean. Fails (exit 1) if any view is over its budget (BUDGET, or the view's own). The counts are three's, so they do not depend on the machine: they move only when what is
-// drawn changes (or the islands do: a new planet's land moves the triangles a little, not the draws).
+// mean. Fails (exit 1) if any view is over its budget (BUDGET, or the view's own). The counts are three's, so they do
+// not depend on the machine: they move only when what is drawn changes (or the land does: a new planet's land moves
+// the triangles a little, not the draws).
 //   node tools/budget.ts        (npm run budget)
 
 import { VIEW, launch } from './launch.ts';
@@ -16,10 +17,10 @@ const MEASURES: readonly (keyof Budget)[] = ['draws', 'triangles', 'passes'];
 /** Each view: its name, the switches that open it, and its own budget where it differs from BUDGET. */
 const VIEWS: { name: string; q: string; own?: Partial<Budget> }[] = [
   { name: 'sea', q: 'screen=match&drive=150,1,14' },
-  { name: 'island', q: 'screen=match' },
+  { name: 'coast', q: 'screen=match' },
   { name: 'ships', q: 'screen=match&ships=12' },
   { name: 'lobby', q: 'screen=lobby' },
-  // The full map draws the whole planet from space at once, every island's land and the sea round it, and nothing
+  // The full map draws the whole planet from space at once, all its land and the sea round it, and nothing
   // else of the game (no ships close, no cloth, no loot): some 0.9–0.94 million triangles as it opens over the start,
   // against the 0.4–0.5 million of the views at sea. It is held to that, not to the sea's limit: a planet with more
   // land, or a finer mesh, shows here.

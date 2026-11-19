@@ -1,7 +1,6 @@
-// The territory (sim/territory.ts, sim/enclose.ts, world/cells.ts): the first game's checks (agent-initial
-// tests/territory.test.ts) and the battle royale's rules.
+// The territory (sim/territory.ts, sim/enclose.ts, world/cells.ts): its geometry and the battle royale's rules.
 //
-// Geometry, as the first game derived it: a ship sails once round a circle at angle θ from a pole, starting and ending
+// Geometry: a ship sails once round a circle at angle θ from a pole, starting and ending
 // in her home patch, and closes the loop. Her water must then be the spherical cap 2πR²(1 − cos θ) plus the part of the
 // home patch outside it. With P the circle's length, d the largest cell diagonal and ρ the patch's radius, the cells
 // claimed are those the path touched (within d of the circle), those enclosed, and the patch's (centres in it), so
@@ -44,7 +43,7 @@ function onCircle(pole: Vec3, theta: number, phi: number): Vec3 {
   return normalize(add(scale(pole, Math.cos(theta)), add(scale(e1, Math.cos(phi)), e2, Math.sin(phi)), Math.sin(theta)));
 }
 
-/** The area of the home patch (radius ρ, centred on the circle) outside the cap of angle θ (the first game's integral). */
+/** The area of the home patch (radius ρ, centred on the circle) outside the cap of angle θ. */
 function patchOutsideCap(theta: number): number {
   const steps = 20000;
   let sum = 0;

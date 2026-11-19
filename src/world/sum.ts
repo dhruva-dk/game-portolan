@@ -74,7 +74,9 @@ export function createSums(table: Float64Array, groups: readonly (readonly numbe
         zs.push((zFrom[c] + jy) * POINTS * 2);
       }
     });
-    return { tx, rowEnd: Int32Array.from(ends), tz: Int32Array.from(zs), beat, amp, unit, now: new Float64Array(n * 2), widest: widestOf(modes) };
+    return {
+      tx, rowEnd: Int32Array.from(ends), tz: Int32Array.from(zs), beat, amp, unit, now: new Float64Array(n * 2), widest: widestOf(modes),
+    };
   };
   const made = groups.map(make);
   const beats = Math.max(0, ...made.flatMap((g) => [...g.beat])) + 1;

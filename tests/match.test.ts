@@ -82,7 +82,7 @@ test('her place and how she sank: by a ball, a ram, or the Storm, one behind eve
   }
 });
 
-test('sunk in the same step as others, the sinkings count one by one in the order reported (0117 end.ts)', () => {
+test('sunk in the same step as others, the sinkings count one by one in the order reported', () => {
   // she and two more go down in one step, she second of the three: one sunk after her, two afloat
   const sinkings: Sunk[] = [{ id: 4, by: 1, cause: 'shot' }, { id: PLAYER, by: 1, cause: 'ram' }, { id: 5, by: null, cause: 'storm' }];
   assert.equal(run(startMatch(), [{ sinkings, alive: [1, 2] }]).place, 4);

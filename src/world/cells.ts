@@ -1,6 +1,6 @@
 // The sea's cells: the planet's equi-angular cube (sphere.ts faceUV) cut into N × N cells a face, for who holds what
-// water (sim/territory.ts) and for drawing it (water/claims.ts). The first game's grid (agent-initial src/sim.ts
-// cellOf, neighbor, trace and its exact cell areas), on this planet.
+// water (sim/territory.ts) and for drawing it (water/claims.ts): each cell's place (cellOf), its neighbours (neighbor),
+// the cells a line crosses (trace) and its exact area.
 //
 // A cell's index is face·N² + j·N + i, i along the face's u and j along its v. N is a power of two, so an index splits
 // into face, row and column by shifts. Along each edge of the cube the two faces' cells line up one for one (both
@@ -101,7 +101,8 @@ export function wrapped(f: number, i: number, j: number): number {
   const inI = i >= 0 && i < N, inJ = j >= 0 && j < N;
   if (inI && inJ) return f * NN + j * N + i;
   const ci = Math.min(N - 1, Math.max(0, i)), cj = Math.min(N - 1, Math.max(0, j)), own = f * NN + cj * N + ci;
-  const across = (c: number, di: number, dj: number) => (di < 0 ? neighbor(c, 0) : di > 0 ? neighbor(c, 1) : dj < 0 ? neighbor(c, 2) : neighbor(c, 3));
+  const across = (c: number, di: number, dj: number) =>
+    di < 0 ? neighbor(c, 0) : di > 0 ? neighbor(c, 1) : dj < 0 ? neighbor(c, 2) : neighbor(c, 3);
   const di = i < 0 ? -1 : i >= N ? 1 : 0, dj = j < 0 ? -1 : j >= N ? 1 : 0;
   if (inJ) return across(own, di, 0);
   if (inI) return across(own, 0, dj);
@@ -138,7 +139,7 @@ export const PLANET_QUANTA = total;
 
 /**
  * The cells crossed going straight from p0 (in c0) to p1 (in c1), c0 left out, as a chain each sharing a side with the
- * last, appended to `out` (the first game's trace): halved until each half's ends share a side; through a corner exactly,
+ * last, appended to `out`: halved until each half's ends share a side; through a corner exactly,
  * by a cell touching both.
  */
 export function trace(p0: Vec3, c0: number, p1: Vec3, c1: number, out: number[], depth = 12): void {

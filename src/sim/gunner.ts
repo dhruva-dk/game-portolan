@@ -1,4 +1,5 @@
-// A bot's guns (bot.ts): 0117's aimAndFire and fightCourse (src/sim/captains/brain.ts), for the two guns she carries.
+// A bot's guns (bot.ts): which of the two she carries she takes in hand, the ring she holds round her foe, and how
+// she lays and fires it.
 //
 // She takes in hand the gun that does most at the range she lies from her foe (armFor): its balls a second over its
 // magazine and reload, less with its fall-off and with its spread past the hull's width there, nothing out of its
@@ -7,15 +8,14 @@
 //
 // In a gun fight she holds the range her gun in hand is best at rather than ramming: she makes for a point on a ring
 // that far round her foe, a little round from where she lies, and swings the other way round it now and then, a sharp
-// captain more often, so she is hard to lead. (0117's working round to windward is left: the wind here doesn't drive a
-// ship.)
+// captain more often, so she is hard to lead. (She doesn't work round to windward: the wind here doesn't drive a ship.)
 //
 // She lays her gun on where her foe will be when the ball comes down, with a wandering error that a sharp captain
 // keeps to a sixth of a green one's, and fires when her foe is in range, past the moment's surprise of first seeing
 // her, and in a burst, not in the pause between two. She sights it from aloft (her eye `aloft` m up her mast) on the
 // sea at that mark, and the gun's aim assist (gun.ts) takes her line of sight as it takes a player's, so her error
 // mostly shows past the edge of its cone; and her hand is unsteadier than she thinks, a green captain's balls
-// spreading wider than a sharp one's (0117's combat.ts fire).
+// spreading wider than a sharp one's.
 //
 // Pure arithmetic: no three, so it runs in node for the tests; deterministic for the same inputs.
 
@@ -28,11 +28,11 @@ import type { ShipState } from './ship.ts';
 import { thrown } from './shot.ts';
 import type { Sight } from './sight.ts';
 
-/** Everything a bot's gunnery is tuned by: 0117's (BRAIN), seconds and metres. */
+/** Everything a bot's gunnery is tuned by. Seconds and metres. */
 export const GUNNER = {
   /** Seconds before a green, and a sharp, captain first fires on a ship she has just seen. */
   react: [2.2, 0.3] as const,
-  /** The range she holds with each gun in hand, m (0117's cannon's 95, the rest where each does most), by her
+  /** The range she holds with each gun in hand, m (the cannon's 95, the rest where each does most), by her
    *  temperament's standoff; closer than `inside` of it, she opens out to `out` of it. Round the ring she makes for a
    *  point `swing` rad on from where she lies. */
   pref: { cannon: 95, scatter: 35, repeater: 70, harpoon: 170, mortar: 140 } as Record<GunKind, number>,
@@ -47,7 +47,7 @@ export const GUNNER = {
   error: 0.2, wander: [0.6, 1.4] as const,
   /** She fires within this share of the gun's range, in bursts of `burst` s with pauses of `pause` s. */
   reach: 0.95, burst: [1.5, 4] as const, pause: [0.8, 2.2] as const,
-  /** Her hand is less steady than she thinks (0117's combat.ts fire): her balls spread 1 + `unsteady` × (1 − skill)
+  /** Her hand is less steady than she thinks: her balls spread 1 + `unsteady` × (1 − skill)
    *  times the gun's own. (2.5 when a common gun spread 0.05; with it 0.03, 4.5 keeps the bots' balls striking home
    *  as often over a match, some 85 in 100, tools/matches.ts.) */
   unsteady: 4.5,
@@ -83,10 +83,10 @@ const toward = (p: Vec3, q: Vec3): Vec3 | null => {
 };
 const between = (draw: () => number, [lo, hi]: readonly [number, number]) => lo + (hi - lo) * draw();
 
-/** How many times the gun's own spread her balls go off within, by her skill (0117's). */
+/** How many times the gun's own spread her balls go off within, by her skill. */
 export const spreadBy = (skill: number) => 1 + GUNNER.unsteady * (1 - skill);
 
-/** The seconds before she fires on a ship she has just seen, by her skill (0117's reactTime). */
+/** The seconds before she fires on a ship she has just seen, by her skill. */
 export const reactTime = (skill: number) => GUNNER.react[0] + (GUNNER.react[1] - GUNNER.react[0]) * skill;
 
 /** What a gun of `kind` and `rarity` does to a ship `metres` off, hit points a second: its balls a second over a
@@ -119,7 +119,7 @@ export function armFor(c: Crew, metres: number | null): number | null {
 }
 
 /**
- * Where she makes for in a gun fight with `foe` (0117's fightCourse): a point on the ring of her preferred range with
+ * Where she makes for in a gun fight with `foe`: a point on the ring of her preferred range with
  * the gun of `kind` round her foe, a little round from where she lies. Turns the way she circles when it is time.
  * Updates `g`.
  */
@@ -136,12 +136,15 @@ export function ring(g: Gunner, at: Vec3, foe: Mark, kind: GunKind, standoff: nu
 }
 
 /**
- * Her gun's orders this step (0117's aimAndFire), her gun of `kind` in hand: sighted on where `foe` will be when the
+ * Her gun's orders this step, her gun of `kind` in hand: sighted on where `foe` will be when the
  * ball comes down, with her wandering error, and fired when she is in its range, has got over first seeing her, is in
  * a burst, and isn't told to `hold` it; her balls spread by her skill. With no foe in sight she looks along her
  * heading and holds her fire. `clock` is hers (s). Updates `g`.
  */
-export function aimAndFire(g: Gunner, own: ShipState, foe: Mark | null, kind: GunKind, clock: number, skill: number, draw: () => number, dt: number, hold = false): Order {
+export function aimAndFire(
+  g: Gunner, own: ShipState, foe: Mark | null, kind: GunKind, clock: number, skill: number, draw: () => number, dt: number,
+  hold = false
+): Order {
   const eye = place(own.at, GUNNER.aloft), bore = GUNS[kind];
   /** Her line of sight from aloft onto the sea at `p`. */
   const sight = (p: Vec3): Sight => ({ from: eye, dir: normalize(add(scale(p, R), eye, -1)) });

@@ -104,7 +104,8 @@ export function shoreOf(field: ArrayLike<number>, level: number): Float32Array {
       const n = neighbor(c, k);
       if (field[n] < level === wet) continue;
       const t = (level - field[c]) / (field[n] - field[c]);
-      let x = p[3 * c] + t * (p[3 * n] - p[3 * c]), y = p[3 * c + 1] + t * (p[3 * n + 1] - p[3 * c + 1]), z = p[3 * c + 2] + t * (p[3 * n + 2] - p[3 * c + 2]);
+      let x = p[3 * c] + t * (p[3 * n] - p[3 * c]), y = p[3 * c + 1] + t * (p[3 * n + 1] - p[3 * c + 1]);
+      let z = p[3 * c + 2] + t * (p[3 * n + 2] - p[3 * c + 2]);
       const l = Math.hypot(x, y, z);
       x /= l; y /= l; z /= l;
       const d = from(c, x, y, z);

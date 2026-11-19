@@ -1,14 +1,13 @@
-// A bot's temperament: 0117's captains' six (src/sim/captains/temperaments.ts), what applies of them, each bot's varied
-// a little by her seed as 0117 varied each captain's, with her skill and mood drawn as 0117 drew them (sim/setup.ts).
+// A bot's temperament: one of six, each bot's varied a little by her seed, with her skill and mood drawn by it too.
 //
 // Pure arithmetic: no three, so it runs in node for the tests; the same for a seed every time.
 
 import { random } from '../world/random.ts';
 
-/** A captain's temperament (0117's Style, what applies of it): how readily she fights, 0–1; how far off she notices a
+/** A captain's temperament: how readily she fights, 0–1; how far off she notices a
  *  ship, m; the hull she runs below; m she keeps inside the Storm's edge (seam); the share of a gun's range she closes
  *  to (seam); how much she wants loot, and how far off she goes for it, m; the hull she mends from (before her skill's
- *  part); how much she wants water (claimer.ts; new, 0–1: the homesteader and the turtle most, the brawler least). With
+ *  part); how much she wants water (claimer.ts, 0–1: the homesteader and the turtle most, the brawler least). With
  *  her skill, 0–1, and her mood (aggro), 0–1. */
 export interface Temper {
   fight: number; notice: number; run: number; margin: number; standoff: number;
@@ -16,7 +15,7 @@ export interface Temper {
   skill: number; aggro: number;
 }
 
-/** 0117's six temperaments: hunter, homesteader, raider, turtle, scavenger, brawler. */
+/** The six temperaments: hunter, homesteader, raider, turtle, scavenger, brawler. */
 const STYLES: readonly Omit<Temper, 'skill' | 'aggro'>[] = [
   { fight: 0.8, notice: 200, run: 25, margin: 25, standoff: 0.9, loot: 0.4, lootReach: 120, mend: 50, claim: 0.35 },
   { fight: 0.3, notice: 110, run: 45, margin: 35, standoff: 1.1, loot: 0.5, lootReach: 130, mend: 65, claim: 1 },
@@ -26,8 +25,8 @@ const STYLES: readonly Omit<Temper, 'skill' | 'aggro'>[] = [
   { fight: 1, notice: 220, run: 15, margin: 15, standoff: 0.7, loot: 0.3, lootReach: 90, mend: 40, claim: 0.2 },
 ];
 
-/** A bot's temperament, by her seed: one of the six, varied a little as 0117 varied each captain's (but her loot and
- *  mending, 0117's own, which it never varied); her skill as 0117 drew it (0.35–0.9), and her mood (0.2–1). */
+/** A bot's temperament, by her seed: one of the six, varied a little (but not her loot, her mending or her claim,
+ *  which are the six's own); her skill (0.35–0.9), and her mood (0.2–1). */
 export function temper(seed: number): Temper {
   const u = random(seed ^ 0x51a7e);
   const t = STYLES[Math.floor(u() * STYLES.length)];

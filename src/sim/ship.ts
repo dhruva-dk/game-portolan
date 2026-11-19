@@ -1,7 +1,7 @@
 // A ship under way: where she is on the sphere, which way her bow points, how fast she goes and turns, and one fixed
 // step of all of it under a helm's orders. The same step for the player and for any ship a bot sails.
 //
-// The handling is the sea demo's (0117 src/sea/ship.ts), which felt eased rather than jumpy: way is gathered and lost
+// The handling (handling.ts SHIP) is eased rather than jumpy: way is gathered and lost
 // exponentially (no reverse), the rudder bites harder the faster she goes, and her rate of turn follows the rudder
 // with a lag. The helm is given a course, not a rudder: the rudder is set by how far she has still to turn, just
 // short of critically damped against that lag, so she comes round onto the course without swinging past it.

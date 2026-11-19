@@ -134,7 +134,9 @@ export function repair(field: Float32Array, level: number, o: TerrainOptions = T
     for (let w = 0; w < W.area.length; w++) if (!holdsMain[w] && sailIn[w] < o.pond) filled++;
     // the sailable bodies left to join: those in bodies big enough (in the main water, or apart from it)
     const join = new Set<number>();
-    for (let c = 0; c < CELLS; c++) if (sail[c] && S.part[c] !== main && (holdsMain[W.part[c]] || sailIn[W.part[c]] >= o.pond)) join.add(S.part[c]);
+    for (let c = 0; c < CELLS; c++) {
+      if (sail[c] && S.part[c] !== main && (holdsMain[W.part[c]] || sailIn[W.part[c]] >= o.pond)) join.add(S.part[c]);
+    }
     if (!join.size && !any) break;
     if (!join.size) continue;
     // the cheapest way from the main body to every cell: free across sailable water, cheap across water too narrow

@@ -145,7 +145,7 @@ test('a blow breaks off what she is mending with; the storm does not', () => {
 
 // ------------------------------------------------------------------ loot
 
-test('the pieces drawn come in their shares: half of them guns (0117: three in five), mostly common, the cannon commonest', () => {
+test('the pieces drawn come in their shares: half of them guns (first three in five), mostly common, the cannon commonest', () => {
   const draw = random(7), n = 20000;
   const g = Array.from({ length: n }, () => rolled(draw));
   const guns = g.filter(isArms);

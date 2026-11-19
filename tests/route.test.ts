@@ -41,7 +41,7 @@ test('a route is found round a round island, all open water, not much longer tha
   const rc = 77.5, tangent = Math.sqrt(110 * 110 - rc * rc), arc = rc * (Math.PI - 2 * Math.acos(rc / 110));
   const least = 2 * tangent + arc, got = length(r.cells);
   console.log(`# round the island: ${got.toFixed(0)} m by the route, ${least.toFixed(0)} m at the least`);
-  // (a route of cells, each to one of the eight round it, runs up to 1.08 times as far as a straight line, 0117's of
+  // (a route of cells, each to one of the eight round it, runs up to 1.08 times as far as a straight line, one of
   // four up to √2; the helm cuts its corners, looking along it as far as the water is clear)
   assert.ok(got < 1.15 * least, `${got} m`);
   assert.ok(Math.min(...r.cells.map((c) => distance(cellCentre(c), start))) > 77.5);

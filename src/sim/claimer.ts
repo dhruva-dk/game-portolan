@@ -1,6 +1,6 @@
 // A bot's water (territory.ts): the loops she sails to claim more of it, her going home to it to get her shield back,
-// and her cutting another ship's open trail. The first game's captains' bites (agent-initial src/bots.ts: out, across,
-// back), weighed among her other options (bot.ts) by the same utility scoring:
+// and her cutting another ship's open trail. Her claims are bites (out, across, back), weighed among her other options
+// (bot.ts) by the same utility scoring:
 // - claim: from inside her water, a bite: out past her edge along a bearing open and inside the storm, across, and
 //   back in a little way inside the edge she left by. Sooner the more she wants water (Temper claim) and the fewer
 //   ships about; out, with her trail open, finishing it comes first (only the storm, a fight or a run outrank it), and
@@ -20,11 +20,11 @@ import { STORM, toEdge } from './storm.ts';
 import { ramp, utility } from './utility.ts';
 import { BOT, between, open, rotate, toward, type Ctx } from './captain.ts';
 
-/** Everything a bot's water is tuned by. Metres and seconds; new, as 0117's captains held none. */
+/** Everything a bot's water is tuned by. Metres and seconds. */
 export const CLAIMER = {
-  /** A bite reaches `depth` m past her edge and runs `width` m along it, from timid to greedy (the first game's middle
-   *  styles' 16–34 and 16–34 units, at 1.5–2.5 m a unit); the edge looked for every `probe` m, out to `edgeMost`; the
-   *  way back ends `inside` m in from it. */
+  /** A bite reaches `depth` m past her edge and runs `width` m along it, from timid to greedy (some 16–34 units
+   *  out and 16–34 along, at 1.5–2.5 m a unit); the edge looked for every `probe` m, out to `edgeMost`; the way back
+   *  ends `inside` m in from it. */
   depth: [30, 90] as const, width: [30, 80] as const, probe: 5, edgeMost: 200, inside: 10,
   /** A bite's marks are reached within `arrive` m. A bite done (closed or cut), she rests `rest` s, less the greedier. */
   arrive: 14, rest: [4, 16] as const,
@@ -69,7 +69,8 @@ export function claimUrge(c: Ctx): number {
   if (!c.sea.holdings) return 0;
   if (outward(c) && m.bite) return CLAIMER.out;
   if (m.clock < m.rested || (c.sea.storm && c.sea.storm.phase >= STORM.phases.length)) return 0;
-  return CLAIMER.setOut * utility(c.t.claim, ramp(nearest(c), CLAIMER.danger, CLAIMER.clear), ramp(distance(c.own.ship.at, m.haven), CLAIMER.far, CLAIMER.near));
+  const safe = ramp(nearest(c), CLAIMER.danger, CLAIMER.clear), home = ramp(distance(c.own.ship.at, m.haven), CLAIMER.far, CLAIMER.near);
+  return CLAIMER.setOut * utility(c.t.claim, safe, home);
 }
 
 /** Plans a bite out from her water at p along a bearing that is open and inside the storm, or null if she finds none. */

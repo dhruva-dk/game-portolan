@@ -7,11 +7,10 @@
 // cap round the one inside it, every centre over water), and the storm at any moment is a function of the match's
 // clock alone: no state to carry, the same for every player at the same second.
 //
-// Tuning is the old game's (game-portolan-0117, sim/tables.ts STORM: seven phases of wait then shrink, damage
-// rising 1 → 12 of a 100-point hull a second), on the same 554 m planet, but started from the whole planet in place of
-// half of it and quickened to a match of about seven and a half minutes (its was thirteen). It holds for any fleet
-// from 20 to 100 (SHIPS is 80): whole matches of bots, armed or not, ran 6.5–7.5 minutes, no more than five ships
-// outside the cap as each phase began, the storm sinking a few at most.
+// Seven phases of wait then shrink, the damage rising 1 → 12 of a 100-point hull a second, started from the whole
+// planet (not half of it, as first tuned) and quickened to a match of about seven and a half minutes (first
+// thirteen). It holds for any fleet from 20 to 100 (SHIPS is 80): whole matches of bots, armed or not, ran 6.5–7.5
+// minutes, no more than five ships outside the cap as each phase began, the storm sinking a few at most.
 //
 // Pure arithmetic: no three, so it runs in node for the tests.
 
@@ -28,8 +27,8 @@ export const STORM = {
    * The phases in order. The first cap is the whole planet (π·R, 1740 m), so the first wait is only a warning: it
    * shows where the storm is headed. The first close is the long one (the far side of the planet is 940 m outside
    * its next cap: 59 s at a ship's best 16 m/s, 134 at an ordinary 7); after it the edge moves at 3–7 m/s, a
-   * ship's easy pace, as the old game's did. The last cap, 75 m, holds a fight and the chase's eye behind her: it
-   * stands some 54 m astern (play/chase.ts BOOM), and at 25 m, the old last cap, and 55, the one before it, the eye
+   * ship's easy pace. The last cap, 75 m, holds a fight and the chase's eye behind her: it stands some 54 m astern
+   * (play/chase.ts BOOM), and at 25 m, the first tuning's last cap, and 55, the one before it, the eye
    * was over the storm wherever she was (drawn in under its cloud now, CLOUD, but then hard up behind her).
    */
   phases: [
@@ -118,7 +117,8 @@ export function planStorm(seed: number, depth: Depth): Vec3[] {
   };
   const wet = (u: Vec3) => depth(scale(u, R));
   const final = phases[n - 1].radius;
-  const rim = (u: Vec3) => Math.min(...Array.from({ length: 8 }, (_, k) => wet(along(scale(u, R), tangent(u, (k * Math.PI) / 4), final).p)));
+  const rim = (u: Vec3) =>
+    Math.min(...Array.from({ length: 8 }, (_, k) => wet(along(scale(u, R), tangent(u, (k * Math.PI) / 4), final).p)));
   let best: Vec3 = [0, 1, 0], score = -Infinity;
   for (let i = 0; i < STORM.tries; i++) {
     const u = unit();
@@ -150,7 +150,8 @@ export function planStorm(seed: number, depth: Depth): Vec3[] {
 export function createStorm(seed: number, depth: Depth) {
   const centres = planStorm(seed, depth), phases = STORM.phases, n = phases.length;
   /** The cap phase k holds at before it closes: the whole planet's for the first. */
-  const held = (k: number): Cap => (k === 0 ? { centre: centres[0], radius: WHOLE } : { centre: centres[k - 1], radius: angle(phases[k - 1].radius) });
+  const held = (k: number): Cap =>
+    k === 0 ? { centre: centres[0], radius: WHOLE } : { centre: centres[k - 1], radius: angle(phases[k - 1].radius) };
   const target = (k: number): Cap => ({ centre: centres[k], radius: angle(phases[k].radius) });
   return (seconds: number): Storm => {
     let t = Math.max(seconds, 0);
@@ -166,7 +167,8 @@ export function createStorm(seed: number, depth: Depth) {
       t -= p.close;
     }
     const last = target(n - 1);
-    return { ...last, next: last, closing: false, secondsToNext: Infinity, phase: n, damage: phases[n - 1].damage + STORM.rise * Math.floor(t / STORM.every + 1) };
+    const damage = phases[n - 1].damage + STORM.rise * Math.floor(t / STORM.every + 1);
+    return { ...last, next: last, closing: false, secondsToNext: Infinity, phase: n, damage };
   };
 }
 

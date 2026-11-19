@@ -144,9 +144,9 @@ test('the same guns fight the same way, to the bit', () => {
   assert.deepEqual(run(), run());
 });
 
-test('the sea is strewn with about half 0117\'s pieces, half of them guns, the cannon the commonest, the harpoon and the mortar the rarest', () => {
+test('the sea is strewn with some 230–340 pieces, half of them guns, the cannon the commonest, the harpoon and the mortar the rarest', () => {
   const f = strewn(5, deep), guns = f.pieces.map((p) => p.goods).filter(isArms);
-  // 0117 strewed some 570, from 400 spots
+  // about half of the 570 first strewn, from 400 spots
   assert.ok(f.pieces.length > 0.4 * 570 && f.pieces.length < 0.6 * 570 && f.pieces.length < (1 + LOOT.second + 0.1) * LOOT.spots, `${f.pieces.length}`);
   const count = (k: GunKind) => guns.filter((g) => g.kind === k).length;
   assert.ok(Math.abs(guns.length / f.pieces.length - LOOT.gun) < 0.08, `${guns.length} of ${f.pieces.length}`);

@@ -5,7 +5,7 @@
 // afloat that are armed at 30, 60 and 120 s and the share with a shield or something to mend with, how the ships were
 // sunk, how and when it ended, the balls fired and how many struck home, and the bots stuck: any that moved less than STUCK m in WINDOW s, told apart by her
 // speed over it: aground (under AGROUND m/s), or sailing round in circles (fighting round a foe, going for a piece
-// near her, or roaming as 0117's bots did, a new mark every few seconds on any bearing). And who holds the sea
+// near her, or roaming, a new mark every few seconds on any bearing). And who holds the sea
 // (sim/territory.ts): the share of the planet held at 30, 60, 120, 240 s and at the end (all ships', and the most
 // any one holds), the loops closed and cut, and the shield their own water gave back.
 

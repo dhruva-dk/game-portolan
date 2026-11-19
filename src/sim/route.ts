@@ -1,21 +1,19 @@
-// Routes round land: 0117's captains' chart and pathfinder (src/sim/nav.ts, and the route-following in
-// captains/brain.ts steerFor) ported to this sea. Every value is 0117's (the same planet, so the same metres) unless a
-// comment says why not.
+// Routes round land: a chart of the open water, a pathfinder over it, and the helm that follows what it finds.
 //
 // The chart: a coarse grid of open water over the sphere, 128 cells along each edge of the cube's six faces (the same
 // equi-angular cube as world/sphere.ts faceUV), about 6.8 m a cell. A cell is open when the water is deep enough for a
 // ship, with a little to spare, at its centre and at eight soundings across it (so a bar thinner than a cell still
 // shows); each open cell knows how many cells it lies from the shore, up to 4. Baked once from a Depth (chart), some
-// tenths of a second on a desktop; the world is fixed, so it is the same all game. (0117's tide, columns and logs, and
-// the heights it kept for line of sight, are left behind: this sea has none of them, and bot.ts sees past land itself.)
+// tenths of a second on a desktop; the world is fixed, so it is the same all game. (It keeps no tide, columns, logs or
+// heights for line of sight: this sea has none of the first three, and bot.ts sees past land itself.)
 //
 // Routes are found by A* over the open cells, a cell near the shore costing more to cross so a route keeps off it where
-// it can, and are followed as 0117's helm followed them (course): straight for the mark while the water to it is clear,
-// else along the route, looking as far ahead along it as the water is clear. New: a route steps to the eight cells round
-// each, not 0117's four, the diagonals only where they cut no corner of land. Over blocked pairs of open water on the
+// it can, and are followed (course): straight for the mark while the water to it is clear, else along the route,
+// looking as far ahead along it as the water is clear. A route steps to the eight cells round each, not only the four
+// beside it, the diagonals only where they cut no corner of land. Over blocked pairs of open water on the
 // release's planet whose way round is under 1.5 times the straight line, it is found within ROUTE.work cells every time
-// at 150–250 m and 84% at 250–400 m (on the islands this sea once had, four neighbours found 91% and 50% where eight
-// found 99% and 91%, in half the time, running 1.1–1.15 times the straight line to four's 1.3–1.4).
+// at 150–250 m and 84% at 250–400 m (where four neighbours found 91% and 50% of what eight found 99% and 91% of, eight
+// took half the time and ran 1.1–1.15 times the straight line to four's 1.3–1.4).
 //
 // Pure arithmetic: no three, so it runs in node for the tests; deterministic, to the bit.
 
@@ -23,11 +21,11 @@ import { add, distance, faceDir, faceUV, frameAt, normalize, scale, R, type Vec3
 import { SHIP } from './handling.ts';
 import type { Depth } from './shoal.ts';
 
-/** Everything the chart and its routes are tuned by. Metres and seconds; 0117's values. */
+/** Everything the chart and its routes are tuned by. Metres and seconds. */
 export const ROUTE = {
   /** Cells along a cube face's edge (a power of two): about 6.8 m cells. */
   n: 128,
-  /** Open water: this deep past her draught (0117's OPEN) at the centre and at soundings `sounding` m east, west,
+  /** Open water: this deep past her draught at the centre and at soundings `sounding` m east, west,
    *  north, south and on the diagonals of it. */
   open: 0.3, sounding: 2.3,
   /** Within `offshore` cells of the shore a cell costs `hug` times as much to cross; the A* is greedy by `greed`. */
@@ -54,7 +52,7 @@ interface Space {
 
 const N = ROUTE.n, LOG = 31 - Math.clz32(N), CELLS = 6 * N * N;
 
-// ---------------------------------------------------------------- the grid (0117's sphere.ts cubeGrid, at 128)
+// ---------------------------------------------------------------- the grid
 
 /** The cell direction p lies in. */
 function cellOf(p: Vec3): number {
@@ -143,7 +141,8 @@ function clearLine(ch: Chart, a: Vec3, b: Vec3, step = 4): boolean {
 
 // ---------------------------------------------------------------- finding a route
 
-/** (0117 sized its heap for every cell four times over; a query pushes at most eight for each cell it looks through.) */
+/** The heap's room: a query pushes at most eight for each cell it looks through, and looks through at most four times
+ *  ROUTE.work. */
 const HEAP = 8 * ROUTE.work * 4 + 1;
 /** A step to a cell further than this, m, is no step: round a cube's corner, where a diagonal has no cell. */
 const STRIDE = 12;
@@ -152,7 +151,10 @@ const STRIDE = 12;
 function space(): Space {
   const centre = new Float64Array(CELLS * 3);
   for (let c = 0; c < CELLS; c++) centre.set(cellCentre(c), 3 * c);
-  return { g: new Float64Array(CELLS), from: new Int32Array(CELLS), seen: new Int32Array(CELLS), marks: new Int32Array(CELLS), centre, heap: new Int32Array(HEAP), key: new Float64Array(HEAP), stamp: 0 };
+  return {
+    g: new Float64Array(CELLS), from: new Int32Array(CELLS), seen: new Int32Array(CELLS), marks: new Int32Array(CELLS), centre,
+    heap: new Int32Array(HEAP), key: new Float64Array(HEAP), stamp: 0,
+  };
 }
 
 /** The nearest open cell to p within `reach` cells, by rings of neighbours: the nearest of the first ring to hold one. */
@@ -190,7 +192,7 @@ function gap(s: Space, a: number, b: number | Vec3): number {
 }
 
 /**
- * A route of cells from p to q over open water, keeping off the shore where it can (0117's findPath). Gives up after
+ * A route of cells from p to q over open water, keeping off the shore where it can. Gives up after
  * `work` cells. `found` false when there is none: `cells` then runs to the cell nearest q that it reached, or is empty
  * when p is on land with no open water near.
  */
@@ -269,7 +271,7 @@ export function findPath(ch: Chart, p: Vec3, q: Vec3, work: number = ROUTE.work)
 export interface Route { readonly cells: readonly number[]; readonly to: Vec3; readonly leg: number; readonly repath: number }
 
 /**
- * Where a ship at `at` making for `want` steers this step of dt seconds (0117's steerFor): null to steer straight for
+ * Where a ship at `at` making for `want` steers this step of dt seconds: null to steer straight for
  * it, as the water there is clear (or it is close); else a point on her route, found afresh every ROUTE.repath s or
  * when the mark moves, and the route as it now stands. From shoal water she follows the route cell by cell, as a line
  * from there isn't to be trusted (a bar under her may lie between her and the water beyond).
@@ -277,7 +279,7 @@ export interface Route { readonly cells: readonly number[]; readonly to: Vec3; r
 export function course(ch: Chart, at: Vec3, want: Vec3, route: Route | null, dt: number): { to: Vec3 | null; route: Route | null } {
   const shoaled = !openAt(ch, at);
   if (distance(at, want) <= ROUTE.far || (!shoaled && clearLine(ch, at, want, ROUTE.step))) return { to: null, route: null };
-  // (0117 looked again every tick while it had no route; here, as on one, every `repath` s)
+  // (with no route, as on one, it looks again every `repath` s, not every step)
   let r = route && { ...route, repath: route.repath - dt };
   if (!r || r.repath <= 0 || distance(r.to, want) > ROUTE.moved) {
     const { cells } = findPath(ch, at, want);

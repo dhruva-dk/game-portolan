@@ -1,6 +1,6 @@
-// Utility scoring: how a bot picks what to do next. 0117's (src/sim/captains/utility.ts) as it was, after the Infinite
-// Axis Utility System (Mark and Lewis, "Building a Better Centaur: AI at Massive Scale", GDC 2015; Mark, "Behavioral
-// Mathematics for Game AI", 2009) and dual-utility reasoning (Dill, "Dual-Utility Reasoning", Game AI Pro 2, 2015):
+// Utility scoring: how a bot picks what to do next, after the Infinite Axis Utility System (Mark and Lewis, "Building
+// a Better Centaur: AI at Massive Scale", GDC 2015; Mark, "Behavioral Mathematics for Game AI", 2009) and dual-utility
+// reasoning (Dill, "Dual-Utility Reasoning", Game AI Pro 2, 2015):
 // - every option is scored from 0 to 1 by multiplying its considerations, each one input normalised to 0..1 and put
 //   through a response curve that says how the option should feel about it;
 // - a product of many factors under 1 drags down an option that simply has more of them to weigh, so each factor's
@@ -64,7 +64,9 @@ export const momentum = (since: number): number => {
  * Scores every option and picks one: the one in hand (`current`, scored up by `held`) if it is still good enough, else
  * one of the good enough ones by weighted chance (`roll`, 0..1). -1 when nothing scores at all.
  */
-export function choose<C>(options: readonly Option<C>[], ctx: C, current: number, skill: number, roll: () => number, held: number = REASON.momentum.held): number {
+export function choose<C>(
+  options: readonly Option<C>[], ctx: C, current: number, skill: number, roll: () => number, held: number = REASON.momentum.held
+): number {
   const scores = options.map((o, k) => o.weight * o.score(ctx) * (k === current ? held : 1));
   const best = Math.max(0, ...scores);
   if (best <= 0) return -1;

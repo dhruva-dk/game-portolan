@@ -1,8 +1,8 @@
-// Who holds the sea: the first game's territory (agent-initial src/sim.ts), as a battle royale has it.
+// Who holds the sea: territory, as a battle royale has it.
 //
 // Every ship starts with a small home patch of sea round her berth. Leaving her own water she lays an open trail (the
 // cells her centre passes through, and a line of points for drawing it); coming back into her own water closes the
-// loop, and the smaller side of the planet it cuts off, whatever lies there (others' water, islands), becomes hers
+// loop, and the smaller side of the planet it cuts off, whatever lies there (others' water, land), becomes hers
 // (enclose.ts). A trail is cut, not deadly: another ship crossing it, or she herself, breaks it, and she loses it, no
 // water gained; she must start again from her own water. A sunk ship's water drains back to open sea, and the storm
 // takes every cell outside its cap. A ship left with no water is not sunk: she lays a new home patch round her
