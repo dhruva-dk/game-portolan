@@ -28,10 +28,11 @@
 
 import { FREQUENCY, geodesic } from './lattice.ts';
 import { random } from './random.ts';
-import { add, cross, dot, frameAt, length, normalize, scale, type Vec3 } from './sphere.ts';
+import { add, cross, dot, frameAt, length, normalize, put, scale, type Out3, type Vec3 } from './sphere.ts';
 
-/** The prevailing wind's direction at a point (a vector from the centre, of any length): a unit tangent there. */
-export type Wind = (p: Vec3) => Vec3;
+/** The prevailing wind's direction at a point (a vector from the centre, of any length): a unit tangent there (into
+ *  `out`, making nothing once warm). */
+export type Wind = (p: Vec3, out?: Out3) => Vec3;
 
 /** How far the degree-2 term bends the wind from circles round the axis: M's largest eigenvalue. */
 const BEND = 0.15;
@@ -39,7 +40,6 @@ const BEND = 0.15;
 const TILT = (40 * Math.PI) / 180;
 
 type Matrix = [Vec3, Vec3, Vec3];
-const times = (m: Matrix, u: Vec3): Vec3 => [dot(m[0], u), dot(m[1], u), dot(m[2], u)];
 
 /** The seed's potential: its axis a (the northern calm) and M, as rows. */
 function potential(seed: number): { a: Vec3; m: Matrix } {
@@ -61,11 +61,16 @@ function potential(seed: number): { a: Vec3; m: Matrix } {
 /** The planet's prevailing wind for a seed: the same field every time. */
 export function createWind(seed: number): Wind {
   const { a, m } = potential(seed);
-  return (p) => {
-    const u = normalize(p);
-    const v = cross(add(a, times(m, u)), u);
+  // (the working vectors, written over each call)
+  const u: Out3 = [0, 0, 0], v: Out3 = [0, 0, 0];
+  return (p, out) => {
+    normalize(p, u);
+    put(v, dot(m[0], u), dot(m[1], u), dot(m[2], u));
+    cross(add(a, v, 1, v), u, v);
     const size = length(v);
-    return size > 1e-9 ? scale(v, 1 / size) : frameAt(u).east;
+    if (size > 1e-9) return scale(v, 1 / size, out);
+    const east = frameAt(u).east;
+    return put(out, east[0], east[1], east[2]);
   };
 }
 

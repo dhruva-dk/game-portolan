@@ -36,19 +36,24 @@ function swells(seed: number) {
     }));
   };
   const terms = { wind: draw(), cloud: draw(), haze: draw() };
-  const at = (k: keyof Weather, t: number) => terms[k].reduce((s, w) => s + w.weight * Math.sin(w.rate * t + w.phase), 0);
+  const at = (k: keyof Weather, t: number) => {
+    let s = 0;
+    for (const w of terms[k]) s += w.weight * Math.sin(w.rate * t + w.phase);
+    return s;
+  };
   return at;
 }
 
 /**
- * The match's weather: weather(seconds) at that time on its clock, about `mean`; a quantity whose `swing` is 0 holds
- * at its mean (a debug pin).
+ * The match's weather: weather(seconds) at that time on its clock, about `mean`, written into `out` (made if none is
+ * given); a quantity whose `swing` is 0 holds at its mean (a debug pin).
  */
 export function createWeather(seed: number, mean: Weather = MEAN, swing: Weather = SWING) {
   const at = swells(seed);
-  return (seconds: number): Weather => ({
-    wind: mean.wind + swing.wind * at('wind', seconds),
-    cloud: Math.min(Math.max(mean.cloud + swing.cloud * at('cloud', seconds), 0), 1),
-    haze: mean.haze * (1 + swing.haze * at('haze', seconds)),
-  });
+  return (seconds: number, out: Weather = { wind: 0, cloud: 0, haze: 0 }): Weather => {
+    out.wind = mean.wind + swing.wind * at('wind', seconds);
+    out.cloud = Math.min(Math.max(mean.cloud + swing.cloud * at('cloud', seconds), 0), 1);
+    out.haze = mean.haze * (1 + swing.haze * at('haze', seconds));
+    return out;
+  };
 }

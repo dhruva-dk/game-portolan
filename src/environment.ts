@@ -5,7 +5,7 @@
 
 import { landOf, planetOf, type Land } from './world/land';
 import type { Planet } from './world/planet';
-import type { Vec3 } from './world/sphere';
+import type { Out3, Vec3 } from './world/sphere';
 import { sunAt, sunPlaces, type SunPlaces } from './world/sun';
 import { createWeather, type Weather } from './world/weather';
 import { createWind, type Wind } from './world/wind';
@@ -17,7 +17,7 @@ export interface Climate {
   /** Where the match's sun is set (world/sun.ts): over every place it stands as high as the hour says. */
   sunPlaces: SunPlaces;
   /** The match's weather at a time on its clock (world/weather.ts). */
-  weather: (seconds: number) => Weather;
+  weather: (seconds: number, out?: Weather) => Weather;
   /**
    * The wind the sea's waves were raised by, metres per second: its mean over the match, since a sea takes hours to
    * grow (the CPU's sea, world/swell.ts, is built with it).
@@ -51,32 +51,38 @@ export interface Environment {
    * Unit vector toward the sun over the eye, in the planet's frame (world space: the north pole is +y;
    * world/sphere.ts). Elsewhere the sun is world/sun.ts's sunAt.
    */
-  sunDirection: Vec3;
+  sunDirection: Out3;
   seaWind: number;
   /** The wind's speed over the sea now, metres per second: the same everywhere. */
   windSpeed: number;
   /** Unit vector the wind blows toward at the eye, in the planet's frame (a tangent there): the prevailing wind's
    *  (world/wind.ts), which varies over the planet. */
-  windDirection: Vec3;
+  windDirection: Out3;
   /** 0–1. */
   cloudCoverage: number;
   /** Aerosol in the air as a multiple of a clear day's (1). Thickens the haze and whitens the sky. */
   haze: number;
 }
 
+/** The weather now, written over each frame. */
+const now: Weather = { wind: 0, cloud: 0, haze: 0 };
+
 /** The environment at `clock` (s) seen from `eye` (world metres), laid into `into` (the last frame's, kept by the
- *  frame), or into a new one. */
+ *  frame: its directions written over, nothing made), or into a new one. */
 export function environmentAt(world: World, clock: number, eye: Vec3, into?: Environment): Environment {
   const { timeOfDay, sunPlaces, weather, seaWind } = world.climate;
-  const now = weather(clock), sunDirection = sunAt(sunPlaces, timeOfDay, eye), windDirection = world.wind(eye);
+  weather(clock, now);
   if (!into) {
+    const sunDirection: Out3 = [0, 0, 0], windDirection: Out3 = [0, 0, 0];
+    sunAt(sunPlaces, timeOfDay, eye, sunDirection);
+    world.wind(eye, windDirection);
     const { wind: windSpeed, cloud: cloudCoverage, haze } = now;
     return { clock, timeOfDay, sunPlaces, seaWind, sunDirection, windSpeed, windDirection, cloudCoverage, haze };
   }
   into.clock = clock;
-  into.sunDirection = sunDirection;
+  sunAt(sunPlaces, timeOfDay, eye, into.sunDirection);
   into.windSpeed = now.wind;
-  into.windDirection = windDirection;
+  world.wind(eye, into.windDirection);
   into.cloudCoverage = now.cloud;
   into.haze = now.haze;
   return into;

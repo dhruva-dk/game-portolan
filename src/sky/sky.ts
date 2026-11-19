@@ -222,6 +222,8 @@ export function createSky(view: View, bolt: boolean) {
   /** What update hands the clouds, and the passes it returns, laid afresh each frame. */
   const cloudInputs: CloudInputs = { coverage: 0, wind: { x: 0, y: 0 }, sunDirection: skySun.value };
   const due: SkyPasses = { tables: NONE, clouds: NONE, reflection: NONE };
+  /** The sun as update works it out, written over each frame. */
+  const seen: sphere.Out3 = [0, 0, 0];
 
   return {
     background,
@@ -242,9 +244,9 @@ export function createSky(view: View, bolt: boolean) {
       storm.update(cap, env.clock, view.eye.position);
       sun.value.fromArray(env.sunDirection);
       origin.value.fromArray(env.sunPlaces.origin);
-      there.value.fromArray(sunAtOrigin(env.sunPlaces, env.timeOfDay));
-      rise.value = sunInSky(env.timeOfDay)[1];
-      const s = sphere.toSky(view.eye.frame, view.eye.dip, env.sunDirection);
+      there.value.fromArray(sunAtOrigin(env.sunPlaces, env.timeOfDay, seen));
+      rise.value = sunInSky(env.timeOfDay, seen)[1];
+      const s = sphere.toSky(view.eye.frame, view.eye.dip, env.sunDirection, seen);
       skySun.value.set(s[0], s[1], s[2]);
       due.tables = tables.update(s[1], env.haze);
       under.value = kind === 'air' ? 1 : 0;

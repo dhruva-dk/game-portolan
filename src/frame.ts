@@ -21,6 +21,7 @@ import { createFleet } from './ship/fleet';
 import { createGunfire } from './gunfire/gunfire';
 import { createArms, muzzle } from './ship/arms';
 import { createLoot } from './loot/loot';
+import type { Out3 } from './world/sphere';
 import { sunAt, sunInSky } from './world/sun';
 import { BLOOM_LEVELS, bloom } from './post/bloom';
 import { film } from './post/film';
@@ -278,7 +279,7 @@ export function createFrame(renderer: WebGPURenderer, world: World, options: Fra
   }
 
   const size = new Vector2();
-  const shadeSun = new Vector3();
+  const shadeSun = new Vector3(), shadeAt: Out3 = [0, 0, 0];
   /** The ships drawn last frame and this one, and the latest moment of the guns' work laid so far (each blast is laid
    *  once). */
   let drawn = new Set<number>(), now = new Set<number>(), laid = -Infinity;
@@ -374,7 +375,7 @@ export function createFrame(renderer: WebGPURenderer, world: World, options: Fra
     terrain.update(eye);
     // the groves' shadows fall along the sun over the place they are cast round, which stays put however the eye moves
     const shade = groves.update(eye);
-    if (shade) shadeSun.fromArray(sunAt(env.sunPlaces, env.timeOfDay, shade.chart.at));
+    if (shade) shadeSun.fromArray(sunAt(env.sunPlaces, env.timeOfDay, shade.chart.at, shadeAt));
     const landShadow = shadow.update(shadeSun, shade);
 
     // 1. offscreen, what is due

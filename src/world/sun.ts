@@ -21,7 +21,7 @@
 //
 // Pure arithmetic: no three, so it runs in node for the tests.
 
-import { add, dot, frameAt, normalize, scale, transport, type Vec3 } from './sphere.ts';
+import { add, dot, frameAt, normalize, put, scale, transport, type FrameOut, type Out3, type Vec3 } from './sphere.ts';
 
 /** The latitude whose day the hours are, radians: the trade-wind tropics. */
 export const LATITUDE = (10 * Math.PI) / 180;
@@ -41,32 +41,39 @@ export interface SunPlaces { anchor: Vec3; origin: Vec3 }
  */
 export const sunPlaces = (start: Vec3, heart: Vec3): SunPlaces => ({ anchor: start, origin: scale(normalize(heart), -1) });
 
-/** Toward the sun at `hours` (0–24) in a place's own frame, as (east, up, north): its height and its compass bearing. */
-export function sunInSky(hours: number): Vec3 {
+/** Toward the sun at `hours` (0–24) in a place's own frame, as (east, up, north): its height and its compass bearing
+ *  (into `out`). */
+export function sunInSky(hours: number, out?: Out3): Vec3 {
   const h = ((hours - 12) / 12) * Math.PI;
-  const [sl, cl, sd, cd] = [Math.sin(LATITUDE), Math.cos(LATITUDE), Math.sin(DECLINATION), Math.cos(DECLINATION)];
-  return [-cd * Math.sin(h), sl * sd + cl * cd * Math.cos(h), cl * sd - sl * cd * Math.cos(h)];
+  const sl = Math.sin(LATITUDE), cl = Math.cos(LATITUDE), sd = Math.sin(DECLINATION), cd = Math.cos(DECLINATION);
+  return put(out, -cd * Math.sin(h), sl * sd + cl * cd * Math.cos(h), cl * sd - sl * cd * Math.cos(h));
 }
 
-/** A unit vector toward the sun a (east, up, north) in the frame at p. */
-const inFrame = (p: Vec3, a: Vec3): Vec3 => {
-  const f = frameAt(p);
-  return add(add(scale(f.east, a[0]), f.up, a[1]), f.north, a[2]);
+/** The working vectors of what follows: each written over each call, so nothing is made once warm. */
+const frame: FrameOut = { up: [0, 0, 0], east: [0, 0, 0], north: [0, 0, 0] };
+const sky: Out3 = [0, 0, 0], here: Out3 = [0, 0, 0], ca: Out3 = [0, 0, 0], cb: Out3 = [0, 0, 0], level: Out3 = [0, 0, 0];
+
+/** A unit vector toward the sun a (east, up, north) in the frame at p (into `out`, not a). */
+const inFrame = (p: Vec3, a: Vec3, out?: Out3): Vec3 => {
+  const f = frameAt(p, frame);
+  return add(add(scale(f.east, a[0], out), f.up, a[1], out), f.north, a[2], out);
 };
 
-/** Toward the sun at the origin at `hours`, world space: the anchor's sun carried there. */
-export function sunAtOrigin(places: SunPlaces, hours: number): Vec3 {
-  return carry(inFrame(places.anchor, sunInSky(hours)), places.anchor, places.origin);
+/** Toward the sun at the origin at `hours`, world space: the anchor's sun carried there (into `out`). */
+export function sunAtOrigin(places: SunPlaces, hours: number, out?: Out3): Vec3 {
+  return carry(inFrame(places.anchor, sunInSky(hours, sky), here), places.anchor, places.origin, out);
 }
 
-/** A direction s over `from` carried to `to`: its height over the level kept, its bearing transported. */
-function carry(s: Vec3, from: Vec3, to: Vec3): Vec3 {
-  const a = normalize(from), b = normalize(to), y = dot(s, a);
-  const level = add(s, a, -y);
-  return normalize(add(transport(level, a, b), b, y));
+/** A direction s over `from` carried to `to`: its height over the level kept, its bearing transported (into `out`,
+ *  which may be s). */
+function carry(s: Vec3, from: Vec3, to: Vec3, out?: Out3): Vec3 {
+  const a = normalize(from, ca), b = normalize(to, cb), y = dot(s, a);
+  add(s, a, -y, level);
+  return normalize(add(transport(level, a, b, level), b, y, level), out);
 }
 
-/** Toward the sun over p (a vector from the centre, of any length) at `hours`, world space: a unit vector. */
-export function sunAt(places: SunPlaces, hours: number, p: Vec3): Vec3 {
-  return carry(sunAtOrigin(places, hours), places.origin, p);
+/** Toward the sun over p (a vector from the centre, of any length) at `hours`, world space: a unit vector (into
+ *  `out`). */
+export function sunAt(places: SunPlaces, hours: number, p: Vec3, out?: Out3): Vec3 {
+  return carry(sunAtOrigin(places, hours, here), places.origin, p, out);
 }

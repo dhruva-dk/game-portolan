@@ -57,12 +57,19 @@ export const place = (up: Vec3, altitude: number): Vec3 => scale(normalize(up), 
 /** Metres above the sea. */
 export const altitude = (p: Vec3) => length(p) - R;
 
+/** A Frame written into (frameAt's `out`). */
+export interface FrameOut { up: Out3; east: Out3; north: Out3 }
+
+/** The pole, whose cross with up is east. */
+const POLE: Vec3 = [0, 1, 0];
+
 /** Up, east and north at a point. At the poles, where east is undefined, it is taken as −z. */
-export function frameAt(p: Vec3): Frame {
-  const up = normalize(p);
-  const e = cross([0, 1, 0], up);
-  const east = length(e) > 1e-9 ? normalize(e) : ([0, 0, -1] as Vec3);
-  return { up, east, north: cross(up, east) };
+export function frameAt(p: Vec3, out?: FrameOut): Frame {
+  const up = normalize(p, out?.up);
+  const e = cross(POLE, up, out?.east);
+  const east = length(e) > 1e-9 ? normalize(e, out?.east) : put(out?.east, 0, 0, -1);
+  const north = cross(up, east, out?.north);
+  return out ?? { up, east, north };
 }
 
 /** The chart's second axis, z: axis × at. */
@@ -152,19 +159,26 @@ export function along(p: Vec3, t: Vec3, metres: number, out?: CourseOut): Course
   return out;
 }
 
+/** transport's working vectors. */
+const ta: Out3 = [0, 0, 0], tb: Out3 = [0, 0, 0], tw: Out3 = [0, 0, 0], tv: Out3 = [0, 0, 0], tx: Out3 = [0, 0, 0];
+
 /**
  * Tangent t at `from` carried to `to` along the great circle between them (parallel transport): turned with the
  * surface, its length kept.
  */
-export function transport(t: Vec3, from: Vec3, to: Vec3): Vec3 {
-  const a = normalize(from), b = normalize(to);
-  const w = cross(a, b), c = dot(a, b);
+export function transport(t: Vec3, from: Vec3, to: Vec3, out?: Out3): Vec3 {
+  const a = normalize(from, ta), b = normalize(to, tb);
+  const w = cross(a, b, tw), c = dot(a, b);
   const size = length(t);
   // Rodrigues' rotation taking a to b: v·c + w × v + w (w·v)/(1 + c)
-  let v = c > -1 + 1e-9 ? add(add(scale(t, c), cross(w, t)), w, dot(w, t) / (1 + c)) : t;
-  v = add(v, b, -dot(v, b));
+  let v: Vec3 = t;
+  if (c > -1 + 1e-9) {
+    const k = dot(w, t) / (1 + c);
+    v = add(add(scale(t, c, tv), cross(w, t, tx), 1, tv), w, k, tv);
+  }
+  v = add(v, b, -dot(v, b), tv);
   const l = length(v);
-  return l > 1e-12 ? scale(v, size / l) : v;
+  return l > 1e-12 ? scale(v, size / l, out) : put(out, v[0], v[1], v[2]);
 }
 
 /** v less its part along the unit vector `up`: v laid in the tangent plane at up (not made unit). */

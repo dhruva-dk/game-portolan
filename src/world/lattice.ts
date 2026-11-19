@@ -156,13 +156,23 @@ export function anchors(points: Vec3[], wind: (p: Vec3) => Vec3, span: number, a
   return all;
 }
 
-/** The anchors within `reach` metres of p, nearest first. */
-export function near(all: Anchor[], p: Vec3, reach: number): number[] {
-  return all
-    .map((a, i) => ({ i, d: distance(a.at, p) }))
-    .filter((x) => x.d <= reach)
-    .sort((x, y) => x.d - y.d)
-    .map((x) => x.i);
+/** Each anchor's distance, as near last measured it. */
+const measured: number[] = [];
+
+/** The anchors within `reach` metres of p, nearest first (of two as near, the first), written into `out` (made if
+ *  none is given): nothing else is made. */
+export function near(all: readonly Anchor[], p: Vec3, reach: number, out: number[] = []): number[] {
+  out.length = 0;
+  for (let i = 0; i < all.length; i++) {
+    const d = (measured[i] = distance(all[i].at, p));
+    if (d > reach) continue;
+    // (an insertion sort, which keeps the order of those as near)
+    let k = out.length;
+    out.push(i);
+    for (; k > 0 && measured[out[k - 1]] > d; k--) out[k] = out[k - 1];
+    out[k] = i;
+  }
+  return out;
 }
 
 /** Each distance's weight (metres; the nearest counts in full), scaled so Σw² = 1. */

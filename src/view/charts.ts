@@ -52,6 +52,8 @@ export function createCharts(span: number, alike: Likeness, wind: Wind) {
   const count = uniform(3, 'int');
   /** The anchors listed, nearest first: the first `count` are the uniform arrays'. */
   const listed = new Int32Array(all.length);
+  /** Every anchor, nearest the eye first (near's out, refilled each frame). */
+  const nearest: number[] = [];
 
   /**
    * The three anchors nearest the unit vector u (indices into the list) and their weights, Σw² = 1; and if asked,
@@ -131,7 +133,7 @@ export function createCharts(span: number, alike: Likeness, wind: Wind) {
     /** Lists the anchors that can weigh in on the sea drawn out to `reach` metres round the point under the eye. */
     update(eye: Vec3, reach: number) {
       // every anchor, nearest first; those within reach, and never fewer than three
-      const order = near(all, eye, Math.PI * R);
+      const order = near(all, eye, Math.PI * R, nearest);
       let n = 0;
       while (n < order.length && distance(all[order[n]].at, eye) <= reach + margin) n++;
       n = Math.max(3, n);
