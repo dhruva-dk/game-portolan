@@ -24,7 +24,7 @@ import { CLOUD, toEdge, type Cap } from '../sim/storm.ts';
 import { AIR_FOV, type Eye } from '../snapshot.ts';
 import type { ShipPose } from '../world/pose.ts';
 import { smoother } from '../world/scalar.ts';
-import { R, add, cross, dot, length, normalize, place, scale, transport, type Vec3 } from '../world/sphere.ts';
+import { R, add, arc, cross, distance, length, normalize, place, rotateAbout, scale, tangent, transport, type Vec3 } from '../world/sphere.ts';
 import { lookAt, rotate, slerp, type Turn } from '../world/turn.ts';
 
 /** The boom: metres back along the look from its focus, which stands FOCUS metres over the sea and SHOULDER metres to
@@ -55,9 +55,6 @@ const SIGHT = 8;
  *  her, and the look tilted `tilt` radians further down (within its steepest). */
 export interface Shot { boom?: number; spin?: number; tilt?: number }
 
-/** t turned `angle` radians to port about `up`. */
-const turned = (t: Vec3, up: Vec3, angle: number) => normalize(add(scale(t, Math.cos(angle)), cross(up, t), Math.sin(angle)));
-
 /** ground: metres above the sea at a point (negative under water); sea: the waves' height there at a time. */
 export function createChase(ground: (p: Vec3) => number, sea: (p: Vec3, time: number) => number) {
   /** The camera: where it stands (world metres) and how it is turned (it looks down its −z). */
@@ -81,7 +78,7 @@ export function createChase(ground: (p: Vec3) => number, sea: (p: Vec3, time: nu
   const clouded = (eye: Vec3) => !!storm && storm.radius < Math.PI && length(eye) - R > CLOUD.lowest && toEdge(eye, storm) < CLOUD.out;
 
   /** The way the look faces along the surface at her. */
-  const view = () => turned(facing, at, spin);
+  const view = () => rotateAbout(facing, at, spin);
 
   /** Whether the land stands within ROOM of the straight line from a to b (metres, from the centre). */
   const blocked = (a: Vec3, b: Vec3) => {
@@ -118,9 +115,7 @@ export function createChase(ground: (p: Vec3) => number, sea: (p: Vec3, time: nu
     const f = flight!;
     f.done = Math.min(1, f.done + dt / f.span);
     const s = smoother(f.done), to = position, r0 = length(f.from), r1 = length(to);
-    const d0 = scale(f.from, 1 / r0), d1 = scale(to, 1 / r1);
-    const angle = Math.acos(Math.min(1, Math.max(-1, dot(d0, d1))));
-    const dir = angle < 1e-4 ? d1 : scale(add(scale(d0, Math.sin((1 - s) * angle)), d1, Math.sin(s * angle)), 1 / Math.sin(angle));
+    const dir = arc(scale(f.from, 1 / r0), scale(to, 1 / r1), s), angle = distance(f.from, to) / R;
     const lift = Math.sin(s * Math.PI) * Math.min(angle * R * 0.5, 600);
     position = scale(dir, Math.exp(Math.log(r0) * (1 - s) + Math.log(r1) * s) + lift);
     // turning from the look it left with to the one it arrives at, and on the way looking down at the sea between the
@@ -140,7 +135,7 @@ export function createChase(ground: (p: Vec3) => number, sea: (p: Vec3, time: nu
     /** Puts it over her shoulder looking along her heading, at the look's first tilt. */
     reset(pose: ShipPose, time: number, shot: Shot = {}) {
       at = level(pose);
-      facing = normalize(add(pose.forward, at, -dot(pose.forward, at)));
+      facing = normalize(tangent(pose.forward, at));
       pitch = PITCH;
       out = 1;
       flight = null;
@@ -163,9 +158,9 @@ export function createChase(ground: (p: Vec3) => number, sea: (p: Vec3, time: nu
       const up = level(pose);
       facing = transport(facing, at, up);
       at = up;
-      facing = normalize(add(facing, at, -dot(facing, at)));
+      facing = normalize(tangent(facing, at));
       // dragged right, the look turns right; dragged down, it looks down
-      facing = turned(facing, at, -look.x * TURN);
+      facing = rotateAbout(facing, at, -look.x * TURN);
       pitch = Math.min(STEEPEST, Math.max(HIGHEST, pitch + look.y * TILT));
       spin = shot.spin ?? 0;
       put(time, dt, (drawing) => (drawing ? IN : OUT), shot);

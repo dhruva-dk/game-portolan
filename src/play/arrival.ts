@@ -13,7 +13,7 @@
 import type { Eye } from '../snapshot';
 import type { ShipPose } from '../world/pose';
 import { clamp, smoother } from '../world/scalar';
-import { R, add, dot, length, normalize, scale, type Vec3 } from '../world/sphere';
+import { R, add, arc, length, normalize, scale } from '../world/sphere';
 import { lookAt, slerp } from '../world/turn';
 
 export const ARRIVAL = {
@@ -26,13 +26,6 @@ export const ARRIVAL = {
   /** How far through the rest of the way down (by its ratio of distances) it begins to turn onto the chase eye's own. */
   onto: 0.6,
 } as const;
-
-/** The point `f` of the way along the great circle from unit vector a to unit vector b. */
-function arc(a: Vec3, b: Vec3, f: number): Vec3 {
-  const c = Math.min(1, Math.max(-1, dot(a, b))), angle = Math.acos(c);
-  if (angle < 1e-6) return b;
-  return normalize(add(scale(a, Math.sin((1 - f) * angle)), b, Math.sin(f * angle)));
-}
 
 /** The eye `t` seconds into the arrival, coming down onto her (her pose as drawn) to `chase`, the chase eye now; null
  *  once it is there. */

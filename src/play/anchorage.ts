@@ -10,7 +10,7 @@
 import { AIR_FOV, type Eye } from '../snapshot.ts';
 import type { ShipPose } from '../world/pose.ts';
 import { wrapAngle } from '../world/scalar.ts';
-import { add, along, cross, dot, normalize, place, scale, type Vec3 } from '../world/sphere.ts';
+import { along, normalize, place, rotateAbout, scale, tangent, type Vec3 } from '../world/sphere.ts';
 import { lookAt } from '../world/turn.ts';
 
 /** The camera at rest: off her bow by `quarter` radians round from dead ahead, on a boom `boom` metres long rising
@@ -45,19 +45,16 @@ export const relaxed = (o: Orbit, dt: number): Orbit => {
   return { yaw: o.yaw * k, pitch: o.pitch * k };
 };
 
-/** t turned `angle` radians to port about `up`. */
-const turned = (t: Vec3, up: Vec3, angle: number) => normalize(add(scale(t, Math.cos(angle)), cross(up, t), Math.sin(angle)));
-
 /**
  * The eye on her at anchor: her pose as drawn, the orbit, the world's clock (s, for the drift) and the floor under a
  * point (metres over the mean sea of the higher of the land and the waves there), which the eye stays CLEAR above.
  */
 export function anchorageEye(pose: ShipPose, o: Orbit, clock: number, floor: (p: Vec3) => number): Eye {
   const up = normalize(pose.position);
-  const ahead = normalize(add(pose.forward, up, -dot(pose.forward, up)));
+  const ahead = normalize(tangent(pose.forward, up));
   const yaw = Math.PI - LOBBY.quarter + LOBBY.drift * Math.sin((clock / LOBBY.period) * Math.PI * 2) + o.yaw;
   // the boom runs from the pivot back along `boom`'s way, rising at `pitch`
-  const way = turned(ahead, up, yaw), pitch = LOBBY.pitch + o.pitch;
+  const way = rotateAbout(ahead, up, yaw), pitch = LOBBY.pitch + o.pitch;
   const under = along(up, scale(way, -1), LOBBY.boom * Math.cos(pitch)).p;
   const position = place(under, Math.max(LOBBY.height + LOBBY.boom * Math.sin(pitch), floor(under) + CLEAR));
   return { kind: 'air', position, orientation: lookAt(position, place(up, LOBBY.height), normalize(position)), fov: AIR_FOV };

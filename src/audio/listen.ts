@@ -10,7 +10,8 @@
 
 import { HOTBAR, type GunKind, type Kit, type Screen, type Status } from '../player.ts';
 import type { ShipDraw, Snapshot } from '../snapshot.ts';
-import { R, type Vec3 } from '../world/sphere.ts';
+import { clamp } from '../world/scalar.ts';
+import { R, distance, dot, type Vec3 } from '../world/sphere.ts';
 import type { Cue } from './cues.ts';
 
 /** What the sound is given each frame: the world drawn, what the HUD reads, the screen shown, whether the full map
@@ -61,8 +62,6 @@ function screenCue(from: Screen, to: Screen): Cue | null {
   return null;
 }
 
-const dot = (a: Vec3, b: Vec3) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
-
 export function createListen(ground: (p: Vec3) => number) {
   const bed: Bed = { speed: 0, wind: 0, heave: 0, roll: 0, coast: Infinity, wall: Infinity, hull: 1, presence: 0, muffle: 0, covered: 0, clock: 0 };
   let screen: Screen | null = null, map = false, generation = -1, seq = 0, trail = false, closing = false;
@@ -73,7 +72,9 @@ export function createListen(ground: (p: Vec3) => number) {
   let sounding = 0;
   const probe: [number, number, number] = [0, 0, 1];
 
-  /** Sounds the next way round the ring about `at` (a unit vector), each of its distances. */
+  /** Sounds the next way round the ring about `at` (a unit vector), each of its distances. The tangent and the steps
+   *  along the great circle are sphere.ts's (tangent, rotateAbout, along) written out on plain numbers, so a frame's
+   *  sounding makes nothing. */
   const sound = (at: Vec3) => {
     const w = sounding % WAYS, phi = (2 * Math.PI * w) / WAYS;
     // a tangent at `at`: off the axis it is least along
@@ -158,7 +159,7 @@ export function createListen(ground: (p: Vec3) => number) {
         const p = own.pose.position, r = Math.sqrt(dot(p, p)), f = own.pose.forward;
         const sx = (f[1] * p[2] - f[2] * p[1]) / r, sy = (f[2] * p[0] - f[0] * p[2]) / r, sz = (f[0] * p[1] - f[1] * p[0]) / r;
         const sl = Math.sqrt(sx * sx + sy * sy + sz * sz) || 1, u = own.pose.up;
-        const now = Math.asin(Math.max(-1, Math.min(1, (u[0] * sx + u[1] * sy + u[2] * sz) / sl)));
+        const now = Math.asin(clamp((u[0] * sx + u[1] * sy + u[2] * sz) / sl, -1, 1));
         const rate = dt > 0 ? (now - roll) / dt : 0;
         if (dt > 0 && Math.sign(rate) !== Math.sign(rolling) && Math.abs(now) > ROPE && scene.clock - turned > TURNS) {
           if (side < 0) call('rope', null, Math.min(1, Math.abs(now) / 0.07));
@@ -179,12 +180,11 @@ export function createListen(ground: (p: Vec3) => number) {
       bed.roll = roll;
       bed.wind = Math.min(1, 0.22 + 0.5 * bed.speed + (s.blowing ? 0.5 : 0));
       sound(s.at);
-      const arc = R * Math.acos(Math.max(-1, Math.min(1, dot(s.at, s.eye.centre))));
-      bed.wall = s.eye.radius - arc;
+      bed.wall = s.eye.radius - distance(s.at, s.eye.centre);
       bed.hull = s.hullMax > 0 ? s.hull / s.hullMax : 1;
       bed.presence = (1 - s.arriving) * (shown === 'title' ? 0.6 : 1);
       bed.muffle = open ? 1 : shown === 'sinking' || shown === 'sunk' ? 0.45 : 0;
-      bed.covered = Math.max(0, Math.min(1, covered));
+      bed.covered = clamp(covered);
       bed.clock = scene.clock;
       return bed;
     },

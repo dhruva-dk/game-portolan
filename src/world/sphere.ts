@@ -137,6 +137,27 @@ export function transport(t: Vec3, from: Vec3, to: Vec3): Vec3 {
   return l > 1e-12 ? scale(v, size / l) : v;
 }
 
+/** v less its part along the unit vector `up`: v laid in the tangent plane at up (not made unit). */
+export const tangent = (v: Vec3, up: Vec3): Vec3 => add(v, up, -dot(v, up));
+
+/** v turned `angle` radians about the unit vector `axis`, anticlockwise looking down it (Rodrigues): a tangent at up
+ *  turned about up goes to port. Its length is kept. */
+export function rotateAbout(v: Vec3, axis: Vec3, angle: number): Vec3 {
+  const c = Math.cos(angle), s = Math.sin(angle);
+  return add(add(scale(v, c), cross(axis, v), s), axis, dot(axis, v) * (1 - c));
+}
+
+/**
+ * The unit vector `f` of the way along the great circle from unit vector a to unit vector b (spherical linear
+ * interpolation): evenly in angle, a at 0 and b at 1. Where they are all but one (or opposite, which leaves the circle
+ * undefined), b.
+ */
+export function arc(a: Vec3, b: Vec3, f: number): Vec3 {
+  const angle = Math.acos(Math.min(1, Math.max(-1, dot(a, b))));
+  if (angle < 1e-6 || Math.PI - angle < 1e-6) return b;
+  return normalize(add(scale(a, Math.sin((1 - f) * angle)), b, Math.sin(f * angle)));
+}
+
 /** Metres along the surface between two points. */
 export function distance(a: Vec3, b: Vec3): number {
   // (normalize, cross, length and dot as above, written out: nothing made, the same arithmetic)
