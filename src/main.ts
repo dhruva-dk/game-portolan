@@ -185,4 +185,4 @@ async function play(s: Stage): Promise<Played> {
   };
 }
 
-await scenario(RELEASE, stage, play);
+await scenario(RELEASE, stage, play, title);

@@ -159,9 +159,11 @@ function setupOf(release: Setup): Setup {
 /**
  * The page set going: the stage and the game on it, built by main.ts's `stage` and `play` from `release`, or from
  * the setup the switches make of it; then, debugging, opened where the switches say (at sea among the demo ships by
- * default), or the flyer drawn instead of the game.
+ * default), or the flyer drawn instead of the game. `title` is the title the page painted first: the game's flow
+ * takes it down; the flyer, which has no flow, takes it down itself once the ground is baked.
  */
-export async function scenario(release: Setup, stage: (setup: Setup) => Promise<Stage>, play: (s: Stage) => Promise<Played>) {
+export async function scenario(release: Setup, stage: (setup: Setup) => Promise<Stage>, play: (s: Stage) => Promise<Played>,
+  title: { show(on: boolean): void }) {
   if (!DEBUG) {
     const s = await stage(release);
     const p = await play(s);
@@ -169,7 +171,10 @@ export async function scenario(release: Setup, stage: (setup: Setup) => Promise<
   }
   const s = await stage(setupOf(release));
   const room = Math.max(SHIPS, number('ships', 0) + 1);
-  if (flying) return s.draw(flyer(s.canvas, s.start.at, demoShips(s.start.at, room), s.matches.storm));
+  if (flying) {
+    void s.ready.then(() => title.show(false));
+    return s.draw(flyer(s.canvas, s.start.at, demoShips(s.start.at, room), s.matches.storm));
+  }
   const p = await play(s);
   safeArea(uiLayer());
   open(p, demoShips(s.start.at, room - 1));
