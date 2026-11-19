@@ -1,6 +1,6 @@
 // How every solid thing is lit: in two tones. A surface has a colour where the sun reaches it and another, chosen for
 // it (palette.ts), where it does not, with a crisp edge between: where it turns from the sun, and where a shadow is
-// cast on it (the island's, the clouds'), which is the same edge and shows the same shadow colour. Over both lies one
+// cast on it (the land's, the clouds'), which is the same edge and shows the same shadow colour. Over both lies one
 // brightness for the place and the hour (level): the sun and the sky on a white surface facing straight up there, so
 // the frame's exposure holds at every height of the sun, the storm darkens what is in it, and the water dims what is
 // under it, while a shadow keeps its chosen colour and never takes the sky's blue.
@@ -47,9 +47,9 @@ const TINTED = 0.4;
 /** A polished surface's highlight: where n · h passes this, half its edge's width. */
 const SHINE = 0.94, SHINE_EDGE = 0.012;
 
-/** visible(p, n): 0…1, how much of the sun reaches p past what stands on the island (shadow.visible). */
+/** visible(p, n): 0…1, how much of the sun reaches p past what stands on the land (shadow.visible). */
 export function createLighting(sky: Sky, below: Below, visible: (p: Vec3Node, n: Vec3Node) => FloatNode): Light {
-  /** 1 where no shadow is cast on p: the island's and the clouds', each cut to a crisp edge. */
+  /** 1 where no shadow is cast on p: the land's and the clouds', each cut to a crisp edge. */
   const open = (p: Vec3Node, n: Vec3Node): FloatNode => {
     // never finer than the pixel, or the shadow map's texels would show as steps far off
     const seen = visible(p, n).toVar(), w = max(fwidth(seen), CAST_EDGE);

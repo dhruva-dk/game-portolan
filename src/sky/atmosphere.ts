@@ -3,8 +3,10 @@
 // and the tests check them here.
 //
 // Units are kilometres. These are Earth's tables, tied to the observer: the eye stands a few metres above the sea at
-// the top of a sphere of radius BOTTOM, and the small planet's own sky is read through them (view.toSky stretches its
-// elevations so its horizon falls on Earth's).
+// the top of a sphere of radius BOTTOM, and the small planet's own sky is read through them (stretching its
+// elevations so its horizon falls on Earth's: world/sphere.ts's toSky).
+
+import type { Rgb } from '../colour';
 
 export const BOTTOM = 6360;
 export const TOP = 6460;
@@ -33,16 +35,13 @@ export const SEA_ALBEDO = 0.06;
 
 const H = Math.sqrt(TOP * TOP - BOTTOM * BOTTOM);
 
-export type RGB = [number, number, number];
-
 /** Extinction per km at height h (km) above the sea. */
-export function extinction(h: number): RGB {
+export function extinction(h: number): Rgb {
   const rayleigh = Math.exp(-h / RAYLEIGH_SCALE_HEIGHT);
   const mie = Math.exp(-h / MIE_SCALE_HEIGHT);
   const ozone = Math.max(0, 1 - Math.abs(h - OZONE_CENTRE) / OZONE_HALF_WIDTH);
-  return [0, 1, 2].map(
-    (i) => RAYLEIGH_SCATTERING[i] * rayleigh + MIE_EXTINCTION * mie + OZONE_ABSORPTION[i] * ozone,
-  ) as RGB;
+  const at = (i: 0 | 1 | 2) => RAYLEIGH_SCATTERING[i] * rayleigh + MIE_EXTINCTION * mie + OZONE_ABSORPTION[i] * ozone;
+  return [at(0), at(1), at(2)];
 }
 
 /** Distance from radius r along cosine-of-zenith mu to the top of the atmosphere. */
@@ -71,15 +70,17 @@ export function transmittanceRMu(u: number, v: number): [number, number] {
 }
 
 /** Fraction of light surviving from radius r along mu to the top of the atmosphere, marched. */
-export function transmittance(r: number, mu: number, steps = 40): RGB {
+export function transmittance(r: number, mu: number, steps = 40): Rgb {
   const length = distanceToTop(r, mu);
   const dt = length / steps;
-  const depth: RGB = [0, 0, 0];
+  let red = 0, green = 0, blue = 0;
   for (let i = 0; i < steps; i++) {
     const t = (i + 0.5) * dt;
     const h = Math.sqrt(r * r + t * t + 2 * r * mu * t) - BOTTOM;
-    const e = extinction(h);
-    for (let c = 0; c < 3; c++) depth[c] += e[c] * dt;
+    const [er, eg, eb] = extinction(h);
+    red += er * dt;
+    green += eg * dt;
+    blue += eb * dt;
   }
-  return depth.map((d) => Math.exp(-d)) as RGB;
+  return [Math.exp(-red), Math.exp(-green), Math.exp(-blue)];
 }
