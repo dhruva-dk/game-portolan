@@ -1,7 +1,7 @@
 // The match's HUD, laid on the world as the chartmaker's slips:
 //   top left    the vitals slip: shield (azure) over hull, each with its numeral
 //   top centre  the Storm's clock (its spiral, m:ss; in the Storm's violet under 30 s) and the ships afloat (a ship, a count)
-//   top right   the minimap (minimap.ts), north up: who holds the sea, the islands, the Storm's calm and the next, the
+//   top right   the minimap (minimap.ts), north up: who holds the sea, the land and its coast, the Storm's calm and the next, the
 //               way in from outside it, her arrow (no other ship, no loot); a tap opens the full map
 //   right       under the right thumb, Fire, in the corner: the mark of the gun in hand on a
 //               paper disc, its rounds left under it; while reloading or taking it up a rubric ring running round its

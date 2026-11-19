@@ -30,7 +30,7 @@ export const LIGHT = {
   warm: '#ffd9a0', white: '#fff1d8', ice: '#cfeeff', azure: '#4fc3ff', gold: '#ffcf5a', red: '#ff2a1a', green: '#7be36b',
   mint: '#c8ffb0',
 } as const;
-/** The land on the minimap: its apron's pale wash, its lowland and its hilltops; its contours sepia (isles.ts). */
+/** The land on the minimap: its shallows' pale wash, its lowland and its hilltops; its contours sepia (ground.ts). */
 export const LAND = { apron: '#f4f0d6', low: '#ecdcac', high: '#b08c58', contour: INK.sepia } as const;
 /** The frame's meter (index.html): its ground, its words and labels, and a reading good, fair or poor. */
 const METER = { ground: SHADOW, text: PAPER, label: '#b9a98c', good: '#8fd18a', fair: '#e8c35a', poor: '#f07a5e' } as const;
