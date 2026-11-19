@@ -20,7 +20,7 @@
 //
 // Pure arithmetic: no three, so it runs in node for the tests.
 
-import { FACES, R, horizonDip, type Vec3 } from '../world/sphere.ts';
+import { FACES, R, faceDir, horizonDip, type Vec3 } from '../world/sphere.ts';
 
 export const LOD = {
   /** Quads along a patch's side (a power of two). */
@@ -41,16 +41,9 @@ const SIDE = (R * Math.PI) / 2;
 const size = (level: number) => SIDE / 2 ** level;
 const range = (level: number) => LOD.RANGE * size(level);
 
-/** The unit vector at (u, v), −1…1, on a face: sphere.ts faceDir, inlined. */
-function dirOf(face: number, u: number, v: number, out: number[]): void {
-  const f = FACES[face], gu = Math.tan((u * Math.PI) / 4), gv = Math.tan((v * Math.PI) / 4);
-  out[0] = out[1] = out[2] = 0;
-  out[f.across[0]] += f.across[1];
-  out[f.u[0]] += f.u[1] * gu;
-  out[f.v[0]] += f.v[1] * gv;
-  const l = Math.hypot(out[0], out[1], out[2]);
-  out[0] /= l; out[1] /= l; out[2] /= l;
-}
+/** Each face's axes, as a patch's floats hold them (STRIDE): across, u and v, each a signed unit vector. */
+const AXES = new Float32Array(6 * 9);
+FACES.forEach((face, f) => [face.across, face.u, face.v].forEach(([axis, sign], m) => (AXES[9 * f + 3 * m + axis] = sign)));
 
 /** The eye, as the selection needs it: where it is (world metres) and how high over the sea. */
 export interface LodEye { position: Vec3; height: number }
@@ -65,7 +58,9 @@ export function createLod(bounds: { lo: Float32Array; hi: Float32Array }) {
   // each level's nodes' bounds, coarser from finer, and their spheres
   const levels = Array.from({ length: LOD.LEAF + 1 }, (_, L) => {
     const n = 2 ** L;
-    return { n, lo: new Float32Array(6 * n * n), hi: new Float32Array(6 * n * n), sphere: new Float32Array(6 * n * n * 4), dir: new Float32Array(6 * n * n * 3) };
+    const nodes = 6 * n * n;
+    const lo = new Float32Array(nodes), hi = new Float32Array(nodes);
+    return { n, lo, hi, sphere: new Float32Array(4 * nodes), dir: new Float32Array(3 * nodes) };
   });
   levels[LOD.LEAF].lo.set(bounds.lo);
   levels[LOD.LEAF].hi.set(bounds.hi);
@@ -85,54 +80,63 @@ export function createLod(bounds: { lo: Float32Array; hi: Float32Array }) {
   // a sphere round each node's patch: about its middle at its middle height, out to the farthest of nine points on
   // its edges and middle at its lowest and highest, and at sea level (where the shader measures the morph from, so a
   // node's nearest is never further than any of its vertices is for the morph)
-  const d: number[] = [0, 0, 0];
   for (const { n, lo, hi, sphere, dir } of levels) {
     for (let f = 0; f < 6; f++) for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
       const k = (f * n + j) * n + i, s = 2 / n, u0 = -1 + i * s, v0 = -1 + j * s;
       const low = R + Math.min(lo[k], 0), high = R + Math.max(hi[k], 0), mid = (low + high) / 2;
-      dirOf(f, u0 + s / 2, v0 + s / 2, d);
+      const d = faceDir(f, u0 + s / 2, v0 + s / 2);
       const cx = d[0] * mid, cy = d[1] * mid, cz = d[2] * mid;
       dir.set(d, 3 * k);
       let r = 0;
       for (let b = 0; b <= 2; b++) for (let a = 0; a <= 2; a++) {
-        dirOf(f, u0 + (a * s) / 2, v0 + (b * s) / 2, d);
-        for (const h of [low, high]) r = Math.max(r, Math.hypot(d[0] * h - cx, d[1] * h - cy, d[2] * h - cz));
+        const e = faceDir(f, u0 + (a * s) / 2, v0 + (b * s) / 2);
+        for (const h of [low, high]) r = Math.max(r, Math.hypot(e[0] * h - cx, e[1] * h - cy, e[2] * h - cz));
       }
       sphere.set([cx, cy, cz, r], 4 * k);
     }
   }
 
+  // the selection under way: the eye, its distance from the centre and its horizon's dip; who says what is in view;
+  // where the patches go, how many fit and how many so far
+  let ex = 0, ey = 0, ez = 0, el = 1, dip = 0, max = 0, count = 0;
+  let inView: InView = () => false, out: Float32Array = new Float32Array(0);
+
+  /** Selects node (i, j) of face f at level L, or its children, or nothing. */
+  function visit(L: number, f: number, i: number, j: number) {
+    if (count >= max) return;
+    const { n, hi, sphere, dir } = levels[L], k = (f * n + j) * n + i;
+    const cx = sphere[4 * k], cy = sphere[4 * k + 1], cz = sphere[4 * k + 2], r = sphere[4 * k + 3];
+    // behind the horizon: further round the planet from under the eye than the eye sees ground as high as its
+    const round = Math.acos(Math.min(1, (ex * dir[3 * k] + ey * dir[3 * k + 1] + ez * dir[3 * k + 2]) / el));
+    if (round - r / R > dip + horizonDip(Math.max(hi[k], 0))) return;
+    if (!inView(cx, cy, cz, r)) return;
+    const near = Math.hypot(cx - ex, cy - ey, cz - ez) - r;
+    if (L < LOD.LEAF && near < range(L + 1)) {
+      for (let q = 0; q < 4; q++) visit(L + 1, f, 2 * i + (q & 1), 2 * j + (q >> 1));
+      return;
+    }
+    const s = 2 / n, o = count++ * STRIDE, quad = size(L) / LOD.P;
+    out[o] = -1 + i * s;
+    out[o + 1] = -1 + j * s;
+    out[o + 2] = s;
+    out[o + 3] = 0.5 + 0.1 * quad;
+    out[o + 4] = LOD.MORPH * range(L);
+    out[o + 5] = range(L);
+    for (let m = 0; m < 9; m++) out[o + 6 + m] = AXES[9 * f + m];
+  }
+
   return {
-    /** The patches to draw for `eye`, those `inView` can see, into `out`; how many (no more than fit). */
-    select(eye: LodEye, inView: InView, out: Float32Array): number {
-      const [ex, ey, ez] = eye.position, el = Math.hypot(ex, ey, ez), dip = horizonDip(eye.height);
-      const max = Math.floor(out.length / STRIDE);
-      let count = 0;
-      const visit = (L: number, f: number, i: number, j: number) => {
-        if (count >= max) return;
-        const { n, hi, sphere, dir } = levels[L], k = (f * n + j) * n + i;
-        const cx = sphere[4 * k], cy = sphere[4 * k + 1], cz = sphere[4 * k + 2], r = sphere[4 * k + 3];
-        // behind the horizon: further round the planet from under the eye than the eye sees ground as high as its
-        const round = Math.acos(Math.min(1, (ex * dir[3 * k] + ey * dir[3 * k + 1] + ez * dir[3 * k + 2]) / el));
-        if (round - r / R > dip + horizonDip(Math.max(hi[k], 0))) return;
-        if (!inView(cx, cy, cz, r)) return;
-        const near = Math.hypot(cx - ex, cy - ey, cz - ez) - r;
-        if (L < LOD.LEAF && near < range(L + 1)) {
-          for (let q = 0; q < 4; q++) visit(L + 1, f, 2 * i + (q & 1), 2 * j + (q >> 1));
-          return;
-        }
-        const s = 2 / n, o = count++ * STRIDE, face = FACES[f], quad = size(L) / LOD.P;
-        out[o] = -1 + i * s;
-        out[o + 1] = -1 + j * s;
-        out[o + 2] = s;
-        out[o + 3] = 0.5 + 0.1 * quad;
-        out[o + 4] = LOD.MORPH * range(L);
-        out[o + 5] = range(L);
-        for (const [m, axis] of [face.across, face.u, face.v].entries()) {
-          out[o + 6 + 3 * m] = out[o + 7 + 3 * m] = out[o + 8 + 3 * m] = 0;
-          out[o + 6 + 3 * m + axis[0]] = axis[1];
-        }
-      };
+    /** The patches to draw for `eye`, those `seen` can see, into `into`; how many (no more than fit). */
+    select(eye: LodEye, seen: InView, into: Float32Array): number {
+      ex = eye.position[0];
+      ey = eye.position[1];
+      ez = eye.position[2];
+      el = Math.hypot(ex, ey, ez);
+      dip = horizonDip(eye.height);
+      inView = seen;
+      out = into;
+      max = Math.floor(into.length / STRIDE);
+      count = 0;
       for (let f = 0; f < 6; f++) visit(0, f, 0, 0);
       return count;
     },

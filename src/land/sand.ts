@@ -1,17 +1,18 @@
 // The ground's look, wherever it is: sand in flat bands by height, each of two tones (palette.ts) with a crisp edge
 // to the next: the sea floor's pale sand, with rubble and sea grass where the ground's cover says (ground.ts) and
 // stones and weed strewn over it (strewn.ts); a paler band along the waterline; the beach; the deeper, drier sand
-// higher up; and under the trees, where fronds have fallen, a darker patch. The bands' edges wander with the ground's
-// mottling, so none is a contour line. Where the ground is steeper than sand lies, a cliff's bare rock in strata.
-// On land the cover carries the land's own (world/planet-terrain.ts): earthier sand in patches where the shrubs grow,
-// and the tops' bare rock. High up, the pale dunes (halfway to the summit: world/planet-terrain.ts BANDS).
+// higher up. The bands' edges wander with the ground's mottling, so none is a contour line. Where the ground is
+// steeper than sand lies, a cliff's bare rock in strata. On land the cover carries the land's own
+// (world/planet-terrain.ts): earthier sand in patches where the shrubs grow, and the tops' bare rock. High up, the pale
+// dunes (halfway to the summit: world/planet-terrain.ts BANDS).
 //
-// Everything is a function of the world position alone (the sea floor's mesh slides along under the eye).
+// Everything is a function of the world position alone (the ground's mesh changes its detail under the eye:
+// terrain-mesh.ts).
 // Lit like everything else (sky/light.ts).
 
 import { dot, float, fract, max, mix, vec3 } from 'three/tsl';
 import {
-  LITTER, ROCK, SAND, SAND_DRY, SAND_DUNE, SAND_LOAM, SAND_SHORE, SEABED_SAND, SEABED_STONE, SEABED_WEED, STRATUM, type Tones,
+  ROCK, SAND, SAND_DRY, SAND_DUNE, SAND_LOAM, SAND_SHORE, SEABED_SAND, SEABED_STONE, SEABED_WEED, STRATUM, type Tones,
 } from '../palette.ts';
 import { BANDS } from '../world/planet-terrain.ts';
 import type { View } from '../view/view.ts';
@@ -22,23 +23,19 @@ import { cut, type FloatNode, type Vec3Node } from '../tsl.ts';
 
 /** Where each band lies (world/planet-terrain.ts BANDS). */
 const { shore: SHORE, beach: BEACH, dry: DRY, loam: LOAM_AT, rubble: RUBBLE, ragged: RAGGED } = BANDS;
-/** The ground's cover (0…1) past which sea grass grows on the floor; and litter under the trees. */
-const GRASS = 0.65, FALLEN = 0.5;
+/** The ground's cover (0…1) past which sea grass grows on the floor. */
+const GRASS = 0.65;
 /** Ground steeper than a cliff's face (CLIFF, rise over run) by SHEER is bare rock (BARE: the cosine of its tilt), so a
  *  dune's steep scraps stay sand; its strata this many metres apart, the pale band this share of each. */
 const CLIFF = 1.2, SHEER = 2.2, BARE = 1 / Math.hypot(1, CLIFF * SHEER), STRATA = 2.2, STRATUM_SHARE = 0.35;
 
-export type Sand = (p: Vec3Node, n: Vec3Node, litter: FloatNode | null) => Vec3Node;
+/** The colour of the ground at world position p, n its normal (world). */
+export type Sand = (p: Vec3Node, n: Vec3Node) => Vec3Node;
 
 /** dune: the height past which the sand is the dunes', metres (BANDS). */
 export function createSand(view: View, ground: Ground, light: Light, dune: number): Sand {
   const strewn = createStrewn();
-
-  /**
-   * The colour of the ground at world position p, n its normal (world), litter 0…1 how thickly fronds and leaves
-   * lie there (null on the sea floor's mesh, where none can).
-   */
-  return (p, n, litter) => {
+  return (p, n) => {
     const height = view.altitude(p), cover = ground.cover(p);
     const mottle = cover.z.sub(0.5);
     const level = height.add(mottle.mul(RAGGED));
@@ -67,7 +64,6 @@ export function createSand(view: View, ground: Ground, light: Light, dune: numbe
     const bare = max(cliff, tops).mul(cut(height, SHORE));
     lay(ROCK, bare);
     lay(STRATUM, bare.mul(cut(fract(level.div(STRATA)), 1 - STRATUM_SHARE)));
-    if (litter) lay(LITTER, cut(litter.add(mottle.mul(0.6)), FALLEN).mul(cut(height, BEACH)));
     return light.toon(p, n, lit, shadow);
   };
 }

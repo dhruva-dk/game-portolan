@@ -11,7 +11,8 @@
 // normal the ground's there: the mesh gives the shape, never the shading, so its level of detail never shows in it.
 
 import {
-  Float32BufferAttribute, InstancedBufferGeometry, InstancedInterleavedBuffer, InterleavedBufferAttribute, Mesh, MeshBasicNodeMaterial, Sphere,
+  Float32BufferAttribute, InstancedBufferGeometry, InstancedInterleavedBuffer, InterleavedBufferAttribute, Mesh,
+  MeshBasicNodeMaterial, Sphere,
 } from 'three/webgpu';
 import { Fn, attribute, clamp, distance, fract, normalize, positionGeometry, positionWorld, tan } from 'three/tsl';
 import type { Vec2Node } from '../tsl.ts';
@@ -58,7 +59,7 @@ function patchGeometry(): InstancedBufferGeometry {
 export function createTerrainMesh(view: View, ground: Ground, sand: Sand, terrain: Terrain) {
   const lod = createLod(heightBounds(terrain, 2 ** LOD.LEAF));
   const geometry = patchGeometry();
-  const patches = new InstancedInterleavedBuffer(new Float32Array(MOST * STRIDE), STRIDE);
+  const list = new Float32Array(MOST * STRIDE), patches = new InstancedInterleavedBuffer(list, STRIDE);
   const field = (name: string, offset: number) => geometry.setAttribute(name, new InterleavedBufferAttribute(patches, 3, offset));
   // terrain-lod.ts STRIDE: corner and size; skirt and morph; the face's axes
   // (not 'patch': WGSL keeps that word)
@@ -84,21 +85,24 @@ export function createTerrainMesh(view: View, ground: Ground, sand: Sand, terrai
     const up = onFace(g.sub(odd.mul(k)));
     return view.place(up, ground.height(up).sub(positionGeometry.z.mul(morph.x)));
   })();
-  material.colorNode = Fn(() => sand(positionWorld, ground.normal(positionWorld), null))();
+  material.colorNode = Fn(() => sand(positionWorld, ground.normal(positionWorld)))();
   const mesh = new Mesh(geometry, material);
   mesh.frustumCulled = false;
 
-  const bounds = new Sphere(), list = patches.array as Float32Array;
+  // whether a patch's bounds lie in the view of the eye being drawn for
+  const bounds = new Sphere();
+  let frustum: Eye['frustum'] | null = null;
+  const inView = (x: number, y: number, z: number, radius: number) => {
+    bounds.center.set(x, y, z);
+    bounds.radius = radius;
+    return frustum !== null && frustum.intersectsSphere(bounds);
+  };
 
   return {
     mesh,
     /** Chooses the patches for `eye`, and sends them. */
     update(eye: Eye) {
-      const inView = (x: number, y: number, z: number, radius: number) => {
-        bounds.center.set(x, y, z);
-        bounds.radius = radius;
-        return eye.frustum.intersectsSphere(bounds);
-      };
+      frustum = eye.frustum;
       const count = lod.select(eye, inView, list);
       geometry.instanceCount = count;
       patches.clearUpdateRanges();
