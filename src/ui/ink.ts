@@ -155,3 +155,19 @@ export function galleon(x: number, y: number, size: number, o: { sail?: string; 
 export function svg(w: number, h: number, body = '') {
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" overflow="visible">${body}</svg>`;
 }
+
+/** svg()'s <svg> as an element, `body` set into it. */
+export function svgNode(w: number, h: number, body = ''): SVGSVGElement {
+  const el = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  el.setAttribute('viewBox', `0 0 ${w} ${h}`);
+  el.setAttribute('width', `${w}`);
+  el.setAttribute('height', `${h}`);
+  el.setAttribute('overflow', 'visible');
+  el.innerHTML = body;
+  return el;
+}
+
+/** How many ids have been given out (uid). */
+let ids = 0;
+/** An id no other element of the page has, for a def a drawing makes for itself (a clip). */
+export const uid = (name: string) => `${name}-${++ids}`;

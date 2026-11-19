@@ -1,8 +1,8 @@
-// The screens round the lobby, after the UI sheet as the owner reworked it. Each was drawn on the sheet's page, 956 ×
-// 440 units with a phone's safe insets (62 each end, 20 at the bottom); on any screen the page is scaled by the UI's
-// size (ui.ts size: the iPad's 1180 × 820 takes it 1.74×, as the HUD) and grows or shrinks to the screen's own shape,
-// and each of its pieces keeps to the edge it was drawn against, the screen's safe area there or the gutter (Page,
-// at): no shape of screen letterboxes it.
+// The screens round the lobby, after the UI sheet as the owner reworked it. Each was drawn on the drawn page (ui.ts
+// DRAWN: 956 × 440 with a phone's safe insets); on any screen the page is scaled by the UI's size (ui.ts size: the
+// iPad's 1180 × 820 takes it 1.74×, as the HUD) and grows or shrinks to the screen's own shape, and each of its pieces
+// keeps to the edge it was drawn against, the screen's safe area there or the gutter (ui.ts at): no shape of screen
+// letterboxes it.
 // Each fades in and out (ways.ts FADE), never cut to.
 //   title   an opaque sheet over the world loading: rhumb lines, the rose whose needle swings while the world loads and
 //           settles north when it is ready, her galleon gilt below; it moves on by itself (flow.ts)
@@ -13,98 +13,38 @@
 // Each folio has its close mark at its corner; a tap outside it closes it too. Her match's end is ends.ts's.
 // No words anywhere; numerals only.
 
-import { INK, PAPER, WASH, bar, galleon, glyph, paperDisc, roughRect, svg } from './ink';
+import { INK, PAPER, WASH, bar, galleon, glyph, paperDisc, roughRect, svgNode } from './ink';
 import { rhumbs, rose } from './marks';
-import { GUTTER, INSET, fade, onTap, size, uiLayer } from './ui';
-
-export const W = 956, H = 440;
+import { onTap, region } from './touch';
+import { at, fade, onResize, page, screen, type Page } from './ui';
 
 /** Sound and look speed, each 0–1; whether the frame's cost shows in its corner (meter.ts). */
 export interface Settings { sound: number; look: number; stats: boolean }
 
-/** The page on this screen, in the page's units: its size, and the safe area's edges with a margin inside them. */
-export interface Page { w: number; h: number; left: number; top: number; right: number; bottom: number }
-
-/** The edges the screens were drawn against: the phone's safe insets (62, 0, 62, 20) and 2 more. */
-const DRAWN = { left: 64, top: 16, right: W - 64, bottom: H - 22 } as const;
-
-/** The safe area's insets, as the page has them (--safe-* stand in for them off the device: ui.ts), read off an unseen
- *  element's padding. */
-let probe: HTMLElement | null = null;
-function insets() {
-  if (!probe) {
-    probe = document.createElement('div');
-    probe.style.cssText = 'position:absolute;visibility:hidden;padding:var(--safe-top, env(safe-area-inset-top)) '
-      + 'var(--safe-right, env(safe-area-inset-right)) var(--safe-bottom, env(safe-area-inset-bottom)) var(--safe-left, env(safe-area-inset-left))';
-    uiLayer().appendChild(probe);
-  }
-  const s = getComputedStyle(probe), px = (v: string) => parseFloat(v) || 0;
-  return { top: px(s.paddingTop), right: px(s.paddingRight), bottom: px(s.paddingBottom), left: px(s.paddingLeft) };
-}
-
-/** The page on a screen `width` × `height` CSS px with the given safe insets: scaled as the drawn page fits it, grown
- *  to its shape. */
-export function pageFor(width: number, height: number, safe: { top: number; right: number; bottom: number; left: number }): Page {
-  const k = size(width, height), w = width / k, h = height / k;
-  const edge = (px: number) => Math.max(px / k + INSET, GUTTER);
-  return { w, h, left: edge(safe.left), top: edge(safe.top), right: w - edge(safe.right), bottom: h - edge(safe.bottom) };
-}
-
-/** `body`, drawn on the phone's page, kept to the page's edges here: `x` to its left or right, or centred between them,
- *  and `y` to its top or bottom, or centred between them. */
-export function at(p: Page, x: 'left' | 'centre' | 'right', y: 'top' | 'middle' | 'bottom', body: string) {
-  const dx = x === 'left' ? p.left - DRAWN.left : x === 'right' ? p.right - DRAWN.right : (p.left + p.right - DRAWN.left - DRAWN.right) / 2;
-  const dy = y === 'top' ? p.top - DRAWN.top : y === 'bottom' ? p.bottom - DRAWN.bottom : (p.top + p.bottom - DRAWN.top - DRAWN.bottom) / 2;
-  return dx === 0 && dy === 0 ? body : `<g transform="translate(${dx.toFixed(1)} ${dy.toFixed(1)})">${body}</g>`;
-}
-
 /** A full-screen sheet: an <svg> of the page on this screen. `opaque` lays parchment under it; `press` makes the whole
  *  sheet take touches (else only its regions do, and the rest reach the world under it). */
 export function sheet(opaque: boolean, press = true) {
-  const root = document.createElement('div');
-  root.className = press ? 'screen press' : 'screen';
-  root.style.display = 'none';
+  const root = screen(press);
   if (opaque) root.style.background = 'radial-gradient(ellipse at 50% 45%, #f7eedb 0%, #f0e2c4 60%, #d8bf90 100%)';
-  uiLayer().appendChild(root);
   /** The last drawing, made again when the screen changes shape while it shows. */
   let last: (() => SVGSVGElement) | null = null;
   /** Draws `body` on the page as it is on this screen, then `bind`s what takes touches in it. */
   const set = (body: (p: Page) => string, bind?: (el: SVGSVGElement) => void) => {
     last = () => {
-      const p = pageFor(innerWidth, innerHeight, insets());
-      root.innerHTML = svg(p.w, p.h, body(p));
-      const el = root.firstElementChild as SVGSVGElement;
+      const p = page(), el = svgNode(p.w, p.h, body(p));
       el.setAttribute('width', '100%');
       el.setAttribute('height', '100%');
+      root.replaceChildren(el);
       bind?.(el);
       return el;
     };
     return last();
   };
-  addEventListener('resize', () => {
-    if (last && root.style.display !== 'none') last();
+  onResize(() => {
+    if (last && !root.hidden) last();
   });
   return { root, set, show: (on: boolean, ms?: number) => fade(root, on, ms) };
 }
-
-/** A press-able region of a sheet, by its id: taken by a touch that comes down on it and lifts on it. */
-export const region = (el: SVGSVGElement, id: string, act: () => void) => {
-  const r = el.querySelector<SVGGElement>(`#${id}`);
-  if (!r) return;
-  // the class, not a style on the group: a touch lands on the shapes inside it, which the layer's rule would
-  // otherwise leave untouchable (ui.ts)
-  r.classList.add('press');
-  let down = -1;
-  r.addEventListener('pointerdown', (e) => {
-    down = e.pointerId;
-    e.stopPropagation();
-  });
-  r.addEventListener('pointerup', (e) => {
-    e.stopPropagation();
-    if (e.pointerId === down) act();
-    down = -1;
-  });
-};
 
 /** The banner every way on is drawn on (the lobby's PLAY): a pennant `w` wide centred on (x, y), its swallowtail at
  *  the left and its point at the right, with `mark` laid on it. `gilt` washes it gold. */
@@ -116,26 +56,20 @@ export function banner(x: number, y: number, w: number, mark: string, gilt = fal
     + mark;
 }
 
-/** The needle's swing, laid down once for every title drawn. */
-let swingLaid = false;
+/** The needle's swing (its keyframes: ui.ts). */
 const SWING = 'needle 1.6s ease-in-out infinite alternate';
 
-/** The title, the one loading screen: shown while the world is made, and again over the way home while the lobby is
- *  made under it (passage.ts); its needle swinging until then. It takes no tap: the flow moves on to the lobby as the
- *  world is ready (flow.ts). */
+/** The title, the one loading screen, made once (main.ts): shown while the world is made, and again over the way home
+ *  while the lobby is made under it (passage.ts), over every other screen; its needle swinging until then. It takes no
+ *  tap: the flow moves on to the lobby as the world is ready (flow.ts). */
 export function createTitle() {
   const s = sheet(true);
+  s.root.style.zIndex = '3';
   let needle!: SVGGElement, settled = false;
   s.set((p) => at(p, 'centre', 'middle', rhumbs(478, 182, 1100, 0.3) + rose(478, 182, 126, 0) + galleon(478, 352, 74, { hull: 'url(#h-gold)' })), (el) => {
     needle = el.querySelector<SVGGElement>('.needle')!;
     needle.style.animation = settled ? 'none' : SWING;
   });
-  if (!swingLaid) {
-    swingLaid = true;
-    const style = document.createElement('style');
-    style.textContent = '@keyframes needle { from { transform: rotate(-38deg) } to { transform: rotate(52deg) } }';
-    document.head.appendChild(style);
-  }
   return {
     root: s.root,
     show: s.show,
@@ -226,17 +160,14 @@ export function createSettings(get: () => Settings, set: (s: Settings) => void, 
       + (on ? `<path d="M${x + 102} ${cy}L${x + 108} ${cy + 7}L${x + 119} ${cy - 7}" fill="none" stroke="${INK.white}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>` : '');
     const stats = `<g id="stats">${glass(234)}<rect x="${x + 30}" y="${234 - 24}" width="${w - 60}" height="48" fill="transparent"/>${box(234, v.stats)}</g>`;
     f.draw(row('sound', 118, glyph('menu.speaker', x + 54, 118, 30), v.sound, WASH.azure) + row('look', 176, look(176), v.look, WASH.ochre) + stats, (el) => {
-      const toggle = el.querySelector<SVGGElement>('#stats')!;
-      toggle.style.pointerEvents = 'auto';
-      toggle.addEventListener('pointerup', () => {
+      region(el, 'stats', () => {
         set({ ...get(), stats: !get().stats });
         draw();
       });
       for (const id of ['sound', 'look'] as const) {
-        const g = el.querySelector<SVGGElement>(`#${id}`)!;
-        g.style.pointerEvents = 'auto';
-        g.addEventListener('pointerup', (e) => {
-          const box = g.getBoundingClientRect(), bx = (x + 96 - (x + 90)) / 214;
+        const row = region(el, id, (e) => {
+          // where along the bar: its hit box runs 6 units before the bar's 200 and 8 past it
+          const box = row!.getBoundingClientRect(), bx = 6 / 214;
           const t = Math.min(Math.max(((e.clientX - box.left) / box.width - bx) / (200 / 214), 0), 1);
           set({ ...get(), [id]: Math.round(t * 20) / 20 });
           draw();

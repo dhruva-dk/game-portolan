@@ -17,7 +17,7 @@ import { laid, layOf, metres, place } from './disc';
 import { createGround } from './ground';
 import { createHeld } from './held';
 import { INK, PAPER, WASH, svg } from './ink';
-import { sizeNow } from './ui';
+import { view } from './ui';
 
 /** Metres from her to the disc's rim: at her 16 m/s some 25 s of sailing, twice a cannon's 200 m reach; some 4.5 m a
  *  pixel on the hud's disc (hud.ts MINIMAP). */
@@ -59,7 +59,7 @@ export function createMinimap(host: HTMLElement, size: number, { coasts, ground:
   (host.firstElementChild as SVGSVGElement).style.position = 'absolute';
   const canvas = document.createElement('canvas');
   // its pixels as many as it is shown at, grown by the UI's size (ui.ts)
-  const dpr = Math.min(devicePixelRatio * sizeNow(), 4);
+  const dpr = Math.min(devicePixelRatio * view.k, 4);
   canvas.width = canvas.height = Math.round(inner * 2 * dpr);
   canvas.style.cssText = `position:absolute;left:${r - inner}px;top:${r - inner}px;width:${inner * 2}px;height:${inner * 2}px;border-radius:50%`;
   host.appendChild(canvas);

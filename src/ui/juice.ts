@@ -17,8 +17,9 @@
 import { HER, blowOf, felt, isGun, type Moment, type Status } from '../player';
 import { createFlash, PICKUP, SCREEN } from './flash';
 import { createHits } from './hits';
-import { glyph, svg } from './ink';
+import { glyph, svgNode } from './ink';
 import type { Glyph } from './glyphs';
+import { view } from './ui';
 
 /** The HUD's pieces it moves: the vitals slip, the Fire and Gust discs, and the hotbar's slots (gun's first). */
 export interface Parts { vitals: HTMLElement; fire: HTMLElement; gust: HTMLElement; slots: readonly HTMLElement[] }
@@ -48,17 +49,16 @@ export function createJuice(body: HTMLElement, parts: Parts) {
   const shake = (el: HTMLElement) =>
     el.animate([{ translate: '0 0' }, { translate: '-6px 0' }, { translate: '5px 0' }, { translate: '-3px 0' }, { translate: '0 0' }], { duration: 320, easing: 'ease-out' });
 
-  /** The piece's mark flown from `from` (CSS px) to the slot. */
+  /** The piece's mark flown from `from` (CSS px) to the slot, drawn at the drawn size and grown by the UI's size. */
   const fly = (name: Glyph, from: { x: number; y: number } | null, slot: HTMLElement) => {
-    const box = slot.getBoundingClientRect(), home = body.getBoundingClientRect();
+    const box = slot.getBoundingClientRect(), home = body.getBoundingClientRect(), k = view.k;
     const to = { x: box.left - home.left + box.width / 2, y: box.top - home.top + box.height / 2 };
     const start = from ?? { x: home.width / 2, y: home.height * 0.6 };
-    const el = document.createElement('div');
-    el.style.cssText = `position:absolute;left:0;top:0;width:44px;height:44px;margin:-22px 0 0 -22px;pointer-events:none`;
-    el.innerHTML = svg(44, 44, glyph(name, 22, 22, 34));
+    const el = svgNode(44, 44, glyph(name, 22, 22, 34));
+    el.style.cssText = 'position:absolute;left:0;top:0;margin:-22px 0 0 -22px';
     body.appendChild(el);
-    const at = (p: { x: number; y: number }, s: number) => ({ transform: `translate(${p.x.toFixed(1)}px,${p.y.toFixed(1)}px) scale(${s})` });
-    const up = { x: start.x, y: start.y - 40 }, all = (FLY.burst + FLY.flight) * 1000;
+    const at = (p: { x: number; y: number }, s: number) => ({ transform: `translate(${p.x.toFixed(1)}px,${p.y.toFixed(1)}px) scale(${(s * k).toFixed(3)})` });
+    const up = { x: start.x, y: start.y - 40 * k }, all = (FLY.burst + FLY.flight) * 1000;
     const a = el.animate([
       { ...at(start, FLY.scale[0]), opacity: 0 },
       { ...at(up, FLY.scale[1]), opacity: 1, offset: FLY.burst / (FLY.burst + FLY.flight) },
@@ -70,8 +70,8 @@ export function createJuice(body: HTMLElement, parts: Parts) {
     };
   };
 
-  const answer = (m: Moment, w: number, h: number) => {
-    const middle = { x: w / 2, y: h / 2 };
+  const answer = (m: Moment) => {
+    const { w, h, k } = view, middle = { x: w / 2, y: h / 2 }, above = 18 * k;
     switch (m.kind) {
       case 'fired':
         if (m.ship !== HER || then - fired < FIRED_APART) return;
@@ -84,12 +84,12 @@ export function createJuice(body: HTMLElement, parts: Parts) {
         if (m.by === HER && m.ship !== HER) {
           const { cross, look: r } = DEALT[blowOf(m)];
           hits.cross(cross, middle.x, middle.y);
-          if (m.seen) hits.figure(m.ship, points, m.hull <= 0, false, m.seen.x, m.seen.y - 18);
+          if (m.seen) hits.figure(m.ship, points, m.hull <= 0, false, m.seen.x, m.seen.y - above);
           flash.flash(r.flash, m.broke ? 1 : felt.dealt(points));
           if ('vignette' in r) flash.vignette(r.vignette);
         } else if (m.ship === HER && points > 0) {
           const r = { broke: SCREEN.shieldLost, hull: SCREEN.hurt, shield: null }[blowOf(m)];
-          hits.arc(m.bearing, w, h, m.hull <= 0);
+          hits.arc(m.bearing, w, h, k, m.hull <= 0);
           if (r) {
             flash.flash(r.flash, m.broke ? 1 : felt.taken(points));
             flash.vignette(r.vignette, m.broke ? 1 : felt.taken(points), m.bearing);
@@ -101,7 +101,7 @@ export function createJuice(body: HTMLElement, parts: Parts) {
       case 'sank':
         if (m.by !== HER || m.ship === HER) return;
         hits.cross('kill', middle.x, middle.y);
-        if (m.seen) hits.figure(m.ship, 0.0001, false, true, m.seen.x, m.seen.y - 18);
+        if (m.seen) hits.figure(m.ship, 0.0001, false, true, m.seen.x, m.seen.y - above);
         flash.flash(SCREEN.sink.flash);
         return;
       case 'took': {
@@ -136,11 +136,10 @@ export function createJuice(body: HTMLElement, parts: Parts) {
     update(s: Status, shown: boolean) {
       const t = performance.now(), dt = Math.min(0.1, (t - then) / 1000);
       then = t;
-      const w = body.clientWidth, h = body.clientHeight;
       for (const m of s.moments) {
         if (m.seq <= heard) continue;
         heard = m.seq;
-        if (shown) answer(m, w, h);
+        if (shown) answer(m);
       }
       if (!shown) hits.clear();
       flash.update(dt, s.hullMax > 0 ? s.hull / s.hullMax : 1, shown && !s.sunk);

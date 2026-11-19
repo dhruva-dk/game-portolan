@@ -9,7 +9,8 @@ import { fade, uiLayer } from './ui';
 export function createVeil() {
   const held = document.createElement('canvas');
   held.className = 'screen';
-  held.style.cssText = 'width:100%;height:100%;display:none';
+  held.style.cssText = 'width:100%;height:100%';
+  held.hidden = true;
   uiLayer().prepend(held);
   /** The change waiting on the next frame drawn. */
   let then: (() => void) | null = null;
@@ -31,10 +32,10 @@ export function createVeil() {
       held.getContext('2d')!.drawImage(picture, 0, 0);
       held.style.transition = 'none';
       held.style.opacity = '1';
-      held.style.display = '';
+      held.hidden = false;
       held.classList.remove('gone');
       act();
-      // (laid out whole before it fades)
+      // (a reflow, so it is laid out whole before it fades: the usual way to start a transition)
       void held.offsetWidth;
       fade(held, false, FADE + 80);
     },

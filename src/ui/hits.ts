@@ -7,7 +7,7 @@
 //   arc      a blow on her: a rubric arc on the screen's rim toward whoever dealt it, fading
 // No words; numerals only. Its own layer, over the world and under the HUD's pieces; it runs on the page's clock.
 
-import { FIGURES, INK } from './ink';
+import { FIGURES, INK, svgNode } from './ink';
 
 /** How long each lasts, s; how close together blows on one ship sum, s; the most figures and arcs at once. */
 export const MARK = { cross: 0.28, kill: 0.8, figure: 0.9, arc: 1.1 } as const;
@@ -37,12 +37,16 @@ export function createHits(parent: HTMLElement) {
   let figures: { ship: number; total: number; last: number; el: HTMLDivElement; kill: boolean }[] = [];
   let arcs = 0;
 
-  const svgEl = (w: number, h: number, body: string, x: number, y: number) => {
-    const el = document.createElement('div');
-    el.style.cssText = `position:absolute;left:${(x - w / 2).toFixed(1)}px;top:${(y - h / 2).toFixed(1)}px;width:${w}px;height:${h}px`;
-    el.innerHTML = `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" style="overflow:visible">${body}</svg>`;
-    layer.appendChild(el);
-    return el;
+  /** A mark at (x, y) CSS px, drawn at the drawn size and grown by the UI's size about its place (ui.ts .mark): what
+   *  holds it, and what is drawn in it, which moves. */
+  const placed = (x: number, y: number, el: HTMLElement | SVGSVGElement) => {
+    const at = document.createElement('div');
+    at.className = 'mark';
+    at.style.left = `${x.toFixed(1)}px`;
+    at.style.top = `${y.toFixed(1)}px`;
+    at.append(el);
+    layer.appendChild(at);
+    return at;
   };
   const gone = (el: HTMLElement, a: Animation) => (a.onfinish = () => el.remove());
 
@@ -68,8 +72,8 @@ export function createHits(parent: HTMLElement) {
           body += `<path d="M${c + Math.cos(a) * r} ${c + Math.sin(a) * r}l${Math.cos(a) * 5} ${Math.sin(a) * 5}" stroke="${AZURE}" stroke-width="2" stroke-linecap="round"/>`;
         }
       }
-      const el = svgEl(s, s, body, x, y), life = (kill ? MARK.kill : kind === 'break' ? 0.6 : MARK.cross) * 1000;
-      gone(el, el.animate(
+      const drawn = svgNode(s, s, body), life = (kill ? MARK.kill : kind === 'break' ? 0.6 : MARK.cross) * 1000;
+      gone(placed(x, y, drawn), drawn.animate(
         kill
           ? [{ transform: 'scale(1.6) rotate(0deg)', opacity: 1 }, { transform: 'scale(1) rotate(45deg)', opacity: 1, offset: 0.3 }, { transform: 'scale(1) rotate(45deg)', opacity: 0 }]
           : [{ transform: `scale(${POP})`, opacity: 1 }, { transform: 'scale(1)', opacity: 1, offset: 0.35 }, { transform: kind === 'break' ? 'scale(1.5)' : 'scale(1)', opacity: 0 }],
@@ -84,31 +88,34 @@ export function createHits(parent: HTMLElement) {
       if (same) same.el.remove();
       figures = figures.filter((f) => f !== same && f.el.isConnected).slice(-(MOST - 1));
       const last = kill || !!same?.kill, size = figureSize(total, last), fill = last ? GOLD : shield ? AZURE : INK.rubric;
-      const el = document.createElement('div');
-      el.textContent = String(total);
-      el.style.cssText = `position:absolute;left:${x.toFixed(1)}px;top:${y.toFixed(1)}px;font:italic 700 ${size.toFixed(0)}px ${FIGURES};color:${fill};`
-        + `-webkit-text-stroke:${(size / 9).toFixed(1)}px ${INK.iron};paint-order:stroke;transform:translate(-50%,-50%);white-space:nowrap`;
-      layer.appendChild(el);
+      const text = document.createElement('div');
+      text.textContent = String(total);
+      text.style.cssText = `font:italic 700 ${size.toFixed(0)}px ${FIGURES};color:${fill};`
+        + `-webkit-text-stroke:${(size / 9).toFixed(1)}px ${INK.iron};paint-order:stroke;white-space:nowrap`;
+      const el = placed(x, y, text);
       figures.push({ ship, total, last: t, el, kill: last });
+      // rising from its place (the mark centres it there), drifting aside
       const drift = (ship % 2 ? 1 : -1) * 10;
-      gone(el, el.animate([
-        { transform: 'translate(-50%,-50%) scale(1.35)', opacity: 1 },
-        { transform: 'translate(-50%,-90%) scale(1)', opacity: 1, offset: 0.25 },
-        { transform: `translate(calc(-50% + ${drift}px),-260%) scale(.9)`, opacity: 0 },
+      gone(el, text.animate([
+        { transform: 'translateY(0) scale(1.35)', opacity: 1 },
+        { transform: 'translateY(-40%) scale(1)', opacity: 1, offset: 0.25 },
+        { transform: `translate(${drift}px,-210%) scale(.9)`, opacity: 0 },
       ], { duration: MARK.figure * 1000 * (last ? 1.4 : 1), easing: 'ease-out' }));
     },
-    /** A blow on her from `bearing` (radians clockwise from ahead), on a `w` × `h` screen; `shield` azure. */
-    arc(bearing: number, w: number, h: number, shield: boolean) {
+    /** A blow on her from `bearing` (radians clockwise from ahead), on a `w` × `h` screen whose UI's size is `k`
+     *  (ui.ts size); `shield` azure. */
+    arc(bearing: number, w: number, h: number, k: number, shield: boolean) {
       if (arcs >= ARCS) return;
-      const p = rimAt(bearing, w, h), s = 120, c = s / 2, r = 54;
+      const p = rimAt(bearing, w, h), s = 120, c = s / 2, r = 54, back = (r - 8) * k;
       // the arc runs across the rim's line toward the middle: square to the bearing
       const a0 = bearing - Math.PI / 2 - HALF, a1 = bearing - Math.PI / 2 + HALF;
       const at = (a: number) => `${(c + Math.cos(a) * r).toFixed(1)} ${(c + Math.sin(a) * r).toFixed(1)}`;
       const d = `M${at(a0)}A${r} ${r} 0 0 1 ${at(a1)}`, ink = shield ? AZURE : INK.rubric;
-      const el = svgEl(s, s, `<path d="${d}" fill="none" stroke="${INK.iron}" stroke-width="9" stroke-linecap="round" opacity=".45"/>`
-        + `<path d="${d}" fill="none" stroke="${ink}" stroke-width="6" stroke-linecap="round"/>`, p.x - Math.sin(bearing) * (r - 8), p.y + Math.cos(bearing) * (r - 8));
+      const drawn = svgNode(s, s, `<path d="${d}" fill="none" stroke="${INK.iron}" stroke-width="9" stroke-linecap="round" opacity=".45"/>`
+        + `<path d="${d}" fill="none" stroke="${ink}" stroke-width="6" stroke-linecap="round"/>`);
+      const el = placed(p.x - Math.sin(bearing) * back, p.y + Math.cos(bearing) * back, drawn);
       arcs++;
-      const a = el.animate([{ opacity: 1, transform: 'scale(1.15)' }, { opacity: 1, transform: 'scale(1)', offset: 0.15 }, { opacity: 0, transform: 'scale(1)' }], { duration: MARK.arc * 1000, easing: 'ease-in' });
+      const a = drawn.animate([{ opacity: 1, transform: 'scale(1.15)' }, { opacity: 1, transform: 'scale(1)', offset: 0.15 }, { opacity: 0, transform: 'scale(1)' }], { duration: MARK.arc * 1000, easing: 'ease-in' });
       a.onfinish = () => {
         el.remove();
         arcs--;

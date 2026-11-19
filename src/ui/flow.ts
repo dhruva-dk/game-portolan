@@ -1,12 +1,14 @@
 // The screens' order, as ways.ts tables it: the title, the lobby with its folios, the match, and her end over the live
 // world (the camera's beat on it, then her result with its ways on: watch the match on, or home). Every way is her tap
 // on something drawn for it, or the match's own course as the game reports it (player.ts End), but the title's, taken
-// as the world is ready; nothing moves on by a clock of its own. Every screen fades in and out; where the world itself changes at once it cross-fades (PLAY:
-// veil.ts), or (home to the lobby) the match fades under the title, the one loading screen, held until the lobby is drawn (passage.ts). The HUD shows in the match (fading in at the end of the arrival: hud.ts), fades out as
-// her end begins, and comes back, only its clock, count and disc, while she watches another ship.
+// as the world is ready; nothing moves on by a clock of its own. Every screen fades in and out; where the world itself
+// changes at once it cross-fades (PLAY: veil.ts), or (home to the lobby) the match fades under the title, the one
+// loading screen, held until the lobby is drawn (passage.ts). The HUD shows in the match (fading in at the end of the
+// arrival: hud.ts), fades out as her end begins, and comes back, only its clock, count and disc, while she watches
+// another ship.
 
-import type { createGlobe } from './globe';
-import type { HudState, createHud } from './hud';
+import type { Globe } from './globe';
+import type { Hud, HudState } from './hud';
 import type { End } from '../player';
 import type { Sea } from '../snapshot';
 import { createResult, createWatching } from './ends';
@@ -17,7 +19,7 @@ import { createVeil } from './veil';
 import { HOME, IN_MATCH, course, events, way, type Screen, type Tap } from './ways';
 
 const KEY = 'portolan.settings';
-/** Milliseconds the HUD takes to fade out as her end begins (0117 AT.dry: 0.3 s, a little slower over a sinking). */
+/** Milliseconds the HUD takes to fade out as her end begins: slow enough to read as the match drying away, not cut. */
 const DRY = 600;
 
 /** Settings kept on the device; never required (a private window may refuse them). */
@@ -42,7 +44,7 @@ function saveSettings(s: Settings) {
 export interface FlowActions { play(): void; home(): void; watch(): void; switch(by: number): void }
 
 /** The flow, from `start`; `title` the title as the page painted it first, before the world was built (main.ts). */
-export function createFlow(hud: ReturnType<typeof createHud>, globe: ReturnType<typeof createGlobe>, start: Screen, act: FlowActions, title: Title) {
+export function createFlow(hud: Hud, globe: Globe, start: Screen, act: FlowActions, title: Title) {
   let screen: Screen = start, settings = loadSettings();
   /** Her end as last reported (null while she fights). */
   let end: End | null = null;
@@ -55,8 +57,7 @@ export function createFlow(hud: ReturnType<typeof createHud>, globe: ReturnType<
   }, () => tap('close'));
   const result = createResult({ watch: () => tap('watch'), leave: () => tap('leave') });
   const watching = createWatching({ leave: () => tap('leave'), switch: (by) => tap('switch', by) });
-  const passage = createPassage();
-  hud.root.style.display = 'none';
+  const passage = createPassage(title);
 
   /** Her tap on something drawn for a way on: taken if the screen has that way. Where the world changes at once, the
    *  change waits: PLAY's on the next frame drawn, held over it and cross-fading (veil.ts); home's under the parchment,
@@ -89,7 +90,8 @@ export function createFlow(hud: ReturnType<typeof createHud>, globe: ReturnType<
   /** Shows `next`: each screen and piece faded in or out as it now stands. */
   function go(next: Screen) {
     screen = next;
-    title.show(next === 'title');
+    // (on the way home the title is the passage's)
+    if (!passage.going) title.show(next === 'title');
     lobby.show(next === 'lobby' || next === 'settings');
     settingsFolio.show(next === 'settings');
     // the HUD: the match's, or only its clock, count and disc while she watches; gone as her end begins
@@ -135,9 +137,8 @@ export function createFlow(hud: ReturnType<typeof createHud>, globe: ReturnType<
     /** A frame: what the HUD reads, and who holds the sea (her id in it) as the frame draws it. */
     update(s: HudState, sea?: Sea, own?: number | null) {
       if (IN_MATCH.includes(screen)) {
-        // the full map's window would show the HUD under it
-        hud.root.style.visibility = globe.open ? 'hidden' : '';
-        hud.update(s, sea, own);
+        // (the full map's window would show the HUD under it)
+        hud.update(s, sea, own, globe.open);
         globe.update(s);
       }
     },

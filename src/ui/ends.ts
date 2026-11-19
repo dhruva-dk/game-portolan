@@ -9,10 +9,11 @@
 // No words; numerals only.
 
 import type { End } from '../player';
-import { INK, PAPER, WASH, figure, glyph, paperDisc, roughCircle, slip, svg } from './ink';
+import { INK, PAPER, WASH, figure, glyph, paperDisc, roughCircle, slip, svg, uid } from './ink';
 import { laurel } from './marks';
-import { at, banner, region, sheet } from './screens';
-import { fade, onTap, piece, uiLayer } from './ui';
+import { banner, sheet } from './screens';
+import { onTap, region } from './touch';
+import { at, fade, piece, screen } from './ui';
 
 /** A place's laurel and numeral: gold for the first, silver for the top five, red for the top ten, ink below. */
 const placed = (place: number) =>
@@ -26,10 +27,13 @@ const percent = (share: number) => {
 
 /** The sea held's mark: a disc of the chart's sea with a patch of her water washed on it in her scarlet, its border
  *  inked (the territory's own look on the sea), `r` across its half. */
-const held = (x: number, y: number, r: number) => `<clipPath id="held-c"><circle cx="${x}" cy="${y}" r="${r}"/></clipPath>`
-  + `<circle cx="${x}" cy="${y}" r="${r}" fill="#c3d8cf"/>`
-  + `<path d="${roughCircle(x + r * 0.22, y + r * 0.12, r * 0.62, 7, r * 0.18)}" fill="rgba(196,40,46,.42)" stroke="rgb(176,28,36)" stroke-width="1.8" clip-path="url(#held-c)"/>`
-  + `<circle cx="${x}" cy="${y}" r="${r}" fill="none" stroke="${INK.iron}" stroke-width="1.4"/>`;
+const held = (x: number, y: number, r: number) => {
+  const clip = uid('held');
+  return `<clipPath id="${clip}"><circle cx="${x}" cy="${y}" r="${r}"/></clipPath>`
+    + `<circle cx="${x}" cy="${y}" r="${r}" fill="#c3d8cf"/>`
+    + `<path d="${roughCircle(x + r * 0.22, y + r * 0.12, r * 0.62, 7, r * 0.18)}" fill="rgba(196,40,46,.42)" stroke="rgb(176,28,36)" stroke-width="1.8" clip-path="url(#${clip})"/>`
+    + `<circle cx="${x}" cy="${y}" r="${r}" fill="none" stroke="${INK.iron}" stroke-width="1.4"/>`;
+};
 
 /** The spyglass: a brass glass of three draws, its eye end at the left, tilted up to the right; `s` its length. */
 export const spyglass = (x: number, y: number, s: number) => {
@@ -126,8 +130,11 @@ export function createResult(act: { watch(): void; leave(): void }) {
       else if (on && end?.over && watching) {
         // the match ended under it: WATCH fades, LEAVE stays where it is
         const w = s.root.querySelector<SVGGElement>('#watch');
-        w?.classList.remove('press');
-        w?.setAttribute('style', 'transition: opacity .3s; opacity: 0');
+        if (w) {
+          w.classList.remove('press');
+          w.style.transition = 'opacity .3s';
+          w.style.opacity = '0';
+        }
         watching = false;
       }
       shown = on;
@@ -144,10 +151,7 @@ export function createResult(act: { watch(): void; leave(): void }) {
 /** While she watches: the anchor's disc (home) at the top left, and at the foot the spyglass between the arrows that
  *  turn her to the ship before (−1) or the next (+1). */
 export function createWatching(act: { leave(): void; switch(by: number): void }) {
-  const root = document.createElement('div');
-  root.className = 'screen';
-  root.style.display = 'none';
-  uiLayer().appendChild(root);
+  const root = screen();
   const leave = piece(root, 'top left', true, true);
   leave.innerHTML = svg(56, 56, paperDisc(28, 28, 25) + anchor(28, 28, 36));
   onTap(leave, act.leave);

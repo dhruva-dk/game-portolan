@@ -3,6 +3,7 @@
 
 import type { Hands } from '../player';
 import { STICK } from './input';
+import { show } from './ui';
 
 const INK = 'rgba(58, 38, 20, 0.7)';
 const KNOB = 22;
@@ -11,7 +12,8 @@ const KNOB = 22;
 export function createStick(layer: HTMLElement) {
   const ring = document.createElement('div');
   ring.style.cssText = `position:absolute;left:0;top:0;width:${2 * STICK}px;height:${2 * STICK}px;border:2px solid ${INK};
-    border-radius:50%;box-sizing:border-box;display:none;scale:var(--k, 1)`;
+    border-radius:50%;box-sizing:border-box;scale:var(--k)`;
+  ring.hidden = true;
   const knob = document.createElement('div');
   knob.style.cssText = `position:absolute;left:${STICK - KNOB}px;top:${STICK - KNOB}px;width:${2 * KNOB}px;height:${2 * KNOB}px;
     border:2px solid ${INK};border-radius:50%;box-sizing:border-box;background:rgba(232, 214, 178, 0.3)`;
@@ -19,11 +21,8 @@ export function createStick(layer: HTMLElement) {
   layer.prepend(ring);
 
   return (stick: Hands['stick']) => {
-    if (!stick?.centre) {
-      ring.style.display = 'none';
-      return;
-    }
-    ring.style.display = 'block';
+    show(ring, !!stick?.centre);
+    if (!stick?.centre) return;
     // `translate`, not `transform`: the UI's size (`scale`) applies after `translate` but before `transform`, and would
     // carry her thumb's place off with it
     ring.style.translate = `${stick.centre[0] - STICK}px ${stick.centre[1] - STICK}px`;
