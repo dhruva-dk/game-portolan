@@ -1,6 +1,6 @@
-// Hit-stop: a blow's moment held for a few hundredths of a second, 0117's (juice/time.ts, its recipes' stops). The
-// match steps on the time this returns (game.ts), so a stop slows the ships, the balls and the sea drawn from them,
-// while the camera's shake and the HUD keep real time: the shake playing over the held frame is what sells the blow.
+// Hit-stop: a blow's moment held for a few hundredths of a second. The match steps on the time this returns
+// (game.ts), so a stop slows the ships, the balls and the sea drawn from them, while the camera's shake and the HUD
+// keep real time: the shake playing over the held frame is what sells the blow.
 //
 // Stops never add up: overlapping ones take the deepest. One in its hold masks every stop of a lower priority. Below a
 // sinking, frozen time is budgeted (BUDGET seconds of it a rolling second), so a run of blows cannot make a slideshow:
@@ -17,7 +17,7 @@ export type Priority = keyof typeof PRIORITY;
 /** The time's scale while held (0 stops it), real seconds held at it and easing back, and its priority. */
 export interface Stop { scale: number; hold: number; release: number; priority: Priority }
 
-/** 0117's recipes' stops (juice/recipes.ts). */
+/** The stops, by what asks them. */
 export const STOPS = {
   hit: { scale: 0.05, hold: 0.045, release: 0.06, priority: 'hit' },
   shieldHit: { scale: 0.1, hold: 0.035, release: 0.05, priority: 'hit' },
@@ -32,8 +32,8 @@ const DEALT: Record<Blow, Stop> = { broke: STOPS.shieldBreak, hull: STOPS.hit, s
 /** Frozen seconds a rolling second allows below a sinking; the longest hold; a frame. */
 const BUDGET = 0.2, WINDOW = 1, MAX_HOLD = 0.6, FRAME = 1 / 60;
 
-/** The stop a deed asks, seen from ship `me`, and how strongly (0117's app/juice.ts): her blows and her sinkings of
- *  others, the blows she takes. */
+/** The stop a deed asks, seen from ship `me`, and how strongly: her blows and her sinkings of others, the blows she
+ *  takes. */
 export function stopFor(d: Deed, me: number): { stop: Stop; strength: number } | null {
   if (d.kind === 'sank') return d.by === me && d.ship !== me ? { stop: STOPS.sink, strength: 1 } : null;
   if (d.kind !== 'struck') return null;
@@ -47,9 +47,13 @@ type Live = Stop & { age: number };
 const valueOf = (s: Live) =>
   (s.age < s.hold ? s.scale : s.scale + (1 - s.scale) * easeInOut(Math.min(1, (s.age - s.hold) / Math.max(1e-6, s.release))));
 const budgeted = (s: Stop) => PRIORITY[s.priority] < PRIORITY.kill;
+/** Frozen time still to come from a live stop. */
+const toCome = (s: Live) => (1 - s.scale) * (Math.max(0, s.hold - s.age) + (Math.min(s.release, s.hold + s.release - s.age) * 2) / 3);
 
 export function createStops() {
-  let live: Live[] = [], spent: { t: number; frozen: number }[] = [], now = 0;
+  /** The stops live; the frozen time spent, each frame's (the moment it was spent, and how much), oldest first. */
+  const live: Live[] = [], spentAt: number[] = [], frozen: number[] = [];
+  let now = 0;
 
   /** The scale now: the deepest of the stops at or above the highest priority still holding. */
   const current = () => {
@@ -60,9 +64,12 @@ export function createStops() {
     return scale;
   };
   /** Frozen time already spent this rolling second, and still to come from the live budgeted stops. */
-  const used = () =>
-    spent.reduce((a, s) => a + s.frozen, 0) +
-    live.filter(budgeted).reduce((a, s) => a + (1 - s.scale) * (Math.max(0, s.hold - s.age) + (Math.min(s.release, s.hold + s.release - s.age) * 2) / 3), 0);
+  const used = () => {
+    let spent = 0, coming = 0;
+    for (const f of frozen) spent += f;
+    for (const s of live) if (budgeted(s)) coming += toCome(s);
+    return spent + coming;
+  };
 
   return {
     /** A stop asked `strength` strong (0…1: shallower, and held for less). */
@@ -80,15 +87,28 @@ export function createStops() {
     update(dt: number): number {
       const scale = current();
       now += dt;
-      for (const s of live) s.age += dt;
-      live = live.filter((s) => s.age < s.hold + s.release);
-      if (scale < 1 && live.length && live.every(budgeted)) spent.push({ t: now, frozen: (1 - scale) * dt });
-      spent = spent.filter((s) => s.t >= now - WINDOW);
+      // those done, and the frozen time older than the window, dropped in place
+      let n = 0;
+      for (const s of live) {
+        s.age += dt;
+        if (s.age < s.hold + s.release) live[n++] = s;
+      }
+      live.length = n;
+      if (scale < 1 && live.length && live.every(budgeted)) {
+        spentAt.push(now);
+        frozen.push((1 - scale) * dt);
+      }
+      n = 0;
+      for (let i = 0; i < spentAt.length; i++) {
+        if (spentAt[i] < now - WINDOW) continue;
+        spentAt[n] = spentAt[i];
+        frozen[n++] = frozen[i];
+      }
+      spentAt.length = frozen.length = n;
       return dt * scale;
     },
     clear() {
-      live = [];
-      spent = [];
+      live.length = spentAt.length = frozen.length = 0;
     },
   };
 }
