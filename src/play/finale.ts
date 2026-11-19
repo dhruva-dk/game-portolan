@@ -5,6 +5,7 @@
 // Each eases in over `rise` seconds and then holds its distance, still turning. The beat is how long it is shown on the
 // live world before the screens lay her result over it (ui/flow.ts; the referee reports it: play/referee.ts).
 
+import { smoother, smootherIntegral } from '../world/scalar.ts';
 import { BOOM, type Shot } from './chase.ts';
 
 export type Ending = 'sunk' | 'won';
@@ -16,15 +17,11 @@ export const FINALE = {
   won: { back: 22, tilt: 0.12, turn: 0.22, rise: 2.4, beat: 2.4 },
 } as const;
 
-/** Smoother step (chase.ts's), and its integral from 0 (½ at 1). */
-const smoother = (u: number) => u * u * u * (u * (u * 6 - 15) + 10);
-const integral = (u: number) => u * u * u * u * (u * (u - 3) + 2.5);
-
 /** The shot `seconds` after her end (none while she fights: `end` null). */
 export function finale(end: Ending | null, seconds: number): Shot {
   if (!end) return {};
   const f = FINALE[end], t = Math.max(0, seconds), u = Math.min(1, t / f.rise);
   // turning as it eases in, so it never jerks: the turn's rate is the ease's, its angle that rate's integral
-  const spin = f.turn * (u < 1 ? f.rise * integral(u) : t - f.rise / 2);
+  const spin = f.turn * (u < 1 ? f.rise * smootherIntegral(u) : t - f.rise / 2);
   return { boom: BOOM + f.back * smoother(u), tilt: f.tilt * smoother(u), spin };
 }

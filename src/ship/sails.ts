@@ -17,7 +17,8 @@
 
 import { Vector3 } from 'three/webgpu';
 import type { Detail } from './detail.ts';
-import { Acc, CLOTH, PIVOT, V, lerp, range, sheet } from './kit.ts';
+import { lerp } from '../world/scalar.ts';
+import { Acc, CLOTH, PIVOT, V, range, sheet } from './kit.ts';
 import { MASTS, deckAt, mastZ, topmastZ, truck, zAt, type MastName } from './lines.ts';
 
 /** Where each square yard hangs, how long it is, and the sail it sets. */

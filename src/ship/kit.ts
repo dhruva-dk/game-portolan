@@ -12,11 +12,9 @@
 //   radius  on a rope, its radius (the shader widens a rope to about a pixel far off)
 
 import { Matrix3, Matrix4, Quaternion, Euler, Vector3 } from 'three/webgpu';
+import { lerp } from '../world/scalar.ts';
 
 export const V = (x = 0, y = 0, z = 0): Vector3 => new Vector3(x, y, z);
-export const clamp = (v: number, a: number, b: number): number => Math.min(b, Math.max(a, v));
-export const lerp = (a: number, b: number, t: number): number => a + (b - a) * t;
-export const sm = (a: number, b: number, x: number): number => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
 /** n + 1 numbers from a to b. */
 export const range = (a: number, b: number, n: number): number[] => Array.from({ length: n + 1 }, (_, i) => lerp(a, b, i / n));
 

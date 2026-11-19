@@ -12,6 +12,7 @@
 
 import type { Eye } from '../snapshot';
 import type { ShipPose } from '../world/pose';
+import { clamp, smoother } from '../world/scalar';
 import { R, add, dot, length, normalize, scale, type Vec3 } from '../world/sphere';
 import { lookAt, slerp } from '../world/turn';
 
@@ -25,10 +26,6 @@ export const ARRIVAL = {
   /** How far through the rest of the way down (by its ratio of distances) it begins to turn onto the chase eye's own. */
   onto: 0.6,
 } as const;
-
-/** Smoother step (chase.ts's). */
-const smoother = (t: number) => t * t * t * (t * (t * 6 - 15) + 10);
-const clamp = (x: number) => Math.min(1, Math.max(0, x));
 
 /** The point `f` of the way along the great circle from unit vector a to unit vector b. */
 function arc(a: Vec3, b: Vec3, f: number): Vec3 {

@@ -11,7 +11,8 @@
 
 import { Vector3 } from 'three/webgpu';
 import type { Detail } from './detail.ts';
-import { Acc, KIND, V, along, beam, box, fan, lathe, lerp, range, rod, sheet, sm, trs, tube } from './kit.ts';
+import { lerp, smoothstep } from '../world/scalar.ts';
+import { Acc, KIND, V, along, beam, box, fan, lathe, range, rod, sheet, trs, tube } from './kit.ts';
 import {
   LEN, LEVELS, MOUNT_S, PLINTH, deckAt, halfAt, inside, keel, levelDeck, mainDeck, onSkin, sideTop, zAt, zOf,
 } from './lines.ts';
@@ -115,7 +116,7 @@ function strakes(acc: Acc, D: Detail): void {
     wale(acc, D, (s) => md(s) - 1.35, 0.0, 0.97, 0.12);
     wale(acc, D, (s) => 0.55 + 0.25 * (s - 0.5) ** 2, 0.02, 0.95, 0.1);
     wale(acc, D, (s) => md(s) + 2.15 - 0.3, 0.0, 0.36, 0.09);
-    wale(acc, D, (s) => md(s) + 2.25 - 0.25 + 0.4 * sm(0.8, 1, s), 0.81, 0.975, 0.08);
+    wale(acc, D, (s) => md(s) + 2.25 - 0.25 + 0.4 * smoothstep(0.8, 1, s), 0.81, 0.975, 0.08);
     wale(acc, D, (s) => md(s) + 4.3 - 0.3, 0.0, 0.13, 0.08);
   });
   // the painted strakes just over each wale, and a band along the waist's sheer: the captain's colour. Twice the
@@ -126,7 +127,8 @@ function strakes(acc: Acc, D: Detail): void {
     strake(acc, D, (s) => md(s) - 1.22, (s) => md(s) - 1.22 + 0.1 * k, 0.0, 0.96);
     strake(acc, D, (s) => md(s) + 0.3, (s) => md(s) + 0.3 + 0.1 * k, 0.42, 0.75);
     strake(acc, D, (s) => md(s) + 2.0, (s) => md(s) + 2.0 + 0.1 * k, 0.0, 0.37);
-    strake(acc, D, (s) => md(s) + 2.45 + 0.4 * sm(0.8, 1, s), (s) => md(s) + 2.45 + 0.1 * k + 0.4 * sm(0.8, 1, s), 0.81, 0.97);
+    strake(acc, D, (s) => md(s) + 2.45 + 0.4 * smoothstep(0.8, 1, s),
+      (s) => md(s) + 2.45 + 0.1 * k + 0.4 * smoothstep(0.8, 1, s), 0.81, 0.97);
     strake(acc, D, (s) => md(s) + 4.45, (s) => md(s) + 4.45 + 0.1 * k, 0.0, 0.14);
   });
 }

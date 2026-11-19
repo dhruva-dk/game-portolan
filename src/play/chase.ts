@@ -23,6 +23,7 @@
 import { CLOUD, toEdge, type Cap } from '../sim/storm.ts';
 import { AIR_FOV, type Eye } from '../snapshot.ts';
 import type { ShipPose } from '../world/pose.ts';
+import { smoother } from '../world/scalar.ts';
 import { R, add, cross, dot, length, normalize, place, scale, transport, type Vec3 } from '../world/sphere.ts';
 import { lookAt, rotate, slerp, type Turn } from '../world/turn.ts';
 
@@ -56,9 +57,6 @@ export interface Shot { boom?: number; spin?: number; tilt?: number }
 
 /** t turned `angle` radians to port about `up`. */
 const turned = (t: Vec3, up: Vec3, angle: number) => normalize(add(scale(t, Math.cos(angle)), cross(up, t), Math.sin(angle)));
-
-/** Smoother step (0117 camera.ts). */
-const smoother = (t: number) => t * t * t * (t * (t * 6 - 15) + 10);
 
 /** ground: metres above the sea at a point (negative under water); sea: the waves' height there at a time. */
 export function createChase(ground: (p: Vec3) => number, sea: (p: Vec3, time: number) => number) {

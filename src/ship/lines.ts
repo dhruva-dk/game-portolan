@@ -8,7 +8,8 @@
 // beakhead (hull.ts) under the bowsprit. Three masts: fore and main square-rigged, a lateen mizzen.
 
 import { Vector3 } from 'three/webgpu';
-import { V, clamp, sm } from './kit.ts';
+import { clamp, smoothstep } from '../world/scalar.ts';
+import { V } from './kit.ts';
 
 /** The whole ship is built at the drawings' size and scaled by this: a 26 m galleon, her mainmast 21 m over the water. */
 export const SCALE = 0.6;
@@ -21,7 +22,7 @@ const YB = 1.1;
 export const zAt = (s: number): number => (s - 0.5) * LEN;
 
 /** The keel's underside: level under her length, sweeping up into the forefoot. */
-export const keel = (s: number): number => -DRAFT * (1 - 0.9 * sm(0.6, 1.02, s) ** 1.7) + 0.25 * (1 - sm(0, 0.15, s));
+export const keel = (s: number): number => -DRAFT * (1 - 0.9 * smoothstep(0.6, 1.02, s) ** 1.7) + 0.25 * (1 - smoothstep(0, 0.15, s));
 
 /** The main deck in the waist, with a gentle sheer to either end. */
 export const mainDeck = (s: number): number => 2.45 + 1.4 * (s - 0.55) ** 2;
@@ -34,7 +35,7 @@ export const LEVELS = [
   { name: 'fore', a: 0.785, b: 0.985, rise: 2.25 },
 ] as const;
 export type Level = (typeof LEVELS)[number];
-const foreRise = (s: number) => 0.7 * sm(0.785, 1, s);
+const foreRise = (s: number) => 0.7 * smoothstep(0.785, 1, s);
 export const levelAt = (s: number): Level => LEVELS.find((l) => s <= l.b) ?? LEVELS[3];
 /** The deck of a level at station s. */
 export const levelDeck = (l: Level, s: number): number => mainDeck(s) + l.rise + (l.name === 'fore' ? foreRise(s) : 0);
@@ -45,9 +46,9 @@ export const SOLID = 1.15;
 /** The top of the planked side: each deck's own, the castles' sides sweeping down into the waist in short S-curves. */
 export function sideTop(s: number): number {
   return mainDeck(s) + SOLID
-    + 2.15 * (1 - sm(0.384, 0.42, s))
-    + 2.15 * (1 - sm(0.149, 0.175, s))
-    + (2.25 + foreRise(s)) * sm(0.75, 0.786, s);
+    + 2.15 * (1 - smoothstep(0.384, 0.42, s))
+    + 2.15 * (1 - smoothstep(0.149, 0.175, s))
+    + (2.25 + foreRise(s)) * smoothstep(0.75, 0.786, s);
 }
 
 /** The greatest half-breadth along her: a wide transom, full quarters, a fine run into the bow. */
@@ -62,12 +63,12 @@ function halfBeamHigh(s: number): number {
   return (BEAM / 2) * Math.max(0, Math.cos((Math.PI / 2) * ((s - 0.52) / 0.48)) ** 0.5);
 }
 /** How hollow the sections are low down: a fine run aft, a sharper entry forward. */
-const fine = (s: number) => 1 + 3.2 * (1 - sm(0, 0.34, s)) + 2.4 * sm(0.6, 1, s);
+const fine = (s: number) => 1 + 3.2 * (1 - smoothstep(0, 0.34, s)) + 2.4 * smoothstep(0.6, 1, s);
 
 /** Half-breadth of the skin at station s and height y. */
 export function halfAt(s: number, y: number): number {
   const k = keel(s);
-  const hb = halfBeamLow(s) + (halfBeamHigh(s) - halfBeamLow(s)) * sm(YB, YB + 3, y);
+  const hb = halfBeamLow(s) + (halfBeamHigh(s) - halfBeamLow(s)) * smoothstep(YB, YB + 3, y);
   // tumblehome: the sides lean in above the greatest breadth, most at the high stern
   if (y >= YB) return Math.max(0, hb * (1 - 0.03 * (y - YB) ** 1.3));
   const q = clamp((y - k) / (YB - k), 0, 1);
@@ -77,7 +78,7 @@ export function halfAt(s: number, y: number): number {
 /** Where along her a point of the skin lies: the stem curves forward as it rises; the transom rakes aft. */
 export function zOf(s: number, y: number): number {
   const up = Math.max(0, y - keel(s));
-  return zAt(s) + 2.4 * (Math.sqrt(up + 1) - 1) * sm(0.84, 1, s) - 0.2 * up * (1 - sm(0, 0.08, s));
+  return zAt(s) + 2.4 * (Math.sqrt(up + 1) - 1) * smoothstep(0.84, 1, s) - 0.2 * up * (1 - smoothstep(0, 0.08, s));
 }
 
 /** A point of the skin, side +1 to port and −1 to starboard. */

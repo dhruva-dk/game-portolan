@@ -14,6 +14,7 @@
 
 import { blowOf, felt, type Blow, type Deed } from '../player.ts';
 import type { Eye } from '../snapshot.ts';
+import { easeInOut, lerp, smoother } from '../world/scalar.ts';
 import { add, type Vec3 } from '../world/sphere.ts';
 import { rotate, type Turn } from '../world/turn.ts';
 
@@ -90,8 +91,7 @@ export function noise(x: number, seed: number): number {
     return (h & 0xffff) / 0x8000 - 1;
   };
   const i = Math.floor(x), f = x - i, a = hash(i) * f, b = hash(i + 1) * (f - 1);
-  const u = f * f * f * (f * (f * 6 - 15) + 10);
-  return (a + (b - a) * u) * 2;
+  return lerp(a, b, smoother(f)) * 2;
 }
 
 /** A damped spring at rest at 0 (0117's juice/ease.ts SPRING.kick: 7 Hz, damping 0.55), stepped in small substeps. */
@@ -126,7 +126,7 @@ export function envelope(p: Pulse, age: number): number {
   if (age < p.attack) return 1 - Math.pow(2, (-10 * age) / p.attack);
   if (age < p.attack + p.hold) return 1;
   const t = Math.min(1, (age - p.attack - p.hold) / Math.max(1e-6, p.release));
-  return 1 - (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
+  return 1 - easeInOut(t);
 }
 
 const DEG = Math.PI / 180;

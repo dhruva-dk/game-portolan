@@ -11,14 +11,10 @@ import { Float32BufferAttribute, IcosahedronGeometry, Vector3, type BufferGeomet
 import { mergeVertices, toCreasedNormals } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { createNoise3 } from '../world/noise3';
 import { random } from '../world/random';
+import { smoothstep } from '../world/scalar';
 
 /** Normals are kept apart across bends sharper than this, radians. */
 const CREASE = 0.6;
-
-const smoothstep = (a: number, b: number, x: number) => {
-  const t = Math.min(Math.max((x - a) / (b - a), 0), 1);
-  return t * t * (3 - 2 * t);
-};
 
 /** detail: the icosphere's subdivision (20 × (detail + 1)² triangles); big: a weathered mass, else a broken boulder. */
 export function rockShape(seed: number, detail: number, big: boolean): BufferGeometry {

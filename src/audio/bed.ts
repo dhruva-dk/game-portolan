@@ -13,6 +13,7 @@
 //
 // The levels are pure (levels: a Bed in, numbers out); the nodes (createBed) are made once and only set after.
 
+import { clamp } from '../world/scalar.ts';
 import type { Bed } from './listen.ts';
 
 /** Every number the bed's nodes are set to: each layer's gain, and the filters that move. */
@@ -30,8 +31,6 @@ export const levels = (): Levels => ({
 /** Seconds the bed's gain under the screens' cover takes to follow it: well inside the cover's own fade, so the sea is
  *  all but gone once the world is covered. */
 const COVER = 0.04;
-
-const clamp = (x: number, a = 0, b = 1) => Math.min(b, Math.max(a, x));
 
 /** Breakers on a shore, 0…1: sets of three swells of their own periods, on the world's clock. */
 export const breakers = (t: number) =>

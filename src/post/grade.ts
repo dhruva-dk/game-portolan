@@ -15,6 +15,8 @@
 
 import { abs, clamp, exp, float, length, luminance, max, min, mix, mod, pow, screenUV, select, smoothstep, step, uniform, vec2, vec3 } from 'three/tsl';
 import type { FloatNode, Vec3Node } from '../tsl';
+// the CPU's numbers, apart from TSL's nodes of the same names
+import * as scalar from '../world/scalar';
 
 type RGB = readonly [number, number, number];
 
@@ -56,15 +58,14 @@ const STORM: Look = {
   exposure: 0.8, temp: -0.15, tint: -0.1, contrast: 1, saturation: 0.92, warm: 1, sea: 0.9, sky: 0.95, fade: 0.03, fadeTo: [0.13, 0.1, 0.19], vignette: 0.32,
 };
 
-const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
-const lerp3 = (a: RGB, b: RGB, t: number): RGB => [lerp(a[0], b[0], t), lerp(a[1], b[1], t), lerp(a[2], b[2], t)];
+const lerp3 = (a: RGB, b: RGB, t: number): RGB => [scalar.lerp(a[0], b[0], t), scalar.lerp(a[1], b[1], t), scalar.lerp(a[2], b[2], t)];
 
 /** Look a and b mixed, t of b. */
 function between(a: Look, b: Look, t: number): Look {
   const out = { ...a };
   for (const k of Object.keys(a) as (keyof Look)[]) {
     const u = a[k], v = b[k];
-    if (typeof u === 'number' && typeof v === 'number') (out[k] as number) = lerp(u, v, t);
+    if (typeof u === 'number' && typeof v === 'number') (out[k] as number) = scalar.lerp(u, v, t);
   }
   return { ...out, fadeTo: lerp3(a.fadeTo, b.fadeTo, t) };
 }
@@ -75,9 +76,8 @@ export function dayLook(rise: number, rising = false): Look {
   let i = 0;
   while (i < DAY.length - 2 && rise > DAY[i + 1][0]) i++;
   const [e0, a] = DAY[i], [e1, b] = DAY[i + 1];
-  const x = Math.min(1, Math.max(0, (rise - e0) / (e1 - e0))), t = x * x * (3 - 2 * x);
-  const day = between(a, b, t);
-  return rising ? between(day, DAWN, 1 - smooth(DAY[0][0], DAY[1][0], rise)) : day;
+  const day = between(a, b, scalar.smoothstep(e0, e1, rise));
+  return rising ? between(day, DAWN, 1 - scalar.smoothstep(DAY[0][0], DAY[1][0], rise)) : day;
 }
 
 /** The curve's knee, of the display's white: light under it is shown as it is. */
@@ -98,11 +98,6 @@ const curve = (light: Vec3Node): Vec3Node => {
 /** Display-linear to the display's sRGB encoding. */
 export const encode = (c: Vec3Node): Vec3Node =>
   mix(c.mul(12.92), pow(max(c, vec3(0)), vec3(1 / 2.4)).mul(1.055).sub(0.055), step(vec3(0.0031308), c));
-
-const smooth = (a: number, b: number, x: number) => {
-  const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
-  return t * t * (3 - 2 * t);
-};
 
 /** Each number of a look, the day's mixed toward the storm's by how deep in it the eye is. */
 type Mixed = { [K in keyof Look]: Look[K] extends number ? FloatNode : Vec3Node };

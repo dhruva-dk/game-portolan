@@ -9,6 +9,7 @@
 
 import { AIR_FOV, type Eye } from '../snapshot.ts';
 import type { ShipPose } from '../world/pose.ts';
+import { wrapAngle } from '../world/scalar.ts';
 import { add, along, cross, dot, normalize, place, scale, type Vec3 } from '../world/sphere.ts';
 import { lookAt } from '../world/turn.ts';
 
@@ -31,13 +32,10 @@ export interface Orbit { yaw: number; pitch: number }
 
 export const REST: Orbit = { yaw: 0, pitch: 0 };
 
-/** An angle brought within ±π. */
-const wrap = (a: number) => Math.atan2(Math.sin(a), Math.cos(a));
-
 /** The orbit after a drag of the look (CSS px: right and down), as 0117's lobby turned it: dragged right, the camera
  *  goes round her toward her stern on the side it stands; dragged down, it rises to look down onto her. */
 export const dragged = (o: Orbit, look: { x: number; y: number }): Orbit => ({
-  yaw: wrap(o.yaw - look.x * ORBIT.turn),
+  yaw: wrapAngle(o.yaw - look.x * ORBIT.turn),
   pitch: Math.min(ORBIT.pitch[1], Math.max(ORBIT.pitch[0], o.pitch + look.y * ORBIT.tilt)),
 });
 

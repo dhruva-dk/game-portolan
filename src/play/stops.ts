@@ -9,6 +9,7 @@
 // Pure: no three, no page.
 
 import { blowOf, felt, type Blow, type Deed } from '../player.ts';
+import { easeInOut } from '../world/scalar.ts';
 
 export const PRIORITY = { hurt: 0, hit: 1, break: 2, kill: 3 } as const;
 export type Priority = keyof typeof PRIORITY;
@@ -43,8 +44,8 @@ export function stopFor(d: Deed, me: number): { stop: Stop; strength: number } |
 }
 
 type Live = Stop & { age: number };
-const ease = (p: number) => (p < 0.5 ? 4 * p * p * p : 1 - (-2 * p + 2) ** 3 / 2);
-const valueOf = (s: Live) => (s.age < s.hold ? s.scale : s.scale + (1 - s.scale) * ease(Math.min(1, (s.age - s.hold) / Math.max(1e-6, s.release))));
+const valueOf = (s: Live) =>
+  (s.age < s.hold ? s.scale : s.scale + (1 - s.scale) * easeInOut(Math.min(1, (s.age - s.hold) / Math.max(1e-6, s.release))));
 const budgeted = (s: Stop) => PRIORITY[s.priority] < PRIORITY.kill;
 
 export function createStops() {
