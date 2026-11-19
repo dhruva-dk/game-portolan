@@ -1,7 +1,7 @@
 // The sun's shadows on the land: what stands on it (rocks, palms, shrubs), seen from the sun into a depth map over
-// one place (a Shade): the land's tiles round the eye (groves.ts). On a globe each place faces the sun its own way, so one map over one place keeps its texels small,
-// and those farther off go without. Nothing on the land moves, so the map is drawn again only when the sun has moved
-// or the place has changed.
+// one place (a Shade): the land's tiles round the eye (groves.ts). On a globe each place faces the sun its own way,
+// so one map over one place keeps its texels small, and those farther off go without. Nothing on the land moves, so
+// the map is drawn again only when the sun has moved or the place has changed.
 //
 // It draws stand-ins for the casters (each shares its caster's geometry and instance matrices, plain black), so the
 // casters themselves are untouched and the depth pass costs no more than their vertices: just the near tiles', which
@@ -58,7 +58,7 @@ export function createShadow(): Shadow {
   // a depth texture reads as a float (NodeUtils getTextureType), as does its comparison
   const map = texture<'float'>(target.depthTexture);
   const stands: { stand: InstancedMesh; caster: Instances }[] = [];
-  const centre = new Vector3(), up = new Vector3(), north = new Vector3(), last = new Vector3();
+  const centre = new Vector3(), up = new Vector3(), north = new Vector3(), axis = new Vector3(), last = new Vector3();
   let covered: Shade | null = null;
 
   return {
@@ -96,7 +96,7 @@ export function createShadow(): Shadow {
         camera.right = camera.top = shade.reach;
         centre.set(...place(shade.chart.at, 0));
         up.set(...shade.chart.at);
-        north.copy(up).cross(new Vector3(...shade.chart.axis));
+        north.copy(up).cross(axis.set(...shade.chart.axis));
       }
       for (const { stand, caster } of stands) stand.count = caster.near;
       last.copy(sun);
