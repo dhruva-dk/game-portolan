@@ -1,7 +1,7 @@
 // The match's course for the player (sim/match.ts) kept by what the game reports each frame, and what it means for
 // the camera: hers while she fights, the hands on it; at her end, sunk or won, held on her ship in its shot
 // (finale.ts), the hands off; once she has sunk and chooses to watch, the ship she watches, flown to, and another
-// when she turns to it. What the screens show of her end is reported plainly (player.ts End).
+// when she turns to it, her hands turning the look about it. What the screens show of her end is reported plainly (player.ts End).
 
 import { PLAYER, startMatch, stepMatch, switched, type MatchState } from '../sim/match';
 import type { End } from '../player';
@@ -11,7 +11,7 @@ import type { Game } from './game';
 export function createReferee(game: Game) {
   let m: MatchState | null = null, of = 0, watching = false;
   const aim = (s: MatchState) => game.view({
-    watch: watching ? s.watch : PLAYER, hands: s.phase === 'fighting',
+    watch: watching ? s.watch : PLAYER, hands: s.phase === 'fighting', look: s.phase === 'fighting' || watching,
     end: s.phase === 'won' ? 'won' : s.phase === 'spectating' && !watching ? 'sunk' : null,
   });
   return {

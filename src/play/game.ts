@@ -68,8 +68,8 @@ const LONG_AGO = 1e3;
 const reloading = (g: Gun): number | null => (g.reload > 0 ? 1 - g.reload / reloadOf(g) : null);
 
 /** What the camera does, as the match's flow sets it (play/referee.ts): the ship it follows; whether the hands steer
- * and look; and her end's shot, held on her ship (finale.ts), or none. */
-export interface View { watch: number; hands: boolean; end: Ending | null }
+ * and look, or only look (as she watches another ship); and her end's shot, held on her ship (finale.ts), or none. */
+export interface View { watch: number; hands: boolean; look: boolean; end: Ending | null }
 
 /** world: the planet and its climate; anchors: the sea's (frame.ts), for the waves' CPU copy; waters: the planet's
  *  water sounded (state.ts); start: where she lies in the lobby and the bearing she heads (radians); first: the match
@@ -84,7 +84,7 @@ export function createGame(world: World, anchors: readonly Anchor[], waters: Wat
    *  whether Gust was pressed; how far the moment drawn is through the last step. */
   let pulled = false, tapped: number | null = null, gusted = false, between = 0;
   /** The camera: what the flow sets, and seconds since her end's shot began. */
-  let view: View = { watch: PLAYER, hands: true, end: null }, ended = 0;
+  let view: View = { watch: PLAYER, hands: true, look: true, end: null }, ended = 0;
   /** Her pose as last drawn. */
   let last: ShipPose = { position: scale(start.at, R), forward: bearing(start.at, start.bearing), up: start.at };
   /** Seconds since the match began while the eye is still coming down onto her (arrival.ts), else null. */
@@ -113,7 +113,7 @@ export function createGame(world: World, anchors: readonly Anchor[], waters: Wat
 
   /** A new match or sea: the camera behind her, its shots and orders as at the start, her helm free. */
   const restart = (her: ShipPose, anchor = false) => {
-    view = { watch: PLAYER, hands: true, end: null };
+    view = { watch: PLAYER, hands: true, look: true, end: null };
     ended = 0;
     anchored = anchor;
     orbit = REST;
@@ -177,7 +177,9 @@ export function createGame(world: World, anchors: readonly Anchor[], waters: Wat
       }
       const followed = view.watch === PLAYER ? last : state.poseOf(view.watch, between) ?? last;
       ended += dt;
-      chase.update(followed, hands.look, dt, state.clock(1), state.storm(1), finale(view.end, ended));
+      // watching another ship, her hands still turn the look about it
+      const look = view.look && arrival === null ? read.look : hands.look;
+      chase.update(followed, look, dt, state.clock(1), state.storm(1), finale(view.end, ended));
       if (arrival !== null && !arriving((arrival += dt), last, chase.eye())) arrival = null;
     },
     /** What is drawn now (snapshot.ts). */
