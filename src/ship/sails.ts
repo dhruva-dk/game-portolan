@@ -38,7 +38,7 @@ export const YARDS: readonly Yard[] = [
 ];
 
 /** The yard's centre line, unbraced: how far forward of its mast's axis it hangs. */
-export const yardZ = (Y: Yard): number => mastZ(Y.mast) + MASTS[Y.mast].r + Y.r + 0.15;
+const yardZ = (Y: Yard): number => mastZ(Y.mast) + MASTS[Y.mast].r + Y.r + 0.15;
 /** A point x metres out along the yard (to port, +x). */
 export const arm = (Y: Yard, x: number): Vector3 => V(x, Y.y, yardZ(Y));
 
@@ -46,7 +46,7 @@ export const arm = (Y: Yard, x: number): Vector3 => V(x, Y.y, yardZ(Y));
 export interface SailPoint { flat: Vector3; belly: number }
 
 /** A square sail's shape, unbraced: (u across from port, v down from the head) to a point. */
-export function squareAt(Y: Yard, u: number, v: number): SailPoint {
+function squareAt(Y: Yard, u: number, v: number): SailPoint {
   const S = Y.sail, hw = Y.len / 2 - 0.35;
   const x = lerp(1, -1, u) * lerp(hw, S.foot / 2, v);
   const su = Math.sin(Math.PI * u) ** 0.7;
@@ -54,11 +54,16 @@ export function squareAt(Y: Yard, u: number, v: number): SailPoint {
   const belly = S.belly * (su * shape + 0.22 * (1 - su) * Math.sin(Math.PI * Math.min(1, v * 1.1)));
   let y = Y.y - 0.2 - S.drop * v;
   // a course's foot curves down in the middle; a topsail's foot is cut in scallops between its clews
-  y += S.scallop ? S.scallop * v ** 4 * Math.abs(Math.sin(Math.PI * u * 3)) ** 0.8 * Math.sin(Math.PI * u) ** 0.3 : 0.25 * v ** 3 * Math.sin(Math.PI * u);
+  y += S.scallop
+    ? S.scallop * v ** 4 * Math.abs(Math.sin(Math.PI * u * 3)) ** 0.8 * Math.sin(Math.PI * u) ** 0.3
+    : 0.25 * v ** 3 * Math.sin(Math.PI * u);
   return { flat: V(x, y, yardZ(Y) + 0.12), belly };
 }
 /** The point itself, its belly blown out. */
-export const squarePoint = (Y: Yard, u: number, v: number): Vector3 => { const p = squareAt(Y, u, v); return p.flat.add(V(0, 0, p.belly)); };
+export const squarePoint = (Y: Yard, u: number, v: number): Vector3 => {
+  const p = squareAt(Y, u, v);
+  return p.flat.add(V(0, 0, p.belly));
+};
 
 /** The mizzen's lateen: its yard crossing the mast `y` up, `at` of its length forward of it, raked up aft. */
 export const LATEEN = { mast: 'mizzen' as MastName, y: MASTS.mizzen.top - 2.6, len: 17.5, at: 0.36, rake: 0.95, belly: 1.2, r: 0.17 };
@@ -72,7 +77,7 @@ export const lateenPeak = (): Vector3 => lateenCross().addScaledVector(lateenDir
 export const lateenClew = (): Vector3 => V(0, deckAt(0.1) + 2.6, zAt(0.07));
 
 /** A lateen point: a along the yard from the tack, b down from the yard to the clew. */
-export function lateenAt(a: number, b: number): SailPoint {
+function lateenAt(a: number, b: number): SailPoint {
   const head = lateenTack().lerp(lateenPeak(), a).add(V(0.1, -0.12, 0));
   const flat = head.lerp(lateenClew(), b);
   const belly = LATEEN.belly * Math.sin(Math.PI * a) ** 0.9 * Math.sin(Math.PI * Math.min(1, b)) ** 0.8 * (1 - 0.4 * b);
@@ -92,7 +97,9 @@ export interface SailGrid {
   kind: number; flip: boolean; mast: { z: number; r: number } | null;
 }
 
-function grid(acc: Acc, name: string, columns: number, rows: number, at: (u: number, v: number) => SailPoint, facing: Vector3, mast: SailGrid['mast']): SailGrid {
+function grid(
+  acc: Acc, name: string, columns: number, rows: number, at: (u: number, v: number) => SailPoint, facing: Vector3, mast: SailGrid['mast'],
+): SailGrid {
   const first = acc.count;
   const pts = range(0, 1, rows).map((v) => range(0, 1, columns).map((u) => at(u, v)));
   const dir = facing.clone().normalize();
@@ -118,8 +125,9 @@ export function buildSails(cloth: Acc, D: Detail): SailGrid[] {
     for (const name of Object.keys(MASTS) as MastName[]) {
       const root = truck(name).add(V(0, 0.05, 0));
       // along it (u) from the truck to its tip, across it (v) down from its upper edge
-      grids.push(grid(cloth, `${name} pennant`, D.pennant, 1, (t, j) => ({ flat: root.clone().add(V(0, -PENNANT.width * (1 - t) * j, -PENNANT.length * t)), belly: 0 }),
-        V(1, 0, 0), null));
+      const at = (t: number, j: number): SailPoint =>
+        ({ flat: root.clone().add(V(0, -PENNANT.width * (1 - t) * j, -PENNANT.length * t)), belly: 0 });
+      grids.push(grid(cloth, `${name} pennant`, D.pennant, 1, at, V(1, 0, 0), null));
     }
   });
   return grids;

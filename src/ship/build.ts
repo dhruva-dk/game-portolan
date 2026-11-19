@@ -14,6 +14,7 @@
 //
 // Pure: no renderer, runs in node for the tests.
 
+import { clamp } from '../world/scalar.ts';
 import { DETAILS, type Detail } from './detail.ts';
 import { buildHull } from './hull.ts';
 import { Acc } from './kit.ts';
@@ -54,8 +55,9 @@ export interface ShipMesh {
   bounds: { min: [number, number, number]; max: [number, number, number] };
 }
 
-const snorm = (v: number) => Math.max(-127, Math.min(127, Math.round(v * 127)));
-const unorm = (v: number) => Math.max(0, Math.min(255, Math.round(v * 255)));
+const snorm = (v: number) => clamp(Math.round(v * 127), -127, 127);
+const unorm = (v: number) => clamp(Math.round(v * 255), 0, 255);
+const snorm16 = (v: number) => clamp(Math.round(v * 32767), -32767, 32767);
 
 /** One accumulator packed; `w` says what the normal's fourth byte carries (for 'grid', each vertex's grid in `grids`). */
 function pack(acc: Acc, w: 'ao' | 'radius' | 'grid', uv: boolean, grids: readonly SailGrid[] = []): Packed {
@@ -63,15 +65,19 @@ function pack(acc: Acc, w: 'ao' | 'radius' | 'grid', uv: boolean, grids: readonl
   const position = new Float32Array(n * 3), normal = new Int8Array(n * 4), part = new Uint8Array(n * 4);
   const uvs = uv ? new Int16Array(n * 2) : null;
   for (let i = 0; i < n; i++) {
-    const [kind, ao, pivot, swing, belly, radius] = acc.a.slice(i * 6, i * 6 + 6);
+    // its attributes (kit.ts Acc): kind, ao, pivot, swing, belly, radius
+    const a = i * 6;
     for (let c = 0; c < 3; c++) {
       position[i * 3 + c] = acc.p[i * 3 + c] * SCALE;
       normal[i * 4 + c] = snorm(acc.n[i * 3 + c]);
     }
-    normal[i * 4 + 3] = w === 'ao' ? snorm(ao) : w === 'radius' ? snorm((radius * SCALE) / RADIUS_UNIT)
+    normal[i * 4 + 3] = w === 'ao' ? snorm(acc.a[a + 1]) : w === 'radius' ? snorm((acc.a[a + 5] * SCALE) / RADIUS_UNIT)
       : grids.findIndex((g) => i >= g.first && i < g.first + (g.columns + 1) * (g.rows + 1));
-    part.set([kind, pivot, unorm(swing), unorm((belly * SCALE) / BELLY_UNIT)], i * 4);
-    if (uvs) for (let c = 0; c < 2; c++) uvs[i * 2 + c] = Math.max(-32767, Math.min(32767, Math.round((acc.uv[i * 2 + c] / UV_RANGE) * 32767)));
+    part[i * 4] = acc.a[a];
+    part[i * 4 + 1] = acc.a[a + 2];
+    part[i * 4 + 2] = unorm(acc.a[a + 3]);
+    part[i * 4 + 3] = unorm((acc.a[a + 4] * SCALE) / BELLY_UNIT);
+    if (uvs) for (let c = 0; c < 2; c++) uvs[i * 2 + c] = snorm16(acc.uv[i * 2 + c] / UV_RANGE);
   }
   const index = n < 65536 ? new Uint16Array(acc.i) : new Uint32Array(acc.i);
   return { position, normal, uv: uvs, part, index, vertices: n, triangles: acc.triangles, bytesPerVertex: 12 + 4 + 4 + (uv ? 4 : 0) };

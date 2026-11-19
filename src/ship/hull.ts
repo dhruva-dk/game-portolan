@@ -214,7 +214,8 @@ function panel(acc: Acc, y0: number, y1: number, a: number, b: number, inset: nu
     return [lerp(-h, h, a) + inset, lerp(-h, h, b) - inset].map((x) => V(x, y, zT(y) - out));
   });
   // upright: its planks run up and down, across the transom's own
-  const uv = (p: Vector3): [number, number] => (upright ? [p.y / PLANK_TILE, p.x / PLANK_TILE + 0.2] : [p.x / PLANK_TILE, p.y / PLANK_TILE]);
+  const uv = (p: Vector3): [number, number] =>
+    (upright ? [p.y / PLANK_TILE, p.x / PLANK_TILE + 0.2] : [p.x / PLANK_TILE, p.y / PLANK_TILE]);
   sheet(acc, grid, grid.map((r) => r.map(uv)), AFT);
 }
 
@@ -324,7 +325,8 @@ function beakhead(acc: Acc, D: Detail): void {
   acc.with({ kind: KIND.spar }, () => {
     for (let k = 0; k < 7; k++) {
       const t = (k + 0.5) / 7;
-      beam(acc, plat[0].clone().lerp(plat[3], t).add(V(0, 0.04, 0)), plat[1].clone().lerp(plat[2], t).add(V(0, 0.04, 0)), 0.06, 0.06, V(0, 1, 0));
+      const port = plat[0].clone().lerp(plat[3], t).add(V(0, 0.04, 0)), starboard = plat[1].clone().lerp(plat[2], t).add(V(0, 0.04, 0));
+      beam(acc, port, starboard, 0.06, 0.06, V(0, 1, 0));
     }
   });
   // head rails: three a side, sweeping from the tip up and aft onto the bow
@@ -333,7 +335,8 @@ function beakhead(acc: Acc, D: Detail): void {
       const end = onSkin(0.955, 4.0 + r * 0.55, side); end.x += side * 0.08;
       const mid = V(side * (1.25 - r * 0.12), 4.15 + r * 0.4, lerp(end.z, tip.z, 0.32));
       const st = tip.clone().add(V(side * 0.12, 0.05 + r * 0.05, -0.2 - r * 0.25));
-      const pts = range(0, 1, 8).map((t) => st.clone().multiplyScalar((1 - t) ** 2).addScaledVector(mid, 2 * t * (1 - t)).addScaledVector(end, t * t));
+      const pts = range(0, 1, 8)
+        .map((t) => st.clone().multiplyScalar((1 - t) ** 2).addScaledVector(mid, 2 * t * (1 - t)).addScaledVector(end, t * t));
       acc.with({ kind: r === 1 ? KIND.gilt : KIND.paint }, () => tube(acc, pts, 0.065, 6, { caps: true }));
     }
     // the cathead, and the anchor hanging from it
@@ -351,14 +354,16 @@ function anchor(acc: Acc, top: Vector3, side: number): void {
   acc.with({ kind: KIND.iron }, () => {
     rod(acc, top, crown, 0.09, 0.11, 5);
     for (const sgn of [1, -1]) {
-      const arm = range(0, 1, 4).map((t) => crown.clone().addScaledVector(across, sgn * 0.85 * Math.sin(t * 1.4)).addScaledVector(down, -1.05 * t * t));
+      const arm = range(0, 1, 4)
+        .map((t) => crown.clone().addScaledVector(across, sgn * 0.85 * Math.sin(t * 1.4)).addScaledVector(down, -1.05 * t * t));
       tube(acc, arm, 0.08, 4, { caps: true });
-      const f = arm[arm.length - 1];
-      box(acc, along(f.clone().addScaledVector(down, 0.12), down.clone().multiplyScalar(-1).addScaledVector(across, sgn * 0.6), V(side, 0, 0)), 0.42, 0.55, 0.05);
+      const f = arm[arm.length - 1], fluke = down.clone().multiplyScalar(-1).addScaledVector(across, sgn * 0.6);
+      box(acc, along(f.clone().addScaledVector(down, 0.12), fluke, V(side, 0, 0)), 0.42, 0.55, 0.05);
     }
   });
   const s = top.clone().addScaledVector(down, 0.3), stock = V(side, 0, 0).cross(down).normalize();
-  acc.with({ kind: KIND.dark }, () => beam(acc, s.clone().addScaledVector(stock, -1.4), s.clone().addScaledVector(stock, 1.4), 0.17, 0.17, down));
+  acc.with({ kind: KIND.dark }, () =>
+    beam(acc, s.clone().addScaledVector(stock, -1.4), s.clone().addScaledVector(stock, 1.4), 0.17, 0.17, down));
 }
 
 // ---------------------------------------------------------------- the gun's plinth and the gratings
@@ -367,8 +372,10 @@ function anchor(acc: Acc, top: Vector3, side: number): void {
 function plinth(acc: Acc, D: Detail): void {
   const y = levelDeck(LEVELS[2], MOUNT_S), z = zAt(MOUNT_S), { height: h, radius: r } = PLINTH;
   if (D.topSides === 0) return;
-  acc.with({ kind: KIND.dark }, () => lathe(acc, [[r * 1.15, -0.05], [r * 1.15, 0.12], [r * 0.85, 0.25], [r * 0.8, h - 0.12], [r, h - 0.06], [r, h], [0, h]],
-    Math.max(6, D.topSides - 2), trs(V(0, y, z))));
+  const profile: [number, number][] = [
+    [r * 1.15, -0.05], [r * 1.15, 0.12], [r * 0.85, 0.25], [r * 0.8, h - 0.12], [r, h - 0.06], [r, h], [0, h],
+  ];
+  acc.with({ kind: KIND.dark }, () => lathe(acc, profile, Math.max(6, D.topSides - 2), trs(V(0, y, z))));
 }
 
 function fittings(acc: Acc): void {
@@ -376,6 +383,8 @@ function fittings(acc: Acc): void {
   for (const [l, s] of [[LEVELS[3], 0.86], [LEVELS[0], 0.06]] as const) {
     const y = levelDeck(l, s), z = zAt(s);
     acc.with({ kind: KIND.spar }, () => box(acc, trs(V(0, y + 0.1, z)), 1.5, 0.2, 1.6));
-    acc.with({ kind: KIND.dark }, () => { for (let i = 0; i < 6; i++) box(acc, trs(V(lerp(-0.6, 0.6, i / 5), y + 0.21, z)), 0.05, 0.03, 1.4); });
+    acc.with({ kind: KIND.dark }, () => {
+      for (let i = 0; i < 6; i++) box(acc, trs(V(lerp(-0.6, 0.6, i / 5), y + 0.21, z)), 0.05, 0.03, 1.4);
+    });
   }
 }

@@ -21,6 +21,7 @@
 
 import type { ShipPose } from '../world/pose.ts';
 import { add, cross, distance, dot, length, normalize, scale, type Vec3 } from '../world/sphere.ts';
+import { clamp, smoothstep } from '../world/scalar.ts';
 import { port } from './mount.ts';
 
 /** Gravity, m/s². */
@@ -38,7 +39,7 @@ export interface Motion { pose: ShipPose; velocity: Vec3; accel: Vec3; spin: Vec
 /** What she feels now, in her own frame. */
 export interface Feeling { weight: Vec3; spin: Vec3; spinning: Vec3 }
 
-const capped = (v: Vec3, most: number): Vec3 => { const l = Math.hypot(...v); return l > most ? scale(v, most / l) : v; };
+const capped = (v: Vec3, most: number): Vec3 => { const l = length(v); return l > most ? scale(v, most / l) : v; };
 const ease = (from: Vec3, to: Vec3, dt: number): Vec3 => add(from, add(to, from, -1), 1 - Math.exp(-dt / EASE));
 
 /** Her motion once she lies at `pose`, dt seconds after `was` (null when first seen, or placed anew). */
@@ -79,10 +80,7 @@ const STIR = 0.4;
 const FILLS = 1.3;
 
 /** How far she is set to sail, at this speed (m/s): 0 at rest, 1 under way. */
-export function underWay(speed: number): number {
-  const t = Math.min(Math.max(speed / WAY, 0), 1);
-  return t * t * (3 - 2 * t);
-}
+const underWay = (speed: number): number => smoothstep(0, WAY, speed);
 
 /** The side the wind blows to, her frame (+1: to port): while it is near her fore-and-aft line, the side her yards are
  * on, so they don't swing back and forth across her as she yaws. */
@@ -97,13 +95,13 @@ const side = (wind: Vec3, brace: number): number =>
  */
 export function trim(wind: Vec3, speed: number, brace: number): number {
   const sailing = side(wind, brace) * BRACED;
-  const rest = wind[2] >= 0 ? Math.max(-BRACED, Math.min(BRACED, Math.atan2(wind[0], wind[2]))) : sailing;
+  const rest = wind[2] >= 0 ? clamp(Math.atan2(wind[0], wind[2]), -BRACED, BRACED) : sailing;
   return rest + (sailing - rest) * underWay(speed);
 }
 
 /** Her yards dt seconds on, hauled toward the trim for this wind and speed. */
 export const hauled = (brace: number, wind: Vec3, speed: number, dt: number): number =>
-  brace + Math.max(-HAUL * dt, Math.min(HAUL * dt, trim(wind, speed, brace) - brace));
+  brace + clamp(trim(wind, speed, brace) - brace, -HAUL * dt, HAUL * dt);
 
 /**
  * The wind her sails feel (her frame, metres a second), for the true wind (her frame) at her speed (m/s), her yards

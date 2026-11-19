@@ -75,8 +75,6 @@ function drawOf(name: string, p: Packed, instances: InstancedInterleavedBuffer, 
 /** A ship afloat as the sea takes her (water/wake.ts): her pose, look (and her yards' brace) and velocity. */
 interface Afloat { pose: ShipPose; look: Look & { brace: number }; velocity: Vec3 }
 
-export type Fleet = ReturnType<typeof createFleet>;
-
 /** capacity: the most ships there will be. */
 export function createFleet(light: Light, wind: Wind, capacity: number) {
   // a pixel's angle, radians: the target's until the first frame gives the eye's (update)

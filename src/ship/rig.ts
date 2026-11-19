@@ -43,7 +43,8 @@ function mast(acc: Acc, D: Detail, name: MastName): void {
   // the lower mast, from the deck to its head over the top, bound with wooldings near
   rod(acc, foot.clone().add(V(0, -0.2, 0)), V(0, m.top + 1.3, z), r, r * 0.78, D.mastSides, small, 3);
   if (D.fittings) acc.with({ kind: KIND.dark }, () => {
-    for (let y = foot.y + 1.6; y < m.top - 2.2; y += 1.25) lathe(acc, [[r * 1.03, -0.09], [r * 1.09, 0], [r * 1.03, 0.09]], D.mastSides, trs(V(0, y, z)));
+    const woolding: [number, number][] = [[r * 1.03, -0.09], [r * 1.09, 0], [r * 1.03, 0.09]];
+    for (let y = foot.y + 1.6; y < m.top - 2.2; y += 1.25) lathe(acc, woolding, D.mastSides, trs(V(0, y, z)));
     lathe(acc, [[r * 1.8, 0], [r * 1.6, 0.35], [r * 1.1, 0.45]], D.mastSides, trs(foot.clone().add(V(0, -0.02, 0))));
   });
   if (small) top(acc, D, name, m.top, z, r * 0.8);
@@ -71,8 +72,10 @@ function top(acc: Acc, D: Detail, name: MastName, y: number, z: number, r: numbe
     for (const dz of [-0.7, 0.3, 0.9]) box(acc, trs(V(0, y - 0.3, z + dz * R * 0.6)), R * 1.8, 0.16, 0.16);
     for (const sx of [1, -1]) beam(acc, V(sx * r, y - 2.4, z), V(sx * (r + 0.12), y - 0.35, z), 0.2, 0.5, V(0, 0, 1));
   }
-  lathe(acc, [[r + 0.05, -0.05], [R * 0.95, -0.05], [R, 0.0], [R, 0.22], [R * 0.95, 0.22], [r + 0.05, 0.12]], D.topSides, trs(V(0, y, z)), 1);
-  acc.with({ kind: KIND.dark }, () => lathe(acc, [[R * 0.7, -0.35], [R * 0.95, -0.05], [R * 0.95, -0.03], [R * 0.7, -0.33]], D.topSides, trs(V(0, y, z)), 1));
+  const platform: [number, number][] = [[r + 0.05, -0.05], [R * 0.95, -0.05], [R, 0.0], [R, 0.22], [R * 0.95, 0.22], [r + 0.05, 0.12]];
+  const under: [number, number][] = [[R * 0.7, -0.35], [R * 0.95, -0.05], [R * 0.95, -0.03], [R * 0.7, -0.33]];
+  lathe(acc, platform, D.topSides, trs(V(0, y, z)), 1);
+  acc.with({ kind: KIND.dark }, () => lathe(acc, under, D.topSides, trs(V(0, y, z)), 1));
 }
 
 /** The bowsprit: a plain spar, lashed down to the knee of the head. */
@@ -89,7 +92,8 @@ function bowsprit(acc: Acc, D: Detail): void {
 /** The lateen's yard, slung across the mizzen to port of it, raked up aft. */
 function lateenYard(acc: Acc, D: Detail): void {
   const n = D.yardSegs, pts = range(0, 1, n).map((t) => lateenTack().lerp(lateenPeak(), t));
-  tube(acc, pts, pts.map((_, i) => LATEEN.r * (0.45 + 0.55 * Math.sin((Math.PI * Math.min(n, i + n / 5)) / (n * 1.2)) ** 0.6)), D.sparSides, { vScale: 3, caps: D.topSides > 0 });
+  const radii = pts.map((_, i) => LATEEN.r * (0.45 + 0.55 * Math.sin((Math.PI * Math.min(n, i + n / 5)) / (n * 1.2)) ** 0.6));
+  tube(acc, pts, radii, D.sparSides, { vScale: 3, caps: D.topSides > 0 });
 }
 
 // ---------------------------------------------------------------- square yards and their lines
@@ -99,9 +103,11 @@ function yard(body: Acc, ropes: Acc, D: Detail, Y: Yard): void {
   body.with({ kind: KIND.spar, pivot, swing: 1 }, () => {
     // thick in its slings, tapering to the arms
     const n = D.yardSegs, pts = range(-Y.len / 2, Y.len / 2, n).map((x) => arm(Y, x));
-    tube(body, pts, pts.map((_, i) => Y.r * (0.42 + 0.58 * Math.sin((Math.PI * i) / n) ** 0.6)), D.sparSides, { vScale: 3, caps: D.topSides > 0 });
+    const radii = pts.map((_, i) => Y.r * (0.42 + 0.58 * Math.sin((Math.PI * i) / n) ** 0.6));
+    tube(body, pts, radii, D.sparSides, { vScale: 3, caps: D.topSides > 0 });
     // the parrel holding it to the mast
-    if (D.fittings) body.with({ kind: KIND.dark }, () => lathe(body, [[m.r * 1.15, -0.15], [m.r * 1.3, 0], [m.r * 1.15, 0.15]], D.mastSides, trs(V(0, Y.y, z))));
+    const parrel: [number, number][] = [[m.r * 1.15, -0.15], [m.r * 1.3, 0], [m.r * 1.15, 0.15]];
+    if (D.fittings) body.with({ kind: KIND.dark }, () => lathe(body, parrel, D.mastSides, trs(V(0, Y.y, z))));
   });
   if (D.ropes !== 'running') return;
   const lower = Y.y < m.top, mh = lower ? m.top + 1.0 : m.cross - 0.2;
@@ -156,7 +162,8 @@ function shrouds(body: Acc, ropes: Acc, D: Detail, name: MastName): void {
     if (D.inboard) {
       const c0 = ch[0].clone().add(V(0, 0, 0.4)), c1 = ch[n - 1].clone().add(V(0, 0, -0.4));
       const cIn = (p: Vector3) => V(side * halfAt(sAtZ(p.z), p.y), p.y, p.z);
-      body.with({ kind: KIND.spar }, () => beam(body, c0.clone().lerp(cIn(c0), 0.5), c1.clone().lerp(cIn(c1), 0.5), 0.12, 0.7, V(side, 0, 0)));
+      const fore = c0.clone().lerp(cIn(c0), 0.5), aft = c1.clone().lerp(cIn(c1), 0.5);
+      body.with({ kind: KIND.spar }, () => beam(body, fore, aft, 0.12, 0.7, V(side, 0, 0)));
     }
     const masthead = V(side * 0.3, hy, z);
     zs.forEach((zz, i) => {
@@ -199,5 +206,6 @@ function stays(ropes: Acc, D: Detail): void {
   stay(top('mizzen'), V(0, 7.0, mastZ('main') - 0.4), 0.045);
   stay(V(0, MASTS.mizzen.tip - 0.3, topmastZ('mizzen')), V(0, MASTS.main.top + 0.2, mastZ('main') - 0.6), 0.025);
   // the bowsprit's shrouds out to the bows
-  if (D.ropes === 'running') for (const side of [1, -1]) rope(ropes, sprit(0.55), V(side * (halfAt(0.94, 4.2) + 0.1), 4.2, zAt(0.94) + 1.6), 0.03, 0, 1);
+  if (D.ropes !== 'running') return;
+  for (const side of [1, -1]) rope(ropes, sprit(0.55), V(side * (halfAt(0.94, 4.2) + 0.1), 4.2, zAt(0.94) + 1.6), 0.03, 0, 1);
 }

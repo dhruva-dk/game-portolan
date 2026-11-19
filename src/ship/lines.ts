@@ -36,7 +36,7 @@ export const LEVELS = [
 ] as const;
 export type Level = (typeof LEVELS)[number];
 const foreRise = (s: number) => 0.7 * smoothstep(0.785, 1, s);
-export const levelAt = (s: number): Level => LEVELS.find((l) => s <= l.b) ?? LEVELS[3];
+const levelAt =(s: number): Level => LEVELS.find((l) => s <= l.b) ?? LEVELS[3];
 /** The deck of a level at station s. */
 export const levelDeck = (l: Level, s: number): number => mainDeck(s) + l.rise + (l.name === 'fore' ? foreRise(s) : 0);
 export const deckAt = (s: number): number => levelDeck(levelAt(s), s);

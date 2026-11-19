@@ -97,7 +97,8 @@ export function createCloth() {
   const canvas = cutCanvas(), n = canvas.count, total = BERTHS * n;
   const X = instancedArray(total, 'vec4'), Vel = instancedArray(total, 'vec4'), P = instancedArray(total, 'vec4');
   const Nrm = instancedArray(total, 'vec4');
-  const [tRest, tGrid, tCell, tMast] = [canvas.rest, canvas.grid, canvas.cell, canvas.mast].map((a) => instancedArray(a, 'vec4').toReadOnly());
+  const [tRest, tGrid, tCell, tMast] = [canvas.rest, canvas.grid, canvas.cell, canvas.mast]
+    .map((a) => instancedArray(a, 'vec4').toReadOnly());
   const values = Array.from({ length: BERTHS * PARAMS }, () => new Vector4());
   const params = uniformArray<'vec4'>(values, 'vec4');
   const h = uniform(1 / 240);
@@ -114,7 +115,8 @@ export function createCloth() {
     return { id, slot, t, base: slot.mul(n), p0: params.element(slot.mul(PARAMS)) };
   };
   /** The particle at column i, row j of the grid at `g0`, in the berth from `base`, in buffer B. */
-  const at = (B: StorageBufferNode<'vec4'>, base: IntNode, g0: IntNode, row: IntNode, i: IntNode, j: IntNode): Vec3Node => B.element(base.add(g0).add(i).add(j.mul(row))).xyz;
+  const at = (B: StorageBufferNode<'vec4'>, base: IntNode, g0: IntNode, row: IntNode, i: IntNode, j: IntNode): Vec3Node =>
+    B.element(base.add(g0).add(i).add(j.mul(row))).xyz;
 
   const predict = Fn(() => {
     const { id, slot, t, base, p0 } = where();

@@ -54,12 +54,16 @@ export function cutCanvas(): Canvas {
   for (const g of ship.sails) {
     const nu = g.columns, nv = g.rows, row = nu + 1, count = row * (nv + 1);
     const pivot = cloth.part[g.first * 4 + 1];
+    // its mast's place and radius, the square sails' pivot, and which way the grid was wound: the same for each particle
+    const standing = [
+      g.mast ? g.mast.z * SCALE : 0, g.mast ? g.mast.r * SCALE : 0, g.kind === CLOTH.square ? PIVOT_Z[pivot] : 0, g.flip ? -1 : 1,
+    ];
     for (let j = 0; j <= nv; j++) for (let i = 0; i <= nu; i++) {
       const k = g.first + j * row + i;
       rest.set([...at(k), lashed(g.kind, i, j, nu, nv) ? 0 : 1], k * 4);
       grid.set([g.first, nu, nv, g.kind], k * 4);
       cell.set([i, j, -1, 0], k * 4);
-      mast.set([g.mast ? g.mast.z * SCALE : 0, g.mast ? g.mast.r * SCALE : 0, g.kind === CLOTH.square ? PIVOT_Z[pivot] : 0, g.flip ? -1 : 1], k * 4);
+      mast.set(standing, k * 4);
     }
     // each free particle's nearest lashing across the cloth: Dijkstra from all of them at once, over the grid's sides
     // and diagonals as cut
