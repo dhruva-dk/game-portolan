@@ -1,33 +1,57 @@
-// The chartmaker's hand, shared by every piece of the UI: his inks and washes, his paper, and the marks he lays on the
-// world (paper slips with rough-cut edges, paper discs, woodcut glyphs, ruled bars, italic numerals). Each is SVG
-// markup in the piece's own units; a piece sets it into an <svg>, and the page carries DEFS once (ui.ts).
-//
-// After the old game's instruments (commit ae981b6: src/chart/inks.ts, screens/instruments.ts).
+// The chartmaker's hand, shared by every piece of the UI: the UI's palette (every colour it draws is named here, and
+// the page's own CSS reads them as custom properties: cssInks) and the marks he lays on the world (paper slips with
+// rough-cut edges, paper discs, woodcut glyphs, ruled bars, italic numerals). Each mark is SVG markup in the piece's
+// own units; a piece sets it into an <svg>, and the page carries DEFS once (ui.ts).
 
-import { GLYPHS, type Glyph, type Prim } from './glyphs';
+import { GLYPHS, type Glyph, type Prim } from './glyphs.ts';
 
 /** Inks: iron for outlines and figures, rubric for harm, the Storm's violet for the Storm alone, gold for the chosen and
- * the won. Lead white only ever over an iron halo, so it holds on bright water. */
+ *  the won, silver for the runners-up, scarlet for her own water and her blood. Lead white only ever over an iron halo,
+ *  so it holds on bright water. */
 export const INK = {
-  iron: 'rgb(38,25,16)', rubric: 'rgb(184,48,26)', storm: 'rgb(98,46,140)', green: 'rgb(58,104,62)', blue: 'rgb(38,76,140)',
-  gold: 'rgb(190,138,44)', sepia: 'rgb(128,94,62)', white: 'rgb(252,246,230)',
+  iron: '#261910', rubric: '#b8301a', storm: '#622e8c', green: '#3a683e', blue: '#264c8c', gold: '#be8a2c',
+  sepia: '#805e3e', silver: '#7f848b', scarlet: '#b01c24', white: '#fcf6e6',
 } as const;
 export type Ink = keyof typeof INK;
 /** Washes laid over the paper. */
 export const WASH = {
   ultramarine: '#3d5f9e', viridian: '#4f9488', ochre: '#c99a4a', vermilion: '#c4452a', azure: '#4a78b8', gold: '#d4a84a',
-  storm: '#6a4a7a', sea: '#d6e4cf', sand: '#e7d39e', shore: '#8a6a3a', hull: '#6e6152',
+  silver: '#b4b8c2', storm: '#6a4a7a', sea: '#c3d8cf', shore: '#8a6a3a', umber: '#6e6152',
 } as const;
-export const PAPER = '#f1e4c8';
-/** The paper a woodcut's cut lines show. */
-export const CUT = '#f4e8cf';
+/** The paper; the paper a woodcut's cut lines show; paper gilt (the chosen, the won); the brass of the minimap's rim. */
+export const PAPER = '#f1e4c8', CUT = '#f4e8cf', GILT = '#f3dfa8', BRASS = '#5b3a1e';
+/** The shade under a slip, or over the world round a sheet; the Storm's shade at the screen's rim outside its calm. */
+export const SHADOW = '#1a1008', DUSK = '#3e1860';
+/** The parchment's light, middle and edge: the paper's gradient (DEFS), and an opaque sheet's (parchment). */
+const PARCHMENT = ['#f7eedb', '#f0e2c4', '#dcc396'] as const;
+/** Light laid over the world, not ink on paper: the screen's flashes and rims, the marks of a blow. */
+export const LIGHT = {
+  warm: '#ffd9a0', white: '#fff1d8', ice: '#cfeeff', azure: '#4fc3ff', gold: '#ffcf5a', red: '#ff2a1a', green: '#7be36b',
+  mint: '#c8ffb0',
+} as const;
+/** The frame's meter (index.html): its ground, its words and labels, and a reading good, fair or poor. */
+const METER = { ground: SHADOW, text: PAPER, label: '#b9a98c', good: '#8fd18a', fair: '#e8c35a', poor: '#f07a5e' } as const;
+
+/** `hex` (#rrggbb) at `a` of its strength, as #rrggbbaa. */
+export const alpha = (hex: string, a: number) => `${hex}${Math.round(a * 255).toString(16).padStart(2, '0')}`;
+
+/** An opaque sheet's ground: the parchment, light in the middle. */
+export const parchment = `radial-gradient(ellipse at 50% 45%, ${PARCHMENT[0]} 0%, ${PARCHMENT[1]} 60%, ${PARCHMENT[2]} 100%)`;
+
+/** The inks the page's own CSS reads (index.html), as custom properties set on the document (ui.ts). */
+export const cssInks: readonly (readonly [string, string])[] = [
+  ['--paper', PAPER], ['--meter-ground', alpha(METER.ground, 0.62)], ['--meter-text', METER.text], ['--meter-label', METER.label],
+  ['--meter-good', METER.good], ['--meter-fair', METER.fair], ['--meter-poor', METER.poor],
+];
+
 /** The numerals' face: an italic old style, iOS's own. */
 export const FIGURES = '"Iowan Old Style", "Palatino", Georgia, serif';
 
 /** The shared defs: the paper's gradient, the slips' shadow, a hatch per ink (and a denser one for large glyphs). */
 export const DEFS = (() => {
-  let d = '<radialGradient id="pg" cx="50%" cy="45%" r="75%"><stop offset="0" stop-color="#f7eedb"/><stop offset=".7" stop-color="#f0e2c4"/><stop offset="1" stop-color="#dcc396"/></radialGradient>';
-  d += '<filter id="sh" x="-20%" y="-20%" width="140%" height="150%"><feDropShadow dx="0" dy="1.5" stdDeviation="1.6" flood-color="#1a1008" flood-opacity=".45"/></filter>';
+  let d = `<radialGradient id="pg" cx="50%" cy="45%" r="75%"><stop offset="0" stop-color="${PARCHMENT[0]}"/>`
+    + `<stop offset=".7" stop-color="${PARCHMENT[1]}"/><stop offset="1" stop-color="${PARCHMENT[2]}"/></radialGradient>`;
+  d += `<filter id="sh" x="-20%" y="-20%" width="140%" height="150%"><feDropShadow dx="0" dy="1.5" stdDeviation="1.6" flood-color="${SHADOW}" flood-opacity=".45"/></filter>`;
   for (const [k, c] of Object.entries(INK)) {
     for (const [tag, size, line] of [['', 1.3, 0.42], ['-d', 0.8, 0.26]] as const) {
       d += `<pattern id="h-${k}${tag}" patternUnits="userSpaceOnUse" width="${size}" height="${size}" patternTransform="rotate(-45)">`

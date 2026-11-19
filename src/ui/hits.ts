@@ -7,7 +7,7 @@
 //   arc      a blow on her: a rubric arc on the screen's rim toward whoever dealt it, fading
 // No words; numerals only. Its own layer, over the world and under the HUD's pieces; it runs on the page's clock.
 
-import { FIGURES, INK, svgNode } from './ink';
+import { FIGURES, INK, LIGHT, svgNode } from './ink';
 
 /** How long each lasts, s; how close together blows on one ship sum, s; the most figures and arcs at once. */
 export const MARK = { cross: 0.28, kill: 0.8, figure: 0.9, arc: 1.1 } as const;
@@ -17,7 +17,7 @@ const TICK = 13, WIDE = 3.5, GAP = 8, POP = 1.55;
 /** The arc's half-angle (rad), and where the rim's ellipse lies, of the screen's width and height. */
 const HALF = 0.22, RIM_X = 0.46, RIM_Y = 0.4;
 /** The shield's azure, and the gold of a sinking. */
-export const AZURE = '#4fc3ff', GOLD = '#ffcf5a';
+const AZURE = LIGHT.azure, GOLD = LIGHT.gold;
 
 /** A figure's size for a blow of `points`: 0117's, by how heavy it was; ×1.6 for the last. */
 export const figureSize = (points: number, last: boolean) => (points < 15 ? 15 : points < 40 ? 19 : 25) * (last ? 1.6 : 1);

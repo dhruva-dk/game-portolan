@@ -2,21 +2,23 @@
 // is let go, or held by the keys (which have no place on the screen).
 
 import type { Hands } from '../player';
+import { INK, PAPER, alpha } from './ink';
 import { STICK } from './input';
 import { show } from './ui';
 
-const INK = 'rgba(58, 38, 20, 0.7)';
+/** The stick's line, iron a little faint, and its knob's paper, fainter. */
+const LINE = alpha(INK.iron, 0.7), KNOB_FILL = alpha(PAPER, 0.3);
 const KNOB = 22;
 
 /** The stick drawn on `layer`, under every other piece of it. */
 export function createStick(layer: HTMLElement) {
   const ring = document.createElement('div');
-  ring.style.cssText = `position:absolute;left:0;top:0;width:${2 * STICK}px;height:${2 * STICK}px;border:2px solid ${INK};
+  ring.style.cssText = `position:absolute;left:0;top:0;width:${2 * STICK}px;height:${2 * STICK}px;border:2px solid ${LINE};
     border-radius:50%;box-sizing:border-box;scale:var(--k)`;
   ring.hidden = true;
   const knob = document.createElement('div');
   knob.style.cssText = `position:absolute;left:${STICK - KNOB}px;top:${STICK - KNOB}px;width:${2 * KNOB}px;height:${2 * KNOB}px;
-    border:2px solid ${INK};border-radius:50%;box-sizing:border-box;background:rgba(232, 214, 178, 0.3)`;
+    border:2px solid ${LINE};border-radius:50%;box-sizing:border-box;background:${KNOB_FILL}`;
   ring.appendChild(knob);
   layer.prepend(ring);
 

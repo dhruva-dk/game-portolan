@@ -35,7 +35,7 @@ import { HOTBAR, type GunKind, type Kit, type Status } from '../player';
 import type { Sea } from '../snapshot';
 import type { Shores } from './coasts';
 import type { Glyph } from './glyphs';
-import { INK, PAPER, WASH, bar, figure, glyph, paperDisc, ring as sweep, slip, svg } from './ink';
+import { DUSK, GILT, INK, PAPER, WASH, alpha, bar, figure, glyph, paperDisc, ring as sweep, slip, svg } from './ink';
 import { createJuice } from './juice';
 import { createMinimap, type More } from './minimap';
 import { RARITY } from '../rarity';
@@ -107,7 +107,7 @@ export function createHud(layer: HTMLElement, shores: Shores, act: HudActions) {
   // the rim's wash outside the calm, under everything else
   const rim = document.createElement('div');
   rim.style.cssText = 'position:absolute;inset:0;pointer-events:none;opacity:0;'
-    + 'box-shadow:inset 0 0 calc(80px * var(--k)) calc(18px * var(--k)) rgba(62,24,96,.6)';
+    + `box-shadow:inset 0 0 calc(80px * var(--k)) calc(18px * var(--k)) ${alpha(DUSK, 0.6)}`;
   body.prepend(rim);
   // fired as the thumb comes down, and held till it lifts; the touch kept from the canvas
   fire.addEventListener('pointerdown', (e) => {
@@ -182,7 +182,7 @@ export function createHud(layer: HTMLElement, shores: Shores, act: HudActions) {
       if (changed(face, shield, s.shieldMax, hull, s.hullMax)) {
         face.innerHTML = svg(214, 60, slip(1, 1, 212, 58)
           + bar(11, 20, 158, 15, shield / s.shieldMax, WASH.azure) + figure(176, 20, shield, 17, { anchor: 'start' })
-          + bar(11, 41, 158, 15, hull / s.hullMax, WASH.hull) + figure(176, 41, hull, 17, { anchor: 'start' }));
+          + bar(11, 41, 158, 15, hull / s.hullMax, WASH.umber) + figure(176, 41, hull, 17, { anchor: 'start' }));
       }
 
       const closing = s.closing || s.storm < 30;
@@ -293,12 +293,12 @@ export function createHud(layer: HTMLElement, shores: Shores, act: HudActions) {
         + `<animateTransform attributeName="transform" type="translate" values="0 0;0 -4;0 0" dur="0.9s" repeatCount="indefinite"/></g>` : '';
       if (!full) {
         // lead white over an iron halo, to hold on bright water; an empty gun slot shows a faint gun's ghost
-        el.innerHTML = svg(SLOT, SLOT, `<rect x="2" y="2" width="${SLOT - 4}" height="${SLOT - 4}" fill="rgba(38,25,16,.12)" stroke="${INK.iron}" stroke-width="3" opacity=".45"/>`
+        el.innerHTML = svg(SLOT, SLOT, `<rect x="2" y="2" width="${SLOT - 4}" height="${SLOT - 4}" fill="${alpha(INK.iron, 0.12)}" stroke="${INK.iron}" stroke-width="3" opacity=".45"/>`
           + `<rect x="2" y="2" width="${SLOT - 4}" height="${SLOT - 4}" fill="none" stroke="${INK.white}" stroke-width="1.2" opacity=".85"/>`
           + (gun ? `<g opacity=".5">${glyph('weapon.cannon', SLOT / 2, SLOT / 2, 28, { ink: 'white' })}</g>` : '') + bob);
       } else {
         const ink = k ? RARITY[k.rarity] : undefined, low = !!k && k.rounds === 0, mine: Glyph = k ? mark(k.kind) : item!.item;
-        el.innerHTML = svg(SLOT, SLOT, slip(0, 0, SLOT, SLOT, { fill: chosen ? '#f3dfa8' : 'url(#pg)', bold: chosen })
+        el.innerHTML = svg(SLOT, SLOT, slip(0, 0, SLOT, SLOT, { fill: chosen ? GILT : 'url(#pg)', bold: chosen })
           + (chosen ? `<rect x="2" y="2" width="${SLOT - 4}" height="${SLOT - 4}" fill="none" stroke="${WASH.gold}" stroke-width="${gun ? 2.6 : 1.6}"/>` : '')
           + (ink !== undefined ? `<rect x="9" y="${SLOT - 9}" width="${SLOT - 18}" height="4" fill="${css(ink)}" stroke="${INK.iron}" stroke-width=".6"/>` : '')
           + glyph(mine, SLOT / 2 - 3, SLOT / 2 - (ink !== undefined ? 3 : 0), 31)

@@ -16,7 +16,7 @@ import type { Shores } from './coasts';
 import { laid, layOf, metres, place } from './disc';
 import { createGround } from './ground';
 import { createHeld } from './held';
-import { INK, PAPER, WASH, svg } from './ink';
+import { BRASS, INK, PAPER, WASH, alpha, svg } from './ink';
 import { view } from './ui';
 
 /** Metres from her to the disc's rim: at her 16 m/s some 25 s of sailing, twice a cannon's 200 m reach; some 4.5 m a
@@ -24,8 +24,8 @@ import { view } from './ui';
 export const SPAN = 408;
 /** The most redraws a second. */
 const RATE = 30;
-/** The sea, the Storm's wash and its edge, the next circle's line and the way's. */
-const SEA = '#c3d8cf', STORM = 'rgba(96,58,120,.4)', EDGE = '#4b2763';
+/** The Storm's wash, its edge, and the faint iron halo under the next circle's line. */
+const STORM = alpha(WASH.storm, 0.4), EDGE = INK.storm, HALO = alpha(INK.iron, 0.45);
 
 export interface Storm { centre: Vec3; radius: number }
 
@@ -53,9 +53,9 @@ export function createMinimap(host: HTMLElement, size: number, { coasts, ground:
   host.style.width = host.style.height = `${size}px`;
   // the brass rim, graduated, and the paper under the sea
   host.innerHTML = svg(size, size,
-    `<circle cx="${r}" cy="${r}" r="${r}" fill="#5b3a1e" filter="url(#sh)"/>`
+    `<circle cx="${r}" cy="${r}" r="${r}" fill="${BRASS}" filter="url(#sh)"/>`
     + `<circle cx="${r}" cy="${r}" r="${r - 4}" fill="none" stroke="${PAPER}" stroke-width="5" stroke-dasharray="2.2 2.2"/>`
-    + `<circle cx="${r}" cy="${r}" r="${inner + 0.5}" fill="${SEA}" stroke="${INK.iron}" stroke-width="1"/>`);
+    + `<circle cx="${r}" cy="${r}" r="${inner + 0.5}" fill="${WASH.sea}" stroke="${INK.iron}" stroke-width="1"/>`);
   (host.firstElementChild as SVGSVGElement).style.position = 'absolute';
   const canvas = document.createElement('canvas');
   // its pixels as many as it is shown at, grown by the UI's size (ui.ts)
@@ -130,7 +130,7 @@ export function createMinimap(host: HTMLElement, size: number, { coasts, ground:
       ctx.strokeStyle = INK.white;
       ctx.lineWidth = 3.2 * dpr;
       ctx.stroke();
-      ctx.strokeStyle = 'rgb(176,28,36)';
+      ctx.strokeStyle = INK.scarlet;
       ctx.lineWidth = 1.8 * dpr;
       ctx.stroke();
     }
@@ -153,11 +153,11 @@ export function createMinimap(host: HTMLElement, size: number, { coasts, ground:
       // the circle it next closes to: white, dotted, over a faint iron halo
       trace(ringOf(next), true);
       ctx.lineCap = 'round';
-      ctx.strokeStyle = 'rgba(38,25,16,.45)';
+      ctx.strokeStyle = HALO;
       ctx.lineWidth = 3 * dpr;
       ctx.setLineDash([0.1 * dpr, 4.4 * dpr]);
       ctx.stroke();
-      ctx.strokeStyle = '#fff';
+      ctx.strokeStyle = INK.white;
       ctx.lineWidth = 2 * dpr;
       ctx.stroke();
       ctx.setLineDash([]);
@@ -173,7 +173,7 @@ export function createMinimap(host: HTMLElement, size: number, { coasts, ground:
       if (reach > from + a * 1.1) {
         const [x1, y1] = [c + ux * from, c + uy * from], [x2, y2] = [c + ux * reach, c + uy * reach];
         ctx.lineCap = 'round';
-        for (const [ink, w] of [[INK.iron, 3.6], ['#fff', 1.8]] as const) {
+        for (const [ink, w] of [[INK.iron, 3.6], [INK.white, 1.8]] as const) {
           ctx.beginPath();
           ctx.moveTo(x1, y1);
           ctx.lineTo(x2 - ux * a * 0.6, y2 - uy * a * 0.6);
@@ -187,7 +187,7 @@ export function createMinimap(host: HTMLElement, size: number, { coasts, ground:
         ctx.lineTo(x2 - ux * a - uy * b, y2 - uy * a + ux * b);
         ctx.lineTo(x2 - ux * a + uy * b, y2 - uy * a - ux * b);
         ctx.closePath();
-        ctx.fillStyle = '#fff';
+        ctx.fillStyle = INK.white;
         ctx.strokeStyle = INK.iron;
         ctx.lineWidth = 1.2 * dpr;
         ctx.lineJoin = 'round';

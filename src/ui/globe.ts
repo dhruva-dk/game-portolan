@@ -24,7 +24,7 @@ import { R, cross, dot, length, normalize, scale, type Vec3 } from '../world/sph
 import type { Coast } from './coasts';
 import { GLYPHS, type Prim } from './glyphs';
 import { clock, type HudState } from './hud';
-import { CUT, INK, PAPER, WASH, figure, galleon, glyph, roughCircle, roughRect, slip, svg, svgNode, uid } from './ink';
+import { CUT, INK, PAPER, SHADOW, WASH, alpha, figure, galleon, glyph, roughCircle, roughRect, slip, svg, svgNode, uid } from './ink';
 import { rhumbs } from './marks';
 import { stormRing, type Storm } from './minimap';
 import { dragged, onTap } from './touch';
@@ -46,6 +46,8 @@ const MOST_LAT = 1.3;
 /** A latitude kept within MOST_LAT; an eye's distance kept between NEAREST and FARTHEST. */
 const latitude = (lat: number) => Math.max(-MOST_LAT, Math.min(MOST_LAT, lat));
 const reach = (d: number) => Math.max(NEAREST, Math.min(FARTHEST, d));
+/** The Storm's swirls, white over an iron line; the pale halo under its edge. */
+const INKS = { swirl: alpha(INK.white, 0.5), swirlLine: alpha(INK.iron, 0.55), halo: alpha(INK.white, 0.75) } as const;
 /** Degrees in a radian. */
 const DEGREES = 180 / Math.PI;
 
@@ -222,10 +224,11 @@ export function createGlobe(coasts: readonly Coast[]) {
     dim.globalCompositeOperation = 'source-over';
     dim.clearRect(0, 0, W, H);
     if (held) dim.drawImage(held, 0, 0, W, H);
-    dim.fillStyle = 'rgba(26,16,8,.45)';
+    dim.fillStyle = alpha(SHADOW, 0.45);
     dim.fillRect(0, 0, W, H);
+    // (cut out: only the fill's strength counts)
     dim.globalCompositeOperation = 'destination-out';
-    dim.fillStyle = '#000';
+    dim.fillStyle = INK.iron;
     dim.beginPath();
     dim.arc(L.x * k, L.y * k, (L.r + 2) * k, 0, Math.PI * 2);
     dim.fill();
@@ -270,8 +273,8 @@ export function createGlobe(coasts: readonly Coast[]) {
     // its calm is still the whole planet)
     if (cap.radius < Math.PI - 0.01) {
       const calm = Math.cos(cap.radius + 40 / R), s = Math.min(1.4, perRadian() / 250);
-      ctx.fillStyle = 'rgba(252,246,230,.5)';
-      ctx.strokeStyle = 'rgba(38,25,16,.55)';
+      ctx.fillStyle = INKS.swirl;
+      ctx.strokeStyle = INKS.swirlLine;
       ctx.lineWidth = 0.8;
       for (const q of SWIRLS) {
         const p = project(e, q, seen);
@@ -293,7 +296,7 @@ export function createGlobe(coasts: readonly Coast[]) {
         ring = stormRing(traced, 180);
       }
       trace(e, ring, true);
-      ctx.strokeStyle = 'rgba(252,246,230,.75)';
+      ctx.strokeStyle = INKS.halo;
       ctx.lineWidth = 6 * k;
       ctx.stroke();
       ctx.strokeStyle = INK.storm;

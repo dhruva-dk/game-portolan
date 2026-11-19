@@ -9,7 +9,7 @@
 //
 // Shown and hidden one way: `show` at once (the `hidden` attribute), `fade` over a time and then hidden.
 
-import { DEFS, svgNode } from './ink';
+import { DEFS, cssInks, svgNode } from './ink';
 import { FADE } from './ways';
 
 /** The page every piece and screen was drawn on, CSS px: a phone's landscape screen, and its safe insets. */
@@ -130,6 +130,8 @@ export function uiLayer(): HTMLElement {
   const style = document.createElement('style');
   style.textContent = STYLE;
   document.head.appendChild(style);
+  // the inks the page's own CSS reads (index.html)
+  for (const [name, value] of cssInks) document.documentElement.style.setProperty(name, value);
   const defs = svgNode(0, 0, DEFS);
   defs.style.position = 'absolute';
   const el = document.createElement('div');

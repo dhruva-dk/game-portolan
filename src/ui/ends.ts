@@ -9,7 +9,7 @@
 // No words; numerals only.
 
 import type { End } from '../player';
-import { INK, PAPER, WASH, figure, glyph, paperDisc, roughCircle, slip, svg, uid } from './ink';
+import { INK, PAPER, SHADOW, WASH, alpha, figure, glyph, paperDisc, roughCircle, slip, svg, uid } from './ink';
 import { laurel } from './marks';
 import { banner, sheet } from './screens';
 import { onTap, region } from './touch';
@@ -17,7 +17,7 @@ import { at, fade, piece, screen } from './ui';
 
 /** A place's laurel and numeral: gold for the first, silver for the top five, red for the top ten, ink below. */
 const placed = (place: number) =>
-  place === 1 ? [WASH.gold, INK.gold] : place <= 5 ? ['#b4b8c2', '#7f848b'] : place <= 10 ? [WASH.vermilion, INK.rubric] : ['#6b5a4a', INK.iron];
+  place === 1 ? [WASH.gold, INK.gold] : place <= 5 ? [WASH.silver, INK.silver] : place <= 10 ? [WASH.vermilion, INK.rubric] : [WASH.umber, INK.iron];
 
 /** A share of the planet as per cent: to a tenth under ten. */
 const percent = (share: number) => {
@@ -30,8 +30,8 @@ const percent = (share: number) => {
 const held = (x: number, y: number, r: number) => {
   const clip = uid('held');
   return `<clipPath id="${clip}"><circle cx="${x}" cy="${y}" r="${r}"/></clipPath>`
-    + `<circle cx="${x}" cy="${y}" r="${r}" fill="#c3d8cf"/>`
-    + `<path d="${roughCircle(x + r * 0.22, y + r * 0.12, r * 0.62, 7, r * 0.18)}" fill="rgba(196,40,46,.42)" stroke="rgb(176,28,36)" stroke-width="1.8" clip-path="url(#${clip})"/>`
+    + `<circle cx="${x}" cy="${y}" r="${r}" fill="${WASH.sea}"/>`
+    + `<path d="${roughCircle(x + r * 0.22, y + r * 0.12, r * 0.62, 7, r * 0.18)}" fill="${alpha(INK.scarlet, 0.42)}" stroke="${INK.scarlet}" stroke-width="1.8" clip-path="url(#${clip})"/>`
     + `<circle cx="${x}" cy="${y}" r="${r}" fill="none" stroke="${INK.iron}" stroke-width="1.4"/>`;
 };
 
@@ -93,7 +93,8 @@ const sunburst = (x: number, y: number, r: number) => {
 export function createResult(act: { watch(): void; leave(): void }) {
   const s = sheet(false, false);
   // shade at the top and the foot, under the band and the ways on; the middle, where her ship is, left clear
-  s.root.style.background = 'linear-gradient(to bottom, rgba(20,12,6,.42), rgba(20,12,6,0) 40%, rgba(20,12,6,0) 66%, rgba(20,12,6,.42))';
+  const shade = alpha(SHADOW, 0.42), clear = alpha(SHADOW, 0);
+  s.root.style.background = `linear-gradient(to bottom, ${shade}, ${clear} 40%, ${clear} 66%, ${shade})`;
   /** Whether it is shown, and with its way to watch. */
   let shown = false, watching = false;
   /** Her place over how many began, in its laurel, `r` across, at (x, y). */

@@ -1,17 +1,18 @@
-// The chart's larger marks, after the UI sheet (and the old game's chart/rose.ts): the compass rose and its rhumb
-// lines, and the laurel for a place.
+// The chart's larger marks, after the UI sheet: the compass rose and its rhumb lines, and the laurel for a place.
 
-import { INK, WASH, arcPath } from './ink';
+import { INK, PAPER, WASH, alpha, arcPath } from './ink';
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
 
-/** 32 rhumb lines from (cx, cy), `reach` long: principal winds iron, half green, quarter rubric. */
+/** The rhumb lines' inks, round the 32 winds: principal iron, half green, quarter vermilion. */
+const WINDS = [INK.iron, WASH.vermilion, INK.green, WASH.vermilion] as const;
+
+/** 32 rhumb lines from (cx, cy), `reach` long: principal winds iron, half green, quarter vermilion. */
 export function rhumbs(cx: number, cy: number, reach: number, opacity = 0.3) {
-  const colours = ['#2a1a10', '#c0452c', '#4a7c4c', '#c0452c'];
   let s = '';
   for (let i = 0; i < 32; i++) {
     const a = (i * Math.PI) / 16;
-    s += `<line x1="${cx}" y1="${cy}" x2="${r2(cx + Math.cos(a) * reach)}" y2="${r2(cy + Math.sin(a) * reach)}" stroke="${colours[i % 4]}" stroke-width=".6"/>`;
+    s += `<line x1="${cx}" y1="${cy}" x2="${r2(cx + Math.cos(a) * reach)}" y2="${r2(cy + Math.sin(a) * reach)}" stroke="${WINDS[i % 4]}" stroke-width=".6"/>`;
   }
   return `<g opacity="${opacity}">${s}</g>`;
 }
@@ -26,8 +27,8 @@ export interface RoseInks {
 }
 /** The chart's rose, as the screens draw it. */
 export const ROSE: RoseInks = {
-  face: 'rgba(241,228,200,.55)', line: INK.iron, ring: INK.iron, weight: 1, breadth: 1, chequer: 0.035,
-  quarter: ['#c0452c', '#f3e3c4'], half: ['#4a7c4c', '#f3e3c4'], ordinal: ['#2a1a10', '#f3e3c4'], cardinal: ['#2a1a10', '#f3e3c4'],
+  face: alpha(PAPER, 0.55), line: INK.iron, ring: INK.iron, weight: 1, breadth: 1, chequer: 0.035,
+  quarter: [WASH.vermilion, PAPER], half: [INK.green, PAPER], ordinal: [INK.iron, PAPER], cardinal: [INK.iron, PAPER],
   fleur: WASH.gold, needle: INK.blue, hub: WASH.gold,
 };
 

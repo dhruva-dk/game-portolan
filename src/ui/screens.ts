@@ -13,7 +13,7 @@
 // Each folio has its close mark at its corner; a tap outside it closes it too. Her match's end is ends.ts's.
 // No words anywhere; numerals only.
 
-import { INK, PAPER, WASH, bar, galleon, glyph, paperDisc, roughRect, svgNode } from './ink';
+import { GILT, INK, PAPER, SHADOW, WASH, alpha, bar, galleon, glyph, paperDisc, parchment, roughRect, svgNode } from './ink';
 import { rhumbs, rose } from './marks';
 import { onTap, region } from './touch';
 import { at, fade, onResize, page, screen, type Page } from './ui';
@@ -25,7 +25,7 @@ export interface Settings { sound: number; look: number; stats: boolean }
  *  sheet take touches (else only its regions do, and the rest reach the world under it). */
 export function sheet(opaque: boolean, press = true) {
   const root = screen(press);
-  if (opaque) root.style.background = 'radial-gradient(ellipse at 50% 45%, #f7eedb 0%, #f0e2c4 60%, #d8bf90 100%)';
+  if (opaque) root.style.background = parchment;
   /** The last drawing, made again when the screen changes shape while it shows. */
   let last: (() => SVGSVGElement) | null = null;
   /** Draws `body` on the page as it is on this screen, then `bind`s what takes touches in it. */
@@ -51,7 +51,7 @@ export function sheet(opaque: boolean, press = true) {
 export function banner(x: number, y: number, w: number, mark: string, gilt = false) {
   const k = w / 210, l = x - w / 2, r = x + w / 2, t = y - 40 * k, b = y + 42 * k;
   const d = `M${l} ${t + 4 * k}Q${x} ${t - 8 * k} ${r} ${t}L${r - 26 * k} ${y}L${r} ${b}Q${x} ${b - 6 * k} ${l} ${b + 2 * k}L${l + 26 * k} ${y}Z`;
-  return `<path d="${d}" fill="${gilt ? '#efd79a' : 'url(#pg)'}" stroke="${INK.iron}" stroke-width="1.6" filter="url(#sh)"/>`
+  return `<path d="${d}" fill="${gilt ? GILT : 'url(#pg)'}" stroke="${INK.iron}" stroke-width="1.6" filter="url(#sh)"/>`
     + `<path d="${d}" fill="none" stroke="${INK.iron}" stroke-width=".5" opacity=".5" transform="translate(${x} ${y}) scale(.93) translate(${-x} ${-y})"/>`
     + mark;
 }
@@ -116,7 +116,7 @@ export function createLobby(act: { play(): void; settings(): void }) {
 function folio(x: number, y: number, w: number, h: number, place: [Parameters<typeof at>[1], Parameters<typeof at>[2]], close: () => void) {
   const s = sheet(false);
   s.root.style.zIndex = '1';
-  s.root.style.background = 'rgba(26,16,8,.25)';
+  s.root.style.background = alpha(SHADOW, 0.25);
   onTap(s.root, close);
   return {
     ...s,

@@ -1,5 +1,4 @@
-// The screen's answer to a blow: 0117's flash, vignette and low-hull heartbeat (juice/screen.ts, its recipes' screen
-// parts). A flash washes the whole screen in a colour for a moment (`add` a pale wash of light, `tint` the colour laid
+// The screen's answer to a blow: a flash, a vignette and the low-hull heartbeat. A flash washes the whole screen in a colour for a moment (`add` a pale wash of light, `tint` the colour laid
 // over it); a vignette darkens the screen's rim in a colour, drawn toward where a blow came from; while her hull
 // is low, a heartbeat of rubric beats at the rim, faster the lower it is.
 //
@@ -8,33 +7,36 @@
 //
 // A layer of the HUD under all its pieces (no touch); it runs on the page's clock.
 
+import { INK, LIGHT } from './ink.ts';
+
 /** A flash: its colour, strength at its peak (0…1), how long it holds there and fades (s), and how it is laid. */
 export interface Flash { colour: string; alpha: number; hold?: number; decay: number; mode?: 'add' | 'tint' }
 /** A vignette: its colour, strength (0…1), how far in it reaches (of the half-screen), its attack, hold and decay
  *  (s), and whether it is drawn toward the blow's bearing. */
 export interface Vignette { colour: string; alpha: number; reach: number; attack?: number; hold?: number; decay: number; aimed?: boolean }
 
-/** 0117's screen recipes (juice/recipes.ts), by name. */
+/** The screen's answers, by name: a warm flash for her own shot, pale ones for blows dealt, ice and azure for a shield,
+ *  red for a blow on her hull, green for a mend. */
 export const SCREEN = {
-  fire: { flash: { colour: '#ffd9a0', alpha: 0.1, hold: 0.033, decay: 0.16 } },
-  hit: { flash: { colour: '#fff1d8', alpha: 0.08, decay: 0.12 } },
-  shieldHit: { flash: { colour: '#bfe6ff', alpha: 0.04, decay: 0.12 } },
-  shieldBreak: { flash: { colour: '#d9f3ff', alpha: 0.28, decay: 0.22 }, vignette: { colour: '#4fc3ff', alpha: 0.35, reach: 0.45, decay: 0.4 } },
+  fire: { flash: { colour: LIGHT.warm, alpha: 0.1, hold: 0.033, decay: 0.16 } },
+  hit: { flash: { colour: LIGHT.white, alpha: 0.08, decay: 0.12 } },
+  shieldHit: { flash: { colour: LIGHT.ice, alpha: 0.04, decay: 0.12 } },
+  shieldBreak: { flash: { colour: LIGHT.ice, alpha: 0.28, decay: 0.22 }, vignette: { colour: LIGHT.azure, alpha: 0.35, reach: 0.45, decay: 0.4 } },
   shieldLost: {
-    flash: { colour: '#cfeeff', alpha: 0.22, decay: 0.25 },
-    vignette: { colour: '#4fc3ff', alpha: 0.55, reach: 0.55, hold: 0.08, decay: 0.6, aimed: true },
+    flash: { colour: LIGHT.ice, alpha: 0.22, decay: 0.25 },
+    vignette: { colour: LIGHT.azure, alpha: 0.55, reach: 0.55, hold: 0.08, decay: 0.6, aimed: true },
   },
   hurt: {
-    flash: { colour: '#ff2a1a', alpha: 0.14, hold: 0.02, decay: 0.3, mode: 'tint' },
-    vignette: { colour: '#c4161c', alpha: 0.6, reach: 0.5, attack: 0.02, hold: 0.06, decay: 0.65, aimed: true },
+    flash: { colour: LIGHT.red, alpha: 0.14, hold: 0.02, decay: 0.3, mode: 'tint' },
+    vignette: { colour: INK.scarlet, alpha: 0.6, reach: 0.5, attack: 0.02, hold: 0.06, decay: 0.65, aimed: true },
   },
-  sink: { flash: { colour: '#fff1d6', alpha: 0.2, decay: 0.3 } },
-  gust: { vignette: { colour: '#e8f4ff', alpha: 0.22, reach: 0.35, decay: 0.5 } },
-  shield: { flash: { colour: '#8fd8ff', alpha: 0.08, decay: 0.2 }, vignette: { colour: '#4fc3ff', alpha: 0.25, reach: 0.4, decay: 0.5 } },
-  repair: { flash: { colour: '#c8ffb0', alpha: 0.06, decay: 0.2 }, vignette: { colour: '#7be36b', alpha: 0.18, reach: 0.4, decay: 0.5 } },
+  sink: { flash: { colour: LIGHT.white, alpha: 0.2, decay: 0.3 } },
+  gust: { vignette: { colour: LIGHT.ice, alpha: 0.22, reach: 0.35, decay: 0.5 } },
+  shield: { flash: { colour: LIGHT.ice, alpha: 0.08, decay: 0.2 }, vignette: { colour: LIGHT.azure, alpha: 0.25, reach: 0.4, decay: 0.5 } },
+  repair: { flash: { colour: LIGHT.mint, alpha: 0.06, decay: 0.2 }, vignette: { colour: LIGHT.green, alpha: 0.18, reach: 0.4, decay: 0.5 } },
 } as const satisfies Record<string, { flash?: Flash; vignette?: Vignette }>;
 
-/** A pickup's flash and vignette by rarity (0117's: none for the commonest two, more for each up). */
+/** A pickup's flash and vignette by rarity: none for the commonest two, more for each up. */
 export const PICKUP = {
   flash: [0, 0, 0.05, 0.08, 0.14], decay: [0, 0, 0.18, 0.25, 0.4], vignette: [0, 0, 0, 0.2, 0.34], fades: [0, 0, 0, 0.5, 0.9],
 } as const;
@@ -42,10 +44,10 @@ export const PICKUP = {
 /** At most BIG flashes a second stronger than SAFE. */
 export const BIG = 3, SAFE = 0.12;
 
-/** The low-hull heartbeat (0117's LOW_HULL): from `start` of her hull, its fastest at `floor`; beats a minute from
- *  slowest to fastest; its rubric; its strength resting and on the beat; its reach; how much the second beat of each
- *  pair is of the first; how long it takes to fade once she is mended (s). */
-export const LOW_HULL = { start: 0.3, floor: 0.05, bpm: [72, 128], colour: '#b0141c', rest: [0.1, 0.32], beat: [0.12, 0.28], reach: [0.42, 0.6], dub: 0.15, fade: 9 } as const;
+/** The low-hull heartbeat: from `start` of her hull, its fastest at `floor`; beats a minute from slowest to fastest;
+ *  its colour, her blood's; its strength resting and on the beat; its reach; how much the second beat of each pair is
+ *  of the first; how long it takes to fade once she is mended (s). */
+export const LOW_HULL = { start: 0.3, floor: 0.05, bpm: [72, 128], colour: INK.scarlet, rest: [0.1, 0.32], beat: [0.12, 0.28], reach: [0.42, 0.6], dub: 0.15, fade: 9 } as const;
 
 /** How strong a flash of `alpha` plays when `recent` big ones have played in the last second. */
 export const capped = (alpha: number, recent: number) => (alpha > SAFE && recent >= BIG ? SAFE : alpha);
