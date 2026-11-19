@@ -8,15 +8,12 @@
 // and done in compute: one pass of seven dispatches, not a cube's 42 render passes and their mip chains, which on the
 // phone and the iPad added 13–20 ms of GPU work to the one frame, a frame dropped every half second.
 
-import {
-  ClampToEdgeWrapping, HalfFloatType, LinearFilter, LinearMipmapLinearFilter,
-  RepeatWrapping, StorageTexture, Vector4, type ComputeNode,
-} from 'three/webgpu';
+import { LinearMipmapLinearFilter, RepeatWrapping, Vector4, type ComputeNode, type StorageTexture } from 'three/webgpu';
 import {
   Fn, Loop, abs, cos, cross, dot, equirectUV, float, instanceIndex, max, normalize, select, sin, storageTexture,
   texture, textureLoad, textureStore, uniformArray, uvec2, vec3, vec4,
 } from 'three/tsl';
-import type { Compute } from '../gpu';
+import { storageTable, type Compute } from '../gpu';
 import type { View } from '../view/view';
 import type { FloatNode, UintNode, Vec3Node, Vec4Node } from '../tsl';
 import type { Tables } from './tables';
@@ -40,14 +37,6 @@ const level = (roughness: FloatNode): FloatNode => {
   const r = float(roughness).clamp();
   return r.mul(float(2).sub(r)).mul(LEVELS);
 };
-
-function storage(width: number, height: number) {
-  const t = new StorageTexture(width, height);
-  t.type = HalfFloatType;
-  t.minFilter = t.magFilter = LinearFilter;
-  t.generateMipmaps = false;
-  return t;
-}
 
 /** The direction at the centre of texel (x, y) of a w×h panorama: the inverse of three's equirectUV. */
 function texelDirection(x: UintNode, y: UintNode, w: number, h: number): Vec3Node {
@@ -115,15 +104,12 @@ function rough(k: number, reduced: StorageTexture, reflection: StorageTexture): 
 export function createReflection(
   view: View, skyRadiance: Tables['skyRadiance'], sunDirection: Vec3Node, cloudsAlong: (d: Vec3Node, steps: number) => Vec4Node,
 ) {
-  const panorama = storage(W, H);
-  const reduced = storage(RW, RH);
-  /** The panorama and its levels, as one texture's mips. */
-  const reflection = storage(W, H);
-  reflection.minFilter = LinearMipmapLinearFilter;
+  const panorama = storageTable(W, H);
+  const reduced = storageTable(RW, RH);
+  /** The panorama and its levels, as one texture's mips: three allots the whole chain of mips and leaves them alone,
+   *  and the compute passes below write the first LEVELS + 1. */
+  const reflection = storageTable(W, H, { min: LinearMipmapLinearFilter, mipmaps: true });
   reflection.wrapS = RepeatWrapping;
-  reflection.wrapT = ClampToEdgeWrapping;
-  // three allots the whole chain of mips and leaves them alone: the compute passes below write the first LEVELS + 1
-  reflection.generateMipmaps = true;
   reflection.mipmapsAutoUpdate = false;
 
   /** The panorama: the sky, and the clouds in it unless they are left out (seen from space). */

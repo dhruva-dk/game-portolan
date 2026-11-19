@@ -6,12 +6,12 @@
 // The first two depend only on the air and are redone when the haze changes; the others when the sun moves.
 // Mappings and constants match atmosphere.ts, where the tests check them.
 
-import { ClampToEdgeWrapping, HalfFloatType, LinearFilter, NearestFilter, StorageTexture } from 'three/webgpu';
+import { NearestFilter } from 'three/webgpu';
 import {
   Fn, If, Loop, abs, acos, clamp, cos, dot, exp, float, instanceIndex, length, max, normalize, pow, select,
   sin, sqrt, texture, textureStore, uniform, uvec2, vec2, vec3, vec4,
 } from 'three/tsl';
-import type { Compute } from '../gpu';
+import { storageTable, type Compute } from '../gpu';
 import { loop, toFloat, type FloatNode, type Vec2Node, type Vec3Node } from '../tsl';
 import * as A from './atmosphere';
 
@@ -22,15 +22,6 @@ const OZONE = vec3(...A.OZONE_ABSORPTION);
 const T_W = 256, T_H = 64, M_N = 32, V_W = 200, V_H = 100;
 /** The least change in the haze, as a share of it, that the air's tables are integrated again for. */
 const HAZE_STEP = 0.01;
-
-function table(w: number, h: number): StorageTexture {
-  const t = new StorageTexture(w, h);
-  t.type = HalfFloatType;
-  t.minFilter = t.magFilter = LinearFilter;
-  t.wrapS = t.wrapT = ClampToEdgeWrapping;
-  t.generateMipmaps = false;
-  return t;
-}
 
 /** Nearest and farthest hits of a ray from o along unit d with a sphere of radius r at the origin; (-1,-1) if none. */
 const raySphere = Fn(([o, d, r]: [Vec3Node, Vec3Node, FloatNode]) => {
@@ -75,11 +66,10 @@ export const VIEW_RADIUS = VIEW_R;
 export type Tables = ReturnType<typeof createTables>;
 
 export function createTables() {
-  const transmittanceTable = table(T_W, T_H);
-  const multipleTable = table(M_N, M_N);
-  const skyViewTable = table(V_W, V_H);
-  const ambientTable = table(3, 1);
-  ambientTable.minFilter = ambientTable.magFilter = NearestFilter;
+  const transmittanceTable = storageTable(T_W, T_H);
+  const multipleTable = storageTable(M_N, M_N);
+  const skyViewTable = storageTable(V_W, V_H);
+  const ambientTable = storageTable(3, 1, { filter: NearestFilter });
 
   /** Multiple of a clear day's aerosol (Environment.haze). */
   const haze = uniform(1);

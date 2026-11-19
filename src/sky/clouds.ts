@@ -7,28 +7,17 @@
 // moving doesn't blur them) and held to the new samples' range. After four frames every half-resolution pixel is
 // fresh.
 
-import {
-  ClampToEdgeWrapping, HalfFloatType, LinearFilter, Matrix4, NearestFilter, StorageTexture, Vector3,
-} from 'three/webgpu';
+import { Matrix4, NearestFilter, StorageTexture, Vector3 } from 'three/webgpu';
 import {
   Fn, If, abs, clamp, dot, float, floor, fract, instanceIndex, int, ivec2, max, min, mix, normalize, select,
   smoothstep, texture, textureLoad, textureStore, uniform, uvec2, vec2, vec3, vec4,
 } from 'three/tsl';
-import type { Compute } from '../gpu';
+import { storageTable, type Compute } from '../gpu';
 import type { View } from '../view/view';
 import { createCloudNoise } from './cloud-noise';
 import { BASE, DIFFUSION, SIGMA, TOP, createCloudField, type CloudField } from './cloud-field';
 import type { Tables } from './tables';
 import { clampInts, loop, type FloatNode, type Vec2Node, type Vec3Node, type Vec4Node } from '../tsl';
-
-function target(w: number, h: number, filter: typeof LinearFilter | typeof NearestFilter = LinearFilter): StorageTexture {
-  const t = new StorageTexture(w, h);
-  t.type = HalfFloatType;
-  t.minFilter = t.magFilter = filter;
-  t.wrapS = t.wrapT = ClampToEdgeWrapping;
-  t.generateMipmaps = false;
-  return t;
-}
 
 /** Most steps a screen ray takes (a grazing one; one looking up needs about 30). */
 const MAX_STEPS = 64;
@@ -87,10 +76,11 @@ function createPasses(width: number, height: number, view: View, field: CloudFie
 
   const HW = Math.max(1, Math.ceil(width / 2)), HH = Math.max(1, Math.ceil(height / 2));
   const MW = Math.ceil(HW / 2), MH = Math.ceil(HH / 2);
-  const marched = target(MW, MH, NearestFilter);
-  const marchedDistance = target(MW, MH, NearestFilter);
-  const history = [target(HW, HH), target(HW, HH)];
-  const historyDistance = [target(HW, HH, NearestFilter), target(HW, HH, NearestFilter)];
+  const nearest = { filter: NearestFilter };
+  const marched = storageTable(MW, MH, nearest);
+  const marchedDistance = storageTable(MW, MH, nearest);
+  const history = [storageTable(HW, HH), storageTable(HW, HH)];
+  const historyDistance = [storageTable(HW, HH, nearest), storageTable(HW, HH, nearest)];
   const cell = uniform(new Vector3());
 
   const marchKernel = Fn(() => {
@@ -172,7 +162,7 @@ const SHADOW_STEPS = 12;
 
 function createShadow(view: View, field: CloudField) {
   const { eye, sunDir } = field.inputs;
-  const map = target(SHADOW_N, SHADOW_N);
+  const map = storageTable(SHADOW_N, SHADOW_N);
   /** Where the shadow map was centred when last drawn, km. */
   const centre = uniform(new Vector3());
 

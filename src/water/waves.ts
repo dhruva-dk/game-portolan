@@ -24,14 +24,13 @@
 // read at the same moment.
 
 import {
-  DataTexture, FloatType, HalfFloatType, LinearFilter, LinearMipmapLinearFilter, RGBAFormat, RepeatWrapping, StorageTexture,
-  Vector2,
+  DataTexture, FloatType, LinearMipmapLinearFilter, RGBAFormat, RepeatWrapping, Vector2, type StorageTexture,
 } from 'three/webgpu';
 import {
   Fn, cos, float, floor, instanceIndex, instancedArray, length, localId, max, select, sin, smoothstep, sqrt, textureLoad, textureStore,
   uint, uniform, uvec2, vec2, vec4, workgroupBarrier, workgroupId,
 } from 'three/tsl';
-import type { Compute } from '../gpu';
+import { storageTable, type Compute } from '../gpu';
 import { BANDS, CASCADES, CHOP, PERIOD, SIZE } from '../world/cascades';
 import { G, coxMunk, initialSpectrum, meanSquareSlope, normalQuantile, seaState, whitecaps, type Sea } from '../world/spectrum';
 import { workgroupArrayOf, type FloatNode, type UintNode, type Vec2Node, type Vec4Node } from '../tsl';
@@ -47,15 +46,9 @@ const HALF = SIZE / 2;
 const AREA = SIZE * SIZE;
 const COUNT = CASCADES.length;
 
-function surface(): StorageTexture {
-  const t = new StorageTexture(SIZE, SIZE);
-  t.type = HalfFloatType;
-  t.minFilter = LinearMipmapLinearFilter;
-  t.magFilter = LinearFilter;
-  t.wrapS = t.wrapT = RepeatWrapping;
-  t.anisotropy = 4;
-  return t;
-}
+/** A cascade's tile of the sea: tiling, its mips made by three, read at a slant. */
+const surface = (): StorageTexture =>
+  storageTable(SIZE, SIZE, { min: LinearMipmapLinearFilter, wrap: RepeatWrapping, mipmaps: true, anisotropy: 4 });
 
 /** Two complex numbers in a vec4 (xy, zw), each times the complex w. */
 const twice = (a: Vec4Node, w: Vec2Node): Vec4Node => vec4(
