@@ -92,7 +92,7 @@ export const reactTime = (skill: number) => GUNNER.react[0] + (GUNNER.react[1] -
 /** What a gun of `kind` and `rarity` does to a ship `metres` off, hit points a second: its balls a second over a
  *  magazine and its reload (a wind-up's wait in it), less with its fall-off, and with its spread wider than her beam
  *  there; none out of its reach. */
-export function suits(g: { kind: GunKind; rarity: number }, metres: number): number {
+function suits(g: { kind: GunKind; rarity: number }, metres: number): number {
   const b = GUNS[g.kind];
   if (metres > b.range || metres < b.least) return 0;
   const cycle = b.mag * (b.interval + b.windup) + reloadOf(g), across = spreadOf(g) * metres;

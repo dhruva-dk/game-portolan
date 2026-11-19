@@ -12,7 +12,7 @@
 // Pure and deterministic: the same planet and seed give the same berths, to the bit.
 
 import { random } from '../world/random.ts';
-import { R, add, along, cross, dot, frameAt, scale, type Vec3 } from '../world/sphere.ts';
+import { R, add, along, distance, frameAt, scale, type Vec3 } from '../world/sphere.ts';
 import { SHIP } from './handling.ts';
 import type { Depth } from './shoal.ts';
 
@@ -154,7 +154,7 @@ export function closest(spawns: readonly Spawn[]): number {
   let least = Infinity;
   for (let i = 0; i < spawns.length; i++) for (let j = i + 1; j < spawns.length; j++) {
     const a = spawns[i].at, b = spawns[j].at;
-    least = Math.min(least, Math.atan2(Math.hypot(...cross(a, b)), dot(a, b)) * R);
+    least = Math.min(least, distance(a, b));
   }
   return least;
 }

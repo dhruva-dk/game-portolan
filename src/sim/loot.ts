@@ -172,6 +172,8 @@ export function overboard(f: Flotsam, at: Vec3, goods: readonly Goods[], from: n
 /** dt seconds of the pieces lying: older (while some ship's to leave), and those with way on carried along it as it
  *  dies, stopped by shoal water. A piece lying still and no ship's is left as it is. */
 export function drifted(f: Flotsam, dt: number, depth: Depth): Flotsam {
+  // (most steps, every piece lies still and no ship's: the flotsam stands as it is)
+  if (f.pieces.every((l) => l.way === STILL && l.from < 0)) return f;
   const k = Math.max(0, 1 - dt * LOOT.drift);
   const pieces = f.pieces.map((l): Loot => {
     if (l.way === STILL && l.from < 0) return l;
@@ -189,7 +191,7 @@ export function drifted(f: Flotsam, dt: number, depth: Depth): Flotsam {
 const REACH = Math.cos(LOOT.reach / R);
 
 /** The empty gun slot a gun picked up goes to: the one in hand if it is empty, else the other; -1 if both are full. */
-export const emptySlot = (c: Crew) => (c.guns[c.hand] === null ? c.hand : c.guns.findIndex((g) => g === null));
+const emptySlot = (c: Crew) => (c.guns[c.hand] === null ? c.hand : c.guns.findIndex((g) => g === null));
 
 /** Her crew with gun slot `slot` holding `g`, its magazine full; taken into her hand, it fires only after EQUIP. */
 const armedWith = (c: Crew, slot: number, g: Arms): Crew => ({
@@ -230,7 +232,7 @@ export interface Taken { ship: number; goods: Goods; at: Vec3; slot: number }
 export function swept(
   f: Flotsam, crews: readonly Crew[], fleet: readonly Vessel[], takes: ReadonlyMap<number, number>, seed: number
 ): { flotsam: Flotsam; crews: Crew[]; took: Taken[] } {
-  let pieces = f.pieces.map((l) => l), next = f.next;
+  let pieces = f.pieces, next = f.next;
   const took: Taken[] = [];
   const by = new Map(crews.map((c) => [c.id, c]));
   for (const v of [...fleet].sort((a, b) => a.id - b.id)) {

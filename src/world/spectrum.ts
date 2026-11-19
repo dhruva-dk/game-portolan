@@ -21,7 +21,7 @@ export function seaState(wind: number, fetch: number) {
 const GAMMA = 3.3;
 
 /** JONSWAP's shape over angular frequency, without its scale α. */
-export function jonswap(w: number, peak: number): number {
+function jonswap(w: number, peak: number): number {
   if (w <= 0) return 0;
   const sigma = w <= peak ? 0.07 : 0.09;
   const r = Math.exp(-((w - peak) ** 2) / (2 * sigma * sigma * peak * peak));

@@ -64,7 +64,7 @@ export function healSlot(c: Crew): number {
 }
 
 /** How much she needs mending: her hull or shield under where she tops it up, by her temperament and skill. */
-export function mendNeed(c: Ctx, crew: Crew): number {
+function mendNeed(c: Ctx, crew: Crew): number {
   const hull = c.t.mend + 20 * c.t.skill, shield = 25 + 25 * c.t.skill;
   return Math.max(ramp(crew.health.hull, hull + 8, hull - 8), ramp(crew.health.shield, shield + 8, shield - 8));
 }
