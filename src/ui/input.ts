@@ -8,9 +8,9 @@
 // (fire) or Space, a slot of the hotbar tapped (tap) and Gust pressed (gust), with a finger or a click. What they mean
 // is the game's business (play/game.ts step); this only reports them.
 
-import type { Hands } from '../player';
-import { clamp } from '../world/scalar';
-import { view } from './ui';
+import type { Hands } from '../player.ts';
+import { clamp } from '../world/scalar.ts';
+import { view } from './ui.ts';
 
 /** The stick's reach from its centre, CSS pixels at the UI's drawn size (ui.ts size: grown with the rest of it). */
 export const STICK = 56;

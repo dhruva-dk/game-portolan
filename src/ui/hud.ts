@@ -31,18 +31,18 @@
 //
 // It reads a plain HudState each frame and redraws a piece only when what it shows has changed.
 
-import { hexToLinear, linearToCss } from '../colour';
-import { HOTBAR, type GunKind, type Kit, type Status } from '../player';
-import { RARITY } from '../rarity';
-import type { Sea } from '../snapshot';
-import { clamp, lerp } from '../world/scalar';
-import type { Shores } from './coasts';
-import type { Glyph } from './glyphs';
-import { DUSK, GILT, INK, PAPER, WASH, alpha, bar, figure, glyph, paperDisc, ring as sweep, slip, svg } from './ink';
-import { createJuice } from './juice';
-import { createMinimap, type More } from './minimap';
-import { onTap } from './touch';
-import { piece, show, view } from './ui';
+import { hexToLinear, linearToCss } from '../colour.ts';
+import { HOTBAR, type GunKind, type Kit, type Status } from '../player.ts';
+import { RARITY } from '../rarity.ts';
+import type { Sea } from '../snapshot.ts';
+import { clamp, lerp } from '../world/scalar.ts';
+import type { Shores } from './coasts.ts';
+import type { Glyph } from './glyphs.ts';
+import { DUSK, GILT, INK, PAPER, WASH, alpha, bar, figure, glyph, paperDisc, ring as sweep, slip, svg } from './ink.ts';
+import { createJuice } from './juice.ts';
+import { createMinimap, type More } from './minimap.ts';
+import { onTap } from './touch.ts';
+import { piece, show, view } from './ui.ts';
 
 /** What the HUD shows: the match as the game reports it, and what she carries. */
 export type HudState = Status & Kit;

@@ -9,8 +9,8 @@
 //
 // Shown and hidden one way: `show` at once (the `hidden` attribute), `fade` over a time and then hidden.
 
-import { DEFS, cssInks, svgNode } from './ink';
-import { FADE } from './ways';
+import { DEFS, cssInks, svgNode } from './ink.ts';
+import { FADE } from './ways.ts';
 
 /** The page every piece and screen was drawn on, CSS px: a phone's landscape screen, and its safe insets. */
 export const DRAWN = { w: 956, h: 440, insets: { top: 0, right: 62, bottom: 20, left: 62 } } as const;

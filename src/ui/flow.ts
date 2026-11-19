@@ -7,16 +7,16 @@
 // arrival: hud.ts), fades out as her end begins, and comes back, only its clock, count and disc, while she watches
 // another ship.
 
-import type { Globe } from './globe';
-import type { Hud, HudState } from './hud';
-import type { End } from '../player';
-import type { Sea } from '../snapshot';
-import { createResult, createWatching } from './ends';
-import { createLobby, createSettings, type Settings, type Title } from './screens';
-import { fade } from './ui';
-import { createPassage } from './passage';
-import { createVeil } from './veil';
-import { HOME, IN_MATCH, course, events, way, type Screen, type Tap } from './ways';
+import type { Globe } from './globe.ts';
+import type { Hud, HudState } from './hud.ts';
+import type { End } from '../player.ts';
+import type { Sea } from '../snapshot.ts';
+import { createResult, createWatching } from './ends.ts';
+import { createLobby, createSettings, type Settings, type Title } from './screens.ts';
+import { fade } from './ui.ts';
+import { createPassage } from './passage.ts';
+import { createVeil } from './veil.ts';
+import { HOME, IN_MATCH, course, events, way, type Screen, type Tap } from './ways.ts';
 
 const KEY = 'portolan.settings';
 /** Milliseconds the HUD takes to fade out as her end begins: slow enough to read as the match drying away, not cut. */

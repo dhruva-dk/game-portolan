@@ -1,4 +1,4 @@
-// The marks of a blow, laid on the HUD: 0117's (its chart HUD's cross, figures and arcs, and juice/markers.ts).
+// The marks of a blow, laid on the HUD: a cross, figures and arcs.
 //   cross    her ball home: four ticks round the reticle in the middle of the screen, popping out and gone in a
 //            moment; white on a hull, azure brackets on a shield, the brackets thrown wide with shards where it
 //            broke; a gold cross turned a quarter and ringed where she sank the ship
@@ -7,7 +7,7 @@
 //   arc      a blow on her: a rubric arc on the screen's rim toward whoever dealt it, fading
 // No words; numerals only. Its own layer, over the world and under the HUD's pieces; it runs on the page's clock.
 
-import { FIGURES, INK, LIGHT, svgNode } from './ink';
+import { FIGURES, INK, LIGHT, svgNode } from './ink.ts';
 
 /** How long each lasts, s; how close together blows on one ship sum, s; the most figures and arcs at once. */
 export const MARK = { cross: 0.28, kill: 0.8, figure: 0.9, arc: 1.1 } as const;
@@ -19,7 +19,7 @@ const HALF = 0.22, RIM_X = 0.46, RIM_Y = 0.4;
 /** The shield's azure, and the gold of a sinking. */
 const AZURE = LIGHT.azure, GOLD = LIGHT.gold;
 
-/** A figure's size for a blow of `points`: 0117's, by how heavy it was; ×1.6 for the last. */
+/** A figure's size for a blow of `points`, by how heavy it was; ×1.6 for the last. */
 export const figureSize = (points: number, last: boolean) => (points < 15 ? 15 : points < 40 ? 19 : 25) * (last ? 1.6 : 1);
 
 /** Where on the rim of a `w` × `h` screen a blow from `bearing` (radians clockwise from ahead) shows: an ellipse

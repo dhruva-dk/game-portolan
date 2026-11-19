@@ -5,8 +5,8 @@
 // passage's to show and hide, not the flow's. What it covers of the world, the sound follows (main.ts: the bed fades
 // under it).
 
-import type { Title } from './screens';
-import { HOME, wayHome } from './ways';
+import type { Title } from './screens.ts';
+import { HOME, wayHome } from './ways.ts';
 
 export function createPassage(title: Title) {
   /** The way home under way (null: none), and the change it makes once the match is covered. */

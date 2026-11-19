@@ -3,8 +3,8 @@
 // new one is drawn under it, so the one dissolves into the other and nothing is cut. Under every screen, so a screen
 // fading in or out over it is seen whole. (Home from a match goes under the title instead: passage.ts.)
 
-import { FADE } from './ways';
-import { fade, uiLayer } from './ui';
+import { FADE } from './ways.ts';
+import { fade, uiLayer } from './ui.ts';
 
 export function createVeil() {
   const held = document.createElement('canvas');

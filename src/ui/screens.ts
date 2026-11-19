@@ -1,8 +1,7 @@
-// The screens round the lobby, after the UI sheet as the owner reworked it. Each was drawn on the drawn page (ui.ts
-// DRAWN: 956 × 440 with a phone's safe insets); on any screen the page is scaled by the UI's size (ui.ts size: the
-// iPad's 1180 × 820 takes it 1.74×, as the HUD) and grows or shrinks to the screen's own shape, and each of its pieces
-// keeps to the edge it was drawn against, the screen's safe area there or the gutter (ui.ts at): no shape of screen
-// letterboxes it.
+// The screens round the lobby. Each was drawn on the drawn page (ui.ts DRAWN: 956 × 440 with its own safe insets); on
+// any screen the page is scaled by the UI's size (ui.ts size: the iPad's 1180 × 820 takes it 1.74×, as the HUD) and
+// grows or shrinks to the screen's own shape, and each of its pieces keeps to the edge it was drawn against, the
+// screen's safe area there or the gutter (ui.ts at): no shape of screen letterboxes it.
 // Each fades in and out (ways.ts FADE), never cut to.
 //   title   an opaque sheet over the world loading: rhumb lines, the rose whose needle swings while the world loads and
 //           settles north when it is ready, her galleon gilt below; it moves on by itself (flow.ts)
@@ -13,11 +12,11 @@
 // Each folio has its close mark at its corner; a tap outside it closes it too. Her match's end is ends.ts's.
 // No words anywhere; numerals only.
 
-import { clamp } from '../world/scalar';
-import { GILT, INK, PAPER, SHADOW, WASH, alpha, bar, galleon, glyph, paperDisc, parchment, roughRect, svgNode } from './ink';
-import { rhumbs, rose } from './marks';
-import { onTap, region } from './touch';
-import { at, fade, onResize, page, screen, type Page } from './ui';
+import { clamp } from '../world/scalar.ts';
+import { GILT, INK, PAPER, SHADOW, WASH, alpha, bar, galleon, glyph, paperDisc, parchment, roughRect, svgNode } from './ink.ts';
+import { rhumbs, rose } from './marks.ts';
+import { onTap, region } from './touch.ts';
+import { at, fade, onResize, page, screen, type Page } from './ui.ts';
 
 /** Sound and look speed, each 0–1; whether the frame's cost shows in its corner (meter.ts). */
 export interface Settings { sound: number; look: number; stats: boolean }

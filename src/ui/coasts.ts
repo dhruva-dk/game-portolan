@@ -2,10 +2,10 @@
 // the land's coast cut into runs a block of cells long (world/coastline.ts); the land itself the minimap draws from the
 // ground round her (ground.ts).
 
-import type { Land } from '../world/land';
-import type { Planet } from '../world/planet';
-import { coastLines } from '../world/coastline';
-import { add, distance, normalize, type Vec3 } from '../world/sphere';
+import type { Land } from '../world/land.ts';
+import type { Planet } from '../world/planet.ts';
+import { coastLines } from '../world/coastline.ts';
+import { add, distance, normalize, type Vec3 } from '../world/sphere.ts';
 
 /** A run of coast: its middle, how far from it it reaches (metres), its points, and whether its last point joins its
  *  first. */

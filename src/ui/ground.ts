@@ -4,9 +4,9 @@
 // it is filled a band of ROWS rows a redraw behind the one shown (the whole plate at once is some 55 000 readings of
 // the height, 20 ms or so); between, the plate shown is laid onto the disc where she now is (disc.ts laid).
 
-import { distance, type Vec3 } from '../world/sphere';
-import { outInto, type Lay, type LayOnto, type Mutable, type Spot } from './disc';
-import { paint } from './isles';
+import { distance, type Vec3 } from '../world/sphere.ts';
+import { outInto, type Lay, type LayOnto, type Mutable, type Spot } from './disc.ts';
+import { paint } from './isles.ts';
 
 /** Samples across a plate; rows of it filled a redraw; metres she sails before a plate is taken afresh. */
 const SIDE = 264, ROWS = 12, MOVE = 30;
@@ -22,7 +22,8 @@ export function createGround(height: (p: Vec3) => number, span: number, top: num
     const canvas = document.createElement('canvas');
     canvas.width = canvas.height = SIDE;
     const g = canvas.getContext('2d')!;
-    return { canvas, g, image: g.createImageData(SIDE, SIDE), h: new Float32Array(SIDE * SIDE), at: [0, 0, 1], right: [1, 0, 0], ahead: [0, 1, 0] };
+    const image = g.createImageData(SIDE, SIDE), h = new Float32Array(SIDE * SIDE);
+    return { canvas, g, image, h, at: [0, 0, 1], right: [1, 0, 0], ahead: [0, 1, 0] };
   };
   const plates = [plate(), plate()];
   let shown: Plate | null = null, filling: Plate | null = null, row = 0;

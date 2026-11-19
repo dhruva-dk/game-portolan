@@ -10,14 +10,14 @@
 // when the circle is off the disc). Her mark at the centre is a small arrowhead turned to her heading. Drawn in canvas
 // 2D when what it shows has changed; tapped, it opens the full map.
 
-import type { Sea } from '../snapshot';
-import { R, add, along, distance, dot, frameAt, normalize, scale, type Vec3 } from '../world/sphere';
-import type { Shores } from './coasts';
-import { laid, layAt, metres, newLay, place, type LayOnto } from './disc';
-import { createGround } from './ground';
-import { createHeld } from './held';
-import { BRASS, INK, PAPER, WASH, alpha, svgNode } from './ink';
-import { view } from './ui';
+import type { Sea } from '../snapshot.ts';
+import { R, add, along, distance, dot, frameAt, normalize, scale, type Vec3 } from '../world/sphere.ts';
+import type { Shores } from './coasts.ts';
+import { laid, layAt, metres, newLay, place, type LayOnto } from './disc.ts';
+import { createGround } from './ground.ts';
+import { createHeld } from './held.ts';
+import { BRASS, INK, PAPER, WASH, alpha, svgNode } from './ink.ts';
+import { view } from './ui.ts';
 
 /** Metres from her to the disc's rim: at her 16 m/s some 25 s of sailing, twice a cannon's 200 m reach; some 4.5 m a
  *  pixel on the hud's disc (hud.ts MINIMAP). */
@@ -83,7 +83,8 @@ export function createMinimap(host: HTMLElement, size: number, { coasts, ground 
   /** The Storm's rings traced, newest last, by their centre and radius. */
   const rings: { centre: Vec3; radius: number; ring: Vec3[] }[] = [];
   const ringOf = (s: Storm) => {
-    for (const k of rings) if (k.radius === s.radius && k.centre[0] === s.centre[0] && k.centre[1] === s.centre[1] && k.centre[2] === s.centre[2]) return k.ring;
+    const [x, y, z] = s.centre;
+    for (const k of rings) if (k.radius === s.radius && k.centre[0] === x && k.centre[1] === y && k.centre[2] === z) return k.ring;
     if (rings.length >= RINGS) rings.shift();
     const ring = stormRing(s, 180);
     rings.push({ centre: [s.centre[0], s.centre[1], s.centre[2]], radius: s.radius, ring });

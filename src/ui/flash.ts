@@ -1,6 +1,7 @@
-// The screen's answer to a blow: a flash, a vignette and the low-hull heartbeat. A flash washes the whole screen in a colour for a moment (`add` a pale wash of light, `tint` the colour laid
-// over it); a vignette darkens the screen's rim in a colour, drawn toward where a blow came from; while her hull
-// is low, a heartbeat of rubric beats at the rim, faster the lower it is.
+// The screen's answer to a blow: a flash, a vignette and the low-hull heartbeat. A flash washes the whole screen in a
+// colour for a moment (`add` a pale wash of light, `tint` the colour laid over it); a vignette darkens the screen's
+// rim in a colour, drawn toward where a blow came from; while her hull is low, a heartbeat of rubric beats at the rim,
+// faster the lower it is.
 //
 // Photosensitivity (WCAG 2.3.1): no more than BIG flashes stronger than SAFE in any second; past that a flash is held
 // to SAFE.

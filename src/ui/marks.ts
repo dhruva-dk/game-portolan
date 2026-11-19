@@ -1,6 +1,6 @@
-// The chart's larger marks, after the UI sheet: the compass rose and its rhumb lines, and the laurel for a place.
+// The chart's larger marks: the compass rose and its rhumb lines, and the laurel for a place.
 
-import { INK, PAPER, WASH, alpha, arcPath } from './ink';
+import { INK, PAPER, WASH, alpha, arcPath } from './ink.ts';
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
 

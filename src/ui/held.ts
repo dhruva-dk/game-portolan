@@ -6,11 +6,11 @@
 // Each holder's water as the sea shows it (water/claims.ts): a flat tint in her colour, hers the deeper, inside a hard
 // line of it along its edge.
 
-import { linearToSrgb } from '../colour';
-import type { Sea } from '../snapshot';
-import { cellOf } from '../world/cells';
-import { distance } from '../world/sphere';
-import { outInto, type Lay, type LayOnto, type Mutable } from './disc';
+import { linearToSrgb } from '../colour.ts';
+import type { Sea } from '../snapshot.ts';
+import { cellOf } from '../world/cells.ts';
+import { distance } from '../world/sphere.ts';
+import { outInto, type Lay, type LayOnto, type Mutable } from './disc.ts';
 
 /** Samples across the grid. */
 const SIDE = 176;

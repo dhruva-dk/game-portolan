@@ -4,7 +4,7 @@
 // Read many times a redraw, so nothing here makes a new array: the disc is laid into one kept by its drawer, and place,
 // metres and laid each answer in one of their own, good until the next call.
 
-import { R, type Vec3 } from '../world/sphere';
+import { R, type Vec3 } from '../world/sphere.ts';
 
 export type Mutable = [number, number, number];
 
@@ -83,7 +83,7 @@ const T: [number, number, number, number, number, number] = [0, 0, 0, 0, 0, 0];
  * The canvas transform that lays an image drawn on `o`'s own flat chart (its x along `e`, its rows down along −n, `m`
  * metres a texel, centred on `o`) onto the disc: as setTransform's a, b, c, d, e, f.
  */
-export function laid(l: Lay, o: Vec3, e: Vec3, n: Vec3, w: number, h: number, m: number): readonly [number, number, number, number, number, number] {
+export function laid(l: Lay, o: Vec3, e: Vec3, n: Vec3, w: number, h: number, m: number): Readonly<typeof T> {
   const step = 10;
   from.at = o;
   from.right = e;

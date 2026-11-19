@@ -156,7 +156,7 @@ export function ring(x: number, y: number, r: number, frac: number, colour: stri
   return `<path d="${arcPath(x, y, r, a0, a1)}" fill="none" stroke="${colour}" stroke-width="${width}" stroke-linecap="round"/>`;
 }
 
-/** A galleon's mark (chart/galleon.ts, simplified), `size` across, centred on (x, y). */
+/** A galleon's mark, `size` across, centred on (x, y). */
 export function galleon(x: number, y: number, size: number, o: { sail?: string; hull?: string; waves?: boolean } = {}) {
   const sail = o.sail ?? CUT, hull = o.hull ?? 'url(#h-iron)', k = size / 100;
   return `<g transform="translate(${r2(x - size / 2)} ${r2(y - size / 2)}) scale(${r2(k)})" stroke="${INK.iron}" stroke-linejoin="round">`

@@ -1,6 +1,6 @@
-// The HUD's answer to what happens (player.ts Moment): 0117's juice (app/juice.ts react, its recipes' screen and HUD
-// parts), as far as this game has what it answered. Each moment is answered once (by its seq), and only those that
-// befall her or that she dealt; the camera's part is the game's (play/shake.ts), the sound's the sound's.
+// The HUD's answer to what happens (player.ts Moment): the screen's and the HUD's part of it. Each moment is answered
+// once (by its seq), and only those that befall her or that she dealt; the camera's part is the game's
+// (play/shake.ts), the sound's the sound's.
 //   her gun fired       a warm flash; the Fire disc knocked in (no oftener than FIRED_APART)
 //   her ball home       the cross round the reticle (hits.ts) and the figure rising off the ship; a flash, the
 //                       stronger where it broke a shield
@@ -14,18 +14,18 @@
 //   her hull low        the heartbeat at the rim (flash.ts)
 // No words; numerals only.
 
-import { HER, blowOf, felt, isGun, type Moment, type Status } from '../player';
-import { clamp } from '../world/scalar';
-import { createFlash, PICKUP, SCREEN } from './flash';
-import { createHits } from './hits';
-import { LIGHT, glyph, svgNode } from './ink';
-import type { Glyph } from './glyphs';
-import { view } from './ui';
+import { HER, blowOf, felt, isGun, type Moment, type Status } from '../player.ts';
+import { clamp } from '../world/scalar.ts';
+import { createFlash, PICKUP, SCREEN } from './flash.ts';
+import { createHits } from './hits.ts';
+import { LIGHT, glyph, svgNode } from './ink.ts';
+import type { Glyph } from './glyphs.ts';
+import { view } from './ui.ts';
 
 /** The HUD's pieces it moves: the vitals slip, the Fire and Gust discs, and the hotbar's slots (gun's first). */
 export interface Parts { vitals: HTMLElement; fire: HTMLElement; gust: HTMLElement; slots: readonly HTMLElement[] }
 
-/** A piece's flight to its slot (0117's FLY): its burst out, its flight, and its size along the way. */
+/** A piece's flight to its slot: its burst out, its flight, and its size along the way. */
 export const FLY = { burst: 0.24, flight: 0.56, scale: [0.35, 1.15, 0.7] } as const;
 
 /** The fewest ms between answers to her firing: the repeater's run of shots (one every 100 ms) flashes and knocks

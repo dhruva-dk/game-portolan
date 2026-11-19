@@ -1,10 +1,10 @@
 // The stick as drawn on the UI's layer: a ring where the thumb came down and a knob under it, in ink; nothing when it
 // is let go, or held by the keys (which have no place on the screen).
 
-import type { Hands } from '../player';
-import { INK, PAPER, alpha } from './ink';
-import { STICK } from './input';
-import { show } from './ui';
+import type { Hands } from '../player.ts';
+import { INK, PAPER, alpha } from './ink.ts';
+import { STICK } from './input.ts';
+import { show } from './ui.ts';
 
 /** The stick's line, iron a little faint, and its knob's paper, fainter. */
 const LINE = alpha(INK.iron, 0.7), KNOB_FILL = alpha(PAPER, 0.3);

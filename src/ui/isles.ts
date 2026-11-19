@@ -2,9 +2,9 @@
 // deepening to ochre up its hills with a faint sepia contour every few metres, its coast inked over it as a line by the
 // minimap.
 
-import { hexToLinear, linearToSrgbRgb, type Rgb } from '../colour';
-import { lerp } from '../world/scalar';
-import { LAND } from './ink';
+import { hexToLinear, linearToSrgbRgb, type Rgb } from '../colour.ts';
+import { lerp } from '../world/scalar.ts';
+import { LAND } from './ink.ts';
 
 /** Where the shallows' pale wash ends: the ground this many metres down. */
 const APRON = 8;

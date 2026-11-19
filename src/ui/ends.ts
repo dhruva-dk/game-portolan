@@ -8,12 +8,12 @@
 //            at the foot the spyglass between the arrows that turn her to the next ship or the one before
 // No words; numerals only.
 
-import type { End } from '../player';
-import { INK, PAPER, SHADOW, WASH, alpha, figure, glyph, paperDisc, roughCircle, slip, svg, uid } from './ink';
-import { laurel } from './marks';
-import { banner, sheet } from './screens';
-import { onTap, region } from './touch';
-import { at, fade, piece, screen } from './ui';
+import type { End } from '../player.ts';
+import { INK, PAPER, SHADOW, WASH, alpha, figure, glyph, paperDisc, roughCircle, slip, svg, uid } from './ink.ts';
+import { laurel } from './marks.ts';
+import { banner, sheet } from './screens.ts';
+import { onTap, region } from './touch.ts';
+import { at, fade, piece, screen } from './ui.ts';
 
 /** A place's laurel and numeral: gold for the first, silver for the top five, red for the top ten, ink below. */
 const placed = (place: number) =>

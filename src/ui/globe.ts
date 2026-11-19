@@ -18,18 +18,18 @@
 // from above); her galleon, gilt. Whatever is on the planet's far side is not shown. Beside the window, the two
 // readings that matter: ships afloat and the Storm's clock.
 
-import type { Cap } from '../sim/storm';
-import { lookingAt, type Eye } from '../snapshot';
-import { clamp } from '../world/scalar';
-import { R, cross, dot, length, normalize, scale, type Vec3 } from '../world/sphere';
-import type { Coast } from './coasts';
-import { GLYPHS, type Prim } from './glyphs';
-import { clock, type HudState } from './hud';
-import { CUT, INK, PAPER, SHADOW, WASH, alpha, figure, galleon, glyph, roughCircle, roughRect, slip, svg, svgNode, uid } from './ink';
-import { rhumbs } from './marks';
-import { stormRing, type Storm } from './minimap';
-import { dragged, onTap } from './touch';
-import { insets, onResize, screen, view, type Insets } from './ui';
+import type { Cap } from '../sim/storm.ts';
+import { lookingAt, type Eye } from '../snapshot.ts';
+import { clamp } from '../world/scalar.ts';
+import { R, cross, dot, length, normalize, scale, type Vec3 } from '../world/sphere.ts';
+import type { Coast } from './coasts.ts';
+import { GLYPHS, type Prim } from './glyphs.ts';
+import { clock, type HudState } from './hud.ts';
+import { CUT, INK, PAPER, SHADOW, WASH, alpha, figure, galleon, glyph, roughCircle, roughRect, slip, svg, svgNode, uid } from './ink.ts';
+import { rhumbs } from './marks.ts';
+import { stormRing, type Storm } from './minimap.ts';
+import { dragged, onTap } from './touch.ts';
+import { insets, onResize, screen, view, type Insets } from './ui.ts';
 
 /** The panel's height, a share of the screen's; the room each side of the window for a reading, px at the drawn size;
  *  the window's radius, a share of the panel's height; the close roundel's side, px at the drawn size (over 44 pt to
