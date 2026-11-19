@@ -3,8 +3,8 @@
 // (Hands: read by ui/input.ts, given to play/game.ts step); what the match reports comes out (Status, read by
 // ui/hud.ts), with what she carries (Kit).
 
-import type { GunKind, LootKind } from './kinds';
-import type { Vec3 } from './world/sphere';
+import type { GunKind, LootKind, Use } from './kinds.ts';
+import type { Vec3 } from './world/sphere.ts';
 
 /** Her hands, as read for a frame. */
 export interface Hands {
@@ -57,11 +57,13 @@ export interface Status {
   moments: readonly Moment[];
 }
 
-/** Her ship's id in what the match reports (Deed: sim/match.ts PLAYER). */
+/** Her ship's id in what the match reports (Deed): sim/match.ts PLAYER, which the UI may not import (tests/moments.test.ts
+ *  holds them equal). */
 export const HER = 0;
 
 /** The kinds of gun, and of a piece taken up or mended with (a gun of a kind, or stores): kinds.ts. */
-export { isGun, type GunKind, type LootKind } from './kinds.ts';
+export { isGun } from './kinds.ts';
+export type { GunKind, LootKind } from './kinds.ts';
 
 /** The hotbar's slots: the guns' first, then the items'. */
 export const HOTBAR = { guns: 2, items: 3 } as const;
@@ -96,7 +98,9 @@ export type Deed = { seq: number; time: number; at: Vec3; ship: number } & (
 
 /** Metres over the sea a deed is placed, by its kind: a blow on a hull at her side, a gun at her muzzle, the rest at
  *  the water. Where it is seen (play/moments.ts) and heard from (audio/audio.ts). */
-export const LIFT: Record<Deed['kind'], number> = { fired: 3, winding: 3, reloading: 3, reloaded: 3, swapped: 3, fell: 0, struck: 2, sank: 2, took: 0.5, mended: 2, gust: 2 };
+export const LIFT: Record<Deed['kind'], number> = {
+  fired: 3, winding: 3, reloading: 3, reloaded: 3, swapped: 3, fell: 0, struck: 2, sank: 2, took: 0.5, mended: 2, gust: 2,
+};
 
 /** The screens (ui/ways.ts, the ways between them): named here for the sound too, which hears which is shown. */
 export const SCREENS = ['title', 'lobby', 'settings', 'match', 'sinking', 'sunk', 'spectate', 'won', 'result'] as const;
@@ -106,7 +110,7 @@ export type Screen = (typeof SCREENS)[number];
  *  shield, struck the hull, or struck a shield only. */
 export type Blow = 'broke' | 'hull' | 'shield';
 export const blowOf = (d: { broke: boolean; hull: number }): Blow => (d.broke ? 'broke' : d.hull > 0 ? 'hull' : 'shield');
-/** How strongly a blow of `points` hit points is felt (0117's app/juice.ts): one she dealt, and one she took. */
+/** How strongly a blow of `points` hit points is felt: one she dealt, and one she took. */
 export const felt = {
   dealt: (points: number) => Math.min(1.3, 0.6 + points / 40),
   taken: (points: number) => Math.min(1.3, 0.4 + points / 40),
@@ -117,8 +121,8 @@ export const felt = {
  *  from the eye, metres. */
 export type Moment = Deed & { seen: { x: number; y: number } | null; bearing: number; metres: number };
 
-/** An item a slot of the hotbar holds. */
-export type Item = 'item.smallShield' | 'item.bigShield' | 'item.repairKit' | 'item.fullRepair';
+/** An item a slot of the hotbar holds: its stores' glyph (kinds.ts Use). */
+export type Item = `item.${Use}`;
 
 /** A slot of the hotbar holding an item, and how many of it if more than one may be held. */
 export interface Slot { item: Item; count?: number }

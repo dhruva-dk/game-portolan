@@ -10,11 +10,11 @@
 // her bow up the screen to the sky's up and widens to the chase eye's lens, and at the last turns onto the chase eye's
 // own turn, ending on the chase eye exactly.
 
-import type { Eye } from '../snapshot';
-import type { ShipPose } from '../world/pose';
-import { clamp, smoother } from '../world/scalar';
-import { R, add, arc, length, normalize, scale } from '../world/sphere';
-import { lookAt, slerp } from '../world/turn';
+import type { Eye } from '../snapshot.ts';
+import type { ShipPose } from '../world/pose.ts';
+import { clamp, smoother } from '../world/scalar.ts';
+import { R, add, arc, length, normalize, scale } from '../world/sphere.ts';
+import { lookAt, slerp } from '../world/turn.ts';
 
 export const ARRIVAL = {
   /** Seconds from space to the chase eye. */

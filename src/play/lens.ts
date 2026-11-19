@@ -1,7 +1,7 @@
 // Where a point on the sea falls on the screen, seen through an eye (snapshot.ts Eye) as the frame's camera draws it
 // (frame.ts: placed and turned as the eye is, its field of view the eye's, vertical, across the view's own aspect).
 
-import type { Eye } from '../snapshot';
+import type { Eye } from '../snapshot.ts';
 import { R, add, dot, scale, type Vec3 } from '../world/sphere.ts';
 import { inverse, rotate } from '../world/turn.ts';
 

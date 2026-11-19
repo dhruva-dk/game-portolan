@@ -4,17 +4,18 @@
 //   in:  { seed, land }               out: { open, clear } (sim/route.ts Soundings), berths (each open point's x, y, z), ms
 //   in:  { match, count } (its seed)   out: { match, spawns (each berth's at and heading, x, y, z each) }
 
-import { sound } from '../sim/route';
-import { berthing, berths, type Berthing } from '../sim/spawn';
-import { planetOf, type Land } from '../world/land';
-import type { Vec3 } from '../world/sphere';
+import { sound } from '../sim/route.ts';
+import { berthing, berths, type Berthing } from '../sim/spawn.ts';
+import { planetOf, type Land } from '../world/land.ts';
+import type { Vec3 } from '../world/sphere.ts';
 
 let sounded: { water: Berthing; depth: (p: Vec3) => number } | null = null;
 
 self.onmessage = (e: MessageEvent<{ seed: number; land: Land } | { match: number; count: number }>) => {
   if ('match' in e.data) {
     const { match, count } = e.data;
-    const spawns = Float64Array.from(sounded ? berths(sounded.water, match, count, sounded.depth).flatMap((b) => [...b.at, ...b.heading]) : []);
+    const dealt = sounded ? berths(sounded.water, match, count, sounded.depth) : [];
+    const spawns = Float64Array.from(dealt.flatMap((b) => [...b.at, ...b.heading]));
     self.postMessage({ match, spawns }, { transfer: [spawns.buffer] });
     return;
   }

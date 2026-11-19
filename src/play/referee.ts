@@ -1,15 +1,18 @@
 // The match's course for the player (sim/match.ts) kept by what the game reports each frame, and what it means for
 // the camera: hers while she fights, the hands on it; at her end, sunk or won, held on her ship in its shot
 // (finale.ts), the hands off; once she has sunk and chooses to watch, the ship she watches, flown to, and another
-// when she turns to it, her hands turning the look about it. What the screens show of her end is reported plainly (player.ts End).
+// when she turns to it, her hands turning the look about it. What the screens show of her end is reported plainly
+// (player.ts End).
 
-import { PLAYER, startMatch, stepMatch, switched, type MatchState } from '../sim/match';
-import type { End } from '../player';
-import { FINALE } from './finale';
-import type { Game } from './game';
+import { PLAYER, startMatch, stepMatch, switched, type MatchState, type Report } from '../sim/match.ts';
+import type { End } from '../player.ts';
+import { FINALE } from './finale.ts';
+import type { Game } from './game.ts';
 
 export function createReferee(game: Game) {
   let m: MatchState | null = null, of = 0, watching = false;
+  /** What the game reports each frame, refilled in place. */
+  const report: Report = { sinkings: [], alive: [], share: 0 };
   const aim = (s: MatchState) => game.view({
     watch: watching ? s.watch : PLAYER, hands: s.phase === 'fighting', look: s.phase === 'fighting' || watching,
     end: s.phase === 'won' ? 'won' : s.phase === 'spectating' && !watching ? 'sunk' : null,
@@ -43,12 +46,15 @@ export function createReferee(game: Game) {
     update(dt: number): End | null {
       if (!m) return null;
       const was = m;
-      m = stepMatch(m, { sinkings: game.sinkings(), alive: game.alive(), share: game.share() }, dt);
+      report.sinkings = game.sinkings();
+      report.alive = game.alive();
+      report.share = game.share();
+      m = stepMatch(m, report, dt);
       if (m.watch !== was.watch || m.phase !== was.phase) aim(m);
       if (m.phase === 'fighting' || m.place === null) return null;
       const how = m.phase === 'won' ? 'won' : m.sunk?.cause ?? 'shot';
       return {
-        how, place: m.place, of, share: m.share, afloat: game.alive().length,
+        how, place: m.place, of, share: m.share, afloat: report.alive.length,
         settled: m.since >= FINALE[m.phase === 'won' ? 'won' : 'sunk'].beat, over: m.over,
       };
     },

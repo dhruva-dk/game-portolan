@@ -2,15 +2,12 @@
 // draws it (frame.ts). Each frame the one hands the other a Snapshot; nothing else passes between them, and nothing
 // outside the frame touches what it draws with.
 
-import type { GunKind, LootKind } from './kinds';
-import type { Cap } from './sim/storm';
-import type { ReadCells } from './world/cells';
-import type { ShipPose } from './world/pose';
-import type { Vec3 } from './world/sphere';
+import type { GunKind, LootKind } from './kinds.ts';
+import type { Cap } from './sim/storm.ts';
+import type { ReadCells } from './world/cells.ts';
+import type { ShipPose } from './world/pose.ts';
+import type { Vec3 } from './world/sphere.ts';
 import { lookAt, type Turn } from './world/turn.ts';
-
-/** A unit quaternion (x, y, z, w). */
-export type Orientation = Turn;
 
 /**
  * Where the world is seen from. In the air (the game's camera, the debug flyer) the eye is among the clouds and under
@@ -21,8 +18,8 @@ export interface Eye {
   kind: 'air' | 'space';
   /** World metres (the planet's centre at the origin). */
   position: Vec3;
-  /** Its turn: it looks down its −z, its y up the screen. */
-  orientation: Orientation;
+  /** Its turn (a unit quaternion: world/turn.ts): it looks down its −z, its y up the screen. */
+  orientation: Turn;
   /** Its vertical field of view, degrees. */
   fov: number;
 }
@@ -34,14 +31,13 @@ export const AIR_FOV = 50;
  *  besides the cross: nothing more, a band across them, or upright stripes of it (the cross counterchanged over them). */
 export interface Look { paint: Vec3; sail: Vec3; pattern: 'plain' | 'band' | 'stripes' }
 
-/** The kinds of gun, each drawn its own way (on the water, on a ship's plinth, and its balls), and of a piece of loot (a
- *  gun of a kind, or stores to mend with): kinds.ts. */
-export type { GunKind, LootKind } from './kinds';
-
 /** A ship drawn: her slot, her pose and colours, her velocity (m/s, world: for the marks she leaves on the sea), whether
- *  she floats (one going down neither fits the sea round her nor marks it), and the gun in her hand, mounted on her
- *  plinth, with the way it is laid (a unit vector, world; it trains round to it), or null with none. */
-export interface ShipDraw { id: number; pose: ShipPose; look: Look; velocity: Vec3; afloat: boolean; gun: { kind: GunKind; aim: Vec3 } | null }
+ *  she floats (one going down neither fits the sea round her nor marks it), and the gun in her hand (its kind: kinds.ts
+ *  GunKind), mounted on her plinth, with the way it is laid (a unit vector, world; it trains round to it), or null with
+ *  none. */
+export interface ShipDraw {
+  id: number; pose: ShipPose; look: Look; velocity: Vec3; afloat: boolean; gun: { kind: GunKind; aim: Vec3 } | null;
+}
 
 /** What the guns did, at a moment on the world's clock (s): a gun of a kind fired from `from` along `dir`; a ball of a
  *  kind come down at `at` (unit vector) in the sea or on land; a ball home in a hull at `at`, or a ram, whether her
@@ -60,7 +56,6 @@ export interface BallDraw { at: Vec3; way: Vec3; gun: GunKind; to: Vec3 }
  *  sea's surface), what it is, the rarity it reads as (0–4: rarity.ts), and when it came onto the water (the world's
  *  clock, s; long before the match for what was strewn at its start), for it to bob up. */
 export interface LootDraw { id: number; at: Vec3; kind: LootKind; rarity: number; born: number }
-
 
 /**
  * A change in who holds the sea (sim/territory.ts Change), numbered in order (seq), at a moment on the world's clock (s):
@@ -126,4 +121,4 @@ export interface Snapshot {
 }
 
 /** The orientation of an eye at `eye` looking at `at`, `up` up the screen (as three turns a camera to look at a point). */
-export const lookingAt = (eye: Vec3, at: Vec3, up: Vec3): Orientation => lookAt(eye, at, up);
+export const lookingAt = (eye: Vec3, at: Vec3, up: Vec3): Turn => lookAt(eye, at, up);

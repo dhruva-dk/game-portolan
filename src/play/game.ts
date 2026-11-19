@@ -27,35 +27,35 @@
 // laid over the chase camera's eye) and the match's time with it (stops.ts: a blow's moment held a few hundredths of
 // a second); the HUD reads the same moments in her status.
 
-import type { World } from '../environment';
-import { fixedClock } from '../sim/fixed';
-import { inHand } from '../sim/battle';
-import { laid, reloadOf, spreadOf, type Gun, type Laying } from '../sim/gun';
-import { charging } from '../sim/gust';
-import { EQUIP, GUN, GUNS, GUST, HEALTH } from '../sim/handling';
-import { progress } from '../sim/hold';
-import { offered, rarityOf } from '../sim/loot';
-import { STORM, toEdge } from '../sim/storm';
-import { sunk } from '../sim/health';
-import { RIDE } from '../sim/ride';
-import { PLAYER } from '../sim/match';
-import type { Vessel } from '../sim/contact';
-import type { Helm, ShipState } from '../sim/ship';
-import type { Eye, LootDraw, Snapshot } from '../snapshot';
-import { createSwell } from '../world/swell';
-import type { Anchor } from '../world/lattice';
-import type { ShipPose } from '../world/pose';
-import { R, add, distance, dot, length, normalize, scale, type Vec3 } from '../world/sphere';
-import { HOTBAR, IDLE, type GunSlot, type Hands, type Kit, type Slot, type Status } from '../player';
-import { REST, anchorageEye, dragged, relaxed, type Orbit } from './anchorage';
-import { ARRIVAL, arriving } from './arrival';
-import { createChase } from './chase';
-import { onScreen } from './lens';
-import { finale, type Ending } from './finale';
-import { seenOf } from './moments';
-import { answerTo, createShake } from './shake';
-import { createStops, stopFor } from './stops';
-import { bearing, createState, type Berth, type Match, type Waters } from './state';
+import type { World } from '../environment.ts';
+import { fixedClock } from '../sim/fixed.ts';
+import { inHand } from '../sim/battle.ts';
+import { laid, reloadOf, spreadOf, type Gun, type Laying } from '../sim/gun.ts';
+import { charging } from '../sim/gust.ts';
+import { EQUIP, GUN, GUNS, GUST, HEALTH } from '../sim/handling.ts';
+import { progress } from '../sim/hold.ts';
+import { offered, rarityOf } from '../sim/loot.ts';
+import { STORM, toEdge } from '../sim/storm.ts';
+import { sunk } from '../sim/health.ts';
+import { RIDE } from '../sim/ride.ts';
+import { PLAYER } from '../sim/match.ts';
+import type { Vessel } from '../sim/contact.ts';
+import type { Helm, ShipState } from '../sim/ship.ts';
+import type { Eye, LootDraw, Snapshot } from '../snapshot.ts';
+import { createSwell } from '../world/swell.ts';
+import type { Anchor } from '../world/lattice.ts';
+import type { ShipPose } from '../world/pose.ts';
+import { R, add, distance, dot, length, normalize, scale, type Vec3 } from '../world/sphere.ts';
+import { HOTBAR, IDLE, type GunSlot, type Hands, type Kit, type Slot, type Status } from '../player.ts';
+import { REST, anchorageEye, dragged, relaxed, type Orbit } from './anchorage.ts';
+import { ARRIVAL, arriving } from './arrival.ts';
+import { createChase } from './chase.ts';
+import { onScreen } from './lens.ts';
+import { finale, type Ending } from './finale.ts';
+import { seenOf } from './moments.ts';
+import { answerTo, createShake } from './shake.ts';
+import { createStops, stopFor } from './stops.ts';
+import { bearing, createState, type Berth, type Match, type Waters } from './state.ts';
 
 /** How little of the stick's push counts as none. */
 const DEAD = 0.15;
