@@ -3,52 +3,62 @@
 // as released and opens at the title. The scenario drives the game, its referee and the screens' flow only through
 // what they offer anyone (main.ts builds them; this only sets them going).
 //
-// ?mood= puts the whole look on one of its alternates: dawn, a low morning sun
-// in a rose mist; warm, a low evening sun over a deeper sea; noon, a high sun, bright and saturated (MOODS: the hour and the haze; the grade and the
-// haze follow the sun's height). ?t=hours sets the time of day (the same everywhere: world/sun.ts); ?wind=m/s the wind's speed, ?haze= the air's
-// aerosol and ?cloud= the cloud cover (0–1) each hold at that instead of drifting (world/weather.ts); ?seed= the
-// planet's (world/planet.ts; SEED by default). ?debug=charts colours the sea by its charts' weights, ?debug=wake shows
-// the ships' marks on it (water/water.ts).
-// ?lat=&lon= degrees put the camera over a point of the planet and ?alt= metres above the sea; ?yaw=deg turns it
-// (clockwise from north: 90 east) and ?look=deg pitches it. The planet is 554 m in radius, so a degree is 9.67 m.
-// ?fly, or any of lat, lon and alt, flies the debug camera (fly.ts) instead of sailing, starting over where she would
-// lie by default; there
-// ?kind= puts a gun of that kind on every ship's plinth (?kind=all: each ship the next kind).
-// ?wall=m flies it m metres short of the storm's edge, in the calm (with ?storm=, the cap held then; negative: in the
-// storm), on the line from the cap's centre toward where she would lie, looking out across the edge (?yaw= turns from
-// that). ?bolt holds the storm's lightning lit (sky/storm-bolt.ts), for a still of it.
-// ?drive=bearing,throttle,seconds;… sails her, her helm lashed to each leg in turn (bearings in degrees clockwise from
-// north where she is), before the first frame; she holds the last until a hand takes the helm. ?gun=0…4 arms every
-// ship with a gun of that rarity, ?kind= (cannon, scatter, repeater, harpoon, mortar) of that kind (sim/gun.ts; a common
-// cannon by default with either); ?fire fires hers at the first step, ?fire=seconds so many seconds into the frames
-// drawn, ?fire=seconds,held holds its trigger that long; ?tap=slot,seconds taps that slot of the hotbar then (0–1 her
-// guns', 2–4 her items': a swap, or a reload); ?storm=seconds holds the storm at
-// that moment of its clock. ?probe stands grey blocks and mirrors ahead (probe.ts). The meter (meter.ts) shows the
-// frame's cost. ?safe=top,right,bottom,left px stands in for the device's safe-area insets (the iPad Air in
-// landscape: ?safe=0,0,20,0, the home indicator's). ?lod=0…3 draws every ship at that level of detail; ?cloth=0 draws every ship's canvas
-// as the wind fills it, none simulated (ship/fleet.ts).
-// ?screen= opens the UI at a screen (title, lobby, settings, match, sunk, spectate, won, result; ui/ways.ts; also
-// map), at sea among ?ships=n others by default: play starts a match as PLAY does (every ship at her berth, the eye
-// coming down from space: play/arrival.ts); sunk sinks her by the first other ship (?by=storm: by the storm) and the
-// screens follow her end as the match would bring it (the camera's beat, then her result); spectate sinks her and
-// watches; won sinks every other, the last by her; result sinks her and all but one other, so the match is over.
-// ?sink=seconds sinks her so many seconds into the frames drawn, ?win=seconds every other ship then, so she wins;
-// ?leave=seconds taps LEAVE then (home to the lobby under the title, where her screen has that way: ui/passage.ts).
-// ?ships= sets them on the sea ahead of her (demoShips), ?way=m/s gives them a straight
-// course at that speed, their helms lashed, and ?heading=deg turns them all. ?ahead=seconds sails the game on that
-// long before the first frame, and ?pause holds it there from then on (the frame still draws: the arrival's stills).
-// The ships in a match are sim/match.ts SHIPS; the frame has room for that many, or for ?ships= more.
-// At sea, ?kit (?kit=seconds: then) puts stores under her for her to sweep up (two guns, a cannon and a scatter, unless
-// ?gun arms her, and three slots of stores), with a better gun beside them, a mortar, offered; ?use=1…3,seconds sets
-// her mending from that slot so many seconds into the frames
-// drawn, ?gust=seconds spends a gust then, ?fire=seconds fires then and ?down=seconds sinks one by her then; ?loot strews a piece of each kind and rarity in a fan ahead
-// of her, 25 m out to 420 m (?loot=m: every kind of gun, each of another rarity, and the stores, in a row across the look m metres out); ?swing=px,px,seconds drags the look that far right and down and lets it go, so many
-// seconds into the frames drawn (0 by default; the look stays where it is put: play/chase.ts); ?slow=k runs the game at k of its speed (for catching a ball in flight).
-// ?flood=seconds, after ?drive='s legs, steers her back to where she began until her loop closes (her trail back into
-// her own water), then sails on that many seconds more (?inward=seconds, after the legs, sails her that long toward the
-// middle of the storm's next circle, then lies to): with ?pause, the flood stopped mid-sweep. ?homeward, after the legs,
-// steers her back to where she began in the frames drawn, her loop closing in view. ?map opens
-// the full map once ?ahead= has run (with screen=play, the whole match's water from space).
+// The look and the weather. ?mood= puts the whole look on one of its alternates: dawn, a low morning sun in a rose
+// mist; warm, a low evening sun over a deeper sea; noon, a high sun, bright and saturated (MOODS: the hour and the
+// haze; the grade and the haze follow the sun's height). ?t=hours sets the time of day (the same everywhere:
+// world/sun.ts); ?wind=m/s the wind's speed, ?haze= the air's aerosol and ?cloud= the cloud cover (0–1) each hold at
+// that instead of drifting (world/weather.ts); ?seed= the planet's (world/planet.ts; SEED by default). ?debug=charts
+// colours the sea by its charts' weights, ?debug=wake shows the ships' marks on it (water/water.ts).
+//
+// The debug camera. ?lat=&lon= degrees put the camera over a point of the planet and ?alt= metres above the sea;
+// ?yaw=deg turns it (clockwise from north: 90 east) and ?look=deg pitches it. The planet is 554 m in radius, so a
+// degree is 9.67 m. ?fly, or any of lat, lon and alt, flies the debug camera (fly.ts) instead of sailing, starting over
+// where she would lie by default; there ?kind= puts a gun of that kind on every ship's plinth (?kind=all: each ship the
+// next kind). ?wall=m flies it m metres short of the storm's edge, in the calm (with ?storm=, the cap held then;
+// negative: in the storm), on the line from the cap's centre toward where she would lie, looking out across the edge
+// (?yaw= turns from that). ?bolt holds the storm's lightning lit (sky/storm-bolt.ts), for a still of it.
+//
+// Her course and her hands. ?drive=bearing,throttle,seconds;… sails her, her helm lashed to each leg in turn (bearings
+// in degrees clockwise from north where she is), before the first frame; she holds the last until a hand takes the
+// helm. ?gun=0…4 arms every ship with a gun of that rarity, ?kind= (cannon, scatter, repeater, harpoon, mortar) of that
+// kind (sim/gun.ts; a common cannon by default with either); ?fire fires hers at the first step, ?fire=seconds so many
+// seconds into the frames drawn, ?fire=seconds,held holds its trigger that long; ?tap=slot,seconds taps that slot of
+// the hotbar then (0–1 her guns', 2–4 her items': a swap, or a reload); ?storm=seconds holds the storm at that moment
+// of its clock.
+//
+// The frame. ?probe stands grey blocks and mirrors ahead (probe.ts). The meter (meter.ts) shows the frame's cost.
+// ?safe=top,right,bottom,left px stands in for the device's safe-area insets (the iPad Air in landscape:
+// ?safe=0,0,20,0, the home indicator's). ?lod=0…3 draws every ship at that level of detail; ?cloth=0 draws every
+// ship's canvas as the wind fills it, none simulated (ship/fleet.ts).
+//
+// The screens. ?screen= opens the UI at a screen (title, lobby, settings, match, sunk, spectate, won, result;
+// ui/ways.ts; also map), at sea among ?ships=n others by default: play starts a match as PLAY does (every ship at her
+// berth, the eye coming down from space: play/arrival.ts); sunk sinks her by the first other ship (?by=storm: by the
+// storm) and the screens follow her end as the match would bring it (the camera's beat, then her result); spectate
+// sinks her and watches; won sinks every other, the last by her; result sinks her and all but one other, so the match
+// is over. ?sink=seconds sinks her so many seconds into the frames drawn, ?win=seconds every other ship then, so she
+// wins; ?leave=seconds taps LEAVE then (home to the lobby under the title, where her screen has that way:
+// ui/passage.ts).
+//
+// The sea about her. ?ships= sets them on the sea ahead of her (demoShips), ?way=m/s gives them a straight course at
+// that speed, their helms lashed, and ?heading=deg turns them all. ?ahead=seconds sails the game on that long before
+// the first frame, and ?pause holds it there from then on (the frame still draws: the arrival's stills). The ships in
+// a match are sim/match.ts SHIPS; the frame has room for that many, or for ?ships= more. At sea, ?kit (?kit=seconds:
+// then) puts stores under her for her to sweep up (two guns, a cannon and a scatter, unless ?gun arms her, and three
+// slots of stores), with a better gun beside them, a mortar, offered; ?use=1…3,seconds sets her mending from that slot
+// so many seconds into the frames drawn, ?gust=seconds spends a gust then, ?fire=seconds fires then and ?down=seconds
+// sinks one by her then; ?loot strews a piece of each kind and rarity in a fan ahead of her, 25 m out to 420 m
+// (?loot=m: every kind of gun, each of another rarity, and the stores, in a row across the look m metres out);
+// ?swing=px,px,seconds drags the look that far right and down and lets it go, so many seconds into the frames drawn (0
+// by default; the look stays where it is put: play/chase.ts); ?slow=k runs the game at k of its speed (for catching a
+// ball in flight).
+//
+// Her loop. ?flood=seconds, after ?drive='s legs, steers her back to where she began until her loop closes (her trail
+// back into her own water), then sails on that many seconds more (?inward=seconds, after the legs, sails her that long
+// toward the middle of the storm's next circle, then lies to): with ?pause, the flood stopped mid-sweep. ?homeward,
+// after the legs, steers her back to where she began in the frames drawn, her loop closing in view. ?map opens the
+// full map once ?ahead= has run (with screen=play, the whole match's water from space).
+//
 // `node tools/terrain-map.ts <seeds>` charts planets' land.
 
 import type { Anchor } from './world/lattice';
@@ -74,9 +84,9 @@ import type { Weather } from './world/weather';
 import { R, add, cross, dot, frameAt, along, normalize, scale, type Vec3 } from './world/sphere';
 
 /** How the page is set up (main.ts RELEASE, or as the switches change it): the planet's seed, the weather's mean and
- *  swing (world/weather.ts) and the time of day (hours); how the frame draws; whether the meter always shows the frame's cost, split by pass (the debug page's;
- *  else only as the settings' stats switch has it);
- *  the seconds the storm is held at (null: it runs) and the gun every ship is armed with (null: none). */
+ *  swing (world/weather.ts) and the time of day (hours); how the frame draws; whether the meter always shows the
+ *  frame's cost, split by pass (the debug page's; else only as the settings' stats switch has it); the seconds the
+ *  storm is held at (null: it runs) and the gun every ship is armed with (null: none). */
 export interface Setup {
   seed: number; mean: Weather; swing: Weather; hours: number;
   drawing: FrameOptions;
@@ -99,7 +109,8 @@ export interface Stage {
 }
 
 /** The game on a stage with its UI over it, as main.ts builds it: the game, its referee and the screens' flow; PLAY
- *  (a match dealt, every ship at her berth); the full map opened (the HUD's tap); a frame of it, and what follows once it is drawn (the canvas then holds it). */
+ *  (a match dealt, every ship at her berth); the full map opened (the HUD's tap); a frame of it, and what follows once
+ *  it is drawn (the canvas then holds it). */
 export interface Played {
   game: Game; referee: Referee; flow: Flow;
   play(): void;
@@ -108,10 +119,9 @@ export interface Played {
   drawn(canvas: HTMLCanvasElement): void;
 }
 
-/** Whether debugging is on: the dev server, or ?debug in the query. */
-const DEBUG = import.meta.env.DEV || new URLSearchParams(location.search).has('debug');
-
 const params = new URLSearchParams(location.search);
+/** Whether debugging is on: the dev server, or ?debug in the query. */
+const DEBUG = import.meta.env.DEV || params.has('debug');
 const number = (name: string, fallback: number) => (params.has(name) ? Number(params.get(name)) : fallback);
 const degrees = Math.PI / 180;
 /** The debug camera flies instead of the game. */
@@ -247,13 +257,16 @@ function winHer(game: Game) {
   others.forEach((id, i) => game.debug.sink(id, i === others.length - 1 ? PLAYER : others[others.length - 1]));
 }
 
+/** A piece the game's debug strews on the sea: a gun or stores. */
+type Goods = Parameters<Game['debug']['strew']>[1][number];
+
 /** ?kit: her stores strewn under her (two guns and three slots of stores), a better gun beside them, and her first
  *  steps to sweep them up. */
 function kit(game: Game) {
-  type Goods = Parameters<Game['debug']['strew']>[1][number];
   const { at, heading } = game.status(), step = () => game.step(STEP, IDLE);
   const under: Goods[] = [
-    { kind: 'cannon', rarity: 2 }, { kind: 'smallShield', count: 3 }, { kind: 'bigShield', count: 2 }, { kind: 'repairKit', count: 2 },
+    { kind: 'cannon', rarity: 2 }, { kind: 'smallShield', count: 3 }, { kind: 'bigShield', count: 2 },
+    { kind: 'repairKit', count: 2 },
   ];
   game.debug.strew(at, under);
   step();
@@ -265,7 +278,6 @@ function kit(game: Game) {
 
 /** ?kit and ?loot: her stores and the loot about her, through what the game offers anyone. */
 function stock(game: Game) {
-  type Goods = Parameters<Game['debug']['strew']>[1][number];
   const { at, heading, facing } = game.status();
   if (params.get('kit') === '') kit(game);
   const row = params.has('loot') ? number('loot', 0) : 0;
@@ -273,17 +285,19 @@ function stock(game: Game) {
     // a row across her bow: the guns, each kind of another rarity, worst to best, then the stores, a few degrees apart
     const all: Goods[] = [
       ...KINDS.map((kind, rarity): Goods => ({ kind, rarity })),
-      { kind: 'smallShield', count: 1 }, { kind: 'bigShield', count: 1 }, { kind: 'repairKit', count: 1 }, { kind: 'fullRepair', count: 1 },
+      { kind: 'smallShield', count: 1 }, { kind: 'bigShield', count: 1 }, { kind: 'repairKit', count: 1 },
+      { kind: 'fullRepair', count: 1 },
     ];
     all.forEach((g, i) => {
-      const side = Math.tan(((i - (all.length - 1) / 2) * 7 * Math.PI) / 180), turned = normalize(add(facing, cross(at, facing), side));
-      game.debug.strew(along(at, turned, row).p, [g]);
+      const side = Math.tan(((i - (all.length - 1) / 2) * 7 * Math.PI) / 180);
+      game.debug.strew(along(at, normalize(add(facing, cross(at, facing), side)), row).p, [g]);
     });
   } else if (params.has('loot')) {
     // a fan ahead of her, clear of her own hull: the rarities worst to best near to far, then again further out
     [25, 50, 90, 140, 200, 250, 300, 350, 420].forEach((m, i) => {
       const side = (i % 2 ? 1 : -1) * (0.45 - 0.035 * i), turned = normalize(add(heading, cross(at, heading), side));
-      game.debug.strew(along(at, turned, m).p, [i === 1 ? { kind: 'smallShield', count: 1 } : { kind: KINDS[i % 5], rarity: i % 5 }]);
+      const piece: Goods = i === 1 ? { kind: 'smallShield', count: 1 } : { kind: KINDS[i % 5], rarity: i % 5 };
+      game.debug.strew(along(at, turned, m).p, [piece]);
     });
   }
 }
@@ -336,7 +350,8 @@ function flyer(element: HTMLElement, start: Vec3, others: readonly Berth[], stor
   const kind = params.get('kind'), armed = (i: number, o: Berth): ShipDraw['gun'] => kind === null ? null
     : { kind: kind === 'all' ? KINDS[i % KINDS.length] : kindOf(kind), aim: normalize(add(o.heading, cross(o.heading, o.at), 0.6)) };
   const ships: ShipDraw[] = others.map((o, i) => ({
-    id: i, pose: { position: scale(o.at, R), forward: o.heading, up: o.at }, look: o.look, velocity: scale(o.heading, number('way', 0)), afloat: true, gun: armed(i, o),
+    id: i, pose: { position: scale(o.at, R), forward: o.heading, up: o.at }, look: o.look,
+    velocity: scale(o.heading, number('way', 0)), afloat: true, gun: armed(i, o),
   }));
   let clock = 0;
   return (dt: number): Snapshot => {

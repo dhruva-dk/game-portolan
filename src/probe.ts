@@ -1,6 +1,10 @@
-// Debug only (?probe): grey blocks at 30, 60, 100 and 150 m north of where she (or the flyer) starts, lit by the sky's light,
-// to judge the light and the haze; and a mirror and a rough sphere 60 m north, to judge the sky's reflection. Each
-// stands upright on the sphere.
+// Debug only (?probe): grey blocks at 30, 60, 100 and 150 m north of where she (or the flyer) starts, lit by the
+// sky's light, to judge the light and the haze; and a mirror and a rough sphere 60 m north, to judge the sky's
+// reflection. Each stands upright on the sphere.
+//
+// The blocks are lit straight from the sky (Sky: the sun through the air and the clouds' shadow, Lambert, and the
+// sky's ambient), not through sky/light.ts's Light: that sets every surface in two chosen tones under one level,
+// which would hide the very light and shading the probe is there to show.
 
 import { BoxGeometry, Matrix4, Mesh, MeshBasicNodeMaterial, SphereGeometry, Vector3 } from 'three/webgpu';
 import { dot, float, max, normalWorld, positionWorld, reflectVector, vec3 } from 'three/tsl';
@@ -31,7 +35,8 @@ export function probeMeshes(sky: Sky, eye: Vec3): Mesh[] {
   const material = new MeshBasicNodeMaterial();
   const albedo = vec3(0.5);
   const p = positionWorld;
-  material.colorNode = albedo.mul(sky.sunIlluminance(p).mul(sky.cloudShadow(p)).mul(max(dot(normalWorld, sky.sun(p)), 0)).add(sky.ambient(p, normalWorld)));
+  const sun = sky.sunIlluminance(p).mul(sky.cloudShadow(p)).mul(max(dot(normalWorld, sky.sun(p)), 0));
+  material.colorNode = albedo.mul(sun.add(sky.ambient(p, normalWorld)));
   for (const [metres, x] of [[30, -12], [60, 25], [100, -40], [150, 60]]) {
     const size = metres / 10;
     stand(new Mesh(new BoxGeometry(size, size * 1.5, size), material), metres, x, size * 0.75 - 1);

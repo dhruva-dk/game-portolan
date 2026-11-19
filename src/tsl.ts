@@ -1,13 +1,16 @@
-// The shaders' value types: a TSL node of each WGSL type, named once (three's Node<'vec3'> and so on), so a shader's
-// inputs and outputs say what they hold. And the few places three's own types (@types/three 0.187) fall short of its
-// public TSL API, each bridged once here, typed, and named with the gap it covers.
-
-// And the two marks a flat look is drawn with, a shape's crisp edge (cut) and a thin line (line), for every material;
-// and what more than one shader works out, written once: a lattice's hash (hash3), a frame on the tangent plane
-// (tangentFrame) and light's phase in a medium (henyeyGreenstein).
+// What the shaders share, written once:
+//   the value types   a TSL node of each WGSL type, named once (three's Node<'vec3'> and so on), so a shader's inputs
+//                     and outputs say what they hold
+//   the marks         a shape's crisp edge (cut) and a thin line (line), the two a flat look is drawn with
+//   the arithmetic    a lattice's hash (hash3), a frame on the tangent plane (tangentFrame), light's phase in a medium
+//                     (henyeyGreenstein) and where a value lies between two (ramp)
+//   the gaps          the few places three's own types (@types/three 0.187) fall short of its public TSL API (toFloat,
+//                     clampInts, minInt, maxInt, loop, workgroupArrayOf), each bridged once, typed, and named with the
+//                     gap it covers
 
 import {
-  Fn, Loop, abs, clamp, cross, float, fract, fwidth, int, max, min, nodeObject, normalize, pow, saturate, select, uint, vec3, workgroupArray,
+  Fn, Loop, abs, clamp, cross, float, fract, fwidth, int, max, min, nodeObject, normalize, pow, saturate, select, uint, vec3,
+  workgroupArray,
 } from 'three/tsl';
 import { MathNode, type Node } from 'three/webgpu';
 

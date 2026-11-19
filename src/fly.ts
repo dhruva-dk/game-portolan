@@ -4,7 +4,8 @@
 
 import { Matrix4, Quaternion, Vector3 } from 'three/webgpu';
 import { AIR_FOV, type Eye } from './snapshot';
-import { add, along, cross, frameAt, fromLatLon, normalize, place, scale, transport } from './world/sphere';
+import { clamp } from './world/scalar';
+import { add, along, cross, frameAt, fromLatLon, length, normalize, place, scale, transport } from './world/sphere';
 
 /** Metres a second; shift multiplies it. */
 const SPEED = 15;
@@ -13,6 +14,12 @@ const FAST = 6;
 const LOWEST = 2;
 /** Radians a pixel of drag. */
 const TURN = 0.004;
+/** Each way it flies, by either of two keys. */
+type Keys = readonly [string, string];
+const KEYS: Record<'right' | 'left' | 'forward' | 'back' | 'up' | 'down', Keys> = {
+  right: ['KeyD', 'ArrowRight'], left: ['KeyA', 'ArrowLeft'], forward: ['KeyW', 'ArrowUp'], back: ['KeyS', 'ArrowDown'],
+  up: ['KeyE', 'Space'], down: ['KeyQ', 'KeyC'],
+};
 
 /** Where the camera starts: radians, but for its height above the sea, in metres. */
 export interface Start {
@@ -32,6 +39,7 @@ export function createFly(element: HTMLElement, start: Start) {
   let heading = add(scale(f.north, Math.cos(start.bearing)), f.east, Math.sin(start.bearing));
   let pitch = start.pitch;
 
+  // (its listeners are never removed: the flyer is made once, on a debug page, and flies until the page is left)
   const held = new Set<string>();
   addEventListener('keydown', (e) => held.add(e.code));
   addEventListener('keyup', (e) => held.delete(e.code));
@@ -45,23 +53,23 @@ export function createFly(element: HTMLElement, start: Start) {
     // turned left (toward up × heading) by a drag to the left
     const a = -e.movementX * TURN;
     heading = normalize(add(scale(heading, Math.cos(a)), cross(at, heading), Math.sin(a)));
-    pitch = Math.max(-1.55, Math.min(1.55, pitch - e.movementY * TURN));
+    pitch = clamp(pitch - e.movementY * TURN, -1.55, 1.55);
   });
 
-  const basis = new Matrix4(), turn = new Quaternion(), orientation = new Quaternion(), x = new Vector3(), y = new Vector3(), z = new Vector3();
-  const axis = new Vector3(1, 0, 0);
+  const basis = new Matrix4(), turn = new Quaternion(), orientation = new Quaternion();
+  const x = new Vector3(), y = new Vector3(), z = new Vector3(), axis = new Vector3(1, 0, 0);
+  /** 1 for either key of `plus` held, −1 for either of `minus`, 0 for both or neither. */
+  const either = (k: Keys) => held.has(k[0]) || held.has(k[1]);
+  const key = (plus: Keys, minus: Keys) => (either(plus) ? 1 : 0) - (either(minus) ? 1 : 0);
 
   /** The eye after dt seconds of flying. */
   return (dt: number): Eye => {
-    const key = (plus: string[], minus: string[]) =>
-      (plus.some((k) => held.has(k)) ? 1 : 0) - (minus.some((k) => held.has(k)) ? 1 : 0);
-    const right = key(['KeyD', 'ArrowRight'], ['KeyA', 'ArrowLeft']), forward = key(['KeyW', 'ArrowUp'], ['KeyS', 'ArrowDown']);
-    const rise = key(['KeyE', 'Space'], ['KeyQ', 'KeyC']);
+    const right = key(KEYS.right, KEYS.left), forward = key(KEYS.forward, KEYS.back), rise = key(KEYS.up, KEYS.down);
     const size = Math.hypot(right, forward, rise);
     if (size > 0) {
       const step = (SPEED * (held.has('ShiftLeft') || held.has('ShiftRight') ? FAST : 1) * dt) / size;
       const flat = add(scale(heading, forward), cross(heading, at), right);
-      const across = Math.hypot(...flat);
+      const across = length(flat);
       if (across > 0) {
         const moved = along(at, scale(flat, 1 / across), across * step);
         heading = normalize(transport(heading, at, moved.p));
@@ -72,8 +80,10 @@ export function createFly(element: HTMLElement, start: Start) {
 
     const up = normalize(at);
     // the camera looks down its −z, its x to the right, y up; then pitched about its x
-    basis.makeBasis(x.set(...cross(heading, up)), y.set(...up), z.set(...scale(heading, -1)));
+    basis.makeBasis(x.fromArray(cross(heading, up)), y.fromArray(up), z.fromArray(heading).negate());
     orientation.setFromRotationMatrix(basis).multiply(turn.setFromAxisAngle(axis, pitch));
-    return { kind: 'air', position: place(up, height), orientation: [orientation.x, orientation.y, orientation.z, orientation.w], fov: AIR_FOV };
+    // (a new eye each frame, as the game's are: what reads it may keep it)
+    const { x: qx, y: qy, z: qz, w: qw } = orientation;
+    return { kind: 'air', position: place(up, height), orientation: [qx, qy, qz, qw], fov: AIR_FOV };
   };
 }

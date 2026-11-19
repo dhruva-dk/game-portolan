@@ -1,5 +1,6 @@
 import {
-  Frustum, InspectorBase, InstancedBufferGeometry, InstancedMesh, Matrix4, Mesh, Scene, type Camera, type Object3D, type RenderTarget, type WebGPURenderer,
+  Frustum, InspectorBase, InstancedBufferGeometry, InstancedMesh, Matrix4, Mesh, Scene, type Camera, type Object3D,
+  type RenderTarget, type WebGPURenderer,
 } from 'three/webgpu';
 
 /**
@@ -24,17 +25,21 @@ import {
  */
 interface Tally { draws: number; tris: number; runs: number }
 
+/** A render() call under way: its label, what it draws, and the counts when it began and of the calls inside it. */
+interface Open { label: string; scene: Object3D; camera: Camera; draws: number; tris: number; inner: number; innerTris: number }
+
 class Passes extends InspectorBase {
   readonly passes = new Map<string, Tally>();
   readonly objects = new Map<string, Tally>();
-  private readonly stack: { label: string; scene: Object3D; camera: Camera; draws: number; tris: number; inner: number; innerTris: number }[] = [];
+  private readonly stack: Open[] = [];
   private readonly frustum = new Frustum();
   private readonly m = new Matrix4();
   constructor(private readonly info: WebGPURenderer['info']) { super(); }
 
   beginRender(_uid: string, scene: Scene, camera: Camera, target: RenderTarget | null) {
     const size = target ? `${target.width}×${target.height}` : 'screen';
-    this.stack.push({ label: `${scene.name || scene.type} ${size}`, scene, camera, draws: this.info.render.drawCalls, tris: this.info.render.triangles, inner: 0, innerTris: 0 });
+    const { drawCalls: draws, triangles: tris } = this.info.render;
+    this.stack.push({ label: `${scene.name || scene.type} ${size}`, scene, camera, draws, tris, inner: 0, innerTris: 0 });
   }
 
   finishRender() {
@@ -49,7 +54,6 @@ class Passes extends InspectorBase {
       outer.innerTris += tris;
     }
   }
-
 
   /** What a scene has to draw, as three culls it. */
   private contents(scene: Scene, camera: Camera, pass: string) {
@@ -74,14 +78,18 @@ function add(map: Map<string, Tally>, key: string, draws: number, tris: number) 
 /** A tally's lines, per frame over `frames`, the most draws first. */
 const lines = (map: Map<string, Tally>, frames: number) => [...map]
   .sort((a, b) => b[1].draws - a[1].draws)
-  .map(([k, t]) => `${k}: ${(t.draws / frames).toFixed(1)} draws ${(t.tris / frames / 1000).toFixed(1)}k tri ${(t.runs / frames).toFixed(2)}×`)
+  .map(([k, t]) =>
+    `${k}: ${(t.draws / frames).toFixed(1)} draws ${(t.tris / frames / 1000).toFixed(1)}k tri ${(t.runs / frames).toFixed(2)}×`)
   .join('\n');
 
 /** The frame rate the panel reads as on budget (the target's floor, 30), and as falling well short of it. */
 const FPS = { good: 30, poor: 20 } as const;
 
-/** The panel's rows: label, value, and a quieter note after it. */
-function panel(fps: number, cpu: string, inRender: string, gpu: string | null, compute: string, draws: number, ktris: number, passes: number) {
+/** The panel's rows: label, value, and a quieter note after it. Markup, as it is made only of the meter's own numbers
+ *  and labels (nothing from outside the page) and only once a second: the panel is laid out afresh each time. */
+function panel(
+  fps: number, cpu: string, inRender: string, gpu: string | null, compute: string, draws: number, ktris: number, passes: number,
+) {
   const tone = fps >= FPS.good ? 'good' : fps >= FPS.poor ? 'fair' : 'poor';
   const row = (label: string, value: string, note = '') => `<div><span>${label}</span><b>${value}</b><i>${note}</i></div>`;
   return `<div class="fps ${tone}"><b>${fps}</b> fps</div>`
@@ -146,7 +154,9 @@ export function createMeter(renderer: WebGPURenderer, el: HTMLElement, split: bo
         `${fps}  cpu ${f(cpu, frames)} (${f(inRender, frames)})` +
         (gpu ? `  gpu ${f(render, read)} + ${f(compute, computed)}` : '  gpu –') +
         `  ${d} draws ${k}k tri ${p} passes`;
-      if (shown) el.innerHTML = panel(fps, f(cpu, frames), f(inRender, frames), gpu ? f(render, read) : null, f(compute, computed), d, k, p);
+      if (shown) {
+        el.innerHTML = panel(fps, f(cpu, frames), f(inRender, frames), gpu ? f(render, read) : null, f(compute, computed), d, k, p);
+      }
       if (split) {
         el.dataset.passes = lines(passes.passes, frames);
         el.dataset.objects = lines(passes.objects, frames);
