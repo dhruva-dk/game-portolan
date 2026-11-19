@@ -138,12 +138,13 @@ export function homeAct(c: Ctx): void {
 }
 
 /** A mark `round` m ahead and turned to her side, in her own water and open: she keeps way on in it, no sitting target
- *  (the other side, else straight on, if none to her side is). */
+ *  (the other side, else about astern, at her water's edge heading out, else straight on, if none to her side is). */
 function circle(c: Ctx): Vec3 {
   const p = c.own.ship.at, f = c.own.ship.heading, side = c.m.rand & 1 ? 1 : -1, h = c.sea.holdings!;
-  for (const a of [0.6, 1.1, 1.7, -0.6, -1.1, -1.7, 2.4, -2.4]) {
-    const q = along(p, rotate(p, f, side * a), CLAIMER.round).p;
-    if (h.ownerAt(q) === c.own.id && open(c, q)) return q;
+  for (const a of [0.6, 1.1, 1.7, -0.6, -1.1, -1.7, 2.4, -2.4, Math.PI]) {
+    const way = rotate(p, f, side * a), q = along(p, way, CLAIMER.round).p;
+    // and her water past it, room for the way she carries on by it
+    if (h.ownerAt(q) === c.own.id && h.ownerAt(along(p, way, CLAIMER.round + CLAIMER.past).p) === c.own.id && open(c, q)) return q;
   }
   return along(p, f, CLAIMER.round).p;
 }

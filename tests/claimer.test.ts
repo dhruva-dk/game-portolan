@@ -6,6 +6,7 @@ import { mind, think, type Memory } from '../src/sim/bot.ts';
 import { shot } from '../src/sim/captain.ts';
 import { afloat, stepFleet, type Vessel } from '../src/sim/contact.ts';
 import { STEP } from '../src/sim/fixed.ts';
+import { SHIP } from '../src/sim/handling.ts';
 import type { Depth } from '../src/sim/shoal.ts';
 import { shipAt, type Helm } from '../src/sim/ship.ts';
 import type { Storm } from '../src/sim/storm.ts';
@@ -104,16 +105,17 @@ test('hurt and her shield down, she heads home to her water; not with the storm 
 test('a bot sails across another\'s open trail she can reach before its ship is home, whatever her temper', () => {
   const north = way(start, 0), helm = (v: Vessel): Helm => ({ course: way(v.ship.at, 0), throttle: 1 });
   for (let seed = 1; seed <= 12; seed++) {
-    // his water at the start, hers far to the south; he sails north 15 s, laying his trail, out of her sight
+    // his water at the start, hers far to the south; he sails north some 200 m, laying his trail, out of her sight
     const t = createTerritory(2);
     t.begin([along(start, way(start, Math.PI), 600).p, start], 0);
-    const him = voyage([afloat(1, shipAt(start, north))], [null], 15, t, { held: helm }).fleet[0];
+    const sailed = Math.round(202 / SHIP.top / STEP) * STEP;
+    const him = voyage([afloat(1, shipAt(start, north))], [null], sailed, t, { held: helm }).fleet[0];
     // she lies 70 m off its middle, abeam of it; he is some 100 m on and 180 m from home: she reaches it long before
     const mid = along(start, north, 90).p, at = along(mid, way(mid, Math.PI / 2), 70).p;
     let cut = 0;
     const modes = new Set<string>();
     voyage([afloat(0, shipAt(at, way(at, Math.PI))), him], [seed, null], 15, t, {
-      since: 15, held: helm,
+      since: sailed, held: helm,
       each: (_, minds, did) => {
         modes.add(minds[0]!.mode);
         cut += did.cut.filter((k) => k.id === 1 && k.by === 0).length;

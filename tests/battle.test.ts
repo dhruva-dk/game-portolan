@@ -151,9 +151,9 @@ const pair = (metres: number, bearing: number, course: number, speed: number): V
 ];
 
 test('led with no spread, a ball strikes a ship on a steady course, at any range and crossing', () => {
-  // (out to 170 m, not 175: since the bore moved abaft her mainmast with the drawn plinth, one at 175 m running from
-  // her at her best is led past the cannon's 200 m from it)
-  for (const metres of [50, 100, 150, 170]) for (const crossing of [0, 45, 90, 135, 180, 270]) {
+  // (out to 160 m, not 175: since the bore moved abaft her mainmast with the drawn plinth, and her best rose to 16 m/s,
+  // one further out running from her at her best is led past the cannon's 200 m from it)
+  for (const metres of [50, 100, 150, 160]) for (const crossing of [0, 45, 90, 135, 180, 270]) {
     const bearing = 30 * deg;
     const fleet = pair(metres, bearing, bearing + crossing * deg, SHIP.top);
     // the gun laid with no spread, and its ball flown among them as she sails on

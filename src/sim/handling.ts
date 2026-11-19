@@ -2,24 +2,27 @@
 // its top speed brought down from 14 to 12 m/s for this smaller planet, quicker to gather way (0.47 → 0.8) and to turn
 // from rest (bite 0.25 → 0.45) after the first drive on the phone, and the speed at which the rudder bites fully kept
 // the same share of top speed; then, by the owner ("a little faster and more nimble"), 12.5% faster (12 → 13.5 m/s),
-// 12% quicker to turn (0.42 → 0.47 rad/s), gathering way (0.8 → 0.9) and answering her helm (2.5 → 2.8) to suit.
-// Whatever was brought down from 0117's top of 14.5 m/s by her top's share (RAM, GUST, the guns' muzzle speeds) is now
-// brought down by 13.5 / 14.5. What her hull does when she meets another's is beside it.
+// 12% quicker to turn (0.42 → 0.47 rad/s), gathering way (0.8 → 0.9) and answering her helm (2.5 → 2.8) to suit; then,
+// by the owner again on the iPad ("faster and handling more snappy"), 18.5% faster (13.5 → 16 m/s), 28% quicker to
+// turn (0.47 → 0.6 rad/s), gathering way (0.9 → 1.3) and losing it (0.35 → 0.5) quicker, answering her helm much
+// quicker (2.8 → 4.5) and her rudder biting more at rest (0.45 → 0.55).
+// Whatever was brought down from 0117's top of 14.5 m/s by her top's share (RAM, GUST, the guns' muzzle speeds) was
+// brought down by 13.5 / 14.5, and is left there. What her hull does when she meets another's is beside it.
 
 import type { GunKind } from '../kinds.ts';
 
 /** Everything her handling is tuned by. Rates are per second. */
 export const SHIP = {
   /** Top speed, m/s. */
-  top: 13.5,
+  top: 16,
   /** The share of the gap to the speed asked for that she makes up a second, gathering way and losing it. */
-  gather: 0.9,
-  drag: 0.35,
+  gather: 1.3,
+  drag: 0.5,
   /** Her fastest turn, rad/s; and how fast her turn follows the rudder. */
-  turn: 0.47,
-  answer: 2.8,
+  turn: 0.6,
+  answer: 4.5,
   /** The rudder bites this much at rest, and fully from `fullBite` of top speed on. */
-  bite: 0.45,
+  bite: 0.55,
   fullBite: 0.32,
   /** Rudder per radian still to turn: full rudder from 48° off the course. */
   steer: 1.2,
@@ -40,17 +43,17 @@ export const SHIP = {
 } as const;
 
 /**
- * Ships meeting (contact.ts): 0117's ramming (src/sim/tables.ts SHIP, sailing.ts collide) with its speeds brought down
- * from her top of 14.5 m/s to 13.5, so the same share of top speed does the same damage, in its hit points (a ship
+ * Ships meeting (contact.ts): 0117's ramming (src/sim/tables.ts SHIP, sailing.ts collide) with its speeds brought
+ * from her top of 14.5 m/s to 16, so the same share of top speed does the same damage, in its hit points (a ship
  * there had 100 of hull behind 100 of shield).
  */
 export const RAM = {
   /** Closing faster than this, m/s, where they meet, is a ram (0117: 7). */
-  least: 6.5,
+  least: 7.72,
   /** A ram's damage: hit points for each m/s of closing past `past` (0117: 2.2 past 5); the most one ram takes off a
    * ship (0117's cap). */
-  damage: 2.363,
-  past: 4.655,
+  damage: 1.994,
+  past: 5.517,
   most: 45,
   /** Each ship takes `bear` of it, and the rest by the other's share of the closing, so the one driving in takes the
    * less (0117). */
