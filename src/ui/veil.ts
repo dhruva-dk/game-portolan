@@ -1,7 +1,7 @@
 // The world's cross-fade, PLAY's: when the world changes under the screens all at once (from her ship at anchor to the
 // eye high over her berth), the last frame drawn before the change is held over the world and fades away (FADE) as the
 // new one is drawn under it, so the one dissolves into the other and nothing is cut. Under every screen, so a screen
-// fading in or out over it is seen whole. (Home from a match goes under parchment instead: passage.ts.)
+// fading in or out over it is seen whole. (Home from a match goes under the title instead: passage.ts.)
 
 import { FADE } from './ways';
 import { fade, uiLayer } from './ui';

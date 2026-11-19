@@ -19,6 +19,7 @@ import { shoresOf } from './ui/coasts';
 import { createGlobe } from './ui/globe';
 import { createFlow } from './ui/flow';
 import { createHud, type HudState } from './ui/hud';
+import { createTitle } from './ui/screens';
 import { createInput } from './ui/input';
 import { createStick } from './ui/stick';
 import { uiLayer } from './ui/ui';
@@ -33,6 +34,17 @@ const RELEASE: Setup = {
 };
 
 loaded('script');
+
+// the title, the one loading screen, painted first: the world's build holds the page some seconds, and till then
+// there was only the page's bare parchment
+const title = createTitle();
+title.show(true, 0);
+// (past the frame that paints it; a page opened unseen draws no frames, and goes on after a moment instead)
+await new Promise((go) => {
+  requestAnimationFrame(() => setTimeout(go));
+  setTimeout(go, 250);
+});
+loaded('title shown');
 
 const meterEl = document.getElementById('meter')!;
 /** Says so in the meter's corner, shown. */
@@ -131,7 +143,7 @@ async function play(s: Stage): Promise<Played> {
     },
     watch: () => referee.watch(),
     switch: (by) => referee.switch(by),
-  });
+  }, title);
   void s.ready.then(() => {
     flow.ready();
     loaded('title');

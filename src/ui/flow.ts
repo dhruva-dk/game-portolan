@@ -2,7 +2,7 @@
 // world (the camera's beat on it, then her result with its ways on: watch the match on, or home). Every way is her tap
 // on something drawn for it, or the match's own course as the game reports it (player.ts End), but the title's, taken
 // as the world is ready; nothing moves on by a clock of its own. Every screen fades in and out; where the world itself changes at once it cross-fades (PLAY:
-// veil.ts), or (home to the lobby) the match fades under parchment, held until the lobby is drawn (passage.ts). The HUD shows in the match (fading in at the end of the arrival: hud.ts), fades out as
+// veil.ts), or (home to the lobby) the match fades under the title, the one loading screen, held until the lobby is drawn (passage.ts). The HUD shows in the match (fading in at the end of the arrival: hud.ts), fades out as
 // her end begins, and comes back, only its clock, count and disc, while she watches another ship.
 
 import type { createGlobe } from './globe';
@@ -10,7 +10,7 @@ import type { HudState, createHud } from './hud';
 import type { End } from '../player';
 import type { Sea } from '../snapshot';
 import { createResult, createWatching } from './ends';
-import { createLobby, createSettings, createTitle, type Settings } from './screens';
+import { createLobby, createSettings, type Settings, type Title } from './screens';
 import { fade } from './ui';
 import { createPassage } from './passage';
 import { createVeil } from './veil';
@@ -41,13 +41,13 @@ function saveSettings(s: Settings) {
  *  on and to turn to another ship. */
 export interface FlowActions { play(): void; home(): void; watch(): void; switch(by: number): void }
 
-export function createFlow(hud: ReturnType<typeof createHud>, globe: ReturnType<typeof createGlobe>, start: Screen, act: FlowActions) {
+/** The flow, from `start`; `title` the title as the page painted it first, before the world was built (main.ts). */
+export function createFlow(hud: ReturnType<typeof createHud>, globe: ReturnType<typeof createGlobe>, start: Screen, act: FlowActions, title: Title) {
   let screen: Screen = start, settings = loadSettings();
   /** Her end as last reported (null while she fights). */
   let end: End | null = null;
 
   const veil = createVeil();
-  const title = createTitle();
   const lobby = createLobby({ play: () => tap('play'), settings: () => tap('settings') });
   const settingsFolio = createSettings(() => settings, (s) => {
     settings = s;

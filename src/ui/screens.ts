@@ -116,20 +116,36 @@ export function banner(x: number, y: number, w: number, mark: string, gilt = fal
     + mark;
 }
 
-/** The title, shown while the world is made: its needle swinging until then. It takes no tap: the flow moves on to the
- *  lobby as the world is ready (flow.ts). */
+/** The needle's swing, laid down once for every title drawn. */
+let swingLaid = false;
+const SWING = 'needle 1.6s ease-in-out infinite alternate';
+
+/** The title, the one loading screen: shown while the world is made, and again over the way home while the lobby is
+ *  made under it (passage.ts); its needle swinging until then. It takes no tap: the flow moves on to the lobby as the
+ *  world is ready (flow.ts). */
 export function createTitle() {
   const s = sheet(true);
   let needle!: SVGGElement, settled = false;
   s.set((p) => at(p, 'centre', 'middle', rhumbs(478, 182, 1100, 0.3) + rose(478, 182, 126, 0) + galleon(478, 352, 74, { hull: 'url(#h-gold)' })), (el) => {
     needle = el.querySelector<SVGGElement>('.needle')!;
-    needle.style.animation = settled ? 'none' : 'needle 1.6s ease-in-out infinite alternate';
+    needle.style.animation = settled ? 'none' : SWING;
   });
-  const style = document.createElement('style');
-  style.textContent = '@keyframes needle { from { transform: rotate(-38deg) } to { transform: rotate(52deg) } }';
-  document.head.appendChild(style);
+  if (!swingLaid) {
+    swingLaid = true;
+    const style = document.createElement('style');
+    style.textContent = '@keyframes needle { from { transform: rotate(-38deg) } to { transform: rotate(52deg) } }';
+    document.head.appendChild(style);
+  }
   return {
+    root: s.root,
     show: s.show,
+    /** Loading again: the needle swings. */
+    swing() {
+      settled = false;
+      needle.style.transition = 'none';
+      needle.style.transform = '';
+      needle.style.animation = SWING;
+    },
     /** The world is ready: the needle settles north, with one small overshoot, as the title fades. */
     ready() {
       settled = true;
@@ -139,6 +155,8 @@ export function createTitle() {
     },
   };
 }
+
+export type Title = ReturnType<typeof createTitle>;
 
 export function createLobby(act: { play(): void; settings(): void }) {
   // a drag anywhere off its controls turns the camera round her (play/anchorage.ts)
