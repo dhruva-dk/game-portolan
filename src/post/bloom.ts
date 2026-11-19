@@ -35,7 +35,8 @@ export function bloom(scene: TextureNode, gain: FloatNode): TextureNode {
     return vec4(c.mul(smoothstep(KNEE[0], KNEE[1], y)), 1);
   })();
   const q = (node: Vec4Node, scale: number) => rtt(node, null, null, { resolutionScale: scale, depthBuffer: false });
-  const d1 = q(knee, 1 / 4), d2 = q(four(d1, 1 / 2, false), 1 / 8), d3 = q(four(d2, 1 / 2, false), 1 / 16), d4 = q(four(d3, 1 / 2, false), 1 / 32);
+  const down = (fine: TextureNode, scale: number) => q(four(fine, 1 / 2, false), scale);
+  const d1 = q(knee, 1 / 4), d2 = down(d1, 1 / 8), d3 = down(d2, 1 / 16), d4 = down(d3, 1 / 32);
   const up = (low: TextureNode, same: TextureNode, scale: number) =>
     q(vec4(four(low, 1, false).rgb.add(same.sample(uv()).rgb), 1), scale);
   const u3 = up(d4, d3, 1 / 16), u2 = up(u3, d2, 1 / 8);

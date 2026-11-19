@@ -1,5 +1,5 @@
 // Light shafts: the sun's light caught in the haze, streaming from the bright sky round the sun past whatever stands
-// in front of it (the clouds' dark cores, the ships' canvas and rigging, an island's palms). In screen space, after
+// in front of it (the clouds' dark cores, the ships' canvas and rigging, the land's palms). In screen space, after
 // Mitchell ("Volumetric Light Scattering as a Post-Process", GPU Gems 3, 13): the sky's light near the sun, where no
 // geometry stands, is blurred along the rays from the sun's place on the screen, two passes of TAPS taps (the second
 // a TAPS-th of the first's span, filling its gaps: TAPS² taps effective), at a quarter of the frame's size.
@@ -7,9 +7,10 @@
 // Cost at the iPad's 1180×820: 3 passes at 295×205 — one of 2 taps, two of 16 — about 2 M taps a frame.
 
 import { Vector2, Vector3, type Matrix4, type TextureNode } from 'three/webgpu';
-import { Fn, dot, exp, float, int, interleavedGradientNoise, max, min, rtt, screenCoordinate, uniform, uv, vec2, vec3, vec4 } from 'three/tsl';
+import {
+  Fn, dot, exp, float, int, interleavedGradientNoise, max, min, rtt, screenCoordinate, select, uniform, uv, vec2, vec3, vec4,
+} from 'three/tsl';
 import { loop, type FloatNode, type Vec2Node, type Vec3Node, type Vec4Node } from '../tsl';
-
 /** Taps along a ray in each of the two passes. */
 const TAPS = 16;
 /** The sky's light past FLOOR (per unit sun) makes shafts, up to CLAMP, so the sun's disc does not swamp them and
@@ -24,9 +25,9 @@ const DECAY = 0.93;
  *  (1 + LOOSEN·off)², and the shafts fade as exp(−OFF_FADE·off). */
 const LOOSEN = 1.5, OFF_FADE = 0.8;
 
-/** What the shafts need of the eye (view/view.ts Eye): where it stands (world), camera to world, its projection, and
- *  world to clip. */
-export interface Seen {
+/** What the shafts need of the eye: where it stands (world), camera to world, its projection, and world to clip. Said
+ *  here, as post/ knows nothing of the view (tests/architecture.test.ts LAYERS); view/view.ts's Eye gives them. */
+interface Seen {
   readonly position: readonly number[];
   readonly world: Matrix4;
   readonly projection: Matrix4;
@@ -46,9 +47,10 @@ export function createShafts(scene: TextureNode, depth: TextureNode) {
 
   const offset = (p: Vec2Node) => p.sub(sun).mul(vec2(aspect, 1));
   const mask = Fn(() => {
-    const sky = depth.sample(uv()).x.greaterThanEqual(1).select(float(1), float(0));
+    const sky = select(depth.sample(uv()).x.greaterThanEqual(1), float(1), float(0));
     const d = offset(uv());
-    return vec4(min(max(scene.sample(uv()).rgb.sub(FLOOR), vec3(0)), vec3(CLAMP)).mul(sky).mul(exp(dot(d, d).mul(around.negate()))), 1);
+    const bright = min(max(scene.sample(uv()).rgb.sub(FLOOR), vec3(0)), vec3(CLAMP));
+    return vec4(bright.mul(sky).mul(exp(dot(d, d).mul(around.negate()))), 1);
   })();
   const q = (n: Vec4Node) => rtt(n, null, null, { resolutionScale: 1 / 4, depthBuffer: false });
   const blur = (source: TextureNode, span: number, thin: FloatNode) => Fn(() => {
@@ -68,7 +70,7 @@ export function createShafts(scene: TextureNode, depth: TextureNode) {
   const second = q(blur(first, 1, float(0)));
   const shafts = q(blur(second, 1 / TAPS, thinning));
 
-  const ahead = new Vector3(), toward = new Vector3(), p = new Vector3();
+  const ahead = new Vector3(), toward = new Vector3(), p = new Vector3(), at = new Vector3();
   return {
     /** The shafts' light at this pixel of the frame, to add to the scene's. */
     light: (): Vec3Node => shafts.sample(uv()).rgb.mul(strength),
@@ -81,7 +83,7 @@ export function createShafts(scene: TextureNode, depth: TextureNode) {
       // (the eye looks down its own −z)
       ahead.setFromMatrixColumn(eye.world, 2).negate().normalize();
       const facing = ahead.dot(toward);
-      p.copy(toward).multiplyScalar(1000).add(new Vector3(...eye.position)).applyMatrix4(eye.viewProjection);
+      p.copy(toward).multiplyScalar(1000).add(at.fromArray(eye.position)).applyMatrix4(eye.viewProjection);
       sun.value.set((p.x + 1) / 2, (1 - p.y) / 2);
       // (width over height: the projection's y scale over its x)
       aspect.value = eye.projection.elements[5] / eye.projection.elements[0];

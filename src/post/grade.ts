@@ -13,12 +13,13 @@
 //
 // Exposure and the vignette act on the scene's light before the curve.
 
-import { abs, clamp, exp, float, length, luminance, max, min, mix, mod, pow, screenUV, select, smoothstep, step, uniform, vec2, vec3 } from 'three/tsl';
+import {
+  abs, clamp, exp, float, length, luminance, max, min, mix, mod, pow, screenUV, select, smoothstep, step, uniform, vec2, vec3,
+} from 'three/tsl';
 import { DAWN_MIST, STORM_SLATE, type Rgb } from '../palette';
 import type { FloatNode, Vec3Node } from '../tsl';
 // the CPU's numbers, apart from TSL's nodes of the same names
 import * as scalar from '../world/scalar';
-
 
 /** A look. The lift is a small offset in linear light. */
 export interface Look {
@@ -41,38 +42,53 @@ export interface Look {
 /** The day's looks, by the sine of the sun's height they are set for. */
 const DAY: readonly (readonly [number, Look])[] = [
   // the golden hour: the light a little amber (the level's own warmth besides), the corners a touch darker
-  [0.17, { exposure: 0, temp: 0.2, tint: 0.02, contrast: 1, saturation: 1, warm: 1.05, sea: 1, sky: 1, fade: 0, fadeTo: [0, 0, 0], vignette: 0.2 }],
+  [0.17, {
+    exposure: 0, temp: 0.2, tint: 0.02, contrast: 1, saturation: 1, warm: 1.05, sea: 1, sky: 1, fade: 0, fadeTo: [0, 0, 0],
+    vignette: 0.2,
+  }],
   // the trade-wind afternoon: the palette as it is
-  [0.47, { exposure: 0, temp: 0.04, tint: 0, contrast: 1, saturation: 1, warm: 1, sea: 1, sky: 1, fade: 0, fadeTo: [0, 0, 0], vignette: 0.14 }],
+  [0.47, {
+    exposure: 0, temp: 0.04, tint: 0, contrast: 1, saturation: 1, warm: 1, sea: 1, sky: 1, fade: 0, fadeTo: [0, 0, 0],
+    vignette: 0.14,
+  }],
   // noon in the tropics: the same, the corners all but open
-  [0.97, { exposure: 0, temp: 0, tint: 0, contrast: 1, saturation: 1, warm: 1, sea: 1, sky: 1, fade: 0, fadeTo: [0, 0, 0], vignette: 0.1 }],
+  [0.97, {
+    exposure: 0, temp: 0, tint: 0, contrast: 1, saturation: 1, warm: 1, sea: 1, sky: 1, fade: 0, fadeTo: [0, 0, 0],
+    vignette: 0.1,
+  }],
 ];
 /** A morning's low sun, against the evening's amber: a rose cast, the blacks lifted a little to a lavender mist.
  *  Mixed in under a rising sun, most at the golden hour's height, gone by the afternoon's. */
 const DAWN: Look = {
-  exposure: 0, temp: -0.02, tint: -0.06, contrast: 1, saturation: 1, warm: 1.05, sea: 1, sky: 1, fade: 0.02, fadeTo: DAWN_MIST, vignette: 0.16,
+  exposure: 0, temp: -0.02, tint: -0.06, contrast: 1, saturation: 1, warm: 1.05, sea: 1, sky: 1, fade: 0.02, fadeTo: DAWN_MIST,
+  vignette: 0.16,
 };
 /** In the storm: cooler and dimmer, pushed toward violet (magenta in the tint), its blacks lifted to a slate violet,
  *  the corners darker. Its colour is kept: the ships' dyes still read. */
 const STORM: Look = {
-  exposure: 0.8, temp: -0.15, tint: -0.1, contrast: 1, saturation: 0.92, warm: 1, sea: 0.9, sky: 0.95, fade: 0.03, fadeTo: STORM_SLATE, vignette: 0.32,
+  exposure: 0.8, temp: -0.15, tint: -0.1, contrast: 1, saturation: 0.92, warm: 1, sea: 0.9, sky: 0.95, fade: 0.03,
+  fadeTo: STORM_SLATE, vignette: 0.32,
 };
 
-const lerp3 = (a: Rgb, b: Rgb, t: number): Rgb => [scalar.lerp(a[0], b[0], t), scalar.lerp(a[1], b[1], t), scalar.lerp(a[2], b[2], t)];
+/** A look's numbers: all but its colour. */
+type Amount = Exclude<keyof Look, 'fadeTo'>;
+/** Every number of a look, made by `each` from its name. */
+const amounts = <T>(each: (k: Amount) => T): { [K in Amount]: T } => ({
+  exposure: each('exposure'), temp: each('temp'), tint: each('tint'), contrast: each('contrast'),
+  saturation: each('saturation'), warm: each('warm'), sea: each('sea'), sky: each('sky'), fade: each('fade'),
+  vignette: each('vignette'),
+});
 
 /** Look a and b mixed, t of b. */
 function between(a: Look, b: Look, t: number): Look {
-  const out = { ...a };
-  for (const k of Object.keys(a) as (keyof Look)[]) {
-    const u = a[k], v = b[k];
-    if (typeof u === 'number' && typeof v === 'number') (out[k] as number) = scalar.lerp(u, v, t);
-  }
-  return { ...out, fadeTo: lerp3(a.fadeTo, b.fadeTo, t) };
+  const [u, v] = [a.fadeTo, b.fadeTo];
+  const fadeTo: Rgb = [scalar.lerp(u[0], v[0], t), scalar.lerp(u[1], v[1], t), scalar.lerp(u[2], v[2], t)];
+  return { ...amounts((k) => scalar.lerp(a[k], b[k], t)), fadeTo };
 }
 
 /** The day's look for a sun whose height has this sine, rising (the morning's) or not: between the looks on either
  *  side of it. */
-export function dayLook(rise: number, rising = false): Look {
+function dayLook(rise: number, rising = false): Look {
   let i = 0;
   while (i < DAY.length - 2 && rise > DAY[i + 1][0]) i++;
   const [e0, a] = DAY[i], [e1, b] = DAY[i + 1];
@@ -100,14 +116,9 @@ export const encode = (c: Vec3Node): Vec3Node =>
   mix(c.mul(12.92), pow(max(c, vec3(0)), vec3(1 / 2.4)).mul(1.055).sub(0.055), step(vec3(0.0031308), c));
 
 /** Each number of a look, the day's mixed toward the storm's by how deep in it the eye is. */
-type Mixed = { [K in keyof Look]: Look[K] extends number ? FloatNode : Vec3Node };
+type Mixed = { [K in Amount]: FloatNode } & { fadeTo: Vec3Node };
 function mixed(a: Look, b: Look, t: FloatNode): Mixed {
-  const out: Partial<Record<keyof Look, FloatNode | Vec3Node>> = {};
-  for (const k of Object.keys(a) as (keyof Look)[]) {
-    const u = a[k], v = b[k];
-    out[k] = typeof u === 'number' && typeof v === 'number' ? mix(float(u), float(v), t) : mix(vec3(...a.fadeTo), vec3(...b.fadeTo), t);
-  }
-  return out as Mixed;
+  return { ...amounts((k) => mix(float(a[k]), float(b[k]), t)), fadeTo: mix(vec3(...a.fadeTo), vec3(...b.fadeTo), t) };
 }
 
 /** The look on display-linear colour: white balance, contrast about middle grey, saturation overall and by hue (in
