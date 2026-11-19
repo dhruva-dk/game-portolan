@@ -1,8 +1,6 @@
 // The near ships' sails and pennants as cloth, simulated on the GPU: extended position-based dynamics (Macklin, Müller
 // and Chentanez, "XPBD", MIG 2016) taken in many small steps of one Jacobi iteration each (Macklin et al., "Small
 // Steps in Physics Simulation", SCA 2019), which converges well enough for canvas without colouring the constraints.
-// Ported from 0117's cloth (src/render/actors/cloth.ts): its solver, its wind and its tuning; the caravel's lateens,
-// its ropes and its shot holes left behind.
 //
 // Each berth (berths.ts) holds one ship's canvas (canvas.ts: the finest level's grids, a particle a vertex), in her own
 // frame — a square sail's in its yard's, before the yard is braced — so her way over the sea moves nothing, and only
@@ -68,13 +66,15 @@ const PARAMS = 5;
 export const breath = (clock: FloatNode, phase: FloatNode): FloatNode =>
   float(1).add(sin(clock.mul(0.83).add(phase)).mul(0.12)).add(sin(clock.mul(2.1).add(phase.mul(2.3))).mul(0.07));
 
-/** A direction turned about the vertical by `angle` (as a square yard is braced: the port arm aft for positive). */
-const turn = (v: Vec3Node, angle: FloatNode): Vec3Node => {
+/** A direction in her frame turned about the vertical by `angle`, as a square yard is braced (the port arm aft for
+ *  positive): the cloth's and the drawn ship's (materials.ts). */
+export const braced = (v: Vec3Node, angle: FloatNode): Vec3Node => {
   const c = cos(angle), s = sin(angle);
   return vec3(v.x.mul(c).add(v.z.mul(s)), v.y, v.x.negate().mul(s).add(v.z.mul(c)));
 };
-/** A point turned so about the vertical through z = pivot. */
-const turnAbout = (p: Vec3Node, angle: FloatNode, pivot: FloatNode | number): Vec3Node => turn(p.sub(vec3(0, 0, pivot)), angle).add(vec3(0, 0, pivot));
+/** A point turned so about the vertical through z = pivot (its mast). */
+export const bracedAbout = (p: Vec3Node, angle: FloatNode, pivot: FloatNode | number): Vec3Node =>
+  braced(p.sub(vec3(0, 0, pivot)), angle).add(vec3(0, 0, pivot));
 
 /** What a berth's ship feels this frame, in her own frame (x to port, y up, z forward). */
 export interface Felt {
@@ -144,11 +144,11 @@ export function createCloth() {
     const spin = params.element(slot.mul(PARAMS).add(3)).xyz, spinning = params.element(slot.mul(PARAMS).add(4)).xyz;
     const square = kind.lessThan(CLOTH.lateen - 0.5);
     const angle = select(square, p0.z, float(0));
-    const r = turnAbout(x, angle, m.z);
+    const r = bracedAbout(x, angle, m.z);
     // swung with her rig about her waterline: thrown outward and along, and carried through the air
     const swing = cross(spinning, r).add(cross(spin, cross(spin, r)));
-    const weight = turn(p2.xyz.sub(swing), angle.negate());
-    const wind = turn(p1.xyz.mul(breath(clock, p0.w)).sub(cross(spin, r)), angle.negate());
+    const weight = braced(p2.xyz.sub(swing), angle.negate());
+    const wind = braced(p1.xyz.mul(breath(clock, p0.w)).sub(cross(spin, r)), angle.negate());
     // The wind's eddies, carried over the canvas at about its speed, pushing it in and out: a little everywhere, so
     // a full sail ripples, and hard where the wind runs along the canvas, so a sail edge-on to it lifts and shakes
     // and a pennant flutters.
@@ -212,7 +212,7 @@ export function createCloth() {
     // the mast stands in the canvas: in a square sail's yard's frame it stands where the brace turns it back to
     If(m.y.greaterThan(0), () => {
       const square = g.w.lessThan(CLOTH.lateen - 0.5);
-      const mast = turnAbout(vec3(0, 0, m.x), select(square, p0.z.negate(), float(0)), m.z);
+      const mast = bracedAbout(vec3(0, 0, m.x), select(square, p0.z.negate(), float(0)), m.z);
       const dx = x.x.sub(mast.x), dz = x.z.sub(mast.z), d = max(dx.mul(dx).add(dz.mul(dz)).sqrt(), 1e-5), keep = m.y.add(CLEAR);
       If(d.lessThan(keep), () => { x.assign(vec3(mast.x.add(dx.mul(keep.div(d))), x.y, mast.z.add(dz.mul(keep.div(d))))); });
     });

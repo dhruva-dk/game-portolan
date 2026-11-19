@@ -4,7 +4,6 @@
 // apart, the wet timber as a darker band along her waterline, and one hard highlight on the gilding.
 
 import { float, mix, positionWorld, select, vec3 } from 'three/tsl';
-import type { Node } from 'three/webgpu';
 import { CREAM, DECK, DYE_SHADE, GILDING, TAR, TIMBER, type Rgb, type Tones } from '../palette.ts';
 import type { Light } from '../sky/light.ts';
 import { cut, line, type FloatNode, type Vec2Node, type Vec3Node } from '../tsl.ts';
@@ -14,6 +13,11 @@ import { KIND } from './kit.ts';
 const STRAKES = 4, SEAM = 0.4;
 /** The hull is wet up to this many metres over her waterline, and darker there by this much. */
 const WET_TO = 0.3, WET = 0.72;
+/** Each kind's tones (null: the captain's paint); and the kinds by their number (kit.ts KIND). */
+const TONES: Record<keyof typeof KIND, Tones | null> = {
+  planks: TIMBER, paint: null, dark: TAR, deck: DECK, spar: TIMBER, gilt: GILDING, iron: TAR,
+};
+const ORDER = (Object.keys(KIND) as (keyof typeof KIND)[]).sort((a, b) => KIND[a] - KIND[b]);
 
 /** A dye's shadow tone: darker and redder than it is in the sun (palette.ts DYE_SHADE). */
 export const shaded = (dye: Vec3Node): Vec3Node => dye.mul(vec3(...DYE_SHADE));
@@ -23,10 +27,13 @@ export const shaded = (dye: Vec3Node): Vec3Node => dye.mul(vec3(...DYE_SHADE));
 export function createWood(light: Light) {
   return (kind: FloatNode, uv: Vec2Node, height: FloatNode, n: Vec3Node, ao: FloatNode, paint: Vec3Node): Vec3Node => {
     const p = positionWorld;
-    const pick = <T>(i: number, a: Node<T>, b: Node<T>) => select(kind.lessThan(i + 0.5), a, b);
-    const tone = (of: (t: Tones) => Rgb, painted: Vec3Node): Vec3Node =>
-      pick(KIND.planks, vec3(...of(TIMBER)), pick(KIND.paint, painted, pick(KIND.dark, vec3(...of(TAR)),
-        pick(KIND.deck, vec3(...of(DECK)), pick(KIND.spar, vec3(...of(TIMBER)), pick(KIND.gilt, vec3(...of(GILDING)), vec3(...of(TAR))))))));
+    // the tone of the kind it is: the kinds tried in turn, the last for whatever is left
+    const tone = (of: (t: Tones) => Rgb, painted: Vec3Node): Vec3Node => {
+      const toned = (k: number): Vec3Node => { const t = TONES[ORDER[k]]; return t ? vec3(...of(t)) : painted; };
+      let picked = toned(ORDER.length - 1);
+      for (let k = ORDER.length - 2; k >= 0; k--) picked = select(kind.lessThan(KIND[ORDER[k]] + 0.5), toned(k), picked);
+      return picked;
+    };
     // the seams between the strakes, on the planking, the paint over it and the deck
     const planked = kind.lessThan(KIND.paint + 0.5).or(kind.greaterThan(KIND.deck - 0.5).and(kind.lessThan(KIND.deck + 0.5)));
     const seam = select(planked, line(uv.y, STRAKES).mul(SEAM), float(0));

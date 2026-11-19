@@ -1,5 +1,5 @@
 // The galleon's three materials — the body, the cloth and the ropes — lit like everything else (sky/light.ts: the
-// sun through the air, the clouds' and the nearest island's shadows, the sky).
+// sun through the air, the clouds' and the land's shadows, the sky).
 //
 // Every ship is an instance (fleet.ts): its pose and look ride along as per-instance attributes, and each vertex is
 // carried from her frame to the world here, in the vertex stage (no instance matrices: the brace and the wind act in
@@ -17,11 +17,11 @@
 // wind slackens or comes along the sail, a luff travelling across it to leeward, its normal tilted to match; and
 // simulated, each vertex at its place on its sail's grid read from the particles (bilinearly, so every level samples
 // the same sheet) with the particles' own normal. Lit in flat tones on both sides: its dye in the sun, a darker, redder
-// one out of it, and a glow where the sun stands behind the canvas. The pennants stream
-// down the same wind, drawn or simulated alike. The ropes: widened to a pixel and a half across far off so the rigging
-// stays a line rather than breaking into dashes, and blended over what is behind them by how much of that width the
-// rope itself would cover — so a distant ship's rigging is the faint web it is, not a black one — their edges soft, as
-// a round rope's are where it turns away from the eye.
+// one out of it, and a glow where the sun stands behind the canvas. The pennants stream down the same wind, drawn or
+// simulated alike. The ropes: widened to a pixel and a half across far off so the rigging stays a line rather than
+// breaking into dashes, and blended over what is behind them by how much of that width the rope itself would cover —
+// so a distant ship's rigging is the faint web it is, not a black one — their edges soft, as a round rope's are where
+// it turns away from the eye.
 
 import { DoubleSide, MeshBasicNodeMaterial, type StorageBufferNode } from 'three/webgpu';
 import {
@@ -31,7 +31,7 @@ import {
 import { read } from './instance.ts';
 import type { Light } from '../sky/light.ts';
 import { BELLY_UNIT, PENNANT_LENGTH, PIVOT_Z, RADIUS_UNIT, UV_RANGE } from './build.ts';
-import { breath, type Cloth } from './cloth.ts';
+import { braced, bracedAbout, breath, type Cloth } from './cloth.ts';
 import { CLOTH } from './kit.ts';
 import { CREAM, DYE_GLOW, TAR } from '../palette.ts';
 import { createWood, shaded } from './wood.ts';
@@ -57,6 +57,9 @@ const UNSEEN = 0.06;
 const ABACK = 0.3;
 /** A pennant flaps this many times a second in a fresh breeze, its waves this many to its length. */
 const FLAP = 2.2, WAVES = 1.6;
+/** The two ripples running across a drawn sail, their wavelengths along its yard, metres (as the cloth's eddies':
+ *  cloth.ts EDDY_WAVES). */
+const RIPPLES = [2.6, 1.7] as const;
 /** A rope is widened to at least this many pixels in radius (below about a pixel and a half across, a line at a slant
  * breaks into dashes without multisampling), and drawn as faint as the rope it stands for is thin. */
 const ROPE_PIXELS = 0.75;
@@ -83,17 +86,14 @@ export function createShipMaterials(light: Light, pixel: FloatNode, canvas: Clot
   const pivot = part.y.mul(255).round();
   const angle = ship.brace.mul(part.z).mul(select(pivot.greaterThan(0.5), float(1), float(0)));
   const pivotZ = select(pivot.greaterThan(1.5), float(PIVOT_Z[2]), float(PIVOT_Z[1]));
-  /** Turned about the vertical through the pivot's mast (a direction: about the vertical through the origin). */
-  const brace = (v: Vec3Node, point: boolean): Vec3Node => {
-    const c = cos(angle), s = sin(angle), z = point ? v.z.sub(pivotZ) : v.z;
-    const x = v.x.mul(c).add(z.mul(s)), zz = v.x.negate().mul(s).add(z.mul(c));
-    return vec3(x, v.y, point ? zz.add(pivotZ) : zz);
-  };
+  /** A point braced about the vertical through its pivot's mast; a direction, braced. */
+  const point = (v: Vec3Node): Vec3Node => bracedAbout(v, angle, pivotZ);
+  const direction = (v: Vec3Node): Vec3Node => braced(v, angle);
 
   // ---- the body
   const body = new MeshBasicNodeMaterial();
-  body.positionNode = ship.position.add(turn(brace(local, true)));
-  const bodyNormal = varying(turn(brace(nrm.xyz, false)));
+  body.positionNode = ship.position.add(turn(point(local)));
+  const bodyNormal = varying(turn(direction(nrm.xyz)));
   const height = varying(local.y);
   const bodyKind = varying(kind);
   body.colorNode = Fn(() => wood(bodyKind, attribute('uv', 'vec2').mul(UV_RANGE), height, normalize(bodyNormal), nrm.w, ship.paint))();
@@ -121,7 +121,7 @@ export function createShipMaterials(light: Light, pixel: FloatNode, canvas: Clot
   const free = smoothstep(0, 0.5, uvCloth.y).mul(select(isLateen, smoothstep(1, 0.75, uvCloth.y), float(1).sub(clew)));
   const luff = strength.sub(abs(fill)).max(0).mul(free);
   const ripple = belly.mul(abs(fill)).mul(0.045);
-  const k1 = 2 * Math.PI / 2.6, k2 = 2 * Math.PI / 1.7;
+  const [k1, k2] = RIPPLES.map((l) => (2 * Math.PI) / l);
   const w1 = a.mul(lee).mul(k1).add(b.mul(0.8)).sub(canvas.clock.mul(strength.mul(9).add(4))).add(phase);
   const w2 = a.mul(lee).mul(k2).sub(b.mul(1.3)).sub(canvas.clock.mul(strength.mul(13).add(5))).add(phase.mul(1.7));
   const shake = luff.mul(0.22).add(ripple);
@@ -156,9 +156,9 @@ export function createShipMaterials(light: Light, pixel: FloatNode, canvas: Clot
     mix(B.element(first.add(row)).xyz, B.element(first.add(row).add(1)).xyz, fx), fy);
   const simulated = bilinear(particles), simulatedNormal = bilinear(particleNormals);
   const shaped = mix(select(isPennant, pennant, sail), simulated, share);
-  clothMaterial.positionNode = ship.position.add(turn(brace(shaped, true)));
+  clothMaterial.positionNode = ship.position.add(turn(point(shaped)));
   const drawn = select(isPennant, across, filled), drawnNormal = normalize(drawn);
-  const clothNormal = varying(turn(brace(mix(drawnNormal, simulatedNormal, share), false)));
+  const clothNormal = varying(turn(direction(mix(drawnNormal, simulatedNormal, share))));
   const clothKind = varying(kind);
   clothMaterial.colorNode = Fn(() => {
     const uvs = attribute('uv', 'vec2').mul(UV_RANGE);
@@ -175,13 +175,13 @@ export function createShipMaterials(light: Light, pixel: FloatNode, canvas: Clot
     // the cross, on the square sails: in the sail's own half-widths from its middle, inside a flaring arm either way;
     // and a border of canvas FRINGE wide round it, which parts it from the stripes
     const c = abs(uvs.sub(0.5)).mul(2).div(REACH);
-    const cross = (d: number) => {
+    const pattee = (d: number) => {
       const armX = c.y.lessThan(mix(float(ARM + d), float(FLARE + d), c.x)).and(c.x.lessThan(1 + d));
       const armY = c.x.lessThan(mix(float(ARM + d), float(FLARE + d), c.y)).and(c.y.lessThan(1 + d));
       return select(square.and(armX.or(armY)), float(1), float(0));
     };
-    const mark = cross(0);
-    const marked = max(band, max(mark, stripe.mul(float(1).sub(cross(FRINGE)))));
+    const mark = pattee(0);
+    const marked = max(band, max(mark, stripe.mul(float(1).sub(pattee(FRINGE)))));
     // a mark as dark or as light as its canvas would not show: it is drawn in cream instead
     const ink = select(abs(luminance(ship.paint).sub(luminance(ship.sail))).lessThan(UNSEEN), vec3(...CREAM), ship.paint);
     let albedo = mix(ship.sail, ink, marked);
@@ -197,8 +197,8 @@ export function createShipMaterials(light: Light, pixel: FloatNode, canvas: Clot
   })();
   // ---- the ropes: blended, so drawn after the sea (fleet.ts)
   const ropes = new MeshBasicNodeMaterial({ transparent: true });
-  const ropeNormal = turn(brace(nrm.xyz, false));
-  const ropeAt = ship.position.add(turn(brace(local, true)));
+  const ropeNormal = turn(direction(nrm.xyz));
+  const ropeAt = ship.position.add(turn(point(local)));
   const radius = nrm.w.mul(RADIUS_UNIT);
   const wide = max(cameraPosition.distance(ropeAt).mul(pixel).mul(ROPE_PIXELS), radius);
   ropes.positionNode = ropeAt.add(ropeNormal.mul(wide.sub(radius)));
