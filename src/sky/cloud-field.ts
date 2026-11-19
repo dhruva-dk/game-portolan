@@ -27,12 +27,12 @@ import {
   texture, texture3D, uniform, vec3, vec4,
 } from 'three/tsl';
 import {
-  BOTTOM, MIE_EXTINCTION, MIE_SCALE_HEIGHT, RAYLEIGH_SCALE_HEIGHT, RAYLEIGH_SCATTERING,
+  BOTTOM, MIE_EXTINCTION, MIE_SCALE_HEIGHT, RAYLEIGH_SCALE_HEIGHT,
 } from './atmosphere';
 import { CLOUD } from '../palette';
-import { POTENTIAL_DECILES, WEATHER_TILE, remap, type CloudNoise } from './cloud-noise';
-import { henyeyGreenstein, loop, type FloatNode, type Vec3Node, type Vec4Node } from '../tsl';
-import type { Tables } from './tables';
+import { POTENTIAL_DECILES, WEATHER_TILE, type CloudNoise } from './cloud-noise';
+import { henyeyGreenstein, loop, ramp, type FloatNode, type Vec3Node, type Vec4Node } from '../tsl';
+import { RAYLEIGH, type Tables } from './tables';
 
 const fall = (a: number, b: number, x: FloatNode): FloatNode => float(1).sub(smoothstep(a, b, x));
 
@@ -150,9 +150,9 @@ export function createCloudField(tables: Tables, noise: CloudNoise) {
     If(reach.greaterThan(0), () => {
       const n = texture3D(noise.shape, p.div(SHAPE_SCALE)).level(float(0));
       const floorNoise = n.g.mul(0.625).add(n.b.mul(0.25)).add(n.a.mul(0.125));
-      const billows = clamp(remap(n.r, floorNoise.sub(1), float(1), float(0), float(1)), 0, 1);
+      const billows = ramp(n.r, floorNoise.sub(1), 1);
       // and a flat base, thinning out over its lowest BASE_FADE
-      dense.assign(clamp(remap(billows, float(1).sub(reach), float(1), float(0), float(1)), 0, 1).mul(smoothstep(0, BASE_FADE / (TOP - BASE), h)));
+      dense.assign(ramp(billows, float(1).sub(reach), 1).mul(smoothstep(0, BASE_FADE / (TOP - BASE), h)));
     });
     return { dense, h, top: top.div(TOP - BASE), inside };
   };
@@ -163,7 +163,7 @@ export function createCloudField(tables: Tables, noise: CloudNoise) {
     const d = texture3D(noise.detail, p.div(DETAIL_SCALE)).level(float(0));
     const df = d.r.mul(0.625).add(d.g.mul(0.25)).add(d.b.mul(0.125));
     const e = mix(df, float(1).sub(df), clamp(h.mul(4), 0, 1));
-    return clamp(remap(dense, e.mul(EROSION), float(1), float(0), float(1)), 0, 1);
+    return ramp(dense, e.mul(EROSION), 1);
   };
 
   /** The cloud's density at q (0–1, of SIGMA), eroded, as the march sees it. */
@@ -187,7 +187,7 @@ export function createCloudField(tables: Tables, noise: CloudNoise) {
     const z = max(eye.y.add(d.y.mul(dist)).add(dist.mul(dist).div(2 * BOTTOM)), 0.01);
     // mean density over a straight climb from the sea to z: H(1 − e^(−z/H)) / z
     const mean = (H: number) => float(H).mul(float(1).sub(exp(z.negate().div(H)))).div(z);
-    const ext = vec3(...RAYLEIGH_SCATTERING).mul(mean(RAYLEIGH_SCALE_HEIGHT)).add(haze.mul(MIE_EXTINCTION).mul(mean(MIE_SCALE_HEIGHT)));
+    const ext = RAYLEIGH.mul(mean(RAYLEIGH_SCALE_HEIGHT)).add(haze.mul(MIE_EXTINCTION).mul(mean(MIE_SCALE_HEIGHT)));
     return exp(ext.mul(dist).negate());
   };
 

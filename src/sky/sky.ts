@@ -30,21 +30,21 @@ import type { Cap } from '../sim/storm';
 import type { Compute } from '../gpu';
 import type { Eye } from '../snapshot';
 import type { View } from '../view/view';
-import { R, toSky } from '../world/sphere';
+import * as sphere from '../world/sphere';
 import { sunAtOrigin, sunInSky } from '../world/sun';
-import { MIE_EXTINCTION, MIE_SCALE_HEIGHT, MIE_SCATTERING, RAYLEIGH_SCATTERING, SEA_ALBEDO } from './atmosphere';
+import { MIE_EXTINCTION, MIE_SCALE_HEIGHT, MIE_SCATTERING, SEA_ALBEDO } from './atmosphere';
 import { HAZE, STORM, tint } from '../palette';
-import { createClouds } from './clouds';
+import { createClouds, type CloudInputs } from './clouds';
 import { createReflection } from './reflection';
 import { createStormLook, type StormLight } from './storm';
-import { VIEW_RADIUS, createTables } from './tables';
+import { RAYLEIGH, VIEW_RADIUS, createTables } from './tables';
 import { henyeyGreenstein, type FloatNode, type Vec3Node } from '../tsl';
 
 /**
  * The sun's disc as the sky draws it, its angular radius: 3° across, where the true sun is 0.53°, a few pixels on the
  * phone and lost in its own glow. It is how the disc looks and nothing more: what lights the world is the sun's
- * illuminance (sunIlluminance), the glint off the sea is the true disc's (water/glitter.ts), and the reflected sky
- * leaves the disc out (reflection.ts).
+ * illuminance (sunIlluminance), the sea draws its own glints (water/optics.ts), and the reflected sky leaves the disc
+ * out (reflection.ts).
  */
 const SUN_DISC = (1.5 * Math.PI) / 180;
 /**
@@ -103,12 +103,16 @@ export interface Sky {
   stormEdge(p: Vec3Node): FloatNode;
 }
 
+/** The sky's passes due in a frame, each part's in order. */
+export interface SkyPasses { tables: readonly Compute[]; clouds: readonly Compute[]; reflection: readonly Compute[] }
+const NONE: readonly Compute[] = [];
+
 /** bolt: the storm's lightning held lit (debug.ts ?bolt). */
 export function createSky(view: View, bolt: boolean) {
   const tables = createTables();
   const { haze, skyAmbientUp, skyRadiance, sunTransmittance } = tables;
   /** Extinction of the air at sea level, per km. */
-  const seaLevelExtinction = vec3(...RAYLEIGH_SCATTERING).add(haze.mul(MIE_EXTINCTION));
+  const seaLevelExtinction = RAYLEIGH.add(haze.mul(MIE_EXTINCTION));
   /** Toward the sun over the eye: in the world, and as the eye's sky shows it. */
   const sun = uniform(new Vector3(0, 1, 0));
   const skySun = uniform(new Vector3(0, 1, 0));
@@ -125,19 +129,22 @@ export function createSky(view: View, bolt: boolean) {
   /** The sun over p: the sun over the origin turned with the rotation that takes the origin to p (sun.ts's carry). */
   const sunOver = (p: Vec3Node): Vec3Node => {
     const u = normalize(p), c = dot(origin, u), w = cross(origin, u);
-    // Rodrigues: v·c + w × v + w (w·v)/(1 + c); at the origin's antipode (under an island) it is undefined
+    // Rodrigues: v·c + w × v + w (w·v)/(1 + c); at the origin's antipode (the land's heart: world/sun.ts) it is undefined
     return normalize(there.mul(c).add(cross(w, there)).add(w.mul(dot(w, there).div(max(c.add(1), 1e-6)))));
   };
 
-  /** The same everywhere: the sun stands as high over every place. */
-  const sunIlluminance = (_p: Vec3Node): Vec3Node => sunTransmittance(VIEW_RADIUS, rise);
+  /** The sun's light through the air at the sea, per unit sun: the same everywhere, as the sun stands as high over
+   *  every place. */
+  const sunAtSea = sunTransmittance(VIEW_RADIUS, rise);
+  const sunIlluminance = (_p: Vec3Node): Vec3Node => sunAtSea;
+  /** And on a level surface. */
+  const sunlight = sunAtSea.mul(max(rise, 0));
 
   const ambient = (p: Vec3Node, n: Vec3Node): Vec3Node => {
     const up = view.up(p);
-    const bounce = sunIlluminance(p).mul(max(rise, 0)).add(skyAmbientUp).mul(SEA_ALBEDO);
+    const bounce = sunlight.add(skyAmbientUp).mul(SEA_ALBEDO);
     return mix(bounce, skyAmbientUp, dot(n, up).mul(0.5).add(0.5)).mul(mix(1, STORM_SKY, storm.depth(p)));
   };
-  const sunlight = sunTransmittance(VIEW_RADIUS, rise).mul(max(rise, 0));
   const stormLight: StormLight = {
     air: sunlight.mul(SUN_IN / (4 * Math.PI)).add(skyAmbientUp.mul(AIR_IN)).mul(vec3(...STORM_TINT)),
     sun: vec3(luminance(sunlight)).mul(vec3(...STORM_SUNLIT)),
@@ -159,8 +166,7 @@ export function createSky(view: View, bolt: boolean) {
     const d = view.toSky(dir);
     const horizon = skyRadiance(normalize(vec3(d.x, 0.02, d.z)), skySun);
     const forward = henyeyGreenstein(dot(normalize(vec3(d.x, max(d.y, 0), d.z)), skySun), HAZE_G);
-    const sunlight = sunTransmittance(VIEW_RADIUS, rise).mul(max(rise, 0.05));
-    return horizon.mul(vec3(...HAZE)).add(sunlight.mul(forward).mul(HAZE_SUN));
+    return horizon.mul(vec3(...HAZE)).add(sunAtSea.mul(max(rise, 0.05)).mul(forward).mul(HAZE_SUN));
   };
   /** The low air's mean density between two heights over the sea (metres), as a share of the sea's. */
   const meanDensity = (a: FloatNode, b: FloatNode): FloatNode => {
@@ -177,7 +183,7 @@ export function createSky(view: View, bolt: boolean) {
    */
   const fog = (color: Vec3Node, dir: Vec3Node, metres: FloatNode): Vec3Node => {
     const end = view.position.add(dir.mul(metres));
-    const density = meanDensity(view.height, length(end).sub(R)).div(reference);
+    const density = meanDensity(view.height, length(end).sub(sphere.R)).div(reference);
     const near = hazeDepth.mul(pow(metres.div(HAZE_DISTANCE), HAZE_SHAPE)).mul(density);
     const band = hazeDepth.mul(exp(max(view.toSky(dir).y, 0).div(-HAZE_BAND)));
     const tau = select(metres.greaterThan(SKY_METRES), band, near).mul(float(1).sub(smoothstep(HAZE_ABOVE[0], HAZE_ABOVE[1], view.height)));
@@ -207,7 +213,12 @@ export function createSky(view: View, bolt: boolean) {
   // what a surface mirrors is the sky beyond the storm: seen from the eye, which is near enough the mirror
   const reflect = (dir: Vec3Node, roughness: FloatNode): Vec3Node => storm.dim(reflection.reflect(dir, roughness), dir, stormLight);
   const open = sunlight.div(Math.PI).add(skyAmbientUp);
-  const light: Sky = { sun: sunOver, sunIlluminance, cloudShadow, cloudCover, stormSun, ambient, open, reflect, storm: storm.depth, stormEdge: storm.edge };
+  const light: Sky = {
+    sun: sunOver, sunIlluminance, cloudShadow, cloudCover, stormSun, ambient, open, reflect, storm: storm.depth, stormEdge: storm.edge,
+  };
+  /** What update hands the clouds, and the passes it returns, laid afresh each frame. */
+  const cloudInputs: CloudInputs = { coverage: 0, wind: { x: 0, y: 0 }, sunDirection: skySun.value };
+  const due: SkyPasses = { tables: NONE, clouds: NONE, reflection: NONE };
 
   return {
     background,
@@ -224,21 +235,29 @@ export function createSky(view: View, bolt: boolean) {
      * part of it. An eye in space sees the clouds from outside: they are neither marched nor moved on (their history
      * stays the air's), they cast no shadow, and the sea mirrors the sky alone. The screen is width × height CSS pixels.
      */
-    update(env: Environment, cap: Cap, kind: Eye['kind'], dt: number, width: number, height: number): { tables: Compute[]; clouds: Compute[]; reflection: Compute[] } {
+    update(env: Environment, cap: Cap, kind: Eye['kind'], dt: number, width: number, height: number): SkyPasses {
       storm.update(cap, env.clock, view.eye.position);
       sun.value.set(...env.sunDirection);
       origin.value.set(...env.sunPlaces.origin);
       there.value.set(...sunAtOrigin(env.sunPlaces, env.timeOfDay));
       rise.value = sunInSky(env.timeOfDay)[1];
-      const s = toSky(view.eye.frame, view.eye.dip, env.sunDirection);
+      const s = sphere.toSky(view.eye.frame, view.eye.dip, env.sunDirection);
       skySun.value.set(s[0], s[1], s[2]);
-      const air = tables.update(s[1], env.haze);
+      due.tables = tables.update(s[1], env.haze);
       under.value = kind === 'air' ? 1 : 0;
-      if (kind === 'space') return { tables: air, clouds: [], reflection: reflection.update(true) };
-      // the clouds drift over the eye with the prevailing wind there (Environment.windDirection), on the eye's east and south
-      const w = env.windDirection, f = view.eye.frame, along = (a: readonly number[]) => env.windSpeed * (w[0] * a[0] + w[1] * a[1] + w[2] * a[2]);
-      const cover = clouds.update({ coverage: env.cloudCoverage, wind: { x: along(f.east), y: -along(f.north) }, sunDirection: skySun.value }, dt, width, height);
-      return { tables: air, clouds: cover, reflection: reflection.update(false) };
+      due.reflection = reflection.update(kind === 'space');
+      if (kind === 'space') {
+        due.clouds = NONE;
+        return due;
+      }
+      // the clouds drift over the eye with the prevailing wind there (Environment.windDirection), on the eye's east
+      // and south
+      const w = env.windDirection, { east, north } = view.eye.frame;
+      cloudInputs.coverage = env.cloudCoverage;
+      cloudInputs.wind.x = env.windSpeed * sphere.dot(w, east);
+      cloudInputs.wind.y = -env.windSpeed * sphere.dot(w, north);
+      due.clouds = clouds.update(cloudInputs, dt, width, height);
+      return due;
     },
   };
 }

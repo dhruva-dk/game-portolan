@@ -58,6 +58,11 @@ export function tangentFrame(up: Vec3Node): { e1: Vec3Node; e2: Vec3Node } {
 export const henyeyGreenstein = (c: FloatNode, g: number): FloatNode =>
   float((1 - g * g) / (4 * Math.PI)).div(pow(float(1 + g * g).sub(c.mul(2 * g)), 1.5));
 
+/** Where x lies between a (0) and b (1), held to 0…1: three's remapClamp(x, a, b), but with a span under 1e-4 taken
+ *  as that, so one closing to nothing never divides by it. */
+export const ramp = (x: FloatNode, a: FloatNode, b: FloatNode | number): FloatNode =>
+  clamp(x.sub(a).div(max(toFloat(b).sub(a), 1e-4)), 0, 1);
+
 /** 0 where x is under `at` … 1 where it is over, the edge between them a pixel wide however far off it is seen: the
  *  edge of a flat shape. In a fragment's shader only (it reads x's change across the pixel). */
 export const cut = (x: FloatNode, at: FloatNode | number): FloatNode => saturate(x.sub(at).div(max(fwidth(x), 1e-6)).add(0.5));

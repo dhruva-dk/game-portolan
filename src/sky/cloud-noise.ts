@@ -10,7 +10,7 @@ import {
   textureStore, uvec2, uvec3, vec2, vec3, vec4,
 } from 'three/tsl';
 import { storageTable, type Compute } from '../gpu';
-import { hash3, type FloatNode, type Vec2Node, type Vec3Node } from '../tsl';
+import { hash3, ramp, type FloatNode, type Vec2Node, type Vec3Node } from '../tsl';
 
 const SHAPE_N = 64, DETAIL_N = 64, WEATHER_N = 1024;
 
@@ -71,8 +71,6 @@ const perlinFbm = (p: Vec3Node, f: number, octaves: number): FloatNode => {
   return sum;
 };
 
-export const remap = (x: FloatNode, a: FloatNode, b: FloatNode, c: FloatNode, d: FloatNode): FloatNode => c.add(x.sub(a).div(max(b.sub(a), 1e-4)).mul(d.sub(c)));
-
 function texel3(n: number) {
   const x = instanceIndex.mod(n), y = instanceIndex.div(n).mod(n), z = instanceIndex.div(n * n);
   return { at: uvec3(x, y, z), uvw: vec3(x, y, z).add(0.5).div(n) };
@@ -84,7 +82,7 @@ const shapeKernel = (shapeVolume: Storage3DTexture) => Fn(() => {
   const pn = clamp(perlinFbm(uvw, 4, 3).mul(1.1).add(0.5), 0, 1);
   const w4 = worley(uvw.mul(4), float(4)), w8 = worley(uvw.mul(8), float(8)), w16 = worley(uvw.mul(16), float(16));
   const wf = w4.mul(0.625).add(w8.mul(0.25)).add(w16.mul(0.125));
-  const pw = clamp(remap(pn, wf.sub(1), float(1), float(0), float(1)), 0, 1);
+  const pw = ramp(pn, wf.sub(1), 1);
   textureStore(shapeVolume, at, vec4(pw, w4, w8, w16));
 })().compute(SHAPE_N ** 3, [64]);
 

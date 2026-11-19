@@ -8,7 +8,7 @@
 
 import { NearestFilter } from 'three/webgpu';
 import {
-  Fn, If, Loop, abs, acos, clamp, cos, dot, exp, float, instanceIndex, length, max, normalize, pow, select,
+  Fn, If, abs, acos, clamp, cos, dot, exp, float, instanceIndex, length, max, normalize, pow, select,
   sin, sqrt, texture, textureStore, uniform, uvec2, vec2, vec3, vec4,
 } from 'three/tsl';
 import { storageTable, type Compute } from '../gpu';
@@ -16,7 +16,8 @@ import { loop, toFloat, type FloatNode, type Vec2Node, type Vec3Node } from '../
 import * as A from './atmosphere';
 
 const H = Math.sqrt(A.TOP * A.TOP - A.BOTTOM * A.BOTTOM);
-const RAYLEIGH = vec3(...A.RAYLEIGH_SCATTERING);
+/** The air's Rayleigh scattering at the sea, per km, as a node (atmosphere.ts). */
+export const RAYLEIGH = vec3(...A.RAYLEIGH_SCATTERING);
 const OZONE = vec3(...A.OZONE_ABSORPTION);
 
 const T_W = 256, T_H = 64, M_N = 32, V_W = 200, V_H = 100;
@@ -40,7 +41,8 @@ const extinctionOf = (dens: Vec3Node): Vec3Node =>
 
 const rayleighPhase = (c: FloatNode): FloatNode => float(3 / (16 * Math.PI)).mul(c.mul(c).add(1));
 
-/** Cornette-Shanks. */
+/** Cornette-Shanks: Henyey-Greenstein (tsl.ts) with a Rayleigh-like (1 + c²) factor, renormalised, as Hillaire's tables
+ *  are integrated with; a different lobe, so it is not that one. */
 const miePhase = (c: FloatNode): FloatNode => {
   const g = A.MIE_G, g2 = g * g;
   const k = (3 / (8 * Math.PI)) * (1 - g2) / (2 + g2);
@@ -107,7 +109,7 @@ export function createTables() {
     const STEPS = 40;
     const dt = d.div(STEPS);
     const depth = vec3(0).toVar();
-    Loop(STEPS, ({ i }) => {
+    loop('step', STEPS, (i) => {
       const p = o.add(dir.mul(float(i).add(0.5).mul(dt)));
       depth.addAssign(extinctionOf(densities(length(p).sub(A.BOTTOM))).mul(dt));
     });
@@ -180,7 +182,7 @@ export function createTables() {
     const pR = rayleighPhase(c), pM = miePhase(c);
     const L = vec3(0).toVar(), T = vec3(1).toVar();
     const STEPS = 30;
-    Loop(STEPS, ({ i }) => {
+    loop('step', STEPS, (i) => {
       // quadratic spacing: fine near the eye, coarse far away
       const t0 = float(i).div(STEPS), t1 = float(i).add(1).div(STEPS);
       const dt = t1.mul(t1).sub(t0.mul(t0)).mul(tMax);
@@ -249,6 +251,8 @@ export function createTables() {
   /** The air's tables, in the order they are integrated (each reads the one before), and the next due, if any. */
   const air = [transmittanceKernel, multipleKernel];
   let next = air.length;
+  /** The passes due this frame (update's, laid afresh each time). */
+  const due: Compute[] = [];
   return {
     /** Multiple of a clear day's aerosol the air's tables were last integrated for (Environment.haze). */
     haze,
@@ -266,14 +270,14 @@ export function createTables() {
      * its tables are integrated one a frame (each is about a millisecond on the Mac), the sky view on the last.
      * Returns the passes that are due, in order.
      */
-    update(sunY: number, hazeAmount: number): Compute[] {
+    update(sunY: number, hazeAmount: number): readonly Compute[] {
       // the first time all at once
       const first = Number.isNaN(lastHaze);
       if (next === air.length && !(Math.abs(hazeAmount - lastHaze) <= HAZE_STEP * lastHaze)) {
         lastHaze = haze.value = hazeAmount;
         next = 0;
       }
-      const due: Compute[] = [];
+      due.length = 0;
       if (next < air.length) {
         do due.push(air[next++]);
         while (first && next < air.length);

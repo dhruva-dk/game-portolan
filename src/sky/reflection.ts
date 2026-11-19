@@ -10,12 +10,12 @@
 
 import { LinearMipmapLinearFilter, RepeatWrapping, Vector4, type ComputeNode, type StorageTexture } from 'three/webgpu';
 import {
-  Fn, Loop, abs, cos, cross, dot, equirectUV, float, instanceIndex, max, normalize, select, sin, storageTexture,
-  texture, textureLoad, textureStore, uniformArray, uvec2, vec3, vec4,
+  Fn, abs, cos, cross, dot, equirectUV, float, instanceIndex, ivec2, max, normalize, select, sin, storageTexture,
+  texture, textureLoad, textureStore, uint, uniformArray, uvec2, vec3, vec4,
 } from 'three/tsl';
 import { storageTable, type Compute } from '../gpu';
 import type { View } from '../view/view';
-import type { FloatNode, UintNode, Vec3Node, Vec4Node } from '../tsl';
+import { loop, type FloatNode, type IntNode, type UintNode, type Vec3Node, type Vec4Node } from '../tsl';
 import type { Tables } from './tables';
 
 const W = 256, H = 128;
@@ -39,7 +39,7 @@ const level = (roughness: FloatNode): FloatNode => {
 };
 
 /** The direction at the centre of texel (x, y) of a w×h panorama: the inverse of three's equirectUV. */
-function texelDirection(x: UintNode, y: UintNode, w: number, h: number): Vec3Node {
+function texelDirection(x: UintNode | IntNode, y: UintNode | IntNode, w: number, h: number): Vec3Node {
   const phi = float(x).add(0.5).div(w).sub(0.5).mul(2 * Math.PI);
   const theta = float(y).add(0.5).div(h).sub(0.5).mul(Math.PI);
   return vec3(cos(theta).mul(cos(phi)), sin(theta), cos(theta).mul(sin(phi)));
@@ -68,7 +68,7 @@ function sharp(k: number, panorama: StorageTexture, reflection: StorageTexture):
     const t = normalize(cross(select(abs(n.y).lessThan(0.999), vec3(0, 1, 0), vec3(1, 0, 0)), n)).toVar();
     const b = cross(n, t).toVar();
     const sum = vec3(0).toVar();
-    Loop(samples.length, ({ i }) => {
+    loop('sample', samples.length, (i) => {
       const s = lobe.element(i);
       const l = t.mul(s.x).add(b.mul(s.y)).add(n.mul(s.z));
       sum.addAssign(texture(panorama, equirectUV(l)).level(float(0)).rgb.mul(s.z));
@@ -84,15 +84,15 @@ function rough(k: number, reduced: StorageTexture, reflection: StorageTexture): 
     const x = instanceIndex.mod(w), y = instanceIndex.div(w);
     const n = texelDirection(x, y, w, h).toVar();
     const sum = vec3(0).toVar(), total = float(0).toVar();
-    Loop({ start: 0, end: RH, type: 'uint' }, { start: 0, end: RW, type: 'uint' }, ({ i, j }) => {
+    loop('row', RH, (i) => loop('column', RW, (j) => {
       const l = texelDirection(j, i, RW, RH);
       const nl = max(dot(n, l), 0);
       // with the view along the normal, (n·h)² = (1 + n·l)/2; the cosine of the latitude is the texel's solid angle
       const d = nl.mul(a2 - 1).add(a2 + 1);
       const weight = nl.mul(l.y.mul(l.y).oneMinus().sqrt()).div(d.mul(d));
-      sum.addAssign(textureLoad(reduced, uvec2(j, i)).rgb.mul(weight));
+      sum.addAssign(textureLoad(reduced, ivec2(j, i)).rgb.mul(weight));
       total.addAssign(weight);
-    });
+    }));
     textureStore(storageTexture(reflection).setMipLevel(k), uvec2(x, y), vec4(sum.div(total), 1));
   })().compute(w * h, [64]);
 }
@@ -126,14 +126,17 @@ export function createReflection(
   const reduce = Fn(() => {
     const x = instanceIndex.mod(RW), y = instanceIndex.div(RW);
     const sum = vec3(0).toVar();
-    Loop({ start: 0, end: 4, type: 'uint' }, { start: 0, end: 4, type: 'uint' }, ({ i, j }) => {
-      sum.addAssign(textureLoad(panorama, uvec2(x.mul(4).add(j), y.mul(4).add(i))).rgb);
-    });
+    loop('row', 4, (i) => loop('column', 4, (j) => {
+      sum.addAssign(textureLoad(panorama, uvec2(x.mul(4).add(uint(j)), y.mul(4).add(uint(i)))).rgb);
+    }));
     textureStore(reduced, uvec2(x, y), vec4(sum.div(16), 1));
   })().compute(RW * RH, [64]);
 
   const levels = [reduce, ...Array.from({ length: LEVELS }, (_, i) => (i + 1 < ROUGH ? sharp(i + 1, panorama, reflection) : rough(i + 1, reduced, reflection)))];
-  const passes = { cloudy: [bakeOf(true), ...levels], clear: [bakeOf(false), ...levels] };
+  /** What update hands back: all the passes, one after another in one pass, or none. */
+  const due: Record<'cloudy' | 'clear' | 'none', readonly Compute[]> = {
+    cloudy: [[bakeOf(true), ...levels]], clear: [[bakeOf(false), ...levels]], none: [],
+  };
 
   let frame = 0, wasClear = false;
   return {
@@ -147,10 +150,10 @@ export function createReflection(
     },
     /** The passes due this frame: all of them, one after another in one pass, every EVERY frames, and at once when the
      *  clouds are left out or put back (clear: the sky alone, for an eye in space). */
-    update(clear: boolean): Compute[] {
+    update(clear: boolean): readonly Compute[] {
       if (clear !== wasClear) frame = 0;
       wasClear = clear;
-      return frame++ % EVERY === 0 ? [clear ? passes.clear : passes.cloudy] : [];
+      return frame++ % EVERY === 0 ? due[clear ? 'clear' : 'cloudy'] : due.none;
     },
   };
 }

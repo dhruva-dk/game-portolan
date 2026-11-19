@@ -26,7 +26,6 @@ const BLEND = 0.25;
 /** The 2×2 cell each frame takes, in an order that spreads them. */
 const LATTICE = [[0, 0], [1, 1], [1, 0], [0, 1]];
 
-
 /** A texture read at uv with a Catmull-Rom filter, from five bilinear reads (Jimenez 2016); size in texels. */
 function catmullRom(tex: StorageTexture, uv: Vec2Node, size: Vec2Node): Vec4Node {
   const s = uv.mul(size);
@@ -215,11 +214,16 @@ export function createClouds(view: View, tables: Tables) {
   const shadow = createShadow(view, field);
 
   let passes = createPasses(1, 1, view, field, cam);
-  let size = [0, 0];
+  /** The screen's size the passes were made for, CSS pixels. */
+  let wide = 0, high = 0;
   let frame = 0;
   let last: readonly number[] | null = null;
   /** Where the camera looked from last frame, and the eye's frame then (the uniforms' own values before the first). */
-  const seen = { viewProjection: new Matrix4(), east: [1, 0, 0], up: [0, 1, 0], south: [0, 0, 1], dip: 0 };
+  const seen = {
+    viewProjection: new Matrix4(), east: new Vector3(1, 0, 0), up: new Vector3(0, 1, 0), south: new Vector3(0, 0, 1), dip: 0,
+  };
+  /** The passes due this frame (update's, laid afresh each time). */
+  const due: Compute[] = [];
   const historyTexture = texture(passes.history[0]);
   const historyDistanceTexture = texture(passes.historyDistance[0]);
 
@@ -239,54 +243,57 @@ export function createClouds(view: View, tables: Tables) {
 
     /** Readies this frame's march, and returns the passes due: the march, its resolve, and every fourth frame the
      * shadow map. */
-    update(inputs: CloudInputs, dt: number, width: number, height: number) {
-      if (width !== size[0] || height !== size[1]) {
-        size = [width, height];
+    update(inputs: CloudInputs, dt: number, width: number, height: number): readonly Compute[] {
+      if (width !== wide || height !== high) {
+        wide = width;
+        high = height;
         // (three frees a texture's memory and a kernel's pipeline and bindings once it is disposed)
         passes.dispose();
         passes = createPasses(width, height, view, field, cam);
         frame = 0;
       }
       coverage.set(inputs.coverage);
-      const carry = [(inputs.wind.x * dt) / 1000, (inputs.wind.y * dt) / 1000];
-      drift.value.x += carry[0];
-      drift.value.z += carry[1];
+      const carryX = (inputs.wind.x * dt) / 1000, carryZ = (inputs.wind.y * dt) / 1000;
+      drift.value.x += carryX;
+      drift.value.z += carryZ;
       drift.value.y += dt * 0.002; // the billows slowly turn over
       sunDir.value.copy(inputs.sunDirection);
       // the eye slides over the map as it moves over the planet, by its step along its own east and south
       const { position, frame: f, height: h } = view.eye;
-      const step = [0, 0];
+      let stepX = 0, stepZ = 0;
       if (last) {
-        const s = [position[0] - last[0], position[1] - last[1], position[2] - last[2]];
-        step[0] = (s[0] * f.east[0] + s[1] * f.east[1] + s[2] * f.east[2]) / 1000;
-        step[1] = -(s[0] * f.north[0] + s[1] * f.north[1] + s[2] * f.north[2]) / 1000;
+        const sx = position[0] - last[0], sy = position[1] - last[1], sz = position[2] - last[2];
+        stepX = (sx * f.east[0] + sy * f.east[1] + sz * f.east[2]) / 1000;
+        stepZ = -(sx * f.north[0] + sy * f.north[1] + sz * f.north[2]) / 1000;
       }
-      eye.value.x += step[0];
-      eye.value.z += step[1];
+      eye.value.x += stepX;
+      eye.value.z += stepZ;
       const climb = h / 1000 - eye.value.y;
       eye.value.y = h / 1000;
       last = position;
       // a cloud at q now was at q + step − carry from where the eye was then
-      cam.shift.value.set(step[0] - carry[0], climb, step[1] - carry[1]);
+      cam.shift.value.set(stepX - carryX, climb, stepZ - carryZ);
       cam.projectionInverse.value.copy(view.eye.projectionInverse);
       cam.cameraWorld.value.copy(view.eye.world);
       cam.frameIndex.value = frame;
       // last frame's camera and eye, for the resolve to find where a cloud was seen then; and this frame's, for the next
+      const then = cam.previousFrame;
       cam.previousViewProjection.value.copy(seen.viewProjection);
-      cam.previousFrame.east.value.set(seen.east[0], seen.east[1], seen.east[2]);
-      cam.previousFrame.up.value.set(seen.up[0], seen.up[1], seen.up[2]);
-      cam.previousFrame.south.value.set(seen.south[0], seen.south[1], seen.south[2]);
-      cam.previousFrame.dip.value = seen.dip;
+      then.east.value.copy(seen.east);
+      then.up.value.copy(seen.up);
+      then.south.value.copy(seen.south);
+      then.dip.value = seen.dip;
       seen.viewProjection.copy(view.eye.viewProjection);
-      seen.east = [...f.east];
-      seen.up = [...f.up];
-      seen.south = [-f.north[0], -f.north[1], -f.north[2]];
+      seen.east.set(f.east[0], f.east[1], f.east[2]);
+      seen.up.set(f.up[0], f.up[1], f.up[2]);
+      seen.south.set(-f.north[0], -f.north[1], -f.north[2]);
       seen.dip = view.eye.dip;
 
       const [cx, cy] = LATTICE[frame % 4];
       passes.cell.value.set(cx, cy, 0);
       const write = frame % 2;
-      const due: Compute[] = [passes.marchKernel, passes.resolveKernels[write]];
+      due.length = 0;
+      due.push(passes.marchKernel, passes.resolveKernels[write]);
       historyTexture.value = passes.history[write];
       historyDistanceTexture.value = passes.historyDistance[write];
 
