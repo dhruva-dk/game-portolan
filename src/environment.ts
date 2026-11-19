@@ -1,4 +1,4 @@
-import { landOf, planetOf, type Land, type LandKind } from './world/land';
+import { landOf, planetOf, type Land } from './world/land';
 import type { Planet } from './world/planet';
 import type { Vec3 } from './world/sphere';
 import { sunAt, sunPlaces, type SunPlaces } from './world/sun';
@@ -25,13 +25,10 @@ export interface Climate {
  *  the game and the frame. */
 export interface World { seed: number; land: Land; planet: Planet; wind: Wind; climate: Climate }
 
-/** seed: the planet's (world/planet.ts); kind: its land's; mean, swing: the weather's (world/weather.ts); hours: the
- *  time of day. */
-export function createWorld(seed: number, kind: LandKind, mean: Weather, swing: Weather, hours: number): World {
-  const land = landOf(seed, kind), planet = planetOf(seed, land);
-  // (the sun set by the islands, or where she starts where there are none: its undefined point then on the far side of
-  // the planet from her, as sunPlaces puts it for a single island)
-  const sun = planet.islands.length > 0 ? sunPlaces(planet.islands) : { anchor: planet.start.at, origin: planet.start.at };
+/** seed: the planet's (world/planet.ts); mean, swing: the weather's (world/weather.ts); hours: the time of day. */
+export function createWorld(seed: number, mean: Weather, swing: Weather, hours: number): World {
+  const land = landOf(seed), planet = planetOf(seed, land);
+  const sun = sunPlaces(planet.start.at, planet.heart);
   return {
     seed, land, planet, wind: createWind(seed),
     climate: { timeOfDay: hours, sunPlaces: sun, weather: createWeather(seed, mean, swing), seaWind: mean.wind },

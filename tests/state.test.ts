@@ -7,11 +7,12 @@ import { chart } from '../src/sim/route.ts';
 import { berthing } from '../src/sim/spawn.ts';
 import { calm, type Storm } from '../src/sim/storm.ts';
 import type { Helm } from '../src/sim/ship.ts';
-import { SEED, createPlanet } from '../src/world/planet.ts';
+import { landOf, planetOf } from '../src/world/land.ts';
+import { SEED } from '../src/world/planet.ts';
 import { add, type Vec3 } from '../src/world/sphere.ts';
 import { flat } from '../src/world/swell.ts';
 
-const planet = createPlanet(SEED);
+const planet = planetOf(SEED, landOf(SEED));
 const depth = (p: Vec3) => -planet.height(p);
 const waters = { chart: chart(depth), water: berthing(depth) };
 const start = planet.start;

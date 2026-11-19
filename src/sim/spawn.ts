@@ -5,9 +5,9 @@
 // round, so no ship starts on a bank or under a coast. A match then picks its berths from those (berths): the first
 // where its seed says, each next the one farthest from every berth taken so far (its distance a little shaken by the
 // seed, so matches differ), then each moved in turn to the berth farthest from its nearest two, which spreads them as
-// far apart as the water allows: on SEED's planet the nearest two some 410 m apart for 20 ships, 240 m for 50, 175 m
-// for 80 and 150 m for 100, all far outside a ram. Each heads the way
-// the water is open longest ahead of her, so none starts bows-on to a shore.
+// far apart as the water allows: on SEED's planet (a tenth of its lattice open) the nearest two some 345 m apart for 20
+// ships, 145 m for 50, 80 m for 80 and 70 m for 100, all outside a ram. Each heads the way the water is open longest
+// ahead of her, so none starts bows-on to a shore.
 //
 // Pure and deterministic: the same planet and seed give the same berths, to the bit.
 

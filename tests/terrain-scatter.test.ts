@@ -1,12 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { WADE } from '../src/world/planet-islands.ts';
 import { terrainPlanet } from '../src/world/planet-terrain.ts';
-import { onRock } from '../src/world/scatter.ts';
 import { distance, fromChart } from '../src/world/sphere.ts';
 import { between, locate, taps } from '../src/world/terrain-grid.ts';
 import { createTerrain } from '../src/world/terrain.ts';
-import { scatterTerrain, type Tile } from '../src/world/terrain-scatter.ts';
+import { WADE, onRock, scatterTerrain, type Tile } from '../src/world/terrain-scatter.ts';
 
 const SHAPES = { shrubs: 4, big: 3, boulders: 3 };
 const terrain = createTerrain(3);

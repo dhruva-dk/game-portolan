@@ -12,9 +12,10 @@
 // Routes are found by A* over the open cells, a cell near the shore costing more to cross so a route keeps off it where
 // it can, and are followed as 0117's helm followed them (course): straight for the mark while the water to it is clear,
 // else along the route, looking as far ahead along it as the water is clear. New: a route steps to the eight cells round
-// each, not 0117's four, the diagonals only where they cut no corner of land. Over blocked pairs of open water on five
-// planets it is found within ROUTE.work cells 99% of the time at 150–250 m (four: 91%) and 91% at 250–400 m (four:
-// 50%), in half the time, and runs 1.1–1.15 times the straight line (four: 1.3–1.4).
+// each, not 0117's four, the diagonals only where they cut no corner of land. Over blocked pairs of open water on the
+// release's planet whose way round is under 1.5 times the straight line, it is found within ROUTE.work cells every time
+// at 150–250 m and 84% at 250–400 m (on the islands this sea once had, four neighbours found 91% and 50% where eight
+// found 99% and 91%, in half the time, running 1.1–1.15 times the straight line to four's 1.3–1.4).
 //
 // Pure arithmetic: no three, so it runs in node for the tests; deterministic, to the bit.
 

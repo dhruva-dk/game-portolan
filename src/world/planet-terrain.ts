@@ -1,10 +1,10 @@
-// The planet as the terrain makes it (terrain.ts): the same Planet the islands' world is (planet.ts), so everything
-// that stands on a planet (the ground's bake, the sea's sounding, the ships, the sights) stands on this one unchanged.
+// The planet (planet.ts) as the terrain makes it (terrain.ts): what everything that stands on the planet stands on (the
+// ground's bake, the sea's sounding, the ships, the sights).
 //
 // What lies on the ground is worked out from the terrain's own two fields at the point, the way in from the coast and
 // the height, with noise only to break edges into patches: nothing is placed by hand, so every band follows the land.
-// Under water the cover means what the islands' does (sea grass on the banks, rubble round the land's foot and strewn
-// over the floor); on land its channels carry the land's own (sand.ts lays them):
+// Under water the cover is sea grass on the banks and rubble round the land's foot and strewn over the floor; on land
+// its channels carry the land's own (sand.ts lays them):
 //   grass   growth: patches inland past the beach where the shrubs grow (terrain-scatter.ts) on earthier sand
 //           (sand.ts), shrinking as the land rises (patches shrink, they don't fade)
 //   rubble  bare rock breaking out toward the tops
@@ -61,6 +61,18 @@ function startOf(t: Terrain): { at: Vec3; bearing: number } {
   return { at, bearing: Math.atan2(dot(toward, f.east), dot(toward, f.north)) };
 }
 
+/** The land's heart: of the cells a quarter of the way round the planet or more from `from`, the one farthest in from
+ *  the coast. */
+function heartOf(t: Terrain, from: Vec3): Vec3 {
+  let best = -1;
+  for (let c = 0; c < CELLS; c++) {
+    if (t.water[c] || (best >= 0 && t.shore[c] >= t.shore[best]) || dot(centreOf(c), from) > 0) continue;
+    best = c;
+  }
+  if (best < 0) throw new Error('no land on the far side of the planet from the start');
+  return centreOf(best);
+}
+
 export function terrainPlanet(t: Terrain, seed: number): Planet {
   const noise = createNoise3(seed + 104729), at = taps();
   const o = t.options;
@@ -95,10 +107,11 @@ export function terrainPlanet(t: Terrain, seed: number): Planet {
     return h;
   };
 
+  const start = startOf(t);
   return {
-    islands: [],
     rises: risesOf(t),
-    start: startOf(t),
+    start,
+    heart: heartOf(t, start.at),
     height: (p) => ground(p, null),
     cover: (p) => {
       const c: Cover = { grass: 0, rubble: 0, mottle: 0, clump: 0 };

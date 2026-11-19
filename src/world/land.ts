@@ -1,21 +1,17 @@
-// What the planet's land is made of: the islands placed on the sea floor (planet.ts), or the terrain grown over the
-// whole planet (terrain.ts). Either way it is plain data, so it is worked out once (the terrain takes a second or so)
-// and handed whole to every thread that needs the planet (the ground's bake, the sea's sounding), each of which makes
-// the same Planet from it.
+// What the planet's land is made of: the terrain grown over the whole planet (terrain.ts). It is plain data, so it is
+// worked out once (it takes a second or so) and handed whole to every thread that needs the planet (the ground's bake,
+// the sea's sounding), each of which makes the same Planet from it.
 //
 // Pure arithmetic: no three, so it runs in node for the tests.
 
-import { createPlanet, type Planet } from './planet.ts';
+import type { Planet } from './planet.ts';
 import { terrainPlanet } from './planet-terrain.ts';
 import { createTerrain, type Terrain } from './terrain.ts';
 
-export type LandKind = 'islands' | 'terrain';
-export type Land = { kind: 'islands' } | { kind: 'terrain'; terrain: Terrain };
+export type Land = Terrain;
 
-/** The land of a planet of this seed, of this kind. */
-export const landOf = (seed: number, kind: LandKind): Land =>
-  kind === 'terrain' ? { kind, terrain: createTerrain(seed) } : { kind };
+/** The land of a planet of this seed. */
+export const landOf = (seed: number): Land => createTerrain(seed);
 
 /** The planet of this seed on its land. */
-export const planetOf = (seed: number, land: Land): Planet =>
-  land.kind === 'terrain' ? terrainPlanet(land.terrain, seed) : createPlanet(seed);
+export const planetOf = (seed: number, land: Land): Planet => terrainPlanet(land, seed);

@@ -1,11 +1,10 @@
-// Where the islands' things lie on the planet. An island's ground (world/planet.ts) and what stands on it
-// (world/scatter.ts) are worked out flat, in metres on the island's own chart (world/sphere.ts); this lays them on
-// the sphere: a chart point and a height become a world position, and the chart's x, up and z there become what
-// stands there's axes.
+// Where the land's things lie on the planet. What stands on a tile of the land (world/terrain-scatter.ts) is worked out
+// flat, in metres on the tile's own chart (world/sphere.ts); this lays them on the sphere: a chart point and a height
+// become a world position, and the chart's x, up and z there become what stands there's axes.
 //
-// Each kind of thing comes in a few shapes, each drawn once (instanced) for all of that shape on the islands in
-// view: the islands' instances are written into the shape's buffer nearest island first, and only those in view
-// are drawn — the buffer is rewritten only when the islands in view change.
+// Each kind of thing comes in a few shapes, each drawn once (instanced) for all of that shape on the tiles in view:
+// the tiles' instances are written into the shape's buffer nearest tile first, and only those in view are drawn — the
+// buffer is rewritten only when the tiles in view change.
 
 import { InstancedBufferAttribute, InstancedMesh, Matrix4, Vector3, type BufferGeometry, type Material } from 'three/webgpu';
 import { chartBasis, fromChart, place, type Chart, type Vec3 } from '../world/sphere';
@@ -29,7 +28,7 @@ export function standing(chart: Chart, x: number, height: number, z: number, loc
   return out.multiplyMatrices(basis, local);
 }
 
-/** Past this many metres from the eye, the palms and shrubs on an island are drawn coarser (palms.ts, shrubs.ts): a
+/** Past this many metres from the eye, the palms and shrubs on a tile are drawn coarser (palms.ts, shrubs.ts): a
  *  palm is some sixty pixels tall, its leaflets a pixel or two across. */
 export const DETAIL = 90;
 
@@ -38,29 +37,29 @@ export interface Placed { matrix: Matrix4; tint?: number }
 
 export interface Instances {
   mesh: InstancedMesh;
-  /** How many of those drawn stand on the first `nearby` islands shown (they come first). */
+  /** How many of those drawn stand on the first `nearby` tiles shown (they come first). */
   near: number;
-  /** Draws the instances on these islands (indices into the list it was made with), nearest first; the first `nearby`
+  /** Draws the instances on these tiles (indices into the list it was made with), nearest first; the first `nearby`
    *  of them make up `near`. */
-  show(islands: number[], nearby?: number): void;
+  show(tiles: number[], nearby?: number): void;
 }
 
-/** One shape's instances, `placed[i]` those on island i. With tints, the geometry gets an instanced 'tint'. */
+/** One shape's instances, `placed[i]` those on tile i. With tints, the geometry gets an instanced 'tint'. */
 export function createInstances(geometry: BufferGeometry, material: Material, placed: Placed[][], tinted = false): Instances {
   const total = Math.max(1, placed.reduce((n, p) => n + p.length, 0));
   const mesh = new InstancedMesh(geometry, material, total);
   const tint = new InstancedBufferAttribute(new Float32Array(total), 1);
   if (tinted) geometry.setAttribute('tint', tint);
   mesh.count = 0;
-  // the instances stand all over the planet; whether an island is in view is decided per island
+  // the instances stand all over the planet; whether a tile is in view is decided per tile
   mesh.frustumCulled = false;
   const self: Instances = {
     mesh,
     near: 0,
-    show(islands, nearby = 1) {
+    show(tiles, nearby = 1) {
       let k = 0;
       self.near = 0;
-      islands.forEach((i, n) => {
+      tiles.forEach((i, n) => {
         for (const p of placed[i]) {
           mesh.setMatrixAt(k, p.matrix);
           tint.setX(k++, p.tint ?? 0);

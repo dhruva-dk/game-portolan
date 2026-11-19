@@ -1,17 +1,17 @@
-// The islands' rocks (scatter.ts says where): big masses heaped into outcrops and the boulders round them. A handful
-// of shapes of each (rock-shape.ts), each drawn once for all its rocks on the islands in view (site.ts).
+// The land's rocks (world/terrain-scatter.ts says where): big masses heaped into outcrops and the boulders round them. A
+// handful of shapes of each (rock-shape.ts), each drawn once for all its rocks on the tiles in view (site.ts).
 //
 // Terracotta in the sun and plum out of it (palette.ts), each facet one flat tone: the facets' own normals, never the
 // shape's smoothed ones. Darker in a band where the sea wets them. Lit like everything else (sky/light.ts).
 //
-// Triangles: 20 × (detail + 1)² a shape: 2880 for a mass, 500 for a boulder; on the islands far from the eye (FAR:
-// islands.ts), where a mass is a few pixels across, each shape at a coarser level of the same lumps: 720 and 180.
+// Triangles: 20 × (detail + 1)² a shape: 2880 for a mass, 500 for a boulder; on the tiles far from the eye (FAR:
+// groves.ts), where a mass is a few pixels across, each shape at a coarser level of the same lumps: 720 and 180.
 
 import { Euler, Matrix4, MeshBasicNodeMaterial, Quaternion, Vector3 } from 'three/webgpu';
 import { Fn, attribute, cross, dFdx, dFdy, dot, float, length, max, mix, normalWorld, positionWorld, select, vec3 } from 'three/tsl';
 import { ROCK } from '../palette';
 import type { View } from '../view/view';
-import type { Rock } from '../world/scatter';
+import type { Rock } from '../world/terrain-scatter';
 import type { Chart } from '../world/sphere';
 import type { Light } from '../sky/light';
 import { rockShape } from './rock-shape';
@@ -25,7 +25,7 @@ const WET_TO = 0.3, WET = 0.72;
 /** How deep in a crack (0…1) a rock is drawn in its shadow tone whatever the sun. */
 const CAVITY = 0.5;
 
-/** rocks[i]: those on island i, whose chart is charts[i]: each shape's instances near and far. */
+/** rocks[i]: those on tile i, whose chart is charts[i]: each shape's instances near and far. */
 export function createRocks(rocks: Rock[][], charts: Chart[], view: View, light: Light) {
   const material = new MeshBasicNodeMaterial();
   material.colorNode = Fn(() => {

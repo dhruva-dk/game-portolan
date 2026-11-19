@@ -18,7 +18,8 @@ import { createMatches } from '../src/play/setup.ts';
 import { PARTS, createState, type Part } from '../src/play/state.ts';
 import { CASCADES } from '../src/world/cascades.ts';
 import { FREQUENCY, anchors, icosphere } from '../src/world/lattice.ts';
-import { SEED, createPlanet } from '../src/world/planet.ts';
+import { landOf, planetOf } from '../src/world/land.ts';
+import { SEED } from '../src/world/planet.ts';
 import type { Vec3 } from '../src/world/sphere.ts';
 import { createSwell, type Hull } from '../src/world/swell.ts';
 import { MEAN } from '../src/world/weather.ts';
@@ -36,7 +37,7 @@ const costOf = (xs: number[]): Cost => {
 
 /** The planet of a seed, its sea and its water sounded, built once for any number of runs. */
 export function world(seed = SEED) {
-  const planet = createPlanet(seed);
+  const planet = planetOf(seed, landOf(seed));
   const depth = (p: Vec3) => -planet.height(p);
   // the sea's charts as frame.ts lays them, but for the choice of offsets (which moves no cost)
   const sea = anchors(icosphere(FREQUENCY), createWind(seed), CASCADES[0]);

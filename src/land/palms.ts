@@ -1,5 +1,5 @@
-// The coconut palms (scatter.ts says where). A few shapes, from nearly upright to leaning far, each drawn once for
-// every palm of about its lean on the islands in view (site.ts), turned to its heading and scaled to its height.
+// The coconut palms (world/terrain-scatter.ts says where). A few shapes, from nearly upright to leaning far, each drawn
+// once for every palm of about its lean on the tiles in view (site.ts), turned to its heading and scaled to its height.
 //
 // The trunk: a tapering tube up a curve that leans from the foot and recurves toward the vertical, flared at the
 // foot, in the trunk's two tones (palette.ts) and ringed by the scars of fallen fronds, drawn as thin lines. Under
@@ -14,7 +14,7 @@ import { BufferGeometry, DoubleSide, Float32BufferAttribute, Matrix4, MeshBasicN
 import { Fn, attribute, faceDirection, float, mix, normalWorld, normalize, positionWorld, uv, vec3 } from 'three/tsl';
 import { PALM_LEAF, PALM_LEAF_OLD, PALM_NUT, PALM_TRUNK, type Rgb, type Tones } from '../palette';
 import { random } from '../world/random';
-import type { Palm } from '../world/scatter';
+import type { Palm } from '../world/terrain-scatter';
 import type { Chart } from '../world/sphere';
 import type { Light } from '../sky/light';
 import { createInstances, standing, type Instances, type Placed } from './site';
@@ -166,7 +166,7 @@ function shape(lean: number, seed: number, detail: Detail): Shape {
   return { trunk, crown };
 }
 
-/** palms[i]: those on island i, whose chart is charts[i]; the instances of each shape's trunk and crown, near and
+/** palms[i]: those on tile i, whose chart is charts[i]; the instances of each shape's trunk and crown, near and
  *  coarse. */
 export function createPalms(palms: Palm[][], charts: Chart[], light: Light): { near: Instances[]; coarse: Instances[] } {
   const trunkMaterial = new MeshBasicNodeMaterial();

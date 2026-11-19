@@ -1,5 +1,5 @@
-// The beach shrubs (scatter.ts says where). A few shapes, each drawn once for all its shrubs on the islands in view
-// (site.ts).
+// The beach shrubs (world/terrain-scatter.ts says where). A few shapes, each drawn once for all its shrubs on the tiles
+// in view (site.ts).
 //
 // A shrub: a few overlapping rounded masses of fleshy leaves, each leaf its own two triangles (no cut-out texture).
 // Leaves lie mostly on the masses' surfaces, some inside. Each leaf's normal is bent halfway toward its mass's: the
@@ -13,7 +13,7 @@ import {
 import { Fn, attribute, mix, normalWorldGeometry, normalize, positionWorld, vec3 } from 'three/tsl';
 import { SHRUB } from '../palette';
 import { random } from '../world/random';
-import type { Shrub } from '../world/scatter';
+import type { Shrub } from '../world/terrain-scatter';
 import type { Chart } from '../world/sphere';
 import type { Light } from '../sky/light';
 import { createInstances, standing, type Instances, type Placed } from './site';
@@ -71,7 +71,7 @@ function shape(seed: number, leaves: number): BufferGeometry {
   return g;
 }
 
-/** shrubs[i]: those on island i, whose chart is charts[i]; each one of SHAPES shapes. The instances of each shape,
+/** shrubs[i]: those on tile i, whose chart is charts[i]; each one of SHAPES shapes. The instances of each shape,
  *  near and coarse. */
 export function createShrubs(shrubs: Shrub[][], charts: Chart[], light: Light): { near: Instances[]; coarse: Instances[] } {
   const material = new MeshBasicNodeMaterial({ side: DoubleSide });

@@ -11,10 +11,8 @@ import type { Eye, Snapshot } from './snapshot';
 import { createSky, type Sky } from './sky/sky';
 import { createGround } from './land/ground';
 import { createGroves } from './land/groves';
-import { createIslands } from './land/islands';
 import { createLighting } from './sky/light';
 import { createSand } from './land/sand';
-import { createSeabed } from './land/seabed';
 import { createTerrainMesh } from './land/terrain-mesh';
 import { createShadow } from './land/shadow';
 import { createView } from './view/view';
@@ -87,10 +85,10 @@ export interface FrameOptions {
  *        waves        the ocean's FFT and its foam (water/waves.ts), every frame
  *        wake         the ships' marks on the sea round the eye (water/wake.ts: their wakes, foam and shadows), one
  *                     small map, drawn while a ship is near enough to mark it
- *        island       the nearest island's shadow map from the sun over it (land/shadow.ts), redrawn only when the
- *                     sun has moved or another island has become the nearest
+ *        land shadow  the shadow map of what stands on the land round the nearest tile, from the sun over it
+ *                     (land/shadow.ts), redrawn only when the sun has moved or another tile has become the nearest
  *        cloth        the near ships' sails (ship/cloth.ts), a few small steps of it, while any are held
- *   2. scene    — sky backdrop; then the solid things (the sea floor, the islands, the ships, the balls in flight);
+ *   2. scene    — sky backdrop; then the solid things (the ground, what stands on it, the ships, the balls in flight);
  *                 then the sea, which reads what was drawn before it behind itself (the floor through the water); then
  *                 the guns' smoke, flashes and spray (gunfire/gunfire.ts), blended over it
  *   3. post     — clouds over whatever they stand in front of, the haze by distance over both (sky.ts fog), the
@@ -102,7 +100,7 @@ export interface FrameOptions {
  *        grade        exposure, vignette, the tone curve, the look (the day's mixed to the storm's), sRGB; a
  *                     dither (post/grade.ts, post/film.ts) — one full-size pass with the bloom's and shafts' reads
  *        FXAA         on the graded image (its edge test wants the screen's values), for the edges of the sea's
- *                     crests and the islands against the sky
+ *                     crests and the land against the sky
  * Each frame every system first does its CPU work, in the order one reads another, and says what of its GPU work is
  * due (gpu.ts); then the frame runs it. Systems hand this file meshes, shader nodes, kernels and offscreen draws; they
  * never hold the renderer. The renderer's settings are all here too.
@@ -132,27 +130,25 @@ export function createFrame(renderer: WebGPURenderer, world: World, options: Fra
   const { grade, gain } = createGrade(rise, east > 0, sky.light.open);
   const scene = new Scene();
   scene.backgroundNode = sky.background;
-  // the ground baked for the shaders in a worker, while the islands are built here
+  // the ground baked for the shaders in a worker, while what stands on the land is built here
   const ground = createGround(world.seed, world.land);
   const water = createWater(view, sky.light, ground, world.wind, options.fleet, options.length, options.sea);
   const shadow = createShadow();
   const light = createLighting(sky.light, water.below, shadow.visible);
-  const terrain = world.land.kind === 'terrain' ? world.land.terrain : null;
+  const terrain = world.land;
   // (the ground's own, with the caustics on the sea floor)
-  const dune = terrain ? BANDS.dunes * terrain.stats.summit : BANDS.dune;
-  const sand = createSand(view, ground, createLighting(sky.light, water.floor, shadow.visible), dune);
-  // the ground under the sea, and the land's own where the land is the terrain's (the islands draw theirs); and what
-  // stands on the land, the terrain's tiles' or the islands'
-  const seabed = terrain ? createTerrainMesh(view, ground, sand, terrain) : createSeabed(view, ground, sand);
-  const islands = terrain ? createGroves(terrain, world.planet, world.seed, view, light) : createIslands(world.planet, world.seed, view, light, sand);
-  shadow.cast(...islands.casters);
+  const sand = createSand(view, ground, createLighting(sky.light, water.floor, shadow.visible), BANDS.dunes * terrain.stats.summit);
+  // the ground, under the sea and over it; and what stands on the land
+  const seabed = createTerrainMesh(view, ground, sand, terrain);
+  const groves = createGroves(terrain, world.planet, world.seed, view, light);
+  shadow.cast(...groves.casters);
   const fleet = createFleet(light, world.wind, options.fleet);
   fleet.pin(options.lod);
   fleet.simulate(options.cloth);
   const arms = createArms(light, options.fleet);
   const gunfire = createGunfire(light);
   const loot = createLoot(light);
-  scene.add(seabed.mesh, ...islands.meshes, ...fleet.meshes, ...arms.meshes, water.mesh, water.ribbons, ...gunfire.meshes, ...loot.meshes, ...(options.extras?.(sky.light, world) ?? []));
+  scene.add(seabed.mesh, ...groves.meshes, ...fleet.meshes, ...arms.meshes, water.mesh, water.ribbons, ...gunfire.meshes, ...loot.meshes, ...(options.extras?.(sky.light, world) ?? []));
   // (named for the meter's split: meter.ts)
   scene.name = 'world';
   [seabed.mesh.name, water.mesh.name, water.ribbons.name] = ['seabed', 'sea', 'trails'];
@@ -249,7 +245,7 @@ export function createFrame(renderer: WebGPURenderer, world: World, options: Fra
    *  background between frames. The target is the renderer's only while the build is laid out: it is given back as it
    *  was both then and once the build is done, since compileAsync takes and restores the renderer's state where it
    *  resumes, after its own awaits (left alone, a frame with no offscreen draw before its own, as when there are no
-   *  ships and no islands, would draw into the last build's target). Frames are drawn whole between tasks, so neither
+   *  ships and no land in view, would draw into the last build's target). Frames are drawn whole between tasks, so neither
    *  lands in one. */
   const build = (scene: Object3D, camera: Draw['camera'], target: Draw['target'], mrt: MRTNode | null = null) => {
     const [was, wasMrt] = [renderer.getRenderTarget(), renderer.getMRT()];
@@ -272,7 +268,7 @@ export function createFrame(renderer: WebGPURenderer, world: World, options: Fra
   }
 
   const size = new Vector2();
-  const islandSun = new Vector3();
+  const shadeSun = new Vector3();
   /** The ships drawn last frame, and the latest moment of the guns' work laid so far (each blast is laid once). */
   let drawn = new Set<number>(), laid = -Infinity;
 
@@ -367,10 +363,10 @@ export function createFrame(renderer: WebGPURenderer, world: World, options: Fra
     loot.update(eye);
     const sea = water.update(env, dt, fleet.ships, s);
     seabed.update(eye);
-    // the island's shadows fall along the sun over it, which stays put however the eye moves
-    const island = islands.update(eye);
-    if (island) islandSun.set(...sunAt(env.sunPlaces, env.timeOfDay, island.chart.at));
-    const islandShadow = shadow.update(islandSun, island);
+    // the groves' shadows fall along the sun over the place they are cast round, which stays put however the eye moves
+    const shade = groves.update(eye);
+    if (shade) shadeSun.set(...sunAt(env.sunPlaces, env.timeOfDay, shade.chart.at));
+    const landShadow = shadow.update(shadeSun, shade);
 
     // 1. offscreen, what is due
     compute(air.tables);
@@ -378,7 +374,7 @@ export function createFrame(renderer: WebGPURenderer, world: World, options: Fra
     compute(air.reflection);
     compute(sea.waves);
     draw(sea.wake);
-    draw(islandShadow);
+    draw(landShadow);
     compute(ships.cloth);
     // 2, 3. the scene and its post, from the eye; the light shafts only in the air
     eyes[seen.kind].shafts.update(eye, env.sunDirection, seen.kind === 'air' ? shaftsFor(rise) : 0);

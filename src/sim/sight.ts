@@ -65,7 +65,7 @@ function lookAlong(s: Sight, end: number, rises: readonly Rise[] | undefined): n
 
 /** Metres along the sight to where it first meets the sea or the land (`depth`, negative on land), within FAR; null if
  *  it meets neither (it looks over the horizon or into the sky). The land is looked for every STEP m; given the land's
- *  `rises` (world/planet.ts risesOf), only where it passes near one, the same steps (so the same answer) and fewer. */
+ *  `rises` (world/planet.ts Planet.rises), only where it passes near one, the same steps (so the same answer) and fewer. */
 export function meets(s: Sight, depth: Depth, rises?: readonly Rise[]): number | null {
   const sea = seaAlong(s), end = Math.min(sea ?? FAR, FAR);
   const under = (t: number) => {

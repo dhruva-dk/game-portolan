@@ -4,10 +4,11 @@ import { BOT, mind, think, type Memory } from '../src/sim/bot.ts';
 import { afloat, stepFleet, type Vessel } from '../src/sim/contact.ts';
 import { STEP } from '../src/sim/fixed.ts';
 import { SHIP } from '../src/sim/handling.ts';
-import { cellCentre, chart, findPath, openAt, type Chart } from '../src/sim/route.ts';
+import { ROUTE, cellCentre, chart, findPath, openAt, type Chart } from '../src/sim/route.ts';
 import { clearance, type Depth } from '../src/sim/shoal.ts';
 import { shipAt } from '../src/sim/ship.ts';
-import { createPlanet, SEED } from '../src/world/planet.ts';
+import { landOf, planetOf } from '../src/world/land.ts';
+import { SEED } from '../src/world/planet.ts';
 import { add, along, distance, frameAt, fromLatLon, normalize, scale, type Vec3 } from '../src/world/sphere.ts';
 import { random } from '../src/world/random.ts';
 
@@ -113,19 +114,25 @@ test('routed bots sail the same voyage from the same places, to the bit', () => 
 });
 
 test('on the real planet: the chart, a route and 16 routed bots, timed', () => {
-  const planet = createPlanet(SEED), depth: Depth = (p) => -planet.height(p);
+  const planet = planetOf(SEED, landOf(SEED)), depth: Depth = (p) => -planet.height(p);
   let t = performance.now();
   const ch = chart(depth);
   const bake = performance.now() - t, open = ch.open.reduce((s, o) => s + o, 0);
-  // round the largest island (its coast `out` metres from its middle, give or take; the rings below were for 69 m)
-  const largest = planet.islands[0], isle = largest.chart.at, f = frameAt(isle), out = largest.radius / 69;
-  const ring = (bearing: number, metres: number) => along(isle, add(scale(f.north, Math.cos(bearing)), f.east, Math.sin(bearing)), metres).p;
-  // across the island from all round it (the first warms the code)
-  findPath(ch, ring(0, 150 * out), ring(Math.PI, 150 * out));
+  // open water to open water 150–400 m off, with land between, all over the planet
+  const rand = random(17), pairs: { p: Vec3; q: Vec3; d: number }[] = [];
+  while (pairs.length < 300) {
+    const z = 2 * rand() - 1, a = 2 * Math.PI * rand(), s = Math.sqrt(1 - z * z), p: Vec3 = [s * Math.cos(a), z, s * Math.sin(a)];
+    const g = frameAt(p), bearing = 2 * Math.PI * rand(), d = 150 + 250 * rand();
+    const q = along(p, add(scale(g.north, Math.cos(bearing)), g.east, Math.sin(bearing)), d).p, n = Math.ceil(d / 6);
+    const line = Array.from({ length: n }, (_, k) => normalize(add(scale(p, 1 - k / n), q, k / n)));
+    if (openAt(ch, p) && openAt(ch, q) && !line.every((x) => openAt(ch, x))) pairs.push({ p, q, d });
+  }
+  // across the land, the first 24 of those under 250 m (the first warms the code)
+  const across = pairs.filter((r) => r.d < 250).slice(0, 24);
+  findPath(ch, across[0].p, across[0].q);
   const times: number[] = [];
   let found = 0;
-  for (let k = 0; k < 24; k++) {
-    const a = ring(k * 0.26, (120 + 4 * k) * out), b = ring(k * 0.26 + Math.PI, 160 * out);
+  for (const { p: a, q: b } of across) {
     // timed as the best of three: the search's own cost, not whatever else the machine is doing (the suite runs its
     // files side by side); a search that does more work is slower every time
     let best = Infinity;
@@ -142,28 +149,30 @@ test('on the real planet: the chart, a route and 16 routed bots, timed', () => {
     assert.ok(stepsOpen(ch, r.cells));
   }
   const mean = times.reduce((s, x) => s + x, 0) / times.length;
-  console.log(`# chart: ${bake.toFixed(0)} ms to bake, ${open} cells of ${ch.open.length} open; a route across the island ${mean.toFixed(2)} ms (the most ${Math.max(...times).toFixed(2)}), ${found} of 24 found`);
-  assert.ok(found >= 20 && mean < 2);
+  console.log(`# chart: ${bake.toFixed(0)} ms to bake, ${open} cells of ${ch.open.length} open; a route across the land `
+    + `${mean.toFixed(2)} ms (the most ${Math.max(...times).toFixed(2)}), ${found} of ${across.length} found`);
+  assert.ok(across.length === 24 && found >= 20 && mean < 2);
 
-  // open water to open water 150–400 m off, with land between, all over the planet: found within ROUTE.work cells
-  // (0117's four neighbours a cell found 91% of those 150–250 m off and 50% of those 250–400 m)
-  const rand = random(17), tally = { near: [0, 0], far: [0, 0] };
-  while (tally.near[0] + tally.far[0] < 300) {
-    const z = 2 * rand() - 1, a = 2 * Math.PI * rand(), s = Math.sqrt(1 - z * z), p: Vec3 = [s * Math.cos(a), z, s * Math.sin(a)];
-    const g = frameAt(p), bearing = 2 * Math.PI * rand(), d = 150 + 250 * rand();
-    const q = along(p, add(scale(g.north, Math.cos(bearing)), g.east, Math.sin(bearing)), d).p;
-    if (!openAt(ch, p) || !openAt(ch, q) || Array.from({ length: Math.ceil(d / 6) }, (_, k) => normalize(add(scale(p, 1 - k / Math.ceil(d / 6)), q, k / Math.ceil(d / 6)))).every((x) => openAt(ch, x))) continue;
+  // all of them whose way round is short, under half as far again as the straight line (as the widest search finds it:
+  // the land is everywhere, so many pairs lie in waters a continent apart): found within ROUTE.work cells
+  const tally = { near: [0, 0], far: [0, 0] };
+  for (const { p, q, d } of pairs) {
+    const wide = findPath(ch, p, q, ROUTE.work * 4);
+    if (!wide.found || length(wide.cells) > 1.5 * d) continue;
     const t = d < 250 ? tally.near : tally.far;
     t[0]++;
     t[1] += +findPath(ch, p, q).found;
   }
-  console.log(`# blocked routes found: ${tally.near[1]} of ${tally.near[0]} 150–250 m off, ${tally.far[1]} of ${tally.far[0]} 250–400 m off`);
-  assert.ok(tally.near[1] >= 0.9 * tally.near[0] && tally.far[1] >= 0.85 * tally.far[0]);
+  console.log(`# blocked routes with a short way round found: ${tally.near[1]} of ${tally.near[0]} 150–250 m off, `
+    + `${tally.far[1]} of ${tally.far[0]} 250–400 m off`);
+  assert.ok(tally.near[1] >= 0.95 * tally.near[0] && tally.far[1] >= 0.8 * tally.far[0]);
 
-  // 16 bots round the island for 20 s
+  // 16 bots on the water round where she starts, for 20 s
+  const home = planet.start.at, f = frameAt(home);
+  const ring = (bearing: number, metres: number) => along(home, add(scale(f.north, Math.cos(bearing)), f.east, Math.sin(bearing)), metres).p;
   let fleet: Vessel[] = [];
   for (let k = 0; fleet.length < 16; k++) {
-    const p = ring(k * 0.7, (110 + 9 * k) * out);
+    const p = ring(k * 0.7, 20 + 6 * k);
     if (openAt(ch, p) && depth(p) > 6) fleet.push(afloat(fleet.length, shipAt(p, frameAt(p).east)));
   }
   const minds = fleet.map((v) => mind(v.id + 1, v.ship.at));

@@ -3,10 +3,8 @@
 // stones and weed strewn over it (strewn.ts); a paler band along the waterline; the beach; the deeper, drier sand
 // higher up; and under the trees, where fronds have fallen, a darker patch. The bands' edges wander with the ground's
 // mottling, so none is a contour line. Where the ground is steeper than sand lies, a cliff's bare rock in strata.
-// Where the land is the terrain's its cover carries the land's own (world/planet-terrain.ts): earthier sand in patches
-// where the shrubs grow, and the tops' bare rock; the islands' land has none. High up, on either, the pale dunes
-// (past 9 m on the islands, halfway to the summit on the terrain: palette.ts BANDS).
-// The islands' meshes and the sea floor's both shade with this, so where they overlap they look the same.
+// On land the cover carries the land's own (world/planet-terrain.ts): earthier sand in patches where the shrubs grow,
+// and the tops' bare rock. High up, the pale dunes (halfway to the summit: palette.ts BANDS).
 //
 // Everything is a function of the world position alone (the sea floor's mesh slides along under the eye).
 // Lit like everything else (sky/light.ts).
@@ -18,20 +16,19 @@ import type { Ground } from './ground';
 import type { Light } from '../sky/light';
 import { createStrewn } from './strewn';
 import { cut, type FloatNode, type Vec3Node } from '../tsl';
-import { ISLANDS } from '../world/planet-islands';
 
 /** Where each band lies (palette.ts BANDS). */
 const { shore: SHORE, beach: BEACH, dry: DRY, loam: LOAM_AT, rubble: RUBBLE, ragged: RAGGED } = BANDS;
 /** The ground's cover (0…1) past which sea grass grows on the floor; and litter under the trees. */
 const GRASS = 0.65, FALLEN = 0.5;
-/** Ground steeper than a cliff's face (ISLANDS.bare, rise over run) by SHEER is bare rock (BARE: the cosine of its
- *  tilt), so a dune's steep scraps stay sand; its strata this many metres apart, the pale band this share of each. */
-const SHEER = 2.2, BARE = 1 / Math.hypot(1, ISLANDS.bare * SHEER), STRATA = 2.2, STRATUM_SHARE = 0.35;
+/** Ground steeper than a cliff's face (CLIFF, rise over run) by SHEER is bare rock (BARE: the cosine of its tilt), so a
+ *  dune's steep scraps stay sand; its strata this many metres apart, the pale band this share of each. */
+const CLIFF = 1.2, SHEER = 2.2, BARE = 1 / Math.hypot(1, CLIFF * SHEER), STRATA = 2.2, STRATUM_SHARE = 0.35;
 
 export type Sand = (p: Vec3Node, n: Vec3Node, litter: FloatNode | null) => Vec3Node;
 
 /** dune: the height past which the sand is the dunes', metres (BANDS). */
-export function createSand(view: View, ground: Ground, light: Light, dune: number = BANDS.dune): Sand {
+export function createSand(view: View, ground: Ground, light: Light, dune: number): Sand {
   const strewn = createStrewn();
 
   /**

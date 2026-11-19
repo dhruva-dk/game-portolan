@@ -289,7 +289,7 @@ const OVER: Record<string, number> = {
   'sim/gunner.ts aimAndFire': 9, 'sim/ride.ts settled': 6, 'sim/shot.ts loosed': 7, 'sim/stores.ts stored': 9, 'sim/stores.ts spilled': 6,
   'sim/utility.ts choose': 6, 'ui/disc.ts laid': 7, 'ui/ink.ts bar': 6, 'ui/ink.ts ring': 6,
   'water/water.ts createWater': 7, 'world/cells.ts trace': 6, 'world/lattice.ts weighInto': 7,
-  'world/planet-islands.ts createIslandSite': 6, 'world/sphere.ts chartAt': 6,
+  'world/sphere.ts chartAt': 6,
 };
 
 test('m. an exported function takes at most MOST parameters, but those in OVER, which only come down', () => {

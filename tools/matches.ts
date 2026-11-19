@@ -18,7 +18,8 @@ import { berthing } from '../src/sim/spawn.ts';
 import { STORM } from '../src/sim/storm.ts';
 import { createMatches } from '../src/play/setup.ts';
 import { createState } from '../src/play/state.ts';
-import { SEED, createPlanet } from '../src/world/planet.ts';
+import { landOf, planetOf } from '../src/world/land.ts';
+import { SEED } from '../src/world/planet.ts';
 import { distance, type Vec3 } from '../src/world/sphere.ts';
 import { flat } from '../src/world/swell.ts';
 
@@ -26,7 +27,7 @@ import { flat } from '../src/world/swell.ts';
 const STUCK = 15, WINDOW = 30, AGROUND = 2;
 const games = Number(process.argv[2] ?? 3), seed = Number(process.argv[3] ?? SEED);
 const t0 = performance.now();
-const planet = createPlanet(seed);
+const planet = planetOf(seed, landOf(seed));
 const depth = (p: Vec3) => -planet.height(p);
 const waters = { chart: chart(depth), water: berthing(depth) };
 const matches = createMatches(seed, planet, null, null);

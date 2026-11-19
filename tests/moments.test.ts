@@ -13,7 +13,8 @@ import { chart } from '../src/sim/route.ts';
 import { berthing } from '../src/sim/spawn.ts';
 import { calm } from '../src/sim/storm.ts';
 import { BIG, SAFE, capped, heartbeat, lowHull } from '../src/ui/flash.ts';
-import { SEED, createPlanet } from '../src/world/planet.ts';
+import { landOf, planetOf } from '../src/world/land.ts';
+import { SEED } from '../src/world/planet.ts';
 import { R, normalize, scale, type Vec3 } from '../src/world/sphere.ts';
 import { flat } from '../src/world/swell.ts';
 import { lookAt } from '../src/world/turn.ts';
@@ -85,7 +86,7 @@ test('as she sees it: the bearing clockwise from the look, its distance, and on 
 });
 
 test('the match records its deeds: a ship sunk is told once, with a sink blast to draw', () => {
-  const planet = createPlanet(SEED), depth = (p: Vec3) => -planet.height(p), start = planet.start;
+  const planet = planetOf(SEED, landOf(SEED)), depth = (p: Vec3) => -planet.height(p), start = planet.start;
   const match: Match = { seed: 1, gun: null, storm: () => calm(start.at) };
   const state = createState(planet, flat, { chart: chart(depth), water: berthing(depth) }, match);
   const before = state.deeds().at(-1)?.seq ?? 0;

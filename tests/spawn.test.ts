@@ -4,10 +4,11 @@ import { SHIP } from '../src/sim/handling.ts';
 import { SHIPS } from '../src/sim/match.ts';
 import { SPAWN, berthing, berths, closest } from '../src/sim/spawn.ts';
 import { createMatches } from '../src/play/setup.ts';
-import { SEED, createPlanet } from '../src/world/planet.ts';
+import { landOf, planetOf } from '../src/world/land.ts';
+import { SEED } from '../src/world/planet.ts';
 import { R, along, dot, length } from '../src/world/sphere.ts';
 
-const planet = createPlanet(SEED);
+const planet = planetOf(SEED, landOf(SEED));
 const depth = (p: readonly [number, number, number]) => -planet.height(p);
 const water = berthing(depth);
 
@@ -35,13 +36,15 @@ test('every ship starts afloat in open water, clear of land all round, heading a
   }
 });
 
-test('the berths spread over the whole planet: no two within several ships\' lengths, the nearest pair far apart', () => {
-  // an even spread of SHIPS over the sphere would have them about this far apart; the berths keep most of it
-  const even = Math.sqrt((2 * 4 * Math.PI * R * R) / (Math.sqrt(3) * SHIPS));
-  for (const n of [20, SHIPS, 100]) {
-    const least = closest(berths(water, 7, n, depth));
-    assert.ok(least > 5 * SHIP.length, `${n} ships: two only ${least.toFixed(0)} m apart`);
-    if (n === SHIPS) assert.ok(least > 0.6 * even, `${n} ships ${least.toFixed(0)} m apart at least, of an even ${even.toFixed(0)}`);
+test('the berths spread over all the open water: no two within a few ships\' lengths, the nearest pair far apart', () => {
+  // an even spread of n ships over the open water (the share of the planet's lattice open) would have them about this
+  // far apart; the berths keep nearly all of it
+  const open = water.points.length / Math.round((4 * Math.PI * R * R) / SPAWN.lattice ** 2);
+  for (const n of [20, 50, SHIPS, 100]) {
+    const least = closest(berths(water, 7, n, depth)), even = Math.sqrt((2 * 4 * Math.PI * R * R * open) / (Math.sqrt(3) * n));
+    console.log(`# ${n} ships: ${least.toFixed(0)} m apart at least, of an even ${even.toFixed(0)}`);
+    assert.ok(least > 2.5 * SHIP.length, `${n} ships: two only ${least.toFixed(0)} m apart`);
+    assert.ok(least > 0.9 * even, `${n} ships ${least.toFixed(0)} m apart at least, of an even ${even.toFixed(0)}`);
   }
 });
 

@@ -1,12 +1,11 @@
 // The sun's shadows on the land: what stands on it (rocks, palms, shrubs), seen from the sun into a depth map over
-// one place (a Shade): the nearest island in view (site.ts orders them), or the terrain's tiles round the eye
-// (groves.ts). On a globe each place faces the sun its own way, so one map over one place keeps its texels small,
+// one place (a Shade): the land's tiles round the eye (groves.ts). On a globe each place faces the sun its own way, so one map over one place keeps its texels small,
 // and those farther off go without. Nothing on the land moves, so the map is drawn again only when the sun has moved
 // or the place has changed.
 //
 // It draws stand-ins for the casters (each shares its caster's geometry and instance matrices, plain black), so the
-// casters themselves are untouched and the depth pass costs no more than their vertices: just the nearest island's,
-// which come first among each caster's instances.
+// casters themselves are untouched and the depth pass costs no more than their vertices: just the near tiles', which
+// come first among each caster's instances.
 
 import {
   DepthTexture, DoubleSide, FloatType, InstancedMesh, LessEqualCompare, Matrix4, MeshBasicNodeMaterial,
@@ -20,7 +19,7 @@ import type { FloatNode, Vec3Node } from '../tsl';
 
 /** Texels across the map. */
 const SIZE = 2048;
-/** How far along the sun's ray the map holds casters, either side of the island, metres. */
+/** How far along the sun's ray the map holds casters, either side of the place, metres. */
 const SPAN = 200;
 /** A receiving point is looked up this far off its surface, metres (about a texel), and this much nearer the sun
  * (of the map's depth range), so a surface doesn't shadow itself. */

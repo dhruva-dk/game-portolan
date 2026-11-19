@@ -1,6 +1,5 @@
-// What stands on the terrain's land (world/terrain-scatter.ts says where), drawn as the islands' things are: the
-// palms, shrubs and rocks (palms.ts, shrubs.ts, rocks.ts), each kind instanced across the tiles in view (site.ts), a
-// tile standing where an island would.
+// What stands on the terrain's land (world/terrain-scatter.ts says where): the palms, shrubs and rocks (palms.ts,
+// shrubs.ts, rocks.ts), each kind instanced across the tiles in view (site.ts).
 //
 // A tile is drawn if what stands on it rises over the eye's horizon and it stands in the camera's view; they are
 // ordered nearest first each frame, and the instances rewritten when that changes. The shadow map (shadow.ts) covers

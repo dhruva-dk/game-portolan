@@ -1,7 +1,6 @@
-// Terrain over the whole planet: the land the game stands on with ?terrain (land.ts), made a Planet by
-// planet-terrain.ts, its things placed by terrain-scatter.ts and its coast traced by coastline.ts; the islands
-// (planet.ts) are the other land. Land is random, never placed by hand; only its share of the planet and the sea's
-// connection are guaranteed.
+// Terrain over the whole planet: the land the game stands on (land.ts), made a Planet by planet-terrain.ts, its things
+// placed by terrain-scatter.ts and its coast traced by coastline.ts. Land is random, never placed by hand; only its
+// share of the planet and the sea's connection are guaranteed.
 //
 // On the sea's cells (cells.ts, 6 × 256², about 3.4 m a cell), in stages, each a pure function of the last:
 //   relief     domain-warped fractal noise over the sphere (noise3.ts), read at each cell's centre

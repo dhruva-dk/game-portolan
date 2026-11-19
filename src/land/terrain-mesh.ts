@@ -1,7 +1,6 @@
-// The ground where the land is the terrain's (world/terrain.ts): the patches terrain-lod.ts selects, each an instance
-// of one grid of P × P quads with a skirt round its edge, all drawn in one call. The grid is anchored to the planet,
-// not the eye (as the sea floor's rings are, seabed.ts): ground that slides under a moving eye swims at its
-// silhouettes, which water hides and bare land would not.
+// The ground, under the sea and over it (world/terrain.ts): the patches terrain-lod.ts selects, each an instance of one
+// grid of P × P quads with a skirt round its edge, all drawn in one call. The grid is anchored to the planet, not the
+// eye: ground that slides under a moving eye swims at its silhouettes, which water hides and bare land would not.
 //
 // Each vertex is placed in the vertex shader: its grid point on its patch, morphed toward its parent's grid by its
 // distance from the eye (terrain-lod.ts), mapped onto its cube face equi-angularly (tan), onto the sphere, and raised

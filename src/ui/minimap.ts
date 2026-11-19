@@ -2,8 +2,8 @@
 // hand. North is always up (the rim's vermilion mark, fixed): the disc never turns, her arrow turns on it.
 //
 // On the plain sea, from the bottom up: who holds the water, a wash in each holder's colour, hers the deeper (held.ts);
-// the land, its aprons a pale wash, its parchment going ochre up the hills (an island's baked once, isles.ts; the
-// terrain's from the ground round her, ground.ts), its coasts inked (coasts.ts);
+// the land, its shallows a pale wash, its parchment going ochre up the hills (from the ground round her, ground.ts), its
+// coasts inked (coasts.ts);
 // her open trail, a line in her colour; the Storm's side of its edge washed in its own violet and the edge a violet
 // line; the circle it next closes to, a white dotted line. Nothing else: no other ship and no loot (as in Fortnite,
 // those are found by eye). Outside the next circle a white line runs from her to its nearest point, ending in an
@@ -12,12 +12,11 @@
 
 import type { Sea } from '../snapshot';
 import { R, add, along, distance, dot, frameAt, normalize, scale, type Vec3 } from '../world/sphere';
-import type { Coast, Shores } from './coasts';
+import type { Shores } from './coasts';
 import { laid, layOf, metres, place } from './disc';
 import { createGround } from './ground';
 import { createHeld } from './held';
 import { INK, PAPER, WASH, svg } from './ink';
-import { bakeIsle, zOf, type Isle } from './isles';
 import { sizeNow } from './ui';
 
 /** Metres from her to the disc's rim: at her 16 m/s some 25 s of sailing, twice a cannon's 200 m reach; some 4.5 m a
@@ -78,17 +77,7 @@ export function createMinimap(host: HTMLElement, size: number, { coasts, ground:
   const ctx = canvas.getContext('2d')!;
   const held = createHeld(SPAN * 1.15);
   // (the plate reaches past the rim by as far as she sails before it is taken afresh, and a margin)
-  const ground = land && createGround(land.height, SPAN + 50, land.top);
-  const isles = new Map<Coast, Isle>();
-  // every island baked one at a time while the page is idle, so none is baked mid-match as she nears it
-  const sites = coasts.filter((c) => c.site);
-  const bake = (i: number) => {
-    const coast = sites[i];
-    if (!coast) return;
-    if (!isles.has(coast)) isles.set(coast, bakeIsle(coast.site!));
-    setTimeout(() => bake(i + 1), 0);
-  };
-  bake(0);
+  const ground = createGround(land.height, SPAN + 50, land.top);
   const rings = new Map<string, Vec3[]>();
   const ringOf = (s: Storm) => {
     const key = `${s.centre.join()}|${s.radius}`;
@@ -132,8 +121,8 @@ export function createMinimap(host: HTMLElement, size: number, { coasts, ground:
 
     if (sea && more.own != null) held.draw(ctx, l, sea, more.own + 1, dt, lay);
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ground?.draw(ctx, l, lay);
-    shores(lay, trace, near);
+    ground.draw(ctx, l, lay);
+    shores(trace, near);
     if (trail && trail.points.length) {
       // her open trail, on to her stern
       trace([...trail.points, at], false);
@@ -218,23 +207,11 @@ export function createMinimap(host: HTMLElement, size: number, { coasts, ground:
     }
   };
 
-  /** The coasts near her, inked; an island's land under its coast, baked the first time it comes near, laid on its own
-   *  chart. */
-  function shores(lay: (o: Vec3, e: Vec3, n: Vec3, w: number, h: number, m: number) => void,
-    trace: (ring: readonly Vec3[], closed: boolean) => void, near: (q: Vec3, reach: number) => boolean) {
+  /** The coasts near her, inked. */
+  function shores(trace: (ring: readonly Vec3[], closed: boolean) => void, near: (q: Vec3, reach: number) => boolean) {
     ctx.lineCap = ctx.lineJoin = 'round';
     for (const coast of coasts) {
       if (!near(coast.centre, SPAN * 1.45 + coast.reach)) continue;
-      const site = coast.site;
-      if (site) {
-        let isle = isles.get(coast);
-        if (!isle) isles.set(coast, (isle = bakeIsle(site)));
-        lay(coast.centre, site.chart.axis, zOf(site), isle.w, isle.h, isle.m);
-        ctx.imageSmoothingEnabled = true;
-        ctx.imageSmoothingQuality = 'medium';
-        ctx.drawImage(isle.canvas, 0, 0);
-        ctx.setTransform(1, 0, 0, 1, 0, 0);
-      }
       trace(coast.ring, coast.closed);
       ctx.strokeStyle = WASH.shore;
       ctx.lineWidth = 1.1 * dpr;

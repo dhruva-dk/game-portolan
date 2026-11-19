@@ -1,8 +1,8 @@
-// What stands on the terrain's land (terrain.ts): the islands' own palms, shrubs and rocks (scatter.ts has their
-// kinds), placed by the land's two fields, how far in from the coast and how high, so every grove follows the land.
+// What stands on the terrain's land (terrain.ts): palms, shrubs and rocks, placed by the land's two fields, how far in
+// from the coast and how high, so every grove follows the land.
 //
 // The land is cut into tiles, BLOCK² cells each, and each tile's things are worked out on its own chart (sphere.ts),
-// the way an island's are on its: whatever draws an island's things draws a tile's (land/site.ts). Candidates are
+// x and z metres from its middle (land/site.ts draws them there). Candidates are
 // drawn cell by cell, each cell in exactly one tile, so the tiles meet without a seam, a gap or a doubled grove; the
 // fields that gather them into groves and clumps are noise in world metres, so they run on across the tiles' edges.
 // Each tile has its own random stream from the seed and its index: a tile's things are the same whatever else is.
@@ -19,15 +19,62 @@
 import { N } from './cells.ts';
 import { createNoise3 } from './noise3.ts';
 import type { Cover, Planet } from './planet.ts';
-import { WADE } from './planet-islands.ts';
 import { hash, random } from './random.ts';
-import { onRock, type Palm, type Rock, type Shrub } from './scatter.ts';
 import { R, add, distance, dot, faceDir, fromChart, normalize, toChart, type Chart, type Vec3 } from './sphere.ts';
 import { CELL, between, locate, taps } from './terrain-grid.ts';
 import { heightBounds, type Terrain } from './terrain.ts';
 
 /** The cells along a side of a tile (as planet-terrain.ts's rises). */
 export const BLOCK = 16;
+
+/** How far out from the waterline the water may be too shallow for a ship (a keel 2.2 m down: sim/handling.ts), metres,
+ *  at most: no rock's foot reaches past it. */
+export const WADE = 7;
+
+export interface Rock {
+  x: number;
+  /** The rock's centre's height: the ground's under it, less how deep it is sunk. */
+  y: number;
+  z: number;
+  /** Its radius, metres, before its shape's own stretching. */
+  size: number;
+  /** Turned about the vertical, radians. */
+  yaw: number;
+  /** One of the big masses (else a boulder round them). */
+  big: boolean;
+  /** Which of its kind's shapes it is. */
+  shape: number;
+}
+
+export interface Palm {
+  x: number;
+  /** The trunk's foot: the ground's height, less a little where it is sunk. */
+  y: number;
+  z: number;
+  /** Metres from the foot to the crown. */
+  height: number;
+  /** How far the trunk leans at its foot, radians from the vertical. */
+  lean: number;
+  /** Which way it leans, radians about the vertical (atan2(z, x)). */
+  heading: number;
+}
+
+export interface Shrub {
+  x: number;
+  y: number;
+  z: number;
+  /** Across, metres. */
+  size: number;
+  yaw: number;
+  /** Which of the shapes it is. */
+  shape: number;
+  /** 0…1: a little paler or darker than the rest. */
+  tint: number;
+}
+
+/** Whether (x, z) lies within `margin` metres of a rock's footprint. */
+export const onRock = (rocks: Rock[], x: number, z: number, margin: number) =>
+  rocks.some((r) => Math.hypot(r.x - x, r.z - z) < r.size * 1.05 + margin);
 
 export interface Tile {
   chart: Chart;
@@ -51,7 +98,7 @@ const BEACH_TOP = -4, PALM_RATE = 0.35, SPACING = 3.5, INLAND = 25, PALM_UP = [0
 /** Shrubs: the hedge's band; two candidates a cell, each kept at most this often; under the hedge's or clumps' cover. */
 const HEDGE = [-14, -5] as const, SHRUB_RATE = 0.3, BARE = 0.7;
 /** Rocks: tops are above this share of the summit; the chance of an outcrop in a top's cell, at most so many to a tile;
- *  the chance a tile with a beach has one on its shoulder; masses' and boulders' radii and counts, as on the islands. */
+ *  the chance a tile with a beach has one on its shoulder; masses' and boulders' radii and counts. */
 const TOP = 0.6, TOP_OUTCROP = 0.03, TOP_OUTCROPS = 2, COAST_OUTCROP = 0.3;
 const BIG = [2.5, 5.5] as const, BIG_COUNT = [3, 6] as const, HEAPED = 0.6;
 const BOULDER = [0.3, 1.6] as const, BOULDERS = [4, 10] as const, SUNK = { big: 0.15, boulder: 0.3 }, FOOT = 0.8;

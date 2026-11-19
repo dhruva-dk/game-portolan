@@ -28,7 +28,7 @@ import { MEAN, SWING } from './world/weather';
 
 /** The release's setup. */
 const RELEASE: Setup = {
-  seed: SEED, land: 'terrain', mean: MEAN, swing: SWING, hours: 16.3,
+  seed: SEED, mean: MEAN, swing: SWING, hours: 16.3,
   drawing: { sea: 'water', fleet: SHIPS, length: SHIP.length, lod: null, cloth: true, bolt: false },
   meter: false, hold: null, gun: null,
 };
@@ -72,7 +72,7 @@ async function stage(setup: Setup): Promise<Stage> {
   loaded('gpu');
 
   // The world, built once and handed to the frame that draws it and the game that runs on it.
-  const world = createWorld(setup.seed, setup.land, setup.mean, setup.swing, setup.hours);
+  const world = createWorld(setup.seed, setup.mean, setup.swing, setup.hours);
   loaded('world');
   const frame = createFrame(renderer, world, setup.drawing);
   loaded('frame');
