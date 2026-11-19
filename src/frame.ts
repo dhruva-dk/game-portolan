@@ -1,5 +1,5 @@
 import {
-  Color, NoToneMapping, PerspectiveCamera, RenderPipeline, Scene, Vector2, Vector3, type MRTNode, type Object3D, type WebGPURenderer,
+  Color, NoToneMapping, PerspectiveCamera, RenderPipeline, Scene, Vector2, Vector3, type Object3D, type PassNode, type WebGPURenderer,
 } from 'three/webgpu';
 import {
   Fn, float, getViewPosition, length, normalize, pass, rtt, screenUV, select, uniform, vec3, vec4,
@@ -29,6 +29,7 @@ import { createShafts, type Shafts } from './post/shafts';
 import { SKY_METRES } from './sky/sky';
 import { SPACE } from './palette';
 import { BANDS } from './world/planet-terrain';
+import { clamp } from './world/scalar';
 import { loaded } from './load';
 import type { Vec4Node } from './tsl';
 
@@ -38,7 +39,7 @@ import type { Vec4Node } from './tsl';
  * curve and the look are the grade's (post/grade.ts), set by the sun's height.
  */
 const BLOOM = 0.22;
-const shaftsFor = (rise: number) => 0.6 * (1 - 0.5 * Math.min(1, Math.max(0, (rise - 0.2) / 0.6)));
+const shaftsFor = (rise: number) => 0.6 * (1 - 0.5 * clamp((rise - 0.2) / 0.6));
 /**
  * The frame's pixels per CSS pixel, whatever the screen's own: the iPad Air's is 2, and the browser scales the frame up
  * to it. At 1 its 1180×820 is 0.97 M pixels, half the screen's own each way, as the phone's 1434×660 at 1.5 was, which
@@ -136,12 +137,13 @@ export function createFrame(renderer: WebGPURenderer, world: World, options: Fra
   const water = createWater(view, sky.light, ground, world.wind, options.fleet, options.length, options.sea);
   const shadow = createShadow();
   const light = createLighting(sky.light, water.below, shadow.visible);
-  const terrain = world.land;
-  // (the ground's own, with the caustics on the sea floor)
-  const sand = createSand(view, ground, createLighting(sky.light, water.floor, shadow.visible), BANDS.dunes * terrain.stats.summit);
+  // The ground's own lighting: the sun on the sea floor focused by the waves over it (water.floor's caustics), kept to
+  // the ground's shaders, where they show, so everything else lit is built without them (water.below).
+  const floorLight = createLighting(sky.light, water.floor, shadow.visible);
+  const sand = createSand(view, ground, floorLight, BANDS.dunes * world.land.stats.summit);
   // the ground, under the sea and over it; and what stands on the land
-  const seabed = createTerrainMesh(view, ground, sand, terrain);
-  const groves = createGroves(terrain, world.planet, world.seed, view, light);
+  const terrain = createTerrainMesh(view, ground, sand, world.land);
+  const groves = createGroves(world.land, world.planet, world.seed, view, light);
   shadow.cast(...groves.casters);
   const fleet = createFleet(light, world.wind, options.fleet);
   fleet.pin(options.lod);
@@ -149,10 +151,11 @@ export function createFrame(renderer: WebGPURenderer, world: World, options: Fra
   const arms = createArms(light, options.fleet);
   const gunfire = createGunfire(light);
   const loot = createLoot(light);
-  scene.add(seabed.mesh, ...groves.meshes, ...fleet.meshes, ...arms.meshes, water.mesh, water.ribbons, ...gunfire.meshes, ...loot.meshes, ...(options.extras?.(sky.light, world) ?? []));
-  // (named for the meter's split: meter.ts)
+  scene.add(terrain.mesh, ...groves.meshes, ...fleet.meshes, ...arms.meshes, water.mesh, water.ribbons);
+  scene.add(...gunfire.meshes, ...loot.meshes, ...(options.extras?.(sky.light, world) ?? []));
+  // labels for the meter's split of the draws (meter.ts), and nothing more
   scene.name = 'world';
-  [seabed.mesh.name, water.mesh.name, water.ribbons.name] = ['seabed', 'sea', 'trails'];
+  [terrain.mesh.name, water.mesh.name, water.ribbons.name] = ['terrain', 'sea', 'trails'];
   gunfire.meshes.forEach((m) => (m.name ||= 'gunfire'));
   loot.meshes.forEach((m, k) => (m.name ||= `loot ${k}`));
 
@@ -241,24 +244,30 @@ export function createFrame(renderer: WebGPURenderer, world: World, options: Fra
     }
     renderer.setRenderTarget(null);
   };
-  /** Builds the shaders and pipelines of all `scene` can draw seen by `camera` into `target` (with its `mrt`), what
-   *  is hidden in it too (a system hides what it has none of by drawing none of it: a count of none), in the
-   *  background between frames. The target is the renderer's only while the build is laid out: it is given back as it
-   *  was both then and once the build is done, since compileAsync takes and restores the renderer's state where it
-   *  resumes, after its own awaits (left alone, a frame with no offscreen draw before its own, as when there are no
-   *  ships and no land in view, would draw into the last build's target). Frames are drawn whole between tasks, so neither
-   *  lands in one. */
-  const build = (scene: Object3D, camera: Draw['camera'], target: Draw['target'], mrt: MRTNode | null = null) => {
-    const [was, wasMrt] = [renderer.getRenderTarget(), renderer.getMRT()];
-    const restore = () => {
-      renderer.setRenderTarget(was);
-      renderer.setMRT(wasMrt);
-    };
-    renderer.setRenderTarget(target);
-    renderer.setMRT(mrt);
-    const built = renderer.compileAsync(scene, camera);
-    restore();
-    return built.then(restore);
+  /** Builds the shaders and pipelines of all an offscreen draw's scene can draw into its target, what is hidden in it
+   *  too (a system hides what it has none of by drawing none of it: a count of none); the canvas is the renderer's
+   *  target again once it is done. */
+  const build = async (d: Pick<Draw, 'scene' | 'camera' | 'target'>) => {
+    renderer.setRenderTarget(d.target);
+    await renderer.compileAsync(d.scene, d.camera);
+    renderer.setRenderTarget(null);
+  };
+  const nothing = new Scene();
+  /**
+   * Builds a scene pass's shaders and pipelines as its draw will use them (three's PassNode.compileAsync: its target,
+   * its MRT and its size set as its draw sets them), after first drawing nothing into its target from its camera.
+   * three 0.187's Renderer.compileAsync lays its build out in the render context a draw from that camera into that
+   * target uses, but only a draw tells that context which target it is for; and a node that copies what lies behind
+   * it as it is built (the sea's read of the floor through the water: ViewportTextureNode) copies from the context's
+   * target, or from the canvas when it has none. The empty draw tells it; its pass draws the whole target each frame.
+   */
+  const buildPass = (seen: PassNode) => {
+    renderer.setRenderTarget(seen.renderTarget);
+    renderer.setMRT(seen.getMRT());
+    renderer.render(nothing, seen.camera);
+    renderer.setRenderTarget(null);
+    renderer.setMRT(null);
+    return seen.compileAsync(renderer);
   };
 
   // 0. once
@@ -270,8 +279,9 @@ export function createFrame(renderer: WebGPURenderer, world: World, options: Fra
 
   const size = new Vector2();
   const shadeSun = new Vector3();
-  /** The ships drawn last frame, and the latest moment of the guns' work laid so far (each blast is laid once). */
-  let drawn = new Set<number>(), laid = -Infinity;
+  /** The ships drawn last frame and this one, and the latest moment of the guns' work laid so far (each blast is laid
+   *  once). */
+  let drawn = new Set<number>(), now = new Set<number>(), laid = -Infinity;
 
   /** The eye's camera, placed and turned as the eye says, its aspect the drawing buffer's. */
   function cameraFor(eye: Eye) {
@@ -289,14 +299,18 @@ export function createFrame(renderer: WebGPURenderer, world: World, options: Fra
   /** The ships, the guns' work and the loot, as the snapshot has them. */
   function stage(s: Snapshot) {
     fleet.own(s.own);
-    const now = new Set<number>();
+    now.clear();
     for (const ship of s.ships) {
       fleet.set(ship.id, ship.pose, ship.look, ship.velocity, ship.afloat);
       now.add(ship.id);
     }
     for (const id of drawn) if (!now.has(id)) fleet.drop(id);
+    const was = drawn;
     drawn = now;
+    now = was;
+    let latest = laid;
     for (const b of s.blasts) {
+      latest = Math.max(latest, b.time);
       if (b.time <= laid) continue;
       // the flash at the drawn gun's mouth
       if (b.kind === 'shot') gunfire.shot(b.time, muzzle(b.from, b.dir, b.gun), b.dir, b.gun);
@@ -304,7 +318,7 @@ export function createFrame(renderer: WebGPURenderer, world: World, options: Fra
       else if (b.kind === 'strike') gunfire.strike(b.time, b.at, b.ram, b.shield, b.broke);
       else gunfire.sink(b.time, b.at);
     }
-    laid = Math.max(laid, ...s.blasts.map((b) => b.time));
+    laid = latest;
     gunfire.draw(s.clock, s.balls);
     loot.draw(s.clock, s.loot, s.eye.position);
     arms.update(s.ships, s.eye.position);
@@ -315,10 +329,10 @@ export function createFrame(renderer: WebGPURenderer, world: World, options: Fra
    * frame (ready): the view from space, the other ships, the loot, the trails, the guns' work and the ships' marks are
    * first seen only once a match is under way, and a shader first built then costs that frame tens of milliseconds
    * (more on the phone). Each eye's post is drawn at two frames from its WARM eye, its passes set up (a post's pass
-   * inside another is set up again as the outer is built, which remakes its draw at the next); then its scene is built from
-   * there, and the ships' marks into their map, one after another (three's builds share the renderer's state).
+   * inside another is set up again as the outer is built, which remakes its draw at the next); then its scene is built
+   * from there, and the ships' marks into their map, one after another (three's builds share the renderer's state).
+   * No frame is drawn until they are done.
    */
-  const nothing = new Scene();
   async function prime() {
     for (let k = 0; k < 2; k++) {
       // (a frame apart: what a pass does once a frame is done again only at the renderer's next)
@@ -330,19 +344,11 @@ export function createFrame(renderer: WebGPURenderer, world: World, options: Fra
       loaded(`posts drawn ${k + 1}`);
     }
     for (const eye of WARM) {
-      const { camera, scene: seen } = eyes[eye.kind];
       cameraFor(eye);
-      // nothing drawn into the pass's target first (its pass draws all of it each frame), so the build's context
-      // knows its target: three's build leaves it unset, and the sea's read of what is behind it would copy the canvas
-      renderer.setRenderTarget(seen.renderTarget);
-      renderer.setMRT(seen.getMRT());
-      renderer.render(nothing, camera);
-      renderer.setRenderTarget(null);
-      renderer.setMRT(null);
-      await build(scene, camera, seen.renderTarget, seen.getMRT());
+      await buildPass(eyes[eye.kind].scene);
       loaded(`built ${eye.kind}`);
     }
-    await build(water.marks.scene, water.marks.camera, water.marks.target);
+    await build(water.marks);
     loaded('built marks');
   }
 
@@ -363,7 +369,7 @@ export function createFrame(renderer: WebGPURenderer, world: World, options: Fra
     gunfire.update(eye);
     loot.update(eye);
     const sea = water.update(env, dt, fleet.ships, s);
-    seabed.update(eye);
+    terrain.update(eye);
     // the groves' shadows fall along the sun over the place they are cast round, which stays put however the eye moves
     const shade = groves.update(eye);
     if (shade) shadeSun.set(...sunAt(env.sunPlaces, env.timeOfDay, shade.chart.at));
