@@ -59,7 +59,7 @@ const none = (found: string[], rule: string) => assert.deepEqual(found, [], `${r
 const NEUTRAL = ['snapshot.ts', 'player.ts', 'environment.ts', 'kinds.ts'];
 /** What every render folder may draw on: three, the world, the GPU's plumbing, the plain seams, the palette, and the
  *  shared light. */
-const RENDER = ['three', 'world/', 'gpu.ts', 'tsl.ts', 'palette.ts', 'snapshot.ts', 'environment.ts', 'sky/light.ts'];
+const RENDER = ['three', 'world/', 'gpu.ts', 'tsl.ts', 'colour.ts', 'palette.ts', 'snapshot.ts', 'environment.ts', 'sky/light.ts'];
 const LAYERS: Record<string, readonly string[]> = {
   // the world and the simulation: pure, headless, deterministic (test g)
   'world/': ['world/'],
@@ -72,11 +72,13 @@ const LAYERS: Record<string, readonly string[]> = {
   'player.ts': ['world/', 'kinds.ts'],
   // the rarities' inks, for the two that draw them
   'rarity.ts': [],
-  // every colour of the world, named once: a leaf, for what draws the world and for the ships' colours (play/colours.ts)
-  'palette.ts': [],
+  // sRGB to linear light and back, written once: for the palette, what draws the world and the UI
+  'colour.ts': ['world/scalar.ts'],
+  // every colour of the world, named once, for what draws the world and for the ships' colours (play/colours.ts)
+  'palette.ts': ['colour.ts'],
   'environment.ts': ['world/'],
   // the UI draws plain data: of the sim only the storm's Cap (the full map inks it)
-  'ui/': ['ui/', 'world/', 'sim/storm.ts', 'snapshot.ts', 'player.ts', 'rarity.ts', 'kinds.ts'],
+  'ui/': ['ui/', 'world/', 'sim/storm.ts', 'snapshot.ts', 'player.ts', 'rarity.ts', 'kinds.ts', 'colour.ts'],
   // the sound: hears what the frame draws and the HUD reads, and the screen shown (player.ts Screen)
   'audio/': ['audio/', 'world/', 'snapshot.ts', 'player.ts', 'kinds.ts'],
   // the game runs the sim and says what to draw and show, as plain data
@@ -88,7 +90,7 @@ const LAYERS: Record<string, readonly string[]> = {
   'ship/': ['ship/', ...RENDER, 'view/view.ts', 'kinds.ts'],
   'gunfire/': ['gunfire/', ...RENDER, 'view/view.ts', 'kinds.ts'],
   // the post chain's steps (grade, bloom, film): nodes over the frame's light, composed by the frame
-  'post/': ['post/', 'three', 'tsl.ts', 'world/scalar.ts'],
+  'post/': ['post/', 'three', 'tsl.ts', 'world/scalar.ts', 'colour.ts'],
   // the loot on the water, its pieces and their beacons
   'loot/': ['loot/', ...RENDER, 'view/view.ts', 'rarity.ts', 'ship/gun.ts', 'kinds.ts'],
   'water/': ['water/', ...RENDER, 'view/', 'sky/sky.ts', 'land/ground.ts', 'ship/build.ts', 'ship/materials.ts', 'ship/waterline.ts', 'sim/wake.ts'],

@@ -23,6 +23,7 @@ import {
   MeshBasicNodeMaterial, OctahedronGeometry, OneFactor, Vector2,
 } from 'three/webgpu';
 import { Fn, abs, attribute, cameraPosition, clamp, cos, cross, dot, float, max, mix, normalize, pow, select, sin, smoothstep, uniform, varying, vec3 } from 'three/tsl';
+import { hexToLinear } from '../colour';
 import { GILDING, GLINT, ICE, TAR, TIMBER } from '../palette';
 import type { Light } from '../sky/light';
 import { GLOW } from '../rarity';
@@ -50,12 +51,7 @@ const EMIT = 1.3, BEAM_EMIT = 3, HALO_EMIT = 1.2, RIM = 0.62;
 const SIZE: Record<LootKind, number> = {
   cannon: 2.3, scatter: 2.1, repeater: 2.2, harpoon: 2.4, mortar: 2.1, smallShield: 1.7, bigShield: 2.25, repairKit: 1.6, fullRepair: 2.1,
 };
-/** Linear rgb of 0xrrggbb. */
-const linear = (hex: number): [number, number, number] => {
-  const c = (byte: number) => Math.pow(byte / 255, 2.2);
-  return [c((hex >> 16) & 255), c((hex >> 8) & 255), c(hex & 255)];
-};
-const LIGHTS = GLOW.map(linear);
+const LIGHTS = GLOW.map((hex) => hexToLinear(hex));
 
 /** The buffers: per piece a vec4 of its place (metres) and id, a vec4 of its rarity's light and the rarity, and a vec4
  *  of its birth (the world's clock, s) and its size. */

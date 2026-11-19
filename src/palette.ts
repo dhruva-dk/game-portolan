@@ -3,18 +3,12 @@
 // where the sun reaches it and the one it shows where it does not (sky/light.ts toon): the shadow is a colour chosen
 // for it, warm and saturated, never the lit one greyed. Written as the display's sRGB, as a painter would pick them.
 
-export type Rgb = readonly [number, number, number];
+import { hexToLinear as ink, type Rgb } from './colour.ts';
+
+export type { Rgb };
 /** A solid's two tones. */
 export interface Tones { readonly lit: Rgb; readonly shadow: Rgb }
 
-/** A display colour ('#RRGGBB', sRGB) as linear RGB. */
-const ink = (hex: string): Rgb => {
-  const channel = (i: number) => {
-    const c = parseInt(hex.slice(1 + 2 * i, 3 + 2 * i), 16) / 255;
-    return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
-  };
-  return [channel(0), channel(1), channel(2)];
-};
 const tones = (lit: string, shadow: string): Tones => ({ lit: ink(lit), shadow: ink(shadow) });
 /** A colour as the tint of a light: its hue and saturation, at luminance y. */
 export const tint = (c: Rgb, y: number): Rgb => {
