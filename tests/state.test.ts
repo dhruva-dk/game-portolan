@@ -1,7 +1,7 @@
 // The match afloat (play/state.ts), as the game steps it: who holds the sea through a step, and a match after another.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { bearing, createState, type Match } from '../src/play/state.ts';
+import { createState, type Match } from '../src/play/state.ts';
 import { PLAYER } from '../src/sim/match.ts';
 import { chart } from '../src/sim/route.ts';
 import { berthing } from '../src/sim/spawn.ts';
@@ -9,7 +9,7 @@ import { calm, type Storm } from '../src/sim/storm.ts';
 import type { Helm } from '../src/sim/ship.ts';
 import { landOf, planetOf } from '../src/world/land.ts';
 import { SEED } from '../src/world/planet.ts';
-import { add, type Vec3 } from '../src/world/sphere.ts';
+import { add, bearingAt, type Vec3 } from '../src/world/sphere.ts';
 import { flat } from '../src/world/swell.ts';
 
 const planet = planetOf(SEED, landOf(SEED));
@@ -36,7 +36,7 @@ function loop(m: Match, state = createState(planet, flat, waters, m)) {
     const at = state.vessels()[0]?.ship.at ?? start.at;
     let s = k / 30;
     for (const [b, seconds] of legs) {
-      if (s < seconds) return { course: bearing(at, b * degrees), throttle: 1 };
+      if (s < seconds) return { course: bearingAt(at, b * degrees), throttle: 1 };
       s -= seconds;
     }
     return { course: add(start.at, at, -1), throttle: 1 };
@@ -66,7 +66,7 @@ test('a ship sunk in a step lays, closes and cuts nothing in it: her water only 
 test('a second match on the same state starts clean: its sea as a new state\'s, her loop closing as it did', () => {
   const alone = loop(deadly(Infinity)), first = loop(deadly(Infinity));
   // the first match sailed on a while past its loop, her trail open again, then the second begun on its state
-  for (let k = 0; k < 240; k++) first.state.advance({ course: bearing(first.state.mine()!.ship.at, 180 * degrees), throttle: 1 }, still);
+  for (let k = 0; k < 240; k++) first.state.advance({ course: bearingAt(first.state.mine()!.ship.at, 180 * degrees), throttle: 1 }, still);
   const was = first.state.sea(1)!;
   assert.ok(was.trails.length > 0, 'her trail open at the first match\'s end');
   const second = loop(deadly(Infinity), first.state);

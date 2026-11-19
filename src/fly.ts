@@ -5,7 +5,7 @@
 import { Matrix4, Quaternion, Vector3 } from 'three/webgpu';
 import { AIR_FOV, type Eye } from './snapshot';
 import { clamp } from './world/scalar';
-import { add, along, cross, frameAt, fromLatLon, length, normalize, place, scale, transport } from './world/sphere';
+import { add, along, bearingAt, cross, fromLatLon, length, normalize, place, scale, transport } from './world/sphere';
 
 /** Metres a second; shift multiplies it. */
 const SPEED = 15;
@@ -35,8 +35,7 @@ export interface Start {
 export function createFly(element: HTMLElement, start: Start) {
   let at = fromLatLon(start.lat, start.lon);
   let height = Math.max(start.height, LOWEST);
-  const f = frameAt(at);
-  let heading = add(scale(f.north, Math.cos(start.bearing)), f.east, Math.sin(start.bearing));
+  let heading = bearingAt(at, start.bearing);
   let pitch = start.pitch;
 
   // (its listeners are never removed: the flyer is made once, on a debug page, and flies until the page is left)

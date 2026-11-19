@@ -69,7 +69,7 @@ import type { Game } from './play/game';
 import type { Referee } from './play/referee';
 import { lookOf } from './play/colours';
 import type { Matches } from './play/setup';
-import { bearing, type Berth } from './play/state';
+import type { Berth } from './play/state';
 import { HOTBAR, IDLE, type Hands } from './player';
 import { probeMeshes } from './probe';
 import { STEP } from './sim/fixed';
@@ -81,7 +81,7 @@ import type { ShipDraw, Snapshot } from './snapshot';
 import type { Flow } from './ui/flow';
 import { uiLayer } from './ui/ui';
 import type { Weather } from './world/weather';
-import { R, add, cross, dot, frameAt, along, normalize, scale, type Vec3 } from './world/sphere';
+import { R, add, bearingAt, cross, dot, frameAt, along, normalize, scale, type Vec3 } from './world/sphere';
 
 /** How the page is set up (main.ts RELEASE, or as the switches change it): the planet's seed, the weather's mean and
  *  swing (world/weather.ts) and the time of day (hours); how the frame draws; whether the meter always shows the
@@ -312,7 +312,7 @@ function drive(game: Game, legs: string) {
   const began = game.status().at;
   for (const leg of legs.split(';').filter(Boolean)) {
     const [b, throttle, seconds] = leg.split(',').map(Number);
-    game.debug.lash((s) => ({ course: bearing(s.at, b * degrees), throttle }));
+    game.debug.lash((s) => ({ course: bearingAt(s.at, b * degrees), throttle }));
     for (let i = 0; i < Math.round(seconds / STEP); i++) game.step(STEP, IDLE);
   }
   if (params.has('inward')) {

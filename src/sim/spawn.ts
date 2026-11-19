@@ -12,7 +12,7 @@
 // Pure and deterministic: the same planet and seed give the same berths, to the bit.
 
 import { random } from '../world/random.ts';
-import { R, add, along, distance, frameAt, scale, type Vec3 } from '../world/sphere.ts';
+import { R, along, bearingAt, distance, scale, type Vec3 } from '../world/sphere.ts';
 import { SHIP } from './handling.ts';
 import type { Depth } from './shoal.ts';
 
@@ -45,19 +45,13 @@ function lattice(count: number): Vec3[] {
   });
 }
 
-/** The tangent at `at` on bearing b (radians clockwise from north). */
-const bearing = (at: Vec3, b: number): Vec3 => {
-  const f = frameAt(at);
-  return add(scale(f.north, Math.cos(b)), f.east, Math.sin(b));
-};
-
 /** Whether a ship may lie at p with water to spare all round her. */
 function open(p: Vec3, depth: Depth): boolean {
   const deep = SHIP.draught + SPAWN.depth;
   if (depth(p) < deep) return false;
   for (let r = SPAWN.ring; r <= SPAWN.clear; r += SPAWN.ring) {
     const n = Math.max(6, Math.round((SPAWN.round * r) / SPAWN.clear));
-    for (let k = 0; k < n; k++) if (depth(along(p, bearing(p, (2 * Math.PI * k) / n), r).p) < deep) return false;
+    for (let k = 0; k < n; k++) if (depth(along(p, bearingAt(p,(2 * Math.PI * k) / n), r).p) < deep) return false;
   }
   return true;
 }
@@ -140,9 +134,9 @@ export function berths(water: Berthing, seed: number, count: number, depth: Dept
   }
   return taken.map((i) => {
     const at = points[i], turn = rand() * 2 * Math.PI;
-    let heading = bearing(at, turn), most = -1;
+    let heading = bearingAt(at, turn), most = -1;
     for (let k = 0; k < SPAWN.bearings; k++) {
-      const t = bearing(at, turn + (2 * Math.PI * k) / SPAWN.bearings), m = run(at, t, depth);
+      const t = bearingAt(at, turn +(2 * Math.PI * k) / SPAWN.bearings), m = run(at, t, depth);
       if (m > most) [heading, most] = [t, m];
     }
     return { at, heading: scale(heading, 1 / Math.hypot(...heading)) };

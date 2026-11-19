@@ -7,7 +7,7 @@ import { STEP } from '../src/sim/fixed.ts';
 import { pose, ride, settled, RIDE, type Ride } from '../src/sim/ride.ts';
 import { shipAt, type ShipState } from '../src/sim/ship.ts';
 import { FREQUENCY, anchors, icosphere } from '../src/world/lattice.ts';
-import { R, add, along, cross, dot, frameAt, fromLatLon, length, scale, type Vec3 } from '../src/world/sphere.ts';
+import { R, along, bearingAt, cross, dot, frameAt, fromLatLon, length, type Vec3 } from '../src/world/sphere.ts';
 import { createWind } from '../src/world/wind.ts';
 
 const all = anchors(icosphere(FREQUENCY), createWind(3), CASCADES[0]);
@@ -81,8 +81,8 @@ test('the hull read is the surface at her four points, but for the waves too sho
 /** Ships on a sea for `seconds`, each sailing on at her own speed and bearing; each step's pose as heave, pitch, roll. */
 function voyages(sea: Hull, every: number, seconds: number) {
   return Array.from({ length: 6 }, (_, k) => {
-    const p = fromLatLon(Math.asin(2 * ((k * 0.618) % 1) - 1) * 0.9, k * 2.4), f = frameAt(p), b = k * 1.1;
-    let s: ShipState = { ...shipAt(p, add(scale(f.north, Math.cos(b)), f.east, Math.sin(b))), speed: 2 + 2.5 * k };
+    const p = fromLatLon(Math.asin(2 * ((k * 0.618) % 1) - 1) * 0.9, k * 2.4), b = k * 1.1;
+    let s: ShipState = { ...shipAt(p, bearingAt(p, b)), speed: 2 + 2.5 * k };
     let r: Ride = settled(s, sea, 0, k, every);
     const out: number[][] = [];
     for (let i = 1; i < seconds / STEP; i++) {

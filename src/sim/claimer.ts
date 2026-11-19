@@ -14,11 +14,11 @@
 //
 // Pure arithmetic: no three, so it runs in node for the tests; deterministic for the same inputs, to the bit.
 
-import { apart, distance, along, type Vec3 } from '../world/sphere.ts';
+import { apart, distance, along, toward, type Vec3 } from '../world/sphere.ts';
 import { SHIP } from './handling.ts';
 import { STORM, toEdge } from './storm.ts';
 import { ramp, utility } from './utility.ts';
-import { BOT, between, open, rotate, toward, type Ctx } from './captain.ts';
+import { BOT, between, open, rotate, type Ctx } from './captain.ts';
 
 /** Everything a bot's water is tuned by. Metres and seconds. */
 export const CLAIMER = {

@@ -42,7 +42,7 @@ import type { Hull } from '../world/swell.ts';
 import { remembered, type Planet } from '../world/planet.ts';
 import type { ShipPose } from '../world/pose.ts';
 import { hash } from '../world/random.ts';
-import { add, frameAt, scale, type Vec3 } from '../world/sphere.ts';
+import { add, bearingAt, scale, type Vec3 } from '../world/sphere.ts';
 import { LOOK, lookOf } from './colours.ts';
 import { createHeld } from './held.ts';
 import { indexed } from './indexed.ts';
@@ -54,12 +54,6 @@ import { sinking } from './sinking.ts';
 const AMIDSHIPS: Helm = { course: null, throttle: 0 };
 /** What a sea is cleared for: a match's, with loot strewn over it and who holds it kept; the lobby's, neither. */
 const MATCH = { loot: true, held: true }, LOBBY = { loot: false, held: false };
-
-/** A bearing (radians clockwise from north at a point) as a direction there. */
-export const bearing = (at: Vec3, b: number): Vec3 => {
-  const f = frameAt(at);
-  return add(scale(f.north, Math.cos(b)), f.east, Math.sin(b));
-};
 
 /** A ship put to sea about her in a match at sea: where she lies and heads, her colours, and her helm lashed (she holds
  * it from the start, making the way its throttle asks, and nobody steers her), or null for a bot at it. */
@@ -407,7 +401,7 @@ export function createState(planet: Planet, sea: Hull, { chart, water }: Waters,
     anchor(start: { at: Vec3; bearing: number }): ShipPose {
       clear(match, [PLAYER], LOBBY);
       quiet = true;
-      launch(PLAYER, shipAt(start.at, bearing(start.at, start.bearing)), LOOK);
+      launch(PLAYER, shipAt(start.at, bearingAt(start.at, start.bearing)), LOOK);
       return aboard.get(PLAYER)!.after;
     },
     /** What only the debug switches (src/debug.ts) and the tools ask of the match. */
@@ -415,7 +409,7 @@ export function createState(planet: Planet, sea: Hull, { chart, water }: Waters,
       /** A match at sea about her: hers at `start`, heading `bearing` (radians), and the others. Returns her pose. */
       atSea(start: { at: Vec3; bearing: number }, others: readonly Berth[]): ShipPose {
         clear(match, [PLAYER, ...others.map((_, i) => i + 1)], MATCH);
-        launch(PLAYER, shipAt(start.at, bearing(start.at, start.bearing)), LOOK);
+        launch(PLAYER, shipAt(start.at, bearingAt(start.at, start.bearing)), LOOK);
         others.forEach((o, i) => {
           const way = (o.lashed?.throttle ?? 0) * SHIP.top;
           launch(i + 1, { ...shipAt(o.at, o.heading), speed: way }, o.look, o.lashed);

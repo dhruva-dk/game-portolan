@@ -23,7 +23,7 @@
 //
 // Pure arithmetic: no three, so it runs in node for the tests; deterministic for the same inputs, to the bit.
 
-import { R, add, apart, along, distance, dot, normalize, type Vec3 } from '../world/sphere.ts';
+import { R, add, apart, along, distance, dot, normalize, toward, type Vec3 } from '../world/sphere.ts';
 import { inHand, type Order } from './battle.ts';
 import { STEP } from './fixed.ts';
 import { aimAndFire, armFor, reactTime } from './gunner.ts';
@@ -31,7 +31,7 @@ import type { Helm } from './ship.ts';
 import { STORM, toEdge, type Cap } from './storm.ts';
 import { temper } from './temper.ts';
 import { choose, logistic, momentum, ramp, utility, type Option } from './utility.ts';
-import { BOT, between, inSight, open, roll, rotate, toward, type Ctx, type Memory, type Mode, type Sea, type Seen } from './captain.ts';
+import { BOT, between, inSight, open, roll, rotate, type Ctx, type Memory, type Mode, type Sea, type Seen } from './captain.ts';
 import { deepest, steer } from './helmsman.ts';
 import { healUrge, lootAct, lootUrge, purse, PURSER } from './purser.ts';
 import { claimAct, claimUrge, cutAct, cutUrge, homeAct, homeUrge, sound } from './claimer.ts';

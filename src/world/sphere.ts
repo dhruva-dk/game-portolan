@@ -11,23 +11,41 @@
 // `at`) and chart z along axis × at, as three's x and z run about y. Distances from `at` are kept exactly; across
 // them the chart stretches, by θ / sin θ at an arc of θ radians (about 1.04 at a fifth of a radian).
 //
+// Written into: the helpers the frame and the step call over and over (cross, scale, add, normalize, tangent,
+// bearingAt, rotateAbout, along, toSky; and turn.ts's) take a last, optional `out` (an Out3, or along's pair of them).
+// Given one, they set their answer into it and hand it back, making nothing; without, they make a new vector. Either
+// way the arithmetic is the same to the bit (tests/sphere.test.ts, tests/turn.test.ts), and `out` may be one of the
+// vectors read: each answer is worked out whole before it is written.
+//
 // Pure arithmetic: no three, so it runs in node for the tests.
 
 export const R = 554;
 
 export type Vec3 = readonly [number, number, number];
+/** A vector the helpers write their answer into (their `out`). */
+export type Out3 = [number, number, number];
 /** A point's local axes: up, and the two horizontal compass directions. */
 export interface Frame { up: Vec3; east: Vec3; north: Vec3 }
 /** An azimuthal-equidistant chart about `at` (a unit vector), its x axis along `axis` (a unit tangent at `at`). */
 export interface Chart { at: Vec3; axis: Vec3 }
 
+/** (x, y, z) set into `out`, or made if there is none. */
+export function put(out: Out3 | undefined, x: number, y: number, z: number): Vec3 {
+  if (!out) return [x, y, z];
+  out[0] = x;
+  out[1] = y;
+  out[2] = z;
+  return out;
+}
+
 export const dot = (a: Vec3, b: Vec3) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
-export const cross = (a: Vec3, b: Vec3): Vec3 => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
-export const scale = (a: Vec3, k: number): Vec3 => [a[0] * k, a[1] * k, a[2] * k];
+export const cross = (a: Vec3, b: Vec3, out?: Out3): Vec3 =>
+  put(out, a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]);
+export const scale = (a: Vec3, k: number, out?: Out3): Vec3 => put(out, a[0] * k, a[1] * k, a[2] * k);
 /** a + b·k. */
-export const add = (a: Vec3, b: Vec3, k = 1): Vec3 => [a[0] + b[0] * k, a[1] + b[1] * k, a[2] + b[2] * k];
+export const add = (a: Vec3, b: Vec3, k = 1, out?: Out3): Vec3 => put(out, a[0] + b[0] * k, a[1] + b[1] * k, a[2] + b[2] * k);
 export const length = (a: Vec3) => Math.sqrt(a[0] * a[0] + a[1] * a[1] + a[2] * a[2]);
-export const normalize = (a: Vec3): Vec3 => scale(a, 1 / length(a));
+export const normalize = (a: Vec3, out?: Out3): Vec3 => scale(a, 1 / length(a), out);
 
 /** The point at a latitude and longitude, radians: the north pole is +y, longitude 0 is +x, and east runs toward −z there. */
 export function fromLatLon(lat: number, lon: number): Vec3 {
@@ -114,12 +132,24 @@ export function chartBasis(c: Chart, p: Vec3): [e1: Vec3, e2: Vec3] {
   return [[scratch[2], scratch[3], scratch[4]], [scratch[5], scratch[6], scratch[7]]];
 }
 
+/** A point on the surface and a tangent there (along's answer). */
+export interface Course { p: Vec3; t: Vec3 }
+/** A Course written into (along's `out`). */
+export interface CourseOut { p: Out3; t: Out3 }
+
+/** along's working vectors. */
+const u0: Out3 = [0, 0, 0], q0: Out3 = [0, 0, 0], k0: Out3 = [0, 0, 0];
+
 /** From p, `metres` along the surface in the direction of tangent t: the point reached and the tangent there. */
-export function along(p: Vec3, t: Vec3, metres: number): { p: Vec3; t: Vec3 } {
-  const u = normalize(p), a = metres / R, c = Math.cos(a), s = Math.sin(a);
-  const q = normalize(add(scale(u, c), t, s));
-  const k = add(scale(t, c), u, -s);
-  return { p: q, t: normalize(add(k, q, -dot(k, q))) };
+export function along(p: Vec3, t: Vec3, metres: number, out?: CourseOut): Course {
+  const u = normalize(p, u0), a = metres / R, c = Math.cos(a), s = Math.sin(a);
+  const q = normalize(add(scale(u, c, q0), t, s, q0), q0);
+  const k = add(scale(t, c, k0), u, -s, k0);
+  const to = add(k, q, -dot(k, q), k0);
+  if (!out) return { p: [q[0], q[1], q[2]], t: normalize(to) };
+  normalize(to, out.t);
+  put(out.p, q[0], q[1], q[2]);
+  return out;
 }
 
 /**
@@ -138,7 +168,19 @@ export function transport(t: Vec3, from: Vec3, to: Vec3): Vec3 {
 }
 
 /** v less its part along the unit vector `up`: v laid in the tangent plane at up (not made unit). */
-export const tangent = (v: Vec3, up: Vec3): Vec3 => add(v, up, -dot(v, up));
+export const tangent = (v: Vec3, up: Vec3, out?: Out3): Vec3 => add(v, up, -dot(v, up), out);
+
+/** The way from unit vector p toward q along the surface: a unit tangent at p, or null at q (or its antipode). */
+export function toward(p: Vec3, q: Vec3, out?: Out3): Vec3 | null {
+  const t = tangent(q, p, out), l = length(t);
+  return l > 1e-12 ? scale(t, 1 / l, out) : null;
+}
+
+/** A bearing (radians clockwise from north at a point, frameAt's) as the unit tangent there. */
+export function bearingAt(at: Vec3, bearing: number, out?: Out3): Vec3 {
+  const f = frameAt(at);
+  return add(scale(f.north, Math.cos(bearing), out), f.east, Math.sin(bearing), out);
+}
 
 /**
  * The unit tangent at unit vector u at `angle` radians round from a reference fixed for each point, anticlockwise
@@ -153,9 +195,12 @@ export function tangentAt(u: Vec3, angle: number): Vec3 {
 
 /** v turned `angle` radians about the unit vector `axis`, anticlockwise looking down it (Rodrigues): a tangent at up
  *  turned about up goes to port. Its length is kept. */
-export function rotateAbout(v: Vec3, axis: Vec3, angle: number): Vec3 {
-  const c = Math.cos(angle), s = Math.sin(angle);
-  return add(add(scale(v, c), cross(axis, v), s), axis, dot(axis, v) * (1 - c));
+export function rotateAbout(v: Vec3, axis: Vec3, angle: number, out?: Out3): Vec3 {
+  const c = Math.cos(angle), s = Math.sin(angle), k = dot(axis, v) * (1 - c);
+  // v·c + (axis × v)·s + axis·k, written out
+  const x = v[0], y = v[1], z = v[2], ax = axis[0], ay = axis[1], az = axis[2];
+  return put(out, x * c + (ay * z - az * y) * s + ax * k, y * c + (az * x - ax * z) * s + ay * k,
+    z * c + (ax * y - ay * x) * s + az * k);
 }
 
 /**
@@ -205,13 +250,13 @@ export const horizonDistance = (height: number) => R * horizonDip(height);
 export const skyElevation = (e: number, dip: number) => (e + dip) / (1 + (2 * dip) / Math.PI);
 
 /** A world direction as the eye's sky sees it: in the eye's frame (x east, y up, z south), its elevation stretched. */
-export function toSky(f: Frame, dip: number, dir: Vec3): Vec3 {
-  const d = normalize(dir);
-  const x = dot(d, f.east), y = dot(d, f.up), z = -dot(d, f.north);
+export function toSky(f: Frame, dip: number, dir: Vec3, out?: Out3): Vec3 {
+  const k = 1 / length(dir), dx = dir[0] * k, dy = dir[1] * k, dz = dir[2] * k;
+  const x = dx * f.east[0] + dy * f.east[1] + dz * f.east[2], y = dx * f.up[0] + dy * f.up[1] + dz * f.up[2];
+  const z = -(dx * f.north[0] + dy * f.north[1] + dz * f.north[2]);
   const e = skyElevation(Math.asin(Math.max(-1, Math.min(1, y))), dip);
-  const h = Math.hypot(x, z);
-  const [hx, hz] = h > 1e-12 ? [x / h, z / h] : [1, 0];
-  return [hx * Math.cos(e), Math.sin(e), hz * Math.cos(e)];
+  const h = Math.hypot(x, z), level = h > 1e-12;
+  return put(out, (level ? x / h : 1) * Math.cos(e), Math.sin(e), (level ? z / h : 0) * Math.cos(e));
 }
 
 // ------------------------------------------------------------------ the cube

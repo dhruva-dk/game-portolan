@@ -7,7 +7,7 @@ import { shipAt } from '../src/sim/ship.ts';
 import { landOf, planetOf } from '../src/world/land.ts';
 import { SEED } from '../src/world/planet.ts';
 import { random } from '../src/world/random.ts';
-import { R, add, along, distance, dot, frameAt, fromLatLon, length, normalize, scale, type Vec3 } from '../src/world/sphere.ts';
+import { R, add, along, bearingAt, distance, dot, frameAt, fromLatLon, length, normalize, scale, type Vec3 } from '../src/world/sphere.ts';
 
 const at = fromLatLon(0.4, -0.7), f = frameAt(at), deep = () => 30;
 /** A sight from `height` m over `at` onto the sea `metres` north. */
@@ -45,8 +45,7 @@ test('looked for only near the land\'s rises, a sight meets what it met looking 
   const offshore = (): { base: Vec3; back: number } => {
     for (;;) {
       const rise = rises[Math.floor(draw() * rises.length)], out = draw() * 2 * Math.PI;
-      const f = frameAt(rise.at), t = add(scale(f.north, Math.cos(out)), f.east, Math.sin(out));
-      const base = along(rise.at, t, rise.reach * (1 + 0.6 * draw())).p;
+      const base = along(rise.at, bearingAt(rise.at, out),rise.reach * (1 + 0.6 * draw())).p;
       if (rise.top > 3 && planet.height(base) < 0) return { base, back: out + Math.PI };
     }
   };
@@ -62,8 +61,7 @@ test('looked for only near the land\'s rises, a sight meets what it met looking 
     // low and looking back toward it, where the land is in the way
     const ashore = k % 3 === 0, off = ashore ? offshore() : null;
     const base = off ? off.base : anywhere();
-    const fb = frameAt(base), a = off ? off.back + 0.6 * (draw() - 0.5) : draw() * 2 * Math.PI;
-    const ahead = add(scale(fb.north, Math.cos(a)), fb.east, Math.sin(a));
+    const a = off ? off.back + 0.6 * (draw() - 0.5) : draw() * 2 * Math.PI, ahead = bearingAt(base, a);
     const s = {
       from: scale(base, R + (ashore ? 2 + 6 * draw() : 3 + 37 * draw())),
       dir: normalize(add(ahead, base, -(ashore ? 0.02 : 0.15) * draw()))

@@ -2,8 +2,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Matrix4, Quaternion, Vector3 } from 'three';
-import { inverse, lookAt, rotate, slerp, type Turn } from '../src/world/turn.ts';
-import type { Vec3 } from '../src/world/sphere.ts';
+import { inverse, lookAt, multiply, rotate, slerp, type Out4, type Turn } from '../src/world/turn.ts';
+import type { Out3, Vec3 } from '../src/world/sphere.ts';
 
 /** A deterministic spread of awkward and ordinary vectors. */
 const vectors: Vec3[] = [
@@ -30,5 +30,28 @@ test('slerp and rotate are three\'s', () => {
   for (const q of turns) for (const v of vectors) {
     const w = new Vector3(...v).applyQuaternion(new Quaternion(...q).invert());
     assert.deepEqual(rotate(v, inverse(q)), [w.x, w.y, w.z]);
+  }
+});
+
+test('lookAt, slerp, multiply and rotate written into an out are what they make, even into what they read', () => {
+  const turns = vectors.slice(0, 12).map((v, i) => lookAt(v, [0, 0, 0], ups[i % ups.length]));
+  const into = <T extends readonly number[]>(made: T, written: T, out: T) => {
+    assert.deepEqual(written, made);
+    assert.equal(written, out);
+  };
+  for (const eye of vectors) for (const up of ups) {
+    const out: Out4 = [9, 9, 9, 9];
+    into(lookAt(eye, [0, 0, 0], up), lookAt(eye, [0, 0, 0], up, out), out);
+  }
+  for (const a of turns) for (const b of turns) {
+    const out: Out4 = [9, 9, 9, 9], own: Out4 = [...a];
+    into(slerp(a, b, 0.3), slerp(a, b, 0.3, out), out);
+    into(slerp(a, b, 0.3), slerp(own, b, 0.3, own), own);
+    const product: Out4 = [...a];
+    into(multiply(a, b), multiply(product, b, product), product);
+  }
+  for (const q of turns) for (const v of vectors) {
+    const out: Out3 = [...v];
+    into(rotate(v, q), rotate(out, q, out), out);
   }
 });

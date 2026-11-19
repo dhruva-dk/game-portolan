@@ -2,7 +2,7 @@
 // cover, its baked faces and its remembered heights. The terrain's own shape is terrain.test.ts's.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { R, along, distance, dot, faceDir, frameAt, add, scale, type Vec3 } from '../src/world/sphere.ts';
+import { R, along, bearingAt, distance, dot, faceDir, type Vec3 } from '../src/world/sphere.ts';
 import { START, SEED, bakeFaces, remembered } from '../src/world/planet.ts';
 import { landOf, planetOf } from '../src/world/land.ts';
 import { CELL, between, locate, taps } from '../src/world/terrain-grid.ts';
@@ -32,8 +32,8 @@ test('the land stands only within its rises: under the top of every rise whose r
   // all over the sphere, and close round the rises' edges
   const points = lattice(20000);
   for (let k = 0; k < 10000; k++) {
-    const r = rises[Math.floor(draw() * rises.length)], f = frameAt(r.at), a = draw() * 2 * Math.PI;
-    points.push(along(r.at, add(scale(f.north, Math.cos(a)), f.east, Math.sin(a)), r.reach * (0.8 + 0.4 * draw())).p);
+    const r = rises[Math.floor(draw() * rises.length)], a = draw() * 2 * Math.PI;
+    points.push(along(r.at, bearingAt(r.at, a), r.reach * (0.8 + 0.4 * draw())).p);
   }
   let worst = -Infinity;
   for (const q of points) {
@@ -60,7 +60,7 @@ test('she starts on the water START m off the coast, facing the land', () => {
   assert.ok(planet.height(p) < -SHIP.draught, `${planet.height(p).toFixed(2)} m under her`);
   assert.ok(Math.abs(-inland(p) - START) < 1.5 * CELL, `${(-inland(p)).toFixed(1)} m off the coast`);
   // the coast is ahead of her: within START and a little more along her heading
-  const f = frameAt(p), ahead = add(scale(f.north, Math.cos(bearing)), f.east, Math.sin(bearing));
+  const ahead = bearingAt(p, bearing);
   assert.ok(inland(along(p, ahead, START + 4 * CELL).p) > 0, 'no land ahead of her');
   assert.ok(Math.abs(dot(ahead, p)) < 1e-9);
 });

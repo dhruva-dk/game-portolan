@@ -19,7 +19,7 @@
 //
 // Pure arithmetic: no three, so it runs in node for the tests; deterministic for the same inputs.
 
-import { R, add, along, cross, distance, dot, length, normalize, place, scale, type Vec3 } from '../world/sphere.ts';
+import { R, add, along, cross, distance, length, normalize, place, scale, toward, type Vec3 } from '../world/sphere.ts';
 import type { Crew, Order } from './battle.ts';
 import { damageOf, falloff, reloadOf, spreadOf } from './gun.ts';
 import type { GunKind } from '../kinds.ts';
@@ -76,11 +76,6 @@ export const gunner = (): Gunner => ({ react: 0, err: [0, 0, 0], errTo: [0, 0, 0
 /** A ship as her gunner sees her: her place, heading, way and shove. */
 interface Mark { ship: ShipState; shove?: Vec3 }
 
-/** The unit tangent at p toward q, or null at q. */
-const toward = (p: Vec3, q: Vec3): Vec3 | null => {
-  const t = add(q, p, -dot(p, q)), l = length(t);
-  return l > 1e-12 ? scale(t, 1 / l) : null;
-};
 const between = (draw: () => number, [lo, hi]: readonly [number, number]) => lo + (hi - lo) * draw();
 
 /** How many times the gun's own spread her balls go off within, by her skill. */

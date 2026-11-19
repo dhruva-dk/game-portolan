@@ -19,7 +19,7 @@
 
 import type { Rise } from '../world/planet.ts';
 import { random } from '../world/random.ts';
-import { R, add, along, cross, distance, dot, length, normalize, scale, type Vec3 } from '../world/sphere.ts';
+import { R, add, along, cross, distance, length, normalize, scale, toward, type Vec3 } from '../world/sphere.ts';
 import type { Vessel } from './contact.ts';
 import type { GunKind } from '../kinds.ts';
 import { FALLOFF, GUN, GUNS } from './handling.ts';
@@ -78,12 +78,6 @@ export const muzzle = (v: Vessel): Vec3 => scale(hullAt(v.ship.at, v.ship.headin
 
 /** Her way over the sea: through the water and on her shove (m/s, a tangent at her place). */
 const way = (v: Vessel): Vec3 => add(scale(v.ship.heading, v.ship.speed), v.shove);
-
-/** The unit tangent at `up` toward `to`, or null right over it. */
-const toward = (up: Vec3, to: Vec3): Vec3 | null => {
-  const t = add(to, up, -dot(to, up));
-  return length(t) > 1e-12 ? normalize(t) : null;
-};
 
 /** The way off along tangent `t` at `up`, at `elevation` above the level. */
 const off = (up: Vec3, t: Vec3, elevation: number) => add(scale(t, Math.cos(elevation)), up, Math.sin(elevation));

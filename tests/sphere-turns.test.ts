@@ -1,7 +1,11 @@
-// world/sphere.ts's turns of directions: the tangent at a point, a turn about an axis, and the great circle's slerp.
+// world/sphere.ts's turns of directions: the tangent at a point, a turn about an axis, and the great circle's slerp;
+// and its helpers written into an out.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { arc, dot, length, normalize, rotateAbout, tangent, type Vec3 } from '../src/world/sphere.ts';
+import {
+  add, along, arc, bearingAt, cross, dot, frameAt, length, normalize, rotateAbout, scale, tangent, toSky, toward,
+  type CourseOut, type Out3, type Vec3,
+} from '../src/world/sphere.ts';
 
 const near = (a: Vec3, b: Vec3, eps = 1e-12, what = '') =>
   assert.ok(Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]) <= eps, `${what} ${a} vs ${b}`);
@@ -27,6 +31,43 @@ test('rotateAbout turns a tangent at up to port, keeps lengths, and leaves the a
     }
     near(rotateAbout(up, up, 1.1), up);
     near(rotateAbout(rotateAbout(v, up, 0.7), up, -0.7), v, 1e-12, 'undone');
+  }
+});
+
+test('the helpers written into an out are what they make, to the bit, even into a vector they read', () => {
+  const vs: Vec3[] = [[0.4, -1.3, 2.2], [3, 0, -1], [1e-3, 5, 2e-4], ...ups];
+  /** Written into a fresh out and into a copy of its first argument, and each the same as made. */
+  const both = (made: Vec3, write: (out: Out3, own: Out3) => Vec3, first: Vec3, what: string) => {
+    const out: Out3 = [9, 9, 9], own: Out3 = [...first];
+    assert.equal(write(out, own), out, what);
+    assert.deepEqual(out, made, what);
+    assert.equal(write(own, own), own, what);
+    assert.deepEqual(own, made, `${what}, into what it reads`);
+  };
+  for (const a of vs) for (const b of vs) for (const up of ups) {
+    both(cross(a, b), (o, own) => cross(own, b, o), a, 'cross');
+    both(scale(a, 0.7), (o, own) => scale(own, 0.7, o), a, 'scale');
+    both(add(a, b, -1.3), (o, own) => add(own, b, -1.3, o), a, 'add');
+    both(normalize(a), (o, own) => normalize(own, o), a, 'normalize');
+    both(tangent(a, up), (o, own) => tangent(own, up, o), a, 'tangent');
+    both(rotateAbout(a, up, 0.9), (o, own) => rotateAbout(own, up, 0.9, o), a, 'rotateAbout');
+    both(bearingAt(up, 1.1), (o) => bearingAt(up, 1.1, o), up, 'bearingAt');
+    both(toSky(frameAt(up), 0.05, a), (o, own) => toSky(frameAt(up), 0.05, own, o), a, 'toSky');
+    const way = toward(up, a);
+    if (way) both(way, (o) => toward(up, a, o)!, up, 'toward');
+    const t = tangent(b, up), course = along(up, t, 37), out: CourseOut = { p: [9, 9, 9], t: [9, 9, 9] };
+    assert.equal(along(up, t, 37, out), out);
+    assert.deepEqual(out, course, 'along');
+  }
+});
+
+test('toward is the unit tangent from p toward q, and bearingAt the bearing clockwise from north', () => {
+  for (const up of ups) {
+    const f = frameAt(up);
+    near(bearingAt(up, 0), f.north);
+    near(bearingAt(up, Math.PI / 2), f.east);
+    near(toward(up, along(up, f.east, 20).p)!, f.east, 1e-9);
+    assert.equal(toward(up, up), null);
   }
 });
 

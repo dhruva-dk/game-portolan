@@ -9,7 +9,7 @@ import { clearance, type Depth } from '../src/sim/shoal.ts';
 import { shipAt } from '../src/sim/ship.ts';
 import { landOf, planetOf } from '../src/world/land.ts';
 import { SEED } from '../src/world/planet.ts';
-import { add, along, distance, frameAt, fromLatLon, normalize, scale, type Vec3 } from '../src/world/sphere.ts';
+import { add, along, bearingAt, distance, frameAt, fromLatLon, normalize, scale, type Vec3 } from '../src/world/sphere.ts';
 import { random } from '../src/world/random.ts';
 
 const deg = Math.PI / 180;
@@ -124,8 +124,8 @@ test('on the real planet: the chart, a route and 16 routed bots, timed', () => {
   const rand = random(17), pairs: { p: Vec3; q: Vec3; d: number }[] = [];
   while (pairs.length < 300) {
     const z = 2 * rand() - 1, a = 2 * Math.PI * rand(), s = Math.sqrt(1 - z * z), p: Vec3 = [s * Math.cos(a), z, s * Math.sin(a)];
-    const g = frameAt(p), bearing = 2 * Math.PI * rand(), d = 150 + 250 * rand();
-    const q = along(p, add(scale(g.north, Math.cos(bearing)), g.east, Math.sin(bearing)), d).p, n = Math.ceil(d / 6);
+    const bearing = 2 * Math.PI * rand(), d = 150 + 250 * rand();
+    const q = along(p, bearingAt(p, bearing), d).p, n = Math.ceil(d / 6);
     const line = Array.from({ length: n }, (_, k) => normalize(add(scale(p, 1 - k / n), q, k / n)));
     if (openAt(ch, p) && openAt(ch, q) && !line.every((x) => openAt(ch, x))) pairs.push({ p, q, d });
   }
@@ -170,9 +170,8 @@ test('on the real planet: the chart, a route and 16 routed bots, timed', () => {
   assert.ok(tally.near[1] >= 0.95 * tally.near[0] && tally.far[1] >= 0.8 * tally.far[0]);
 
   // 16 bots on the water round where she starts, for 20 s
-  const home = planet.start.at, f = frameAt(home);
-  const ring = (bearing: number, metres: number) =>
-    along(home, add(scale(f.north, Math.cos(bearing)), f.east, Math.sin(bearing)), metres).p;
+  const home = planet.start.at;
+  const ring = (bearing: number, metres: number) => along(home, bearingAt(home, bearing), metres).p;
   const berthed: Vessel[] = [];
   for (let k = 0; berthed.length < 16; k++) {
     const p = ring(k * 0.7, 20 + 6 * k);

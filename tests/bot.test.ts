@@ -8,7 +8,7 @@ import { RAM, SHIP } from '../src/sim/handling.ts';
 import { clearance, type Depth } from '../src/sim/shoal.ts';
 import { shipAt, type Helm } from '../src/sim/ship.ts';
 import { toEdge, type Cap, type Storm } from '../src/sim/storm.ts';
-import { R, add, along, distance, dot, frameAt, fromLatLon, normalize, scale, type Vec3 } from '../src/world/sphere.ts';
+import { R, along, bearingAt, distance, dot, frameAt, fromLatLon, normalize, type Vec3 } from '../src/world/sphere.ts';
 
 const deg = Math.PI / 180;
 const start = fromLatLon(0.2, 0.3);
@@ -51,13 +51,9 @@ function sail(
 }
 
 /** A ship `metres` from the start on a bearing (radians clockwise from north), heading `heading` likewise. */
-const way = (p: Vec3, bearing: number): Vec3 => {
-  const f = frameAt(p);
-  return add(scale(f.north, Math.cos(bearing)), f.east, Math.sin(bearing));
-};
 const placed = (id: number, bearing: number, metres: number, heading: number, speed = 0): Vessel => {
-  const at = along(start, way(start, bearing), metres).p;
-  return afloat(id, { ...shipAt(at, way(at, heading)), speed });
+  const at = along(start, bearingAt(start, bearing), metres).p;
+  return afloat(id, { ...shipAt(at, bearingAt(at, heading)), speed });
 };
 /** Seeds whose temper passes `ok`. */
 const seedsWhere = (ok: (t: ReturnType<typeof temper>) => boolean, n: number) => {
@@ -175,7 +171,7 @@ test('a bot outside the next cap makes for it in time, and is never caught outsi
   // the next cap, 120 m round a point 400 m off; it starts to close from 600 m in 20 s, over 70 s (its edge at 7 m/s,
   // as fast as any phase after the first)
   for (const [k, seed] of captains.entries()) {
-    const centre = along(start, way(start, k * 0.9), 400).p, storm = closing(centre, 600, 120, 20, 70);
+    const centre = along(start, bearingAt(start, k * 0.9), 400).p, storm = closing(centre, 600, 120, 20, 70);
     let worst = Infinity;
     const r = sail([placed(1, k * 0.7, 30, k * 1.9)], [seed], 100, deep, undefined, (f, t) => {
       worst = Math.min(worst, toEdge(f[0].ship.at, storm(t)));
@@ -188,7 +184,7 @@ test('a bot outside the next cap makes for it in time, and is never caught outsi
   }
   // and without the storm she pays it no heed (so it is the storm that brings her in)
   const free = sail([placed(1, 0, 30, 0)], [captains[0]], 70, deep);
-  assert.ok(toEdge(free.fleet[0].ship.at, { centre: along(start, way(start, 0), 400).p, radius: 120 / R }) < 0);
+  assert.ok(toEdge(free.fleet[0].ship.at, { centre: along(start, bearingAt(start, 0), 400).p, radius: 120 / R }) < 0);
 });
 
 test('a bot inside the cap never leaves it, roaming or with the next one closing round her', () => {

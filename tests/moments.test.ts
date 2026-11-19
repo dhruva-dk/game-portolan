@@ -6,7 +6,7 @@ import { HER, HOTBAR, type Deed } from '../src/player.ts';
 import { KEEP, bearingFrom, deedsOf, kept, seenOf, type Done } from '../src/play/moments.ts';
 import { CAMERA, answerTo, createShake, envelope, noise } from '../src/play/shake.ts';
 import { STOPS, createStops, stopFor } from '../src/play/stops.ts';
-import { bearing, createState, type Match } from '../src/play/state.ts';
+import { createState, type Match } from '../src/play/state.ts';
 import { LOOK } from '../src/play/colours.ts';
 import { PLAYER } from '../src/sim/match.ts';
 import { chart } from '../src/sim/route.ts';
@@ -15,7 +15,7 @@ import { calm } from '../src/sim/storm.ts';
 import { BIG, SAFE, capped, heartbeat, lowHull } from '../src/ui/flash.ts';
 import { landOf, planetOf } from '../src/world/land.ts';
 import { SEED } from '../src/world/planet.ts';
-import { R, normalize, scale, type Vec3 } from '../src/world/sphere.ts';
+import { R, bearingAt, normalize, scale, type Vec3 } from '../src/world/sphere.ts';
 import { flat } from '../src/world/swell.ts';
 import { lookAt } from '../src/world/turn.ts';
 
@@ -98,7 +98,7 @@ test('the match records its deeds: a ship sunk is told once, with a sink blast t
   const state = createState(planet, flat, { chart: chart(depth), water: berthing(depth) }, match);
   const before = state.deeds().at(-1)?.seq ?? 0;
   const there = normalize([start.at[0] + 0.05, start.at[1], start.at[2]]);
-  state.debug.atSea(start, [{ at: there, heading: bearing(there, 0), look: LOOK, lashed: null }]);
+  state.debug.atSea(start, [{ at: there, heading: bearingAt(there, 0), look: LOOK, lashed: null }]);
   const other = state.vessels().find((v) => v.id !== PLAYER)!.id;
   state.debug.sink(other, PLAYER);
   const sank = state.deeds().filter((d) => d.seq > before && d.kind === 'sank');

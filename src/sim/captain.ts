@@ -4,7 +4,7 @@
 //
 // Pure arithmetic: no three, so it runs in node for the tests; deterministic for the same inputs, to the bit.
 
-import { add, cross, dot, length, scale, type Vec3 } from '../world/sphere.ts';
+import { add, cross, scale, type Vec3 } from '../world/sphere.ts';
 import { random } from '../world/random.ts';
 import { STEP } from './fixed.ts';
 import { SHIP } from './handling.ts';
@@ -163,11 +163,6 @@ export interface Ctx { own: Seen; others: readonly Seen[]; sea: Sea; m: Memory; 
 
 // ---------------------------------------------------------------- the sphere
 
-/** The way from p toward q along the surface: a unit tangent at p, or null at q (or its antipode). */
-export function toward(p: Vec3, q: Vec3): Vec3 | null {
-  const t = add(q, p, -dot(p, q)), l = length(t);
-  return l > 1e-12 ? scale(t, 1 / l) : null;
-}
 /** Tangent t at p turned `a` radians to port. */
 export const rotate = (p: Vec3, t: Vec3, a: number): Vec3 => add(scale(t, Math.cos(a)), cross(p, t), Math.sin(a));
 /** A ship's way through the water and her shove: m/s, a tangent at her place. */

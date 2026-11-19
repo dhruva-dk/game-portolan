@@ -10,7 +10,7 @@
 //
 // Pure arithmetic: no three, so it runs in node for the tests; deterministic for the same inputs, to the bit.
 
-import { add, apart, along, cross, distance, dot, length, normalize, scale, transport, type Vec3 } from '../world/sphere.ts';
+import { add, apart, along, cross, distance, dot, length, normalize, scale, toward, transport, type Vec3 } from '../world/sphere.ts';
 import { inHand } from './battle.ts';
 import { gap } from './contact.ts';
 import { RAM, SHIP } from './handling.ts';
@@ -18,7 +18,7 @@ import { ring } from './gunner.ts';
 import { offCourse, turned, type Helm } from './ship.ts';
 import { course as routed } from './route.ts';
 import { PURSER } from './purser.ts';
-import { BOT, between, inSight, open, roll, rotate, toward, unitHash, velocity, type Ctx, type Seen } from './captain.ts';
+import { BOT, between, inSight, open, roll, rotate, unitHash, velocity, type Ctx, type Seen } from './captain.ts';
 
 /** Where to steer to ram `foe` on her side: led for where she will be, by way of her beam when she is end on. A tangent
  *  at her place. */

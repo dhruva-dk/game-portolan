@@ -46,7 +46,7 @@ import type { Eye, LootDraw, Snapshot } from '../snapshot.ts';
 import { createSwell } from '../world/swell.ts';
 import type { Anchor } from '../world/lattice.ts';
 import type { ShipPose } from '../world/pose.ts';
-import { R, add, distance, dot, normalize, scale, type Vec3 } from '../world/sphere.ts';
+import { R, add, bearingAt, distance, dot, normalize, scale, type Vec3 } from '../world/sphere.ts';
 import { HOTBAR, IDLE, type GunSlot, type Hands, type Item, type Kit, type Moment, type Slot, type Status } from '../player.ts';
 import { REST, anchorageEye, dragged, relaxed, type Orbit } from './anchorage.ts';
 import { ARRIVAL, arriving } from './arrival.ts';
@@ -56,7 +56,7 @@ import { finale, type Ending } from './finale.ts';
 import { see, seenOf } from './moments.ts';
 import { answerTo, createShake } from './shake.ts';
 import { createStops, stopFor } from './stops.ts';
-import { bearing, createState, type Berth, type Match, type Waters } from './state.ts';
+import { createState, type Berth, type Match, type Waters } from './state.ts';
 
 /** How little of the stick's push counts as none. */
 const DEAD = 0.15;
@@ -99,7 +99,7 @@ export function createGame(world: World, anchors: readonly Anchor[], waters: Wat
   /** The camera: what the flow sets, and seconds since her end's shot began. */
   let view: View = { watch: PLAYER, hands: true, look: true, end: null }, ended = 0;
   /** Her pose as last drawn. */
-  let last: ShipPose = { position: scale(start.at, R), forward: bearing(start.at, start.bearing), up: start.at };
+  let last: ShipPose = { position: scale(start.at, R), forward: bearingAt(start.at, start.bearing), up: start.at };
   /** Seconds since the match began while the eye is still coming down onto her (arrival.ts), else null. */
   let arrival: number | null = null;
   /** Her helm while lashed, until a hand takes it. */

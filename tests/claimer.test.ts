@@ -12,21 +12,16 @@ import { shipAt, type Helm } from '../src/sim/ship.ts';
 import type { Storm } from '../src/sim/storm.ts';
 import { temper } from '../src/sim/temper.ts';
 import { createTerritory, type Outcome, type Territory } from '../src/sim/territory.ts';
-import { R, add, along, distance, frameAt, fromLatLon, scale, type Vec3 } from '../src/world/sphere.ts';
+import { R, along, bearingAt, distance, fromLatLon } from '../src/world/sphere.ts';
 
 const start = fromLatLon(0.2, 0.3);
 const deep: Depth = () => 30;
 const WHOLE = { centre: start, radius: Math.PI };
 
-/** The way on a bearing (radians clockwise from north) at p. */
-const way = (p: Vec3, bearing: number): Vec3 => {
-  const f = frameAt(p);
-  return add(scale(f.north, Math.cos(bearing)), f.east, Math.sin(bearing));
-};
 /** Ship `id` `metres` from the start on a bearing, heading `heading`. */
 const placed = (id: number, bearing: number, metres: number, heading: number): Vessel => {
-  const at = along(start, way(start, bearing), metres).p;
-  return afloat(id, shipAt(at, way(at, heading)));
+  const at = along(start, bearingAt(start, bearing), metres).p;
+  return afloat(id, shipAt(at, bearingAt(at, heading)));
 };
 const seedWhere = (ok: (t: ReturnType<typeof temper>) => boolean) => {
   let s = 1;
@@ -96,7 +91,7 @@ test('hurt and her shield down, she heads home to her water; not with the storm 
   assert.ok(free.modes.has('home'), `about ${[...free.modes]}`);
   assert.ok(free.home, `${free.from.toFixed(0)} m from her berth`);
   // the storm's calm 200 m north of her berth, 150 m round: her water outside it, she inside
-  const centre = along(start, way(start, 0), 200).p, cap = { centre, radius: 150 / R };
+  const centre = along(start, bearingAt(start, 0), 200).p, cap = { centre, radius: 150 / R };
   const storm: Storm = { ...cap, next: cap, closing: false, secondsToNext: 60, phase: 1, damage: 0.05 };
   const stormy = hurt(25, storm);
   assert.ok(!stormy.modes.has('home'), `about ${[...stormy.modes]}`);
@@ -104,18 +99,18 @@ test('hurt and her shield down, she heads home to her water; not with the storm 
 });
 
 test('a bot sails across another\'s open trail she can reach before its ship is home, whatever her temper', () => {
-  const north = way(start, 0), helm = (v: Vessel): Helm => ({ course: way(v.ship.at, 0), throttle: 1 });
+  const north = bearingAt(start, 0), helm = (v: Vessel): Helm => ({ course: bearingAt(v.ship.at, 0), throttle: 1 });
   for (let seed = 1; seed <= 12; seed++) {
     // his water at the start, hers far to the south; he sails north some 200 m, laying his trail, out of her sight
     const t = createTerritory(2);
-    t.begin([along(start, way(start, Math.PI), 600).p, start], 0);
+    t.begin([along(start, bearingAt(start, Math.PI), 600).p, start], 0);
     const sailed = Math.round(202 / SHIP.top / STEP) * STEP;
     const him = voyage([afloat(1, shipAt(start, north))], [null], sailed, t, { held: helm }).fleet[0];
     // she lies 70 m off its middle, abeam of it; he is some 100 m on and 180 m from home: she reaches it long before
-    const mid = along(start, north, 90).p, at = along(mid, way(mid, Math.PI / 2), 70).p;
+    const mid = along(start, north, 90).p, at = along(mid, bearingAt(mid, Math.PI / 2), 70).p;
     let cut = 0;
     const modes = new Set<string>();
-    voyage([afloat(0, shipAt(at, way(at, Math.PI))), him], [seed, null], 15, t, {
+    voyage([afloat(0, shipAt(at, bearingAt(at, Math.PI))), him], [seed, null], 15, t, {
       since: sailed, held: helm,
       each: (_, minds, did) => {
         modes.add(minds[0]!.mode);

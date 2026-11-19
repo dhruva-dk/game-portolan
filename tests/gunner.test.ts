@@ -11,22 +11,17 @@ import { asked, type Ask } from '../src/sim/stores.ts';
 import { reactTime, spreadBy } from '../src/sim/gunner.ts';
 import type { Depth } from '../src/sim/shoal.ts';
 import { shipAt, type Helm } from '../src/sim/ship.ts';
-import { add, along, distance, frameAt, fromLatLon, scale, type Vec3 } from '../src/world/sphere.ts';
+import { along, bearingAt, distance, fromLatLon } from '../src/world/sphere.ts';
 import { temper } from '../src/sim/temper.ts';
 import { sunk } from '../src/sim/health.ts';
 import type { Storm } from '../src/sim/storm.ts';
-import { R } from '../src/world/sphere.ts';
 
 const deep: Depth = () => 30;
 const start = fromLatLon(0.2, 0.3);
 const deg = Math.PI / 180;
-const way = (p: Vec3, bearing: number): Vec3 => {
-  const f = frameAt(p);
-  return add(scale(f.north, Math.cos(bearing)), f.east, Math.sin(bearing));
-};
 const placed = (id: number, bearing: number, metres: number, heading: number, speed = 0): Vessel => {
-  const at = along(start, way(start, bearing), metres).p;
-  return afloat(id, { ...shipAt(at, way(at, heading)), speed });
+  const at = along(start, bearingAt(start, bearing), metres).p;
+  return afloat(id, { ...shipAt(at, bearingAt(at, heading)), speed });
 };
 const bold = (() => {
   const out: number[] = [];
