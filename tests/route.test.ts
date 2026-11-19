@@ -15,7 +15,8 @@ import { random } from '../src/world/random.ts';
 const deg = Math.PI / 180;
 const start = fromLatLon(0.2, 0.3);
 const { east, north } = frameAt(start);
-const at = (x: number, y: number): Vec3 => along(start, add(scale(east, x / Math.hypot(x, y) || 0), north, y / Math.hypot(x, y) || 0), Math.hypot(x, y)).p;
+const at = (x: number, y: number): Vec3 =>
+  along(start, add(scale(east, x / Math.hypot(x, y) || 0), north, y / Math.hypot(x, y) || 0), Math.hypot(x, y)).p;
 
 /** A round island `r` m across its dry land at c, its floor rising 1 in 3, in water 30 m deep. */
 const island = (c: Vec3, r: number) => (p: Vec3) => (distance(p, c) - r) / 3;
@@ -92,7 +93,8 @@ test('a bot reaches a mark behind an island in near the least time, which withou
     const tangent = Math.sqrt(d * d - rc * rc), arc = rc * (Math.PI - Math.acos(rc / d) - Math.acos(rc / 130));
     const least = (tangent + arc + Math.sqrt(130 * 130 - rc * rc) - BOT.arrive) / SHIP.top;
     const routed = voyage(round, roundChart, ship, mark, 3), felt = voyage(round, null, ship, mark, 3);
-    console.log(`# behind the island from ${y} m: ${routed.seconds.toFixed(1)} s by routes, ${felt.seconds.toFixed(1)} s feeling her way, ${least.toFixed(1)} s at top speed all the way`);
+    console.log(`# behind the island from ${y} m: ${routed.seconds.toFixed(1)} s by routes, ${felt.seconds.toFixed(1)} s feeling her way,`
+      + ` ${least.toFixed(1)} s at top speed all the way`);
     assert.ok(routed.least >= 0);
     assert.ok(routed.seconds < 1.3 * least + 4, `${y}: ${routed.seconds} s`);
     assert.ok(felt.seconds > 1.2 * routed.seconds, `${y}: ${felt.seconds} s without`);
@@ -133,10 +135,10 @@ test('on the real planet: the chart, a route and 16 routed bots, timed', () => {
   const times: number[] = [];
   let found = 0;
   for (const { p: a, q: b } of across) {
-    // timed as the best of three: the search's own cost, not whatever else the machine is doing (the suite runs its
+    // timed as the best of five: the search's own cost, not whatever else the machine is doing (the suite runs its
     // files side by side); a search that does more work is slower every time
     let best = Infinity;
-    const r = Array.from({ length: 3 }, () => {
+    const r = Array.from({ length: 5 }, () => {
       t = performance.now();
       const found = findPath(ch, a, b);
       best = Math.min(best, performance.now() - t);
@@ -169,29 +171,36 @@ test('on the real planet: the chart, a route and 16 routed bots, timed', () => {
 
   // 16 bots on the water round where she starts, for 20 s
   const home = planet.start.at, f = frameAt(home);
-  const ring = (bearing: number, metres: number) => along(home, add(scale(f.north, Math.cos(bearing)), f.east, Math.sin(bearing)), metres).p;
-  let fleet: Vessel[] = [];
-  for (let k = 0; fleet.length < 16; k++) {
+  const ring = (bearing: number, metres: number) =>
+    along(home, add(scale(f.north, Math.cos(bearing)), f.east, Math.sin(bearing)), metres).p;
+  const berthed: Vessel[] = [];
+  for (let k = 0; berthed.length < 16; k++) {
     const p = ring(k * 0.7, 20 + 6 * k);
-    if (openAt(ch, p) && depth(p) > 6) fleet.push(afloat(fleet.length, shipAt(p, frameAt(p).east)));
+    if (openAt(ch, p) && depth(p) > 6) berthed.push(afloat(berthed.length, shipAt(p, frameAt(p).east)));
   }
-  const minds = fleet.map((v) => mind(v.id + 1, v.ship.at));
-  let botMs = 0, worst = 0, all = 0;
-  const steps = 20 / STEP;
-  for (let n = 0; n < steps; n++) {
-    const t0 = performance.now();
-    const helms = fleet.map((v, i) => {
-      const r = think(v, fleet.filter((o) => o.id !== v.id), { depth, chart: ch }, minds[i], v.id + 1);
-      minds[i] = r.memory;
-      return r.helm;
-    });
-    const t1 = performance.now();
-    fleet = stepFleet(fleet, helms, STEP, depth).fleet;
-    botMs += t1 - t0;
-    worst = Math.max(worst, t1 - t0);
-    all += performance.now() - t0;
+  // sailed twice, the same 20 s each time, each step timed as the lesser of the two: the bots' own cost, not whatever
+  // else the machine is doing (the suite runs its files side by side)
+  const steps = 20 / STEP, thinking = new Array<number>(steps).fill(Infinity), whole = thinking.slice();
+  let fleet = berthed;
+  for (let run = 0; run < 2; run++) {
+    fleet = berthed;
+    const minds = fleet.map((v) => mind(v.id + 1, v.ship.at));
+    for (let n = 0; n < steps; n++) {
+      const t0 = performance.now();
+      const helms = fleet.map((v, i) => {
+        const r = think(v, fleet.filter((o) => o.id !== v.id), { depth, chart: ch }, minds[i], v.id + 1);
+        minds[i] = r.memory;
+        return r.helm;
+      });
+      const t1 = performance.now();
+      fleet = stepFleet(fleet, helms, STEP, depth).fleet;
+      thinking[n] = Math.min(thinking[n], t1 - t0);
+      whole[n] = Math.min(whole[n], performance.now() - t0);
+    }
   }
-  console.log(`# 16 routed bots on the planet: ${(botMs / steps).toFixed(3)} ms a step thinking (the most ${worst.toFixed(2)}), ${(all / steps).toFixed(3)} ms with the fleet`);
+  const botMs = thinking.reduce((s, x) => s + x, 0), all = whole.reduce((s, x) => s + x, 0);
+  console.log(`# 16 routed bots on the planet: ${(botMs / steps).toFixed(3)} ms a step thinking`
+    + ` (the most ${Math.max(...thinking).toFixed(2)}), ${(all / steps).toFixed(3)} ms with the fleet`);
   assert.ok(botMs / steps < 1);
   for (const v of fleet) assert.ok(clearance(v.ship.at, v.ship.heading, depth).least >= 0);
 });
