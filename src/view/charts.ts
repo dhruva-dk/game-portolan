@@ -107,7 +107,8 @@ export function createCharts(span: number, alike: Likeness, wind: Wind) {
         const at = C.xyz, axis = X.xyz;
         const c = chartNodes(at, axis, cross(axis, at))(u);
         const grad = (d: Vec3Node | undefined) => (d ? vec2(dot(d, c.e1), dot(d, c.e2)) : vec2(0));
-        read({ q: c.q.add(vec2(C.w, X.w)), e1: c.e1, e2: c.e2, w: weight[slot], dx: grad(dp?.[0]), dy: grad(dp?.[1]), dw: slope[slot] ?? vec3(0) }, slot);
+        const q = c.q.add(vec2(C.w, X.w));
+        read({ q, e1: c.e1, e2: c.e2, w: weight[slot], dx: grad(dp?.[0]), dy: grad(dp?.[1]), dw: slope[slot] ?? vec3(0) }, slot);
       };
       if (slot === 0) run();
       else If(weight[slot].greaterThan(0), run);

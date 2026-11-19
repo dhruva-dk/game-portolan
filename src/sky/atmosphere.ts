@@ -3,8 +3,8 @@
 // and the tests check them here.
 //
 // Units are kilometres. These are Earth's tables, tied to the observer: the eye stands a few metres above the sea at
-// the top of a sphere of radius BOTTOM, and the small planet's own sky is read through them (stretching its
-// elevations so its horizon falls on Earth's: world/sphere.ts's toSky).
+// the top of a sphere of radius BOTTOM, and the small planet's own sky is read through them (view.toSky stretches its
+// elevations so its horizon falls on Earth's).
 
 import type { Rgb } from '../colour';
 
@@ -45,7 +45,7 @@ export function extinction(h: number): Rgb {
 }
 
 /** Distance from radius r along cosine-of-zenith mu to the top of the atmosphere. */
-export function distanceToTop(r: number, mu: number): number {
+function distanceToTop(r: number, mu: number): number {
   return Math.max(0, -r * mu + Math.sqrt(Math.max(0, r * r * (mu * mu - 1) + TOP * TOP)));
 }
 

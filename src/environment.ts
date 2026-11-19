@@ -70,7 +70,8 @@ export function environmentAt(world: World, clock: number, eye: Vec3, into?: Env
   const { timeOfDay, sunPlaces, weather, seaWind } = world.climate;
   const now = weather(clock), sunDirection = sunAt(sunPlaces, timeOfDay, eye), windDirection = world.wind(eye);
   if (!into) {
-    return { clock, timeOfDay, sunPlaces, seaWind, sunDirection, windSpeed: now.wind, windDirection, cloudCoverage: now.cloud, haze: now.haze };
+    const { wind: windSpeed, cloud: cloudCoverage, haze } = now;
+    return { clock, timeOfDay, sunPlaces, seaWind, sunDirection, windSpeed, windDirection, cloudCoverage, haze };
   }
   into.clock = clock;
   into.sunDirection = sunDirection;

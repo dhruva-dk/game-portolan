@@ -21,8 +21,6 @@ export type BoolNode = Node<'bool'>;
 export type Vec2Node = Node<'vec2'>;
 export type Vec3Node = Node<'vec3'>;
 export type Vec4Node = Node<'vec4'>;
-export type Mat3Node = Node<'mat3'>;
-export type Mat4Node = Node<'mat4'>;
 
 /** float(x) for x either a number or a float node: three's float() takes each, as separate overloads, so a value that
  * may be either has to be told apart before the call. */

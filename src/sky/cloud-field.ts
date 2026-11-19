@@ -33,7 +33,10 @@ import { CLOUD } from '../palette';
 import { POTENTIAL_DECILES, WEATHER_TILE, type CloudNoise } from './cloud-noise';
 import { henyeyGreenstein, loop, ramp, type FloatNode, type Vec3Node, type Vec4Node } from '../tsl';
 import { RAYLEIGH, type Tables } from './tables';
+// the CPU's numbers, apart from TSL's nodes of the same names
+import * as scalar from '../world/scalar';
 
+/** 1 under a … 0 past b, eased between: smoothstep's fall. */
 const fall = (a: number, b: number, x: FloatNode): FloatNode => float(1).sub(smoothstep(a, b, x));
 
 // ------------------------------------------------------------------ constants
@@ -71,7 +74,7 @@ const BILLOW = 0.25;
 /** How much of the billows the erosion can take. */
 const EROSION = 0.55;
 /** Farthest distance marched, km: about where the shell's base meets the horizon (√(2·6360·1.2) = 124). */
-export const MAX_DISTANCE = 120;
+const MAX_DISTANCE = 120;
 /** Past this distance the erosion is finer than a pixel, km; it is left out. */
 const DETAIL_DISTANCE = 25;
 /** Target step, km; a ray takes as many as its path through the shell needs, up to its cap. */
@@ -95,12 +98,11 @@ export type CloudField = ReturnType<typeof createCloudField>;
  * zero, by up to LAYER at full cover, so even the gaps between cells lie that deep inside cloud and the billows no
  * longer open them. And how far the large-scale field moves it either way (km), most at middling cover.
  */
-export function cloudThreshold(k: number): { threshold: number; fieldShift: number } {
-  const x = Math.min(Math.max(1 - k, 0), 1) * 10;
+function cloudThreshold(k: number): { threshold: number; fieldShift: number } {
+  const x = scalar.clamp(1 - k) * 10;
   const i = Math.min(Math.floor(x), 9);
   const D = POTENTIAL_DECILES;
-  const t = Math.min(Math.max((k - 0.6) / 0.4, 0), 1);
-  const layer = LAYER * t * t * (3 - 2 * t);
+  const layer = LAYER * scalar.smoothstep(0.6, 1, k);
   return { threshold: D[i] + (x - i) * (D[i + 1] - D[i]) - layer, fieldShift: FIELD_SHIFT * 4 * k * (1 - k) };
 }
 

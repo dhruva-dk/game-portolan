@@ -24,7 +24,10 @@
 //   deck(c, dir, m)  the storm seen from high over it instead (the full map's view from space): its cloud's top
 
 import { Vector3 } from 'three/webgpu';
-import { Fn, abs, cross, dot, exp, float, length, luminance, max, mix, normalWorldGeometry, normalize, pow, select, smoothstep, sqrt, uniform, vec3 } from 'three/tsl';
+import {
+  Fn, abs, cross, dot, exp, float, length, luminance, max, mix, normalWorldGeometry, normalize, pow, select, smoothstep, sqrt,
+  uniform, vec3,
+} from 'three/tsl';
 import type { Environment } from '../environment';
 import type { Cap } from '../sim/storm';
 import type { Compute } from '../gpu';

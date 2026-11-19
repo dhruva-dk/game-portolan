@@ -132,7 +132,8 @@ export function createReflection(
     textureStore(reduced, uvec2(x, y), vec4(sum.div(16), 1));
   })().compute(RW * RH, [64]);
 
-  const levels = [reduce, ...Array.from({ length: LEVELS }, (_, i) => (i + 1 < ROUGH ? sharp(i + 1, panorama, reflection) : rough(i + 1, reduced, reflection)))];
+  const filter = (n: number) => (n < ROUGH ? sharp(n, panorama, reflection) : rough(n, reduced, reflection));
+  const levels = [reduce, ...Array.from({ length: LEVELS }, (_, i) => filter(i + 1))];
   /** What update hands back: all the passes, one after another in one pass, or none. */
   const due: Record<'cloudy' | 'clear' | 'none', readonly Compute[]> = {
     cloudy: [[bakeOf(true), ...levels]], clear: [[bakeOf(false), ...levels]], none: [],
