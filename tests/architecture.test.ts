@@ -94,8 +94,10 @@ const LAYERS: Record<string, readonly string[]> = {
   'water/': ['water/', ...RENDER, 'view/', 'sky/sky.ts', 'land/ground.ts', 'ship/build.ts', 'ship/materials.ts', 'ship/waterline.ts', 'sim/wake.ts'],
   'gpu.ts': ['three'],
   'tsl.ts': ['three'],
-  'frame.ts': ['three', 'gpu.ts', 'tsl.ts', 'palette.ts', 'snapshot.ts', 'environment.ts', 'world/', 'view/', 'sky/', 'land/', 'water/', 'ship/', 'gunfire/', 'loot/', 'post/'],
+  'frame.ts': ['three', 'gpu.ts', 'tsl.ts', 'palette.ts', 'snapshot.ts', 'environment.ts', 'load.ts', 'world/', 'view/', 'sky/', 'land/', 'water/', 'ship/', 'gunfire/', 'loot/', 'post/'],
   'meter.ts': ['three'],
+  // the load's stages, said as reached: a leaf, for the page and the frame
+  'load.ts': [],
   // the debug tools, and the switches that drive the game through what it offers anyone
   'fly.ts': ['three', 'world/', 'snapshot.ts'],
   'probe.ts': ['three', 'world/', 'sky/sky.ts'],

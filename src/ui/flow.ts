@@ -1,7 +1,7 @@
 // The screens' order, as ways.ts tables it: the title, the lobby with its folios, the match, and her end over the live
 // world (the camera's beat on it, then her result with its ways on: watch the match on, or home). Every way is her tap
-// on something drawn for it, or the match's own course as the game reports it (player.ts End); nothing moves on by a
-// clock of its own. Every screen fades in and out; where the world itself changes at once it cross-fades (PLAY:
+// on something drawn for it, or the match's own course as the game reports it (player.ts End), but the title's, taken
+// as the world is ready; nothing moves on by a clock of its own. Every screen fades in and out; where the world itself changes at once it cross-fades (PLAY:
 // veil.ts), or (home to the lobby) the match fades under parchment, held until the lobby is drawn (passage.ts). The HUD shows in the match (fading in at the end of the arrival: hud.ts), fades out as
 // her end begins, and comes back, only its clock, count and disc, while she watches another ship.
 
@@ -53,7 +53,7 @@ export function createFlow(
   let end: End | null = null, gain: { from: Career; to: Career } | null = null;
 
   const veil = createVeil();
-  const title = createTitle(() => tap('begin'));
+  const title = createTitle();
   const lobby = createLobby({ play: () => tap('play'), rank: () => tap('rank'), settings: () => tap('settings') });
   const rank = createRank(() => tap('close'));
   const settingsFolio = createSettings(() => settings, (s) => {
@@ -121,8 +121,11 @@ export function createFlow(
     get settings() {
       return settings;
     },
-    /** The world is ready to be shown. */
-    ready: () => title.ready(),
+    /** The world is ready to be shown: the title gives way to the lobby by itself (if the UI still stands there). */
+    ready() {
+      title.ready();
+      tap('begin');
+    },
     /** Her end as the game reports it each frame (null while she fights or with no match): the screens follow it. */
     end(now: End | null) {
       end = now;

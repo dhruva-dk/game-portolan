@@ -71,31 +71,23 @@ export function banner(x: number, y: number, w: number, mark: string, gilt = fal
     + mark;
 }
 
-export function createTitle(go: () => void) {
+/** The title, shown while the world is made: its needle swinging until then. It takes no tap: the flow moves on to the
+ *  lobby as the world is ready (flow.ts). */
+export function createTitle() {
   const s = sheet(true);
-  // the cue, once ready: a gilt ring breathing out from the rose, over and over
-  const cue = `<g id="cue" opacity="0"><circle cx="478" cy="182" r="132" fill="none" stroke="${WASH.gold}" stroke-width="3">`
-    + '<animate attributeName="r" values="132;150" dur="1.8s" repeatCount="indefinite"/>'
-    + '<animate attributeName="stroke-opacity" values=".9;0" dur="1.8s" repeatCount="indefinite"/></circle>'
-    + `<circle cx="478" cy="182" r="131" fill="none" stroke="${WASH.gold}" stroke-width="2.4" opacity=".85"/></g>`;
-  s.set(rhumbs(478, 182, 1100, 0.3) + cue + rose(478, 182, 126, 0) + galleon(478, 352, 74, { hull: 'url(#h-gold)' }));
-  const needle = s.root.querySelector<SVGGElement>('.needle')!, ring = s.root.querySelector<SVGGElement>('#cue')!;
+  s.set(rhumbs(478, 182, 1100, 0.3) + rose(478, 182, 126, 0) + galleon(478, 352, 74, { hull: 'url(#h-gold)' }));
+  const needle = s.root.querySelector<SVGGElement>('.needle')!;
   needle.style.animation = 'needle 1.6s ease-in-out infinite alternate';
-  ring.style.transition = 'opacity 0.6s ease 0.6s';
   const style = document.createElement('style');
   style.textContent = '@keyframes needle { from { transform: rotate(-38deg) } to { transform: rotate(52deg) } }';
   document.head.appendChild(style);
-  let ready = false;
-  onTap(s.root, () => ready && go());
   return {
     show: s.show,
-    /** The world is ready: the needle settles north, with one small overshoot, and the cue begins. */
+    /** The world is ready: the needle settles north, with one small overshoot, as the title fades. */
     ready() {
-      ready = true;
       needle.style.animation = 'none';
       needle.style.transition = 'transform 0.9s cubic-bezier(.3,1.6,.5,1)';
       needle.style.transform = 'rotate(0deg)';
-      ring.style.opacity = '1';
     },
   };
 }
