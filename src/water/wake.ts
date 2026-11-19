@@ -53,7 +53,7 @@ import { additive, type Draw } from '../gpu';
 import { PIVOT_Z, buildShip } from '../ship/build';
 import { THROUGH } from '../ship/materials';
 import { WATERLINE } from '../ship/waterline';
-import { WAKE, laid, type WakePoint } from '../sim/wake';
+import { WAKE, lay, type WakePoint } from '../sim/wake';
 import type { Sky } from '../sky/sky';
 import type { View } from '../view/view';
 import type { ShipPose } from '../world/pose';
@@ -308,8 +308,8 @@ export function createWake(view: View, sky: Sky, capacity: number) {
   const wakes: WakePoint[][] = [];
   /** How far each ship's bow has gone since her wake began, metres; and where it was last frame. */
   const sailed = new Float64Array(capacity);
-  /** Where each ship's bow was last frame (a unit vector). */
-  const stems: (sphere.Vec3 | undefined)[] = [];
+  /** Where each ship's bow was last frame (a unit vector), and where it is now. */
+  const stems: (sphere.Out3 | undefined)[] = [], bow: sphere.Out3 = [0, 1, 0];
   /** The bow now: the newest point of the ribbon being drawn, which the wake kept so far (sim/wake.ts) goes on from. */
   const head: WakePoint = { at: [0, 1, 0], time: 0, speed: 0 };
   /** The chart the map is drawn on: the eye's. */
@@ -366,14 +366,14 @@ export function createWake(view: View, sky: Sky, capacity: number) {
         const speed = sphere.length(velocity);
         // her bow, a unit vector of its own: the wake keeps it
         const bx = pos[0] + fwd[0] * WATERLINE.stem, by = pos[1] + fwd[1] * WATERLINE.stem, bz = pos[2] + fwd[2] * WATERLINE.stem;
-        const bl = 1 / Math.hypot(bx, by, bz), stem: sphere.Vec3 = [bx * bl, by * bl, bz * bl];
-        const was = wakes[i], last = stems[i];
-        wakes[i] = laid(was ?? [], stem, now, speed);
+        const bl = 1 / Math.hypot(bx, by, bz), stem = bow;
+        sphere.put(stem, bx * bl, by * bl, bz * bl);
+        const last = stems[i], wake = (wakes[i] ??= []), on = lay(wake, stem, now, speed);
         // a fresh wake starts the count again (and it goes round every 4 km, to keep its precision; the seam is
         // a jump in the patches' pattern, once in a long while)
-        const fresh = !was?.length || !wakes[i].includes(was[0]) || !last;
-        sailed[i] = fresh ? 0 : (sailed[i] + sphere.distance(last, stem)) % 4096;
-        stems[i] = stem;
+        sailed[i] = on && last ? (sailed[i] + sphere.distance(last, stem)) % 4096 : 0;
+        if (last) sphere.put(last, stem[0], stem[1], stem[2]);
+        else stems[i] = [stem[0], stem[1], stem[2]];
         // too far off the map for any of her marks to reach it
         if (sphere.distance(stem, eye.frame.up) > REACH * 1.5 + WAKE.most * 3) continue;
         head.at = stem;
