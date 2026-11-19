@@ -64,7 +64,8 @@ export function quad<G extends BufferGeometry>(g: G, bottom = -1): G {
 
 /**
  * A scene drawn into a target of its own, cleared first: to `clear` (0xrrggbb and an alpha) if given, else to the
- * renderer's clear colour.
+ * renderer's clear colour. three draws a scene through a camera, so one is always given, even where every mesh places
+ * itself in the target (water/wake.ts) and the camera is never read.
  */
 export interface Draw {
   scene: Scene;

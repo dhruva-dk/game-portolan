@@ -106,8 +106,7 @@ export function loop(name: string, count: number | IntNode, body: (i: IntNode) =
   return Loop(params, (counters: Readonly<Record<string, IntNode>>) => body(counters[name]));
 }
 
-// three's WorkgroupInfoNode has element(index) (WorkgroupInfoNode.js: a WorkgroupInfoElementNode), which its types
-// (WorkgroupInfoNode.d.ts) leave out; declared here as three defines it, its element type given by the caller.
+// A gap in @types/three 0.187: WorkgroupInfoNode.element(index), public in three (WorkgroupInfoNode.js), is undeclared.
 declare module 'three/webgpu' {
   interface WorkgroupInfoNode {
     element<TNodeType>(indexNode: Node | number): Node<TNodeType>;
