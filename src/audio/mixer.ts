@@ -11,7 +11,7 @@ import type { Heard } from './space.ts';
 import { claim, clear, pool, VOICES } from './voices.ts';
 
 /** The ceiling the limiter holds the output under (−1 dBFS). */
-export const CEILING = db(-1);
+const CEILING = db(-1);
 /** The mix's gain into the master's dynamics, dB: the whole set so the passage of play (tools/audio.ts) sits near
  *  −22 LUFS at the settings' default level, her gun's peaks taken by the limiter. */
 const GAIN = 4;

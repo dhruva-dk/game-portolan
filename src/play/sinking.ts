@@ -5,7 +5,7 @@
 import type { ShipPose } from '../world/pose.ts';
 import { add, cross, normalize, rotateAbout } from '../world/sphere.ts';
 
-export const SINKING = {
+const SINKING = {
   /** Seconds from sunk to gone. */
   seconds: 7,
   /** Metres she goes down by then: past her mainmast's truck. */

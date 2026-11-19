@@ -47,7 +47,7 @@ export const GALE_HEARD = 380, GALE_INSIDE = 45;
  *  about her once in it. And the share of it that is about her (rain, the highs), 0…1. */
 export const galeOf = (wall: number) =>
   (wall >= GALE_HEARD ? 0 : wall > 0 ? 0.6 * (1 - wall / GALE_HEARD) : 0.6 + 0.4 * clamp(-wall / GALE_INSIDE));
-export const insideOf = (wall: number) => clamp(-wall / GALE_INSIDE + 0.15);
+const insideOf = (wall: number) => clamp(-wall / GALE_INSIDE + 0.15);
 
 /** The bed's levels for `b`, written into `out`. */
 export function levelsOf(b: Bed, out: Levels): Levels {

@@ -444,5 +444,3 @@ export function createState(planet: Planet, sea: Hull, { chart, water }: Waters,
     },
   };
 }
-
-export type State = ReturnType<typeof createState>;

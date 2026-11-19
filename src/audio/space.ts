@@ -15,7 +15,7 @@ export const SPEED = 340;
  *  own inverse distance, so a gun a few hundred metres off is still heard over the sea about her. */
 export const NEAR = 14, FALL = 0.8;
 /** Quieter than this (a factor; −46 dB) a sound is not played. */
-export const QUIET = 0.005;
+const QUIET = 0.005;
 /** The air's lowpass: OPEN Hz at hand, coming down as the distance grows (half at DULL m), never under FLOOR. */
 export const OPEN = 16000, DULL = 90, FLOOR = 550;
 

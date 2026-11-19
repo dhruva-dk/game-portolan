@@ -180,5 +180,3 @@ export function createChase(ground: (p: Vec3) => number, sea: (p: Vec3, time: nu
     sight: () => ({ from: position, dir: rotate([0, 0, -1], orientation) }),
   };
 }
-
-export type Chase = ReturnType<typeof createChase>;
