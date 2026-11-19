@@ -292,8 +292,8 @@ export function createFrame(renderer: WebGPURenderer, world: World, options: Fra
     camera.aspect = size.x / size.y;
     camera.fov = eye.fov;
     camera.updateProjectionMatrix();
-    camera.position.set(...eye.position);
-    camera.quaternion.set(...eye.orientation);
+    camera.position.fromArray(eye.position);
+    camera.quaternion.fromArray(eye.orientation);
     camera.updateMatrixWorld();
     return camera;
   }
@@ -374,7 +374,7 @@ export function createFrame(renderer: WebGPURenderer, world: World, options: Fra
     terrain.update(eye);
     // the groves' shadows fall along the sun over the place they are cast round, which stays put however the eye moves
     const shade = groves.update(eye);
-    if (shade) shadeSun.set(...sunAt(env.sunPlaces, env.timeOfDay, shade.chart.at));
+    if (shade) shadeSun.fromArray(sunAt(env.sunPlaces, env.timeOfDay, shade.chart.at));
     const landShadow = shadow.update(shadeSun, shade);
 
     // 1. offscreen, what is due

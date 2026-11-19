@@ -240,9 +240,9 @@ export function createSky(view: View, bolt: boolean) {
      */
     update(env: Environment, cap: Cap, kind: Eye['kind'], dt: number, width: number, height: number): SkyPasses {
       storm.update(cap, env.clock, view.eye.position);
-      sun.value.set(...env.sunDirection);
-      origin.value.set(...env.sunPlaces.origin);
-      there.value.set(...sunAtOrigin(env.sunPlaces, env.timeOfDay));
+      sun.value.fromArray(env.sunDirection);
+      origin.value.fromArray(env.sunPlaces.origin);
+      there.value.fromArray(sunAtOrigin(env.sunPlaces, env.timeOfDay));
       rise.value = sunInSky(env.timeOfDay)[1];
       const s = sphere.toSky(view.eye.frame, view.eye.dip, env.sunDirection);
       skySun.value.set(s[0], s[1], s[2]);

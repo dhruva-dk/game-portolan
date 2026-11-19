@@ -144,7 +144,7 @@ export function createStormLook(view: View, shape: Storage3DTexture, held: boole
     /** The storm now (sim/storm.ts); seconds: the world's clock (Environment.clock), which its rain, billows and
      *  lightning run on; eye: where the eye is (world, m). */
     update(cap: Cap, seconds: number, eye: Vec3) {
-      centre.value.set(...cap.centre);
+      centre.value.fromArray(cap.centre);
       radius.value = cap.radius;
       // two axes square to the centre, for the bays along the edge
       const [one, two] = across;
