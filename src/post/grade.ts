@@ -14,11 +14,11 @@
 // Exposure and the vignette act on the scene's light before the curve.
 
 import { abs, clamp, exp, float, length, luminance, max, min, mix, mod, pow, screenUV, select, smoothstep, step, uniform, vec2, vec3 } from 'three/tsl';
+import { DAWN_MIST, STORM_SLATE, type Rgb } from '../palette';
 import type { FloatNode, Vec3Node } from '../tsl';
 // the CPU's numbers, apart from TSL's nodes of the same names
 import * as scalar from '../world/scalar';
 
-type RGB = readonly [number, number, number];
 
 /** A look. The lift is a small offset in linear light. */
 export interface Look {
@@ -33,7 +33,7 @@ export interface Look {
   /** Saturation of the warm hues (reds to yellows), the sea's (greens to cyans) and the sky's (blues), on top. */
   warm: number; sea: number; sky: number;
   /** Lifts the blacks toward fadeTo by this much. */
-  fade: number; fadeTo: RGB;
+  fade: number; fadeTo: Rgb;
   /** How much the corners darken. */
   vignette: number;
 }
@@ -50,15 +50,15 @@ const DAY: readonly (readonly [number, Look])[] = [
 /** A morning's low sun, against the evening's amber: a rose cast, the blacks lifted a little to a lavender mist.
  *  Mixed in under a rising sun, most at the golden hour's height, gone by the afternoon's. */
 const DAWN: Look = {
-  exposure: 0, temp: -0.02, tint: -0.06, contrast: 1, saturation: 1, warm: 1.05, sea: 1, sky: 1, fade: 0.02, fadeTo: [0.12, 0.1, 0.15], vignette: 0.16,
+  exposure: 0, temp: -0.02, tint: -0.06, contrast: 1, saturation: 1, warm: 1.05, sea: 1, sky: 1, fade: 0.02, fadeTo: DAWN_MIST, vignette: 0.16,
 };
 /** In the storm: cooler and dimmer, pushed toward violet (magenta in the tint), its blacks lifted to a slate violet,
  *  the corners darker. Its colour is kept: the ships' dyes still read. */
 const STORM: Look = {
-  exposure: 0.8, temp: -0.15, tint: -0.1, contrast: 1, saturation: 0.92, warm: 1, sea: 0.9, sky: 0.95, fade: 0.03, fadeTo: [0.13, 0.1, 0.19], vignette: 0.32,
+  exposure: 0.8, temp: -0.15, tint: -0.1, contrast: 1, saturation: 0.92, warm: 1, sea: 0.9, sky: 0.95, fade: 0.03, fadeTo: STORM_SLATE, vignette: 0.32,
 };
 
-const lerp3 = (a: RGB, b: RGB, t: number): RGB => [scalar.lerp(a[0], b[0], t), scalar.lerp(a[1], b[1], t), scalar.lerp(a[2], b[2], t)];
+const lerp3 = (a: Rgb, b: Rgb, t: number): Rgb => [scalar.lerp(a[0], b[0], t), scalar.lerp(a[1], b[1], t), scalar.lerp(a[2], b[2], t)];
 
 /** Look a and b mixed, t of b. */
 function between(a: Look, b: Look, t: number): Look {

@@ -1,7 +1,8 @@
 // The palette: every colour of the world, named once, in linear RGB. A sea chart's inks: vermilion, ochre, murrey,
-// moss, gold and parchment cream, on a sea of turquoise and ultramarine, against a violet storm. Each solid thing has two tones, the one it shows
-// where the sun reaches it and the one it shows where it does not (sky/light.ts toon): the shadow is a colour chosen
-// for it, warm and saturated, never the lit one greyed. Written as the display's sRGB, as a painter would pick them.
+// moss, gold and parchment cream, on a sea of turquoise and ultramarine, against a violet storm. Each solid thing has
+// two tones, the one it shows where the sun reaches it and the one it shows where it does not (sky/light.ts toon): the
+// shadow is a colour chosen for it, warm and saturated, never the lit one greyed. Written as the display's sRGB, as a
+// painter would pick them (colour.ts turns them to light); the lights that glow of themselves are written as light.
 
 import { hexToLinear as ink, type Rgb } from './colour.ts';
 
@@ -70,16 +71,37 @@ export const SPACE: Rgb = [0.0015, 0.002, 0.004];
 /** A fair-weather cloud: cream where the sun lights it, rose beneath. */
 export const CLOUD = tones('#FFF1D6', '#E8A58C');
 /** Powder smoke: a cloud's cream, and a deeper rose in its shadow. */
-export const SMOKE = tones('#FFF1D6', '#D9907C');
+export const SMOKE: Tones = { lit: CLOUD.lit, shadow: ink('#D9907C') };
 
 /** Dust a ball throws up on land, and the dark smoke of a ball home in a hull. */
 export const DUST = ink('#C9A06A');
 export const SOOT = ink('#5A4A55');
 
+// ---- the guns' fire: lights, radiance per unit of sun (gunfire/gunfire.ts)
+/** A muzzle's flash, and a ball home's. */
+export const FIRE: Rgb = [1, 0.55, 0.2];
+/** A shield's light, azure: #4FC3FF's sRGB numbers taken as light (so paler than that ink would be). */
+export const AZURE: Rgb = [0.31, 0.76, 1];
+/** A ball in flight: its iron core, and the hot rim round it. */
+export const BALL_IRON: Rgb = [0.015, 0.013, 0.012];
+export const BALL_SPARK: Rgb = [6, 3, 0.9];
+/** A ball's tracer at the ball, dying to nothing at its tail. */
+export const TRACER: Rgb = [5, 2.2, 0.6];
+/** The ring laid on the water where a mortar's shell will fall. */
+export const FALL_MARK: Rgb = [3.2, 0.9, 0.35];
+
 // ---- the loot
 export const ICE = tones('#8FE0F5', '#3F8FC9');
 /** A highlight on ice: white. */
 export const GLINT = ink('#FFFFFF');
+/** The light each rarity glows with on the water (its rim, its ring), worst to best: grey, green, blue, purple, gold
+ *  (rarity.ts RARITY: the same rarities' inks on the chart). */
+export const RARITY_GLOW: readonly Rgb[] = ['#C9D1DA', '#55E05A', '#3AA0FF', '#B85CFF', '#FFA21F'].map((hex) => ink(hex));
+
+// ---- the grade's lifted blacks (post/grade.ts fadeTo)
+/** A morning's lavender mist, and the storm's slate violet. */
+export const DAWN_MIST: Rgb = [0.12, 0.1, 0.15];
+export const STORM_SLATE: Rgb = [0.13, 0.1, 0.19];
 
 // ---- the dyes: what a ship's paint and canvas are, and so her water's
 /** A dye's shadow tone is its lit one times this: darker, and redder (as canvas goes to its warm tan). */

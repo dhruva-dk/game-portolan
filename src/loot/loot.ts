@@ -2,7 +2,7 @@
 // piece is the thing itself, hanging RIDE m over the waves where the snapshot has it, bobbing, slowly turning and
 // rocking: a gun the gun of its kind a ship carries (ship/gun.ts), its muzzle cocked up; a shield a crystal of ice, the big one
 // taller; a repair a cask, the full one bigger. Each is lit as everything is (sky/light.ts: two flat tones, and a hard
-// highlight on a gun's gilding and on ice), with a flat rim of its rarity's light (rarity.ts GLOW) where it turns
+// highlight on a gun's gilding and on ice), with a flat rim of its rarity's light (palette.ts RARITY_GLOW) where it turns
 // from the eye. A piece put on the water during the match rises up out of it as it comes (born).
 //
 // Over each stands its beam: a thin column of gold light, (14 + 7 × rarity) m tall, fading up its height and
@@ -23,10 +23,8 @@ import {
   MeshBasicNodeMaterial, OctahedronGeometry, OneFactor, Vector2,
 } from 'three/webgpu';
 import { Fn, abs, attribute, cameraPosition, clamp, cos, cross, dot, float, max, mix, normalize, pow, select, sin, smoothstep, uniform, varying, vec3 } from 'three/tsl';
-import { hexToLinear } from '../colour';
-import { GILDING, GLINT, ICE, TAR, TIMBER } from '../palette';
+import { GILDING, GLINT, ICE, RARITY_GLOW, TAR, TIMBER } from '../palette';
 import type { Light } from '../sky/light';
-import { GLOW } from '../rarity';
 import { KINDS, type GunKind, type LootKind } from '../kinds';
 import { gunShape, gunSurface } from '../ship/gun';
 import type { LootDraw } from '../snapshot';
@@ -51,7 +49,6 @@ const EMIT = 1.3, BEAM_EMIT = 3, HALO_EMIT = 1.2, RIM = 0.62;
 const SIZE: Record<LootKind, number> = {
   cannon: 2.3, scatter: 2.1, repeater: 2.2, harpoon: 2.4, mortar: 2.1, smallShield: 1.7, bigShield: 2.25, repairKit: 1.6, fullRepair: 2.1,
 };
-const LIGHTS = GLOW.map((hex) => hexToLinear(hex));
 
 /** The buffers: per piece a vec4 of its place (metres) and id, a vec4 of its rarity's light and the rarity, and a vec4
  *  of its birth (the world's clock, s) and its size. */
@@ -204,7 +201,7 @@ export function createLoot(light: Light) {
     for (const l of pieces) {
       if (n >= PIECES) break;
       if (!keep(l)) continue;
-      const c = LIGHTS[l.rarity];
+      const c = RARITY_GLOW[l.rarity];
       o = n++ * STRIDE;
       put(0, l.at[0]), put(1, l.at[1]), put(2, l.at[2]), put(3, l.id);
       put(4, c[0]), put(5, c[1]), put(6, c[2]), put(7, l.rarity);

@@ -90,7 +90,7 @@ const LAYERS: Record<string, readonly string[]> = {
   'ship/': ['ship/', ...RENDER, 'view/view.ts', 'kinds.ts'],
   'gunfire/': ['gunfire/', ...RENDER, 'view/view.ts', 'kinds.ts'],
   // the post chain's steps (grade, bloom, film): nodes over the frame's light, composed by the frame
-  'post/': ['post/', 'three', 'tsl.ts', 'world/scalar.ts', 'colour.ts'],
+  'post/': ['post/', 'three', 'tsl.ts', 'world/scalar.ts', 'colour.ts', 'palette.ts'],
   // the loot on the water, its pieces and their beacons
   'loot/': ['loot/', ...RENDER, 'view/view.ts', 'rarity.ts', 'ship/gun.ts', 'kinds.ts'],
   'water/': ['water/', ...RENDER, 'view/', 'sky/sky.ts', 'land/ground.ts', 'ship/build.ts', 'ship/materials.ts', 'ship/waterline.ts', 'sim/wake.ts'],

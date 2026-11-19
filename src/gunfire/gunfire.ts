@@ -33,7 +33,7 @@ import {
   Fn, abs, atan, attribute, cameraPosition, cos, cross, exp, float, max, mix, normalize, pow, select, sin, smoothstep, uniform, varying, vec3,
 } from 'three/tsl';
 import { KINDS, gunOrder, type GunKind } from '../kinds';
-import { DUST, FOAM, SMOKE, SOOT, TIMBER } from '../palette';
+import { AZURE, BALL_IRON, BALL_SPARK, DUST, FALL_MARK, FIRE, FOAM, SMOKE, SOOT, TIMBER, TRACER } from '../palette';
 import type { Light } from '../sky/light';
 import type { BallDraw } from '../snapshot';
 import type { Eye } from '../view/view';
@@ -62,12 +62,11 @@ const SHOT: Record<GunKind, Shot> = {
   harpoon: { size: 0.05, pixels: 3, long: 0.8, hot: 0, tracer: 0, glow: 0, trail: 0, puff: 0 },
   mortar: { size: 0.26, pixels: 8, long: 0, hot: 0.7, tracer: 0.06, glow: 0.7, trail: 2, puff: 0.55 },
 };
-/** A ball's streak (seconds of its flight it is drawn out along); its core's iron and its rim's glow (radiance per unit
- *  sun), the rim from where the surface turns this far from the eye (the cosine). */
-const STREAK = 0.02, CORE: Vec3 = [0.015, 0.013, 0.012], SPARK: Vec3 = [6, 3, 0.9], RIM = 0.55;
-/** Its tracer: its width at the ball (m, and the fewest pixels), and its glow (radiance per unit sun) there, dying to
- *  nothing at its tail. */
-const TRACER_WIDE = 0.22, TRACER_PIXELS = 3, TRACER_GLOW: Vec3 = [5, 2.2, 0.6];
+/** A ball's streak (seconds of its flight it is drawn out along); its rim (palette.ts BALL_SPARK about its BALL_IRON)
+ *  from where the surface turns this far from the eye (the cosine). */
+const STREAK = 0.02, RIM = 0.55;
+/** Its tracer: its width at the ball (m, and the fewest pixels); its glow there is palette.ts TRACER. */
+const TRACER_WIDE = 0.22, TRACER_PIXELS = 3;
 /** Its trail (0117's smoke ribbon): its puffs' growth (m/s), life (s), ink and opacity. */
 const TRAIL_GROW = 1.4, TRAIL_LIFE = 1.6, TRAIL_INK: Vec3 = SMOKE.lit, TRAIL_OPACITY = 0.26;
 /** Each kind's firing: its flashes, their size, its puffs of smoke, how wide they spread, and how dense. */
@@ -75,9 +74,9 @@ const FIRING: Record<GunKind, readonly [number, number, number, number, number]>
   cannon: [3, 0.9, 12, 1.2, 0.5], scatter: [4, 1.2, 14, 3, 0.5], repeater: [1, 0.55, 2, 0.6, 0.35],
   harpoon: [0, 0, 5, 1.5, 0.22], mortar: [3, 1.3, 18, 2, 0.6],
 };
-/** A fall mark: its radius (the mortar's splash, sim/handling.ts GUNS; tests/guns.test.ts holds them equal), the
- *  fewest pixels its line is wide, and its glow (radiance per unit sun). */
-const MARK = 11, MARK_PIXELS = 2, MARK_GLOW: Vec3 = [3.2, 0.9, 0.35];
+/** A fall mark: its radius (the mortar's splash, sim/handling.ts GUNS; tests/guns.test.ts holds them equal) and the
+ *  fewest pixels its line is wide; its glow is palette.ts FALL_MARK. */
+const MARK = 11, MARK_PIXELS = 2;
 /** Seconds of a shell's flight its mark counts down over (about its longest lob). */
 const FLIGHT = 5;
 
@@ -119,7 +118,7 @@ function ballMesh(pixel: FloatNode) {
   m.positionNode = at.add(local.add(along.mul(local.dot(along).mul(stretch.sub(1)))).mul(radius));
   // the iron where it faces the eye, the rim's glow where it turns away (none on the harpoon's bolt)
   const facing = varying(abs(normalize(local).dot(normalize(cameraPosition.sub(at))))), hot = varying(byKind(kind, (s) => s.hot));
-  m.colorNode = mix(vec3(...SPARK).mul(hot), vec3(...CORE), smoothstep(RIM - 0.12, RIM + 0.12, facing).max(float(1).sub(hot.min(1))));
+  m.colorNode = mix(vec3(...BALL_SPARK).mul(hot), vec3(...BALL_IRON), smoothstep(RIM - 0.12, RIM + 0.12, facing).max(float(1).sub(hot.min(1))));
   const mesh = new Mesh(g, m);
   mesh.frustumCulled = false;
 
@@ -140,7 +139,7 @@ function ballMesh(pixel: FloatNode) {
   const back = local.y, taper = float(1).sub(back.mul(0.75)), trails = byKind(kind, (s) => s.tracer);
   tm.positionNode = at.sub(along.mul(back.mul(speed).mul(trails))).add(across.mul(local.x.mul(wide).mul(taper))).mul(select(trails.greaterThan(0), float(1), float(0)));
   const y = varying(back), x = varying(local.x), glow = varying(byKind(kind, (s) => s.glow));
-  tm.colorNode = vec3(...TRACER_GLOW).mul(glow).mul(pow(float(1).sub(y), 2)).mul(smoothstep(1, 0.4, abs(x)));
+  tm.colorNode = vec3(...TRACER).mul(glow).mul(pow(float(1).sub(y), 2)).mul(smoothstep(1, 0.4, abs(x)));
   const tracer = new Mesh(t, tm);
   tracer.frustumCulled = false;
   tracer.renderOrder = 3;
@@ -171,7 +170,7 @@ function markMesh(pixel: FloatNode, now: FloatNode) {
     const r = uv.length(), ring = (at: FloatNode) => smoothstep(line, line.mul(0.4), abs(r.sub(at)));
     const pulse = sin(now.mul(9)).mul(0.2).add(0.8);
     const inner = float(1).sub(near).mul(0.92).add(0.04);
-    return vec3(...MARK_GLOW).mul(ring(float(0.97)).add(ring(inner).mul(0.7))).mul(near.mul(0.7).add(0.3)).mul(pulse);
+    return vec3(...FALL_MARK).mul(ring(float(0.97)).add(ring(inner).mul(0.7))).mul(near.mul(0.7).add(0.3)).mul(pulse);
   })();
   const mesh = new Mesh(g, m);
   mesh.frustumCulled = false;
@@ -236,9 +235,6 @@ function puffMesh(light: Light, now: FloatNode) {
 }
 
 /** light: how the world is lit (sky/light.ts): the puffs; the sparks glow of themselves. */
-/** A gun's fire, and a shield's light (0117's shield azure, #4fc3ff). */
-const FIRE: Vec3 = [1, 0.55, 0.2], AZURE: Vec3 = [0.31, 0.76, 1];
-
 export function createGunfire(light: Light) {
   const now = uniform(0), pixel = uniform(0.0026);
   const balls = ballMesh(pixel), marks = markMesh(pixel, now);
