@@ -52,7 +52,8 @@ const SLOT = 50, GAP = 6, APART = 16;
 const SLOTS = HOTBAR.guns + HOTBAR.items, LEFT = (i: number) => i * (SLOT + GAP) + (i >= HOTBAR.guns ? APART - GAP : 0);
 /** A gun's mark. */
 const mark = (k: GunKind): Glyph => `weapon.${k}`;
-const MINIMAP = 132;
+/** The minimap's diameter, px (its metres a pixel: minimap.ts SPAN). */
+const MINIMAP = 198;
 /** Fire's radius, px, in the corner on the gutter's lines, as the minimap over it and the hotbar beside it are; Gust's
  *  centre from Fire's, left and up (the old game's, chart/layout.ts). */
 const FIRE = 40, GUST_RIGHT = 6, GUST_UP = 86;

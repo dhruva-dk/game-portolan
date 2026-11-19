@@ -11,7 +11,7 @@ import { R, type Vec3 } from '../world/sphere';
 import type { Lay } from './disc';
 
 /** Samples across the grid. */
-const SIDE = 112;
+const SIDE = 176;
 /** How far the edge is looked for round a sample, in samples, and in how many directions. */
 const REACH = 2, DIRS = 8;
 const OFFSETS = Array.from({ length: DIRS }, (_, i) => {

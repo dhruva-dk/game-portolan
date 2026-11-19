@@ -20,8 +20,9 @@ import { INK, PAPER, WASH, svg } from './ink';
 import { bakeIsle, zOf, type Isle } from './isles';
 import { sizeNow } from './ui';
 
-/** Metres from her to the disc's rim: at her 16 m/s some 16 s of sailing, past a cannon's 200 m reach. */
-export const SPAN = 260;
+/** Metres from her to the disc's rim: at her 16 m/s some 25 s of sailing, twice a cannon's 200 m reach; some 4.5 m a
+ *  pixel on the hud's disc (hud.ts MINIMAP). */
+export const SPAN = 408;
 /** The most redraws a second. */
 const RATE = 30;
 /** The sea, the Storm's wash and its edge, the next circle's line and the way's. */

@@ -1,15 +1,15 @@
 // The terrain's land round her, for the minimap: painted as the islands are (isles.ts paint) from the ground's height
 // sampled over a disc round her, SIDE × SIDE samples (some 3.4 m apart, a cell), as held.ts samples who holds the sea.
 // The land never changes, so a plate is taken afresh only when she has sailed MOVE metres from where the last was, and
-// it is filled a band of ROWS rows a redraw behind the one shown (the whole plate at once is some 25 000 readings of
-// the height, 10 ms or so); between, the plate shown is laid onto the disc where she now is (disc.ts laid).
+// it is filled a band of ROWS rows a redraw behind the one shown (the whole plate at once is some 55 000 readings of
+// the height, 20 ms or so); between, the plate shown is laid onto the disc where she now is (disc.ts laid).
 
 import { R, type Vec3 } from '../world/sphere';
 import type { Lay } from './disc';
 import { paint } from './isles';
 
 /** Samples across a plate; rows of it filled a redraw; metres she sails before a plate is taken afresh. */
-const SIDE = 184, ROWS = 12, MOVE = 30;
+const SIDE = 264, ROWS = 12, MOVE = 30;
 
 interface Plate { canvas: HTMLCanvasElement; g: CanvasRenderingContext2D; image: ImageData; h: Float32Array; at: Vec3; e: Vec3; n: Vec3 }
 
