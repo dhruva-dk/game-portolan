@@ -21,7 +21,7 @@
 // (motion.ts) handed to the cloth, before it is moved on. Every other ship's are the drawn shape the shader fills.
 
 import {
-  BufferAttribute, BufferGeometry, DynamicDrawUsage, InstancedBufferGeometry, InstancedInterleavedBuffer, InterleavedBufferAttribute,
+  BufferAttribute, DynamicDrawUsage, InstancedBufferGeometry, InstancedInterleavedBuffer, InterleavedBufferAttribute,
   Mesh, Sphere, Vector3, type Material,
 } from 'three/webgpu';
 import { uniform } from 'three/tsl';
@@ -30,13 +30,13 @@ import type { Look } from '../snapshot.ts';
 import type { Light } from '../sky/light.ts';
 import type { Eye } from '../view/view.ts';
 import type { ShipPose } from '../world/pose.ts';
-import { add, length, scale, type Vec3 } from '../world/sphere.ts';
+import { length, scale, type Vec3 } from '../world/sphere.ts';
 import type { Wind } from '../world/wind.ts';
 import { BERTHS, moor, type Berth } from './berths.ts';
 import { buildShip, type Packed } from './build.ts';
-import { createCloth } from './cloth.ts';
-import { SLOTS, STRIDE, pack } from './instance.ts';
-import { DETAILS, chooseDetail } from './detail.ts';
+import { createCloth, type Felt } from './cloth.ts';
+import { SLOTS, STRIDE, pack, type Instance } from './instance.ts';
+import { DETAILS, PIXEL, chooseDetail } from './detail.ts';
 import { createShipMaterials } from './materials.ts';
 import { feeling, filling, hauled, inFrame, moved, trim, type Motion } from './motion.ts';
 
@@ -46,51 +46,52 @@ const PATTERNS: Record<Look['pattern'], number> = { plain: 0, band: 1, stripes: 
 const MIDDLE = 9, RADIUS = 18;
 /** The wind at which the sails are full and the pennants stream straight, metres per second. */
 const FULL = 8;
+/** Each level's three draws, by name (for the meter's split: meter.ts). */
+const PARTS = ['body', 'cloth', 'ropes'] as const;
 
 const levels = DETAILS.length;
-
-/** A wind (metres a second) as a share of FULL, at most 1. */
-const share = (w: Vec3): Vec3 => { const size = length(w); return size > 0 ? scale(w, Math.min(size / FULL, 1) / size) : [0, 0, 0]; };
 
 /** Ship i's own phase, radians, so no two ships' canvas moves in step. */
 const phaseOf = (i: number) => (i * 2.399) % (2 * Math.PI);
 
 /** The draw for one packed mesh, sharing its level's instances. */
-function drawOf(p: Packed, instances: InstancedInterleavedBuffer, material: Material): Mesh {
-  const g = new InstancedBufferGeometry();
-  g.setAttribute('position', new BufferAttribute(p.position, 3));
-  g.setAttribute('nrm', new BufferAttribute(p.normal, 4, true));
-  if (p.uv) g.setAttribute('uv', new BufferAttribute(p.uv, 2, true));
-  g.setAttribute('part', new BufferAttribute(p.part, 4, true));
-  g.setIndex(new BufferAttribute(p.index, 1));
-  SLOTS.forEach((name, i) =>
-    g.setAttribute(name, new InterleavedBufferAttribute(instances, 4, i * 4)));
-  g.instanceCount = 0;
-  const mesh = new Mesh(g as BufferGeometry, material);
+function drawOf(name: string, p: Packed, instances: InstancedInterleavedBuffer, material: Material) {
+  const geometry = new InstancedBufferGeometry();
+  geometry.setAttribute('position', new BufferAttribute(p.position, 3));
+  geometry.setAttribute('nrm', new BufferAttribute(p.normal, 4, true));
+  if (p.uv) geometry.setAttribute('uv', new BufferAttribute(p.uv, 2, true));
+  geometry.setAttribute('part', new BufferAttribute(p.part, 4, true));
+  geometry.setIndex(new BufferAttribute(p.index, 1));
+  SLOTS.forEach((slot, i) => geometry.setAttribute(slot, new InterleavedBufferAttribute(instances, 4, i * 4)));
+  geometry.instanceCount = 0;
+  const mesh = new Mesh(geometry, material);
+  mesh.name = name;
   mesh.frustumCulled = false;
   // the blended ropes after the sea, which reads what is behind it from what was drawn before it
   mesh.renderOrder = material.transparent ? 1 : 0;
-  return mesh;
+  return { mesh, geometry };
 }
+
+/** A ship afloat as the sea takes her (water/wake.ts): her pose, look (and her yards' brace) and velocity. */
+interface Afloat { pose: ShipPose; look: Look & { brace: number }; velocity: Vec3 }
 
 export type Fleet = ReturnType<typeof createFleet>;
 
 /** capacity: the most ships there will be. */
 export function createFleet(light: Light, wind: Wind, capacity: number) {
-  const pixel = uniform(0.0026);
+  // a pixel's angle, radians: the target's until the first frame gives the eye's (update)
+  const pixel = uniform(PIXEL);
   const cloth = createCloth();
   const materials = createShipMaterials(light, pixel, cloth);
-  const instances = Array.from({ length: levels }, () => {
-    const buffer = new InstancedInterleavedBuffer(new Float32Array(capacity * STRIDE), STRIDE);
-    return buffer.setUsage(DynamicDrawUsage);
-  });
+  const lists = Array.from({ length: levels }, () => new Float32Array(capacity * STRIDE));
+  const instances = lists.map((list) => new InstancedInterleavedBuffer(list, STRIDE).setUsage(DynamicDrawUsage));
   const draws = instances.map((buffer, k) => {
-    const ship = buildShip(k);
+    const ship = buildShip(k), parts = [ship.body, ship.cloth, ship.ropes] as const;
+    const made = [materials.body, materials.cloth, materials.ropes] as const;
     // (the farthest level has no ropes, and so no rope draw)
-    return ([[ship.body, materials.body], [ship.cloth, materials.cloth], [ship.ropes, materials.ropes]] as const)
-      .filter(([p]) => p.triangles > 0).map(([p, material], j) => Object.assign(drawOf(p, buffer, material), { name: `ship ${['body', 'cloth', 'ropes'][j]} ${k}` }));
+    return PARTS.flatMap((part, j) => (parts[j].triangles > 0 ? [drawOf(`ship ${part} ${k}`, parts[j], buffer, made[j])] : []));
   });
-  const meshes = draws.flat();
+  const meshes = draws.flat().map((d) => d.mesh);
 
   const poses: ShipPose[] = [], looks: Look[] = [], velocities: Vec3[] = [], was: number[] = [];
   /** Whether ship i floats (else she is going down), and whether she is drawn at all. */
@@ -98,10 +99,24 @@ export function createFleet(light: Light, wind: Wind, capacity: number) {
   /** How each ship's square yards are braced, radians (+ turns the port arm aft); and, this frame, her sails' wind, her
    * frame, metres a second. */
   const braces: number[] = [], sails: Vec3[] = [];
-  let count = 0, pinned = -1, own = -1;
-  let berths: (Berth | null)[] = new Array(BERTHS).fill(null), simulating = true;
+  let count = 0, pinned = -1, own = -1, simulating = true;
+  const berths: (Berth | null)[] = new Array(BERTHS).fill(null);
   const motions: (Motion | null)[] = new Array(BERTHS).fill(null);
-  const sphere = new Sphere();
+  /** Each berth's ship's feeling, handed to the cloth. */
+  const felts = Array.from({ length: BERTHS }, (): Felt => ({
+    brace: 0, phase: 0, wind: [0, 0, 0], weight: [0, 0, 0], spin: [0, 0, 0], spinning: [0, 0, 0],
+  }));
+  /** Each ship's distance from the eye, metres (Infinity for one not drawn), for the berths. */
+  const metres = new Float64Array(capacity).fill(Infinity);
+  /** How many ships each level draws this frame. */
+  const filled = new Uint32Array(levels);
+  /** Each ship afloat, as the sea takes her, and those afloat this frame (ships). */
+  const records: Afloat[] = [], afloat: Afloat[] = [];
+  const eye = new Vector3(), sphere = new Sphere();
+  const drawn: Instance = {
+    position: [0, 0, 0], forward: [0, 0, 0], up: [0, 0, 0], brace: 0, wind: [0, 0], paint: [0, 0, 0], sail: [0, 0, 0],
+    pattern: 0, phase: 0, berth: 0, share: 0,
+  };
 
   /** The ship i's pose, look and velocity (metres per second, world space), and whether she floats; ships 0…count−1
    * are drawn, but those dropped. */
@@ -120,62 +135,91 @@ export function createFleet(light: Light, wind: Wind, capacity: number) {
 
   /** Each ship's yards hauled round dt seconds on, her sails' wind found, and the berths handed out; returns the passes
    * that move each berthed ship's canvas on dt seconds. */
-  function sail(eye: Vector3, windSpeed: number, dt: number): Compute[] {
+  function sail(windSpeed: number, dt: number): readonly Compute[] {
     for (let i = 0; i < count; i++) {
+      metres[i] = Infinity;
       // (a ship not drawn, or never set, has no canvas to fill)
       if (!shown[i]) continue;
       const pose = poses[i], speed = length(velocities[i]);
       const blowing = inFrame(pose, scale(wind(pose.position), windSpeed));
       braces[i] = Number.isNaN(braces[i]) ? trim(blowing, speed, 0) : hauled(braces[i], blowing, speed, dt);
       sails[i] = filling(blowing, speed, braces[i]);
+      if (simulating) metres[i] = eye.distanceTo(middleOf(pose));
     }
-    const metres = poses.slice(0, count).map((p, i) => (shown[i] ? eye.distanceTo(new Vector3(...add(p.position, p.up, MIDDLE))) : Infinity));
-    const before = berths;
-    berths = moor(berths, simulating ? metres : metres.map(() => Infinity), simulating ? own : -1, dt);
-    berths.forEach((b, k) => {
-      if (!b) { motions[k] = null; cloth.set(k, null); return; }
-      const motion = moved(b.fresh || before[k]?.ship !== b.ship ? null : motions[k], poses[b.ship], dt);
+    moor(berths, metres, simulating ? own : -1, dt);
+    for (let k = 0; k < BERTHS; k++) {
+      const b = berths[k];
+      if (!b) {
+        motions[k] = null;
+        cloth.set(k, null);
+        continue;
+      }
+      // (a berth's ship stays hers till it is let go: a new one comes fresh)
+      const motion = moved(b.fresh ? null : motions[k], poses[b.ship], dt), felt = felts[k], feels = feeling(motion);
       motions[k] = motion;
-      cloth.set(k, { brace: braces[b.ship], phase: phaseOf(b.ship), wind: sails[b.ship], ...feeling(motion) }, b.fresh);
-    });
+      felt.brace = braces[b.ship];
+      felt.phase = phaseOf(b.ship);
+      felt.wind = sails[b.ship];
+      felt.weight = feels.weight;
+      felt.spin = feels.spin;
+      felt.spinning = feels.spinning;
+      cloth.set(k, felt, b.fresh);
+    }
     return cloth.update(dt);
+  }
+
+  /** The middle of her rig (MIDDLE over her waterline), into the sphere round it. */
+  function middleOf(pose: ShipPose): Vector3 {
+    const p = pose.position, u = pose.up;
+    return sphere.center.set(p[0] + u[0] * MIDDLE, p[1] + u[1] * MIDDLE, p[2] + u[2] * MIDDLE);
   }
 
   /**
    * Each frame, once the eye has moved (view.ts): windSpeed in metres per second; dt the seconds since the last.
    * Returns what is due: the near ships' canvas as cloth.
    */
-  function update(seen: Readonly<Eye>, windSpeed: number, dt: number): { cloth: Compute[] } {
+  function update(seen: Readonly<Eye>, windSpeed: number, dt: number): { cloth: readonly Compute[] } {
     pixel.value = seen.pixel;
-    const eye = new Vector3(...seen.position);
-    const canvas = sail(eye, windSpeed, dt);
-    const shares = new Map(berths.flatMap((b, k) => (b ? [[b.ship, [k, b.share]] as const] : [])));
-    const filled = new Array<number>(levels).fill(0);
+    eye.fromArray(seen.position);
+    const canvas = sail(windSpeed, dt);
+    filled.fill(0);
+    sphere.radius = RADIUS;
     for (let i = 0; i < count; i++) {
       const pose = poses[i], look = looks[i];
       if (!shown[i]) { was[i] = -1; continue; }
-      const middle = add(pose.position, pose.up, MIDDLE);
-      sphere.set(new Vector3(...middle), RADIUS);
+      middleOf(pose);
       if (!seen.frustum.intersectsSphere(sphere)) { was[i] = -1; continue; }
       // (the player's own ship always whole: the chase camera holds her at the finest level's edge)
       const k = pinned >= 0 ? pinned : i === own ? 0 : chooseDetail(was[i], eye.distanceTo(sphere.center), pixel.value);
       was[i] = k;
       // her sails' wind, as a share of FULL across her and along her
-      const w = share(sails[i]);
-      const [berth, part] = shares.get(i) ?? [0, 0];
-      pack(instances[k].array as Float32Array, filled[k]++ * STRIDE, {
-        position: pose.position, forward: pose.forward, up: pose.up, brace: braces[i], wind: [w[0], w[2]],
-        paint: look.paint, sail: look.sail, pattern: PATTERNS[look.pattern], phase: phaseOf(i), berth, share: part,
-      });
+      const w = sails[i], size = length(w), part = size > 0 ? Math.min(size / FULL, 1) / size : 0;
+      drawn.position = pose.position;
+      drawn.forward = pose.forward;
+      drawn.up = pose.up;
+      drawn.brace = braces[i];
+      drawn.wind[0] = w[0] * part;
+      drawn.wind[1] = w[2] * part;
+      drawn.paint = look.paint;
+      drawn.sail = look.sail;
+      drawn.pattern = PATTERNS[look.pattern];
+      drawn.phase = phaseOf(i);
+      drawn.berth = drawn.share = 0;
+      for (let b = 0; b < BERTHS; b++) {
+        const held = berths[b];
+        if (held?.ship === i) { drawn.berth = b; drawn.share = held.share; }
+      }
+      pack(lists[k], filled[k]++ * STRIDE, drawn);
     }
-    draws.forEach((three, k) => {
+    for (let k = 0; k < levels; k++) {
       // (only the ships written go up: the buffer holds the most ships' worth)
       if (filled[k] > 0) {
+        instances[k].clearUpdateRanges();
         instances[k].addUpdateRange(0, filled[k] * STRIDE);
         instances[k].needsUpdate = true;
       }
-      for (const mesh of three) (mesh.geometry as InstancedBufferGeometry).instanceCount = filled[k];
-    });
+      for (const { geometry } of draws[k]) geometry.instanceCount = filled[k];
+    }
     return { cloth: canvas };
   }
 
@@ -192,9 +236,21 @@ export function createFleet(light: Light, wind: Wind, capacity: number) {
     /** Draw every ship at level k, or by her size again for null (a debug view). */
     pin(k: number | null) { pinned = k ?? -1; },
     /** The ships afloat as last set: each one's pose, look (and her yards' brace) and velocity (for the marks she leaves
-     * on the sea). */
-    get ships() {
-      return poses.slice(0, count).flatMap((pose, i) => (shown[i] && floats[i] ? [{ pose, look: { ...looks[i], brace: braces[i] }, velocity: velocities[i] }] : []));
+     * on the sea). The same list each time, made over: read it before the next. */
+    get ships(): readonly Afloat[] {
+      afloat.length = 0;
+      for (let i = 0; i < count; i++) {
+        if (!shown[i] || !floats[i]) continue;
+        const r = (records[i] ??= { pose: poses[i], look: { ...looks[i], brace: 0 }, velocity: velocities[i] });
+        r.pose = poses[i];
+        r.velocity = velocities[i];
+        r.look.paint = looks[i].paint;
+        r.look.sail = looks[i].sail;
+        r.look.pattern = looks[i].pattern;
+        r.look.brace = braces[i];
+        afloat.push(r);
+      }
+      return afloat;
     },
   };
 }

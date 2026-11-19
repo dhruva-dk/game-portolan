@@ -237,7 +237,11 @@ export function createCloth() {
   })().compute(total, [64]);
 
   const steps = [...Array.from({ length: SUBSTEPS }, () => [predict, solve]).flat(), normals];
+  // what update returns: the steps, or none
+  const due: Compute[] = [steps], idle: Compute[] = [];
   let live = false;
+  /** A berth's k-th vec4 of parameters set to v (her frame) and 0. */
+  const put = (k: number, v: Vec3) => values[k].set(v[0], v[1], v[2], 0);
 
   return {
     /** Particles a berth. */
@@ -252,23 +256,23 @@ export function createCloth() {
      * berth is set every frame, before the update: a fresh berth is fresh for that frame's steps only.
      */
     set(k: number, felt: Felt | null, fresh = false) {
-      const [p0, p1, p2, p3, p4] = values.slice(k * PARAMS, k * PARAMS + PARAMS);
-      if (!felt) { p0.set(0, 0, 0, 0); return; }
-      p0.set(1, fresh ? 1 : 0, felt.brace, felt.phase);
-      p1.set(...felt.wind, 0);
-      p2.set(...felt.weight, 0);
-      p3.set(...felt.spin, 0);
-      p4.set(...felt.spinning, 0);
+      const o = k * PARAMS;
+      if (!felt) { values[o].set(0, 0, 0, 0); return; }
+      values[o].set(1, fresh ? 1 : 0, felt.brace, felt.phase);
+      put(o + 1, felt.wind);
+      put(o + 2, felt.weight);
+      put(o + 3, felt.spin);
+      put(o + 4, felt.spinning);
       live = true;
     },
     /** Each frame, after the berths are set: the steps that move the cloth on dt seconds, in one pass; none while no
      * berth is held. */
     update(dt: number): Compute[] {
       clock.value += dt;
-      if (!live || dt <= 0) return [];
+      if (!live || dt <= 0) return idle;
       h.value = Math.min(dt, LONGEST) / SUBSTEPS;
       live = false;
-      return [steps];
+      return due;
     },
   };
 }

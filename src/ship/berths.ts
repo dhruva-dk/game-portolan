@@ -22,30 +22,57 @@ const KEEP = 1.3;
  * whether she has just come (her cloth to be laid out as cut). */
 export interface Berth { ship: number; age: number; share: number; fresh: boolean }
 
+/** The ships wanted in a berth, nearest first (moor's, kept from call to call). */
+const wanted = new Int32Array(BERTHS);
+
+/** Whether ship i holds one of the berths. */
+function holds(berths: readonly (Berth | null)[], i: number): boolean {
+  for (let k = 0; k < BERTHS; k++) if (berths[k]?.ship === i) return true;
+  return false;
+}
+
+/** Whether ship i is among the first n wanted. */
+function among(i: number, n: number): boolean {
+  for (let w = 0; w < n; w++) if (wanted[w] === i) return true;
+  return false;
+}
+
 /**
- * The berths after dt seconds, given each ship's distance from the eye (metres; Infinity for a ship not on the sea)
- * and the player's own ship (or −1), who always has one.
+ * The berths (BERTHS of them, each empty or held) moved on dt seconds, in place, given each ship's distance from the
+ * eye (metres; Infinity for a ship not on the sea) and the player's own ship (or −1), who always has one. Returns them.
  */
-export function moor(berths: readonly (Berth | null)[], metres: readonly number[], own: number, dt: number): (Berth | null)[] {
-  const held = new Set(berths.flatMap((b) => (b ? [b.ship] : [])));
-  const rank = (i: number) => (i === own ? -1 : metres[i] / (held.has(i) ? KEEP : 1));
-  const wanted = new Set(metres.map((_, i) => i).filter((i) => i === own || metres[i] < CLOTH_REACH)
-    .sort((a, b) => rank(a) - rank(b)).slice(0, BERTHS));
-  const next = Array.from({ length: BERTHS }, (_, k): Berth | null => {
-    const b = berths[k];
-    if (!b) return null;
-    if (wanted.has(b.ship)) {
-      const age = b.age + dt;
-      return { ship: b.ship, age, share: age > SETTLE ? Math.min(1, b.share + dt / FADE) : b.share, fresh: false };
+export function moor(berths: (Berth | null)[], metres: ArrayLike<number>, own: number, dt: number): (Berth | null)[] {
+  // the wanted, picked nearest first (the player first of all; a ship holding a berth as if KEEP times nearer), the
+  // lowest numbered first between equals
+  let n = 0;
+  for (; n < BERTHS; n++) {
+    let best = -1, bestRank = Infinity;
+    for (let i = 0; i < metres.length; i++) {
+      if ((i !== own && !(metres[i] < CLOTH_REACH)) || among(i, n)) continue;
+      const rank = i === own ? -1 : metres[i] / (holds(berths, i) ? KEEP : 1);
+      if (rank < bestRank) { best = i; bestRank = rank; }
     }
-    const share = b.share - dt / FADE;
-    return share > 0 ? { ...b, age: b.age + dt, share, fresh: false } : null;
-  });
-  for (const ship of wanted) {
-    if (held.has(ship)) continue;
-    const free = next.indexOf(null);
-    if (free < 0) break;
-    next[free] = { ship, age: 0, share: 0, fresh: true };
+    if (best < 0) break;
+    wanted[n] = best;
   }
-  return next;
+  // the held aged, and faded in, or out (and let go) if no longer wanted; then the wanted not held given free ones
+  for (let k = 0; k < BERTHS; k++) {
+    const b = berths[k];
+    if (!b) continue;
+    b.age += dt;
+    b.fresh = false;
+    if (among(b.ship, n)) {
+      if (b.age > SETTLE) b.share = Math.min(1, b.share + dt / FADE);
+    } else {
+      b.share -= dt / FADE;
+      if (b.share <= 0) berths[k] = null;
+    }
+  }
+  for (let w = 0; w < n; w++) {
+    if (holds(berths, wanted[w])) continue;
+    const free = berths.indexOf(null);
+    if (free < 0) break;
+    berths[free] = { ship: wanted[w], age: 0, share: 0, fresh: true };
+  }
+  return berths;
 }

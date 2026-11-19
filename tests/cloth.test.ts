@@ -69,16 +69,17 @@ const held = (b: (Berth | null)[]) => b.flatMap((x) => (x ? [x.ship] : [])).sort
 test('the berths go to the player and the nearest within reach, the cloth settling unseen before it is shown', () => {
   const metres = ships(10, (i) => 20 + i * 15);
   metres[7] = 5; // a near ship far down the list
-  const empty = new Array(BERTHS).fill(null);
-  const first = moor(empty, metres, 9, 1 / 30);
+  // (moor moves the berths on in place)
+  const empty = () => new Array(BERTHS).fill(null);
+  const first = moor(empty(), metres, 9, 1 / 30);
   assert.deepEqual(held(first), [0, 1, 7, 9]);
   assert.ok(first.every((b) => b && b.fresh && b.share === 0));
   const settling = run(first, metres, 9, SETTLE * 0.9);
   assert.ok(settling.every((b) => b && !b.fresh && b.share === 0), 'unseen while it settles');
-  const shown = run(first, metres, 9, SETTLE + FADE + 0.1);
+  const shown = run(settling, metres, 9, FADE + 0.2);
   assert.ok(shown.every((b) => b && b.share === 1), 'shown in full after it fades in');
   // nobody past reach
-  assert.deepEqual(held(moor(empty, ships(3, () => CLOTH_REACH + 1), -1, 1 / 30)), []);
+  assert.deepEqual(held(moor(empty(), ships(3, () => CLOTH_REACH + 1), -1, 1 / 30)), []);
 });
 
 test('a ship that is no longer among the nearest fades out before her berth goes to another, with no jump', () => {
