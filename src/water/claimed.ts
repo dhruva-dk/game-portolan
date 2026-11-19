@@ -1,15 +1,15 @@
 // Who holds the sea, as the water reads it (claims.ts): the frame's copy of the cells (world/cells.ts), kept from the
-// Snapshot's Sea, with what the shader needs to draw the borders smooth and the changes as moving fronts. The first
-// game's (agent-initial src/territory.ts Territory: load, change, settle, share), on this grid.
+// Snapshot's Sea, with what the shader needs to draw the borders smooth and the changes as moving fronts.
 //
 // Each cell keeps four bytes: who holds it, who held it before, and the smoothed share of its own holder over the
-// 9 × 9 cells round it (a Gaussian, σ 1.6 cells, never under MIN_SHARE so a thin strip never vanishes, but only just over a half, so the border follows the smoothed share and not the cells’ edges; 255 when that
-// whole window is one holder's: the shader can stop at one read there), now and before. And a moment, on the world's
-// clock: when the change front reached it. A change keeps the cells' state before it for HOLD s, the shader drawing the
-// old against the new as a front sweeps over (from the loop's own cells, a breadth-first spread alternately four- and
-// eight-way for a near round front, smoothed twice), then the cells settle and forget it. The changes read are drawn in
-// order within a few milliseconds' work a frame (work, SLICES), a large one over some frames: the GPU's words wait until it is done
-// and its front starts then, each cell still drawn as it was until the front reaches it.
+// 9 × 9 cells round it (a Gaussian, σ 1.6 cells, never under MIN_SHARE so a thin strip never vanishes, but only just
+// over a half, so the border follows the smoothed share and not the cells’ edges; 255 when that whole window is one
+// holder's: the shader can stop at one read there), now and before. And a moment, on the world's clock: when the
+// change front reached it. A change keeps the cells' state before it for HOLD s, the shader drawing the old against
+// the new as a front sweeps over (from the loop's own cells, a breadth-first spread alternately four- and eight-way
+// for a near round front, smoothed twice), then the cells settle and forget it. The changes read are drawn in order
+// within a few milliseconds' work a frame (work, SLICES), a large one over some frames: the GPU's words wait until it
+// is done and its front starts then, each cell still drawn as it was until the front reaches it.
 //
 // The cells go to the GPU as two storage buffers, one word a cell, laid out a face at a time in (N + 2)² words: each
 // face's cells within an apron one cell wide holding the next faces' cells along its edges (cells.ts wrapped), so the
@@ -118,7 +118,9 @@ export function createClaimed(slices = SLICES) {
   };
   const windowOf = (c: number) => {
     const i = columnOf(c), j = rowOf(c), inner = i >= FLAT && j >= FLAT && i < N - FLAT && j < N - FLAT;
-    for (let dj = -FLAT, k = 0; dj <= FLAT; dj++) for (let di = -FLAT; di <= FLAT; di++, k++) win[k] = inner ? c + dj * N + di : offset(c, di, dj);
+    for (let dj = -FLAT, k = 0; dj <= FLAT; dj++) {
+      for (let di = -FLAT; di <= FLAT; di++, k++) win[k] = inner ? c + dj * N + di : offset(c, di, dj);
+    }
     return win;
   };
   /** The smoothed share of c's own holder over its window, a byte: 255 when the window is all hers. */
@@ -323,6 +325,14 @@ export function createClaimed(slices = SLICES) {
   /** Copies at most `most` of the cells touched into the GPU's words (apron copies too), each face's range of words
    *  changed widened into `lo`/`hi`; returns how many it copied. */
   const lo = new Array<number>(6), hi = new Array<number>(6);
+  /** Each face's range of words changed, as `work` returns them, rewritten each frame. */
+  const ranges = Array.from({ length: 6 }, (): [number, number] => [0, 0]);
+  /** Slices left in this frame's work. */
+  let left = 0;
+  /** Runs `slice` while slices are left and it does a whole one's work, each that did any work spent. */
+  const spend = (slice: (most: number) => number) => {
+    for (let n = SLICE; n === SLICE && left > 0;) if ((n = slice(SLICE)) > 0) left--;
+  };
   const put = (s: number, c: number) => {
     gpuCells[s] = words[c];
     gpuReveal[s] = reveal[c];
@@ -356,9 +366,15 @@ export function createClaimed(slices = SLICES) {
       if (!sea) return false;
       for (let i = from; i < sea.changes.length; i++) {
         const k = sea.changes[i];
-        if (k.kind === 'claim') pending.push({ cells: k.cells, owner: k.ship + 1, time: k.time, from: Int32Array.from({ length: k.loop }, (_, j) => k.cells[j]) });
-        else if (k.kind === 'home') pending.push({ cells: k.cells, owner: k.ship + 1, time: k.time, from: Int32Array.of(cellOf(k.at)) });
-        else if (k.kind === 'drain') pending.push({ cells: k.cells, owner: 0, time: k.time, from: null });
+        if (k.kind === 'claim') {
+          const loop = k.cells;
+          const from = Int32Array.from({ length: k.loop }, (_, j) => loop[j]);
+          pending.push({ cells: k.cells, owner: k.ship + 1, time: k.time, from });
+        } else if (k.kind === 'home') {
+          pending.push({ cells: k.cells, owner: k.ship + 1, time: k.time, from: Int32Array.of(cellOf(k.at)) });
+        } else if (k.kind === 'drain') {
+          pending.push({ cells: k.cells, owner: 0, time: k.time, from: null });
+        }
       }
       return false;
     },
@@ -368,15 +384,11 @@ export function createClaimed(slices = SLICES) {
      * words where they are until it is done (no frame draws half of one: a cell sent is drawn as before until its front
      * comes). Returns each face's range of words changed ([start, end), or empty).
      */
-    work(clock: number): [number, number][] {
+    work(clock: number): readonly (readonly [start: number, end: number])[] {
       now = clock;
       lo.fill(WORDS);
       hi.fill(-1);
-      let left = slices;
-      /** Runs `slice` while slices are left and it does a whole one's work, each that did any work spent. */
-      const spend = (slice: (most: number) => number) => {
-        for (let n = SLICE; n === SLICE && left > 0;) if ((n = slice(SLICE)) > 0) left--;
-      };
+      left = slices;
       for (;;) {
         if (!job) spend(flush);
         if (left <= 0 || (!job && !pending.length)) break;
@@ -390,11 +402,12 @@ export function createClaimed(slices = SLICES) {
       }
       if (!job) spend(settle);
       used = slices - left;
-      if (whole) {
-        whole = false;
-        return lo.map((_, f): [number, number] => [f * TILE, (f + 1) * TILE]);
+      for (let f = 0; f < 6; f++) {
+        ranges[f][0] = whole ? f * TILE : hi[f] < 0 ? 0 : lo[f];
+        ranges[f][1] = whole ? (f + 1) * TILE : hi[f] < 0 ? 0 : hi[f] + 1;
       }
-      return lo.map((l, f): [number, number] => (hi[f] < 0 ? [0, 0] : [l, hi[f] + 1]));
+      whole = false;
+      return ranges;
     },
     /** The slices the last frame's work took (at most its budget). */
     used: () => used,

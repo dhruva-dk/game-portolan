@@ -16,7 +16,7 @@ import { Vector4 } from 'three/webgpu';
 import { abs, clamp, cross, dot, exp, float, floor, int, length, max, min, mix, select, uniformArray, vec2 } from 'three/tsl';
 import { WATERLINE } from '../ship/waterline';
 import type { ShipPose } from '../world/pose';
-import { dot as dotV, type Vec3 } from '../world/sphere';
+import * as sphere from '../world/sphere';
 import { minInt, type BoolNode, type FloatNode, type Vec3Node } from '../tsl';
 
 /** The ships nearest the eye whose hulls the sea fits round. */
@@ -44,8 +44,12 @@ export function outside(across: FloatNode, along: FloatNode): FloatNode {
 
 export function createHulls() {
   const slots = () => Array.from({ length: NEAREST }, () => new Vector4());
+  /** The three uniform arrays' values, a slot each. */
   const values = { at: slots(), fwd: slots(), up: slots() };
-  const at = uniformArray<'vec4'>(values.at, 'vec4'), fwd = uniformArray<'vec4'>(values.fwd, 'vec4'), up = uniformArray<'vec4'>(values.up, 'vec4');
+  const at = uniformArray<'vec4'>(values.at, 'vec4'), fwd = uniformArray<'vec4'>(values.fwd, 'vec4');
+  const up = uniformArray<'vec4'>(values.up, 'vec4');
+  /** The nearest ships' indices and their nearness (minus the eye's dot with them: least is nearest), kept between frames. */
+  const chosen = new Int32Array(NEAREST), nearness = new Float64Array(NEAREST);
 
   /** The least of each hull's `outside` at world position p, metres. */
   const nearest = (p: Vec3Node): FloatNode => {
@@ -63,16 +67,33 @@ export function createHulls() {
       const d = nearest(p);
       return { inside: d.lessThan(-INSET), glow: float(1).sub(exp(max(d, 0).div(-SHADE_REACH)).mul(SHADE)) };
     },
-    /** Each frame: the ships' poses, and the eye (world, metres), the nearest NEAREST taken. */
-    update(poses: readonly ShipPose[], eye: Vec3) {
-      const order = poses.map((p, i) => ({ i, d: -dotV(p.position, eye) })).sort((a, b) => a.d - b.d);
+    /** Each frame: the ships, and the eye (world, metres), the nearest NEAREST taken. */
+    update(ships: readonly { pose: ShipPose }[], eye: sphere.Vec3) {
+      // the nearest NEAREST, nearest first, by insertion into a short list
+      let taken = 0;
+      for (let i = 0; i < ships.length; i++) {
+        const d = -sphere.dot(ships[i].pose.position, eye);
+        if (taken === NEAREST && d >= nearness[taken - 1]) continue;
+        let k = taken < NEAREST ? taken++ : taken - 1;
+        for (; k > 0 && nearness[k - 1] > d; k--) {
+          nearness[k] = nearness[k - 1];
+          chosen[k] = chosen[k - 1];
+        }
+        nearness[k] = d;
+        chosen[k] = i;
+      }
       for (let k = 0; k < NEAREST; k++) {
-        const pose = order[k] ? poses[order[k].i] : null;
-        const set = (a: Vector4[], v: Vec3) => a[k].set(v[0], v[1], v[2], 0);
         // the empty slots parked far off, square, so nothing lies inside them
-        set(values.at, pose ? pose.position : [1e6, 0, 0]);
-        set(values.fwd, pose ? pose.forward : [1, 0, 0]);
-        set(values.up, pose ? pose.up : [0, 1, 0]);
+        if (k < taken) {
+          const { position, forward, up } = ships[chosen[k]].pose;
+          values.at[k].set(position[0], position[1], position[2], 0);
+          values.fwd[k].set(forward[0], forward[1], forward[2], 0);
+          values.up[k].set(up[0], up[1], up[2], 0);
+        } else {
+          values.at[k].set(1e6, 0, 0, 0);
+          values.fwd[k].set(1, 0, 0, 0);
+          values.up[k].set(0, 1, 0, 0);
+        }
       }
     },
   };

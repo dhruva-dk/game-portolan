@@ -1,5 +1,5 @@
-// Who holds the sea, drawn in it: the first game's shading in of the water and its line (agent-initial src/territory.ts
-// TERRITORY_GLSL), in TSL, read straight from the cells (claimed.ts) with no bake between.
+// Who holds the sea, drawn in it: the water shaded in its holder's colour and her line along the border, in TSL, read
+// straight from the cells (claimed.ts) with no bake between.
 //
 // Each holder's share is a smooth field over the sea: the cells round a point read with a quadratic B-spline over the
 // 3 × 3 nearest (each cell's smoothed share of its own holder, claimed.ts), the field between the two holders there
@@ -27,10 +27,10 @@ import {
   If, abs, atan, clamp, dot, exp, float, floor, int, length, max, min, mix, select, smoothstep, storage, uniform, uniformArray,
   vec2, vec4,
 } from 'three/tsl';
-import { N } from '../world/cells';
 import type { Sea } from '../snapshot';
-import { type BoolNode, type FloatNode, type IntNode, type UintNode, type Vec2Node, type Vec3Node, type Vec4Node } from '../tsl';
+import type { BoolNode, FloatNode, IntNode, UintNode, Vec2Node, Vec3Node, Vec4Node } from '../tsl';
 import { gnomonic } from '../view/cube';
+import { N } from '../world/cells';
 import { HOLD, SIDE, WORDS, createClaimed } from './claimed';
 
 /** The tint: how far the water's colour is given up for its holder's (0…1), the others' and hers; seen from afar (a
@@ -38,12 +38,16 @@ import { HOLD, SIDE, WORDS, createClaimed } from './claimed';
 const TINT = 0.1, OWN_TINT = 0.14, FAR_TINT = 0.9;
 /** The emphasis her own colour's w carries (the others' 1): her line is the wider. */
 const OWN_LINE = 2;
-/** The line's half width, pixels, the same near and far (hers OWN_WIDE times it); from afar (a cell under a pixel or
- *  two) it is FAINTEST of itself, the tint telling the holders apart there. */
-const HALF = 1.1, OWN_WIDE = 1.5, FAINTEST = 0.5;
+/** The line's half width, pixels, the same near and far (hers OWN_WIDE times it), here and in the open trails'
+ *  (trails.ts); from afar (a cell under a pixel or two) it is FAINTEST of itself, the tint telling the holders apart. */
+export const LINE_HALF = 1.1, OWN_WIDE = 1.5;
+const FAINTEST = 0.5;
 /** The line's light, as a share of what the sun and sky give a white surface, once the colour's brightest channel is
  *  raised to 1: the holder's colour at its brightest, flat, under what the bloom takes. */
 const INK = 1;
+
+/** The light of a line in `colour`, per unit of what a white surface gets: its brightest channel raised to INK. */
+export const lineLight = (colour: Vec3Node): Vec3Node => colour.div(max(max(colour.x, colour.y), max(colour.z, 0.02))).mul(INK);
 /** The flood's front: its width, seconds of its sweep, and its light. */
 const CREST = 0.03, CREST_GAIN = 1.2;
 
@@ -52,8 +56,8 @@ const CREST = 0.03, CREST_GAIN = 1.2;
  *  (0…1) and how far off it is seen (0…1: 1 a cell under a pixel or two). */
 export interface Claim { dye: Vec4Node; ink: Vec4Node; drain: FloatNode; far: FloatNode }
 
-/** A line of width w at distance d, widened to the pixel's footprint px with its energy kept (the first game's). */
-const line = (d: FloatNode, w: number, px: FloatNode): FloatNode => {
+/** A soft stroke of width w at distance d, widened to the pixel's footprint px with its energy kept. */
+const stroke = (d: FloatNode, w: number, px: FloatNode): FloatNode => {
   const we = max(px, w);
   return exp(d.mul(d).div(we.mul(we)).negate()).mul(float(w).div(we));
 };
@@ -149,7 +153,8 @@ export function createClaims(ships: number) {
           for (const { word, r, w, dw } of taps) {
             const moving = r.greaterThan(settled);
             const id = float(word.bitAnd(255)), b = float(word.shiftRight(16).bitAnd(255)).div(255);
-            add(before, select(moving, float(word.shiftRight(8).bitAnd(255)), id), select(moving, float(word.shiftRight(24)).div(255), b), w, dw);
+            const idBefore = select(moving, float(word.shiftRight(8).bitAnd(255)), id);
+            add(before, idBefore, select(moving, float(word.shiftRight(24)).div(255), b), w, dw);
           }
         }).Else(() => {
           for (const k of ['b', 'c', 'base', 'gBase', 'eA', 'gA', 'eB', 'gB', 'eC', 'gC'] as const) before[k].assign(now[k]);
@@ -181,9 +186,9 @@ export function createClaims(ships: number) {
           // distance to the border in pixels; the tint even over all her water, each side its holder's
           const d = abs(f.v).div(f.px);
           const strength = mix(aHi.mul(tintOf(hi.w)), aLo.mul(tintOf(lo.w)), t);
-          const wide = float(HALF).mul(mix(float(1), float(OWN_WIDE), hers(max(hi.w, lo.w.mul(aLo)))));
+          const wide = float(LINE_HALF).mul(mix(float(1), float(OWN_WIDE), hers(max(hi.w, lo.w.mul(aLo)))));
           const cover = clamp(wide.sub(d).add(0.5), 0, 1).mul(mix(float(1), float(FAINTEST), far)).mul(aHi);
-          const light = side.xyz.div(max(max(side.x, side.y), max(side.z, 0.02))).mul(INK);
+          const light = lineLight(side.xyz);
           return { tint, strength, ink: vec4(light.mul(cover), cover), colour: side.xyz, light };
         };
         const fN = field(now), fB = field(before), sN = shade(fN), sB = shade(fB);
@@ -197,7 +202,7 @@ export function createClaims(ships: number) {
         const colour = select(tc.w.greaterThan(1e-3), tc.xyz.div(max(tc.w, 1e-3)), mix(sB.colour, sN.colour, tf));
         // the flood's front running over the water as a line; the drained water churned behind the front drawing back
         const changing = select(length(sN.tint.sub(sB.tint)).greaterThan(1e-3), float(1), float(0));
-        const crest = min(line(since, CREST, pxT).mul(CREST_GAIN).mul(sN.tint.w).mul(changing), 1);
+        const crest = min(stroke(since, CREST, pxT).mul(CREST_GAIN).mul(sN.tint.w).mul(changing), 1);
         drain.assign(float(1).sub(sN.tint.w).mul(sB.tint.w).mul(select(since.lessThan(0), float(1).sub(fade), exp(since.mul(-3)))));
         const lines = mix(sB.ink.mul(fade), sN.ink, tf);
         ink.assign(lines.add(vec4(sN.light.mul(crest.mul(INK)), crest).mul(float(1).sub(lines.w))));
@@ -211,7 +216,9 @@ export function createClaims(ships: number) {
     update(sea: Sea | undefined, now: number, own: number | null) {
       // (a new match's sea, or none, or one whose changes were missed, is sent whole once it is taken)
       claimed.follow(sea);
-      for (const [a, b] of claimed.work(now)) {
+      const ranges = claimed.work(now);
+      for (let f = 0; f < ranges.length; f++) {
+        const a = ranges[f][0], b = ranges[f][1];
         if (b <= a) continue;
         cellsAttr.addUpdateRange(a, b - a);
         revealAttr.addUpdateRange(a, b - a);
@@ -219,9 +226,10 @@ export function createClaims(ships: number) {
       }
       if (!sea) return;
       clock.value = now;
-      sea.colours.forEach((c, id) => {
-        if (id + 1 < values.length) values[id + 1].set(c[0], c[1], c[2], id === own ? OWN_LINE : 1);
-      });
+      for (let id = 0; id < sea.colours.length && id + 1 < values.length; id++) {
+        const c = sea.colours[id];
+        values[id + 1].set(c[0], c[1], c[2], id === own ? OWN_LINE : 1);
+      }
     },
   };
 }

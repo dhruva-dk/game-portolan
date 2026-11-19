@@ -17,22 +17,32 @@ export interface Reading { fresh: boolean; missed: boolean; from: number }
 
 export function createCursor() {
   let generation = NONE, seq = 0;
+  /** What `read` returns, rewritten by each read (read it before reading again). */
+  const reading: Reading = { fresh: false, missed: false, from: 0 };
   return {
     /** Reads `sea` (none outside a match): from now on its changes up to its last count as read. */
-    read(sea: Sea | undefined): Reading {
+    read(sea: Sea | undefined): Readonly<Reading> {
       if (!sea) {
-        const fresh = generation !== NONE;
-        [generation, seq] = [NONE, 0];
-        return { fresh, missed: false, from: 0 };
+        reading.fresh = generation !== NONE;
+        reading.missed = false;
+        reading.from = 0;
+        generation = NONE;
+        seq = 0;
+        return reading;
       }
       const fresh = sea.generation !== generation;
-      if (fresh) [generation, seq] = [sea.generation, 0];
+      if (fresh) {
+        generation = sea.generation;
+        seq = 0;
+      }
       const log = sea.changes;
       let from = log.length;
       while (from > 0 && log[from - 1].seq > seq) from--;
-      const missed = !fresh && sea.seq > seq && (from === log.length || log[from].seq !== seq + 1);
+      reading.fresh = fresh;
+      reading.missed = !fresh && sea.seq > seq && (from === log.length || log[from].seq !== seq + 1);
+      reading.from = from;
       seq = sea.seq;
-      return { fresh, missed, from };
+      return reading;
     },
   };
 }

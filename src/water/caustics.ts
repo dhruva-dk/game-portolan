@@ -18,7 +18,7 @@ import { Fn, If, dFdx, dFdy, dot, float, length, log2, max, mix, smoothstep, sqr
 import type { Sky } from '../sky/sky';
 import type { Charts } from '../view/charts';
 import type { View } from '../view/view';
-import { CASCADES, SIZE } from '../world/cascades';
+import { CASCADES, LONG, SIZE } from '../world/cascades';
 import { N_WATER } from './optics';
 import { CURVED, type Waves } from './waves';
 import type { FloatNode, Vec3Node } from '../tsl';
@@ -31,8 +31,10 @@ const PIXELS = 4;
  * short waves' foci (about 3°). */
 const BLUR = 0.05;
 
-/** shallows(p): how much of the long (k < 2) and short waves the depth at p lets through. */
-export function createCaustics(view: View, sky: Sky, waves: Waves, charts: Charts, shallows: (p: Vec3Node) => { long: FloatNode; short: FloatNode }) {
+/** shallows(p): how much of the long (the first LONG cascades) and short waves the depth at p lets through. */
+export function createCaustics(
+  view: View, sky: Sky, waves: Waves, charts: Charts, shallows: (p: Vec3Node) => { long: FloatNode; short: FloatNode }
+) {
   return (p: Vec3Node): FloatNode => Fn(() => {
     const up = view.up(p);
     const depth = max(view.altitude(p).negate(), 0);
@@ -55,7 +57,7 @@ export function createCaustics(view: View, sky: Sky, waves: Waves, charts: Chart
       CURVED.forEach((k, i) => {
         const L = CASCADES[k];
         const lod = log2(max(width.div(L / SIZE), 1));
-        h = h.add(texture(waves.curvature[i], entry.div(L)).level(lod).xyz.mul(k < 2 ? long : short));
+        h = h.add(texture(waves.curvature[i], entry.div(L)).level(lod).xyz.mul(k < LONG ? long : short));
       });
       // (hxx, hzz, hxz) on this chart's axes, onto the first's
       const a = dot(c.e1, E1), b = dot(c.e2, E1), e = dot(c.e1, E2), d = dot(c.e2, E2);

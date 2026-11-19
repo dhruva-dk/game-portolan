@@ -42,19 +42,19 @@ import type { Ground } from '../land/ground';
 import type { Sky } from '../sky/sky';
 import { createCharts } from '../view/charts';
 import type { View } from '../view/view';
+import { BANDS, BREAKER, CASCADES, FETCH, LONG, SIZE } from '../world/cascades';
+import { likeness } from '../world/spectrum';
 import { R } from '../world/sphere';
 import type { Wind } from '../world/wind';
-import { BANDS, BREAKER, CASCADES, FETCH, LONG, SIZE } from '../world/cascades';
+import type { FloatNode, Vec2Node, Vec3Node } from '../tsl';
 import { createCaustics } from './caustics';
 import { createClaims } from './claims';
-import { createTrails } from './trails';
 import { createFoam } from './foam';
 import { createHulls } from './hulls';
 import { N_WATER, createOptics } from './optics';
-import { likeness } from '../world/spectrum';
+import { createTrails } from './trails';
 import { createWake, type Afloat } from './wake';
 import { createWaves } from './waves';
-import type { FloatNode, Vec2Node, Vec3Node } from '../tsl';
 
 const SPOKES = 128;
 const FIRST = 1;
@@ -98,7 +98,9 @@ export type SeaShows = 'water' | 'charts' | 'wake';
 
 /** wind: the planet's prevailing wind; ships: the most there will be, and shipLength a ship's overall, m; shows: what the
  *  sea is drawn as. */
-export function createWater(view: View, sky: Sky, ground: Ground, wind: Wind, ships: number, shipLength: number, shows: SeaShows = 'water') {
+export function createWater(
+  view: View, sky: Sky, ground: Ground, wind: Wind, ships: number, shipLength: number, shows: SeaShows = 'water'
+) {
   const waves = createWaves();
   const wake = createWake(view, sky, ships);
   const hulls = createHulls();
@@ -157,7 +159,7 @@ export function createWater(view: View, sky: Sky, ground: Ground, wind: Wind, sh
   const phase = varying(saturate(wave.w.div(waves.amplitude).mul(0.5).add(0.5)));
   const foamOn = createFoam(waves);
   const rest = varying(grid.up);
-  material.colorNode = Fn(() => {
+  const seaShader = () => Fn(() => {
     // no water inside a hull
     const hull = hulls.at(positionWorld);
     If(hull.inside, () => {
@@ -201,7 +203,7 @@ export function createWater(view: View, sky: Sky, ground: Ground, wind: Wind, sh
         const s = read(waves.slopes[k], float(1 / L)), m = scale(k);
         s2 = s2.add(s.xy.mul(m));
         v = v.add(max(s.z.sub(s.x.mul(s.x)), 0).add(max(s.w.sub(s.y.mul(s.y)), 0)).mul(m.mul(m)));
-        if (k < 2) {
+        if (k < LONG) {
           h = h.add(read(waves.displacement[k], float(1 / L)).y.mul(m));
         }
       });
@@ -219,7 +221,8 @@ export function createWater(view: View, sky: Sky, ground: Ground, wind: Wind, sh
     variance.addAssign(storm.mul(STORM_ROUGH));
     // the storm's foot churned white along its edge, over the crests
     const foot = smoothstep(-2, 2, past).mul(float(1).sub(smoothstep(FOOT[0], FOOT[1], past)));
-    foam.assign(max(mix(foam, max(foam, smoothstep(0.55, 1, phase)), storm.mul(STORM_FOAM)), foot.mul(smoothstep(0.2, 0.8, phase)).mul(0.8)));
+    const stormFoam = mix(foam, max(foam, smoothstep(0.55, 1, phase)), storm.mul(STORM_FOAM));
+    foam.assign(max(stormFoam, foot.mul(smoothstep(0.2, 0.8, phase)).mul(0.8)));
     // and its line on the water: so wide in metres near, never under a pixel and a half far off
     const edgeLine = float(1).sub(smoothstep(0, max(footprint, 0.05), abs(past).sub(max(float(EDGE_LINE), footprint.mul(0.75)))));
     const v = normalize(cameraPosition.sub(positionWorld));
@@ -257,18 +260,19 @@ export function createWater(view: View, sky: Sky, ground: Ground, wind: Wind, sh
     // drawn black along every beach.
     const alpha = sqrt(max(variance.mul(float(1).sub(air.mul(0.6))), SMOOTHEST));
     const depth = max(ground.height(rest).negate(), 0);
-    const sea = optics.seaRadiance({ p: positionWorld, v, n, alpha, crest, foam, behind, path, depth }, near, held).mul(float(1).sub(storm.mul(STORM_DARK)));
+    const surface = { p: positionWorld, v, n, alpha, crest, foam, behind, path, depth };
+    const sea = optics.seaRadiance(surface, near, held).mul(float(1).sub(storm.mul(STORM_DARK)));
     return mix(sea, vec3(...LIGHTNING).mul(luminance(sky.open)).mul(EDGE_LIGHT), edgeLine);
   })();
   // the charts' weights as red, green and blue, about as bright on the screen as they are after the frame's exposure
-  if (shows === 'charts') material.colorNode = Fn(() => charts.debug(rest).mul(0.1))();
+  const chartsShader = () => Fn(() => charts.debug(rest).mul(0.1))();
   // the ships' marks: foam red, the wake's crests green (troughs dark), air blue, shadow grey
-  if (shows === 'wake') {
-    material.colorNode = Fn(() => {
-      const m = wake.read(normalize(rest).mul(R)).marks;
-      return vec3(saturate(m.x), saturate(m.y.mul(2).add(0.5)), saturate(m.z)).mul(float(1).sub(wake.shade(positionWorld).mul(0.7))).mul(0.1);
-    })();
-  }
+  const wakeShader = () => Fn(() => {
+    const m = wake.read(normalize(rest).mul(R)).marks;
+    return vec3(saturate(m.x), saturate(m.y.mul(2).add(0.5)), saturate(m.z)).mul(float(1).sub(wake.shade(positionWorld).mul(0.7))).mul(0.1);
+  })();
+  // only the graph that is shown is built
+  material.colorNode = shows === 'charts' ? chartsShader() : shows === 'wake' ? wakeShader() : seaShader();
 
   // drawn after everything solid, which it reads behind itself; and both sides of it, since near the horizon the eye
   // looks so low across the waves that it sees the backs of their faces past the crests
@@ -279,7 +283,7 @@ export function createWater(view: View, sky: Sky, ground: Ground, wind: Wind, sh
 
   const caustics = createCaustics(view, sky, waves, charts, shallows);
   // the open trails, riding the waves (and the wakes' waves) as the water does
-  const trails = createTrails(sky, (up, c) => view.place(up, 0).add(waveAt(up, c).xyz).add(up.mul(wake.height(up))), shipLength);
+  const trails = createTrails(sky, (up, c) => view.place(up, 0).add(waveAt(up, c).xyz).add(up.mul(wake.height(up))), shipLength, ships);
 
   return {
     mesh,
@@ -303,13 +307,15 @@ export function createWater(view: View, sky: Sky, ground: Ground, wind: Wind, sh
     marks: wake.draw,
     /** Each frame: the world, the ships on the sea, who holds it and whose ship is hers (at the snapshot's clock).
      *  Returns what is due: the waves' passes, the marks' draw. */
-    update(env: Environment, dt: number, ships: readonly Afloat[], drawn?: Pick<Snapshot, 'sea' | 'own' | 'ships' | 'clock'>): { waves: Compute[]; wake: Draw | null } {
+    update(
+      env: Environment, dt: number, ships: readonly Afloat[], drawn?: Pick<Snapshot, 'sea' | 'own' | 'ships' | 'clock'>,
+    ): { waves: Compute[]; wake: Draw | null } {
       const clock = drawn?.clock ?? env.clock;
       claims.update(drawn?.sea, clock, drawn?.own ?? null);
-      trails.update(drawn?.sea, clock, drawn?.ships ?? [], view.eye.position, drawn?.own ?? null);
+      trails.update(drawn?.sea, clock, drawn?.ships ?? [], view.eye, drawn?.own ?? null);
       const swell = waves.update({ wind: env.seaWind, fetch: FETCH }, env.windSpeed, env.clock, dt);
       const marks = wake.update(env, ships);
-      hulls.update(ships.map((s) => s.pose), view.eye.position);
+      hulls.update(ships, view.eye.position);
       // past the horizon, as far as a crest could still show over it; the charts that can weigh in out to there
       charts.update(view.eye.position, grid.update(waves.amplitude.value * 2));
       return { waves: swell, wake: marks };

@@ -28,10 +28,11 @@ import {
 } from 'three/webgpu';
 import {
   Fn, cos, float, floor, instanceIndex, instancedArray, length, localId, max, select, sin, smoothstep, sqrt, textureLoad, textureStore,
-  uint, uniform, uvec2, vec2, vec4, workgroupBarrier, workgroupId,
+  uint, uniform, uniformArray, uvec2, vec2, vec4, workgroupBarrier, workgroupId,
 } from 'three/tsl';
 import { storageTable, type Compute } from '../gpu';
 import { BANDS, CASCADES, CHOP, PERIOD, SIZE } from '../world/cascades';
+import { clamp } from '../world/scalar';
 import { G, coxMunk, initialSpectrum, meanSquareSlope, normalQuantile, seaState, whitecaps, type Sea } from '../world/spectrum';
 import { workgroupArrayOf, type FloatNode, type UintNode, type Vec2Node, type Vec4Node } from '../tsl';
 
@@ -45,6 +46,8 @@ const RIPPLE_FLOOR = 4e-4;
 const HALF = SIZE / 2;
 const AREA = SIZE * SIZE;
 const COUNT = CASCADES.length;
+/** Each cascade's width, metres, for the kernels to index by cascade. */
+const widths = uniformArray<'float'>(CASCADES, 'float');
 
 /** A cascade's tile of the sea: tiling, its mips made by three, read at a slant. */
 const surface = (): StorageTexture =>
@@ -83,7 +86,7 @@ export function createWaves() {
   const spectrumKernel = Fn(() => {
     const c = instanceIndex.div(AREA), i = instanceIndex.mod(AREA);
     const x = i.mod(SIZE), y = i.div(SIZE);
-    const width = select(c.equal(0), CASCADES[0], select(c.equal(1), CASCADES[1], CASCADES[2]));
+    const width = widths.element(c);
     const h0 = textureLoad(initial, uvec2(x, y.add(c.mul(SIZE))));
     const k = vec2(float(x).sub(HALF), float(y).sub(HALF)).mul(float(2 * Math.PI).div(width));
     const kl = length(k);
@@ -226,7 +229,7 @@ export function createWaves() {
       }
       // foam lasts longer the harder the wind blows: τ from a second to five (the residual foam a whitecap leaves,
       // Monahan's stage B, a few seconds)
-      fade.value = Math.exp(-dt / (1 + 4 * Math.min(Math.max((now - 5) / 15, 0), 1)));
+      fade.value = Math.exp(-dt / (1 + 4 * clamp((now - 5) / 15)));
       time.value = clock % PERIOD;
       return passes;
     },

@@ -150,6 +150,14 @@ function tinted(c: Vec3Node, colour: Vec3Node, a: FloatNode, far: FloatNode): Ve
 }
 
 /**
+ * What a white surface lying on the sea at world position p would give back, given the sun's illuminance there (the
+ * sky's ambient() is a radiance, so its E/π is itself): the water's colours and the borders' lines are tones under it.
+ */
+export function whiteSurface(sky: Sky, p: Vec3Node, up: Vec3Node, illuminance: Vec3Node): Vec3Node {
+  return illuminance.mul(max(dot(sky.sun(p), up), 0)).div(Math.PI).add(sky.ambient(p, up));
+}
+
+/**
  * The light leaving the sea toward the eye from surface s; ships, what the ships do to the light there; held, who
  * holds the water there: the water tinted her colour, and her border's line drawn over it.
  */
@@ -160,9 +168,9 @@ function seaRadiance(sky: Sky, view: View, s: Surface, ships: Ships, held?: Held
   const F = fresnel(nv).mul(MIRROR);
   const sun = sky.sunIlluminance(p).mul(sky.cloudShadow(p)).mul(ships.lit);
 
-  // what a white surface lying on the sea would give back (ambient() is the sky's radiance, so its E/π is itself):
-  // the water's colours are tones under it, as a solid's are under its level (sky/light.ts)
-  const irradiance = sun.mul(max(dot(l, up), 0)).div(Math.PI).add(sky.ambient(p, up));
+  // the water's colours are tones under what a white surface would give back, as a solid's are under its level
+  // (sky/light.ts)
+  const irradiance = whiteSurface(sky, p, up, sun);
   // the water's own tone by how much of it the eye looks through, paler where a wake has worked air into it, and a
   // second, deeper tone in the troughs between the waves, its edge crisp
   const own = mix(mix(vec3(...SEA_SHALLOW), vec3(...SEA_MIDDLE), smoothstep(SHALLOW_TO, MIDDLE_AT, depth)), vec3(...SEA_DEEP), smoothstep(MIDDLE_AT, DEEP_AT, depth));
