@@ -86,16 +86,15 @@ test('cover: 0…1; no sea grass in the deeps, and the land\'s growth only inlan
   }
 });
 
-test('bakeFaces: the nodes are height() at faceDir, and the faces nearly agree along their shared edges', () => {
+test('bakeFaces: the nodes are height() at faceDir, and the faces agree along their shared edges', () => {
   const n = 33;
   const { height, cover } = bakeFaces(planet, n);
   assert.equal(height.length, 6);
   const byDirection = new Map<string, number[]>();
-  // on a cube face's edge the terrain is read from whichever face the point falls on, and the two faces' readings there
-  // part by up to SEAM m (terrain-grid.ts locate: each face's taps run on past its edge as though the next face's cells
-  // lay on its own lattice, which they nearly do); a point there a hair to either side reads either (0.28 m the most
-  // on this planet)
-  const SEAM = 0.35;
+  // on a cube face's edge the terrain is read from whichever face the point falls on, and the readings either side
+  // of the edge, and at the cube's corners, are one (terrain-grid.ts locate): the faces' nodes there part only by the
+  // rounding of their directions
+  const SEAM = 1e-4;
   let seam = 0;
   for (let face = 0; face < 6; face++) for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
     const p = faceDir(face, (2 * i) / (n - 1) - 1, (2 * j) / (n - 1) - 1), k = j * n + i;
@@ -115,7 +114,7 @@ test('bakeFaces: the nodes are height() at faceDir, and the faces nearly agree a
   assert.equal(counts.filter((c) => c === 2).length, 12 * (n - 2));
   assert.equal(counts.filter((c) => c === 3).length, 8);
   for (const v of byDirection.values()) seam = Math.max(seam, Math.max(...v) - Math.min(...v));
-  console.log(`# the faces part along their edges by ${seam.toFixed(3)} m at most`);
+  console.log(`# the faces part along their edges by ${seam.toExponential(1)} m at most`);
   assert.ok(seam < SEAM, `${seam} m`);
 });
 

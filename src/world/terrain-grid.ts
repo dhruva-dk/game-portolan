@@ -4,7 +4,8 @@
 //
 // Pure arithmetic: no three, so it runs in node for the tests.
 
-import { CELLS, N, PLANET_QUANTA, areaQuanta, beyond, centreOf, neighbor } from './cells.ts';
+import { CELLS, N, PLANET_QUANTA, areaQuanta, centreOf, columnOf, faceOf, neighbor, rowOf } from './cells.ts';
+import { smoothstep } from './scalar.ts';
 import { R, faceUV, type Vec3 } from './sphere.ts';
 
 /** Square metres in an area quantum (cells.ts), and a cell's area. */
@@ -159,9 +160,10 @@ export function disc(c: number, radius: number, seen: Int32Array, mark: number, 
   }
 }
 
-/** The sixteen cells whose centres surround a point, and each one's weight. */
-export interface Taps { cell: Int32Array; weight: Float64Array }
-export const taps = (): Taps => ({ cell: new Int32Array(16), weight: new Float64Array(16) });
+/** The sixteen cells whose centres surround a point and each one's weight, `n` in all: near a corner of the cube up to
+ *  sixteen more (locate). */
+export interface Taps { cell: Int32Array; weight: Float64Array; n: number }
+export const taps = (): Taps => ({ cell: new Int32Array(32), weight: new Float64Array(32), n: 16 });
 
 /** Catmull-Rom's four weights at fraction t between the middle two of four evenly spaced samples. */
 function catmullRom(t: number, w: Float64Array) {
@@ -172,12 +174,58 @@ function catmullRom(t: number, w: Float64Array) {
   w[3] = 0.5 * (t3 - t2);
 }
 
+// Each face's lattice carried on past each of its sides (0 −u, 1 +u, 2 −v, 3 +v) as the next face unfolds flat beside
+// it, five numbers a side: that face; whether a place along the edge is a row of that face's (1) or a column (0); the
+// sign and offset taking a place along this face's edge to one along that face's; and its column or row at the edge.
+// Along an edge the two faces' cells line up one for one (cells.ts), so unfolded they make one lattice across it.
+const FOLD = new Int32Array(24 * 5);
+for (let f = 0; f < 6; f++) for (let s = 0; s < 4; s++) {
+  const rim = s === 0 || s === 2 ? 0 : N - 1;
+  const edge = (k: number) => f * N * N + (s < 2 ? k * N + rim : rim * N + k);
+  const a = neighbor(edge(0), s), b = neighbor(edge(1), s), o = 5 * (4 * f + s), rows = +(columnOf(a) === columnOf(b));
+  FOLD.set([faceOf(a), rows, rows ? rowOf(b) - rowOf(a) : columnOf(b) - columnOf(a), rows ? rowOf(a) : columnOf(a),
+    rows ? columnOf(a) : rowOf(a)], o);
+}
+
+/** unfold's answer: a face, column and row. */
+const SPOT = new Int32Array(3);
+/** Column i, row j of face f's lattice, past its side s (and maybe past another side too), as the column and row of the
+ *  next face's lattice unfolded beside it, into SPOT. */
+function unfold(f: number, i: number, j: number, s: number) {
+  const o = 5 * (4 * f + s), depth = s === 0 ? -1 - i : s === 1 ? i - N : s === 2 ? -1 - j : j - N;
+  const along = FOLD[o + 3] + FOLD[o + 2] * (s < 2 ? j : i), across = FOLD[o + 4] === 0 ? depth : N - 1 - depth;
+  SPOT[0] = FOLD[o];
+  SPOT[1] = FOLD[o + 1] ? across : along;
+  SPOT[2] = FOLD[o + 1] ? along : across;
+}
+
+/** The cell at column i, row j of face f's lattice, past at most one of its sides: there, the unfolded next face's. */
+function past(f: number, i: number, j: number): number {
+  if (i >= 0 && i < N && j >= 0 && j < N) return f * N * N + j * N + i;
+  unfold(f, i, j, i < 0 ? 0 : i >= N ? 1 : j < 0 ? 2 : 3);
+  return past(SPOT[0], SPOT[1], SPOT[2]);
+}
+
+/** The cell at column i, row j of face f's lattice, past two sides at once (beyond a corner of the cube, where no cell
+ *  lies): unfolded across side s first, then on past the next face's side as `past` reads it there. */
+function pastCorner(f: number, i: number, j: number, s: number): number {
+  unfold(f, i, j, s);
+  return past(SPOT[0], SPOT[1], SPOT[2]);
+}
+
 const WU = new Float64Array(4), WV = new Float64Array(4);
 /**
  * Where unit vector p falls among the cells' centres, into `at`: the 4 × 4 round it on its face's lattice of centres
- * (equi-angular, as cells.ts lays them; past the face's edge, the next face's cells there) and their bicubic
- * Catmull-Rom weights. Read through them a field is smooth, its slope continuous (no creases along the cells' rows
- * for the light to catch), and at a cell's centre it is exactly the cell's own value.
+ * (equi-angular, as cells.ts lays them) and their bicubic Catmull-Rom weights. Read through them a field is smooth,
+ * its slope continuous (no creases along the cells' rows for the light to catch), and at a cell's centre it is exactly
+ * the cell's own value.
+ *
+ * Past the face's edge the lattice runs on over the next face unfolded flat beside it, so a point on the edge reads
+ * the same cells with the same weights from either face, and the field runs on across the seam without a step. Beyond
+ * a corner of the cube, where three faces meet and the unfolded lattices can't all agree, a tap is read both ways
+ * (across one edge then the other, and the other way round), each weighted by how near the point lies to the edge that
+ * way agrees with. That leaves the corner itself read differently from each way into it, so within half a cell of it
+ * (short of the corner cells' centres) the reading eases into one all three faces share there.
  */
 export function locate(p: Vec3, at: Taps): void {
   const { face, u, v } = faceUV(p);
@@ -185,17 +233,57 @@ export function locate(p: Vec3, at: Taps): void {
   const i = Math.floor(x), j = Math.floor(y);
   catmullRom(x - i, WU);
   catmullRom(y - j, WV);
-  const inside = i >= 1 && i < N - 2 && j >= 1 && j < N - 2;
+  at.n = 16;
+  if (i >= 1 && i < N - 2 && j >= 1 && j < N - 2) {
+    for (let b = 0; b < 4; b++) for (let a = 0; a < 4; a++) {
+      const k = 4 * b + a;
+      at.cell[k] = face * N * N + (j + b - 1) * N + i + a - 1;
+      at.weight[k] = WU[a] * WV[b];
+    }
+    return;
+  }
+  // how far the point lies from the nearer u and v edges, cells; and the share of a tap beyond a corner read across
+  // the u edge first, which is the reading that agrees with the next face's there
+  const du = Math.min(x + 0.5, N - 0.5 - x), dv = Math.min(y + 0.5, N - 0.5 - y);
+  const first = du + dv > 0 ? dv / (du + dv) : 0.5;
   for (let b = 0; b < 4; b++) for (let a = 0; a < 4; a++) {
-    const k = 4 * b + a, ci = i + a - 1, cj = j + b - 1;
-    at.cell[k] = inside ? face * N * N + cj * N + ci : beyond(face, ci, cj);
-    at.weight[k] = WU[a] * WV[b];
+    const k = 4 * b + a, ci = i + a - 1, cj = j + b - 1, w = WU[a] * WV[b];
+    if ((ci >= 0 && ci < N) || (cj >= 0 && cj < N)) {
+      at.cell[k] = past(face, ci, cj);
+      at.weight[k] = w;
+      continue;
+    }
+    at.cell[k] = pastCorner(face, ci, cj, ci < 0 ? 0 : 1);
+    at.weight[k] = w * first;
+    at.cell[at.n] = pastCorner(face, ci, cj, cj < 0 ? 2 : 3);
+    at.weight[at.n++] = w * (1 - first);
+  }
+  const corner = 1 - smoothstep(0, 0.5, Math.hypot(du, dv));
+  if (corner > 0) cornerTaps(face, x < N / 2, y < N / 2, corner, at);
+}
+
+/** Catmull-Rom's weights at the middle of the nearer and farther cell either side of it. */
+const MID = [9 / 16, -1 / 16] as const;
+/**
+ * Eases `at` by `share` into the reading at the corner of face f nearest the point (low u if `lowU`, low v if `lowV`)
+ * that all three faces meeting there share: each face's 2 × 2 cells at the corner, weighted as the bicubic weighs
+ * them there, the three faces alike.
+ */
+function cornerTaps(f: number, lowU: boolean, lowV: boolean, share: number, at: Taps) {
+  for (let k = 0; k < at.n; k++) at.weight[k] *= 1 - share;
+  for (let b = 0; b < 2; b++) for (let a = 0; a < 2; a++) {
+    const own = lowU ? a : N - 1 - a, row = lowV ? b : N - 1 - b, w = (share * 4 * MID[a] * MID[b]) / 3;
+    const out = lowU ? -1 - a : N + a, outRow = lowV ? -1 - b : N + b;
+    at.cell[at.n] = past(f, own, row);
+    at.cell[at.n + 1] = past(f, out, row);
+    at.cell[at.n + 2] = past(f, own, outRow);
+    for (let k = 0; k < 3; k++) at.weight[at.n++] = w;
   }
 }
 
 /** A per-cell value read smoothly where `at` was located. */
 export function between(values: ArrayLike<number>, at: Taps): number {
   let v = 0;
-  for (let k = 0; k < 16; k++) v += values[at.cell[k]] * at.weight[k];
+  for (let k = 0; k < at.n; k++) v += values[at.cell[k]] * at.weight[k];
   return v;
 }

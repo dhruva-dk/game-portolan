@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { CELLS, N, centreOf } from '../src/world/cells.ts';
-import { R, normalize, type Vec3 } from '../src/world/sphere.ts';
+import { R, add, faceDir, faceUV, normalize, type Vec3 } from '../src/world/sphere.ts';
 import { CELL, centres, components, shoreOf } from '../src/world/terrain-grid.ts';
 import { TERRAIN, createTerrain, heightAt, profile } from '../src/world/terrain.ts';
 
@@ -62,6 +62,31 @@ test('the height is continuous and gentle everywhere, across faces too', () => {
   }
   // (the relief's grades scale with the summit: 0.75 for a summit of 20 m; a jump at a seam would be many times that)
   assert.ok(steepest < 0.0375 * t.options.summit, `steepest ${steepest.toFixed(2)}`);
+});
+
+test('the height runs on across every edge of the cube without a step, to its corners', () => {
+  // each face's four sides, and the face past each: the cube's twelve edges, each from both its faces
+  const edges = new Set<string>();
+  let worst = 0, where = '';
+  for (const [seed, t] of terrains) {
+    const h = heightAt(t);
+    for (let face = 0; face < 6; face++) for (let side = 0; side < 4; side++) {
+      // the point s of the way out to this side (1 on it), k along it
+      const sign = side % 2 ? 1 : -1;
+      const on = (s: number, k: number) => (side < 2 ? faceDir(face, sign * s, k) : faceDir(face, k, sign * s));
+      edges.add([face, faceUV(on(1.01, 0)).face].sort().join());
+      for (let n = 0; n <= 2000; n++) {
+        // a point on the edge (the cube's corners too), and two a hair either side of it across the edge
+        const k = n / 1000 - 1, e = on(1, k), out = normalize(add(e, on(0.999, k), -1));
+        const a = normalize(add(e, out, -1e-9)), b = normalize(add(e, out, 1e-9));
+        assert.notEqual(faceUV(a).face, faceUV(b).face);
+        const step = Math.abs(h(a) - h(b));
+        if (step > worst) [worst, where] = [step, `seed ${seed}, face ${face} side ${side} at ${k}`];
+      }
+    }
+  }
+  assert.equal(edges.size, 12);
+  assert.ok(worst < 1e-4, `${worst} m at ${where}`);
 });
 
 test('the profile meets the sea at 0 from either side, and rises inland and falls offshore', () => {
