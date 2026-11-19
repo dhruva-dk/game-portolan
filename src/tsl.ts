@@ -4,7 +4,7 @@
 
 // And the two marks a flat look is drawn with, a shape's crisp edge (cut) and a thin line (line), for every material.
 
-import { Fn, Loop, clamp, float, fract, fwidth, int, max, min, nodeObject, saturate, uint, vec3, workgroupArray } from 'three/tsl';
+import { Fn, Loop, clamp, float, fract, fwidth, int, max, min, nodeObject, pow, saturate, uint, vec3, workgroupArray } from 'three/tsl';
 import { MathNode, type Node } from 'three/webgpu';
 
 export type FloatNode = Node<'float'>;
@@ -40,6 +40,11 @@ const pcg3 = Fn(([c]: [Vec3Node]) => {
   return vec3(float(x), float(y), float(z)).mul(1 / 2 ** 32);
 }).setLayout({ name: 'pcg3', type: 'vec3', inputs: [{ name: 'c', type: 'vec3' }] });
 export const hash3 = (c: Vec3Node): Vec3Node => pcg3(c);
+
+/** The Henyey-Greenstein phase, per steradian, of light turned through an angle of cosine c by a lobe of asymmetry g
+ *  (forward for g > 0). */
+export const henyeyGreenstein = (c: FloatNode, g: number): FloatNode =>
+  float((1 - g * g) / (4 * Math.PI)).div(pow(float(1 + g * g).sub(c.mul(2 * g)), 1.5));
 
 /** 0 where x is under `at` … 1 where it is over, the edge between them a pixel wide however far off it is seen: the
  *  edge of a flat shape. In a fragment's shader only (it reads x's change across the pixel). */

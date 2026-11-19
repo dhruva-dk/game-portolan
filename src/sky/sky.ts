@@ -38,7 +38,7 @@ import { createClouds } from './clouds';
 import { createReflection } from './reflection';
 import { createStormLook, type StormLight } from './storm';
 import { VIEW_RADIUS, createTables } from './tables';
-import type { FloatNode, Vec3Node } from '../tsl';
+import { henyeyGreenstein, type FloatNode, type Vec3Node } from '../tsl';
 
 /**
  * The sun's disc as the sky draws it, its angular radius: 3° across, where the true sun is 0.53°, a few pixels on the
@@ -88,9 +88,6 @@ const HAZE_SPECTRUM = [0.85, 1, 1.12] as const, HAZE_SUN = 0.22, HAZE_G = 0.72;
 const HAZE_ABOVE = [40, 200] as const;
 /** Past this many metres a ray has met nothing: the frame hands the sky's pixels this far or further. */
 export const SKY_METRES = 1e4;
-
-const hg = (c: FloatNode, g: number): FloatNode =>
-  float((1 - g * g) / (4 * Math.PI)).div(pow(float(1 + g * g).sub(c.mul(2 * g)), 1.5));
 
 /** The light the sky gives everything else. */
 export interface Sky {
@@ -161,7 +158,7 @@ export function createSky(view: View, bolt: boolean) {
   const hazeColor = (dir: Vec3Node): Vec3Node => {
     const d = view.toSky(dir);
     const horizon = skyRadiance(normalize(vec3(d.x, 0.02, d.z)), skySun);
-    const forward = hg(dot(normalize(vec3(d.x, max(d.y, 0), d.z)), skySun), HAZE_G);
+    const forward = henyeyGreenstein(dot(normalize(vec3(d.x, max(d.y, 0), d.z)), skySun), HAZE_G);
     const sunlight = sunTransmittance(VIEW_RADIUS, rise).mul(max(rise, 0.05));
     return horizon.mul(vec3(...HAZE)).add(sunlight.mul(forward).mul(HAZE_SUN));
   };
@@ -199,8 +196,7 @@ export function createSky(view: View, bolt: boolean) {
     const r = sqrt(max(float(1).sub(c).mul(2), 0)).div(SUN_DISC);
     const halo = exp(max(r.sub(1), 0).div(-WIDTH)).mul(HALO);
     const disc = float(1).sub(smoothstep(1 - EDGE, 1, r)).add(halo).mul(SUN_RADIANCE);
-    const g2 = PEAK_G * PEAK_G;
-    const peak = float((1 - g2) / (4 * Math.PI)).div(pow(float(1 + g2).sub(c.mul(2 * PEAK_G)), 1.5));
+    const peak = henyeyGreenstein(c, PEAK_G);
     const mieDepth = haze.mul(MIE_SCATTERING * MIE_SCALE_HEIGHT * PEAK_SHARE).div(max(d.y, 0.03));
     return sky.add(T.mul(disc.add(peak.mul(mieDepth))));
   })();

@@ -19,11 +19,11 @@
 // The march: from where the ray enters the storm (or the eye), the step is the distance to the nearest cloud or rain
 // while there is none (the bounds below, then the billows' own surface), and STEP, growing with distance, in the rain.
 
-import { Break, If, acos, atan, clamp, cos, dot, exp, float, length, max, min, mix, normalize, pow, select, sin, smoothstep, texture3D, vec3 } from 'three/tsl';
+import { Break, If, acos, atan, clamp, cos, dot, exp, float, length, max, min, mix, normalize, select, sin, smoothstep, texture3D, vec3 } from 'three/tsl';
 import type { Storage3DTexture } from 'three/webgpu';
 import { CLOUD } from '../sim/storm';
 import { R } from '../world/sphere';
-import { loop, type FloatNode, type Vec3Node } from '../tsl';
+import { henyeyGreenstein, loop, type FloatNode, type Vec3Node } from '../tsl';
 
 /** The cloud's base, metres up, and how far its rolls lift and lower it, each ROLL_WIDTH metres across. Its rolls and
  * billows (5 m at most 1.7) take it down to some 40.6 m: sim/storm.ts CLOUD.lowest, which the chase keeps under. */
@@ -82,8 +82,6 @@ export interface FieldLight { air: Vec3Node; sun: Vec3Node; toward: Vec3Node; gl
  * what survived to `mark` metres along. */
 export interface Marched { light: Vec3Node; T: FloatNode; reached: FloatNode; atMark: FloatNode }
 
-const hg = (c: FloatNode, g: number): FloatNode => float((1 - g * g) / (4 * Math.PI)).div(pow(float(1 + g * g).sub(c.mul(2 * g)), 1.5));
-
 export function createStormField(cap: Cap, shape: Storage3DTexture) {
   /** Metres past the cap's edge over the unit vector u. */
   const edge = (u: Vec3Node): FloatNode => acos(clamp(dot(u, cap.centre), -1, 1)).sub(cap.radius).mul(R).sub(cap.whole.mul(1e4));
@@ -137,7 +135,7 @@ export function createStormField(cap: Cap, shape: Storage3DTexture) {
     const air = lit.air.mul(mix(DARK, BRIGHT, high).mul(sky).add(calm));
     const sun = lit.sun.mul(clamp(dot(normal, lit.toward), 0, 1).mul(high).mul(SUNLIT / Math.PI));
     // against the sun, its light through the billows' thin edges
-    const lining = lit.sun.mul(hg(dot(d, lit.toward), 0.6).mul(LINING * 4 * Math.PI)).mul(high).mul(float(1).sub(clamp(dot(normal, d.negate()), 0, 1)));
+    const lining = lit.sun.mul(henyeyGreenstein(dot(d, lit.toward), 0.6).mul(LINING * 4 * Math.PI)).mul(high).mul(float(1).sub(clamp(dot(normal, d.negate()), 0, 1)));
     return air.add(sun).add(lining).add(lit.glow(q));
   };
 

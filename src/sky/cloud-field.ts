@@ -31,7 +31,7 @@ import {
 } from './atmosphere';
 import { CLOUD } from '../palette';
 import { POTENTIAL_DECILES, WEATHER_TILE, remap, type CloudNoise } from './cloud-noise';
-import { loop, type FloatNode, type Vec3Node, type Vec4Node } from '../tsl';
+import { henyeyGreenstein, loop, type FloatNode, type Vec3Node, type Vec4Node } from '../tsl';
 import type { Tables } from './tables';
 
 const fall = (a: number, b: number, x: FloatNode): FloatNode => float(1).sub(smoothstep(a, b, x));
@@ -84,10 +84,8 @@ const TAPS = [0.05, 0.15, 0.35, 0.8];
  *  brightness); and how bright its shadow tone is, of what a white surface in the open gets. */
 const WARMED = 0.5, UNDERLIT = 0.7;
 
-const hg = (c: FloatNode, g: number): FloatNode =>
-  float((1 - g * g) / (4 * Math.PI)).div(pow(float(1 + g * g).sub(c.mul(2 * g)), 1.5));
 /** Cloud's phase: a strong forward lobe and a weak back one (Hillaire 2016). */
-const phase = (c: FloatNode, k: number): FloatNode => mix(hg(c, -0.3 * k), hg(c, 0.8 * k), 0.7);
+const phase = (c: FloatNode, k: number): FloatNode => mix(henyeyGreenstein(c, -0.3 * k), henyeyGreenstein(c, 0.8 * k), 0.7);
 
 export type CloudField = ReturnType<typeof createCloudField>;
 
