@@ -61,28 +61,22 @@ import { clamp } from '../world/scalar';
 import * as sphere from '../world/sphere';
 import type { FloatNode, Vec2Node, Vec3Node, Vec4Node } from '../tsl';
 import { outside } from './hulls';
+import { ARM_LIFE, ARM_WIDTH, CHURN, KELVIN, SPREAD, WIDEN, createRibbon, type Route } from './ribbon';
 
 /** Texels across the map, and how far it reaches from the point under the eye, metres. */
 const SIZE = 512, REACH = 128;
 const TEXEL = (2 * REACH) / SIZE;
 /** The speed at which a ship's wake is at its fullest, metres a second. */
 const FULL = 10;
-/** tan of the Kelvin angle, 19.47°. */
-const KELVIN = Math.tan((19.47 * Math.PI) / 180);
 /** Her waterline's length, metres. */
 const LENGTH = WATERLINE.stem - WATERLINE.stern;
 
-/** The churned water astern: its half-width under her transom, and how fast it spreads, metres a second. */
-const CHURN = 1.6, SPREAD = 0.3;
 /** The churn's foam in tongues: TONGUE metres apart along her track, slanting back
  *  TONGUE_SLANT metres a metre out, its cover times TONGUE_CREST on them and TONGUE_LANE in the blue lanes between. */
 const TONGUE = 3.5, TONGUE_SLANT = 1.2, TONGUE_CREST = 1.35, TONGUE_LANE = 0.2;
-/** The wedge's arms: their crests' height at full speed, metres, and how long they last in a calm, seconds (fading by
- * e each FADE); the share of that a rough sea takes. */
-const ARM = 0.18, ARM_LIFE = 22, ARM_FADE = 10, ROUGH = 0.45;
-/** An arm's half-width as it leaves her stem, metres, and how fast it widens, metres a second per metre a second of
- * her speed then. */
-const ARM_WIDTH = 0.9, WIDEN = 0.05;
+/** The wedge's arms: their crests' height at full speed, metres, and how long they last in a calm (ARM_LIFE, ribbon.ts),
+ * fading by e each ARM_FADE seconds; the share of that a rough sea takes. */
+const ARM = 0.18, ARM_FADE = 10, ROUGH = 0.45;
 /** The bow wave's foam along the arms: how long it lasts, seconds (fading by e each), and its half-width, metres; and
  *  how white the streaks its crests leave behind it are, and how wide at most (metres): bold, so her wake reads as a
  *  short, wide white V hugging her stern, not two long thin arms running to the horizon: the streaks only a faint
@@ -99,13 +93,8 @@ const RIM_SHARE = 0.3, CURL_REACH = 0.9;
 const FEATHER = [0.1, 0.6] as const;
 /** The curls' cover, of the rim's: more than whole, so each crest prints white well in from the rim. */
 const CURL = 1.8;
-/** The ribbon reaches this many of an arm's half-widths past its crest (and at least ARM_ROOM metres), and at least
- * this many of the churn's half-widths. */
-const ARM_REACH = 4, ARM_ROOM = 4, CHURN_ROOM = 2.6;
 /** The wind at which the sea is at its roughest for the wakes, metres a second (calm below a quarter of it). */
 const ROUGHEST = 14;
-/** On the inside of a turn, the ribbon reaches this share of the way to its centre. */
-const INSIDE = 0.8;
 /** Foam round a waterline at rest: a thin collar, whole against her side, out LAPPING_OUT m; past it the water she
  *  stirs, AIR_OUT m out, pale with air at most LAPPING_AIR (optics.ts), so the white fades through turquoise to the
  *  sea rather than ending as a cut-out band. And the bow wave's height at full speed, metres. */
@@ -327,55 +316,10 @@ export function createWake(view: View, sky: Sky, capacity: number) {
   const chart: sphere.Chart = { at: [0, 1, 0], axis: [1, 0, 0] };
   /** A point on a chart, metres (chartAt's out). */
   const onChart = new Float64Array(2);
-  const at = trailAt.data, mark = trailMark.data, sailedAt = trailLaid.data;
   const patch = patchAt.data, patchM = patchMark.data;
-
-  /** The wake's point k: the bow now, then the kept points from `skip`. */
-  const wakePoint = (kept: readonly WakePoint[], skip: number, k: number): WakePoint => (k === 0 ? head : kept[skip + k - 1]);
-
-  /** One ship's ribbon from her stem now along her kept wake (less its first `skip` points), `gone` metres sailed along
-   * it, from vertex `v0`; returns the vertices it took. */
-  function ribbon(chart: sphere.Chart, kept: readonly WakePoint[], skip: number, now: number, gone: number, v0: number): number {
-    const count = 1 + kept.length - skip;
-    let run = 0;
-    for (let k = 0; k < count; k++) {
-      const point = wakePoint(kept, skip, k), p = point.at;
-      if (k > 0) run += sphere.distance(wakePoint(kept, skip, k - 1).at, p);
-      // along the path toward her bow, from the points either side
-      const ahead = wakePoint(kept, skip, Math.max(k - 1, 0)).at, behind = wakePoint(kept, skip, Math.min(k + 1, count - 1)).at;
-      // the way along the path (ahead less behind), brought into the tangent plane at p, and across it, side = p × that
-      const tx = ahead[0] - behind[0], ty = ahead[1] - behind[1], tz = ahead[2] - behind[2];
-      const along = tx * p[0] + ty * p[1] + tz * p[2];
-      const ux = tx - p[0] * along, uy = ty - p[1] * along, uz = tz - p[2] * along;
-      const sx = p[1] * uz - p[2] * uy, sy = p[2] * ux - p[0] * uz, sz = p[0] * uy - p[1] * ux, sl = 1 / Math.hypot(sx, sy, sz);
-      const age = now - point.time, reach = point.speed * age * KELVIN;
-      const room = Math.max(ARM_ROOM, ARM_REACH * (ARM_WIDTH + WIDEN * point.speed * age));
-      const half = Math.max(age < ARM_LIFE ? reach + room : 0, (CHURN + SPREAD * age) * CHURN_ROOM);
-      // On the inside of a turn the ribbon reaches no further than most of the way to the turn's centre, past which
-      // it would fold back over itself. The turn here: how far the path bends between the stretches either side,
-      // over their length (+ to port).
-      const ix = p[0] - behind[0], iy = p[1] - behind[1], iz = p[2] - behind[2];
-      const ox = ahead[0] - p[0], oy = ahead[1] - p[1], oz = ahead[2] - p[2];
-      const li = Math.hypot(ix, iy, iz), lo = Math.hypot(ox, oy, oz), lengths = li * lo;
-      const turn = (iy * oz - iz * oy) * p[0] + (iz * ox - ix * oz) * p[1] + (ix * oy - iy * ox) * p[2];
-      const bend = lengths > 0 ? turn / lengths / (((li + lo) / 2) * sphere.R) : 0;
-      for (let s = 1; s >= -1; s -= 2) {
-        const i = v0 + 2 * k + (s > 0 ? 0 : 1);
-        const reaches = s * bend > 0 ? Math.min(half, INSIDE / Math.abs(bend)) : half;
-        // from p, s·reaches metres along the sea in the direction of side (chartAt takes it unnormalised)
-        const angle = (s * reaches) / sphere.R, c = Math.cos(angle), w = Math.sin(angle) * sl;
-        sphere.chartAt(chart, p[0] * c + sx * w, p[1] * c + sy * w, p[2] * c + sz * w, onChart);
-        at[i * 2] = onChart[0];
-        at[i * 2 + 1] = onChart[1];
-        mark[i * 4] = s * reaches;
-        mark[i * 4 + 1] = age;
-        mark[i * 4 + 2] = point.speed;
-        mark[i * 4 + 3] = run;
-        sailedAt[i] = gone - run;
-      }
-    }
-    return 2 * count;
-  }
+  /** One ship's wake to lay as a ribbon: her bow now, then what the wake kept (sim/wake.ts). */
+  const route: Route = { head, kept: [], skip: 0 };
+  const ribbon = createRibbon(trailAt.data, trailMark.data, trailLaid.data);
 
   return {
     /**
@@ -435,8 +379,9 @@ export function createWake(view: View, sky: Sky, capacity: number) {
         head.at = stem;
         head.time = now;
         head.speed = speed;
-        const kept = wakes[i], skip = kept.length > 0 && sphere.distance(kept[0].at, stem) <= 0.05 ? 1 : 0;
-        const took = ribbon(chart, kept, skip, now, sailed[i], vertex);
+        route.kept = wakes[i];
+        route.skip = route.kept.length > 0 && sphere.distance(route.kept[0].at, stem) <= 0.05 ? 1 : 0;
+        const took = ribbon(chart, route, now, sailed[i], vertex);
         for (let k = 0; k + 1 < took / 2; k++) {
           const a = vertex + 2 * k, t = triangle * 3;
           trailIndex[t] = a, trailIndex[t + 1] = a + 1, trailIndex[t + 2] = a + 2;

@@ -1,9 +1,9 @@
-// Loot on the water as it is seen: 0117's before its crates (render/actors/loot.ts and tsl/loot.ts at c79ef49^). Each
-// piece is the thing itself, hanging RIDE m over the waves where the snapshot has it, bobbing, slowly turning and
-// rocking: a gun the gun of its kind a ship carries (ship/gun.ts), its muzzle cocked up; a shield a crystal of ice, the big one
-// taller; a repair a cask, the full one bigger. Each is lit as everything is (sky/light.ts: two flat tones, and a hard
-// highlight on a gun's gilding and on ice), with a flat rim of its rarity's light (palette.ts RARITY_GLOW) where it turns
-// from the eye. A piece put on the water during the match rises up out of it as it comes (born).
+// Loot on the water as it is seen. Each piece is the thing itself, hanging RIDE m over the waves where the snapshot
+// has it, bobbing, slowly turning and rocking: a gun the gun of its kind a ship carries (ship/gun.ts), its muzzle
+// cocked up; a shield a crystal of ice, the big one taller; a repair a cask, the full one bigger. Each is lit as
+// everything is (sky/light.ts: two flat tones, and a hard highlight on a gun's gilding and on ice), with a flat rim of
+// its rarity's light (palette.ts RARITY_GLOW) where it turns from the eye. A piece put on the water during the match
+// rises up out of it as it comes (born).
 //
 // Over each stands its beam: a thin column of gold light, (14 + 7 × rarity) m tall, fading up its height and
 // pulsing upward, with a ring of its rarity's light on the water about it within HALO m; never narrower than
@@ -21,10 +21,13 @@ import {
   BufferAttribute, BufferGeometry, CylinderGeometry, DoubleSide, DynamicDrawUsage, InstancedBufferGeometry, InstancedInterleavedBuffer,
   InterleavedBufferAttribute, LatheGeometry, Matrix4, Mesh, MeshBasicNodeMaterial, OctahedronGeometry, Vector2,
 } from 'three/webgpu';
-import { Fn, abs, attribute, cameraPosition, clamp, cos, cross, dot, float, max, mix, normalize, pow, select, sin, smoothstep, uniform, varying, vec3 } from 'three/tsl';
+import {
+  Fn, abs, attribute, cameraPosition, clamp, cos, cross, dot, float, max, mix, normalize, pow, select, sin, smoothstep, uniform, varying,
+  vec3,
+} from 'three/tsl';
 import { GILDING, GLINT, ICE, RARITY_GLOW, TAR, TIMBER } from '../palette';
 import type { Light } from '../sky/light';
-import { KINDS, type GunKind, type LootKind } from '../kinds';
+import { KINDS, gunOrder, type GunKind, type LootKind } from '../kinds';
 import { gunShape, gunSurface } from '../ship/gun';
 import type { LootDraw } from '../snapshot';
 import type { Eye } from '../view/view';
@@ -50,6 +53,24 @@ const SIZE: Record<LootKind, number> = {
   cannon: 2.3, scatter: 2.1, repeater: 2.2, harpoon: 2.4, mortar: 2.1, smallShield: 1.7, bigShield: 2.25, repairKit: 1.6, fullRepair: 2.1,
 };
 
+/** The draws a piece belongs to: a gun's is its kind's place in KINDS, then the crystals, the casks and the beams (which
+ *  every piece also has). */
+const CRYSTALS = KINDS.length, CASKS = KINDS.length + 1, BEAMS = KINDS.length + 2;
+const GROUP: Record<LootKind, number> = {
+  cannon: gunOrder('cannon'), scatter: gunOrder('scatter'), repeater: gunOrder('repeater'), harpoon: gunOrder('harpoon'),
+  mortar: gunOrder('mortar'), smallShield: CRYSTALS, bigShield: CRYSTALS, repairKit: CASKS, fullRepair: CASKS,
+};
+
+/** Whether the last `put`s changed anything: a buffer is sent only when so. */
+let changed = false;
+/** Writes `value` (as a float32) at `array[i]`, noting if that changed it. */
+function put(array: InstancedInterleavedBuffer['array'], i: number, value: number) {
+  const f = Math.fround(value);
+  if (array[i] === f) return;
+  array[i] = f;
+  changed = true;
+}
+
 /** The buffers: per piece a vec4 of its place (metres) and id, a vec4 of its rarity's light and the rarity, and a vec4
  *  of its birth (the world's clock, s) and its size. */
 const STRIDE = 12;
@@ -58,7 +79,9 @@ const STRIDE = 12;
 function instanced(shape: BufferGeometry, buffer: InstancedInterleavedBuffer): InstancedBufferGeometry {
   const g = new InstancedBufferGeometry();
   if (shape.getIndex()) g.setIndex(shape.getIndex());
-  for (const name of ['position', 'normal', 'uv', 'part', 'metal']) if (shape.getAttribute(name)) g.setAttribute(name, shape.getAttribute(name));
+  for (const name of ['position', 'normal', 'uv', 'part', 'metal']) {
+    if (shape.getAttribute(name)) g.setAttribute(name, shape.getAttribute(name));
+  }
   g.setAttribute('lootAt', new InterleavedBufferAttribute(buffer, 4, 0));
   g.setAttribute('lootGlow', new InterleavedBufferAttribute(buffer, 4, 4));
   g.setAttribute('lootLife', new InterleavedBufferAttribute(buffer, 4, 8));
@@ -80,18 +103,21 @@ function gun(kind: GunKind): BufferGeometry {
 }
 
 /** A cask, 1 m tall, bellied, its middle at the origin. */
-const cask = () =>
-  new LatheGeometry([[0, -0.5], [0.3, -0.5], [0.38, -0.33], [0.43, -0.17], [0.46, 0], [0.43, 0.17], [0.38, 0.33], [0.3, 0.5], [0, 0.5]].map(([r, y]) => new Vector2(r, y)), 12);
+const cask = () => {
+  const profile = [[0, -0.5], [0.3, -0.5], [0.38, -0.33], [0.43, -0.17], [0.46, 0], [0.43, 0.17], [0.38, 0.33], [0.3, 0.5], [0, 0.5]];
+  return new LatheGeometry(profile.map(([r, y]) => new Vector2(r, y)), 12);
+};
 
 /** The beam, an open column 1 m tall from its foot (part 0, uv.y up it), and its ring's square on the water (part 1,
  *  −1…1 across), in one. */
 function beamAndRing(): BufferGeometry {
   const c = new CylinderGeometry(HEAD, FOOT, 1, 12, 1, true).translate(0, 0.5, 0).toNonIndexed();
   const n = c.getAttribute('position').count;
-  const position = new Float32Array((n + 6) * 3), normal = new Float32Array((n + 6) * 3), uv = new Float32Array((n + 6) * 2), part = new Float32Array(n + 6);
-  position.set(c.getAttribute('position').array as Float32Array);
-  normal.set(c.getAttribute('normal').array as Float32Array);
-  uv.set(c.getAttribute('uv').array as Float32Array);
+  const position = new Float32Array((n + 6) * 3), normal = new Float32Array((n + 6) * 3);
+  const uv = new Float32Array((n + 6) * 2), part = new Float32Array(n + 6);
+  position.set(c.getAttribute('position').array);
+  normal.set(c.getAttribute('normal').array);
+  uv.set(c.getAttribute('uv').array);
   [[-1, -1], [1, -1], [1, 1], [-1, -1], [1, 1], [-1, 1]].forEach(([x, z], i) => {
     position.set([x, 0, z], (n + i) * 3);
     normal.set([0, 1, 0], (n + i) * 3);
@@ -107,7 +133,9 @@ function beamAndRing(): BufferGeometry {
 
 /** light: how the world is lit (sky/light.ts). */
 export function createLoot(light: Light) {
-  const now = uniform(0), pixel = uniform(0.0026);
+  const now = uniform(0);
+  /** How wide a pixel is per metre away: the eye's, set by `update` each frame before anything is drawn. */
+  const pixel = uniform(0);
   const buffer = () => new InstancedInterleavedBuffer(new Float32Array(PIECES * STRIDE), STRIDE).setUsage(DynamicDrawUsage);
   const guns = KINDS.map(buffer), crystals = buffer(), casks = buffer(), beams = buffer();
 
@@ -122,7 +150,8 @@ export function createLoot(light: Light) {
   const pop = clamp(now.sub(life.x).mul(RISE), 0, 1);
   const far = cameraPosition.sub(at.xyz).length();
   const grow = max(float(1), far.mul(pixel).mul(SHAPE_PIXELS / SHAPE_ACROSS)).mul(life.y).mul(pop.mul(0.6).add(0.4));
-  const centre = at.xyz.add(up.mul(float(RIDE).mul(grow.min(3)).add(sin(now.mul(BOB_RATE).add(id)).mul(BOB)).sub(float(1).sub(pop).mul(SINK))));
+  const height = float(RIDE).mul(grow.min(3)).add(sin(now.mul(BOB_RATE).add(id)).mul(BOB)).sub(float(1).sub(pop).mul(SINK));
+  const centre = at.xyz.add(up.mul(height));
   const shown = select(far.lessThan(SHAPE), float(1), float(0));
   const local = attribute('position', 'vec3'), normal = attribute('normal', 'vec3');
   const turn = (v: Vec3Node) => side.mul(v.x).add(lift.mul(v.y)).add(fore.mul(v.z));
@@ -132,7 +161,8 @@ export function createLoot(light: Light) {
   const piece = (geometry: InstancedBufferGeometry, surface: (p: Vec3Node, n: Vec3Node, l: Vec3Node) => Vec3Node) => {
     const m = new MeshBasicNodeMaterial();
     m.positionNode = centre.add(turn(local).mul(grow)).mul(shown);
-    const p = varying(centre.add(turn(local).mul(grow))), n = varying(turn(normal)), l = varying(local), tint = varying(glow.rgb), base = varying(centre);
+    const p = varying(centre.add(turn(local).mul(grow))), n = varying(turn(normal)), l = varying(local);
+    const tint = varying(glow.rgb), base = varying(centre);
     m.colorNode = Fn(() => {
       const nn = normalize(n), eye = normalize(cameraPosition.sub(p));
       // a flat rim of its rarity's light where it turns from the eye
@@ -164,7 +194,8 @@ export function createLoot(light: Light) {
   const ringAt = at.xyz.add(up.mul(0.12)).add(e1.mul(local.x.mul(halo))).add(e2.mul(local.z.mul(halo)));
   const beamShown = select(far.lessThan(BEAM), float(1), float(0)), ringShown = select(far.lessThan(HALO), float(1), float(0));
   bm.positionNode = select(ring.greaterThan(0.5), ringAt.mul(ringShown), beamAt.mul(beamShown).mul(pop));
-  const v = varying(uv.y), xz = varying(local.xz), isRing = varying(ring), tint = varying(glow.rgb), r = varying(glow.w), base = varying(at.xyz);
+  const v = varying(uv.y), xz = varying(local.xz), isRing = varying(ring);
+  const tint = varying(glow.rgb), r = varying(glow.w), base = varying(at.xyz);
   const core = varying(abs(dot(normalize(e1.mul(normal.x).add(e2.mul(normal.z))), normalize(cameraPosition.sub(at.xyz)))));
   const near = varying(smoothstep(10, 55, far));
   bm.colorNode = Fn(() => {
@@ -181,37 +212,42 @@ export function createLoot(light: Light) {
   // after the sea, which reads what was drawn before it (as the gunfire's puffs)
   beamMesh.renderOrder = 2;
 
-  /** Fills a buffer in place from the pieces that pass `keep` and shows its mesh's instances; sends it, as far as it
-   *  holds pieces, if anything in it changed. */
-  const counts = new Map<InstancedInterleavedBuffer, number>();
-  const fill = (buffer: InstancedInterleavedBuffer, drawn: { mesh: Mesh; geometry: InstancedBufferGeometry }, pieces: readonly LootDraw[], keep: (l: LootDraw) => boolean) => {
-    const array = buffer.array as Float32Array;
-    let n = 0, changed = false, o = 0;
-    const put = (k: number, value: number) => {
-      const f = Math.fround(value);
-      if (array[o + k] === f) return;
-      array[o + k] = f;
-      changed = true;
-    };
-    for (const l of pieces) {
-      if (n >= PIECES) break;
-      if (!keep(l)) continue;
-      const c = RARITY_GLOW[l.rarity];
-      o = n++ * STRIDE;
-      put(0, l.at[0]), put(1, l.at[1]), put(2, l.at[2]), put(3, l.id);
-      put(4, c[0]), put(5, c[1]), put(6, c[2]), put(7, l.rarity);
-      put(8, l.born), put(9, SIZE[l.kind]);
+  /** The draws, by group: each gun's kind (as KINDS orders them), the crystals, the casks, then the beams. */
+  const drawn = [
+    ...gunMeshes.map((g, i) => ({ buffer: guns[i], geometry: g.geometry })),
+    { buffer: crystals, geometry: crystalMesh.geometry }, { buffer: casks, geometry: caskMesh.geometry },
+    { buffer: beams, geometry: beamGeometry },
+  ];
+  /** How many pieces each draw held when last filled. */
+  const counts = drawn.map(() => -1);
+
+  /** Fills a group's buffer in place from the pieces of its kinds (the beams: all of them) within SHAPE m of the eye
+   *  (the beams: any distance), and shows that many instances; sends the buffer, as far as it holds pieces, if anything
+   *  in it changed. */
+  const fill = (group: number, pieces: readonly LootDraw[], eye: readonly [number, number, number]) => {
+    const { buffer, geometry } = drawn[group], array = buffer.array;
+    let n = 0;
+    changed = false;
+    for (let i = 0; i < pieces.length && n < PIECES; i++) {
+      const l = pieces[i];
+      if (group !== BEAMS) {
+        const dx = l.at[0] - eye[0], dy = l.at[1] - eye[1], dz = l.at[2] - eye[2];
+        if (GROUP[l.kind] !== group || dx * dx + dy * dy + dz * dz >= SHAPE * SHAPE) continue;
+      }
+      const c = RARITY_GLOW[l.rarity], o = n++ * STRIDE;
+      put(array, o, l.at[0]), put(array, o + 1, l.at[1]), put(array, o + 2, l.at[2]), put(array, o + 3, l.id);
+      put(array, o + 4, c[0]), put(array, o + 5, c[1]), put(array, o + 6, c[2]), put(array, o + 7, l.rarity);
+      put(array, o + 8, l.born), put(array, o + 9, SIZE[l.kind]);
     }
     if (changed) {
       buffer.clearUpdateRanges();
       buffer.addUpdateRange(0, n * STRIDE);
       buffer.needsUpdate = true;
     }
-    if (counts.get(buffer) === n) return;
-    counts.set(buffer, n);
-    drawn.geometry.instanceCount = n;
+    if (counts[group] === n) return;
+    counts[group] = n;
+    geometry.instanceCount = n;
   };
-  const shields = (l: LootDraw) => l.kind === 'smallShield' || l.kind === 'bigShield';
 
   return {
     meshes: [...gunMeshes.map((g) => g.mesh), crystalMesh.mesh, caskMesh.mesh, beamMesh],
@@ -219,11 +255,7 @@ export function createLoot(light: Light) {
      *  sent as beams alone). */
     draw(time: number, pieces: readonly LootDraw[], eye: readonly [number, number, number]) {
       now.value = time;
-      const near = (l: LootDraw) => (l.at[0] - eye[0]) ** 2 + (l.at[1] - eye[1]) ** 2 + (l.at[2] - eye[2]) ** 2 < SHAPE * SHAPE;
-      KINDS.forEach((kind, i) => fill(guns[i], gunMeshes[i], pieces, (l) => l.kind === kind && near(l)));
-      fill(crystals, crystalMesh, pieces, (l) => shields(l) && near(l));
-      fill(casks, caskMesh, pieces, (l) => (l.kind === 'repairKit' || l.kind === 'fullRepair') && near(l));
-      fill(beams, { mesh: beamMesh, geometry: beamGeometry }, pieces, () => true);
+      for (let group = 0; group < drawn.length; group++) fill(group, pieces, eye);
     },
     /** Each frame, once the eye has moved (view.ts). */
     update(eye: Readonly<Eye>) {
