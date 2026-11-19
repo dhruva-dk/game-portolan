@@ -4,13 +4,11 @@
 //
 // Pure arithmetic: no three, so it runs in node for the tests.
 
-import type { Vec3 } from './sphere.ts';
+import { cross, type Vec3 } from './sphere.ts';
 
 /** A unit quaternion (x, y, z, w). */
 export type Turn = readonly [number, number, number, number];
 
-/** a × b */
-const cross = (a: Vec3, b: Vec3): Vec3 => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
 const lengthSq = (a: Vec3) => a[0] * a[0] + a[1] * a[1] + a[2] * a[2];
 /** a made unit length (left as it is if it has none), as three's Vector3.normalize. */
 const unit = (a: Vec3): Vec3 => {
@@ -71,6 +69,24 @@ export function slerp(a: Turn, b: Turn, t: number): Turn {
   if (l === 0) return [0, 0, 0, 1];
   const k = 1 / l;
   return [q[0] * k, q[1] * k, q[2] * k, q[3] * k];
+}
+
+/** The turn of `angle` radians about the unit vector `axis`, as three's Quaternion.setFromAxisAngle. */
+export function axisAngle(axis: Vec3, angle: number): Turn {
+  const s = Math.sin(angle / 2);
+  return [axis[0] * s, axis[1] * s, axis[2] * s, Math.cos(angle / 2)];
+}
+
+/** a then b in a's own frame (a·b), as three's Quaternion.multiplyQuaternions(a, b): q.multiply(b) turns q about its
+ *  own axes. */
+export function multiply(a: Turn, b: Turn): Turn {
+  const [ax, ay, az, aw] = a, [bx, by, bz, bw] = b;
+  return [
+    ax * bw + aw * bx + ay * bz - az * by,
+    ay * bw + aw * by + az * bx - ax * bz,
+    az * bw + aw * bz + ax * by - ay * bx,
+    aw * bw - ax * bx - ay * by - az * bz,
+  ];
 }
 
 /** The turn undone. */

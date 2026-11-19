@@ -16,7 +16,7 @@ import { blowOf, felt, type Blow, type Deed } from '../player.ts';
 import type { Eye } from '../snapshot.ts';
 import { easeInOut, lerp, smoother } from '../world/scalar.ts';
 import { add, type Vec3 } from '../world/sphere.ts';
-import { rotate, type Turn } from '../world/turn.ts';
+import { axisAngle, multiply, rotate, type Turn } from '../world/turn.ts';
 
 /** All of it at this share of 0117's, and no field-of-view pulse past this many degrees either way. */
 const GENTLE = 0.75, PULSE = 6;
@@ -131,10 +131,7 @@ export function envelope(p: Pulse, age: number): number {
 
 const DEG = Math.PI / 180;
 /** q turned by `a` radians about its own unit axis `k`. */
-const turned = (q: Turn, k: Vec3, a: number): Turn => {
-  const s = Math.sin(a / 2), [bx, by, bz, bw] = [k[0] * s, k[1] * s, k[2] * s, Math.cos(a / 2)], [ax, ay, az, aw] = q;
-  return [aw * bx + ax * bw + ay * bz - az * by, aw * by - ax * bz + ay * bw + az * bx, aw * bz + ax * by - ay * bx + az * bw, aw * bw - ax * bx - ay * by - az * bz];
-};
+const turned = (q: Turn, k: Vec3, a: number): Turn => multiply(q, axisAngle(k, a));
 
 export function createShake(seed = 1) {
   const trauma: Record<Band, number> = { hit: 0, rumble: 0 };
