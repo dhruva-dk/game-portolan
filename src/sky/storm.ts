@@ -16,7 +16,10 @@
 //   deck(c, dir, m)    the same seen from high over its top (the full map's eye, in space)
 
 import { Vector3, type Storage3DTexture, type UniformNode } from 'three/webgpu';
-import { Fn, If, abs, clamp, dot, exp, float, interleavedGradientNoise, max, min, mx_noise_float, normalize, screenCoordinate, select, smoothstep, sqrt, uniform, vec3 } from 'three/tsl';
+import {
+  Fn, If, abs, clamp, dot, exp, float, interleavedGradientNoise, max, min, mx_noise_float, normalize, screenCoordinate, select,
+  smoothstep, sqrt, uniform, vec3,
+} from 'three/tsl';
 import type { Cap } from '../sim/storm';
 import type { View } from '../view/view';
 import { R, type Vec3 } from '../world/sphere';
@@ -47,7 +50,9 @@ export function createStormLook(view: View, shape: Storage3DTexture, held: boole
   const radius = uniform(Math.PI);
   const outerCosine = uniform(-1);
   const clock = uniform(0), whole = uniform(1);
-  const across: [UniformNode<'vec3', Vector3>, UniformNode<'vec3', Vector3>] = [uniform(new Vector3(1, 0, 0)), uniform(new Vector3(0, 0, 1))];
+  const across: [UniformNode<'vec3', Vector3>, UniformNode<'vec3', Vector3>] = [
+    uniform(new Vector3(1, 0, 0)), uniform(new Vector3(0, 0, 1)),
+  ];
   const size = uniform(R);
   const field = createStormField({ centre, radius, whole, clock, across, size }, shape);
   const bolt = createBolt(held);
@@ -78,12 +83,15 @@ export function createStormLook(view: View, shape: Storage3DTexture, held: boole
     const t1 = select(disc.lessThan(0), hi, clamp(min(r1, r2), lo, hi));
     const t2 = select(disc.lessThan(0), hi, clamp(max(r1, r2), lo, hi));
     const outside = (t: FloatNode): BoolNode => field.edge(normalize(o.add(d.mul(t)))).greaterThan(field.OUTERMOST);
-    const enter = select(outside(lo.add(t1).mul(0.5)), lo, select(outside(t1.add(t2).mul(0.5)), t1, select(outside(t2.add(hi).mul(0.5)), t2, hi)));
+    // the first of the pieces lo…t1, t1…t2, t2…hi whose midpoint lies outside the cap: a at its start, or what follows
+    const first = (a: FloatNode, b: FloatNode, then: FloatNode): FloatNode => select(outside(a.add(b).mul(0.5)), a, then);
+    const enter = first(lo, t1, first(t1, t2, first(t2, hi, hi)));
     return { enter, leave: select(whole.greaterThan(0), enter, hi) };
   };
 
-  /** Colour c seen `metres` along world direction dir from the eye, through the storm lit by `light`, marched. */
-  const through = (c: Vec3Node, dir: Vec3Node, metres: FloatNode, light: StormLight): Vec3Node => {
+  /** Colour c seen `metres` along world direction dir from the eye, through the storm lit by `light`, marched: in a
+   *  function of its own (Fn), as the march's branches and variables need one, whichever shader it is called in. */
+  const through = (c: Vec3Node, dir: Vec3Node, metres: FloatNode, light: StormLight): Vec3Node => Fn(() => {
     const seen = c.toVar();
     const { enter, leave } = span(dir, metres);
     If(leave.greaterThan(enter), () => {
@@ -103,37 +111,36 @@ export function createStormLook(view: View, shape: Storage3DTexture, held: boole
       });
     });
     return seen;
-  };
+  })();
 
   /** Colour c seen m metres along world direction dir from the eye, through the storm lit by `light`. */
-  const veil = (c: Vec3Node, dir: Vec3Node, metres: FloatNode, light: StormLight): Vec3Node =>
-    Fn(() => {
-      const seen = through(c, dir, metres, light);
-      // from inside, the rain driving past the eye: streaks fixed to the sky's directions, falling
-      const d = view.toSky(dir);
-      const fall = mx_noise_float(vec3(d.x.mul(STREAK), d.y.add(d.x.mul(STREAK_LEAN)).mul(STREAK_LONG).add(clock.mul(STREAK_FALL)), d.z.mul(STREAK)));
-      const streaks = smoothstep(0.45, 0.8, fall).mul(depth(view.position)).mul(smoothstep(BASE, BASE * 0.6, view.height)).mul(STREAK_LIGHT);
-      return seen.add(light.air.add(bolt.glow(light.air, view.position)).mul(streaks));
-    })();
+  const veil = (c: Vec3Node, dir: Vec3Node, metres: FloatNode, light: StormLight): Vec3Node => {
+    const seen = through(c, dir, metres, light);
+    // from inside, the rain driving past the eye: streaks fixed to the sky's directions, falling
+    const d = view.toSky(dir);
+    const down = d.y.add(d.x.mul(STREAK_LEAN)).mul(STREAK_LONG).add(clock.mul(STREAK_FALL));
+    const fall = mx_noise_float(vec3(d.x.mul(STREAK), down, d.z.mul(STREAK)));
+    const under = smoothstep(BASE, BASE * 0.6, view.height);
+    const streaks = smoothstep(0.45, 0.8, fall).mul(depth(view.position)).mul(under).mul(STREAK_LIGHT);
+    return seen.add(light.air.add(bolt.glow(light.air, view.position)).mul(streaks));
+  };
 
   /** What a mirror (the sea) shows of the storm, cheaply: the length of the ray in its reach, as an even cloud. */
-  const dim = (c: Vec3Node, dir: Vec3Node, light: StormLight): Vec3Node =>
-    Fn(() => {
-      const { enter, leave } = span(dir, float(1e5));
-      const deep = max(depth(view.position.add(dir.mul(leave.add(enter).mul(0.5)))), 0.3);
-      const T = exp(leave.sub(enter).mul(deep).mul(-MIRROR_SIGMA));
-      return c.mul(T).add(light.air.mul(MIRROR_LIGHT).mul(float(1).sub(T)));
-    })();
-
-  /** Colour c seen m metres along world direction dir from an eye high over the storm (the full map's, from space). */
-  const deck = (c: Vec3Node, dir: Vec3Node, metres: FloatNode, light: StormLight): Vec3Node => Fn(() => through(c, dir, metres, light))();
+  const dim = (c: Vec3Node, dir: Vec3Node, light: StormLight): Vec3Node => {
+    const { enter, leave } = span(dir, float(1e5));
+    const deep = max(depth(view.position.add(dir.mul(leave.add(enter).mul(0.5)))), 0.3);
+    const T = exp(leave.sub(enter).mul(deep).mul(-MIRROR_SIGMA));
+    return c.mul(T).add(light.air.mul(MIRROR_LIGHT).mul(float(1).sub(T)));
+  };
 
   return {
     depth,
     edge,
     veil,
     dim,
-    deck,
+    /** Colour c seen m metres along world direction dir from an eye high over the storm (the full map's, from space):
+     *  the march alone, without the rain driving past the eye. */
+    deck: through,
     /** The storm now (sim/storm.ts); seconds: the world's clock (Environment.clock), which its rain, billows and
      *  lightning run on; eye: where the eye is (world, m). */
     update(cap: Cap, seconds: number, eye: Vec3) {

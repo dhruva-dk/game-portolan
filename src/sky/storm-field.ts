@@ -19,16 +19,19 @@
 // The march: from where the ray enters the storm (or the eye), the step is the distance to the nearest cloud or rain
 // while there is none (the bounds below, then the billows' own surface), and STEP, growing with distance, in the rain.
 
-import { Break, If, acos, atan, clamp, cos, dot, exp, float, length, max, min, mix, normalize, select, sin, smoothstep, texture3D, vec3 } from 'three/tsl';
+import {
+  Break, If, acos, atan, clamp, cos, dot, exp, float, length, max, min, mix, normalize, select, sin, smoothstep, texture3D, vec3,
+} from 'three/tsl';
 import type { Storage3DTexture } from 'three/webgpu';
-import { CLOUD } from '../sim/storm';
+import * as storm from '../sim/storm';
 import { R } from '../world/sphere';
 import { henyeyGreenstein, loop, type FloatNode, type Vec3Node } from '../tsl';
 
-/** The cloud's base, metres up, and how far its rolls lift and lower it, each ROLL_WIDTH metres across. Its rolls and
- * billows (5 m at most 1.7) take it down to some 40.6 m: sim/storm.ts CLOUD.lowest, which the chase keeps under. */
-export const BASE = CLOUD.base;
-const ROLL = 9, ROLL_WIDTH = 26;
+/** The cloud's base, metres up, and how far its rolls lift and lower it, each ROLL_WIDTH metres across, and its
+ * billows (metres a unit of them). Its rolls and billows (BASE_BILLOW at most 1.7) take it down to some 40.6 m:
+ * sim/storm.ts CLOUD.lowest, which the chase keeps under. */
+export const BASE = storm.CLOUD.base;
+const ROLL = 9, ROLL_WIDTH = 26, BASE_BILLOW = 5;
 /** How far the base's front stands out over the calm (metres, negative: in the calm), and how far the face leans back
  * a metre up; how far its billows reach either side of it. With the bays drawn in and the billows out, the front stands
  * at most some 47 m out over the calm: sim/storm.ts CLOUD.out. */
@@ -59,12 +62,17 @@ const SOFT = 1, SOFT_FAR = 0.004;
 const DARK = 0.45, BRIGHT = 2.6, RAIN_LIGHT = 0.95;
 /** The light from the calm on whatever of the cloud faces it, as a share of the storm's air light. */
 const CALM = 0.3;
+/** The sky's light on the cloud by which way it faces: SKY, and SKY_UP more (or less) a unit of its facing up (or
+ * down), never under SKY_LEAST; less in the billows' hollows: HOLLOWS.per a unit of their lift about HOLLOWS.mean,
+ * held to HOLLOWS.least…most. */
+const SKY = 0.6, SKY_UP = 0.45, SKY_LEAST = 0.3;
+const HOLLOWS = { per: 0.3, mean: 0.9, least: 0.7, most: 1.2 } as const;
 /** The sun's light on the cloud, as a share of a white surface's, and on its thin edges seen against the sun (the
- * silver lining). */
-const SUNLIT = 0.55, LINING = 0.15;
+ * silver lining), whose lobe through them leans forward by LINING_G (henyeyGreenstein's g). */
+const SUNLIT = 0.55, LINING = 0.15, LINING_G = 0.6;
 
-/** The storm's state as the shaders read it (storm.ts's uniforms). */
-export interface Cap {
+/** The storm's state as the shaders read it (storm.ts's uniforms of sim/storm.ts's Cap). */
+export interface CapNodes {
   centre: Vec3Node;
   radius: FloatNode;
   whole: FloatNode;
@@ -82,7 +90,7 @@ export interface FieldLight { air: Vec3Node; sun: Vec3Node; toward: Vec3Node; gl
  * what survived to `mark` metres along. */
 export interface Marched { light: Vec3Node; T: FloatNode; reached: FloatNode; atMark: FloatNode }
 
-export function createStormField(cap: Cap, shape: Storage3DTexture) {
+export function createStormField(cap: CapNodes, shape: Storage3DTexture) {
   /** Metres past the cap's edge over the unit vector u. */
   const edge = (u: Vec3Node): FloatNode => acos(clamp(dot(u, cap.centre), -1, 1)).sub(cap.radius).mul(R).sub(cap.whole.mul(1e4));
   /** The nearest the cloud or rain comes to the calm, metres past the edge (negative). */
@@ -109,7 +117,7 @@ export function createStormField(cap: Cap, shape: Storage3DTexture) {
     const front = float(SHELF).add(max(h.sub(base), 0).mul(LEAN)).add(bay.mul(mix(0.4, 1, smoothstep(BASE, BASE + 50, h))));
     const face = e.sub(front).add(lift.mul(FACE).mul(reach));
     const top = float(CROWN).add(lift.mul(CROWN_BILLOW)).sub(h);
-    const under = h.sub(base).add(lift.mul(5)).mul(1.5);
+    const under = h.sub(base).add(lift.mul(BASE_BILLOW)).mul(1.5);
     // the base's slope across its rolls (metres up a metre in)
     const rolling = cos(roll).mul((ROLL * 2 * Math.PI) / ROLL_WIDTH);
     return { lift, reach, face, top, under, rolling, inside: min(min(face, top), under) };
@@ -124,18 +132,21 @@ export function createStormField(cap: Cap, shape: Storage3DTexture) {
     const out = normalize(up.mul(dot(up, cap.centre)).sub(cap.centre));
     const onTop = c.top.lessThan(min(c.face, c.under)), onBase = c.under.lessThan(c.face);
     const flat = select(onTop, up, select(onBase, normalize(up.negate().add(out.mul(c.rolling))), normalize(up.mul(LEAN).sub(out))));
-    const slope = vec3(billows(q.add(vec3(SLOPE, 0, 0))), billows(q.add(vec3(0, SLOPE, 0))), billows(q.add(vec3(0, 0, SLOPE)))).sub(c.lift).div(SLOPE);
-    const amplitude = select(onTop, float(CROWN_BILLOW), select(onBase, float(5), c.reach.mul(FACE)));
+    const slope = vec3(billows(q.add(vec3(SLOPE, 0, 0))), billows(q.add(vec3(0, SLOPE, 0))), billows(q.add(vec3(0, 0, SLOPE))))
+      .sub(c.lift).div(SLOPE);
+    const amplitude = select(onTop, float(CROWN_BILLOW), select(onBase, float(BASE_BILLOW), c.reach.mul(FACE)));
     const normal = normalize(flat.sub(slope.mul(amplitude)));
     const high = smoothstep(BASE, CROWN, h);
     // the sky's light from above (the sea's, under the base), less in the hollows between the billows
-    const sky = max(dot(normal, up).mul(0.45).add(0.6), 0.3).mul(clamp(c.lift.mul(0.3).add(0.9), 0.7, 1.2));
+    const hollows = clamp(c.lift.mul(HOLLOWS.per).add(HOLLOWS.mean), HOLLOWS.least, HOLLOWS.most);
+    const sky = max(dot(normal, up).mul(SKY_UP).add(SKY), SKY_LEAST).mul(hollows);
     // and the light of the open, sunlit calm, coming in level under the shelf
     const calm = clamp(dot(normal, out.negate()), 0, 1).mul(CALM);
     const air = lit.air.mul(mix(DARK, BRIGHT, high).mul(sky).add(calm));
     const sun = lit.sun.mul(clamp(dot(normal, lit.toward), 0, 1).mul(high).mul(SUNLIT / Math.PI));
     // against the sun, its light through the billows' thin edges
-    const lining = lit.sun.mul(henyeyGreenstein(dot(d, lit.toward), 0.6).mul(LINING * 4 * Math.PI)).mul(high).mul(float(1).sub(clamp(dot(normal, d.negate()), 0, 1)));
+    const edgeOn = float(1).sub(clamp(dot(normal, d.negate()), 0, 1));
+    const lining = lit.sun.mul(henyeyGreenstein(dot(d, lit.toward), LINING_G).mul(LINING * 4 * Math.PI)).mul(high).mul(edgeOn);
     return air.add(sun).add(lining).add(lit.glow(q));
   };
 
@@ -143,7 +154,9 @@ export function createStormField(cap: Cap, shape: Storage3DTexture) {
    * Marches the ray from o along unit d from `from` to `to` metres, starting `jitter` (0…1) of a step in; `mark` is a
    * distance along it whose transmittance is wanted (where the lightning stands).
    */
-  const march = (o: Vec3Node, d: Vec3Node, from: FloatNode, to: FloatNode, jitter: FloatNode, mark: FloatNode, lit: FieldLight): Marched => {
+  const march = (
+    o: Vec3Node, d: Vec3Node, from: FloatNode, to: FloatNode, jitter: FloatNode, mark: FloatNode, lit: FieldLight,
+  ): Marched => {
     const L = vec3(0).toVar(), T = float(1).toVar(), atMark = float(1).toVar();
     const t = from.add(jitter.mul(STEP)).toVar();
     // the cloud: whether the ray has crossed its surface, and where (or where it passed closest, and how close as a
@@ -191,13 +204,15 @@ export function createStormField(cap: Cap, shape: Storage3DTexture) {
             shaft.assign(smoothstep(0.3, 0.7, n.r));
             streak.assign(smoothstep(0.35, 0.85, n.a));
             const ramp = smoothstep(0, RAIN_RAMP, e.add(n.g.sub(0.5).mul(8)));
-            rho.assign(mix(RAIN_THIN, RAIN_HEAVY, shaft).mul(streak.mul(0.8).add(0.6)).mul(ramp).mul(smoothstep(BASE + ROLL, BASE - ROLL, h)));
+            const underBase = smoothstep(BASE + ROLL, BASE - ROLL, h);
+            rho.assign(mix(RAIN_THIN, RAIN_HEAVY, shaft).mul(streak.mul(0.8).add(0.6)).mul(ramp).mul(underBase));
           });
           // in the rain, the step; short of the cloud's billows (and clear of the rain): toward their surface
           step.assign(select(rho.greaterThan(1e-6), inStep, max(min(inside.negate().mul(0.6), rainOff.add(inStep)), least)));
           If(rho.greaterThan(1e-6), () => {
             // a heavy shaft darker than the thinner rain round it, its streaks paler; darker up toward the base
-            const S = lit.air.mul(RAIN_LIGHT).mul(mix(1.25, 0.55, shaft)).mul(streak.mul(0.35).add(0.85)).mul(mix(1.15, 0.6, smoothstep(0, BASE, h))).add(lit.glow(q));
+            const S = lit.air.mul(RAIN_LIGHT).mul(mix(1.25, 0.55, shaft)).mul(streak.mul(0.35).add(0.85))
+              .mul(mix(1.15, 0.6, smoothstep(0, BASE, h))).add(lit.glow(q));
             const stepT = exp(rho.mul(step).negate());
             L.addAssign(S.mul(T.mul(float(1).sub(stepT))));
             T.mulAssign(stepT);
