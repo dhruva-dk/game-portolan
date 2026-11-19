@@ -17,13 +17,13 @@
 
 import { Vector4 } from 'three/webgpu';
 import {
-  If, Loop, acos, clamp, cross, dot, float, hash, int, length, max, normalize, smoothstep, sqrt, uint, uniform, uniformArray, vec2, vec3,
+  If, acos, clamp, cross, dot, float, hash, int, length, max, normalize, smoothstep, sqrt, uint, uniform, uniformArray, vec2, vec3,
 } from 'three/tsl';
 import { FREQUENCY, anchors, band, cover, icosphere, near, type Anchor, type Likeness } from '../world/lattice';
-import { R, type Vec3 } from '../world/sphere';
+import { R, distance, type Vec3 } from '../world/sphere';
 import type { Wind } from '../world/wind';
 import { chartNodes } from './view';
-import type { FloatNode, Vec2Node, Vec3Node } from '../tsl';
+import { loop, type FloatNode, type Vec2Node, type Vec3Node } from '../tsl';
 
 /** One chart's read at a point: where on the patches (metres, offset included), its axes there, and its weight. */
 export interface Read {
@@ -50,7 +50,8 @@ export function createCharts(span: number, alike: Likeness, wind: Wind) {
   const centres = uniformArray<'vec4'>(centreValues, 'vec4');
   const axes = uniformArray<'vec4'>(axisValues, 'vec4');
   const count = uniform(3, 'int');
-  let listed = '';
+  /** The anchors listed, nearest first: the first `count` are the uniform arrays'. */
+  const listed = new Int32Array(all.length);
 
   /**
    * The three anchors nearest the unit vector u (indices into the list) and their weights, Σw² = 1; and if asked,
@@ -60,7 +61,7 @@ export function createCharts(span: number, alike: Likeness, wind: Wind) {
   const pick = (u: Vec3Node, gradients = false) => {
     const c = [float(-2).toVar(), float(-2).toVar(), float(-2).toVar()];
     const i = [int(0).toVar(), int(0).toVar(), int(0).toVar()];
-    Loop({ start: int(0), end: count, type: 'int', condition: '<' }, ({ i: k }) => {
+    loop('anchor', count, (k) => {
       const d = dot(u, centres.element(k).xyz).toVar();
       If(d.greaterThan(c[0]), () => {
         c[2].assign(c[1]); i[2].assign(i[1]);
@@ -128,16 +129,19 @@ export function createCharts(span: number, alike: Likeness, wind: Wind) {
     debug,
     /** Lists the anchors that can weigh in on the sea drawn out to `reach` metres round the point under the eye. */
     update(eye: Vec3, reach: number) {
+      // every anchor, nearest first; those within reach, and never fewer than three
       const order = near(all, eye, Math.PI * R);
-      const n = Math.max(3, near(all, eye, reach + margin).length);
-      const key = order.slice(0, n).join(',');
-      if (key === listed) return;
-      listed = key;
-      order.slice(0, n).forEach((a, k) => {
-        const { at, axis, offset } = all[a];
+      let n = 0;
+      while (n < order.length && distance(all[order[n]].at, eye) <= reach + margin) n++;
+      n = Math.max(3, n);
+      let same = n === count.value;
+      for (let k = 0; same && k < n; k++) same = order[k] === listed[k];
+      if (same) return;
+      for (let k = 0; k < n; k++) {
+        const { at, axis, offset } = all[(listed[k] = order[k])];
         centreValues[k].set(at[0], at[1], at[2], offset[0]);
         axisValues[k].set(axis[0], axis[1], axis[2], offset[1]);
-      });
+      }
       count.value = n;
     },
   };

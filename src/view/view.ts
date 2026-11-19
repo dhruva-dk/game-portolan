@@ -11,7 +11,7 @@
 //   fromSky(d)   the inverse: a sky direction back to the world, for the frame given
 //   local(p)     where p lies on the eye's chart, metres east (x) and south (z) of the point under the eye
 //   onEye(p)     the same, with the eye's chart's axes carried to p
-//   chart(c)     a reader for a fixed chart: where p lies on it, and its axes carried to p
+//   under(d,m,h) how much of a ray from the eye lies under a height
 //   rings(...)   a grid of rings round the point under the eye, laid on the sphere out to the horizon
 //
 // The eye is worked out once a frame from the camera (update), on the CPU and into uniforms: the one place outside
@@ -22,7 +22,7 @@ import { BufferGeometry, Float32BufferAttribute, Frustum, Matrix4, Vector3, type
 import {
   asin, atan, clamp, cos, cross, dot, length, max, normalize, positionGeometry, select, sin, sqrt, uniform, vec2, vec3,
 } from 'three/tsl';
-import { R, cross as crossV, frameAt, horizonDip, type Chart, type Frame, type Vec3 } from '../world/sphere';
+import { R, frameAt, horizonDip, type Frame, type Vec3 } from '../world/sphere';
 import { toFloat, type FloatNode, type Vec2Node, type Vec3Node } from '../tsl';
 
 /** The eye, as the CPU sees it. */
@@ -67,7 +67,6 @@ export function chartNodes(A: Vec3Node, a1: Vec3Node, a2: Vec3Node) {
   };
 }
 
-const v3 = (v: Vec3) => vec3(v[0], v[1], v[2]);
 const set = (u: UniformNode<'vec3'>, v: Vec3) => u.value.set(v[0], v[1], v[2]);
 
 export type View = ReturnType<typeof createView>;
@@ -83,6 +82,8 @@ export function createView() {
     position: [0, R + 10, 0], frame: frameAt([0, 1, 0]), height: 10, dip: 0, pixel: 0.001, frustum: new Frustum(),
     projection: new Matrix4(), projectionInverse: new Matrix4(), world: new Matrix4(), viewProjection: new Matrix4(),
   };
+  /** The eye as the systems read it; and where the camera stands, worked out into this each frame. */
+  const seen: Readonly<Eye> = eye, at = new Vector3();
 
   const up = (p: Vec3Node): Vec3Node => normalize(p);
   const altitude = (p: Vec3Node): FloatNode => length(p).sub(R);
@@ -157,8 +158,6 @@ export function createView() {
     place,
     toSky,
     fromSky,
-    /** The eye's frame as nodes, for fromSky. */
-    frame: { east, up: up0, south, dip },
     /** The eye's position (world, metres) and height, as nodes. */
     position,
     height,
@@ -169,13 +168,15 @@ export function createView() {
     },
     local: (p: Vec3Node): Vec2Node => eyeChart(p).q,
     onEye: (p: Vec3Node): Charted => eyeChart(p),
-    chart: (c: Chart) => chartNodes(v3(c.at), v3(c.axis), v3(crossV(c.axis, c.at))),
     rings,
     /** The eye on the CPU, as of the last update. */
-    eye: eye as Readonly<Eye>,
-    /** Each frame, once the camera is placed: the eye it gives, on a screen `screen` CSS pixels high. */
+    eye: seen,
+    /**
+     * Each frame, once the camera is placed: the eye it gives, on a screen `screen` CSS pixels high. Its position and
+     * frame are new each frame, values the systems may keep (clouds.ts keeps the last position to find the eye's step).
+     */
     update(camera: PerspectiveCamera, screen: number) {
-      const p = camera.getWorldPosition(new Vector3());
+      const p = camera.getWorldPosition(at);
       eye.pixel = (2 * Math.tan(((camera.fov / camera.zoom) * Math.PI) / 360)) / screen;
       eye.projection.copy(camera.projectionMatrix);
       eye.projectionInverse.copy(camera.projectionMatrixInverse);
@@ -189,7 +190,7 @@ export function createView() {
       position.value.copy(p);
       set(up0, eye.frame.up);
       set(east, eye.frame.east);
-      set(south, [-eye.frame.north[0], -eye.frame.north[1], -eye.frame.north[2]]);
+      south.value.set(-eye.frame.north[0], -eye.frame.north[1], -eye.frame.north[2]);
       height.value = eye.height;
       dip.value = eye.dip;
     },

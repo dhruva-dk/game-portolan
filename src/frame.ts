@@ -5,7 +5,7 @@ import {
   Fn, float, getViewPosition, length, normalize, pass, rtt, screenUV, select, uniform, vec3, vec4,
 } from 'three/tsl';
 import { fxaa } from 'three/examples/jsm/tsl/display/FXAANode.js';
-import { environmentAt, type World } from './environment';
+import { environmentAt, type Environment, type World } from './environment';
 import type { Compute, Draw } from './gpu';
 import type { Eye, Snapshot } from './snapshot';
 import { createSky, type Sky } from './sky/sky';
@@ -282,6 +282,8 @@ export function createFrame(renderer: WebGPURenderer, world: World, options: Fra
   /** The ships drawn last frame and this one, and the latest moment of the guns' work laid so far (each blast is laid
    *  once). */
   let drawn = new Set<number>(), now = new Set<number>(), laid = -Infinity;
+  /** The environment the frame draws in, laid afresh each frame. */
+  let env: Environment | undefined;
 
   /** The eye's camera, placed and turned as the eye says, its aspect the drawing buffer's. */
   function cameraFor(eye: Eye) {
@@ -355,7 +357,7 @@ export function createFrame(renderer: WebGPURenderer, world: World, options: Fra
   /** Draws the world as the snapshot has it, from its eye, dt seconds after the last frame. */
   function render(s: Snapshot, dt: number) {
     const seen = s.eye;
-    const env = environmentAt(world, s.clock, seen.position);
+    env = environmentAt(world, s.clock, seen.position, env);
     stage(s);
     // the CPU's work, each system's after what it reads: the view first; the ships' yards before the marks they cast.
     // The eye is given the screen's size in CSS pixels, not the frame's (SCALE): the ships' and the guns' detail and
