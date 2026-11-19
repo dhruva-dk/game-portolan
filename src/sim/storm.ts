@@ -27,17 +27,19 @@ export const STORM = {
   /**
    * The phases in order. The first cap is the whole planet (π·R, 1740 m), so the first wait is only a warning: it
    * shows where the storm is headed. The first close is the long one (the far side of the planet is 940 m outside
-   * its next cap: 70 s at a ship's best 13.5 m/s, 134 at an ordinary 7); after it the edge moves at 3–7 m/s, a
-   * ship's easy pace, as the old game's did. The last cap, 25 m, holds two or three ships' lengths: a fight.
+   * its next cap: 59 s at a ship's best 16 m/s, 134 at an ordinary 7); after it the edge moves at 3–7 m/s, a
+   * ship's easy pace, as the old game's did. The last cap, 75 m, holds a fight and the chase's eye behind her: it
+   * stands some 66 m astern (play/chase.ts BOOM), and at 25 m, the old last cap, and 55, the one before it, the eye
+   * was in the storm's wall wherever she was and saw nothing but its violet.
    */
   phases: [
     { wait: 60, close: 70, radius: 800, damage: 0.01 },
     { wait: 45, close: 40, radius: 480, damage: 0.02 },
-    { wait: 40, close: 32, radius: 300, damage: 0.03 },
-    { wait: 35, close: 26, radius: 180, damage: 0.05 },
-    { wait: 25, close: 20, radius: 100, damage: 0.07 },
-    { wait: 20, close: 16, radius: 55, damage: 0.09 },
-    { wait: 15, close: 14, radius: 25, damage: 0.12 },
+    { wait: 40, close: 32, radius: 320, damage: 0.03 },
+    { wait: 35, close: 26, radius: 220, damage: 0.05 },
+    { wait: 25, close: 20, radius: 150, damage: 0.07 },
+    { wait: 20, close: 16, radius: 110, damage: 0.09 },
+    { wait: 15, close: 14, radius: 75, damage: 0.12 },
   ] as readonly Phase[],
   /** Once the last cap has closed, the damage rises by `rise` (of a hull a second) every `every` seconds, so the
    * match ends even if the last ships keep apart. */

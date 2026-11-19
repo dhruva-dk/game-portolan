@@ -41,11 +41,13 @@ test('the match runs six to eight minutes, and its phases add up to it', () => {
   assert.equal(storm(t + 0.01).secondsToNext, Infinity);
 });
 
-test('it starts as the whole planet and closes to a cap small enough to force a fight', () => {
+test('it starts as the whole planet and closes to a cap small enough to force a fight, wide enough for the eye', () => {
   const storm = createStorm(3, depthOf(3));
   assert.equal(storm(0).radius, Math.PI);
   assert.ok(!outside([0, -R, 0], storm(0)) && !outside([0, R, 0], storm(0)));
-  assert.ok(storm(DURATION).radius * R <= 30);
+  // a fight: no wider than a gun's range across; and the chase's eye, some 66 m astern, inside it with her at its middle
+  assert.ok(storm(DURATION).radius * R <= 100);
+  assert.ok(storm(DURATION).radius * R >= 70);
 });
 
 test('each cap lies within the last, and holds the one it closes to; the radius never grows', () => {
