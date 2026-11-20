@@ -10,8 +10,8 @@
 //   spent if one may be (not while she mends);
 // - her helm as her stores sail her (crewed): a gust blowing drives her on
 // (ship.ts), and mending she sails at
-//   hold.ts USING of the speed she asks;
-// - after the fighting (stored): what she mends with and her gust stepped on,
+//   hold.ts USING of the speed she asks, her rigging cut RIGGING of it;
+// - after the fighting (stored): what she mends with, her gust and her cut rigging stepped on,
 // the loot drifted and swept up (and
 //   the swaps asked for made), and every ship sunk this step spilling what she had.
 //
@@ -22,7 +22,7 @@ import type { Crew, Cue } from './battle.ts';
 import type { Vessel } from './contact.ts';
 import { reloadOf } from './gun.ts';
 import { spent, stepGust } from './gust.ts';
-import { CARRIED, EQUIP, GUNS } from './handling.ts';
+import { CARRIED, EQUIP, GUNS, RIGGING } from './handling.ts';
 import { sunk } from './health.ts';
 import { stepUse, tapped, USING, type Use } from './hold.ts';
 import {
@@ -157,12 +157,13 @@ export function asked(
 
 /**
  * Her helm as her stores sail her: driven on by a gust blowing, held back while
- * she mends.
+ * she mends, and while her rigging is cut (RIGGING).
  */
 export function crewed(h: Helm, c: Crew | undefined): Helm {
   if (!c) return h;
   const gust = c.gust.blowing > 0;
-  const throttle = c.hold.using ? h.throttle * USING : h.throttle;
+  const throttle =
+    h.throttle * (c.hold.using ? USING : 1) * (c.cut > 0 ? RIGGING : 1);
   return gust || throttle !== h.throttle ? { ...h, throttle, gust } : h;
 }
 
@@ -189,7 +190,13 @@ export function stored(
     if (sunk(c.health)) return c;
     const u = stepUse(c.hold, c.health, dt);
     if (u.done) mended.push({ ship: c.id, use: u.done });
-    return { ...c, hold: u.hold, health: u.health, gust: stepGust(c.gust, dt) };
+    return {
+      ...c,
+      hold: u.hold,
+      health: u.health,
+      gust: stepGust(c.gust, dt),
+      cut: c.cut - dt > 1e-9 ? c.cut - dt : 0,
+    };
   });
   const s = swept(f, stepped, fleet, takes, seed);
   return {

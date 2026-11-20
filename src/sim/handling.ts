@@ -211,7 +211,18 @@ interface Bore {
    */
   splash: number;
   falls: boolean;
+  /**
+   * Seconds a ship struck sails with her rigging cut (RIGGING), 0 for a gun
+   * that cuts none.
+   */
+  cuts: number;
 }
+
+/**
+ * A ship whose rigging is cut (a scatter's grape: GUNS `cuts`) sails at this
+ * share of the speed she asks, till it is mended.
+ */
+export const RIGGING = 0.5;
 
 /**
  * The five guns (gun.ts, shot.ts), on a plinth in her waist, two carried and
@@ -224,7 +235,7 @@ interface Bore {
  *   its range, 200 m, as the one gun this sea had before (its pull some 14 g at the sea, its arcs as they were);
  * - scatter, the shotgun: 8 pellets of 8 in a wide cone, 1 s apart, 4 to a
  * magazine, 70 m (165 → 126 m/s), the pellets
- *   dropping into the sea not far past it;
+ *   dropping into the sea not far past it; its grape cuts the rigging of a ship it strikes, slowing her 4 s (RIGGING);
  * - repeater, the rifle: 7 a ball, 0.1 s apart, 30 to a magazine, 150 m (185 →
  * 172 m/s), flat (12° at full range);
  * - harpoon, the long gun: one 80 bolt, wound up 0.75 s, none of the spread,
@@ -253,6 +264,7 @@ export const GUNS: Readonly<Record<GunKind, Bore>> = {
     spread: 0.03,
     splash: 0,
     falls: true,
+    cuts: 0,
   },
   scatter: {
     damage: 8,
@@ -269,6 +281,7 @@ export const GUNS: Readonly<Record<GunKind, Bore>> = {
     spread: 0.09,
     splash: 0,
     falls: true,
+    cuts: 4,
   },
   repeater: {
     damage: 7,
@@ -285,6 +298,7 @@ export const GUNS: Readonly<Record<GunKind, Bore>> = {
     spread: 0.05,
     splash: 0,
     falls: true,
+    cuts: 0,
   },
   harpoon: {
     damage: 80,
@@ -301,6 +315,7 @@ export const GUNS: Readonly<Record<GunKind, Bore>> = {
     spread: 0,
     splash: 0,
     falls: false,
+    cuts: 0,
   },
   mortar: {
     damage: 75,
@@ -317,6 +332,7 @@ export const GUNS: Readonly<Record<GunKind, Bore>> = {
     spread: 0.02,
     splash: 11,
     falls: false,
+    cuts: 0,
   },
 };
 

@@ -75,6 +75,19 @@ const GUNNER = {
    */
   unsteady: 6,
   /**
+   * The share of that unsteadiness each gun's spread takes: a scatter's a
+   * third, its charge already wide whatever her hand (a shotgun forgives a
+   * shaky one; with all of it a green captain's grape went off within half a
+   * radian, 15 m either side at 30 m, most of it past the hull).
+   */
+  shake: {
+    cannon: 1,
+    scatter: 1 / 3,
+    repeater: 1,
+    harpoon: 1,
+    mortar: 1,
+  } satisfies Record<GunKind, number>,
+  /**
    * Her eye aloft, metres over the sea, from which she sights the gun on her
    * mark.
    */
@@ -131,7 +144,7 @@ export const GUNNERY = {
   /**
    * She fires within this share of each gun's range (holding a gun that sprays
    * till she is nearer: PLAN W3), in bursts of `burst` s with pauses of `pause`
-   * s.
+   * s (`pauses`).
    */
   reach: {
     cannon: 0.95,
@@ -142,6 +155,18 @@ export const GUNNERY = {
   } satisfies Record<GunKind, number>,
   burst: [1.5, 4] as const,
   pause: [0.8, 2.2] as const,
+  /**
+   * Whether she pauses between bursts with each gun: not with a scatter, a
+   * gun fired once a second that does all it does close, where a pause is a
+   * volley lost and her foe gone out of reach.
+   */
+  pauses: {
+    cannon: true,
+    scatter: false,
+    repeater: true,
+    harpoon: true,
+    mortar: true,
+  } satisfies Record<GunKind, boolean>,
 } as const;
 
 /** What her gunnery carries from one step to the next. */
@@ -186,10 +211,11 @@ const between = (draw: () => number, [lo, hi]: readonly [number, number]) =>
   lo + (hi - lo) * draw();
 
 /**
- * How many times the gun's own spread her balls go off within, by her skill.
+ * How many times the gun's own spread her balls go off within, by her skill,
+ * with a gun of `kind`.
  */
-export const spreadBy = (skill: number) =>
-  1 + GUNNER.unsteady * (1 - skill) ** 2;
+export const spreadBy = (skill: number, kind: GunKind = 'cannon') =>
+  1 + GUNNER.unsteady * GUNNER.shake[kind] * (1 - skill) ** 2;
 
 /** The seconds before she fires on a ship she has just seen, by her skill. */
 export const reactTime = (skill: number) =>
@@ -356,7 +382,9 @@ export function aimAndFire(
   )
     return { aim, fire: false };
   // bursts: firing whenever loaded through one, holding fire through the pause
-  // after it
+  // after it (with a gun she doesn't pause with, firing whenever loaded)
+  if (!t.pauses[kind])
+    return { aim, fire: true, spread: spreadBy(skill, kind) };
   if (g.burst > 0) {
     g.burst -= dt;
     if (g.burst <= 0) g.burst = -between(draw, t.pause);
@@ -365,5 +393,5 @@ export function aimAndFire(
     if (g.burst >= 0) g.burst = between(draw, t.burst);
     return { aim, fire: false };
   } else g.burst = between(draw, t.burst);
-  return { aim, fire: true, spread: spreadBy(skill) };
+  return { aim, fire: true, spread: spreadBy(skill, kind) };
 }

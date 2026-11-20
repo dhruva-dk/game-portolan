@@ -11,7 +11,9 @@
 // it reloads, and it fires again full. A ship sunk takes no more, fires no
 // more, and is no longer laid on or struck; her crew is kept, sunk, for the
 // game to take her off the sea. A blow that strikes breaks off whatever she was
-// mending with (hold.ts); a gun fired in a gust goes off wider (gust.ts).
+// mending with (hold.ts); a gun fired in a gust goes off wider (gust.ts); a
+// gun that cuts rigging (the scatter's grape) leaves her slowed a while
+// (stores.ts crewed).
 //
 // The storm (storm.ts) wears at every ship outside its cap, a share of a full
 // hull a second, past the shield (weathered, after the step).
@@ -44,8 +46,9 @@ import type { Depth } from './shoal.ts';
 /**
  * A ship's crew: who she is (her Vessel's id), her hit points, the guns she
  * carries (CARRIED slots, null empty) and the slot in hand, seconds till the
- * gun in hand may fire after she took it up (EQUIP), her hold (hold.ts) and her
- * gust (gust.ts).
+ * gun in hand may fire after she took it up (EQUIP), her hold (hold.ts), her
+ * gust (gust.ts), and seconds till her rigging is mended, cut by a gun that
+ * cuts it (GUNS `cuts`; 0 whole).
  */
 export interface Crew {
   id: number;
@@ -55,6 +58,7 @@ export interface Crew {
   equip: number;
   hold: Hold;
   gust: Gust;
+  cut: number;
 }
 
 /**
@@ -148,6 +152,7 @@ export const crewOf = (id: number, ...guns: Gun[]): Crew => ({
   equip: 0,
   hold: emptyHold(),
   gust: gustOf(),
+  cut: 0,
 });
 
 /** The gun in her hand, or null. */
@@ -266,6 +271,7 @@ export function stepBattle(
     const harm = harmed(c.health, damage);
     c.health = harm.health;
     c.hold = broken(c.hold);
+    if (gun) c.cut = Math.max(c.cut, GUNS[gun].cuts);
     const broke = harm.shield > 0 && c.health.shield <= 0;
     // a scatter's pellets on one ship in one step: one strike
     const same = ram

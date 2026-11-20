@@ -1,7 +1,7 @@
 // The five guns (sim/handling.ts GUNS) as they fight (sim/battle.ts): how long
 // each takes to sink a ship at its best range, its magazine, interval, reload
 // and wind-up, the time to take one up, the fall-off of its bite, the mortar's
-// burst, and the same fight every time. (What is dropped on a sinking:
+// burst, the scatter's cut rigging, and the same fight every time. (What is dropped on a sinking:
 // loot.test.ts; a bot's choice by range: gunner.test.ts.)
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -19,7 +19,8 @@ import { afloat, type Vessel } from '../src/sim/contact.ts';
 import { STEP } from '../src/sim/fixed.ts';
 import { falloff, gunOf } from '../src/sim/gun.ts';
 import { KINDS, type GunKind } from '../src/kinds.ts';
-import { EQUIP, FALLOFF, GUNS } from '../src/sim/handling.ts';
+import { EQUIP, FALLOFF, GUNS, RIGGING } from '../src/sim/handling.ts';
+import { crewed, stored } from '../src/sim/stores.ts';
 import { LOOT, isArms, laying } from '../src/sim/loot.ts';
 import { toEdge } from '../src/sim/storm.ts';
 import { loosed } from '../src/sim/shot.ts';
@@ -130,6 +131,38 @@ test('each gun sinks a ship at its best range in a band: 1–5 s against her hul
   // none takes more than three and a half times another's through a shield
   const both = rows.map((r) => r[2]);
   assert.ok(Math.max(...both) / Math.min(...both) < 3.5);
+});
+
+test("a scatter's grape cuts the rigging of the ship it strikes: she sails at RIGGING of the speed she asks till it is mended; a cannon's ball cuts none", () => {
+  const struck = (kind: GunKind) =>
+    fight(
+      [crewOf(1, gunOf(kind, 0)), crewOf(2)],
+      [
+        afloat(1, lying(centre, 0)),
+        afloat(2, lying(east(BEST.scatter), Math.PI / 2)),
+      ],
+      0.5
+    ).battle.crews[1];
+  assert.equal(struck('cannon').cut, 0);
+  const c = struck('scatter');
+  assert.ok(c.cut > 0 && c.cut <= GUNS.scatter.cuts, `${c.cut}`);
+  const helm = { course: null, throttle: 0.8 };
+  assert.equal(crewed(helm, c).throttle, 0.8 * RIGGING);
+  // mended after the fighting, as the seconds pass
+  let crews = [c];
+  for (let i = 0; i < Math.ceil(GUNS.scatter.cuts / STEP); i++)
+    crews = stored(
+      crews,
+      { pieces: [], next: 0 },
+      [],
+      new Map(),
+      [],
+      STEP,
+      deep,
+      1
+    ).crews;
+  assert.equal(crews[0].cut, 0);
+  assert.equal(crewed(helm, crews[0]).throttle, 0.8);
 });
 
 /** Ship 1 alone with a common gun of `kind` (more given after it), her trigger held for `seconds`, out at sea. */
