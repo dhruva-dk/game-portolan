@@ -63,7 +63,7 @@ export const STYLES: readonly Omit<Temper, 'skill' | 'aggro'>[] = [
   },
   {
     fight: 0.55,
-    notice: 130,
+    notice: 120,
     run: 35,
     margin: 25,
     standoff: 0.9,
@@ -110,13 +110,15 @@ export const STYLES: readonly Omit<Temper, 'skill' | 'aggro'>[] = [
 /**
  * The skill each style is drawn from, least to most (hunter … brawler): the
  * fighters sharper, as fighting is their trade, the scavenger, who lives by
- * keeping out of it, the least; each within 0–1.
+ * keeping out of it, the least; each within 0–1. The raider's and the
+ * turtle's were trimmed when the hand steadied with skill (gunner.ts
+ * `unsteady`, PLAN A3), which gave most to the middling and put them ahead.
  */
 const SKILL: readonly (readonly [number, number])[] = [
   [0.55, 1],
   [0.35, 0.9],
+  [0.25, 0.8],
   [0.3, 0.85],
-  [0.35, 0.9],
   [0.15, 0.7],
   [0.55, 1],
 ];
