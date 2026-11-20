@@ -886,7 +886,15 @@ export function createState(
       const gone = (c: Crew): Crew =>
         c.id === id ? { ...c, health: { ...c.health, hull: 0, shield: 0 } } : c;
       battle = { ...battle, crews: s.crews.map(gone) };
-      founder({ id, by, cause: by === null ? 'storm' : 'shot', gun: null });
+      // by a ball from the gun `by` has in hand
+      const held = battle.crews.find((c) => c.id === by),
+        g = held && inHand(held);
+      founder({
+        id,
+        by,
+        cause: by === null ? 'storm' : 'shot',
+        gun: g ? g.kind : null,
+      });
       log.keep(NOTHING_DONE, NOTHING_DONE, NOTHING_DONE, null, tick * STEP);
     },
     /**
