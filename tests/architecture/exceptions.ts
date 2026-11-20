@@ -202,7 +202,6 @@ export const EXCEPTIONS: readonly Exception[] = [
       ['src/sim/battle.ts', 'stepBattle', 7],
       ['src/sim/bot.ts', 'think', 6],
       ['src/sim/gun.ts', 'chosen', 6],
-      ['src/sim/gun.ts', 'laid', 8],
       ['src/sim/ride.ts', 'settled', 6],
       ['src/sim/shot.ts', 'loosed', 7],
       ['src/sim/stores.ts', 'stored', 8],

@@ -29,6 +29,8 @@ export const RULES: Record<string, (r: Rules) => Over> = {
       weights: [w[0] / 2, w[1] / Math.SQRT2, w[2], w[3] * Math.SQRT2, w[4] * 2],
     },
   }),
+  /** No assist: every gun laid where its sight meets the sea (PLAN A2). */
+  noAssist: ({ aim }) => ({ aim: { assist: aim.assist.map(() => 0) } }),
   /** The storm waits two thirds as long at each phase. */
   quick: ({ storm }) => ({
     storm: {

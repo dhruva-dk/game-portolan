@@ -35,6 +35,9 @@ export const STUCK = 15,
 /** The seconds each ship's water is taken at. */
 export const HELD = [30, 60, 120, 240] as const;
 
+/** A ship under way for where balls fall about her (ShipResult fell), m/s. */
+const MOVING = 4;
+
 /** A shot's range to her mark: close (a scatter's), mid (a repeater's), far. */
 export const BANDS = ['close', 'mid', 'far'] as const;
 export type Band = (typeof BANDS)[number];
@@ -65,8 +68,19 @@ export interface Fighting {
 export interface ShipResult {
   id: number;
   brain: string;
-  /** Her persona (sim/persona.ts). */
+  /** Her persona (sim/persona.ts), her gunner's skill (0…1: sim/temper.ts). */
   persona: string;
+  skill: number;
+  /** Whether a stand-in for a player laid her gun (player.ts). */
+  player: boolean;
+  /** Her shots and those home, by the gun fired and the range (A2). */
+  aim: Partial<Record<GunKind, Record<Band, Count>>>;
+  /**
+   * Where her balls came down (struck or splashed) about the ship she laid on,
+   * when that ship was under way (MOVING): astern of her middle along her way,
+   * or ahead (A4: a gunner who leads short lays astern).
+   */
+  fell: { astern: number; ahead: number };
   /** 1 the last afloat (or every ship afloat at the end); n the first sunk. */
   place: number;
   sunk: { time: number; cause: string; by: number | null } | null;
@@ -173,8 +187,14 @@ interface Watch {
   r: ShipResult;
   afloat: number;
   speedSum: number;
-  /** Her last shot: its gun, rarity and range band, and whether it is home yet (her blows struck are put down to it). */
-  last: { kind: GunKind; rarity: number; band: Band; home: boolean } | null;
+  /** Her last shot: its gun, rarity and range band, the ship it was laid on, and whether it is home yet (her blows struck are put down to it). */
+  last: {
+    kind: GunKind;
+    rarity: number;
+    band: Band;
+    target: number | null;
+    home: boolean;
+  } | null;
 }
 
 /** What her mind shows now (Why), `depth` the sea's. */
@@ -191,6 +211,11 @@ function whyNow(m: Readonly<Memory>, depth: (p: Vec3) => number): Why[] {
 const bump = <K extends string>(to: Partial<Record<K, number>>, k: K, n = 1) =>
   (to[k] = (to[k] ?? 0) + n);
 const count = (): Count => ({ shots: 0, hits: 0 });
+const bands = (): Record<Band, Count> => ({
+  close: count(),
+  mid: count(),
+  far: count(),
+});
 
 /** Pieces taken up: how many, the seconds they lay all told, how many fought over. */
 export interface Flow {
@@ -206,13 +231,15 @@ type Stepped = ReturnType<State['advance']>;
 
 /**
  * A watch over a match on a sea of `depth`: `step()` with what each step did;
- * `second()` once each second of its clock; `end()` its account.
+ * `second()` once each second of its clock; `end()` its account. `players`:
+ * the ships a stand-in lays the guns of.
  */
 export function watch(
   state: State,
   brainOf: (id: number) => string,
   depth: (p: Vec3) => number,
-  type: string
+  type: string,
+  players: ReadonlySet<number> = new Set()
 ) {
   const ships = new Map<number, Watch>();
   for (const k of state.ships())
@@ -227,6 +254,10 @@ export function watch(
         id: k.id,
         brain: brainOf(k.id),
         persona: debugOf(state).natureOf(k.id)?.persona ?? '',
+        skill: debugOf(state).natureOf(k.id)?.temper.skill ?? 0,
+        player: players.has(k.id),
+        aim: {},
+        fell: { astern: 0, ahead: 0 },
         place: 0,
         sunk: null,
         armed: k.armed ? 0 : null,
@@ -268,16 +299,25 @@ export function watch(
   const born = new Map<number, number>(),
     firstLater = state.loot().next;
   let seenNext = firstLater;
-  const shots: MatchResult['shots'] = {
-    band: { close: count(), mid: count(), far: count() },
-    kind: {},
-    rarity: {},
-  };
+  const shots: MatchResult['shots'] = { band: bands(), kind: {}, rarity: {} };
   let lastShot = 0,
     quiet = 0;
   /** Where ship `id` is now, if afloat. */
   const where = (id: number) =>
     state.vessels().find((v) => v.id === id)?.ship.at ?? null;
+  /**
+   * A ball of `w`'s come down `at` (a unit vector): astern or ahead of the
+   * ship her last shot was laid on, if that ship is under way.
+   */
+  const fell = (w: Watch, at: Vec3) => {
+    const t = w.last?.target,
+      v = t == null ? null : state.vessels().find((o) => o.id === t);
+    if (!v || v.ship.speed < MOVING) return;
+    const { heading: h, at: p } = v.ship;
+    const along =
+      (at[0] - p[0]) * h[0] + (at[1] - p[1]) * h[1] + (at[2] - p[2]) * h[2];
+    w.r.fell[along < 0 ? 'astern' : 'ahead']++;
+  };
 
   return {
     step(did: Stepped) {
@@ -298,15 +338,16 @@ export function watch(
           )
             range = Math.min(range, distance(from, v.ship.at));
         const band = bandOf(range);
-        w.last = { kind: s.gun, rarity, band, home: false };
+        w.last = { kind: s.gun, rarity, band, target: s.target, home: false };
         bump(w.r.fighting.shots, s.gun);
+        (w.r.aim[s.gun] ??= bands())[band].shots++;
         shots.band[band].shots++;
         const k = (shots.kind[s.gun] ??= {
           ...count(),
           balls: 0,
           fell: 0,
           dealt: 0,
-          bands: { close: count(), mid: count(), far: count() },
+          bands: bands(),
         });
         k.shots++;
         k.bands[band].shots++;
@@ -327,11 +368,14 @@ export function watch(
         by.r.fighting.dealt += s.damage;
         const l = by.last;
         if (!l) continue;
+        if (s.struck === l.target) fell(by, s.at);
         const k = shots.kind[l.kind];
         if (k) k.dealt += s.damage;
         if (l.home) continue;
         l.home = true;
         by.r.fighting.hits++;
+        const mine = by.r.aim[l.kind];
+        if (mine) mine[l.band].hits++;
         shots.band[l.band].hits++;
         if (k) {
           k.hits++;
@@ -343,6 +387,8 @@ export function watch(
       for (const s of did.splashes) {
         const k = shots.kind[s.gun];
         if (k) k.fell++;
+        const w = ships.get(s.shooter);
+        if (w) fell(w, s.at);
       }
       for (const t of did.took) {
         // (a piece put over the side and taken up within the step was never

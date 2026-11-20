@@ -99,7 +99,7 @@ import { createDrawing } from './drawing.ts';
 import { createHeld } from './held.ts';
 import { indexed } from './indexed.ts';
 import { createLog, NOTHING_DONE } from './moments.ts';
-import { createOrders, type Hand } from './orders.ts';
+import { createOrders, type Hand, type Sighter } from './orders.ts';
 import { sinking } from './sinking.ts';
 
 /** No way on and the rudder amidships. */
@@ -270,7 +270,7 @@ export function createState(
   const seedOf = (id: number) => hash(match.seed, id);
   let fleet: Vessel[] = [];
   const aboard = new Map<number, Aboard>();
-  let battle: Battle = battleOf([], match.seed);
+  let battle: Battle = battleOf([], match.seed, match.type.rules.aim.assist);
   let wrecks: Wreck[] = [];
   /**
    * The line of sight each ship's gun was last laid along (a unit vector; null:
@@ -403,7 +403,8 @@ export function createState(
       ids.map((id) =>
         gun ? crewOf(id, gunOf(gun.kind, gun.rarity)) : crewOf(id)
       ),
-      match.seed
+      match.seed,
+      match.type.rules.aim.assist
     );
     territory = held ? createTerritory(Math.max(...ids) + 1) : null;
     generation++;
@@ -748,6 +749,8 @@ export function createState(
     vessel,
     /** A ship's crew: her health and her gun (sim/battle.ts). */
     crew: (id: number): Crew => byId(battle.crews).get(id)!,
+    /** The guns' assist this match: its cone, radians, by rarity (rules.ts). */
+    assist: (): readonly number[] => battle.assist,
     /** Her ship on the sea, or null once sunk. */
     mine: () => vessel(PLAYER),
     /** The ids of every ship not sunk (the same list until one sinks). */
@@ -893,6 +896,15 @@ export function createState(
      * null for one sunk (tools/harness tells the bots apart by it).
      */
     natureOf: (id: number): Nature | null => aboard.get(id)?.nature ?? null,
+    /**
+     * Makes a bot of this match a stand-in for a player (orders.ts Hand):
+     * `sights` lays her gun, her bot the rest (tools/harness/player.ts). For
+     * this match only: the next start puts a bot at every helm again.
+     */
+    standIn: (id: number, sights: Sighter) => {
+      const a = aboard.get(id);
+      if (a?.mind) a.sights = sights;
+    },
   });
   return state;
 }
@@ -907,6 +919,7 @@ interface Debug {
   sink(id: number, by: number | null): void;
   mindOf(id: number): Readonly<Memory> | null;
   natureOf(id: number): Nature | null;
+  standIn(id: number, sights: Sighter): void;
 }
 
 /** Each state's debug face, set as it is made. */

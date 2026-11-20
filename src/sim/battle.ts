@@ -24,7 +24,7 @@ import type { Rise } from '../world/planet.ts';
 import { distance, type Vec3 } from '../world/sphere.ts';
 import type { Blow, Vessel } from './contact.ts';
 import type { GunKind } from '../kinds.ts';
-import { CARRIED, FALLOFF, GUNS, GUST, HEALTH } from './handling.ts';
+import { CARRIED, FALLOFF, GUN, GUNS, GUST, HEALTH } from './handling.ts';
 import { harmed, sunk, whole, type Health } from './health.ts';
 import { outside, type Storm } from './storm.ts';
 import {
@@ -58,13 +58,15 @@ export interface Crew {
 }
 
 /**
- * The fighting as it stands: every ship's crew, the balls in flight, and the
- * seed the guns' spread is drawn from.
+ * The fighting as it stands: every ship's crew, the balls in flight, the seed
+ * the guns' spread is drawn from, and the guns' assist (its cone, radians, by
+ * rarity: the match's rules, rules.ts).
  */
 export interface Battle {
   crews: Crew[];
   balls: Ball[];
   seed: number;
+  assist: readonly number[];
 }
 
 /**
@@ -153,12 +155,18 @@ export const inHand = (c: Crew): Gun | null => c.guns[c.hand] ?? null;
 export const armed = (c: Crew) => c.guns.some((g) => g !== null);
 
 /**
- * The fighting before it starts: these crews, no balls, drawing from `seed`.
+ * The fighting before it starts: these crews, no balls, drawing from `seed`,
+ * the guns' assist `assist` (the game's own if not given).
  */
-export const battleOf = (crews: readonly Crew[], seed: number): Battle => ({
+export const battleOf = (
+  crews: readonly Crew[],
+  seed: number,
+  assist: readonly number[] = GUN.assist
+): Battle => ({
   crews: [...crews].sort((a, b) => a.id - b.id),
   balls: [],
   seed,
+  assist,
 });
 
 /**
@@ -335,16 +343,13 @@ export function stepBattle(
           spreadOf(gun) *
           (order?.spread ?? 1) *
           (c.gust.blowing > 0 ? GUST.spread : 1);
-        const lay = laid(
-          v,
-          gun,
-          order?.aim ?? null,
-          targets,
-          b.seed,
+        const lay = laid(v, gun, order?.aim ?? null, targets, {
+          seed: b.seed,
           depth,
           spread,
-          rises
-        );
+          cone: b.assist[gun.rarity],
+          rises,
+        });
         for (const dir of lay.dirs)
           balls.push(
             loosed(
@@ -376,6 +381,7 @@ export function stepBattle(
       crews: [...crews.values()].sort((x, y) => x.id - y.id),
       balls,
       seed: b.seed,
+      assist: b.assist,
     },
     shots,
     strikes,

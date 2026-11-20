@@ -529,3 +529,34 @@ then the behaviour commits on top.
   changes the fight (more kills, more damage taken), not the outcome. The
   knobs stay, all off; the game is unchanged. So the niche gaps above are
   the guns' own numbers to close (W2's table), not the bots' stances.
+- 2026-11-20 (H7, A2): a stand-in for a player (`tools/harness/player.ts`,
+  `--players k`): her gun laid along the chase camera's line through the
+  middle of the screen, on her foe's body as it was 0.2 s ago, the reticle
+  wandering 0.04 rad; the assist became a match rule (`rules.aim`, so
+  `--rules noAssist` takes it away), and `laid` takes a record (its 8-argument
+  exception is gone). `tools/harness/aim.ts` reports shots home by who laid
+  the gun (the stand-in, or bots by skill third) and range band. On 64
+  matches, close / mid / far, all guns:
+
+  | who         | assisted        | no assist       |
+  | ----------- | --------------- | --------------- |
+  | stand-in    | 85% / 50% / 47% | 48% / 2% / 2%   |
+  | green bots  | 69% / 27% / 33% | 68% / 25% / 22% |
+  | fair bots   | 75% / 30% / 28% | 72% / 30% / 23% |
+  | sharp bots  | 81% / 39% / 33% | 80% / 38% / 17% |
+
+  Bots' hit rates already climb with skill. The assist does all a thumb's
+  aiming: a sloppier thumb (0.3 s late, 0.07 rad of wander) hits the same, to
+  the point; without it a thumb barely hits past the scatter's range. So the
+  player's edge over the sharpest bots (+4 / +11 / +14 points) is not the
+  assist, which bots use too: it is the bots' unsteady hand, their spread
+  `1 + 4.5 (1 − skill)` times the gun's, the player's the gun's own.
+- 2026-11-20 (A3): **not tuned; a design call left open.** The gate (the
+  player at or below the best bots) can only be met by narrowing the
+  assist, and the numbers above say a narrower cone takes a thumb from 50%
+  at mid toward 2% long before it touches the bots, whose own eye already
+  sits on the body. The lever that moves the gap is the bots' hand
+  (`unsteady` in gunner.ts: at skill 0.9 it is 1.45×); bringing a sharp bot
+  to the gun's own spread puts her level with a player. Which side should
+  give is how the game should feel, so it is the owner's: the knobs, and
+  the harness to measure either choice, are in place.

@@ -95,9 +95,7 @@ function rate(rarity: number, metres: number, off = 0, k = 1): number {
       gun,
       sightOn(fleet[0], fleet[1], off * side),
       fleet,
-      11,
-      deep,
-      spreadOf(gun) * k
+      { seed: 11, depth: deep, spread: spreadOf(gun) * k }
     );
     let battle = {
         ...battleOf([crewOf(1), crewOf(2)], 0),

@@ -191,22 +191,39 @@ function lead(kind: GunKind, from: Vec3, target: Vessel): Vec3 | null {
 const BEYOND = 1000;
 
 /**
+ * What a gun is laid over: water `depth` deep (the land looked for only near
+ * its `rises`, if given: sight.ts meets); its balls spread over `spread`
+ * radians (half-angle; the gun's own if not given) by the gun's seeded numbers
+ * from `seed`; its assist's cone `cone` radians (the match's rules', rules.ts;
+ * the game's own for the gun's rarity if not given).
+ */
+interface Lay {
+  seed: number;
+  depth: Depth;
+  spread?: number;
+  cone?: number;
+  rises?: readonly Rise[];
+}
+
+/**
  * How `gun` aboard `shooter` is laid, aimed along `sight`, among `others` (the
- * ships it may be laid on, not sunk), over water `depth` deep (the land looked
- * for only near its `rises`, if given: sight.ts meets), its balls spread over
- * `spread` radians (half-angle) by the gun's seeded numbers from `seed`. With
- * no sight, along her heading at full range.
+ * ships it may be laid on, not sunk), over what `lay` gives. With no sight,
+ * along her heading at full range.
  */
 export function laid(
   shooter: Vessel,
   gun: Gun,
   sight: Sight | null,
   others: readonly Vessel[],
-  seed: number,
-  depth: Depth,
-  spread: number = spreadOf(gun),
-  rises?: readonly Rise[]
+  lay: Lay
 ): Laying {
+  const {
+    seed,
+    depth,
+    spread = spreadOf(gun),
+    cone = GUN.assist[gun.rarity],
+    rises,
+  } = lay;
   const g = GUNS[gun.kind],
     from = muzzle(shooter),
     up = normalize(from);
@@ -216,7 +233,7 @@ export function laid(
   const mark = chosen(
     s,
     from,
-    GUN.assist[gun.rarity],
+    cone,
     others.filter((o) => o.id !== shooter.id),
     g.range,
     land ? meet! : Infinity

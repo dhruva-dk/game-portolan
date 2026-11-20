@@ -6,11 +6,13 @@
 // Node only (tools/).
 
 import { createMatches } from '../../src/play/setup.ts';
-import { createState } from '../../src/play/state.ts';
+import { createState, debugOf } from '../../src/play/state.ts';
 import { STEP } from '../../src/sim/fixed.ts';
+import { hash } from '../../src/world/random.ts';
 import { flat } from '../../src/world/swell.ts';
 import { brainNamed } from './brains.ts';
 import { watch, type MatchResult } from './metrics.ts';
+import { standIn, type Thumb } from './player.ts';
 import { ruledBy } from './rules.ts';
 import { typeNamed } from './types.ts';
 import { worldOf } from './world.ts';
@@ -21,8 +23,11 @@ import { worldOf } from './world.ts';
  * name, ship `id` sailing `brains[(id + match) % brains.length]`; of the type
  * named `type` (tools/harness/types.ts: as the game deals them if not given),
  * under its rules changed by the variant named `rules` (tools/harness/rules.ts:
- * as they are if not given); until one is left, or `seconds` (the storm's whole course and two minutes
- * more if not given). (Turned by the match: a ship's id sets her temperament,
+ * as they are if not given); every `players`-th ship's gun laid by a stand-in
+ * for a player with a `thumb` (tools/harness/player.ts THUMBS: none if not
+ * given; steady); until one is
+ * left, or `seconds` (the storm's whole course and two minutes more if not
+ * given). (Turned by the match: a ship's id sets her temperament,
  * her berth and whose shots she takes, and in a mixed fleet the even ids,
  * sailing one brain in every match, placed better whatever brain it was. Over
  * matches each brain sails every id alike.)
@@ -33,6 +38,8 @@ export interface Spec {
   brains: readonly string[];
   type?: string;
   rules?: string;
+  players?: number;
+  thumb?: Thumb;
   seconds?: number;
 }
 
@@ -66,13 +73,22 @@ export function runMatch(spec: Spec): Result {
   let m = matches.deal();
   for (let k = 1; k < spec.match; k++) m = matches.deal();
   state.start(m, false);
+  // the stand-ins: every players-th ship, turned by the match as the brains
+  // are, so over matches they sail every id
+  const players = new Set<number>();
+  if (spec.players)
+    for (const k of state.ships())
+      if ((k.id + spec.match) % spec.players === 0) {
+        players.add(k.id);
+        debugOf(state).standIn(k.id, standIn(hash(m.seed, k.id), spec.thumb));
+      }
   // the storm's whole course, and two minutes more
   const course = m.type.rules.storm.phases.reduce(
       (t, p) => t + p.wait + p.close,
       0
     ),
     end = spec.seconds ?? course + 120,
-    seen = watch(state, brainOf, w.depth, m.type.name);
+    seen = watch(state, brainOf, w.depth, m.type.name, players);
   const idle = { course: null, throttle: 0 },
     still = { aim: null, fire: false },
     each = Math.round(1 / STEP);

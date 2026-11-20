@@ -51,6 +51,8 @@ import {
 } from '../src/world/sphere.ts';
 
 const deep: Depth = () => 30;
+/** Laid over deep water from `seed`, with no spread. */
+const flat = (seed: number) => ({ seed, depth: deep, spread: 0 });
 const deg = Math.PI / 180;
 const centre = fromLatLon(0.2, 0.3);
 /** A ship at `c` heading `bearing` (radians to port of east) at `speed`. */
@@ -317,9 +319,7 @@ test('led with no spread, a ball strikes a ship on a steady course, at any range
         cannon(0),
         on(fleet[0].ship, turned(fleet[0].ship, bearing), metres),
         fleet,
-        7,
-        deep,
-        0
+        { seed: 7, depth: deep, spread: 0 }
       );
       assert.equal(
         lay.target,
@@ -342,7 +342,7 @@ test('led with no spread, a ball strikes a ship on a steady course, at any range
           deep
         ).fleet;
         const r2 = stepBattle(
-          { crews: [crewOf(1), crewOf(2)], balls, seed: 0 },
+          { ...battleOf([crewOf(1), crewOf(2)], 0), balls },
           f,
           never(f),
           [],
@@ -386,7 +386,7 @@ test('with no ship in the assist cone the gun is laid along the sight, at full r
     )
       a += 1e-4;
     assert.equal(
-      laid(fleet[0], g, swung(fleet[0], fleet[1], k * a), fleet, 1, deep, 0)
+      laid(fleet[0], g, swung(fleet[0], fleet[1], k * a), fleet, flat(1))
         .target,
       2,
       'inside: laid on her'
@@ -397,7 +397,7 @@ test('with no ship in the assist cone the gun is laid along the sight, at full r
     )
       a += 1e-4;
     const sight = swung(fleet[0], fleet[1], k * a),
-      lay = laid(fleet[0], g, sight, fleet, 1, deep, 0);
+      lay = laid(fleet[0], g, sight, fleet, flat(1));
     assert.equal(lay.target, null, 'outside: not laid on her');
     assert.equal(lay.reached, false, 'the sight meets nothing');
     const dir = lay.dirs[0],
@@ -433,7 +433,7 @@ test('with no ship in the cone, the ball is laid to come down where the sight me
   const fleet = [afloat(1, lying(centre, 0))];
   for (const metres of [30, 80, 140]) {
     const sight = on(fleet[0].ship, fleet[0].ship.heading, metres),
-      lay = laid(fleet[0], cannon(0), sight, fleet, 1, deep, 0);
+      lay = laid(fleet[0], cannon(0), sight, fleet, flat(1));
     const meet = normalize(add(sight.from, sight.dir, seaAlong(sight)!));
     assert.ok(
       distance(lay.fall, meet) < 1e-6,
@@ -462,9 +462,14 @@ test('of two in the cone, the gun takes the one nearer the sight, and of two on 
       offSight(sight, fleet[1].ship)!.angle < GUN.assist[4],
     'both in the cone'
   );
-  assert.equal(laid(fleet[0], cannon(4), sight, fleet, 1, deep, 0).target, 2);
+  assert.equal(laid(fleet[0], cannon(4), sight, fleet, flat(1)).target, 2);
   const both = [fleet[0], afloat(3, lying(out(centre, 0, 80), 1)), fleet[2]];
-  assert.equal(laid(both[0], cannon(4), sight, both, 1, deep, 0).target, 3);
+  assert.equal(laid(both[0], cannon(4), sight, both, flat(1)).target, 3);
+  // with no cone, the gun takes neither: laid on the sea where the sight meets it
+  assert.equal(
+    laid(fleet[0], cannon(4), sight, fleet, { ...flat(1), cone: 0 }).target,
+    null
+  );
 });
 
 test('the spread closes up with rarity, and is the same for the same seed', () => {
@@ -474,9 +479,12 @@ test('the spread closes up with rarity, and is the same for the same seed', () =
     for (let n = 0; n < 300; n++) {
       const gun = { ...cannon(rarity), fired: n };
       const sight = on(fleet[0].ship, fleet[0].ship.heading, 150),
-        lay = laid(fleet[0], gun, sight, fleet, 99, deep),
-        clean = laid(fleet[0], gun, sight, fleet, 99, deep, 0);
-      assert.deepEqual(lay, laid(fleet[0], gun, sight, fleet, 99, deep));
+        lay = laid(fleet[0], gun, sight, fleet, { seed: 99, depth: deep }),
+        clean = laid(fleet[0], gun, sight, fleet, flat(99));
+      assert.deepEqual(
+        lay,
+        laid(fleet[0], gun, sight, fleet, { seed: 99, depth: deep })
+      );
       const angle = Math.acos(Math.min(1, dot(lay.dirs[0], clean.dirs[0])));
       assert.ok(angle <= spreadOf(gun) + 1e-9, 'within the cone');
       sum += angle;
@@ -525,13 +533,16 @@ test("an order's spread widens the gun's by that many times: the same draw, furt
   // laid by the battle as by laid() with the gun's spread times the order's
   const gun = cannon(2),
     sight = on(fleet[0].ship, fleet[0].ship.heading, 150),
-    clean = laid(fleet[0], gun, sight, fleet, 5, deep, 0).dirs[0];
+    clean = laid(fleet[0], gun, sight, fleet, flat(5)).dirs[0];
   const off = (k: number) =>
     Math.acos(
       Math.min(
         1,
         dot(
-          laid(fleet[0], gun, sight, fleet, 5, deep, spreadOf(gun) * k).dirs[0],
+          laid(fleet[0], gun, sight, fleet, {
+            ...flat(5),
+            spread: spreadOf(gun) * k,
+          }).dirs[0],
           clean
         )
       )
@@ -599,7 +610,7 @@ test('the land is in the way: a ball laid over an island falls on it', () => {
       up = normalize(from),
       ahead = fleet[0].ship.heading;
     let b: Battle = {
-      crews: [crewOf(1), crewOf(2)],
+      ...battleOf([crewOf(1), crewOf(2)], 0),
       balls: [
         loosed(
           1,

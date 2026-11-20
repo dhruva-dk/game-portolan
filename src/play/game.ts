@@ -411,7 +411,13 @@ export function createGame(
    * the next step would lay it.
    */
   const aimed = (v: Vessel, gun: Gun): Laying =>
-    laid(v, gun, chase.sight(), state.vessels(), 0, depth, 0, rises);
+    laid(v, gun, chase.sight(), state.vessels(), {
+      seed: 0,
+      depth,
+      spread: 0,
+      cone: state.assist()[gun.rarity],
+      rises,
+    });
 
   /**
    * A new match or sea: the camera behind her, its shots and orders as at the

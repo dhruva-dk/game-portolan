@@ -38,6 +38,17 @@ test('every variant makes whole rules, keys in the game’s order', () => {
     const r = ruledBy(undefined, name)!(3).rules;
     assert.deepEqual(Object.keys(r.loot), Object.keys(DEFAULT_RULES.loot));
     assert.deepEqual(Object.keys(r.storm), Object.keys(DEFAULT_RULES.storm));
+    assert.deepEqual(Object.keys(r.aim), Object.keys(DEFAULT_RULES.aim));
   }
   assert.throws(() => ruledBy(undefined, 'nonesuch'), /no rules "nonesuch"/);
+});
+
+test('noAssist takes the assist away at every rarity, and nothing else', () => {
+  const r = ruledBy(undefined, 'noAssist')!(5).rules;
+  assert.deepEqual(
+    r.aim.assist,
+    DEFAULT_RULES.aim.assist.map(() => 0)
+  );
+  assert.deepEqual(r.loot, dealt(5).rules.loot);
+  assert.deepEqual(r.storm, dealt(5).rules.storm);
 });

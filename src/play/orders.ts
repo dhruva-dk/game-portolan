@@ -5,6 +5,7 @@
 // each step, not made anew.
 
 import { armed, type Crew, type Order } from '../sim/battle.ts';
+import type { Sight } from '../sim/sight.ts';
 import { think, type Memory, type Sea, type Seen } from '../sim/bot.ts';
 import type { Nature } from '../sim/persona.ts';
 import { building, type Chart } from '../sim/route.ts';
@@ -19,15 +20,25 @@ import type { Cap, Storm } from '../sim/storm.ts';
 import { distance, R, type Vec3 } from '../world/sphere.ts';
 
 /**
+ * A stand-in's eye (state.ts debugOf standIn; tools/harness/player.ts): each
+ * step, her gun's line of sight, given her own ship and the foe her bot
+ * fights (null: none).
+ */
+export type Sighter = (own: Seen, foe: Seen | null) => Sight;
+
+/**
  * What a ship's orders come from aboard her: her bot's mind (null: the player's
  * hands, or her helm lashed), her nature (her seed, brain and temperament:
  * sim/brain.ts), and the helm a lashed ship holds. A bot's mind is written back
- * as she thinks.
+ * as she thinks. A stand-in's `sights` lay her bot's gun in its stead, as a
+ * player's hands would: the bot sails her and chooses when to fire, the
+ * stand-in where, her balls going off within the gun's own spread.
  */
 export interface Hand {
   mind: Memory | null;
   nature: Nature;
   steady: Helm;
+  sights?: Sighter;
 }
 
 /**
@@ -162,7 +173,10 @@ export function createOrders(depth: (p: Vec3) => number, chart: Chart) {
         const r = think(seen[i], others, sea, a.mind, a.nature);
         a.mind = r.memory;
         helms.push(r.helm);
-        orders.push(r.order);
+        if (a.sights) {
+          const foe = others.find((o) => o.id === r.memory.foe) ?? null;
+          orders.push({ aim: a.sights(seen[i], foe), fire: r.order.fire });
+        } else orders.push(r.order);
         if (r.ask !== NOTHING) asks.set(id, r.ask);
       }
     }
