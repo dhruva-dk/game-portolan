@@ -6,9 +6,38 @@
 // its budget (BUDGET, or the view's own). The counts are three's, so they do
 // not depend on the machine: they move only when what is drawn changes (or the
 // land does: a new planet's land moves the triangles a little, not the draws).
-//   node tools/budget.ts        (npm run budget)
+// --split prints each view's triangles by system and pass, the most first: the
+// meter's split by what is drawn (src/meter.ts data-objects; the dev server
+// always splits), each mesh's shapes summed under its name ('palms coarse 3'
+// under 'palms coarse').
+//   node tools/budget.ts [--split]        (npm run budget)
 
 import { VIEW, launch } from './launch.ts';
+
+const split = process.argv.includes('--split');
+
+/**
+ * The meter's split of a frame by what is drawn (lines 'pass/name k: d draws
+ * t k tri r×'), summed by system: each name less its shape's number.
+ */
+function bySystem(objects: string): string {
+  const sums = new Map<string, { draws: number; tris: number }>();
+  for (const line of objects.split('\n')) {
+    const m = /^(.*?)(?: \d+)?: ([\d.]+) draws ([\d.]+)k tri/.exec(line);
+    if (!m) continue;
+    const s = sums.get(m[1]) ?? { draws: 0, tris: 0 };
+    s.draws += Number(m[2]);
+    s.tris += Number(m[3]);
+    sums.set(m[1], s);
+  }
+  return [...sums]
+    .sort((a, b) => b[1].tris - a[1].tris)
+    .map(
+      ([k, s]) =>
+        `       ${k.padEnd(22)} ${s.tris.toFixed(0).padStart(5)}k tri  ${s.draws.toFixed(0)} draws`
+    )
+    .join('\n');
+}
 
 /**
  * Per displayed frame, every pass summed. The iPad pays CPU for each draw
@@ -57,6 +86,8 @@ try {
       { timeout: 10000 }
     );
     const text = (await page.getAttribute('#meter', 'data-line')) ?? '';
+    const objects = (await page.getAttribute('#meter', 'data-objects')) ?? '',
+      passes = (await page.getAttribute('#meter', 'data-passes')) ?? '';
     await page.close();
     const m = /(\d+) draws (\d+)k tri (\d+) passes/.exec(text);
     if (!m) throw new Error(`[${name}] the meter reads '${text}'`);
@@ -72,6 +103,10 @@ try {
         (breaches.length ? `  (over: ${breaches.join(', ')})` : '') +
         (own ? `  (its own: ${limit.triangles / 1000}k tri)` : '')
     );
+    if (split)
+      console.log(
+        `${passes.replace(/^/gm, '     pass ')}\n${bySystem(objects)}`
+      );
   }
 } finally {
   await close();

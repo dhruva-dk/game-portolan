@@ -416,3 +416,18 @@ then the behaviour commits on top.
   kept). Uncommitted iPad stick work from the old `ipad-fixes` worktree saved
   to `~/Downloads/ipad-fixes-uncommitted.patch`. Baseline: 372 tests pass;
   budget as in the headline. This plan written.
+- 2026-11-20 (G0): where the triangles go (`node tools/budget.ts --split`).
+  Every view's triangles are in its one world pass; the other 14 passes are
+  post (bloom, shafts, grade: a quad each), and the land's shadow map (2048²)
+  is drawn again only when the sun or the place moves (2.4k tri, a frame in a
+  hundred). So it is the land's things, not passes: coast 1304k = palms coarse
+  298k, palms 239k, rocks 175k, shrubs 172k, terrain 151k, shrubs coarse 125k,
+  rocks far 46k, sea 30k, ship 18k; ships 1359k the same plus 36k more ship;
+  sea 822k = palms coarse 219k, terrain 148k, shrubs 125k, shrubs coarse 95k,
+  palms 70k; lobby 814k = palms 282k, shrubs 212k, rocks 139k; map 3517k =
+  palms coarse 2413k, rocks far 578k, shrubs 165k, palms 158k. Two causes:
+  the coarse palm (~1100 tri) is the last level, drawn out to the horizon and,
+  from space, over the whole lit planet (some 2200 palms); and the tiles the
+  shadow map covers (143 m round the land tile nearest the eye) are drawn at
+  full detail in the world pass, seen or not, however far off (the map's
+  near palms, shrubs and rocks are those, 1200 m away).
