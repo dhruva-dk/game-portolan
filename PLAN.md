@@ -41,7 +41,7 @@ said; met ✓, not met ✗, the call left to the owner ◐:
 | Triangles, ships and coast views     | 1359k / 1304k  | ✓ 630k / 576k (worst view 893k of 900k)                                                                                                                        |
 | Draw calls, worst view               | 70             | ✓ 77 (a palm one draw, not two; every view fewer: sea 62, coast 64, ships 64, lobby 49, map 33)                                                                |
 | Bot seconds stuck                    | 4.2 s          | ✓ 4.1 s (runs on this code range 3.5–4.3 s)                                                                                                                    |
-| Guns, one against one                | unmeasured     | ◐ `duel.ts`: harpoon beats cannon, mortar far; scatter loses 19 in 20 (its spray or the gun band: the owner's)                                                 |
+| Guns, one against one                | unmeasured     | ◐ `duel.ts`: harpoon beats cannon, mortar far; scatter wins 65 / 60% from 40 / 80 m (was 18 / 10%), its grape cutting rigging; by gun held it still rates low |
 
 **Targets for this plan.** Each is a gate a milestone must meet, measured the
 same way:
@@ -755,3 +755,23 @@ then the behaviour commits on top.
     outlasting another within 7%); now met (+0.029 … −0.064).
   - `rate.ts` takes several runs and rates them as one. Golden `5b47591c` →
     `915a82b4`; mixed, gold rush, cagey `c827b8e7`, `e9044250`, `162d9ab0`.
+- 2026-11-20 (W4, the scatter): **a viable gun in duels; by gun held in
+  matches, not met.** Three rules, its numbers and the gun band untouched:
+  its grape cuts a struck ship's rigging, and she sails at half speed for
+  4 s, so a cannon can't open the range on it; a bot's shaky hand widens
+  its cone a third as much as any other gun's; she doesn't pause between
+  bursts with it. Against a cannon from 40 / 80 / 120 / 160 / 200 m it wins
+  26 / 24 / 13 / 11 / 18 of 40 (was 7 / 4 / 3 / 2 / 9). By gun held
+  longest it rates −0.178 ± 0.038 (was −0.113; the others +0.27 to +0.42),
+  and that measure can't show a better scatter: any ship with a second gun
+  holds it while no foe is near, so only ships with nothing else count as
+  scatters. By the gun fired longest (`rate.ts --by fired`, new) it is level
+  with the rest, before and after (+0.103 → +0.127, the others +0.09 to
+  +0.28). Its own ships, those that never held another kind, went −0.29 →
+  −0.13. Personas within ±0.045 of the mean before and after. Dropped: 11 a
+  pellet at 1.25 s (keeps the band, held −0.05, but strongest by fired at
+  +3.4 se and winning from 200 m two in three), reach 85 m, rigging 0.4,
+  W3's rush, and a captain wanting less of a fight she is outranged in.
+  The duel tool steps her stores as the game does. BOTS.md has the tables.
+  Golden `334fa9c8` → `ade79d2e`; mixed, gold rush, cagey `bd7c4725`,
+  `6af23769`, `65121435`.

@@ -702,3 +702,72 @@ commit; anything visible checked in headless chromium; iPad Air M1 at 30–40 fp
   spray that makes it a scatter, and loosening the band is a design call.
   The owner's; this table and the duel tool are what to choose by. In free-for-all matches close fights still come (the scatter deals
   most a minute held there), so this is a duel's weakness first.
+
+- The scatter, by mechanics rather than its numbers (its damage, cone,
+  reach and the gun band as they were). Three changes, each a rule:
+  - **grape cuts rigging** (`handling.ts` GUNS `cuts`, RIGGING; `battle.ts`
+    Crew `cut`; `stores.ts` crewed, stored): a ship a scatter strikes sails
+    at half the speed she asks for 4 s, the clock set again by every volley
+    that strikes. Sim state only, nothing drawn. The cannon can no longer
+    open the range on a scatter that has hit her.
+  - **a shotgun forgives a shaky hand** (`gunner.ts` GUNNER `shake`): a
+    bot's unsteadiness widens a scatter's cone by a third of what it widens
+    any other gun's. Before, a green captain's grape went off within half a
+    radian, 15 m either side at 30 m, most of it past the hull.
+  - **no pauses with it** (`gunner.ts` GUNNERY `pauses`): she fires the
+    scatter whenever loaded in reach. Its volleys are a second apart, and a
+    pause lost one and let her foe out of reach.
+
+  The duel tool now steps her stores as the game does (`crewed`, `stored`):
+  before, a gust spent in a duel never drove her on, and its wider spread
+  lasted the rest of the duel. Wins of 40 against a cannon at 40 / 80 / 120
+  / 160 / 200 m, 20 pairs (the first four rows on the code before `depth`'s
+  A3 hand, the rest on it):
+
+  | scatter                               | duels                 | θ by gun held, 64 matches |
+  | ------------------------------------- | --------------------- | ------------------------- |
+  | base                                  | 5 / 2 / 1 / 2 / 7     | −0.190                    |
+  | cut 4 s, hand ⅓                       | 17 / 14 / 5 / 8 / 12  | −0.164                    |
+  | the same, rigging 0.4                 | 17 / 14 / 6 / 8 / 12  | –                         |
+  | cut 4 s, hand ⅓, no pauses            | 22 / 21 / 10 / 11 / 14 | −0.125                   |
+  | base (A3 hand)                        | 7 / 4 / 3 / 2 / 9     | −0.113 ± 0.037            |
+  | **kept**: cut 4 s, hand ⅓, no pauses  | 26 / 24 / 13 / 11 / 18 | −0.178 ± 0.038           |
+  | and 11 a pellet, volleys 1.25 s apart | 33 / 33 / 19 / 18 / 26 | −0.049 ± 0.037           |
+
+  On 10 pairs (of 20), each part alone: cut 2.5 s 7 / 5 / 0 / 4 / 3; hand ⅓
+  5 / 4 / 1 / 3 / 5; both 10 / 5 / 2 / 4 / 6 (−0.093 in matches); cut
+  2.5 s and W3's rush 6 / 4 / 1 / 4 / 3. Reach 85 m on top: −0.113 in
+  matches, dropped.
+
+  **Duels: met.** The scatter now wins 65% from 40 m and 60% from 80 m, and
+  loses from further out, as a short gun should. **Matches by gun held:
+  not met.** Within the noise of the base (±0.04), the other four guns at
+  +0.27 to +0.42. The rating by the gun held longest can't show a better
+  scatter. A ship with a scatter and any other gun holds the other while no
+  foe is near (she weighs her guns at `idle` 100 m, past the scatter's
+  reach), so a ship counts as a scatter only if she had nothing else. Rated
+  by the one kind a ship ever held (ships with two kinds apart), the
+  scatter's own ships went −0.294 ± 0.063 → −0.125 ± 0.085. They sit between
+  the harpoon's and the mortar's (+0.046 → −0.165, −0.414 → −0.411), and
+  well under the cannon's and the repeater's alone (+0.19, +0.30 to +0.34).
+  Rated instead
+  by the gun she fired longest (`rate.ts --by fired`, shots by interval),
+  the scatter is level with the rest before and after: base +0.103 ± 0.033
+  (−0.8 se from the median), now +0.127 ± 0.039 (+0.5 se); the others
+  +0.09 to +0.28.
+
+  Dropped: 11 a pellet with volleys 1.25 s apart. It keeps the band (a bare
+  hull 1.50 s, with a shield 2.73 s) and moves the held rating to −0.049,
+  still −10 se. But by the gun fired it makes the scatter the strongest
+  (+0.228, +3.4 se), and it beats a cannon from 200 m two times in three.
+  Also dropped, a rule that a captain outranged by her foe's gun, out of her
+  own reach, wants the fight less (`fighting.ts`, 0.3 by skill): −0.150 by
+  gun held, so no gain.
+
+  Personas, 64 matches, base → kept: scavenger +0.025 → +0.001, turtle
+  +0.014 → +0.007, raider +0.011 → +0.022, homesteader −0.009 → −0.044,
+  hunter −0.013 → +0.012, brawler −0.028 → +0.003 (each ± 0.03–0.04; spread
+  0.053 → 0.066). The gun band is unchanged: the scatter takes 1.23 s to
+  sink a bare hull and 3.23 s with a shield. A test holds the cut (`guns.test.ts`).
+  Golden `334fa9c8` → `ade79d2e`; mixed, gold rush, cagey `bd7c4725`,
+  `6af23769`, `65121435`.
