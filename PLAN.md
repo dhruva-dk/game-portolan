@@ -629,11 +629,13 @@ then the behaviour commits on top.
 - 2026-11-20 (W4): **no new kind; the mortar retuned.** Its shell 60 → 75:
   damage a minute held 53 → 72, its ships place 41.4 → 39.8. Cannon,
   repeater, harpoon and mortar ships now rate within 2 se of each other.
-  The scatter's ships rate −13 se, but the scatter deals the most a minute
-  held; its ships are the ones that fought closest (the gunner takes it in
-  hand close), so the rating measures their fights, not the gun. More reach
-  didn't move it (dropped). A duel test would settle it; BOTS.md has the
-  table. Golden `060f4d3b`.
+  The scatter's ships rate −13 se. **The scatter is weak, and the gate is
+  not met for it**: duels (`tools/harness/duel.ts`, logged below) show it
+  losing to a cannon 19 times in 20 even from 40 m, as the cannon opens out
+  and the scatter's captain holds her ring instead of chasing. Its numbers
+  can't fix that (reach, magazine, no burst pauses: each tried); it wants a
+  pursuit, or a light gun's speed. The owner's call; BOTS.md has the
+  tables. Golden `060f4d3b`.
 - 2026-11-20 (P5, in part): her end screen shows the gun that sank her (it
   drew a cannon for any ball): a strike names its gun (`battle.ts` Strike,
   null for a ram), the sinking carries it (`match.ts` Sunk, `player.ts`
@@ -652,3 +654,11 @@ then the behaviour commits on top.
   list needs mapped tuple types or casts (none allowed in `src`). That is a
   more abstract interface, not a deeper one. Revisit when a part is next
   added and the three edits actually hurt.
+- 2026-11-20 (R5): `gunfire/gunfire.ts` split by mesh: `balls.ts` (251
+  lines, with SHOT), `marks.ts` (121, MARK), `puffs.ts` (596, every event's
+  puffs and the trails); `gunfire.ts` (54) keeps the shared clock and
+  composes them. Same draws and triangles in every budget view, golden
+  unchanged.
+- 2026-11-20 (duels): `tools/harness/duel.ts`, one gun against another,
+  two bots alone, from 40–200 m. It overturned W4's first reading of the
+  scatter (above); BOTS.md has the matrix against the cannon.

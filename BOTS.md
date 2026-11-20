@@ -571,15 +571,12 @@ commit; anything visible checked in headless chromium; iPad Air M1 at 30–40 fp
   | mortar           | +0.278 ± 0.070 | +0.295 ± 0.058 | **53 → 72**      | 112    | 41.4 → 39.8 |
   | scatter          | −0.209 ± 0.039 | −0.215 ± 0.042 | 254 → 252        | 73     | 48.4        |
 
-  The four guns but the scatter are now within 2 se of each other. **The
-  scatter's rating is not the scatter's**: it deals the most a minute held
-  and trades near even (dealt 0.8 of taken; cannon 0.92), but its ships live
-  73 s against 120. A gunner takes the scatter in hand when a foe is close
-  (`gunner.ts`), so "held a scatter longest" picks out ships that fought
-  close most, and close fights are where ships die. Tried and dropped:
-  its reach 70 → 85 m (carry 110 → 134) left it −13.0 se (more shots, less
-  each, no longer life). A duel test (one scatter, one cannon, from each
-  range) is what would settle it; the rating can't. `gunner.test.ts` now
+  The four guns but the scatter are now within 2 se of each other. The
+  scatter deals the most a minute held, but its ships live 73 s against 120.
+  (I first read that as selection, the scatter held by ships that fought
+  closest; **the duels below say otherwise: the scatter is weak.**) Tried
+  and dropped: its reach 70 → 85 m (carry 110 → 134) left it −13.0 se.
+  `gunner.test.ts` now
   holds "far off, the harpoon" only while her foe is beyond the scatter's
   reach (she closes on him, and may take it up inside). Golden re-recorded:
   `abb64139` → `060f4d3b`.
@@ -598,3 +595,28 @@ commit; anything visible checked in headless chromium; iPad Air M1 at 30–40 fp
   (main 13.9). Over 64 dealt matches: pinned 4.1 → 3.6 s a ship, aground
   0.1 → 0.0 s, armed 90% by 16 → 15 s, ms a step 1.26 → 1.13. Golden
   `060f4d3b` → `72ddf57a`.
+- Duels (`tools/harness/duel.ts`): two bold bots alone on open water, one
+  gun each, from 40–200 m, each pair sailed both ways. Wins against a
+  cannon, of 20 at 40 / 80 / 120 / 160 / 200 m:
+
+  | gun      | 40 m | 80 m | 120 m | 160 m | 200 m |
+  | -------- | ---- | ---- | ----- | ----- | ----- |
+  | scatter  | 1    | 2    | 0     | 0     | 1     |
+  | repeater | 5    | 5    | 5     | 2     | 2     |
+  | mortar   | 7    | 9    | 11    | 16    | 15    |
+  | harpoon  | 15   | 16   | 15    | 19    | 17    |
+
+  One against one the longer gun wins: it opens out, and the shorter can't
+  close (same top speed, guns that bear any way). The scatter loses even
+  from 40 m, and a trace shows why: it wins the first exchange (151 hp dealt
+  to 80 by 4 s), then the cannon opens out at 15 m/s while she sails on at
+  5–9, circling at her ring at a turn's pace rather than chasing, and by
+  6 s she is 80 m off and out of reach. None of its numbers fix that (each
+  tried, each 1–2 of 20 at 40 m): reach 100 m; a magazine of 6; no pause
+  between bursts (`GUNNERY.burst`, a rhythm that suits a cannon, not a gun
+  fired once a second); a magazine of 6 and no pause together; W3's rush
+  stance. **The scatter needs a pursuit**: a captain with a short gun whose
+  foe opens out should chase flat out, not hold her ring; or a light gun
+  should sail faster. Which is the game's to choose; the duel tool measures
+  it. In free-for-all matches close fights still come (the scatter deals
+  most a minute held there), so this is a duel's weakness first.
