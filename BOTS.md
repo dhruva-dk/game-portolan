@@ -356,3 +356,9 @@ commit; anything visible checked in headless chromium; iPad Air M1 at 30–40 fp
   fleets: pinned +0.1 s [−2.1, 2.0]; balanced mixed: place −0.37 [−2.65,
   1.89] vs `noCover`. Visible behaviour, no cost. Golden → `8c6241ba`.
   Scenario test (an island between) wanted with C3.
+- Step cost after E3, D, F1–F2 (`tools/steps.ts`, 60 s, desktop; base
+  975191c timed in a scratch worktree the same way): command median 0.54 →
+  0.58–0.62 ms, step 1.56 → 1.66–1.74 ms (+6–10%), most likely the 57% more
+  loot each bot weighs a think; the worst step's spike (17–20 ms, route
+  finding) is the base's own. Under the 5 ms median gate. Headless budget
+  unchanged from the base (its triangle overs pre-exist).
