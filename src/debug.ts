@@ -21,7 +21,8 @@
 // degree is 9.67 m. ?fly, or any of lat, lon and alt, flies the debug camera
 // (fly.ts) instead of sailing, starting over where she would lie by default;
 // there ?kind= puts a gun of that kind on every ship's plinth (?kind=all: each
-// ship the next kind). ?wall=m flies it m metres short of the storm's edge, in
+// ship the next kind), and ?rarity= of that rarity (0 common to 4; ?rarity=all:
+// each the next, after each kind). ?wall=m flies it m metres short of the storm's edge, in
 // the calm (with ?storm=, the cap held then; negative: in the storm), on the
 // line from the cap's centre toward where she would lie, looking out across the
 // edge (?yaw= turns from that). ?bolt holds the storm's lightning lit
@@ -102,7 +103,7 @@ import { HOTBAR, IDLE, type Hands } from './player.ts';
 import { probeMeshes } from './probe.ts';
 import { STEP } from './sim/fixed.ts';
 import { KINDS, type GunKind } from './kinds.ts';
-import { SHIP } from './sim/handling.ts';
+import { GUN, SHIP } from './sim/handling.ts';
 import { PLAYER, SHIPS } from './sim/match.ts';
 import type { Cap } from './sim/storm.ts';
 import type { ShipDraw, Snapshot } from './snapshot.ts';
@@ -556,13 +557,19 @@ function flyer(
       (params.has('wall') ? Math.atan2(dot(away, east), dot(away, north)) : 0),
     pitch: number('look', -6) * degrees,
   });
-  // ?kind arms each with a gun of that kind (?kind=all: each the next kind), laid over her starboard bow
+  // ?kind arms each with a gun of that kind (?kind=all: each the next kind), laid over her starboard bow; ?rarity of
+  // that rarity (0 common, the default, to 4; ?rarity=all: each the next, through the kinds first)
   const kind = params.get('kind'),
+    rarity = params.get('rarity'),
     armed = (i: number, o: Berth): ShipDraw['gun'] =>
       kind === null
         ? null
         : {
             kind: kind === 'all' ? KINDS[i % KINDS.length] : kindOf(kind),
+            rarity:
+              rarity === 'all'
+                ? Math.floor(i / KINDS.length) % GUN.rarities.length
+                : number('rarity', 0),
             aim: normalize(add(o.heading, cross(o.heading, o.at), 0.6)),
           };
   const ships: ShipDraw[] = others.map((o, i) => ({

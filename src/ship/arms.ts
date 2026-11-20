@@ -7,7 +7,11 @@
 // A ship with no gun in hand, or going down, has none on her plinth.
 //
 // Each gun is bronze, oak and iron, lit as everything is (gun.ts gunSurface);
-// one material serves every kind.
+// one material serves every kind. One finer than common has its bronze cast in
+// its rarity's light, and a rim of it where it turns from the eye, as it had
+// floating (loot.ts; palette.ts RARITY_GLOW), so a ship's gun can be read
+// across the water: the light rides in each instance's spare fourth floats, no
+// draw more.
 
 import {
   BufferAttribute,
@@ -18,8 +22,23 @@ import {
   Mesh,
   MeshBasicNodeMaterial,
 } from 'three/webgpu';
-import { Fn, attribute, cross, normalize, varying } from 'three/tsl';
+import {
+  Fn,
+  abs,
+  attribute,
+  cameraPosition,
+  cross,
+  dot as dotNode,
+  float,
+  mix,
+  normalize,
+  smoothstep,
+  step,
+  varying,
+  vec3,
+} from 'three/tsl';
 import { KINDS, gunOrder, type GunKind } from '../kinds.ts';
+import { RARITY_GLOW, type Rgb } from '../palette.ts';
 import type { Light } from '../sky/light.ts';
 import type { ShipDraw } from '../snapshot.ts';
 import type { Vec3Node } from '../tsl.ts';
@@ -44,8 +63,22 @@ export const muzzle = (from: Vec3, dir: Vec3, kind: GunKind): Vec3 =>
 
 /** Metres from the eye within which the guns are drawn. */
 const NEAR = 360;
-/** Floats a gun's instance: its place, its forward and its up, each a vec4. */
+/**
+ * Floats a gun's instance: its place, its forward and its up, each a vec4, the
+ * fourth of each its rarity's light (red, green, blue; none for a common gun).
+ */
 const FLOATS = 12;
+/**
+ * How bright a gun's rim glows, of what the sun and the sky give a white
+ * surface; and how far a face must turn from the eye (0 facing it … 1 edge on)
+ * to be in it: wider than a floating piece's, a gun being a few pixels across.
+ */
+const EMIT = 1.3,
+  RIM = 0.5;
+/** How far a finer gun's bronze is cast toward its rarity's light. */
+const TINT = 0.7;
+/** A common gun's light: none. */
+const NONE: Rgb = [0, 0, 0];
 
 /**
  * light: how the world is lit (sky/light.ts); capacity: the most ships there
@@ -72,8 +105,23 @@ export function createArms(light: Light, capacity: number) {
   m.positionNode = p;
   const wp = varying(p),
     wn = varying(turn(normal)),
-    made = varying(metal);
-  m.colorNode = Fn(() => gunSurface(light, wp, normalize(wn), made))();
+    made = varying(metal),
+    glow = varying(vec3(at.w, fwd.w, up.w));
+  m.colorNode = Fn(() => {
+    const n = normalize(wn),
+      eye = normalize(cameraPosition.sub(wp)),
+      fine = step(1e-3, glow.x.add(glow.y).add(glow.z));
+    const edge = smoothstep(
+      RIM - 0.05,
+      RIM + 0.05,
+      float(1).sub(abs(dotNode(n, eye)))
+    ).mul(fine);
+    return mix(
+      gunSurface(light, wp, n, made, { colour: glow, share: fine.mul(TINT) }),
+      glow.mul(light.level(wp).mul(EMIT)),
+      edge
+    );
+  })();
 
   const drawn = KINDS.map((kind) => {
     const s = gunShape(kind, 8),
@@ -123,12 +171,13 @@ export function createArms(light: Light, capacity: number) {
         const flat = add(sh.gun.aim, pose.up, -dot(sh.gun.aim, pose.up), laid),
           size = length(flat);
         const toward = size > 1e-3 ? scale(flat, 1 / size, laid) : pose.forward;
+        const glow = sh.gun.rarity > 0 ? RARITY_GLOW[sh.gun.rarity] : NONE;
         for (let j = 0; j < 3; j++) {
           a[o + j] = mount[j];
           a[o + 4 + j] = toward[j];
           a[o + 8 + j] = pose.up[j];
+          a[o + 3 + 4 * j] = glow[j];
         }
-        a[o + 3] = a[o + 7] = a[o + 11] = 0;
       }
       for (let k = 0; k < drawn.length; k++) {
         const d = drawn[k],

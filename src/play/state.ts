@@ -697,7 +697,7 @@ export function createState(
         const d = drawing.slot(n++, id, a.look, true);
         blendPose(a.before, a.after, between, d.pose);
         add(scale(ship.heading, ship.speed, d.velocity), shove, 1, d.velocity);
-        if (g) d.gun = drawing.armed(d, g.kind, aims.get(id) ?? ship.heading);
+        if (g) d.gun = drawing.armed(d, g, aims.get(id) ?? ship.heading);
       }
       for (const w of wrecks)
         if (wreckAt(w, now, drawing.slot(n, w.id, w.look, false).pose)) n++;

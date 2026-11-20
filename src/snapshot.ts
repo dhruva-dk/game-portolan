@@ -48,8 +48,9 @@ export interface Look {
  * A ship drawn: her slot, her pose and colours, her velocity (m/s, world: for
  * the marks she leaves on the sea), whether she floats (one going down neither
  * fits the sea round her nor marks it), and the gun in her hand (its kind:
- * kinds.ts GunKind), mounted on her plinth, with the way it is laid (a unit
- * vector, world; it trains round to it), or null with none.
+ * kinds.ts GunKind, and rarity, 0 common to 4 legendary), mounted on her
+ * plinth, with the way it is laid (a unit vector, world; it trains round to
+ * it), or null with none.
  */
 export interface ShipDraw {
   id: number;
@@ -57,7 +58,7 @@ export interface ShipDraw {
   look: Look;
   velocity: Vec3;
   afloat: boolean;
-  gun: { kind: GunKind; aim: Vec3 } | null;
+  gun: { kind: GunKind; rarity: number; aim: Vec3 } | null;
 }
 
 /**
