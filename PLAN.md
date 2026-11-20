@@ -663,7 +663,11 @@ then the behaviour commits on top.
   two bots alone, from 40–200 m. It overturned W4's first reading of the
   scatter (above); BOTS.md has the matrix against the cannon. A general
   pursuit (flat out when far from her ring) was tried for it: no help in
-  duels, no gain over 64 matches, personas wider; dropped.
+  duels, no gain over 64 matches, personas wider; dropped. So were its own
+  numbers (BOTS.md has the table): a tighter cone wins duels (cone 0.04: 7
+  of 20 at 40 m) but nothing in matches; pellets of 14 win both (11 of 20;
+  θ −0.18 → +0.02) but sink a bare hull in one volley, against the gun
+  band. Left for the owner: the scatter's spray, or the band.
 - 2026-11-20 (§6.7, golden): a golden match for each other type,
   `tests/golden-types.test.ts`: mixed, gold rush and cagey, 120 s each on
   the same seed with the type forced (`478c4fb1`, `9188f956`, `73f8b05b`).

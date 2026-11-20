@@ -622,7 +622,25 @@ commit; anything visible checked in headless chromium; iPad Air M1 at 30–40 fp
   past about 45 m while a cannon does its 20 dps at any range. Over 64
   matches that rule left places as they were (40.5) and spread the
   personas wider (scavenger +3.8 → +5.8 se), so dropped. **The scatter's
-  weakness is its damage against its reach**, not its helm: it wants more
-  bite close, or a light gun's speed. The owner's call; the duel tool
-  measures it. In free-for-all matches close fights still come (the scatter deals
+  weakness is its damage against its reach**, not its helm. Its own
+  numbers, each measured in duels against the cannon (wins of 20 at 40 /
+  80 / 120 / 160 / 200 m) and over the 64 matches (θ by gun held longest;
+  base −0.18, the other four +0.26 to +0.39):
+
+  | scatter                      | duels              | θ in matches | `guns.test` band                         |
+  | ---------------------------- | ------------------ | ------------ | ---------------------------------------- |
+  | base (8 a pellet, 0.09 cone) | 1 / 2 / 0 / 0 / 1  | −0.18        | ok                                       |
+  | volleys 0.6 s apart          | 3 / 2 / 2 / 1 / 2  | –            | –                                        |
+  | 12 a pellet                  | 8 / 4 / 2 / 1 / 1  | −0.05        | breaks the shield floor                  |
+  | 14 a pellet                  | 11 / 6 / 3 / 2 / 3 | +0.02        | sinks a bare hull in one volley (0.27 s) |
+  | cone 0.06                    | 4 / 3 / 1 / 3 / 2  | –            | ok                                       |
+  | cone 0.05                    | 5 / 6 / 3 / 4 / 3  | −0.16        | ok (1.23 / 3.23 s)                       |
+  | cone 0.04                    | 7 / 9 / 5 / 6 / 5  | –            | ok                                       |
+
+  A tighter cone wins duels and nothing in matches; only more bite moves
+  the matches, and the band (no gun sinks a bare hull under 0.9 s, nor hull
+  and shield under 2.5 s) holds a pellet at 8 at a volley a second. So the
+  scatter is left as it was: a cone near the cannon's (0.04) loses the
+  spray that makes it a scatter, and loosening the band is a design call.
+  The owner's; this table and the duel tool are what to choose by. In free-for-all matches close fights still come (the scatter deals
   most a minute held there), so this is a duel's weakness first.
