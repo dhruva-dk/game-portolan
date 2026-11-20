@@ -25,15 +25,15 @@ import {
   USES,
 } from '../src/sim/hold.ts';
 import {
-  berthed,
   cargo,
   drifted,
   isArms,
+  laying,
   LOOT,
   offered,
   overboard,
+  PIECE,
   rolled,
-  strewn,
   swept,
   type Flotsam,
   type Loot,
@@ -318,13 +318,15 @@ test('the loot is strewn evenly over the planet, on open water only, the same fo
   // a world with a round island: its middle dry, its rim shallow
   const isle = fromLatLon(0, 0);
   const depth: Depth = (p) => (distance(p, isle) < 120 ? -5 : 20);
-  const f = strewn(5, depth);
-  assert.deepEqual(f, strewn(5, depth));
+  const f = laying(5, depth).strewn();
+  assert.deepEqual(f, laying(5, depth).strewn());
   assert.notDeepEqual(
     f.pieces.map((l) => l.at),
-    strewn(6, depth).pieces.map((l) => l.at)
+    laying(6, depth)
+      .strewn()
+      .pieces.map((l) => l.at)
   );
-  assert.ok(f.pieces.every((l) => depth(l.at) >= SHIP.draught + LOOT.open));
+  assert.ok(f.pieces.every((l) => depth(l.at) >= SHIP.draught + PIECE.open));
   assert.ok(
     f.pieces.length > LOOT.spots * 1.3 && f.pieces.length < LOOT.spots * 1.5,
     `${f.pieces.length}`
@@ -346,14 +348,12 @@ test('every berth has a gun within reach of it at the start, on open water; one 
   const depth: Depth = (p) =>
     dot(p, east) > 0 && distance(p, c0) < 60 ? 1 : 20;
   const berths = [c0, at(400), at(-300)];
-  const f = berthed(
+  const f = laying(9, depth).berthed(
     lying(
       piece(0, at(410), { kind: 'cannon', rarity: 1 }),
       piece(1, at(-300), { kind: 'repairKit', count: 4 })
     ),
-    berths,
-    9,
-    depth
+    berths
   );
   assert.equal(f.pieces.length, 4);
   assert.equal(f.next, 102);
@@ -362,17 +362,15 @@ test('every berth has a gun within reach of it at the start, on open water; one 
       f.pieces.some((l) => isArms(l.goods) && distance(l.at, b) < LOOT.berth)
     );
   for (const l of f.pieces.slice(2))
-    assert.ok(depth(l.at) >= SHIP.draught + LOOT.open);
+    assert.ok(depth(l.at) >= SHIP.draught + PIECE.open);
   assert.deepEqual(
     f,
-    berthed(
+    laying(9, depth).berthed(
       lying(
         piece(0, at(410), { kind: 'cannon', rarity: 1 }),
         piece(1, at(-300), { kind: 'repairKit', count: 4 })
       ),
-      berths,
-      9,
-      depth
+      berths
     )
   );
 });
@@ -545,7 +543,7 @@ test('a ship sunk spills both her guns and all her stores where she lies, gone f
   const goods = cargo(c);
   assert.equal(goods.length, 4);
   let f = overboard({ pieces: [], next: 0 }, c0, goods, 1, 9);
-  assert.ok(f.pieces.every((l) => Math.hypot(...l.way) >= LOOT.kick));
+  assert.ok(f.pieces.every((l) => Math.hypot(...l.way) >= PIECE.kick));
   for (let t = 0; t < 5; t += STEP) f = drifted(f, STEP, deep);
   const out = f.pieces.map((l) => distance(c0, l.at));
   assert.ok(

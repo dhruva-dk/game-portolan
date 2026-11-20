@@ -17,7 +17,7 @@
 import { STEP } from '../src/sim/fixed.ts';
 import { KINDS } from '../src/kinds.ts';
 import { GUNS, SHIP } from '../src/sim/handling.ts';
-import { LOOT } from '../src/sim/loot.ts';
+import { PIECE } from '../src/sim/loot.ts';
 import { chart } from '../src/sim/route.ts';
 import { berthing } from '../src/sim/spawn.ts';
 import { STORM } from '../src/sim/storm.ts';
@@ -51,7 +51,9 @@ for (let g = 0; g < games; g++) {
   const m = matches.deal();
   state.start(m, false);
   const loot = state.loot().pieces,
-    shallow = loot.filter((l) => depth(l.at) < SHIP.draught + LOOT.open).length;
+    shallow = loot.filter(
+      (l) => depth(l.at) < SHIP.draught + PIECE.open
+    ).length;
   const marks: string[] = [],
     track = new Map<number, { at: Vec3; speed: number }[]>();
   const stuck = new Map<

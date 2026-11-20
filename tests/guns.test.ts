@@ -20,7 +20,7 @@ import { STEP } from '../src/sim/fixed.ts';
 import { falloff, gunOf } from '../src/sim/gun.ts';
 import { KINDS, type GunKind } from '../src/kinds.ts';
 import { EQUIP, FALLOFF, GUNS } from '../src/sim/handling.ts';
-import { LOOT, cached, isArms, strewn } from '../src/sim/loot.ts';
+import { LOOT, isArms, laying } from '../src/sim/loot.ts';
 import { toEdge } from '../src/sim/storm.ts';
 import { loosed } from '../src/sim/shot.ts';
 import type { Depth } from '../src/sim/shoal.ts';
@@ -310,7 +310,7 @@ test('the same guns fight the same way, to the bit', () => {
 });
 
 test('the sea is strewn with some 400–480 pieces, two in five of them guns, the cannon the commonest, the harpoon and the mortar the rarest', () => {
-  const f = strewn(5, deep),
+  const f = laying(5, deep).strewn(),
     guns = f.pieces.map((p) => p.goods).filter(isArms);
   // some 1.4 a spot, from 320 spots
   assert.ok(
@@ -331,12 +331,13 @@ test('the sea is strewn with some 400–480 pieces, two in five of them guns, th
 });
 
 test("a phase's cache is dropped in the heart of the next cap, rare and the same for the same seed", () => {
-  const f = strewn(5, deep),
+  const lay = laying(5, deep),
+    f = lay.strewn(),
     cap = { centre: [0, 1, 0] as Vec3, radius: 150 / R };
-  const a = cached(f, cap, 3, 5, deep),
-    b = cached(f, cap, 3, 5, deep);
+  const a = lay.cached(f, cap, 3),
+    b = laying(5, deep).cached(f, cap, 3);
   assert.deepEqual(a, b);
-  assert.notDeepEqual(a, cached(f, cap, 4, 5, deep));
+  assert.notDeepEqual(a, lay.cached(f, cap, 4));
   const drop = a.pieces.slice(f.pieces.length);
   assert.equal(drop.length, LOOT.cache.pieces);
   assert.equal(a.next, f.next + drop.length);

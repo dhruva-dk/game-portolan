@@ -20,17 +20,8 @@ import { PURSER } from './purser.ts';
 import { ROAMING } from './roaming.ts';
 import { STORMING } from './storming.ts';
 import { RAMMING } from './tactician.ts';
+import { merged, type Changes, type Widen } from './tables.ts';
 import { STYLES, temper, type Temper } from './temper.ts';
-
-/**
- * A table as a brain holds it: its numbers any numbers, not the ones it was
- * written with (so a variant may give others), its lists and tables alike.
- */
-type Widen<T> = T extends number
-  ? number
-  : T extends string
-    ? string
-    : { readonly [K in keyof T]: Widen<T[K]> };
 
 /**
  * What each part of a bot is tuned by: the weights of her options (bot.ts), her
@@ -70,6 +61,35 @@ export const DEFAULT_BRAIN: Brain = {
   gunnery: GUNNERY,
   styles: STYLES,
 };
+
+/**
+ * What a variant of a brain changes: any keys of any of its tables, and the
+ * temperaments whole.
+ */
+export type Over = Changes<Omit<Brain, 'styles'>> & {
+  readonly styles?: Brain['styles'];
+};
+
+/**
+ * A whole brain: `base` with `over`'s changes, every slice and key in the
+ * default's order (one shape for every brain: tables.ts).
+ */
+export function variant(over: Over, base: Brain = DEFAULT_BRAIN): Brain {
+  return {
+    choice: merged('choice', base.choice, over.choice),
+    sight: merged('sight', base.sight, over.sight),
+    mind: merged('mind', base.mind, over.mind),
+    roaming: merged('roaming', base.roaming, over.roaming),
+    storming: merged('storming', base.storming, over.storming),
+    ramming: merged('ramming', base.ramming, over.ramming),
+    helm: merged('helm', base.helm, over.helm),
+    purser: merged('purser', base.purser, over.purser),
+    claimer: merged('claimer', base.claimer, over.claimer),
+    hunting: merged('hunting', base.hunting, over.hunting),
+    gunnery: merged('gunnery', base.gunnery, over.gunnery),
+    styles: over.styles ?? base.styles,
+  };
+}
 
 /**
  * A bot's nature, fixed for her life: her seed (her chance's start, and the

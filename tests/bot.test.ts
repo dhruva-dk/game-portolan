@@ -312,6 +312,7 @@ function closing(
       closing: t >= wait && !done,
       secondsToNext: t < wait ? wait - t : done ? Infinity : wait + close - t,
       phase: done ? 7 : 0,
+      final: done,
       damage: 0.05,
     };
   };

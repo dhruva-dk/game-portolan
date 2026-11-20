@@ -32,6 +32,7 @@ import {
 } from '../world/sphere.ts';
 import { random } from '../world/random.ts';
 import type { Depth } from './shoal.ts';
+import type { Widen } from './tables.ts';
 
 /**
  * One phase: it holds for `wait` seconds, then closes over `close` seconds to a
@@ -39,11 +40,19 @@ import type { Depth } from './shoal.ts';
  * cap loses `damage` of a full hull a second.
  */
 interface Phase {
-  wait: number;
-  close: number;
-  radius: number;
-  damage: number;
+  readonly wait: number;
+  readonly close: number;
+  readonly radius: number;
+  readonly damage: number;
 }
+
+/**
+ * The storm's table as a match holds it (rules.ts): any numbers, and any phases
+ * (one at least), each closing to a cap inside the one before.
+ */
+export type StormTable = Omit<Widen<typeof STORM>, 'phases'> & {
+  readonly phases: readonly Phase[];
+};
 
 export const STORM = {
   /**
@@ -123,6 +132,8 @@ export interface Storm extends Cap {
    * closed.
    */
   phase: number;
+  /** Whether the last cap has closed (never, with no storm). */
+  final: boolean;
   /** Share of a full hull a ship outside the cap loses a second. */
   damage: number;
 }
@@ -142,6 +153,7 @@ export const calm = (centre: Vec3): Storm => ({
   closing: false,
   secondsToNext: Infinity,
   phase: 0,
+  final: false,
   damage: 0,
 });
 
@@ -164,11 +176,16 @@ function slerp(a: Vec3, b: Vec3, f: number): Vec3 {
  * Plans the match's caps from its seed over the sea floor `depth`: the centres
  * of the phases' caps, the first (the whole planet's) sharing the second's.
  * Each wider centre lies within the room its inner cap leaves (the difference
- * of their radii), so each cap holds the next, and over water.
+ * of their radii), so each cap holds the next, and over water. `table`: the
+ * match's (rules.ts).
  */
-export function planStorm(seed: number, depth: Depth): Vec3[] {
+export function planStorm(
+  seed: number,
+  depth: Depth,
+  table: StormTable = STORM
+): Vec3[] {
   const rand = random(seed * 48271 + 7),
-    phases = STORM.phases;
+    phases = table.phases;
   const n = phases.length;
   const unit = (): Vec3 => {
     // uniform on the sphere
@@ -187,9 +204,9 @@ export function planStorm(seed: number, depth: Depth): Vec3[] {
     );
   let best: Vec3 = [0, 1, 0],
     score = -Infinity;
-  for (let i = 0; i < STORM.tries; i++) {
+  for (let i = 0; i < table.tries; i++) {
     const u = unit();
-    const s = Math.min(wet(u) - STORM.open, rim(u));
+    const s = Math.min(wet(u) - table.open, rim(u));
     if (s > score) [best, score] = [u, s];
     if (s >= 0) break;
   }
@@ -198,9 +215,9 @@ export function planStorm(seed: number, depth: Depth): Vec3[] {
   centres[n - 1] = best;
   for (let k = n - 2; k >= 0; k--) {
     const inner = centres[k + 1],
-      room = angle(phases[k].radius - phases[k + 1].radius) * STORM.wander;
+      room = angle(phases[k].radius - phases[k + 1].radius) * table.wander;
     centres[k] = inner;
-    for (let i = 0; i < STORM.tries; i++) {
+    for (let i = 0; i < table.tries; i++) {
       const c = normalize(
         along(
           inner,
@@ -220,11 +237,15 @@ export function planStorm(seed: number, depth: Depth): Vec3[] {
 /**
  * The match's storm: storm(seconds) at that time on its clock (negative times
  * are the start). seed: the match's; depth: water over the floor at a point,
- * metres (shoal.ts).
+ * metres (shoal.ts); table: the match's (rules.ts).
  */
-export function createStorm(seed: number, depth: Depth) {
-  const centres = planStorm(seed, depth),
-    phases = STORM.phases,
+export function createStorm(
+  seed: number,
+  depth: Depth,
+  table: StormTable = STORM
+) {
+  const centres = planStorm(seed, depth, table),
+    phases = table.phases,
     n = phases.length;
   /**
    * The cap phase k holds at before it closes: the whole planet's for the
@@ -251,6 +272,7 @@ export function createStorm(seed: number, depth: Depth) {
           closing: false,
           secondsToNext: p.wait - t,
           phase: k,
+          final: false,
           damage: p.damage,
         };
       t -= p.wait;
@@ -265,6 +287,7 @@ export function createStorm(seed: number, depth: Depth) {
           closing: true,
           secondsToNext: p.close - t,
           phase: k,
+          final: false,
           damage: p.damage,
         };
       }
@@ -272,13 +295,14 @@ export function createStorm(seed: number, depth: Depth) {
     }
     const last = target(n - 1);
     const damage =
-      phases[n - 1].damage + STORM.rise * Math.floor(t / STORM.every + 1);
+      phases[n - 1].damage + table.rise * Math.floor(t / table.every + 1);
     return {
       ...last,
       next: last,
       closing: false,
       secondsToNext: Infinity,
       phase: n,
+      final: true,
       damage,
     };
   };

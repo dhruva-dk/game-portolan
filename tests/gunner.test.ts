@@ -206,6 +206,7 @@ const stormIn = (phase: number): Storm => ({
   closing: false,
   secondsToNext: phase < 7 ? 60 : Infinity,
   phase,
+  final: phase >= 7,
   damage: 0,
 });
 const mild = (() => {

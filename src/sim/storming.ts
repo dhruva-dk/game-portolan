@@ -9,7 +9,7 @@
 // for the same inputs, to the bit.
 
 import { R, along, distance, toward, type Vec3 } from '../world/sphere.ts';
-import { STORM, toEdge, type Cap } from './storm.ts';
+import { toEdge, type Cap } from './storm.ts';
 import { ramp } from './utility.ts';
 import { open, rotate, type Ctx } from './captain.ts';
 
@@ -53,9 +53,7 @@ export function stormUrge(c: Ctx): number {
   const p = c.own.ship.at,
     margin = c.t.margin;
   const pressed =
-    late(c) &&
-    toEdge(p, s.next) < margin * c.b.storming.inNext &&
-    s.phase < STORM.phases.length;
+    late(c) && toEdge(p, s.next) < margin * c.b.storming.inNext && !s.final;
   return Math.max(
     ramp(
       toEdge(p, s),

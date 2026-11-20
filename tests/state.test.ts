@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import { createState, type Match } from '../src/play/state.ts';
 import { PLAYER } from '../src/sim/match.ts';
 import { chart } from '../src/sim/route.ts';
+import { DEFAULT_RULES } from '../src/sim/rules.ts';
 import { berthing } from '../src/sim/spawn.ts';
 import { calm, type Storm } from '../src/sim/storm.ts';
 import type { Helm } from '../src/sim/ship.ts';
@@ -26,6 +27,7 @@ const degrees = Math.PI / 180;
  */
 const deadly = (at: number): Match => ({
   seed: 1,
+  rules: DEFAULT_RULES,
   gun: null,
   storm: (t): Storm =>
     t < at

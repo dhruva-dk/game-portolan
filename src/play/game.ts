@@ -45,7 +45,7 @@ import { charging } from '../sim/gust.ts';
 import { EQUIP, GUN, GUNS, GUST, HEALTH } from '../sim/handling.ts';
 import { progress } from '../sim/hold.ts';
 import { offered, rarityOf } from '../sim/loot.ts';
-import { STORM, toEdge } from '../sim/storm.ts';
+import { toEdge } from '../sim/storm.ts';
 import { sunk } from '../sim/health.ts';
 import { RIDE } from '../sim/ride.ts';
 import { PLAYER } from '../sim/match.ts';
@@ -640,7 +640,7 @@ export function createGame(
       report.closing = s.closing;
       report.eye = calm;
       report.next =
-        s.phase < STORM.phases.length && (s.closing || s.next.radius < s.radius)
+        !s.final && (s.closing || s.next.radius < s.radius)
           ? nextOf(s.next)
           : null;
       report.outside = v ? Math.max(0, -toEdge(v.ship.at, s)) : 0;

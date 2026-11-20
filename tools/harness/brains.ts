@@ -1,54 +1,9 @@
 // The brains the harness can sail a fleet with, by name: the game's own, and
-// variants, each a few numbers changed from it. A variant is written as only
-// what it changes (`Over`), and made whole by `variant`, every slice and key in
-// the default's order (one shape for every brain, so the hot loops stay as
-// fast with a variant as without and the harness's timings are honest).
+// variants, each a few numbers changed from it (sim/brain.ts variant).
 //
 // Node only (tools/).
 
-import { DEFAULT_BRAIN, type Brain } from '../../src/sim/brain.ts';
-
-/** The slices of a brain that are tables of numbers (the styles are a list). */
-type Table = Exclude<keyof Brain, 'styles'>;
-
-/**
- * What a variant changes: any keys of any table, and the styles whole.
- */
-export type Over = { readonly [S in Table]?: Partial<Brain[S]> } & {
-  readonly styles?: Brain['styles'];
-};
-
-/** A table with `o`'s changes, every key in `b`'s order. */
-function merged<T extends object>(name: string, b: T, o?: Partial<T>): T {
-  if (!o) return b;
-  for (const k of Object.keys(o))
-    if (!(k in b)) throw new Error(`brain has no ${name}.${k}`);
-  const out = { ...b };
-  for (const k of Object.keys(b) as (keyof T)[]) {
-    const v = o[k];
-    if (v !== undefined) out[k] = v;
-  }
-  return out;
-}
-
-/** A whole brain: the default with `over`'s changes, keys in the default's order. */
-export function variant(over: Over, base: Brain = DEFAULT_BRAIN): Brain {
-  return {
-    choice: merged('choice', base.choice, over.choice),
-    sight: merged('sight', base.sight, over.sight),
-    mind: merged('mind', base.mind, over.mind),
-    roaming: merged('roaming', base.roaming, over.roaming),
-    storming: merged('storming', base.storming, over.storming),
-    ramming: merged('ramming', base.ramming, over.ramming),
-    helm: merged('helm', base.helm, over.helm),
-    purser: merged('purser', base.purser, over.purser),
-    claimer: merged('claimer', base.claimer, over.claimer),
-    hunting: merged('hunting', base.hunting, over.hunting),
-    gunnery: merged('gunnery', base.gunnery, over.gunnery),
-    styles: over.styles ?? base.styles,
-  };
-}
-
+import { DEFAULT_BRAIN, variant, type Brain } from '../../src/sim/brain.ts';
 /**
  * The brains by name. `default` is the game's; the rest are variants kept for
  * comparing against it (add one here to run it: `--brains default,name`).

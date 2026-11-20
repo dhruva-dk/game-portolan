@@ -14,7 +14,7 @@
 
 import { distance, along, toward, type Vec3 } from '../world/sphere.ts';
 import { clearAt } from './route.ts';
-import { STORM, toEdge } from './storm.ts';
+import { toEdge } from './storm.ts';
 import { ramp, utility } from './utility.ts';
 import { between, open, rotate, type Ctx } from './captain.ts';
 
@@ -97,11 +97,7 @@ export function claimUrge(c: Ctx): number {
   const { m } = c;
   if (!c.sea.holdings) return 0;
   if (m.bite) return c.b.claimer.out;
-  if (
-    m.clock < m.rested ||
-    (c.sea.storm && c.sea.storm.phase >= STORM.phases.length)
-  )
-    return 0;
+  if (m.clock < m.rested || c.sea.storm?.final) return 0;
   const safe = ramp(nearest(c), c.b.claimer.danger, c.b.claimer.clear);
   return c.b.claimer.setOut * utility(c.t.claim, safe);
 }

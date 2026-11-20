@@ -24,6 +24,7 @@ import { createState, type Match } from '../src/play/state.ts';
 import { LOOK } from '../src/play/colours.ts';
 import { PLAYER } from '../src/sim/match.ts';
 import { chart } from '../src/sim/route.ts';
+import { DEFAULT_RULES } from '../src/sim/rules.ts';
 import { berthing } from '../src/sim/spawn.ts';
 import { calm } from '../src/sim/storm.ts';
 import { BIG, SAFE, capped, heartbeat, lowHull } from '../src/ui/flash.ts';
@@ -239,7 +240,12 @@ test('the match records its deeds: a ship sunk is told once, with a sink blast t
   const planet = planetOf(SEED, landOf(SEED)),
     depth = (p: Vec3) => -planet.height(p),
     start = planet.start;
-  const match: Match = { seed: 1, gun: null, storm: () => calm(start.at) };
+  const match: Match = {
+    seed: 1,
+    rules: DEFAULT_RULES,
+    gun: null,
+    storm: () => calm(start.at),
+  };
   const state = createState(
     planet,
     flat,

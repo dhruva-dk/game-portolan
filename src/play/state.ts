@@ -38,6 +38,8 @@ import {
   type Battle,
   type Crew,
   type Order,
+  type Shot,
+  type Strike,
 } from '../sim/battle.ts';
 import { mind, rammed, shot, type Memory } from '../sim/bot.ts';
 import { DEFAULT_BRAIN, nature, type Brain } from '../sim/brain.ts';
@@ -58,14 +60,14 @@ import {
   type Ride,
 } from '../sim/ride.ts';
 import {
-  berthed,
-  cached,
+  laying,
   overboard,
-  strewn,
   type Arms,
   type Flotsam,
   type Goods,
+  type Taken,
 } from '../sim/loot.ts';
+import type { Rules } from '../sim/rules.ts';
 import {
   asked,
   crewed,
@@ -76,7 +78,7 @@ import {
 } from '../sim/stores.ts';
 import type { Chart } from '../sim/route.ts';
 import { shipAt, type Helm, type ShipState } from '../sim/ship.ts';
-import { STORM, calm, type Storm } from '../sim/storm.ts';
+import { calm, type Storm } from '../sim/storm.ts';
 import { heard, type Report } from '../sim/hunter.ts';
 import {
   createTerritory,
@@ -121,12 +123,14 @@ export interface Berth {
 }
 
 /**
- * The match: its seed (each bot's mind comes from it and her slot), its storm
- * by the match's clock (s), and the gun every ship is armed with, or null for
- * none (as every ship puts to sea in a match).
+ * The match: its seed (each bot's mind comes from it and her slot), its rules
+ * (what loot it lays, and how its storm closes: sim/rules.ts), its storm by the
+ * match's clock (s), planned by them, and the gun every ship is armed with, or
+ * null for none (as every ship puts to sea in a match).
  */
 export interface Match {
   seed: number;
+  rules: Rules;
   storm: (seconds: number) => Storm;
   gun: Arms | null;
   /**
@@ -170,12 +174,24 @@ interface Afloat {
  * null outside a match), and the shield each ship's water gave back
  * (sim/holding.ts).
  */
-interface Stepped {
+interface Held {
   held: Outcome | null;
   regained: readonly Regained[];
 }
 /** A step outside a match. */
-const UNHELD: Stepped = { held: null, regained: [] };
+const UNHELD: Held = { held: null, regained: [] };
+
+/**
+ * What a step did: to who holds the sea (Held); and the shots fired in it, the
+ * blows struck home (balls and rams, by whom on whom, and what they took) and
+ * the loot taken up (sim/battle.ts, sim/loot.ts), for whoever keeps count (the
+ * harness: the frame reads what is kept for it instead, moments.ts).
+ */
+interface Stepped extends Held {
+  shots: readonly Shot[];
+  strikes: readonly Strike[];
+  took: readonly Taken[];
+}
 
 /**
  * A step's parts, in the order they run: the orders (the bots' thinking), the
@@ -245,7 +261,8 @@ export function createState(
 ) {
   const depth = remembered((p: Vec3) => -planet.height(p)),
     rises = planet.rises;
-  let match = first;
+  let match = first,
+    lay = laying(match.seed, depth, match.rules.loot);
   const seedOf = (id: number) => hash(match.seed, id);
   let fleet: Vessel[] = [];
   const aboard = new Map<number, Aboard>();
@@ -364,7 +381,8 @@ export function createState(
     { loot, held }: { loot: boolean; held: boolean }
   ) => {
     match = m;
-    flotsam = loot ? strewn(m.seed, depth) : { pieces: [], next: 0 };
+    lay = laying(m.seed, depth, m.rules.loot);
+    flotsam = loot ? lay.strewn() : { pieces: [], next: 0 };
     dropped = loot ? 0 : Infinity;
     gunfire = [];
     fleet = [];
@@ -515,7 +533,7 @@ export function createState(
    * and each ship's shield coming back by her share of it: of the ships still
    * afloat, those sunk in the step (`lost`) painting and closing nothing in it.
    */
-  const hold = (storm: Storm): Stepped => {
+  const hold = (storm: Storm): Held => {
     if (!territory) return UNHELD;
     sailing.length = 0;
     for (const v of fleet) if (!lost.includes(v.id)) sailing.push(v);
@@ -586,8 +604,8 @@ export function createState(
     /**
      * One step: the player's helm, gun and stores, everyone else's from her bot
      * or her lashed helm; then the fleet's step and the fighting's, who holds
-     * the sea, and what it all did kept to be drawn. Returns what it did to who
-     * holds the sea. `lap`, if given, is told as each of its parts is done
+     * the sea, and what it all did kept to be drawn. Returns what it did
+     * (Stepped). `lap`, if given, is told as each of its parts is done
      * (tools/steps.ts times them).
      */
     advance(
@@ -597,9 +615,9 @@ export function createState(
       lap?: (part: Part) => void
     ): Stepped {
       const storm = stormAt(time());
-      if (storm.phase > dropped && storm.phase < STORM.phases.length) {
+      if (storm.phase > dropped && !storm.final) {
         const before = flotsam.next;
-        flotsam = cached(flotsam, storm.next, storm.phase, match.seed, depth);
+        flotsam = lay.cached(flotsam, storm.next, storm.phase);
         for (let id = before; id < flotsam.next; id++)
           born.set(id, tick * STEP);
         dropped = storm.phase;
@@ -635,7 +653,12 @@ export function createState(
         tick * STEP
       );
       lap?.('keep');
-      return did;
+      return {
+        ...did,
+        shots: fought.shots,
+        strikes: fought.strikes,
+        took: kept.took,
+      };
     },
 
     /** The match's clock: seconds since it began. */
@@ -758,17 +781,15 @@ export function createState(
      * A new match: SHIPS ships, hers the first, the rest bots, every one afloat
      * at her berth (sim/spawn.ts) with a gun in reach of it (sim/loot.ts
      * berthed). Returns her pose. manned: false puts a bot at her helm too (for
-     * tools/matches.ts, whole matches of bots).
+     * tools/harness, whole matches of bots).
      */
     start(m: Match, manned = true): ShipPose {
       const ids = Array.from({ length: SHIPS }, (_, i) => i);
       clear(m, ids, MATCH);
       const at = m.berths ?? berths(water, m.seed, SHIPS, depth);
-      flotsam = berthed(
+      flotsam = lay.berthed(
         flotsam,
-        at.map((b) => b.at),
-        m.seed,
-        depth
+        at.map((b) => b.at)
       );
       at.forEach((b, id) =>
         launch(id, shipAt(b.at, b.heading), lookOf(id), null, manned)
