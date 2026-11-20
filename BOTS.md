@@ -265,3 +265,23 @@ commit; anything visible checked in headless chromium; iPad Air M1 at 30–40 fp
   so no reflex fires at all ("none"). A slow crawl (0.35) frees her better
   than full. The fix (E3, re-scoped): progress over a window, and a turn
   that doesn't swing her head is given up for the other side.
+- E3 measured (16 paired matches each; brain variants switch each change
+  off, e.g. `helm.budge: 1e9`; a variant equal to the old code reproduced
+  the baseline to the digit). Window + flip together: worse (+4.8 s). Flip
+  alone −2.4 s; window alone −0.9 s (n.s.). Slow backing (0.35): +4.6 s.
+  Inspecting m4 #25 from 0 s showed the real trap: she went for loot at
+  16 m/s into a cove, took it, and ran on to the cove's head, wedged
+  (`wedge.ts` at her final state: no helm moves her at all; open water only
+  astern, and no reverse). Loot spots on land were moved to the _nearest_
+  open water, i.e. onto shorelines and cove heads.
+  - Purser skipping inshore pieces (chart `clearAt` < 2): pinned −7.5 s but
+    90% armed slid 27 → 92 s. Rejected as the main lever.
+  - **Loot laid roomy** (loot.ts `roomy`: open water `LOOT.room` 14 m round
+    every way, for strewn and berthed guns): old helm 20.1 → 15.6 s pinned,
+    and arming _faster_, 90% by 21 s (was 27). Strewing costs ~8 ms desktop
+    once a match (est. 20–25 ms iPad; one-off).
+  - Kept: roomy loot + side flip (`HELM.budge` 1.5 s, `swing` 0.15 rad) +
+    purser room 2 (for spilled pieces). Window dropped (it hurt).
+  - **Result: pinned 20.1 → 13.8 s a ship (−31%), aground 3.7 → 5.2 s,
+    armed 85%, median 7 s, 90% by 21 s (was 27).** Golden → `076db454`.
+  - Left: storm mode is now 76% of stuck time. Next to inspect.

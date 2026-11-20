@@ -56,6 +56,10 @@ export const BRAINS: Record<string, Brain> = {
   keen: variant({ sight: { sightMax: 360, forget: 8 } }),
   /** Feels further ahead for land, and backs off a bank sooner. */
   wary: variant({ helm: { feel: 24, stuck: 1.5 } }),
+  /** Backing off at a crawl. */
+  crawl: variant({ helm: { slow: 0.35 } }),
+  /** The helm and purser before E3: no side given up, loot however inshore. */
+  before: variant({ helm: { budge: 1e9 }, purser: { room: 0 } }),
 };
 
 /** The brain of this name, or an error naming those there are. */

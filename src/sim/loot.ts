@@ -90,11 +90,12 @@ export const LOOT = {
   drift: 2.2,
   kick: 3,
   /**
-   * A spot lies over this much water past her draught; one on land or the
-   * shallows is moved to the nearest such water in rings `ring` m apart, out to
-   * `shore` m.
+   * A spot lies over this much water past her draught, and so does the water
+   * `room` m round it every way; one that doesn't is moved to the nearest that
+   * does in rings `ring` m apart, out to `shore` m.
    */
   open: 1,
+  room: 14,
   ring: 8,
   shore: 240,
   /**
@@ -178,15 +179,30 @@ export function rolled(draw: () => number): Goods {
 const open = (depth: Depth, p: Vec3) => depth(p) >= SHIP.draught + LOOT.open;
 
 /**
- * p, or the open water nearest it, or null if there is none within LOOT.shore.
+ * Whether a piece laid at p lies where a ship can come to it and come about
+ * after: open water there and LOOT.room m round it every way. (Laid at the
+ * head of a cove narrower than her turning circle, a piece draws a ship on to
+ * the shore, where she wedges: the bots' harness found most of them stuck so.)
+ */
+function roomy(depth: Depth, p: Vec3): boolean {
+  if (!open(depth, p)) return false;
+  for (let k = 0; k < 8; k++)
+    if (!open(depth, along(p, tangentAt(p, (k * Math.PI) / 4), LOOT.room).p))
+      return false;
+  return true;
+}
+
+/**
+ * p, or the roomy water nearest it, or null if there is none within
+ * LOOT.shore.
  */
 function opened(depth: Depth, p: Vec3): Vec3 | null {
-  if (open(depth, p)) return p;
+  if (roomy(depth, p)) return p;
   for (let d = LOOT.ring; d <= LOOT.shore; d += LOOT.ring) {
     const n = Math.max(8, Math.round((2 * Math.PI * d) / (2 * LOOT.ring)));
     for (let k = 0; k < n; k++) {
       const q = along(p, tangentAt(p, (2 * Math.PI * k) / n), d).p;
-      if (open(depth, q)) return q;
+      if (roomy(depth, q)) return q;
     }
   }
   return null;
@@ -269,7 +285,7 @@ export function berthed(
       (_, k) => along(b, tangentAt(b, a + (k * Math.PI) / 4), d).p
     );
     const at =
-      round.find((q) => open(depth, q)) ?? opened(depth, round[0]) ?? b;
+      round.find((q) => roomy(depth, q)) ?? opened(depth, round[0]) ?? b;
     pieces.push({
       id: f.next + pieces.length - f.pieces.length,
       at,

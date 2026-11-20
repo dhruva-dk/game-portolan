@@ -45,7 +45,9 @@ import type { Way } from './pilot.ts';
  * What her helm carries from step to step: seconds and way (sign, + to port)
  * she holds a turn off land; seconds left backing off a bank (below 0: working
  * off a bar), seconds crawling, and the way she backs off; where she was a step
- * ago.
+ * ago. The side she is turning off a bank (+1 port, −1 starboard, 0 none), her
+ * heading as she began it and the seconds since; and the side she tried that
+ * didn't bring her head round (0 none).
  */
 export interface HelmMemory {
   avoid: number;
@@ -53,6 +55,10 @@ export interface HelmMemory {
   stuckT: number;
   strafe: number;
   was: Vec3;
+  side: number;
+  head: Vec3;
+  sideT: number;
+  blocked: number;
 }
 
 /** A helm's memory as she puts to sea at `at`. */
@@ -62,6 +68,10 @@ export const helmMemory = (at: Vec3): HelmMemory => ({
   stuckT: 0,
   strafe: 1,
   was: at,
+  side: 0,
+  head: [0, 0, 0],
+  sideT: 0,
+  blocked: 0,
 });
 
 /** Everything her helm is tuned by. Seconds and metres. */
@@ -98,6 +108,13 @@ export const HELM = {
   most: 4.5,
   slack: 0.6,
   slow: 0.6,
+  /**
+   * A turn off a bank that hasn't swung her head `swing` rad in `budge` s is
+   * given up for the other side: the shallows (shoal.ts) won't let a hull swing
+   * one way into worse water, and only the other may free her.
+   */
+  budge: 1.5,
+  swing: 0.15,
   /**
    * Making for a mark inside the circle she turns at her speed (else she sails
    * round it for good), she slows to `tighten` of the speed whose circle passes
@@ -260,6 +277,30 @@ function answer(c: Ctx, foe: number): number | null {
 }
 
 /**
+ * The side she turns off a bank, `want` (+1 port, −1 starboard) unless she has
+ * tried it and it didn't bring her head round (HELM.budge, swing): then the
+ * other. Updates her memory.
+ */
+function sideOf(c: Ctx, want: number, dt: number): number {
+  const { m } = c,
+    heading = c.own.ship.heading;
+  const s = want === m.blocked ? -want : want;
+  if (s !== m.side) {
+    [m.side, m.head, m.sideT] = [s, heading, 0];
+    return s;
+  }
+  m.sideT += dt;
+  if (
+    m.sideT >= c.b.helm.budge &&
+    dot(m.head, heading) > Math.cos(c.b.helm.swing)
+  ) {
+    m.blocked = s;
+    [m.side, m.head, m.sideT] = [-s, heading, 0];
+  }
+  return m.side;
+}
+
+/**
  * Backs off a bank she is stuck against, by how far she really sailed last
  * step, not her speed: a hull pressed into a bank keeps her way on while hardly
  * moving. `course` is the turn she wants, before any off land. Her helm while
@@ -279,7 +320,7 @@ function stuck(
   const steady = { helm: null, lost: false };
   if (m.backT > 0) {
     m.backT -= dt;
-    return order(m.strafe * c.b.helm.full);
+    return order(sideOf(c, m.strafe, dt) * c.b.helm.full);
   }
   const crawling = distance(m.was, ship.at) < c.b.helm.crawl * dt;
   // held up by shoal water off her bow, she works off it the way the water
@@ -294,10 +335,12 @@ function stuck(
     // (with the way off astern she holds the turn she is in, or she would swing
     // from one side to the other)
     const holding = Math.abs(deep) > Math.PI / 2 && ship.turn * deep < 0;
+    const turn = holding
+      ? Math.sign(ship.turn) * c.b.helm.full
+      : Math.max(-c.b.helm.full, Math.min(c.b.helm.full, 2 * deep));
+    const side = sideOf(c, turn >= 0 ? 1 : -1, dt);
     return order(
-      holding
-        ? Math.sign(ship.turn) * c.b.helm.full
-        : Math.max(-c.b.helm.full, Math.min(c.b.helm.full, 2 * deep)),
+      side * turn > 0 ? turn : side * c.b.helm.full,
       m.backT + dt > -c.b.helm.wade
     );
   }
@@ -305,7 +348,11 @@ function stuck(
   const gaveUp = m.backT <= -(c.b.helm.wade + c.b.helm.most);
   m.backT = 0;
   if (crawling || gaveUp) m.stuckT += gaveUp ? c.b.helm.stuck : dt;
-  else m.stuckT = Math.max(0, m.stuckT - 2 * dt);
+  else {
+    m.stuckT = Math.max(0, m.stuckT - 2 * dt);
+    // making way again: free, every side open to her once more
+    [m.side, m.blocked] = [0, 0];
+  }
   if (m.stuckT <= c.b.helm.stuck) return steady;
   m.stuckT = 0;
   // she turns off toward whichever side lies open, or the way to her course

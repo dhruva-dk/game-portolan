@@ -29,6 +29,7 @@ import { NOTHING, type Ask } from './stores.ts';
 import { toEdge } from './storm.ts';
 import { ramp, utility } from './utility.ts';
 import type { Ctx } from './captain.ts';
+import { clearAt } from './route.ts';
 
 /** Everything a bot's stores are tuned by. */
 export const PURSER = {
@@ -38,6 +39,13 @@ export const PURSER = {
    */
   least: 0.04,
   edge: 10,
+  /**
+   * A piece whose water lies fewer than `room` chart cells from the shore
+   * (route.ts clearAt, 6.8 m a cell) isn't gone for: she comes on it at speed,
+   * and in a cove narrower than her turning circle she would run on to its
+   * head and wedge there (shoal.ts lets no hull swing into worse water).
+   */
+  room: 2,
   /** Mending with a foe about, she makes for open water this far from her. */
   clear: 60,
   /**
@@ -196,13 +204,15 @@ export function lootUrge(c: Ctx): number {
     [m.shun, m.target] = [m.target, -1];
   const p = own.ship.at,
     within = Math.cos(t.lootReach / R),
-    s = c.sea.storm;
+    s = c.sea.storm,
+    ch = c.sea.chart;
   let best: Loot | null = null,
     bs = 0,
     kept: Loot | null = null;
   for (const l of pieces) {
     if (dot(p, l.at) < within || l.id === m.shun) continue;
     if (s && toEdge(l.at, s) < c.b.purser.edge) continue;
+    if (ch && clearAt(ch, l.at) < c.b.purser.room) continue;
     const w = worth(c, crew, l);
     if (w <= 0) continue;
     const d = distance(p, l.at);

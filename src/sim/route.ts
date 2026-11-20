@@ -197,6 +197,8 @@ export const charted = (s: Soundings): Chart => ({
 });
 
 export const openAt = (ch: Chart, p: Vec3): boolean => ch.open[cellOf(p)] === 1;
+/** How many cells the water at p lies from the shore (0: not open; up to 4). */
+export const clearAt = (ch: Chart, p: Vec3): number => ch.clear[cellOf(p)];
 
 /**
  * Where along a chord clearLine looks; and a cell's centre, as course looks

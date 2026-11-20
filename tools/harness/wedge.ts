@@ -13,7 +13,8 @@ import { STEP } from '../../src/sim/fixed.ts';
 import { SHIP } from '../../src/sim/handling.ts';
 import { turned, type ShipState } from '../../src/sim/ship.ts';
 import { clearance } from '../../src/sim/shoal.ts';
-import { distance, dot } from '../../src/world/sphere.ts';
+import { BOT } from '../../src/sim/captain.ts';
+import { along, distance, dot } from '../../src/world/sphere.ts';
 import { worldOf } from './world.ts';
 
 const { values: a, positionals } = parseArgs({
@@ -29,6 +30,16 @@ const c = clearance(start.at, start.heading, w.depth);
 console.log(
   `draught ${SHIP.draught} m; depth amidships ${w.depth(start.at).toFixed(2)} m; least under her hull ${c.least.toFixed(2)} m`
 );
+// the water round her: each 30° from her bow (to port), open ('.') or not ('#')
+// each 6 m out to 60
+for (let deg = 0; deg < 360; deg += 30) {
+  const t = turned(start, (deg * Math.PI) / 180);
+  let s = '';
+  for (let d = 6; d <= 60; d += 6)
+    s +=
+      w.depth(along(start.at, t, d).p) >= SHIP.draught + BOT.open ? '.' : '#';
+  console.log(`${String(deg).padStart(3)}° ${s}`);
+}
 for (const throttle of [0.35, 1])
   for (const [name, turn] of [
     ['port', 2.4],
