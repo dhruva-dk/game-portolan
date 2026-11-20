@@ -21,6 +21,9 @@ export interface Exception {
 
 /** Why each of the functions over the parameter limit stands: it took that many when the rule came in. */
 const TOOK = 'took this many when the limit came in; pass a named record when it is next reworked';
+/** Why each file's non-null assertions stand: each a value the code knows is there (a canvas's context, an element of
+ *  its own drawing, a key it just set); proved to the types instead as each is touched. */
+const ASSERTED = 'asserted this many when the rule came in; prove each to the types as touched, and lower this';
 /** Why each part of src errs under the strictest options: it was written without them; each error fixed lowers it. */
 const STRICTER = 'written before an index read could be missing or an optional property absent; fix as touched, and lower this';
 
@@ -67,6 +70,17 @@ export const EXCEPTIONS: readonly Exception[] = [
     ['src/ui/ink.ts', 'bar', 6], ['src/ui/ink.ts', 'ring', 6], ['src/water/water.ts', 'createWater', 7], ['src/world/cells.ts', 'trace', 6],
     ['src/world/lattice.ts', 'weighInto', 7], ['src/world/sphere.ts', 'chartAt', 6],
   ] as const).map(([file, name, at]) => ({ rule: 'parameters', file, name, at, why: TOOK })),
+
+  // non-null assertions, by file, at what they were when the rule came in
+  ...([
+    ['src/loot/loot.ts', 1], ['src/main.ts', 1], ['src/play/chase.ts', 1], ['src/play/orders.ts', 2],
+    ['src/play/state.ts', 7], ['src/ship/rig.ts', 1], ['src/sim/battle.ts', 1], ['src/sim/bot.ts', 1],
+    ['src/sim/claimer.ts', 2], ['src/sim/contact.ts', 3], ['src/sim/gun.ts', 2], ['src/sim/loot.ts', 3],
+    ['src/sim/wake.ts', 1], ['src/ui/globe.ts', 3], ['src/ui/ground.ts', 1], ['src/ui/held.ts', 1],
+    ['src/ui/hud.ts', 1], ['src/ui/minimap.ts', 2], ['src/ui/screens.ts', 3], ['src/ui/veil.ts', 1],
+    ['src/water/claimed.ts', 1], ['src/water/trails.ts', 1], ['src/world/coastline.ts', 2],
+    ['src/world/terrain-grid.ts', 2], ['src/world/terrain.ts', 1],
+  ] as const).map(([file, at]) => ({ rule: 'non-null', file, at, why: ASSERTED })),
 
   // errors under the strictest options (tsconfig.strict.json), by part of src, at what they were when the options came in
   ...([

@@ -24,10 +24,3 @@ export function hexToLinear(hex: string | number): Rgb {
 export function linearToSrgbRgb(c: Rgb): Rgb {
   return [linearToSrgb(clamp(c[0])), linearToSrgb(clamp(c[1])), linearToSrgb(clamp(c[2]))];
 }
-
-/** Linear RGB as a CSS colour, '#rrggbb' (each channel held within 0…1 and rounded to its nearest byte). */
-export function linearToCss(c: Rgb): string {
-  const byte = (x: number) => Math.round(x * 255).toString(16).padStart(2, '0');
-  const s = linearToSrgbRgb(c);
-  return `#${byte(s[0])}${byte(s[1])}${byte(s[2])}`;
-}
