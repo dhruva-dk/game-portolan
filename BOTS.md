@@ -4,6 +4,25 @@ The working file for the `bot-harness` branch (a worktree off `main` at 975191c)
 Read **Design** before touching bot code; after any compaction, re-read this
 whole file before doing anything else. Design changes only by a Decision.
 
+**Status (16 matches, 80 bots each, same matches before and after):**
+
+| Measure                   | Base (975191c) | Now         |
+| ------------------------- | -------------- | ----------- |
+| Pinned (stuck, not claim) | 20.1 s a ship  | 4.2 s       |
+| Ships ever pinned         | not logged     | 27%         |
+| Aground                   | 3.7 s          | 0.0 s       |
+| Mean speed                | 13.4 m/s (E3c) | 14.5 m/s    |
+| Armed (90% of ships by)   | 85% (27 s)     | 91% (20 s)  |
+| Median step / worst step  | 1.56 / 17 ms   | 1.6 / 13 ms |
+
+What moved it, biggest first: the calm's flow field (E4, −8 s), roomy loot
+and the side flip (E3, −6 s), easing when coming about with land ahead (E3c,
+−1.5 s), steering by eye off the shore (E1a). New behaviour: hunting to the
+sound of guns (F1), running for cover behind land (F2), storm-phase loot
+caches and more loot (D). Tools: the harness, `inspect`, `wedge`, `compare`,
+`replay`; scenarios in `tests/scenarios.test.ts`. Left: pocket wedges that only
+the shared shoal physics can free (E3d), crossing/channel scenarios (C3).
+
 ---
 
 ## 1. Design
@@ -34,7 +53,7 @@ turn left?", follow the arrows: it is never more than five hops.
 | Captain   | `sim/bot.ts` (decide, OPTIONS)                                                                  | Sighting, storm, own state | `Intent`                                                 | `MIND` (+ each option's owner's)           | `m.mind`                       |
 | — options | storm/fight/flee/roam: `bot.ts`; heal/loot: `purser.ts`; claim: `claimer.ts`; hunt: `hunter.ts` | Ctx view                   | a score 0..1 with named factors; a goal                  | `PURSER`, `CLAIMER`, `STORMING`, `HUNTING` | `m.purse`, `m.claim`, `m.hunt` |
 | Tactician | `sim/tactician.ts` (ramCourse, recoil; gunner.ts ring)                                          | Intent, foe now            | `Mark`: where to route to, the aim if clear, pace        | `RAMMING`                                  | `m.tactic`                     |
-| Pilot     | `sim/pilot.ts` over `sim/route.ts`, later behind `Router`                                       | Mark, chart                | `Way`: the tangent to steer, distance, pace, foe         | `ROUTE`                                    | `m.route`                      |
+| Pilot     | `sim/pilot.ts` over `sim/route.ts` (A\* routes; the calm's field when one falls short, E4)      | Mark, chart, `Sea.calm`    | `Way`: the tangent to steer, distance, pace, foe         | `ROUTE`                                    | `m.route`                      |
 | Helmsman  | `sim/helmsman.ts`, later behind `Steering`                                                      | Way, depth, nearby rams    | `Helm`: course, throttle; and `lost` (pilot drops route) | `HELM`                                     | `m.helm`                       |
 | Gunner    | `sim/gunner.ts`                                                                                 | foe, held gun              | `Order`, arm                                             | `GUNNER`                                   | `m.gun`                        |
 
