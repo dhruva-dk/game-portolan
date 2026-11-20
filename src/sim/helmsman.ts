@@ -122,6 +122,13 @@ export const HELM = {
    */
   tighten: 0.8,
   leastWay: 0.35,
+  /**
+   * Coming about, her course over `cramp` rad off her heading with land ahead
+   * on her heading within `feel` and her speed, she eases to `leastWay`: she
+   * turns in a third the circle at it, and drove her bow on to the shore
+   * coming round at full.
+   */
+  cramp: Math.PI / 2,
   /** Making for a mark gently, her throttle within `near` m of it. */
   gently: 0.55,
   near: 25,
@@ -224,13 +231,17 @@ export function steer(
   // (2 sin off), the speed that turns it r × SHIP.turn
   const off = Math.abs(course),
     r = toD / (2 * (off > Math.PI / 2 ? 1 : Math.max(0.05, Math.sin(off))));
+  const cramped =
+    off > c.b.helm.cramp && !probe(c, 0, c.b.helm.feel + ship.speed);
   const tight =
     way.pace === 'ram'
       ? 1
-      : Math.max(
-          c.b.helm.leastWay,
-          Math.min(1, (c.b.helm.tighten * r * SHIP.turn) / SHIP.top)
-        );
+      : cramped
+        ? c.b.helm.leastWay
+        : Math.max(
+            c.b.helm.leastWay,
+            Math.min(1, (c.b.helm.tighten * r * SHIP.turn) / SHIP.top)
+          );
   const s = stuck(c, dt, course);
   m.was = ship.at;
   return { helm: s.helm ?? order(turn, Math.min(easy, tight)), lost: s.lost };

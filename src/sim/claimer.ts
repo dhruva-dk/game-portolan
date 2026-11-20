@@ -13,6 +13,7 @@
 // for the same inputs, to the bit.
 
 import { distance, along, toward, type Vec3 } from '../world/sphere.ts';
+import { clearAt } from './route.ts';
 import { STORM, toEdge } from './storm.ts';
 import { ramp, utility } from './utility.ts';
 import { between, open, rotate, type Ctx } from './captain.ts';
@@ -30,6 +31,12 @@ export const CLAIMER = {
   probe: 5,
   edgeMost: 200,
   inside: 10,
+  /**
+   * Her marks out lie `room` chart cells from the shore at least (some 20 m):
+   * she comes about at each, at speed, and one hard by a shore had her drive
+   * her bow on to it coming round.
+   */
+  room: 3,
   /**
    * A bite's marks are reached within `arrive` m. A bite done, she rests `rest`
    * s, less the greedier.
@@ -118,7 +125,11 @@ function plan(c: Ctx, p: Vec3): Vec3[] | null {
     (c.b.claimer.width[1] - c.b.claimer.width[0]) *
       greed *
       between(c.m, 0.6, 1);
-  const kept = (q: Vec3) => open(c, q) && (!s || toEdge(q, s) > c.t.margin);
+  const ch = c.sea.chart,
+    kept = (q: Vec3) =>
+      open(c, q) &&
+      (!ch || clearAt(ch, q) >= c.b.claimer.room) &&
+      (!s || toEdge(q, s) > c.t.margin);
   const start = between(c.m, -Math.PI, Math.PI),
     flank = c.m.rand & 1 ? 1 : -1;
   for (let k = 0; k < 8; k++) {

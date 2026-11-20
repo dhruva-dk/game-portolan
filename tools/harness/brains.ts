@@ -59,6 +59,10 @@ export const BRAINS: Record<string, Brain> = {
   wary: variant({ helm: { feel: 24, stuck: 1.5 } }),
   /** Runs straight away, never for cover behind land. */
   noCover: variant({ mind: { cover: 0 } }),
+  /** Sets her claim's marks anywhere open, hard by a shore too. */
+  shoreBites: variant({ claimer: { room: 0 } }),
+  /** Comes about at full whatever lies ahead. */
+  noCramp: variant({ helm: { cramp: 9 } }),
   /** Hears no guns (hunts nothing). */
   deaf: variant({ hunting: { earshot: 0 } }),
   /** Hears guns further off, and is drawn to them from further. */

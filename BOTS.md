@@ -378,3 +378,19 @@ commit; anything visible checked in headless chromium; iPad Air M1 at 30–40 fp
   Whole fleets, 16 matches: pinned +0.2 s [−1.7, 2.1] (storm-mode wedges
   have another cause), aground 4.7 → 4.0 s. Golden → `72969f30`. Open: the
   helm's stuck clock didn't see a bow driven on to land at speed (E3 lead).
+- E3c, how the long wedges begin: 76% of pinned time is in runs over 40 s,
+  nearly all storm mode, but they begin earlier. m11 #12 (162 s): in claim
+  at 16 m/s for a bite mark 20 m off with land 30 m beyond; the mark
+  reached, the next lay 150° astern; coming round at full (a 27 m circle)
+  she put her bow and port side in a notch, where `wedge.ts` finds no helm
+  that moves her (no reverse; the shallows refuse any swing touching at two
+  points: a physics matter, shared with the player, left alone). Her feel
+  ahead runs along her course, open astern, so nothing warned her.
+  - Claim marks `CLAIMER.room` 3 cells from the shore (as the purser's
+    loot): pinned −0.1 s [−1.7, 1.4], neutral; kept (closes that path).
+  - **Cramp**: course over `HELM.cramp` (90°) off her heading with land on
+    her heading within feel + speed, she eases to `leastWay` (a 9 m circle,
+    not 27). A pace, not a turn: it doesn't fight the planner. **Pinned
+    14.0 → 12.4 s a ship, −1.5 [−2.8, −0.3]; aground 4.2 → 3.7 s; claim
+    circling 2.3 → 1.8 s.** From 60°: +0.6 s worse than 90°.
+  - Golden → `e9be4e05`. Variants `shoreBites`, `noCramp` kept.
