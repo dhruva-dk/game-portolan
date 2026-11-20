@@ -125,7 +125,7 @@ export function ratings(rs: readonly Rating[]): string[] {
   return sorted.map(
     (r) =>
       `  ${r.group.padEnd(22)} θ ${r.theta >= 0 ? '+' : ''}${r.theta.toFixed(3)} ± ${r.se.toFixed(3)}` +
-      ` (${((r.theta - median) / Math.max(r.se, 1e-9)).toFixed(1)} se from the median; ${r.ships} ships)`
+      ` (${((r.theta - median) / Math.max(r.se, 1e-9)).toFixed(2)} se from the median; ${r.ships} ships)`
   );
 }
 

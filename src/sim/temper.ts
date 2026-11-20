@@ -75,7 +75,7 @@ export const STYLES: readonly Omit<Temper, 'skill' | 'aggro'>[] = [
   {
     fight: 0.35,
     notice: 85,
-    run: 35,
+    run: 30,
     margin: 45,
     standoff: 1.25,
     loot: 0.6,
@@ -117,7 +117,7 @@ export const STYLES: readonly Omit<Temper, 'skill' | 'aggro'>[] = [
 const SKILL: readonly (readonly [number, number])[] = [
   [0.55, 1],
   [0.35, 0.9],
-  [0.25, 0.8],
+  [0.2, 0.75],
   [0.3, 0.85],
   [0.15, 0.7],
   [0.55, 1],

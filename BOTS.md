@@ -724,15 +724,15 @@ commit; anything visible checked in headless chromium; iPad Air M1 at 30–40 fp
   / 160 / 200 m, 20 pairs (the first four rows on the code before `depth`'s
   A3 hand, the rest on it):
 
-  | scatter                               | duels                 | θ by gun held, 64 matches |
-  | ------------------------------------- | --------------------- | ------------------------- |
-  | base                                  | 5 / 2 / 1 / 2 / 7     | −0.190                    |
-  | cut 4 s, hand ⅓                       | 17 / 14 / 5 / 8 / 12  | −0.164                    |
-  | the same, rigging 0.4                 | 17 / 14 / 6 / 8 / 12  | –                         |
-  | cut 4 s, hand ⅓, no pauses            | 22 / 21 / 10 / 11 / 14 | −0.125                   |
-  | base (A3 hand)                        | 7 / 4 / 3 / 2 / 9     | −0.113 ± 0.037            |
-  | **kept**: cut 4 s, hand ⅓, no pauses  | 26 / 24 / 13 / 11 / 18 | −0.178 ± 0.038           |
-  | and 11 a pellet, volleys 1.25 s apart | 33 / 33 / 19 / 18 / 26 | −0.049 ± 0.037           |
+  | scatter                               | duels                  | θ by gun held, 64 matches |
+  | ------------------------------------- | ---------------------- | ------------------------- |
+  | base                                  | 5 / 2 / 1 / 2 / 7      | −0.190                    |
+  | cut 4 s, hand ⅓                       | 17 / 14 / 5 / 8 / 12   | −0.164                    |
+  | the same, rigging 0.4                 | 17 / 14 / 6 / 8 / 12   | –                         |
+  | cut 4 s, hand ⅓, no pauses            | 22 / 21 / 10 / 11 / 14 | −0.125                    |
+  | base (A3 hand)                        | 7 / 4 / 3 / 2 / 9      | −0.113 ± 0.037            |
+  | **kept**: cut 4 s, hand ⅓, no pauses  | 26 / 24 / 13 / 11 / 18 | −0.178 ± 0.038            |
+  | and 11 a pellet, volleys 1.25 s apart | 33 / 33 / 19 / 18 / 26 | −0.049 ± 0.037            |
 
   On 10 pairs (of 20), each part alone: cut 2.5 s 7 / 5 / 0 / 4 / 3; hand ⅓
   5 / 4 / 1 / 3 / 5; both 10 / 5 / 2 / 4 / 6 (−0.093 in matches); cut
@@ -771,3 +771,29 @@ commit; anything visible checked in headless chromium; iPad Air M1 at 30–40 fp
   sink a bare hull and 3.23 s with a shield. A test holds the cut (`guns.test.ts`).
   Golden `334fa9c8` → `ade79d2e`; mixed, gold rush, cagey `bd7c4725`,
   `6af23769`, `65121435`.
+
+- PLAN A3, the bots' hand. The best bots shot worse than a player's
+  stand-in at mid range; the assist (one function, both users) was not why,
+  their hand was. Its spread `1 + 4.5 (1 − skill)` → `1 + 6 (1 − skill)²`
+  times the gun's: green (0.3) 3.9×, fair (0.6) 2×, sharp (0.85) 1.1×, the
+  best a player's own. Measured like with like (`aim.ts --against`, new): a
+  stand-in sails her bot's persona, so she is set beside the very ships she
+  takes, sailed by their bots in the same 64 matches without stand-ins, of
+  hunter and brawler (whose bots reach 0.9). Close / mid / far, all guns:
+  stand-in 82 / 49 / 47%, best bots before 84 / 51 / 42, now 84 / 49 / 53;
+  repeater 77 / 39 against 78 / 32 → 78 / 40; cannon 94 / 66 / 29 against
+  97 / 66 / 33. Dropped: a truer aim error for the sharp (`1 − 0.95 skill`,
+  nothing over the hand), and bots laying on the foe's body and leaving the
+  lead to the assist (no better close, worse far).
+
+- PLAN P6, the gate met, on the final code (the hand and the scatter in).
+  The hand gave most to the middling: raider +2.5 se, turtle +1.7 over 256
+  matches. Raider skill 0.2–0.75 (0.3–0.85), notice 120 (130); turtle skill
+  0.3–0.85 (0.35–0.9), runs at 30 (35). The turtle's notice 85 → 80 took her
+  up (+2.1 se), so it stayed 85. Over 256 matches: hunter +0.98 se (θ
+  +0.015), brawler +0.83, raider +0.12, turtle −0.12, scavenger −0.53,
+  homesteader −1.08 (θ −0.018); spread 0.033. The fighters on top is new:
+  a sharp hand pays the ships that fight. By gun fired the scatter is level
+  with cannon and repeater (θ +0.140, +0.143, +0.143). Steps 1.7 / 11.8 ms.
+  Golden `a78e3806`; mixed, gold rush, cagey `65f13eb0`, `547b07bd`,
+  `e9626c23`.

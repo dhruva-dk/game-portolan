@@ -29,19 +29,19 @@ roadmap above it. After a compaction, read this file, then `BOTS.md`.
 targets, measured the same way on 64 dealt matches (80 bots each) unless
 said; met ✓, not met ✗, the call left to the owner ◐:
 
-| Measure                              | Before         | Now (`depth`)                                                                                                                                                  |
-| ------------------------------------ | -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Distinct bot personalities           | 6, one per bot | ✓ 6 personas, each a temper and a crew, each measured apart (shots, home, dealt, taken, kills, place)                                                          |
-| Match types                          | 1              | ✓ 4: mixed, bloodbath, gold rush, cagey. 90% armed by 13 / 13 / 11 / 34 s; half down by 60 s (bloodbath), 104 s (cagey)                                        |
-| What can be varied in the harness    | brain tables   | ✓ brain, gunnery, option weights, rules (loot, caches, storm, assist), a player's thumb                                                                        |
-| Combat measured in the harness       | none           | ✓ shots and hits by range, gun, rarity, skill and who laid it; damage; where hits fall on a hull; ratings by gun                                               |
-| Strongest personality over median    | unknown        | ✗ by 0.2 se: turtle +1.2 se over 256 matches (θ +0.03; was scavenger +7.8 se, θ +0.16); weakest brawler −4.4 se (θ −0.06, was −0.21)                           |
-| Player assist vs best bot's hit rate | unmeasured     | ✓ like with like (the stand-ins' own ships, hunter and brawler): best bots 84 / 49 / 53% close / mid / far, stand-in 82 / 49 / 47; per gun level or under (A3) |
-| Sim step, median / worst             | 1.6 / 13 ms    | ✓ 1.8 / 11.9 ms (`npm run steps` on the head; main 1.6 / 13.9). It was 22 ms before the first routes were spread                                               |
-| Triangles, ships and coast views     | 1359k / 1304k  | ✓ 630k / 576k (worst view 893k of 900k)                                                                                                                        |
-| Draw calls, worst view               | 70             | ✓ 77 (a palm one draw, not two; every view fewer: sea 62, coast 64, ships 64, lobby 49, map 33)                                                                |
-| Bot seconds stuck                    | 4.2 s          | ✓ 4.1 s (runs on this code range 3.5–4.3 s)                                                                                                                    |
-| Guns, one against one                | unmeasured     | ◐ `duel.ts`: harpoon beats cannon, mortar far; scatter wins 65 / 60% from 40 / 80 m (was 18 / 10%), its grape cutting rigging; by gun held it still rates low |
+| Measure                              | Before         | Now (`depth`)                                                                                                                                                                                                                                                                                                                                                                   |
+| ------------------------------------ | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Distinct bot personalities           | 6, one per bot | ✓ 6 personas, each a temper and a crew, each measured apart (shots, home, dealt, taken, kills, place)                                                                                                                                                                                                                                                                           |
+| Match types                          | 1              | ✓ 4: mixed, bloodbath, gold rush, cagey. 90% armed by 13 / 13 / 11 / 34 s; half down by 60 s (bloodbath), 104 s (cagey)                                                                                                                                                                                                                                                         |
+| What can be varied in the harness    | brain tables   | ✓ brain, gunnery, option weights, rules (loot, caches, storm, assist), a player's thumb                                                                                                                                                                                                                                                                                         |
+| Combat measured in the harness       | none           | ✓ shots and hits by range, gun, rarity, skill and who laid it; damage; where hits fall on a hull; ratings by gun                                                                                                                                                                                                                                                                |
+| Strongest personality over median    | unknown        | ✓ hunter +0.98 se over 256 matches (θ +0.015; was scavenger +7.8 se, θ +0.16); weakest homesteader −1.1 se (θ −0.018, was brawler −0.21); all six within 0.033 θ                                                                                                                                                                                                                |
+| Player assist vs best bot's hit rate | unmeasured     | ✓ like with like (the stand-ins' own ships, hunter and brawler): best bots 84 / 49 / 53% close / mid / far, stand-in 82 / 49 / 47; per gun level or under (A3)                                                                                                                                                                                                                  |
+| Sim step, median / worst             | 1.6 / 13 ms    | ✓ 1.7 / 11.8 ms (`npm run steps` on the head; main 1.6 / 13.9). It was 22 ms before the first routes were spread                                                                                                                                                                                                                                                                |
+| Triangles, ships and coast views     | 1359k / 1304k  | ✓ 630k / 576k (worst view 893k of 900k)                                                                                                                                                                                                                                                                                                                                         |
+| Draw calls, worst view               | 70             | ✓ 77 (a palm one draw, not two; every view fewer: sea 62, coast 64, ships 64, lobby 49, map 33)                                                                                                                                                                                                                                                                                 |
+| Bot seconds stuck                    | 4.2 s          | ✓ 4.1 s (runs on this code range 3.5–4.3 s)                                                                                                                                                                                                                                                                                                                                     |
+| Guns, one against one                | unmeasured     | ✓ `duel.ts`: harpoon beats cannon, mortar far; scatter wins 65 / 60% from 40 / 80 m (was 18 / 10%), its grape cutting rigging; by the gun fired longest, over 256 matches, level with cannon and repeater (θ +0.14 each) and no kind dominating (`rate.ts --by fired`). By gun held it still rates low (−0.18), as a ship with a second gun holds that one while no foe is near |
 
 **Targets for this plan.** Each is a gate a milestone must meet, measured the
 same way:
@@ -775,3 +775,29 @@ then the behaviour commits on top.
   The duel tool steps her stores as the game does. BOTS.md has the tables.
   Golden `334fa9c8` → `ade79d2e`; mixed, gold rush, cagey `bd7c4725`,
   `6af23769`, `65121435`.
+- 2026-11-20 (W4, the scatter, over 256 matches): on the final code, by the
+  gun fired longest the scatter is level with cannon and repeater (θ +0.140,
+  +0.143, +0.143), no kind dominating (mortar +1.1 se the strongest, harpoon
+  −2.4 the weakest). So the scatter is a viable gun: it wins its duels close
+  and holds its own in matches when it is the gun fought with. W4's gate,
+  "no kind dominates", is met.
+- 2026-11-20 (P6, the gate met): **the strongest persona within one se of
+  the median over 256 matches**, on the final code (A3's hand and the
+  scatter in):
+
+  | 256 matches | hunter | brawler | raider | turtle | scavenger | homesteader |
+  | ----------- | ------ | ------- | ------ | ------ | --------- | ----------- |
+  | θ           | +0.015 | +0.014  | +0.001 | −0.003 | −0.009    | −0.018      |
+  | se from med | +0.98  | +0.83   | +0.12  | −0.12  | −0.53     | −1.08       |
+
+  Spread 0.033 θ (0.371 at the head of this work, 0.093 after the first
+  P6). A3's steadier hand gave most to the middling, putting the raider 2.5
+  se and the turtle 1.7 over; so the raider's skill is drawn 0.2–0.75 (was
+  0.3–0.85) and her notice 120 m (130), the turtle's skill 0.3–0.85
+  (0.35–0.9) and she runs at 30 hull (35). Tried and dropped: the turtle
+  seeing later (notice 80: she rose, +2.1 se). Four passes of 256 matches;
+  as logged above, any change moves every persona by about a se, so the
+  last pass is a pass of the gate, not a margin under it. `rate.ts` prints
+  se to two places. Steps 1.7 / 11.8 ms; the capture 64 draws, 576k
+  triangles. Golden `a78e3806`; mixed, gold rush, cagey `65f13eb0`,
+  `547b07bd`, `e9626c23`.
