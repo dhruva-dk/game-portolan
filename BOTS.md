@@ -219,6 +219,12 @@ commit; anything visible checked in headless chromium; iPad Air M1 at 30–40 fp
         `cover`/`rings`/`wide`/`gain`).
   - [x] F3 Mixed fleets balanced by match (`brains[(id + match) % n]`) and
         a paired place interval in the summary.
+  - [x] F4 2D replay: `node tools/harness/replay.ts --match 4 [--brain b]`
+        writes one self-contained page (~1.7 MB): the planet unrolled
+        (land, shallows, sea at 1440 × 720), each ship each second coloured
+        by her mind's mode with her heading, the storm's edge and the next
+        calm; play, scrub, speed, zoom, pan, click a ship to follow her.
+        Checked in headless Chromium (no errors; follow and play work).
 
 ## 3. Decisions
 
