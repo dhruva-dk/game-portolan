@@ -1,8 +1,7 @@
 // A reader's place in who holds the sea (snapshot.ts Sea): which match's sea it
 // last read (its generation) and the last change it read there. The water
-// (claimed.ts) and the trails (trails.ts) each keep one, so each reads every
-// change once, starts over with each new match whatever its changes are
-// numbered, and knows when it has missed some (gone from the log before it read
+// (claimed.ts) keeps one, so it reads every change once, starts over with each
+// new match whatever its changes are numbered, and knows when it has missed some (gone from the log before it read
 // them: frames not drawn for longer than the changes are kept).
 //
 // Pure: no three, so it runs in node for the tests.

@@ -77,7 +77,7 @@
 // in flight).
 //
 // Her loop. ?flood=seconds, after ?drive='s legs, steers her back to where she
-// began until her loop closes (her trail back into her own water), then sails
+// began until her loop closes (her strip back against her older water), then sails
 // on that many seconds more (?inward=seconds, after the legs, sails her that
 // long toward the middle of the storm's next circle, then lies to): with
 // ?pause, the flood stopped mid-sweep. ?homeward, after the legs, steers her
@@ -221,7 +221,6 @@ function setupOf(release: Setup): Setup {
       sea: sea === 'charts' || sea === 'wake' ? sea : release.drawing.sea,
       // (room for ?ships= past a match's, for judging the frame with more)
       fleet: Math.max(release.drawing.fleet, number('ships', 0) + 1),
-      length: release.drawing.length,
       lod: params.has('lod') ? number('lod', 0) : release.drawing.lod,
       cloth: params.get('cloth') !== '0' && release.drawing.cloth,
       bolt: params.has('bolt') || release.drawing.bolt,

@@ -62,9 +62,6 @@ export const CUE_NAMES = [
   'select',
   'whistle',
   'claim',
-  'cut',
-  'enter',
-  'leave',
   'closing',
   'tap',
   'open',
@@ -128,9 +125,6 @@ export const CUES: Record<Cue, CueSound> = {
   whistle: { sound: 'whistle', level: 0, bus: 'world' },
   // her water, and the storm
   claim: { sound: 'claim', level: 0, bus: 'own' },
-  cut: { sound: 'cut', level: 0, bus: 'own' },
-  enter: { sound: 'enter', level: 0, bus: 'own' },
-  leave: { sound: 'leave', level: 0, bus: 'own' },
   closing: { sound: 'closing', level: 0, bus: 'own' },
   // the screens
   tap: { sound: 'tap', level: 0, bus: 'ui' },

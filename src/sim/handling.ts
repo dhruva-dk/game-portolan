@@ -133,13 +133,13 @@ export const HEALTH = {
 } as const;
 
 /**
- * Her own water (territory.ts): inside it her shield comes back `shield` hit
- * points a second, well under what a common cannon takes off a second held on
- * her (GUNS.cannon), so a fight can't be won by sitting at home, but 20–30 s
- * there after one puts back 60–90 of it; and she sails `speed` times her top
- * speed (+9%, 14.7 m/s).
+ * Her water (territory.ts, holding.ts): wherever she is, her shield comes back
+ * `shield` hit points a second with `full` of the calm hers (a fifth of the sea
+ * inside the storm), in proportion with less: well under what a common cannon
+ * takes off a second held on her (GUNS.cannon), so a fight can't be won on
+ * water alone, but 20–30 s after one puts back 60–90 of it.
  */
-export const HOLDING = { shield: 3, speed: 1.09 } as const;
+export const HOLDING = { shield: 3, full: 0.2 } as const;
 
 /**
  * Gust, her one ability (gust.ts): a burst of wind in her canvas and a hop off

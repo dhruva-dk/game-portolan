@@ -414,7 +414,6 @@ test('listen: a ball passing near whistles once; a slot of her stores taken in h
   assert.deepEqual(cues(hearing(scene(2.6), status(), 'match')), ['launch']);
   const sea = (
     seq: number,
-    trail: boolean,
     changes: NonNullable<Snapshot['sea']>['changes'] = []
   ): Snapshot['sea'] => ({
     generation: 1,
@@ -422,37 +421,31 @@ test('listen: a ball passing near whistles once; a slot of her stores taken in h
     seq,
     changes,
     colours: [],
-    trails: trail ? [{ id: 0, serial: 1, points: [] }] : [],
   });
-  cues(hearing(scene(3, [], [], [], sea(0, false)), status()));
-  assert.deepEqual(
-    cues(hearing(scene(3.1, [], [], [], sea(0, true)), status())),
-    ['leave']
-  );
+  cues(hearing(scene(3, [], [], [], sea(0)), status()));
   assert.deepEqual(
     cues(
       hearing(
         scene(
-          3.2,
+          3.1,
           [],
           [],
           [],
-          sea(1, false, [
-            { seq: 1, time: 3.2, kind: 'claim', ship: 0, cells: [], loop: 0 },
+          sea(2, [
+            { seq: 1, time: 3.1, kind: 'paint', ship: 0, cells: [] },
+            { seq: 2, time: 3.1, kind: 'claim', ship: 0, cells: [], loop: 0 },
           ])
         ),
         status()
       )
     ),
-    ['claim']
+    ['claim'],
+    'a loop closed heard, her strip not'
   );
   assert.deepEqual(
-    cues(hearing(scene(3.3, [], [], [], sea(1, true)), status())),
-    ['leave']
-  );
-  assert.deepEqual(
-    cues(hearing(scene(3.4, [], [], [], sea(1, false)), status())),
-    ['enter']
+    cues(hearing(scene(3.2, [], [], [], sea(2)), status())),
+    [],
+    'each change heard once'
   );
   // the way home's parchment: the bed follows how much of the world it covers
   assert.equal(

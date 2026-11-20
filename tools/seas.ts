@@ -33,16 +33,11 @@ export const seaOf = (t: Territory, generation: number): Sea => ({
   seq: t.last(),
   changes: t.changes(),
   colours: [],
-  trails: t
-    .trails()
-    .flatMap((k, id) =>
-      k.points.length ? [{ id, serial: k.serial, points: k.points }] : []
-    ),
 });
 
 /**
- * Ships sailing bites out of their homes near `centre`, crossing each other's
- * trails, some sunk, under a storm that closes after `calm` s: `steps` steps of
+ * Ships sailing bites out of their homes near `centre`, painting over each
+ * other's water, some sunk, under a storm that closes after `calm` s: `steps` steps of
  * a match, each handed to `frame` once its sea is (generation `generation`),
  * with the clock, read or not, as the frames fall.
  */

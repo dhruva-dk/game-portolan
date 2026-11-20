@@ -1,8 +1,7 @@
 // What is heard from what she sees and holds as it changes, frame to frame (the
 // deeds on the sea are the match's moments: status.moments, her guns' among
 // them): a slot of her stores taken in hand, a ball passing near the eye, her
-// water (a loop closed, her trail cut, her own water left and entered), the
-// storm beginning to close, and the screens
+// water (a loop closed), the storm beginning to close, and the screens
 // (a folio opened and closed, PLAY, her end); and what the bed follows (Bed):
 // her speed, the wind in her rig, her heave and roll, the nearest coast, the
 // storm's wall, her hull, and how much of the sea is heard at all (and how much
@@ -127,7 +126,6 @@ export function createListen(ground: (p: Vec3) => number) {
     map = false,
     generation = -1,
     seq = 0,
-    trail = false,
     closing = false;
   let chosen = 0;
   let lift = NaN,
@@ -209,7 +207,6 @@ export function createListen(ground: (p: Vec3) => number) {
       if (fresh) {
         generation = sea?.generation ?? 0;
         seq = sea?.seq ?? 0;
-        trail = false;
         closing = s.closing;
         lift = NaN;
       }
@@ -220,22 +217,12 @@ export function createListen(ground: (p: Vec3) => number) {
         call(out, 'select');
       chosen = s.chosen;
 
-      // her water: a loop closed, her trail cut; her open trail begun (she left
-      // her water) or ended (back in it)
+      // her water: a loop closed
       if (sea && scene.own !== null) {
-        let claimed = false;
-        for (const c of sea.changes) {
-          if (c.seq <= seq || c.ship !== scene.own) continue;
-          if (c.kind === 'claim') call(out, 'claim');
-          if (c.kind === 'cut') call(out, 'cut');
-          claimed ||= c.kind === 'claim' || c.kind === 'cut';
-        }
+        for (const c of sea.changes)
+          if (c.seq > seq && c.ship === scene.own && c.kind === 'claim')
+            call(out, 'claim');
         seq = sea.seq;
-        let open = false;
-        for (const t of sea.trails) open ||= t.id === scene.own;
-        if (!fresh && open && !trail) call(out, 'leave');
-        if (!fresh && !open && trail && !claimed && own) call(out, 'enter');
-        trail = open;
       }
       if (s.closing && !closing && FOUGHT(shown)) call(out, 'closing');
       closing = s.closing;

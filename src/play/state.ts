@@ -45,7 +45,7 @@ import { STEP, blendPose } from '../sim/fixed.ts';
 import { gunOf } from '../sim/gun.ts';
 import { SHIP } from '../sim/handling.ts';
 import { sunk } from '../sim/health.ts';
-import { homed, regain, type Regained } from '../sim/holding.ts';
+import { regain, type Regained } from '../sim/holding.ts';
 import { PLAYER, SHIPS, credited, type Cause } from '../sim/match.ts';
 import { berths, type Berthing, type Spawn } from '../sim/spawn.ts';
 import {
@@ -163,9 +163,9 @@ interface Afloat {
 }
 
 /**
- * What a step did to who holds the sea: its loops closed and trails cut
- * (sim/territory.ts; null outside a match), and the shield each ship's own
- * water gave back (sim/holding.ts).
+ * What a step did to who holds the sea: its loops closed (sim/territory.ts;
+ * null outside a match), and the shield each ship's water gave back
+ * (sim/holding.ts).
  */
 interface Stepped {
   held: Outcome | null;
@@ -307,12 +307,13 @@ export function createState(
 
   /**
    * What a step hands from part to part, kept and refilled: the ships sunk in
-   * it, the ships still sailing and their moves, and the ships that blew a
-   * gust.
+   * it, the ships still sailing, their moves and their ids, and the ships that
+   * blew a gust.
    */
   const lost: number[] = [],
     sailing: Vessel[] = [],
     moves: Move[] = [],
+    ids: number[] = [],
     blown = new Set<number>();
 
   /**
@@ -435,11 +436,7 @@ export function createState(
     battle.crews = wants.crews;
     const manned = byId(wants.crews);
     for (let i = 0; i < fleet.length; i++)
-      helms[i] = homed(
-        crewed(helms[i], manned.get(fleet[i].id)),
-        territory,
-        fleet[i]
-      );
+      helms[i] = crewed(helms[i], manned.get(fleet[i].id));
     from.clear();
     for (const v of fleet) from.set(v.id, v.ship.at);
     const met = stepFleet(fleet, helms, STEP, depth);
@@ -500,9 +497,9 @@ export function createState(
   };
 
   /**
-   * Who holds the sea after the step (each trail laid, each loop closed), and
-   * in her own water her shield coming back: of the ships still afloat, those
-   * sunk in the step (`lost`) laying, closing and cutting nothing in it.
+   * Who holds the sea after the step (each strip painted, each loop closed),
+   * and each ship's shield coming back by her share of it: of the ships still
+   * afloat, those sunk in the step (`lost`) painting and closing nothing in it.
    */
   const hold = (storm: Storm): Stepped => {
     if (!territory) return UNHELD;
@@ -514,10 +511,11 @@ export function createState(
       m.id = v.id;
       m.from = from.get(v.id) ?? v.ship.at;
       m.to = v.ship.at;
+      ids[i] = v.id;
     }
-    moves.length = sailing.length;
+    moves.length = ids.length = sailing.length;
     const did = territory.step(moves, tick * STEP, storm);
-    const back = regain(battle.crews, sailing, territory, STEP);
+    const back = regain(battle.crews, ids, territory, storm, STEP);
     battle.crews = back.crews;
     return { held: did, regained: back.regained };
   };

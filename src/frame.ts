@@ -93,8 +93,7 @@ const WARM: readonly Eye[] = [
 /**
  * How the frame draws: what the sea is drawn as (water/water.ts); the most
  * ships it draws at once (the room the fleet and the sea keep for them: the
- * match's ship count), and a ship's length overall, m (the sim's: her trail
- * runs from her stern); every ship at one level of detail (ship/fleet.ts pin)
+ * match's ship count); every ship at one level of detail (ship/fleet.ts pin)
  * or null; whether the near ships' canvas is simulated; whether the storm's
  * lightning is held lit (sky/storm-bolt.ts), for a still of it; and anything
  * more to stand in the world, lit by the sky.
@@ -102,7 +101,6 @@ const WARM: readonly Eye[] = [
 export interface FrameOptions {
   sea: SeaShows;
   fleet: number;
-  length: number;
   lod: number | null;
   cloth: boolean;
   bolt: boolean;
@@ -187,7 +185,6 @@ export function createFrame(
     ground,
     world.wind,
     options.fleet,
-    options.length,
     options.sea
   );
   const shadow = createShadow();
@@ -218,8 +215,7 @@ export function createFrame(
     ...groves.meshes,
     ...fleet.meshes,
     ...arms.meshes,
-    water.mesh,
-    water.ribbons
+    water.mesh
   );
   scene.add(
     ...gunfire.meshes,
@@ -228,11 +224,7 @@ export function createFrame(
   );
   // labels for the meter's split of the draws (meter.ts), and nothing more
   scene.name = 'world';
-  [terrain.mesh.name, water.mesh.name, water.ribbons.name] = [
-    'terrain',
-    'sea',
-    'trails',
-  ];
+  [terrain.mesh.name, water.mesh.name] = ['terrain', 'sea'];
   gunfire.meshes.forEach((m) => (m.name ||= 'gunfire'));
   loot.meshes.forEach((m, k) => (m.name ||= `loot ${k}`));
 
@@ -442,7 +434,7 @@ export function createFrame(
 
   /**
    * Builds every shader the frame can draw with, and its pipeline, once the ground is baked and before the first
-   * frame (ready): the view from space, the other ships, the loot, the trails, the guns' work and the ships' marks are
+   * frame (ready): the view from space, the other ships, the loot, the guns' work and the ships' marks are
    * first seen only once a match is under way, and a shader first built then costs that frame tens of milliseconds
    * (more on the phone). Each eye's post is drawn at two frames from its WARM eye, its passes set up (a post's pass
    * inside another is set up again as the outer is built, which remakes its draw at the next); then its scene is built

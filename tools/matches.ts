@@ -65,9 +65,9 @@ for (let g = 0; g < games; g++) {
     const shares = state.ships().map((k) => state.share(k.id));
     return `${(100 * shares.reduce((a, b) => a + b, 0)).toFixed(2)}% (most ${(100 * Math.max(...shares)).toFixed(2)}%)`;
   };
-  /** The match's loops (closed, the square metres they took, cut by another, cut by herself or given up) and the shield
-   *  each ship's own water gave back, from what each step did. */
-  const loops = { closed: 0, metres: 0, cut: 0, own: 0 },
+  /** The match's loops (closed, the square metres they took) and the shield each ship's water gave back, from what each
+   *  step did. */
+  const loops = { closed: 0, metres: 0 },
     back = new Map<number, number>();
   const balls = { fired: 0, struck: 0 };
   /** By kind: shots fired, balls fired (a scatter's pellets each), and balls come down short of a ship. */
@@ -86,10 +86,6 @@ for (let g = 0; g < games; g++) {
         loops.closed + 1,
         loops.metres + k.metres,
       ];
-    for (const k of did.held?.cut ?? []) {
-      if (k.by !== null && k.by !== k.id) loops.cut++;
-      else loops.own++;
-    }
     for (const k of did.regained)
       back.set(k.id, (back.get(k.id) ?? 0) + k.shield);
     // the balls fired and struck home this step (what the guns did, kept for the frame: those newer than the last seen)
@@ -199,7 +195,7 @@ for (let g = 0; g < games; g++) {
     regained = [...back.values()];
   console.log(`  held: ${held.join(', ')}, end ${holding()}`);
   console.log(
-    `  loops: ${l.closed} closed (${l.metres.toFixed(0)} m²), ${l.cut} cut by another, ${l.own} cut by herself or given up;` +
+    `  loops: ${l.closed} closed (${l.metres.toFixed(0)} m²);` +
       ` shield from her water ${regained.reduce((a, b) => a + b, 0).toFixed(0)} hp over ${regained.filter((k) => k > 0).length} ships`
   );
   const all = [...stuck.values()],

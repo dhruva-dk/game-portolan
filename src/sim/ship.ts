@@ -25,7 +25,7 @@ import {
   scale,
   type Vec3,
 } from '../world/sphere.ts';
-import { GUST, HOLDING, SHIP } from './handling.ts';
+import { GUST, SHIP } from './handling.ts';
 import { navigate, type Depth } from './shoal.ts';
 
 /** One ship's state. */
@@ -51,11 +51,6 @@ export interface Helm {
   throttle: number;
   /** Whether a gust fills her canvas this step (gust.ts; handling.ts GUST). */
   gust?: boolean;
-  /**
-   * Whether she is in her own water this step (territory.ts; handling.ts
-   * HOLDING): her top speed is higher there.
-   */
-  home?: boolean;
 }
 
 /**
@@ -123,8 +118,7 @@ export function step(
     (rudder * SHIP.turn * (helm.gust ? GUST.turn : 1) * bite(s.speed) -
       s.turn) *
       close(SHIP.answer, dt);
-  const top = SHIP.top * (helm.home ? HOLDING.speed : 1);
-  const want = Math.max(0, Math.min(1, helm.throttle)) * top;
+  const want = Math.max(0, Math.min(1, helm.throttle)) * SHIP.top;
   let speed: number;
   // a gust drives her on hard toward its speed over what she asks; after it,
   // what she has over her top is shed at a rate
@@ -135,7 +129,8 @@ export function step(
         -GUST.accel * dt,
         Math.min(GUST.accel * dt, want + GUST.speed - s.speed)
       );
-  else if (s.speed > top) speed = Math.max(top, s.speed - GUST.shed * dt);
+  else if (s.speed > SHIP.top)
+    speed = Math.max(SHIP.top, s.speed - GUST.shed * dt);
   else
     speed =
       s.speed +

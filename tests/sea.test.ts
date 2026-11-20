@@ -87,7 +87,8 @@ test("a new match's changes are read from its first: its loops closed are not ta
     );
   }
   assert.ok(first.changes().at(-1)!.seq > 10);
-  // the second: a new sea, read whole, then its first loop read as a loop closed
+  // the second: a new sea, read whole, then its first loop read as a loop
+  // closed
   const second = createTerritory(1);
   second.begin([home], 0);
   assert.equal(cursor.read(seaOf(second, 2)).fresh, true);
@@ -96,8 +97,12 @@ test("a new match's changes are read from its first: its loops closed are not ta
     { fresh, from } = cursor.read(sea);
   assert.equal(fresh, false);
   assert.deepEqual(
-    sea.changes.slice(from).map((c) => c.kind),
-    ['claim']
+    sea.changes
+      .slice(from)
+      .map((c) => c.kind)
+      .filter((k) => k !== 'paint'),
+    ['claim'],
+    'her strips painted, and one loop closed'
   );
   // read again, nothing new; and no sea at all starts over once
   assert.equal(cursor.read(sea).from, sea.changes.length);
@@ -155,7 +160,7 @@ test("the water's copy of the cells keeps up with the sea: loops, drains, the st
     for (let f = 0; f < 600 && !claimed.idle(); f++) frame(undefined);
     same(new Uint8Array(CELLS), 'the lobby');
   }
-  assert.deepEqual([...kinds].sort(), ['claim', 'cut', 'drain', 'home']);
+  assert.deepEqual([...kinds].sort(), ['claim', 'drain', 'home', 'paint']);
   // whole for each match's first frame and each lobby's, and again after frames
   // missed
   assert.ok(whole > 4, `taken whole ${whole} times`);

@@ -210,8 +210,7 @@ export function steer(c: Ctx, dt: number): Helm {
   if (answered !== null) turn = answered;
   // going for loot or mending, she eases up near where she makes for
   const easy =
-    (m.mode === 'loot' || m.mode === 'heal' || m.mode === 'home') &&
-    toD < PURSER.near
+    (m.mode === 'loot' || m.mode === 'heal') && toD < PURSER.near
       ? PURSER.slow
       : 1;
   // a mark (not a ship; the ring's round a foe is one) inside the circle she

@@ -1,13 +1,10 @@
 // A bot's water (sim/claimer.ts), as she sails it against who holds the sea
-// (sim/territory.ts): out on a loop and back, home when hurt but not into the
-// storm, and across another's open trail.
+// (sim/territory.ts): out on a loop and back, taking the water it closes.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mind, think, type Memory } from '../src/sim/bot.ts';
-import { shot } from '../src/sim/captain.ts';
 import { afloat, stepFleet, type Vessel } from '../src/sim/contact.ts';
 import { STEP } from '../src/sim/fixed.ts';
-import { SHIP } from '../src/sim/handling.ts';
 import type { Depth } from '../src/sim/shoal.ts';
 import { shipAt, type Helm } from '../src/sim/ship.ts';
 import type { Storm } from '../src/sim/storm.ts';
@@ -17,13 +14,7 @@ import {
   type Outcome,
   type Territory,
 } from '../src/sim/territory.ts';
-import {
-  R,
-  along,
-  bearingAt,
-  distance,
-  fromLatLon,
-} from '../src/world/sphere.ts';
+import { along, bearingAt, distance, fromLatLon } from '../src/world/sphere.ts';
 
 const start = fromLatLon(0.2, 0.3);
 const deep: Depth = () => 30;
@@ -123,86 +114,4 @@ test('a bot sails out of her water on a loop and back into it, and takes the wat
     `${closed} loops closed, ${back} of them back in her water`
   );
   assert.ok(t.share(0) > 2 * home, `her share ${t.share(0)} from ${home}`);
-});
-
-/** Her home patch at the start, and her 90 m north of it, just shot and her shield down: where she goes, and what she
- *  is about, over `seconds` under `storm`. */
-function hurt(seconds: number, storm?: Storm) {
-  const seed = seedWhere((k) => k.claim > 0.5),
-    t = createTerritory(1);
-  t.begin([start], 0);
-  const she: Seen = { ...placed(0, 0, 90, Math.PI / 2), shield: 5, hull: 60 };
-  const m = mind(seed, start),
-    modes = new Set<string>();
-  const r = voyage([she], [seed], seconds, t, {
-    minds: [shot(m, 1)],
-    storm,
-    each: (_, minds) => modes.add(minds[0]!.mode),
-  });
-  return {
-    modes,
-    home: t.ownerAt(r.fleet[0].ship.at) === 0,
-    from: distance(r.fleet[0].ship.at, start),
-  };
-}
-
-test('hurt and her shield down, she heads home to her water; not with the storm on it', () => {
-  const free = hurt(25);
-  assert.ok(free.modes.has('home'), `about ${[...free.modes]}`);
-  assert.ok(free.home, `${free.from.toFixed(0)} m from her berth`);
-  // the storm's calm 200 m north of her berth, 150 m round: her water outside it, she inside
-  const centre = along(start, bearingAt(start, 0), 200).p,
-    cap = { centre, radius: 150 / R };
-  const storm: Storm = {
-    ...cap,
-    next: cap,
-    closing: false,
-    secondsToNext: 60,
-    phase: 1,
-    damage: 0.05,
-  };
-  const stormy = hurt(25, storm);
-  assert.ok(!stormy.modes.has('home'), `about ${[...stormy.modes]}`);
-  assert.ok(
-    !stormy.home && stormy.from > 50,
-    `${stormy.from.toFixed(0)} m from her berth`
-  );
-});
-
-test("a bot sails across another's open trail she can reach before its ship is home, whatever her temper", () => {
-  const north = bearingAt(start, 0),
-    helm = (v: Vessel): Helm => ({
-      course: bearingAt(v.ship.at, 0),
-      throttle: 1,
-    });
-  for (let seed = 1; seed <= 12; seed++) {
-    // his water at the start, hers far to the south; he sails north some 200 m, laying his trail, out of her sight
-    const t = createTerritory(2);
-    t.begin([along(start, bearingAt(start, Math.PI), 600).p, start], 0);
-    const sailed = Math.round(202 / SHIP.top / STEP) * STEP;
-    const him = voyage([afloat(1, shipAt(start, north))], [null], sailed, t, {
-      held: helm,
-    }).fleet[0];
-    // she lies 70 m off its middle, abeam of it; he is some 100 m on and 180 m from home: she reaches it long before
-    const mid = along(start, north, 90).p,
-      at = along(mid, bearingAt(mid, Math.PI / 2), 70).p;
-    let cut = 0;
-    const modes = new Set<string>();
-    voyage(
-      [afloat(0, shipAt(at, bearingAt(at, Math.PI))), him],
-      [seed, null],
-      15,
-      t,
-      {
-        since: sailed,
-        held: helm,
-        each: (_, minds, did) => {
-          modes.add(minds[0]!.mode);
-          cut += did.cut.filter((k) => k.id === 1 && k.by === 0).length;
-        },
-      }
-    );
-    assert.ok(modes.has('cut'), `seed ${seed}: about ${[...modes]}`);
-    assert.equal(cut, 1, `seed ${seed}: his trail cut by her`);
-  }
 });

@@ -11,7 +11,8 @@
 // change front reached it. A change keeps the cells' state before it for HOLD
 // s, the shader drawing the old against the new as a front sweeps over (from
 // the loop's own cells, a breadth-first spread alternately four- and eight-way
-// for a near round front, smoothed twice), then the cells settle and forget it.
+// for a near round front, smoothed twice; a painted strip all at once), then
+// the cells settle and forget it.
 // The changes read are drawn in order within a few milliseconds' work a frame
 // (work, SLICES), a large one over some frames: the GPU's words wait until it
 // is done and its front starts then, each cell still drawn as it was until the
@@ -496,7 +497,15 @@ export function createClaimed(slices = SLICES) {
       if (!sea) return false;
       for (let i = from; i < sea.changes.length; i++) {
         const k = sea.changes[i];
-        if (k.kind === 'claim') {
+        // her strip: every cell its own front's source, drawn at once
+        if (k.kind === 'paint')
+          pending.push({
+            cells: k.cells,
+            owner: k.ship + 1,
+            time: k.time,
+            from: k.cells,
+          });
+        else if (k.kind === 'claim') {
           const loop = k.cells;
           const from = Int32Array.from({ length: k.loop }, (_, j) => loop[j]);
           pending.push({

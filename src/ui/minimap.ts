@@ -5,8 +5,7 @@
 // On the plain sea, from the bottom up: who holds the water, a wash in each
 // holder's colour, hers the deeper (held.ts); the land, its shallows a pale
 // wash, its parchment going ochre up the hills (from the ground round her,
-// ground.ts), its coasts inked (coasts.ts); her open trail, a line in her
-// colour; the Storm's side of its edge washed in its own violet and the edge a
+// ground.ts), its coasts inked (coasts.ts); the Storm's side of its edge washed in its own violet and the edge a
 // violet line; the circle it next closes to, a white dotted line. Nothing else:
 // no other ship and no loot (those are found by eye). Outside the next circle a
 // white line runs from her to its nearest point, ending in an arrowhead (on the
@@ -125,7 +124,7 @@ export function createMinimap(
     (Math.atan2(dot(t, l.right), dot(t, l.ahead)) * 180) / Math.PI;
 
   /** What was last drawn: where she was (millionths), her heading (tenths of a degree), gilt or not, the calm's size and
-   *  place, the next's size, the sea's last change and her trail's length. */
+   *  place, the next's size and the sea's last change. */
   const was = {
     x: NaN,
     y: NaN,
@@ -136,7 +135,6 @@ export function createMinimap(
     calmAt: NaN,
     next: NaN,
     seq: NaN,
-    trail: NaN,
   };
   let gilt: boolean | null = null,
     then = performance.now();
@@ -150,14 +148,6 @@ export function createMinimap(
     layAt(l, at, c, k);
     const sea = more.sea,
       seq = sea?.changes.at(-1)?.seq ?? NaN;
-    let trail: Sea['trails'][number] | null = null;
-    if (sea) {
-      for (const t of sea.trails) {
-        if (t.id !== more.own) continue;
-        trail = t;
-        break;
-      }
-    }
     const x = Math.round(at[0] * 1e6),
       y = Math.round(at[1] * 1e6),
       z = Math.round(at[2] * 1e6),
@@ -165,7 +155,6 @@ export function createMinimap(
     const calmR = more.calm?.radius ?? NaN,
       calmAt = more.calm?.centre[0] ?? NaN,
       nextR = more.next?.radius ?? NaN;
-    const points = trail?.points.length ?? NaN;
     if (
       x === was.x &&
       y === was.y &&
@@ -175,8 +164,7 @@ export function createMinimap(
       same(calmR, was.calm) &&
       same(calmAt, was.calmAt) &&
       same(nextR, was.next) &&
-      same(seq, was.seq) &&
-      same(points, was.trail)
+      same(seq, was.seq)
     )
       return;
     was.x = x;
@@ -188,7 +176,6 @@ export function createMinimap(
     was.calmAt = calmAt;
     was.next = nextR;
     was.seq = seq;
-    was.trail = points;
     then = now;
     her.setAttribute(
       'transform',
@@ -206,19 +193,6 @@ export function createMinimap(
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     land.draw(ctx, l, lay);
     shores(at);
-    if (trail && trail.points.length) {
-      // her open trail, on to her stern
-      trace(trail.points, false);
-      const p = place(l, at);
-      ctx.lineTo(p[0], p[1]);
-      ctx.lineCap = ctx.lineJoin = 'round';
-      ctx.strokeStyle = INK.white;
-      ctx.lineWidth = 3.2 * dpr;
-      ctx.stroke();
-      ctx.strokeStyle = INK.scarlet;
-      ctx.lineWidth = 1.8 * dpr;
-      ctx.stroke();
-    }
     const calm =
       more.calm && more.calm.radius < R * Math.PI * 0.99 ? more.calm : null;
     if (calm) {

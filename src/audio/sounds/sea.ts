@@ -1,6 +1,6 @@
-// Her ship and her sea's sounds: a gust filling her canvas, the loot she takes up and the stores she mends with, and
-// her water: a loop closed (the sea rushing as her colour floods it), her trail
-// cut, her own water entered and left, the storm beginning to close.
+// Her ship and her sea's sounds: a gust filling her canvas, the loot she takes
+// up and the stores she mends with, and her water: a loop closed (the sea
+// rushing as her colour floods it), the storm beginning to close.
 
 import {
   ar,
@@ -97,55 +97,6 @@ export function claim(rate: number, seed: number): Samples {
   bubbles(t, 22, 1, 1.8, 300, 900, 0.06);
   filter(t, 'lowshelf', 130, 0.7, -8);
   return normal(finish(t, 0.05, 0.4)).x;
-}
-
-/** Her trail cut: a line snapping, its whip, and its slack slapping down. */
-export function cut(rate: number, seed: number): Samples {
-  const t = take(0.75, rate, seed);
-  const snap = layer(t, 0.05);
-  noise(snap, fall(0.0025));
-  filter(snap, 'highpass', 1000);
-  mix(t, snap, 0, 1.4);
-  const whip = layer(t, 0.3);
-  noise(whip, ar(0.004, 0.06));
-  filter(whip, 'bandpass', (s) => 3600 * Math.exp(-s / 0.05) + 450, 2);
-  mix(t, whip, 0, 1.2);
-  modes(
-    t,
-    [
-      [240, 0.12, 0.5],
-      [520, 0.07, 0.3],
-    ],
-    0.11,
-    0.05
-  );
-  const slap = layer(t, 0.3);
-  noise(slap, ar(0.002, 0.04));
-  filter(slap, 'lowpass', 900);
-  mix(t, slap, 0.11, 0.9);
-  return normal(finish(t)).x;
-}
-
-/** Into her own water: a soft, settling wash. */
-export function enter(rate: number, seed: number): Samples {
-  const t = take(1.3, rate, seed);
-  const wash = layer(t);
-  noise(wash, swell(0.3, 1.25, 0.8));
-  filter(wash, 'lowpass', (s) => 900 - 400 * s, 0.7);
-  mix(t, wash, 0, 1);
-  bubbles(t, 8, 0.2, 0.8, 500, 900, 0.05);
-  filter(t, 'highpass', 70);
-  return normal(finish(t, 0.02, 0.2)).x;
-}
-
-/** Out of her own water: a lighter wash opening ahead of her. */
-export function leave(rate: number, seed: number): Samples {
-  const t = take(0.9, rate, seed);
-  const wash = layer(t);
-  noise(wash, swell(0.12, 0.85, 0.6));
-  filter(wash, 'bandpass', (s) => 900 + 900 * s, 0.8);
-  mix(t, wash, 0, 1);
-  return normal(finish(t, 0.02, 0.2)).x;
 }
 
 /**

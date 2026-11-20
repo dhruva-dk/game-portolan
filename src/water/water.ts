@@ -107,7 +107,6 @@ import { createClaims } from './claims.ts';
 import { createFoam } from './foam.ts';
 import { createHulls } from './hulls.ts';
 import { N_WATER, createOptics } from './optics.ts';
-import { createTrails } from './trails.ts';
 import { createWake, type Afloat } from './wake.ts';
 import { createWaves } from './waves.ts';
 
@@ -180,8 +179,8 @@ const RUNUP = 0.5,
 export type SeaShows = 'water' | 'charts' | 'wake';
 
 /**
- * wind: the planet's prevailing wind; ships: the most there will be, and
- * shipLength a ship's overall, m; shows: what the sea is drawn as.
+ * wind: the planet's prevailing wind; ships: the most there will be; shows:
+ * what the sea is drawn as.
  */
 export function createWater(
   view: View,
@@ -189,7 +188,6 @@ export function createWater(
   ground: Ground,
   wind: Wind,
   ships: number,
-  shipLength: number,
   shows: SeaShows = 'water'
 ) {
   const waves = createWaves();
@@ -512,22 +510,9 @@ export function createWater(
   mesh.frustumCulled = false;
 
   const caustics = createCaustics(view, sky, waves, charts, shallows);
-  // the open trails, riding the waves (and the wakes' waves) as the water does
-  const trails = createTrails(
-    sky,
-    (up, c) =>
-      view
-        .place(up, 0)
-        .add(waveAt(up, c).xyz)
-        .add(up.mul(wake.height(up))),
-    shipLength,
-    ships
-  );
 
   return {
     mesh,
-    /** The open trails' ribbons, drawn after the sea. */
-    ribbons: trails.mesh,
     /**
      * The sea's charts (world/lattice.ts), for its CPU copy (world/swell.ts).
      */
@@ -567,13 +552,6 @@ export function createWater(
     ): { waves: Compute[]; wake: Draw | null } {
       const clock = drawn?.clock ?? env.clock;
       claims.update(drawn?.sea, clock, drawn?.own ?? null);
-      trails.update(
-        drawn?.sea,
-        clock,
-        drawn?.ships ?? [],
-        view.eye,
-        drawn?.own ?? null
-      );
       const swell = waves.update(
         { wind: env.seaWind, fetch: FETCH },
         env.windSpeed,

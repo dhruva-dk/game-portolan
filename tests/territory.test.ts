@@ -4,10 +4,11 @@
 // Geometry: a ship sails once round a circle at angle θ from a pole, starting
 // and ending in her home patch, and closes the loop. Her water must then be the
 // spherical cap 2πR²(1 − cos θ) plus the part of the home patch outside it.
-// With P the circle's length, d the largest cell diagonal and ρ the patch's
-// radius, the cells claimed are those the path touched (within d of the
-// circle), those enclosed, and the patch's (centres in it), so measured −
-// expected lies in [−πρd, P·d + πρd] (the path here is the circle itself).
+// With P the circle's length, d the largest cell diagonal, b the strip's half
+// width and ρ the patch's radius, the cells claimed are those her strip painted
+// (within b + d of the circle), those enclosed, and the patch's (centres in
+// it), so measured − expected lies in [−πρd, P·(b + d) + πρd] (the path here is
+// the circle itself).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -99,11 +100,10 @@ function patchOutsideCap(theta: number): number {
 
 /**
  * Sails ship 0 of `t` along `path` (unit vectors), a step from each to the
- * next; returns every outcome.
+ * next; returns the square metres of each loop she closed.
  */
 function sail(t: Territory, path: readonly Vec3[], id = 0, cap = WHOLE) {
-  const claimed: number[] = [],
-    cut: (number | null)[] = [];
+  const claimed: number[] = [];
   for (let k = 1; k < path.length; k++) {
     const o = t.step(
       [{ id, from: path[k - 1], to: path[k] }],
@@ -111,9 +111,15 @@ function sail(t: Territory, path: readonly Vec3[], id = 0, cap = WHOLE) {
       cap
     );
     for (const c of o.claimed) claimed.push(c.metres);
-    for (const c of o.cut) cut.push(c.by);
   }
-  return { claimed, cut };
+  return { claimed };
+}
+
+/** The point `m` metres from `p` square to the great circle from `p` toward `q`, to its left. */
+function aside(p: Vec3, q: Vec3, m: number): Vec3 {
+  const ahead = normalize(add(q, p, -dot(p, q))),
+    left = cross(p, ahead);
+  return normalize(add(p, left, m / R));
 }
 
 /**
@@ -182,23 +188,20 @@ for (const [label, deg, pole] of CIRCLES) {
       path = circlePath(pole, theta);
     const t = createTerritory(1);
     t.begin([path[0]], 0);
-    const { claimed, cut } = sail(t, path);
+    const { claimed } = sail(t, path);
     assert.equal(claimed.length, 1, 'the loop closed once');
-    assert.deepEqual(cut, []);
     const P = 2 * Math.PI * R * Math.sin(theta),
-      rim = Math.PI * TERRITORY.home * DIAGONAL;
+      rim = Math.PI * TERRITORY.home * DIAGONAL,
+      most = P * (TERRITORY.brush + DIAGONAL) + rim;
     const expected =
       2 * Math.PI * R * R * (1 - Math.cos(theta)) + patchOutsideCap(theta);
     const measured = t.share(0) * PLANET,
       err = measured - expected;
     console.log(
       `${label}: ${measured.toFixed(0)} m², expected ${expected.toFixed(0)} (error ${((100 * err) / expected).toFixed(3)}%),` +
-        ` allowed [${(-rim).toFixed(0)}, ${(P * DIAGONAL + rim).toFixed(0)}]`
+        ` allowed [${(-rim).toFixed(0)}, ${most.toFixed(0)}]`
     );
-    assert.ok(
-      err >= -rim && err <= P * DIAGONAL + rim,
-      `error ${err.toFixed(0)} m²`
-    );
+    assert.ok(err >= -rim && err <= most, `error ${err.toFixed(0)} m²`);
   });
 }
 
@@ -217,7 +220,7 @@ test('a loop wider than a hemisphere takes the smaller side, the other one', () 
     P = 2 * Math.PI * R * Math.sin(theta),
     rim = Math.PI * TERRITORY.home * DIAGONAL;
   assert.ok(
-    err >= -rim && err <= P * DIAGONAL + rim,
+    err >= -rim && err <= P * (TERRITORY.brush + DIAGONAL) + rim,
     `error ${err.toFixed(0)} m²`
   );
   assert.ok(
@@ -226,7 +229,7 @@ test('a loop wider than a hemisphere takes the smaller side, the other one', () 
   );
 });
 
-test('the closed trail is an unbroken chain of cells, and what it encloses is taken from others, islands and all', () => {
+test('what a loop encloses is taken from others, islands and all; it floods from her strip', () => {
   const pole: Vec3 = normalize([0.3, 0.8, -0.5]),
     theta = 0.12,
     path = circlePath(pole, theta);
@@ -238,114 +241,82 @@ test('the closed trail is an unbroken chain of cells, and what it encloses is ta
   assert.equal(t.ownerAt(pole), 0, 'her water inside the loop is taken');
   assert.equal(t.holds(1), false);
   const claim = t.changes().find((c) => c.kind === 'claim');
-  assert.ok(claim && claim.kind === 'claim');
-  for (let k = 1; k < claim.loop; k++) {
+  assert.ok(claim && claim.kind === 'claim' && claim.loop > 0);
+  for (let k = 0; k < claim.loop; k++) {
+    const off: number = distance(centreOf(claim.cells[k]), pole) - R * theta;
     assert.ok(
-      adjacent(claim.cells[k - 1], claim.cells[k]) ||
-        claim.cells[k - 1] === claim.cells[k],
-      `trail cells ${k - 1}→${k}`
+      Math.abs(off) <= TERRITORY.brush + DIAGONAL,
+      `the flood starts from her strip (${off.toFixed(1)} m off her course)`
     );
   }
 });
 
-test('another ship crossing her open trail cuts it: no water gained, and she must go home before laying another', () => {
-  const pole: Vec3 = [1, 0, 0],
-    theta = 0.15,
-    path = circlePath(pole, theta);
-  const t = createTerritory(2);
-  const far = onCircle(pole, theta + 0.3, Math.PI);
-  t.begin([path[0], far], 0);
-  const half = Math.floor(path.length / 2);
-  sail(t, path.slice(0, half));
-  assert.ok(t.trail(0).points.length > 10, 'her trail is open');
-  // ship 1 sails straight across the circle's middle, through her trail
-  const across = line(
-    onCircle(pole, theta + 0.05, Math.PI * 0.3),
-    onCircle(pole, theta + 0.05, Math.PI * 1.3)
-  );
-  const cuts = sail(t, across, 1).cut;
-  assert.deepEqual(cuts, [1], 'cut by ship 1');
-  assert.equal(t.trail(0).points.length, 0, 'her trail is gone');
-  const before = t.share(0);
-  const rest = sail(t, path.slice(half - 1));
-  assert.deepEqual(rest.claimed, [], 'coming home closes nothing');
-  assert.equal(t.share(0), before);
-  assert.ok(t.holds(0) && t.holds(1), 'nobody sinks of it');
-  // out again from her water, she lays a new trail
-  sail(t, line(path[0], onCircle(pole, theta + 0.1, 0.1)));
-  assert.ok(t.trail(0).points.length > 0);
-});
-
-test('crossing her own open trail cuts it too; and two ships crossing each other in one step both lose theirs', () => {
-  const t = createTerritory(3);
-  const pole: Vec3 = [0, -1, 0],
-    theta = 0.4;
-  const start = onCircle(pole, theta, 0);
-  t.begin(
-    [start, onCircle(pole, theta + 0.5, 2), onCircle(pole, theta + 0.5, 4)],
-    0
-  );
-  // a figure of eight: out, round a loop and back across her own path
-  const a = onCircle(pole, theta, 0.4),
-    b = onCircle(pole, theta - 0.1, 0.6),
-    c = onCircle(pole, theta + 0.1, 0.6);
-  const path = [
-    ...line(start, a),
-    ...line(a, b).slice(1),
-    ...line(b, c).slice(1),
-    ...line(c, onCircle(pole, theta - 0.05, 0.3)).slice(1),
-  ];
-  assert.deepEqual(sail(t, path).cut, [0], 'she cut her own');
-
-  // two ships each a trail, then each across the other's in the same step
-  const u = createTerritory(2),
-    A = normalize([1, 0.2, 0.1]),
-    B = normalize([1, -0.2, 0.1]);
-  u.begin([A, B], 0);
-  const pa = line(A, normalize([1, 0.2, -0.15])),
-    pb = line(B, normalize([1, -0.2, -0.15]));
-  for (let k = 1; k < Math.min(pa.length, pb.length); k++) {
-    u.step(
-      [
-        { id: 0, from: pa[k - 1], to: pa[k] },
-        { id: 1, from: pb[k - 1], to: pb[k] },
-      ],
-      k,
-      WHOLE
-    );
-  }
-  const ta = u.trail(0),
-    tb = u.trail(1);
-  const ca = ta.points[Math.floor(ta.points.length / 2)],
-    cb = tb.points[Math.floor(tb.points.length / 2)];
-  const ea = pa[pa.length - 1],
-    eb = pb[pb.length - 1];
-  const xa = line(ea, cb),
-    xb = line(eb, ca),
-    moves: Move[][] = [];
-  for (let k = 1; k < Math.max(xa.length, xb.length); k++) {
-    moves.push([
-      {
-        id: 0,
-        from: xa[Math.min(k - 1, xa.length - 1)],
-        to: xa[Math.min(k, xa.length - 1)],
-      },
-      {
-        id: 1,
-        from: xb[Math.min(k - 1, xb.length - 1)],
-        to: xb[Math.min(k, xb.length - 1)],
-      },
-    ]);
-  }
-  const cuts = moves.flatMap((m, k) => u.step(m, 100 + k, WHOLE).cut);
+test('sailing paints a strip as wide as her beam, hers at once: no line to cut, nothing given up', () => {
+  const start: Vec3 = normalize([0.2, -0.4, 0.9]),
+    t = createTerritory(1);
+  t.begin([start], 0);
+  const before = t.share(0) * PLANET;
+  // 120 m straight out from her home patch, out of it after 30
+  const end = normalize(add(start, basis(start)[0], 120 / R)),
+    path = line(start, end);
+  sail(t, path);
+  const painted = t.share(0) * PLANET - before,
+    strip = (120 - TERRITORY.home) * 2 * TERRITORY.brush;
   assert.ok(
-    cuts.some((c) => c.id === 0 && c.by === 1) &&
-      cuts.some((c) => c.id === 1 && c.by === 0),
-    JSON.stringify(cuts)
+    painted > strip * 0.7 && painted < strip * 1.6,
+    `painted ${painted.toFixed(0)} m², a strip of ${strip.toFixed(0)}`
+  );
+  for (const m of [50, 80, 110]) {
+    const p = path[Math.round(m / STRIDE)];
+    assert.equal(t.ownerAt(p), 0, `hers under her course, ${m} m out`);
+    assert.equal(t.ownerAt(aside(p, end, 1)), 0, 'hers a metre to the side');
+    assert.equal(t.ownerAt(aside(p, end, -1)), 0, 'and to the other');
+    assert.equal(t.ownerAt(aside(p, end, 9)), -1, 'open sea 9 m off');
+  }
+  const paints = t.changes().filter((c) => c.kind === 'paint');
+  assert.ok(paints.length > 0 && paints.every((c) => c.ship === 0));
+  // sailing on in her own water paints nothing more
+  const seq = t.last();
+  sail(t, line(end, path[Math.round(60 / STRIDE)]));
+  assert.ok(
+    t.changes().every((c) => c.seq <= seq || c.kind !== 'paint'),
+    'nothing painted over her own water'
   );
 });
 
-test("the storm takes the water outside its cap; a sunk ship's drains away; a ship with none lays a new home", () => {
+test("her strip takes others' water as it passes; theirs is left smaller, not cut off", () => {
+  const a: Vec3 = normalize([0.6, 0.6, 0.5]),
+    t = createTerritory(2);
+  const b = normalize(add(a, basis(a)[0], 70 / R));
+  t.begin([a, b], 0);
+  const theirs = t.share(1);
+  // straight through the middle of ship 1's home patch and out the far side
+  const through = normalize(add(a, basis(a)[0], 140 / R));
+  sail(t, line(a, through));
+  assert.equal(t.ownerAt(b), 0, "the middle of ship 1's patch is hers");
+  assert.ok(t.share(1) < theirs && t.holds(1), "ship 1's is smaller");
+  assert.ok(t.share(1) > theirs * 0.5);
+});
+
+test('crossing her own strip, far from where she painted it, closes a loop', () => {
+  const pole: Vec3 = normalize([-0.4, 0.3, 0.85]),
+    theta = 50 / R;
+  const home = onCircle(pole, theta + 120 / R, 0),
+    t = createTerritory(1);
+  t.begin([home], 0);
+  // out to the circle, once round it and on across her own strip there
+  const enter = onCircle(pole, theta, 0);
+  const path = [
+    ...line(home, enter),
+    ...circlePath(pole, theta, 0, 1.15).slice(1),
+  ];
+  const { claimed } = sail(t, path);
+  assert.equal(claimed.length, 1, 'one loop closed, far from home');
+  assert.equal(t.ownerAt(pole), 0, 'the middle of the loop is hers');
+  assert.ok(claimed[0] > 0.8 * Math.PI * 50 * 50);
+});
+
+test("the storm takes the water outside its cap; a sunk ship's drains away; a ship with none paints on where she is", () => {
   const t = createTerritory(2),
     a: Vec3 = [0, 1, 0],
     b = normalize([0, 0.2, 1]);
@@ -360,10 +331,12 @@ test("the storm takes the water outside its cap; a sunk ship's drains away; a sh
       drain.ship === null &&
       drain.cells.length > 100
   );
-  // not sunk: sailing on, she lays a new home patch where she is
+  // not sunk: sailing on, she paints water of her own where she is, no new
+  // home patch laid
   const path = line(b, normalize([0.1, 0.25, 1]));
-  sail(t, path, 1, cap);
-  assert.ok(t.holds(1), 'a new home');
+  sail(t, path, 1, WHOLE);
+  assert.ok(t.holds(1), 'water of her own again');
+  assert.ok(!t.changes().some((c) => c.kind === 'home' && c.time > 0));
   t.sink(0, 50);
   assert.equal(t.share(0), 0);
   assert.equal(t.ownerAt(a), -1);
@@ -388,8 +361,7 @@ function wander(seed: number, steps: number, ships = 80) {
   const turn = new Float64Array(ships);
   let worst = 0,
     total = 0,
-    claims = 0,
-    cuts = 0;
+    claims = 0;
   for (let k = 0; k < steps; k++) {
     const moves: Move[] = at.map((p, i) => {
       if (rand() < 1 / 60) turn[i] = (rand() * 2 - 1) * 0.42;
@@ -411,10 +383,9 @@ function wander(seed: number, steps: number, ships = 80) {
     worst = Math.max(worst, ms);
     total += ms;
     claims += o.claimed.length;
-    cuts += o.cut.length;
     moves.forEach((m, i) => (at[i] = m.to));
   }
-  return { t, worst, mean: total / steps, claims, cuts };
+  return { t, worst, mean: total / steps, claims };
 }
 
 test('determinism: the same moves give the same grid, to the bit; 80 ships cost little a step', () => {
@@ -425,9 +396,9 @@ test('determinism: the same moves give the same grid, to the bit; 80 ships cost 
     a.t.changes().map((c) => [c.seq, c.kind]),
     b.t.changes().map((c) => [c.seq, c.kind])
   );
-  assert.ok(a.claims > 0 && a.cuts > 0, `claims ${a.claims}, cuts ${a.cuts}`);
+  assert.ok(a.claims > 0, `claims ${a.claims}`);
   console.log(
-    `80 ships, 60 s: ${a.claims} loops closed, ${a.cuts} cut;` +
+    `80 ships, 60 s: ${a.claims} loops closed;` +
       ` a step ${a.mean.toFixed(3)} ms on average, ${a.worst.toFixed(2)} ms at worst`
   );
   assert.ok(a.mean < 2, `${a.mean} ms a step`);

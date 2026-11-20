@@ -223,9 +223,7 @@ export type Mode =
   | 'storm'
   | 'heal'
   | 'loot'
-  | 'claim'
-  | 'home'
-  | 'cut';
+  | 'claim';
 
 /** What a bot carries from one step to the next, her gunnery's with it. */
 export interface Memory extends Gunner {
@@ -273,10 +271,9 @@ export interface Memory extends Gunner {
   lootT: number;
   shun: number;
   /**
-   * Her water (claimer.ts): where she last lay in it; the bite she sails (its
-   * marks), the one she makes for, and when she may set out on the next.
+   * Her water (claimer.ts): the bite she sails (its marks), the one she makes
+   * for, and when she may set out on the next.
    */
-  haven: Vec3;
   bite: Vec3[] | null;
   leg: number;
   rested: number;
@@ -311,7 +308,6 @@ export const mind = (seed: number, at: Vec3): Memory => ({
   target: -1,
   lootT: 0,
   shun: -1,
-  haven: at,
   bite: null,
   leg: 0,
   rested: 0,

@@ -1,10 +1,11 @@
-// What a closed loop takes: her own water and her trail are the fence; every
+// What a closed loop takes: her own water and her run (the cells she painted
+// since her strip last met her older water) are the fence; every
 // connected stretch of the rest of the planet but the largest becomes hers. On
 // a sphere every loop cuts the world in two, so this is the smaller side, with
 // every pocket the fence shuts off besides: whatever lies there, others' water
 // and land too.
 //
-// The stretches are flooded from the trail's neighbours in lockstep, a few
+// The stretches are flooded from the run's neighbours in lockstep, a few
 // cells each a round, merging where they meet; the flood stops as soon as one
 // stretch is still growing and already outweighs every one that has finished,
 // so its cost goes with the smaller side, not the planet.
@@ -25,15 +26,15 @@ const TURN = 16;
 
 /**
  * The cells a loop gives ship `me` (owner value: her id + 1), given who holds
- * each cell and her trail's cells in the order laid: the trail's own first
+ * each cell and her run's cells in the order painted: the run's own first
  * (`loop` of them), then those it encloses.
  */
 export function enclose(
   owner: Uint8Array,
   me: number,
-  trail: readonly number[]
+  run: readonly number[]
 ): { cells: Int32Array; loop: number } {
-  for (const c of trail) MARK[c] = 1;
+  for (const c of run) MARK[c] = 1;
   const fenced = (c: number) => owner[c] === me || MARK[c] === 1;
   const parent: number[] = [],
     queue: number[][] = [],
@@ -44,7 +45,7 @@ export function enclose(
     while (parent[r] !== r) r = parent[r] = parent[parent[r]];
     return r;
   };
-  for (const c of trail) {
+  for (const c of run) {
     for (let k = 0; k < 4; k++) {
       const n = neighbor(c, k);
       if (fenced(n) || LABEL[n]) continue;
@@ -114,7 +115,7 @@ export function enclose(
     for (let r = 0; r < parent.length; r++)
       if (parent[r] === r && (outer < 0 || area[r] > area[outer])) outer = r;
   const gained: number[] = [];
-  for (const c of trail) {
+  for (const c of run) {
     if (!MARK[c]) continue;
     MARK[c] = 0;
     gained.push(c);

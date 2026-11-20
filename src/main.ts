@@ -15,7 +15,6 @@ import { createMeter } from './meter.ts';
 import { createGame } from './play/game.ts';
 import { createReferee } from './play/referee.ts';
 import { createMatches, watersOf } from './play/setup.ts';
-import { SHIP } from './sim/handling.ts';
 import { SHIPS } from './sim/match.ts';
 import type { Snapshot } from './snapshot.ts';
 import { shoresOf } from './ui/coasts.ts';
@@ -35,14 +34,7 @@ const RELEASE: Setup = {
   mean: MEAN,
   swing: SWING,
   hours: 16.3,
-  drawing: {
-    sea: 'water',
-    fleet: SHIPS,
-    length: SHIP.length,
-    lod: null,
-    cloth: true,
-    bolt: false,
-  },
+  drawing: { sea: 'water', fleet: SHIPS, lod: null, cloth: true, bolt: false },
   meter: false,
   hold: null,
   gun: null,

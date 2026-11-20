@@ -83,10 +83,10 @@ const TINT = 0.1,
 const OWN_LINE = 2;
 /**
  * The line's half width, pixels, the same near and far (hers OWN_WIDE times
- * it), here and in the open trails' (trails.ts); from afar (a cell under a
- * pixel or two) it is FAINTEST of itself, the tint telling the holders apart.
+ * it); from afar (a cell under a pixel or two) it is FAINTEST of itself, the
+ * tint telling the holders apart.
  */
-export const LINE_HALF = 1.1,
+const LINE_HALF = 1.1,
   OWN_WIDE = 1.5;
 const FAINTEST = 0.5;
 /**
@@ -100,7 +100,7 @@ const INK = 1;
  * The light of a line in `colour`, per unit of what a white surface gets: its
  * brightest channel raised to INK.
  */
-export const lineLight = (colour: Vec3Node): Vec3Node =>
+const lineLight = (colour: Vec3Node): Vec3Node =>
   colour.div(max(max(colour.x, colour.y), max(colour.z, 0.02))).mul(INK);
 /** The flood's front: its width, seconds of its sweep, and its light. */
 const CREST = 0.03,

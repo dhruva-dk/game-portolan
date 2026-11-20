@@ -69,15 +69,7 @@ import {
 } from './captain.ts';
 import { deepest, steer } from './helmsman.ts';
 import { healUrge, lootAct, lootUrge, purse, PURSER } from './purser.ts';
-import {
-  claimAct,
-  claimUrge,
-  cutAct,
-  cutUrge,
-  homeAct,
-  homeUrge,
-  sound,
-} from './claimer.ts';
+import { claimAct, claimUrge } from './claimer.ts';
 import { NOTHING, type Ask } from './stores.ts';
 
 export {
@@ -122,7 +114,6 @@ export function think(
     foeD: Infinity,
     seed,
   };
-  sound(c);
   if (m.think <= 0) {
     m.think = BOT.every;
     perceive(c);
@@ -444,10 +435,7 @@ const OPTIONS: readonly Choice[] = [
     },
   },
   { name: 'loot', weight: 1.8, mode: 'loot', score: lootUrge, act: lootAct },
-  // her water (claimer.ts): home to get her shield back, across another's
-  // trail, a loop to claim more
-  { name: 'home', weight: 2, mode: 'home', score: homeUrge, act: homeAct },
-  { name: 'cut', weight: 2, mode: 'cut', score: cutUrge, act: cutAct },
+  // her water (claimer.ts): a loop to claim more
   {
     name: 'claim',
     weight: 1.5,

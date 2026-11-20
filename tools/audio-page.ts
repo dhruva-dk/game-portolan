@@ -119,7 +119,7 @@ interface Script {
   mend: readonly [number, number];
   whistle: number;
   storm: { from: number; wall: number; closing: number; rate: number };
-  trail: readonly [number, number];
+  claim: number;
   sinks: readonly [number, number];
   strikes: readonly number[];
   speed: (t: number) => number;
@@ -151,7 +151,7 @@ const PASSAGE: Script = {
   mend: [10.8, 12.3],
   whistle: 12.4,
   storm: { from: 16, wall: 600, closing: 18, rate: 47 },
-  trail: [22, 25],
+  claim: 25,
   sinks: [2, 20],
 };
 
@@ -172,7 +172,7 @@ const still = (
   mend: [Infinity, Infinity],
   whistle: -10,
   storm: { from: 0, wall, closing: Infinity, rate: 0 },
-  trail: [Infinity, Infinity],
+  claim: Infinity,
   sinks: [-1, Infinity],
   strikes: [],
   speed: () => speed,
@@ -474,21 +474,12 @@ export async function passage(
         to: radial,
       });
     }
-    const { storm, trail, gust, pickup, select, mend } = SCRIPT;
+    const { storm, claim, gust, pickup, select, mend } = SCRIPT;
     const wall =
       t < storm.from ? storm.wall : storm.wall - (t - storm.from) * storm.rate;
     const changes: SeaChange[] =
-      t >= trail[1]
-        ? [
-            {
-              seq: 1,
-              time: trail[1],
-              kind: 'claim',
-              ship: 0,
-              cells: [],
-              loop: 0,
-            },
-          ]
+      t >= claim
+        ? [{ seq: 1, time: claim, kind: 'claim', ship: 0, cells: [], loop: 0 }]
         : [];
     const scene: Snapshot = {
       eye,
@@ -505,10 +496,6 @@ export async function passage(
         seq: changes.length,
         changes,
         colours: [],
-        trails:
-          t >= trail[0] && t < trail[1]
-            ? [{ id: 0, serial: 1, points: [] }]
-            : [],
       },
     };
     const lastShot = Math.max(-10, ...SCRIPT.ownShots.filter((s) => s <= t));

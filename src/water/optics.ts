@@ -290,7 +290,7 @@ function tinted(
  * E/π is itself): the water's colours and the borders' lines are tones under
  * it.
  */
-export function whiteSurface(
+function whiteSurface(
   sky: Sky,
   p: Vec3Node,
   up: Vec3Node,

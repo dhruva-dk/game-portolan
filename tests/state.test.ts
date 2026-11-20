@@ -86,8 +86,8 @@ test('a ship sunk in a step lays, closes and cuts nothing in it: her water only 
 test("a second match on the same state starts clean: its sea as a new state's, her loop closing as it did", () => {
   const alone = loop(deadly(Infinity)),
     first = loop(deadly(Infinity));
-  // the first match sailed on a while past its loop, her trail open again, then
-  // the second begun on its state
+  // the first match sailed on a while past its loop, painting on, then the
+  // second begun on its state
   for (let k = 0; k < 240; k++)
     first.state.advance(
       {
@@ -97,7 +97,10 @@ test("a second match on the same state starts clean: its sea as a new state's, h
       still
     );
   const was = first.state.sea(1)!;
-  assert.ok(was.trails.length > 0, "her trail open at the first match's end");
+  assert.ok(
+    was.changes.some((c) => c.kind === 'paint' && c.ship === PLAYER),
+    "her strip painted at the first match's end"
+  );
   const second = loop(deadly(Infinity), first.state);
   assert.equal(
     second.closed,
@@ -105,8 +108,7 @@ test("a second match on the same state starts clean: its sea as a new state's, h
     'her loop closes at the same moment of its match'
   );
   // nothing of the first: the same changes in the same order (on the world's
-  // clock, later by as long as it ran before), the same water held, no trail
-  // but what a new state has
+  // clock, later by as long as it ran before), the same water held
   const a = alone.state.sea(1)!,
     b = second.state.sea(1)!,
     later = b.changes[0].time - a.changes[0].time;
@@ -117,6 +119,5 @@ test("a second match on the same state starts clean: its sea as a new state's, h
   assert.ok(later > 0);
   assert.deepEqual(timed(b.changes, later), timed(a.changes, 0));
   assert.deepEqual(b.owner, a.owner);
-  assert.deepEqual(b.trails, a.trails);
   assert.equal(second.state.share(PLAYER), alone.state.share(PLAYER));
 });

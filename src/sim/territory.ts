@@ -1,20 +1,22 @@
-// Who holds the sea: territory, as a battle royale has it.
+// Who holds the sea: territory, painted as she sails.
 //
-// Every ship starts with a small home patch of sea round her berth. Leaving her
-// own water she lays an open trail (the cells her centre passes through, and a
-// line of points for drawing it); coming back into her own water closes the
-// loop, and the smaller side of the planet it cuts off, whatever lies there
-// (others' water, land), becomes hers (enclose.ts). A trail is cut, not deadly:
-// another ship crossing it, or she herself, breaks it, and she loses it, no
-// water gained; she must start again from her own water. A sunk ship's water
-// drains back to open sea, and the storm takes every cell outside its cap. A
-// ship left with no water is not sunk: she lays a new home patch round her
-// wherever she is on open sea (her open trail, if any, given up), and claims
-// again from there.
+// Every ship starts with a small home patch of sea round her berth. Wherever
+// she sails she paints a strip of the sea her own, `brush` metres either side
+// of her course, at once: open sea and others' water alike (theirs is left the
+// smaller). Her strip coming back against her older water (her patch, an
+// earlier strip, a loop she closed before, or her own strip from further back
+// than her length) closes a loop: the smaller side of the planet it cuts off,
+// whatever lies there (others' water, land), becomes hers (enclose.ts). Nothing
+// is open to be cut. A sunk ship's water drains back to open sea, and the storm
+// takes every cell outside its cap; a ship left with none paints on from where
+// she is.
 //
-// What changed is logged (Change) for the frame to draw: a claim flooding in
-// from its loop, a home patch, water draining, a trail cut. The grid itself,
-// one byte a cell, is kept in place and read by reference.
+// Her run is the cells she has painted since her strip last came against her
+// older water: what a loop's fence is made of, its flood starting there.
+//
+// What changed is logged (Change) for the frame to draw: a strip painted, a
+// claim flooding in from its loop, a home patch, water draining. The grid
+// itself, one byte a cell, is kept in place and read by reference.
 //
 // Pure arithmetic: no three, so it runs in node for the tests; the same moves
 // give the same grid, to the bit.
@@ -29,7 +31,7 @@ import {
   trace,
   type ReadCells,
 } from '../world/cells.ts';
-import { R, distance, normalize, type Vec3 } from '../world/sphere.ts';
+import { R, normalize, type Vec3 } from '../world/sphere.ts';
 import { enclose } from './enclose.ts';
 import type { Cap } from './storm.ts';
 
@@ -39,11 +41,11 @@ export const TERRITORY = {
    * either way.
    */
   home: 30,
-  /** Metres between the points of her open trail, as drawn. */
-  spacing: 2,
+  /** Metres either side of her course she paints: a strip her beam's width. */
+  brush: 4,
   /**
-   * Her newest trail cells, under her own hull, that she does not cut by
-   * crossing again: about her length.
+   * Her newest cells, in cells her course has crossed (about her length), that
+   * her strip does not close a loop against: what she has only just painted.
    */
   grace: 8,
   /**
@@ -51,35 +53,26 @@ export const TERRITORY = {
    * second).
    */
   sweep: 15,
-  /**
-   * A new home patch is laid only where at least this share of it is open sea.
-   */
-  room: 0.5,
   /** Seconds a change is kept for the frame to draw. */
   kept: 8,
 } as const;
 
 /**
- * A ship's open trail: which one it is (a new one each time she leaves her
- * water), its points (unit vectors, the first where she left her water, then
- * one every `spacing` metres) and its cells in the order laid. Empty when she
- * is in her own water.
- */
-interface Trail {
-  serial: number;
-  points: Vec3[];
-  cells: number[];
-}
-
-/**
  * What changed, numbered in order (seq), at a moment on the clock the game
  * steps it by (s: play/state.ts gives the world's, the frame's own):
- *   claim  a loop closed: `cells` became `ship`'s, the first `loop` of them the trail's own (the flood comes from there)
+ *   paint  her strip: `cells` became `ship`'s as she sailed over them
+ *   claim  a loop closed: `cells` became `ship`'s, the first `loop` of them her run's (the flood comes from there)
  *   home   a home patch laid: `cells` became `ship`'s, from `at` outward
  *   drain  `cells` went back to open sea: `ship`'s as she sank, or (ship null) the storm's
- *   cut    `ship`'s open trail was broken by `by` (herself, or null: given up), no water gained
  */
 type Change =
+  | {
+      seq: number;
+      time: number;
+      kind: 'paint';
+      ship: number;
+      cells: Int32Array;
+    }
   | {
       seq: number;
       time: number;
@@ -102,8 +95,7 @@ type Change =
       kind: 'drain';
       ship: number | null;
       cells: Int32Array;
-    }
-  | { seq: number; time: number; kind: 'cut'; ship: number; by: number | null };
+    };
 
 /** A ship's move over one step: from where to where (unit vectors). */
 export interface Move {
@@ -112,12 +104,8 @@ export interface Move {
   to: Vec3;
 }
 
-/**
- * What a step did: trails cut (whose, by whom) and loops closed (whose, how
- * many square metres they took).
- */
+/** What a step did: loops closed (whose, how many square metres they took). */
 export interface Outcome {
-  cut: { id: number; by: number | null }[];
   claimed: { id: number; metres: number }[];
 }
 
@@ -131,30 +119,41 @@ type Logged = Change extends infer C
 export function createTerritory(count: number) {
   /** Who holds each cell: 0 open sea, else her id + 1. */
   const owner = new Uint8Array(CELLS);
-  /** Whose open trail runs through each cell: 0 none, else her id + 1. */
-  const laid = new Uint8Array(CELLS);
+  /**
+   * When its holder painted each cell, in cells her course had crossed then
+   * (walked); 0 for a patch's or a loop's.
+   */
+  const when = new Int32Array(CELLS);
   const area = new Float64Array(count);
-  const trails: Trail[] = Array.from({ length: count }, () => ({
-    serial: 0,
-    points: [],
-    cells: [],
-  }));
+  /** Cells each ship's course has crossed, from past her grace on. */
+  const walked = new Int32Array(count).fill(TERRITORY.grace + 1);
+  /** Each ship's run: the cells painted since her strip last met her older water. */
+  const runs: number[][] = Array.from({ length: count }, () => []);
   /** The cell under each ship at her last step (−1: not seen yet). */
   const under = new Int32Array(count).fill(-1);
-  /**
-   * Whether her trail was cut (or given up) and she has not yet been back in
-   * her own water: she lays none till then.
-   */
-  const adrift = new Uint8Array(count);
-  let changes: Change[] = [],
+  /** The brush's scratch: each cell's last stamp, and the cells reached. */
+  const stamp = new Int32Array(CELLS),
+    reached: number[] = [];
+  /** The log, and the copy of it last handed out (null: changed since). */
+  const changes: Change[] = [];
+  let handed: readonly Change[] | null = null,
     seq = 0,
     steps = 0,
-    serials = 0;
-  const cosHome = Math.cos(TERRITORY.home / R);
+    stamps = 0;
+  const cosHome = Math.cos(TERRITORY.home / R),
+    cosBrush = Math.cos(TERRITORY.brush / R);
 
   const log = (c: Logged) => {
-    changes = changes.filter((k) => k.time > c.time - TERRITORY.kept);
+    // (oldest first: those too old are the first few)
+    let gone = 0;
+    while (
+      gone < changes.length &&
+      changes[gone].time <= c.time - TERRITORY.kept
+    )
+      gone++;
+    if (gone) changes.splice(0, gone);
     changes.push({ ...c, seq: ++seq });
+    handed = null;
   };
   const set = (c: number, to: number) => {
     const from = owner[c],
@@ -163,79 +162,81 @@ export function createTerritory(count: number) {
     if (to) area[to - 1] += a;
     owner[c] = to;
   };
-  const drop = (id: number) => {
-    const me = id + 1,
-      t = trails[id];
-    for (const c of t.cells) if (laid[c] === me) laid[c] = 0;
-    t.cells = [];
-    t.points = [];
+
+  /**
+   * The cells whose centres lie within `cos` (of the angle) of `at`, reached
+   * from the cell under it: written into `reached`.
+   */
+  const round = (at: Vec3, cos: number) => {
+    const first = cellOf(at),
+      s = ++stamps;
+    reached.length = 0;
+    reached.push(first);
+    stamp[first] = s;
+    for (let k = 0; k < reached.length; k++)
+      for (let d = 0; d < 4; d++) {
+        const n = neighbor(reached[k], d);
+        if (stamp[n] === s || cosTo(n, at) < cos) continue;
+        stamp[n] = s;
+        reached.push(n);
+      }
+  };
+
+  /** Lays her a home patch round `at`, wherever it is not another's. */
+  const home = (id: number, at: Vec3, time: number) => {
+    const u = normalize(at);
+    round(u, cosHome);
+    const cells = reached.filter((c) => owner[c] === 0 || owner[c] === id + 1);
+    for (const c of cells) {
+      set(c, id + 1);
+      when[c] = 0;
+    }
+    log({ kind: 'home', time, ship: id, cells: Int32Array.from(cells), at: u });
   };
 
   /**
-   * The open cells of a home patch round `at`, or none if too few of its cells
-   * are open sea.
+   * Paints her brush round `at` into `painted`; whether it met her older water.
    */
-  const patch = (id: number, at: Vec3): number[] => {
-    const u = normalize(at),
-      first = cellOf(u),
-      seen = new Set([first]),
-      list = [first];
-    for (let k = 0; k < list.length; k++) {
-      for (let d = 0; d < 4; d++) {
-        const n = neighbor(list[k], d);
-        if (seen.has(n) || cosTo(n, u) < cosHome) continue;
-        seen.add(n);
-        list.push(n);
+  const paint = (id: number, at: Vec3, painted: number[]): boolean => {
+    const me = id + 1,
+      now = walked[id],
+      old = now - TERRITORY.grace;
+    let met = false;
+    round(at, cosBrush);
+    for (const c of reached) {
+      if (owner[c] === me) {
+        met ||= when[c] < old;
+        continue;
+      }
+      set(c, me);
+      when[c] = now;
+      runs[id].push(c);
+      painted.push(c);
+      for (let d = 0; d < 4 && !met; d++) {
+        const n = neighbor(c, d);
+        met = owner[n] === me && when[n] < old;
       }
     }
-    const open = list.filter((c) => owner[c] === 0 || owner[c] === id + 1);
-    return open.length >= list.length * TERRITORY.room ? open : [];
-  };
-
-  /** Lays her a home patch round `at`; whether one was laid. */
-  const home = (id: number, at: Vec3, time: number): boolean => {
-    const cells = patch(id, at);
-    if (!cells.length) return false;
-    for (const c of cells) set(c, id + 1);
-    log({
-      kind: 'home',
-      time,
-      ship: id,
-      cells: Int32Array.from(cells),
-      at: normalize(at),
-    });
-    return true;
+    return met;
   };
 
   /**
-   * Starts her trail where she crossed out of her water between `from` and `to`
-   * (found by halving), or at `from` if her water went from under her.
-   */
-  const open = (id: number, lost: boolean, from: Vec3, to: Vec3) => {
-    const me = id + 1;
-    let lo = from,
-      hi = to;
-    for (let i = 0; i < 8 && !lost; i++) {
-      const m = normalize([lo[0] + hi[0], lo[1] + hi[1], lo[2] + hi[2]]);
-      if (owner[cellOf(m)] === me) lo = m;
-      else hi = m;
-    }
-    const t = trails[id];
-    t.serial = ++serials;
-    t.points = [lost ? lo : hi];
-    t.cells = [];
-  };
-
-  /**
-   * Closes her loop: the trail and what it encloses become hers. Returns the
-   * square metres it took.
+   * Closes her loop: what her run and her water fence off becomes hers.
+   * Returns the square metres it took (0: it fenced nothing off).
    */
   const claim = (id: number, time: number): number => {
     const me = id + 1,
       before = area[id];
-    const { cells, loop } = enclose(owner, me, trails[id].cells);
-    for (const c of cells) set(c, me);
-    drop(id);
+    // (only the run's cells still hers: another's strip may have taken some)
+    const run = runs[id].filter((c) => owner[c] === me);
+    runs[id] = [];
+    if (!run.length) return 0;
+    const { cells, loop } = enclose(owner, me, run);
+    if (cells.length === loop) return 0;
+    for (let k = loop; k < cells.length; k++) {
+      set(cells[k], me);
+      when[cells[k]] = 0;
+    }
     log({ kind: 'claim', time, ship: id, cells, loop });
     return ((area[id] - before) / PLANET_QUANTA) * 4 * Math.PI * R * R;
   };
@@ -255,16 +256,15 @@ export function createTerritory(count: number) {
       log({ kind: 'drain', time, ship: null, cells: Int32Array.from(lost) });
   };
 
-  const held: ReadCells = owner,
-    trailed: ReadCells = laid;
+  const held: ReadCells = owner;
   return {
     /**
      * Who holds each cell (0 open sea, else her id + 1): every change logged so
      * far, applied in order.
      */
     owner: held,
-    /** Whose open trail runs through each cell (0 none, else her id + 1). */
-    laid: trailed,
+    /** How many ships it holds the sea for. */
+    ships: count,
 
     /** Lays every ship her home patch round her berth, at the match's start. */
     begin(berths: readonly Vec3[], time: number) {
@@ -276,85 +276,42 @@ export function createTerritory(count: number) {
 
     /**
      * One step: each ship's move (those afloat), at `time` (that clock), under
-     * the storm's cap. Trails are judged as they stood before the step, so two
-     * ships crossing each other's in one step both lose theirs, whatever the
-     * order.
+     * the storm's cap, in the order of their ids: each paints her strip where
+     * she now is, and closes her loop if it met her older water.
      */
     step(moves: readonly Move[], time: number, cap: Cap): Outcome {
-      const ordered = [...moves].sort((a, b) => a.id - b.id);
-      const walks = ordered.map(({ id, from, to }) => {
+      const outcome: Outcome = { claimed: [] },
+        walk: number[] = [];
+      for (const { id, from, to } of [...moves].sort((a, b) => a.id - b.id)) {
         const c0 = under[id] < 0 ? cellOf(from) : under[id],
-          c1 = cellOf(to),
-          walk = [c0];
+          c1 = cellOf(to);
+        walk.length = 0;
+        walk.push(c0);
         trace(normalize(from), c0, normalize(to), c1, walk);
         under[id] = c1;
-        return walk;
-      });
-      // crossings
-      const cut = new Map<number, number | null>();
-      ordered.forEach(({ id }, m) => {
-        const walk = walks[m],
-          mine = trails[id].cells;
-        for (let k = 1; k < walk.length; k++) {
-          const o = laid[walk[k]] - 1;
-          if (o < 0 || cut.has(o)) continue;
-          if (o !== id) cut.set(o, id);
-          else if (mine.lastIndexOf(walk[k]) < mine.length - TERRITORY.grace)
-            cut.set(id, id);
-        }
-      });
-      const outcome: Outcome = { cut: [], claimed: [] };
-      for (const [id, by] of [...cut].sort((a, b) => a[0] - b[0])) {
-        drop(id);
-        adrift[id] = 1;
-        log({ kind: 'cut', time, ship: id, by });
-        outcome.cut.push({ id, by });
+        walked[id] += walk.length - 1;
+        const painted: number[] = [];
+        const met = paint(id, normalize(to), painted);
+        if (painted.length)
+          log({
+            kind: 'paint',
+            time,
+            ship: id,
+            cells: Int32Array.from(painted),
+          });
+        if (!met) continue;
+        const metres = claim(id, time);
+        if (metres > 0) outcome.claimed.push({ id, metres });
       }
-      // trails laid, opened and closed
-      ordered.forEach(({ id, from, to }, m) => {
-        const me = id + 1,
-          walk = walks[m],
-          t = trails[id];
-        for (let k = 0; k < walk.length; k++) {
-          const c = walk[k],
-            going = t.points.length > 0;
-          if (k === 0 && going) continue;
-          if (owner[c] === me) {
-            adrift[id] = 0;
-            if (going) outcome.claimed.push({ id, metres: claim(id, time) });
-          } else if (going || !adrift[id]) {
-            if (!going) open(id, k === 0, from, to);
-            t.cells.push(c);
-            laid[c] = me;
-          }
-        }
-        if (
-          t.points.length &&
-          distance(t.points[t.points.length - 1], to) >= TERRITORY.spacing
-        )
-          t.points.push(normalize(to));
-      });
       if (++steps % TERRITORY.sweep === 0) sweep(cap, time);
-      // a ship with no water left gives up her trail and starts again from a
-      // new home patch, where there is room
-      for (const { id, to } of ordered) {
-        if (area[id] > 0) continue;
-        if (!home(id, to, time)) continue;
-        adrift[id] = 0;
-        if (trails[id].points.length) {
-          drop(id);
-          log({ kind: 'cut', time, ship: id, by: null });
-          outcome.cut.push({ id, by: null });
-        }
-      }
       return outcome;
     },
 
-    /** She sank: her trail is gone and her water drains back to open sea. */
+    /** She sank: her water drains back to open sea. */
     sink(id: number, time: number) {
       const me = id + 1,
         cells: number[] = [];
-      drop(id);
+      runs[id] = [];
       for (let c = owner.indexOf(me); c >= 0; c = owner.indexOf(me, c + 1)) {
         cells.push(c);
         set(c, 0);
@@ -372,27 +329,23 @@ export function createTerritory(count: number) {
     share: (id: number) => area[id] / PLANET_QUANTA,
     /** Whether she holds any water. */
     holds: (id: number) => area[id] > 0,
-    /** Her open trail (empty in her own water). */
-    trail: (id: number): Readonly<Trail> => trails[id],
-    /** Every open trail, by ship id. */
-    trails: (): readonly Readonly<Trail>[] => trails,
     /**
      * What changed in the last `kept` seconds, oldest first, numbered from 1
-     * with none left out.
+     * with none left out: a copy, kept as it was when handed out.
      */
-    changes: (): readonly Change[] => changes,
+    changes: (): readonly Change[] => (handed ??= changes.slice()),
     /** The number of the last change made (0: none yet), kept or not. */
     last: () => seq,
 
     /**
-     * The grid's fingerprint (FNV-1a over who holds each cell and whose trail
-     * runs through it).
+     * The grid's fingerprint (FNV-1a over who holds each cell and when it was
+     * painted).
      */
     hash(): string {
       let h = 0x811c9dc5;
       for (let c = 0; c < CELLS; c++)
         h = Math.imul(
-          Math.imul(h ^ owner[c], 0x01000193) ^ laid[c],
+          Math.imul(h ^ owner[c], 0x01000193) ^ when[c],
           0x01000193
         );
       return (h >>> 0).toString(16).padStart(8, '0');

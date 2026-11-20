@@ -109,12 +109,13 @@ export interface LootDraw {
 
 /**
  * A change in who holds the sea (sim/territory.ts Change), numbered in order
- * (seq), at a moment on the world's clock (s): a loop closed (its first `loop`
- * cells the trail's, the flood coming from them), a home patch laid round `at`,
- * water drained back to open sea (a sunk ship's, or the storm's: ship null), or
- * an open trail cut.
+ * (seq), at a moment on the world's clock (s): her strip painted as she sailed,
+ * a loop closed (its first `loop` cells her run's, the flood coming from them),
+ * a home patch laid round `at`, or water drained back to open sea (a sunk
+ * ship's, or the storm's: ship null).
  */
 export type SeaChange =
+  | { seq: number; time: number; kind: 'paint'; ship: number; cells: ReadCells }
   | {
       seq: number;
       time: number;
@@ -137,21 +138,7 @@ export type SeaChange =
       kind: 'drain';
       ship: number | null;
       cells: ReadCells;
-    }
-  | { seq: number; time: number; kind: 'cut'; ship: number; by: number | null };
-
-/**
- * An open trail drawn: whose, which one (a new number each time she leaves her
- * water), its points (unit vectors, a couple of metres apart, oldest first; the
- * ribbon runs on from the last to her stern). While its serial holds, its
- * points only ever grow at the end: a reader keeping a copy need only add the
- * new ones.
- */
-export interface TrailDraw {
-  id: number;
-  serial: number;
-  points: readonly Vec3[];
-}
+    };
 
 /**
  * Who holds the sea (sim/territory.ts), as the frame follows it:
@@ -163,7 +150,6 @@ export interface TrailDraw {
  *               out: `owner` is every change applied in order. A reader whose first change not yet read is past the
  *               one after its last (or, none kept, whose last is short of `seq`) has missed some: it starts over from
  *               `owner` (water/cursor.ts)
- *   trails      the open trails
  *   colours     each ship's colour on the sea, by id (linear rgb)
  * Its changes' times are on the world's clock, the snapshot's own
  * (Snapshot.clock: the moment they are drawn at).
@@ -173,7 +159,6 @@ export interface Sea {
   owner: ReadCells;
   seq: number;
   changes: readonly SeaChange[];
-  trails: readonly TrailDraw[];
   colours: readonly Vec3[];
 }
 
