@@ -84,6 +84,7 @@ const LAYERS: Record<string, readonly string[]> = {
   'play/': ['play/', 'sim/', 'world/', 'palette.ts', ...NEUTRAL],
   // what draws the world; each sideways import named
   'view/': ['view/', ...RENDER],
+  // (of sim/storm.ts its Cap and CLOUD: the storm's state is the snapshot's)
   'sky/': ['sky/', ...RENDER, 'view/view.ts', 'sim/storm.ts'],
   'land/': ['land/', ...RENDER, 'view/view.ts', 'view/cube.ts'],
   'ship/': ['ship/', ...RENDER, 'view/view.ts', 'kinds.ts'],
@@ -224,6 +225,23 @@ test('layers: every import is one its part of src may make (LAYERS), and every p
         text: `a row for '${part}', not in src`,
       });
   none('layers', found, 'imports outside the layers');
+});
+
+test("layers: what draws the storm has its state from the snapshot alone: of sim/storm.ts it takes types and the cloud's fixed heights (CLOUD)", () => {
+  none(
+    'layers',
+    files
+      .filter((f) => f.rel.startsWith('sky/') || f.rel.startsWith('ui/'))
+      .flatMap((f) => imports(f))
+      .filter(
+        (i) =>
+          i.to === 'sim/storm.ts' &&
+          !i.typeOnly &&
+          (i.whole || i.names.some((n) => n !== 'CLOUD'))
+      )
+      .map((i) => ({ file: i.from.at, line: i.line, text: i.spec })),
+    'sim/storm.ts taken by what draws for more than its types and CLOUD'
+  );
 });
 
 test('passes: passes live in src/frame.ts only', () => {

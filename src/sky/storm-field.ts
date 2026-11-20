@@ -47,7 +47,10 @@ import {
   vec3,
 } from 'three/tsl';
 import type { Storage3DTexture } from 'three/webgpu';
-import * as storm from '../sim/storm.ts';
+// (the storm's state, its cap, comes as every frame's does, through the
+// snapshot: storm.ts's uniforms; from sim/storm.ts only CLOUD, fixed for good,
+// the one height the cloud is drawn at and the chase keeps its eye under)
+import { CLOUD } from '../sim/storm.ts';
 import { R } from '../world/sphere.ts';
 import {
   henyeyGreenstein,
@@ -62,7 +65,7 @@ import {
  * and billows (BASE_BILLOW at most 1.7) take it down to some 40.6 m:
  * sim/storm.ts CLOUD.lowest, which the chase keeps under.
  */
-export const BASE = storm.CLOUD.base;
+export const BASE = CLOUD.base;
 const ROLL = 9,
   ROLL_WIDTH = 26,
   BASE_BILLOW = 5;
