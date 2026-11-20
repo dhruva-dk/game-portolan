@@ -511,6 +511,19 @@ commit; anything visible checked in headless chromium; iPad Air M1 at 30–40 fp
     fight 0.95, scavenger fight 0.4, a hunter's crowd wariness; later, a
     hunter running at 35 hull, not 25 (the brawler's fix: hunter −0.11 →
     −0.12, nothing).
+  - The longer ears (hunter 650 m, raider 600, brawler 700) draw no
+    further than the game's: past HUNTING `far` (450 m) heard guns score
+    nothing (a branch review found it). Mended (each crew's `far` scaled
+    with her ear): hunter −0.11 → −0.14, brawler −0.18 → −0.23, scavenger
+    +0.15 → +0.21; the fighters sent to more distant fights sink sooner.
+    Dropped instead: hunter −0.14, brawler −0.18, scavenger +0.17. Both
+    worse than leaving it; left, and `persona.ts` now says what it does.
+  - A ram's damage now cools her mood as a ball's does (`bot.ts bruised`;
+    the same review found only balls did, against MIND's own rule; the
+    storm's still doesn't). Over 64 matches: every persona within 0.01 θ
+    of before. Golden `72ddf57a` → `5b47591c`; mixed, gold rush, cagey
+    `cc288cab`, `0866fb65`, `4372590b`. The duel tool now tells its bots
+    what struck them for how much, as the game does (it passed no damage).
 
   | set (64 matches) | scavenger | turtle | raider | homesteader | hunter | brawler | spread |
   | ---------------- | --------- | ------ | ------ | ----------- | ------ | ------- | ------ |

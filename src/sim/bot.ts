@@ -139,6 +139,14 @@ export const rammed = (m: Memory, by: number): Memory => ({
 });
 
 /**
+ * Her memory once a ram has struck her, taking `damage` hit points (the game
+ * tells her, from battle.ts's strikes that are rams; who rammed her she knows
+ * from the blow: rammed).
+ */
+export const bruised = (m: Memory, damage: number): Memory =>
+  wounded(m, damage);
+
+/**
  * Her memory once a ball of `by`'s has struck her, taking `damage` hit points
  * (the game tells her, from battle.ts's strikes that aren't rams).
  */

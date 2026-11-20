@@ -42,7 +42,7 @@ import {
   type Splash,
   type Strike,
 } from '../sim/battle.ts';
-import { mind, rammed, sank, shot, type Memory } from '../sim/bot.ts';
+import { bruised, mind, rammed, sank, shot, type Memory } from '../sim/bot.ts';
 import { DEFAULT_BRAIN, type Brain } from '../sim/brain.ts';
 import { nature, type MatchType, type Nature } from '../sim/persona.ts';
 import { afloat, stepFleet, type Vessel } from '../sim/contact.ts';
@@ -516,7 +516,10 @@ export function createState(
     for (const s of fought.strikes) {
       struck.set(s.struck, { by: s.shooter, tick });
       const a = aboard.get(s.struck);
-      if (a?.mind && !s.ram) a.mind = shot(a.mind, s.shooter, s.damage);
+      if (a?.mind)
+        a.mind = s.ram
+          ? bruised(a.mind, s.damage)
+          : shot(a.mind, s.shooter, s.damage);
     }
     const worn = weathered(fought.battle, fleet, storm, STEP);
     lost.length = 0;

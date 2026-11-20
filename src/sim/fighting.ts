@@ -93,7 +93,8 @@ export const MIND = {
   shotFresh: 5,
   /**
    * Her mood moves: each ship she sinks warms it by `won`; each hundred hit
-   * points she takes cools it by `hurt`; it settles back to her temper's, by
+   * points a ball or a ram takes off her cools it by `hurt` (not the storm's:
+   * a storm is no fight); it settles back to her temper's, by
    * half every `settle` s; never further off it than `band`.
    */
   won: 0.2,

@@ -49,6 +49,12 @@ type Mix = Readonly<Record<Persona, number>>;
  * turtle heal 4.2, flee 3.9, fight 2.2, hunt 1.4, cover 240 m; scavenger loot
  * 2.4, hunt 1.5; brawler fight 3.1, hunt 2.7, earshot 700 m, sight
  * 280 m.
+ *
+ * An ear longer than the game's draws her no further: guns past HUNTING `far`
+ * (450 m) score nothing (hunter.ts huntUrge), so all a longer one changes is
+ * which guns she last heard. Both mending that (her `far` as long as her ear)
+ * and dropping the longer ears measured worse for the fighters (BOTS.md), so
+ * they stay as they are.
  */
 const CREWS: Readonly<Record<Persona, (b: Brain) => Over>> = {
   // goes to the guns she hears from far off, and sees a foe sooner
@@ -81,7 +87,7 @@ const CREWS: Readonly<Record<Persona, (b: Brain) => Over>> = {
   scavenger: ({ choice }) => ({
     choice: { loot: choice.loot * (4 / 3), hunt: choice.hunt * 0.75 },
   }),
-  // fights first and hears a fight from furthest, but one at a time: a crowd
+  // fights first and hears furthest (see above), but one at a time: a crowd
   // round her cools her more than most (and she runs, losing, as any: her
   // style's own runs are later than most, temper.ts)
   brawler: ({ choice, hunting, sight, mind }) => ({

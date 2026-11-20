@@ -8,8 +8,8 @@
 // Every ship starts with a full shield, as she would be with a few fights'
 // loot in her, the two bow to bow; each gun common. The same steps as the
 // game's: think (sim/bot.ts), stepFleet (contact.ts), stepBattle (battle.ts),
-// the guns asked for taken in hand (stores.ts), a bot told of the balls that
-// strike her.
+// the guns asked for taken in hand (stores.ts), a bot told of what strikes her
+// and what it took (play/state.ts's way).
 
 import { parseArgs } from 'node:util';
 import { KINDS, type GunKind } from '../../src/kinds.ts';
@@ -21,7 +21,7 @@ import {
   type Battle,
   type Order,
 } from '../../src/sim/battle.ts';
-import { mind, shot, think, type Memory } from '../../src/sim/bot.ts';
+import { bruised, mind, shot, think, type Memory } from '../../src/sim/bot.ts';
 import { afloat, stepFleet, type Vessel } from '../../src/sim/contact.ts';
 import { STEP } from '../../src/sim/fixed.ts';
 import { gunOf } from '../../src/sim/gun.ts';
@@ -117,7 +117,10 @@ function duel(metres: number, seeds: number[], guns: GunKind[]): number {
     b = f.battle;
     for (const k of f.strikes) {
       const j = fleet.findIndex((v) => v.id === k.struck);
-      if (!k.ram && j >= 0) minds[j] = shot(minds[j], k.shooter);
+      if (j >= 0)
+        minds[j] = k.ram
+          ? bruised(minds[j], k.damage)
+          : shot(minds[j], k.shooter, k.damage);
     }
     for (const c of b.crews) if (sunk(c.health)) return c.id;
   }
