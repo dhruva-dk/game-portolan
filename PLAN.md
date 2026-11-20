@@ -37,7 +37,7 @@ said; met ✓, not met ✗, the call left to the owner ◐:
 | Combat measured in the harness       | none           | ✓ shots and hits by range, gun, rarity, skill and who laid it; damage; where hits fall on a hull; ratings by gun        |
 | Strongest personality over median    | unknown        | ✗ scavenger +3.8 se, hunter −4.0 se, brawler −5.8 se (θ +0.15 / −0.11 / −0.18): the fighters die fighting               |
 | Player assist vs best bot's hit rate | unmeasured     | ◐ measured: a player's stand-in beats sharp bots by 4 / 11 / 14 points close / mid / far; the bots' hand, A3            |
-| Sim step, median / worst             | 1.6 / 13 ms    | ✓ 1.8 / 12.5 ms (`npm run steps`; main 1.6 / 13.9 measured alongside). It was 22 ms before the first routes were spread |
+| Sim step, median / worst             | 1.6 / 13 ms    | ✓ 1.8 / 13.1 ms (`npm run steps` on the head; main 1.6 / 13.9). It was 22 ms before the first routes were spread        |
 | Triangles, ships and coast views     | 1359k / 1304k  | ✓ 630k / 576k (worst view 893k of 900k)                                                                                 |
 | Draw calls, worst view               | 70             | ✗ 86 (within the 100 budget, over this plan's 80; G1 left a draw per gun kind)                                          |
 | Bot seconds stuck                    | 4.2 s          | ✓ 4.1 s (runs on this code range 3.5–4.3 s)                                                                             |
@@ -675,3 +675,14 @@ then the behaviour commits on top.
   the same seed with the type forced (`478c4fb1`, `9188f956`, `73f8b05b`).
   The run and hash are shared with `golden.test.ts` in
   `tests/golden/run.ts`; that hash is unchanged.
+- 2026-11-20 (review): a fresh review of the branch's `src` (main…26b4833)
+  for bugs, determinism, hot paths and three.js use. Determinism, hot paths
+  and three.js came out clean; the refactors (storm.final, Strike/Sunk gun,
+  the gunfire split, first-route spreading, grove LOD, rarity glow packing)
+  checked equivalent. Two findings, both real: (1) the hunter's, raider's
+  and brawler's longer ears draw them no further than anyone's (guns past
+  HUNTING `far` score nothing); mending and dropping them both measured
+  worse for the fighters, so they stay and `persona.ts` says what they do;
+  (2) only balls cooled a bot's mood, not rams, against MIND's rule; fixed
+  (`bruised`), neutral over 64 matches. Golden `5b47591c`, the type
+  goldens re-recorded.
