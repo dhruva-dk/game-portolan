@@ -3,7 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mind, think, type Memory } from '../src/sim/bot.ts';
-import { nature } from '../src/sim/brain.ts';
+import { nature } from '../src/sim/persona.ts';
 import { afloat, stepFleet, type Vessel } from '../src/sim/contact.ts';
 import { STEP } from '../src/sim/fixed.ts';
 import type { Depth } from '../src/sim/shoal.ts';

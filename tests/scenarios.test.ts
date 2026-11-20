@@ -4,7 +4,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { crewOf } from '../src/sim/battle.ts';
-import { DEFAULT_BRAIN, nature, type Brain } from '../src/sim/brain.ts';
+import { DEFAULT_BRAIN, type Brain } from '../src/sim/brain.ts';
+import { nature } from '../src/sim/persona.ts';
 import { mind, think, type Memory, type Seen } from '../src/sim/bot.ts';
 import { afloat, stepFleet, type Vessel } from '../src/sim/contact.ts';
 import { STEP } from '../src/sim/fixed.ts';

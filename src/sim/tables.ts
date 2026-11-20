@@ -17,6 +17,18 @@ export type Widen<T> = T extends number
     ? string
     : { readonly [K in keyof T]: Widen<T[K]> };
 
+/**
+ * The index `weights` give a uniform draw `u` (0 ≤ u < 1): each index as
+ * likely as its weight. Even weights give ⌊u·n⌋ exactly (each step takes a
+ * whole number off a multiple of u, which loses nothing).
+ */
+export function weighed(weights: readonly number[], u: number): number {
+  let r = u * weights.reduce((a, b) => a + b, 0),
+    k = 0;
+  while (k < weights.length - 1 && r >= weights[k]) r -= weights[k++];
+  return k;
+}
+
 /** Changes to tables of tables: any keys of any of them. */
 export type Changes<T> = { readonly [S in keyof T]?: Partial<T[S]> };
 

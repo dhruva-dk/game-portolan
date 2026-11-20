@@ -47,7 +47,7 @@ import { EQUIP, GUN, SHIP } from './handling.ts';
 import { roomFor, stowed, USES, type Use } from './hold.ts';
 import type { Depth } from './shoal.ts';
 import { toEdge, type Cap } from './storm.ts';
-import type { Widen } from './tables.ts';
+import { weighed, type Widen } from './tables.ts';
 
 /**
  * The loot table: what a match lays, and where (a match's rules may lay other:
@@ -177,14 +177,6 @@ const STILL: Vec3 = [0, 0, 0];
  */
 export const rarityOf = (g: Goods) =>
   isArms(g) ? g.rarity : PIECE.rarity[g.kind];
-
-/** The index `weights` give a uniform draw `u`. */
-function weighed(weights: readonly number[], u: number): number {
-  let r = u * weights.reduce((a, b) => a + b, 0),
-    k = 0;
-  while (k < weights.length - 1 && r >= weights[k]) r -= weights[k++];
-  return k;
-}
 
 /**
  * A gun of the kind and rarity a loot table's kinds and `weights` (its own, or

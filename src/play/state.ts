@@ -42,7 +42,8 @@ import {
   type Strike,
 } from '../sim/battle.ts';
 import { mind, rammed, shot, type Memory } from '../sim/bot.ts';
-import { DEFAULT_BRAIN, nature, type Brain } from '../sim/brain.ts';
+import { DEFAULT_BRAIN, type Brain } from '../sim/brain.ts';
+import { nature, type MatchType, type Nature } from '../sim/persona.ts';
 import { afloat, stepFleet, type Vessel } from '../sim/contact.ts';
 import { STEP, blendPose } from '../sim/fixed.ts';
 import { gunOf } from '../sim/gun.ts';
@@ -67,7 +68,6 @@ import {
   type Goods,
   type Taken,
 } from '../sim/loot.ts';
-import type { Rules } from '../sim/rules.ts';
 import {
   asked,
   crewed,
@@ -123,14 +123,15 @@ export interface Berth {
 }
 
 /**
- * The match: its seed (each bot's mind comes from it and her slot), its rules
- * (what loot it lays, and how its storm closes: sim/rules.ts), its storm by the
- * match's clock (s), planned by them, and the gun every ship is armed with, or
- * null for none (as every ship puts to sea in a match).
+ * The match: its seed (each bot's mind comes from it and her slot), its type
+ * (the mix of personas it is sailed by, and its rules: what loot it lays, how
+ * its storm closes; sim/persona.ts), its storm by the match's clock (s),
+ * planned by its rules, and the gun every ship is armed with, or null for none
+ * (as every ship puts to sea in a match).
  */
 export interface Match {
   seed: number;
-  rules: Rules;
+  type: MatchType;
   storm: (seconds: number) => Storm;
   gun: Arms | null;
   /**
@@ -262,7 +263,7 @@ export function createState(
   const depth = remembered((p: Vec3) => -planet.height(p)),
     rises = planet.rises;
   let match = first,
-    lay = laying(match.seed, depth, match.rules.loot);
+    lay = laying(match.seed, depth, match.type.rules.loot);
   const seedOf = (id: number) => hash(match.seed, id);
   let fleet: Vessel[] = [];
   const aboard = new Map<number, Aboard>();
@@ -363,7 +364,7 @@ export function createState(
     aboard.set(id, {
       look,
       mind: bot ? mind(seedOf(id), ship.at) : null,
-      nature: nature(seedOf(id), brainOf(id)),
+      nature: nature(seedOf(id), brainOf(id), match.type.mix),
       steady: lashed ?? AMIDSHIPS,
       ride: r,
       before: p,
@@ -381,7 +382,7 @@ export function createState(
     { loot, held }: { loot: boolean; held: boolean }
   ) => {
     match = m;
-    lay = laying(m.seed, depth, m.rules.loot);
+    lay = laying(m.seed, depth, m.type.rules.loot);
     flotsam = loot ? lay.strewn() : { pieces: [], next: 0 };
     dropped = loot ? 0 : Infinity;
     gunfire = [];
@@ -883,6 +884,11 @@ export function createState(
        */
       mindOf: (id: number): Readonly<Memory> | null =>
         aboard.get(id)?.mind ?? null,
+      /**
+       * A ship's nature (her persona, her crew's brain, her temperament), or
+       * null for one sunk (tools/harness tells the bots apart by it).
+       */
+      natureOf: (id: number): Nature | null => aboard.get(id)?.nature ?? null,
     },
   };
 }

@@ -4,7 +4,7 @@
 
 import { SHIPS } from '../sim/match.ts';
 import { charted } from '../sim/route.ts';
-import { DEFAULT_RULES, type Rules } from '../sim/rules.ts';
+import { MIXED, type MatchType } from '../sim/persona.ts';
 import type { Spawn } from '../sim/spawn.ts';
 import { createStorm, type Storm } from '../sim/storm.ts';
 import type { Land } from '../world/land.ts';
@@ -74,21 +74,21 @@ export function watersOf(
  * The matches on a planet of this seed: the first on the planet's own seed,
  * each next one dealt a seed of its own (its storm and its bots' minds come
  * from it). hold: seconds the storm is held at, or null to let it run; gun: the
- * gun every ship is armed with, or null for none; rulesOf: each match's rules
- * by its seed (the game's own if not given).
+ * gun every ship is armed with, or null for none; typeOf: each match's type by
+ * its seed (sim/persona.ts: a mixed match if not given).
  */
 export function createMatches(
   seed: number,
   planet: Planet,
   hold: number | null,
   gun: Match['gun'],
-  rulesOf: (seed: number) => Rules = () => DEFAULT_RULES
+  typeOf: (seed: number) => MatchType = () => MIXED
 ) {
   const depth = (p: Vec3) => -planet.height(p);
   const match = (s: number): Match => {
-    const rules = rulesOf(s),
-      closing = createStorm(s, depth, rules.storm);
-    return { seed: s, rules, storm: (t) => closing(hold ?? t), gun };
+    const type = typeOf(s),
+      closing = createStorm(s, depth, type.rules.storm);
+    return { seed: s, type, storm: (t) => closing(hold ?? t), gun };
   };
   let played = 0,
     berth: Berther | null = null;

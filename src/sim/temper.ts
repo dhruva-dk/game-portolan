@@ -5,6 +5,7 @@
 // seed every time.
 
 import { random } from '../world/random.ts';
+import { weighed } from './tables.ts';
 
 /**
  * A captain's temperament: how readily she fights, 0–1; how far off she notices
@@ -31,7 +32,7 @@ export interface Temper {
 
 /**
  * The six temperaments: hunter, homesteader, raider, turtle, scavenger,
- * brawler.
+ * brawler (persona.ts PERSONAS, in this order).
  */
 export const STYLES: readonly Omit<Temper, 'skill' | 'aggro'>[] = [
   {
@@ -104,16 +105,21 @@ export const STYLES: readonly Omit<Temper, 'skill' | 'aggro'>[] = [
 
 /**
  * A bot's temperament, by her seed: one of the `styles` (her brain's; the six
- * if not given), varied a little (but not her loot, her mending or her claim,
- * which are the style's own); her skill (0.35–0.9), and her mood (0.2–1).
+ * if not given), drawn by `weights` (each as likely as the next if not given:
+ * a match's mix of personas, persona.ts), varied a little (but not her loot,
+ * her mending or her claim, which are the style's own); her skill (0.35–0.9),
+ * and her mood (0.2–1). With the style drawn, by its index.
  */
 export function temper(
   seed: number,
-  styles: readonly Omit<Temper, 'skill' | 'aggro'>[] = STYLES
-): Temper {
+  styles: readonly Omit<Temper, 'skill' | 'aggro'>[] = STYLES,
+  weights: readonly number[] = styles.map(() => 1)
+): Temper & { style: number } {
   const u = random(seed ^ 0x51a7e);
-  const t = styles[Math.floor(u() * styles.length)];
+  const style = weighed(weights, u()),
+    t = styles[style];
   return {
+    style,
     fight: Math.min(1, Math.max(0, t.fight + 0.2 * (u() - 0.5))),
     notice: t.notice * (0.85 + 0.3 * u()),
     run: t.run * (0.8 + 0.4 * u()),

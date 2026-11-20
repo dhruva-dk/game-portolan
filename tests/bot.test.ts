@@ -1,5 +1,5 @@
 import { test } from 'node:test';
-import { nature } from '../src/sim/brain.ts';
+import { nature } from '../src/sim/persona.ts';
 import assert from 'node:assert/strict';
 import { mind, rammed, think, type Memory } from '../src/sim/bot.ts';
 import { temper } from '../src/sim/temper.ts';

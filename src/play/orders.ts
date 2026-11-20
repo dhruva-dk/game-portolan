@@ -6,7 +6,7 @@
 
 import { armed, type Crew, type Order } from '../sim/battle.ts';
 import { think, type Memory, type Sea, type Seen } from '../sim/bot.ts';
-import type { Nature } from '../sim/brain.ts';
+import type { Nature } from '../sim/persona.ts';
 import { building, type Chart } from '../sim/route.ts';
 import type { Vessel } from '../sim/contact.ts';
 import type { Holdings } from '../sim/claimer.ts';

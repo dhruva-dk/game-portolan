@@ -20,7 +20,8 @@
 
 import { distance, type Vec3 } from '../world/sphere.ts';
 import { inHand, type Order } from './battle.ts';
-import type { Brain, Nature } from './brain.ts';
+import type { Brain } from './brain.ts';
+import type { Nature } from './persona.ts';
 import { STEP } from './fixed.ts';
 import { aimAndFire, armFor, gunner } from './gunner.ts';
 import type { Helm } from './ship.ts';

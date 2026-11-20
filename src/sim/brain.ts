@@ -1,10 +1,9 @@
-// A bot's brain: what each part of her is tuned by, gathered, and her nature
-// (her seed, her brain and the temperament they give her), fixed for her life.
-// The brain adds nothing of its own: each slice is a part's own table, kept and
-// documented where that part reads it (BOTS.md 1.3), and a part reads only its
-// own slices, from the brain it is given (tests/architecture-bots.test.ts).
-// Every ship in the game sails with DEFAULT_BRAIN; the harness (tools/) gives
-// others.
+// A bot's brain: what each part of her is tuned by, gathered. The brain adds
+// nothing of its own: each slice is a part's own table, kept and documented
+// where that part reads it (BOTS.md 1.3), and a part reads only its own
+// slices, from the brain it is given (tests/architecture-bots.test.ts). The
+// game's is DEFAULT_BRAIN, which each persona's crew changes (persona.ts); the
+// harness (tools/) gives others.
 //
 // Pure arithmetic: no three, so it runs in node for the tests; deterministic
 // for the same inputs, to the bit.
@@ -21,7 +20,7 @@ import { ROAMING } from './roaming.ts';
 import { STORMING } from './storming.ts';
 import { RAMMING } from './tactician.ts';
 import { merged, type Changes, type Widen } from './tables.ts';
-import { STYLES, temper, type Temper } from './temper.ts';
+import { STYLES } from './temper.ts';
 
 /**
  * What each part of a bot is tuned by: the weights of her options (bot.ts), her
@@ -90,20 +89,3 @@ export function variant(over: Over, base: Brain = DEFAULT_BRAIN): Brain {
     styles: over.styles ?? base.styles,
   };
 }
-
-/**
- * A bot's nature, fixed for her life: her seed (her chance's start, and the
- * steps she thinks on), her brain, and the temperament they give her.
- */
-export interface Nature {
-  readonly seed: number;
-  readonly brain: Brain;
-  readonly temper: Temper;
-}
-
-/** The nature of a bot of this seed and brain. */
-export const nature = (seed: number, brain: Brain = DEFAULT_BRAIN): Nature => ({
-  seed,
-  brain,
-  temper: temper(seed, brain.styles),
-});
