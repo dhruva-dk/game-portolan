@@ -35,8 +35,12 @@ export const STUCK = 15,
 /** The seconds each ship's water is taken at. */
 export const HELD = [30, 60, 120, 240] as const;
 
-/** A ship under way for where balls fall about her (ShipResult fell), m/s. */
-const MOVING = 4;
+/**
+ * A ship under way for where balls fall about her (ShipResult fell), m/s; and
+ * how near her they must fall to count, m.
+ */
+const MOVING = 4,
+  ABOUT = 40;
 
 /** A shot's range to her mark: close (a scatter's), mid (a repeater's), far. */
 export const BANDS = ['close', 'mid', 'far'] as const;
@@ -76,11 +80,11 @@ export interface ShipResult {
   /** Her shots and those home, by the gun fired and the range (A2). */
   aim: Partial<Record<GunKind, Record<Band, Count>>>;
   /**
-   * Where her balls came down (struck or splashed) about the ship she laid on,
-   * when that ship was under way (MOVING): astern of her middle along her way,
-   * or ahead (A4: a gunner who leads short lays astern).
+   * Where her balls came down (struck or splashed) about the ship she laid on
+   * (within ABOUT), when that ship was under way (MOVING): astern of her
+   * middle along her way, or ahead (A4: a gunner who leads short lays astern).
    */
-  fell: { astern: number; ahead: number };
+  fell: Record<Band, Fell>;
   /** 1 the last afloat (or every ship afloat at the end); n the first sunk. */
   place: number;
   sunk: { time: number; cause: string; by: number | null } | null;
@@ -208,6 +212,12 @@ function whyNow(m: Readonly<Memory>, depth: (p: Vec3) => number): Why[] {
   return out.length ? out : ['none'];
 }
 
+/** Balls come down astern of a ship's middle, and ahead of it (ShipResult fell). */
+interface Fell {
+  astern: number;
+  ahead: number;
+}
+
 const bump = <K extends string>(to: Partial<Record<K, number>>, k: K, n = 1) =>
   (to[k] = (to[k] ?? 0) + n);
 const count = (): Count => ({ shots: 0, hits: 0 });
@@ -257,7 +267,11 @@ export function watch(
         skill: debugOf(state).natureOf(k.id)?.temper.skill ?? 0,
         player: players.has(k.id),
         aim: {},
-        fell: { astern: 0, ahead: 0 },
+        fell: {
+          close: { astern: 0, ahead: 0 },
+          mid: { astern: 0, ahead: 0 },
+          far: { astern: 0, ahead: 0 },
+        },
         place: 0,
         sunk: null,
         armed: k.armed ? 0 : null,
@@ -307,16 +321,18 @@ export function watch(
     state.vessels().find((v) => v.id === id)?.ship.at ?? null;
   /**
    * A ball of `w`'s come down `at` (a unit vector): astern or ahead of the
-   * ship her last shot was laid on, if that ship is under way.
+   * ship her last shot was laid on, if that ship is under way and it fell
+   * within ABOUT of her.
    */
   const fell = (w: Watch, at: Vec3) => {
-    const t = w.last?.target,
-      v = t == null ? null : state.vessels().find((o) => o.id === t);
-    if (!v || v.ship.speed < MOVING) return;
+    const l = w.last,
+      v = l && state.vessels().find((o) => o.id === l.target);
+    if (!l || !v || v.ship.speed < MOVING || distance(at, v.ship.at) > ABOUT)
+      return;
     const { heading: h, at: p } = v.ship;
     const along =
       (at[0] - p[0]) * h[0] + (at[1] - p[1]) * h[1] + (at[2] - p[2]) * h[2];
-    w.r.fell[along < 0 ? 'astern' : 'ahead']++;
+    w.r.fell[l.band][along < 0 ? 'astern' : 'ahead']++;
   };
 
   return {

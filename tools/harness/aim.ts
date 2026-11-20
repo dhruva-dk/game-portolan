@@ -92,26 +92,35 @@ if (import.meta.main) {
     // true lays as many ahead of her middle as astern
     const fell = astern(results);
     console.log(
-      '  balls come down astern of a ship under way, of those about her:'
+      '  balls come down astern of a ship under way, of those about her, close / mid / far:'
     );
     for (const w of WHO)
       console.log(
-        `    ${w.padEnd(7)}${shown({ shots: fell[w].all, hits: fell[w].astern })}`
+        `    ${w.padEnd(7)}${BANDS.map((b) => {
+          const f = fell.get(`${w} ${b}`) ?? { astern: 0, all: 0 };
+          return shown({ shots: f.all, hits: f.astern });
+        }).join('')}`
       );
   }
 }
 
-/** Of the balls each who laid on a ship under way, how many came down astern of her middle. */
+/**
+ * Of the balls each who laid on a ship under way, by the range they were
+ * fired at, how many came down about her and how many of those astern of her
+ * middle: keyed `who band`.
+ */
 export function astern(results: readonly Result[]) {
-  const out = Object.fromEntries(
-    WHO.map((w) => [w, { astern: 0, all: 0 }])
-  ) as Record<Who, { astern: number; all: number }>;
+  const out = new Map<string, { astern: number; all: number }>();
   for (const r of results)
-    for (const s of r.ships) {
-      if (!s.fell) continue;
-      const to = out[whoOf(s)];
-      to.astern += s.fell.astern;
-      to.all += s.fell.astern + s.fell.ahead;
-    }
+    for (const s of r.ships)
+      for (const b of BANDS) {
+        const f = s.fell?.[b];
+        if (!f) continue;
+        const key = `${whoOf(s)} ${b}`,
+          to = out.get(key) ?? { astern: 0, all: 0 };
+        to.astern += f.astern;
+        to.all += f.astern + f.ahead;
+        out.set(key, to);
+      }
   return out;
 }

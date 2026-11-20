@@ -538,12 +538,12 @@ then the behaviour commits on top.
   the gun (the stand-in, or bots by skill third) and range band. On 64
   matches, close / mid / far, all guns:
 
-  | who         | assisted        | no assist       |
-  | ----------- | --------------- | --------------- |
-  | stand-in    | 85% / 50% / 47% | 48% / 2% / 2%   |
-  | green bots  | 69% / 27% / 33% | 68% / 25% / 22% |
-  | fair bots   | 75% / 30% / 28% | 72% / 30% / 23% |
-  | sharp bots  | 81% / 39% / 33% | 80% / 38% / 17% |
+  | who        | assisted        | no assist       |
+  | ---------- | --------------- | --------------- |
+  | stand-in   | 85% / 50% / 47% | 48% / 2% / 2%   |
+  | green bots | 69% / 27% / 33% | 68% / 25% / 22% |
+  | fair bots  | 75% / 30% / 28% | 72% / 30% / 23% |
+  | sharp bots | 81% / 39% / 33% | 80% / 38% / 17% |
 
   Bots' hit rates already climb with skill. The assist does all a thumb's
   aiming: a sloppier thumb (0.3 s late, 0.07 rad of wander) hits the same, to
@@ -551,6 +551,7 @@ then the behaviour commits on top.
   player's edge over the sharpest bots (+4 / +11 / +14 points) is not the
   assist, which bots use too: it is the bots' unsteady hand, their spread
   `1 + 4.5 (1 − skill)` times the gun's, the player's the gun's own.
+
 - 2026-11-20 (A3): **not tuned; a design call left open.** The gate (the
   player at or below the best bots) can only be met by narrowing the
   assist, and the numbers above say a narrower cone takes a thumb from 50%
@@ -560,3 +561,31 @@ then the behaviour commits on top.
   to the gun's own spread puts her level with a player. Which side should
   give is how the game should feel, so it is the owner's: the knobs, and
   the harness to measure either choice, are in place.
+- 2026-11-20 (A4): **tried, measured, dropped.** A gunner who leads short
+  by her greenness (she laid 1 + (1 − skill)(swing·w − under) of the true
+  lead, through the assist) and the harness's new measure of it: where her
+  balls come down about a ship under way, within 40 m, astern of her middle
+  or ahead (`ShipResult.fell`, by range; `aim.ts`). Bots' shares did follow
+  skill (0.44 / 0.60 / 0.79 by thirds at `under` 1), but on 32 matches a run,
+  close / mid:
+
+  | astern of her middle | green     | fair      | sharp     |
+  | -------------------- | --------- | --------- | --------- |
+  | the game (control)   | 50% / 46% | 50% / 50% | 53% / 51% |
+  | leading short, deep  | 57% / 57% | 56% / 62% | 56% / 58% |
+
+  Every third moves alike and hit rates not at all: bots fight close, where
+  the whole lead is a few metres along a 30 m hull, under a spread of as
+  much. Skill already reads in how often she hits (A2); a style of lead does
+  not read in this game's fighting, so the code is gone and the golden is
+  unchanged. The measure stays for any later try.
+
+- 2026-11-20 (G2, first slice): **a ship's gun shows its rarity**: its
+  bronze cast in its rarity's light and a rim of it where it turns from the
+  eye, as a floating piece has (`ship/arms.ts`, `gunSurface`'s tint). The
+  light rides in the instance's three spare floats: no draw, no attribute,
+  no triangle more (the worst view 77 draws, 919k, as before). Uncommon,
+  rare and epic read plainly across a deck; **legendary barely does**, its
+  orange (#FFA21F) near the gilded bronze every common gun wears (#F5C542).
+  Making it pop means a plainer bronze for common guns: an art call left to
+  the owner. `?rarity=` (or `all`) arms the fly view's ships so.
