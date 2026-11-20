@@ -19,11 +19,11 @@ import { Vector4 } from 'three/webgpu';
 import {
   If, acos, clamp, cross, dot, float, hash, int, length, max, normalize, smoothstep, sqrt, uint, uniform, uniformArray, vec2, vec3,
 } from 'three/tsl';
-import { FREQUENCY, anchors, band, cover, icosphere, near, type Anchor, type Likeness } from '../world/lattice';
-import { R, distance, type Vec3 } from '../world/sphere';
-import type { Wind } from '../world/wind';
-import { chartNodes } from './view';
-import { loop, type FloatNode, type Vec2Node, type Vec3Node } from '../tsl';
+import { FREQUENCY, anchors, band, cover, icosphere, near, type Anchor, type Likeness } from '../world/lattice.ts';
+import { R, distance, type Vec3 } from '../world/sphere.ts';
+import type { Wind } from '../world/wind.ts';
+import { chartNodes } from './view.ts';
+import { loop, type FloatNode, type Vec2Node, type Vec3Node } from '../tsl.ts';
 
 /** One chart's read at a point: where on the patches (metres, offset included), its axes there, and its weight. */
 export interface Read {

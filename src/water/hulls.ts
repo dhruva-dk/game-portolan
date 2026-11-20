@@ -14,10 +14,10 @@
 
 import { Vector4 } from 'three/webgpu';
 import { abs, clamp, cross, dot, exp, float, floor, int, length, max, min, mix, select, uniformArray, vec2 } from 'three/tsl';
-import { WATERLINE } from '../ship/waterline';
-import type { ShipPose } from '../world/pose';
-import * as sphere from '../world/sphere';
-import { minInt, type BoolNode, type FloatNode, type Vec3Node } from '../tsl';
+import { WATERLINE } from '../ship/waterline.ts';
+import type { ShipPose } from '../world/pose.ts';
+import * as sphere from '../world/sphere.ts';
+import { minInt, type BoolNode, type FloatNode, type Vec3Node } from '../tsl.ts';
 
 /** The ships nearest the eye whose hulls the sea fits round. */
 export const NEAREST = 4;

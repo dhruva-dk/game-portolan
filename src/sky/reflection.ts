@@ -13,10 +13,10 @@ import {
   Fn, abs, cos, cross, dot, equirectUV, float, instanceIndex, ivec2, max, normalize, select, sin, storageTexture,
   texture, textureLoad, textureStore, uint, uniformArray, uvec2, vec3, vec4,
 } from 'three/tsl';
-import { storageTable, type Compute } from '../gpu';
-import type { View } from '../view/view';
-import { loop, type FloatNode, type IntNode, type UintNode, type Vec3Node, type Vec4Node } from '../tsl';
-import type { Tables } from './tables';
+import { storageTable, type Compute } from '../gpu.ts';
+import type { View } from '../view/view.ts';
+import { loop, type FloatNode, type IntNode, type UintNode, type Vec3Node, type Vec4Node } from '../tsl.ts';
+import type { Tables } from './tables.ts';
 
 const W = 256, H = 128;
 /** Frames between bakes: the clouds and the sun move slowly. */

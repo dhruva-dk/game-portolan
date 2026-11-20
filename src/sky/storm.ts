@@ -20,12 +20,12 @@ import {
   Fn, If, abs, clamp, dot, exp, float, interleavedGradientNoise, max, min, mx_noise_float, normalize, screenCoordinate, select,
   smoothstep, sqrt, uniform, vec3,
 } from 'three/tsl';
-import type { Cap } from '../sim/storm';
-import type { View } from '../view/view';
-import { R, type Vec3 } from '../world/sphere';
-import { createBolt } from './storm-bolt';
-import { BASE, TOP, createStormField, type FieldLight } from './storm-field';
-import type { BoolNode, FloatNode, Vec3Node } from '../tsl';
+import type { Cap } from '../sim/storm.ts';
+import type { View } from '../view/view.ts';
+import { R, type Vec3 } from '../world/sphere.ts';
+import { createBolt } from './storm-bolt.ts';
+import { BASE, TOP, createStormField, type FieldLight } from './storm-field.ts';
+import type { BoolNode, FloatNode, Vec3Node } from '../tsl.ts';
 
 /** Its density rises from nothing at the cap's edge to full this many metres past it. */
 const SOFT = 25;

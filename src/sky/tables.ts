@@ -11,9 +11,9 @@ import {
   Fn, If, abs, acos, clamp, cos, dot, exp, float, instanceIndex, length, max, normalize, pow, select,
   sin, sqrt, texture, textureStore, uniform, uvec2, vec2, vec3, vec4,
 } from 'three/tsl';
-import { storageTable, type Compute } from '../gpu';
-import { loop, toFloat, type FloatNode, type Vec2Node, type Vec3Node } from '../tsl';
-import * as A from './atmosphere';
+import { storageTable, type Compute } from '../gpu.ts';
+import { loop, toFloat, type FloatNode, type Vec2Node, type Vec3Node } from '../tsl.ts';
+import * as A from './atmosphere.ts';
 
 const H = Math.sqrt(A.TOP * A.TOP - A.BOTTOM * A.BOTTOM);
 /** The air's Rayleigh scattering at the sea, per km, as a node (atmosphere.ts). */

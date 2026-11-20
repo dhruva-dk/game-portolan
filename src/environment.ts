@@ -3,12 +3,12 @@
 // the match. The environment is that world at a moment and a place: the clock, the sun over the eye, the weather now
 // and the wind there, worked out by the frame alone each frame and read by every system that draws.
 
-import { landOf, planetOf, type Land } from './world/land';
-import type { Planet } from './world/planet';
-import type { Out3, Vec3 } from './world/sphere';
-import { sunAt, sunPlaces, type SunPlaces } from './world/sun';
-import { createWeather, type Weather } from './world/weather';
-import { createWind, type Wind } from './world/wind';
+import { landOf, planetOf, type Land } from './world/land.ts';
+import type { Planet } from './world/planet.ts';
+import type { Out3, Vec3 } from './world/sphere.ts';
+import { sunAt, sunPlaces, type SunPlaces } from './world/sun.ts';
+import { createWeather, type Weather } from './world/weather.ts';
+import { createWind, type Wind } from './world/wind.ts';
 
 /** The match's sky and sea, fixed for it. */
 export interface Climate {

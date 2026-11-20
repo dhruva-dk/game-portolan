@@ -19,10 +19,10 @@
 // it thins away to nothing, so the water meets the sand with no line drawn between them.
 
 import { abs, float, max, min, mix, saturate, sin, smoothstep, texture } from 'three/tsl';
-import type { Read } from '../view/charts';
-import { CASCADES } from '../world/cascades';
-import { FOAMING, type Waves } from './waves';
-import type { FloatNode } from '../tsl';
+import type { Read } from '../view/charts.ts';
+import { CASCADES } from '../world/cascades.ts';
+import { FOAMING, type Waves } from './waves.ts';
+import type { FloatNode } from '../tsl.ts';
 
 /** A lobe of the scallops is about this many metres across; each row of them is bent this far (radians) by the other. */
 const LOBE = 1.6, BENT = 0.9;

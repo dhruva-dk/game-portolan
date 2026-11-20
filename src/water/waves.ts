@@ -30,11 +30,11 @@ import {
   Fn, cos, float, floor, instanceIndex, instancedArray, length, localId, max, select, sin, smoothstep, sqrt, textureLoad, textureStore,
   uint, uniform, uniformArray, uvec2, vec2, vec4, workgroupBarrier, workgroupId,
 } from 'three/tsl';
-import { storageTable, type Compute } from '../gpu';
-import { BANDS, CASCADES, CHOP, PERIOD, SIZE } from '../world/cascades';
-import { clamp } from '../world/scalar';
-import { G, coxMunk, initialSpectrum, meanSquareSlope, normalQuantile, seaState, whitecaps, type Sea } from '../world/spectrum';
-import { workgroupArrayOf, type FloatNode, type UintNode, type Vec2Node, type Vec4Node } from '../tsl';
+import { storageTable, type Compute } from '../gpu.ts';
+import { BANDS, CASCADES, CHOP, PERIOD, SIZE } from '../world/cascades.ts';
+import { clamp } from '../world/scalar.ts';
+import { G, coxMunk, initialSpectrum, meanSquareSlope, normalQuantile, seaState, whitecaps, type Sea } from '../world/spectrum.ts';
+import { workgroupArrayOf, type FloatNode, type UintNode, type Vec2Node, type Vec4Node } from '../tsl.ts';
 
 /** Cascades whose curvature focuses caustics: the shorter waves, a few metres and less. */
 export const CURVED = [1, 2];

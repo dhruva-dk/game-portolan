@@ -16,10 +16,10 @@
 import {
   abs, clamp, exp, float, length, luminance, max, min, mix, mod, pow, screenUV, select, smoothstep, step, uniform, vec2, vec3,
 } from 'three/tsl';
-import { DAWN_MIST, STORM_SLATE, type Rgb } from '../palette';
-import type { FloatNode, Vec3Node } from '../tsl';
+import { DAWN_MIST, STORM_SLATE, type Rgb } from '../palette.ts';
+import type { FloatNode, Vec3Node } from '../tsl.ts';
 // the CPU's numbers, apart from TSL's nodes of the same names
-import * as scalar from '../world/scalar';
+import * as scalar from '../world/scalar.ts';
 
 /** A look. The lift is a small offset in linear light. */
 export interface Look {

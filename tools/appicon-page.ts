@@ -2,8 +2,8 @@
 // own rose (src/ui/marks.ts rose, recoloured through its inks) on a ground, rasterises it opaque at 1024 px and steps it
 // down to any smaller size, and hands back the pixels as base64 RGB, three bytes a pixel.
 
-import { INK, WASH, svg } from '../src/ui/ink';
-import { ROSE, rose, type RoseInks } from '../src/ui/marks';
+import { INK, WASH, svg } from '../src/ui/ink.ts';
+import { ROSE, rose, type RoseInks } from '../src/ui/marks.ts';
 
 export const SIZE = 1024;
 /** The rose's radius: its ring some 80% of the square, inside the corners iOS rounds away. */

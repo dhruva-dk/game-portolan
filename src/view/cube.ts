@@ -4,8 +4,8 @@
 
 import { abs, atan, int, select, vec2 } from 'three/tsl';
 import type { Node } from 'three/webgpu';
-import { FACES, type Axis } from '../world/sphere';
-import type { FloatNode, IntNode, Vec2Node, Vec3Node } from '../tsl';
+import { FACES, type Axis } from '../world/sphere.ts';
+import type { FloatNode, IntNode, Vec2Node, Vec3Node } from '../tsl.ts';
 
 /** The face across `axis` on its side `sign`. */
 const faceAcross = (axis: number, sign: number) => FACES.findIndex((f) => f.across[0] === axis && f.across[1] === sign);

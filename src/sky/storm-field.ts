@@ -23,9 +23,9 @@ import {
   Break, If, acos, atan, clamp, cos, dot, exp, float, length, max, min, mix, normalize, select, sin, smoothstep, texture3D, vec3,
 } from 'three/tsl';
 import type { Storage3DTexture } from 'three/webgpu';
-import * as storm from '../sim/storm';
-import { R } from '../world/sphere';
-import { henyeyGreenstein, loop, type FloatNode, type Vec3Node } from '../tsl';
+import * as storm from '../sim/storm.ts';
+import { R } from '../world/sphere.ts';
+import { henyeyGreenstein, loop, type FloatNode, type Vec3Node } from '../tsl.ts';
 
 /** The cloud's base, metres up, and how far its rolls lift and lower it, each ROLL_WIDTH metres across, and its
  * billows (metres a unit of them). Its rolls and billows (BASE_BILLOW at most 1.7) take it down to some 40.6 m:

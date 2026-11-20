@@ -4,13 +4,13 @@
 // of hers and others' about her, a ball passing, blows taken, a pickup and its use, a ship going down, a loop closed,
 // the storm closing over her). Each comes back as base64 float samples, one string a channel.
 
-import { createEngine } from '../src/audio/audio';
-import { CUES, CUE_NAMES, soundOf, type Cue } from '../src/audio/cues';
-import type { Hearing } from '../src/audio/listen';
-import { KINDS } from '../src/kinds';
-import { HOTBAR, type Deed, type GunKind, type Kit, type Moment, type Status } from '../src/player';
-import { lookingAt, type Blast, type BallDraw, type Eye, type SeaChange, type ShipDraw, type Snapshot } from '../src/snapshot';
-import { R, add, cross, normalize, scale, type Vec3 } from '../src/world/sphere';
+import { createEngine } from '../src/audio/audio.ts';
+import { CUES, CUE_NAMES, soundOf, type Cue } from '../src/audio/cues.ts';
+import type { Hearing } from '../src/audio/listen.ts';
+import { KINDS } from '../src/kinds.ts';
+import { HOTBAR, type Deed, type GunKind, type Kit, type Moment, type Status } from '../src/player.ts';
+import { lookingAt, type Blast, type BallDraw, type Eye, type SeaChange, type ShipDraw, type Snapshot } from '../src/snapshot.ts';
+import { R, add, cross, normalize, scale, type Vec3 } from '../src/world/sphere.ts';
 
 const RATE = 48000;
 

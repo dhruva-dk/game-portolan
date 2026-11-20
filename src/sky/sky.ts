@@ -28,20 +28,20 @@ import {
   Fn, abs, cross, dot, exp, float, length, luminance, max, mix, normalWorldGeometry, normalize, pow, select, smoothstep, sqrt,
   uniform, vec3,
 } from 'three/tsl';
-import type { Environment } from '../environment';
-import type { Cap } from '../sim/storm';
-import type { Compute } from '../gpu';
-import type { Eye } from '../snapshot';
-import type { View } from '../view/view';
-import * as sphere from '../world/sphere';
-import { sunAtOrigin, sunInSky } from '../world/sun';
-import { MIE_EXTINCTION, MIE_SCALE_HEIGHT, MIE_SCATTERING, SEA_ALBEDO } from './atmosphere';
-import { HAZE, STORM, tint } from '../palette';
-import { createClouds, type CloudInputs } from './clouds';
-import { createReflection } from './reflection';
-import { createStormLook, type StormLight } from './storm';
-import { RAYLEIGH, VIEW_RADIUS, createTables } from './tables';
-import { henyeyGreenstein, type FloatNode, type Vec3Node } from '../tsl';
+import type { Environment } from '../environment.ts';
+import type { Cap } from '../sim/storm.ts';
+import type { Compute } from '../gpu.ts';
+import type { Eye } from '../snapshot.ts';
+import type { View } from '../view/view.ts';
+import * as sphere from '../world/sphere.ts';
+import { sunAtOrigin, sunInSky } from '../world/sun.ts';
+import { MIE_EXTINCTION, MIE_SCALE_HEIGHT, MIE_SCATTERING, SEA_ALBEDO } from './atmosphere.ts';
+import { HAZE, STORM, tint } from '../palette.ts';
+import { createClouds, type CloudInputs } from './clouds.ts';
+import { createReflection } from './reflection.ts';
+import { createStormLook, type StormLight } from './storm.ts';
+import { RAYLEIGH, VIEW_RADIUS, createTables } from './tables.ts';
+import { henyeyGreenstein, type FloatNode, type Vec3Node } from '../tsl.ts';
 
 /**
  * The sun's disc as the sky draws it, its angular radius: 3° across, where the true sun is 0.53°, a few pixels on the

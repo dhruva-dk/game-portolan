@@ -27,11 +27,11 @@ import {
   If, abs, atan, clamp, dot, exp, float, floor, int, length, max, min, mix, select, smoothstep, storage, uniform, uniformArray,
   vec2, vec4,
 } from 'three/tsl';
-import type { Sea } from '../snapshot';
-import type { BoolNode, FloatNode, IntNode, UintNode, Vec2Node, Vec3Node, Vec4Node } from '../tsl';
-import { gnomonic } from '../view/cube';
-import { N } from '../world/cells';
-import { HOLD, SIDE, WORDS, createClaimed } from './claimed';
+import type { Sea } from '../snapshot.ts';
+import type { BoolNode, FloatNode, IntNode, UintNode, Vec2Node, Vec3Node, Vec4Node } from '../tsl.ts';
+import { gnomonic } from '../view/cube.ts';
+import { N } from '../world/cells.ts';
+import { HOLD, SIDE, WORDS, createClaimed } from './claimed.ts';
 
 /** The tint: how far the water's colour is given up for its holder's (0…1), the others' and hers; seen from afar (a
  *  cell under a pixel or two: the full map's), more, so the holders read from space. */

@@ -61,27 +61,27 @@
 //
 // `node tools/terrain-map.ts <seeds>` charts planets' land.
 
-import type { Anchor } from './world/lattice';
-import type { World } from './environment';
-import type { FrameOptions } from './frame';
-import { createFly } from './fly';
-import type { Game } from './play/game';
-import type { Referee } from './play/referee';
-import { lookOf } from './play/colours';
-import type { Matches } from './play/setup';
-import type { Berth } from './play/state';
-import { HOTBAR, IDLE, type Hands } from './player';
-import { probeMeshes } from './probe';
-import { STEP } from './sim/fixed';
-import { KINDS, type GunKind } from './kinds';
-import { SHIP } from './sim/handling';
-import { PLAYER, SHIPS } from './sim/match';
-import type { Cap } from './sim/storm';
-import type { ShipDraw, Snapshot } from './snapshot';
-import type { Flow } from './ui/flow';
-import { uiLayer } from './ui/ui';
-import type { Weather } from './world/weather';
-import { R, add, bearingAt, cross, dot, frameAt, along, normalize, scale, type Vec3 } from './world/sphere';
+import type { Anchor } from './world/lattice.ts';
+import type { World } from './environment.ts';
+import type { FrameOptions } from './frame.ts';
+import { createFly } from './fly.ts';
+import type { Game } from './play/game.ts';
+import type { Referee } from './play/referee.ts';
+import { lookOf } from './play/colours.ts';
+import type { Matches } from './play/setup.ts';
+import type { Berth } from './play/state.ts';
+import { HOTBAR, IDLE, type Hands } from './player.ts';
+import { probeMeshes } from './probe.ts';
+import { STEP } from './sim/fixed.ts';
+import { KINDS, type GunKind } from './kinds.ts';
+import { SHIP } from './sim/handling.ts';
+import { PLAYER, SHIPS } from './sim/match.ts';
+import type { Cap } from './sim/storm.ts';
+import type { ShipDraw, Snapshot } from './snapshot.ts';
+import type { Flow } from './ui/flow.ts';
+import { uiLayer } from './ui/ui.ts';
+import type { Weather } from './world/weather.ts';
+import { R, add, bearingAt, cross, dot, frameAt, along, normalize, scale, type Vec3 } from './world/sphere.ts';
 
 /** How the page is set up (main.ts RELEASE, or as the switches change it): the planet's seed, the weather's mean and
  *  swing (world/weather.ts) and the time of day (hours); how the frame draws; whether the meter always shows the

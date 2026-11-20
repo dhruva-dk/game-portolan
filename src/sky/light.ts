@@ -9,8 +9,8 @@
 // thin thing (a leaf, a sail) is lit from either side: its far side's sun shows through it.
 
 import { cameraPosition, dot, float, fwidth, luminance, max, mix, normalize, saturate, smoothstep, vec3 } from 'three/tsl';
-import type { FloatNode, Vec3Node } from '../tsl';
-import type { Sky } from './sky';
+import type { FloatNode, Vec3Node } from '../tsl.ts';
+import type { Sky } from './sky.ts';
 
 /** The light under the water at a point, as a share of what is above it (water.below). */
 export interface Below { sun(p: Vec3Node): Vec3Node; sky(p: Vec3Node): Vec3Node }

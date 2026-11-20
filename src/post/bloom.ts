@@ -10,7 +10,7 @@
 
 import type { TextureNode } from 'three/webgpu';
 import { Fn, abs, dFdx, dFdy, float, luminance, rtt, smoothstep, uv, vec2, vec4 } from 'three/tsl';
-import type { FloatNode, Vec4Node } from '../tsl';
+import type { FloatNode, Vec4Node } from '../tsl.ts';
 
 /** The soft knee, in the scene's light per unit sun times the exposure's 2^stops (so in what the eye sees): bloom
  *  starts at KNEE[0] and takes everything past KNEE[1]. White foam in the open is 1. */

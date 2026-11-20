@@ -9,8 +9,8 @@ import {
   Fn, clamp, dot, float, floor, fract, instanceIndex, length, max, min, mix, mod, normalize, select, smoothstep,
   textureStore, uvec2, uvec3, vec2, vec3, vec4,
 } from 'three/tsl';
-import { storageTable, type Compute } from '../gpu';
-import { hash3, ramp, type FloatNode, type Vec2Node, type Vec3Node } from '../tsl';
+import { storageTable, type Compute } from '../gpu.ts';
+import { hash3, ramp, type FloatNode, type Vec2Node, type Vec3Node } from '../tsl.ts';
 
 const SHAPE_N = 64, DETAIL_N = 64, WEATHER_N = 1024;
 

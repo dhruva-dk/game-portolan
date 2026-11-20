@@ -8,8 +8,8 @@
 
 import { BoxGeometry, Matrix4, Mesh, MeshBasicNodeMaterial, SphereGeometry, Vector3 } from 'three/webgpu';
 import { dot, float, max, normalWorld, positionWorld, reflectVector, vec3 } from 'three/tsl';
-import type { Sky } from './sky/sky';
-import { add, along, frameAt, length, normalize, place, type Vec3 } from './world/sphere';
+import type { Sky } from './sky/sky.ts';
+import { add, along, frameAt, length, normalize, place, type Vec3 } from './world/sphere.ts';
 
 /** The probe's meshes, standing north of `eye` (world metres), for the frame to stand in its scene. */
 export function probeMeshes(sky: Sky, eye: Vec3): Mesh[] {

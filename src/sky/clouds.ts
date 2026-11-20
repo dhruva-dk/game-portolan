@@ -12,12 +12,12 @@ import {
   Fn, If, abs, clamp, float, floor, fract, instanceIndex, int, interleavedGradientNoise, ivec2, max, min, mix, normalize, select,
   smoothstep, texture, textureLoad, textureStore, uniform, uvec2, vec2, vec3, vec4,
 } from 'three/tsl';
-import { storageTable, type Compute } from '../gpu';
-import type { View } from '../view/view';
-import { createCloudNoise } from './cloud-noise';
-import { BASE, DIFFUSION, SIGMA, TOP, createCloudField, type CloudField } from './cloud-field';
-import type { Tables } from './tables';
-import { clampInts, loop, type FloatNode, type Vec2Node, type Vec3Node, type Vec4Node } from '../tsl';
+import { storageTable, type Compute } from '../gpu.ts';
+import type { View } from '../view/view.ts';
+import { createCloudNoise } from './cloud-noise.ts';
+import { BASE, DIFFUSION, SIGMA, TOP, createCloudField, type CloudField } from './cloud-field.ts';
+import type { Tables } from './tables.ts';
+import { clampInts, loop, type FloatNode, type Vec2Node, type Vec3Node, type Vec4Node } from '../tsl.ts';
 
 /** Most steps a screen ray takes (a grazing one; one looking up needs about 30). */
 const MAX_STEPS = 64;

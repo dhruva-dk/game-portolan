@@ -7,7 +7,7 @@
 // Cost: two hashes a pixel, in the frame's last pass.
 
 import { frameId, hash, screenCoordinate, uint, vec4 } from 'three/tsl';
-import type { FloatNode, Vec3Node, Vec4Node } from '../tsl';
+import type { FloatNode, Vec3Node, Vec4Node } from '../tsl.ts';
 
 /** A hash in 0…1 of the pixel and the frame, one of two streams (each seed a large odd step apart). */
 const noise = (k: number): FloatNode => {

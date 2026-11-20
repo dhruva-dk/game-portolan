@@ -15,13 +15,13 @@
 // footprint is wide, the net fades into an even light of itself.
 
 import { Fn, If, dFdx, dFdy, dot, float, length, log2, max, mix, smoothstep, sqrt, texture, vec2, vec3 } from 'three/tsl';
-import type { Sky } from '../sky/sky';
-import type { Charts } from '../view/charts';
-import type { View } from '../view/view';
-import { CASCADES, LONG, SIZE } from '../world/cascades';
-import { N_WATER } from './optics';
-import { CURVED, type Waves } from './waves';
-import type { FloatNode, Vec3Node } from '../tsl';
+import type { Sky } from '../sky/sky.ts';
+import type { Charts } from '../view/charts.ts';
+import type { View } from '../view/view.ts';
+import { CASCADES, LONG, SIZE } from '../world/cascades.ts';
+import { N_WATER } from './optics.ts';
+import { CURVED, type Waves } from './waves.ts';
+import type { FloatNode, Vec3Node } from '../tsl.ts';
 
 /** Caustics focus as if the floor were no deeper than about this, metres. */
 const FOCUS = 2.5;

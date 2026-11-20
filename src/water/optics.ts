@@ -15,10 +15,10 @@
 // sun; depths are heights below the sea's level there (view.altitude).
 
 import { dot, exp, float, fwidth, length, max, min, mix, normalize, pow, saturate, smoothstep, sqrt, vec3 } from 'three/tsl';
-import { FOAM, SEA_DEEP, SEA_MIDDLE, SEA_SHALLOW } from '../palette';
-import type { Sky } from '../sky/sky';
-import type { View } from '../view/view';
-import { cut, type FloatNode, type Vec3Node, type Vec4Node } from '../tsl';
+import { FOAM, SEA_DEEP, SEA_MIDDLE, SEA_SHALLOW } from '../palette.ts';
+import type { Sky } from '../sky/sky.ts';
+import type { View } from '../view/view.ts';
+import { cut, type FloatNode, type Vec3Node, type Vec4Node } from '../tsl.ts';
 
 /** Absorption per metre, red/green/blue (680, 550, 440 nm): pure water's (Pope & Fry 1997). It colours the light that
  *  reaches the floor and what the eye sees of the floor through the water. */

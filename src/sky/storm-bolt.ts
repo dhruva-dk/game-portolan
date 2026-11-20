@@ -8,13 +8,13 @@
 
 import { Vector3 } from 'three/webgpu';
 import { abs, cross, dot, exp, float, fract, length, luminance, max, min, normalize, smoothstep, uniform, vec3 } from 'three/tsl';
-import { LIGHTNING, tint } from '../palette';
-import type { Cap } from '../sim/storm';
-import { hash01 } from '../world/random';
-import { clamp } from '../world/scalar';
-import { R, type Vec3 } from '../world/sphere';
-import { BASE } from './storm-field';
-import type { FloatNode, Vec3Node } from '../tsl';
+import { LIGHTNING, tint } from '../palette.ts';
+import type { Cap } from '../sim/storm.ts';
+import { hash01 } from '../world/random.ts';
+import { clamp } from '../world/scalar.ts';
+import { R, type Vec3 } from '../world/sphere.ts';
+import { BASE } from './storm-field.ts';
+import type { FloatNode, Vec3Node } from '../tsl.ts';
 
 /**
  * One stroke in each BOLT seconds, at a moment within it; its flickers (seconds from the stroke, and each one's

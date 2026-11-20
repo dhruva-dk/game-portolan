@@ -28,13 +28,13 @@ import {
 } from 'three/tsl';
 import {
   BOTTOM, MIE_EXTINCTION, MIE_SCALE_HEIGHT, RAYLEIGH_SCALE_HEIGHT,
-} from './atmosphere';
-import { CLOUD } from '../palette';
-import { POTENTIAL_DECILES, WEATHER_TILE, type CloudNoise } from './cloud-noise';
-import { henyeyGreenstein, loop, ramp, type FloatNode, type Vec3Node, type Vec4Node } from '../tsl';
-import { RAYLEIGH, type Tables } from './tables';
+} from './atmosphere.ts';
+import { CLOUD } from '../palette.ts';
+import { POTENTIAL_DECILES, WEATHER_TILE, type CloudNoise } from './cloud-noise.ts';
+import { henyeyGreenstein, loop, ramp, type FloatNode, type Vec3Node, type Vec4Node } from '../tsl.ts';
+import { RAYLEIGH, type Tables } from './tables.ts';
 // the CPU's numbers, apart from TSL's nodes of the same names
-import * as scalar from '../world/scalar';
+import * as scalar from '../world/scalar.ts';
 
 /** 1 under a … 0 past b, eased between: smoothstep's fall. */
 const fall = (a: number, b: number, x: FloatNode): FloatNode => float(1).sub(smoothstep(a, b, x));

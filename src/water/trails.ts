@@ -17,15 +17,15 @@ import {
   Fn, attribute, cameraPosition, clamp, dot, float, fract, fwidth, int, max, min, mix, normalize, select, smoothstep, sqrt, uniform,
   uniformArray, varying, vec4,
 } from 'three/tsl';
-import { premultiplied } from '../gpu';
-import type { Sky } from '../sky/sky';
-import type { Sea, ShipDraw } from '../snapshot';
-import type { FloatNode, Vec3Node } from '../tsl';
-import type { Eye } from '../view/view';
-import * as sphere from '../world/sphere';
-import { LINE_HALF, OWN_WIDE, lineLight } from './claims';
-import { createCursor } from './cursor';
-import { whiteSurface } from './optics';
+import { premultiplied } from '../gpu.ts';
+import type { Sky } from '../sky/sky.ts';
+import type { Sea, ShipDraw } from '../snapshot.ts';
+import type { FloatNode, Vec3Node } from '../tsl.ts';
+import type { Eye } from '../view/view.ts';
+import * as sphere from '../world/sphere.ts';
+import { LINE_HALF, OWN_WIDE, lineLight } from './claims.ts';
+import { createCursor } from './cursor.ts';
+import { whiteSurface } from './optics.ts';
 
 /** The most points drawn at once, over every ribbon. */
 const POINTS = 16384;

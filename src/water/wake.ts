@@ -48,20 +48,20 @@ import {
   Fn, abs, attribute, cos, cross, dot, exp, float, length, max, min, mix, mx_noise_float, normalize, saturate, select, sin, smoothstep,
   step, texture, uniform, vec2, vec3, vec4,
 } from 'three/tsl';
-import type { Environment } from '../environment';
-import { additive, type Draw } from '../gpu';
-import { PIVOT_Z, buildShip } from '../ship/build';
-import { THROUGH } from '../ship/materials';
-import { WATERLINE } from '../ship/waterline';
-import { WAKE, lay, type WakePoint } from '../sim/wake';
-import type { Sky } from '../sky/sky';
-import type { View } from '../view/view';
-import type { ShipPose } from '../world/pose';
-import { clamp } from '../world/scalar';
-import * as sphere from '../world/sphere';
-import type { FloatNode, Vec2Node, Vec3Node, Vec4Node } from '../tsl';
-import { outside } from './hulls';
-import { ARM_LIFE, ARM_WIDTH, CHURN, KELVIN, SPREAD, WIDEN, createRibbon, type Route } from './ribbon';
+import type { Environment } from '../environment.ts';
+import { additive, type Draw } from '../gpu.ts';
+import { PIVOT_Z, buildShip } from '../ship/build.ts';
+import { THROUGH } from '../ship/materials.ts';
+import { WATERLINE } from '../ship/waterline.ts';
+import { WAKE, lay, type WakePoint } from '../sim/wake.ts';
+import type { Sky } from '../sky/sky.ts';
+import type { View } from '../view/view.ts';
+import type { ShipPose } from '../world/pose.ts';
+import { clamp } from '../world/scalar.ts';
+import * as sphere from '../world/sphere.ts';
+import type { FloatNode, Vec2Node, Vec3Node, Vec4Node } from '../tsl.ts';
+import { outside } from './hulls.ts';
+import { ARM_LIFE, ARM_WIDTH, CHURN, KELVIN, SPREAD, WIDEN, createRibbon, type Route } from './ribbon.ts';
 
 /** Texels across the map, and how far it reaches from the point under the eye, metres. */
 const SIZE = 512, REACH = 128;

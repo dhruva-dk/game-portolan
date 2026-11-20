@@ -3,29 +3,29 @@
 // title; only the page's debug switches change either (debug.ts scenario, the one way in).
 
 import { WebGPUCoordinateSystem, WebGPURenderer } from 'three/webgpu';
-import { createAudio } from './audio/audio';
-import type { Hearing } from './audio/listen';
-import { scenario, type Played, type Setup, type Stage } from './debug';
-import { createWorld } from './environment';
-import { createFrame } from './frame';
-import { loaded } from './load';
-import { createMeter } from './meter';
-import { createGame } from './play/game';
-import { createReferee } from './play/referee';
-import { createMatches, watersOf } from './play/setup';
-import { SHIP } from './sim/handling';
-import { SHIPS } from './sim/match';
-import type { Snapshot } from './snapshot';
-import { shoresOf } from './ui/coasts';
-import { createGlobe } from './ui/globe';
-import { createFlow } from './ui/flow';
-import { createHud, type HudState } from './ui/hud';
-import { createTitle } from './ui/screens';
-import { createInput } from './ui/input';
-import { createStick } from './ui/stick';
-import { uiLayer } from './ui/ui';
-import { SEED } from './world/planet';
-import { MEAN, SWING } from './world/weather';
+import { createAudio } from './audio/audio.ts';
+import type { Hearing } from './audio/listen.ts';
+import { scenario, type Played, type Setup, type Stage } from './debug.ts';
+import { createWorld } from './environment.ts';
+import { createFrame } from './frame.ts';
+import { loaded } from './load.ts';
+import { createMeter } from './meter.ts';
+import { createGame } from './play/game.ts';
+import { createReferee } from './play/referee.ts';
+import { createMatches, watersOf } from './play/setup.ts';
+import { SHIP } from './sim/handling.ts';
+import { SHIPS } from './sim/match.ts';
+import type { Snapshot } from './snapshot.ts';
+import { shoresOf } from './ui/coasts.ts';
+import { createGlobe } from './ui/globe.ts';
+import { createFlow } from './ui/flow.ts';
+import { createHud, type HudState } from './ui/hud.ts';
+import { createTitle } from './ui/screens.ts';
+import { createInput } from './ui/input.ts';
+import { createStick } from './ui/stick.ts';
+import { uiLayer } from './ui/ui.ts';
+import { SEED } from './world/planet.ts';
+import { MEAN, SWING } from './world/weather.ts';
 
 /** The release's setup. */
 const RELEASE: Setup = {

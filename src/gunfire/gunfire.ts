@@ -33,15 +33,15 @@ import {
   Fn, abs, atan, attribute, cameraPosition, cos, cross, exp, float, max, mix, normalize, pow, select, sin, smoothstep, uniform, varying,
   vec3,
 } from 'three/tsl';
-import { KINDS, gunOrder, type GunKind } from '../kinds';
-import { AZURE, BALL_IRON, BALL_SPARK, DUST, FALL_MARK, FIRE, FOAM, SMOKE, SOOT, TIMBER, TRACER } from '../palette';
-import type { Light } from '../sky/light';
-import type { BallDraw } from '../snapshot';
-import type { Eye } from '../view/view';
-import { random } from '../world/random';
-import * as sphere from '../world/sphere';
-import { additive, premultiplied, quad } from '../gpu';
-import { tangentFrame, type FloatNode, type Vec2Node } from '../tsl';
+import { KINDS, gunOrder, type GunKind } from '../kinds.ts';
+import { AZURE, BALL_IRON, BALL_SPARK, DUST, FALL_MARK, FIRE, FOAM, SMOKE, SOOT, TIMBER, TRACER } from '../palette.ts';
+import type { Light } from '../sky/light.ts';
+import type { BallDraw } from '../snapshot.ts';
+import type { Eye } from '../view/view.ts';
+import { random } from '../world/random.ts';
+import * as sphere from '../world/sphere.ts';
+import { additive, premultiplied, quad } from '../gpu.ts';
+import { tangentFrame, type FloatNode, type Vec2Node } from '../tsl.ts';
 
 /** The most balls in flight, fall marks, and puffs alive, at once. */
 const BALLS = 512, MARKS = 64, PUFFS = 4096;

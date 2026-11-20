@@ -10,7 +10,7 @@ import { Vector2, Vector3, type Matrix4, type TextureNode } from 'three/webgpu';
 import {
   Fn, dot, exp, float, int, interleavedGradientNoise, max, min, rtt, screenCoordinate, select, uniform, uv, vec2, vec3, vec4,
 } from 'three/tsl';
-import { loop, type FloatNode, type Vec2Node, type Vec3Node, type Vec4Node } from '../tsl';
+import { loop, type FloatNode, type Vec2Node, type Vec3Node, type Vec4Node } from '../tsl.ts';
 /** Taps along a ray in each of the two passes. */
 const TAPS = 16;
 /** The sky's light past FLOOR (per unit sun) makes shafts, up to CLAMP, so the sun's disc does not swamp them and

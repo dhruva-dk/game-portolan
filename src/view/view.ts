@@ -22,8 +22,8 @@ import { BufferGeometry, Float32BufferAttribute, Frustum, Matrix4, Vector3, type
 import {
   asin, atan, clamp, cos, cross, dot, length, max, normalize, positionGeometry, select, sin, sqrt, uniform, vec2, vec3,
 } from 'three/tsl';
-import { R, frameAt, horizonDip, type Frame, type Vec3 } from '../world/sphere';
-import { toFloat, type FloatNode, type Vec2Node, type Vec3Node } from '../tsl';
+import { R, frameAt, horizonDip, type Frame, type Vec3 } from '../world/sphere.ts';
+import { toFloat, type FloatNode, type Vec2Node, type Vec3Node } from '../tsl.ts';
 
 /** The eye, as the CPU sees it. */
 export interface Eye {

@@ -25,14 +25,14 @@ import {
   Fn, abs, attribute, cameraPosition, clamp, cos, cross, dot, float, max, mix, normalize, pow, select, sin, smoothstep, uniform, varying,
   vec3,
 } from 'three/tsl';
-import { GILDING, GLINT, ICE, RARITY_GLOW, TAR, TIMBER } from '../palette';
-import type { Light } from '../sky/light';
-import { KINDS, gunOrder, type GunKind, type LootKind } from '../kinds';
+import { GILDING, GLINT, ICE, RARITY_GLOW, TAR, TIMBER } from '../palette.ts';
+import type { Light } from '../sky/light.ts';
+import { KINDS, gunOrder, type GunKind, type LootKind } from '../kinds.ts';
 import { gunShape, gunSurface } from '../ship/gun.ts';
-import type { LootDraw } from '../snapshot';
-import type { Eye } from '../view/view';
-import { additive } from '../gpu';
-import { tangentFrame, type Vec3Node } from '../tsl';
+import type { LootDraw } from '../snapshot.ts';
+import type { Eye } from '../view/view.ts';
+import { additive } from '../gpu.ts';
+import { tangentFrame, type Vec3Node } from '../tsl.ts';
 
 /** The most pieces drawn at once. */
 const PIECES = 512;

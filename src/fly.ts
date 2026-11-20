@@ -3,9 +3,9 @@
 // away from the planet's centre, its heading carried along with it. It stays above the water.
 
 import { Matrix4, Quaternion, Vector3 } from 'three/webgpu';
-import { AIR_FOV, type Eye } from './snapshot';
-import { clamp } from './world/scalar';
-import { add, along, bearingAt, cross, fromLatLon, length, normalize, place, scale, transport } from './world/sphere';
+import { AIR_FOV, type Eye } from './snapshot.ts';
+import { clamp } from './world/scalar.ts';
+import { add, along, bearingAt, cross, fromLatLon, length, normalize, place, scale, transport } from './world/sphere.ts';
 
 /** Metres a second; shift multiplies it. */
 const SPEED = 15;

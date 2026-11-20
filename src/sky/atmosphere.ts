@@ -6,7 +6,7 @@
 // the top of a sphere of radius BOTTOM, and the small planet's own sky is read through them (view.toSky stretches its
 // elevations so its horizon falls on Earth's).
 
-import type { Rgb } from '../colour';
+import type { Rgb } from '../colour.ts';
 
 export const BOTTOM = 6360;
 export const TOP = 6460;

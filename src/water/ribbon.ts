@@ -4,8 +4,8 @@
 // long ago she passed and how fast she went, and how far along the path they are, which the map's shader draws from.
 // Nothing is made: it writes straight into the buffers it is given, for every ship every frame.
 
-import type { WakePoint } from '../sim/wake';
-import * as sphere from '../world/sphere';
+import type { WakePoint } from '../sim/wake.ts';
+import * as sphere from '../world/sphere.ts';
 
 /** tan of the Kelvin angle, 19.47°. */
 export const KELVIN = Math.tan((19.47 * Math.PI) / 180);

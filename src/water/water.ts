@@ -34,27 +34,27 @@ import {
   getScreenPosition, getViewPosition, length, log2, luminance, max, min, mix, normalize, positionView, positionWorld, saturate,
   screenUV, select, smoothstep, sqrt, step, tanh, texture, varying, vec2, vec3, vec4, viewportDepthTexture, viewportSharedTexture,
 } from 'three/tsl';
-import type { Environment } from '../environment';
-import { LIGHTNING } from '../palette';
-import type { Snapshot } from '../snapshot';
-import type { Compute, Draw } from '../gpu';
-import type { Ground } from '../land/ground';
-import type { Sky } from '../sky/sky';
-import { createCharts } from '../view/charts';
-import type { View } from '../view/view';
-import { BANDS, BREAKER, CASCADES, FETCH, LONG, SIZE } from '../world/cascades';
-import { likeness } from '../world/spectrum';
-import { R } from '../world/sphere';
-import type { Wind } from '../world/wind';
-import type { FloatNode, Vec2Node, Vec3Node } from '../tsl';
-import { createCaustics } from './caustics';
-import { createClaims } from './claims';
-import { createFoam } from './foam';
-import { createHulls } from './hulls';
-import { N_WATER, createOptics } from './optics';
-import { createTrails } from './trails';
-import { createWake, type Afloat } from './wake';
-import { createWaves } from './waves';
+import type { Environment } from '../environment.ts';
+import { LIGHTNING } from '../palette.ts';
+import type { Snapshot } from '../snapshot.ts';
+import type { Compute, Draw } from '../gpu.ts';
+import type { Ground } from '../land/ground.ts';
+import type { Sky } from '../sky/sky.ts';
+import { createCharts } from '../view/charts.ts';
+import type { View } from '../view/view.ts';
+import { BANDS, BREAKER, CASCADES, FETCH, LONG, SIZE } from '../world/cascades.ts';
+import { likeness } from '../world/spectrum.ts';
+import { R } from '../world/sphere.ts';
+import type { Wind } from '../world/wind.ts';
+import type { FloatNode, Vec2Node, Vec3Node } from '../tsl.ts';
+import { createCaustics } from './caustics.ts';
+import { createClaims } from './claims.ts';
+import { createFoam } from './foam.ts';
+import { createHulls } from './hulls.ts';
+import { N_WATER, createOptics } from './optics.ts';
+import { createTrails } from './trails.ts';
+import { createWake, type Afloat } from './wake.ts';
+import { createWaves } from './waves.ts';
 
 const SPOKES = 128;
 const FIRST = 1;
