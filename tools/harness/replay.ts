@@ -13,7 +13,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { parseArgs } from 'node:util';
 import { createMatches } from '../../src/play/setup.ts';
-import { createState } from '../../src/play/state.ts';
+import { createState, debugOf } from '../../src/play/state.ts';
 import { BOT } from '../../src/sim/captain.ts';
 import { STEP } from '../../src/sim/fixed.ts';
 import { SHIP } from '../../src/sim/handling.ts';
@@ -103,7 +103,7 @@ while (state.time() < until) {
       ahead = latLon(along(v.ship.at, v.ship.heading, 5).p),
       dLon = Math.atan2(Math.sin(ahead[1] - lo), Math.cos(ahead[1] - lo));
     const bearing = Math.atan2(dLon * Math.cos(la), ahead[0] - la);
-    const mode = state.debug.mindOf(v.id)?.mode;
+    const mode = debugOf(state).mindOf(v.id)?.mode;
     return [
       v.id,
       r4(la),

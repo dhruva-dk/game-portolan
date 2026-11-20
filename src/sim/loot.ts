@@ -486,11 +486,12 @@ export function offered(
 }
 
 /**
- * A piece taken up: by which ship, what of it (a stack taken only in part, the
- * part), where it lay, and the slot it went to (a gun's: her gun slot, 0 or 1;
- * else an item slot, 1–3).
+ * A piece taken up: which (its id), by which ship, what of it (a stack taken
+ * only in part, the part), where it lay, and the slot it went to (a gun's: her
+ * gun slot, 0 or 1; else an item slot, 1–3).
  */
 export interface Taken {
+  id: number;
   ship: number;
   goods: Goods;
   at: Vec3;
@@ -548,7 +549,7 @@ export function swept(
           if (slot < 0) kept.push(l);
           else {
             c = armedWith(c, slot, g);
-            took.push({ ship: v.id, goods: g, at: l.at, slot });
+            took.push({ id: l.id, ship: v.id, goods: g, at: l.at, slot });
           }
           continue;
         }
@@ -557,6 +558,7 @@ export function swept(
         if (s.left < g.count) {
           const slot = 1 + s.hold.items.findIndex((k) => k?.kind === g.kind);
           took.push({
+            id: l.id,
             ship: v.id,
             goods: { kind: g.kind, count: g.count - s.left },
             at: l.at,
@@ -590,6 +592,7 @@ export function swept(
                 };
         pieces = pieces.filter((l) => l.id !== swap.id);
         took.push({
+          id: swap.id,
           ship: v.id,
           goods,
           at: swap.at,

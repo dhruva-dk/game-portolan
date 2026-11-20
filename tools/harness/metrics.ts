@@ -21,6 +21,7 @@
 // Node only (tools/).
 
 import type { GunKind } from '../../src/kinds.ts';
+import { debugOf } from '../../src/play/state.ts';
 import type { Memory } from '../../src/sim/bot.ts';
 import { BOT, type Mode } from '../../src/sim/captain.ts';
 import { GUNS, SHIP } from '../../src/sim/handling.ts';
@@ -124,16 +125,43 @@ export interface MatchResult {
   msPerStep: number;
   left: number;
   causes: Record<string, number>;
-  /** Shots by range to the mark, by gun (and balls fired and come down short), and by rarity. */
+  /**
+   * Shots by range to the mark; by gun (and balls fired and come down short,
+   * the damage its balls did, and its shots by range); and by rarity.
+   */
   shots: {
     band: Record<Band, Count>;
-    kind: Partial<Record<GunKind, Count & { balls: number; fell: number }>>;
+    kind: Partial<
+      Record<
+        GunKind,
+        Count & {
+          balls: number;
+          fell: number;
+          dealt: number;
+          bands: Record<Band, Count>;
+        }
+      >
+    >;
     rarity: Record<number, Count>;
   };
   /** The longest the guns were silent after the first 30 s (s). */
   quiet: number;
-  /** Pieces at the start, of them in water too shoal to reach, and at the end. */
-  loot: { start: number; shallow: number; end: number };
+  /**
+   * Pieces at the start, of them in water too shoal to reach, and at the end;
+   * those taken up (L1), by when they came on the water (`first`: laid with
+   * the match; `later`: put over the side, or laid since), each how many, the
+   * seconds they lay all told, and how many were fought over (another ship
+   * within FOUGHT m of it as it was taken); and what was taken, by kind and,
+   * guns, by rarity.
+   */
+  loot: {
+    start: number;
+    shallow: number;
+    end: number;
+    taken: Record<'first' | 'later', Flow>;
+    kinds: Record<string, number>;
+    rarity: Record<number, number>;
+  };
   ships: ShipResult[];
 }
 
@@ -164,6 +192,16 @@ const bump = <K extends string>(to: Partial<Record<K, number>>, k: K, n = 1) =>
   (to[k] = (to[k] ?? 0) + n);
 const count = (): Count => ({ shots: 0, hits: 0 });
 
+/** Pieces taken up: how many, the seconds they lay all told, how many fought over. */
+export interface Flow {
+  pieces: number;
+  lay: number;
+  fought: number;
+}
+const flow = (): Flow => ({ pieces: 0, lay: 0, fought: 0 });
+/** A piece is fought over with another ship this near it (m) as it is taken. */
+export const FOUGHT = 150;
+
 type Stepped = ReturnType<State['advance']>;
 
 /**
@@ -188,7 +226,7 @@ export function watch(
       r: {
         id: k.id,
         brain: brainOf(k.id),
-        persona: state.debug.natureOf(k.id)?.persona ?? '',
+        persona: debugOf(state).natureOf(k.id)?.persona ?? '',
         place: 0,
         sunk: null,
         armed: k.armed ? 0 : null,
@@ -217,11 +255,19 @@ export function watch(
       },
     });
   const pieces = state.loot().pieces;
-  const loot = {
+  const loot: Omit<MatchResult['loot'], 'end'> = {
     start: pieces.length,
     shallow: pieces.filter((l) => depth(l.at) < SHIP.draught + PIECE.open)
       .length,
+    taken: { first: flow(), later: flow() },
+    kinds: {},
+    rarity: {},
   };
+  // when each piece came on the water, on the match's clock: those laid with
+  // it at 0, each later one the step it is first afloat (ids only grow)
+  const born = new Map<number, number>(),
+    firstLater = state.loot().next;
+  let seenNext = firstLater;
   const shots: MatchResult['shots'] = {
     band: { close: count(), mid: count(), far: count() },
     kind: {},
@@ -255,8 +301,15 @@ export function watch(
         w.last = { kind: s.gun, rarity, band, home: false };
         bump(w.r.fighting.shots, s.gun);
         shots.band[band].shots++;
-        const k = (shots.kind[s.gun] ??= { ...count(), balls: 0, fell: 0 });
+        const k = (shots.kind[s.gun] ??= {
+          ...count(),
+          balls: 0,
+          fell: 0,
+          dealt: 0,
+          bands: { close: count(), mid: count(), far: count() },
+        });
         k.shots++;
+        k.bands[band].shots++;
         k.balls += GUNS[s.gun].pellets;
         (shots.rarity[rarity] ??= count()).shots++;
         if (now > 30) quiet = Math.max(quiet, now - Math.max(30, lastShot));
@@ -273,12 +326,17 @@ export function watch(
         }
         by.r.fighting.dealt += s.damage;
         const l = by.last;
-        if (!l || l.home) continue;
+        if (!l) continue;
+        const k = shots.kind[l.kind];
+        if (k) k.dealt += s.damage;
+        if (l.home) continue;
         l.home = true;
         by.r.fighting.hits++;
         shots.band[l.band].hits++;
-        const k = shots.kind[l.kind];
-        if (k) k.hits++;
+        if (k) {
+          k.hits++;
+          k.bands[l.band].hits++;
+        }
         const r = shots.rarity[l.rarity];
         if (r) r.hits++;
       }
@@ -287,12 +345,33 @@ export function watch(
         if (k) k.fell++;
       }
       for (const t of did.took) {
+        // (a piece put over the side and taken up within the step was never
+        // seen afloat: it lay no time)
+        const f = loot.taken[t.id < firstLater ? 'first' : 'later'],
+          by = where(t.ship);
+        f.pieces++;
+        f.lay += t.id < firstLater ? now : now - (born.get(t.id) ?? now);
+        if (
+          by &&
+          state
+            .vessels()
+            .some((v) => v.id !== t.ship && distance(v.ship.at, by) < FOUGHT)
+        )
+          f.fought++;
+        bump(loot.kinds, t.goods.kind);
+        if (isArms(t.goods))
+          loot.rarity[t.goods.rarity] = (loot.rarity[t.goods.rarity] ?? 0) + 1;
         const w = ships.get(t.ship);
         if (!w) continue;
         if (isArms(t.goods)) {
           w.r.took.guns++;
           w.r.took.rarest = Math.max(w.r.took.rarest, t.goods.rarity);
         } else w.r.took.stores++;
+      }
+      const f = state.loot();
+      if (f.next > seenNext) {
+        for (const l of f.pieces) if (l.id >= seenNext) born.set(l.id, now);
+        seenNext = f.next;
       }
       for (const k of did.held?.claimed ?? []) {
         const w = ships.get(k.id);
@@ -308,7 +387,7 @@ export function watch(
       for (const v of state.vessels()) {
         const w = ships.get(v.id);
         if (!w) continue;
-        const mind = state.debug.mindOf(v.id),
+        const mind = debugOf(state).mindOf(v.id),
           mode = mind?.mode ?? 'roam',
           crew = state.crew(v.id);
         w.afloat++;

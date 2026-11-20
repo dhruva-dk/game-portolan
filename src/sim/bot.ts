@@ -52,7 +52,16 @@ import {
 } from './purser.ts';
 import { claimAct, claimMemory, claimUrge } from './claimer.ts';
 import { huntAct, huntMemory, huntUrge } from './hunter.ts';
-import { away, fightUrge, fleeGoal, fleeUrge, holdsFire } from './fighting.ts';
+import {
+  away,
+  fightUrge,
+  fleeGoal,
+  fleeUrge,
+  holdsFire,
+  mood,
+  moodMemory,
+  wounded,
+} from './fighting.ts';
 import { roamGoal } from './roaming.ts';
 import { keptInside, stormGoal, stormUrge } from './storming.ts';
 import { NOTHING, type Ask } from './stores.ts';
@@ -74,6 +83,7 @@ export const CHOICE = {
 } as const satisfies Record<Mode, number>;
 
 export { BOT, type Memory, type Mode, type Sea, type Seen } from './captain.ts';
+export { sank } from './fighting.ts';
 
 /**
  * What her mind carries: seconds she has been afloat, and steps to her next
@@ -108,6 +118,7 @@ export const mind = (seed: number, at: Vec3): Memory => ({
   hitT: -Infinity,
   shotBy: -1,
   shotT: -Infinity,
+  ...moodMemory(),
   ...tacticMemory(),
   ...pilotMemory(),
   ...helmMemory(at),
@@ -128,11 +139,11 @@ export const rammed = (m: Memory, by: number): Memory => ({
 });
 
 /**
- * Her memory once a ball of `by`'s has struck her (the game tells her, from
- * battle.ts's strikes that aren't rams).
+ * Her memory once a ball of `by`'s has struck her, taking `damage` hit points
+ * (the game tells her, from battle.ts's strikes that aren't rams).
  */
-export const shot = (m: Memory, by: number): Memory => ({
-  ...m,
+export const shot = (m: Memory, by: number, damage = 0): Memory => ({
+  ...wounded(m, damage),
   shotBy: by,
   shotT: m.clock,
 });
@@ -170,6 +181,7 @@ export function think(
     seed: who.seed,
   };
   lootTime(c, dt);
+  mood(c, dt);
   if (m.think <= 0) {
     m.think = BOT.every;
     perceive(c);

@@ -47,7 +47,7 @@ type Mix = Readonly<Record<Persona, number>>;
  * hunter hunt 2.7, fight 2.9, earshot 650 m, sight 280 m; homesteader claim
  * 2.1, hunt 1.4, earshot 350 m; raider loot 2.2, hunt 2.4, earshot 600 m;
  * turtle heal 4.2, flee 3.9, fight 2.2, hunt 1.4, cover 240 m; scavenger loot
- * 2.4, hunt 1.5; brawler fight 3.1, hunt 2.7, flee 2.8, earshot 700 m, sight
+ * 2.4, hunt 1.5; brawler fight 3.1, hunt 2.7, earshot 700 m, sight
  * 280 m.
  */
 const CREWS: Readonly<Record<Persona, (b: Brain) => Over>> = {
@@ -81,13 +81,12 @@ const CREWS: Readonly<Record<Persona, (b: Brain) => Over>> = {
   scavenger: ({ choice }) => ({
     choice: { loot: choice.loot * (4 / 3), hunt: choice.hunt * 0.75 },
   }),
-  // fights first, runs last, and hears a fight from furthest
-  brawler: ({ choice, hunting, sight }) => ({
-    choice: {
-      fight: choice.fight * (31 / 26),
-      hunt: choice.hunt * 1.35,
-      flee: choice.flee * (28 / 33),
-    },
+  // fights first and hears a fight from furthest, but one at a time: a crowd
+  // round her cools her more than most (and she runs, losing, as any: her
+  // style's own runs are later than most, temper.ts)
+  brawler: ({ choice, hunting, sight, mind }) => ({
+    choice: { fight: choice.fight * (31 / 26), hunt: choice.hunt * 1.35 },
+    mind: { crowding: mind.crowding * 1.6 },
     hunting: { earshot: hunting.earshot * 1.4 },
     sight: { sightMax: sight.sightMax * (7 / 6) },
   }),

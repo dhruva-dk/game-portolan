@@ -92,7 +92,13 @@ import { finale, type Ending } from './finale.ts';
 import { see, seenOf } from './moments.ts';
 import { answerTo, createShake } from './shake.ts';
 import { createStops, stopFor } from './stops.ts';
-import { createState, type Berth, type Match, type Waters } from './state.ts';
+import {
+  createState,
+  debugOf,
+  type Berth,
+  type Match,
+  type Waters,
+} from './state.ts';
 
 /** How little of the stick's push counts as none. */
 const DEAD = 0.15;
@@ -686,7 +692,7 @@ export function createGame(
        * others about her.
        */
       atSea(others: readonly Berth[]) {
-        restart(state.debug.atSea(start, others));
+        restart(debugOf(state).atSea(start, others));
       },
       /**
        * Lashes her helm: from the next step she sails by `helm` (given her ship
@@ -696,8 +702,8 @@ export function createGame(
       lash(helm: (s: ShipState) => Helm) {
         held = helm;
       },
-      sink: state.debug.sink,
-      strew: state.debug.strew,
+      sink: debugOf(state).sink,
+      strew: debugOf(state).strew,
     },
   };
 }

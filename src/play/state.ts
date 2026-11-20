@@ -42,7 +42,7 @@ import {
   type Splash,
   type Strike,
 } from '../sim/battle.ts';
-import { mind, rammed, shot, type Memory } from '../sim/bot.ts';
+import { mind, rammed, sank, shot, type Memory } from '../sim/bot.ts';
 import { DEFAULT_BRAIN, type Brain } from '../sim/brain.ts';
 import { nature, type MatchType, type Nature } from '../sim/persona.ts';
 import { afloat, stepFleet, type Vessel } from '../sim/contact.ts';
@@ -432,6 +432,9 @@ export function createState(
       heading: v.ship.heading,
     });
     log.sank(id, by, v.ship.at);
+    // the bot she was sunk by is told: her mood warms (sim/fighting.ts)
+    const victor = by === null ? undefined : aboard.get(by);
+    if (victor?.mind) victor.mind = sank(victor.mind);
     territory?.sink(id, tick * STEP);
     wrecks.push({
       id,
@@ -508,7 +511,7 @@ export function createState(
     for (const s of fought.strikes) {
       struck.set(s.struck, { by: s.shooter, tick });
       const a = aboard.get(s.struck);
-      if (a?.mind && !s.ram) a.mind = shot(a.mind, s.shooter);
+      if (a?.mind && !s.ram) a.mind = shot(a.mind, s.shooter, s.damage);
     }
     const worn = weathered(fought.battle, fleet, storm, STEP);
     lost.length = 0;
@@ -604,7 +607,7 @@ export function createState(
     while (wrecks.length && !wreckAt(wrecks[0], clock(0))) wrecks.shift();
   };
 
-  return {
+  const state = {
     /**
      * One step: the player's helm, gun and stores, everyone else's from her bot
      * or her lashed helm; then the fleet's step and the fighting's, who holds
@@ -818,81 +821,105 @@ export function createState(
       );
       return aboard.get(PLAYER)!.after;
     },
-    /**
-     * What only the debug switches (src/debug.ts) and the tools ask of the
-     * match.
-     */
-    debug: {
-      /**
-       * A match at sea about her: hers at `start`, heading `bearing` (radians),
-       * and the others. Returns her pose.
-       */
-      atSea(
-        start: { at: Vec3; bearing: number },
-        others: readonly Berth[]
-      ): ShipPose {
-        clear(match, [PLAYER, ...others.map((_, i) => i + 1)], MATCH);
-        launch(
-          PLAYER,
-          shipAt(start.at, bearingAt(start.at, start.bearing)),
-          LOOK
-        );
-        others.forEach((o, i) => {
-          const way = (o.lashed?.throttle ?? 0) * SHIP.top;
-          launch(
-            i + 1,
-            { ...shipAt(o.at, o.heading), speed: way },
-            o.look,
-            o.lashed
-          );
-        });
-        territory?.begin(
-          fleet.map((v) => v.ship.at),
-          tick * STEP
-        );
-        return aboard.get(PLAYER)!.after;
-      },
-      /**
-       * Puts goods on the water at `at` (a unit vector), lying still and no
-       * ship's, as if long spilt.
-       */
-      strew(at: Vec3, goods: readonly Goods[]) {
-        const n = flotsam.pieces.length;
-        const f = overboard(flotsam, at, goods, -1, match.seed);
-        const still = (l: Flotsam['pieces'][number], i: number): typeof l =>
-          i < n ? l : { ...l, way: [0, 0, 0], age: 10 };
-        flotsam = { ...f, pieces: f.pieces.map(still) };
-      },
-      /**
-       * Sends a ship afloat to the bottom at once, the last blow `by`'s (null:
-       * the storm's), spilling what she carries.
-       */
-      sink(id: number, by: number | null) {
-        if (!aboard.has(id)) return;
-        const before = flotsam.next,
-          s = spilled(battle.crews, flotsam, fleet, [id], match.seed);
-        for (let n = before; n < s.flotsam.next; n++) born.set(n, tick * STEP);
-        flotsam = s.flotsam;
-        const gone = (c: Crew): Crew =>
-          c.id === id
-            ? { ...c, health: { ...c.health, hull: 0, shield: 0 } }
-            : c;
-        battle = { ...battle, crews: s.crews.map(gone) };
-        founder(id, by, by === null ? 'storm' : 'shot');
-        log.keep(NOTHING_DONE, NOTHING_DONE, NOTHING_DONE, null, tick * STEP);
-      },
-      /**
-       * A bot's mind as it stands after the last step (what she is about, her
-       * goal, her route), or null for a ship no bot sails or one sunk: to be
-       * read, never written (tools/harness watches the bots by it).
-       */
-      mindOf: (id: number): Readonly<Memory> | null =>
-        aboard.get(id)?.mind ?? null,
-      /**
-       * A ship's nature (her persona, her crew's brain, her temperament), or
-       * null for one sunk (tools/harness tells the bots apart by it).
-       */
-      natureOf: (id: number): Nature | null => aboard.get(id)?.nature ?? null,
-    },
   };
+  // what only the debug switches (src/debug.ts) and the tools ask of the
+  // match: kept off the state the game plays, had by debugOf
+  DEBUG.set(state, {
+    /**
+     * A match at sea about her: hers at `start`, heading `bearing` (radians),
+     * and the others. Returns her pose.
+     */
+    atSea(
+      start: { at: Vec3; bearing: number },
+      others: readonly Berth[]
+    ): ShipPose {
+      clear(match, [PLAYER, ...others.map((_, i) => i + 1)], MATCH);
+      launch(
+        PLAYER,
+        shipAt(start.at, bearingAt(start.at, start.bearing)),
+        LOOK
+      );
+      others.forEach((o, i) => {
+        const way = (o.lashed?.throttle ?? 0) * SHIP.top;
+        launch(
+          i + 1,
+          { ...shipAt(o.at, o.heading), speed: way },
+          o.look,
+          o.lashed
+        );
+      });
+      territory?.begin(
+        fleet.map((v) => v.ship.at),
+        tick * STEP
+      );
+      return aboard.get(PLAYER)!.after;
+    },
+    /**
+     * Puts goods on the water at `at` (a unit vector), lying still and no
+     * ship's, as if long spilt.
+     */
+    strew(at: Vec3, goods: readonly Goods[]) {
+      const n = flotsam.pieces.length;
+      const f = overboard(flotsam, at, goods, -1, match.seed);
+      const still = (l: Flotsam['pieces'][number], i: number): typeof l =>
+        i < n ? l : { ...l, way: [0, 0, 0], age: 10 };
+      flotsam = { ...f, pieces: f.pieces.map(still) };
+    },
+    /**
+     * Sends a ship afloat to the bottom at once, the last blow `by`'s (null:
+     * the storm's), spilling what she carries.
+     */
+    sink(id: number, by: number | null) {
+      if (!aboard.has(id)) return;
+      const before = flotsam.next,
+        s = spilled(battle.crews, flotsam, fleet, [id], match.seed);
+      for (let n = before; n < s.flotsam.next; n++) born.set(n, tick * STEP);
+      flotsam = s.flotsam;
+      const gone = (c: Crew): Crew =>
+        c.id === id ? { ...c, health: { ...c.health, hull: 0, shield: 0 } } : c;
+      battle = { ...battle, crews: s.crews.map(gone) };
+      founder(id, by, by === null ? 'storm' : 'shot');
+      log.keep(NOTHING_DONE, NOTHING_DONE, NOTHING_DONE, null, tick * STEP);
+    },
+    /**
+     * A bot's mind as it stands after the last step (what she is about, her
+     * goal, her route), or null for a ship no bot sails or one sunk: to be
+     * read, never written (tools/harness watches the bots by it).
+     */
+    mindOf: (id: number): Readonly<Memory> | null =>
+      aboard.get(id)?.mind ?? null,
+    /**
+     * A ship's nature (her persona, her crew's brain, her temperament), or
+     * null for one sunk (tools/harness tells the bots apart by it).
+     */
+    natureOf: (id: number): Nature | null => aboard.get(id)?.nature ?? null,
+  });
+  return state;
+}
+
+/** What only the debug switches and the tools ask of a match (debugOf). */
+interface Debug {
+  atSea(
+    start: { at: Vec3; bearing: number },
+    others: readonly Berth[]
+  ): ShipPose;
+  strew(at: Vec3, goods: readonly Goods[]): void;
+  sink(id: number, by: number | null): void;
+  mindOf(id: number): Readonly<Memory> | null;
+  natureOf(id: number): Nature | null;
+}
+
+/** Each state's debug face, set as it is made. */
+const DEBUG = new WeakMap<object, Debug>();
+
+/**
+ * What only the debug switches (src/debug.ts) and the tools ask of a match: a
+ * match laid out at sea, goods strewn, a ship sunk at once; a bot's mind and
+ * nature, to be read. Kept off the state itself, so the game plays a state
+ * without them.
+ */
+export function debugOf(state: ReturnType<typeof createState>): Debug {
+  const d = DEBUG.get(state);
+  if (!d) throw new Error('not a match state');
+  return d;
 }

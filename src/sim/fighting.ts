@@ -3,7 +3,8 @@
 // where she runs to.
 //
 // Fighting is ramming, or her guns once armed (gunner.ts): her will to is her
-// temperament and mood, the odds (hull, a seam for health.ts), being rammed,
+// temperament and mood (which a sinking she deals warms, and the blows she
+// takes cool, settling back: `mood`), the odds (hull, a seam for health.ts), being rammed,
 // and the crowd round her where a third ship would finish whoever won; close
 // aboard she fights whatever her will; and she lets a ship sailing away from
 // her go once it is past reach, as a ram can't catch a ship as fast as she is.
@@ -17,7 +18,7 @@
 import { along, distance, dot, toward, type Vec3 } from '../world/sphere.ts';
 import { toEdge } from './storm.ts';
 import { logistic, ramp, utility } from './utility.ts';
-import { open, rotate, type Ctx, type Seen } from './captain.ts';
+import { aggroOf, open, rotate, type Ctx, type Seen } from './captain.ts';
 import { SHIP } from './handling.ts';
 import { hidden } from './lookout.ts';
 import { keptInside } from './storming.ts';
@@ -90,14 +91,64 @@ export const MIND = {
   lastFew: 3,
   more: 0.4,
   shotFresh: 5,
+  /**
+   * Her mood moves: each ship she sinks warms it by `won`; each hundred hit
+   * points she takes cools it by `hurt`; it settles back to her temper's, by
+   * half every `settle` s; never further off it than `band`.
+   */
+  won: 0.2,
+  hurt: 0.45,
+  settle: 45,
+  band: 0.5,
 } as const;
+
+/**
+ * Her mood, as it stands off her temper's aggro (captain.ts aggroOf), and
+ * what has befallen her since she last weighed it: hit points taken, ships
+ * sunk.
+ */
+export interface MoodMemory {
+  heat: number;
+  hurt: number;
+  won: number;
+}
+export const moodMemory = (): MoodMemory => ({ heat: 0, hurt: 0, won: 0 });
+
+/** Her memory once she has taken `damage` hit points (bot.ts shot). */
+export const wounded = <M extends MoodMemory>(m: M, damage: number): M => ({
+  ...m,
+  hurt: m.hurt + damage,
+});
+
+/** Her memory once a ship she struck last has gone down (the game tells her). */
+export const sank = <M extends MoodMemory>(m: M): M => ({
+  ...m,
+  won: m.won + 1,
+});
+
+/**
+ * Her mood over dt seconds: what befell her weighed in (MIND won, hurt), and
+ * settling back toward her temper's.
+ */
+export function mood(c: Ctx, dt: number): void {
+  const { m } = c,
+    k = c.b.mind;
+  if (m.heat === 0 && m.hurt === 0 && m.won === 0) return;
+  const heat =
+    m.heat * Math.pow(0.5, dt / k.settle) +
+    k.won * m.won -
+    (k.hurt * m.hurt) / 100;
+  m.heat = Math.max(-k.band, Math.min(k.band, heat));
+  m.hurt = 0;
+  m.won = 0;
+}
 
 /** How much she wants to fight the ship she sees. */
 export function fightUrge(c: Ctx): number {
   const { m, t, foe, own } = c;
   if (!foe) return 0;
   const d = c.foeD;
-  let will = t.fight * (0.6 + 0.4 * t.aggro);
+  let will = t.fight * (0.6 + 0.4 * aggroOf(c));
   const strength = (s: Seen) => (s.hull ?? 100) + (s.shield ?? 0);
   will += ((0.1 + 0.5 * t.skill) * (strength(own) - strength(foe))) / 100;
   if (m.hitBy === foe.id)

@@ -10,7 +10,7 @@
 
 import { parseArgs } from 'node:util';
 import { createMatches } from '../../src/play/setup.ts';
-import { createState } from '../../src/play/state.ts';
+import { createState, debugOf } from '../../src/play/state.ts';
 import { BOT } from '../../src/sim/captain.ts';
 import { STEP } from '../../src/sim/fixed.ts';
 import { SHIP } from '../../src/sim/handling.ts';
@@ -81,7 +81,7 @@ while (state.time() < until && state.vessel(id)) {
   [was, sailed, most] = [now.ship.at, 0, 0];
   if (steps / each < from) continue;
   const v = now,
-    k = state.debug.mindOf(id)!;
+    k = debugOf(state).mindOf(id)!;
   const r = k.route,
     short = r ? distance(r.to, k.goal) : NaN;
   // her chart cell (open or not, cells clear of shore) and her route's next

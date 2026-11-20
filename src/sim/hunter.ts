@@ -16,7 +16,7 @@ import { R, distance, dot, normalize, type Vec3 } from '../world/sphere.ts';
 import type { Shot } from './battle.ts';
 import { toEdge } from './storm.ts';
 import { ramp, utility } from './utility.ts';
-import type { Ctx } from './captain.ts';
+import { aggroOf, type Ctx } from './captain.ts';
 
 /** Seconds a shot is heard after it is fired (the sea's, not a bot's). */
 const RINGS = 6;
@@ -136,7 +136,7 @@ export function huntUrge(c: Ctx): number {
   if (!m.hunt) return 0;
   const strength = (own.hull ?? 100) + (own.shield ?? 0);
   return utility(
-    t.fight * (0.6 + 0.4 * t.aggro),
+    t.fight * (0.6 + 0.4 * aggroOf(c)),
     ramp(strength, h.weak, h.whole),
     ramp(distance(own.ship.at, m.hunt), h.far, h.near)
   );

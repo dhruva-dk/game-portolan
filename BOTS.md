@@ -488,3 +488,37 @@ commit; anything visible checked in headless chromium; iPad Air M1 at 30–40 fp
   s a ship over all. The scavenger is pinned most (10.3 s: her loot reach
   takes her inshore), and places best (35): P6's to balance.
   - Golden → `cb57b52c`.
+- PLAN H6, ratings (`tools/harness/rate.ts`): each persona's strength θ fitted
+  to the order ships went down in (Plackett–Luce, worst first; standard
+  errors bootstrapped over matches). Two independent sets of 64 dealt
+  matches agree on the order: scavenger +0.28/+0.22, turtle +0.09/+0.13,
+  homesteader +0.04/−0.00, raider +0.01/+0.08, hunter −0.07/−0.07, brawler
+  −0.34/−0.35 (se 0.03–0.05). The brawler: half sunk by 41 s, her will to
+  fight clearing the threshold through the early restraint.
+- PLAN P4/P6, mood and balance. A bot's mood moves (`fighting.ts mood`, her
+  `heat` off her temper's aggro, read by `captain.ts aggroOf`): each 100 hp
+  she takes cools it 0.45, each ship she sinks warms it 0.2, settling back by
+  half every 45 s, never more than 0.5 off. Alone it barely moves the ratings
+  (brawler −0.34 → −0.33): it is texture, not a balance lever. What moved
+  them (four passes of 64 matches, each kept only if it held):
+  - brawler: runs at 28 hull, not 15; loot 0.45 (0.3), mends at 55 (40); her
+    crew no longer cuts her flee (she could not break off a fight she was
+    losing); a crowd cools her 1.6 times as much (she duels; most of her
+    deaths were a third ship's).
+  - scavenger: loot reach 170 m (220), runs at 30 (40).
+  - tried and dropped as noise: scavenger reach 140 and mend 50, brawler
+    fight 0.95, scavenger fight 0.4, a hunter's crowd wariness.
+
+  | set (64 matches) | scavenger | turtle | raider | homesteader | hunter | brawler | spread |
+  | ---------------- | --------- | ------ | ------ | ----------- | ------ | ------- | ------ |
+  | 1–64 before      | +0.28     | +0.09  | +0.01  | +0.04       | −0.07  | −0.34   | 0.63   |
+  | 1–64 after       | +0.21     | +0.06  | +0.00  | +0.03       | −0.13  | −0.17   | 0.38   |
+  | 65–128 before    | +0.22     | +0.13  | +0.08  | −0.00       | −0.07  | −0.35   | 0.57   |
+  | 65–128 after     | +0.15     | +0.09  | +0.05  | +0.02       | −0.10  | −0.20   | 0.35   |
+
+  A scavenger's odds of outlasting a brawler: 1.8 → 1.4. Not yet the gate
+  (strongest within a standard error of the median): the scavenger's edge is
+  the battle royale's own, sitting out the fights, and held through every
+  change to her loot, reach and running; the fighters lead in kills (brawler
+  1.13 a ship, scavenger 0.9). Brawler median death 41 → 60 s. Pinned 3.9 →
+  4.1 s a ship (noise); 1.1 ms a step. Golden → `1655ebe1`.

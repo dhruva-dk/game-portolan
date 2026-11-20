@@ -23,6 +23,7 @@ import type { Crew } from './battle.ts';
 import type { Loot } from './loot.ts';
 import type { ClaimMemory, Holdings } from './claimer.ts';
 import type { MindMemory } from './bot.ts';
+import type { MoodMemory } from './fighting.ts';
 import type { HelmMemory } from './helmsman.ts';
 import type { HuntMemory, Report } from './hunter.ts';
 import type { LookMemory } from './lookout.ts';
@@ -116,7 +117,7 @@ interface Chance {
 /**
  * What a bot carries from one step to the next: each part's own, declared and
  * written by that part alone (tests/architecture-bots.test.ts): her mind's
- * (bot.ts) and her lookout's, her tactician's, pilot's and helm's, her
+ * (bot.ts), her mood (fighting.ts), her lookout's, her tactician's, pilot's and helm's, her
  * purser's, claimer's and hunter's, her gunner's; and her chance. This is the
  * crew's roster: a new part's memory is added here.
  */
@@ -130,6 +131,7 @@ export interface Memory
     PurseMemory,
     ClaimMemory,
     HuntMemory,
+    MoodMemory,
     Gunner {}
 
 /**
@@ -178,6 +180,13 @@ export const between = (m: Memory, lo: number, hi: number) =>
 /** Whether the water at p is open to her. */
 export const open = (c: Ctx, p: Vec3) =>
   c.sea.depth(p) >= SHIP.draught + BOT.open;
+
+/**
+ * Her mood now: her temperament's aggro, moved by what has befallen her (her
+ * mind's heat: fighting.ts mood), 0–1.
+ */
+export const aggroOf = (c: Ctx) =>
+  Math.min(1, Math.max(0, c.t.aggro + c.m.heat));
 
 /** Whether she saw her foe when she last looked. */
 export const inSight = (c: Ctx) =>

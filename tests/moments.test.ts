@@ -20,7 +20,7 @@ import {
   noise,
 } from '../src/play/shake.ts';
 import { STOPS, createStops, stopFor } from '../src/play/stops.ts';
-import { createState, type Match } from '../src/play/state.ts';
+import { createState, debugOf, type Match } from '../src/play/state.ts';
 import { LOOK } from '../src/play/colours.ts';
 import { PLAYER } from '../src/sim/match.ts';
 import { chart } from '../src/sim/route.ts';
@@ -90,9 +90,15 @@ test(
       ],
       sunk: [{ id: 2, by: 0, at }],
       took: [
-        { ship: 0, goods: { kind: 'harpoon', rarity: 3 }, at, slot: 1 },
-        { ship: 0, goods: { kind: 'smallShield', count: 3 }, at, slot: 2 },
-        { ship: 5, goods: { kind: 'repairKit', count: 1 }, at, slot: 1 },
+        { id: 1, ship: 0, goods: { kind: 'harpoon', rarity: 3 }, at, slot: 1 },
+        {
+          id: 2,
+          ship: 0,
+          goods: { kind: 'smallShield', count: 3 },
+          at,
+          slot: 2,
+        },
+        { id: 3, ship: 5, goods: { kind: 'repairKit', count: 1 }, at, slot: 1 },
       ],
       mended: [
         { ship: 0, use: 'bigShield' },
@@ -254,11 +260,11 @@ test('the match records its deeds: a ship sunk is told once, with a sink blast t
   );
   const before = state.deeds().at(-1)?.seq ?? 0;
   const there = normalize([start.at[0] + 0.05, start.at[1], start.at[2]]);
-  state.debug.atSea(start, [
+  debugOf(state).atSea(start, [
     { at: there, heading: bearingAt(there, 0), look: LOOK, lashed: null },
   ]);
   const other = state.vessels().find((v) => v.id !== PLAYER)!.id;
-  state.debug.sink(other, PLAYER);
+  debugOf(state).sink(other, PLAYER);
   const sank = state.deeds().filter((d) => d.seq > before && d.kind === 'sank');
   assert.equal(sank.length, 1);
   assert.ok(

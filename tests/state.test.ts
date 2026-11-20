@@ -2,7 +2,7 @@
 // through a step, and a match after another.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createState, type Match } from '../src/play/state.ts';
+import { createState, debugOf, type Match } from '../src/play/state.ts';
 import { PLAYER } from '../src/sim/match.ts';
 import { chart } from '../src/sim/route.ts';
 import { MIXED } from '../src/sim/persona.ts';
@@ -47,7 +47,7 @@ const deadly = (at: number): Match => ({
  * did), and the state.
  */
 function loop(m: Match, state = createState(planet, flat, waters, m)) {
-  state.debug.atSea(start, []);
+  debugOf(state).atSea(start, []);
   const legs: [number, number][] = [
     [180, 5],
     [90, 4],
