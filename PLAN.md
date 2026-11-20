@@ -521,3 +521,11 @@ then the behaviour commits on top.
   (one mesh per kind, or one atlas mesh with a variant index); until then the
   view is held to what it measured (86 draws, 920k) so no new draw lands
   unnoticed. A sixth gun kind would cost two more. Headless frame 7 ms CPU.
+- 2026-11-20 (W3): a stance with each gun, as brain knobs (`gunnery.rush`,
+  `gunnery.reach`, per kind): rush in with a loaded scatter and stand off
+  reloading; hold a repeater's fire till nearer. **Neither makes a bot
+  stronger**: on 128 fresh matches every variant is within 0.7 se of the
+  game's (a first set's +0.07 was noise; BOTS.md has the table). The rush
+  changes the fight (more kills, more damage taken), not the outcome. The
+  knobs stay, all off; the game is unchanged. So the niche gaps above are
+  the guns' own numbers to close (W2's table), not the bots' stances.

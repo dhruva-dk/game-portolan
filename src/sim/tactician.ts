@@ -3,7 +3,8 @@
 // - unarmed, the ship she would ram, struck on her side, led for where she will
 //   be, not only in passing; once her hull touches her foe's, bearing away a
 //   while (a ram's blow lands once until they are RAM.rearm clear);
-// - armed, a mark on the ring round her foe at her gun's range (gunner.ts).
+// - armed, a mark on the ring round her foe at her gun's range (gunner.ts),
+//   made flat out with a gun she rushes in with, loaded.
 // What she makes for is handed on as a Mark: the place a route round land is
 // found to (pilot.ts), the way she would steer were the water clear, how
 // far it is, and the pace she makes it at (helmsman.ts).
@@ -25,7 +26,7 @@ import {
 import { inHand } from './battle.ts';
 import { gap } from './contact.ts';
 import { SHIP } from './handling.ts';
-import { ring } from './gunner.ts';
+import { ring, rushing } from './gunner.ts';
 import {
   inSight,
   velocity,
@@ -143,7 +144,7 @@ export function mark(c: Ctx, intent: Intent, dt: number): Mark {
       at: ringed,
       aim: toward(ship.at, ringed),
       distance: distance(ship.at, ringed),
-      pace: 'turn',
+      pace: held && rushing(c, held.kind) ? 'ram' : 'turn',
     };
   if (foe)
     return {

@@ -488,6 +488,7 @@ commit; anything visible checked in headless chromium; iPad Air M1 at 30–40 fp
   s a ship over all. The scavenger is pinned most (10.3 s: her loot reach
   takes her inshore), and places best (35): P6's to balance.
   - Golden → `cb57b52c`.
+
 - PLAN H6, ratings (`tools/harness/rate.ts`): each persona's strength θ fitted
   to the order ships went down in (Plackett–Luce, worst first; standard
   errors bootstrapped over matches). Two independent sets of 64 dealt
@@ -522,3 +523,22 @@ commit; anything visible checked in headless chromium; iPad Air M1 at 30–40 fp
   change to her loot, reach and running; the fighters lead in kills (brawler
   1.13 a ship, scavenger 0.9). Brawler median death 41 → 60 s. Pinned 3.9 →
   4.1 s a ship (noise); 1.1 ms a step. Golden → `1655ebe1`.
+
+- PLAN W3, a stance with each gun (`gunner.ts` GUNNERY `rush`, `reach`, per
+  kind): with a loaded scatter she closes on her ring flat out and stands off
+  at twice it reloading (`rushScatter`); with a repeater she holds her fire
+  till within 0.75 of its range (`holdRepeater`). Measured as brains sailed
+  side by side in mixed matches:
+
+  | set                      | default | rushScatter | holdRepeater | both             |
+  | ------------------------ | ------- | ----------- | ------------ | ---------------- |
+  | 64 matches, three brains | −0.039  | +0.013      | +0.027       |                  |
+  | 64 matches, two brains   |         |             |              | −0.019 vs +0.019 |
+  | 128 fresh matches, four  | +0.001  | +0.002      | +0.010       | −0.012           |
+
+  (θ, se 0.014–0.022.) The first set's +0.07 for holding the repeater was
+  noise: on 128 fresh matches no stance moves a bot's place by more than
+  0.7 se. The rush shows in how she fights (0.95 kills a ship, not 0.88;
+  dealt 200 hp, took 232, against 196 and 229), not in where she places.
+  Kept as knobs, all off: the game's gunnery unchanged, golden unchanged
+  (`1655ebe1`); the variants stay in `tools/harness/brains.ts`.

@@ -28,6 +28,21 @@ export const BRAINS: Record<string, Brain> = {
   crawl: variant({ helm: { slow: 0.35 } }),
   /** The helm and purser before E3: no side given up, loot however inshore. */
   before: variant({ helm: { budge: 1e9 }, purser: { room: 0 } }),
+  /** Rushes in with a loaded scatter, and stands off at twice its ring reloading (PLAN W3). */
+  rushScatter: variant({
+    gunnery: { rush: { ...DEFAULT_BRAIN.gunnery.rush, scatter: 2 } },
+  }),
+  /** Holds a repeater's fire till within 0.75 of its range (PLAN W3). */
+  holdRepeater: variant({
+    gunnery: { reach: { ...DEFAULT_BRAIN.gunnery.reach, repeater: 0.75 } },
+  }),
+  /** Both stances (PLAN W3). */
+  stances: variant({
+    gunnery: {
+      rush: { ...DEFAULT_BRAIN.gunnery.rush, scatter: 2 },
+      reach: { ...DEFAULT_BRAIN.gunnery.reach, repeater: 0.75 },
+    },
+  }),
 };
 
 /** The brain of this name, or an error naming those there are. */

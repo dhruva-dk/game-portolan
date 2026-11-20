@@ -39,7 +39,7 @@ import {
   toward,
   type Vec3,
 } from '../world/sphere.ts';
-import type { Order } from './battle.ts';
+import { inHand, type Order } from './battle.ts';
 import { roll, type Ctx } from './captain.ts';
 import { damageOf, falloff, reloadOf, spreadOf } from './gun.ts';
 import type { GunKind } from '../kinds.ts';
@@ -101,6 +101,19 @@ export const GUNNERY = {
   out: 1.2,
   swing: 0.5,
   /**
+   * Her stance with each gun (PLAN W3): 0, she makes for her ring at a turn's
+   * pace whatever her gun; else, with that gun loaded she closes on her ring
+   * flat out, and reloading she stands off at this many times it (the scatter
+   * is a gun to rush in with and get out again).
+   */
+  rush: {
+    cannon: 0,
+    scatter: 0,
+    repeater: 0,
+    harpoon: 0,
+    mortar: 0,
+  } satisfies Record<GunKind, number>,
+  /**
    * Choosing her gun: another is taken in hand when it would do `swap` times
    * what the one in hand does; a gun reloading counts for `reloading` of
    * itself; with no foe she weighs them at `idle` m.
@@ -114,10 +127,17 @@ export const GUNNERY = {
    */
   weave: [4, 9] as const,
   /**
-   * She fires within this share of the gun's range, in bursts of `burst` s with
-   * pauses of `pause` s.
+   * She fires within this share of each gun's range (holding a gun that sprays
+   * till she is nearer: PLAN W3), in bursts of `burst` s with pauses of `pause`
+   * s.
    */
-  reach: 0.95,
+  reach: {
+    cannon: 0.95,
+    scatter: 0.95,
+    repeater: 0.95,
+    harpoon: 0.95,
+    mortar: 0.95,
+  } satisfies Record<GunKind, number>,
   burst: [1.5, 4] as const,
   pause: [0.8, 2.2] as const,
 } as const;
@@ -227,11 +247,24 @@ export function armFor(x: Ctx, metres: number | null): number | null {
   return best >= 0 && best !== c.hand ? best : null;
 }
 
+/** Whether the gun in her hand is loaded: rounds in it, and not reloading. */
+const loaded = (c: Ctx) => {
+  const g = c.own.crew ? inHand(c.own.crew) : null;
+  return !!g && g.reload <= 0 && g.rounds > 0;
+};
+
+/**
+ * Whether she rushes her ring with the gun of `kind` in hand: her stance with
+ * it (GUNNERY rush), and it loaded.
+ */
+export const rushing = (c: Ctx, kind: GunKind) =>
+  c.b.gunnery.rush[kind] > 0 && loaded(c);
+
 /**
  * Where she makes for in a gun fight with `foe`: a point on the ring of her
  * preferred range with the gun of `kind` round her foe (by her temperament's
- * standoff), a little round from where she lies. Turns the way she circles
- * when it is time. Updates her gunner's memory.
+ * standoff, and her stance: GUNNERY rush), a little round from where she lies.
+ * Turns the way she circles when it is time. Updates her gunner's memory.
  */
 export function ring(c: Ctx, foe: Mark, kind: GunKind, dt: number): Vec3 {
   const g = c.m,
@@ -242,7 +275,8 @@ export function ring(c: Ctx, foe: Mark, kind: GunKind, dt: number): Vec3 {
     g.circle = -g.circle;
     g.circleT = between(() => roll(c.m), t.weave) * (1 - 0.6 * c.t.skill);
   }
-  const pref = t.pref[kind] * c.t.standoff,
+  const rush = t.rush[kind],
+    pref = t.pref[kind] * c.t.standoff * (rush > 0 && !loaded(c) ? rush : 1),
     f = foe.ship.at;
   const out = toward(f, at) ?? scale(foe.ship.heading, -1);
   const round = add(
@@ -311,7 +345,12 @@ export function aimAndFire(
   const miss = GUNNER.error * (1 - 0.85 * skill) * d;
   const mark = normalize(add(lead, g.err, miss / R));
   const aim = sight(mark);
-  if (d > bore.range * t.reach || d < bore.least || clock < g.react || hold)
+  if (
+    d > bore.range * t.reach[kind] ||
+    d < bore.least ||
+    clock < g.react ||
+    hold
+  )
     return { aim, fire: false };
   // bursts: firing whenever loaded through one, holding fire through the pause
   // after it
