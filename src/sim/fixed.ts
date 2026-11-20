@@ -3,8 +3,8 @@
 //
 // Pure arithmetic: no three, so it runs in node for the tests.
 
-import type { ShipPose } from '../world/pose.ts';
-import { add, dot, normalize, scale } from '../world/sphere.ts';
+import type { PoseOut, ShipPose } from '../world/pose.ts';
+import { add, dot, normalize, scale, type Out3 } from '../world/sphere.ts';
 
 /** Seconds a step. */
 export const STEP = 1 / 30;
@@ -22,9 +22,15 @@ export function fixedClock(step = STEP) {
   };
 }
 
-/** A pose t of the way from a to b (0–1): positions straight between, axes turned between and kept square. */
-export function blendPose(a: ShipPose, b: ShipPose, t: number): ShipPose {
-  const up = normalize(add(scale(a.up, 1 - t), b.up, t));
-  const f = add(scale(a.forward, 1 - t), b.forward, t);
-  return { position: add(scale(a.position, 1 - t), b.position, t), forward: normalize(add(f, up, -dot(f, up))), up };
+/** blendPose's forward, before it is squared to up. */
+const f0: Out3 = [0, 0, 0];
+
+/** A pose t of the way from a to b (0–1): positions straight between, axes turned between and kept square (into
+ *  `out`, which may be a but not b). */
+export function blendPose(a: ShipPose, b: ShipPose, t: number, out?: PoseOut): ShipPose {
+  const f = add(scale(a.forward, 1 - t, f0), b.forward, t, f0);
+  const up = normalize(add(scale(a.up, 1 - t, out?.up), b.up, t, out?.up), out?.up);
+  const position = add(scale(a.position, 1 - t, out?.position), b.position, t, out?.position);
+  const forward = normalize(add(f, up, -dot(f, up), out?.forward), out?.forward);
+  return out ?? { position, forward, up };
 }

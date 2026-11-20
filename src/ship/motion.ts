@@ -19,8 +19,8 @@
 //
 // Pure arithmetic: no three, so it runs in node for the tests.
 
-import type { ShipPose } from '../world/pose.ts';
-import { add, cross, distance, dot, length, normalize, scale, type Vec3 } from '../world/sphere.ts';
+import { copyPose, poseOut, type PoseOut, type ShipPose } from '../world/pose.ts';
+import { add, cross, distance, dot, length, normalize, put, scale, type Out3, type Vec3 } from '../world/sphere.ts';
 import { clamp, smoothstep } from '../world/scalar.ts';
 import { port } from './mount.ts';
 
@@ -33,36 +33,69 @@ const MOST_ACCEL = 20, MOST_SPINNING = 4;
 /** A move further than this in one frame is a ship placed anew, metres. */
 const JUMP = 20;
 
-/** What has been seen of her motion so far, in the world. */
-export interface Motion { pose: ShipPose; velocity: Vec3; accel: Vec3; spin: Vec3; spinning: Vec3 }
+/** What has been seen of her motion so far, in the world: her pose last seen (her own copy of it), and her rates. */
+export interface Motion { pose: PoseOut; velocity: Out3; accel: Out3; spin: Out3; spinning: Out3 }
 
 /** What she feels now, in her own frame. */
 export interface Feeling { weight: Vec3; spin: Vec3; spinning: Vec3 }
+/** A Feeling written into (feeling's `out`). */
+export interface FeelingOut { weight: Out3; spin: Out3; spinning: Out3 }
 
-const capped = (v: Vec3, most: number): Vec3 => { const l = length(v); return l > most ? scale(v, most / l) : v; };
-const ease = (from: Vec3, to: Vec3, dt: number): Vec3 => add(from, add(to, from, -1), 1 - Math.exp(-dt / EASE));
+/** A motion to be written into: at rest. */
+export const motionOut = (): Motion => ({ pose: poseOut(), velocity: [0, 0, 0], accel: [0, 0, 0], spin: [0, 0, 0], spinning: [0, 0, 0] });
 
-/** Her motion once she lies at `pose`, dt seconds after `was` (null when first seen, or placed anew). */
-export function moved(was: Motion | null, pose: ShipPose, dt: number): Motion {
+/** v made no longer than `most` (into d). */
+const capped = (v: Vec3, most: number): Vec3 => { const l = length(v); return l > most ? scale(v, most / l, d) : v; };
+/** `from` eased dt seconds toward `to`, into `out` (which may be from). */
+const ease = (from: Vec3, to: Vec3, dt: number, out: Out3): Vec3 => add(from, add(to, from, -1, e), 1 - Math.exp(-dt / EASE), out);
+
+/** moved's working vectors: a difference, an easing's step, her turn, her two ports, and her velocity and spin before
+ *  they are kept. */
+const d: Out3 = [0, 0, 0], e: Out3 = [0, 0, 0], turned: Out3 = [0, 0, 0], pa: Out3 = [0, 0, 0], pb: Out3 = [0, 0, 0];
+const velocity: Out3 = [0, 0, 0], spin: Out3 = [0, 0, 0];
+
+/** Her motion once she lies at `pose`, dt seconds after `was` (null when first seen, or placed anew), into `out`
+ *  (which may be was): her pose copied into it. */
+export function moved(was: Motion | null, pose: ShipPose, dt: number, out: Motion = motionOut()): Motion {
   if (!was || dt <= 0 || distance(was.pose.position, pose.position) > JUMP) {
-    return { pose, velocity: was && dt <= 0 ? was.velocity : [0, 0, 0], accel: [0, 0, 0], spin: [0, 0, 0], spinning: [0, 0, 0] };
+    const v = was && dt <= 0 ? was.velocity : null;
+    put(out.velocity, v ? v[0] : 0, v ? v[1] : 0, v ? v[2] : 0);
+    put(out.accel, 0, 0, 0);
+    put(out.spin, 0, 0, 0);
+    put(out.spinning, 0, 0, 0);
+    copyPose(pose, out.pose);
+    return out;
   }
-  const velocity = ease(was.velocity, scale(add(pose.position, was.pose.position, -1), 1 / dt), dt);
-  const accel = ease(was.accel, capped(scale(add(velocity, was.velocity, -1), 1 / dt), MOST_ACCEL), dt);
   const a = was.pose, b = pose;
-  const turned = add(add(cross(a.forward, b.forward), cross(a.up, b.up)), cross(port(a), port(b)));
-  const spin = ease(was.spin, scale(turned, 1 / (2 * dt)), dt);
-  const spinning = ease(was.spinning, capped(scale(add(spin, was.spin, -1), 1 / dt), MOST_SPINNING), dt);
-  return { pose, velocity, accel, spin, spinning };
+  ease(was.velocity, scale(add(b.position, a.position, -1, d), 1 / dt, d), dt, velocity);
+  ease(was.accel, capped(scale(add(velocity, was.velocity, -1, d), 1 / dt, d), MOST_ACCEL), dt, out.accel);
+  add(cross(a.forward, b.forward, turned), cross(a.up, b.up, d), 1, turned);
+  add(turned, cross(port(a, pa), port(b, pb), d), 1, turned);
+  ease(was.spin, scale(turned, 1 / (2 * dt), turned), dt, spin);
+  ease(was.spinning, capped(scale(add(spin, was.spin, -1, d), 1 / dt, d), MOST_SPINNING), dt, out.spinning);
+  // (what was is read for is read: now it may be written over)
+  put(out.velocity, velocity[0], velocity[1], velocity[2]);
+  put(out.spin, spin[0], spin[1], spin[2]);
+  copyPose(pose, out.pose);
+  return out;
 }
 
-/** A world vector in her frame. */
-export const inFrame = (pose: ShipPose, v: Vec3): Vec3 => [dot(v, port(pose)), dot(v, pose.up), dot(v, pose.forward)];
+/** inFrame's port. */
+const across: Out3 = [0, 0, 0];
 
-/** What her canvas feels of her motion, in her own frame. */
-export function feeling(m: Motion): Feeling {
-  const weight = add(scale(normalize(m.pose.position), -G), m.accel, -1);
-  return { weight: inFrame(m.pose, weight), spin: inFrame(m.pose, m.spin), spinning: inFrame(m.pose, m.spinning) };
+/** A world vector in her frame (into `out`, which may be v). */
+export const inFrame = (pose: ShipPose, v: Vec3, out?: Out3): Vec3 =>
+  put(out, dot(v, port(pose, across)), dot(v, pose.up), dot(v, pose.forward));
+
+/** feeling's weight, in the world. */
+const weight: Out3 = [0, 0, 0];
+
+/** What her canvas feels of her motion, in her own frame (into `out`). */
+export function feeling(m: Motion, out?: FeelingOut): Feeling {
+  add(scale(normalize(m.pose.position, weight), -G, weight), m.accel, -1, weight);
+  const w = inFrame(m.pose, weight, out?.weight), s = inFrame(m.pose, m.spin, out?.spin);
+  const spinning = inFrame(m.pose, m.spinning, out?.spinning);
+  return out ?? { weight: w, spin: s, spinning };
 }
 
 /** The most her square yards are braced round, radians (the shrouds stop them); and how fast they are hauled round,
@@ -108,8 +141,11 @@ export const hauled = (brace: number, wind: Vec3, speed: number, dt: number): nu
  * braced so: at rest a share of the true wind; under way, coming round from astern with her yards, QUARTER/BRACED as
  * far as they are braced, and as strong as the true wind and her speed (times FILLS) together.
  */
-export function filling(wind: Vec3, speed: number, brace: number): Vec3 {
+export function filling(wind: Vec3, speed: number, brace: number, out?: Out3): Vec3 {
   const a = (brace / BRACED) * QUARTER, most = Math.hypot(length(wind), FILLS * speed);
-  const sailing: Vec3 = [most * Math.sin(a), 0, most * Math.cos(a)];
-  return add(scale(wind, STIR), add(sailing, wind, -STIR), underWay(speed));
+  // (what it gains under way, worked out before out, which may be the wind, is written)
+  const gained = add(put(sailing, most * Math.sin(a), 0, most * Math.cos(a)), wind, -STIR, sailing);
+  return add(scale(wind, STIR, out), gained, underWay(speed), out);
 }
+/** filling's wind under way. */
+const sailing: Out3 = [0, 0, 0];

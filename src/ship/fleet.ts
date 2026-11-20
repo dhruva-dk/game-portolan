@@ -30,7 +30,7 @@ import type { Look } from '../snapshot.ts';
 import type { Light } from '../sky/light.ts';
 import type { Eye } from '../view/view.ts';
 import type { ShipPose } from '../world/pose.ts';
-import { length, scale, type Vec3 } from '../world/sphere.ts';
+import { length, scale, type Out3, type Vec3 } from '../world/sphere.ts';
 import type { Wind } from '../world/wind.ts';
 import { BERTHS, moor, type Berth } from './berths.ts';
 import { buildShip, type Packed } from './build.ts';
@@ -38,7 +38,7 @@ import { createCloth, type Felt } from './cloth.ts';
 import { SLOTS, STRIDE, pack, type Instance } from './instance.ts';
 import { DETAILS, PIXEL, chooseDetail } from './detail.ts';
 import { createShipMaterials } from './materials.ts';
-import { feeling, filling, hauled, inFrame, moved, trim, type Motion } from './motion.ts';
+import { feeling, filling, hauled, inFrame, motionOut, moved, trim, type FeelingOut } from './motion.ts';
 
 /** A sails' pattern as the instance carries it (instance.ts). */
 const PATTERNS: Record<Look['pattern'], number> = { plain: 0, band: 1, stripes: 2 };
@@ -96,12 +96,15 @@ export function createFleet(light: Light, wind: Wind, capacity: number) {
   const floats: boolean[] = [], shown: boolean[] = [];
   /** How each ship's square yards are braced, radians (+ turns the port arm aft); and, this frame, her sails' wind, her
    * frame, metres a second. */
-  const braces: number[] = [], sails: Vec3[] = [];
+  const braces: number[] = [], sails: Out3[] = [];
+  /** The true wind at a ship, her frame (worked out for each in turn). */
+  const blowing: Out3 = [0, 0, 0];
   let count = 0, pinned = -1, own = -1, simulating = true;
   const berths: (Berth | null)[] = new Array(BERTHS).fill(null);
-  const motions: (Motion | null)[] = new Array(BERTHS).fill(null);
+  /** Each berth's ship's motion, written over each frame, and whether it holds one (none once the berth is let go). */
+  const motions = Array.from({ length: BERTHS }, motionOut), moving: boolean[] = new Array(BERTHS).fill(false);
   /** Each berth's ship's feeling, handed to the cloth. */
-  const felts = Array.from({ length: BERTHS }, (): Felt => ({
+  const felts = Array.from({ length: BERTHS }, (): Felt & FeelingOut => ({
     brace: 0, phase: 0, wind: [0, 0, 0], weight: [0, 0, 0], spin: [0, 0, 0], spinning: [0, 0, 0],
   }));
   /** Each ship's distance from the eye, metres (Infinity for one not drawn), for the berths. */
@@ -139,28 +142,26 @@ export function createFleet(light: Light, wind: Wind, capacity: number) {
       // (a ship not drawn, or never set, has no canvas to fill)
       if (!shown[i]) continue;
       const pose = poses[i], speed = length(velocities[i]);
-      const blowing = inFrame(pose, scale(wind(pose.position), windSpeed));
+      inFrame(pose, scale(wind(pose.position, blowing), windSpeed, blowing), blowing);
       braces[i] = Number.isNaN(braces[i]) ? trim(blowing, speed, 0) : hauled(braces[i], blowing, speed, dt);
-      sails[i] = filling(blowing, speed, braces[i]);
+      filling(blowing, speed, braces[i], (sails[i] ??= [0, 0, 0]));
       if (simulating) metres[i] = eye.distanceTo(middleOf(pose));
     }
     moor(berths, metres, simulating ? own : -1, dt);
     for (let k = 0; k < BERTHS; k++) {
       const b = berths[k];
       if (!b) {
-        motions[k] = null;
+        moving[k] = false;
         cloth.set(k, null);
         continue;
       }
       // (a berth's ship stays hers till it is let go: a new one comes fresh)
-      const motion = moved(b.fresh ? null : motions[k], poses[b.ship], dt), felt = felts[k], feels = feeling(motion);
-      motions[k] = motion;
+      const motion = moved(b.fresh || !moving[k] ? null : motions[k], poses[b.ship], dt, motions[k]), felt = felts[k];
+      moving[k] = true;
+      feeling(motion, felt);
       felt.brace = braces[b.ship];
       felt.phase = phaseOf(b.ship);
       felt.wind = sails[b.ship];
-      felt.weight = feels.weight;
-      felt.spin = feels.spin;
-      felt.spinning = feels.spinning;
       cloth.set(k, felt, b.fresh);
     }
     return cloth.update(dt);

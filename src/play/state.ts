@@ -40,10 +40,11 @@ import { createTerritory, type Move, type Outcome, type Territory } from '../sim
 import type { BallDraw, Look, Sea, ShipDraw } from '../snapshot.ts';
 import type { Hull } from '../world/swell.ts';
 import { remembered, type Planet } from '../world/planet.ts';
-import type { ShipPose } from '../world/pose.ts';
+import type { PoseOut, ShipPose } from '../world/pose.ts';
 import { hash } from '../world/random.ts';
 import { add, bearingAt, scale, type Vec3 } from '../world/sphere.ts';
 import { LOOK, lookOf } from './colours.ts';
+import { createDrawing } from './drawing.ts';
 import { createHeld } from './held.ts';
 import { indexed } from './indexed.ts';
 import { createLog, NOTHING_DONE } from './moments.ts';
@@ -195,8 +196,10 @@ export function createState(planet: Planet, sea: Hull, { chart, water }: Waters,
   /** The world's clock at the moment drawn, `between` of the way from the step before last to the last. */
   const clock = (between: number) => (tick - 1 + between) * STEP;
 
-  /** A wreck as drawn at the world's clock `now`, or null once she is gone. */
-  const wreckAt = (w: Wreck, now: number) => sinking(w.pose, now - w.tick * STEP, w.side);
+  /** A wreck as drawn at the world's clock `now` (into `out`), or null once she is gone. */
+  const wreckAt = (w: Wreck, now: number, out?: PoseOut) => sinking(w.pose, now - w.tick * STEP, w.side, out);
+  /** The ships and balls as the frame is handed them, written over each frame. */
+  const drawing = createDrawing();
 
   /** The fleet sailed a step: each helm as her stores and her water have it; a bot rammed knows who rammed her.
    *  Returns what her stores were asked and the fleet's meeting; `from` holds where each ship lay before. */
@@ -317,19 +320,18 @@ export function createState(planet: Planet, sea: Hull, { chart, water }: Waters,
       return stormAt(Math.max(0, clock(between) - begun * STEP));
     },
     /** Every ship drawn at the moment `between` of the way through the last step: afloat, or going down. */
-    drawn(between: number): ShipDraw[] {
-      const now = clock(between), still: Vec3 = [0, 0, 0], crews = byId(battle.crews);
-      const ships: ShipDraw[] = fleet.map(({ id, ship, shove }) => {
-        const a = aboard.get(id)!, c = crews.get(id), g = c && inHand(c);
-        const gun = g ? { kind: g.kind, aim: aims.get(id) ?? ship.heading } : null;
-        const velocity = add(scale(ship.heading, ship.speed), shove);
-        return { id, pose: blendPose(a.before, a.after, between), look: a.look, velocity, afloat: true, gun };
-      });
-      for (const w of wrecks) {
-        const p = wreckAt(w, now);
-        if (p) ships.push({ id: w.id, pose: p, look: w.look, velocity: still, afloat: false, gun: null });
+    drawn(between: number): readonly ShipDraw[] {
+      const now = clock(between), crews = byId(battle.crews);
+      let n = 0;
+      for (let i = 0; i < fleet.length; i++) {
+        const { id, ship, shove } = fleet[i], a = aboard.get(id)!, c = crews.get(id), g = c && inHand(c);
+        const d = drawing.slot(n++, id, a.look, true);
+        blendPose(a.before, a.after, between, d.pose);
+        add(scale(ship.heading, ship.speed, d.velocity), shove, 1, d.velocity);
+        if (g) d.gun = drawing.armed(d, g.kind, aims.get(id) ?? ship.heading);
       }
-      return ships;
+      for (const w of wrecks) if (wreckAt(w, now, drawing.slot(n, w.id, w.look, false).pose)) n++;
+      return drawing.ships(n);
     },
     /** Where a ship is drawn at the moment `between` of the way through the last step, or null if she is not. */
     poseOf(id: number, between: number): ShipPose | null {
@@ -341,8 +343,7 @@ export function createState(planet: Planet, sea: Hull, { chart, water }: Waters,
     /** A ship's pose after the last step, if she is afloat. */
     after: (id: number): ShipPose | null => aboard.get(id)?.after ?? null,
     /** Every ball in flight at the moment `between` of the way through the last step (world metres), and its way. */
-    balls: (between: number): BallDraw[] =>
-      battle.balls.map((b) => ({ at: add(b.p, b.v, (between - 1) * STEP), way: b.v, gun: b.kind, to: b.to })),
+    balls: (between: number): readonly BallDraw[] => drawing.balls(battle.balls, (between - 1) * STEP),
     /** What the guns did in the last KEPT seconds, oldest first. */
     blasts: log.blasts,
     /** The loot on the water. */
