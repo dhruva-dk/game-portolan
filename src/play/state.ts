@@ -39,7 +39,7 @@ import {
   type Crew,
   type Order,
 } from '../sim/battle.ts';
-import { mind, rammed, shot } from '../sim/bot.ts';
+import { mind, rammed, shot, type Memory } from '../sim/bot.ts';
 import { DEFAULT_BRAIN, nature, type Brain } from '../sim/brain.ts';
 import { afloat, stepFleet, type Vessel } from '../sim/contact.ts';
 import { STEP, blendPose } from '../sim/fixed.ts';
@@ -840,6 +840,13 @@ export function createState(
         founder(id, by, by === null ? 'storm' : 'shot');
         log.keep(NOTHING_DONE, NOTHING_DONE, NOTHING_DONE, null, tick * STEP);
       },
+      /**
+       * A bot's mind as it stands after the last step (what she is about, her
+       * goal, her route), or null for a ship no bot sails or one sunk: to be
+       * read, never written (tools/harness watches the bots by it).
+       */
+      mindOf: (id: number): Readonly<Memory> | null =>
+        aboard.get(id)?.mind ?? null,
     },
   };
 }
