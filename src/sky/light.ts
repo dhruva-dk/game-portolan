@@ -63,8 +63,18 @@ export interface Light {
     shadow: Vec3Node,
     shine: Vec3Node
   ): Vec3Node;
-  /** The same for a leaf: lit where the sun reaches either side of it. */
-  leaf(p: Vec3Node, n: Vec3Node, lit: Vec3Node, shadow: Vec3Node): Vec3Node;
+  /**
+   * The same for a leaf: lit where the sun reaches either side of it. `through`
+   * (1 if not given) is how much of the sun on its far side comes through: at
+   * 0, a solid surface, lit as toon is.
+   */
+  leaf(
+    p: Vec3Node,
+    n: Vec3Node,
+    lit: Vec3Node,
+    shadow: Vec3Node,
+    through?: FloatNode
+  ): Vec3Node;
   /**
    * 0 in shadow … 1 in the sun, the edge between crisp: a surface at p facing
    * n.
@@ -179,9 +189,10 @@ export function createLighting(
       ).mul(sunlit);
       return mix(mix(shadow, lit, sunlit), shine, glint).mul(level(p));
     },
-    leaf(p, n, lit, shadow) {
+    leaf(p, n, lit, shadow, through) {
       const s = sides(p, n);
-      return mix(shadow, lit, max(s.front, s.back)).mul(level(p));
+      const back = through ? s.back.mul(through) : s.back;
+      return mix(shadow, lit, max(s.front, back)).mul(level(p));
     },
   };
 }

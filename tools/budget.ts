@@ -69,13 +69,13 @@ const VIEWS: { name: string; q: string; own?: Partial<Budget> }[] = [
   // her own gun fired; a row of every kind of piece on the water and stores
   // under her. Beyond play (the berths are spread over the planet, and few are
   // left when they close), so it is held to a ceiling of its own, what it
-  // measured when it was made (86 draws: each kind of gun two, on the ships
-  // and on the water; 903k triangles, the ships 225k, their guns 18k, the loot
-  // 41k), the triangles a little over: new art must not raise it.
+  // measures (77 draws: each kind of gun two, on the ships and on the water;
+  // 896k triangles, the ships 218k, their guns 18k, the loot 41k), the
+  // triangles a little over: new art must not raise it.
   {
     name: 'worst',
     q: 'screen=match&ships=79&pack&arm&ahead=6&kit&loot=60&gun=4&kind=mortar&fire=',
-    own: { draws: 86, triangles: 920_000 },
+    own: { draws: 77, triangles: 920_000 },
   },
 ];
 

@@ -14,6 +14,10 @@
 // so the leaves need no cut-out texture (an alpha test would cost the iPad's
 // GPU its hidden-surface removal). Lit on both sides, and from behind as leaves
 // are (sky/light.ts leaf), in two flat greens.
+//
+// Trunk and crown are one geometry and one material, so a shape is one draw:
+// a vertex's `crown` says which it is, and the trunk takes no light through
+// from behind (lit as toon is).
 
 import {
   BufferGeometry,
@@ -33,6 +37,7 @@ import {
   normalWorld,
   normalize,
   positionWorld,
+  select,
   uv,
   vec3,
 } from 'three/tsl';
@@ -152,12 +157,8 @@ const OLD = 0.8;
 const HEART = 0.4,
   SHADED = 0.62;
 
-interface Shape {
-  trunk: BufferGeometry;
-  crown: BufferGeometry;
-}
-
-function shape(lean: number, seed: number, detail: Detail): Shape {
+/** A palm of the given lean, trunk and crown in one geometry. */
+function shape(lean: number, seed: number, detail: Detail): BufferGeometry {
   const {
     along: ALONG,
     around: AROUND,
@@ -252,13 +253,6 @@ function shape(lean: number, seed: number, detail: Detail): Shape {
         index.push(a, b, d, b, e, d);
       }
   }
-  const trunk = new BufferGeometry();
-  trunk.setAttribute('position', new Float32BufferAttribute(pos, 3));
-  trunk.setAttribute('normal', new Float32BufferAttribute(nrm, 3));
-  trunk.setAttribute('uv', new Float32BufferAttribute(uvs, 2));
-  trunk.setAttribute('nut', new Float32BufferAttribute(nut, 1));
-  trunk.setIndex(index);
-
   // ---- the crown
   const cp: number[] = [],
     cn: number[] = [],
@@ -385,65 +379,94 @@ function shape(lean: number, seed: number, detail: Detail): Shape {
       }
     }
   }
-  const crown = new BufferGeometry();
-  crown.setAttribute('position', new Float32BufferAttribute(cp, 3));
-  crown.setAttribute('normal', new Float32BufferAttribute(cn, 3));
-  crown.setAttribute('leaf', new Float32BufferAttribute(ca, 2));
-  return { trunk, crown };
+  // ---- one geometry, the trunk's vertices then the crown's: each part's own
+  // attributes nought on the other's, and `crown` 1 on the crown's
+  const trunks = pos.length / 3,
+    leaves = cp.length / 3;
+  const none = (n: number): number[] => new Array<number>(n).fill(0);
+  const g = new BufferGeometry();
+  g.setAttribute('position', new Float32BufferAttribute(pos.concat(cp), 3));
+  g.setAttribute('normal', new Float32BufferAttribute(nrm.concat(cn), 3));
+  g.setAttribute(
+    'uv',
+    new Float32BufferAttribute(uvs.concat(none(2 * leaves)), 2)
+  );
+  g.setAttribute(
+    'nut',
+    new Float32BufferAttribute(nut.concat(none(leaves)), 1)
+  );
+  g.setAttribute(
+    'leaf',
+    new Float32BufferAttribute(none(2 * trunks).concat(ca), 2)
+  );
+  g.setAttribute(
+    'crown',
+    new Float32BufferAttribute(none(trunks).concat(none(leaves).fill(1)), 1)
+  );
+  g.setIndex(
+    index.concat(Array.from({ length: leaves }, (_, i) => trunks + i))
+  );
+  return g;
 }
 
 /**
  * palms[i]: those on tile i, whose chart is charts[i]; for each level of
- * detail (LEVELS, nearest first), the instances of each shape's trunk and
- * crown.
+ * detail (LEVELS, nearest first), the instances of each of its shapes (trunk
+ * and crown one draw).
  */
 export function createPalms(
   palms: Palm[][],
   charts: Chart[],
   light: Light
 ): Instances[][] {
-  const trunkMaterial = new MeshBasicNodeMaterial();
-  trunkMaterial.colorNode = Fn(() => {
+  // the trunk and the crown in one draw: both sides drawn, for the leaves (the
+  // trunk's far side is hidden behind its near one)
+  const material = new MeshBasicNodeMaterial({ side: DoubleSide });
+  material.colorNode = Fn(() => {
     const p = positionWorld,
-      n = normalize(normalWorld),
-      nut = attribute('nut', 'float');
-    // the scars of fallen fronds: a thin dark ring every RING metres up the
-    // trunk
+      crown = attribute('crown', 'float');
+    // the side facing the eye
+    const n = normalize(normalWorld).mul(faceDirection);
+
+    // the trunk: the scars of fallen fronds, a thin dark ring every RING
+    // metres up it
+    const nut = attribute('nut', 'float');
     const scar = float(1)
       .sub(line(uv().y, 1 / RING).mul(SCAR))
       .mul(float(1).sub(nut))
       .add(nut);
-    const tone = (of: (t: Tones) => Rgb): Vec3Node =>
+    const bark = (of: (t: Tones) => Rgb): Vec3Node =>
       mix(vec3(...of(PALM_TRUNK)).mul(scar), vec3(...of(PALM_NUT)), nut);
-    return light.toon(
-      p,
-      n,
-      tone((t) => t.lit),
-      tone((t) => t.shadow)
-    );
-  })();
 
-  const crownMaterial = new MeshBasicNodeMaterial({ side: DoubleSide });
-  crownMaterial.colorNode = Fn(() => {
-    const p = positionWorld,
-      leaf = attribute('leaf', 'vec2');
-    // the side facing the eye
-    const n = normalize(normalWorld).mul(faceDirection);
-    // old fronds yellowed; and in the crown's heart, where little light
-    // reaches, a leaflet keeps its shadow tone
+    // the crown: old fronds yellowed; and in the crown's heart, where little
+    // light reaches, a leaflet keeps its shadow tone
+    const leaf = attribute('leaf', 'vec2');
     const old = cut(leaf.x, OLD);
-    const tone = (of: (t: Tones) => Rgb): Vec3Node =>
+    const green = (of: (t: Tones) => Rgb): Vec3Node =>
       mix(vec3(...of(PALM_LEAF)), vec3(...of(PALM_LEAF_OLD)), old);
-    const shadow = tone((t) => t.shadow);
+    const leafShadow = green((t) => t.shadow);
+    const leafLit = mix(
+      leafShadow,
+      green((t) => t.lit),
+      cut(leaf.y, SHADED)
+    );
+
+    const isCrown = crown.greaterThan(0.5);
+    // lit through from behind only on the crown: the trunk is solid
     return light.leaf(
       p,
       n,
-      mix(
-        shadow,
-        tone((t) => t.lit),
-        cut(leaf.y, SHADED)
+      select(
+        isCrown,
+        leafLit,
+        bark((t) => t.lit)
       ),
-      shadow
+      select(
+        isCrown,
+        leafShadow,
+        bark((t) => t.shadow)
+      ),
+      crown
     );
   })();
 
@@ -485,12 +508,13 @@ export function createPalms(
   };
   return LEVELS.map(({ name, detail, leans }) => {
     const by = placed(leans);
-    return leans.flatMap((lean, k) => {
-      const sh = shape(lean, k + 11, detail);
-      return [
-        createInstances(`${name} ${2 * k}`, sh.trunk, trunkMaterial, by[k]),
-        createInstances(`${name} ${2 * k + 1}`, sh.crown, crownMaterial, by[k]),
-      ];
-    });
+    return leans.map((lean, k) =>
+      createInstances(
+        `${name} ${k}`,
+        shape(lean, k + 11, detail),
+        material,
+        by[k]
+      )
+    );
   });
 }
