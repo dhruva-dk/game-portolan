@@ -420,3 +420,17 @@ commit; anything visible checked in headless chromium; iPad Air M1 at 30–40 fp
     budget unchanged.
   - Test: `scenarios.test.ts`, a long wall between her and the heart.
   - Golden → `109c72f7`.
+- E3d, the wedges left (after E4, 4.2 s a ship): the worst place now (13%,
+  m7 #73) is a true pocket: bow and port side on land, `wedge.ts` frees her
+  hard to starboard only. Her helm works off it toward the deepest water,
+  but each step she surges more than a crawl (0.08–0.12 m, to and fro) its
+  clock starts again; she never gets 2.5 s into it. Tried steadying the
+  crawl test (her way made good as a vector, averaged over 0.5 s, the
+  surge cancelling): **worse, +2.5 s [1.5, 3.5]**; "back" rose to 82% of
+  pinned time. With E3b's windows, twice now: a more sensitive stuck test
+  calls her stuck in tight turns she was making, and backing off costs more
+  than it saves. **The step test's deafness is load-bearing.** Reverted.
+  A fix must be specific to the pocket (two hull points touching), not a
+  keener ear; or the shallows (shoal.ts) letting a hull touching at two
+  points ease off, which is the game's physics (the player's too), not
+  this branch's.
