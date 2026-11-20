@@ -8,7 +8,7 @@ import { ROUTE, cellCentre, chart, findPath, openAt, type Chart } from '../src/s
 import { clearance, type Depth } from '../src/sim/shoal.ts';
 import { shipAt } from '../src/sim/ship.ts';
 import { landOf, planetOf } from '../src/world/land.ts';
-import { SEED } from '../src/world/planet.ts';
+import { SEED } from '../src/environment.ts';
 import { add, along, bearingAt, distance, frameAt, fromLatLon, normalize, scale, type Vec3 } from '../src/world/sphere.ts';
 import { random } from '../src/world/random.ts';
 

@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { STORM, calm, createStorm, outside, planStorm, toEdge, type Cap } from '../src/sim/storm.ts';
 import { landOf, planetOf } from '../src/world/land.ts';
-import { SEED } from '../src/world/planet.ts';
+import { SEED } from '../src/environment.ts';
 import { R, add, along, cross, dot, normalize, scale, type Vec3 } from '../src/world/sphere.ts';
 
 /** The matches' seeds, each on the release's planet. */

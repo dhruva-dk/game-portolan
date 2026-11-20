@@ -3,7 +3,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { R, along, bearingAt, distance, dot, faceDir, type Vec3 } from '../src/world/sphere.ts';
-import { START, SEED, bakeFaces, remembered } from '../src/world/planet.ts';
+import { SEED } from '../src/environment.ts';
+import { START, bakeFaces } from '../src/world/planet.ts';
+import { remembered } from '../src/world/remembered.ts';
 import { landOf, planetOf } from '../src/world/land.ts';
 import { CELL, between, locate, taps } from '../src/world/terrain-grid.ts';
 import { WADE } from '../src/world/terrain-scatter.ts';

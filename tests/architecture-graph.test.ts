@@ -82,7 +82,7 @@ test('cycles: no import goes round in a circle (types aside: they are erased)', 
  * sphere; then, side by side and apart, the sea and the sky's motions, and the planet's making.
  */
 const TIERS: Record<string, readonly string[]> = {
-  math: ['scalar.ts', 'random.ts', 'sphere.ts', 'turn.ts', 'pose.ts'],
+  math: ['scalar.ts', 'random.ts', 'sphere.ts', 'turn.ts', 'pose.ts', 'remembered.ts'],
   grids: ['cells.ts', 'lattice.ts', 'noise3.ts'],
   motions: ['cascades.ts', 'sum.ts', 'spectrum.ts', 'swell.ts', 'sun.ts', 'weather.ts', 'wind.ts'],
   making: ['planet.ts', 'planet-terrain.ts', 'terrain.ts', 'terrain-grid.ts', 'terrain-scatter.ts', 'land.ts', 'coastline.ts'],

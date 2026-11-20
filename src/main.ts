@@ -6,7 +6,7 @@ import { WebGPUCoordinateSystem, WebGPURenderer } from 'three/webgpu';
 import { createAudio } from './audio/audio.ts';
 import type { Hearing } from './audio/listen.ts';
 import { scenario, type Played, type Setup, type Stage } from './debug.ts';
-import { createWorld } from './environment.ts';
+import { SEED, createWorld } from './environment.ts';
 import { createFrame } from './frame.ts';
 import { loaded } from './load.ts';
 import { createMeter } from './meter.ts';
@@ -24,7 +24,6 @@ import { createTitle } from './ui/screens.ts';
 import { createInput } from './ui/input.ts';
 import { createStick } from './ui/stick.ts';
 import { uiLayer } from './ui/ui.ts';
-import { SEED } from './world/planet.ts';
 import { MEAN, SWING } from './world/weather.ts';
 
 /** The release's setup. */
@@ -122,7 +121,7 @@ async function play(s: Stage): Promise<Played> {
   const input = createInput(s.canvas, () => game.steering());
   const layer = uiLayer();
   const stick = createStick(layer);
-  const shores = shoresOf(s.world.planet, s.world.land);
+  const shores = shoresOf(s.world.planet, s.world.coasts, s.world.land.stats.summit);
   const globe = createGlobe(shores.coasts);
   // what the HUD reads, the match's and her kit's in one object refilled each frame
   const status: HudState = Object.assign({}, game.status(), game.kit());

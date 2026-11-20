@@ -29,7 +29,6 @@ import { createGrade, encode } from './post/grade.ts';
 import { createShafts, type Shafts } from './post/shafts.ts';
 import { SKY_METRES } from './sky/sky.ts';
 import { SPACE } from './palette.ts';
-import { duneHeight } from './world/planet-terrain.ts';
 import { clamp } from './world/scalar.ts';
 import { loaded } from './load.ts';
 import type { Vec4Node } from './tsl.ts';
@@ -141,7 +140,7 @@ export function createFrame(renderer: WebGPURenderer, world: World, options: Fra
   // The ground's own lighting: the sun on the sea floor focused by the waves over it (water.floor's caustics), kept to
   // the ground's shaders, where they show, so everything else lit is built without them (water.below).
   const floorLight = createLighting(sky.light, water.floor, shadow.visible);
-  const sand = createSand(view, ground, floorLight, duneHeight(world.land.stats.summit));
+  const sand = createSand(view, ground, floorLight, world.dunes);
   // the ground, under the sea and over it; and what stands on the land
   const terrain = createTerrainMesh(view, ground, sand, world.land);
   const groves = createGroves(world.land, world.planet, world.seed, view, light);

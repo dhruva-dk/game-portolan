@@ -19,7 +19,7 @@ import { STORM } from '../src/sim/storm.ts';
 import { createMatches } from '../src/play/setup.ts';
 import { createState } from '../src/play/state.ts';
 import { landOf, planetOf } from '../src/world/land.ts';
-import { SEED } from '../src/world/planet.ts';
+import { SEED } from '../src/environment.ts';
 import { distance, type Vec3 } from '../src/world/sphere.ts';
 import { flat } from '../src/world/swell.ts';
 

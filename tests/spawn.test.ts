@@ -5,7 +5,7 @@ import { SHIPS } from '../src/sim/match.ts';
 import { SPAWN, berthing, berths, type Spawn } from '../src/sim/spawn.ts';
 import { createMatches } from '../src/play/setup.ts';
 import { landOf, planetOf } from '../src/world/land.ts';
-import { SEED } from '../src/world/planet.ts';
+import { SEED } from '../src/environment.ts';
 import { R, along, distance, dot, length } from '../src/world/sphere.ts';
 
 /** The least distance between any two berths, metres along the surface. */

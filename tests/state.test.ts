@@ -8,7 +8,7 @@ import { berthing } from '../src/sim/spawn.ts';
 import { calm, type Storm } from '../src/sim/storm.ts';
 import type { Helm } from '../src/sim/ship.ts';
 import { landOf, planetOf } from '../src/world/land.ts';
-import { SEED } from '../src/world/planet.ts';
+import { SEED } from '../src/environment.ts';
 import { add, bearingAt, type Vec3 } from '../src/world/sphere.ts';
 import { flat } from '../src/world/swell.ts';
 

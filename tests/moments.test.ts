@@ -14,7 +14,7 @@ import { berthing } from '../src/sim/spawn.ts';
 import { calm } from '../src/sim/storm.ts';
 import { BIG, SAFE, capped, heartbeat, lowHull } from '../src/ui/flash.ts';
 import { landOf, planetOf } from '../src/world/land.ts';
-import { SEED } from '../src/world/planet.ts';
+import { SEED } from '../src/environment.ts';
 import { R, bearingAt, normalize, scale, type Vec3 } from '../src/world/sphere.ts';
 import { flat } from '../src/world/swell.ts';
 import { lookAt } from '../src/world/turn.ts';

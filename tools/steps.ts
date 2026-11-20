@@ -19,7 +19,7 @@ import { PARTS, createState, type Part } from '../src/play/state.ts';
 import { CASCADES } from '../src/world/cascades.ts';
 import { FREQUENCY, anchors, icosphere } from '../src/world/lattice.ts';
 import { landOf, planetOf } from '../src/world/land.ts';
-import { SEED } from '../src/world/planet.ts';
+import { SEED } from '../src/environment.ts';
 import type { Vec3 } from '../src/world/sphere.ts';
 import { createSwell, type Hull } from '../src/world/swell.ts';
 import { MEAN } from '../src/world/weather.ts';

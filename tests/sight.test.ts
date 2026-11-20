@@ -5,7 +5,7 @@ import { SHIP } from '../src/sim/handling.ts';
 import { meets, offSight, pointOn, seaAlong } from '../src/sim/sight.ts';
 import { shipAt } from '../src/sim/ship.ts';
 import { landOf, planetOf } from '../src/world/land.ts';
-import { SEED } from '../src/world/planet.ts';
+import { SEED } from '../src/environment.ts';
 import { random } from '../src/world/random.ts';
 import { R, add, along, bearingAt, distance, dot, frameAt, fromLatLon, length, normalize, scale, type Vec3 } from '../src/world/sphere.ts';
 

@@ -3,7 +3,9 @@
 // the match. The environment is that world at a moment and a place: the clock, the sun over the eye, the weather now
 // and the wind there, worked out by the frame alone each frame and read by every system that draws.
 
+import { coastLines } from './world/coastline.ts';
 import { landOf, planetOf, type Land } from './world/land.ts';
+import { duneHeight } from './world/planet-terrain.ts';
 import type { Planet } from './world/planet.ts';
 import type { Out3, Vec3 } from './world/sphere.ts';
 import { sunAt, sunPlaces, type SunPlaces } from './world/sun.ts';
@@ -25,17 +27,21 @@ interface Climate {
   seaWind: number;
 }
 
-/** The world a match is set in: its planet and what its land is made of (world/land.ts: for the workers that make the
- *  planet again), the planet's prevailing wind and the climate, from one seed. Built once (main.ts) and handed to both
- *  the game and the frame. */
-export interface World { seed: number; land: Land; planet: Planet; wind: Wind; climate: Climate }
+/** The planet the game is played on (main.ts RELEASE). */
+export const SEED = 3;
 
-/** seed: the planet's (world/planet.ts); mean, swing: the weather's (world/weather.ts); hours: the time of day. */
+/** The world a match is set in: its planet and what its land is made of (world/land.ts: for the workers that make the
+ *  planet again), its coasts (world/coastline.ts: runs of points on the unit sphere, for the charts), the height past
+ *  which its sand is the dunes' (metres), the planet's prevailing wind and the climate, from one seed. Built once
+ *  (main.ts) and handed to the game, the frame and the UI: what they draw of the land is read off it, never made again. */
+export interface World { seed: number; land: Land; planet: Planet; coasts: Vec3[][]; dunes: number; wind: Wind; climate: Climate }
+
+/** seed: the planet's (SEED); mean, swing: the weather's (world/weather.ts); hours: the time of day. */
 export function createWorld(seed: number, mean: Weather, swing: Weather, hours: number): World {
   const land = landOf(seed), planet = planetOf(seed, land);
   const sun = sunPlaces(planet.start.at, planet.heart);
   return {
-    seed, land, planet, wind: createWind(seed),
+    seed, land, planet, coasts: coastLines(land.shore), dunes: duneHeight(land.stats.summit), wind: createWind(seed),
     climate: { timeOfDay: hours, sunPlaces: sun, weather: createWeather(seed, mean, swing), seaWind: mean.wind },
   };
 }

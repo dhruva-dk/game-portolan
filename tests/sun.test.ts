@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { R, add, along, cross, distance, dot, frameAt, fromLatLon, length, normalize, scale, type Vec3 } from '../src/world/sphere.ts';
 import { CELLS, centreOf } from '../src/world/cells.ts';
 import { landOf, planetOf } from '../src/world/land.ts';
-import { SEED } from '../src/world/planet.ts';
+import { SEED } from '../src/environment.ts';
 import { random } from '../src/world/random.ts';
 import { sunAt, sunAtOrigin, sunInSky, sunPlaces, type SunPlaces } from '../src/world/sun.ts';
 import { between, locate, taps } from '../src/world/terrain-grid.ts';
