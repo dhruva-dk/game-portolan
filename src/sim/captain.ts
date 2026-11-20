@@ -23,6 +23,7 @@ import type { Loot } from './loot.ts';
 import type { ClaimMemory, Holdings } from './claimer.ts';
 import type { MindMemory } from './bot.ts';
 import type { HelmMemory } from './helmsman.ts';
+import type { HuntMemory, Report } from './hunter.ts';
 import type { PilotMemory } from './pilot.ts';
 import type { PurseMemory } from './purser.ts';
 import type { TacticMemory } from './tactician.ts';
@@ -60,7 +61,8 @@ export interface Seen {
  * chart (route.ts), without which she finds no routes round land, only feels
  * her way along it; the storm now (storm.ts), without which she pays it no
  * heed; and the loot on the water (loot.ts); and who holds it (territory.ts),
- * without which she claims none.
+ * without which she claims none; and the guns ringing out (hunter.ts), without
+ * which she hears none.
  */
 export interface Sea {
   depth: Depth;
@@ -68,6 +70,7 @@ export interface Sea {
   storm?: Storm | null;
   loot?: readonly Loot[];
   holdings?: Holdings | null;
+  gunfire?: readonly Report[];
 }
 
 export type Mode =
@@ -77,7 +80,8 @@ export type Mode =
   | 'storm'
   | 'heal'
   | 'loot'
-  | 'claim';
+  | 'claim'
+  | 'hunt';
 
 /**
  * What she means, as her mind hands it to her tactician (tactician.ts): where
@@ -110,6 +114,7 @@ export interface Memory
     HelmMemory,
     PurseMemory,
     ClaimMemory,
+    HuntMemory,
     Gunner {}
 
 /**

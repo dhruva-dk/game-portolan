@@ -12,6 +12,7 @@
 import { MIND, ROAMING, SIGHT, STORMING } from './bot.ts';
 import { CLAIMER } from './claimer.ts';
 import { HELM } from './helmsman.ts';
+import { HUNTING } from './hunter.ts';
 import { PURSER } from './purser.ts';
 import { RAMMING } from './tactician.ts';
 import { STYLES, temper, type Temper } from './temper.ts';
@@ -29,8 +30,8 @@ type Widen<T> = T extends number
 /**
  * What each part of a bot is tuned by: her sight, her mind's weighing, her
  * roaming and her storm (bot.ts), her ramming (tactician.ts), her helm
- * (helmsman.ts), her stores (purser.ts), her water (claimer.ts), and the
- * temperaments she may be born to (temper.ts).
+ * (helmsman.ts), her stores (purser.ts), her water (claimer.ts), her ear
+ * (hunter.ts), and the temperaments she may be born to (temper.ts).
  */
 export interface Brain {
   readonly sight: Widen<typeof SIGHT>;
@@ -41,6 +42,7 @@ export interface Brain {
   readonly helm: Widen<typeof HELM>;
   readonly purser: Widen<typeof PURSER>;
   readonly claimer: Widen<typeof CLAIMER>;
+  readonly hunting: Widen<typeof HUNTING>;
   readonly styles: Widen<typeof STYLES>;
 }
 
@@ -54,6 +56,7 @@ export const DEFAULT_BRAIN: Brain = {
   helm: HELM,
   purser: PURSER,
   claimer: CLAIMER,
+  hunting: HUNTING,
   styles: STYLES,
 };
 

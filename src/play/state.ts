@@ -77,6 +77,7 @@ import {
 import type { Chart } from '../sim/route.ts';
 import { shipAt, type Helm, type ShipState } from '../sim/ship.ts';
 import { STORM, calm, type Storm } from '../sim/storm.ts';
+import { heard, type Report } from '../sim/hunter.ts';
 import {
   createTerritory,
   type Move,
@@ -270,6 +271,8 @@ export function createState(
    */
   let flotsam: Flotsam = { pieces: [], next: 0 },
     dropped = Infinity;
+  /** The guns ringing out: each ship's last shot, for a few seconds. */
+  let gunfire: Report[] = [];
   const sinkings: Sinking[] = [];
   /**
    * Each ship's last blow taken: its striker, and the step it landed on (for
@@ -363,6 +366,7 @@ export function createState(
     match = m;
     flotsam = loot ? strewn(m.seed, depth) : { pieces: [], next: 0 };
     dropped = loot ? 0 : Infinity;
+    gunfire = [];
     fleet = [];
     aboard.clear();
     aims.clear();
@@ -604,12 +608,8 @@ export function createState(
         fleet,
         byId(battle.crews),
         aboard,
-        helm,
-        gun,
-        ask,
-        storm,
-        flotsam,
-        territory
+        { helm, gun, ask },
+        { storm, loot: flotsam, holdings: territory, gunfire }
       );
       for (let i = 0; i < fleet.length; i++)
         aims.set(fleet[i].id, told.orders[i]?.aim?.dir ?? null);
@@ -617,6 +617,8 @@ export function createState(
       const { wants, met } = sail(told.helms, told.asks);
       lap?.('sail');
       const { fought, kept } = fight(told.orders, met, storm, wants);
+      if (fought.shots.length > 0 || gunfire.length > 0)
+        gunfire = heard(gunfire, fought.shots, time());
       lap?.('fight');
       tick++;
       const did = hold(storm);

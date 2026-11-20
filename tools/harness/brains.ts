@@ -42,6 +42,7 @@ export function variant(over: Over, base: Brain = DEFAULT_BRAIN): Brain {
     helm: merged('helm', base.helm, over.helm),
     purser: merged('purser', base.purser, over.purser),
     claimer: merged('claimer', base.claimer, over.claimer),
+    hunting: merged('hunting', base.hunting, over.hunting),
     styles: over.styles ?? base.styles,
   };
 }
@@ -56,6 +57,10 @@ export const BRAINS: Record<string, Brain> = {
   keen: variant({ sight: { sightMax: 360, forget: 8 } }),
   /** Feels further ahead for land, and backs off a bank sooner. */
   wary: variant({ helm: { feel: 24, stuck: 1.5 } }),
+  /** Hears no guns (hunts nothing). */
+  deaf: variant({ hunting: { earshot: 0 } }),
+  /** Hears guns further off, and is drawn to them from further. */
+  keenEar: variant({ hunting: { earshot: 800, far: 750, near: 250 } }),
   /** Backing off at a crawl. */
   crawl: variant({ helm: { slow: 0.35 } }),
   /** The helm and purser before E3: no side given up, loot however inshore. */

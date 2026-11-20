@@ -10,6 +10,7 @@ import type { Nature } from '../sim/brain.ts';
 import type { Chart } from '../sim/route.ts';
 import type { Vessel } from '../sim/contact.ts';
 import type { Holdings } from '../sim/claimer.ts';
+import type { Report } from '../sim/hunter.ts';
 import type { Flotsam } from '../sim/loot.ts';
 import { PLAYER } from '../sim/match.ts';
 import type { Helm } from '../sim/ship.ts';
@@ -27,6 +28,17 @@ export interface Hand {
   mind: Memory | null;
   nature: Nature;
   steady: Helm;
+}
+
+/**
+ * The sea as it stands this step, as the bots read it: the storm, the loot, who
+ * holds the water, and the guns ringing out.
+ */
+interface SeaNow {
+  storm: Storm;
+  loot: Flotsam;
+  holdings: Holdings | null;
+  gunfire: readonly Report[];
 }
 
 /** A lashed ship's gun: laid nowhere, never fired. */
@@ -48,7 +60,14 @@ export function createOrders(depth: (p: Vec3) => number, chart: Chart) {
     orders: Order[] = [],
     asks = new Map<number, Ask>();
   /** The sea as the bots read it this step. */
-  const sea: Sea = { depth, chart, storm: null, loot: [], holdings: null };
+  const sea: Sea = {
+    depth,
+    chart,
+    storm: null,
+    loot: [],
+    holdings: null,
+    gunfire: [],
+  };
   const out = { helms, orders, asks };
 
   /**
@@ -70,26 +89,24 @@ export function createOrders(depth: (p: Vec3) => number, chart: Chart) {
   /**
    * The fleet's orders for a step, in its order, and what each asks of her
    * stores: `helm`, `gun` and `ask` the player's; `crews` and `aboard` each
-   * ship's by id; the storm, the loot and who holds the sea as the bots read
-   * them. The lists handed back are refilled by the next call.
+   * ship's by id; the sea as it stands. The lists handed back are refilled by
+   * the next call.
    */
   return (
     fleet: readonly Vessel[],
     crews: ReadonlyMap<number, Crew>,
     aboard: ReadonlyMap<number, Hand>,
-    helm: Helm,
-    gun: Order,
-    ask: Ask,
-    storm: Storm,
-    loot: Flotsam,
-    holdings: Holdings | null
+    player: { helm: Helm; gun: Order; ask: Ask },
+    now: SeaNow
   ) => {
+    const { helm, gun, ask } = player;
     seen.length = helms.length = orders.length = 0;
     asks.clear();
     for (const v of fleet) seen.push(sight(v, crews.get(v.id)!));
-    sea.storm = storm;
-    sea.loot = loot.pieces;
-    sea.holdings = holdings;
+    sea.storm = now.storm;
+    sea.loot = now.loot.pieces;
+    sea.holdings = now.holdings;
+    sea.gunfire = now.gunfire;
     for (let i = 0; i < fleet.length; i++) {
       const id = fleet[i].id,
         a = aboard.get(id)!;

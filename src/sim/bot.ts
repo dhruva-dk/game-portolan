@@ -81,6 +81,7 @@ import {
   purseMemory,
 } from './purser.ts';
 import { claimAct, claimMemory, claimUrge } from './claimer.ts';
+import { huntAct, huntMemory, huntUrge } from './hunter.ts';
 import { NOTHING, type Ask } from './stores.ts';
 import { SHIP } from './handling.ts';
 
@@ -232,6 +233,7 @@ export const mind = (seed: number, at: Vec3): Memory => ({
   ...helmMemory(at),
   ...purseMemory(),
   ...claimMemory(),
+  ...huntMemory(),
   ...gunner(),
 });
 
@@ -582,9 +584,9 @@ interface Choice extends Option<Ctx> {
   act(c: Ctx): Vec3;
 }
 
-// (Sheltering from weather, to be weighed 5.2, after the storm, hunting to the
-// sound of guns, and raiding wait on things this sea hasn't got; claiming is
-// claimer.ts's.)
+// (Sheltering from weather, to be weighed 5.2, after the storm, and raiding
+// wait on things this sea hasn't got; claiming is claimer.ts's, hunting to the
+// sound of guns hunter.ts's.)
 const roamOption: Choice = {
   name: 'roam',
   weight: 1,
@@ -627,6 +629,8 @@ const OPTIONS: readonly Choice[] = [
     score: fightUrge,
     act: (c) => c.m.last,
   },
+  // to the sound of guns (hunter.ts)
+  { name: 'hunt', weight: 2, mode: 'hunt', score: huntUrge, act: huntAct },
   { name: 'loot', weight: 1.8, mode: 'loot', score: lootUrge, act: lootAct },
   // her water (claimer.ts): a loop to claim more
   {

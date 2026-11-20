@@ -24,6 +24,7 @@ const PARTS = [
   'sim/gunner.ts',
   'sim/purser.ts',
   'sim/claimer.ts',
+  'sim/hunter.ts',
   'sim/route.ts',
   'sim/utility.ts',
   'sim/temper.ts',
@@ -36,7 +37,12 @@ const SAILING = [
   'sim/route.ts',
 ];
 /** The parts that choose what she is about. */
-const CHOOSING = ['sim/bot.ts', 'sim/purser.ts', 'sim/claimer.ts'];
+const CHOOSING = [
+  'sim/bot.ts',
+  'sim/purser.ts',
+  'sim/claimer.ts',
+  'sim/hunter.ts',
+];
 /**
  * Tables read as they are, not from the brain: captain.ts's BOT, shared by
  * every part; and gunner.ts's GUNNER, her aim's feel, the same for every bot
@@ -96,6 +102,7 @@ const SLICES: Record<string, readonly string[]> = {
   'sim/helmsman.ts': ['helm'],
   'sim/purser.ts': ['purser'],
   'sim/claimer.ts': ['claimer'],
+  'sim/hunter.ts': ['hunting'],
 };
 
 test('own slices: a part reads its tuning from the brain it is given (c.b), its own slices alone, never its table itself', () => {

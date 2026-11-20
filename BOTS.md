@@ -28,15 +28,15 @@ turn left?", follow the arrows: it is never more than five hops.
                          └──────────┘
 ```
 
-| Role      | Module                                                                       | Takes                      | Gives                                                    | Tuning                           | Memory slice         |
-| --------- | ---------------------------------------------------------------------------- | -------------------------- | -------------------------------------------------------- | -------------------------------- | -------------------- |
-| Lookout   | `sim/lookout.ts` (from bot.ts perceive/hidden)                               | fleet, depth               | `Sighting`: foe, where last seen, who rammed/shot her    | `SIGHT`                          | `m.look`             |
-| Captain   | `sim/bot.ts` (decide, OPTIONS)                                               | Sighting, storm, own state | `Intent`                                                 | `MIND` (+ each option's owner's) | `m.mind`             |
-| — options | storm/fight/flee/roam: `bot.ts`; heal/loot: `purser.ts`; claim: `claimer.ts` | Ctx view                   | a score 0..1 with named factors; a goal                  | `PURSER`, `CLAIMER`, `STORMING`  | `m.purse`, `m.claim` |
-| Tactician | `sim/tactician.ts` (ramCourse, recoil; gunner.ts ring)                       | Intent, foe now            | `Mark`: where to route to, the aim if clear, pace        | `RAMMING`                        | `m.tactic`           |
-| Pilot     | `sim/pilot.ts` over `sim/route.ts`, later behind `Router`                    | Mark, chart                | `Way`: the tangent to steer, distance, pace, foe         | `ROUTE`                          | `m.route`            |
-| Helmsman  | `sim/helmsman.ts`, later behind `Steering`                                   | Way, depth, nearby rams    | `Helm`: course, throttle; and `lost` (pilot drops route) | `HELM`                           | `m.helm`             |
-| Gunner    | `sim/gunner.ts`                                                              | foe, held gun              | `Order`, arm                                             | `GUNNER`                         | `m.gun`              |
+| Role      | Module                                                                                          | Takes                      | Gives                                                    | Tuning                                     | Memory slice                   |
+| --------- | ----------------------------------------------------------------------------------------------- | -------------------------- | -------------------------------------------------------- | ------------------------------------------ | ------------------------------ |
+| Lookout   | `sim/lookout.ts` (from bot.ts perceive/hidden)                                                  | fleet, depth               | `Sighting`: foe, where last seen, who rammed/shot her    | `SIGHT`                                    | `m.look`                       |
+| Captain   | `sim/bot.ts` (decide, OPTIONS)                                                                  | Sighting, storm, own state | `Intent`                                                 | `MIND` (+ each option's owner's)           | `m.mind`                       |
+| — options | storm/fight/flee/roam: `bot.ts`; heal/loot: `purser.ts`; claim: `claimer.ts`; hunt: `hunter.ts` | Ctx view                   | a score 0..1 with named factors; a goal                  | `PURSER`, `CLAIMER`, `STORMING`, `HUNTING` | `m.purse`, `m.claim`, `m.hunt` |
+| Tactician | `sim/tactician.ts` (ramCourse, recoil; gunner.ts ring)                                          | Intent, foe now            | `Mark`: where to route to, the aim if clear, pace        | `RAMMING`                                  | `m.tactic`                     |
+| Pilot     | `sim/pilot.ts` over `sim/route.ts`, later behind `Router`                                       | Mark, chart                | `Way`: the tangent to steer, distance, pace, foe         | `ROUTE`                                    | `m.route`                      |
+| Helmsman  | `sim/helmsman.ts`, later behind `Steering`                                                      | Way, depth, nearby rams    | `Helm`: course, throttle; and `lost` (pilot drops route) | `HELM`                                     | `m.helm`                       |
+| Gunner    | `sim/gunner.ts`                                                                                 | foe, held gun              | `Order`, arm                                             | `GUNNER`                                   | `m.gun`                        |
 
 **The Intent** is the seam between choosing and sailing. The helm never sees
 modes, loot or claims; the captain never sees rudders or banks.
@@ -176,7 +176,7 @@ commit; anything visible checked in headless chromium; iPad Air M1 at 30–40 fp
 
 - [x] **A. Lock behaviour.** Golden-match test (hash of every ship's place, hull,
       and the result after N steps on a fixed seed). Baseline metrics recorded.
-- [ ] **B. Refactor, hash unchanged.**
+- [x] **B. Refactor, hash unchanged.**
   - [x] B1 Split `BOT` to its owners (SIGHT, MIND, ROAMING, STORMING, HELM,
         RAMMING); captain.ts BOT keeps only `every` and `open`, shared by all.
   - [x] B2 `Intent` → tactician.ts `Mark` → pilot.ts `Way` → helmsman. The helm
@@ -209,7 +209,10 @@ commit; anything visible checked in headless chromium; iPad Air M1 at 30–40 fp
   - [ ] E4 Storm flow field per phase (Router #2).
   - [ ] E5 Context steering on the clearance field (Steering #2).
 - [ ] **F. Stretch.** Mixed-fleet tournament + ratings; 2D replay HTML; breaking
-      line of sight when fleeing; hunting to the sound of guns.
+      line of sight when fleeing.
+  - [x] F1 Hunting to the sound of guns (`sim/hunter.ts`, its own role:
+        `HUNTING`, `c.b.hunting`, `HuntMemory`; the sea keeps each ship's
+        last shot ringing 6 s, handed to bots as `Sea.gunfire`).
 
 ## 3. Decisions
 
@@ -319,3 +322,14 @@ commit; anything visible checked in headless chromium; iPad Air M1 at 30–40 fp
   [−0.0, 0.8], armed/heal unchanged. Golden → `d133157f`.
 - D done. Next: C3 scenarios, then F depth (hunting to the sound of guns,
   breaking line of sight when fleeing).
+- F1, hunting to the sound of guns: armed, hull+shield over 70, no foe in
+  sight and not resting, she makes for the nearest guns heard within 500 m
+  (not in the storm), keener by her fight temper × aggro and the nearer
+  (450 → 150 m); silent, she keeps on 20 s to where they last spoke, gives
+  up there (45 m) and rests 15 s. Option weight 2 (between fight 2.6 and
+  loot 1.8). play/orders.ts's step now takes `player` and `now` records
+  (was 9 positional parameters). Harness, 16 matches, whole fleets vs
+  `deaf` (earshot 0): hunt 2% of time, matches 426 → 416 s, pinned −1.4 s
+  [−2.8, 0.1]; `keenEar` (800 m): hunt 4%, 406 s. Mixed fleets (`--mix`):
+  place 40.0 hunters vs 40.4 deaf vs 41.1 keen: liveliness, not power.
+  Golden → `654f4299`.
