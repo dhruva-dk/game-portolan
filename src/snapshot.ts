@@ -53,7 +53,7 @@ export type Blast =
 export interface BallDraw { at: Vec3; way: Vec3; gun: GunKind; to: Vec3 }
 
 /** A piece of loot on the water (sim/loot.ts): its id (for its own bob and turn), where it floats (world metres, on the
- *  sea's surface), what it is, the rarity it reads as (0–4: rarity.ts), and when it came onto the water (the world's
+ *  sea's surface), what it is, the rarity it reads as (0–4: ui/ink.ts RARITY), and when it came onto the water (the world's
  *  clock, s; long before the match for what was strewn at its start), for it to bob up. */
 export interface LootDraw { id: number; at: Vec3; kind: LootKind; rarity: number; born: number }
 

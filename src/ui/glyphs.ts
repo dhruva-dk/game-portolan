@@ -5,7 +5,7 @@
 
 export interface Prim { k: 'f' | 's'; d: string; w?: number; cut?: boolean; top?: boolean; fine?: boolean; bold?: boolean; tr?: string; op?: number; evenodd?: boolean; dash?: string; cap?: string }
 
-export const GLYPHS = {
+const DRAWN = {
   'hud.spiral': [{ k: 's', d: 'M12 1.4L14.7 1.91L17.15 3.08L19.18 4.82L20.66 7L21.51 9.45L21.7 12L21.22 14.47L20.14 16.7L18.54 18.54L16.55 19.88L14.32 20.65L12 20.8L9.76 20.36L7.75 19.36L6.1 17.9L4.9 16.1L4.22 14.08L4.1 12L4.51 9.99L5.42 8.2L6.73 6.73L8.35 5.68L10.15 5.09L12 5L13.77 5.38L15.35 6.2L16.63 7.37L17.54 8.8L18.04 10.38L18.1 12L17.75 13.54L17.02 14.9L16 16L14.75 16.76L13.38 17.17L12 17.2L10.69 16.88L9.55 16.24L8.64 15.36L8.02 14.3L7.7 13.15L7.7 12L7.99 10.93L8.54 10L9.28 9.28L10.15 8.8L11.08 8.57L12 8.6L12.84 8.86L13.55 9.32L14.09 9.91L14.42 10.6L14.56 11.31L14.5 12L14.27 12.61L13.91 13.1L13.45 13.45L12.95 13.65L12.45 13.69L12 13.6', w: 2 },{ k: 'f', d: 'M10.7 12a1.3 1.3 0 1 1 2.6 0a1.3 1.3 0 1 1 -2.6 0Z' }],
   'hud.storm': [{ k: 'f', d: 'M6.6 12a5.4 5.4 0 1 1 10.8 0a5.4 5.4 0 1 1 -10.8 0ZM9.8 12a2.2 2.2 0 1 0 4.4 0a2.2 2.2 0 1 0 -4.4 0Z' },{ k: 'f', d: 'M12 7.2C11.6 3.6 14.6 1.2 19.6 1.6C16.4 2.8 15.2 4.8 15.6 8.4Z' },{ k: 'f', d: 'M12 7.2C11.6 3.6 14.6 1.2 19.6 1.6C16.4 2.8 15.2 4.8 15.6 8.4Z', tr: 'rotate(180 12 12)' },{ k: 'f', d: 'M12 7.2C11.6 3.6 14.6 1.2 19.6 1.6C16.4 2.8 15.2 4.8 15.6 8.4Z', fine: true, tr: 'rotate(90 12 12)', op: 0.45 },{ k: 'f', d: 'M12 7.2C11.6 3.6 14.6 1.2 19.6 1.6C16.4 2.8 15.2 4.8 15.6 8.4Z', fine: true, tr: 'rotate(270 12 12)', op: 0.45 }],
   'hud.shipsLeft': [{ k: 'f', d: 'M2.4 16H21.6L19.4 20.4C19 21.2 18.2 21.6 17.4 21.6H6.6C5.8 21.6 5 21.2 4.6 20.4Z' },{ k: 'f', d: 'M11.1 3V14.8H3.6C5.4 11 6.4 7 11.1 3Z' },{ k: 'f', d: 'M12.9 5.2C16.6 8 18.6 11.4 19.8 14.8H12.9Z' },{ k: 'f', d: 'M11.1 2L15 3L11.1 4Z' }],
@@ -25,4 +25,6 @@ export const GLYPHS = {
   'menu.speaker': [{ k: 'f', d: 'M2.6 9.4H7.2L13.2 4.2V19.8L7.2 14.6H2.6Z' },{ k: 's', d: 'M16 8.4C17.8 10.4 17.8 13.6 16 15.6', w: 1.9 },{ k: 's', d: 'M18.8 5.8C22 9.4 22 14.6 18.8 18.2', w: 1.9 }],
 } satisfies Record<string, Prim[]>;
 
-export type Glyph = keyof typeof GLYPHS;
+export type Glyph = keyof typeof DRAWN;
+/** Each glyph's primitives. */
+export const GLYPHS: Readonly<Record<Glyph, readonly Prim[]>> = DRAWN;

@@ -42,7 +42,7 @@ function risesOf(t: Terrain): Rise[] {
     if (top < 0) continue;
     const corner = (i: number, j: number) => centreOf(face * N * N + j * N + i);
     const lo = bi * BLOCK, hi = lo + BLOCK - 1, low = bj * BLOCK, high = low + BLOCK - 1;
-    const at = normalize([lo, hi].flatMap((i) => [low, high].map((j) => corner(i, j))).reduce((a, b) => add(a, b), [0, 0, 0] as Vec3));
+    const at = normalize([lo, hi].flatMap((i) => [low, high].map((j) => corner(i, j))).reduce<Vec3>((a, b) => add(a, b), [0, 0, 0]));
     const reach = Math.max(...[[lo, low], [hi, low], [lo, high], [hi, high]].map(([i, j]) => distance(at, corner(i, j)))) + 2 * CELL;
     rises.push({ at, reach, top });
   }

@@ -39,9 +39,9 @@ export interface Berthing { readonly points: readonly Vec3[] }
 /** Points spread evenly over the sphere, `count` of them (a Fibonacci lattice). */
 function lattice(count: number): Vec3[] {
   const golden = Math.PI * (3 - Math.sqrt(5));
-  return Array.from({ length: count }, (_, i) => {
+  return Array.from({ length: count }, (_, i): Vec3 => {
     const y = 1 - (2 * (i + 0.5)) / count, s = Math.sqrt(1 - y * y), a = i * golden;
-    return [Math.cos(a) * s, y, Math.sin(a) * s] as Vec3;
+    return [Math.cos(a) * s, y, Math.sin(a) * s];
   });
 }
 

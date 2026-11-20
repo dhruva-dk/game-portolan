@@ -30,6 +30,10 @@ export const LIGHT = {
   warm: '#ffd9a0', white: '#fff1d8', ice: '#cfeeff', azure: '#4fc3ff', gold: '#ffcf5a', red: '#ff2a1a', green: '#7be36b',
   mint: '#c8ffb0',
 } as const;
+/** The rarities' inks, worst to best (0–4: sim/loot.ts, snapshot.ts LootDraw), under a gun's slot: silver, verdigris,
+ *  azurite, then purpure, so the epic reads purple on the chart as it glows on the water (palette.ts RARITY_GLOW), and
+ *  not the red of the blows' figures; gold. */
+export const RARITY = ['#969aa0', INK.green, INK.blue, '#6a3a8e', INK.gold] as const;
 /** The land on the minimap: its shallows' pale wash, its lowland and its hilltops; its contours sepia (ground.ts). */
 export const LAND = { apron: '#f4f0d6', low: '#ecdcac', high: '#b08c58', contour: INK.sepia } as const;
 /** The frame's meter (index.html): its ground, its words and labels, and a reading good, fair or poor. */
@@ -118,7 +122,7 @@ export function glyph(name: Glyph, x: number, y: number, size: number, o: GlyphS
     return `<path d="${p.d}" fill="none" stroke="${cut ? paper : ink}" stroke-width="${p.w ?? 1.5}" stroke-linecap="round" stroke-linejoin="round"${tr}${op}/>`;
   };
   let under = '', cuts = '', over = '';
-  for (const p of GLYPHS[name] as readonly Prim[]) {
+  for (const p of GLYPHS[name]) {
     if ((p.fine && !big) || (p.bold && big)) continue;
     if (p.cut) cuts += one(p, true);
     else if (p.top) over += one(p, false);

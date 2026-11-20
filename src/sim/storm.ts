@@ -39,7 +39,7 @@ export const STORM = {
     { wait: 25, close: 20, radius: 150, damage: 0.07 },
     { wait: 20, close: 16, radius: 110, damage: 0.09 },
     { wait: 15, close: 14, radius: 75, damage: 0.12 },
-  ] as readonly Phase[],
+  ] satisfies readonly Phase[],
   /** Once the last cap has closed, the damage rises by `rise` (of a hull a second) every `every` seconds, so the
    * match ends even if the last ships keep apart. */
   rise: 0.04,

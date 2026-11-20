@@ -35,7 +35,7 @@ const GUNNER = {
   /** The range she holds with each gun in hand, m (the cannon's 95, the rest where each does most), by her
    *  temperament's standoff; closer than `inside` of it, she opens out to `out` of it. Round the ring she makes for a
    *  point `swing` rad on from where she lies. */
-  pref: { cannon: 95, scatter: 35, repeater: 70, harpoon: 170, mortar: 140 } as Record<GunKind, number>,
+  pref: { cannon: 95, scatter: 35, repeater: 70, harpoon: 170, mortar: 140 } satisfies Record<GunKind, number>,
   inside: 0.6, out: 1.2, swing: 0.5,
   /** Choosing her gun: another is taken in hand when it would do `swap` times what the one in hand does; a gun
    *  reloading counts for `reloading` of itself; with no foe she weighs them at `idle` m. */

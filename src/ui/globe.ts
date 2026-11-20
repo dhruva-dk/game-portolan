@@ -23,7 +23,7 @@ import { lookingAt, type Eye } from '../snapshot.ts';
 import { clamp } from '../world/scalar.ts';
 import { R, cross, dot, length, normalize, scale, type Vec3 } from '../world/sphere.ts';
 import type { Coast } from './coasts.ts';
-import { GLYPHS, type Prim } from './glyphs.ts';
+import { GLYPHS } from './glyphs.ts';
 import { clock, type HudState } from './hud.ts';
 import { CUT, INK, PAPER, SHADOW, WASH, alpha, figure, galleon, glyph, roughCircle, roughRect, slip, svg, svgNode, uid } from './ink.ts';
 import { rhumbs } from './marks.ts';
@@ -58,7 +58,7 @@ const SWIRLS: Vec3[] = Array.from({ length: 60 }, (_, i) => {
 /** The Storm's glyph as one path: its eye and its four arms, each turned about the glyph's centre as its `tr` says. */
 const SWIRL = (() => {
   const path = new Path2D();
-  for (const p of GLYPHS['hud.storm'] as readonly Prim[]) {
+  for (const p of GLYPHS['hud.storm']) {
     const turn = Number(/rotate\((\d+)/.exec(p.tr ?? '')?.[1] ?? 0);
     path.addPath(new Path2D(p.d), new DOMMatrix().translate(12, 12).rotate(turn).translate(-12, -12));
   }
@@ -204,7 +204,7 @@ export function createGlobe(coasts: readonly Coast[]) {
     afloat.style.top = storm.style.top = `${L.y}px`;
     shut.style.left = `${L.panel.x + L.panel.w - CLOSE * 0.22 * k}px`;
     shut.style.top = `${L.panel.y + CLOSE * 0.22 * k}px`;
-    const dpr = Math.min(devicePixelRatio, 3);
+    const dpr = Math.min(view.dpr, 3);
     for (const el of [canvas, backdrop]) {
       el.width = Math.round(w * dpr);
       el.height = Math.round(h * dpr);

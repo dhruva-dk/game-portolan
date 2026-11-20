@@ -42,7 +42,7 @@ export type Charts = ReturnType<typeof createCharts>;
  * wind: the prevailing wind, along which each chart's x axis is laid.
  */
 export function createCharts(span: number, alike: Likeness, wind: Wind) {
-  const all = anchors(icosphere(FREQUENCY), wind, span, alike);
+  const all: readonly Anchor[] = anchors(icosphere(FREQUENCY), wind, span, alike);
   const width = band(FREQUENCY);
   /** Past the drawn sea, the furthest an anchor can lie and still weigh in somewhere on it. */
   const margin = cover(FREQUENCY) + width;
@@ -80,7 +80,8 @@ export function createCharts(span: number, alike: Likeness, wind: Wind) {
     const s = [float(1), smoothstep(width, 0, arc[1].sub(arc[0])), smoothstep(width, 0, arc[2].sub(arc[0]))];
     const size = sqrt(s[0].add(s[1].mul(s[1])).add(s[2].mul(s[2])));
     const weight = s.map((x) => x.div(size).toVar());
-    if (!gradients) return { index: i, weight, slope: [] as Vec3Node[] };
+    const none: Vec3Node[] = [];
+    if (!gradients) return { index: i, weight, slope: none };
     const away = i.map((k, j) => {
       const t = u.mul(c[j]).sub(centres.element(k).xyz);
       return t.div(max(length(t), 1e-6));
@@ -127,7 +128,7 @@ export function createCharts(span: number, alike: Likeness, wind: Wind) {
 
   return {
     /** Every anchor, as world/lattice.ts placed them: for the CPU's copy of the waves (world/swell.ts). */
-    anchors: all as readonly Anchor[],
+    anchors: all,
     each,
     debug,
     /** Lists the anchors that can weigh in on the sea drawn out to `reach` metres round the point under the eye. */

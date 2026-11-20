@@ -1,5 +1,5 @@
 // The galleon's canvas: a course and a topsail on each of the fore and main masts, a lateen on the mizzen, and a
-// pennant at each masthead. Ported from the galleon branch's rig.ts (the bonaventure's and the spritsail's dropped).
+// pennant at each masthead (no bonaventure, no spritsail).
 //
 // Each sail is one grid of `columns × rows` cells, its vertices row by row from the head (v = 0) to the foot (v = 1),
 // left to right (u = 0 … 1), the pennants' too: the finest level's grids are the cloth simulation's particles
@@ -19,7 +19,7 @@ import { Vector3 } from 'three/webgpu';
 import type { Detail } from './detail.ts';
 import { lerp } from '../world/scalar.ts';
 import { Acc, CLOTH, PIVOT, V, range, sheet } from './kit.ts';
-import { MASTS, deckAt, mastZ, topmastZ, truck, zAt, type MastName } from './lines.ts';
+import { MASTS, MAST_NAMES, deckAt, mastZ, topmastZ, truck, zAt } from './lines.ts';
 
 /** Where each square yard hangs, how long it is, and the sail it sets. */
 export interface Yard {
@@ -66,7 +66,7 @@ export const squarePoint = (Y: Yard, u: number, v: number): Vector3 => {
 };
 
 /** The mizzen's lateen: its yard crossing the mast `y` up, `at` of its length forward of it, raked up aft. */
-export const LATEEN = { mast: 'mizzen' as MastName, y: MASTS.mizzen.top - 2.6, len: 17.5, at: 0.36, rake: 0.95, belly: 1.2, r: 0.17 };
+export const LATEEN = { y: MASTS.mizzen.top - 2.6, len: 17.5, at: 0.36, rake: 0.95, belly: 1.2, r: 0.17 };
 const lateenDir = () => V(0, Math.sin(LATEEN.rake), -Math.cos(LATEEN.rake));
 /** Where the lateen yard crosses the mast, to port of it. */
 export const lateenCross = (): Vector3 => V(MASTS.mizzen.r + 0.2, LATEEN.y, mastZ('mizzen'));
@@ -122,7 +122,7 @@ export function buildSails(cloth: Acc, D: Detail): SailGrid[] {
   cloth.with({ kind: CLOTH.lateen }, () =>
     grids.push(grid(cloth, 'mizzen lateen', D.lateen[0], D.lateen[1], lateenAt, V(1, 0, 0), { z: mastZ('mizzen'), r: MASTS.mizzen.r })));
   if (D.pennant) cloth.with({ kind: CLOTH.pennant }, () => {
-    for (const name of Object.keys(MASTS) as MastName[]) {
+    for (const name of MAST_NAMES) {
       const root = truck(name).add(V(0, 0.05, 0));
       // along it (u) from the truck to its tip, across it (v) down from its upper edge
       const at = (t: number, j: number): SailPoint =>

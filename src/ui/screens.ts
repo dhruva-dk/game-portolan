@@ -15,8 +15,8 @@
 import { clamp } from '../world/scalar.ts';
 import { GILT, INK, PAPER, SHADOW, WASH, alpha, bar, galleon, glyph, paperDisc, parchment, roughRect, svgNode } from './ink.ts';
 import { rhumbs, rose } from './marks.ts';
-import { onTap, region } from './touch.ts';
-import { at, fade, onResize, page, screen, type Page } from './ui.ts';
+import { keep, onTap, region } from './touch.ts';
+import { at, boxOf, fade, onResize, page, screen, type Page } from './ui.ts';
 
 /** Sound and look speed, each 0–1; whether the frame's cost shows in its corner (meter.ts). */
 export interface Settings { sound: number; look: number; stats: boolean }
@@ -129,7 +129,7 @@ function folio(x: number, y: number, w: number, h: number, place: [Parameters<ty
         + `<g id="close">${paperDisc(x + w - 4, y + 4, 19)}${glyph('menu.close', x + w - 4, y + 4, 20)}</g>`), (el) => {
         const inner = el.querySelector<SVGGElement>('#folio')!;
         inner.style.pointerEvents = 'auto';
-        inner.addEventListener('pointerdown', (e) => e.stopPropagation());
+        keep(inner);
         region(el, 'close', close);
         bind?.(el);
       });
@@ -167,8 +167,8 @@ export function createSettings(get: () => Settings, set: (s: Settings) => void, 
       for (const id of ['sound', 'look'] as const) {
         const row = region(el, id, (e) => {
           // where along the bar: its hit box runs 6 units before the bar's 200 and 8 past it
-          const box = row!.getBoundingClientRect(), bx = 6 / 214;
-          const t = clamp(((e.clientX - box.left) / box.width - bx) / (200 / 214));
+          const bar = boxOf(row!), bx = 6 / 214;
+          const t = clamp(((e.clientX - bar.left) / bar.width - bx) / (200 / 214));
           set({ ...get(), [id]: Math.round(t * 20) / 20 });
           draw();
         });

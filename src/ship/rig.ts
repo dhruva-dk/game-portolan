@@ -1,4 +1,4 @@
-// The galleon's rig, ported from the galleon branch: three masts — the fore and main with lower masts, plain tops,
+// The galleon's rig: three masts — the fore and main with lower masts, plain tops,
 // topmasts, crosstrees and topgallant poles, the mizzen with a pole topmast — a plain bowsprit, the yards, and the
 // ropes: shrouds set up with deadeyes on channels (no ratlines), stays forward, and the running lines (ties, lifts,
 // clewlines, sheets, tacks, braces). The sails themselves are sails.ts's.
@@ -11,23 +11,21 @@
 import { Vector3 } from 'three/webgpu';
 import type { Detail } from './detail.ts';
 import { Acc, KIND, PIVOT, V, along, beam, box, lathe, range, rod, rope, trs, tube } from './kit.ts';
-import { BOWSPRIT, LEN, MASTS, deckAt, halfAt, mastFoot, mastZ, poleZ, sideTop, sprit, topmastZ, zAt, type MastName } from './lines.ts';
+import { BOWSPRIT, LEN, MASTS, MAST_NAMES, deckAt, halfAt, mastFoot, mastZ, poleZ, sideTop, sprit, topmastZ, zAt, type MastName } from './lines.ts';
 import { LATEEN, YARDS, arm, lateenClew, lateenCross, lateenPeak, lateenTack, squarePoint, type Yard } from './sails.ts';
 
 /** Each top's radius, and how many shrouds a side each mast has. */
 const TOP_R: Record<MastName, number> = { main: 2.0, fore: 1.75, mizzen: 1.15 };
 const SHROUDS: Record<MastName, number> = { main: 6, fore: 5, mizzen: 4 };
-const NAMES = Object.keys(MASTS) as MastName[];
-
 export function buildRig(body: Acc, ropes: Acc, D: Detail): void {
   body.with({ kind: KIND.spar }, () => {
-    for (const m of NAMES) mast(body, D, m);
+    for (const m of MAST_NAMES) mast(body, D, m);
     bowsprit(body, D);
     lateenYard(body, D);
   });
   for (const Y of YARDS) yard(body, ropes, D, Y);
   if (D.ropes === 'none') return;
-  for (const m of NAMES) shrouds(body, ropes, D, m);
+  for (const m of MAST_NAMES) shrouds(body, ropes, D, m);
   stays(ropes, D);
   if (D.ropes === 'running') lateenLines(ropes, D);
 }

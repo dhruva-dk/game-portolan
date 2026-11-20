@@ -1,6 +1,6 @@
 // The galleon's geometry kit: an accumulator per draw (body, sails, ropes) and the few shapes everything on her is
-// made of — lofted sheets, tubes along a path, lathed profiles, boxes and hanging ropes. Ported from the galleon
-// branch's mesh.ts; pure arithmetic (three's math classes only, no renderer), so it runs in node for the tests.
+// made of — lofted sheets, tubes along a path, lathed profiles, boxes and hanging ropes. Pure arithmetic (three's math
+// classes only, no renderer), so it runs in node for the tests.
 //
 // Every vertex carries, besides its position, normal and uv, what the shaders need to know about it, set on the
 // accumulator as a brush before a shape is drawn:

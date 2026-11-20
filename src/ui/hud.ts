@@ -31,17 +31,15 @@
 //
 // It reads a plain HudState each frame and redraws a piece only when what it shows has changed.
 
-import { hexToLinear, linearToCss } from '../colour.ts';
 import { HOTBAR, type GunKind, type Kit, type Status } from '../player.ts';
-import { RARITY } from '../rarity.ts';
 import type { Sea } from '../snapshot.ts';
 import { clamp, lerp } from '../world/scalar.ts';
 import type { Shores } from './coasts.ts';
 import type { Glyph } from './glyphs.ts';
-import { DUSK, GILT, INK, PAPER, WASH, alpha, bar, figure, glyph, paperDisc, ring as sweep, slip, svg } from './ink.ts';
+import { DUSK, GILT, INK, PAPER, RARITY, WASH, alpha, bar, figure, glyph, paperDisc, ring as sweep, slip, svg } from './ink.ts';
 import { createJuice } from './juice.ts';
 import { createMinimap, type More } from './minimap.ts';
-import { onTap } from './touch.ts';
+import { onHold, onTap } from './touch.ts';
 import { piece, show, view } from './ui.ts';
 
 /** What the HUD shows: the match as the game reports it, and what she carries. */
@@ -67,8 +65,6 @@ const RETICLE = 10, LOCKED = 0.75, FALL = 4, SPREAD = 48;
 const RIM = [0.35, 1] as const, RIM_DEEP = 80;
 /** The share of the arrival (play/arrival.ts ARRIVAL.seconds, 2.8 s) over whose last the HUD fades in. */
 const FADE = 0.25;
-/** A display colour, 0xrrggbb, as css. */
-const css = (hex: number) => linearToCss(hexToLinear(hex));
 
 /** m:ss */
 export const clock = (s: number) => {
@@ -112,12 +108,7 @@ export function createHud(layer: HTMLElement, shores: Shores, act: HudActions) {
     + `box-shadow:inset 0 0 calc(80px * var(--k)) calc(18px * var(--k)) ${alpha(DUSK, 0.6)}`;
   body.prepend(rim);
   // fired as the thumb comes down, and held till it lifts; the touch kept from the canvas
-  fire.addEventListener('pointerdown', (e) => {
-    e.stopPropagation();
-    fire.setPointerCapture(e.pointerId);
-    act.fire(true);
-  });
-  for (const lift of ['pointerup', 'pointercancel', 'lostpointercapture'] as const) fire.addEventListener(lift, () => act.fire(false));
+  onHold(fire, act.fire);
   const hotbar = piece(body, 'bottom centre', false, true);
 
   const drawMap = createMinimap(map, MINIMAP, shores);
@@ -302,7 +293,7 @@ export function createHud(layer: HTMLElement, shores: Shores, act: HudActions) {
         const ink = k ? RARITY[k.rarity] : undefined, low = !!k && k.rounds === 0, mine: Glyph = k ? mark(k.kind) : item!.item;
         el.innerHTML = svg(SLOT, SLOT, slip(0, 0, SLOT, SLOT, { fill: chosen ? GILT : 'url(#pg)', bold: chosen })
           + (chosen ? `<rect x="2" y="2" width="${SLOT - 4}" height="${SLOT - 4}" fill="none" stroke="${WASH.gold}" stroke-width="${gun ? 2.6 : 1.6}"/>` : '')
-          + (ink !== undefined ? `<rect x="9" y="${SLOT - 9}" width="${SLOT - 18}" height="4" fill="${css(ink)}" stroke="${INK.iron}" stroke-width=".6"/>` : '')
+          + (ink !== undefined ? `<rect x="9" y="${SLOT - 9}" width="${SLOT - 18}" height="4" fill="${ink}" stroke="${INK.iron}" stroke-width=".6"/>` : '')
           + glyph(mine, SLOT / 2 - 3, SLOT / 2 - (ink !== undefined ? 3 : 0), 31)
           + (count != null ? figure(SLOT - 4, SLOT / 2 + 12, count, 17, { fill: low ? INK.rubric : INK.iron, anchor: 'end' }) : '')
           + (used >= 0 ? sweep(SLOT / 2, SLOT / 2, SLOT / 2 - 6, used / 32, reload >= 0 && !(chosen && s.using !== null) ? INK.rubric : WASH.gold, 3.5) : '')

@@ -23,7 +23,8 @@ import { createHud, type HudState } from './ui/hud.ts';
 import { createTitle } from './ui/screens.ts';
 import { createInput } from './ui/input.ts';
 import { createStick } from './ui/stick.ts';
-import { uiLayer } from './ui/ui.ts';
+import { onPressed } from './ui/touch.ts';
+import { onResize, uiLayer, view } from './ui/ui.ts';
 import { MEAN, SWING } from './world/weather.ts';
 
 /** The release's setup. */
@@ -86,8 +87,11 @@ async function stage(setup: Setup): Promise<Stage> {
     matches: createMatches(setup.seed, world.planet, setup.hold, setup.gun),
     async draw(next: (dt: number) => Snapshot, drawn?: (canvas: HTMLCanvasElement) => void) {
       console.info(`ground baked in ${(await frame.ready).toFixed(0)} ms`);
-      frame.resize(innerWidth, innerHeight);
-      addEventListener('resize', () => frame.resize(innerWidth, innerHeight));
+      // the canvas the screen's size, as the UI's layer finds it (made first, if the debug page drew without it)
+      uiLayer();
+      const fit = () => frame.resize(view.w, view.h);
+      fit();
+      onResize(fit);
       let last = performance.now(), first = true;
       renderer.setAnimationLoop(() => {
         const now = performance.now();
@@ -125,7 +129,7 @@ async function play(s: Stage): Promise<Played> {
   const globe = createGlobe(shores.coasts);
   // what the HUD reads, the match's and her kit's in one object refilled each frame
   const status: HudState = Object.assign({}, game.status(), game.kit());
-  const hudState = (): HudState => Object.assign(status, game.status(s.canvas.clientWidth, s.canvas.clientHeight), game.kit());
+  const hudState = (): HudState => Object.assign(status, game.status(view.w, view.h), game.kit());
   const map = () => globe.show(hudState());
   const hud = createHud(layer, shores, { slot: input.tap, gust: input.gust, fire: input.fire, map });
   // the sound, begun on her first touch, hearing what it does in one object refilled each frame
@@ -144,9 +148,7 @@ async function play(s: Stage): Promise<Played> {
     switch: (by) => referee.switch(by),
   }, title);
   // a tick for each tap on something of the UI's
-  layer.addEventListener('pointerdown', (e) => {
-    if (e.target instanceof Element && e.target.closest('.press')) audio.tap(flow.screen);
-  }, true);
+  onPressed(layer, () => audio.tap(flow.screen));
   void s.ready.then(() => {
     flow.ready();
     loaded('title');

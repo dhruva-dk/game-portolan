@@ -1,4 +1,4 @@
-// The galleon's hull and what is fixed to it, ported from the galleon branch: the planked skin and flat transom,
+// The galleon's hull and what is fixed to it: the planked skin and flat transom,
 // the wales and the painted strakes over them (the captain's colour), the solid bulwarks with their cap rail, the
 // decks and the bulkheads where they step, the transom's framing (gilt rails, dark stiles, panels of upright
 // planking, a frieze in her colour) and crest, the rudder, the beakhead (bare: no figure), the catheads and anchors,
@@ -271,7 +271,7 @@ function stern(acc: Acc): void {
 // ---------------------------------------------------------------- the rudder
 
 /** The rudder hung on the sternpost, tapering from 1.5 m at its foot to 0.55 at its head, capped; at the finest level
- * its iron straps (the pintles' and gudgeons', as the galleon branch has them). */
+ * its iron straps (the pintles' and gudgeons'). */
 function rudder(acc: Acc, D: Detail): void {
   const y0 = keel(0) + 0.1, y1 = mainDeck(0) + 0.9;
   const width = (y: number) => lerp(1.5, 0.55, (y - y0) / (y1 - y0));

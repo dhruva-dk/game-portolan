@@ -122,7 +122,7 @@ export function createGame(world: World, anchors: readonly Anchor[], waters: Wat
   };
 
   /** The storm's calm as the HUD last read it (a new object only when it has moved or changed by a metre). */
-  let calm = { centre: [0, 0, 1] as Vec3, radius: -1 };
+  let calm: { centre: Vec3; radius: number } = { centre: [0, 0, 1], radius: -1 };
 
   /** What the HUD reads (status), and what she carries (kit), as last reported: one object each, refilled each time,
    *  with what hangs off them (the gun in hand, the reticle and its fall, the calm the storm next closes to, the

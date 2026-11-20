@@ -88,7 +88,7 @@ export const ICE = tones('#8FE0F5', '#3F8FC9');
 /** A highlight on ice: white. */
 export const GLINT = ink('#FFFFFF');
 /** The light each rarity glows with on the water (its rim, its ring), worst to best: grey, green, blue, purple, gold
- *  (rarity.ts RARITY: the same rarities' inks on the chart). */
+ *  (ui/ink.ts RARITY: the same rarities' inks on the chart). */
 export const RARITY_GLOW: readonly Rgb[] = ['#C9D1DA', '#55E05A', '#3AA0FF', '#B85CFF', '#FFA21F'].map((hex) => ink(hex));
 
 // ---- the grade's lifted blacks (post/grade.ts fadeTo)

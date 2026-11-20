@@ -1,14 +1,11 @@
-// The guns as they are drawn, on a ship's plinth (arms.ts) and floating as loot (loot/loot.ts): their shapes
-// (gun-shape.ts, plain arithmetic that runs in node), and how they take the light.
+// How the guns take the light, on a ship's plinth (arms.ts) and floating as loot (loot/loot.ts); their shapes are
+// gun-shape.ts's (plain arithmetic that runs in node).
 
 import { select, vec3 } from 'three/tsl';
 import { CREAM, GILDING, IRON, TIMBER, type Rgb, type Tones } from '../palette.ts';
 import type { Light } from '../sky/light.ts';
 import type { FloatNode, Vec3Node } from '../tsl.ts';
 import { METAL } from './gun-shape.ts';
-
-// (the shape as loot/loot.ts takes it, its layer reaching ship/ only through this file)
-export { gunShape } from './gun-shape.ts';
 
 /** A gun's colour at world place `p`, normal `n` (unit), its part made of `made` (METAL), lit as everything is
  *  (sky/light.ts), in two tones: the bronze gilded and the iron gunmetal, each with its hard highlight; the oak

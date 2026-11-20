@@ -28,8 +28,8 @@ const GUTTER = 16, INSET = 2;
  */
 const size = (width: number, height: number) => Math.min(height / DRAWN.h, width / LEAST);
 
-/** The screen now, CSS px, and the UI's size on it: kept by the one resize listener. */
-export const view = { w: 0, h: 0, k: 1 };
+/** The screen now, CSS px, the UI's size on it and the device's pixels to a CSS px: kept by the one resize listener. */
+export const view = { w: 0, h: 0, k: 1, dpr: 1 };
 
 /** The safe area's insets, CSS px. */
 export interface Insets { top: number; right: number; bottom: number; left: number }
@@ -101,8 +101,7 @@ export function fade(el: HTMLElement, on: boolean, ms = FADE) {
     if (el.hidden) {
       el.style.opacity = '0';
       el.hidden = false;
-      // (a reflow, so it is laid out at nothing and fades from there: the usual way to start a transition)
-      void el.offsetWidth;
+      reflow(el);
     }
     el.style.opacity = '1';
   } else {
@@ -113,6 +112,14 @@ export function fade(el: HTMLElement, on: boolean, ms = FADE) {
     }, ms));
   }
 }
+
+/** Lays `el` out now, as it stands: a transition begun after it starts from there (the usual way to start one). */
+export function reflow(el: HTMLElement) {
+  void el.offsetWidth;
+}
+
+/** Where `el` stands on the screen now, CSS px. It asks the page to lay itself out: on a touch, never each frame. */
+export const boxOf = (el: Element): DOMRect => el.getBoundingClientRect();
 
 /** What is told when the screen changes size, after `view` is. */
 const resizes = new Set<() => void>();
@@ -140,7 +147,7 @@ export function uiLayer(): HTMLElement {
   document.body.appendChild(el);
   layer = el;
   const resized = () => {
-    [view.w, view.h, view.k] = [innerWidth, innerHeight, size(innerWidth, innerHeight)];
+    [view.w, view.h, view.k, view.dpr] = [innerWidth, innerHeight, size(innerWidth, innerHeight), devicePixelRatio];
     el.style.setProperty('--k', view.k.toFixed(4));
     for (const fn of resizes) fn();
   };

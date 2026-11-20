@@ -21,7 +21,7 @@ import { R, along, dot, normalize, rotateAbout, scale, tangentAt, type Vec3 } fr
 import type { Crew } from './battle.ts';
 import type { Vessel } from './contact.ts';
 import { gunOf } from './gun.ts';
-import { KINDS as GUN_KINDS, isGun, type GunKind } from '../kinds.ts';
+import { KINDS as GUN_KINDS, STORES, isGun, type GunKind } from '../kinds.ts';
 import { EQUIP, GUN, SHIP } from './handling.ts';
 import { roomFor, stowed, USES, type Use } from './hold.ts';
 import type { Depth } from './shoal.ts';
@@ -35,9 +35,9 @@ export const LOOT = {
    *  harpoon, mortar), and their rarities' weights, common to legendary. */
   gun: 0.5, kinds: [36, 22, 22, 10, 10], weights: [42, 30, 17, 8, 3],
   /** The share of the rest of each consumable, how many come together, and the rarity each reads as. */
-  shares: { smallShield: 0.36, repairKit: 0.22, bigShield: 0.28, fullRepair: 0.14 } as Record<Use, number>,
-  counts: { smallShield: 3, bigShield: 1, repairKit: 4, fullRepair: 1 } as Record<Use, number>,
-  rarity: { smallShield: 1, bigShield: 2, repairKit: 1, fullRepair: 3 } as Record<Use, number>,
+  shares: { smallShield: 0.36, repairKit: 0.22, bigShield: 0.28, fullRepair: 0.14 } satisfies Record<Use, number>,
+  counts: { smallShield: 3, bigShield: 1, repairKit: 4, fullRepair: 1 } satisfies Record<Use, number>,
+  rarity: { smallShield: 1, bigShield: 2, repairKit: 1, fullRepair: 3 } satisfies Record<Use, number>,
   /** Metres from her centre she picks a piece up within; seconds a piece put over the side lies before its ship may
    *  take it back; how fast a kicked piece's way dies, per second; and the kick a spilled piece is given, m/s, more for
    *  each slot down. */
@@ -67,7 +67,6 @@ export interface Loot { id: number; at: Vec3; goods: Goods; from: number; age: n
 export interface Flotsam { pieces: readonly Loot[]; next: number }
 
 const STILL: Vec3 = [0, 0, 0];
-const KINDS = Object.keys(LOOT.shares) as Use[];
 
 /** The rarity a piece reads as (its colour): a gun's own, a consumable's by kind. */
 export const rarityOf = (g: Goods) => (isArms(g) ? g.rarity : LOOT.rarity[g.kind]);
@@ -87,7 +86,7 @@ const gunned = (u: number, v: number): Arms =>
 export function rolled(draw: () => number): Goods {
   if (draw() < LOOT.gun) return gunned(draw(), draw());
   let r = draw();
-  for (const kind of KINDS) {
+  for (const kind of STORES) {
     if (r < LOOT.shares[kind]) return { kind, count: LOOT.counts[kind] };
     r -= LOOT.shares[kind];
   }

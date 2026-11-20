@@ -20,7 +20,7 @@
 
 import { R, add, dot, length, normalize, scale, type Vec3 } from '../world/sphere.ts';
 import { KEEL, RADIUS } from './contact.ts';
-import { KINDS, type GunKind } from '../kinds.ts';
+import { perKind, type GunKind } from '../kinds.ts';
 import { GUN, GUNS, SHIP } from './handling.ts';
 import type { ShipState } from './ship.ts';
 import type { Depth } from './shoal.ts';
@@ -55,10 +55,10 @@ const nuFor = (metres: number) => {
   return (2 * s) / (1 + s);
 };
 /** Each kind's ν at its muzzle speed, and its pull, m³/s² (MU / r² at r). */
-const PULL = Object.fromEntries(KINDS.map((k) => {
+const PULL = perKind((k) => {
   const nu = nuFor(GUNS[k].carry);
-  return [k, { nu, mu: (GUNS[k].speed * GUNS[k].speed * MUZZLE) / nu }];
-})) as Record<GunKind, { nu: number; mu: number }>;
+  return { nu, mu: (GUNS[k].speed * GUNS[k].speed * MUZZLE) / nu };
+});
 
 /** Metres along the sea at which a ball with speed ratio ν fired at `elevation` comes back to the muzzle's height. */
 const carried = (nu: number, elevation: number) => {

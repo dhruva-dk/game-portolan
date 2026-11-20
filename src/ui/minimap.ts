@@ -66,7 +66,7 @@ export function createMinimap(host: HTMLElement, size: number, { coasts, ground 
   rim.style.position = 'absolute';
   const canvas = document.createElement('canvas');
   // its pixels as many as it is shown at, grown by the UI's size (ui.ts)
-  const dpr = Math.min(devicePixelRatio * view.k, 4);
+  const dpr = Math.min(view.dpr * view.k, 4);
   canvas.width = canvas.height = Math.round(inner * 2 * dpr);
   canvas.style.cssText = `position:absolute;left:${r - inner}px;top:${r - inner}px;width:${inner * 2}px;height:${inner * 2}px;border-radius:50%`;
   // north on the rim, and her arrowhead, over the canvas

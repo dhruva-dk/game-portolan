@@ -63,7 +63,8 @@ export type Waves = ReturnType<typeof createWaves>;
 
 export function createWaves() {
   // each cascade's h₀ stacked: cascade c in rows c·N … c·N + N − 1
-  const initial = new DataTexture(new Float32Array(AREA * COUNT * 4), SIZE, SIZE * COUNT, RGBAFormat, FloatType);
+  const spectra = new Float32Array(AREA * COUNT * 4);
+  const initial = new DataTexture(spectra, SIZE, SIZE * COUNT, RGBAFormat, FloatType);
   const time = uniform(0);
   /** Half the sea's significant height: about how high a crest stands. */
   const amplitude = uniform(1);
@@ -206,7 +207,7 @@ export function createWaves() {
       // a new sea only when its wind changes; the same seeds keep the waves where they are
       if (Math.abs(sea.wind - wind) > 0.05) {
         wind = sea.wind;
-        const data = initial.image.data as Float32Array;
+        const data = spectra;
         held = 0;
         CASCADES.forEach((L, c) => {
           data.set(initialSpectrum(SIZE, L, sea, c + 1, BANDS[c]), c * AREA * 4);

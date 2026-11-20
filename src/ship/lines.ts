@@ -1,4 +1,4 @@
-// The galleon's lines, ported from the galleon branch. Drawn as the shipwright's drawings give them, in design
+// The galleon's lines, drawn as the shipwright's drawings give them, in design
 // metres (a 30 m waterline): build.ts scales the whole ship by SCALE as it packs her, so every number here and in
 // hull.ts and rig.ts is in design metres. Her own frame: +y up from the waterline, +z to the bow, +x to port. A
 // station s runs from the transom (0) to the stem (1).
@@ -88,6 +88,10 @@ export const onSkin = (s: number, y: number, side: number, out = V()): Vector3 =
 /** The breadth inside the side at a height (the planking's thickness taken off). */
 export const inside = (s: number, y: number): number => Math.max(0, halfAt(s, y) - 0.14);
 
+/** The masts, forward to aft. */
+export const MAST_NAMES = ['fore', 'main', 'mizzen'] as const;
+export type MastName = (typeof MAST_NAMES)[number];
+
 /**
  * Where the masts step, and each one's heights over the waterline: the lower mast's top, the topmast's crosstrees
  * (none on the mizzen, whose topmast is a pole) and the truck at its tip.
@@ -96,8 +100,7 @@ export const MASTS = {
   fore: { s: 0.8, top: 15.6, cross: 25.2, tip: 31.5, r: 0.36 },
   main: { s: 0.535, top: 16.8, cross: 27.6, tip: 35.5, r: 0.44 },
   mizzen: { s: 0.275, top: 13.6, cross: 0, tip: 20.5, r: 0.28 },
-} as const;
-export type MastName = keyof typeof MASTS;
+} as const satisfies Record<MastName, { s: number; top: number; cross: number; tip: number; r: number }>;
 export const mastZ = (name: MastName): number => zAt(MASTS[name].s);
 export const mastFoot = (name: MastName): Vector3 => V(0, deckAt(MASTS[name].s), mastZ(name));
 /** How far forward of the lower mast its topmast stands (held there by the cap). */

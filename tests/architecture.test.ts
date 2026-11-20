@@ -31,14 +31,13 @@ const LAYERS: Record<string, readonly string[]> = {
   'snapshot.ts': ['world/', 'sim/storm.ts', 'kinds.ts'],
   'player.ts': ['world/', 'kinds.ts'],
   // the rarities' inks, for the two that draw them
-  'rarity.ts': [],
   // sRGB to linear light and back, written once: for the palette, what draws the world and the UI
   'colour.ts': ['world/scalar.ts'],
   // every colour of the world, named once, for what draws the world and for the ships' colours (play/colours.ts)
   'palette.ts': ['colour.ts'],
   'environment.ts': ['world/'],
   // the UI draws plain data: of the sim only the storm's Cap (the full map inks it)
-  'ui/': ['ui/', 'world/', 'sim/storm.ts', 'snapshot.ts', 'player.ts', 'rarity.ts', 'kinds.ts', 'colour.ts'],
+  'ui/': ['ui/', 'world/', 'sim/storm.ts', 'snapshot.ts', 'player.ts', 'kinds.ts', 'colour.ts'],
   // the sound: hears what the frame draws and the HUD reads, and the screen shown (player.ts Screen)
   'audio/': ['audio/', 'world/', 'snapshot.ts', 'player.ts', 'kinds.ts'],
   // the game runs the sim and says what to draw and show, as plain data
@@ -52,7 +51,7 @@ const LAYERS: Record<string, readonly string[]> = {
   // the post chain's steps (grade, bloom, film): nodes over the frame's light, composed by the frame
   'post/': ['post/', 'three', 'tsl.ts', 'world/scalar.ts', 'colour.ts', 'palette.ts'],
   // the loot on the water, its pieces and their beacons
-  'loot/': ['loot/', ...RENDER, 'view/view.ts', 'rarity.ts', 'ship/gun-shape.ts', 'kinds.ts'],
+  'loot/': ['loot/', ...RENDER, 'view/view.ts', 'ship/gun.ts', 'ship/gun-shape.ts', 'kinds.ts'],
   'water/': [
     'water/', ...RENDER, 'view/', 'sky/sky.ts', 'land/ground.ts', 'ship/build.ts', 'ship/materials.ts', 'ship/waterline.ts', 'sim/wake.ts',
   ],
@@ -152,7 +151,7 @@ test('frame: the frame draws a snapshot; it alone makes the camera, works out th
   none('frame', hits(/\btypeof\s+createFrame\b/, notFrame), "the frame's type named outside src/frame.ts");
   // what the rest of the game may ask of the frame: no camera, scene, sky, fleet or gunfire of its to reach into
   const caller = (rel: string) => rel === 'main.ts' || rel === 'debug.ts' || rel.startsWith('play/') || rel.startsWith('ui/');
-  none('frame', hits(/\bframe\s*\??\.\s*(?!(resize|render|ready|anchors)\b)\w/, caller), 'frame.<x> other than resize, render, ready and anchors');
+  none('frame', hits(/(?<![\w/.'"-])frame\s*\??\.\s*(?!(resize|render|ready|anchors)\b)\w/, caller), 'frame.<x> other than resize, render, ready and anchors');
   // the environment is plain data built each frame, written by nobody
   none('frame', hits(/\benv\s*\.\s*\w+\s*(\+|-|\*|\/)?=(?!=)/), 'a write to the environment');
 });
@@ -214,7 +213,7 @@ test("colour: luma is three's luminance(), and only the excepted move a colour t
 
 test('citations: comments say why, not which review, reference or other codebase asked', () => {
   // raw text, comments and all: a review round, a reference image, the prototype this was ported from, a commit's hash
-  const CITED = /\breview\s*#?\d|\bround\s*#?\d+\b(?!\s*(trip|off|up|down))|idea\.png|art\/target|reference image|\btarget\.png\b|\b0117\b|agent-initial|\bold game\b|\bcommit\s+[0-9a-f]{7,40}\b|(?<![0-9a-fx#])\b(?=[0-9a-f]*[a-f])(?=[0-9a-f]*\d)[0-9a-f]{7,12}\b(?![0-9a-f])/i;
+  const CITED = /\breview\s*#?\d|\bround\s*#?\d+\b(?!\s*(trip|off|up|down))|idea\.png|art\/target|reference image|\btarget\.png\b|\b0117\b|agent-initial|\bold game\b|\bported from\b|\bthe [\w-]+ branch\b|\bcommit\s+[0-9a-f]{7,40}\b|(?<![0-9a-fx#])\b(?=[0-9a-f]*[a-f])(?=[0-9a-f]*\d)[0-9a-f]{7,12}\b(?![0-9a-f])/i;
   const found = [...files, ...everywhere.filter((f) => f.at.startsWith('tools/'))].flatMap((f) => f.text.split('\n').flatMap((line, i) =>
     CITED.test(line) ? [{ file: f.at, line: i + 1, text: line.trim() }] : []));
   none('citations', found, 'a review round, reference image, other codebase or commit named');

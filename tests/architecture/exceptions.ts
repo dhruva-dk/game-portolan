@@ -30,6 +30,13 @@ export const EXCEPTIONS: readonly Exception[] = [
   { rule: 'camera', file: 'src/meter.ts', why: 'the meter measures what the frame drew from its eye; it reads, never moves, the camera' },
   { rule: 'camera', file: 'src/land/shadow.ts', why: "the shadow map's camera is its own, orthographic, looking down on what it maps" },
 
+  // the meter's panel, its pointers and three's types filled in
+  { rule: 'markup', file: 'src/meter.ts', why: "the meter's panel, written from its own numbers each half second; not the UI's, as it measures the UI too" },
+  { rule: 'pointers', file: 'src/ui/globe.ts', why: "the full map's spin and pinch: fingers followed together, told from a tap by touch.ts dragged" },
+  { rule: 'pointers', file: 'src/fly.ts', why: "the debug page's free eye, turned by a mouse drag; never in the release" },
+  { rule: 'casts', file: 'src/ship/wood.ts', at: 1, why: "Object.keys is string[] by TypeScript's design; KIND is a closed literal, its keys exactly these" },
+  { rule: 'primitives', file: 'src/tsl.ts', three: '0.187.0', why: "three's types leave out TSL nodes it exports (the types are filled in where tsl.ts names them)" },
+
   // exports only the tests or tools take: each the plain form of what the game runs, for them to read it through
   { rule: 'exports', file: 'src/audio/cues.ts', name: 'DEEDS', why: 'every kind of deed, for the test that each has its cue' },
   { rule: 'exports', file: 'src/sim/route.ts', name: 'chart', why: 'the chart baked in-process for the tests and tools; the game bakes the same in its worker (play/sounding.ts)' },
@@ -51,7 +58,7 @@ export const EXCEPTIONS: readonly Exception[] = [
 
   // over the parameter limit, at what they took
   ...([
-    ['src/audio/dsp.ts', 'design', 6], ['src/audio/dsp.ts', 'filter', 7], ['src/audio/dsp.ts', 'slips', 6], ['src/audio/dsp.ts', 'bubbles', 7],
+    ['src/audio/dsp.ts', 'filter', 7], ['src/audio/dsp.ts', 'slips', 6], ['src/audio/dsp.ts', 'bubbles', 7],
     ['src/audio/dsp.ts', 'crackle', 6], ['src/audio/sounds/blows.ts', 'timber', 7], ['src/land/site.ts', 'standing', 6],
     ['src/ship/kit.ts', 'rod', 8], ['src/ship/kit.ts', 'rope', 7], ['src/ship/kit.ts', 'box', 6], ['src/ship/kit.ts', 'beam', 7],
     ['src/sim/battle.ts', 'stepBattle', 7], ['src/sim/bot.ts', 'think', 6], ['src/sim/gun.ts', 'chosen', 6], ['src/sim/gun.ts', 'laid', 8],

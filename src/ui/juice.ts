@@ -20,7 +20,7 @@ import { createFlash, PICKUP, SCREEN } from './flash.ts';
 import { createHits } from './hits.ts';
 import { LIGHT, glyph, svgNode } from './ink.ts';
 import type { Glyph } from './glyphs.ts';
-import { view } from './ui.ts';
+import { boxOf, view } from './ui.ts';
 
 /** The HUD's pieces it moves: the vitals slip, the Fire and Gust discs, and the hotbar's slots (gun's first). */
 interface Parts { vitals: HTMLElement; fire: HTMLElement; gust: HTMLElement; slots: readonly HTMLElement[] }
@@ -52,8 +52,8 @@ export function createJuice(body: HTMLElement, parts: Parts) {
 
   /** The piece's mark flown from `from` (CSS px) to the slot, drawn at the drawn size and grown by the UI's size. */
   const fly = (name: Glyph, from: { x: number; y: number } | null, slot: HTMLElement) => {
-    const box = slot.getBoundingClientRect(), home = body.getBoundingClientRect(), k = view.k;
-    const to = { x: box.left - home.left + box.width / 2, y: box.top - home.top + box.height / 2 };
+    const there = boxOf(slot), home = boxOf(body), k = view.k;
+    const to = { x: there.left - home.left + there.width / 2, y: there.top - home.top + there.height / 2 };
     const start = from ?? { x: home.width / 2, y: home.height * 0.6 };
     const el = svgNode(44, 44, glyph(name, 22, 22, 34));
     el.style.cssText = 'position:absolute;left:0;top:0;margin:-22px 0 0 -22px';

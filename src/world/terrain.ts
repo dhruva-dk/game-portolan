@@ -43,7 +43,7 @@ export const TERRAIN = {
   /** The beach's slope at the waterline, and the berm it levels at, metres. */
   beach: 1 / 8, berm: 1.5,
   /** The banks' depth, shallowest to deepest, metres. */
-  bank: [4, 16] as readonly [number, number],
+  bank: [4, 16] satisfies readonly [number, number],
 };
 
 type TerrainOptions = typeof TERRAIN;

@@ -27,6 +27,29 @@ export function onTap(el: GlobalEventHandlers, act: (e: PointerEvent) => void) {
   });
 }
 
+/** Calls `held(true)` as a touch comes down on `el` and `held(false)` as it lifts, wherever it has gone meanwhile (the
+ *  element keeps it); the touch kept from whatever is under it. */
+export function onHold(el: HTMLElement, held: (on: boolean) => void) {
+  el.addEventListener('pointerdown', (e) => {
+    e.stopPropagation();
+    el.setPointerCapture(e.pointerId);
+    held(true);
+  });
+  for (const lift of ['pointerup', 'pointercancel', 'lostpointercapture'] as const) el.addEventListener(lift, () => held(false));
+}
+
+/** Keeps a touch on `el` from whatever is under it, doing nothing with it (a sheet's paper, under its own taps). */
+export function keep(el: Element) {
+  el.addEventListener('pointerdown', (e) => e.stopPropagation());
+}
+
+/** Calls `act` as a touch comes down on anything of `layer`'s that takes one (`.press`), before that thing hears it. */
+export function onPressed(layer: HTMLElement, act: () => void) {
+  layer.addEventListener('pointerdown', (e) => {
+    if (e.target instanceof Element && e.target.closest('.press')) act();
+  }, true);
+}
+
 /** A part of a sheet's drawing, by its id, made to take a tap; the part, if there is one. */
 export function region(el: SVGSVGElement, id: string, act: (e: PointerEvent) => void): SVGElement | null {
   const r = el.querySelector<SVGElement>(`#${id}`);

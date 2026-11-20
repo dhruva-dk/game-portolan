@@ -147,7 +147,7 @@ export function createWake(view: View, sky: Sky, capacity: number) {
   // (unused: every draw places itself on the map)
   const camera = new OrthographicCamera();
   /** The map's draw, cleared to nothing: no foam, no height, no air, no shadow. */
-  const draw: Draw = { scene, camera, target, clear: { color: 0x000000, alpha: 0 } };
+  const draw: Draw = { scene, camera, target, clear: { color: 0, alpha: 0 } };
   /** 1 while the map holds this frame's marks, 0 while no ship is near enough to draw any. */
   const live = uniform(0);
   /** How rough the sea is, 0…1, by the wind. */

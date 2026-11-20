@@ -4,7 +4,7 @@
 // fading in or out over it is seen whole. (Home from a match goes under the title instead: passage.ts.)
 
 import { FADE } from './ways.ts';
-import { fade, uiLayer } from './ui.ts';
+import { fade, reflow, uiLayer } from './ui.ts';
 
 export function createVeil() {
   const held = document.createElement('canvas');
@@ -35,8 +35,8 @@ export function createVeil() {
       held.hidden = false;
       held.classList.remove('gone');
       act();
-      // (a reflow, so it is laid out whole before it fades: the usual way to start a transition)
-      void held.offsetWidth;
+      // (laid out whole before it fades)
+      reflow(held);
       fade(held, false, FADE + 80);
     },
   };
