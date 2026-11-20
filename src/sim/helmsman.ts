@@ -10,6 +10,7 @@
 //
 // Pure arithmetic: no three, so it runs in node for the tests; deterministic for the same inputs, to the bit.
 
+import { STRIDE } from '../world/random.ts';
 import { add, apart, along, cross, distance, dot, length, normalize, scale, toward, transport, type Vec3 } from '../world/sphere.ts';
 import { inHand } from './battle.ts';
 import { gap } from './contact.ts';
@@ -129,7 +130,7 @@ function answer(c: Ctx): number | null {
     if (length(add(r, rel, when)) > BOT.miss) continue;
     const bearing = offCourse(own.ship, t);
     if (m.mode === 'fight' && o.id === m.foe && Math.abs(bearing) < 0.5) continue;
-    if (unitHash(c.seed, o.id * 7919 + Math.floor(m.clock / BOT.warn)) > 0.2 + 0.75 * c.t.skill) continue;
+    if (unitHash(c.seed, o.id * STRIDE +Math.floor(m.clock / BOT.warn)) > 0.2 + 0.75 * c.t.skill) continue;
     return Math.abs(bearing) < Math.PI / 2 ? bearing : bearing - Math.sign(bearing) * Math.PI;
   }
   return null;

@@ -3,17 +3,7 @@
 // modes (wood, iron, a ward's ring), stick-slip trains (a creak), bubbles, and the envelopes and shaping that join them.
 // Pure: no Web Audio here, so every sound can be made and measured headless (tools/audio.ts) and in node (tests).
 
-/** A seeded random in [0, 1) (mulberry32). */
-export function rng(seed: number): () => number {
-  let s = seed >>> 0;
-  return () => {
-    s = (s + 0x6d2b79f5) >>> 0;
-    let t = s;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
+import { random } from '../world/random.ts';
 
 /** A sound's samples, each −1…1. */
 export type Samples = Float32Array<ArrayBuffer>;
@@ -23,7 +13,7 @@ export interface Take { x: Samples; rate: number; r: () => number }
 
 /** A take `seconds` long at `rate`, its random seeded by `seed`. */
 export const take = (seconds: number, rate: number, seed: number): Take =>
-  ({ x: new Float32Array(Math.ceil(seconds * rate)), rate, r: rng(seed) });
+  ({ x: new Float32Array(Math.ceil(seconds * rate)), rate, r: random(seed) });
 
 /** A gain in decibels as a factor. */
 export const db = (d: number) => 10 ** (d / 20);

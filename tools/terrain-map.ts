@@ -12,7 +12,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { R, normalize, type Vec3 } from '../src/world/sphere.ts';
 import { cellOf } from '../src/world/cells.ts';
 import type { Cover } from '../src/world/planet.ts';
-import { BANDS, terrainPlanet } from '../src/world/planet-terrain.ts';
+import { BANDS, duneHeight, terrainPlanet } from '../src/world/planet-terrain.ts';
 import { clamp, lerp as mix } from '../src/world/scalar.ts';
 import { TERRAIN, createTerrain, type Terrain } from '../src/world/terrain.ts';
 import { linearToSrgb } from '../src/colour.ts';
@@ -70,7 +70,7 @@ function globes(t: Terrain, seed: number, size: number, marks: boolean): Uint8Ar
       const p: Vec3 = g === 0 ? [x, y1, z1] : [-x, y1, -z1];
       const u = normalize(p), k = j * W + g * size + i;
       hs[k] = planet.sample(u, cover); cs[k] = cellOf(u); zs[k] = z;
-      tones[k] = land(hs[k], cover, BANDS.dunes * t.stats.summit);
+      tones[k] = land(hs[k], cover, duneHeight(t.stats.summit));
     }
   }
   const rgb = new Uint8Array(W * H * 3).fill(18), mpp = R / r;

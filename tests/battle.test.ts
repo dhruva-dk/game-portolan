@@ -6,7 +6,7 @@ import { STEP } from '../src/sim/fixed.ts';
 import { chosen, gunOf, laid, muzzle, spreadOf } from '../src/sim/gun.ts';
 import { KINDS, type GunKind } from '../src/kinds.ts';
 import { GUN, GUNS, HEALTH, SHIP } from '../src/sim/handling.ts';
-import { FOOT } from '../src/ship/gun.ts';
+import { FOOT } from '../src/ship/gun-shape.ts';
 import { GUN_DRAWN, GUN_MOUNT } from '../src/ship/mount.ts';
 import { harmed, healed, sunk, whole } from '../src/sim/health.ts';
 import { flown, loosed, reach, thrown, type Ball } from '../src/sim/shot.ts';

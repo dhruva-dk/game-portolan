@@ -2,6 +2,9 @@
 //
 // Pure arithmetic: no three, so it runs in node for the tests.
 
+/** A prime a seed is stepped by to seed another stream apart from it: the next match's, a second noise's, a take's. */
+export const STRIDE = 7919;
+
 /** A seeded generator, 0…1 (mulberry32). */
 export function random(seed: number): () => number {
   let a = seed >>> 0;

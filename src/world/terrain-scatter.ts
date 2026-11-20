@@ -19,7 +19,7 @@
 import { N } from './cells.ts';
 import { createNoise3 } from './noise3.ts';
 import type { Cover, Planet } from './planet.ts';
-import { hash, random } from './random.ts';
+import { STRIDE, hash, random } from './random.ts';
 import { clamp, smoothstep } from './scalar.ts';
 import { R, add, distance, dot, faceDir, fromChart, normalize, toChart, type Chart, type Vec3 } from './sphere.ts';
 import { CELL, between, locate, taps } from './terrain-grid.ts';
@@ -106,7 +106,7 @@ const BOULDER = [0.3, 1.6] as const, BOULDERS = [4, 10] as const, SUNK = { big: 
 
 export function scatterTerrain(t: Terrain, planet: Planet, seed: number, shapes: Shapes): Tile[] {
   const blocks = N / BLOCK, tops = heightBounds(t, blocks).hi, summit = t.options.summit;
-  const noise = createNoise3(seed + 7919), at = taps(), cover: Cover = { grass: 0, rubble: 0, mottle: 0, clump: 0 };
+  const noise = createNoise3(seed + STRIDE), at = taps(), cover: Cover = { grass: 0, rubble: 0, mottle: 0, clump: 0 };
   /** Noise about −1…1 at unit direction p, features `size` metres across. */
   const read = (p: Vec3, size: number, shift: number) => noise.value((p[0] * R) / size + shift, (p[1] * R) / size, (p[2] * R) / size);
   const shoreAt = (p: Vec3) => {

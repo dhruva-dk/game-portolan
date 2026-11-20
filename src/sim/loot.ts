@@ -17,7 +17,7 @@
 // Pure arithmetic: no three, so it runs in node for the tests; deterministic for the same inputs.
 
 import { random, hash } from '../world/random.ts';
-import { R, add, along, cross, dot, normalize, scale, tangentAt, type Vec3 } from '../world/sphere.ts';
+import { R, along, dot, normalize, rotateAbout, scale, tangentAt, type Vec3 } from '../world/sphere.ts';
 import type { Crew } from './battle.ts';
 import type { Vessel } from './contact.ts';
 import { gunOf } from './gun.ts';
@@ -117,8 +117,7 @@ export function strewn(seed: number, depth: Depth, spots: number = LOOT.spots): 
   const pieces: Loot[] = [];
   // the lattice turned at random: a random axis-angle applied to each point
   const axis = normalize([draw() - 0.5, draw() - 0.5, draw() - 0.5]), turn = draw() * 2 * Math.PI;
-  const spin = (v: Vec3): Vec3 =>
-    add(add(scale(v, Math.cos(turn)), cross(axis, v), Math.sin(turn)), axis, dot(axis, v) * (1 - Math.cos(turn)));
+  const spin = (v: Vec3): Vec3 => rotateAbout(v, axis, turn);
   const cell = Math.sqrt((4 * Math.PI * R * R) / spots), golden = Math.PI * (3 - Math.sqrt(5));
   for (let k = 0; k < spots; k++) {
     const y = 1 - (2 * (k + 0.5)) / spots, r = Math.sqrt(1 - y * y), phi = k * golden;

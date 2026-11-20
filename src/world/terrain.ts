@@ -21,6 +21,7 @@
 // Pure arithmetic: no three, so it runs in node for the tests; deterministic for the seed.
 
 import { CELLS, N, PLANET_QUANTA, areaQuanta, beyond, neighbor } from './cells.ts';
+import { STRIDE } from './random.ts';
 import { clamp } from './scalar.ts';
 import { R, type Vec3 } from './sphere.ts';
 import { createNoise3 } from './noise3.ts';
@@ -77,7 +78,7 @@ export interface TerrainStats {
 
 /** The relief at every cell: domain-warped fractal noise, about −1…1. */
 export function relief(seed: number, o: TerrainOptions = TERRAIN): Float32Array {
-  const noise = createNoise3(seed), warpNoise = createNoise3(seed + 7919), p = centres(), out = new Float32Array(CELLS);
+  const noise = createNoise3(seed), warpNoise = createNoise3(seed + STRIDE), p = centres(), out = new Float32Array(CELLS);
   const fbm = (x: number, y: number, z: number, octaves: number) => {
     let v = 0, amp = 1, f = 1, sum = 0;
     for (let i = 0; i < octaves; i++, amp *= o.gain, f *= 2) {

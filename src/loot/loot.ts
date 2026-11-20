@@ -28,7 +28,7 @@ import {
 import { GILDING, GLINT, ICE, RARITY_GLOW, TAR, TIMBER } from '../palette';
 import type { Light } from '../sky/light';
 import { KINDS, gunOrder, type GunKind, type LootKind } from '../kinds';
-import { gunShape, gunSurface } from '../ship/gun';
+import { gunShape, gunSurface } from '../ship/gun.ts';
 import type { LootDraw } from '../snapshot';
 import type { Eye } from '../view/view';
 import { additive } from '../gpu';

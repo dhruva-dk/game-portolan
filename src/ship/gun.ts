@@ -7,8 +7,8 @@ import type { Light } from '../sky/light.ts';
 import type { FloatNode, Vec3Node } from '../tsl.ts';
 import { METAL } from './gun-shape.ts';
 
-// (the shape as loot/loot.ts and tests/battle.test.ts take it from here)
-export { FOOT, gunShape } from './gun-shape.ts';
+// (the shape as loot/loot.ts takes it, its layer reaching ship/ only through this file)
+export { gunShape } from './gun-shape.ts';
 
 /** A gun's colour at world place `p`, normal `n` (unit), its part made of `made` (METAL), lit as everything is
  *  (sky/light.ts), in two tones: the bronze gilded and the iron gunmetal, each with its hard highlight; the oak

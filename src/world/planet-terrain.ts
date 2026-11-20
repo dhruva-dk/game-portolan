@@ -28,6 +28,8 @@ const GRASS_IN = [20, 45] as const, FOOT = [2, 5, 15, 35] as const;
  *  and past which rubble lies (on the land's tops, bare rock); how far up or down the ground's mottling moves a band's
  *  edge, metres (the dunes' six times as far). */
 export const BANDS = { shore: -0.15, beach: 0.45, dry: 2.6, dunes: 0.5, loam: 0.5, rubble: 0.7, ragged: 0.5 } as const;
+/** The height past which the sand is the dunes', metres, on land whose summit is this high. */
+export const duneHeight = (summit: number) => BANDS.dunes * summit;
 /** The cells along a side of a block one rise stands for (sim/sight.ts looks for land only near one). */
 const BLOCK = 16;
 

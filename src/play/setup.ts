@@ -7,6 +7,7 @@ import type { Spawn } from '../sim/spawn.ts';
 import { createStorm, type Storm } from '../sim/storm.ts';
 import type { Land } from '../world/land.ts';
 import type { Planet } from '../world/planet.ts';
+import { STRIDE } from '../world/random.ts';
 import type { Vec3 } from '../world/sphere.ts';
 import type { Match, Waters } from './state.ts';
 
@@ -14,9 +15,6 @@ import type { Match, Waters } from './state.ts';
 export type Berther = (match: number) => Promise<Spawn[]>;
 /** What the sounding worker answers: the water sounded (once), or a match's berths (sounding.ts). */
 type Sounded = { open: Uint8Array; clear: Uint8Array; berths: Float64Array; ms: number } | { match: number; spawns: Float64Array };
-
-/** Each next match's seed is the one before's plus this (a prime). */
-const STRIDE = 7919;
 
 /** The water of a planet of this seed and land as the match reads it (state.ts Waters), sounded in a worker
  *  (sounding.ts) while the ground's bakes in its own (land/bake.ts); the milliseconds the sounding took; and the worker

@@ -9,13 +9,13 @@
 // nothing before one), put to sleep while the app is away and woken when it is back; its sounds are made in a worker
 // (maker.ts), each heard once it is back.
 
-import type { Vec3 } from '../world/sphere.ts';
-import { R } from '../world/sphere.ts';
+import { STRIDE, random } from '../world/random.ts';
+import { R, type Vec3 } from '../world/sphere.ts';
 import { NAMES, SOUNDS, type SoundName } from './bank.ts';
 import type { Ask, Made } from './maker.ts';
 import { createBed, levels, levelsOf } from './bed.ts';
 import { CUES, cueOf, soundOf, type Happening } from './cues.ts';
-import { db, rng } from './dsp.ts';
+import { db } from './dsp.ts';
 import { createListen, type Call, type Hearing } from './listen.ts';
 import { createMixer } from './mixer.ts';
 import { close, hear, heard } from './space.ts';
@@ -26,7 +26,7 @@ const LOOP = 6;
 
 export function createEngine(ctx: BaseAudioContext, ground: (p: Vec3) => number) {
   const mixer = createMixer(ctx);
-  const r = rng(0x5ea);
+  const r = random(0x5ea);
   const noise = ctx.createBuffer(2, Math.round(ctx.sampleRate * LOOP), ctx.sampleRate);
   for (let c = 0; c < 2; c++) {
     const x = noise.getChannelData(c);
@@ -38,7 +38,7 @@ export function createEngine(ctx: BaseAudioContext, ground: (p: Vec3) => number)
   let heardTo = 0;
   /** Each sound's takes, as they are made; and those still to make. */
   const bank = new Map<SoundName, AudioBuffer[]>();
-  const queue = NAMES.flatMap((name) => Array.from({ length: SOUNDS[name].takes }, (_, i) => ({ name, seed: 1 + i * 7919 })));
+  const queue = NAMES.flatMap((name) => Array.from({ length: SOUNDS[name].takes }, (_, i) => ({ name, seed: 1 + i * STRIDE })));
   const deeds: Happening[] = [], calls: Call[] = [], lv = levels(), h = heard();
   /** A take of `name` made: heard from now on. */
   const took = (name: SoundName, x: Float32Array<ArrayBuffer>) => {
