@@ -1,6 +1,8 @@
 // Ratings from where ships placed: each group's strength (by persona, brain,
 // or anything a ship is told apart by), fitted to the order ships went down in.
-//   node tools/harness/rate.ts results.jsonl [--by persona|brain|type-persona]
+//   node tools/harness/rate.ts results.jsonl [--by persona|brain|type-persona|gun]
+// (gun: the kind she held longest. Ships carry the gun they find, so a gun's
+// rating is of the ships that kept it, not of the gun alone.)
 //
 // The model (Plackett–Luce, worst first): each sinking is the one ship, of
 // those still afloat, that was to go next, chosen with odds e^−θ of her group;
@@ -131,6 +133,12 @@ export const GROUPINGS: Readonly<
   persona: (s) => s.persona,
   brain: (s) => s.brain,
   'type-persona': (s, r) => `${r.type}: ${s.persona}`,
+  // the gun she had in hand longest (none: she never held one)
+  gun: (s) =>
+    Object.entries(s.hand).reduce(
+      (best, [k, t]) => ((t ?? 0) > best.t ? { k, t: t ?? 0 } : best),
+      { k: 'none', t: 0 }
+    ).k,
 };
 
 if (import.meta.main) {

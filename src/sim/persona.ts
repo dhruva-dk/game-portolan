@@ -144,9 +144,11 @@ const waits = (by: number) =>
 /**
  * The game's match types, each with how often it is dealt: most matches mixed;
  * a bloodbath (hunters, brawlers and raiders, guns lying thick and rarer, the
- * storm in a hurry); a gold rush (scavengers, raiders and homesteaders, loot
- * everywhere); a cagey one (turtles and homesteaders, guns scarce, the storm
- * taking its time).
+ * storm in a hurry, its caches mostly guns); a gold rush (scavengers, raiders
+ * and homesteaders, loot everywhere, a gun lying near every berth, and caches
+ * that grow as the storm closes, 7 pieces, then 9, 11 …); a cagey one (turtles
+ * and homesteaders, guns scarce, the storm taking its time, its caches small
+ * and mostly mending).
  */
 export const TYPES: readonly (MatchType & { readonly dealt: number })[] = [
   { ...MIXED, dealt: 0.55 },
@@ -155,7 +157,11 @@ export const TYPES: readonly (MatchType & { readonly dealt: number })[] = [
     dealt: 0.15,
     mix: { ...EVEN, hunter: 3, brawler: 3, raider: 2, turtle: 0.5 },
     rules: ruled({
-      loot: { gun: 0.55, weights: [30, 32, 22, 11, 5] },
+      loot: {
+        gun: 0.55,
+        weights: [30, 32, 22, 11, 5],
+        cache: { ...DEFAULT_RULES.loot.cache, pieces: 6, gun: 0.75 },
+      },
       storm: { phases: waits(0.8) },
     }),
   },
@@ -163,13 +169,29 @@ export const TYPES: readonly (MatchType & { readonly dealt: number })[] = [
     name: 'gold rush',
     dealt: 0.15,
     mix: { ...EVEN, scavenger: 3, raider: 2, homesteader: 2 },
-    rules: ruled({ loot: { spots: 440, weights: [28, 30, 24, 12, 6] } }),
+    rules: ruled({
+      loot: {
+        spots: 440,
+        second: 0.55,
+        weights: [28, 30, 24, 12, 6],
+        berth: 80,
+        near: 30,
+        far: 60,
+        cache: { ...DEFAULT_RULES.loot.cache, pieces: 7, more: 2 },
+      },
+    }),
   },
   {
     name: 'cagey',
     dealt: 0.15,
     mix: { ...EVEN, turtle: 3, homesteader: 3, brawler: 0.5 },
-    rules: ruled({ loot: { gun: 0.34 }, storm: { phases: waits(1.15) } }),
+    rules: ruled({
+      loot: {
+        gun: 0.34,
+        cache: { ...DEFAULT_RULES.loot.cache, pieces: 4, gun: 0.25 },
+      },
+      storm: { phases: waits(1.15) },
+    }),
   },
 ];
 

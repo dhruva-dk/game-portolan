@@ -589,3 +589,23 @@ then the behaviour commits on top.
   orange (#FFA21F) near the gilded bronze every common gun wears (#F5C542).
   Making it pop means a plainer bronze for common guns: an art call left to
   the owner. `?rarity=` (or `all`) arms the fly view's ships so.
+- 2026-11-20 (H8): the replay (`tools/harness/replay.ts`) draws each shot
+  as a line from her to where it came down, by its gun's colour, a hit
+  solid with a burst, a miss faint with a ring; a ship followed shows her
+  persona, skill and her tally to the moment (shots, hits, kills, dealt,
+  taken); a legend for both. A full match's page grows 3.7% (1.63 to
+  1.69 MB).
+- 2026-11-20 (§6.7): debug.ts no longer ships in the release script: main.ts
+  loads it by `import()` only on the dev server or with `?debug` (an
+  architecture test holds it). Bytes about even (the shared code splits into
+  a chunk of its own), but the release neither fetches nor runs it.
+  `sky/storm-field.ts` took no storm state from `sim/storm.ts`, only the
+  cloud's fixed base height, so it is not routed through the snapshot; it
+  now imports that constant alone, and a test holds render code to types and
+  `CLOUD` from that file.
+- 2026-11-20 (L2): loot and caches by match type behind the Rules seam
+  (`persona.ts` TYPES; `loot.ts` `cache.more`, pieces added to each cache as
+  the storm closes). Gate met: a gold rush arms 90% of ships by 11 s (it was
+  13), a bloodbath by 13; cagey 34. The golden match is dealt a bloodbath,
+  so it is re-recorded (`abb64139`); detail in BOTS.md. Mixed matches are
+  unchanged. Also `rate.ts --by gun` (the kind she held longest), for W4.

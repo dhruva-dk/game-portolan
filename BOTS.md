@@ -542,3 +542,19 @@ commit; anything visible checked in headless chromium; iPad Air M1 at 30–40 fp
   dealt 200 hp, took 232, against 196 and 229), not in where she places.
   Kept as knobs, all off: the game's gunnery unchanged, golden unchanged
   (`1655ebe1`); the variants stay in `tools/harness/brains.ts`.
+
+- PLAN L2, loot and caches by match type (`persona.ts` TYPES, `loot.ts`
+  `cache.more`): a gold rush lays a second gun more often (0.55), a gun
+  near every berth (80 m, 30–60 m off), and caches that grow as the storm
+  closes (7 pieces, then 9, 11 …); a bloodbath's caches are 6 pieces, three
+  in four of them guns; a cagey match's are 4, one in four a gun. Mixed
+  matches are as they were. Over 16 matches of each type:
+
+  | type      | armed 90% by | a second kind | shots a ship, home    | half down by |
+  | --------- | ------------ | ------------- | --------------------- | ------------ |
+  | gold rush | 13 → 11 s    | 77 → 80%      | 17.0 → 18.5, 67 → 66% | 85 → 89 s    |
+  | bloodbath | 13 → 13 s    | 69 → 69%      | 16.1 → 16.3, 56%      | 60 → 60 s    |
+  | cagey     | 32 → 34 s    | 61 → 61%      | 19.3, 67%             | 104 → 104 s  |
+
+  A gold rush now arms soonest of the four. The golden match is dealt a
+  bloodbath, so its hash moves: `1655ebe1` → `abb64139`.

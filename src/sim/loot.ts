@@ -96,13 +96,19 @@ export const LOOT = {
   far: 150,
   /**
    * A cache dropped as each phase of the storm after the first begins: `pieces`
-   * pieces within `within` of the next cap's radius of its centre, on roomy
-   * water inside it, `gun` of them guns of the rarer tiers (`weights`, common to
-   * legendary), the rest a big shield or a full repair. The calm's heart is
-   * where the fleet is making anyway, and something worth fighting over there
-   * meets them.
+   * pieces, and `more` again for each cache before it, within `within`
+   * of the next cap's radius of its centre, on roomy water inside it, `gun` of
+   * them guns of the rarer tiers (`weights`, common to legendary), the rest a
+   * big shield or a full repair. The calm's heart is where the fleet is making
+   * anyway, and something worth fighting over there meets them.
    */
-  cache: { pieces: 5, within: 0.5, gun: 0.4, weights: [0, 0, 50, 35, 15] },
+  cache: {
+    pieces: 5,
+    more: 0,
+    within: 0.5,
+    gun: 0.4,
+    weights: [0, 0, 50, 35, 15],
+  },
 } as const;
 
 /** The loot table as a match holds it (rules.ts). */
@@ -316,7 +322,8 @@ function cached(
     k = t.cache;
   const pieces = [...f.pieces];
   let next = f.next;
-  for (let i = 0; i < k.pieces; i++) {
+  const count = k.pieces + k.more * Math.max(0, phase - 1);
+  for (let i = 0; i < count; i++) {
     const p = along(
       cap.centre,
       tangentAt(cap.centre, draw() * 2 * Math.PI),
