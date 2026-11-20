@@ -28,23 +28,24 @@ turn left?", follow the arrows: it is never more than five hops.
                          └──────────┘
 ```
 
-| Role      | Module                                                                       | Takes                                         | Gives                                                 | Tuning                           | Memory slice         |
-| --------- | ---------------------------------------------------------------------------- | --------------------------------------------- | ----------------------------------------------------- | -------------------------------- | -------------------- |
-| Lookout   | `sim/lookout.ts` (from bot.ts perceive/hidden)                               | fleet, depth                                  | `Sighting`: foe, where last seen, who rammed/shot her | `SIGHT`                          | `m.look`             |
-| Captain   | `sim/bot.ts` (decide, OPTIONS)                                               | Sighting, storm, own state                    | `Intent`                                              | `MIND` (+ each option's owner's) | `m.mind`             |
-| — options | storm/fight/flee/roam: `bot.ts`; heal/loot: `purser.ts`; claim: `claimer.ts` | Ctx view                                      | a score 0..1 with named factors; a goal               | `PURSER`, `CLAIMER`, `STORMING`  | `m.purse`, `m.claim` |
-| Tactician | `sim/tactician.ts` (ramCourse, recoil; gunner.ts ring)                       | Intent, foe now                               | `Mark`: where to route to, the aim if clear, pace     | `RAMMING`                        | `m.tactic`           |
-| Pilot     | `sim/pilot.ts` over `sim/route.ts`, later behind `Router`                    | Mark, chart                                   | `Way`: the tangent to steer, distance, pace, foe      | `ROUTE`                          | `m.route`            |
-| Helmsman  | `sim/helmsman.ts`, later behind `Steering`                                   | Way, depth, nearby rams                       | `Helm`: course, throttle; and `lost` (pilot drops route) | `HELM`                        | `m.helm`             |
-| Gunner    | `sim/gunner.ts`                                                              | foe, held gun                                 | `Order`, arm                                          | `GUNNER`                         | `m.gun`              |
+| Role      | Module                                                                       | Takes                      | Gives                                                    | Tuning                           | Memory slice         |
+| --------- | ---------------------------------------------------------------------------- | -------------------------- | -------------------------------------------------------- | -------------------------------- | -------------------- |
+| Lookout   | `sim/lookout.ts` (from bot.ts perceive/hidden)                               | fleet, depth               | `Sighting`: foe, where last seen, who rammed/shot her    | `SIGHT`                          | `m.look`             |
+| Captain   | `sim/bot.ts` (decide, OPTIONS)                                               | Sighting, storm, own state | `Intent`                                                 | `MIND` (+ each option's owner's) | `m.mind`             |
+| — options | storm/fight/flee/roam: `bot.ts`; heal/loot: `purser.ts`; claim: `claimer.ts` | Ctx view                   | a score 0..1 with named factors; a goal                  | `PURSER`, `CLAIMER`, `STORMING`  | `m.purse`, `m.claim` |
+| Tactician | `sim/tactician.ts` (ramCourse, recoil; gunner.ts ring)                       | Intent, foe now            | `Mark`: where to route to, the aim if clear, pace        | `RAMMING`                        | `m.tactic`           |
+| Pilot     | `sim/pilot.ts` over `sim/route.ts`, later behind `Router`                    | Mark, chart                | `Way`: the tangent to steer, distance, pace, foe         | `ROUTE`                          | `m.route`            |
+| Helmsman  | `sim/helmsman.ts`, later behind `Steering`                                   | Way, depth, nearby rams    | `Helm`: course, throttle; and `lost` (pilot drops route) | `HELM`                           | `m.helm`             |
+| Gunner    | `sim/gunner.ts`                                                              | foe, held gun              | `Order`, arm                                             | `GUNNER`                         | `m.gun`              |
 
 **The Intent** is the seam between choosing and sailing. The helm never sees
 modes, loot or claims; the captain never sees rudders or banks.
 
 ```ts
-interface Intent {      // captain.ts; bot.ts intentOf derives it from memory each step
-  goal: Vec3;           // where she means to be
-  foe: number;          // the ship she means to fight; -1 none
+interface Intent {
+  // captain.ts; bot.ts intentOf derives it from memory each step
+  goal: Vec3; // where she means to be
+  foe: number; // the ship she means to fight; -1 none
   arrive: 'through' | 'gently'; // gently: ease up near it (loot, mending)
 }
 ```
@@ -66,13 +67,23 @@ is all the helm learns of why.
 `src/sim/brain.ts` composes the roles' tuning; it adds no field of its own.
 
 ```ts
-export interface Brain { sight: SightTuning; mind: MindTuning; ram: RamTuning;
-  route: RouteTuning; helm: HelmTuning; gunner: GunnerTuning; purser: PurserTuning;
-  claimer: ClaimerTuning; styles: Styles }
+export interface Brain { sight; mind; roaming; storming   // bot.ts
+  ramming /* tactician */; helm; purser; claimer; styles /* temper */ }
 export const DEFAULT_BRAIN: Brain = { sight: SIGHT, mind: MIND, ... };
+export const nature = (seed, brain = DEFAULT_BRAIN): Nature  // seed, brain, temper
 ```
 
-- Each function takes **its slice**, never the Brain: `steer(view, wp, intent, k: HelmTuning)`.
+- A ship's `Nature` sits on her `Hand` (play/orders.ts), made at launch from
+  `createState(..., brainOf)` (the game passes none: every ship the default).
+- Each part reads **its own slices** off `c.b` (the Ctx carries the brain, as
+  it carries her memory): `c.b.helm.feel` in helmsman.ts, never `HELM.feel`,
+  never `c.b.purser`. Enforced by the "own slices" rule, not by signatures:
+  threading slices as parameters would break the parameter ratchet (think
+  already takes 6) for no gain the rule doesn't give.
+- Out of the brain, on purpose: `BOT` (shared), `GUNNER` (aim feel: fairness to
+  the player, Decision 4), `ROUTE`/`REASON`/`WORTH` (tools every part uses
+  alike). Option weights (bot.ts OPTIONS 6, 3.5, …) are still literals: next
+  to move into `mind` when a variant wants them.
 - Variants live in `tools/brains/*.ts` as typed partial overrides, merged onto
   `DEFAULT_BRAIN` into whole objects, same keys in the same order (one hidden
   class, so V8 keeps the hot loops fast and the harness's ms are honest).
@@ -88,12 +99,13 @@ A choice that can't be printed this way is a design bug.
 
 ### 1.5 Rules (each a test in `tests/architecture-bots.test.ts`)
 
-1. **Own tuning only.** A module of `src/sim` names no tuning table but its own.
-2. **Brain stays at the top.** Only `sim/brain.ts`, `sim/bot.ts`, `play/orders.ts`,
-   `tests/` and `tools/` name `Brain`.
-3. **The helm knows no modes.** `helmsman.ts` and `route.ts` import nothing of
-   `bot.ts`, `purser.ts`, `claimer.ts`, and never name `Mode`.
-4. **Tuning is data.** No function in any tuning table (type-level check).
+1. **Own tuning only.** A part names no tuning table but its own (test "own tuning").
+2. **Own slices.** A part reads its tuning off the brain it is given, its own
+   slices alone, and never its table directly (test "own slices").
+3. **The helm knows no modes.** tactician, pilot, helmsman and route import
+   nothing of `bot.ts`, `purser.ts`, `claimer.ts`, and never name `Mode`.
+4. **Memory owners.** A memory field (`…Memory`, `Gunner`, `Chance`) is written
+   only in the file that declares it.
 5. **Golden match.** A whole match with `DEFAULT_BRAIN` hashes to the recorded
    value; tracing on or off, the same. A deliberate change of behaviour re-records
    it, with its metrics before and after, in the Log.
@@ -173,8 +185,8 @@ commit; anything visible checked in headless chromium; iPad Air M1 at 30–40 fp
         starting values; captain.ts `Memory` gathers them; bot.ts `mind()`
         builds them. Options' `act` returns the goal (the mind alone writes it).
         Rules 1, 3 and memory owners: tests/architecture-bots.test.ts.
-  - [ ] B4 `Brain` composed in brain.ts; slices passed down; per-ship Brain in
-        `orders.ts` Hand. Architecture tests 1–6.
+  - [x] B4 `Brain` composed in brain.ts; `Nature` per ship on the `Hand`;
+        `createState(..., brainOf)`; parts read `c.b.<own slice>`. Rules 1–4.
 - [ ] **C. Harness.**
   - [ ] C1 runMatch(spec), worker pool, chart cache (`.cache/`, gitignored), JSONL.
   - [ ] C2 Trace sink + events; metrics: stuck by mode, progress/s, route
@@ -207,6 +219,10 @@ commit; anything visible checked in headless chromium; iPad Air M1 at 30–40 fp
    order on the harness: spots 200 → ~320 with gun share 0.5 → ~0.42; then a
    resupply drift per storm phase, laid inside the next cap (draws fights to it).
    Check the drawn loot's cost in headless chromium (more instances on iPad).
+4. **The gunner's tuning stays out of the brain.** Her aim (reaction, error,
+   spread by skill) is how fair a bot is to shoot against, the same for every
+   bot; skill (temper) already varies it. Variants are about choices and
+   sailing. Revisit only if a variant needs a different gunner.
 
 ## 4. Log
 
@@ -221,3 +237,6 @@ commit; anything visible checked in headless chromium; iPad Air M1 at 30–40 fp
   PurseMemory, ClaimMemory, Gunner, Chance). New seams: pilot `lose`, gunner
   `sighted`, purser `lootTime`/`healAct` (policy in purser, geometry from the
   mind by callback). Golden unchanged; 365 tests.
+- B4: brain.ts (Brain, DEFAULT_BRAIN, Nature, nature); think takes a Nature;
+  Hand.nature; createState brainOf; temper takes styles; weaponWorth takes
+  `other`. Golden unchanged; 366 tests.

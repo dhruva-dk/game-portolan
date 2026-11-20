@@ -118,15 +118,14 @@ export const healUrge = (c: Ctx) => {
  * 0.2 a tier.
  */
 function pairWorth(
-  guns: readonly (Pick<Gun, 'kind' | 'rarity'> | null)[]
+  guns: readonly (Pick<Gun, 'kind' | 'rarity'> | null)[],
+  other: number
 ): number {
   const [a, b] = guns
     .filter((g) => g !== null)
     .map((g) => ({ kind: g.kind, v: 1 + 0.2 * g.rarity }))
     .sort((x, y) => y.v - x.v);
-  return !a
-    ? 0
-    : a.v + (b ? (b.kind === a.kind ? 0.1 : PURSER.other) * b.v : 0);
+  return !a ? 0 : a.v + (b ? (b.kind === a.kind ? 0.1 : other) * b.v : 0);
 }
 
 /**
@@ -137,13 +136,17 @@ function pairWorth(
 export function weaponWorth(
   guns: readonly (Gun | null)[],
   kind: GunKind,
-  rarity: number
+  rarity: number,
+  other: number
 ): { worth: number; slot: number } {
-  const now = pairWorth(guns);
+  const now = pairWorth(guns, other);
   let best = { worth: 0, slot: -1 };
   guns.forEach((_, i) => {
     const w =
-      pairWorth(guns.map((g, k) => (k === i ? { kind, rarity } : g))) - now;
+      pairWorth(
+        guns.map((g, k) => (k === i ? { kind, rarity } : g)),
+        other
+      ) - now;
     if (
       w > best.worth + 1e-9 &&
       (guns[i] === null || guns.every((g) => g !== null))
@@ -157,12 +160,12 @@ export function weaponWorth(
  * What a piece is worth to her: a gun by weaponWorth (unarmed, PURSER.bare
  * times as much), things to mend with that go in her slots 0.5.
  */
-function worth(crew: Crew, l: Loot): number {
+function worth(c: Ctx, crew: Crew, l: Loot): number {
   const g = l.goods;
   if (isArms(g))
     return (
-      weaponWorth(crew.guns, g.kind, g.rarity).worth *
-      (armed(crew) ? 1 : PURSER.bare)
+      weaponWorth(crew.guns, g.kind, g.rarity, c.b.purser.other).worth *
+      (armed(crew) ? 1 : c.b.purser.bare)
     );
   return roomFor(crew.hold, g.kind) >= 0 ? 0.5 : 0;
 }
@@ -189,7 +192,7 @@ export function lootUrge(c: Ctx): number {
   m.loot = -1;
   if (!crew || !pieces) return 0;
   // gone for too long, she gives it up
-  if (m.mode === 'loot' && m.target >= 0 && m.lootT > PURSER.patience)
+  if (m.mode === 'loot' && m.target >= 0 && m.lootT > c.b.purser.patience)
     [m.shun, m.target] = [m.target, -1];
   const p = own.ship.at,
     within = Math.cos(t.lootReach / R),
@@ -199,14 +202,14 @@ export function lootUrge(c: Ctx): number {
     kept: Loot | null = null;
   for (const l of pieces) {
     if (dot(p, l.at) < within || l.id === m.shun) continue;
-    if (s && toEdge(l.at, s) < PURSER.edge) continue;
-    const w = worth(crew, l);
+    if (s && toEdge(l.at, s) < c.b.purser.edge) continue;
+    const w = worth(c, crew, l);
     if (w <= 0) continue;
     const d = distance(p, l.at);
     // a ship well nearer to it is left to take it
     if (
-      d > PURSER.take &&
-      nearerTo(c.others, l.at, Math.cos((PURSER.ceded * d) / R))
+      d > c.b.purser.take &&
+      nearerTo(c.others, l.at, Math.cos((c.b.purser.ceded * d) / R))
     )
       continue;
     if (l.id === m.target) kept = l;
@@ -220,7 +223,7 @@ export function lootUrge(c: Ctx): number {
     m.loot = kept.id;
     return ease(Math.max(bs, 0.1));
   }
-  if (bs <= PURSER.least || !best) return 0;
+  if (bs <= c.b.purser.least || !best) return 0;
   m.loot = best.id;
   return ease(bs);
 }
@@ -245,7 +248,7 @@ export function lootAct(c: Ctx): Vec3 {
  * her (found by her mind, `clearOf`).
  */
 export const healAct = (c: Ctx, clearOf: (metres: number) => Vec3): Vec3 =>
-  c.foe ? clearOf(PURSER.clear) : c.own.ship.at;
+  c.foe ? clearOf(c.b.purser.clear) : c.own.ship.at;
 
 /**
  * What her purser carries: the piece she would go for as she last weighed it,
@@ -299,18 +302,23 @@ export function purse(c: Ctx): Ask {
     const l = c.sea.loot?.find((k) => k.id === m.target);
     const w =
       l && isArms(l.goods)
-        ? weaponWorth(crew.guns, l.goods.kind, l.goods.rarity)
+        ? weaponWorth(crew.guns, l.goods.kind, l.goods.rarity, c.b.purser.other)
         : null;
-    if (l && w && w.worth > 0 && distance(c.own.ship.at, l.at) < PURSER.take)
+    if (
+      l &&
+      w &&
+      w.worth > 0 &&
+      distance(c.own.ship.at, l.at) < c.b.purser.take
+    )
       [take, arm] = [0, w.slot === crew.hand ? null : w.slot];
   }
   if (ready(crew.gust) && !crew.hold.using) {
     const fleeing = m.mode === 'flee' || m.mode === 'storm';
     const run =
-      fleeing && (crew.gust.charges >= 2 || crew.health.hull < PURSER.low);
+      fleeing && (crew.gust.charges >= 2 || crew.health.hull < c.b.purser.low);
     if (
       run ||
-      (m.mode === 'fight' && distance(c.own.ship.at, m.goal) > PURSER.far)
+      (m.mode === 'fight' && distance(c.own.ship.at, m.goal) > c.b.purser.far)
     )
       gust = true;
   }

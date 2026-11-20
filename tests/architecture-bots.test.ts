@@ -37,8 +37,15 @@ const SAILING = [
 ];
 /** The parts that choose what she is about. */
 const CHOOSING = ['sim/bot.ts', 'sim/purser.ts', 'sim/claimer.ts'];
-/** What every part may read of another's tuning: captain.ts's shared BOT. */
-const SHARED = new Set(['BOT']);
+/**
+ * Tables read as they are, not from the brain: captain.ts's BOT, shared by
+ * every part; and gunner.ts's GUNNER, her aim's feel, the same for every bot
+ * (a fairness to the player, not a choice of hers: BOTS.md decision 4); and
+ * the tools every part sails by alike: route.ts's ROUTE (the chart's search),
+ * utility.ts's REASON (the weighing of options), purser.ts's WORTH (what each
+ * of her stores mends).
+ */
+const SHARED = new Set(['BOT', 'GUNNER', 'ROUTE', 'REASON', 'WORTH']);
 
 const parts = files.filter((f) => PARTS.includes(f.rel));
 
@@ -80,6 +87,55 @@ test('own tuning: a part of a bot names no other part’s tuning table (captain.
         });
     });
   none('own tuning', found, 'a part reading another part’s tuning');
+});
+
+/** The brain's slices each part reads (brain.ts Brain): its own, no other's. */
+const SLICES: Record<string, readonly string[]> = {
+  'sim/bot.ts': ['sight', 'mind', 'roaming', 'storming'],
+  'sim/tactician.ts': ['ramming'],
+  'sim/helmsman.ts': ['helm'],
+  'sim/purser.ts': ['purser'],
+  'sim/claimer.ts': ['claimer'],
+};
+
+test('own slices: a part reads its tuning from the brain it is given (c.b), its own slices alone, never its table itself', () => {
+  const found: Hit[] = [];
+  let reads = 0;
+  for (const f of parts) {
+    const own = new Set(tables(f)),
+      slices = SLICES[f.rel] ?? [];
+    visit(tree(f), (n) => {
+      // its table named outside its own declaration
+      if (
+        ts.isIdentifier(n) &&
+        own.has(n.text) &&
+        !SHARED.has(n.text) &&
+        !(ts.isVariableDeclaration(n.parent) && n.parent.name === n)
+      )
+        found.push({
+          file: f.at,
+          line: lineOf(f, n.getStart()),
+          text: `${n.text} read, not the brain's`,
+        });
+      // a slice of the brain: c.b.<slice>
+      if (
+        ts.isPropertyAccessExpression(n) &&
+        ts.isPropertyAccessExpression(n.expression) &&
+        n.expression.name.text === 'b'
+      ) {
+        reads++;
+        if (!slices.includes(n.name.text))
+          found.push({
+            file: f.at,
+            line: lineOf(f, n.getStart()),
+            text: `b.${n.name.text} is not its own`,
+          });
+      }
+    });
+  }
+  // (the rule reads something)
+  assert.ok(reads >= 100, `only ${reads} reads of the brain found`);
+  none('own slices', found, 'a part reading tuning not its own slice');
 });
 
 test('no modes: the parts that sail her import nothing of those that choose, and never name a Mode', () => {

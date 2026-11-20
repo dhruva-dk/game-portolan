@@ -1,4 +1,5 @@
 import { test } from 'node:test';
+import { nature } from '../src/sim/brain.ts';
 import assert from 'node:assert/strict';
 import type { GunKind } from '../src/kinds.ts';
 import { HEALTH } from '../src/sim/handling.ts';
@@ -100,7 +101,7 @@ function battle(
         seen.filter((o) => o.id !== v.id),
         { depth: deep, storm },
         m,
-        seeds[i]!
+        nature(seeds[i]!)
       );
       minds[i] = r.memory;
       helms.push(r.helm);

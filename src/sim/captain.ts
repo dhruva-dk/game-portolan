@@ -17,6 +17,7 @@ import type { Chart } from './route.ts';
 import type { Depth } from './shoal.ts';
 import type { Storm } from './storm.ts';
 import type { Temper } from './temper.ts';
+import type { Brain } from './brain.ts';
 import type { Crew } from './battle.ts';
 import type { Loot } from './loot.ts';
 import type { ClaimMemory, Holdings } from './claimer.ts';
@@ -113,14 +114,15 @@ export interface Memory
 
 /**
  * What a think and a step weigh: her, the others afloat, the sea, her memory
- * (written to), her temperament, her foe as she sees her now and how far off,
- * and her seed.
+ * (written to), her brain (each part reads its own slice: brain.ts) and
+ * temperament, her foe as she sees her now and how far off, and her seed.
  */
 export interface Ctx {
   own: Seen;
   others: readonly Seen[];
   sea: Sea;
   m: Memory;
+  b: Brain;
   t: Temper;
   foe: Seen | null;
   foeD: number;

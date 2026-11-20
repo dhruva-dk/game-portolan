@@ -1,4 +1,5 @@
 import { test } from 'node:test';
+import { nature } from '../src/sim/brain.ts';
 import assert from 'node:assert/strict';
 import {
   armed,
@@ -78,7 +79,7 @@ function sail(
         seen.filter((o) => o.id !== v.id),
         { depth: deep, loot: f.pieces },
         minds[v.id],
-        seeds[v.id]
+        nature(seeds[v.id])
       );
       minds[v.id] = r.memory;
       helms[i] = r.helm;
@@ -182,23 +183,36 @@ const seeds = (ok: (s: number) => boolean, n: number) => {
 
 test('a gun is worth most to a ship with none; then one of another kind; with both slots full, only a better one', () => {
   const bare = [null, null];
-  assert.deepEqual(weaponWorth(bare, 'cannon', 0), { worth: 1, slot: 0 });
+  assert.deepEqual(weaponWorth(bare, 'cannon', 0, PURSER.other), {
+    worth: 1,
+    slot: 0,
+  });
   assert.ok(
-    weaponWorth(bare, 'cannon', 4).worth > weaponWorth(bare, 'cannon', 0).worth
+    weaponWorth(bare, 'cannon', 4, PURSER.other).worth >
+      weaponWorth(bare, 'cannon', 0, PURSER.other).worth
   );
   const one = [gunOf('cannon', 2), null];
-  assert.equal(weaponWorth(one, 'scatter', 0).slot, 1, 'into the empty slot');
+  assert.equal(
+    weaponWorth(one, 'scatter', 0, PURSER.other).slot,
+    1,
+    'into the empty slot'
+  );
   assert.ok(
-    weaponWorth(one, 'scatter', 0).worth >
-      3 * weaponWorth(one, 'cannon', 0).worth,
+    weaponWorth(one, 'scatter', 0, PURSER.other).worth >
+      3 * weaponWorth(one, 'cannon', 0, PURSER.other).worth,
     'another kind, for another range'
   );
   const both = [gunOf('cannon', 1), gunOf('scatter', 0)];
-  assert.equal(weaponWorth(both, 'cannon', 1).worth, 0);
-  assert.equal(weaponWorth(both, 'cannon', 0).worth, 0);
-  assert.equal(weaponWorth(both, 'cannon', 3).slot, 0, 'the one it betters');
+  assert.equal(weaponWorth(both, 'cannon', 1, PURSER.other).worth, 0);
+  assert.equal(weaponWorth(both, 'cannon', 0, PURSER.other).worth, 0);
+  assert.equal(
+    weaponWorth(both, 'cannon', 3, PURSER.other).slot,
+    0,
+    'the one it betters'
+  );
   assert.ok(
-    weaponWorth(both, 'cannon', 3).worth > weaponWorth(both, 'cannon', 2).worth
+    weaponWorth(both, 'cannon', 3, PURSER.other).worth >
+      weaponWorth(both, 'cannon', 2, PURSER.other).worth
   );
 });
 

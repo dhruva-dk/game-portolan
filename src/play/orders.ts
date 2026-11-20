@@ -6,6 +6,7 @@
 
 import { armed, type Crew, type Order } from '../sim/battle.ts';
 import { think, type Memory, type Sea, type Seen } from '../sim/bot.ts';
+import type { Nature } from '../sim/brain.ts';
 import type { Chart } from '../sim/route.ts';
 import type { Vessel } from '../sim/contact.ts';
 import type { Holdings } from '../sim/claimer.ts';
@@ -18,11 +19,13 @@ import type { Vec3 } from '../world/sphere.ts';
 
 /**
  * What a ship's orders come from aboard her: her bot's mind (null: the player's
- * hands, or her helm lashed), and the helm a lashed ship holds. A bot's mind is
- * written back as she thinks.
+ * hands, or her helm lashed), her nature (her seed, brain and temperament:
+ * sim/brain.ts), and the helm a lashed ship holds. A bot's mind is written back
+ * as she thinks.
  */
 export interface Hand {
   mind: Memory | null;
+  nature: Nature;
   steady: Helm;
 }
 
@@ -68,8 +71,7 @@ export function createOrders(depth: (p: Vec3) => number, chart: Chart) {
    * The fleet's orders for a step, in its order, and what each asks of her
    * stores: `helm`, `gun` and `ask` the player's; `crews` and `aboard` each
    * ship's by id; the storm, the loot and who holds the sea as the bots read
-   * them; `seedOf` each bot's seed by id. The lists handed back are refilled by
-   * the next call.
+   * them. The lists handed back are refilled by the next call.
    */
   return (
     fleet: readonly Vessel[],
@@ -80,8 +82,7 @@ export function createOrders(depth: (p: Vec3) => number, chart: Chart) {
     ask: Ask,
     storm: Storm,
     loot: Flotsam,
-    holdings: Holdings | null,
-    seedOf: (id: number) => number
+    holdings: Holdings | null
   ) => {
     seen.length = helms.length = orders.length = 0;
     asks.clear();
@@ -103,7 +104,7 @@ export function createOrders(depth: (p: Vec3) => number, chart: Chart) {
         // (a bot reads `others` only while she thinks)
         others.length = 0;
         for (const o of seen) if (o.id !== id) others.push(o);
-        const r = think(seen[i], others, sea, a.mind, seedOf(id));
+        const r = think(seen[i], others, sea, a.mind, a.nature);
         a.mind = r.memory;
         helms.push(r.helm);
         orders.push(r.order);

@@ -65,7 +65,7 @@ export const helmMemory = (at: Vec3): HelmMemory => ({
 });
 
 /** Everything her helm is tuned by. Seconds and metres. */
-const HELM = {
+export const HELM = {
   /**
    * Feeling ahead for shoal water: this far plus her speed (m/s × 1 s); sides
    * felt `side` rad either way, a little further; a turn off land is `firm` rad
@@ -141,7 +141,7 @@ export function deepest(c: Ctx): number {
     const t = rotate(at, heading, (k * Math.PI) / 8);
     let top = -Infinity,
       end = 0;
-    for (let s = 2; s <= HELM.sound; s += 3)
+    for (let s = 2; s <= c.b.helm.sound; s += 3)
       top = Math.max(top, (end = -c.sea.depth(along(at, t, s).p)));
     const score = top + 0.25 * end;
     if (score < low) [low, best] = [score, (k * Math.PI) / 8];
@@ -169,7 +169,7 @@ export function steer(
   const course = turn;
   // feel ahead along the course (not her heading: coming round, she would only
   // ever feel the bank)
-  const ahead = Math.min(HELM.feel + ship.speed, toD);
+  const ahead = Math.min(c.b.helm.feel + ship.speed, toD);
   if (
     want &&
     !open(
@@ -178,8 +178,8 @@ export function steer(
         .p
     )
   ) {
-    const port = probe(c, HELM.side, HELM.feelSide + ship.speed),
-      starboard = probe(c, -HELM.side, HELM.feelSide + ship.speed);
+    const port = probe(c, c.b.helm.side, c.b.helm.feelSide + ship.speed),
+      starboard = probe(c, -c.b.helm.side, c.b.helm.feelSide + ship.speed);
     // she keeps turning off the way she began to, unless only the other side
     // lies open
     let way = Math.sign(m.avoid);
@@ -188,19 +188,20 @@ export function steer(
         port !== starboard ? (port ? 1 : -1) : port ? 0 : turn >= 0 ? 1 : -1;
     }
     if (way !== 0) {
-      turn = way * (port !== starboard ? HELM.firm : HELM.hard);
-      m.avoid = way * HELM.avoid;
+      turn = way * (port !== starboard ? c.b.helm.firm : c.b.helm.hard);
+      m.avoid = way * c.b.helm.avoid;
     }
   } else if (m.avoid !== 0) {
     if (Math.sign(turn) !== Math.sign(m.avoid))
-      turn = Math.sign(m.avoid) * HELM.firm;
+      turn = Math.sign(m.avoid) * c.b.helm.firm;
     m.avoid =
       m.avoid > 0 ? Math.max(0, m.avoid - dt) : Math.min(0, m.avoid + dt);
   }
   const answered = answer(c, way.foe);
   if (answered !== null) turn = answered;
   // making for it gently, she eases up near it
-  const easy = way.pace === 'gently' && toD < HELM.near ? HELM.gently : 1;
+  const easy =
+    way.pace === 'gently' && toD < c.b.helm.near ? c.b.helm.gently : 1;
   // a mark (not a ship she rams) inside the circle she turns at her speed she
   // would only sail round: slowed to turn to it, the circle through it r = d /
   // (2 sin off), the speed that turns it r × SHIP.turn
@@ -210,8 +211,8 @@ export function steer(
     way.pace === 'ram'
       ? 1
       : Math.max(
-          HELM.leastWay,
-          Math.min(1, (HELM.tighten * r * SHIP.turn) / SHIP.top)
+          c.b.helm.leastWay,
+          Math.min(1, (c.b.helm.tighten * r * SHIP.turn) / SHIP.top)
         );
   const s = stuck(c, dt, course);
   m.was = ship.at;
@@ -228,26 +229,26 @@ function answer(c: Ctx, foe: number): number | null {
     p = own.ship.at,
     mine = velocity(own);
   for (const o of c.others) {
-    if (apart(p, o.ship.at, HELM.threat)) continue;
+    if (apart(p, o.ship.at, c.b.helm.threat)) continue;
     const d = distance(p, o.ship.at),
       t = toward(p, o.ship.at);
-    if (d > HELM.threat || !t) continue;
+    if (d > c.b.helm.threat || !t) continue;
     const r = scale(t, d),
       rel = add(transport(velocity(o), o.ship.at, p), mine, -1),
       closing = -dot(t, rel);
     if (
-      closing < HELM.closing * RAM.least ||
-      (d - SHIP.length / 2) / closing > HELM.warn
+      closing < c.b.helm.closing * RAM.least ||
+      (d - SHIP.length / 2) / closing > c.b.helm.warn
     )
       continue;
     const back = toward(o.ship.at, p);
-    if (!back || dot(o.ship.heading, back) < Math.cos(HELM.aimed)) continue;
+    if (!back || dot(o.ship.heading, back) < Math.cos(c.b.helm.aimed)) continue;
     const when = -dot(r, rel) / dot(rel, rel);
-    if (length(add(r, rel, when)) > HELM.miss) continue;
+    if (length(add(r, rel, when)) > c.b.helm.miss) continue;
     const bearing = offCourse(own.ship, t);
     if (o.id === foe && Math.abs(bearing) < 0.5) continue;
     if (
-      unitHash(c.seed, o.id * STRIDE + Math.floor(m.clock / HELM.warn)) >
+      unitHash(c.seed, o.id * STRIDE + Math.floor(m.clock / c.b.helm.warn)) >
       0.2 + 0.75 * c.t.skill
     )
       continue;
@@ -272,56 +273,56 @@ function stuck(
   const { m } = c,
     ship = c.own.ship;
   const order = (turn: number, lost = false) => ({
-    helm: { course: turned(ship, turn), throttle: HELM.slow },
+    helm: { course: turned(ship, turn), throttle: c.b.helm.slow },
     lost,
   });
   const steady = { helm: null, lost: false };
   if (m.backT > 0) {
     m.backT -= dt;
-    return order(m.strafe * HELM.full);
+    return order(m.strafe * c.b.helm.full);
   }
-  const crawling = distance(m.was, ship.at) < HELM.crawl * dt;
+  const crawling = distance(m.was, ship.at) < c.b.helm.crawl * dt;
   // held up by shoal water off her bow, she works off it the way the water
   // deepens; the clock runs below zero meanwhile
   const held =
     crawling &&
-    !open(c, along(ship.at, ship.heading, 0.4 * SHIP.length + HELM.bow).p);
-  if (held && m.backT > -(HELM.wade + HELM.most)) {
+    !open(c, along(ship.at, ship.heading, 0.4 * SHIP.length + c.b.helm.bow).p);
+  if (held && m.backT > -(c.b.helm.wade + c.b.helm.most)) {
     m.backT -= dt;
-    if (m.backT > -HELM.wade) return steady;
+    if (m.backT > -c.b.helm.wade) return steady;
     const deep = deepest(c);
     // (with the way off astern she holds the turn she is in, or she would swing
     // from one side to the other)
     const holding = Math.abs(deep) > Math.PI / 2 && ship.turn * deep < 0;
     return order(
       holding
-        ? Math.sign(ship.turn) * HELM.full
-        : Math.max(-HELM.full, Math.min(HELM.full, 2 * deep)),
-      m.backT + dt > -HELM.wade
+        ? Math.sign(ship.turn) * c.b.helm.full
+        : Math.max(-c.b.helm.full, Math.min(c.b.helm.full, 2 * deep)),
+      m.backT + dt > -c.b.helm.wade
     );
   }
   // and if that doesn't float her, she backs off as from a bank
-  const gaveUp = m.backT <= -(HELM.wade + HELM.most);
+  const gaveUp = m.backT <= -(c.b.helm.wade + c.b.helm.most);
   m.backT = 0;
-  if (crawling || gaveUp) m.stuckT += gaveUp ? HELM.stuck : dt;
+  if (crawling || gaveUp) m.stuckT += gaveUp ? c.b.helm.stuck : dt;
   else m.stuckT = Math.max(0, m.stuckT - 2 * dt);
-  if (m.stuckT <= HELM.stuck) return steady;
+  if (m.stuckT <= c.b.helm.stuck) return steady;
   m.stuckT = 0;
   // she turns off toward whichever side lies open, or the way to her course
   // when both do, until it lies less than half a turn on, so she doesn't swing
   // back across the bank
-  const reach = HELM.feelSide + ship.speed,
-    port = probe(c, 2 * HELM.side, reach),
-    starboard = probe(c, -2 * HELM.side, reach);
+  const reach = c.b.helm.feelSide + ship.speed,
+    port = probe(c, 2 * c.b.helm.side, reach),
+    starboard = probe(c, -2 * c.b.helm.side, reach);
   m.strafe = port !== starboard ? (port ? 1 : -1) : course >= 0 ? 1 : -1;
   const round =
     m.strafe * course >= 0 ? Math.abs(course) : 2 * Math.PI - Math.abs(course);
   m.backT = Math.min(
-    HELM.most,
+    c.b.helm.most,
     Math.max(
-      between(m, HELM.least, HELM.least * 2.2),
-      (round - Math.PI + HELM.slack) / HELM.rate
+      between(m, c.b.helm.least, c.b.helm.least * 2.2),
+      (round - Math.PI + c.b.helm.slack) / c.b.helm.rate
     )
   );
-  return order(m.strafe * HELM.full, true);
+  return order(m.strafe * c.b.helm.full, true);
 }

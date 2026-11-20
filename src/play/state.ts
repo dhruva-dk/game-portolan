@@ -40,6 +40,7 @@ import {
   type Order,
 } from '../sim/battle.ts';
 import { mind, rammed, shot } from '../sim/bot.ts';
+import { DEFAULT_BRAIN, nature, type Brain } from '../sim/brain.ts';
 import { afloat, stepFleet, type Vessel } from '../sim/contact.ts';
 import { STEP, blendPose } from '../sim/fixed.ts';
 import { gunOf } from '../sim/gun.ts';
@@ -230,13 +231,15 @@ export interface Waters {
 
 /**
  * planet: the world's; sea: its waves, which the ships ride; waters: its water,
- * sounded.
+ * sounded; brainOf: the brain each bot by id sails with (the game's own if not
+ * given: sim/brain.ts; the harness gives others).
  */
 export function createState(
   planet: Planet,
   sea: Hull,
   { chart, water }: Waters,
-  first: Match
+  first: Match,
+  brainOf: (id: number) => Brain = () => DEFAULT_BRAIN
 ) {
   const depth = remembered((p: Vec3) => -planet.height(p)),
     rises = planet.rises;
@@ -335,6 +338,7 @@ export function createState(
     aboard.set(id, {
       look,
       mind: bot ? mind(seedOf(id), ship.at) : null,
+      nature: nature(seedOf(id), brainOf(id)),
       steady: lashed ?? AMIDSHIPS,
       ride: r,
       before: p,
@@ -592,8 +596,7 @@ export function createState(
         ask,
         storm,
         flotsam,
-        territory,
-        seedOf
+        territory
       );
       for (let i = 0; i < fleet.length; i++)
         aims.set(fleet[i].id, told.orders[i]?.aim?.dir ?? null);

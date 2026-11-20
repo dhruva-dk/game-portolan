@@ -18,7 +18,7 @@ import { ramp, utility } from './utility.ts';
 import { between, open, rotate, type Ctx } from './captain.ts';
 
 /** Everything a bot's water is tuned by. Metres and seconds. */
-const CLAIMER = {
+export const CLAIMER = {
   /**
    * A bite reaches `depth` m past her edge and runs `width` m along it, from
    * timid to greedy (some 16–34 units out and 16–34 along, at 1.5–2.5 m a
@@ -89,14 +89,14 @@ const nearest = (c: Ctx) =>
 export function claimUrge(c: Ctx): number {
   const { m } = c;
   if (!c.sea.holdings) return 0;
-  if (m.bite) return CLAIMER.out;
+  if (m.bite) return c.b.claimer.out;
   if (
     m.clock < m.rested ||
     (c.sea.storm && c.sea.storm.phase >= STORM.phases.length)
   )
     return 0;
-  const safe = ramp(nearest(c), CLAIMER.danger, CLAIMER.clear);
-  return CLAIMER.setOut * utility(c.t.claim, safe);
+  const safe = ramp(nearest(c), c.b.claimer.danger, c.b.claimer.clear);
+  return c.b.claimer.setOut * utility(c.t.claim, safe);
 }
 
 /**
@@ -109,23 +109,27 @@ function plan(c: Ctx, p: Vec3): Vec3[] | null {
     greed = c.t.claim,
     f = c.own.ship.heading;
   const depth =
-    CLAIMER.depth[0] +
-    (CLAIMER.depth[1] - CLAIMER.depth[0]) * greed * between(c.m, 0.6, 1);
+    c.b.claimer.depth[0] +
+    (c.b.claimer.depth[1] - c.b.claimer.depth[0]) *
+      greed *
+      between(c.m, 0.6, 1);
   const width =
-    CLAIMER.width[0] +
-    (CLAIMER.width[1] - CLAIMER.width[0]) * greed * between(c.m, 0.6, 1);
+    c.b.claimer.width[0] +
+    (c.b.claimer.width[1] - c.b.claimer.width[0]) *
+      greed *
+      between(c.m, 0.6, 1);
   const kept = (q: Vec3) => open(c, q) && (!s || toEdge(q, s) > c.t.margin);
   const start = between(c.m, -Math.PI, Math.PI),
     flank = c.m.rand & 1 ? 1 : -1;
   for (let k = 0; k < 8; k++) {
     const dir = rotate(p, f, start + (k * Math.PI) / 4);
-    let edge = CLAIMER.probe;
+    let edge = c.b.claimer.probe;
     while (
-      edge < CLAIMER.edgeMost &&
+      edge < c.b.claimer.edgeMost &&
       h.ownerAt(along(p, dir, edge).p) === c.own.id
     )
-      edge += CLAIMER.probe;
-    if (edge >= CLAIMER.edgeMost) continue;
+      edge += c.b.claimer.probe;
+    if (edge >= c.b.claimer.edgeMost) continue;
     const gate = along(p, dir, edge).p,
       out = along(p, dir, edge + depth);
     const across = toward(out.p, gate),
@@ -135,7 +139,7 @@ function plan(c: Ctx, p: Vec3): Vec3[] | null {
       b = along(a, side, width).p,
       back = toward(b, gate);
     if (!back) continue;
-    const home = along(gate, toward(gate, p) ?? dir, CLAIMER.inside).p;
+    const home = along(gate, toward(gate, p) ?? dir, c.b.claimer.inside).p;
     const turn = along(b, back, distance(b, gate) * 0.5).p;
     if ([a, b, turn].every(kept)) return [a, b, turn, home];
   }
@@ -153,25 +157,25 @@ export function claimAct(c: Ctx): Vec3 {
   if (
     m.bite &&
     m.leg === m.bite.length - 1 &&
-    distance(p, m.bite[m.leg]) < CLAIMER.arrive
+    distance(p, m.bite[m.leg]) < c.b.claimer.arrive
   ) {
     m.bite = null;
     m.rested =
       m.clock +
-      CLAIMER.rest[1] -
-      (CLAIMER.rest[1] - CLAIMER.rest[0]) * c.t.claim;
+      c.b.claimer.rest[1] -
+      (c.b.claimer.rest[1] - c.b.claimer.rest[0]) * c.t.claim;
   }
   if (!m.bite) {
     m.bite = plan(c, p);
     m.leg = 0;
     if (!m.bite) {
-      m.rested = m.clock + CLAIMER.rest[1];
+      m.rested = m.clock + c.b.claimer.rest[1];
       return circle(c);
     }
   }
   while (
     m.leg < m.bite.length - 1 &&
-    distance(p, m.bite[m.leg]) < CLAIMER.arrive
+    distance(p, m.bite[m.leg]) < c.b.claimer.arrive
   )
     m.leg++;
   return m.bite[m.leg];
@@ -189,14 +193,15 @@ function circle(c: Ctx): Vec3 {
     h = c.sea.holdings!;
   for (const a of [0.6, 1.1, 1.7, -0.6, -1.1, -1.7, 2.4, -2.4, Math.PI]) {
     const way = rotate(p, f, side * a),
-      q = along(p, way, CLAIMER.round).p;
+      q = along(p, way, c.b.claimer.round).p;
     // and her water past it, room for the way she carries on by it
     if (
       h.ownerAt(q) === c.own.id &&
-      h.ownerAt(along(p, way, CLAIMER.round + CLAIMER.past).p) === c.own.id &&
+      h.ownerAt(along(p, way, c.b.claimer.round + c.b.claimer.past).p) ===
+        c.own.id &&
       open(c, q)
     )
       return q;
   }
-  return along(p, f, CLAIMER.round).p;
+  return along(p, f, c.b.claimer.round).p;
 }

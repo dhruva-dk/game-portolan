@@ -49,7 +49,7 @@ export const tacticMemory = (): TacticMemory => ({ recoil: 0 });
  * point off her beam, half the way out, `offMin`–`offMax` m; once her hull
  * touches her foe's, she bears away for `recoil` s.
  */
-const RAMMING = {
+export const RAMMING = {
   lead: 8,
   commit: 25,
   abeam: 0.5,
@@ -102,14 +102,17 @@ function ramCourse(c: Ctx, foe: Seen): Vec3 {
     ].filter((x) => x > 0);
     if (roots.length) tau = Math.min(...roots);
   }
-  let aim = add(r, v, Math.min(tau, RAMMING.lead));
+  let aim = add(r, v, Math.min(tau, c.b.ramming.lead));
   const reach = length(aim);
-  if (reach > RAMMING.commit) {
+  if (reach > c.b.ramming.commit) {
     const h = transport(foe.ship.heading, foe.ship.at, p),
       port = cross(p, h),
       back = scale(aim, -1 / reach);
-    const aside = Math.min(RAMMING.offMax, Math.max(RAMMING.offMin, reach / 2));
-    if (Math.abs(dot(back, h)) > RAMMING.abeam)
+    const aside = Math.min(
+      c.b.ramming.offMax,
+      Math.max(c.b.ramming.offMin, reach / 2)
+    );
+    if (Math.abs(dot(back, h)) > c.b.ramming.abeam)
       aim = add(aim, port, Math.sign(dot(back, port) || 1) * aside);
   }
   return aim;
@@ -123,7 +126,7 @@ export function mark(c: Ctx, intent: Intent, dt: number): Mark {
   const { m, own } = c,
     ship = own.ship;
   const foe = intent.foe >= 0 && inSight(c) ? c.foe : null;
-  if (foe && gap(ship, foe.ship) < 1) m.recoil = RAMMING.recoil;
+  if (foe && gap(ship, foe.ship) < 1) m.recoil = c.b.ramming.recoil;
   m.recoil = Math.max(0, m.recoil - dt);
   if (foe && m.recoil > 0) {
     const at = toward(ship.at, foe.ship.at);

@@ -1,4 +1,5 @@
 import { test } from 'node:test';
+import { nature } from '../src/sim/brain.ts';
 import assert from 'node:assert/strict';
 import { mind, rammed, think, type Memory } from '../src/sim/bot.ts';
 import { temper } from '../src/sim/temper.ts';
@@ -67,7 +68,7 @@ function sail(
         fleet.filter((o) => o.id !== v.id),
         { depth, storm: storm?.(n * STEP) },
         m,
-        seeds[i]!
+        nature(seeds[i]!)
       );
       minds[i] = r.memory;
       return r.helm;

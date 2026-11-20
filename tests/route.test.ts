@@ -1,4 +1,5 @@
 import { test } from 'node:test';
+import { nature } from '../src/sim/brain.ts';
 import assert from 'node:assert/strict';
 import { ROAMING, mind, think, type Memory } from '../src/sim/bot.ts';
 import { afloat, stepFleet, type Vessel } from '../src/sim/contact.ts';
@@ -145,7 +146,7 @@ function voyage(
     least = Infinity;
   for (let n = 1; n <= most / STEP; n++) {
     m = { ...m, goal: mark, since: 0 };
-    const r = think(fleet[0], [], { depth, chart: ch }, m, seed);
+    const r = think(fleet[0], [], { depth, chart: ch }, m, nature(seed));
     m = r.memory;
     fleet = stepFleet(fleet, [r.helm], STEP, depth).fleet;
     least = Math.min(
@@ -322,7 +323,7 @@ test('on the real planet: the chart, a route and 16 routed bots, timed', () => {
           fleet.filter((o) => o.id !== v.id),
           { depth, chart: ch },
           minds[i],
-          v.id + 1
+          nature(v.id + 1)
         );
         minds[i] = r.memory;
         return r.helm;

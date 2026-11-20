@@ -33,7 +33,7 @@ export interface Temper {
  * The six temperaments: hunter, homesteader, raider, turtle, scavenger,
  * brawler.
  */
-const STYLES: readonly Omit<Temper, 'skill' | 'aggro'>[] = [
+export const STYLES: readonly Omit<Temper, 'skill' | 'aggro'>[] = [
   {
     fight: 0.8,
     notice: 200,
@@ -103,13 +103,16 @@ const STYLES: readonly Omit<Temper, 'skill' | 'aggro'>[] = [
 ];
 
 /**
- * A bot's temperament, by her seed: one of the six, varied a little (but not
- * her loot, her mending or her claim, which are the six's own); her skill
- * (0.35–0.9), and her mood (0.2–1).
+ * A bot's temperament, by her seed: one of the `styles` (her brain's; the six
+ * if not given), varied a little (but not her loot, her mending or her claim,
+ * which are the style's own); her skill (0.35–0.9), and her mood (0.2–1).
  */
-export function temper(seed: number): Temper {
+export function temper(
+  seed: number,
+  styles: readonly Omit<Temper, 'skill' | 'aggro'>[] = STYLES
+): Temper {
   const u = random(seed ^ 0x51a7e);
-  const t = STYLES[Math.floor(u() * STYLES.length)];
+  const t = styles[Math.floor(u() * styles.length)];
   return {
     fight: Math.min(1, Math.max(0, t.fight + 0.2 * (u() - 0.5))),
     notice: t.notice * (0.85 + 0.3 * u()),

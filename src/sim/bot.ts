@@ -45,7 +45,7 @@ import { STEP } from './fixed.ts';
 import { aimAndFire, armFor, gunner, sighted } from './gunner.ts';
 import type { Helm } from './ship.ts';
 import { STORM, toEdge, type Cap } from './storm.ts';
-import { temper } from './temper.ts';
+import type { Nature } from './brain.ts';
 import {
   choose,
   logistic,
@@ -90,7 +90,7 @@ import { SHIP } from './handling.ts';
  * `sightStep` m along the way; a ship that rammed her within MIND.grudge s is
  * seen as `nearer` as far.
  */
-const SIGHT = {
+export const SIGHT = {
   sightMax: 240,
   forget: 4,
   sightLine: 2.5,
@@ -99,7 +99,7 @@ const SIGHT = {
 } as const;
 
 /** How she weighs a fight, a run and holding back. Seconds and metres. */
-const MIND = {
+export const MIND = {
   /**
    * A ship that rammed her within `grudge` s rouses her will to fight by
    * `roused`, cooling from `cool` s on. Rammed within `fresh` s, by one she
@@ -174,7 +174,7 @@ export const ROAMING = { roam: 9, arrive: 20, near: 60, far: 160 } as const;
  * under `drift` m, a roaming mark is drawn `drawn` of the way in toward its
  * centre (a chord's share).
  */
-const STORMING = {
+export const STORMING = {
   late: 25,
   ease: [0.55, 0.3] as const,
   inNext: 0.5,
@@ -259,14 +259,15 @@ export const shot = (m: Memory, by: number): Memory => ({
  * One step of dt seconds of a bot's mind: what she orders her helm and her gun,
  * what she asks of her stores, and her memory after. `own` is her own ship,
  * `others` every other ship afloat (she sees only those in her sight), `sea`
- * what she knows of the water, the storm and the loot, `seed` hers for good.
+ * what she knows of the water, the storm and the loot, `who` her nature (her
+ * seed, brain and temperament: brain.ts), hers for good.
  */
 export function think(
   own: Seen,
   others: readonly Seen[],
   sea: Sea,
   memory: Memory,
-  seed: number,
+  who: Nature,
   dt = STEP
 ): { helm: Helm; order: Order; ask: Ask; memory: Memory } {
   const m: Memory = {
@@ -280,10 +281,11 @@ export function think(
     others,
     sea,
     m,
-    t: temper(seed),
+    b: who.brain,
+    t: who.temper,
     foe: null,
     foeD: Infinity,
-    seed,
+    seed: who.seed,
   };
   lootTime(c, dt);
   if (m.think <= 0) {
@@ -340,8 +342,8 @@ function hidden(c: Ctx, a: Vec3, b: Vec3): boolean {
   const d = distance(a, b),
     t = toward(a, b);
   if (!t) return false;
-  for (let s = SIGHT.sightStep; s < d; s += SIGHT.sightStep)
-    if (-c.sea.depth(along(a, t, s).p) > SIGHT.sightLine) return true;
+  for (let s = c.b.sight.sightStep; s < d; s += c.b.sight.sightStep)
+    if (-c.sea.depth(along(a, t, s).p) > c.b.sight.sightLine) return true;
   return false;
 }
 
@@ -354,11 +356,13 @@ function perceive(c: Ctx): void {
   let best: Seen | null = null,
     bd = c.t.notice * (0.8 + 0.4 * c.t.skill);
   for (const o of c.others) {
-    if (apart(own.ship.at, o.ship.at, SIGHT.sightMax)) continue;
+    if (apart(own.ship.at, o.ship.at, c.b.sight.sightMax)) continue;
     const d = distance(own.ship.at, o.ship.at);
-    if (d > SIGHT.sightMax) continue;
+    if (d > c.b.sight.sightMax) continue;
     const score =
-      o.id === m.hitBy && m.clock - m.hitT < MIND.grudge ? d * SIGHT.nearer : d;
+      o.id === m.hitBy && m.clock - m.hitT < c.b.mind.grudge
+        ? d * c.b.sight.nearer
+        : d;
     if (score >= bd || hidden(c, own.ship.at, o.ship.at)) continue;
     [bd, best] = [score, o];
   }
@@ -366,7 +370,8 @@ function perceive(c: Ctx): void {
   if (best) [m.foe, m.seen, m.last] = [best.id, m.clock, best.ship.at];
   else if (
     m.foe >= 0 &&
-    (m.clock - m.seen > SIGHT.forget || !c.others.some((o) => o.id === m.foe))
+    (m.clock - m.seen > c.b.sight.forget ||
+      !c.others.some((o) => o.id === m.foe))
   )
     m.foe = -1;
 }
@@ -379,7 +384,7 @@ const reach = (cap: Cap) => cap.radius * R;
 /** Whether the next cap is closing, or will start to within STORMING.late s. */
 const late = (c: Ctx) =>
   !!c.sea.storm &&
-  (c.sea.storm.closing || c.sea.storm.secondsToNext < STORMING.late);
+  (c.sea.storm.closing || c.sea.storm.secondsToNext < c.b.storming.late);
 
 /**
  * How urgently she must get inside: from nothing `ease[0]` of her margin in
@@ -394,10 +399,14 @@ function stormUrge(c: Ctx): number {
     margin = c.t.margin;
   const pressed =
     late(c) &&
-    toEdge(p, s.next) < margin * STORMING.inNext &&
+    toEdge(p, s.next) < margin * c.b.storming.inNext &&
     s.phase < STORM.phases.length;
   return Math.max(
-    ramp(toEdge(p, s), margin * STORMING.ease[0], margin * STORMING.ease[1]),
+    ramp(
+      toEdge(p, s),
+      margin * c.b.storming.ease[0],
+      margin * c.b.storming.ease[1]
+    ),
     pressed ? 1 : 0
   );
 }
@@ -409,7 +418,11 @@ function stormUrge(c: Ctx): number {
 function openNear(c: Ctx, q: Vec3): Vec3 {
   if (open(c, q)) return q;
   const t = toward(q, c.own.ship.at) ?? c.own.ship.heading;
-  for (let d = STORMING.ring; d <= STORMING.shore; d += STORMING.ring) {
+  for (
+    let d = c.b.storming.ring;
+    d <= c.b.storming.shore;
+    d += c.b.storming.ring
+  ) {
     for (let k = 0; k < 16; k++) {
       const p = along(q, rotate(q, t, (k * Math.PI) / 8), d).p;
       if (open(c, p)) return p;
@@ -425,7 +438,7 @@ function openNear(c: Ctx, q: Vec3): Vec3 {
 function inward(c: Ctx, p: Vec3, centre: Vec3, r: number): Vec3 {
   if (distance(p, centre) <= r) return p;
   const t = toward(centre, p);
-  return openNear(c, t ? along(centre, t, r * STORMING.inward).p : centre);
+  return openNear(c, t ? along(centre, t, r * c.b.storming.inward).p : centre);
 }
 
 /**
@@ -437,7 +450,7 @@ function stormGoal(c: Ctx): Vec3 {
     margin = c.t.margin,
     p = c.own.ship.at;
   const cap: Cap =
-    toEdge(p, s) < margin * STORMING.nearEdge || !late(c) ? s : s.next;
+    toEdge(p, s) < margin * c.b.storming.nearEdge || !late(c) ? s : s.next;
   return inward(c, p, cap.centre, Math.max(0, reach(cap) - margin));
 }
 
@@ -464,17 +477,18 @@ function fightUrge(c: Ctx): number {
   will += ((0.1 + 0.5 * t.skill) * (strength(own) - strength(foe))) / 100;
   if (m.hitBy === foe.id)
     will +=
-      MIND.roused * ramp(m.clock - m.hitT, MIND.grudge + MIND.cool, MIND.cool);
+      c.b.mind.roused *
+      ramp(m.clock - m.hitT, c.b.mind.grudge + c.b.mind.cool, c.b.mind.cool);
   for (const o of c.others)
-    if (o.id !== foe.id && distance(own.ship.at, o.ship.at) < MIND.crowd)
-      will -= MIND.crowding * t.skill;
+    if (o.id !== foe.id && distance(own.ship.at, o.ship.at) < c.b.mind.crowd)
+      will -= c.b.mind.crowding * t.skill;
   const restraint = holdBack(c);
   will -= restraint;
   // close aboard she fights whatever her will, from nearer while she holds back
   const close = ramp(
     d,
-    MIND.closeFrom - 50 * restraint,
-    MIND.closeAt - 50 * restraint
+    c.b.mind.closeFrom - 50 * restraint,
+    c.b.mind.closeAt - 50 * restraint
   );
   if (close >= 1) return 1;
   // past reach, a ship sailing away is let go: in a fight, once she is clearly
@@ -484,13 +498,13 @@ function fightUrge(c: Ctx): number {
   // speed away, as a ram must catch her
   const from = toward(foe.ship.at, own.ship.at),
     off = from ? -dot(foe.ship.heading, from) : 0;
-  const past = ramp(d, MIND.letGo - 10, MIND.letGo + 15);
+  const past = ramp(d, c.b.mind.letGo - 10, c.b.mind.letGo + 15);
   const go = !own.armed
     ? 1 -
       past *
         ramp(
           off * foe.ship.speed,
-          ...(m.mode === 'fight' ? MIND.outrun : MIND.outran)
+          ...(m.mode === 'fight' ? c.b.mind.outrun : c.b.mind.outran)
         )
     : restraint > 0
       ? 1 -
@@ -499,7 +513,7 @@ function fightUrge(c: Ctx): number {
       : 1;
   return Math.max(
     close,
-    utility(logistic(will, MIND.will, MIND.willWidth), go)
+    utility(logistic(will, c.b.mind.will, c.b.mind.willWidth), go)
   );
 }
 
@@ -511,10 +525,10 @@ function fightUrge(c: Ctx): number {
 function holdBack(c: Ctx): number {
   const s = c.sea.storm;
   const by = s
-    ? MIND.restraint[Math.min(s.phase, MIND.restraint.length - 1)]
+    ? c.b.mind.restraint[Math.min(s.phase, c.b.mind.restraint.length - 1)]
     : 0;
   if (by <= 0) return 0;
-  return c.others.length + 1 <= MIND.lastFew ? by + MIND.more : by;
+  return c.others.length + 1 <= c.b.mind.lastFew ? by + c.b.mind.more : by;
 }
 
 /**
@@ -527,8 +541,8 @@ const holdsFire = (c: Ctx) =>
   !(
     c.foe &&
     c.m.shotBy === c.foe.id &&
-    c.m.clock - c.m.shotT < MIND.shotFresh &&
-    c.foeD < MIND.letGo
+    c.m.clock - c.m.shotT < c.b.mind.shotFresh &&
+    c.foeD < c.b.mind.letGo
   );
 
 /**
@@ -553,7 +567,7 @@ function evading(c: Ctx): number {
     !c.foe ||
     c.foeD >= 140 ||
     m.hitBy !== c.foe.id ||
-    m.clock - m.hitT > MIND.fresh
+    m.clock - m.hitT > c.b.mind.fresh
   )
     return 0;
   return utility(1 - fightUrge(c), 0.3 + 0.7 * c.t.skill);
@@ -571,7 +585,7 @@ interface Choice extends Option<Ctx> {
 // (Sheltering from weather, to be weighed 5.2, after the storm, hunting to the
 // sound of guns, and raiding wait on things this sea hasn't got; claiming is
 // claimer.ts's.)
-const ROAM: Choice = {
+const roamOption: Choice = {
   name: 'roam',
   weight: 1,
   mode: 'roam',
@@ -580,8 +594,8 @@ const ROAM: Choice = {
     const { m } = c;
     if (
       m.mode !== 'roam' ||
-      m.since > ROAMING.roam ||
-      distance(c.own.ship.at, m.goal) < ROAMING.arrive
+      m.since > c.b.roaming.roam ||
+      distance(c.own.ship.at, m.goal) < c.b.roaming.arrive
     ) {
       m.since = 0;
       return roamGoal(c);
@@ -604,7 +618,7 @@ const OPTIONS: readonly Choice[] = [
     weight: 3.3,
     mode: 'flee',
     score: (c) => Math.max(losing(c), evading(c)),
-    act: (c) => keptInside(c, away(c, c.m.last, MIND.run)),
+    act: (c) => keptInside(c, away(c, c.m.last, c.b.mind.run)),
   },
   {
     name: 'fight',
@@ -622,7 +636,7 @@ const OPTIONS: readonly Choice[] = [
     score: claimUrge,
     act: claimAct,
   },
-  ROAM,
+  roamOption,
 ];
 
 function decide(c: Ctx): void {
@@ -636,7 +650,7 @@ function decide(c: Ctx): void {
   const o =
     OPTIONS[
       choose(OPTIONS, c, current, c.t.skill, () => roll(m), momentum(m.since))
-    ] ?? ROAM;
+    ] ?? roamOption;
   if (o.mode !== m.mode) {
     [m.mode, m.since] = [o.mode, 0];
     lose(m);
@@ -681,13 +695,13 @@ function roamGoal(c: Ctx): Vec3 {
     let q = along(
       p,
       rotate(p, f, between(c.m, -Math.PI, Math.PI)),
-      between(c.m, ROAMING.near, ROAMING.far)
+      between(c.m, c.b.roaming.near, c.b.roaming.far)
     ).p;
-    if (s && reach(s) < STORMING.drift)
-      q = normalize(add(q, add(s.centre, q, -1), STORMING.drawn));
+    if (s && reach(s) < c.b.storming.drift)
+      q = normalize(add(q, add(s.centre, q, -1), c.b.storming.drawn));
     if (open(c, q) && (!keep || toEdge(q, keep) > margin)) return q;
   }
   if (s && toEdge(p, s) < 2 * margin)
     return inward(c, p, s.centre, Math.max(0, reach(s) - 2 * margin));
-  return along(p, rotate(p, f, deepest(c)), ROAMING.near).p;
+  return along(p, rotate(p, f, deepest(c)), c.b.roaming.near).p;
 }
