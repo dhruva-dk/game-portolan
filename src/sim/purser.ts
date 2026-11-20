@@ -13,7 +13,7 @@
 // Pure arithmetic: no three, so it runs in node for the tests; deterministic for the same inputs, to the bit.
 
 import { smoothstep } from '../world/scalar.ts';
-import { R, distance, dot } from '../world/sphere.ts';
+import { R, distance, dot, type Vec3 } from '../world/sphere.ts';
 import { armed, type Crew } from './battle.ts';
 import { ready } from './gust.ts';
 import type { Gun } from './gun.ts';
@@ -103,6 +103,12 @@ function worth(crew: Crew, l: Loot): number {
   return roomFor(crew.hold, g.kind) >= 0 ? 0.5 : 0;
 }
 
+/** Whether any of `others` lies nearer `at` than the angle whose cosine is `cos`. */
+function nearerTo(others: Ctx['others'], at: Vec3, cos: number): boolean {
+  for (let i = 0; i < others.length; i++) if (dot(others[i].ship.at, at) > cos) return true;
+  return false;
+}
+
 /**
  * The piece she would go for, and its worth by her temperament and its distance; the one she is
  * already going for kept while it is in reach. Notes it in her memory (`loot`).
@@ -122,11 +128,13 @@ export function lootUrge(c: Ctx): number {
     if (w <= 0) continue;
     const d = distance(p, l.at);
     // a ship well nearer to it is left to take it
-    const nearer = Math.cos((PURSER.ceded * d) / R);
-    if (d > PURSER.take && c.others.some((o) => dot(o.ship.at, l.at) > nearer)) continue;
+    if (d > PURSER.take && nearerTo(c.others, l.at, Math.cos((PURSER.ceded * d) / R))) continue;
     if (l.id === m.target) kept = l;
     const score = (w * t.loot) / (1 + d / 60);
-    if (score > bs) [bs, best] = [score, l];
+    if (score > bs) {
+      bs = score;
+      best = l;
+    }
   }
   if (kept && m.mode === 'loot') {
     m.loot = kept.id;

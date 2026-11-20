@@ -17,7 +17,9 @@
 // Pure arithmetic: no three, so it runs in node for the tests.
 
 import { smoothstep } from '../world/scalar.ts';
-import { add, along, cross, dot, frameAt, length, normalize, scale, transport, type Vec3 } from '../world/sphere.ts';
+import {
+  add, along, cross, dot, frameAt, length, normalize, put, scale, transport, type CourseOut, type Out3, type Vec3,
+} from '../world/sphere.ts';
 import { SHIP } from './handling.ts';
 import type { ShipState } from './ship.ts';
 
@@ -40,22 +42,41 @@ export const HULL: readonly (readonly [number, number])[] = [
 /** Metres either side at which the floor's slope is measured. */
 const PROBE = 1.5;
 
-/** Where a point of her hull (metres ahead of amidships and to port) lies, with her amidships at `at`. */
-export function hullAt(at: Vec3, heading: Vec3, [ahead, across]: readonly [number, number]): Vec3 {
-  if (ahead === 0 && across === 0) return at;
-  const d = add(scale(heading, ahead), cross(at, heading), across), metres = length(d);
-  return along(at, scale(d, 1 / metres), metres).p;
+/** hullAt's working vectors. */
+const toPort: Out3 = [0, 0, 0], off: Out3 = [0, 0, 0], reached: CourseOut = { p: [0, 0, 0], t: [0, 0, 0] };
+
+/** Where a point of her hull (metres ahead of amidships and to port) lies, with her amidships at `at` (into `out`;
+ *  without one, amidships is `at` itself). */
+export function hullAt(at: Vec3, heading: Vec3, point: readonly [number, number], out?: Out3): Vec3 {
+  const ahead = point[0], across = point[1];
+  if (ahead === 0 && across === 0) return out ? put(out, at[0], at[1], at[2]) : at;
+  const d = add(scale(heading, ahead, off), cross(at, heading, toPort), across, off), metres = length(d);
+  const p = along(at, scale(d, 1 / metres, off), metres, reached).p;
+  return put(out, p[0], p[1], p[2]);
+}
+
+/** under's sounding; and the point of HULL (its index) the last it made found shallowest, −1 for none. */
+const sounded: Out3 = [0, 0, 0];
+let shoalest = -1;
+
+/** How much water she has under her hull at its shallowest point, metres. */
+export function under(at: Vec3, heading: Vec3, depth: Depth): number {
+  let least = Infinity;
+  shoalest = -1;
+  for (let i = 0; i < HULL.length; i++) {
+    const c = depth(hullAt(at, heading, HULL[i], sounded)) - SHIP.draught;
+    if (c < least) {
+      least = c;
+      shoalest = i;
+    }
+  }
+  return least;
 }
 
 /** How much water she has under her hull at its shallowest point, metres, and where that is. */
 export function clearance(at: Vec3, heading: Vec3, depth: Depth): { least: number; where: Vec3 } {
-  let least = Infinity, where = at;
-  for (const point of HULL) {
-    const p = hullAt(at, heading, point);
-    const c = depth(p) - SHIP.draught;
-    if (c < least) [least, where] = [c, p];
-  }
-  return { least, where };
+  const least = under(at, heading, depth);
+  return { least, where: shoalest < 0 ? at : hullAt(at, heading, HULL[shoalest]) };
 }
 
 /** The way into deeper water at p: a unit tangent there, or null where the floor is level. */
@@ -120,7 +141,7 @@ export function navigate(s: ShipState, heading: Vec3, dt: number, depth: Depth):
     }
   }
   const fine = (to: { at: Vec3; heading: Vec3 }) => {
-    const c = clearance(to.at, to.heading, depth).least;
+    const c = under(to.at, to.heading, depth);
     return c >= 0 || c >= before.least;
   };
   const turning = moved(s.at, heading, add(move, push));

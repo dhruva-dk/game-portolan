@@ -31,7 +31,7 @@ import { clamp } from '../world/scalar.ts';
 import { R, add, dot, frameAt, length, normalize, scale, transport, type Vec3 } from '../world/sphere.ts';
 import { RAM, SHIP } from './handling.ts';
 import { step, type Helm, type ShipState } from './ship.ts';
-import { clearance, hullAt, moved, type Depth } from './shoal.ts';
+import { hullAt, moved, under, type Depth } from './shoal.ts';
 
 /** A ship in a fleet: who she is (an id no other in the fleet has), how she sails, the shove she is carried on by (m/s,
  * a tangent at her place), and the ships she has rammed or been rammed by and not yet drawn clear of. */
@@ -112,20 +112,25 @@ interface Meeting {
   middle: Vec3;
 }
 
-/** How a and b lie toward each other, or null if they lie too far apart to matter. */
+/** A point on the chart with axes east and north. */
+const flat = (p: Vec3, east: Vec3, north: Vec3): P => [R * dot(p, east), R * dot(p, north)];
+
+/** A ship laid on the chart with axes east and north. */
+function lay(s: ShipState, east: Vec3, north: Vec3): Laid {
+  const x = dot(s.heading, east), y = dot(s.heading, north), l = Math.hypot(x, y);
+  const stern = flat(hullAt(s.at, s.heading, [-KEEL, 0]), east, north), stem = flat(hullAt(s.at, s.heading, [KEEL, 0]), east, north);
+  return { centre: flat(s.at, east, north), ahead: [x / l, y / l], stern, stem };
+}
+
+/** How a and b lie toward each other, or null if they lie too far apart to matter (and then made without making
+ *  anything: it is asked of every pair, many times a step). */
 function meet(a: ShipState, b: ShipState): Meeting | null {
   const dx = a.at[0] - b.at[0], dy = a.at[1] - b.at[1], dz = a.at[2] - b.at[2];
   const reach = SHIP.length + RAM.rearm + 1;
   if ((dx * dx + dy * dy + dz * dz) * R * R > reach * reach) return null;
   const middle = normalize(add(a.at, b.at));
   const { east, north } = frameAt(middle);
-  const flat = (p: Vec3): P => [R * dot(p, east), R * dot(p, north)];
-  const lay = (s: ShipState): Laid => {
-    const x = dot(s.heading, east), y = dot(s.heading, north), l = Math.hypot(x, y);
-    const stern = flat(hullAt(s.at, s.heading, [-KEEL, 0])), stem = flat(hullAt(s.at, s.heading, [KEEL, 0]));
-    return { centre: flat(s.at), ahead: [x / l, y / l], stern, stem };
-  };
-  const la = lay(a), lb = lay(b);
+  const la = lay(a, east, north), lb = lay(b, east, north);
   const [s, t] = nearest(la.stern, la.stem, lb.stern, lb.stem);
   const p = along2(la.stern, sub(la.stem, la.stern), s), q = along2(lb.stern, sub(lb.stem, lb.stern), t);
   const d = sub(q, p), apart = Math.hypot(d[0], d[1]);
@@ -223,8 +228,8 @@ function pushed(s: ShipState, m: Meeting, u: P, metres: number, depth: Depth): S
   let d = add(scale(m.east, u[0]), m.north, u[1]);
   d = normalize(add(d, s.at, -dot(d, s.at)));
   const to = moved(s.at, s.heading, scale(d, metres));
-  const c = clearance(to.at, to.heading, depth).least;
-  return c >= 0 || c >= clearance(s.at, s.heading, depth).least ? { ...s, ...to } : null;
+  const c = under(to.at, to.heading, depth);
+  return c >= 0 || c >= under(s.at, s.heading, depth) ? { ...s, ...to } : null;
 }
 
 /** a and b pushed apart along the way between them, each by as much as she gives, unless the shallows hold her, when
@@ -251,8 +256,8 @@ function sailed(v: Vessel, helm: Helm, dt: number, depth: Depth): Working {
   const metres = length(shove) * dt;
   if (metres > 0) {
     const to = moved(ship.at, ship.heading, scale(shove, dt));
-    const c = clearance(to.at, to.heading, depth).least;
-    if (c >= 0 || c >= clearance(ship.at, ship.heading, depth).least) {
+    const c = under(to.at, to.heading, depth);
+    if (c >= 0 || c >= under(ship.at, ship.heading, depth)) {
       shove = transport(shove, ship.at, to.at);
       ship = { ...ship, ...to };
     } else shove = [0, 0, 0];
