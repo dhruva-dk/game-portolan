@@ -95,19 +95,6 @@ export const EXCEPTIONS: readonly Exception[] = [
 
   // exports only the tests or tools take: each the plain form of what the game
   // runs, for them to read it through
-  // (until the match types deal them: PLAN.md P2/P3, the next step)
-  ...(['Over', 'variant'] as const).map((name) => ({
-    rule: 'exports' as const,
-    file: 'src/sim/brain.ts',
-    name,
-    why: 'the harness’s brain variants; personas build theirs with it next (PLAN.md P2)',
-  })),
-  ...(['RulesOver', 'ruled'] as const).map((name) => ({
-    rule: 'exports' as const,
-    file: 'src/sim/rules.ts',
-    name,
-    why: 'the tests’ rules variants; match types build theirs with it next (PLAN.md P3)',
-  })),
   {
     rule: 'exports',
     file: 'src/audio/cues.ts',

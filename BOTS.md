@@ -459,3 +459,32 @@ commit; anything visible checked in headless chromium; iPad Air M1 at 30–40 fp
   keener ear; or the shallows (shoal.ts) letting a hull touching at two
   points ease off, which is the game's physics (the player's too), not
   this branch's.
+- PLAN H1–H3 (the `depth` branch): the harness counts the fighting from what
+  each step did (`state.advance` returns its shots, strikes, splashes and
+  pickups): shots by gun, range band and rarity and how many home (a shot
+  home once, however many pellets strike), damage dealt, rammed and taken,
+  kills, pickups, time with each gun in hand, a second kind, water at
+  30/60/120/240 s; a block per persona and per match type. `tools/matches.ts`
+  is gone; on match 1 the harness gives its very figures (1302 shots, by gun,
+  armed shares, silence, loot), but for hits (77% of strikes per shot there,
+  64% of shots home here).
+- PLAN P2/P3, personas and match types (`sim/persona.ts`): a persona is her
+  temper (as before) and a crew, changes to the brain she sails: the weights
+  of her options (CHOICE), how far she hears guns and sees ships, a turtle's
+  reach for cover. Each match is dealt a type by its seed: mixed 55%,
+  bloodbath, gold rush, cagey 15% each, each a mix of personas and rules
+  (loot laid, the storm's waits). 8 matches a type, 80 bots:
+
+  | Type      | Length | Armed 90% by | Shots home | Loops a ship | Loot laid |
+  | --------- | ------ | ------------ | ---------- | ------------ | --------- |
+  | bloodbath | 376 s  | 13 s         | 56%        | 4.3          | 446       |
+  | gold rush | 414 s  | 13 s         | 65%        | 6.5          | 618       |
+  | mixed     | 420 s  | 21 s         | 62%        | 6.8          | 447       |
+  | cagey     | 453 s  | 38 s         | 70%        | 8.4          | 446       |
+
+  The crews part the personas (8 matches before, 16 mixed after): brawler
+  16.4 → 21.4 shots a ship, 0.84 → 1.09 kills, place 52 → 50 (she dies
+  first); homesteader 19.0 → 15.5 shots, 0.96 → 0.70 kills. Pinned 5.6 → 4.6
+  s a ship over all. The scavenger is pinned most (10.3 s: her loot reach
+  takes her inshore), and places best (35): P6's to balance.
+  - Golden → `cb57b52c`.

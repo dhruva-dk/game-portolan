@@ -4,7 +4,7 @@
 
 import { SHIPS } from '../sim/match.ts';
 import { charted } from '../sim/route.ts';
-import { MIXED, type MatchType } from '../sim/persona.ts';
+import { dealt, type MatchType } from '../sim/persona.ts';
 import type { Spawn } from '../sim/spawn.ts';
 import { createStorm, type Storm } from '../sim/storm.ts';
 import type { Land } from '../world/land.ts';
@@ -75,14 +75,14 @@ export function watersOf(
  * each next one dealt a seed of its own (its storm and its bots' minds come
  * from it). hold: seconds the storm is held at, or null to let it run; gun: the
  * gun every ship is armed with, or null for none; typeOf: each match's type by
- * its seed (sim/persona.ts: a mixed match if not given).
+ * its seed (sim/persona.ts: as the game deals them if not given).
  */
 export function createMatches(
   seed: number,
   planet: Planet,
   hold: number | null,
   gun: Match['gun'],
-  typeOf: (seed: number) => MatchType = () => MIXED
+  typeOf: (seed: number) => MatchType = dealt
 ) {
   const depth = (p: Vec3) => -planet.height(p);
   const match = (s: number): Match => {

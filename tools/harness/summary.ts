@@ -218,11 +218,47 @@ function overMatches(results: readonly Result[]) {
   ];
 }
 
+/** The second half its fleet was down, of a match (Infinity: never). */
+function halfDown(r: Result): number {
+  const t = r.ships
+    .flatMap((s) => (s.sunk ? [s.sunk.time] : []))
+    .sort((a, b) => a - b);
+  return t[Math.floor(r.ships.length / 2) - 1] ?? Infinity;
+}
+
+/** Each match type's matches summed up, side by side (sim/persona.ts). */
+function byType(results: readonly Result[]) {
+  const types = [...new Set(results.map((r) => r.type))].sort();
+  const lines = [
+    'by match type: matches, median length, half down by, armed 90% by, shots a ship and home, a second kind, loops, longest silence',
+  ];
+  for (const t of types) {
+    const of = results.filter((r) => r.type === t),
+      ships = of.flatMap((r) => r.ships),
+      shots = sum(ships.map((s) => sum(Object.values(s.fighting.shots)))),
+      hits = sum(ships.map((s) => s.fighting.hits)),
+      armed = ships.flatMap((s) => (s.armed === null ? [] : [s.armed]));
+    lines.push(
+      `  ${t.padEnd(10)} ${String(of.length).padStart(3)}, ${at(
+        of.map((r) => r.seconds),
+        0.5
+      ).toFixed(
+        0
+      )} s, ${at(of.map(halfDown), 0.5).toFixed(0)} s, ${at(armed, 0.9)} s, ` +
+        `${(shots / ships.length).toFixed(1)} ${pc(hits, shots)}, ` +
+        `${pc(ships.filter((s) => s.second !== null).length, ships.length)}, ` +
+        `${mean(ships.map((s) => s.loops)).toFixed(1)}, ${Math.max(...of.map((r) => r.quiet)).toFixed(0)} s`
+    );
+  }
+  return lines;
+}
+
 export function summary(results: readonly Result[]): string {
   const names = [...new Set(results.flatMap((r) => r.spec.brains))];
   const lines = [
     ...byBrain(results, names),
     ...byPersona(results),
+    ...byType(results),
     ...overMatches(results),
   ];
   // against the first, match by match (fleets of one brain each)

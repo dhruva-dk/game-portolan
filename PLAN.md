@@ -454,3 +454,20 @@ then the behaviour commits on top.
   crown's leaflets). The map's own 1000k limit is dropped: it is held to the
   sea's 900k. `npm run budget` already exited 1 when a view was over (§6.5's
   "exits 0" was stale); it is the gate.
+- 2026-11-20 (R1, A1, P1): the captain split along her crew's lines
+  (`lookout`, `storming`, `fighting`, `roaming` parts); her option weights
+  and gunnery are brain slices. Golden unchanged.
+- 2026-11-20 (R2): a match carries its rules (`sim/rules.ts`: loot table,
+  storm table), read where loot is laid (`loot.ts laying`) and the storm
+  planned; `Storm.final` so nothing else reads its phases; `variant` moved
+  into `src` (`sim/tables.ts` holds `merged`, `weighed`). Golden unchanged.
+- 2026-11-20 (H1–H3): the harness counts the fighting from `advance`'s
+  report (shots, strikes, splashes, pickups); a block per persona and per
+  match type; `tools/matches.ts` deleted, its figures reproduced on match 1.
+- 2026-11-20 (P2, P3, H5): `sim/persona.ts`. A persona is a temper and a
+  crew (shares of the brain she sails: options' weights, ear, eye, cover);
+  four match types dealt by seed (mixed 55%, bloodbath, gold rush, cagey),
+  each a persona mix and rules; `--type` runs one. Bloodbath is the
+  shortest (376 s, against 420 mixed and 453 cagey), gold rush lays 618
+  pieces and arms a second kind most (75%), cagey arms slowest (90% by 38 s)
+  and holds the most water. Golden → `cb57b52c` (BOTS.md log has the table).

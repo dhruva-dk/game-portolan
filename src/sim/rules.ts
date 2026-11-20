@@ -23,7 +23,7 @@ export interface Rules {
 export const DEFAULT_RULES: Rules = { loot: LOOT, storm: STORM };
 
 /** What a variant of the rules changes: any keys of either table. */
-export type RulesOver = Changes<Rules>;
+type RulesOver = Changes<Rules>;
 
 /** Whole rules: `base` with `over`'s changes, keys in `base`'s order. */
 export const ruled = (over: RulesOver, base: Rules = DEFAULT_RULES): Rules => ({
