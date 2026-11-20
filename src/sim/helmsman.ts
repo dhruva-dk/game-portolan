@@ -39,7 +39,6 @@ import { offCourse, turned, type Helm } from './ship.ts';
 import { course as routed } from './route.ts';
 import { PURSER } from './purser.ts';
 import {
-  BOT,
   between,
   inSight,
   open,
@@ -50,6 +49,76 @@ import {
   type Ctx,
   type Seen,
 } from './captain.ts';
+
+/** Everything her helm is tuned by. Seconds and metres. */
+const HELM = {
+  /**
+   * Feeling ahead for shoal water: this far plus her speed (m/s × 1 s); sides
+   * felt `side` rad either way, a little further; a turn off land is `firm` rad
+   * of steer when one side is open, `hard` when neither is; held `avoid` s once
+   * the way clears.
+   */
+  feel: 14,
+  feelSide: 16,
+  side: 0.6,
+  firm: 0.9,
+  hard: 1.2,
+  avoid: 0.8,
+  /**
+   * Backing off a bank: making less than `crawl` m/s she is stuck (1 at a top
+   * of 14.5, scaled to SHIP.top). With shoal water `bow` m past her forefoot,
+   * she waits `wade` s, then makes for the deepest water `sound` m round her
+   * for up to `most` s. Else stuck `stuck` s, she turns hard (steer `full`)
+   * toward the open side at about `rate` rad/s (0.65 at a turn of 0.55;
+   * SHIP.turn is 0.6), for `least`–2.2×`least` s, at most `most`, until her
+   * course lies within `slack` of half a turn ahead; at `slow` throttle.
+   */
+  crawl: 0.93,
+  bow: 4,
+  wade: 1,
+  sound: 14,
+  stuck: 2.5,
+  full: 2.4,
+  rate: 0.56,
+  least: 1,
+  most: 4.5,
+  slack: 0.6,
+  slow: 0.6,
+  /**
+   * Making for a mark inside the circle she turns at her speed (else she sails
+   * round it for good), she slows to `tighten` of the speed whose circle passes
+   * through it, down to `least` throttle (enough for the rudder to bite).
+   */
+  tighten: 0.8,
+  leastWay: 0.35,
+  /**
+   * Answering a ram: a ship within `threat` m, her bow within `aimed` rad of
+   * her, closing faster than `closing` of a ram's least, due within `warn` s
+   * and passing within `miss` m. Whether she sees it is decided once each
+   * `warn` s, with a chance of 0.2 + 0.75 × skill.
+   */
+  threat: 90,
+  aimed: 0.6,
+  closing: 0.8,
+  warn: 5,
+  miss: 0.75 * SHIP.length,
+} as const;
+
+/**
+ * Ramming: the lead is at most `lead` s; from further than `commit` m, a ship
+ * she lies more than `abeam` (cosine) ahead or astern of is come at by way of a
+ * point off her beam, half the way out, `offMin`–`offMax` m; once her hull
+ * touches her foe's, she bears away for `recoil` s (a ram's blow lands once
+ * until they are RAM.rearm clear).
+ */
+const RAMMING = {
+  lead: 8,
+  commit: 25,
+  abeam: 0.5,
+  offMin: 15,
+  offMax: 50,
+  recoil: 3,
+} as const;
 
 /**
  * Where to steer to ram `foe` on her side: led for where she will be, by way of
@@ -75,14 +144,14 @@ function ramCourse(c: Ctx, foe: Seen): Vec3 {
     ].filter((x) => x > 0);
     if (roots.length) tau = Math.min(...roots);
   }
-  let aim = add(r, v, Math.min(tau, BOT.lead));
+  let aim = add(r, v, Math.min(tau, RAMMING.lead));
   const reach = length(aim);
-  if (reach > BOT.commit) {
+  if (reach > RAMMING.commit) {
     const h = transport(foe.ship.heading, foe.ship.at, p),
       port = cross(p, h),
       back = scale(aim, -1 / reach);
-    const aside = Math.min(BOT.offMax, Math.max(BOT.offMin, reach / 2));
-    if (Math.abs(dot(back, h)) > BOT.abeam)
+    const aside = Math.min(RAMMING.offMax, Math.max(RAMMING.offMin, reach / 2));
+    if (Math.abs(dot(back, h)) > RAMMING.abeam)
       aim = add(aim, port, Math.sign(dot(back, port) || 1) * aside);
   }
   return aim;
@@ -108,7 +177,7 @@ export function deepest(c: Ctx): number {
     const t = rotate(at, heading, (k * Math.PI) / 8);
     let top = -Infinity,
       end = 0;
-    for (let s = 2; s <= BOT.sound; s += 3)
+    for (let s = 2; s <= HELM.sound; s += 3)
       top = Math.max(top, (end = -c.sea.depth(along(at, t, s).p)));
     const score = top + 0.25 * end;
     if (score < low) [low, best] = [score, (k * Math.PI) / 8];
@@ -129,7 +198,7 @@ export function steer(c: Ctx, dt: number): Helm {
   });
   // what she makes for: her foe's side, away from her after a ram, or her goal
   const foe = m.mode === 'fight' && inSight(c) ? c.foe : null;
-  if (foe && gap(ship, foe.ship) < 1) m.recoil = BOT.recoil;
+  if (foe && gap(ship, foe.ship) < 1) m.recoil = RAMMING.recoil;
   m.recoil = Math.max(0, m.recoil - dt);
   let want: Vec3 | null,
     toD = foe ? c.foeD : distance(ship.at, m.goal),
@@ -178,7 +247,7 @@ export function steer(c: Ctx, dt: number): Helm {
   const course = turn;
   // feel ahead along the course (not her heading: coming round, she would only
   // ever feel the bank)
-  const ahead = Math.min(BOT.feel + ship.speed, toD);
+  const ahead = Math.min(HELM.feel + ship.speed, toD);
   if (
     want &&
     !open(
@@ -187,8 +256,8 @@ export function steer(c: Ctx, dt: number): Helm {
         .p
     )
   ) {
-    const port = probe(c, BOT.side, BOT.feelSide + ship.speed),
-      starboard = probe(c, -BOT.side, BOT.feelSide + ship.speed);
+    const port = probe(c, HELM.side, HELM.feelSide + ship.speed),
+      starboard = probe(c, -HELM.side, HELM.feelSide + ship.speed);
     // she keeps turning off the way she began to, unless only the other side
     // lies open
     let way = Math.sign(m.avoid);
@@ -197,12 +266,12 @@ export function steer(c: Ctx, dt: number): Helm {
         port !== starboard ? (port ? 1 : -1) : port ? 0 : turn >= 0 ? 1 : -1;
     }
     if (way !== 0) {
-      turn = way * (port !== starboard ? BOT.firm : BOT.hard);
-      m.avoid = way * BOT.avoid;
+      turn = way * (port !== starboard ? HELM.firm : HELM.hard);
+      m.avoid = way * HELM.avoid;
     }
   } else if (m.avoid !== 0) {
     if (Math.sign(turn) !== Math.sign(m.avoid))
-      turn = Math.sign(m.avoid) * BOT.firm;
+      turn = Math.sign(m.avoid) * HELM.firm;
     m.avoid =
       m.avoid > 0 ? Math.max(0, m.avoid - dt) : Math.min(0, m.avoid + dt);
   }
@@ -223,8 +292,8 @@ export function steer(c: Ctx, dt: number): Helm {
     foe && !mark
       ? 1
       : Math.max(
-          BOT.leastWay,
-          Math.min(1, (BOT.tighten * r * SHIP.turn) / SHIP.top)
+          HELM.leastWay,
+          Math.min(1, (HELM.tighten * r * SHIP.turn) / SHIP.top)
         );
   return stuck(c, dt, course) ?? order(turn, Math.min(easy, tight));
 }
@@ -239,27 +308,27 @@ function answer(c: Ctx): number | null {
     p = own.ship.at,
     mine = velocity(own);
   for (const o of c.others) {
-    if (apart(p, o.ship.at, BOT.threat)) continue;
+    if (apart(p, o.ship.at, HELM.threat)) continue;
     const d = distance(p, o.ship.at),
       t = toward(p, o.ship.at);
-    if (d > BOT.threat || !t) continue;
+    if (d > HELM.threat || !t) continue;
     const r = scale(t, d),
       rel = add(transport(velocity(o), o.ship.at, p), mine, -1),
       closing = -dot(t, rel);
     if (
-      closing < BOT.closing * RAM.least ||
-      (d - SHIP.length / 2) / closing > BOT.warn
+      closing < HELM.closing * RAM.least ||
+      (d - SHIP.length / 2) / closing > HELM.warn
     )
       continue;
     const back = toward(o.ship.at, p);
-    if (!back || dot(o.ship.heading, back) < Math.cos(BOT.aimed)) continue;
+    if (!back || dot(o.ship.heading, back) < Math.cos(HELM.aimed)) continue;
     const when = -dot(r, rel) / dot(rel, rel);
-    if (length(add(r, rel, when)) > BOT.miss) continue;
+    if (length(add(r, rel, when)) > HELM.miss) continue;
     const bearing = offCourse(own.ship, t);
     if (m.mode === 'fight' && o.id === m.foe && Math.abs(bearing) < 0.5)
       continue;
     if (
-      unitHash(c.seed, o.id * STRIDE + Math.floor(m.clock / BOT.warn)) >
+      unitHash(c.seed, o.id * STRIDE + Math.floor(m.clock / HELM.warn)) >
       0.2 + 0.75 * c.t.skill
     )
       continue;
@@ -280,55 +349,55 @@ function stuck(c: Ctx, dt: number, course: number): Helm | null {
     ship = c.own.ship;
   const order = (turn: number): Helm => ({
     course: turned(ship, turn),
-    throttle: BOT.slow,
+    throttle: HELM.slow,
   });
   if (m.backT > 0) {
     m.backT -= dt;
-    return order(m.strafe * BOT.full);
+    return order(m.strafe * HELM.full);
   }
-  const crawling = distance(m.was, ship.at) < BOT.crawl * dt;
+  const crawling = distance(m.was, ship.at) < HELM.crawl * dt;
   // held up by shoal water off her bow, she works off it the way the water
   // deepens; the clock runs below zero meanwhile
   const held =
     crawling &&
-    !open(c, along(ship.at, ship.heading, 0.4 * SHIP.length + BOT.bow).p);
-  if (held && m.backT > -(BOT.wade + BOT.most)) {
+    !open(c, along(ship.at, ship.heading, 0.4 * SHIP.length + HELM.bow).p);
+  if (held && m.backT > -(HELM.wade + HELM.most)) {
     m.backT -= dt;
-    if (m.backT > -BOT.wade) return null;
-    if (m.backT + dt > -BOT.wade) m.route = null;
+    if (m.backT > -HELM.wade) return null;
+    if (m.backT + dt > -HELM.wade) m.route = null;
     const deep = deepest(c);
     // (with the way off astern she holds the turn she is in, or she would swing
     // from one side to the other)
     const holding = Math.abs(deep) > Math.PI / 2 && ship.turn * deep < 0;
     return order(
       holding
-        ? Math.sign(ship.turn) * BOT.full
-        : Math.max(-BOT.full, Math.min(BOT.full, 2 * deep))
+        ? Math.sign(ship.turn) * HELM.full
+        : Math.max(-HELM.full, Math.min(HELM.full, 2 * deep))
     );
   }
   // and if that doesn't float her, she backs off as from a bank
-  const gaveUp = m.backT <= -(BOT.wade + BOT.most);
+  const gaveUp = m.backT <= -(HELM.wade + HELM.most);
   m.backT = 0;
-  if (crawling || gaveUp) m.stuckT += gaveUp ? BOT.stuck : dt;
+  if (crawling || gaveUp) m.stuckT += gaveUp ? HELM.stuck : dt;
   else m.stuckT = Math.max(0, m.stuckT - 2 * dt);
-  if (m.stuckT <= BOT.stuck) return null;
+  if (m.stuckT <= HELM.stuck) return null;
   m.stuckT = 0;
   m.route = null;
   // she turns off toward whichever side lies open, or the way to her course
   // when both do, until it lies less than half a turn on, so she doesn't swing
   // back across the bank
-  const reach = BOT.feelSide + ship.speed,
-    port = probe(c, 2 * BOT.side, reach),
-    starboard = probe(c, -2 * BOT.side, reach);
+  const reach = HELM.feelSide + ship.speed,
+    port = probe(c, 2 * HELM.side, reach),
+    starboard = probe(c, -2 * HELM.side, reach);
   m.strafe = port !== starboard ? (port ? 1 : -1) : course >= 0 ? 1 : -1;
   const round =
     m.strafe * course >= 0 ? Math.abs(course) : 2 * Math.PI - Math.abs(course);
   m.backT = Math.min(
-    BOT.most,
+    HELM.most,
     Math.max(
-      between(m, BOT.least, BOT.least * 2.2),
-      (round - Math.PI + BOT.slack) / BOT.rate
+      between(m, HELM.least, HELM.least * 2.2),
+      (round - Math.PI + HELM.slack) / HELM.rate
     )
   );
-  return order(m.strafe * BOT.full);
+  return order(m.strafe * HELM.full);
 }

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { BOT, mind, think, type Memory } from '../src/sim/bot.ts';
+import { ROAMING, mind, think, type Memory } from '../src/sim/bot.ts';
 import { afloat, stepFleet, type Vessel } from '../src/sim/contact.ts';
 import { STEP } from '../src/sim/fixed.ts';
 import { SHIP } from '../src/sim/handling.ts';
@@ -152,7 +152,7 @@ function voyage(
       least,
       clearance(fleet[0].ship.at, fleet[0].ship.heading, depth).least
     );
-    if (distance(fleet[0].ship.at, mark) < BOT.arrive)
+    if (distance(fleet[0].ship.at, mark) < ROAMING.arrive)
       return { seconds: n * STEP, least, memory: m };
   }
   return { seconds: Infinity, least, memory: m };
@@ -168,7 +168,8 @@ test('a bot reaches a mark behind an island in near the least time, which withou
     const tangent = Math.sqrt(d * d - rc * rc),
       arc = rc * (Math.PI - Math.acos(rc / d) - Math.acos(rc / 130));
     const least =
-      (tangent + arc + Math.sqrt(130 * 130 - rc * rc) - BOT.arrive) / SHIP.top;
+      (tangent + arc + Math.sqrt(130 * 130 - rc * rc) - ROAMING.arrive) /
+      SHIP.top;
     const routed = voyage(round, roundChart, ship, mark, 3),
       felt = voyage(round, null, ship, mark, 3);
     console.log(
