@@ -10,7 +10,9 @@
 //
 // Node only (tools/).
 
-import type { Mode } from '../../src/sim/captain.ts';
+import type { Memory } from '../../src/sim/bot.ts';
+import { BOT, type Mode } from '../../src/sim/captain.ts';
+import { SHIP } from '../../src/sim/handling.ts';
 import { distance, type Vec3 } from '../../src/world/sphere.ts';
 import type { State } from './run.ts';
 
@@ -33,9 +35,31 @@ export interface ShipResult {
   stuck: Partial<Record<Mode, number>>;
   aground: number;
   pinned: number;
+  /** Of her pinned seconds, how many each of what her mind showed then was so (WHY). */
+  why: Partial<Record<Why, number>>;
+  /** Each run of pinned seconds: when it began, how long, her mode, where (a unit vector) and why. */
+  episodes: Episode[];
   /** Mean speed over her seconds afloat (m/s), and her share of the water at the end. */
   speed: number;
   share: number;
+}
+
+/**
+ * What her mind shows in a pinned second (helmsman.ts, pilot.ts): `avoid`
+ * holding a turn off land, `back` backing off a bank or working off a bar,
+ * `short` her route ending SHORT m or more short of her goal (none found to it:
+ * route.ts hands back the cell nearest), `dry` her goal in water not open to
+ * her; `none` none of these.
+ */
+export type Why = 'avoid' | 'back' | 'short' | 'dry' | 'none';
+const SHORT = 30;
+
+export interface Episode {
+  from: number;
+  seconds: number;
+  mode: Mode;
+  at: Vec3;
+  why: Why[];
 }
 
 /** A match's account. */
@@ -50,6 +74,8 @@ export interface MatchResult {
 }
 
 interface Watch {
+  /** The pinned run under way, if she is pinned. */
+  run: Episode | null;
   path: Vec3[];
   speeds: number[];
   r: ShipResult;
@@ -57,11 +83,30 @@ interface Watch {
   speedSum: number;
 }
 
-/** A watch over a match: `second()` once each second of its clock; `end()` its account. */
-export function watch(state: State, brainOf: (id: number) => string) {
+/** What her mind shows now (Why), `depth` the sea's. */
+function whyNow(m: Readonly<Memory>, depth: (p: Vec3) => number): Why[] {
+  const out: Why[] = [];
+  if (m.avoid > 0) out.push('avoid');
+  if (m.backT !== 0) out.push('back');
+  if (m.mode !== 'fight' && m.route && distance(m.route.to, m.goal) > SHORT)
+    out.push('short');
+  if (depth(m.goal) < SHIP.draught + BOT.open) out.push('dry');
+  return out.length ? out : ['none'];
+}
+
+/**
+ * A watch over a match on a sea of `depth`: `second()` once each second of its
+ * clock; `end()` its account.
+ */
+export function watch(
+  state: State,
+  brainOf: (id: number) => string,
+  depth: (p: Vec3) => number
+) {
   const ships = new Map<number, Watch>();
   for (const k of state.ships())
     ships.set(k.id, {
+      run: null,
       path: [],
       speeds: [],
       afloat: 0,
@@ -76,6 +121,8 @@ export function watch(state: State, brainOf: (id: number) => string) {
         stuck: {},
         aground: 0,
         pinned: 0,
+        why: {},
+        episodes: [],
         speed: 0,
         share: 0,
       },
@@ -102,12 +149,24 @@ export function watch(state: State, brainOf: (id: number) => string) {
           w.path.shift();
           w.speeds.shift();
         }
-        if (w.path.length > WINDOW && distance(w.path[0], v.ship.at) < STUCK) {
+        const stuck =
+          w.path.length > WINDOW && distance(w.path[0], v.ship.at) < STUCK;
+        if (stuck) {
           add(w.r.stuck, mode);
-          if (mode !== 'claim') w.r.pinned++;
           const mean = w.speeds.reduce((a, b) => a + b, 0) / w.speeds.length;
           if (mean < AGROUND) w.r.aground++;
         }
+        if (stuck && mode !== 'claim' && mind) {
+          w.r.pinned++;
+          const why = whyNow(mind, depth);
+          for (const y of why) w.r.why[y] = (w.r.why[y] ?? 0) + 1;
+          if (!w.run || w.run.mode !== mode) {
+            w.run = { from: s, seconds: 0, mode, at: v.ship.at, why: [] };
+            w.r.episodes.push(w.run);
+          }
+          w.run.seconds++;
+          for (const y of why) if (!w.run.why.includes(y)) w.run.why.push(y);
+        } else w.run = null;
       }
     },
     end(steps: number, ms: number): MatchResult {

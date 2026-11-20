@@ -54,7 +54,7 @@ export function runMatch(spec: Spec): Result {
   for (let k = 1; k < spec.match; k++) m = matches.deal();
   state.start(m, false);
   const end = spec.seconds ?? END,
-    seen = watch(state, brainOf);
+    seen = watch(state, brainOf, w.depth);
   const idle = { course: null, throttle: 0 },
     still = { aim: null, fire: false },
     each = Math.round(1 / STEP);

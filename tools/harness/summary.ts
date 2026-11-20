@@ -29,6 +29,21 @@ function interval(xs: readonly number[]): [number, number] {
   return [at(means, 0.025), at(means, 0.975)];
 }
 
+/** Counts by key summed over ships, as "key n%" of the whole, most first. */
+function tally(each: readonly Partial<Record<string, number>>[]): string {
+  const sum = new Map<string, number>();
+  let total = 0;
+  for (const e of each)
+    for (const [k, n] of Object.entries(e)) {
+      sum.set(k, (sum.get(k) ?? 0) + (n ?? 0));
+      total += n ?? 0;
+    }
+  return [...sum]
+    .sort((x, y) => y[1] - x[1])
+    .map(([k, n]) => `${k} ${((100 * n) / Math.max(1, total)).toFixed(0)}%`)
+    .join(' ');
+}
+
 /** The figures of one brain's ships. */
 function figures(ships: readonly ShipResult[]) {
   const armed = ships.flatMap((s) => (s.armed === null ? [] : [s.armed]));
@@ -49,6 +64,8 @@ function figures(ships: readonly ShipResult[]) {
     armedMedian: at(armed, 0.5),
     armed90: at(armed, 0.9),
     place: mean(ships.map((s) => s.place)),
+    why: tally(ships.map((s) => s.why)),
+    pinnedBy: tally(ships.map((s) => s.stuck)),
     speed: mean(ships.map((s) => s.speed)),
     modes: [...modes]
       .sort((x, y) => y[1] - x[1])
@@ -72,7 +89,9 @@ export function summary(results: readonly Result[]): string {
       `  pinned ${f.pinned.toFixed(1)} s a ship (${(100 * f.everPinned).toFixed(0)}% ever), aground ${f.aground.toFixed(1)} s, ` +
         `circling in claim ${f.claimStuck.toFixed(1)} s; ${f.speed.toFixed(1)} m/s`,
       `  armed ${(100 * f.armed).toFixed(0)}%, median ${f.armedMedian} s, 90% by ${f.armed90} s; place ${f.place.toFixed(1)}`,
-      `  time: ${f.modes}`
+      `  time: ${f.modes}`,
+      `  stuck by mode: ${f.pinnedBy}`,
+      `  pinned, her mind showing: ${f.why}`
     );
   }
   // against the first, match by match (fleets of one brain each)

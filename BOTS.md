@@ -188,9 +188,17 @@ commit; anything visible checked in headless chromium; iPad Air M1 at 30–40 fp
   - [x] B4 `Brain` composed in brain.ts; `Nature` per ship on the `Hand`;
         `createState(..., brainOf)`; parts read `c.b.<own slice>`. Rules 1–4.
 - [ ] **C. Harness.**
-  - [ ] C1 runMatch(spec), worker pool, chart cache (`.cache/`, gitignored), JSONL.
-  - [ ] C2 Trace sink + events; metrics: stuck by mode, progress/s, route
-        failures, time in mode, why-lines, armed by t, loot taken, placement.
+  - [x] C1 `node tools/harness/cli.ts --brains default,wary --matches 16`:
+        runMatch(spec), worker pool (9 threads), JSONL in `.cache/harness/`,
+        summary with paired bootstrap CI. The world is made once per worker
+        (~0.3 s): no disk cache needed.
+  - [x] C2 Observation without a trace sink: the harness reads each bot's
+        memory once a second (`state.debug.mindOf`), so the sim is untouched.
+        Metrics: time in mode, stuck by mode, pinned (stuck, not claiming)
+        with "why" (avoid/back/short/dry/none) and episodes (where, when);
+        armed by t, place. Tools: `inspect.ts` (one ship second by second),
+        `wedge.ts` (can a ship in this state free herself, per helm).
+        Why-lines (scores of the top options) deferred: not needed so far.
   - [ ] C3 Scenarios: crossing pairs (200 fixed), channel, storm-from-a-cove,
         duel, chase. Suite under 60 s as a test.
 - [ ] **D. Loot more plentiful** (user ask, measured). See Decision 3.
@@ -240,3 +248,20 @@ commit; anything visible checked in headless chromium; iPad Air M1 at 30–40 fp
 - B4: brain.ts (Brain, DEFAULT_BRAIN, Nature, nature); think takes a Nature;
   Hand.nature; createState brainOf; temper takes styles; weaponWorth takes
   `other`. Golden unchanged; 366 tests.
+- C1/C2 harness baseline (16 matches, default, 45 s on 9 workers;
+  `.cache/harness/baseline.jsonl`): 421 s a match, 1.53 ms/step (9 at once);
+  **pinned 20.1 s a ship, 44% of ships ever**, aground 3.7 s, claim-circling
+  6.4 s; armed 85%, median 7 s, 90% by 27 s. Stuck by mode: storm 65%, claim
+  24%, loot 7%. Pinned, mind showing: back 67%, none 31%, dry 1%, short 0%.
+  Runs of ≥30 s hold 21.6k of 25.7k pinned seconds.
+- **Why bots are stuck (found, not guessed):** the routes are fine (short 0%).
+  The long runs are a ship with her bow on a shore in a cove (m4 #25, m6 #37).
+  `wedge.ts` from her exact state: one side frees her (head swings 83–176°),
+  the other moves her 0 m: shoal.ts refuses any turn that puts a hull point in
+  worse water. Her helm keeps choosing the blocked side: (a) `deepest`'s
+  turn and the back-off side are picked by feel, never checked against her
+  head actually swinging; (b) `crawling` is judged step to step, and a hull
+  surging against a shore (4–11 m/s, eased back each step) is never crawling,
+  so no reflex fires at all ("none"). A slow crawl (0.35) frees her better
+  than full. The fix (E3, re-scoped): progress over a window, and a turn
+  that doesn't swing her head is given up for the other side.
