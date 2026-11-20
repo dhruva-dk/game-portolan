@@ -1,8 +1,9 @@
 // Ratings from where ships placed: each group's strength (by persona, brain,
 // or anything a ship is told apart by), fitted to the order ships went down in.
-//   node tools/harness/rate.ts results.jsonl [--by persona|brain|type-persona|gun]
-// (gun: the kind she held longest. Ships carry the gun they find, so a gun's
-// rating is of the ships that kept it, not of the gun alone.)
+//   node tools/harness/rate.ts results.jsonl [--by persona|brain|type-persona|gun|fired]
+// (gun: the kind she held longest; fired: the kind she fired longest. Ships
+// carry the gun they find, so a gun's rating is of the ships that kept it, not
+// of the gun alone.)
 //
 // The model (Plackett–Luce, worst first): each sinking is the one ship, of
 // those still afloat, that was to go next, chosen with odds e^−θ of her group;
@@ -18,6 +19,8 @@
 
 import { readFileSync } from 'node:fs';
 import { parseArgs } from 'node:util';
+import type { GunKind } from '../../src/kinds.ts';
+import { GUNS } from '../../src/sim/handling.ts';
 import { random } from '../../src/world/random.ts';
 import type { ShipResult } from './metrics.ts';
 import type { Result } from './run.ts';
@@ -137,6 +140,17 @@ export const GROUPINGS: Readonly<
   gun: (s) =>
     Object.entries(s.hand).reduce(
       (best, [k, t]) => ((t ?? 0) > best.t ? { k, t: t ?? 0 } : best),
+      { k: 'none', t: 0 }
+    ).k,
+  // the gun she fired longest, its shots by its interval (none: she never
+  // fired): a ship with two guns has her longer one in hand while no foe is
+  // near, so `gun` counts a scatter only for ships that had nothing else
+  fired: (s) =>
+    Object.entries(s.fighting.shots).reduce(
+      (best, [k, n]) => {
+        const t = (n ?? 0) * GUNS[k as GunKind].interval;
+        return t > best.t ? { k, t } : best;
+      },
       { k: 'none', t: 0 }
     ).k,
 };
