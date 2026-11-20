@@ -32,7 +32,11 @@ export interface Temper {
 
 /**
  * The six temperaments: hunter, homesteader, raider, turtle, scavenger,
- * brawler (persona.ts PERSONAS, in this order).
+ * brawler (persona.ts PERSONAS, in this order). Balanced by the ratings
+ * (PLAN P6): a captain who sees every ship from far off slips away from
+ * every fight, and outlasts those who fight; so the scavenger, her eyes on
+ * the loot, notices a ship late, and the turtle, in her shell, not much
+ * sooner.
  */
 export const STYLES: readonly Omit<Temper, 'skill' | 'aggro'>[] = [
   {
@@ -59,7 +63,7 @@ export const STYLES: readonly Omit<Temper, 'skill' | 'aggro'>[] = [
   },
   {
     fight: 0.55,
-    notice: 160,
+    notice: 130,
     run: 35,
     margin: 25,
     standoff: 0.9,
@@ -70,8 +74,8 @@ export const STYLES: readonly Omit<Temper, 'skill' | 'aggro'>[] = [
   },
   {
     fight: 0.35,
-    notice: 120,
-    run: 50,
+    notice: 85,
+    run: 35,
     margin: 45,
     standoff: 1.25,
     loot: 0.6,
@@ -81,34 +85,48 @@ export const STYLES: readonly Omit<Temper, 'skill' | 'aggro'>[] = [
   },
   {
     fight: 0.3,
-    notice: 120,
+    notice: 60,
     run: 30,
     margin: 30,
     standoff: 1.15,
-    loot: 1,
-    lootReach: 170,
+    loot: 0.75,
+    lootReach: 140,
     mend: 60,
     claim: 0.5,
   },
   {
     fight: 1,
     notice: 220,
-    run: 28,
+    run: 32,
     margin: 15,
     standoff: 0.7,
-    loot: 0.45,
+    loot: 0.6,
     lootReach: 90,
-    mend: 55,
+    mend: 60,
     claim: 0.2,
   },
+];
+
+/**
+ * The skill each style is drawn from, least to most (hunter … brawler): the
+ * fighters sharper, as fighting is their trade, the scavenger, who lives by
+ * keeping out of it, the least; each within 0–1.
+ */
+const SKILL: readonly (readonly [number, number])[] = [
+  [0.55, 1],
+  [0.35, 0.9],
+  [0.3, 0.85],
+  [0.35, 0.9],
+  [0.15, 0.7],
+  [0.55, 1],
 ];
 
 /**
  * A bot's temperament, by her seed: one of the `styles` (her brain's; the six
  * if not given), drawn by `weights` (each as likely as the next if not given:
  * a match's mix of personas, persona.ts), varied a little (but not her loot,
- * her mending or her claim, which are the style's own); her skill (0.35–0.9),
- * and her mood (0.2–1). With the style drawn, by its index.
+ * her mending or her claim, which are the style's own); her skill (by her
+ * style, SKILL), and her mood (0.2–1). With the style drawn, by its index.
  */
 export function temper(
   seed: number,
@@ -117,7 +135,8 @@ export function temper(
 ): Temper & { style: number } {
   const u = random(seed ^ 0x51a7e);
   const style = weighed(weights, u()),
-    t = styles[style];
+    t = styles[style],
+    [lo, hi] = SKILL[style] ?? SKILL[1];
   return {
     style,
     fight: Math.min(1, Math.max(0, t.fight + 0.2 * (u() - 0.5))),
@@ -129,7 +148,7 @@ export function temper(
     lootReach: t.lootReach,
     mend: t.mend,
     claim: t.claim,
-    skill: 0.35 + 0.55 * u(),
+    skill: lo + (hi - lo) * u(),
     aggro: 0.2 + 0.8 * u(),
   };
 }

@@ -10,6 +10,7 @@
 import { along, apart, distance, toward, type Vec3 } from '../world/sphere.ts';
 import { sighted } from './gunner.ts';
 import type { Ctx, Seen } from './captain.ts';
+import type { Temper } from './temper.ts';
 
 /**
  * How she sees: the farthest she looks for a ship, m; seconds she follows one
@@ -52,6 +53,9 @@ export function hidden(c: Ctx, a: Vec3, b: Vec3): boolean {
   return false;
 }
 
+/** How far off she notices a ship, m: her temper's notice, by her skill. */
+export const eye = (t: Temper): number => t.notice * (0.8 + 0.4 * t.skill);
+
 /**
  * Notes the nearest ship she can see; a foe out of sight is followed to where
  * she was last seen, then let go. A ship newly in her eye is told to her gunner
@@ -60,7 +64,7 @@ export function hidden(c: Ctx, a: Vec3, b: Vec3): boolean {
 export function perceive(c: Ctx): void {
   const { m, own } = c;
   let best: Seen | null = null,
-    bd = c.t.notice * (0.8 + 0.4 * c.t.skill);
+    bd = eye(c.t);
   for (const o of c.others) {
     if (apart(own.ship.at, o.ship.at, c.b.sight.sightMax)) continue;
     const d = distance(own.ship.at, o.ship.at);

@@ -149,12 +149,15 @@ if (import.meta.main) {
   const by = GROUPINGS[a.by];
   if (!by || !positionals[0])
     throw new Error(
-      `usage: rate.ts results.jsonl [--by ${Object.keys(GROUPINGS).join('|')}]`
+      `usage: rate.ts results.jsonl ... [--by ${Object.keys(GROUPINGS).join('|')}]`
     );
-  const results: Result[] = readFileSync(positionals[0], 'utf8')
-    .split('\n')
-    .filter((l) => l.trim())
-    .map((l) => JSON.parse(l));
+  // several runs rated as one (each its own matches: 1-64 and 65-128, say)
+  const results: Result[] = positionals.flatMap((file) =>
+    readFileSync(file, 'utf8')
+      .split('\n')
+      .filter((l) => l.trim())
+      .map((l) => JSON.parse(l))
+  );
   console.log(`ratings by ${a.by} over ${results.length} matches:`);
   for (const l of ratings(rate(results, by))) console.log(l);
 }

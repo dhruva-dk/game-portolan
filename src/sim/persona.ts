@@ -83,7 +83,8 @@ const CREWS: Readonly<Record<Persona, (b: Brain) => Over>> = {
     },
     mind: { cover: mind.cover * (4 / 3) },
   }),
-  // the loot before anything but the storm and her life
+  // the loot before anything but the storm and her life (her eyes on it, she
+  // sees a ship late: temper.ts)
   scavenger: ({ choice }) => ({
     choice: { loot: choice.loot * (4 / 3), hunt: choice.hunt * 0.75 },
   }),

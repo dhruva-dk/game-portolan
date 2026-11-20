@@ -21,6 +21,7 @@ import type { Depth } from '../src/sim/shoal.ts';
 import { shipAt, type Helm } from '../src/sim/ship.ts';
 import { along, bearingAt, distance, fromLatLon } from '../src/world/sphere.ts';
 import { temper } from '../src/sim/temper.ts';
+import { eye } from '../src/sim/lookout.ts';
 import { sunk } from '../src/sim/health.ts';
 import type { Storm } from '../src/sim/storm.ts';
 
@@ -209,9 +210,12 @@ const stormIn = (phase: number): Storm => ({
   final: phase >= 7,
   damage: 0,
 });
+// mild captains who see a ship 110 m off (a scavenger, her eyes on the loot,
+// sees one no further than some 85 m)
 const mild = (() => {
   const out: number[] = [];
-  for (let s = 1; out.length < 3; s++) if (temper(s).fight < 0.35) out.push(s);
+  for (let s = 1; out.length < 3; s++)
+    if (temper(s).fight < 0.35 && eye(temper(s)) > 125) out.push(s);
   return out;
 })();
 

@@ -358,7 +358,11 @@ test('a piece she can not come to she gives up after a while, and leaves be', ()
       const d = distance(p, lagoon);
       return d > 15 && d < 45 ? -2 : 30;
     };
-  for (const seed of seeds((s) => temper(s).loot >= 0.5, 3)) {
+  // those who want loot and look for it as far off as the lagoon
+  for (const seed of seeds(
+    (s) => temper(s).loot >= 0.5 && temper(s).lootReach > 100,
+    3
+  )) {
     const r = sail(
       [c0],
       [seed],

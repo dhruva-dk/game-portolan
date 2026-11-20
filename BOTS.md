@@ -539,6 +539,47 @@ commit; anything visible checked in headless chromium; iPad Air M1 at 30–40 fp
   1.13 a ship, scavenger 0.9). Brawler median death 41 → 60 s. Pinned 3.9 →
   4.1 s a ship (noise); 1.1 ms a step. Golden → `1655ebe1`.
 
+- PLAN P6 again, by skill and by eye (`temper.ts` SKILL, `notice`). Rated
+  over 256 dealt matches (1–256, `rate.ts` now takes several runs as one),
+  the same before and after:
+
+  | 256 matches | scavenger | turtle | raider | homesteader | hunter | brawler | spread |
+  | ----------- | --------- | ------ | ------ | ----------- | ------ | ------- | ------ |
+  | before (θ)  | +0.158    | +0.072 | +0.057 | +0.008      | −0.081 | −0.213  | 0.371  |
+  | before (se) | +7.8      | +2.2   | +1.4   | −1.6        | −5.9   | −12.2   |        |
+  | after (θ)   | +0.021    | +0.029 | +0.027 | +0.000      | −0.014 | −0.064  | 0.093  |
+  | after (se)  | +0.7      | +1.2   | +0.9   | −0.7        | −1.5   | −4.4    |        |
+
+  Thirteen passes, each on matches 1–64 or 1–128, the last on all 256
+  (tuned on 1–128; on 129–256, unseen, the 12th pass held: +2.1 / −1.4 se
+  against the head's +5.4 / −8.9). What moved it, most first:
+  - Skill by style: hunter and brawler drawn 0.55–1, raider 0.3–0.85,
+    scavenger 0.15–0.7, the rest 0.35–0.9 (it was 0.35–0.9 for all). The
+    fighters lose by fighting green; this alone brought hunter −5.2 → −0.8
+    and brawler −7.3 → −1.0 se (64 matches each).
+  - The cautious see a ship later (`notice`): scavenger 120 → 60 m, turtle
+    120 → 85, raider 160 → 130; the turtle runs at 35 hull (50). Each step
+    of the scavenger's took her down a se or two. A captain who sees every
+    ship from far off slips away from every fight.
+  - Smaller: scavenger loot 1 → 0.75 and reach 170 → 140 m; brawler loot
+    0.45 → 0.6, mends at 60 (55), runs at 32 (28).
+  - Tried and nothing: scavenger runs at 22 (30).
+  - Not reached: the gate's one se (turtle +1.2). At this spread a change to
+    one persona reshuffles every match, and moves each of the others by
+    about ±0.03 θ with it (the raider rose 0.04 untouched, the brawler fell
+    0.04 untouched). A gate in se also tightens with every match run.
+    PLAN.md suggests one in θ (every persona within ±0.07: odds of
+    outlasting within 7%), which this meets.
+
+  The personas play as far apart as before (1–64: shots a ship brawler
+  23.4, hunter 20.4, scavenger 13.1; kills 1.41, 1.29, 0.63) and place
+  within 39–43 of 80. Pinned 4.1 → 3.4 s, armed and kills the same, shots
+  home 62 → 65%. Four tests had picked their bot by a seed or by temper
+  alone, and leaned on how far she then saw or looked for loot; each now
+  picks one who sees or reaches as far as the test needs (`lookout.ts eye`
+  names how far she notices a ship). Golden `5b47591c` → `915a82b4`; mixed,
+  gold rush, cagey `c827b8e7`, `e9044250`, `162d9ab0`.
+
 - PLAN W3, a stance with each gun (`gunner.ts` GUNNERY `rush`, `reach`, per
   kind): with a loaded scatter she closes on her ring flat out and stands off
   at twice it reloading (`rushScatter`); with a repeater she holds her fire

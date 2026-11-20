@@ -17,6 +17,8 @@ import {
   openAt,
 } from '../src/sim/route.ts';
 import { shipAt } from '../src/sim/ship.ts';
+import { eye } from '../src/sim/lookout.ts';
+import { temper } from '../src/sim/temper.ts';
 import type { Depth } from '../src/sim/shoal.ts';
 import {
   along,
@@ -47,9 +49,16 @@ function blocked(depth: Depth, a: Vec3, b: Vec3): boolean {
   return false;
 }
 
+/** A captain who keeps a ship in her eye well past 100 m, as she runs from it. */
+const SEED = (() => {
+  let s = 1;
+  while (eye(temper(s)) < 150) s++;
+  return s;
+})();
+
 /**
- * A battered, unarmed bot at c0 heading north, with an armed foe lying still
- * 100 m west of her, sailed `seconds` with `brain` on a chart of `depth`: her
+ * A battered, unarmed bot (SEED) at c0 heading north, with an armed foe lying
+ * still 100 m west of her, sailed `seconds` with `brain` on a chart of `depth`: her
  * modes in turn, the seconds land hid her from her foe, and the seconds she
  * made good less than a metre in.
  */
@@ -65,7 +74,7 @@ function run(depth: Depth, brain: Brain, seconds: number) {
     },
     second = Math.round(1 / STEP);
   let fleet: Vessel[] = [afloat(0, shipAt(c0, north))],
-    m: Memory = mind(5, c0),
+    m: Memory = mind(SEED, c0),
     hidden = 0,
     pinned = 0,
     was = c0;
@@ -78,7 +87,7 @@ function run(depth: Depth, brain: Brain, seconds: number) {
       was = here;
     }
     const own: Seen = { ...fleet[0], crew, hull: 12, shield: 0, armed: false };
-    const r = think(own, [foe], { depth, chart: ch }, m, nature(5, brain));
+    const r = think(own, [foe], { depth, chart: ch }, m, nature(SEED, brain));
     m = r.memory;
     if (modes.at(-1) !== m.mode) modes.push(m.mode);
     fleet = stepFleet(fleet, [r.helm], STEP, depth).fleet;
