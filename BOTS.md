@@ -508,7 +508,9 @@ commit; anything visible checked in headless chromium; iPad Air M1 at 30–40 fp
     deaths were a third ship's).
   - scavenger: loot reach 170 m (220), runs at 30 (40).
   - tried and dropped as noise: scavenger reach 140 and mend 50, brawler
-    fight 0.95, scavenger fight 0.4, a hunter's crowd wariness.
+    fight 0.95, scavenger fight 0.4, a hunter's crowd wariness; later, a
+    hunter running at 35 hull, not 25 (the brawler's fix: hunter −0.11 →
+    −0.12, nothing).
 
   | set (64 matches) | scavenger | turtle | raider | homesteader | hunter | brawler | spread |
   | ---------------- | --------- | ------ | ------ | ----------- | ------ | ------- | ------ |
@@ -592,9 +594,11 @@ commit; anything visible checked in headless chromium; iPad Air M1 at 30–40 fp
   re-path instead, tried first, did nothing. The worst step by match type,
   the game's seed, flat sea: mixed 16.4 → 11.3 ms, bloodbath 20.9 → 11.7,
   gold rush 18.2 → 12.6, cagey 16.1 → 14.7; `npm run steps` 22.0 → 12.5
-  (main 13.9). Over 64 dealt matches: pinned 4.1 → 3.6 s a ship, aground
-  0.1 → 0.0 s, armed 90% by 16 → 15 s, ms a step 1.26 → 1.13. Golden
-  `060f4d3b` → `72ddf57a`.
+  (main 13.9). Over 64 dealt matches: pinned 3.6 → 4.1 s a ship, aground
+  0.0 → 0.1 s, armed 90% by 15 → 16 s (first logged the other way round,
+  before and after swapped; corrected). Within the noise: the same matches
+  on this code with small unrelated changes give 3.5–4.3 s pinned, and ms a
+  step 1.02–1.26 on identical code. Golden `060f4d3b` → `72ddf57a`.
 - Duels (`tools/harness/duel.ts`): two bold bots alone on open water, one
   gun each, from 40–200 m, each pair sailed both ways. Wins against a
   cannon, of 20 at 40 / 80 / 120 / 160 / 200 m:
