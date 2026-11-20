@@ -1,16 +1,25 @@
-// The palette: every colour of the world, named once, in linear RGB. A sea chart's inks: vermilion, ochre, murrey,
-// moss, gold and parchment cream, on a sea of turquoise and ultramarine, against a violet storm. Each solid thing has
-// two tones, the one it shows where the sun reaches it and the one it shows where it does not (sky/light.ts toon): the
-// shadow is a colour chosen for it, warm and saturated, never the lit one greyed. Written as the display's sRGB, as a
-// painter would pick them (colour.ts turns them to light); the lights that glow of themselves are written as light.
+// The palette: every colour of the world, named once, in linear RGB. A sea
+// chart's inks: vermilion, ochre, murrey, moss, gold and parchment cream, on a
+// sea of turquoise and ultramarine, against a violet storm. Each solid thing
+// has two tones, the one it shows where the sun reaches it and the one it shows
+// where it does not (sky/light.ts toon): the shadow is a colour chosen for it,
+// warm and saturated, never the lit one greyed. Written as the display's sRGB,
+// as a painter would pick them (colour.ts turns them to light); the lights that
+// glow of themselves are written as light.
 
 import { hexToLinear as ink, type Rgb } from './colour.ts';
 
 export type { Rgb };
 /** A solid's two tones. */
-export interface Tones { readonly lit: Rgb; readonly shadow: Rgb }
+export interface Tones {
+  readonly lit: Rgb;
+  readonly shadow: Rgb;
+}
 
-const tones = (lit: string, shadow: string): Tones => ({ lit: ink(lit), shadow: ink(shadow) });
+const tones = (lit: string, shadow: string): Tones => ({
+  lit: ink(lit),
+  shadow: ink(shadow),
+});
 /** A colour as the tint of a light: its hue and saturation, at luminance y. */
 export const tint = (c: Rgb, y: number): Rgb => {
   const k = y / (0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]);
@@ -19,10 +28,16 @@ export const tint = (c: Rgb, y: number): Rgb => {
 
 // ---- the land
 export const SAND = tones('#F6CF6A', '#D08E3E');
-/** The sand along the waterline, paler; and the dry sand high up the beach, deeper. */
+/**
+ * The sand along the waterline, paler; and the dry sand high up the beach,
+ * deeper.
+ */
 export const SAND_SHORE = tones('#FBE7B0', '#DDAA66');
 export const SAND_DRY = tones('#EBA532', '#BF6A2A');
-/** Inland: a warmer, earthier sand in patches where the shrubs grow; and the bleached, wind-blown sand high up. */
+/**
+ * Inland: a warmer, earthier sand in patches where the shrubs grow; and the
+ * bleached, wind-blown sand high up.
+ */
 export const SAND_LOAM = tones('#D88B3A', '#A2552E');
 export const SAND_DUNE = tones('#F1D49A', '#C9925A');
 export const ROCK = tones('#B8553A', '#74304A');
@@ -43,7 +58,10 @@ export const TIMBER = tones('#9A5A2C', '#5A2F2E');
 export const DECK = tones('#D9A86A', '#9A6548');
 export const TAR = tones('#3A2A2E', '#221827');
 export const GILDING = tones('#F5C542', '#B8792A');
-/** The hard highlight on gilding and gunmetal, and the mark on a sail whose own paint would not show: cream. */
+/**
+ * The hard highlight on gilding and gunmetal, and the mark on a sail whose own
+ * paint would not show: cream.
+ */
 export const CREAM = ink('#F3E6C8');
 /** Gunmetal: the iron of a gun's yoke and barrels. */
 export const IRON = tones('#4A4450', '#2A2233');
@@ -59,21 +77,29 @@ export const STORM = tones('#7A4FB8', '#3D2670');
 export const LIGHTNING = ink('#D9C2FF');
 /** The haze's glow is the horizon's sky times this: warm. */
 export const HAZE: Rgb = [1.08, 0.9, 0.7];
-/** Past the planet's limb, seen from space: all but black, a little blue (linear light, before exposure). */
+/**
+ * Past the planet's limb, seen from space: all but black, a little blue (linear
+ * light, before exposure).
+ */
 export const SPACE: Rgb = [0.0015, 0.002, 0.004];
 /** A fair-weather cloud: cream where the sun lights it, rose beneath. */
 export const CLOUD = tones('#FFF1D6', '#E8A58C');
 /** Powder smoke: a cloud's cream, and a deeper rose in its shadow. */
 export const SMOKE: Tones = { lit: CLOUD.lit, shadow: ink('#D9907C') };
 
-/** Dust a ball throws up on land, and the dark smoke of a ball home in a hull. */
+/**
+ * Dust a ball throws up on land, and the dark smoke of a ball home in a hull.
+ */
 export const DUST = ink('#C9A06A');
 export const SOOT = ink('#5A4A55');
 
 // ---- the guns' fire: lights, radiance per unit of sun (gunfire/gunfire.ts)
 /** A muzzle's flash, and a ball home's. */
 export const FIRE: Rgb = [1, 0.55, 0.2];
-/** A shield's light, azure: #4FC3FF's sRGB numbers taken as light (so paler than that ink would be). */
+/**
+ * A shield's light, azure: #4FC3FF's sRGB numbers taken as light (so paler than
+ * that ink would be).
+ */
 export const AZURE: Rgb = [0.31, 0.76, 1];
 /** A ball in flight: its iron core, and the hot rim round it. */
 export const BALL_IRON: Rgb = [0.015, 0.013, 0.012];
@@ -87,9 +113,18 @@ export const FALL_MARK: Rgb = [3.2, 0.9, 0.35];
 export const ICE = tones('#8FE0F5', '#3F8FC9');
 /** A highlight on ice: white. */
 export const GLINT = ink('#FFFFFF');
-/** The light each rarity glows with on the water (its rim, its ring), worst to best: grey, green, blue, purple, gold
- *  (ui/ink.ts RARITY: the same rarities' inks on the chart). */
-export const RARITY_GLOW: readonly Rgb[] = ['#C9D1DA', '#55E05A', '#3AA0FF', '#B85CFF', '#FFA21F'].map((hex) => ink(hex));
+/**
+ * The light each rarity glows with on the water (its rim, its ring), worst to
+ * best: grey, green, blue, purple, gold (ui/ink.ts RARITY: the same rarities'
+ * inks on the chart).
+ */
+export const RARITY_GLOW: readonly Rgb[] = [
+  '#C9D1DA',
+  '#55E05A',
+  '#3AA0FF',
+  '#B85CFF',
+  '#FFA21F',
+].map((hex) => ink(hex));
 
 // ---- the grade's lifted blacks (post/grade.ts fadeTo)
 /** A morning's lavender mist, and the storm's slate violet. */
@@ -97,13 +132,22 @@ export const DAWN_MIST: Rgb = [0.12, 0.1, 0.15];
 export const STORM_SLATE: Rgb = [0.13, 0.1, 0.19];
 
 // ---- the dyes: what a ship's paint and canvas are, and so her water's
-/** A dye's shadow tone is its lit one times this: darker, and redder (as canvas goes to its warm tan). */
+/**
+ * A dye's shadow tone is its lit one times this: darker, and redder (as canvas
+ * goes to its warm tan).
+ */
 export const DYE_SHADE: Rgb = [0.56, 0.4, 0.42];
-/** A sail with the sun behind it glows: its dye times itself by this share (deeper, more saturated) and brighter. */
+/**
+ * A sail with the sun behind it glows: its dye times itself by this share
+ * (deeper, more saturated) and brighter.
+ */
 export const DYE_GLOW = { deepen: 0.35, gain: 1.25 } as const;
 export const VERMILION = ink('#D2332A');
 export const OCHRE = ink('#E8A21C');
-/** A yellow green, far from the sea's; a pale pink no one takes for her red; and a clear yellow. */
+/**
+ * A yellow green, far from the sea's; a pale pink no one takes for her red; and
+ * a clear yellow.
+ */
 export const MOSS = ink('#7F9A2A');
 export const ROSE = ink('#F2A0B4');
 export const LEMON = ink('#F4E06A');

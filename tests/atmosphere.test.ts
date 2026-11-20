@@ -1,10 +1,17 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  BOTTOM, MIE_EXTINCTION, MIE_SCALE_HEIGHT, TOP, transmittance, transmittanceRMu, transmittanceUV,
+  BOTTOM,
+  MIE_EXTINCTION,
+  MIE_SCALE_HEIGHT,
+  TOP,
+  transmittance,
+  transmittanceRMu,
+  transmittanceUV,
 } from '../src/sky/atmosphere.ts';
 
-const near = (a: number, b: number, tol: number) => assert.ok(Math.abs(a - b) <= tol, `${a} not within ${tol} of ${b}`);
+const near = (a: number, b: number, tol: number) =>
+  assert.ok(Math.abs(a - b) <= tol, `${a} not within ${tol} of ${b}`);
 
 test('transmittance table mapping round-trips', () => {
   for (const r of [BOTTOM, BOTTOM + 0.5, BOTTOM + 30, TOP - 1]) {

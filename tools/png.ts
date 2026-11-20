@@ -1,5 +1,6 @@
-// A PNG of 8-bit RGB pixels, no alpha channel: the spectrograms (tools/audio.ts) and the app's icon (tools/appicon.ts),
-// which iOS refuses if it carries one.
+// A PNG of 8-bit RGB pixels, no alpha channel: the spectrograms
+// (tools/audio.ts) and the app's icon (tools/appicon.ts), which iOS refuses if
+// it carries one.
 import { deflateSync } from 'node:zlib';
 
 /** CRC-32, for the PNG's chunks. */
@@ -17,7 +18,9 @@ const crc32 = (b: Buffer) => {
 /** The PNG of `rgb`, three bytes a pixel, row by row. */
 export function png(width: number, height: number, rgb: Uint8Array): Buffer {
   const chunk = (type: string, data: Buffer) => {
-    const len = Buffer.alloc(4), body = Buffer.concat([Buffer.from(type), data]), crc = Buffer.alloc(4);
+    const len = Buffer.alloc(4),
+      body = Buffer.concat([Buffer.from(type), data]),
+      crc = Buffer.alloc(4);
     len.writeUInt32BE(data.length);
     crc.writeUInt32BE(crc32(body));
     return Buffer.concat([len, body, crc]);
@@ -27,8 +30,15 @@ export function png(width: number, height: number, rgb: Uint8Array): Buffer {
   ihdr.writeUInt32BE(height, 4);
   ihdr.set([8, 2, 0, 0, 0], 8);
   const raw = Buffer.alloc((width * 3 + 1) * height);
-  for (let y = 0; y < height; y++) raw.set(rgb.subarray(y * width * 3, (y + 1) * width * 3), y * (width * 3 + 1) + 1);
+  for (let y = 0; y < height; y++)
+    raw.set(
+      rgb.subarray(y * width * 3, (y + 1) * width * 3),
+      y * (width * 3 + 1) + 1
+    );
   return Buffer.concat([
-    Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk('IHDR', ihdr), chunk('IDAT', deflateSync(raw)), chunk('IEND', Buffer.alloc(0))
+    Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
+    chunk('IHDR', ihdr),
+    chunk('IDAT', deflateSync(raw)),
+    chunk('IEND', Buffer.alloc(0)),
   ]);
 }

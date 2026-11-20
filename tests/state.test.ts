@@ -1,4 +1,5 @@
-// The match afloat (play/state.ts), as the game steps it: who holds the sea through a step, and a match after another.
+// The match afloat (play/state.ts), as the game steps it: who holds the sea
+// through a step, and a match after another.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createState, type Match } from '../src/play/state.ts';
@@ -19,31 +20,51 @@ const start = planet.start;
 const still = { aim: null, fire: false };
 const degrees = Math.PI / 180;
 
-/** A match whose storm lies calm until `at` s on its clock, then shrinks to nothing and sinks every ship in a step. */
+/**
+ * A match whose storm lies calm until `at` s on its clock, then shrinks to
+ * nothing and sinks every ship in a step.
+ */
 const deadly = (at: number): Match => ({
-  seed: 1, gun: null,
+  seed: 1,
+  gun: null,
   storm: (t): Storm =>
-    (t < at ? calm(start.at) : { ...calm(start.at), radius: 1e-6, next: { centre: start.at, radius: 1e-6 }, damage: 1e6 }),
+    t < at
+      ? calm(start.at)
+      : {
+          ...calm(start.at),
+          radius: 1e-6,
+          next: { centre: start.at, radius: 1e-6 },
+          damage: 1e6,
+        },
 });
 
-/** Her loop sailed alone from her berth in a match at sea (a new one on `state`, if given): south, east, and home;
- *  each step's helm, until it closes. Returns the match's clock at the start of the step that closed it (null: it
- *  never did), and the state. */
+/**
+ * Her loop sailed alone from her berth in a match at sea (a new one on `state`,
+ * if given): south, east, and home; each step's helm, until it closes. Returns
+ * the match's clock at the start of the step that closed it (null: it never
+ * did), and the state.
+ */
 function loop(m: Match, state = createState(planet, flat, waters, m)) {
   state.debug.atSea(start, []);
-  const legs: [number, number][] = [[180, 5], [90, 4]];
+  const legs: [number, number][] = [
+    [180, 5],
+    [90, 4],
+  ];
   const helm = (k: number): Helm => {
     const at = state.vessels()[0]?.ship.at ?? start.at;
     let s = k / 30;
     for (const [b, seconds] of legs) {
-      if (s < seconds) return { course: bearingAt(at, b * degrees), throttle: 1 };
+      if (s < seconds)
+        return { course: bearingAt(at, b * degrees), throttle: 1 };
       s -= seconds;
     }
     return { course: add(start.at, at, -1), throttle: 1 };
   };
   for (let k = 0; k < 30 * 30; k++) {
-    const time = state.time(), did = state.advance(helm(k), still);
-    if (did.held?.claimed.some((c) => c.id === PLAYER) || !state.mine()) return { closed: time, did, state };
+    const time = state.time(),
+      did = state.advance(helm(k), still);
+    if (did.held?.claimed.some((c) => c.id === PLAYER) || !state.mine())
+      return { closed: time, did, state };
   }
   return { closed: null, did: null, state };
 }
@@ -62,19 +83,35 @@ test('a ship sunk in a step lays, closes and cuts nothing in it: her water only 
   assert.equal(sunk.state.share(PLAYER), 0);
 });
 
-
-test('a second match on the same state starts clean: its sea as a new state\'s, her loop closing as it did', () => {
-  const alone = loop(deadly(Infinity)), first = loop(deadly(Infinity));
-  // the first match sailed on a while past its loop, her trail open again, then the second begun on its state
-  for (let k = 0; k < 240; k++) first.state.advance({ course: bearingAt(first.state.mine()!.ship.at, 180 * degrees), throttle: 1 }, still);
+test("a second match on the same state starts clean: its sea as a new state's, her loop closing as it did", () => {
+  const alone = loop(deadly(Infinity)),
+    first = loop(deadly(Infinity));
+  // the first match sailed on a while past its loop, her trail open again, then
+  // the second begun on its state
+  for (let k = 0; k < 240; k++)
+    first.state.advance(
+      {
+        course: bearingAt(first.state.mine()!.ship.at, 180 * degrees),
+        throttle: 1,
+      },
+      still
+    );
   const was = first.state.sea(1)!;
-  assert.ok(was.trails.length > 0, 'her trail open at the first match\'s end');
+  assert.ok(was.trails.length > 0, "her trail open at the first match's end");
   const second = loop(deadly(Infinity), first.state);
-  assert.equal(second.closed, alone.closed, 'her loop closes at the same moment of its match');
-  // nothing of the first: the same changes in the same order (on the world's clock, later by as long as it ran
-  // before), the same water held, no trail but what a new state has
-  const a = alone.state.sea(1)!, b = second.state.sea(1)!, later = b.changes[0].time - a.changes[0].time;
-  const timed = (cs: typeof a.changes, by: number) => cs.map((c) => ({ ...c, time: Math.round((c.time - by) * 1e6) }));
+  assert.equal(
+    second.closed,
+    alone.closed,
+    'her loop closes at the same moment of its match'
+  );
+  // nothing of the first: the same changes in the same order (on the world's
+  // clock, later by as long as it ran before), the same water held, no trail
+  // but what a new state has
+  const a = alone.state.sea(1)!,
+    b = second.state.sea(1)!,
+    later = b.changes[0].time - a.changes[0].time;
+  const timed = (cs: typeof a.changes, by: number) =>
+    cs.map((c) => ({ ...c, time: Math.round((c.time - by) * 1e6) }));
   assert.equal(b.generation, was.generation + 1);
   assert.equal(b.seq, a.seq);
   assert.ok(later > 0);

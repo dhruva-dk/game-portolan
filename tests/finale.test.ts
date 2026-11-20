@@ -25,15 +25,28 @@ for (const end of ['sunk', 'won'] as const) {
     let last = finale(end, 0);
     for (let t = dt; t < f.rise * 3; t += dt) {
       const s = finale(end, t);
-      assert.ok(Math.abs(s.boom! - last.boom!) < f.back * dt * 2, `boom at ${t.toFixed(2)}`);
-      assert.ok(Math.abs(s.tilt! - last.tilt!) < f.tilt * dt * 2, `tilt at ${t.toFixed(2)}`);
+      assert.ok(
+        Math.abs(s.boom! - last.boom!) < f.back * dt * 2,
+        `boom at ${t.toFixed(2)}`
+      );
+      assert.ok(
+        Math.abs(s.tilt! - last.tilt!) < f.tilt * dt * 2,
+        `tilt at ${t.toFixed(2)}`
+      );
       const turned = s.spin! - last.spin!;
-      assert.ok(turned >= 0 && turned <= f.turn * dt + 1e-9, `turn at ${t.toFixed(2)}`);
+      assert.ok(
+        turned >= 0 && turned <= f.turn * dt + 1e-9,
+        `turn at ${t.toFixed(2)}`
+      );
       last = s;
     }
   });
 }
 
 test('the beat ends before the shot has eased all the way out, so the result comes over a camera still moving', () => {
-  for (const end of ['sunk', 'won'] as const) assert.ok(FINALE[end].beat > 1.5 && FINALE[end].beat <= FINALE[end].rise, end);
+  for (const end of ['sunk', 'won'] as const)
+    assert.ok(
+      FINALE[end].beat > 1.5 && FINALE[end].beat <= FINALE[end].rise,
+      end
+    );
 });

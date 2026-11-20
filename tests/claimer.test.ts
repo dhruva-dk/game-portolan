@@ -1,5 +1,6 @@
-// A bot's water (sim/claimer.ts), as she sails it against who holds the sea (sim/territory.ts): out on a loop and back,
-// home when hurt but not into the storm, and across another's open trail.
+// A bot's water (sim/claimer.ts), as she sails it against who holds the sea
+// (sim/territory.ts): out on a loop and back, home when hurt but not into the
+// storm, and across another's open trail.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mind, think, type Memory } from '../src/sim/bot.ts';
@@ -11,15 +12,30 @@ import type { Depth } from '../src/sim/shoal.ts';
 import { shipAt, type Helm } from '../src/sim/ship.ts';
 import type { Storm } from '../src/sim/storm.ts';
 import { temper } from '../src/sim/temper.ts';
-import { createTerritory, type Outcome, type Territory } from '../src/sim/territory.ts';
-import { R, along, bearingAt, distance, fromLatLon } from '../src/world/sphere.ts';
+import {
+  createTerritory,
+  type Outcome,
+  type Territory,
+} from '../src/sim/territory.ts';
+import {
+  R,
+  along,
+  bearingAt,
+  distance,
+  fromLatLon,
+} from '../src/world/sphere.ts';
 
 const start = fromLatLon(0.2, 0.3);
 const deep: Depth = () => 30;
 const WHOLE = { centre: start, radius: Math.PI };
 
 /** Ship `id` `metres` from the start on a bearing, heading `heading`. */
-const placed = (id: number, bearing: number, metres: number, heading: number): Vessel => {
+const placed = (
+  id: number,
+  bearing: number,
+  metres: number,
+  heading: number
+): Vessel => {
   const at = along(start, bearingAt(start, bearing), metres).p;
   return afloat(id, shipAt(at, bearingAt(at, heading)));
 };
@@ -29,40 +45,71 @@ const seedWhere = (ok: (t: ReturnType<typeof temper>) => boolean) => {
   return s;
 };
 
-/** A ship as a bot sees her: as she lies, with her shield (full unless given). */
+/**
+ * A ship as a bot sees her: as she lies, with her shield (full unless given).
+ */
 type Seen = Vessel & { shield?: number; hull?: number };
 
 /**
- * `seconds` of the fleet sailing on territory `t` (its ids the fleet's): a bot for each seed (null: a ship holding
- * `held`'s orders), each with her mind (or the one `minds` gives), under `storm`, from `since` s on the territory's
- * clock; after each step, `each` is told the fleet, the bots' minds and what the step did to who holds the sea.
+ * `seconds` of the fleet sailing on territory `t` (its ids the fleet's): a bot
+ * for each seed (null: a ship holding `held`'s orders), each with her mind (or
+ * the one `minds` gives), under `storm`, from `since` s on the territory's
+ * clock; after each step, `each` is told the fleet, the bots' minds and what
+ * the step did to who holds the sea.
  */
-function voyage(fleet: Seen[], seeds: (number | null)[], seconds: number, t: Territory, o: {
-  minds?: (Memory | null)[]; storm?: Storm; since?: number; held?: (v: Vessel) => Helm;
-  each?: (fleet: Seen[], minds: (Memory | null)[], did: Outcome) => void;
-}) {
-  const minds = o.minds ?? fleet.map((v, i) => (seeds[i] === null ? null : mind(seeds[i]!, v.ship.at)));
+function voyage(
+  fleet: Seen[],
+  seeds: (number | null)[],
+  seconds: number,
+  t: Territory,
+  o: {
+    minds?: (Memory | null)[];
+    storm?: Storm;
+    since?: number;
+    held?: (v: Vessel) => Helm;
+    each?: (fleet: Seen[], minds: (Memory | null)[], did: Outcome) => void;
+  }
+) {
+  const minds =
+    o.minds ??
+    fleet.map((v, i) =>
+      seeds[i] === null ? null : mind(seeds[i]!, v.ship.at)
+    );
   for (let n = 1; n <= Math.round(seconds / STEP); n++) {
     const helms = fleet.map((v, i) => {
       const m = minds[i];
       if (!m) return o.held!(v);
-      const r = think(v, fleet.filter((k) => k.id !== v.id), { depth: deep, storm: o.storm ?? null, holdings: t }, m, seeds[i]!);
+      const r = think(
+        v,
+        fleet.filter((k) => k.id !== v.id),
+        { depth: deep, storm: o.storm ?? null, holdings: t },
+        m,
+        seeds[i]!
+      );
       minds[i] = r.memory;
       return r.helm;
     });
-    const from = fleet.map((v) => v.ship.at), moved = stepFleet(fleet, helms, STEP, deep).fleet;
+    const from = fleet.map((v) => v.ship.at),
+      moved = stepFleet(fleet, helms, STEP, deep).fleet;
     fleet = fleet.map((v, i) => ({ ...v, ...moved[i] }));
-    const did = t.step(fleet.map((v, i) => ({ id: v.id, from: from[i], to: v.ship.at })), (o.since ?? 0) + n * STEP, WHOLE);
+    const did = t.step(
+      fleet.map((v, i) => ({ id: v.id, from: from[i], to: v.ship.at })),
+      (o.since ?? 0) + n * STEP,
+      WHOLE
+    );
     o.each?.(fleet, minds, did);
   }
   return { fleet, minds };
 }
 
 test('a bot sails out of her water on a loop and back into it, and takes the water it closes', () => {
-  const seed = seedWhere((k) => k.claim > 0.8), t = createTerritory(1);
+  const seed = seedWhere((k) => k.claim > 0.8),
+    t = createTerritory(1);
   t.begin([start], 0);
   const home = t.share(0);
-  let out = 0, closed = 0, back = 0;
+  let out = 0,
+    closed = 0,
+    back = 0;
   voyage([placed(0, 0, 0, 0)], [seed], 120, t, {
     each: (fleet, _, did) => {
       out = Math.max(out, distance(fleet[0].ship.at, start));
@@ -71,19 +118,32 @@ test('a bot sails out of her water on a loop and back into it, and takes the wat
     },
   });
   assert.ok(out > 50, `the farthest out ${out.toFixed(0)} m`);
-  assert.ok(closed >= 1 && back === closed, `${closed} loops closed, ${back} of them back in her water`);
+  assert.ok(
+    closed >= 1 && back === closed,
+    `${closed} loops closed, ${back} of them back in her water`
+  );
   assert.ok(t.share(0) > 2 * home, `her share ${t.share(0)} from ${home}`);
 });
 
 /** Her home patch at the start, and her 90 m north of it, just shot and her shield down: where she goes, and what she
  *  is about, over `seconds` under `storm`. */
 function hurt(seconds: number, storm?: Storm) {
-  const seed = seedWhere((k) => k.claim > 0.5), t = createTerritory(1);
+  const seed = seedWhere((k) => k.claim > 0.5),
+    t = createTerritory(1);
   t.begin([start], 0);
   const she: Seen = { ...placed(0, 0, 90, Math.PI / 2), shield: 5, hull: 60 };
-  const m = mind(seed, start), modes = new Set<string>();
-  const r = voyage([she], [seed], seconds, t, { minds: [shot(m, 1)], storm, each: (_, minds) => modes.add(minds[0]!.mode) });
-  return { modes, home: t.ownerAt(r.fleet[0].ship.at) === 0, from: distance(r.fleet[0].ship.at, start) };
+  const m = mind(seed, start),
+    modes = new Set<string>();
+  const r = voyage([she], [seed], seconds, t, {
+    minds: [shot(m, 1)],
+    storm,
+    each: (_, minds) => modes.add(minds[0]!.mode),
+  });
+  return {
+    modes,
+    home: t.ownerAt(r.fleet[0].ship.at) === 0,
+    from: distance(r.fleet[0].ship.at, start),
+  };
 }
 
 test('hurt and her shield down, she heads home to her water; not with the storm on it', () => {
@@ -91,32 +151,57 @@ test('hurt and her shield down, she heads home to her water; not with the storm 
   assert.ok(free.modes.has('home'), `about ${[...free.modes]}`);
   assert.ok(free.home, `${free.from.toFixed(0)} m from her berth`);
   // the storm's calm 200 m north of her berth, 150 m round: her water outside it, she inside
-  const centre = along(start, bearingAt(start, 0), 200).p, cap = { centre, radius: 150 / R };
-  const storm: Storm = { ...cap, next: cap, closing: false, secondsToNext: 60, phase: 1, damage: 0.05 };
+  const centre = along(start, bearingAt(start, 0), 200).p,
+    cap = { centre, radius: 150 / R };
+  const storm: Storm = {
+    ...cap,
+    next: cap,
+    closing: false,
+    secondsToNext: 60,
+    phase: 1,
+    damage: 0.05,
+  };
   const stormy = hurt(25, storm);
   assert.ok(!stormy.modes.has('home'), `about ${[...stormy.modes]}`);
-  assert.ok(!stormy.home && stormy.from > 50, `${stormy.from.toFixed(0)} m from her berth`);
+  assert.ok(
+    !stormy.home && stormy.from > 50,
+    `${stormy.from.toFixed(0)} m from her berth`
+  );
 });
 
-test('a bot sails across another\'s open trail she can reach before its ship is home, whatever her temper', () => {
-  const north = bearingAt(start, 0), helm = (v: Vessel): Helm => ({ course: bearingAt(v.ship.at, 0), throttle: 1 });
+test("a bot sails across another's open trail she can reach before its ship is home, whatever her temper", () => {
+  const north = bearingAt(start, 0),
+    helm = (v: Vessel): Helm => ({
+      course: bearingAt(v.ship.at, 0),
+      throttle: 1,
+    });
   for (let seed = 1; seed <= 12; seed++) {
     // his water at the start, hers far to the south; he sails north some 200 m, laying his trail, out of her sight
     const t = createTerritory(2);
     t.begin([along(start, bearingAt(start, Math.PI), 600).p, start], 0);
     const sailed = Math.round(202 / SHIP.top / STEP) * STEP;
-    const him = voyage([afloat(1, shipAt(start, north))], [null], sailed, t, { held: helm }).fleet[0];
+    const him = voyage([afloat(1, shipAt(start, north))], [null], sailed, t, {
+      held: helm,
+    }).fleet[0];
     // she lies 70 m off its middle, abeam of it; he is some 100 m on and 180 m from home: she reaches it long before
-    const mid = along(start, north, 90).p, at = along(mid, bearingAt(mid, Math.PI / 2), 70).p;
+    const mid = along(start, north, 90).p,
+      at = along(mid, bearingAt(mid, Math.PI / 2), 70).p;
     let cut = 0;
     const modes = new Set<string>();
-    voyage([afloat(0, shipAt(at, bearingAt(at, Math.PI))), him], [seed, null], 15, t, {
-      since: sailed, held: helm,
-      each: (_, minds, did) => {
-        modes.add(minds[0]!.mode);
-        cut += did.cut.filter((k) => k.id === 1 && k.by === 0).length;
-      },
-    });
+    voyage(
+      [afloat(0, shipAt(at, bearingAt(at, Math.PI))), him],
+      [seed, null],
+      15,
+      t,
+      {
+        since: sailed,
+        held: helm,
+        each: (_, minds, did) => {
+          modes.add(minds[0]!.mode);
+          cut += did.cut.filter((k) => k.id === 1 && k.by === 0).length;
+        },
+      }
+    );
     assert.ok(modes.has('cut'), `seed ${seed}: about ${[...modes]}`);
     assert.equal(cut, 1, `seed ${seed}: his trail cut by her`);
   }

@@ -1,5 +1,6 @@
-// A list's entries by id, kept: indexed again only when handed another list, or told the one it has has changed in
-// place, so that looking a ship or a crew up each frame makes nothing.
+// A list's entries by id, kept: indexed again only when handed another list, or
+// told the one it has has changed in place, so that looking a ship or a crew up
+// each frame makes nothing.
 
 export function indexed<T extends { id: number }>() {
   const byId = new Map<number, T>();
@@ -13,7 +14,10 @@ export function indexed<T extends { id: number }>() {
       list = of;
       return byId;
     },
-    /** The list last indexed has changed in place: index it again when next asked. */
+    /**
+     * The list last indexed has changed in place: index it again when next
+     * asked.
+     */
     stale() {
       list = null;
     },

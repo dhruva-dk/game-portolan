@@ -30,12 +30,14 @@ test('the lines run along the coast, unbroken, each within its block', () => {
     for (let i = 0; i < line.length; i++) {
       locate(line[i], at);
       worst = Math.max(worst, Math.abs(between(terrain.shore, at)));
-      // (at most a square's diagonal, and the cells mid-face are the largest: 1.3 times the mean)
+      // (at most a square's diagonal, and the cells mid-face are the largest:
+      // 1.3 times the mean)
       if (i) assert.ok(distance(line[i - 1], line[i]) < 2 * CELL);
       assert.ok(distance(line[0], line[i]) < 1.5 * BLOCK * CELL);
     }
   }
-  // (read straight between two centres, not as the ground reads it, bicubic: measured 0.67 m at worst, a fifth of a
-  // cell, under half a pixel on the minimap)
+  // (read straight between two centres, not as the ground reads it, bicubic:
+  // measured 0.67 m at worst, a fifth of a cell, under half a pixel on the
+  // minimap)
   assert.ok(worst < 0.25 * CELL, `worst ${worst.toFixed(3)} m off the coast`);
 });

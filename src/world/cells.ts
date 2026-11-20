@@ -1,66 +1,104 @@
-// The sea's cells: the planet's equi-angular cube (sphere.ts faceUV) cut into N × N cells a face, for who holds what
-// water (sim/territory.ts) and for drawing it (water/claims.ts): each cell's place (cellOf), its neighbours (neighbor),
+// The sea's cells: the planet's equi-angular cube (sphere.ts faceUV) cut into N
+// × N cells a face, for who holds what water (sim/territory.ts) and for drawing
+// it (water/claims.ts): each cell's place (cellOf), its neighbours (neighbor),
 // the cells a line crosses (trace) and its exact area.
 //
-// A cell's index is face·N² + j·N + i, i along the face's u and j along its v. N is a power of two, so an index splits
-// into face, row and column by shifts. Along each edge of the cube the two faces' cells line up one for one (both
-// faces' coordinates along a shared edge are the same ratio), so stepping across an edge lands in the neighbouring
-// face's edge row at the same place along it: the cells tile the planet without a seam.
+// A cell's index is face·N² + j·N + i, i along the face's u and j along its v.
+// N is a power of two, so an index splits into face, row and column by shifts.
+// Along each edge of the cube the two faces' cells line up one for one (both
+// faces' coordinates along a shared edge are the same ratio), so stepping
+// across an edge lands in the neighbouring face's edge row at the same place
+// along it: the cells tile the planet without a seam.
 //
-// N = 256: a cell is 2.7–3.8 m across (3.4 m at a face's middle), a galleon 26 m long covers some eight of them, the
-// whole planet is 393 216 cells (one byte each to say who holds it), and the largest loop a ship can close (half the
+// N = 256: a cell is 2.7–3.8 m across (3.4 m at a face's middle), a galleon 26
+// m long covers some eight of them, the whole planet is 393 216 cells (one byte
+// each to say who holds it), and the largest loop a ship can close (half the
 // planet) floods 200 000 of them.
 //
 // Pure arithmetic: no three, so it runs in node for the tests.
 
-import { R, faceUV, normalize, put, type FaceUV, type Out3, type Vec3 } from './sphere.ts';
+import {
+  R,
+  faceUV,
+  normalize,
+  put,
+  type FaceUV,
+  type Out3,
+  type Vec3,
+} from './sphere.ts';
 
 /** Cells along a face's edge. */
 export const N = 256;
-const NN = N * N, LOG = 8;
+const NN = N * N,
+  LOG = 8;
 /** Cells on the planet. */
 export const CELLS = 6 * NN;
 
-/** Cells as a reader has them, a number a cell (who holds each; the cells a change took), with no way to write them. */
+/**
+ * Cells as a reader has them, a number a cell (who holds each; the cells a
+ * change took), with no way to write them.
+ */
 export type ReadCells = ArrayLike<number>;
 
-/** The point on face f at gnomonic (gu, gv), unnormalised: sphere.ts faceDir's faces (into `out`). */
+/**
+ * The point on face f at gnomonic (gu, gv), unnormalised: sphere.ts faceDir's
+ * faces (into `out`).
+ */
 function onFace(f: number, gu: number, gv: number, out?: Out3): Vec3 {
   switch (f) {
-    case 0: return put(out, 1, gv, -gu);
-    case 1: return put(out, -1, gv, gu);
-    case 2: return put(out, gu, 1, -gv);
-    case 3: return put(out, gu, -1, gv);
-    case 4: return put(out, gu, gv, 1);
-    default: return put(out, -gu, gv, -1);
+    case 0:
+      return put(out, 1, gv, -gu);
+    case 1:
+      return put(out, -1, gv, gu);
+    case 2:
+      return put(out, gu, 1, -gv);
+    case 3:
+      return put(out, gu, -1, gv);
+    case 4:
+      return put(out, gu, gv, 1);
+    default:
+      return put(out, -gu, gv, -1);
   }
 }
 
-/** The point at (u, v) on face f in the equi-angular coordinates (−1…1, and a little past an edge), into `out`. */
+/**
+ * The point at (u, v) on face f in the equi-angular coordinates (−1…1, and a
+ * little past an edge), into `out`.
+ */
 const atUV = (f: number, u: number, v: number, out?: Out3): Vec3 =>
   onFace(f, Math.tan(u * (Math.PI / 4)), Math.tan(v * (Math.PI / 4)), out);
 
 /**
- * The cube's cells n along each face's edge (a power of two): the cell a point lies in (any vector from the centre),
- * a cell's centre (a unit vector, into `out`), and its kth neighbour (k: 0 −u, 1 +u, 2 −v, 3 +v), across a face's
- * edge onto the next face; and tan of each column's (or row's) centre angle, the gnomonic coordinate of its middle.
- * These cells' (N), and the bots' chart's (sim/route.ts), coarser.
+ * The cube's cells n along each face's edge (a power of two): the cell a point
+ * lies in (any vector from the centre), a cell's centre (a unit vector, into
+ * `out`), and its kth neighbour (k: 0 −u, 1 +u, 2 −v, 3 +v), across a face's
+ * edge onto the next face; and tan of each column's (or row's) centre angle,
+ * the gnomonic coordinate of its middle. These cells' (N), and the bots'
+ * chart's (sim/route.ts), coarser.
  */
 export function cubeCells(n: number) {
-  const nn = n * n, log = 31 - Math.clz32(n), uv: FaceUV = { face: 0, u: 0, v: 0 }, onCube: Out3 = [0, 0, 0];
-  const tan = Float64Array.from({ length: n }, (_, k) => Math.tan(((k + 0.5) / n * 2 - 1) * (Math.PI / 4)));
+  const nn = n * n,
+    log = 31 - Math.clz32(n),
+    uv: FaceUV = { face: 0, u: 0, v: 0 },
+    onCube: Out3 = [0, 0, 0];
+  const tan = Float64Array.from({ length: n }, (_, k) =>
+    Math.tan((((k + 0.5) / n) * 2 - 1) * (Math.PI / 4))
+  );
   const cellOf = (p: Vec3): number => {
     const { face, u, v } = faceUV(p, uv);
     const i = Math.min(n - 1, Math.max(0, Math.floor((u + 1) * 0.5 * n)));
     const j = Math.min(n - 1, Math.max(0, Math.floor((v + 1) * 0.5 * n)));
     return face * nn + j * n + i;
   };
-  // The cell across each face edge, [face][side −u, +u, −v, +v][place along the edge]: probing a hair past the edge
-  // lands in the next face's edge row at the same place.
+  // The cell across each face edge, [face][side −u, +u, −v, +v][place along the
+  // edge]: probing a hair past the edge lands in the next face's edge row at
+  // the same place.
   const edge = new Int32Array(24 * n);
   for (let f = 0; f < 6; f++) {
     for (let k = 0; k < n; k++) {
-      const t = ((k + 0.5) / n) * 2 - 1, b = f * 4 * n + k, e = 1 + 1e-6;
+      const t = ((k + 0.5) / n) * 2 - 1,
+        b = f * 4 * n + k,
+        e = 1 + 1e-6;
       edge[b] = cellOf(atUV(f, -e, t));
       edge[b + n] = cellOf(atUV(f, e, t));
       edge[b + 2 * n] = cellOf(atUV(f, t, -e));
@@ -70,9 +108,20 @@ export function cubeCells(n: number) {
   return {
     cellOf,
     tan,
-    centre: (c: number, out?: Out3): Vec3 => normalize(onFace(c >> (2 * log), tan[c & (n - 1)], tan[(c >> log) & (n - 1)], onCube), out),
+    centre: (c: number, out?: Out3): Vec3 =>
+      normalize(
+        onFace(
+          c >> (2 * log),
+          tan[c & (n - 1)],
+          tan[(c >> log) & (n - 1)],
+          onCube
+        ),
+        out
+      ),
     neighbor(c: number, k: number): number {
-      const i = c & (n - 1), j = (c >> log) & (n - 1), e = (c >> (2 * log)) * 4 * n;
+      const i = c & (n - 1),
+        j = (c >> log) & (n - 1),
+        e = (c >> (2 * log)) * 4 * n;
       if (k === 0) return i > 0 ? c - 1 : edge[e + j];
       if (k === 1) return i < n - 1 ? c + 1 : edge[e + n + j];
       if (k === 2) return j > 0 ? c - n : edge[e + 2 * n + i];
@@ -81,7 +130,8 @@ export function cubeCells(n: number) {
   };
 }
 
-const CUBE = cubeCells(N), TAN = CUBE.tan;
+const CUBE = cubeCells(N),
+  TAN = CUBE.tan;
 
 /** The face, column and row of a cell. */
 export const faceOf = (c: number) => c >> (2 * LOG);
@@ -97,13 +147,22 @@ export const centreOf = CUBE.centre;
 /** cosTo's point on the cube. */
 const toward: Out3 = [0, 0, 0];
 
-/** The cosine of the angle between a cell's centre and unit vector u: cheap, for sweeping many cells. */
+/**
+ * The cosine of the angle between a cell's centre and unit vector u: cheap, for
+ * sweeping many cells.
+ */
 export function cosTo(c: number, u: Vec3): number {
-  const q = onFace(faceOf(c), TAN[columnOf(c)], TAN[rowOf(c)], toward), x = q[0], y = q[1], z = q[2];
+  const q = onFace(faceOf(c), TAN[columnOf(c)], TAN[rowOf(c)], toward),
+    x = q[0],
+    y = q[1],
+    z = q[2];
   return (x * u[0] + y * u[1] + z * u[2]) / Math.sqrt(x * x + y * y + z * z);
 }
 
-/** A cell's k-th neighbour (k: 0 −u, 1 +u, 2 −v, 3 +v), across a face's edge onto the next face. */
+/**
+ * A cell's k-th neighbour (k: 0 −u, 1 +u, 2 −v, 3 +v), across a face's edge
+ * onto the next face.
+ */
 export const neighbor = CUBE.neighbor;
 
 /** Whether two cells share a side. */
@@ -113,17 +172,29 @@ export function adjacent(a: number, b: number): boolean {
 }
 
 /**
- * The cell at column i, row j of face f, where i or j may be one past the face's edge (−1 or N): then the next face's
- * cell there. Past both edges at once, at a corner of the cube, where only three cells meet, it is the lowest-numbered
- * of those three, as every face that meets there takes it (so all three read the corner alike).
+ * The cell at column i, row j of face f, where i or j may be one past the
+ * face's edge (−1 or N): then the next face's cell there. Past both edges at
+ * once, at a corner of the cube, where only three cells meet, it is the
+ * lowest-numbered of those three, as every face that meets there takes it (so
+ * all three read the corner alike).
  */
 export function wrapped(f: number, i: number, j: number): number {
-  const inI = i >= 0 && i < N, inJ = j >= 0 && j < N;
+  const inI = i >= 0 && i < N,
+    inJ = j >= 0 && j < N;
   if (inI && inJ) return f * NN + j * N + i;
-  const ci = Math.min(N - 1, Math.max(0, i)), cj = Math.min(N - 1, Math.max(0, j)), own = f * NN + cj * N + ci;
+  const ci = Math.min(N - 1, Math.max(0, i)),
+    cj = Math.min(N - 1, Math.max(0, j)),
+    own = f * NN + cj * N + ci;
   const across = (c: number, di: number, dj: number) =>
-    di < 0 ? neighbor(c, 0) : di > 0 ? neighbor(c, 1) : dj < 0 ? neighbor(c, 2) : neighbor(c, 3);
-  const di = i < 0 ? -1 : i >= N ? 1 : 0, dj = j < 0 ? -1 : j >= N ? 1 : 0;
+    di < 0
+      ? neighbor(c, 0)
+      : di > 0
+        ? neighbor(c, 1)
+        : dj < 0
+          ? neighbor(c, 2)
+          : neighbor(c, 3);
+  const di = i < 0 ? -1 : i >= N ? 1 : 0,
+    dj = j < 0 ? -1 : j >= N ? 1 : 0;
   if (inJ) return across(own, di, 0);
   if (inI) return across(own, 0, dj);
   return Math.min(own, across(own, di, 0), across(own, 0, dj));
@@ -132,25 +203,37 @@ export function wrapped(f: number, i: number, j: number): number {
 /** beyond's point past the face's edge. */
 const past: Out3 = [0, 0, 0];
 
-/** The cell at column i, row j of face f, however far past its edges: where that point of the face's plane, carried
- *  on past the edge, lands on the sphere (a few cells past, the next face's cell there). */
+/**
+ * The cell at column i, row j of face f, however far past its edges: where that
+ * point of the face's plane, carried on past the edge, lands on the sphere (a
+ * few cells past, the next face's cell there).
+ */
 export function beyond(f: number, i: number, j: number): number {
   if (i >= 0 && i < N && j >= 0 && j < N) return f * NN + j * N + i;
-  return cellOf(atUV(f, ((i + 0.5) / N) * 2 - 1, ((j + 0.5) / N) * 2 - 1, past));
+  return cellOf(
+    atUV(f, ((i + 0.5) / N) * 2 - 1, ((j + 0.5) / N) * 2 - 1, past)
+  );
 }
 
-// Every cell's exact area on the sphere, one table for all six faces. A gnomonic rectangle [x0, x1] × [y0, y1] on the
-// cube's face subtends F(x1, y1) − F(x0, y1) − F(x1, y0) + F(x0, y0) steradians, F = atan(xy / √(1 + x² + y²)). Areas
-// are whole numbers of AREA_Q quanta, so sums of them are exact in any order of adding and taking away.
+// Every cell's exact area on the sphere, one table for all six faces. A
+// gnomonic rectangle [x0, x1] × [y0, y1] on the cube's face subtends F(x1, y1)
+// − F(x0, y1) − F(x1, y0) + F(x0, y0) steradians, F = atan(xy / √(1 + x² +
+// y²)). Areas are whole numbers of AREA_Q quanta, so sums of them are exact in
+// any order of adding and taking away.
 const AREA_Q = 1 << 20;
 const AREA = new Float64Array(NN);
 let total = 0;
 {
-  const g = Float64Array.from({ length: N + 1 }, (_, k) => Math.tan((k / N * 2 - 1) * (Math.PI / 4)));
-  const F = (i: number, j: number) => Math.atan((g[i] * g[j]) / Math.sqrt(1 + g[i] * g[i] + g[j] * g[j]));
+  const g = Float64Array.from({ length: N + 1 }, (_, k) =>
+    Math.tan(((k / N) * 2 - 1) * (Math.PI / 4))
+  );
+  const F = (i: number, j: number) =>
+    Math.atan((g[i] * g[j]) / Math.sqrt(1 + g[i] * g[i] + g[j] * g[j]));
   for (let j = 0; j < N; j++) {
     for (let i = 0; i < N; i++) {
-      AREA[j * N + i] = Math.round((F(i + 1, j + 1) - F(i, j + 1) - F(i + 1, j) + F(i, j)) * R * R * AREA_Q);
+      AREA[j * N + i] = Math.round(
+        (F(i + 1, j + 1) - F(i, j + 1) - F(i + 1, j) + F(i, j)) * R * R * AREA_Q
+      );
       total += 6 * AREA[j * N + i];
     }
   }
@@ -161,11 +244,19 @@ export const areaQuanta = (c: number) => AREA[c & (NN - 1)];
 export const PLANET_QUANTA = total;
 
 /**
- * The cells crossed going straight from p0 (in c0) to p1 (in c1), c0 left out, as a chain each sharing a side with the
- * last, appended to `out`: halved until each half's ends share a side; through a corner exactly,
- * by a cell touching both.
+ * The cells crossed going straight from p0 (in c0) to p1 (in c1), c0 left out,
+ * as a chain each sharing a side with the last, appended to `out`: halved until
+ * each half's ends share a side; through a corner exactly, by a cell touching
+ * both.
  */
-export function trace(p0: Vec3, c0: number, p1: Vec3, c1: number, out: number[], depth = 12): void {
+export function trace(
+  p0: Vec3,
+  c0: number,
+  p1: Vec3,
+  c1: number,
+  out: number[],
+  depth = 12
+): void {
   if (c0 === c1) return;
   if (adjacent(c0, c1)) {
     out.push(c1);
@@ -182,7 +273,8 @@ export function trace(p0: Vec3, c0: number, p1: Vec3, c1: number, out: number[],
     out.push(c1);
     return;
   }
-  const m = normalize([p0[0] + p1[0], p0[1] + p1[1], p0[2] + p1[2]]), cm = cellOf(m);
+  const m = normalize([p0[0] + p1[0], p0[1] + p1[1], p0[2] + p1[2]]),
+    cm = cellOf(m);
   if (cm !== c0) trace(p0, c0, m, cm, out, depth - 1);
   if (cm !== c1) trace(m, cm, p1, c1, out, depth - 1);
 }

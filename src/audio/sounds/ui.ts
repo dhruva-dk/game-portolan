@@ -1,9 +1,26 @@
-// The UI's sounds, in the world's manner, no tune anywhere: a tap a quill's tick on parchment; a folio unfolding and
-// folded shut; PLAY her canvas filling and the sea taking her; her end, sunk, the sea closing over; her win, a great
+// The UI's sounds, in the world's manner, no tune anywhere: a tap a quill's
+// tick on parchment; a folio unfolding and folded shut; PLAY her canvas filling
+// and the sea taking her; her end, sunk, the sea closing over; her win, a great
 // swell and a salute of guns far off.
 
 import {
-  ar, brown, bubbles, crackle, fall, filter, finish, layer, mix, modes, noise, normal, swell, take, tone, type Samples, type Take,
+  ar,
+  brown,
+  bubbles,
+  crackle,
+  fall,
+  filter,
+  finish,
+  layer,
+  mix,
+  modes,
+  noise,
+  normal,
+  swell,
+  take,
+  tone,
+  type Samples,
+  type Take,
 } from '../dsp.ts';
 import { timber } from './blows.ts';
 
@@ -12,7 +29,15 @@ export function tap(rate: number, seed: number): Samples {
   const t = take(0.09, rate, seed);
   noise(t, fall(0.004));
   filter(t, 'bandpass', 3000 + 600 * t.r(), 1.2);
-  modes(t, [[1800, 0.03, 0.15], [3100, 0.02, 0.1]], 0, 0.05);
+  modes(
+    t,
+    [
+      [1800, 0.03, 0.15],
+      [3100, 0.02, 0.1],
+    ],
+    0,
+    0.05
+  );
   return normal(finish(t, 0.0005, 0.02)).x;
 }
 
@@ -23,7 +48,9 @@ const parchment = (t: Take, at: number, seconds: number, grains: number) => {
   filter(p, 'bandpass', 2600, 0.7);
   mix(t, p, 0, 1);
   const rustle = layer(t);
-  noise(rustle, (s) => (s < at ? 0 : swell(seconds * 0.2, seconds, seconds * 0.6)(s - at)));
+  noise(rustle, (s) =>
+    s < at ? 0 : swell(seconds * 0.2, seconds, seconds * 0.6)(s - at)
+  );
   filter(rustle, 'bandpass', 3500, 0.6);
   mix(t, rustle, 0, 0.35);
 };
@@ -32,7 +59,15 @@ const parchment = (t: Take, at: number, seconds: number, grains: number) => {
 export function open(rate: number, seed: number): Samples {
   const t = take(0.55, rate, seed);
   parchment(t, 0, 0.32, 55);
-  modes(t, [[160, 0.1, 0.4], [300, 0.07, 0.25]], 0.3, 0.05);
+  modes(
+    t,
+    [
+      [160, 0.1, 0.4],
+      [300, 0.07, 0.25],
+    ],
+    0.3,
+    0.05
+  );
   return normal(finish(t)).x;
 }
 
@@ -40,7 +75,15 @@ export function open(rate: number, seed: number): Samples {
 export function close(rate: number, seed: number): Samples {
   const t = take(0.4, rate, seed);
   parchment(t, 0, 0.14, 25);
-  modes(t, [[190, 0.1, 0.6], [340, 0.07, 0.4]], 0.13, 0.05);
+  modes(
+    t,
+    [
+      [190, 0.1, 0.6],
+      [340, 0.07, 0.4],
+    ],
+    0.13,
+    0.05
+  );
   const puff = layer(t, 0.2);
   noise(puff, ar(0.002, 0.03));
   filter(puff, 'lowpass', 800);
@@ -48,25 +91,59 @@ export function close(rate: number, seed: number): Samples {
   return normal(finish(t)).x;
 }
 
-/** PLAY: her canvas filling with a great crack, the sea taking her, her timbers answering. */
+/**
+ * PLAY: her canvas filling with a great crack, the sea taking her, her timbers
+ * answering.
+ */
 export function launch(rate: number, seed: number): Samples {
   const t = take(2.6, rate, seed);
   const crack = layer(t, 0.1);
   noise(crack, fall(0.008));
   filter(crack, 'highpass', 300);
   mix(t, crack, 0.02, 1.4);
-  modes(t, [[150, 0.14, 0.8], [228, 0.11, 0.6], [380, 0.07, 0.35]], 0.02, 0.05);
-  tone(t, (s) => 120 * (0.6 + 0.4 * Math.exp(-s / 0.05)), ar(0.002, 0.07), 0.02, 0.3);
+  modes(
+    t,
+    [
+      [150, 0.14, 0.8],
+      [228, 0.11, 0.6],
+      [380, 0.07, 0.35],
+    ],
+    0.02,
+    0.05
+  );
+  tone(
+    t,
+    (s) => 120 * (0.6 + 0.4 * Math.exp(-s / 0.05)),
+    ar(0.002, 0.07),
+    0.02,
+    0.3
+  );
   const wash = layer(t);
   noise(wash, swell(0.5, 2.55, 1.6));
-  filter(wash, 'lowpass', (s) => 400 + 1800 * Math.exp(-(((s - 0.8) / 0.6) ** 2)), 0.7);
+  filter(
+    wash,
+    'lowpass',
+    (s) => 400 + 1800 * Math.exp(-(((s - 0.8) / 0.6) ** 2)),
+    0.7
+  );
   mix(t, wash, 0, 0.9);
-  timber(t, (s) => 40 + 50 * Math.sin(s * 3), swell(0.2, 0.9, 0.3), 0.35, 0.9, 330, 0.5);
+  timber(
+    t,
+    (s) => 40 + 50 * Math.sin(s * 3),
+    swell(0.2, 0.9, 0.3),
+    0.35,
+    0.9,
+    330,
+    0.5
+  );
   filter(t, 'highpass', 50);
   return normal(finish(t, 0.002, 0.4)).x;
 }
 
-/** Her end, sunk: the sea closing over, deep and muffled, the last of her going down. */
+/**
+ * Her end, sunk: the sea closing over, deep and muffled, the last of her going
+ * down.
+ */
 export function lost(rate: number, seed: number): Samples {
   const t = take(3.4, rate, seed);
   const under = layer(t);
@@ -80,12 +157,20 @@ export function lost(rate: number, seed: number): Samples {
   return normal(finish(t, 0.03, 0.8)).x;
 }
 
-/** Her win: a great swell of the sea, and a salute of guns fired far off, one after another. */
+/**
+ * Her win: a great swell of the sea, and a salute of guns fired far off, one
+ * after another.
+ */
 export function salute(rate: number, seed: number): Samples {
   const t = take(6, rate, seed);
   const sea = layer(t);
   noise(sea, swell(1.6, 5.9, 3));
-  filter(sea, 'lowpass', (s) => 350 + 1700 * Math.exp(-(((s - 2.1) / 1.3) ** 2)), 0.7);
+  filter(
+    sea,
+    'lowpass',
+    (s) => 350 + 1700 * Math.exp(-(((s - 2.1) / 1.3) ** 2)),
+    0.7
+  );
   mix(t, sea, 0, 0.7);
   const low = layer(t);
   brown(low, swell(1.6, 5.9, 3));

@@ -1,64 +1,124 @@
-// The sea's charts as the shaders see them (their CPU half is world/lattice.ts): at a point, the three anchors
-// nearest it, their weights, and for each one that weighs in, where the point lies on its chart and the chart's axes
-// carried there (view.ts's chartNodes, the one place the shaders do a chart's arithmetic).
+// The sea's charts as the shaders see them (their CPU half is
+// world/lattice.ts): at a point, the three anchors nearest it, their weights,
+// and for each one that weighs in, where the point lies on its chart and the
+// chart's axes carried there (view.ts's chartNodes, the one place the shaders
+// do a chart's arithmetic).
 //
-// The anchors that can matter on screen — those within the drawn sea's reach of the eye, and a cell and a band past
-// it — are uploaded nearest first to a uniform array each frame (two vec4 each: centre and axis, the offset in their
-// w). A uniform array rather than a data texture: a few hundred floats, indexed directly with no sampler. Each vertex
-// and pixel walks the list with one dot product per anchor, keeping the three nearest. The choice and the weights
-// depend on the point alone, never on the eye (the list only bounds the search): the sea is a function of place and
-// time.
+// The anchors that can matter on screen — those within the drawn sea's reach of
+// the eye, and a cell and a band past it — are uploaded nearest first to a
+// uniform array each frame (two vec4 each: centre and axis, the offset in their
+// w). A uniform array rather than a data texture: a few hundred floats, indexed
+// directly with no sampler. Each vertex and pixel walks the list with one dot
+// product per anchor, keeping the three nearest. The choice and the weights
+// depend on the point alone, never on the eye (the list only bounds the
+// search): the sea is a function of place and time.
 //
-// Reads are skipped where a chart has no weight: the second and third charts' work happens inside an `if` on their
-// weight, so in a cell's interior (where only the nearest weighs in) their texture reads never run. Inside the `if`,
-// fragment reads must not use implicit derivatives (WGSL forbids them in non-uniform control flow, and the chart
-// coordinates jump where the nearest anchor changes), so each chart hands its reads the gradients of its own
-// coordinates across the pixel, worked out from the world position's: dq = (dp·e1, dp·e2).
+// Reads are skipped where a chart has no weight: the second and third charts'
+// work happens inside an `if` on their weight, so in a cell's interior (where
+// only the nearest weighs in) their texture reads never run. Inside the `if`,
+// fragment reads must not use implicit derivatives (WGSL forbids them in
+// non-uniform control flow, and the chart coordinates jump where the nearest
+// anchor changes), so each chart hands its reads the gradients of its own
+// coordinates across the pixel, worked out from the world position's: dq =
+// (dp·e1, dp·e2).
 
 import { Vector4 } from 'three/webgpu';
 import {
-  If, acos, clamp, cross, dot, float, hash, int, length, max, normalize, smoothstep, sqrt, uint, uniform, uniformArray, vec2, vec3,
+  If,
+  acos,
+  clamp,
+  cross,
+  dot,
+  float,
+  hash,
+  int,
+  length,
+  max,
+  normalize,
+  smoothstep,
+  sqrt,
+  uint,
+  uniform,
+  uniformArray,
+  vec2,
+  vec3,
 } from 'three/tsl';
-import { FREQUENCY, anchors, band, cover, icosphere, near, type Anchor, type Likeness } from '../world/lattice.ts';
+import {
+  FREQUENCY,
+  anchors,
+  band,
+  cover,
+  icosphere,
+  near,
+  type Anchor,
+  type Likeness,
+} from '../world/lattice.ts';
 import { R, distance, type Vec3 } from '../world/sphere.ts';
 import type { Wind } from '../world/wind.ts';
 import { chartNodes } from './view.ts';
 import { loop, type FloatNode, type Vec2Node, type Vec3Node } from '../tsl.ts';
 
-/** One chart's read at a point: where on the patches (metres, offset included), its axes there, and its weight. */
+/**
+ * One chart's read at a point: where on the patches (metres, offset included),
+ * its axes there, and its weight.
+ */
 export interface Read {
-  q: Vec2Node; e1: Vec3Node; e2: Vec3Node; w: FloatNode;
-  /** q's change across the pixel, right and down (fragment stage only, when asked for). */
-  dx: Vec2Node; dy: Vec2Node;
-  /** w's gradient over the sphere, per metre (a world vector; with dx, dy only). */
+  q: Vec2Node;
+  e1: Vec3Node;
+  e2: Vec3Node;
+  w: FloatNode;
+  /**
+   * q's change across the pixel, right and down (fragment stage only, when
+   * asked for).
+   */
+  dx: Vec2Node;
+  dy: Vec2Node;
+  /**
+   * w's gradient over the sphere, per metre (a world vector; with dx, dy only).
+   */
   dw: Vec3Node;
 }
 
 export type Charts = ReturnType<typeof createCharts>;
 
 /**
- * span: the width of the largest patch, metres, over which the anchors' offsets are spread; alike: how alike two
- * reads of the patches are, for choosing offsets that make neighbouring charts' seas independent (lattice.anchors);
+ * span: the width of the largest patch, metres, over which the anchors' offsets
+ * are spread; alike: how alike two reads of the patches are, for choosing
+ * offsets that make neighbouring charts' seas independent (lattice.anchors);
  * wind: the prevailing wind, along which each chart's x axis is laid.
  */
 export function createCharts(span: number, alike: Likeness, wind: Wind) {
-  const all: readonly Anchor[] = anchors(icosphere(FREQUENCY), wind, span, alike);
+  const all: readonly Anchor[] = anchors(
+    icosphere(FREQUENCY),
+    wind,
+    span,
+    alike
+  );
   const width = band(FREQUENCY);
-  /** Past the drawn sea, the furthest an anchor can lie and still weigh in somewhere on it. */
+  /**
+   * Past the drawn sea, the furthest an anchor can lie and still weigh in
+   * somewhere on it.
+   */
   const margin = cover(FREQUENCY) + width;
-  const centreValues = all.map(() => new Vector4()), axisValues = all.map(() => new Vector4());
+  const centreValues = all.map(() => new Vector4()),
+    axisValues = all.map(() => new Vector4());
   const centres = uniformArray<'vec4'>(centreValues, 'vec4');
   const axes = uniformArray<'vec4'>(axisValues, 'vec4');
   const count = uniform(3, 'int');
-  /** The anchors listed, nearest first: the first `count` are the uniform arrays'. */
+  /**
+   * The anchors listed, nearest first: the first `count` are the uniform
+   * arrays'.
+   */
   const listed = new Int32Array(all.length);
   /** Every anchor, nearest the eye first (near's out, refilled each frame). */
   const nearest: number[] = [];
 
   /**
-   * The three anchors nearest the unit vector u (indices into the list) and their weights, Σw² = 1; and if asked,
-   * the weights' gradients over the sphere, per metre. Each weight is s/|s| with s = smoothstep(width, 0, arc − arc₀)
-   * of the arcs to the anchors, and an arc's gradient is the unit tangent pointing away from its anchor.
+   * The three anchors nearest the unit vector u (indices into the list) and
+   * their weights, Σw² = 1; and if asked, the weights' gradients over the
+   * sphere, per metre. Each weight is s/|s| with s = smoothstep(width, 0, arc −
+   * arc₀) of the arcs to the anchors, and an arc's gradient is the unit tangent
+   * pointing away from its anchor.
    */
   const pick = (u: Vec3Node, gradients = false) => {
     const c = [float(-2).toVar(), float(-2).toVar(), float(-2).toVar()];
@@ -66,18 +126,30 @@ export function createCharts(span: number, alike: Likeness, wind: Wind) {
     loop('anchor', count, (k) => {
       const d = dot(u, centres.element(k).xyz).toVar();
       If(d.greaterThan(c[0]), () => {
-        c[2].assign(c[1]); i[2].assign(i[1]);
-        c[1].assign(c[0]); i[1].assign(i[0]);
-        c[0].assign(d); i[0].assign(k);
-      }).ElseIf(d.greaterThan(c[1]), () => {
-        c[2].assign(c[1]); i[2].assign(i[1]);
-        c[1].assign(d); i[1].assign(k);
-      }).ElseIf(d.greaterThan(c[2]), () => {
-        c[2].assign(d); i[2].assign(k);
-      });
+        c[2].assign(c[1]);
+        i[2].assign(i[1]);
+        c[1].assign(c[0]);
+        i[1].assign(i[0]);
+        c[0].assign(d);
+        i[0].assign(k);
+      })
+        .ElseIf(d.greaterThan(c[1]), () => {
+          c[2].assign(c[1]);
+          i[2].assign(i[1]);
+          c[1].assign(d);
+          i[1].assign(k);
+        })
+        .ElseIf(d.greaterThan(c[2]), () => {
+          c[2].assign(d);
+          i[2].assign(k);
+        });
     });
     const arc = c.map((x) => acos(clamp(x, -1, 1)).mul(R));
-    const s = [float(1), smoothstep(width, 0, arc[1].sub(arc[0])), smoothstep(width, 0, arc[2].sub(arc[0]))];
+    const s = [
+      float(1),
+      smoothstep(width, 0, arc[1].sub(arc[0])),
+      smoothstep(width, 0, arc[2].sub(arc[0])),
+    ];
     const size = sqrt(s[0].add(s[1].mul(s[1])).add(s[2].mul(s[2])));
     const weight = s.map((x) => x.div(size).toVar());
     const none: Vec3Node[] = [];
@@ -92,34 +164,58 @@ export function createCharts(span: number, alike: Likeness, wind: Wind) {
       return away[j].sub(away[0]).mul(t.mul(float(1).sub(t)).mul(-6 / width));
     });
     const dsize = ds[0].mul(s[1]).add(ds[1].mul(s[2])).div(size);
-    const slope = [vec3(0), ...ds].map((d, j) => d.sub(dsize.mul(weight[j])).div(size));
+    const slope = [vec3(0), ...ds].map((d, j) =>
+      d.sub(dsize.mul(weight[j])).div(size)
+    );
     return { index: i, weight, slope };
   };
 
   /**
-   * Calls `read` for each chart with weight at world position p (nearest first; the first always), inside a branch
-   * on its weight for the second and third. Must be called inside an Fn. dp: p's change across the pixel, right and
-   * down, for the reads' gradients (fragment stage); worked out before any branch.
+   * Calls `read` for each chart with weight at world position p (nearest first;
+   * the first always), inside a branch on its weight for the second and third.
+   * Must be called inside an Fn. dp: p's change across the pixel, right and
+   * down, for the reads' gradients (fragment stage); worked out before any
+   * branch.
    */
-  function each(p: Vec3Node, read: (r: Read, slot: number) => void, dp?: [Vec3Node, Vec3Node]) {
+  function each(
+    p: Vec3Node,
+    read: (r: Read, slot: number) => void,
+    dp?: [Vec3Node, Vec3Node]
+  ) {
     const u = normalize(p);
     const { index, weight, slope } = pick(u, dp !== undefined);
     index.forEach((k, slot) => {
       const run = () => {
-        const C = centres.element(k), X = axes.element(k);
-        const at = C.xyz, axis = X.xyz;
+        const C = centres.element(k),
+          X = axes.element(k);
+        const at = C.xyz,
+          axis = X.xyz;
         const c = chartNodes(at, axis, cross(axis, at))(u);
-        const grad = (d: Vec3Node | undefined) => (d ? vec2(dot(d, c.e1), dot(d, c.e2)) : vec2(0));
+        const grad = (d: Vec3Node | undefined) =>
+          d ? vec2(dot(d, c.e1), dot(d, c.e2)) : vec2(0);
         const q = c.q.add(vec2(C.w, X.w));
-        read({ q, e1: c.e1, e2: c.e2, w: weight[slot], dx: grad(dp?.[0]), dy: grad(dp?.[1]), dw: slope[slot] ?? vec3(0) }, slot);
+        read(
+          {
+            q,
+            e1: c.e1,
+            e2: c.e2,
+            w: weight[slot],
+            dx: grad(dp?.[0]),
+            dy: grad(dp?.[1]),
+            dw: slope[slot] ?? vec3(0),
+          },
+          slot
+        );
       };
       if (slot === 0) run();
       else If(weight[slot].greaterThan(0), run);
     });
   }
 
-  /** For the sea's look 'charts' (water.ts SeaShows): the three weights as red, green and blue, each cell a little
-   *  lighter or darker than the next. */
+  /**
+   * For the sea's look 'charts' (water.ts SeaShows): the three weights as red,
+   * green and blue, each cell a little lighter or darker than the next.
+   */
   function debug(p: Vec3Node): Vec3Node {
     const { index, weight } = pick(normalize(p));
     const shade = hash(uint(index[0])).mul(0.5).add(0.5);
@@ -127,16 +223,27 @@ export function createCharts(span: number, alike: Likeness, wind: Wind) {
   }
 
   return {
-    /** Every anchor, as world/lattice.ts placed them: for the CPU's copy of the waves (world/swell.ts). */
+    /**
+     * Every anchor, as world/lattice.ts placed them: for the CPU's copy of the
+     * waves (world/swell.ts).
+     */
     anchors: all,
     each,
     debug,
-    /** Lists the anchors that can weigh in on the sea drawn out to `reach` metres round the point under the eye. */
+    /**
+     * Lists the anchors that can weigh in on the sea drawn out to `reach`
+     * metres round the point under the eye.
+     */
     update(eye: Vec3, reach: number) {
-      // every anchor, nearest first; those within reach, and never fewer than three
+      // every anchor, nearest first; those within reach, and never fewer than
+      // three
       const order = near(all, eye, Math.PI * R, nearest);
       let n = 0;
-      while (n < order.length && distance(all[order[n]].at, eye) <= reach + margin) n++;
+      while (
+        n < order.length &&
+        distance(all[order[n]].at, eye) <= reach + margin
+      )
+        n++;
       n = Math.max(3, n);
       let same = n === count.value;
       for (let k = 0; same && k < n; k++) same = order[k] === listed[k];

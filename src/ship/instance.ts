@@ -1,5 +1,6 @@
-// A ship's instance: what each drawn ship carries to the shaders, six vec4s interleaved in one buffer per level of
-// detail. The one place its layout is known: the fleet packs it (pack), the materials read it by name (read).
+// A ship's instance: what each drawn ship carries to the shaders, six vec4s
+// interleaved in one buffer per level of detail. The one place its layout is
+// known: the fleet packs it (pack), the materials read it by name (read).
 //
 //   shipAt     position xyz, brace w
 //   shipFwd    forward xyz, the sails' wind across her w
@@ -12,23 +13,40 @@ import { attribute, vec2 } from 'three/tsl';
 import type { Vec3 } from '../world/sphere.ts';
 
 /** The attributes, in the order they lie in an instance. */
-export const SLOTS = ['shipAt', 'shipFwd', 'shipUp', 'shipPaint', 'shipCloth', 'shipBerth'] as const;
+export const SLOTS = [
+  'shipAt',
+  'shipFwd',
+  'shipUp',
+  'shipPaint',
+  'shipCloth',
+  'shipBerth',
+] as const;
 /** Floats an instance. */
 export const STRIDE = SLOTS.length * 4;
 
 export interface Instance {
-  position: Vec3; forward: Vec3; up: Vec3;
+  position: Vec3;
+  forward: Vec3;
+  up: Vec3;
   /** The yards' turn about the masts, radians. */
   brace: number;
-  /** The sails' wind as a share of full: across her (to port) and along her (ahead). */
+  /**
+   * The sails' wind as a share of full: across her (to port) and along her
+   * (ahead).
+   */
   wind: [number, number];
-  paint: Vec3; sail: Vec3;
+  paint: Vec3;
+  sail: Vec3;
   /** The sails' pattern (materials.ts: 0 plain, 1 band, 2 stripes). */
   pattern: number;
   /** Her canvas's own phase, radians. */
   phase: number;
-  /** Her cloth berth (cloth.ts), and how much of the drawn canvas is its (0 when she has none). */
-  berth: number; share: number;
+  /**
+   * Her cloth berth (cloth.ts), and how much of the drawn canvas is its (0 when
+   * she has none).
+   */
+  berth: number;
+  share: number;
 }
 
 /** Writes an instance into a at float o, in SLOTS' order. */
@@ -52,10 +70,23 @@ export function pack(a: Float32Array, o: number, s: Instance) {
 
 /** The instance as a vertex shader reads it. */
 export function read() {
-  const at = attribute('shipAt', 'vec4'), fwd = attribute('shipFwd', 'vec4'), up = attribute('shipUp', 'vec4');
-  const paint = attribute('shipPaint', 'vec4'), cloth = attribute('shipCloth', 'vec4'), berth = attribute('shipBerth', 'vec4');
+  const at = attribute('shipAt', 'vec4'),
+    fwd = attribute('shipFwd', 'vec4'),
+    up = attribute('shipUp', 'vec4');
+  const paint = attribute('shipPaint', 'vec4'),
+    cloth = attribute('shipCloth', 'vec4'),
+    berth = attribute('shipBerth', 'vec4');
   return {
-    position: at.xyz, brace: at.w, forward: fwd.xyz, up: up.xyz, wind: vec2(fwd.w, up.w),
-    paint: paint.rgb, pattern: paint.w, sail: cloth.rgb, phase: cloth.w, berth: berth.x, share: berth.y,
+    position: at.xyz,
+    brace: at.w,
+    forward: fwd.xyz,
+    up: up.xyz,
+    wind: vec2(fwd.w, up.w),
+    paint: paint.rgb,
+    pattern: paint.w,
+    sail: cloth.rgb,
+    phase: cloth.w,
+    berth: berth.x,
+    share: berth.y,
   };
 }

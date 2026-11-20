@@ -1,68 +1,139 @@
-// What passes between the player and the game, as plain data: the seam between play/ (the game) and ui/ (what she
-// sees and touches), as snapshot.ts is the seam between the game and the frame. Her hands' orders go in each frame
-// (Hands: read by ui/input.ts, given to play/game.ts step); what the match reports comes out (Status, read by
-// ui/hud.ts), with what she carries (Kit).
+// What passes between the player and the game, as plain data: the seam between
+// play/ (the game) and ui/ (what she sees and touches), as snapshot.ts is the
+// seam between the game and the frame. Her hands' orders go in each frame
+// (Hands: read by ui/input.ts, given to play/game.ts step); what the match
+// reports comes out (Status, read by ui/hud.ts), with what she carries (Kit).
 
 import type { GunKind, LootKind, Use } from './kinds.ts';
 import type { Vec3 } from './world/sphere.ts';
 
 /** Her hands, as read for a frame. */
 export interface Hands {
-  /** The stick, while held: how far it is pushed right and up the screen (within the unit disc), and its centre (CSS
-   *  px; none for the keys). */
+  /**
+   * The stick, while held: how far it is pushed right and up the screen (within
+   * the unit disc), and its centre (CSS px; none for the keys).
+   */
   stick: { x: number; y: number; centre: [number, number] | null } | null;
-  /** The look: pixels dragged right and down since the last read, and whether a finger is on it. */
+  /**
+   * The look: pixels dragged right and down since the last read, and whether a
+   * finger is on it.
+   */
   look: { x: number; y: number; held: boolean };
-  /** Whether her gun's trigger is held, or was pressed since the last read: held, it fires at its kind's interval. */
+  /**
+   * Whether her gun's trigger is held, or was pressed since the last read:
+   * held, it fires at its kind's interval.
+   */
   fire: boolean;
-  /** The hotbar's slot last tapped since the last read (HOTBAR: 0–1 the guns', 2–4 the items'), or null. */
+  /**
+   * The hotbar's slot last tapped since the last read (HOTBAR: 0–1 the guns',
+   * 2–4 the items'), or null.
+   */
   tap: number | null;
   /** Whether Gust has been pressed since the last read. */
   gust: boolean;
 }
 
 /** No hand on anything. */
-export const IDLE: Hands = { stick: null, look: { x: 0, y: 0, held: false }, fire: false, tap: null, gust: false };
+export const IDLE: Hands = {
+  stick: null,
+  look: { x: 0, y: 0, held: false },
+  fire: false,
+  tap: null,
+  gust: false,
+};
 
-/** The match as the HUD reads it: plain data, one object refilled each time it is asked for (read it then; what is
- *  kept of it past the frame, keep by value). */
+/**
+ * The match as the HUD reads it: plain data, one object refilled each time it
+ * is asked for (read it then; what is kept of it past the frame, keep by
+ * value).
+ */
 export interface Status {
-  /** Where the ship the camera follows is (unit sphere) and the way she heads (unit tangent): hers, or once she has
-   *  sunk the one she watches. */
-  at: Vec3; heading: Vec3;
-  /** The way the camera looks along the sea there (unit tangent): what the stick's up means. */
+  /**
+   * Where the ship the camera follows is (unit sphere) and the way she heads
+   * (unit tangent): hers, or once she has sunk the one she watches.
+   */
+  at: Vec3;
+  heading: Vec3;
+  /**
+   * The way the camera looks along the sea there (unit tangent): what the
+   * stick's up means.
+   */
   facing: Vec3;
-  /** How much of the eye's arrival from space is still to come (1 as a match begins, 0 once it is down with her). */
+  /**
+   * How much of the eye's arrival from space is still to come (1 as a match
+   * begins, 0 once it is down with her).
+   */
   arriving: number;
   /** Her hit points, and their most. */
-  hull: number; hullMax: number; shield: number; shieldMax: number;
-  /** The gun in her hand, for Fire and the reticle: its kind and rarity (0–4, sim/handling.ts GUN.rarities), the rounds
-   *  left in its magazine, how far reloaded (0…1, 1 when it isn't reloading), how far wound up (0…1; null when it isn't
-   *  winding), how much of taking it up is still to come (0…1, 0 ready), and whether its assist has a ship to lay on
-   *  where she is aimed (sim/gun.ts); null with none in hand. */
-  gun: { kind: GunKind; rarity: number; rounds: number; ready: number; charge: number | null; swapping: number; locked: boolean } | null;
+  hull: number;
+  hullMax: number;
+  shield: number;
+  shieldMax: number;
+  /**
+   * The gun in her hand, for Fire and the reticle: its kind and rarity (0–4,
+   * sim/handling.ts GUN.rarities), the rounds left in its magazine, how far
+   * reloaded (0…1, 1 when it isn't reloading), how far wound up (0…1; null when
+   * it isn't winding), how much of taking it up is still to come (0…1, 0
+   * ready), and whether its assist has a ship to lay on where she is aimed
+   * (sim/gun.ts); null with none in hand.
+   */
+  gun: {
+    kind: GunKind;
+    rarity: number;
+    rounds: number;
+    ready: number;
+    charge: number | null;
+    swapping: number;
+    locked: boolean;
+  } | null;
   /** Ships still afloat, hers among them; whether hers is sunk. */
-  afloat: number; sunk: boolean;
-  /** Seconds till the storm next holds or closes (0 once it has closed for good), whether it is closing now, its calm
-   *  (radius in metres) and the calm it next closes to (null once it has closed for good); how far outside the calm
-   *  she is, metres (0 inside). */
-  storm: number; closing: boolean; eye: { centre: Vec3; radius: number }; next: { centre: Vec3; radius: number } | null; outside: number;
-  /** Her gun's aim, while her hands are on her ship and she has a gun in hand (else null). The reticle stands in the
-   *  middle of the screen, where the gun is aimed (play/chase.ts); `fall` is where the ball will come down, or pass
-   *  through the ship it is laid on (CSS px from the top left; null off the screen or hidden by the sea's curve),
-   *  `reach` whether it reaches what the reticle is on (false: past range, nearer than a lob's least, or the sky),
-   *  `spread` the radius its balls go off within there (CSS px), and `lob` whether it is lobbed (the fall is the mark). */
-  reticle: { fall: { x: number; y: number } | null; reach: boolean; spread: number; lob: boolean } | null;
-  /** What happened in about the last second, oldest first (Moment): what the HUD answers her with, and what sound
-   *  will play. A reader keeps the last seq it took and takes those past it. */
+  afloat: number;
+  sunk: boolean;
+  /**
+   * Seconds till the storm next holds or closes (0 once it has closed for
+   * good), whether it is closing now, its calm (radius in metres) and the calm
+   * it next closes to (null once it has closed for good); how far outside the
+   * calm she is, metres (0 inside).
+   */
+  storm: number;
+  closing: boolean;
+  eye: { centre: Vec3; radius: number };
+  next: { centre: Vec3; radius: number } | null;
+  outside: number;
+  /**
+   * Her gun's aim, while her hands are on her ship and she has a gun in hand
+   * (else null). The reticle stands in the middle of the screen, where the gun
+   * is aimed (play/chase.ts); `fall` is where the ball will come down, or pass
+   * through the ship it is laid on (CSS px from the top left; null off the
+   * screen or hidden by the sea's curve), `reach` whether it reaches what the
+   * reticle is on (false: past range, nearer than a lob's least, or the sky),
+   * `spread` the radius its balls go off within there (CSS px), and `lob`
+   * whether it is lobbed (the fall is the mark).
+   */
+  reticle: {
+    fall: { x: number; y: number } | null;
+    reach: boolean;
+    spread: number;
+    lob: boolean;
+  } | null;
+  /**
+   * What happened in about the last second, oldest first (Moment): what the HUD
+   * answers her with, and what sound will play. A reader keeps the last seq it
+   * took and takes those past it.
+   */
   moments: readonly Moment[];
 }
 
-/** Her ship's id in what the match reports (Deed): sim/match.ts PLAYER, which the UI may not import (tests/moments.test.ts
- *  holds them equal). */
+/**
+ * Her ship's id in what the match reports (Deed): sim/match.ts PLAYER, which
+ * the UI may not import (tests/moments.test.ts holds them equal).
+ */
 export const HER = 0;
 
-/** The kinds of gun, and of a piece taken up or mended with (a gun of a kind, or stores): kinds.ts. */
+/**
+ * The kinds of gun, and of a piece taken up or mended with (a gun of a kind, or
+ * stores): kinds.ts.
+ */
 export { isGun } from './kinds.ts';
 export type { GunKind, LootKind } from './kinds.ts';
 
@@ -70,8 +141,9 @@ export type { GunKind, LootKind } from './kinds.ts';
 export const HOTBAR = { guns: 2, items: 3 } as const;
 
 /**
- * What happened on the sea, as the match reports it (play/moments.ts), numbered in order (seq, from 1 within a game)
- * at a moment on the world's clock (time, s), where it happened (at, a unit vector), and the ship it befell (ship; 0
+ * What happened on the sea, as the match reports it (play/moments.ts), numbered
+ * in order (seq, from 1 within a game) at a moment on the world's clock (time,
+ * s), where it happened (at, a unit vector), and the ship it befell (ship; 0
  * hers, sim/match.ts PLAYER):
  *   fired     a gun of a kind went off: ship's
  *   winding   a heavy gun began winding up to fire (a harpoon's or a mortar's): ship's
@@ -88,49 +160,108 @@ export const HOTBAR = { guns: 2, items: 3 } as const;
  *   gust      ship spent a gust (only hers)
  */
 export type Deed = { seq: number; time: number; at: Vec3; ship: number } & (
-  | { kind: 'fired' | 'winding' | 'reloading' | 'reloaded' | 'swapped'; gun: GunKind }
+  | {
+      kind: 'fired' | 'winding' | 'reloading' | 'reloaded' | 'swapped';
+      gun: GunKind;
+    }
   | { kind: 'fell'; land: boolean }
-  | { kind: 'struck'; by: number; shield: number; hull: number; broke: boolean; ram: boolean }
+  | {
+      kind: 'struck';
+      by: number;
+      shield: number;
+      hull: number;
+      broke: boolean;
+      ram: boolean;
+    }
   | { kind: 'sank'; by: number | null }
   | { kind: 'took'; piece: LootKind; rarity: number; slot: number }
   | { kind: 'mended'; piece: LootKind }
   | { kind: 'gust' }
 );
 
-/** Metres over the sea a deed is placed, by its kind: a blow on a hull at her side, a gun at her muzzle, the rest at
- *  the water. Where it is seen (play/moments.ts) and heard from (audio/audio.ts). */
+/**
+ * Metres over the sea a deed is placed, by its kind: a blow on a hull at her
+ * side, a gun at her muzzle, the rest at the water. Where it is seen
+ * (play/moments.ts) and heard from (audio/audio.ts).
+ */
 export const LIFT: Record<Deed['kind'], number> = {
-  fired: 3, winding: 3, reloading: 3, reloaded: 3, swapped: 3, fell: 0, struck: 2, sank: 2, took: 0.5, mended: 2, gust: 2,
+  fired: 3,
+  winding: 3,
+  reloading: 3,
+  reloaded: 3,
+  swapped: 3,
+  fell: 0,
+  struck: 2,
+  sank: 2,
+  took: 0.5,
+  mended: 2,
+  gust: 2,
 };
 
-/** The screens (ui/ways.ts, the ways between them): named here for the sound too, which hears which is shown. */
-export const SCREENS = ['title', 'lobby', 'settings', 'match', 'sinking', 'sunk', 'spectate', 'won', 'result'] as const;
+/**
+ * The screens (ui/ways.ts, the ways between them): named here for the sound
+ * too, which hears which is shown.
+ */
+export const SCREENS = [
+  'title',
+  'lobby',
+  'settings',
+  'match',
+  'sinking',
+  'sunk',
+  'spectate',
+  'won',
+  'result',
+] as const;
 export type Screen = (typeof SCREENS)[number];
 
-/** What a blow (a Deed 'struck') did, as the screen, the camera, the hit-stop and the sound each answer it: broke a
- *  shield, struck the hull, or struck a shield only. */
+/**
+ * What a blow (a Deed 'struck') did, as the screen, the camera, the hit-stop
+ * and the sound each answer it: broke a shield, struck the hull, or struck a
+ * shield only.
+ */
 export type Blow = 'broke' | 'hull' | 'shield';
-export const blowOf = (d: { broke: boolean; hull: number }): Blow => (d.broke ? 'broke' : d.hull > 0 ? 'hull' : 'shield');
-/** How strongly a blow of `points` hit points is felt: one she dealt, and one she took. */
+export const blowOf = (d: { broke: boolean; hull: number }): Blow =>
+  d.broke ? 'broke' : d.hull > 0 ? 'hull' : 'shield';
+/**
+ * How strongly a blow of `points` hit points is felt: one she dealt, and one
+ * she took.
+ */
 export const felt = {
   dealt: (points: number) => Math.min(1.3, 0.6 + points / 40),
   taken: (points: number) => Math.min(1.3, 0.4 + points / 40),
 };
 
-/** A Deed as she sees it: where it falls on her screen (CSS px from the top left; null off it, or behind her), its
- *  bearing from the way the camera looks (radians clockwise: 0 ahead, π/2 to the right, ±π behind), and how far it is
- *  from the eye, metres. */
-export type Moment = Deed & { seen: { x: number; y: number } | null; bearing: number; metres: number };
+/**
+ * A Deed as she sees it: where it falls on her screen (CSS px from the top
+ * left; null off it, or behind her), its bearing from the way the camera looks
+ * (radians clockwise: 0 ahead, π/2 to the right, ±π behind), and how far it is
+ * from the eye, metres.
+ */
+export type Moment = Deed & {
+  seen: { x: number; y: number } | null;
+  bearing: number;
+  metres: number;
+};
 
 /** An item a slot of the hotbar holds: its stores' glyph (kinds.ts Use). */
 export type Item = `item.${Use}`;
 
 /** A slot of the hotbar holding an item, and how many of it if more than one may be held. */
-export interface Slot { item: Item; count?: number }
+export interface Slot {
+  item: Item;
+  count?: number;
+}
 
 /** A gun slot of the hotbar holding a gun: its kind, rarity (0–4), the rounds left of its magazine and how many that
  *  holds, and how far through reloading it is (0…1; null when it isn't). */
-export interface GunSlot { kind: GunKind; rarity: number; rounds: number; mag: number; reload: number | null }
+export interface GunSlot {
+  kind: GunKind;
+  rarity: number;
+  rounds: number;
+  mag: number;
+  reload: number | null;
+}
 
 /** What she carries: the hotbar's two gun slots and three item slots (null: empty), the slot in hand (HOTBAR: the gun
  *  in hand's, or the item chosen), how far through using it she is (0…1; null when she isn't), the slot a tap would
@@ -138,8 +269,13 @@ export interface GunSlot { kind: GunKind; rarity: number; rounds: number; mag: n
  *  back (1.4: one ready, the next 40% back), the most she carries, and whether one blows now. */
 export interface Kit {
   guns: readonly [GunSlot | null, GunSlot | null];
-  items: readonly [Slot | null, Slot | null, Slot | null]; chosen: number; using: number | null; offer: number | null;
-  gust: number; gusts: number; blowing: boolean;
+  items: readonly [Slot | null, Slot | null, Slot | null];
+  chosen: number;
+  using: number | null;
+  offer: number | null;
+  gust: number;
+  gusts: number;
+  blowing: boolean;
 }
 
 /** Her match's end, as the screens show it: how it came (she won, or what sank her: a ball, a ram, the Storm), her
@@ -148,6 +284,10 @@ export interface Kit {
  *  is over (she won, or one ship or none is afloat). */
 export interface End {
   how: 'won' | 'shot' | 'ram' | 'storm';
-  place: number; of: number; share: number; afloat: number;
-  settled: boolean; over: boolean;
+  place: number;
+  of: number;
+  share: number;
+  afloat: number;
+  settled: boolean;
+  over: boolean;
 }

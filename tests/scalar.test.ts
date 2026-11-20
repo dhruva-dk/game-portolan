@@ -1,9 +1,19 @@
-// world/scalar.ts: the single numbers' arithmetic, at its ends and in its middle.
+// world/scalar.ts: the single numbers' arithmetic, at its ends and in its
+// middle.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { clamp, easeInOut, lerp, smoother, smootherIntegral, smoothstep, wrapAngle } from '../src/world/scalar.ts';
+import {
+  clamp,
+  easeInOut,
+  lerp,
+  smoother,
+  smootherIntegral,
+  smoothstep,
+  wrapAngle,
+} from '../src/world/scalar.ts';
 
-const near = (a: number, b: number, eps = 1e-12, what = '') => assert.ok(Math.abs(a - b) <= eps, `${what} ${a} vs ${b}`);
+const near = (a: number, b: number, eps = 1e-12, what = '') =>
+  assert.ok(Math.abs(a - b) <= eps, `${what} ${a} vs ${b}`);
 
 test('clamp holds within 0…1 by default, or the bounds given', () => {
   assert.equal(clamp(-0.5), 0);
@@ -33,13 +43,20 @@ test('smoother is eased at both ends, symmetric, and its integral is its area', 
   assert.equal(smoother(0), 0);
   assert.equal(smoother(1), 1);
   assert.equal(smoother(0.5), 0.5);
-  for (const t of [0.1, 0.3, 0.7]) near(smoother(t) + smoother(1 - t), 1, 1e-12, `t ${t}`);
+  for (const t of [0.1, 0.3, 0.7])
+    near(smoother(t) + smoother(1 - t), 1, 1e-12, `t ${t}`);
   // the slope at the ends is nil
   near((smoother(1e-4) - smoother(0)) / 1e-4, 0, 1e-6, 'slope at 0');
   assert.equal(smootherIntegral(0), 0);
   assert.equal(smootherIntegral(1), 0.5);
   // its derivative is smoother
-  for (const t of [0.2, 0.5, 0.9]) near((smootherIntegral(t + 1e-6) - smootherIntegral(t - 1e-6)) / 2e-6, smoother(t), 1e-6, `t ${t}`);
+  for (const t of [0.2, 0.5, 0.9])
+    near(
+      (smootherIntegral(t + 1e-6) - smootherIntegral(t - 1e-6)) / 2e-6,
+      smoother(t),
+      1e-6,
+      `t ${t}`
+    );
 });
 
 test('easeInOut is the cubic in and out', () => {
@@ -52,7 +69,7 @@ test('easeInOut is the cubic in and out', () => {
 
 test('wrapAngle brings an angle within ±π', () => {
   near(wrapAngle(0), 0);
-  near(wrapAngle(3 * Math.PI / 2), -Math.PI / 2, 1e-12);
-  near(wrapAngle(-5 * Math.PI / 2), -Math.PI / 2, 1e-12);
+  near(wrapAngle((3 * Math.PI) / 2), -Math.PI / 2, 1e-12);
+  near(wrapAngle((-5 * Math.PI) / 2), -Math.PI / 2, 1e-12);
   near(wrapAngle(1), 1);
 });

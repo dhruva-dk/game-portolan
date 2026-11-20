@@ -1,63 +1,89 @@
-// Every debug switch, read from the page's query, and the scenario they set up. None of it runs in a release build
-// unless the page asks with ?debug: off Vite's dev server (import.meta.env.DEV) and without ?debug the page is set up
-// as released and opens at the title. The scenario drives the game, its referee and the screens' flow only through
-// what they offer anyone (main.ts builds them; this only sets them going).
+// Every debug switch, read from the page's query, and the scenario they set up.
+// None of it runs in a release build unless the page asks with ?debug: off
+// Vite's dev server (import.meta.env.DEV) and without ?debug the page is set up
+// as released and opens at the title. The scenario drives the game, its referee
+// and the screens' flow only through what they offer anyone (main.ts builds
+// them; this only sets them going).
 //
-// The look and the weather. ?mood= puts the whole look on one of its alternates: dawn, a low morning sun in a rose
-// mist; warm, a low evening sun over a deeper sea; noon, a high sun, bright and saturated (MOODS: the hour and the
-// haze; the grade and the haze follow the sun's height). ?t=hours sets the time of day (the same everywhere:
-// world/sun.ts); ?wind=m/s the wind's speed, ?haze= the air's aerosol and ?cloud= the cloud cover (0–1) each hold at
-// that instead of drifting (world/weather.ts); ?seed= the planet's (environment.ts SEED by default). ?debug=charts
-// colours the sea by its charts' weights, ?debug=wake shows the ships' marks on it (water/water.ts).
+// The look and the weather. ?mood= puts the whole look on one of its
+// alternates: dawn, a low morning sun in a rose mist; warm, a low evening sun
+// over a deeper sea; noon, a high sun, bright and saturated (MOODS: the hour
+// and the haze; the grade and the haze follow the sun's height). ?t=hours sets
+// the time of day (the same everywhere: world/sun.ts); ?wind=m/s the wind's
+// speed, ?haze= the air's aerosol and ?cloud= the cloud cover (0–1) each hold
+// at that instead of drifting (world/weather.ts); ?seed= the planet's
+// (environment.ts SEED by default). ?debug=charts colours the sea by its
+// charts' weights, ?debug=wake shows the ships' marks on it (water/water.ts).
 //
-// The debug camera. ?lat=&lon= degrees put the camera over a point of the planet and ?alt= metres above the sea;
-// ?yaw=deg turns it (clockwise from north: 90 east) and ?look=deg pitches it. The planet is 554 m in radius, so a
-// degree is 9.67 m. ?fly, or any of lat, lon and alt, flies the debug camera (fly.ts) instead of sailing, starting over
-// where she would lie by default; there ?kind= puts a gun of that kind on every ship's plinth (?kind=all: each ship the
-// next kind). ?wall=m flies it m metres short of the storm's edge, in the calm (with ?storm=, the cap held then;
-// negative: in the storm), on the line from the cap's centre toward where she would lie, looking out across the edge
-// (?yaw= turns from that). ?bolt holds the storm's lightning lit (sky/storm-bolt.ts), for a still of it.
+// The debug camera. ?lat=&lon= degrees put the camera over a point of the
+// planet and ?alt= metres above the sea; ?yaw=deg turns it (clockwise from
+// north: 90 east) and ?look=deg pitches it. The planet is 554 m in radius, so a
+// degree is 9.67 m. ?fly, or any of lat, lon and alt, flies the debug camera
+// (fly.ts) instead of sailing, starting over where she would lie by default;
+// there ?kind= puts a gun of that kind on every ship's plinth (?kind=all: each
+// ship the next kind). ?wall=m flies it m metres short of the storm's edge, in
+// the calm (with ?storm=, the cap held then; negative: in the storm), on the
+// line from the cap's centre toward where she would lie, looking out across the
+// edge (?yaw= turns from that). ?bolt holds the storm's lightning lit
+// (sky/storm-bolt.ts), for a still of it.
 //
-// Her course and her hands. ?drive=bearing,throttle,seconds;… sails her, her helm lashed to each leg in turn (bearings
-// in degrees clockwise from north where she is), before the first frame; she holds the last until a hand takes the
-// helm. ?gun=0…4 arms every ship with a gun of that rarity, ?kind= (cannon, scatter, repeater, harpoon, mortar) of that
-// kind (sim/gun.ts; a common cannon by default with either); ?fire fires hers at the first step, ?fire=seconds so many
-// seconds into the frames drawn, ?fire=seconds,held holds its trigger that long; ?tap=slot,seconds taps that slot of
-// the hotbar then (0–1 her guns', 2–4 her items': a swap, or a reload); ?storm=seconds holds the storm at that moment
-// of its clock.
+// Her course and her hands. ?drive=bearing,throttle,seconds;… sails her, her
+// helm lashed to each leg in turn (bearings in degrees clockwise from north
+// where she is), before the first frame; she holds the last until a hand takes
+// the helm. ?gun=0…4 arms every ship with a gun of that rarity, ?kind= (cannon,
+// scatter, repeater, harpoon, mortar) of that kind (sim/gun.ts; a common cannon
+// by default with either); ?fire fires hers at the first step, ?fire=seconds so
+// many seconds into the frames drawn, ?fire=seconds,held holds its trigger that
+// long; ?tap=slot,seconds taps that slot of the hotbar then (0–1 her guns', 2–4
+// her items': a swap, or a reload); ?storm=seconds holds the storm at that
+// moment of its clock.
 //
-// The frame. ?probe stands grey blocks and mirrors ahead (probe.ts). The meter (meter.ts) shows the frame's cost.
-// ?safe=top,right,bottom,left px stands in for the device's safe-area insets (the iPad Air in landscape:
-// ?safe=0,0,20,0, the home indicator's). ?lod=0…3 draws every ship at that level of detail; ?cloth=0 draws every
-// ship's canvas as the wind fills it, none simulated (ship/fleet.ts).
+// The frame. ?probe stands grey blocks and mirrors ahead (probe.ts). The meter
+// (meter.ts) shows the frame's cost. ?safe=top,right,bottom,left px stands in
+// for the device's safe-area insets (the iPad Air in landscape: ?safe=0,0,20,0,
+// the home indicator's). ?lod=0…3 draws every ship at that level of detail;
+// ?cloth=0 draws every ship's canvas as the wind fills it, none simulated
+// (ship/fleet.ts).
 //
-// The screens. ?screen= opens the UI at a screen (title, lobby, settings, match, sunk, spectate, won, result;
-// ui/ways.ts; also map), at sea among ?ships=n others by default: play starts a match as PLAY does (every ship at her
-// berth, the eye coming down from space: play/arrival.ts); sunk sinks her by the first other ship (?by=storm: by the
-// storm) and the screens follow her end as the match would bring it (the camera's beat, then her result); spectate
-// sinks her and watches; won sinks every other, the last by her; result sinks her and all but one other, so the match
-// is over. ?sink=seconds sinks her so many seconds into the frames drawn, ?win=seconds every other ship then, so she
-// wins; ?leave=seconds taps LEAVE then (home to the lobby under the title, where her screen has that way:
-// ui/passage.ts).
+// The screens. ?screen= opens the UI at a screen (title, lobby, settings,
+// match, sunk, spectate, won, result; ui/ways.ts; also map), at sea among
+// ?ships=n others by default: play starts a match as PLAY does (every ship at
+// her berth, the eye coming down from space: play/arrival.ts); sunk sinks her
+// by the first other ship (?by=storm: by the storm) and the screens follow her
+// end as the match would bring it (the camera's beat, then her result);
+// spectate sinks her and watches; won sinks every other, the last by her;
+// result sinks her and all but one other, so the match is over. ?sink=seconds
+// sinks her so many seconds into the frames drawn, ?win=seconds every other
+// ship then, so she wins; ?leave=seconds taps LEAVE then (home to the lobby
+// under the title, where her screen has that way: ui/passage.ts).
 //
-// The sea about her. ?ships= sets them on the sea ahead of her (demoShips), ?way=m/s gives them a straight course at
-// that speed, their helms lashed, and ?heading=deg turns them all. ?ahead=seconds sails the game on that long before
-// the first frame, and ?pause holds it there from then on (the frame still draws: the arrival's stills). The ships in
-// a match are sim/match.ts SHIPS; the frame has room for that many, or for ?ships= more. At sea, ?kit (?kit=seconds:
-// then) puts stores under her for her to sweep up (two guns, a cannon and a scatter, unless ?gun arms her, and three
-// slots of stores), with a better gun beside them, a mortar, offered; ?use=1…3,seconds sets her mending from that slot
-// so many seconds into the frames drawn, ?gust=seconds spends a gust then, ?fire=seconds fires then and ?down=seconds
-// sinks one by her then; ?loot strews a piece of each kind and rarity in a fan ahead of her, 25 m out to 420 m
-// (?loot=m: every kind of gun, each of another rarity, and the stores, in a row across the look m metres out);
-// ?swing=px,px,seconds drags the look that far right and down and lets it go, so many seconds into the frames drawn (0
-// by default; the look stays where it is put: play/chase.ts); ?slow=k runs the game at k of its speed (for catching a
-// ball in flight).
+// The sea about her. ?ships= sets them on the sea ahead of her (demoShips),
+// ?way=m/s gives them a straight course at that speed, their helms lashed, and
+// ?heading=deg turns them all. ?ahead=seconds sails the game on that long
+// before the first frame, and ?pause holds it there from then on (the frame
+// still draws: the arrival's stills). The ships in a match are sim/match.ts
+// SHIPS; the frame has room for that many, or for ?ships= more. At sea, ?kit
+// (?kit=seconds: then) puts stores under her for her to sweep up (two guns, a
+// cannon and a scatter, unless ?gun arms her, and three slots of stores), with
+// a better gun beside them, a mortar, offered; ?use=1…3,seconds sets her
+// mending from that slot so many seconds into the frames drawn, ?gust=seconds
+// spends a gust then, ?fire=seconds fires then and ?down=seconds sinks one by
+// her then; ?loot strews a piece of each kind and rarity in a fan ahead of her,
+// 25 m out to 420 m (?loot=m: every kind of gun, each of another rarity, and
+// the stores, in a row across the look m metres out); ?swing=px,px,seconds
+// drags the look that far right and down and lets it go, so many seconds into
+// the frames drawn (0 by default; the look stays where it is put:
+// play/chase.ts); ?slow=k runs the game at k of its speed (for catching a ball
+// in flight).
 //
-// Her loop. ?flood=seconds, after ?drive='s legs, steers her back to where she began until her loop closes (her trail
-// back into her own water), then sails on that many seconds more (?inward=seconds, after the legs, sails her that long
-// toward the middle of the storm's next circle, then lies to): with ?pause, the flood stopped mid-sweep. ?homeward,
-// after the legs, steers her back to where she began in the frames drawn, her loop closing in view. ?map opens the
-// full map once ?ahead= has run (with screen=play, the whole match's water from space).
+// Her loop. ?flood=seconds, after ?drive='s legs, steers her back to where she
+// began until her loop closes (her trail back into her own water), then sails
+// on that many seconds more (?inward=seconds, after the legs, sails her that
+// long toward the middle of the storm's next circle, then lies to): with
+// ?pause, the flood stopped mid-sweep. ?homeward, after the legs, steers her
+// back to where she began in the frames drawn, her loop closing in view. ?map
+// opens the full map once ?ahead= has run (with screen=play, the whole match's
+// water from space).
 //
 // `node tools/terrain-map.ts <seeds>` charts planets' land.
 
@@ -81,38 +107,77 @@ import type { ShipDraw, Snapshot } from './snapshot.ts';
 import type { Flow } from './ui/flow.ts';
 import { uiLayer } from './ui/ui.ts';
 import type { Weather } from './world/weather.ts';
-import { R, add, bearingAt, cross, dot, frameAt, along, normalize, scale, type Vec3 } from './world/sphere.ts';
+import {
+  R,
+  add,
+  bearingAt,
+  cross,
+  dot,
+  frameAt,
+  along,
+  normalize,
+  scale,
+  type Vec3,
+} from './world/sphere.ts';
 
-/** How the page is set up (main.ts RELEASE, or as the switches change it): the planet's seed, the weather's mean and
- *  swing (world/weather.ts) and the time of day (hours); how the frame draws; whether the meter always shows the
- *  frame's cost, split by pass (the debug page's; else only as the settings' stats switch has it); the seconds the
- *  storm is held at (null: it runs) and the gun every ship is armed with (null: none). */
+/**
+ * How the page is set up (main.ts RELEASE, or as the switches change it): the
+ * planet's seed, the weather's mean and swing (world/weather.ts) and the time
+ * of day (hours); how the frame draws; whether the meter always shows the
+ * frame's cost, split by pass (the debug page's; else only as the settings'
+ * stats switch has it); the seconds the storm is held at (null: it runs) and
+ * the gun every ship is armed with (null: none).
+ */
 export interface Setup {
-  seed: number; mean: Weather; swing: Weather; hours: number;
+  seed: number;
+  mean: Weather;
+  swing: Weather;
+  hours: number;
   drawing: FrameOptions;
   meter: boolean;
-  hold: number | null; gun: { kind: GunKind; rarity: number } | null;
+  hold: number | null;
+  gun: { kind: GunKind; rarity: number } | null;
 }
 
 /** ?kind's gun kind, a cannon by default. */
-const kindOf = (name: string | null): GunKind => KINDS.find((k) => k === name) ?? 'cannon';
+const kindOf = (name: string | null): GunKind =>
+  KINDS.find((k) => k === name) ?? 'cannon';
 
-/** The world on a setup, as main.ts builds it: the world, where she lies at the start, the canvas the world is drawn
- *  on, the sea's anchors and the ground's bake (frame.ts), the matches dealt; and the drawing begun, each frame from
- *  `next` (given the seconds since the last, the world as it is to be drawn), once the ground is baked. */
+/**
+ * The world on a setup, as main.ts builds it: the world, where she lies at the
+ * start, the canvas the world is drawn on, the sea's anchors and the ground's
+ * bake (frame.ts), the matches dealt; and the drawing begun, each frame from
+ * `next` (given the seconds since the last, the world as it is to be drawn),
+ * once the ground is baked.
+ */
 export interface Stage {
-  world: World; start: { at: Vec3; bearing: number }; canvas: HTMLElement;
-  anchors: readonly Anchor[]; ready: Promise<number>; matches: Matches;
-  /** Shows the frame's cost in its corner, or hides it (always shown when the setup's meter is). */
+  world: World;
+  start: { at: Vec3; bearing: number };
+  canvas: HTMLElement;
+  anchors: readonly Anchor[];
+  ready: Promise<number>;
+  matches: Matches;
+  /**
+   * Shows the frame's cost in its corner, or hides it (always shown when the
+   * setup's meter is).
+   */
   stats(on: boolean): void;
-  draw(next: (dt: number) => Snapshot, drawn?: (canvas: HTMLCanvasElement) => void): Promise<void>;
+  draw(
+    next: (dt: number) => Snapshot,
+    drawn?: (canvas: HTMLCanvasElement) => void
+  ): Promise<void>;
 }
 
-/** The game on a stage with its UI over it, as main.ts builds it: the game, its referee and the screens' flow; PLAY
- *  (a match dealt, every ship at her berth); the full map opened (the HUD's tap); a frame of it, and what follows once
- *  it is drawn (the canvas then holds it). */
+/**
+ * The game on a stage with its UI over it, as main.ts builds it: the game, its
+ * referee and the screens' flow; PLAY (a match dealt, every ship at her berth);
+ * the full map opened (the HUD's tap); a frame of it, and what follows once it
+ * is drawn (the canvas then holds it).
+ */
 export interface Played {
-  game: Game; referee: Referee; flow: Flow;
+  game: Game;
+  referee: Referee;
+  flow: Flow;
   play(): void;
   map(): void;
   next(dt: number): Snapshot;
@@ -122,24 +187,36 @@ export interface Played {
 const params = new URLSearchParams(location.search);
 /** Whether debugging is on: the dev server, or ?debug in the query. */
 const DEBUG = import.meta.env.DEV || params.has('debug');
-const number = (name: string, fallback: number) => (params.has(name) ? Number(params.get(name)) : fallback);
+const number = (name: string, fallback: number) =>
+  params.has(name) ? Number(params.get(name)) : fallback;
 const degrees = Math.PI / 180;
 /** The debug camera flies instead of the game. */
-const flying = params.has('fly') || ['lat', 'lon', 'alt', 'wall'].some((k) => params.has(k));
+const flying =
+  params.has('fly') || ['lat', 'lon', 'alt', 'wall'].some((k) => params.has(k));
 
-/** The art direction's alternates (?mood=): the hour, and the haze's mean as a share of the release's. */
+/**
+ * The art direction's alternates (?mood=): the hour, and the haze's mean as a
+ * share of the release's.
+ */
 const MOODS: Record<string, { hours: number; haze: number }> = {
-  dawn: { hours: 6.8, haze: 1.6 }, warm: { hours: 17.4, haze: 1.2 }, noon: { hours: 12.6, haze: 0.7 },
+  dawn: { hours: 6.8, haze: 1.6 },
+  warm: { hours: 17.4, haze: 1.2 },
+  noon: { hours: 12.6, haze: 0.7 },
 };
 
 /** The release's setup as the switches change it. */
 function setupOf(release: Setup): Setup {
   const mood = MOODS[params.get('mood') ?? ''];
-  const mean = { ...release.mean, haze: release.mean.haze * (mood?.haze ?? 1) }, swing = { ...release.swing };
-  for (const k of ['wind', 'cloud', 'haze'] as const) if (params.has(k)) [mean[k], swing[k]] = [number(k, 0), 0];
+  const mean = { ...release.mean, haze: release.mean.haze * (mood?.haze ?? 1) },
+    swing = { ...release.swing };
+  for (const k of ['wind', 'cloud', 'haze'] as const)
+    if (params.has(k)) [mean[k], swing[k]] = [number(k, 0), 0];
   const sea = params.get('debug');
   return {
-    seed: number('seed', release.seed), mean, swing, hours: number('t', mood?.hours ?? release.hours),
+    seed: number('seed', release.seed),
+    mean,
+    swing,
+    hours: number('t', mood?.hours ?? release.hours),
     drawing: {
       sea: sea === 'charts' || sea === 'wake' ? sea : release.drawing.sea,
       // (room for ?ships= past a match's, for judging the frame with more)
@@ -148,22 +225,33 @@ function setupOf(release: Setup): Setup {
       lod: params.has('lod') ? number('lod', 0) : release.drawing.lod,
       cloth: params.get('cloth') !== '0' && release.drawing.cloth,
       bolt: params.has('bolt') || release.drawing.bolt,
-      extras: params.has('probe') ? (light, world) => probeMeshes(light, world.planet.start.at) : release.drawing.extras,
+      extras: params.has('probe')
+        ? (light, world) => probeMeshes(light, world.planet.start.at)
+        : release.drawing.extras,
     },
     meter: true,
     hold: params.has('storm') ? number('storm', 0) : release.hold,
-    gun: params.has('gun') || params.has('kind') ? { kind: kindOf(params.get('kind')), rarity: number('gun', 0) } : release.gun,
+    gun:
+      params.has('gun') || params.has('kind')
+        ? { kind: kindOf(params.get('kind')), rarity: number('gun', 0) }
+        : release.gun,
   };
 }
 
 /**
- * The page set going: the stage and the game on it, built by main.ts's `stage` and `play` from `release`, or from
- * the setup the switches make of it; then, debugging, opened where the switches say (at sea among the demo ships by
- * default), or the flyer drawn instead of the game. `title` is the title the page painted first: the game's flow
- * takes it down; the flyer, which has no flow, takes it down itself once the ground is baked.
+ * The page set going: the stage and the game on it, built by main.ts's `stage`
+ * and `play` from `release`, or from the setup the switches make of it; then,
+ * debugging, opened where the switches say (at sea among the demo ships by
+ * default), or the flyer drawn instead of the game. `title` is the title the
+ * page painted first: the game's flow takes it down; the flyer, which has no
+ * flow, takes it down itself once the ground is baked.
  */
-export async function scenario(release: Setup, stage: (setup: Setup) => Promise<Stage>, play: (s: Stage) => Promise<Played>,
-  title: { show(on: boolean): void }) {
+export async function scenario(
+  release: Setup,
+  stage: (setup: Setup) => Promise<Stage>,
+  play: (s: Stage) => Promise<Played>,
+  title: { show(on: boolean): void }
+) {
   if (!DEBUG) {
     const s = await stage(release);
     const p = await play(s);
@@ -173,49 +261,89 @@ export async function scenario(release: Setup, stage: (setup: Setup) => Promise<
   const room = Math.max(SHIPS, number('ships', 0) + 1);
   if (flying) {
     void s.ready.then(() => title.show(false));
-    return s.draw(flyer(s.canvas, s.start.at, demoShips(s.start.at, room), s.matches.storm));
+    return s.draw(
+      flyer(s.canvas, s.start.at, demoShips(s.start.at, room), s.matches.storm)
+    );
   }
   const p = await play(s);
   safeArea(uiLayer());
   open(p, demoShips(s.start.at, room - 1));
-  const paused = params.has('pause'), slow = number('slow', 1);
-  // ?use: the item's slot tapped twice (chosen, then used); ?tap's slot tapped; ?gust and ?fire pressed; ?swing's
-  // drag; so many seconds in
-  const swing = params.get('swing')?.split(',').map(Number), item = HOTBAR.guns - 1;
-  const [slot, use] = (params.get('use') ?? '').split(',').map(Number), tap = params.get('tap')?.split(',').map(Number);
+  const paused = params.has('pause'),
+    slow = number('slow', 1);
+  // ?use: the item's slot tapped twice (chosen, then used); ?tap's slot tapped;
+  // ?gust and ?fire pressed; ?swing's drag; so many seconds in
+  const swing = params.get('swing')?.split(',').map(Number),
+    item = HOTBAR.guns - 1;
+  const [slot, use] = (params.get('use') ?? '').split(',').map(Number),
+    tap = params.get('tap')?.split(',').map(Number);
   const [fireAt, held] = (params.get('fire') ?? '').split(',').map(Number);
   const timed: { at: number; hands: Partial<Hands> }[] = [
-    ...(slot > 0 ? [{ at: use || 0, hands: { tap: item + slot } }, { at: use || 0, hands: { tap: item + slot } }] : []),
+    ...(slot > 0
+      ? [
+          { at: use || 0, hands: { tap: item + slot } },
+          { at: use || 0, hands: { tap: item + slot } },
+        ]
+      : []),
     ...(tap ? [{ at: tap[1] || 0, hands: { tap: tap[0] || 0 } }] : []),
-    ...(params.has('gust') ? [{ at: number('gust', 0), hands: { gust: true } }] : []),
+    ...(params.has('gust')
+      ? [{ at: number('gust', 0), hands: { gust: true } }]
+      : []),
     ...(params.get('fire') ? [{ at: fireAt || 0, hands: { fire: true } }] : []),
-    ...(swing ? [{ at: swing[2] || 0, hands: { look: { x: swing[0] || 0, y: swing[1] || 0, held: false } } }] : []),
+    ...(swing
+      ? [
+          {
+            at: swing[2] || 0,
+            hands: {
+              look: { x: swing[0] || 0, y: swing[1] || 0, held: false },
+            },
+          },
+        ]
+      : []),
   ];
-  // ?sink and ?win: her end, and ?down: one sunk by her, so many seconds into the frames drawn; ?leave: her tap on LEAVE
+  // ?sink and ?win: her end, and ?down: one sunk by her, so many seconds into
+  // the frames drawn; ?leave: her tap on LEAVE
   const ends = [
-    ...(params.has('leave') ? [{ at: number('leave', 0), act: () => p.flow.tap('leave') }] : []),
-    ...(params.has('sink') ? [{ at: number('sink', 0), act: () => sinkHer(p.game) }] : []),
-    ...(params.has('win') ? [{ at: number('win', 0), act: () => winHer(p.game) }] : []),
-    ...(params.has('down') ? [{ at: number('down', 0), act: () => downOne(p.game) }] : []),
-    ...(params.get('kit') ? [{ at: number('kit', 0), act: () => kit(p.game) }] : []),
+    ...(params.has('leave')
+      ? [{ at: number('leave', 0), act: () => p.flow.tap('leave') }]
+      : []),
+    ...(params.has('sink')
+      ? [{ at: number('sink', 0), act: () => sinkHer(p.game) }]
+      : []),
+    ...(params.has('win')
+      ? [{ at: number('win', 0), act: () => winHer(p.game) }]
+      : []),
+    ...(params.has('down')
+      ? [{ at: number('down', 0), act: () => downOne(p.game) }]
+      : []),
+    ...(params.get('kit')
+      ? [{ at: number('kit', 0), act: () => kit(p.game) }]
+      : []),
   ];
   let drawn = 0;
   return s.draw((real) => {
-    const dt = paused ? 0 : real * slow, frame = p.next(dt);
-    for (const t of timed) if (drawn <= t.at && drawn + dt > t.at) p.game.step(STEP, { ...IDLE, ...t.hands });
+    const dt = paused ? 0 : real * slow,
+      frame = p.next(dt);
+    for (const t of timed)
+      if (drawn <= t.at && drawn + dt > t.at)
+        p.game.step(STEP, { ...IDLE, ...t.hands });
     // ?fire's trigger held: pressed for the frames' next steps
-    if (held > 0 && drawn > fireAt && drawn <= fireAt + held) p.game.step(0, { ...IDLE, fire: true });
+    if (held > 0 && drawn > fireAt && drawn <= fireAt + held)
+      p.game.step(0, { ...IDLE, fire: true });
     for (const e of ends) if (drawn <= e.at && drawn + dt > e.at) e.act();
     drawn += dt;
     return frame;
   }, p.drawn);
 }
 
-/** Opens the game where ?screen= says, among `others` at sea; then sails it on ?ahead= seconds. */
+/**
+ * Opens the game where ?screen= says, among `others` at sea; then sails it on
+ * ?ahead= seconds.
+ */
 function open(p: Played, others: readonly Berth[]) {
   const { game, referee, flow } = p;
   const screen = params.get('screen') ?? 'match';
-  if (screen === 'title' || screen === 'lobby' || screen === 'settings') flow.go(screen);
+  if (screen === 'title' || screen === 'lobby' || screen === 'settings')
+    flow.go(screen);
   else if (screen === 'play') {
     p.play();
     flow.go('match');
@@ -223,9 +351,12 @@ function open(p: Played, others: readonly Berth[]) {
     game.debug.atSea(others);
     drive(game, params.get('drive') ?? '');
     referee.begin();
-    // her end, as the match's own course would bring it: the screens follow it from the match (ui/ways.ts)
-    if (screen === 'sunk' || screen === 'spectate' || screen === 'result') sinkHer(game);
-    if (screen === 'result') others.forEach((_, i) => i > 0 && game.debug.sink(i + 1, 1));
+    // her end, as the match's own course would bring it: the screens follow it
+    // from the match (ui/ways.ts)
+    if (screen === 'sunk' || screen === 'spectate' || screen === 'result')
+      sinkHer(game);
+    if (screen === 'result')
+      others.forEach((_, i) => i > 0 && game.debug.sink(i + 1, 1));
     if (screen === 'won') winHer(game);
     flow.go('match');
     if (screen === 'spectate') {
@@ -247,7 +378,10 @@ function open(p: Played, others: readonly Berth[]) {
 /** Sinks her by the first other ship afloat (?by=storm: by the Storm). */
 function sinkHer(game: Game) {
   const by = game.alive().find((id) => id !== PLAYER);
-  game.debug.sink(PLAYER, by !== undefined && params.get('by') !== 'storm' ? by : null);
+  game.debug.sink(
+    PLAYER,
+    by !== undefined && params.get('by') !== 'storm' ? by : null
+  );
 }
 
 /** The first other ship afloat, sunk by her. */
@@ -259,18 +393,28 @@ function downOne(game: Game) {
 /** Sinks every other ship afloat, the last by her, so she wins. */
 function winHer(game: Game) {
   const others = game.alive().filter((id) => id !== PLAYER);
-  others.forEach((id, i) => game.debug.sink(id, i === others.length - 1 ? PLAYER : others[others.length - 1]));
+  others.forEach((id, i) =>
+    game.debug.sink(
+      id,
+      i === others.length - 1 ? PLAYER : others[others.length - 1]
+    )
+  );
 }
 
 /** A piece the game's debug strews on the sea: a gun or stores. */
 type Goods = Parameters<Game['debug']['strew']>[1][number];
 
-/** ?kit: her stores strewn under her (two guns and three slots of stores), a better gun beside them, and her first
- *  steps to sweep them up. */
+/**
+ * ?kit: her stores strewn under her (two guns and three slots of stores), a
+ * better gun beside them, and her first steps to sweep them up.
+ */
 function kit(game: Game) {
-  const { at, heading } = game.status(), step = () => game.step(STEP, IDLE);
+  const { at, heading } = game.status(),
+    step = () => game.step(STEP, IDLE);
   const under: Goods[] = [
-    { kind: 'cannon', rarity: 2 }, { kind: 'smallShield', count: 3 }, { kind: 'bigShield', count: 2 },
+    { kind: 'cannon', rarity: 2 },
+    { kind: 'smallShield', count: 3 },
+    { kind: 'bigShield', count: 2 },
     { kind: 'repairKit', count: 2 },
   ];
   game.debug.strew(at, under);
@@ -281,88 +425,156 @@ function kit(game: Game) {
   step();
 }
 
-/** ?kit and ?loot: her stores and the loot about her, through what the game offers anyone. */
+/**
+ * ?kit and ?loot: her stores and the loot about her, through what the game
+ * offers anyone.
+ */
 function stock(game: Game) {
   const { at, heading, facing } = game.status();
   if (params.get('kit') === '') kit(game);
   const row = params.has('loot') ? number('loot', 0) : 0;
   if (row > 0) {
-    // a row across her bow: the guns, each kind of another rarity, worst to best, then the stores, a few degrees apart
+    // a row across her bow: the guns, each kind of another rarity, worst to
+    // best, then the stores, a few degrees apart
     const all: Goods[] = [
       ...KINDS.map((kind, rarity): Goods => ({ kind, rarity })),
-      { kind: 'smallShield', count: 1 }, { kind: 'bigShield', count: 1 }, { kind: 'repairKit', count: 1 },
+      { kind: 'smallShield', count: 1 },
+      { kind: 'bigShield', count: 1 },
+      { kind: 'repairKit', count: 1 },
       { kind: 'fullRepair', count: 1 },
     ];
     all.forEach((g, i) => {
       const side = Math.tan(((i - (all.length - 1) / 2) * 7 * Math.PI) / 180);
-      game.debug.strew(along(at, normalize(add(facing, cross(at, facing), side)), row).p, [g]);
+      game.debug.strew(
+        along(at, normalize(add(facing, cross(at, facing), side)), row).p,
+        [g]
+      );
     });
   } else if (params.has('loot')) {
-    // a fan ahead of her, clear of her own hull: the rarities worst to best near to far, then again further out
+    // a fan ahead of her, clear of her own hull: the rarities worst to best
+    // near to far, then again further out
     [25, 50, 90, 140, 200, 250, 300, 350, 420].forEach((m, i) => {
-      const side = (i % 2 ? 1 : -1) * (0.45 - 0.035 * i), turned = normalize(add(heading, cross(at, heading), side));
-      const piece: Goods = i === 1 ? { kind: 'smallShield', count: 1 } : { kind: KINDS[i % 5], rarity: i % 5 };
+      const side = (i % 2 ? 1 : -1) * (0.45 - 0.035 * i),
+        turned = normalize(add(heading, cross(at, heading), side));
+      const piece: Goods =
+        i === 1
+          ? { kind: 'smallShield', count: 1 }
+          : { kind: KINDS[i % 5], rarity: i % 5 };
       game.debug.strew(along(at, turned, m).p, [piece]);
     });
   }
 }
 
-/** ?drive's legs ("bearing,throttle,seconds;…"), each sailed with her helm lashed to it. */
+/**
+ * ?drive's legs ("bearing,throttle,seconds;…"), each sailed with her helm
+ * lashed to it.
+ */
 function drive(game: Game, legs: string) {
   const began = game.status().at;
   for (const leg of legs.split(';').filter(Boolean)) {
     const [b, throttle, seconds] = leg.split(',').map(Number);
-    game.debug.lash((s) => ({ course: bearingAt(s.at, b * degrees), throttle }));
+    game.debug.lash((s) => ({
+      course: bearingAt(s.at, b * degrees),
+      throttle,
+    }));
     for (let i = 0; i < Math.round(seconds / STEP); i++) game.step(STEP, IDLE);
   }
   if (params.has('inward')) {
     // toward the middle of the circle the storm next closes to (or its calm)
-    const { next, eye } = game.status(), goal = (next ?? eye).centre;
-    game.debug.lash((s) => ({ course: add(goal, s.at, -dot(goal, s.at)), throttle: 1 }));
-    for (let i = 0; i < Math.round(number('inward', 0) / STEP); i++) game.step(STEP, IDLE);
+    const { next, eye } = game.status(),
+      goal = (next ?? eye).centre;
+    game.debug.lash((s) => ({
+      course: add(goal, s.at, -dot(goal, s.at)),
+      throttle: 1,
+    }));
+    for (let i = 0; i < Math.round(number('inward', 0) / STEP); i++)
+      game.step(STEP, IDLE);
     game.debug.lash((s) => ({ course: s.heading, throttle: 0 }));
   }
-  // ?homeward: back toward where she began in the frames drawn, so her loop closes and floods in view
-  if (params.has('homeward')) game.debug.lash((s) => ({ course: add(began, s.at, -1), throttle: 1 }));
+  // ?homeward: back toward where she began in the frames drawn, so her loop
+  // closes and floods in view
+  if (params.has('homeward'))
+    game.debug.lash((s) => ({ course: add(began, s.at, -1), throttle: 1 }));
   if (!params.has('flood')) return;
   game.debug.lash((s) => ({ course: add(began, s.at, -1), throttle: 1 }));
-  const closed = () => game.snapshot().sea?.changes.some((k) => k.kind === 'claim' && k.ship === PLAYER);
+  const closed = () =>
+    game
+      .snapshot()
+      .sea?.changes.some((k) => k.kind === 'claim' && k.ship === PLAYER);
   for (let i = 0; i < 30 / STEP && !closed(); i++) game.step(STEP, IDLE);
-  for (let i = 0; i < Math.round(number('flood', 0) / STEP); i++) game.step(STEP, IDLE);
+  for (let i = 0; i < Math.round(number('flood', 0) / STEP); i++)
+    game.step(STEP, IDLE);
 }
 
 /** ?safe's insets, set on the UI's layer (ui/ui.ts). */
 function safeArea(layer: HTMLElement) {
   const insets = params.get('safe')?.split(',').map(Number);
-  if (insets) ['top', 'right', 'bottom', 'left'].forEach((side, i) => layer.style.setProperty(`--safe-${side}`, `${insets[i] ?? 0}px`));
+  if (insets)
+    ['top', 'right', 'bottom', 'left'].forEach((side, i) =>
+      layer.style.setProperty(`--safe-${side}`, `${insets[i] ?? 0}px`)
+    );
 }
 
 /** The debug camera, flown from over `start` (or ?lat/?lon), keeping the world's clock itself, over `others` lying
  *  still (drawn as if making ?way=) and the storm as it stands by that clock. */
-function flyer(element: HTMLElement, start: Vec3, others: readonly Berth[], storm: (seconds: number) => Cap) {
+function flyer(
+  element: HTMLElement,
+  start: Vec3,
+  others: readonly Berth[],
+  storm: (seconds: number) => Cap
+) {
   // ?wall: over the storm's edge, looking out across it
-  const cap = storm(0), c = cap.centre, out = normalize(add(start, c, -dot(start, c))), a = cap.radius - number('wall', 0) / R;
-  const over = params.has('wall') ? add(scale(c, Math.cos(a)), out, Math.sin(a)) : start;
-  const away = add(scale(out, Math.cos(a)), c, -Math.sin(a)), { north, east } = frameAt(over);
+  const cap = storm(0),
+    c = cap.centre,
+    out = normalize(add(start, c, -dot(start, c))),
+    a = cap.radius - number('wall', 0) / R;
+  const over = params.has('wall')
+    ? add(scale(c, Math.cos(a)), out, Math.sin(a))
+    : start;
+  const away = add(scale(out, Math.cos(a)), c, -Math.sin(a)),
+    { north, east } = frameAt(over);
   const fly = createFly(element, {
     lat: params.has('lat') ? number('lat', 0) * degrees : Math.asin(over[1]),
-    lon: params.has('lon') ? number('lon', 0) * degrees : Math.atan2(-over[2], over[0]),
+    lon: params.has('lon')
+      ? number('lon', 0) * degrees
+      : Math.atan2(-over[2], over[0]),
     height: number('alt', 10),
-    bearing: number('yaw', 0) * degrees + (params.has('wall') ? Math.atan2(dot(away, east), dot(away, north)) : 0),
+    bearing:
+      number('yaw', 0) * degrees +
+      (params.has('wall') ? Math.atan2(dot(away, east), dot(away, north)) : 0),
     pitch: number('look', -6) * degrees,
   });
   // ?kind arms each with a gun of that kind (?kind=all: each the next kind), laid over her starboard bow
-  const kind = params.get('kind'), armed = (i: number, o: Berth): ShipDraw['gun'] => kind === null ? null
-    : { kind: kind === 'all' ? KINDS[i % KINDS.length] : kindOf(kind), aim: normalize(add(o.heading, cross(o.heading, o.at), 0.6)) };
+  const kind = params.get('kind'),
+    armed = (i: number, o: Berth): ShipDraw['gun'] =>
+      kind === null
+        ? null
+        : {
+            kind: kind === 'all' ? KINDS[i % KINDS.length] : kindOf(kind),
+            aim: normalize(add(o.heading, cross(o.heading, o.at), 0.6)),
+          };
   const ships: ShipDraw[] = others.map((o, i) => ({
-    id: i, pose: { position: scale(o.at, R), forward: o.heading, up: o.at }, look: o.look,
-    velocity: scale(o.heading, number('way', 0)), afloat: true, gun: armed(i, o),
+    id: i,
+    pose: { position: scale(o.at, R), forward: o.heading, up: o.at },
+    look: o.look,
+    velocity: scale(o.heading, number('way', 0)),
+    afloat: true,
+    gun: armed(i, o),
   }));
   let clock = 0;
   return (dt: number): Snapshot => {
     const eye = fly(dt);
     clock += dt;
-    return { eye, clock, storm: storm(clock), ships, own: null, balls: [], loot: [], blasts: [] };
+    return {
+      eye,
+      clock,
+      storm: storm(clock),
+      ships,
+      own: null,
+      balls: [],
+      loot: [],
+      blasts: [],
+    };
   };
 }
 
@@ -373,13 +585,28 @@ function flyer(element: HTMLElement, start: Vec3, others: readonly Berth[], stor
  */
 function demoShips(south: Vec3, most: number): Berth[] {
   const others: Berth[] = [];
-  const ships = Math.min(number('ships', 0), most), { up, north } = frameAt(south), way = number('way', 0);
+  const ships = Math.min(number('ships', 0), most),
+    { up, north } = frameAt(south),
+    way = number('way', 0);
   for (let i = 0; i < ships; i++) {
-    const out = [30, 60, 100, 150][i] ?? 150 + (i - 3) * 40, side = i < 4 ? [0, -12, 25, -40][i] : (i % 2 ? 1 : -1) * 30 * i;
-    const p = along(along(up, north, out).p, cross(north, up), side).p, u = normalize(p);
-    const t = normalize(add(north, u, -dot(north, u))), heading = [1.9, -0.6, 2.8, 0.9][i % 4] + i - number('heading', 0) * degrees;
-    const forward = add(scale(t, Math.cos(heading)), cross(u, t), Math.sin(heading));
-    others.push({ at: u, heading: forward, look: lookOf(i + 1), lashed: way > 0 ? { course: null, throttle: way / SHIP.top } : null });
+    const out = [30, 60, 100, 150][i] ?? 150 + (i - 3) * 40,
+      side = i < 4 ? [0, -12, 25, -40][i] : (i % 2 ? 1 : -1) * 30 * i;
+    const p = along(along(up, north, out).p, cross(north, up), side).p,
+      u = normalize(p);
+    const t = normalize(add(north, u, -dot(north, u))),
+      heading =
+        [1.9, -0.6, 2.8, 0.9][i % 4] + i - number('heading', 0) * degrees;
+    const forward = add(
+      scale(t, Math.cos(heading)),
+      cross(u, t),
+      Math.sin(heading)
+    );
+    others.push({
+      at: u,
+      heading: forward,
+      look: lookOf(i + 1),
+      lashed: way > 0 ? { course: null, throttle: way / SHIP.top } : null,
+    });
   }
   return others;
 }
