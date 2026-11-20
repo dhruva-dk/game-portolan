@@ -539,6 +539,29 @@ then the behaviour commits on top.
   (one mesh per kind, or one atlas mesh with a variant index); until then the
   view is held to what it measured (86 draws, 920k) so no new draw lands
   unnoticed. A sixth gun kind would cost two more. Headless frame 7 ms CPU.
+- 2026-11-20 (G1 done): the gate met, not by the guns but by the palms.
+  Each palm shape was two draws, trunk and crown, apart only for their
+  lighting; a leaf's light is the toon's and the sun through it from
+  behind, so `light.leaf` takes how much comes through (crown 1, trunk 0:
+  the trunk lit as toon is, to the bit) and one double-sided material draws
+  both (`land/palms.ts`). Nine draws fewer in the worst view, and some in
+  every view; triangles unchanged everywhere:
+
+  | view  | before   | after    |
+  | ----- | -------- | -------- |
+  | sea   | 70 draws | 62 draws |
+  | coast | 73 draws | 64 draws |
+  | ships | 73 draws | 64 draws |
+  | lobby | 59 draws | 49 draws |
+  | map   | 34 draws | 33 draws |
+  | worst | 86, 896k | 77, 896k |
+
+  Pixel diff against the old captures (all six views, and ashore among the
+  palms looking down on the crowns): the pixels more than 16 levels off are
+  0.02–0.34%, as the old captures differ from themselves (0.02–0.29%: the
+  grain, drifting clouds, the sails); the nearest crowns, enlarged, are the
+  same. The worst view is held to 77. The guns' two draws a kind stay G2's.
+
 - 2026-11-20 (W3): a stance with each gun, as brain knobs (`gunnery.rush`,
   `gunnery.reach`, per kind): rush in with a loaded scatter and stand off
   reloading; hold a repeater's fire till nearer. **Neither makes a bot
