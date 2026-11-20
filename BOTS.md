@@ -201,7 +201,7 @@ commit; anything visible checked in headless chromium; iPad Air M1 at 30–40 fp
         Why-lines (scores of the top options) deferred: not needed so far.
   - [ ] C3 Scenarios: crossing pairs (200 fixed), channel, storm-from-a-cove,
         duel, chase. Suite under 60 s as a test.
-- [ ] **D. Loot more plentiful** (user ask, measured). See Decision 3.
+- [x] **D. Loot more plentiful** (user ask, measured). See Decision 3.
 - [ ] **E. Navigation**, each change measured, hash re-recorded:
   - [ ] E1 Clearance in metres; cells under the hull's need barred; cost by clearance.
   - [ ] E2 Water bodies labelled; goals snapped to her own.
@@ -310,3 +310,12 @@ commit; anything visible checked in headless chromium; iPad Air M1 at 30–40 fp
   ~35% of the planet within the 700 m drawn, ~180 pieces). NB the budget's
   coast/ships/map views are over on triangles _before_ this change too
   (1.30M / 1.35M / 3.51M vs 0.9M / 1.0M): pre-existing, not the bots'.
+- D2, storm caches: as each phase after the first begins, `LOOT.cache` (5
+  pieces, guns of rare+ tiers 40%, else big shield / full repair) dropped
+  within half the next cap's radius of its centre on roomy water
+  (loot.ts `cached`, state.ts `dropped`). 4 matches: 115 dropped, 40% taken,
+  median 30 s after the drop (the rest unwanted by bots already armed well;
+  rich pickings in the calm for the player). Harness vs D1: pinned +0.4 s
+  [−0.0, 0.8], armed/heal unchanged. Golden → `d133157f`.
+- D done. Next: C3 scenarios, then F depth (hunting to the sound of guns,
+  breaking line of sight when fleeing).

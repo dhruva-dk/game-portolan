@@ -59,6 +59,7 @@ import {
 } from '../sim/ride.ts';
 import {
   berthed,
+  cached,
   overboard,
   strewn,
   type Arms,
@@ -75,7 +76,7 @@ import {
 } from '../sim/stores.ts';
 import type { Chart } from '../sim/route.ts';
 import { shipAt, type Helm, type ShipState } from '../sim/ship.ts';
-import { calm, type Storm } from '../sim/storm.ts';
+import { STORM, calm, type Storm } from '../sim/storm.ts';
 import {
   createTerritory,
   type Move,
@@ -263,8 +264,12 @@ export function createState(
    */
   const log = createLog(PLAYER),
     born = new Map<number, number>();
-  /** The loot on the water. */
-  let flotsam: Flotsam = { pieces: [], next: 0 };
+  /**
+   * The loot on the water; the storm's phase whose cache was dropped last
+   * (Infinity: none to drop, the sea strewn with no loot).
+   */
+  let flotsam: Flotsam = { pieces: [], next: 0 },
+    dropped = Infinity;
   const sinkings: Sinking[] = [];
   /**
    * Each ship's last blow taken: its striker, and the step it landed on (for
@@ -357,6 +362,7 @@ export function createState(
   ) => {
     match = m;
     flotsam = loot ? strewn(m.seed, depth) : { pieces: [], next: 0 };
+    dropped = loot ? 0 : Infinity;
     fleet = [];
     aboard.clear();
     aims.clear();
@@ -587,6 +593,13 @@ export function createState(
       lap?: (part: Part) => void
     ): Stepped {
       const storm = stormAt(time());
+      if (storm.phase > dropped && storm.phase < STORM.phases.length) {
+        const before = flotsam.next;
+        flotsam = cached(flotsam, storm.next, storm.phase, match.seed, depth);
+        for (let id = before; id < flotsam.next; id++)
+          born.set(id, tick * STEP);
+        dropped = storm.phase;
+      }
       const told = orders(
         fleet,
         byId(battle.crews),

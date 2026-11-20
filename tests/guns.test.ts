@@ -20,7 +20,8 @@ import { STEP } from '../src/sim/fixed.ts';
 import { falloff, gunOf } from '../src/sim/gun.ts';
 import { KINDS, type GunKind } from '../src/kinds.ts';
 import { EQUIP, FALLOFF, GUNS } from '../src/sim/handling.ts';
-import { LOOT, isArms, strewn } from '../src/sim/loot.ts';
+import { LOOT, cached, isArms, strewn } from '../src/sim/loot.ts';
+import { toEdge } from '../src/sim/storm.ts';
 import { loosed } from '../src/sim/shot.ts';
 import type { Depth } from '../src/sim/shoal.ts';
 import { shipAt, turned, type ShipState } from '../src/sim/ship.ts';
@@ -327,4 +328,29 @@ test('the sea is strewn with some 400–480 pieces, two in five of them guns, th
   assert.ok(
     count('harpoon') < count('scatter') && count('mortar') < count('repeater')
   );
+});
+
+test("a phase's cache is dropped in the heart of the next cap, rare and the same for the same seed", () => {
+  const f = strewn(5, deep),
+    cap = { centre: [0, 1, 0] as Vec3, radius: 150 / R };
+  const a = cached(f, cap, 3, 5, deep),
+    b = cached(f, cap, 3, 5, deep);
+  assert.deepEqual(a, b);
+  assert.notDeepEqual(a, cached(f, cap, 4, 5, deep));
+  const drop = a.pieces.slice(f.pieces.length);
+  assert.equal(drop.length, LOOT.cache.pieces);
+  assert.equal(a.next, f.next + drop.length);
+  assert.deepEqual(
+    drop.map((l) => l.id),
+    drop.map((_, i) => f.next + i)
+  );
+  for (const l of drop) {
+    // within its share of the cap's radius of the centre
+    assert.ok(toEdge(l.at, cap) >= (1 - LOOT.cache.within) * 150 - 1e-6);
+    assert.ok(
+      isArms(l.goods)
+        ? l.goods.rarity >= 2
+        : l.goods.kind === 'bigShield' || l.goods.kind === 'fullRepair'
+    );
+  }
 });

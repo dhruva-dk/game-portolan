@@ -1,9 +1,9 @@
 // Loot on the water: guns and things to mend with, strewn over the whole planet
 // at the start of a match and spilled from every ship that sinks; a ship
 // sailing over a piece picks it up. For two gun slots and three item slots:
-// - strewn: LOOT.spots spots over the planet (two and a half a ship for a match
-// of 80, half what it was, laid evenly,
-//   each moved off land and shallows to the nearest open water, which gathers some along the coast), each with a piece
+// - strewn: LOOT.spots spots over the planet (four a ship for a match of 80,
+// laid evenly,
+//   each moved off land and shallows to the nearest water open all round it), each with a piece
 //   and LOOT.second of them a second 4 m off; and a gun laid near any berth with none in reach (berthed), so the match
 //   opens on a scramble for the nearest. A piece is a gun LOOT.gun of the time, its kind drawn by LOOT.kinds (the cannon
 //   commonest, the harpoon and the mortar rarest) and its rarity by LOOT.weights, else a consumable by LOOT.shares, in
@@ -16,7 +16,9 @@
 // - spilled: a ship sinking puts both her guns and her slots over the side,
 // kicked out a few m/s each a different way
 //   and drifting to a stop; what a ship put over the side she can't pick up again until it has lain LOOT.settle s and
-//   she has sailed clear of it.
+//   she has sailed clear of it;
+// - cached: as each phase of the storm after the first begins, a few of the
+// rarer pieces dropped round the heart of the cap it closes to (LOOT.cache).
 //
 // Pure arithmetic: no three, so it runs in node for the tests; deterministic
 // for the same inputs.
@@ -39,6 +41,7 @@ import { KINDS as GUN_KINDS, STORES, isGun, type GunKind } from '../kinds.ts';
 import { EQUIP, GUN, SHIP } from './handling.ts';
 import { roomFor, stowed, USES, type Use } from './hold.ts';
 import type { Depth } from './shoal.ts';
+import { toEdge, type Cap } from './storm.ts';
 
 /** The loot table, and its spots. */
 export const LOOT = {
@@ -106,6 +109,15 @@ export const LOOT = {
   berth: 160,
   near: 90,
   far: 150,
+  /**
+   * A cache dropped as each phase of the storm after the first begins: `pieces`
+   * pieces within `within` of the next cap's radius of its centre, on roomy
+   * water inside it, `gun` of them guns of the rarer tiers (`weights`, common to
+   * legendary), the rest a big shield or a full repair. The calm's heart is
+   * where the fleet is making anyway, and something worth fighting over there
+   * meets them.
+   */
+  cache: { pieces: 5, within: 0.5, gun: 0.4, weights: [0, 0, 50, 35, 15] },
 } as const;
 
 /** A piece: a gun of a kind and a rarity, or a count of one consumable. */
@@ -256,6 +268,47 @@ export function strewn(
     }
   }
   return { pieces, next: pieces.length };
+}
+
+/**
+ * The loot `f` with the cache of phase `phase` dropped in `cap` (the cap the
+ * storm closes to next; LOOT.cache), drawn from the match's `seed` and the
+ * phase. A piece whose roomy water lies outside the cap isn't laid.
+ */
+export function cached(
+  f: Flotsam,
+  cap: Cap,
+  phase: number,
+  seed: number,
+  depth: Depth
+): Flotsam {
+  const draw = random(hash(seed, 0xcac0 + phase)),
+    k = LOOT.cache;
+  const pieces = [...f.pieces];
+  let next = f.next;
+  for (let i = 0; i < k.pieces; i++) {
+    const p = along(
+      cap.centre,
+      tangentAt(cap.centre, draw() * 2 * Math.PI),
+      R * cap.radius * k.within * Math.sqrt(draw())
+    ).p;
+    const goods: Goods =
+      draw() < k.gun
+        ? {
+            kind: GUN_KINDS[weighed(LOOT.kinds, draw())],
+            rarity: Math.min(
+              weighed(k.weights, draw()),
+              GUN.rarities.length - 1
+            ),
+          }
+        : draw() < 0.5
+          ? { kind: 'bigShield', count: LOOT.counts.bigShield }
+          : { kind: 'fullRepair', count: LOOT.counts.fullRepair };
+    const at = opened(depth, p);
+    if (!at || toEdge(at, cap) < 0) continue;
+    pieces.push({ id: next++, at, goods, from: -1, age: 0, way: STILL });
+  }
+  return { pieces, next };
 }
 
 /**
