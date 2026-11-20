@@ -199,11 +199,14 @@ commit; anything visible checked in headless chromium; iPad Air M1 at 30–40 fp
         armed by t, place. Tools: `inspect.ts` (one ship second by second),
         `wedge.ts` (can a ship in this state free herself, per helm).
         Why-lines (scores of the top options) deferred: not needed so far.
-  - [ ] C3 Scenarios: crossing pairs (200 fixed), channel, storm-from-a-cove,
-        duel, chase. Suite under 60 s as a test.
+  - [ ] C3 Scenarios (`tests/scenarios.test.ts`): cover behind an island and
+        an island's shoulder done; crossing pairs, channel, storm-from-a-cove
+        to come (duel, storm caps, routes already in bot/gunner/route tests).
+        Suite under 60 s as a test.
 - [x] **D. Loot more plentiful** (user ask, measured). See Decision 3.
 - [ ] **E. Navigation**, each change measured, hash re-recorded:
   - [ ] E1 Clearance in metres; cells under the hull's need barred; cost by clearance.
+        (E1a done: steering by eye wants water `ROUTE.wide` cells off.)
   - [ ] E2 Water bodies labelled; goals snapped to her own.
   - [ ] E3 Progress-based stuck; goal blacklist.
   - [ ] E4 Storm flow field per phase (Router #2).
@@ -355,10 +358,23 @@ commit; anything visible checked in headless chromium; iPad Air M1 at 30–40 fp
   74% = no cover's, flee time 3552 → 2987 s (contact broken sooner). Whole
   fleets: pinned +0.1 s [−2.1, 2.0]; balanced mixed: place −0.37 [−2.65,
   1.89] vs `noCover`. Visible behaviour, no cost. Golden → `8c6241ba`.
-  Scenario test (an island between) wanted with C3.
+  Scenario test: see E1a.
 - Step cost after E3, D, F1–F2 (`tools/steps.ts`, 60 s, desktop; base
   975191c timed in a scratch worktree the same way): command median 0.54 →
   0.58–0.62 ms, step 1.56 → 1.66–1.74 ms (+6–10%), most likely the 57% more
   loot each bot weighs a think; the worst step's spike (17–20 ms, route
   finding) is the base's own. Under the 5 ms median gate. Headless budget
   unchanged from the base (its triangle overs pre-exist).
+- C3/E1a, an island's shoulder: the first scenario (a bot fleeing past a
+  round island, `tests/scenarios.test.ts`) had her, with or without cover,
+  lie with her bow on the island for 12 s of 16, holding a route, her helm
+  reading 4.3 m/s into the land and its stuck clock at 0. Cause: `course`
+  looks ahead along the route as far as `clearLine` holds, and that took any
+  _open_ cell, including those hard by the shore (`clear` 1): the look ahead
+  cut the route's offshore cells and the shoulder with them. Now a chord is
+  clear through cells `ROUTE.wide` (2) from the shore, or as far as its ends
+  are (she can leave water close in, and make for it). Scenario: pinned 12 →
+  0 s both ways, hidden 0 → 5.2 s with cover (both fail with `wide` 1).
+  Whole fleets, 16 matches: pinned +0.2 s [−1.7, 2.1] (storm-mode wedges
+  have another cause), aground 4.7 → 4.0 s. Golden → `72969f30`. Open: the
+  helm's stuck clock didn't see a bow driven on to land at speed (E3 lead).

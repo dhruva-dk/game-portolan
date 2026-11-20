@@ -75,6 +75,8 @@ export const ROUTE = {
   reached: 10,
   ahead: 6,
   step: 6,
+  /** Cells from the shore water must lie to count as clear, steering by eye. */
+  wide: 2,
 } as const;
 
 /**
@@ -207,15 +209,22 @@ export const clearAt = (ch: Chart, p: Vec3): number => ch.clear[cellOf(p)];
 const looked: Out3 = [0, 0, 0],
   centre: Out3 = [0, 0, 0];
 
-/** Open water all along the chord from a to b, looked at every `step` m. */
+/**
+ * Water all along the chord from a to b, looked at every `step` m, at least
+ * ROUTE.wide cells from the shore, or as far as a or b itself is (from water
+ * close in she may still leave, and make for it): a chord through the cells
+ * by the shore takes her round a point with her bow on it.
+ */
 function clearLine(ch: Chart, a: Vec3, b: Vec3, step = 4): boolean {
-  const k = Math.max(1, Math.ceil(distance(a, b) / step));
+  const k = Math.max(1, Math.ceil(distance(a, b) / step)),
+    need = Math.max(1, Math.min(ROUTE.wide, clearAt(ch, a), clearAt(ch, b)));
   for (let s = 1; s <= k; s++)
     if (
-      !openAt(
-        ch,
-        normalize(add(scale(a, 1 - s / k, looked), b, s / k, looked), looked)
-      )
+      ch.clear[
+        cellOf(
+          normalize(add(scale(a, 1 - s / k, looked), b, s / k, looked), looked)
+        )
+      ] < need
     )
       return false;
   return true;
