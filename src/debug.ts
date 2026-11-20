@@ -1,7 +1,8 @@
 // Every debug switch, read from the page's query, and the scenario they set up.
-// None of it runs in a release build unless the page asks with ?debug: off
-// Vite's dev server (import.meta.env.DEV) and without ?debug the page is set up
-// as released and opens at the title. The scenario drives the game, its referee
+// None of it runs, or is even fetched, in a release build unless the page asks
+// with ?debug: off Vite's dev server (import.meta.env.DEV) and without ?debug
+// main.ts sets the page up as released, opening at the title, and never loads
+// this. The scenario drives the game, its referee
 // and the screens' flow only through what they offer anyone (main.ts builds
 // them; this only sets them going).
 //
@@ -188,8 +189,6 @@ export interface Played {
 }
 
 const params = new URLSearchParams(location.search);
-/** Whether debugging is on: the dev server, or ?debug in the query. */
-const DEBUG = import.meta.env.DEV || params.has('debug');
 const number = (name: string, fallback: number) =>
   params.has(name) ? Number(params.get(name)) : fallback;
 const degrees = Math.PI / 180;
@@ -241,12 +240,12 @@ function setupOf(release: Setup): Setup {
 }
 
 /**
- * The page set going: the stage and the game on it, built by main.ts's `stage`
- * and `play` from `release`, or from the setup the switches make of it; then,
- * debugging, opened where the switches say (at sea among the demo ships by
- * default), or the flyer drawn instead of the game. `title` is the title the
- * page painted first: the game's flow takes it down; the flyer, which has no
- * flow, takes it down itself once the ground is baked.
+ * The page set going, debugging (main.ts loads this only then): the stage and
+ * the game on it, built by main.ts's `stage` and `play` from the setup the
+ * switches make of `release`; then opened where the switches say (at sea among
+ * the demo ships by default), or the flyer drawn instead of the game. `title`
+ * is the title the page painted first: the game's flow takes it down; the
+ * flyer, which has no flow, takes it down itself once the ground is baked.
  */
 export async function scenario(
   release: Setup,
@@ -254,11 +253,6 @@ export async function scenario(
   play: (s: Stage) => Promise<Played>,
   title: { show(on: boolean): void }
 ) {
-  if (!DEBUG) {
-    const s = await stage(release);
-    const p = await play(s);
-    return s.draw(p.next, p.drawn);
-  }
   const s = await stage(setupOf(release));
   const room = Math.max(SHIPS, number('ships', 0) + 1);
   if (flying) {

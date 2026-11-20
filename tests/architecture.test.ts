@@ -379,12 +379,19 @@ test('determinism: src/world and src/sim are deterministic and headless', () => 
   );
 });
 
-test('debug: the debug switches live in src/debug.ts alone, set going by one call from src/main.ts', () => {
+test('debug: the debug switches live in src/debug.ts alone, loaded and set going by one call from src/main.ts', () => {
+  // (but ?debug itself, read by src/main.ts to know whether to load them at all)
   none(
     'debug',
     hits(
       /\blocation\b|\bURLSearchParams\b|\bswitches\s*\./,
       (rel) => rel !== 'debug.ts'
+    ).filter(
+      (h) =>
+        !(
+          h.file === 'src/main.ts' &&
+          /new URLSearchParams\(location\.search\)\.has\('debug'\)/.test(h.text)
+        )
     ),
     "the page's query read outside src/debug.ts"
   );
@@ -400,28 +407,17 @@ test('debug: the debug switches live in src/debug.ts alone, set going by one cal
       .map(({ f, i }) => ({ file: f.at, line: i.line, text: i.spec })),
     'src/debug.ts imported other than by src/main.ts'
   );
-  const values = takers.filter(({ i }) => !i.typeOnly);
+  // its code loaded once, by a dynamic import: a static one would bundle it into every release
   assert.deepEqual(
-    values.flatMap(({ i }) => i.names).filter((n) => n === 'scenario'),
-    ['scenario'],
-    'src/main.ts takes scenario from src/debug.ts'
+    takers
+      .filter(({ i }) => !i.typeOnly)
+      .map(({ f, i }) => `${f.rel} ${i.whole ? 'import()' : 'import'}`),
+    ['main.ts import()'],
+    'src/main.ts loads src/debug.ts once, by a dynamic import (else only its types)'
   );
   const main = files.find((f) => f.rel === 'main.ts')!;
-  let calls = 0,
-    others = 0;
-  for (const s of tree(main).statements) {
-    if (
-      !ts.isImportDeclaration(s) ||
-      !ts.isStringLiteral(s.moduleSpecifier) ||
-      !/\/debug(\.ts)?$/.test(s.moduleSpecifier.text)
-    )
-      continue;
-    const b = s.importClause?.namedBindings;
-    if (b && ts.isNamedImports(b))
-      others += b.elements.filter(
-        (e) => !e.isTypeOnly && e.name.text !== 'scenario'
-      ).length;
-  }
+  let calls = 0;
+  const taken: string[] = [];
   ts.forEachChild(tree(main), function each(n: ts.Node) {
     if (
       ts.isCallExpression(n) &&
@@ -429,11 +425,26 @@ test('debug: the debug switches live in src/debug.ts alone, set going by one cal
       n.expression.text === 'scenario'
     )
       calls++;
+    // what the dynamic import's module is taken apart into
+    if (
+      ts.isVariableDeclaration(n) &&
+      ts.isObjectBindingPattern(n.name) &&
+      n.initializer &&
+      ts.isAwaitExpression(n.initializer) &&
+      ts.isCallExpression(n.initializer.expression) &&
+      n.initializer.expression.expression.kind ===
+        ts.SyntaxKind.ImportKeyword &&
+      /\/debug(\.ts)?['"]$/.test(
+        n.initializer.expression.arguments[0]?.getText(tree(main)) ?? ''
+      )
+    )
+      for (const e of n.name.elements)
+        taken.push((e.propertyName ?? e.name).getText(tree(main)));
     ts.forEachChild(n, each);
   });
-  assert.equal(
-    others,
-    0,
+  assert.deepEqual(
+    taken,
+    ['scenario'],
     'src/main.ts takes only scenario (and types) from src/debug.ts'
   );
   assert.equal(calls, 1, 'src/main.ts calls scenario once');

@@ -2,12 +2,12 @@
 // on it with the UI over it (play), and a frame drawn each time the screen is
 // ready for one. How it is set up is the release's (RELEASE), and it opens at
 // the title; only the page's debug switches change either (debug.ts scenario,
-// the one way in).
+// the one way in, loaded only when debugging, so a release ships without it).
 
 import { WebGPUCoordinateSystem, WebGPURenderer } from 'three/webgpu';
 import { createAudio } from './audio/audio.ts';
 import type { Hearing } from './audio/listen.ts';
-import { scenario, type Played, type Setup, type Stage } from './debug.ts';
+import type { Played, Setup, Stage } from './debug.ts';
 import { SEED, createWorld } from './environment.ts';
 import { createFrame } from './frame.ts';
 import { loaded } from './load.ts';
@@ -238,4 +238,19 @@ async function play(s: Stage): Promise<Played> {
   };
 }
 
-await scenario(RELEASE, stage, play, title);
+/**
+ * Whether debugging is on: Vite's dev server, or ?debug in the page's query
+ * (the one switch read here: the rest are debug.ts's, fetched only with it).
+ */
+const DEBUG =
+  import.meta.env.DEV || new URLSearchParams(location.search).has('debug');
+
+if (DEBUG) {
+  const { scenario } = await import('./debug.ts');
+  await scenario(RELEASE, stage, play, title);
+} else {
+  // as released: the game on the stage, opening at the title
+  const s = await stage(RELEASE);
+  const p = await play(s);
+  await s.draw(p.next, p.drawn);
+}
