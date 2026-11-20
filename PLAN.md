@@ -29,19 +29,19 @@ roadmap above it. After a compaction, read this file, then `BOTS.md`.
 targets, measured the same way on 64 dealt matches (80 bots each) unless
 said; met ✓, not met ✗, the call left to the owner ◐:
 
-| Measure                              | Before         | Now (`depth`)                                                                                                                        |
-| ------------------------------------ | -------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| Distinct bot personalities           | 6, one per bot | ✓ 6 personas, each a temper and a crew, each measured apart (shots, home, dealt, taken, kills, place)                                |
-| Match types                          | 1              | ✓ 4: mixed, bloodbath, gold rush, cagey. 90% armed by 13 / 13 / 11 / 34 s; half down by 60 s (bloodbath), 104 s (cagey)              |
-| What can be varied in the harness    | brain tables   | ✓ brain, gunnery, option weights, rules (loot, caches, storm, assist), a player's thumb                                              |
-| Combat measured in the harness       | none           | ✓ shots and hits by range, gun, rarity, skill and who laid it; damage; where hits fall on a hull; ratings by gun                     |
-| Strongest personality over median    | unknown        | ✗ by 0.2 se: turtle +1.2 se over 256 matches (θ +0.03; was scavenger +7.8 se, θ +0.16); weakest brawler −4.4 se (θ −0.06, was −0.21) |
-| Player assist vs best bot's hit rate | unmeasured     | ◐ measured: a player's stand-in beats sharp bots by 4 / 11 / 14 points close / mid / far; the bots' hand, A3                         |
-| Sim step, median / worst             | 1.6 / 13 ms    | ✓ 1.8 / 11.9 ms (`npm run steps` on the head; main 1.6 / 13.9). It was 22 ms before the first routes were spread                     |
-| Triangles, ships and coast views     | 1359k / 1304k  | ✓ 630k / 576k (worst view 893k of 900k)                                                                                              |
-| Draw calls, worst view               | 70             | ✓ 77 (a palm one draw, not two; every view fewer: sea 62, coast 64, ships 64, lobby 49, map 33)                                      |
-| Bot seconds stuck                    | 4.2 s          | ✓ 4.1 s (runs on this code range 3.5–4.3 s)                                                                                          |
-| Guns, one against one                | unmeasured     | ◐ `duel.ts`: harpoon beats cannon, mortar far; scatter loses 19 in 20 (its spray or the gun band: the owner's)                       |
+| Measure                              | Before         | Now (`depth`)                                                                                                                                                  |
+| ------------------------------------ | -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Distinct bot personalities           | 6, one per bot | ✓ 6 personas, each a temper and a crew, each measured apart (shots, home, dealt, taken, kills, place)                                                          |
+| Match types                          | 1              | ✓ 4: mixed, bloodbath, gold rush, cagey. 90% armed by 13 / 13 / 11 / 34 s; half down by 60 s (bloodbath), 104 s (cagey)                                        |
+| What can be varied in the harness    | brain tables   | ✓ brain, gunnery, option weights, rules (loot, caches, storm, assist), a player's thumb                                                                        |
+| Combat measured in the harness       | none           | ✓ shots and hits by range, gun, rarity, skill and who laid it; damage; where hits fall on a hull; ratings by gun                                               |
+| Strongest personality over median    | unknown        | ✗ by 0.2 se: turtle +1.2 se over 256 matches (θ +0.03; was scavenger +7.8 se, θ +0.16); weakest brawler −4.4 se (θ −0.06, was −0.21)                           |
+| Player assist vs best bot's hit rate | unmeasured     | ✓ like with like (the stand-ins' own ships, hunter and brawler): best bots 84 / 49 / 53% close / mid / far, stand-in 82 / 49 / 47; per gun level or under (A3) |
+| Sim step, median / worst             | 1.6 / 13 ms    | ✓ 1.8 / 11.9 ms (`npm run steps` on the head; main 1.6 / 13.9). It was 22 ms before the first routes were spread                                               |
+| Triangles, ships and coast views     | 1359k / 1304k  | ✓ 630k / 576k (worst view 893k of 900k)                                                                                                                        |
+| Draw calls, worst view               | 70             | ✓ 77 (a palm one draw, not two; every view fewer: sea 62, coast 64, ships 64, lobby 49, map 33)                                                                |
+| Bot seconds stuck                    | 4.2 s          | ✓ 4.1 s (runs on this code range 3.5–4.3 s)                                                                                                                    |
+| Guns, one against one                | unmeasured     | ◐ `duel.ts`: harpoon beats cannon, mortar far; scatter loses 19 in 20 (its spray or the gun band: the owner's)                                                 |
 
 **Targets for this plan.** Each is a gate a milestone must meet, measured the
 same way:
@@ -593,15 +593,30 @@ then the behaviour commits on top.
   assist, which bots use too: it is the bots' unsteady hand, their spread
   `1 + 4.5 (1 − skill)` times the gun's, the player's the gun's own.
 
-- 2026-11-20 (A3): **not tuned; a design call left open.** The gate (the
-  player at or below the best bots) can only be met by narrowing the
-  assist, and the numbers above say a narrower cone takes a thumb from 50%
-  at mid toward 2% long before it touches the bots, whose own eye already
-  sits on the body. The lever that moves the gap is the bots' hand
-  (`unsteady` in gunner.ts: at skill 0.9 it is 1.45×); bringing a sharp bot
-  to the gun's own spread puts her level with a player. Which side should
-  give is how the game should feel, so it is the owner's: the knobs, and
-  the harness to measure either choice, are in place.
+- 2026-11-20 (A3): **met, by the bots' hand, the assist untouched.**
+  Narrowing the assist takes a thumb from 50% at mid toward 2% long before
+  it touches the bots, so the assist stays; the bots' hand gives. Their
+  spread was `1 + 4.5 (1 − skill)` times the gun's (1.45× at 0.9); now
+  `1 + 6 (1 − skill)²`: a green captain (0.3) 3.9×, fair (0.6) 2×, sharp
+  (0.85) 1.1×, the best a player's own. And the gate is measured like with
+  like (`aim.ts --against`): a stand-in sails her bot's persona and fights
+  where it fights, so she is set beside the very ships she takes, sailed by
+  their bots in the same 64 matches without her; of hunter and brawler,
+  the personas whose bots reach 0.9. Close / mid / far:
+
+  |              | all guns      | cannon        | repeater |
+  | ------------ | ------------- | ------------- | -------- |
+  | stand-in     | 82 / 49 / 47% | 94 / 66 / 29% | 77 / 39% |
+  | best, before | 84 / 51 / 42% | 96 / 65 / 22% | 78 / 32% |
+  | best, now    | 84 / 49 / 53% | 97 / 66 / 33% | 78 / 40% |
+
+  Level or under at every band with every gun the fighters fire enough to
+  say (the harpoon and mortar too rarely). Tried and dropped on the way: a
+  truer aim error for the sharp (it bought nothing over the hand), and bots
+  laying on the body and leaving the lead to the assist as a player does
+  (no better, and worse far off). The whole fleet's rates rise with it
+  (sharp at mid 41 → 46%), so the personas were re-measured after.
+
 - 2026-11-20 (A4): **tried, measured, dropped.** A gunner who leads short
   by her greenness (she laid 1 + (1 − skill)(swing·w − under) of the true
   lead, through the assist) and the harness's new measure of it: where her

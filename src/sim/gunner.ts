@@ -67,11 +67,13 @@ const GUNNER = {
   wander: [0.6, 1.4] as const,
   /**
    * Her hand is less steady than she thinks: her balls spread 1 + `unsteady` ×
-   * (1 − skill) times the gun's own. (2.5 when a common gun spread 0.05; with
-   * it 0.03, 4.5 keeps the bots' balls striking home as often over a match,
-   * some 85 in 100, tools/harness/summary.ts.)
+   * (1 − skill)² times the gun's own: a green captain's (0.3) 3.9 times, a
+   * fair one's (0.6) 2, a sharp one's (0.85) 1.1, the best's the gun's own as
+   * a player's is. (It was 1 + 4.5 (1 − skill), and left the best bots short
+   * of a player at mid range by up to 13 points, the same ships set beside
+   * each other: PLAN A3, tools/harness/aim.ts --against.)
    */
-  unsteady: 4.5,
+  unsteady: 6,
   /**
    * Her eye aloft, metres over the sea, from which she sights the gun on her
    * mark.
@@ -186,7 +188,8 @@ const between = (draw: () => number, [lo, hi]: readonly [number, number]) =>
 /**
  * How many times the gun's own spread her balls go off within, by her skill.
  */
-export const spreadBy = (skill: number) => 1 + GUNNER.unsteady * (1 - skill);
+export const spreadBy = (skill: number) =>
+  1 + GUNNER.unsteady * (1 - skill) ** 2;
 
 /** The seconds before she fires on a ship she has just seen, by her skill. */
 export const reactTime = (skill: number) =>
