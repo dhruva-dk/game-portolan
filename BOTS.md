@@ -285,3 +285,19 @@ commit; anything visible checked in headless chromium; iPad Air M1 at 30–40 fp
   - **Result: pinned 20.1 → 13.8 s a ship (−31%), aground 3.7 → 5.2 s,
     armed 85%, median 7 s, 90% by 21 s (was 27).** Golden → `076db454`.
   - Left: storm mode is now 76% of stuck time. Next to inspect.
+- E3b, storm-mode wedges (m11 #68): chasing a foe straight (no route) into
+  a pocket one chart cell off shore, her next route cell 123° to starboard;
+  the shallows refuse that swing, while hard to port frees her in 4 m
+  (`wedge.ts`). She surges ~5 cm a step, so the step test never calls her
+  stuck. Three helm reflexes tried, all **worse** (16 paired matches vs.
+  the committed helm, 13.8 s pinned):
+  - headway window (net < crawl×1 s → crawling): +3.1 s;
+  - stricter window (net < 0.3 m in 1 s / 0.6 m in 1–2 s): +3.8–3.9 s;
+  - coming about the long way when a > 0.5 rad turn doesn't swing her head
+    in 1.5 s: +4.0 s (0.3 rad: +4.8 s); "circling in claim" rose too.
+  - Lesson: more helm reflexes fight the planner. The cause is upstream:
+    goals (foes, loot) drawing her into water her hull can't turn in. Leads
+    for later: a foe/loot goal in clear < 2 water is not chased straight
+    but via the route; `ROUTE.hug` (2.5×) higher. Parked for D.
+  - `inspect.ts` gained per-second made/sailed/most-step, her chart cell
+    (open, clearance) and her route's next cell as bearing/metres.
