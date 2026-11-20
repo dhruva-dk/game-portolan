@@ -1,5 +1,4 @@
-// Her ship and her sea's sounds: her rigging creaking on the roll, a gust
-// filling her canvas, the loot she takes up and the stores she mends with, and
+// Her ship and her sea's sounds: a gust filling her canvas, the loot she takes up and the stores she mends with, and
 // her water: a loop closed (the sea rushing as her colour floods it), her trail
 // cut, her own water entered and left, the storm beginning to close.
 
@@ -16,7 +15,6 @@ import {
   modes,
   noise,
   normal,
-  slips,
   swell,
   take,
   tone,
@@ -24,28 +22,6 @@ import {
   type Take,
 } from '../dsp.ts';
 import { timber } from './blows.ts';
-
-/** Her rigging taking the strain: a rope's tight, quick creak in its block. */
-export function rope(rate: number, seed: number): Samples {
-  const t = take(0.55, rate, seed);
-  const long = 0.25 + 0.2 * t.r(),
-    a = layer(t),
-    b = layer(t);
-  slips(
-    a,
-    (s) => 150 + 140 * Math.sin((Math.PI * s) / long),
-    swell(0.05, long, 0.1),
-    0.01,
-    long,
-    0.15
-  );
-  b.x.set(a.x);
-  filter(a, 'bandpass', 1350 + 300 * t.r(), 6);
-  filter(b, 'bandpass', 2400 + 400 * t.r(), 5);
-  mix(t, a, 0, 6);
-  mix(t, b, 0, 3);
-  return normal(finish(t, 0.01, 0.05)).x;
-}
 
 /** Canvas filling at once: a crack with a low body, its flutter after. */
 const canvas = (t: Take, at: number, gain: number) => {

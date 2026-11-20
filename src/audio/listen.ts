@@ -2,7 +2,7 @@
 // deeds on the sea are the match's moments: status.moments, her guns' among
 // them): a slot of her stores taken in hand, a ball passing near the eye, her
 // water (a loop closed, her trail cut, her own water left and entered), the
-// storm beginning to close, her rigging at an end of her roll, and the screens
+// storm beginning to close, and the screens
 // (a folio opened and closed, PLAY, her end); and what the bed follows (Bed):
 // her speed, the wind in her rig, her heave and roll, the nearest coast, the
 // storm's wall, her hull, and how much of the sea is heard at all (and how much
@@ -94,12 +94,6 @@ const PASS = 30,
   WHISTLE = 0.3,
   APART = 0.12;
 /**
- * Her roll at its end, radians, under which her rigging is not heard; and the
- * fewest seconds between the ends of her roll it is heard at (one end in two).
- */
-const ROPE = 0.02,
-  TURNS = 0.8;
-/**
  * What a screen shown says, by the screen it came from: a folio opened, closed;
  * PLAY; her end.
  */
@@ -138,9 +132,6 @@ export function createListen(ground: (p: Vec3) => number) {
   let chosen = 0;
   let lift = NaN,
     roll = 0,
-    rolling = 0,
-    turned = 0,
-    side = 1,
     whistled = -Infinity;
   /**
    * Land found on the ring (1) or not (0), each way and distance; the next to
@@ -272,7 +263,7 @@ export function createListen(ground: (p: Vec3) => number) {
         whistled = scene.clock;
       }
 
-      // her heave and roll; her rigging at one end of her roll in two
+      // her heave and roll
       if (own) {
         const p = own.pose.position,
           r = Math.sqrt(dot(p, p)),
@@ -285,19 +276,6 @@ export function createListen(ground: (p: Vec3) => number) {
         const now = Math.asin(
           clamp((u[0] * sx + u[1] * sy + u[2] * sz) / sl, -1, 1)
         );
-        const rate = dt > 0 ? (now - roll) / dt : 0;
-        if (
-          dt > 0 &&
-          Math.sign(rate) !== Math.sign(rolling) &&
-          Math.abs(now) > ROPE &&
-          scene.clock - turned > TURNS
-        ) {
-          if (side < 0)
-            call(out, 'rope', null, Math.min(1, Math.abs(now) / 0.07));
-          side = -side;
-          turned = scene.clock;
-        }
-        if (dt > 0) rolling = rate;
         roll = now;
         const height = r - R;
         bed.heave =

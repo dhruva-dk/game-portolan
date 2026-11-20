@@ -35,7 +35,6 @@ import {
   leave,
   mendHull,
   mendWard,
-  rope,
   took,
 } from './sounds/sea.ts';
 import { close, launch, lost, open, salute, tap } from './sounds/ui.ts';
@@ -112,7 +111,6 @@ const SOUND = {
   ring: { make: ring, takes: 2, level: -4, priority: 8, reach: 0 },
   shatter: { make: shatter, takes: 1, level: -5, priority: 9, reach: 0 },
   sink: { make: sink, takes: 2, level: -4, priority: 7, reach: 1400 },
-  rope: { make: rope, takes: 3, level: -21, priority: 1, reach: 0 },
   gust: { make: gust, takes: 2, level: -7, priority: 6, reach: 0 },
   took: { make: took, takes: 2, level: -5, priority: 6, reach: 0 },
   mendWard: { make: mendWard, takes: 1, level: -11, priority: 6, reach: 0 },

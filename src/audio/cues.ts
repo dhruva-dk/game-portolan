@@ -9,7 +9,7 @@
 // world's clock (time), where (at, a unit vector), and the ship it befell
 // (ship). The rest are heard from what she sees and holds as it changes
 // (listen.ts): a slot of her stores taken in hand, a ball passing near, her
-// water, the storm, her rigging on the roll, and the screens.
+// water, the storm, and the screens.
 
 import {
   blowOf,
@@ -66,7 +66,6 @@ export const CUE_NAMES = [
   'enter',
   'leave',
   'closing',
-  'rope',
   'tap',
   'open',
   'close',
@@ -133,8 +132,6 @@ export const CUES: Record<Cue, CueSound> = {
   enter: { sound: 'enter', level: 0, bus: 'own' },
   leave: { sound: 'leave', level: 0, bus: 'own' },
   closing: { sound: 'closing', level: 0, bus: 'own' },
-  // her rigging on the roll
-  rope: { sound: 'rope', level: 0, bus: 'own' },
   // the screens
   tap: { sound: 'tap', level: 0, bus: 'ui' },
   open: { sound: 'open', level: 0, bus: 'ui' },
