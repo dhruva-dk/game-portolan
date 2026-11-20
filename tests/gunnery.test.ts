@@ -13,7 +13,7 @@ import { GUN, SHIP } from '../src/sim/handling.ts';
 import { loosed } from '../src/sim/shot.ts';
 import { offSight, type Sight } from '../src/sim/sight.ts';
 import { shipAt, turned } from '../src/sim/ship.ts';
-import { R, add, along, cross, dot, frameAt, fromLatLon, normalize, scale, type Vec3 } from '../src/world/sphere.ts';
+import { R, add, along, cross, dot, frameAt, fromLatLon, normalize, scale } from '../src/world/sphere.ts';
 
 const deep = () => 30, N = 200;
 const centre = fromLatLon(0.2, 0.3);

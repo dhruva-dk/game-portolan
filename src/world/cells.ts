@@ -36,8 +36,9 @@ function onFace(f: number, gu: number, gv: number, out?: Out3): Vec3 {
   }
 }
 
-/** The point at (u, v) on face f in the equi-angular coordinates (−1…1, and a little past an edge). */
-const atUV = (f: number, u: number, v: number): Vec3 => onFace(f, Math.tan(u * (Math.PI / 4)), Math.tan(v * (Math.PI / 4)));
+/** The point at (u, v) on face f in the equi-angular coordinates (−1…1, and a little past an edge), into `out`. */
+const atUV = (f: number, u: number, v: number, out?: Out3): Vec3 =>
+  onFace(f, Math.tan(u * (Math.PI / 4)), Math.tan(v * (Math.PI / 4)), out);
 
 /**
  * The cube's cells n along each face's edge (a power of two): the cell a point lies in (any vector from the centre),
@@ -128,11 +129,14 @@ export function wrapped(f: number, i: number, j: number): number {
   return Math.min(own, across(own, di, 0), across(own, 0, dj));
 }
 
+/** beyond's point past the face's edge. */
+const past: Out3 = [0, 0, 0];
+
 /** The cell at column i, row j of face f, however far past its edges: where that point of the face's plane, carried
  *  on past the edge, lands on the sphere (a few cells past, the next face's cell there). */
 export function beyond(f: number, i: number, j: number): number {
   if (i >= 0 && i < N && j >= 0 && j < N) return f * NN + j * N + i;
-  return cellOf(atUV(f, ((i + 0.5) / N) * 2 - 1, ((j + 0.5) / N) * 2 - 1));
+  return cellOf(atUV(f, ((i + 0.5) / N) * 2 - 1, ((j + 0.5) / N) * 2 - 1, past));
 }
 
 // Every cell's exact area on the sphere, one table for all six faces. A gnomonic rectangle [x0, x1] × [y0, y1] on the

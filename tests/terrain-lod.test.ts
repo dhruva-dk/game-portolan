@@ -47,7 +47,8 @@ for (const [name, eye] of eyes) {
     assert.ok(near >= 4, `${near} leaf patches`);
   });
 
-  test(`terrain lod ${name}: neighbouring patches differ by a level at most, and where they meet the finer is its parent's grid and the coarser unmorphed`, () => {
+  test(`terrain lod ${name}: neighbouring patches differ by a level at most, `
+    + 'and where they meet the finer is its parent\'s grid and the coarser unmorphed', () => {
     const list = patches(eye), eps = 1e-9;
     let seams = 0;
     for (const a of list) for (const b of list) {

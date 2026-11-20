@@ -8,7 +8,9 @@ test('hexToLinear is three\'s sRGB to linear, from a string or a number', () => 
   for (const hex of [0x000000, 0xffffff, 0x4fc3ff, 0xd2332a, 0x0a0b0c, 0x808080]) {
     const c = new Color().setHex(hex, SRGBColorSpace);
     const ours = hexToLinear(hex);
-    for (const [i, v] of [c.r, c.g, c.b].entries()) assert.ok(Math.abs(ours[i] - v) < 1e-7, `${hex.toString(16)}: ${ours} vs ${[c.r, c.g, c.b]}`);
+    for (const [i, v] of [c.r, c.g, c.b].entries()) {
+      assert.ok(Math.abs(ours[i] - v) < 1e-7, `${hex.toString(16)}: ${ours} vs ${[c.r, c.g, c.b]}`);
+    }
     assert.deepEqual(hexToLinear(`#${hex.toString(16).padStart(6, '0')}`), ours);
   }
 });

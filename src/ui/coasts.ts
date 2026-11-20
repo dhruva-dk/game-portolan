@@ -7,9 +7,9 @@ import type { Planet } from '../world/planet.ts';
 import { coastLines } from '../world/coastline.ts';
 import { add, distance, normalize, type Vec3 } from '../world/sphere.ts';
 
-/** A run of coast: its middle, how far from it it reaches (metres), its points, and whether its last point joins its
- *  first. */
-export interface Coast { centre: Vec3; reach: number; ring: Vec3[]; closed: boolean }
+/** A run of coast: its middle, how far from it it reaches (metres), and its points (a closed run's last its first:
+ *  world/coastline.ts, so each is traced open). */
+export interface Coast { centre: Vec3; reach: number; ring: Vec3[] }
 
 /** What the charts draw of the land: its coasts, and the ground's height over the sea and its highest (the minimap
  *  paints the land round her from them). */
@@ -24,7 +24,7 @@ export function shoresOf(planet: Planet, land: Land): Shores {
     // (a loop, not a spread: a coast may run to more points than a call takes arguments)
     let reach = 0;
     for (const p of ring) reach = Math.max(reach, distance(centre, p));
-    return { centre, reach, ring, closed: false };
+    return { centre, reach, ring };
   });
   return { coasts, ground: { height: planet.height, top: land.stats.summit } };
 }

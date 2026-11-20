@@ -95,7 +95,8 @@ function voyages(sea: Hull, every: number, seconds: number) {
   });
 }
 
-test('her ride on the hull read, five times a second, is her ride on the whole surface read every step: to a few cm and a fraction of a degree', () => {
+test('her ride on the hull read, five times a second, is her ride on the whole surface read every step: '
+  + 'to a few cm and a fraction of a degree', () => {
   for (const wind of [7.6, 15]) {
     const swell = createSwell(all, open, wind, { shortest: RIDE.shortest });
     const got = voyages(swell.hull, RIDE.every, 30);

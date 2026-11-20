@@ -106,7 +106,8 @@ export function createBed(ctx: BaseAudioContext, noise: AudioBuffer, out: AudioN
   ], true);
   const wash = layer(0, [{ type: 'bandpass', frequency: 700, Q: 0.6 }, { type: 'lowpass', frequency: 2500, Q: 0.5 }], true);
   const hiss = layer(0, [
-    { type: 'highpass', frequency: 1800, Q: 0.6 }, { type: 'peaking', frequency: 3800, Q: 0.8, gain: 3 }, { type: 'lowpass', frequency: 8000 },
+    { type: 'highpass', frequency: 1800, Q: 0.6 }, { type: 'peaking', frequency: 3800, Q: 0.8, gain: 3 },
+    { type: 'lowpass', frequency: 8000 },
   ], false);
   const wind = layer(1, [{ type: 'bandpass', frequency: 400, Q: 0.8 }], true);
   const rig = layer(1, [{ type: 'bandpass', frequency: 1100, Q: 3 }], true);

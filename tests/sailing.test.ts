@@ -69,7 +69,7 @@ test('over the pole: still on her great circle, her heading still a unit tangent
   const s0 = { ...shipAt(fromLatLon(85 * deg, 0.7), frameAt(fromLatLon(85 * deg, 0.7)).north), speed: SHIP.top };
   const plane = cross(s0.at, s0.heading);
   let travelled = 0, last = s0.at, most = -1;
-  const s = run(s0, () => ({ course: null, throttle: 1 }), 30, deep, (s) => {
+  run(s0, () => ({ course: null, throttle: 1 }), 30, deep, (s) => {
     travelled += distance(last, s.at);
     last = s.at;
     most = Math.max(most, s.at[1]);

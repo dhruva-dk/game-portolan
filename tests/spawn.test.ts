@@ -11,7 +11,9 @@ import { R, along, distance, dot, length } from '../src/world/sphere.ts';
 /** The least distance between any two berths, metres along the surface. */
 function closest(spawns: readonly Spawn[]): number {
   let least = Infinity;
-  for (let i = 0; i < spawns.length; i++) for (let j = i + 1; j < spawns.length; j++) least = Math.min(least, distance(spawns[i].at, spawns[j].at));
+  for (let i = 0; i < spawns.length; i++) {
+    for (let j = i + 1; j < spawns.length; j++) least = Math.min(least, distance(spawns[i].at, spawns[j].at));
+  }
   return least;
 }
 

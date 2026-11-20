@@ -12,7 +12,6 @@ import { SEED } from '../src/world/planet.ts';
 import { add, along, bearingAt, distance, frameAt, fromLatLon, normalize, scale, type Vec3 } from '../src/world/sphere.ts';
 import { random } from '../src/world/random.ts';
 
-const deg = Math.PI / 180;
 const start = fromLatLon(0.2, 0.3);
 const { east, north } = frameAt(start);
 const at = (x: number, y: number): Vec3 =>

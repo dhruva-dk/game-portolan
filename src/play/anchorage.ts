@@ -1,5 +1,6 @@
-// The lobby's camera on her at anchor: standing off her starboard bow on the quarter, a little above her, looking down its boom at her mainsail's foot so
-// the hull sits low and the sails stand whole, and drifting slowly round her and back. A finger dragged anywhere off
+// The lobby's camera on her at anchor: standing off her starboard bow on the quarter, a little above her, looking
+// down its boom at her mainsail's foot so the hull sits low and the sails stand whole, and drifting slowly round her
+// and back. A finger dragged anywhere off
 // the lobby's controls turns it round her (freely) and tilts its boom (within ORBIT.pitch, so never under the sea);
 // let go, it eases back to its rest.
 //

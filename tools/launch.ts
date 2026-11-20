@@ -11,7 +11,9 @@ export const PORT = 5199;
 export async function launch() {
   const server = await createServer({ logLevel: 'error', server: { port: PORT, strictPort: false } });
   await server.listen();
-  const browser = await chromium.launch({ args: ['--enable-unsafe-webgpu', '--use-angle=metal', '--enable-gpu', '--ignore-gpu-blocklist', '--disable-gpu-vsync', '--disable-frame-rate-limit'] });
+  const browser = await chromium.launch({
+    args: ['--enable-unsafe-webgpu', '--use-angle=metal', '--enable-gpu', '--ignore-gpu-blocklist', '--disable-gpu-vsync', '--disable-frame-rate-limit'],
+  });
   return {
     browser,
     url: server.resolvedUrls?.local[0] ?? `http://localhost:${PORT}/`,

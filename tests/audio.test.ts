@@ -10,7 +10,7 @@ import { breakers, galeOf, levels, levelsOf } from '../src/audio/bed.ts';
 import { KINDS } from '../src/kinds.ts';
 import { HOTBAR, type GunKind, type Kit, type Status } from '../src/player.ts';
 import type { BallDraw, Blast, Eye, ShipDraw, Snapshot } from '../src/snapshot.ts';
-import { R, normalize, scale, type Vec3 } from '../src/world/sphere.ts';
+import { R, scale, type Vec3 } from '../src/world/sphere.ts';
 import { inverse, lookAt, rotate } from '../src/world/turn.ts';
 
 const at: Vec3 = [0, 0, 1];

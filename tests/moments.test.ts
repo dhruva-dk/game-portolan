@@ -30,7 +30,8 @@ test('her id in the deeds is the match\'s player', () => {
   assert.equal(HER, PLAYER);
 });
 
-test('a step\'s deeds: numbered in order, swapped, fired (by kind), wound and reloaded, fell, struck, sank, then her stores; others\' stores and reloads unreported', () => {
+test('a step\'s deeds: numbered in order, swapped, fired (by kind), wound and reloaded, fell, struck, sank, then her stores; '
+  + 'others\' stores and reloads unreported', () => {
   const done: Done = {
     ...none,
     shots: [{ shooter: 2, from: scale(at, R + 3), dirs: [[1, 0, 0]], gun: 'scatter' }],

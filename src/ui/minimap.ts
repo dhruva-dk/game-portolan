@@ -249,7 +249,7 @@ export function createMinimap(host: HTMLElement, size: number, { coasts, ground 
     ctx.lineCap = ctx.lineJoin = 'round';
     for (const coast of coasts) {
       if (dot(coast.centre, at) <= Math.cos((SPAN * 1.45 + coast.reach) / R)) continue;
-      trace(coast.ring, coast.closed);
+      trace(coast.ring, false);
       ctx.strokeStyle = WASH.shore;
       ctx.lineWidth = 1.1 * dpr;
       ctx.stroke();

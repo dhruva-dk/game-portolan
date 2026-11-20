@@ -264,7 +264,7 @@ export function createGlobe(coasts: readonly Coast[]) {
     ctx.lineWidth = k;
     for (const coast of coasts) {
       if (dot(coast.centre, e.c) * e.d < 0.9) continue;
-      trace(e, coast.ring, coast.closed);
+      trace(e, coast.ring, false);
       ctx.stroke();
     }
     ctx.globalAlpha = 1;
