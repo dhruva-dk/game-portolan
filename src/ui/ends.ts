@@ -94,12 +94,13 @@ const anchor = (x: number, y: number, s: number) => {
 const chevron = (x: number, y: number, side: number) =>
   `<path d="M${x - 6 * side} ${y - 11}L${x + 6 * side} ${y}L${x - 6 * side} ${y + 11}" fill="none" stroke="${INK.iron}" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>`;
 
-/** What sank her, in a paper disc: a gun for a ball, two hulls met for a ram, the Storm's whirl. */
-const cause = (x: number, y: number, how: End['how']) => {
+/** What sank her, in a paper disc: for a ball the gun it came from (a cannon, not known), two hulls met for a ram,
+ *  the Storm's whirl. */
+const cause = (x: number, y: number, { how, gun }: End) => {
   const r = 22;
   const mark =
     how === 'shot'
-      ? glyph('weapon.cannon', x, y, 32)
+      ? glyph(`weapon.${gun ?? 'cannon'}`, x, y, 32)
       : how === 'storm'
         ? glyph('hud.storm', x, y, 32, { ink: 'storm' })
         : `<g transform="translate(${x} ${y})" stroke="${INK.iron}" stroke-width="1.4" stroke-linejoin="round">` +
@@ -167,7 +168,7 @@ export function createResult(act: { watch(): void; leave(): void }) {
       : slip(310, 14, 336, 116, { bold: true }) +
         place(378, y, 46, end) +
         `<path d="M440 30V114" stroke="${INK.iron}" stroke-width=".8" opacity=".6"/>` +
-        cause(476, y, end.how) +
+        cause(476, y, end) +
         held(530, y, 16) +
         figure(552, y, percent(end.share), 26, { anchor: 'start' });
     const ways = watching

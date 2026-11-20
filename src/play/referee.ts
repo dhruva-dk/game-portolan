@@ -81,6 +81,7 @@ export function createReferee(game: Game) {
       const how = m.phase === 'won' ? 'won' : (m.sunk?.cause ?? 'shot');
       return {
         how,
+        gun: m.phase === 'won' ? null : (m.sunk?.gun ?? null),
         place: m.place,
         of,
         share: m.share,

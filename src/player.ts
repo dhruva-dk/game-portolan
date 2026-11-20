@@ -278,12 +278,14 @@ export interface Kit {
   blowing: boolean;
 }
 
-/** Her match's end, as the screens show it: how it came (she won, or what sank her: a ball, a ram, the Storm), her
+/** Her match's end, as the screens show it: how it came (she won, or what sank her: a ball, and the kind of gun it
+ *  was fired from, a ram, the Storm), her
  *  place of how many began, the share of the planet's water she held (0…1), the ships still afloat; whether the
  *  camera has had its beat on her end (play/finale.ts), so her result may be laid over the world; whether the match
  *  is over (she won, or one ship or none is afloat). */
 export interface End {
   how: 'won' | 'shot' | 'ram' | 'storm';
+  gun: GunKind | null;
   place: number;
   of: number;
   share: number;

@@ -98,8 +98,8 @@ export interface Shot {
  * A ball, a shell's burst or a ram striking home: who dealt it (for a ram, the
  * other ship), who took it, the hit points it took off her shield and her hull
  * together, and of those off each; whether it broke her shield (took the last
- * of it); and where (a unit vector). A scatter's pellets striking one ship in
- * one step are one strike.
+ * of it); and where (a unit vector); whether a ram, else the gun's kind. A
+ * scatter's pellets striking one ship in one step are one strike.
  */
 export interface Strike {
   shooter: number;
@@ -110,6 +110,7 @@ export interface Strike {
   broke: boolean;
   at: Vec3;
   ram: boolean;
+  gun: GunKind | null;
 }
 
 /**
@@ -257,8 +258,9 @@ export function stepBattle(
     id: number,
     damage: number,
     at: Vec3,
-    ram: boolean
+    gun: GunKind | null
   ) => {
+    const ram = gun === null;
     const c = crews.get(id);
     if (!c || sunk(c.health)) return;
     const harm = harmed(c.health, damage);
@@ -284,14 +286,15 @@ export function stepBattle(
         broke,
         at,
         ram,
+        gun,
       });
     if (sunk(c.health)) sunkNow.push(id);
   };
 
   // the rams
   for (const blow of blows) {
-    deal(blow.struck.id, blow.striker.id, blow.striker.damage, blow.at, true);
-    deal(blow.striker.id, blow.struck.id, blow.struck.damage, blow.at, true);
+    deal(blow.struck.id, blow.striker.id, blow.striker.damage, blow.at, null);
+    deal(blow.striker.id, blow.struck.id, blow.struck.damage, blow.at, null);
   }
 
   // the balls in flight
@@ -315,10 +318,10 @@ export function stepBattle(
             m.id,
             damage * (1 - (FALLOFF.edge * d) / splash),
             f.at,
-            false
+            kind
           );
       }
-    } else if (f.struck !== null) deal(shooter, f.struck, damage, f.at, false);
+    } else if (f.struck !== null) deal(shooter, f.struck, damage, f.at, kind);
     if (f.struck === null)
       splashes.push({ shooter, gun: kind, at: f.at, land: f.land });
   }

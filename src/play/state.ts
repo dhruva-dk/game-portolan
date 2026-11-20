@@ -51,7 +51,13 @@ import { gunOf } from '../sim/gun.ts';
 import { SHIP } from '../sim/handling.ts';
 import { sunk } from '../sim/health.ts';
 import { regain, type Regained } from '../sim/holding.ts';
-import { PLAYER, SHIPS, credited, type Cause } from '../sim/match.ts';
+import {
+  PLAYER,
+  SHIPS,
+  credited,
+  type Cause,
+  type Sunk,
+} from '../sim/match.ts';
 import { berths, type Berthing, type Spawn } from '../sim/spawn.ts';
 import {
   hopped,
@@ -144,13 +150,10 @@ export interface Match {
 
 /**
  * A ship sunk: who she was, who sank her (the ship whose ball or ram dealt the
- * last blow; null for the storm), how, when, on the match's clock (s), and
- * where she went down and the way she headed.
+ * last blow; null for the storm), how and by a ball the gun's kind, when, on
+ * the match's clock (s), and where she went down and the way she headed.
  */
-interface Sinking {
-  id: number;
-  by: number | null;
-  cause: Cause;
+interface Sinking extends Sunk {
   time: number;
   at: Vec3;
   heading: Vec3;
@@ -419,7 +422,7 @@ export function createState(
     quiet ? calm(match.storm(0).centre) : match.storm(seconds);
 
   /** A ship sinks now, at the hand of `by` (null: the storm). */
-  const founder = (id: number, by: number | null, cause: Sinking['cause']) => {
+  const founder = ({ id, by, cause, gun }: Sunk) => {
     alive = null;
     const a = aboard.get(id),
       v = vessel(id);
@@ -428,6 +431,7 @@ export function createState(
       id,
       by,
       cause,
+      gun,
       time: time(),
       at: v.ship.at,
       heading: v.ship.heading,
@@ -594,14 +598,15 @@ export function createState(
         : undefined;
       const cause: Cause = blow ? (blow.ram ? 'ram' : 'shot') : 'storm',
         last = struck.get(id);
-      founder(
+      founder({
         id,
-        credited(
+        by: credited(
           cause,
           last ? { by: last.by, ago: (tick - last.tick) * STEP } : null
         ),
-        cause
-      );
+        cause,
+        gun: blow?.gun ?? null,
+      });
     }
     // (each goes down as long as the others, so the first sunk is the first
     // gone)
@@ -881,7 +886,7 @@ export function createState(
       const gone = (c: Crew): Crew =>
         c.id === id ? { ...c, health: { ...c.health, hull: 0, shield: 0 } } : c;
       battle = { ...battle, crews: s.crews.map(gone) };
-      founder(id, by, by === null ? 'storm' : 'shot');
+      founder({ id, by, cause: by === null ? 'storm' : 'shot', gun: null });
       log.keep(NOTHING_DONE, NOTHING_DONE, NOTHING_DONE, null, tick * STEP);
     },
     /**

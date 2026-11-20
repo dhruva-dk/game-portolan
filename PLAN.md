@@ -634,3 +634,9 @@ then the behaviour commits on top.
   hand close), so the rating measures their fights, not the gun. More reach
   didn't move it (dropped). A duel test would settle it; BOTS.md has the
   table. Golden `060f4d3b`.
+- 2026-11-20 (P5, in part): her end screen shows the gun that sank her (it
+  drew a cannon for any ball): a strike names its gun (`battle.ts` Strike,
+  null for a ram), the sinking carries it (`match.ts` Sunk, `player.ts`
+  End). The persona in words ("sunk by a raider") would break the screens'
+  wordless language, and a glyph or sail tint per persona is new art, so
+  both are the owner's. Golden unchanged.

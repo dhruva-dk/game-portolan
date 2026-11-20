@@ -189,10 +189,10 @@ test('a ram takes off each ship what contact.ts reported, through her shield (no
     HEALTH.hull + HEALTH.start - blow.striker.damage
   );
   assert.deepEqual(
-    r.strikes.map((s) => [s.struck, s.shooter, s.ram]),
+    r.strikes.map((s) => [s.struck, s.shooter, s.ram, s.gun]),
     [
-      [blow.striker.id, blow.struck.id, true],
-      [blow.struck.id, blow.striker.id, true],
+      [blow.striker.id, blow.struck.id, true, null],
+      [blow.struck.id, blow.striker.id, true, null],
     ]
   );
 });
@@ -351,6 +351,8 @@ test('led with no spread, a ball strikes a ship on a steady course, at any range
         );
         balls = r2.battle.balls;
         struck = r2.strikes[0]?.struck ?? null;
+        // the strike names the gun the ball came from (the end screen shows it)
+        if (r2.strikes[0]) assert.equal(r2.strikes[0].gun, 'cannon');
       }
       assert.equal(struck, 2, `${metres} m, crossing ${crossing}°: struck her`);
     }

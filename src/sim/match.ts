@@ -13,6 +13,8 @@
 // Storm's sinking goes to the ship that last struck her if it did so within
 // CREDIT seconds (credited). Pure: a value stepped by what the game reports.
 
+import type { GunKind } from '../kinds.ts';
+
 type Phase = 'fighting' | 'spectating' | 'won';
 
 /** The player's ship's id. */
@@ -27,11 +29,15 @@ export const SHIPS = 80;
 /** How a ship sank: by a ball, a ram, or the Storm. */
 export type Cause = 'shot' | 'ram' | 'storm';
 
-/** A ship sunk: who, who sank her (null: the storm, or none), and how. */
+/**
+ * A ship sunk: who, who sank her (null: the storm, or none), how, and by a
+ * ball, the kind of gun it was fired from (null: a ram or the storm).
+ */
 export interface Sunk {
   id: number;
   by: number | null;
   cause: Cause;
+  gun: GunKind | null;
 }
 
 /** Seconds a blow is credited with a sinking by the Storm after it. */

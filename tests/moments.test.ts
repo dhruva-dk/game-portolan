@@ -86,6 +86,7 @@ test(
           broke: true,
           at,
           ram: false,
+          gun: 'scatter',
         },
       ],
       sunk: [{ id: 2, by: 0, at }],
