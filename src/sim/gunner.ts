@@ -69,7 +69,7 @@ const GUNNER = {
    * Her hand is less steady than she thinks: her balls spread 1 + `unsteady` ×
    * (1 − skill) times the gun's own. (2.5 when a common gun spread 0.05; with
    * it 0.03, 4.5 keeps the bots' balls striking home as often over a match,
-   * some 85 in 100, tools/matches.ts.)
+   * some 85 in 100, tools/harness/summary.ts.)
    */
   unsteady: 4.5,
   /**

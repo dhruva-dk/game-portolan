@@ -160,7 +160,7 @@ export const EXCEPTIONS: readonly Exception[] = [
     rule: 'exports',
     file: 'src/world/swell.ts',
     name: 'flat',
-    why: 'a sea without waves for the matches run headless (the tests, tools/matches.ts and tools/steps.ts)',
+    why: 'a sea without waves for the matches run headless (the tests, tools/harness and tools/steps.ts)',
   },
   {
     rule: 'exports',

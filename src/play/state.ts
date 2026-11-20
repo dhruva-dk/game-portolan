@@ -39,6 +39,7 @@ import {
   type Crew,
   type Order,
   type Shot,
+  type Splash,
   type Strike,
 } from '../sim/battle.ts';
 import { mind, rammed, shot, type Memory } from '../sim/bot.ts';
@@ -184,13 +185,15 @@ const UNHELD: Held = { held: null, regained: [] };
 
 /**
  * What a step did: to who holds the sea (Held); and the shots fired in it, the
- * blows struck home (balls and rams, by whom on whom, and what they took) and
- * the loot taken up (sim/battle.ts, sim/loot.ts), for whoever keeps count (the
- * harness: the frame reads what is kept for it instead, moments.ts).
+ * blows struck home (balls and rams, by whom on whom, and what they took), the
+ * balls come down short, and the loot taken up (sim/battle.ts, sim/loot.ts),
+ * for whoever keeps count (the harness: the frame reads what is kept for it
+ * instead, moments.ts).
  */
 interface Stepped extends Held {
   shots: readonly Shot[];
   strikes: readonly Strike[];
+  splashes: readonly Splash[];
   took: readonly Taken[];
 }
 
@@ -658,6 +661,7 @@ export function createState(
         ...did,
         shots: fought.shots,
         strikes: fought.strikes,
+        splashes: fought.splashes,
         took: kept.took,
       };
     },

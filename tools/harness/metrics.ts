@@ -1,7 +1,17 @@
-// What the harness measures of a match, watched once a second of its clock:
-// each ship's time in each mode, her time stuck (by the mode she was in), when
-// she first held a gun, her water, and how and when she went down; and of the
-// match, how it ended and what a step cost.
+// What the harness measures of a match. Each step, from what it did (the shots,
+// the blows struck home, the balls come down short, the loot taken up, the
+// loops closed and the shield won back: play/state.ts advance), each ship's
+// fighting: her shots by gun, her hits, the damage she dealt and took, her
+// kills, what she took up. Once a second of its clock: each ship's time in each
+// mode and with each gun in hand, her time stuck (by the mode she was in), when
+// she first held a gun and a second kind, her water at HELD seconds. And of the
+// match: how it ended, its shots by range, gun and rarity and how many struck
+// home, its longest quiet, its loot, and what a step cost.
+//
+// A blow struck is put down to the shot its shooter fired last (her gun, its
+// rarity, the range then): a ball is in flight a second or two, and a ship
+// fires one gun at a time, so that is the shot nearly always. A shot is home
+// once, however many of its pellets strike, in however many steps.
 //
 // Stuck: she moved less than STUCK m over the last WINDOW s. That is not always
 // a fault: a bot claiming circles in her own water on purpose (claimer.ts
@@ -10,25 +20,63 @@
 //
 // Node only (tools/).
 
+import type { GunKind } from '../../src/kinds.ts';
 import type { Memory } from '../../src/sim/bot.ts';
 import { BOT, type Mode } from '../../src/sim/captain.ts';
-import { SHIP } from '../../src/sim/handling.ts';
+import { GUNS, SHIP } from '../../src/sim/handling.ts';
+import { PIECE, isArms } from '../../src/sim/loot.ts';
 import { distance, type Vec3 } from '../../src/world/sphere.ts';
 import type { State } from './run.ts';
 
 export const STUCK = 15,
   WINDOW = 30,
   AGROUND = 2;
+/** The seconds each ship's water is taken at. */
+export const HELD = [30, 60, 120, 240] as const;
+
+/** A shot's range to her mark: close (a scatter's), mid (a repeater's), far. */
+export const BANDS = ['close', 'mid', 'far'] as const;
+export type Band = (typeof BANDS)[number];
+const bandOf = (m: number): Band =>
+  m < GUNS.scatter.range ? 'close' : m < GUNS.repeater.range ? 'mid' : 'far';
+
+/** Shots fired and blows struck home with them. */
+export interface Count {
+  shots: number;
+  hits: number;
+}
+
+/** A ship's fighting over a match. */
+export interface Fighting {
+  /** Shots by the gun fired. */
+  shots: Partial<Record<GunKind, number>>;
+  /** Her shots that struck home. */
+  hits: number;
+  /** Hit points her balls took off others; her rams took; others' took off her. */
+  dealt: number;
+  rammed: number;
+  taken: number;
+  /** Ships she sank (shot, rammed, or the storm finishing one she had struck last). */
+  kills: number;
+}
 
 /** A ship's account of a match. */
 export interface ShipResult {
   id: number;
   brain: string;
+  /** Her persona (sim/persona.ts). */
+  persona: string;
   /** 1 the last afloat (or every ship afloat at the end); n the first sunk. */
   place: number;
   sunk: { time: number; cause: string; by: number | null } | null;
-  /** The match second she first held a gun (null: never). */
+  /** The match second she first held a gun (null: never); a second kind of gun. */
   armed: number | null;
+  second: number | null;
+  fighting: Fighting;
+  /** Seconds with each kind of gun in hand. */
+  hand: Partial<Record<GunKind, number>>;
+  /** What she took up: guns (and the rarest), and stores. */
+  took: { guns: number; rarest: number; stores: number };
   /** Seconds in each mode. */
   modes: Partial<Record<Mode, number>>;
   /** Seconds stuck, by the mode she was in; aground, of them; pinned: any mode but claim. */
@@ -39,9 +87,14 @@ export interface ShipResult {
   why: Partial<Record<Why, number>>;
   /** Each run of pinned seconds: when it began, how long, her mode, where (a unit vector) and why. */
   episodes: Episode[];
-  /** Mean speed over her seconds afloat (m/s), and her share of the water at the end. */
+  /** Mean speed over her seconds afloat (m/s). */
   speed: number;
+  /** Her share of the water at each of HELD (while afloat; 0 after) and at the end. */
+  held: number[];
   share: number;
+  /** Loops she closed, and the shield her water gave back (hp). */
+  loops: number;
+  regained: number;
 }
 
 /**
@@ -64,12 +117,23 @@ export interface Episode {
 
 /** A match's account. */
 export interface MatchResult {
+  /** Its type (sim/persona.ts). */
+  type: string;
   seconds: number;
   steps: number;
   msPerStep: number;
   left: number;
   causes: Record<string, number>;
-  loot: { start: number; end: number };
+  /** Shots by range to the mark, by gun (and balls fired and come down short), and by rarity. */
+  shots: {
+    band: Record<Band, Count>;
+    kind: Partial<Record<GunKind, Count & { balls: number; fell: number }>>;
+    rarity: Record<number, Count>;
+  };
+  /** The longest the guns were silent after the first 30 s (s). */
+  quiet: number;
+  /** Pieces at the start, of them in water too shoal to reach, and at the end. */
+  loot: { start: number; shallow: number; end: number };
   ships: ShipResult[];
 }
 
@@ -81,6 +145,8 @@ interface Watch {
   r: ShipResult;
   afloat: number;
   speedSum: number;
+  /** Her last shot: its gun, rarity and range band, and whether it is home yet (her blows struck are put down to it). */
+  last: { kind: GunKind; rarity: number; band: Band; home: boolean } | null;
 }
 
 /** What her mind shows now (Why), `depth` the sea's. */
@@ -94,14 +160,21 @@ function whyNow(m: Readonly<Memory>, depth: (p: Vec3) => number): Why[] {
   return out.length ? out : ['none'];
 }
 
+const bump = <K extends string>(to: Partial<Record<K, number>>, k: K, n = 1) =>
+  (to[k] = (to[k] ?? 0) + n);
+const count = (): Count => ({ shots: 0, hits: 0 });
+
+type Stepped = ReturnType<State['advance']>;
+
 /**
- * A watch over a match on a sea of `depth`: `second()` once each second of its
- * clock; `end()` its account.
+ * A watch over a match on a sea of `depth`: `step()` with what each step did;
+ * `second()` once each second of its clock; `end()` its account.
  */
 export function watch(
   state: State,
   brainOf: (id: number) => string,
-  depth: (p: Vec3) => number
+  depth: (p: Vec3) => number,
+  type: string
 ) {
   const ships = new Map<number, Watch>();
   for (const k of state.ships())
@@ -111,12 +184,25 @@ export function watch(
       speeds: [],
       afloat: 0,
       speedSum: 0,
+      last: null,
       r: {
         id: k.id,
         brain: brainOf(k.id),
+        persona: state.debug.natureOf(k.id)?.persona ?? '',
         place: 0,
         sunk: null,
         armed: k.armed ? 0 : null,
+        second: null,
+        fighting: {
+          shots: {},
+          hits: 0,
+          dealt: 0,
+          rammed: 0,
+          taken: 0,
+          kills: 0,
+        },
+        hand: {},
+        took: { guns: 0, rarest: -1, stores: 0 },
         modes: {},
         stuck: {},
         aground: 0,
@@ -124,25 +210,117 @@ export function watch(
         why: {},
         episodes: [],
         speed: 0,
+        held: HELD.map(() => 0),
         share: 0,
+        loops: 0,
+        regained: 0,
       },
     });
-  const loot = state.loot().pieces.length;
-  const add = (to: Partial<Record<Mode, number>>, m: Mode) =>
-    (to[m] = (to[m] ?? 0) + 1);
+  const pieces = state.loot().pieces;
+  const loot = {
+    start: pieces.length,
+    shallow: pieces.filter((l) => depth(l.at) < SHIP.draught + PIECE.open)
+      .length,
+  };
+  const shots: MatchResult['shots'] = {
+    band: { close: count(), mid: count(), far: count() },
+    kind: {},
+    rarity: {},
+  };
+  let lastShot = 0,
+    quiet = 0;
+  /** Where ship `id` is now, if afloat. */
+  const where = (id: number) =>
+    state.vessels().find((v) => v.id === id)?.ship.at ?? null;
 
   return {
+    step(did: Stepped) {
+      const now = state.time();
+      for (const s of did.shots) {
+        const w = ships.get(s.shooter);
+        if (!w) continue;
+        const c = state.crew(s.shooter),
+          rarity = c.guns[c.hand]?.rarity ?? 0,
+          from = where(s.shooter);
+        // her range to her mark, or to the nearest ship if she had none
+        let range = Infinity;
+        for (const v of state.vessels())
+          if (
+            from &&
+            v.id !== s.shooter &&
+            (s.target === null || v.id === s.target)
+          )
+            range = Math.min(range, distance(from, v.ship.at));
+        const band = bandOf(range);
+        w.last = { kind: s.gun, rarity, band, home: false };
+        bump(w.r.fighting.shots, s.gun);
+        shots.band[band].shots++;
+        const k = (shots.kind[s.gun] ??= { ...count(), balls: 0, fell: 0 });
+        k.shots++;
+        k.balls += GUNS[s.gun].pellets;
+        (shots.rarity[rarity] ??= count()).shots++;
+        if (now > 30) quiet = Math.max(quiet, now - Math.max(30, lastShot));
+        lastShot = now;
+      }
+      for (const s of did.strikes) {
+        const by = ships.get(s.shooter),
+          on = ships.get(s.struck);
+        if (on) on.r.fighting.taken += s.damage;
+        if (!by) continue;
+        if (s.ram) {
+          by.r.fighting.rammed += s.damage;
+          continue;
+        }
+        by.r.fighting.dealt += s.damage;
+        const l = by.last;
+        if (!l || l.home) continue;
+        l.home = true;
+        by.r.fighting.hits++;
+        shots.band[l.band].hits++;
+        const k = shots.kind[l.kind];
+        if (k) k.hits++;
+        const r = shots.rarity[l.rarity];
+        if (r) r.hits++;
+      }
+      for (const s of did.splashes) {
+        const k = shots.kind[s.gun];
+        if (k) k.fell++;
+      }
+      for (const t of did.took) {
+        const w = ships.get(t.ship);
+        if (!w) continue;
+        if (isArms(t.goods)) {
+          w.r.took.guns++;
+          w.r.took.rarest = Math.max(w.r.took.rarest, t.goods.rarity);
+        } else w.r.took.stores++;
+      }
+      for (const k of did.held?.claimed ?? []) {
+        const w = ships.get(k.id);
+        if (w) w.r.loops++;
+      }
+      for (const k of did.regained) {
+        const w = ships.get(k.id);
+        if (w) w.r.regained += k.shield;
+      }
+    },
     second(s: number) {
+      const at = HELD.indexOf(s as (typeof HELD)[number]);
       for (const v of state.vessels()) {
         const w = ships.get(v.id);
         if (!w) continue;
         const mind = state.debug.mindOf(v.id),
-          mode = mind?.mode ?? 'roam';
+          mode = mind?.mode ?? 'roam',
+          crew = state.crew(v.id);
         w.afloat++;
         w.speedSum += v.ship.speed;
-        add(w.r.modes, mode);
-        if (w.r.armed === null && state.crew(v.id).guns.some((g) => g))
-          w.r.armed = s;
+        bump(w.r.modes, mode);
+        const guns = crew.guns.filter((g) => g !== null),
+          inHand = crew.guns[crew.hand];
+        if (inHand) bump(w.r.hand, inHand.kind);
+        if (w.r.armed === null && guns.length) w.r.armed = s;
+        if (w.r.second === null && new Set(guns.map((g) => g.kind)).size > 1)
+          w.r.second = s;
+        if (at >= 0) w.r.held[at] = state.share(v.id);
         w.path.push(v.ship.at);
         w.speeds.push(v.ship.speed);
         if (w.path.length > WINDOW + 1) {
@@ -152,14 +330,14 @@ export function watch(
         const stuck =
           w.path.length > WINDOW && distance(w.path[0], v.ship.at) < STUCK;
         if (stuck) {
-          add(w.r.stuck, mode);
+          bump(w.r.stuck, mode);
           const mean = w.speeds.reduce((a, b) => a + b, 0) / w.speeds.length;
           if (mean < AGROUND) w.r.aground++;
         }
         if (stuck && mode !== 'claim' && mind) {
           w.r.pinned++;
           const why = whyNow(mind, depth);
-          for (const y of why) w.r.why[y] = (w.r.why[y] ?? 0) + 1;
+          for (const y of why) bump(w.r.why, y);
           if (!w.run || w.run.mode !== mode) {
             w.run = { from: s, seconds: 0, mode, at: v.ship.at, why: [] };
             w.r.episodes.push(w.run);
@@ -177,7 +355,9 @@ export function watch(
         const w = ships.get(k.id)!;
         w.r.sunk = { time: k.time, cause: k.cause, by: k.by };
         w.r.place = ships.size - i;
-        causes[k.cause] = (causes[k.cause] ?? 0) + 1;
+        bump(causes, k.cause);
+        const by = k.by === null ? undefined : ships.get(k.by);
+        if (by && k.by !== k.id) by.r.fighting.kills++;
       });
       for (const w of ships.values()) {
         if (!w.r.sunk) w.r.place = 1;
@@ -185,12 +365,15 @@ export function watch(
         w.r.share = state.share(w.r.id);
       }
       return {
+        type,
         seconds: state.time(),
         steps,
         msPerStep: ms / Math.max(1, steps),
         left: left.length,
         causes,
-        loot: { start: loot, end: state.loot().pieces.length },
+        shots,
+        quiet,
+        loot: { ...loot, end: state.loot().pieces.length },
         ships: [...ships.values()].map((w) => w.r),
       };
     },
