@@ -301,3 +301,12 @@ commit; anything visible checked in headless chromium; iPad Air M1 at 30–40 fp
     but via the route; `ROUTE.hug` (2.5×) higher. Parked for D.
   - `inspect.ts` gained per-second made/sailed/most-step, her chart cell
     (open, clearance) and her route's next cell as bearing/metres.
+- D1, loot more plentiful: `LOOT.spots` 200 → 320, `gun` 0.5 → 0.42 (~440
+  pieces: consumables ×2.0, guns ×1.35). Game tuning, so measured with
+  `compare.ts` (two runs of the same 16 matches, paired): armed 85 → 90%,
+  median 7 → 7 s, 90% by 21 → 17 s (bounds ≥ 5 s, ≤ 30 s: kept); loot time
+  11 → 14%, heal 2 → 3%; pinned +1.0 s [−1.0, 3.1] (n.s.). Golden →
+  `fecf349e`. Headless budget: +4–7k triangles, +0 draws (instanced, cap 512;
+  ~35% of the planet within the 700 m drawn, ~180 pieces). NB the budget's
+  coast/ships/map views are over on triangles _before_ this change too
+  (1.30M / 1.35M / 3.51M vs 0.9M / 1.0M): pre-existing, not the bots'.

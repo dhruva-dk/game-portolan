@@ -43,18 +43,19 @@ import type { Depth } from './shoal.ts';
 /** The loot table, and its spots. */
 export const LOOT = {
   /**
-   * Spots strewn over the planet, and the share with a second piece: some 280
-   * pieces (it was 400 spots, some 570).
+   * Spots strewn over the planet, and the share with a second piece: some 440
+   * pieces (it was 200 spots, some 280; and before that 400, some 570).
    */
-  spots: 200,
+  spots: 320,
   second: 0.4,
   /**
-   * The share of pieces that are guns (brought down from 0.62 so the first is a
-   * scramble, most ships armed by 20–30 s: tools/matches.ts), their kinds'
-   * weights (in kinds.ts KINDS' order: cannon, scatter, repeater, harpoon,
-   * mortar), and their rarities' weights, common to legendary.
+   * The share of pieces that are guns (brought down from 0.62, then from 0.5 as
+   * the spots grew, so the first is still a scramble, most ships armed by
+   * 20–30 s: tools/harness), their kinds' weights (in kinds.ts KINDS' order:
+   * cannon, scatter, repeater, harpoon, mortar), and their rarities' weights,
+   * common to legendary.
    */
-  gun: 0.5,
+  gun: 0.42,
   kinds: [36, 22, 22, 10, 10],
   weights: [42, 30, 17, 8, 3],
   /**
