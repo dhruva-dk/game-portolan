@@ -64,7 +64,7 @@ export function spectrum(sea: Sea): (kx: number, kz: number) => number {
 }
 
 /** The wavenumbers a patch holds, rad/m: [from, to). Patches of different sizes hold different bands, so no wave is drawn twice. */
-export type Band = [number, number];
+type Band = [number, number];
 
 const banded = (S: (kx: number, kz: number) => number, [lo, hi]: Band) => (kx: number, kz: number) => {
   const k = Math.hypot(kx, kz);

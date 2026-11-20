@@ -41,7 +41,7 @@ function saveSettings(s: Settings) {
 
 /** What the screens ask of the game: a new match (PLAY), home to the lobby's quiet sea, and, sunk, to watch the match
  *  on and to turn to another ship. */
-export interface FlowActions { play(): void; home(): void; watch(): void; switch(by: number): void }
+interface FlowActions { play(): void; home(): void; watch(): void; switch(by: number): void }
 
 /** The flow, from `start`; `title` the title as the page painted it first, before the world was built (main.ts). */
 export function createFlow(hud: Hud, globe: Globe, start: Screen, act: FlowActions, title: Title) {

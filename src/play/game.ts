@@ -82,7 +82,7 @@ const tapOf = (tapped: number | null) => ({
 
 /** What the camera does, as the match's flow sets it (play/referee.ts): the ship it follows; whether the hands steer
  * and look, or only look (as she watches another ship); and her end's shot, held on her ship (finale.ts), or none. */
-export interface View { watch: number; hands: boolean; look: boolean; end: Ending | null }
+interface View { watch: number; hands: boolean; look: boolean; end: Ending | null }
 
 /** world: the planet and its climate; anchors: the sea's (frame.ts), for the waves' CPU copy; waters: the planet's
  *  water sounded (state.ts); start: where she lies in the lobby and the bearing she heads (radians); first: the match

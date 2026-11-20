@@ -13,10 +13,10 @@ import type { FloatNode, Vec3Node } from '../tsl.ts';
 import type { Sky } from './sky.ts';
 
 /** The light under the water at a point, as a share of what is above it (water.below). */
-export interface Below { sun(p: Vec3Node): Vec3Node; sky(p: Vec3Node): Vec3Node }
+interface Below { sun(p: Vec3Node): Vec3Node; sky(p: Vec3Node): Vec3Node }
 
 /** A thin thing's two sides: 1 where the sun reaches the side facing n, and where it comes through from the other. */
-export interface Sides { front: FloatNode; back: FloatNode }
+interface Sides { front: FloatNode; back: FloatNode }
 
 export interface Light {
   /** The radiance of a surface at world position p facing n (unit), of tone `lit` in the sun and `shadow` out of it. */

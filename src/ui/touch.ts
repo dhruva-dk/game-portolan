@@ -3,7 +3,7 @@
 // pinch from a tap by the same travel; the canvas's stick and look (input.ts) take every finger as a drag.
 
 /** How far a press may travel and still be a tap, CSS px. */
-export const TAP = 8;
+const TAP = 8;
 
 /** Whether a press from (x0, y0) to (x1, y1) has travelled past a tap. */
 export const dragged = (x0: number, y0: number, x1: number, y1: number) => Math.hypot(x1 - x0, y1 - y0) > TAP;

@@ -73,7 +73,7 @@ for (let f = 0; f < 6; f++) {
 
 /** A change to draw (snapshot.ts SeaChange, less the cut): its cells, its holder after (0 open sea, else id + 1),
  *  when (world clock, s) and the cells its front spreads from (null: in from the changed water's edge). */
-export interface Shift { cells: ReadCells; owner: number; time: number; from: ReadCells | null }
+interface Shift { cells: ReadCells; owner: number; time: number; from: ReadCells | null }
 
 /** Units of work in a slice (a cell gone through is a quarter of one to 32 of them, by what is done with it): some
  *  0.1 ms of work. */
@@ -420,5 +420,3 @@ export function createClaimed(slices = SLICES) {
     ownerOf: (c: number) => cells[c * 4],
   };
 }
-
-export type Claimed = ReturnType<typeof createClaimed>;

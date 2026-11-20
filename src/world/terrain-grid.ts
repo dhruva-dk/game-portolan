@@ -24,7 +24,7 @@ export function centres(): Float64Array {
 }
 
 /** Metres along the surface between two cells' centres. */
-export function arc(a: number, b: number): number {
+function arc(a: number, b: number): number {
   const p = centres(), dx = p[3 * a] - p[3 * b], dy = p[3 * a + 1] - p[3 * b + 1], dz = p[3 * a + 2] - p[3 * b + 2];
   return 2 * R * Math.asin(Math.min(1, Math.sqrt(dx * dx + dy * dy + dz * dz) / 2));
 }
@@ -162,7 +162,7 @@ export function disc(c: number, radius: number, seen: Int32Array, mark: number, 
 
 /** The sixteen cells whose centres surround a point and each one's weight, `n` in all: near a corner of the cube up to
  *  sixteen more (locate). */
-export interface Taps { cell: Int32Array; weight: Float64Array; n: number }
+interface Taps { cell: Int32Array; weight: Float64Array; n: number }
 export const taps = (): Taps => ({ cell: new Int32Array(32), weight: new Float64Array(32), n: 16 });
 
 /** Catmull-Rom's four weights at fraction t between the middle two of four evenly spaced samples. */

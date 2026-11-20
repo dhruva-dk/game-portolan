@@ -93,7 +93,7 @@ const BUILD: Record<GunKind, (acc: Acc, sides: number) => void> = {
     acc.with({ kind: METAL.oak }, () => rod(acc, V(-0.3, -0.16, -0.38), V(-0.3, -0.16, -0.48), 0.024, 0.024, 5));
     yoke(acc, 0.2);
   },
-  harpoon(acc, sides) {
+  harpoon(acc) {
     acc.with({ kind: METAL.oak }, () => {
       // the stock, and the bow's arms swept back from its head
       beam(acc, V(0, 0, -0.75), V(0, 0, 0.62), 0.13, 0.12, V(0, 1, 0));
@@ -128,7 +128,7 @@ const BUILD: Record<GunKind, (acc: Acc, sides: number) => void> = {
 
 /** A gun's shape as plain arrays: positions and normals (xyz each), what each vertex is made of, and the triangles'
  *  indices. */
-export interface GunShape { position: Float32Array; normal: Float32Array; metal: Float32Array; index: Uint16Array }
+interface GunShape { position: Float32Array; normal: Float32Array; metal: Float32Array; index: Uint16Array }
 
 /** The gun of `kind`, with `sides` round its barrel. */
 export function gunShape(kind: GunKind = 'cannon', sides = 10): GunShape {

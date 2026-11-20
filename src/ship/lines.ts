@@ -15,7 +15,8 @@ import { V } from './kit.ts';
 export const SCALE = 0.6;
 
 /** Length between the transom and the stem at the waterline, the greatest beam, and the draft. */
-export const LEN = 30, BEAM = 8.6, DRAFT = 3.3;
+export const LEN = 30, BEAM = 8.6;
+const DRAFT = 3.3;
 /** Height of the greatest breadth over the waterline. */
 const YB = 1.1;
 
@@ -34,7 +35,7 @@ export const LEVELS = [
   { name: 'waist', a: 0.385, b: 0.785, rise: 0 },
   { name: 'fore', a: 0.785, b: 0.985, rise: 2.25 },
 ] as const;
-export type Level = (typeof LEVELS)[number];
+type Level = (typeof LEVELS)[number];
 const foreRise = (s: number) => 0.7 * smoothstep(0.785, 1, s);
 const levelAt =(s: number): Level => LEVELS.find((l) => s <= l.b) ?? LEVELS[3];
 /** The deck of a level at station s. */
@@ -42,7 +43,7 @@ export const levelDeck = (l: Level, s: number): number => mainDeck(s) + l.rise +
 export const deckAt = (s: number): number => levelDeck(levelAt(s), s);
 
 /** How high the planked bulwark stands over each deck: solid to the rail, no balustrade. */
-export const SOLID = 1.15;
+const SOLID = 1.15;
 /** The top of the planked side: each deck's own, the castles' sides sweeping down into the waist in short S-curves. */
 export function sideTop(s: number): number {
   return mainDeck(s) + SOLID

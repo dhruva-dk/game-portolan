@@ -23,7 +23,7 @@ export { SCREENS, type Screen };
 export const TAPS = ['begin', 'play', 'settings', 'close', 'watch', 'switch', 'leave'] as const;
 export const EVENTS = ['sunk', 'won', 'settled', 'over'] as const;
 export type Tap = (typeof TAPS)[number];
-export type Event = (typeof EVENTS)[number];
+type Event = (typeof EVENTS)[number];
 export type Trigger = Tap | Event;
 
 /** Every way on from each screen: what takes it, and where to. */

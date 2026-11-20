@@ -12,7 +12,7 @@ import type { Vec3 } from '../world/sphere.ts';
 import type { Match, Waters } from './state.ts';
 
 /** A match's berths worked out off the main thread, by its seed. */
-export type Berther = (match: number) => Promise<Spawn[]>;
+type Berther = (match: number) => Promise<Spawn[]>;
 /** What the sounding worker answers: the water sounded (once), or a match's berths (sounding.ts). */
 type Sounded = { open: Uint8Array; clear: Uint8Array; berths: Float64Array; ms: number } | { match: number; spawns: Float64Array };
 

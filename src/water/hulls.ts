@@ -20,7 +20,7 @@ import * as sphere from '../world/sphere.ts';
 import { minInt, type BoolNode, type FloatNode, type Vec3Node } from '../tsl.ts';
 
 /** The ships nearest the eye whose hulls the sea fits round. */
-export const NEAREST = 4;
+const NEAREST = 4;
 /** The cut is brought in this far from the waterline, metres. */
 const INSET = 0.12;
 /** The shade beside her: how much of the sea's glow she takes away against her side, and how fast it fades out, metres. */

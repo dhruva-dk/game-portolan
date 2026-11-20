@@ -402,5 +402,3 @@ export function createFrame(renderer: WebGPURenderer, world: World, options: Fra
     anchors: water.anchors,
   };
 }
-
-export type Frame = ReturnType<typeof createFrame>;

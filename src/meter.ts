@@ -36,13 +36,13 @@ class Passes extends InspectorBase {
   private readonly m = new Matrix4();
   constructor(private readonly info: WebGPURenderer['info']) { super(); }
 
-  beginRender(_uid: string, scene: Scene, camera: Camera, target: RenderTarget | null) {
+  override beginRender(_uid: string, scene: Scene, camera: Camera, target: RenderTarget | null) {
     const size = target ? `${target.width}×${target.height}` : 'screen';
     const { drawCalls: draws, triangles: tris } = this.info.render;
     this.stack.push({ label: `${scene.name || scene.type} ${size}`, scene, camera, draws, tris, inner: 0, innerTris: 0 });
   }
 
-  finishRender() {
+  override finishRender() {
     const p = this.stack.pop();
     if (!p) return;
     const draws = this.info.render.drawCalls - p.draws, tris = this.info.render.triangles - p.tris;

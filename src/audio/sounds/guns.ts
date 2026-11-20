@@ -29,7 +29,7 @@ export type { GunKind };
  *   ring    a note it rings with, Hz, and the seconds it rings (the harpoon's cable, the mortar's tube; 0 none)
  *   bend    how far the ring's note falls as it rings, a share of it
  */
-export interface Report {
+interface Report {
   crack: number; thump: number; body: number; blast: number; tail: number; rattle: number; drive: number; ring: number; ringT: number;
   bend: number;
 }

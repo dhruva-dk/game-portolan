@@ -83,7 +83,7 @@ const way = (v: Vessel): Vec3 => add(scale(v.ship.heading, v.ship.speed), v.shov
 const off = (up: Vec3, t: Vec3, elevation: number) => add(scale(t, Math.cos(elevation)), up, Math.sin(elevation));
 
 /** Where `v` will be `seconds` on, sailing on as she sails now (a unit vector). */
-export function ahead(v: Vessel, seconds: number): Vec3 {
+function ahead(v: Vessel, seconds: number): Vec3 {
   const w = way(v), speed = length(w);
   return speed > 1e-9 ? along(v.ship.at, scale(w, 1 / speed), speed * seconds).p : v.ship.at;
 }
@@ -107,7 +107,7 @@ export function chosen(sight: Sight, from: Vec3, cone: number, others: readonly 
 
 /** Where a gun of `kind` lays on `target` from `from` so that its ball meets her: the point she will have reached when
  * it comes down, or null if that is out of its reach. */
-export function lead(kind: GunKind, from: Vec3, target: Vessel): Vec3 | null {
+function lead(kind: GunKind, from: Vec3, target: Vessel): Vec3 | null {
   const up = normalize(from);
   let at = target.ship.at;
   for (let i = 0; i < 8; i++) {

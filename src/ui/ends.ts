@@ -36,7 +36,7 @@ const held = (x: number, y: number, r: number) => {
 };
 
 /** The spyglass: a brass glass of three draws, its eye end at the left, tilted up to the right; `s` its length. */
-export const spyglass = (x: number, y: number, s: number) => {
+const spyglass = (x: number, y: number, s: number) => {
   const k = s / 80;
   const tube = (x0: number, w: number, h: number) => `<rect x="${x0}" y="${-h / 2}" width="${w}" height="${h}" rx="1.5" fill="url(#h-gold-d)" stroke="${INK.iron}" stroke-width="1.6"/>`
     + `<rect x="${x0}" y="${-h / 2}" width="${w}" height="${h}" rx="1.5" fill="${WASH.gold}" opacity=".55"/>`;
@@ -48,7 +48,7 @@ export const spyglass = (x: number, y: number, s: number) => {
 };
 
 /** The anchor: its ring, stock and shank, and its arms with their flukes; `s` its height. */
-export const anchor = (x: number, y: number, s: number) => {
+const anchor = (x: number, y: number, s: number) => {
   const k = s / 64;
   const fluke = (side: number) => `<path d="M${side * 23} 4l${side * 7} -9l${side * -1} 13z" fill="${INK.iron}"/>`;
   return `<g transform="translate(${x} ${y}) scale(${k})" stroke="${INK.iron}" fill="none" stroke-linecap="round" stroke-linejoin="round">`

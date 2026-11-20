@@ -22,7 +22,7 @@ import type { FloatNode, Vec3Node } from '../tsl.ts';
 import * as scalar from '../world/scalar.ts';
 
 /** A look. The lift is a small offset in linear light. */
-export interface Look {
+interface Look {
   /** Stops of exposure over what shows a tone in the open exactly as chosen (0: a white surface there is the
    *  display's white). */
   exposure: number;

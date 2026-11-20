@@ -11,7 +11,7 @@ import { createWeather, type Weather } from './world/weather.ts';
 import { createWind, type Wind } from './world/wind.ts';
 
 /** The match's sky and sea, fixed for it. */
-export interface Climate {
+interface Climate {
   /** Hours, 0–24: the time of day, the same everywhere (world/sun.ts). */
   timeOfDay: number;
   /** Where the match's sun is set (world/sun.ts): over every place it stands as high as the hour says. */

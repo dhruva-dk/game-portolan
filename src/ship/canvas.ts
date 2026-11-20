@@ -19,7 +19,7 @@ import { SCALE } from './lines.ts';
 import type { SailGrid } from './sails.ts';
 
 /** Four vec4s a particle, as the simulation reads them. */
-export interface Canvas {
+interface Canvas {
   /** Particles a ship. */
   count: number;
   /** Each sail's and pennant's grid (build.ts's for the finest level: the cloth vertices' `grid`s index it). */

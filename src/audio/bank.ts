@@ -17,11 +17,11 @@ import { close, launch, lost, open, salute, tap } from './sounds/ui.ts';
  *   priority  for a voice when all are taken (voices.ts): a sound takes the voice of one lower, never higher
  *   reach     metres past which it is not heard (placed sounds)
  */
-export interface Sound { make: (rate: number, seed: number) => Samples; takes: number; level: number; priority: number; reach: number }
+interface Sound { make: (rate: number, seed: number) => Samples; takes: number; level: number; priority: number; reach: number }
 
 /** Each gun's report, by kind (sounds/guns.ts GUNS): the repeater's quieter and with more takes, as it fires ten a
  *  second; the mortar's carrying furthest. */
-export const REPORTS: Record<GunKind, Sound> = {
+const REPORTS: Record<GunKind, Sound> = {
   cannon: { make: report(GUNS.cannon), takes: 3, level: -1, priority: 8, reach: 1400 },
   scatter: { make: report(GUNS.scatter), takes: 3, level: -1, priority: 8, reach: 1100 },
   repeater: { make: report(GUNS.repeater), takes: 5, level: -7, priority: 7, reach: 900 },

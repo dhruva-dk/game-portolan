@@ -26,7 +26,7 @@ import { CELL, between, locate, taps } from './terrain-grid.ts';
 import { heightBounds, type Terrain } from './terrain.ts';
 
 /** The cells along a side of a tile (as planet-terrain.ts's rises). */
-export const BLOCK = 16;
+const BLOCK = 16;
 
 /** How far out from the waterline the water may be too shallow for a ship (a keel 2.2 m down: sim/handling.ts), metres,
  *  at most: no rock's foot reaches past it. */
@@ -88,7 +88,7 @@ export interface Tile {
 }
 
 /** How many shapes each kind is drawn in (land/: shrubs.ts, rocks.ts). */
-export interface Shapes { shrubs: number; big: number; boulders: number }
+interface Shapes { shrubs: number; big: number; boulders: number }
 
 /** A tile whose ground rises no higher than this, metres, has nothing on it. */
 const LOWEST = 0.5;

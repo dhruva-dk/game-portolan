@@ -27,21 +27,21 @@ type Band = 'hit' | 'rumble';
 const BAND_NAMES: readonly Band[] = ['hit', 'rumble'];
 /** Each band: noise cells a second, trauma lost a second, metres at full shake (right, up, back), degrees (pitch, yaw,
  *  roll): roll the most, since it reads best from a chase camera and keeps the aim where it was. */
-export const BANDS: Record<Band, { freq: number; decay: number; pos: Vec3; rot: Vec3 }> = {
+const BANDS: Record<Band, { freq: number; decay: number; pos: Vec3; rot: Vec3 }> = {
   hit: { freq: 16, decay: 1.8, pos: [0.5, 0.4, 0.3], rot: [2.2, 2.2, 4] },
   rumble: { freq: 4, decay: 0.8, pos: [0.6, 0.5, 0.4], rot: [1.4, 1.6, 3] },
 };
 
 /** A knock: metres along the eye's right, up and back, degrees of pitch (up), yaw (left) and roll (clockwise), and
  *  metres pushed and degrees rolled away from the blow's bearing, when there is one. */
-export interface Kick {
+interface Kick {
   right?: number; up?: number; back?: number; pitch?: number; yaw?: number; roll?: number; away?: number; tilt?: number;
 }
 /** A pulse of the field of view, degrees (− punches in), over seconds. */
-export interface Pulse { deg: number; attack: number; hold: number; release: number }
+interface Pulse { deg: number; attack: number; hold: number; release: number }
 /** How the camera answers a moment: trauma added to a band, a kick, a pulse, and the metres over which it fades out
  *  with distance (full at the first, none past the second). */
-export interface Answer { shake?: number; band?: Band; kick?: Kick; fov?: Pulse; falloff?: readonly [number, number] }
+interface Answer { shake?: number; band?: Band; kick?: Kick; fov?: Pulse; falloff?: readonly [number, number] }
 
 /** The camera's answers, by what asks them (at full strength: GENTLE of it is played). */
 export const CAMERA = {
@@ -102,7 +102,7 @@ export function noise(x: number, seed: number): number {
 }
 
 /** A damped spring at rest at 0 (a kick's: 7 Hz, damping 0.55), stepped in small substeps. */
-export function spring(freq = 7, damping = 0.55) {
+function spring(freq = 7, damping = 0.55) {
   let x = 0, v = 0;
   const w = 2 * Math.PI * freq, k = w * w, c = 2 * damping * w;
   const step = (dt: number) => {

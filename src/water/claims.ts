@@ -54,7 +54,7 @@ const CREST = 0.03, CREST_GAIN = 1.2;
 /** What the sea is at a point: its tint (rgb the holder's colour, a how far the water gives up its own for it), the
  *  line over it (rgb its light per unit of a white surface's, premultiplied; a its cover), a drained change's churn
  *  (0…1) and how far off it is seen (0…1: 1 a cell under a pixel or two). */
-export interface Claim { dye: Vec4Node; ink: Vec4Node; drain: FloatNode; far: FloatNode }
+interface Claim { dye: Vec4Node; ink: Vec4Node; drain: FloatNode; far: FloatNode }
 
 /** A soft stroke of width w at distance d, widened to the pixel's footprint px with its energy kept. */
 const stroke = (d: FloatNode, w: number, px: FloatNode): FloatNode => {

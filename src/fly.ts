@@ -22,7 +22,7 @@ const KEYS: Record<'right' | 'left' | 'forward' | 'back' | 'up' | 'down', Keys> 
 };
 
 /** Where the camera starts: radians, but for its height above the sea, in metres. */
-export interface Start {
+interface Start {
   lat: number;
   lon: number;
   height: number;

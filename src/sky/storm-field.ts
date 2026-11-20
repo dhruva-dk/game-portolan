@@ -72,7 +72,7 @@ const HOLLOWS = { per: 0.3, mean: 0.9, least: 0.7, most: 1.2 } as const;
 const SUNLIT = 0.55, LINING = 0.15, LINING_G = 0.6;
 
 /** The storm's state as the shaders read it (storm.ts's uniforms of sim/storm.ts's Cap). */
-export interface CapNodes {
+interface CapNodes {
   centre: Vec3Node;
   radius: FloatNode;
   whole: FloatNode;
@@ -88,7 +88,7 @@ export interface FieldLight { air: Vec3Node; sun: Vec3Node; toward: Vec3Node; gl
 
 /** What a march gives: the light along the ray (radiance), what survives of what lies behind, how far it got (m), and
  * what survived to `mark` metres along. */
-export interface Marched { light: Vec3Node; T: FloatNode; reached: FloatNode; atMark: FloatNode }
+interface Marched { light: Vec3Node; T: FloatNode; reached: FloatNode; atMark: FloatNode }
 
 export function createStormField(cap: CapNodes, shape: Storage3DTexture) {
   /** Metres past the cap's edge over the unit vector u. */

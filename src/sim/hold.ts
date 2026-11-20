@@ -31,10 +31,10 @@ export const USES: Readonly<Record<Use, { shield: number; hull: number; cap: num
 export const USING = 0.6;
 
 /** The item slots. */
-export const SLOTS = 3;
+const SLOTS = 3;
 
 /** A stack in a slot. */
-export interface Stack { kind: Use; count: number }
+interface Stack { kind: Use; count: number }
 
 /** The hold: the item slots (null: empty), the slot in hand (0 the gun's, then the items'), and what she is using:
  *  the slot, and seconds left. */

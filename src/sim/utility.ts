@@ -45,7 +45,7 @@ export interface Option<C> {
   score(ctx: C): number;
 }
 
-export const REASON = {
+const REASON = {
   /** How much the option in hand is scored up by: `fresh` just after it was taken up, easing to `held` over `settle`
    *  seconds, so a choice just made is given time to show what it's worth before a near rival can unseat it. */
   momentum: { fresh: 1.45, held: 1.12, settle: 3 },

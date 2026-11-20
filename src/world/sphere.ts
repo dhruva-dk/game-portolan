@@ -54,8 +54,6 @@ export function fromLatLon(lat: number, lon: number): Vec3 {
 
 /** The world position `altitude` metres above the sea over the point `up`. */
 export const place = (up: Vec3, altitude: number, out?: Out3): Vec3 => scale(normalize(up, out), R + altitude, out);
-/** Metres above the sea. */
-export const altitude = (p: Vec3) => length(p) - R;
 
 /** A Frame written into (frameAt's `out`). */
 export interface FrameOut { up: Out3; east: Out3; north: Out3 }
@@ -140,7 +138,7 @@ export function chartBasis(c: Chart, p: Vec3): [e1: Vec3, e2: Vec3] {
 }
 
 /** A point on the surface and a tangent there (along's answer). */
-export interface Course { p: Vec3; t: Vec3 }
+interface Course { p: Vec3; t: Vec3 }
 /** A Course written into (along's `out`). */
 export interface CourseOut { p: Out3; t: Out3 }
 

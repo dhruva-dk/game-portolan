@@ -37,7 +37,7 @@ const JUMP = 20;
 export interface Motion { pose: PoseOut; velocity: Out3; accel: Out3; spin: Out3; spinning: Out3 }
 
 /** What she feels now, in her own frame. */
-export interface Feeling { weight: Vec3; spin: Vec3; spinning: Vec3 }
+interface Feeling { weight: Vec3; spin: Vec3; spinning: Vec3 }
 /** A Feeling written into (feeling's `out`). */
 export interface FeelingOut { weight: Out3; spin: Out3; spinning: Out3 }
 

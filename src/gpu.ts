@@ -15,7 +15,7 @@ export type Compute = ComputeNode | ComputeNode[];
 
 /** How a storage table is read: its filter (min, if given, for minification), its wrap, whether three allots it a
  *  chain of mips, and its anisotropy. */
-export interface TableReads {
+interface TableReads {
   filter?: MagnificationTextureFilter;
   min?: MinificationTextureFilter;
   wrap?: Wrapping;

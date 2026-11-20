@@ -36,7 +36,7 @@ const MOVE_MODES = 256;
 export type Surface = (p: Vec3, time: number) => number;
 
 /** The water under a hull, metres above sea level: under her bow and stern, and her port and starboard rails. */
-export interface Under { bow: number; stern: number; port: number; starboard: number }
+interface Under { bow: number; stern: number; port: number; starboard: number }
 
 /** The water under a hull lying at `at` (a unit vector) heading `heading` (a unit tangent there), read `reach` metres
  *  ahead of and behind her middle and `rail` metres out to either side, at a time on the world's clock. The answer is
@@ -44,7 +44,7 @@ export interface Under { bow: number; stern: number; port: number; starboard: nu
 export type Hull = (at: Vec3, heading: Vec3, reach: number, rail: number, time: number) => Under;
 
 /** The sea's two reads. */
-export interface Swell { at: Surface; hull: Hull }
+interface Swell { at: Surface; hull: Hull }
 
 /** A sea without waves, under any hull (for the matches run headless, where the waves only lift the drawn ships). */
 const LEVEL: Under = Object.freeze({ bow: 0, stern: 0, port: 0, starboard: 0 });
@@ -82,7 +82,7 @@ export function longModes(wind: number, count = MODES): Float64Array {
 }
 
 /** The reads' options: the shortest wave a hull feels, metres (0: all of them), and the modes kept. */
-export interface SwellOptions { shortest?: number; count?: number }
+interface SwellOptions { shortest?: number; count?: number }
 
 /** sum.ts's groups: every mode kept, the largest for the move, and those a hull feels. */
 const EVERY = 0, MOVE = 1, FELT = 2;

@@ -118,7 +118,7 @@ export const GUST = {
 
 
 /** One kind of gun (GUNS). */
-export interface Bore {
+interface Bore {
   /** Hit points a ball takes off (each pellet's), and the balls (pellets) a shot throws. */
   damage: number; pellets: number;
   /** Seconds between shots, held on the trigger; balls a magazine holds; seconds to reload it, once empty. */

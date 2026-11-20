@@ -36,7 +36,7 @@ export const SEA_ALBEDO = 0.06;
 const H = Math.sqrt(TOP * TOP - BOTTOM * BOTTOM);
 
 /** Extinction per km at height h (km) above the sea. */
-export function extinction(h: number): Rgb {
+function extinction(h: number): Rgb {
   const rayleigh = Math.exp(-h / RAYLEIGH_SCALE_HEIGHT);
   const mie = Math.exp(-h / MIE_SCALE_HEIGHT);
   const ozone = Math.max(0, 1 - Math.abs(h - OZONE_CENTRE) / OZONE_HALF_WIDTH);

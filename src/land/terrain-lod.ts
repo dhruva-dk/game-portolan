@@ -48,7 +48,7 @@ FACES.forEach((face, f) => [face.across, face.u, face.v].forEach(([axis, sign], 
 /** The eye, as the selection needs it: where it is (world metres) and how high over the sea. */
 export interface LodEye { position: Vec3; height: number }
 /** Whether a sphere (centre x, y, z and radius, world metres) can be in view. */
-export type InView = (x: number, y: number, z: number, radius: number) => boolean;
+type InView = (x: number, y: number, z: number, radius: number) => boolean;
 
 /**
  * The quadtree over `bounds`, the ground's lowest and highest over each leaf node (6 × 2^LEAF × 2^LEAF, row by row,

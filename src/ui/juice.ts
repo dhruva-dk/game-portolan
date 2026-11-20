@@ -23,10 +23,10 @@ import type { Glyph } from './glyphs.ts';
 import { view } from './ui.ts';
 
 /** The HUD's pieces it moves: the vitals slip, the Fire and Gust discs, and the hotbar's slots (gun's first). */
-export interface Parts { vitals: HTMLElement; fire: HTMLElement; gust: HTMLElement; slots: readonly HTMLElement[] }
+interface Parts { vitals: HTMLElement; fire: HTMLElement; gust: HTMLElement; slots: readonly HTMLElement[] }
 
 /** A piece's flight to its slot: its burst out, its flight, and its size along the way. */
-export const FLY = { burst: 0.24, flight: 0.56, scale: [0.35, 1.15, 0.7] } as const;
+const FLY = { burst: 0.24, flight: 0.56, scale: [0.35, 1.15, 0.7] } as const;
 
 /** The fewest ms between answers to her firing: the repeater's run of shots (one every 100 ms) flashes and knocks
  *  the Fire disc at half its rate, not with every shot. */

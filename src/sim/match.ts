@@ -11,7 +11,7 @@
 // whose hand: the Storm's sinking goes to the ship that last struck her if it did so within CREDIT seconds
 // (credited). Pure: a value stepped by what the game reports.
 
-export type Phase = 'fighting' | 'spectating' | 'won';
+type Phase = 'fighting' | 'spectating' | 'won';
 
 /** The player's ship's id. */
 export const PLAYER = 0;

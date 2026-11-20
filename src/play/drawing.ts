@@ -9,7 +9,7 @@ import { add, put, type Out3, type Vec3 } from '../world/sphere.ts';
 
 /** A ship as drawn: her pose and her velocity her slot's own, and her gun's kind and aim (`gun`, when she has one in
  *  hand). */
-export interface Drawing extends ShipDraw { pose: PoseOut; velocity: Out3; held: { kind: GunKind; aim: Vec3 } }
+interface Drawing extends ShipDraw { pose: PoseOut; velocity: Out3; held: { kind: GunKind; aim: Vec3 } }
 /** A ball as drawn. */
 interface Flight extends BallDraw { at: Out3 }
 

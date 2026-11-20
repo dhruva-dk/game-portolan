@@ -46,7 +46,7 @@ export const TERRAIN = {
   bank: [4, 16] as readonly [number, number],
 };
 
-export type TerrainOptions = typeof TERRAIN;
+type TerrainOptions = typeof TERRAIN;
 
 export interface Terrain {
   /** The relief after repair, the sea level in it (water where relief < level), and its lowest and highest. */
@@ -63,7 +63,7 @@ export interface Terrain {
   stats: TerrainStats;
 }
 
-export interface TerrainStats {
+interface TerrainStats {
   /** Land's share before and after the repair. */
   landBefore: number; landAfter: number;
   /** Sailable bodies before and after the repair (after must be 1); water bodies after. */
@@ -77,7 +77,7 @@ export interface TerrainStats {
 // ---------------------------------------------------------------- the stages
 
 /** The relief at every cell: domain-warped fractal noise, about −1…1. */
-export function relief(seed: number, o: TerrainOptions = TERRAIN): Float32Array {
+function relief(seed: number, o: TerrainOptions = TERRAIN): Float32Array {
   const noise = createNoise3(seed), warpNoise = createNoise3(seed + STRIDE), p = centres(), out = new Float32Array(CELLS);
   const fbm = (x: number, y: number, z: number, octaves: number) => {
     let v = 0, amp = 1, f = 1, sum = 0;
@@ -107,7 +107,7 @@ const largest = (area: number[]) => area.reduce((best, a, i) => (a > area[best] 
  * The relief repaired so the sailable water is one body: rounds of filling what can't be joined and digging a channel
  * from each other sailable body to the largest along the cheapest way through the relief. Changes `field` in place.
  */
-export function repair(field: Float32Array, level: number, o: TerrainOptions = TERRAIN) {
+function repair(field: Float32Array, level: number, o: TerrainOptions = TERRAIN) {
   const changed = new Uint8Array(CELLS), seen = new Int32Array(CELLS).fill(-1), span = 1 - level;
   let channels = 0, filled = 0, sailableBefore = -1, mark = 0;
   const dig = (n: number) => { if (field[n] >= level) { field[n] = level - 0.02; changed[n] = 1; } };

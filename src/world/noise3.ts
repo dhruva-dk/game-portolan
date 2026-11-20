@@ -10,7 +10,7 @@ const G = new Float64Array([
   1, 1, 0, -1, 1, 0, 1, -1, 0, -1, -1, 0, 1, 0, 1, -1, 0, 1, 1, 0, -1, -1, 0, -1, 0, 1, 1, 0, -1, 1, 0, 1, -1, 0, -1, -1,
 ]);
 
-export interface Noise3 {
+interface Noise3 {
   /** About −1…1, features about one unit apart. */
   value(x: number, y: number, z: number): number;
   /** The same value, its gradient written into `grad` (x, y, z). */

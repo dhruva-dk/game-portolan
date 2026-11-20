@@ -43,7 +43,7 @@ const yardZ = (Y: Yard): number => mastZ(Y.mast) + MASTS[Y.mast].r + Y.r + 0.15;
 export const arm = (Y: Yard, x: number): Vector3 => V(x, Y.y, yardZ(Y));
 
 /** A point of a sail: where it hangs flat, and how far the wind blows it out of that. */
-export interface SailPoint { flat: Vector3; belly: number }
+interface SailPoint { flat: Vector3; belly: number }
 
 /** A square sail's shape, unbraced: (u across from port, v down from the head) to a point. */
 function squareAt(Y: Yard, u: number, v: number): SailPoint {

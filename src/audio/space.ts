@@ -17,7 +17,7 @@ export const NEAR = 14, FALL = 0.8;
 /** Quieter than this (a factor; −46 dB) a sound is not played. */
 const QUIET = 0.005;
 /** The air's lowpass: OPEN Hz at hand, coming down as the distance grows (half at DULL m), never under FLOOR. */
-export const OPEN = 16000, DULL = 90, FLOOR = 550;
+const OPEN = 16000, DULL = 90, FLOOR = 550;
 
 /** How a sound is heard: whether at all, its delay (s), gain (factor), lowpass (Hz) and pan (−1 left … 1 right). */
 export interface Heard { audible: boolean; delay: number; gain: number; cutoff: number; pan: number }

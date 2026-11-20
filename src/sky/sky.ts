@@ -107,7 +107,7 @@ export interface Sky {
 }
 
 /** The sky's passes due in a frame, each part's in order. */
-export interface SkyPasses { tables: readonly Compute[]; clouds: readonly Compute[]; reflection: readonly Compute[] }
+interface SkyPasses { tables: readonly Compute[]; clouds: readonly Compute[]; reflection: readonly Compute[] }
 const NONE: readonly Compute[] = [];
 
 /** bolt: the storm's lightning held lit (debug.ts ?bolt). */

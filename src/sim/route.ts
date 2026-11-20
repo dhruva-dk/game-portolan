@@ -71,7 +71,7 @@ export const chart = (depth: Depth): Chart => charted(sound(depth));
 
 /** The soundings a chart is made of: which cells are open water, and how many cells each lies from the shore (up to
  *  4). Plain arrays, so a worker can hand them over (play/sounding.ts). */
-export interface Soundings { readonly open: Uint8Array; readonly clear: Uint8Array }
+interface Soundings { readonly open: Uint8Array; readonly clear: Uint8Array }
 
 /** Sounds the water `depth` gives, cell by cell. */
 export function sound(depth: Depth): Soundings {

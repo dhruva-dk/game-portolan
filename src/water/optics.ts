@@ -49,7 +49,7 @@ const GLINT = 0.9985, GLINT_EDGE = 0.0006, GLINT_LIGHT = 0.5;
 const absorption = vec3(...ABSORPTION);
 
 /** Schlick's Fresnel for water. */
-export const fresnel = (cos: FloatNode): FloatNode => float(F0).add(pow(float(1).sub(saturate(cos)), 5).mul(1 - F0));
+const fresnel = (cos: FloatNode): FloatNode => float(F0).add(pow(float(1).sub(saturate(cos)), 5).mul(1 - F0));
 
 export function createOptics(sky: Sky, view: View) {
   /** 1 below the sea's mean level, 0 above, over a few centimetres. */
@@ -82,7 +82,7 @@ export function createOptics(sky: Sky, view: View) {
 }
 
 /** The sea's surface at a pixel, as the water's shader finds it. */
-export interface Surface {
+interface Surface {
   /** World position, and the unit vector from it to the eye. */
   p: Vec3Node; v: Vec3Node;
   /** The surface's normal; and its roughness, √(mean square slope) (the slopes the pixel can't resolve, plus the
@@ -101,14 +101,14 @@ export interface Surface {
  * What the ships do to the light here (water/wake.ts, water/hulls.ts), each 0…1: the share of the sun their shadows
  * leave, the share of the water's glow a hull beside it leaves, and the air a wake has worked into it.
  */
-export interface Ships { lit: FloatNode; glow: FloatNode; air: FloatNode }
+interface Ships { lit: FloatNode; glow: FloatNode; air: FloatNode }
 
 /**
  * Who holds the water here (water/claims.ts): its tint (rgb the holder's colour, a how far the water gives up its own
  * colour for it, its brightness kept) and the line drawn over it (rgb its light per unit of what a white surface gets,
  * premultiplied; a its cover); and how far off it is seen (0 near, 1 a cell under a pixel or two: the full map's).
  */
-export interface Held { dye: Vec4Node; ink: Vec4Node; far: FloatNode }
+interface Held { dye: Vec4Node; ink: Vec4Node; far: FloatNode }
 
 /** How much colour a tint gives the water: at most TINT_CHROMA of the water's own chroma (Oklab), for a holder's colour
  *  whose chroma is TINT_RICH of its lightness or more; seen from afar, as rich as her colour is (FAR_RICH of it). */

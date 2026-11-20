@@ -40,7 +40,7 @@ export interface Ball {
 }
 
 /** Where a ball ended: the ship it struck (or null), where (a unit vector), and whether on the land. */
-export interface Fall {
+interface Fall {
   ball: Ball;
   struck: number | null;
   at: Vec3;
@@ -84,7 +84,7 @@ function flight(nu: number, mu: number, elevation: number): number {
 
 /** How a ball is thrown to come back down to the muzzle's height `metres` along the sea: its elevation (radians), its
  * muzzle speed (m/s) and its time in the air (s). */
-export interface Throw { elevation: number; speed: number; time: number }
+interface Throw { elevation: number; speed: number; time: number }
 
 /** How a gun of `kind` throws a ball `metres` along the sea: low at its muzzle speed, or lobbed at its elevation with
  * the charge the distance needs; null past its range (or, lobbed, nearer than its least). */
@@ -137,7 +137,7 @@ function inHull(s: ShipState, q: Vec3): boolean {
 }
 
 /** A ship a ball may strike: who she is and how she lies. */
-export interface Mark {
+interface Mark {
   id: number;
   ship: ShipState;
 }

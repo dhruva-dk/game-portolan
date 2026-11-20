@@ -21,7 +21,7 @@ import { GUST, SHIP } from './handling.ts';
 import type { ShipState } from './ship.ts';
 
 /** The water under a hull (world/swell.ts): under her bow and stern and her rails, at a time on the world's clock. */
-export type Sea = Hull;
+type Sea = Hull;
 
 /**
  * Each motion's spring: its natural frequency (rad/s), its damping (1 is critical), and whether it is damped against

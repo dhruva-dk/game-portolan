@@ -43,10 +43,10 @@ export interface Vessel {
 }
 
 /** Where a blow lands on her. */
-export type Part = 'bow' | 'side' | 'stern';
+type Part = 'bow' | 'side' | 'stern';
 
 /** One ship's side of a ram: who she is, where it landed on her, and the hit points it took off her. */
-export interface Hit {
+interface Hit {
   id: number;
   part: Part;
   damage: number;

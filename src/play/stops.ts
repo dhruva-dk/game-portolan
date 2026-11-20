@@ -12,10 +12,10 @@ import { blowOf, felt, type Blow, type Deed } from '../player.ts';
 import { easeInOut } from '../world/scalar.ts';
 
 const PRIORITY = { hurt: 0, hit: 1, break: 2, kill: 3 } as const;
-export type Priority = keyof typeof PRIORITY;
+type Priority = keyof typeof PRIORITY;
 
 /** The time's scale while held (0 stops it), real seconds held at it and easing back, and its priority. */
-export interface Stop { scale: number; hold: number; release: number; priority: Priority }
+interface Stop { scale: number; hold: number; release: number; priority: Priority }
 
 /** The stops, by what asks them. */
 export const STOPS = {

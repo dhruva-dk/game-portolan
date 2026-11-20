@@ -32,7 +32,7 @@ const MOVED = 0.002;
  *  among each caster's (Instances.near). One object for each place, so a place is known again by being the same. */
 export interface Shade { chart: Chart; reach: number }
 
-export interface Shadow {
+interface Shadow {
   /** 0…1: how much of the sun reaches world position p on a surface facing n. */
   visible(p: Vec3Node, n: Vec3Node): FloatNode;
   /** Adds things that cast shadows. */

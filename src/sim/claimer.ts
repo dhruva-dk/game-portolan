@@ -21,7 +21,7 @@ import { ramp, utility } from './utility.ts';
 import { BOT, between, open, rotate, type Ctx } from './captain.ts';
 
 /** Everything a bot's water is tuned by. Metres and seconds. */
-export const CLAIMER = {
+const CLAIMER = {
   /** A bite reaches `depth` m past her edge and runs `width` m along it, from timid to greedy (some 16–34 units
    *  out and 16–34 along, at 1.5–2.5 m a unit); the edge looked for every `probe` m, out to `edgeMost`; the way back
    *  ends `inside` m in from it. */

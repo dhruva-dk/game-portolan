@@ -10,8 +10,8 @@
 import { FIGURES, INK, LIGHT, svgNode } from './ink.ts';
 
 /** How long each lasts, s; how close together blows on one ship sum, s; the most figures and arcs at once. */
-export const MARK = { cross: 0.28, kill: 0.8, figure: 0.9, arc: 1.1 } as const;
-export const MERGE = 0.35, MOST = 12, ARCS = 6;
+const MARK = { cross: 0.28, kill: 0.8, figure: 0.9, arc: 1.1 } as const;
+const MERGE = 0.35, MOST = 12, ARCS = 6;
 /** The cross's ticks: length, width and gap from the middle (px), and its pop. */
 const TICK = 13, WIDE = 3.5, GAP = 8, POP = 1.55;
 /** The arc's half-angle (rad), and where the rim's ellipse lies, of the screen's width and height. */
@@ -20,11 +20,11 @@ const HALF = 0.22, RIM_X = 0.46, RIM_Y = 0.4;
 const AZURE = LIGHT.azure, GOLD = LIGHT.gold;
 
 /** A figure's size for a blow of `points`, by how heavy it was; ×1.6 for the last. */
-export const figureSize = (points: number, last: boolean) => (points < 15 ? 15 : points < 40 ? 19 : 25) * (last ? 1.6 : 1);
+const figureSize = (points: number, last: boolean) => (points < 15 ? 15 : points < 40 ? 19 : 25) * (last ? 1.6 : 1);
 
 /** Where on the rim of a `w` × `h` screen a blow from `bearing` (radians clockwise from ahead) shows: an ellipse
  *  round the middle, ahead at its top. */
-export const rimAt = (bearing: number, w: number, h: number) => ({ x: w / 2 + Math.sin(bearing) * RIM_X * w, y: h / 2 - Math.cos(bearing) * RIM_Y * h });
+const rimAt = (bearing: number, w: number, h: number) => ({ x: w / 2 + Math.sin(bearing) * RIM_X * w, y: h / 2 - Math.cos(bearing) * RIM_Y * h });
 
 type Kind = 'hit' | 'shield' | 'break' | 'kill';
 

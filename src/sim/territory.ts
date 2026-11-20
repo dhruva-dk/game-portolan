@@ -36,7 +36,7 @@ export const TERRITORY = {
 /** A ship's open trail: which one it is (a new one each time she leaves her water), its points (unit vectors, the
  *  first where she left her water, then one every `spacing` metres) and its cells in the order laid. Empty when she
  *  is in her own water. */
-export interface Trail { serial: number; points: Vec3[]; cells: number[] }
+interface Trail { serial: number; points: Vec3[]; cells: number[] }
 
 /**
  * What changed, numbered in order (seq), at a moment on the clock the game steps it by (s: play/state.ts gives the
@@ -46,7 +46,7 @@ export interface Trail { serial: number; points: Vec3[]; cells: number[] }
  *   drain  `cells` went back to open sea: `ship`'s as she sank, or (ship null) the storm's
  *   cut    `ship`'s open trail was broken by `by` (herself, or null: given up), no water gained
  */
-export type Change =
+type Change =
   | { seq: number; time: number; kind: 'claim'; ship: number; cells: Int32Array; loop: number }
   | { seq: number; time: number; kind: 'home'; ship: number; cells: Int32Array; at: Vec3 }
   | { seq: number; time: number; kind: 'drain'; ship: number | null; cells: Int32Array }

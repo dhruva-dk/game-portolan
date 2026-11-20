@@ -45,7 +45,7 @@ export interface Eye {
 }
 
 /** A point's place on a chart (metres), the chart's x and z axes carried to it, up there, and its arc from the centre (radians). */
-export interface Charted { q: Vec2Node; e1: Vec3Node; e2: Vec3Node; up: Vec3Node; theta: FloatNode }
+interface Charted { q: Vec2Node; e1: Vec3Node; e2: Vec3Node; up: Vec3Node; theta: FloatNode }
 
 /**
  * A chart given by its centre `A` and axes `a1`, `a2` = a1 × A, as nodes (constants, uniforms or a uniform array's

@@ -12,10 +12,10 @@ import { clamp } from '../world/scalar.ts';
 import { INK, LIGHT } from './ink.ts';
 
 /** A flash: its colour, strength at its peak (0…1), how long it holds there and fades (s), and how it is laid. */
-export interface Flash { colour: string; alpha: number; hold?: number; decay: number; mode?: 'add' | 'tint' }
+interface Flash { colour: string; alpha: number; hold?: number; decay: number; mode?: 'add' | 'tint' }
 /** A vignette: its colour, strength (0…1), how far in it reaches (of the half-screen), its attack, hold and decay
  *  (s), and whether it is drawn toward the blow's bearing. */
-export interface Vignette { colour: string; alpha: number; reach: number; attack?: number; hold?: number; decay: number; aimed?: boolean }
+interface Vignette { colour: string; alpha: number; reach: number; attack?: number; hold?: number; decay: number; aimed?: boolean }
 
 /** The screen's answers, by name: a warm flash for her own shot, pale ones for blows dealt, ice and azure for a shield,
  *  red for a blow on her hull, green for a mend. */
@@ -49,7 +49,7 @@ export const BIG = 3, SAFE = 0.12;
 /** The low-hull heartbeat: from `start` of her hull, its fastest at `floor`; beats a minute from slowest to fastest;
  *  its colour, her blood's; its strength resting and on the beat; its reach; how much the second beat of each pair is
  *  of the first; how long it takes to fade once she is mended (s). */
-export const LOW_HULL = { start: 0.3, floor: 0.05, bpm: [72, 128], colour: INK.scarlet, rest: [0.1, 0.32], beat: [0.12, 0.28], reach: [0.42, 0.6], dub: 0.15, fade: 9 } as const;
+const LOW_HULL = { start: 0.3, floor: 0.05, bpm: [72, 128], colour: INK.scarlet, rest: [0.1, 0.32], beat: [0.12, 0.28], reach: [0.42, 0.6], dub: 0.15, fade: 9 } as const;
 
 /** How strong a flash of `alpha` plays when `recent` big ones have played in the last second. */
 export const capped = (alpha: number, recent: number) => (alpha > SAFE && recent >= BIG ? SAFE : alpha);

@@ -29,7 +29,7 @@ import { thrown } from './shot.ts';
 import type { Sight } from './sight.ts';
 
 /** Everything a bot's gunnery is tuned by. Seconds and metres. */
-export const GUNNER = {
+const GUNNER = {
   /** Seconds before a green, and a sharp, captain first fires on a ship she has just seen. */
   react: [2.2, 0.3] as const,
   /** The range she holds with each gun in hand, m (the cannon's 95, the rest where each does most), by her

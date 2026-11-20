@@ -35,7 +35,7 @@ const EASE = 0.6;
 const GRIND = 1.5;
 /** Her hull's points that must clear the floor, metres ahead of amidships and to port: her forefoot, amidships, her
  * quarters and her sternpost. */
-export const HULL: readonly (readonly [number, number])[] = [
+const HULL: readonly (readonly [number, number])[] = [
   [0.4 * SHIP.length, 0], [0, 0],
   [-0.3 * SHIP.length, 0.3 * SHIP.beam], [-0.3 * SHIP.length, -0.3 * SHIP.beam], [-0.4 * SHIP.length, 0],
 ];

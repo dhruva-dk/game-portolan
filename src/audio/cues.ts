@@ -33,7 +33,7 @@ export type Bus = 'world' | 'own' | 'ui';
 
 /** A cue: its sound (`report`: the report of the gun that fired, by its kind: bank.ts REPORTS), its level against the
  *  sound's own (dB), and where it plays. */
-export interface CueSound { sound: SoundName | 'report'; level: number; bus: Bus }
+interface CueSound { sound: SoundName | 'report'; level: number; bus: Bus }
 
 /** The sound a cue plays, for a gun of kind `gun` (a cannon's, if none is said). */
 export const soundOf = (c: CueSound, gun: GunKind | null): SoundName => (c.sound === 'report' ? (gun ?? 'cannon') : c.sound);

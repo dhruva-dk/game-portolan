@@ -24,9 +24,9 @@
 import { add, dot, frameAt, normalize, put, scale, transport, type FrameOut, type Out3, type Vec3 } from './sphere.ts';
 
 /** The latitude whose day the hours are, radians: the trade-wind tropics. */
-export const LATITUDE = (10 * Math.PI) / 180;
+const LATITUDE = (10 * Math.PI) / 180;
 /** The sun's declination: the solstice; fixed until seasons matter. */
-export const DECLINATION = (23.44 * Math.PI) / 180;
+const DECLINATION = (23.44 * Math.PI) / 180;
 
 /**
  * Where the match's sun is set: `anchor`, where its bearing is the compass's (up there), and `origin`, from which it

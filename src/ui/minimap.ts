@@ -21,7 +21,7 @@ import { view } from './ui.ts';
 
 /** Metres from her to the disc's rim: at her 16 m/s some 25 s of sailing, twice a cannon's 200 m reach; some 4.5 m a
  *  pixel on the hud's disc (hud.ts MINIMAP). */
-export const SPAN = 408;
+const SPAN = 408;
 /** The most redraws a second. */
 const RATE = 30;
 /** The Storm's wash, its edge, and the faint iron halo under the next circle's line. */

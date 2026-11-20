@@ -138,8 +138,6 @@ function sent(a: BufferAttribute | InstancedInterleavedBuffer, items: number) {
   a.needsUpdate = true;
 }
 
-export type Wake = ReturnType<typeof createWake>;
-
 /** capacity: the most ships. */
 export function createWake(view: View, sky: Sky, capacity: number) {
   const target = new RenderTarget(SIZE, SIZE, { type: HalfFloatType, format: RGBAFormat, depthBuffer: false });

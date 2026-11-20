@@ -20,7 +20,7 @@ import type { Depth } from './shoal.ts';
 
 /** One phase: it holds for `wait` seconds, then closes over `close` seconds to a cap of `radius` metres (along the
  * surface); while it runs, a ship outside the cap loses `damage` of a full hull a second. */
-export interface Phase { wait: number; close: number; radius: number; damage: number }
+interface Phase { wait: number; close: number; radius: number; damage: number }
 
 export const STORM = {
   /**

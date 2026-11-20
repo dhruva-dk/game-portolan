@@ -13,7 +13,7 @@ import { DEFS, cssInks, svgNode } from './ink.ts';
 import { FADE } from './ways.ts';
 
 /** The page every piece and screen was drawn on, CSS px: a phone's landscape screen, and its safe insets. */
-export const DRAWN = { w: 956, h: 440, insets: { top: 0, right: 62, bottom: 20, left: 62 } } as const;
+const DRAWN = { w: 956, h: 440, insets: { top: 0, right: 62, bottom: 20, left: 62 } } as const;
 /** The least width the drawn pieces need side by side at their own size (the HUD's top row: the vitals, a gap, then
  *  half the readings, to the middle, is 340). */
 const LEAST = 680;
@@ -26,7 +26,7 @@ const GUTTER = 16, INSET = 2;
  * the drawn size, so a piece is the same share of the screen's short edge on any screen (1 on the page it was drawn
  * on, 1.74 on the iPad Air's 1180 × 820), unless the screen is too narrow for the drawn pieces side by side at that size.
  */
-export const size = (width: number, height: number) => Math.min(height / DRAWN.h, width / LEAST);
+const size = (width: number, height: number) => Math.min(height / DRAWN.h, width / LEAST);
 
 /** The screen now, CSS px, and the UI's size on it: kept by the one resize listener. */
 export const view = { w: 0, h: 0, k: 1 };
@@ -39,7 +39,7 @@ export interface Page { w: number; h: number; left: number; top: number; right: 
 
 /** The page on a screen `width` × `height` CSS px with the given safe insets: scaled by the UI's size, grown to the
  *  screen's shape. */
-export function pageFor(width: number, height: number, safe: Insets): Page {
+function pageFor(width: number, height: number, safe: Insets): Page {
   const k = size(width, height), w = width / k, h = height / k;
   const edge = (px: number) => Math.max(px / k + INSET, GUTTER);
   return { w, h, left: edge(safe.left), top: edge(safe.top), right: w - edge(safe.right), bottom: h - edge(safe.bottom) };

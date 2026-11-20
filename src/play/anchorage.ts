@@ -19,7 +19,7 @@ import { lookAt, type Out4 } from '../world/turn.ts';
 export const LOBBY = { quarter: 0.95, boom: 30, pitch: 0.1, height: 7, drift: 0.26, period: 90 } as const;
 
 /** The screen the drags are measured for, CSS px: the target's, the iPad Air's in landscape. */
-export const VIEWPORT = { width: 1180, height: 820 } as const;
+const VIEWPORT = { width: 1180, height: 820 } as const;
 
 /** How far a finger takes it: the boom's tilt either way (radians); radians a pixel of drag across and up (a swipe
  *  across VIEWPORT turns her 1.5π, and down it tilts 1.2); the share of the way back to rest closed a second once let
@@ -54,7 +54,7 @@ export const relaxed = (o: Orbit, dt: number, out: Orbit = { ...o }): Orbit => {
 };
 
 /** An eye written into (anchorageEye's `out`). */
-export type EyeOut = Eye & { position: Out3; orientation: Out4 };
+type EyeOut = Eye & { position: Out3; orientation: Out4 };
 /** An eye to be written into. */
 export const eyeOut = (): EyeOut => ({ kind: 'air', position: [0, 0, 0], orientation: [0, 0, 0, 1], fov: AIR_FOV });
 

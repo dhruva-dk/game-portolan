@@ -44,7 +44,7 @@ export interface Packed {
   bytesPerVertex: number;
 }
 
-export interface ShipMesh {
+interface ShipMesh {
   body: Packed;
   cloth: Packed;
   ropes: Packed;

@@ -18,10 +18,10 @@ export const take = (seconds: number, rate: number, seed: number): Take =>
 /** A gain in decibels as a factor. */
 export const db = (d: number) => 10 ** (d / 20);
 
-export type Shape = 'lowpass' | 'highpass' | 'bandpass' | 'peak' | 'lowshelf' | 'highshelf';
+type Shape = 'lowpass' | 'highpass' | 'bandpass' | 'peak' | 'lowshelf' | 'highshelf';
 
 /** The RBJ cookbook's biquad for `shape` at `f` Hz, `q`, `gain` dB (peak and shelves), into `c` (b0 b1 b2 a1 a2, a0 = 1). */
-export function design(c: Float64Array, shape: Shape, f: number, q: number, gain: number, rate: number) {
+function design(c: Float64Array, shape: Shape, f: number, q: number, gain: number, rate: number) {
   const w = (2 * Math.PI * Math.min(f, rate * 0.49)) / rate, cos = Math.cos(w), sin = Math.sin(w);
   const alpha = sin / (2 * q), A = 10 ** (gain / 40);
   let b0 = 0, b1 = 0, b2 = 0, a0 = 1, a1 = 0, a2 = 0;
@@ -42,7 +42,7 @@ export function design(c: Float64Array, shape: Shape, f: number, q: number, gain
 }
 
 /** A frequency that holds, or one that moves along the sound (`t`, seconds from its start). */
-export type Hz = number | ((t: number) => number);
+type Hz = number | ((t: number) => number);
 
 /** Filters `x[from…to)` in place through one biquad; a moving frequency is followed every 16 samples. */
 export function filter(t: Take, shape: Shape, f: Hz, q = 0.707, gain = 0, from = 0, to = t.x.length) {

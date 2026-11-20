@@ -113,7 +113,7 @@ export function sheet(acc: Acc, grid: Vector3[][], uvs: [number, number][][], fa
 
 // ---------------------------------------------------------------- tubes
 
-export interface TubeOptions {
+interface TubeOptions {
   /** Metres along the tube per unit of v. */
   vScale?: number;
   /** Marks it a rope: each vertex carries its radius, for the rope shader's widening. */

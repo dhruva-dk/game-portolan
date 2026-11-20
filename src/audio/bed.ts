@@ -17,7 +17,7 @@ import { clamp } from '../world/scalar.ts';
 import type { Bed } from './listen.ts';
 
 /** Every number the bed's nodes are set to: each layer's gain, and the filters that move. */
-export interface Levels {
+interface Levels {
   swell: number; swellHz: number; wash: number; washHz: number; hiss: number; wind: number; windHz: number; rig: number;
   rigHz: number; surf: number; surfHz: number; gale: number; galeHz: number; rain: number; strain: number;
   presence: number; open: number; uncovered: number;
@@ -41,7 +41,7 @@ export const breakers = (t: number) =>
   );
 
 /** Metres from the storm's wall at which the gale is first heard, and how far into the storm it is all about her. */
-export const GALE_HEARD = 380, GALE_INSIDE = 45;
+const GALE_HEARD = 380, GALE_INSIDE = 45;
 
 /** The gale's share for `wall` m to the storm's wall (+ inside the calm), 0…1: a low roar rising as she nears it, all
  *  about her once in it. And the share of it that is about her (rain, the highs), 0…1. */

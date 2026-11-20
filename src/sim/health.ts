@@ -13,7 +13,7 @@ export interface Health {
 }
 
 /** What a blow did: her health after it, what it took off the shield and off the hull. */
-export interface Harm {
+interface Harm {
   health: Health;
   shield: number;
   hull: number;

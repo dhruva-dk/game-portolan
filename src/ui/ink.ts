@@ -13,7 +13,7 @@ export const INK = {
   iron: '#261910', rubric: '#b8301a', storm: '#622e8c', green: '#3a683e', blue: '#264c8c', gold: '#be8a2c',
   sepia: '#805e3e', silver: '#7f848b', scarlet: '#b01c24', white: '#fcf6e6',
 } as const;
-export type Ink = keyof typeof INK;
+type Ink = keyof typeof INK;
 /** Washes laid over the paper. */
 export const WASH = {
   ultramarine: '#3d5f9e', viridian: '#4f9488', ochre: '#c99a4a', vermilion: '#c4452a', azure: '#4a78b8', gold: '#d4a84a',
@@ -95,7 +95,7 @@ export function arcPath(cx: number, cy: number, r: number, a0: number, a1: numbe
   return `M${r2(x0)} ${r2(y0)}A${r} ${r} 0 ${a1 - a0 > Math.PI ? 1 : 0} 1 ${r2(x1)} ${r2(y1)}`;
 }
 
-export interface FigureStyle { fill?: string; anchor?: 'start' | 'middle' | 'end'; halo?: string; haloWidth?: number; weight?: number }
+interface FigureStyle { fill?: string; anchor?: 'start' | 'middle' | 'end'; halo?: string; haloWidth?: number; weight?: number }
 /** A numeral (or a few), centred on y, in the chartmaker's italic. */
 export function figure(x: number, y: number, text: string | number, size: number, o: FigureStyle = {}) {
   const halo = o.halo ? ` stroke="${o.halo}" stroke-width="${o.haloWidth ?? 3}" paint-order="stroke" stroke-linejoin="round"` : '';
@@ -103,7 +103,7 @@ export function figure(x: number, y: number, text: string | number, size: number
     + ` text-anchor="${o.anchor ?? 'middle'}" dominant-baseline="central"${halo}>${esc(String(text))}</text>`;
 }
 
-export interface GlyphStyle { ink?: Ink; paper?: string; opacity?: number }
+interface GlyphStyle { ink?: Ink; paper?: string; opacity?: number }
 /** A woodcut glyph `size` across, centred on (x, y): its shapes hatched in the ink and outlined, its cuts in paper. */
 export function glyph(name: Glyph, x: number, y: number, size: number, o: GlyphStyle = {}) {
   const ink = INK[o.ink ?? 'iron'], paper = o.paper ?? CUT, s = size / 24, big = size >= 40;
@@ -128,7 +128,7 @@ export function glyph(name: Glyph, x: number, y: number, size: number, o: GlyphS
   return `<g transform="translate(${r2(x - size / 2)} ${r2(y - size / 2)}) scale(${r2(s)})"${op}>${under}${cuts}${over}</g>`;
 }
 
-export interface SlipStyle { fill?: string; bold?: boolean; flat?: boolean; rule?: boolean }
+interface SlipStyle { fill?: string; bold?: boolean; flat?: boolean; rule?: boolean }
 /** A paper slip laid on the world: rough-cut, shadowed, ruled inside its edge. */
 export function slip(x: number, y: number, w: number, h: number, o: SlipStyle = {}) {
   const seed = x * 3 + y * 7 + w;

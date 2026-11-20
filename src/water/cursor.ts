@@ -13,7 +13,7 @@ const NONE = -1;
 /** What a read found: whether to start over (a new match's sea, or none where there was one), whether changes were
  *  missed (the reader's copy of the cells is behind: it must take them whole from the sea's), and the index in the
  *  sea's changes of the first not read before. */
-export interface Reading { fresh: boolean; missed: boolean; from: number }
+interface Reading { fresh: boolean; missed: boolean; from: number }
 
 export function createCursor() {
   let generation = NONE, seq = 0;

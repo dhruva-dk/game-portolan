@@ -13,7 +13,7 @@ import type { Vec3 } from '../world/sphere.ts';
 export interface Waters { ownerAt(p: Vec3): number }
 
 /** A ship as her water reads her: who she is and where she lies. */
-export interface Lying { id: number; ship: { at: Vec3 } }
+interface Lying { id: number; ship: { at: Vec3 } }
 
 /** Whether she lies in her own water (none outside a match). */
 export const atHome = (waters: Waters | null, v: Lying): boolean => !!waters && waters.ownerAt(v.ship.at) === v.id;

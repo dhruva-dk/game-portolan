@@ -30,6 +30,20 @@ export const EXCEPTIONS: readonly Exception[] = [
   { rule: 'camera', file: 'src/meter.ts', why: 'the meter measures what the frame drew from its eye; it reads, never moves, the camera' },
   { rule: 'camera', file: 'src/land/shadow.ts', why: "the shadow map's camera is its own, orthographic, looking down on what it maps" },
 
+  // exports only the tests or tools take: each the plain form of what the game runs, for them to read it through
+  { rule: 'exports', file: 'src/audio/cues.ts', name: 'DEEDS', why: 'every kind of deed, for the test that each has its cue' },
+  { rule: 'exports', file: 'src/sim/route.ts', name: 'chart', why: 'the chart baked in-process for the tests and tools; the game bakes the same in its worker (play/sounding.ts)' },
+  { rule: 'exports', file: 'src/sky/atmosphere.ts', name: 'transmittance', why: "the CPU's reference transmittance, which the tests hold the sky's table to" },
+  { rule: 'exports', file: 'src/sky/atmosphere.ts', name: 'transmittanceUV', why: "the transmittance table's coordinates on the CPU, which the tests hold the shader's to" },
+  { rule: 'exports', file: 'src/sky/atmosphere.ts', name: 'transmittanceRMu', why: "the inverse of the table's coordinates, for the tests' round trip" },
+  { rule: 'exports', file: 'src/world/lattice.ts', name: 'blend', why: "the blend's weights written plainly, which the tests hold weighInto's to" },
+  { rule: 'exports', file: 'src/world/lattice.ts', name: 'weigh', why: 'weighInto into lists of its own, for the tests to read the choice the GPU makes' },
+  { rule: 'exports', file: 'src/world/lattice.ts', name: 'stretch', why: "how far a chart stretches, for the test that the lattice's cover keeps it under 1%" },
+  { rule: 'exports', file: 'src/world/swell.ts', name: 'flat', why: 'a sea without waves for the matches run headless (the tests, tools/matches.ts and tools/steps.ts)' },
+  { rule: 'exports', file: 'src/world/terrain.ts', name: 'heightAt', why: "the terrain's own reading, held by its tests; the planet reads it the same way with its cover (planet-terrain.ts)" },
+  { rule: 'exports', file: 'src/world/turn.ts', name: 'inverse', why: 'a turn undone, for the tests that a turn and its inverse come home' },
+  { rule: 'exports', file: 'src/world/wind.ts', name: 'calms', why: "where createWind's field vanishes, for the tests that it vanishes there alone" },
+
   // a colour moved toward its grey: the look's own (grade), and how much of a tint the light and the clouds carry
   { rule: 'desaturate', file: 'src/post/grade.ts', why: "the look's saturation, overall and by hue" },
   { rule: 'desaturate', file: 'src/sky/light.ts', why: "how much of the sky's tint the light carries (TINTED)" },

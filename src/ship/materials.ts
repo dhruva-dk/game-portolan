@@ -64,7 +64,7 @@ const RIPPLES = [2.6, 1.7] as const;
  * breaks into dashes without multisampling), and drawn as faint as the rope it stands for is thin. */
 const ROPE_PIXELS = 0.75;
 
-export interface ShipMaterials { body: MeshBasicNodeMaterial; cloth: MeshBasicNodeMaterial; ropes: MeshBasicNodeMaterial }
+interface ShipMaterials { body: MeshBasicNodeMaterial; cloth: MeshBasicNodeMaterial; ropes: MeshBasicNodeMaterial }
 
 /** pixel: the angle a pixel spans, radians — a uniform the fleet keeps; canvas: the near ships' cloth. */
 export function createShipMaterials(light: Light, pixel: FloatNode, canvas: Cloth): ShipMaterials {

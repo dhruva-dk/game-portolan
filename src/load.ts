@@ -3,7 +3,7 @@
 // the native console (tools/ipad.sh --console); all of them kept as `loads` for the page's tools.
 
 /** The stages reached so far, in order: what, and when (ms since the page began). */
-export const loads: { stage: string; at: number }[] = [];
+const loads: { stage: string; at: number }[] = [];
 
 /** Notes a stage of the load reached now. */
 export function loaded(stage: string) {

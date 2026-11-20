@@ -47,7 +47,7 @@ import { piece, show, view } from './ui.ts';
 /** What the HUD shows: the match as the game reports it, and what she carries. */
 export type HudState = Status & Kit;
 
-export interface HudActions { slot(i: number): void; gust(): void; map(): void; fire(down: boolean): void }
+interface HudActions { slot(i: number): void; gust(): void; map(): void; fire(down: boolean): void }
 
 /** A slot's side, the gap between slots and between the guns' and the stores', px. */
 const SLOT = 50, GAP = 6, APART = 16;
