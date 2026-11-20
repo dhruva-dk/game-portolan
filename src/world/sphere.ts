@@ -295,9 +295,10 @@ export const FACES: readonly { across: Axis; u: Axis; v: Axis }[] = [
 
 export interface FaceUV { face: number; u: number; v: number }
 
-/** The cube face p lies on, and where on it, u and v in −1…1, spaced evenly in angle (an equi-angular cube). */
-export function faceUV(p: Vec3): FaceUV {
-  const [x, y, z] = p;
+/** The cube face p lies on, and where on it, u and v in −1…1, spaced evenly in angle (an equi-angular cube); into
+ *  `out`. */
+export function faceUV(p: Vec3, out?: FaceUV): FaceUV {
+  const x = p[0], y = p[1], z = p[2];
   const ax = Math.abs(x), ay = Math.abs(y), az = Math.abs(z);
   let face: number, gu: number, gv: number;
   if (ax >= ay && ax >= az) {
@@ -313,12 +314,25 @@ export function faceUV(p: Vec3): FaceUV {
     gu = (z >= 0 ? x : -x) / az;
     gv = y / az;
   }
-  return { face, u: Math.atan(gu) * (4 / Math.PI), v: Math.atan(gv) * (4 / Math.PI) };
+  const u = Math.atan(gu) * (4 / Math.PI), v = Math.atan(gv) * (4 / Math.PI);
+  if (!out) return { face, u, v };
+  out.face = face;
+  out.u = u;
+  out.v = v;
+  return out;
 }
 
-/** The unit vector at (u, v) on a cube face: faceUV's inverse. */
-export function faceDir(face: number, u: number, v: number): Vec3 {
+/** faceDir's point on the cube, before it is put on the sphere. */
+const onCube: Out3 = [0, 0, 0];
+
+/** The unit vector at (u, v) on a cube face: faceUV's inverse (into `out`). */
+export function faceDir(face: number, u: number, v: number, out?: Out3): Vec3 {
   const gu = Math.tan(u * (Math.PI / 4)), gv = Math.tan(v * (Math.PI / 4));
-  const faces: Vec3[] = [[1, gv, -gu], [-1, gv, gu], [gu, 1, -gv], [gu, -1, gv], [gu, gv, 1], [-gu, gv, -1]];
-  return normalize(faces[face]);
+  if (face === 0) put(onCube, 1, gv, -gu);
+  else if (face === 1) put(onCube, -1, gv, gu);
+  else if (face === 2) put(onCube, gu, 1, -gv);
+  else if (face === 3) put(onCube, gu, -1, gv);
+  else if (face === 4) put(onCube, gu, gv, 1);
+  else put(onCube, -gu, gv, -1);
+  return normalize(onCube, out);
 }

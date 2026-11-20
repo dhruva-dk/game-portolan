@@ -17,7 +17,8 @@
 //
 // Pure arithmetic: no three, so it runs in node for the tests; deterministic, to the bit.
 
-import { add, distance, faceDir, faceUV, frameAt, normalize, scale, R, type Vec3 } from '../world/sphere.ts';
+import { cubeCells } from '../world/cells.ts';
+import { add, distance, frameAt, normalize, scale, R, type Out3, type Vec3 } from '../world/sphere.ts';
 import { SHIP } from './handling.ts';
 import type { Depth } from './shoal.ts';
 
@@ -48,49 +49,18 @@ export interface Chart { readonly open: Uint8Array; readonly clear: Uint8Array; 
 interface Space {
   readonly g: Float64Array; readonly from: Int32Array; readonly seen: Int32Array; readonly marks: Int32Array; readonly centre: Float64Array;
   readonly heap: Int32Array; readonly key: Float64Array; stamp: number;
+  /** How many are on the heap; and the rings of cells nearestOpen looks through. */
+  size: number; readonly queue: number[];
 }
 
-const N = ROUTE.n, LOG = 31 - Math.clz32(N), CELLS = 6 * N * N;
+const N = ROUTE.n, CELLS = 6 * N * N;
 
 // ---------------------------------------------------------------- the grid
 
-/** The cell direction p lies in. */
-function cellOf(p: Vec3): number {
-  const f = faceUV(p);
-  const i = Math.min(N - 1, Math.max(0, Math.floor((f.u + 1) * 0.5 * N)));
-  const j = Math.min(N - 1, Math.max(0, Math.floor((f.v + 1) * 0.5 * N)));
-  return (f.face << (2 * LOG)) + (j << LOG) + i;
-}
-
-/** The unit direction of a cell's centre. */
-export function cellCentre(c: number): Vec3 {
-  const i = c & (N - 1), j = (c >> LOG) & (N - 1);
-  return faceDir(c >> (2 * LOG), ((i + 0.5) / N) * 2 - 1, ((j + 0.5) / N) * 2 - 1);
-}
-
-/** Across each face's four edges, the cell on the far side of each cell along it. */
-const EDGE = (() => {
-  const edge = new Int32Array(24 * N), e = 1 + 1e-6;
-  for (let f = 0; f < 6; f++) {
-    for (let k = 0; k < N; k++) {
-      const t = ((k + 0.5) / N) * 2 - 1, b = f * 4 * N + k;
-      edge[b] = cellOf(faceDir(f, -e, t));
-      edge[b + N] = cellOf(faceDir(f, e, t));
-      edge[b + 2 * N] = cellOf(faceDir(f, t, -e));
-      edge[b + 3 * N] = cellOf(faceDir(f, t, e));
-    }
-  }
-  return edge;
-})();
-
-/** A cell's neighbour k: 0 west, 1 east, 2 south, 3 north on its face. */
-function neighbour(c: number, k: number): number {
-  const i = c & (N - 1), j = (c >> LOG) & (N - 1), e = (c >> (2 * LOG)) * 4 * N;
-  if (k === 0) return i > 0 ? c - 1 : EDGE[e + j];
-  if (k === 1) return i < N - 1 ? c + 1 : EDGE[e + N + j];
-  if (k === 2) return j > 0 ? c - N : EDGE[e + 2 * N + i];
-  return j < N - 1 ? c + N : EDGE[e + 3 * N + i];
-}
+/** The chart's cells: world/cells.ts's cube, coarser. The cell direction p lies in; the unit direction of a cell's
+ *  centre (into `out`); a cell's neighbour k, 0 west, 1 east, 2 south, 3 north on its face. */
+const GRID = cubeCells(N), cellOf = GRID.cellOf, neighbour = GRID.neighbor;
+export const cellCentre = GRID.centre;
 
 // ---------------------------------------------------------------- the chart
 
@@ -132,10 +102,13 @@ export const charted = (s: Soundings): Chart => ({ open: s.open, clear: s.clear,
 
 export const openAt = (ch: Chart, p: Vec3): boolean => ch.open[cellOf(p)] === 1;
 
+/** Where along a chord clearLine looks; and a cell's centre, as course looks along the route. */
+const looked: Out3 = [0, 0, 0], centre: Out3 = [0, 0, 0];
+
 /** Open water all along the chord from a to b, looked at every `step` m. */
 function clearLine(ch: Chart, a: Vec3, b: Vec3, step = 4): boolean {
   const k = Math.max(1, Math.ceil(distance(a, b) / step));
-  for (let s = 1; s <= k; s++) if (!openAt(ch, normalize(add(scale(a, 1 - s / k), b, s / k)))) return false;
+  for (let s = 1; s <= k; s++) if (!openAt(ch, normalize(add(scale(a, 1 - s / k, looked), b, s / k, looked), looked))) return false;
   return true;
 }
 
@@ -153,14 +126,16 @@ function space(): Space {
   for (let c = 0; c < CELLS; c++) centre.set(cellCentre(c), 3 * c);
   return {
     g: new Float64Array(CELLS), from: new Int32Array(CELLS), seen: new Int32Array(CELLS), marks: new Int32Array(CELLS), centre,
-    heap: new Int32Array(HEAP), key: new Float64Array(HEAP), stamp: 0,
+    heap: new Int32Array(HEAP), key: new Float64Array(HEAP), stamp: 0, size: 0, queue: [],
   };
 }
 
 /** The nearest open cell to p within `reach` cells, by rings of neighbours: the nearest of the first ring to hold one. */
 function nearestOpen(ch: Chart, s: Space, p: Vec3, reach: number): number {
-  const start = cellOf(p), mark = ++s.stamp, queue = [start];
+  const start = cellOf(p), mark = ++s.stamp, queue = s.queue;
   if (ch.open[start]) return start;
+  queue.length = 0;
+  queue.push(start);
   s.marks[start] = mark;
   let best = -1, near = Infinity, depth = 0, end = 1;
   for (let q = 0; q < queue.length; q++) {
@@ -170,8 +145,11 @@ function nearestOpen(ch: Chart, s: Space, p: Vec3, reach: number): number {
     }
     const c = queue[q];
     if (ch.open[c]) {
-      const d = gap(s, c, p);
-      if (d < near) [near, best] = [d, c];
+      const d = gapTo(s, c, p);
+      if (d < near) {
+        near = d;
+        best = c;
+      }
       continue;
     }
     for (let k = 0; k < 4; k++) {
@@ -185,10 +163,52 @@ function nearestOpen(ch: Chart, s: Space, p: Vec3, reach: number): number {
   return best;
 }
 
-/** Metres between cell a's centre and cell b's, or the point p (a unit vector). */
-function gap(s: Space, a: number, b: number | Vec3): number {
-  const C = s.centre, [x, y, z] = typeof b === 'number' ? [C[3 * b], C[3 * b + 1], C[3 * b + 2]] : b;
-  return R * Math.hypot(C[3 * a] - x, C[3 * a + 1] - y, C[3 * a + 2] - z);
+/** Metres between cell a's centre and cell b's. */
+function gap(s: Space, a: number, b: number): number {
+  const C = s.centre;
+  return R * Math.hypot(C[3 * a] - C[3 * b], C[3 * a + 1] - C[3 * b + 1], C[3 * a + 2] - C[3 * b + 2]);
+}
+
+/** Metres between cell a's centre and the point p (a unit vector). */
+function gapTo(s: Space, a: number, p: Vec3): number {
+  const C = s.centre;
+  return R * Math.hypot(C[3 * a] - p[0], C[3 * a + 1] - p[1], C[3 * a + 2] - p[2]);
+}
+
+// The open heap, of cells by their keys (the least first; of two the same, the lower cell), its size `s.size`.
+
+/** Whether the heap's ith entry comes before its jth. */
+const less = (s: Space, i: number, j: number) => s.key[i] < s.key[j] || (s.key[i] === s.key[j] && s.heap[i] < s.heap[j]);
+
+function swap(s: Space, i: number, j: number) {
+  const { heap, key } = s, c = heap[i], k = key[i];
+  heap[i] = heap[j];
+  heap[j] = c;
+  key[i] = key[j];
+  key[j] = k;
+}
+
+function push(s: Space, cell: number, k: number) {
+  let i = s.size++;
+  s.heap[i] = cell;
+  s.key[i] = k;
+  for (let up = (i - 1) >> 1; i > 0 && less(s, i, up); i = up, up = (i - 1) >> 1) swap(s, i, up);
+}
+
+function pop(s: Space): number {
+  const top = s.heap[0], n = --s.size;
+  s.heap[0] = s.heap[n];
+  s.key[0] = s.key[n];
+  for (let i = 0; ;) {
+    const l = 2 * i + 1, r = l + 1;
+    let m = i;
+    if (l < n && less(s, l, m)) m = l;
+    if (r < n && less(s, r, m)) m = r;
+    if (m === i) break;
+    swap(s, i, m);
+    i = m;
+  }
+  return top;
 }
 
 /**
@@ -197,49 +217,28 @@ function gap(s: Space, a: number, b: number | Vec3): number {
  * when p is on land with no open water near.
  */
 export function findPath(ch: Chart, p: Vec3, q: Vec3, work: number = ROUTE.work): { cells: number[]; found: boolean } {
-  const s = ch.space, { g, from: FROM, seen, heap, key } = s, to = cellOf(q), budget = Math.min(work, ROUTE.work * 4);
+  const s = ch.space, { g, from: FROM, seen } = s, to = cellOf(q), budget = Math.min(work, ROUTE.work * 4);
   const start = nearestOpen(ch, s, p, ROUTE.wade);
   if (start < 0) return { cells: [], found: false };
   const stamp = ++s.stamp;
-  let n = 0;
-  const less = (i: number, j: number) => key[i] < key[j] || (key[i] === key[j] && heap[i] < heap[j]);
-  const swap = (i: number, j: number) => {
-    [heap[i], heap[j]] = [heap[j], heap[i]];
-    [key[i], key[j]] = [key[j], key[i]];
-  };
-  const push = (cell: number, k: number) => {
-    let i = n++;
-    [heap[i], key[i]] = [cell, k];
-    for (let up = (i - 1) >> 1; i > 0 && less(i, up); i = up, up = (i - 1) >> 1) swap(i, up);
-  };
-  const pop = () => {
-    const top = heap[0];
-    n--;
-    [heap[0], key[0]] = [heap[n], key[n]];
-    for (let i = 0; ;) {
-      const l = 2 * i + 1, r = l + 1;
-      let m = i;
-      if (l < n && less(l, m)) m = l;
-      if (r < n && less(r, m)) m = r;
-      if (m === i) break;
-      swap(i, m);
-      i = m;
-    }
-    return top;
-  };
+  s.size = 0;
   g[start] = 0;
   FROM[start] = -1;
   seen[start] = stamp;
-  push(start, gap(s, start, to));
+  push(s, start, gap(s, start, to));
   let best = start, bestH = gap(s, start, to), found = false, left = budget;
-  while (n > 0 && left-- > 0) {
-    const c = pop(), gc = g[c];
+  while (s.size > 0 && left-- > 0) {
+    const c = pop(s), gc = g[c];
     if (c === to) {
-      [best, found] = [c, true];
+      best = c;
+      found = true;
       break;
     }
     const h = gap(s, c, to);
-    if (h < bestH) [bestH, best] = [h, c];
+    if (h < bestH) {
+      bestH = h;
+      best = c;
+    }
     for (let k = 0; k < 8; k++) {
       let m: number;
       if (k < 4) m = neighbour(c, k);
@@ -257,7 +256,7 @@ export function findPath(ch: Chart, p: Vec3, q: Vec3, work: number = ROUTE.work)
       seen[m] = stamp;
       g[m] = gm;
       FROM[m] = c;
-      if (n < HEAP) push(m, gm + ROUTE.greed * gap(s, m, to));
+      if (s.size < HEAP) push(s, m, gm + ROUTE.greed * gap(s, m, to));
     }
   }
   const cells: number[] = [];
@@ -288,9 +287,11 @@ export function course(ch: Chart, at: Vec3, want: Vec3, route: Route | null, dt:
   const { cells } = r;
   if (cells.length === 0) return { to: null, route: r };
   let leg = r.leg;
-  while (leg < cells.length - 1 && distance(at, cellCentre(cells[leg])) < ROUTE.reached) leg++;
+  while (leg < cells.length - 1 && distance(at, cellCentre(cells[leg], centre)) < ROUTE.reached) leg++;
   // look ahead along the route as far as the water is clear
   let k = leg;
-  while (!shoaled && k + 1 < cells.length && k < leg + ROUTE.ahead && clearLine(ch, at, cellCentre(cells[k + 1]), ROUTE.step)) k++;
+  while (!shoaled && k + 1 < cells.length && k < leg + ROUTE.ahead && clearLine(ch, at, cellCentre(cells[k + 1], centre), ROUTE.step)) {
+    k++;
+  }
   return { to: cellCentre(cells[k]), route: { ...r, leg } };
 }
