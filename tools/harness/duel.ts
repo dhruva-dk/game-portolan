@@ -8,8 +8,9 @@
 // Every ship starts with a full shield, as she would be with a few fights'
 // loot in her, the two bow to bow; each gun common. The same steps as the
 // game's: think (sim/bot.ts), stepFleet (contact.ts), stepBattle (battle.ts),
-// the guns asked for taken in hand (stores.ts), a bot told of what strikes her
-// and what it took (play/state.ts's way).
+// the guns asked for taken in hand and her helm as her stores sail her, her
+// gust and mending stepped after the fighting (stores.ts), a bot told of what
+// strikes her and what it took (play/state.ts's way).
 
 import { parseArgs } from 'node:util';
 import { KINDS, type GunKind } from '../../src/kinds.ts';
@@ -30,7 +31,7 @@ import { sunk } from '../../src/sim/health.ts';
 import { nature } from '../../src/sim/persona.ts';
 import type { Depth } from '../../src/sim/shoal.ts';
 import { shipAt, type Helm } from '../../src/sim/ship.ts';
-import { asked, type Ask } from '../../src/sim/stores.ts';
+import { asked, crewed, stored, type Ask } from '../../src/sim/stores.ts';
 import { temper } from '../../src/sim/temper.ts';
 import { along, bearingAt, fromLatLon } from '../../src/world/sphere.ts';
 
@@ -56,6 +57,8 @@ const A = kindOf(positionals[0], 'scatter'),
   seconds = Number(values.seconds);
 
 const deep: Depth = () => 30;
+/** No loot on the water. */
+const NONE = { pieces: [], next: 0 };
 const start = fromLatLon(0.2, 0.3);
 /** Ship `id` `metres` north of the start, heading `heading` rad. */
 const placed = (id: number, metres: number, heading: number): Vessel => {
@@ -107,14 +110,30 @@ function duel(metres: number, seeds: number[], guns: GunKind[]): number {
       orders.push(r.order);
       asks.set(v.id, r.ask);
     });
-    b = {
-      ...b,
-      crews: asked(b.crews, fleet, { pieces: [], next: 0 }, asks).crews,
-    };
+    const wants = asked(b.crews, fleet, NONE, asks);
+    b = { ...b, crews: wants.crews };
+    fleet.forEach((v, i) => {
+      helms[i] = crewed(
+        helms[i],
+        wants.crews.find((k) => k.id === v.id)
+      );
+    });
     const met = stepFleet(fleet, helms, STEP, deep);
     fleet = met.fleet;
     const f = stepBattle(b, fleet, orders, met.blows, STEP, deep);
-    b = f.battle;
+    b = {
+      ...f.battle,
+      crews: stored(
+        f.battle.crews,
+        NONE,
+        fleet,
+        wants.takes,
+        f.sunk,
+        STEP,
+        deep,
+        7
+      ).crews,
+    };
     for (const k of f.strikes) {
       const j = fleet.findIndex((v) => v.id === k.struck);
       if (j >= 0)
