@@ -72,6 +72,18 @@ export type Mode =
   | 'loot'
   | 'claim';
 
+/**
+ * What she means, as her mind hands it to her tactician (tactician.ts): where
+ * she means to be, the ship she means to fight (-1: none), and whether she
+ * makes for her goal `gently` (easing up near it, as for loot or mending) or
+ * `through` it.
+ */
+export interface Intent {
+  goal: Vec3;
+  foe: number;
+  arrive: 'through' | 'gently';
+}
+
 /** What a bot carries from one step to the next, her gunnery's with it. */
 export interface Memory extends Gunner {
   /**

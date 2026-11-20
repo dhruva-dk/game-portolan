@@ -38,12 +38,6 @@ export const PURSER = {
    */
   least: 0.04,
   edge: 10,
-  /**
-   * Going for loot or mending, her throttle within `near` m of where she makes
-   * for.
-   */
-  slow: 0.55,
-  near: 25,
   /** Mending with a foe about, she makes for open water this far from her. */
   clear: 60,
   /**

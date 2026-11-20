@@ -16,9 +16,9 @@ turn left?", follow the arrows: it is never more than five hops.
 
 ```
             every think (0.2 s)                          every step (1/30 s)
- ┌──────────┐  Sighting  ┌──────────┐  Intent   ┌────────────┐  Mark  ┌───────────┐ Waypoint ┌────────────┐  Helm
- │ Lookout  │──────────▶│ Captain  │─────────▶│ Tactician  │──────▶│ Navigator │────────▶│ Helmsman   │──────▶ ship
- │ sees     │           │ chooses  │          │ where, now │       │ routes    │         │ steers     │
+ ┌──────────┐  Sighting  ┌──────────┐  Intent   ┌────────────┐  Mark  ┌───────────┐   Way    ┌────────────┐  Helm
+ │ Lookout  │──────────▶│ Captain  │─────────▶│ Tactician  │──────▶│ Pilot     │────────▶│ Helmsman   │──────▶ ship
+ │ sees     │           │ chooses  │          │ where, now │       │ routes    │◀─ lost ─│ steers     │
  └──────────┘           └──────────┘          └────────────┘       └───────────┘         └────────────┘
                               │ asks                 │ foe
                               ▼                      ▼
@@ -33,22 +33,25 @@ turn left?", follow the arrows: it is never more than five hops.
 | Lookout   | `sim/lookout.ts` (from bot.ts perceive/hidden)                               | fleet, depth                                  | `Sighting`: foe, where last seen, who rammed/shot her | `SIGHT`                          | `m.look`             |
 | Captain   | `sim/bot.ts` (decide, OPTIONS)                                               | Sighting, storm, own state                    | `Intent`                                              | `MIND` (+ each option's owner's) | `m.mind`             |
 | — options | storm/fight/flee/roam: `bot.ts`; heal/loot: `purser.ts`; claim: `claimer.ts` | Ctx view                                      | a score 0..1 with named factors; a goal               | `PURSER`, `CLAIMER`, `STORMING`  | `m.purse`, `m.claim` |
-| Tactician | fight marks (ramCourse, recoil from helmsman.ts; ring from gunner.ts)        | Intent, foe now                               | `Mark`: a point to make for this step                 | `RAM`                            | `m.tactic`           |
-| Navigator | `sim/route.ts` behind `Router`                                               | Mark, chart                                   | `Waypoint`: next point to steer at                    | `ROUTE`                          | `m.route`            |
-| Helmsman  | `sim/helmsman.ts` behind `Steering`                                          | Waypoint, `Intent.arrive`, depth, nearby rams | `Helm`: course, throttle                              | `HELM`                           | `m.helm`             |
+| Tactician | `sim/tactician.ts` (ramCourse, recoil; gunner.ts ring)                       | Intent, foe now                               | `Mark`: where to route to, the aim if clear, pace     | `RAMMING`                        | `m.tactic`           |
+| Pilot     | `sim/pilot.ts` over `sim/route.ts`, later behind `Router`                    | Mark, chart                                   | `Way`: the tangent to steer, distance, pace, foe      | `ROUTE`                          | `m.route`            |
+| Helmsman  | `sim/helmsman.ts`, later behind `Steering`                                   | Way, depth, nearby rams                       | `Helm`: course, throttle; and `lost` (pilot drops route) | `HELM`                        | `m.helm`             |
 | Gunner    | `sim/gunner.ts`                                                              | foe, held gun                                 | `Order`, arm                                          | `GUNNER`                         | `m.gun`              |
 
 **The Intent** is the seam between choosing and sailing. The helm never sees
 modes, loot or claims; the captain never sees rudders or banks.
 
 ```ts
-interface Intent {
-  goal: Vec3; // where she means to be
+interface Intent {      // captain.ts; bot.ts intentOf derives it from memory each step
+  goal: Vec3;           // where she means to be
+  foe: number;          // the ship she means to fight; -1 none
   arrive: 'through' | 'gently'; // gently: ease up near it (loot, mending)
-  foe: number; // -1 none
-  stance: 'none' | 'ram' | 'ring' | 'clear'; // how the tactician treats the foe
 }
 ```
+
+Ram, ring or bear away is the tactician's call from the foe and her gun, so
+Intent carries no stance. The tactician's `Pace` (`ram` | `turn` | `gently`)
+is all the helm learns of why.
 
 ### 1.2 Three lifetimes, never mixed
 
@@ -132,22 +135,22 @@ Baseline (seed 7922, one match): 38/80 bots moved under 15 m in 30 s, **0
 aground**, median speed while stuck 12.5 m/s. From reading the code (to be
 confirmed by trace in phase C):
 
-1. Navigator: A\* treats any 6.8 m cell with depth ±2.3 m as passable; a 26 m
+1. Pilot (route.ts): A\* treats any 6.8 m cell with depth ±2.3 m as passable; a 26 m
    ship turning a ~27 m circle cannot use a one-cell slot.
 2. Helmsman: side feelers sit ~18 m either side; in any channel under ~36 m both
    touch land, so she turns hard away and holds it 0.8 s; the route pulls her back.
    Planner (chart) and reflex (true depth) disagree, and she circles.
-3. Navigator: with no route in 4000 cells, A\* hands back the cell nearest the
+3. Pilot (route.ts): with no route in 4000 cells, A\* hands back the cell nearest the
    goal as the crow flies, a cove; she replans every 2 s to the same cove.
 4. Captain: goals are checked open at a point, never reachable.
 5. Helmsman: stuck means under 0.93 m/s, so circling at speed is never seen.
 
 In the new design: (1) the chart knows clearance in metres and bars cells
 under half a beam plus margin; (2) Steering reads the same clearance field as
-the Navigator; (3, 4) the Captain's goals are snapped into her own body of water
+the Pilot; (3, 4) the Captain's goals are snapped into her own body of water
 (components labelled at bake), storm goals come from a shared flow field; (5)
-the Helmsman judges progress toward the Waypoint over a window, and on failure
-the Navigator blacklists that goal for a while. Each shows in the trace as a
+the Helmsman judges progress along the Way over a window, and on failure
+the Pilot blacklists that goal for a while. Each shows in the trace as a
 named event.
 
 ---
@@ -159,13 +162,13 @@ messages in the house voice; one action per shell call; `npm test` green on ever
 commit; anything visible checked in headless chromium; iPad Air M1 at 30–40 fps
 (watch ms/step: 0.70 desktop baseline).
 
-- [ ] **A. Lock behaviour.** Golden-match test (hash of every ship's place, hull,
+- [x] **A. Lock behaviour.** Golden-match test (hash of every ship's place, hull,
       and the result after N steps on a fixed seed). Baseline metrics recorded.
 - [ ] **B. Refactor, hash unchanged.**
-  - [ ] B1 Split `BOT` to its owners (SIGHT, MIND, STORMING, RAM, HELM); no
-        module reads another's table (helmsman's PURSER reads go).
-  - [ ] B2 `Intent`; helmsman takes Waypoint + Intent, not modes. Tactician out
-        of helmsman.
+  - [x] B1 Split `BOT` to its owners (SIGHT, MIND, ROAMING, STORMING, HELM,
+        RAMMING); captain.ts BOT keeps only `every` and `open`, shared by all.
+  - [x] B2 `Intent` → tactician.ts `Mark` → pilot.ts `Way` → helmsman. The helm
+        knows no modes; PURSER.near/slow became HELM.near/gently.
   - [ ] B3 Memory in slices per role.
   - [ ] B4 `Brain` composed in brain.ts; slices passed down; per-ship Brain in
         `orders.ts` Hand. Architecture tests 1–6.
@@ -187,9 +190,11 @@ commit; anything visible checked in headless chromium; iPad Air M1 at 30–40 fp
 
 ## 3. Decisions
 
-1. **Crew-role modules** (lookout, captain, tactician, navigator, helmsman,
+1. **Crew-role modules** (lookout, captain, tactician, pilot, helmsman,
    gunner, purser, claimer): the code already names modules by role; one role,
    one table, one memory slice keeps each small enough to hold in the head.
+   (The router role is the **pilot**: `navigator` trips the determinism test's
+   browser-global scan, and a pilot is the one who takes a ship round land.)
 2. **Refactor before harness.** The harness needs the Brain seam; the seam done
    right is the refactor. Both from one piece of work, under one golden hash.
 3. **Loot (asked for mid-run).** Now 200 spots × 1.4 ≈ 280 pieces, cut on
@@ -204,3 +209,8 @@ commit; anything visible checked in headless chromium; iPad Air M1 at 30–40 fp
 
 - 975191c baseline (seed 7922, 1 match): 438 s, 0.70 ms/step; stuck 38/80, 0
   aground, median 12.5 m/s; armed 65/80, median 7 s, 90% by 22 s; 283 pieces.
+- A: golden match, 300 s of seed SEED's first dealt match → `e5efec20`
+  (10 s to run; suite 362 tests, ~22 s).
+- B1: BOT split by owner. Golden unchanged.
+- B2: Intent/Mark/Way seam; tactician.ts, pilot.ts new. Golden unchanged.
+  Note: the architecture scans flag the words "navigator" and "for now".

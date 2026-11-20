@@ -62,12 +62,15 @@ import {
   roll,
   rotate,
   type Ctx,
+  type Intent,
   type Memory,
   type Mode,
   type Sea,
   type Seen,
 } from './captain.ts';
 import { deepest, steer } from './helmsman.ts';
+import { navigate } from './pilot.ts';
+import { mark } from './tactician.ts';
 import { healUrge, lootAct, lootUrge, purse, PURSER } from './purser.ts';
 import { claimAct, claimUrge } from './claimer.ts';
 import { NOTHING, type Ask } from './stores.ts';
@@ -224,7 +227,11 @@ export function think(
   }
   c.foe = m.foe >= 0 ? (others.find((o) => o.id === m.foe) ?? null) : null;
   c.foeD = c.foe ? distance(own.ship.at, c.foe.ship.at) : Infinity;
-  const helm = steer(c, dt);
+  // what she means, where she makes for this step, the way there, her helm
+  const intent = intentOf(m),
+    way = navigate(c, mark(c, intent, dt), intent.foe, dt),
+    { helm, lost } = steer(c, way, dt);
+  if (lost) m.route = null;
   const held = own.crew ? inHand(own.crew) : null,
     seen = inSight(c) ? c.foe : null;
   const order: Order = held
@@ -250,6 +257,16 @@ export function think(
       : null;
   return { helm, order, ask: arm === null ? ask : { ...ask, arm }, memory: m };
 }
+
+/**
+ * What she means, from what she is about: her goal, her foe while she fights,
+ * and gently to loot or a mending.
+ */
+const intentOf = (m: Memory): Intent => ({
+  goal: m.goal,
+  foe: m.mode === 'fight' ? m.foe : -1,
+  arrive: m.mode === 'loot' || m.mode === 'heal' ? 'gently' : 'through',
+});
 
 // ---------------------------------------------------------------- seeing
 
