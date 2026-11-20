@@ -57,6 +57,8 @@ export const BRAINS: Record<string, Brain> = {
   keen: variant({ sight: { sightMax: 360, forget: 8 } }),
   /** Feels further ahead for land, and backs off a bank sooner. */
   wary: variant({ helm: { feel: 24, stuck: 1.5 } }),
+  /** Runs straight away, never for cover behind land. */
+  noCover: variant({ mind: { cover: 0 } }),
   /** Hears no guns (hunts nothing). */
   deaf: variant({ hunting: { earshot: 0 } }),
   /** Hears guns further off, and is drawn to them from further. */

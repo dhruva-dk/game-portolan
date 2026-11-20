@@ -145,6 +145,17 @@ export const MIND = {
    */
   run: 120,
   /**
+   * Running, she would sooner make for water with land between her and her foe
+   * (out of sight, she is soon let go), within `cover` m of her on `rings`
+   * rings, the nearest first (0: never); no more than `wide` rad off straight
+   * away, and further from her foe by `gain` of the way to it at least (cover
+   * off to her side would take her across her foe's guns).
+   */
+  cover: 180,
+  rings: 3,
+  wide: Math.PI / 3,
+  gain: 0.6,
+  /**
    * Early in a match she would sooner keep out of a fight: her will to fight
    * falls by this much in each of the storm's phases (the last once it has
    * closed), and more by `more` with `lastFew` ships or fewer afloat. While it
@@ -620,7 +631,9 @@ const OPTIONS: readonly Choice[] = [
     weight: 3.3,
     mode: 'flee',
     score: (c) => Math.max(losing(c), evading(c)),
-    act: (c) => keptInside(c, away(c, c.m.last, c.b.mind.run)),
+    // behind land if there is any near, else straight away
+    act: (c) =>
+      keptInside(c, cover(c, c.m.last) ?? away(c, c.m.last, c.b.mind.run)),
   },
   {
     name: 'fight',
@@ -680,6 +693,41 @@ function away(c: Ctx, from: Vec3, d: number): Vec3 {
     if (open(c, q)) return q;
   }
   return along(p, out, d).p;
+}
+
+/**
+ * Cover from `from` (where her foe was last seen): open water inside the storm
+ * by her margin, further from `from` than she is, and land between it and
+ * `from` (hidden). The cover she is making for while it still is; else the
+ * nearest within MIND.cover m (on MIND.rings rings, twelve bearings each, the
+ * ones most away first); else null.
+ */
+function cover(c: Ctx, from: Vec3): Vec3 | null {
+  const { m } = c,
+    p = c.own.ship.at,
+    s = c.sea.storm,
+    most = c.b.mind.cover,
+    rings = c.b.mind.rings,
+    now = distance(from, p);
+  if (most <= 0) return null;
+  const good = (q: Vec3, gain: number) =>
+    distance(from, q) > now + gain &&
+    open(c, q) &&
+    (!s || toEdge(q, s) > c.t.margin) &&
+    hidden(c, from, q);
+  if (m.mode === 'flee' && good(m.goal, 0)) return m.goal;
+  const out = toward(from, p) ?? c.own.ship.heading,
+    off = toward(p, along(from, out, now + 1).p) ?? c.own.ship.heading;
+  for (let r = 1; r <= rings; r++) {
+    const d = (r * most) / rings;
+    for (let k = 0; k < 12; k++) {
+      const a = (k % 2 ? 1 : -1) * Math.ceil(k / 2) * (Math.PI / 6);
+      if (Math.abs(a) > c.b.mind.wide + 1e-9) break;
+      const q = along(p, rotate(p, off, a), d).p;
+      if (good(q, d * c.b.mind.gain)) return q;
+    }
+  }
+  return null;
 }
 
 /**

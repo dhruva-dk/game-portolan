@@ -208,11 +208,14 @@ commit; anything visible checked in headless chromium; iPad Air M1 at 30–40 fp
   - [ ] E3 Progress-based stuck; goal blacklist.
   - [ ] E4 Storm flow field per phase (Router #2).
   - [ ] E5 Context steering on the clearance field (Steering #2).
-- [ ] **F. Stretch.** Mixed-fleet tournament + ratings; 2D replay HTML; breaking
-      line of sight when fleeing.
+- [ ] **F. Stretch.** Mixed-fleet tournament + ratings; 2D replay HTML.
   - [x] F1 Hunting to the sound of guns (`sim/hunter.ts`, its own role:
         `HUNTING`, `c.b.hunting`, `HuntMemory`; the sea keeps each ship's
         last shot ringing 6 s, handed to bots as `Sea.gunfire`).
+  - [x] F2 Breaking line of sight when fleeing (bot.ts `cover`, MIND
+        `cover`/`rings`/`wide`/`gain`).
+  - [x] F3 Mixed fleets balanced by match (`brains[(id + match) % n]`) and
+        a paired place interval in the summary.
 
 ## 3. Decisions
 
@@ -332,4 +335,24 @@ commit; anything visible checked in headless chromium; iPad Air M1 at 30–40 fp
   `deaf` (earshot 0): hunt 2% of time, matches 426 → 416 s, pinned −1.4 s
   [−2.8, 0.1]; `keenEar` (800 m): hunt 4%, 406 s. Mixed fleets (`--mix`):
   place 40.0 hunters vs 40.4 deaf vs 41.1 keen: liveliness, not power.
-  Golden → `654f4299`.
+  Golden → `654f4299`. (Those mixed places were biased: see F3.)
+- F3, harness bug: `--mix` gave ship `id` brain `id % n`, and a ship's id
+  sets her temperament, berth and more: in two-brain mixes the even ids
+  armed 92% vs 89% and placed ~0.7 better _whatever brain they sailed_
+  (swapping the order flipped the result). Now `brains[(id + match) % n]`,
+  so over matches each brain sails every id alike (armed then 90/91%). The
+  summary also gives mixed fleets a paired place interval, match by match.
+  Re-measured, 24 balanced mixed matches: hunters vs deaf place −0.94
+  [−2.87, 1.06]: neutral to positive.
+- F2, breaking line of sight: fleeing, she makes for cover: open water within
+  180 m (3 rings × 12 bearings, nearest first), inside the storm by her
+  margin, land between it and where her foe was last seen (`hidden`, the
+  lookout's own test), kept while it stays so. First cut (any bearing):
+  83% of flee goals behind land, but runners afloat 20 s after a flight
+  74% → 65% (cover off her beam took her across the foe's guns; 6 matches,
+  scratch tool). Narrowed to ±60° off straight away and further from the foe
+  by 0.6 of the step out (`wide`, `gain`): 69% behind land, afloat after
+  74% = no cover's, flee time 3552 → 2987 s (contact broken sooner). Whole
+  fleets: pinned +0.1 s [−2.1, 2.0]; balanced mixed: place −0.37 [−2.65,
+  1.89] vs `noCover`. Visible behaviour, no cost. Golden → `8c6241ba`.
+  Scenario test (an island between) wanted with C3.
