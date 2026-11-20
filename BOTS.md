@@ -615,8 +615,14 @@ commit; anything visible checked in headless chromium; iPad Air M1 at 30–40 fp
   tried, each 1–2 of 20 at 40 m): reach 100 m; a magazine of 6; no pause
   between bursts (`GUNNERY.burst`, a rhythm that suits a cannon, not a gun
   fired once a second); a magazine of 6 and no pause together; W3's rush
-  stance. **The scatter needs a pursuit**: a captain with a short gun whose
-  foe opens out should chase flat out, not hold her ring; or a light gun
-  should sail faster. Which is the game's to choose; the duel tool measures
-  it. In free-for-all matches close fights still come (the scatter deals
+  stance. Nor does a pursuit: tried, a captain farther than `out` of her
+  ring makes for it flat out, whatever her gun (`chasing`, beside
+  `rushing`). She then sails at 16 m/s, as fast as the cannon, and still
+  loses 19 of 20: equal speeds hold the gap, and a scatter is near harmless
+  past about 45 m while a cannon does its 20 dps at any range. Over 64
+  matches that rule left places as they were (40.5) and spread the
+  personas wider (scavenger +3.8 → +5.8 se), so dropped. **The scatter's
+  weakness is its damage against its reach**, not its helm: it wants more
+  bite close, or a light gun's speed. The owner's call; the duel tool
+  measures it. In free-for-all matches close fights still come (the scatter deals
   most a minute held there), so this is a duel's weakness first.

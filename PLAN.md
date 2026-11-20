@@ -390,7 +390,7 @@ protect.
   the world's colours by system so a new rarity's tint has an obvious home.
 - **The golden test covers one seed for 300 s.** Add a second, short golden
   on a seed with many personas once P3 lands, so match types are protected
-  too.
+  too. _Done: one for each other type (log)._
 - **Choosing personalities is unweighted**
   (`styles[Math.floor(u() * styles.length)]`), which is why every match looks
   alike. P3 fixes it.
@@ -661,4 +661,11 @@ then the behaviour commits on top.
   unchanged.
 - 2026-11-20 (duels): `tools/harness/duel.ts`, one gun against another,
   two bots alone, from 40–200 m. It overturned W4's first reading of the
-  scatter (above); BOTS.md has the matrix against the cannon.
+  scatter (above); BOTS.md has the matrix against the cannon. A general
+  pursuit (flat out when far from her ring) was tried for it: no help in
+  duels, no gain over 64 matches, personas wider; dropped.
+- 2026-11-20 (§6.7, golden): a golden match for each other type,
+  `tests/golden-types.test.ts`: mixed, gold rush and cagey, 120 s each on
+  the same seed with the type forced (`478c4fb1`, `9188f956`, `73f8b05b`).
+  The run and hash are shared with `golden.test.ts` in
+  `tests/golden/run.ts`; that hash is unchanged.
