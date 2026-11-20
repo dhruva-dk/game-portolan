@@ -14,6 +14,7 @@
 import { KINDS } from '../../src/kinds.ts';
 import { random } from '../../src/world/random.ts';
 import { BANDS, HELD, type Count, type ShipResult } from './metrics.ts';
+import { GROUPINGS, rate, ratings } from './rate.ts';
 import type { Result } from './run.ts';
 
 const mean = (xs: readonly number[]) =>
@@ -154,7 +155,7 @@ function byPersona(results: readonly Result[]) {
 }
 
 /** Hits of shots, as "n shots m% home". */
-const rate = (c: Count) => `${c.shots} shots ${pc(c.hits, c.shots)} home`;
+const home = (c: Count) => `${c.shots} shots ${pc(c.hits, c.shots)} home`;
 
 /** The matches summed up: their types, endings, shooting, quiet and loot. */
 function overMatches(results: readonly Result[]) {
@@ -167,7 +168,7 @@ function overMatches(results: readonly Result[]) {
       c.shots += r.shots.band[b].shots;
       c.hits += r.shots.band[b].hits;
     }
-    return `${b} ${rate(c)}`;
+    return `${b} ${home(c)}`;
   });
   const kind = KINDS.flatMap((k) => {
     const c = { shots: 0, hits: 0, balls: 0, fell: 0 };
@@ -181,7 +182,7 @@ function overMatches(results: readonly Result[]) {
     }
     return c.shots
       ? [
-          `${k} ${rate(c)} (${pc(c.balls - c.fell, c.balls)} of balls not short)`,
+          `${k} ${home(c)} (${pc(c.balls - c.fell, c.balls)} of balls not short)`,
         ]
       : [];
   });
@@ -196,7 +197,7 @@ function overMatches(results: readonly Result[]) {
       c.shots += x.shots;
       c.hits += x.hits;
     }
-    return `${k}: ${rate(c)}`;
+    return `${k}: ${home(c)}`;
   });
   // the share of ships afloat at each mark that were armed by it
   const armedBy = [30, 60, 120].map((t) => {
@@ -253,11 +254,30 @@ function byType(results: readonly Result[]) {
   return lines;
 }
 
+/** Ratings by persona (tools/harness/rate.ts), and within each match type if more than one ran. */
+function rated(results: readonly Result[]) {
+  const lines = [
+    'ratings by persona (θ: how well she lasts; e^Δθ the odds of outlasting):',
+    ...ratings(rate(results, GROUPINGS.persona)),
+  ];
+  const types = [...new Set(results.map((r) => r.type))].sort();
+  if (types.length > 1)
+    for (const t of types) {
+      const of = results.filter((r) => r.type === t);
+      lines.push(
+        `  in ${t} (${of.length} matches):`,
+        ...ratings(rate(of, GROUPINGS.persona, 100)).map((l) => `  ${l}`)
+      );
+    }
+  return lines;
+}
+
 export function summary(results: readonly Result[]): string {
   const names = [...new Set(results.flatMap((r) => r.spec.brains))];
   const lines = [
     ...byBrain(results, names),
     ...byPersona(results),
+    ...rated(results),
     ...byType(results),
     ...overMatches(results),
   ];
