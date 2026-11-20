@@ -1,7 +1,7 @@
 // Turns as unit quaternions, for the eyes the world is seen from: three's own arithmetic (Matrix4.lookAt with
 // Quaternion.setFromRotationMatrix, Quaternion.slerp, Vector3.applyQuaternion) done on plain numbers, step for step,
 // so the game and the UI turn an eye exactly as three would, without three (tests/turn.test.ts holds them to it).
-// lookAt, slerp, multiply and rotate take a last, optional `out` to write into, as sphere.ts's helpers do.
+// lookAt, slerp, axisAngle, multiply and rotate take a last, optional `out` to write into, as sphere.ts's helpers do.
 //
 // Pure arithmetic: no three, so it runs in node for the tests.
 
@@ -96,9 +96,9 @@ export function slerp(a: Turn, b: Turn, t: number, out?: Out4): Turn {
 }
 
 /** The turn of `angle` radians about the unit vector `axis`, as three's Quaternion.setFromAxisAngle. */
-export function axisAngle(axis: Vec3, angle: number): Turn {
+export function axisAngle(axis: Vec3, angle: number, out?: Out4): Turn {
   const s = Math.sin(angle / 2);
-  return [axis[0] * s, axis[1] * s, axis[2] * s, Math.cos(angle / 2)];
+  return put4(out, axis[0] * s, axis[1] * s, axis[2] * s, Math.cos(angle / 2));
 }
 
 /** a then b in a's own frame (a·b), as three's Quaternion.multiplyQuaternions(a, b): q.multiply(b) turns q about its

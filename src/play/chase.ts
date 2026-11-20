@@ -24,7 +24,7 @@ import { AIR_FOV, type Eye } from '../snapshot.ts';
 import type { ShipPose } from '../world/pose.ts';
 import { smoother } from '../world/scalar.ts';
 import {
-  R, add, arc, cross, distance, length, normalize, place, rotateAbout, scale, tangent, transport, type Vec3,
+  R, add, arc, cross, distance, length, normalize, place, rotateAbout, scale, tangent, transport, type Out3, type Vec3,
 } from '../world/sphere.ts';
 import { lookAt, rotate, slerp, type Turn } from '../world/turn.ts';
 
@@ -82,14 +82,19 @@ export function createChase(ground: (p: Vec3) => number, sea: (p: Vec3, time: nu
   /** The way the look faces along the surface at her. */
   const view = () => rotateAbout(facing, at, spin);
 
+  /** blocked's working vectors: the line, a point along it, and the place under that. */
+  const gap: Out3 = [0, 0, 0], point: Out3 = [0, 0, 0], under: Out3 = [0, 0, 0];
   /** Whether the land stands within ROOM of the straight line from a to b (metres, from the centre). */
   const blocked = (a: Vec3, b: Vec3) => {
+    const d = add(b, a, -1, gap);
     for (let i = 1; i <= SIGHT; i++) {
-      const p = add(a, add(b, a, -1), i / SIGHT);
-      if (ground(normalize(p)) + ROOM > length(p) - R) return true;
+      const p = add(a, d, i / SIGHT, point);
+      if (ground(normalize(p, under)) + ROOM > length(p) - R) return true;
     }
     return false;
   };
+  /** The eye the camera is, handed out each frame. */
+  const seeing: Eye = { kind: 'air', position, orientation, fov: AIR_FOV };
 
   /** Places the camera: its boom drawn in toward what the land and the sea ask, at `rate` per second (instantly if
    *  Infinity). */
@@ -172,9 +177,11 @@ export function createChase(ground: (p: Vec3) => number, sea: (p: Vec3, time: nu
       const ahead = view();
       return { ahead, right: cross(ahead, at) };
     },
-    /** The eye the camera is now: where it stands and how it is turned. */
+    /** The eye the camera is now: where it stands and how it is turned (the same object each time, refilled). */
     eye(): Eye {
-      return { kind: 'air', position, orientation, fov: AIR_FOV };
+      seeing.position = position;
+      seeing.orientation = orientation;
+      return seeing;
     },
     /** The line through the middle of the screen: where the eye stands and the way it looks (sim/sight.ts). */
     sight: () => ({ from: position, dir: rotate([0, 0, -1], orientation) }),

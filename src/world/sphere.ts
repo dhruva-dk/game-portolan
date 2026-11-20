@@ -53,7 +53,7 @@ export function fromLatLon(lat: number, lon: number): Vec3 {
 }
 
 /** The world position `altitude` metres above the sea over the point `up`. */
-export const place = (up: Vec3, altitude: number): Vec3 => scale(normalize(up), R + altitude);
+export const place = (up: Vec3, altitude: number, out?: Out3): Vec3 => scale(normalize(up, out), R + altitude, out);
 /** Metres above the sea. */
 export const altitude = (p: Vec3) => length(p) - R;
 

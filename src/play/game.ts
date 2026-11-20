@@ -48,7 +48,7 @@ import type { Anchor } from '../world/lattice.ts';
 import type { ShipPose } from '../world/pose.ts';
 import { R, add, bearingAt, distance, dot, normalize, scale, type Vec3 } from '../world/sphere.ts';
 import { HOTBAR, IDLE, type GunSlot, type Hands, type Item, type Kit, type Moment, type Slot, type Status } from '../player.ts';
-import { REST, anchorageEye, dragged, relaxed, type Orbit } from './anchorage.ts';
+import { REST, anchorageEye, dragged, eyeOut, relaxed, type Orbit } from './anchorage.ts';
 import { ARRIVAL, arriving } from './arrival.ts';
 import { createChase } from './chase.ts';
 import { placed, type Point, type View as Viewport } from './lens.ts';
@@ -104,8 +104,11 @@ export function createGame(world: World, anchors: readonly Anchor[], waters: Wat
   let arrival: number | null = null;
   /** Her helm while lashed, until a hand takes it. */
   let held: ((s: ShipState) => Helm) | null = null;
-  /** Whether she lies at anchor in the lobby, where the camera has been dragged round her, and its eye as last placed. */
-  let anchored = false, orbit: Orbit = REST, berth: Eye | null = null;
+  /** Whether she lies at anchor in the lobby, where the camera has been dragged round her (written over), and its eye
+   *  as last placed (into its own, kept), if it has been; and the floor it is kept over, of the land and the sea at the
+   *  world's clock `floorAt`. */
+  let anchored = false, berth: Eye | null = null, floorAt = 0;
+  const orbit: Orbit = { ...REST }, berthed = eyeOut(), floor = (p: Vec3) => Math.max(ground(p), sea.at(p, floorAt));
   /** The camera's answer to what happens, the match's time held on a blow, and the last moment they answered. */
   const shake = createShake(), stops = createStops();
   let answered = 0;
@@ -203,7 +206,7 @@ export function createGame(world: World, anchors: readonly Anchor[], waters: Wat
     view = { watch: PLAYER, hands: true, look: true, end: null };
     ended = 0;
     anchored = anchor;
-    orbit = REST;
+    Object.assign(orbit, REST);
     berth = null;
     shake.clear();
     stops.clear();
@@ -255,10 +258,10 @@ export function createGame(world: World, anchors: readonly Anchor[], waters: Wat
       last = state.poseOf(PLAYER, between) ?? last;
       if (anchored) {
         // at anchor, the look's drag turns the camera round her; let go, it eases home
-        orbit = dragged(orbit, read.look);
-        if (!read.look.held) orbit = relaxed(orbit, dt);
-        const now = state.clock(between);
-        berth = anchorageEye(last, orbit, now, (p) => Math.max(ground(p), sea.at(p, now)));
+        dragged(orbit, read.look, orbit);
+        if (!read.look.held) relaxed(orbit, dt, orbit);
+        floorAt = state.clock(between);
+        berth = anchorageEye(last, orbit, floorAt, floor, berthed);
         return;
       }
       const followed = view.watch === PLAYER ? last : state.poseOf(view.watch, between) ?? last;
@@ -271,7 +274,7 @@ export function createGame(world: World, anchors: readonly Anchor[], waters: Wat
     /** What is drawn now (snapshot.ts): the same object each time, refilled. */
     snapshot(): Snapshot {
       const eye = chase.eye(), time = state.clock(between), near = normalize(last.position);
-      const seen = anchored ? berth ?? anchorageEye(last, orbit, time, ground)
+      const seen = anchored ? berth ?? anchorageEye(last, orbit, time, ground, berthed)
         : (arrival !== null && arriving(arrival, last, eye)) || shake.on(eye);
       let n = 0;
       for (const l of state.loot().pieces) {

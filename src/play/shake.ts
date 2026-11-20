@@ -17,8 +17,8 @@ import { blowOf, felt, type Blow, type Deed } from '../player.ts';
 import type { Eye } from '../snapshot.ts';
 import { hash01 } from '../world/random.ts';
 import { clamp, easeInOut, lerp, smoother } from '../world/scalar.ts';
-import { add, type Vec3 } from '../world/sphere.ts';
-import { axisAngle, multiply, rotate, type Turn } from '../world/turn.ts';
+import { add, type Out3, type Vec3 } from '../world/sphere.ts';
+import { axisAngle, multiply, rotate, type Out4, type Turn } from '../world/turn.ts';
 
 /** All of it at this share of CAMERA's, and no field-of-view pulse past this many degrees either way. */
 const GENTLE = 0.75, PULSE = 6;
@@ -137,8 +137,12 @@ export function envelope(p: Pulse, age: number): number {
 }
 
 const DEG = Math.PI / 180;
-/** q turned by `a` radians about its own unit axis `k`. */
-const turned = (q: Turn, k: Vec3, a: number): Turn => multiply(q, axisAngle(k, a));
+/** The eye's own axes. */
+const X: Vec3 = [1, 0, 0], Y: Vec3 = [0, 1, 0], Z: Vec3 = [0, 0, 1];
+/** A turn about one of them. */
+const about: Out4 = [0, 0, 0, 1];
+/** q turned by `a` radians about its own unit axis `k` (into `out`, which may be q). */
+const turned = (q: Turn, k: Vec3, a: number, out?: Out4): Turn => multiply(q, axisAngle(k, a, about), out);
 /** A band's noise on one axis (0–5: right, up, back, pitch, yaw, roll) `f` cells in, `amount` strong. */
 const shook = (f: number, axis: number, seed: number, band: Band, amount: number) =>
   noise(f + axis * 17.3, seed + axis * 101 + (band === 'hit' ? 0 : 7)) * amount;
@@ -150,6 +154,9 @@ export function createShake(seed = 1) {
   let t = 0;
   /** The offset this frame: metres along the eye's right, up and back; degrees of pitch, yaw and roll; of the fov. */
   const o = { x: 0, y: 0, z: 0, pitch: 0, yaw: 0, roll: 0, fov: 0 };
+  /** The eye on() hands back, written over each frame; and an axis of the eye's, in the world. */
+  const shaken: Eye & { position: Out3; orientation: Out4 } = { kind: 'air', position: [0, 0, 0], orientation: [0, 0, 0, 1], fov: 0 };
+  const axis: Out3 = [0, 0, 0];
 
   return {
     /** An answer played `strength` strong, from `bearing` (radians clockwise from the look) `metres` away. */
@@ -198,10 +205,12 @@ export function createShake(seed = 1) {
     },
     /** The eye as the camera placed it, knocked and shaken (three's translateX/Y/Z, rotateY, rotateX, rotateZ). */
     on(eye: Eye): Eye {
-      const q = eye.orientation;
-      const position = add(add(add(eye.position, rotate([1, 0, 0], q), o.x), rotate([0, 1, 0], q), o.y), rotate([0, 0, 1], q), o.z);
-      const orientation = turned(turned(turned(q, [0, 1, 0], o.yaw * DEG), [1, 0, 0], o.pitch * DEG), [0, 0, 1], -o.roll * DEG);
-      return { ...eye, position, orientation, fov: eye.fov + o.fov };
+      const q = eye.orientation, p = shaken.position, t = shaken.orientation;
+      add(add(add(eye.position, rotate(X, q, axis), o.x, p), rotate(Y, q, axis), o.y, p), rotate(Z, q, axis), o.z, p);
+      turned(turned(turned(q, Y, o.yaw * DEG, t), X, o.pitch * DEG, t), Z, -o.roll * DEG, t);
+      shaken.kind = eye.kind;
+      shaken.fov = eye.fov + o.fov;
+      return shaken;
     },
     /** What the tests read of it, nothing the game does: copies of the offset now and of the trauma left in each band
      *  (what on() lays over an eye, and what drains, before they are mixed into one). */

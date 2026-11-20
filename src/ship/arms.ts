@@ -15,7 +15,7 @@ import { KINDS, gunOrder, type GunKind } from '../kinds.ts';
 import type { Light } from '../sky/light.ts';
 import type { ShipDraw } from '../snapshot.ts';
 import type { Vec3Node } from '../tsl.ts';
-import { add, dot, length, scale, type Vec3 } from '../world/sphere.ts';
+import { add, dot, length, scale, type Out3, type Vec3 } from '../world/sphere.ts';
 import { gunSurface } from './gun.ts';
 import { MUZZLE, gunShape } from './gun-shape.ts';
 import { GUN_DRAWN, GUN_MOUNT, toWorld } from './mount.ts';
@@ -62,6 +62,8 @@ export function createArms(light: Light, capacity: number) {
   });
   /** How many of each kind (gunOrder) are drawn this frame. */
   const filled = new Uint32Array(KINDS.length);
+  /** A gun's mount and the way it is laid, worked out for each in turn. */
+  const mounted: Out3 = [0, 0, 0], laid: Out3 = [0, 0, 0];
 
   return {
     meshes: drawn.map((d) => d.mesh),
@@ -70,12 +72,12 @@ export function createArms(light: Light, capacity: number) {
       filled.fill(0);
       for (const sh of ships) {
         if (!sh.afloat || !sh.gun) continue;
-        const pose = sh.pose, mount = toWorld(pose, GUN_MOUNT);
+        const pose = sh.pose, mount = toWorld(pose, GUN_MOUNT, mounted);
         if (Math.hypot(mount[0] - eye[0], mount[1] - eye[1], mount[2] - eye[2]) > NEAR) continue;
         const k = gunOrder(sh.gun.kind), a = drawn[k].list, o = filled[k]++ * FLOATS;
         // her aim laid flat on her deck; straight up or down, her bow
-        const flat = add(sh.gun.aim, pose.up, -dot(sh.gun.aim, pose.up)), size = length(flat);
-        const toward = size > 1e-3 ? scale(flat, 1 / size) : pose.forward;
+        const flat = add(sh.gun.aim, pose.up, -dot(sh.gun.aim, pose.up), laid), size = length(flat);
+        const toward = size > 1e-3 ? scale(flat, 1 / size, laid) : pose.forward;
         for (let j = 0; j < 3; j++) {
           a[o + j] = mount[j];
           a[o + 4 + j] = toward[j];
