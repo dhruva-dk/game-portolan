@@ -1,0 +1,418 @@
+# Plan: depth without draw cost
+
+Bots, loot, weapons and aim made deeper and more varied, with matches of
+distinct character, measured in the headless harness, at no cost to the
+frame on an iPad Air M1 (30–40 fps). New art for weapons and rarities is in
+scope, paid for out of the triangle budget.
+
+Branch `depth`, worktree `/Users/dk/Developer/game-portolan-depth`, off `main`
+at b184a13. `BOTS.md` stays the bots' design and log; this file is the
+roadmap above it. After a compaction, read this file, then `BOTS.md`.
+
+---
+
+## Headline
+
+**Already done (on `main`, from the `bot-harness` work).** Same 16 matches,
+80 bots each, before and after:
+
+| Measure                         | Before (975191c) | Now (b184a13) |
+| ------------------------------- | ---------------- | ------------- |
+| Bot seconds stuck (pinned)      | 20.1 s a ship    | 4.2 s (−79%)  |
+| Seconds aground                 | 3.7 s            | 0.0 s         |
+| Armed, and 90% of ships by      | 85%, 27 s        | 91%, 20 s     |
+| Sim step, median / worst        | 1.56 / 17 ms     | 1.6 / 13 ms   |
+| Draw calls (worst view, of 100) | 70               | 70            |
+| Tests                           | all pass         | 372, all pass |
+
+**Targets for this plan.** Each is a gate a milestone must meet, measured the
+same way:
+
+| Measure                                    | Now            | Target                                                  |
+| ------------------------------------------ | -------------- | ------------------------------------------------------- |
+| Distinct bot personalities                 | 6, one per bot | 6+, each with a measured, separate behaviour profile    |
+| Match types (aggressive, gold rush, …)     | 1 (equal odds) | 4, chosen by match seed, each measurably different      |
+| What can be varied in the harness          | brain tables   | brain + gunner + option weights + rules (guns, loot)    |
+| Combat measured in the harness             | none           | shots, hits, hit rate by range, kind, skill; damage     |
+| Strongest personality's rating over median | unknown        | within one standard error (none dominant)               |
+| Player assist vs best bot's hit rate       | unmeasured     | assist never better than the best bot                   |
+| Sim step, median / worst                   | 1.6 / 13 ms    | ≤ 2 / ≤ 16 ms                                           |
+| Triangles, ships and coast views           | 1359k / 1304k  | ≤ 900k (budget), new weapon and rarity art included     |
+| Draw calls, worst view                     | 70             | ≤ 80, with every weapon, rarity and shot type on screen |
+| Bot seconds stuck                          | 4.2 s          | ≤ 4.2 s (no regression)                                 |
+
+---
+
+## 1. What already exists (so we build on it, not beside it)
+
+Several things I proposed in conversation are already in the code. This list
+is the starting point, checked against the source:
+
+- **Five gun kinds** (`src/kinds.ts`: cannon, scatter, repeater, harpoon,
+  mortar) with per-kind range, damage, reload, spread, pellets, wind-up and
+  fall-off (`sim/handling.ts GUNS`, `sim/gun.ts`).
+- **Five rarity tiers** that ease damage, reload and spread (`GUN.rarities`,
+  `damageBy`, `reloadBy`, `spreadBy`).
+- **One aim assist for player and bots alike** (`sim/gun.ts laid`): the target
+  nearest the line of sight within a cone, led to where she'll be when the ball
+  lands (closed-form flight, `sim/shot.ts`), land blocking the line.
+- **Bot gunnery by skill** (`sim/gunner.ts`): reaction time, a wandering aim
+  error a sharp captain keeps to a sixth of a green one's, an unsteady hand
+  widening the spread, bursts and pauses, the gun chosen for the range
+  (`armFor`), and a ring held at each kind's best range.
+- **Loot with kinds and rarity weights** (`sim/loot.ts LOOT`), storm-phase
+  caches of rarer goods, sunk ships spilling their cargo (`overboard`,
+  `cargo`), and four stores (shields, repairs).
+- **Temperament** (`sim/temper.ts`): six styles, one drawn per bot by her seed,
+  her numbers nudged, plus `skill` and `aggro`.
+- **The harness** (`tools/harness/`): parallel headless matches, brain
+  variants, mixed fleets, paired intervals, `inspect`, `wedge`, `compare`,
+  `replay`; `tests/golden.test.ts` and `tests/scenarios.test.ts`.
+
+So the work is less "add weapons and aim" and more: **make all of it
+variable, measurable, and expressed as personality and match character**, then
+add new kinds and art where the numbers show a gap.
+
+---
+
+## 2. Ground rules
+
+1. **Depth goes into decisions, not into things drawn.** A behaviour shows
+   through what's already on screen: where a ship goes, her heading, speed,
+   when she fires, the shots and the crates. New art is welcome for new
+   _things_ (a weapon kind, a rarity), never as a signal for a behaviour.
+2. **The sim never knows about art.** A kind or rarity is an id in `sim/`; the
+   renderer maps it to a look. `sim/` and `world/` stay headless and
+   deterministic (the architecture tests already enforce this).
+3. **Draw calls grow with kinds, not with counts.** One instanced mesh per
+   kind (or one per family with a per-instance variant index into an atlas).
+   80 ships firing costs what one does.
+4. **Rarity is per-instance data on a shared material** (tint, glow, a band),
+   not a material per rarity.
+5. **Every change is measured.** It lands with harness numbers before and
+   after, logged in `BOTS.md` (bots) or here (everything else). A deliberate
+   behaviour change re-records the golden hash in the same commit.
+6. **Budgets are gates**, every milestone: `npm test`, `npm run check`,
+   `npm run budget` (draws, triangles, passes), `node tools/steps.ts` (median
+   ≤ 2 ms, worst ≤ 16 ms), and on-device frame time for anything touching the
+   renderer (`tools/ipad.sh`).
+7. **Rebase only, commit often, never push.** One worktree, no subagents
+   unless asked.
+
+---
+
+## 3. Workstreams
+
+### H. Harness first (prerequisite for everything else)
+
+The harness is good at motion and choices, blind to combat, loot and
+personality. Close that before tuning anything it can't see.
+
+| Step | What                                                                                                                                                                                                                                                                                                   | Files                                            | Gate                                                                       |
+| ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------ | -------------------------------------------------------------------------- |
+| H1   | **Combat stats per ship:** shots, hits, hit rate by range band, gun kind and rarity; damage dealt and taken; kills; time in hand per kind. Read from `state` reports (`gunfire`, sinkings), not by reaching into sim.                                                                                  | `tools/harness/metrics.ts`, `summary.ts`         | numbers agree with `tools/matches.ts` on the same seed                     |
+| H2   | **Fold `tools/matches.ts` into the harness** (its armed, hits, territory and stuck figures), then delete it. Two definitions of "stuck" today (15 m in 30 s there; pinned episodes here).                                                                                                              | `tools/matches.ts` (gone), `tools/harness/*`     | every figure it printed is in `summary`                                    |
+| H3   | **Results by personality**: group by temper style (and by persona once P2 lands), not only by brain.                                                                                                                                                                                                   | `run.ts` records each ship's style; `summary.ts` | six rows per brain                                                         |
+| H4   | **Rules overrides in a run** (`Spec.rules`): variant gun, rarity, loot and storm tables, separate from brains, since they are the game's rules, not a mind's. Needs the Rules seam (R2).                                                                                                               | `tools/harness/rules.ts` (like `brains.ts`)      | a `--rules` variant changes the result; the default leaves the golden hash |
+| H5   | **Match type as a spec field** once P3 lands; sweep over types.                                                                                                                                                                                                                                        | `run.ts`, `cli.ts`                               | per-type summary                                                           |
+| H6   | **Tournament ratings**: a Plackett–Luce (ranking) model fitted to placements over mixed fleets, with standard errors; `tools/harness/rate.ts`. Round-robins personalities, brains or rules.                                                                                                            | new `rate.ts`                                    | stable ratings over two seeds of 64 matches                                |
+| H7   | **A stand-in player** for aim-assist fairness: a scripted "player" ship that aims through the camera line exactly as the player does (centre of screen on the foe with human-like jitter), so assist hit rate can be compared with bots'. It measures fairness, not feel; feel needs hands on an iPad. | `tools/harness/player.ts`                        | hit rate by range for assist on/off                                        |
+| H8   | **Replay shows combat and personality**: shots and hits as marks, the persona in the inspector.                                                                                                                                                                                                        | `replay.ts`                                      | headless Chromium check, no errors                                         |
+
+### A. Aim
+
+| Step | What                                                                                                                                                                                                                                                   | Gate                                                    |
+| ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------- |
+| A1   | **`GUNNER` into the brain** as a `gunner` slice (it is module-private today, so no variant can touch aim). Same pattern as the other parts: the part reads `c.b.gunner`; the architecture tests' own-slice rules extend to it.                         | golden hash unchanged (pure refactor)                   |
+| A2   | **Measure**: hit rate by skill, range and kind (H1), with the stand-in player (H7) beside the bots.                                                                                                                                                    | a table in this file                                    |
+| A3   | **Tune the assist curve** (cone width, how the pull fades with angle, how far the lead is trusted) so the player's assisted hit rate sits at or below the best bots' at each range. One function, two users: player and bots stay on the same physics. | assist ≤ best bot at every range band                   |
+| A4   | **Skill shows in aim style**, not only error size: a green gunner leads too little on a crossing target and over-corrects; a sharp one leads true. Readable from the shots alone.                                                                      | hit rate monotone in skill; replay shows the difference |
+
+### P. Personalities and match character
+
+The ask: some seeds give really aggressive matches with aggressive bots.
+Today the six styles are drawn with equal odds, so every match has about the
+same mix, and a style changes only a bot's temper numbers, never how her crew
+works.
+
+| Step | What                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | Gate                                                                                                                           |
+| ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| P1   | **Option weights into the brain** (`mind.weights`). `OPTIONS` in `bot.ts` holds them as literals (storm 6, heal 3.5, flee 3.3, fight 2.6, hunt 2, loot 1.8, claim 1.5), out of reach of variants and personas.                                                                                                                                                                                                                                                                                                                  | golden unchanged                                                                                                               |
+| P2   | **A persona = temper numbers + a brain override** (`sim/persona.ts`): `{ style, over: Over }`, where `Over` is the harness's existing `variant` shape moved into `src`. An aggressive persona is high fight, low run, close standoff, high aggro, _and_ a brain that hears guns further (`hunting.earshot`), rams keener (`ramming`), never hides (`mind.cover: 0`), fights near the storm edge (`storming` margin), weights fight and hunt higher (`mind.weights`). Each persona's brain is built once per match, not per bot. | each persona's behaviour profile (fight time, nearest-foe distance, rams, place) apart from the rest by more than its interval |
+| P3   | **Match types from the match seed** (`sim/persona.ts matchMix`): weights over personas. Bloodbath (brawlers and hunters), gold rush (scavengers, richer loot table), cagey (turtles and homesteaders), mixed (as today). The match type can also pick a rules variant (a gold rush has more loot). Deterministic: same seed, same match.                                                                                                                                                                                        | per-type summaries differ: bloodbath has the shortest median match and most kills                                              |
+| P4   | **Mood that moves**: `aggro` rises with a sinking she dealt, falls with damage taken and with each storm phase, inside her persona's band. A new memory slice owned by the captain.                                                                                                                                                                                                                                                                                                                                             | spread of behaviour within one persona grows; no persona's rating moves outside its interval                                   |
+| P5   | **Legible without new effects**: behaviour first (a brawler charges, a turtle hugs the calm). Optionally a sail tint per persona (one per-instance number) and the persona in the kill feed ("sunk by a raider").                                                                                                                                                                                                                                                                                                               | budget unchanged; playtest: can you name the aggressive bots after a minute                                                    |
+| P6   | **Balance**: the tournament (H6) over personas and match types. No persona dominates; each wins some match type.                                                                                                                                                                                                                                                                                                                                                                                                                | strongest within one standard error of the median, per match type                                                              |
+
+### W. Weapons
+
+Five kinds exist. Make them data that varies, then add kinds only where the
+numbers show an empty niche.
+
+| Step | What                                                                                                                                                                                                                       | Gate                                                  |
+| ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
+| W1   | **Gun tables behind the Rules seam** (R2), so harness rule variants can change them.                                                                                                                                       | golden unchanged with default rules                   |
+| W2   | **Map the niches**: damage per second by range for each kind and rarity (from the tables, and measured by H1). Find the gaps (for instance, nothing that rewards broadside position, nothing that denies an area).         | a chart in this file                                  |
+| W3   | **Tactics per kind**: the tactician already keeps each kind's best range. Add a stance per kind where it matters (harpoon: hold a long line and pull; mortar: keep land between; scatter: close in fast, ram when loaded). | per-kind hit rate and kills rise; stuck seconds don't |
+| W4   | **New kinds, only for the gaps W2 finds** (one or two at most), each a row in `KINDS` and `GUNS`, a stance, art (G2), a sound. Each is balanced in the tournament before its art is final.                                 | no kind dominates in the tournament; budgets hold     |
+
+### L. Loot
+
+| Step | What                                                                                                                                                                                                                                                | Gate                                           |
+| ---- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| L1   | **Loot stats** (H1 extension): pickups by kind and rarity, time on the water, drops fought over (two or more ships within 150 m of a piece when it's taken).                                                                                        | in `summary`                                   |
+| L2   | **Loot tables per match type and storm phase** behind the Rules seam (the caches already rise in rarity by phase).                                                                                                                                  | gold rush arms faster than bloodbath           |
+| L3   | **New goods only where they change decisions**: a sail (speed for a while), plating (hull cap), a powder cask (next reload faster). Each needs a sim effect, a purser score, a HUD line, a crate look (G2), and a harness check that bots value it. | each new good is picked up and changes a fight |
+
+### G. Graphics and art
+
+| Step | What                                                                                                                                                                                                                                                                                                                                                                     | Gate                                                  |
+| ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------- |
+| G0   | **Pay back the triangle overruns before adding art.** Today: ships view 1359k, coast 1304k (budget 900k); map 3517k (its own 1000k). Find what's spending them (`budget` split by system) and cut with level of detail at distance, not by lowering near quality.                                                                                                        | all views within budget                               |
+| G1   | **A worst-case budget scene**: 80 ships, each with the heaviest gun of the highest rarity, every shot type in the air, every crate type on the water.                                                                                                                                                                                                                    | draws ≤ 80, triangles ≤ 900k, passes unchanged        |
+| G2   | **Art per weapon kind and rarity** under the rules in §2: one instanced mesh per kind (or one atlas mesh with a variant index), rarity as per-instance tint and glow on a shared node material, three levels of detail (a gun on a ship is a few pixels at play distance). Crates the same. Muzzle flashes and hits from the one shared puff pool `gunfire` already has. | G1 holds; on-device frame time unchanged within noise |
+| G3   | **An art seam** for weapons and crates: today their geometry is built in code (`loot/loot.ts gun(kind)`). Authored models will be a second source, so this becomes a real seam (two adapters): a table of kind → geometry and LODs, procedural or loaded.                                                                                                                | swapping one kind's look touches one row              |
+
+### R. Architecture fixes
+
+From the review below. Each is a refactor that leaves the golden hash alone,
+unless it says otherwise.
+
+| Step | What                                                                                                     | Why first                                                    |
+| ---- | -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| R1   | Split `sim/bot.ts` along the crew lines BOTS.md already draws, and break the crew's import cycle (§6.1). | P1, P2 and P4 all land in `bot.ts`; it is 759 lines already. |
+| R2   | The Rules seam (§6.2).                                                                                   | H4, W1, L2 and P3 need it.                                   |
+| R3   | One measuring path: `tools/matches.ts` into the harness (H2).                                            | two sources of truth for "stuck"                             |
+| R4   | `state.debug` out of the production state object (§6.3).                                                 | small; reduces what the live game carries                    |
+| R5   | Gunfire split by mesh (§6.4).                                                                            | before G2 adds per-kind looks                                |
+| R6   | The art seam (G3).                                                                                       | before G2                                                    |
+
+---
+
+## 4. Order and milestones
+
+Each milestone ends green on every gate in §2 and is logged.
+
+| Milestone       | Steps                         | Output                                                                       |
+| --------------- | ----------------------------- | ---------------------------------------------------------------------------- |
+| M1 Foundations  | R1, R2, A1, P1, R3/H2, H1, H3 | everything variable and measured; golden hash unchanged                      |
+| M2 Measure      | H4, H6, H7, A2, W2, L1        | tables in this file: hit rates, niches, loot flow, ratings of today's styles |
+| M3 Personality  | P2, P3, H5, P4, P6, P5        | match types and personas, balanced; new golden hash                          |
+| M4 Combat depth | A3, A4, W3, L2                | assist fair, skill readable, stances per kind                                |
+| M5 Art budget   | G0, G1, R5, R6                | room for art, and the seams it needs                                         |
+| M6 New things   | W4, L3, G2, H8                | one or two new kinds and goods, with art, balanced                           |
+| M7 Review again | §7 re-run                     | the review's findings closed or re-justified                                 |
+
+M1 and M2 come before anything a player sees, because tuning what you can't
+measure is guessing. M5 can run beside M3 and M4 (different files).
+
+---
+
+## 5. Risks
+
+| Risk                                                                                     | Mitigation                                                                                                       |
+| ---------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| Threading rules through the sim slows the hot loops (megamorphic objects, extra lookups) | One rules object per match, every table in one shape (as `variant` does for brains); `steps.ts` before and after |
+| Personas make matches feel random rather than characterful                               | Few match types, strongly different; playtest each; the kill feed names them                                     |
+| Aggressive personas raise stuck time (more ramming near shore)                           | Stuck seconds is a gate on every milestone; scenarios for ramming near land                                      |
+| Balance by harness overfits to bots and misses how players play                          | The stand-in player (H7), then real playtests on device before anything ships                                    |
+| New art blows the iPad budget                                                            | G0 and G1 first; art lands only inside the worst-case scene's budget                                             |
+| The golden hash churns and hides an unintended change                                    | Refactor commits must leave it; behaviour commits change it alone, with numbers in the log                       |
+
+---
+
+## 6. Review: a harsh senior staff graphics and gameplay pass
+
+Measured on `main` at b184a13: 195 files and 47.7k lines in `src`, 372 tests,
+budgets as in the headline. The good first, briefly, because it is what to
+protect.
+
+**What's strong.**
+
+- **The layering is real and enforced.** `sim/` imports only `world/` and
+  `kinds.ts`; nothing in the sim knows three.js. Architecture tests police
+  layers, cycles, determinism, `any`, parameter counts, clones, colours,
+  pointers, the frame owning every pass, exports nobody uses and file size.
+  Few codebases this size have that.
+- **Determinism is bit-exact and tested** (golden hash), which is what makes
+  the harness trustworthy.
+- **Draw calls are low** (70 of 100 at worst) and passes fixed at 15.
+- **The bot crew has a real design** (lookout, captain, tactician, pilot,
+  helmsman, gunner), with per-part tuning and memory, and tests that stop the
+  sailing parts from knowing about modes.
+
+**What's wrong**, most severe first:
+
+### 6.1 The bot crew is one knot, and `bot.ts` is the captain plus four other jobs (severity: high)
+
+- `sim/bot.ts` is 759 lines. It holds the lookout (`SIGHT`, `perceive`,
+  `hidden`), the captain's choice (`decide`, `OPTIONS`), and the storm, fight,
+  flee and roam options with their tuning (`STORMING`, `ROAMING`, `stormUrge`,
+  `stormGoal`, `keptInside`, `fightUrge`, `holdBack`, `losing`, `evading`,
+  `away`, `cover`, `roamGoal`). BOTS.md's own table says the lookout should be
+  `sim/lookout.ts`; it never moved.
+- There's a 9-file import cycle among `bot`, `captain`, `brain`, `purser`,
+  `hunter`, `tactician`, `pilot`, `helmsman` and `claimer`. It's type-only, so the cycles
+  test lets it through and it costs nothing at run time. But it means no part
+  can be read alone. The cause is that `captain.ts` does three jobs: it holds
+  the shared `Ctx`, it holds geometry helpers (`between`, `open`, `rotate`),
+  and it assembles `Memory` by importing every part's memory type. Meanwhile
+  `brain.ts` imports every part's tuning table, and `bot.ts` owns four of them.
+- **Option weights are literals** in `OPTIONS`, and **`GUNNER` isn't in the
+  brain**. So two of the biggest personality levers can't be varied by the
+  harness or by a persona.
+- **Two personality systems overlap with no rule between them.** `Temper` (per
+  bot, numbers) and `Brain` (per fleet, tables) both shape "how aggressive she
+  is": `t.fight * (0.6 + 0.4 * t.aggro)` in `fightUrge`, and `MIND`'s weights.
+  Nobody can say which knob to turn for "more aggressive".
+
+**Fix (R1, P1, P2, A1):**
+
+- `captain.ts` becomes a leaf, `crew/ctx.ts`, holding only the context type
+  and shared geometry. It imports no part.
+- `Memory` and `Brain` are composed in one place, `crew.ts`, the only module
+  that knows the list of parts.
+- `bot.ts` splits into `lookout.ts`, `storming.ts`, `fighting.ts` (fight, flee
+  and cover) and `roaming.ts`. `bot.ts` keeps only `think`, `decide` and the
+  option list, about 200 lines.
+- Option weights and `GUNNER` go into the brain.
+- A persona is defined as temper plus brain override (P2), and the rule is
+  written into BOTS.md: temper is who she is, brain is how her crew works.
+- Add an architecture test that forbids type cycles inside `sim/` too.
+
+### 6.2 The game's rules are module constants: nothing can vary them (severity: high, for this plan)
+
+- `GUNS`, `GUN` and `FALLOFF` (`handling.ts`), `LOOT` (`loot.ts`) and `STORM`
+  (`storm.ts`) are imported directly wherever they're read.
+- So a harness run can't try a different gun table, a match type can't carry a
+  richer loot table, and a weapon variant means editing source and
+  re-recording the golden hash.
+
+**Fix (R2):**
+
+- A `Rules` object with those tables, made once per match and passed through
+  `createState` to the sim the way `Brain` is.
+- Default rules are the current constants (golden hash unchanged); harness
+  variants are a second adapter, so this is a real seam.
+- Keep one shape for every rules object so the hot loops stay monomorphic,
+  and gate on `steps.ts`.
+
+### 6.3 `play/state.ts` is deep but carries debug and holds everything in one closure (severity: medium)
+
+- 868 lines, imports 33 files, about 20 mutable `let`s in one closure. Its
+  interface is small (`start`, `advance`, reads), so the deletion test says it
+  earns its place: it's a deep module, not a god object.
+- Two faults:
+  - It ships a `debug` sub-interface (`atSea`, `strew`, `sink`, `mindOf`)
+    inside the production object.
+  - Its phases (`sail`, `fight`, `hold`, `rideOn`, `founderAll`) are internal
+    seams that are tested only through the whole. A bug in looting is found
+    by a whole-match golden diff, not by a focused test.
+
+**Fix (R4):**
+
+- Move `debug` into a separate module that the tools and debug page build on
+  top of the state, through an internal seam, not the public interface.
+- Later, and only if a phase grows, give phases their own modules with their
+  own tests.
+- Don't split it for size alone.
+
+### 6.4 The render modules for shots and loot are monoliths, just before we add art to them (severity: medium)
+
+- `gunfire/gunfire.ts` is 911 lines, the biggest file in `src`: balls, marks,
+  puffs and their shaders in one module. `loot/loot.ts` (543) builds each gun
+  kind's crate geometry procedurally (`gun(kind)`).
+- G2 will add per-kind and per-rarity looks to both. Done in place, that
+  doubles them.
+
+**Fix (R5, G3):**
+
+- Split `gunfire.ts` by mesh: balls, marks and puffs.
+- Make weapon and crate looks a table of kind → geometry and levels of
+  detail, procedural now and authored later. With two sources that's a real
+  seam.
+
+### 6.5 The triangle budget is broken in three of five views, and nothing stops it getting worse (severity: high for art)
+
+- **Ships** 1359k, **coast** 1304k against 900k; **map** 3517k against its own
+  1000k.
+- `npm run budget` reports OVER and exits 0, so the overrun is tolerated, and
+  every art change would add to it unnoticed.
+- 15 passes a frame is also a lot for a tile-based mobile GPU: each pass is a
+  render-target switch and a round trip through memory. The budget counts
+  them but nothing ties them to measured device time.
+
+**Fix (G0, G1):**
+
+- Cut back to budget with level of detail at distance.
+- Make `budget` fail when a view is over (each view's exception written down
+  with a reason, like the architecture tests' exceptions).
+- Add the worst-case scene.
+- For passes, measure device frame time per pass on the iPad once
+  (`tools/ipad.sh`) and record which passes could merge. Don't merge blind.
+
+### 6.6 Two ways to measure a match (severity: medium)
+
+- `tools/matches.ts` and `tools/harness/` both run whole matches, with
+  different "stuck" definitions (15 m in 30 s there; pinned episodes here),
+  and only `matches.ts` counts hits. Two sources of truth will drift.
+
+**Fix (R3/H2):** fold `matches.ts` into the harness and delete it.
+
+### 6.7 Smaller findings (severity: low)
+
+- **Debug code ships in the production bundle.** `debug.ts` (612 lines,
+  importing `play` and `sim`) is imported statically by `main.ts`. Check the
+  built bundle; if it's there, load it with a dynamic import behind the debug
+  switch.
+- **A render module reads sim tables directly.** `sky/storm-field.ts` imports
+  `sim/storm.ts` as values, where other render code reads the snapshot. It's
+  allowed by the layer table, but it's a second path for storm state; route
+  it through the snapshot.
+- **`palette.ts` has 56 exports.** That's fine for named colours, but group
+  the world's colours by system so a new rarity's tint has an obvious home.
+- **The golden test covers one seed for 300 s.** Add a second, short golden
+  on a seed with many personas once P3 lands, so match types are protected
+  too.
+- **Choosing personalities is unweighted**
+  (`styles[Math.floor(u() * styles.length)]`), which is why every match looks
+  alike. P3 fixes it.
+
+---
+
+## 7. Improve-codebase-architecture run
+
+Run with the deep-module method: depth is what a caller gets per unit of
+interface; the deletion test checks whether a module earns its place; one
+adapter is a hypothetical seam, two are a real one. Candidates, best first:
+
+| #   | Module / cluster                                           | Today                                                                                                                                                                                              | Deletion test                                                                                         | Proposal                                                                                                                                                                                                                                                         | Seam real?                                                                     |
+| --- | ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| 1   | **The crew** (`bot`, `captain`, `brain`, 6 parts)          | Interface is `think(own, others, sea, memory, nature)`: small and good. But adding a part means editing `captain.ts` (Memory), `brain.ts` (Brain), `bot.ts` (OPTIONS) and the harness's `variant`. | Delete `captain.ts`: its helpers and types reappear in every part. It earns its place, but as a leaf. | A **part registry** in `crew.ts`: each part exports `{ tuning, memory(), options? }`; `Brain`, `Memory`, OPTIONS and `variant` are derived from the list. Adding a part (a gunner slice, a mood) is one new file and one line. `think`'s interface is unchanged. | Yes: brains already vary (default and variants), and personas will.            |
+| 2   | **Rules** (`GUNS`, `GUN`, `LOOT`, `STORM`)                 | Constants imported in a dozen places.                                                                                                                                                              | No module to delete; complexity is spread across readers.                                             | One `Rules` value through `createState`; readers take it from context. Interface: the tables, nothing more.                                                                                                                                                      | Yes once harness variants or match types exist (M1–M3); premature before that. |
+| 3   | **Personality** (`temper.ts` + brain variants)             | Two overlapping mechanisms; the variant builder lives in `tools/`.                                                                                                                                 | Delete `temper.ts`: its draw moves into the persona; nothing else is lost.                            | `sim/persona.ts`: `personaOf(matchSeed, botSeed) → { temper, brain }`, the match mix inside it. `variant` moves from `tools/harness/brains.ts` into `src` (personas need it at run time).                                                                        | Yes: several personas, several match types.                                    |
+| 4   | **Match measurement** (`matches.ts`, `harness/metrics.ts`) | Two implementations of the same questions.                                                                                                                                                         | Delete `matches.ts`: nothing lost once H2 lands.                                                      | One `metrics` module observing `state` through its public interface.                                                                                                                                                                                             | Not a seam: one module.                                                        |
+| 5   | **Shots and crates' looks** (`gunfire.ts`, `loot/loot.ts`) | Geometry built inline per kind.                                                                                                                                                                    | Splitting doesn't remove complexity; a table removes the per-kind branching.                          | `looks.ts`: `kind → { geometry by level of detail, rarity tint rule }`. `gunfire` and `loot` draw from it.                                                                                                                                                       | Yes when authored art arrives (procedural and authored adapters).              |
+| 6   | **The match state** (`play/state.ts`)                      | Deep: small interface, large implementation.                                                                                                                                                       | Delete it and everything falls apart: it earns its place.                                             | Leave the interface. Move `debug` out (R4). Split phases into modules only when one needs its own tests.                                                                                                                                                         | n/a                                                                            |
+
+Rejected:
+
+- **Splitting `play/state.ts` or `play/game.ts` for size alone.** Their
+  interfaces are small; splitting would make them shallower.
+- **A "Router" or "Steering" interface for the pilot and helm.** Each has one
+  adapter, so the seam is hypothetical until a second router exists. BOTS.md
+  already says "later".
+
+**Order:** 1 and 2 in M1 (they unblock everything), 3 in M3, 4 in M1, 5 in
+M5, 6 any time. Each lands as a refactor commit that leaves the golden hash,
+then the behaviour commits on top.
+
+---
+
+## 8. Log
+
+- 2026-11-20: worktree made. `main` fast-forwarded to `bot-harness`
+  (b184a13); stale worktrees and fully merged branches removed (manager work
+  kept). Uncommitted iPad stick work from the old `ipad-fixes` worktree saved
+  to `~/Downloads/ipad-fixes-uncommitted.patch`. Baseline: 372 tests pass;
+  budget as in the headline. This plan written.
