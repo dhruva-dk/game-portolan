@@ -583,3 +583,18 @@ commit; anything visible checked in headless chromium; iPad Air M1 at 30–40 fp
   holds "far off, the harpoon" only while her foe is beyond the scatter's
   reach (she closes on him, and may take it up inside). Golden re-recorded:
   `abb64139` → `060f4d3b`.
+
+- The worst step, 22 ms on this branch (14 on main), was the step the storm
+  sets its next calm: every ship making for the calm has her mark jump at
+  once, and those whose water to it had been clear (no route) all ran the
+  pathfinder in that step (profiled: 20 of its 24 ms in `findPath` under
+  `course`). Now a ship wanting a route where she had none, in open water,
+  looks for it on one of the next 6 steps, picked by the cell she is in
+  (`route.ts` ROUTE.spread; in shoal water still at once); meanwhile she
+  steers straight, or down the calm's field. Spreading a moved mark's
+  re-path instead, tried first, did nothing. The worst step by match type,
+  the game's seed, flat sea: mixed 16.4 → 11.3 ms, bloodbath 20.9 → 11.7,
+  gold rush 18.2 → 12.6, cagey 16.1 → 14.7; `npm run steps` 22.0 → 12.5
+  (main 13.9). Over 64 dealt matches: pinned 4.1 → 3.6 s a ship, aground
+  0.1 → 0.0 s, armed 90% by 16 → 15 s, ms a step 1.26 → 1.13. Golden
+  `060f4d3b` → `72ddf57a`.

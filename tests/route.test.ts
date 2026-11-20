@@ -10,6 +10,7 @@ import {
   ROUTE,
   cellCentre,
   chart,
+  course,
   findPath,
   openAt,
   type Chart,
@@ -98,6 +99,28 @@ test('a route is found round a round island, all open water, not much longer tha
   assert.ok(
     Math.min(...r.cells.map((c) => distance(cellCentre(c), start))) > 77.5
   );
+});
+
+test('ships in open water wanting a route in one step look for it over the next few, not all in that step', () => {
+  // twenty ships west of the island, along a line, all making for a mark due
+  // east of it (the island between): as when the storm sets its next calm
+  const ships = Array.from({ length: 20 }, (_, i) => at(-130, -95 + 10 * i)),
+    mark = at(130, 0);
+  const routes = ships.map(() => null as ReturnType<typeof course>['route']);
+  const looked: number[] = [];
+  for (let step = 0; step < ROUTE.spread; step++) {
+    let n = 0;
+    ships.forEach((p, i) => {
+      const had = routes[i]?.cells.length ?? 0;
+      routes[i] = course(roundChart, p, mark, routes[i], STEP).route;
+      if (had === 0 && (routes[i]?.cells.length ?? 0) > 0) n++;
+    });
+    looked.push(n);
+  }
+  console.log(`# ships finding their route, step by step: ${looked}`);
+  // each has her route within `spread` steps, and no step finds most of them
+  assert.ok(routes.every((r) => r && r.cells.length > 0 && r.found));
+  assert.ok(Math.max(...looked) <= ships.length / 2, `${looked}`);
 });
 
 test('a route goes through a strait rather than round', () => {

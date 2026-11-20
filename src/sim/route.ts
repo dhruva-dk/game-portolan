@@ -65,13 +65,15 @@ export const ROUTE = {
   wade: 6,
   /**
    * Routing: from further than `far` m, with the water to the mark not clear; a
-   * new route every `repath` s, or when the mark has moved `moved` m; a cell
+   * new route every `repath` s, or when the mark has moved `moved` m (the
+   * first, in open water, within `spread` steps of wanting it); a cell
    * `reached` within this many m; up to `ahead` cells looked ahead along it,
    * and the water looked along every `step` m.
    */
   far: 12,
   repath: 2,
   moved: 30,
+  spread: 6,
   reached: 10,
   ahead: 6,
   step: 6,
@@ -614,6 +616,22 @@ export function course(
     return { to: null, route: null };
   // (with no route, as on one, it looks again every `repath` s, not every step)
   let r = route && { ...route, repath: route.repath - dt };
+  // wanting a route where she had none, in open water, she looks for it on a
+  // step of her own, one of the next `spread` by the cell she is in: when the
+  // storm sets its next calm, every ship's mark moves in one step, and the
+  // ships whose water to it was clear would otherwise all look in that step
+  const wait = r || shoaled ? 0 : cellOf(at) % ROUTE.spread;
+  if (wait > 0)
+    return {
+      to: null,
+      route: {
+        cells: [],
+        to: want,
+        leg: 0,
+        repath: (wait - 0.5) * dt,
+        found: false,
+      },
+    };
   if (!r || r.repath <= 0 || distance(r.to, want) > ROUTE.moved) {
     const { cells, found } = findPath(ch, at, want);
     r = {

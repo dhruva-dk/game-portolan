@@ -37,7 +37,7 @@ said; met ✓, not met ✗, the call left to the owner ◐:
 | Combat measured in the harness       | none           | ✓ shots and hits by range, gun, rarity, skill and who laid it; damage; where hits fall on a hull; ratings by gun        |
 | Strongest personality over median    | unknown        | ✗ scavenger +6.2 se, hunter −7.2 se, brawler −6.4 se (the types weigh them unequally too)                               |
 | Player assist vs best bot's hit rate | unmeasured     | ◐ measured: a player's stand-in beats sharp bots by 4 / 11 / 14 points close / mid / far; the bots' hand, A3            |
-| Sim step, median / worst             | 1.6 / 13 ms    | ✗ 1.8 / 22 ms (`npm run steps`; main 1.6 / 14 the same way). The worst is the step the storm sets its next calm         |
+| Sim step, median / worst             | 1.6 / 13 ms    | ✓ 1.8 / 12.5 ms (`npm run steps`; main 1.6 / 13.9 measured alongside). It was 22 ms before the first routes were spread |
 | Triangles, ships and coast views     | 1359k / 1304k  | ✓ 630k / 576k (worst view 893k of 900k)                                                                                 |
 | Draw calls, worst view               | 70             | ✗ 86 (within the 100 budget, over this plan's 80; G1 left a draw per gun kind)                                          |
 | Bot seconds stuck                    | 4.2 s          | ✓ 3.6 s                                                                                                                 |
@@ -640,3 +640,15 @@ then the behaviour commits on top.
   End). The persona in words ("sunk by a raider") would break the screens'
   wordless language, and a glyph or sail tint per persona is new art, so
   both are the owner's. Golden unchanged.
+- 2026-11-20 (step budget): the branch's worst step had risen to 22 ms
+  (gate ≤ 16): at the storm's next calm every ship wanting a fresh route ran
+  the pathfinder in one step. A ship's first route in open water is now
+  looked for within 6 steps, by her cell (`route.ts` ROUTE.spread): worst
+  12.5 ms (main 13.9), median 1.8; stuck and arming no worse over 64
+  matches. Golden `72ddf57a`; BOTS.md has the numbers.
+- 2026-11-20 (§7 #1, the crew part registry): **not done, on purpose.**
+  Read again, adding a part is three explicit edits (`Brain`, `variant`,
+  `Memory`), each guarded by the architecture test; deriving them from a
+  list needs mapped tuple types or casts (none allowed in `src`). That is a
+  more abstract interface, not a deeper one. Revisit when a part is next
+  added and the three edits actually hurt.
