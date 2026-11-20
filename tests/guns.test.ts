@@ -212,9 +212,9 @@ test("a ball's bite holds to 60% of its range, then falls to half at full range;
     assert.equal(falloff(k, GUNS[k].range), 1);
 });
 
-test("a mortar's fall mark is drawn its splash's size (gunfire.ts MARK, which may not import the sim)", () => {
+test("a mortar's fall mark is drawn its splash's size (gunfire/marks.ts MARK, which may not import the sim)", () => {
   const text = readFileSync(
-    new URL('../src/gunfire/gunfire.ts', import.meta.url),
+    new URL('../src/gunfire/marks.ts', import.meta.url),
     'utf8'
   );
   assert.equal(
