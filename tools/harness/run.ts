@@ -17,8 +17,12 @@ import { worldOf } from './world.ts';
 /**
  * A match to run: on the planet of `planet` (the game's if not given), the
  * `match`-th dealt on it (1 the first after the lobby's), the bots' brains by
- * name, ship `id` sailing `brains[id % brains.length]`; until one is left, or
- * `seconds` (the storm's whole course and two minutes more if not given).
+ * name, ship `id` sailing `brains[(id + match) % brains.length]`; until one is
+ * left, or `seconds` (the storm's whole course and two minutes more if not
+ * given). (Turned by the match: a ship's id sets her temperament, her berth and
+ * whose shots she takes, and in a mixed fleet the even ids, sailing one brain
+ * in every match, placed better whatever brain it was. Over matches each brain
+ * sails every id alike.)
  */
 export interface Spec {
   planet?: number;
@@ -40,7 +44,8 @@ export interface Result extends MatchResult {
 
 export function runMatch(spec: Spec): Result {
   const w = worldOf(spec.planet);
-  const brainOf = (id: number) => spec.brains[id % spec.brains.length];
+  const brainOf = (id: number) =>
+    spec.brains[(id + spec.match) % spec.brains.length];
   const brains = new Map(spec.brains.map((n) => [n, brainNamed(n)]));
   const matches = createMatches(w.seed, w.planet, null, null);
   const state = createState(

@@ -115,5 +115,21 @@ export function summary(results: readonly Result[]): string {
       `${name} − ${first}: pinned ${mean(diffs).toFixed(1)} s a ship [${lo.toFixed(1)}, ${hi.toFixed(1)}] over ${diffs.length} matches`
     );
   }
+  // in mixed fleets, against the first, the place each brain's ships came to,
+  // match by match (lower is better)
+  const placeIn = (r: Result, name: string) =>
+    mean(r.ships.filter((s) => s.brain === name).map((s) => s.place));
+  for (const name of rest) {
+    const diffs = results
+      .filter(
+        (r) => r.spec.brains.includes(name) && r.spec.brains.includes(first)
+      )
+      .map((r) => placeIn(r, name) - placeIn(r, first));
+    if (diffs.length < 2) continue;
+    const [lo, hi] = interval(diffs);
+    lines.push(
+      `${name} − ${first}: place ${mean(diffs).toFixed(2)} [${lo.toFixed(2)}, ${hi.toFixed(2)}] over ${diffs.length} mixed matches (lower is better)`
+    );
+  }
   return lines.join('\n');
 }
