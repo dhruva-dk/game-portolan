@@ -11,6 +11,7 @@ import { STEP } from '../../src/sim/fixed.ts';
 import { flat } from '../../src/world/swell.ts';
 import { brainNamed } from './brains.ts';
 import { watch, type MatchResult } from './metrics.ts';
+import { ruledBy } from './rules.ts';
 import { typeNamed } from './types.ts';
 import { worldOf } from './world.ts';
 
@@ -18,8 +19,9 @@ import { worldOf } from './world.ts';
  * A match to run: on the planet of `planet` (the game's if not given), the
  * `match`-th dealt on it (1 the first after the lobby's), the bots' brains by
  * name, ship `id` sailing `brains[(id + match) % brains.length]`; of the type
- * named `type` (tools/harness/types.ts: as the game deals them if not given);
- * until one is left, or `seconds` (the storm's whole course and two minutes
+ * named `type` (tools/harness/types.ts: as the game deals them if not given),
+ * under its rules changed by the variant named `rules` (tools/harness/rules.ts:
+ * as they are if not given); until one is left, or `seconds` (the storm's whole course and two minutes
  * more if not given). (Turned by the match: a ship's id sets her temperament,
  * her berth and whose shots she takes, and in a mixed fleet the even ids,
  * sailing one brain in every match, placed better whatever brain it was. Over
@@ -30,6 +32,7 @@ export interface Spec {
   match: number;
   brains: readonly string[];
   type?: string;
+  rules?: string;
   seconds?: number;
 }
 
@@ -51,7 +54,7 @@ export function runMatch(spec: Spec): Result {
     w.planet,
     null,
     null,
-    typeNamed(spec.type)
+    ruledBy(typeNamed(spec.type), spec.rules)
   );
   const state = createState(
     w.planet,

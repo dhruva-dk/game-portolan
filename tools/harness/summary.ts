@@ -13,7 +13,7 @@
 
 import { KINDS } from '../../src/kinds.ts';
 import { random } from '../../src/world/random.ts';
-import { BANDS, HELD, type Count, type ShipResult } from './metrics.ts';
+import { BANDS, FOUGHT, HELD, type Count, type ShipResult } from './metrics.ts';
 import { GROUPINGS, rate, ratings } from './rate.ts';
 import type { Result } from './run.ts';
 
@@ -216,6 +216,33 @@ function overMatches(results: readonly Result[]) {
     `  armed, of ships afloat: ${armedBy.join(', ')}; the guns' longest silence after 30 s, median ${at(quiet, 0.5).toFixed(0)} s, most ${Math.max(...quiet).toFixed(0)} s`,
     `  loot: ${mean(results.map((r) => r.loot.start)).toFixed(0)} pieces at the start, ` +
       `${mean(results.map((r) => r.loot.shallow)).toFixed(1)} too shoal to reach; ${mean(results.map((r) => r.loot.end)).toFixed(0)} at the end`,
+    ...lootFlow(results),
+  ];
+}
+
+/** The loot taken up (L1): how long it lay and how much was fought over, the guns by rarity, and stores by kind. */
+function lootFlow(results: readonly Result[]): string[] {
+  // (results written before L1 have none)
+  const had = results.filter((r) => r.loot.taken);
+  if (!had.length) return [];
+  const n = had.length,
+    flowOf = (k: 'first' | 'later') => {
+      const f = { pieces: 0, lay: 0, fought: 0 };
+      for (const r of had) {
+        f.pieces += r.loot.taken[k].pieces;
+        f.lay += r.loot.taken[k].lay;
+        f.fought += r.loot.taken[k].fought;
+      }
+      return (
+        `${(f.pieces / n).toFixed(0)} a match, ${(f.lay / Math.max(1, f.pieces)).toFixed(0)} s on the water, ` +
+        `${pc(f.fought, f.pieces)} fought over`
+      );
+    };
+  const kinds = tally(had.map((r) => r.loot.kinds)),
+    rarity = tally(had.map((r) => r.loot.rarity));
+  return [
+    `  taken up: laid with the match ${flowOf('first')}; come on the water since ${flowOf('later')} (another ship within ${FOUGHT} m)`,
+    `  taken up by kind: ${kinds}; guns by rarity: ${rarity}`,
   ];
 }
 

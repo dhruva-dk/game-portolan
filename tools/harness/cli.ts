@@ -3,12 +3,13 @@
 // they are compared pair by pair), or one fleet of them all mixed. Writes each
 // match's result as a line of JSON and prints each brain's summary.
 //   node tools/harness/cli.ts [--brains default,keen] [--matches 8] [--from 1]
-//     [--mix] [--type name] [--seconds 300] [--planet seed] [--workers n]
-//     [--out file]
+//     [--mix] [--type name] [--rules name] [--seconds 300] [--planet seed]
+//     [--workers n] [--out file]
 // --matches: how many matches (dealt --from on); --mix: one fleet, the brains
 // dealt round it by id, not a fleet of each; --type: every match of that type
-// (tools/harness/types.ts; else each of the type the game deals it); --out:
-// the JSONL (else .cache/harness/<time>.jsonl).
+// (tools/harness/types.ts; else each of the type the game deals it); --rules:
+// each match's rules changed so (tools/harness/rules.ts); --out: the JSONL
+// (else .cache/harness/<time>.jsonl).
 //
 // Node only (tools/).
 
@@ -26,6 +27,7 @@ const { values: a } = parseArgs({
     from: { type: 'string', default: '1' },
     mix: { type: 'boolean', default: false },
     type: { type: 'string' },
+    rules: { type: 'string' },
     seconds: { type: 'string' },
     planet: { type: 'string' },
     workers: { type: 'string', default: String(CORES) },
@@ -40,6 +42,7 @@ const base = {
   ...(a.planet ? { planet: Number(a.planet) } : {}),
   ...(a.seconds ? { seconds: Number(a.seconds) } : {}),
   ...(a.type ? { type: a.type } : {}),
+  ...(a.rules ? { rules: a.rules } : {}),
 };
 const specs: Spec[] = [];
 for (let k = from; k < from + count; k++)
