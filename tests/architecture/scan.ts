@@ -68,11 +68,21 @@ export const comments = (f: Scanned) => {
   return out;
 };
 
-/** Every line of src (or of `among`) matching `pattern`, as a hit; `keep` filters by folder-relative path. */
-export const hits = (pattern: RegExp, keep: (rel: string) => boolean = () => true, among: readonly Scanned[] = files): Hit[] =>
-  among.filter((f) => keep(f.rel)).flatMap((f) =>
-    code(f.text).flatMap((line, i) => (pattern.test(line) ? [{ file: f.at, line: i + 1, text: line.trim() }] : []))
-  );
+/** Every match of `pattern` in the code of src (or of `among`), as a hit on the line it starts on; `keep` filters by
+ *  folder-relative path. Matched over the whole file, so a call the formatter wraps (`\s` takes the line's end) is
+ *  found as it would be on one line; `^` and `$` are a line's. */
+export const hits = (pattern: RegExp, keep: (rel: string) => boolean = () => true, among: readonly Scanned[] = files): Hit[] => {
+  const all = new RegExp(pattern.source, `${pattern.flags.replace(/[gm]/g, '')}gm`);
+  return among.filter((f) => keep(f.rel)).flatMap((f) => {
+    const lines = code(f.text), text = lines.join('\n'), found = new Map<number, Hit>();
+    for (const m of text.matchAll(all)) {
+      const line = text.slice(0, m.index).split('\n').length;
+      found.set(line, { file: f.at, line, text: lines[line - 1]!.trim() });
+      if (m[0] === '') all.lastIndex++;
+    }
+    return [...found.values()];
+  });
+};
 /** The same, in src, the tests and the tools. */
 export const anywhere = (pattern: RegExp) => hits(pattern, undefined, everywhere);
 
