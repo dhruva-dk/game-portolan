@@ -8,7 +8,8 @@
 // for the same inputs, to the bit.
 
 import { distance, toward, type Vec3 } from '../world/sphere.ts';
-import { course, type Route } from './route.ts';
+import { course, downField, type Route } from './route.ts';
+import { toEdge } from './storm.ts';
 import type { Ctx } from './captain.ts';
 import type { Mark, Pace } from './tactician.ts';
 
@@ -54,9 +55,17 @@ export function navigate(c: Ctx, mark: Mark, foe: number, dt: number): Way {
     foe,
   };
   if (!mark.at) return way;
-  const r = c.sea.chart && course(c.sea.chart, at, mark.at, m.route, dt);
+  const ch = c.sea.chart,
+    r = ch && course(ch, at, mark.at, m.route, dt);
   m.route = r ? r.route : null;
-  if (r && r.to)
-    [way.want, way.distance] = [toward(at, r.to), distance(at, r.to)];
+  // a mark in the calm her route doesn't reach (the pathfinder gave up round a
+  // long coast): down the chart's way in, not to the cell nearest it
+  const calm = c.sea.calm,
+    by =
+      ch && r?.route && !r.route.found && calm && toEdge(mark.at, calm.cap) > 0
+        ? downField(ch, calm.field, at)
+        : null,
+    to = by ?? r?.to;
+  if (to) [way.want, way.distance] = [toward(at, to), distance(at, to)];
   return way;
 }

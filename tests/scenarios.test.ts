@@ -8,7 +8,13 @@ import { DEFAULT_BRAIN, nature, type Brain } from '../src/sim/brain.ts';
 import { mind, think, type Memory, type Seen } from '../src/sim/bot.ts';
 import { afloat, stepFleet, type Vessel } from '../src/sim/contact.ts';
 import { STEP } from '../src/sim/fixed.ts';
-import { chart } from '../src/sim/route.ts';
+import {
+  building,
+  chart,
+  downField,
+  findPath,
+  openAt,
+} from '../src/sim/route.ts';
 import { shipAt } from '../src/sim/ship.ts';
 import type { Depth } from '../src/sim/shoal.ts';
 import {
@@ -106,4 +112,45 @@ test("a bot routed round an island's shoulder keeps her bow off it: she is never
     );
     assert.equal(r.pinned, 0, `cover ${cover}: ${r.modes.join(' ')}`);
   }
+});
+
+/** Metres east and north of c0, of a point near it. */
+function en(p: Vec3): [number, number] {
+  const t = toward(c0, p),
+    d = distance(c0, p);
+  if (!t) return [0, 0];
+  const dot = (b: Vec3) => t[0] * b[0] + t[1] * b[1] + t[2] * b[2];
+  return [d * dot(east), d * dot(north)];
+}
+
+test('the way into the calm leads round the end of a long wall, where a route given up on runs to the wall nearest it', () => {
+  // a wall of land 20 m thick from 300 m west to 200 m east; she lies 50 m
+  // south of it, the calm's heart 60 m north
+  const depth: Depth = (p) => {
+      const [e, n] = en(p);
+      return Math.abs(n) < 10 && e > -300 && e < 200 ? -10 : 30;
+    },
+    ch = chart(depth),
+    heart = at(0, 60),
+    from = at(0, -50);
+  // the pathfinder given little work gives up, its route ending at the wall
+  const gaveUp = findPath(ch, from, heart, 200);
+  assert.ok(!gaveUp.found);
+  // the field, found a share at a time, leads round
+  const f = building(ch, (p) => distance(p, heart) < 30);
+  let shares = 0;
+  while (!f.build(5000)) shares++;
+  assert.ok(shares > 2, `whole in ${shares + 1} shares`);
+  let p = from,
+    hops = 0,
+    furthestEast = 0;
+  for (; hops < 200; hops++) {
+    const to = downField(ch, f.field, p);
+    if (!to) break;
+    assert.ok(openAt(ch, to));
+    p = to;
+    furthestEast = Math.max(furthestEast, en(p)[0]);
+  }
+  assert.ok(distance(p, heart) < 40, `ended ${en(p).map(Math.round)}`);
+  assert.ok(furthestEast > 200, `round the east end: ${furthestEast}`);
 });

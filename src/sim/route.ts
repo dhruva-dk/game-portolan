@@ -371,6 +371,29 @@ function pop(s: Space): number {
   return top;
 }
 
+/** stepsOf's cells. */
+const STEPS = new Int32Array(8);
+
+/**
+ * The cells a route may step to from c (into `out`), how many: its four
+ * neighbours, west, east, south, north on its face; then its diagonals, west or
+ * east and then south or north, each only with both cells beside it open, so
+ * it cuts no corner of land, and only to a cell beside this one. Open or not.
+ */
+function stepsOf(ch: Chart, c: number, out: Int32Array): number {
+  let n = 0;
+  for (let k = 0; k < 4; k++) out[n++] = neighbour(c, k);
+  for (let k = 4; k < 8; k++) {
+    const x = neighbour(c, k & 1),
+      y = neighbour(c, 2 + ((k >> 1) & 1));
+    if (!ch.open[x] || !ch.open[y]) continue;
+    const m = neighbour(x, 2 + ((k >> 1) & 1));
+    if (gap(ch.space, c, m) > STRIDE) continue;
+    out[n++] = m;
+  }
+  return n;
+}
+
 /**
  * A route of cells from p to q over open water, keeping off the shore where it
  * can. Gives up after `work` cells. `found` false when there is none: `cells`
@@ -412,19 +435,9 @@ export function findPath(
       bestH = h;
       best = c;
     }
-    for (let k = 0; k < 8; k++) {
-      let m: number;
-      if (k < 4) m = neighbour(c, k);
-      else {
-        // a diagonal: west or east, then south or north; only with both cells
-        // beside it open, so it cuts no corner of land, and only to a cell
-        // beside this one
-        const x = neighbour(c, k & 1),
-          y = neighbour(c, 2 + ((k >> 1) & 1));
-        if (!ch.open[x] || !ch.open[y]) continue;
-        m = neighbour(x, 2 + ((k >> 1) & 1));
-        if (gap(s, c, m) > STRIDE) continue;
-      }
+    const n = stepsOf(ch, c, STEPS);
+    for (let i = 0; i < n; i++) {
+      const m = STEPS[i];
       if (!ch.open[m] && m !== to) continue;
       const gm =
         gc + gap(s, c, m) * (ch.clear[m] >= ROUTE.offshore ? 1 : ROUTE.hug);
@@ -440,6 +453,128 @@ export function findPath(
   return { cells: cells.reverse(), found };
 }
 
+// ---------------------------------------------------------------- a way in
+
+/**
+ * The chart's way into some water from everywhere: for each cell, what the
+ * cheapest route from it into that water costs (as findPath reckons it: metres,
+ * the shore's cells dearer), 0 in it, Infinity where none reaches. Found once
+ * for every ship, it has the ways round a long coast the pathfinder gives up on
+ * within its work, where its route ran to the cell nearest the mark: the head
+ * of the cove pointing at it.
+ */
+export type Field = Float32Array;
+
+/**
+ * A field being found, a share at a time: `build(work)` looks at about `work`
+ * cells more, and says whether the field is whole. Some 200,000 in all; done
+ * at once, some 20 ms, more than a frame has.
+ */
+interface Building {
+  readonly field: Field;
+  build(work: number): boolean;
+}
+
+/** The field into the open cells whose centres `into` holds, to be found. */
+export function building(ch: Chart, into: (p: Vec3) => boolean): Building {
+  const cost = new Float32Array(CELLS).fill(Infinity),
+    heap = new Int32Array(CELLS),
+    at = new Int32Array(CELLS).fill(-1),
+    steps = new Int32Array(8);
+  let size = 0,
+    seeded = 0;
+  // an indexed heap of cells by cost (the least first; of two the same, the
+  // lower cell)
+  const before = (a: number, b: number) =>
+    cost[a] < cost[b] || (cost[a] === cost[b] && a < b);
+  const put = (i: number, c: number) => {
+    heap[i] = c;
+    at[c] = i;
+  };
+  const up = (i: number) => {
+    const c = heap[i];
+    while (i > 0) {
+      const p = (i - 1) >> 1;
+      if (!before(c, heap[p])) break;
+      put(i, heap[p]);
+      i = p;
+    }
+    put(i, c);
+  };
+  const down = (i: number) => {
+    const c = heap[i];
+    for (;;) {
+      const l = 2 * i + 1;
+      if (l >= size) break;
+      const k = l + 1 < size && before(heap[l + 1], heap[l]) ? l + 1 : l;
+      if (!before(heap[k], c)) break;
+      put(i, heap[k]);
+      i = k;
+    }
+    put(i, c);
+  };
+  const build = (work: number): boolean => {
+    // the water it leads into, every cell looked at
+    for (; seeded < CELLS && work > 0; seeded++, work--) {
+      const c = seeded;
+      if (ch.open[c] && into(cellCentre(c, looked))) {
+        cost[c] = 0;
+        put(size, c);
+        up(size++);
+      }
+    }
+    // then out from it, the cheapest first
+    for (; size > 0 && work > 0; work--) {
+      const c = heap[0];
+      at[c] = -2;
+      if (--size > 0) {
+        put(0, heap[size]);
+        down(0);
+      }
+      // the way from each open cell beside it, its cost stepping into this one
+      const step = ch.clear[c] >= ROUTE.offshore ? 1 : ROUTE.hug,
+        n = stepsOf(ch, c, steps);
+      for (let i = 0; i < n; i++) {
+        const m = steps[i];
+        if (!ch.open[m] || at[m] === -2) continue;
+        const g = cost[c] + gap(ch.space, m, c) * step;
+        if (g >= cost[m]) continue;
+        cost[m] = g;
+        if (at[m] < 0) {
+          put(size, m);
+          up(size++);
+        } else up(at[m]);
+      }
+    }
+    return seeded === CELLS && size === 0;
+  };
+  return { field: cost, build };
+}
+
+/**
+ * Where a ship at `at` steers down field `f`: the cell furthest down it, up to
+ * ROUTE.ahead cells on, that the water to is clear (the first in any case);
+ * null in the water it leads into, or where none of it reaches her.
+ */
+export function downField(ch: Chart, f: Field, at: Vec3): Vec3 | null {
+  let c = nearestOpen(ch, ch.space, at, ROUTE.wade);
+  if (c < 0 || !(f[c] > 0 && f[c] < Infinity)) return null;
+  let to = -1;
+  for (let k = 0; k < ROUTE.ahead && f[c] > 0; k++) {
+    const n = stepsOf(ch, c, STEPS);
+    let next = -1;
+    for (let i = 0; i < n; i++) {
+      const m = STEPS[i];
+      if (ch.open[m] && f[m] < (next < 0 ? f[c] : f[next])) next = m;
+    }
+    if (next < 0) break;
+    c = next;
+    if (to >= 0 && !clearLine(ch, at, cellCentre(c, centre), ROUTE.step)) break;
+    to = c;
+  }
+  return to < 0 ? null : cellCentre(to);
+}
+
 // ---------------------------------------------------------------- following
 // one
 
@@ -452,6 +587,8 @@ export interface Route {
   readonly to: Vec3;
   readonly leg: number;
   readonly repath: number;
+  /** Whether it reaches the mark (else it runs to the cell nearest it). */
+  readonly found: boolean;
 }
 
 /**
@@ -478,12 +615,13 @@ export function course(
   // (with no route, as on one, it looks again every `repath` s, not every step)
   let r = route && { ...route, repath: route.repath - dt };
   if (!r || r.repath <= 0 || distance(r.to, want) > ROUTE.moved) {
-    const { cells } = findPath(ch, at, want);
+    const { cells, found } = findPath(ch, at, want);
     r = {
       cells,
       to: want,
       leg: Math.min(1, cells.length - 1),
       repath: ROUTE.repath,
+      found,
     };
   }
   const { cells } = r;

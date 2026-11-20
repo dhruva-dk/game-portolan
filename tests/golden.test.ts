@@ -16,7 +16,7 @@ import { flat } from '../src/world/swell.ts';
 
 /** Seconds of the match stepped; the hash it comes to. */
 const SECONDS = 300,
-  GOLDEN = 'e9be4e05';
+  GOLDEN = '109c72f7';
 
 /** FNV-1a over the bits of every number given, as eight hex digits. */
 function fingerprint(numbers: readonly number[]): string {

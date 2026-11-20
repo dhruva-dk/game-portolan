@@ -7,7 +7,7 @@
 import { armed, type Crew, type Order } from '../sim/battle.ts';
 import { think, type Memory, type Sea, type Seen } from '../sim/bot.ts';
 import type { Nature } from '../sim/brain.ts';
-import type { Chart } from '../sim/route.ts';
+import { building, type Chart } from '../sim/route.ts';
 import type { Vessel } from '../sim/contact.ts';
 import type { Holdings } from '../sim/claimer.ts';
 import type { Report } from '../sim/hunter.ts';
@@ -15,8 +15,8 @@ import type { Flotsam } from '../sim/loot.ts';
 import { PLAYER } from '../sim/match.ts';
 import type { Helm } from '../sim/ship.ts';
 import { NOTHING, type Ask } from '../sim/stores.ts';
-import type { Storm } from '../sim/storm.ts';
-import type { Vec3 } from '../world/sphere.ts';
+import type { Cap, Storm } from '../sim/storm.ts';
+import { distance, R, type Vec3 } from '../world/sphere.ts';
 
 /**
  * What a ship's orders come from aboard her: her bot's mind (null: the player's
@@ -45,6 +45,24 @@ interface SeaNow {
 const HOLD_FIRE: Order = { aim: null, fire: false };
 
 /**
+ * The calm's heart, the field leads into: within this share of its radius of
+ * its centre (where the bots make for, sim/bot.ts STORMING.inward).
+ */
+const HEART = 0.6;
+/**
+ * Cells of it looked at a step (some 0.8 ms; whole in some 25 steps, under a
+ * second).
+ */
+const CALM_WORK = 8000;
+
+/** Whether two caps are the same. */
+const same = (a: Cap, b: Cap) =>
+  a.radius === b.radius &&
+  a.centre[0] === b.centre[0] &&
+  a.centre[1] === b.centre[1] &&
+  a.centre[2] === b.centre[2];
+
+/**
  * The orders' maker on a planet of this depth, its open water charted for the
  * bots' routes.
  */
@@ -69,6 +87,8 @@ export function createOrders(depth: (p: Vec3) => number, chart: Chart) {
     gunfire: [],
   };
   const out = { helms, orders, asks };
+  /** The way into the next calm, while it is being found. */
+  let coming: { cap: Cap; found: ReturnType<typeof building> } | null = null;
 
   /**
    * A ship as the bots see her: where she is and goes, her hit points, her gun,
@@ -104,6 +124,24 @@ export function createOrders(depth: (p: Vec3) => number, chart: Chart) {
     asks.clear();
     for (const v of fleet) seen.push(sight(v, crews.get(v.id)!));
     sea.storm = now.storm;
+    // the way into the calm, found a share each step as the storm sets the
+    // next (till then, the last)
+    const next = now.storm.next;
+    if (
+      !(coming && same(coming.cap, next)) &&
+      !(sea.calm && same(sea.calm.cap, next))
+    ) {
+      const heart = HEART * next.radius * R,
+        centre = next.centre;
+      coming = {
+        cap: { centre, radius: next.radius },
+        found: building(chart, (p) => distance(p, centre) <= heart),
+      };
+    }
+    if (coming?.found.build(CALM_WORK)) {
+      sea.calm = { cap: coming.cap, field: coming.found.field };
+      coming = null;
+    }
     sea.loot = now.loot.pieces;
     sea.holdings = now.holdings;
     sea.gunfire = now.gunfire;

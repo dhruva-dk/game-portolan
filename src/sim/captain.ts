@@ -13,9 +13,9 @@ import { STEP } from './fixed.ts';
 import { SHIP } from './handling.ts';
 import type { Gunner } from './gunner.ts';
 import type { ShipState } from './ship.ts';
-import type { Chart } from './route.ts';
+import type { Chart, Field } from './route.ts';
 import type { Depth } from './shoal.ts';
-import type { Storm } from './storm.ts';
+import type { Cap, Storm } from './storm.ts';
 import type { Temper } from './temper.ts';
 import type { Brain } from './brain.ts';
 import type { Crew } from './battle.ts';
@@ -62,7 +62,8 @@ export interface Seen {
  * her way along it; the storm now (storm.ts), without which she pays it no
  * heed; and the loot on the water (loot.ts); and who holds it (territory.ts),
  * without which she claims none; and the guns ringing out (hunter.ts), without
- * which she hears none.
+ * which she hears none; and the chart's way into the calm, without which a
+ * mark in it she finds no route to she makes for as near as the route goes.
  */
 export interface Sea {
   depth: Depth;
@@ -71,6 +72,16 @@ export interface Sea {
   loot?: readonly Loot[];
   holdings?: Holdings | null;
   gunfire?: readonly Report[];
+  calm?: Calm | null;
+}
+
+/**
+ * The calm the storm closes to next, and the chart's field (route.ts) into its
+ * heart, found once a phase for every ship.
+ */
+interface Calm {
+  readonly cap: Cap;
+  readonly field: Field;
 }
 
 export type Mode =

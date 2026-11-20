@@ -209,7 +209,7 @@ commit; anything visible checked in headless chromium; iPad Air M1 at 30–40 fp
         (E1a done: steering by eye wants water `ROUTE.wide` cells off.)
   - [ ] E2 Water bodies labelled; goals snapped to her own.
   - [ ] E3 Progress-based stuck; goal blacklist.
-  - [ ] E4 Storm flow field per phase (Router #2).
+  - [x] E4 Storm flow field per phase (Router #2): `Sea.calm`, `downField`.
   - [ ] E5 Context steering on the clearance field (Steering #2).
 - [ ] **F. Stretch.** Mixed-fleet tournament + ratings; 2D replay HTML.
   - [x] F1 Hunting to the sound of guns (`sim/hunter.ts`, its own role:
@@ -394,3 +394,29 @@ commit; anything visible checked in headless chromium; iPad Air M1 at 30–40 fp
     14.0 → 12.4 s a ship, −1.5 [−2.8, −0.3]; aground 4.2 → 3.7 s; claim
     circling 2.3 → 1.8 s.** From 60°: +0.6 s worse than 90°.
   - Golden → `e9be4e05`. Variants `shoreBites`, `noCramp` kept.
+- E4, the way into the calm (flow field): clustering pinned runs by place
+  (40 m), 15 places held 60% of all pinned time, the worst 9% (33 runs in 5
+  matches): the planet's traps, the same every match. m2 #27 there: not
+  wedged (`wedge.ts` frees her any way), but her route was 3 cells long for
+  a storm goal 462 m off _in her own water_ (a flood says so). `findPath`
+  caps its work at 16,000 cells; round a ragged coast with the shore's
+  surcharge that isn't enough, and a route given up on runs to the cell
+  nearest the mark: the head of the cove pointing at the calm, where every
+  storm-bound ship near piled in. More A\* work is out (80 ships re-route
+  every 2 s). Now: `route.ts` `building(ch, into)` finds a Dijkstra field
+  over the whole chart from the calm's heart outward (the shore's cells
+  dearer, as `findPath`), 8,000 cells a step (`orders.ts` `CALM_WORK`,
+  whole in < 1 s) as each phase sets the next cap; the orders hand it to
+  bots as `Sea.calm`. The pilot, whose route to a mark inside the calm was
+  not found, steers `downField` (the furthest cell down it, up to 6 on, the
+  water clear). Mode-free: a property of the mark, not her mind's mode.
+  findPath's neighbour loop is now `stepsOf`, shared (bit-exact).
+  - **Pinned 12.4 → 4.2 s a ship (−8 s, intervals far from 0); aground 3.7
+    → 0.0 s; mean speed 13.4 → 14.5 m/s.** 27% of ships ever pinned (35%).
+    Stuck now: storm 52%, claim 27%, loot 12%.
+  - Cost: built at once, 20 ms (worst step 34 ms, a hitch each phase on
+    the iPad), so built in shares: worst step 13 ms (base 17–20: the field
+    spares the long failed searches), median 1.6 ms as before. Headless
+    budget unchanged.
+  - Test: `scenarios.test.ts`, a long wall between her and the heart.
+  - Golden → `109c72f7`.
