@@ -431,3 +431,26 @@ then the behaviour commits on top.
   shadow map covers (143 m round the land tile nearest the eye) are drawn at
   full detail in the world pass, seen or not, however far off (the map's
   near palms, shrubs and rocks are those, 1200 m away).
+- 2026-11-20 (G0 done): every view within budget. The shadow map's
+  stand-ins have their own instances (`land/site.ts` casting), so the world
+  pass draws only tiles in view, each at its distance's level; palms gain far
+  (past 220 m, 320 tri) and distant (past 600 m, 44 tri: a blade a frond)
+  levels, shrubs far (past 220 m, 20 leaves), rocks distant (past 600 m);
+  one table of reaches in `land/groves.ts` (REACH). Far levels use fewer
+  shapes (palms two leans then one, shrubs one) to hold the draws.
+
+  | view  | before             | after          |
+  | ----- | ------------------ | -------------- |
+  | sea   | 69 draws, 822k tri | 70 draws, 477k |
+  | coast | 70 draws, 1304k    | 73 draws, 576k |
+  | ships | 70 draws, 1359k    | 73 draws, 630k |
+  | lobby | 54 draws, 814k     | 59 draws, 259k |
+  | map   | 60 draws, 3517k    | 34 draws, 513k |
+
+  Passes unchanged (15). Ashore, 14 m up among the palms: 974k to 674k.
+  Judged by eye and by pixel diff against the old captures: under 0.15% of
+  pixels differ in any view, all on palms 90–300 m off; ashore 0.03%. From
+  space the palms and rocks read as before (blade shaded and sized to match a
+  crown's leaflets). The map's own 1000k limit is dropped: it is held to the
+  sea's 900k. `npm run budget` already exited 1 when a view was over (§6.5's
+  "exits 0" was stale); it is the gate.
