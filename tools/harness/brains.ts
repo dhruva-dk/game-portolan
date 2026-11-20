@@ -34,6 +34,7 @@ function merged<T extends object>(name: string, b: T, o?: Partial<T>): T {
 /** A whole brain: the default with `over`'s changes, keys in the default's order. */
 export function variant(over: Over, base: Brain = DEFAULT_BRAIN): Brain {
   return {
+    choice: merged('choice', base.choice, over.choice),
     sight: merged('sight', base.sight, over.sight),
     mind: merged('mind', base.mind, over.mind),
     roaming: merged('roaming', base.roaming, over.roaming),
@@ -43,6 +44,7 @@ export function variant(over: Over, base: Brain = DEFAULT_BRAIN): Brain {
     purser: merged('purser', base.purser, over.purser),
     claimer: merged('claimer', base.claimer, over.claimer),
     hunting: merged('hunting', base.hunting, over.hunting),
+    gunnery: merged('gunnery', base.gunnery, over.gunnery),
     styles: over.styles ?? base.styles,
   };
 }

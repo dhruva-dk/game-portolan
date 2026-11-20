@@ -39,7 +39,8 @@ import {
   toward,
   type Vec3,
 } from '../world/sphere.ts';
-import type { Crew, Order } from './battle.ts';
+import type { Order } from './battle.ts';
+import { roll, type Ctx } from './captain.ts';
 import { damageOf, falloff, reloadOf, spreadOf } from './gun.ts';
 import type { GunKind } from '../kinds.ts';
 import { GUNS, SHIP } from './handling.ts';
@@ -47,13 +48,42 @@ import type { ShipState } from './ship.ts';
 import { thrown } from './shot.ts';
 import type { Sight } from './sight.ts';
 
-/** Everything a bot's gunnery is tuned by. Seconds and metres. */
+/**
+ * Her aim's feel: the same for every bot, whatever her brain (a fairness to
+ * the player, not a choice of hers: BOTS.md decision 4). Seconds and metres.
+ */
 const GUNNER = {
   /**
    * Seconds before a green, and a sharp, captain first fires on a ship she has
    * just seen.
    */
   react: [2.2, 0.3] as const,
+  /**
+   * Her error, as a share of the distance, for a green captain; a sharp one's a
+   * sixth of it. It wanders to a new mark every `wander` s, and follows it at 2
+   * a second.
+   */
+  error: 0.2,
+  wander: [0.6, 1.4] as const,
+  /**
+   * Her hand is less steady than she thinks: her balls spread 1 + `unsteady` ×
+   * (1 − skill) times the gun's own. (2.5 when a common gun spread 0.05; with
+   * it 0.03, 4.5 keeps the bots' balls striking home as often over a match,
+   * some 85 in 100, tools/matches.ts.)
+   */
+  unsteady: 4.5,
+  /**
+   * Her eye aloft, metres over the sea, from which she sights the gun on her
+   * mark.
+   */
+  aloft: 20,
+} as const;
+
+/**
+ * How she fights her guns: her brain's to choose (brain.ts gunnery), as an
+ * aggressive captain holds closer and fires longer bursts. Seconds and metres.
+ */
+export const GUNNERY = {
   /**
    * The range she holds with each gun in hand, m (the cannon's 95, the rest
    * where each does most), by her temperament's standoff; closer than `inside`
@@ -84,31 +114,12 @@ const GUNNER = {
    */
   weave: [4, 9] as const,
   /**
-   * Her error, as a share of the distance, for a green captain; a sharp one's a
-   * sixth of it. It wanders to a new mark every `wander` s, and follows it at 2
-   * a second.
-   */
-  error: 0.2,
-  wander: [0.6, 1.4] as const,
-  /**
    * She fires within this share of the gun's range, in bursts of `burst` s with
    * pauses of `pause` s.
    */
   reach: 0.95,
   burst: [1.5, 4] as const,
   pause: [0.8, 2.2] as const,
-  /**
-   * Her hand is less steady than she thinks: her balls spread 1 + `unsteady` ×
-   * (1 − skill) times the gun's own. (2.5 when a common gun spread 0.05; with
-   * it 0.03, 4.5 keeps the bots' balls striking home as often over a match,
-   * some 85 in 100, tools/matches.ts.)
-   */
-  unsteady: 4.5,
-  /**
-   * Her eye aloft, metres over the sea, from which she sights the gun on her
-   * mark.
-   */
-  aloft: 20,
 } as const;
 
 /** What her gunnery carries from one step to the next. */
@@ -189,14 +200,18 @@ function suits(g: { kind: GunKind; rarity: number }, metres: number): number {
 
 /**
  * The gun slot she would take in hand at `metres` from her foe (null: none, or
- * GUNNER.idle with no foe), or null to keep the one she has.
+ * her gunnery's `idle` with no foe), or null to keep the one she has. Nothing
+ * without a crew.
  */
-export function armFor(c: Crew, metres: number | null): number | null {
-  const d = metres ?? GUNNER.idle;
+export function armFor(x: Ctx, metres: number | null): number | null {
+  const c = x.own.crew,
+    t = x.b.gunnery;
+  if (!c) return null;
+  const d = metres ?? t.idle;
   const score = (i: number) => {
     const g = c.guns[i];
     return g
-      ? suits(g, d) * (g.reload > 0 || g.rounds <= 0 ? GUNNER.reloading : 1)
+      ? suits(g, d) * (g.reload > 0 || g.rounds <= 0 ? t.reloading : 1)
       : 0;
   };
   const mine = c.guns[c.hand];
@@ -204,11 +219,7 @@ export function armFor(c: Crew, metres: number | null): number | null {
   let best = c.hand,
     bs = score(c.hand);
   c.guns.forEach((g, i) => {
-    if (
-      g &&
-      i !== c.hand &&
-      score(i) > Math.max(bs * GUNNER.swap, mine ? 1e-9 : 0)
-    )
+    if (g && i !== c.hand && score(i) > Math.max(bs * t.swap, mine ? 1e-9 : 0))
       [best, bs] = [i, score(i)];
   });
   // with nothing in hand, any gun she has
@@ -218,36 +229,31 @@ export function armFor(c: Crew, metres: number | null): number | null {
 
 /**
  * Where she makes for in a gun fight with `foe`: a point on the ring of her
- * preferred range with the gun of `kind` round her foe, a little round from
- * where she lies. Turns the way she circles when it is time. Updates `g`.
+ * preferred range with the gun of `kind` round her foe (by her temperament's
+ * standoff), a little round from where she lies. Turns the way she circles
+ * when it is time. Updates her gunner's memory.
  */
-export function ring(
-  g: Gunner,
-  at: Vec3,
-  foe: Mark,
-  kind: GunKind,
-  standoff: number,
-  skill: number,
-  draw: () => number,
-  dt: number
-): Vec3 {
+export function ring(c: Ctx, foe: Mark, kind: GunKind, dt: number): Vec3 {
+  const g = c.m,
+    t = c.b.gunnery,
+    at = c.own.ship.at;
   g.circleT -= dt;
   if (g.circleT <= 0) {
     g.circle = -g.circle;
-    g.circleT = between(draw, GUNNER.weave) * (1 - 0.6 * skill);
+    g.circleT = between(() => roll(c.m), t.weave) * (1 - 0.6 * c.t.skill);
   }
-  const pref = GUNNER.pref[kind] * standoff,
+  const pref = t.pref[kind] * c.t.standoff,
     f = foe.ship.at;
   const out = toward(f, at) ?? scale(foe.ship.heading, -1);
   const round = add(
-    scale(out, Math.cos(GUNNER.swing)),
+    scale(out, Math.cos(t.swing)),
     cross(f, out),
-    g.circle * Math.sin(GUNNER.swing)
+    g.circle * Math.sin(t.swing)
   );
   return along(
     f,
     round,
-    distance(at, f) < pref * GUNNER.inside ? pref * GUNNER.out : pref
+    distance(at, f) < pref * t.inside ? pref * t.out : pref
   ).p;
 }
 
@@ -256,19 +262,21 @@ export function ring(
  * will be when the ball comes down, with her wandering error, and fired when
  * she is in its range, has got over first seeing her, is in a burst, and isn't
  * told to `hold` it; her balls spread by her skill. With no foe in sight she
- * looks along her heading and holds her fire. `clock` is hers (s). Updates `g`.
+ * looks along her heading and holds her fire. Updates her gunner's memory.
  */
 export function aimAndFire(
-  g: Gunner,
-  own: ShipState,
+  c: Ctx,
   foe: Mark | null,
   kind: GunKind,
-  clock: number,
-  skill: number,
-  draw: () => number,
-  dt: number,
-  hold = false
+  hold: boolean,
+  dt: number
 ): Order {
+  const g = c.m,
+    t = c.b.gunnery,
+    own = c.own.ship,
+    skill = c.t.skill,
+    clock = c.m.clock,
+    draw = () => roll(c.m);
   const eye = place(own.at, GUNNER.aloft),
     bore = GUNS[kind];
   /** Her line of sight from aloft onto the sea at `p`. */
@@ -303,22 +311,17 @@ export function aimAndFire(
   const miss = GUNNER.error * (1 - 0.85 * skill) * d;
   const mark = normalize(add(lead, g.err, miss / R));
   const aim = sight(mark);
-  if (
-    d > bore.range * GUNNER.reach ||
-    d < bore.least ||
-    clock < g.react ||
-    hold
-  )
+  if (d > bore.range * t.reach || d < bore.least || clock < g.react || hold)
     return { aim, fire: false };
   // bursts: firing whenever loaded through one, holding fire through the pause
   // after it
   if (g.burst > 0) {
     g.burst -= dt;
-    if (g.burst <= 0) g.burst = -between(draw, GUNNER.pause);
+    if (g.burst <= 0) g.burst = -between(draw, t.pause);
   } else if (g.burst < 0) {
     g.burst += dt;
-    if (g.burst >= 0) g.burst = between(draw, GUNNER.burst);
+    if (g.burst >= 0) g.burst = between(draw, t.burst);
     return { aim, fire: false };
-  } else g.burst = between(draw, GUNNER.burst);
+  } else g.burst = between(draw, t.burst);
   return { aim, fire: true, spread: spreadBy(skill) };
 }

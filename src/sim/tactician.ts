@@ -28,7 +28,6 @@ import { SHIP } from './handling.ts';
 import { ring } from './gunner.ts';
 import {
   inSight,
-  roll,
   velocity,
   type Ctx,
   type Intent,
@@ -138,19 +137,7 @@ export function mark(c: Ctx, intent: Intent, dt: number): Mark {
     };
   }
   const held = own.crew ? inHand(own.crew) : null;
-  const ringed =
-    foe && held
-      ? ring(
-          m,
-          ship.at,
-          foe,
-          held.kind,
-          c.t.standoff,
-          c.t.skill,
-          () => roll(m),
-          dt
-        )
-      : null;
+  const ringed = foe && held ? ring(c, foe, held.kind, dt) : null;
   if (ringed)
     return {
       at: ringed,

@@ -1,7 +1,8 @@
 import { test } from 'node:test';
 import { nature } from '../src/sim/brain.ts';
 import assert from 'node:assert/strict';
-import { ROAMING, mind, think, type Memory } from '../src/sim/bot.ts';
+import { mind, think, type Memory } from '../src/sim/bot.ts';
+import { ROAMING } from '../src/sim/roaming.ts';
 import { afloat, stepFleet, type Vessel } from '../src/sim/contact.ts';
 import { STEP } from '../src/sim/fixed.ts';
 import { SHIP } from '../src/sim/handling.ts';

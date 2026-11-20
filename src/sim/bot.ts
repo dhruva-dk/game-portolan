@@ -1,66 +1,34 @@
 // A bot: a captain's mind for a ship, as a pure function from what she can see
-// to her helm's and her gun's orders. Her temperament is temper.ts's and her
-// weighing of what to do utility.ts's; what needs hearing or wind is left out
-// until those are here (loot and mending are purser.ts's, territory
-// claimer.ts's).
-//
-// Every BOT.every steps she thinks:
-// - perceive: the nearest ship she can see within her notice (land between
-// hides one), a ship that just rammed her
-//   seen as twice as near; a foe out of sight is followed to where she was lost, and let go after `forget` seconds;
-// - decide: utility scoring (utility.ts) over the storm, flee, fight and roam,
-// the one in hand kept while it is good
-//   enough.
-//   The storm comes first: close to its edge or outside it, or with the next cap closing or nearly due and her not
-//   well inside it, she makes for the water her temperament's margin inside the cap she must be in; roaming, her
-//   marks are kept that margin inside the edge and drift in toward the middle as it closes, and running she runs no
-//   nearer the edge than that.
-//   Fighting is ramming: her will to is her temperament and mood, the odds (hull, a seam for health.ts), being rammed,
-//   and the crowd round her where a third ship would finish whoever won; close aboard she fights whatever her will;
-//   and she lets a ship sailing away from her go once it is past reach, as a ram can't catch a ship as fast as she is.
-//   She runs from a fight she is losing, or from a ship that rams her that she won't fight.
-// Every step she steers (helmsman.ts) for what she is about, and, armed, fights
-// with her guns instead of ramming (gunner.ts aimAndFire and ring): she takes
-// in hand the one for the range, holds its range round her foe, and lays and
-// fires it, a gun reaching a ship however fast she sails. Mending (weighed 3.5
-// among her options) and loot (1.8) are purser.ts's, with what she asks of her
-// hold and her gust each step.
+// to her helm's and her gun's orders (BOTS.md 1.1). This file is the captain:
+// it gathers her crew's memory, runs a think every BOT.every steps and a step
+// of sailing every step, and chooses among her options. The options are each
+// their part's:
+// - the storm (storming.ts), weighed first: inside the cap by her margin;
+// - mending and loot (purser.ts), with what she asks of her hold and her gust;
+// - flight and fight (fighting.ts): ramming, or her guns once armed;
+// - hunting to the sound of guns (hunter.ts), and claiming water (claimer.ts);
+// - and roaming (roaming.ts) when nothing better calls.
+// Each scores 0..1 with named factors (utility.ts), multiplied by its weight
+// (her brain's `choice`, so a brain or a persona may rank them otherwise), and
+// the one in hand is kept while it is good enough. Her lookout (lookout.ts)
+// tells her which ship she has her eye on. Every step she steers (tactician,
+// pilot, helmsman) for what she is about, and, armed, lays and fires her gun
+// (gunner.ts).
 //
 // Pure arithmetic: no three, so it runs in node for the tests; deterministic
 // for the same inputs, to the bit.
 
-import {
-  R,
-  add,
-  apart,
-  along,
-  distance,
-  dot,
-  normalize,
-  toward,
-  type Vec3,
-} from '../world/sphere.ts';
+import { distance, type Vec3 } from '../world/sphere.ts';
 import { inHand, type Order } from './battle.ts';
+import type { Brain, Nature } from './brain.ts';
 import { STEP } from './fixed.ts';
-import { aimAndFire, armFor, gunner, sighted } from './gunner.ts';
+import { aimAndFire, armFor, gunner } from './gunner.ts';
 import type { Helm } from './ship.ts';
-import { STORM, toEdge, type Cap } from './storm.ts';
-import type { Nature } from './brain.ts';
-import {
-  choose,
-  logistic,
-  momentum,
-  ramp,
-  utility,
-  type Option,
-} from './utility.ts';
+import { choose, momentum, type Option } from './utility.ts';
 import {
   BOT,
-  between,
   inSight,
-  open,
   roll,
-  rotate,
   type Ctx,
   type Intent,
   type Memory,
@@ -68,7 +36,8 @@ import {
   type Sea,
   type Seen,
 } from './captain.ts';
-import { deepest, helmMemory, steer } from './helmsman.ts';
+import { helmMemory, steer } from './helmsman.ts';
+import { lookMemory, perceive } from './lookout.ts';
 import { lose, navigate, pilotMemory } from './pilot.ts';
 import { mark, tacticMemory } from './tactician.ts';
 import {
@@ -82,129 +51,33 @@ import {
 } from './purser.ts';
 import { claimAct, claimMemory, claimUrge } from './claimer.ts';
 import { huntAct, huntMemory, huntUrge } from './hunter.ts';
+import { away, fightUrge, fleeGoal, fleeUrge, holdsFire } from './fighting.ts';
+import { roamGoal } from './roaming.ts';
+import { keptInside, stormGoal, stormUrge } from './storming.ts';
 import { NOTHING, type Ask } from './stores.ts';
-import { SHIP } from './handling.ts';
 
 /**
- * How she sees: the farthest she looks for a ship, m; seconds she follows one
- * out of sight; ground higher than `sightLine` m hides one, looked for every
- * `sightStep` m along the way; a ship that rammed her within MIND.grudge s is
- * seen as `nearer` as far.
+ * Her options' weights, their ranks: what each option's score is multiplied by
+ * before they are compared (utility.ts choose). The storm first; then mending,
+ * flight and fight; then hunting, loot and claiming water; roaming last.
  */
-export const SIGHT = {
-  sightMax: 240,
-  forget: 4,
-  sightLine: 2.5,
-  sightStep: 20,
-  nearer: 0.5,
-} as const;
-
-/** How she weighs a fight, a run and holding back. Seconds and metres. */
-export const MIND = {
-  /**
-   * A ship that rammed her within `grudge` s rouses her will to fight by
-   * `roused`, cooling from `cool` s on. Rammed within `fresh` s, by one she
-   * won't fight, she runs.
-   */
-  grudge: 5,
-  roused: 0.4,
-  cool: 3,
-  fresh: 3,
-  /**
-   * Within `crowd` m each other ship she sees takes this much off her will, by
-   * her skill.
-   */
-  crowd: 150,
-  crowding: 0.25,
-  /**
-   * The will at which she is in two minds, and how sharply it decides (logistic
-   * width).
-   */
-  will: 0.35,
-  willWidth: 0.1,
-  /**
-   * Closer than `closeFrom` m she starts to fight whatever her will; closer
-   * than `closeAt`, wholly.
-   */
-  closeFrom: 50,
-  closeAt: 35,
-  /**
-   * A ship sailing away is let go from `letGo` m at any time in a match, as a
-   * ram can't catch a ship as fast as she is.
-   */
-  letGo: 90,
-  /**
-   * Her speed away, m/s, over which she is let go from a fight, and over which
-   * she isn't taken up (a ram must catch her, sailing up to SHIP.top).
-   */
-  outrun: [0.75 * SHIP.top, 0.95 * SHIP.top] as const,
-  outran: [0.55 * SHIP.top, 0.75 * SHIP.top] as const,
-  /**
-   * Running, she makes for open water this far off from her foe; she looks this
-   * far round a run for open water.
-   */
-  run: 120,
-  /**
-   * Running, she would sooner make for water with land between her and her foe
-   * (out of sight, she is soon let go), within `cover` m of her on `rings`
-   * rings, the nearest first (0: never); no more than `wide` rad off straight
-   * away, and further from her foe by `gain` of the way to it at least (cover
-   * off to her side would take her across her foe's guns).
-   */
-  cover: 180,
-  rings: 3,
-  wide: Math.PI / 3,
-  gain: 0.6,
-  /**
-   * Early in a match she would sooner keep out of a fight: her will to fight
-   * falls by this much in each of the storm's phases (the last once it has
-   * closed), and more by `more` with `lastFew` ships or fewer afloat. While it
-   * does, she lets a ship sailing away go past `letGo` m with a gun too, and
-   * holds her fire outside a fight she chose, but at a ship within `letGo` m
-   * that shot her within `shotFresh` s.
-   */
-  restraint: [0.5, 0.5, 0.45, 0.35, 0.25, 0.1, 0, 0] as const,
-  lastFew: 3,
-  more: 0.4,
-  shotFresh: 5,
-} as const;
-
-/**
- * Roaming: a new mark every `roam` s or within `arrive` m, `near`–`far` m off.
- */
-export const ROAMING = { roam: 9, arrive: 20, near: 60, far: 160 } as const;
-
-/**
- * The storm (stormUrge, keptInside, inward and roamGoal), by her temperament's
- * margin (Temper): the next cap is `late` when it is closing or due to within
- * this many s; getting inside is urgent from `ease[0]` of her margin in from the
- * edge, wholly by `ease[1]`; late, she is well inside the next cap `inNext` of
- * her margin in. Within `nearEdge` of her margin of the edge she makes for the
- * cap she is in, else for the next. Making in, she makes for open water
- * `inward` of the way out from the centre to her edge less her margin, found
- * within `shore` m of it in rings `ring` m apart (20 of them). Once the cap is
- * under `drift` m, a roaming mark is drawn `drawn` of the way in toward its
- * centre (a chord's share).
- */
-export const STORMING = {
-  late: 25,
-  ease: [0.55, 0.3] as const,
-  inNext: 0.5,
-  nearEdge: 0.4,
-  inward: 0.6,
-  shore: 136,
-  ring: 6.8,
-  drift: 600,
-  drawn: 0.4,
-} as const;
+export const CHOICE = {
+  storm: 6,
+  heal: 3.5,
+  flee: 3.3,
+  fight: 2.6,
+  hunt: 2,
+  loot: 1.8,
+  claim: 1.5,
+  roam: 1,
+} as const satisfies Record<Mode, number>;
 
 export { BOT, type Memory, type Mode, type Sea, type Seen } from './captain.ts';
 
 /**
  * What her mind carries: seconds she has been afloat, and steps to her next
- * think; what she is about, since when (s), and where she makes for; her foe (an
- * id, or -1), when she last saw her, and where; who last rammed her (-1: none)
- * and when, and who last shot her and when.
+ * think; what she is about, since when (s), and where she makes for; who last
+ * rammed her (-1: none) and when, and who last shot her and when.
  */
 export interface MindMemory {
   clock: number;
@@ -212,9 +85,6 @@ export interface MindMemory {
   mode: Mode;
   since: number;
   goal: Vec3;
-  foe: number;
-  seen: number;
-  last: Vec3;
   hitBy: number;
   hitT: number;
   shotBy: number;
@@ -232,9 +102,7 @@ export const mind = (seed: number, at: Vec3): Memory => ({
   mode: 'roam',
   since: 0,
   goal: at,
-  foe: -1,
-  seen: -Infinity,
-  last: at,
+  ...lookMemory(at),
   hitBy: -1,
   hitT: -Infinity,
   shotBy: -1,
@@ -316,24 +184,14 @@ export function think(
   const held = own.crew ? inHand(own.crew) : null,
     seen = inSight(c) ? c.foe : null;
   const order: Order = held
-    ? aimAndFire(
-        m,
-        own.ship,
-        seen,
-        held.kind,
-        m.clock,
-        c.t.skill,
-        () => roll(m),
-        dt,
-        holdsFire(c)
-      )
+    ? aimAndFire(c, seen, held.kind, holdsFire(c), dt)
     : { aim: null, fire: false };
   // her stores asked on the steps she thinks; the gun for the range taken in
   // hand whenever it changes
   const ask = m.think === BOT.every ? purse(c) : NOTHING;
   const arm =
     own.crew && ask.take === null && ask.tap === null && !own.crew.hold.using
-      ? armFor(own.crew, seen ? c.foeD : null)
+      ? armFor(c, seen ? c.foeD : null)
       : null;
   return { helm, order, ask: arm === null ? ask : { ...ask, arm }, memory: m };
 }
@@ -348,259 +206,21 @@ const intentOf = (m: Memory): Intent => ({
   arrive: m.mode === 'loot' || m.mode === 'heal' ? 'gently' : 'through',
 });
 
-// ---------------------------------------------------------------- seeing
-
-/** Whether land stands between a and b, high enough to hide a ship. */
-function hidden(c: Ctx, a: Vec3, b: Vec3): boolean {
-  const d = distance(a, b),
-    t = toward(a, b);
-  if (!t) return false;
-  for (let s = c.b.sight.sightStep; s < d; s += c.b.sight.sightStep)
-    if (-c.sea.depth(along(a, t, s).p) > c.b.sight.sightLine) return true;
-  return false;
-}
-
-/**
- * Notes the nearest ship she can see; a foe out of sight is followed to where
- * she was last seen, then let go.
- */
-function perceive(c: Ctx): void {
-  const { m, own } = c;
-  let best: Seen | null = null,
-    bd = c.t.notice * (0.8 + 0.4 * c.t.skill);
-  for (const o of c.others) {
-    if (apart(own.ship.at, o.ship.at, c.b.sight.sightMax)) continue;
-    const d = distance(own.ship.at, o.ship.at);
-    if (d > c.b.sight.sightMax) continue;
-    const score =
-      o.id === m.hitBy && m.clock - m.hitT < c.b.mind.grudge
-        ? d * c.b.sight.nearer
-        : d;
-    if (score >= bd || hidden(c, own.ship.at, o.ship.at)) continue;
-    [bd, best] = [score, o];
-  }
-  if (best && best.id !== m.foe) sighted(m, m.clock, c.t.skill);
-  if (best) [m.foe, m.seen, m.last] = [best.id, m.clock, best.ship.at];
-  else if (
-    m.foe >= 0 &&
-    (m.clock - m.seen > c.b.sight.forget ||
-      !c.others.some((o) => o.id === m.foe))
-  )
-    m.foe = -1;
-}
-
-// ---------------------------------------------------------------- the storm
-
-/** Metres the cap reaches along the surface from its centre. */
-const reach = (cap: Cap) => cap.radius * R;
-
-/** Whether the next cap is closing, or will start to within STORMING.late s. */
-const late = (c: Ctx) =>
-  !!c.sea.storm &&
-  (c.sea.storm.closing || c.sea.storm.secondsToNext < c.b.storming.late);
-
-/**
- * How urgently she must get inside: from nothing `ease[0]` of her margin in
- * from the edge to wholly at `ease[1]` of it (and outside); and wholly while
- * the next cap is late and she isn't `inNext` of her margin inside it, until
- * the last has closed.
- */
-function stormUrge(c: Ctx): number {
-  const s = c.sea.storm;
-  if (!s) return 0;
-  const p = c.own.ship.at,
-    margin = c.t.margin;
-  const pressed =
-    late(c) &&
-    toEdge(p, s.next) < margin * c.b.storming.inNext &&
-    s.phase < STORM.phases.length;
-  return Math.max(
-    ramp(
-      toEdge(p, s),
-      margin * c.b.storming.ease[0],
-      margin * c.b.storming.ease[1]
-    ),
-    pressed ? 1 : 0
-  );
-}
-
-/**
- * Open water at q, or the nearest to it in rings `ring` m apart out to `shore`
- * m, 16 ways round each; q itself if there is none.
- */
-function openNear(c: Ctx, q: Vec3): Vec3 {
-  if (open(c, q)) return q;
-  const t = toward(q, c.own.ship.at) ?? c.own.ship.heading;
-  for (
-    let d = c.b.storming.ring;
-    d <= c.b.storming.shore;
-    d += c.b.storming.ring
-  ) {
-    for (let k = 0; k < 16; k++) {
-      const p = along(q, rotate(q, t, (k * Math.PI) / 8), d).p;
-      if (open(c, p)) return p;
-    }
-  }
-  return q;
-}
-
-/**
- * Where she makes for to be within `r` m of `centre`: where she is, if she is;
- * else open water `inward` of the way out from the centre toward her.
- */
-function inward(c: Ctx, p: Vec3, centre: Vec3, r: number): Vec3 {
-  if (distance(p, centre) <= r) return p;
-  const t = toward(centre, p);
-  return openNear(c, t ? along(centre, t, r * c.b.storming.inward).p : centre);
-}
-
-/**
- * The cap she makes for in the storm: the one she is in, while it isn't late or
- * she is near its edge; else the next.
- */
-function stormGoal(c: Ctx): Vec3 {
-  const s = c.sea.storm!,
-    margin = c.t.margin,
-    p = c.own.ship.at;
-  const cap: Cap =
-    toEdge(p, s) < margin * c.b.storming.nearEdge || !late(c) ? s : s.next;
-  return inward(c, p, cap.centre, Math.max(0, reach(cap) - margin));
-}
-
-/**
- * Pulls a mark she would make for that lies nearer the edge than her margin in
- * to that margin inside it.
- */
-const keptInside = (c: Ctx, q: Vec3): Vec3 => {
-  const s = c.sea.storm;
-  return s && toEdge(q, s) < c.t.margin
-    ? inward(c, q, s.centre, Math.max(0, reach(s) - c.t.margin))
-    : q;
-};
-
 // ---------------------------------------------------------------- deciding
-
-/** How much she wants to ram the ship she sees, a ram her weapon. */
-function fightUrge(c: Ctx): number {
-  const { m, t, foe, own } = c;
-  if (!foe) return 0;
-  const d = c.foeD;
-  let will = t.fight * (0.6 + 0.4 * t.aggro);
-  const strength = (s: Seen) => (s.hull ?? 100) + (s.shield ?? 0);
-  will += ((0.1 + 0.5 * t.skill) * (strength(own) - strength(foe))) / 100;
-  if (m.hitBy === foe.id)
-    will +=
-      c.b.mind.roused *
-      ramp(m.clock - m.hitT, c.b.mind.grudge + c.b.mind.cool, c.b.mind.cool);
-  for (const o of c.others)
-    if (o.id !== foe.id && distance(own.ship.at, o.ship.at) < c.b.mind.crowd)
-      will -= c.b.mind.crowding * t.skill;
-  const restraint = holdBack(c);
-  will -= restraint;
-  // close aboard she fights whatever her will, from nearer while she holds back
-  const close = ramp(
-    d,
-    c.b.mind.closeFrom - 50 * restraint,
-    c.b.mind.closeAt - 50 * restraint
-  );
-  if (close >= 1) return 1;
-  // past reach, a ship sailing away is let go: in a fight, once she is clearly
-  // away; out of one, she is not taken up while she nearly is, so it doesn't
-  // flicker as she weaves. Armed, while she holds back, by her heading alone,
-  // as a gun reaches a ship however fast she sails; ramming, always, by her
-  // speed away, as a ram must catch her
-  const from = toward(foe.ship.at, own.ship.at),
-    off = from ? -dot(foe.ship.heading, from) : 0;
-  const past = ramp(d, c.b.mind.letGo - 10, c.b.mind.letGo + 15);
-  const go = !own.armed
-    ? 1 -
-      past *
-        ramp(
-          off * foe.ship.speed,
-          ...(m.mode === 'fight' ? c.b.mind.outrun : c.b.mind.outran)
-        )
-    : restraint > 0
-      ? 1 -
-        past *
-          (m.mode === 'fight' ? ramp(off, 0, 0.35) : ramp(off, -0.45, -0.15))
-      : 1;
-  return Math.max(
-    close,
-    utility(logistic(will, c.b.mind.will, c.b.mind.willWidth), go)
-  );
-}
-
-/**
- * How much she holds back from a fight now: by the storm's phase, and more
- * among the last few afloat (her and the others she is given). None without a
- * storm.
- */
-function holdBack(c: Ctx): number {
-  const s = c.sea.storm;
-  const by = s
-    ? c.b.mind.restraint[Math.min(s.phase, c.b.mind.restraint.length - 1)]
-    : 0;
-  if (by <= 0) return 0;
-  return c.others.length + 1 <= c.b.mind.lastFew ? by + c.b.mind.more : by;
-}
-
-/**
- * Whether she holds her fire: while she holds back, outside a fight she chose,
- * but at a ship close by that has just shot her.
- */
-const holdsFire = (c: Ctx) =>
-  c.m.mode !== 'fight' &&
-  holdBack(c) > 0 &&
-  !(
-    c.foe &&
-    c.m.shotBy === c.foe.id &&
-    c.m.clock - c.m.shotT < c.b.mind.shotFresh &&
-    c.foeD < c.b.mind.letGo
-  );
-
-/**
- * Losing a fight: her hull down past where her temperament runs, with the foe
- * close (a seam for health.ts).
- */
-const losing = (c: Ctx) =>
-  c.foe
-    ? utility(
-        ramp(c.own.hull ?? 100, c.t.run + 8, c.t.run - 4),
-        ramp(c.foeD, 160, 130)
-      )
-    : 0;
-
-/**
- * Rammed by a ship she doesn't want to fight: the less she wants to, and the
- * sharper she is, the more she gets clear.
- */
-function evading(c: Ctx): number {
-  const { m } = c;
-  if (
-    !c.foe ||
-    c.foeD >= 140 ||
-    m.hitBy !== c.foe.id ||
-    m.clock - m.hitT > c.b.mind.fresh
-  )
-    return 0;
-  return utility(1 - fightUrge(c), 0.3 + 0.7 * c.t.skill);
-}
 
 /**
  * An option she may take up: its mode, and its act, which gives her goal while
- * she is about it (her mind alone writes her goal).
+ * she is about it (her mind alone writes her goal). Its weight is her brain's.
  */
 interface Choice extends Option<Ctx> {
   readonly mode: Mode;
   act(c: Ctx): Vec3;
 }
 
-// (Sheltering from weather, to be weighed 5.2, after the storm, and raiding
-// wait on things this sea hasn't got; claiming is claimer.ts's, hunting to the
-// sound of guns hunter.ts's.)
-const roamOption: Choice = {
+// (Sheltering from weather, to be weighed after the storm, and raiding wait on
+// things this sea hasn't got.)
+const roam: Omit<Choice, 'weight'> = {
   name: 'roam',
-  weight: 1,
   mode: 'roam',
   score: () => 0.15,
   act: (c) => {
@@ -616,144 +236,54 @@ const roamOption: Choice = {
     return m.goal;
   },
 };
-const OPTIONS: readonly Choice[] = [
-  { name: 'storm', weight: 6, mode: 'storm', score: stormUrge, act: stormGoal },
+
+/** Her options, in the order they are weighed, their weights aside. */
+const OPTIONS: readonly Omit<Choice, 'weight'>[] = [
+  { name: 'storm', mode: 'storm', score: stormUrge, act: stormGoal },
   // mending where she is, or clear of a foe about
   {
     name: 'heal',
-    weight: 3.5,
     mode: 'heal',
     score: healUrge,
     act: (c) => healAct(c, (d) => keptInside(c, away(c, c.m.last, d))),
   },
-  {
-    name: 'flee',
-    weight: 3.3,
-    mode: 'flee',
-    score: (c) => Math.max(losing(c), evading(c)),
-    // behind land if there is any near, else straight away
-    act: (c) =>
-      keptInside(c, cover(c, c.m.last) ?? away(c, c.m.last, c.b.mind.run)),
-  },
-  {
-    name: 'fight',
-    weight: 2.6,
-    mode: 'fight',
-    score: fightUrge,
-    act: (c) => c.m.last,
-  },
+  { name: 'flee', mode: 'flee', score: fleeUrge, act: fleeGoal },
+  { name: 'fight', mode: 'fight', score: fightUrge, act: (c) => c.m.last },
   // to the sound of guns (hunter.ts)
-  { name: 'hunt', weight: 2, mode: 'hunt', score: huntUrge, act: huntAct },
-  { name: 'loot', weight: 1.8, mode: 'loot', score: lootUrge, act: lootAct },
+  { name: 'hunt', mode: 'hunt', score: huntUrge, act: huntAct },
+  { name: 'loot', mode: 'loot', score: lootUrge, act: lootAct },
   // her water (claimer.ts): a loop to claim more
-  {
-    name: 'claim',
-    weight: 1.5,
-    mode: 'claim',
-    score: claimUrge,
-    act: claimAct,
-  },
-  roamOption,
+  { name: 'claim', mode: 'claim', score: claimUrge, act: claimAct },
+  roam,
 ];
 
+/** Her options weighed by a brain's `choice`, made once a brain. */
+const weighed = new WeakMap<Brain['choice'], readonly Choice[]>();
+function optionsOf(b: Brain): readonly Choice[] {
+  let o = weighed.get(b.choice);
+  if (!o) {
+    o = OPTIONS.map((x) => ({ ...x, weight: b.choice[x.mode] }));
+    weighed.set(b.choice, o);
+  }
+  return o;
+}
+
 function decide(c: Ctx): void {
-  const { m } = c;
+  const { m } = c,
+    options = optionsOf(c.b);
   c.foe =
     m.foe >= 0 && inSight(c)
       ? (c.others.find((o) => o.id === m.foe) ?? null)
       : null;
   c.foeD = c.foe ? distance(c.own.ship.at, c.foe.ship.at) : Infinity;
-  const current = OPTIONS.findIndex((o) => o.mode === m.mode);
+  const current = options.findIndex((o) => o.mode === m.mode);
   const o =
-    OPTIONS[
-      choose(OPTIONS, c, current, c.t.skill, () => roll(m), momentum(m.since))
-    ] ?? roamOption;
+    options[
+      choose(options, c, current, c.t.skill, () => roll(m), momentum(m.since))
+    ] ?? options[options.length - 1];
   if (o.mode !== m.mode) {
     [m.mode, m.since] = [o.mode, 0];
     lose(m);
   }
   m.goal = o.act(c);
-}
-
-/**
- * Open water `d` m from p away from `from`: straight away, or swung a little
- * further round each way until open.
- */
-function away(c: Ctx, from: Vec3, d: number): Vec3 {
-  const p = c.own.ship.at,
-    t = toward(from, p) ?? c.own.ship.heading;
-  const out =
-    toward(p, along(from, t, distance(from, p) + 1).p) ?? c.own.ship.heading;
-  for (let k = 0; k <= 8; k++) {
-    const q = along(
-      p,
-      rotate(p, out, (k % 2 ? 1 : -1) * Math.ceil(k / 2) * (Math.PI / 8)),
-      d
-    ).p;
-    if (open(c, q)) return q;
-  }
-  return along(p, out, d).p;
-}
-
-/**
- * Cover from `from` (where her foe was last seen): open water inside the storm
- * by her margin, further from `from` than she is, and land between it and
- * `from` (hidden). The cover she is making for while it still is; else the
- * nearest within MIND.cover m (on MIND.rings rings, twelve bearings each, the
- * ones most away first); else null.
- */
-function cover(c: Ctx, from: Vec3): Vec3 | null {
-  const { m } = c,
-    p = c.own.ship.at,
-    s = c.sea.storm,
-    most = c.b.mind.cover,
-    rings = c.b.mind.rings,
-    now = distance(from, p);
-  if (most <= 0) return null;
-  const good = (q: Vec3, gain: number) =>
-    distance(from, q) > now + gain &&
-    open(c, q) &&
-    (!s || toEdge(q, s) > c.t.margin) &&
-    hidden(c, from, q);
-  if (m.mode === 'flee' && good(m.goal, 0)) return m.goal;
-  const out = toward(from, p) ?? c.own.ship.heading,
-    off = toward(p, along(from, out, now + 1).p) ?? c.own.ship.heading;
-  for (let r = 1; r <= rings; r++) {
-    const d = (r * most) / rings;
-    for (let k = 0; k < 12; k++) {
-      const a = (k % 2 ? 1 : -1) * Math.ceil(k / 2) * (Math.PI / 6);
-      if (Math.abs(a) > c.b.mind.wide + 1e-9) break;
-      const q = along(p, rotate(p, off, a), d).p;
-      if (good(q, d * c.b.mind.gain)) return q;
-    }
-  }
-  return null;
-}
-
-/**
- * A mark to roam to: open water a random way off, drawn in toward the storm's
- * middle once its cap is under `drift` m and kept her margin inside its edge
- * (inside the next cap's while that is late, as the storm's edge closes at up
- * to 8 m/s); failing that, in from the edge if she is near it, or else toward
- * the deepest water round her.
- */
-function roamGoal(c: Ctx): Vec3 {
-  const p = c.own.ship.at,
-    f = c.own.ship.heading,
-    s = c.sea.storm,
-    margin = c.t.margin;
-  const keep = s && (late(c) ? s.next : s);
-  for (let tries = 0; tries < 8; tries++) {
-    let q = along(
-      p,
-      rotate(p, f, between(c.m, -Math.PI, Math.PI)),
-      between(c.m, c.b.roaming.near, c.b.roaming.far)
-    ).p;
-    if (s && reach(s) < c.b.storming.drift)
-      q = normalize(add(q, add(s.centre, q, -1), c.b.storming.drawn));
-    if (open(c, q) && (!keep || toEdge(q, keep) > margin)) return q;
-  }
-  if (s && toEdge(p, s) < 2 * margin)
-    return inward(c, p, s.centre, Math.max(0, reach(s) - 2 * margin));
-  return along(p, rotate(p, f, deepest(c)), c.b.roaming.near).p;
 }

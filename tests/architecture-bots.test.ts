@@ -18,6 +18,10 @@ import {
 const PARTS = [
   'sim/bot.ts',
   'sim/captain.ts',
+  'sim/lookout.ts',
+  'sim/storming.ts',
+  'sim/fighting.ts',
+  'sim/roaming.ts',
   'sim/tactician.ts',
   'sim/pilot.ts',
   'sim/helmsman.ts',
@@ -39,6 +43,10 @@ const SAILING = [
 /** The parts that choose what she is about. */
 const CHOOSING = [
   'sim/bot.ts',
+  'sim/lookout.ts',
+  'sim/storming.ts',
+  'sim/fighting.ts',
+  'sim/roaming.ts',
   'sim/purser.ts',
   'sim/claimer.ts',
   'sim/hunter.ts',
@@ -46,7 +54,8 @@ const CHOOSING = [
 /**
  * Tables read as they are, not from the brain: captain.ts's BOT, shared by
  * every part; and gunner.ts's GUNNER, her aim's feel, the same for every bot
- * (a fairness to the player, not a choice of hers: BOTS.md decision 4); and
+ * (a fairness to the player, not a choice of hers: BOTS.md decision 4; how
+ * she fights her guns is her brain's, GUNNERY); and
  * the tools every part sails by alike: route.ts's ROUTE (the chart's search),
  * utility.ts's REASON (the weighing of options), purser.ts's WORTH (what each
  * of her stores mends).
@@ -97,7 +106,13 @@ test('own tuning: a part of a bot names no other part’s tuning table (captain.
 
 /** The brain's slices each part reads (brain.ts Brain): its own, no other's. */
 const SLICES: Record<string, readonly string[]> = {
-  'sim/bot.ts': ['sight', 'mind', 'roaming', 'storming'],
+  'sim/bot.ts': ['choice', 'roaming'],
+  // (her grudge is the mind's: who rammed her is seen as nearer)
+  'sim/lookout.ts': ['sight', 'mind'],
+  'sim/storming.ts': ['storming'],
+  'sim/fighting.ts': ['mind'],
+  'sim/roaming.ts': ['roaming'],
+  'sim/gunner.ts': ['gunnery'],
   'sim/tactician.ts': ['ramming'],
   'sim/helmsman.ts': ['helm'],
   'sim/purser.ts': ['purser'],

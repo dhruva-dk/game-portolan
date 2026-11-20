@@ -1,5 +1,6 @@
-// What a bot is, shared by all her parts (bot.ts her mind, tactician.ts,
-// pilot.ts, helmsman.ts, gunner.ts, purser.ts, claimer.ts): what they all are
+// What a bot is, shared by all her parts (bot.ts her mind, lookout.ts,
+// storming.ts, fighting.ts, roaming.ts, tactician.ts, pilot.ts, helmsman.ts,
+// gunner.ts, purser.ts, claimer.ts, hunter.ts): what they all are
 // tuned by, how she sees a ship, what she carries from one step to the next (each
 // part's own, gathered), what she means, what a step of her weighs, and the few
 // bits of the sphere and of chance they all reach for.
@@ -24,14 +25,15 @@ import type { ClaimMemory, Holdings } from './claimer.ts';
 import type { MindMemory } from './bot.ts';
 import type { HelmMemory } from './helmsman.ts';
 import type { HuntMemory, Report } from './hunter.ts';
+import type { LookMemory } from './lookout.ts';
 import type { PilotMemory } from './pilot.ts';
 import type { PurseMemory } from './purser.ts';
 import type { TacticMemory } from './tactician.ts';
 
 /**
  * What every part of a bot shares: how often she thinks, and what water is open
- * to her. Each part keeps the rest of its tuning itself (bot.ts SIGHT, MIND,
- * ROAM and STORMING; helmsman.ts HELM and RAMMING).
+ * to her. Each part keeps the rest of its tuning itself (brain.ts gathers
+ * them).
  */
 export const BOT = {
   /** Think every this many steps (0.2 s). */
@@ -114,12 +116,14 @@ interface Chance {
 /**
  * What a bot carries from one step to the next: each part's own, declared and
  * written by that part alone (tests/architecture-bots.test.ts): her mind's
- * (bot.ts), her tactician's, pilot's and helm's, her purser's and claimer's,
- * her gunner's; and her chance.
+ * (bot.ts) and her lookout's, her tactician's, pilot's and helm's, her
+ * purser's, claimer's and hunter's, her gunner's; and her chance. This is the
+ * crew's roster: a new part's memory is added here.
  */
 export interface Memory
   extends Chance,
     MindMemory,
+    LookMemory,
     TacticMemory,
     PilotMemory,
     HelmMemory,

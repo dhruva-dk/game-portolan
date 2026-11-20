@@ -9,11 +9,16 @@
 // Pure arithmetic: no three, so it runs in node for the tests; deterministic
 // for the same inputs, to the bit.
 
-import { MIND, ROAMING, SIGHT, STORMING } from './bot.ts';
+import { CHOICE } from './bot.ts';
 import { CLAIMER } from './claimer.ts';
+import { MIND } from './fighting.ts';
+import { GUNNERY } from './gunner.ts';
 import { HELM } from './helmsman.ts';
 import { HUNTING } from './hunter.ts';
+import { SIGHT } from './lookout.ts';
 import { PURSER } from './purser.ts';
+import { ROAMING } from './roaming.ts';
+import { STORMING } from './storming.ts';
 import { RAMMING } from './tactician.ts';
 import { STYLES, temper, type Temper } from './temper.ts';
 
@@ -28,12 +33,15 @@ type Widen<T> = T extends number
     : { readonly [K in keyof T]: Widen<T[K]> };
 
 /**
- * What each part of a bot is tuned by: her sight, her mind's weighing, her
- * roaming and her storm (bot.ts), her ramming (tactician.ts), her helm
- * (helmsman.ts), her stores (purser.ts), her water (claimer.ts), her ear
- * (hunter.ts), and the temperaments she may be born to (temper.ts).
+ * What each part of a bot is tuned by: the weights of her options (bot.ts), her
+ * sight (lookout.ts), her weighing of a fight and a run (fighting.ts), her
+ * roaming (roaming.ts) and her storm (storming.ts), her ramming
+ * (tactician.ts), her helm (helmsman.ts), her stores (purser.ts), her water
+ * (claimer.ts), her ear (hunter.ts), how she fights her guns (gunner.ts), and
+ * the temperaments she may be born to (temper.ts).
  */
 export interface Brain {
+  readonly choice: Widen<typeof CHOICE>;
   readonly sight: Widen<typeof SIGHT>;
   readonly mind: Widen<typeof MIND>;
   readonly roaming: Widen<typeof ROAMING>;
@@ -43,11 +51,13 @@ export interface Brain {
   readonly purser: Widen<typeof PURSER>;
   readonly claimer: Widen<typeof CLAIMER>;
   readonly hunting: Widen<typeof HUNTING>;
+  readonly gunnery: Widen<typeof GUNNERY>;
   readonly styles: Widen<typeof STYLES>;
 }
 
 /** The brain every ship in the game sails with. */
 export const DEFAULT_BRAIN: Brain = {
+  choice: CHOICE,
   sight: SIGHT,
   mind: MIND,
   roaming: ROAMING,
@@ -57,6 +67,7 @@ export const DEFAULT_BRAIN: Brain = {
   purser: PURSER,
   claimer: CLAIMER,
   hunting: HUNTING,
+  gunnery: GUNNERY,
   styles: STYLES,
 };
 
