@@ -1,6 +1,6 @@
-// The frame's budget, checked headless: five standard views (open sea under
+// The frame's budget, checked headless: six standard views (open sea under
 // way; at the start, off its coast; a dozen ships in view; the lobby; the full
-// map open over the start), each held still (?pause) and read off the meter
+// map open over the start; the worst a match can ask), each held still (?pause) and read off the meter
 // (src/meter.ts) once it has settled: a displayed frame's draw calls, triangles
 // and render passes, each a second's mean. Fails (exit 1) if any view is over
 // its budget (BUDGET, or the view's own). The counts are three's, so they do
@@ -63,6 +63,20 @@ const VIEWS: { name: string; q: string; own?: Partial<Budget> }[] = [
   // had its own limit (1 million) while they were drawn coarse; it is held to
   // the sea's now.
   { name: 'map', q: 'screen=match&map' },
+  // The worst a match can ask (PLAN G1): every other ship of a match in view,
+  // packed in a fan ahead of her, each with a legendary gun, the kinds in turn,
+  // six seconds into fighting (wrecks going down, smoke and balls in the air);
+  // her own gun fired; a row of every kind of piece on the water and stores
+  // under her. Beyond play (the berths are spread over the planet, and few are
+  // left when they close), so it is held to a ceiling of its own, what it
+  // measured when it was made (86 draws: each kind of gun two, on the ships
+  // and on the water; 903k triangles, the ships 225k, their guns 18k, the loot
+  // 41k), the triangles a little over: new art must not raise it.
+  {
+    name: 'worst',
+    q: 'screen=match&ships=79&pack&arm&ahead=6&kit&loot=60&gun=4&kind=mortar&fire=',
+    own: { draws: 86, triangles: 920_000 },
+  },
 ];
 
 const { browser, url, close } = await launch();
@@ -101,7 +115,9 @@ try {
     console.log(
       `${breaches.length ? 'OVER' : 'ok  '} ${name.padEnd(6)} ${seen.draws} draws  ${m[2]}k tri  ${seen.passes} passes` +
         (breaches.length ? `  (over: ${breaches.join(', ')})` : '') +
-        (own ? `  (its own: ${limit.triangles / 1000}k tri)` : '')
+        (own
+          ? `  (its own: ${limit.draws} draws, ${limit.triangles / 1000}k tri)`
+          : '')
     );
     if (split)
       console.log(

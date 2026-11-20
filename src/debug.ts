@@ -57,7 +57,8 @@
 // ship then, so she wins; ?leave=seconds taps LEAVE then (home to the lobby
 // under the title, where her screen has that way: ui/passage.ts).
 //
-// The sea about her. ?ships= sets them on the sea ahead of her (demoShips),
+// The sea about her. ?ships= sets them on the sea ahead of her (demoShips;
+// ?pack: in rows of ten, a fan of them filling the view),
 // ?way=m/s gives them a straight course at that speed, their helms lashed, and
 // ?heading=deg turns them all. ?ahead=seconds sails the game on that long
 // before the first frame, and ?pause holds it there from then on (the frame
@@ -68,7 +69,8 @@
 // a better gun beside them, a mortar, offered; ?use=1…3,seconds sets her
 // mending from that slot so many seconds into the frames drawn, ?gust=seconds
 // spends a gust then, ?fire=seconds fires then and ?down=seconds sinks one by
-// her then; ?loot strews a piece of each kind and rarity in a fan ahead of her,
+// her then; ?arm gives every other ship a legendary gun (the kinds in turn), so
+// with ?ahead they are fighting; ?loot strews a piece of each kind and rarity in a fan ahead of her,
 // 25 m out to 420 m (?loot=m: every kind of gun, each of another rarity, and
 // the stores, in a row across the look m metres out); ?swing=px,px,seconds
 // drags the look that far right and down and lets it go, so many seconds into
@@ -431,6 +433,17 @@ function kit(game: Game) {
 function stock(game: Game) {
   const { at, heading, facing } = game.status();
   if (params.get('kit') === '') kit(game);
+  if (params.has('arm')) {
+    // every other ship a legendary gun under her, the kinds in turn, swept up
+    // at her next step: once they fight (?ahead), every kind of shot is in the
+    // air (tools/budget.ts worst)
+    for (const s of game.ships())
+      if (s.id !== PLAYER && s.afloat)
+        game.debug.strew(s.at, [
+          { kind: KINDS[s.id % KINDS.length], rarity: 4 },
+        ]);
+    game.step(STEP, IDLE);
+  }
   const row = params.has('loot') ? number('loot', 0) : 0;
   if (row > 0) {
     // a row across her bow: the guns, each kind of another rarity, worst to
@@ -587,9 +600,19 @@ function demoShips(south: Vec3, most: number): Berth[] {
   const ships = Math.min(number('ships', 0), most),
     { up, north } = frameAt(south),
     way = number('way', 0);
+  const pack = params.has('pack');
   for (let i = 0; i < ships; i++) {
-    const out = [30, 60, 100, 150][i] ?? 150 + (i - 3) * 40,
-      side = i < 4 ? [0, -12, 25, -40][i] : (i % 2 ? 1 : -1) * 30 * i;
+    // packed: rows of ten in a fan ahead of her, 40 m out and on every 40
+    const row = Math.floor(i / 10),
+      col = (i % 10) - 4.5;
+    const out = pack
+        ? 40 + 40 * row
+        : ([30, 60, 100, 150][i] ?? 150 + (i - 3) * 40),
+      side = pack
+        ? col * (12 + 4 * row)
+        : i < 4
+          ? [0, -12, 25, -40][i]
+          : (i % 2 ? 1 : -1) * 30 * i;
     const p = along(along(up, north, out).p, cross(north, up), side).p,
       u = normalize(p);
     const t = normalize(add(north, u, -dot(north, u))),

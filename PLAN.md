@@ -454,6 +454,7 @@ then the behaviour commits on top.
   crown's leaflets). The map's own 1000k limit is dropped: it is held to the
   sea's 900k. `npm run budget` already exited 1 when a view was over (§6.5's
   "exits 0" was stale); it is the gate.
+
 - 2026-11-20 (R1, A1, P1): the captain split along her crew's lines
   (`lookout`, `storming`, `fighting`, `roaming` parts); her option weights
   and gunnery are brain slices. Golden unchanged.
@@ -471,3 +472,52 @@ then the behaviour commits on top.
   shortest (376 s, against 420 mixed and 453 cagey), gold rush lays 618
   pieces and arms a second kind most (75%), cagey arms slowest (90% by 38 s)
   and holds the most water. Golden → `cb57b52c` (BOTS.md log has the table).
+- 2026-11-20 (H6): `tools/harness/rate.ts`, Plackett–Luce ratings (worst
+  first) with bootstrapped errors; the summary rates personas, and within
+  each type. Two sets of 64 matches agree on the order (BOTS.md log).
+- 2026-11-20 (P4, P6, R4): mood moves (damage cools, a kill warms, it
+  settles back); four balance passes, two kept. Spread of θ 0.63 → 0.38 and
+  0.57 → 0.35 on two independent sets; brawler −0.34 → −0.17/−0.20. The
+  gate (strongest within one se of the median) is not met: the scavenger's
+  edge is sitting out the fights, and held through every change to her
+  loot. BOTS.md has the table and what was dropped as noise. `debugOf(state)`
+  replaces `state.debug`. Golden → `1655ebe1`.
+- 2026-11-20 (H4, L1, W2): `--rules` variants; loot flow in the summary
+  (pieces laid with the match are taken after 23 s on the water, 67% with
+  another ship within 150 m; drops after 21 s, 81%). The gun niches
+  (`tools/harness/niches.ts`, 64 dealt matches):
+
+  | gun      | on paper, hp/s common (20 / 70 / 100 / 150 / 200 m) | home close / mid / far | hp a shot | in a match, hp/s close / mid |
+  | -------- | --------------------------------------------------- | ---------------------- | --------- | ---------------------------- |
+  | cannon   | 33 / 33 / 33 / 27 / 17                              | 88% / 51% / 21%        | 16.9      | ~29 / ~15                    |
+  | scatter  | 48 / 24 / 0 / 0 / 0                                 | 95% / – / –            | 41.6      | ~31 / 0                      |
+  | repeater | 43 / 43 / 39 / 21 / 0                               | 67% / 24% / –          | 5.0       | ~29 / ~9                     |
+  | harpoon  | 28 at every range to 240                            | 98% / 94% / 82%        | 68.9      | ~24 / ~23                    |
+  | mortar   | 23 from 30 to 220 m                                 | 80% / 62% / 21%        | 32.4      | ~12 / ~9                     |
+
+  The gaps:
+  - **Close in, three guns tie** (~30 hp/s). The scatter, the close gun,
+    is no better there than the cannon or the repeater.
+  - **Mid range is the harpoon's alone**, by half again over the cannon.
+    Only its rarity (4% of pickups) holds it.
+  - **The mortar is weakest everywhere.** Its niche (over land, and a splash
+    for a crowd) goes unused: no bot keeps land between herself and a foe.
+  - **The repeater is two shots in three, and sprays at mid range** (24% home).
+  - **No gun rewards a broadside, and none denies an area over time.**
+
+  W3's stances are aimed at the first three.
+
+- 2026-11-20 (G1): `npm run budget` has a `worst` view: 79 ships packed in a
+  fan ahead of her (`?pack`), each with a legendary gun, the kinds in turn
+  (`?arm`), six seconds into fighting; her own gun fired; a row of every kind
+  of piece and stores under her. 86 draws, 903k triangles, 15 passes: the
+  ships 225k, all five guns 18k in five draws, the loot 41k in eight, the
+  gunfire 8k in three. **The gate (≤ 80 draws) is missed by 6.** Rarity
+  costs no draw and neither do more ships or pieces; each kind of gun costs
+  two (on the ships, on the water), and that is the 6. One merged mesh per
+  system would pay ~5× the vertices per gun (the masked shapes still run the
+  vertex stage), over 900k; a vertex-pulled single draw would not, but it is a
+  lot of machinery for ~0.3 ms of draw CPU on the M1. That choice is G2's
+  (one mesh per kind, or one atlas mesh with a variant index); until then the
+  view is held to what it measured (86 draws, 920k) so no new draw lands
+  unnoticed. A sixth gun kind would cost two more. Headless frame 7 ms CPU.
