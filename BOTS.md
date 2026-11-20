@@ -1,0 +1,206 @@
+# Bots: design, plan and log
+
+The working file for the `bot-harness` branch (a worktree off `main` at 975191c).
+Read **Design** before touching bot code; after any compaction, re-read this
+whole file before doing anything else. Design changes only by a Decision.
+
+---
+
+## 1. Design
+
+### 1.1 How a bot thinks (the one page)
+
+A bot is a crew. Each role is one module, owns one tuning table and one slice of
+memory, and hands the next role one small, named thing. To answer "why did she
+turn left?", follow the arrows: it is never more than five hops.
+
+```
+            every think (0.2 s)                          every step (1/30 s)
+ ┌──────────┐  Sighting  ┌──────────┐  Intent   ┌────────────┐  Mark  ┌───────────┐ Waypoint ┌────────────┐  Helm
+ │ Lookout  │──────────▶│ Captain  │─────────▶│ Tactician  │──────▶│ Navigator │────────▶│ Helmsman   │──────▶ ship
+ │ sees     │           │ chooses  │          │ where, now │       │ routes    │         │ steers     │
+ └──────────┘           └──────────┘          └────────────┘       └───────────┘         └────────────┘
+                              │ asks                 │ foe
+                              ▼                      ▼
+                         ┌──────────┐          ┌──────────┐
+                         │ Purser   │          │ Gunner   │──────▶ Order (aim, fire), arm
+                         │ Claimer  │          └──────────┘
+                         └──────────┘
+```
+
+| Role      | Module                                                                       | Takes                                         | Gives                                                 | Tuning                           | Memory slice         |
+| --------- | ---------------------------------------------------------------------------- | --------------------------------------------- | ----------------------------------------------------- | -------------------------------- | -------------------- |
+| Lookout   | `sim/lookout.ts` (from bot.ts perceive/hidden)                               | fleet, depth                                  | `Sighting`: foe, where last seen, who rammed/shot her | `SIGHT`                          | `m.look`             |
+| Captain   | `sim/bot.ts` (decide, OPTIONS)                                               | Sighting, storm, own state                    | `Intent`                                              | `MIND` (+ each option's owner's) | `m.mind`             |
+| — options | storm/fight/flee/roam: `bot.ts`; heal/loot: `purser.ts`; claim: `claimer.ts` | Ctx view                                      | a score 0..1 with named factors; a goal               | `PURSER`, `CLAIMER`, `STORMING`  | `m.purse`, `m.claim` |
+| Tactician | fight marks (ramCourse, recoil from helmsman.ts; ring from gunner.ts)        | Intent, foe now                               | `Mark`: a point to make for this step                 | `RAM`                            | `m.tactic`           |
+| Navigator | `sim/route.ts` behind `Router`                                               | Mark, chart                                   | `Waypoint`: next point to steer at                    | `ROUTE`                          | `m.route`            |
+| Helmsman  | `sim/helmsman.ts` behind `Steering`                                          | Waypoint, `Intent.arrive`, depth, nearby rams | `Helm`: course, throttle                              | `HELM`                           | `m.helm`             |
+| Gunner    | `sim/gunner.ts`                                                              | foe, held gun                                 | `Order`, arm                                          | `GUNNER`                         | `m.gun`              |
+
+**The Intent** is the seam between choosing and sailing. The helm never sees
+modes, loot or claims; the captain never sees rudders or banks.
+
+```ts
+interface Intent {
+  goal: Vec3; // where she means to be
+  arrive: 'through' | 'gently'; // gently: ease up near it (loot, mending)
+  foe: number; // -1 none
+  stance: 'none' | 'ram' | 'ring' | 'clear'; // how the tactician treats the foe
+}
+```
+
+### 1.2 Three lifetimes, never mixed
+
+| What   | Lives                                     | Owner                    | May hold                       |
+| ------ | ----------------------------------------- | ------------------------ | ------------------------------ |
+| Tuning | a variant (all game, for `DEFAULT_BRAIN`) | each role's module       | numbers and number tables only |
+| Temper | a ship (seed + the variant's styles)      | `temper.ts`              | numbers                        |
+| Memory | changes every step                        | each role, its own slice | state                          |
+
+### 1.3 The Brain
+
+`src/sim/brain.ts` composes the roles' tuning; it adds no field of its own.
+
+```ts
+export interface Brain { sight: SightTuning; mind: MindTuning; ram: RamTuning;
+  route: RouteTuning; helm: HelmTuning; gunner: GunnerTuning; purser: PurserTuning;
+  claimer: ClaimerTuning; styles: Styles }
+export const DEFAULT_BRAIN: Brain = { sight: SIGHT, mind: MIND, ... };
+```
+
+- Each function takes **its slice**, never the Brain: `steer(view, wp, intent, k: HelmTuning)`.
+- Variants live in `tools/brains/*.ts` as typed partial overrides, merged onto
+  `DEFAULT_BRAIN` into whole objects, same keys in the same order (one hidden
+  class, so V8 keeps the hot loops fast and the harness's ms are honest).
+- Different _behaviour_ (not numbers) goes behind a seam (`Router`, `Steering`)
+  chosen in `bot.ts`, introduced only when its second implementation lands.
+
+### 1.4 Every choice prints
+
+Each option's score is `weight × utility(named factors) × momentum`. The trace
+records, each think, the top three options with their factors, so the harness can
+say: `chose storm 0.82 (edge 0.90 × due 0.91) over loot 0.40 (worth 0.7 × near 0.6)`.
+A choice that can't be printed this way is a design bug.
+
+### 1.5 Rules (each a test in `tests/architecture-bots.test.ts`)
+
+1. **Own tuning only.** A module of `src/sim` names no tuning table but its own.
+2. **Brain stays at the top.** Only `sim/brain.ts`, `sim/bot.ts`, `play/orders.ts`,
+   `tests/` and `tools/` name `Brain`.
+3. **The helm knows no modes.** `helmsman.ts` and `route.ts` import nothing of
+   `bot.ts`, `purser.ts`, `claimer.ts`, and never name `Mode`.
+4. **Tuning is data.** No function in any tuning table (type-level check).
+5. **Golden match.** A whole match with `DEFAULT_BRAIN` hashes to the recorded
+   value; tracing on or off, the same. A deliberate change of behaviour re-records
+   it, with its metrics before and after, in the Log.
+6. `src` never imports `tools/`. (Seams need two real implementations: a review
+   rule, not a test.)
+
+### 1.6 Glossary (the code's words)
+
+| Word             | Means                                           | Where             |
+| ---------------- | ----------------------------------------------- | ----------------- |
+| think            | a decision tick, every 6 steps                  | bot.ts            |
+| mode             | the option in hand                              | captain.ts `Mode` |
+| bite             | a claim loop: out, across, back                 | claimer.ts        |
+| ring             | the circle at gun range she keeps round her foe | gunner.ts         |
+| purser           | stores: loot, mending, arming                   | purser.ts         |
+| wade / backT < 0 | working off a bar under her bow                 | helmsman.ts stuck |
+| strafe           | which way she turns backing off a bank          | helmsman.ts stuck |
+| recoil           | bearing away after her ram touches              | helmsman.ts       |
+| margin           | metres she keeps inside the storm's edge        | temper.ts         |
+| chart            | 6.8 m cells of open water, baked once           | route.ts          |
+| open             | deep enough: draught + 0.3 m                    | captain.ts        |
+
+### 1.7 The harness (five layers)
+
+| Layer        | What                                                                                                                                | Where                                                     |
+| ------------ | ----------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| 1 Seam       | Brain per ship, golden hash                                                                                                         | `src/sim/brain.ts`, `play/orders.ts`                      |
+| 2 Runner     | `runMatch(spec) → result`; worker pool (8 P-cores); chart cached per planet seed; JSONL keyed by spec hash                          | `tools/harness/`                                          |
+| 3 Observe    | optional trace sink in Ctx (typed events per role); metric reducers                                                                 | `src/sim/trace.ts`, `tools/harness/metrics/`              |
+| 4 Experiment | scenarios (set-piece starts, seconds each); single-variant and mixed-fleet tournaments; paired seeds, bootstrap CIs, held-out seeds | `tools/harness/scenarios/`, `tools/harness/tournament.ts` |
+| 5 Inspect    | replay any spec with full trace; 2D top-down HTML (tracks by mode, stuck heatmap, why-lines); find-examples query                   | `tools/harness/replay.ts`                                 |
+
+Fidelity is not traded for speed: no cut-down sim. Speed is parallelism,
+caching, and short scenarios.
+
+### 1.8 Worked example: why bots circle at 12 m/s
+
+Baseline (seed 7922, one match): 38/80 bots moved under 15 m in 30 s, **0
+aground**, median speed while stuck 12.5 m/s. From reading the code (to be
+confirmed by trace in phase C):
+
+1. Navigator: A\* treats any 6.8 m cell with depth ±2.3 m as passable; a 26 m
+   ship turning a ~27 m circle cannot use a one-cell slot.
+2. Helmsman: side feelers sit ~18 m either side; in any channel under ~36 m both
+   touch land, so she turns hard away and holds it 0.8 s; the route pulls her back.
+   Planner (chart) and reflex (true depth) disagree, and she circles.
+3. Navigator: with no route in 4000 cells, A\* hands back the cell nearest the
+   goal as the crow flies, a cove; she replans every 2 s to the same cove.
+4. Captain: goals are checked open at a point, never reachable.
+5. Helmsman: stuck means under 0.93 m/s, so circling at speed is never seen.
+
+In the new design: (1) the chart knows clearance in metres and bars cells
+under half a beam plus margin; (2) Steering reads the same clearance field as
+the Navigator; (3, 4) the Captain's goals are snapped into her own body of water
+(components labelled at bake), storm goals come from a shared flow field; (5)
+the Helmsman judges progress toward the Waypoint over a window, and on failure
+the Navigator blacklists that goal for a while. Each shows in the trace as a
+named event.
+
+---
+
+## 2. Plan (priority order; any prefix is a coherent stop)
+
+House rules: worktree only; rebase, never merge; no push; commit often, prose
+messages in the house voice; one action per shell call; `npm test` green on every
+commit; anything visible checked in headless chromium; iPad Air M1 at 30–40 fps
+(watch ms/step: 0.70 desktop baseline).
+
+- [ ] **A. Lock behaviour.** Golden-match test (hash of every ship's place, hull,
+      and the result after N steps on a fixed seed). Baseline metrics recorded.
+- [ ] **B. Refactor, hash unchanged.**
+  - [ ] B1 Split `BOT` to its owners (SIGHT, MIND, STORMING, RAM, HELM); no
+        module reads another's table (helmsman's PURSER reads go).
+  - [ ] B2 `Intent`; helmsman takes Waypoint + Intent, not modes. Tactician out
+        of helmsman.
+  - [ ] B3 Memory in slices per role.
+  - [ ] B4 `Brain` composed in brain.ts; slices passed down; per-ship Brain in
+        `orders.ts` Hand. Architecture tests 1–6.
+- [ ] **C. Harness.**
+  - [ ] C1 runMatch(spec), worker pool, chart cache (`.cache/`, gitignored), JSONL.
+  - [ ] C2 Trace sink + events; metrics: stuck by mode, progress/s, route
+        failures, time in mode, why-lines, armed by t, loot taken, placement.
+  - [ ] C3 Scenarios: crossing pairs (200 fixed), channel, storm-from-a-cove,
+        duel, chase. Suite under 60 s as a test.
+- [ ] **D. Loot more plentiful** (user ask, measured). See Decision 3.
+- [ ] **E. Navigation**, each change measured, hash re-recorded:
+  - [ ] E1 Clearance in metres; cells under the hull's need barred; cost by clearance.
+  - [ ] E2 Water bodies labelled; goals snapped to her own.
+  - [ ] E3 Progress-based stuck; goal blacklist.
+  - [ ] E4 Storm flow field per phase (Router #2).
+  - [ ] E5 Context steering on the clearance field (Steering #2).
+- [ ] **F. Stretch.** Mixed-fleet tournament + ratings; 2D replay HTML; breaking
+      line of sight when fleeing; hunting to the sound of guns.
+
+## 3. Decisions
+
+1. **Crew-role modules** (lookout, captain, tactician, navigator, helmsman,
+   gunner, purser, claimer): the code already names modules by role; one role,
+   one table, one memory slice keeps each small enough to hold in the head.
+2. **Refactor before harness.** The harness needs the Brain seam; the seam done
+   right is the refactor. Both from one piece of work, under one golden hash.
+3. **Loot (asked for mid-run).** Now 200 spots × 1.4 ≈ 280 pieces, cut on
+   purpose from ~570 so the first gun is a scramble (most armed by 20–30 s).
+   Target: about twice the consumables and some more guns, _keeping_ the opening
+   scramble: armed median still ≥ 5 s, 90% armed by ≤ 30 s. Levers, tried in
+   order on the harness: spots 200 → ~320 with gun share 0.5 → ~0.42; then a
+   resupply drift per storm phase, laid inside the next cap (draws fights to it).
+   Check the drawn loot's cost in headless chromium (more instances on iPad).
+
+## 4. Log
+
+- 975191c baseline (seed 7922, 1 match): 438 s, 0.70 ms/step; stuck 38/80, 0
+  aground, median 12.5 m/s; armed 65/80, median 7 s, 90% by 22 s; 283 pieces.
