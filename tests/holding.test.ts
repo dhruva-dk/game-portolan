@@ -40,9 +40,10 @@ test('every ship afloat regains by her own share wherever she lies, up to her mo
       shielded(2, HEALTH.shield - 0.01),
       shielded(3, 40),
     ];
-  // ship 0 a fifth of the calm, ship 1 a tenth, ship 2 near her most, ship 3
-  // none; ship 3 sunk besides
-  const shares = [0.05, 0.025, 0.05, 0],
+  // ship 0 HOLDING.full of the calm (a quarter of the planet), ship 1 half as
+  // much, ship 2 near her most, ship 3 none; ship 3 sunk besides
+  const full = HOLDING.full / 4,
+    shares = [full, full / 2, full, 0],
     held = { share: (id: number) => shares[id] };
   const r = regain(crews, [0, 1, 2], held, QUARTER, dt);
   assert.ok(

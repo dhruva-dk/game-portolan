@@ -134,12 +134,14 @@ export const HEALTH = {
 
 /**
  * Her water (territory.ts, holding.ts): wherever she is, her shield comes back
- * `shield` hit points a second with `full` of the calm hers (a fifth of the sea
- * inside the storm), in proportion with less: well under what a common cannon
- * takes off a second held on her (GUNS.cannon), so a fight can't be won on
- * water alone, but 20–30 s after one puts back 60–90 of it.
+ * `shield` hit points a second with `full` of the calm hers (a hundredth of the
+ * sea inside the storm: the most one ship holds early in a match is some 0.3 to
+ * 1% of the planet, a common one 0.2%, 0.6 a second), in proportion with less:
+ * well under what a common cannon takes off a second held on her
+ * (GUNS.cannon), so a fight can't be won on water alone, but 20–30 s after one
+ * puts back 60–90 of it.
  */
-export const HOLDING = { shield: 3, full: 0.2 } as const;
+export const HOLDING = { shield: 3, full: 0.01 } as const;
 
 /**
  * Gust, her one ability (gust.ts): a burst of wind in her canvas and a hop off
