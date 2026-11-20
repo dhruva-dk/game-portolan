@@ -5,7 +5,7 @@ import { CUES, CUE_NAMES, DEEDS, cueOf, soundOf, type Happening } from '../src/a
 import { TOP, createListen, type Call, type Hearing } from '../src/audio/listen.ts';
 import { SHIP } from '../src/sim/handling.ts';
 import { FALL, NEAR, SPEED, bearingFrom, cutoffAt, hear, heard, panOf, rolloff } from '../src/audio/space.ts';
-import { VOICES, claim, playing, pool } from '../src/audio/voices.ts';
+import { VOICES, claim, pool, type Pool } from '../src/audio/voices.ts';
 import { breakers, galeOf, levels, levelsOf } from '../src/audio/bed.ts';
 import { KINDS } from '../src/kinds.ts';
 import { HOTBAR, type GunKind, type Kit, type Status } from '../src/player.ts';
@@ -143,7 +143,7 @@ test('bearing and pan: ahead 0, right +π/2, behind ±π, as the eye is turned; 
 
 test('voices: never more than VOICES at once; a new sound takes a free slot, else the oldest of the lowest priority no higher than its own',
   () => {
-  const p = pool();
+  const p = pool(), playing = (q: Pool, now: number) => q.ends.filter((e) => e > now).length;
   for (let i = 0; i < VOICES; i++) assert.equal(claim(p, 0, 5, i * 0.01, 10), i);
   assert.equal(playing(p, 1), VOICES);
   assert.equal(claim(p, 1, 4, 1, 3), -1, 'a lower priority finds no room');

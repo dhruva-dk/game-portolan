@@ -4,7 +4,7 @@ import { buildShip, type Packed } from '../src/ship/build.ts';
 import { DETAILS, SLACK, chooseDetail, reach } from '../src/ship/detail.ts';
 import { buildHull } from '../src/ship/hull.ts';
 import { Acc } from '../src/ship/kit.ts';
-import { GUN_MOUNT, gunMount, toWorld } from '../src/ship/mount.ts';
+import { GUN_MOUNT, toWorld } from '../src/ship/mount.ts';
 import { buildRig } from '../src/ship/rig.ts';
 import { buildSails } from '../src/ship/sails.ts';
 import { R, add, dot, frameAt, length, normalize, type Vec3 } from '../src/world/sphere.ts';
@@ -96,9 +96,9 @@ test('the gun mount stands on her waist, carried with her pose', () => {
   assert.ok(Math.abs(GUN_MOUNT[2]) < 4, `mount ${GUN_MOUNT[2]} m from amidships`);
   const up = normalize([0.3, 0.9, -0.2]), { east } = frameAt(up);
   const pose = { position: [up[0] * R, up[1] * R, up[2] * R] as Vec3, forward: east, up };
-  const m = gunMount(pose);
-  assert.ok(Math.abs(length(add(m.position, pose.position, -1)) - Math.hypot(...GUN_MOUNT)) < 1e-9);
-  assert.ok(Math.abs(dot(m.position, up) - (R + GUN_MOUNT[1])) < 1e-9);
+  // (where arms.ts puts the gun)
+  const m = toWorld(pose, GUN_MOUNT);
+  assert.ok(Math.abs(length(add(m, pose.position, -1)) - Math.hypot(...GUN_MOUNT)) < 1e-9);
+  assert.ok(Math.abs(dot(m, up) - (R + GUN_MOUNT[1])) < 1e-9);
   assert.ok(Math.abs(dot(toWorld(pose, [0, 0, 5]), east) - dot(pose.position, east) - 5) < 1e-9);
-  assert.deepEqual(m.forward, pose.forward);
 });

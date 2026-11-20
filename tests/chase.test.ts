@@ -4,17 +4,20 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createChase, PITCH } from '../src/play/chase.ts';
 import { finale } from '../src/play/finale.ts';
-import { onScreen } from '../src/play/lens.ts';
+import { placed } from '../src/play/lens.ts';
 import { CLOUD, toEdge } from '../src/sim/storm.ts';
 import { GUNS } from '../src/sim/handling.ts';
 import { offSight } from '../src/sim/sight.ts';
 import { shipAt } from '../src/sim/ship.ts';
+import type { Eye } from '../src/snapshot.ts';
 import { R, add, along, cross, distance, dot, length, normalize, scale, transport, type Vec3 } from '../src/world/sphere.ts';
 
 const up: Vec3 = normalize([0.3, 0.9, -0.2]);
 const north = normalize(cross([1, 0, 0], up));
 const flat = () => -30, calm = () => 0;
 const deg = Math.PI / 180;
+/** Where p, `up` m over the sea, falls through `e` on a view `width` × `height`: placed, into a point of its own. */
+const onScreen = (e: Eye, p: Vec3, width: number, height: number, up = 0) => placed({ x: 0, y: 0 }, e, p, up, { width, height });
 /** Her pose at `at`, heading `forward` (any vector; its part along the surface counts). */
 const pose = (at: Vec3, forward: Vec3) => ({ position: scale(at, R), forward: normalize(add(forward, at, -dot(forward, at))), up: at });
 /** `t` turned `a` radians to port about `u`. */

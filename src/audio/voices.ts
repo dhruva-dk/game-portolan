@@ -29,9 +29,6 @@ export function claim(p: Pool, now: number, priority: number, begins: number, en
   return slot;
 }
 
-/** How many slots are playing at `now`. */
-export const playing = (p: Pool, now: number) => p.ends.reduce((n, e) => n + (e > now ? 1 : 0), 0);
-
 /** Every slot freed (a new sea: nothing carries over). */
 export function clear(p: Pool) {
   p.begins.fill(0);

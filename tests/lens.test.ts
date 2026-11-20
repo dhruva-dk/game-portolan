@@ -1,13 +1,16 @@
 // Where a point falls on the screen through an eye (play/lens.ts), as the frame's camera draws it.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { onScreen } from '../src/play/lens.ts';
+import { placed } from '../src/play/lens.ts';
 import { AIR_FOV, type Eye } from '../src/snapshot.ts';
 import { R, add, along, normalize, scale, type Vec3 } from '../src/world/sphere.ts';
 import { lookAt } from '../src/world/turn.ts';
 
 const W = 956, H = 440;
 const at: Vec3 = [0, 1, 0], north: Vec3 = [0, 0, -1];
+
+/** Where p, `up` m over the sea, falls through `e` on a view `width` × `height`: placed, into a point of its own. */
+const onScreen = (e: Eye, p: Vec3, width: number, height: number, up = 0) => placed({ x: 0, y: 0 }, e, p, up, { width, height });
 
 /** An eye `up` m over the sea at `at`, looking at the sea `ahead` m north, its field of view `fov` degrees. */
 function eye(up: number, ahead: number, fov = AIR_FOV): Eye {

@@ -27,6 +27,3 @@ export function toWorld(pose: ShipPose, local: Vec3, out?: Out3): Vec3 {
   const x = local[0], y = local[1], z = local[2];
   return add(add(add(pose.position, port(pose, side), x, out), pose.up, y, out), pose.forward, z, out);
 }
-
-/** The gun mount's place in the world: at GUN_MOUNT, facing her bow, up her up. */
-export const gunMount = (pose: ShipPose): ShipPose => ({ position: toWorld(pose, GUN_MOUNT), forward: pose.forward, up: pose.up });

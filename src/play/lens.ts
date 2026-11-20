@@ -33,8 +33,3 @@ export function placed(out: Point, eye: Eye, p: Vec3, up: number, view: View): P
   out.y = ((1 - y) / 2) * height;
   return out;
 }
-
-/** Where a point on the sea (a unit vector), or `up` metres over it, falls through `eye` in a view `width` × `height`
- *  px; null behind the eye or hidden from it by the sea's curve. */
-export const onScreen = (eye: Eye, p: Vec3, width: number, height: number, up = 0): Point | null =>
-  placed({ x: 0, y: 0 }, eye, p, up, { width, height });

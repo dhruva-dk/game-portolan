@@ -2,11 +2,18 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { SHIP } from '../src/sim/handling.ts';
 import { SHIPS } from '../src/sim/match.ts';
-import { SPAWN, berthing, berths, closest } from '../src/sim/spawn.ts';
+import { SPAWN, berthing, berths, type Spawn } from '../src/sim/spawn.ts';
 import { createMatches } from '../src/play/setup.ts';
 import { landOf, planetOf } from '../src/world/land.ts';
 import { SEED } from '../src/world/planet.ts';
-import { R, along, dot, length } from '../src/world/sphere.ts';
+import { R, along, distance, dot, length } from '../src/world/sphere.ts';
+
+/** The least distance between any two berths, metres along the surface. */
+function closest(spawns: readonly Spawn[]): number {
+  let least = Infinity;
+  for (let i = 0; i < spawns.length; i++) for (let j = i + 1; j < spawns.length; j++) least = Math.min(least, distance(spawns[i].at, spawns[j].at));
+  return least;
+}
 
 const planet = planetOf(SEED, landOf(SEED));
 const depth = (p: readonly [number, number, number]) => -planet.height(p);

@@ -12,7 +12,7 @@
 // Pure and deterministic: the same planet and seed give the same berths, to the bit.
 
 import { random } from '../world/random.ts';
-import { R, along, bearingAt, distance, scale, type Vec3 } from '../world/sphere.ts';
+import { R, along, bearingAt, scale, type Vec3 } from '../world/sphere.ts';
 import { SHIP } from './handling.ts';
 import type { Depth } from './shoal.ts';
 
@@ -141,14 +141,4 @@ export function berths(water: Berthing, seed: number, count: number, depth: Dept
     }
     return { at, heading: scale(heading, 1 / Math.hypot(...heading)) };
   });
-}
-
-/** The least distance between any two berths, metres along the surface. */
-export function closest(spawns: readonly Spawn[]): number {
-  let least = Infinity;
-  for (let i = 0; i < spawns.length; i++) for (let j = i + 1; j < spawns.length; j++) {
-    const a = spawns[i].at, b = spawns[j].at;
-    least = Math.min(least, distance(a, b));
-  }
-  return least;
 }
