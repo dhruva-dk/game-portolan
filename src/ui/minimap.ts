@@ -15,17 +15,16 @@
 // changed; tapped, it opens the full map.
 
 import type { Sea } from '../snapshot.ts';
+import { R, along, dot, type Vec3 } from '../world/sphere.ts';
 import {
-  R,
-  add,
-  along,
-  distance,
-  dot,
-  frameAt,
-  normalize,
-  scale,
-  type Vec3,
-} from '../world/sphere.ts';
+  createRings,
+  head,
+  strokeNext,
+  strokeWay,
+  wayHead,
+  wayIn,
+  type Storm,
+} from './calm.ts';
 import type { Shores } from './coasts.ts';
 import { laid, layAt, metres, newLay, place, type LayOnto } from './disc.ts';
 import { createGround } from './ground.ts';
@@ -41,40 +40,11 @@ import { view } from './ui.ts';
 const SPAN = 408;
 /** The most redraws a second. */
 const RATE = 30;
-/**
- * The Storm's wash, its edge, and the faint iron halo under the next circle's
- * line.
- */
+/** The Storm's wash and its edge. */
 const STORM = alpha(WASH.storm, 0.4),
-  EDGE = INK.storm,
-  HALO = alpha(INK.iron, 0.45);
-/**
- * The way in's line: iron under white, each its width, px at the drawn size.
- */
-const WAY = [
-  [INK.iron, 3.6],
-  [INK.white, 1.8],
-] as const;
+  EDGE = INK.storm;
 /** Rings of the Storm kept traced, the oldest let go. */
 const RINGS = 8;
-
-export interface Storm {
-  centre: Vec3;
-  radius: number;
-}
-
-/** The small circle `radius` metres round `centre`, as `n` points. */
-export function stormRing(storm: Storm, n = 96): Vec3[] {
-  const { north, east } = frameAt(storm.centre);
-  return Array.from({ length: n }, (_, i) => {
-    const a = (i / n) * Math.PI * 2;
-    return along(
-      storm.centre,
-      add(scale(north, Math.cos(a)), east, Math.sin(a)),
-      storm.radius
-    ).p;
-  });
-}
 
 /**
  * What else the disc may show: her arrow gilt, for a ship watched after a
@@ -88,10 +58,6 @@ export interface More {
   sea?: Sea;
   own?: number | null;
 }
-
-/** An arrowhead's path, its tip `l` up from (0, 0). */
-const head = (l: number) =>
-  `M0 ${-l}L${l * 0.62} ${l * 0.7}L0 ${l * 0.32}L${-l * 0.62} ${l * 0.7}Z`;
 
 /** Whether two readings are the same, none (NaN) the same as none. */
 const same = (a: number, b: number) => a === b || (a !== a && b !== b);
@@ -133,31 +99,9 @@ export function createMinimap(
   const held = createHeld(SPAN * 1.15);
   // (the plate reaches past the rim by as far as she sails before it is taken afresh, and a margin)
   const land = createGround(ground.height, SPAN + 50, ground.top);
-  /** The Storm's rings traced, newest last, by their centre and radius. */
-  const rings: { centre: Vec3; radius: number; ring: Vec3[] }[] = [];
-  const ringOf = (s: Storm) => {
-    const [x, y, z] = s.centre;
-    for (const k of rings)
-      if (
-        k.radius === s.radius &&
-        k.centre[0] === x &&
-        k.centre[1] === y &&
-        k.centre[2] === z
-      )
-        return k.ring;
-    if (rings.length >= RINGS) rings.shift();
-    const ring = stormRing(s, 180);
-    rings.push({
-      centre: [s.centre[0], s.centre[1], s.centre[2]],
-      radius: s.radius,
-      ring,
-    });
-    return ring;
-  };
+  const rings = createRings(RINGS),
+    ringOf = (s: Storm) => rings(s.centre, s.radius);
   const stats = { draws: 0, ms: 0, since: performance.now() };
-  /** The next circle's dots, and none. */
-  const DOTS = [0.1 * dpr, 4.4 * dpr],
-    NONE: number[] = [];
 
   /** The disc as laid this redraw (disc.ts). */
   const l = newLay();
@@ -295,20 +239,12 @@ export function createMinimap(
     if (next) {
       // the circle it next closes to: white, dotted, over a faint iron halo
       trace(ringOf(next), true);
-      ctx.lineCap = 'round';
-      ctx.strokeStyle = HALO;
-      ctx.lineWidth = 3 * dpr;
-      ctx.setLineDash(DOTS);
-      ctx.stroke();
-      ctx.strokeStyle = INK.white;
-      ctx.lineWidth = 2 * dpr;
-      ctx.stroke();
-      ctx.setLineDash(NONE);
+      strokeNext(ctx, dpr);
     }
     // outside the next circle (or the calm, with none to come), the way in: a line to its nearest point
-    const goal = next ?? calm;
-    const d = goal ? distance(at, goal.centre) : 0;
-    if (goal && d > goal.radius) way(at, goal, d, c, k);
+    const goal = next ?? calm,
+      w = goal && wayIn(at, goal);
+    if (w) way(at, w.to, w.gap, c, k);
     stats.draws++;
     stats.ms += performance.now() - now;
     if (now - stats.since > 2000) {
@@ -323,45 +259,26 @@ export function createMinimap(
     }
   };
 
-  /** The way in from `at`, `d` metres from the goal's centre, to its nearest point: a line ending in an arrowhead at the
-   *  circle, or on the rim when the circle is off the disc. */
-  function way(at: Vec3, goal: Storm, d: number, c: number, k: number) {
-    const to = normalize(add(goal.centre, at, -dot(goal.centre, at)));
+  /** The way in from `at` along `to`, `gap` metres to the circle: a line ending in an arrowhead at the circle, or on
+   *  the rim when the circle is off the disc. */
+  function way(at: Vec3, to: Vec3, gap: number, c: number, k: number) {
     const m = metres(l, along(at, to, 1).p),
       len = Math.hypot(m[0], m[1]);
     const ux = m[0] / len,
       uy = -m[1] / len,
       rim = (inner - 4) * dpr;
-    const reach = Math.min((d - goal.radius) * k, rim),
+    const reach = Math.min(gap * k, rim),
       from = 11 * dpr,
-      a = 5.5 * dpr,
-      b = 3.8 * dpr;
+      a = 5.5 * dpr;
     if (reach <= from + a * 1.1) return;
-    const x1 = c + ux * from,
-      y1 = c + uy * from,
-      x2 = c + ux * reach,
+    const x2 = c + ux * reach,
       y2 = c + uy * reach;
-    ctx.lineCap = 'round';
-    for (const [ink, w] of WAY) {
-      ctx.beginPath();
-      ctx.moveTo(x1, y1);
-      ctx.lineTo(x2 - ux * a * 0.6, y2 - uy * a * 0.6);
-      ctx.strokeStyle = ink;
-      ctx.lineWidth = w * dpr;
-      ctx.stroke();
-    }
-    // its arrowhead, at the circle or on the rim
     ctx.beginPath();
-    ctx.moveTo(x2 + ux * 2 * dpr, y2 + uy * 2 * dpr);
-    ctx.lineTo(x2 - ux * a - uy * b, y2 - uy * a + ux * b);
-    ctx.lineTo(x2 - ux * a + uy * b, y2 - uy * a - ux * b);
-    ctx.closePath();
-    ctx.fillStyle = INK.white;
-    ctx.strokeStyle = INK.iron;
-    ctx.lineWidth = 1.2 * dpr;
-    ctx.lineJoin = 'round';
-    ctx.stroke();
-    ctx.fill();
+    ctx.moveTo(c + ux * from, c + uy * from);
+    ctx.lineTo(x2 - ux * a * 0.6, y2 - uy * a * 0.6);
+    strokeWay(ctx, dpr);
+    // its arrowhead, at the circle or on the rim
+    wayHead(ctx, { x: x2, y: y2, ux, uy }, dpr);
   }
 
   /** The coasts near her, inked. */

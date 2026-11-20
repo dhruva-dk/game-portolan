@@ -21,8 +21,9 @@
 // Over the window, placed each frame by projecting world points with the eye's
 // numbers: the coasts (coasts.ts), inked lightly over their real ground; the
 // Storm's edge in its violet (the Storm itself is the world's own, its cloud
-// seen from above); her galleon, gilt. Whatever is on the planet's far side is
-// not shown. Beside the window, the two readings that matter: ships afloat and
+// seen from above); as on the minimap (calm.ts), the circle it next closes to
+// and the way in to it, and her mark, a small arrowhead turned to her heading.
+// Whatever is on the planet's far side is not shown. Beside the window, the two readings that matter: ships afloat and
 // the Storm's clock.
 
 import type { Cap } from '../sim/storm.ts';
@@ -30,6 +31,7 @@ import { lookingAt, type Eye } from '../snapshot.ts';
 import { clamp } from '../world/scalar.ts';
 import {
   R,
+  along,
   cross,
   dot,
   length,
@@ -37,6 +39,15 @@ import {
   scale,
   type Vec3,
 } from '../world/sphere.ts';
+import {
+  createRings,
+  head,
+  strokeNext,
+  strokeWay,
+  traceWay,
+  wayHead,
+  wayIn,
+} from './calm.ts';
 import type { Coast } from './coasts.ts';
 import { GLYPHS } from './glyphs.ts';
 import { clock, type HudState } from './hud.ts';
@@ -45,10 +56,8 @@ import {
   INK,
   PAPER,
   SHADOW,
-  WASH,
   alpha,
   figure,
-  galleon,
   glyph,
   roughCircle,
   roughRect,
@@ -58,7 +67,6 @@ import {
   uid,
 } from './ink.ts';
 import { rhumbs } from './marks.ts';
-import { stormRing, type Storm } from './minimap.ts';
 import { dragged, onTap } from './touch.ts';
 import { insets, onResize, screen, view, type Insets } from './ui.ts';
 
@@ -73,6 +81,10 @@ const PANEL = 0.8,
   SIDE = 112,
   WINDOW = 0.37,
   CLOSE = 50;
+/** Half her mark's side, px at the drawn size. */
+const MARK = 10;
+/** Metres between the points of the way in as traced over the planet. */
+const WAY_STEP = 12;
 /**
  * The eye's distance from the planet's centre at its farthest (where it opens)
  * and nearest, in radii: from the farthest the whole planet fills the window;
@@ -277,14 +289,13 @@ export function createGlobe(coasts: readonly Coast[]) {
   canvas.style.cssText = 'position:absolute;left:0;top:0';
   root.appendChild(canvas);
   const ctx = canvas.getContext('2d')!;
-  // her mark, centred on her place and grown by the UI's size
-  const mark = layer('left:-32px;top:-32px');
+  // her mark, the minimap's arrowhead turned to her heading as it is seen, centred on her place and grown by the UI's
+  // size
+  const mark = layer(`left:-${MARK}px;top:-${MARK}px`);
   mark.innerHTML = svg(
-    64,
-    64,
-    `<circle cx="32" cy="32" r="27" fill="${WASH.vermilion}" fill-opacity=".9" stroke="${INK.iron}" stroke-width="1.2"/>` +
-      `<circle cx="32" cy="32" r="30" fill="none" stroke="${INK.white}" stroke-opacity=".7" stroke-width="1.5"/>` +
-      galleon(32, 28, 50, { hull: WASH.gold })
+    MARK * 2,
+    MARK * 2,
+    `<path transform="translate(${MARK} ${MARK})" d="${head(6)}" fill="${INK.white}" stroke="${INK.iron}" stroke-width="1.3" stroke-linejoin="round"/>`
   );
   // the readings, each side of the window: ships afloat, and the Storm's clock
   const afloat = layer(''),
@@ -315,9 +326,10 @@ export function createGlobe(coasts: readonly Coast[]) {
   let L = layoutFor(1, 1, 1, { top: 0, right: 0, bottom: 0, left: 0 });
   /** Scratch for each point projected this frame. */
   const seen: Seen = { x: 0, y: 0, facing: 0 };
-  /** The Storm's edge as last traced: its calm, and its ring. */
-  let traced: Storm | null = null,
-    ring: Vec3[] = [];
+  /** The Storm's edge and the circle it next closes to, as traced. */
+  const rings = createRings(4);
+  /** Scratch for her heading's point projected. */
+  const ahead: Seen = { x: 0, y: 0, facing: 0 };
 
   /** The panel laid out on the screen as it is now: parchment framed in a double rule, its rhumb lines, and a round
    *  window cut in it inside a graduated ring, drawn at the drawn size and grown by the UI's size; the readings beside
@@ -461,21 +473,7 @@ export function createGlobe(coasts: readonly Coast[]) {
         ctx.restore();
       }
       // its edge traced afresh only as the calm closes
-      const t = traced;
-      if (
-        !t ||
-        t.radius !== cap.radius * R ||
-        t.centre[0] !== cap.centre[0] ||
-        t.centre[1] !== cap.centre[1] ||
-        t.centre[2] !== cap.centre[2]
-      ) {
-        traced = {
-          centre: [cap.centre[0], cap.centre[1], cap.centre[2]],
-          radius: cap.radius * R,
-        };
-        ring = stormRing(traced, 180);
-      }
-      trace(e, ring, true);
+      trace(e, rings(cap.centre, cap.radius * R), true);
       ctx.strokeStyle = INKS.halo;
       ctx.lineWidth = 6 * k;
       ctx.stroke();
@@ -483,16 +481,39 @@ export function createGlobe(coasts: readonly Coast[]) {
       ctx.lineWidth = 3 * k;
       ctx.stroke();
     }
+    if (state) calms(e, state, k);
     ctx.restore();
-    // her mark, on this side only, fading as it nears the limb
+    // her mark, on this side only, fading as it nears the limb, turned to her heading as seen
     const p = state ? project(e, state.at, seen) : null;
     const shown =
       !!p && p.facing > 0 && Math.hypot(p.x - win.x, p.y - win.y) < win.r;
     mark.hidden = !shown;
-    if (p && shown) {
+    if (state && p && shown) {
+      const q = project(e, along(state.at, state.heading, 1).p, ahead),
+        turn = Math.atan2(q.x - p.x, p.y - q.y) * DEGREES;
       mark.style.opacity = Math.min(1, p.facing / 0.04).toFixed(2);
-      mark.style.transform = `translate(${p.x.toFixed(1)}px,${p.y.toFixed(1)}px) scale(${k.toFixed(3)})`;
+      mark.style.transform = `translate(${p.x.toFixed(1)}px,${p.y.toFixed(1)}px) scale(${k.toFixed(3)}) rotate(${turn.toFixed(1)}deg)`;
     }
+  }
+
+  /** As on the minimap: the circle the Storm next closes to, and outside it (or the calm, with none to come) the way
+   *  in, a line over the planet to its nearest point ending in an arrowhead (at the limb when that is out of sight). */
+  function calms(e: Sight, s: HudState, k: number) {
+    const next = s.next && s.next.radius < R * Math.PI * 0.99 ? s.next : null;
+    if (next) {
+      trace(e, rings(next.centre, next.radius), true);
+      strokeNext(ctx, k);
+    }
+    const calm = s.eye.radius < R * Math.PI * 0.99 ? s.eye : null,
+      goal = next ?? calm,
+      w = goal && wayIn(s.at, goal);
+    if (!w) return;
+    const tip = traceWay(ctx, s.at, w, WAY_STEP, (q) => {
+      const p = project(e, q, seen);
+      return p.facing > 0 ? p : null;
+    });
+    strokeWay(ctx, k);
+    if (tip) wayHead(ctx, tip, k);
   }
 
   function readout() {
