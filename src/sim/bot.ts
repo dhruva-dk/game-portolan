@@ -42,7 +42,7 @@ import {
 } from '../world/sphere.ts';
 import { inHand, type Order } from './battle.ts';
 import { STEP } from './fixed.ts';
-import { aimAndFire, armFor, reactTime } from './gunner.ts';
+import { aimAndFire, armFor, gunner, sighted } from './gunner.ts';
 import type { Helm } from './ship.ts';
 import { STORM, toEdge, type Cap } from './storm.ts';
 import { temper } from './temper.ts';
@@ -68,11 +68,19 @@ import {
   type Sea,
   type Seen,
 } from './captain.ts';
-import { deepest, steer } from './helmsman.ts';
-import { navigate } from './pilot.ts';
-import { mark } from './tactician.ts';
-import { healUrge, lootAct, lootUrge, purse, PURSER } from './purser.ts';
-import { claimAct, claimUrge } from './claimer.ts';
+import { deepest, helmMemory, steer } from './helmsman.ts';
+import { lose, navigate, pilotMemory } from './pilot.ts';
+import { mark, tacticMemory } from './tactician.ts';
+import {
+  healAct,
+  healUrge,
+  lootAct,
+  lootTime,
+  lootUrge,
+  purse,
+  purseMemory,
+} from './purser.ts';
+import { claimAct, claimMemory, claimUrge } from './claimer.ts';
 import { NOTHING, type Ask } from './stores.ts';
 import { SHIP } from './handling.ts';
 
@@ -178,16 +186,74 @@ const STORMING = {
   drawn: 0.4,
 } as const;
 
-export {
-  BOT,
-  mind,
-  rammed,
-  shot,
-  type Memory,
-  type Mode,
-  type Sea,
-  type Seen,
-} from './captain.ts';
+export { BOT, type Memory, type Mode, type Sea, type Seen } from './captain.ts';
+
+/**
+ * What her mind carries: seconds she has been afloat, and steps to her next
+ * think; what she is about, since when (s), and where she makes for; her foe (an
+ * id, or -1), when she last saw her, and where; who last rammed her (-1: none)
+ * and when, and who last shot her and when.
+ */
+export interface MindMemory {
+  clock: number;
+  think: number;
+  mode: Mode;
+  since: number;
+  goal: Vec3;
+  foe: number;
+  seen: number;
+  last: Vec3;
+  hitBy: number;
+  hitT: number;
+  shotBy: number;
+  shotT: number;
+}
+
+/**
+ * A new mind for a ship at `at`, by her seed: every part's memory as she puts
+ * to sea. Bots think on different steps, by their seeds.
+ */
+export const mind = (seed: number, at: Vec3): Memory => ({
+  rand: (seed * 0x9e3779b1) >>> 0,
+  clock: 0,
+  think: 1 + ((seed >>> 0) % BOT.every),
+  mode: 'roam',
+  since: 0,
+  goal: at,
+  foe: -1,
+  seen: -Infinity,
+  last: at,
+  hitBy: -1,
+  hitT: -Infinity,
+  shotBy: -1,
+  shotT: -Infinity,
+  ...tacticMemory(),
+  ...pilotMemory(),
+  ...helmMemory(at),
+  ...purseMemory(),
+  ...claimMemory(),
+  ...gunner(),
+});
+
+/**
+ * Her memory once `by` has rammed her (the game tells her, from contact.ts's
+ * blows).
+ */
+export const rammed = (m: Memory, by: number): Memory => ({
+  ...m,
+  hitBy: by,
+  hitT: m.clock,
+});
+
+/**
+ * Her memory once a ball of `by`'s has struck her (the game tells her, from
+ * battle.ts's strikes that aren't rams).
+ */
+export const shot = (m: Memory, by: number): Memory => ({
+  ...m,
+  shotBy: by,
+  shotT: m.clock,
+});
 
 /**
  * One step of dt seconds of a bot's mind: what she orders her helm and her gun,
@@ -208,7 +274,6 @@ export function think(
     clock: memory.clock + dt,
     since: memory.since + dt,
     think: memory.think - 1,
-    lootT: memory.mode === 'loot' ? memory.lootT + dt : memory.lootT,
   };
   const c: Ctx = {
     own,
@@ -220,6 +285,7 @@ export function think(
     foeD: Infinity,
     seed,
   };
+  lootTime(c, dt);
   if (m.think <= 0) {
     m.think = BOT.every;
     perceive(c);
@@ -231,7 +297,7 @@ export function think(
   const intent = intentOf(m),
     way = navigate(c, mark(c, intent, dt), intent.foe, dt),
     { helm, lost } = steer(c, way, dt);
-  if (lost) m.route = null;
+  if (lost) lose(m);
   const held = own.crew ? inHand(own.crew) : null,
     seen = inSight(c) ? c.foe : null;
   const order: Order = held
@@ -247,7 +313,6 @@ export function think(
         holdsFire(c)
       )
     : { aim: null, fire: false };
-  m.was = own.ship.at;
   // her stores asked on the steps she thinks; the gun for the range taken in
   // hand whenever it changes
   const ask = m.think === BOT.every ? purse(c) : NOTHING;
@@ -297,7 +362,7 @@ function perceive(c: Ctx): void {
     if (score >= bd || hidden(c, own.ship.at, o.ship.at)) continue;
     [bd, best] = [score, o];
   }
-  if (best && best.id !== m.foe) m.react = m.clock + reactTime(c.t.skill);
+  if (best && best.id !== m.foe) sighted(m, m.clock, c.t.skill);
   if (best) [m.foe, m.seen, m.last] = [best.id, m.clock, best.ship.at];
   else if (
     m.foe >= 0 &&
@@ -494,9 +559,13 @@ function evading(c: Ctx): number {
   return utility(1 - fightUrge(c), 0.3 + 0.7 * c.t.skill);
 }
 
+/**
+ * An option she may take up: its mode, and its act, which gives her goal while
+ * she is about it (her mind alone writes her goal).
+ */
 interface Choice extends Option<Ctx> {
   readonly mode: Mode;
-  act(c: Ctx): void;
+  act(c: Ctx): Vec3;
 }
 
 // (Sheltering from weather, to be weighed 5.2, after the storm, hunting to the
@@ -515,49 +584,34 @@ const ROAM: Choice = {
       distance(c.own.ship.at, m.goal) < ROAMING.arrive
     ) {
       m.since = 0;
-      m.goal = roamGoal(c);
+      return roamGoal(c);
     }
+    return m.goal;
   },
 };
 const OPTIONS: readonly Choice[] = [
-  {
-    name: 'storm',
-    weight: 6,
-    mode: 'storm',
-    score: stormUrge,
-    act: (c) => {
-      c.m.goal = stormGoal(c);
-    },
-  },
+  { name: 'storm', weight: 6, mode: 'storm', score: stormUrge, act: stormGoal },
   // mending where she is, or clear of a foe about
   {
     name: 'heal',
     weight: 3.5,
     mode: 'heal',
     score: healUrge,
-    act: (c) => {
-      c.m.goal = c.foe
-        ? keptInside(c, away(c, c.m.last, PURSER.clear))
-        : c.own.ship.at;
-    },
+    act: (c) => healAct(c, (d) => keptInside(c, away(c, c.m.last, d))),
   },
   {
     name: 'flee',
     weight: 3.3,
     mode: 'flee',
     score: (c) => Math.max(losing(c), evading(c)),
-    act: (c) => {
-      c.m.goal = keptInside(c, away(c, c.m.last, MIND.run));
-    },
+    act: (c) => keptInside(c, away(c, c.m.last, MIND.run)),
   },
   {
     name: 'fight',
     weight: 2.6,
     mode: 'fight',
     score: fightUrge,
-    act: (c) => {
-      c.m.goal = c.m.last;
-    },
+    act: (c) => c.m.last,
   },
   { name: 'loot', weight: 1.8, mode: 'loot', score: lootUrge, act: lootAct },
   // her water (claimer.ts): a loop to claim more
@@ -583,8 +637,11 @@ function decide(c: Ctx): void {
     OPTIONS[
       choose(OPTIONS, c, current, c.t.skill, () => roll(m), momentum(m.since))
     ] ?? ROAM;
-  if (o.mode !== m.mode) [m.mode, m.since, m.route] = [o.mode, 0, null];
-  o.act(c);
+  if (o.mode !== m.mode) {
+    [m.mode, m.since] = [o.mode, 0];
+    lose(m);
+  }
+  m.goal = o.act(c);
 }
 
 /**

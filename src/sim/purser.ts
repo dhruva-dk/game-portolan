@@ -228,14 +228,49 @@ export function lootUrge(c: Ctx): number {
 /** The loot response: smoothly from 0.05 to 0.3 of worth. */
 const ease = (x: number) => smoothstep(0.05, 0.3, x);
 
-/** Going for the piece lootUrge chose: it becomes her target, and her goal. */
-export function lootAct(c: Ctx): void {
+/**
+ * Going for the piece lootUrge chose: it becomes her target, and where it lies
+ * her goal (her goal as it was, if it is gone).
+ */
+export function lootAct(c: Ctx): Vec3 {
   const { m } = c,
     l = c.sea.loot?.find((k) => k.id === m.loot);
-  if (!l) return;
+  if (!l) return m.goal;
   if (l.id !== m.target) [m.target, m.lootT] = [l.id, 0];
-  m.goal = l.at;
+  return l.at;
 }
+
+/**
+ * Mending: where she is, or with a foe about, open water PURSER.clear m from
+ * her (found by her mind, `clearOf`).
+ */
+export const healAct = (c: Ctx, clearOf: (metres: number) => Vec3): Vec3 =>
+  c.foe ? clearOf(PURSER.clear) : c.own.ship.at;
+
+/**
+ * What her purser carries: the piece she would go for as she last weighed it,
+ * the one she is going for and for how many seconds, and the one she gave up
+ * (ids; -1 none).
+ */
+export interface PurseMemory {
+  loot: number;
+  target: number;
+  lootT: number;
+  shun: number;
+}
+
+/** A purser's memory as she puts to sea. */
+export const purseMemory = (): PurseMemory => ({
+  loot: -1,
+  target: -1,
+  lootT: 0,
+  shun: -1,
+});
+
+/** Her time going for loot kept, a step of dt seconds on while she does. */
+export const lootTime = (c: Ctx, dt: number) => {
+  if (c.m.mode === 'loot') c.m.lootT += dt;
+};
 
 /**
  * What she asks of her stores this step: mending, the slot worth most; going

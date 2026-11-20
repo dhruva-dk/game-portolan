@@ -162,6 +162,14 @@ export const reactTime = (skill: number) =>
   GUNNER.react[0] + (GUNNER.react[1] - GUNNER.react[0]) * skill;
 
 /**
+ * Her gunner told of a new ship in her sight at `clock` s: she holds her fire
+ * her reaction's time, by her skill.
+ */
+export const sighted = (g: Gunner, clock: number, skill: number) => {
+  g.react = clock + reactTime(skill);
+};
+
+/**
  * What a gun of `kind` and `rarity` does to a ship `metres` off, hit points a
  * second: its balls a second over a magazine and its reload (a wind-up's wait
  * in it), less with its fall-off, and with its spread wider than her beam

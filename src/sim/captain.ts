@@ -1,7 +1,8 @@
-// What a bot is, shared by her mind (bot.ts), her helm (helmsman.ts) and her
-// gun (gunner.ts): what she is tuned by, how she sees a ship, what she carries
-// from one step to the next, what a step of her weighs, and the few bits of the
-// sphere and of chance they all reach for.
+// What a bot is, shared by all her parts (bot.ts her mind, tactician.ts,
+// pilot.ts, helmsman.ts, gunner.ts, purser.ts, claimer.ts): what they all are
+// tuned by, how she sees a ship, what she carries from one step to the next (each
+// part's own, gathered), what she means, what a step of her weighs, and the few
+// bits of the sphere and of chance they all reach for.
 //
 // Pure arithmetic: no three, so it runs in node for the tests; deterministic
 // for the same inputs, to the bit.
@@ -10,15 +11,20 @@ import { add, cross, scale, type Vec3 } from '../world/sphere.ts';
 import { random } from '../world/random.ts';
 import { STEP } from './fixed.ts';
 import { SHIP } from './handling.ts';
-import { gunner, type Gunner } from './gunner.ts';
+import type { Gunner } from './gunner.ts';
 import type { ShipState } from './ship.ts';
-import type { Chart, Route } from './route.ts';
+import type { Chart } from './route.ts';
 import type { Depth } from './shoal.ts';
 import type { Storm } from './storm.ts';
 import type { Temper } from './temper.ts';
 import type { Crew } from './battle.ts';
 import type { Loot } from './loot.ts';
-import type { Holdings } from './claimer.ts';
+import type { ClaimMemory, Holdings } from './claimer.ts';
+import type { MindMemory } from './bot.ts';
+import type { HelmMemory } from './helmsman.ts';
+import type { PilotMemory } from './pilot.ts';
+import type { PurseMemory } from './purser.ts';
+import type { TacticMemory } from './tactician.ts';
 
 /**
  * What every part of a bot shares: how often she thinks, and what water is open
@@ -84,114 +90,26 @@ export interface Intent {
   arrive: 'through' | 'gently';
 }
 
-/** What a bot carries from one step to the next, her gunnery's with it. */
-export interface Memory extends Gunner {
-  /**
-   * Her random draws' state; seconds she has been afloat; steps to her next
-   * think.
-   */
+/** Her random draws' state: written by roll alone. */
+interface Chance {
   rand: number;
-  clock: number;
-  think: number;
-  /** What she is about, since when (s), and where she makes for. */
-  mode: Mode;
-  since: number;
-  goal: Vec3;
-  /** Her foe (an id, or -1), when she last saw her, and where. */
-  foe: number;
-  seen: number;
-  last: Vec3;
-  /** Who last rammed her (-1: none) and when; who last shot her and when. */
-  hitBy: number;
-  hitT: number;
-  shotBy: number;
-  shotT: number;
-  /**
-   * Seconds and way (sign, + to port) she holds a turn off land; seconds left
-   * backing off a bank (below 0: working off a bar), seconds crawling, and the
-   * way she backs off; seconds left bearing away from a ram.
-   */
-  avoid: number;
-  backT: number;
-  stuckT: number;
-  strafe: number;
-  recoil: number;
-  /** Where she was a step ago. */
-  was: Vec3;
-  /** The route round land she follows (route.ts), if any. */
-  route: Route | null;
-  /**
-   * Loot (purser.ts): the piece she would go for as she last weighed it, the
-   * one she is going for and for how many seconds, and the one she gave up
-   * (ids; -1 none).
-   */
-  loot: number;
-  target: number;
-  lootT: number;
-  shun: number;
-  /**
-   * Her water (claimer.ts): the bite she sails (its marks), the one she makes
-   * for, and when she may set out on the next.
-   */
-  bite: Vec3[] | null;
-  leg: number;
-  rested: number;
 }
 
 /**
- * A new mind for a ship at `at`, by her seed. Bots think on different steps, by
- * their seeds.
+ * What a bot carries from one step to the next: each part's own, declared and
+ * written by that part alone (tests/architecture-bots.test.ts): her mind's
+ * (bot.ts), her tactician's, pilot's and helm's, her purser's and claimer's,
+ * her gunner's; and her chance.
  */
-export const mind = (seed: number, at: Vec3): Memory => ({
-  rand: (seed * 0x9e3779b1) >>> 0,
-  clock: 0,
-  think: 1 + ((seed >>> 0) % BOT.every),
-  mode: 'roam',
-  since: 0,
-  goal: at,
-  foe: -1,
-  seen: -Infinity,
-  last: at,
-  hitBy: -1,
-  hitT: -Infinity,
-  shotBy: -1,
-  shotT: -Infinity,
-  avoid: 0,
-  backT: 0,
-  stuckT: 0,
-  strafe: 1,
-  recoil: 0,
-  was: at,
-  route: null,
-  loot: -1,
-  target: -1,
-  lootT: 0,
-  shun: -1,
-  bite: null,
-  leg: 0,
-  rested: 0,
-  ...gunner(),
-});
-
-/**
- * Her memory once `by` has rammed her (the game tells her, from contact.ts's
- * blows).
- */
-export const rammed = (m: Memory, by: number): Memory => ({
-  ...m,
-  hitBy: by,
-  hitT: m.clock,
-});
-
-/**
- * Her memory once a ball of `by`'s has struck her (the game tells her, from
- * battle.ts's strikes that aren't rams).
- */
-export const shot = (m: Memory, by: number): Memory => ({
-  ...m,
-  shotBy: by,
-  shotT: m.clock,
-});
+export interface Memory
+  extends Chance,
+    MindMemory,
+    TacticMemory,
+    PilotMemory,
+    HelmMemory,
+    PurseMemory,
+    ClaimMemory,
+    Gunner {}
 
 /**
  * What a think and a step weigh: her, the others afloat, the sea, her memory

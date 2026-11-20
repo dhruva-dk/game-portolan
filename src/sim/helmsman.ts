@@ -27,6 +27,7 @@ import {
   scale,
   toward,
   transport,
+  type Vec3,
 } from '../world/sphere.ts';
 import { RAM, SHIP } from './handling.ts';
 import { offCourse, turned, type Helm } from './ship.ts';
@@ -39,6 +40,29 @@ import {
   type Ctx,
 } from './captain.ts';
 import type { Way } from './pilot.ts';
+
+/**
+ * What her helm carries from step to step: seconds and way (sign, + to port)
+ * she holds a turn off land; seconds left backing off a bank (below 0: working
+ * off a bar), seconds crawling, and the way she backs off; where she was a step
+ * ago.
+ */
+export interface HelmMemory {
+  avoid: number;
+  backT: number;
+  stuckT: number;
+  strafe: number;
+  was: Vec3;
+}
+
+/** A helm's memory as she puts to sea at `at`. */
+export const helmMemory = (at: Vec3): HelmMemory => ({
+  avoid: 0,
+  backT: 0,
+  stuckT: 0,
+  strafe: 1,
+  was: at,
+});
 
 /** Everything her helm is tuned by. Seconds and metres. */
 const HELM = {
@@ -190,6 +214,7 @@ export function steer(
           Math.min(1, (HELM.tighten * r * SHIP.turn) / SHIP.top)
         );
   const s = stuck(c, dt, course);
+  m.was = ship.at;
   return { helm: s.helm ?? order(turn, Math.min(easy, tight)), lost: s.lost };
 }
 

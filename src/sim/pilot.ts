@@ -8,9 +8,25 @@
 // for the same inputs, to the bit.
 
 import { distance, toward, type Vec3 } from '../world/sphere.ts';
-import { course } from './route.ts';
+import { course, type Route } from './route.ts';
 import type { Ctx } from './captain.ts';
 import type { Mark, Pace } from './tactician.ts';
+
+/** What her pilot carries: the route round land she follows, if any. */
+export interface PilotMemory {
+  route: Route | null;
+}
+
+/** A pilot's memory as she puts to sea. */
+export const pilotMemory = (): PilotMemory => ({ route: null });
+
+/**
+ * Lets her route go: her helm found her lost, or her mind has set her about
+ * something new.
+ */
+export const lose = (m: PilotMemory) => {
+  m.route = null;
+};
 
 /**
  * What her helm steers along this step: a tangent at her place (null: none),

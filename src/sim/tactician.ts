@@ -35,6 +35,14 @@ import {
   type Seen,
 } from './captain.ts';
 
+/** What her tactician carries: seconds left bearing away from a ram. */
+export interface TacticMemory {
+  recoil: number;
+}
+
+/** A tactician's memory as she puts to sea. */
+export const tacticMemory = (): TacticMemory => ({ recoil: 0 });
+
 /**
  * Ramming: the lead is at most `lead` s; from further than `commit` m, a ship
  * she lies more than `abeam` (cosine) ahead or astern of is come at by way of a

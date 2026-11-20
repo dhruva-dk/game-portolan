@@ -61,6 +61,23 @@ export interface Holdings {
   ownerAt(p: Vec3): number;
 }
 
+/**
+ * What her claimer carries: the bite she sails (its marks), the one she makes
+ * for, and when she may set out on the next.
+ */
+export interface ClaimMemory {
+  bite: Vec3[] | null;
+  leg: number;
+  rested: number;
+}
+
+/** A claimer's memory as she puts to sea. */
+export const claimMemory = (): ClaimMemory => ({
+  bite: null,
+  leg: 0,
+  rested: 0,
+});
+
 /** The distance to the nearest other ship. */
 const nearest = (c: Ctx) =>
   c.others.reduce(
@@ -125,8 +142,11 @@ function plan(c: Ctx, p: Vec3): Vec3[] | null {
   return null;
 }
 
-/** Sails her bite: planned where she is, its marks in turn. */
-export function claimAct(c: Ctx): void {
+/**
+ * Sails her bite: planned where she is, its marks in turn. Her goal: the mark
+ * she makes for, or one to circle on in her water if she has no bite.
+ */
+export function claimAct(c: Ctx): Vec3 {
   const { m } = c,
     p = c.own.ship.at;
   // back at its last mark: the bite is done
@@ -146,8 +166,7 @@ export function claimAct(c: Ctx): void {
     m.leg = 0;
     if (!m.bite) {
       m.rested = m.clock + CLAIMER.rest[1];
-      m.goal = circle(c);
-      return;
+      return circle(c);
     }
   }
   while (
@@ -155,7 +174,7 @@ export function claimAct(c: Ctx): void {
     distance(p, m.bite[m.leg]) < CLAIMER.arrive
   )
     m.leg++;
-  m.goal = m.bite[m.leg];
+  return m.bite[m.leg];
 }
 
 /**

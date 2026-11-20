@@ -169,7 +169,10 @@ commit; anything visible checked in headless chromium; iPad Air M1 at 30–40 fp
         RAMMING); captain.ts BOT keeps only `every` and `open`, shared by all.
   - [x] B2 `Intent` → tactician.ts `Mark` → pilot.ts `Way` → helmsman. The helm
         knows no modes; PURSER.near/slow became HELM.near/gently.
-  - [ ] B3 Memory in slices per role.
+  - [x] B3 Memory in slices per role: each part declares `…Memory` and its
+        starting values; captain.ts `Memory` gathers them; bot.ts `mind()`
+        builds them. Options' `act` returns the goal (the mind alone writes it).
+        Rules 1, 3 and memory owners: tests/architecture-bots.test.ts.
   - [ ] B4 `Brain` composed in brain.ts; slices passed down; per-ship Brain in
         `orders.ts` Hand. Architecture tests 1–6.
 - [ ] **C. Harness.**
@@ -214,3 +217,7 @@ commit; anything visible checked in headless chromium; iPad Air M1 at 30–40 fp
 - B1: BOT split by owner. Golden unchanged.
 - B2: Intent/Mark/Way seam; tactician.ts, pilot.ts new. Golden unchanged.
   Note: the architecture scans flag the words "navigator" and "for now".
+- B3: memory slices (MindMemory bot.ts, TacticMemory, PilotMemory, HelmMemory,
+  PurseMemory, ClaimMemory, Gunner, Chance). New seams: pilot `lose`, gunner
+  `sighted`, purser `lootTime`/`healAct` (policy in purser, geometry from the
+  mind by callback). Golden unchanged; 365 tests.
