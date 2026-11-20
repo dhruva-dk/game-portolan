@@ -230,7 +230,8 @@ interface Bore {
  * - harpoon, the long gun: one 80 bolt, wound up 0.75 s, none of the spread,
  * 240 m (300 → 279 m/s), flattest of all (8°
  *   at full range); its bite does not fall off with range (with no crits on a sail's head to make up for it);
- * - mortar, the lob: a 60 shell over 11 m, two to a magazine, wound up 0.6 s,
+ * - mortar, the lob: a 75 shell over 11 m (60 at first: it did least a minute
+ * held), two to a magazine, wound up 0.6 s,
  * out to 220 m: laid at 60°, its charge
  *   for the distance, 1.3 s in the air at 50 m and 2.8 s at 220 (first 0.9–2.8 s), never nearer than 30 m.
  * No crits (a hit on the sail's head): this sea has no parts to a ship. Rarity
@@ -302,7 +303,7 @@ export const GUNS: Readonly<Record<GunKind, Bore>> = {
     falls: false,
   },
   mortar: {
-    damage: 60,
+    damage: 75,
     pellets: 1,
     interval: 1.3,
     mag: 2,

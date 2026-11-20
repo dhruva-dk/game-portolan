@@ -25,6 +25,23 @@ roadmap above it. After a compaction, read this file, then `BOTS.md`.
 | Draw calls (worst view, of 100) | 70               | 70            |
 | Tests                           | all pass         | 372, all pass |
 
+**Where the `depth` branch stands (2026-11-20, morning).** The plan's
+targets, measured the same way on 64 dealt matches (80 bots each) unless
+said; met ✓, not met ✗, the call left to the owner ◐:
+
+| Measure                              | Before         | Now (`depth`)                                                                                                           |
+| ------------------------------------ | -------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| Distinct bot personalities           | 6, one per bot | ✓ 6 personas, each a temper and a crew, each measured apart (shots, home, dealt, taken, kills, place)                   |
+| Match types                          | 1              | ✓ 4: mixed, bloodbath, gold rush, cagey. 90% armed by 13 / 13 / 11 / 34 s; half down by 60 s (bloodbath), 104 s (cagey) |
+| What can be varied in the harness    | brain tables   | ✓ brain, gunnery, option weights, rules (loot, caches, storm, assist), a player's thumb                                 |
+| Combat measured in the harness       | none           | ✓ shots and hits by range, gun, rarity, skill and who laid it; damage; where hits fall on a hull; ratings by gun        |
+| Strongest personality over median    | unknown        | ✗ scavenger +6.2 se, hunter −7.2 se, brawler −6.4 se (the types weigh them unequally too)                               |
+| Player assist vs best bot's hit rate | unmeasured     | ◐ measured: a player's stand-in beats sharp bots by 4 / 11 / 14 points close / mid / far; the bots' hand, A3            |
+| Sim step, median / worst             | 1.6 / 13 ms    | ✗ 1.8 / 22 ms (`npm run steps`; main 1.6 / 14 the same way). The worst is the step the storm sets its next calm         |
+| Triangles, ships and coast views     | 1359k / 1304k  | ✓ 630k / 576k (worst view 893k of 900k)                                                                                 |
+| Draw calls, worst view               | 70             | ✗ 86 (within the 100 budget, over this plan's 80; G1 left a draw per gun kind)                                          |
+| Bot seconds stuck                    | 4.2 s          | ✓ 3.6 s                                                                                                                 |
+
 **Targets for this plan.** Each is a gate a milestone must meet, measured the
 same way:
 
@@ -609,3 +626,11 @@ then the behaviour commits on top.
   13), a bloodbath by 13; cagey 34. The golden match is dealt a bloodbath,
   so it is re-recorded (`abb64139`); detail in BOTS.md. Mixed matches are
   unchanged. Also `rate.ts --by gun` (the kind she held longest), for W4.
+- 2026-11-20 (W4): **no new kind; the mortar retuned.** Its shell 60 → 75:
+  damage a minute held 53 → 72, its ships place 41.4 → 39.8. Cannon,
+  repeater, harpoon and mortar ships now rate within 2 se of each other.
+  The scatter's ships rate −13 se, but the scatter deals the most a minute
+  held; its ships are the ones that fought closest (the gunner takes it in
+  hand close), so the rating measures their fights, not the gun. More reach
+  didn't move it (dropped). A duel test would settle it; BOTS.md has the
+  table. Golden `060f4d3b`.

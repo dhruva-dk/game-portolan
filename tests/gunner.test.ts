@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import { nature } from '../src/sim/persona.ts';
 import assert from 'node:assert/strict';
 import type { GunKind } from '../src/kinds.ts';
-import { HEALTH } from '../src/sim/handling.ts';
+import { GUNS, HEALTH } from '../src/sim/handling.ts';
 import {
   armed,
   battleOf,
@@ -309,11 +309,20 @@ test('a bot with two guns takes in hand the one for the range: a scatter close, 
       [[gunOf('harpoon', 0), gunOf('scatter', 0)], null],
       6
     );
-    const kinds = (r: ReturnType<typeof battle>) => [
-      ...new Set(r.fired.filter((f) => f.id === 0).map((f) => f.gun)),
+    const kinds = (r: ReturnType<typeof battle>, beyond = 0) => [
+      ...new Set(
+        r.fired
+          .filter(
+            (f) => f.id === 0 && r.ranges[Math.round(f.t / STEP)] > beyond
+          )
+          .map((f) => f.gun)
+      ),
     ];
-    console.log(`# seed ${seed}: far ${kinds(far)}, near ${kinds(near)}`);
-    assert.deepEqual(kinds(far), ['harpoon'], `${seed}: far off`);
+    // far off: while her foe is out of the scatter's reach (she closes on him,
+    // so she may take it up once he is within it)
+    const out = kinds(far, GUNS.scatter.range);
+    console.log(`# seed ${seed}: far ${out}, near ${kinds(near)}`);
+    assert.deepEqual(out, ['harpoon'], `${seed}: far off`);
     assert.ok(kinds(near).includes('scatter'), `${seed}: close`);
   }
 });

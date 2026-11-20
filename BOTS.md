@@ -558,3 +558,28 @@ commit; anything visible checked in headless chromium; iPad Air M1 at 30–40 fp
 
   A gold rush now arms soonest of the four. The golden match is dealt a
   bloodbath, so its hash moves: `1655ebe1` → `abb64139`.
+
+- PLAN W4, the guns' numbers for W2's gaps, no new kind: the mortar's shell
+  60 → 75 (`handling.ts` GUNS). Rated by the gun each ship held longest
+  (`rate.ts --by gun`), with damage a minute held, 64 dealt matches each:
+
+  | gun held longest | θ before       | θ after        | hp a minute held | life s | place       |
+  | ---------------- | -------------- | -------------- | ---------------- | ------ | ----------- |
+  | cannon           | +0.419 ± 0.030 | +0.387 ± 0.026 | 102 → 104        | 120    | 36.8        |
+  | repeater         | +0.443 ± 0.034 | +0.381 ± 0.027 | 114 → 116        | 121    | 36.7        |
+  | harpoon          | +0.389 ± 0.066 | +0.420 ± 0.071 | 136 → 133        | 122    | 38.3        |
+  | mortar           | +0.278 ± 0.070 | +0.295 ± 0.058 | **53 → 72**      | 112    | 41.4 → 39.8 |
+  | scatter          | −0.209 ± 0.039 | −0.215 ± 0.042 | 254 → 252        | 73     | 48.4        |
+
+  The four guns but the scatter are now within 2 se of each other. **The
+  scatter's rating is not the scatter's**: it deals the most a minute held
+  and trades near even (dealt 0.8 of taken; cannon 0.92), but its ships live
+  73 s against 120. A gunner takes the scatter in hand when a foe is close
+  (`gunner.ts`), so "held a scatter longest" picks out ships that fought
+  close most, and close fights are where ships die. Tried and dropped:
+  its reach 70 → 85 m (carry 110 → 134) left it −13.0 se (more shots, less
+  each, no longer life). A duel test (one scatter, one cannon, from each
+  range) is what would settle it; the rating can't. `gunner.test.ts` now
+  holds "far off, the harpoon" only while her foe is beyond the scatter's
+  reach (she closes on him, and may take it up inside). Golden re-recorded:
+  `abb64139` → `060f4d3b`.
