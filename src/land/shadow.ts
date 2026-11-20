@@ -5,10 +5,10 @@
 // without. Nothing on the land moves, so the map is drawn again only when the
 // sun has moved or the place has changed.
 //
-// It draws stand-ins for the casters (each shares its caster's geometry and
-// instance matrices, plain black), so the casters themselves are untouched and
-// the depth pass costs no more than their vertices: just the near tiles', which
-// come first among each caster's instances.
+// It draws stand-ins for the casters (each shares its caster's geometry, plain
+// black, with its own instances: those on the tiles the map covers, seen or
+// not, site.ts casting), so the casters themselves are untouched and the depth
+// pass costs no more than the covered tiles' vertices.
 
 import {
   DepthTexture,
@@ -50,9 +50,8 @@ const MOVED = 0.002;
 
 /**
  * What a map covers: a square `reach` metres out each way from its chart's
- * centre, with its things' instances first among each caster's
- * (Instances.near). One object for each place, so a place is known again by
- * being the same.
+ * centre, its things' instances each caster's casting() (site.ts). One object
+ * for each place, so a place is known again by being the same.
  */
 export interface Shade {
   chart: Chart;
@@ -137,7 +136,7 @@ export function createShadow(): Shadow {
       for (const caster of casters) {
         const m = caster.mesh,
           stand = new InstancedMesh(m.geometry, black, m.instanceMatrix.count);
-        stand.instanceMatrix = m.instanceMatrix;
+        stand.instanceMatrix = caster.casting().matrices;
         stand.frustumCulled = false;
         stands.push({ stand, caster });
         scene.add(stand);
@@ -156,7 +155,8 @@ export function createShadow(): Shadow {
         up.set(...shade.chart.at);
         north.copy(up).cross(axis.set(...shade.chart.axis));
       }
-      for (const { stand, caster } of stands) stand.count = caster.near;
+      for (const { stand, caster } of stands)
+        stand.count = caster.casting().count;
       last.copy(sun);
       camera.position.copy(centre).addScaledVector(sun, SPAN);
       camera.up.copy(Math.abs(sun.dot(up)) > 0.99 ? north : up);

@@ -58,11 +58,11 @@ const VIEWS: { name: string; q: string; own?: Partial<Budget> }[] = [
   { name: 'ships', q: 'screen=match&ships=12' },
   { name: 'lobby', q: 'screen=lobby' },
   // The full map draws the whole planet from space at once, all its land and
-  // the sea round it, and nothing else of the game (no ships close, no cloth,
-  // no loot): some 0.9–0.94 million triangles as it opens over the start,
-  // against the 0.4–0.5 million of the views at sea. It is held to that, not to
-  // the sea's limit: a planet with more land, or a finer mesh, shows here.
-  { name: 'map', q: 'screen=match&map', own: { triangles: 1_000_000 } },
+  // the sea round it: its palms and rocks at their distant levels
+  // (land/groves.ts), some 0.5 million triangles as it opens over the start. It
+  // had its own limit (1 million) while they were drawn coarse; it is held to
+  // the sea's now.
+  { name: 'map', q: 'screen=match&map' },
 ];
 
 const { browser, url, close } = await launch();

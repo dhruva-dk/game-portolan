@@ -4,12 +4,12 @@
 //
 // A tile is drawn if what stands on it rises over the eye's horizon and it
 // stands in the camera's view; they are ordered nearest first each frame, and
-// the instances rewritten when that changes. The shadow map (shadow.ts) covers
-// the land round the tile nearest the eye, SHADE metres out from its middle:
-// the tiles whose things reach into it come first, in view or not, so all of
-// them cast. Past DETAIL metres off a tile's palms and shrubs are drawn coarser
-// (site.ts), past FAR its rocks (rocks.ts), and past BUSHES its shrubs not at
-// all.
+// the instances rewritten when that changes. Each kind comes in levels of
+// detail, coarser farther off (REACH): a tile's things are drawn at the level
+// its distance from the eye falls in. The shadow map (shadow.ts) covers the
+// land round the tile nearest the eye, SHADE metres out from its middle: the
+// tiles whose things reach into it cast, at their finest, in view or not (the
+// map's own instances: site.ts casting).
 
 import { Sphere, Vector3 } from 'three/webgpu';
 import type { Eye, View } from '../view/view.ts';
@@ -22,24 +22,30 @@ import { createPalms } from './palms.ts';
 import { KINDS, createRocks } from './rocks.ts';
 import type { Shade } from './shadow.ts';
 import { SHAPES, createShrubs } from './shrubs.ts';
-import { DETAIL } from './site.ts';
+import type { Instances } from './site.ts';
 
 /**
  * The tallest a palm stands over the ground, metres; how far past a tile its
- * palms lean; how deep under the sea a rock's foot goes; past how far off a
- * tile's rocks are drawn coarser.
+ * palms lean; how deep under the sea a rock's foot goes.
  */
 const TOPS = 14,
   LEANS = 15,
-  FOOT = 5,
-  FAR = 160;
+  FOOT = 5;
+/** How far out the shadow map reaches from the middle of the tile nearest the eye, metres. */
+const SHADE = 90;
 /**
- * How far out the shadow map reaches from the middle of the tile nearest the
- * eye, metres; past how far off a tile's shrubs aren't drawn (a shrub is a few
- * pixels there, and the land runs to the horizon).
+ * Out to how far from the eye each of a kind's levels of detail is drawn,
+ * metres, nearest first; past the last, none of the kind. A palm 10 m tall
+ * stands some 80 pixels tall at 90 m, 35 at 220 and 13 at 600 (60° across the
+ * iPad's 820 pixels); from space (the full map, 1200 m and more) a few. Shrubs
+ * aren't drawn past 400 m, where one is a few pixels and the land runs to the
+ * horizon.
  */
-const SHADE = 90,
-  BUSHES = 400;
+const REACH = {
+  palms: [90, 220, 600, Infinity],
+  shrubs: [90, 220, 400],
+  rocks: [160, 600, Infinity],
+};
 
 export function createGroves(
   terrain: Terrain,
@@ -54,7 +60,7 @@ export function createGroves(
     boulders: KINDS.boulder.shapes,
   });
   const charts = tiles.map((t) => t.chart);
-  const rocky = createRocks(
+  const rocks = createRocks(
     tiles.map((t) => t.rocks),
     charts,
     view,
@@ -70,10 +76,25 @@ export function createGroves(
     charts,
     light
   );
-  // (only the near cast: the shadow map covers only tiles near the eye, whose
-  // things are drawn near)
-  const casters = [...rocky.near, ...palms.near, ...shrubs.near];
-  const fine = [...palms.near, ...shrubs.near];
+  // the finest cast (the shadow map covers only tiles near the eye)
+  const casters = [...rocks[0], ...palms[0], ...shrubs[0]];
+  // each level's instances, and the run of the tiles seen it draws: from the
+  // first past the level before's reach (CUTS[from], or the first seen) to the
+  // last within its own (CUTS[to])
+  const CUTS = [...new Set(Object.values(REACH).flat())].sort((a, b) => a - b);
+  const levels = (
+    [
+      [palms, REACH.palms],
+      [shrubs, REACH.shrubs],
+      [rocks, REACH.rocks],
+    ] as const
+  ).flatMap(([kind, reach]) =>
+    kind.map((drawn: Instances[], j) => ({
+      drawn,
+      from: j === 0 ? -1 : CUTS.indexOf(reach[j - 1]),
+      to: CUTS.indexOf(reach[j]),
+    }))
+  );
   // a sphere round all that stands on each tile, from under the sea to its
   // palms' tops, the planet's curve under it too
   const bounds = tiles.map((t) => {
@@ -88,48 +109,37 @@ export function createGroves(
   const n = tiles.length,
     off = new Float64Array(n);
   // every tile nearest first, kept from frame to frame (so sorting it again
-  // moves few); the tiles drawn, those the shadow map covers and then those
-  // seen, each nearest first, and those seen while they are sorted out
+  // moves few); the tiles seen, nearest first, and as last shown; the tiles
+  // the shadow map covers
   const order = Int32Array.from({ length: n }, (_, i) => i),
-    drawn = new Int32Array(n),
-    seen = new Int32Array(n);
-  // the tiles drawn: how many, how many of them covered, and how many of those
-  // seen lie within DETAIL, FAR and BUSHES
-  let count = 0,
-    covered = 0,
-    close = 0,
-    near = 0,
-    bushy = 0;
-  // and as last shown
-  const shown = new Int32Array(n),
-    was = { count: -1, covered: 0, close: 0, near: 0, bushy: 0 };
+    seen = new Int32Array(n),
+    shown = new Int32Array(n),
+    covered = new Int32Array(n);
+  // how many tiles are seen, and how many of them lie within each of CUTS; and
+  // as last shown; the tile nearest the eye as last cast
+  let saw = 0,
+    showed = -1,
+    cast = -1;
+  const cuts = new Int32Array(CUTS.length),
+    was = new Int32Array(CUTS.length);
 
   /**
-   * Whether the tiles drawn, and how they are cut, are as last shown; if not,
+   * Whether the tiles seen, and how they are cut, are as last shown; if not,
    * they are from now on.
    */
   const unchanged = (): boolean => {
-    let same =
-      count === was.count &&
-      covered === was.covered &&
-      close === was.close &&
-      near === was.near &&
-      bushy === was.bushy;
-    for (let k = 0; same && k < count; k++) same = drawn[k] === shown[k];
+    let same = saw === showed;
+    for (let k = 0; same && k < CUTS.length; k++) same = cuts[k] === was[k];
+    for (let k = 0; same && k < saw; k++) same = seen[k] === shown[k];
     if (same) return true;
-    for (let k = 0; k < count; k++) shown[k] = drawn[k];
-    was.count = count;
-    was.covered = covered;
-    was.close = close;
-    was.near = near;
-    was.bushy = bushy;
+    shown.set(seen.subarray(0, saw));
+    was.set(cuts);
+    showed = saw;
     return false;
   };
 
   return {
-    meshes: [...casters, ...rocky.far, ...palms.coarse, ...shrubs.coarse].map(
-      (c) => c.mesh
-    ),
+    meshes: levels.flatMap((l) => l.drawn.map((c) => c.mesh)),
     /** What casts shadows: each kind's instances. */
     casters,
     /**
@@ -148,37 +158,39 @@ export function createGroves(
         for (; j >= 0 && off[order[j]] > off[i]; j--) order[j + 1] = order[j];
         order[j + 1] = i;
       }
-      const nearest = order[0],
-        centre = tiles[nearest].chart.at;
-      let saw = 0;
-      covered = close = near = bushy = 0;
+      const nearest = order[0];
+      if (nearest !== cast) {
+        cast = nearest;
+        const centre = tiles[nearest].chart.at;
+        let m = 0;
+        for (let i = 0; i < n; i++)
+          if (
+            distance(tiles[i].chart.at, centre) <
+            SHADE + tiles[i].reach + LEANS
+          )
+            covered[m++] = i;
+        for (const c of casters) c.cast(covered, 0, m);
+      }
+      saw = 0;
+      let c = 0;
       for (let k = 0; k < n; k++) {
         const i = order[k],
           t = tiles[i];
-        if (distance(t.chart.at, centre) < SHADE + t.reach + LEANS)
-          drawn[covered++] = i;
-        else if (
+        if (
           off[i] - LEANS < horizon + horizonDistance(t.top + TOPS) &&
           eye.frustum.intersectsSphere(bounds[i])
         ) {
+          // (seen is nearest first, so the tiles within each cut are a run of it)
+          const d = Math.hypot(Math.max(off[i], 0), eye.height);
+          for (; c < CUTS.length && d >= CUTS[c]; c++) cuts[c] = saw;
           seen[saw++] = i;
-          const d = Math.hypot(off[i], eye.height);
-          close += +(d < DETAIL);
-          near += +(d < FAR);
-          bushy += +(d < BUSHES);
         }
       }
-      // (seen is nearest first, so each of close, near and bushy is a run of
-      // it)
-      for (let k = 0; k < saw; k++) drawn[covered + k] = seen[k];
-      count = covered + saw;
-      if (unchanged()) return shades[nearest];
-      for (const c of fine) c.show(drawn, 0, covered + close, covered);
-      for (const c of palms.coarse) c.show(drawn, covered + close, count);
-      for (const c of shrubs.coarse)
-        c.show(drawn, covered + close, covered + Math.max(close, bushy));
-      for (const c of rocky.near) c.show(drawn, 0, covered + near, covered);
-      for (const c of rocky.far) c.show(drawn, covered + near, count);
+      for (; c < CUTS.length; c++) cuts[c] = saw;
+      if (!unchanged())
+        for (const { drawn, from, to } of levels)
+          for (const d of drawn)
+            d.show(seen, from < 0 ? 0 : cuts[from], cuts[to]);
       return shades[nearest];
     },
   };

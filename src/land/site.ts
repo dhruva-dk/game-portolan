@@ -7,7 +7,8 @@
 // Each kind of thing comes in a few shapes, each drawn once (instanced) for all
 // of that shape on the tiles in view: the tiles' instances are written into the
 // shape's buffer nearest tile first, and only those in view are drawn — the
-// buffer is rewritten only when the tiles in view change.
+// buffer is rewritten only when the tiles in view change. The shadow map's
+// stand-ins (shadow.ts) have a buffer of their own, of the tiles it covers.
 
 import {
   InstancedBufferAttribute,
@@ -66,13 +67,6 @@ export function standing(
 }
 
 /**
- * Past this many metres from the eye, the palms and shrubs on a tile are drawn
- * coarser (palms.ts, shrubs.ts): a palm is some sixty pixels tall, its leaflets
- * a pixel or two across.
- */
-export const DETAIL = 90;
-
-/**
  * One instance: its world matrix, and its tint (0…1) for shapes that take one.
  */
 export interface Placed {
@@ -83,20 +77,18 @@ export interface Placed {
 export interface Instances {
   mesh: InstancedMesh;
   /**
-   * How many of those drawn stand on the first `nearby` tiles shown (they come
-   * first).
-   */
-  near: number;
-  /**
    * Draws the instances on tiles[from…to) (indices into the list it was made
-   * with), nearest first; the first `nearby` of them make up `near`.
+   * with), nearest first.
    */
-  show(
-    tiles: ArrayLike<number>,
-    from: number,
-    to: number,
-    nearby?: number
-  ): void;
+  show(tiles: ArrayLike<number>, from: number, to: number): void;
+  /**
+   * The instances the shadow map draws (shadow.ts), apart from those shown, so
+   * the world pass draws only the tiles in view and the map those it covers,
+   * seen or not: their matrices, and how many. Made when first asked for.
+   */
+  casting(): { matrices: InstancedBufferAttribute; count: number };
+  /** Writes the instances on tiles[from…to) into casting(). */
+  cast(tiles: ArrayLike<number>, from: number, to: number): void;
 }
 
 /**
@@ -137,25 +129,38 @@ export function createInstances(
   // the instances stand all over the planet; whether a tile is in view is
   // decided per tile
   mesh.frustumCulled = false;
-  const self: Instances = {
+  let shadow: { matrices: InstancedBufferAttribute; count: number } | null =
+    null;
+  const casting = () =>
+    (shadow ??= {
+      matrices: new InstancedBufferAttribute(new Float32Array(total * 16), 16),
+      count: 0,
+    });
+  return {
     mesh,
-    near: 0,
-    show(tiles, from, to, nearby = 1) {
+    show(tiles, from, to) {
       let k = 0;
-      self.near = 0;
       for (let n = from; n < to; n++) {
         const on = placed[tiles[n]];
         for (let j = 0; j < on.length; j++) {
           mesh.setMatrixAt(k, on[j].matrix);
           tint.setX(k++, on[j].tint ?? 0);
         }
-        if (n - from < nearby) self.near = k;
       }
       mesh.count = k;
       // (only what is drawn goes up to the GPU)
       send(mesh.instanceMatrix, k, 16);
       send(tint, k, 1);
     },
+    casting,
+    cast(tiles, from, to) {
+      const c = casting();
+      let k = 0;
+      for (let n = from; n < to; n++)
+        for (const p of placed[tiles[n]])
+          p.matrix.toArray(c.matrices.array, 16 * k++);
+      c.count = k;
+      send(c.matrices, k, 16);
+    },
   };
-  return self;
 }

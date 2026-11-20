@@ -8,8 +8,9 @@
 // band where the sea wets them. Lit like everything else (sky/light.ts).
 //
 // Triangles: 20 × (detail + 1)² a shape: 2880 for a mass, 500 for a boulder; on
-// the tiles far from the eye (FAR: groves.ts), where a mass is a few pixels
-// across, each shape at a coarser level of the same lumps: 720 and 180.
+// the tiles far from the eye (groves.ts), where a mass is a few pixels across,
+// each shape at a coarser level of the same lumps: 720 and 180; from space,
+// 320 and 80.
 
 import {
   Euler,
@@ -43,11 +44,19 @@ import { rockShape } from './rock-shape.ts';
 import { createInstances, standing, type Placed } from './site.ts';
 import { cut } from '../tsl.ts';
 
-/** How many shapes of each kind, and how finely each is made, near and far. */
-export const KINDS = {
-  big: { shapes: 4, detail: 11, far: 5 },
-  boulder: { shapes: 4, detail: 4, far: 2 },
-};
+/** How many shapes of each kind. */
+export const KINDS = { big: { shapes: 4 }, boulder: { shapes: 4 } };
+/**
+ * Each level of detail, nearest first (groves.ts says how far off each is
+ * drawn): how finely each kind's shapes are made (rock-shape.ts), and how many
+ * of them it is drawn in (distant, from space, a mass a few pixels across, all
+ * as the first).
+ */
+const LEVELS = [
+  { name: 'rocks', big: 11, boulder: 4, shapes: 4 },
+  { name: 'rocks far', big: 5, boulder: 2, shapes: 4 },
+  { name: 'rocks distant', big: 3, boulder: 1, shapes: 4 },
+];
 /**
  * A rock is wet up to this many metres over the sea, and darker there by this
  * much.
@@ -61,8 +70,8 @@ const WET_TO = 0.3,
 const CAVITY = 0.5;
 
 /**
- * rocks[i]: those on tile i, whose chart is charts[i]: each shape's instances
- * near and far.
+ * rocks[i]: those on tile i, whose chart is charts[i]. For each level of
+ * detail (LEVELS, nearest first), the instances of each of its shapes.
  */
 export function createRocks(
   rocks: Rock[][],
@@ -107,29 +116,22 @@ export function createRocks(
     m.compose(zero, q.setFromEuler(e), s.setScalar(r.size));
     return { matrix: standing(chart, r.x, r.y, r.z, m, new Matrix4()) };
   };
-  const placed = (big: boolean, k: number) =>
-    rocks.map((on, i) =>
-      on
-        .filter((r) => r.big === big && r.shape === k)
-        .map((r) => place(r, charts[i]))
-    );
-  const kind = (big: boolean, far: boolean) =>
-    Array.from(
-      { length: big ? KINDS.big.shapes : KINDS.boulder.shapes },
-      (_, k) => {
-        const { detail, far: coarse } = big ? KINDS.big : KINDS.boulder;
-        // (numbered in turn, the masses' shapes and then the boulders')
-        const name = `${far ? 'rocks far' : 'rocks'} ${k + (big ? 0 : KINDS.big.shapes)}`;
-        return createInstances(
-          name,
-          rockShape(k + (big ? 1 : 51), far ? coarse : detail, big),
+  const all = rocks.map((on, i) =>
+    on.map((r) => ({ ...place(r, charts[i]), big: r.big, shape: r.shape }))
+  );
+  return LEVELS.map((level) =>
+    [true, false].flatMap((big) =>
+      Array.from({ length: level.shapes }, (_, k) =>
+        createInstances(
+          // (numbered in turn, the masses' shapes and then the boulders')
+          `${level.name} ${k + (big ? 0 : level.shapes)}`,
+          rockShape(k + (big ? 1 : 51), big ? level.big : level.boulder, big),
           material,
-          placed(big, k)
-        );
-      }
-    );
-  return {
-    near: [...kind(true, false), ...kind(false, false)],
-    far: [...kind(true, true), ...kind(false, true)],
-  };
+          all.map((on) =>
+            on.filter((r) => r.big === big && r.shape % level.shapes === k)
+          )
+        )
+      )
+    )
+  );
 }

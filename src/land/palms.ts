@@ -71,21 +71,74 @@ const STOUT = 1.3;
 const FRONDS = 16,
   NUT = 0.12;
 /**
- * How finely a palm is drawn: the trunk's rings along and sides around, a
- * nut's, each frond's rachis segments and leaflets down each side. Past DETAIL
- * metres off (site.ts) the same palm, every frond where it was, is drawn
- * coarser: fewer, broader leaflets covering as much, about a third of the
- * triangles.
+ * How finely a palm is drawn: the trunk's rings along (a divisor of NEAR's) and
+ * sides around, a nut's (0: no nuts), each frond's rachis segments, whether its
+ * rachis is drawn, and its leaflets down each side (0: the frond one blade).
  */
 interface Detail {
   along: number;
   around: number;
   nut: number;
   rachis: number;
+  stalk: boolean;
   leaflets: number;
 }
-const NEAR: Detail = { along: 28, around: 9, nut: 5, rachis: 10, leaflets: 28 };
-const COARSE: Detail = { along: 7, around: 5, nut: 2, rachis: 4, leaflets: 9 };
+const NEAR: Detail = {
+  along: 28,
+  around: 9,
+  nut: 5,
+  rachis: 10,
+  stalk: true,
+  leaflets: 28,
+};
+/**
+ * Each level of detail, nearest first (groves.ts says how far off each is
+ * drawn), and the leans its shapes are drawn at. Each is the same palm, every
+ * frond where it was: coarse, fewer, broader leaflets covering as much (about
+ * 1100 triangles, a third of near's); far (a palm some 30 pixels tall), three a
+ * side and no rachis or nuts (320); distant (a few pixels, from space), each
+ * frond one blade (44). Far off, fewer leans: the crown stands no more than a
+ * pixel or two off where its own lean would put it.
+ */
+const LEVELS: { name: string; detail: Detail; leans: readonly number[] }[] = [
+  { name: 'palms', detail: NEAR, leans: LEANS },
+  {
+    name: 'palms coarse',
+    detail: {
+      along: 7,
+      around: 5,
+      nut: 2,
+      rachis: 4,
+      stalk: true,
+      leaflets: 9,
+    },
+    leans: LEANS,
+  },
+  {
+    name: 'palms far',
+    detail: {
+      along: 4,
+      around: 4,
+      nut: 0,
+      rachis: 3,
+      stalk: false,
+      leaflets: 3,
+    },
+    leans: [0.14, 0.39],
+  },
+  {
+    name: 'palms distant',
+    detail: {
+      along: 2,
+      around: 3,
+      nut: 0,
+      rachis: 2,
+      stalk: false,
+      leaflets: 0,
+    },
+    leans: [0.27],
+  },
+];
 /** Leaf scars ring the trunk every this many metres, each drawn this dark. */
 const RING = 0.45,
   SCAR = 0.35;
@@ -167,7 +220,7 @@ function shape(lean: number, seed: number, detail: Detail): Shape {
   const top = centres[ALONG],
     up = tangents[ALONG];
   const nuts = random(seed);
-  for (let k = 0; k < 7; k++) {
+  for (let k = 0; k < (detail.nut > 0 ? 7 : 0); k++) {
     const f = nuts() * 2 * Math.PI;
     const ring = 0.24 * STOUT;
     const at = top
@@ -256,7 +309,7 @@ function shape(lean: number, seed: number, detail: Detail): Shape {
     // the crown's heart
     const shadeOf = (u: number) =>
       (0.85 + rand() * 0.3) * (HEART + (1 - HEART) * u);
-    for (let k = 0; k < RACHIS; k++) {
+    for (let k = 0; detail.stalk && k < RACHIS; k++) {
       // the rachis: a narrow strip
       const side = along[k]
         .clone()
@@ -270,6 +323,27 @@ function shape(lean: number, seed: number, detail: Detail): Shape {
         e = spine[k + 1].clone().sub(side);
       tri(a, b, d, lift, age, 0.8 * shadeOf(k / RACHIS));
       tri(b, e, d, lift, age, 0.8 * shadeOf(k / RACHIS));
+    }
+    if (LEAFLETS === 0) {
+      // one blade: from the frond's foot out to its tip, sagging as its
+      // leaflets do, as wide as they cover (with the gaps between them, some
+      // two thirds of how far they reach)
+      const m = spine[RACHIS >> 1],
+        t = along[RACHIS >> 1];
+      const side = t.clone().cross(world).normalize(),
+        lift = side.clone().cross(t).normalize();
+      const reach = 0.55,
+        sag = 0.3 + 0.3 * age;
+      const l = m
+          .clone()
+          .addScaledVector(side, reach)
+          .addScaledVector(lift, -sag),
+        r = m.clone().addScaledVector(side, -reach).addScaledVector(lift, -sag);
+      // (shaded as its leaflets nearer the heart: about half the blades in
+      // their shadow tone, as half a full crown's leaflets are)
+      const s = shadeOf(0.35);
+      tri(spine[0], r, spine[RACHIS], lift, age, s);
+      tri(spine[0], spine[RACHIS], l, lift, age, s);
     }
     for (let l = 0; l < LEAFLETS; l++) {
       const u = 0.1 + (0.9 * (l + 0.5)) / LEAFLETS,
@@ -319,14 +393,15 @@ function shape(lean: number, seed: number, detail: Detail): Shape {
 }
 
 /**
- * palms[i]: those on tile i, whose chart is charts[i]; the instances of each
- * shape's trunk and crown, near and coarse.
+ * palms[i]: those on tile i, whose chart is charts[i]; for each level of
+ * detail (LEVELS, nearest first), the instances of each shape's trunk and
+ * crown.
  */
 export function createPalms(
   palms: Palm[][],
   charts: Chart[],
   light: Light
-): { near: Instances[]; coarse: Instances[] } {
+): Instances[][] {
   const trunkMaterial = new MeshBasicNodeMaterial();
   trunkMaterial.colorNode = Fn(() => {
     const p = positionWorld,
@@ -377,45 +452,45 @@ export function createPalms(
     s = new Vector3(),
     zero = new Vector3(),
     up = new Vector3(0, 1, 0);
-  const nearest = (p: Palm) =>
-    LEANS.reduce(
-      (best, l, j) =>
-        Math.abs(l - p.lean) < Math.abs(LEANS[best] - p.lean) ? j : best,
-      0
-    );
   // the shape leans toward +x; turn it to the palm's heading, and stand it on
   // the sphere
-  const placed = LEANS.map((_, k) =>
-    palms.map((on, i) =>
-      on
-        .filter((p) => nearest(p) === k)
-        .map((p): Placed => {
-          q.setFromAxisAngle(up, -p.heading);
-          return {
-            matrix: standing(
-              charts[i],
-              p.x,
-              p.y,
-              p.z,
-              m.compose(zero, q, s.setScalar(p.height / HEIGHT)),
-              new Matrix4()
-            ),
-          };
-        })
-    )
+  const matrices = palms.map((on, i) =>
+    on.map((p) => {
+      q.setFromAxisAngle(up, -p.heading);
+      return standing(
+        charts[i],
+        p.x,
+        p.y,
+        p.z,
+        m.compose(zero, q, s.setScalar(p.height / HEIGHT)),
+        new Matrix4()
+      );
+    })
   );
-  const at = (detail: Detail, name: string) =>
-    LEANS.flatMap((lean, k) => {
+  /** Each palm on its tile drawn as the nearest of `leans`: theirs, by lean. */
+  const placed = (leans: readonly number[]) => {
+    const nearest = (p: Palm) =>
+      leans.reduce(
+        (best, l, j) =>
+          Math.abs(l - p.lean) < Math.abs(leans[best] - p.lean) ? j : best,
+        0
+      );
+    return leans.map((_, k) =>
+      palms.map((on, i) =>
+        on.flatMap((p, j): Placed[] =>
+          nearest(p) === k ? [{ matrix: matrices[i][j] }] : []
+        )
+      )
+    );
+  };
+  return LEVELS.map(({ name, detail, leans }) => {
+    const by = placed(leans);
+    return leans.flatMap((lean, k) => {
       const sh = shape(lean, k + 11, detail);
       return [
-        createInstances(`${name} ${2 * k}`, sh.trunk, trunkMaterial, placed[k]),
-        createInstances(
-          `${name} ${2 * k + 1}`,
-          sh.crown,
-          crownMaterial,
-          placed[k]
-        ),
+        createInstances(`${name} ${2 * k}`, sh.trunk, trunkMaterial, by[k]),
+        createInstances(`${name} ${2 * k + 1}`, sh.crown, crownMaterial, by[k]),
       ];
     });
-  return { near: at(NEAR, 'palms'), coarse: at(COARSE, 'palms coarse') };
+  });
 }

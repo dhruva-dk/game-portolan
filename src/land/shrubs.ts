@@ -41,12 +41,19 @@ import { cut } from '../tsl.ts';
 
 /** How many shapes the shrubs come in. */
 export const SHAPES = 4;
+/** Its leaves, near. */
+const LEAVES = 450;
 /**
- * Its leaves near, and past DETAIL metres off (site.ts): fewer and larger,
- * covering the same masses as much.
+ * Each level of detail, nearest first (groves.ts says how far off each is
+ * drawn): its leaves, fewer and larger farther off, covering the same masses
+ * as much; and how many of the shapes it is drawn in (far, a shrub a few pixels
+ * across, all as the first).
  */
-const LEAVES = 450,
-  COARSE = 70;
+const LEVELS = [
+  { name: 'shrubs', leaves: LEAVES, shapes: SHAPES },
+  { name: 'shrubs coarse', leaves: 70, shapes: SHAPES },
+  { name: 'shrubs far', leaves: 20, shapes: 1 },
+];
 /** A leaf's length, as a share of the shrub's size. */
 const LEAF = 0.095;
 /**
@@ -127,13 +134,14 @@ function shape(seed: number, leaves: number): BufferGeometry {
 
 /**
  * shrubs[i]: those on tile i, whose chart is charts[i]; each one of SHAPES
- * shapes. The instances of each shape, near and coarse.
+ * shapes. For each level of detail (LEVELS, nearest first), the instances of
+ * each of its shapes.
  */
 export function createShrubs(
   shrubs: Shrub[][],
   charts: Chart[],
   light: Light
-): { near: Instances[]; coarse: Instances[] } {
+): Instances[][] {
   const material = new MeshBasicNodeMaterial({ side: DoubleSide });
   material.colorNode = Fn(() => {
     // the normal as the shape has it, bent toward its mass's, whichever side of
@@ -161,33 +169,36 @@ export function createShrubs(
     s = new Vector3(),
     zero = new Vector3(),
     up = new Vector3(0, 1, 0);
-  const placed = Array.from({ length: SHAPES }, (_, k) =>
-    shrubs.map((on, i) =>
-      on
-        .filter((b) => b.shape === k)
-        .map((b): Placed => {
-          m.compose(
-            zero,
-            q.setFromAxisAngle(up, b.yaw),
-            s.set(b.size, b.size * 0.8, b.size)
-          );
-          return {
-            matrix: standing(
-              charts[i],
-              b.x,
-              b.y - 0.05 * b.size,
-              b.z,
-              m,
-              new Matrix4()
-            ),
-            tint: b.tint,
-          };
-        })
+  const all = shrubs.map((on, i) =>
+    on.map((b): Placed & { shape: number } => {
+      m.compose(
+        zero,
+        q.setFromAxisAngle(up, b.yaw),
+        s.set(b.size, b.size * 0.8, b.size)
+      );
+      return {
+        matrix: standing(
+          charts[i],
+          b.x,
+          b.y - 0.05 * b.size,
+          b.z,
+          m,
+          new Matrix4()
+        ),
+        tint: b.tint,
+        shape: b.shape,
+      };
+    })
+  );
+  return LEVELS.map(({ name, leaves, shapes }) =>
+    Array.from({ length: shapes }, (_, k) =>
+      createInstances(
+        `${name} ${k}`,
+        shape(k + 101, leaves),
+        material,
+        all.map((on) => on.filter((b) => b.shape % shapes === k)),
+        true
+      )
     )
   );
-  const at = (leaves: number, name: string) =>
-    placed.map((p, k) =>
-      createInstances(`${name} ${k}`, shape(k + 101, leaves), material, p, true)
-    );
-  return { near: at(LEAVES, 'shrubs'), coarse: at(COARSE, 'shrubs coarse') };
 }
