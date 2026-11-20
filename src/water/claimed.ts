@@ -3,12 +3,13 @@
 // needs to draw the borders smooth and the changes as moving fronts.
 //
 // Each cell keeps four bytes: who holds it, who held it before, and the
-// smoothed share of its own holder over the 9 × 9 cells round it (a Gaussian, σ
-// 1.6 cells, never under MIN_SHARE so a thin strip never vanishes, but only
-// just over a half, so the border follows the smoothed share and not the cells’
+// smoothed share of its own holder over the 9 × 9 cells round it (shares.ts: a
+// Gaussian, never under a floor so a thin strip never vanishes, but only just
+// over a half, so the border follows the smoothed share and not the cells’
 // edges; 255 when that whole window is one holder's: the shader can stop at one
 // read there), now and before. And a moment, on the world's clock: when the
-// change front reached it. A change keeps the cells' state before it for HOLD
+// change front reached it. The strips every ship paints since the last frame
+// are drawn as one change, each cell its own holder's. A change keeps the cells' state before it for HOLD
 // s, the shader drawing the old against the new as a front sweeps over (from
 // the loop's own cells, a breadth-first spread alternately four- and eight-way
 // for a near round front, smoothed twice; a painted strip all at once), then
@@ -24,15 +25,14 @@
 // shader's 3 × 3 reads never leave a face's tile. What changed is sent as a
 // range of words a face, never the whole.
 //
-// Pure: no three, so it runs in node for the tests (as cursor.ts does); the two
-// name their imports with .ts, as node's do, while the rest of the folder,
-// which only Vite loads, leaves it off.
+// Pure: no three, so it runs in node for the tests (as cursor.ts and shares.ts
+// do); the three name their imports with .ts, as node's do, while the rest of
+// the folder, which only Vite loads, leaves it off.
 
 import type { Sea } from '../snapshot.ts';
 import {
   CELLS,
   N,
-  beyond,
   cellOf,
   columnOf,
   faceOf,
@@ -41,50 +41,18 @@ import {
   type ReadCells,
 } from '../world/cells.ts';
 import { createCursor } from './cursor.ts';
+import { createShares } from './shares.ts';
 
 /**
  * Seconds a changed cell keeps who held it before, for the front; then it
  * settles.
  */
 export const HOLD = 8;
-/** The least smoothed share a cell keeps of its own holder. */
-const MIN_SHARE = 0.52;
-/**
- * The smoothing's spread, cells: wider than 1.15, as a ship's home here is only
- * some 18 cells across, and a narrower one leaves its circle an octagon.
- */
-const SIGMA = 1.6;
-/** The smoothing window's reach, cells: (2·FLAT + 1)² of them. */
-const FLAT = 4,
-  WIN = 2 * FLAT + 1;
 /** The padded face's side, and its words. */
 export const SIDE = N + 2;
 const TILE = SIDE * SIDE;
 /** Words on the GPU: six padded faces. */
 export const WORDS = 6 * TILE;
-
-const SMOOTH = new Float32Array(WIN * WIN);
-{
-  let sum = 0;
-  for (let k = 0; k < WIN * WIN; k++) {
-    const i = (k % WIN) - FLAT,
-      j = Math.floor(k / WIN) - FLAT;
-    sum += SMOOTH[k] = Math.exp(-(i * i + j * j) / (2 * SIGMA * SIGMA));
-  }
-  for (let k = 0; k < WIN * WIN; k++) SMOOTH[k] /= sum;
-}
-/** The eight neighbours' steps, the four sides' first. */
-const NBI = [1, -1, 0, 0, 1, -1, 1, -1];
-const NBJ = [0, 0, 1, -1, 1, 1, -1, -1];
-
-/** The cell di, dj cells from c, carried past a face's edge onto the next. */
-function offset(c: number, di: number, dj: number): number {
-  const i = columnOf(c) + di,
-    j = rowOf(c) + dj;
-  return i >= 0 && i < N && j >= 0 && j < N
-    ? c + dj * N + di
-    : beyond(faceOf(c), i, j);
-}
 
 /** A cell's word in its own face's tile. */
 const slotOf = (c: number) =>
@@ -111,13 +79,14 @@ for (let f = 0; f < 6; f++) {
 }
 
 /**
- * A change to draw (snapshot.ts SeaChange, less the cut): its cells, its holder
- * after (0 open sea, else id + 1), when (world clock, s) and the cells its
- * front spreads from (null: in from the changed water's edge).
+ * A change to draw (snapshot.ts SeaChange): its cells, its holder after (0 open
+ * sea, else id + 1; or each cell's, for the strips painted since the last frame
+ * drawn together), when (world clock, s) and the cells its front spreads from
+ * (null: in from the changed water's edge).
  */
 interface Shift {
   cells: ReadCells;
-  owner: number;
+  owner: number | Uint8Array;
   time: number;
   from: ReadCells | null;
 }
@@ -147,6 +116,7 @@ export function createClaimed(slices = SLICES) {
   /** What goes to the GPU: the words and the moments, padded (SIDE, WORDS). */
   const gpuCells = new Uint32Array(WORDS),
     gpuReveal = new Float32Array(WORDS).fill(-1e6);
+  const shares = createShares(cells);
   const mark = new Int32Array(CELLS),
     seen = new Int32Array(CELLS),
     list = new Int32Array(CELLS),
@@ -170,54 +140,16 @@ export function createClaimed(slices = SLICES) {
     now = 0;
   /** The slices the last frame's work took. */
   let used = 0;
-  const win = new Int32Array(WIN * WIN),
-    nb = new Int32Array(8);
 
   const touch = (c: number) => {
     if (isDirty[c]) return;
     isDirty[c] = 1;
     dirty[dirtyCount++] = c;
   };
+  const { around, windowOf } = shares;
   /**
-   * The eight cells round c (its four sides' first), straight across the face
-   * away from its edges.
-   */
-  const around = (c: number) => {
-    const i = columnOf(c),
-      j = rowOf(c);
-    if (i > 0 && j > 0 && i < N - 1 && j < N - 1)
-      for (let s = 0; s < 8; s++) nb[s] = c + NBJ[s] * N + NBI[s];
-    else for (let s = 0; s < 8; s++) nb[s] = offset(c, NBI[s], NBJ[s]);
-    return nb;
-  };
-  const windowOf = (c: number) => {
-    const i = columnOf(c),
-      j = rowOf(c),
-      inner = i >= FLAT && j >= FLAT && i < N - FLAT && j < N - FLAT;
-    for (let dj = -FLAT, k = 0; dj <= FLAT; dj++) {
-      for (let di = -FLAT; di <= FLAT; di++, k++)
-        win[k] = inner ? c + dj * N + di : offset(c, di, dj);
-    }
-    return win;
-  };
-  /**
-   * The smoothed share of c's own holder over its window, a byte: 255 when the
-   * window is all hers.
-   */
-  const share = (c: number) => {
-    const o = cells[c * 4],
-      w = windowOf(c);
-    let s = 0,
-      flat = true;
-    for (let k = 0; k < w.length; k++) {
-      if (cells[w[k] * 4] === o) s += SMOOTH[k];
-      else flat = false;
-    }
-    return flat ? 255 : Math.min(254, Math.round(Math.max(s, MIN_SHARE) * 255));
-  };
-  /**
-   * Lists the cells within FLAT of c not yet listed for this change; returns
-   * the new count.
+   * Lists the cells of c's window not yet listed for this change; returns the
+   * new count.
    */
   const listWindow = (c: number, e: number, n: number, out: Int32Array) => {
     for (const x of windowOf(c)) {
@@ -261,6 +193,7 @@ export function createClaimed(slices = SLICES) {
     for (let c = 0; c < CELLS; c++) {
       cells[c * 4] = cells[c * 4 + 1] = owner[c];
       cells[c * 4 + 2] = cells[c * 4 + 3] = 255;
+      shares.whole(c);
       reveal[c] = -1e6;
       if (owner[c]) list[n++] = c;
       if (tick(1 / 4)) yield;
@@ -272,7 +205,9 @@ export function createClaimed(slices = SLICES) {
       if (tick(16)) yield;
     }
     for (let k = 0; k < m; k++) {
-      cells[queue[k] * 4 + 2] = cells[queue[k] * 4 + 3] = share(queue[k]);
+      cells[queue[k] * 4 + 2] = cells[queue[k] * 4 + 3] = shares.count(
+        queue[k]
+      );
       if (tick(32)) yield;
     }
     gpuReveal.fill(-1e6);
@@ -318,14 +253,22 @@ export function createClaimed(slices = SLICES) {
       }
       if (tick(1)) yield;
     }
+    const inside = (x: number) => mark[x] === e || mark[x] === e + 1;
     for (let k = 0; k < changed.length; k++) {
-      const c = changed[k];
-      cells[c * 4 + 1] = cells[c * 4];
+      const c = changed[k],
+        was = cells[c * 4],
+        to = typeof owner === 'number' ? owner : owner[k];
+      cells[c * 4 + 1] = was;
       cells[c * 4 + 3] = cells[c * 4 + 2];
-      cells[c * 4] = owner;
+      // (only those near the changed water's edge have cells round them not
+      // changing with them)
+      const near = mark[c] === e + 1 && was !== to;
+      if (near) shares.spread(c, was, to, inside);
+      cells[c * 4] = to;
       cells[c * 4 + 2] = 255;
+      shares.whole(c);
       touch(c);
-      if (tick(1)) yield;
+      if (tick(near ? 8 : 1)) yield;
     }
     for (let k = 0; k < nl; k++) {
       const c = list[k];
@@ -334,14 +277,17 @@ export function createClaimed(slices = SLICES) {
       cells[c * 4 + 3] = cells[c * 4 + 2];
       touch(c);
     }
+    // the changed cells' shares, and those whose windows reach past a face's
+    // edge, counted afresh; the rest as spread
     for (let k = 0; k < nl; k++) {
-      cells[list[k] * 4 + 2] = share(list[k]);
-      if (tick(8)) yield;
+      const x = list[k],
+        again = inside(x) || shares.edged(x);
+      cells[x * 4 + 2] = again ? shares.count(x) : shares.kept(x);
+      if (tick(again ? 8 : 1)) yield;
     }
 
     // the front: breadth first through the changed water, four- and eight-way
     // by turns
-    const inside = (x: number) => mark[x] === e || mark[x] === e + 1;
     let head = 0,
       tail = 0;
     if (from) {
@@ -478,6 +424,27 @@ export function createClaimed(slices = SLICES) {
     return n;
   }
 
+  /**
+   * The strips read and not yet queued: each cell and its painter, and when the
+   * last was painted. Every ship paints most steps, so they are drawn as one
+   * change, every cell its own front's source (drawn at once): one a change,
+   * they would queue faster than the frames draw them.
+   */
+  const painted: number[] = [],
+    painters: number[] = [];
+  let paintedAt = 0;
+  const paint = () => {
+    if (!painted.length) return;
+    const cells = Int32Array.from(painted);
+    pending.push({
+      cells,
+      owner: Uint8Array.from(painters),
+      time: paintedAt,
+      from: cells,
+    });
+    painted.length = painters.length = 0;
+  };
+
   const cursor = createCursor();
   return {
     gpuCells,
@@ -497,15 +464,17 @@ export function createClaimed(slices = SLICES) {
       if (!sea) return false;
       for (let i = from; i < sea.changes.length; i++) {
         const k = sea.changes[i];
-        // her strip: every cell its own front's source, drawn at once
-        if (k.kind === 'paint')
-          pending.push({
-            cells: k.cells,
-            owner: k.ship + 1,
-            time: k.time,
-            from: k.cells,
-          });
-        else if (k.kind === 'claim') {
+        // the strips painted, gathered into one change until another comes
+        if (k.kind === 'paint') {
+          for (let j = 0; j < k.cells.length; j++) {
+            painted.push(k.cells[j]);
+            painters.push(k.ship + 1);
+          }
+          paintedAt = k.time;
+          continue;
+        }
+        paint();
+        if (k.kind === 'claim') {
           const loop = k.cells;
           const from = Int32Array.from({ length: k.loop }, (_, j) => loop[j]);
           pending.push({
@@ -525,6 +494,7 @@ export function createClaimed(slices = SLICES) {
           pending.push({ cells: k.cells, owner: 0, time: k.time, from: null });
         }
       }
+      paint();
       return false;
     },
     /**
@@ -551,7 +521,11 @@ export function createClaimed(slices = SLICES) {
         }
         if (done) job = null;
       }
-      if (!job) spend(settle);
+      // (the cells settled sent in the same frame, if the budget allows)
+      if (!job) {
+        spend(settle);
+        spend(flush);
+      }
       used = slices - left;
       for (let f = 0; f < 6; f++) {
         ranges[f][0] = whole ? f * TILE : hi[f] < 0 ? 0 : lo[f];
@@ -566,5 +540,7 @@ export function createClaimed(slices = SLICES) {
     idle: () => !job && !pending.length && dirtyCount === 0,
     /** Who holds cell c now, as drawn (0 open sea, else id + 1). */
     ownerOf: (c: number) => cells[c * 4],
+    /** Cell c's smoothed share of its holder now, as drawn (a byte). */
+    shareAt: (c: number) => cells[c * 4 + 2],
   };
 }

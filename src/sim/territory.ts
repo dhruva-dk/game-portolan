@@ -2,7 +2,7 @@
 //
 // Every ship starts with a small home patch of sea round her berth. Wherever
 // she sails she paints a strip of the sea her own, `brush` metres either side
-// of her course, at once: open sea and others' water alike (theirs is left the
+// of her course and running `ahead` metres before her bow, at once: open sea and others' water alike (theirs is left the
 // smaller). Her strip coming back against her older water (her patch, an
 // earlier strip, a loop she closed before, or her own strip from further back
 // than her length) closes a loop: the smaller side of the planet it cuts off,
@@ -31,8 +31,9 @@ import {
   trace,
   type ReadCells,
 } from '../world/cells.ts';
-import { R, normalize, type Vec3 } from '../world/sphere.ts';
+import { R, add, dot, length, normalize, type Vec3 } from '../world/sphere.ts';
 import { enclose } from './enclose.ts';
+import { SHIP } from './handling.ts';
 import type { Cap } from './storm.ts';
 
 export const TERRITORY = {
@@ -41,8 +42,16 @@ export const TERRITORY = {
    * either way.
    */
   home: 30,
-  /** Metres either side of her course she paints: a strip her beam's width. */
-  brush: 4,
+  /**
+   * Metres either side of her course she paints: a strip some 1.5 times her
+   * beam as drawn (the border's smoothing takes about a metre off its 11).
+   */
+  brush: 5.5,
+  /**
+   * Metres her strip runs ahead of her bow as she sails: the brush is centred
+   * her half length and this, less its own reach, ahead of her middle.
+   */
+  ahead: 3,
   /**
    * Her newest cells, in cells her course has crossed (about her length), that
    * her strip does not close a loop against: what she has only just painted.
@@ -131,6 +140,8 @@ export function createTerritory(count: number) {
   const runs: number[][] = Array.from({ length: count }, () => []);
   /** The cell under each ship at her last step (−1: not seen yet). */
   const under = new Int32Array(count).fill(-1);
+  /** The way each ship last moved (unit tangents; 0: not yet). */
+  const way: Vec3[] = Array.from({ length: count }, () => [0, 0, 0]);
   /** The brush's scratch: each cell's last stamp, and the cells reached. */
   const stamp = new Int32Array(CELLS),
     reached: number[] = [];
@@ -141,7 +152,20 @@ export function createTerritory(count: number) {
     steps = 0,
     stamps = 0;
   const cosHome = Math.cos(TERRITORY.home / R),
-    cosBrush = Math.cos(TERRITORY.brush / R);
+    cosBrush = Math.cos(TERRITORY.brush / R),
+    lead = (SHIP.length / 2 + TERRITORY.ahead - TERRITORY.brush) / R;
+
+  /**
+   * Where her brush is centred, she at `to` from `from`: `lead` ahead of her
+   * the way she moves (the way she last moved, still).
+   */
+  const brushAt = (id: number, from: Vec3, to: Vec3): Vec3 => {
+    const d = add(to, from, -1),
+      along = add(d, to, -dot(d, to)),
+      l = length(along);
+    if (l > 1e-12) way[id] = [along[0] / l, along[1] / l, along[2] / l];
+    return normalize(add(to, way[id], lead));
+  };
 
   const log = (c: Logged) => {
     // (oldest first: those too old are the first few)
@@ -291,7 +315,11 @@ export function createTerritory(count: number) {
         under[id] = c1;
         walked[id] += walk.length - 1;
         const painted: number[] = [];
-        const met = paint(id, normalize(to), painted);
+        const met = paint(
+          id,
+          brushAt(id, normalize(from), normalize(to)),
+          painted
+        );
         if (painted.length)
           log({
             kind: 'paint',
@@ -317,6 +345,7 @@ export function createTerritory(count: number) {
         set(c, 0);
       }
       under[id] = -1;
+      way[id] = [0, 0, 0];
       log({ kind: 'drain', time, ship: id, cells: Int32Array.from(cells) });
     },
 

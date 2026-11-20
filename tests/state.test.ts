@@ -108,15 +108,20 @@ test("a second match on the same state starts clean: its sea as a new state's, h
     'her loop closes at the same moment of its match'
   );
   // nothing of the first: the same changes in the same order (on the world's
-  // clock, later by as long as it ran before), the same water held
+  // clock, later by as long as it ran before), the same water held; those
+  // both still keep (the clock's rounding may keep one more at the far end)
   const a = alone.state.sea(1)!,
     b = second.state.sea(1)!,
-    later = b.changes[0].time - a.changes[0].time;
+    later = b.changes.at(-1)!.time - a.changes.at(-1)!.time,
+    since = Math.max(a.changes[0].seq, b.changes[0].seq);
   const timed = (cs: typeof a.changes, by: number) =>
-    cs.map((c) => ({ ...c, time: Math.round((c.time - by) * 1e6) }));
+    cs
+      .filter((c) => c.seq >= since)
+      .map((c) => ({ ...c, time: Math.round((c.time - by) * 1e6) }));
   assert.equal(b.generation, was.generation + 1);
   assert.equal(b.seq, a.seq);
   assert.ok(later > 0);
+  assert.ok(Math.abs(a.changes[0].seq - b.changes[0].seq) <= 1);
   assert.deepEqual(timed(b.changes, later), timed(a.changes, 0));
   assert.deepEqual(b.owner, a.owner);
   assert.equal(second.state.share(PLAYER), alone.state.share(PLAYER));

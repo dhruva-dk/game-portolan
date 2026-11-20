@@ -6,11 +6,18 @@ import { createTerritory, type Territory } from '../src/sim/territory.ts';
 import type { Sea } from '../src/snapshot.ts';
 import { SLICES, createClaimed } from '../src/water/claimed.ts';
 import { createCursor } from '../src/water/cursor.ts';
-import { CELLS, type ReadCells } from '../src/world/cells.ts';
+import {
+  CELLS,
+  N,
+  columnOf,
+  rowOf,
+  type ReadCells,
+} from '../src/world/cells.ts';
 import { random } from '../src/world/random.ts';
 import {
   R,
   add,
+  cross,
   distance,
   dot,
   normalize,
@@ -108,6 +115,80 @@ test("a new match's changes are read from its first: its loops closed are not ta
   assert.equal(cursor.read(sea).from, sea.changes.length);
   assert.equal(cursor.read(undefined).fresh, true);
   assert.equal(cursor.read(undefined).fresh, false);
+});
+
+test("a match's whole fleet painting is drawn in the frame it is read, every frame past the match's start, within its budget", () => {
+  // 80 ships about the planet, each sailing out of her home patch at her top
+  // speed (0.53 m a step), turning gently, a frame drawn every step
+  const ships = 80,
+    t = createTerritory(ships),
+    claimed = createClaimed();
+  const homes = Array.from({ length: ships }, (_, i): Vec3 => {
+    const y = 1 - (2 * (i + 0.5)) / ships,
+      r = Math.sqrt(1 - y * y),
+      a = i * 2.39996;
+    return [r * Math.cos(a), y, r * Math.sin(a)];
+  });
+  const ways = homes.map((h, i) =>
+    normalize(
+      add(
+        [Math.cos(i), 0.3, Math.sin(i)],
+        h,
+        -dot(h, [Math.cos(i), 0.3, Math.sin(i)])
+      )
+    )
+  );
+  t.begin(homes, 0);
+  const at = homes.slice();
+  let most = 0,
+    behind = 0;
+  for (let s = 1; s <= 300; s++) {
+    const moves = at.map((p, id) => {
+      const to = normalize(add(p, ways[id], 0.53 / R)),
+        turned = add(ways[id], cross(to, ways[id]), id % 2 ? 0.004 : -0.004);
+      ways[id] = normalize(add(turned, to, -dot(turned, to)));
+      return { id, from: p, to };
+    });
+    moves.forEach((m) => (at[m.id] = m.to));
+    t.step(moves, s / 30, WHOLE);
+    claimed.follow(seaOf(t, 1));
+    claimed.work(s / 30);
+    most = Math.max(most, claimed.used());
+    // (at the start, the grid taken whole, some hundred slices, and every ship
+    // leaving her home patch at once: some frames to catch up)
+    if (s > 45 && !claimed.idle()) behind++;
+  }
+  assert.ok(
+    t.changes().filter((c) => c.kind === 'paint').length > 1000,
+    'the fleet painting'
+  );
+  assert.equal(behind, 0, 'frames that ended with strips left to draw');
+  assert.ok(most <= SLICES, `${most} slices in a frame`);
+  // the same sea taken whole, every share counted afresh: the shares kept as
+  // the strips came the same, to a rounding, away from the faces' edges (near
+  // them a window reaching onto the next face is not the mirror of the
+  // other's, and a change may leave a share there a little off: as it did when
+  // every share near a change was counted afresh)
+  const fresh = createClaimed();
+  fresh.follow(seaOf(t, 2));
+  for (let f = 0; f < 600 && !fresh.idle(); f++) fresh.work(10 + f);
+  const edge = (c: number) =>
+    Math.min(columnOf(c), rowOf(c), N - 1 - columnOf(c), N - 1 - rowOf(c)) < 4;
+  let off = 0;
+  for (let c = 0; c < CELLS; c++) {
+    if (claimed.ownerOf(c) !== t.owner[c])
+      assert.fail(
+        `cell ${c} is ${claimed.ownerOf(c)}, the sea's ${t.owner[c]}`
+      );
+    if (edge(c)) continue;
+    const d = Math.abs(claimed.shareAt(c) - fresh.shareAt(c));
+    if (d > 1)
+      assert.fail(
+        `cell ${c}'s share ${claimed.shareAt(c)}, counted afresh ${fresh.shareAt(c)}`
+      );
+    off += d;
+  }
+  assert.ok(off < 50, `${off} shares off by a rounding`);
 });
 
 test("the water's copy of the cells keeps up with the sea: loops, drains, the storm, frames missed and a new match", () => {
