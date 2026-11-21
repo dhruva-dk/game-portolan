@@ -9,9 +9,10 @@
 //   a ball home    a flash, splinters thrown out of her side and falling, and dark smoke
 //   a ram          splinters
 //   a ball flying  a ribbon of thin grey smoke along the way it came (its kind's trail, balls.ts SHOT)
-//   a worn ship    thin grey wisps off her waist (wear 1), a dark column (wear 2); spray off her side where her
-//                  waterline is holed, smoke from her gun ports where her deck is (her faults): the nearest few,
-//                  fewer and bigger puffs the farther she is, none past sight (worn)
+//   a worn ship    thin grey wisps off her waist (wear 1), a sooty column (wear 2); spray off her side where her
+//                  waterline is holed, smoke from her gun ports where her deck is (her faults): as smoking.ts
+//                  plans it, the nearest few, fewer and bigger puffs the farther she is, none past sight (worn)
+// A puff thins away close by the eye (EYE), and nearest it is not drawn.
 // Smoke and spray are flat shapes in two tones (palette.ts: powder smoke cream,
 // rose beneath; spray the foam's white), as bright as the place and the hour
 // (sky/light.ts level), and blended premultiplied: a flash is all added light,
@@ -45,16 +46,7 @@ import {
   vec3,
 } from 'three/tsl';
 import type { GunKind } from '../kinds.ts';
-import {
-  AZURE,
-  DUST,
-  FIRE,
-  FOAM,
-  SMOKE,
-  SOOT,
-  TIMBER,
-  WISP,
-} from '../palette.ts';
+import { AZURE, DUST, FIRE, FOAM, SMOKE, SOOT, TIMBER } from '../palette.ts';
 import type { Light } from '../sky/light.ts';
 import type { BallDraw, ShipDraw } from '../snapshot.ts';
 import { random } from '../world/random.ts';
@@ -63,6 +55,16 @@ import { premultiplied, quad } from '../gpu.ts';
 import type { FloatNode, Vec2Node } from '../tsl.ts';
 import { SHOT } from './balls.ts';
 import { MARK } from './marks.ts';
+import {
+  CLOSE,
+  HOLED,
+  LIFE_SPREAD,
+  PORTS,
+  SMOKING,
+  WORN,
+  smokers,
+  type Smoker,
+} from './smoking.ts';
 
 /** The most puffs alive at once. */
 const PUFFS = 4096;
@@ -97,59 +99,11 @@ const FIRING: Record<
 type Vec3 = sphere.Vec3;
 
 /**
- * A worn ship's smoke (ShipDraw.wear), wear 1's and 2's: puffs a second near
- * her, their size (m), growth (m/s), rise (m/s), drag (per s), lift (m/s² up),
- * life (s), opacity and ink; thin grey wisps up past her tops, then a dark
- * column twice her masts' height.
+ * How near the eye a puff thins away (metres from it to the puff's middle: none
+ * at the first, whole from the second), so smoke on the lens neither walls off
+ * the view nor costs its fill.
  */
-const WORN = [
-  null,
-  {
-    rate: 6,
-    size: 0.4,
-    grow: 0.7,
-    rise: 6,
-    drag: 0.4,
-    lift: 0.6,
-    life: 4.5,
-    opacity: 0.5,
-    ink: WISP,
-  },
-  {
-    rate: 12,
-    size: 0.8,
-    grow: 1.1,
-    rise: 8,
-    drag: 0.35,
-    lift: 0.9,
-    life: 6.5,
-    opacity: 0.8,
-    ink: SOOT,
-  },
-] as const;
-/**
- * The smoking ships: the most at once (the nearest), how near the eye she
- * smokes in full (metres; farther, fewer puffs and bigger), and past how far
- * none; where on her it rises (metres over her waterline and aft of her
- * middle: her waist, ship/lines.ts at her SCALE).
- */
-const SMOKING = { most: 8, near: 50, far: 360, over: 2.5, aft: 1.5 } as const;
-/**
- * A ship holed at her waterline (her faults, kinds.ts ZONES): spray thrown off
- * her side, puffs a second near by fault (none, minor, major), from half her
- * beam out and along her length's middle (metres, ship/lines.ts at her SCALE).
- */
-const HOLED = { rate: [0, 7, 16], beam: 2.7, length: 5 } as const;
-/**
- * Her deck afire: smoke from her gun ports, puffs a second near by fault, from
- * how high over her waterline, along how much of her, how dense.
- */
-const PORTS = {
-  rate: [0, 5, 12],
-  over: 1.3,
-  length: 6,
-  opacity: 0.75,
-} as const;
+const EYE = [3, 12] as const;
 
 /**
  * A puff's flat shape: its edge's radius on its sprite and half that edge's
@@ -193,24 +147,6 @@ interface Puff {
   fadeIn: number;
 }
 
-/**
- * Whether a ship at `p` (metres) shows from `eye` over the horizon: the line to
- * a point SMOKING.over and some more above her stays over the sea.
- */
-function overHorizon(eye: Vec3, p: Vec3) {
-  const k = (sphere.R + SMOKING.over + 6) / Math.max(1e-6, sphere.length(p));
-  const dx = p[0] * k - eye[0],
-    dy = p[1] * k - eye[1],
-    dz = p[2] * k - eye[2];
-  const t =
-    -(eye[0] * dx + eye[1] * dy + eye[2] * dz) / (dx * dx + dy * dy + dz * dz);
-  if (t <= 0 || t >= 1) return true;
-  const x = eye[0] + dx * t,
-    y = eye[1] + dy * t,
-    z = eye[2] + dz * t;
-  return x * x + y * y + z * z >= sphere.R * sphere.R;
-}
-
 function puffMesh(light: Light, now: FloatNode) {
   const g = quad(new InstancedBufferGeometry());
   const data = new Float32Array(PUFFS * STRIDE);
@@ -244,8 +180,15 @@ function puffMesh(light: Light, now: FloatNode) {
       )
     )
     .sub(up.mul(f.w.mul(0.5).mul(age).mul(age)));
-  const size = select(alive, f.x.add(f.y.mul(age)), float(0));
-  const eye = normalize(cameraPosition.sub(centre));
+  // thinning away near the eye (EYE), and gone, not drawn at all, nearest it
+  const toEye = cameraPosition.sub(centre),
+    seen = smoothstep(EYE[0], EYE[1], toEye.length());
+  const size = select(
+    alive.and(seen.greaterThan(0)),
+    f.x.add(f.y.mul(age)),
+    float(0)
+  );
+  const eye = normalize(toEye);
   const right = normalize(cross(up, eye)),
     upward = cross(eye, right);
   const local = attribute('position', 'vec3');
@@ -267,7 +210,8 @@ function puffMesh(light: Light, now: FloatNode) {
   const uv = varying(local.xy),
     upright = varying(turned.y),
     mid = varying(centre);
-  const tv = varying(t);
+  const tv = varying(t),
+    near = varying(seen);
   // a flat shape with a crisp edge: a drop's disc, or a cloud's, scalloped
   // round its edge by a few lobes (its own, by its seed); a glow's stays soft,
   // as light is
@@ -288,7 +232,9 @@ function puffMesh(light: Light, now: FloatNode) {
   // it thins only at the end of its life: until then the shape is whole, as
   // painted
   const alpha = Fn(() =>
-    shapeOf(uv.length()).mul(look.x.mul(fade(tv)).mul(SOLID).min(1))
+    shapeOf(uv.length())
+      .mul(look.x.mul(fade(tv)).mul(SOLID).min(1))
+      .mul(near)
   )();
   m.colorNode = Fn(() => {
     const r = uv.length();
@@ -303,7 +249,7 @@ function puffMesh(light: Light, now: FloatNode) {
     return tone
       .mul(light.level(mid))
       .mul(alpha)
-      .add(ink.rgb.mul(ink.w).mul(glowOf(r)).mul(fade(tv)));
+      .add(ink.rgb.mul(ink.w).mul(glowOf(r)).mul(fade(tv)).mul(near));
   })();
   m.opacityNode = alpha;
   // premultiplied: a glow adds its light, smoke covers what is behind
@@ -326,12 +272,31 @@ export function createPuffs(light: Light, now: FloatNode) {
   let drawn = -Infinity,
     wornAt = -Infinity;
   /**
-   * Each worn ship's share of a puff owed (by id); the smoking this frame, and
-   * how far each is from the eye (metres).
+   * Each smoking ship's share of a puff owed, by her id and the kind (smoking.ts
+   * Smoker: smoke, spray, ports); the smoking this frame (smoking.ts smokers,
+   * its entries kept); the puff they lay, rewritten for each, and the ways it
+   * is worked out in (so none is made).
    */
   const owed = new Map<number, number>(),
-    smoking: ShipDraw[] = [],
-    away: number[] = [];
+    smoking: Smoker[] = [],
+    wornAt3: [number, number, number] = [0, 0, 0],
+    wornWay: [number, number, number] = [0, 0, 0],
+    wornPuff: Puff = {
+      at: wornAt3,
+      way: wornWay,
+      size: 0,
+      grow: 0,
+      drag: 0,
+      pull: 0,
+      life: 0,
+      ink: SOOT,
+      glow: 0,
+      opacity: 0,
+      soft: 1,
+      fadeIn: 0,
+    },
+    side: [number, number, number] = [0, 0, 0],
+    rand: [number, number, number] = [0, 0, 0];
   /** The puff a ball's trail lays, rewritten for each (so none is made). */
   const trailAt: [number, number, number] = [0, 0, 0];
   const trailPuff: Puff = {
@@ -357,12 +322,24 @@ export function createPuffs(light: Light, now: FloatNode) {
     fresh = 0;
   const draw = random(0x6a11);
   const u = (lo: number, hi: number) => lo + (hi - lo) * draw();
-  /** A random unit vector. */
-  const any = (): sphere.Vec3 => {
+  /** A random unit vector (into `out`, if given). */
+  const any = (out?: [number, number, number]): sphere.Vec3 => {
     const z = u(-1, 1),
       a = u(0, 2 * Math.PI),
       s = Math.sqrt(1 - z * z);
-    return [s * Math.cos(a), s * Math.sin(a), z];
+    return sphere.put(out, s * Math.cos(a), s * Math.sin(a), z);
+  };
+  /**
+   * How many puffs of kind `j` (Smoker's order) ship `id` lays now, laying
+   * `rate` a second for `since` s: what is owed carried over, a frame's
+   * fraction at a time.
+   */
+  const owe = (id: number, j: number, rate: number, since: number) => {
+    const key = id * 3 + j,
+      due = (owed.get(key) ?? draw()) + rate * since,
+      k = Math.floor(due);
+    owed.set(key, due - k);
+    return k;
   };
   /** A random unit tangent at `up`: one random direction, laid in the plane. */
   const across = (up: sphere.Vec3): sphere.Vec3 =>
@@ -656,109 +633,87 @@ export function createPuffs(light: Light, now: FloatNode) {
     /**
      * Each frame, at `time` (the world's clock, s), before draw: the smoke of
      * the worn among `ships` (ShipDraw.wear), and the spray and ports' smoke
-     * of the holed and afire (ShipDraw.faults), seen from `eye` (metres): of the
-     * nearest SMOKING.most afloat and within sight (short of SMOKING.far and
-     * over the horizon), each laying her puffs at her wear's rate, fewer and
-     * bigger the farther she is.
+     * of the holed and afire (ShipDraw.faults), seen from `eye` (metres), as
+     * smoking.ts plans it; bigger puffs the farther she is, and lower and
+     * smaller close by the eye. Makes nothing.
      */
     worn(time: number, ships: readonly ShipDraw[], eye: Vec3) {
       const since =
         time - wornAt > 0 && time - wornAt < 0.25 ? time - wornAt : 0;
       wornAt = time;
       if (!since) return;
-      /** How many puffs of kind `j` ship `id` lays now, at `rate` a second. */
-      const owe = (id: number, j: number, rate: number) => {
-        const due = (owed.get(id * 3 + j) ?? draw()) + rate * since,
-          k = Math.floor(due);
-        owed.set(id * 3 + j, due - k);
-        return k;
-      };
-      let n = 0;
-      for (const s of ships) {
-        if (!s.afloat || !(s.wear || s.faults[2] || s.faults[3])) continue;
-        const p = s.pose.position,
-          d = Math.hypot(p[0] - eye[0], p[1] - eye[1], p[2] - eye[2]);
-        if (d > SMOKING.far || !overHorizon(eye, p)) continue;
-        smoking[n] = s;
-        away[n++] = d;
-      }
-      // the nearest: a pass of selection, n being few
-      for (let i = 0; i < Math.min(n, SMOKING.most); i++) {
-        let best = i;
-        for (let j = i + 1; j < n; j++) if (away[j] < away[best]) best = j;
-        [smoking[i], smoking[best]] = [smoking[best], smoking[i]];
-        [away[i], away[best]] = [away[best], away[i]];
-        const s = smoking[i],
+      const n = smokers(ships, eye, smoking),
+        q = wornPuff,
+        at = wornAt3,
+        way = wornWay;
+      for (let i = 0; i < n; i++) {
+        const m = smoking[i];
+        if (!m) continue;
+        const s = m.ship,
           w = WORN[s.wear],
-          far = Math.max(1, away[i] / SMOKING.near);
+          big = Math.sqrt(Math.max(1, m.away / SMOKING.near)),
+          low = CLOSE.rise + (1 - CLOSE.rise) * m.close,
+          small = CLOSE.size + (1 - CLOSE.size) * m.close;
         const { position: p, up, forward } = s.pose;
-        // her side's spray where her waterline is holed, her ports' smoke where her deck is
-        const side = sphere.cross(up, forward),
-          [, , water, deck] = s.faults;
-        for (let k = owe(s.id, 1, (HOLED.rate[water] ?? 0) / far); k > 0; k--) {
-          const out = Math.sign(u(-1, 1)),
-            at = sphere.add(
-              sphere.add(p, side, out * HOLED.beam),
-              forward,
-              u(-HOLED.length, HOLED.length)
-            );
-          lay(
-            time - u(0, since),
-            spray(
-              at,
-              sphere.add(sphere.scale(up, u(2, 5)), side, out * u(1, 3)),
-              u(0.4, 0.8) * Math.sqrt(far),
-              0.6,
-              0.3,
-              u(0.8, 1.4)
-            )
-          );
+        sphere.cross(up, forward, side);
+        // her side's spray where her waterline is holed
+        for (let k = owe(s.id, 1, m.spray, since); k > 0; k--) {
+          const out = Math.sign(u(-1, 1));
+          sphere.add(p, side, out * HOLED.beam, at);
+          sphere.add(at, forward, u(-HOLED.length, HOLED.length), at);
+          sphere.scale(up, u(2, 5), way);
+          sphere.add(way, side, out * u(1, 3), way);
+          q.size = u(0.4, 0.8) * big;
+          q.grow = 0.6;
+          q.drag = 0.3;
+          q.pull = 9.8;
+          q.life = u(0.8, HOLED.life);
+          q.ink = FOAM;
+          q.opacity = 0.9;
+          q.soft = 0.3;
+          q.fadeIn = 0;
+          lay(time - u(0, since), q);
         }
-        for (let k = owe(s.id, 2, (PORTS.rate[deck] ?? 0) / far); k > 0; k--) {
-          const out = Math.sign(u(-1, 1)),
-            at = sphere.add(
-              sphere.add(sphere.add(p, up, PORTS.over), side, out * HOLED.beam),
-              forward,
-              u(-PORTS.length, PORTS.length)
-            );
-          lay(time - u(0, since), {
-            ...smoke(
-              at,
-              sphere.add(sphere.scale(side, out * u(1, 2.5)), up, u(1, 2.5)),
-              SOOT,
-              PORTS.opacity,
-              u(2, 3.2),
-              0.55 * Math.sqrt(far)
-            ),
-            grow: 0.9 * Math.sqrt(far),
-            drag: 0.8,
-            pull: -0.6,
-          });
+        // her ports' smoke where her deck is afire
+        for (let k = owe(s.id, 2, m.ports, since); k > 0; k--) {
+          const out = Math.sign(u(-1, 1));
+          sphere.add(p, up, PORTS.over, at);
+          sphere.add(at, side, out * HOLED.beam, at);
+          sphere.add(at, forward, u(-PORTS.length, PORTS.length), at);
+          sphere.scale(side, out * u(1, 2.5), way);
+          sphere.add(way, up, u(1, 2.5) * low, way);
+          q.size = 0.55 * big * small;
+          q.grow = 0.9 * big * small;
+          q.drag = 0.8;
+          q.pull = -0.6 * low;
+          q.life = u(2, PORTS.life);
+          q.ink = SOOT;
+          q.opacity = PORTS.opacity;
+          q.soft = 1;
+          q.fadeIn = 0.05;
+          lay(time - u(0, since), q);
         }
+        // her wear's smoke off her waist
         if (!w) continue;
-        for (let k = owe(s.id, 0, w.rate / far); k > 0; k--) {
-          const at = sphere.add(
-            sphere.add(sphere.add(p, up, SMOKING.over), forward, -SMOKING.aft),
-            across(up),
-            u(0, 0.8)
-          );
-          lay(time - u(0, since), {
-            ...smoke(
-              at,
-              sphere.add(sphere.scale(up, w.rise * u(0.7, 1.2)), any(), 0.4),
-              w.ink,
-              w.opacity,
-              w.life * u(0.8, 1.1),
-              w.size * Math.sqrt(far)
-            ),
-            grow: w.grow * Math.sqrt(far),
-            drag: w.drag,
-            pull: -w.lift,
-            fadeIn: 0.12,
-          });
+        for (let k = owe(s.id, 0, m.wear, since); k > 0; k--) {
+          sphere.add(p, up, SMOKING.over * low, at);
+          sphere.add(at, forward, -SMOKING.aft, at);
+          sphere.normalize(sphere.tangent(any(rand), up, rand), rand);
+          sphere.add(at, rand, u(0, 0.8), at);
+          sphere.scale(up, w.rise * low * u(0.7, 1.2), way);
+          sphere.add(way, any(rand), 0.4, way);
+          q.size = w.size * big * small;
+          q.grow = w.grow * big * small;
+          q.drag = w.drag;
+          q.pull = -w.lift * low;
+          q.life = w.life * u(0.8, LIFE_SPREAD);
+          q.ink = w.ink;
+          q.opacity = w.opacity;
+          q.soft = 1;
+          q.fadeIn = 0.12;
+          lay(time - u(0, since), q);
         }
       }
-      smoking.length = 0;
     },
     /**
      * Each frame, at `time` (the world's clock, s): the trails of the first `n`
