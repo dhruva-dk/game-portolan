@@ -9,7 +9,7 @@ import { createFaults } from '../src/ship/faults.ts';
 import type { ShipDraw } from '../src/snapshot.ts';
 import { RING, glow, sectorOf } from '../src/ui/hits.ts';
 import { PAPER, WASH } from '../src/ui/ink.ts';
-import { struckZone, washOf } from '../src/ui/vitals.ts';
+import { shimmer, struckZone, washOf } from '../src/ui/vitals.ts';
 
 test("vitals: a zone's wash runs paper, ochre, vermilion, and darkens as its share grows", () => {
   assert.equal(washOf(0), PAPER);
@@ -29,6 +29,29 @@ test('vitals: the zone a blow struck is the one whose share rose most; none when
   assert.equal(struckZone([0.5, 0.5, 0, 0], [0.5, 0.5, 0, 0]), -1);
   assert.equal(struckZone([0.5, 0.5, 0, 0], [0.51, 0.49, 0, 0]), -1);
   assert.equal(struckZone([0.4, 0.2, 0.2, 0.2], [0.3, 0.15, 0.15, 0.4]), 3);
+});
+
+test('vitals: the mending shimmer starts as she begins, runs on unbroken while she mends, and stops as she ends', () => {
+  let started = 0,
+    cancelled = 0;
+  const start = () => {
+    started++;
+    return { cancel: () => void cancelled++ };
+  };
+  let a = shimmer<ReturnType<typeof start>>(null, false, start);
+  assert.equal(a, null);
+  a = shimmer(a, true, start);
+  const first = a;
+  for (let i = 0; i < 5; i++) a = shimmer(a, true, start);
+  assert.equal(a, first, 'the same one runs on through redraws');
+  assert.equal(started, 1);
+  a = shimmer(a, false, start);
+  assert.equal(a, null);
+  assert.equal(cancelled, 1);
+  a = shimmer(a, false, start);
+  assert.equal(cancelled, 1);
+  a = shimmer(a, true, start);
+  assert.equal(started, 2, 'started afresh when she mends again');
 });
 
 test('a blow on her lights the sector of the ring toward its dealer: eight, ahead first, clockwise', () => {
