@@ -40,7 +40,8 @@ import { HOTBAR, type GunKind, type Kit, type Status } from '../player.ts';
 import type { Sea } from '../snapshot.ts';
 import { clamp, lerp } from '../world/scalar.ts';
 import type { Shores } from './coasts.ts';
-import type { Glyph } from './glyphs.ts';
+import { createChanged } from './drawn.ts';
+import { stormMark, type Glyph } from './glyphs.ts';
 import {
   DUSK,
   GILT,
@@ -171,38 +172,8 @@ export function createHud(layer: HTMLElement, shores: Shores, act: HudActions) {
   hotbar.style.height = `${SLOT}px`;
   const juice = createJuice(body, { vitals: face, fire, gust, slots });
 
-  /** What each piece shows, as last drawn: up to six values. */
-  const drawn = new Map<HTMLElement, unknown[]>();
-  /** Whether `el` is to show other than it does: true, and kept, if any of a…f differs from what it was drawn with. */
-  const changed = (
-    el: HTMLElement,
-    a: unknown,
-    b?: unknown,
-    c?: unknown,
-    d?: unknown,
-    e?: unknown,
-    f?: unknown
-  ) => {
-    let was = drawn.get(el);
-    if (
-      was &&
-      was[0] === a &&
-      was[1] === b &&
-      was[2] === c &&
-      was[3] === d &&
-      was[4] === e &&
-      was[5] === f
-    )
-      return false;
-    if (!was) drawn.set(el, (was = [a, b, c, d, e, f]));
-    was[0] = a;
-    was[1] = b;
-    was[2] = c;
-    was[3] = d;
-    was[4] = e;
-    was[5] = f;
-    return true;
-  };
+  /** Whether a piece is to show other than it does (drawn.ts). */
+  const changed = createChanged<HTMLElement>();
   /** The HUD's strength and the rim's as last set, hundredths; where the fall's ring was last put, tenths of a px. */
   let strength = -1,
     wash = -1,
@@ -243,7 +214,7 @@ export function createHud(layer: HTMLElement, shores: Shores, act: HudActions) {
           184,
           38,
           slip(1, 2, 88, 34) +
-            glyph(s.closing ? 'hud.boltFilled' : 'hud.bolt', 20, 19, 24, {
+            glyph(stormMark(s.closing), 20, 19, 24, {
               ink: closing ? 'storm' : 'iron',
             }) +
             figure(60, 19, time, 23, { fill: closing ? INK.storm : INK.iron }) +

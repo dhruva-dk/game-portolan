@@ -29,7 +29,7 @@ import {
   vec3,
 } from 'three/tsl';
 import { LIGHTNING, tint } from '../palette.ts';
-import type { Cap } from '../sim/storm.ts';
+import type { StormDraw } from '../snapshot.ts';
 import { hash01 } from '../world/random.ts';
 import { clamp } from '../world/scalar.ts';
 import { R, type Vec3 } from '../world/sphere.ts';
@@ -50,9 +50,9 @@ const BOLT = 4.5,
     [0.21, 0.34, 0.85],
   ] as const;
 /**
- * As a closing begins, a stroke of its own at once: its flickers, longer and
- * brighter; on the edge, EDGE metres in. A closing begins when the cap shrinks
- * by more than SHRINK radians after holding HELD seconds of the world's clock.
+ * As a closing begins (the snapshot's storm closing, as it was not), a stroke
+ * of its own at once: its flickers, longer and brighter; on the edge, EDGE
+ * metres in.
  */
 const STRIKE = [
     [0, 0.09, 1],
@@ -60,9 +60,7 @@ const STRIKE = [
     [0.28, 0.42, 1],
     [0.55, 0.64, 0.6],
   ] as const,
-  EDGE = 8,
-  SHRINK = 1e-7,
-  HELD = 1;
+  EDGE = 8;
 const IN = 30,
   ALONG = 0.7,
   NEAR = 50,
@@ -117,14 +115,12 @@ export function createBolt(held: boolean) {
     way = new Vector3(),
     at = new Vector3();
   /**
-   * The cap's radius and the world's clock at the last update; whether the
-   * storm is closing, and when it last shrank; when its closing began (its
-   * stroke).
+   * The world's clock at the last update, and whether the storm was closing
+   * then (none yet: as if it were, so a first frame strikes nothing); when its
+   * closing began (its stroke).
    */
-  let radius = NaN,
-    last = -Infinity,
+  let last = -Infinity,
     closing = true,
-    still = -Infinity,
     struck = -Infinity;
 
   return {
@@ -193,21 +189,16 @@ export function createBolt(held: boolean) {
       );
     },
     /**
-     * The stroke now (sim/storm.ts's cap; seconds: the world's clock; eye:
-     * where the eye is, world m).
+     * The stroke now (cap: the storm drawn, snapshot.ts; seconds: the world's
+     * clock; eye: where the eye is, world m; whole: the eye over the whole
+     * planet, which sees none).
      */
-    update(cap: Cap, seconds: number, eye: Vec3, whole: boolean) {
-      // a closing begun: the cap shrinking after it held (or on a new sea, or
-      // the clock run back, none)
-      if (seconds < last || !Number.isFinite(radius)) {
-        closing = true;
-        struck = -Infinity;
-      } else if (cap.radius < radius - SHRINK) {
-        if (!closing) struck = seconds;
-        closing = true;
-        still = seconds;
-      } else if (seconds - still > HELD) closing = false;
-      radius = cap.radius;
+    update(cap: StormDraw, seconds: number, eye: Vec3, whole: boolean) {
+      // a closing begun: closing now, as it was not (on a new sea, or the
+      // clock run back, none: what it is then is where it starts from)
+      if (seconds < last || !Number.isFinite(last)) struck = -Infinity;
+      else if (cap.closing && !closing) struck = seconds;
+      closing = cap.closing;
       last = seconds;
       const striking = seconds - struck < STRIKE[STRIKE.length - 1][1];
       const n = striking ? -1 - Math.floor(struck) : Math.floor(seconds / BOLT),

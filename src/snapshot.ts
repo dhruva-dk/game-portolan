@@ -186,6 +186,15 @@ export interface Sea {
   colours: readonly Vec3[];
 }
 
+/**
+ * The storm as drawn: its safe cap, and whether it is closing while the match
+ * is fought (a closing's beginning strikes its bolt at the edge:
+ * sky/storm-bolt.ts; once she has won it is no news).
+ */
+export interface StormDraw extends Cap {
+  closing: boolean;
+}
+
 /** Everything the frame draws, for one frame. */
 export interface Snapshot {
   eye: Eye;
@@ -196,9 +205,10 @@ export interface Snapshot {
   clock: number;
   /**
    * The storm's safe cap at the moment drawn (sim/storm.ts), worked out on the
-   * match's own clock: the frame never works it out from `clock`.
+   * match's own clock: the frame never works it out from `clock`; and whether
+   * it is closing.
    */
-  storm: Cap;
+  storm: StormDraw;
   /**
    * Every ship drawn (at most the frame's fleet, frame.ts FrameOptions, each id
    * below it); a ship not listed is not drawn.

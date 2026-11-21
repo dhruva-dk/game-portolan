@@ -17,7 +17,14 @@
 //
 // Pure: no three, no page.
 
-import { blowOf, felt, type Blow, type Deed } from '../player.ts';
+import {
+  blowOf,
+  felt,
+  worsened,
+  type Blow,
+  type Deed,
+  type Faults,
+} from '../player.ts';
 import type { Eye } from '../snapshot.ts';
 import { hash01 } from '../world/random.ts';
 import { clamp, easeInOut, lerp, smoother } from '../world/scalar.ts';
@@ -165,6 +172,14 @@ const DEALT: Record<Blow, Answer> = {
  * The camera's answer to a deed seen from `me` (her id; −1 watching another's
  * ship: only the world's rumbles reach her), and how strongly; null for none.
  */
+/**
+ * The camera's answer to her faults going from `was` to `now`: CAMERA.fault,
+ * once, as one comes on or worsens (player.ts worsened) while she is at sea
+ * (not anchored, arriving or sunk); else none.
+ */
+export const faultAnswer = (was: Faults, now: Faults, atSea: boolean) =>
+  atSea && worsened(was, now) ? CAMERA.fault : null;
+
 export function answerTo(
   d: Deed,
   me: number

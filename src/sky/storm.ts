@@ -41,7 +41,7 @@ import {
   uniform,
   vec3,
 } from 'three/tsl';
-import type { Cap } from '../sim/storm.ts';
+import type { StormDraw } from '../snapshot.ts';
 import type { View } from '../view/view.ts';
 import { R, type Vec3 } from '../world/sphere.ts';
 import { createBolt } from './storm-bolt.ts';
@@ -272,7 +272,7 @@ export function createStormLook(
      * (Environment.clock), which its rain, billows and lightning run on; eye:
      * where the eye is (world, m).
      */
-    update(cap: Cap, seconds: number, eye: Vec3) {
+    update(cap: StormDraw, seconds: number, eye: Vec3) {
       centre.value.fromArray(cap.centre);
       radius.value = cap.radius;
       // two axes square to the centre, for the bays along the edge

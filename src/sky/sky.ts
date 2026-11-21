@@ -48,9 +48,8 @@ import {
   vec3,
 } from 'three/tsl';
 import type { Environment } from '../environment.ts';
-import type { Cap } from '../sim/storm.ts';
 import type { Compute } from '../gpu.ts';
-import type { Eye } from '../snapshot.ts';
+import type { Eye, StormDraw } from '../snapshot.ts';
 import type { View } from '../view/view.ts';
 import * as sphere from '../world/sphere.ts';
 import { sunAtOrigin, sunInSky } from '../world/sun.ts';
@@ -398,7 +397,7 @@ export function createSky(view: View, bolt: boolean) {
      */
     update(
       env: Environment,
-      cap: Cap,
+      cap: StormDraw,
       kind: Eye['kind'],
       dt: number,
       width: number,

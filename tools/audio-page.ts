@@ -487,7 +487,7 @@ export async function passage(
     const scene: Snapshot = {
       eye,
       clock: t,
-      storm: { centre: radial, radius: wall / R },
+      storm: { centre: radial, radius: wall / R, closing: false },
       ships,
       own: 0,
       balls,

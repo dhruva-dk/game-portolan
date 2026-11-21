@@ -106,7 +106,7 @@ import type { Anchor } from './world/lattice.ts';
 import type { World } from './environment.ts';
 import type { FrameOptions } from './frame.ts';
 import { createFly } from './fly.ts';
-import type { Game, Worn } from './play/game.ts';
+import type { DebugDamage, Game } from './play/game.ts';
 import type { Referee } from './play/referee.ts';
 import { dealt, lookOf, worn } from './play/colours.ts';
 import type { Matches } from './play/setup.ts';
@@ -117,8 +117,7 @@ import { STEP } from './sim/fixed.ts';
 import { KINDS, SOUND, type Fault, type GunKind } from './kinds.ts';
 import { GUN, SHIP } from './sim/handling.ts';
 import { PLAYER, SHIPS } from './sim/match.ts';
-import type { Cap } from './sim/storm.ts';
-import type { ShipDraw, Snapshot } from './snapshot.ts';
+import type { ShipDraw, Snapshot, StormDraw } from './snapshot.ts';
 import type { Flow } from './ui/flow.ts';
 import { uiLayer } from './ui/ui.ts';
 import type { Weather } from './world/weather.ts';
@@ -224,7 +223,7 @@ const nth = (name: string, i: number, hi: number) => {
 /** A fault or a wear as a switch gives it: 0, 1 or 2. */
 const grade = (v: number): Fault => (v >= 1.5 ? 2 : v >= 0.5 ? 1 : 0);
 /** The damage ?zones, ?faults, ?wear and ?mend set (null with none of them). */
-const damage: Worn | null = ['zones', 'faults', 'wear', 'mend'].some((k) =>
+const damage: DebugDamage | null =['zones', 'faults', 'wear', 'mend'].some((k) =>
   params.has(k)
 )
   ? {
@@ -597,7 +596,7 @@ function flyer(
   element: HTMLElement,
   start: Vec3,
   others: readonly Berth[],
-  storm: (seconds: number) => Cap
+  storm: (seconds: number) => StormDraw
 ) {
   // ?wall: over the storm's edge, looking out across it
   const cap = storm(0),

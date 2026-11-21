@@ -5,8 +5,11 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { SOUND, worsened, type Faults } from '../src/player.ts';
+import { CAMERA, faultAnswer } from '../src/play/shake.ts';
 import { createFaults } from '../src/ship/faults.ts';
 import type { ShipDraw } from '../src/snapshot.ts';
+import { createChanged } from '../src/ui/drawn.ts';
+import { GLYPHS, stormMark } from '../src/ui/glyphs.ts';
 import { RING, glow, sectorOf } from '../src/ui/hits.ts';
 import { PAPER, WASH } from '../src/ui/ink.ts';
 import { shimmer, struckZone, washOf } from '../src/ui/vitals.ts';
@@ -119,6 +122,60 @@ test('faults on a drawn ship: her canvas grimed and slack, a list, her head wand
   assert.ok(d.look.sail[0] < 0.75 && f.slack(1) < 0.9, 'easing out');
   for (let t = 6.2; t < 20; t += 0.1) [d] = f.apply([ship(SOUND)], t);
   assert.ok(Math.abs(d.look.sail[0] - 0.8) < 1e-3 && f.slack(1) > 0.999);
+
+  // her look kept but for her sail, and what came in untouched
+  const listed = ship([2, 0, 2, 0]),
+    g2 = createFaults();
+  [d] = g2.apply([listed], 0);
+  assert.equal(d.look.paint, listed.look.paint);
+  assert.equal(d.look.pattern, listed.look.pattern);
+  assert.deepEqual(listed.look.sail, [0.8, 0.1, 0.1]);
+  assert.deepEqual(listed.pose.up, [0, 0, 1]);
+  // a gun's mouth on her, 5 m over her middle, carried over with her list; one
+  // off her, or on a ship unfaulted, left where it is
+  const into: [number, number, number] = [0, 0, 0],
+    on = g2.carried([0, 0, 559], [listed], into),
+    leaned = d.pose.up;
+  for (let j = 0; j < 3; j++)
+    assert.ok(
+      Math.abs(on[j] - (listed.pose.position[j] + 5 * leaned[j])) < 1e-9
+    );
+  assert.deepEqual(g2.carried([100, 0, 554], [listed], into), [100, 0, 554]);
+  const sound = ship(SOUND);
+  g2.apply([sound], 1);
+  assert.deepEqual(g2.carried([0, 0, 559], [sound], into), [0, 0, 559]);
+});
+
+test("the storm's mark: its bolt hollow while it holds, filled while it closes, the same bolt", () => {
+  const held = GLYPHS[stormMark(false)],
+    closing = GLYPHS[stormMark(true)];
+  assert.ok(held.every((p) => p.k === 's'));
+  assert.ok(closing.every((p) => p.k === 'f'));
+  assert.equal(held[0]?.d, closing[0]?.d);
+});
+
+test('a piece is drawn again only when what it shows changes (the clock turning its bolt filled)', () => {
+  const changed = createChanged<object>(),
+    clock = {},
+    other = {};
+  // the clock's: its seconds, ships afloat, in violet, closing (hud.ts)
+  assert.equal(changed(clock, 40, 6, false, false), true, 'first drawn');
+  for (let i = 0; i < 5; i++)
+    assert.equal(changed(clock, 40, 6, false, false), false);
+  assert.equal(changed(clock, 40, 6, true, true), true, 'closing: redrawn');
+  assert.equal(changed(clock, 40, 6, true, true), false);
+  assert.equal(changed(other, 40, 6, true, true), true, 'each piece its own');
+  assert.equal(changed(clock, 39, 6, true, true), true);
+});
+
+test('the camera punches once as a fault comes on or worsens, and only at sea', () => {
+  const minor: Faults = [0, 1, 0, 0],
+    major: Faults = [0, 2, 0, 0];
+  assert.equal(faultAnswer(SOUND, minor, true), CAMERA.fault);
+  assert.equal(faultAnswer(minor, major, true), CAMERA.fault);
+  assert.equal(faultAnswer(minor, minor, true), null, 'once');
+  assert.equal(faultAnswer(major, minor, true), null, 'mending');
+  assert.equal(faultAnswer(SOUND, major, false), null, 'not at sea');
 });
 
 test('a fault worsens when any zone goes up a grade, never when one mends or moves', () => {

@@ -49,7 +49,7 @@ import {
   wayIn,
 } from './calm.ts';
 import type { Coast } from './coasts.ts';
-import { GLYPHS } from './glyphs.ts';
+import { GLYPHS, stormMark } from './glyphs.ts';
 import { clock, type HudState } from './hud.ts';
 import {
   CUT,
@@ -534,7 +534,7 @@ export function createGlobe(coasts: readonly Coast[]) {
       80,
       96,
       slip(1, 1, 78, 94, { flat: true }) +
-        glyph(state.closing ? 'hud.boltFilled' : 'hud.bolt', 40, 30, 32, {
+        glyph(stormMark(state.closing), 40, 30, 32, {
           ink: closing ? 'storm' : 'iron',
         }) +
         figure(40, 70, clock(state.storm), 24, {

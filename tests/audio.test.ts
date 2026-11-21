@@ -320,7 +320,7 @@ function scene(
       fov: 50,
     },
     clock: t,
-    storm: { centre: at, radius: 1 },
+    storm: { centre: at, radius: 1, closing: false },
     ships: [her, ...ships],
     own: 0,
     balls,

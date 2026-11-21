@@ -129,6 +129,9 @@ interface Afloat {
 }
 
 /** capacity: the most ships there will be. */
+/** A ship's velocity when none is given: still. */
+const STILL: Vec3 = [0, 0, 0];
+
 export function createFleet(light: Light, wind: Wind, capacity: number) {
   // a pixel's angle, radians: the target's until the first frame gives the
   // eye's (update)
@@ -209,17 +212,16 @@ export function createFleet(light: Light, wind: Wind, capacity: number) {
     share: 0,
   };
 
-  /** The ship i's pose, look and velocity (metres per second, world space), whether she floats, and the share of her
-   * sails' wind her canvas takes (1 whole; less, slack: her rigging cut, faults.ts); ships 0…count−1 are drawn, but those
-   * dropped. */
+  /** The ship i's pose and look, and as `how` has her (each as given there, if it is): her velocity (metres per second,
+   * world space; still), whether she floats (afloat), and the share of her sails' wind her canvas takes (1 whole; less,
+   * slack: her rigging cut, faults.ts); ships 0…count−1 are drawn, but those dropped. */
   function set(
     i: number,
     pose: ShipPose,
     look: Look,
-    velocity: Vec3 = [0, 0, 0],
-    afloat = true,
-    slack = 1
+    how: { velocity?: Vec3; afloat?: boolean; slack?: number } = {}
   ) {
+    const { velocity = STILL, afloat = true, slack = 1 } = how;
     if (i >= capacity)
       throw new Error(`fleet: ship ${i} past capacity ${capacity}`);
     slacks[i] = slack;
