@@ -5,6 +5,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { SOUND, ZONES, worsened, type Faults } from '../src/player.ts';
+import { edgeAt } from '../src/ui/hits.ts';
 import { PAPER, WASH } from '../src/ui/ink.ts';
 import { struckZone, washOf } from '../src/ui/vitals.ts';
 
@@ -26,6 +27,18 @@ test('vitals: the zone a blow struck is the one whose share rose most; none when
   assert.equal(struckZone([0.5, 0.5, 0, 0], [0.5, 0.5, 0, 0]), -1);
   assert.equal(struckZone([0.5, 0.5, 0, 0], [0.51, 0.49, 0, 0]), -1);
   assert.equal(struckZone([0.4, 0.2, 0.2, 0.2], [0.3, 0.15, 0.15, 0.4]), 3);
+});
+
+test('a blow from off the screen: its arc where the line from the middle toward its dealer meets the edge', () => {
+  const near = (p: { x: number; y: number }, x: number, y: number) =>
+    assert.ok(Math.hypot(p.x - x, p.y - y) < 1e-6, `${p.x}, ${p.y}`);
+  near(edgeAt(0, 1180, 820, 20), 590, 20);
+  near(edgeAt(Math.PI / 2, 1180, 820, 20), 1160, 410);
+  near(edgeAt(Math.PI, 1180, 820, 20), 590, 800);
+  near(edgeAt(-Math.PI / 2, 1180, 820, 20), 20, 410);
+  // toward a corner, the nearer side of the screen takes it
+  const p = edgeAt(Math.PI / 4, 1180, 820, 20);
+  near(p, 590 + 390, 20);
 });
 
 test('zones: rigging, rudder, waterline, deck, in that order', () => {

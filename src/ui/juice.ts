@@ -5,8 +5,9 @@
 //   her gun fired       a warm flash; the Fire disc knocked in (no oftener than FIRED_APART)
 //   her ball home       the cross round the reticle (hits.ts) and the figure rising off the ship; a flash, the
 //                       stronger where it broke a shield
-//   a blow on her       the arc toward who dealt it; rubric (or azure, on her shield) at the rim toward it; the vitals
-//                       slip jolted (the zone struck flashes: vitals.ts)
+//   a blow on her       from a ship off the screen or behind her, an arc at the screen's edge toward it (hits.ts), as
+//                       heavy as the blow; the vignette darker on that side; the vitals slip jolted (the zone struck
+//                       flashes: vitals.ts)
 //   her sinking of one  the gold cross and the gold figure
 //   took up             the piece's mark flies from where it lay to its slot, which pops; a flash and a rim of
 //                       light the rarer it is
@@ -176,14 +177,13 @@ export function createJuice(body: HTMLElement, parts: Parts) {
             hull: SCREEN.hurt,
             shield: null,
           }[blowOf(m)];
-          hits.arc(m.bearing, w, h, k, m.hull <= 0);
+          const weight = m.broke ? 1 : felt.taken(points),
+            whence = m.whence?.bearing ?? m.bearing;
+          if (m.whence && !m.whence.seen)
+            hits.edge(whence, weight, w, h, k, m.hull <= 0);
           if (r) {
-            flash.flash(r.flash, m.broke ? 1 : felt.taken(points));
-            flash.vignette(
-              r.vignette,
-              m.broke ? 1 : felt.taken(points),
-              m.bearing
-            );
+            flash.flash(r.flash, weight);
+            flash.vignette(r.vignette, weight, whence);
           }
           jolt(parts.vitals);
         }

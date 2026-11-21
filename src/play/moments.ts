@@ -346,4 +346,7 @@ export const seenOf = (
   width: number,
   height: number
 ): Moment =>
-  see({ ...d, seen: null, bearing: 0, metres: 0 }, eye, { width, height });
+  see({ ...d, seen: null, bearing: 0, metres: 0, whence: null }, eye, {
+    width,
+    height,
+  });

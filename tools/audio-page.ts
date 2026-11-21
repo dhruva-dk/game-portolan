@@ -439,6 +439,7 @@ export async function passage(
             seen: null,
             bearing: 0,
             metres: 0,
+            whence: null,
           };
         moments = [...moments.filter((x) => x.time > t - 1), m];
       }

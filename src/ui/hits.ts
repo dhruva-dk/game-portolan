@@ -4,7 +4,8 @@
 //            broke; a gold cross turned a quarter and ringed where she sank the ship
 //   figure   the hit points the blow took, a numeral rising from the struck ship and fading: rubric off a hull, azure
 //            off a shield; blows on one ship close together summed in one figure; gold and bigger for the last
-//   arc      a blow on her: a rubric arc on the screen's rim toward whoever dealt it, fading
+//   edge     a blow on her from a ship off the screen or behind her: a rubric arc at the screen's edge toward it
+//            (azure on her shield), as heavy as the blow, held and fading over 2 s
 // No words; numerals only. Its own layer, over the world and under the HUD's
 // pieces; it runs on the page's clock.
 
@@ -14,7 +15,7 @@ import { FIGURES, INK, LIGHT, svgNode } from './ink.ts';
  * How long each lasts, s; how close together blows on one ship sum, s; the most
  * figures and arcs at once.
  */
-const MARK = { cross: 0.28, kill: 0.8, figure: 0.9, arc: 1.1 } as const;
+const MARK = { cross: 0.28, kill: 0.8, figure: 0.9, arc: 2 } as const;
 const MERGE = 0.35,
   MOST = 12,
   ARCS = 6;
@@ -26,12 +27,11 @@ const TICK = 13,
   GAP = 8,
   POP = 1.55;
 /**
- * The arc's half-angle (rad), and where the rim's ellipse lies, of the screen's
- * width and height.
+ * The arc at the screen's edge: how far in from it (px at the drawn size), its
+ * half-angle (radians: the least, and more by the blow's weight), its width at
+ * the middle (px at the drawn size, the same), and the steps it is drawn in.
  */
-const HALF = 0.22,
-  RIM_X = 0.46,
-  RIM_Y = 0.4;
+const EDGE = { inset: 14, half: [0.06, 0.1], wide: [6, 9], steps: 16 } as const;
 /** The shield's azure, and the gold of a sinking. */
 const AZURE = LIGHT.azure,
   GOLD = LIGHT.gold;
@@ -44,13 +44,21 @@ const figureSize = (points: number, last: boolean) =>
   (points < 15 ? 15 : points < 40 ? 19 : 25) * (last ? 1.6 : 1);
 
 /**
- * Where on the rim of a `w` × `h` screen a blow from `bearing` (radians
- * clockwise from ahead) shows: an ellipse round the middle, ahead at its top.
+ * Where a blow from `bearing` (radians clockwise from ahead) shows on a `w` ×
+ * `h` screen: where the line from its middle that way meets the edge, `inset`
+ * px in from it (ahead at the top, behind at the foot).
  */
-const rimAt = (bearing: number, w: number, h: number) => ({
-  x: w / 2 + Math.sin(bearing) * RIM_X * w,
-  y: h / 2 - Math.cos(bearing) * RIM_Y * h,
-});
+export function edgeAt(bearing: number, w: number, h: number, inset: number) {
+  const dx = Math.sin(bearing),
+    dy = -Math.cos(bearing),
+    hx = w / 2 - inset,
+    hy = h / 2 - inset;
+  const t = Math.min(
+    Math.abs(dx) > 1e-9 ? hx / Math.abs(dx) : Infinity,
+    Math.abs(dy) > 1e-9 ? hy / Math.abs(dy) : Infinity
+  );
+  return { x: w / 2 + dx * t, y: h / 2 + dy * t };
+}
 
 type Kind = 'hit' | 'shield' | 'break' | 'kill';
 
@@ -201,44 +209,56 @@ export function createHits(parent: HTMLElement) {
         )
       );
     },
-    /** A blow on her from `bearing` (radians clockwise from ahead), on a `w` × `h` screen whose UI's size is `k`
-     *  (ui.ts size); `shield` azure. */
-    arc(bearing: number, w: number, h: number, k: number, shield: boolean) {
+    /** A blow on her from a ship off the screen or behind her, at `bearing` (radians clockwise from ahead), felt
+     *  `weight` (player.ts felt), on a `w` × `h` screen whose UI's size is `k` (ui.ts size); `shield` azure. */
+    edge(
+      bearing: number,
+      weight: number,
+      w: number,
+      h: number,
+      k: number,
+      shield: boolean
+    ) {
       if (arcs >= ARCS) return;
-      const p = rimAt(bearing, w, h),
-        s = 120,
-        c = s / 2,
-        r = 54,
-        back = (r - 8) * k;
-      // the arc runs across the rim's line toward the middle: square to the bearing
-      const a0 = bearing - Math.PI / 2 - HALF,
-        a1 = bearing - Math.PI / 2 + HALF;
-      const at = (a: number) =>
-        `${(c + Math.cos(a) * r).toFixed(1)} ${(c + Math.sin(a) * r).toFixed(1)}`;
-      const d = `M${at(a0)}A${r} ${r} 0 0 1 ${at(a1)}`,
-        ink = shield ? AZURE : INK.rubric;
+      // a stretch of the circle about the middle through where the bearing meets the screen's edge
+      const cx = w / 2,
+        cy = h / 2,
+        p = edgeAt(bearing, w, h, EDGE.inset * k),
+        r = Math.hypot(p.x - cx, p.y - cy),
+        half = EDGE.half[0] + EDGE.half[1] * weight,
+        wide = (EDGE.wide[0] + EDGE.wide[1] * weight) * k;
+      // a crescent: the circle along its outside, its inside drawn in by its width at the middle, to points at the ends
+      const at = (a: number, at: number) =>
+        `${(cx + Math.sin(a) * at).toFixed(1)} ${(cy - Math.cos(a) * at).toFixed(1)}`;
+      let d = `M${at(bearing - half, r)}`;
+      for (let i = 1; i <= EDGE.steps; i++)
+        d += `L${at(bearing - half + (2 * half * i) / EDGE.steps, r)}`;
+      for (let i = EDGE.steps - 1; i > 0; i--) {
+        const s = i / EDGE.steps;
+        d += `L${at(bearing - half + 2 * half * s, r - wide * Math.sin(Math.PI * s))}`;
+      }
+      d += 'Z';
+      const ink = shield ? AZURE : INK.rubric;
       const drawn = svgNode(
-        s,
-        s,
-        `<path d="${d}" fill="none" stroke="${INK.iron}" stroke-width="9" stroke-linecap="round" opacity=".45"/>` +
-          `<path d="${d}" fill="none" stroke="${ink}" stroke-width="6" stroke-linecap="round"/>`
+        w,
+        h,
+        `<path d="${d}" fill="${ink}" stroke="${INK.iron}" stroke-width="${(1.6 * k).toFixed(1)}" stroke-linejoin="round" stroke-opacity=".6"/>`
       );
-      const el = placed(
-        p.x - Math.sin(bearing) * back,
-        p.y + Math.cos(bearing) * back,
-        drawn
-      );
+      drawn.style.cssText = 'position:absolute;left:0;top:0';
+      drawn.style.transformOrigin = `${cx}px ${cy}px`;
+      layer.appendChild(drawn);
       arcs++;
       const a = drawn.animate(
         [
-          { opacity: 1, transform: 'scale(1.15)' },
-          { opacity: 1, transform: 'scale(1)', offset: 0.15 },
+          { opacity: 1, transform: 'scale(0.97)' },
+          { opacity: 1, transform: 'scale(1)', offset: 0.08 },
+          { opacity: 0.85, offset: 0.35 },
           { opacity: 0, transform: 'scale(1)' },
         ],
         { duration: MARK.arc * 1000, easing: 'ease-in' }
       );
       a.onfinish = () => {
-        el.remove();
+        drawn.remove();
         arcs--;
       };
     },

@@ -369,12 +369,15 @@ export const felt = {
  * A Deed as she sees it: where it falls on her screen (CSS px from the top
  * left; null off it, or behind her), its bearing from the way the camera looks
  * (radians clockwise: 0 ahead, π/2 to the right, ±π behind), and how far it is
- * from the eye, metres.
+ * from the eye, metres; for a blow, where the ship that dealt it lies as she
+ * sees it (its bearing so, and whether it is on her screen), null for any other
+ * deed or once that ship is gone.
  */
 export type Moment = Deed & {
   seen: { x: number; y: number } | null;
   bearing: number;
   metres: number;
+  whence: { bearing: number; seen: boolean } | null;
 };
 
 /** An item a slot of the hotbar holds: its stores' glyph (kinds.ts Use). */
