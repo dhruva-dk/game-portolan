@@ -2,11 +2,12 @@
 // the blows struck home, the balls come down short, the loot taken up, the
 // loops closed and the shield won back: play/state.ts advance), each ship's
 // fighting: her shots by gun, her hits, the damage she dealt and took, her
-// kills, what she took up. Once a second of its clock: each ship's time in each
-// mode and with each gun in hand, her time stuck (by the mode she was in), when
-// she first held a gun and a second kind, her water at HELD seconds. And of the
-// match: how it ended, its shots by range, gun and rarity and how many struck
-// home, its longest quiet, its loot, and what a step cost.
+// kills, what she took up, what she mended. Once a second of its clock: each
+// ship's time afloat, in each mode and with each gun in hand, her time stuck (by
+// the mode she was in), when she first held a gun and a second kind, her water
+// at HELD seconds. And of the match: how it ended, its shots by range, gun and
+// rarity and how many struck home, its longest quiet and lull, its loot, and
+// what a step cost.
 //
 // A blow struck is put down to the shot its shooter fired last (her gun, its
 // rarity, the range then): a ball is in flight a second or two, and a ship
@@ -114,6 +115,10 @@ export interface ShipResult {
   /** Loops she closed, and the shield her water gave back (hp). */
   loops: number;
   regained: number;
+  /** Seconds afloat (whole seconds of the match's clock). */
+  afloat: number;
+  /** What she mended with her stores (hold.ts): hull, and shield (hp). */
+  mended: { hull: number; shield: number };
 }
 
 /**
@@ -165,6 +170,11 @@ export interface MatchResult {
   /** The longest the guns were silent after the first 30 s (s). */
   quiet: number;
   /**
+   * The longest no blow struck home anywhere after the first 30 s, to the
+   * end (s): `quiet` counts shots, and guns can fire all through a lull.
+   */
+  lull: number;
+  /**
    * Pieces at the start, of them in water too shoal to reach, and at the end;
    * those taken up (L1), by when they came on the water (`first`: laid with
    * the match; `later`: put over the side, or laid since), each how many, the
@@ -191,6 +201,8 @@ interface Watch {
   r: ShipResult;
   afloat: number;
   speedSum: number;
+  /** Her health after the step before (her mending is read off its rise). */
+  health: { hull: number; shield: number };
   /** Her last shot: its gun, rarity and range band, the ship it was laid on, and whether it is home yet (her blows struck are put down to it). */
   last: {
     kind: GunKind;
@@ -259,6 +271,7 @@ export function watch(
       speeds: [],
       afloat: 0,
       speedSum: 0,
+      health: { hull: k.hull, shield: k.shield },
       last: null,
       r: {
         id: k.id,
@@ -297,6 +310,8 @@ export function watch(
         share: 0,
         loops: 0,
         regained: 0,
+        afloat: 0,
+        mended: { hull: 0, shield: 0 },
       },
     });
   const pieces = state.loot().pieces;
@@ -315,7 +330,10 @@ export function watch(
   let seenNext = firstLater;
   const shots: MatchResult['shots'] = { band: bands(), kind: {}, rarity: {} };
   let lastShot = 0,
-    quiet = 0;
+    quiet = 0,
+    lastBlow = 0,
+    lull = 0;
+  const regainedNow = new Map<number, number>();
   /** Where ship `id` is now, if afloat. */
   const where = (id: number) =>
     state.vessels().find((v) => v.id === id)?.ship.at ?? null;
@@ -371,6 +389,10 @@ export function watch(
         (shots.rarity[rarity] ??= count()).shots++;
         if (now > 30) quiet = Math.max(quiet, now - Math.max(30, lastShot));
         lastShot = now;
+      }
+      if (did.strikes.length) {
+        if (now > 30) lull = Math.max(lull, now - Math.max(30, lastBlow));
+        lastBlow = now;
       }
       for (const s of did.strikes) {
         const by = ships.get(s.shooter),
@@ -439,9 +461,27 @@ export function watch(
         const w = ships.get(k.id);
         if (w) w.r.loops++;
       }
+      regainedNow.clear();
       for (const k of did.regained) {
         const w = ships.get(k.id);
         if (w) w.r.regained += k.shield;
+        regainedNow.set(k.id, k.shield);
+      }
+      // Her mending, read off her health's rise over the step: a store used
+      // is given all at once as it is done (hold.ts stepUse), and a blow
+      // struck breaks one off, so no step that finishes one also has a blow
+      // in it, and only the storm's wear (a step's worth) can hide in the
+      // rise. Her shield's rise is her water's (regained) and the stores'.
+      for (const v of state.vessels()) {
+        const w = ships.get(v.id);
+        if (!w) continue;
+        const h = state.crew(v.id).health,
+          hull = h.hull - w.health.hull,
+          shield = h.shield - w.health.shield - (regainedNow.get(v.id) ?? 0);
+        if (hull > 1e-6) w.r.mended.hull += hull;
+        if (shield > 1e-6) w.r.mended.shield += shield;
+        w.health.hull = h.hull;
+        w.health.shield = h.shield;
       }
     },
     second(s: number) {
@@ -503,6 +543,7 @@ export function watch(
       for (const w of ships.values()) {
         if (!w.r.sunk) w.r.place = 1;
         w.r.speed = w.afloat ? w.speedSum / w.afloat : 0;
+        w.r.afloat = w.afloat;
         w.r.share = state.share(w.r.id);
       }
       return {
@@ -514,6 +555,8 @@ export function watch(
         causes,
         shots,
         quiet,
+        // the lull running at the end counts too
+        lull: Math.max(lull, state.time() - Math.max(30, lastBlow)),
         loot: { ...loot, end: state.loot().pieces.length },
         ships: [...ships.values()].map((w) => w.r),
       };
