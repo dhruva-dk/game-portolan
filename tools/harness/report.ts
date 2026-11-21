@@ -3,7 +3,7 @@
 // planet, each set pooled, and each set's worst planet; set down as one page,
 // nothing fetched, a table per metric, each planet linking a replay of its
 // first match (replay.ts) written beside it.
-//   node tools/harness/report.ts [--pool all|tune|held] [--matches 8] [--from 1]
+//   node tools/harness/report.ts [--pool all|tune|held] [--matches 16] [--from 1]
 //     [--workers n] [--out .cache/harness/report] [--results file.jsonl]
 //     [--save tools/harness/baseline.json] [--against tools/harness/baseline.json]
 //     [--no-replays]
@@ -11,7 +11,9 @@
 // one's results.jsonl) instead of running; --save: the figures as a baseline;
 // --against: each figure's change from a baseline, with its standard error, the
 // gated ones (damage, lull, distinctness) on the held-out set and its worst
-// planet flagged where they fell by more than two.
+// planet flagged where they fell by more than two. 16 matches a planet (the
+// baseline's) run in some four and a half minutes on ten cores, replays and
+// all: as many as keep a worst planet's lull to an se of some ten seconds.
 //
 // Node only (tools/).
 
@@ -47,13 +49,17 @@ const esc = (s: string) =>
     (c) => `&${{ '&': 'amp', '<': 'lt', '>': 'gt', '"': 'quot' }[c]};`
   );
 
-/** Figures to four significant places, for a baseline kept small; NaN as null (JSON's way). */
+/**
+ * Figures to six significant places, for a baseline kept small (a run of it
+ * again, measured against it, changes by nothing shown); NaN as null (JSON's
+ * way).
+ */
 const rounded = (m: Measured): Measured =>
   JSON.parse(
     JSON.stringify(m, (_, v) =>
       typeof v === 'number' && !Number.isInteger(v)
         ? Number.isFinite(v)
-          ? Number(v.toPrecision(4))
+          ? Number(v.toPrecision(6))
           : null
         : v
     )
@@ -223,7 +229,7 @@ a { color:inherit; }
 svg { display:block; } svg .axis { stroke:var(--line); stroke-width:1; }
 </style></head><body>
 <h1>Harness report</h1>
-<p class="note">${matches} matches a planet (matches ${from} to ${from + matches - 1}), every ship a bot; ${m.planets.length} planets, ${m.planets.reduce((a, p) => a + p.matches, 0)} matches in ${seconds.toFixed(0)} s. Figures of each planet's matches together; se by the jackknife over matches. <span class="tag tune">tune</span> planets are tuned on, <span class="tag held">held</span> never; gated (*) on the held-out set and its worst planet.${replays ? ' Each planet links a replay of its first match.' : ''}</p>
+<p class="note">${matches} match${matches === 1 ? '' : 'es'} a planet (matches ${from} to ${from + matches - 1}), every ship a bot; ${m.planets.length} planets, ${m.planets.reduce((a, p) => a + p.matches, 0)} matches in ${seconds.toFixed(0)} s. Figures of each planet's matches together; se by the jackknife over matches. <span class="tag tune">tune</span> planets are tuned on, <span class="tag held">held</span> never; gated (*) on the held-out set and its worst planet.${replays ? ' Each planet links a replay of its first match.' : ''}</p>
 <h2>At a glance</h2>
 <div class="wrap">${glance}</div>
 ${sections.map((s) => `<div class="wrap">${s}</div>`).join('\n')}
@@ -241,7 +247,7 @@ if (import.meta.main) {
   const { values: a } = parseArgs({
     options: {
       pool: { type: 'string', default: 'all' },
-      matches: { type: 'string', default: '8' },
+      matches: { type: 'string', default: '16' },
       from: { type: 'string', default: '1' },
       workers: { type: 'string', default: String(CORES) },
       out: { type: 'string', default: '.cache/harness/report' },

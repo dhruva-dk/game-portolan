@@ -211,6 +211,7 @@ export function recorded(spec: Spec) {
   });
   const sunk = state.sinkings().map((k) => [tenths(k.time), k.id, k.by ?? -1]);
   return {
+    planet: w.seed,
     match: spec.match,
     seed: m.seed,
     type: m.type.name,
@@ -275,7 +276,7 @@ canvas { display:block; width:100%; touch-action:none; cursor:grab; }
 #info { position:absolute; left:16px; top:8px; background:var(--panel); border:1px solid var(--line); border-radius:6px; padding:6px 10px; display:none; font-variant-numeric:tabular-nums; white-space:pre-line; }
 #t { font-variant-numeric:tabular-nums; min-width:72px; color:var(--muted); }
 </style></head><body>
-<header><h1>Match ${data.match} · seed ${data.seed} · ${data.type} · ${data.brain}</h1>
+<header><h1>Planet ${data.planet} · match ${data.match} · seed ${data.seed} · ${data.type} · ${data.brain}</h1>
 <div id="bar"><button id="play">Play</button><input id="scrub" type="range" min="0" value="0">
 <span id="t"></span><select id="speed"><option>1</option><option>2</option><option selected>4</option><option>8</option><option>16</option></select></div></header>
 <div class="legend" id="modes"></div>
