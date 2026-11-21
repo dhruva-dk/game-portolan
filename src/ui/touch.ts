@@ -41,7 +41,10 @@ export function onTap(el: GlobalEventHandlers, act: (e: PointerEvent) => void) {
  * lifts, wherever it has gone meanwhile (the element keeps it); the touch kept
  * from whatever is under it.
  */
-export function onHold(el: HTMLElement, held: (on: boolean) => void) {
+export function onHold(
+  el: GlobalEventHandlers & Pick<Element, 'setPointerCapture'>,
+  held: (on: boolean) => void
+) {
   el.addEventListener('pointerdown', (e) => {
     e.stopPropagation();
     el.setPointerCapture(e.pointerId);

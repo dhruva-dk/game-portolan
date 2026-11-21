@@ -2,11 +2,12 @@
 // after the camera's beat on it:
 //   result   sunk, a band across the top: her place in its laurel over how many began (17 over 80), what sank her (a
 //            ball, a ram, the Storm) in a paper disc, the sea she held (her share of the planet's water); the middle of
-//            the screen, her ship going down, left clear.
+//            the screen, her ship going down, left clear. The sea held is marked by a patch of waves in her dye, its
+//            share always to a tenth (0.0%).
 //            Won, her place gilt in a sunburst beside the sea she held. At the foot her ways on, each
-//            a banner: the spyglass (watch the match on: spectate) while ships still fight, the tree (home, this seed
-//            sailed again) and the seed (home, a new seed)
-//   watching small marks at the edges while she watches another ship: the seed's disc at the top left (home, a new
+//            a banner: the spyglass (watch the match on: spectate) while ships still fight, the circular arrow (home,
+//            this seed sailed again) and the die (home, a new seed)
+//   watching small marks at the edges while she watches another ship: the anchor's disc at the top left (home, a new
 //            seed), and
 //            at the foot the spyglass between the arrows that turn her to the next ship or the one before
 // No words; numerals only.
@@ -26,7 +27,7 @@ import {
   svg,
   uid,
 } from './ink.ts';
-import { laurel, ram, seed, spyglass } from './marks.ts';
+import { laurel, ram, spyglass } from './marks.ts';
 import { banner, sheet } from './screens.ts';
 import { onTap, region } from './touch.ts';
 import { at, fade, piece, screen } from './ui.ts';
@@ -44,43 +45,93 @@ const placed = (place: number) =>
         ? [WASH.vermilion, INK.rubric]
         : [WASH.umber, INK.iron];
 
-/** A share of the planet as per cent: to a tenth under ten. */
-const percent = (share: number) => {
-  const p = Math.max(0, share) * 100;
-  return `${p > 0 && p < 10 ? p.toFixed(1) : Math.round(p)}%`;
-};
+/** A share of the planet as per cent, always to a tenth (0.0%). */
+const percent = (share: number) => `${(Math.max(0, share) * 100).toFixed(1)}%`;
 
-/** The sea held's mark: a disc of the chart's sea with a patch of her water washed on it in her scarlet, its border
- *  inked (the territory's own look on the sea), `r` across its half. */
-const held = (x: number, y: number, r: number) => {
-  const clip = uid('held');
+const r2 = (n: number) => Math.round(n * 100) / 100;
+
+/** The sea held's mark: a disc of the chart's sea, waves inked across it, a patch of it washed in her dye and its
+ *  border inked in it (her water's own look on the sea), `r` across its half. */
+const held = (x: number, y: number, r: number, dye: string) => {
+  const clip = uid('held'),
+    wave = (wy: number) =>
+      `M${r2(x - r)} ${r2(wy)}q${r2(r / 4)} ${r2(-r / 5)} ${r2(r / 2)} 0t${r2(r / 2)} 0t${r2(r / 2)} 0t${r2(r / 2)} 0`;
   return (
     `<clipPath id="${clip}"><circle cx="${x}" cy="${y}" r="${r}"/></clipPath>` +
     `<circle cx="${x}" cy="${y}" r="${r}" fill="${WASH.sea}"/>` +
-    `<path d="${roughCircle(x + r * 0.22, y + r * 0.12, r * 0.62, 7, r * 0.18)}" fill="${alpha(INK.scarlet, 0.42)}" stroke="${INK.scarlet}" stroke-width="1.8" clip-path="url(#${clip})"/>` +
+    `<g clip-path="url(#${clip})"><path d="${roughCircle(x + r * 0.22, y + r * 0.12, r * 0.62, 7, r * 0.18)}" fill="${alpha(dye, 0.55)}" stroke="${dye}" stroke-width="1.8"/>` +
+    `<path d="${wave(y - r * 0.35)}${wave(y + r * 0.1)}${wave(y + r * 0.55)}" fill="none" stroke="${INK.white}" stroke-width="1.1" stroke-linecap="round" opacity=".8"/></g>` +
     `<circle cx="${x}" cy="${y}" r="${r}" fill="none" stroke="${INK.iron}" stroke-width="1.4"/>`
   );
 };
 
-/** The tree (this seed sailed again: the same world grown): a palm, its trunk leaning and ringed, five fronds from its
- *  crown; `s` its height. */
-const tree = (x: number, y: number, s: number) => {
-  const k = s / 64;
-  const frond = (dx: number, dy: number, bend: number) =>
-    `<path d="M4 -16Q${4 + dx / 2} ${-16 + dy / 2 - bend} ${4 + dx} ${-16 + dy}Q${4 + dx / 2} ${-16 + dy / 2 + bend / 3} 4 -16Z" fill="${WASH.viridian}" stroke="${INK.green}" stroke-width="1.6"/>`;
+/** The circular arrow (this seed sailed again: round once more), `s` across: most of a ring, its head at the top. */
+const again = (x: number, y: number, s: number) => {
+  const k = r2(s / 48),
+    ring = 'M-15.6 -9A18 18 0 1 0 0 -18';
   return (
-    `<g transform="translate(${x} ${y}) scale(${k})" stroke="${INK.iron}" stroke-linecap="round" stroke-linejoin="round">` +
-    `<path d="M-14 28H14" stroke="${INK.sepia}" stroke-width="3"/>` +
-    `<path d="M-2 28Q-4 6 4 -16" fill="none" stroke-width="5"/>` +
-    `<path d="M-3 18h4M-3 8h4M-1 -2h4M1 -10h4" stroke="${WASH.umber}" stroke-width="1.4"/>` +
-    frond(-24, 2, 10) +
-    frond(24, 4, 10) +
-    frond(-16, -14, 6) +
-    frond(18, -12, 6) +
-    frond(2, -22, 4) +
-    `<circle cx="2" cy="-13" r="2.6" fill="${INK.sepia}" stroke="none"/><circle cx="7" cy="-12" r="2.6" fill="${INK.sepia}" stroke="none"/></g>`
+    `<g transform="translate(${x} ${y}) scale(${k})" stroke-linecap="round" stroke-linejoin="round">` +
+    `<path d="${ring}" fill="none" stroke="${INK.iron}" stroke-width="8"/>` +
+    `<path d="${ring}" fill="none" stroke="${WASH.azure}" stroke-width="4"/>` +
+    `<path d="M-2 -28L12 -18L-2 -8Z" fill="${WASH.azure}" stroke="${INK.iron}" stroke-width="2"/></g>`
   );
 };
+
+/** The die (a new seed, rolled), `s` across: a cube seen from above a corner, five pips on its top, two and three on
+ *  its sides. */
+const die = (x: number, y: number, s: number) => {
+  const a = 20,
+    c = a * 0.87;
+  /** The pips at (u, v) of a face from the near corner (0, 0) along two of its edges. */
+  const pips = (
+    o: [number, number],
+    e: [number, number],
+    f: [number, number],
+    at: [number, number][]
+  ) =>
+    at
+      .map(
+        ([u, v]) =>
+          `<circle cx="${r2(o[0] + u * e[0] + v * f[0])}" cy="${r2(o[1] + u * e[1] + v * f[1])}" r="2.3"/>`
+      )
+      .join('');
+  const near: [number, number] = [0, 0],
+    left: [number, number] = [-c, -a / 2],
+    right: [number, number] = [c, -a / 2],
+    down: [number, number] = [0, a];
+  return (
+    `<g transform="translate(${x} ${y + s * 0.08}) scale(${r2(s / 44)})" stroke="${INK.iron}" stroke-width="1.8" stroke-linejoin="round">` +
+    `<path d="M0 0L${-c} ${-a / 2}L0 ${-a}L${c} ${-a / 2}Z" fill="${PAPER}"/>` +
+    `<path d="M0 0L${-c} ${-a / 2}V${a / 2}L0 ${a}Z" fill="${WASH.silver}"/>` +
+    `<path d="M0 0L${c} ${-a / 2}V${a / 2}L0 ${a}Z" fill="${WASH.umber}" fill-opacity=".55"/>` +
+    `<g fill="${INK.iron}" stroke="none">` +
+    pips(near, left, right, [
+      [0.22, 0.22],
+      [0.78, 0.22],
+      [0.5, 0.5],
+      [0.22, 0.78],
+      [0.78, 0.78],
+    ]) +
+    pips(near, left, down, [
+      [0.3, 0.3],
+      [0.7, 0.7],
+    ]) +
+    pips(near, right, down, [
+      [0.25, 0.25],
+      [0.5, 0.5],
+      [0.75, 0.75],
+    ]) +
+    `</g></g>`
+  );
+};
+
+/** The anchor (home: put in to harbour), `s` high: its ring, stock and shank, the arms curving up to their flukes. */
+const anchor = (x: number, y: number, s: number) =>
+  `<g transform="translate(${x} ${y}) scale(${r2(s / 48)})" stroke="${INK.iron}" stroke-linecap="round" stroke-linejoin="round" fill="none">` +
+  `<circle cx="0" cy="-18" r="4.5" stroke-width="3"/>` +
+  `<path d="M0 -13.5V20M-10 -7H10" stroke-width="4"/>` +
+  `<path d="M-17 6Q-14 20 0 21Q14 20 17 6" stroke-width="4"/>` +
+  `<path d="M-21 9L-17 3L-13 9M13 9L17 3L21 9" stroke-width="3.4"/></g>`;
 
 /** A chevron pointing `side` (−1 left, +1 right). */
 const chevron = (x: number, y: number, side: number) =>
@@ -122,12 +173,12 @@ const sunburst = (x: number, y: number, r: number) => {
   );
 };
 
-/** Her result over the world: what it shows, and its ways on (watch: null while there is no match on to watch). */
-export function createResult(act: {
-  watch(): void;
-  leave(): void;
-  again(): void;
-}) {
+/** Her result over the world: what it shows, and its ways on (watch: null while there is no match on to watch);
+ *  `dye` her livery's, as the display shows it, for the sea she held. */
+export function createResult(
+  dye: () => string,
+  act: { watch(): void; leave(): void; again(): void }
+) {
   const s = sheet(false, false);
   // shade at the top and the foot, under the band and the ways on; the middle, where her ship is, left clear
   const shade = alpha(SHADOW, 0.42),
@@ -157,18 +208,18 @@ export function createResult(act: {
       ? sunburst(478, 100, 56) +
         place(478, 100, 66, end) +
         slip(214, 74, 158, 56) +
-        held(244, 102, 16) +
+        held(244, 102, 16, dye()) +
         figure(266, 102, percent(end.share), 26, { anchor: 'start' })
       : slip(310, 14, 336, 116, { bold: true }) +
         place(378, y, 46, end) +
         `<path d="M440 30V114" stroke="${INK.iron}" stroke-width=".8" opacity=".6"/>` +
         cause(476, y, end) +
-        held(530, y, 16) +
+        held(530, y, 16, dye()) +
         figure(552, y, percent(end.share), 26, { anchor: 'start' });
-    // the tree (this seed again) and the seed (a new one), the spyglass before them while ships still fight
+    // the circular arrow (this seed again) and the die (a new one), the spyglass before them while ships still fight
     const homes = (x: number, w: number, gilt = false) =>
-      `<g id="again">${banner(x, 370, w, tree(x - 4, 366, 58), gilt)}</g>` +
-      `<g id="leave">${banner(x + w + 20, 370, w, seed(x + w + 16, 366, 54), gilt)}</g>`;
+      `<g id="again">${banner(x, 370, w, again(x - 4, 366, 50), gilt)}</g>` +
+      `<g id="leave">${banner(x + w + 20, 370, w, die(x + w + 16, 366, 50), gilt)}</g>`;
     const ways = watching
       ? `<g id="watch">${banner(282, 370, 176, spyglass(278, 366, 68))}</g>${homes(478, 176)}`
       : homes(380, 176, won);
@@ -216,7 +267,7 @@ export function createWatching(act: {
 }) {
   const root = screen();
   const leave = piece(root, 'top left', true, true);
-  leave.innerHTML = svg(56, 56, paperDisc(28, 28, 25) + seed(28, 30, 34));
+  leave.innerHTML = svg(56, 56, paperDisc(28, 28, 25) + anchor(28, 29, 32));
   onTap(leave, act.leave);
   const foot = piece(root, 'bottom centre', false, true);
   foot.innerHTML = svg(196, 60, slip(64, 10, 68, 42) + spyglass(98, 31, 52));

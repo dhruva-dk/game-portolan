@@ -1,15 +1,16 @@
 // The seed panel's fleet card (panel.ts): what a seed's race is sailed by, in
-// drawn marks and numerals (the house style: no words). At its head the
-// match's type in a paper disc, the persona most of the bots are in a gilt
-// one, and the two captains who stand out, each by her mark and her ship's
-// number: the sharpest (a star) and the most reckless (a flame). Under it a
-// bar for each persona, its count over it and its mark under it, the most
-// common gilt. Under those, five rows, one a trait: its mark, then skill as a
-// rating of five stars (the last filled in part), and each other trait a rule
-// from nothing to the most it runs to with the fleet's spread washed over it
-// and its average ticked; the average and the spread in numerals. Skill is read
-// in stars (to a tenth), aggression as hundredths; notice and the storm margin
-// in metres; flee hull in the hull's hundred.
+// drawn marks and numerals (the house style: no words but the match type's).
+// At its head the match's type in a paper disc, its one word under it, the
+// persona most of the bots are in a gilt one, and the two captains who stand
+// out, each by a badge and her ship's number: the sharpest (a star on it) and
+// the most reckless (a flame). Under it a bar for each persona, its count over
+// it and its mark under it, the most common gilt. Held, the card shows in the
+// bars' place five rows, one a trait: its mark, then skill as a rating of five
+// stars (the last filled in part), and each other trait a rule from nothing to
+// the most it runs to with the fleet's spread washed over it and its average
+// ticked; the average and the spread in numerals. Skill is read in stars (to a
+// tenth), aggression as hundredths; notice and the storm margin in metres; flee
+// hull in the hull's hundred.
 
 import type { Fleet, Spread } from '../player.ts';
 import {
@@ -157,13 +158,32 @@ const TRAITS: readonly {
 /** The card's width, at the drawn size. */
 export const CARD = 264;
 
-/** The fleet card for `f`, its top left at (x, y), CARD across and about 270 down. */
-export function fleetCard(x: number, y: number, f: Fleet) {
-  // its head: the type, the most common persona, and the two who stand out
+/**
+ * Each match type's word, under its mark (sim/persona.ts TYPES's order): the
+ * one word the card sets down, the type's mark alone not reading plain.
+ */
+const TYPE_WORDS = ['mixed', 'bloodbath', 'gold', 'cagey'] as const;
+
+/** A badge about (x, y): a gilt rosette, its two ribbon tails under it, `body` (a trait's mark) on its face. */
+const badge = (x: number, y: number, body: string) =>
+  `<g stroke="${INK.iron}" stroke-width=".9" stroke-linejoin="round">` +
+  `<path d="M${x - 7} ${y + 6}L${x - 10} ${y + 19}L${x - 5} ${y + 15}L${x - 2} ${y + 19}L${x - 1} ${y + 8}Z" fill="${WASH.vermilion}"/>` +
+  `<path d="M${x + 7} ${y + 6}L${x + 10} ${y + 19}L${x + 5} ${y + 15}L${x + 2} ${y + 19}L${x + 1} ${y + 8}Z" fill="${WASH.vermilion}"/>` +
+  `<circle cx="${x}" cy="${y}" r="12.5" fill="${WASH.gold}" stroke-width="1.2" stroke-dasharray="2.6 1.4"/>` +
+  `<circle cx="${x}" cy="${y}" r="9.5" fill="${PAPER}" stroke-width=".8"/></g>${body}`;
+
+/**
+ * The fleet card for `f`, its top left at (x, y), CARD across and about 230
+ * down: its head, then a bar a persona; or, `traits`, the five trait rows in
+ * the bars' place (held: panel.ts).
+ */
+export function fleetCard(x: number, y: number, f: Fleet, traits = false) {
+  // its head: the type and its word, the most common persona, and the two who stand out, each badged
   const hy = y + 24;
   let s =
     paperDisc(x + 22, hy, 21) +
     typeMark(f.type, x + 22, hy, 30) +
+    figure(x + 22, hy + 33, TYPE_WORDS[f.type] ?? '', 14, { fill: INK.sepia }) +
     paperDisc(x + 70, hy, 21, INK.gold) +
     `<circle cx="${x + 70}" cy="${hy}" r="16" fill="${GILT}"/>` +
     personaMark(f.common, x + 70, hy, 24);
@@ -171,26 +191,30 @@ export function fleetCard(x: number, y: number, f: Fleet) {
     const sx = x + 100 + k * 84;
     s +=
       slip(sx, hy - 19, 78, 38, { flat: true }) +
-      traitMark(k, sx + 14, hy, 18) +
-      personaMark(who.persona, sx + 32, hy, 16) +
-      figure(sx + 44, hy, `#${who.id}`, 17, { anchor: 'start' });
+      badge(sx + 19, hy - 2, traitMark(k, sx + 19, hy - 2, 13)) +
+      figure(sx + 38, hy, `#${who.id}`, 17, { anchor: 'start' });
   }
-  // a bar a persona
-  const base = y + 118,
-    tallest = Math.max(1, ...f.counts);
-  s += `<path d="M${x + 2} ${base}H${x + CARD - 2}" stroke="${INK.iron}" stroke-width="1"/>`;
-  f.counts.forEach((n, i) => {
-    const cx = x + 22 + i * 44,
-      h = (44 * n) / tallest,
-      common = i === f.common;
-    s +=
-      `<rect x="${cx - 11}" y="${r2(base - h)}" width="22" height="${r2(h)}" fill="${common ? WASH.gold : WASH.ochre}" fill-opacity="${common ? 0.95 : 0.55}" stroke="${INK.iron}" stroke-width=".9"/>` +
-      figure(cx, base - h - 9, n, 15, { fill: common ? INK.gold : INK.iron }) +
-      personaMark(i, cx, base + 17, 22);
-  });
+  if (!traits) {
+    // a bar a persona
+    const base = y + 198,
+      tallest = Math.max(1, ...f.counts);
+    s += `<path d="M${x + 2} ${base}H${x + CARD - 2}" stroke="${INK.iron}" stroke-width="1"/>`;
+    f.counts.forEach((n, i) => {
+      const cx = x + 22 + i * 44,
+        h = (64 * n) / tallest,
+        common = i === f.common;
+      s +=
+        `<rect x="${cx - 11}" y="${r2(base - h)}" width="22" height="${r2(h)}" fill="${common ? WASH.gold : WASH.ochre}" fill-opacity="${common ? 0.95 : 0.55}" stroke="${INK.iron}" stroke-width=".9"/>` +
+        figure(cx, base - h - 9, n, 15, {
+          fill: common ? INK.gold : INK.iron,
+        }) +
+        personaMark(i, cx, base + 17, 22);
+    });
+    return s;
+  }
   // a row a trait
   TRAITS.forEach((t, i) => {
-    const ty = y + 162 + i * 24,
+    const ty = y + 120 + i * 26,
       { mean, spread } = t.of(f),
       bx = x + 30,
       bw = 140,

@@ -121,7 +121,7 @@ export function createFlow(
     },
     () => tap('close')
   );
-  const result = createResult({
+  const result = createResult(livery.dye, {
     watch: () => tap('watch'),
     leave: () => tap('leave'),
     again: () => tap('again'),

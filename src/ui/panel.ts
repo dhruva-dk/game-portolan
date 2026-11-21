@@ -3,7 +3,8 @@
 // seed in (any text, as seeds are: world/seeds.ts), the seed's mark beside it
 // rolling a new one into it; under them the seed's planet inked on a
 // parchment disc (orb.ts), spun by a finger; at the right what its race is
-// sailed by (fleet.ts); under that the SAIL banner, her galleon on it, which
+// sailed by (fleet.ts), its captains' traits shown while the card is held;
+// under that the SAIL banner, her galleon on it, which
 // sails the seed in the field (a new page on it, under the title).
 //
 // As she types, the preview follows: the fleet at once (arithmetic), the
@@ -26,7 +27,7 @@ import {
 import { seed } from './marks.ts';
 import { createOrb } from './orb.ts';
 import { banner, folio } from './screens.ts';
-import { keep, region } from './touch.ts';
+import { keep, onHold, region } from './touch.ts';
 import { boxOf, view } from './ui.ts';
 
 /** The folio on the drawn page, centred on whatever screen. */
@@ -39,6 +40,8 @@ const FIELD = { x: 186, y: 44, w: 246, h: 40 },
 const LONGEST = 24;
 /** Ms of her pause in typing before the fleet, and the planet, are worked out. */
 const PAUSE = { fleet: 90, chart: 380 };
+/** Ms the fleet card is held before it shows the traits. */
+const HOLD = 350;
 
 /** The disc the globe is inked on: shaded on the paper, ringed, its degrees ticked round it. */
 function disc() {
@@ -94,13 +97,29 @@ export function createSeedPanel(
   /** The seed in the field, as it is read. */
   const text = () => named(input.value);
 
+  /** Whether the card shows the traits (held a while), and the wait before it does. */
+  let traits = false,
+    holding = 0;
   /** The fleet of the seed in the field, drawn on the card (none for none). */
   const fleet = () => {
     const name = text();
     if (card)
       card.innerHTML = name
-        ? fleetCard(CARD_AT.x, CARD_AT.y, seeds.fleet(name))
+        ? fleetCard(CARD_AT.x, CARD_AT.y, seeds.fleet(name), traits)
         : '';
+  };
+  /** The card held (its traits shown once it has been HOLD ms), or let go (the bars back). */
+  const hold = (on: boolean) => {
+    clearTimeout(holding);
+    if (on)
+      holding = window.setTimeout(() => {
+        traits = true;
+        fleet();
+      }, HOLD);
+    else if (traits) {
+      traits = false;
+      fleet();
+    }
   };
   /** The planet of the seed in the field, asked of the worker; the last faded under it until it comes. */
   const survey = () => {
@@ -148,6 +167,10 @@ export function createSeedPanel(
         });
         region(el, 'sp-sail', () => act.sail(text() || seeds.name));
         card = el.querySelector<SVGGElement>('#sp-card');
+        if (card) {
+          card.classList.add('press');
+          onHold(card, hold);
+        }
         fleet();
         // the field's input and the globe's canvas over their places, as the page lays them out now
         f.root.append(input, orb.el);
@@ -183,6 +206,7 @@ export function createSeedPanel(
       } else {
         clearTimeout(timers.fleet);
         clearTimeout(timers.chart);
+        hold(false);
         input.blur();
       }
     },

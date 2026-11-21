@@ -8,7 +8,7 @@
 //   title   an opaque sheet over the world loading: rhumb lines, the rose whose needle swings while the world loads and
 //           settles north when it is ready, her galleon gilt below; it moves on by itself (flow.ts)
 //   lobby   over her ship at anchor: the wheel (tap: settings), the PLAY banner with her galleon on it, the seed's
-//           chip at the top left, its name (tap: the seed panel, panel.ts), and the dye pot at the bottom left in her
+//           chip at the top left, its name and a pencil (tap: the seed panel, panel.ts), and the dye pot at the bottom left in her
 //           dye (tap: her livery, livery.ts). No tabs. Elsewhere a drag reaches the world: it turns the camera round
 //           her.
 //   settings a small folio: sound and look speed, each a bar set by a tap along it; the stats (the frame's cost in
@@ -34,7 +34,7 @@ import {
   slip,
   svgNode,
 } from './ink.ts';
-import { rhumbs, rose, seed } from './marks.ts';
+import { rhumbs, rose } from './marks.ts';
 import { keep, onTap, region } from './touch.ts';
 import { at, boxOf, fade, onResize, page, screen, type Page } from './ui.ts';
 
@@ -158,13 +158,19 @@ export function createTitle() {
 
 export type Title = ReturnType<typeof createTitle>;
 
-/** The seed's chip: a slip at the lobby's top left, the seed's mark and its name (the one piece of text the screens
- *  set down, as a seed is any text she gives it), sized to the name. */
+/** A small pencil, `s` long, its point at the lower left: a thing to be written in (the seed's chip). */
+const pencil = (x: number, y: number, s: number) =>
+  `<g transform="translate(${x} ${y}) rotate(-45) scale(${s / 24})" stroke="${INK.iron}" stroke-width="1.3" stroke-linejoin="round">` +
+  `<path d="M-6 -3.2H9V3.2H-6Z" fill="${WASH.ochre}"/><path d="M9 -3.2H12.5V3.2H9Z" fill="${WASH.vermilion}"/>` +
+  `<path d="M-6 -3.2L-12 0L-6 3.2Z" fill="${PAPER}"/><path d="M-10 -1.1L-12 0L-10 1.1Z" fill="${INK.iron}"/></g>`;
+
+/** The seed's chip: a slip at the lobby's top left, the seed's name (the one piece of text the screens set down, as a
+ *  seed is any text she gives it) and a small pencil after it, sized to the name. */
 function seedChip(x: number, y: number, name: string) {
-  const w = 52 + Math.max(2, name.length) * 10.5;
+  const w = 56 + Math.max(2, name.length) * 10.5;
   return (
-    `<g id="seed">${slip(x, y, w, 44, { bold: true })}${seed(x + 22, y + 24, 32)}` +
-    `${figure(x + 42, y + 22, name, 21, { anchor: 'start' })}</g>`
+    `<g id="seed">${slip(x, y, w, 44, { bold: true })}` +
+    `${figure(x + 16, y + 22, name, 21, { anchor: 'start' })}${pencil(x + w - 22, y + 22, 22)}</g>`
   );
 }
 
@@ -270,7 +276,7 @@ export function folio(
 }
 
 /** Settings, lean: sound and look speed, each a bar, a tap along a bar sets it; and the stats, a box ticked or not
- *  beside an hourglass, a tap on the row turns them on or off. */
+ *  beside a small graph, a tap on the row turns them on or off. */
 export function createSettings(
   get: () => Settings,
   set: (s: Settings) => void,
@@ -292,23 +298,34 @@ export function createSettings(
       wash: string
     ) =>
       `<g id="${id}">${icon}<rect x="${x + 90}" y="${cy - 22}" width="214" height="44" fill="transparent"/>${bar(x + 96, cy, 200, 22, value, wash)}</g>`;
-    /** Look speed's mark: a cross-staff's sight. */
-    const look = (cy: number) =>
-      `<g stroke="${INK.iron}" fill="none" stroke-width="1.6"><circle cx="${x + 54}" cy="${cy}" r="11"/>` +
-      `<path d="M${x + 54} ${cy - 17}v8M${x + 54} ${cy + 9}v8M${x + 37} ${cy}h8M${x + 63} ${cy}h8"/></g>`;
-    /** The stats' mark: an hourglass, the frame's time. */
-    const glass = (cy: number) =>
-      `<g stroke="${INK.iron}" stroke-width="1.6" stroke-linejoin="round"><path d="M${x + 43} ${cy - 15}h22M${x + 43} ${cy + 15}h22" stroke-linecap="round" fill="none"/>` +
-      `<path d="M${x + 46} ${cy - 15}C${x + 46} ${cy - 5} ${x + 52} ${cy - 3} ${x + 52} ${cy}C${x + 52} ${cy + 3} ${x + 46} ${cy + 5} ${x + 46} ${cy + 15}` +
-      `H${x + 62}C${x + 62} ${cy + 5} ${x + 56} ${cy + 3} ${x + 56} ${cy}C${x + 56} ${cy - 3} ${x + 62} ${cy - 5} ${x + 62} ${cy - 15}Z" fill="url(#h-iron)"/>` +
-      `<path d="M${x + 49} ${cy + 13}L${x + 54} ${cy + 6}L${x + 59} ${cy + 13}Z" fill="${WASH.ochre}" stroke="none"/></g>`;
+    /** Look speed's mark: an eye, an arrow either side of it, the way the look turns. */
+    const look = (cy: number) => {
+      const c = x + 54;
+      return (
+        `<g stroke="${INK.iron}" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round">` +
+        `<path d="M${c - 11} ${cy}Q${c} ${cy - 11} ${c + 11} ${cy}Q${c} ${cy + 11} ${c - 11} ${cy}Z" fill="${PAPER}"/>` +
+        `<circle cx="${c}" cy="${cy}" r="4.2" fill="${WASH.azure}"/><circle cx="${c}" cy="${cy}" r="1.6" fill="${INK.iron}" stroke="none"/>` +
+        `<path d="M${c - 15} ${cy - 5}L${c - 20} ${cy}L${c - 15} ${cy + 5}M${c + 15} ${cy - 5}L${c + 20} ${cy}L${c + 15} ${cy + 5}" fill="none"/></g>`
+      );
+    };
+    /** The stats' mark: a small graph, the frame's cost over time. */
+    const graph = (cy: number) => {
+      const l = x + 42,
+        b = cy + 13;
+      return (
+        `<g stroke="${INK.iron}" stroke-linejoin="round" stroke-linecap="round" fill="none">` +
+        `<path d="M${l + 5} ${b}V${b - 9}M${l + 12} ${b}V${b - 16}M${l + 19} ${b}V${b - 12}" stroke="${WASH.ochre}" stroke-width="4.5" stroke-linecap="butt"/>` +
+        `<path d="M${l} ${cy - 14}V${b}H${l + 25}" stroke-width="1.6"/>` +
+        `<path d="M${l + 3} ${b - 13}L${l + 10} ${b - 21}L${l + 17} ${b - 17}L${l + 24} ${b - 25}" stroke="${INK.rubric}" stroke-width="1.6"/></g>`
+      );
+    };
     /** The stats' box, 28 across, ticked when they show. */
     const box = (cy: number, on: boolean) =>
       `<path d="${roughRect(x + 96, cy - 14, 28, 28, 5)}" fill="${on ? WASH.viridian : PAPER}" fill-opacity="${on ? 0.85 : 1}" stroke="${INK.iron}" stroke-width=".9"/>` +
       (on
         ? `<path d="M${x + 102} ${cy}L${x + 108} ${cy + 7}L${x + 119} ${cy - 7}" fill="none" stroke="${INK.white}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>`
         : '');
-    const stats = `<g id="stats">${glass(234)}<rect x="${x + 30}" y="${234 - 24}" width="${w - 60}" height="48" fill="transparent"/>${box(234, v.stats)}</g>`;
+    const stats = `<g id="stats">${graph(234)}<rect x="${x + 30}" y="${234 - 24}" width="${w - 60}" height="48" fill="transparent"/>${box(234, v.stats)}</g>`;
     f.draw(
       row(
         'sound',
