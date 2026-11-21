@@ -65,8 +65,8 @@ persona spread within 1 se. At most 3 tuning passes. Goldens re-recorded and nam
 **Vitals as telemetry** (Forza's damage readout, in the chart's hand). The top-left slip keeps its shield and hull
 bars and their numerals, and gains beside them a top-down ship silhouette, inked, her four zones drawn as parts of her (masts and canvas across her middle; her
 stern; her sides along the waterline; her deck from bow aft). Each zone washed from paper through ochre to vermilion
-by its share; a faulted zone rubric, its fault's mark beside it (minor drawn, major filled). Her shield an azure
-outline round her, its arc as full as her shield; her hull's numeral large, her shield's small. A hit: the struck
+by its share; a faulted zone rubric, its fault's mark on or against it (minor drawn, major filled). Her shield is
+read off its bar (no outline round her); her hull's numeral large, her shield's small. A hit: the struck
 zone flashes and the silhouette jolts (a few px, ~250 ms, eased). A fault coming on: a bigger beat (a camera punch, a
 timber crack's sound cue: audio.ts) once. Mending: a slow gold shimmer over her and a mark that she mends. Redrawn
 only when what it shows changes. Drawn for the iPad Air: legible at arm's length, a thumb's clear of the stick.
