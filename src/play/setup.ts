@@ -71,9 +71,9 @@ export function watersOf(
 }
 
 /**
- * The matches on a planet of this seed: the first on the planet's own seed,
- * each next one dealt a seed of its own (its storm and its bots' minds come
- * from it). hold: seconds the storm is held at, or null to let it run; gun: the
+ * The matches on a planet of this seed: the first on the planet's own seed (the
+ * game's race: race), each next one dealt a seed of its own (its storm and its
+ * bots' minds come from it; the harness and the tests deal them). hold: seconds the storm is held at, or null to let it run; gun: the
  * gun every ship is armed with, or null for none; typeOf: each match's type by
  * its seed (sim/persona.ts: as the game deals them if not given).
  */
@@ -104,8 +104,19 @@ export function createMatches(
     });
   };
   const first = match(seed);
+  /** The race's own berths, once worked out (berthRace). */
+  let own: Spawn[] | undefined;
   return {
     first,
+    /**
+     * The seed's own race, as the game sails it (a seed is one race): the
+     * first match, its berths with it if worked out in time (berthRace).
+     */
+    race: (): Match => ({ ...first, berths: own }),
+    /** The race's berths worked out by `by` (watersOf's) ahead of PLAY. */
+    berthRace(by: Berther) {
+      void by(seed).then((berths) => (own = berths));
+    },
     /** The storm of the first match, by its clock (s). */
     storm: (t: number): Storm => first.storm(t),
     /**

@@ -137,6 +137,7 @@ const TIERS: Record<string, readonly string[]> = {
     'turn.ts',
     'pose.ts',
     'remembered.ts',
+    'seeds.ts',
   ],
   grids: ['cells.ts', 'lattice.ts', 'noise3.ts'],
   motions: [

@@ -64,6 +64,13 @@ export const EXCEPTIONS: readonly Exception[] = [
     why: "the shadow map's camera is its own, orthographic, looking down on what it maps",
   },
 
+  // the seed rides in the page's address
+  {
+    rule: 'debug',
+    file: 'src/address.ts',
+    why: "?seed= is the release's, not a debug switch: a seed is one race and the world is built once a page, so the next race is a new page with its seed in the address (the app has no other way to carry it across the load)",
+  },
+
   // the meter's panel, its pointers and three's types filled in
   {
     rule: 'markup',

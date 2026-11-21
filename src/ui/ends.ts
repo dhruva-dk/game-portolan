@@ -4,8 +4,10 @@
 //            ball, a ram, the Storm) in a paper disc, the sea she held (her share of the planet's water); the middle of
 //            the screen, her ship going down, left clear.
 //            Won, her place gilt in a sunburst beside the sea she held. At the foot her ways on, each
-//            a banner: the spyglass (watch the match on: spectate) while ships still fight, and the anchor (home)
-//   watching small marks at the edges while she watches another ship: the anchor's disc at the top left (home), and
+//            a banner: the spyglass (watch the match on: spectate) while ships still fight, the tree (home, this seed
+//            sailed again) and the seed (home, a new seed)
+//   watching small marks at the edges while she watches another ship: the seed's disc at the top left (home, a new
+//            seed), and
 //            at the foot the spyglass between the arrows that turn her to the next ship or the one before
 // No words; numerals only.
 
@@ -77,16 +79,37 @@ const spyglass = (x: number, y: number, s: number) => {
   );
 };
 
-/** The anchor: its ring, stock and shank, and its arms with their flukes; `s` its height. */
-const anchor = (x: number, y: number, s: number) => {
+/** The seed (a new seed, a new world): an almond-shaped seed, its seam inked, a shoot curling from its top; `s` its
+ *  height. */
+const seed = (x: number, y: number, s: number) => {
   const k = s / 64;
-  const fluke = (side: number) =>
-    `<path d="M${side * 23} 4l${side * 7} -9l${side * -1} 13z" fill="${INK.iron}"/>`;
   return (
-    `<g transform="translate(${x} ${y}) scale(${k})" stroke="${INK.iron}" fill="none" stroke-linecap="round" stroke-linejoin="round">` +
-    `<circle cx="0" cy="-25" r="5.5" stroke-width="3"/><path d="M0 -19.5V26" stroke-width="4.4"/>` +
-    `<path d="M-15 -12H15" stroke-width="4"/><circle cx="-16" cy="-12" r="2.4" fill="${INK.iron}"/><circle cx="16" cy="-12" r="2.4" fill="${INK.iron}"/>` +
-    `<path d="M-23 4Q-22 26 0 27Q22 26 23 4" stroke-width="3.6"/>${fluke(-1)}${fluke(1)}</g>`
+    `<g transform="translate(${x} ${y}) scale(${k})" stroke="${INK.iron}" stroke-linecap="round" stroke-linejoin="round">` +
+    `<path d="M0 -14C15 -8 18 14 0 28C-18 14 -15 -8 0 -14Z" fill="${WASH.ochre}" stroke-width="3"/>` +
+    `<path d="M0 -14C15 -8 18 14 0 28C-18 14 -15 -8 0 -14Z" fill="${WASH.umber}" opacity=".45" stroke="none"/>` +
+    `<path d="M0 -8Q5 8 0 22" fill="none" stroke-width="1.6"/>` +
+    `<path d="M0 -14Q-1 -24 7 -29" fill="none" stroke="${INK.green}" stroke-width="3"/>` +
+    `<path d="M7 -29Q15 -31 17 -24Q10 -21 7 -29Z" fill="${WASH.viridian}" stroke="${INK.green}" stroke-width="1.6"/></g>`
+  );
+};
+
+/** The tree (this seed sailed again: the same world grown): a palm, its trunk leaning and ringed, five fronds from its
+ *  crown; `s` its height. */
+const tree = (x: number, y: number, s: number) => {
+  const k = s / 64;
+  const frond = (dx: number, dy: number, bend: number) =>
+    `<path d="M4 -16Q${4 + dx / 2} ${-16 + dy / 2 - bend} ${4 + dx} ${-16 + dy}Q${4 + dx / 2} ${-16 + dy / 2 + bend / 3} 4 -16Z" fill="${WASH.viridian}" stroke="${INK.green}" stroke-width="1.6"/>`;
+  return (
+    `<g transform="translate(${x} ${y}) scale(${k})" stroke="${INK.iron}" stroke-linecap="round" stroke-linejoin="round">` +
+    `<path d="M-14 28H14" stroke="${INK.sepia}" stroke-width="3"/>` +
+    `<path d="M-2 28Q-4 6 4 -16" fill="none" stroke-width="5"/>` +
+    `<path d="M-3 18h4M-3 8h4M-1 -2h4M1 -10h4" stroke="${WASH.umber}" stroke-width="1.4"/>` +
+    frond(-24, 2, 10) +
+    frond(24, 4, 10) +
+    frond(-16, -14, 6) +
+    frond(18, -12, 6) +
+    frond(2, -22, 4) +
+    `<circle cx="2" cy="-13" r="2.6" fill="${INK.sepia}" stroke="none"/><circle cx="7" cy="-12" r="2.6" fill="${INK.sepia}" stroke="none"/></g>`
   );
 };
 
@@ -133,7 +156,11 @@ const sunburst = (x: number, y: number, r: number) => {
 };
 
 /** Her result over the world: what it shows, and its ways on (watch: null while there is no match on to watch). */
-export function createResult(act: { watch(): void; leave(): void }) {
+export function createResult(act: {
+  watch(): void;
+  leave(): void;
+  again(): void;
+}) {
   const s = sheet(false, false);
   // shade at the top and the foot, under the band and the ways on; the middle, where her ship is, left clear
   const shade = alpha(SHADOW, 0.42),
@@ -171,14 +198,19 @@ export function createResult(act: { watch(): void; leave(): void }) {
         cause(476, y, end) +
         held(530, y, 16) +
         figure(552, y, percent(end.share), 26, { anchor: 'start' });
+    // the tree (this seed again) and the seed (a new one), the spyglass before them while ships still fight
+    const homes = (x: number, w: number, gilt = false) =>
+      `<g id="again">${banner(x, 370, w, tree(x - 4, 366, 58), gilt)}</g>` +
+      `<g id="leave">${banner(x + w + 20, 370, w, seed(x + w + 16, 366, 54), gilt)}</g>`;
     const ways = watching
-      ? `<g id="watch">${banner(380, 370, 176, spyglass(376, 366, 68))}</g><g id="leave">${banner(576, 370, 176, anchor(572, 366, 52))}</g>`
-      : `<g id="leave">${banner(478, 370, 196, anchor(474, 366, 56), won)}</g>`;
+      ? `<g id="watch">${banner(282, 370, 176, spyglass(278, 366, 68))}</g>${homes(478, 176)}`
+      : homes(380, 176, won);
     // the band at the top of the screen, the ways on at its foot (on another shape of screen, each kept to its edge)
     s.set(
       (p) => at(p, 'centre', 'top', body) + at(p, 'centre', 'bottom', ways),
       (el) => {
         region(el, 'leave', act.leave);
+        region(el, 'again', act.again);
         if (watching) region(el, 'watch', act.watch);
       }
     );
@@ -217,7 +249,7 @@ export function createWatching(act: {
 }) {
   const root = screen();
   const leave = piece(root, 'top left', true, true);
-  leave.innerHTML = svg(56, 56, paperDisc(28, 28, 25) + anchor(28, 28, 36));
+  leave.innerHTML = svg(56, 56, paperDisc(28, 28, 25) + seed(28, 30, 34));
   onTap(leave, act.leave);
   const foot = piece(root, 'bottom centre', false, true);
   foot.innerHTML = svg(196, 60, slip(64, 10, 68, 42) + spyglass(98, 31, 52));

@@ -12,8 +12,8 @@
 // and the haze; the grade and the haze follow the sun's height). ?t=hours sets
 // the time of day (the same everywhere: world/sun.ts); ?wind=m/s the wind's
 // speed, ?haze= the air's aerosol and ?cloud= the cloud cover (0–1) each hold
-// at that instead of drifting (world/weather.ts); ?seed= the planet's
-// (environment.ts SEED by default). ?debug=charts colours the sea by its
+// at that instead of drifting (world/weather.ts); ?seed= the race's, any text
+// (address.ts; on a debug page environment.ts SEED by default). ?debug=charts colours the sea by its
 // charts' weights, ?debug=wake shows the ships' marks on it (water/water.ts).
 //
 // The debug camera. ?lat=&lon= degrees put the camera over a point of the
@@ -56,8 +56,8 @@
 // spectate sinks her and watches; won sinks every other, the last by her;
 // result sinks her and all but one other, so the match is over. ?sink=seconds
 // sinks her so many seconds into the frames drawn, ?win=seconds every other
-// ship then, so she wins; ?leave=seconds taps LEAVE then (home to the lobby
-// under the title, where her screen has that way: ui/passage.ts).
+// ship then, so she wins; ?leave=seconds taps LEAVE then (home, a new page on
+// a new seed under the title, where her screen has that way: ui/passage.ts).
 //
 // The sea about her. ?ships= sets them on the sea ahead of her (demoShips;
 // ?pack: in rows of ten, a fan of them filling the view),
@@ -134,6 +134,8 @@ import {
  */
 export interface Setup {
   seed: number;
+  /** The seed as named (address.ts): what the number came from. */
+  name: string;
   mean: Weather;
   swing: Weather;
   hours: number;
@@ -156,6 +158,8 @@ const kindOf = (name: string | null): GunKind =>
  */
 export interface Stage {
   world: World;
+  /** The seed the page sails, as named. */
+  name: string;
   start: { at: Vec3; bearing: number };
   canvas: HTMLElement;
   anchors: readonly Anchor[];
@@ -215,7 +219,9 @@ function setupOf(release: Setup): Setup {
     if (params.has(k)) [mean[k], swing[k]] = [number(k, 0), 0];
   const sea = params.get('debug');
   return {
-    seed: number('seed', release.seed),
+    // (?seed= is the release's too, read before this: address.ts)
+    seed: release.seed,
+    name: release.name,
     mean,
     swing,
     hours: number('t', mood?.hours ?? release.hours),

@@ -66,6 +66,8 @@ const LAYERS: Record<string, readonly string[]> = {
   // ships' colours (play/colours.ts)
   'palette.ts': ['colour.ts'],
   'environment.ts': ['world/'],
+  // the seed in the page's address: read, rolled, and sailed onto a new page
+  'address.ts': ['world/'],
   // the UI draws plain data: of the sim only the storm's Cap (the full map inks
   // it)
   'ui/': [

@@ -8,6 +8,7 @@ import { WebGPUCoordinateSystem, WebGPURenderer } from 'three/webgpu';
 import { createAudio } from './audio/audio.ts';
 import type { Hearing } from './audio/listen.ts';
 import type { Played, Setup, Stage } from './debug.ts';
+import { launched, roll, sail } from './address.ts';
 import { SEED, createWorld } from './environment.ts';
 import { createFrame } from './frame.ts';
 import { loaded } from './load.ts';
@@ -26,11 +27,26 @@ import { createInput } from './ui/input.ts';
 import { createStick } from './ui/stick.ts';
 import { onPressed } from './ui/touch.ts';
 import { onResize, uiLayer, view } from './ui/ui.ts';
+import { seedOf } from './world/seeds.ts';
 import { MEAN, SWING } from './world/weather.ts';
+
+/**
+ * Whether debugging is on: Vite's dev server, or ?debug in the page's query
+ * (the one switch read here: the rest are debug.ts's, fetched only with it).
+ */
+const DEBUG =
+  import.meta.env.DEV || new URLSearchParams(location.search).has('debug');
+
+/**
+ * The seed this page sails (address.ts): its ?seed=, or one rolled afresh; a
+ * debug page with none stays on the planet the tools measure (SEED).
+ */
+const NAME = launched(() => (DEBUG ? String(SEED) : roll()));
 
 /** The release's setup. */
 const RELEASE: Setup = {
-  seed: SEED,
+  seed: seedOf(NAME),
+  name: NAME,
   mean: MEAN,
   swing: SWING,
   hours: 16.3,
@@ -100,6 +116,7 @@ async function stage(setup: Setup): Promise<Stage> {
 
   return {
     world,
+    name: setup.name,
     start: world.planet.start,
     canvas: renderer.domElement,
     anchors: frame.anchors,
@@ -142,8 +159,8 @@ async function play(s: Stage): Promise<Played> {
   const { waters, ms, berth } = await watersOf(s.world.seed, s.world.land);
   console.info(`water sounded in ${ms.toFixed(0)} ms`);
   loaded('sounded');
-  // (each match's berths worked out in that worker ahead of PLAY)
-  s.matches.berthBy(berth);
+  // (the race's berths worked out in that worker ahead of PLAY)
+  s.matches.berthRace(berth);
   const game = createGame(s.world, s.anchors, waters, s.start, s.matches.first);
   const referee = createReferee(game);
 
@@ -170,8 +187,9 @@ async function play(s: Stage): Promise<Played> {
   });
   // the sound, begun on her first touch, hearing what it does in one object refilled each frame
   const audio = createAudio(s.world.planet.height);
+  // the page's one race: the seed's own (a seed is a race; the next is a new page)
   const deal = () => {
-    game.start(s.matches.deal());
+    game.start(s.matches.race());
     referee.begin();
   };
   const flow = createFlow(
@@ -180,10 +198,9 @@ async function play(s: Stage): Promise<Played> {
     'title',
     {
       play: deal,
-      home() {
-        referee.end();
-        game.anchor();
-      },
+      // home under the title, onto a new page: a new seed, or this one again
+      home: () => sail(roll()),
+      again: () => sail(s.name),
       watch: () => referee.watch(),
       switch: (by) => referee.switch(by),
     },
@@ -237,13 +254,6 @@ async function play(s: Stage): Promise<Played> {
     },
   };
 }
-
-/**
- * Whether debugging is on: Vite's dev server, or ?debug in the page's query
- * (the one switch read here: the rest are debug.ts's, fetched only with it).
- */
-const DEBUG =
-  import.meta.env.DEV || new URLSearchParams(location.search).has('debug');
 
 if (DEBUG) {
   const { scenario } = await import('./debug.ts');

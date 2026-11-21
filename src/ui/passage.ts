@@ -1,11 +1,11 @@
-// The way home from a match (LEAVE: ways.ts HOME, wayHome): the title, the one
-// loading screen (screens.ts), comes over the match, its needle swinging; it is
-// held while the match is put away and the lobby made and drawn unseen under
-// it, and lifts off the lobby settled, her ship at anchor and its pieces in
-// place, the needle settling north as it goes. The title is the one the page
-// painted first (main.ts), over every screen; while the way home is under way
-// it is the passage's to show and hide, not the flow's. What it covers of the
-// world, the sound follows (main.ts: the bed fades under it).
+// The way home from a match (LEAVE or AGAIN: ways.ts HOME, wayHome): the
+// title, the one loading screen (screens.ts), comes over the match, its needle
+// swinging; once it covers it, the change is made under it, and that change is
+// the page going (main.ts: home is a new page, a seed being one race), so the
+// title stays over it till it does, and the next page paints it first. The
+// title is the one the page painted first (main.ts), over every screen; while
+// the way home is under way it is the passage's to show, not the flow's. What
+// it covers of the world, the sound follows (main.ts: the bed fades under it).
 
 import type { Title } from './screens.ts';
 import { HOME, wayHome } from './ways.ts';
@@ -29,7 +29,7 @@ export function createPassage(title: Title) {
     },
     /**
      * Brings the title over the match; once it is covered, makes the change
-     * (`act`) under it.
+     * (`act`) under it, and holds it there.
      */
     cover(act: () => void) {
       way = wayHome(performance.now());
@@ -37,16 +37,13 @@ export function createPassage(title: Title) {
       title.swing();
       title.show(true, HOME.cover);
     },
-    /** A frame just drawn: the way home moved on by it. */
+    /** A frame just drawn: the way home moved on by it, till it is covered. */
     drawn() {
-      const leg = way?.drawn(performance.now());
-      if (leg === 'hold') {
+      if (way?.leg !== 'cover') return;
+      if (way.drawn(performance.now()) === 'hold') {
         change?.();
         change = null;
-      } else if (leg === 'lift') {
-        title.ready();
-        title.show(false, HOME.lift);
-      } else if (leg === 'home') way = null;
+      }
     },
   };
 }

@@ -4,9 +4,9 @@
 // her tap on something drawn for it, or the match's own course as the game
 // reports it (player.ts End), but the title's, taken as the world is ready;
 // nothing moves on by a clock of its own. Every screen fades in and out; where
-// the world itself changes at once it cross-fades (PLAY: veil.ts), or (home to
-// the lobby) the match fades under the title, the one loading screen, held
-// until the lobby is drawn (passage.ts). The HUD shows in the match (fading in
+// the world itself changes at once it cross-fades (PLAY: veil.ts), or (home,
+// on a new seed or this one again) the match fades under the title, the one
+// loading screen, held while the page loads again under it (passage.ts). The HUD shows in the match (fading in
 // at the end of the arrival: hud.ts), fades out as her end begins, and comes
 // back, only its clock, count and disc, while she watches another ship.
 
@@ -62,12 +62,14 @@ function saveSettings(s: Settings) {
 }
 
 /**
- * What the screens ask of the game: a new match (PLAY), home to the lobby's
- * quiet sea, and, sunk, to watch the match on and to turn to another ship.
+ * What the screens ask of the game: the race (PLAY), home on a new seed or on
+ * this one again (each a new page, made under the title), and, sunk, to watch
+ * the match on and to turn to another ship.
  */
 interface FlowActions {
   play(): void;
   home(): void;
+  again(): void;
   watch(): void;
   switch(by: number): void;
 }
@@ -104,6 +106,7 @@ export function createFlow(
   const result = createResult({
     watch: () => tap('watch'),
     leave: () => tap('leave'),
+    again: () => tap('again'),
   });
   const watching = createWatching({
     leave: () => tap('leave'),
@@ -126,15 +129,12 @@ export function createFlow(
         end = null;
         go(next);
       });
-    } else if (t === 'leave') {
+    } else if (t === 'leave' || t === 'again') {
       result.hide(HOME.cover);
       watching.show(false, HOME.cover);
       fade(hud.root, false, HOME.cover);
-      passage.cover(() => {
-        act.home();
-        end = null;
-        go(next);
-      });
+      // (the page goes under the title: no screen after it on this one)
+      passage.cover(t === 'leave' ? act.home : act.again);
     } else {
       if (t === 'watch') act.watch();
       if (t === 'switch') act.switch(by);

@@ -11,11 +11,13 @@
 //   match     the arrival, then her hands on her ship; she sinks → sinking; she is the last afloat → won
 //   sinking   the camera held on her ship going down, the HUD gone; the beat done → sunk, or → result if the match
 //             is over
-//   sunk      her result over the live world, with WATCH → spectate and LEAVE → lobby (by the parchment: HOME); the
-//             match over → result
+//   sunk      her result over the live world, with WATCH → spectate, AGAIN (the tree: this seed sailed again) and
+//             LEAVE (the seed: a new one) → lobby (by the parchment: HOME); the match over → result
 //   spectate  watching another ship: turn to the next or the one before; LEAVE → lobby; the match over → result
 //   won       the camera circling her, the HUD gone; the beat done → result
-//   result    her result over the live world, one way on: LEAVE → lobby
+//   result    her result over the live world, its ways on: AGAIN or LEAVE → lobby
+// Home is a new page (main.ts, address.ts): a seed is one race, and the world is built once a page; the parchment
+// comes over the match and stays while the page loads again under it, onto the title.
 
 import { SCREENS, type Screen } from '../player.ts';
 
@@ -30,6 +32,7 @@ export const TAPS = [
   'watch',
   'switch',
   'leave',
+  'again',
 ] as const;
 export const EVENTS = ['sunk', 'won', 'settled', 'over'] as const;
 export type Tap = (typeof TAPS)[number];
@@ -43,10 +46,10 @@ export const WAYS: Record<Screen, Partial<Record<Trigger, Screen>>> = {
   settings: { close: 'lobby' },
   match: { sunk: 'sinking', won: 'won' },
   sinking: { settled: 'sunk' },
-  sunk: { watch: 'spectate', leave: 'lobby', over: 'result' },
+  sunk: { watch: 'spectate', leave: 'lobby', again: 'lobby', over: 'result' },
   spectate: { switch: 'spectate', leave: 'lobby', over: 'result' },
   won: { settled: 'result' },
-  result: { leave: 'lobby' },
+  result: { leave: 'lobby', again: 'lobby' },
 };
 
 /** The screens over a match under way. */
