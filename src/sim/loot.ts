@@ -56,35 +56,39 @@ import { weighed, type Widen } from './tables.ts';
  */
 export const LOOT = {
   /**
-   * Spots strewn over the planet, and the share with a second piece: some 440
-   * pieces (it was 200 spots, some 280; and before that 400, some 570).
+   * Spots strewn over the planet, and the share with a second piece: some 900
+   * pieces (it was 320 spots, some 440; before that 200, some 280; and before
+   * that 400, some 570), for fights fed by what they mend with.
    */
-  spots: 320,
+  spots: 640,
   second: 0.4,
   /**
    * The share of pieces that are guns (brought down from 0.62, then from 0.5 as
    * the spots grew, so the first is still a scramble, most ships armed by
-   * 20–30 s: tools/harness), their kinds' weights (in kinds.ts KINDS' order:
-   * cannon, scatter, repeater, harpoon, mortar), and their rarities' weights,
-   * common to legendary.
+   * 20–30 s: tools/harness; then from 0.42 as they doubled, so the guns grew
+   * by some 70% and the mending by 2.2 times), their kinds' weights (in
+   * kinds.ts KINDS' order: cannon, scatter, repeater, harpoon, mortar), and
+   * their rarities' weights, common to legendary.
    */
-  gun: 0.42,
+  gun: 0.36,
   kinds: [36, 22, 22, 10, 10],
   weights: [42, 30, 17, 8, 3],
   /**
    * The share of the rest of each consumable, how many come together, and the
-   * rarity each reads as.
+   * rarity each reads as. The hull's mending leans the larger (it was 0.36,
+   * 0.22, 0.28, 0.14): with loot plenty, ships' slots full of shields mended
+   * no more hull (tools/harness).
    */
   shares: {
-    smallShield: 0.36,
-    repairKit: 0.22,
-    bigShield: 0.28,
-    fullRepair: 0.14,
+    smallShield: 0.26,
+    repairKit: 0.32,
+    bigShield: 0.2,
+    fullRepair: 0.22,
   } satisfies Record<Use, number>,
   counts: {
-    smallShield: 3,
+    smallShield: 4,
     bigShield: 1,
-    repairKit: 4,
+    repairKit: 5,
     fullRepair: 1,
   } satisfies Record<Use, number>,
   /**
@@ -103,7 +107,7 @@ export const LOOT = {
    * anyway, and something worth fighting over there meets them.
    */
   cache: {
-    pieces: 5,
+    pieces: 8,
     more: 0,
     within: 0.5,
     gun: 0.4,
@@ -528,11 +532,17 @@ export function swept(
     let c = by.get(v.id);
     if (!c || c.health.hull <= 0) continue;
     const p = v.ship.at;
-    // (most ships, most steps, are near no piece and have none of their own
-    // lying about: the pieces stand as they are)
+    // (most ships, most steps, take nothing and leave nothing of their own: the
+    // pieces stand as they are. Nothing is taken unless something within reach
+    // fits her as she is; nothing of hers changes but a piece settled and clear)
     let near = false;
-    for (let i = 0; i < pieces.length && !near; i++)
-      near = pieces[i].from === v.id || dot(p, pieces[i].at) > REACH;
+    for (let i = 0; i < pieces.length && !near; i++) {
+      const l = pieces[i];
+      near =
+        l.from === v.id
+          ? l.age >= PIECE.settle && dot(p, l.at) <= REACH
+          : dot(p, l.at) > REACH && fits(c, l.goods);
+    }
     if (near) {
       const kept: Loot[] = [];
       for (const l of pieces) {

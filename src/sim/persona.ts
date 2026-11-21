@@ -152,11 +152,24 @@ const waits = (by: number) =>
   DEFAULT_RULES.storm.phases.map((p) => ({ ...p, wait: p.wait * by }));
 
 /**
+ * The loot each type changes, as so many times the game's own: so a type keeps
+ * its character as the game's loot is scaled.
+ */
+const LAID = DEFAULT_RULES.loot;
+const times = (k: number, of: number) => Math.round(k * of * 100) / 100;
+const cache = (pieces: number, more: number, gun = LAID.cache.gun) => ({
+  ...LAID.cache,
+  pieces: Math.round(LAID.cache.pieces * pieces),
+  more: Math.round(LAID.cache.pieces * more),
+  gun,
+});
+
+/**
  * The game's match types, each with how often it is dealt: most matches mixed;
  * a bloodbath (hunters, brawlers and raiders, guns lying thick and rarer, the
  * storm in a hurry, its caches mostly guns); a gold rush (scavengers, raiders
  * and homesteaders, loot everywhere, a gun lying near every berth, and caches
- * that grow as the storm closes, 7 pieces, then 9, 11 …); a cagey one (turtles
+ * that grow as the storm closes, 11 pieces, then 14, 17 …); a cagey one (turtles
  * and homesteaders, guns scarce, the storm taking its time, its caches small
  * and mostly mending).
  */
@@ -168,9 +181,9 @@ export const TYPES: readonly (MatchType & { readonly dealt: number })[] = [
     mix: { ...EVEN, hunter: 3, brawler: 3, raider: 2, turtle: 0.5 },
     rules: ruled({
       loot: {
-        gun: 0.55,
+        gun: times(LAID.gun, 1.31),
         weights: [30, 32, 22, 11, 5],
-        cache: { ...DEFAULT_RULES.loot.cache, pieces: 6, gun: 0.75 },
+        cache: cache(1.2, 0, 0.75),
       },
       storm: { phases: waits(0.8) },
     }),
@@ -181,13 +194,13 @@ export const TYPES: readonly (MatchType & { readonly dealt: number })[] = [
     mix: { ...EVEN, scavenger: 3, raider: 2, homesteader: 2 },
     rules: ruled({
       loot: {
-        spots: 440,
+        spots: Math.round(LAID.spots * 1.375),
         second: 0.55,
         weights: [28, 30, 24, 12, 6],
         berth: 80,
         near: 30,
         far: 60,
-        cache: { ...DEFAULT_RULES.loot.cache, pieces: 7, more: 2 },
+        cache: cache(1.4, 0.4),
       },
     }),
   },
@@ -196,10 +209,7 @@ export const TYPES: readonly (MatchType & { readonly dealt: number })[] = [
     dealt: 0.15,
     mix: { ...EVEN, turtle: 3, homesteader: 3, brawler: 0.5 },
     rules: ruled({
-      loot: {
-        gun: 0.34,
-        cache: { ...DEFAULT_RULES.loot.cache, pieces: 4, gun: 0.25 },
-      },
+      loot: { gun: times(LAID.gun, 0.81), cache: cache(0.8, 0, 0.25) },
       storm: { phases: waits(1.15) },
     }),
   },

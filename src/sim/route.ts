@@ -634,11 +634,14 @@ export function course(
     };
   if (!r || r.repath <= 0 || distance(r.to, want) > ROUTE.moved) {
     const { cells, found } = findPath(ch, at, want);
+    // the next look a step or a few later or sooner by the cell she is in, so
+    // ships that looked in one step (berthed by the shore, they all look in the
+    // first) don't go on looking in one step every `repath` s
     r = {
       cells,
       to: want,
       leg: Math.min(1, cells.length - 1),
-      repath: ROUTE.repath,
+      repath: ROUTE.repath + ((cellOf(at) % ROUTE.spread) - 2.5) * dt,
       found,
     };
   }

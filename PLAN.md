@@ -154,6 +154,31 @@ held out. At most 3 passes per layer, and for the loot change. Stop early
 when a pass doesn't beat the noise (1 se) on the held-out planets, and keep
 the best so far.
 
+## Results
+
+Each step against the baseline before it (`tools/harness/report.ts`, 16
+matches a planet on all ten; ± one se; held = the five held out). Step budget
+from `npm run steps` (median / p95 / worst, ms a step).
+
+**Step 1, loot (much more plentiful).** Spots 320 → 640, guns 0.42 → 0.36 of
+pieces, mending counts up (small shield 3 → 4, repair kit 4 → 5), its shares
+leaning to the hull (0.36 / 0.22 / 0.28 / 0.14 → 0.26 / 0.32 / 0.20 / 0.22),
+caches 5 → 8; the match types' loot written as so many times the game's own,
+so each keeps its character. Held pooled: damage 122.9 → 129.1 (+6.2 ± 1.8);
+hull mended 7.79 → 10.82 (+3.0 ± 0.3); shield restored 67.0 → 68.8 (+1.8 ±
+0.7); sustain 0.608 → 0.617; longest lull 88.8 → 83.7 (−5.1 ± 6.2);
+distinctness 0.171 → 0.172; stuck 4.07 → 3.93; aground 0.20 → 0.09; spread
+0.140 → 0.067. Worst held: damage 119.5 → 125.7, lull 97.8 → 91.6.
+Flag: the tune set's lull rose 74.5 → 87.2 (+12.7 ± 5.5) in all four runs
+made; held moved the other way. Steps 1.68 / 4.42 / 11.4 → 1.96 / 4.71 /
+13.2: a sweep over twice the pieces, and routes found again in lockstep (a
+group of ships every 2 s, 14 ms): each route's next look is now staggered by
+her cell, as its first was.
+- Tried: ×1.5 spots with the old shares (held damage +5.7 ± 1.9, hull +2.0 ±
+  0.3); ×2 spots (damage +8.9 ± 1.9, hull +2.0 ± 0.3: hull mending flat, the
+  slots full of shields); kept ×2 with the shares leaning to the hull (hull
+  +2.7 ± 0.3, damage +6.2, within noise of ×2).
+
 ## Not decided / later
 
 - Restage in place (parked).

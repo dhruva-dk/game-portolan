@@ -311,7 +311,11 @@ test('the pieces drawn come in their shares: half of them guns (first three in f
     'the cannon commonest, the harpoon and mortar rarest'
   );
   const small = g.filter((x) => x.kind === 'smallShield');
-  assert.ok(small.every((x) => x.kind === 'smallShield' && x.count === 3));
+  assert.ok(
+    small.every(
+      (x) => x.kind === 'smallShield' && x.count === LOOT.counts.smallShield
+    )
+  );
 });
 
 test('the loot is strewn evenly over the planet, on open water only, the same for a seed', () => {
