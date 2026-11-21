@@ -71,8 +71,10 @@ zone flashes and the silhouette jolts (a few px, ~250 ms, eased). A fault coming
 timber crack's sound cue: audio.ts) once. Mending: a slow gold shimmer over her and a mark that she mends. Redrawn
 only when what it shows changes. Drawn for the iPad Air: legible at arm's length, a thumb's clear of the stick.
 
-**Shot from off the screen.** A blow on her from a ship off the screen or behind: an arc at the screen's edge at its
-bearing (Moment.bearing), held 2 s, fading, as heavy as the blow. Replaces the rings round her that read as rings.
+**Where the blow came from.** A ring round the middle of the screen (round the reticle), in eight sectors: a blow on
+her lights the sector it came from (the dealer's bearing from the eye, Moment.whence) with a red glow, held about 2 s
+and fading, brighter for a heavier blow; at rest the ring is all but invisible. Replaces the rings round her ship and
+the crescents at the screen's edge.
 
 **Smoke.** Through the puffs (gunfire/puffs.ts), no new pass: a ship with wear 1 trails thin grey wisps, wear 2 a
 dark column. Budgeted for the iPad Air at 30-40 fps: a cap on emitters, thinned with distance, none past sight.
