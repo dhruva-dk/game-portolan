@@ -257,7 +257,8 @@ export function createFleet(light: Light, wind: Wind, capacity: number) {
       if (slacks[i] < 1) scale(sails[i], slacks[i], sails[i]);
       if (simulating) metres[i] = eye.distanceTo(middleOf(pose));
     }
-    moor(berths, metres, simulating ? own : -1, dt);
+    // (her own berthed only while she is drawn: never set, or dropped, none)
+    moor(berths, metres, simulating && shown[own] ? own : -1, dt);
     for (let k = 0; k < BERTHS; k++) {
       const b = berths[k];
       if (!b) {
