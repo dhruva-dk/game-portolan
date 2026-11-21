@@ -54,6 +54,8 @@ export type Fault = 0 | 1 | 2;
 /** One number for each zone, in ZONES' order; a fault for each. */
 export type Zones<T> = readonly [T, T, T, T];
 export type Faults = Zones<Fault>;
+/** No zone faulted. */
+export const SOUND: Faults = [0, 0, 0, 0];
 
 const ORDER = perKind((k) => KINDS.indexOf(k));
 /** A gun's kind's place in KINDS. */

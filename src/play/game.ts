@@ -52,7 +52,7 @@ import { RIDE } from '../sim/ride.ts';
 import { PLAYER } from '../sim/match.ts';
 import type { Vessel } from '../sim/contact.ts';
 import type { Helm, ShipState } from '../sim/ship.ts';
-import type { Use } from '../kinds.ts';
+import type { Fault, Use } from '../kinds.ts';
 import type { Eye, LootDraw, Snapshot } from '../snapshot.ts';
 import { createSwell } from '../world/swell.ts';
 import type { Anchor } from '../world/lattice.ts';
@@ -70,6 +70,9 @@ import {
 import {
   HOTBAR,
   IDLE,
+  SOUND,
+  worsened,
+  type Faults,
   type GunSlot,
   type Hands,
   type Item,
@@ -92,7 +95,7 @@ import { createChase } from './chase.ts';
 import { placed, type Point, type View as Viewport } from './lens.ts';
 import { finale, type Ending } from './finale.ts';
 import { see, seenOf } from './moments.ts';
-import { answerTo, createShake } from './shake.ts';
+import { CAMERA, answerTo, createShake } from './shake.ts';
 import { createStops, stopFor } from './stops.ts';
 import {
   createState,
@@ -101,6 +104,18 @@ import {
   type Match,
   type Waters,
 } from './state.ts';
+
+/**
+ * Damage as the debug switches set it (debug.ts ?zones, ?faults, ?wear): her
+ * zones' shares, faults and mending (player.ts Status), and every ship's wear
+ * and faults (snapshot.ts ShipDraw).
+ */
+export interface Worn {
+  zones: Status['zones'];
+  faults: Faults;
+  mending: boolean;
+  wear: Fault;
+}
 
 /** How little of the stick's push counts as none. */
 const DEAD = 0.15;
@@ -225,6 +240,17 @@ export function createGame(
   const shake = createShake(),
     stops = createStops();
   let answered = 0;
+  /**
+   * Her zones, faults and mending, and every ship's wear and faults, as the
+   * debug switches set them (debug.wear), over the match's own; null: the
+   * match's.
+   */
+  let worn: Worn | null = null;
+  /** A ship's faults: as worn, else her own (sim/faults.ts). */
+  const faultsOn = (s: Crew): Faults =>
+    worn?.faults ?? faultsOf(s.health.hull, s.wear);
+  /** Her faults as the camera last answered them. */
+  let faulted: Faults = SOUND;
 
   /**
    * The hands' orders: the stick's push as a heading across the sea as the
@@ -265,7 +291,7 @@ export function createGame(
     shield: 0,
     shieldMax: HEALTH.shield,
     zones: UNWORN.zones,
-    faults: [0, 0, 0, 0],
+    faults: SOUND,
     mending: false,
     gun: null,
     afloat: 0,
@@ -500,6 +526,11 @@ export function createGame(
         const stop = stopFor(d, me);
         if (stop) stops.request(stop.stop, stop.strength);
       }
+      // a fault come on or worsened: a punch, once
+      const faults = faultsOn(state.crew(PLAYER));
+      if (worsened(faulted, faults) && !anchored && arrival === null)
+        shake.play(CAMERA.fault, 1);
+      faulted = faults;
       shake.update(dt);
       const time = clock(stops.update(dt));
       for (let i = 0; i < time.steps; i++) {
@@ -585,6 +616,11 @@ export function createGame(
       drawn.clock = time;
       drawn.storm = state.storm(between);
       drawn.ships = state.drawn(between);
+      if (worn)
+        for (const d of drawn.ships) {
+          d.wear = worn.wear;
+          d.faults = worn.faults;
+        }
       drawn.balls = state.balls(between);
       drawn.blasts = state.blasts();
       drawn.sea = state.sea(between);
@@ -664,13 +700,14 @@ export function createGame(
       report.facing = chase.axes().ahead;
       report.arriving =
         arrival === null ? 0 : Math.max(0, 1 - arrival / ARRIVAL.seconds);
-      report.hull = c.health.hull;
-      report.shield = c.health.shield;
-      // her zones, or the watched ship's
+      // her hull, shield, zones and faults, or the watched ship's; the debug's
+      // held over either
       const w = (watched ? state.crew(view.watch) : c) ?? c;
-      report.zones = sharesOf(w.wear);
-      report.faults = faultsOf(w.health.hull, w.wear);
-      report.mending = w.wear.mending;
+      report.hull = w.health.hull;
+      report.shield = w.health.shield;
+      report.zones = worn?.zones ?? sharesOf(w.wear);
+      report.faults = faultsOn(w);
+      report.mending = worn?.mending ?? w.wear.mending;
       report.gun = g ? inHandOf(g, c, lay?.target != null) : null;
       report.afloat = state.alive().length;
       report.sunk = sunk(c.health);
@@ -736,6 +773,11 @@ export function createGame(
       },
       sink: debugOf(state).sink,
       strew: debugOf(state).strew,
+      /** Her zones, faults and mending, and every ship's wear and faults, held at `w` over the match's (null: the
+       *  match's own again). */
+      wear(w: Worn | null) {
+        worn = w;
+      },
     },
   };
 }

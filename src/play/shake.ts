@@ -112,6 +112,13 @@ export const CAMERA = {
     fov: { deg: -2.5, attack: 0.04, hold: 0.05, release: 0.35 },
   },
   hurt: { shake: 0.38, kick: { away: 0.55, tilt: 2 } },
+  // a fault come on her: a bigger beat than any one blow
+  fault: {
+    shake: 0.55,
+    band: 'rumble',
+    kick: { away: 0.9, tilt: 3.2, pitch: 0.6 },
+    fov: { deg: -4, attack: 0.05, hold: 0.1, release: 0.5 },
+  },
   sink: {
     shake: 0.45,
     fov: { deg: -6, attack: 0.08, hold: 0.25, release: 0.6 },

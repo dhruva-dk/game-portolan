@@ -146,8 +146,15 @@ export const HER = 0;
 export { isGun } from './kinds.ts';
 export type { GunKind, LootKind } from './kinds.ts';
 /** A ship's four zones and their faults (none, minor, major): kinds.ts. */
-export { ZONES } from './kinds.ts';
+export { SOUND, ZONES } from './kinds.ts';
 export type { Fault, Faults, Zone, Zones } from './kinds.ts';
+
+/**
+ * Whether a fault came on, or worsened, from `was` to `now` (each zone's, in
+ * ZONES' order): the beat the camera, the sound and the HUD give it once.
+ */
+export const worsened = (was: Faults, now: Faults) =>
+  now[0] > was[0] || now[1] > was[1] || now[2] > was[2] || now[3] > was[3];
 
 /** The hotbar's slots: the guns' first, then the items'. */
 export const HOTBAR = { guns: 2, items: 3 } as const;

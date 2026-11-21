@@ -84,6 +84,13 @@
 // play/chase.ts); ?slow=k runs the game at k of its speed (for catching a ball
 // in flight).
 //
+// Damage. ?zones=r,u,w,d sets her zones' shares of her hull's damage (rigging,
+// rudder, waterline, deck: player.ts ZONES), ?faults=a,b,c,d their faults (0
+// none, 1 minor, 2 major) on her and every ship, ?wear=0…2 every ship's wear
+// (her smoke), ?mend her water mending her; held over the match's own
+// (game.ts debug.wear), from ?worn=seconds into the frames drawn (0 by
+// default: from the first; later, a fault comes on in view).
+//
 // Her loop. ?flood=seconds, after ?drive='s legs, steers her back to where she
 // began until her loop closes (her strip back against her older water), then sails
 // on that many seconds more (?inward=seconds, after the legs, sails her that
@@ -99,7 +106,7 @@ import type { Anchor } from './world/lattice.ts';
 import type { World } from './environment.ts';
 import type { FrameOptions } from './frame.ts';
 import { createFly } from './fly.ts';
-import type { Game } from './play/game.ts';
+import type { Game, Worn } from './play/game.ts';
 import type { Referee } from './play/referee.ts';
 import { dealt, lookOf, worn } from './play/colours.ts';
 import type { Matches } from './play/setup.ts';
@@ -107,7 +114,7 @@ import type { Berth } from './play/state.ts';
 import { HOTBAR, IDLE, type Hands, type Livery } from './player.ts';
 import { probeMeshes } from './probe.ts';
 import { STEP } from './sim/fixed.ts';
-import { KINDS, type GunKind } from './kinds.ts';
+import { KINDS, SOUND, type Fault, type GunKind } from './kinds.ts';
 import { GUN, SHIP } from './sim/handling.ts';
 import { PLAYER, SHIPS } from './sim/match.ts';
 import type { Cap } from './sim/storm.ts';
@@ -208,6 +215,35 @@ const degrees = Math.PI / 180;
 /** The debug camera flies instead of the game. */
 const flying =
   params.has('fly') || ['lat', 'lon', 'alt', 'wall'].some((k) => params.has(k));
+
+/** A list switch's nth number (?zones=r,u,w,d), within 0…hi (0 where not given). */
+const nth = (name: string, i: number, hi: number) => {
+  const v = Number((params.get(name) ?? '').split(',')[i]);
+  return Math.min(hi, Math.max(0, Number.isFinite(v) ? v : 0));
+};
+/** A fault or a wear as a switch gives it: 0, 1 or 2. */
+const grade = (v: number): Fault => (v >= 1.5 ? 2 : v >= 0.5 ? 1 : 0);
+/** The damage ?zones, ?faults, ?wear and ?mend set (null with none of them). */
+const damage: Worn | null = ['zones', 'faults', 'wear', 'mend'].some((k) =>
+  params.has(k)
+)
+  ? {
+      zones: [
+        nth('zones', 0, 1),
+        nth('zones', 1, 1),
+        nth('zones', 2, 1),
+        nth('zones', 3, 1),
+      ],
+      faults: [
+        grade(nth('faults', 0, 2)),
+        grade(nth('faults', 1, 2)),
+        grade(nth('faults', 2, 2)),
+        grade(nth('faults', 3, 2)),
+      ],
+      mending: params.has('mend'),
+      wear: grade(number('wear', 0)),
+    }
+  : null;
 
 /**
  * The art direction's alternates (?mood=): the hour, and the haze's mean as a
@@ -337,7 +373,11 @@ export async function scenario(
     ...(params.get('kit')
       ? [{ at: number('kit', 0), act: () => kit(p.game) }]
       : []),
+    ...(damage && number('worn', 0) > 0
+      ? [{ at: number('worn', 0), act: () => p.game.debug.wear(damage) }]
+      : []),
   ];
+  if (damage && !(number('worn', 0) > 0)) p.game.debug.wear(damage);
   let drawn = 0;
   return s.draw((real) => {
     const dt = paused ? 0 : real * slow,
@@ -602,8 +642,8 @@ function flyer(
     velocity: scale(o.heading, number('way', 0)),
     afloat: true,
     gun: armed(i, o),
-    wear: 0,
-    faults: [0, 0, 0, 0],
+    wear: damage?.wear ?? 0,
+    faults: damage?.faults ?? SOUND,
   }));
   let clock = 0;
   return (dt: number): Snapshot => {
