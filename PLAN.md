@@ -25,8 +25,7 @@ the scatter, P6 met). Decisions below were settled in conversation on
 - **Every launch rolls a random seed.** A finished race returns to the title
   as a page reload with a new random seed.
 - **Result screen, two buttons:** a **seed** (a new random seed) and a
-  **tree** (sail this seed again: reload with the same one). _(Reading of "a
-  tree and a seed": confirm.)_
+  **tree**, a palm (sail this seed again: reload with the same one).
 - **The lobby shows the current seed** as a chip; tapped, it opens the seed
   panel.
 - **Seed panel:**
@@ -42,10 +41,15 @@ the scatter, P6 met). Decisions below were settled in conversation on
     margin and flee hull; standouts (the sharpest captain, the most
     reckless).
   - **Never shown:** the storm's caps.
-- **How the seed is carried:** `localStorage` plus a reload in the iOS app
-  (Capacitor loads `dist/index.html` in a WKWebView and has no address bar);
-  `?seed=` still works on the web and in debug. The release path reads the
-  seed, not only `debug.ts`.
+- **How the seed is carried:** in the page's address, `?seed=` (`address.ts`),
+  in the iOS app too (Capacitor loads `dist/index.html` in a WKWebView; a new
+  address is a new page). Chosen over `localStorage`, which a private window
+  may refuse. A page with no seed rolls one; a debug page with none keeps
+  `SEED` (3), the planet the tools measure. A new page keeps only `?debug`, so
+  a debug switch like `?leave` doesn't fire again.
+- **Home from a race:** the title comes over the match and stays while the
+  page loads again under it (`ui/passage.ts`). The result's tree reloads the
+  same seed; its seed rolls a new one. Done in `4959a57`.
 - **Restage in place:** parked. Revisit only if a reload on the iPad Air is
   slow; time it as part of step 2.
 
@@ -126,19 +130,29 @@ budget holds (worst step under 16 ms, iPad Air M1 at 30-40 fps).
 
 ## 6. Order of work
 
-1. ~~Land depth on main.~~ Done (`1a84fc0`).
-2. **Seed module and plumbing:** text to seed, the word list, the release
-   reading `localStorage` and `?seed=`, a random seed per launch, the lobby
-   chip, the reload to the title, the seed and tree buttons. Time a reload
-   on the iPad.
-3. **The seed panel:** the inked globe and the fleet card. Tested in
-   headless Chromium.
+1. ~~Land depth on main.~~ Done (`1a84fc0`). Landing it checked out a
+   committed `node_modules` symlink (`718ee0e`) over the main checkout's real
+   one; restored with `npm ci`, and untracked on `seeds` (`d3dec6f`). Main
+   still tracks it until `seeds` lands.
+2. ~~**Seed module and plumbing.**~~ Done (`4959a57`): text to seed, the word
+   list, `?seed=`, a random seed per launch, the reload to the title, the seed
+   and tree buttons. Still to do: time a reload on the iPad. The lobby chip
+   moved to step 3.
+3. **The lobby chip and the seed panel:** the inked globe and the fleet card.
+   Tested in headless Chromium.
 4. **Harness pool and report page:** the 5 + 5 planets; an HTML report of
    section 5's metrics per planet, each planet linking its replay
    (`tools/harness/replay.ts`).
 5. Then, each gated on the report: loot scaled up, then bot layers 1 to 4.
 
 Steps 3 and 4 can run in parallel worktrees once step 2 lands.
+
+## Tuning passes
+
+A pass is one change, run on the 5 tuning planets, then checked on the 5
+held out. At most 3 passes per layer, and for the loot change. Stop early
+when a pass doesn't beat the noise (1 se) on the held-out planets, and keep
+the best so far.
 
 ## Not decided / later
 
