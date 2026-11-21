@@ -174,6 +174,8 @@ export function createSeedPanel(
   return {
     /** Opens it on the seed this page sails, or closes it. */
     show(on: boolean) {
+      // (shown before it is drawn: the field and the globe are laid over their places as the page lays them out)
+      f.show(on);
       if (on) {
         input.value = seeds.name;
         draw();
@@ -183,7 +185,6 @@ export function createSeedPanel(
         clearTimeout(timers.chart);
         input.blur();
       }
-      f.show(on);
     },
   };
 }

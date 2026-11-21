@@ -141,7 +141,11 @@ export function createOrb() {
         const x = land[i] ?? 0,
           y = land[i + 1] ?? 0,
           z = land[i + 2] ?? 0;
-        if (x * c[0] + y * c[1] + z * c[2] <= 0.02) continue;
+        // foreshortened toward the limb the dots crowd; kept in the share
+        // they face the eye (by the golden ratio's even sieve), they lie as
+        // thick on the paper there as at the middle, with no moiré
+        const facing = x * c[0] + y * c[1] + z * c[2];
+        if (facing <= 0.02 || ((i / 3) * 0.618034) % 1 > facing * 1.3) continue;
         ctx.fillRect(
           r + r * (x * right[0] + z * right[2]) - d / 2,
           r - r * (x * up[0] + y * up[1] + z * up[2]) - d / 2,
