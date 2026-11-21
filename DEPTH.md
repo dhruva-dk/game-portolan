@@ -62,8 +62,8 @@ persona spread within 1 se. At most 3 tuning passes. Goldens re-recorded and nam
 
 ## B. The telemetry HUD and the damage on the ships (render, HUD)
 
-**Vitals as telemetry** (Forza's damage readout, in the chart's hand). The top-left slip's two bars become a
-top-down ship silhouette, inked, her four zones drawn as parts of her (masts and canvas across her middle; her
+**Vitals as telemetry** (Forza's damage readout, in the chart's hand). The top-left slip keeps its shield and hull
+bars and their numerals, and gains beside them a top-down ship silhouette, inked, her four zones drawn as parts of her (masts and canvas across her middle; her
 stern; her sides along the waterline; her deck from bow aft). Each zone washed from paper through ochre to vermilion
 by its share; a faulted zone rubric, its fault's mark beside it (minor drawn, major filled). Her shield an azure
 outline round her, its arc as full as her shield; her hull's numeral large, her shield's small. A hit: the struck
@@ -87,14 +87,14 @@ the clock and the full map. As a closing begins, a bolt strikes at the edge (sky
 
 ## C. The lobby: her livery, and the UI made plain
 
-**Livery.** One set of liveries for every ship: COLOURS (eight dyes: vermilion and the six of play/colours.ts and one
-more, none near the sea's blues and greens, the foam's cream or the storm's violet) × PATTERNS (plain, band, stripes).
+**Livery.** One set of liveries for every ship: COLOURS (about sixteen dyes: vermilion and the six of
+play/colours.ts among them, none near the sea's blues and greens, the foam's cream or the storm's violet) × PATTERNS (plain, band, stripes).
 Her choice is kept on the device (localStorage, every read and write in try/catch; vermilion plain by default). The
 seed deals every bot hers from the same set (hash(seed, id)), never her colour: her colour is hers alone at sea. Her
 water, her line on the sea and her mark on the minimap take her colour.
 
 In the lobby: a paper disc at its foot (a dye pot or a sail swatch: drawn in the house hand) opens a slim folio
-docked at the bottom, so her ship at anchor stays in view above it and changes as she taps: a row of eight daubs of
+docked at the bottom, so her ship at anchor stays in view above it and changes as she taps: two rows of eight daubs of
 dye, a row of three small sails showing each pattern in the chosen dye, the chosen one gilt-ringed. While it is open
 the camera eases round to her broadside. Tap outside or the close mark to close. Big targets (44 pt at least), no
 words, nothing that shifts as she taps.
