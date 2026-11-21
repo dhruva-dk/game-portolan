@@ -80,11 +80,13 @@ export interface Sea {
 
 /**
  * The calm the storm closes to next, and the chart's field (route.ts) into its
- * heart, found once a phase for every ship.
+ * heart (the water within `heart` m of its centre), found once a phase for
+ * every ship.
  */
 interface Calm {
   readonly cap: Cap;
   readonly field: Field;
+  readonly heart: number;
 }
 
 export type Mode =

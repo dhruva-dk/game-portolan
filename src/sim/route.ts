@@ -577,6 +577,43 @@ export function downField(ch: Chart, f: Field, at: Vec3): Vec3 | null {
   return to < 0 ? null : cellCentre(to);
 }
 
+/**
+ * What the way down field `f` costs from `at` (as the field reckons it:
+ * metres, the shore's cells dearer): its nearest open cell's; Infinity where
+ * none of it reaches her.
+ */
+export function fieldAt(ch: Chart, f: Field, at: Vec3): number {
+  const c = nearestOpen(ch, ch.space, at, ROUTE.wade);
+  return c < 0 ? Infinity : f[c];
+}
+
+/**
+ * Where the way down field `f` from `at` first costs no more than `until`:
+ * stepping always to the cheapest cell beside, at most `most` cells on (so a
+ * look costs at most so many); null where none of it reaches her.
+ */
+export function downTo(
+  ch: Chart,
+  f: Field,
+  at: Vec3,
+  until: number,
+  most: number
+): Vec3 | null {
+  let c = nearestOpen(ch, ch.space, at, ROUTE.wade);
+  if (c < 0 || !(f[c] < Infinity)) return null;
+  for (let k = 0; k < most && f[c] > until; k++) {
+    const n = stepsOf(ch, c, STEPS);
+    let next = -1;
+    for (let i = 0; i < n; i++) {
+      const m = STEPS[i];
+      if (ch.open[m] && f[m] < (next < 0 ? f[c] : f[next])) next = m;
+    }
+    if (next < 0) break;
+    c = next;
+  }
+  return cellCentre(c);
+}
+
 // ---------------------------------------------------------------- following
 // one
 

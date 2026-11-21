@@ -179,6 +179,28 @@ her cell, as its first was.
   slots full of shields); kept ×2 with the shares leaning to the hull (hull
   +2.7 ± 0.3, damage +6.2, within noise of ×2).
 
+**Step 2, layer 1 (the zone by water).** Seen: a bot reckoned herself inside
+the next cap as the crow flies, and stopped half her margin in, though in a
+bay far round by sea from where the storm was going; her mark was the nearest
+water just inside. Now, with the chart's way into the next cap's heart (Sea
+calm, which now carries the heart's size), how far in she is is that way's
+cost short of the heart, and her mark is down the way to where it costs her
+margin in, deeper by up to half of the rest the more time is left (40 s);
+bounded at 40 cells a think (storming.ts; route.ts fieldAt, downTo). Ships
+outside the cap as it finished closing, six matches on 2807500422: 46 of 232
+→ 26 of 220. Held pooled: damage 129.1 → 130.9 (+1.9 ± 1.8); hull mended
+10.82 → 10.63 (−0.2 ± 0.4); sustain 0.617 → 0.609; lull 83.7 → 92.2 (+8.5 ±
+5.8); distinctness 0.172 → 0.162 (−0.011 ± 0.007); stuck 3.93 → 4.42; aground
+0.09 → 0.03; spread 0.067 → 0.104. Worst held: damage 125.7 → 125.5, lull
+91.6 → 110.4 (+18.8 ± 12.0). None worse by two se; lull and distinctness lean
+worse by some 1.5 (flagged). Steps 1.96 / 4.71 / 13.2 → 1.65 / 3.48 / 12.0
+(marks down the way in are found by the router; fewer searches run to their
+limit). The lulls are the endgame's (two or three ships 100–250 m apart,
+claiming or roaming, out of each other's sight): left to layers 2–4.
+- Tried and dropped: pressing her on until she reaches her deeper mark (held
+  hull mended −1.2 ± 0.3 and sustain −0.021, both worse by two se: in the
+  storm's option she mends nothing; lull +2.2 ± 6.1).
+
 ## Not decided / later
 
 - Restage in place (parked).

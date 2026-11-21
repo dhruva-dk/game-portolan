@@ -57,7 +57,8 @@ const HOLD_FIRE: Order = { aim: null, fire: false };
 
 /**
  * The calm's heart, the field leads into: within this share of its radius of
- * its centre (where the bots make for, sim/bot.ts STORMING.inward).
+ * its centre (where the bots make for, sim/storming.ts STORMING.inward; the
+ * way's cost short of it is how far in they reckon themselves).
  */
 const HEART = 0.6;
 /**
@@ -99,7 +100,11 @@ export function createOrders(depth: (p: Vec3) => number, chart: Chart) {
   };
   const out = { helms, orders, asks };
   /** The way into the next calm, while it is being found. */
-  let coming: { cap: Cap; found: ReturnType<typeof building> } | null = null;
+  let coming: {
+    cap: Cap;
+    heart: number;
+    found: ReturnType<typeof building>;
+  } | null = null;
 
   /**
    * A ship as the bots see her: where she is and goes, her hit points, her gun,
@@ -146,11 +151,16 @@ export function createOrders(depth: (p: Vec3) => number, chart: Chart) {
         centre = next.centre;
       coming = {
         cap: { centre, radius: next.radius },
+        heart,
         found: building(chart, (p) => distance(p, centre) <= heart),
       };
     }
     if (coming?.found.build(CALM_WORK)) {
-      sea.calm = { cap: coming.cap, field: coming.found.field };
+      sea.calm = {
+        cap: coming.cap,
+        field: coming.found.field,
+        heart: coming.heart,
+      };
       coming = null;
     }
     sea.loot = now.loot.pieces;

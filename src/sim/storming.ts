@@ -9,7 +9,8 @@
 // for the same inputs, to the bit.
 
 import { R, along, distance, toward, type Vec3 } from '../world/sphere.ts';
-import { toEdge, type Cap } from './storm.ts';
+import { downTo, fieldAt } from './route.ts';
+import { toEdge, type Cap, type Storm } from './storm.ts';
 import { ramp } from './utility.ts';
 import { open, rotate, type Ctx } from './captain.ts';
 
@@ -31,6 +32,19 @@ export const STORMING = {
   inward: 0.6,
   shore: 136,
   ring: 6.8,
+  /**
+   * With the chart's way into the next cap's heart (Sea calm), how far in she
+   * is is reckoned by water: the way's cost short of the heart's edge, from the
+   * cap's edge. Making in, she makes down that way to where it costs her
+   * margin in from the edge, and deeper by up to `deeper` of what lies past
+   * that, the more of `ahead` s are left before the cap has closed (a close
+   * not yet begun counted as `closing` s); `most` cells looked down it at a
+   * think.
+   */
+  deeper: 0.5,
+  ahead: 40,
+  closing: 20,
+  most: 40,
 } as const;
 
 /** Metres the cap reaches along the surface from its centre. */
@@ -53,7 +67,7 @@ export function stormUrge(c: Ctx): number {
   const p = c.own.ship.at,
     margin = c.t.margin;
   const pressed =
-    late(c) && toEdge(p, s.next) < margin * c.b.storming.inNext && !s.final;
+    late(c) && inNext(c, s.next) < margin * c.b.storming.inNext && !s.final;
   return Math.max(
     ramp(
       toEdge(p, s),
@@ -95,9 +109,59 @@ export function inward(c: Ctx, p: Vec3, centre: Vec3, r: number): Vec3 {
 }
 
 /**
+ * The chart's way into this cap's heart (Sea calm), if she has it: the next
+ * cap's, once found; null for any other cap, or with no chart.
+ */
+function calmOf(c: Ctx, cap: Cap) {
+  const k = c.sea.calm,
+    ch = c.sea.chart;
+  return k &&
+    ch &&
+    k.cap.radius === cap.radius &&
+    k.cap.centre[0] === cap.centre[0] &&
+    k.cap.centre[1] === cap.centre[1] &&
+    k.cap.centre[2] === cap.centre[2]
+    ? { ch, field: k.field, gap: reach(cap) - k.heart }
+    : null;
+}
+
+/**
+ * How far inside the next cap she is, m: by the chart's way into its heart
+ * when she has it (the way's cost short of the heart's edge from the cap's
+ * edge, so water in a bay far round by sea from the heart is reckoned outside,
+ * however near the heart it lies), and as the crow flies otherwise, or if
+ * that is less.
+ */
+function inNext(c: Ctx, next: Cap): number {
+  const p = c.own.ship.at,
+    edge = toEdge(p, next),
+    k = calmOf(c, next);
+  return k ? Math.min(edge, k.gap - fieldAt(k.ch, k.field, p)) : edge;
+}
+
+/**
+ * Where she makes for to be inside the next cap, by the chart's way into its
+ * heart: where the way costs her margin in from the cap's edge, deeper the
+ * more time is left before it has closed; where she is, if she is in that
+ * far. Null with no way (none found yet, or none reaching her).
+ */
+function downCalm(c: Ctx, s: Storm): Vec3 | null {
+  const k = calmOf(c, s.next);
+  if (!k) return null;
+  const st = c.b.storming,
+    left = s.secondsToNext + (s.closing ? 0 : st.closing),
+    deep = st.deeper * Math.min(1, left / st.ahead),
+    until = Math.max(0, k.gap - c.t.margin) * (1 - deep),
+    p = c.own.ship.at;
+  if (fieldAt(k.ch, k.field, p) <= until) return p;
+  return downTo(k.ch, k.field, p, until, st.most);
+}
+
+/**
  * The cap she makes for in the storm: the one she is in, while it isn't late or
- * she is near its edge; else the next. (Where she is, with no storm: its urge
- * is nothing then, so it is never chosen.)
+ * she is near its edge; else the next, down the chart's way into its heart
+ * when she has it. (Where she is, with no storm: its urge is nothing then, so
+ * it is never chosen.)
  */
 export function stormGoal(c: Ctx): Vec3 {
   const s = c.sea.storm,
@@ -106,7 +170,10 @@ export function stormGoal(c: Ctx): Vec3 {
   if (!s) return p;
   const cap: Cap =
     toEdge(p, s) < margin * c.b.storming.nearEdge || !late(c) ? s : s.next;
-  return inward(c, p, cap.centre, Math.max(0, reach(cap) - margin));
+  return (
+    (cap === s.next && downCalm(c, s)) ||
+    inward(c, p, cap.centre, Math.max(0, reach(cap) - margin))
+  );
 }
 
 /**
