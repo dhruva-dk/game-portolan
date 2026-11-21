@@ -94,6 +94,8 @@ export const SMOKE: Tones = { lit: CLOUD.lit, shadow: ink('#D9907C') };
  */
 export const DUST = ink('#C9A06A');
 export const SOOT = ink('#5A4A55');
+/** A worn ship's thin smoke: a warm grey (gunfire/puffs.ts). */
+export const WISP = ink('#9C9294');
 
 // ---- the guns' fire: lights, radiance per unit of sun (gunfire/gunfire.ts)
 /** A muzzle's flash, and a ball home's. */

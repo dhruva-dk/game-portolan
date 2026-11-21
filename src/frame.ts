@@ -427,7 +427,7 @@ export function createFrame(
       else gunfire.sink(b.time, b.at);
     }
     laid = latest;
-    gunfire.draw(s.clock, s.balls);
+    gunfire.draw(s.clock, s.balls, s.ships, s.eye.position);
     loot.draw(s.clock, s.loot, s.eye.position);
     arms.update(s.ships, s.eye.position);
   }

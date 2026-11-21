@@ -9,6 +9,8 @@
 //   a ball home    a flash, splinters thrown out of her side and falling, and dark smoke
 //   a ram          splinters
 //   a ball flying  a ribbon of thin grey smoke along the way it came (its kind's trail, balls.ts SHOT)
+//   a worn ship    thin grey wisps off her waist (wear 1), a dark column (wear 2): the nearest few, fewer and
+//                  bigger puffs the farther she is, none past sight (worn)
 // Smoke and spray are flat shapes in two tones (palette.ts: powder smoke cream,
 // rose beneath; spray the foam's white), as bright as the place and the hour
 // (sky/light.ts level), and blended premultiplied: a flash is all added light,
@@ -42,9 +44,18 @@ import {
   vec3,
 } from 'three/tsl';
 import type { GunKind } from '../kinds.ts';
-import { AZURE, DUST, FIRE, FOAM, SMOKE, SOOT, TIMBER } from '../palette.ts';
+import {
+  AZURE,
+  DUST,
+  FIRE,
+  FOAM,
+  SMOKE,
+  SOOT,
+  TIMBER,
+  WISP,
+} from '../palette.ts';
 import type { Light } from '../sky/light.ts';
-import type { BallDraw } from '../snapshot.ts';
+import type { BallDraw, ShipDraw } from '../snapshot.ts';
 import { random } from '../world/random.ts';
 import * as sphere from '../world/sphere.ts';
 import { premultiplied, quad } from '../gpu.ts';
@@ -83,6 +94,45 @@ const FIRING: Record<
 };
 
 type Vec3 = sphere.Vec3;
+
+/**
+ * A worn ship's smoke (ShipDraw.wear), wear 1's and 2's: puffs a second near
+ * her, their size (m), growth (m/s), rise (m/s), drag (per s), lift (m/s² up),
+ * life (s), opacity and ink; thin grey wisps up past her tops, then a dark
+ * column twice her masts' height.
+ */
+const WORN = [
+  null,
+  {
+    rate: 6,
+    size: 0.4,
+    grow: 0.7,
+    rise: 6,
+    drag: 0.4,
+    lift: 0.6,
+    life: 4.5,
+    opacity: 0.5,
+    ink: WISP,
+  },
+  {
+    rate: 12,
+    size: 0.8,
+    grow: 1.1,
+    rise: 8,
+    drag: 0.35,
+    lift: 0.9,
+    life: 6.5,
+    opacity: 0.8,
+    ink: SOOT,
+  },
+] as const;
+/**
+ * The smoking ships: the most at once (the nearest), how near the eye she
+ * smokes in full (metres; farther, fewer puffs and bigger), and past how far
+ * none; where on her it rises (metres over her waterline and aft of her
+ * middle: her waist, ship/lines.ts at her SCALE).
+ */
+const SMOKING = { most: 8, near: 50, far: 360, over: 2.5, aft: 1.5 } as const;
 
 /**
  * A puff's flat shape: its edge's radius on its sprite and half that edge's
@@ -124,6 +174,24 @@ interface Puff {
   opacity: number;
   soft: number;
   fadeIn: number;
+}
+
+/**
+ * Whether a ship at `p` (metres) shows from `eye` over the horizon: the line to
+ * a point SMOKING.over and some more above her stays over the sea.
+ */
+function overHorizon(eye: Vec3, p: Vec3) {
+  const k = (sphere.R + SMOKING.over + 6) / Math.max(1e-6, sphere.length(p));
+  const dx = p[0] * k - eye[0],
+    dy = p[1] * k - eye[1],
+    dz = p[2] * k - eye[2];
+  const t =
+    -(eye[0] * dx + eye[1] * dy + eye[2] * dz) / (dx * dx + dy * dy + dz * dz);
+  if (t <= 0 || t >= 1) return true;
+  const x = eye[0] + dx * t,
+    y = eye[1] + dy * t,
+    z = eye[2] + dz * t;
+  return x * x + y * y + z * z >= sphere.R * sphere.R;
 }
 
 function puffMesh(light: Light, now: FloatNode) {
@@ -237,8 +305,16 @@ function puffMesh(light: Light, now: FloatNode) {
 export function createPuffs(light: Light, now: FloatNode) {
   const puffs = puffMesh(light, now);
   const array = puffs.data;
-  /** The world's clock when the balls' trails were last laid. */
-  let drawn = -Infinity;
+  /** The world's clock when the balls' trails, and the worn ships' smoke, were last laid. */
+  let drawn = -Infinity,
+    wornAt = -Infinity;
+  /**
+   * Each worn ship's share of a puff owed (by id); the smoking this frame, and
+   * how far each is from the eye (metres).
+   */
+  const owed = new Map<number, number>(),
+    smoking: ShipDraw[] = [],
+    away: number[] = [];
   /** The puff a ball's trail lays, rewritten for each (so none is made). */
   const trailAt: [number, number, number] = [0, 0, 0];
   const trailPuff: Puff = {
@@ -559,6 +635,65 @@ export function createPuffs(light: Light, now: FloatNode) {
           way = sphere.add(sphere.scale(at, u(2, 7)), any(), 2);
         lay(time, smoke(from, way, SOOT, 0.75, u(4, 7), 2));
       }
+    },
+    /**
+     * Each frame, at `time` (the world's clock, s), before draw: the smoke of
+     * the worn among `ships` (ShipDraw.wear), seen from `eye` (metres): of the
+     * nearest SMOKING.most afloat and within sight (short of SMOKING.far and
+     * over the horizon), each laying her puffs at her wear's rate, fewer and
+     * bigger the farther she is.
+     */
+    worn(time: number, ships: readonly ShipDraw[], eye: Vec3) {
+      const since =
+        time - wornAt > 0 && time - wornAt < 0.25 ? time - wornAt : 0;
+      wornAt = time;
+      if (!since) return;
+      let n = 0;
+      for (const s of ships) {
+        if (!s.afloat || !s.wear) continue;
+        const p = s.pose.position,
+          d = Math.hypot(p[0] - eye[0], p[1] - eye[1], p[2] - eye[2]);
+        if (d > SMOKING.far || !overHorizon(eye, p)) continue;
+        smoking[n] = s;
+        away[n++] = d;
+      }
+      // the nearest: a pass of selection, n being few
+      for (let i = 0; i < Math.min(n, SMOKING.most); i++) {
+        let best = i;
+        for (let j = i + 1; j < n; j++) if (away[j] < away[best]) best = j;
+        [smoking[i], smoking[best]] = [smoking[best], smoking[i]];
+        [away[i], away[best]] = [away[best], away[i]];
+        const s = smoking[i],
+          w = WORN[s.wear];
+        if (!w) continue;
+        const far = Math.max(1, away[i] / SMOKING.near),
+          due = (owed.get(s.id) ?? draw()) + (w.rate * since) / far;
+        let k = Math.floor(due);
+        owed.set(s.id, due - k);
+        const { position: p, up, forward } = s.pose;
+        for (; k > 0; k--) {
+          const at = sphere.add(
+            sphere.add(sphere.add(p, up, SMOKING.over), forward, -SMOKING.aft),
+            across(up),
+            u(0, 0.8)
+          );
+          lay(time - u(0, since), {
+            ...smoke(
+              at,
+              sphere.add(sphere.scale(up, w.rise * u(0.7, 1.2)), any(), 0.4),
+              w.ink,
+              w.opacity,
+              w.life * u(0.8, 1.1),
+              w.size * Math.sqrt(far)
+            ),
+            grow: w.grow * Math.sqrt(far),
+            drag: w.drag,
+            pull: -w.lift,
+            fadeIn: 0.12,
+          });
+        }
+      }
+      smoking.length = 0;
     },
     /**
      * Each frame, at `time` (the world's clock, s): the trails of the first `n`

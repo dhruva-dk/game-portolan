@@ -5,14 +5,16 @@
 //   balls.ts  the balls and their tracers (two draws)
 //   marks.ts  the fall marks on the water about each mortar shell's landing
 //   puffs.ts  flashes, smoke, spray and splinters, laid as the battle reports
-//             what made them, and the smoke trailing the balls
+//             what made them, the smoke trailing the balls, and the worn
+//             ships' smoke
 // This one holds the clock and the eye's pixel they share, and hands each its
 // part of every frame.
 
 import { uniform } from 'three/tsl';
 import type { Light } from '../sky/light.ts';
-import type { BallDraw } from '../snapshot.ts';
+import type { BallDraw, ShipDraw } from '../snapshot.ts';
 import type { Eye } from '../view/view.ts';
+import type { Vec3 } from '../world/sphere.ts';
 import { createBalls } from './balls.ts';
 import { createMarks } from './marks.ts';
 import { createPuffs } from './puffs.ts';
@@ -39,9 +41,18 @@ export function createGunfire(light: Light) {
     splash: puffs.splash,
     strike: puffs.strike,
     sink: puffs.sink,
-    /** Each frame: the world's clock now (s), and every ball in flight. */
-    draw(time: number, flying: readonly BallDraw[]) {
+    /**
+     * Each frame: the world's clock now (s), every ball in flight, and the
+     * ships (the worn smoke) as seen from `eye` (metres).
+     */
+    draw(
+      time: number,
+      flying: readonly BallDraw[],
+      ships: readonly ShipDraw[],
+      eye: Vec3
+    ) {
       now.value = time;
+      puffs.worn(time, ships, eye);
       const n = balls.draw(flying);
       marks.draw(flying, n);
       puffs.draw(time, flying, n);
