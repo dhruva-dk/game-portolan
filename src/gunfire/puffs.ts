@@ -9,8 +9,9 @@
 //   a ball home    a flash, splinters thrown out of her side and falling, and dark smoke
 //   a ram          splinters
 //   a ball flying  a ribbon of thin grey smoke along the way it came (its kind's trail, balls.ts SHOT)
-//   a worn ship    thin grey wisps off her waist (wear 1), a dark column (wear 2): the nearest few, fewer and
-//                  bigger puffs the farther she is, none past sight (worn)
+//   a worn ship    thin grey wisps off her waist (wear 1), a dark column (wear 2); spray off her side where her
+//                  waterline is holed, smoke from her gun ports where her deck is (her faults): the nearest few,
+//                  fewer and bigger puffs the farther she is, none past sight (worn)
 // Smoke and spray are flat shapes in two tones (palette.ts: powder smoke cream,
 // rose beneath; spray the foam's white), as bright as the place and the hour
 // (sky/light.ts level), and blended premultiplied: a flash is all added light,
@@ -133,6 +134,22 @@ const WORN = [
  * middle: her waist, ship/lines.ts at her SCALE).
  */
 const SMOKING = { most: 8, near: 50, far: 360, over: 2.5, aft: 1.5 } as const;
+/**
+ * A ship holed at her waterline (her faults, kinds.ts ZONES): spray thrown off
+ * her side, puffs a second near by fault (none, minor, major), from half her
+ * beam out and along her length's middle (metres, ship/lines.ts at her SCALE).
+ */
+const HOLED = { rate: [0, 7, 16], beam: 2.7, length: 5 } as const;
+/**
+ * Her deck afire: smoke from her gun ports, puffs a second near by fault, from
+ * how high over her waterline, along how much of her, how dense.
+ */
+const PORTS = {
+  rate: [0, 5, 12],
+  over: 1.3,
+  length: 6,
+  opacity: 0.75,
+} as const;
 
 /**
  * A puff's flat shape: its edge's radius on its sprite and half that edge's
@@ -638,7 +655,8 @@ export function createPuffs(light: Light, now: FloatNode) {
     },
     /**
      * Each frame, at `time` (the world's clock, s), before draw: the smoke of
-     * the worn among `ships` (ShipDraw.wear), seen from `eye` (metres): of the
+     * the worn among `ships` (ShipDraw.wear), and the spray and ports' smoke
+     * of the holed and afire (ShipDraw.faults), seen from `eye` (metres): of the
      * nearest SMOKING.most afloat and within sight (short of SMOKING.far and
      * over the horizon), each laying her puffs at her wear's rate, fewer and
      * bigger the farther she is.
@@ -648,9 +666,16 @@ export function createPuffs(light: Light, now: FloatNode) {
         time - wornAt > 0 && time - wornAt < 0.25 ? time - wornAt : 0;
       wornAt = time;
       if (!since) return;
+      /** How many puffs of kind `j` ship `id` lays now, at `rate` a second. */
+      const owe = (id: number, j: number, rate: number) => {
+        const due = (owed.get(id * 3 + j) ?? draw()) + rate * since,
+          k = Math.floor(due);
+        owed.set(id * 3 + j, due - k);
+        return k;
+      };
       let n = 0;
       for (const s of ships) {
-        if (!s.afloat || !s.wear) continue;
+        if (!s.afloat || !(s.wear || s.faults[2] || s.faults[3])) continue;
         const p = s.pose.position,
           d = Math.hypot(p[0] - eye[0], p[1] - eye[1], p[2] - eye[2]);
         if (d > SMOKING.far || !overHorizon(eye, p)) continue;
@@ -664,14 +689,54 @@ export function createPuffs(light: Light, now: FloatNode) {
         [smoking[i], smoking[best]] = [smoking[best], smoking[i]];
         [away[i], away[best]] = [away[best], away[i]];
         const s = smoking[i],
-          w = WORN[s.wear];
-        if (!w) continue;
-        const far = Math.max(1, away[i] / SMOKING.near),
-          due = (owed.get(s.id) ?? draw()) + (w.rate * since) / far;
-        let k = Math.floor(due);
-        owed.set(s.id, due - k);
+          w = WORN[s.wear],
+          far = Math.max(1, away[i] / SMOKING.near);
         const { position: p, up, forward } = s.pose;
-        for (; k > 0; k--) {
+        // her side's spray where her waterline is holed, her ports' smoke where her deck is
+        const side = sphere.cross(up, forward),
+          [, , water, deck] = s.faults;
+        for (let k = owe(s.id, 1, (HOLED.rate[water] ?? 0) / far); k > 0; k--) {
+          const out = Math.sign(u(-1, 1)),
+            at = sphere.add(
+              sphere.add(p, side, out * HOLED.beam),
+              forward,
+              u(-HOLED.length, HOLED.length)
+            );
+          lay(
+            time - u(0, since),
+            spray(
+              at,
+              sphere.add(sphere.scale(up, u(2, 5)), side, out * u(1, 3)),
+              u(0.4, 0.8) * Math.sqrt(far),
+              0.6,
+              0.3,
+              u(0.8, 1.4)
+            )
+          );
+        }
+        for (let k = owe(s.id, 2, (PORTS.rate[deck] ?? 0) / far); k > 0; k--) {
+          const out = Math.sign(u(-1, 1)),
+            at = sphere.add(
+              sphere.add(sphere.add(p, up, PORTS.over), side, out * HOLED.beam),
+              forward,
+              u(-PORTS.length, PORTS.length)
+            );
+          lay(time - u(0, since), {
+            ...smoke(
+              at,
+              sphere.add(sphere.scale(side, out * u(1, 2.5)), up, u(1, 2.5)),
+              SOOT,
+              PORTS.opacity,
+              u(2, 3.2),
+              0.55 * Math.sqrt(far)
+            ),
+            grow: 0.9 * Math.sqrt(far),
+            drag: 0.8,
+            pull: -0.6,
+          });
+        }
+        if (!w) continue;
+        for (let k = owe(s.id, 0, w.rate / far); k > 0; k--) {
           const at = sphere.add(
             sphere.add(sphere.add(p, up, SMOKING.over), forward, -SMOKING.aft),
             across(up),

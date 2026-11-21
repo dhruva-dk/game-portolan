@@ -40,6 +40,7 @@ import { createWater, type SeaShows } from './water/water.ts';
 import { createFleet } from './ship/fleet.ts';
 import { createGunfire } from './gunfire/gunfire.ts';
 import { createArms, muzzle } from './ship/arms.ts';
+import { createFaults } from './ship/faults.ts';
 import { createLoot } from './loot/loot.ts';
 import type { Out3 } from './world/sphere.ts';
 import { sunAt, sunInSky } from './world/sun.ts';
@@ -207,7 +208,8 @@ export function createFrame(
   const fleet = createFleet(light, world.wind, options.fleet);
   fleet.pin(options.lod);
   fleet.simulate(options.cloth);
-  const arms = createArms(light, options.fleet);
+  const arms = createArms(light, options.fleet),
+    faults = createFaults();
   const gunfire = createGunfire(light);
   const loot = createLoot(light);
   scene.add(
@@ -406,8 +408,17 @@ export function createFrame(
   function stage(s: Snapshot) {
     fleet.own(s.own);
     now.clear();
-    for (const ship of s.ships) {
-      fleet.set(ship.id, ship.pose, ship.look, ship.velocity, ship.afloat);
+    // each drawn with her faults on her (ship/faults.ts)
+    const ships = faults.apply(s.ships, s.clock);
+    for (const ship of ships) {
+      fleet.set(
+        ship.id,
+        ship.pose,
+        ship.look,
+        ship.velocity,
+        ship.afloat,
+        faults.slack(ship.id)
+      );
       now.add(ship.id);
     }
     for (const id of drawn) if (!now.has(id)) fleet.drop(id);
@@ -427,9 +438,9 @@ export function createFrame(
       else gunfire.sink(b.time, b.at);
     }
     laid = latest;
-    gunfire.draw(s.clock, s.balls, s.ships, s.eye.position);
+    gunfire.draw(s.clock, s.balls, ships, s.eye.position);
     loot.draw(s.clock, s.loot, s.eye.position);
-    arms.update(s.ships, s.eye.position);
+    arms.update(ships, s.eye.position);
   }
 
   /**

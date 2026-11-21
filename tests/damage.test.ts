@@ -5,6 +5,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { SOUND, ZONES, worsened, type Faults } from '../src/player.ts';
+import { createFaults } from '../src/ship/faults.ts';
+import type { ShipDraw } from '../src/snapshot.ts';
 import { edgeAt } from '../src/ui/hits.ts';
 import { PAPER, WASH } from '../src/ui/ink.ts';
 import { struckZone, washOf } from '../src/ui/vitals.ts';
@@ -39,6 +41,39 @@ test('a blow from off the screen: its arc where the line from the middle toward 
   // toward a corner, the nearer side of the screen takes it
   const p = edgeAt(Math.PI / 4, 1180, 820, 20);
   near(p, 590 + 390, 20);
+});
+
+test('faults on a drawn ship: her canvas grimed and slack, a list, her head wandering; eased in, and sound when mended', () => {
+  const ship = (faults: Faults): ShipDraw => ({
+    id: 1,
+    pose: { position: [0, 0, 554], forward: [1, 0, 0], up: [0, 0, 1] },
+    look: { paint: [0.5, 0.4, 0.3], sail: [0.8, 0.1, 0.1], pattern: 'plain' },
+    velocity: [0, 0, 0],
+    afloat: true,
+    gun: null,
+    wear: 0,
+    faults,
+  });
+  const f = createFaults();
+  // the first frame settles at once
+  let [d] = f.apply([ship([2, 2, 2, 0])], 0);
+  // greyed toward soot: darker, and its red no longer far above its green
+  const [r, g] = d.look.sail;
+  assert.ok(r < 0.5 && r - g < 0.35, `grimed: ${d.look.sail}`);
+  assert.ok(f.slack(1) < 0.5, 'slack');
+  const up = d.pose.up;
+  assert.ok(Math.abs(up[2] - Math.cos(0.15)) < 1e-6, `listed: ${up}`);
+  assert.ok(Math.abs(Math.hypot(...up) - 1) < 1e-9);
+  assert.ok(Math.abs(Math.hypot(...d.pose.forward) - 1) < 1e-9);
+  const heads = new Set<string>();
+  for (let t = 0; t < 6; t += 0.5)
+    heads.add(f.apply([ship([2, 2, 2, 0])], t)[0].pose.forward[1].toFixed(3));
+  assert.ok(heads.size > 4, 'her head wanders');
+  // mended: eased back, not jumped
+  [d] = f.apply([ship([0, 0, 0, 0])], 6.1);
+  assert.ok(d.look.sail[0] < 0.75 && f.slack(1) < 0.9, 'easing out');
+  for (let t = 6.2; t < 20; t += 0.1) [d] = f.apply([ship(SOUND)], t);
+  assert.ok(Math.abs(d.look.sail[0] - 0.8) < 1e-3 && f.slack(1) > 0.999);
 });
 
 test('zones: rigging, rudder, waterline, deck, in that order', () => {
