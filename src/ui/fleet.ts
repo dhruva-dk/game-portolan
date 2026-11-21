@@ -2,13 +2,14 @@
 // drawn marks and numerals (the house style: no words). At its head the
 // match's type in a paper disc, the persona most of the bots are in a gilt
 // one, and the two captains who stand out, each by her mark and her ship's
-// number: the sharpest (a target) and the most reckless (a flame). Under it a
+// number: the sharpest (a star) and the most reckless (a flame). Under it a
 // bar for each persona, its count over it and its mark under it, the most
-// common gilt. Under those, five rows, one a trait: its mark, a rule from
-// nothing to the most it runs to with the fleet's spread washed over it and
-// its average ticked, and the average and the spread in numerals. Skill and
-// aggression are read as hundredths; notice and the storm margin in metres;
-// flee hull in the hull's hundred.
+// common gilt. Under those, five rows, one a trait: its mark, then skill as a
+// rating of five stars (the last filled in part), and each other trait a rule
+// from nothing to the most it runs to with the fleet's spread washed over it
+// and its average ticked; the average and the spread in numerals. Skill is read
+// in stars (to a tenth), aggression as hundredths; notice and the storm margin
+// in metres; flee hull in the hull's hundred.
 
 import type { Fleet, Spread } from '../player.ts';
 import {
@@ -21,6 +22,7 @@ import {
   glyph,
   paperDisc,
   slip,
+  uid,
 } from './ink.ts';
 import { ram, rose, spyglass } from './marks.ts';
 
@@ -85,10 +87,41 @@ function typeMark(i: number, x: number, y: number, s: number) {
   );
 }
 
-/** The traits' marks, `s` across: skill's target, aggression's flame, notice's eye, the Storm's whirl, a hull running. */
+/** A five-pointed star's outline about (x, y), `r` to its points, one point up. */
+const starPath = (x: number, y: number, r: number) =>
+  Array.from({ length: 10 }, (_, k) => {
+    const a = (k * Math.PI) / 5 - Math.PI / 2,
+      d = k % 2 ? r * 0.45 : r;
+    return `${k ? 'L' : 'M'}${r2(x + d * Math.cos(a))} ${r2(y + d * Math.sin(a))}`;
+  }).join('') + 'Z';
+
+/**
+ * A rating in stars, `n` of five (0…5), each `r` to its points, `gap` apart,
+ * the first centred on (x, y): every star outlined, filled gilt as far as the
+ * rating reaches, the last of them only in part (clipped at its share of its
+ * width).
+ */
+function stars(x: number, y: number, n: number, r: number, gap: number) {
+  let s = '';
+  for (let k = 0; k < 5; k++) {
+    const cx = x + k * gap,
+      part = Math.min(Math.max(n - k, 0), 1),
+      d = starPath(cx, y, r);
+    if (part >= 1) s += `<path d="${d}" fill="${WASH.gold}"/>`;
+    else if (part > 0) {
+      const clip = uid('star');
+      s +=
+        `<clipPath id="${clip}"><rect x="${r2(cx - r)}" y="${r2(y - r)}" width="${r2(2 * r * part)}" height="${r2(2 * r)}"/></clipPath>` +
+        `<path d="${d}" fill="${WASH.gold}" clip-path="url(#${clip})"/>`;
+    }
+    s += `<path d="${d}" fill="none" stroke="${INK.iron}" stroke-width="1.1" stroke-linejoin="round"/>`;
+  }
+  return s;
+}
+
+/** The traits' marks, `s` across: skill's star, aggression's flame, notice's eye, the Storm's whirl, a hull running. */
 const TRAIT_MARKS = [
-  `<circle r="10" fill="${PAPER}" stroke-width="1.3"/><circle r="6" fill="none" stroke-width="1"/>` +
-    `<circle r="2.4" fill="${INK.rubric}" stroke="none"/>`,
+  `<path d="${starPath(0, 1, 11)}" fill="${WASH.gold}" stroke-width="1.3"/>`,
   `<path d="M0 11C-7 11 -9 4 -5 -3C-4 0 -2 1 -1 0C-3 -5 0 -9 2 -12C3 -6 8 -3 7 3C6 8 3 11 0 11Z" fill="${WASH.vermilion}" stroke-width="1.2"/>` +
     `<path d="M0 10C-3 10 -4 6 -2 3C0 5 1 3 1 1C3 3 4 6 2 9Z" fill="${WASH.gold}" stroke="none"/>`,
   `<path d="M-11 0Q0 -10 11 0Q0 10 -11 0Z" fill="${PAPER}" stroke-width="1.3"/>` +
@@ -162,6 +195,18 @@ export function fleetCard(x: number, y: number, f: Fleet) {
       bx = x + 30,
       bw = 140,
       on = (v: number) => bx + (bw * Math.min(Math.max(v, 0), t.most)) / t.most;
+    // skill as a rating, out of five stars (the plainest read of how good a captain is)
+    if (i === 0) {
+      s +=
+        traitMark(i, x + 12, ty, 20) +
+        stars(bx + 14, ty, mean * 5, 11, 28) +
+        figure(x + 206, ty, (mean * 5).toFixed(1), 18, { anchor: 'end' }) +
+        figure(x + 212, ty + 1, `±${(spread * 5).toFixed(1)}`, 13, {
+          anchor: 'start',
+          fill: INK.sepia,
+        });
+      return;
+    }
     s +=
       traitMark(i, x + 12, ty, 20) +
       `<path d="M${bx} ${ty}H${bx + bw}M${bx} ${ty - 4}v8M${bx + bw} ${ty - 4}v8" stroke="${INK.iron}" stroke-width=".8"/>` +
