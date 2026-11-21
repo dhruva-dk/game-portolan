@@ -20,6 +20,7 @@
 
 import type { Crew, Cue } from './battle.ts';
 import type { Vessel } from './contact.ts';
+import { fitOf } from './faults.ts';
 import { reloadOf } from './gun.ts';
 import { spent, stepGust } from './gust.ts';
 import { CARRIED, EQUIP, GUNS, RIGGING } from './handling.ts';
@@ -102,7 +103,7 @@ function armed(
     crew: {
       ...crew,
       guns: crew.guns.map((k, i) =>
-        i === slot ? { ...g, reload: reloadOf(g) } : k
+        i === slot ? { ...g, reload: reloadOf(g, fitOf(crew).reload) } : k
       ),
     },
     take: false,

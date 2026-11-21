@@ -27,6 +27,7 @@ import { distance, type Vec3 } from '../world/sphere.ts';
 import type { Blow, Vessel } from './contact.ts';
 import type { GunKind } from '../kinds.ts';
 import { CARRIED, FALLOFF, GUN, GUNS, GUST, HEALTH } from './handling.ts';
+import { fitOf } from './faults.ts';
 import { harmed, sunk, whole, type Health } from './health.ts';
 import { outside, type Storm } from './storm.ts';
 import {
@@ -177,13 +178,15 @@ export const battleOf = (
 
 /**
  * One step of the gun `g` in hand of crew `c`, firing by `loose` (which lays it
- * and puts its balls in flight); its cues told to `cue`. The gun after it.
+ * and puts its balls in flight), reloading in `reload` times its own time (her
+ * handling's: handling.ts Handling); its cues told to `cue`. The gun after it.
  */
 function worked(
   c: Crew,
   g: Gun,
   trigger: boolean,
   dt: number,
+  reload: number,
   loose: (g: Gun) => void,
   cue: (kind: Cue['kind']) => void
 ): Gun {
@@ -201,7 +204,7 @@ function worked(
     };
     fired = true;
     if (gun.rounds <= 0) {
-      gun = { ...gun, reload: reloadOf(gun) };
+      gun = { ...gun, reload: reloadOf(gun, reload) };
       cue('reloading');
     }
   };
@@ -215,7 +218,7 @@ function worked(
       cue('reloaded');
     }
   } else if (gun.rounds <= 0) {
-    gun = { ...gun, reload: reloadOf(gun) };
+    gun = { ...gun, reload: reloadOf(gun, reload) };
     cue('reloading');
   } else if (trigger && gun.cool <= 1e-9 && c.equip <= 1e-9) {
     if (bore.windup > 0) {
@@ -379,8 +382,14 @@ export function stepBattle(
           target: lay.target,
         });
       };
-      const gun = worked(c, g, !!order?.fire, dt, loose, (kind) =>
-        cues.push({ ship: v.id, at: v.ship.at, kind, gun: g.kind })
+      const gun = worked(
+        c,
+        g,
+        !!order?.fire,
+        dt,
+        fitOf(c).reload,
+        loose,
+        (kind) => cues.push({ ship: v.id, at: v.ship.at, kind, gun: g.kind })
       );
       c.guns = c.guns.map((k, i) => (i === c.hand ? gun : k));
     });

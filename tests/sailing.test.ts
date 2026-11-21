@@ -89,6 +89,31 @@ test('she gathers way to her top speed and no further, and turns no faster than 
   assert.equal(astern.speed, 0);
 });
 
+test('by her own handling: her top speed and fastest turn are hers, not the tables’; cut under her way, she sheds what is over it', () => {
+  const fit = { top: SHIP.top * 0.7, turn: SHIP.turn * 0.6, reload: 1 };
+  let s = shipAt(start, north),
+    fastest = 0,
+    quickest = 0;
+  for (let i = 0; i < Math.round(60 / STEP); i++) {
+    s = step(s, { course: turned(s, 2), throttle: 1 }, STEP, deep, fit);
+    fastest = Math.max(fastest, s.speed);
+    quickest = Math.max(quickest, Math.abs(s.turn));
+  }
+  assert.ok(
+    fastest <= fit.top + 1e-9 && s.speed > fit.top * 0.99,
+    `${fastest}, ${s.speed}`
+  );
+  assert.ok(
+    quickest <= fit.turn + 1e-9 && quickest > fit.turn * 0.99,
+    `${quickest}`
+  );
+  // at her old top, her top cut: down to the new one within a few seconds
+  let t: ShipState = { ...shipAt(start, north), speed: SHIP.top };
+  for (let i = 0; i < Math.round(3 / STEP); i++)
+    t = step(t, { course: null, throttle: 1 }, STEP, deep, fit);
+  assert.ok(Math.abs(t.speed - fit.top) < 1e-9, `${t.speed}`);
+});
+
 test('let go, she coasts and slows by her drag alone', () => {
   const s0: ShipState = { ...shipAt(start, north), speed: SHIP.top };
   let last = s0.speed;

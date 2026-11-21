@@ -73,12 +73,13 @@ export const gunOf = (kind: GunKind, rarity: number): Gun => ({
 
 /**
  * Hit points a ball of `gun` takes off, before its fall-off; seconds its reload
- * takes; its spread (half-angle).
+ * takes (`by` times it on a ship whose handling slows it: handling.ts
+ * Handling); its spread (half-angle).
  */
 export const damageOf = (g: Pick<Gun, 'kind' | 'rarity'>) =>
   GUNS[g.kind].damage * GUN.damageBy[g.rarity];
-export const reloadOf = (g: Pick<Gun, 'kind' | 'rarity'>) =>
-  GUNS[g.kind].reload * GUN.reloadBy[g.rarity];
+export const reloadOf = (g: Pick<Gun, 'kind' | 'rarity'>, by = 1) =>
+  GUNS[g.kind].reload * GUN.reloadBy[g.rarity] * by;
 export const spreadOf = (g: Pick<Gun, 'kind' | 'rarity'>) =>
   GUNS[g.kind].spread * GUN.spreadBy[g.rarity];
 

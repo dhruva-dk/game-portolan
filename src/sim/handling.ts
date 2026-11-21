@@ -60,6 +60,19 @@ export const SHIP = {
 } as const;
 
 /**
+ * A ship's own handling, as she sails and works her gun now: her top speed
+ * (m/s), her fastest turn (rad/s), and how many times its kind's and rarity's
+ * time her gun takes to reload (gun.ts reloadOf). Her faults make it of her
+ * (faults.ts fitOf); SPEC is the tables' own, a whole ship's.
+ */
+export interface Handling {
+  top: number;
+  turn: number;
+  reload: number;
+}
+export const SPEC: Handling = { top: SHIP.top, turn: SHIP.turn, reload: 1 };
+
+/**
  * Ships meeting (contact.ts): ramming first tuned for a top of 14.5 m/s, its
  * speeds brought to her top of 16, so the same share of top speed does the same
  * damage, in hit points (HEALTH: 100 of hull behind 100 of shield).

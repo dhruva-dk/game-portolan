@@ -51,7 +51,7 @@ import {
   transport,
   type Vec3,
 } from '../world/sphere.ts';
-import { RAM, SHIP } from './handling.ts';
+import { RAM, SHIP, SPEC, type Handling } from './handling.ts';
 import { step, type Helm, type ShipState } from './ship.ts';
 import { hullAt, moved, under, type Depth } from './shoal.ts';
 
@@ -416,8 +416,14 @@ function heldApart(a: Working, b: Working, m: Meeting, depth: Depth): void {
  * Her own step under her helm, then on along her shove, as far as the shallows
  * let her; the shove dying away.
  */
-function sailed(v: Vessel, helm: Helm, dt: number, depth: Depth): Working {
-  let ship = step(v.ship, helm, dt, depth);
+function sailed(
+  v: Vessel,
+  helm: Helm,
+  dt: number,
+  depth: Depth,
+  fit: Handling
+): Working {
+  let ship = step(v.ship, helm, dt, depth, fit);
   let shove = transport(v.shove, v.ship.at, ship.at);
   const metres = length(shove) * dt;
   if (metres > 0) {
@@ -435,20 +441,24 @@ function sailed(v: Vessel, helm: Helm, dt: number, depth: Depth): Working {
 
 /**
  * One step of dt seconds for a fleet, each ship under her own helm (helms[i]
- * for fleet[i]), in water `depth` deep; the fleet after it (in the same order),
- * the rams there were, and the change of velocity each ship's meetings gave her
- * (m/s, a tangent at her place), for her ride to show.
+ * for fleet[i]) and by her own handling (fits[i]; the tables' if not given), in
+ * water `depth` deep; the fleet after it (in the same order), the rams there
+ * were, and the change of velocity each ship's meetings gave her (m/s, a
+ * tangent at her place), for her ride to show.
  */
 export function stepFleet(
   fleet: readonly Vessel[],
   helms: readonly Helm[],
   dt: number,
-  depth: Depth
+  depth: Depth,
+  fits: readonly Handling[] = []
 ): { fleet: Vessel[]; blows: Blow[]; jolts: Vec3[] } {
   const order = fleet
     .map((_, i) => i)
     .sort((i, j) => fleet[i].id - fleet[j].id);
-  const ws = order.map((i) => sailed(fleet[i], helms[i], dt, depth));
+  const ws = order.map((i) =>
+    sailed(fleet[i], helms[i], dt, depth, fits[i] ?? SPEC)
+  );
   const pairs = (each: (a: Working, b: Working) => void) => {
     for (let i = 0; i < ws.length; i++)
       for (let j = i + 1; j < ws.length; j++) each(ws[i], ws[j]);

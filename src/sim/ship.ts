@@ -25,7 +25,7 @@ import {
   scale,
   type Vec3,
 } from '../world/sphere.ts';
-import { GUST, SHIP } from './handling.ts';
+import { GUST, SHIP, SPEC, type Handling } from './handling.ts';
 import { navigate, type Depth } from './shoal.ts';
 
 /** One ship's state. */
@@ -101,13 +101,16 @@ export function turned(s: ShipState, angle: number): Vec3 {
 
 /**
  * One step of dt seconds under `helm`, in water `depth` deep (metres at a
- * point).
+ * point), by her own handling (`fit`: her top speed and her fastest turn; the
+ * tables' if not given). Her rudder bites by her speed through the water, as
+ * any ship's.
  */
 export function step(
   s: ShipState,
   helm: Helm,
   dt: number,
-  depth: Depth
+  depth: Depth,
+  fit: Handling = SPEC
 ): ShipState {
   const rudder =
     helm.course && length(helm.course) > 0
@@ -115,10 +118,9 @@ export function step(
       : 0;
   const turn =
     s.turn +
-    (rudder * SHIP.turn * (helm.gust ? GUST.turn : 1) * bite(s.speed) -
-      s.turn) *
+    (rudder * fit.turn * (helm.gust ? GUST.turn : 1) * bite(s.speed) - s.turn) *
       close(SHIP.answer, dt);
-  const want = Math.max(0, Math.min(1, helm.throttle)) * SHIP.top;
+  const want = Math.max(0, Math.min(1, helm.throttle)) * fit.top;
   let speed: number;
   // a gust drives her on hard toward its speed over what she asks; after it,
   // what she has over her top is shed at a rate
@@ -129,8 +131,8 @@ export function step(
         -GUST.accel * dt,
         Math.min(GUST.accel * dt, want + GUST.speed - s.speed)
       );
-  else if (s.speed > SHIP.top)
-    speed = Math.max(SHIP.top, s.speed - GUST.shed * dt);
+  else if (s.speed > fit.top)
+    speed = Math.max(fit.top, s.speed - GUST.shed * dt);
   else
     speed =
       s.speed +

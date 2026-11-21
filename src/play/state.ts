@@ -48,7 +48,8 @@ import { nature, type MatchType, type Nature } from '../sim/persona.ts';
 import { afloat, stepFleet, type Vessel } from '../sim/contact.ts';
 import { STEP, blendPose } from '../sim/fixed.ts';
 import { gunOf } from '../sim/gun.ts';
-import { SHIP } from '../sim/handling.ts';
+import { fitOf } from '../sim/faults.ts';
+import { SHIP, type Handling } from '../sim/handling.ts';
 import { sunk } from '../sim/health.ts';
 import { regain, type Regained } from '../sim/holding.ts';
 import {
@@ -342,10 +343,11 @@ export function createState(
 
   /**
    * What a step hands from part to part, kept and refilled: the ships sunk in
-   * it, the ships still sailing, their moves and their ids, and the ships that
-   * blew a gust.
+   * it, the ships still sailing, their moves and their ids, the ships that
+   * blew a gust, and each ship's handling as she sails the step.
    */
-  const lost: number[] = [],
+  const fits: Handling[] = [],
+    lost: number[] = [],
     sailing: Vessel[] = [],
     moves: Move[] = [],
     ids: number[] = [],
@@ -479,11 +481,15 @@ export function createState(
     const wants = asked(battle.crews, fleet, flotsam, asks);
     battle.crews = wants.crews;
     const manned = byId(wants.crews);
-    for (let i = 0; i < fleet.length; i++)
-      helms[i] = crewed(helms[i], manned.get(fleet[i].id));
+    for (let i = 0; i < fleet.length; i++) {
+      const c = manned.get(fleet[i].id);
+      helms[i] = crewed(helms[i], c);
+      fits[i] = fitOf(c);
+    }
+    fits.length = fleet.length;
     from.clear();
     for (const v of fleet) from.set(v.id, v.ship.at);
-    const met = stepFleet(fleet, helms, STEP, depth);
+    const met = stepFleet(fleet, helms, STEP, depth, fits);
     fleet = met.fleet;
     for (const b of met.blows) {
       const a = aboard.get(b.struck.id);
