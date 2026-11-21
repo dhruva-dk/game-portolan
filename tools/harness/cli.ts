@@ -4,8 +4,9 @@
 // match's result as a line of JSON and prints each brain's summary.
 //   node tools/harness/cli.ts [--brains default,keen] [--matches 8] [--from 1]
 //     [--mix] [--type name] [--rules name] [--players k] [--seconds 300]
-//     [--planet seed] [--workers n] [--out file]
-// --matches: how many matches (dealt --from on); --mix: one fleet, the brains
+//     [--planet seed | --pool tune|held|all] [--workers n] [--out file]
+// --matches: how many matches (dealt --from on), on each planet of --pool if
+// one is named (tools/harness/planets.ts); --mix: one fleet, the brains
 // dealt round it by id, not a fleet of each; --type: every match of that type
 // (tools/harness/types.ts; else each of the type the game deals it); --rules:
 // each match's rules changed so (tools/harness/rules.ts); --players: every
@@ -19,6 +20,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { parseArgs } from 'node:util';
+import { planetsOf } from './planets.ts';
 import { thumbNamed } from './player.ts';
 import { CORES, runPool } from './pool.ts';
 import type { Result, Spec } from './run.ts';
@@ -36,6 +38,7 @@ const { values: a } = parseArgs({
     thumb: { type: 'string' },
     seconds: { type: 'string' },
     planet: { type: 'string' },
+    pool: { type: 'string' },
     workers: { type: 'string', default: String(CORES) },
     out: { type: 'string' },
   },
@@ -53,9 +56,12 @@ const base = {
   ...(a.thumb ? { thumb: thumbNamed(a.thumb) } : {}),
 };
 const specs: Spec[] = [];
-for (let k = from; k < from + count; k++)
-  if (a.mix) specs.push({ ...base, match: k, brains });
-  else for (const b of brains) specs.push({ ...base, match: k, brains: [b] });
+for (const planet of a.pool ? planetsOf(a.pool) : [undefined])
+  for (let k = from; k < from + count; k++) {
+    const on = planet === undefined ? base : { ...base, planet };
+    if (a.mix) specs.push({ ...on, match: k, brains });
+    else for (const b of brains) specs.push({ ...on, match: k, brains: [b] });
+  }
 
 const out =
   a.out ??
@@ -68,7 +74,7 @@ const results: Result[] = await runPool(specs, {
   workers: Number(a.workers),
   done: (r, n) =>
     console.log(
-      `  ${n}/${specs.length} match ${r.spec.match} [${r.spec.brains.join(',')}]: ` +
+      `  ${n}/${specs.length}${r.spec.planet === undefined ? '' : ` planet ${r.spec.planet}`} match ${r.spec.match} [${r.spec.brains.join(',')}]: ` +
         `${r.left} left at ${r.seconds.toFixed(0)} s, ${r.msPerStep.toFixed(2)} ms a step`
     ),
 });

@@ -387,6 +387,18 @@ addEventListener('resize', size); size(); requestAnimationFrame(tick);
 </script></body></html>
 `;
 
+/** The storm's whole course and two minutes more (run.ts's end), s. */
+export const END = STORM.phases.reduce((t, p) => t + p.wait + p.close, 0) + 120;
+
+/** The replay of `spec` written to `out`; a line on it. */
+export function writeReplay(spec: Spec, out: string): string {
+  const data = recorded(spec);
+  const page = pageOf({ ...data, ...groundOf(worldOf(spec.planet)) });
+  mkdirSync(dirname(out), { recursive: true });
+  writeFileSync(out, page);
+  return `${out}: ${data.frames.length} s, ${data.marks.length} shots, ${(page.length / 1e6).toFixed(2)} MB`;
+}
+
 if (import.meta.main) {
   const { values: a } = parseArgs({
     options: {
@@ -397,19 +409,15 @@ if (import.meta.main) {
       planet: { type: 'string' },
     },
   });
-  const END = STORM.phases.reduce((t, p) => t + p.wait + p.close, 0) + 120,
-    out = a.out ?? `.cache/harness/replay-${a.match}.html`,
-    planet = a.planet ? Number(a.planet) : undefined;
-  const data = recorded({
-    match: Number(a.match),
-    brain: a.brain,
-    seconds: a.seconds ? Number(a.seconds) : END,
-    planet,
-  });
-  const page = pageOf({ ...data, ...groundOf(worldOf(planet)) });
-  mkdirSync(dirname(out), { recursive: true });
-  writeFileSync(out, page);
   console.log(
-    `${out}: ${data.frames.length} s, ${data.marks.length} shots, ${(page.length / 1e6).toFixed(2)} MB`
+    writeReplay(
+      {
+        match: Number(a.match),
+        brain: a.brain,
+        seconds: a.seconds ? Number(a.seconds) : END,
+        planet: a.planet ? Number(a.planet) : undefined,
+      },
+      a.out ?? `.cache/harness/replay-${a.match}.html`
+    )
   );
 }
