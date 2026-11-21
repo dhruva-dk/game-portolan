@@ -128,6 +128,34 @@ export function closing(rate: number, seed: number): Samples {
 }
 
 /**
+ * The storm's bolt at its edge as it begins to close: the stroke's tearing
+ * crack, and its thunder rolling away under it, broken by the cloud.
+ */
+export function thunder(rate: number, seed: number): Samples {
+  const t = take(4.5, rate, seed);
+  const tear = layer(t, 0.5);
+  noise(tear, ar(0.002, 0.09));
+  filter(tear, 'highpass', 700);
+  mix(t, tear, 0.05, 1.1);
+  const clap = layer(t, 0.8);
+  brown(clap, ar(0.006, 0.25));
+  filter(clap, 'lowpass', 900);
+  mix(t, clap, 0.06, 1.5);
+  const roll = layer(t),
+    beat = 1.3 + t.r(),
+    env = swell(0.15, 4.4, 2.8);
+  brown(
+    roll,
+    (s) => env(s) * (0.55 + 0.45 * Math.abs(Math.sin(2 * Math.PI * beat * s)))
+  );
+  filter(roll, 'lowpass', (s) => 520 * Math.exp(-s / 1.6) + 140);
+  filter(roll, 'peak', 90, 1, 6);
+  mix(t, roll, 0.1, 1.8);
+  filter(t, 'highpass', 30);
+  return normal(finish(t, 0.002, 0.8)).x;
+}
+
+/**
  * Loot taken up: the crate scraping aboard and set down, the sea running off
  * it.
  */

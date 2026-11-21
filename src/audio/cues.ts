@@ -51,6 +51,7 @@ export const CUE_NAMES = [
   'hurt',
   'ring',
   'shatter',
+  'fault',
   'sank',
   'sunk',
   'took',
@@ -63,6 +64,7 @@ export const CUE_NAMES = [
   'whistle',
   'claim',
   'closing',
+  'thunder',
   'tap',
   'open',
   'close',
@@ -111,6 +113,8 @@ export const CUES: Record<Cue, CueSound> = {
   hurt: { sound: 'hurt', level: 0, bus: 'own' },
   ring: { sound: 'ring', level: 0, bus: 'own' },
   shatter: { sound: 'shatter', level: 0, bus: 'own' },
+  // a fault come on her
+  fault: { sound: 'fault', level: 0, bus: 'own' },
   // a ship going down from where she lies; hers, close
   sank: { sound: 'sink', level: 0, bus: 'world' },
   sunk: { sound: 'sink', level: 2, bus: 'own' },
@@ -126,6 +130,7 @@ export const CUES: Record<Cue, CueSound> = {
   // her water, and the storm
   claim: { sound: 'claim', level: 0, bus: 'own' },
   closing: { sound: 'closing', level: 0, bus: 'own' },
+  thunder: { sound: 'thunder', level: 0, bus: 'own' },
   // the screens
   tap: { sound: 'tap', level: 0, bus: 'ui' },
   open: { sound: 'open', level: 0, bus: 'ui' },

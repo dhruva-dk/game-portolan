@@ -467,6 +467,23 @@ test('listen: a ball passing near whistles once; a slot of her stores taken in h
   );
 });
 
+test('listen: a fault coming on cracks once, a worse one again, a mending none; the storm closing thunders, then its wind', () => {
+  const l = createListen(() => -20),
+    out: Call[] = [];
+  const cues = (t: number, over: Partial<Status & Kit>) => {
+    out.length = 0;
+    l.listen(hearing(scene(t), status(over)), 1 / 30, out);
+    return out.map((c) => c.cue);
+  };
+  cues(0, {});
+  assert.deepEqual(cues(0.1, { faults: [0, 0, 1, 0] }), ['fault']);
+  assert.deepEqual(cues(0.2, { faults: [0, 0, 1, 0] }), [], 'once');
+  assert.deepEqual(cues(0.3, { faults: [0, 1, 2, 0] }), ['fault']);
+  assert.deepEqual(cues(0.4, { faults: [0, 0, 1, 0] }), [], 'mended');
+  assert.deepEqual(cues(0.5, { closing: true }), ['thunder', 'closing']);
+  assert.deepEqual(cues(0.6, { closing: true }), []);
+});
+
 test('the bed: the storm heard from afar and all about her inside; surf only near a coast; levels bounded', () => {
   assert.equal(galeOf(1000), 0);
   for (let w = 400; w > -100; w -= 10)

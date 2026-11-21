@@ -97,6 +97,28 @@ export function hurt(rate: number, seed: number): Samples {
   return normal(finish(t)).x;
 }
 
+/**
+ * A fault come on her: a beam giving way, a great crack splitting along the
+ * grain, the timbers settling into their new hurt with a long groan.
+ */
+export function fault(rate: number, seed: number): Samples {
+  const t = take(2.2, rate, seed);
+  hull(t, 1.4, 160);
+  // the split running along the grain: a second, longer crack, falling in pitch
+  const split = layer(t, 0.4);
+  noise(split, ar(0.004, 0.22));
+  filter(split, 'bandpass', (s) => 1500 * Math.exp(-s / 0.25) + 500, 1.4);
+  mix(t, split, 0.06, 1.6);
+  const chips = layer(t);
+  crackle(chips, 90, 0.07, 0.5, 0.8, 0.003);
+  filter(chips, 'highpass', 1100);
+  mix(t, chips, 0, 0.6);
+  timber(t, (s) => 42 - 18 * s, swell(0.2, 1.9, 1), 0.25, 1.9, 240, 0.8);
+  filter(t, 'lowshelf', 120, 0.7, -5);
+  saturate(t, 1.8);
+  return normal(finish(t, 0.002, 0.3)).x;
+}
+
 /** The ward's modes: a plate's inharmonic partials, not a scale's. */
 const WARD: readonly (readonly [number, number, number])[] = [
   [587, 1.1, 0.5],

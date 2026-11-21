@@ -6,7 +6,7 @@
 //   her ball home       the cross round the reticle (hits.ts) and the figure rising off the ship; a flash, the
 //                       stronger where it broke a shield
 //   a blow on her       the arc toward who dealt it; rubric (or azure, on her shield) at the rim toward it; the vitals
-//                       slip shaken
+//                       slip jolted (the zone struck flashes: vitals.ts)
 //   her sinking of one  the gold cross and the gold figure
 //   took up             the piece's mark flies from where it lay to its slot, which pops; a flash and a rim of
 //                       light the rarer it is
@@ -76,8 +76,8 @@ export function createJuice(body: HTMLElement, parts: Parts) {
     fired = -Infinity;
 
   /**
-   * A piece knocked: scaled to `k` and back on a spring, or shaken side to
-   * side.
+   * A piece knocked: scaled to `k` and back on a spring, or jolted a few px and
+   * settled.
    */
   const pop = (el: HTMLElement, k: number, ms = 260) =>
     el.animate(
@@ -88,16 +88,16 @@ export function createJuice(body: HTMLElement, parts: Parts) {
         composite: 'replace',
       }
     );
-  const shake = (el: HTMLElement) =>
+  const jolt = (el: HTMLElement) =>
     el.animate(
       [
         { translate: '0 0' },
-        { translate: '-6px 0' },
-        { translate: '5px 0' },
-        { translate: '-3px 0' },
+        { translate: '-4px 2px', offset: 0.15 },
+        { translate: '3px -1px', offset: 0.45 },
+        { translate: '-1px 0', offset: 0.75 },
         { translate: '0 0' },
       ],
-      { duration: 320, easing: 'ease-out' }
+      { duration: 250, easing: 'cubic-bezier(.2,.7,.3,1)' }
     );
 
   /**
@@ -185,7 +185,7 @@ export function createJuice(body: HTMLElement, parts: Parts) {
               m.bearing
             );
           }
-          shake(parts.vitals);
+          jolt(parts.vitals);
         }
         return;
       }

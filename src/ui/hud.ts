@@ -1,5 +1,6 @@
 // The match's HUD, laid on the world as the chartmaker's slips:
-//   top left    the vitals slip: shield (azure) over hull, each with its numeral
+//   top left    the vitals slip (vitals.ts): her ship from above, each of her zones washed by the damage it has
+//               taken and marked when faulted, beside shield (azure) over hull, each a bar with its numeral
 //   top centre  the Storm's clock (its spiral, m:ss; in the Storm's violet under 30 s) and the ships afloat (a ship, a count)
 //   top right   the minimap (minimap.ts), north up: who holds the sea, the land and its coast, the Storm's calm and the next, the
 //               way in from outside it, her arrow (no other ship, no loot); a tap opens the full map
@@ -47,7 +48,6 @@ import {
   RARITY,
   WASH,
   alpha,
-  bar,
   figure,
   glyph,
   paperDisc,
@@ -59,6 +59,7 @@ import { createJuice } from './juice.ts';
 import { createMinimap, type More } from './minimap.ts';
 import { onHold, onTap } from './touch.ts';
 import { piece, show, view } from './ui.ts';
+import { createVitals } from './vitals.ts';
 
 /**
  * What the HUD shows: the match as the game reports it, and what she carries.
@@ -124,6 +125,7 @@ export function createHud(layer: HTMLElement, shores: Shores, act: HudActions) {
   // what the vitals show, inside the piece: what is knocked (juice.ts), so its knock does not undo the piece's size
   const face = document.createElement('div');
   vitals.appendChild(face);
+  const drawVitals = createVitals(face);
   const readings = piece(body, 'top centre', false, true);
   const map = piece(body, 'top right', true, true);
   // the right thumb's: Fire in the corner, Gust over it
@@ -230,19 +232,7 @@ export function createHud(layer: HTMLElement, shores: Shores, act: HudActions) {
         body.style.opacity = (now / 100).toFixed(2);
       }
       show(body, now > 0 && !covered);
-      const shield = Math.round(s.shield),
-        hull = Math.round(s.hull);
-      if (changed(face, shield, s.shieldMax, hull, s.hullMax)) {
-        face.innerHTML = svg(
-          214,
-          60,
-          slip(1, 1, 212, 58) +
-            bar(11, 20, 158, 15, shield / s.shieldMax, WASH.azure) +
-            figure(176, 20, shield, 17, { anchor: 'start' }) +
-            bar(11, 41, 158, 15, hull / s.hullMax, WASH.umber) +
-            figure(176, 41, hull, 17, { anchor: 'start' })
-        );
-      }
+      drawVitals.update(s);
 
       const closing = s.closing || s.storm < 30;
       if (changed(readings, Math.ceil(s.storm), s.afloat, closing)) {

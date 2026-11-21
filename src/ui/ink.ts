@@ -118,6 +118,19 @@ export const alpha = (hex: string, a: number) =>
     .toString(16)
     .padStart(2, '0')}`;
 
+/** `a` laid `t` of the way to `b` (each #rrggbb), as #rrggbb. */
+export const blend = (a: string, b: string, t: number) => {
+  let out = '#';
+  for (const i of [1, 3, 5]) {
+    const x = parseInt(a.slice(i, i + 2), 16),
+      y = parseInt(b.slice(i, i + 2), 16);
+    out += Math.round(x + (y - x) * t)
+      .toString(16)
+      .padStart(2, '0');
+  }
+  return out;
+};
+
 /** An opaque sheet's ground: the parchment, light in the middle. */
 export const parchment = `radial-gradient(ellipse at 50% 45%, ${PARCHMENT[0]} 0%, ${PARCHMENT[1]} 60%, ${PARCHMENT[2]} 100%)`;
 
