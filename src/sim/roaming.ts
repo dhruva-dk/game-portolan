@@ -1,12 +1,21 @@
 // Where a bot roams when nothing better calls (bot.ts weighs it last): a new
 // mark every `roam` s or within `arrive` m of the last, `near`–`far` m off a
 // random way, drawn in toward the storm's middle as its cap shrinks; or, once
-// it is time, to her place for the phase and about it (placing.ts).
+// it is time, to her place for the phase and about it (placing.ts). A shy one
+// roams clear of guns she hears (PLAN layer 4).
 //
 // Pure arithmetic: no three, so it runs in node for the tests; deterministic
 // for the same inputs, to the bit.
 
-import { add, along, distance, normalize, type Vec3 } from '../world/sphere.ts';
+import {
+  R,
+  add,
+  along,
+  distance,
+  dot,
+  normalize,
+  type Vec3,
+} from '../world/sphere.ts';
 import { toEdge } from './storm.ts';
 import { between, open, rotate, type Ctx } from './captain.ts';
 import { deepest } from './helmsman.ts';
@@ -27,7 +36,20 @@ export const ROAMING = {
   drift: 600,
   drawn: 0.4,
   home: 50,
+  /**
+   * Guns she hears (not her own) she roams no nearer than `shy` m (0: she pays
+   * them no heed; a turtle's and a homesteader's: persona.ts).
+   */
+  shy: 0,
 } as const;
+
+/** Whether q lies within her `shy` m of guns she hears. */
+function loud(c: Ctx, q: Vec3): boolean {
+  const shy = c.b.roaming.shy;
+  if (shy <= 0 || !c.sea.gunfire) return false;
+  const within = Math.cos(shy / R);
+  return c.sea.gunfire.some((r) => r.by !== c.own.id && dot(q, r.at) > within);
+}
 
 /**
  * A mark to roam to: open water a random way off, drawn in toward the storm's
@@ -59,7 +81,8 @@ export function roamGoal(c: Ctx): Vec3 {
         ).p;
     if (!home && s && reach(s) < c.b.roaming.drift)
       q = normalize(add(q, add(s.centre, q, -1), c.b.roaming.drawn));
-    if (open(c, q) && (!keep || toEdge(q, keep) > margin)) return q;
+    if (open(c, q) && (!keep || toEdge(q, keep) > margin) && !loud(c, q))
+      return q;
   }
   if (s && toEdge(p, s) < 2 * margin)
     return inward(c, p, s.centre, Math.max(0, reach(s) - 2 * margin));

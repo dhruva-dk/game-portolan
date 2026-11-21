@@ -78,6 +78,7 @@ const CREWS: Readonly<Record<Persona, (b: Brain) => Over>> = {
   homesteader: ({ choice, hunting, placing }) => ({
     choice: { claim: choice.claim * 1.4, hunt: choice.hunt * 0.7 },
     hunting: { earshot: hunting.earshot * 0.7 },
+    roaming: { shy: 250 },
     placing: {
       open: placing.open + 0.4,
       cover: placing.cover + 0.3,
@@ -89,7 +90,7 @@ const CREWS: Readonly<Record<Persona, (b: Brain) => Over>> = {
   // lies, or a narrows
   raider: ({ choice, hunting, placing }) => ({
     choice: { loot: choice.loot * (11 / 9), hunt: choice.hunt * 1.2 },
-    hunting: { earshot: hunting.earshot * 1.2 },
+    hunting: { earshot: hunting.earshot * 1.2, standoff: 1 },
     placing: {
       plunder: placing.plunder + 0.6,
       strait: placing.strait + 0.4,
@@ -106,6 +107,7 @@ const CREWS: Readonly<Record<Persona, (b: Brain) => Over>> = {
       hunt: choice.hunt * 0.7,
     },
     mind: { cover: mind.cover * (4 / 3) },
+    roaming: { shy: 250 },
     placing: {
       cover: placing.cover + 1,
       deep: placing.deep * 0.6,
@@ -130,7 +132,7 @@ const CREWS: Readonly<Record<Persona, (b: Brain) => Over>> = {
   brawler: ({ choice, hunting, sight, mind, placing }) => ({
     choice: { fight: choice.fight * (31 / 26), hunt: choice.hunt * 1.35 },
     mind: { crowding: mind.crowding * 1.6 },
-    hunting: { earshot: hunting.earshot * 1.4 },
+    hunting: { earshot: hunting.earshot * 1.4, standoff: 1 },
     sight: { sightMax: sight.sightMax * (7 / 6) },
     placing: {
       deep: placing.deep * 1.4,

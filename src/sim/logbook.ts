@@ -8,7 +8,9 @@
 //   far, last seen not far off, not one she ran from;
 // - to keep from a ship she ran from: her place for the phase is not where
 //   that ship was last seen (placing.ts), nor her hunt;
-// - and her place weighs the ships she knows about it (placing.ts foes).
+// - and her place weighs the ships she knows about it (placing.ts foes);
+// - and a fight she waits on she falls on once she knows a ship in it is
+//   hurt (hunter.ts).
 //
 // Pure arithmetic: no three, so it runs in node for the tests; deterministic
 // for the same inputs, to the bit.
@@ -122,6 +124,16 @@ export function prey(c: Ctx): Sighting | null {
 export function shunned(c: Ctx, q: Vec3): boolean {
   const within = Math.cos(c.b.logbook.shun / R);
   return c.m.log.some((s) => ranFrom(s) && dot(q, s.at) > within);
+}
+
+/**
+ * Whether she knows a ship within `metres` of q at no more than `wounded` of
+ * her own strength (hunter.ts: a fight she waits on, worn down).
+ */
+export function hurtNear(c: Ctx, q: Vec3, metres: number): boolean {
+  const within = Math.cos(metres / R),
+    weak = c.b.logbook.wounded * strengthOf(c);
+  return c.m.log.some((s) => s.strength <= weak && dot(q, s.at) > within);
 }
 
 /** How many ships she knows of within `m` metres of q. */

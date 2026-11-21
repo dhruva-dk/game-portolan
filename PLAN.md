@@ -247,6 +247,29 @@ place weighs the ships she knows near it (placing.ts foes: hunter and brawler
 All within noise, none worse; it doesn't beat one se on held, so one pass
 only (the rule). Steps 1.71 / 3.63 / 12.5 → 1.71 / 3.73 / 13.0.
 
+**Step 5, layer 4 (joining others' fights).** A raider or a brawler who hears
+guns (hunter.ts HUNTING standoff, persona.ts) makes not for them but for a
+stand 250 m off them on her side, out of the longest gun's reach (240 m),
+while they ring, for 25 s at most; she falls on them once they fall silent,
+once that is out, or once her log knows a ship within 150 m of them at half
+her strength or less (logbook.ts hurtNear). A turtle or a homesteader roams
+no nearer than 250 m to guns she hears (roaming.ts ROAMING shy). Held pooled:
+damage 131.6 → 129.8 (−1.8 ± 2.0); hull mended 10.56 → 10.57; sustain 0.610
+→ 0.609; lull 81.5 → 88.2 (+6.7 ± 5.7); distinctness 0.163 → 0.166 (+0.002 ±
+0.008); stuck 4.40 → 4.17; aground 0.02 → 0.02; spread 0.073 → 0.055. Worst
+held: damage 124.7 → 127.0, lull 95.1 → 101.8. Tune pooled the other way:
+lull −5.1 ± 6.2, distinctness +0.009 ± 0.007. None worse by two se; held
+damage and lull lean worse by about one se (flagged); one pass only (the
+rule). Steps 1.71 / 3.73 / 13.0 → 1.73 / 3.88 / 14.6; the worst is the first
+step of the match, cold (14.7 ms; the next worst 9.4, then 7.5).
+
+**Steps 1–5 together**, held pooled: damage 122.9 → 129.8; hull mended 7.79
+→ 10.57; sustain 0.608 → 0.609; lull 88.8 → 88.2; distinctness 0.171 →
+0.166; worst held damage 119.5 → 127.0, lull 97.8 → 101.8. The damage and
+mending are the loot's; the four layers move the gates within noise. The
+endgame lull is held up by `holdBack`'s `more` (fighting.ts MIND; step 3
+above), not by where the ships are.
+
 ## Not decided / later
 
 - Restage in place (parked).

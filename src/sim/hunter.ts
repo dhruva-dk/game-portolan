@@ -7,19 +7,29 @@
 //   the keener the more she likes a fight and the nearer they are; when they
 //   fall silent she makes on for where they last spoke for a while, and gives
 //   it up there, or once that while is out. A fight draws ships to it, and the
-//   ones that come find it by its smoke and noise, as a player would. Guns by
+//   ones that come find it by its smoke and noise, as a player would. A raider
+//   or a brawler (persona.ts) stands off out of the guns' reach while they
+//   ring, and falls on whoever is left (PLAN layer 4). Guns by
 //   a ship she ran from she lets be; with none to hear, she goes back for a
 //   wounded ship she saw lately, to where she saw her (her log: logbook.ts).
 //
 // Pure arithmetic: no three, so it runs in node for the tests; deterministic
 // for the same inputs, to the bit.
 
-import { R, distance, dot, normalize, type Vec3 } from '../world/sphere.ts';
+import {
+  R,
+  along,
+  distance,
+  dot,
+  normalize,
+  toward,
+  type Vec3,
+} from '../world/sphere.ts';
 import type { Shot } from './battle.ts';
 import { toEdge } from './storm.ts';
 import { ramp, utility } from './utility.ts';
 import { aggroOf, type Ctx } from './captain.ts';
-import { prey, shunned } from './logbook.ts';
+import { hurtNear, prey, shunned } from './logbook.ts';
 
 /** Seconds a shot is heard after it is fired (the sea's, not a bot's). */
 const RINGS = 6;
@@ -75,16 +85,29 @@ export const HUNTING = {
   rest: 15,
   /** Guns inside the storm's edge by less than this are let be. */
   edge: 20,
+  /**
+   * Whether she waits on a fight she hears (1) or goes straight in (0: a
+   * raider's and a brawler's wait, persona.ts): she stands `stand` m off the
+   * guns, out of their reach (the longest gun's 240 m), while they ring, for
+   * `wait` s at most; she falls on them once they fall silent, once that is
+   * out, or once she knows a ship by them is hurt (her log: logbook.ts), within
+   * `by` m of them.
+   */
+  standoff: 0,
+  stand: 250,
+  wait: 25,
+  by: 150,
 } as const;
 
 /**
  * What her ear carries: where she is going to the guns (null: nowhere), when
- * she last heard them there, and when she last gave a hunt up (her mind's
- * clock, s).
+ * she last heard them there, when she first did (her wait's start), and when
+ * she last gave a hunt up (her mind's clock, s).
  */
 export interface HuntMemory {
   hunt: Vec3 | null;
   huntT: number;
+  waitT: number;
   restT: number;
 }
 
@@ -92,6 +115,7 @@ export interface HuntMemory {
 export const huntMemory = (): HuntMemory => ({
   hunt: null,
   huntT: -Infinity,
+  waitT: -Infinity,
   restT: -Infinity,
 });
 
@@ -132,8 +156,10 @@ export function huntUrge(c: Ctx): number {
     h = c.b.hunting;
   if (!own.armed || c.foe || m.clock - m.restT < h.rest) return 0;
   const r = nearest(c);
-  if (r) [m.hunt, m.huntT] = [r.at, m.clock];
-  else if (
+  if (r) {
+    if (!m.hunt) m.waitT = m.clock;
+    [m.hunt, m.huntT] = [r.at, m.clock];
+  } else if (
     m.hunt &&
     (m.clock - m.huntT > h.keep || distance(own.ship.at, m.hunt) < h.arrive)
   )
@@ -141,7 +167,7 @@ export function huntUrge(c: Ctx): number {
   // no guns, a wounded ship she saw lately (logbook.ts): back for her
   if (!m.hunt && !r) {
     const w = prey(c);
-    if (w) [m.hunt, m.huntT] = [w.at, m.clock];
+    if (w) [m.hunt, m.huntT, m.waitT] = [w.at, m.clock, -Infinity];
   }
   if (!m.hunt) return 0;
   const strength = (own.hull ?? 100) + (own.shield ?? 0);
@@ -152,5 +178,21 @@ export function huntUrge(c: Ctx): number {
   );
 }
 
-/** Going to the guns: where she last heard them her goal. */
-export const huntAct = (c: Ctx): Vec3 => c.m.hunt ?? c.m.goal;
+/**
+ * Going to the guns: where she last heard them her goal; or, while she waits
+ * on the fight (standoff), her stand off them, on her side.
+ */
+export function huntAct(c: Ctx): Vec3 {
+  const { m } = c,
+    h = c.b.hunting,
+    p = c.own.ship.at;
+  if (!m.hunt) return m.goal;
+  const waiting =
+    h.standoff > 0 &&
+    m.huntT === m.clock &&
+    m.clock - m.waitT < h.wait &&
+    !hurtNear(c, m.hunt, h.by);
+  if (!waiting) return m.hunt;
+  const from = toward(m.hunt, p);
+  return from ? along(m.hunt, from, h.stand).p : m.hunt;
+}
