@@ -25,7 +25,7 @@ import {
   slip,
   uid,
 } from './ink.ts';
-import { ram, rose, spyglass } from './marks.ts';
+import { badge, ram, rose } from './marks.ts';
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
 
@@ -41,16 +41,18 @@ const coin = (x: number, y: number) =>
 
 /**
  * Each persona's mark, `s` across, in sim/persona.ts's order: the hunter's
- * spyglass (she goes to the guns she hears from far off); the homesteader's
- * pennant staked in her ground (she keeps to her water); the raider's black
- * flag; the turtle; the scavenger's coin (the loot before anything); the
- * brawler's ram.
+ * hunting horn (she runs down the guns she hears from far off); the
+ * homesteader's pennant staked in her ground (she keeps to her water); the
+ * raider's black flag; the turtle; the scavenger's coin (the loot before
+ * anything); the brawler's ram.
  */
 function personaMark(i: number, x: number, y: number, s: number) {
-  if (i === 0) return spyglass(x, y, s * 1.2);
   if (i === 5) return ram(x, y, s / 30);
   const body = [
-    '',
+    // the horn's baldric over it, its brass curving from the mouthpiece down and up to the bell, banded twice
+    `<path d="M-10 -5Q-1 -17 10 -6" fill="none" stroke="${INK.sepia}" stroke-width="1.3"/>` +
+      `<path d="M-12 -6Q-11 7 2 7Q8 7 11 1L15 -2L9 -8L8 -3Q5 3 1 3Q-8 3 -9 -6Z" fill="${WASH.gold}" stroke-width="1.3"/>` +
+      `<path d="M-13.5 -6.5H-7.5" stroke-width="2.4"/><path d="M-6.4 2.2L-7.8 5.6M4.4 3.2L5.8 6.4" stroke-width="1"/>`,
     `<path d="M-12 11Q-4 4 6 11Z" fill="${WASH.shore}" stroke-width="1.1"/><path d="M-5 9V-11" stroke-width="1.8"/>` +
       `<path d="M-5 -11L10 -6L-5 -1Z" fill="${WASH.viridian}" stroke-width="1.2"/>`,
     `<path d="M-8 11V-11" stroke-width="1.8"/><path d="M-8 -11H10V1H-8Z" fill="${INK.iron}" stroke-width="1"/>` +
@@ -64,27 +66,54 @@ function personaMark(i: number, x: number, y: number, s: number) {
   return grid(x, y, s, body ?? '');
 }
 
+/** A small coin of a heap, 3.6 across its half, at (x, y) of a mark's grid. */
+const piece = (x: number, y: number) =>
+  `<circle cx="${x}" cy="${y}" r="3.6" fill="${WASH.gold}" stroke-width="1"/>` +
+  `<circle cx="${x}" cy="${y}" r="2" fill="none" stroke-width=".5"/>`;
+
 /**
  * Each match type's mark, `s` across, in sim/persona.ts TYPES's order: a
  * rose (mixed: every persona alike, the game's own rules); crossed cutlasses
  * with a drop of blood (a bloodbath); coins heaped (a gold rush); a great
- * shield (cagey).
+ * shield, a heater blazoned with a gilt cross (cagey).
  */
 function typeMark(i: number, x: number, y: number, s: number) {
   if (i === 0) return rose(x, y, s * 0.5);
-  if (i === 3) return glyph('item.bigShield', x, y, s);
-  if (i === 2) return grid(x, y, s, coin(-5, 5) + coin(5, 5) + coin(0, -4));
+  if (i === 3)
+    return grid(
+      x,
+      y,
+      s,
+      `<path d="M-10 -12H10V-2C10 6 5 10 0 13C-5 10 -10 6 -10 -2Z" fill="${WASH.azure}" stroke="none"/>` +
+        `<path d="M0 -12V12.4M-10 -3H10" stroke="${WASH.gold}" stroke-width="3.4" stroke-linecap="butt"/>` +
+        `<path d="M-10 -12H10V-2C10 6 5 10 0 13C-5 10 -10 6 -10 -2Z" fill="none" stroke-width="1.6"/>`
+    );
+  if (i === 2) {
+    // a heap of them on the ground, the rows behind drawn first
+    let heap = `<path d="M-14 11.5H14" stroke-width="1"/>`;
+    for (const [y0, xs] of [
+      [-10, [0]],
+      [-4, [-3, 3]],
+      [2, [-6, 0, 6]],
+      [8, [-9, -3, 3, 9]],
+    ] as const)
+      for (const x0 of xs) heap += piece(x0, y0);
+    return grid(x, y, s, heap);
+  }
+  // each blade curving from its hilt to its point, its grip and pommel past a guard
   const blade = (side: number) =>
-    `<path d="M${-9 * side} 10Q${2 * side} 1 ${9 * side} -11" fill="none" stroke-width="3.4"/>` +
-    `<path d="M${-9 * side} 10Q${2 * side} 1 ${9 * side} -11" fill="none" stroke="${CUT}" stroke-width="1.2"/>` +
-    `<path d="M${-9 * side} 4L${-3 * side} 10" stroke-width="2.4"/>`;
+    `<path d="M${-7 * side} 7Q${2 * side} 0 ${10 * side} -12" fill="none" stroke-width="3.6"/>` +
+    `<path d="M${-7 * side} 7Q${2 * side} 0 ${10 * side} -12" fill="none" stroke="${CUT}" stroke-width="1.4"/>` +
+    `<path d="M${-10 * side} 3.5L${-4 * side} 10" stroke-width="2.6"/>` +
+    `<path d="M${-7 * side} 7L${-11 * side} 11" stroke="${INK.sepia}" stroke-width="2.6"/>` +
+    `<circle cx="${-11.6 * side}" cy="11.6" r="1.7" fill="${WASH.gold}" stroke-width=".8"/>`;
   return grid(
     x,
     y,
     s,
     blade(1) +
       blade(-1) +
-      `<path d="M0 -2Q2.5 2 0 4Q-2.5 2 0 -2Z" fill="${INK.rubric}" stroke="none"/>`
+      `<path d="M0 -1Q2.6 3 0 5Q-2.6 3 0 -1Z" fill="${INK.rubric}" stroke="none"/>`
   );
 }
 
@@ -159,31 +188,29 @@ const TRAITS: readonly {
 export const CARD = 264;
 
 /**
- * Each match type's word, under its mark (sim/persona.ts TYPES's order): the
- * one word the card sets down, the type's mark alone not reading plain.
- */
-const TYPE_WORDS = ['mixed', 'bloodbath', 'gold', 'cagey'] as const;
-
-/** A badge about (x, y): a gilt rosette, its two ribbon tails under it, `body` (a trait's mark) on its face. */
-const badge = (x: number, y: number, body: string) =>
-  `<g stroke="${INK.iron}" stroke-width=".9" stroke-linejoin="round">` +
-  `<path d="M${x - 7} ${y + 6}L${x - 10} ${y + 19}L${x - 5} ${y + 15}L${x - 2} ${y + 19}L${x - 1} ${y + 8}Z" fill="${WASH.vermilion}"/>` +
-  `<path d="M${x + 7} ${y + 6}L${x + 10} ${y + 19}L${x + 5} ${y + 15}L${x + 2} ${y + 19}L${x + 1} ${y + 8}Z" fill="${WASH.vermilion}"/>` +
-  `<circle cx="${x}" cy="${y}" r="12.5" fill="${WASH.gold}" stroke-width="1.2" stroke-dasharray="2.6 1.4"/>` +
-  `<circle cx="${x}" cy="${y}" r="9.5" fill="${PAPER}" stroke-width=".8"/></g>${body}`;
-
-/**
  * The fleet card for `f`, its top left at (x, y), CARD across and about 230
- * down: its head, then a bar a persona; or, `traits`, the five trait rows in
- * the bars' place (held: panel.ts).
+ * down, edged: its head, then a bar a persona; or, `traits`, the five trait
+ * rows in the bars' place (held: panel.ts). Every part of it, inked or not,
+ * takes her touch.
  */
 export function fleetCard(x: number, y: number, f: Fleet, traits = false) {
-  // its head: the type and its word, the most common persona, and the two who stand out, each badged
-  const hy = y + 24;
+  // its edge, a hairline, all of it taking her hold; its corner turned down while the bars show (more behind them)
+  const l = x - 4,
+    t = y - 8,
+    r = x + CARD + 4,
+    b = y + 236,
+    ear = traits ? 0 : 16;
   let s =
+    `<path d="M${l} ${t}H${r}V${b - ear}L${r - ear} ${b}H${l}Z" fill="transparent" stroke="${INK.iron}" stroke-width=".7" stroke-opacity=".45"/>` +
+    (ear
+      ? `<path d="M${r} ${b - ear}L${r - ear} ${b}L${r - ear + 3} ${b - ear + 3}Z" fill="${PAPER}" stroke="${INK.iron}" stroke-width=".8" stroke-linejoin="round"/>`
+      : '');
+  // its head: the type and its name under it, the most common persona, and the two who stand out, each badged
+  const hy = y + 24;
+  s +=
     paperDisc(x + 22, hy, 21) +
     typeMark(f.type, x + 22, hy, 30) +
-    figure(x + 22, hy + 33, TYPE_WORDS[f.type] ?? '', 14, { fill: INK.sepia }) +
+    figure(x + 22, hy + 33, f.name, 13, { fill: INK.sepia }) +
     paperDisc(x + 70, hy, 21, INK.gold) +
     `<circle cx="${x + 70}" cy="${hy}" r="16" fill="${GILT}"/>` +
     personaMark(f.common, x + 70, hy, 24);

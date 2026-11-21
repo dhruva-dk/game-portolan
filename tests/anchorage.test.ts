@@ -112,6 +112,16 @@ test('her livery folio open, it eases round to her broadside and stays there; cl
     where(anchorageEye(pose, off, 0, flat).position).off,
     where(anchorageEye(pose, o, 0, flat).position).off
   );
+  let back = off;
+  for (let i = 0; i < 300; i++)
+    back = turned(relaxed(back, 1 / 30), true, 1 / 30);
+  assert.equal(back.broadside, 1);
+  assert.ok(
+    Math.abs(
+      where(anchorageEye(pose, back, 0, flat).position).off - BROADSIDE.quarter
+    ) < 0.01,
+    JSON.stringify(back)
+  );
   // closed: back to its rest
   for (let i = 0; i < 300; i++) o = turned(o, false, 1 / 30);
   assert.equal(o.broadside, 0);

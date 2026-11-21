@@ -1,6 +1,7 @@
 // The chart's larger marks: the compass rose and its rhumb lines, the laurel
-// for a place, and the marks more than one screen draws (the spyglass, the
-// seed, a ram).
+// for a place, and the marks more than one screen draws, or that mean one
+// thing wherever they are (the spyglass, a ram, a badge, the pencil, the dye
+// pot, the circular arrow, the die, the anchor).
 
 import { INK, PAPER, WASH, alpha, arcPath } from './ink.ts';
 
@@ -169,22 +170,104 @@ export const spyglass = (x: number, y: number, s: number) => {
   );
 };
 
-/** The seed (a new seed, a new world): an almond-shaped seed, its seam inked, a shoot curling from its top; `s` its
- *  height. */
-export const seed = (x: number, y: number, s: number) => {
-  const k = s / 64;
-  return (
-    `<g transform="translate(${x} ${y}) scale(${k})" stroke="${INK.iron}" stroke-linecap="round" stroke-linejoin="round">` +
-    `<path d="M0 -14C15 -8 18 14 0 28C-18 14 -15 -8 0 -14Z" fill="${WASH.ochre}" stroke-width="3"/>` +
-    `<path d="M0 -14C15 -8 18 14 0 28C-18 14 -15 -8 0 -14Z" fill="${WASH.umber}" opacity=".45" stroke="none"/>` +
-    `<path d="M0 -8Q5 8 0 22" fill="none" stroke-width="1.6"/>` +
-    `<path d="M0 -14Q-1 -24 7 -29" fill="none" stroke="${INK.green}" stroke-width="3"/>` +
-    `<path d="M7 -29Q15 -31 17 -24Q10 -21 7 -29Z" fill="${WASH.viridian}" stroke="${INK.green}" stroke-width="1.6"/></g>`
-  );
-};
-
 /** A ram: two hulls met bow to bow, a rubric spark between them; about 34 across at `s` 1. */
 export const ram = (x: number, y: number, s = 1) =>
   `<g transform="translate(${x} ${y}) scale(${s})" stroke="${INK.iron}" stroke-width="1.4" stroke-linejoin="round">` +
   `<path d="M-17 -2L-3 -2L1 2L-3 7L-15 7Z" fill="url(#h-iron)"/><path d="M17 -2L3 -2L-1 2L3 7L15 7Z" fill="url(#h-iron)" transform="scale(1 -1) translate(0 -5)"/>` +
   `<path d="M0 -12l2 6l5 -4l-2 6l6 1l-6 2l3 5" fill="none" stroke="${INK.rubric}" stroke-width="1.6"/></g>`;
+
+/** A badge about (x, y): a gilt rosette, its two ribbon tails under it, `body` (a trait's mark) on its face. */
+export const badge = (x: number, y: number, body: string) =>
+  `<g stroke="${INK.iron}" stroke-width=".9" stroke-linejoin="round">` +
+  `<path d="M${x - 7} ${y + 6}L${x - 10} ${y + 19}L${x - 5} ${y + 15}L${x - 2} ${y + 19}L${x - 1} ${y + 8}Z" fill="${WASH.vermilion}"/>` +
+  `<path d="M${x + 7} ${y + 6}L${x + 10} ${y + 19}L${x + 5} ${y + 15}L${x + 2} ${y + 19}L${x + 1} ${y + 8}Z" fill="${WASH.vermilion}"/>` +
+  `<circle cx="${x}" cy="${y}" r="12.5" fill="${WASH.gold}" stroke-width="1.2" stroke-dasharray="2.6 1.4"/>` +
+  `<circle cx="${x}" cy="${y}" r="9.5" fill="${PAPER}" stroke-width=".8"/></g>${body}`;
+
+/** A small pencil, `s` long, its point at the lower left: a thing to be written in (the seed's chip). */
+export const pencil = (x: number, y: number, s: number) =>
+  `<g transform="translate(${x} ${y}) rotate(-45) scale(${s / 24})" stroke="${INK.iron}" stroke-width="1.3" stroke-linejoin="round">` +
+  `<path d="M-6 -3.2H9V3.2H-6Z" fill="${WASH.ochre}"/><path d="M9 -3.2H12.5V3.2H9Z" fill="${WASH.vermilion}"/>` +
+  `<path d="M-6 -3.2L-12 0L-6 3.2Z" fill="${PAPER}"/><path d="M-10 -1.1L-12 0L-10 1.1Z" fill="${INK.iron}"/></g>`;
+
+/** The dye pot (her livery's folio), `s` across, about (x, y): an earthen pot brimming with her `dye`, a dribble of
+ *  it down its lip, a brush standing in it. */
+export const dyePot = (x: number, y: number, s: number, dye: string) =>
+  `<g transform="translate(${x} ${y}) scale(${s / 24})" stroke="${INK.iron}" stroke-linejoin="round" stroke-linecap="round">` +
+  `<path d="M3 -3L10 -12" stroke="${INK.sepia}" stroke-width="2.2"/>` +
+  `<path d="M9 -11L11.5 -14L13 -12.5L10.5 -10Z" fill="${dye}" stroke-width=".8"/>` +
+  `<path d="M-9 -3Q-11.5 7 -6 10.5H6Q11.5 7 9 -3Z" fill="url(#h-sepia)" stroke-width="1.3"/>` +
+  `<path d="M-9.5 3.5H9.5" stroke-width=".6" fill="none"/>` +
+  `<ellipse cx="0" cy="-3.5" rx="10" ry="3" fill="${PAPER}" stroke-width="1.2"/>` +
+  `<ellipse cx="0" cy="-3.4" rx="7.6" ry="1.9" fill="${dye}" stroke-width=".7"/>` +
+  `<path d="M-6.5 -2.4Q-7.4 1 -6.6 3.2Q-5.6 1 -5.6 -2.2Z" fill="${dye}" stroke-width=".6"/></g>`;
+
+/** The circular arrow (this seed sailed again: round once more), `s` across: most of a ring, a band of paper inked
+ *  either side, its gilt head at the top. */
+export const again = (x: number, y: number, s: number) => {
+  const ring = 'M-15.6 -9A18 18 0 1 0 0 -18';
+  return (
+    `<g transform="translate(${x} ${y}) scale(${r2(s / 48)})" stroke-linecap="round" stroke-linejoin="round">` +
+    `<path d="${ring}" fill="none" stroke="${INK.iron}" stroke-width="8.4"/>` +
+    `<path d="${ring}" fill="none" stroke="${PAPER}" stroke-width="4.6"/>` +
+    `<path d="M-2 -29L13 -18L-2 -7Z" fill="${WASH.gold}" stroke="${INK.iron}" stroke-width="2"/></g>`
+  );
+};
+
+/** The die (a seed rolled: a new world), `s` across: a cube of paper seen from above a corner, inked, its right side
+ *  hatched; five pips on its top (the middle one gilt), two and three on its sides. */
+export const die = (x: number, y: number, s: number) => {
+  const a = 20,
+    c = a * 0.87;
+  type P = readonly [number, number];
+  /** The point (u, v) of a face from `o` along its edges `e` and `f`. */
+  const on = (o: P, e: P, f: P, u: number, v: number) =>
+    [r2(o[0] + u * e[0] + v * f[0]), r2(o[1] + u * e[1] + v * f[1])] as const;
+  const pips = (o: P, e: P, f: P, uv: readonly P[]) =>
+    uv
+      .map(([u, v]) => {
+        const [px, py] = on(o, e, f, u, v);
+        return `<circle cx="${px}" cy="${py}" r="2.3"/>`;
+      })
+      .join('');
+  const near: P = [0, 0],
+    left: P = [-c, -a / 2],
+    right: P = [c, -a / 2],
+    down: P = [0, a];
+  let hatch = '';
+  for (const t of [0.2, 0.4, 0.6, 0.8]) {
+    const [hx, hy] = on(near, right, down, t, 0.08);
+    hatch += `M${hx} ${hy}V${r2(hy + a * 0.84)}`;
+  }
+  const [mx, my] = on(near, left, right, 0.5, 0.5);
+  return (
+    `<g transform="translate(${x} ${y + s * 0.08}) scale(${r2(s / 44)})" stroke="${INK.iron}" stroke-width="1.8" stroke-linejoin="round">` +
+    `<path d="M0 0L${-c} ${-a / 2}L0 ${-a}L${c} ${-a / 2}ZM0 0L${-c} ${-a / 2}V${a / 2}L0 ${a}ZM0 0L${c} ${-a / 2}V${a / 2}L0 ${a}Z" fill="${PAPER}"/>` +
+    `<path d="${hatch}" stroke-width=".6" opacity=".55"/>` +
+    `<g fill="${INK.iron}" stroke="none">` +
+    pips(near, left, right, [
+      [0.22, 0.22],
+      [0.78, 0.22],
+      [0.22, 0.78],
+      [0.78, 0.78],
+    ]) +
+    pips(near, left, down, [
+      [0.3, 0.3],
+      [0.7, 0.7],
+    ]) +
+    pips(near, right, down, [
+      [0.25, 0.25],
+      [0.5, 0.5],
+      [0.75, 0.75],
+    ]) +
+    `</g><circle cx="${mx}" cy="${my}" r="2.7" fill="${WASH.gold}" stroke-width=".9"/></g>`
+  );
+};
+
+/** The anchor (home: put in to harbour), `s` high: its ring, stock and shank, the arms curving up to their flukes. */
+export const anchor = (x: number, y: number, s: number) =>
+  `<g transform="translate(${x} ${y}) scale(${r2(s / 48)})" stroke="${INK.iron}" stroke-linecap="round" stroke-linejoin="round" fill="none">` +
+  `<circle cx="0" cy="-18" r="4.5" stroke-width="3"/>` +
+  `<path d="M0 -13.5V20M-10 -7H10" stroke-width="4"/>` +
+  `<path d="M-17 6Q-14 20 0 21Q14 20 17 6" stroke-width="4"/>` +
+  `<path d="M-21 9L-17 3L-13 9M13 9L17 3L21 9" stroke-width="3.4"/></g>`;

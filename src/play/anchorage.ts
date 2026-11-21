@@ -46,8 +46,9 @@ export const LOBBY = {
  * The camera on her broadside, while the livery folio is open: square off her
  * beam, on a longer boom, looking at a point `height` metres over the sea at her
  * (lower than at rest, so she stands higher on the screen, clear of the folio
- * docked at its foot), not drifting; turned to it or back with `ease` of the
- * way closed a second.
+ * docked at its foot), not drifting; turned to it or back with what is left of
+ * the way shrinking by e^−ease a second (at 2.4, nine tenths of it gone in a
+ * second), the turn smoothed at both ends as the eye takes it.
  */
 export const BROADSIDE = {
   quarter: Math.PI / 2,

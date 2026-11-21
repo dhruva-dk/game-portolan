@@ -34,7 +34,7 @@ import {
   slip,
   svgNode,
 } from './ink.ts';
-import { rhumbs, rose } from './marks.ts';
+import { dyePot, pencil, rhumbs, rose } from './marks.ts';
 import { keep, onTap, region } from './touch.ts';
 import { at, boxOf, fade, onResize, page, screen, type Page } from './ui.ts';
 
@@ -158,12 +158,6 @@ export function createTitle() {
 
 export type Title = ReturnType<typeof createTitle>;
 
-/** A small pencil, `s` long, its point at the lower left: a thing to be written in (the seed's chip). */
-const pencil = (x: number, y: number, s: number) =>
-  `<g transform="translate(${x} ${y}) rotate(-45) scale(${s / 24})" stroke="${INK.iron}" stroke-width="1.3" stroke-linejoin="round">` +
-  `<path d="M-6 -3.2H9V3.2H-6Z" fill="${WASH.ochre}"/><path d="M9 -3.2H12.5V3.2H9Z" fill="${WASH.vermilion}"/>` +
-  `<path d="M-6 -3.2L-12 0L-6 3.2Z" fill="${PAPER}"/><path d="M-10 -1.1L-12 0L-10 1.1Z" fill="${INK.iron}"/></g>`;
-
 /** The seed's chip: a slip at the lobby's top left, the seed's name (the one piece of text the screens set down, as a
  *  seed is any text she gives it) and a small pencil after it, sized to the name. */
 function seedChip(x: number, y: number, name: string) {
@@ -173,18 +167,6 @@ function seedChip(x: number, y: number, name: string) {
     `${figure(x + 16, y + 22, name, 21, { anchor: 'start' })}${pencil(x + w - 22, y + 22, 22)}</g>`
   );
 }
-
-/** The dye pot (her livery's folio: livery.ts), `s` across, about (x, y): an earthen pot brimming with her dye, a
- *  dribble of it down its lip, a brush standing in it. */
-const dyePot = (x: number, y: number, s: number, dye: string) =>
-  `<g transform="translate(${x} ${y}) scale(${s / 24})" stroke="${INK.iron}" stroke-linejoin="round" stroke-linecap="round">` +
-  `<path d="M3 -3L10 -12" stroke="${INK.sepia}" stroke-width="2.2"/>` +
-  `<path d="M9 -11L11.5 -14L13 -12.5L10.5 -10Z" fill="${dye}" stroke-width=".8"/>` +
-  `<path d="M-9 -3Q-11.5 7 -6 10.5H6Q11.5 7 9 -3Z" fill="url(#h-sepia)" stroke-width="1.3"/>` +
-  `<path d="M-9.5 3.5H9.5" stroke-width=".6" fill="none"/>` +
-  `<ellipse cx="0" cy="-3.5" rx="10" ry="3" fill="${PAPER}" stroke-width="1.2"/>` +
-  `<ellipse cx="0" cy="-3.4" rx="7.6" ry="1.9" fill="${dye}" stroke-width=".7"/>` +
-  `<path d="M-6.5 -2.4Q-7.4 1 -6.6 3.2Q-5.6 1 -5.6 -2.2Z" fill="${dye}" stroke-width=".6"/></g>`;
 
 /** The lobby over her ship at anchor: `dye` her livery's dye now, for the pot. */
 export function createLobby(

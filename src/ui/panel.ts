@@ -1,7 +1,7 @@
 // The seed panel: a folio over the lobby (screens.ts folio), opened from the
 // seed's chip, on the seed this page sails. At its top left a field to type a
-// seed in (any text, as seeds are: world/seeds.ts), the seed's mark beside it
-// rolling a new one into it; under them the seed's planet inked on a
+// seed in (any text, as seeds are: world/seeds.ts), the die beside it rolling
+// a new one into it (the die of her end's new seed, marks.ts); under them the seed's planet inked on a
 // parchment disc (orb.ts), spun by a finger; at the right what its race is
 // sailed by (fleet.ts), its captains' traits shown while the card is held;
 // under that the SAIL banner, her galleon on it, which
@@ -24,7 +24,7 @@ import {
   roughCircle,
   slip,
 } from './ink.ts';
-import { seed } from './marks.ts';
+import { die } from './marks.ts';
 import { createOrb } from './orb.ts';
 import { banner, folio } from './screens.ts';
 import { keep, onHold, region } from './touch.ts';
@@ -156,7 +156,7 @@ export function createSeedPanel(
     f.draw(
       slip(FIELD.x, FIELD.y, FIELD.w, FIELD.h, { flat: true }) +
         `<rect id="sp-field" x="${FIELD.x + 6}" y="${FIELD.y + 4}" width="${FIELD.w - 12}" height="${FIELD.h - 8}" fill="transparent"/>` +
-        `<g id="sp-roll">${paperDisc(FIELD.x + FIELD.w + 28, FIELD.y + 20, 22)}${seed(FIELD.x + FIELD.w + 28, FIELD.y + 22, 30)}</g>` +
+        `<g id="sp-roll">${paperDisc(FIELD.x + FIELD.w + 28, FIELD.y + 20, 22)}${die(FIELD.x + FIELD.w + 28, FIELD.y + 19, 30)}</g>` +
         disc() +
         `<g id="sp-card"></g>` +
         `<g id="sp-sail">${banner(CARD_AT.x + CARD / 2, 358, 190, galleon(CARD_AT.x + CARD / 2, 354, 70, { waves: true }), true)}</g>`,

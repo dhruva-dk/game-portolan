@@ -5,6 +5,8 @@
 // numerals). Each mark is SVG markup in the piece's own units; a piece sets it
 // into an <svg>, and the page carries DEFS once (ui.ts).
 
+import { linearToHex } from '../colour.ts';
+import type { Sea } from '../snapshot.ts';
 import { hash01 } from '../world/random.ts';
 import { GLYPHS, type Glyph, type Prim } from './glyphs.ts';
 
@@ -232,6 +234,23 @@ export function figure(
     `<text x="${r2(x)}" y="${r2(y)}" font-size="${size}" font-family='${FIGURES}' font-style="italic" font-weight="${o.weight ?? 400}" fill="${o.fill ?? INK.iron}"` +
     ` text-anchor="${o.anchor ?? 'middle'}" dominant-baseline="central"${halo}>${esc(String(text))}</text>`
   );
+}
+
+/** A share (0…1) as a per cent, always to a tenth (0.0%), never below none. */
+export const percent = (share: number) =>
+  `${(Math.max(0, share) * 100).toFixed(1)}%`;
+
+/**
+ * Ship `own`'s dye on `sea` as the display shows it ('#rrggbb': the colours
+ * the sea is drawn with, her water's and her ship's), or white while it is not
+ * known.
+ */
+export function dyeOn(
+  sea: Pick<Sea, 'colours'> | undefined,
+  own: number | null | undefined
+) {
+  const c = sea && own != null ? sea.colours[own] : undefined;
+  return c ? linearToHex(c) : INK.white;
 }
 
 interface GlyphStyle {

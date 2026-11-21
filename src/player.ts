@@ -288,6 +288,8 @@ export interface Standout {
  */
 export interface Fleet {
   type: number;
+  /** The type's name, the one word the card sets down (its mark alone not reading plain). */
+  name: string;
   /** How many bots of each persona. */
   counts: readonly number[];
   /** The persona most of them are. */

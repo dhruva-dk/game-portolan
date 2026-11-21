@@ -69,6 +69,7 @@ export function fleetOf(seed: number): Fleet {
   const common = counts.indexOf(Math.max(...counts));
   return {
     type: TYPES.findIndex((t) => t === type),
+    name: type.name,
     counts,
     common,
     skill: spread(all, (n) => n.temper.skill),

@@ -10,10 +10,9 @@
 // no other ship and no loot (those are found by eye). Outside the next circle a
 // white line runs from her to its nearest point, ending in an arrowhead (on the
 // rim when the circle is off the disc). Her mark at the centre is a small
-// arrowhead in her dye turned to her heading. Drawn in canvas 2D when what it shows has
-// changed; tapped, it opens the full map.
+// arrowhead in her dye (ink.ts dyeOn) turned to her heading. Drawn in canvas
+// 2D when what it shows has changed; tapped, it opens the full map.
 
-import { linearToHex } from '../colour.ts';
 import type { Sea } from '../snapshot.ts';
 import { R, along, dot, type Vec3 } from '../world/sphere.ts';
 import {
@@ -29,7 +28,7 @@ import type { Shores } from './coasts.ts';
 import { laid, layAt, metres, newLay, place, type LayOnto } from './disc.ts';
 import { createGround } from './ground.ts';
 import { createHeld } from './held.ts';
-import { BRASS, INK, PAPER, WASH, alpha, svgNode } from './ink.ts';
+import { BRASS, INK, PAPER, WASH, alpha, dyeOn, svgNode } from './ink.ts';
 import { view } from './ui.ts';
 
 /**
@@ -139,19 +138,6 @@ export function createMinimap(
   };
   let drawnFill = '',
     then = performance.now();
-  /** Her ship's dye as the display shows it, worked out once a match (the sea's colours are a match's). */
-  let dyed: {
-    colours: Sea['colours'] | null;
-    own: number | null;
-    hex: string;
-  } = { colours: null, own: null, hex: INK.white };
-  const dyeOf = (sea: Sea | undefined, own: number | null | undefined) => {
-    const c = sea && own != null ? sea.colours[own] : undefined;
-    if (!sea || !c) return INK.white;
-    if (sea.colours !== dyed.colours || own !== dyed.own)
-      dyed = { colours: sea.colours, own: own!, hex: linearToHex(c) };
-    return dyed.hex;
-  };
   return (at: Vec3, heading: Vec3, more: More) => {
     // at most RATE times a second
     const now = performance.now(),
@@ -196,7 +182,7 @@ export function createMinimap(
       `translate(${r} ${r}) rotate(${(turned / 10).toFixed(1)})`
     );
     // her arrowhead in her dye (white till her ship's colour is known); gilt watching another ship after a sinking
-    const fill = more.gilt ? WASH.gold : dyeOf(sea, more.own);
+    const fill = more.gilt ? WASH.gold : dyeOn(sea, more.own);
     if (fill !== drawnFill) {
       drawnFill = fill;
       her.innerHTML = `<path d="${head(6)}" fill="${fill}" stroke="${INK.iron}" stroke-width="1.3" stroke-linejoin="round"/>`;

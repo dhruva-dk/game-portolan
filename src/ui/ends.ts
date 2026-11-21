@@ -22,12 +22,13 @@ import {
   figure,
   glyph,
   paperDisc,
+  percent,
   roughCircle,
   slip,
   svg,
   uid,
 } from './ink.ts';
-import { laurel, ram, spyglass } from './marks.ts';
+import { again, anchor, die, laurel, ram, spyglass } from './marks.ts';
 import { banner, sheet } from './screens.ts';
 import { onTap, region } from './touch.ts';
 import { at, fade, piece, screen } from './ui.ts';
@@ -45,9 +46,6 @@ const placed = (place: number) =>
         ? [WASH.vermilion, INK.rubric]
         : [WASH.umber, INK.iron];
 
-/** A share of the planet as per cent, always to a tenth (0.0%). */
-const percent = (share: number) => `${(Math.max(0, share) * 100).toFixed(1)}%`;
-
 const r2 = (n: number) => Math.round(n * 100) / 100;
 
 /** The sea held's mark: a disc of the chart's sea, waves inked across it, a patch of it washed in her dye and its
@@ -64,74 +62,6 @@ const held = (x: number, y: number, r: number, dye: string) => {
     `<circle cx="${x}" cy="${y}" r="${r}" fill="none" stroke="${INK.iron}" stroke-width="1.4"/>`
   );
 };
-
-/** The circular arrow (this seed sailed again: round once more), `s` across: most of a ring, its head at the top. */
-const again = (x: number, y: number, s: number) => {
-  const k = r2(s / 48),
-    ring = 'M-15.6 -9A18 18 0 1 0 0 -18';
-  return (
-    `<g transform="translate(${x} ${y}) scale(${k})" stroke-linecap="round" stroke-linejoin="round">` +
-    `<path d="${ring}" fill="none" stroke="${INK.iron}" stroke-width="8"/>` +
-    `<path d="${ring}" fill="none" stroke="${WASH.azure}" stroke-width="4"/>` +
-    `<path d="M-2 -28L12 -18L-2 -8Z" fill="${WASH.azure}" stroke="${INK.iron}" stroke-width="2"/></g>`
-  );
-};
-
-/** The die (a new seed, rolled), `s` across: a cube seen from above a corner, five pips on its top, two and three on
- *  its sides. */
-const die = (x: number, y: number, s: number) => {
-  const a = 20,
-    c = a * 0.87;
-  /** The pips at (u, v) of a face from the near corner (0, 0) along two of its edges. */
-  const pips = (
-    o: [number, number],
-    e: [number, number],
-    f: [number, number],
-    at: [number, number][]
-  ) =>
-    at
-      .map(
-        ([u, v]) =>
-          `<circle cx="${r2(o[0] + u * e[0] + v * f[0])}" cy="${r2(o[1] + u * e[1] + v * f[1])}" r="2.3"/>`
-      )
-      .join('');
-  const near: [number, number] = [0, 0],
-    left: [number, number] = [-c, -a / 2],
-    right: [number, number] = [c, -a / 2],
-    down: [number, number] = [0, a];
-  return (
-    `<g transform="translate(${x} ${y + s * 0.08}) scale(${r2(s / 44)})" stroke="${INK.iron}" stroke-width="1.8" stroke-linejoin="round">` +
-    `<path d="M0 0L${-c} ${-a / 2}L0 ${-a}L${c} ${-a / 2}Z" fill="${PAPER}"/>` +
-    `<path d="M0 0L${-c} ${-a / 2}V${a / 2}L0 ${a}Z" fill="${WASH.silver}"/>` +
-    `<path d="M0 0L${c} ${-a / 2}V${a / 2}L0 ${a}Z" fill="${WASH.umber}" fill-opacity=".55"/>` +
-    `<g fill="${INK.iron}" stroke="none">` +
-    pips(near, left, right, [
-      [0.22, 0.22],
-      [0.78, 0.22],
-      [0.5, 0.5],
-      [0.22, 0.78],
-      [0.78, 0.78],
-    ]) +
-    pips(near, left, down, [
-      [0.3, 0.3],
-      [0.7, 0.7],
-    ]) +
-    pips(near, right, down, [
-      [0.25, 0.25],
-      [0.5, 0.5],
-      [0.75, 0.75],
-    ]) +
-    `</g></g>`
-  );
-};
-
-/** The anchor (home: put in to harbour), `s` high: its ring, stock and shank, the arms curving up to their flukes. */
-const anchor = (x: number, y: number, s: number) =>
-  `<g transform="translate(${x} ${y}) scale(${r2(s / 48)})" stroke="${INK.iron}" stroke-linecap="round" stroke-linejoin="round" fill="none">` +
-  `<circle cx="0" cy="-18" r="4.5" stroke-width="3"/>` +
-  `<path d="M0 -13.5V20M-10 -7H10" stroke-width="4"/>` +
-  `<path d="M-17 6Q-14 20 0 21Q14 20 17 6" stroke-width="4"/>` +
-  `<path d="M-21 9L-17 3L-13 9M13 9L17 3L21 9" stroke-width="3.4"/></g>`;
 
 /** A chevron pointing `side` (−1 left, +1 right). */
 const chevron = (x: number, y: number, side: number) =>

@@ -26,8 +26,7 @@ import {
 } from './kept.ts';
 import { createLobby, createSettings, type Title } from './screens.ts';
 import { fade } from './ui.ts';
-import { INK } from './ink.ts';
-import { linearToHex } from '../colour.ts';
+import { INK, dyeOn } from './ink.ts';
 import { createPassage } from './passage.ts';
 import { createVeil } from './veil.ts';
 import {
@@ -101,8 +100,9 @@ export function createFlow(
   /** Her dye as she wears it now (the lobby's dye pot). */
   const worn = () =>
     act.wardrobe.dyes[act.wardrobe.worn().dye]?.dye ?? INK.white;
-  /** Her ship's colour on the sea as she last sailed it (her end's sea held), as the minimap reads it. */
-  let sailed: Sea['colours'][number] | null = null;
+  /** Her ship's dye on the sea as she last sailed it (her end's sea held), as the minimap reads it. */
+  let sailed: string | null = null,
+    seen: Sea['colours'] | null = null;
   const lobby = createLobby(act.seeds.name, worn, {
     play: () => tap('play'),
     settings: () => tap('settings'),
@@ -126,7 +126,7 @@ export function createFlow(
     },
     () => tap('close')
   );
-  const result = createResult(() => (sailed ? linearToHex(sailed) : worn()), {
+  const result = createResult(() => sailed ?? worn(), {
     watch: () => tap('watch'),
     leave: () => tap('leave'),
     again: () => tap('again'),
@@ -238,9 +238,11 @@ export function createFlow(
      * frame draws it.
      */
     update(s: HudState, sea?: Sea, own?: number | null) {
-      // (her own ship's while she sails; another's once she watches)
-      if (screen === 'match' && sea && own != null)
-        sailed = sea.colours[own] ?? sailed;
+      // (her own ship's while she sails, not another's once she watches; once a match: its colours are the match's)
+      if (screen === 'match' && sea && own != null && sea.colours !== seen) {
+        seen = sea.colours;
+        sailed = dyeOn(sea, own);
+      }
       if (IN_MATCH.includes(screen)) {
         // (the full map's window would show the HUD under it)
         hud.update(s, sea, own, globe.open);
