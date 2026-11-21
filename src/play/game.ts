@@ -74,6 +74,7 @@ import {
   type Hands,
   type Item,
   type Kit,
+  type Livery,
   type Moment,
   type Slot,
   type Status,
@@ -84,6 +85,7 @@ import {
   dragged,
   eyeOut,
   relaxed,
+  turned,
   type Orbit,
 } from './anchorage.ts';
 import { ARRIVAL, arriving } from './arrival.ts';
@@ -211,7 +213,9 @@ export function createGame(
    */
   let anchored = false,
     berth: Eye | null = null,
-    floorAt = 0;
+    floorAt = 0,
+    /** Whether the camera is to stand on her broadside (the livery folio open). */
+    aside = false;
   const orbit: Orbit = { ...REST },
     berthed = eyeOut(),
     floor = (p: Vec3) => Math.max(ground(p), sea.at(p, floorAt));
@@ -458,6 +462,18 @@ export function createGame(
      */
     steering,
     /**
+     * Her livery as she chooses it: her ship at anchor in it at once, and hers
+     * in every match after (state.ts wear).
+     */
+    wear: (l: Livery) => state.wear(l),
+    /**
+     * The lobby's camera eased round to her broadside (her livery folio open),
+     * or back to its rest.
+     */
+    broadside(on: boolean) {
+      aside = on;
+    },
+    /**
      * A frame of dt seconds, her hands as read for it (none while the match's
      * flow, the lobby or the arrival has them): the match stepped on, the
      * camera moved after the ship it follows.
@@ -513,6 +529,7 @@ export function createGame(
         // eases home
         dragged(orbit, read.look, orbit);
         if (!read.look.held) relaxed(orbit, dt, orbit);
+        turned(orbit, aside, dt, orbit);
         floorAt = state.clock(between);
         berth = anchorageEye(last, orbit, floorAt, floor, berthed);
         return;

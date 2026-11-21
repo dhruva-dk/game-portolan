@@ -3,7 +3,7 @@
 // play/stops.ts), and the screen's flashes and heartbeat (ui/flash.ts).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { HER, HOTBAR, type Deed } from '../src/player.ts';
+import { HER, HOTBAR, LIVERY, type Deed } from '../src/player.ts';
 import {
   KEEP,
   bearingFrom,
@@ -21,7 +21,7 @@ import {
 } from '../src/play/shake.ts';
 import { STOPS, createStops, stopFor } from '../src/play/stops.ts';
 import { createState, debugOf, type Match } from '../src/play/state.ts';
-import { LOOK } from '../src/play/colours.ts';
+import { lookOf } from '../src/play/colours.ts';
 import { PLAYER } from '../src/sim/match.ts';
 import { chart } from '../src/sim/route.ts';
 import { MIXED } from '../src/sim/persona.ts';
@@ -262,7 +262,12 @@ test('the match records its deeds: a ship sunk is told once, with a sink blast t
   const before = state.deeds().at(-1)?.seq ?? 0;
   const there = normalize([start.at[0] + 0.05, start.at[1], start.at[2]]);
   debugOf(state).atSea(start, [
-    { at: there, heading: bearingAt(there, 0), look: LOOK, lashed: null },
+    {
+      at: there,
+      heading: bearingAt(there, 0),
+      look: lookOf(LIVERY),
+      lashed: null,
+    },
   ]);
   const other = state.vessels().find((v) => v.id !== PLAYER)!.id;
   debugOf(state).sink(other, PLAYER);

@@ -4,12 +4,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  BROADSIDE,
   LOBBY,
   ORBIT,
   REST,
   anchorageEye,
   dragged,
   relaxed,
+  turned,
 } from '../src/play/anchorage.ts';
 import {
   R,
@@ -74,18 +76,50 @@ test('a drag turns it freely round her, and tilts it only within its limits', ()
 test('it never goes under the sea or into the land, at any turn and tilt', () => {
   for (let yaw = -Math.PI; yaw <= Math.PI; yaw += 0.3) {
     for (const pitch of ORBIT.pitch) {
-      assert.ok(
-        where(anchorageEye(pose, { yaw, pitch }, 37, flat).position).height >
-          1.5
-      );
-      // a hill under it: it stands over it
-      assert.ok(
-        where(anchorageEye(pose, { yaw, pitch }, 37, () => 20).position)
-          .height >=
-          21.5 - 1e-9
-      );
+      for (const broadside of [0, 0.5, 1]) {
+        const o = { yaw, pitch, broadside };
+        assert.ok(where(anchorageEye(pose, o, 37, flat).position).height > 1.5);
+        // a hill under it: it stands over it
+        assert.ok(
+          where(anchorageEye(pose, o, 37, () => 20).position).height >=
+            21.5 - 1e-9
+        );
+      }
     }
   }
+});
+
+test('her livery folio open, it eases round to her broadside and stays there; closed, it eases back to its rest', () => {
+  let o = REST;
+  for (let i = 0; i < 90; i++) o = turned(o, true, 1 / 30);
+  // most of the way in three seconds, smoothly (never past it)
+  assert.ok(o.broadside > 0.99 && o.broadside <= 1, `${o.broadside}`);
+  for (let i = 0; i < 300; i++) o = turned(o, true, 1 / 30);
+  assert.equal(o.broadside, 1);
+  // there, square off her starboard beam, and still at any clock (no drift)
+  for (const clock of [0, 22.5, 45]) {
+    const w = where(anchorageEye(pose, o, clock, flat).position);
+    assert.ok(Math.abs(w.off - BROADSIDE.quarter) < 0.01, `${w.off}`);
+  }
+  // looking below the pivot it rests on, so she stands higher on the screen, over the folio
+  const e = anchorageEye(pose, o, 0, flat),
+    look = rotate([0, 0, -1], e.orientation),
+    pivot = normalize(add(scale(up, R + LOBBY.height), e.position, -1));
+  assert.ok(dot(look, up) < dot(pivot, up));
+  // a drag still turns it, and let go it comes back to the broadside
+  const off = dragged(o, { x: 200, y: 0 });
+  assert.notEqual(
+    where(anchorageEye(pose, off, 0, flat).position).off,
+    where(anchorageEye(pose, o, 0, flat).position).off
+  );
+  // closed: back to its rest
+  for (let i = 0; i < 300; i++) o = turned(o, false, 1 / 30);
+  assert.equal(o.broadside, 0);
+  assert.ok(
+    Math.abs(
+      where(anchorageEye(pose, o, 0, flat).position).off - LOBBY.quarter
+    ) < 0.01
+  );
 });
 
 test('let go, it eases home, the short way round', () => {

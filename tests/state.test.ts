@@ -3,7 +3,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createState, debugOf, type Match } from '../src/play/state.ts';
-import { PLAYER } from '../src/sim/match.ts';
+import { COLOURS, dealt, lookOf } from '../src/play/colours.ts';
+import { LIVERY } from '../src/player.ts';
+import { PLAYER, SHIPS } from '../src/sim/match.ts';
 import { chart } from '../src/sim/route.ts';
 import { MIXED } from '../src/sim/persona.ts';
 import { berthing } from '../src/sim/spawn.ts';
@@ -70,6 +72,37 @@ function loop(m: Match, state = createState(planet, flat, waters, m)) {
   }
   return { closed: null, did: null, state };
 }
+
+test('her livery: worn at anchor at once; her ship in it at sea, the bots dealt round it, her water her dye', () => {
+  const state = createState(planet, flat, waters, deadly(Infinity)),
+    hers = { dye: 4, pattern: 2 };
+  const her = () => state.drawn(1).find((d) => d.id === PLAYER)!.look;
+  state.anchor(start);
+  assert.deepEqual(her(), lookOf(LIVERY), 'vermilion, plain, till she chooses');
+  state.wear(hers);
+  assert.deepEqual(her(), lookOf(hers), 'at anchor, in it at once');
+  state.start(deadly(Infinity));
+  const drawn = state.drawn(1);
+  assert.equal(drawn.length, SHIPS);
+  for (const d of drawn)
+    assert.deepEqual(
+      d.look,
+      lookOf(d.id === PLAYER ? hers : dealt(1, d.id, hers)),
+      `ship ${d.id}`
+    );
+  assert.ok(drawn.every((d) => d.id === PLAYER || d.look.sail !== her().sail));
+  // who holds the sea: each ship's water her canvas's dye
+  const sea = state.sea(1)!;
+  assert.deepEqual(sea.colours[PLAYER], COLOURS[hers.dye]);
+  drawn.forEach((d) => assert.deepEqual(sea.colours[d.id], d.look.sail));
+  // a match under way keeps the colours it was put to sea in
+  state.wear(LIVERY);
+  assert.deepEqual(her(), lookOf(hers));
+  // a livery past the set is held to it
+  state.anchor(start);
+  state.wear({ dye: 99, pattern: 1 });
+  assert.deepEqual(her(), lookOf({ dye: 0, pattern: 1 }));
+});
 
 test('a ship sunk in a step lays, closes and cuts nothing in it: her water only drains', () => {
   const sailed = loop(deadly(Infinity));

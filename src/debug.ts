@@ -63,7 +63,8 @@
 // The sea about her. ?ships= sets them on the sea ahead of her (demoShips;
 // ?pack: in rows of ten, a fan of them filling the view),
 // ?way=m/s gives them a straight course at that speed, their helms lashed, and
-// ?heading=deg turns them all. ?ahead=seconds sails the game on that long
+// ?heading=deg turns them all. ?livery=dye,pattern puts her in that livery
+// (play/colours.ts COLOURS, player.ts PATTERNS), the others dealt round it. ?ahead=seconds sails the game on that long
 // before the first frame, and ?pause holds it there from then on (the frame
 // still draws: the arrival's stills). The ships in a match are sim/match.ts
 // SHIPS; the frame has room for that many, or for ?ships= more. At sea, ?kit
@@ -98,10 +99,10 @@ import type { FrameOptions } from './frame.ts';
 import { createFly } from './fly.ts';
 import type { Game } from './play/game.ts';
 import type { Referee } from './play/referee.ts';
-import { lookOf } from './play/colours.ts';
+import { dealt, lookOf, worn } from './play/colours.ts';
 import type { Matches } from './play/setup.ts';
 import type { Berth } from './play/state.ts';
-import { HOTBAR, IDLE, type Hands } from './player.ts';
+import { HOTBAR, IDLE, type Hands, type Livery } from './player.ts';
 import { probeMeshes } from './probe.ts';
 import { STEP } from './sim/fixed.ts';
 import { KINDS, type GunKind } from './kinds.ts';
@@ -196,6 +197,11 @@ export interface Played {
 const params = new URLSearchParams(location.search);
 const number = (name: string, fallback: number) =>
   params.has(name) ? Number(params.get(name)) : fallback;
+/** ?livery=dye,pattern: hers (player.ts Livery), held to the set; else hers by default. */
+const hers: Livery = (() => {
+  const [dye, pattern] = (params.get('livery') ?? '').split(',').map(Number);
+  return worn({ dye: dye || 0, pattern: pattern || 0 });
+})();
 const degrees = Math.PI / 180;
 /** The debug camera flies instead of the game. */
 const flying =
@@ -265,12 +271,19 @@ export async function scenario(
   if (flying) {
     void s.ready.then(() => title.show(false));
     return s.draw(
-      flyer(s.canvas, s.start.at, demoShips(s.start.at, room), s.matches.storm)
+      flyer(
+        s.canvas,
+        s.start.at,
+        demoShips(s.start.at, room, s.world.seed),
+        s.matches.storm
+      )
     );
   }
   const p = await play(s);
   safeArea(uiLayer());
-  open(p, demoShips(s.start.at, room - 1));
+  // ?livery: hers, worn before the sea about her is laid
+  if (params.has('livery')) p.game.wear(hers);
+  open(p, demoShips(s.start.at, room - 1, s.world.seed));
   const paused = params.has('pause'),
     slow = number('slow', 1);
   // ?use: the item's slot tapped twice (chosen, then used); ?tap's slot tapped;
@@ -607,10 +620,11 @@ function flyer(
 
 /**
  * ?ships=n (at most `most`) galleons on the sea ahead of `south` (looking north) — 30, 60, 100, 150 m out and on
- * past — on the mean sea, each on her own heading and in her own colours (play/colours.ts): bots, or with ?way= m/s
+ * past — on the mean sea, each on her own heading and in her colours as `seed` deals them round hers (play/colours.ts
+ * dealt): bots, or with ?way= m/s
  * their helms lashed to a straight course at that speed. ?heading=deg turns them all that much further (clockwise seen from above).
  */
-function demoShips(south: Vec3, most: number): Berth[] {
+function demoShips(south: Vec3, most: number, seed: number): Berth[] {
   const others: Berth[] = [];
   const ships = Math.min(number('ships', 0), most),
     { up, north } = frameAt(south),
@@ -641,7 +655,7 @@ function demoShips(south: Vec3, most: number): Berth[] {
     others.push({
       at: u,
       heading: forward,
-      look: lookOf(i + 1),
+      look: lookOf(dealt(seed, i + 1, hers)),
       lashed: way > 0 ? { course: null, throttle: way / SHIP.top } : null,
     });
   }

@@ -153,3 +153,19 @@ export const ROSE = ink('#F2A0B4');
 export const LEMON = ink('#F4E06A');
 export const MURREY = ink('#8A2A6A');
 export const CHARCOAL = ink('#2E2A33');
+/**
+ * The rest of the liveries' dyes (play/colours.ts COLOURS): a pink-red coral, a
+ * clear orange, a yellow-green brighter than the moss, a dark olive, an oxblood
+ * darker than her vermilion, a brown umber, a hot cerise, a pale peach, and a
+ * warm pewter grey. None a blue, a green near the sea's, the foam's cream or
+ * the storm's violet.
+ */
+export const CORAL = ink('#EE6E5C');
+export const TANGERINE = ink('#F2801E');
+export const CHARTREUSE = ink('#BCC82C');
+export const OLIVE = ink('#5C5A1E');
+export const OXBLOOD = ink('#741A22');
+export const UMBER = ink('#6E4222');
+export const CERISE = ink('#D63C88');
+export const PEACH = ink('#F6BC8C');
+export const PEWTER = ink('#8E8882');

@@ -101,7 +101,8 @@ import { remembered } from '../world/remembered.ts';
 import type { PoseOut, ShipPose } from '../world/pose.ts';
 import { hash } from '../world/random.ts';
 import { add, bearingAt, scale, type Vec3 } from '../world/sphere.ts';
-import { LOOK, lookOf } from './colours.ts';
+import { LIVERY, type Livery } from '../player.ts';
+import { dealt, lookOf, worn } from './colours.ts';
 import { createDrawing } from './drawing.ts';
 import { createHeld } from './held.ts';
 import { indexed } from './indexed.ts';
@@ -322,6 +323,12 @@ export function createState(
   let territory: Territory | null = null;
   const held = createHeld();
   /**
+   * Her livery, as she last chose it (wear); each ship's colour on the sea by
+   * id, as she was put to sea this match (her canvas's dye).
+   */
+  let hers: Livery = LIVERY;
+  const colours: Vec3[] = [];
+  /**
    * Which match's sea it is (snapshot.ts Sea generation): one more for each sea
    * cleared.
    */
@@ -366,6 +373,7 @@ export function createState(
   ) => {
     fleet.push(afloat(id, ship));
     vessels.stale();
+    colours[id] = look.sail;
     const r = settled(ship, sea, tick * STEP, id),
       p = pose(ship, r);
     const bot = (id !== PLAYER || !manned) && !lashed;
@@ -396,6 +404,7 @@ export function createState(
     gunfire = [];
     fleet = [];
     aboard.clear();
+    colours.length = 0;
     aims.clear();
     wrecks = [];
     log.clear();
@@ -768,7 +777,7 @@ export function createState(
      * same object each time, refilled (held.ts); none outside a match.
      */
     sea: (_between = 1): Sea | undefined =>
-      territory ? held(territory, generation) : undefined,
+      territory ? held(territory, generation, colours) : undefined,
     /** A ship's share of the planet's water now, 0…1 (none outside a match). */
     share: (id: number) => territory?.share(id) ?? 0,
 
@@ -831,8 +840,15 @@ export function createState(
         flotsam,
         at.map((b) => b.at)
       );
+      // hers as she chose it, the bots' dealt by the race's seed round it
       at.forEach((b, id) =>
-        launch(id, shipAt(b.at, b.heading), lookOf(id), null, manned)
+        launch(
+          id,
+          shipAt(b.at, b.heading),
+          lookOf(id === PLAYER ? hers : dealt(m.seed, id, hers)),
+          null,
+          manned
+        )
       );
       territory?.begin(
         at.map((b) => b.at),
@@ -849,9 +865,19 @@ export function createState(
       launch(
         PLAYER,
         shipAt(start.at, bearingAt(start.at, start.bearing)),
-        LOOK
+        lookOf(hers)
       );
       return aboard.get(PLAYER)!.after;
+    },
+    /**
+     * Her livery as she chooses it (held to the set): her ship at anchor in it
+     * at once, and hers in every match after, the bots dealt round it. A match
+     * under way keeps the colours it was put to sea in.
+     */
+    wear(l: Livery) {
+      hers = worn(l);
+      const her = aboard.get(PLAYER);
+      if (quiet && her) her.look = lookOf(hers);
     },
   };
   // what only the debug switches (src/debug.ts) and the tools ask of the
@@ -869,7 +895,7 @@ export function createState(
       launch(
         PLAYER,
         shipAt(start.at, bearingAt(start.at, start.bearing)),
-        LOOK
+        lookOf(hers)
       );
       others.forEach((o, i) => {
         const way = (o.lashed?.throttle ?? 0) * SHIP.top;

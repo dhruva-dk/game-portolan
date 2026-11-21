@@ -229,6 +229,23 @@ export const SCREENS = [
 export type Screen = (typeof SCREENS)[number];
 
 /**
+ * The patterns a ship's dye may be laid on her canvas in besides her cross
+ * (snapshot.ts Look): none, a band across it, upright stripes.
+ */
+export const PATTERNS = ['plain', 'band', 'stripes'] as const;
+
+/**
+ * A captain's livery: her dye, by its place in the set every ship's is dealt
+ * from (play/colours.ts COLOURS), and its pattern, by its place in PATTERNS.
+ */
+export interface Livery {
+  dye: number;
+  pattern: number;
+}
+/** Hers until she chooses: vermilion, plain. */
+export const LIVERY: Livery = { dye: 0, pattern: 0 };
+
+/**
  * A trait of the bots' over a fleet: its average, and its spread (the standard
  * deviation) about it.
  */

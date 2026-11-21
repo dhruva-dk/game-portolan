@@ -3,7 +3,8 @@
 // the hull sits low and the sails stand whole, and drifting slowly round her
 // and back. A finger dragged anywhere off the lobby's controls turns it round
 // her (freely) and tilts its boom (within ORBIT.pitch, so never under the sea);
-// let go, it eases back to its rest.
+// let go, it eases back to its rest. While her livery folio is open it comes
+// round to her broadside, and back once it closes (BROADSIDE).
 //
 // Pure: the orbit is a value turned by the look's drag and eased by the
 // seconds; the eye is worked out from her pose, the orbit and the world's
@@ -12,7 +13,7 @@
 
 import { AIR_FOV, type Eye } from '../snapshot.ts';
 import type { ShipPose } from '../world/pose.ts';
-import { clamp, wrapAngle } from '../world/scalar.ts';
+import { clamp, lerp, smoother, wrapAngle } from '../world/scalar.ts';
 import {
   along,
   normalize,
@@ -42,6 +43,20 @@ export const LOBBY = {
 } as const;
 
 /**
+ * The camera on her broadside, while the livery folio is open: square off her
+ * beam, on a longer boom, looking at a point `height` metres over the sea at her
+ * (lower than at rest, so she stands higher on the screen, clear of the folio
+ * docked at its foot), not drifting; turned to it or back with `ease` of the
+ * way closed a second.
+ */
+export const BROADSIDE = {
+  quarter: Math.PI / 2,
+  boom: 40,
+  height: -2,
+  ease: 2.4,
+} as const;
+
+/**
  * The screen the drags are measured for, CSS px: the target's, the iPad Air's
  * in landscape.
  */
@@ -66,14 +81,16 @@ const CLEAR = 1.5;
 
 /**
  * Where a finger has taken the camera off its rest: its turn round her
- * (radians, to port, within ±π) and its boom's tilt (radians, up).
+ * (radians, to port, within ±π) and its boom's tilt (radians, up); and how far
+ * it has come round to her broadside (0 at rest, 1 there: BROADSIDE).
  */
 export interface Orbit {
   yaw: number;
   pitch: number;
+  broadside: number;
 }
 
-export const REST: Orbit = { yaw: 0, pitch: 0 };
+export const REST: Orbit = { yaw: 0, pitch: 0, broadside: 0 };
 
 /**
  * The orbit after a drag of the look (CSS px: right and down): dragged right,
@@ -102,6 +119,25 @@ export const relaxed = (o: Orbit, dt: number, out: Orbit = { ...o }): Orbit => {
   const k = Math.exp(-ORBIT.back * dt);
   out.yaw = o.yaw * k;
   out.pitch = o.pitch * k;
+  out.broadside = o.broadside;
+  return out;
+};
+
+/**
+ * The orbit eased over dt seconds toward her broadside (`on`) or back to its
+ * rest, smoothly at both ends (into `out`, which may be o).
+ */
+export const turned = (
+  o: Orbit,
+  on: boolean,
+  dt: number,
+  out: Orbit = { ...o }
+): Orbit => {
+  out.yaw = o.yaw;
+  out.pitch = o.pitch;
+  const to = on ? 1 : 0;
+  out.broadside = to + (o.broadside - to) * Math.exp(-BROADSIDE.ease * dt);
+  if (Math.abs(out.broadside - to) < 1e-4) out.broadside = to;
   return out;
 };
 
@@ -140,27 +176,31 @@ export function anchorageEye(
 ): Eye {
   normalize(pose.position, up);
   normalize(tangent(pose.forward, up, ahead), ahead);
+  // (the broadside's share of the turn, eased in and out)
+  const b = smoother(clamp(o.broadside));
   const yaw =
     Math.PI -
-    LOBBY.quarter +
-    LOBBY.drift * Math.sin((clock / LOBBY.period) * Math.PI * 2) +
+    lerp(LOBBY.quarter, BROADSIDE.quarter, b) +
+    (1 - b) * LOBBY.drift * Math.sin((clock / LOBBY.period) * Math.PI * 2) +
     o.yaw;
   // the boom runs from the pivot back along `boom`'s way, rising at `pitch`
-  const pitch = LOBBY.pitch + o.pitch;
+  const pitch = LOBBY.pitch + o.pitch,
+    boom = lerp(LOBBY.boom, BROADSIDE.boom, b),
+    height = lerp(LOBBY.height, BROADSIDE.height, b);
   const under = along(
     up,
     scale(rotateAbout(ahead, up, yaw, way), -1, way),
-    LOBBY.boom * Math.cos(pitch),
+    boom * Math.cos(pitch),
     end
   ).p;
   const position = place(
     under,
-    Math.max(LOBBY.height + LOBBY.boom * Math.sin(pitch), floor(under) + CLEAR),
+    Math.max(LOBBY.height + boom * Math.sin(pitch), floor(under) + CLEAR),
     out.position
   );
   lookAt(
     position,
-    place(up, LOBBY.height, at),
+    place(up, height, at),
     normalize(position, way),
     out.orientation
   );
