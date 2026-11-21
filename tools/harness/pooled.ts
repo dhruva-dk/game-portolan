@@ -219,6 +219,29 @@ export const METRICS: readonly Metric[] = [
       }),
   },
   {
+    // with any zone faulted (sim/faults.ts), however long she was afloat
+    key: 'faulted',
+    label: 'Faulted a ship (any zone)',
+    unit: 's',
+    digits: 1,
+    better: 'down',
+    gate: false,
+    of: (rs) => jackknife(rs, (q) => perShip(q, (s) => s.faulted ?? 0)),
+  },
+  {
+    key: 'watered',
+    label: 'Hull her own water mended a minute, a ship afloat',
+    unit: 'hp/min',
+    digits: 3,
+    better: 'up',
+    gate: false,
+    of: (rs) =>
+      jackknife(
+        rs,
+        (q) => sum(ships(q).map((s) => s.watered ?? 0)) / minutes(q)
+      ),
+  },
+  {
     key: 'spread',
     label: 'Persona rating spread (strongest θ − weakest)',
     unit: 'θ',

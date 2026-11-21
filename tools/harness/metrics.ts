@@ -2,9 +2,10 @@
 // the blows struck home, the balls come down short, the loot taken up, the
 // loops closed and the shield won back: play/state.ts advance), each ship's
 // fighting: her shots by gun, her hits, the damage she dealt and took, her
-// kills, what she took up, what she mended, whether she came back from a low
-// hull (LOW: sank a ship after, or rose over BACK). Once a second of its clock: each
-// ship's time afloat, in each mode and with each gun in hand, her time stuck (by
+// kills, what she took up, what she mended (her stores; her water apart),
+// whether she came back from a low hull (LOW: sank a ship after, or rose over
+// BACK). Once a second of its clock: each ship's time afloat, faulted
+// (sim/faults.ts), in each mode and with each gun in hand, her time stuck (by
 // the mode she was in), when she first held a gun and a second kind, her water
 // at HELD seconds. And of the match: how it ended, its shots by range, gun and
 // rarity and how many struck home, its longest quiet and lull, its loot, and
@@ -26,6 +27,7 @@ import type { GunKind } from '../../src/kinds.ts';
 import { debugOf } from '../../src/play/state.ts';
 import type { Memory } from '../../src/sim/bot.ts';
 import { BOT, type Mode } from '../../src/sim/captain.ts';
+import { faultsOf } from '../../src/sim/faults.ts';
 import { GUNS, SHIP } from '../../src/sim/handling.ts';
 import { PIECE, isArms } from '../../src/sim/loot.ts';
 import { distance, type Vec3 } from '../../src/world/sphere.ts';
@@ -126,6 +128,9 @@ export interface ShipResult {
    */
   low: number | null;
   comeback: boolean;
+  /** Seconds afloat with a fault (sim/faults.ts), and her hull her water mended (hp). */
+  faulted: number;
+  watered: number;
 }
 
 /** A ship is low under this much hull, and back from it over this much. */
@@ -325,6 +330,8 @@ export function watch(
         mended: { hull: 0, shield: 0 },
         low: null,
         comeback: false,
+        faulted: 0,
+        watered: 0,
       },
     });
   const pieces = state.loot().pieces;
@@ -488,10 +495,13 @@ export function watch(
       for (const v of state.vessels()) {
         const w = ships.get(v.id);
         if (!w) continue;
-        const h = state.crew(v.id).health,
+        const c = state.crew(v.id),
+          h = c.health,
           hull = h.hull - w.health.hull,
           shield = h.shield - w.health.shield - (regainedNow.get(v.id) ?? 0);
-        if (hull > 1e-6) w.r.mended.hull += hull;
+        // (her water's mending is hers alone in its step: no blow, no store)
+        if (hull > 1e-6 && c.wear.mending) w.r.watered += hull;
+        else if (hull > 1e-6) w.r.mended.hull += hull;
         if (shield > 1e-6) w.r.mended.shield += shield;
         if (w.r.low === null && h.hull < LOW) w.r.low = now;
         else if (w.r.low !== null && h.hull > BACK) w.r.comeback = true;
@@ -517,6 +527,8 @@ export function watch(
         if (w.r.second === null && new Set(guns.map((g) => g.kind)).size > 1)
           w.r.second = s;
         if (at >= 0) w.r.held[at] = state.share(v.id);
+        if (faultsOf(crew.health.hull, crew.wear).some((f) => f > 0))
+          w.r.faulted++;
         w.path.push(v.ship.at);
         w.speeds.push(v.ship.speed);
         if (w.path.length > WINDOW + 1) {
