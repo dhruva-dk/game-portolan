@@ -53,12 +53,7 @@ import { PLAYER } from '../sim/match.ts';
 import type { Vessel } from '../sim/contact.ts';
 import type { Helm, ShipState } from '../sim/ship.ts';
 import type { Fault, Use } from '../kinds.ts';
-import {
-  bearingFrom,
-  type Eye,
-  type LootDraw,
-  type Snapshot,
-} from '../snapshot.ts';
+import { type Eye, type LootDraw, type Snapshot } from '../snapshot.ts';
 import { createSwell } from '../world/swell.ts';
 import type { Anchor } from '../world/lattice.ts';
 import type { ShipPose } from '../world/pose.ts';
@@ -73,11 +68,12 @@ import {
   type Vec3,
 } from '../world/sphere.ts';
 import {
+  HER,
   HOTBAR,
   IDLE,
-  LIFT,
   SOUND,
   worsened,
+  type Deed,
   type Faults,
   type GunSlot,
   type Hands,
@@ -421,47 +417,21 @@ export function createGame(
     )
       gone++;
     if (gone) moments.splice(0, gone);
-    for (const m of moments) whence(see(m, eye, screen), eye);
+    for (const m of moments) see(m, eye, screen, dealer(m));
     const seen = moments.length ? moments[moments.length - 1].seq : 0;
     for (const d of deeds)
       if (d.seq > seen)
-        moments.push(whence(seenOf(d, eye, screen.width, screen.height), eye));
+        moments.push(seenOf(d, eye, screen.width, screen.height, dealer(d)));
     return moments;
   };
-  /** Where a dealer is seen from, world metres, and on the screen; refilled. */
-  const dealer: [number, number, number] = [0, 0, 0],
-    dealerAt: Point = { x: 0, y: 0 };
   /**
-   * A blow's moment `m` given where the ship that dealt it lies as seen through
-   * `eye` (its bearing, and whether it is on the screen), in place; none for a
-   * ram, any other deed, or a dealer gone.
+   * Where the ship that dealt a blow on her with a gun lies (a unit vector);
+   * none for a ram, any other deed, or a dealer gone.
    */
-  const whence = (m: Moment, eye: Eye) => {
-    const v =
-      m.kind === 'struck' && !m.ram && m.by !== m.ship
-        ? state.vessel(m.by)
-        : null;
-    if (!v) {
-      m.whence = null;
-      return m;
-    }
-    const w = (m.whence ??= { bearing: 0, seen: false }),
-      lift = R + LIFT.struck,
-      p = v.ship.at;
-    dealer[0] = p[0] * lift;
-    dealer[1] = p[1] * lift;
-    dealer[2] = p[2] * lift;
-    w.bearing = bearingFrom(eye, dealer);
-    const on =
-      screen.width > 0 ? placed(dealerAt, eye, p, LIFT.struck, screen) : null;
-    w.seen =
-      !!on &&
-      on.x >= 0 &&
-      on.x <= screen.width &&
-      on.y >= 0 &&
-      on.y <= screen.height;
-    return m;
-  };
+  const dealer = (d: Deed) =>
+    d.kind === 'struck' && d.ship === HER && !d.ram && d.by !== d.ship
+      ? (state.vessel(d.by)?.ship.at ?? null)
+      : null;
 
   /**
    * What is drawn (snapshot), as last drawn: one object, refilled each time,

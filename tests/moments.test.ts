@@ -3,7 +3,7 @@
 // play/stops.ts), and the screen's flashes and heartbeat (ui/flash.ts).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { HER, HOTBAR, LIVERY, type Deed } from '../src/player.ts';
+import { HER, HOTBAR, LIFT, LIVERY, type Deed } from '../src/player.ts';
 import {
   KEEP,
   bearingFrom,
@@ -241,6 +241,33 @@ test('as she sees it: the bearing clockwise from the look, its distance, and on 
   );
   assert.equal(seenOf({ ...d, at: behind }, eye, 956, 440).seen, null);
   void north;
+  // a blow on her: whence is her dealer's bearing from the eye, wherever on or
+  // off the screen it lies; none without a dealer
+  const blow: Deed = {
+    seq: 2,
+    time: 0,
+    at: ahead,
+    ship: HER,
+    kind: 'struck',
+    by: 4,
+    shield: 0,
+    hull: 10,
+    broke: false,
+    ram: false,
+  };
+  for (const by of [ahead, right, behind])
+    assert.ok(
+      Math.abs(
+        (seenOf(blow, eye, 956, 440, by).whence ?? NaN) -
+          bearingFrom(eye, scale(by, R + LIFT.struck))
+      ) < 1e-9
+    );
+  assert.ok(
+    Math.abs(
+      Math.abs(seenOf(blow, eye, 956, 440, behind).whence ?? 0) - Math.PI
+    ) < 0.2
+  );
+  assert.equal(seenOf(blow, eye, 956, 440).whence, null);
 });
 
 test('the match records its deeds: a ship sunk is told once, with a sink blast to draw', () => {

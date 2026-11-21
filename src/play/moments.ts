@@ -323,11 +323,24 @@ const where: [number, number, number] = [0, 0, 0],
 
 /**
  * Moment `m` seen again, in place, through `eye` on `view` (CSS px; none where
- * its width is 0).
+ * its width is 0); `by`, where the ship that dealt it lies (a unit vector), for
+ * a blow on her: its bearing from the eye is the moment's whence.
  */
-export function see(m: Moment, eye: Eye, view: View): Moment {
-  const lift = R + LIFT[m.kind],
-    p = eye.position;
+export function see(
+  m: Moment,
+  eye: Eye,
+  view: View,
+  by: Readonly<Vec3> | null = null
+): Moment {
+  const p = eye.position;
+  if (by) {
+    const lift = R + LIFT.struck;
+    where[0] = by[0] * lift;
+    where[1] = by[1] * lift;
+    where[2] = by[2] * lift;
+    m.whence = bearingFrom(eye, where);
+  } else m.whence = null;
+  const lift = R + LIFT[m.kind];
   where[0] = m.at[0] * lift;
   where[1] = m.at[1] * lift;
   where[2] = m.at[2] * lift;
@@ -339,14 +352,20 @@ export function see(m: Moment, eye: Eye, view: View): Moment {
   return m;
 }
 
-/** A deed as she sees it through `eye` on a view `width` × `height` CSS px. */
+/**
+ * A deed as she sees it through `eye` on a view `width` × `height` CSS px; `by`
+ * as see's.
+ */
 export const seenOf = (
   d: Deed,
   eye: Eye,
   width: number,
-  height: number
+  height: number,
+  by: Readonly<Vec3> | null = null
 ): Moment =>
-  see({ ...d, seen: null, bearing: 0, metres: 0, whence: null }, eye, {
-    width,
-    height,
-  });
+  see(
+    { ...d, seen: null, bearing: 0, metres: 0, whence: null },
+    eye,
+    { width, height },
+    by
+  );

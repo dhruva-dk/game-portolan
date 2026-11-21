@@ -4,8 +4,8 @@
 //            broke; a gold cross turned a quarter and ringed where she sank the ship
 //   figure   the hit points the blow took, a numeral rising from the struck ship and fading: rubric off a hull, azure
 //            off a shield; blows on one ship close together summed in one figure; gold and bigger for the last
-//   edge     a blow on her from a ship off the screen or behind her: a rubric arc at the screen's edge toward it
-//            (azure on her shield), as heavy as the blow, held and fading over 2 s
+//   ring     a ring of eight sectors round the reticle, faint at rest: a blow on her from a ship lights the sector
+//            toward it rubric, brighter the heavier, held and fading over 2 s
 // No words; numerals only. Its own layer, over the world and under the HUD's
 // pieces; it runs on the page's clock.
 
@@ -13,12 +13,11 @@ import { FIGURES, INK, LIGHT, svgNode } from './ink.ts';
 
 /**
  * How long each lasts, s; how close together blows on one ship sum, s; the most
- * figures and arcs at once.
+ * figures at once.
  */
-const MARK = { cross: 0.28, kill: 0.8, figure: 0.9, arc: 2 } as const;
+const MARK = { cross: 0.28, kill: 0.8, figure: 0.9 } as const;
 const MERGE = 0.35,
-  MOST = 12,
-  ARCS = 6;
+  MOST = 12;
 /**
  * The cross's ticks: length, width and gap from the middle (px), and its pop.
  */
@@ -27,11 +26,19 @@ const TICK = 13,
   GAP = 8,
   POP = 1.55;
 /**
- * The arc at the screen's edge: how far in from it (px at the drawn size), its
- * half-angle (radians: the least, and more by the blow's weight), its width at
- * the middle (px at the drawn size, the same), and the steps it is drawn in.
+ * The ring round the reticle: its radius (px at the drawn size, clear of the
+ * reticle at its widest, hud.ts SPREAD), its sectors and the gap between them
+ * (radians), its look at rest, and lit: the least and most brightness (by the
+ * blow's weight) and how long it is held fading, s.
  */
-const EDGE = { inset: 14, half: [0.06, 0.1], wide: [6, 9], steps: 16 } as const;
+export const RING = {
+  radius: 66,
+  sectors: 8,
+  gap: 0.16,
+  rest: 0.16,
+  lit: [0.45, 1],
+  held: 2,
+} as const;
 /** The shield's azure, and the gold of a sinking. */
 const AZURE = LIGHT.azure,
   GOLD = LIGHT.gold;
@@ -44,21 +51,45 @@ const figureSize = (points: number, last: boolean) =>
   (points < 15 ? 15 : points < 40 ? 19 : 25) * (last ? 1.6 : 1);
 
 /**
- * Where a blow from `bearing` (radians clockwise from ahead) shows on a `w` ×
- * `h` screen: where the line from its middle that way meets the edge, `inset`
- * px in from it (ahead at the top, behind at the foot).
+ * The ring's sector a blow from `bearing` (radians clockwise from ahead) lights:
+ * 0 ahead, at the top, and on clockwise; each from half a sector before its
+ * middle up to, not including, half a sector after.
  */
-export function edgeAt(bearing: number, w: number, h: number, inset: number) {
-  const dx = Math.sin(bearing),
-    dy = -Math.cos(bearing),
-    hx = w / 2 - inset,
-    hy = h / 2 - inset;
-  const t = Math.min(
-    Math.abs(dx) > 1e-9 ? hx / Math.abs(dx) : Infinity,
-    Math.abs(dy) > 1e-9 ? hy / Math.abs(dy) : Infinity
-  );
-  return { x: w / 2 + dx * t, y: h / 2 + dy * t };
+export function sectorOf(bearing: number) {
+  const n = RING.sectors,
+    // (a hair over, so a boundary's rounding never drops it to the sector before)
+    s = Math.floor((bearing / (2 * Math.PI)) * n + 0.5 + 1e-9);
+  return ((s % n) + n) % n;
 }
+
+/**
+ * A sector's light for a blow felt `weight` (player.ts felt; 1 and over the
+ * heaviest): its brightness over the time it is held, struck at once and fading
+ * out, and how long, ms.
+ */
+export function glow(weight: number) {
+  const w = Math.min(1, Math.max(0, weight)),
+    top = RING.lit[0] + (RING.lit[1] - RING.lit[0]) * w;
+  return {
+    frames: [
+      { opacity: top },
+      { opacity: top, offset: 0.12 },
+      { opacity: top * 0.6, offset: 0.5 },
+      { opacity: 0 },
+    ],
+    ms: RING.held * 1000,
+  };
+}
+
+/** The ring's sector `i` as an arc round (c, c), radius r, its gap left. */
+const sectorArc = (i: number, c: number, r: number) => {
+  const step = (2 * Math.PI) / RING.sectors,
+    a = i * step - step / 2 + RING.gap / 2,
+    b = a + step - RING.gap,
+    at = (t: number) =>
+      `${(c + Math.sin(t) * r).toFixed(2)} ${(c - Math.cos(t) * r).toFixed(2)}`;
+  return `M${at(a)}A${r} ${r} 0 0 1 ${at(b)}`;
+};
 
 type Kind = 'hit' | 'shield' | 'break' | 'kill';
 
@@ -79,7 +110,35 @@ export function createHits(parent: HTMLElement) {
     el: HTMLDivElement;
     kill: boolean;
   }[] = [];
-  let arcs = 0;
+
+  // the ring round the reticle: its sectors faint at rest, and over each its
+  // light, a rubric arc on iron in a rubric glow, unseen till a blow lights it
+  const c = RING.radius + 10,
+    rests: string[] = [],
+    lights: string[] = [];
+  for (let i = 0; i < RING.sectors; i++) {
+    const d = sectorArc(i, c, RING.radius);
+    rests.push(d);
+    lights.push(
+      `<g opacity="0">` +
+        `<path d="${d}" stroke="${INK.rubric}" stroke-width="12" opacity=".4"/>` +
+        `<path d="${d}" stroke="${INK.iron}" stroke-width="6" opacity=".45"/>` +
+        `<path d="${d}" stroke="${INK.rubric}" stroke-width="3.6"/></g>`
+    );
+  }
+  const ring = svgNode(
+    2 * c,
+    2 * c,
+    `<g fill="none" stroke-linecap="round"><path d="${rests.join('')}" stroke="${INK.white}" stroke-width="1.4" opacity="${RING.rest}"/>${lights.join('')}</g>`
+  );
+  const ringAt = document.createElement('div');
+  ringAt.className = 'mark';
+  ringAt.style.cssText = 'left:50%;top:50%';
+  ringAt.append(ring);
+  parent.prepend(ringAt);
+  const lit = Array.from(ring.querySelectorAll<SVGGElement>('g > g')),
+    lighting: (Animation | null)[] = lit.map(() => null);
+  let showing = true;
 
   /**
    * A mark at (x, y) CSS px, drawn at the drawn size and grown by the UI's size
@@ -209,64 +268,32 @@ export function createHits(parent: HTMLElement) {
         )
       );
     },
-    /** A blow on her from a ship off the screen or behind her, at `bearing` (radians clockwise from ahead), felt
-     *  `weight` (player.ts felt), on a `w` × `h` screen whose UI's size is `k` (ui.ts size); `shield` azure. */
-    edge(
-      bearing: number,
-      weight: number,
-      w: number,
-      h: number,
-      k: number,
-      shield: boolean
-    ) {
-      if (arcs >= ARCS) return;
-      // a stretch of the circle about the middle through where the bearing meets the screen's edge
-      const cx = w / 2,
-        cy = h / 2,
-        p = edgeAt(bearing, w, h, EDGE.inset * k),
-        r = Math.hypot(p.x - cx, p.y - cy),
-        half = EDGE.half[0] + EDGE.half[1] * weight,
-        wide = (EDGE.wide[0] + EDGE.wide[1] * weight) * k;
-      // a crescent: the circle along its outside, its inside drawn in by its width at the middle, to points at the ends
-      const at = (a: number, at: number) =>
-        `${(cx + Math.sin(a) * at).toFixed(1)} ${(cy - Math.cos(a) * at).toFixed(1)}`;
-      let d = `M${at(bearing - half, r)}`;
-      for (let i = 1; i <= EDGE.steps; i++)
-        d += `L${at(bearing - half + (2 * half * i) / EDGE.steps, r)}`;
-      for (let i = EDGE.steps - 1; i > 0; i--) {
-        const s = i / EDGE.steps;
-        d += `L${at(bearing - half + 2 * half * s, r - wide * Math.sin(Math.PI * s))}`;
-      }
-      d += 'Z';
-      const ink = shield ? AZURE : INK.rubric;
-      const drawn = svgNode(
-        w,
-        h,
-        `<path d="${d}" fill="${ink}" stroke="${INK.iron}" stroke-width="${(1.6 * k).toFixed(1)}" stroke-linejoin="round" stroke-opacity=".6"/>`
-      );
-      drawn.style.cssText = 'position:absolute;left:0;top:0';
-      drawn.style.transformOrigin = `${cx}px ${cy}px`;
-      layer.appendChild(drawn);
-      arcs++;
-      const a = drawn.animate(
-        [
-          { opacity: 1, transform: 'scale(0.97)' },
-          { opacity: 1, transform: 'scale(1)', offset: 0.08 },
-          { opacity: 0.85, offset: 0.35 },
-          { opacity: 0, transform: 'scale(1)' },
-        ],
-        { duration: MARK.arc * 1000, easing: 'ease-in' }
-      );
+    /** A blow on her from a ship at `bearing` (radians clockwise from ahead), felt `weight` (player.ts felt): its
+     *  sector of the ring lit, held and fading (a blow again on it lights it afresh). */
+    struck(bearing: number, weight: number) {
+      const i = sectorOf(bearing),
+        { frames, ms } = glow(weight);
+      lighting[i]?.cancel();
+      const a = lit[i].animate(frames, { duration: ms, easing: 'linear' });
+      lighting[i] = a;
       a.onfinish = () => {
-        drawn.remove();
-        arcs--;
+        if (lighting[i] === a) lighting[i] = null;
       };
     },
-    /** Every mark taken off (a new match, or she is watching another ship). */
+    /** The ring shown, or not (she is watching another ship, or arriving). */
+    show(on: boolean) {
+      if (on === showing) return;
+      showing = on;
+      ringAt.style.display = on ? '' : 'none';
+    },
+    /** Every mark taken off, the ring dark (a new match, or she is watching another ship). */
     clear() {
       layer.replaceChildren();
       figures = [];
-      arcs = 0;
+      for (let i = 0; i < lighting.length; i++) {
+        lighting[i]?.cancel();
+        lighting[i] = null;
+      }
     },
   };
 }

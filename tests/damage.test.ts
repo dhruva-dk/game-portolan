@@ -4,10 +4,10 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { SOUND, ZONES, worsened, type Faults } from '../src/player.ts';
+import { SOUND, worsened, type Faults } from '../src/player.ts';
 import { createFaults } from '../src/ship/faults.ts';
 import type { ShipDraw } from '../src/snapshot.ts';
-import { edgeAt } from '../src/ui/hits.ts';
+import { RING, glow, sectorOf } from '../src/ui/hits.ts';
 import { PAPER, WASH } from '../src/ui/ink.ts';
 import { struckZone, washOf } from '../src/ui/vitals.ts';
 
@@ -31,16 +31,38 @@ test('vitals: the zone a blow struck is the one whose share rose most; none when
   assert.equal(struckZone([0.4, 0.2, 0.2, 0.2], [0.3, 0.15, 0.15, 0.4]), 3);
 });
 
-test('a blow from off the screen: its arc where the line from the middle toward its dealer meets the edge', () => {
-  const near = (p: { x: number; y: number }, x: number, y: number) =>
-    assert.ok(Math.hypot(p.x - x, p.y - y) < 1e-6, `${p.x}, ${p.y}`);
-  near(edgeAt(0, 1180, 820, 20), 590, 20);
-  near(edgeAt(Math.PI / 2, 1180, 820, 20), 1160, 410);
-  near(edgeAt(Math.PI, 1180, 820, 20), 590, 800);
-  near(edgeAt(-Math.PI / 2, 1180, 820, 20), 20, 410);
-  // toward a corner, the nearer side of the screen takes it
-  const p = edgeAt(Math.PI / 4, 1180, 820, 20);
-  near(p, 590 + 390, 20);
+test('a blow on her lights the sector of the ring toward its dealer: eight, ahead first, clockwise', () => {
+  const step = Math.PI / 4,
+    e = 1e-6;
+  for (let i = 0; i < 8; i++) {
+    // its middle, either way round, and just inside both its ends
+    assert.equal(sectorOf(i * step), i);
+    assert.equal(sectorOf(i * step - 2 * Math.PI), i);
+    assert.equal(sectorOf(i * step - step / 2 + e), i);
+    assert.equal(sectorOf(i * step + step / 2 - e), i);
+    // a boundary belongs to the sector clockwise of it
+    assert.equal(sectorOf(i * step + step / 2), (i + 1) % 8);
+  }
+  assert.equal(sectorOf(Math.PI / 2), 2, 'right');
+  assert.equal(sectorOf(-Math.PI / 2), 6, 'left');
+  assert.equal(sectorOf(Math.PI), 4, 'behind');
+  assert.equal(sectorOf(-Math.PI), 4, 'behind, the other way');
+});
+
+test("a sector's light: struck at once, brighter the heavier, faded out over 2 s", () => {
+  const light = glow(0.4),
+    heavy = glow(1.3),
+    o = (g: ReturnType<typeof glow>) => g.frames.map((f) => f.opacity);
+  assert.equal(light.ms, 2000);
+  for (const g of [light, heavy]) {
+    const os = o(g);
+    for (let i = 1; i < os.length; i++) assert.ok(os[i] <= os[i - 1]);
+    assert.equal(os[os.length - 1], 0);
+    assert.ok(os[0] > RING.rest, 'lit above the ring at rest');
+  }
+  assert.ok(o(heavy)[0] > o(light)[0]);
+  assert.equal(o(heavy)[0], 1);
+  assert.equal(o(glow(0))[0], RING.lit[0]);
 });
 
 test('faults on a drawn ship: her canvas grimed and slack, a list, her head wandering; eased in, and sound when mended', () => {
@@ -74,10 +96,6 @@ test('faults on a drawn ship: her canvas grimed and slack, a list, her head wand
   assert.ok(d.look.sail[0] < 0.75 && f.slack(1) < 0.9, 'easing out');
   for (let t = 6.2; t < 20; t += 0.1) [d] = f.apply([ship(SOUND)], t);
   assert.ok(Math.abs(d.look.sail[0] - 0.8) < 1e-3 && f.slack(1) > 0.999);
-});
-
-test('zones: rigging, rudder, waterline, deck, in that order', () => {
-  assert.deepEqual(ZONES, ['rigging', 'rudder', 'waterline', 'deck']);
 });
 
 test('a fault worsens when any zone goes up a grade, never when one mends or moves', () => {
