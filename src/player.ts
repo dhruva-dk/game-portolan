@@ -206,6 +206,7 @@ export const SCREENS = [
   'title',
   'lobby',
   'settings',
+  'seed',
   'match',
   'sinking',
   'sunk',
@@ -214,6 +215,84 @@ export const SCREENS = [
   'result',
 ] as const;
 export type Screen = (typeof SCREENS)[number];
+
+/**
+ * A trait of the bots' over a fleet: its average, and its spread (the standard
+ * deviation) about it.
+ */
+export interface Spread {
+  mean: number;
+  spread: number;
+}
+
+/**
+ * A captain who stands out of a fleet: her ship's id, her persona (by its index,
+ * as Fleet counts them) and the reading she stands out by.
+ */
+export interface Standout {
+  id: number;
+  persona: number;
+  by: number;
+}
+
+/**
+ * A seed's fleet, as the seed panel shows it (play/fleet.ts): the bots the
+ * game deals that seed's race, summed up in numbers. Personas by index:
+ * hunter, homesteader, raider, turtle, scavenger, brawler (sim/persona.ts);
+ * match types by index: mixed, bloodbath, gold rush, cagey (its TYPES).
+ */
+export interface Fleet {
+  type: number;
+  /** How many bots of each persona. */
+  counts: readonly number[];
+  /** The persona most of them are. */
+  common: number;
+  /**
+   * Over the bots: skill (0–1), aggression (her will to fight at rest, 0–1),
+   * notice (how far off she sees a ship, m), storm margin (m she keeps inside
+   * the Storm's edge) and flee hull (the hull she runs below, of 100).
+   */
+  skill: Spread;
+  aggression: Spread;
+  notice: Spread;
+  margin: Spread;
+  flee: Spread;
+  /**
+   * The sharpest captain (by her skill), and the most reckless (by her
+   * aggression for the hull she runs at: aggression × (100 − flee) / 100).
+   */
+  sharpest: Standout;
+  reckless: Standout;
+}
+
+/**
+ * A seed's planet as the seed panel inks it, worked out off the main thread
+ * (play/survey.ts): its coasts, runs of points on the unit sphere (x y z each,
+ * run after run; `runs` where each starts, in points, and one past the last);
+ * points on its land to stipple it (x y z each); where she lies at the start
+ * (a unit vector); and the milliseconds it took.
+ */
+export interface Chart {
+  name: string;
+  points: Float32Array;
+  runs: Uint32Array;
+  land: Float32Array;
+  start: Vec3;
+  ms: number;
+}
+
+/**
+ * What the seed panel asks of the game: the seed this page sails; a seed's
+ * fleet (at once: arithmetic); its chart (a worker's while she types: null if a
+ * later ask overtook it); a seed rolled afresh; and the page sailing a seed.
+ */
+export interface Seeds {
+  name: string;
+  fleet(name: string): Fleet;
+  chart(name: string): Promise<Chart | null>;
+  roll(): string;
+  sail(name: string): void;
+}
 
 /**
  * What a blow (a Deed 'struck') did, as the screen, the camera, the hit-stop

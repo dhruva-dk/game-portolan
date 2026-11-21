@@ -48,7 +48,8 @@
 // (ship/fleet.ts).
 //
 // The screens. ?screen= opens the UI at a screen (title, lobby, settings,
-// match, sunk, spectate, won, result; ui/ways.ts; also map), at sea among
+// seed: the seed panel over the lobby, on the page's ?seed=; match, sunk,
+// spectate, won, result; ui/ways.ts; also map), at sea among
 // ?ships=n others by default: play starts a match as PLAY does (every ship at
 // her berth, the eye coming down from space: play/arrival.ts); sunk sinks her
 // by the first other ship (?by=storm: by the storm) and the screens follow her
@@ -344,7 +345,12 @@ export async function scenario(
 function open(p: Played, others: readonly Berth[]) {
   const { game, referee, flow } = p;
   const screen = params.get('screen') ?? 'match';
-  if (screen === 'title' || screen === 'lobby' || screen === 'settings')
+  if (
+    screen === 'title' ||
+    screen === 'lobby' ||
+    screen === 'settings' ||
+    screen === 'seed'
+  )
     flow.go(screen);
   else if (screen === 'play') {
     p.play();

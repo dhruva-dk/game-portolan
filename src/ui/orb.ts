@@ -1,0 +1,265 @@
+// The seed panel's globe (panel.ts): a seed's planet inked on a parchment disc
+// as a chartmaker would, from the plain data a worker surveyed for it
+// (player.ts Chart). Seen from afar, straight on (orthographic), north up, the
+// far side hidden: faint meridians and parallels every 30°, the land
+// stippled, the coasts in iron, and where she lies at the start a small ringed
+// point. A finger spins it (touch.ts onDrag); let go, it runs on and settles,
+// drawn only while it moves. The paper, its ring and its degrees are the
+// panel's; this is the canvas over them, the ink.
+//
+// As the full map turns its planet (globe.ts): the point under the eye by its
+// latitude and longitude, a drag carrying the ground under the finger with it.
+
+import type { Chart } from '../player.ts';
+import { clamp } from '../world/scalar.ts';
+import { INK, LAND, WASH, alpha } from './ink.ts';
+import { onDrag } from './touch.ts';
+import { view } from './ui.ts';
+
+/**
+ * How far north or south it turns, radians; how fast a let-go spin dies, per
+ * second; the slowest spin drawn on, radians a second.
+ */
+const MOST_LAT = 1.2,
+  DRAG = 2.2,
+  STILL = 0.01;
+/** Its tilt as a chart opens: a little north of her start, so her pole shows. */
+const TILT = 0.25;
+
+/** The graticule: parallels and meridians every 30°, as runs of points (the Chart's form). */
+const GRATICULE = (() => {
+  const points: number[] = [],
+    runs = [0];
+  const ring = (at: (t: number) => [number, number, number]) => {
+    for (let i = 0; i <= 72; i++) points.push(...at((i / 72) * Math.PI * 2));
+    runs.push(points.length / 3);
+  };
+  for (const lat of [-60, -30, 0, 30, 60].map((d) => (d * Math.PI) / 180))
+    ring((t) => [
+      Math.cos(lat) * Math.cos(t),
+      Math.sin(lat),
+      Math.cos(lat) * Math.sin(t),
+    ]);
+  for (let m = 0; m < 6; m++) {
+    const lon = (m * Math.PI) / 6;
+    ring((t) => [
+      Math.cos(t) * Math.cos(lon),
+      Math.sin(t),
+      -Math.cos(t) * Math.sin(lon),
+    ]);
+  }
+  return { points: Float32Array.from(points), runs: Uint32Array.from(runs) };
+})();
+
+export function createOrb() {
+  const el = document.createElement('canvas');
+  el.className = 'press';
+  el.style.cssText =
+    'position:absolute;touch-action:none;border-radius:50%;transition:opacity .35s ease';
+  const ctx = el.getContext('2d');
+  /**
+   * Its diameter, CSS px; the chart inked; whether it is turning, and when it
+   * was last drawn turning (ms).
+   */
+  let size = 0,
+    chart: Chart | null = null,
+    moving = false,
+    last = 0;
+  const spin = { lat: TILT, lon: 0, vLat: 0, vLon: 0 };
+  /** Whether a finger is on it. */
+  let held = false;
+  /** The eye's axes this frame: toward it, its right, its up (the planet's frame). */
+  const c: [number, number, number] = [1, 0, 0],
+    right: [number, number, number] = [0, 0, -1],
+    up: [number, number, number] = [0, 1, 0];
+  const axes = () => {
+    const cl = Math.cos(spin.lat),
+      sl = Math.sin(spin.lat),
+      co = Math.cos(spin.lon),
+      so = Math.sin(spin.lon);
+    [c[0], c[1], c[2]] = [cl * co, sl, -cl * so];
+    // right: north × c, level; up: c × right
+    [right[0], right[1], right[2]] = [-so, 0, -co];
+    [up[0], up[1], up[2]] = [-sl * co, cl, sl * so];
+  };
+
+  /** Strokes runs of points facing the eye, each run broken where it goes round the limb. */
+  const trace = (
+    g: CanvasRenderingContext2D,
+    points: Float32Array,
+    runs: Uint32Array,
+    r: number
+  ) => {
+    g.beginPath();
+    for (let k = 0; k + 1 < runs.length; k++) {
+      let pen = false;
+      for (let i = runs[k] ?? 0; i < (runs[k + 1] ?? 0); i++) {
+        const x = points[3 * i] ?? 0,
+          y = points[3 * i + 1] ?? 0,
+          z = points[3 * i + 2] ?? 0;
+        if (x * c[0] + y * c[1] + z * c[2] <= 0) {
+          pen = false;
+          continue;
+        }
+        const sx = r + r * (x * right[0] + z * right[2]),
+          sy = r - r * (x * up[0] + y * up[1] + z * up[2]);
+        if (pen) g.lineTo(sx, sy);
+        else g.moveTo(sx, sy);
+        pen = true;
+      }
+    }
+    g.stroke();
+  };
+
+  /** Inks the globe as it is turned now. */
+  function draw() {
+    if (!ctx || !size) return;
+    const dpr = el.width / size,
+      r = size / 2,
+      k = view.k;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, size, size);
+    axes();
+    // the sea's wash, deepening to the limb
+    const sea = ctx.createRadialGradient(r * 0.8, r * 0.75, r * 0.1, r, r, r);
+    sea.addColorStop(0, alpha(WASH.sea, 0.25));
+    sea.addColorStop(1, alpha(WASH.sea, 0.75));
+    ctx.fillStyle = sea;
+    ctx.beginPath();
+    ctx.arc(r, r, r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.lineJoin = ctx.lineCap = 'round';
+    ctx.strokeStyle = alpha(INK.iron, 0.2);
+    ctx.lineWidth = 0.6 * k;
+    trace(ctx, GRATICULE.points, GRATICULE.runs, r);
+    if (chart) {
+      // the land stippled, the coasts over it
+      const land = chart.land,
+        d = 1.3 * k;
+      ctx.fillStyle = alpha(LAND.high, 0.7);
+      for (let i = 0; i < land.length; i += 3) {
+        const x = land[i] ?? 0,
+          y = land[i + 1] ?? 0,
+          z = land[i + 2] ?? 0;
+        if (x * c[0] + y * c[1] + z * c[2] <= 0.02) continue;
+        ctx.fillRect(
+          r + r * (x * right[0] + z * right[2]) - d / 2,
+          r - r * (x * up[0] + y * up[1] + z * up[2]) - d / 2,
+          d,
+          d
+        );
+      }
+      ctx.strokeStyle = INK.iron;
+      ctx.lineWidth = 0.9 * k;
+      trace(ctx, chart.points, chart.runs, r);
+      // her anchorage, on this side only
+      const [x, y, z] = chart.start;
+      if (x * c[0] + y * c[1] + z * c[2] > 0) {
+        ctx.beginPath();
+        ctx.arc(
+          r + r * (x * right[0] + z * right[2]),
+          r - r * (x * up[0] + y * up[1] + z * up[2]),
+          3.2 * k,
+          0,
+          Math.PI * 2
+        );
+        ctx.fillStyle = INK.white;
+        ctx.fill();
+        ctx.strokeStyle = INK.scarlet;
+        ctx.lineWidth = 1.6 * k;
+        ctx.stroke();
+      }
+    }
+    // the limb, shaded
+    const limb = ctx.createRadialGradient(r, r, r * 0.7, r, r, r);
+    limb.addColorStop(0, alpha(INK.iron, 0));
+    limb.addColorStop(1, alpha(INK.iron, 0.22));
+    ctx.fillStyle = limb;
+    ctx.beginPath();
+    ctx.arc(r, r, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  /** Turns it on by its spin while it moves, drawing each frame, until it settles. */
+  function run(now: number) {
+    const dt = Math.min(0.1, (now - last) / 1000);
+    last = now;
+    if (!held) {
+      spin.lon += spin.vLon * dt;
+      spin.lat = clamp(spin.lat + spin.vLat * dt, -MOST_LAT, MOST_LAT);
+      const fade = Math.exp(-DRAG * dt);
+      spin.vLon *= fade;
+      spin.vLat *= fade;
+    }
+    draw();
+    moving = held || Math.hypot(spin.vLon, spin.vLat) > STILL;
+    if (moving) requestAnimationFrame(run);
+  }
+  const go = () => {
+    if (moving) return;
+    moving = true;
+    last = performance.now();
+    requestAnimationFrame(run);
+  };
+
+  onDrag(el, {
+    move(dx, dy, ms) {
+      held = true;
+      const r = size / 2 || 1,
+        lon = -dx / (r * Math.max(0.2, Math.cos(spin.lat))),
+        lat = dy / r;
+      spin.lon += lon;
+      spin.lat = clamp(spin.lat + lat, -MOST_LAT, MOST_LAT);
+      // its speed, smoothed, is what it runs on with when let go
+      const s = Math.max(4, ms) / 1000;
+      spin.vLon = ms ? spin.vLon * 0.5 + (lon / s) * 0.5 : 0;
+      spin.vLat = ms ? spin.vLat * 0.5 + (lat / s) * 0.5 : 0;
+      go();
+    },
+    lift(still) {
+      held = false;
+      // a finger held still before it lifts lets it go still
+      if (still > 80) spin.vLat = spin.vLon = 0;
+      go();
+    },
+  });
+
+  return {
+    el,
+    /** Lays it over the disc: its top left and its diameter, CSS px. */
+    place(left: number, top: number, across: number) {
+      size = across;
+      const dpr = Math.min(view.dpr, 2);
+      el.width = Math.round(across * dpr);
+      el.height = Math.round(across * dpr);
+      Object.assign(el.style, {
+        left: `${left}px`,
+        top: `${top}px`,
+        width: `${across}px`,
+        height: `${across}px`,
+      });
+      draw();
+    },
+    /**
+     * Inks `next` (null: none yet), or, while a seed's chart is being
+     * surveyed (`waiting`), keeps the last faded under it. A new planet opens
+     * over her start, still.
+     */
+    show(next: Chart | null, waiting: boolean) {
+      el.style.opacity = waiting ? '0.3' : '1';
+      if (waiting || next === chart) return;
+      chart = next;
+      if (next && !held) {
+        const [x, y, z] = next.start;
+        spin.lat = clamp(
+          Math.asin(clamp(y, -1, 1)) + TILT,
+          -MOST_LAT,
+          MOST_LAT
+        );
+        spin.lon = Math.atan2(-z, x);
+        spin.vLat = spin.vLon = 0;
+      }
+      draw();
+    },
+  };
+}

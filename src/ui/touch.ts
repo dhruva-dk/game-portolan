@@ -2,7 +2,8 @@
 // pointer that comes down on a thing and lifts on it without travelling past
 // TAP; past that it is a drag. The full map's fingers (globe.ts) tell its spin
 // and pinch from a tap by the same travel; the canvas's stick and look
-// (input.ts) take every finger as a drag.
+// (input.ts) take every finger as a drag, as the seed panel's globe takes its
+// one (onDrag, orb.ts).
 
 /** How far a press may travel and still be a tap, CSS px. */
 const TAP = 8;
@@ -52,6 +53,44 @@ export function onHold(el: HTMLElement, held: (on: boolean) => void) {
     'lostpointercapture',
   ] as const)
     el.addEventListener(lift, () => held(false));
+}
+
+/**
+ * One finger dragged on `el` (the seed panel's globe): `drag.move` as it goes,
+ * by the CSS px it went and the ms that took; `drag.lift` as it lifts, with the
+ * ms it was held still before; the touch kept from whatever is under it, and
+ * the element keeping it wherever it goes.
+ */
+export function onDrag(
+  el: HTMLElement,
+  drag: {
+    move(dx: number, dy: number, ms: number): void;
+    lift(still: number): void;
+  }
+) {
+  let id = -1,
+    x = 0,
+    y = 0,
+    t = 0;
+  el.addEventListener('pointerdown', (e) => {
+    e.stopPropagation();
+    if (id !== -1) return;
+    el.setPointerCapture(e.pointerId);
+    [id, x, y, t] = [e.pointerId, e.clientX, e.clientY, e.timeStamp];
+    drag.move(0, 0, 0);
+  });
+  el.addEventListener('pointermove', (e) => {
+    if (e.pointerId !== id) return;
+    drag.move(e.clientX - x, e.clientY - y, e.timeStamp - t);
+    [x, y, t] = [e.clientX, e.clientY, e.timeStamp];
+  });
+  for (const end of ['pointerup', 'pointercancel'] as const)
+    el.addEventListener(end, (e) => {
+      if (e.pointerId !== id) return;
+      e.stopPropagation();
+      id = -1;
+      drag.lift(e.timeStamp - t);
+    });
 }
 
 /**

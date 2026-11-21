@@ -7,12 +7,13 @@
 // FADE), never cut to.
 //   title   an opaque sheet over the world loading: rhumb lines, the rose whose needle swings while the world loads and
 //           settles north when it is ready, her galleon gilt below; it moves on by itself (flow.ts)
-//   lobby   over her ship at anchor: the wheel (tap: settings) and the PLAY banner with her galleon on it. No tabs.
-//           Elsewhere a drag reaches the world: it turns the camera round her.
+//   lobby   over her ship at anchor: the wheel (tap: settings), the PLAY banner with her galleon on it, and the seed's
+//           chip at the top left, its name (tap: the seed panel, panel.ts). No tabs. Elsewhere a drag reaches the
+//           world: it turns the camera round her.
 //   settings a small folio: sound and look speed, each a bar set by a tap along it; the stats (the frame's cost in
 //           the bottom-left corner: meter.ts), a box ticked by a tap
 // Each folio has its close mark at its corner; a tap outside it closes it too.
-// Her match's end is ends.ts's. No words anywhere; numerals only.
+// Her match's end is ends.ts's. No words anywhere; numerals only (but the seed's name, which is hers to give).
 
 import { clamp } from '../world/scalar.ts';
 import {
@@ -23,14 +24,16 @@ import {
   WASH,
   alpha,
   bar,
+  figure,
   galleon,
   glyph,
   paperDisc,
   parchment,
   roughRect,
+  slip,
   svgNode,
 } from './ink.ts';
-import { rhumbs, rose } from './marks.ts';
+import { rhumbs, rose, seed } from './marks.ts';
 import { keep, onTap, region } from './touch.ts';
 import { at, boxOf, fade, onResize, page, screen, type Page } from './ui.ts';
 
@@ -154,7 +157,20 @@ export function createTitle() {
 
 export type Title = ReturnType<typeof createTitle>;
 
-export function createLobby(act: { play(): void; settings(): void }) {
+/** The seed's chip: a slip at the lobby's top left, the seed's mark and its name (the one piece of text the screens
+ *  set down, as a seed is any text she gives it), sized to the name. */
+function seedChip(x: number, y: number, name: string) {
+  const w = 52 + Math.max(2, name.length) * 10.5;
+  return (
+    `<g id="seed">${slip(x, y, w, 44, { bold: true })}${seed(x + 22, y + 24, 32)}` +
+    `${figure(x + 42, y + 22, name, 21, { anchor: 'start' })}</g>`
+  );
+}
+
+export function createLobby(
+  name: string,
+  act: { play(): void; settings(): void; seed(): void }
+) {
   // a drag anywhere off its controls turns the camera round her (play/anchorage.ts)
   const s = sheet(false, false);
   let drawn = false;
@@ -164,6 +180,7 @@ export function createLobby(act: { play(): void; settings(): void }) {
         drawn = true;
         s.set(
           (p) =>
+            at(p, 'left', 'top', seedChip(66, 18, name)) +
             at(
               p,
               'right',
@@ -179,6 +196,7 @@ export function createLobby(act: { play(): void; settings(): void }) {
           (el) => {
             region(el, 'wheel', act.settings);
             region(el, 'play', act.play);
+            region(el, 'seed', act.seed);
           }
         );
       }
@@ -187,13 +205,10 @@ export function createLobby(act: { play(): void; settings(): void }) {
   };
 }
 
-/** A folio laid over the lobby, drawn at (x, y) on the phone's page and kept to the page's edges as `place` says (at);
- *  its close mark at its top right corner; a tap outside it closes it too. */
-function folio(
-  x: number,
-  y: number,
-  w: number,
-  h: number,
+/** A folio laid over the lobby, its box drawn at (x, y) on the phone's page and kept to the page's edges as `place`
+ *  says (at); its close mark at its top right corner; a tap outside it closes it too. */
+export function folio(
+  { x, y, w, h }: { x: number; y: number; w: number; h: number },
   place: [Parameters<typeof at>[1], Parameters<typeof at>[2]],
   close: () => void
 ) {
@@ -240,7 +255,7 @@ export function createSettings(
     y = 86,
     w = 332,
     h = 208;
-  const f = folio(x, y, w, h, ['right', 'top'], close);
+  const f = folio({ x, y, w, h }, ['right', 'top'], close);
   const draw = () => {
     const v = get();
     const row = (

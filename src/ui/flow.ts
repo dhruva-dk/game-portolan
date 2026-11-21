@@ -1,5 +1,5 @@
 // The screens' order, as ways.ts tables it: the title, the lobby with its
-// folios, the match, and her end over the live world (the camera's beat on it,
+// folios (the settings, the seed panel), the match, and her end over the live world (the camera's beat on it,
 // then her result with its ways on: watch the match on, or home). Every way is
 // her tap on something drawn for it, or the match's own course as the game
 // reports it (player.ts End), but the title's, taken as the world is ready;
@@ -12,7 +12,8 @@
 
 import type { Globe } from './globe.ts';
 import type { Hud, HudState } from './hud.ts';
-import type { End } from '../player.ts';
+import type { End, Seeds } from '../player.ts';
+import { createSeedPanel } from './panel.ts';
 import type { Sea } from '../snapshot.ts';
 import { createResult, createWatching } from './ends.ts';
 import {
@@ -72,6 +73,8 @@ interface FlowActions {
   again(): void;
   watch(): void;
   switch(by: number): void;
+  /** The seed panel's: the page's seed, previews of others, and a seed sailed (a new page). */
+  seeds: Seeds;
 }
 
 /**
@@ -91,9 +94,19 @@ export function createFlow(
   let end: End | null = null;
 
   const veil = createVeil();
-  const lobby = createLobby({
+  const lobby = createLobby(act.seeds.name, {
     play: () => tap('play'),
     settings: () => tap('settings'),
+    seed: () => tap('seed'),
+  });
+  /** The seed the panel sails, once she taps SAIL. */
+  let sailing = act.seeds.name;
+  const panel = createSeedPanel(act.seeds, {
+    close: () => tap('close'),
+    sail(name) {
+      sailing = name;
+      tap('sail');
+    },
   });
   const settingsFolio = createSettings(
     () => settings,
@@ -129,6 +142,9 @@ export function createFlow(
         end = null;
         go(next);
       });
+    } else if (t === 'sail') {
+      // a seed sailed from the panel: a new page on it, under the title, as home is
+      passage.cover(() => act.seeds.sail(sailing));
     } else if (t === 'leave' || t === 'again') {
       result.hide(HOME.cover);
       watching.show(false, HOME.cover);
@@ -144,11 +160,14 @@ export function createFlow(
 
   /** Shows `next`: each screen and piece faded in or out as it now stands. */
   function go(next: Screen) {
+    const was = screen;
     screen = next;
     // (on the way home the title is the passage's)
     if (!passage.going) title.show(next === 'title');
-    lobby.show(next === 'lobby' || next === 'settings');
+    lobby.show(next === 'lobby' || next === 'settings' || next === 'seed');
     settingsFolio.show(next === 'settings');
+    // (opened afresh on the page's seed, so only as it comes or goes)
+    if (next === 'seed' || was === 'seed') panel.show(next === 'seed');
     // the HUD: the match's, or only its clock, count and disc while she
     // watches; gone as her end begins
     const shown = next === 'match' || next === 'spectate';

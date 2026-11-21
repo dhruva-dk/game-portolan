@@ -22,8 +22,11 @@ import { DEFAULT_RULES, ruled, type Rules } from './rules.ts';
 import { weighed } from './tables.ts';
 import { temper, type Temper } from './temper.ts';
 
-/** The personas, in the order of their temperaments (temper.ts STYLES). */
-const PERSONAS = [
+/**
+ * The personas, in the order of their temperaments (temper.ts STYLES); the
+ * seed panel counts them in this order (play/fleet.ts).
+ */
+export const PERSONAS = [
   'hunter',
   'homesteader',
   'raider',

@@ -13,7 +13,9 @@ import { SEED, createWorld } from './environment.ts';
 import { createFrame } from './frame.ts';
 import { loaded } from './load.ts';
 import { createMeter } from './meter.ts';
+import { fleetOf } from './play/fleet.ts';
 import { createGame } from './play/game.ts';
+import { surveyor } from './play/preview.ts';
 import { createReferee } from './play/referee.ts';
 import { createMatches, watersOf } from './play/setup.ts';
 import { SHIPS } from './sim/match.ts';
@@ -203,6 +205,14 @@ async function play(s: Stage): Promise<Played> {
       again: () => sail(s.name),
       watch: () => referee.watch(),
       switch: (by) => referee.switch(by),
+      // the seed panel's: a seed's fleet at once, its planet surveyed in a worker as she types, a seed sailed
+      seeds: {
+        name: s.name,
+        fleet: (name) => fleetOf(seedOf(name)),
+        chart: surveyor(),
+        roll,
+        sail,
+      },
     },
     title
   );

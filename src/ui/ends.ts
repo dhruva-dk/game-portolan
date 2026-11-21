@@ -26,7 +26,7 @@ import {
   svg,
   uid,
 } from './ink.ts';
-import { laurel } from './marks.ts';
+import { laurel, ram, seed, spyglass } from './marks.ts';
 import { banner, sheet } from './screens.ts';
 import { onTap, region } from './touch.ts';
 import { at, fade, piece, screen } from './ui.ts';
@@ -59,37 +59,6 @@ const held = (x: number, y: number, r: number) => {
     `<circle cx="${x}" cy="${y}" r="${r}" fill="${WASH.sea}"/>` +
     `<path d="${roughCircle(x + r * 0.22, y + r * 0.12, r * 0.62, 7, r * 0.18)}" fill="${alpha(INK.scarlet, 0.42)}" stroke="${INK.scarlet}" stroke-width="1.8" clip-path="url(#${clip})"/>` +
     `<circle cx="${x}" cy="${y}" r="${r}" fill="none" stroke="${INK.iron}" stroke-width="1.4"/>`
-  );
-};
-
-/** The spyglass: a brass glass of three draws, its eye end at the left, tilted up to the right; `s` its length. */
-const spyglass = (x: number, y: number, s: number) => {
-  const k = s / 80;
-  const tube = (x0: number, w: number, h: number) =>
-    `<rect x="${x0}" y="${-h / 2}" width="${w}" height="${h}" rx="1.5" fill="url(#h-gold-d)" stroke="${INK.iron}" stroke-width="1.6"/>` +
-    `<rect x="${x0}" y="${-h / 2}" width="${w}" height="${h}" rx="1.5" fill="${WASH.gold}" opacity=".55"/>`;
-  return (
-    `<g transform="translate(${x} ${y}) rotate(-16) scale(${k})" stroke-linejoin="round">` +
-    tube(-40, 18, 10) +
-    tube(-23, 22, 14) +
-    tube(-2, 32, 19) +
-    `<rect x="29" y="-12.5" width="9" height="25" rx="2" fill="${INK.iron}" stroke="${INK.iron}" stroke-width="1.2"/>` +
-    `<path d="M-40 -5v10M-23 -7v14M-2 -9.5v19M12 -9.5v19" stroke="${INK.iron}" stroke-width="1.2"/>` +
-    `<circle cx="-42" cy="0" r="3" fill="${INK.iron}"/></g>`
-  );
-};
-
-/** The seed (a new seed, a new world): an almond-shaped seed, its seam inked, a shoot curling from its top; `s` its
- *  height. */
-const seed = (x: number, y: number, s: number) => {
-  const k = s / 64;
-  return (
-    `<g transform="translate(${x} ${y}) scale(${k})" stroke="${INK.iron}" stroke-linecap="round" stroke-linejoin="round">` +
-    `<path d="M0 -14C15 -8 18 14 0 28C-18 14 -15 -8 0 -14Z" fill="${WASH.ochre}" stroke-width="3"/>` +
-    `<path d="M0 -14C15 -8 18 14 0 28C-18 14 -15 -8 0 -14Z" fill="${WASH.umber}" opacity=".45" stroke="none"/>` +
-    `<path d="M0 -8Q5 8 0 22" fill="none" stroke-width="1.6"/>` +
-    `<path d="M0 -14Q-1 -24 7 -29" fill="none" stroke="${INK.green}" stroke-width="3"/>` +
-    `<path d="M7 -29Q15 -31 17 -24Q10 -21 7 -29Z" fill="${WASH.viridian}" stroke="${INK.green}" stroke-width="1.6"/></g>`
   );
 };
 
@@ -126,9 +95,7 @@ const cause = (x: number, y: number, { how, gun }: End) => {
       ? glyph(`weapon.${gun ?? 'cannon'}`, x, y, 32)
       : how === 'storm'
         ? glyph('hud.storm', x, y, 32, { ink: 'storm' })
-        : `<g transform="translate(${x} ${y})" stroke="${INK.iron}" stroke-width="1.4" stroke-linejoin="round">` +
-          `<path d="M-17 -2L-3 -2L1 2L-3 7L-15 7Z" fill="url(#h-iron)"/><path d="M17 -2L3 -2L-1 2L3 7L15 7Z" fill="url(#h-iron)" transform="scale(1 -1) translate(0 -5)"/>` +
-          `<path d="M0 -12l2 6l5 -4l-2 6l6 1l-6 2l3 5" fill="none" stroke="${INK.rubric}" stroke-width="1.6"/></g>`;
+        : ram(x, y);
   return paperDisc(x, y, r, how === 'storm' ? INK.storm : INK.iron) + mark;
 };
 

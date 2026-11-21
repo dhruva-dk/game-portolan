@@ -6,8 +6,10 @@
 // it is drawn (HOME, wayHome).
 //   title     the chart over the world loading; once ready, by itself (begin)        → lobby
 //   lobby     over her ship at anchor: PLAY → match (the world cross-fades to the eye coming down from space); the
-//             wheel → settings
+//             wheel → settings; the seed's chip → seed
 //   settings  a folio over the lobby, with its close mark (a tap outside closes it too) → lobby
+//   seed      the seed panel, a folio over the lobby: close → lobby; SAIL a seed (a new page on it, under the title,
+//             as home is) → lobby
 //   match     the arrival, then her hands on her ship; she sinks → sinking; she is the last afloat → won
 //   sinking   the camera held on her ship going down, the HUD gone; the beat done → sunk, or → result if the match
 //             is over
@@ -33,6 +35,8 @@ export const TAPS = [
   'switch',
   'leave',
   'again',
+  'seed',
+  'sail',
 ] as const;
 export const EVENTS = ['sunk', 'won', 'settled', 'over'] as const;
 export type Tap = (typeof TAPS)[number];
@@ -42,8 +46,9 @@ export type Trigger = Tap | Event;
 /** Every way on from each screen: what takes it, and where to. */
 export const WAYS: Record<Screen, Partial<Record<Trigger, Screen>>> = {
   title: { begin: 'lobby' },
-  lobby: { play: 'match', settings: 'settings' },
+  lobby: { play: 'match', settings: 'settings', seed: 'seed' },
   settings: { close: 'lobby' },
+  seed: { close: 'lobby', sail: 'lobby' },
   match: { sunk: 'sinking', won: 'won' },
   sinking: { settled: 'sunk' },
   sunk: { watch: 'spectate', leave: 'lobby', again: 'lobby', over: 'result' },
