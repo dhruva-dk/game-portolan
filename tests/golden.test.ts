@@ -10,7 +10,7 @@ import { golden } from './golden/run.ts';
 
 /** Seconds of the match stepped; the hash it comes to. */
 const SECONDS = 300,
-  GOLDEN = '35c0b0c1';
+  GOLDEN = '974e1247';
 
 test(`golden: ${SECONDS} s of a match of bots come out the same, to the bit`, () => {
   assert.equal(golden(SECONDS), GOLDEN);

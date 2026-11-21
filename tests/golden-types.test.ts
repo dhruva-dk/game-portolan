@@ -11,9 +11,9 @@ import { golden } from './golden/run.ts';
 /** Seconds each match is stepped; the hash each comes to, by type. */
 const SECONDS = 120,
   GOLDEN = new Map([
-    ['mixed', 'b18ddd7a'],
-    ['gold rush', '880b6e2c'],
-    ['cagey', 'f003a313'],
+    ['mixed', '37bf76df'],
+    ['gold rush', 'f50611da'],
+    ['cagey', '9cf18491'],
   ]);
 
 for (const type of TYPES)

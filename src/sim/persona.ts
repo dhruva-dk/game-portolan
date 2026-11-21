@@ -60,24 +60,43 @@ type Mix = Readonly<Record<Persona, number>>;
  * they stay as they are.
  */
 const CREWS: Readonly<Record<Persona, (b: Brain) => Over>> = {
-  // goes to the guns she hears from far off, and sees a foe sooner
-  hunter: ({ choice, hunting, sight }) => ({
+  // goes to the guns she hears from far off, and sees a foe sooner; waits at a
+  // narrows ships must pass, early
+  hunter: ({ choice, hunting, sight, placing }) => ({
     choice: { hunt: choice.hunt * 1.35, fight: choice.fight * (29 / 26) },
     hunting: { earshot: hunting.earshot * 1.3 },
     sight: { sightMax: sight.sightMax * (7 / 6) },
+    placing: {
+      strait: placing.strait + 1,
+      deep: placing.deep * 0.6,
+      early: placing.early * 1.5,
+    },
   }),
-  // keeps to her water: claims more, hunts less, hears less
-  homesteader: ({ choice, hunting }) => ({
+  // keeps to her water: claims more, hunts less, hears less; open water to
+  // claim, a shore near
+  homesteader: ({ choice, hunting, placing }) => ({
     choice: { claim: choice.claim * 1.4, hunt: choice.hunt * 0.7 },
     hunting: { earshot: hunting.earshot * 0.7 },
+    placing: {
+      open: placing.open + 0.4,
+      cover: placing.cover + 0.3,
+      early: placing.early * (4 / 3),
+    },
   }),
-  // after loot, and after a fight she hears to take it from
-  raider: ({ choice, hunting }) => ({
+  // after loot, and after a fight she hears to take it from; where the loot
+  // lies, or a narrows
+  raider: ({ choice, hunting, placing }) => ({
     choice: { loot: choice.loot * (11 / 9), hunt: choice.hunt * 1.2 },
     hunting: { earshot: hunting.earshot * 1.2 },
+    placing: {
+      plunder: placing.plunder + 0.6,
+      strait: placing.strait + 0.4,
+      early: placing.early * (5 / 6),
+    },
   }),
-  // mends and runs sooner, fights later, runs for cover further off
-  turtle: ({ choice, mind }) => ({
+  // mends and runs sooner, fights later, runs for cover further off; sits in a
+  // cove with a way out, early
+  turtle: ({ choice, mind, placing }) => ({
     choice: {
       heal: choice.heal * 1.2,
       flee: choice.flee * (39 / 33),
@@ -85,20 +104,32 @@ const CREWS: Readonly<Record<Persona, (b: Brain) => Over>> = {
       hunt: choice.hunt * 0.7,
     },
     mind: { cover: mind.cover * (4 / 3) },
+    placing: {
+      cover: placing.cover + 1,
+      deep: placing.deep * 0.6,
+      early: placing.early * 2,
+    },
   }),
   // the loot before anything but the storm and her life (her eyes on it, she
-  // sees a ship late: temper.ts)
-  scavenger: ({ choice }) => ({
+  // sees a ship late: temper.ts); where it lies, and late
+  scavenger: ({ choice, placing }) => ({
     choice: { loot: choice.loot * (4 / 3), hunt: choice.hunt * 0.75 },
+    placing: {
+      plunder: placing.plunder + 1,
+      deep: placing.deep * 0.6,
+      early: placing.early * 0.5,
+    },
   }),
   // fights first and hears furthest (see above), but one at a time: a crowd
   // round her cools her more than most (and she runs, losing, as any: her
-  // style's own runs are later than most, temper.ts)
-  brawler: ({ choice, hunting, sight, mind }) => ({
+  // style's own runs are later than most, temper.ts); in the heart of the
+  // next cap, where the fleet will be
+  brawler: ({ choice, hunting, sight, mind, placing }) => ({
     choice: { fight: choice.fight * (31 / 26), hunt: choice.hunt * 1.35 },
     mind: { crowding: mind.crowding * 1.6 },
     hunting: { earshot: hunting.earshot * 1.4 },
     sight: { sightMax: sight.sightMax * (7 / 6) },
+    placing: { deep: placing.deep * 1.4, early: placing.early * (7 / 6) },
   }),
 };
 

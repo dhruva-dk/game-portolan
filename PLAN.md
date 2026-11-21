@@ -201,6 +201,34 @@ claiming or roaming, out of each other's sight): left to layers 2–4.
   hull mended −1.2 ± 0.3 and sustain −0.021, both worse by two se: in the
   storm's option she mends nothing; lull +2.2 ± 6.1).
 
+**Step 3, layer 2 (a place per phase).** A new part, placing.ts (PLACING,
+PlaceMemory): as each cap is set she looks over 12 places inside it, 2 a
+think, and keeps the best, a new one only if worth 1.2 times hers. A place is
+weighed by how deep in by water (the calm field), how near her, cover (land
+on some sides, open on most), a narrows (land on two facing sides, open
+across), open water and loot near; weights and how early she comes are her
+persona's (persona.ts CREWS: a turtle a cove, early; a hunter a narrows,
+early; a scavenger the loot, late; a raider loot or a narrows; a homesteader
+open water by a shore; a brawler the heart). She makes for it, roaming, from
+30 s (by persona) before the cap begins to close (roaming.ts). Held pooled:
+damage 130.9 → 130.5 (−0.4 ± 1.9); hull mended 10.63 → 10.26 (−0.4 ± 0.4);
+sustain 0.609 → 0.605; lull 92.2 → 84.3 (−7.9 ± 5.9); distinctness 0.162 →
+0.169 (+0.007 ± 0.007); stuck 4.42 → 4.53; aground 0.03 → 0.00; spread
+0.104 → 0.110. Worst held: damage 125.5 → 127.0, lull 110.4 → 104.4. Steps
+1.65 / 3.48 / 12.0 → 1.71 / 3.63 / 12.5.
+- Seen: in the endgame the last three claim water 75–290 m apart and never
+  roam, so the place acts mostly mid-match. They don't fight at 75 m because
+  of `holdBack`: with 3 ships or fewer afloat her will falls by `more` (0.4)
+  on top of the phase's restraint (fighting.ts MIND lastFew, more; 0117's
+  restraint, 07a6c84), 0.5–0.75 in all in phases 3–5. That is the endgame
+  lull's cause; it is a design choice, so it is flagged, not changed.
+- Tried and dropped: no new bite of water further than 80 m from her place
+  once it is time (held damage +5.8 ± 2.2, distinctness +0.028 ± 0.008, but
+  lull +15.8 ± 6.3 and sustain −0.027 ± 0.007, both worse by two se: more
+  fights early bring the last three, and their standoff, sooner); turning for
+  her place the moment it is time, not at her next roaming mark (held lull
+  −0.8 ± 6.1, the rest alike: so this layer's lull gain is within noise).
+
 ## Not decided / later
 
 - Restage in place (parked).

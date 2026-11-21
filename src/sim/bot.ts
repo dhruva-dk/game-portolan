@@ -7,7 +7,8 @@
 // - mending and loot (purser.ts), with what she asks of her hold and her gust;
 // - flight and fight (fighting.ts): ramming, or her guns once armed;
 // - hunting to the sound of guns (hunter.ts), and claiming water (claimer.ts);
-// - and roaming (roaming.ts) when nothing better calls.
+// - and roaming (roaming.ts) when nothing better calls, to her place for the
+//   phase when it is time (placing.ts: she looks places over as she thinks).
 // Each scores 0..1 with named factors (utility.ts), multiplied by its weight
 // (her brain's `choice`, so a brain or a persona may rank them otherwise), and
 // the one in hand is kept while it is good enough. Her lookout (lookout.ts)
@@ -62,6 +63,7 @@ import {
   moodMemory,
   wounded,
 } from './fighting.ts';
+import { placeMemory, survey } from './placing.ts';
 import { roamGoal } from './roaming.ts';
 import { keptInside, stormGoal, stormUrge } from './storming.ts';
 import { NOTHING, type Ask } from './stores.ts';
@@ -125,6 +127,7 @@ export const mind = (seed: number, at: Vec3): Memory => ({
   ...purseMemory(),
   ...claimMemory(),
   ...huntMemory(),
+  ...placeMemory(),
   ...gunner(),
 });
 
@@ -193,6 +196,7 @@ export function think(
   if (m.think <= 0) {
     m.think = BOT.every;
     perceive(c);
+    survey(c);
     decide(c);
   }
   c.foe = m.foe >= 0 ? (others.find((o) => o.id === m.foe) ?? null) : null;
