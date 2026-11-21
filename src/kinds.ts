@@ -1,6 +1,6 @@
-// The kinds of gun, and of what lies on the water: named here once, for the
-// sim, the seams, what draws them, the HUD and the sound alike. A leaf: it
-// imports nothing.
+// The kinds of gun, of what lies on the water, and of a ship's zones and their
+// faults: named here once, for the sim, the seams, what draws them, the HUD and
+// the sound alike. A leaf: it imports nothing.
 
 /**
  * The guns' kinds, in the one order they are told everywhere (the gunfire's
@@ -42,6 +42,15 @@ export type LootKind = GunKind | Use;
 const GUNS: ReadonlySet<LootKind> = new Set(KINDS);
 /** Whether a piece of loot is a gun. */
 export const isGun = (k: LootKind): k is GunKind => GUNS.has(k);
+
+/**
+ * A ship's four zones, where a blow lands on her (sim/faults.ts), in the one
+ * order they are told everywhere: aloft, her stern, her side low, her deck.
+ */
+export const ZONES = ['rigging', 'rudder', 'waterline', 'deck'] as const;
+export type Zone = (typeof ZONES)[number];
+/** A zone's fault: none, minor, major. */
+export type Fault = 0 | 1 | 2;
 
 const ORDER = perKind((k) => KINDS.indexOf(k));
 /** A gun's kind's place in KINDS. */

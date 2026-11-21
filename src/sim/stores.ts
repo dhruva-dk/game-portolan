@@ -11,7 +11,8 @@
 // - her helm as her stores sail her (crewed): a gust blowing drives her on
 // (ship.ts), and mending she sails at
 //   hold.ts USING of the speed she asks, her rigging cut RIGGING of it;
-// - after the fighting (stored): what she mends with, her gust and her cut rigging stepped on,
+// - after the fighting (stored): what she mends with (mended above
+// faults.ts FAULTS.minor, her zones' tallies cleared), her gust and her cut rigging stepped on,
 // the loot drifted and swept up (and
 //   the swaps asked for made), and every ship sunk this step spilling what she had.
 //
@@ -20,7 +21,7 @@
 
 import type { Crew, Cue } from './battle.ts';
 import type { Vessel } from './contact.ts';
-import { fitOf } from './faults.ts';
+import { fitOf, rose } from './faults.ts';
 import { reloadOf } from './gun.ts';
 import { spent, stepGust } from './gust.ts';
 import { CARRIED, EQUIP, GUNS, RIGGING } from './handling.ts';
@@ -195,6 +196,7 @@ export function stored(
       ...c,
       hold: u.hold,
       health: u.health,
+      wear: rose(c.wear, c.health.hull, u.health.hull),
       gust: stepGust(c.gust, dt),
       cut: c.cut - dt > 1e-9 ? c.cut - dt : 0,
     };

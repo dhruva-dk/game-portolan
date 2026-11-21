@@ -11,9 +11,11 @@
 // it reloads, and it fires again full. A ship sunk takes no more, fires no
 // more, and is no longer laid on or struck; her crew is kept, sunk, for the
 // game to take her off the sea. A blow that strikes breaks off whatever she was
-// mending with (hold.ts); a gun fired in a gust goes off wider (gust.ts); a
-// gun that cuts rigging (the scatter's grape) leaves her slowed a while
-// (stores.ts crewed).
+// mending with (hold.ts), lands on one of her zones and breaks the quiet of
+// both ships (faults.ts: what her hull is in each zone her faults; a gun
+// reloads by her handling, fitOf); a gun fired in a gust goes off wider
+// (gust.ts); a gun that cuts rigging (the scatter's grape) leaves her slowed a
+// while (stores.ts crewed).
 //
 // The storm (storm.ts) wears at every ship outside its cap, a share of a full
 // hull a second, past the shield (weathered, after the step).
@@ -27,7 +29,7 @@ import { distance, type Vec3 } from '../world/sphere.ts';
 import type { Blow, Vessel } from './contact.ts';
 import type { GunKind } from '../kinds.ts';
 import { CARRIED, FALLOFF, GUN, GUNS, GUST, HEALTH } from './handling.ts';
-import { fitOf } from './faults.ts';
+import { dealt, fitOf, struck, UNWORN, zoneOf, type Wear } from './faults.ts';
 import { harmed, sunk, whole, type Health } from './health.ts';
 import { outside, type Storm } from './storm.ts';
 import {
@@ -48,8 +50,8 @@ import type { Depth } from './shoal.ts';
  * A ship's crew: who she is (her Vessel's id), her hit points, the guns she
  * carries (CARRIED slots, null empty) and the slot in hand, seconds till the
  * gun in hand may fire after she took it up (EQUIP), her hold (hold.ts), her
- * gust (gust.ts), and seconds till her rigging is mended, cut by a gun that
- * cuts it (GUNS `cuts`; 0 whole).
+ * gust (gust.ts), seconds till her rigging is mended, cut by a gun that cuts
+ * it (GUNS `cuts`; 0 whole), and what her blows have done to her (faults.ts).
  */
 export interface Crew {
   id: number;
@@ -60,6 +62,7 @@ export interface Crew {
   hold: Hold;
   gust: Gust;
   cut: number;
+  wear: Wear;
 }
 
 /**
@@ -154,6 +157,7 @@ export const crewOf = (id: number, ...guns: Gun[]): Crew => ({
   hold: emptyHold(),
   gust: gustOf(),
   cut: 0,
+  wear: UNWORN,
 });
 
 /** The gun in her hand, or null. */
@@ -261,19 +265,27 @@ export function stepBattle(
   };
   const strikes: Strike[] = [],
     sunkNow: number[] = [];
+  // a blow (a ball coming along `way`) on the zone of her it lands on
+  // (faults.ts zoneOf), and both ships' quiet broken
+  const ships = new Map(fleet.map((v) => [v.id, v.ship]));
   const deal = (
     by: number,
     id: number,
     damage: number,
     at: Vec3,
-    gun: GunKind | null
+    gun: GunKind | null,
+    way = at
   ) => {
     const ram = gun === null;
-    const c = crews.get(id);
-    if (!c || sunk(c.health)) return;
+    const c = crews.get(id),
+      ship = ships.get(id);
+    if (!c || !ship || sunk(c.health)) return;
     const harm = harmed(c.health, damage);
     c.health = harm.health;
     c.hold = broken(c.hold);
+    c.wear = struck(c.wear, zoneOf(ship, at, way, gun), harm.hull);
+    const d = crews.get(by);
+    if (d) d.wear = dealt(d.wear);
     if (gun) c.cut = Math.max(c.cut, GUNS[gun].cuts);
     const broke = harm.shield > 0 && c.health.shield <= 0;
     // a scatter's pellets on one ship in one step: one strike
@@ -327,10 +339,12 @@ export function stepBattle(
             m.id,
             damage * (1 - (FALLOFF.edge * d) / splash),
             f.at,
-            kind
+            kind,
+            f.ball.v
           );
       }
-    } else if (f.struck !== null) deal(shooter, f.struck, damage, f.at, kind);
+    } else if (f.struck !== null)
+      deal(shooter, f.struck, damage, f.at, kind, f.ball.v);
     if (f.struck === null)
       splashes.push({ shooter, gun: kind, at: f.at, land: f.land });
   }

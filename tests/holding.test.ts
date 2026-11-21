@@ -30,6 +30,8 @@ test('her shield comes back in proportion to her share of the calm, at HOLDING.s
   );
   assert.equal(regainRate(HOLDING.full), HOLDING.shield);
   assert.equal(regainRate(0.9), HOLDING.shield, 'no faster past it');
+  // doubled with her hull's faults (DEPTH.md A): a full holding, 6 a second
+  assert.equal(regainRate(HOLDING.full), 6);
 });
 
 test('every ship afloat regains by her own share wherever she lies, up to her most; the rest do not', () => {

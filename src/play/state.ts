@@ -48,7 +48,7 @@ import { nature, type MatchType, type Nature } from '../sim/persona.ts';
 import { afloat, stepFleet, type Vessel } from '../sim/contact.ts';
 import { STEP, blendPose } from '../sim/fixed.ts';
 import { gunOf } from '../sim/gun.ts';
-import { fitOf } from '../sim/faults.ts';
+import { fitOf, tended } from '../sim/faults.ts';
 import { SHIP, type Handling } from '../sim/handling.ts';
 import { sunk } from '../sim/health.ts';
 import { regain, type Regained } from '../sim/holding.ts';
@@ -549,13 +549,24 @@ export function createState(
     return { fought, kept };
   };
 
+  /** Whether ship `id` lies in her own water. */
+  const home = (id: number) => {
+    const v = vessel(id);
+    return !!v && !!territory && territory.ownerAt(v.ship.at) === id;
+  };
+
   /**
    * Who holds the sea after the step (each strip painted, each loop closed),
    * and each ship's shield coming back by her share of it: of the ships still
    * afloat, those sunk in the step (`lost`) painting and closing nothing in it.
+   * Then every ship's hull mended in her own water, or leaking
+   * (sim/faults.ts tended).
    */
   const hold = (storm: Storm): Held => {
-    if (!territory) return UNHELD;
+    if (!territory) {
+      battle.crews = tended(battle.crews, () => false, STEP);
+      return UNHELD;
+    }
     sailing.length = 0;
     for (const v of fleet) if (!lost.includes(v.id)) sailing.push(v);
     for (let i = 0; i < sailing.length; i++) {
@@ -569,7 +580,7 @@ export function createState(
     moves.length = ids.length = sailing.length;
     const did = territory.step(moves, tick * STEP, storm);
     const back = regain(battle.crews, ids, territory, storm, STEP);
-    battle.crews = back.crews;
+    battle.crews = tended(back.crews, home, STEP);
     return { held: did, regained: back.regained };
   };
 
