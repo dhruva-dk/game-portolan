@@ -94,14 +94,15 @@ test('under 25 hull with nothing to mend with, she makes for her own water near 
   assert.equal(healUrge(ctx(crew(15, [5, 0, 0, 0]), 40)), 0);
 });
 
-test('lamed, her rigging or her rudder faulted, she runs the less; her waterline, as much as whole', () => {
+test('lamed, her rigging or her rudder faulted, she runs the less, by her will to fight; her waterline, as much as whole', () => {
   const whole = fleeUrge(ctx(crew(20, [0, 0, 0, 0]), 100)),
     rigging = fleeUrge(ctx(crew(20, [5, 0, 0, 0]), 100)),
     rudder = fleeUrge(ctx(crew(30, [0, 5, 0, 0]), 100)),
     waterline = fleeUrge(ctx(crew(20, [0, 0, 5, 0]), 100));
   assert.ok(whole > 0.9, `${whole}`);
-  assert.ok(Math.abs(rigging - whole * 0.4) < 1e-9, `${rigging}`);
-  assert.ok(Math.abs(rudder - whole * 0.7) < 1e-9, `${rudder}`);
+  // (by her temper's will to fight, 0.4: lamed wholly, 0.6 × 0.4 less)
+  assert.ok(Math.abs(rigging - whole * 0.76) < 1e-9, `${rigging}`);
+  assert.ok(Math.abs(rudder - whole * 0.88) < 1e-9, `${rudder}`);
   assert.equal(waterline, whole);
 });
 

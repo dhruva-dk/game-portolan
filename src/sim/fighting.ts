@@ -114,7 +114,8 @@ export const MIND = {
    * Lamed, her rigging or rudder faulted (faults.ts: half for a minor fault,
    * wholly for a major), she can't outrun a foe: her will to run falls by
    * `lame` of it, and with her foe within `letGo` m her will to fight rises by
-   * `cornered`.
+   * `cornered`, each by her temper's will to fight (a timid ship lamed still
+   * runs).
    */
   lame: 0.6,
   cornered: 0.3,
@@ -178,7 +179,7 @@ export function fightUrge(c: Ctx): number {
       will -= c.b.mind.crowding * t.skill;
   if (strength(foe) >= strength(own) && ranFromShip(c, foe.id))
     will -= c.b.mind.beaten;
-  if (d < c.b.mind.letGo) will += c.b.mind.cornered * lamed(c);
+  if (d < c.b.mind.letGo) will += c.b.mind.cornered * t.fight * lamed(c);
   const restraint = holdBack(c);
   will -= restraint;
   // close aboard she fights whatever her will, from nearer while she holds back
@@ -265,7 +266,7 @@ const losing = (c: Ctx) =>
         ramp(c.own.hull ?? 100, c.t.run + 8, c.t.run - 4),
         ramp(c.foeD, 160, 130)
       ) *
-      (1 - c.b.mind.lame * lamed(c))
+      (1 - c.b.mind.lame * c.t.fight * lamed(c))
     : 0;
 
 /**
