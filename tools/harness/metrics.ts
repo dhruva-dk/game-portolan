@@ -2,7 +2,8 @@
 // the blows struck home, the balls come down short, the loot taken up, the
 // loops closed and the shield won back: play/state.ts advance), each ship's
 // fighting: her shots by gun, her hits, the damage she dealt and took, her
-// kills, what she took up, what she mended. Once a second of its clock: each
+// kills, what she took up, what she mended, whether she came back from a low
+// hull (LOW: sank a ship after, or rose over BACK). Once a second of its clock: each
 // ship's time afloat, in each mode and with each gun in hand, her time stuck (by
 // the mode she was in), when she first held a gun and a second kind, her water
 // at HELD seconds. And of the match: how it ended, its shots by range, gun and
@@ -119,7 +120,17 @@ export interface ShipResult {
   afloat: number;
   /** What she mended with her stores (hold.ts): hull, and shield (hp). */
   mended: { hull: number; shield: number };
+  /**
+   * The match second her hull first fell under LOW (null: never), and whether
+   * she came back from it: sank a ship after it, or her hull rose over BACK.
+   */
+  low: number | null;
+  comeback: boolean;
 }
+
+/** A ship is low under this much hull, and back from it over this much. */
+export const LOW = 30,
+  BACK = 60;
 
 /**
  * What her mind shows in a pinned second (helmsman.ts, pilot.ts): `avoid`
@@ -312,6 +323,8 @@ export function watch(
         regained: 0,
         afloat: 0,
         mended: { hull: 0, shield: 0 },
+        low: null,
+        comeback: false,
       },
     });
   const pieces = state.loot().pieces;
@@ -480,6 +493,8 @@ export function watch(
           shield = h.shield - w.health.shield - (regainedNow.get(v.id) ?? 0);
         if (hull > 1e-6) w.r.mended.hull += hull;
         if (shield > 1e-6) w.r.mended.shield += shield;
+        if (w.r.low === null && h.hull < LOW) w.r.low = now;
+        else if (w.r.low !== null && h.hull > BACK) w.r.comeback = true;
         w.health.hull = h.hull;
         w.health.shield = h.shield;
       }
@@ -538,7 +553,10 @@ export function watch(
         w.r.place = ships.size - i;
         bump(causes, k.cause);
         const by = k.by === null ? undefined : ships.get(k.by);
-        if (by && k.by !== k.id) by.r.fighting.kills++;
+        if (by && k.by !== k.id) {
+          by.r.fighting.kills++;
+          if (by.r.low !== null && k.time >= by.r.low) by.r.comeback = true;
+        }
       });
       for (const w of ships.values()) {
         if (!w.r.sunk) w.r.place = 1;

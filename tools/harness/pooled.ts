@@ -204,6 +204,21 @@ export const METRICS: readonly Metric[] = [
     of: (rs) => jackknife(rs, (q) => perShip(q, (s) => s.aground)),
   },
   {
+    // of the ships that fell under LOW hull, those that then sank a ship or
+    // rose back over BACK (metrics.ts)
+    key: 'comeback',
+    label: 'Comebacks: of ships fallen under 30 hull, the share that came back',
+    unit: '',
+    digits: 3,
+    better: 'up',
+    gate: true,
+    of: (rs) =>
+      jackknife(rs, (q) => {
+        const low = ships(q).filter((s) => s.low !== null);
+        return low.filter((s) => s.comeback).length / Math.max(1, low.length);
+      }),
+  },
+  {
     key: 'spread',
     label: 'Persona rating spread (strongest θ − weakest)',
     unit: 'θ',

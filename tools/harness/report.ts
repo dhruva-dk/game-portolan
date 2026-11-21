@@ -10,7 +10,7 @@
 // --results: measure a run already made (its JSONL: cli.ts --pool, or this
 // one's results.jsonl) instead of running; --save: the figures as a baseline;
 // --against: each figure's change from a baseline, with its standard error, the
-// gated ones (damage, lull, distinctness) on the held-out set and its worst
+// gated ones (damage, lull, distinctness, comebacks) on the held-out set and its worst
 // planet flagged where they fell by more than two. 16 matches a planet (the
 // baseline's) run in some four and a half minutes on ten cores, replays and
 // all: as many as keep a worst planet's lull to an se of some ten seconds.
