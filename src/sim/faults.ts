@@ -26,7 +26,14 @@
 // Pure arithmetic: no three, so it runs in node for the tests; deterministic
 // for the same inputs, to the bit.
 
-import { ZONES, type Fault, type GunKind, type Zone } from '../kinds.ts';
+import {
+  ZONES,
+  type Fault,
+  type Faults,
+  type GunKind,
+  type Zone,
+  type Zones,
+} from '../kinds.ts';
 import { R, add, dot, length, type Vec3 } from '../world/sphere.ts';
 import type { Crew } from './battle.ts';
 import { SHIP, SPEC, type Handling } from './handling.ts';
@@ -69,9 +76,6 @@ const RIGGING = ZONES.indexOf('rigging'),
   RUDDER = ZONES.indexOf('rudder'),
   WATERLINE = ZONES.indexOf('waterline'),
   DECK = ZONES.indexOf('deck');
-
-/** One number for each zone, in ZONES' order. */
-type Zones<T> = readonly [T, T, T, T];
 
 /**
  * What her blows have done to her (battle.ts Crew): the hull each zone has
@@ -135,13 +139,13 @@ export const rose = (w: Wear, from: number, to: number): Wear =>
   to > from && to > FAULTS.minor ? { ...w, zones: UNWORN.zones } : w;
 
 /** Her hull's band: 0 above FAULTS.minor, 1 down to FAULTS.major, 2 under it. */
-const wearOf = (hull: number): Fault =>
+export const wearOf = (hull: number): Fault =>
   hull > FAULTS.minor ? 0 : hull >= FAULTS.major ? 1 : 2;
 
-const NONE: Zones<Fault> = [0, 0, 0, 0];
+const NONE: Faults = [0, 0, 0, 0];
 
 /** Her faults (ZONES' order), by her hull and her tallies. */
-export function faultsOf(hull: number, w: Wear): Zones<Fault> {
+export function faultsOf(hull: number, w: Wear): Faults {
   const band = wearOf(hull);
   if (band === 0) return NONE;
   // the most-hit zone and the next (ties to the first in ZONES)
@@ -157,6 +161,13 @@ export function faultsOf(hull: number, w: Wear): Zones<Fault> {
   const of = (i: number): Fault =>
     i === first ? band : band === 2 && i === second ? 1 : 0;
   return [of(0), of(1), of(2), of(3)];
+}
+
+/** Each zone's share of the hull her tallies hold (0…1, summing to 1 or 0). */
+export function sharesOf(w: Wear): Zones<number> {
+  const [a, b, c, d] = w.zones,
+    all = a + b + c + d;
+  return all > 0 ? [a / all, b / all, c / all, d / all] : UNWORN.zones;
 }
 
 /** Her handling as she is now: the tables' with each fault's cost. */

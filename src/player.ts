@@ -4,7 +4,7 @@
 // (Hands: read by ui/input.ts, given to play/game.ts step); what the match
 // reports comes out (Status, read by ui/hud.ts), with what she carries (Kit).
 
-import type { GunKind, LootKind, Use } from './kinds.ts';
+import type { Faults, GunKind, LootKind, Use, Zones } from './kinds.ts';
 import type { Vec3 } from './world/sphere.ts';
 
 /** Her hands, as read for a frame. */
@@ -69,6 +69,15 @@ export interface Status {
   hullMax: number;
   shield: number;
   shieldMax: number;
+  /**
+   * Her hull's zones (ZONES' order, sim/faults.ts): each one's share of the
+   * hull she has lost to blows since it was last mended above 40 (0…1, summing
+   * to 1, or all 0 with none), each one's fault, and whether her own water
+   * mends her hull now.
+   */
+  zones: Zones<number>;
+  faults: Faults;
+  mending: boolean;
   /**
    * The gun in her hand, for Fire and the reticle: its kind and rarity (0–4,
    * sim/handling.ts GUN.rarities), the rounds left in its magazine, how far
@@ -136,6 +145,9 @@ export const HER = 0;
  */
 export { isGun } from './kinds.ts';
 export type { GunKind, LootKind } from './kinds.ts';
+/** A ship's four zones and their faults (none, minor, major): kinds.ts. */
+export { ZONES } from './kinds.ts';
+export type { Fault, Faults, Zone, Zones } from './kinds.ts';
 
 /** The hotbar's slots: the guns' first, then the items'. */
 export const HOTBAR = { guns: 2, items: 3 } as const;

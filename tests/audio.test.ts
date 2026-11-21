@@ -309,6 +309,8 @@ function scene(
     velocity: [6, 0, 0],
     afloat: true,
     gun: null,
+    wear: 0,
+    faults: [0, 0, 0, 0],
   };
   return {
     eye: {
@@ -336,6 +338,9 @@ const status = (over: Partial<Status & Kit> = {}): Status & Kit => ({
   hullMax: 100,
   shield: 30,
   shieldMax: 50,
+  zones: [0, 0, 0, 0],
+  faults: [0, 0, 0, 0],
+  mending: false,
   gun: {
     kind: 'cannon',
     rarity: 0,

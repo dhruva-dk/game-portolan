@@ -48,7 +48,7 @@ import { nature, type MatchType, type Nature } from '../sim/persona.ts';
 import { afloat, stepFleet, type Vessel } from '../sim/contact.ts';
 import { STEP, blendPose } from '../sim/fixed.ts';
 import { gunOf } from '../sim/gun.ts';
-import { fitOf, tended } from '../sim/faults.ts';
+import { faultsOf, fitOf, tended, wearOf } from '../sim/faults.ts';
 import { SHIP, type Handling } from '../sim/handling.ts';
 import { sunk } from '../sim/health.ts';
 import { regain, type Regained } from '../sim/holding.ts';
@@ -708,7 +708,7 @@ export function createState(
     },
     /**
      * Every ship drawn at the moment `between` of the way through the last
-     * step: afloat, or going down.
+     * step: afloat, her wear and faults hers (sim/faults.ts), or going down.
      */
     drawn(between: number): readonly ShipDraw[] {
       const now = clock(between),
@@ -723,6 +723,10 @@ export function createState(
         blendPose(a.before, a.after, between, d.pose);
         add(scale(ship.heading, ship.speed, d.velocity), shove, 1, d.velocity);
         if (g) d.gun = drawing.armed(d, g, aims.get(id) ?? ship.heading);
+        if (c) {
+          d.wear = wearOf(c.health.hull);
+          d.faults = faultsOf(c.health.hull, c.wear);
+        }
       }
       for (const w of wrecks)
         if (wreckAt(w, now, drawing.slot(n, w.id, w.look, false).pose)) n++;

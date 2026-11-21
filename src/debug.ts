@@ -585,6 +585,8 @@ function flyer(
     velocity: scale(o.heading, number('way', 0)),
     afloat: true,
     gun: armed(i, o),
+    wear: 0,
+    faults: [0, 0, 0, 0],
   }));
   let clock = 0;
   return (dt: number): Snapshot => {

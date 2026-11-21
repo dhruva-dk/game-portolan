@@ -39,7 +39,8 @@
 
 import type { World } from '../environment.ts';
 import { fixedClock } from '../sim/fixed.ts';
-import { inHand } from '../sim/battle.ts';
+import { inHand, type Crew } from '../sim/battle.ts';
+import { faultsOf, fitOf, sharesOf, UNWORN } from '../sim/faults.ts';
 import { laid, reloadOf, spreadOf, type Gun, type Laying } from '../sim/gun.ts';
 import { charging } from '../sim/gust.ts';
 import { EQUIP, GUN, GUNS, GUST, HEALTH } from '../sim/handling.ts';
@@ -114,9 +115,12 @@ const DRAWN = 700,
  * onto the water: long since bobbed up.
  */
 const LONG_AGO = 1e3;
-/** How far a gun is through reloading (0…1), or null when it isn't. */
-const reloading = (g: Gun): number | null =>
-  g.reload > 0 ? 1 - g.reload / reloadOf(g) : null;
+/**
+ * How far a gun is through reloading (0…1), or null when it isn't: by her
+ * handling as she is (a faulted deck reloads slower: sim/faults.ts fitOf).
+ */
+const reloading = (g: Gun, c: Crew): number | null =>
+  g.reload > 0 ? 1 - g.reload / reloadOf(g, fitOf(c).reload) : null;
 /** The hotbar's glyph for stores of each use. */
 const ITEM: Record<Use, Item> = {
   smallShield: 'item.smallShield',
@@ -257,6 +261,9 @@ export function createGame(
     hullMax: HEALTH.hull,
     shield: 0,
     shieldMax: HEALTH.shield,
+    zones: UNWORN.zones,
+    faults: [0, 0, 0, 0],
+    mending: false,
     gun: null,
     afloat: 0,
     sunk: false,
@@ -317,16 +324,16 @@ export function createGame(
   const moments: Moment[] = [];
 
   /**
-   * Her gun in hand, `equip` s through taking it up, `locked` if its assist has
-   * a ship to lay on.
+   * Her gun in hand, her crew `c` (taking it up, and reloading it), `locked`
+   * if its assist has a ship to lay on.
    */
-  const inHandOf = (g: Gun, equip: number, locked: boolean) => {
+  const inHandOf = (g: Gun, c: Crew, locked: boolean) => {
     holding.kind = g.kind;
     holding.rarity = g.rarity;
     holding.rounds = g.rounds;
-    holding.ready = reloading(g) ?? 1;
+    holding.ready = reloading(g, c) ?? 1;
     holding.charge = g.windup > 0 ? 1 - g.windup / GUNS[g.kind].windup : null;
-    holding.swapping = equip / EQUIP;
+    holding.swapping = c.equip / EQUIP;
     holding.locked = locked;
     return holding;
   };
@@ -587,7 +594,7 @@ export function createGame(
           slot.rarity = g.rarity;
           slot.rounds = g.rounds;
           slot.mag = GUNS[g.kind].mag;
-          slot.reload = reloading(g);
+          slot.reload = reloading(g, c);
         }
         slots[i] = g ? slot : null;
       }
@@ -645,7 +652,12 @@ export function createGame(
         arrival === null ? 0 : Math.max(0, 1 - arrival / ARRIVAL.seconds);
       report.hull = c.health.hull;
       report.shield = c.health.shield;
-      report.gun = g ? inHandOf(g, c.equip, lay?.target != null) : null;
+      // her zones, or the watched ship's
+      const w = (watched ? state.crew(view.watch) : c) ?? c;
+      report.zones = sharesOf(w.wear);
+      report.faults = faultsOf(w.health.hull, w.wear);
+      report.mending = w.wear.mending;
+      report.gun = g ? inHandOf(g, c, lay?.target != null) : null;
       report.afloat = state.alive().length;
       report.sunk = sunk(c.health);
       report.storm = Number.isFinite(s.secondsToNext) ? s.secondsToNext : 0;

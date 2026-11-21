@@ -51,6 +51,9 @@ export const ZONES = ['rigging', 'rudder', 'waterline', 'deck'] as const;
 export type Zone = (typeof ZONES)[number];
 /** A zone's fault: none, minor, major. */
 export type Fault = 0 | 1 | 2;
+/** One number for each zone, in ZONES' order; a fault for each. */
+export type Zones<T> = readonly [T, T, T, T];
+export type Faults = Zones<Fault>;
 
 const ORDER = perKind((k) => KINDS.indexOf(k));
 /** A gun's kind's place in KINDS. */

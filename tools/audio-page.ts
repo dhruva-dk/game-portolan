@@ -398,6 +398,8 @@ export async function passage(
       velocity: scale(forward, speedAt(t)),
       afloat: true,
       gun: null,
+      wear: 0,
+      faults: [0, 0, 0, 0],
     };
     const place = (x: number, z: number): Vec3 =>
       scale(normalize(add(add(radial, side, x / R), forward, z / R)), R + 2);
@@ -508,6 +510,9 @@ export async function passage(
       ...harm(t, SCRIPT.strikes),
       hullMax: 100,
       shieldMax: 50,
+      zones: [0, 0, 0, 0],
+      faults: [0, 0, 0, 0],
+      mending: false,
       gun: {
         kind: 'cannon',
         rarity: 0,

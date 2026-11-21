@@ -18,7 +18,9 @@ import {
   faultsOf,
   fitOf,
   rose,
+  sharesOf,
   struck,
+  wearOf,
   tended,
   zoneOf,
   type Wear,
@@ -30,6 +32,13 @@ import { shipAt } from '../src/sim/ship.ts';
 import { loosed } from '../src/sim/shot.ts';
 import type { Depth } from '../src/sim/shoal.ts';
 import { ZONES, type Zone } from '../src/kinds.ts';
+import { SEED } from '../src/environment.ts';
+import { createMatches } from '../src/play/setup.ts';
+import { createState } from '../src/play/state.ts';
+import { chart } from '../src/sim/route.ts';
+import { berthing } from '../src/sim/spawn.ts';
+import { landOf, planetOf } from '../src/world/land.ts';
+import { flat } from '../src/world/swell.ts';
 import {
   R,
   add,
@@ -139,6 +148,13 @@ test('faults by her hull: above 40 none; at 40 down to 25 her most-hit zone mino
   assert.deepEqual(faultsOf(20, { ...w, zones: [10, 0, 10, 0] }), [2, 0, 1, 0]);
   assert.deepEqual(faultsOf(20, { ...w, zones: [0, 7, 0, 0] }), [0, 2, 0, 0]);
   assert.deepEqual(faultsOf(10, UNWORN), [0, 0, 0, 0]);
+  // what her readout shows: each zone's share, and her wear
+  assert.deepEqual(sharesOf(w), [5 / 45, 0, 30 / 45, 10 / 45]);
+  assert.deepEqual(sharesOf(UNWORN), [0, 0, 0, 0]);
+  assert.deepEqual(
+    [wearOf(41), wearOf(40), wearOf(25), wearOf(24.9)],
+    [0, 1, 1, 2]
+  );
 });
 
 test('each fault costs her handling: rigging her top ×0.85 / ×0.7, rudder her turn ×0.8 / ×0.6, waterline her top ×0.92, deck her reload ×1.2 / ×1.5; together they multiply', () => {
@@ -200,6 +216,36 @@ test('her water mends her: 5 quiet seconds in her own water, then 2 hull a secon
     after(hit, MEND.quiet - 0.2, true).health.hull,
     some.health.hull
   );
+});
+
+test("in the game's own match, every ship drawn shows her wear and faults, and her water mends her", () => {
+  const planet = planetOf(SEED, landOf(SEED)),
+    depth = (p: Vec3) => -planet.height(p),
+    matches = createMatches(SEED, planet, null, null),
+    state = createState(
+      planet,
+      flat,
+      { chart: chart(depth), water: berthing(depth) },
+      matches.first
+    );
+  state.start(matches.deal(), false);
+  const idle = { course: null, throttle: 0 },
+    still = { aim: null, fire: false };
+  let faulted = false,
+    mended = false;
+  while (state.time() < 400 && !(faulted && mended)) {
+    state.advance(idle, still);
+    for (const d of state.drawn(1)) {
+      if (!d.afloat) continue;
+      const c = state.crew(d.id);
+      assert.equal(d.wear, wearOf(c.health.hull));
+      assert.deepEqual(d.faults, faultsOf(c.health.hull, c.wear));
+      faulted ||= d.faults.some((f) => f > 0);
+      mended ||= c.wear.mending;
+    }
+  }
+  assert.ok(faulted, 'a ship was faulted');
+  assert.ok(mended, 'a ship was mended in her water');
 });
 
 test('her tallies clear once her stores mend her above 40, and not short of it', () => {

@@ -2,7 +2,7 @@
 // the same lists, and the same objects in them, a slot to a ship or a ball,
 // written over each frame; the frame reads them before the next.
 
-import type { GunKind } from '../kinds.ts';
+import type { Faults, GunKind } from '../kinds.ts';
 import type { Ball } from '../sim/shot.ts';
 import type { BallDraw, Look, ShipDraw } from '../snapshot.ts';
 import { poseOut, type PoseOut } from '../world/pose.ts';
@@ -17,6 +17,7 @@ interface Drawing extends ShipDraw {
   velocity: Out3;
   held: { kind: GunKind; rarity: number; aim: Vec3 };
 }
+const UNFAULTED: Faults = [0, 0, 0, 0];
 /** A ball as drawn. */
 interface Flight extends BallDraw {
   at: Out3;
@@ -30,8 +31,8 @@ export function createDrawing() {
   return {
     /**
      * The nth ship drawn's slot, put nth on the list: ship `id` in her colours,
-     * afloat or going down, still and with no gun in hand till her velocity and
-     * her gun are written.
+     * afloat or going down, unworn, still and with no gun in hand till her
+     * wear, her velocity and her gun are written.
      */
     slot(n: number, id: number, look: Look, afloat: boolean): Drawing {
       const d =
@@ -44,6 +45,8 @@ export function createDrawing() {
             velocity: [0, 0, 0],
             afloat,
             gun: null,
+            wear: 0,
+            faults: UNFAULTED,
             held: { kind: 'cannon', rarity: 0, aim: [0, 0, 1] },
           });
       d.id = id;
@@ -51,6 +54,8 @@ export function createDrawing() {
       d.afloat = afloat;
       put(d.velocity, 0, 0, 0);
       d.gun = null;
+      d.wear = 0;
+      d.faults = UNFAULTED;
       return d;
     },
     /** Her gun in hand, of a kind and rarity, laid along `aim`: her slot's own. */
