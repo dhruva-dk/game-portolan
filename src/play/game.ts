@@ -74,7 +74,6 @@ import {
   type Hands,
   type Item,
   type Kit,
-  type Livery,
   type Moment,
   type Slot,
   type Status,
@@ -461,13 +460,9 @@ export function createGame(
      * flow, the lobby or the arrival has them.
      */
     steering,
-    /**
-     * Her livery as she chooses it: her ship at anchor in it at once, and hers
-     * in every match after (state.ts wear); as worn, held to the set.
-     */
-    wear: (l: Livery): Livery => state.wear(l),
-    /** Her livery, as she last chose it. */
-    worn: (): Livery => state.worn(),
+    /** Her livery as she chooses it, and as she last chose it (the state's own: state.ts wear, worn). */
+    wear: state.wear,
+    worn: state.worn,
     /**
      * The lobby's camera eased round to her broadside (her livery folio open),
      * or back to its rest.
