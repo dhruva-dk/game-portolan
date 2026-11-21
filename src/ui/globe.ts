@@ -518,10 +518,11 @@ export function createGlobe(coasts: readonly Coast[]) {
 
   function readout() {
     if (!state) return;
-    const key = `${state.afloat} ${clock(state.storm)}`;
+    const key = `${state.afloat} ${clock(state.storm)} ${state.closing}`;
     if (key === read) return;
     read = key;
-    const closing = state.storm < 30;
+    // (as the clock's: its bolt filled while the Storm closes, violet while it does and under 30 s)
+    const closing = state.closing || state.storm < 30;
     afloat.innerHTML = svg(
       80,
       96,
@@ -533,7 +534,9 @@ export function createGlobe(coasts: readonly Coast[]) {
       80,
       96,
       slip(1, 1, 78, 94, { flat: true }) +
-        glyph('hud.spiral', 40, 30, 30, { ink: closing ? 'storm' : 'iron' }) +
+        glyph(state.closing ? 'hud.boltFilled' : 'hud.bolt', 40, 30, 32, {
+          ink: closing ? 'storm' : 'iron',
+        }) +
         figure(40, 70, clock(state.storm), 24, {
           fill: closing ? INK.storm : INK.iron,
         })

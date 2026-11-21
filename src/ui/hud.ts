@@ -1,7 +1,8 @@
 // The match's HUD, laid on the world as the chartmaker's slips:
 //   top left    the vitals slip (vitals.ts): her ship from above, each of her zones washed by the damage it has
 //               taken and marked when faulted, beside shield (azure) over hull, each a bar with its numeral
-//   top centre  the Storm's clock (its spiral, m:ss; in the Storm's violet under 30 s) and the ships afloat (a ship, a count)
+//   top centre  the Storm's clock (its bolt, hollow while it holds and filled while it closes, m:ss; in the Storm's violet
+//               while it closes and under 30 s) and the ships afloat (a ship, a count)
 //   top right   the minimap (minimap.ts), north up: who holds the sea, the land and its coast, the Storm's calm and the next, the
 //               way in from outside it, her arrow (no other ship, no loot); a tap opens the full map
 //   right       under the right thumb, Fire, in the corner: the mark of the gun in hand on a
@@ -234,14 +235,15 @@ export function createHud(layer: HTMLElement, shores: Shores, act: HudActions) {
       show(body, now > 0 && !covered);
       drawVitals.update(s);
 
+      // in the Storm's violet as it closes or is about to; its bolt filled while it closes
       const closing = s.closing || s.storm < 30;
-      if (changed(readings, Math.ceil(s.storm), s.afloat, closing)) {
+      if (changed(readings, Math.ceil(s.storm), s.afloat, closing, s.closing)) {
         const time = clock(s.storm);
         readings.innerHTML = svg(
           184,
           38,
           slip(1, 2, 88, 34) +
-            glyph('hud.spiral', 20, 19, 22, {
+            glyph(s.closing ? 'hud.boltFilled' : 'hud.bolt', 20, 19, 24, {
               ink: closing ? 'storm' : 'iron',
             }) +
             figure(60, 19, time, 23, { fill: closing ? INK.storm : INK.iron }) +

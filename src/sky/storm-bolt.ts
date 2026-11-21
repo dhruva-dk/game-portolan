@@ -2,7 +2,9 @@
 // the cloud's base to the sea, a way into the storm, flickering two or three
 // times. Each flicker lights the cloud and the rain round the stroke from
 // within, and the stroke itself shows as a jagged white channel wherever the
-// rain in front of it lets it through.
+// rain in front of it lets it through. As the storm begins to close, a stroke
+// of its own at once, on the edge nearest the eye, flickering longer (the
+// thunder is the sound's: audio/listen.ts).
 //
 // Worked out on the CPU from the world's clock, so every frame of a moment
 // agrees: where the stroke stands (in the wall within sight of the eye along
@@ -47,6 +49,20 @@ const BOLT = 4.5,
     [0.1, 0.15, 0.4],
     [0.21, 0.34, 0.85],
   ] as const;
+/**
+ * As a closing begins, a stroke of its own at once: its flickers, longer and
+ * brighter; on the edge, EDGE metres in. A closing begins when the cap shrinks
+ * by more than SHRINK radians after holding HELD seconds of the world's clock.
+ */
+const STRIKE = [
+    [0, 0.09, 1],
+    [0.13, 0.22, 0.55],
+    [0.28, 0.42, 1],
+    [0.55, 0.64, 0.6],
+  ] as const,
+  EDGE = 8,
+  SHRINK = 1e-7,
+  HELD = 1;
 const IN = 30,
   ALONG = 0.7,
   NEAR = 50,
@@ -100,6 +116,16 @@ export function createBolt(held: boolean) {
     side = new Vector3(),
     way = new Vector3(),
     at = new Vector3();
+  /**
+   * The cap's radius and the world's clock at the last update; whether the
+   * storm is closing, and when it last shrank; when its closing began (its
+   * stroke).
+   */
+  let radius = NaN,
+    last = -Infinity,
+    closing = true,
+    still = -Infinity,
+    struck = -Infinity;
 
   return {
     flash,
@@ -171,10 +197,25 @@ export function createBolt(held: boolean) {
      * where the eye is, world m).
      */
     update(cap: Cap, seconds: number, eye: Vec3, whole: boolean) {
-      const n = Math.floor(seconds / BOLT),
-        since = seconds - (n + hash01(n, 0) * 0.8) * BOLT;
+      // a closing begun: the cap shrinking after it held (or on a new sea, or
+      // the clock run back, none)
+      if (seconds < last || !Number.isFinite(radius)) {
+        closing = true;
+        struck = -Infinity;
+      } else if (cap.radius < radius - SHRINK) {
+        if (!closing) struck = seconds;
+        closing = true;
+        still = seconds;
+      } else if (seconds - still > HELD) closing = false;
+      radius = cap.radius;
+      last = seconds;
+      const striking = seconds - struck < STRIKE[STRIKE.length - 1][1];
+      const n = striking ? -1 - Math.floor(struck) : Math.floor(seconds / BOLT),
+        since = striking
+          ? seconds - struck
+          : seconds - (n + hash01(n, 0) * 0.8) * BOLT;
       let lit = 0;
-      for (const [from, to, strength] of FLICKER)
+      for (const [from, to, strength] of striking ? STRIKE : FLICKER)
         if (since >= from && since < to) lit = strength;
       flash.value = whole ? 0 : held ? FLICKER[0][2] : lit;
       if (!flash.value) return;
@@ -186,7 +227,8 @@ export function createBolt(held: boolean) {
       out.copy(u).addScaledVector(c, -u.dot(c)).normalize();
       side.crossVectors(c, out);
       const off = (Math.acos(clamp(u.dot(c), -1, 1)) - cap.radius) * R;
-      const turn = (hash01(n, 1) - 0.5) * 2;
+      // (the closing's stroke at the edge nearest her, square in her view of it)
+      const turn = striking ? 0 : (hash01(n, 1) - 0.5) * 2;
       if (off > 0) {
         // in the storm: a way off the eye, any way round
         const far = DISTANCE[0] + hash01(n, 2) * (DISTANCE[1] - DISTANCE[0]);
@@ -199,8 +241,8 @@ export function createBolt(held: boolean) {
           .normalize();
       } else {
         // in the calm: IN metres into the wall, along it either way from the
-        // eye's nearest point of it
-        const a = cap.radius + IN / R,
+        // eye's nearest point of it (the closing's on its edge)
+        const a = cap.radius + (striking ? EDGE : IN) / R,
           round =
             (turn * Math.max(NEAR, -off * ALONG)) /
             (R * Math.max(Math.sin(a), 0.05));

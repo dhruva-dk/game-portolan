@@ -376,6 +376,13 @@ const DRAWN = {
     { k: 's', d: 'M16 8.4C17.8 10.4 17.8 13.6 16 15.6', w: 1.9 },
     { k: 's', d: 'M18.8 5.8C22 9.4 22 14.6 18.8 18.2', w: 1.9 },
   ],
+  // the Storm's mark: a bolt, hollow while it holds, filled while it closes
+  'hud.bolt': [
+    { k: 's', d: 'M14.6 1.6L5.4 13.4H11.3L8.7 22.4L18.7 9.7H12.7Z', w: 1.9 },
+  ],
+  'hud.boltFilled': [
+    { k: 'f', d: 'M14.6 1.6L5.4 13.4H11.3L8.7 22.4L18.7 9.7H12.7Z' },
+  ],
 } satisfies Record<string, Prim[]>;
 
 export type Glyph = keyof typeof DRAWN;
