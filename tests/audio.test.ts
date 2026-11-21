@@ -64,6 +64,7 @@ const each = (ship: number, gun: GunKind = 'cannon'): Happening[] =>
           hull: 10,
           broke: false,
           ram: false,
+          zone: 0,
         };
       case 'sank':
         return { ...base, kind, by: null };
@@ -118,6 +119,7 @@ test('her blows: her ward taking all of one rings, its last breaks it, the rest 
     hull,
     broke,
     ram: false,
+    zone: 0,
   });
   assert.equal(cueOf(blow(20, 0, false), 0), 'ring');
   assert.equal(cueOf(blow(10, 10, true), 0), 'shatter');
@@ -334,6 +336,7 @@ const status = (over: Partial<Status & Kit> = {}): Status & Kit => ({
   heading: [1, 0, 0],
   facing: [1, 0, 0],
   arriving: 0,
+  of: 0,
   hull: 100,
   hullMax: 100,
   shield: 30,
@@ -482,6 +485,9 @@ test('listen: a fault coming on cracks once, a worse one again, a mending none; 
   assert.deepEqual(cues(0.4, { faults: [0, 0, 1, 0] }), [], 'mended');
   assert.deepEqual(cues(0.5, { closing: true }), ['thunder', 'closing']);
   assert.deepEqual(cues(0.6, { closing: true }), []);
+  // another ship's faults, as she is watched in hers: no crack for them
+  assert.deepEqual(cues(0.7, { of: 3, faults: [2, 2, 2, 2] }), []);
+  assert.deepEqual(cues(0.8, { of: 3, faults: [2, 2, 2, 2] }), []);
 });
 
 test('the bed: the storm heard from afar and all about her inside; surf only near a coast; levels bounded', () => {

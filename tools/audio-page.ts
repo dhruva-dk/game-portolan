@@ -271,6 +271,7 @@ export async function passage(
       hull: 12,
       broke: false,
       ram: false,
+      zone: 0,
     }));
   });
   for (const [k, [id, s]] of SCRIPT.otherShots.entries()) {
@@ -303,6 +304,7 @@ export async function passage(
     hull: 0,
     broke: false,
     ram: false,
+    zone: 0,
   }));
   tell(b, (at) => ({
     seq: 0,
@@ -315,6 +317,7 @@ export async function passage(
     hull: 15,
     broke: true,
     ram: false,
+    zone: 0,
   }));
   tell(c, (at) => ({
     seq: 0,
@@ -327,6 +330,7 @@ export async function passage(
     hull: 21,
     broke: false,
     ram: false,
+    zone: 0,
   }));
   tell(SCRIPT.sinks[1], () => ({
     seq: 0,
@@ -508,6 +512,7 @@ export async function passage(
       heading: forward,
       facing: forward,
       arriving: 0,
+      of: 0,
       ...harm(t, SCRIPT.strikes),
       hullMax: 100,
       shieldMax: 50,

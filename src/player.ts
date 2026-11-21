@@ -64,6 +64,11 @@ export interface Status {
    * begins, 0 once it is down with her).
    */
   arriving: number;
+  /**
+   * The ship the hit points, zones and faults below are: hers, or once she has
+   * sunk the one she watches (a change of it is no blow nor fault come on).
+   */
+  of: number;
   /** Her hit points, and their most. */
   hull: number;
   hullMax: number;
@@ -171,8 +176,9 @@ export const HOTBAR = { guns: 2, items: 3 } as const;
  *   swapped   she took her gun of a kind in hand (only hers)
  *   fell      a ball came down in the sea, or on the land: a miss (ship: who fired it)
  *   struck    a ball or a ram home in ship, dealt by `by`: the hit points it took off her shield and off her hull,
- *             whether it took the last of her shield, and whether it was a ram
- *   sank      ship went down, sunk by `by` (null: the storm)
+ *             whether it took the last of her shield, whether it was a ram, and the zone of her it landed on
+ *             (ZONES' order)
+ *   sank     ship went down, sunk by `by` (null: the storm)
  *   took      ship took up a piece of loot (only hers is reported): what, its rarity (0–4) and the hotbar's slot it
  *             went to (HOTBAR)
  *   mended    ship finished mending with what she used (only hers)
@@ -191,6 +197,7 @@ export type Deed = { seq: number; time: number; at: Vec3; ship: number } & (
       hull: number;
       broke: boolean;
       ram: boolean;
+      zone: number;
     }
   | { kind: 'sank'; by: number | null }
   | { kind: 'took'; piece: LootKind; rarity: number; slot: number }

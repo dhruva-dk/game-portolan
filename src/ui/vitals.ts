@@ -105,23 +105,6 @@ export function washOf(share: number): string {
 /** A share as the slip draws it: in 20ths. */
 const step = (share: number) => Math.round(clamp(share) * 20);
 
-/**
- * The zone a blow just struck, from her zones' shares as last drawn to as they
- * are now: the one whose share rose most (by a 20th at least), or −1.
- */
-export function struckZone(
-  was: readonly number[],
-  now: readonly number[]
-): number {
-  let best = -1,
-    most = 0;
-  for (let i = 0; i < now.length; i++) {
-    const rose = step(now[i]) - step(was[i]);
-    if (rose > most) [best, most] = [i, rose];
-  }
-  return best;
-}
-
 /** The chart's danger mark at (x, y): a ringed cross, drawn (minor) or filled (major). */
 const danger = (x: number, y: number, major: boolean) => {
   const r = MARK_R,
@@ -206,13 +189,26 @@ export function createVitals(face: HTMLElement) {
       `<defs><pattern id="${hatch}" patternUnits="userSpaceOnUse" width="2.6" height="2.6" patternTransform="rotate(45)">` +
       `<path d="M0 0V2.6" stroke="${INK.iron}" stroke-width=".7" opacity=".55"/></pattern></defs>`;
   /** What was last drawn: the numbers, her zones' shares in 20ths (packed), her faults (packed), her mending. */
-  const was = [NaN, NaN, NaN, NaN, NaN, NaN],
-    shares = [0, 0, 0, 0];
+  const was = [NaN, NaN, NaN, NaN, NaN, NaN];
+  /** Her faults as last drawn, and the ship they were (Status of). */
   let faulted: Faults = [0, 0, 0, 0],
+    of = NaN,
     shimmering: Animation | null = null;
 
   return {
+    /** A blow on her hull (the Moment's): the zone it landed on flashes. */
+    struck(zone: number) {
+      flashes.children[zone]?.animate([{ opacity: 0.95 }, { opacity: 0 }], {
+        duration: 420,
+        easing: 'ease-out',
+      });
+    },
     update(s: Status) {
+      // another ship's (watching, or a new match): drawn as she is, no pop
+      if (s.of !== of) {
+        of = s.of;
+        faulted = s.faults;
+      }
       const shield = Math.round(s.shield),
         hull = Math.round(s.hull),
         most = s.shieldMax * 1000 + s.hullMax,
@@ -231,15 +227,8 @@ export function createVitals(face: HTMLElement) {
         mending === was[5]
       )
         return;
-      // a blow on her hull: the zone it struck flashes; a fault come on: the slip pops
-      const first = Number.isNaN(was[0]),
-        hit = struckZone(shares, z);
-      if (hit >= 0 && !first)
-        flashes.children[hit].animate([{ opacity: 0.95 }, { opacity: 0 }], {
-          duration: 420,
-          easing: 'ease-out',
-        });
-      if (worsened(faulted, f) && !first)
+      // a fault come on: the slip pops
+      if (worsened(faulted, f))
         face.animate(
           [{ scale: '1' }, { scale: '1.12', offset: 0.3 }, { scale: '1' }],
           { duration: 380, easing: 'cubic-bezier(.3,1.6,.5,1)' }
@@ -250,7 +239,6 @@ export function createVitals(face: HTMLElement) {
       was[3] = zones;
       was[4] = faults;
       was[5] = mending;
-      for (let i = 0; i < 4; i++) shares[i] = z[i];
       faulted = f;
       sheen?.setAttribute(
         'width',

@@ -8,6 +8,7 @@ import {
   crewOf,
   stepBattle,
   type Battle,
+  type Strike,
   type Crew,
 } from '../src/sim/battle.ts';
 import { afloat } from '../src/sim/contact.ts';
@@ -99,9 +100,10 @@ test('where a blow lands: abeam her waterline; her after third her rudder; rakin
 
 /**
  * A cannon ball loosed at her side from 20 m abeam, ship 1 the shooter (her
- * quiet 7 s), she with `shield`: the battle once it has struck.
+ * quiet 7 s), she with `shield`: the battle once it has struck, and its strikes
+ * into `struck`.
  */
-function shotAt(shield: number): Battle {
+function shotAt(shield: number, struck: Strike[] = []): Battle {
   const muzzle = scale(on(0, 20), R + 3),
     fleet = [afloat(1, shipAt(on(0, 20), ahead)), afloat(2, her)];
   let b: Battle = {
@@ -123,8 +125,11 @@ function shotAt(shield: number): Battle {
       ),
     ],
   };
-  for (let i = 0; i < 30 && b.balls.length; i++)
-    b = stepBattle(b, fleet, [], [], STEP, deep).battle;
+  for (let i = 0; i < 30 && b.balls.length; i++) {
+    const s = stepBattle(b, fleet, [], [], STEP, deep);
+    struck.push(...s.strikes);
+    b = s.battle;
+  }
   return b;
 }
 
@@ -134,9 +139,15 @@ test('a blow her shield holds harms no zone; past it, the zone it lands on takes
   assert.equal(on.health.shield, 70, 'struck');
   assert.deepEqual(on.wear.zones, [0, 0, 0, 0]);
   assert.deepEqual([by.wear.quiet, on.wear.quiet], [0, 0]);
-  const through = shotAt(20).crews[1];
+  const strikes: Strike[] = [],
+    through = shotAt(20, strikes).crews[1];
   assert.equal(through.health.hull, 90);
   assert.deepEqual(through.wear.zones, [0, 0, 10, 0]);
+  // the strike names the zone that took it (the HUD flashes it)
+  assert.deepEqual(
+    strikes.map((s) => s.zone),
+    [Z('waterline')]
+  );
 });
 
 test('faults by her hull: above 40 none; at 40 down to 25 her most-hit zone minor; under 25 that zone major and the next minor; ties to the first; none with no tally', () => {

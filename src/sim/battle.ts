@@ -119,6 +119,8 @@ export interface Strike {
   at: Vec3;
   ram: boolean;
   gun: GunKind | null;
+  /** The zone of her it landed on (kinds.ts ZONES' order: faults.ts zoneOf). */
+  zone: number;
 }
 
 /**
@@ -283,7 +285,8 @@ export function stepBattle(
     const harm = harmed(c.health, damage);
     c.health = harm.health;
     c.hold = broken(c.hold);
-    c.wear = struck(c.wear, zoneOf(ship, at, way, gun), harm.hull);
+    const zone = zoneOf(ship, at, way, gun);
+    c.wear = struck(c.wear, zone, harm.hull);
     const d = crews.get(by);
     if (d) d.wear = dealt(d.wear);
     if (gun) c.cut = Math.max(c.cut, GUNS[gun].cuts);
@@ -293,6 +296,8 @@ export function stepBattle(
       ? undefined
       : strikes.find((s) => !s.ram && s.shooter === by && s.struck === id);
     if (same) {
+      // (the zone of the first pellet to reach her hull)
+      if (same.hull === 0 && harm.hull > 0) same.zone = zone;
       same.damage += harm.shield + harm.hull;
       same.shield += harm.shield;
       same.hull += harm.hull;
@@ -308,6 +313,7 @@ export function stepBattle(
         at,
         ram,
         gun,
+        zone,
       });
     if (sunk(c.health)) sunkNow.push(id);
   };

@@ -12,7 +12,7 @@ import { createChanged } from '../src/ui/drawn.ts';
 import { GLYPHS, stormMark } from '../src/ui/glyphs.ts';
 import { RING, glow, sectorOf } from '../src/ui/hits.ts';
 import { PAPER, WASH } from '../src/ui/ink.ts';
-import { shimmer, struckZone, washOf } from '../src/ui/vitals.ts';
+import { shimmer, washOf } from '../src/ui/vitals.ts';
 
 test("vitals: a zone's wash runs paper, ochre, vermilion, and darkens as its share grows", () => {
   assert.equal(washOf(0), PAPER);
@@ -23,15 +23,6 @@ test("vitals: a zone's wash runs paper, ochre, vermilion, and darkens as its sha
     [1, 3, 5].reduce((a, i) => a + parseInt(hex.slice(i, i + 2), 16), 0);
   for (let s = 0; s < 0.6; s += 0.05)
     assert.ok(light(washOf(s + 0.05)) < light(washOf(s)), `darker past ${s}`);
-});
-
-test('vitals: the zone a blow struck is the one whose share rose most; none when no share rose by a 20th', () => {
-  assert.equal(struckZone([0, 0, 0, 0], [0, 0, 1, 0]), 2);
-  // shares are of the damage taken: one zone's rise is the others' fall
-  assert.equal(struckZone([0.5, 0.5, 0, 0], [0.4, 0.6, 0, 0]), 1);
-  assert.equal(struckZone([0.5, 0.5, 0, 0], [0.5, 0.5, 0, 0]), -1);
-  assert.equal(struckZone([0.5, 0.5, 0, 0], [0.51, 0.49, 0, 0]), -1);
-  assert.equal(struckZone([0.4, 0.2, 0.2, 0.2], [0.3, 0.15, 0.15, 0.4]), 3);
 });
 
 test('vitals: the mending shimmer starts as she begins, runs on unbroken while she mends, and stops as she ends', () => {

@@ -4,7 +4,7 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import type { Faults, Wear } from '../src/kinds.ts';
+import type { Fault, Faults } from '../src/kinds.ts';
 import type { ShipDraw } from '../src/snapshot.ts';
 import {
   CLOSE,
@@ -23,7 +23,7 @@ import { R } from '../src/world/sphere.ts';
 const ship = (
   id: number,
   metres: number,
-  wear: Wear,
+  wear: Fault,
   faults: Faults = [0, 0, 0, 0],
   afloat = true
 ): ShipDraw => {

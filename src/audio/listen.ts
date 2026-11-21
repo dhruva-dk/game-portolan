@@ -132,8 +132,10 @@ export function createListen(ground: (p: Vec3) => number) {
     generation = -1,
     seq = 0,
     closing = false;
+  /** Her hotbar's slot in hand; the faults last heard, and whose (Status of). */
   let chosen = 0,
-    faulted: Faults = SOUND;
+    faulted: Faults = SOUND,
+    faultsOf = NaN;
   let lift = NaN,
     roll = 0,
     whistled = -Infinity;
@@ -236,9 +238,12 @@ export function createListen(ground: (p: Vec3) => number) {
         call(out, 'closing');
       }
       closing = s.closing;
-      // a fault come on her, or worsened: a beam giving way
-      if (!fresh && worsened(faulted, s.faults) && !s.sunk) call(out, 'fault');
+      // a fault come on her, or worsened: a beam giving way (not another
+      // ship's, watched in her place)
+      if (!fresh && s.of === faultsOf && worsened(faulted, s.faults) && !s.sunk)
+        call(out, 'fault');
       faulted = s.faults;
+      faultsOf = s.of;
 
       // a ball passing near the eye: its whistle begun WHISTLE s before its
       // closest

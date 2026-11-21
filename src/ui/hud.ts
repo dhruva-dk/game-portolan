@@ -170,7 +170,13 @@ export function createHud(layer: HTMLElement, shores: Shores, act: HudActions) {
   const raised = slots.map(() => false);
   hotbar.style.width = `${LEFT(SLOTS - 1) + SLOT}px`;
   hotbar.style.height = `${SLOT}px`;
-  const juice = createJuice(body, { vitals: face, fire, gust, slots });
+  const juice = createJuice(body, {
+    vitals: face,
+    struck: drawVitals.struck,
+    fire,
+    gust,
+    slots,
+  });
 
   /** Whether a piece is to show other than it does (drawn.ts). */
   const changed = createChanged<HTMLElement>();

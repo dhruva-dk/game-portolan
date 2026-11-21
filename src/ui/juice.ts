@@ -31,11 +31,13 @@ import type { Glyph } from './glyphs.ts';
 import { boxOf, view } from './ui.ts';
 
 /**
- * The HUD's pieces it moves: the vitals slip, the Fire and Gust discs, and the
+ * The HUD's pieces it moves: the vitals slip (and its zone a blow on her hull
+ * landed on, flashed: vitals.ts struck), the Fire and Gust discs, and the
  * hotbar's slots (gun's first).
  */
 interface Parts {
   vitals: HTMLElement;
+  struck: (zone: number) => void;
   fire: HTMLElement;
   gust: HTMLElement;
   slots: readonly HTMLElement[];
@@ -184,6 +186,7 @@ export function createJuice(body: HTMLElement, parts: Parts) {
             flash.vignette(r.vignette, weight, whence);
           }
           jolt(parts.vitals);
+          if (m.hull > 0) parts.struck(m.zone);
         }
         return;
       }

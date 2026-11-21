@@ -287,6 +287,7 @@ export function createGame(
     heading: start.at,
     facing: start.at,
     arriving: 0,
+    of: PLAYER,
     hull: 0,
     hullMax: HEALTH.hull,
     shield: 0,
@@ -727,6 +728,7 @@ export function createGame(
       // her hull, shield, zones and faults, or the watched ship's; the debug's
       // held over either
       const w = (watched ? state.crew(view.watch) : c) ?? c;
+      report.of = w.id;
       report.hull = w.health.hull;
       report.shield = w.health.shield;
       report.zones = worn?.zones ?? sharesOf(w.wear);

@@ -223,8 +223,8 @@ const nth = (name: string, i: number, hi: number) => {
 /** A fault or a wear as a switch gives it: 0, 1 or 2. */
 const grade = (v: number): Fault => (v >= 1.5 ? 2 : v >= 0.5 ? 1 : 0);
 /** The damage ?zones, ?faults, ?wear and ?mend set (null with none of them). */
-const damage: DebugDamage | null =['zones', 'faults', 'wear', 'mend'].some((k) =>
-  params.has(k)
+const damage: DebugDamage | null = ['zones', 'faults', 'wear', 'mend'].some(
+  (k) => params.has(k)
 )
   ? {
       zones: [
