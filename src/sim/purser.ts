@@ -2,7 +2,8 @@
 // her hold and her gust, for two guns and three item slots:
 // - mending (heal, 3.5): with something in her slots that would mend her as she
 // is, and her hull or shield under what
-//   her temperament (and, sharper, sooner) tops up at, while no foe is close; she uses the slot worth most;
+//   her temperament (and, sharper, sooner) tops up at, or faulted (faults.ts), while no foe is close; she uses the
+//   slot worth most. With nothing to mend with and her hull low enough for her water to mend, her own water;
 // - loot (1.8): the piece within her temperament's reach worth most to her,
 // falling off with distance; a gun that
 //   betters what she carries (a first gun most, then a second of another kind, then a better of either), things to
@@ -18,8 +19,9 @@
 // for the same inputs, to the bit.
 
 import { smoothstep } from '../world/scalar.ts';
-import { R, distance, dot, type Vec3 } from '../world/sphere.ts';
+import { R, along, distance, dot, type Vec3 } from '../world/sphere.ts';
 import { armed, type Crew } from './battle.ts';
+import { faultsOf, MEND } from './faults.ts';
 import { ready } from './gust.ts';
 import type { Gun } from './gun.ts';
 import type { GunKind } from '../kinds.ts';
@@ -28,7 +30,7 @@ import { isArms, type Loot } from './loot.ts';
 import { NOTHING, type Ask } from './stores.ts';
 import { toEdge } from './storm.ts';
 import { ramp, utility } from './utility.ts';
-import type { Ctx } from './captain.ts';
+import { open, rotate, type Ctx } from './captain.ts';
 import { clearAt } from './route.ts';
 
 /** Everything a bot's stores are tuned by. */
@@ -71,6 +73,17 @@ export const PURSER = {
    * range).
    */
   other: 0.7,
+  /**
+   * Faulted (faults.ts), her need of mending is at least this by her worst
+   * fault (none, minor, major).
+   */
+  faulted: [0, 0.6, 1] as const,
+  /**
+   * Under MEND.cap hull, her own water mends her: she makes for it, within
+   * `reach` m of her, as much as this (her stores' mending weighs up to 1).
+   */
+  water: 0.9,
+  reach: 150,
 } as const;
 
 /**
@@ -105,19 +118,48 @@ function mendNeed(c: Ctx, crew: Crew): number {
     shield = 25 + 25 * c.t.skill;
   return Math.max(
     ramp(crew.health.hull, hull + 8, hull - 8),
-    ramp(crew.health.shield, shield + 8, shield - 8)
+    ramp(crew.health.shield, shield + 8, shield - 8),
+    c.b.purser.faulted[Math.max(...faultsOf(crew.health.hull, crew.wear))]
   );
+}
+
+/** The bearings round her she looks along for her own water, and how many rings out. */
+const LOOKS = 8,
+  RINGS = 3;
+/**
+ * The nearest of her own water (territory.ts) within PURSER.reach of her, on
+ * LOOKS bearings and RINGS rings: where she is, if she lies in it; null with
+ * none.
+ */
+function ownWater(c: Ctx): Vec3 | null {
+  const h = c.sea.holdings,
+    { id, ship } = c.own;
+  if (!h) return null;
+  if (h.ownerAt(ship.at) === id) return ship.at;
+  for (let r = 1; r <= RINGS; r++)
+    for (let k = 0; k < LOOKS; k++) {
+      const way = rotate(ship.at, ship.heading, (2 * Math.PI * k) / LOOKS),
+        p = along(ship.at, way, (r * c.b.purser.reach) / RINGS).p;
+      if (h.ownerAt(p) === id && open(c, p)) return p;
+    }
+  return null;
 }
 
 /**
  * The heal option's score: something to mend with, need of it, and no foe
- * close.
+ * close; or, her hull under MEND.cap, her own water near (faults.ts tended).
  */
 export const healUrge = (c: Ctx) => {
   const crew = c.own.crew;
-  return !crew || healSlot(crew) < 0
-    ? 0
-    : utility(mendNeed(c, crew), ramp(c.foeD, 55, 90));
+  if (!crew) return 0;
+  const clear = ramp(c.foeD, 55, 90),
+    stores = healSlot(crew) < 0 ? 0 : utility(mendNeed(c, crew), clear);
+  if (crew.health.hull >= MEND.cap || !ownWater(c)) return stores;
+  return Math.max(
+    stores,
+    c.b.purser.water *
+      utility(ramp(crew.health.hull, MEND.cap, MEND.cap - 10), clear)
+  );
 };
 
 /**
@@ -254,11 +296,16 @@ export function lootAct(c: Ctx): Vec3 {
 }
 
 /**
- * Mending: where she is, or with a foe about, open water PURSER.clear m from
- * her (found by her mind, `clearOf`).
+ * Mending: by her stores, where she is, or with a foe about, open water
+ * PURSER.clear m from her (found by her mind, `clearOf`); with nothing to mend
+ * with, in her own water.
  */
 export const healAct = (c: Ctx, clearOf: (metres: number) => Vec3): Vec3 =>
-  c.foe ? clearOf(c.b.purser.clear) : c.own.ship.at;
+  c.own.crew && healSlot(c.own.crew) < 0
+    ? (ownWater(c) ?? c.own.ship.at)
+    : c.foe
+      ? clearOf(c.b.purser.clear)
+      : c.own.ship.at;
 
 /**
  * What her purser carries: the piece she would go for as she last weighed it,
