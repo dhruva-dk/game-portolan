@@ -8,8 +8,8 @@
 //   title   an opaque sheet over the world loading: rhumb lines, the rose whose needle swings while the world loads and
 //           settles north when it is ready, her galleon gilt below; it moves on by itself (flow.ts)
 //   lobby   over her ship at anchor: the wheel (tap: settings), the PLAY banner with her galleon on it, the seed's
-//           chip at the top left, its name and a pencil (tap: the seed panel, panel.ts), and the dye pot at the bottom left in her
-//           dye (tap: her livery, livery.ts). No tabs. Elsewhere a drag reaches the world: it turns the camera round
+//           chip at the top left, its name and a pencil (tap: the seed panel, panel.ts), and the dye pot beside the
+//           wheel in her dye (tap: her livery, livery.ts). No tabs. Elsewhere a drag reaches the world: it turns the camera round
 //           her.
 //   settings a small folio: sound and look speed, each a bar set by a tap along it; the stats (the frame's cost in
 //           the bottom-left corner: meter.ts), a box ticked by a tap
@@ -208,13 +208,9 @@ export function createLobby(
               p,
               'right',
               'top',
-              `<g id="wheel"><circle cx="866" cy="40" r="26" fill="url(#pg)" stroke="${INK.iron}" stroke-width="1.6" filter="url(#sh)"/>${glyph('menu.wheel', 866, 40, 34)}</g>`
-            ) +
-            at(
-              p,
-              'left',
-              'bottom',
-              `<g id="livery"><circle cx="92" cy="392" r="26" fill="url(#pg)" stroke="${INK.iron}" stroke-width="1.6" filter="url(#sh)"/>${dyePot(91, 394, 36, pot)}</g>`
+              `<g id="wheel"><circle cx="866" cy="40" r="26" fill="url(#pg)" stroke="${INK.iron}" stroke-width="1.6" filter="url(#sh)"/>${glyph('menu.wheel', 866, 40, 34)}</g>` +
+                // (beside the wheel: the meter has the bottom-left corner, over every screen)
+                `<g id="livery"><circle cx="802" cy="40" r="26" fill="url(#pg)" stroke="${INK.iron}" stroke-width="1.6" filter="url(#sh)"/>${dyePot(801, 42, 36, pot)}</g>`
             ) +
             at(
               p,

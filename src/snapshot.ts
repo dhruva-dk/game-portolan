@@ -45,6 +45,25 @@ export interface Look {
 }
 
 /**
+ * Where a Look's marks fall on a square sail, in the sail's own measures: the
+ * cross pattée's arms flaring from `arm` at its middle to `flare` at their
+ * ends, reaching `reach` of the sail's half-width and half-height from its
+ * middle; the band across it from `band[0]` to `band[1]` of its height; and
+ * `stripes` upright stripes' worth across it (odd, so its edges match), the
+ * middle one and every other marked, each parted from the cross by a border of
+ * canvas `fringe` wide (of `reach`, as `arm` and `flare` are). One for the ship
+ * drawn (ship/materials.ts) and the sails the livery folio shows (ui/livery.ts).
+ */
+export const SAIL_MARKS = {
+  arm: 0.13,
+  flare: 0.34,
+  reach: 0.66,
+  band: [0.36, 0.64],
+  stripes: 5,
+  fringe: 0.2,
+} as const;
+
+/**
  * A ship drawn: her slot, her pose and colours, her velocity (m/s, world: for
  * the marks she leaves on the sea), whether she floats (one going down neither
  * fits the sea round her nor marks it), and the gun in her hand (its kind:

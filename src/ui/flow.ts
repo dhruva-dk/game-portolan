@@ -1,5 +1,5 @@
 // The screens' order, as ways.ts tables it: the title, the lobby with its
-// folios (the settings, the seed panel), the match, and her end over the live world (the camera's beat on it,
+// folios (the settings, the seed panel, her livery), the match, and her end over the live world (the camera's beat on it,
 // then her result with its ways on: watch the match on, or home). Every way is
 // her tap on something drawn for it, or the match's own course as the game
 // reports it (player.ts End), but the title's, taken as the world is ready;
@@ -18,12 +18,16 @@ import { createSeedPanel } from './panel.ts';
 import type { Sea } from '../snapshot.ts';
 import { createResult, createWatching } from './ends.ts';
 import {
-  createLobby,
-  createSettings,
-  type Settings,
-  type Title,
-} from './screens.ts';
+  keepLivery,
+  keepSettings,
+  keptLivery,
+  keptSettings,
+  type Store,
+} from './kept.ts';
+import { createLobby, createSettings, type Title } from './screens.ts';
 import { fade } from './ui.ts';
+import { INK } from './ink.ts';
+import { linearToHex } from '../colour.ts';
 import { createPassage } from './passage.ts';
 import { createVeil } from './veil.ts';
 import {
@@ -36,30 +40,18 @@ import {
   type Tap,
 } from './ways.ts';
 
-const KEY = 'portolan.settings';
 /**
  * Milliseconds the HUD takes to fade out as her end begins: slow enough to read
  * as the match drying away, not cut.
  */
 const DRY = 600;
 
-/**
- * Settings kept on the device; never required (a private window may refuse
- * them).
- */
-const SETTINGS: Settings = { sound: 0.8, look: 0.5, stats: false };
-function loadSettings(): Settings {
+/** The device's store (kept.ts), or none: a private window may throw as it is reached. */
+function device(): Store | null {
   try {
-    return { ...SETTINGS, ...JSON.parse(localStorage.getItem(KEY) ?? '{}') };
+    return localStorage;
   } catch {
-    return { ...SETTINGS };
-  }
-}
-function saveSettings(s: Settings) {
-  try {
-    localStorage.setItem(KEY, JSON.stringify(s));
-  } catch {
-    // kept for this session only
+    return null;
   }
 }
 
@@ -91,14 +83,27 @@ export function createFlow(
   act: FlowActions,
   title: Title
 ) {
+  const store = device(),
+    names = act.wardrobe.dyes.map((d) => d.name);
   let screen: Screen = start,
-    settings = loadSettings();
+    settings = keptSettings(store);
+  // her livery as the device keeps it, worn before anything is drawn
+  act.wardrobe.wear(keptLivery(store, names));
   /** Her end as last reported (null while she fights). */
   let end: End | null = null;
 
   const veil = createVeil();
-  const livery = createLivery(act.wardrobe, () => tap('close'));
-  const lobby = createLobby(act.seeds.name, livery.dye, {
+  const livery = createLivery(
+    act.wardrobe,
+    (l) => keepLivery(store, l, names),
+    () => tap('close')
+  );
+  /** Her dye as she wears it now (the lobby's dye pot). */
+  const worn = () =>
+    act.wardrobe.dyes[act.wardrobe.worn().dye]?.dye ?? INK.white;
+  /** Her ship's colour on the sea as she last sailed it (her end's sea held), as the minimap reads it. */
+  let sailed: Sea['colours'][number] | null = null;
+  const lobby = createLobby(act.seeds.name, worn, {
     play: () => tap('play'),
     settings: () => tap('settings'),
     seed: () => tap('seed'),
@@ -117,11 +122,11 @@ export function createFlow(
     () => settings,
     (s) => {
       settings = s;
-      saveSettings(s);
+      keepSettings(store, s);
     },
     () => tap('close')
   );
-  const result = createResult(livery.dye, {
+  const result = createResult(() => (sailed ? linearToHex(sailed) : worn()), {
     watch: () => tap('watch'),
     leave: () => tap('leave'),
     again: () => tap('again'),
@@ -233,6 +238,9 @@ export function createFlow(
      * frame draws it.
      */
     update(s: HudState, sea?: Sea, own?: number | null) {
+      // (her own ship's while she sails; another's once she watches)
+      if (screen === 'match' && sea && own != null)
+        sailed = sea.colours[own] ?? sailed;
       if (IN_MATCH.includes(screen)) {
         // (the full map's window would show the HUD under it)
         hud.update(s, sea, own, globe.open);

@@ -74,7 +74,8 @@ import {
 } from './build.ts';
 import { braced, bracedAbout, breath, type Cloth } from './cloth.ts';
 import { CLOTH } from './kit.ts';
-import { CREAM, DYE_GLOW, TAR } from '../palette.ts';
+import { DYE_GLOW, MARKS, TAR } from '../palette.ts';
+import { SAIL_MARKS } from '../snapshot.ts';
 import { createWood, shaded } from './wood.ts';
 import { line, type FloatNode, type Vec3Node } from '../tsl.ts';
 
@@ -85,30 +86,23 @@ import { line, type FloatNode, type Vec3Node } from '../tsl.ts';
  */
 export const THROUGH = 0.55;
 /**
- * Every ship's mark on her square sails, in her paint: a cross pattée, its arms
- * flaring from ARM at the middle to FLARE at their ends, REACH of the sail's
- * half-width and half-height from its middle. Paint lets through PAINTED of
- * what the canvas does, so against the sun the cross stands dark on the glowing
- * cloth.
+ * Every ship's mark on her square sails, in her paint: a cross pattée, and her
+ * pattern's band or stripes (snapshot.ts SAIL_MARKS). Paint lets through
+ * PAINTED of what the canvas does, so against the sun the cross stands dark on
+ * the glowing cloth.
  */
-const ARM = 0.13,
-  FLARE = 0.34,
-  REACH = 0.66,
+const { arm: ARM, flare: FLARE, reach: REACH } = SAIL_MARKS,
   PAINTED = 0.35;
 /**
  * A square sail's cloths: how many across it (each about 0.4 m), shown as faint
  * seams.
  */
 const CLOTHS = 26;
-/**
- * A striped sail's stripes across it, odd so its two edges match; and the
- * canvas border round the cross on it (of REACH, as ARM and FLARE are).
- */
-const STRIPES = 5,
-  FRINGE = 0.2;
+const { stripes: STRIPES, fringe: FRINGE, band: BAND } = SAIL_MARKS;
 /**
  * A mark whose paint is within this much of its canvas's luminance is drawn in
- * cream (palette.ts CREAM).
+ * the marks' ink for the canvas instead (palette.ts MARKS: cream on a dark
+ * dye, tar on a light one).
  */
 const UNSEEN = 0.06;
 /**
@@ -367,8 +361,8 @@ export function createShipMaterials(
       float(0)
     );
     const band = banded
-      .mul(smoothstep(0.36, 0.37, uvs.y))
-      .mul(smoothstep(0.64, 0.63, uvs.y));
+      .mul(smoothstep(BAND[0], BAND[0] + 0.01, uvs.y))
+      .mul(smoothstep(BAND[1], BAND[1] - 0.01, uvs.y));
     // upright stripes, one a cloth's width apart in STRIPES, the middle one
     // paint; smoothed over a pixel
     const s = uvs.x.sub(0.5).mul(STRIPES),
@@ -399,10 +393,14 @@ export function createShipMaterials(
       max(mark, stripe.mul(float(1).sub(pattee(FRINGE))))
     );
     // a mark as dark or as light as its canvas would not show: it is drawn in
-    // cream instead
+    // the marks' ink for its canvas instead (palette.ts markOn, as a node)
     const ink = select(
       abs(luminance(ship.paint).sub(luminance(ship.sail))).lessThan(UNSEEN),
-      vec3(...CREAM),
+      select(
+        luminance(ship.sail).greaterThan(MARKS.turn),
+        vec3(...MARKS.dark),
+        vec3(...MARKS.light)
+      ),
       ship.paint
     );
     let albedo = mix(ship.sail, ink, marked);

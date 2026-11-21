@@ -22,38 +22,46 @@ import {
   TANGERINE,
   UMBER,
   VERMILION,
+  markOn,
 } from '../palette.ts';
 import { LIVERY, PATTERNS, type Livery } from '../player.ts';
 import type { Look } from '../snapshot.ts';
 import { hash } from '../world/random.ts';
 import type { Vec3 } from '../world/sphere.ts';
 
-const dye = (c: readonly [number, number, number]): Vec3 => [c[0], c[1], c[2]];
-
 /**
- * The dyes, linear rgb: her hull's paint and her canvas both of the one dye.
- * Two rows of eight as the folio lays them out: the bright and the light (her
+ * The dyes by name, linear rgb: her hull's paint and her canvas both of the one
+ * dye, and its marks in the ink that stands out on it (palette.ts markOn). Two
+ * rows of eight as the folio lays them out: the bright and the light (her
  * vermilion first), then the deep and the dull. None a blue, a green near the
- * sea's, the foam's cream or the storm's violet.
+ * sea's, the foam's cream or the storm's violet. Her choice is kept by its
+ * name, so the set may be reordered or grown.
  */
-export const COLOURS: readonly Vec3[] = [
-  VERMILION,
-  CORAL,
-  TANGERINE,
-  OCHRE,
-  LEMON,
-  CHARTREUSE,
-  PEACH,
-  ROSE,
-  OXBLOOD,
-  UMBER,
-  OLIVE,
-  MOSS,
-  CERISE,
-  MURREY,
-  PEWTER,
-  CHARCOAL,
-].map(dye);
+export const DYES: readonly { name: string; colour: Vec3; mark: Vec3 }[] =
+  Object.entries({
+    vermilion: VERMILION,
+    coral: CORAL,
+    tangerine: TANGERINE,
+    ochre: OCHRE,
+    lemon: LEMON,
+    chartreuse: CHARTREUSE,
+    peach: PEACH,
+    rose: ROSE,
+    oxblood: OXBLOOD,
+    umber: UMBER,
+    olive: OLIVE,
+    moss: MOSS,
+    cerise: CERISE,
+    murrey: MURREY,
+    pewter: PEWTER,
+    charcoal: CHARCOAL,
+  }).map(([name, c]) => ({
+    name,
+    colour: [c[0], c[1], c[2]],
+    mark: [...markOn(c)],
+  }));
+/** The dyes' colours, in the set's order. */
+export const COLOURS: readonly Vec3[] = DYES.map((d) => d.colour);
 
 /** A livery held to the set: a dye or a pattern past it is hers by default. */
 export const worn = (l: Livery): Livery => ({
@@ -64,8 +72,8 @@ const within = (i: number, n: number) => Number.isInteger(i) && i >= 0 && i < n;
 
 /**
  * A livery's colours: its dye as her paint and her canvas, and its pattern; her
- * cross on them in cream (her paint would not show on her own canvas:
- * ship/materials.ts UNSEEN).
+ * marks on them in the ink that stands out on the dye (her paint would not
+ * show on her own canvas: ship/materials.ts UNSEEN, palette.ts markOn).
  */
 export const lookOf = (l: Livery): Look => {
   const { dye, pattern } = worn(l),

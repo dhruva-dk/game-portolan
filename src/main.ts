@@ -10,7 +10,7 @@ import type { Hearing } from './audio/listen.ts';
 import type { Played, Setup, Stage } from './debug.ts';
 import { launched, roll, sail } from './address.ts';
 import { linearToHex } from './colour.ts';
-import { COLOURS } from './play/colours.ts';
+import { DYES } from './play/colours.ts';
 import { SEED, createWorld } from './environment.ts';
 import { createFrame } from './frame.ts';
 import { loaded } from './load.ts';
@@ -217,7 +217,11 @@ async function play(s: Stage): Promise<Played> {
       },
       // her livery's folio's: the set's dyes as the page shows them, hers worn on the game's ship
       wardrobe: {
-        dyes: COLOURS.map(linearToHex),
+        dyes: DYES.map((d) => ({
+          name: d.name,
+          dye: linearToHex(d.colour),
+          mark: linearToHex(d.mark),
+        })),
         worn: game.worn,
         wear: game.wear,
         broadside: game.broadside,

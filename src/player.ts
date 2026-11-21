@@ -247,14 +247,15 @@ export interface Livery {
 export const LIVERY: Livery = { dye: 0, pattern: 0 };
 
 /**
- * What the lobby's livery folio asks of the game: the set's dyes as the display
- * shows them ('#rrggbb', in the set's order); the livery she wears; hers worn
+ * What the lobby's livery folio asks of the game: the set's dyes, in the set's
+ * order, each its name (hers is kept by it), its colour and the ink of its
+ * marks as the display shows them ('#rrggbb'); the livery she wears; hers worn
  * (her ship at anchor in it at once, and hers in every match after, the bots
  * dealt round it), as held to the set; and the camera turned to her broadside
  * while the folio is open, or let back to its rest.
  */
 export interface Wardrobe {
-  dyes: readonly string[];
+  dyes: readonly { name: string; dye: string; mark: string }[];
   worn(): Livery;
   wear(l: Livery): Livery;
   broadside(on: boolean): void;

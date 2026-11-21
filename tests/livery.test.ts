@@ -3,9 +3,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { hexToLinear, linearToSrgbRgb } from '../src/colour.ts';
-import { COLOURS, dealt, lookOf, worn } from '../src/play/colours.ts';
+import { ColorManagement, Vector3 } from 'three';
+import { COLOURS, DYES, dealt, lookOf, worn } from '../src/play/colours.ts';
 import {
   CREAM,
+  MARKS,
+  markOn,
   FOAM,
   SEA_DEEP,
   SEA_MIDDLE,
@@ -90,6 +93,43 @@ test('every dye stands apart from every other, and from the sea, the foam and th
   }
 });
 
+/** A linear colour's relative luminance, by three's own coefficients (not the palette's). */
+const lum = (c: readonly number[]) => {
+  const k = ColorManagement.getLuminanceCoefficients(new Vector3());
+  return k.x * c[0] + k.y * c[1] + k.z * c[2];
+};
+/** Two colours' contrast ratio, as the web measures it: 1 none, 21 black on white. */
+const contrast = (a: readonly number[], b: readonly number[]) => {
+  const [hi, lo] = [lum(a), lum(b)].sort((x, y) => y - x);
+  return (hi + 0.05) / (lo + 0.05);
+};
+
+test('every dye has its marks in an ink that stands out on it: cream on the dark, tar on the light', () => {
+  for (const d of DYES) {
+    assert.deepEqual(d.mark, [...markOn(d.colour)]);
+    const c = contrast(d.colour, d.mark);
+    assert.ok(c >= 3, `${d.name}'s marks ${c.toFixed(2)} : 1`);
+    // and the other ink would stand out no more
+    const other = d.mark[0] === MARKS.light[0] ? MARKS.dark : MARKS.light;
+    assert.ok(c >= contrast(d.colour, other), `${d.name}: the other ink`);
+  }
+  // the pale dyes take the dark ink, the deep ones cream
+  const ink = (name: string) => DYES.find((d) => d.name === name)?.mark;
+  for (const name of ['lemon', 'peach', 'chartreuse', 'rose', 'ochre'])
+    assert.deepEqual(ink(name), [...MARKS.dark], name);
+  for (const name of ['vermilion', 'oxblood', 'murrey', 'charcoal'])
+    assert.deepEqual(ink(name), [...MARKS.light], name);
+});
+
+test('every dye has a name of its own, and its colour is the set’s', () => {
+  assert.equal(new Set(DYES.map((d) => d.name)).size, DYES.length);
+  assert.deepEqual(
+    DYES.map((d) => d.colour),
+    COLOURS
+  );
+  assert.equal(DYES[LIVERY.dye].name, 'vermilion');
+});
+
 test("a livery's look: its dye as paint and canvas, its pattern; one past the set is hers by default", () => {
   every((l) => {
     const look = lookOf(l);
@@ -109,10 +149,22 @@ test("a livery's look: its dye as paint and canvas, its pattern; one past the se
 });
 
 test('the seed deals every bot hers from the set, the same every time for the same seed', () => {
+  // the first six bots of seed 1234, she in hers by default: cerise banded,
+  // lemon, cerise and cerise striped, umber striped, chartreuse plain
+  assert.deepEqual(
+    [1, 2, 3, 4, 5, 6].map((id) => dealt(1234, id, LIVERY)),
+    [
+      { dye: 12, pattern: 1 },
+      { dye: 4, pattern: 2 },
+      { dye: 12, pattern: 2 },
+      { dye: 12, pattern: 2 },
+      { dye: 9, pattern: 2 },
+      { dye: 5, pattern: 0 },
+    ]
+  );
   for (const seed of SEEDS)
     for (let id = 1; id < SHIPS; id++) {
       const a = dealt(seed, id, LIVERY);
-      assert.deepEqual(a, dealt(seed, id, LIVERY));
       assert.deepEqual(
         worn(a),
         a,

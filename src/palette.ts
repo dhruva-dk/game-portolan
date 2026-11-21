@@ -20,9 +20,11 @@ const tones = (lit: string, shadow: string): Tones => ({
   lit: ink(lit),
   shadow: ink(shadow),
 });
+/** A colour's luminance (three's luminance(), the working space's weights, on the CPU). */
+const luma = (c: Rgb) => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
 /** A colour as the tint of a light: its hue and saturation, at luminance y. */
 export const tint = (c: Rgb, y: number): Rgb => {
-  const k = y / (0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]);
+  const k = y / luma(c);
   return [c[0] * k, c[1] * k, c[2] * k];
 };
 
@@ -169,3 +171,19 @@ export const UMBER = ink('#6E4222');
 export const CERISE = ink('#D63C88');
 export const PEACH = ink('#F6BC8C');
 export const PEWTER = ink('#8E8882');
+/**
+ * The marks (cross, band, stripes) on a canvas of a dye: cream on a dark dye,
+ * tar on a light one; a dye lighter than `turn` (its luminance) is light. The
+ * turn is where the two stand out from it equally (the luminances' contrast
+ * ratio, each + 0.05), so whichever is chosen stands out the more: at worst
+ * some 3.3 : 1, the ship's own material and the livery folio alike
+ * (ship/materials.ts, ui/livery.ts by the Wardrobe).
+ */
+export const MARKS = {
+  light: CREAM,
+  dark: TAR.lit,
+  turn: Math.sqrt((luma(CREAM) + 0.05) * (luma(TAR.lit) + 0.05)) - 0.05,
+} as const;
+/** The ink of the marks on a canvas of dye `c` (MARKS). */
+export const markOn = (c: Rgb): Rgb =>
+  luma(c) > MARKS.turn ? MARKS.dark : MARKS.light;
