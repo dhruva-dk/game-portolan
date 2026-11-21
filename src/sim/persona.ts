@@ -69,6 +69,7 @@ const CREWS: Readonly<Record<Persona, (b: Brain) => Over>> = {
     placing: {
       strait: placing.strait + 1,
       deep: placing.deep * 0.6,
+      foes: placing.foes + 0.4,
       early: placing.early * 1.5,
     },
   }),
@@ -80,6 +81,7 @@ const CREWS: Readonly<Record<Persona, (b: Brain) => Over>> = {
     placing: {
       open: placing.open + 0.4,
       cover: placing.cover + 0.3,
+      foes: placing.foes - 0.3,
       early: placing.early * (4 / 3),
     },
   }),
@@ -107,6 +109,7 @@ const CREWS: Readonly<Record<Persona, (b: Brain) => Over>> = {
     placing: {
       cover: placing.cover + 1,
       deep: placing.deep * 0.6,
+      foes: placing.foes - 0.4,
       early: placing.early * 2,
     },
   }),
@@ -129,7 +132,11 @@ const CREWS: Readonly<Record<Persona, (b: Brain) => Over>> = {
     mind: { crowding: mind.crowding * 1.6 },
     hunting: { earshot: hunting.earshot * 1.4 },
     sight: { sightMax: sight.sightMax * (7 / 6) },
-    placing: { deep: placing.deep * 1.4, early: placing.early * (7 / 6) },
+    placing: {
+      deep: placing.deep * 1.4,
+      foes: placing.foes + 0.4,
+      early: placing.early * (7 / 6),
+    },
   }),
 };
 

@@ -10,7 +10,9 @@
 // - strait: land on two sides facing, water open across them: a narrows ships
 //   must pass;
 // - open: water open all round;
-// - loot: pieces lying near it.
+// - loot: pieces lying near it;
+// - foes: ships she knows of about it (her log: logbook.ts), sought or kept
+//   from by persona; and never by a ship she ran from.
 // She makes for it, when nothing better calls, from her persona's time before
 // the cap is due on (roaming.ts): a turtle sits in her cove early, a scavenger
 // comes late.
@@ -26,6 +28,7 @@ import {
   tangentAt,
   type Vec3,
 } from '../world/sphere.ts';
+import { knownNear, shunned } from './logbook.ts';
 import { fieldAt, openAt } from './route.ts';
 import { toEdge, type Cap } from './storm.ts';
 import { open, rotate, unitHash, type Ctx } from './captain.ts';
@@ -51,6 +54,14 @@ export const PLACING = {
   strait: 0,
   open: 0.2,
   plunder: 0,
+  /**
+   * Ships she knows of (her log: logbook.ts) within `round` × 4 m, `crowd` all
+   * it counts: drawn (a hunter's) or kept from (a turtle's). A place by a ship
+   * she ran from costs `shun`.
+   */
+  foes: 0,
+  crowd: 2,
+  shun: 1,
   /**
    * She makes for her place this many seconds before the cap is due to begin
    * closing, and while it closes.
@@ -125,7 +136,9 @@ function worth(c: Ctx, cap: Cap, q: Vec3): number {
     pl.cover * cover +
     pl.strait * strait +
     pl.open * (1 - land / 8) +
-    pl.plunder * Math.min(1, pieces / pl.plenty)
+    pl.plunder * Math.min(1, pieces / pl.plenty) +
+    pl.foes * Math.min(1, knownNear(c, q, 4 * pl.round) / pl.crowd) -
+    (shunned(c, q) ? pl.shun : 0)
   );
 }
 

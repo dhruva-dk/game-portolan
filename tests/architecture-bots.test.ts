@@ -30,6 +30,7 @@ const PARTS = [
   'sim/claimer.ts',
   'sim/hunter.ts',
   'sim/placing.ts',
+  'sim/logbook.ts',
   'sim/route.ts',
   'sim/utility.ts',
   'sim/temper.ts',
@@ -52,6 +53,7 @@ const CHOOSING = [
   'sim/claimer.ts',
   'sim/hunter.ts',
   'sim/placing.ts',
+  'sim/logbook.ts',
 ];
 /**
  * Tables read as they are, not from the brain: captain.ts's BOT, shared by
@@ -121,6 +123,7 @@ const SLICES: Record<string, readonly string[]> = {
   'sim/claimer.ts': ['claimer'],
   'sim/hunter.ts': ['hunting'],
   'sim/placing.ts': ['placing'],
+  'sim/logbook.ts': ['logbook'],
 };
 
 test('own slices: a part reads its tuning from the brain it is given (c.b), its own slices alone, never its table itself', () => {

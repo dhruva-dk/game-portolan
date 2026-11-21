@@ -14,6 +14,7 @@ import { MIND } from './fighting.ts';
 import { GUNNERY } from './gunner.ts';
 import { HELM } from './helmsman.ts';
 import { HUNTING } from './hunter.ts';
+import { LOGBOOK } from './logbook.ts';
 import { SIGHT } from './lookout.ts';
 import { PLACING } from './placing.ts';
 import { PURSER } from './purser.ts';
@@ -29,7 +30,7 @@ import { STYLES } from './temper.ts';
  * roaming (roaming.ts) and her storm (storming.ts), her ramming
  * (tactician.ts), her helm (helmsman.ts), her stores (purser.ts), her water
  * (claimer.ts), her ear (hunter.ts), how she fights her guns (gunner.ts), her
- * place for a phase (placing.ts), and the temperaments she may be born to
+ * place for a phase (placing.ts), her log (logbook.ts), and the temperaments she may be born to
  * (temper.ts).
  */
 export interface Brain {
@@ -45,6 +46,7 @@ export interface Brain {
   readonly hunting: Widen<typeof HUNTING>;
   readonly gunnery: Widen<typeof GUNNERY>;
   readonly placing: Widen<typeof PLACING>;
+  readonly logbook: Widen<typeof LOGBOOK>;
   readonly styles: Widen<typeof STYLES>;
 }
 
@@ -62,6 +64,7 @@ export const DEFAULT_BRAIN: Brain = {
   hunting: HUNTING,
   gunnery: GUNNERY,
   placing: PLACING,
+  logbook: LOGBOOK,
   styles: STYLES,
 };
 
@@ -91,6 +94,7 @@ export function variant(over: Over, base: Brain = DEFAULT_BRAIN): Brain {
     hunting: merged('hunting', base.hunting, over.hunting),
     gunnery: merged('gunnery', base.gunnery, over.gunnery),
     placing: merged('placing', base.placing, over.placing),
+    logbook: merged('logbook', base.logbook, over.logbook),
     styles: over.styles ?? base.styles,
   };
 }

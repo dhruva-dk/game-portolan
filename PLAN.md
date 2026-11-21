@@ -229,6 +229,24 @@ sustain 0.609 → 0.605; lull 92.2 → 84.3 (−7.9 ± 5.9); distinctness 0.162 
   her place the moment it is time, not at her next roaming mark (held lull
   −0.8 ± 6.1, the rest alike: so this layer's lull gain is within noise).
 
+**Step 4, layer 3 (memory).** A new part, logbook.ts (LOGBOOK, LogMemory):
+every think she notes each ship she can see within her notice (land hides
+one): where, hull and shield, the gun in her hand, when; and a ship she ran
+from, when. Notes fade after 60 s; 8 ships at most. Read: with no guns to
+hear, she goes back (the hunt) for a ship she saw lately at half her
+strength or less, within 350 m, to where she saw her, once (a hunt given up,
+only a newer sighting draws her again); guns by a ship she ran from she lets
+be (150 m), and her place is never there; a ship she ran from, no weaker than
+she, takes 0.25 off her will to fight her (fighting.ts MIND beaten); her
+place weighs the ships she knows near it (placing.ts foes: hunter and brawler
++0.4, turtle −0.4, homesteader −0.3). Only what she saw. Held pooled: damage
+130.5 → 131.6 (+1.1 ± 2.1); hull mended 10.26 → 10.56 (+0.3 ± 0.3); sustain
+0.605 → 0.610; lull 84.3 → 81.5 (−2.8 ± 5.7); distinctness 0.169 → 0.163
+(−0.005 ± 0.007); stuck 4.53 → 4.40; aground 0.00 → 0.02; spread 0.110 →
+0.073. Worst held: damage 127.0 → 124.7, lull 104.4 → 95.1 (−9.3 ± 11.3).
+All within noise, none worse; it doesn't beat one se on held, so one pass
+only (the rule). Steps 1.71 / 3.63 / 12.5 → 1.71 / 3.73 / 13.0.
+
 ## Not decided / later
 
 - Restage in place (parked).

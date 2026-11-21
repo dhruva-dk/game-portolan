@@ -20,6 +20,7 @@ import { toEdge } from './storm.ts';
 import { logistic, ramp, utility } from './utility.ts';
 import { aggroOf, open, rotate, type Ctx, type Seen } from './captain.ts';
 import { SHIP } from './handling.ts';
+import { ranFromShip } from './logbook.ts';
 import { hidden } from './lookout.ts';
 import { keptInside } from './storming.ts';
 
@@ -40,6 +41,11 @@ export const MIND = {
    */
   crowd: 150,
   crowding: 0.25,
+  /**
+   * A ship she ran from lately (her log: logbook.ts), and no weaker than she,
+   * takes this much off her will.
+   */
+  beaten: 0.25,
   /**
    * The will at which she is in two minds, and how sharply it decides (logistic
    * width).
@@ -159,6 +165,8 @@ export function fightUrge(c: Ctx): number {
   for (const o of c.others)
     if (o.id !== foe.id && distance(own.ship.at, o.ship.at) < c.b.mind.crowd)
       will -= c.b.mind.crowding * t.skill;
+  if (strength(foe) >= strength(own) && ranFromShip(c, foe.id))
+    will -= c.b.mind.beaten;
   const restraint = holdBack(c);
   will -= restraint;
   // close aboard she fights whatever her will, from nearer while she holds back

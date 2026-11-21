@@ -7,7 +7,9 @@
 //   the keener the more she likes a fight and the nearer they are; when they
 //   fall silent she makes on for where they last spoke for a while, and gives
 //   it up there, or once that while is out. A fight draws ships to it, and the
-//   ones that come find it by its smoke and noise, as a player would.
+//   ones that come find it by its smoke and noise, as a player would. Guns by
+//   a ship she ran from she lets be; with none to hear, she goes back for a
+//   wounded ship she saw lately, to where she saw her (her log: logbook.ts).
 //
 // Pure arithmetic: no three, so it runs in node for the tests; deterministic
 // for the same inputs, to the bit.
@@ -17,6 +19,7 @@ import type { Shot } from './battle.ts';
 import { toEdge } from './storm.ts';
 import { ramp, utility } from './utility.ts';
 import { aggroOf, type Ctx } from './captain.ts';
+import { prey, shunned } from './logbook.ts';
 
 /** Seconds a shot is heard after it is fired (the sea's, not a bot's). */
 const RINGS = 6;
@@ -106,6 +109,8 @@ function nearest(c: Ctx): Report | null {
     const d = dot(p, r.at);
     if (d < within || d <= bd) continue;
     if (s && toEdge(r.at, s) < c.b.hunting.edge) continue;
+    // not back into a fight she ran from (logbook.ts)
+    if (shunned(c, r.at)) continue;
     [best, bd] = [r, d];
   }
   return best;
@@ -133,6 +138,11 @@ export function huntUrge(c: Ctx): number {
     (m.clock - m.huntT > h.keep || distance(own.ship.at, m.hunt) < h.arrive)
   )
     giveUp(c);
+  // no guns, a wounded ship she saw lately (logbook.ts): back for her
+  if (!m.hunt && !r) {
+    const w = prey(c);
+    if (w) [m.hunt, m.huntT] = [w.at, m.clock];
+  }
   if (!m.hunt) return 0;
   const strength = (own.hull ?? 100) + (own.shield ?? 0);
   return utility(

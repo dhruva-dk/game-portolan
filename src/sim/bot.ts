@@ -63,6 +63,7 @@ import {
   moodMemory,
   wounded,
 } from './fighting.ts';
+import { logMemory, note } from './logbook.ts';
 import { placeMemory, survey } from './placing.ts';
 import { roamGoal } from './roaming.ts';
 import { keptInside, stormGoal, stormUrge } from './storming.ts';
@@ -128,6 +129,7 @@ export const mind = (seed: number, at: Vec3): Memory => ({
   ...claimMemory(),
   ...huntMemory(),
   ...placeMemory(),
+  ...logMemory(),
   ...gunner(),
 });
 
@@ -196,6 +198,7 @@ export function think(
   if (m.think <= 0) {
     m.think = BOT.every;
     perceive(c);
+    note(c);
     survey(c);
     decide(c);
   }
