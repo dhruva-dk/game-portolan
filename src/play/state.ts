@@ -872,13 +872,16 @@ export function createState(
     /**
      * Her livery as she chooses it (held to the set): her ship at anchor in it
      * at once, and hers in every match after, the bots dealt round it. A match
-     * under way keeps the colours it was put to sea in.
+     * under way keeps the colours it was put to sea in. Returns hers as worn.
      */
-    wear(l: Livery) {
+    wear(l: Livery): Livery {
       hers = worn(l);
       const her = aboard.get(PLAYER);
       if (quiet && her) her.look = lookOf(hers);
+      return hers;
     },
+    /** Her livery, as she last chose it. */
+    worn: (): Livery => hers,
   };
   // what only the debug switches (src/debug.ts) and the tools ask of the
   // match: kept off the state the game plays, had by debugOf

@@ -9,6 +9,8 @@ import { createAudio } from './audio/audio.ts';
 import type { Hearing } from './audio/listen.ts';
 import type { Played, Setup, Stage } from './debug.ts';
 import { launched, roll, sail } from './address.ts';
+import { linearToHex } from './colour.ts';
+import { COLOURS } from './play/colours.ts';
 import { SEED, createWorld } from './environment.ts';
 import { createFrame } from './frame.ts';
 import { loaded } from './load.ts';
@@ -212,6 +214,13 @@ async function play(s: Stage): Promise<Played> {
         chart: surveyor(),
         roll,
         sail,
+      },
+      // her livery's folio's: the set's dyes as the page shows them, hers worn on the game's ship
+      wardrobe: {
+        dyes: COLOURS.map(linearToHex),
+        worn: game.worn,
+        wear: game.wear,
+        broadside: game.broadside,
       },
     },
     title

@@ -463,9 +463,11 @@ export function createGame(
     steering,
     /**
      * Her livery as she chooses it: her ship at anchor in it at once, and hers
-     * in every match after (state.ts wear).
+     * in every match after (state.ts wear); as worn, held to the set.
      */
-    wear: (l: Livery) => state.wear(l),
+    wear: (l: Livery): Livery => state.wear(l),
+    /** Her livery, as she last chose it. */
+    worn: (): Livery => state.worn(),
     /**
      * The lobby's camera eased round to her broadside (her livery folio open),
      * or back to its rest.

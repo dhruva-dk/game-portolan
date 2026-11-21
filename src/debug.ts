@@ -48,7 +48,8 @@
 // (ship/fleet.ts).
 //
 // The screens. ?screen= opens the UI at a screen (title, lobby, settings,
-// seed: the seed panel over the lobby, on the page's ?seed=; match, sunk,
+// seed: the seed panel over the lobby, on the page's ?seed=; livery: her
+// livery's folio, her ship turned broadside above it; match, sunk,
 // spectate, won, result; ui/ways.ts; also map), at sea among
 // ?ships=n others by default: play starts a match as PLAY does (every ship at
 // her berth, the eye coming down from space: play/arrival.ts); sunk sinks her
@@ -243,7 +244,8 @@ function setupOf(release: Setup): Setup {
         ? (light, world) => probeMeshes(light, world.planet.start.at)
         : release.drawing.extras,
     },
-    meter: true,
+    // (?meter=0: none, for the screens' captures, where it would sit on the lobby's dye pot)
+    meter: params.get('meter') !== '0',
     hold: params.has('storm') ? number('storm', 0) : release.hold,
     gun:
       params.has('gun') || params.has('kind')
@@ -362,7 +364,8 @@ function open(p: Played, others: readonly Berth[]) {
     screen === 'title' ||
     screen === 'lobby' ||
     screen === 'settings' ||
-    screen === 'seed'
+    screen === 'seed' ||
+    screen === 'livery'
   )
     flow.go(screen);
   else if (screen === 'play') {

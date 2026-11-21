@@ -77,6 +77,10 @@ test('her result and the folios each have their own drawn way on: home, or close
     'no race from the panel but a seed sailed'
   );
   assert.equal(way('settings', 'seed'), null);
+  // her livery's folio: opened from the lobby's dye pot, closed back to it; nothing else from it
+  assert.equal(way('lobby', 'livery'), 'livery');
+  assert.deepEqual(WAYS.livery, { close: 'lobby' });
+  assert.equal(way('settings', 'livery'), null);
   assert.equal(way('title', 'begin'), 'lobby');
   assert.equal(way('lobby', 'play'), 'match');
   // a tap that is not one of the screen's ways does nothing
@@ -197,7 +201,7 @@ test("home: the timings are the owner's: a quick cover, at least half a second h
 });
 
 test('outside the match, its course moves nothing', () => {
-  for (const s of ['title', 'lobby', 'settings', 'seed'] as const) {
+  for (const s of ['title', 'lobby', 'settings', 'seed', 'livery'] as const) {
     assert.equal(
       course(s, events({ how: 'shot', settled: true, over: true })),
       s

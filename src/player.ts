@@ -219,6 +219,7 @@ export const SCREENS = [
   'lobby',
   'settings',
   'seed',
+  'livery',
   'match',
   'sinking',
   'sunk',
@@ -244,6 +245,20 @@ export interface Livery {
 }
 /** Hers until she chooses: vermilion, plain. */
 export const LIVERY: Livery = { dye: 0, pattern: 0 };
+
+/**
+ * What the lobby's livery folio asks of the game: the set's dyes as the display
+ * shows them ('#rrggbb', in the set's order); the livery she wears; hers worn
+ * (her ship at anchor in it at once, and hers in every match after, the bots
+ * dealt round it), as held to the set; and the camera turned to her broadside
+ * while the folio is open, or let back to its rest.
+ */
+export interface Wardrobe {
+  dyes: readonly string[];
+  worn(): Livery;
+  wear(l: Livery): Livery;
+  broadside(on: boolean): void;
+}
 
 /**
  * A trait of the bots' over a fleet: its average, and its spread (the standard

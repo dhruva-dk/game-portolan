@@ -38,3 +38,13 @@ export function linearToSrgbRgb(c: Rgb): Rgb {
     linearToSrgb(clamp(c[2])),
   ];
 }
+
+/** Linear RGB as the display colour a painter would write, '#rrggbb'. */
+export const linearToHex = (c: Rgb) =>
+  `#${linearToSrgbRgb(c)
+    .map((v) =>
+      Math.round(v * 255)
+        .toString(16)
+        .padStart(2, '0')
+    )
+    .join('')}`;

@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { Color, SRGBColorSpace } from 'three';
 import {
   hexToLinear,
+  linearToHex,
   linearToSrgb,
   linearToSrgbRgb,
   srgbToLinear,
@@ -37,4 +38,9 @@ test('linearToSrgb undoes srgbToLinear', () => {
     held[0] === 0 && Math.abs(held[1] - 1) < 1e-12 && held[2] === 0,
     `${held}`
   );
+});
+
+test('linearToHex writes back the hex a colour was read from', () => {
+  for (const hex of ['#000000', '#ffffff', '#d2332a', '#0a0b0c', '#f4e06a'])
+    assert.equal(linearToHex(hexToLinear(hex)), hex);
 });

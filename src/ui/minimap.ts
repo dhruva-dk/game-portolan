@@ -10,9 +10,10 @@
 // no other ship and no loot (those are found by eye). Outside the next circle a
 // white line runs from her to its nearest point, ending in an arrowhead (on the
 // rim when the circle is off the disc). Her mark at the centre is a small
-// arrowhead turned to her heading. Drawn in canvas 2D when what it shows has
+// arrowhead in her dye turned to her heading. Drawn in canvas 2D when what it shows has
 // changed; tapped, it opens the full map.
 
+import { linearToHex } from '../colour.ts';
 import type { Sea } from '../snapshot.ts';
 import { R, along, dot, type Vec3 } from '../world/sphere.ts';
 import {
@@ -136,8 +137,21 @@ export function createMinimap(
     next: NaN,
     seq: NaN,
   };
-  let gilt: boolean | null = null,
+  let drawnFill = '',
     then = performance.now();
+  /** Her ship's dye as the display shows it, worked out once a match (the sea's colours are a match's). */
+  let dyed: {
+    colours: Sea['colours'] | null;
+    own: number | null;
+    hex: string;
+  } = { colours: null, own: null, hex: INK.white };
+  const dyeOf = (sea: Sea | undefined, own: number | null | undefined) => {
+    const c = sea && own != null ? sea.colours[own] : undefined;
+    if (!sea || !c) return INK.white;
+    if (sea.colours !== dyed.colours || own !== dyed.own)
+      dyed = { colours: sea.colours, own: own!, hex: linearToHex(c) };
+    return dyed.hex;
+  };
   return (at: Vec3, heading: Vec3, more: More) => {
     // at most RATE times a second
     const now = performance.now(),
@@ -181,10 +195,11 @@ export function createMinimap(
       'transform',
       `translate(${r} ${r}) rotate(${(turned / 10).toFixed(1)})`
     );
-    if (!!more.gilt !== gilt) {
-      // watching another ship after a sinking: her arrowhead gilt
-      gilt = !!more.gilt;
-      her.innerHTML = `<path d="${head(6)}" fill="${gilt ? WASH.gold : INK.white}" stroke="${INK.iron}" stroke-width="1.3" stroke-linejoin="round"/>`;
+    // her arrowhead in her dye (white till her ship's colour is known); gilt watching another ship after a sinking
+    const fill = more.gilt ? WASH.gold : dyeOf(sea, more.own);
+    if (fill !== drawnFill) {
+      drawnFill = fill;
+      her.innerHTML = `<path d="${head(6)}" fill="${fill}" stroke="${INK.iron}" stroke-width="1.3" stroke-linejoin="round"/>`;
     }
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, canvas.width, canvas.height);

@@ -416,6 +416,9 @@ test('listen: a ball passing near whistles once; a slot of her stores taken in h
   assert.deepEqual(cues(hearing(scene(2.3), status(), 'lobby')), []);
   assert.deepEqual(cues(hearing(scene(2.4), status(), 'settings')), ['open']);
   assert.deepEqual(cues(hearing(scene(2.5), status(), 'lobby')), ['close']);
+  // her livery's folio, as the settings'
+  assert.deepEqual(cues(hearing(scene(2.52), status(), 'livery')), ['open']);
+  assert.deepEqual(cues(hearing(scene(2.54), status(), 'lobby')), ['close']);
   assert.deepEqual(cues(hearing(scene(2.6), status(), 'match')), ['launch']);
   const sea = (
     seq: number,

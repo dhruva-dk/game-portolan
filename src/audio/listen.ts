@@ -97,8 +97,9 @@ const PASS = 30,
  * PLAY; her end.
  */
 function screenCue(from: Screen, to: Screen): Cue | null {
-  if (to === 'settings') return 'open';
-  if (from === 'settings' && to === 'lobby') return 'close';
+  if (to === 'settings' || to === 'livery') return 'open';
+  if ((from === 'settings' || from === 'livery') && to === 'lobby')
+    return 'close';
   if (from === 'lobby' && to === 'match') return 'launch';
   if (to === 'sunk' && from === 'sinking') return 'lost';
   if (to === 'won') return 'salute';

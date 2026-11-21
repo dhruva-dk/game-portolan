@@ -12,7 +12,8 @@
 
 import type { Globe } from './globe.ts';
 import type { Hud, HudState } from './hud.ts';
-import type { End, Seeds } from '../player.ts';
+import type { End, Seeds, Wardrobe } from '../player.ts';
+import { createLivery } from './livery.ts';
 import { createSeedPanel } from './panel.ts';
 import type { Sea } from '../snapshot.ts';
 import { createResult, createWatching } from './ends.ts';
@@ -75,6 +76,8 @@ interface FlowActions {
   switch(by: number): void;
   /** The seed panel's: the page's seed, previews of others, and a seed sailed (a new page). */
   seeds: Seeds;
+  /** Her livery's folio's: the set's dyes, hers worn, the camera turned to her broadside. */
+  wardrobe: Wardrobe;
 }
 
 /**
@@ -94,10 +97,12 @@ export function createFlow(
   let end: End | null = null;
 
   const veil = createVeil();
-  const lobby = createLobby(act.seeds.name, {
+  const livery = createLivery(act.wardrobe, () => tap('close'));
+  const lobby = createLobby(act.seeds.name, livery.dye, {
     play: () => tap('play'),
     settings: () => tap('settings'),
     seed: () => tap('seed'),
+    livery: () => tap('livery'),
   });
   /** The seed the panel sails, once she taps SAIL. */
   let sailing = act.seeds.name;
@@ -164,8 +169,10 @@ export function createFlow(
     screen = next;
     // (on the way home the title is the passage's)
     if (!passage.going) title.show(next === 'title');
+    // (her livery's folio takes the lobby's place: her ship above it, nothing over her)
     lobby.show(next === 'lobby' || next === 'settings' || next === 'seed');
     settingsFolio.show(next === 'settings');
+    if (next === 'livery' || was === 'livery') livery.show(next === 'livery');
     // (opened afresh on the page's seed, so only as it comes or goes)
     if (next === 'seed' || was === 'seed') panel.show(next === 'seed');
     // the HUD: the match's, or only its clock, count and disc while she

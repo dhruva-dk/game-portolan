@@ -51,8 +51,8 @@ export const LOBBY = {
  */
 export const BROADSIDE = {
   quarter: Math.PI / 2,
-  boom: 40,
-  height: -2,
+  boom: 44,
+  height: 4,
   ease: 2.4,
 } as const;
 

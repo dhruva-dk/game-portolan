@@ -7,9 +7,10 @@
 // FADE), never cut to.
 //   title   an opaque sheet over the world loading: rhumb lines, the rose whose needle swings while the world loads and
 //           settles north when it is ready, her galleon gilt below; it moves on by itself (flow.ts)
-//   lobby   over her ship at anchor: the wheel (tap: settings), the PLAY banner with her galleon on it, and the seed's
-//           chip at the top left, its name (tap: the seed panel, panel.ts). No tabs. Elsewhere a drag reaches the
-//           world: it turns the camera round her.
+//   lobby   over her ship at anchor: the wheel (tap: settings), the PLAY banner with her galleon on it, the seed's
+//           chip at the top left, its name (tap: the seed panel, panel.ts), and the dye pot at the bottom left in her
+//           dye (tap: her livery, livery.ts). No tabs. Elsewhere a drag reaches the world: it turns the camera round
+//           her.
 //   settings a small folio: sound and look speed, each a bar set by a tap along it; the stats (the frame's cost in
 //           the bottom-left corner: meter.ts), a box ticked by a tap
 // Each folio has its close mark at its corner; a tap outside it closes it too.
@@ -167,17 +168,33 @@ function seedChip(x: number, y: number, name: string) {
   );
 }
 
+/** The dye pot (her livery's folio: livery.ts), `s` across, about (x, y): an earthen pot brimming with her dye, a
+ *  dribble of it down its lip, a brush standing in it. */
+const dyePot = (x: number, y: number, s: number, dye: string) =>
+  `<g transform="translate(${x} ${y}) scale(${s / 24})" stroke="${INK.iron}" stroke-linejoin="round" stroke-linecap="round">` +
+  `<path d="M3 -3L10 -12" stroke="${INK.sepia}" stroke-width="2.2"/>` +
+  `<path d="M9 -11L11.5 -14L13 -12.5L10.5 -10Z" fill="${dye}" stroke-width=".8"/>` +
+  `<path d="M-9 -3Q-11.5 7 -6 10.5H6Q11.5 7 9 -3Z" fill="url(#h-sepia)" stroke-width="1.3"/>` +
+  `<path d="M-9.5 3.5H9.5" stroke-width=".6" fill="none"/>` +
+  `<ellipse cx="0" cy="-3.5" rx="10" ry="3" fill="${PAPER}" stroke-width="1.2"/>` +
+  `<ellipse cx="0" cy="-3.4" rx="7.6" ry="1.9" fill="${dye}" stroke-width=".7"/>` +
+  `<path d="M-6.5 -2.4Q-7.4 1 -6.6 3.2Q-5.6 1 -5.6 -2.2Z" fill="${dye}" stroke-width=".6"/></g>`;
+
+/** The lobby over her ship at anchor: `dye` her livery's dye now, for the pot. */
 export function createLobby(
   name: string,
-  act: { play(): void; settings(): void; seed(): void }
+  dye: () => string,
+  act: { play(): void; settings(): void; seed(): void; livery(): void }
 ) {
   // a drag anywhere off its controls turns the camera round her (play/anchorage.ts)
   const s = sheet(false, false);
-  let drawn = false;
+  /** The dye its pot was last drawn in (null: not yet drawn). */
+  let drawn: string | null = null;
   return {
     show(on: boolean) {
-      if (on && !drawn) {
-        drawn = true;
+      if (on && drawn !== dye()) {
+        drawn = dye();
+        const pot = drawn;
         s.set(
           (p) =>
             at(p, 'left', 'top', seedChip(66, 18, name)) +
@@ -189,6 +206,12 @@ export function createLobby(
             ) +
             at(
               p,
+              'left',
+              'bottom',
+              `<g id="livery"><circle cx="92" cy="392" r="26" fill="url(#pg)" stroke="${INK.iron}" stroke-width="1.6" filter="url(#sh)"/>${dyePot(91, 394, 36, pot)}</g>`
+            ) +
+            at(
+              p,
               'right',
               'bottom',
               `<g id="play">${banner(777, 318, 210, galleon(777, 314, 78, { waves: true }))}</g>`
@@ -197,6 +220,7 @@ export function createLobby(
             region(el, 'wheel', act.settings);
             region(el, 'play', act.play);
             region(el, 'seed', act.seed);
+            region(el, 'livery', act.livery);
           }
         );
       }
@@ -206,15 +230,17 @@ export function createLobby(
 }
 
 /** A folio laid over the lobby, its box drawn at (x, y) on the phone's page and kept to the page's edges as `place`
- *  says (at); its close mark at its top right corner; a tap outside it closes it too. */
+ *  says (at); its close mark at its top right corner; a tap outside it closes it too. `shade` dims the world round it
+ *  (not round her livery's, which shows her ship as she is dyed). */
 export function folio(
   { x, y, w, h }: { x: number; y: number; w: number; h: number },
   place: [Parameters<typeof at>[1], Parameters<typeof at>[2]],
-  close: () => void
+  close: () => void,
+  shade = true
 ) {
   const s = sheet(false);
   s.root.style.zIndex = '1';
-  s.root.style.background = alpha(SHADOW, 0.25);
+  if (shade) s.root.style.background = alpha(SHADOW, 0.25);
   onTap(s.root, close);
   return {
     ...s,
