@@ -87,10 +87,13 @@ try {
     await page.waitForTimeout(400);
     await capture(`${label}-letter`);
     await page.locator('.o-tab').nth(3).click();
-    await tap('.y-slot .k-btn');
-    await page.waitForTimeout(400);
-    await tap('.y-card');
-    await page.waitForTimeout(400);
+    // (a card dealt and picked, where her designer knows a component of the part)
+    if (await page.locator('.y-slot .k-btn:not(.off)').count()) {
+      await tap('.y-slot .k-btn');
+      await page.waitForTimeout(400);
+      await tap('.y-card');
+      await page.waitForTimeout(400);
+    }
     await capture(`${label}-design`);
     await page.locator('.o-tab').nth(8).click();
     await tap('.s-scouting .k-rows > .k-tr');
@@ -104,8 +107,21 @@ try {
       await page.waitForTimeout(400);
       await capture(`${label}-offer`);
     }
+    // what the career is asked through the screens, where it may be: a sponsor signed, a building begun, a design started
+    const asked = async (tab: number, selector: string, name: string) => {
+      await page.locator('.o-tab').nth(tab).click();
+      await page.waitForTimeout(300);
+      if (!(await page.locator(selector).count())) return;
+      await tap(selector);
+      await page.waitForTimeout(500);
+      await capture(`${label}-${name}`);
+    };
+    await asked(10, '.sp-sign .k-btn:not(.off)', 'signed');
+    await asked(4, '.s-hq .k-btn.on:not(.off)', 'building');
+    await asked(3, '.s-ship .b-act .k-btn:not(.off)', 'designing');
     await page.locator('.o-tab').nth(0).click();
     await at('home', 10000);
+    await capture(`${label}-home`);
   };
   for (let race = 1; race <= races; race++) {
     // Continue through the days until race day's plan opens
@@ -159,7 +175,9 @@ try {
       if (await page.locator('.o-body > .s-result:not([hidden])').count())
         break;
       const leave = page.locator('[data-way="leave"]');
-      if (await leave.isVisible()) await leave.click();
+      // (the result may come up over it as it is reached)
+      if (await leave.isVisible())
+        await leave.click({ timeout: 2000 }).catch(() => null);
       await page.waitForTimeout(2000);
     }
     await at('result', 10000);

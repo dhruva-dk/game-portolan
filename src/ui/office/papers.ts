@@ -38,6 +38,7 @@ const CSS = `
 .f-bad { color: var(--bad); }
 .s-sponsors { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
 .sp-slots { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.sp-slots .b-lines { grid-template-columns: auto 1fr; }
 .sp-name { font: 600 21px/1.2 var(--serif); text-align: center; padding: 8px 0 2px; }
 .sp-sign { display: flex; gap: 4px; }
 .sp-sign > .k-btn { height: 34px; padding: 0 10px; }

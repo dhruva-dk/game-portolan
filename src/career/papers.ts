@@ -16,7 +16,7 @@ import type {
 import type { Act } from '../office/people.ts';
 import type { Check } from './command.ts';
 import { component, TYPES } from './components.ts';
-import { designCheck, projection } from './design.ts';
+import { designCheck, pool, projection } from './design.ts';
 import {
   buildCheck,
   buildCost,
@@ -200,6 +200,7 @@ export function shipPaper(
   const c = myTeam(s),
     me = s.player ? s.people[s.player.person] : null;
   const deals = c.draft?.type === type ? c.draft.deals : [];
+  const known = pool(s, c.id, type).length;
   const slots = Array.from({ length: designSlots(c) }, (_, slot) => {
     const d = deals.find((x) => x.slot === slot),
       pick = picked[slot] ?? null;
@@ -211,13 +212,15 @@ export function shipPaper(
       })),
       picked: pick !== null && d?.cards.includes(pick) ? pick : null,
       deal: {
-        ok: c.staff.designer !== null && !d?.redealt && !c.design,
+        ok: known > 0 && !d?.redealt && !c.design,
         why:
           c.staff.designer === null
             ? 'The team has no designer.'
-            : d?.redealt
-              ? 'That slot has had its one redeal.'
-              : '',
+            : known === 0
+              ? 'The designer knows no components of this part.'
+              : d?.redealt
+                ? 'That slot has had its one redeal.'
+                : '',
       },
     };
   });

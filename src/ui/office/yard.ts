@@ -199,7 +199,9 @@ export function createShip(office: Office): Screen<ShipPaper> {
                       el(
                         'header',
                         '',
-                        `Component ${slot + 1}`,
+                        !s.deal.ok && s.cards.length === 0 && s.deal.why !== ''
+                          ? s.deal.why
+                          : `Component ${slot + 1}`,
                         button(
                           s.cards.length > 0 ? 'Redeal' : 'Deal',
                           () =>
