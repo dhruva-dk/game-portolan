@@ -109,7 +109,7 @@ function membersOf(s: CareerState, c: Team): Member[] {
 }
 
 /** A ship's pit today: her mechanic, the team's pit crew, the bond. */
-function pitOf(s: CareerState, c: Team, ship: Ship): PitCrew {
+export function pitOf(s: CareerState, c: Team, ship: Ship): PitCrew {
   const m = c.staff.ships[ship]?.mechanic ?? null;
   const g = m === null ? undefined : s.people[m];
   return pitCrew({

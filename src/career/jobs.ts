@@ -1,8 +1,11 @@
-// The player's job offers (Phase B section 7, D22): TakeJob moves the player to the team: they sail its ship one, its
-// weaker driver is released, its manager goes to the free agents, its talks under way end, and the old team's chairman
-// hires a replacement. The player's colours and emblem stay with the old team. DeclineJob lets the team's chairman hire
-// elsewhere; a sacked player must take one of the offers shown and cannot decline the last.
+// The player's job offers: TakeJob moves the player to the team: they sail its
+// first ship, its three strongest drivers sail the rest, its weakest is
+// released, its manager goes to the free agents, its talks under way end, and
+// the old team's chairman hires a replacement. The player's colours and emblem
+// stay with the old team. DeclineJob lets the team's chairman hire elsewhere; a
+// sacked player must take one of the offers shown and cannot decline the last.
 
+import { SHIPS } from '../office.ts';
 import {
   accept,
   refuse,
@@ -17,7 +20,13 @@ import { hireManager } from './chairmen.ts';
 import { endTalk } from './hiring.ts';
 import { unscheduled, type Event } from './queue.ts';
 import { stars } from './stars.ts';
-import type { CareerState, Team, Hands } from './state.ts';
+import {
+  personAt,
+  teamOf,
+  withPerson,
+  withTeam,
+  type CareerState,
+} from './state.ts';
 import { TUNING } from './tuning.ts';
 
 /** Whether the player may take a team's offered post now. */
@@ -51,61 +60,59 @@ function withdrawn(
     s,
     (e: Event) => e.kind === 'jobExpires' && set.has(e.team)
   );
-  out = {
-    ...out,
-    player: {
-      ...out.player!,
-      offers: out.player!.offers.filter((o) => !set.has(o.team)),
-    },
-  };
+  if (out.player)
+    out = {
+      ...out,
+      player: {
+        ...out.player,
+        offers: out.player.offers.filter((o) => !set.has(o.team)),
+      },
+    };
   for (const c of teams) out = hireManager(out, c, roll, false);
   return out;
 }
 
 /** A state with the player moved to a team (checked first). */
 export function taken(s: CareerState, team: number, roll: Dice): CareerState {
-  const p = s.player!;
+  const p = s.player;
+  if (!p) return s;
   const old = p.sacked ? null : p.team;
   let out = talksOf(s, team);
   if (old !== null) {
     out = talksOf(out, old);
-    const o = out.teams[old];
+    const o = teamOf(out, old);
     out = withTeam(out, {
       ...o,
       player: false,
       staff: { ...o.staff, manager: null },
     });
   }
-  const was = out.teams[team].staff.manager;
+  const was = teamOf(out, team).staff.manager;
   if (was !== null) out = released(out, was);
-  // its drivers: the stronger sails ship two, the weaker is released; ship one is the player's
-  const caps = out.teams[team].staff.ships
-    .map((h) => h.driver)
-    .filter((x): x is number => x !== null);
-  const [stronger, weaker] = [...caps].sort(
-    (a, b) => stars(out.people[b]) - stars(out.people[a]) || a - b
-  );
-  if (weaker !== undefined) out = released(out, weaker);
-  const c = out.teams[team];
-  const ships: [Hands, Hands] = [
-    { driver: null, mechanic: c.staff.ships[0].mechanic },
-    { driver: stronger ?? null, mechanic: c.staff.ships[1].mechanic },
-  ];
+  // its drivers: the first ship is the player's, the strongest sail the rest, the one left over is released
+  const drivers = teamOf(out, team)
+    .staff.ships.flatMap((h) => (h.driver === null ? [] : [h.driver]))
+    .map((id) => personAt(out, id))
+    .sort((a, b) => stars(b) - stars(a) || a.id - b.id);
+  const kept = drivers.slice(0, SHIPS.length - 1);
+  for (const g of drivers.slice(SHIPS.length - 1)) out = released(out, g.id);
+  const c = teamOf(out, team);
   out = withTeam(out, {
     ...c,
     player: true,
-    bonds: [0, 0],
+    bonds: SHIPS.map(() => 0),
     confidence: TUNING.team.confidence,
-    staff: { ...c.staff, manager: p.person, ships },
+    staff: {
+      ...c.staff,
+      manager: p.person,
+      ships: c.staff.ships.map((h, ship) => ({
+        driver: ship === 0 ? null : (kept[ship - 1]?.id ?? null),
+        mechanic: h.mechanic,
+      })),
+    },
   });
-  const people = [...out.people];
-  if (stronger !== undefined)
-    people[stronger] = {
-      ...people[stronger],
-      contract: { ...people[stronger].contract!, status: 'ship' },
-    };
-  people[p.person] = {
-    ...people[p.person],
+  out = withPerson(out, {
+    ...personAt(out, p.person),
     contract: {
       team,
       status: 'staff',
@@ -117,18 +124,12 @@ export function taken(s: CareerState, team: number, roll: Dice): CareerState {
       breakClause: null,
       signed: s.day,
     },
-  };
-  out = { ...out, people, player: { ...p, team, sacked: false } };
+  });
+  out = { ...out, player: { ...p, team, sacked: false } };
   const others = p.offers.map((o) => o.team);
   out = withdrawn(out, others, roll);
   return old === null ? out : hireManager(out, old, roll, false);
 }
-
-const withTeam = (s: CareerState, c: Team): CareerState => {
-  const teams = [...s.teams];
-  teams[c.id] = c;
-  return { ...s, teams };
-};
 
 /** Whether the player may decline a team's offer. */
 export function declineCheck(s: CareerState, team: number): Check {

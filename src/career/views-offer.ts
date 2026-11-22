@@ -19,7 +19,7 @@ import {
 import { askOffer, defaultPerson } from './views-profile.ts';
 import {
   moneyText,
-  teamOf,
+  myTeam,
   faceOf,
   fig,
   line,
@@ -33,7 +33,7 @@ const act = (why: string | null | undefined): Act => ({
   why: why ?? '',
 });
 const STATUS: Readonly<Record<Status, string>> = {
-  ship: 'Ship two',
+  ship: 'A ship',
   reserve: 'Reserve',
   staff: 'Staff',
 };
@@ -53,7 +53,7 @@ export function offerView(
   person: number | null,
   draft: Offer | null
 ): OfferView {
-  const c = teamOf(s),
+  const c = myTeam(s),
     id = person ?? defaultPerson(s, c),
     g = s.people[id];
   const talk = s.talks.find((t) => t.team === c.id && t.person === id) ?? null;
@@ -103,7 +103,7 @@ export function offerView(
           : null;
   const mineRoles = (r: string) =>
     [
-      c.staff.ships[1].driver,
+      ...c.staff.ships.map((h) => h.driver),
       c.staff.reserve,
       ...c.staff.ships.map((h) => h.mechanic),
       c.staff.designer,

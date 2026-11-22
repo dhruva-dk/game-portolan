@@ -155,11 +155,11 @@ export interface Outcome {
 export function objectiveMet(o: Objective, r: Outcome): boolean {
   switch (o) {
     case 'top10':
-      return r.best !== null && r.best <= 10;
+      return r.best !== null && r.best <= P.need.top;
     case 'sinkTwo':
-      return r.sinkings >= 2;
+      return r.sinkings >= P.need.sink;
     case 'afloat':
-      return r.afloat >= 2;
+      return r.afloat >= P.need.afloat;
     case 'mostSea':
       return r.mostSea;
   }

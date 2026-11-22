@@ -1,37 +1,40 @@
-// The office's fixtures: careers on a memory store, made by the commands a player would send (Found, Advance, StartScout,
-// OfferContract, a race recorded), for ?screen= (debug.ts) and tools/capture.ts. Nothing here touches the device's own
-// career. `people` is a career past its first race: one rival driver scouted, another being scouted, and a free agent's
-// talks under way (a lowball, its answer due); `sacked` is that career with the chairman's patience gone (its state set, then
-// snapshotted: no run of races reliably ends in a sacking).
+// The office's fixtures: careers on a memory store, made by the commands a
+// player would send (Found, Advance, StartScout, OfferContract), for ?screen=
+// (debug.ts) and tools/capture.ts. Nothing here touches the device's own
+// career, and no race is sailed here: every fixture stands before the season's
+// first race, or on its day. `people` has one rival driver scouted, another
+// being scouted, and a free agent's talks under way (a lowball, its answer
+// due); `sacked` is that career with the chairman's patience gone (its state
+// set, then snapshotted).
 
-import type { Command, Desk } from './office';
-import type { RaceResult } from './race';
-import { createDesk, type Shelf } from './desk';
-import { send, fresh, checkpoint, type Kept } from './career/session';
-import type { CareerState } from './career/career';
-import { raceCards } from './career/card';
-import { sackedOffers } from './career/chairmen';
-import { offerView } from './career/views-offer';
-import { profileView } from './career/views-profile';
-import { seen } from './career/views-person';
-import { topBar } from './career/views';
-import { SPEC } from './sim/fit';
-import { emptyDisk, memoryStore, type Disk } from './store/memory';
+import type { Command, Desk } from './office.ts';
+import { createDesk, type Shelf } from './desk.ts';
+import { send, fresh, checkpoint, type Kept } from './career/session.ts';
+import type { CareerState } from './career/career.ts';
+import { sackedOffers } from './career/chairmen.ts';
+import { offerView } from './career/views-offer.ts';
+import { profileView } from './career/views-profile.ts';
+import { seen } from './career/views-person.ts';
+import { myTeam, topBar } from './career/views.ts';
+import { emptyDisk, memoryStore, type Disk } from './store/memory.ts';
 
 /** The fixtures' founding. */
 export const FOUNDING: Extract<Command, { kind: 'Found' }> = {
   kind: 'Found',
   seed: 20261115,
   team: 'Portolan Quills',
-  colours: { first: 2, second: 7 },
+  colours: { dye: 2, pattern: 1 },
   emblem: 3,
   given: 'Ottoline',
   family: 'Wrackham',
   headshot: 99,
 };
 
-/** The careers a fixture can be: none yet (found), founded (home), on race day, a save whose last action is torn
- *  (recover), past the first race with scouting and talks under way (people), and dismissed (sacked). */
+/**
+ * The careers a fixture can be: none yet (found), founded (home), on race day,
+ * a save whose last action is torn (recover), with scouting and talks under
+ * way (people), and dismissed (sacked).
+ */
 export const FIXTURES = [
   'found',
   'home',
@@ -45,50 +48,27 @@ export type Fixture = (typeof FIXTURES)[number];
 /** A step of a fixture: a command, or the commands a state calls for. */
 type Step = Command | ((s: CareerState) => readonly Command[]);
 
-/** Every tier's race recorded, the ships home in card order, none sunk. */
-const raced = (s: CareerState): Command[] => [
-  { kind: 'RaceStarted', round: s.race!.round },
-  ...raceCards(s, SPEC).map((card): Command => {
-    const order = card.ships.map((x) => x.id),
-      sea = order.slice(0, 10),
-      total = sea.reduce((a, _i, k) => a + 10 - k, 0);
-    const result: RaceResult = {
-      seed: card.seed,
-      tier: card.tier,
-      round: card.round,
-      order,
-      sinkings: [],
-      faults: [],
-      stops: [],
-      seaHeld: sea.map((id, k) => ({ id, share: (10 - k) / total })),
-      hits: order.map((id) => ({ id, fired: 12, landed: 4, taken: 3 })),
-      seconds: 720,
-    };
-    return { kind: 'RecordRace', result };
-  }),
-];
-
-const mine = (s: CareerState) => s.player!.team;
-/** The `n`th rival driver of the player's tier not yet known to them. */
-const stranger = (s: CareerState, n: number) =>
-  s.people.filter(
+/** The rival drivers of the player's tier not yet known to them. */
+const strangers = (s: CareerState) => {
+  const mine = myTeam(s);
+  return s.people.filter(
     (g) =>
       g.contract &&
-      g.contract.team !== mine(s) &&
+      g.contract.team !== mine.id &&
       g.role === 'driver' &&
-      s.teams[g.contract.team].tier === s.teams[mine(s)].tier &&
-      !seen(s, mine(s), g.id).known
-  )[n];
-const scouted =
-  (n: number) =>
-  (s: CareerState): Command[] => {
-    const g = stranger(s, n),
-      p = profileView(s, g.id);
-    return p.scout.ok
-      ? [{ kind: 'StartScout', scout: p.scout.scout!, person: g.id }]
-      : [];
-  };
-/** A free mechanic offered less than they ask, in place of the player's ship-two mechanic. */
+      s.teams[g.contract.team]?.tier === mine.tier &&
+      !seen(s, mine.id, g.id).known
+  );
+};
+/** The first of them a scout of the player's is sent to. */
+const scouted = (s: CareerState): Command[] => {
+  const g = strangers(s)[0];
+  const scout = g ? profileView(s, g.id).scout : null;
+  return g && scout && scout.ok && scout.scout !== null
+    ? [{ kind: 'StartScout', scout: scout.scout, person: g.id }]
+    : [];
+};
+/** A free mechanic offered less than they ask, in place of the mechanic of the player's last ship. */
 const haggle = (s: CareerState): Command[] => {
   for (const g of s.people) {
     if (g.contract || g.retired !== null || g.player || g.role !== 'mechanic')
@@ -96,7 +76,7 @@ const haggle = (s: CareerState): Command[] => {
     const v = offerView(s, g.id, null),
       offer = {
         ...v.draft,
-        replaces: v.replaces[v.replaces.length - 1].id,
+        replaces: v.replaces[v.replaces.length - 1]?.id ?? null,
         wage: Math.round(v.draft.wage * 0.75),
       };
     if (offerView(s, g.id, offer).send.ok)
@@ -110,25 +90,27 @@ const until =
   (s: CareerState): Command[] =>
     done(s) || topBar(s).go.raceDay ? [] : [{ kind: 'Advance' }];
 
-/** The people fixture's people (for ?screen=profile, offer and ?who=): the rival driver scouted, the one being scouted,
- *  the free agent in talks, and ship two's driver. */
+/**
+ * The people fixture's people (for ?screen=profile, offer and ?who=): the
+ * rival driver scouted, the one being scouted, the free agent in talks, and
+ * the first of the player's hired drivers.
+ */
 export const PICKED = { scouted: -1, unknown: -1, talks: -1, driver: -1 };
 const PEOPLE: readonly Step[] = [
   FOUNDING,
   { kind: 'DebugBalance', balance: 6400 },
   (s) => {
-    PICKED.scouted = stranger(s, 0).id;
-    return scouted(0)(s);
+    PICKED.scouted = strangers(s)[0]?.id ?? -1;
+    return scouted(s);
   },
-  { kind: 'Advance' },
-  raced,
-  ...Array.from({ length: 6 }, () =>
-    until((s) => seen(s, mine(s), PICKED.scouted).known)
+  ...Array.from({ length: 12 }, () =>
+    until((s) => seen(s, myTeam(s).id, PICKED.scouted).known)
   ),
   (s) => {
-    PICKED.unknown = stranger(s, 0).id;
-    PICKED.driver = s.teams[mine(s)].staff.ships[1].driver ?? -1;
-    return scouted(0)(s);
+    PICKED.unknown = strangers(s)[0]?.id ?? -1;
+    PICKED.driver =
+      myTeam(s).staff.ships.find((h) => h.driver !== null)?.driver ?? -1;
+    return scouted(s);
   },
   (s) => {
     const c = haggle(s);
@@ -166,6 +148,13 @@ function memoryShelf(disk: Disk): Shelf {
   };
 }
 
+/** A career with the player dismissed and the posts open to them offered. */
+function dismissed(s: CareerState): CareerState {
+  return s.player
+    ? sackedOffers({ ...s, player: { ...s.player, sacked: true } })
+    : s;
+}
+
 /** A desk on a fixture's career. */
 export async function fixture(name: Fixture): Promise<Desk> {
   const disk = emptyDisk(),
@@ -183,20 +172,13 @@ export async function fixture(name: Fixture): Promise<Desk> {
   }
   // (recover: the last action's entry torn on the disk, as a crash mid-write leaves it)
   if (name === 'recover')
-    disk.entries[disk.entries.length - 1] = disk.entries[
-      disk.entries.length - 1
-    ].slice(0, 40);
+    disk.entries = disk.entries.map((e, i) =>
+      i === disk.entries.length - 1 ? e.slice(0, 40) : e
+    );
   if (name === 'sacked')
     await checkpoint(
       store,
-      {
-        ...kept,
-        state: sackedOffers({
-          ...kept.state,
-          player: { ...kept.state.player!, sacked: true },
-        }),
-        snapshots: [],
-      },
+      { ...kept, state: dismissed(kept.state), snapshots: [] },
       false
     );
   return createDesk(memoryShelf(disk), true);

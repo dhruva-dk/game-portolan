@@ -36,7 +36,7 @@ export function scoutCheck(
   const g = s.people[person];
   if (g.retired !== null || g.player)
     return why('who', 'There is no one there to scout.');
-  if (knows(s, team, g)) return why('known', 'You know them already.');
+  if (knows(team, g)) return why('known', 'You know them already.');
   if (s.scouting.some((x) => x.team === team && x.person === person))
     return why('already', 'Another of your scouts is on them.');
   const reach = effective(s.people[scout] as PersonOf<'scout'>, null).reach;

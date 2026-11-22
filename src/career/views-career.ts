@@ -12,7 +12,7 @@ import { ROLE_NAMES, ageOf, dayText } from './views-person.ts';
 import {
   TIERS,
   moneyText,
-  teamOf,
+  myTeam,
   faceOf,
   fig,
   line,
@@ -60,7 +60,7 @@ function card(s: CareerState, team: number, expires: number): JobCard {
 export function careerView(s: CareerState): CareerView {
   const p = s.player!,
     me = s.people[p.person],
-    c = teamOf(s);
+    c = myTeam(s);
   const managers = s.people
     .filter((g) => g.role === 'manager' && g.retired === null && !g.player)
     .map((g) => g.reputation);

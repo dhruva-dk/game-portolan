@@ -51,7 +51,7 @@ export function lean(s: CareerState, team: number, change: Change): number {
       return clamp1(
         (meanU(caps.map((x) => x.stormcraft)) - 0.5) *
           2 *
-          (change.pace < l.next.storm.pace ? 1 : -1)
+          (change.pace < l.next.storm ? 1 : -1)
       );
     case 'ban':
       return clamp1((0.5 - meanU(caps.map((x) => x.gunnery))) * 2);

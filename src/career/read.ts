@@ -2,7 +2,7 @@
 // screen draws as given. The mail rendered, newest first; a tier's table; the season's calendar; race day's preview
 // of the player's team; a dilemma's question and its answers.
 
-import type { Stance, Job } from '../race.ts';
+import type { Call } from '../race.ts';
 import { dilemma } from './events.ts';
 import { lineups } from './lineup.ts';
 import { render as worded } from './mail.ts';
@@ -88,30 +88,36 @@ export function fixtures(s: CareerState): Fixture[] {
   }));
 }
 
-/** Race day's preview of the player's team: who sails ship two (and whether a stand-in), the stance and the pit crew's
- *  order, whether the race may begin; null if no race is due or the player has no team. */
-export interface Preview {
-  round: number;
+/** A ship of the player's team on race day: who sails her (null: the player, or no one), whether a stand-in, whether she forfeits. */
+export interface Boarding {
   driver: number | null;
   standIn: boolean;
   forfeit: boolean;
-  stance: Stance;
-  order: readonly Job[];
+}
+
+/**
+ * Race day's preview of the player's team: who sails each ship, the call, and
+ * whether the race may begin; null if no race is due or the player has no team.
+ */
+export interface Preview {
+  round: number;
+  ships: readonly Boarding[];
+  call: Call;
   started: boolean;
 }
 
 export function preview(s: CareerState): Preview | null {
   const me = mine(s);
-  if (s.race === null || me === null) return null;
-  const x = lineups(s)[me],
-    two = x.ships[1];
+  const x = me === null ? undefined : lineups(s)[me];
+  if (s.race === null || !x) return null;
   return {
     round: s.race.round,
-    driver: two.driver,
-    standIn: two.standIn,
-    forfeit: two.forfeit,
-    stance: x.stance,
-    order: x.order,
+    ships: x.ships.map((a) => ({
+      driver: a.driver,
+      standIn: a.standIn,
+      forfeit: a.forfeit,
+    })),
+    call: x.call,
     started: s.race.started,
   };
 }

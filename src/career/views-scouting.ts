@@ -26,7 +26,7 @@ import {
 } from './views-person.ts';
 import {
   moneyText,
-  teamOf,
+  myTeam,
   faceOf,
   fig,
   line,
@@ -47,7 +47,7 @@ const ROLES: readonly Role[] = [
 /** The filter a market opens on: the first open post's role, else drivers. */
 export function defaultFilter(s: CareerState): ScoutingFilter {
   return {
-    role: openPosts(s, teamOf(s))[0]?.role ?? 'driver',
+    role: openPosts(myTeam(s))[0]?.role ?? 'driver',
     tier: null,
     contract: 'any',
     known: false,
@@ -121,7 +121,7 @@ export function scoutingView(
   filter: ScoutingFilter | null,
   shortlist: readonly number[]
 ): ScoutingView {
-  const c = teamOf(s),
+  const c = myTeam(s),
     f = filter ?? defaultFilter(s);
   const rows = s.people
     .filter((g) => passes(s, c, g, f))

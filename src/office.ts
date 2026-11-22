@@ -282,7 +282,7 @@ export interface HomeView {
     confidence: Figure;
     sponsor: string | null;
   } | null;
-  ships: readonly [ShipHalf, ShipHalf];
+  ships: readonly ShipHalf[];
   improvement: {
     design: { type: PartType; days: Figure } | null;
     points: Figure;
@@ -302,7 +302,8 @@ export interface FoundView {
   age: number;
   colours: Colours;
   emblem: number;
-  swatches: number;
+  dyes: number;
+  patterns: number;
   emblems: number;
   limits: { team: number; person: number };
   replacing: string;

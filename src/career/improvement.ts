@@ -13,36 +13,39 @@ import { accept, refuse, why, type Check, type Handlers } from './command.ts';
 import { effective } from './effective.ts';
 import { within } from './flags.ts';
 import { mine } from './post.ts';
-import type { PersonOf } from './roles.ts';
+import { hasRole, type PersonOf } from './roles.ts';
 import { factoryPoints } from './hq.ts';
 import { perfImprovement, reliabilityImprovement } from './pit.ts';
-import type { CareerState, Team, Part } from './state.ts';
+import {
+  teamOf,
+  withTeam,
+  type CareerState,
+  type Team,
+  type Part,
+} from './state.ts';
 import { termsFor } from './suppliers.ts';
 import { TUNING } from './tuning.ts';
 
 const Y = TUNING.improvement;
 
-/** A ship's mechanic's effective stats, or null. */
-function mechanicOf(
+/** Each ship's mechanic's effective stats (null: she has none), by ship. */
+function mechanicsOf(
   s: CareerState,
-  c: Team,
-  ship: 0 | 1
-): PersonOf<'mechanic'>['stats'] | null {
-  const id = c.staff.ships[ship].mechanic;
-  return id === null
-    ? null
-    : effective(s.people[id] as PersonOf<'mechanic'>, null);
+  c: Team
+): (PersonOf<'mechanic'>['stats'] | null)[] {
+  return c.staff.ships.map((h) => {
+    const g = h.mechanic === null ? undefined : s.people[h.mechanic];
+    return g && hasRole(g, 'mechanic') ? effective(g, null) : null;
+  });
 }
 
 /** A team's improvement points a day: the factory's, plus each mechanic's (Reliability + Performance) / 4. */
 export function improvementPoints(s: CareerState, team: number): number {
-  const c = s.teams[team];
-  let points = factoryPoints(c);
-  for (const ship of [0, 1] as const) {
-    const b = mechanicOf(s, c, ship);
-    if (b) points += (b.reliability + b.perf) * Y.mechanic;
-  }
-  return points;
+  const c = teamOf(s, team);
+  return mechanicsOf(s, c).reduce(
+    (points, b) => points + (b ? (b.reliability + b.perf) * Y.mechanic : 0),
+    factoryPoints(c)
+  );
 }
 
 /** A team's improvement points over the days [from, to): each day's points, the factory's at × slow on the days storm damage
@@ -59,7 +62,7 @@ export function improvementWork(
     exempt = within(s, `exempt:${team}`, D.exemptDays, from, to);
   return (
     (to - from) * daily -
-    slow * factoryPoints(s.teams[team]) * (1 - D.slow) +
+    slow * factoryPoints(teamOf(s, team)) * (1 - D.slow) +
     exempt * daily * D.exempt
   );
 }
@@ -108,12 +111,12 @@ export function worked(
 
 /** A state with a team's improvement work reckoned from its improvementDay to today. */
 export function improvementTo(s: CareerState, team: number): CareerState {
-  const c = s.teams[team];
+  const c = teamOf(s, team);
   const days = s.day - c.improvementDay;
   if (days <= 0) return s;
-  const mechanics = [mechanicOf(s, c, 0), mechanicOf(s, c, 1)];
+  const mechanics = mechanicsOf(s, c);
   const factors = (p: Part) => {
-    const b = mechanics[p.ship ?? 0];
+    const b = p.ship === null ? null : mechanics[p.ship];
     const improvement = termsFor(c.suppliers, p.type).improvement;
     return {
       perf: perfImprovement(b?.perf ?? 0) * improvement,
@@ -126,9 +129,7 @@ export function improvementTo(s: CareerState, team: number): CareerState {
     c.improvement,
     factors
   );
-  const teams = [...s.teams];
-  teams[team] = { ...c, parts, improvementDay: s.day };
-  return { ...s, teams };
+  return withTeam(s, { ...c, parts, improvementDay: s.day });
 }
 
 /** Every team's improvement brought to today (section 13 calls it before race cards are made). */
@@ -144,7 +145,7 @@ export function improvementCheck(
 ): Check {
   if (!Array.isArray(shares))
     return why('shares', 'The improvement needs a split.');
-  const c = s.teams[team];
+  const c = teamOf(s, team);
   const seen = new Set<number>();
   let total = 0;
   for (const sh of shares) {
@@ -175,16 +176,14 @@ export function improvementSet(
   shares: readonly ImprovementShare[]
 ): CareerState {
   const out = improvementTo(s, team);
-  const teams = [...out.teams];
-  teams[team] = {
-    ...out.teams[team],
+  return withTeam(out, {
+    ...teamOf(out, team),
     improvement: shares.map((x) => ({
       part: x.part,
       perf: x.perf,
       reliability: x.reliability,
     })),
-  };
-  return { ...out, teams };
+  });
 }
 
 export const IMPROVEMENT: Handlers = {

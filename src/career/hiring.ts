@@ -122,7 +122,7 @@ export function signableCheck(
       if (seatRole(seat).status !== o.status)
         return why('status', 'They take the post of the one they replace.');
     }
-    if (!seatFor(s, c, o))
+    if (!seatFor(c, o))
       return why(
         'noSeat',
         `There is no open post for a ${g.role}: name whom they replace.`

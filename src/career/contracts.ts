@@ -13,7 +13,13 @@ import type { Contract, Person } from './roles.ts';
 import { openSeat, seatOf, seated, unseated, type Seat } from './seats.ts';
 import { YEAR, stars } from './stars.ts';
 import { unscheduled } from './queue.ts';
-import type { CareerState, Team } from './state.ts';
+import {
+  teamOf,
+  withPerson,
+  withTeam,
+  type CareerState,
+  type Team,
+} from './state.ts';
 import { TUNING } from './tuning.ts';
 
 const M = TUNING.market;
@@ -70,7 +76,7 @@ export const dismissalCost = (s: CareerState, g: Person): number =>
   g.contract ? g.contract.wage * racesLeft(s) : 0;
 
 /** A team's seat for a person it signs: the seat of the person they replace, if still aboard, else an open one. */
-export function seatFor(s: CareerState, c: Team, offer: Offer): Seat | null {
+export function seatFor(c: Team, offer: Offer): Seat | null {
   if (offer.replaces !== null) {
     const seat = seatOf(c, offer.replaces);
     if (seat) return seat;
@@ -78,28 +84,16 @@ export function seatFor(s: CareerState, c: Team, offer: Offer): Seat | null {
   return openSeat(c, offer.role, offer.status);
 }
 
-/** A state with a team changed. */
-const withTeam = (s: CareerState, c: Team): CareerState => {
-  const teams = [...s.teams];
-  teams[c.id] = c;
-  return { ...s, teams };
-};
-
-/** A state with a person changed. */
-const withPerson = (s: CareerState, g: Person): CareerState => {
-  const people = [...s.people];
-  people[g.id] = g;
-  return { ...s, people };
-};
-
 /** Bonds of a team's ships reset where a driver or mechanic changed. */
 function rebonded(before: Team, after: Team): Team {
-  const same = (k: 0 | 1) =>
-    before.staff.ships[k].driver === after.staff.ships[k].driver &&
-    before.staff.ships[k].mechanic === after.staff.ships[k].mechanic;
   return {
     ...after,
-    bonds: [same(0) ? after.bonds[0] : 0, same(1) ? after.bonds[1] : 0],
+    bonds: after.staff.ships.map((h, k) => {
+      const was = before.staff.ships[k];
+      return was && was.driver === h.driver && was.mechanic === h.mechanic
+        ? (after.bonds[k] ?? 0)
+        : 0;
+    }),
   };
 }
 
@@ -179,7 +173,7 @@ export function signed(s: CareerState, deal: Signing): CareerState {
       offer.replaces !== null &&
       seatOf(c0, offer.replaces)
     ) {
-      const seat = seatFor(out, c0, offer)!;
+      const seat = seatFor(c0, offer);
       const leaving = out.people[offer.replaces];
       out = paid(out, team, dismissalCost(out, leaving), {
         kind: 'dismissal',
@@ -192,7 +186,7 @@ export function signed(s: CareerState, deal: Signing): CareerState {
         out,
         team,
         person,
-        seatFor(out, c0, { ...offer, replaces: null })!
+        seatFor(c0, { ...offer, replaces: null })
       );
     }
   }
@@ -229,21 +223,17 @@ export function signed(s: CareerState, deal: Signing): CareerState {
   return talksEnded(out, person, null);
 }
 
-/** A state with a person put in a seat of a team (their pit job the seat's). */
+/** A state with a person put in a seat of a team (no seat: the state as it was). */
 function seatedAt(
   s: CareerState,
   team: number,
   person: number,
-  seat: Seat
+  seat: Seat | null
 ): CareerState {
-  const c = s.teams[team];
-  const out = withTeam(
-    s,
-    rebonded(c, { ...c, staff: seated(c.staff, seat, person) })
-  );
-  return seat.kind === 'pit'
-    ? withPerson(out, { ...out.people[person], job: seat.job })
-    : out;
+  const c = teamOf(s, team);
+  return seat
+    ? withTeam(s, rebonded(c, { ...c, staff: seated(c.staff, seat, person) }))
+    : s;
 }
 
 /** A state with every contract that runs out at this season's end expired: those people go to the free agents, and the

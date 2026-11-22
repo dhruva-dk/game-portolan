@@ -346,7 +346,7 @@ export const TEMPLATES: Readonly<Record<string, Template>> = {
     ['The pit crew is worn out', '{person} is exhausted'],
     [
       '{person} is worn out. The pit crew needs a decision before the race.',
-      'The {job} job is wearing {person} down.',
+      'The pit stops are wearing {person} down.',
     ]
   ),
   partSwap: t(
@@ -417,7 +417,7 @@ const MEASURES: Readonly<Record<Measure, string>> = {
 const OBJECTIVES: Readonly<Record<string, string>> = {
   top10: 'finish in the top ten',
   sinkTwo: 'sink two ships',
-  afloat: 'both ships afloat',
+  afloat: 'three ships afloat',
   mostSea: 'hold the most sea',
 };
 const ORDINAL = (n: number): string =>

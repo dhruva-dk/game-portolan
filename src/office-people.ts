@@ -1,19 +1,18 @@
 // The seam's people views (Phase C batch 2): team, profile, offer, market, career and jobs, built by career/views-*.ts
 // and drawn by ui/office/. Types only, as office.ts: plain data, every figure with its comparison and its explanation.
 
-import type { Colours, Job } from './race';
+import type { Colours } from './race.ts';
 import type {
   Face,
   Figure,
   Line,
   Offer,
-  Plan,
   Role,
   Ship,
   Status,
   TopBar,
   Want,
-} from './office';
+} from './office.ts';
 
 /** Stars as a team sees them: exact (lo = hi) once known, else a range. */
 export interface Range {
@@ -44,26 +43,14 @@ export interface RosterRow {
   tags: readonly string[];
   find: { role: Role; status: Status } | null; // an open post: the market's filter that finds them
 }
-/** A pit crew member at their job. */
+/** A pit crew member: their work in a stop, how often they slip, and how tired they are. */
 export interface PitRow {
   id: number;
   face: Face;
   name: string;
-  job: Job;
-  jobName: string;
-  rating: Figure;
+  work: Figure;
+  slip: Figure;
   fatigue: Figure;
-  rate: Figure;
-  botch: Figure;
-  moves: readonly { job: Job; label: string }[];
-}
-/** A job's place in the pit crew's order, with the plans that move it up or down (null: it cannot go). */
-export interface OrderRow {
-  job: Job;
-  label: string;
-  who: string;
-  up: Plan | null;
-  down: Plan | null;
 }
 /** `team`: the roster, its wages and open posts, the bonds, the pit crew. */
 export interface TeamView {
@@ -73,8 +60,8 @@ export interface TeamView {
   open: readonly { role: Role; status: Status; label: string }[];
   bonds: readonly { ship: Ship; label: string; bond: Figure; fill: number }[];
   pit: readonly PitRow[];
-  order: readonly OrderRow[];
-  orderWhy: string | null; // why the order cannot be moved now (null: it can)
+  /** The pit crew as a ship's stop has them (race.ts PitCrew), by ship. */
+  stops: readonly { ship: Ship; pace: Figure; slip: Figure }[];
 }
 
 /** A stat as the profile draws it: its value, its ceiling, and which way it is heading. */

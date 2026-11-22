@@ -7,6 +7,7 @@
 // same functions (career/works.ts).
 
 import type { PartType } from '../race.ts';
+import { SHIPS } from '../office.ts';
 import { canSpend, paid } from './balance.ts';
 import {
   accept,
@@ -354,12 +355,11 @@ export function built(
     links: [{ to: 'part', id }],
   });
   if (c.player || d.forNext) return out;
-  const ships = ([0, 1] as const).map((ship) => ({
+  const worst = SHIPS.map((ship) => ({
     ship,
     perf: c.parts.find((p) => p.ship === ship && p.type === d.type)?.perf ?? 0,
-  }));
-  const worse = ships[1].perf < ships[0].perf ? ships[1] : ships[0];
-  return part.perf > worse.perf ? fitted(out, e.team, id, worse.ship) : out;
+  })).reduce((a, b) => (b.perf < a.perf ? b : a));
+  return part.perf > worst.perf ? fitted(out, e.team, id, worst.ship) : out;
 }
 
 export const DESIGNING: Handlers = {

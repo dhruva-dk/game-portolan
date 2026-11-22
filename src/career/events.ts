@@ -3,12 +3,16 @@
 // manager takes. Their words are career/mail.ts's (the dilemma's id is its mail kind). Drawing and answering them is
 // career/dilemmas.ts's.
 
-import type { MailCategory, Offer, Personality } from '../office.ts';
-import type { PartType } from '../race.ts';
+import {
+  SHIPS,
+  type MailCategory,
+  type Offer,
+  type Personality,
+} from '../office.ts';
+import { PARTS, type PartType } from '../race.ts';
 import { askWage } from './asks.ts';
 import { canSpend, paid } from './balance.ts';
 import { why, type Check } from './command.ts';
-import { TYPES } from './components.ts';
 import type { Rand } from './dice.ts';
 import { standingOf } from './chairmen.ts';
 import { flag, flagged, nextRace, unflagged } from './flags.ts';
@@ -17,9 +21,15 @@ import { learned } from './knowledge.ts';
 import { moraleIn } from './morale.ts';
 import { signed } from './contracts.ts';
 import { bondLevel, fatigueOn } from './pit.ts';
+import type { Person } from './roles.ts';
 import { age, potential } from './stars.ts';
 import {
+  championshipOf,
+  personAt,
   staffOf,
+  teamOf,
+  withPerson,
+  withTeam,
   type CareerState,
   type Team,
   type Mail,
@@ -59,15 +69,11 @@ const no = (code: string, sentence: string): Answer => ({
 });
 
 /** A state with a person changed by a function. */
-function personSet(
+const personSet = (
   s: CareerState,
   id: number,
-  f: (g: CareerState['people'][number]) => CareerState['people'][number]
-): CareerState {
-  const people = [...s.people];
-  people[id] = f(people[id]);
-  return { ...s, people };
-}
+  f: (g: Person) => Person
+): CareerState => withPerson(s, f(personAt(s, id)));
 const moraleBy = (s: CareerState, id: number, by: number) =>
   personSet(s, id, (g) => ({ ...g, morale: moraleIn(g.morale + by) }));
 const marketBy = (s: CareerState, id: number, by: number) =>
@@ -75,15 +81,11 @@ const marketBy = (s: CareerState, id: number, by: number) =>
     ...g,
     marketability: Math.min(100, Math.max(0, g.marketability + by)),
   }));
-function teamSet(
+const teamSet = (
   s: CareerState,
   team: number,
   f: (c: Team) => Team
-): CareerState {
-  const teams = [...s.teams];
-  teams[team] = f(teams[team]);
-  return { ...s, teams };
-}
+): CareerState => withTeam(s, f(teamOf(s, team)));
 /** Coin spent on an answer, if the chairman allows it. */
 const spend = (
   s: CareerState,
@@ -94,12 +96,12 @@ const spend = (
   canSpend(s.teams[team], balance)
     ? ok(paid(s, team, balance, { kind: 'dilemma', what }))
     : no('balance', 'The chairman will not let the balance fall that low.');
-/** The team's two ships' drivers. */
+/** The team's ships' drivers. */
 const drivers = (c: Team): number[] =>
   c.staff.ships.map((h) => h.driver).filter((x): x is number => x !== null);
 const N = (x: string | number | undefined): number => Number(x);
 
-/** The ship-one parts of a team by type. */
+/** The parts of a team's first ship by type. */
 const shipOne = (c: Team): Map<PartType, Part> =>
   new Map(c.parts.filter((p) => p.ship === 0).map((p) => [p.type, p]));
 /** Two parts with their numbers exchanged. */
@@ -181,28 +183,37 @@ export const DILEMMAS: readonly Dilemma[] = [
     options: ['give', 'hold'],
     rival: [1, 1, 1, 1, 1, 1],
     trigger: (s, c) => {
-      const when = flag(s, `newPart:${c.id}`),
-        driver = c.staff.ships[1].driver;
-      const type = TYPES.find((t) => c.lastNew[t] === 0);
+      const when = flag(s, `newPart:${c.id}`);
+      const type = PARTS.find((t) => c.lastNew[t] !== null);
+      const got = type ? c.lastNew[type] : null;
+      const ship = c.staff.ships.findIndex(
+        (h, k) => k !== got && h.driver !== null
+      );
+      const driver = c.staff.ships[ship]?.driver ?? null;
       return when !== null &&
         when >= s.day - TUNING.calendar.gap &&
         driver !== null &&
+        got !== null &&
         type
-        ? { person: driver, type }
+        ? { person: driver, type, ship, from: got }
         : null;
     },
     answer: (s, c, slots, o) => {
       const out = unflagged(s, `newPart:${c.id}`);
       if (o === 1) return ok(moraleBy(out, N(slots.person), D.argueLost));
-      const a = c.parts.find((p) => p.ship === 0 && p.type === slots.type),
-        b = c.parts.find((p) => p.ship === 1 && p.type === slots.type);
-      if (!a || !b) return no('part', 'The part is no longer fitted.');
+      const to = SHIPS[N(slots.ship)];
+      const a = c.parts.find(
+          (p) => p.ship === N(slots.from) && p.type === slots.type
+        ),
+        b = c.parts.find((p) => p.ship === to && p.type === slots.type);
+      if (!a || !b || to === undefined)
+        return no('part', 'The part is no longer fitted.');
       const moved = teamSet(out, c.id, (x) => ({
         ...replaced(x, [
-          { ...a, ship: 1 },
-          { ...b, ship: 0 },
+          { ...a, ship: b.ship },
+          { ...b, ship: a.ship },
         ]),
-        lastNew: { ...x.lastNew, [a.type]: 1 },
+        lastNew: { ...x.lastNew, [a.type]: to },
       }));
       return ok(moraleBy(moved, N(slots.person), D.argue));
     },
@@ -219,32 +230,37 @@ export const DILEMMAS: readonly Dilemma[] = [
       if (s.round < 5) return null;
       const k = c.staff.ships.findIndex(
         (h, i) =>
-          h.mechanic !== null && h.driver !== null && bondLevel(c.bonds[i]) <= 1
+          h.mechanic !== null &&
+          h.driver !== null &&
+          bondLevel(c.bonds[i] ?? 0) <= 1
       );
-      return k < 0
-        ? null
-        : {
-            ship: k,
-            mechanic: c.staff.ships[k].mechanic!,
-            person: c.staff.ships[k].driver!,
-          };
+      const h = c.staff.ships[k];
+      return h && h.mechanic !== null && h.driver !== null
+        ? { ship: k, mechanic: h.mechanic, person: h.driver }
+        : null;
     },
     answer: (s, c, slots, o) => {
       const k = N(slots.ship);
       if (o === 0) {
-        const [a, b] = c.staff.ships;
-        if (a.mechanic === null || b.mechanic === null)
+        // her mechanic changes places with the next ship's
+        const n = (k + 1) % c.staff.ships.length;
+        const a = c.staff.ships[k],
+          b = c.staff.ships[n];
+        if (!a || !b || a.mechanic === null || b.mechanic === null)
           return no('mechanic', 'Both ships need a mechanic to swap them.');
         return ok(
           teamSet(s, c.id, (x) => ({
             ...x,
-            bonds: [0, 0],
+            bonds: x.bonds.map((bond, i) => (i === k || i === n ? 0 : bond)),
             staff: {
               ...x.staff,
-              ships: [
-                { ...a, mechanic: b.mechanic },
-                { ...b, mechanic: a.mechanic },
-              ],
+              ships: x.staff.ships.map((h, i) =>
+                i === k
+                  ? { ...h, mechanic: b.mechanic }
+                  : i === n
+                    ? { ...h, mechanic: a.mechanic }
+                    : h
+              ),
             },
           }))
         );
@@ -255,10 +271,9 @@ export const DILEMMAS: readonly Dilemma[] = [
       return ok(
         teamSet(spent.state, c.id, (x) => ({
           ...x,
-          bonds: [
-            x.bonds[0] + (k === 0 ? D.dinnerBond : 0),
-            x.bonds[1] + (k === 1 ? D.dinnerBond : 0),
-          ],
+          bonds: x.bonds.map((bond, i) =>
+            i === k ? bond + D.dinnerBond : bond
+          ),
         }))
       );
     },
@@ -355,7 +370,7 @@ export const DILEMMAS: readonly Dilemma[] = [
         .map((id) => s.people[id])
         .find((x) => x.fatigue > D.worn);
       return g && nextRace(s) !== null
-        ? { person: g.id, job: g.job ?? 'mend' }
+        ? { person: g.id }
         : null;
     },
     answer: (s, c, slots, o) => {
@@ -384,29 +399,37 @@ export const DILEMMAS: readonly Dilemma[] = [
     options: ['swap', 'decline'],
     rival: [1, 1, 1, 1, 1, 1],
     trigger: (s, c, rand) => {
-      const spec = new Set(s.championships[c.tier].rules.spec);
+      const l = championshipOf(s, c.tier);
+      const spec = new Set(l.rules.spec);
       const mineOf = shipOne(c);
-      const others = s.championships[c.tier].teams.filter((x) => x !== c.id);
+      const others = l.teams.filter((x) => x !== c.id);
       const r = others[Math.floor(rand() * others.length)];
       if (r === undefined) return null;
-      const theirs = shipOne(s.teams[r]);
-      const types = TYPES.filter(
+      const theirs = shipOne(teamOf(s, r));
+      const gap = (t: PartType) =>
+        (theirs.get(t)?.perf ?? 0) - (mineOf.get(t)?.perf ?? 0);
+      const types = PARTS.filter(
         (t) => !spec.has(t) && mineOf.has(t) && theirs.has(t)
       );
-      const give = types.find((t) => theirs.get(t)!.perf > mineOf.get(t)!.perf),
-        take = types.find((t) => mineOf.get(t)!.perf > theirs.get(t)!.perf);
+      const give = types.find((t) => gap(t) > 0),
+        take = types.find((t) => gap(t) < 0);
       return give && take ? { team: r, give, take } : null;
     },
     answer: (s, c, slots, o) => {
       if (o === 1) return ok(s);
       const r = N(slots.team);
       let a = improvementTo(improvementTo(s, c.id), r);
-      const ours = shipOne(a.teams[c.id]),
-        theirs = shipOne(a.teams[r]);
-      const types = [slots.give, slots.take] as PartType[];
-      if (!types.every((t) => ours.has(t) && theirs.has(t)))
+      const ours = shipOne(teamOf(a, c.id)),
+        theirs = shipOne(teamOf(a, r));
+      const pairs = PARTS.filter(
+        (t) => t === slots.give || t === slots.take
+      ).flatMap((t) => {
+        const mine = ours.get(t),
+          other = theirs.get(t);
+        return mine && other ? [swapped(mine, other)] : [];
+      });
+      if (pairs.length !== 2)
         return no('part', 'The parts are no longer fitted.');
-      const pairs = types.map((t) => swapped(ours.get(t)!, theirs.get(t)!));
       a = teamSet(a, c.id, (x) =>
         replaced(
           x,

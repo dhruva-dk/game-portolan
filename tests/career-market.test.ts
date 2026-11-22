@@ -149,7 +149,7 @@ test('a scout is sent to a person in Reach, reports by mail after its days, and 
       g.contract === null &&
       g.retired === null &&
       !g.player &&
-      !knows(s, c.id, g)
+      !knows(c.id, g)
   )!;
   const before = view(s, c.id, target.id);
   assert.equal(before.known, false);

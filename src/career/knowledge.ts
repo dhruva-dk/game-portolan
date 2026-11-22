@@ -32,7 +32,7 @@ export const tierOf = (s: CareerState, g: Person): number | null =>
   g.contract ? s.teams[g.contract.team].tier : null;
 
 /** Whether a team knows a person exactly: its own, or scouted. */
-export const knows = (s: CareerState, team: number, g: Person): boolean =>
+export const knows = (team: number, g: Person): boolean =>
   g.contract?.team === team || g.known[team] !== undefined;
 
 /** The ids of the people with an entry for each team in their `known`, for the last people list read. States share every
@@ -112,7 +112,7 @@ export function view(
     pot = potential(g);
   const k = g.known[team];
   const e = sight(tierOf(s, g));
-  if (knows(s, team, g)) {
+  if (knows(team, g)) {
     return {
       known: true,
       stars: [st, st],

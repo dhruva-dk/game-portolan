@@ -59,7 +59,7 @@ export function changeOf(m: Measure, next: Rules, rand: Rand): Change | null {
     case 'storm':
       return {
         measure: 'storm',
-        pace: moved(next.storm.pace, A.pace, A.paceRange),
+        pace: moved(next.storm, A.pace, A.paceRange),
       };
     case 'ban': {
       const open = KINDS.filter((k) => !next.banned.includes(k));
@@ -100,7 +100,7 @@ export function changed(r: Rules, c: Change): Rules {
           : r.spec.filter((t) => t !== c.type),
       };
     case 'storm':
-      return { ...r, storm: { pace: c.pace } };
+      return { ...r, storm: c.pace };
     case 'ban':
       return { ...r, banned: [...new Set([...r.banned, c.kind])] };
     case 'pointsPerSinking':

@@ -2,17 +2,17 @@
 // traits, morale and marketability, wants once scouted, stats with which way they head, the role's own figures, the
 // history, the contract, and what the player may do (scout, offer, renew, dismiss), each with why not. Pure.
 
-import type { Offer } from '../office.ts';
+import type { Figure, Offer } from '../office.ts';
 import type { Act, ProfileView, StatLine } from '../office-people.ts';
 import { closing, dismissalCost, racesLeft } from './contracts.ts';
 import { effective, marketability } from './effective.ts';
 import { offerCheck } from './hiring.ts';
 import { askOf } from './market.ts';
 import { TUNING } from './tuning.ts';
-import type { Person, PersonOf } from './roles.ts';
+import type { Person } from './roles.ts';
 import { scoutCheck, scoutingDays } from './scouting.ts';
-import { seatOf, seatRole } from './seats.ts';
-import { JOBS, mendingFactor, rating, repairsFactor } from './pit.ts';
+import { openSeat, seatOf, seatRole } from './seats.ts';
+import { mendingFactor, repairsFactor, slipOf, work } from './pit.ts';
 import {
   designSpeed,
   feedbackPoints,
@@ -23,7 +23,6 @@ import { age } from './stars.ts';
 import type { CareerState, Team } from './state.ts';
 import { trait } from './traits.ts';
 import {
-  JOB_NAMES,
   ROLE_NAMES,
   WANT_NAMES,
   endsText,
@@ -37,7 +36,7 @@ import {
 import {
   TIERS,
   moneyText,
-  teamOf,
+  myTeam,
   faceOf,
   fig,
   line,
@@ -51,12 +50,16 @@ const act = (why: string | null | undefined): Act => ({
   why: why ?? '',
 });
 const pct = (x: number) => `${Math.round(x * 100)}%`;
+/** A pit crew member's chance of a slip at stats of 10, rested. */
+const SLIP_AT_TEN =
+  TUNING.pit.slip *
+  (1 - (TUNING.pit.steady.precision + TUNING.pit.steady.nerve) / 2);
 
-/** The person a profile or offer opens on when none is named: the first in talks, else ship two's driver. */
+/** The person a profile or offer opens on when none is named: the first in talks, else the first of its hired drivers. */
 export function defaultPerson(s: CareerState, c: Team): number {
   return (
     s.talks.find((t) => t.team === c.id)?.person ??
-    c.staff.ships[1].driver ??
+    c.staff.ships.find((h) => h.driver !== null)?.driver ??
     c.staff.chairman
   );
 }
@@ -69,7 +72,7 @@ export function askOffer(s: CareerState, c: Team, g: Person): Offer {
   const status = seat
     ? seatRole(seat).status
     : g.role === 'driver'
-      ? c.staff.ships[1].driver === null
+      ? openSeat(c, 'driver', 'ship')
         ? 'ship'
         : 'reserve'
       : 'staff';
@@ -86,36 +89,32 @@ export function askOffer(s: CareerState, c: Team, g: Person): Offer {
   };
 }
 
+/** One of a role's own figures, set against what stats of 10 make. */
+const one = (
+  label: string,
+  now: { value: number; text: string },
+  against: string,
+  lines: [string, string | number][]
+) => ({
+  label,
+  figure: fig(now.value, now.text, rival('average', against), {
+    title: label,
+    lines: lines.map(([a, b]) => line(a, b)),
+  }),
+});
+const times = (x: number) => ({ value: x, text: `×${x.toFixed(2)}` });
+
 /** The role's own figures. */
-function specifics(
-  s: CareerState,
-  g: Person
-): { label: string; figure: ReturnType<typeof fig> }[] {
-  const st = effective(g as PersonOf<typeof g.role>, null) as Readonly<
-    Record<string, number>
-  >;
-  const one = (
-    label: string,
-    v: number,
-    text: string,
-    against: string,
-    lines: [string, string | number][]
-  ) => ({
-    label,
-    figure: fig(v, text, rival('average', against), {
-      title: label,
-      lines: lines.map(([a, b]) => line(a, b)),
-    }),
-  });
+function specifics(g: Person): { label: string; figure: Figure }[] {
   switch (g.role) {
-    case 'driver':
+    case 'driver': {
+      const points = feedbackPoints(effective(g, null).feedback);
       return [
         one(
           'Feedback a race',
-          feedbackPoints(st.feedback),
-          feedbackPoints(st.feedback).toFixed(1),
+          { value: points, text: points.toFixed(1) },
           feedbackPoints(10).toFixed(1),
-          [['Feedback', st.feedback]]
+          [['Feedback', effective(g, null).feedback]]
         ),
         {
           label: 'Fitness',
@@ -127,81 +126,81 @@ function specifics(
           ),
         },
       ];
-    case 'mechanic':
+    }
+    case 'mechanic': {
+      const st = effective(g, null);
       return [
         one(
           'Repairs',
-          repairsFactor(st.repairs),
-          `×${repairsFactor(st.repairs).toFixed(2)}`,
-          `×${repairsFactor(10).toFixed(2)}`,
+          times(repairsFactor(st.repairs)),
+          times(repairsFactor(10)).text,
           [['Repairs', st.repairs]]
         ),
         one(
           'Mending',
-          mendingFactor(st.mending),
-          `×${mendingFactor(st.mending).toFixed(2)}`,
-          `×${mendingFactor(10).toFixed(2)}`,
+          times(mendingFactor(st.mending)),
+          times(mendingFactor(10)).text,
           [['Mending', st.mending]]
         ),
       ];
-    case 'designer':
+    }
+    case 'designer': {
+      const st = effective(g, null);
+      const chance = innovationChance(st.innovation);
       return [
         one(
           'Design speed',
-          designSpeed(st.speed),
-          `×${designSpeed(st.speed).toFixed(2)}`,
-          `×${designSpeed(10).toFixed(2)}`,
+          times(designSpeed(st.speed)),
+          times(designSpeed(10)).text,
           [['Speed', st.speed]]
         ),
         one(
           'Innovation',
-          innovationChance(st.innovation),
-          pct(innovationChance(st.innovation)),
+          { value: chance, text: pct(chance) },
           pct(innovationChance(10)),
           [['Innovation', st.innovation]]
         ),
       ];
-    case 'scout':
+    }
+    case 'scout': {
+      const width = starWidth(effective(g, null).judgement);
       return [
         one(
           'Star range',
-          starWidth(st.judgement),
-          `±${(starWidth(st.judgement) / 2).toFixed(1)}`,
+          { value: width, text: `±${(width / 2).toFixed(1)}` },
           `±${(starWidth(10) / 2).toFixed(1)}`,
-          [['Judgement', st.judgement]]
+          [['Judgement', effective(g, null).judgement]]
         ),
       ];
+    }
     case 'pit': {
-      const best = [...JOBS].sort(
-        (a, b) =>
-          rating(st as PersonOf<'pit'>['stats'], b) -
-          rating(st as PersonOf<'pit'>['stats'], a)
-      )[0];
-      const r = rating(st as PersonOf<'pit'>['stats'], best);
+      const st = effective(g, null),
+        slip = slipOf(st, 0);
       return [
-        one(
-          `Best job: ${JOB_NAMES[best]}`,
-          r,
-          String(Math.round(r * 100)),
-          '50',
-          JOBS.map((j) => [
-            JOB_NAMES[j],
-            Math.round(rating(st as PersonOf<'pit'>['stats'], j) * 100),
-          ])
-        ),
+        one('Work', times(work(st, 0)), times(1).text, [
+          ['Speed', st.speed],
+          ['Strength', st.strength],
+          ['Teamwork', st.teamwork],
+        ]),
+        one('Slip chance', { value: slip, text: pct(slip) }, pct(SLIP_AT_TEN), [
+          ['Precision', st.precision],
+          ['Nerve', st.nerve],
+        ]),
       ];
     }
     case 'manager':
       return [
         one(
           'Reputation',
-          g.reputation,
-          String(Math.round(g.reputation)),
+          {
+            value: g.reputation,
+            text: String(Math.round(g.reputation)),
+          },
           '50',
           [['Reputation', Math.round(g.reputation)]]
         ),
       ];
-    default:
+    case 'chairman':
       return [];
   }
 }
@@ -211,7 +210,7 @@ export function profileView(
   s: CareerState,
   person: number | null
 ): ProfileView {
-  const c = teamOf(s),
+  const c = myTeam(s),
     id = person ?? defaultPerson(s, c),
     g = s.people[id];
   const v = seen(s, c.id, id),
@@ -339,7 +338,7 @@ export function profileView(
       : null,
     stats,
     statsNote: v.known ? '' : 'Scout to read',
-    specifics: v.known ? specifics(s, g) : [],
+    specifics: v.known ? specifics(g) : [],
     history: [...g.history]
       .reverse()
       .map((h) => ({

@@ -1,7 +1,11 @@
 // The office's views (Phase C, office.ts): what each management screen draws, built from the career's state. Pure:
 // a view is plain data, every figure with what it is set against and what it is made of. The screens work out no rule.
 
-import { SWATCHES, type Colours, type PartType } from '../race.ts';
+import { PARTS, type Colours } from '../race.ts';
+import {
+  SHIPS,
+  type Ship,
+} from '../office.ts';
 import type {
   CommandOf,
   Comparison,
@@ -14,7 +18,6 @@ import type {
   LetterLine,
   Line,
   Named,
-  PartMark,
   RecoverView,
   SettingsView,
   ShipHalf,
@@ -24,17 +27,23 @@ import type {
 import { advanceCheck } from './advance.ts';
 import { dice, seeded } from './dice.ts';
 import { standingOf } from './chairmen.ts';
-import { foundingCheck, weakest } from './found.ts';
+import { foundingCheck, taken } from './found.ts';
 import { NOUNS, teamName, family, given, place, words } from './names.ts';
 import { mailView, table, unread } from './read.ts';
 import type { Person } from './roles.ts';
 import { factoryPoints } from './hq.ts';
 import { bondLevel } from './pit.ts';
 import { age, potential, stars } from './stars.ts';
-import type { CareerState, Team, Objective } from './state.ts';
+import {
+  teamOf,
+  personAt,
+  type CareerState,
+  type Team,
+  type Objective,
+} from './state.ts';
 import { trait } from './traits.ts';
 import { TUNING } from './tuning.ts';
-import { PART_TYPES, makeWorld, staffStars } from './world.ts';
+import { BUILDINGS, makeWorld, staffStars } from './world.ts';
 import { improvementPoints } from './improvement.ts';
 
 /** 1st, 2nd, 3rd, 4th, 11th. */
@@ -82,9 +91,13 @@ export const named = (s: CareerState, id: number | null): Named | null =>
     ? null
     : { id, face: faceOf(s, s.people[id]), name: nameOf(s.people[id]) };
 
+/** The player, once the career is founded (the screens open only then). */
+function playerOf(s: CareerState): NonNullable<CareerState['player']> {
+  if (!s.player) throw new Error('no career is founded');
+  return s.player;
+}
 /** The player's team: the one they manage, or the one they left when sacked. */
-export const teamOf = (s: CareerState): Team =>
-  s.teams[(s.player as NonNullable<CareerState['player']>).team];
+export const myTeam = (s: CareerState): Team => teamOf(s, playerOf(s).team);
 
 /** The Coin and its change this season, from the ledger. */
 function moneyFigure(s: CareerState, c: Team): Figure {
@@ -128,8 +141,8 @@ const LEDGER: Readonly<Record<string, string>> = {
 
 /** The top bar. */
 export function topBar(s: CareerState): TopBar {
-  const c = teamOf(s),
-    me = s.people[(s.player as NonNullable<CareerState['player']>).person];
+  const c = myTeam(s),
+    me = personAt(s, playerOf(s).person);
   const blocked = advanceCheck(s);
   const raceDay = blocked?.code === 'raceDay';
   const screen =
@@ -165,7 +178,7 @@ export function topBar(s: CareerState): TopBar {
 const OBJECTIVE: Readonly<Record<Objective, string>> = {
   top10: 'a top-ten finish',
   sinkTwo: 'two ships sunk',
-  afloat: 'both ships afloat',
+  afloat: 'three ships afloat',
   mostSea: 'the most sea held',
 };
 
@@ -226,18 +239,18 @@ function racePanel(s: CareerState, c: Team): HomeView['race'] {
   };
 }
 
-function shipHalf(s: CareerState, c: Team, ship: 0 | 1): ShipHalf {
-  const hands = c.staff.ships[ship],
-    bond = c.bonds[ship],
+function shipHalf(s: CareerState, c: Team, ship: Ship): ShipHalf {
+  const hands = c.staff.ships[ship] ?? { driver: null, mechanic: null },
+    bond = c.bonds[ship] ?? 0,
     level = bondLevel(bond),
     next = TUNING.bond.levels[level] ?? null;
-  const parts: PartMark[] = PART_TYPES.map((type: PartType) => {
+  const parts = PARTS.map((type) => {
     const p = c.parts.find(
       (x) => x.ship === ship && x.type === type && !x.forNext
     );
     return { type, low: !!p && p.condition < 0.5, fitted: !!p };
   });
-  const cap = hands.driver === null ? null : s.people[hands.driver];
+  const cap = hands.driver === null ? null : personAt(s, hands.driver);
   const M = TUNING.morale;
   return {
     ship,
@@ -261,7 +274,9 @@ function shipHalf(s: CareerState, c: Team, ship: 0 | 1): ShipHalf {
       }
     ),
     driver: cap && {
-      ...(named(s, cap.id) as Named),
+      id: cap.id,
+      face: faceOf(s, cap),
+      name: nameOf(cap),
       stars: stars(cap),
       potential: potential(cap),
       tags: cap.traits.map((t) => trait(t).name),
@@ -332,7 +347,7 @@ export function letters(s: CareerState, n: number): LetterLine[] {
 
 /** `home`. */
 export function homeView(s: CareerState): HomeView {
-  const c = teamOf(s),
+  const c = myTeam(s),
     points = improvementPoints(s, c.id),
     factory = factoryPoints(c);
   const tier = s.championships[c.tier].teams,
@@ -343,7 +358,7 @@ export function homeView(s: CareerState): HomeView {
   return {
     top: topBar(s),
     race: racePanel(s, c),
-    ships: [shipHalf(s, c, 0), shipHalf(s, c, 1)],
+    ships: SHIPS.map((ship) => shipHalf(s, c, ship)),
     improvement: {
       design: d && {
         type: d.type,
@@ -375,13 +390,18 @@ export function homeView(s: CareerState): HomeView {
           ],
         }
       ),
-      works: Object.entries(c.buildings)
-        .filter(([, w]) => w.next !== null)
-        .map(([b, w]) => ({
-          building: b as keyof Team['buildings'],
-          level: (w.next as { level: number }).level,
-          days: Math.max(0, (w.next as { done: number }).done - s.day),
-        })),
+      works: BUILDINGS.flatMap((building) => {
+        const next = c.buildings[building].next;
+        return next
+          ? [
+              {
+                building,
+                level: next.level,
+                days: Math.max(0, next.done - s.day),
+              },
+            ]
+          : [];
+      }),
     },
     table: {
       tier: TIERS[c.tier] ?? `Championship ${c.tier + 1}`,
@@ -396,11 +416,11 @@ export const TIERS = ['Tier 1', 'Tier 2', 'Tier 3'];
 /** Founding's defaults for a seed: a team name whose words clash with no team's, a name for the player, a face. */
 const founding = new Map<string, { replacing: string; names: string[] }>();
 function worldFor(seed: number, colours: Colours) {
-  const key = `${seed}.${colours.first}.${colours.second}`;
+  const key = `${seed}.${colours.dye}.${colours.pattern}`;
   let w = founding.get(key);
   if (!w) {
     const world = makeWorld(seed, colours, dice(seed, {}));
-    const k = weakest(world),
+    const k = taken(world),
       chairman = world.people[k.staff.chairman];
     const staff = world.people.filter(
       (g) => g.contract?.team === k.id && g.retired === null
@@ -410,8 +430,8 @@ function worldFor(seed: number, colours: Colours) {
       names: world.teams.map((x) => x.name),
     };
     founding.set(key, w);
-    if (founding.size > 4)
-      founding.delete(founding.keys().next().value as string);
+    for (const oldest of [...founding.keys()].slice(0, -4))
+      founding.delete(oldest);
   }
   return w;
 }
@@ -438,7 +458,8 @@ export function foundView(seed: number, colours: Colours): FoundView {
     age: TUNING.player.age,
     colours,
     emblem: Math.floor(rand() * TUNING.world.emblems),
-    swatches: SWATCHES,
+    dyes: TUNING.world.liveries.dyes,
+    patterns: TUNING.world.liveries.patterns,
     emblems: TUNING.world.emblems,
     limits: { team: 24, person: TUNING.player.personName },
     replacing: w.replacing,
@@ -448,11 +469,11 @@ export function foundView(seed: number, colours: Colours): FoundView {
 /** What the founding form gets wrong, field by field (each checked with the others set to ones the career takes), so
  *  each error shows under its own field; a field missing is right. The team's name is held to the form's 24. */
 export function foundErrors(c: CommandOf<'Found'>): FoundErrors {
-  const v = foundView(c.seed, { first: 0, second: 1 });
+  const v = foundView(c.seed, { dye: 0, pattern: 0 });
   const good: CommandOf<'Found'> = {
     ...c,
     team: v.team,
-    colours: { first: 0, second: 1 },
+    colours: { dye: 0, pattern: 0 },
     emblem: 0,
     given: v.given,
     family: v.family,
@@ -460,20 +481,24 @@ export function foundErrors(c: CommandOf<'Found'>): FoundErrors {
   };
   const say = (k: Partial<CommandOf<'Found'>>) =>
     foundingCheck({ ...good, ...k })?.sentence;
-  const out: FoundErrors = {
-    team:
+  const out: FoundErrors = {};
+  const set = (k: keyof FoundErrors, sentence: string | undefined) => {
+    if (sentence !== undefined) out[k] = sentence;
+  };
+  set(
+    'team',
       c.team.trim().length > v.limits.team
         ? `The team's name is too long: at most ${v.limits.team} letters.`
-        : say({ team: c.team }),
-    colours: say({ colours: c.colours }),
-    emblem: say({ emblem: c.emblem }),
-    person:
+        : say({ team: c.team })
+  );
+  set('colours', say({ colours: c.colours }));
+  set('emblem', say({ emblem: c.emblem }));
+  set(
+    'person',
       say({ given: c.given }) ??
       say({ family: c.family }) ??
-      say({ headshot: c.headshot }),
-  };
-  for (const k of Object.keys(out) as (keyof FoundErrors)[])
-    if (out[k] === undefined) delete out[k];
+      say({ headshot: c.headshot })
+  );
   return out;
 }
 

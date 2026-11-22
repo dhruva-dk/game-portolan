@@ -10,15 +10,9 @@ import { age } from './stars.ts';
 import type { CareerState, Team } from './state.ts';
 import { TUNING } from './tuning.ts';
 import { TIERS, moneyText } from './views.ts';
-import type { Job } from '../race.ts';
 
-/** Each pit job's name. */
-export const JOB_NAMES: Readonly<Record<Job, string>> = {
-  mend: 'Mend',
-  gust: 'Gust',
-  stores: 'Stores',
-  part: 'Part',
-};
+/** A ship of a team, as a line names her ("Ship 1" the first). */
+export const shipName = (ship: number): string => `Ship ${ship + 1}`;
 
 /** Each role's name, as a heading or a line says it. */
 export const ROLE_NAMES: Readonly<Record<Role, string>> = {
@@ -27,7 +21,7 @@ export const ROLE_NAMES: Readonly<Record<Role, string>> = {
   mechanic: 'Mechanic',
   designer: 'Designer',
   scout: 'Scout',
-  pit: 'Pit',
+  pit: 'Pit crew',
   chairman: 'Chairman',
 };
 /** Each want, in words. */
@@ -72,16 +66,15 @@ export function seen(
 export const rangeText = (r: Range) =>
   r.lo === r.hi ? `${r.lo}` : `${r.lo}–${r.hi}`;
 
-/** The post a person holds on their team ("Ship two", "Reserve", "Mend"), or what they are. */
+/** The post a person holds on their team ("Ship 2", "Reserve"), or what they are. */
 export function postOf(s: CareerState, g: Person): string {
   const c = g.contract ? s.teams[g.contract.team] : null;
   if (!c) return g.retired !== null ? 'Retired' : 'Free agent';
   const ship = c.staff.ships.findIndex(
     (h) => h.driver === g.id || h.mechanic === g.id
   );
-  if (ship >= 0) return ship === 0 ? 'Ship one' : 'Ship two';
+  if (ship >= 0) return shipName(ship);
   if (c.staff.reserve === g.id) return 'Reserve';
-  if (g.role === 'pit' && g.job) return JOB_NAMES[g.job];
   return ROLE_NAMES[g.role];
 }
 /** When a contract ends, in words. */
@@ -124,17 +117,16 @@ export function heading(
 }
 
 /** The roles and the post a team holds open of each: the market's filter for each empty place. */
-export function openPosts(
-  s: CareerState,
-  c: Team
-): { role: Role; status: Status; label: string }[] {
+export function openPosts(c: Team): { role: Role; status: Status; label: string }[] {
   const out: { role: Role; status: Status; label: string }[] = [];
-  if (c.staff.ships[1].driver === null)
-    out.push({
-      role: 'driver',
-      status: 'ship',
-      label: 'A driver for ship two',
-    });
+  c.staff.ships.forEach((h, i) => {
+    if (h.driver === null && !(c.player && i === 0))
+      out.push({
+        role: 'driver',
+        status: 'ship',
+        label: `A driver for ${shipName(i).toLowerCase()}`,
+      });
+  });
   if (c.staff.reserve === null)
     out.push({ role: 'driver', status: 'reserve', label: 'A reserve driver' });
   c.staff.ships.forEach((h, i) => {
@@ -142,7 +134,7 @@ export function openPosts(
       out.push({
         role: 'mechanic',
         status: 'staff',
-        label: `A mechanic for ship ${i === 0 ? 'one' : 'two'}`,
+        label: `A mechanic for ${shipName(i).toLowerCase()}`,
       });
   });
   if (c.staff.designer === null)
@@ -159,7 +151,7 @@ export function openPosts(
     out.push({
       role: 'pit',
       status: 'staff',
-      label: `Pit (${pit - c.staff.pit.length} short)`,
+      label: `Pit crew (${pit - c.staff.pit.length} short)`,
     });
   return out;
 }

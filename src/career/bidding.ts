@@ -20,7 +20,7 @@ import type { Decide, Mind } from './rivals.ts';
 import { openSeat, seatOf, seatRole } from './seats.ts';
 import { scoutCheck, sent } from './scouting.ts';
 import { age, potential, stars } from './stars.ts';
-import { staffOf, type CareerState, type Team, type Hands } from './state.ts';
+import { staffOf, type CareerState, type Team } from './state.ts';
 import { TUNING } from './tuning.ts';
 
 const R = TUNING.rivals;
@@ -179,9 +179,13 @@ function seatedAway(
   switch (seat.kind) {
     case 'driver':
     case 'mechanic': {
-      const ships: Hands[] = [{ ...staff.ships[0] }, { ...staff.ships[1] }];
-      ships[seat.ship] = { ...ships[seat.ship], [seat.kind]: -1 };
-      return { ...staff, ships: [ships[0], ships[1]] };
+      const kind = seat.kind;
+      return {
+        ...staff,
+        ships: staff.ships.map((h, k) =>
+          k === seat.ship ? { ...h, [kind]: -1 } : h
+        ),
+      };
     }
     case 'reserve':
       return { ...staff, reserve: -1 };
@@ -389,7 +393,7 @@ export const scout: Decide = (s, mind, roll) => {
       (g.contract === null ||
         g.contract.breakClause !== null ||
         closing(s, g.contract)) &&
-      !knows(s, mind.team, g) &&
+      !knows(mind.team, g) &&
       inSome(tierOf(s, g))
   );
   const ranked = looked(pool, roll)

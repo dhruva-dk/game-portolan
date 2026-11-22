@@ -395,6 +395,7 @@ export const TUNING = {
       spread: 60,
       headroom: 120,
       reliability: [0.6, 0.5, 0.4],
+      reliabilitySpread: 0.04,
       reliabilityHeadroom: 0.1,
     },
     /** A manager's reputation at the start, by tier, ± half the spread. */
@@ -423,7 +424,9 @@ export const TUNING = {
   },
 
   /** The player at founding: their manager's reputation, and the longest names they may give. */
-  player: { reputation: 10, teamName: 32, personName: 20, age: 35 },
+  /** The player: their manager's reputation at the start, the longest names, their age, and the team they take (its
+   *  place by staff strength in the last tier, 1 the strongest). */
+  player: { reputation: 10, teamName: 32, personName: 20, age: 35, place: 18 },
 
   /** A person's patience in talks (Phase B section 5). */
   patience: 3,
@@ -549,6 +552,8 @@ export const TUNING = {
     races: [3, 10],
     bonus: 7, // an objective sponsor's bonus × the team's marketability × tier × the objective's weight
     objectives: { top10: 1, sinkTwo: 1.6, afloat: 1.2, mostSea: 1.8 },
+    /** What each objective asks of a team's race: a ship in the first so many, so many ships sunk, so many of its own afloat at the end. */
+    need: { top: 10, sink: 2, afloat: 3 },
     objectiveShare: 0.5, // the share of offers that pay for objectives
     better: [1.5, -0.5], // a rival replaces a sponsor for one worth this × as much (Finance u)
   },
