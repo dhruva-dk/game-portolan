@@ -20,7 +20,7 @@ import {
   jobRate,
   fatigueOn,
   rating,
-} from './service.ts';
+} from './pit.ts';
 import type { CareerState, Team } from './state.ts';
 import { trait } from './traits.ts';
 import { TUNING } from './tuning.ts';

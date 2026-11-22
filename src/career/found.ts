@@ -123,7 +123,6 @@ function playerPerson(
     reputation: P.reputation,
     fatigue: 0,
     fatigueDay: 0,
-    job: null,
     components: [],
     unfit: 0,
     grudge: null,

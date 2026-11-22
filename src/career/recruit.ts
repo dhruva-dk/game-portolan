@@ -144,7 +144,6 @@ export function makePerson(m: Making, rand: Rand, taken: Set<string>): Person {
     reputation: m.role === 'manager' ? Math.round(within(rand, 10, 40)) : 0,
     fatigue: 0,
     fatigueDay: m.day,
-    job: null,
     // a designer's known components, by their own seed (no stream's turn), so every new designer is dealt alike
     components:
       m.role === 'designer'

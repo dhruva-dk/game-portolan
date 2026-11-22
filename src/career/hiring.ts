@@ -87,7 +87,7 @@ export function signableCheck(
       return why('replaces', 'A renewal keeps them where they are.');
     if (wantsOut(g.morale))
       return why('leaving', 'They have asked to leave and will not renew.');
-    const seat = seatOf(c, person, (id) => s.people[id].job);
+    const seat = seatOf(c, person);
     if (seat && g.role === 'driver' && seatRole(seat).status !== o.status)
       return why(
         'status',
@@ -109,7 +109,7 @@ export function signableCheck(
         'They will not drop more than one tier while under contract.'
       );
     if (o.replaces !== null) {
-      const seat = seatOf(c, o.replaces, (id) => s.people[id].job);
+      const seat = seatOf(c, o.replaces);
       if (
         !seat ||
         seat.kind === 'manager' ||

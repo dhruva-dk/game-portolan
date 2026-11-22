@@ -8,11 +8,20 @@
 // stars and youth give (the player's toward their reputation). A team's is 0.4 × its reputation + 0.6 × the mean of its
 // two ships' drivers' (the player's own on ship one). It feeds asks (asks.ts), pay drivers (effective.ts) and sponsors.
 
+import { TEAM } from '../race.ts';
 import { marketability } from './effective.ts';
 import { standingOf } from './chairmen.ts';
 import type { Person } from './roles.ts';
 import { age, stars } from './stars.ts';
-import type { CareerState, Team } from './state.ts';
+import {
+  championshipOf,
+  teamOf,
+  withPeople,
+  withTeam,
+  withTeams,
+  type CareerState,
+  type Team,
+} from './state.ts';
 import { TUNING } from './tuning.ts';
 
 const R = TUNING.reputation,
@@ -70,31 +79,28 @@ export function reputationAfterRace(
   points: (team: number) => number,
   mine: ShipRace | null
 ): CareerState {
-  const l = s.championships[tier];
+  const l = championshipOf(s, tier);
   const mean =
     l.teams.reduce((a, c) => a + points(c), 0) / Math.max(1, l.teams.length);
-  const teams = [...s.teams];
-  const people = [...s.people];
+  const teams: Team[] = [];
+  const people: Person[] = [];
   let player = s.player;
   for (const id of l.teams) {
-    const c = s.teams[id];
-    teams[id] = {
+    const c = teamOf(s, id);
+    teams.push({
       ...c,
       reputation: in100(c.reputation + teamMove(points(id), mean)),
-    };
-    const m = c.staff.manager;
-    if (m === null) continue;
+    });
+    const m = c.staff.manager === null ? undefined : s.people[c.staff.manager];
+    if (!m) continue;
     let move = managerMove(c.target, standingOf(s, id));
     if (c.player && player && mine)
-      move += shipMove(mine.points, mean / 2, mine.sinkings);
-    people[m] = {
-      ...people[m],
-      reputation: in100(people[m].reputation + move),
-    };
-    if (c.player && player)
-      player = { ...player, reputation: people[m].reputation };
+      move += shipMove(mine.points, mean / TEAM, mine.sinkings);
+    const reputation = in100(m.reputation + move);
+    people.push({ ...m, reputation });
+    if (c.player && player) player = { ...player, reputation };
   }
-  return { ...s, teams, people, player };
+  return { ...withPeople(withTeams(s, teams), people), player };
 }
 
 /** A state with a team's season's-end reputation moved. */
@@ -105,14 +111,11 @@ export function reputationAtEnd(
   promoted: boolean,
   relegated: boolean
 ): CareerState {
-  const teams = [...s.teams];
-  teams[team] = {
-    ...s.teams[team],
-    reputation: in100(
-      s.teams[team].reputation + seasonMove(title, promoted, relegated)
-    ),
-  };
-  return { ...s, teams };
+  const c = teamOf(s, team);
+  return withTeam(s, {
+    ...c,
+    reputation: in100(c.reputation + seasonMove(title, promoted, relegated)),
+  });
 }
 
 /** What a person's marketability drifts toward: stars and youth (the player: their reputation). */
@@ -137,38 +140,39 @@ export function marketMove(
   return in100(raised + X.drift * (anchor(g, day) - raised));
 }
 
-/** A state with a team's two ships' sailors' marketability moved by their race (`ships`, by ship; null: did not sail). */
+/** Who sails each ship of a team by right: her driver, and the player on the first ship of their own team. */
+const sailors = (s: CareerState, c: Team): Person[] =>
+  c.staff.ships.flatMap((h, ship) => {
+    const id = c.player && ship === 0 ? s.player?.person : h.driver;
+    const g = id === undefined || id === null ? undefined : s.people[id];
+    return g ? [g] : [];
+  });
+
+/** A state with a team's ships' sailors' marketability moved by their race (`ships`, by ship; null: did not sail). */
 export function marketabilityAfterRace(
   s: CareerState,
   team: number,
-  ships: readonly [ShipRace | null, ShipRace | null]
+  ships: readonly (ShipRace | null)[]
 ): CareerState {
-  const c = s.teams[team];
-  const people = [...s.people];
-  ([0, 1] as const).forEach((ship) => {
-    const id =
-      c.player && ship === 0
-        ? (s.player?.person ?? null)
-        : c.staff.ships[ship].driver;
-    if (id === null) return;
-    people[id] = {
-      ...people[id],
-      marketability: marketMove(people[id], ships[ship], s.day),
-    };
-  });
-  return { ...s, people };
+  const c = teamOf(s, team);
+  const at = new Map(
+    c.staff.ships.map((h, ship) => [
+      c.player && ship === 0 ? s.player?.person : h.driver,
+      ships[ship] ?? null,
+    ])
+  );
+  return withPeople(
+    s,
+    sailors(s, c).map((g) => ({
+      ...g,
+      marketability: marketMove(g, at.get(g.id) ?? null, s.day),
+    }))
+  );
 }
 
-/** A team's marketability: 0.4 × its reputation + 0.6 × the mean of its two ships' sailors'. */
+/** A team's marketability: TUNING.marketMoves.team × its reputation, and the rest the mean of its ships' sailors'. */
 export function teamMarketability(s: CareerState, c: Team): number {
-  const sailors = ([0, 1] as const).map((ship) =>
-    c.player && ship === 0
-      ? (s.player?.person ?? null)
-      : c.staff.ships[ship].driver
-  );
-  const known = sailors
-    .filter((id): id is number => id !== null)
-    .map((id) => marketability(s.people[id]));
+  const known = sailors(s, c).map(marketability);
   const mean =
     known.length === 0 ? 0 : known.reduce((a, b) => a + b, 0) / known.length;
   return tenth(X.team * c.reputation + (1 - X.team) * mean);

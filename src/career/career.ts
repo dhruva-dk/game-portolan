@@ -21,7 +21,6 @@ import {
   type Handler,
   type Handlers,
 } from './command.ts';
-import { TEAMING } from './teaming.ts';
 import { dice } from './dice.ts';
 import { FOUNDING } from './found.ts';
 import { HIRING, closingOpens, hear, lapse, silenceFalls } from './hiring.ts';
@@ -62,7 +61,6 @@ export const EVENTS: EventHandlers = {
 export const COMMANDS: Handlers = {
   ...FOUNDING,
   ...timeHandlers(EVENTS),
-  ...TEAMING,
   ...SCOUTING,
   ...HIRING,
   ...JOBS_TAKEN,

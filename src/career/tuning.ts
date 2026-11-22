@@ -25,7 +25,9 @@ export const TUNING = {
   /** The world at the start (Phase B section 3, epic section 5). */
   world: {
     championships: 3,
-    teams: 40,
+    teams: 20, // a championship's: race.ts TEAMS
+    /** The liveries a team's colours are dealt from: the dyes and patterns a ship may wear (race.ts Colours). */
+    liveries: { dyes: 16, patterns: 3 },
     emblems: 12,
     colonies: 40,
     free: 300, // free agents across every role
@@ -39,7 +41,6 @@ export const TUNING = {
       pit: 0.33,
     },
     pit: 4, // pit crew members a team
-    mechanics: 2, // one a ship
     /** A team's staff stars by tier, and the seeded spread about them (± half of it). */
     stars: [3.5, 2.5, 1.75],
     starSpread: 1,
@@ -131,13 +132,13 @@ export const TUNING = {
     concentration: [1.3, -0.6],
     leadership: [1.3, -0.6],
     leadershipMorale: 4,
-    arrive: 4,
     handling: [1.25, -0.5],
     reliability: [0.8, 0.4],
     perf: [0.8, 0.4],
     chemistry: [1, 1],
   },
-  bond: { levels: [5, 12, 20], sooner: 1, gustRecharge: 0.9 },
+  /** The bond of a ship's mechanic and driver: the points each level takes, and her pit's pace × by the level reached. */
+  bond: { levels: [5, 12, 20], pace: [1, 0.97, 0.94, 0.9] },
   designer: {
     start: 8,
     innovation: [0.2, 0.6],
@@ -157,17 +158,14 @@ export const TUNING = {
     persuasionDays: 30,
     nest: [1, 0.85, 0.7],
   },
+  /** The pit crew (career/pit.ts): what a member's stats weigh in their work and their steadiness, and what tiring does. */
   pit: {
-    weights: {
-      mend: { strength: 0.6, speed: 0.4 },
-      gust: { speed: 0.6, teamwork: 0.4 },
-      stores: { speed: 0.5, precision: 0.5 },
-      part: { precision: 0.7, teamwork: 0.3 },
-    },
+    work: { speed: 0.4, strength: 0.3, teamwork: 0.3 },
+    steady: { precision: 0.7, nerve: 0.3 },
     base: 0.5,
     tired: 0.3,
-    botch: 0.25,
-    botchTired: 0.25,
+    slip: 0.25,
+    slipTired: 0.25,
     stamina: 25,
     staminaOver: 1.5,
     recovery: 10,
@@ -396,7 +394,7 @@ export const TUNING = {
       perf: [620, 470, 330],
       spread: 60,
       headroom: 120,
-      reliability: [0.82, 0.74, 0.66],
+      reliability: [0.6, 0.5, 0.4],
       reliabilityHeadroom: 0.1,
     },
     /** A manager's reputation at the start, by tier, ± half the spread. */
@@ -432,14 +430,14 @@ export const TUNING = {
 
   /** Parts (Phase B section 8). */
   parts: {
-    handling: 0.15, // a part's Handling: spec × (1 ± this × perf / 1000)
-    standard: { perf: 500, reliability: 0.9 }, // a spec type's standard part
-    spare: { perf: 300, reliability: 0.7 }, // what a ship sails with when her part of a type is confiscated and no spare is left
+    handling: 0.15, // a part as fitted: the spec part's performance × (1 + this × (perf − the standard's) / 1000)
+    standard: { perf: 500, reliability: 0.5 }, // a spec type's standard part: race.ts Fitted's 1 and 0.5
+    spare: { perf: 300, reliability: 0.3 }, // what a ship sails with when her part of a type is confiscated and no spare is left
     wear: 0.1,
     faultWear: 0.05, // condition lost a race sailed, and more a fault
     carry: 0.6, // a part's performance and maximum carried into the next season
     spares: 1, // unfitted parts kept a type at the season's end (the best)
-    newPartMorale: 5, // ship two's driver's morale lost at a second new part in a row to ship one
+    newPartMorale: 5, // the other ships' drivers' morale lost at a second new part in a row to one ship
     fine: 0.2, // an inspection's fine: (1 + risk) × this × the part's design cost
   },
   /** The improvement (Phase B section 8.4): points a day, and what a point does. */
@@ -547,7 +545,7 @@ export const TUNING = {
     stand: 14, // offers a team gets every so many days, standing so long
     perRace: 4.6, // a fixed sponsor's Coin a race × the team's marketability × its tier's factor
     tier: [1.7, 1, 1], //   (Tier 1's wages outrun its marketability)
-    tier: [1, 1.6, 2.4], // × by the offer's tier (the landing pad's level at most)
+    grade: [1, 1.6, 2.4], // × by the offer's grade (the landing pad's level at most)
     races: [3, 10],
     bonus: 7, // an objective sponsor's bonus × the team's marketability × tier × the objective's weight
     objectives: { top10: 1, sinkTwo: 1.6, afloat: 1.2, mostSea: 1.8 },
@@ -568,9 +566,13 @@ export const TUNING = {
     inspectionRange: [0, 2 / 3],
     points: [0, 3],
   },
-  /** Race day (Phase B section 13, D20): points for places 1 to 5, then 21 − place to place 20; the championships that swap at
-   *  the season's end each way. */
-  race: { top: [25, 22, 20, 18, 16], last: 20, swap: 4, standIn: 1 }, // standIn: a stand-in driver's fee a race × their ask
+  /** Race day: the points of the first ten ships; the teams that swap between two championships at the season's end,
+   *  each way; a stand-in driver's fee a race × their ask. */
+  race: {
+    top: [25, 18, 15, 12, 10, 8, 6, 4, 2, 1],
+    swap: 1,
+    standIn: 1,
+  },
   /** The dilemmas (Phase B section 12, career/events.ts): the chance a team draws one after a round, and their numbers. */
   dilemmas: {
     chance: 0.6,
@@ -586,12 +588,12 @@ export const TUNING = {
     dinnerBond: 5, // Coin, bond points
     grey: { perf: 40, risk: 0.15 },
     report: 5, // a grey component's numbers; marketability for reporting it
-    guest: 2, // ship two's Consistency lost with a guest aboard
+    guest: 2, // the Consistency her first hired driver loses with a guest aboard
     worn: 30,
     rest: 0.5,
     restFatigue: 30,
     push: 0.1,
-    cover: 120, // fatigue that triggers; rest's rate ×; push's botch +; cover's Coin
+    cover: 120, // fatigue that triggers; rest's work ×; push's slip +; cover's cost
     press: 5,
     low: 40, // confidence and marketability moved; below this confidence the press asks
     trialAge: 20,

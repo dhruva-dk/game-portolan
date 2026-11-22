@@ -29,7 +29,7 @@ import { NOUNS, teamName, family, given, place, words } from './names.ts';
 import { mailView, table, unread } from './read.ts';
 import type { Person } from './roles.ts';
 import { factoryPoints } from './hq.ts';
-import { bondLevel } from './service.ts';
+import { bondLevel } from './pit.ts';
 import { age, potential, stars } from './stars.ts';
 import type { CareerState, Team, Objective } from './state.ts';
 import { trait } from './traits.ts';

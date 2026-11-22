@@ -4,9 +4,9 @@
 // The vocabulary both sides name (roles, buildings, wants, an offer, a race plan) is here, so a screen can build a
 // command without reaching into career/. The career's own state (career/state.ts) is built from these words.
 
-import type { GunKind } from './kinds';
-import type { Call, Colours, Job, PartType, RaceResult, Stance } from './race';
-import type { PeopleDesk } from './office-people';
+import type { GunKind } from './kinds.ts';
+import type { Call, Colours, PartType, RaceResult } from './race.ts';
+import type { PeopleDesk } from './office-people.ts';
 
 /** The roles every person has one of (D37). A reserve driver is a driver whose contract's status is 'reserve'. */
 export type Role =
@@ -45,12 +45,14 @@ export type Personality =
   | 'engineer'
   | 'gambler'
   | 'steady';
-/** A driver's place on her team: sailing ship two, or the reserve. Every other role's status is 'staff'. */
+/** A driver's place on her team: sailing a ship, or the reserve. Every other role's status is 'staff'. */
 export type Status = 'ship' | 'reserve' | 'staff';
 /** The three trades a team picks a supplier from each off-season (Phase B section 8.7). */
 export type Trade = 'timber' | 'canvas' | 'cordage';
-/** A ship of a team: 0 is ship one (the player's on the player's team), 1 ship two. */
-export type Ship = 0 | 1;
+/** A ship of a team (race.ts TEAM of them): 0 is the player's on the player's team. */
+export type Ship = 0 | 1 | 2 | 3;
+/** A team's ships, in order. */
+export const SHIPS: readonly Ship[] = [0, 1, 2, 3];
 /** The mail's categories (Phase B section 12). */
 export type MailCategory =
   | 'team'
@@ -85,13 +87,10 @@ export interface Offer {
 
 /** The race plan of the player's team (Phase B section 13). */
 export interface Plan {
-  driver: number; // the person who sails ship two
+  drivers: readonly number[]; // who sails each ship after the player's, in the ships' order
   parts: readonly { part: number; ship: Ship }[]; // which part on which ship
-  stance: Stance; // ship two's
-  order: readonly Job[]; // the pit crew's job order
-  jobs: Readonly<Record<Job, number>>; // which pit crew member works which job
   objectives: readonly (number | null)[]; // by sponsor slot: the objective chosen, by index into that sponsor's list
-  call: Call; // the wheel's call at the start
+  call: Call; // the team's call at the start
 }
 
 /** One part's share of the improvement's points (Phase B section 8.4), the two shares 0..1 summing to at most 1. */
@@ -127,7 +126,6 @@ export type Command =
   | { kind: 'AcceptCounter'; person: number }
   | { kind: 'WithdrawOffer'; person: number }
   | { kind: 'Dismiss'; person: number }
-  | { kind: 'MovePitJob'; person: number; job: Job }
   | { kind: 'SetImprovement'; shares: readonly ImprovementShare[] }
   | { kind: 'FitPart'; part: number; ship: Ship | null }
   | {

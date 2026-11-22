@@ -47,7 +47,7 @@ export function without(staff: Staff, id: number): Staff {
   });
   return {
     ...staff,
-    ships: [hand(staff.ships[0]), hand(staff.ships[1])],
+    ships: staff.ships.map(hand),
     reserve: staff.reserve === id ? null : staff.reserve,
     designer: staff.designer === id ? null : staff.designer,
     scouts: staff.scouts.filter((x) => x !== id),

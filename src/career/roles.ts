@@ -1,11 +1,11 @@
 // Every person and their role's stats (Phase B section 2, D15, D37). A stat is 0 to 20 at one decimal; u = stat / 20.
-// What each stat does is in career/service.ts (mechanic, pit), career/staff.ts (driver, designer, scout) and the
+// What each stat does is in career/pit.ts (mechanic, pit), career/staff.ts (driver, designer, scout) and the
 // sections that read the manager's and the chairman's (rivals, chairmen).
 //
 // The player is a person too (D35): a manager whose stats are all 0 and never read, since the player's own choices
 // stand for them (D8).
 
-import type { Job, PartType, Stat, Persona } from '../race.ts';
+import type { PartType, Stat, Persona } from '../race.ts';
 import type { Personality, Role, Status, Want } from '../office.ts';
 
 /** Each role's stats, in the order a screen lists them. */
@@ -55,7 +55,15 @@ export const ROLE_STATS = {
   chairman: ['patience', 'ambition', 'generosity', 'meddling'],
 } as const satisfies Record<Role, readonly string[]>;
 
-export const ROLES = Object.keys(ROLE_STATS) as readonly Role[];
+export const ROLES: readonly Role[] = [
+  'driver',
+  'mechanic',
+  'designer',
+  'scout',
+  'pit',
+  'manager',
+  'chairman',
+];
 
 export type StatOf<R extends Role> = (typeof ROLE_STATS)[R][number];
 export type StatsOf<R extends Role> = Readonly<Record<StatOf<R>, number>>;
@@ -128,7 +136,6 @@ export interface PersonCore {
   reputation: number; // a manager's, 0..100
   fatigue: number; // a pit crew member's, 0..100, as it stood on fatigueDay
   fatigueDay: number;
-  job: Job | null; // a pit crew member's job
   components: readonly string[]; // a designer's known components (career/components.ts)
   unfit: number; // races still to miss injured
   grudge: number | null; // the team that last sank her (Grudge-holder)
@@ -172,3 +179,32 @@ export const withStats = (
   g: Person,
   stats: Readonly<Record<string, number>>
 ): Person => personOf(g, g.role, stats, g.ceiling);
+
+/** A role's stats, each put through `f` (the same names). */
+export function mapped<S extends Readonly<Record<string, number>>>(
+  stats: S,
+  f: (value: number, name: string) => number
+): S {
+  const out: Record<string, number> = {};
+  for (const [k, v] of Object.entries(stats)) out[k] = f(v, k);
+  return out as S;
+}
+
+/** Whether a person is of a role: told to the types. */
+export const hasRole = <R extends Role>(
+  g: Person,
+  role: R
+): g is Extract<Person, { role: R }> => g.role === role;
+
+/**
+ * A person as one of a role. A staff's seat names its role (career/seats.ts),
+ * so the one seated there is of it: anyone else is a broken state, thrown
+ * here and refused by the reducer (career/career.ts apply).
+ */
+export function inRole<R extends Role>(
+  g: Person | undefined,
+  role: R
+): Extract<Person, { role: R }> {
+  if (!g || !hasRole(g, role)) throw new Error(`no ${role} there`);
+  return g;
+}

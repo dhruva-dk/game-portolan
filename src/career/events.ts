@@ -16,7 +16,7 @@ import { signableCheck } from './hiring.ts';
 import { learned } from './knowledge.ts';
 import { moraleIn } from './morale.ts';
 import { signed } from './contracts.ts';
-import { bondLevel, fatigueOn } from './service.ts';
+import { bondLevel, fatigueOn } from './pit.ts';
 import { age, potential } from './stars.ts';
 import {
   staffOf,

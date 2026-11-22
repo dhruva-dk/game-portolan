@@ -18,7 +18,7 @@ import type { Streams } from './dice.ts';
 import type { Event } from './queue.ts';
 import type { Person } from './roles.ts';
 
-/** A ship's two who sail and serve her: the driver (null on the player's ship one: the player sails her) and her mechanic. */
+/** A ship's two who sail and serve her: the driver (null on the player's own ship: the player sails her) and her mechanic. */
 export interface Hands {
   driver: number | null;
   mechanic: number | null;
@@ -28,11 +28,11 @@ export interface Hands {
 export interface Staff {
   manager: number | null; // null while the post is open (section 7)
   chairman: number;
-  ships: readonly [Hands, Hands];
+  ships: readonly Hands[]; // race.ts TEAM of them, by ship
   reserve: number | null;
   designer: number | null;
   scouts: readonly number[]; // one a crow's nest level at most
-  pit: readonly number[]; // four; each one's job is on the person
+  pit: readonly number[]; // the pit crew, TUNING.world.pit of them at most
 }
 
 /** A building's level, and the works under way to the next (Phase B section 9). */
@@ -95,7 +95,7 @@ export interface Draft {
 export type Objective = 'top10' | 'sinkTwo' | 'afloat' | 'mostSea';
 
 /** A sponsor, offered or signed (Phase B section 10): a fixed sum a race (no objectives), or a bonus for the objective
- *  chosen in each race plan from its list; for so many races; of a tier (the landing pad's level it needs). */
+ *  chosen in each race plan from its list; for so many races; of a grade (the landing pad's level it needs). */
 export interface Sponsor {
   id: number;
   name: string;
@@ -103,7 +103,7 @@ export interface Sponsor {
   objectives: readonly Objective[];
   bonus: number;
   races: number;
-  tier: number;
+  grade: number;
 }
 
 /** A sponsor's offer standing until a day. */
@@ -126,7 +126,7 @@ export interface Team {
   debtFloor: number; // balance below which no spend is accepted (negative)
   reputation: number; // 0..100
   confidence: number; // the chairman's in the manager, 0..100
-  target: number; // the chairman's target place, 1..40
+  target: number; // the chairman's target place, 1 the first
   buildings: Readonly<Record<Building, Works>>;
   parts: readonly Part[];
   design: Design | null;
@@ -135,7 +135,7 @@ export interface Team {
   improvement: readonly ImprovementShare[];
   improvementDay: number; // the day the improvement's work is reckoned to (closed form, career/improvement.ts)
   lastNew: Readonly<Record<PartType, Ship | null>>; // who got the last new part of each type
-  bonds: readonly [number, number]; // each ship's mechanic and driver
+  bonds: readonly number[]; // each ship's mechanic and driver, by ship
   suppliers: Readonly<Record<Trade, string | null>>;
   sponsors: readonly (Sponsor | null)[]; // by slot, three
   offers: readonly SponsorOffer[];
@@ -164,12 +164,23 @@ export interface Proposal {
 }
 export type Side = 'for' | 'against' | 'abstain';
 
+/** A line of a championship's drivers' table: who sailed (the player too), the team they last sailed for, and their season. */
+export interface DriverStanding {
+  person: number;
+  team: number;
+  points: number;
+  wins: number;
+  podiums: number;
+  sinkings: number;
+}
+
 export interface Championship {
-  id: number;
-  teams: readonly number[]; // forty, by id
+  id: number; // its tier: 0 the first
+  teams: readonly number[]; // race.ts TEAMS of them, by id
   rules: Rules; // this season's
   next: Rules; // next season's, as voted
   standings: readonly Standing[];
+  drivers: readonly DriverStanding[]; // everyone who has sailed a race of it this season
   proposals: readonly Proposal[];
 }
 
@@ -321,26 +332,54 @@ export function beginning(schema: number): CareerState {
   };
 }
 
-/** A state with some people replaced (by id), the rest shared. */
-export function withPeople(
-  s: CareerState,
-  changed: readonly Person[]
-): CareerState {
-  if (changed.length === 0) return s;
-  const people = [...s.people];
-  for (const g of changed) people[g.id] = g;
-  return { ...s, people };
+/** A list with some of its items replaced (each by its id, which is its place), the rest shared. */
+function replaced<T extends { id: number }>(
+  list: readonly T[],
+  changed: readonly T[]
+): readonly T[] {
+  if (changed.length === 0) return list;
+  const out = [...list];
+  for (const x of changed) out[x.id] = x;
+  return out;
 }
 
+/** A state with some people replaced (by id), the rest shared. */
+export const withPeople = (
+  s: CareerState,
+  changed: readonly Person[]
+): CareerState => ({ ...s, people: replaced(s.people, changed) });
+/** A state with one person replaced. */
+export const withPerson = (s: CareerState, g: Person): CareerState =>
+  withPeople(s, [g]);
+
 /** A state with some teams replaced (by id), the rest shared. */
-export function withTeams(
+export const withTeams = (
   s: CareerState,
   changed: readonly Team[]
-): CareerState {
-  if (changed.length === 0) return s;
-  const teams = [...s.teams];
-  for (const c of changed) teams[c.id] = c;
-  return { ...s, teams };
+): CareerState => ({ ...s, teams: replaced(s.teams, changed) });
+/** A state with one team replaced. */
+export const withTeam = (s: CareerState, c: Team): CareerState =>
+  withTeams(s, [c]);
+
+/** A team by id. An id past the teams is a broken state: thrown, and refused by the reducer (career/career.ts apply). */
+export function teamOf(s: CareerState, id: number): Team {
+  const c = s.teams[id];
+  if (!c) throw new Error(`no team ${id}`);
+  return c;
+}
+
+/** A championship by its tier; as teamOf. */
+export function championshipOf(s: CareerState, tier: number): Championship {
+  const l = s.championships[tier];
+  if (!l) throw new Error(`no tier ${tier}`);
+  return l;
+}
+
+/** A person by id; as teamOf. */
+export function personAt(s: CareerState, id: number): Person {
+  const g = s.people[id];
+  if (!g) throw new Error(`no person ${id}`);
+  return g;
 }
 
 /** Every person on a team's staff, by id. */

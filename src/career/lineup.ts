@@ -1,20 +1,23 @@
-// Who sails each ship on race day, and how (Phase B section 13). A pure function of the state: the card builder
-// (career/card.ts) and the round's close (career/round.ts) read the same lineup, and while the player's race is under
+// Who sails each ship on race day, and under what call. A pure function of the
+// state: the card builder (career/card.ts) and the round's close
+// (career/round.ts) read the same lineup, and while the player's race is under
 // way the career takes no order that could change it (career/career.ts).
 //
-// A ship's driver: the player's ship one is the player's (null). Ship two of the player's team is the plan's driver
-// if they may sail. Otherwise each ship takes her own driver if fit, else the team's reserve if fit and not on the
-// other ship, else a stand-in: the best fit free-agent driver not already engaged (the player's team first, then by
-// team id), paid for the one race at their ask. With none, the ship is forfeit (sunk at the start): no ship ever
-// starts without someone to sail her.
+// A ship's driver: the first ship of the player's team is the player's (null).
+// The player's other ships take the plan's drivers where they may sail. Then
+// each ship still open takes her own driver if fit, else the team's reserve if
+// fit and not aboard another, else a stand-in: the best fit free-agent driver
+// not already engaged (the player's team first, then by team id), paid for the
+// one race at their ask. With none, the ship is forfeit: no ship ever starts
+// without someone to sail her.
 
-import type { Job, Stance, Persona } from '../race.ts';
+import { CALLS, type Call, type Persona } from '../race.ts';
+import { SHIPS } from '../office.ts';
 import { effective } from './effective.ts';
 import { seeded, type Rand } from './dice.ts';
 import { tacticsHolds } from './leadership.ts';
 import { unfit } from './morale.ts';
-import type { Person, PersonOf } from './roles.ts';
-import { JOBS } from './service.ts';
+import { hasRole, type Person } from './roles.ts';
 import { stars } from './stars.ts';
 import type { CareerState, Team } from './state.ts';
 
@@ -25,26 +28,26 @@ export interface Aboard {
   forfeit: boolean;
 }
 
-/** A team's race: who sails each ship, ship two's stance (both ships' for a rival), the pit crew's order, and the
- *  sponsor objectives chosen. */
+/** A team's race: who sails each ship, the call it sails under, and the sponsor objectives chosen. */
 export interface Sailing {
   team: number;
-  ships: readonly [Aboard, Aboard];
-  stance: Stance;
-  order: readonly Job[];
+  ships: readonly Aboard[];
+  call: Call;
   objectives: readonly (number | null)[];
 }
 
-/** The stance each persona sails at its best. */
-const STANCE: Readonly<Record<Persona, Stance>> = {
-  hunter: 'hunt',
+/** The call each persona sails at its best. */
+const CALL: Readonly<Record<Persona, Call>> = {
+  hunter: 'attack',
   homesteader: 'hold',
-  raider: 'loot',
+  raider: 'attack',
   turtle: 'hold',
-  scavenger: 'loot',
-  brawler: 'hunt',
+  scavenger: 'free',
+  brawler: 'attack',
 };
-export const STANCES: readonly Stance[] = ['hunt', 'hold', 'loot', 'shadow'];
+
+const HERS: Aboard = { driver: null, standIn: false, forfeit: false };
+const NOBODY: Aboard = { driver: null, standIn: false, forfeit: true };
 
 /** A number for today's race of a team or person to seed its draws (form, a rival's plan): the same all race day. */
 export const raceRand = (s: CareerState, salt: number): Rand =>
@@ -72,18 +75,14 @@ function freeDrivers(s: CareerState): Person[] {
     .sort((a, b) => stars(b) - stars(a) || a.id - b.id);
 }
 
-/** A rival's stance for the race: the one its drivers' persona sails best if its manager's Tactics holds, else drawn. */
-function rivalStance(s: CareerState, c: Team, driver: number | null): Stance {
+/** A rival's call for the race: the one its first driver's persona sails best if its manager's Tactics holds, else drawn. */
+function rivalCall(s: CareerState, c: Team, driver: number | null): Call {
   const rand = raceRand(s, 100000 + c.id);
-  const m = c.staff.manager === null ? null : s.people[c.staff.manager];
-  const tactics =
-    m && m.role === 'manager'
-      ? effective(m as PersonOf<'manager'>, null).tactics
-      : 0;
-  const persona = driver === null ? null : s.people[driver].persona;
-  return persona && tacticsHolds(tactics, rand)
-    ? STANCE[persona]
-    : STANCES[Math.floor(rand() * STANCES.length)];
+  const m = c.staff.manager === null ? undefined : s.people[c.staff.manager];
+  const tactics = m && hasRole(m, 'manager') ? effective(m, null).tactics : 0;
+  const persona = driver === null ? null : (s.people[driver]?.persona ?? null);
+  const drawn = CALLS[Math.floor(rand() * CALLS.length)] ?? 'free';
+  return persona && tacticsHolds(tactics, rand) ? CALL[persona] : drawn;
 }
 
 /** Every team's race on race day, by team id. */
@@ -96,66 +95,71 @@ export function lineups(s: CareerState): Sailing[] {
     taken.add(g.id);
     return g.id;
   };
-  const me = s.player && !s.player.sacked ? s.player.team : null;
-  const planned = me === null ? null : s.teams[me].plan;
-  if (
-    planned &&
-    maySail(s, me!, planned.driver) &&
-    s.people[planned.driver].contract === null
-  )
-    taken.add(planned.driver);
-  const order =
-    me === null
-      ? s.teams
-      : [s.teams[me], ...s.teams.filter((c) => c.id !== me)];
-  const out: Sailing[] = new Array(s.teams.length);
+  const mine = s.player && !s.player.sacked ? s.teams[s.player.team] : null;
+  const plan = mine?.plan ?? null;
+  const wanted = (ship: number): number | null => {
+    const d = plan?.drivers[ship - 1];
+    return mine && d !== undefined && maySail(s, mine.id, d) ? d : null;
+  };
+  // the plan's free agents are engaged before any rival looks for a stand-in
+  for (const ship of SHIPS) {
+    const d = wanted(ship);
+    if (d !== null && s.people[d]?.contract === null) taken.add(d);
+  }
+  const order = mine
+    ? [mine, ...s.teams.filter((c) => c.id !== mine.id)]
+    : s.teams;
+  const out = new Map<number, Sailing>();
   for (const c of order) {
     const used = new Set<number>();
-    const aboard = (ship: 0 | 1): Aboard => {
-      if (c.id === me && ship === 0)
-        return { driver: null, standIn: false, forfeit: false };
-      const choice =
-        c.id === me && planned && maySail(s, c.id, planned.driver)
-          ? planned.driver
-          : null;
-      const own = c.staff.ships[ship].driver,
-        reserve = c.staff.reserve;
-      for (const g of [choice, own, reserve]) {
-        if (g !== null && !used.has(g) && maySail(s, c.id, g)) {
-          used.add(g);
-          return {
-            driver: g,
-            standIn: s.people[g].contract === null,
-            forfeit: false,
-          };
-        }
+    const ships = new Map<number, Aboard>();
+    const board = (ship: number, g: number) => {
+      used.add(g);
+      ships.set(ship, {
+        driver: g,
+        standIn: s.people[g]?.contract === null,
+        forfeit: false,
+      });
+    };
+    if (c === mine) {
+      ships.set(0, HERS);
+      for (const ship of SHIPS) {
+        const d = ship === 0 ? null : wanted(ship);
+        if (d !== null && !used.has(d)) board(ship, d);
       }
-      const g = hire();
-      if (g !== null) used.add(g);
-      return g === null
-        ? { driver: null, standIn: false, forfeit: true }
-        : { driver: g, standIn: true, forfeit: false };
-    };
-    const ships = [aboard(0), aboard(1)] as const;
-    const mine = c.id === me && planned;
-    out[c.id] = {
+    }
+    for (const ship of SHIPS) {
+      if (ships.has(ship)) continue;
+      const own = c.staff.ships[ship]?.driver ?? null;
+      const fit = [own, c.staff.reserve].find(
+        (g) => g !== null && !used.has(g) && maySail(s, c.id, g)
+      );
+      const g = fit ?? hire();
+      if (g === null) ships.set(ship, NOBODY);
+      else board(ship, g);
+    }
+    const aboard = SHIPS.map((ship) => ships.get(ship) ?? NOBODY);
+    out.set(c.id, {
       team: c.id,
-      ships,
-      stance: mine
-        ? planned.stance
-        : rivalStance(s, c, ships[0].driver ?? ships[1].driver),
-      order: mine ? planned.order : JOBS,
-      objectives: mine ? planned.objectives : [],
-    };
+      ships: aboard,
+      call:
+        c === mine && plan
+          ? plan.call
+          : rivalCall(s, c, aboard.find((a) => a.driver !== null)?.driver ?? null),
+      objectives: c === mine && plan ? plan.objectives : [],
+    });
   }
-  return out;
+  return s.teams.map(
+    (c) =>
+      out.get(c.id) ?? { team: c.id, ships: [], call: 'free', objectives: [] }
+  );
 }
 
-/** The teams of a tier's race in side order: in the player's tier theirs first, then the others by id. */
-export function sides(s: CareerState, tier: number): number[] {
-  const teams = [...s.championships[tier].teams].sort((a, b) => a - b);
+/** The teams of a tier's race in the card's order: in the player's tier theirs first, then the others by id. */
+export function grid(s: CareerState, tier: number): number[] {
+  const teams = [...(s.championships[tier]?.teams ?? [])].sort((a, b) => a - b);
   const me = s.player && !s.player.sacked ? s.player.team : null;
-  return me !== null && s.teams[me].tier === tier
+  return me !== null && s.teams[me]?.tier === tier
     ? [me, ...teams.filter((c) => c !== me)]
     : teams;
 }

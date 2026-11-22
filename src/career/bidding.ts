@@ -150,7 +150,6 @@ export function openPosts(
       t.offer.replaces === null &&
       s.people[t.person].contract?.team !== c.id
   );
-  const jobs = staff.pit.map((id) => s.people[id].job);
   for (const role of HIRED)
     for (const status of role === 'driver'
       ? (['ship', 'reserve'] as const)
@@ -159,13 +158,12 @@ export function openPosts(
         (t) => t.offer.role === role && t.offer.status === status
       ).length;
       for (
-        let seat = openSeat({ ...c, staff }, role, status, jobs);
+        let seat = openSeat({ ...c, staff }, role, status);
         seat;
-        seat = openSeat({ ...c, staff }, role, status, jobs)
+        seat = openSeat({ ...c, staff }, role, status)
       ) {
         // take the seat (by a stand-in id no person has) so the next open one is found
         staff = seatedAway(staff, seat);
-        if (seat.kind === 'pit') jobs.push(seat.job);
         if (waiting > 0) waiting--;
         else out.push({ role, status });
       }
@@ -239,7 +237,7 @@ function weakest(s: CareerState, mind: Mind, role: Role): Person | null {
         g.role === role &&
         !g.player &&
         !talking(s, mind.team, g.id) &&
-        (role !== 'driver' || seatOf(c, g.id, () => null)?.kind === 'driver')
+        (role !== 'driver' || seatOf(c, g.id)?.kind === 'driver')
     );
   if (
     s.talks.some(
@@ -267,11 +265,7 @@ function upgrade(employed: boolean): Decide {
     for (const role of HIRED) {
       const low = weakest(state, mind, role);
       if (!low) continue;
-      const seat = seatOf(
-        state.teams[mind.team],
-        low.id,
-        (id) => state.people[id].job
-      );
+      const seat = seatOf(state.teams[mind.team], low.id);
       if (!seat) continue;
       const floor = knownWorth(mind, low) + bar(mind);
       const ranked = pool
@@ -329,11 +323,7 @@ export const renew: Decide = (s, mind0, roll) => {
     )
     .sort((a, b) => knownWorth(mind, b) - knownWorth(mind, a) || a.id - b.id);
   for (const g of due) {
-    const seat = seatOf(
-      state.teams[mind.team],
-      g.id,
-      (id) => state.people[id].job
-    );
+    const seat = seatOf(state.teams[mind.team], g.id);
     if (!seat) continue;
     const r = tryOffer(
       state,

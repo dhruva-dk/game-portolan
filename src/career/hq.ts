@@ -51,7 +51,7 @@ export const fishIncome = (c: Team): number =>
       K.fishLevel[at(c.buildings.fishMarket.level)]
   );
 /** The landing pad: the highest sponsor tier a team may sign. */
-export const sponsorTier = (c: Team): number => c.buildings.landingPad.level;
+export const sponsorGrade = (c: Team): number => c.buildings.landingPad.level;
 
 /** Whether a team may raise a building a level now. */
 export function buildCheck(s: CareerState, team: number, b: Building): Check {

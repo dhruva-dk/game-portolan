@@ -26,6 +26,9 @@ export const refuse = (code: string, sentence: string): Applied => ({
   reason: { code, sentence },
 });
 
+/** A check that did not hold, as the command's refusal. */
+export const refused = (reason: Refusal): Applied => ({ ok: false, reason });
+
 /** An accepted command's new state. */
 export const accept = (state: CareerState): Applied => ({ ok: true, state });
 

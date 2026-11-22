@@ -1,13 +1,13 @@
-// A person's effective stats: their role stats shifted by morale (±1) and by their traits in a setting (Phase B
-// section 2.3). Form is added on top for a driver's race (career/form.ts). Every reader of a stat in a race or a
-// decision reads these, never the raw stats.
+// A person's effective stats: their role stats shifted by morale (±1) and by
+// their traits in a setting. Form is added on top for a driver's race
+// (career/form.ts). Every reader of a stat in a race or a decision reads these,
+// never the raw stats.
 
-import type { DriverStats } from '../race.ts';
+import type { Role } from '../office.ts';
 import { moraleShift } from './morale.ts';
-import { stat, type Person, type PersonOf } from './roles.ts';
+import { mapped, stat, type Person, type PersonOf } from './roles.ts';
 import { modifier, type Setting } from './traits.ts';
 import { TUNING } from './tuning.ts';
-import type { Role } from '../office.ts';
 
 /** A person's stats with morale and their traits (those that hold in the setting; null: those that always hold). */
 export function effective<R extends Role>(
@@ -16,18 +16,8 @@ export function effective<R extends Role>(
 ): PersonOf<R>['stats'] {
   const mod = modifier(g.traits, setting);
   const shift = moraleShift(g.morale) + mod.all;
-  const raw: Readonly<Record<string, number>> = g.stats;
-  const out: Record<string, number> = {};
-  for (const k of Object.keys(raw))
-    out[k] = stat(raw[k] + shift + (mod.stats[k] ?? 0));
-  return out as PersonOf<R>['stats'];
+  return mapped(g.stats, (v, k) => stat(v + shift + (mod.stats[k] ?? 0)));
 }
-
-/** A driver's effective stats, in the seam's type. */
-export const driverStats = (
-  g: PersonOf<'driver'>,
-  setting: Setting | null
-): DriverStats => effective(g, setting);
 
 /** A person's marketability with their traits', kept to 0..100. */
 export const marketability = (g: Person): number =>
@@ -36,7 +26,7 @@ export const marketability = (g: Person): number =>
     Math.max(0, g.marketability + modifier(g.traits, null).marketability)
   );
 
-/** The Coin a Pay Driver brings her team a race. */
+/** What a Pay Driver brings her team a race. */
 export const payIncome = (g: Person): number =>
   Math.round(modifier(g.traits, null).balance * marketability(g));
 

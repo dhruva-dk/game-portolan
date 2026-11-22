@@ -12,7 +12,7 @@ import { TUNING } from './tuning.ts';
 import type { Person, PersonOf } from './roles.ts';
 import { scoutCheck, scoutingDays } from './scouting.ts';
 import { seatOf, seatRole } from './seats.ts';
-import { JOBS, mendingFactor, rating, repairsFactor } from './service.ts';
+import { JOBS, mendingFactor, rating, repairsFactor } from './pit.ts';
 import {
   designSpeed,
   feedbackPoints,
@@ -65,7 +65,7 @@ export function defaultPerson(s: CareerState, c: Team): number {
 export function askOffer(s: CareerState, c: Team, g: Person): Offer {
   const ask = askOf(s, g, c),
     mine = g.contract?.team === c.id;
-  const seat = mine ? seatOf(c, g.id, (id) => s.people[id].job) : null;
+  const seat = mine ? seatOf(c, g.id) : null;
   const status = seat
     ? seatRole(seat).status
     : g.role === 'driver'

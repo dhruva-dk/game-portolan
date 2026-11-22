@@ -1,5 +1,5 @@
 // Sponsors (Phase B section 10): three slots a team. Offers come every few rounds (a `sponsorOffer` event a team, every
-// 42 days), their size by the team's marketability and their tier (at most the landing pad's level). A sponsor pays a
+// 42 days), their size by the team's marketability and their grade (at most the landing pad's level). A sponsor pays a
 // fixed sum a race (career/money.ts raceMoney), or a bonus for the objective chosen in each race plan from their list
 // (finish top 10; sink two ships; both ships afloat at the end; hold the most sea in the team's tier), harder paying
 // more, for a number of races. SignSponsor. Rivals sign by Finance (career/works.ts).
@@ -19,7 +19,7 @@ import { sponsor as sponsorName } from './names.ts';
 import { mine, post } from './post.ts';
 import { schedule, type Event } from './queue.ts';
 import { teamMarketability } from './reputation.ts';
-import { sponsorTier } from './hq.ts';
+import { sponsorGrade } from './hq.ts';
 import type { CareerState, Team } from './state.ts';
 import { TUNING } from './tuning.ts';
 
@@ -51,8 +51,8 @@ export function sponsorOffers(
     teamMarketability(s, c) * P.tier[Math.min(P.tier.length - 1, c.tier)];
   const offers: SponsorOffer[] = [];
   for (let i = 0; i < count; i++) {
-    const tier = between(rand, 1, Math.max(1, sponsorTier(c)));
-    const scale = market * P.tier[tier - 1];
+    const grade = between(rand, 1, Math.max(1, sponsorGrade(c)));
+    const scale = market * (P.grade[grade - 1] ?? 1);
     const races = between(rand, P.races[0], P.races[1]);
     const objective = rand() < P.objectiveShare;
     const objectives = objective
@@ -67,7 +67,7 @@ export function sponsorOffers(
       objectives,
       bonus: objective ? Math.round(P.bonus * scale) : 0,
       races,
-      tier,
+      grade,
     };
     offers.push({ sponsor, expires: s.day + P.stand });
   }
@@ -118,7 +118,7 @@ export function signCheck(
   const o = c.offers.find((x) => x.sponsor.id === offer);
   if (!o) return why('offer', 'No such offer stands.');
   if (o.expires < s.day) return why('lapsed', 'That offer has lapsed.');
-  if (o.sponsor.tier > sponsorTier(c))
+  if (o.sponsor.grade > sponsorGrade(c))
     return why(
       'tier',
       'The landing pad cannot receive a sponsor of that standing.'

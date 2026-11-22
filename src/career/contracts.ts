@@ -69,17 +69,13 @@ export function breakCost(s: CareerState, g: Person, team: number): number {
 export const dismissalCost = (s: CareerState, g: Person): number =>
   g.contract ? g.contract.wage * racesLeft(s) : 0;
 
-/** The jobs a team's pit hold. */
-const jobsOf = (s: CareerState, c: Team) =>
-  c.staff.pit.map((id) => s.people[id].job);
-
 /** A team's seat for a person it signs: the seat of the person they replace, if still aboard, else an open one. */
 export function seatFor(s: CareerState, c: Team, offer: Offer): Seat | null {
   if (offer.replaces !== null) {
-    const seat = seatOf(c, offer.replaces, (id) => s.people[id].job);
+    const seat = seatOf(c, offer.replaces);
     if (seat) return seat;
   }
-  return openSeat(c, offer.role, offer.status, jobsOf(s, c));
+  return openSeat(c, offer.role, offer.status);
 }
 
 /** A state with a team changed. */
@@ -145,7 +141,6 @@ export function released(s: CareerState, person: number): CareerState {
   out = withPerson(out, {
     ...out.people[person],
     contract: null,
-    job: g.role === 'pit' ? null : g.job,
   });
   out = scoutingStopped(out, person);
   return talksEnded(out, person, null);
@@ -182,7 +177,7 @@ export function signed(s: CareerState, deal: Signing): CareerState {
     const c0 = out.teams[team];
     if (
       offer.replaces !== null &&
-      seatOf(c0, offer.replaces, (id) => out.people[id].job)
+      seatOf(c0, offer.replaces)
     ) {
       const seat = seatFor(out, c0, offer)!;
       const leaving = out.people[offer.replaces];

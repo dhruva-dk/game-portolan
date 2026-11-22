@@ -15,7 +15,7 @@ import { within } from './flags.ts';
 import { mine } from './post.ts';
 import type { PersonOf } from './roles.ts';
 import { factoryPoints } from './hq.ts';
-import { perfImprovement, reliabilityImprovement } from './service.ts';
+import { perfImprovement, reliabilityImprovement } from './pit.ts';
 import type { CareerState, Team, Part } from './state.ts';
 import { termsFor } from './suppliers.ts';
 import { TUNING } from './tuning.ts';
