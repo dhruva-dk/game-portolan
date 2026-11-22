@@ -399,13 +399,20 @@ export function createState(
     const r = settled(ship, sea, tick * STEP, id),
       p = pose(ship, r);
     const bot = (id !== PLAYER || !manned) && !lashed,
-      driver = card?.ships[id]?.driver;
+      carded = card?.ships[id],
+      driver = carded?.driver;
     aboard.set(id, {
       look,
       mind: bot ? mind(driver?.seed ?? seedOf(id), ship.at) : null,
-      // (a card's driver is her own bot; else the bot her berth's seed deals)
+      // (a card's driver is her own bot, under her team's call; else the bot
+      // her berth's seed deals)
       nature: driver
-        ? natureOf(driver, closedBy(match.type.rules.storm), brainOf(id))
+        ? natureOf(
+            driver,
+            closedBy(match.type.rules.storm),
+            brainOf(id),
+            carded?.call
+          )
         : nature(seedOf(id), brainOf(id), match.type.mix),
       steady: lashed ?? AMIDSHIPS,
       ride: r,
@@ -645,7 +652,8 @@ export function createState(
       storm,
       STEP
     );
-    battle.crews = tended(back.crews, home, STEP);
+    // (in a race sailed by a card her water mends no one: the pit does)
+    battle.crews = tended(back.crews, tally ? () => false : home, STEP);
     return { held: did, regained: back.regained };
   };
 
@@ -749,6 +757,12 @@ export function createState(
       lap?.('fight');
       tick++;
       const did = hold(storm);
+      if (tally)
+        battle.crews = tally.tend(battle.crews, told.asks, {
+          home,
+          tick,
+          aboard,
+        });
       lap?.('hold');
       rideOn(met, wants.blew);
       lap?.('ride');

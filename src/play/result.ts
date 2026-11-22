@@ -22,13 +22,18 @@
 // wherever it is run.
 
 import { SOUND, type Faults } from '../kinds.ts';
-import type { RaceCard, RaceResult } from '../race.ts';
+import type { Call, RaceCard, RaceResult } from '../race.ts';
 import type { Crew, Shot, Strike } from '../sim/battle.ts';
+import { called } from '../sim/called.ts';
 import { over, teamsOf } from '../sim/carded.ts';
 import type { Vessel } from '../sim/contact.ts';
 import { faultsIn } from '../sim/faults.ts';
+import { STEP } from '../sim/fixed.ts';
 import { sunk } from '../sim/health.ts';
 import type { Sunk } from '../sim/match.ts';
+import type { Nature } from '../sim/persona.ts';
+import { pitted } from '../sim/pit.ts';
+import type { Ask } from '../sim/stores.ts';
 
 /**
  * The finishing order, first place first: `alive` (the ships afloat at the
@@ -111,6 +116,8 @@ export function createTally(card: RaceCard, closes: number) {
   /** Each ship's faults as last watched. */
   const levels: Faults[] = [];
   const forfeit = card.ships.filter((s) => s.forfeit).map((s) => s.id);
+  /** The call each ship's team sails under, by her id. */
+  const calls = card.ships.map((s) => s.call);
   let made: RaceResult | null = null;
 
   /** What the guns and the rams did in a step. */
@@ -192,9 +199,49 @@ export function createTally(card: RaceCard, closes: number) {
     holds(id: number, share: number) {
       held[id] = share;
     },
-    /** A pit stop ended: whose, when it began, how long, its jobs and slips. */
-    pitted(stop: RaceResult['pits'][number]) {
-      pits.push(stop);
+    /** The call a ship's team sails under now. */
+    callOf: (id: number): Call => calls[id],
+    /**
+     * A step's asks of the race (sim/stores.ts Ask), done once the sea is
+     * held, at step `tick`: a team's call changed by a ship of it, every bot
+     * of that team (`aboard`, by id) sailing under it from now
+     * (sim/called.ts); and the pit (sim/pit.ts), for the ships in their team's
+     * water (`home`), each stop that ended noted. Returns the crews after.
+     */
+    tend(
+      crews: readonly Crew[],
+      asks: ReadonlyMap<number, Ask>,
+      sea: {
+        home(id: number): boolean;
+        tick: number;
+        aboard: ReadonlyMap<number, { nature: Nature }>;
+      }
+    ): Crew[] {
+      for (const [id, { call }] of asks) {
+        if (!call) continue;
+        for (const s of card.ships) {
+          if (s.team !== teams[id]) continue;
+          calls[s.id] = call;
+          const a = sea.aboard.get(s.id);
+          if (a)
+            a.nature = { ...a.nature, brain: called(a.nature.brain, call) };
+        }
+      }
+      const lane = {
+        seed: card.seed,
+        tick: sea.tick,
+        crew: (id: number) => card.ships[id].pit,
+      };
+      const served = pitted(crews, asks, sea.home, lane, STEP);
+      for (const { id, seconds, jobs, slips } of served.stops)
+        pits.push({
+          id,
+          second: sea.tick * STEP - seconds,
+          seconds,
+          jobs,
+          slips,
+        });
+      return served.crews;
     },
     /**
      * A step of the race tallied: what its guns and rams did (`shots`,

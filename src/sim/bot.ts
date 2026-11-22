@@ -7,6 +7,7 @@
 // - mending and loot (purser.ts), with what she asks of her hold and her gust;
 // - flight and fight (fighting.ts): ramming, or her guns once armed;
 // - hunting to the sound of guns (hunter.ts), and claiming water (claimer.ts);
+// - her team's pit, in a race sailed in teams (pitting.ts);
 // - and roaming (roaming.ts) when nothing better calls, to her place for the
 //   phase when it is time (placing.ts: she looks places over as she thinks).
 // Each scores 0..1 with named factors (utility.ts), multiplied by its weight
@@ -64,6 +65,7 @@ import {
   wounded,
 } from './fighting.ts';
 import { logMemory, note } from './logbook.ts';
+import { pitAct, pitAsk, pitUrge } from './pitting.ts';
 import { placeMemory, survey } from './placing.ts';
 import { roamGoal } from './roaming.ts';
 import { keptInside, stormGoal, stormUrge } from './storming.ts';
@@ -83,6 +85,7 @@ export const CHOICE = {
   hunt: 2,
   loot: 1.8,
   claim: 1.5,
+  pit: 3.4,
   roam: 1,
 } as const satisfies Record<Mode, number>;
 
@@ -217,7 +220,7 @@ export function think(
     : { aim: null, fire: false };
   // her stores asked on the steps she thinks; the gun for the range taken in
   // hand whenever it changes
-  const ask = m.think === BOT.every ? purse(c) : NOTHING;
+  const ask = m.think === BOT.every ? pitAsk(c, purse(c)) : NOTHING;
   const arm =
     own.crew && ask.take === null && ask.tap === null && !own.crew.hold.using
       ? armFor(c, seen ? c.foeD : null)
@@ -232,7 +235,10 @@ export function think(
 const intentOf = (m: Memory): Intent => ({
   goal: m.goal,
   foe: m.mode === 'fight' ? m.foe : -1,
-  arrive: m.mode === 'loot' || m.mode === 'heal' ? 'gently' : 'through',
+  arrive:
+    m.mode === 'loot' || m.mode === 'heal' || m.mode === 'pit'
+      ? 'gently'
+      : 'through',
 });
 
 // ---------------------------------------------------------------- deciding
@@ -283,6 +289,8 @@ const OPTIONS: readonly Omit<Choice, 'weight'>[] = [
   { name: 'loot', mode: 'loot', score: lootUrge, act: lootAct },
   // her water (claimer.ts): a loop to claim more
   { name: 'claim', mode: 'claim', score: claimUrge, act: claimAct },
+  // her team's pit, in a race sailed in teams (pitting.ts)
+  { name: 'pit', mode: 'pit', score: pitUrge, act: pitAct },
   roam,
 ];
 

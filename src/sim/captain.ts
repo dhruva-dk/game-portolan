@@ -1,6 +1,6 @@
 // What a bot is, shared by all her parts (bot.ts her mind, lookout.ts,
 // storming.ts, fighting.ts, roaming.ts, tactician.ts, pilot.ts, helmsman.ts,
-// gunner.ts, purser.ts, claimer.ts, hunter.ts): what they all are
+// gunner.ts, purser.ts, claimer.ts, hunter.ts, pitting.ts): what they all are
 // tuned by, how she sees a ship, what she carries from one step to the next (each
 // part's own, gathered), what she means, what a step of her weighs, and the few
 // bits of the sphere and of chance they all reach for.
@@ -8,7 +8,7 @@
 // Pure arithmetic: no three, so it runs in node for the tests; deterministic
 // for the same inputs, to the bit.
 
-import { add, cross, scale, type Vec3 } from '../world/sphere.ts';
+import { add, along, cross, scale, type Vec3 } from '../world/sphere.ts';
 import { random } from '../world/random.ts';
 import { STEP } from './fixed.ts';
 import { SHIP } from './handling.ts';
@@ -101,7 +101,8 @@ export type Mode =
   | 'heal'
   | 'loot'
   | 'claim'
-  | 'hunt';
+  | 'hunt'
+  | 'pit';
 
 /**
  * What she means, as her mind hands it to her tactician (tactician.ts): where
@@ -188,6 +189,30 @@ export const between = (m: Memory, lo: number, hi: number) =>
 /** Whether the water at p is open to her. */
 export const open = (c: Ctx, p: Vec3) =>
   c.sea.depth(p) >= SHIP.draught + BOT.open;
+
+/** The bearings round her she looks along for water, and how many rings out. */
+const LOOKS = 8,
+  RINGS = 3;
+/**
+ * The nearest water that is `mine` (by where it lies) within `reach` m of her,
+ * on LOOKS bearings and RINGS rings: where she is, if she lies in it; null with
+ * none open to her.
+ */
+export function waterNear(
+  c: Ctx,
+  reach: number,
+  mine: (p: Vec3) => boolean
+): Vec3 | null {
+  const { ship } = c.own;
+  if (mine(ship.at)) return ship.at;
+  for (let r = 1; r <= RINGS; r++)
+    for (let k = 0; k < LOOKS; k++) {
+      const way = rotate(ship.at, ship.heading, (2 * Math.PI * k) / LOOKS),
+        p = along(ship.at, way, (r * reach) / RINGS).p;
+      if (mine(p) && open(c, p)) return p;
+    }
+  return null;
+}
 
 /**
  * Her mood now: her temperament's aggro, moved by what has befallen her (her

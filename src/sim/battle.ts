@@ -52,6 +52,7 @@ import {
 import { fly, loosed, offHull, type Ball } from './shot.ts';
 import { broken, emptyHold, type Hold } from './hold.ts';
 import { gustOf, type Gust } from './gust.ts';
+import type { Stop } from './pit.ts';
 import type { Sight } from './sight.ts';
 import type { Depth } from './shoal.ts';
 
@@ -74,6 +75,8 @@ export interface Crew {
   wear: Wear;
   /** Her own build, in a race sailed by a card (play/fitted.ts); else none. */
   build?: Build;
+  /** The pit stop she is at, while her team's crew serve her (pit.ts). */
+  pit?: Stop;
 }
 
 /**

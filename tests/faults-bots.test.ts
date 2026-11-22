@@ -39,6 +39,7 @@ const crew = (hull: number, zones: Wear['zones'], kit = false): Crew => {
 /** Her own water: the sea more than `from` m east of her. */
 const holdings = (from: number) => ({
   ownerAt: (p: Vec3) => (dot(p, east) * R > from ? 1 : -1),
+  teamAt: () => -1,
 });
 /**
  * A think of her crew `c`, a foe `foeD` m to her north (or none), her own

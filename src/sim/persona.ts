@@ -20,9 +20,10 @@ import { random } from '../world/random.ts';
 import { DEFAULT_BRAIN, variant, type Brain, type Over } from './brain.ts';
 import { DEFAULT_RULES, ruled, type Rules } from './rules.ts';
 import { weighed } from './tables.ts';
+import { called } from './called.ts';
 import { driven } from './driven.ts';
 import { temper, type Temper } from './temper.ts';
-import type { Driver } from '../race.ts';
+import type { Call, Driver } from '../race.ts';
 
 /**
  * The personas, in the order of their temperaments (temper.ts STYLES); the
@@ -314,15 +315,21 @@ export function nature(
 /**
  * The nature of the bot a driver is (race.ts Driver), in a race whose storm
  * has closed by `length` seconds: of her seed and her own persona (whatever
- * the mix), her temperament as her stats have it (driven.ts). A driver
- * of ten in every stat is the bot of that seed and persona, to the bit.
+ * the mix), her temperament as her stats have it (driven.ts), her crew's
+ * brain under her team's `call` (called.ts). A driver of ten in every stat
+ * sailing free is the bot of that seed and persona, to the bit.
  */
 export function natureOf(
   driver: Driver,
   length: number,
-  brain: Brain = DEFAULT_BRAIN
+  brain: Brain = DEFAULT_BRAIN,
+  call: Call = 'free'
 ): Nature {
   const mix = { ...NONE, [driver.persona]: 1 },
     n = nature(driver.seed, brain, mix);
-  return { ...n, temper: driven(n.temper, driver.stats, length) };
+  return {
+    ...n,
+    brain: called(n.brain, call),
+    temper: driven(n.temper, driver.stats, length),
+  };
 }

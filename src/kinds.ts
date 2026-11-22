@@ -57,6 +57,12 @@ export type Faults = Zones<Fault>;
 /** No zone faulted. */
 export const SOUND: Faults = [0, 0, 0, 0];
 
+/**
+ * A job of a pit stop (sim/pit.ts): a zone repaired, her gust's charges taken
+ * on, a repair kit taken on.
+ */
+export type Job = Zone | 'gust' | 'kit';
+
 const ORDER = perKind((k) => KINDS.indexOf(k));
 /** A gun's kind's place in KINDS. */
 export const gunOrder = (k: GunKind): number => ORDER[k];

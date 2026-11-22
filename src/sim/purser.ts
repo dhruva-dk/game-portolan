@@ -19,7 +19,7 @@
 // for the same inputs, to the bit.
 
 import { smoothstep } from '../world/scalar.ts';
-import { R, along, distance, dot, type Vec3 } from '../world/sphere.ts';
+import { R, distance, dot, type Vec3 } from '../world/sphere.ts';
 import { armed, type Crew } from './battle.ts';
 import { faultsIn, MEND } from './faults.ts';
 import { ready } from './gust.ts';
@@ -30,7 +30,7 @@ import { isArms, type Loot } from './loot.ts';
 import { NOTHING, type Ask } from './stores.ts';
 import { toEdge } from './storm.ts';
 import { ramp, utility } from './utility.ts';
-import { open, rotate, type Ctx } from './captain.ts';
+import { waterNear, type Ctx } from './captain.ts';
 import { clearAt } from './route.ts';
 
 /** Everything a bot's stores are tuned by. */
@@ -123,26 +123,16 @@ function mendNeed(c: Ctx, crew: Crew): number {
   );
 }
 
-/** The bearings round her she looks along for her own water, and how many rings out. */
-const LOOKS = 8,
-  RINGS = 3;
 /**
- * The nearest of her own water (territory.ts) within PURSER.reach of her, on
- * LOOKS bearings and RINGS rings: where she is, if she lies in it; null with
- * none.
+ * The nearest of her own water (territory.ts) within PURSER.reach of her
+ * (captain.ts waterNear); null with none, and in a race sailed in teams, where
+ * her water mends no one (the pit does: pitting.ts).
  */
 function ownWater(c: Ctx): Vec3 | null {
   const h = c.sea.holdings,
-    { id, ship } = c.own;
-  if (!h) return null;
-  if (h.ownerAt(ship.at) === id) return ship.at;
-  for (let r = 1; r <= RINGS; r++)
-    for (let k = 0; k < LOOKS; k++) {
-      const way = rotate(ship.at, ship.heading, (2 * Math.PI * k) / LOOKS),
-        p = along(ship.at, way, (r * c.b.purser.reach) / RINGS).p;
-      if (h.ownerAt(p) === id && open(c, p)) return p;
-    }
-  return null;
+    { id, team } = c.own;
+  if (!h || team !== undefined) return null;
+  return waterNear(c, c.b.purser.reach, (p) => h.ownerAt(p) === id);
 }
 
 /**

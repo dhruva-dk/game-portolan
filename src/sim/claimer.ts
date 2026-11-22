@@ -62,10 +62,12 @@ export const CLAIMER = {
 
 /**
  * Who holds the sea, as a bot knows it (territory.ts): who holds the water at a
- * point (her id, −1 none).
+ * point (her id, −1 none), and which team (−1 none: with no teams, each ship
+ * is her own).
  */
 export interface Holdings {
   ownerAt(p: Vec3): number;
+  teamAt(p: Vec3): number;
 }
 
 /**

@@ -38,6 +38,11 @@ else {
   console.log(
     `race ${result.seconds.toFixed(1)} s, ${result.sinkings.length} sunk, ${afloat} afloat, won by ship ${result.order[0]} of team ${card.ships[result.order[0]].team}`
   );
+  const sum = (k: 'jobs' | 'slips' | 'seconds') =>
+    result.pits.reduce((n, p) => n + p[k], 0);
+  console.log(
+    `pits ${result.pits.length} stops by ${new Set(result.pits.map((p) => p.id)).size} ships: ${sum('jobs')} jobs, ${sum('slips')} slips, ${sum('seconds').toFixed(0)} s in all; ${result.faults.length} faults`
+  );
   console.log(
     `wall ${(ms / 1000).toFixed(2)} s (the planet ${(world.ms / 1000).toFixed(2)} s besides)`
   );
