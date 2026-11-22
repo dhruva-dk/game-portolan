@@ -13,7 +13,7 @@ import type {
   Ship,
   Trade,
   ImprovementShare,
-} from '../office.ts';
+} from '../office/command.ts';
 import type { Streams } from './dice.ts';
 import type { Event } from './queue.ts';
 import type { Person } from './roles.ts';
@@ -152,7 +152,7 @@ export interface Standing {
 }
 
 /** An Admiralty proposal (Phase B section 11): voted before `round`, on day `closes`. `votes` by team id; `lobbied`
- *  the sway Coin has added to each side; `decided` true (carried), false (the rule kept), null (open). */
+ *  the sway money has added to each side; `decided` true (carried), false (the rule kept), null (open). */
 export interface Proposal {
   id: number;
   round: number;

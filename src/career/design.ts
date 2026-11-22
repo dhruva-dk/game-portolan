@@ -7,7 +7,7 @@
 // same functions (career/works.ts).
 
 import type { PartType } from '../race.ts';
-import { SHIPS } from '../office.ts';
+import { SHIPS } from '../office/command.ts';
 import { canSpend, paid } from './balance.ts';
 import {
   accept,

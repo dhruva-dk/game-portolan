@@ -8,13 +8,13 @@ import {
   type MailCategory,
   type Offer,
   type Personality,
-} from '../office.ts';
+} from '../office/command.ts';
 import { PARTS, type PartType } from '../race.ts';
 import { askWage } from './asks.ts';
 import { canSpend, paid } from './balance.ts';
 import { why, type Check } from './command.ts';
 import type { Rand } from './dice.ts';
-import { standingOf } from './chairmen.ts';
+import { standingOf } from './standings.ts';
 import { flag, flagged, nextRace, unflagged } from './flags.ts';
 import { signableCheck } from './hiring.ts';
 import { learned } from './knowledge.ts';
@@ -86,7 +86,7 @@ const teamSet = (
   team: number,
   f: (c: Team) => Team
 ): CareerState => withTeam(s, f(teamOf(s, team)));
-/** Coin spent on an answer, if the chairman allows it. */
+/** money spent on an answer, if the chairman allows it. */
 const spend = (
   s: CareerState,
   team: number,
@@ -369,9 +369,7 @@ export const DILEMMAS: readonly Dilemma[] = [
       const g = c.staff.pit
         .map((id) => s.people[id])
         .find((x) => x.fatigue > D.worn);
-      return g && nextRace(s) !== null
-        ? { person: g.id }
-        : null;
+      return g && nextRace(s) !== null ? { person: g.id } : null;
     },
     answer: (s, c, slots, o) => {
       const id = N(slots.person),

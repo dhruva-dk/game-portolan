@@ -1,4 +1,4 @@
-// Money (Phase B section 10, D21): one currency, Coin. Income: sponsors (career/sponsors.ts), prize money at the
+// Money (Phase B section 10, D21): one currency. Income: sponsors (career/sponsors.ts), prize money at the
 // season's end (by place, spread by rules.prizeSpread), the fish market, pay drivers. Costs: wages each race, designs,
 // buildings and their upkeep, fines, break clauses and signing fees (each paid where it happens, through balance.ts
 // `paid`, which writes the player's ledger). Below the chairman's floor no command that spends is accepted
@@ -10,7 +10,7 @@
 import { paid } from './balance.ts';
 import { racesLeft } from './contracts.ts';
 import { payIncome } from './effective.ts';
-import { standingOf } from './chairmen.ts';
+import { standingOf } from './standings.ts';
 import { commitment } from './leadership.ts';
 import { fishIncome, upkeep } from './hq.ts';
 import { staffOf, type CareerState, type Team } from './state.ts';
@@ -28,7 +28,7 @@ export const payDrivers = (s: CareerState, c: Team): number =>
     0
   );
 
-/** A team's fixed sponsors' Coin a race. */
+/** A team's fixed sponsors' money a race. */
 export const sponsorIncome = (c: Team): number =>
   c.sponsors.reduce(
     (a, p) => a + (p && p.objectives.length === 0 ? p.perRace : 0),
@@ -130,7 +130,7 @@ export function prizes(s: CareerState): CareerState {
   return out;
 }
 
-/** The Coin a rival manager will commit (Finance's share) of what its team's season is projected to leave above the
+/** The money a rival manager will commit (Finance's share) of what its team's season is projected to leave above the
  *  debt floor: wages run on to the season's end, so a manager plans by the projection, not only the balance in hand. */
 export const roomOf = (s: CareerState, team: number, finance: number): number =>
   commitment(finance, projection(s, team).end, s.teams[team].debtFloor);

@@ -5,7 +5,7 @@
 // stay with the old team. DeclineJob lets the team's chairman hire elsewhere; a
 // sacked player must take one of the offers shown and cannot decline the last.
 
-import { SHIPS } from '../office.ts';
+import { SHIPS } from '../office/command.ts';
 import {
   accept,
   refuse,
@@ -27,6 +27,7 @@ import {
   withTeam,
   type CareerState,
 } from './state.ts';
+import { playerAboard } from './seats.ts';
 import { TUNING } from './tuning.ts';
 
 /** Whether the player may take a team's offered post now. */
@@ -105,10 +106,7 @@ export function taken(s: CareerState, team: number, roll: Dice): CareerState {
     staff: {
       ...c.staff,
       manager: p.person,
-      ships: c.staff.ships.map((h, ship) => ({
-        driver: ship === 0 ? null : (kept[ship - 1]?.id ?? null),
-        mechanic: h.mechanic,
-      })),
+      ships: playerAboard(c.staff.ships, kept),
     },
   });
   out = withPerson(out, {

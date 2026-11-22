@@ -508,6 +508,13 @@ export const planet = (rand: Rand): string =>
 export const fullName = (g: { given: string; family: string }): string =>
   `${g.given} ${g.family}`.toLowerCase();
 
+/** 1st, 2nd, 3rd, 4th, 11th. */
+export const ordinal = (n: number) =>
+  `${n}${n % 100 >= 11 && n % 100 <= 13 ? 'th' : (['th', 'st', 'nd', 'rd'][n % 10] ?? 'th')}`;
+/** A sum of money as a figure's text: grouped by thousands, signed when asked. */
+export const moneyText = (n: number, signed = false) =>
+  `${signed && n > 0 ? '+' : n < 0 ? '−' : ''}${Math.abs(Math.round(n)).toLocaleString('en-GB')}`;
+
 /** Every word of a name, lower case: two teams may share none. */
 export const words = (name: string): string[] =>
   name

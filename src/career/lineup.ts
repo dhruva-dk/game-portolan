@@ -12,7 +12,7 @@
 // without someone to sail her.
 
 import { CALLS, type Call, type Persona } from '../race.ts';
-import { SHIPS } from '../office.ts';
+import { SHIPS } from '../office/command.ts';
 import { effective } from './effective.ts';
 import { seeded, type Rand } from './dice.ts';
 import { tacticsHolds } from './leadership.ts';

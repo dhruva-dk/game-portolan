@@ -2,19 +2,19 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { apply, start } from '../src/career/career.ts';
 import {
-  moneyText,
   foundErrors,
   foundView,
   homeView,
   letters,
-  ordinal,
   recoverView,
   settingsView,
   topBar,
 } from '../src/career/views.ts';
+import { moneyText, ordinal } from '../src/career/names.ts';
 import { table } from '../src/career/read.ts';
 import { FOUND, founded, must, sailed, toRaceDay } from './career-kit.ts';
-import type { Figure, Offer } from '../src/office.ts';
+import type { Figure } from '../src/office/career.ts';
+import type { Offer } from '../src/office/command.ts';
 import type { CareerState } from '../src/career/state.ts';
 import { sackedOffers } from '../src/career/chairmen.ts';
 import { careerView, jobsView } from '../src/career/views-career.ts';
@@ -248,7 +248,7 @@ function signable(s: CareerState): { person: number; offer: Offer } {
   throw new Error('no one to sign');
 }
 
-test('team: the roster by role with the player heading the drivers, the pit crew, and each ship\'s stop as her card carries it', () => {
+test("team: the roster by role with the player heading the drivers, the pit crew, and each ship's stop as her card carries it", () => {
   const s = founded(),
     v = teamView(s),
     c = s.teams[s.player!.team];

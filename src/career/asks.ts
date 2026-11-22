@@ -1,7 +1,7 @@
 // What a person asks of a team (Phase B section 5): their wants, drawn by seed and weighted by age and traits, and their
 // ask: wage a race, signing fee, contract length. The scoring of offers against these is the market's (section 5).
 
-import type { Role, Want } from '../office.ts';
+import type { Role, Want } from '../office/command.ts';
 import { weighted, type Rand } from './dice.ts';
 import { marketability, wageTrait } from './effective.ts';
 import { modifier } from './traits.ts';

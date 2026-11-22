@@ -7,14 +7,9 @@
 // team tracks who got the last new part of each type, and a second in a row to
 // the same ship costs the other ships' drivers morale.
 
-import {
-  PARTS,
-  type Fitted,
-  type PartType,
-  type RaceResult,
-} from '../race.ts';
+import { PARTS, type Fitted, type PartType, type RaceResult } from '../race.ts';
 import { ZONES, type Zone } from '../kinds.ts';
-import { SHIPS, type Ship } from '../office.ts';
+import { SHIPS, type Ship } from '../office/command.ts';
 import {
   accept,
   refuse,
@@ -183,7 +178,8 @@ export function fitted(
       out = withPeople(
         out,
         c.staff.ships.flatMap((h, k) => {
-          const g = k === ship || h.driver === null ? null : out.people[h.driver];
+          const g =
+            k === ship || h.driver === null ? null : out.people[h.driver];
           return g
             ? [{ ...g, morale: moraleIn(g.morale - P.newPartMorale) }]
             : [];

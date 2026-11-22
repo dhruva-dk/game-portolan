@@ -13,7 +13,7 @@ import {
   type Role,
   type Ship,
   type Status,
-} from '../office.ts';
+} from '../office/command.ts';
 import { askFee, askSeasons, askWage } from './asks.ts';
 import {
   makeCalendar,
@@ -157,10 +157,7 @@ const levelAbout = (rand: Rand, mean: number): number =>
   Math.min(3, Math.max(1, Math.round(mean + (rand() - 0.5) * 1.6)));
 
 /** A team's buildings at the start, each drawn in BUILDINGS' order. */
-function startingBuildings(
-  rand: Rand,
-  tier: number
-): Record<Building, Works> {
+function startingBuildings(rand: Rand, tier: number): Record<Building, Works> {
   const drawn = (): Works => ({
     level: levelAbout(rand, at(C.buildings, tier)),
     next: null,

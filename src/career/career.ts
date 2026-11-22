@@ -6,7 +6,7 @@
 // throws on a bad command. Each section's handlers are joined here (COMMANDS, EVENTS); a command kind with no handler
 // yet is refused, never guessed at.
 
-import type { Command, CommandKind } from '../office.ts';
+import type { Command, CommandKind } from '../office/command.ts';
 import { ADMIRALTY, counted, proposalPut } from './admiralty.ts';
 import { timeHandlers, type EventHandlers } from './advance.ts';
 import { DESIGNING, built, drawn } from './design.ts';

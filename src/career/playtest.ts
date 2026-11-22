@@ -1,5 +1,5 @@
 // The playtest commands (Phase B section 16, D42): taken only when debug.ts enables them (career/career.ts), and
-// journaled like any other. DebugBalance gives the player's team Coin; DebugReveal shows the player every person;
+// journaled like any other. DebugBalance gives the player's team money; DebugReveal shows the player every person;
 // DebugToRaceDay and DebugToSeasonEnd run the calendar past every stop but race day (a race is never skipped: its
 // result is the match's to give), up to the next race day or through the season's end.
 
@@ -12,7 +12,7 @@ import type { EventKind } from './queue.ts';
 import type { CareerState } from './state.ts';
 import { stars } from './stars.ts';
 
-/** The most Coin one DebugBalance gives or takes. */
+/** The most money one DebugBalance gives or takes. */
 const MOST = 1_000_000;
 
 /** Events applied, no stop heeded, until `done` holds after one, a race day comes, or the queue is empty. */
@@ -60,7 +60,7 @@ export const debugHandlers = (events: EventHandlers): Handlers => ({
     )
       return refuse(
         'balance',
-        'Give a whole sum of Coin, not zero, up to a million either way.'
+        'Give a whole sum of money, not zero, up to a million either way.'
       );
     return accept(
       paid(s, me, -c.balance, { kind: 'debug', what: 'a playtest grant' })

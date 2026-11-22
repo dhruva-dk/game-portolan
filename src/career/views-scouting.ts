@@ -1,13 +1,13 @@
 // `market` (Phase C batch 2): every person of a role the filter lets through, as the player's team sees them, the
 // shortlist, and the scouts at work with the crow's nest that sets how many there may be. Pure, read-side.
 
-import type { Role } from '../office.ts';
+import type { Role } from '../office/command.ts';
 import type {
   ScoutingFilter,
   ScoutingRow,
   ScoutingView,
   ScoutRow,
-} from '../office-people.ts';
+} from '../office/people.ts';
 import { closing } from './contracts.ts';
 import { effective } from './effective.ts';
 import { tierOf } from './knowledge.ts';
@@ -24,16 +24,8 @@ import {
   seen,
   whereText,
 } from './views-person.ts';
-import {
-  moneyText,
-  myTeam,
-  faceOf,
-  fig,
-  line,
-  nameOf,
-  rival,
-  topBar,
-} from './views.ts';
+import { myTeam, faceOf, fig, line, nameOf, rival, topBar } from './views.ts';
+import { moneyText } from './names.ts';
 
 /** The roles a market lists (managers and chairmen are hired by chairmen, not offered contracts). */
 const ROLES: readonly Role[] = [

@@ -8,7 +8,7 @@
 // released to the market; its reserve stays.
 
 import type { Colours } from '../race.ts';
-import { SHIPS, type CommandOf } from '../office.ts';
+import { SHIPS, type CommandOf } from '../office/command.ts';
 import {
   accept,
   refuse,
@@ -31,6 +31,7 @@ import {
   type CareerState,
   type Team,
 } from './state.ts';
+import { playerAboard } from './seats.ts';
 import { TUNING } from './tuning.ts';
 import { makeWorld, staffStars } from './world.ts';
 
@@ -103,7 +104,10 @@ function playerPerson(
   c: CommandOf<'Found'>,
   team: Team
 ): PersonOf<'manager'> {
-  const zero = mapped(inRole(s.people[team.staff.manager ?? -1], 'manager').stats, () => 0);
+  const zero = mapped(
+    inRole(s.people[team.staff.manager ?? -1], 'manager').stats,
+    () => 0
+  );
   return {
     id: s.people.length,
     seed: c.headshot,
@@ -182,10 +186,7 @@ function takenOver(
     staff: {
       ...taking.staff,
       manager: me.id,
-      ships: taking.staff.ships.map((h, ship) => ({
-        driver: ship === 0 ? null : (kept[ship - 1]?.id ?? null),
-        mechanic: h.mechanic,
-      })),
+      ships: playerAboard(taking.staff.ships, kept),
     },
   };
   const out = withTeam(

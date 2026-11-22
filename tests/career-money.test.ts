@@ -38,7 +38,7 @@ import {
 } from '../src/career/inspection.ts';
 import { fishIncome, sponsorGrade, upkeep } from '../src/career/hq.ts';
 import { racesLeft } from '../src/career/contracts.ts';
-import { standingOf } from '../src/career/chairmen.ts';
+import { standingOf } from '../src/career/standings.ts';
 import { dice } from '../src/career/dice.ts';
 import { fullyFitted } from '../src/career/parts.ts';
 import {
@@ -302,7 +302,10 @@ test('SignSponsor: into a slot, replacing one there; refusals', () => {
   const low = withTeam(s, me, (c) => ({
     ...c,
     buildings: { ...c.buildings, landingPad: { level: 1, next: null } },
-    offers: c.offers.map((o) => ({ ...o, sponsor: { ...o.sponsor, grade: 3 } })),
+    offers: c.offers.map((o) => ({
+      ...o,
+      sponsor: { ...o.sponsor, grade: 3 },
+    })),
   }));
   refused(low, { kind: 'SignSponsor', offer: a.sponsor.id, slot: 0 }, 'tier');
   const t = must(s, { kind: 'SignSponsor', offer: a.sponsor.id, slot: 1 });

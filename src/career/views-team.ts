@@ -2,8 +2,8 @@
 // pit crew, and each ship's pit stop as the race card will carry it. Pure,
 // read-side.
 
-import { SHIPS } from '../office.ts';
-import type { TeamView, PitRow, RosterRow } from '../office-people.ts';
+import { SHIPS } from '../office/command.ts';
+import type { TeamView, PitRow, RosterRow } from '../office/people.ts';
 import { pitOf } from './card.ts';
 import { effective } from './effective.ts';
 import { perRace, wages } from './money.ts';
@@ -22,16 +22,8 @@ import {
   shipName,
   wageText,
 } from './views-person.ts';
-import {
-  moneyText,
-  myTeam,
-  faceOf,
-  fig,
-  line,
-  nameOf,
-  rival,
-  topBar,
-} from './views.ts';
+import { myTeam, faceOf, fig, line, nameOf, rival, topBar } from './views.ts';
+import { moneyText } from './names.ts';
 
 const pct = (x: number) => `${Math.round(x * 100)}%`;
 
@@ -160,16 +152,16 @@ function pitRow(
 
 /** The pit crew's rows, the best worker's work beside each. */
 function pitRows(s: CareerState, c: Team): PitRow[] {
-  const crew = c.staff.pit.flatMap((id) => {
+  const members = c.staff.pit.flatMap((id) => {
     const g = s.people[id];
     return g && hasRole(g, 'pit') ? [g] : [];
   });
   const house = c.buildings.pitHouse.level;
   const best = Math.max(
     0,
-    ...crew.map((g) => work(effective(g, null), fatigueOn(g, s.day, house)))
+    ...members.map((g) => work(effective(g, null), fatigueOn(g, s.day, house)))
   );
-  return crew.map((g) => pitRow(s, c, g, best));
+  return members.map((g) => pitRow(s, c, g, best));
 }
 
 /** A team's wages a race by role's name (the player's own person draws none). */

@@ -1,12 +1,12 @@
 // Chairmen and the managers' market (Phase B section 7, D22): each chairman sets a target at the season's start (Ambition)
-// and adds Coin and a debt floor (Generosity); their confidence moves after each race (Patience), only with a run of
+// and adds money and a debt floor (Generosity); their confidence moves after each race (Patience), only with a run of
 // races behind the target, and carries into the next season; their word comes by mail as it crosses 75, 50 or 25. A
 // manager past their grace and behind the target is sacked at 0 at once, and at the season's end if the target was
 // missed by more than 5 places with confidence low. The chairman then hires: the best manager whose reputation fits the
 // tier, from the free agents or a lower tier's teams, or offers the post to the player. The player is a manager
 // like any other here.
 
-import type { Offer } from '../office.ts';
+import type { Offer } from '../office/command.ts';
 import { askFee, askSeasons, askWage } from './asks.ts';
 import { contractEnds, signed, released } from './contracts.ts';
 import { between, within, type Dice } from './dice.ts';
@@ -29,8 +29,8 @@ import {
   type CareerState,
   type Team,
   type JobOffer,
-  type Standing,
 } from './state.ts';
+import { standingOf } from './standings.ts';
 import { TUNING } from './tuning.ts';
 import { targets } from './world.ts';
 
@@ -43,23 +43,6 @@ const withTeam = (s: CareerState, c: Team): CareerState => {
   teams[c.id] = c;
   return { ...s, teams };
 };
-
-/** Each tier's places by team, for each standings list already read (immutable, so its order never changes). */
-const placed = new WeakMap<readonly Standing[], ReadonlyMap<number, number>>();
-
-/** A team's place in its tier (1 best): by points, then wins, then the lower id. */
-export function standingOf(s: CareerState, team: number): number {
-  const standings = s.championships[s.teams[team].tier].standings;
-  let places = placed.get(standings);
-  if (!places) {
-    const sorted = [...standings].sort(
-      (a, b) => b.points - a.points || b.wins - a.wins || a.team - b.team
-    );
-    places = new Map(sorted.map((x, i) => [x.team, i + 1]));
-    placed.set(standings, places);
-  }
-  return places.get(team) ?? 0;
-}
 
 /** The chairman's word, if confidence crossed one of 75, 50, 25 (either way): the level crossed. */
 export function wordAt(before: number, after: number): number | null {
@@ -315,7 +298,7 @@ export function sackedOffers(s: CareerState): CareerState {
 }
 
 /** A state at a season's start for every chairman: the target set (expected place by staff stars, moved up by Ambition);
- *  Coin added and the debt floor set (Generosity). Section 13 calls it as each season starts. */
+ *  money added and the debt floor set (Generosity). Section 13 calls it as each season starts. */
 export function seasonStart(s: CareerState): CareerState {
   const teams = s.teams.map((c) => {
     const g = chairmanOf(s, c).stats.generosity;

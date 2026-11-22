@@ -8,12 +8,14 @@
 // the next round is next, and the dilemmas are drawn (career/dilemmas.ts).
 
 import { TEAM, type RaceResult } from '../race.ts';
-import { SHIPS } from '../office.ts';
+import { SHIPS } from '../office/command.ts';
 import { askWage } from './asks.ts';
 import { paid } from './balance.ts';
-import { afterRace, standingOf } from './chairmen.ts';
+import { afterRace } from './chairmen.ts';
+import { standingOf } from './standings.ts';
 import type { Dice } from './dice.ts';
 import { effective } from './effective.ts';
+import { mechanicsOf } from './improvement.ts';
 import { flagsCleared, today } from './flags.ts';
 import { inspected } from './inspection.ts';
 import { grid, lineups, type Sailing } from './lineup.ts';
@@ -317,10 +319,7 @@ function spirits(s: CareerState, x: Raced, of: Closing): CareerState {
   const standing = standingOf(s, x.team);
   const sailed = new Set(x.sailing.ships.map((a) => a.driver));
   const levels = c.bonds.map(bondLevel);
-  const mechanics = c.staff.ships.map((h) => {
-    const g = h.mechanic === null ? undefined : s.people[h.mechanic];
-    return g && hasRole(g, 'mechanic') ? effective(g, null) : null;
-  });
+  const mechanics = mechanicsOf(s, c);
   const led = mechanics.flatMap((m) => (m ? [m.leadership] : []));
   const lead = mean(led.map(leadershipMorale), 0);
   let out = s;
@@ -370,14 +369,12 @@ function spirits(s: CareerState, x: Raced, of: Closing): CareerState {
 }
 
 /** Who sailed each ship of a team for the drivers' table: her driver, and the player on their own. */
-const sailorOf = (
-  s: CareerState,
-  x: Raced,
-  ship: number
-): number | null => {
+const sailorOf = (s: CareerState, x: Raced, ship: number): number | null => {
   const a = x.sailing.ships[ship];
   if (!a || a.forfeit) return null;
-  return a.driver ?? (teamOf(s, x.team).player ? (s.player?.person ?? null) : null);
+  return (
+    a.driver ?? (teamOf(s, x.team).player ? (s.player?.person ?? null) : null)
+  );
 };
 
 /** A championship's two tables after a race: the teams', and the drivers' (each ship's points to who sailed her). */
@@ -437,7 +434,9 @@ function teamClosed(s: CareerState, x: Raced, of: Closing): CareerState {
   out = partsAfterRace(
     out,
     x.team,
-    x.sailing.ships.map((a, ship) => (a.forfeit ? null : x.place * TEAM + ship)),
+    x.sailing.ships.map((a, ship) =>
+      a.forfeit ? null : x.place * TEAM + ship
+    ),
     of.result
   );
   out = bonusesPaid(

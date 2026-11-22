@@ -1,15 +1,16 @@
 // What the people views (views-team, -profile, -offer, -market, -career) say of any person: their stars as the player's
 // team sees them, their post, their contract, their stats and which way they head. Pure, read-side.
 
-import type { Role, Status, Want } from '../office.ts';
-import type { Range } from '../office-people.ts';
+import type { Role, Status, Want } from '../office/command.ts';
+import type { Range } from '../office/people.ts';
 import { racesLeft } from './contracts.ts';
 import { view, type Sight } from './knowledge.ts';
 import type { Person } from './roles.ts';
 import { age } from './stars.ts';
 import type { CareerState, Team } from './state.ts';
 import { TUNING } from './tuning.ts';
-import { TIERS, moneyText } from './views.ts';
+import { TIERS } from './views.ts';
+import { moneyText } from './names.ts';
 
 /** A ship of a team, as a line names her ("Ship 1" the first). */
 export const shipName = (ship: number): string => `Ship ${ship + 1}`;
@@ -117,7 +118,9 @@ export function heading(
 }
 
 /** The roles and the post a team holds open of each: the market's filter for each empty place. */
-export function openPosts(c: Team): { role: Role; status: Status; label: string }[] {
+export function openPosts(
+  c: Team
+): { role: Role; status: Status; label: string }[] {
   const out: { role: Role; status: Status; label: string }[] = [];
   c.staff.ships.forEach((h, i) => {
     if (h.driver === null && !(c.player && i === 0))

@@ -3,7 +3,7 @@
 // improvability, traits, wants, morale and marketability. The world's start and each season's young people use it.
 
 import type { Persona } from '../race.ts';
-import type { Personality, Role } from '../office.ts';
+import type { Personality, Role } from '../office/command.ts';
 import { dealtKnown } from './components.ts';
 import { between, pick, seeded, within, type Rand } from './dice.ts';
 import { drawWants } from './asks.ts';

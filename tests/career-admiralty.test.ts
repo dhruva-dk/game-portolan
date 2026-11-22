@@ -1,7 +1,7 @@
 // The Admiralty (Phase B section 11) and the rivals' rows of sections 8–11 (section 6's table).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import type { Change, Measure } from '../src/office.ts';
+import type { Change, Measure } from '../src/office/command.ts';
 import { KINDS } from '../src/kinds.ts';
 import {
   changed,
@@ -68,9 +68,7 @@ test("a measure's change: in its range, never the rule as it stands; carried int
       assert.equal(c.measure, m);
       const r = changed(next, c);
       assert.notDeepEqual(r, next, `${m} changes nothing`);
-      assert.ok(
-        r.storm >= A.paceRange[0] && r.storm <= A.paceRange[1]
-      );
+      assert.ok(r.storm >= A.paceRange[0] && r.storm <= A.paceRange[1]);
       assert.ok(
         r.prizeSpread >= A.spreadRange[0] && r.prizeSpread <= A.spreadRange[1]
       );

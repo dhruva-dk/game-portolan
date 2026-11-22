@@ -44,9 +44,7 @@ test('a part as fitted: performance 1 at the standard part, ± 0.15 over the who
   const P = TUNING.parts;
   assert.equal(performanceOf(P.standard.perf), 1);
   assert.ok(
-    Math.abs(
-      performanceOf(1000) - performanceOf(0) - P.handling
-    ) < 1e-12
+    Math.abs(performanceOf(1000) - performanceOf(0) - P.handling) < 1e-12
   );
   assert.deepEqual(fittedOf(standardPart(1, 'hull', 0)), {
     performance: 1,
@@ -133,7 +131,8 @@ test("the ships' politics: a second new part in a row to one ship costs the othe
       part({ id: 50002, type: 'keel', perf: 2100, perfMax: 2100 }),
     ],
   }));
-  const morale = (state: typeof s) => others.map((id) => state.people[id].morale);
+  const morale = (state: typeof s) =>
+    others.map((id) => state.people[id].morale);
   const once = fitted(s, rival, 50001, 0);
   assert.equal(once.teams[rival].lastNew.keel, 0);
   assert.deepEqual(morale(once), morale(s), 'the first new part costs nothing');

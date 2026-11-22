@@ -1,10 +1,11 @@
 // The mail's words (Phase B section 12): every kind of message a section posts (career/post.ts), as data, with at
 // least two wordings each; the wording is chosen by seed when the message is posted. A template's text names its
 // slots in braces ({person}); `render` fills them from the message's slots, a person's or a team's id read as their name,
-// a day as "Day 41", a sum as Coin. The twelve dilemmas' words are here too (their rules are career/events.ts's).
+// a day as "Day 41", a sum as a grouped figure. The twelve dilemmas' words are here too (their rules are career/events.ts's).
 
-import type { Building, Measure } from '../office.ts';
+import type { Building, Measure } from '../office/command.ts';
 import { component } from './components.ts';
+import { moneyText, ordinal } from './names.ts';
 import type { CareerState, Mail } from './state.ts';
 import { supplier } from './suppliers.ts';
 import { trait } from './traits.ts';
@@ -420,8 +421,6 @@ const OBJECTIVES: Readonly<Record<string, string>> = {
   afloat: 'three ships afloat',
   mostSea: 'hold the most sea',
 };
-const ORDINAL = (n: number): string =>
-  `${n}${n % 100 >= 11 && n % 100 <= 13 ? 'th' : (['th', 'st', 'nd', 'rd'][n % 10] ?? 'th')}`;
 
 /** What a slot's value reads as, by the slot's name. */
 function slotText(s: CareerState, key: string, value: string | number): string {
@@ -450,7 +449,7 @@ function slotText(s: CareerState, key: string, value: string | number): string {
     case 'balance':
     case 'prize':
     case 'wage':
-      return `${Math.round(n)} Coin`;
+      return moneyText(n);
     case 'building':
       return BUILDINGS[value as Building] ?? String(value);
     case 'component':
@@ -465,7 +464,7 @@ function slotText(s: CareerState, key: string, value: string | number): string {
       return supplier(String(value))?.name ?? String(value);
     case 'place':
     case 'standing':
-      return ORDINAL(n);
+      return ordinal(n);
     case 'rising':
       return n ? 'risen' : 'fallen';
     case 'carried':

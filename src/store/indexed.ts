@@ -5,7 +5,7 @@
 
 import {
   KEEP,
-  type Entry,
+  readEntry,
   type Saved,
   type Snapshot,
   type Store,
@@ -25,15 +25,6 @@ interface Kept {
   snapshots: Snapshot[];
 }
 
-/** An entry's text read back; what does not parse comes back shaped like no entry, so the career counts it lost. */
-function readEntry(text: string): Entry {
-  try {
-    return JSON.parse(text);
-  } catch {
-    return JSON.parse(JSON.stringify({ unreadable: text.length }));
-  }
-}
-
 /** A request's result, or its error. */
 const done = <T>(r: IDBRequest<T>): Promise<T> =>
   new Promise((ok, no) => {
@@ -48,7 +39,7 @@ function inTransaction<T>(
   work: (t: IDBTransaction) => Promise<T>
 ): Promise<T> {
   return new Promise((ok, no) => {
-    const t = db.transaction(names as string[], 'readwrite');
+    const t = db.transaction([...names], 'readwrite');
     let result: T;
     t.oncomplete = () => ok(result);
     t.onabort = () => no(t.error ?? new Error('The save was abandoned.'));
@@ -91,10 +82,12 @@ export function openDatabase(
 }
 
 /** The snapshots newest first. */
-const snapshotsOf = async (t: IDBTransaction): Promise<Snapshot[]> =>
-  ((await done(t.objectStore(SNAPSHOTS).getAll())) as Snapshot[])
+async function snapshotsOf(t: IDBTransaction): Promise<Snapshot[]> {
+  const all: Snapshot[] = await done(t.objectStore(SNAPSHOTS).getAll());
+  return all
     .sort((a, b) => b.at - a.at)
     .map((s) => ({ at: s.at, state: s.state, sum: s.sum }));
+}
 
 /** The store over an open database. */
 export function indexedStore(db: IDBDatabase): Store {
@@ -109,17 +102,14 @@ export function indexedStore(db: IDBDatabase): Store {
       inTransaction(db, [SNAPSHOTS], async (t) => {
         const snaps = t.objectStore(SNAPSHOTS);
         await done(snaps.put({ at, state, sum } satisfies Snapshot));
-        const ats = ((await done(snaps.getAllKeys())) as number[]).sort(
-          (a, b) => b - a
-        );
-        for (const old of ats.slice(KEEP)) snaps.delete(old);
+        const ats = await done(snaps.getAllKeys());
+        const newest = ats.map(Number).sort((a, b) => b - a);
+        for (const old of newest.slice(KEEP)) snaps.delete(old);
       }),
     load: async (): Promise<Saved> => {
       const t = db.transaction([ENTRIES, SNAPSHOTS], 'readonly');
-      const [lines, snapshots] = await Promise.all([
-        done(t.objectStore(ENTRIES).getAll()) as Promise<Line[]>,
-        snapshotsOf(t),
-      ]);
+      const read: Promise<Line[]> = done(t.objectStore(ENTRIES).getAll());
+      const [lines, snapshots] = await Promise.all([read, snapshotsOf(t)]);
       return {
         snapshots,
         entries: lines
@@ -133,9 +123,7 @@ export function indexedStore(db: IDBDatabase): Store {
         const from = newest
           ? IDBKeyRange.lowerBound(newest.at, true)
           : undefined;
-        const lines = (await done(
-          t.objectStore(ENTRIES).getAll(from)
-        )) as Line[];
+        const lines: Line[] = await done(t.objectStore(ENTRIES).getAll(from));
         const kept: Kept = {
           snapshots: newest ? [newest] : [],
           entries: lines.map((l) => l.text),
@@ -144,9 +132,9 @@ export function indexedStore(db: IDBDatabase): Store {
       }),
     restore: () =>
       inTransaction(db, [ENTRIES, SNAPSHOTS, BACKUP], async (t) => {
-        const kept = (await done(t.objectStore(BACKUP).get(BACKUP))) as
-          | Kept
-          | undefined;
+        const kept: Kept | undefined = await done(
+          t.objectStore(BACKUP).get(BACKUP)
+        );
         if (!kept) return false;
         const lines = t.objectStore(ENTRIES),
           snaps = t.objectStore(SNAPSHOTS);

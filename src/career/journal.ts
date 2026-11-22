@@ -2,7 +2,7 @@
 // JSON ({ seq, tuning, command }), started from the previous entry's sum (the first from FNV's offset). A snapshot's
 // sum is FNV-1a of its text from the offset.
 
-import type { Command } from '../office.ts';
+import type { Command } from '../office/command.ts';
 import { canonical, fnv, hex, sumOf, unhex } from './canon.ts';
 import type { CareerState } from './state.ts';
 import type { Entry, Snapshot } from './store.ts';

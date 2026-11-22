@@ -2,12 +2,9 @@
 // a view is plain data, every figure with what it is set against and what it is made of. The screens work out no rule.
 
 import { PARTS, type Colours } from '../race.ts';
-import {
-  SHIPS,
-  type Ship,
-} from '../office.ts';
+import { SHIPS, type Ship } from '../office/command.ts';
+import type { CommandOf } from '../office/command.ts';
 import type {
-  CommandOf,
   Comparison,
   Explanation,
   Face,
@@ -23,12 +20,21 @@ import type {
   ShipHalf,
   StandingLine,
   TopBar,
-} from '../office.ts';
+} from '../office/career.ts';
 import { advanceCheck } from './advance.ts';
 import { dice, seeded } from './dice.ts';
-import { standingOf } from './chairmen.ts';
+import { standingOf } from './standings.ts';
 import { foundingCheck, taken } from './found.ts';
-import { NOUNS, teamName, family, given, place, words } from './names.ts';
+import {
+  NOUNS,
+  teamName,
+  family,
+  given,
+  moneyText,
+  ordinal,
+  place,
+  words,
+} from './names.ts';
 import { mailView, table, unread } from './read.ts';
 import type { Person } from './roles.ts';
 import { factoryPoints } from './hq.ts';
@@ -46,12 +52,6 @@ import { TUNING } from './tuning.ts';
 import { BUILDINGS, makeWorld, staffStars } from './world.ts';
 import { improvementPoints } from './improvement.ts';
 
-/** 1st, 2nd, 3rd, 4th, 11th. */
-export const ordinal = (n: number) =>
-  `${n}${n % 100 >= 11 && n % 100 <= 13 ? 'th' : (['th', 'st', 'nd', 'rd'][n % 10] ?? 'th')}`;
-/** Coin as a figure's text: grouped by thousands, signed when asked. */
-export const moneyText = (n: number, signed = false) =>
-  `${signed && n > 0 ? '+' : n < 0 ? '−' : ''}${Math.abs(Math.round(n)).toLocaleString('en-GB')}`;
 /** A line of an explanation. */
 export const line = (label: string, amount: string | number): Line => ({
   label,
@@ -99,7 +99,7 @@ function playerOf(s: CareerState): NonNullable<CareerState['player']> {
 /** The player's team: the one they manage, or the one they left when sacked. */
 export const myTeam = (s: CareerState): Team => teamOf(s, playerOf(s).team);
 
-/** The Coin and its change this season, from the ledger. */
+/** The balance and its change this season, from the ledger. */
 function moneyFigure(s: CareerState, c: Team): Figure {
   const start = s.calendar?.start ?? 0,
     season = s.ledger.filter((l) => l.day >= start);
@@ -115,7 +115,7 @@ function moneyFigure(s: CareerState, c: Team): Figure {
     c.balance,
     moneyText(c.balance),
     { kind: 'change', by, text: `${moneyText(by, true)} this season` },
-    { title: 'Coin', lines }
+    { title: 'Balance', lines }
   );
 }
 /** The ledger's kinds as the slip names them. */
@@ -487,15 +487,15 @@ export function foundErrors(c: CommandOf<'Found'>): FoundErrors {
   };
   set(
     'team',
-      c.team.trim().length > v.limits.team
-        ? `The team's name is too long: at most ${v.limits.team} letters.`
-        : say({ team: c.team })
+    c.team.trim().length > v.limits.team
+      ? `The team's name is too long: at most ${v.limits.team} letters.`
+      : say({ team: c.team })
   );
   set('colours', say({ colours: c.colours }));
   set('emblem', say({ emblem: c.emblem }));
   set(
     'person',
-      say({ given: c.given }) ??
+    say({ given: c.given }) ??
       say({ family: c.family }) ??
       say({ headshot: c.headshot })
   );

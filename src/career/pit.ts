@@ -105,7 +105,7 @@ export const fatigueOn = (
  */
 export interface Pit {
   mechanic: PersonOf<'mechanic'>['stats'] | null;
-  crew: readonly Member[];
+  members: readonly Member[];
   bond: number;
 }
 
@@ -127,16 +127,16 @@ const ABSENT: Member = {
 /**
  * A ship's PitCrew. Pace: her mechanic's Pit Handling, over the crew's mean
  * work × her mechanic's Repairs and Mending, × her bond's level. Slip: the
- * crew's mean chance × her mechanic's Concentration. A crew of 10s with a
+ * pit crew's mean chance × her mechanic's Concentration. A pit crew of 10s with a
  * mechanic of 10s and no bond is the spec's pace of 1.
  */
 export function pitCrew(p: Pit): PitCrew {
-  const crew = Array.from(
+  const members = Array.from(
     { length: TUNING.world.pit },
-    (_, i) => p.crew[i] ?? ABSENT
+    (_, i) => p.members[i] ?? ABSENT
   );
   const mean = (f: (m: Member) => number) =>
-    crew.reduce((a, m) => a + f(m), 0) / crew.length;
+    members.reduce((a, m) => a + f(m), 0) / members.length;
   const m = p.mechanic;
   const worked =
     mean(
@@ -146,8 +146,7 @@ export function pitCrew(p: Pit): PitCrew {
   const bond = TUNING.bond.pace[bondLevel(p.bond)] ?? 1;
   const slip =
     mean(
-      (x) =>
-        slipOf(x.stats, x.fatigue) + (x.pushed ? TUNING.dilemmas.push : 0)
+      (x) => slipOf(x.stats, x.fatigue) + (x.pushed ? TUNING.dilemmas.push : 0)
     ) * concentrationFactor(m?.concentration ?? 0);
   return {
     pace: (handlingFactor(m?.handling ?? 0) / worked) * bond,

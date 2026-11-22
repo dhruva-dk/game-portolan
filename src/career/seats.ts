@@ -5,7 +5,7 @@
 // reserve driver, a race mechanic a ship, a lead designer, a scout a
 // crow's-nest level, the pit crew.
 
-import { SHIPS, type Role, type Ship, type Status } from '../office.ts';
+import { SHIPS, type Role, type Ship, type Status } from '../office/command.ts';
 import { without } from './ageing.ts';
 import type { Hands, Staff, Team } from './state.ts';
 import { TUNING } from './tuning.ts';
@@ -54,6 +54,17 @@ export const statuses = (role: Role): readonly Status[] =>
 /** The ships of a team a hired driver may sail: all but the player's own on the player's team. */
 export const hiredShips = (c: Team): readonly Ship[] =>
   c.player ? SHIPS.slice(1) : SHIPS;
+
+/** A team's ships as the player takes it over: she sails ship 0, the drivers kept sail the rest in order, every
+ *  mechanic stays. */
+export const playerAboard = (
+  ships: Staff['ships'],
+  kept: readonly { id: number }[]
+): Staff['ships'] =>
+  ships.map((h, ship) => ({
+    driver: ship === 0 ? null : (kept[ship - 1]?.id ?? null),
+    mechanic: h.mechanic,
+  }));
 
 /** The first open seat of a role and status on a team, or null. The player's own ship has no driver's seat. */
 export function openSeat(c: Team, role: Role, status: Status): Seat | null {

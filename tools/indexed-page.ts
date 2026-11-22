@@ -2,9 +2,9 @@
 // (tests/store-suite.ts) on the IndexedDB adapter (src/store/indexed.ts), each test on a database of its own,
 // reopened as after a restart, and reports each test's outcome.
 
-import type { Command } from '../src/office';
-import { indexedStore, openDatabase } from '../src/store/indexed';
-import { STORE_TESTS, type Rig } from '../tests/store-suite';
+import type { Command } from '../src/office/command.ts';
+import { indexedStore, openDatabase } from '../src/store/indexed.ts';
+import { STORE_TESTS, type Rig } from '../tests/store-suite.ts';
 
 export interface Outcome {
   name: string;

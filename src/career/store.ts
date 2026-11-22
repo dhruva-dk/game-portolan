@@ -5,7 +5,7 @@
 // (career/journal.ts). A snapshot is the state's canonical JSON and its sum, at the seq of the last entry it holds.
 // The store keeps the newest three snapshots.
 
-import type { Command } from '../office.ts';
+import type { Command } from '../office/command.ts';
 
 export interface Entry {
   seq: number; // 1 the first
@@ -43,3 +43,13 @@ export interface Store {
 
 /** How many snapshots a store keeps. */
 export const KEEP = 3;
+
+/** An entry's text read back. What does not parse comes back as a record shaped like no entry, so the career counts
+ *  it lost rather than the load failing. */
+export function readEntry(text: string): Entry {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return JSON.parse(JSON.stringify({ unreadable: text.length }));
+  }
+}

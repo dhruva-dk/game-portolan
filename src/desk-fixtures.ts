@@ -7,7 +7,8 @@
 // due); `sacked` is that career with the chairman's patience gone (its state
 // set, then snapshotted).
 
-import type { Command, Desk } from './office.ts';
+import type { Command } from './office/command.ts';
+import type { CareerDesk } from './office/career.ts';
 import { createDesk, type Shelf } from './desk.ts';
 import { send, fresh, checkpoint, type Kept } from './career/session.ts';
 import type { CareerState } from './career/career.ts';
@@ -156,7 +157,7 @@ function dismissed(s: CareerState): CareerState {
 }
 
 /** A desk on a fixture's career. */
-export async function fixture(name: Fixture): Promise<Desk> {
+export async function fixture(name: Fixture): Promise<CareerDesk> {
   const disk = emptyDisk(),
     store = memoryStore(disk);
   let kept: Kept = fresh(true);

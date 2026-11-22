@@ -121,7 +121,7 @@ export const TUNING = {
     most: 3,
     gain: 0.08, // chance a season's end gives a trait, if under most
     lose: 0.06, // chance a season's end takes one
-    pay: 0.6, // a Pay Driver brings this × marketability Coin a race
+    pay: 0.6, // a Pay Driver brings this × marketability money a race
   },
 
   /** What each role's stats do (Phase B section 2.1). */
@@ -194,7 +194,7 @@ export const TUNING = {
     grace: 0.5, // seasons a new manager serves before they can be sacked
     debt: 0,
     pastFloor: -0.5, // a race while balance is below zero, past the floor
-    generosity: 0.3, // Coin added at the season's start, × u × the tier's budget
+    generosity: 0.3, // money added at the season's start, × u × the tier's budget
     floor: [0.3, 0.4], // the debt floor, × the tier's budget, below zero
     meddling: [0.2, 0.6], // the chance an chairman's dilemma is the one drawn
     words: [75, 50, 25], // confidence crossing these sends the chairman's word
@@ -518,7 +518,7 @@ export const TUNING = {
     points: [10, 20, 30], // the factory's improvement points a day
     slots: [2, 3, 4], // the drawing loft's design slots
     loft: [1, 0.85, 0.7], // the drawing loft's design days ×
-    fish: [120, 80, 50], // Coin a race the fish market brings at level 1, by tier
+    fish: [120, 80, 50], // money a race the fish market brings at level 1, by tier
     fishLevel: [1, 1.8, 2.6], //   × this by its level
   },
 
@@ -546,7 +546,7 @@ export const TUNING = {
     every: 42,
     offers: 2,
     stand: 14, // offers a team gets every so many days, standing so long
-    perRace: 4.6, // a fixed sponsor's Coin a race × the team's marketability × its tier's factor
+    perRace: 4.6, // a fixed sponsor's money a race × the team's marketability × its tier's factor
     tier: [1.7, 1, 1], //   (Tier 1's wages outrun its marketability)
     grade: [1, 1.6, 2.4], // × by the offer's grade (the landing pad's level at most)
     races: [3, 10],
@@ -562,7 +562,7 @@ export const TUNING = {
     rounds: [3, 7], // the votes come before these rounds (0 the first)
     open: 12, // days a proposal stands before its vote
     abstain: 0.2, // a measure nearer even than this abstains
-    lobby: 0.1, // sway a Coin lobbied
+    lobby: 0.1, // sway a unit of money lobbied
     pace: 0.1,
     paceRange: [0.6, 1.6],
     spread: 0.25,
@@ -573,11 +573,7 @@ export const TUNING = {
   },
   /** Race day: the points of the first ten ships; the teams that swap between two championships at the season's end,
    *  each way; a stand-in driver's fee a race × their ask. */
-  race: {
-    top: [25, 18, 15, 12, 10, 8, 6, 4, 2, 1],
-    swap: 2,
-    standIn: 1,
-  },
+  race: { top: [25, 18, 15, 12, 10, 8, 6, 4, 2, 1], swap: 2, standIn: 1 },
   /** The dilemmas (Phase B section 12, career/events.ts): the chance a team draws one after a round, and their numbers. */
   dilemmas: {
     chance: 0.6,
@@ -590,7 +586,7 @@ export const TUNING = {
     argue: 5,
     argueLost: -10, // morale: the part given over, or the loser's when held
     dinner: 150,
-    dinnerBond: 5, // Coin, bond points
+    dinnerBond: 5, // money, bond points
     grey: { perf: 40, risk: 0.15 },
     report: 5, // a grey component's numbers; marketability for reporting it
     guest: 2, // the Consistency her first hired driver loses with a guest aboard
@@ -606,7 +602,7 @@ export const TUNING = {
     trialWage: 0.5, // a young free agent's age under, potential from; wage × their ask
     repair: 400,
     slowDays: 20,
-    slow: 0.5, // Coin a building level to repair now; else the factory at × slow for slowDays
+    slow: 0.5, // money a building level to repair now; else the factory at × slow for slowDays
     stamina: 6,
     relapse: 0.3,
     relapseRaces: 2, // an unfit driver who sails: Stamina lost, the chance of more races out

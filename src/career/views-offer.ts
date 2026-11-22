@@ -1,8 +1,8 @@
 // `offer` (Phase C batch 2): the contract document drawn on a draft, what it costs, how it meets the person's wants,
 // their patience, the talks so far and who else is talking to them, and where the talk stands. Pure, read-side.
 
-import type { Offer, Status } from '../office.ts';
-import type { Act, OfferView } from '../office-people.ts';
+import type { Offer, Status } from '../office/command.ts';
+import type { Act, OfferView } from '../office/people.ts';
 import { breakCost, dismissalCost } from './contracts.ts';
 import { offerCheck } from './hiring.ts';
 import { askOf, satisfied } from './market.ts';
@@ -17,16 +17,8 @@ import {
   wageText,
 } from './views-person.ts';
 import { askOffer, defaultPerson } from './views-profile.ts';
-import {
-  moneyText,
-  myTeam,
-  faceOf,
-  fig,
-  line,
-  nameOf,
-  rival,
-  topBar,
-} from './views.ts';
+import { myTeam, faceOf, fig, line, nameOf, rival, topBar } from './views.ts';
+import { moneyText } from './names.ts';
 
 const act = (why: string | null | undefined): Act => ({
   ok: !why,
@@ -166,9 +158,9 @@ export function offerView(
         }
       ),
       left: fig(left, moneyText(left), rival('floor', moneyText(c.debtFloor)), {
-        title: 'Coin left',
+        title: 'Balance left',
         lines: [
-          line('Coin', moneyText(c.balance)),
+          line('Balance', moneyText(c.balance)),
           line('Cost to sign', `−${moneyText(now)}`),
         ],
       }),

@@ -14,7 +14,7 @@ import {
   type Event,
 } from '../src/career/queue.ts';
 import { stopsFor } from '../src/career/advance.ts';
-import type { Command } from '../src/office.ts';
+import type { Command } from '../src/office/command.ts';
 import {
   FOUND,
   founded,
@@ -71,7 +71,11 @@ test('the same state and command give the same result; a refusal changes nothing
   assert.ok(a.ok && b.ok);
   if (a.ok && b.ok) assert.equal(canonical(a.state), canonical(b.state));
   const before = canonical(s);
-  apply(s, { kind: 'FitPart', part: s.teams[s.player!.team].parts[0].id, ship: 1 });
+  apply(s, {
+    kind: 'FitPart',
+    part: s.teams[s.player!.team].parts[0].id,
+    ship: 1,
+  });
   assert.equal(canonical(s), before, 'states are never changed in place');
 });
 

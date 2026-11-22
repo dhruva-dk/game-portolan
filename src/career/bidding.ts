@@ -4,7 +4,7 @@
 // bids, the youth builder's eye for potential and long contracts for the young, the poacher's short ones), and acts
 // only through the player's own checks: hiring.ts offerCheck and offered, scouting.ts scoutCheck and sent.
 
-import type { Offer, Role, Status } from '../office.ts';
+import type { Offer, Role, Status } from '../office/command.ts';
 import { askFee } from './asks.ts';
 import { breakCost, closing, dismissalCost, racesLeft } from './contracts.ts';
 import type { Dice } from './dice.ts';

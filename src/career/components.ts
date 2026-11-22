@@ -1,11 +1,11 @@
 // The components a design is made of (Phase B section 8.2, D11): six part types × three tiers × three components, as
 // data. Each has a name, a type, a tier, and its effects on the design: performance and its maximum, reliability and
-// its maximum, days to design and to build, risk, and Coin. Tiers 2 and 3 of sails, rigging and keel are unlocked by
+// its maximum, days to design and to build, risk, and money. Tiers 2 and 3 of sails, rigging and keel are unlocked by
 // the test tank's level; of rudder, hull and mounts by the foundry's. Every tier has a grey component: risk for a
 // large gain. A designer knows some of them (dealt by seed from tiers 1 and 2) and may learn more (Innovation).
 
 import type { PartType } from '../race.ts';
-import type { Building } from '../office.ts';
+import type { Building } from '../office/command.ts';
 import { shuffled, type Rand } from './dice.ts';
 import { componentsKnown } from './staff.ts';
 
@@ -41,7 +41,7 @@ const NONE: Effects = {
 };
 
 /** The three kinds every tier has, each tier's numbers × the tier's scale: a steady gain, a sound one (reliability),
- *  and a grey one (risk for a large gain). One type in two trades days for the steady gain's Coin. */
+ *  and a grey one (risk for a large gain). One type in two trades days for the steady gain's money. */
 const KINDS: readonly Partial<Effects>[] = [
   { perf: 22, perfMax: 30, balance: 40, designDays: 1 },
   { perf: 6, reliability: 0.05, reliabilityMax: 0.04, balance: 50 },

@@ -2,7 +2,7 @@
 // and verdicts, the managers' market, and the player's job offers.
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import type { Personality } from '../src/office.ts';
+import type { Personality } from '../src/office/command.ts';
 import type { CareerState } from '../src/career/career.ts';
 import { released } from '../src/career/contracts.ts';
 import { dice } from '../src/career/dice.ts';
@@ -18,10 +18,10 @@ import {
   sacksAtEnd,
   seasonStart,
   served,
-  standingOf,
   verdicts,
   wordAt,
 } from '../src/career/chairmen.ts';
+import { standingOf } from '../src/career/standings.ts';
 import { learned } from '../src/career/knowledge.ts';
 import { confidenceCarried, confidenceMove } from '../src/career/leadership.ts';
 import { YEAR } from '../src/career/stars.ts';
@@ -290,7 +290,7 @@ test("a team's post offered to a player of enough reputation; TakeJob moves them
   );
 });
 
-test("at a season's start chairmen add Coin and set targets; at its end a target missed by more than 5 places sacks, if confidence is low", () => {
+test("at a season's start chairmen add money and set targets; at its end a target missed by more than 5 places sacks, if confidence is low", () => {
   const s = pastGrace();
   const t = seasonStart(s);
   for (const c of t.teams) assert.ok(c.balance >= s.teams[c.id].balance);

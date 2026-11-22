@@ -5,7 +5,7 @@
 // sea-held point; a team sailing risky parts, against more inspection.
 
 import type { PartType } from '../race.ts';
-import type { Change } from '../office.ts';
+import type { Change } from '../office/command.ts';
 import { effective } from './effective.ts';
 import { unit, type PersonOf } from './roles.ts';
 import type { CareerState, Team } from './state.ts';

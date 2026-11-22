@@ -99,7 +99,7 @@ const member = (v: number, fatigue = 0): pit.Member => ({
   rested: false,
   pushed: false,
 });
-const crewOf = (v: number, fatigue = 0) =>
+const pitOf = (v: number, fatigue = 0) =>
   Array.from({ length: TUNING.world.pit }, () => member(v, fatigue));
 
 test('bond: levels at 5, 12 and 20, each a quicker stop', () => {
@@ -108,7 +108,7 @@ test('bond: levels at 5, 12 and 20, each a quicker stop', () => {
     [0, 0, 1, 1, 2, 2, 3, 3]
   );
   const at = (bond: number) =>
-    pit.pitCrew({ mechanic: mechanic(10), crew: crewOf(10), bond });
+    pit.pitCrew({ mechanic: mechanic(10), members: pitOf(10), bond });
   assert.deepEqual(
     [0, 5, 12, 20].map((b) => at(b).pace / at(0).pace),
     TUNING.bond.pace
@@ -116,7 +116,7 @@ test('bond: levels at 5, 12 and 20, each a quicker stop', () => {
   assert.equal(at(20).slip, at(0).slip, 'a bond steadies no hand');
 });
 
-test("pit crew: Speed, Strength and Teamwork raise a member's work, Precision and Nerve lower their slips; fatigue does the reverse; Stamina tires them less", () => {
+test("pit members: Speed, Strength and Teamwork raise a member's work, Precision and Nerve lower their slips; fatigue does the reverse; Stamina tires them less", () => {
   for (const k of ['speed', 'strength', 'teamwork'] as const) {
     rises((x) => pit.work({ ...pitStats(10), [k]: x }, 0), `${k} (work)`);
     assert.equal(
@@ -140,7 +140,7 @@ test("pit crew: Speed, Strength and Teamwork raise a member's work, Precision an
   assert.equal(pit.fatigueGained(0), 37.5);
 });
 
-test('pit crew: fatigue falls 10 × (1 + pit house level) a day, in closed form, never below 0', () => {
+test('pit members: fatigue falls 10 × (1 + pit house level) a day, in closed form, never below 0', () => {
   const g = { fatigue: 80, fatigueDay: 10 };
   assert.equal(pit.fatigueOn(g, 10, 1), 80);
   assert.equal(pit.fatigueOn(g, 12, 1), 40);
@@ -150,16 +150,15 @@ test('pit crew: fatigue falls 10 × (1 + pit house level) a day, in closed form,
 });
 
 test("a ship's pit: her mechanic and the pit crew land in the pace and slip the sim reads (race.ts PitCrew)", () => {
-  const at = (m: number, crew: number, fatigue = 0) =>
-    pit.pitCrew({
-      mechanic: mechanic(m),
-      crew: crewOf(crew, fatigue),
-      bond: 0,
-    });
+  const at = (m: number, p: number, fatigue = 0) =>
+    pit.pitCrew({ mechanic: mechanic(m), members: pitOf(p, fatigue), bond: 0 });
   const spec = at(10, 10);
   assert.ok(Math.abs(spec.pace - 1) < 1e-9, 'tens all round are the spec pace');
   assert.ok(spec.slip > 0 && spec.slip < 1);
-  assert.ok(at(10, HIGH).pace < at(10, LOW).pace, 'a better crew is quicker');
+  assert.ok(
+    at(10, HIGH).pace < at(10, LOW).pace,
+    'a better pit crew is quicker'
+  );
   assert.ok(at(10, HIGH).slip < at(10, LOW).slip, 'and slips less');
   assert.ok(at(HIGH, 10).pace < at(LOW, 10).pace, 'a better mechanic too');
   assert.ok(at(HIGH, 10).slip < at(LOW, 10).slip);
@@ -170,7 +169,7 @@ test("a ship's pit: her mechanic and the pit crew land in the pace and slip the 
     const with1 = (v: number) =>
       pit.pitCrew({
         mechanic: { ...mechanic(10), [k]: v },
-        crew: crewOf(10),
+        members: pitOf(10),
         bond: 0,
       });
     return [with1(LOW), with1(HIGH)];
@@ -186,22 +185,22 @@ test("a ship's pit: her mechanic and the pit crew land in the pace and slip the 
   // a place no one fills, and no mechanic, are the worst there is
   const short = pit.pitCrew({
     mechanic: mechanic(10),
-    crew: crewOf(10).slice(1),
+    members: pitOf(10).slice(1),
     bond: 0,
   });
   assert.ok(short.pace > spec.pace && short.slip > spec.slip);
-  const none = pit.pitCrew({ mechanic: null, crew: crewOf(10), bond: 0 });
+  const none = pit.pitCrew({ mechanic: null, members: pitOf(10), bond: 0 });
   assert.ok(none.pace > at(LOW, 10).pace && none.slip >= at(LOW, 10).slip);
   // a dilemma's rest and push
   const rested = pit.pitCrew({
     mechanic: mechanic(10),
-    crew: [{ ...member(10), rested: true }, ...crewOf(10).slice(1)],
+    members: [{ ...member(10), rested: true }, ...pitOf(10).slice(1)],
     bond: 0,
   });
   assert.ok(rested.pace > spec.pace, 'a member rested works less this race');
   const pushed = pit.pitCrew({
     mechanic: mechanic(10),
-    crew: [{ ...member(10), pushed: true }, ...crewOf(10).slice(1)],
+    members: [{ ...member(10), pushed: true }, ...pitOf(10).slice(1)],
     bond: 0,
   });
   assert.ok(pushed.slip > spec.slip, 'a member pushed on slips more');

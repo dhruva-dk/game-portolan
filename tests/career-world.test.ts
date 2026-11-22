@@ -80,7 +80,10 @@ test("colours: a dye in a pattern, no two teams of a tier in the same livery, th
       .map((i) => world.teams[i].colours)
       .map((c) => {
         assert.ok(
-          c.dye >= 0 && c.dye < L.dyes && c.pattern >= 0 && c.pattern < L.patterns
+          c.dye >= 0 &&
+            c.dye < L.dyes &&
+            c.pattern >= 0 &&
+            c.pattern < L.patterns
         );
         return key(c);
       });

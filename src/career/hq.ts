@@ -3,10 +3,10 @@
 // level gives is read where it acts, through the functions here: the factory's improvement points and build days, the
 // drawing loft's slots, design days and designers' growth (stars.ts SCHOOL), the test tank's and the foundry's
 // component tiers (components.ts), the sailing school's drivers' growth, the pit crew loft's fatigue recovery
-// (service.ts recovery), the crow's nest's scouts and scouting days (staff.ts scoutDays), the fish market's Coin and
+// (pit.ts recovery), the crow's nest's scouts and scouting days (staff.ts scoutDays), the fish market's money and
 // the landing pad's sponsor tiers.
 
-import type { Building } from '../office.ts';
+import type { Building } from '../office/command.ts';
 import { canSpend, paid } from './balance.ts';
 import { accept, refuse, why, type Check, type Handlers } from './command.ts';
 import { mine, post } from './post.ts';
@@ -44,7 +44,7 @@ export const designSlots = (c: Team): number =>
   K.slots[at(c.buildings.drawingLoft.level)];
 export const loftFactor = (c: Team): number =>
   K.loft[at(c.buildings.drawingLoft.level)];
-/** The fish market: Coin a race, by tier. */
+/** The fish market: money a race, by tier. */
 export const fishIncome = (c: Team): number =>
   Math.round(
     K.fish[Math.min(K.fish.length - 1, c.tier)] *

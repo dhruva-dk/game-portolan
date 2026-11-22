@@ -7,7 +7,7 @@ import { canonical } from '../src/career/canon.ts';
 import { entry, ORIGIN } from '../src/career/journal.ts';
 import { fresh, open, send, type Kept } from '../src/career/session.ts';
 import { KEEP, type Store } from '../src/career/store.ts';
-import type { Command } from '../src/office.ts';
+import type { Command } from '../src/office/command.ts';
 
 /** How an adapter is made for the suite: a new empty store, the same store opened again (as after a restart), and the
  *  journal's entry at an index altered on disk (one byte of its text changed). */

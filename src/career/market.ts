@@ -3,7 +3,7 @@
 // reach 1.0), refuse below. Pure functions of the state, which the player's offers, the rivals' bids and the screens
 // all call.
 
-import type { Offer, Want } from '../office.ts';
+import type { Offer, Want } from '../office/command.ts';
 import { askFee, askSeasons, askWage } from './asks.ts';
 import { renewalAsk } from './morale.ts';
 import type { Person } from './roles.ts';

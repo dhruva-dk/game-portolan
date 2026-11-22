@@ -8,7 +8,7 @@ import {
   type Offer,
   type Plan,
   type Ship,
-} from '../src/office.ts';
+} from '../src/office/command.ts';
 import { raceCards } from '../src/career/card.ts';
 import { lineups } from '../src/career/lineup.ts';
 import { TEMPLATES } from '../src/career/mail.ts';

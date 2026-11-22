@@ -3,7 +3,7 @@
 // (career/form.ts). Every reader of a stat in a race or a decision reads these,
 // never the raw stats.
 
-import type { Role } from '../office.ts';
+import type { Role } from '../office/command.ts';
 import { moraleShift } from './morale.ts';
 import { mapped, stat, type Person, type PersonOf } from './roles.ts';
 import { modifier, type Setting } from './traits.ts';

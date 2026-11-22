@@ -2,7 +2,7 @@
 // patience, the tier rule, break clauses, dismissals, renewals and the contract's last days. The player's commands
 // and the rivals' bids (career/rivals.ts) go through the same checks and the same `offered` and `signed`.
 
-import type { Offer } from '../office.ts';
+import type { Offer } from '../office/command.ts';
 import {
   accept,
   refuse,
@@ -47,7 +47,7 @@ function shapeCheck(o: Offer): Check {
   if (!money)
     return why(
       'offer',
-      'Wages, fees, bonuses and the break clause are whole Coin.'
+      'Wages, fees, bonuses and the break clause are whole sums.'
     );
   if (!whole(o.seasons, 1, 3))
     return why('seasons', 'A contract runs one to three seasons.');

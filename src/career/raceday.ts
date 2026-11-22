@@ -4,7 +4,7 @@
 // improvement is brought to the day, so the cards read today's parts.
 
 import { CALLS, TEAM, type RaceResult } from '../race.ts';
-import { SHIPS, type Plan } from '../office.ts';
+import { SHIPS, type Plan } from '../office/command.ts';
 import type { EventHandler } from './advance.ts';
 import {
   accept,

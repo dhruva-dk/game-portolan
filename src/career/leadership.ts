@@ -91,11 +91,11 @@ export const confidenceCarried = (confidence: number, start: number): number =>
 export const debtMove = (balance: number, floor: number): number =>
   balance < floor ? E.pastFloor : balance < 0 ? E.debt : 0;
 
-/** Generosity: Coin the chairman adds at the season's start. */
+/** Generosity: money the chairman adds at the season's start. */
 export const endowment = (generosity: number, budget: number): number =>
   E.generosity * unit(generosity) * budget;
 
-/** Generosity: the debt floor (a negative Coin). */
+/** Generosity: the debt floor (a negative balance). */
 export const debtFloor = (generosity: number, budget: number): number =>
   -lin(E.floor, unit(generosity)) * budget;
 

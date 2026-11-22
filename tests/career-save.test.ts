@@ -3,6 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { canonical, fnv, hex, sumOf } from '../src/career/canon.ts';
 import {
   ORIGIN,
@@ -25,7 +26,7 @@ import type { Entry, Store } from '../src/career/store.ts';
 import { TUNING_VERSION } from '../src/career/tuning.ts';
 import { emptyDisk, memoryStore, type Disk } from '../src/store/memory.ts';
 import { faultyStore, type Fault } from '../src/store/faulty.ts';
-import type { Command } from '../src/office.ts';
+import type { Command } from '../src/office/command.ts';
 import { script } from './career-kit.ts';
 
 /** Runs commands through `send` until the store dies; what the player was last told was saved. */
@@ -345,7 +346,7 @@ test('the Snapshot request writes one now; a backup copies the newest snapshot a
 test('a save of schema 1 (the fixture) loads; a save from a newer schema is not read as this one', async () => {
   const fixture = JSON.parse(
     readFileSync(
-      new URL('./fixtures/career-schema-1.json', import.meta.url),
+      join(import.meta.dirname, 'fixtures', 'career-schema-1.json'),
       'utf8'
     )
   );

@@ -8,7 +8,7 @@
 // n days the first points restore it (the most worn part first) and the rest split; caps are per part. `improvementTo` brings
 // a team's parts to today; anything that reads or changes them first calls it.
 
-import type { ImprovementShare } from '../office.ts';
+import type { ImprovementShare } from '../office/command.ts';
 import { accept, refuse, why, type Check, type Handlers } from './command.ts';
 import { effective } from './effective.ts';
 import { within } from './flags.ts';
@@ -29,7 +29,7 @@ import { TUNING } from './tuning.ts';
 const Y = TUNING.improvement;
 
 /** Each ship's mechanic's effective stats (null: she has none), by ship. */
-function mechanicsOf(
+export function mechanicsOf(
   s: CareerState,
   c: Team
 ): (PersonOf<'mechanic'>['stats'] | null)[] {

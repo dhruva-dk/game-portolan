@@ -2,7 +2,7 @@
 // releasing, expiry at the season's end, and the young people who enter the market each season. The player's team and
 // every rival sign and release through these same functions.
 
-import type { Offer } from '../office.ts';
+import type { Offer } from '../office/command.ts';
 import { paid } from './balance.ts';
 import { between, within, type Dice } from './dice.ts';
 import { fullName } from './names.ts';
@@ -132,10 +132,7 @@ export function released(s: CareerState, person: number): CareerState {
     s,
     rebonded(c, { ...c, staff: unseated(c.staff, person) })
   );
-  out = withPerson(out, {
-    ...out.people[person],
-    contract: null,
-  });
+  out = withPerson(out, { ...out.people[person], contract: null });
   out = scoutingStopped(out, person);
   return talksEnded(out, person, null);
 }
@@ -169,10 +166,7 @@ export function signed(s: CareerState, deal: Signing): CareerState {
     }
     if (g.contract) out = released(out, person);
     const c0 = out.teams[team];
-    if (
-      offer.replaces !== null &&
-      seatOf(c0, offer.replaces)
-    ) {
+    if (offer.replaces !== null && seatOf(c0, offer.replaces)) {
       const seat = seatFor(c0, offer);
       const leaving = out.people[offer.replaces];
       out = paid(out, team, dismissalCost(out, leaving), {

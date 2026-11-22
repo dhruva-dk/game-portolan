@@ -4,7 +4,7 @@
 
 import {
   KEEP,
-  type Entry,
+  readEntry,
   type Saved,
   type Snapshot,
   type Store,
@@ -22,16 +22,6 @@ export const emptyDisk = (): Disk => ({
   snapshots: [],
   backup: null,
 });
-
-/** An entry's text read back. What does not parse comes back as a record shaped like no entry, so the career counts
- *  it lost rather than the load failing. */
-export function readEntry(text: string): Entry {
-  try {
-    return JSON.parse(text);
-  } catch {
-    return JSON.parse(JSON.stringify({ unreadable: text.length }));
-  }
-}
 
 /** An entry's seq as stored, or null if its text does not say. */
 const seqOf = (text: string): number | null => {

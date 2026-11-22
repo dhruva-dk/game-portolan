@@ -1,10 +1,10 @@
 // Traits (Phase B section 2.3), as data: an id, a name, the roles that may have one, a condition the career can
 // evaluate (the planet, the round, the rules, a rival on the grid, contract state, age, tier), and a modifier (to
-// stats, morale, marketability, wants, wage, Coin a race, or the team's young drivers' growth). A person has at most
+// stats, morale, marketability, wants, wage, money a race, or the team's young drivers' growth). A person has at most
 // three; they gain or lose them at a season's end by seed (`turned`) and by events.
 
 import type { Rules } from '../race.ts';
-import type { Role, Want } from '../office.ts';
+import type { Role, Want } from '../office/command.ts';
 import { pick, type Rand } from './dice.ts';
 import { TUNING } from './tuning.ts';
 
@@ -27,7 +27,7 @@ export interface Modifier {
   morale: number; // a race
   marketability: number;
   wage: number; // her ask × (1 + this)
-  balance: number; // × her marketability, Coin a race to her team
+  balance: number; // × her marketability, money a race to her team
   growth: number; // to her team's drivers under the mentor age
   wants: Want | null; // a want she always ranks first
 }

@@ -2,25 +2,24 @@
 // chairman's confidence, the record by season, honours, the posts offered), and the chairman's letter with the offers when
 // sacked or tempted. Pure, read-side.
 
-import type { JobCard, JobsView, CareerView } from '../office-people.ts';
+import type { JobCard, JobsView, CareerView } from '../office/people.ts';
 import { marketability } from './effective.ts';
-import { standingOf } from './chairmen.ts';
+import { standingOf } from './standings.ts';
 import { takeCheck } from './jobs.ts';
 import type { CareerState } from './state.ts';
 import { TUNING } from './tuning.ts';
 import { ROLE_NAMES, ageOf, dayText } from './views-person.ts';
 import {
   TIERS,
-  moneyText,
   myTeam,
   faceOf,
   fig,
   line,
   nameOf,
-  ordinal,
   rival,
   topBar,
 } from './views.ts';
+import { moneyText, ordinal } from './names.ts';
 
 /** A team's offer of its manager's post, as a card shows it. */
 function card(s: CareerState, team: number, expires: number): JobCard {

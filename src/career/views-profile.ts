@@ -2,8 +2,9 @@
 // traits, morale and marketability, wants once scouted, stats with which way they head, the role's own figures, the
 // history, the contract, and what the player may do (scout, offer, renew, dismiss), each with why not. Pure.
 
-import type { Figure, Offer } from '../office.ts';
-import type { Act, ProfileView, StatLine } from '../office-people.ts';
+import type { Figure } from '../office/career.ts';
+import type { Offer } from '../office/command.ts';
+import type { Act, ProfileView, StatLine } from '../office/people.ts';
 import { closing, dismissalCost, racesLeft } from './contracts.ts';
 import { effective, marketability } from './effective.ts';
 import { offerCheck } from './hiring.ts';
@@ -35,7 +36,6 @@ import {
 } from './views-person.ts';
 import {
   TIERS,
-  moneyText,
   myTeam,
   faceOf,
   fig,
@@ -44,6 +44,7 @@ import {
   rival,
   topBar,
 } from './views.ts';
+import { moneyText } from './names.ts';
 
 const act = (why: string | null | undefined): Act => ({
   ok: !why,
@@ -192,10 +193,7 @@ function specifics(g: Person): { label: string; figure: Figure }[] {
       return [
         one(
           'Reputation',
-          {
-            value: g.reputation,
-            text: String(Math.round(g.reputation)),
-          },
+          { value: g.reputation, text: String(Math.round(g.reputation)) },
           '50',
           [['Reputation', Math.round(g.reputation)]]
         ),

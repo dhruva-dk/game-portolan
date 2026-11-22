@@ -1,6 +1,6 @@
 // Stars, age, growth and retirement (Phase B section 2.2).
 
-import type { Building, Role } from '../office.ts';
+import type { Building, Role } from '../office/command.ts';
 import { seeded, type Rand } from './dice.ts';
 import { stat, withStats, type Person } from './roles.ts';
 import { TUNING } from './tuning.ts';

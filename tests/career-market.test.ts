@@ -2,7 +2,7 @@
 // tier rule, break clauses, approaches, dismissals, expiry, the young).
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import type { Offer } from '../src/office.ts';
+import type { Offer } from '../src/office/command.ts';
 import { apply, type CareerState } from '../src/career/career.ts';
 import {
   breakCost,
@@ -56,8 +56,7 @@ function asked(
       ? g.role === 'driver'
         ? 'ship'
         : 'staff'
-      : seatRole(seatOf(s.teams[team], replaces)!)
-          .status;
+      : seatRole(seatOf(s.teams[team], replaces)!).status;
   return {
     role: g.role,
     status,
@@ -146,10 +145,7 @@ test('a scout is sent to a person in Reach, reports by mail after its days, and 
   assert.ok(scout !== undefined, "the player's team starts with a scout");
   const target = s.people.find(
     (g) =>
-      g.contract === null &&
-      g.retired === null &&
-      !g.player &&
-      !knows(c.id, g)
+      g.contract === null && g.retired === null && !g.player && !knows(c.id, g)
   )!;
   const before = view(s, c.id, target.id);
   assert.equal(before.known, false);

@@ -10,7 +10,7 @@
 
 import { TEAM } from '../race.ts';
 import { marketability } from './effective.ts';
-import { standingOf } from './chairmen.ts';
+import { standingOf } from './standings.ts';
 import type { Person } from './roles.ts';
 import { age, stars } from './stars.ts';
 import {

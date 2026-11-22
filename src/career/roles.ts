@@ -6,7 +6,7 @@
 // stand for them (D8).
 
 import type { PartType, Stat, Persona } from '../race.ts';
-import type { Personality, Role, Status, Want } from '../office.ts';
+import type { Personality, Role, Status, Want } from '../office/command.ts';
 
 /** Each role's stats, in the order a screen lists them. */
 export const ROLE_STATS = {
@@ -78,7 +78,7 @@ const designerTypesAreTheSeams: Same<
 export const SEAM_NAMES_HOLD =
   driverStatsAreTheSeams && designerTypesAreTheSeams;
 
-/** A person's contract (Phase B section 5). Wage, fee and bonuses in Coin; `ends` the season at whose end it runs out
+/** A person's contract (Phase B section 5). Wage, fee and bonuses in money; `ends` the season at whose end it runs out
  *  (null for an chairman, and for the player, who are their team's for as long as they stay). */
 export interface Contract {
   team: number;

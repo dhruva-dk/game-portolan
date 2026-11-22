@@ -2,7 +2,7 @@
 //
 // - improvement: splits the points toward its parts ranked worst in its tier, weighted by their worth (the room left to
 //   improve them); a low Development splits more evenly (leadership.ts improvementSplit);
-// - design: picks the type it ranks worst in, and from each slot's dealt cards the component of most worth per Coin,
+// - design: picks the type it ranks worst in, and from each slot's dealt cards the component of most worth per money,
 //   accepting risk by personality; late in the season it designs for the next;
 // - build: buildings in its personality's order, when the balance it commits allows;
 // - sponsors: signs the best offers standing, and replaces a weaker sponsor for one worth enough more (Finance);
@@ -12,7 +12,7 @@
 // Each acts only through the player's own checks and functions, and spends from the Mind's room.
 
 import type { PartType } from '../race.ts';
-import type { Building } from '../office.ts';
+import type { Building } from '../office/command.ts';
 import { cast, rivalSide } from './admiralty.ts';
 import { canSpend } from './balance.ts';
 import { TYPES, component } from './components.ts';
@@ -126,7 +126,7 @@ function worstType(s: CareerState, c: Team): PartType | null {
   return worst;
 }
 
-/** Design: the worst-ranked type, each slot's best card by worth per Coin (risk by personality). */
+/** Design: the worst-ranked type, each slot's best card by worth per money (risk by personality). */
 export const design: Decide = (s, mind) => {
   const c = s.teams[mind.team];
   if (c.design || c.staff.designer === null) return { state: s, mind };

@@ -5,7 +5,7 @@
 // if every entry carries the present tuning), else the backup, else it says plainly that the save is lost. A torn
 // tail is dropped and the player told what was lost.
 
-import type { Command, Refusal } from '../office.ts';
+import type { Command, Refusal } from '../office/command.ts';
 import { apply, start, type CareerState } from './career.ts';
 import {
   ORIGIN,

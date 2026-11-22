@@ -9,7 +9,7 @@
 // a rival yet to vote when the count comes votes by its measure then (admiralty.ts counted). The race plan
 // (section 13) is decided on its own event with the same Mind.
 
-import type { Personality } from '../office.ts';
+import type { Personality } from '../office/command.ts';
 import { fill, poach, renew, replace, scout } from './bidding.ts';
 import type { Dice } from './dice.ts';
 import { effective } from './effective.ts';
@@ -36,7 +36,7 @@ const R = TUNING.rivals;
 /** The rows of section 6's table a review runs, in an order set by personality. */
 export type Row = keyof (typeof R.personalities)[Personality]['order'];
 
-/** What a rival manager brings to a decision: their team, their effective stats, their personality, and the Coin
+/** What a rival manager brings to a decision: their team, their effective stats, their personality, and the balance
  *  still to commit this review (each row's spending takes from it). */
 export interface Mind {
   team: number;

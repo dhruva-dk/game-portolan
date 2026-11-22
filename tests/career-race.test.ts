@@ -3,7 +3,7 @@
 // and the debug commands.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import type { Plan } from '../src/office.ts';
+import type { Plan } from '../src/office/command.ts';
 import { raceCards } from '../src/career/card.ts';
 import { apply, type CareerState } from '../src/career/career.ts';
 import { lineups } from '../src/career/lineup.ts';
@@ -105,7 +105,7 @@ test('stand-ins: with more of her drivers unfit than the reserve covers, a ship 
   refused(none, { kind: 'RaceStarted', round: 0 }, 'noDriver');
 });
 
-test('a rival sails under a call: its first driver\'s, if its manager\'s Tactics holds', () => {
+test("a rival sails under a call: its first driver's, if its manager's Tactics holds", () => {
   for (const x of lineups(DAY))
     assert.ok(['free', 'attack', 'hold', 'form'].includes(x.call));
 });
@@ -121,7 +121,9 @@ test('SetPlan: a sound plan is kept; each wrong part of one is refused with its 
     plan: { ...p, drivers: swapped },
   });
   assert.deepEqual(
-    lineups(turned)[ME].ships.slice(1).map((a) => a.driver),
+    lineups(turned)
+      [ME].ships.slice(1)
+      .map((a) => a.driver),
     swapped,
     "the plan's drivers board in its order"
   );
@@ -132,7 +134,11 @@ test('SetPlan: a sound plan is kept; each wrong part of one is refused with its 
     { kind: 'SetPlan', plan: { ...p, drivers: with0(other) } },
     'driver'
   );
-  refused(DAY, { kind: 'SetPlan', plan: { ...p, drivers: with0(-1) } }, 'driver');
+  refused(
+    DAY,
+    { kind: 'SetPlan', plan: { ...p, drivers: with0(-1) } },
+    'driver'
+  );
   refused(
     DAY,
     { kind: 'SetPlan', plan: { ...p, drivers: p.drivers.slice(1) } },
@@ -143,11 +149,7 @@ test('SetPlan: a sound plan is kept; each wrong part of one is refused with its 
     { kind: 'SetPlan', plan: { ...p, drivers: with0(p.drivers[1]) } },
     'driver'
   );
-  refused(
-    unfitted(DAY, [p.drivers[0]]),
-    { kind: 'SetPlan', plan: p },
-    'unfit'
-  );
+  refused(unfitted(DAY, [p.drivers[0]]), { kind: 'SetPlan', plan: p }, 'unfit');
   refused(
     DAY,
     { kind: 'SetPlan', plan: { ...p, call: 'sing' as Plan['call'] } },
@@ -271,7 +273,7 @@ test('points: 25, 18, 15, 12, 10, 8, 6, 4, 2, 1 to the first ten ships; a sinkin
   assert.equal(t[2].points, 2 + 1, 'team 2: ninth and tenth');
 });
 
-test('the drivers\' table: each ship\'s points go to who sailed her, the player among them', () => {
+test("the drivers' table: each ship's points go to who sailed her, the player among them", () => {
   const after = sailed(DAY);
   const l = after.championships[after.teams[ME].tier];
   const teams = new Map(l.standings.map((x) => [x.team, x.points]));
@@ -282,7 +284,10 @@ test('the drivers\' table: each ship\'s points go to who sailed her, the player 
   assert.equal(l.drivers.length, l.teams.length * TEAM);
   for (const [team, points] of teams) {
     const sea = points - (byTeam.get(team) ?? 0);
-    assert.ok(sea === 0 || sea === 1, `team ${team}: its ships' points, and at most the sea's one`);
+    assert.ok(
+      sea === 0 || sea === 1,
+      `team ${team}: its ships' points, and at most the sea's one`
+    );
   }
 });
 

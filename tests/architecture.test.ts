@@ -76,6 +76,26 @@ const LAYERS: Record<string, readonly string[]> = {
   // view and what it asks, as plain data; its fixtures (the debug page's desk)
   // name the palette's dyes
   'office/': ['office/', 'race.ts', 'kinds.ts', 'colour.ts', 'palette.ts'],
+  // the career: pure, headless, deterministic (determinism), a reducer over a
+  // journal; it deals race cards and takes results (race.ts), and builds the
+  // office's views (the seam's words, commands and views); it never runs a
+  // race (no play/, no sim/) and never draws (no ui/)
+  'career/': [
+    'career/',
+    'office/command.ts',
+    'office/career.ts',
+    'office/people.ts',
+    'race.ts',
+    'kinds.ts',
+    'world/random.ts',
+  ],
+  // where the career's journal is kept: memory, IndexedDB, and a faulty disk
+  // for the tests (career/store.ts Store)
+  'store/': ['store/', 'career/store.ts'],
+  // the career's desk: its session on a store, as the office asks for it; and
+  // the fixture careers it is opened on, made by the commands a player sends
+  'desk.ts': ['career/', 'store/', 'office/', 'race.ts'],
+  'desk-fixtures.ts': ['desk.ts', 'career/', 'store/', 'office/'],
   // the UI draws plain data: of the sim only the storm's Cap (the full map inks
   // it); the office's screens draw the seam's views
   'ui/': [
@@ -400,14 +420,17 @@ test('frame: the frame draws a snapshot; it alone makes the camera, works out th
   );
 });
 
-test('determinism: src/world and src/sim are deterministic and headless', () => {
+test('determinism: src/world, src/sim and src/career are deterministic and headless', () => {
   none(
     'determinism',
     hits(
-      /\bMath\.random\b|\bDate\b|\bperformance\b|\b(document|window|self|globalThis|navigator|location)\b/,
-      (rel) => rel.startsWith('world/') || rel.startsWith('sim/')
+      /\bMath\.random\b|\bDate\b|\bperformance\b|\b(document|window|self|globalThis|navigator|location|indexedDB|localStorage)\b/,
+      (rel) =>
+        rel.startsWith('world/') ||
+        rel.startsWith('sim/') ||
+        rel.startsWith('career/')
     ),
-    'Math.random, Date, performance or a browser global in src/world or src/sim'
+    'Math.random, Date, performance or a browser global in src/world, src/sim or src/career'
   );
 });
 

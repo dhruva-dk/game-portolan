@@ -18,7 +18,7 @@ import {
   type RaceShip,
   type Rules,
 } from '../race.ts';
-import { SHIPS, type Ship } from '../office.ts';
+import { SHIPS, type Ship } from '../office/command.ts';
 import { endDay } from './contracts.ts';
 import { effective } from './effective.ts';
 import { today } from './flags.ts';
@@ -114,7 +114,7 @@ export function pitOf(s: CareerState, c: Team, ship: Ship): PitCrew {
   const g = m === null ? undefined : s.people[m];
   return pitCrew({
     mechanic: g && hasRole(g, 'mechanic') ? effective(g, null) : null,
-    crew: membersOf(s, c),
+    members: membersOf(s, c),
     bond: c.bonds[ship] ?? 0,
   });
 }
@@ -134,8 +134,7 @@ function shipOf(
     team: at.place,
     colours: c.colours,
     parts: fittedParts(c, ship),
-    driver:
-      a && a.driver !== null ? driverOf(s, a.driver, c, at.teams) : null,
+    driver: a && a.driver !== null ? driverOf(s, a.driver, c, at.teams) : null,
     pit: pitOf(s, c, ship),
     call: at.sailing.call,
     forfeit,

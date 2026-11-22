@@ -1,10 +1,10 @@
 // Suppliers (Phase B section 8.7, D18): in the off-season each team chooses one each of timber (hull, keel), canvas
 // (sails, rigging) and cordage (rudder, mounts) from three cards a trade, dealt by seed from this table. Each gives a
-// trade-off for its parts for the season, and costs Coin once. The window is the off-season up to the season's first
+// trade-off for its parts for the season, and costs money once. The window is the off-season up to the season's first
 // race (the founding included). Rivals choose by personality (career/works.ts).
 
 import type { PartType } from '../race.ts';
-import type { Personality, Trade } from '../office.ts';
+import type { Personality, Trade } from '../office/command.ts';
 import { canSpend, paid } from './balance.ts';
 import { accept, refuse, why, type Check, type Handlers } from './command.ts';
 import { seeded, shuffled } from './dice.ts';
@@ -252,7 +252,7 @@ const WEIGHT: Readonly<Record<Personality, Terms>> = {
   steady: T(0.3, 0.5, 600, -80, 40, -40),
 };
 
-/** A supplier's worth to a personality, less its Coin at a weight. */
+/** A supplier's worth to a personality, less its money at a weight. */
 export function supplierWorth(personality: Personality, x: Supplier): number {
   const w = WEIGHT[personality];
   return (

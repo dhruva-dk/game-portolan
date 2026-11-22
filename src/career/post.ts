@@ -2,7 +2,7 @@
 // the templates that word them, two or more each, are career/mail.ts's. A message addressed to a team reaches the
 // player only if it is theirs: a rival's news is not the player's mail (their scouting reports, their answers).
 
-import type { MailCategory } from '../office.ts';
+import type { MailCategory } from '../office/command.ts';
 import { seeded } from './dice.ts';
 import type { CareerState, Mail } from './state.ts';
 

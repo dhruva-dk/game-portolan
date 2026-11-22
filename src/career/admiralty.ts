@@ -4,12 +4,12 @@
 //
 // Each team has one vote. A rival votes by a measure of its own state (measure.ts); one near even abstains, unless
 // swayed: each side's sway is the sum of its backers' manager reputation × (a rival's Politics u; the player's 1),
-// plus the Coin lobbied for it, and each abstainer joins the side with more sway with a chance of the margin's share.
+// plus the money lobbied for it, and each abstainer joins the side with more sway with a chance of the margin's share.
 // Votes cast decide; a tie keeps the rule. The result comes by mail and takes effect at the season's end (rulesTurned).
 
 import { KINDS } from '../kinds.ts';
 import type { Rules } from '../race.ts';
-import type { Change, Measure } from '../office.ts';
+import type { Change, Measure } from '../office/command.ts';
 import { canSpend, paid } from './balance.ts';
 import {
   accept,
@@ -57,10 +57,7 @@ export function changeOf(m: Measure, next: Rules, rand: Rand): Change | null {
       return { measure: 'spec', type, spec: !next.spec.includes(type) };
     }
     case 'storm':
-      return {
-        measure: 'storm',
-        pace: moved(next.storm, A.pace, A.paceRange),
-      };
+      return { measure: 'storm', pace: moved(next.storm, A.pace, A.paceRange) };
     case 'ban': {
       const open = KINDS.filter((k) => !next.banned.includes(k));
       return open.length <= 2
@@ -315,7 +312,7 @@ export function lobbyCheck(
   if (no) return no;
   if (side === 'abstain') return why('side', 'Lobby for a side.');
   if (!whole(balance, 1, Number.MAX_SAFE_INTEGER))
-    return why('balance', 'Lobby a sum of Coin.');
+    return why('balance', 'Lobby a sum of money.');
   if (!canSpend(s.teams[team], balance))
     return why(
       'balance',

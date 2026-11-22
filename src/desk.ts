@@ -1,9 +1,11 @@
-// The desk: the career's session on its store, as the office (ui/office/) asks for it (office.ts Desk). Loaded and
+// The career's desk: its session on its store, as the office asks for it (office/career.ts CareerDesk). Loaded and
 // verified on launch; each command applied and journaled before the office redraws; a refusal or a failed save
-// returned as the sentence the office's notice says. main.ts makes one on IndexedDB; a fixture (fixtures.ts) on memory.
+// returned as the sentence the office's notice says. On the device it is kept in IndexedDB (deviceShelf); a fixture
+// career (desk-fixtures.ts) on memory.
 
-import type { Colours } from './race';
-import type { Command, Desk } from './office';
+import type { Colours } from './race.ts';
+import type { Command } from './office/command.ts';
+import type { CareerDesk } from './office/career.ts';
 import {
   backupNow,
   lostSentence,
@@ -11,8 +13,8 @@ import {
   send,
   type Kept,
   type Opened,
-} from './career/session';
-import type { Store } from './career/store';
+} from './career/session.ts';
+import type { Store } from './career/store.ts';
 import {
   foundErrors,
   foundView,
@@ -20,13 +22,13 @@ import {
   recoverView,
   settingsView,
   topBar,
-} from './career/views';
-import { careerView, jobsView } from './career/views-career';
-import { teamView } from './career/views-team';
-import { scoutingView } from './career/views-scouting';
-import { offerView } from './career/views-offer';
-import { profileView } from './career/views-profile';
-import { indexedStore, openDatabase } from './store/indexed';
+} from './career/views.ts';
+import { careerView, jobsView } from './career/views-career.ts';
+import { teamView } from './career/views-team.ts';
+import { scoutingView } from './career/views-scouting.ts';
+import { offerView } from './career/views-offer.ts';
+import { profileView } from './career/views-profile.ts';
+import { indexedStore, openDatabase } from './store/indexed.ts';
 
 /** Where the career is kept: a store opened, and wiped for a new career. */
 export interface Shelf {
@@ -39,7 +41,10 @@ export interface Shelf {
 }
 
 /** A desk on `shelf`, the career loaded (and verified) from it. */
-export async function createDesk(shelf: Shelf, debug = false): Promise<Desk> {
+export async function createDesk(
+  shelf: Shelf,
+  debug = false
+): Promise<CareerDesk> {
   let store = await shelf.open(),
     opened: Opened = await open(store, debug),
     kept: Kept | null = opened.ok ? opened.kept : null;
@@ -51,7 +56,7 @@ export async function createDesk(shelf: Shelf, debug = false): Promise<Desk> {
     opened.from === 'backup' ||
     opened.lost !== null;
   const must = () => kept as Kept;
-  const desk: Desk = {
+  const desk: CareerDesk = {
     changed: null,
     where: () =>
       troubled ? 'recover' : must().state.player === null ? 'found' : 'home',

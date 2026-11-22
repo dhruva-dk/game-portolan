@@ -16,12 +16,8 @@ import {
   youngPeople,
 } from './contracts.ts';
 import type { Dice } from './dice.ts';
-import {
-  managersRenewed,
-  seasonStart,
-  standingOf,
-  verdicts,
-} from './chairmen.ts';
+import { managersRenewed, seasonStart, verdicts } from './chairmen.ts';
+import { standingOf } from './standings.ts';
 import { knowledgeTurned } from './knowledge.ts';
 import { prizeAt, prizes } from './money.ts';
 import { carried } from './parts.ts';

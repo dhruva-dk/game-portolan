@@ -1,18 +1,9 @@
 // The seam's people views (Phase C batch 2): team, profile, offer, market, career and jobs, built by career/views-*.ts
 // and drawn by ui/office/. Types only, as office.ts: plain data, every figure with its comparison and its explanation.
 
-import type { Colours } from './race.ts';
-import type {
-  Face,
-  Figure,
-  Line,
-  Offer,
-  Role,
-  Ship,
-  Status,
-  TopBar,
-  Want,
-} from './office.ts';
+import type { Colours } from '../race.ts';
+import type { Face, Figure, Line, TopBar } from './career.ts';
+import type { Offer, Role, Ship, Status, Want } from './command.ts';
 
 /** Stars as a team sees them: exact (lo = hi) once known, else a range. */
 export interface Range {

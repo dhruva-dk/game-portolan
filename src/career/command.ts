@@ -3,7 +3,7 @@
 // career/career.ts joins them. A rule a screen needs (is this allowed, what does it cost) is a pure function beside
 // its handler, which the handler and the view models both call.
 
-import type { CommandKind, CommandOf, Refusal } from '../office.ts';
+import type { CommandKind, CommandOf, Refusal } from '../office/command.ts';
 import type { Dice } from './dice.ts';
 import type { CareerState } from './state.ts';
 
