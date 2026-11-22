@@ -186,6 +186,32 @@ test("a rival manager whose chairman's confidence falls to nothing is sacked, an
   invariants(t);
 });
 
+test('a ship with no driver signed to her costs the manager confidence a race, and at nothing their post, whatever the target', () => {
+  const s = pastGrace();
+  const c = lastRival(s);
+  const manned = withTeamSet(s, c.id, { target: 20, confidence: 50 });
+  const short = released(manned, c.staff.ships[1].driver!);
+  const full = afterRace(manned, c.id, roll(manned)).teams[c.id];
+  const less = afterRace(short, c.id, roll(short)).teams[c.id];
+  assert.equal(
+    Math.round((less.confidence - full.confidence) * 10) / 10,
+    TUNING.chairman.seat
+  );
+  assert.ok(TUNING.chairman.seat < 0);
+  // a target met does not save a manager who leaves ships to stand-ins
+  const spent = withTeamSet(short, c.id, { confidence: 0.01 });
+  assert.notEqual(
+    afterRace(spent, c.id, roll(spent)).teams[c.id].staff.manager,
+    c.staff.manager
+  );
+  const kept = withTeamSet(manned, c.id, { confidence: 0.01 });
+  assert.equal(
+    afterRace(kept, c.id, roll(kept)).teams[c.id].staff.manager,
+    c.staff.manager,
+    'with every seat signed and the target met, the manager stays'
+  );
+});
+
 test("sacked by the chairman directly: a rival's post filled at once; the best candidate is never the player", () => {
   const s = founded();
   const c = s.teams.find((x) => !x.player && x.staff.manager !== null)!;

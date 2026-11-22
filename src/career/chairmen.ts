@@ -53,7 +53,7 @@ export function wordAt(before: number, after: number): number | null {
 }
 
 /** A state after a race for one team's chairman: confidence moved by the standing against the target (Patience scales a
- *  fall) and by the balance; the word mailed at a crossing; the manager sacked at 0. Section 13 calls it for every team
+ *  fall), by the balance, and by each ship with no driver signed to her; the word mailed at a crossing; the manager sacked at 0. Section 13 calls it for every team
  *  as the round closes, after the standings. */
 export function afterRace(
   s: CareerState,
@@ -64,9 +64,14 @@ export function afterRace(
   if (c.staff.manager === null) return s;
   const patience = chairmanOf(s, c).stats.patience;
   const standing = standingOf(s, team);
+  // (the player's own ship has no driver's seat)
+  const unmanned = c.staff.ships.filter(
+    (h, ship) => h.driver === null && !(c.player && ship === 0)
+  ).length;
   const move =
     confidenceMove(patience, c.target, standing, s.round + 1) +
-    debtMove(c.balance, c.debtFloor);
+    debtMove(c.balance, c.debtFloor) +
+    E.seat * unmanned;
   const confidence =
     Math.round(Math.min(100, Math.max(0, c.confidence + move)) * 10) / 10;
   let out = withTeam(s, { ...c, confidence });
@@ -80,7 +85,10 @@ export function afterRace(
       slots: { level: word, rising: confidence > c.confidence ? 1 : 0 },
       links: [],
     });
-  return confidence <= 0 && standing - c.target > E.slack && served(s, c)
+  // (behind the target, or with a ship sailed by no one of the team's: a target sinks with a team let run down)
+  return confidence <= 0 &&
+    (standing - c.target > E.slack || unmanned > 0) &&
+    served(s, c)
     ? sacked(out, team, roll)
     : out;
 }

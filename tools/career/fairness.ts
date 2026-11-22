@@ -147,30 +147,43 @@ const rivals: TeamSeason[] = careers.flatMap((c) =>
 /** The championships, told apart in every table: points are alike in scale only within one. */
 const tiers = [0, 1, 2];
 
+/** The first season's rival teams: no team has yet changed championship, so a slot is a seat and nothing else. */
+const first: TeamSeason[] = careers.flatMap((c) =>
+  (c.records[0]?.teams ?? []).filter((t) => !t.player)
+);
+/** Slot against points by championship, for some team-seasons. */
+const seats = (of: readonly TeamSeason[]) =>
+  table(
+    ['Championship', 'Slot and points', 'Slots 1-10', 'Slots 11-20'],
+    tiers.map((tier) => {
+      const t = of.filter((x) => x.tier === tier);
+      return [
+        String(tier + 1),
+        fixed(
+          together(
+            t.map((x) => x.slot),
+            t.map((x) => x.points)
+          ),
+          3
+        ),
+        fixed(mean(t.filter((x) => x.slot < 10).map((x) => x.points))),
+        fixed(mean(t.filter((x) => x.slot >= 10).map((x) => x.points))),
+      ];
+    })
+  );
 say(
   '## 3. No seat advantage',
   '',
-  `${rivals.length} rival team-seasons. A team’s slot on its grid against its points, by championship (how they go together, −1 to 1), and the mean points of the front half of the grid and the back half.`,
+  `A team’s slot on its grid against its points, by championship (how they go together, −1 to 1), and the mean points of the front half of the grid and the back half. In the first season (${first.length} rival team-seasons), before any team has changed championship:`,
   ''
 );
-table(
-  ['Championship', 'Slot and points', 'Slots 1-10', 'Slots 11-20'],
-  tiers.map((tier) => {
-    const t = rivals.filter((x) => x.tier === tier);
-    return [
-      String(tier + 1),
-      fixed(
-        together(
-          t.map((x) => x.slot),
-          t.map((x) => x.points)
-        ),
-        3
-      ),
-      fixed(mean(t.filter((x) => x.slot < 10).map((x) => x.points))),
-      fixed(mean(t.filter((x) => x.slot >= 10).map((x) => x.points))),
-    ];
-  })
+seats(first);
+say(
+  '',
+  `Over every season (${rivals.length}): a slot is a team’s order by its number, and a team come down from the championship above (the stronger for it) has a low one, so here strength shows in the slot.`,
+  ''
 );
+seats(rivals);
 
 /** Team-seasons of a championship in four groups by `key`, least first: each group's mean points. */
 function quartiles(tier: number, key: (t: TeamSeason) => number): string[] {

@@ -6,7 +6,7 @@
 // A pair [a, b] is a line in u = stat / 20: a + b × u. A triple by tier is Tier 1's, Two's, Three's.
 
 /** Bump with any change to TUNING (and pin the new hash in the test). */
-export const TUNING_VERSION = 9;
+export const TUNING_VERSION = 10;
 
 const ROLE_YEARS = {
   manager: [40, 55],
@@ -195,6 +195,7 @@ export const TUNING = {
     grace: 0.5, // seasons a new manager serves before they can be sacked
     debt: 0,
     pastFloor: -0.5, // a race while balance is below zero, past the floor
+    seat: -2, // a race, for each ship with no driver signed to her (a stand-in sails her)
     generosity: 0.3, // money added at the season's start, × u × the tier's budget
     floor: [0.3, 0.4], // the debt floor, × the tier's budget, below zero
     meddling: [0.2, 0.6], // the chance a chairman's dilemma is the one drawn
