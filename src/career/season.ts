@@ -36,8 +36,8 @@ const finalOrder = (s: CareerState): number[][] =>
     [...l.teams].sort((a, b) => standingOf(s, a) - standingOf(s, b))
   );
 
-/** Where each team goes: −1 up a tier, +1 down, 0 stays. The bottom four of each tier but the last go down, the
- *  top four of each but the first go up. */
+/** Where each team goes: −1 up a tier, +1 down, 0 stays. The last of each tier but the last goes down, the
+ *  champion of each but the first goes up (TUNING.race.swap of each). */
 export function movesOf(
   order: readonly (readonly number[])[]
 ): Map<number, number> {

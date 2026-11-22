@@ -6,7 +6,7 @@
 // A ship's driver: the first ship of the player's team is the player's (null).
 // The player's other ships take the plan's drivers where they may sail. Then
 // each ship still open takes her own driver if fit, else the team's reserve if
-// fit and not aboard another, else a stand-in: the best fit free-agent driver
+// fit and not aboard another, else a stand-in: the least fit free-agent driver
 // not already engaged (the player's team first, then by team id), paid for the
 // one race at their ask. With none, the ship is forfeit: no ship ever starts
 // without someone to sail her.
@@ -61,7 +61,8 @@ export function maySail(s: CareerState, team: number, person: number): boolean {
   return g.contract === null || g.contract.team === team;
 }
 
-/** The fit free-agent drivers, best first: the stand-ins. */
+/** The fit free-agent drivers, the least first: the stand-ins (who will sail a day for a team with no seat for them is
+ *  whoever is not waiting on a better offer). */
 function freeDrivers(s: CareerState): Person[] {
   return s.people
     .filter(
@@ -72,7 +73,7 @@ function freeDrivers(s: CareerState): Person[] {
         !g.player &&
         !unfit(g)
     )
-    .sort((a, b) => stars(b) - stars(a) || a.id - b.id);
+    .sort((a, b) => stars(a) - stars(b) || a.id - b.id);
 }
 
 /** A rival's call for the race: the one its first driver's persona sails best if its manager's Tactics holds, else drawn. */

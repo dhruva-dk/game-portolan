@@ -11,12 +11,15 @@
 // planet's.
 
 import {
+  STATS,
   TEAM,
   type Driver,
+  type DriverStats,
   type PitCrew,
   type RaceCard,
   type RaceShip,
   type Rules,
+  type Stat,
 } from '../race.ts';
 import { SHIPS, type Ship } from '../office/command.ts';
 import { endDay } from './contracts.ts';
@@ -141,6 +144,38 @@ function shipOf(
   };
 }
 
+/**
+ * A card's drivers read against their field: each stat as far from ten as it
+ * is from the field's mean, × TUNING.race.field (kept to 0…20). The sim leans
+ * a driver by her stat's distance from ten, and a championship's drivers lie
+ * within a point or two of one another: read so, the better crew is the better
+ * ship, whatever the championship's level.
+ */
+function fielded(ships: readonly RaceShip[]): RaceShip[] {
+  const driven = ships.flatMap((h) => (h.driver ? [h.driver.stats] : []));
+  if (driven.length === 0) return [...ships];
+  const mean = (stat: Stat) =>
+    driven.reduce((a, d) => a + d[stat], 0) / driven.length;
+  const means = new Map(STATS.map((stat) => [stat, mean(stat)]));
+  const read = (stats: DriverStats): DriverStats => {
+    const out: Record<Stat, number> = { ...stats };
+    for (const stat of STATS)
+      out[stat] = Math.min(
+        20,
+        Math.max(
+          0,
+          10 + TUNING.race.field * (stats[stat] - (means.get(stat) ?? 10))
+        )
+      );
+    return out;
+  };
+  return ships.map((h) =>
+    h.driver
+      ? { ...h, driver: { ...h.driver, stats: read(h.driver.stats) } }
+      : h
+  );
+}
+
 /** The race's seed for a championship today. */
 const raceSeed = (s: CareerState, tier: number): number =>
   Math.floor(raceRand(s, 200000 + tier)() * 4294967296) >>> 0;
@@ -165,7 +200,7 @@ function cardOf(
     tier,
     round: s.round,
     rules: raceRules(s, tier),
-    ships,
+    ships: fielded(ships),
   };
 }
 

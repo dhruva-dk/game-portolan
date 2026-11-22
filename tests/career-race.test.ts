@@ -11,7 +11,7 @@ import { placePoints, tally } from '../src/career/round.ts';
 import { movesOf } from '../src/career/season.ts';
 import { YEAR } from '../src/career/stars.ts';
 import { TUNING } from '../src/career/tuning.ts';
-import { TEAM, type RaceResult } from '../src/race.ts';
+import { STATS, TEAM, type RaceResult } from '../src/race.ts';
 import { standIn } from './career-results.ts';
 import {
   founded,
@@ -75,7 +75,24 @@ test('race day: the player sails ship one; every other ship has one sailor, none
   );
 });
 
-test('stand-ins: with more of her drivers unfit than the reserve covers, a ship takes the best free driver for the race; with none she is forfeit', () => {
+test("a card's drivers are read against their field: each stat about ten across a championship, whatever its level, and no two fields alike", () => {
+  const cards = raceCards(DAY);
+  for (const card of cards) {
+    const driven = card.ships.flatMap((h) => (h.driver ? [h.driver] : []));
+    for (const stat of STATS) {
+      const xs = driven.map((d) => d.stats[stat]);
+      assert.ok(xs.every((x) => x >= 0 && x <= 20));
+      const mean = xs.reduce((a, b) => a + b, 0) / xs.length;
+      // (ten but for the few kept to 0…20)
+      assert.ok(Math.abs(mean - 10) < 1, `${card.tier} ${stat}: ${mean}`);
+      // and spread: a field's drivers are told apart
+      assert.ok(Math.max(...xs) - Math.min(...xs) > 6, `${stat} is spread`);
+    }
+  }
+  assert.ok(TUNING.race.field > 1);
+});
+
+test('stand-ins: with more of her drivers unfit than the reserve covers, a ship takes a free driver for the race (the least of them); with none she is forfeit', () => {
   const c = DAY.teams[ME];
   const own = [...c.staff.ships.map((h) => h.driver), c.staff.reserve].filter(
     (x): x is number => x !== null
@@ -303,7 +320,7 @@ test('the round closes when the three results are in: standings by points, the n
   invariants(after);
 });
 
-test('the season ends: prizes, two up and two down, standings reset, the next calendar a year on', () => {
+test('the season ends: prizes, the champion up and the last down, standings reset, the next calendar a year on', () => {
   assert.deepEqual(
     [
       ...movesOf([
@@ -313,14 +330,10 @@ test('the season ends: prizes, two up and two down, standings reset, the next ca
       ]),
     ].sort((a, b) => a[0] - b[0]),
     [
-      [8, 1],
       [9, 1],
       [10, -1],
-      [11, -1],
-      [18, 1],
       [19, 1],
       [20, -1],
-      [21, -1],
     ]
   );
   let s = DAY;

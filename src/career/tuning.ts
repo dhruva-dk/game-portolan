@@ -6,7 +6,7 @@
 // A pair [a, b] is a line in u = stat / 20: a + b × u. A triple by tier is Tier 1's, Two's, Three's.
 
 /** Bump with any change to TUNING (and pin the new hash in the test). */
-export const TUNING_VERSION = 8;
+export const TUNING_VERSION = 9;
 
 const ROLE_YEARS = {
   manager: [40, 55],
@@ -434,7 +434,7 @@ export const TUNING = {
 
   /** Parts (Phase B section 8). */
   parts: {
-    handling: 0.15, // a part as fitted: the spec part's performance × (1 + this × (perf − the standard's) / 1000)
+    handling: 0.6, // a part as fitted: the spec part's performance × (1 + this × (perf − the standard's) / 1000)
     standard: { perf: 500, reliability: 0.5 }, // a spec type's standard part: race.ts Fitted's 1 and 0.5
     spare: { perf: 300, reliability: 0.3 }, // what a ship sails with when her part of a type is confiscated and no spare is left
     wear: 0.1,
@@ -574,8 +574,14 @@ export const TUNING = {
     points: [0, 3],
   },
   /** Race day: the points of the first ten ships; the teams that swap between two championships at the season's end,
-   *  each way; a stand-in driver's fee a race × their ask. */
-  race: { top: [25, 18, 15, 12, 10, 8, 6, 4, 2, 1], swap: 2, standIn: 1 },
+   *  each way; a stand-in driver's fee a race × their ask; how many times over a driver's distance from her field's
+   *  mean is read (card.ts fielded). */
+  race: {
+    top: [25, 18, 15, 12, 10, 8, 6, 4, 2, 1],
+    swap: 1,
+    standIn: 1,
+    field: 2.5,
+  },
   /** The dilemmas (Phase B section 12, career/events.ts): the chance a team draws one after a round, and their numbers. */
   dilemmas: {
     chance: 0.6,

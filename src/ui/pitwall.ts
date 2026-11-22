@@ -52,7 +52,7 @@ const CSS = `
 .w-row > em { font-style: normal; text-align: right; color: var(--gold); }
 .w-row.own { background: var(--chip); font-weight: 700; }
 .w-row.out { color: var(--bar-faint); text-decoration: line-through; }
-.w-mates { position: absolute; right: 12px; top: 384px; width: 196px; display: flex; flex-direction: column; gap: 4px; }
+.w-mates { position: absolute; right: 12px; top: 370px; width: 196px; display: flex; flex-direction: column; gap: 4px; }
 .w-mate { display: grid; grid-template-columns: 40px 1fr; column-gap: 8px; align-items: center; padding: 2px 8px 4px;
   background: var(--plate); color: var(--bar-ink); border: 1.5px solid var(--ink); font-size: 13px; }
 .w-mate > b { grid-row: span 2; font: 700 19px/1 var(--narrow); }
