@@ -1,4 +1,4 @@
-// The seam between the career and a race (MANAGER.md, the race): a RaceCard
+// The seam between the career and a race: a RaceCard
 // goes in, a RaceResult comes out, with the plain words both sides share.
 // Types and constants only. The career (career/) writes the card and reads the
 // result; the race (sim/, play/) reads the card and writes the result; neither

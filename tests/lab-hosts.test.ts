@@ -1,5 +1,5 @@
 // The lab fleet's choosing (tools/fleet/hosts.ts), held to the owner's limits
-// (tools/fleet/limits.ts LIMITS, MANAGER.md 6): which hosts a batch takes and
+// (tools/fleet/limits.ts LIMITS): which hosts a batch takes and
 // how many jobs each is given; and the reading of what the lab says (the hosts
 // listed, a probe's answer, the keys published).
 import { test } from 'node:test';

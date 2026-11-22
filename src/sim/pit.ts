@@ -1,4 +1,4 @@
-// The pit stop (MANAGER.md 3 point 7), in a race sailed by a card. In her
+// The pit stop, in a race sailed by a card. In her
 // team's water a ship may pit: she asks for a stop, a list of jobs chosen up
 // front (stores.ts Ask.pit), and her team's pit crew (race.ts PitCrew) does
 // them one at a time, in the order asked, while she stays in team water:

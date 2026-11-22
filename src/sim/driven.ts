@@ -1,4 +1,4 @@
-// A driver's stats on her bot (race.ts Driver, MANAGER.md 3 point 6): the
+// A driver's stats on her bot (race.ts Driver): the
 // temperament her seed and her persona draw (temper.ts), moved by her nine
 // stats. Her persona and her brain are untouched; a driver of ten in every
 // stat is the bot of that seed and persona, to the bit.

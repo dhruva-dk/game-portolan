@@ -1,4 +1,4 @@
-// One whole career sailed headless on real races (MANAGER.md 6), from one seed, for so many seasons. Its player's team
+// One whole career sailed headless on real races, from one seed, for so many seasons. Its player's team
 // is run by a scripted manager (managers.ts), and its ship is sailed by a bot of the tier's median stats (a driver put
 // on the card for ship 0). Every race is a real runRace of the career's own card; no result is rolled. Every command
 // goes through the career's session onto a memory store, journaled as the game's are. run.ts is its command line, and

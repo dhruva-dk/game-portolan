@@ -10,12 +10,14 @@ import type {
   FinancesPaper,
   HqPaper,
   MailPaper,
+  Measure,
   ShipPaper,
   SponsorsPaper,
 } from '../office/papers.ts';
 import type { Act } from '../office/people.ts';
 import type { Check } from './command.ts';
-import { component, TYPES } from './components.ts';
+import type { Building } from '../office/command.ts';
+import { COMPONENTS, component, TYPES } from './components.ts';
 import { designCheck, pool, projection } from './design.ts';
 import {
   buildCheck,
@@ -38,7 +40,14 @@ import {
 } from './office.ts';
 import { dilemmaView, fixtures } from './read.ts';
 import { signCheck } from './sponsors.ts';
-import type { CareerState, Objective, Sponsor } from './state.ts';
+import {
+  championshipOf,
+  type CareerState,
+  type Objective,
+  type Sponsor,
+  type Team,
+} from './state.ts';
+import { TRADES, supplier } from './suppliers.ts';
 import { TUNING } from './tuning.ts';
 import { letters, myTeam } from './views.ts';
 import { shipName } from './views-person.ts';
@@ -152,19 +161,85 @@ export function sponsorsPaper(s: CareerState): SponsorsPaper {
   };
 }
 
+const mean = (xs: readonly number[]) =>
+  xs.length ? xs.reduce((a, x) => a + x, 0) / xs.length : 0;
+
+/** A chart's bars for her team `c` against its championship: `of` each team's numbers, a bar each, as shares of `most`. */
+function measured(
+  s: CareerState,
+  c: Team,
+  names: readonly string[],
+  of: (team: Team) => readonly number[],
+  most: (k: number, all: readonly (readonly number[])[]) => number
+): Measure[] {
+  const all = s.teams.map(of),
+    tier = championshipOf(s, c.tier).teams.map((id) => all[id] ?? []);
+  return names.map((name, k) => {
+    const top = Math.max(1e-9, most(k, all));
+    const share = (m: readonly number[]) => (m[k] ?? 0) / top;
+    return {
+      name,
+      value: share(all[c.id] ?? []),
+      best: Math.max(...tier.map(share)),
+      average: mean(tier.map(share)),
+    };
+  });
+}
+
+/** What each building is for, as its card says it (hq.ts reads what each level gives). */
+const ABOUT: Readonly<Record<Building, string>> = {
+  factory:
+    'Where parts are built and improved between races. Each level gives more improvement work a day and builds a part sooner.',
+  drawingLoft:
+    'Where parts are designed. Each level gives a design another component, shortens it, and brings designers on faster.',
+  testTank: 'Hulls proved in still water. Each level opens better components.',
+  foundry: 'Iron cast for the ships. Each level opens better components.',
+  sailingSchool: 'Where drivers are taught. Each level brings them on faster.',
+  pitHouse: 'Where the pit crew rest. Each level mends their fatigue sooner.',
+  crowsNest:
+    'Where the scouts keep watch. Each level takes on another scout and shortens a scouting.',
+  fishMarket: 'The team’s stall on the quay. It brings in money every race.',
+  landingPad:
+    'Where sponsors come ashore. Each level lets a better sponsor be signed.',
+};
+
+/** What the buildings are for, a bar of the headquarters' chart each: its name, and the buildings counted in it. */
+const WINGS: readonly (readonly [string, readonly Building[]])[] = [
+  ['Overall', BUILDINGS],
+  ['Design', ['drawingLoft', 'testTank', 'foundry']],
+  ['Factory', ['factory']],
+  ['Crew', ['sailingSchool', 'pitHouse']],
+  ['Scouting', ['crowsNest']],
+  ['Income', ['fishMarket', 'landingPad']],
+];
+
 /** The headquarters. */
 export function hqPaper(s: CareerState): HqPaper {
-  const c = myTeam(s);
+  const c = myTeam(s),
+    top = (b: Building) => TUNING.hq.works[b].cost.length;
   return {
+    stats: measured(
+      s,
+      c,
+      WINGS.map(([name]) => name),
+      (x) =>
+        WINGS.map(([, of]) => of.reduce((a, b) => a + x.buildings[b].level, 0)),
+      (k) => (WINGS[k]?.[1] ?? []).reduce((a, b) => a + top(b), 0)
+    ),
+    knowledge: TYPES.map((t) => ({
+      part: PARTS[t] ?? t,
+      known: pool(s, c.id, t).length,
+      of: COMPONENTS.filter((x) => x.type === t).length,
+    })),
     buildings: BUILDINGS.map((b) => {
       const w = c.buildings[b],
-        top = TUNING.hq.works[b].cost.length,
-        next = Math.min(top, w.level + 1);
+        next = Math.min(top(b), w.level + 1);
       return {
         id: b,
         name: BUILT[b],
+        about: ABOUT[b],
         level: w.level,
-        top,
+        top: top(b),
         upkeep: upkeepAt(b, w.level),
         cost: buildCost(b, next),
         days: buildDays(b, next),
@@ -189,6 +264,17 @@ function effectOf(id: string): string {
   ]
     .filter(Boolean)
     .join(', ');
+}
+
+/** The mean performance of the parts a team has fitted: of them all, then of each type. */
+function fitted(c: Team): number[] {
+  const on = c.parts.filter((p) => p.ship !== null && !p.forNext);
+  return [
+    mean(on.map((p) => p.perf)),
+    ...TYPES.map((t) =>
+      mean(on.filter((p) => p.type === t).map((p) => p.perf))
+    ),
+  ];
 }
 
 /** The ship: the design on the drawing board is of `type`, with `picked` its slots' cards (null: none picked). */
@@ -227,6 +313,21 @@ export function shipPaper(
   const chosen = slots.flatMap((x) => (x.picked ? [x.picked] : []));
   const p = projection(s, c.id, type, chosen);
   return {
+    stats: measured(
+      s,
+      c,
+      ['Overall', ...TYPES.map((t) => PARTS[t] ?? t)],
+      fitted,
+      (k, all) => Math.max(...all.map((m) => m[k] ?? 0))
+    ),
+    suppliers: TRADES.map((t) => ({
+      trade: capital(t),
+      name: supplier(c.suppliers[t])?.name ?? null,
+    })),
+    improving: {
+      perf: c.improvement.reduce((a, x) => a + x.perf, 0),
+      reliability: c.improvement.reduce((a, x) => a + x.reliability, 0),
+    },
     ships: c.staff.ships.map((h, i) => ({
       name: shipName(i),
       driver:

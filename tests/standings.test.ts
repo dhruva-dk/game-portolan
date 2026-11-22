@@ -1,5 +1,4 @@
-// The race as its HUD reads it (player.ts Race, play/standings.ts; MANAGER.md
-// 3 point 10): her teammates, the standings, her pit and her team's call, as
+// The race as its HUD reads it (player.ts Race, play/standings.ts): her teammates, the standings, her pit and her team's call, as
 // plain data off the state of a carded race.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

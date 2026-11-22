@@ -1,4 +1,4 @@
-// The seam between the career and the office (MANAGER.md, the office): what
+// The seam between the career and the office: what
 // the office's screens draw and what they ask, as plain data. A screen draws one
 // view (its own file here: home.ts, menu.ts) and knows nothing of where it came
 // from; the desk hands the views out and takes what is asked. Types and

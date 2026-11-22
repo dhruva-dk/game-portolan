@@ -143,6 +143,9 @@ function ship(zones: readonly number[], faults: Faults, hatch: string) {
   return body;
 }
 
+/** Her ship from above, sound, in a column 84 across and 92 tall: the plan the office's fitting sheet is laid round. */
+export const plan = () => ship([0, 0, 0, 0], [0, 0, 0, 0], 'h-iron');
+
 /**
  * The mending shimmer's animation, from the one running (or none) and whether
  * she is mending: `start`ed as she begins, the same one kept while she goes on,

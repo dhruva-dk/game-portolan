@@ -12,7 +12,7 @@ import { emblem } from '../emblem.ts';
 import { TYPE } from '../ink.ts';
 import { icon } from '../kit/icons.ts';
 import { el, grouped, pressed, styled, type Kid } from '../kit/part.ts';
-import { stylesheet } from '../kit/style.ts';
+import { cut, stylesheet } from '../kit/style.ts';
 import type { Office } from './office.ts';
 import { SCREENS, type Name } from './screens.ts';
 
@@ -38,40 +38,49 @@ const LABELS: Readonly<Record<Tab, string>> = {
 };
 
 const CSS = `
+/* the strip and the nav: two bands of the chart's margin, ruled twice on the side they face the page */
 .o-strip { position: absolute; left: 0; right: 0; top: 0; height: ${STRIP}px; display: flex; align-items: center; gap: 6px;
-  padding-right: 6px; background: var(--bar); color: var(--bar-ink); border-bottom: 1.5px solid var(--ink); }
-.o-team { align-self: stretch; display: flex; align-items: center; gap: 10px; min-width: 190px; max-width: 250px;
-  padding: 0 16px 0 10px; background: var(--chip); border-left: 6px solid var(--team); }
-.o-team > span { font: 700 17px/1.1 var(--serif); letter-spacing: .02em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.o-title { padding: 0 14px; font: 700 ${TYPE.title}px/1 var(--serif); letter-spacing: .1em; text-transform: uppercase; white-space: nowrap; }
-.o-chips { margin-left: auto; display: flex; align-items: center; gap: 8px; }
-.o-chip { position: relative; height: 44px; min-width: 44px; display: flex; align-items: center; gap: 8px; padding: 0 8px 0 12px;
-  background: var(--chip); white-space: nowrap; }
+  padding-right: 8px; color: var(--ink); border-bottom: 1.5px solid var(--ink); box-shadow: 0 2px 0 var(--shade);
+  background: linear-gradient(to top, transparent 3px, var(--line) 3px, var(--line) 3.8px, transparent 3.8px), var(--bar); }
+/* the team's plate and the chips keep their widths on every screen: the title has what is left, a long one set smaller */
+.o-team { flex: none; align-self: stretch; display: flex; align-items: center; gap: 10px; width: 236px; margin-bottom: 5px;
+  padding: 0 12px 0 10px; background: var(--light); border-left: 7px solid var(--team); border-right: 1px solid var(--line); }
+.o-team > span { font: 700 16px/1.1 var(--serif); letter-spacing: .02em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.o-title { flex: 1 1 0; min-width: 0; padding: 0 12px 4px; font: 700 ${TYPE.title}px/1 var(--serif); letter-spacing: .12em;
+  text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.o-title.long { font-size: 20px; letter-spacing: .06em; }
+.o-chips { flex: none; display: flex; align-items: center; gap: 8px; padding-bottom: 4px; }
+.o-chip { position: relative; height: 40px; min-width: 44px; display: flex; align-items: center; gap: 6px; padding: 0 6px 0 9px;
+  ${cut('light')} white-space: nowrap; }
 .o-chip > .o-lines { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.2; }
-.o-chip small { font-size: ${TYPE.small}px; color: var(--bar-faint); }
-.o-chip > .k-icon:last-child { color: var(--bar-faint); }
+.o-chip small { font-size: ${TYPE.small}px; font-style: italic; color: var(--faint); }
+.o-chip > .k-icon:last-child { color: var(--faint); }
 .o-chip.still { padding-right: 12px; }
-.o-pill { padding: 5px 12px; background: var(--good); color: var(--on-fill); font-weight: 600; border: 1.5px solid var(--bar-ink); }
-.o-pill.owing { background: var(--bad); }
-.o-count { position: absolute; right: 4px; top: -5px; min-width: 20px; height: 20px; padding: 0 5px; display: grid;
-  place-items: center; border-radius: 10px; background: var(--bad); color: var(--on-fill); font: 700 ${TYPE.small}px/1 var(--narrow); }
+.o-pill { padding: 4px 11px; background: var(--good); color: var(--on-fill); font-weight: 700; border: 1.2px solid var(--ink);
+  box-shadow: inset 0 0 0 2px var(--good), inset 0 0 0 2.7px var(--on-fill); }
+.o-pill.owing { background: var(--bad); box-shadow: inset 0 0 0 2px var(--bad), inset 0 0 0 2.7px var(--on-fill); }
+.o-count { position: absolute; right: 2px; top: -7px; min-width: 20px; height: 20px; padding: 0 5px; display: grid;
+  place-items: center; border-radius: 10px; background: var(--bad); color: var(--on-fill); border: 1.2px solid var(--ink);
+  font: italic 700 ${TYPE.small}px/1 var(--serif); }
 
 .o-nav { position: absolute; left: 0; right: 0; bottom: 0; height: ${NAV}px; display: flex; align-items: center;
-  padding: 0 8px; background: var(--bar); color: var(--bar-faint); border-top: 1.5px solid var(--ink); }
-.o-hist { display: flex; margin-right: 8px; }
-.o-hist > div { width: 44px; height: 44px; display: grid; place-items: center; background: var(--go); color: var(--on-fill); }
-.o-hist > div + div { border-left: 1px solid var(--bar); }
-.o-tabs { flex: 1; align-self: stretch; display: flex; min-width: 0; }
+  padding: 4px 8px 0; color: var(--ink); border-top: 1.5px solid var(--ink);
+  background: linear-gradient(to bottom, transparent 3px, var(--line) 3px, var(--line) 3.8px, transparent 3.8px), var(--bar); }
+.o-hist { display: flex; gap: 5px; margin-right: 8px; }
+.o-hist > div { width: 42px; height: 42px; display: grid; place-items: center; ${cut('light')} }
+.o-tabs { flex: 1; align-self: stretch; display: flex; min-width: 0; padding: 5px 0 4px; }
 .o-tab { position: relative; flex: 1; min-width: 44px; display: flex; flex-direction: column; align-items: center;
-  justify-content: center; gap: 3px; font: 600 ${TYPE.small}px/1 var(--narrow); letter-spacing: .03em; }
-.o-tab + .o-tab { border-left: 1px solid var(--chip); }
-.o-tab.lit { background: var(--go); color: var(--on-fill); }
-.o-tab > .o-count { right: 6px; top: 4px; }
-.o-tab > .o-busy { position: absolute; left: 8px; right: 8px; bottom: 0; height: 5px; background: var(--stripes); }
-.o-date { height: 44px; margin: 0 8px; padding: 0 12px; display: flex; align-items: center; gap: 4px; background: var(--go);
-  color: var(--on-fill); white-space: nowrap; }
-.o-on { height: 44px; width: 150px; display: flex; align-items: center; justify-content: center; gap: 10px; background: var(--on);
-  color: var(--on-fill); border: 1.5px solid var(--bar-ink); font-weight: 700; letter-spacing: .04em; }
+  justify-content: center; gap: 2px; border: 1.5px solid transparent; font: 500 ${TYPE.small}px/1 var(--serif); }
+.o-tab + .o-tab:not(.lit) { border-left-color: var(--rule); }
+.o-tab.lit { ${cut('gilt')} font-weight: 700; }
+.o-tab.lit + .o-tab { border-left-color: transparent; }
+.o-tab > .o-count { right: 4px; top: 0; }
+.o-tab > .o-busy { position: absolute; left: 8px; right: 8px; bottom: 0; height: 5px; background: var(--stripes);
+  box-shadow: inset 0 0 0 .8px var(--ink); }
+.o-date { height: 42px; margin: 0 10px; padding: 0 12px; display: flex; align-items: center; gap: 4px; ${cut('light')}
+  font-style: italic; white-space: nowrap; }
+.o-on { height: 44px; width: 146px; display: flex; align-items: center; justify-content: center; gap: 10px; ${cut('on')}
+  color: var(--on-fill); font-weight: 700; letter-spacing: .04em; }
 `;
 
 /** The shell for `office`: `hist` its ways back and forward. */
@@ -111,7 +120,7 @@ export function createShell(
         ),
         { '--team': v.team.colours[0] }
       ),
-      el('div', 'o-title', title),
+      el('div', title.length > 9 ? 'o-title long' : 'o-title', title),
       el(
         'div',
         'o-chips',

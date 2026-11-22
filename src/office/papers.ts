@@ -79,11 +79,27 @@ export interface SponsorsPaper {
   offers: readonly (Backer & { days: number; sign: Act })[];
 }
 
-/** `hq`: the buildings, each at its level, with what the next would cost. */
+/** A bar of a chart against the championship: three shares (0…1), hers, the best and the average. */
+export interface Measure {
+  name: string;
+  value: number;
+  best: number;
+  average: number;
+}
+
+/**
+ * `hq`: how built up it is against the championship (overall, then by what
+ * the buildings are for), how many of each part's components her designer
+ * knows, and the buildings, each at its level, with what it is for and what
+ * the next level would cost.
+ */
 export interface HqPaper {
+  stats: readonly Measure[];
+  knowledge: readonly { part: string; known: number; of: number }[];
   buildings: readonly {
     id: Building;
     name: string;
+    about: string;
     level: number;
     top: number;
     upkeep: number;
@@ -112,10 +128,16 @@ interface Slot {
   deal: Act;
 }
 /**
- * `ship`: each ship's parts, the spares, the design in hand, and the design
- * on the drawing board (its type, its slots, what it would be and cost).
+ * `ship`: the ships' stats against the championship (overall, then each type
+ * of part: shares of the most any team has), who supplies each trade, how the
+ * improvement's work is shared (0: idle), each ship's parts, the spares, the
+ * design in hand, and the design on the drawing board (its type, its slots,
+ * what it would be and cost).
  */
 export interface ShipPaper {
+  stats: readonly Measure[];
+  suppliers: readonly { trade: string; name: string | null }[];
+  improving: { perf: number; reliability: number };
   ships: readonly { name: string; driver: string }[];
   types: readonly { id: PartType; label: string }[];
   parts: readonly PartLine[];

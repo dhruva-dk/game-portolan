@@ -1,4 +1,4 @@
-// A season of a headless career as the runner reports it, with what MANAGER.md 6's claims read from it:
+// A season of a headless career as the runner reports it, with what the harness's claims read from it:
 //
 // - 3, no seat advantage: each team's slot on the grid (its berth follows from it) and its colours, with its points;
 // - 4, strength pays: its drivers' stars, its fitted parts' performance and reliability, with its points;

@@ -1,11 +1,10 @@
-// The fairness report's numbers (MANAGER.md 6), read from a batch of whole
+// The fairness report's numbers, read from a batch of whole
 // careers the fleet sailed (tools/fleet: `run career`), and written as
 // Markdown:
 //   node tools/career/fairness.ts <results folder> [out.md]
 // Each file of the folder is one career's job (tools/fleet/job.ts): its report
 // (sail.ts Report) under `result`. What is measured here is what the careers
-// came to; nothing is rolled or assumed. A claim the batch cannot speak to is
-// said so in the report's own words (docs/fairness/README.md).
+// came to; nothing is rolled or assumed.
 //
 // Node only (tools/).
 
@@ -81,7 +80,7 @@ say(
   ''
 );
 
-// ---- the bands (MANAGER.md 4): where each scripted manager's team lands
+// ---- the bands: where each scripted manager's team lands
 say(
   '## The three managers',
   '',

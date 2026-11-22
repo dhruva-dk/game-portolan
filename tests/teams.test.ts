@@ -1,4 +1,4 @@
-// A race sailed in teams (MANAGER.md 3, points 2 to 4): no ship harms a mate,
+// A race sailed in teams: no ship harms a mate,
 // by ball, burst or ram; no gun's assist and no bot takes a mate for a mark; a
 // team's water is as her own to each of its ships; and the race is over when
 // one team is afloat.

@@ -7,7 +7,7 @@
 // are drawn again. Hidden, it is not laid out at all: it costs a race nothing.
 
 import type { Ask, Desk } from '../../office/office.ts';
-import { OFFICE, alpha } from '../ink.ts';
+import { SHADOW, alpha } from '../ink.ts';
 import { PAGE, createPage } from '../kit/page.ts';
 import { el } from '../kit/part.ts';
 import { kitStyle, stylesheet } from '../kit/style.ts';
@@ -21,7 +21,7 @@ const PAST = 4000;
 const CSS = `
 .ui .o-root, .ui .o-root * { pointer-events: auto; }
 .o-root { overflow: hidden; z-index: 2; }
-.o-dim { position: absolute; inset: ${-PAST}px; background: ${alpha(OFFICE.bar, 0.46)};
+.o-dim { position: absolute; inset: ${-PAST}px; background: ${alpha(SHADOW, 0.34)};
   -webkit-backdrop-filter: blur(9px); backdrop-filter: blur(9px); }
 .o-body { position: absolute; left: 0; right: 0; top: ${STRIP}px; bottom: ${NAV}px; }
 .o-body.bare { top: 0; bottom: 0; }
@@ -71,7 +71,8 @@ export function createOffice(desk: Desk) {
 
   /** Each list scrolled as it was, or, not yet scrolled, to where it asks (her own row in view). */
   function settle(at: Name, keep: boolean) {
-    body.querySelectorAll<HTMLElement>('.k-rows').forEach((list) => {
+    const within = made.get(at)?.el ?? body;
+    within.querySelectorAll<HTMLElement>('.k-rows').forEach((list) => {
       const key = `${at} ${list.dataset.keep ?? ''}`;
       if (keep) scrolled.set(key, list.scrollTop);
       else list.scrollTop = scrolled.get(key) ?? Number(list.dataset.top ?? 0);
@@ -80,7 +81,8 @@ export function createOffice(desk: Desk) {
 
   /** The world shown clear through the open screen's window (an element it marks o-window), dimmed round it. */
   function clear() {
-    const hole = body.querySelector('.o-window');
+    const hole =
+      (open && made.get(open)?.el.querySelector('.o-window')) || null;
     if (!hole) {
       dim.style.clipPath = '';
       return;
@@ -94,8 +96,8 @@ export function createOffice(desk: Desk) {
     dim.style.clipPath = `polygon(evenodd, 0 0, 100% 0, 100% 100%, 0 100%, 0 0, ${l} ${t}, ${l} ${b}, ${r} ${b}, ${r} ${t}, ${l} ${t})`;
   }
 
-  /** Draws the shell and the open screen from the desk. */
-  function draw() {
+  /** Draws the shell and the open screen from the desk (`fresh`: just opened, its lists where they ask to be). */
+  function draw(fresh = false) {
     if (!open || root.hidden) return;
     const entry = SCREENS[open],
       now = made.get(open);
@@ -105,7 +107,10 @@ export function createOffice(desk: Desk) {
       forward: ahead.length > 0,
     });
     body.classList.toggle('bare', entry.bare);
-    settle(open, true);
+    if (fresh) {
+      for (const key of [...scrolled.keys()])
+        if (key.startsWith(`${open} `)) scrolled.delete(key);
+    } else settle(open, true);
     now.draw(desk);
     settle(open, false);
     clear();
@@ -122,8 +127,9 @@ export function createOffice(desk: Desk) {
       body.append(now.el);
     }
     for (const [other, o] of made) o.el.hidden = other !== name;
+    const fresh = open !== name;
     open = name;
-    draw();
+    draw(fresh);
     return true;
   }
 
@@ -150,11 +156,11 @@ export function createOffice(desk: Desk) {
       return open;
     },
     /** Draws the office again, if it is shown (something changed that it did not ask). */
-    draw,
+    draw: () => draw(),
     /** Shows the office, drawn afresh, or fades it away. */
     show(on: boolean) {
       fade(root, on);
-      if (on) draw();
+      if (on) draw(true);
     },
     /** Opens the screen `name`; false if it is not built. */
     go(name: Name) {

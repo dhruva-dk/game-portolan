@@ -1,4 +1,4 @@
-// A team's call (sim/called.ts, MANAGER.md 3 point 8): what it makes of a
+// A team's call (sim/called.ts): what it makes of a
 // brain's weights, what each call does to her bots' own choosing over seeded
 // races, and her hands changing her team's call as the race is sailed.
 import { test } from 'node:test';

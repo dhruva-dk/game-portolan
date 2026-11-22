@@ -1,4 +1,4 @@
-// A carded race sailed headless (play/race.ts runRace, MANAGER.md 3 point 9):
+// A carded race sailed headless (play/race.ts runRace):
 // a pure function of its card and its planet, with the result the career reads
 // (race.ts RaceResult).
 import { test } from 'node:test';

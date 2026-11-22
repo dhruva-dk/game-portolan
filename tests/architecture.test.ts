@@ -55,7 +55,7 @@ const LAYERS: Record<string, readonly string[]> = {
   // the kinds of gun and of loot, named once for all who tell them apart: a
   // leaf
   'kinds.ts': [],
-  // the seam between the career and a race (MANAGER.md): the card that goes in
+  // the seam between the career and a race: the card that goes in
   // and the result that comes out, as plain data
   'race.ts': ['kinds.ts'],
   // the plain-data seams: what the frame draws (snapshot.ts), what passes
@@ -73,7 +73,7 @@ const LAYERS: Record<string, readonly string[]> = {
   'environment.ts': ['world/'],
   // the seed in the page's address: read, rolled, and sailed onto a new page
   'address.ts': ['world/'],
-  // the seam between the career and the office (MANAGER.md): each screen's
+  // the seam between the career and the office: each screen's
   // view and what it asks, as plain data; its fixtures (the debug page's desk)
   // name the palette's dyes
   'office/': ['office/', 'race.ts', 'kinds.ts', 'colour.ts', 'palette.ts'],

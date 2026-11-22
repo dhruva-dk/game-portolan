@@ -1,4 +1,4 @@
-// A ship fitted out by her card (play/fitted.ts, MANAGER.md 3 point 5): her
+// A ship fitted out by her card (play/fitted.ts): her
 // parts' performance makes her handling and her most hull, their reliability
 // the hull at which her zones fault. A spec ship is the tables' own.
 import { test } from 'node:test';

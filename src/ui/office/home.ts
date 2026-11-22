@@ -45,8 +45,9 @@ const CSS = `
 .h-jobs .k-btn { padding: 0 9px; font-size: 14px; }
 .h-jobs .k-who { max-width: 150px; }
 .h-chair { flex: none; height: 252px; }
-.h-chair .h-row { flex: 1; display: flex; align-items: center; justify-content: space-around; gap: 8px; }
-.h-chair .h-col { display: flex; flex-direction: column; align-items: stretch; gap: 8px; min-width: 150px; text-align: center; }
+.h-chair .h-row { flex: 1; display: flex; align-items: center; gap: 10px; }
+.h-chair .h-row > svg { flex: none; }
+.h-chair .h-col { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: stretch; gap: 8px; text-align: center; }
 .h-chair .h-aim { flex: none; display: flex; align-items: center; justify-content: center; gap: 14px; padding-top: 10px;
   font: 700 19px/1 var(--narrow); letter-spacing: .04em; }
 .h-chair .h-aim > i { align-self: stretch; width: 1px; background: var(--rule); }
@@ -59,8 +60,8 @@ const CSS = `
 .h-art { position: relative; flex: 1; min-height: 0; overflow: hidden; background: var(--light); border: 1.5px solid var(--ink); }
 .h-art > svg { position: absolute; left: 0; top: 0; width: 100%; height: 100%; }
 .h-art > .h-plate { position: absolute; left: 0; bottom: 12px; padding: 6px 18px 6px 12px; display: flex; flex-direction: column;
-  background: var(--plate); color: var(--bar-ink); }
-.h-plate > span { font-size: 13px; color: var(--bar-faint); }
+  background: var(--plate); color: var(--plate-ink); }
+.h-plate > span { font-size: 13px; font-style: italic; color: var(--plate-faint); }
 .h-plate > b { font: 700 21px/1.1 var(--narrow); letter-spacing: .1em; text-transform: uppercase; }
 .h-art > .k-btn { position: absolute; right: 8px; bottom: 12px; }
 .h-rounds { flex: none; display: flex; gap: 3px; height: 5px; }
@@ -136,7 +137,8 @@ export function createHome(office: Office): Screen<HomeView> {
                   'div',
                   '',
                   portrait(v.team.colours, 52),
-                  el('span', '', d.name),
+                  // (her family name: four to a row, the initial has no room)
+                  el('span', '', d.name.replace(/^\S+\.\s+/, '')),
                   el('b', '', ordinal(d.place))
                 )
               )
@@ -161,7 +163,7 @@ export function createHome(office: Office): Screen<HomeView> {
               el(
                 'div',
                 'h-row',
-                dial(v.chairman.happiness, 'Disappointed', 'Happy', 150),
+                dial(v.chairman.happiness, 'Disappointed', 'Happy', 140),
                 el(
                   'div',
                   'h-col',

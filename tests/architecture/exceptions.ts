@@ -140,20 +140,20 @@ export const EXCEPTIONS: readonly Exception[] = [
   {
     rule: 'exports',
     file: 'src/race.ts',
-    why: 'the seam is written first, for the race and the career to be built to at once (MANAGER.md 3, 4); this goes stale, and is removed, once both take every word of it',
+    why: 'the seam is written first, for the race and the career to be built to at once; this goes stale, and is removed, once both take every word of it',
   },
-  // the career, ported whole before the office's release flow takes it
-  // (MANAGER.md 5, flow; 8 point 3): each goes stale once that flow runs it
+  // the career, ported whole before the office's release flow takes it: each
+  // goes stale once that flow runs it
   {
     rule: 'exports',
     file: 'src/career/read.ts',
     name: 'preview',
-    why: "race preparation's view (MANAGER.md 5), tested; taken by the desk when that screen is built",
+    why: "race preparation's view, tested; taken by the desk when that screen is built",
   },
   {
     rule: 'exports',
     file: 'src/desk-fixtures.ts',
-    why: "fixture careers made by a player's commands, for ?screen= on a real career rather than made-up data (MANAGER.md 5); debug.ts takes them when the first of the career's screens is built",
+    why: "fixture careers made by a player's commands, for ?screen= on a real career rather than made-up data; debug.ts takes them when the first of the career's screens is built",
   },
   {
     rule: 'exports',

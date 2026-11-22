@@ -113,21 +113,24 @@ const METER = {
 } as const;
 
 /**
- * The office's dress (ui/kit/, ui/office/): the navy of its strip and nav, a
- * chip's ground on it and the strip's two inks; the parchment of a panel, a
- * region of it a tone darker and one lighter; its ink, and its second ink for
- * labels; the ink set on a filled control; and the fills that say what a thing
- * is: go (a button, the chosen), bad (a loss, cancel), good, fair, warn (under
- * way), gold (stars), and the one way on (Continue).
+ * The office's dress (ui/kit/, ui/office/), the chartmaker's own: the paper of
+ * its strip and nav (band); a plate (a label inked solid) and the two inks set
+ * on one; the parchment of a panel, a region of it a tone darker and one
+ * lighter, and gilt for the chosen; the sea behind a face; its ink, and its
+ * second ink for labels; the ink set on a filled control; and the fills that
+ * say what a thing is: go (a button), bad (a loss, cancel), good, fair, warn
+ * (under way), gold (stars), and the one way on (Continue).
  */
 export const OFFICE = {
-  bar: '#1b2431',
-  chip: '#2a3545',
-  barInk: '#efe4cc',
-  barFaint: '#aab0b8',
+  band: '#ead9b4',
+  plate: INK.iron,
+  plateInk: CUT,
+  plateFaint: '#cbb994',
   panel: '#f2e7cf',
   dark: '#e4d2ac',
   light: '#faf3e3',
+  gilt: GILT,
+  sea: WASH.sea,
   ink: '#241b13',
   faint: '#5d4b37',
   onFill: '#fff8ea',
@@ -167,12 +170,9 @@ export const toneOf = (share: number): Tone =>
         ? 'warn'
         : 'bad';
 /**
- * The office's faces: Avenir Next for labels, tables and figures, its
- * condensed cut for a panel's title and the nav; the inked serif (FIGURES) for
- * screen titles and team names alone. Its sizes, px: nothing under `small`.
+ * The office's sizes, px: nothing under `small`. Its one face is the
+ * chartmaker's serif (FIGURES), as the race's is.
  */
-export const SANS = '"Avenir Next", Avenir, "Helvetica Neue", sans-serif',
-  NARROW = '"Avenir Next Condensed", "Avenir Next", Avenir, sans-serif';
 export const TYPE = { title: 26, head: 18, body: 15, small: 13 } as const;
 
 /** `hex` (#rrggbb) at `a` of its strength, as #rrggbbaa. */

@@ -1,5 +1,4 @@
-// A race sailed by a card as its HUD reads it (player.ts Race, MANAGER.md 3
-// point 10): for one ship of it, her team's call, her teammates, the standings
+// A race sailed by a card as its HUD reads it (player.ts Race): for one ship of it, her team's call, her teammates, the standings
 // of every ship, and her pit. Plain data made of the sea as a step left it
 // (result.ts Standing), once a step however often it is asked for: one object,
 // refilled, its rows too.

@@ -10,7 +10,7 @@ import { emblem } from '../emblem.ts';
 import { WASH, galleon } from '../ink.ts';
 import { icon, type Icon } from '../kit/icons.ts';
 import { drawn, el, pressed, type Kid } from '../kit/part.ts';
-import { stylesheet } from '../kit/style.ts';
+import { cut, stylesheet } from '../kit/style.ts';
 import { rhumbs, rose } from '../marks.ts';
 import type { Office } from './office.ts';
 import type { Screen } from './screens.ts';
@@ -26,9 +26,8 @@ const CSS = `
   grid-template-columns: 62fr 38fr; gap: 10px; }
 .s-menu > .m-rows { position: absolute; left: 34px; right: 34px; top: 682px; height: 64px; display: grid;
   grid-template-columns: 1fr 1fr; gap: 10px; }
-.m-tile, .m-row { background: var(--panel); border: 1.5px solid var(--ink);
-  box-shadow: inset 0 0 0 3px var(--panel), inset 0 0 0 4px var(--rule), 0 2px 0 var(--shade); }
-.m-tile { display: flex; flex-direction: column; padding: 4px; min-height: 0; }
+.m-tile, .m-row { ${cut('panel')} }
+.m-tile { display: flex; flex-direction: column; padding: 6px; min-height: 0; }
 .m-head, .m-row { display: flex; align-items: center; font: 500 26px/1 var(--narrow); letter-spacing: .08em; text-transform: uppercase; }
 .m-head { flex: none; height: 76px; }
 .m-head > .m-icon, .m-row > .m-icon { align-self: stretch; width: 68px; display: grid; place-items: center; color: var(--faint); }
@@ -40,9 +39,9 @@ const CSS = `
 .m-hero { position: relative; flex: 1; min-height: 0; overflow: hidden; border: 1.5px solid var(--ink); }
 .m-hero > svg { position: absolute; left: 0; top: 0; width: 100%; height: 100%; }
 .m-hero > .m-plate { position: absolute; left: 0; bottom: 34px; padding: 10px 26px 10px 22px; display: flex; flex-direction: column;
-  gap: 3px; background: var(--plate); color: var(--bar-ink); }
+  gap: 3px; background: var(--plate); color: var(--plate-ink); }
 .m-plate > b { font: 700 24px/1.1 var(--narrow); letter-spacing: .08em; text-transform: uppercase; }
-.m-plate > span { color: var(--bar-faint); }
+.m-plate > span { font-style: italic; color: var(--plate-faint); }
 `;
 
 /** A tile's picture: `art` over three slashes of `colour`, drawn `w` × `h` and filling its frame. */

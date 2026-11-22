@@ -1,4 +1,4 @@
-// The lab fleet's limits, the owner's (MANAGER.md 6), and where the fleet is:
+// The lab fleet's limits, the owner's, and where the fleet is:
 // every number the dispatcher is held to, in one table each. Nothing in
 // tools/fleet/ uses a machine, a thread or a second these do not allow; the
 // choosing (hosts.ts) and the plan (plan.ts) are tested against them.

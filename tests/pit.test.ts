@@ -1,4 +1,4 @@
-// The pit stop (sim/pit.ts, MANAGER.md 3 point 7): its rule, a bot's own stops
+// The pit stop (sim/pit.ts): its rule, a bot's own stops
 // (sim/pitting.ts), and the pit in a race sailed by a card (play/state.ts).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

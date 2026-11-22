@@ -26,7 +26,7 @@ import { button } from './kit/button.ts';
 import { createPage } from './kit/page.ts';
 import { el, ordinal, pressed, styled, type Kid } from './kit/part.ts';
 import { meter } from './kit/stat.ts';
-import { kitStyle, stylesheet } from './kit/style.ts';
+import { cut, kitStyle, stylesheet } from './kit/style.ts';
 import { fade, screen } from './ui.ts';
 
 /** Who sails each ship of the race, and her team's colour as the page shows it, by ship id. */
@@ -41,34 +41,35 @@ const ROWS = 10,
   EVERY = 250;
 
 const CSS = `
-.w-tower { position: absolute; left: 12px; top: 198px; width: 196px; background: var(--plate); color: var(--bar-ink);
-  border: 1.5px solid var(--ink); }
-.w-tower > b { display: block; padding: 5px 10px; background: var(--bar); font: 600 14px/1.2 var(--narrow); letter-spacing: .1em;
-  text-transform: uppercase; }
+/* the tower and her mates' cards: slips of the HUD's own paper, ruled as a ledger is */
+.w-tower { position: absolute; left: 12px; top: 198px; width: 196px; ${cut('panel')} color: var(--ink); }
+.w-tower > b { display: block; padding: 6px 10px 4px; border-bottom: 1.2px solid var(--ink); font: 700 13px/1.2 var(--serif);
+  letter-spacing: .16em; text-transform: uppercase; text-align: center; }
 .w-row { position: relative; display: grid; grid-template-columns: 26px 1fr 22px; align-items: center; height: 23px;
-  padding: 0 6px 0 12px; font-size: 13px; border-top: 1px solid var(--chip); }
-.w-row > i { position: absolute; left: 0; top: 2px; bottom: 2px; width: 5px; background: var(--team); }
+  padding: 0 6px 0 12px; font-size: 13px; border-top: 1px solid var(--rule); }
+.w-row > i { position: absolute; left: 1px; top: 2px; bottom: 2px; width: 5px; background: var(--team);
+  box-shadow: inset 0 0 0 .6px var(--ink); }
 .w-row > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.w-row > em { font-style: normal; text-align: right; color: var(--gold); }
-.w-row.own { background: var(--chip); font-weight: 700; }
-.w-row.out { color: var(--bar-faint); text-decoration: line-through; }
-.w-mates { position: absolute; right: 12px; top: 370px; width: 196px; display: flex; flex-direction: column; gap: 4px; }
-.w-mate { display: grid; grid-template-columns: 40px 1fr; column-gap: 8px; align-items: center; padding: 2px 8px 4px;
-  background: var(--plate); color: var(--bar-ink); border: 1.5px solid var(--ink); font-size: 13px; }
-.w-mate > b { grid-row: span 2; font: 700 19px/1 var(--narrow); }
-.w-mate > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.w-mate > small { font-size: 13px; color: var(--bar-faint); }
-.w-mate > .k-meter { grid-column: span 2; height: 4px; margin-top: 2px; background: var(--chip); }
+.w-row > em { text-align: right; font-weight: 700; color: var(--bad); }
+.w-row.own { background: var(--gilt); font-weight: 700; }
+.w-row.out { color: var(--faint); text-decoration: line-through; }
+.w-mates { position: absolute; right: 12px; top: 370px; width: 196px; display: flex; flex-direction: column; gap: 6px; }
+.w-mate { display: grid; grid-template-columns: 44px 1fr; column-gap: 8px; align-items: center; padding: 2px 8px 5px;
+  ${cut('panel')} color: var(--ink); font-size: 13px; }
+.w-mate > b { grid-row: span 2; font: italic 500 21px/1 var(--serif); font-variant-numeric: oldstyle-nums; }
+.w-mate > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
+.w-mate > small { font-size: 13px; font-style: italic; color: var(--faint); }
+.w-mate > .k-meter { grid-column: span 2; height: 5px; margin-top: 2px; }
 .w-mate.out { opacity: .55; }
-.w-keys { position: absolute; left: 420px; top: 96px; width: 340px; display: flex; gap: 6px; }
+.w-keys { position: absolute; left: 420px; top: 96px; width: 340px; display: flex; gap: 8px; }
 .w-keys > .k-btn { flex: 1; height: 44px; padding: 0 8px; }
 .w-sheet { position: absolute; left: 440px; top: 150px; width: 300px; }
 .w-sheet > .k-panel > .k-body { gap: 6px; }
-.w-job { display: grid; grid-template-columns: 1fr auto; align-items: center; height: 40px; padding: 0 12px; background: var(--dark);
-  border: 1.5px solid transparent; }
-.w-job.chosen { background: var(--light); border-color: var(--ink); box-shadow: inset 0 0 0 2px var(--go); font-weight: 700; }
+.w-job { display: grid; grid-template-columns: 1fr auto; align-items: center; height: 40px; padding: 0 12px;
+  border: 1.2px solid var(--rule); }
+.w-job.chosen { background: var(--gilt); border-color: var(--ink); font-weight: 700; }
 .w-sum { display: flex; justify-content: space-between; align-items: baseline; padding: 6px 4px 2px; }
-.w-sum > b { font: 700 21px/1 var(--narrow); color: var(--bad); }
+.w-sum > b { font: italic 700 22px/1 var(--serif); color: var(--bad); }
 .w-ways { display: flex; gap: 8px; }
 .w-ways > .k-btn { flex: 1; }
 `;

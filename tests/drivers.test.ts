@@ -1,4 +1,4 @@
-// A driver's stats on her bot (sim/driven.ts, MANAGER.md 3 point 6): ten in
+// A driver's stats on her bot (sim/driven.ts): ten in
 // every stat is today's bot of her seed and persona; and, a test a stat, two
 // drivers alike but for that stat at 4 and at 16 differ the expected way: over
 // seeded races where a race's result shows it (gunnery, nerve), over seeded

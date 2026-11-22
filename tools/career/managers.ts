@@ -1,4 +1,4 @@
-// The scripted managers of the career's harness (MANAGER.md 4 and 6): what each sends at a stop, as the player's own
+// The scripted managers of the career's harness: what each sends at a stop, as the player's own
 // commands, journaled like any other.
 //
 // - idle: nothing (never spends, never hires): its contracts run out, its chairman's confidence with them.

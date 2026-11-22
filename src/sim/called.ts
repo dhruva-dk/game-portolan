@@ -1,4 +1,4 @@
-// A team's call on its bots (MANAGER.md 3 point 8; race.ts Call), in a race
+// A team's call on its bots, in a race
 // sailed by a card: free, attack, hold (our water), form (on the first ship of
 // the team). A call biases the weights her brain already chooses by (bot.ts
 // CHOICE, as her persona's crew has them): each of her options' weights times
