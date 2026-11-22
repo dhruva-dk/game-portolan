@@ -274,8 +274,10 @@ touched (`node tools/capture.ts`), looked at beside its reference.
 **Landing on `mm`** (never a merge), from your worktree:
 1. `git rebase mm`, then `npm test`.
 2. `git merge-base --is-ancestor mm HEAD` must hold.
-3. `git -C /Users/dk/Developer/game-portolan rebase <your-branch>` fast-forwards
-   `mm`. If it refuses because `mm` moved, go to 1.
+3. Message the orchestrator: "ready to land `<your-branch>` at `<commit>`". An
+   agent's worktree is isolated and cannot move `mm` itself: the orchestrator
+   fast-forwards `mm` to your branch, runs `npm test` there, and answers. Carry
+   on meanwhile; when `mm` has moved, go to 1 before you ask again.
 Land early and often: a seam others wait on is landed the hour it is done.
 
 ## 8. Order
