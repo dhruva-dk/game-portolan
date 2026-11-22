@@ -34,6 +34,7 @@ import {
   dateAt,
   short,
   span,
+  titled,
 } from './office.ts';
 import { dilemmaView, fixtures } from './read.ts';
 import { signCheck } from './sponsors.ts';
@@ -55,7 +56,7 @@ export function mailPaper(s: CareerState, open: number | null): MailPaper {
   const all = letters(s, s.mail.length).map((l) => ({
     id: l.id,
     date: dateAt(s, start + l.day - 1),
-    subject: l.subject,
+    subject: titled(l.subject),
     from: l.from,
     about: NEWS[l.category][1],
     unread: l.unread,
@@ -70,7 +71,7 @@ export function mailPaper(s: CareerState, open: number | null): MailPaper {
       letter && mail
         ? {
             ...letter,
-            body: render(s, mail).body,
+            body: titled(render(s, mail).body),
             options: (asked?.options ?? []).map(capital),
             answer: asked?.answer ?? null,
           }

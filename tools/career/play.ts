@@ -97,10 +97,13 @@ try {
     await at('profile', 10000);
     await page.waitForTimeout(400);
     await capture(`${label}-profile`);
-    await page.locator('.s-profile .k-btn.on').click();
-    await at('offer', 10000);
-    await page.waitForTimeout(400);
-    await capture(`${label}-offer`);
+    // (the offer, where one may be made: not to a driver under contract elsewhere)
+    if (await page.locator('.s-profile .k-btn.on:not(.off)').count()) {
+      await page.locator('.s-profile .k-btn.on').click();
+      await at('offer', 10000);
+      await page.waitForTimeout(400);
+      await capture(`${label}-offer`);
+    }
     await page.locator('.o-tab').nth(0).click();
     await at('home', 10000);
   };
@@ -127,16 +130,29 @@ try {
     await page.waitForTimeout(14000);
     await capture(`race${race}-sailing`);
     // the pit wall's keys: the team's orders changed, and a pit stop's sheet opened where she lies
-    await tap('.w-keys .k-btn');
-    await page.waitForTimeout(600);
-    await capture(`race${race}-orders`);
-    await tap('.w-sheet .w-job:nth-child(2)');
-    await page.waitForTimeout(600);
-    if ((await page.locator('.w-keys .k-btn:not(.off)').count()) > 1) {
-      await page.locator('.w-keys .k-btn').nth(1).click();
+    // (if she is still afloat: left alone she may be sunk before a key is reached)
+    const key = (selector: string, nth = 0) =>
+      page
+        .locator(selector)
+        .nth(nth)
+        .click({ timeout: 3000 })
+        .then(
+          () => true,
+          () => false
+        );
+    if (await key('.w-keys .k-btn')) {
       await page.waitForTimeout(600);
-      await capture(`race${race}-pit`);
-    } else await capture(`race${race}-called`);
+      await capture(`race${race}-orders`);
+      await key('.w-sheet .w-job', 1);
+      await page.waitForTimeout(600);
+      if (
+        (await page.locator('.w-keys .k-btn:not(.off)').count()) > 1 &&
+        (await key('.w-keys .k-btn', 1))
+      ) {
+        await page.waitForTimeout(600);
+        await capture(`race${race}-pit`);
+      } else await capture(`race${race}-called`);
+    }
     // her ship left alone sinks in the storm in time; then LEAVE (the anchor) hurries the race to its end
     const began = Date.now();
     while (Date.now() - began < 900000) {

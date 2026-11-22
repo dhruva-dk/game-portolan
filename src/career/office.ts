@@ -46,6 +46,12 @@ const CHAMPIONSHIPS = [
 export const championship = (tier: number) =>
   CHAMPIONSHIPS[tier] ?? `Championship ${tier + 1}`;
 
+/** A letter's words with each championship named as the office names it. */
+export const titled = (text: string) =>
+  text.replace(/\bTier ([1-9])\b/g, (_, n: string) =>
+    championship(Number(n) - 1)
+  );
+
 /** The year the first season is sailed in, and the months a season runs through with their days. */
 const YEAR_ONE = 1716;
 const MONTHS: readonly (readonly [string, number])[] = [
@@ -364,7 +370,7 @@ export function homeView(s: CareerState, look: Look): HomeView {
         ? {
             kind: news[0],
             headline: news[1],
-            subject: letter.subject,
+            subject: titled(letter.subject),
             status: letter.from,
             button: 'Mail',
             screen: 'mail',
