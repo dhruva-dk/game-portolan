@@ -14,7 +14,11 @@ import { weighed } from './tables.ts';
  * loot, and how far off she goes for it, m; the hull she mends from (before her
  * skill's part); how much she wants water (claimer.ts, 0–1: the homesteader and
  * the turtle most, the brawler least). With her skill, 0–1, and her mood
- * (aggro), 0–1.
+ * (aggro), 0–1; and her skill at three trades, each 0–1 and each her skill
+ * itself unless a driver's stats say otherwise (driven.ts): her gunnery (her
+ * gunner's hand: gunner.ts), her helm (her answer to a ram: helmsman.ts) and
+ * her lookout (how far she sees and how soon she answers: lookout.ts). A
+ * driver's stamina gives her a late race besides (Late).
  */
 export interface Temper {
   fight: number;
@@ -28,7 +32,28 @@ export interface Temper {
   claim: number;
   skill: number;
   aggro: number;
+  gunnery: number;
+  helm: number;
+  lookout: number;
+  late?: Late;
 }
+
+/**
+ * A driver's late race: from `from` seconds on her clock her gunnery and her
+ * helm move, evenly, to these by `to` seconds, and stay there.
+ */
+interface Late {
+  from: number;
+  to: number;
+  gunnery: number;
+  helm: number;
+}
+
+/** A style: a temperament before a bot's own skill and mood are drawn. */
+type Style = Omit<
+  Temper,
+  'skill' | 'aggro' | 'gunnery' | 'helm' | 'lookout' | 'late'
+>;
 
 /**
  * The six temperaments: hunter, homesteader, raider, turtle, scavenger,
@@ -38,7 +63,7 @@ export interface Temper {
  * the loot, notices a ship late, and the turtle, in her shell, not much
  * sooner.
  */
-export const STYLES: readonly Omit<Temper, 'skill' | 'aggro'>[] = [
+export const STYLES: readonly Style[] = [
   {
     fight: 0.8,
     notice: 200,
@@ -132,14 +157,14 @@ const SKILL: readonly (readonly [number, number])[] = [
  */
 export function temper(
   seed: number,
-  styles: readonly Omit<Temper, 'skill' | 'aggro'>[] = STYLES,
+  styles: readonly Style[] = STYLES,
   weights: readonly number[] = styles.map(() => 1)
 ): Temper & { style: number } {
   const u = random(seed ^ 0x51a7e);
   const style = weighed(weights, u()),
     t = styles[style],
     [lo, hi] = SKILL[style] ?? SKILL[1];
-  return {
+  const drawn = {
     style,
     fight: Math.min(1, Math.max(0, t.fight + 0.2 * (u() - 0.5))),
     notice: t.notice * (0.85 + 0.3 * u()),
@@ -152,5 +177,22 @@ export function temper(
     claim: t.claim,
     skill: lo + (hi - lo) * u(),
     aggro: 0.2 + 0.8 * u(),
+  };
+  const { skill } = drawn;
+  return { ...drawn, gunnery: skill, helm: skill, lookout: skill };
+}
+
+/**
+ * Her temperament `seconds` into her race: as it is, but for a driver's late
+ * race (Temper.late), her gunnery and her helm part of the way to its end's.
+ */
+export function tempered(t: Temper, seconds: number): Temper {
+  const l = t.late;
+  if (!l || seconds <= l.from) return t;
+  const f = Math.min(1, (seconds - l.from) / (l.to - l.from));
+  return {
+    ...t,
+    gunnery: t.gunnery + (l.gunnery - t.gunnery) * f,
+    helm: t.helm + (l.helm - t.helm) * f,
   };
 }

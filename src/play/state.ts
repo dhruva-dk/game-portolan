@@ -46,7 +46,12 @@ import {
 import { bruised, mind, rammed, sank, shot, type Memory } from '../sim/bot.ts';
 import { DEFAULT_BRAIN, type Brain } from '../sim/brain.ts';
 import { checked, entered, mates } from '../sim/carded.ts';
-import { nature, type MatchType, type Nature } from '../sim/persona.ts';
+import {
+  nature,
+  natureOf,
+  type MatchType,
+  type Nature,
+} from '../sim/persona.ts';
 import { afloat, stepFleet, type Vessel } from '../sim/contact.ts';
 import { STEP, blendPose } from '../sim/fixed.ts';
 import { gunOf } from '../sim/gun.ts';
@@ -393,11 +398,15 @@ export function createState(
     colours[id] = look.sail;
     const r = settled(ship, sea, tick * STEP, id),
       p = pose(ship, r);
-    const bot = (id !== PLAYER || !manned) && !lashed;
+    const bot = (id !== PLAYER || !manned) && !lashed,
+      driver = card?.ships[id]?.driver;
     aboard.set(id, {
       look,
-      mind: bot ? mind(seedOf(id), ship.at) : null,
-      nature: nature(seedOf(id), brainOf(id), match.type.mix),
+      mind: bot ? mind(driver?.seed ?? seedOf(id), ship.at) : null,
+      // (a card's driver is her own bot; else the bot her berth's seed deals)
+      nature: driver
+        ? natureOf(driver, closedBy(match.type.rules.storm), brainOf(id))
+        : nature(seedOf(id), brainOf(id), match.type.mix),
       steady: lashed ?? AMIDSHIPS,
       ride: r,
       before: p,

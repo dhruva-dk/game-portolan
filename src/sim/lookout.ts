@@ -55,7 +55,7 @@ export function hidden(c: Ctx, a: Vec3, b: Vec3): boolean {
 }
 
 /** How far off she notices a ship, m: her temper's notice, by her skill. */
-export const eye = (t: Temper): number => t.notice * (0.8 + 0.4 * t.skill);
+export const eye = (t: Temper): number => t.notice * (0.8 + 0.4 * t.lookout);
 
 /**
  * Notes the nearest ship she can see; a foe out of sight is followed to where
@@ -78,7 +78,7 @@ export function perceive(c: Ctx): void {
     if (score >= bd || hidden(c, own.ship.at, o.ship.at)) continue;
     [bd, best] = [score, o];
   }
-  if (best && best.id !== m.foe) sighted(m, m.clock, c.t.skill);
+  if (best && best.id !== m.foe) sighted(m, m.clock, c.t.lookout);
   if (best) [m.foe, m.seen, m.last] = [best.id, m.clock, best.ship.at];
   else if (
     m.foe >= 0 &&

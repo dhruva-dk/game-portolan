@@ -20,7 +20,9 @@ import { random } from '../world/random.ts';
 import { DEFAULT_BRAIN, variant, type Brain, type Over } from './brain.ts';
 import { DEFAULT_RULES, ruled, type Rules } from './rules.ts';
 import { weighed } from './tables.ts';
+import { driven } from './driven.ts';
 import { temper, type Temper } from './temper.ts';
+import type { Driver } from '../race.ts';
 
 /**
  * The personas, in the order of their temperaments (temper.ts STYLES); the
@@ -171,6 +173,16 @@ const EVEN: Mix = {
   brawler: 1,
 };
 
+/** No persona at all: a driver's own is put to it (natureOf). */
+const NONE: Mix = {
+  hunter: 0,
+  homesteader: 0,
+  raider: 0,
+  turtle: 0,
+  scavenger: 0,
+  brawler: 0,
+};
+
 /**
  * A match's type: its name, the mix of personas it is sailed by, and its rules.
  */
@@ -297,4 +309,20 @@ export function nature(
   );
   const persona = PERSONAS[t.style];
   return { seed, persona, brain: crewsOf(brain)[persona], temper: t };
+}
+
+/**
+ * The nature of the bot a driver is (race.ts Driver), in a race whose storm
+ * has closed by `length` seconds: of her seed and her own persona (whatever
+ * the mix), her temperament as her stats have it (driven.ts). A driver
+ * of ten in every stat is the bot of that seed and persona, to the bit.
+ */
+export function natureOf(
+  driver: Driver,
+  length: number,
+  brain: Brain = DEFAULT_BRAIN
+): Nature {
+  const mix = { ...NONE, [driver.persona]: 1 },
+    n = nature(driver.seed, brain, mix);
+  return { ...n, temper: driven(n.temper, driver.stats, length) };
 }

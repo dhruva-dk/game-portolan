@@ -287,7 +287,7 @@ function evading(c: Ctx): number {
     m.clock - m.hitT > c.b.mind.fresh
   )
     return 0;
-  return utility(1 - fightUrge(c), 0.3 + 0.7 * c.t.skill);
+  return utility(1 - fightUrge(c), 0.3 + 0.7 * c.t.helm);
 }
 
 /** How much she wants to run: losing a fight, or rammed by one she won't. */

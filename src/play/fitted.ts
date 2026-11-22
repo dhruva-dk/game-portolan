@@ -12,7 +12,9 @@
 // are the tables'; the most reliable part's are FITTED.sway less of them, the
 // least reliable's as much more. Her sails and her rigging are her rigging
 // zone's (the mean of the two), her rudder her rudder's, her hull and her keel
-// her waterline's, her gun mounts her deck's.
+// her waterline's, her gun mounts her deck's. Her driver's seamanship moves
+// every band of hers besides (sim/driven.ts DRIVER.seamanship): a driver who
+// keeps her ship well has it fault later.
 //
 // A part of no performance, or of a reliability out of 0…1, is an error naming
 // it.
@@ -26,6 +28,7 @@ import { PARTS, type PartType, type RaceShip } from '../race.ts';
 import type { Crew } from '../sim/battle.ts';
 import { FAULTS, type Band } from '../sim/faults.ts';
 import { HEALTH, SPEC } from '../sim/handling.ts';
+import { DRIVER, lean } from '../sim/driven.ts';
 
 /** What a ship's parts are read by. Starting values. */
 export const FITTED = {
@@ -45,21 +48,29 @@ export const FITTED = {
   } satisfies Record<Zone, readonly PartType[]>,
 } as const;
 
-/** The band of a zone whose parts are `reliability` reliable. */
-const bandOf = (reliability: number): Band => {
+/**
+ * The band of a zone whose parts are `reliability` reliable, `kept` times over
+ * (her driver's seamanship).
+ */
+const bandOf = (reliability: number, kept: number): Band => {
   const by =
-    1 + (FITTED.sway * (FITTED.spec - reliability)) / (1 - FITTED.spec);
+    (1 + (FITTED.sway * (FITTED.spec - reliability)) / (1 - FITTED.spec)) *
+    kept;
   return { minor: FAULTS.minor * by, major: FAULTS.major * by };
 };
 
-/** Her zones' bands (ZONES' order), by her parts' reliability. */
-function bandsOf(parts: RaceShip['parts']): Zones<Band> {
+/**
+ * Her zones' bands (ZONES' order), by her parts' reliability and her driver's
+ * seamanship (a stat; ten with her hands on her: sim/driven.ts DRIVER).
+ */
+function bandsOf({ parts, driver }: RaceShip): Zones<Band> {
+  const kept = 1 - DRIVER.seamanship * lean(driver?.stats.seamanship ?? 10);
   const of = (z: number): Band => {
     const zone = ZONES[z],
       made = zone ? FITTED.zones[zone] : [];
     let sum = 0;
     for (const p of made) sum += parts[p].reliability;
-    return bandOf(made.length > 0 ? sum / made.length : FITTED.spec);
+    return bandOf(made.length > 0 ? sum / made.length : FITTED.spec, kept);
   };
   return [of(0), of(1), of(2), of(3)];
 }
@@ -91,7 +102,7 @@ export function fitted(c: Crew, ship?: RaceShip): Crew {
         gather: SPEC.gather * p.rigging.performance,
         spread: SPEC.spread / p.keel.performance,
       },
-      bands: bandsOf(p),
+      bands: bandsOf(ship),
     },
   };
 }

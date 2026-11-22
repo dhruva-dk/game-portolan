@@ -277,7 +277,7 @@ function answer(c: Ctx, foe: number): number | null {
     if (o.id === foe && Math.abs(bearing) < 0.5) continue;
     if (
       unitHash(c.seed, o.id * STRIDE + Math.floor(m.clock / c.b.helm.warn)) >
-      0.2 + 0.75 * c.t.skill
+      0.2 + 0.75 * c.t.helm
     )
       continue;
     return Math.abs(bearing) < Math.PI / 2

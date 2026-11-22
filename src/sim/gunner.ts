@@ -302,7 +302,7 @@ export function ring(c: Ctx, foe: Mark, kind: GunKind, dt: number): Vec3 {
   g.circleT -= dt;
   if (g.circleT <= 0) {
     g.circle = -g.circle;
-    g.circleT = between(() => roll(c.m), t.weave) * (1 - 0.6 * c.t.skill);
+    g.circleT = between(() => roll(c.m), t.weave) * (1 - 0.6 * c.t.gunnery);
   }
   const rush = t.rush[kind],
     pref = t.pref[kind] * c.t.standoff * (rush > 0 && !loaded(c) ? rush : 1),
@@ -337,7 +337,7 @@ export function aimAndFire(
   const g = c.m,
     t = c.b.gunnery,
     own = c.own.ship,
-    skill = c.t.skill,
+    skill = c.t.gunnery,
     clock = c.m.clock,
     draw = () => roll(c.m);
   const eye = place(own.at, GUNNER.aloft),

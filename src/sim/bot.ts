@@ -68,6 +68,7 @@ import { placeMemory, survey } from './placing.ts';
 import { roamGoal } from './roaming.ts';
 import { keptInside, stormGoal, stormUrge } from './storming.ts';
 import { NOTHING, type Ask } from './stores.ts';
+import { tempered } from './temper.ts';
 
 /**
  * Her options' weights, their ranks: what each option's score is multiplied by
@@ -188,7 +189,7 @@ export function think(
     sea,
     m,
     b: who.brain,
-    t: who.temper,
+    t: tempered(who.temper, m.clock),
     foe: null,
     foeD: Infinity,
     seed: who.seed,
