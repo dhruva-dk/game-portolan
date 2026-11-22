@@ -22,9 +22,11 @@
 // wherever it is run.
 
 import { SOUND, type Faults } from '../kinds.ts';
-import type { Call, RaceCard, RaceResult } from '../race.ts';
+import type { Race } from '../player.ts';
+import type { RaceCard, RaceResult } from '../race.ts';
 import type { Crew, Shot, Strike } from '../sim/battle.ts';
 import { called } from '../sim/called.ts';
+import type { Mode } from '../sim/captain.ts';
 import { over, teamsOf } from '../sim/carded.ts';
 import type { Vessel } from '../sim/contact.ts';
 import { faultsIn } from '../sim/faults.ts';
@@ -34,6 +36,7 @@ import type { Sunk } from '../sim/match.ts';
 import type { Nature } from '../sim/persona.ts';
 import { pitted } from '../sim/pit.ts';
 import type { Ask } from '../sim/stores.ts';
+import { createStandings } from './standings.ts';
 
 /**
  * The finishing order, first place first: `alive` (the ships afloat at the
@@ -118,6 +121,7 @@ export function createTally(card: RaceCard, closes: number) {
   const forfeit = card.ships.filter((s) => s.forfeit).map((s) => s.id);
   /** The call each ship's team sails under, by her id. */
   const calls = card.ships.map((s) => s.call);
+  const standings = createStandings(card);
   let made: RaceResult | null = null;
 
   /** What the guns and the rams did in a step. */
@@ -199,8 +203,22 @@ export function createTally(card: RaceCard, closes: number) {
     holds(id: number, share: number) {
       held[id] = share;
     },
-    /** The call a ship's team sails under now. */
-    callOf: (id: number): Call => calls[id],
+    /**
+     * The race as ship `id`'s HUD reads it (standings.ts), the sea as the
+     * last step left it: `home` whether a ship lies in her team's water,
+     * `mode` what a ship's bot is about.
+     */
+    view: (
+      id: number,
+      s: Standing,
+      sea: { home(id: number): boolean; mode(id: number): Mode | undefined }
+    ): Race =>
+      standings(id, s, {
+        call: calls[id],
+        order: () => finishing(s.alive, s.sunk, s.share, forfeit),
+        home: sea.home(id),
+        mode: sea.mode,
+      }),
     /**
      * A step's asks of the race (sim/stores.ts Ask), done once the sea is
      * held, at step `tick`: a team's call changed by a ship of it, every bot

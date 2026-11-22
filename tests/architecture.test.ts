@@ -62,7 +62,8 @@ const LAYERS: Record<string, readonly string[]> = {
   // between the player and the game (player.ts), and the world as built for a
   // match (environment.ts)
   'snapshot.ts': ['world/', 'sim/storm.ts', 'kinds.ts'],
-  'player.ts': ['world/', 'kinds.ts'],
+  // (of race.ts, a team's calls: the race's HUD shows and changes hers)
+  'player.ts': ['world/', 'kinds.ts', 'race.ts'],
   // the rarities' inks, for the two that draw them sRGB to linear light and
   // back, written once: for the palette, what draws the world and the UI
   'colour.ts': ['world/scalar.ts'],
@@ -180,6 +181,7 @@ const LAYERS: Record<string, readonly string[]> = {
   'debug.ts': [
     'play/colours.ts',
     'play/game.ts',
+    'play/race.ts',
     'play/referee.ts',
     'play/setup.ts',
     'play/state.ts',

@@ -88,6 +88,17 @@
 // play/chase.ts); ?slow=k runs the game at k of its speed (for catching a ball
 // in flight).
 //
+// A race. ?race starts a race sailed by a card (play/race.ts: a field of spec
+// ships in teams of four, ?race=n teams of them, 20 by default), her hands on
+// ship 0 and the eye coming down from space as PLAY's does, so the race's HUD
+// has its data (player.ts Status.race); ?pit=seconds asks a pit stop of every
+// job so many seconds into the frames drawn (it begins if she lies in her
+// team's water, as at her berth she does, and her hands are on her ship: once
+// the eye is down, so ?pit=7 or with ?ahead), and ?call=name,seconds changes her
+// team's call then (free, attack, hold, form). The race as its HUD reads it is
+// set on the page each second drawn, for the tools (the body's data-race, as
+// JSON).
+//
 // Damage. ?zones=r,u,w,d sets her zones' shares of her hull's damage (rigging,
 // rudder, waterline, deck: player.ts ZONES), ?faults=a,b,c,d their faults (0
 // none, 1 minor, 2 major) on her and every ship, ?wear=0…2 every ship's wear
@@ -111,11 +122,19 @@ import type { World } from './environment.ts';
 import type { FrameOptions } from './frame.ts';
 import { createFly } from './fly.ts';
 import type { DebugDamage, Game } from './play/game.ts';
+import { raceOf, specField } from './play/race.ts';
 import type { Referee } from './play/referee.ts';
 import { dealt, lookOf, worn } from './play/colours.ts';
 import type { Matches } from './play/setup.ts';
 import type { Berth } from './play/state.ts';
-import { HOTBAR, IDLE, type Hands, type Livery } from './player.ts';
+import {
+  CALLS,
+  HOTBAR,
+  IDLE,
+  JOBS,
+  type Hands,
+  type Livery,
+} from './player.ts';
 import { probeMeshes } from './probe.ts';
 import { STEP } from './sim/fixed.ts';
 import { KINDS, SOUND, type Fault, type GunKind } from './kinds.ts';
@@ -332,7 +351,11 @@ export async function scenario(
   // ?livery: hers, worn before the sea about her is laid (else hers as the
   // device keeps it, as the flow found it); the others dealt round it
   if (params.has('livery')) p.game.wear(asked);
-  open(p, demoShips(s.start.at, room - 1, s.world.seed, p.game.worn()));
+  open(
+    p,
+    demoShips(s.start.at, room - 1, s.world.seed, p.game.worn()),
+    s.world
+  );
   const paused = params.has('pause'),
     slow = number('slow', 1);
   // ?use: the item's slot tapped twice (chosen, then used); ?tap's slot tapped;
@@ -342,6 +365,8 @@ export async function scenario(
   const [slot, use] = (params.get('use') ?? '').split(',').map(Number),
     tap = params.get('tap')?.split(',').map(Number);
   const [fireAt, held] = (params.get('fire') ?? '').split(',').map(Number);
+  const [named, callAt] = (params.get('call') ?? '').split(','),
+    call = CALLS.find((c) => c === named);
   const timed: { at: number; hands: Partial<Hands> }[] = [
     ...(slot > 0
       ? [
@@ -354,6 +379,10 @@ export async function scenario(
       ? [{ at: number('gust', 0), hands: { gust: true } }]
       : []),
     ...(params.get('fire') ? [{ at: fireAt || 0, hands: { fire: true } }] : []),
+    ...(params.has('pit')
+      ? [{ at: number('pit', 0), hands: { pit: JOBS } }]
+      : []),
+    ...(call ? [{ at: Number(callAt) || 0, hands: { call } }] : []),
     ...(swing
       ? [
           {
@@ -399,16 +428,20 @@ export async function scenario(
     if (held > 0 && drawn > fireAt && drawn <= fireAt + held)
       p.game.step(0, { ...IDLE, fire: true });
     for (const e of ends) if (drawn <= e.at && drawn + dt > e.at) e.act();
+    // ?race: the race as its HUD reads it, set on the page each second drawn
+    // for the tools to read (the body's data-race, as JSON)
+    if (params.has('race') && Math.floor(drawn + dt) > Math.floor(drawn))
+      document.body.dataset.race = JSON.stringify(p.game.status().race);
     drawn += dt;
     return frame;
   }, p.drawn);
 }
 
 /**
- * Opens the game where ?screen= says, among `others` at sea; then sails it on
- * ?ahead= seconds.
+ * Opens the game where ?screen= says, among `others` at sea (or, with ?race, in
+ * a carded race on `world`); then sails it on ?ahead= seconds.
  */
-function open(p: Played, others: readonly Berth[]) {
+function open(p: Played, others: readonly Berth[], world: World) {
   const { game, referee, flow } = p;
   const screen = params.get('screen') ?? 'match';
   if (officed) {
@@ -426,7 +459,13 @@ function open(p: Played, others: readonly Berth[]) {
     screen === 'livery'
   )
     flow.go(screen);
-  else if (screen === 'play') {
+  else if (params.has('race')) {
+    // a carded race of spec ships, her hands on ship 0 (play/race.ts)
+    const teams = number('race', 0) || undefined;
+    game.start(raceOf(specField(world.seed, teams, true), world.planet));
+    referee.begin();
+    flow.go('match');
+  } else if (screen === 'play') {
     p.play();
     flow.go('match');
   } else {

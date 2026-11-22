@@ -110,7 +110,7 @@ import { remembered } from '../world/remembered.ts';
 import type { PoseOut, ShipPose } from '../world/pose.ts';
 import { hash } from '../world/random.ts';
 import { add, bearingAt, scale, type Vec3 } from '../world/sphere.ts';
-import { LIVERY, type Livery } from '../player.ts';
+import { LIVERY, type Livery, type Race } from '../player.ts';
 import { dealt, lookOf, worn } from './colours.ts';
 import { createDrawing } from './drawing.ts';
 import { createHeld } from './held.ts';
@@ -868,6 +868,15 @@ export function createState(
      * on, and on any sea but a carded race's.
      */
     result: (): RaceResult | null => tally?.result() ?? null,
+    /**
+     * A race sailed by a card as ship `id`'s HUD reads it (player.ts Race;
+     * standings.ts): null in a match with no card.
+     */
+    race: (id: number): Race | null =>
+      tally?.view(id, standing(), {
+        home,
+        mode: (k) => aboard.get(k)?.mind?.mode,
+      }) ?? null,
     /**
      * Every ship of the match in the order she would finish as it stands
      * (result.ts finishing), first place first; a race's forfeits last.

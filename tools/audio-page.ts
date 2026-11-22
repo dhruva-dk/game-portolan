@@ -537,6 +537,7 @@ export async function passage(
       outside: Math.max(0, -wall),
       reticle: null,
       moments,
+      race: null,
       guns: [
         { kind: 'cannon', rarity: 0, rounds: 8, mag: 8, reload: null },
         null,

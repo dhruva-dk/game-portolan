@@ -148,12 +148,6 @@ export const EXCEPTIONS: readonly Exception[] = [
     name: 'runRace',
     why: "a race sailed headless: the tools' and the tests' (tools/race.ts, the fleet's), and the career's worker's for the tiers she is not in (MANAGER.md 3 point 9, 4); this goes stale, and is removed, once the career takes it",
   },
-  {
-    rule: 'exports',
-    file: 'src/play/race.ts',
-    name: 'specField',
-    why: "a field of spec ships to sail a race with: the tools' and the tests', and the debug switch's that starts a carded race for the race HUD to be drawn on (MANAGER.md 3 point 10); this goes stale, and is removed, once that takes it",
-  },
   // the career, ported whole before the office's release flow takes it
   // (MANAGER.md 5, flow; 8 point 3): each goes stale once that flow runs it
   {

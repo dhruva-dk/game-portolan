@@ -362,6 +362,7 @@ const status = (over: Partial<Status & Kit> = {}): Status & Kit => ({
   outside: 0,
   reticle: null,
   moments: [],
+  race: null,
   guns: [{ kind: 'cannon', rarity: 0, rounds: 8, mag: 8, reload: null }, null],
   items: [null, null, null],
   chosen: 0,

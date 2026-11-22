@@ -52,6 +52,7 @@ import { RIDE } from '../sim/ride.ts';
 import { PLAYER } from '../sim/match.ts';
 import type { Vessel } from '../sim/contact.ts';
 import type { Helm, ShipState } from '../sim/ship.ts';
+import type { Ask } from '../sim/stores.ts';
 import type { Fault, Use } from '../kinds.ts';
 import type { Eye, LootDraw, Snapshot, StormDraw } from '../snapshot.ts';
 import { createSwell } from '../world/swell.ts';
@@ -120,6 +121,8 @@ export interface DebugDamage {
 
 /** How little of the stick's push counts as none. */
 const DEAD = 0.15;
+/** Nothing asked of a race. */
+const UNASKED: Pick<Ask, 'pit' | 'call'> = {};
 /**
  * Loot is drawn within DRAWN m of the eye (so none from space), floating on the
  * waves within RIDES m of the eye's ship. (Never on the disc: the sea is
@@ -204,6 +207,11 @@ export function createGame(
     tapped: number | null = null,
     gusted = false,
     between = 0;
+  /**
+   * What her hands asked of a race since the last frame that stepped: a pit
+   * stop, her team's call (sim/stores.ts Ask).
+   */
+  let raced: Pick<Ask, 'pit' | 'call'> = UNASKED;
   /** The camera: what the flow sets, and seconds since her end's shot began. */
   let view: View = { watch: PLAYER, hands: true, look: true, end: null },
     ended = 0;
@@ -304,6 +312,7 @@ export function createGame(
     outside: 0,
     reticle: null,
     moments: [],
+    race: null,
   };
   const holding: NonNullable<Status['gun']> = {
     kind: 'cannon',
@@ -522,6 +531,14 @@ export function createGame(
       pulled ||= hands.fire;
       gusted ||= hands.gust;
       if (hands.tap !== null) tapped = hands.tap;
+      // (her team's call is hers to change with her hands off her ship too:
+      // sunk, she calls it still)
+      if (hands.pit || read.call)
+        raced = {
+          ...raced,
+          ...(hands.pit && { pit: hands.pit }),
+          ...(read.call && { call: read.call }),
+        };
       // what happened since the last frame, answered from where the camera now
       // looks
       const me = view.watch,
@@ -563,9 +580,9 @@ export function createGame(
         state.advance(
           helm,
           { aim: chase.sight(), fire: !!v && pulled },
-          { tap, arm, gust: gusted, take: null }
+          { tap, arm, gust: gusted, take: null, ...raced }
         );
-        [tapped, gusted] = [null, false];
+        [tapped, gusted, raced] = [null, false, UNASKED];
       }
       // the trigger held through all of a frame's steps
       if (time.steps > 0) pulled = false;
@@ -750,6 +767,7 @@ export function createGame(
         (2 * Math.max(1, seen) * Math.tan((eye.fov * Math.PI) / 360));
       report.reticle = lay && g ? reticleOf(lay, g, eye, spread) : null;
       report.moments = momentsSeen(eye);
+      report.race = state.race(PLAYER);
       return report;
     },
     sinkings: state.sinkings,

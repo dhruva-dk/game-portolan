@@ -89,6 +89,13 @@ function due(c: Crew, job: Job): boolean {
   return c.wear.zones[zoneOf(job)] > 0;
 }
 
+/**
+ * The seconds `job` would take her now, her crew working at `pace` and not
+ * slipping: none with nothing for it to do.
+ */
+export const jobTime = (c: Crew, job: Job, pace: number) =>
+  due(c, job) ? timeOf(job) * pace : 0;
+
 /** Her crew with `job` done. */
 function worked(c: Crew, job: Job): Crew {
   if (job === 'gust')
