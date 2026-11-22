@@ -8,8 +8,6 @@ import assert from 'node:assert/strict';
 import { shardsOf } from '../tools/fleet/dispatch.ts';
 import { careerShard, parted } from '../tools/fleet/jobs/career.ts';
 import { raceShard } from '../tools/fleet/jobs/race.ts';
-import type { Report } from '../tools/career/sail.ts';
-import type { Season } from '../tools/career/tally.ts';
 import { KEPT, keptWorlds, worldOf } from '../tools/harness/world.ts';
 import { TEAMS } from '../src/race.ts';
 
@@ -26,7 +24,13 @@ test('career: a shard is a manager, a seed and seasons; nothing else is', () => 
     seed: 12,
     seasons: 5,
   });
-  for (const bad of ['shrewd-12', 'lazy-1-5', 'idle-1-0', 'idle-x-5', 'idle-1-5-'])
+  for (const bad of [
+    'shrewd-12',
+    'lazy-1-5',
+    'idle-1-0',
+    'idle-x-5',
+    'idle-1-5-',
+  ])
     assert.throws(() => careerShard(bad), /career/, bad);
 });
 
@@ -41,15 +45,14 @@ test('career: a batch of careers is asked for in one line, every manager by ever
   assert.deepEqual(shardsOf('gold-rush,4..5'), ['gold-rush', '4', '5']);
 });
 
-const season = (n: number, ms: number): Season =>
-  // only its wall is read by the parting; the rest is carried as it is
-  ({
-    season: n,
-    wall: { ms, races: 30, raceMs: ms - 9, planetMs: 9 },
-  }) as unknown as Season;
+// only a record's wall is read by the parting; the rest is carried as it is
+const season = (n: number, ms: number) => ({
+  season: n,
+  wall: { ms, races: 30, raceMs: ms - 9, planetMs: 9 },
+});
 
-const report = (ms: number): Report => ({
-  manager: 'sensible',
+const report = (ms: number) => ({
+  manager: 'sensible' as const,
   seed: 3,
   seasons: 2,
   tuning: 7,

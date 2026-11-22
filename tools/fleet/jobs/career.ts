@@ -28,11 +28,13 @@ export function careerShard(shard: string): {
 }
 
 /** A season's record with its times taken out (its races' count kept: that is the career's). */
-type Timeless = Omit<Season, 'wall'> & { wall: { races: number } };
+type Timeless<S> = Omit<S, 'wall'> & { wall: { races: number } };
 
 /** A report parted: what is the career's (hashed), and its wall times (aside). */
-export function parted(report: Report): {
-  result: Omit<Report, 'wall' | 'records'> & { records: Timeless[] };
+export function parted<S extends Pick<Season, 'wall'>>(
+  report: Omit<Report, 'records'> & { records: S[] }
+): {
+  result: Omit<Report, 'wall' | 'records'> & { records: Timeless<S>[] };
   aside: { ms: number; perSeason: number[]; seasons: Season['wall'][] };
 } {
   const { wall, records, ...rest } = report;
