@@ -245,7 +245,7 @@ export function createHq(office: Office): Screen<HqPaper> {
       ]);
       stats.classList.add('q-stats');
       const know = panel(
-        'Component Knowledge',
+        'Part Knowledge',
         v.knowledge.map((k, i) =>
           el(
             'div',

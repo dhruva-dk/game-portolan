@@ -45,11 +45,14 @@ const CSS = `
 .h-jobs .k-btn { padding: 0 9px; font-size: 14px; }
 .h-jobs .k-who { max-width: 150px; }
 .h-chair { flex: none; height: 252px; }
+.h-chair .k-head { padding-left: 14px; padding-right: 34px; letter-spacing: .08em; }
+.h-none { flex: 1; display: grid; place-items: center; font-style: italic; color: var(--faint); }
+.h-none + .h-jobs { display: none; }
 .h-chair .h-row { flex: 1; display: flex; align-items: center; gap: 10px; }
 .h-chair .h-row > svg { flex: none; }
 .h-chair .h-col { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: stretch; gap: 8px; text-align: center; }
 .h-chair .h-aim { flex: none; display: flex; align-items: center; justify-content: center; gap: 14px; padding-top: 10px;
-  font: 700 19px/1 var(--narrow); letter-spacing: .04em; }
+  font: 700 17px/1 var(--narrow); letter-spacing: .02em; white-space: nowrap; }
 .h-chair .h-aim > i { align-self: stretch; width: 1px; background: var(--rule); }
 .h-stats { flex: none; height: 262px; }
 .s-home .k-card { flex: none; height: 150px; }
@@ -151,9 +154,9 @@ export function createHome(office: Office): Screen<HomeView> {
           'h-ship',
           drawn(
             320,
-            210,
-            rhumbs(160, 120, 420, 0.16) +
-              galleon(160, 108, 190, { sail: v.team.colours[0], waves: true })
+            156,
+            rhumbs(160, 90, 420, 0.16) +
+              galleon(160, 80, 150, { sail: v.team.colours[0], waves: true })
           )
         ),
         as(
@@ -223,6 +226,7 @@ export function createHome(office: Office): Screen<HomeView> {
                 },
                 true
               ),
+            !work && el('div', 'h-none', 'No work is under way.'),
             el(
               'div',
               'h-jobs k-rows',

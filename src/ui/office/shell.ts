@@ -43,12 +43,12 @@ const CSS = `
   padding-right: 8px; color: var(--ink); border-bottom: 1.5px solid var(--ink); box-shadow: 0 2px 0 var(--shade);
   background: linear-gradient(to top, transparent 3px, var(--line) 3px, var(--line) 3.8px, transparent 3.8px), var(--bar); }
 /* the team's plate and the chips keep their widths on every screen: the title has what is left, a long one set smaller */
-.o-team { flex: none; align-self: stretch; display: flex; align-items: center; gap: 10px; width: 236px; margin-bottom: 5px;
+.o-team { flex: none; align-self: stretch; display: flex; align-items: center; gap: 10px; width: 216px; margin-bottom: 5px;
   padding: 0 12px 0 10px; background: var(--light); border-left: 7px solid var(--team); border-right: 1px solid var(--line); }
-.o-team > span { font: 700 16px/1.1 var(--serif); letter-spacing: .02em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.o-team > span { font: 700 15px/1.1 var(--serif); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .o-title { flex: 1 1 0; min-width: 0; padding: 0 12px 4px; font: 700 ${TYPE.title}px/1 var(--serif); letter-spacing: .12em;
   text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.o-title.long { font-size: 20px; letter-spacing: .06em; }
+.o-title.long { font-size: 18px; letter-spacing: .04em; }
 .o-chips { flex: none; display: flex; align-items: center; gap: 8px; padding-bottom: 4px; }
 .o-chip { position: relative; height: 40px; min-width: 44px; display: flex; align-items: center; gap: 6px; padding: 0 6px 0 9px;
   ${cut('light')} white-space: nowrap; }
