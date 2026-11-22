@@ -13,7 +13,7 @@ import type { Vec3 } from '../../src/world/sphere.ts';
 import { flat } from '../../src/world/swell.ts';
 
 /** FNV-1a over the bits of every number given, as eight hex digits. */
-function fingerprint(numbers: readonly number[]): string {
+export function fingerprint(numbers: readonly number[]): string {
   const bytes = new Uint8Array(new Float64Array(numbers).buffer);
   let h = 0x811c9dc5;
   for (const b of bytes) h = Math.imul(h ^ b, 0x01000193) >>> 0;
@@ -39,10 +39,18 @@ export function golden(seconds: number, type?: MatchType): string {
   const idle = { course: null, throttle: 0 },
     still = { aim: null, fire: false };
   while (state.time() < seconds) state.advance(idle, still);
+  return fingerprint(numbersOf(state));
+}
+
+/**
+ * What a golden hashes of a match's state: its clock, the loot left, and every
+ * ship's place, heading, speed, health, share and whether she floats.
+ */
+export function numbersOf(state: ReturnType<typeof createState>): number[] {
   const numbers: number[] = [state.time(), state.loot().pieces.length];
   for (const v of state.vessels())
     numbers.push(v.id, ...v.ship.at, ...v.ship.heading, v.ship.speed);
   for (const k of state.ships())
     numbers.push(k.id, k.hull, k.shield, state.share(k.id), k.afloat ? 1 : 0);
-  return fingerprint(numbers);
+  return numbers;
 }

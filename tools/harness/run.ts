@@ -51,7 +51,13 @@ export interface Result extends MatchResult {
   seed: number;
 }
 
-export function runMatch(spec: Spec): Result {
+export const runMatch = (spec: Spec): Result => runWatched(spec);
+
+/**
+ * A spec's match run to its end. `look`: shown the state once each second of
+ * its clock, and at its end (the fleet's jobs hash it as it goes).
+ */
+export function runWatched(spec: Spec, look?: (state: State) => void): Result {
   const w = worldOf(spec.planet);
   const brainOf = (id: number) =>
     spec.brains[(id + spec.match) % spec.brains.length];
@@ -96,7 +102,11 @@ export function runMatch(spec: Spec): Result {
   const t = performance.now();
   while (state.alive().length > 1 && state.time() < end) {
     seen.step(state.advance(idle, still));
-    if (++steps % each === 0) seen.second(steps / each);
+    if (++steps % each === 0) {
+      seen.second(steps / each);
+      look?.(state);
+    }
   }
+  look?.(state);
   return { spec, seed: m.seed, ...seen.end(steps, performance.now() - t) };
 }

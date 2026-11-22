@@ -13,10 +13,23 @@
 // Node only (tools/).
 
 import { spawn } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  renameSync,
+  writeFileSync,
+} from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, resolve } from 'node:path';
-import { hostsOf, PROBE, probeOf, type Probe } from './hosts.ts';
+import {
+  choose,
+  hostsOf,
+  PROBE,
+  probeOf,
+  type Probe,
+  type Seat,
+} from './hosts.ts';
 import { FLEET, TIMES } from './limits.ts';
 
 /** The repository's root, and the fleet's local folder in it (not committed). */
@@ -47,6 +60,11 @@ export const SSH = [
   'LogLevel=ERROR',
   '-T',
 ] as const;
+
+/** The same ssh as one word for rsync's `-e`. */
+export const RSH = ['ssh', ...SSH]
+  .map((word) => (/\s/.test(word) ? `"${word}"` : word))
+  .join(' ');
 
 /** What a command came to: its exit code (null: killed, or never ran) and what it wrote. */
 export interface Ran {
@@ -142,9 +160,26 @@ export async function discover(): Promise<string[]> {
       `the gate (${FLEET.gate}) did not list the hosts: ${r.err.trim() || `exit ${r.code}`}`
     );
   mkdirSync(dirname(KNOWN), { recursive: true });
-  writeFileSync(KNOWN, keysOf(published, hosts).join('\n') + '\n');
+  // (whole or not at all: an ssh of ours may be reading it)
+  writeFileSync(
+    `${KNOWN}.${process.pid}`,
+    keysOf(published, hosts).join('\n') + '\n'
+  );
+  renameSync(`${KNOWN}.${process.pid}`, KNOWN);
   writeFileSync(LISTED, JSON.stringify(hosts));
   return hosts;
+}
+
+/**
+ * The seats of a batch to start now: the lab listed, every host probed (its
+ * load is checked before each batch), and the batch chosen under the limits
+ * (hosts.ts choose).
+ */
+export async function seatsNow(
+  want: { machines?: number; cereals?: number } = {}
+): Promise<Seat[]> {
+  const { probes } = await probe(await discover());
+  return choose(probes, want);
 }
 
 /** The hosts last listed (none if never). */
