@@ -1,4 +1,4 @@
-// Sponsors (Phase B section 10): three slots a team. Offers come every few rounds (a `sponsorOffer` event a team, every
+// Sponsors: three slots a team. Offers come every few rounds (a `sponsorOffer` event a team, every
 // 42 days), their size by the team's marketability and their grade (at most the landing pad's level). A sponsor pays a
 // fixed sum a race (career/money.ts raceMoney), or a bonus for the objective chosen in each race plan from their list
 // (finish top 10; sink two ships; both ships afloat at the end; hold the most sea in the team's tier), harder paying

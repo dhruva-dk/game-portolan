@@ -1,4 +1,4 @@
-// A ship's faults (DEPTH.md A): where her blows land on her, and what they
+// A ship's faults: where her blows land on her, and what they
 // cost her once her hull is low.
 //
 // Every blow that reaches her hull (past her shield: while it holds, no zone is

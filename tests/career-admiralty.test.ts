@@ -1,4 +1,4 @@
-// The Admiralty (Phase B section 11) and the rivals' rows of sections 8–11 (section 6's table).
+// The Admiralty and the rivals' rows of sections 8–11 (section 6's table).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { Change, Measure } from '../src/office/command.ts';

@@ -1,4 +1,4 @@
-// Stars, age, growth and retirement (Phase B section 2.2).
+// Stars, age, growth and retirement.
 
 import type { Building, Role } from '../office/command.ts';
 import { seeded, type Rand } from './dice.ts';
@@ -58,7 +58,7 @@ export interface Schooling {
   sailingSchool: number;
 }
 
-/** The building whose level schools each role (Phase B section 2.2); managers and chairmen have none. */
+/** The building whose level schools each role; managers and chairmen have none. */
 export const SCHOOL: Readonly<Record<Role, Building | null>> = {
   driver: 'sailingSchool',
   pit: 'pitHouse',

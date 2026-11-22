@@ -1,4 +1,4 @@
-// Hiring (Phase B section 5): offers, answers two days on (an approach to another team's person, seven), counters,
+// Hiring: offers, answers two days on (an approach to another team's person, seven), counters,
 // patience, the tier rule, break clauses, dismissals, renewals and the contract's last days. The player's commands
 // and the rivals' bids (career/rivals.ts) go through the same checks and the same `offered` and `signed`.
 

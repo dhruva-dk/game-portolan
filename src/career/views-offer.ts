@@ -1,4 +1,4 @@
-// `offer` (Phase C batch 2): the contract document drawn on a draft, what it costs, how it meets the person's wants,
+// `offer`: the contract document drawn on a draft, what it costs, how it meets the person's wants,
 // their patience, the talks so far and who else is talking to them, and where the talk stands. Pure, read-side.
 
 import type { Offer, Status } from '../office/command.ts';

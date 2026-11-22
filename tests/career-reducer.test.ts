@@ -1,4 +1,4 @@
-// The reducer, time and the dice (Phase B section 1): apply never throws on a bad command, the same state and command
+// The reducer, time and the dice: apply never throws on a bad command, the same state and command
 // give the same result, Advance pops the queue to the next event that needs the player.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

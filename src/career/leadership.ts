@@ -1,5 +1,5 @@
-// What a rival manager's and a chairman's stats do (Phase B sections 2.1, 6 and 7), as pure functions the rivals and
-// the chairmen call. A stat's u is stat / 20. Politics is read where sway is summed (Phase B section 11).
+// What a rival manager's and a chairman's stats do, as pure functions the rivals and
+// the chairmen call. A stat's u is stat / 20. Politics is read where sway is summed.
 
 import type { Rand } from './dice.ts';
 import { unit } from './roles.ts';

@@ -1,4 +1,4 @@
-// The port the career saves through (Phase B section 1). Adapters live in src/store/ and import only this file:
+// The port the career saves through. Adapters live in src/store/ and import only this file:
 // store/memory.ts for tests, tests/store-faulty.ts to fail or tear a chosen write, store/indexed.ts in the game.
 //
 // The journal is append-only: every applied command is one Entry, its sum chained from the previous entry's

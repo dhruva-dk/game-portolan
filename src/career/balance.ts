@@ -1,4 +1,4 @@
-// money moving between teams (Phase B section 10): what the market pays and takes (signing fees, break clauses,
+// money moving between teams: what the market pays and takes (signing fees, break clauses,
 // dismissals). A spend is refused below the chairman's debt floor; a payment owed (wages, a break clause received) is
 // never refused. The player's team's moves are written to the ledger.
 

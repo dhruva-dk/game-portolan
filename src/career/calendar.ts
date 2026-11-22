@@ -1,4 +1,4 @@
-// A season's calendar (Phase B section 13): ten race days fourteen days apart, then thirty days off, each race on a
+// A season's calendar: ten race days fourteen days apart, then thirty days off, each race on a
 // planet fixed when the season is made (its seed, its name, its storm pace). The next season starts a YEAR later.
 
 import { schedule } from './queue.ts';
@@ -82,7 +82,7 @@ export function sponsorsScheduled(s: CareerState, from: number): CareerState {
   );
 }
 
-/** The day of a team's first review (Phase B section 6): staggered by team id over the week. */
+/** The day of a team's first review: staggered by team id over the week. */
 const firstReview = (team: number, from: number): number =>
   from + 1 + (team % TUNING.rivals.review);
 

@@ -52,7 +52,7 @@ interface Blocker {
   sentence: string;
 }
 
-/** The top bar (Phase C section 5): the player, their team, the date, the balance, and Continue. */
+/** The top bar: the player, their team, the date, the balance, and Continue. */
 export interface TopBar {
   name: string;
   face: Face;

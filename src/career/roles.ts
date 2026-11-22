@@ -1,9 +1,9 @@
-// Every person and their role's stats (Phase B section 2, D15, D37). A stat is 0 to 20 at one decimal; u = stat / 20.
+// Every person and their role's stats. A stat is 0 to 20 at one decimal; u = stat / 20.
 // What each stat does is in career/pit.ts (mechanic, pit), career/staff.ts (driver, designer, scout) and the
 // sections that read the manager's and the chairman's (rivals, chairmen).
 //
-// The player is a person too (D35): a manager whose stats are all 0 and never read, since the player's own choices
-// stand for them (D8).
+// The player is a person too: a manager whose stats are all 0 and never read, since the player's own choices
+// stand for them.
 
 import type { PartType, Stat, Persona } from '../race.ts';
 import type { Personality, Role, Status, Want } from '../office/command.ts';
@@ -66,7 +66,7 @@ true satisfies Same<
   PartType
 >;
 
-/** A person's contract (Phase B section 5). Wage, fee and bonuses in money; `ends` the season at whose end it runs out
+/** A person's contract. Wage, fee and bonuses in money; `ends` the season at whose end it runs out
  *  (null for a chairman, and for the player, who are their team's for as long as they stay). */
 export interface Contract {
   team: number;
@@ -80,7 +80,7 @@ export interface Contract {
   signed: number; // the day
 }
 
-/** What a team knows of a person once scouted (Phase B section 4): the day, their stars at the last season's end (a
+/** What a team knows of a person once scouted: the day, their stars at the last season's end (a
  *  screen's arrow is stars now against these), the scout whose report it was (null: their own staff), and whether
  *  that report's Persuasion has been spent on an offer. */
 interface Known {
@@ -127,7 +127,7 @@ export interface PersonCore {
   components: readonly string[]; // a designer's known components (career/components.ts)
   unfit: number; // races still to miss injured
   grudge: number | null; // the team that last sank her (Grudge-holder)
-  patience: number; // in talks (Phase B section 5)
+  patience: number; // in talks
   silentUntil: number; // the day talks open again after patience ran out
   silenced: boolean; // the contract's last days passed with no renewal: morale paid once
   retired: number | null; // the day

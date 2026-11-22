@@ -1,4 +1,4 @@
-// Canonical JSON and the 32-bit FNV-1a sum the journal and snapshots are checked by (Phase B section 1). Written here,
+// Canonical JSON and the 32-bit FNV-1a sum the journal and snapshots are checked by. Written here,
 // no library, no Web Crypto: the same text and the same sum for the same value on every platform.
 
 /** A value the career saves: plain JSON, no undefined, no functions, finite numbers. */

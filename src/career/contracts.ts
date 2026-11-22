@@ -1,4 +1,4 @@
-// Contracts (Phase B section 5): when one runs out, its last days, who a team may sign and what it costs, signing and
+// Contracts: when one runs out, its last days, who a team may sign and what it costs, signing and
 // releasing, expiry at the season's end, and the young people who enter the market each season. The player's team and
 // every rival sign and release through these same functions.
 

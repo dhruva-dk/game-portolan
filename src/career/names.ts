@@ -1,4 +1,4 @@
-// Every generated name (Phase B section 2.4, D34): people' given and family names, colonies, teams ("<place> <noun>"),
+// Every generated name: people' given and family names, colonies, teams ("<place> <noun>"),
 // sponsors ("<family> & <relation>, <trade>") and planets, built by seed from syllable tables. No generated name of any
 // kind contains a BANNED word as a whole word, in any case: a generator draws again until it holds.
 

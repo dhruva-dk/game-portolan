@@ -1,4 +1,4 @@
-// Suppliers (Phase B section 8.7, D18): in the off-season each team chooses one each of timber (hull, keel), canvas
+// Suppliers: in the off-season each team chooses one each of timber (hull, keel), canvas
 // (sails, rigging) and cordage (rudder, mounts) from three cards a trade, dealt by seed from this table. Each gives a
 // trade-off for its parts for the season, and costs money once. The window is the off-season up to the season's first
 // race (the founding included). Rivals choose by personality (career/works.ts).

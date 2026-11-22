@@ -1,4 +1,4 @@
-// The career's randomness (Phase B section 1). Each named stream draws `random(hash(worldSeed, name, counter))`
+// The career's randomness. Each named stream draws `random(hash(worldSeed, name, counter))`
 // (world/random.ts), its counter kept in the state, so the same state and command give the same result.
 //
 // Stream names are a section's word, and ':' and an id where a stream belongs to one thing: 'world', 'names',

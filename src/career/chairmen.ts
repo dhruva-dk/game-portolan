@@ -1,4 +1,4 @@
-// Chairmen and the managers' market (Phase B section 7, D22): each chairman sets a target at the season's start (Ambition)
+// Chairmen and the managers' market: each chairman sets a target at the season's start (Ambition)
 // and adds money and a debt floor (Generosity); their confidence moves after each race (Patience), only with a run of
 // races behind the target, and carries into the next season; their word comes by mail as it crosses 75, 50 or 25. A
 // manager past their grace and behind the target is sacked at 0 at once, and at the season's end if the target was

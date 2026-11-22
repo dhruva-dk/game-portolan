@@ -1,4 +1,4 @@
-// Traits (Phase B section 2.3), as data: an id, a name, the roles that may have one, a condition the career can
+// Traits, as data: an id, a name, the roles that may have one, a condition the career can
 // evaluate (the planet, the round, the rules, a rival on the grid, contract state, age, tier), and a modifier (to
 // stats, morale, marketability, wants, wage, money a race, or the team's young drivers' growth). A person has at most
 // three; they gain or lose them at a season's end by seed (`turned`) and by events.

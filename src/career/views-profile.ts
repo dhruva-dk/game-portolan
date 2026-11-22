@@ -1,4 +1,4 @@
-// `profile` (Phase C batch 2): any person of any role, as the player's team sees them: their stars (ranges until known),
+// `profile`: any person of any role, as the player's team sees them: their stars (ranges until known),
 // traits, morale and marketability, wants once scouted, stats with which way they head, the role's own figures, the
 // history, the contract, and what the player may do (scout, offer, renew, dismiss), each with why not. Pure.
 

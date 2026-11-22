@@ -1,4 +1,4 @@
-// The career's time (D41, Phase B section 1): an event queue ordered by (day, seq). Advance pops events up to and
+// The career's time: an event queue ordered by (day, seq). Advance pops events up to and
 // including the next that needs the player, applying each (career/advance.ts). Nothing scans every person every day:
 // each team acts on its own events, and daily quantities (fatigue, the improvement) are worked out in closed form over the
 // days between them.

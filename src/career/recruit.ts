@@ -1,4 +1,4 @@
-// Making a person (Phase B section 2): a role, a strength in stars and an age go in; a whole person comes out, named,
+// Making a person: a role, a strength in stars and an age go in; a whole person comes out, named,
 // with stats about that strength, a ceiling (their stats at peak, from which potential is read), a peak age,
 // improvability, traits, wants, morale and marketability. The world's start and each season's young people use it.
 

@@ -1,10 +1,10 @@
-// The improvement (Phase B section 8.4): work points a day, the factory's 10, 20 or 30 plus each mechanic's
+// The improvement: work points a day, the factory's 10, 20 or 30 plus each mechanic's
 // (Reliability + Performance) / 4. First each day the points restore fitted parts' condition (a point, 0.01) up to 1;
 // the rest go as the team split them: per fitted non-spec part, a share to performance (1 a point, × her ship's
 // mechanic's Performance factor) and a share to reliability (0.002 a point, × her Reliability factor), each up to its
 // maximum, × the part's supplier's improvement terms.
 //
-// Worked out in closed form over the days since the team's improvementDay (D41): condition only rises between races, so over
+// Worked out in closed form over the days since the team's improvementDay: condition only rises between races, so over
 // n days the first points restore it (the most worn part first) and the rest split; caps are per part. `improvementTo` brings
 // a team's parts to today; anything that reads or changes them first calls it.
 

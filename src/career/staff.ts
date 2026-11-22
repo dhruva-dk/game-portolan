@@ -1,4 +1,4 @@
-// What a driver's Feedback, a designer's and a scout's stats do (Phase B section 2.1), as pure functions the
+// What a driver's Feedback, a designer's and a scout's stats do, as pure functions the
 // sections that use them call (design, scouting, the market). A stat's u is stat / 20.
 
 import type { Rand } from './dice.ts';

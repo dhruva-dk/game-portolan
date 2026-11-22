@@ -1,4 +1,4 @@
-// The headquarters (Phase B section 9, D29): nine buildings, levels 1 to 3 (every team holds each at level 1 at least), any
+// The headquarters: nine buildings, levels 1 to 3 (every team holds each at level 1 at least), any
 // number under way at once. Each level has a cost, days to build and an upkeep a race (TUNING.hq). What each
 // level gives is read where it acts, through the functions here: the factory's improvement points and build days, the
 // drawing loft's slots, design days and designers' growth (stars.ts SCHOOL), the test tank's and the foundry's

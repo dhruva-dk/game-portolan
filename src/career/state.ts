@@ -1,4 +1,4 @@
-// The whole career in one immutable value (Phase B section 1): every person and team, the championships and their rules, the
+// The whole career in one immutable value: every person and team, the championships and their rules, the
 // calendar, the player, mail, the ledger, talks, scouting, the event queue and every random stream's counter. It is
 // plain JSON (career/canon.ts Json): a snapshot is its canonical text. Ids are indices: person i is people[i], team i is
 // teams[i]. Nothing is ever removed from people (the retired keep their history) or teams.
@@ -35,13 +35,13 @@ export interface Staff {
   pit: readonly number[]; // the pit crew, TUNING.world.pit of them at most
 }
 
-/** A building's level, and the works under way to the next (Phase B section 9). */
+/** A building's level, and the works under way to the next. */
 export interface Works {
   level: number;
   next: { level: number; done: number } | null;
 }
 
-/** A part a team owns (Phase B section 8.1). Performance (perf) 0..1000; reliability, risk, condition 0..1. */
+/** A part a team owns. Performance (perf) 0..1000; reliability, risk, condition 0..1. */
 export interface Part {
   id: number;
   type: PartType;
@@ -67,7 +67,7 @@ export interface Numbers {
   risk: number;
 }
 
-/** A design in hand (Phase B section 8.3): designed by `designed`, built by `built`. `projected` is fixed at its start;
+/** A design in hand: designed by `designed`, built by `built`. `projected` is fixed at its start;
  *  `drawn` by the designer's Accuracy when it is designed. */
 export interface Design {
   type: PartType;
@@ -81,7 +81,7 @@ export interface Design {
   drawn: Numbers | null;
 }
 
-/** A design's cards before it starts (D18): its type, and each slot's deal (the cards, whether redealt once). */
+/** A design's cards before it starts: its type, and each slot's deal (the cards, whether redealt once). */
 export interface Draft {
   type: PartType;
   deals: readonly {
@@ -91,10 +91,10 @@ export interface Draft {
   }[];
 }
 
-/** A sponsor's objective in a race (Phase B section 10). */
+/** A sponsor's objective in a race. */
 export type Objective = 'top10' | 'sinkTwo' | 'afloat' | 'mostSea';
 
-/** A sponsor, offered or signed (Phase B section 10): a fixed sum a race (no objectives), or a bonus for the objective
+/** A sponsor, offered or signed: a fixed sum a race (no objectives), or a bonus for the objective
  *  chosen in each race plan from its list; for so many races; of a grade (the landing pad's level it needs). */
 export interface Sponsor {
   id: number;
@@ -112,7 +112,7 @@ export interface SponsorOffer {
   expires: number;
 }
 
-/** A team (Phase B section 3). */
+/** A team. */
 export interface Team {
   id: number;
   name: string;
@@ -151,7 +151,7 @@ export interface Standing {
   sinkings: number;
 }
 
-/** An Admiralty proposal (Phase B section 11): voted before `round`, on day `closes`. `votes` by team id; `lobbied`
+/** An Admiralty proposal: voted before `round`, on day `closes`. `votes` by team id; `lobbied`
  *  the sway money has added to each side; `decided` true (carried), false (the rule kept), null (open). */
 export interface Proposal {
   id: number;
@@ -208,7 +208,7 @@ interface RaceDay {
   results: readonly (RaceResult | null)[];
 }
 
-/** A message (Phase B section 12). */
+/** A message. */
 export interface Mail {
   id: number;
   day: number;
@@ -229,7 +229,7 @@ export interface Mail {
   } | null;
 }
 
-/** A line of the player's team's ledger (Phase B section 10). */
+/** A line of the player's team's ledger. */
 interface LedgerLine {
   day: number;
   kind: string;
@@ -238,7 +238,7 @@ interface LedgerLine {
   balance: number;
 }
 
-/** Talks between a team and a person (Phase B section 5). */
+/** Talks between a team and a person. */
 export interface Talk {
   id: number;
   team: number;
@@ -250,7 +250,7 @@ export interface Talk {
   scout: number | null;
 }
 
-/** A scout at work (Phase B section 4). */
+/** A scout at work. */
 interface Scouting {
   team: number;
   scout: number;
@@ -259,14 +259,14 @@ interface Scouting {
   done: number;
 }
 
-/** A team's offer of its manager's post to the player (Phase B section 7). */
+/** A team's offer of its manager's post to the player. */
 export interface JobOffer {
   team: number;
   made: number;
   expires: number;
 }
 
-/** The player (D35): their person, their team, their manager's reputation, and the posts they are offered. */
+/** The player: their person, their team, their manager's reputation, and the posts they are offered. */
 interface Player {
   person: number;
   team: number;

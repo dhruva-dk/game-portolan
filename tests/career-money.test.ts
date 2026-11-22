@@ -1,4 +1,4 @@
-// Money, reputation, marketability, sponsors and inspection (Phase B sections 8.5, 10).
+// Money, reputation, marketability, sponsors and inspection.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {

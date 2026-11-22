@@ -1,4 +1,4 @@
-// The Admiralty (Phase B section 11): each tier votes on its own next season's rules twice a season (before rounds
+// The Admiralty: each tier votes on its own next season's rules twice a season (before rounds
 // 4 and 8 as players count them). The Admiralty puts one proposal: which part types are spec; the storm's pace;
 // banning a gun kind; points per sinking; the sea-held point; prize money's spread; the inspection rate.
 //

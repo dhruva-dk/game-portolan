@@ -1,4 +1,4 @@
-// Drawing and answering the dilemmas (Phase B section 12; the twelve are career/events.ts's). After each round closes,
+// Drawing and answering the dilemmas (the twelve are career/events.ts's). After each round closes,
 // each team draws one at most, by seed: with a chance, among those whose trigger holds, a chairman's dilemma weighted by
 // the chairman's Meddling. A rival answers at once by its manager's personality (the last option if it cannot take its
 // own). The player's comes by mail a few days later, before the next race (a `dilemma` event, which stops Advance),

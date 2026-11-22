@@ -1,4 +1,4 @@
-// Designing a part (Phase B section 8.3, D18): one design at a time per team. Each of the drawing loft's slots (2, 3,
+// Designing a part: one design at a time per team. Each of the drawing loft's slots (2, 3,
 // 4) is dealt three cards from the components the designer knows and the buildings allow, seeded by the design, the
 // slot and the deal's count, with one redeal a slot. The design starts from the team's best of the type plus the
 // designer's rating × 8 plus the components; it costs by tier and type plus the components; it takes 14 days × the

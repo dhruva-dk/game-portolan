@@ -206,7 +206,7 @@ test('recover and settings say what happened', () => {
   assert.match(settingsView({ day: 12, season: 0 }).backup, /Day 12, Season 1/);
 });
 
-// ---- the people screens (Phase C batch 2)
+// ---- the people screens
 
 /** Every figure of a view set against something and explained. */
 function explained(v: unknown): void {

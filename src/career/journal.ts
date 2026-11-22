@@ -1,4 +1,4 @@
-// The journal's entries and their chain (Phase B section 1): each entry's sum is the 32-bit FNV-1a of its canonical
+// The journal's entries and their chain: each entry's sum is the 32-bit FNV-1a of its canonical
 // JSON ({ seq, tuning, command }), started from the previous entry's sum (the first from FNV's offset). A snapshot's
 // sum is FNV-1a of its text from the offset.
 

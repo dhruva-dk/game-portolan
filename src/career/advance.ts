@@ -1,4 +1,4 @@
-// Advance (D41, Phase B section 1): pops the queue's events up to and including the next one that needs the player
+// Advance: pops the queue's events up to and including the next one that needs the player
 // (race day, a dilemma, an answer, a deadline), applying each by its kind's handler. The day becomes each event's day
 // as it is popped. Each section adds its kinds' handlers to EVENTS (a kind with none is a bug: it throws).
 

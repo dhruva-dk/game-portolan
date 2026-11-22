@@ -1,4 +1,4 @@
-// `market` (Phase C batch 2): every person of a role the filter lets through, as the player's team sees them, the
+// `market`: every person of a role the filter lets through, as the player's team sees them, the
 // shortlist, and the scouts at work with the crow's nest that sets how many there may be. Pure, read-side.
 
 import type { Role } from '../office/command.ts';

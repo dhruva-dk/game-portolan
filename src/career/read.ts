@@ -1,4 +1,4 @@
-// What the career's screens read (Phase B section 12–13, for Phase C): pure selectors over the state, each a view a
+// What the career's screens read: pure selectors over the state, each a view a
 // screen draws as given. The mail rendered, newest first; a tier's table; the season's calendar; race day's preview
 // of the player's team; a dilemma's question and its answers.
 

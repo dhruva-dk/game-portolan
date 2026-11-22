@@ -1,4 +1,4 @@
-// The components a design is made of (Phase B section 8.2, D11): six part types × three tiers × three components, as
+// The components a design is made of: six part types × three tiers × three components, as
 // data. Each has a name, a type, a tier, and its effects on the design: performance and its maximum, reliability and
 // its maximum, days to design and to build, risk, and money. Tiers 2 and 3 of sails, rigging and keel are unlocked by
 // the test tank's level; of rudder, hull and mounts by the foundry's. Every tier has a grey component: risk for a

@@ -1,4 +1,4 @@
-// The journal, snapshots and the store (Phase B section 1, D23, D24, D36): kill at every write of a scripted session
+// The journal, snapshots and the store: kill at every write of a scripted session
 // and reload; corrupt each byte class and reload; replay equals state; failed appends change nothing; migrations.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -374,7 +374,7 @@ test('a save of schema 1 (the fixture) loads; a save from a newer schema is not 
     backup: null,
   };
   const o2 = await open(memoryStore(d2), true);
-  // the fixture's entries were written under tuning 1: once the tuning moves on, its journal is never replayed whole (D36)
+  // the fixture's entries were written under tuning 1: once the tuning moves on, its journal is never replayed whole
   if (fixture.entries.every((e: Entry) => e.tuning === TUNING_VERSION))
     assert.ok(o2.ok && o2.from === 'journal');
   else

@@ -1,4 +1,4 @@
-// Scouting (Phase B section 4): a free scout of a team is sent to a person in their Reach; after the scout's days (Speed)
+// Scouting: a free scout of a team is sent to a person in their Reach; after the scout's days (Speed)
 // times the crow's nest's factor, the report comes by mail and the team knows the person exactly. CancelScout frees the
 // scout and loses the progress. Rivals scout through the same check and the same start.
 

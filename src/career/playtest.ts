@@ -1,4 +1,4 @@
-// The playtest commands (Phase B section 16, D42): taken only when debug.ts enables them (career/career.ts), and
+// The playtest commands: taken only when debug.ts enables them (career/career.ts), and
 // journaled like any other. DebugBalance gives the player's team money; DebugReveal shows the player every person;
 // DebugToRaceDay and DebugToSeasonEnd run the calendar past every stop but race day (a race is never skipped: its
 // result is the match's to give), up to the next race day or through the season's end.

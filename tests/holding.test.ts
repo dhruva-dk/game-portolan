@@ -30,7 +30,7 @@ test('her shield comes back in proportion to her share of the calm, at HOLDING.s
   );
   assert.equal(regainRate(HOLDING.full), HOLDING.shield);
   assert.equal(regainRate(0.9), HOLDING.shield, 'no faster past it');
-  // raised with her hull's faults (DEPTH.md A, tuned by the harness): a full
+  // raised with her hull's faults (tuned by the harness): a full
   // holding, 4.5 a second
   assert.equal(regainRate(HOLDING.full), 4.5);
 });

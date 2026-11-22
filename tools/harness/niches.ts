@@ -1,4 +1,4 @@
-// The guns' niches (PLAN.md W2): each kind's damage a second by range, as its
+// The guns' niches: each kind's damage a second by range, as its
 // tables have it (src/sim/handling.ts GUNS, a gun's rarity GUN, its fall-off
 // src/sim/gun.ts), and, given a run, as the bots got it: each kind's shots home
 // by range band and the damage a shot did.

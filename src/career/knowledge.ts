@@ -1,4 +1,4 @@
-// What a team knows of a person (Phase B section 4, D16). Knowledge is per team: a team knows its own staff and every
+// What a team knows of a person. Knowledge is per team: a team knows its own staff and every
 // person its scouts have reported on, exactly; of the rest it sees ranges, as wide as its best scout's Judgement
 // (stars) and Insight (potential) among those with the person in Reach allow, the stars' centre off by a seeded amount
 // fixed for that team and person. The player's screens and the rivals' choices read the same view.

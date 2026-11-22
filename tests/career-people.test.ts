@@ -1,4 +1,4 @@
-// Stars, growth, age, retirement, morale, form, traits and injury (Phase B sections 2.2 and 2.3).
+// Stars, growth, age, retirement, morale, form, traits and injury.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { random } from '../src/world/random.ts';

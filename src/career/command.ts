@@ -1,5 +1,5 @@
 // What every command handler is: a pure function of the state, the command and the dice, returning the new state or
-// a typed refusal (Phase B section 1). Each section's module exports a table of handlers by command kind;
+// a typed refusal. Each section's module exports a table of handlers by command kind;
 // career/career.ts joins them. A rule a screen needs (is this allowed, what does it cost) is a pure function beside
 // its handler, which the handler and the view models both call.
 

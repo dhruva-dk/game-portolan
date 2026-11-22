@@ -1,4 +1,4 @@
-// A season's end for every person (Phase B sections 2.2 and 2.3): growth (or decline) by age, retirement, and traits
+// A season's end for every person: growth (or decline) by age, retirement, and traits
 // gained or lost. Season's end calls them in its order (section 13): retirements, then growth, then traits. Each is
 // one pass over the people a season, never a day; draws are one roll of the 'retire' and 'traits' streams a season,
 // taken in person id order.

@@ -1,4 +1,4 @@
-// The tuning pin (D36, Phase B section 1): a hash of TUNING is pinned to TUNING_VERSION, so a changed number without a
+// The tuning pin: a hash of TUNING is pinned to TUNING_VERSION, so a changed number without a
 // bumped version fails here. To change a number: change it, bump TUNING_VERSION, and set PINNED to the new pair.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

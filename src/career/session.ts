@@ -1,4 +1,4 @@
-// The career kept in a store (Phase B section 1, D23, D24): every applied command journaled before the game goes on;
+// The career kept in a store: every applied command journaled before the game goes on;
 // snapshots every 50 entries, at each race's end, at each season's end and on request; backups at each season's end,
 // before a migration and on request; compaction after a backup. Loading takes the newest snapshot whose sum holds and
 // the entries after it whose chain holds, else the next snapshot back, else the whole journal from the world seed (only
@@ -203,7 +203,7 @@ function recover(saved: Saved, debug: boolean): Found | null {
     );
   }
   // the whole journal: only if it begins at the beginning (compaction has not dropped its start) and every entry was
-  // written under the present tuning (D36)
+  // written under the present tuning
   // (a journal of nothing but one torn first entry loads as the beginning, the torn action reported lost)
   const readable = entries.filter(shaped);
   if (

@@ -1,4 +1,4 @@
-// The market's rules (Phase B section 5, D16, D28): what a person asks of a team, how an offer scores against their
+// The market's rules: what a person asks of a team, how an offer scores against their
 // three wants, and their answer: accept at 1.0, counter from 0.85 (raising the money, then status, then length, to
 // reach 1.0), refuse below. Pure functions of the state, which the player's offers, the rivals' bids and the screens
 // all call.

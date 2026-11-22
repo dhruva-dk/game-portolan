@@ -1,4 +1,4 @@
-// Morale and injury (Phase B section 2.3). Morale is 0 to 100, starts at 60, and shifts every role's effective stats
+// Morale and injury. Morale is 0 to 100, starts at 60, and shifts every role's effective stats
 // by (morale − 50) / 50 points. Each move is a pure function the race's close, the market and the dilemmas call.
 
 import type { Rand } from './dice.ts';

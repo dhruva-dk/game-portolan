@@ -423,7 +423,7 @@ export function script(seed: number, length: number): Command[] {
   return out;
 }
 
-/** The rules every state holds to (Phase B acceptance's property tests): one person on at most one team, staff and
+/** The rules every state holds to: one person on at most one team, staff and
  *  contracts agreeing, the queue in order, no two living people sharing a full name, no banned or shared team words,
  *  each person's stats their role's. */
 export function invariants(s: CareerState): void {

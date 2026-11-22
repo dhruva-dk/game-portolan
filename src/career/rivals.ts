@@ -1,4 +1,4 @@
-// Rival managers (Phase B section 6): a rival team runs every rule the player runs, decided by its manager at its
+// Rival managers: a rival team runs every rule the player runs, decided by its manager at its
 // weekly review (each team every 7 days, staggered by team id) and on its own events (a scout's report). Each row of
 // the section's table is a decision read from the manager's stats and personality; the personality orders the rows
 // and sets how much of its Finance commitment the team spends. Every offer and scouting goes through the player's own

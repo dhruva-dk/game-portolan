@@ -1,4 +1,4 @@
-// Posting a message to the player (Phase B section 12). Each section names its messages by a kind and fills its slots;
+// Posting a message to the player. Each section names its messages by a kind and fills its slots;
 // the templates that word them, two or more each, are career/mail.ts's. A message addressed to a team reaches the
 // player only if it is theirs: a rival's news is not the player's mail (their scouting reports, their answers).
 

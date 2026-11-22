@@ -1,4 +1,4 @@
-// The seam's people views (Phase C batch 2): team, profile, offer, market, career and jobs, built by career/views-*.ts
+// The seam's people views: team, profile, offer, market, career and jobs, built by career/views-*.ts
 // and drawn by ui/office/. Types only, as office.ts: plain data, every figure with its comparison and its explanation.
 
 import type { Colours } from '../race.ts';

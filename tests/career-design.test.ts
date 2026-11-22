@@ -1,4 +1,4 @@
-// Components, designing, the headquarters and suppliers (Phase B sections 8.2, 8.3, 8.7, 9).
+// Components, designing, the headquarters and suppliers.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {

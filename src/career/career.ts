@@ -76,7 +76,7 @@ export const COMMANDS: Handlers = {
   ...debugHandlers(EVENTS),
 };
 
-/** The commands only a debug build takes (D42). */
+/** The commands only a debug build takes. */
 const DEBUG: ReadonlySet<CommandKind> = new Set<CommandKind>([
   'DebugBalance',
   'DebugReveal',

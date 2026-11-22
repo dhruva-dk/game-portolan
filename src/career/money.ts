@@ -1,4 +1,4 @@
-// Money (Phase B section 10, D21): one currency. Income: sponsors (career/sponsors.ts), prize money at the
+// Money: one currency. Income: sponsors (career/sponsors.ts), prize money at the
 // season's end (by place, spread by rules.prizeSpread), the fish market, pay drivers. Costs: wages each race, designs,
 // buildings and their upkeep, fines, break clauses and signing fees (each paid where it happens, through balance.ts
 // `paid`, which writes the player's ledger). Below the chairman's floor no command that spends is accepted

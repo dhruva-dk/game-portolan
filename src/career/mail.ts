@@ -1,4 +1,4 @@
-// The mail's words (Phase B section 12): every kind of message a section posts (career/post.ts), as data, with at
+// The mail's words: every kind of message a section posts (career/post.ts), as data, with at
 // least two wordings each; the wording is chosen by seed when the message is posted. A template's text names its
 // slots in braces ({person}); `render` fills them from the message's slots, a person's or a team's id read as their name,
 // a day as "Day 41", a sum as a grouped figure. The twelve dilemmas' words are here too (their rules are career/events.ts's).

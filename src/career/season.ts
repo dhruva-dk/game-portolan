@@ -1,4 +1,4 @@
-// The season's end and start (Phase B section 13). At the end, in order: prize money; the teams' season reputations
+// The season's end and start. At the end, in order: prize money; the teams' season reputations
 // and the player's mail of their place; retirements; new people; trusted managers renewed; contracts expire; the rules
 // turn; the chairmen' verdicts, sackings and hirings (on the season's standings, before the championships change); promotion
 // and relegation (four each way); knowledge marked; growth; traits; suppliers cleared; next season's parts (under the

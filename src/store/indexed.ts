@@ -1,4 +1,4 @@
-// The career's store in the browser's IndexedDB (career/store.ts; Phase B section 16). Three object stores: the
+// The career's store in the browser's IndexedDB (career/store.ts). Three object stores: the
 // journal's entries (each its JSON text, keyed by seq), the snapshots (keyed by the seq they hold; the newest three
 // kept), and the backup (one record). Every write is one transaction, so an append lands whole or not at all; a write
 // that fails rejects and the career does not go on (career/session.ts).

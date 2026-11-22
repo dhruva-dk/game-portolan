@@ -1,4 +1,4 @@
-// The office's views (Phase C, office.ts): what each management screen draws, built from the career's state. Pure:
+// The office's views (office.ts): what each management screen draws, built from the career's state. Pure:
 // a view is plain data, every figure with what it is set against and what it is made of. The screens work out no rule.
 
 import { PARTS, type Colours } from '../race.ts';

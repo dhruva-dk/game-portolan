@@ -1,4 +1,4 @@
-// The save's schema version and the pure migrations between versions (Phase B section 1). A bump ships a migration
+// The save's schema version and the pure migrations between versions. A bump ships a migration
 // from the version before, here, and a fixture of the old version under tests/fixtures/ that the tests load. A save
 // is backed up before it is migrated (career/session.ts).
 

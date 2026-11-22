@@ -1,4 +1,4 @@
-// `career` and `jobs` (Phase C batch 2): the player as a manager (reputation and its rank, marketability, the
+// `career` and `jobs`: the player as a manager (reputation and its rank, marketability, the
 // chairman's confidence, the record by season, honours, the posts offered), and the chairman's letter with the offers when
 // sacked or tempted. Pure, read-side.
 

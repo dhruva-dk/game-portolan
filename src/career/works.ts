@@ -1,4 +1,4 @@
-// The rows of a rival manager's review for parts, buildings, sponsors, suppliers and the vote (Phase B section 6):
+// The rows of a rival manager's review for parts, buildings, sponsors, suppliers and the vote:
 //
 // - improvement: splits the points toward its parts ranked worst in its tier, weighted by their worth (the room left to
 //   improve them); a low Development splits more evenly (leadership.ts improvementSplit);

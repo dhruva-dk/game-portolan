@@ -1,4 +1,4 @@
-// A ship's faults (DEPTH.md A, sim/faults.ts): where a blow lands on her, her
+// A ship's faults (sim/faults.ts): where a blow lands on her, her
 // faults by her hull's band, what each costs her, her leak, and her water's
 // mending.
 import { test } from 'node:test';

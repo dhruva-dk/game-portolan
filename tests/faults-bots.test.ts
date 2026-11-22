@@ -1,4 +1,4 @@
-// A bot's faults (DEPTH.md A): faulted, she wants mending more (purser.ts) and
+// A bot's faults: faulted, she wants mending more (purser.ts) and
 // her own water more; lamed, her rigging or rudder faulted, she runs the less
 // and, cornered, fights the more (fighting.ts). Each part reads its own slice.
 import { test } from 'node:test';

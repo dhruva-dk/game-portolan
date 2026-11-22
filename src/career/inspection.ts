@@ -1,4 +1,4 @@
-// Inspection and risk (Phase B section 8.5): after each race, `rules.inspection` of a tier's teams (a third), drawn by
+// Inspection and risk: after each race, `rules.inspection` of a tier's teams (a third), drawn by
 // seed, are inspected. Each fitted part with risk is found with a chance equal to its risk. Found, it is confiscated,
 // the team is fined (1 + risk) × 20% of its design cost, and that race's points are struck from the team. Mail tells
 // the team, and the tier.

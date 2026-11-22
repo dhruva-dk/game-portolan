@@ -1,4 +1,4 @@
-// The hiring rows of a rival manager's review (Phase B section 6): fill an empty role, replace the weakest, renew,
+// The hiring rows of a rival manager's review: fill an empty role, replace the weakest, renew,
 // poach, scout, and the bid every offer is made at. Each reads the manager's stats (Talent Eye weighs potential over
 // stars; Finance sets the balance committed; Negotiation the bid) and personality (the gambler's lower bar and bigger
 // bids, the youth builder's eye for potential and long contracts for the young, the poacher's short ones), and acts

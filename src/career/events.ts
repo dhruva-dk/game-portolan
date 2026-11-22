@@ -1,4 +1,4 @@
-// The twelve dilemmas (Phase B section 12), as data: each a trigger the career can evaluate for a team (the slots of
+// The twelve dilemmas, as data: each a trigger the career can evaluate for a team (the slots of
 // its mail if it holds, else null), its options, what each option does, and which option each personality of rival
 // manager takes. Their words are career/mail.ts's (the dilemma's id is its mail kind). Drawing and answering them is
 // career/dilemmas.ts's.

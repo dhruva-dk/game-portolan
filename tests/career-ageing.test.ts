@@ -1,4 +1,4 @@
-// A season's end for every person (Phase B sections 2.2, 2.3): growth, retirement, traits.
+// A season's end for every person: growth, retirement, traits.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {

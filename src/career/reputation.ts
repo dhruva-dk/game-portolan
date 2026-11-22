@@ -1,4 +1,4 @@
-// Reputation and marketability (Phase B section 10, D38). Reputation, a team's and a manager's, is 0 to 100. A team's
+// Reputation and marketability. Reputation, a team's and a manager's, is 0 to 100. A team's
 // moves after each race by its ships' points against its tier's mean, and at the season's end by a title,
 // promotion and relegation. The player's own ship counts in the team's like any ship; her points and sinkings also
 // move the player's manager reputation directly. A manager's moves with their team's standing against their chairman's

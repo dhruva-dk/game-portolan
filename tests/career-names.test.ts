@@ -1,4 +1,4 @@
-// Names (Phase B section 2.4, D34): no generated name of any kind holds a banned word as a whole word, in any case.
+// Names: no generated name of any kind holds a banned word as a whole word, in any case.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { random } from '../src/world/random.ts';

@@ -136,7 +136,7 @@ test('founding: the team takes the place of the 18th of Tier 3 by staff strength
   assert.equal(me.role, 'manager');
   assert.ok(
     Object.values(me.stats).every((v) => v === 0),
-    'the player has no stats (D8)'
+    'the player has no stats'
   );
   assert.equal(team.staff.manager, me.id);
   // the inheritance
