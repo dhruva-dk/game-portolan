@@ -52,7 +52,7 @@ export const statuses = (role: Role): readonly Status[] =>
   role === 'driver' ? ['ship', 'reserve'] : ['staff'];
 
 /** The ships of a team a hired driver may sail: all but the player's own on the player's team. */
-export const hiredShips = (c: Team): readonly Ship[] =>
+const hiredShips = (c: Team): readonly Ship[] =>
   c.player ? SHIPS.slice(1) : SHIPS;
 
 /** A team's ships as the player takes it over: she sails ship 0, the drivers kept sail the rest in order, every

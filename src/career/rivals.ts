@@ -18,10 +18,11 @@ import { knownTo } from './knowledge.ts';
 import { commitment } from './leadership.ts';
 import { roomOf } from './money.ts';
 import { schedule, type Event } from './queue.ts';
-import type { PersonOf, StatsOf } from './roles.ts';
+import type { StatsOf } from './roles.ts';
 import { reported } from './scouting.ts';
 import type { CareerState } from './state.ts';
 import { TUNING } from './tuning.ts';
+import { inRole } from './roles.ts';
 import {
   build,
   design,
@@ -34,7 +35,7 @@ import {
 const R = TUNING.rivals;
 
 /** The rows of section 6's table a review runs, in an order set by personality. */
-export type Row = keyof (typeof R.personalities)[Personality]['order'];
+type Row = keyof (typeof R.personalities)[Personality]['order'];
 
 /** What a rival manager brings to a decision: their team, their effective stats, their personality, and the balance
  *  still to commit this review (each row's spending takes from it). */
@@ -75,7 +76,7 @@ export function mindOf(s: CareerState, team: number): Mind | null {
   if (c.player || c.staff.manager === null) return null;
   const g = s.people[c.staff.manager];
   if (g.role !== 'manager' || g.player) return null;
-  const stats = effective(g as PersonOf<'manager'>, null);
+  const stats = effective(inRole(g, 'manager'), null);
   const personality = g.personality ?? 'steady';
   const room =
     Math.min(
@@ -95,9 +96,9 @@ export function mindOf(s: CareerState, team: number): Mind | null {
 export function rowsFor(personality: Personality): Row[] {
   const order: Readonly<Partial<Record<Row, number>>> =
     R.personalities[personality].order;
-  return (Object.keys(order) as Row[]).sort(
-    (a, b) => (order[b] ?? 0) - (order[a] ?? 0)
-  );
+  return Object.keys(order)
+    .filter((k): k is Row => k in order)
+    .sort((a, b) => (order[b] ?? 0) - (order[a] ?? 0));
 }
 
 /** A state with a team's rows run in its manager's order (those of `only`, if given). */

@@ -10,7 +10,7 @@ import { shuffled, type Rand } from './dice.ts';
 import { componentsKnown } from './staff.ts';
 
 /** What a component does to a design. Any effect it lacks is 0. */
-export interface Effects {
+interface Effects {
   perf: number;
   perfMax: number;
   reliability: number;
@@ -21,13 +21,27 @@ export interface Effects {
   balance: number;
 }
 
-export interface Component {
+interface Component {
   id: string;
   name: string;
   type: PartType;
   tier: 1 | 2 | 3;
   effects: Effects;
 }
+
+/** Every effect, by name. */
+const EFFECTS: readonly (keyof Effects)[] = [
+  'perf',
+  'perfMax',
+  'reliability',
+  'reliabilityMax',
+  'designDays',
+  'buildDays',
+  'risk',
+  'balance',
+];
+/** The tiers, by index. */
+const TIER = [1, 2, 3] as const;
 
 const NONE: Effects = {
   perf: 0,
@@ -109,7 +123,7 @@ export const TYPES: readonly PartType[] = [
 ];
 
 /** The building whose level unlocks a type's tiers. */
-export const UNLOCKS: Readonly<Record<PartType, Building>> = {
+const UNLOCKS: Readonly<Record<PartType, Building>> = {
   sails: 'testTank',
   rigging: 'testTank',
   keel: 'testTank',
@@ -120,7 +134,7 @@ export const UNLOCKS: Readonly<Record<PartType, Building>> = {
 
 const scaled = (e: Partial<Effects>, k: number): Effects => {
   const out: Effects = { ...NONE };
-  for (const key of Object.keys(e) as (keyof Effects)[]) {
+  for (const key of EFFECTS) {
     const v = (e[key] ?? 0) * k;
     out[key] =
       key === 'designDays' || key === 'buildDays'
@@ -139,7 +153,7 @@ export const COMPONENTS: readonly Component[] = TYPES.flatMap((type, ti) =>
         id: `${type}.${t + 1}.${k}`,
         name,
         type,
-        tier: (t + 1) as 1 | 2 | 3,
+        tier: TIER[t],
         effects: scaled(kind, SCALE[t]),
       };
     })
@@ -166,8 +180,7 @@ export function summed(ids: readonly string[]): Effects {
   for (const id of ids) {
     const c = component(id);
     if (!c) continue;
-    for (const k of Object.keys(out) as (keyof Effects)[])
-      out[k] += c.effects[k];
+    for (const k of EFFECTS) out[k] += c.effects[k];
   }
   return out;
 }

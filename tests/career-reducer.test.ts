@@ -7,12 +7,12 @@ import { COMMANDS, EVENTS, apply, start } from '../src/career/career.ts';
 import { canonical } from '../src/career/canon.ts';
 import { dice } from '../src/career/dice.ts';
 import {
-  ordered,
   schedule,
   scheduled,
   unscheduled,
   type Event,
 } from '../src/career/queue.ts';
+import { ordered } from './career-kit.ts';
 import { stopsFor } from '../src/career/advance.ts';
 import type { Command } from '../src/office/command.ts';
 import {

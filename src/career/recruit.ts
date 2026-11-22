@@ -39,7 +39,7 @@ const PERSONALITIES: readonly Personality[] = [
 const KNOWN = 0x636f6d70;
 
 /** What a new person is made from. */
-export interface Making {
+interface Making {
   id: number;
   role: Role;
   stars: number; // about how strong now, 0..5

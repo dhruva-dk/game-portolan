@@ -103,7 +103,7 @@ export const fatigueOn = (
  * has none), the team's pit crew (a place no one fills works as one of all 0),
  * and her bond's points.
  */
-export interface Pit {
+interface Pit {
   mechanic: PersonOf<'mechanic'>['stats'] | null;
   members: readonly Member[];
   bond: number;

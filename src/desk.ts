@@ -55,7 +55,10 @@ export async function createDesk(
     opened.from === 'journal' ||
     opened.from === 'backup' ||
     opened.lost !== null;
-  const must = () => kept as Kept;
+  const must = (): Kept => {
+    if (!kept) throw new Error('no career is open');
+    return kept;
+  };
   const desk: CareerDesk = {
     changed: null,
     where: () =>

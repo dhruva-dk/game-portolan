@@ -40,7 +40,7 @@ import { fishIncome, sponsorGrade, upkeep } from '../src/career/hq.ts';
 import { racesLeft } from '../src/career/contracts.ts';
 import { standingOf } from '../src/career/standings.ts';
 import { dice } from '../src/career/dice.ts';
-import { fullyFitted } from '../src/career/parts.ts';
+import { fullyFitted } from './career-kit.ts';
 import {
   staffOf,
   type CareerState,

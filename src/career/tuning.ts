@@ -6,7 +6,7 @@
 // A pair [a, b] is a line in u = stat / 20: a + b × u. A triple by tier is Tier 1's, Two's, Three's.
 
 /** Bump with any change to TUNING (and pin the new hash in the test). */
-export const TUNING_VERSION = 5;
+export const TUNING_VERSION = 6;
 
 const ROLE_YEARS = {
   manager: [40, 55],
@@ -694,5 +694,3 @@ export const TUNING = {
     reliabilityBelow: 0.8, // the improvement gives reliability a share while a part's is below this
   },
 } as const;
-
-export type Tuning = typeof TUNING;

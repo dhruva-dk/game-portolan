@@ -7,7 +7,7 @@
 import type { PartType } from '../race.ts';
 import type { Change } from '../office/command.ts';
 import { effective } from './effective.ts';
-import { unit, type PersonOf } from './roles.ts';
+import { unit, type PersonOf, inRole } from './roles.ts';
 import type { CareerState, Team } from './state.ts';
 
 const clamp1 = (x: number) => Math.min(1, Math.max(-1, x));
@@ -17,7 +17,7 @@ function drivers(s: CareerState, c: Team): PersonOf<'driver'>['stats'][] {
   return c.staff.ships
     .map((h) => h.driver)
     .filter((id): id is number => id !== null)
-    .map((id) => effective(s.people[id] as PersonOf<'driver'>, null));
+    .map((id) => effective(inRole(s.people[id], 'driver'), null));
 }
 
 const meanU = (xs: readonly number[]): number =>

@@ -24,15 +24,26 @@ export function canonical(value: unknown): string {
       return JSON.stringify(value);
     case 'object': {
       if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
-      const record = value as Record<string, unknown>;
-      const keys = Object.keys(record)
-        .filter((k) => record[k] !== undefined)
-        .sort();
-      return `{${keys.map((k) => `${JSON.stringify(k)}:${canonical(record[k])}`).join(',')}}`;
+      const fields: [string, unknown][] = Object.entries(value).filter(
+        ([, v]) => v !== undefined
+      );
+      fields.sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+      return `{${fields.map(([k, v]) => `${JSON.stringify(k)}:${canonical(v)}`).join(',')}}`;
     }
     default:
       throw new Error(`canonical: a ${typeof value} cannot be saved`);
   }
+}
+
+/** A field of a value read back as JSON, not yet known to be of any shape: undefined if it is not there. */
+export const fieldOf = (o: object, key: string): unknown =>
+  key in o ? Reflect.get(o, key) : undefined;
+
+/** A value the state must hold: thrown if it is missing, a broken state the reducer refuses (career.ts apply). */
+export function known<T>(x: T | null | undefined): T {
+  if (x === null || x === undefined)
+    throw new Error('a value the state must hold is missing');
+  return x;
 }
 
 const OFFSET = 0x811c9dc5;

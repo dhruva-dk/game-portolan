@@ -3,7 +3,7 @@
 // sum is FNV-1a of its text from the offset.
 
 import type { Command } from '../office/command.ts';
-import { canonical, fnv, hex, sumOf, unhex } from './canon.ts';
+import { canonical, fieldOf, fnv, hex, sumOf, unhex } from './canon.ts';
 import type { CareerState } from './state.ts';
 import type { Entry, Snapshot } from './store.ts';
 
@@ -11,7 +11,7 @@ import type { Entry, Snapshot } from './store.ts';
 export const ORIGIN = hex(fnv(''));
 
 /** An entry's sum, chained from the one before. */
-export function entrySum(
+function entrySum(
   prev: string,
   seq: number,
   tuning: number,
@@ -35,16 +35,16 @@ export function entry(
 /** Whether a value read back is shaped as an entry (a torn write may not be). */
 export function shaped(e: unknown): e is Entry {
   if (e === null || typeof e !== 'object') return false;
-  const x = e as Record<string, unknown>;
-  const c = x.command as Record<string, unknown> | null | undefined;
+  const seq = fieldOf(e, 'seq'),
+    c = fieldOf(e, 'command');
   return (
-    typeof x.seq === 'number' &&
-    Number.isInteger(x.seq) &&
-    typeof x.tuning === 'number' &&
-    typeof x.sum === 'string' &&
+    typeof seq === 'number' &&
+    Number.isInteger(seq) &&
+    typeof fieldOf(e, 'tuning') === 'number' &&
+    typeof fieldOf(e, 'sum') === 'string' &&
     c !== null &&
     typeof c === 'object' &&
-    typeof c.kind === 'string'
+    typeof fieldOf(c, 'kind') === 'string'
   );
 }
 
@@ -91,11 +91,10 @@ export function unpacked(s: Snapshot): { state: unknown; tip: string } | null {
   try {
     const x: unknown = JSON.parse(s.state);
     if (x === null || typeof x !== 'object') return null;
-    const r = x as { state?: unknown; tip?: unknown };
-    return typeof r.tip === 'string' &&
-      unhex(r.tip) !== null &&
-      r.state !== undefined
-      ? { state: r.state, tip: r.tip }
+    const state = fieldOf(x, 'state'),
+      tip = fieldOf(x, 'tip');
+    return typeof tip === 'string' && unhex(tip) !== null && state !== undefined
+      ? { state, tip }
       : null;
   } catch {
     return null;

@@ -50,7 +50,7 @@ export function improvementPoints(s: CareerState, team: number): number {
 
 /** A team's improvement points over the days [from, to): each day's points, the factory's at × slow on the days storm damage
  *  is mended slowly, and all × (1 + exempt) on the days of a testing exemption (career/events.ts). */
-export function improvementWork(
+function improvementWork(
   s: CareerState,
   team: number,
   from: number,

@@ -8,15 +8,14 @@ import {
   bestFitted,
   carried,
   fitted,
-  fullyFitted,
   fittedOf,
   fittedParts,
   partsAfterRace,
   performanceOf,
-  shipParts,
   standardPart,
   worn,
 } from '../src/career/parts.ts';
+import { fullyFitted, shipParts } from './career-kit.ts';
 import {
   worked,
   improvementCheck,

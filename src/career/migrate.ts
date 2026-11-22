@@ -28,7 +28,7 @@ function stepped(
 ): { ok: true; state: Record_; from: number } | { ok: false; why: string } {
   if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed))
     return { ok: false, why: 'the save is not a career' };
-  let state = parsed as Record_;
+  let state: Record_ = Object.fromEntries(Object.entries(parsed));
   const from = state.schema;
   if (typeof from !== 'number' || !Number.isInteger(from) || from < 1)
     return { ok: false, why: 'the save has no schema version' };

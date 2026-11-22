@@ -86,7 +86,7 @@ export function faceOf(s: CareerState, g: Person): Face {
   };
 }
 /** A person as a line names them, or null. */
-export const named = (s: CareerState, id: number | null): Named | null =>
+const named = (s: CareerState, id: number | null): Named | null =>
   id === null
     ? null
     : { id, face: faceOf(s, s.people[id]), name: nameOf(s.people[id]) };

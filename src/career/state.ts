@@ -190,7 +190,7 @@ export interface Planet {
   name: string;
   pace: number;
 }
-export interface Round {
+interface Round {
   day: number;
   planet: Planet;
 }
@@ -202,7 +202,7 @@ export interface Calendar {
 }
 
 /** The race day under way: its round, whether the player's race began, and the three championships' results. */
-export interface RaceDay {
+interface RaceDay {
   round: number;
   started: boolean;
   results: readonly (RaceResult | null)[];
@@ -230,7 +230,7 @@ export interface Mail {
 }
 
 /** A line of the player's team's ledger (Phase B section 10). */
-export interface LedgerLine {
+interface LedgerLine {
   day: number;
   kind: string;
   what: string;
@@ -251,7 +251,7 @@ export interface Talk {
 }
 
 /** A scout at work (Phase B section 4). */
-export interface Scouting {
+interface Scouting {
   team: number;
   scout: number;
   person: number;
@@ -267,7 +267,7 @@ export interface JobOffer {
 }
 
 /** The player (D35): their person, their team, their manager's reputation, and the posts they are offered. */
-export interface Player {
+interface Player {
   person: number;
   team: number;
   reputation: number;

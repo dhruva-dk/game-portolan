@@ -5,12 +5,12 @@
 //   'tear' — that write leaves half of itself (an append's last entry, or a snapshot's text, cut short), and every
 //            later write is refused (the app was killed during it).
 
-import { KEEP, type Store } from '../career/store.ts';
-import { emptyDisk, memoryStore, type Disk } from './memory.ts';
+import { KEEP, type Store } from '../src/career/store.ts';
+import { emptyDisk, memoryStore, type Disk } from '../src/store/memory.ts';
 
 export type Fault = 'fail' | 'kill' | 'tear';
 
-export interface Faulty extends Store {
+interface Faulty extends Store {
   disk: Disk;
   /** Writes made so far (refused ones too). */
   writes(): number;

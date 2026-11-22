@@ -1,7 +1,6 @@
 // What a driver's Feedback, a designer's and a scout's stats do (Phase B section 2.1), as pure functions the
 // sections that use them call (design, scouting, the market). A stat's u is stat / 20.
 
-import type { PartType } from '../race.ts';
 import type { Rand } from './dice.ts';
 import { unit } from './roles.ts';
 import { TUNING } from './tuning.ts';
@@ -55,12 +54,6 @@ export const accuracyDraw = (accuracy: number, rand: Rand): number =>
 /** How many components a new designer knows. */
 export const componentsKnown = (stars: number): number =>
   W.knows + Math.round(stars);
-
-/** A designer's stat for a part type. */
-export const typeStat = (
-  stats: Readonly<Record<PartType, number>>,
-  type: PartType
-): number => stats[type];
 
 // ---- the scout -------------------------------------------------------------------------------------------------
 

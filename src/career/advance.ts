@@ -16,7 +16,7 @@ export type EventHandler<K extends EventKind> = (
 export type EventHandlers = { readonly [K in EventKind]?: EventHandler<K> };
 
 /** Whether an event stops Advance for the player once applied. */
-export type Stops = (s: CareerState, event: Event) => boolean;
+type Stops = (s: CareerState, event: Event) => boolean;
 
 /** The kinds that always need the player. Others may need them by the state (a dilemma for the player's team). A new
  *  season's first day stops too: its planets and suppliers wait, and it splits the forty-four days off in two. */
@@ -84,11 +84,7 @@ export function advanceCheck(
 }
 
 /** Advance, with a set of event handlers. */
-export function advance(
-  s: CareerState,
-  roll: Dice,
-  events: EventHandlers
-): Applied {
+function advance(s: CareerState, roll: Dice, events: EventHandlers): Applied {
   const blocked = advanceCheck(s);
   if (blocked) return refuse(blocked.code, blocked.sentence);
   let state = s;

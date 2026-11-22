@@ -6,6 +6,7 @@
 // designer's Accuracy fixes the numbers and Innovation may teach a component. Rivals deal and design through these
 // same functions (career/works.ts).
 
+import { known } from './canon.ts';
 import type { PartType } from '../race.ts';
 import { SHIPS } from '../office/command.ts';
 import { canSpend, paid } from './balance.ts';
@@ -46,6 +47,7 @@ import type {
   Part,
 } from './state.ts';
 import { termsFor } from './suppliers.ts';
+import { inRole } from './roles.ts';
 import { TUNING } from './tuning.ts';
 
 const D = TUNING.design;
@@ -55,7 +57,7 @@ const thou = (x: number) => Math.round(x * 1000) / 1000;
 const wright = (s: CareerState, c: Team): PersonOf<'designer'> | null =>
   c.staff.designer === null
     ? null
-    : (s.people[c.staff.designer] as PersonOf<'designer'>);
+    : inRole(s.people[c.staff.designer], 'designer');
 
 /** The components a team's designer may put on a design of a type: known, of the type, of a tier its buildings allow. */
 export function pool(s: CareerState, team: number, type: PartType): string[] {
@@ -85,7 +87,7 @@ export function dealt(
 }
 
 /** Whether a team may deal (or redeal) a slot's cards for a design of a type. */
-export function dealCheck(
+function dealCheck(
   s: CareerState,
   team: number,
   type: PartType,
@@ -297,7 +299,7 @@ export function drawn(
     slots: { type: d.type, perf, perfMax },
     links: [{ to: 'screen', id: 'design' }],
   });
-  if (w && rand() < innovationChance(stats!.innovation)) {
+  if (w && rand() < innovationChance(known(stats).innovation)) {
     const open = unknownOpen(w.components, c.buildings);
     if (open.length > 0) {
       const learnt = pick(rand, open);

@@ -21,7 +21,7 @@ export interface Setting {
 }
 
 /** What a trait changes. `all` shifts every stat of her role; a named stat shifts only if her role has it. */
-export interface Modifier {
+interface Modifier {
   stats: Readonly<Record<string, number>>;
   all: number;
   morale: number; // a race
@@ -32,7 +32,7 @@ export interface Modifier {
   wants: Want | null; // a want she always ranks first
 }
 
-export interface Trait {
+interface Trait {
   id: string;
   name: string;
   roles: readonly Role[];

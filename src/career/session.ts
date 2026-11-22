@@ -33,12 +33,12 @@ export interface Kept {
 }
 
 /** What the player is told was lost on load: how many actions, since which day. */
-export interface Lost {
+interface Lost {
   actions: number;
   since: number;
 }
 
-export type Sent =
+type Sent =
   | { ok: true; kept: Kept; snapshotFailed: boolean }
   | { ok: false; reason: Refusal };
 
@@ -185,7 +185,7 @@ type Found = How & { kept: Kept; lost: Lost | null };
 
 /** The career from what a store holds, or null if nothing in it holds. */
 function recover(saved: Saved, debug: boolean): Found | null {
-  const entries = saved.entries as readonly unknown[];
+  const entries: readonly unknown[] = saved.entries;
   for (const [i, snap] of saved.snapshots.entries()) {
     if (!intact(snap)) continue;
     const packed = unpacked(snap);

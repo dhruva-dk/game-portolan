@@ -4,8 +4,9 @@
 // bids, the youth builder's eye for potential and long contracts for the young, the poacher's short ones), and acts
 // only through the player's own checks: hiring.ts offerCheck and offered, scouting.ts scoutCheck and sent.
 
+import { known } from './canon.ts';
 import type { Offer, Role, Status } from '../office/command.ts';
-import { askFee } from './asks.ts';
+import { askFee, seasons } from './asks.ts';
 import { breakCost, closing, dismissalCost, racesLeft } from './contracts.ts';
 import type { Dice } from './dice.ts';
 import { offerCheck, offered } from './hiring.ts';
@@ -14,7 +15,7 @@ import { knows, tierOf, middle, sightOf, view } from './knowledge.ts';
 import { bidShare, worth } from './leadership.ts';
 import { askOf } from './market.ts';
 import { wantsOut } from './morale.ts';
-import { unit, type Person, type PersonOf } from './roles.ts';
+import { unit, type Person, inRole } from './roles.ts';
 import { inReach } from './staff.ts';
 import type { Decide, Mind } from './rivals.ts';
 import { openSeat, seatOf, seatRole } from './seats.ts';
@@ -34,7 +35,7 @@ const HIRED: readonly Role[] = [
 
 /** A person's worth to a manager from the stars and potential they see: Talent Eye's weight on potential, more for a
  *  youth builder. */
-export function worthTo(
+function worthTo(
   mind: Mind,
   seen: { stars: number; potential: number }
 ): number {
@@ -50,7 +51,7 @@ const knownWorth = (mind: Mind, g: Person): number =>
 
 /** The bid a manager opens with: the ask × (1.1 − 0.3 × Negotiation u), a gambler's × 1.1; a fee of four races; the
  *  length by personality and age; a driver's bonuses as at the start; a break clause unless a good negotiator. */
-export function bid(
+function bid(
   s: CareerState,
   mind: Mind,
   g: Person,
@@ -63,10 +64,7 @@ export function bid(
       (mind.personality === 'gambler' ? R.bigBid : 1)
   );
   const p = R.personalities[mind.personality];
-  const seasons = (age(g, s.day) < TUNING.wage.young ? p.young : p.other) as
-    | 1
-    | 2
-    | 3;
+  const length = seasons(age(g, s.day) < TUNING.wage.young ? p.young : p.other);
   const driver = g.role === 'driver';
   const K = TUNING.contracts;
   return {
@@ -74,7 +72,7 @@ export function bid(
     status: at.status,
     wage,
     fee: askFee(wage),
-    seasons,
+    seasons: length,
     podium: driver ? Math.round(wage * K.podium) : 0,
     sinking: driver ? Math.round(wage * K.sinking) : 0,
     breakClause:
@@ -138,10 +136,7 @@ function knownCandidates(
 }
 
 /** A team's open seats, less those its talks will fill: each as the role and status an offer names. */
-export function openPosts(
-  s: CareerState,
-  c: Team
-): { role: Role; status: Status }[] {
+function openPosts(s: CareerState, c: Team): { role: Role; status: Status }[] {
   const out: { role: Role; status: Status }[] = [];
   let staff = c.staff;
   const pending = s.talks.filter(
@@ -373,7 +368,7 @@ export const scout: Decide = (s, mind, roll) => {
     s.scouting.filter((x) => x.team === mind.team).map((x) => x.person)
   );
   const reaches = free.map(
-    (id) => effective(s.people[id] as PersonOf<'scout'>, null).reach
+    (id) => effective(inRole(s.people[id], 'scout'), null).reach
   );
   const reached = new Map<number | null, boolean>();
   const inSome = (tier: number | null): boolean => {
@@ -382,7 +377,7 @@ export const scout: Decide = (s, mind, roll) => {
         tier,
         reaches.some((r) => inReach(r, c.tier, tier))
       );
-    return reached.get(tier)!;
+    return known(reached.get(tier));
   };
   const pool = s.people.filter(
     (g) =>

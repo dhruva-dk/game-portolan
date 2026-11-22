@@ -11,6 +11,7 @@
 //
 // Each acts only through the player's own checks and functions, and spends from the Mind's room.
 
+import { known } from './canon.ts';
 import type { PartType } from '../race.ts';
 import type { Building } from '../office/command.ts';
 import { cast, rivalSide } from './admiralty.ts';
@@ -137,9 +138,9 @@ export const design: Decide = (s, mind) => {
   const picked: string[] = [];
   for (let slot = 0; slot < designSlots(c); slot++) {
     out = dealSlot(out, mind.team, type, slot);
-    const cards = out.teams[mind.team].draft!.deals.find(
-      (d) => d.slot === slot
-    )!.cards;
+    const cards = known(
+      known(out.teams[mind.team].draft).deals.find((d) => d.slot === slot)
+    ).cards;
     const best = cards
       .filter((id) => !picked.includes(id))
       .map((id) => ({ id, w: cardWorth(id, W.risk[mind.personality]) }))
@@ -246,7 +247,9 @@ export const vote: Decide = (s, mind) => {
       p.votes[mind.team] !== undefined
     )
       continue;
-    const now = out.championships[tier].proposals.find((x) => x.id === p.id)!;
+    const now = known(
+      out.championships[tier].proposals.find((x) => x.id === p.id)
+    );
     out = cast(out, tier, now, mind.team, rivalSide(out, mind.team, p.change));
   }
   return { state: out, mind };

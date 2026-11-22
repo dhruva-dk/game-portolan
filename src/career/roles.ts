@@ -55,28 +55,16 @@ export const ROLE_STATS = {
   chairman: ['patience', 'ambition', 'generosity', 'meddling'],
 } as const satisfies Record<Role, readonly string[]>;
 
-export const ROLES: readonly Role[] = [
-  'driver',
-  'mechanic',
-  'designer',
-  'scout',
-  'pit',
-  'manager',
-  'chairman',
-];
-
-export type StatOf<R extends Role> = (typeof ROLE_STATS)[R][number];
+type StatOf<R extends Role> = (typeof ROLE_STATS)[R][number];
 export type StatsOf<R extends Role> = Readonly<Record<StatOf<R>, number>>;
 
 // the seam's names hold: a driver's stats are race.ts Stat, a designer's six are its PartType
 type Same<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
-const driverStatsAreTheSeams: Same<StatOf<'driver'>, Stat> = true;
-const designerTypesAreTheSeams: Same<
+true satisfies Same<StatOf<'driver'>, Stat>;
+true satisfies Same<
   Exclude<StatOf<'designer'>, 'innovation' | 'speed' | 'accuracy'>,
   PartType
-> = true;
-export const SEAM_NAMES_HOLD =
-  driverStatsAreTheSeams && designerTypesAreTheSeams;
+>;
 
 /** A person's contract (Phase B section 5). Wage, fee and bonuses in money; `ends` the season at whose end it runs out
  *  (null for an chairman, and for the player, who are their team's for as long as they stay). */
@@ -95,7 +83,7 @@ export interface Contract {
 /** What a team knows of a person once scouted (Phase B section 4): the day, their stars at the last season's end (a
  *  screen's arrow is stars now against these), the scout whose report it was (null: their own staff), and whether
  *  that report's Persuasion has been spent on an offer. */
-export interface Known {
+interface Known {
   day: number;
   last: number;
   by: number | null;
@@ -103,7 +91,7 @@ export interface Known {
 }
 
 /** A season of a person's history: their team and what they did (races sailed, or worked, for every role). */
-export interface SeasonLine {
+interface SeasonLine {
   season: number;
   team: number | null;
   tier: number | null;

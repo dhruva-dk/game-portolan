@@ -2,6 +2,7 @@
 // traits, morale and marketability, wants once scouted, stats with which way they head, the role's own figures, the
 // history, the contract, and what the player may do (scout, offer, renew, dismiss), each with why not. Pure.
 
+import { known } from './canon.ts';
 import type { Figure } from '../office/career.ts';
 import type { Offer } from '../office/command.ts';
 import type { Act, ProfileView, StatLine } from '../office/people.ts';
@@ -216,19 +217,18 @@ export function profileView(
     you = g.player;
   const where = whereText(s, g),
     years = age(g, s.day);
+  const ceilings: Readonly<Record<string, number>> = g.ceiling;
   const stats: StatLine[] = v.known
-    ? Object.entries(g.stats as Readonly<Record<string, number>>).map(
-        ([k, n]) => {
-          const ceiling = (g.ceiling as Readonly<Record<string, number>>)[k];
-          return {
-            label: statName(k),
-            value: n,
-            ceiling,
-            arrow: heading(s, g, n, ceiling),
-            text: n.toFixed(0),
-          };
-        }
-      )
+    ? Object.entries(g.stats).map(([k, n]) => {
+        const ceiling = ceilings[k];
+        return {
+          label: statName(k),
+          value: n,
+          ceiling,
+          arrow: heading(s, g, n, ceiling),
+          text: n.toFixed(0),
+        };
+      })
     : [];
   const talk = s.talks.find((t) => t.team === c.id && t.person === id) ?? null;
   const busy = s.scouting.find((x) => x.team === c.id && x.person === id);
@@ -271,7 +271,7 @@ export function profileView(
       ? 'Not yours to renew.'
       : g.role === 'chairman' || g.role === 'manager'
         ? "Chairmen and managers are the chairman's."
-        : g.contract?.ends === null || !closing(s, g.contract!)
+        : g.contract?.ends === null || !closing(s, known(g.contract))
           ? `Opens in the contract's last ${TUNING.market.closingDays} days.`
           : (offerNo?.sentence ?? null);
   const owed = dismissalCost(s, g);

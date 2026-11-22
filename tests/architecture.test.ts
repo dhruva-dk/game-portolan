@@ -89,8 +89,8 @@ const LAYERS: Record<string, readonly string[]> = {
     'kinds.ts',
     'world/random.ts',
   ],
-  // where the career's journal is kept: memory, IndexedDB, and a faulty disk
-  // for the tests (career/store.ts Store)
+  // where the career's journal is kept: memory and IndexedDB
+  // (career/store.ts Store)
   'store/': ['store/', 'career/store.ts'],
   // the career's desk: its session on a store, as the office asks for it; and
   // the fixture careers it is opened on, made by the commands a player sends
@@ -424,7 +424,8 @@ test('determinism: src/world, src/sim and src/career are deterministic and headl
   none(
     'determinism',
     hits(
-      /\bMath\.random\b|\bDate\b|\bperformance\b|\b(document|window|self|globalThis|navigator|location|indexedDB|localStorage)\b/,
+      // (performance the clock, `performance.`, not a part's performance: race.ts Fitted)
+      /\bMath\.random\b|\bDate\b|(?<![.\w])performance\s*\.|\b(document|window|self|globalThis|navigator|location|indexedDB|localStorage)\b/,
       (rel) =>
         rel.startsWith('world/') ||
         rel.startsWith('sim/') ||

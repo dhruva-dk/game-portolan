@@ -12,7 +12,7 @@ import { closing } from './contracts.ts';
 import { effective } from './effective.ts';
 import { tierOf } from './knowledge.ts';
 import { askOf } from './market.ts';
-import type { Person, PersonOf } from './roles.ts';
+import type { Person } from './roles.ts';
 import { inReach } from './staff.ts';
 import { stars } from './stars.ts';
 import type { CareerState, Team } from './state.ts';
@@ -25,6 +25,7 @@ import {
   whereText,
 } from './views-person.ts';
 import { myTeam, faceOf, fig, line, nameOf, rival, topBar } from './views.ts';
+import { inRole } from './roles.ts';
 import { moneyText } from './names.ts';
 
 /** The roles a market lists (managers and chairmen are hired by chairmen, not offered contracts). */
@@ -37,7 +38,7 @@ const ROLES: readonly Role[] = [
 ];
 
 /** The filter a market opens on: the first open post's role, else drivers. */
-export function defaultFilter(s: CareerState): ScoutingFilter {
+function defaultFilter(s: CareerState): ScoutingFilter {
   return {
     role: openPosts(myTeam(s))[0]?.role ?? 'driver',
     tier: null,
@@ -124,7 +125,7 @@ export function scoutingView(
         a.name.localeCompare(b.name)
     );
   const scouts: ScoutRow[] = c.staff.scouts.map((id) => {
-    const g = s.people[id] as PersonOf<'scout'>,
+    const g = inRole(s.people[id], 'scout'),
       job = s.scouting.find((x) => x.scout === id) ?? null;
     const left = job ? Math.max(0, job.done - s.day) : 0;
     return {

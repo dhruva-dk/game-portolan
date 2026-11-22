@@ -6,6 +6,7 @@
 // tier, from the free agents or a lower tier's teams, or offers the post to the player. The player is a manager
 // like any other here.
 
+import { known } from './canon.ts';
 import type { Offer } from '../office/command.ts';
 import { askFee, askSeasons, askWage } from './asks.ts';
 import { contractEnds, signed, released } from './contracts.ts';
@@ -32,12 +33,13 @@ import {
 } from './state.ts';
 import { standingOf } from './standings.ts';
 import { TUNING } from './tuning.ts';
+import { inRole } from './roles.ts';
 import { targets } from './world.ts';
 
 const E = TUNING.chairman;
 
 const chairmanOf = (s: CareerState, c: Team): PersonOf<'chairman'> =>
-  s.people[c.staff.chairman] as PersonOf<'chairman'>;
+  inRole(s.people[c.staff.chairman], 'chairman');
 const withTeam = (s: CareerState, c: Team): CareerState => {
   const teams = [...s.teams];
   teams[c.id] = c;
@@ -214,7 +216,7 @@ export function mayOffer(s: CareerState, team: number): boolean {
 
 /** A state with a team's post offered to the player: 7 days to answer (no lapse while they are out of a team). */
 export function offerJob(s: CareerState, team: number): CareerState {
-  const p = s.player!;
+  const p = known(s.player);
   const offer: JobOffer = { team, made: s.day, expires: s.day + E.offerDays };
   let out: CareerState = {
     ...s,
@@ -291,7 +293,7 @@ export function sackedOffers(s: CareerState): CareerState {
   )[0];
   if (
     least &&
-    !out.player!.offers.some((o) => out.teams[o.team].tier === least.tier)
+    !known(out.player).offers.some((o) => out.teams[o.team].tier === least.tier)
   )
     out = offerJob(out, least.id);
   return out;

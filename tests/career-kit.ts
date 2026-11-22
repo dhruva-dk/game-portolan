@@ -18,11 +18,33 @@ import { TUNING } from '../src/career/tuning.ts';
 import { apply, start, type CareerState } from '../src/career/career.ts';
 import { random } from '../src/world/random.ts';
 import { allowed, fullName, words } from '../src/career/names.ts';
-import { ordered } from '../src/career/queue.ts';
+import type { Event } from '../src/career/queue.ts';
 import { ROLE_STATS } from '../src/career/roles.ts';
-import { staffOf, type Team } from '../src/career/state.ts';
+import { staffOf, type Part, type Team } from '../src/career/state.ts';
 import { CALLS, PARTS } from '../src/race.ts';
 import { TRADES, supplierCards } from '../src/career/suppliers.ts';
+
+/** A ship's fitted parts, in PARTS' order. */
+export const shipParts = (c: Team, ship: Ship): Part[] =>
+  PARTS.flatMap((t) => c.parts.filter((p) => p.ship === ship && p.type === t));
+
+/** Whether every ship of a team carries one part of each type (an invariant). */
+export const fullyFitted = (c: Team): boolean =>
+  SHIPS.every((ship) =>
+    PARTS.every(
+      (t) => c.parts.filter((p) => p.ship === ship && p.type === t).length === 1
+    )
+  );
+
+/** Whether a queue is in order: by day, then by seq (an invariant the tests hold the state to). */
+export function ordered(queue: readonly Event[]): boolean {
+  for (let i = 1; i < queue.length; i++) {
+    const a = queue[i - 1],
+      b = queue[i];
+    if (!(a.day < b.day || (a.day === b.day && a.seq < b.seq))) return false;
+  }
+  return true;
+}
 
 /** The Found command of the tests' usual career. */
 export const FOUND: Extract<Command, { kind: 'Found' }> = {

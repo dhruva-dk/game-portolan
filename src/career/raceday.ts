@@ -68,7 +68,7 @@ function driverCheck(s: CareerState, team: number, person: unknown): Check {
  * race, fit); each part theirs and fittable, named once; a call; an objective
  * a sponsor slot, within that sponsor's list.
  */
-export function planCheck(s: CareerState, team: number, p: Plan): Check {
+function planCheck(s: CareerState, team: number, p: Plan): Check {
   if (s.race?.started) return why('racing', 'The race is under way.');
   if (!p || typeof p !== 'object') return why('plan', 'That is no race plan.');
   const c = teamOf(s, team);
@@ -107,7 +107,7 @@ export function planCheck(s: CareerState, team: number, p: Plan): Check {
 }
 
 /** A state with the plan set: its parts fitted, the plan kept (checked first). */
-export function planned(s: CareerState, team: number, p: Plan): CareerState {
+function planned(s: CareerState, team: number, p: Plan): CareerState {
   let out = s;
   for (const x of p.parts)
     if (teamOf(out, team).parts.find((q) => q.id === x.part)?.ship !== x.ship)
@@ -128,7 +128,7 @@ export function planned(s: CareerState, team: number, p: Plan): CareerState {
  * championship not yet recorded (the player's only once their race began), its
  * order every ship of the card once, every id it names on the card.
  */
-export function recordCheck(s: CareerState, r: RaceResult): Check {
+function recordCheck(s: CareerState, r: RaceResult): Check {
   if (s.race === null) return why('noRace', 'No race is due.');
   if (
     !r ||

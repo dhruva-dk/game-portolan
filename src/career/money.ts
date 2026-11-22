@@ -21,7 +21,7 @@ export const wages = (s: CareerState, c: Team): number =>
   staffOf(c).reduce((a, id) => a + (s.people[id].contract?.wage ?? 0), 0);
 
 /** What a team's pay drivers bring a race (every driver on its staff with the trait). */
-export const payDrivers = (s: CareerState, c: Team): number =>
+const payDrivers = (s: CareerState, c: Team): number =>
   staffOf(c).reduce(
     (a, id) =>
       a + (s.people[id].role === 'driver' ? payIncome(s.people[id]) : 0),
@@ -29,14 +29,14 @@ export const payDrivers = (s: CareerState, c: Team): number =>
   );
 
 /** A team's fixed sponsors' money a race. */
-export const sponsorIncome = (c: Team): number =>
+const sponsorIncome = (c: Team): number =>
   c.sponsors.reduce(
     (a, p) => a + (p && p.objectives.length === 0 ? p.perRace : 0),
     0
   );
 
 /** A team's committed money a race, each line. */
-export interface PerRace {
+interface PerRace {
   wages: number;
   upkeep: number;
   fish: number;
@@ -136,7 +136,7 @@ export const roomOf = (s: CareerState, team: number, finance: number): number =>
   commitment(finance, projection(s, team).end, s.teams[team].debtFloor);
 
 /** The ledger's projection: balance at the season's end from what is committed, with its lines. */
-export interface Projection {
+interface Projection {
   balance: number;
   races: number;
   perRace: PerRace;

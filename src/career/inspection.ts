@@ -5,6 +5,7 @@
 //
 // A ship whose part is confiscated fits the team's best spare of the type, or sails a stand-in (parts.ts sparePart).
 
+import { known } from './canon.ts';
 import { paid } from './balance.ts';
 import { shuffled, type Dice } from './dice.ts';
 import { sparePart } from './parts.ts';
@@ -14,7 +15,7 @@ import { TUNING } from './tuning.ts';
 import { improvementTo } from './improvement.ts';
 
 /** A team's finding: the parts confiscated, the fine, the points struck. */
-export interface Finding {
+interface Finding {
   team: number;
   parts: readonly number[];
   fine: number;
@@ -67,7 +68,7 @@ export function inspected(
     let parts = c.parts.filter((p) => !caught.includes(p));
     let id = out.ids.part;
     for (const p of caught) {
-      const ship = p.ship!;
+      const ship = known(p.ship);
       const spare = parts
         .filter((x) => x.type === p.type && x.ship === null && !x.forNext)
         .sort((a, b) => b.perf - a.perf || a.id - b.id)[0];

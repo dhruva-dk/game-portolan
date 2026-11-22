@@ -54,10 +54,6 @@ export const fittedOf = (p: Part): Fitted => ({
   reliability: p.reliability * p.condition,
 });
 
-/** A ship's fitted parts, in PARTS' order. */
-export const shipParts = (c: Team, ship: Ship): Part[] =>
-  PARTS.flatMap((t) => c.parts.filter((p) => p.ship === ship && p.type === t));
-
 /** A ship's six parts as the race card carries them. */
 export function fittedParts(
   c: Team,
@@ -333,14 +329,6 @@ export function bestFitted(c: Team): Team {
     ),
   };
 }
-
-/** Whether every ship of a team carries one part of each type (an invariant). */
-export const fullyFitted = (c: Team): boolean =>
-  SHIPS.every((ship) =>
-    PARTS.every(
-      (t) => c.parts.filter((p) => p.ship === ship && p.type === t).length === 1
-    )
-  );
 
 export const FITTING: Handlers = {
   FitPart: (s, c) => {

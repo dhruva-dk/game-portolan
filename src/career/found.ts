@@ -55,7 +55,7 @@ function nameCheck(name: string, most: number, what: string): Check {
 const L = TUNING.world.liveries;
 
 /** Whether the colours are a livery a ship may wear: a dye of the palette's in one of its patterns. */
-export const coloursCheck = (c: Colours): Check =>
+const coloursCheck = (c: Colours): Check =>
   !c || !whole(c.dye, 0, L.dyes - 1) || !whole(c.pattern, 0, L.patterns - 1)
     ? why('colours', 'Pick a dye and a pattern for your ships.')
     : null;
@@ -207,7 +207,7 @@ function takenOver(
 }
 
 /** The founded world, or why not. */
-export function found(
+function found(
   c: CommandOf<'Found'>,
   roll: Dice
 ): { ok: true; state: CareerState } | { ok: false; check: NonNullable<Check> } {

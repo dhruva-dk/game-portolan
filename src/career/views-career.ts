@@ -2,6 +2,7 @@
 // chairman's confidence, the record by season, honours, the posts offered), and the chairman's letter with the offers when
 // sacked or tempted. Pure, read-side.
 
+import { known } from './canon.ts';
 import type { JobCard, JobsView, CareerView } from '../office/people.ts';
 import { marketability } from './effective.ts';
 import { standingOf } from './standings.ts';
@@ -57,7 +58,7 @@ function card(s: CareerState, team: number, expires: number): JobCard {
 
 /** `career`. */
 export function careerView(s: CareerState): CareerView {
-  const p = s.player!,
+  const p = known(s.player),
     me = s.people[p.person],
     c = myTeam(s);
   const managers = s.people
@@ -151,7 +152,7 @@ export function careerView(s: CareerState): CareerView {
 
 /** `jobs`: sacked, the old team's chairman writes; tempted, the first offering team's. */
 export function jobsView(s: CareerState): JobsView {
-  const p = s.player!,
+  const p = known(s.player),
     offers = p.offers.map((o) => card(s, o.team, o.expires));
   const from = p.sacked
     ? s.teams[p.team]

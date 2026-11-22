@@ -3,6 +3,7 @@
 // trade-off for its parts for the season, and costs money once. The window is the off-season up to the season's first
 // race (the founding included). Rivals choose by personality (career/works.ts).
 
+import { known } from './canon.ts';
 import type { PartType } from '../race.ts';
 import type { Personality, Trade } from '../office/command.ts';
 import { canSpend, paid } from './balance.ts';
@@ -13,7 +14,7 @@ import type { CareerState } from './state.ts';
 
 /** What a supplier's goods do to its parts for the season: performance at a design's start and its maximum (added),
  *  reliability (added), condition lost a race (×), the improvement's points on them (×), and a design's cost (×). */
-export interface Terms {
+interface Terms {
   start: number;
   max: number;
   reliability: number;
@@ -22,7 +23,7 @@ export interface Terms {
   cost: number;
 }
 
-export interface Supplier {
+interface Supplier {
   id: string;
   name: string;
   trade: Trade;
@@ -33,7 +34,7 @@ export interface Supplier {
 export const TRADES: readonly Trade[] = ['timber', 'canvas', 'cordage'];
 
 /** The part types each trade supplies. */
-export const SUPPLIES: Readonly<Record<Trade, readonly PartType[]>> = {
+const SUPPLIES: Readonly<Record<Trade, readonly PartType[]>> = {
   timber: ['hull', 'keel'],
   canvas: ['sails', 'rigging'],
   cordage: ['rudder', 'mounts'],
@@ -232,7 +233,7 @@ export function chosen(
   trade: Trade,
   id: string
 ): CareerState {
-  const x = supplier(id)!;
+  const x = known(supplier(id));
   const c = s.teams[team];
   const teams = [...s.teams];
   teams[team] = { ...c, suppliers: { ...c.suppliers, [trade]: id } };

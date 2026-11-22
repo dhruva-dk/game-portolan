@@ -10,7 +10,7 @@ import { mine } from './post.ts';
 import type { CareerState, Mail, Planet } from './state.ts';
 
 /** A message as the mail screen lists it. */
-export interface MailView {
+interface MailView {
   id: number;
   day: number;
   category: Mail['category'];
@@ -40,7 +40,7 @@ export const unread = (s: CareerState): number =>
   s.mail.filter((m) => !m.read).length;
 
 /** A row of a tier's table. */
-export interface TableRow {
+interface TableRow {
   place: number;
   team: number;
   name: string;
@@ -69,7 +69,7 @@ export function table(s: CareerState, tier: number): TableRow[] {
 }
 
 /** A race of the season's calendar: its round, day, planet, and whether it is sailed, today, or to come. */
-export interface Fixture {
+interface Fixture {
   round: number;
   day: number;
   planet: Planet;
@@ -89,7 +89,7 @@ export function fixtures(s: CareerState): Fixture[] {
 }
 
 /** A ship of the player's team on race day: who sails her (null: the player, or no one), whether a stand-in, whether she forfeits. */
-export interface Boarding {
+interface Boarding {
   driver: number | null;
   standIn: boolean;
   forfeit: boolean;
@@ -99,7 +99,7 @@ export interface Boarding {
  * Race day's preview of the player's team: who sails each ship, the call, and
  * whether the race may begin; null if no race is due or the player has no team.
  */
-export interface Preview {
+interface Preview {
   round: number;
   ships: readonly Boarding[];
   call: Call;
@@ -123,7 +123,7 @@ export function preview(s: CareerState): Preview | null {
 }
 
 /** A dilemma's mail: its question and answers, which the player chose (null if open), the answer a lapse takes. */
-export interface DilemmaView {
+interface DilemmaView {
   mail: number;
   id: string;
   subject: string;

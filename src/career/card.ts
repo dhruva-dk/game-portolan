@@ -40,7 +40,7 @@ import { TUNING } from './tuning.ts';
 const D = TUNING.dilemmas;
 
 /** The rules a championship's race is sailed under today: its rules, the storm at the planet's pace. */
-export function raceRules(s: CareerState, tier: number): Rules {
+function raceRules(s: CareerState, tier: number): Rules {
   const r = championshipOf(s, tier).rules;
   const pace = s.calendar?.rounds[s.round]?.planet.pace ?? 1;
   return { ...r, storm: Math.round(r.storm * pace * 1000) / 1000 };
@@ -142,11 +142,11 @@ function shipOf(
 }
 
 /** The race's seed for a championship today. */
-export const raceSeed = (s: CareerState, tier: number): number =>
+const raceSeed = (s: CareerState, tier: number): number =>
   Math.floor(raceRand(s, 200000 + tier)() * 4294967296) >>> 0;
 
 /** A championship's card today (race day), given the lineups. */
-export function cardOf(
+function cardOf(
   s: CareerState,
   tier: number,
   all: readonly Sailing[]

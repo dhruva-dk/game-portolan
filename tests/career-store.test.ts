@@ -2,7 +2,7 @@
 // IndexedDB adapter runs the same suite in headless Chromium: node tools/indexed.ts.
 import { test } from 'node:test';
 import { emptyDisk, memoryStore, type Disk } from '../src/store/memory.ts';
-import { faultyStore } from '../src/store/faulty.ts';
+import { faultyStore } from './store-faulty.ts';
 import type { Store } from '../src/career/store.ts';
 import { script } from './career-kit.ts';
 import { STORE_TESTS, type Rig } from './store-suite.ts';

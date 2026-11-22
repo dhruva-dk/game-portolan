@@ -15,8 +15,8 @@ import { effective } from './effective.ts';
 import { knows, tierOf, learned } from './knowledge.ts';
 import { mine, post } from './post.ts';
 import { schedule, type Event } from './queue.ts';
-import type { PersonOf } from './roles.ts';
 import { inReach, scoutDays } from './staff.ts';
+import { inRole } from './roles.ts';
 import type { CareerState } from './state.ts';
 
 /** Whether a team may send one of its scouts to a person. */
@@ -39,7 +39,7 @@ export function scoutCheck(
   if (knows(team, g)) return why('known', 'You know them already.');
   if (s.scouting.some((x) => x.team === team && x.person === person))
     return why('already', 'Another of your scouts is on them.');
-  const reach = effective(s.people[scout] as PersonOf<'scout'>, null).reach;
+  const reach = effective(inRole(s.people[scout], 'scout'), null).reach;
   if (!inReach(reach, c.tier, tierOf(s, g)))
     return why('reach', "They are beyond this scout's Reach.");
   return null;
@@ -52,7 +52,7 @@ export function scoutingDays(
   scout: number
 ): number {
   return scoutDays(
-    effective(s.people[scout] as PersonOf<'scout'>, null).speed,
+    effective(inRole(s.people[scout], 'scout'), null).speed,
     s.teams[team].buildings.crowsNest.level
   );
 }

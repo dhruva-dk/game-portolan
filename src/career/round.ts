@@ -71,7 +71,7 @@ export const placePoints = (place: number): number => R.top[place - 1] ?? 0;
  * place, ships sunk by it, its ships afloat at the end, and whether it alone
  * held the most sea.
  */
-export interface TeamRace {
+interface TeamRace {
   points: number;
   ships: readonly (ShipRace & { place: number })[];
   best: number;

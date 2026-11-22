@@ -16,7 +16,7 @@ import { TUNING } from './tuning.ts';
 import { BUILDINGS } from './world.ts';
 
 const K = TUNING.hq;
-export const TOP = 3;
+const TOP = 3;
 
 /** A level's index into a by-level table (level 1 → 0), kept to the table. */
 const at = (level: number): number => Math.min(TOP - 1, Math.max(0, level - 1));
@@ -95,7 +95,7 @@ export function finished(
   e: Extract<Event, { kind: 'building' }>
 ): CareerState {
   const c = s.teams[e.team];
-  const b = e.building as Building;
+  const b = e.building;
   const w = c.buildings[b];
   if (!w?.next) return s;
   const teams = [...s.teams];

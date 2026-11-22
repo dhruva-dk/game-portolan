@@ -4,6 +4,7 @@
 // (finish top 10; sink two ships; both ships afloat at the end; hold the most sea in the team's tier), harder paying
 // more, for a number of races. SignSponsor. Rivals sign by Finance (career/works.ts).
 
+import { known } from './canon.ts';
 import type { Objective, Sponsor, SponsorOffer } from './state.ts';
 import { paid } from './balance.ts';
 import {
@@ -24,7 +25,7 @@ import type { CareerState, Team } from './state.ts';
 import { TUNING } from './tuning.ts';
 
 const P = TUNING.sponsors;
-export const OBJECTIVES: readonly Objective[] = [
+const OBJECTIVES: readonly Objective[] = [
   'top10',
   'sinkTwo',
   'afloat',
@@ -134,7 +135,7 @@ export function signedSponsor(
   slot: number
 ): CareerState {
   const c = s.teams[team];
-  const o = c.offers.find((x) => x.sponsor.id === offer)!;
+  const o = known(c.offers.find((x) => x.sponsor.id === offer));
   const sponsors = [0, 1, 2].map((i) =>
     i === slot ? o.sponsor : (c.sponsors[i] ?? null)
   );
@@ -144,7 +145,7 @@ export function signedSponsor(
 }
 
 /** How a team's race went, for its sponsors' objectives. */
-export interface Outcome {
+interface Outcome {
   best: number | null;
   sinkings: number;
   afloat: number;

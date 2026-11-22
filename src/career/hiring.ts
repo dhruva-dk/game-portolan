@@ -2,6 +2,7 @@
 // patience, the tier rule, break clauses, dismissals, renewals and the contract's last days. The player's commands
 // and the rivals' bids (career/rivals.ts) go through the same checks and the same `offered` and `signed`.
 
+import { known } from './canon.ts';
 import type { Offer } from '../office/command.ts';
 import {
   accept,
@@ -29,10 +30,10 @@ import { roomOf } from './money.ts';
 import { moraleIn, silenceMove, wantsOut } from './morale.ts';
 import { mine, post } from './post.ts';
 import { schedule, unscheduled, type Event } from './queue.ts';
-import type { PersonOf } from './roles.ts';
 import { seatOf, seatRole, statuses } from './seats.ts';
 import { persuades } from './staff.ts';
 import type { CareerState, Talk } from './state.ts';
+import { inRole } from './roles.ts';
 import { TUNING } from './tuning.ts';
 
 const M = TUNING.market;
@@ -191,9 +192,7 @@ export function offered(
   if (known && known.by !== null && !known.used) {
     const by = out.people[known.by];
     const persuasion =
-      by.role === 'scout'
-        ? effective(by as PersonOf<'scout'>, null).persuasion
-        : 0;
+      by.role === 'scout' ? effective(inRole(by, 'scout'), null).persuasion : 0;
     if (persuades(persuasion, known.day, out.day, roll.roll('persuade'))) {
       patience = Math.min(M.patienceMost, patience + 1);
       scout = known.by;
@@ -259,13 +258,13 @@ export function endTalk(
 }
 
 /** Whether a rival meets a person's counter: payable within its manager's Finance, at most the ask × counterMost. */
-export function meetsCounter(s: CareerState, t: Talk, counter: Offer): boolean {
+function meetsCounter(s: CareerState, t: Talk, counter: Offer): boolean {
   const c = s.teams[t.team];
   const manager = c.staff.manager === null ? null : s.people[c.staff.manager];
   if (!manager || manager.role !== 'manager') return false;
   const g = s.people[t.person];
   const ask = askOf(s, g, c).wage;
-  const stats = effective(manager as PersonOf<'manager'>, null);
+  const stats = effective(inRole(manager, 'manager'), null);
   const room = Math.min(
     roomOf(s, t.team, stats.finance),
     commitment(stats.finance, c.balance, c.debtFloor)
@@ -435,7 +434,7 @@ function myTeam(s: CareerState): { team: number } | { no: NonNullable<Check> } {
 }
 
 /** Whether the player may dismiss a person. */
-export function dismissCheck(s: CareerState, person: number): Check {
+function dismissCheck(s: CareerState, person: number): Check {
   const m = myTeam(s);
   if ('no' in m) return m.no;
   if (!whole(person, 0, s.people.length - 1))
@@ -493,7 +492,7 @@ export const HIRING: Handlers = {
     const no = dismissCheck(s, c.person);
     if (no) return refuse(no.code, no.sentence);
     const g = s.people[c.person];
-    const team = g.contract!.team;
+    const team = known(g.contract).team;
     return accept(
       released(
         paid(s, team, dismissalCost(s, g), {

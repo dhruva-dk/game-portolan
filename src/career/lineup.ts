@@ -22,7 +22,7 @@ import { stars } from './stars.ts';
 import type { CareerState, Team } from './state.ts';
 
 /** Who sails a ship: a person (null: the player), whether hired for the race, whether she is forfeit. */
-export interface Aboard {
+interface Aboard {
   driver: number | null;
   standIn: boolean;
   forfeit: boolean;

@@ -83,7 +83,7 @@ export function sponsorsScheduled(s: CareerState, from: number): CareerState {
 }
 
 /** The day of a team's first review (Phase B section 6): staggered by team id over the week. */
-export const firstReview = (team: number, from: number): number =>
+const firstReview = (team: number, from: number): number =>
   from + 1 + (team % TUNING.rivals.review);
 
 /** A state with every team's first review scheduled from a day; each review schedules the next. */

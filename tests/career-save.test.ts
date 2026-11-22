@@ -25,7 +25,7 @@ import {
 import type { Entry, Store } from '../src/career/store.ts';
 import { TUNING_VERSION } from '../src/career/tuning.ts';
 import { emptyDisk, memoryStore, type Disk } from '../src/store/memory.ts';
-import { faultyStore, type Fault } from '../src/store/faulty.ts';
+import { faultyStore, type Fault } from './store-faulty.ts';
 import type { Command } from '../src/office/command.ts';
 import { script } from './career-kit.ts';
 

@@ -5,6 +5,7 @@
 // if its trigger still holds; one left unanswered lapses to its last option at the next draw. AnswerDilemma, and
 // MarkRead, which the mail's screen sends.
 
+import { known } from './canon.ts';
 import type { EventHandler } from './advance.ts';
 import { accept, refuse, whole, type Handlers } from './command.ts';
 import { between, weighted, type Dice, type Rand } from './dice.ts';
@@ -20,8 +21,8 @@ import { nextRace } from './flags.ts';
 import { meddleChance } from './leadership.ts';
 import { mine, post } from './post.ts';
 import { schedule } from './queue.ts';
-import type { PersonOf } from './roles.ts';
 import type { CareerState, Team, Mail } from './state.ts';
+import { inRole } from './roles.ts';
 import { TUNING } from './tuning.ts';
 
 const D = TUNING.dilemmas;
@@ -54,7 +55,7 @@ function candidates(
   c: Team,
   rand: Rand
 ): { d: Dilemma; weight: number }[] {
-  const chairman = s.people[c.staff.chairman] as PersonOf<'chairman'>;
+  const chairman = inRole(s.people[c.staff.chairman], 'chairman');
   const meddle = meddleChance(effective(chairman, null).meddling);
   const seen = new Map<string, number>();
   if (c.player)
@@ -153,12 +154,6 @@ export const dilemmaComes: EventHandler<'dilemma'> = (s, e, roll) => {
   };
 };
 
-/** Whether a dilemma's mail came today and waits for the player (Advance stops on it). */
-export const dilemmaWaits = (s: CareerState, id: string): boolean =>
-  s.mail.some(
-    (m) => m.day === s.day && m.dilemma?.id === id && m.dilemma.answer === null
-  );
-
 export const MAIL: Handlers = {
   AnswerDilemma: (s, c) => {
     const me = mine(s);
@@ -178,7 +173,7 @@ export const MAIL: Handlers = {
     if (Number(m.slots.own) !== me)
       return refuse('stale', "That was another team's matter.");
     if (s.race?.started) return refuse('racing', 'The race is under way.');
-    const d = dilemma(m.dilemma.id)!;
+    const d = known(dilemma(m.dilemma.id));
     const a = d.answer(s, s.teams[me], m.slots, c.option);
     if ('no' in a) return refuse(a.no.code, a.no.sentence);
     return accept({

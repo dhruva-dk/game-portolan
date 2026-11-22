@@ -93,6 +93,41 @@ export const EXCEPTIONS: readonly Exception[] = [
     at: 1,
     why: "Object.keys is string[] by TypeScript's design; KIND is a closed literal, its keys exactly these",
   },
+  // the career's casts that TypeScript cannot prove: each says why
+  ...(
+    [
+      [
+        'src/career/career.ts',
+        1,
+        "the handler table indexed by a command's kind: TypeScript cannot tie a union's kind to its handler's command (a correlated union), so the handler is named for every kind",
+      ],
+      [
+        'src/career/advance.ts',
+        2,
+        "the event handlers indexed by an event's kind, and the event handed to its own: a correlated union, as career.ts's commands",
+      ],
+      [
+        'src/career/playtest.ts',
+        2,
+        "the debug commands' run of the event handlers, as advance.ts's: a correlated union",
+      ],
+      [
+        'src/career/roles.ts',
+        2,
+        "a person made of a role and that role's stats by name (the generator and growth give exactly ROLE_STATS' names, which the tests hold): a discriminated union built from data; and a role's stats mapped name for name",
+      ],
+      [
+        'src/career/stars.ts',
+        1,
+        "a person of a role grown: the same role, the same stat names (roles.ts withStats), for a caller's own narrowed type",
+      ],
+      [
+        'src/career/migrate.ts',
+        1,
+        "a save's parsed state taken as the career's: its sum checked (journal.ts intact) and its schema brought to this one",
+      ],
+    ] as const
+  ).map(([file, at, why]) => ({ rule: 'casts', file, at, why })),
   {
     rule: 'primitives',
     file: 'src/tsl.ts',
@@ -118,6 +153,43 @@ export const EXCEPTIONS: readonly Exception[] = [
     file: 'src/play/race.ts',
     name: 'specField',
     why: "a field of spec ships to sail a race with: the tools' and the tests', and the debug switch's that starts a carded race for the race HUD to be drawn on (MANAGER.md 3 point 10); this goes stale, and is removed, once that takes it",
+  },
+  // the career, ported whole before the office's release flow takes it
+  // (MANAGER.md 5, flow; 8 point 3): each goes stale once that flow runs it
+  {
+    rule: 'exports',
+    file: 'src/career/card.ts',
+    name: 'raceCards',
+    why: "a round's race cards, one a tier, as the career deals them: the season runner's (tools/) and the tests'; the desk deals them once race day is wired (the player's race, and the worker's two other tiers, MANAGER.md 4)",
+  },
+  {
+    rule: 'exports',
+    file: 'src/career/read.ts',
+    name: 'fixtures',
+    why: "the calendar's view (MANAGER.md 5, calendar), tested; taken by the desk when that screen is built",
+  },
+  {
+    rule: 'exports',
+    file: 'src/career/read.ts',
+    name: 'preview',
+    why: "race preparation's view (MANAGER.md 5), tested; taken by the desk when that screen is built",
+  },
+  {
+    rule: 'exports',
+    file: 'src/career/read.ts',
+    name: 'dilemmaView',
+    why: "a dilemma's choices (MANAGER.md 5, mail), tested; taken by the desk when that screen is built",
+  },
+  {
+    rule: 'exports',
+    file: 'src/desk.ts',
+    name: 'deviceShelf',
+    why: "the career kept on this device (IndexedDB), for the menu's Continue; main.ts takes it when the office is wired into the release (MANAGER.md 8 point 3)",
+  },
+  {
+    rule: 'exports',
+    file: 'src/desk-fixtures.ts',
+    why: "fixture careers made by a player's commands, for ?screen= on a real career rather than made-up data (MANAGER.md 5); debug.ts takes them when the first of the career's screens is built",
   },
   {
     rule: 'exports',
@@ -274,6 +346,7 @@ export const EXCEPTIONS: readonly Exception[] = [
   ...(
     [
       ['src/audio/', 51],
+      ['src/career/', 583],
       ['src/debug.ts', 16],
       ['src/gunfire/', 6],
       ['src/land/', 72],

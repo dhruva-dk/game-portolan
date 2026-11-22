@@ -63,10 +63,6 @@ export function seen(
     trait: v.trait,
   };
 }
-/** Stars in words: "3.5" or "2–3.5". */
-export const rangeText = (r: Range) =>
-  r.lo === r.hi ? `${r.lo}` : `${r.lo}–${r.hi}`;
-
 /** The post a person holds on their team ("Ship 2", "Reserve"), or what they are. */
 export function postOf(s: CareerState, g: Person): string {
   const c = g.contract ? s.teams[g.contract.team] : null;

@@ -11,7 +11,7 @@ import { supplier } from './suppliers.ts';
 import { trait } from './traits.ts';
 
 /** A kind's words: a subject and a body, each in two or more wordings (the same count of each). */
-export interface Template {
+interface Template {
   subject: readonly string[];
   body: readonly string[];
 }
@@ -395,7 +395,7 @@ export const TEMPLATES: Readonly<Record<string, Template>> = {
 };
 
 const TIERS = ['Tier 1', 'Tier 2', 'Tier 3'];
-const BUILDINGS: Readonly<Record<Building, string>> = {
+const BUILDINGS: Readonly<Record<string, string>> = {
   factory: 'factory',
   drawingLoft: 'drawing loft',
   testTank: 'test tank',
@@ -405,8 +405,8 @@ const BUILDINGS: Readonly<Record<Building, string>> = {
   crowsNest: "crow's nest",
   fishMarket: 'fish market',
   landingPad: 'landing pad',
-};
-const MEASURES: Readonly<Record<Measure, string>> = {
+} satisfies Record<Building, string>;
+const MEASURES: Readonly<Record<string, string>> = {
   spec: 'the spec parts',
   storm: "the storm's pace",
   ban: 'a gun ban',
@@ -414,7 +414,7 @@ const MEASURES: Readonly<Record<Measure, string>> = {
   seaHeldPoint: 'the sea-held point',
   prizeSpread: "the prize money's spread",
   inspection: 'the inspection rate',
-};
+} satisfies Record<Measure, string>;
 const OBJECTIVES: Readonly<Record<string, string>> = {
   top10: 'finish in the top ten',
   sinkTwo: 'sink two ships',
@@ -451,13 +451,13 @@ function slotText(s: CareerState, key: string, value: string | number): string {
     case 'wage':
       return moneyText(n);
     case 'building':
-      return BUILDINGS[value as Building] ?? String(value);
+      return BUILDINGS[value] ?? String(value);
     case 'component':
       return component(String(value))?.name ?? String(value);
     case 'trait':
       return trait(String(value)).name;
     case 'measure':
-      return MEASURES[value as Measure] ?? String(value);
+      return MEASURES[value] ?? String(value);
     case 'objective':
       return OBJECTIVES[String(value)] ?? String(value);
     case 'supplier':
@@ -488,11 +488,7 @@ function slotText(s: CareerState, key: string, value: string | number): string {
 }
 
 /** A template's text with its slots filled from a message. */
-export const filled = (
-  s: CareerState,
-  text: string,
-  slots: Mail['slots']
-): string =>
+const filled = (s: CareerState, text: string, slots: Mail['slots']): string =>
   text
     .replace(/\{(\w+)\}/g, (all, key: string) =>
       key in slots ? slotText(s, key, slots[key]) : all

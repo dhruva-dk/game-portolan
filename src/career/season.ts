@@ -5,6 +5,7 @@
 // new tier's rules); then the new season: its calendar, the chairmen' money and targets, its events. On the new
 // season's first day the player is mailed its planets and the suppliers' choice.
 
+import { known } from './canon.ts';
 import type { EventHandler } from './advance.ts';
 import { newsworthy, retirements, seasonGrowth, traitTurns } from './ageing.ts';
 import { rulesTurned } from './admiralty.ts';
@@ -30,7 +31,7 @@ import { TUNING } from './tuning.ts';
 const SWAP = TUNING.race.swap;
 
 /** Each tier's teams in final order (1 first). */
-export const finalOrder = (s: CareerState): number[][] =>
+const finalOrder = (s: CareerState): number[][] =>
   s.championships.map((l) =>
     [...l.teams].sort((a, b) => standingOf(s, a) - standingOf(s, b))
   );
@@ -166,7 +167,7 @@ export const seasonEnded: EventHandler<'seasonEnd'> = (s, _e, roll) => {
   for (const c of out.teams) out = carried(out, c.id);
   const calendar = makeCalendar(
     s.season + 1,
-    nextStart(s.calendar!.start),
+    nextStart(known(s.calendar).start),
     roll.roll('calendar')
   );
   out = seasonStart({ ...out, season: s.season + 1, round: 0, calendar });

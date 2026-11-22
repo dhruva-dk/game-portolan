@@ -7,7 +7,6 @@ import type { Role } from '../office/command.ts';
 import { moraleShift } from './morale.ts';
 import { mapped, stat, type Person, type PersonOf } from './roles.ts';
 import { modifier, type Setting } from './traits.ts';
-import { TUNING } from './tuning.ts';
 
 /** A person's stats with morale and their traits (those that hold in the setting; null: those that always hold). */
 export function effective<R extends Role>(
@@ -39,5 +38,3 @@ export const mentors = (people: readonly Person[]): boolean =>
   people.some(
     (g) => g.role === 'driver' && modifier(g.traits, null).growth > 0
   );
-
-export const MENTOR_AGE = TUNING.growth.mentorAge;

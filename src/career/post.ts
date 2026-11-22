@@ -7,7 +7,7 @@ import { seeded } from './dice.ts';
 import type { CareerState, Mail } from './state.ts';
 
 /** What a section posts: the team it concerns (null: the player whatever their team), from whom, and its slots. */
-export interface Letter {
+interface Letter {
   team: number | null;
   category: MailCategory;
   sender: number | null;
@@ -17,7 +17,7 @@ export interface Letter {
 }
 
 /** How many wordings a message has, unless career/mail.ts says otherwise. */
-export const WORDINGS = 2;
+const WORDINGS = 2;
 
 /** The player's team, or null before founding or while sacked (section 7). */
 export const mine = (s: CareerState): number | null =>

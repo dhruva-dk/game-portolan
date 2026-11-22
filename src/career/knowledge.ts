@@ -5,7 +5,7 @@
 
 import { seeded } from './dice.ts';
 import { effective } from './effective.ts';
-import type { Person, PersonOf } from './roles.ts';
+import type { Person } from './roles.ts';
 import {
   centreOff,
   inReach,
@@ -15,11 +15,12 @@ import {
   traitShows,
 } from './staff.ts';
 import { potential, stars } from './stars.ts';
+import { inRole } from './roles.ts';
 import type { CareerState } from './state.ts';
 
 /** What a team sees of a person: exact once known; ranges otherwise. `arrow` is the change in stars since the last
  *  season's end, for a known person. */
-export interface View {
+interface View {
   known: boolean;
   stars: readonly [number, number];
   potential: readonly [number, number];
@@ -82,7 +83,7 @@ export function sightOf(s: CareerState, team: number): Sight {
   const scouts = c.staff.scouts
     .map((id) => s.people[id])
     .filter((g) => g.role === 'scout')
-    .map((g) => effective(g as PersonOf<'scout'>, null));
+    .map((g) => effective(inRole(g, 'scout'), null));
   const by = new Map<number | null, { judgement: number; insight: number }>();
   return (tier) => {
     const hit = by.get(tier);

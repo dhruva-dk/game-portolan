@@ -26,7 +26,7 @@ const M = TUNING.market;
 const ROUNDS = TUNING.calendar.rounds;
 
 /** Whether this season's races are all sailed (its off-season). */
-export const seasonOver = (s: CareerState): boolean =>
+const seasonOver = (s: CareerState): boolean =>
   s.round >= ROUNDS && s.race === null;
 
 /** Races still to sail this season. */
@@ -34,7 +34,7 @@ export const racesLeft = (s: CareerState): number =>
   Math.max(0, ROUNDS - s.round);
 
 /** The day a season ends (its last race day). */
-export function seasonEndDay(s: CareerState, season: number): number {
+function seasonEndDay(s: CareerState, season: number): number {
   const cal = s.calendar;
   return cal ? cal.end + (season - cal.season) * YEAR : 0;
 }
@@ -138,7 +138,7 @@ export function released(s: CareerState, person: number): CareerState {
 }
 
 /** What a signing writes: the team, the person, the offer agreed. */
-export interface Signing {
+interface Signing {
   team: number;
   person: number;
   offer: Offer;

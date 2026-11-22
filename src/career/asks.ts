@@ -21,7 +21,7 @@ const WANTS: readonly Want[] = [
 ];
 
 /** Each want's weight in the draw at an age: the young lean to status and ambition, the old to security and money. */
-export function wantWeights(role: Role, years: number): Record<Want, number> {
+function wantWeights(role: Role, years: number): Record<Want, number> {
   const young = Math.min(1, Math.max(0, (30 - years) / 12));
   const old = Math.min(1, Math.max(0, (years - 28) / 14));
   return {
@@ -76,5 +76,8 @@ export const askFee = (wage: number): number => wage * W.feeRaces;
 /** The contract length a person of an age asks, in seasons: the young short, the old long. */
 export const askSeasons = (years: number): 1 | 2 | 3 => {
   const [young, middle, old] = W.lengths;
-  return (years < W.young ? young : years < W.old ? middle : old) as 1 | 2 | 3;
+  return seasons(years < W.young ? young : years < W.old ? middle : old);
 };
+
+/** A contract's length in seasons, a table's number held to 1..3. */
+export const seasons = (n: number): 1 | 2 | 3 => (n <= 1 ? 1 : n >= 3 ? 3 : 2);

@@ -16,7 +16,7 @@ const M = TUNING.market;
 const ROUNDS = TUNING.calendar.rounds;
 
 /** What a person asks of a team: wage a race at its tier (less for a content person's renewal), fee, length. */
-export interface Ask {
+interface Ask {
   wage: number;
   fee: number;
   seasons: 1 | 2 | 3;
@@ -85,7 +85,7 @@ export function score(
 }
 
 /** The person's answer to an offer: accept, a counter (the offer they would accept), or refuse. */
-export type Answer =
+type Answer =
   | { kind: 'accept' }
   | { kind: 'counter'; offer: Offer }
   | { kind: 'refuse' };

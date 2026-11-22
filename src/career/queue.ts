@@ -5,15 +5,17 @@
 //
 // Each kind names the section that schedules it and handles it.
 
+import type { Building } from '../office/command.ts';
+
 /** What happens on a day. */
-export type Happening =
+type Happening =
   | { kind: 'race'; round: number } // section 13: race day (needs the player)
   | { kind: 'seasonEnd' } // section 13
   | { kind: 'seasonStart' } // section 13: targets, money, the calendar
   | { kind: 'review'; team: number } // section 6: a rival's weekly review
   | { kind: 'designed'; team: number } // section 8.3: a design is drawn
   | { kind: 'built'; team: number } // section 8.3: its part is built
-  | { kind: 'building'; team: number; building: string } // section 9: works finished
+  | { kind: 'building'; team: number; building: Building } // section 9: works finished
   | { kind: 'answer'; talk: number } // section 5: a person answers an offer
   | { kind: 'report'; team: number; scout: number } // section 4: a scout reports
   | { kind: 'closing'; season: number } // section 5: the last days of contracts ending this season open
@@ -45,7 +47,7 @@ export function scheduled(queue: readonly Event[], event: Event): Event[] {
 }
 
 /** What the state's queue needs to schedule: the queue and the next seq. */
-export interface Timed {
+interface Timed {
   queue: readonly Event[];
   seq: number;
 }
@@ -67,14 +69,4 @@ export function unscheduled<S extends Timed>(
 ): S {
   const queue = s.queue.filter((e) => !drop(e));
   return queue.length === s.queue.length ? s : { ...s, queue };
-}
-
-/** The next event, if any. */
-export const next = (queue: readonly Event[]): Event | null => queue[0] ?? null;
-
-/** Whether a queue is in order (an invariant the tests hold the state to). */
-export function ordered(queue: readonly Event[]): boolean {
-  for (let i = 1; i < queue.length; i++)
-    if (!before(queue[i - 1], queue[i])) return false;
-  return true;
 }

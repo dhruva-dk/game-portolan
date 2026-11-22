@@ -74,7 +74,7 @@ function withdrawn(
 }
 
 /** A state with the player moved to a team (checked first). */
-export function taken(s: CareerState, team: number, roll: Dice): CareerState {
+function taken(s: CareerState, team: number, roll: Dice): CareerState {
   const p = s.player;
   if (!p) return s;
   const old = p.sacked ? null : p.team;
@@ -130,7 +130,7 @@ export function taken(s: CareerState, team: number, roll: Dice): CareerState {
 }
 
 /** Whether the player may decline a team's offer. */
-export function declineCheck(s: CareerState, team: number): Check {
+function declineCheck(s: CareerState, team: number): Check {
   const p = s.player;
   if (!p) return why('unfounded', 'Found a team first.');
   if (!p.offers.some((o) => o.team === team))

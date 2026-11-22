@@ -64,7 +64,7 @@ export interface StatLine {
   text: string;
 }
 /** A season of a person's history. */
-export interface HistoryLine {
+interface HistoryLine {
   season: string;
   team: string;
   tier: string;

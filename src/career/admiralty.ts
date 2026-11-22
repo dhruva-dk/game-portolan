@@ -7,6 +7,7 @@
 // plus the money lobbied for it, and each abstainer joins the side with more sway with a chance of the margin's share.
 // Votes cast decide; a tie keeps the rule. The result comes by mail and takes effect at the season's end (rulesTurned).
 
+import { known } from './canon.ts';
 import { KINDS } from '../kinds.ts';
 import type { Rules } from '../race.ts';
 import type { Change, Measure } from '../office/command.ts';
@@ -25,9 +26,9 @@ import { sway as politicsSway } from './leadership.ts';
 import { lean } from './measure.ts';
 import { mine, post } from './post.ts';
 import { schedule, type Event } from './queue.ts';
-import type { PersonOf } from './roles.ts';
 import type { CareerState, Proposal, Side } from './state.ts';
 import { TUNING } from './tuning.ts';
+import { inRole } from './roles.ts';
 import { TYPES } from './components.ts';
 
 const A = TUNING.admiralty;
@@ -199,7 +200,7 @@ export function swayOf(s: CareerState, team: number): number {
   return c.player
     ? g.reputation
     : politicsSway(
-        effective(g as PersonOf<'manager'>, null).politics,
+        effective(inRole(g, 'manager'), null).politics,
         g.reputation
       );
 }
@@ -283,7 +284,7 @@ export function counted(
 }
 
 /** Whether the player's team may vote on, or lobby for, a proposal now. */
-export function voteCheck(
+function voteCheck(
   s: CareerState,
   team: number,
   proposal: number,
@@ -301,7 +302,7 @@ export function voteCheck(
 }
 
 /** Whether the player's team may lobby a sum for a side. */
-export function lobbyCheck(
+function lobbyCheck(
   s: CareerState,
   team: number,
   proposal: number,
@@ -322,7 +323,7 @@ export function lobbyCheck(
 }
 
 /** A state with a sum lobbied (checked first): paid, its sway added to the side. */
-export function lobbied(
+function lobbied(
   s: CareerState,
   team: number,
   proposal: number,
@@ -330,7 +331,7 @@ export function lobbied(
   balance: number
 ): CareerState {
   const tier = s.teams[team].tier;
-  const p = proposalOf(s, tier, proposal)!;
+  const p = known(proposalOf(s, tier, proposal));
   const out = withProposal(s, tier, {
     ...p,
     lobbied: { ...p.lobbied, [side]: p.lobbied[side] + balance * A.lobby },
@@ -367,7 +368,7 @@ export const ADMIRALTY: Handlers = {
           cast(
             s,
             s.teams[me].tier,
-            proposalOf(s, s.teams[me].tier, c.proposal)!,
+            known(proposalOf(s, s.teams[me].tier, c.proposal)),
             me,
             c.side
           )

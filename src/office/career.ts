@@ -47,7 +47,7 @@ export interface Face {
 }
 
 /** What stops Continue, and the screen that answers it. */
-export interface Blocker {
+interface Blocker {
   screen: string;
   sentence: string;
 }
@@ -68,7 +68,7 @@ export interface TopBar {
 }
 
 /** A part as its mark shows it on a ship: its type, and whether its condition is below half. */
-export interface PartMark {
+interface PartMark {
   type: PartType;
   low: boolean;
   fitted: boolean;

@@ -96,7 +96,7 @@ const RACING_TAKES: ReadonlySet<CommandKind> = new Set<CommandKind>([
 export const start = (): CareerState => beginning(SCHEMA);
 
 /** What `apply` is told besides the state and the command: whether debug commands are taken. */
-export interface Allow {
+interface Allow {
   debug: boolean;
 }
 
