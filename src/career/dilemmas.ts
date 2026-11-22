@@ -1,5 +1,5 @@
 // Drawing and answering the dilemmas (Phase B section 12; the twelve are career/events.ts's). After each round closes,
-// each team draws one at most, by seed: with a chance, among those whose trigger holds, an chairman's dilemma weighted by
+// each team draws one at most, by seed: with a chance, among those whose trigger holds, a chairman's dilemma weighted by
 // the chairman's Meddling. A rival answers at once by its manager's personality (the last option if it cannot take its
 // own). The player's comes by mail a few days later, before the next race (a `dilemma` event, which stops Advance),
 // if its trigger still holds; one left unanswered lapses to its last option at the next draw. AnswerDilemma, and
@@ -47,7 +47,7 @@ function rivalOption(s: CareerState, c: Team, d: Dilemma): number {
   return i < 0 ? d.options.length - 1 : d.rival[i];
 }
 
-/** The dilemmas whose trigger holds for a team, and how much each weighs in the draw: an chairman's by its Meddling; for
+/** The dilemmas whose trigger holds for a team, and how much each weighs in the draw: a chairman's by its Meddling; for
  *  the player, each the less the more often it has come to them (the career's mail keeps count), so the rare ones
  *  are not drowned by those that nearly always hold. */
 function candidates(

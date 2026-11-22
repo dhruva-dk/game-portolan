@@ -6,7 +6,7 @@
 // A pair [a, b] is a line in u = stat / 20: a + b × u. A triple by tier is Tier 1's, Two's, Three's.
 
 /** Bump with any change to TUNING (and pin the new hash in the test). */
-export const TUNING_VERSION = 6;
+export const TUNING_VERSION = 7;
 
 const ROLE_YEARS = {
   manager: [40, 55],
@@ -179,13 +179,13 @@ export const TUNING = {
     development: [0.5, 2], // how sharply the improvement's points go to the worst-ranked parts (an exponent)
     tactics: [0.4, 0.6], // the chance the race plan takes its best choice
   },
-  /** What an chairman's stats do (Phase B section 7). */
+  /** What a chairman's stats do (Phase B section 7). */
   chairman: {
     ambition: 3, // places the target is moved up, × u
     perPlace: 0.6,
     fall: -4,
     rise: 4, // confidence a race: perPlace a place past the slack (to fall) or ahead (to rise)
-    slack: 3, // places behind the target an chairman lets pass
+    slack: 3, // places behind the target a chairman lets pass
     met: 1, // confidence a race at or above the target
     settle: 5, // races before the standings weigh in full (the first weighs 1/settle)
     patience: [1.3, -0.6], // a fall × this
@@ -196,12 +196,12 @@ export const TUNING = {
     pastFloor: -0.5, // a race while balance is below zero, past the floor
     generosity: 0.3, // money added at the season's start, × u × the tier's budget
     floor: [0.3, 0.4], // the debt floor, × the tier's budget, below zero
-    meddling: [0.2, 0.6], // the chance an chairman's dilemma is the one drawn
+    meddling: [0.2, 0.6], // the chance a chairman's dilemma is the one drawn
     words: [75, 50, 25], // confidence crossing these sends the chairman's word
     missedBy: 5, // places past the target at the season's end that sack the manager
-    fit: [55, 30, 0], // the manager's reputation an chairman looks for, by tier
+    fit: [55, 30, 0], // the manager's reputation a chairman looks for, by tier
     jobs: [70, 45, 0], // the player's reputation a tier's teams offer their post at
-    ambitious: 14, // an chairman's Ambition at or above which, at the season's end, they court a better manager
+    ambitious: 14, // a chairman's Ambition at or above which, at the season's end, they court a better manager
     offerDays: 7, // a job offer stands this long
     standing: 2, // the most job offers standing at once while the player has a team
   },
@@ -524,7 +524,7 @@ export const TUNING = {
 
   /** Money (Phase B section 10): each tier's prize pool at the season's end, shared by place by rules.prizeSpread. */
   //   Sized so a median team's prize is about a third of its season's wages and upkeep (the sponsors bring about half).
-  money: { prize: [1040000, 400000, 210000] },
+  money: { prize: [760000, 330000, 150000] }, // a tier's pool: its median team about balances over a season
   /** Reputation (Phase B section 10), 0..100. */
   reputation: {
     perPoint: 0.1,

@@ -39,7 +39,7 @@ function seasonEndDay(s: CareerState, season: number): number {
   return cal ? cal.end + (season - cal.season) * YEAR : 0;
 }
 
-/** The day a contract runs out (none for an chairman's or the player's). */
+/** The day a contract runs out (none for a chairman's or the player's). */
 export const endDay = (s: CareerState, c: Contract): number =>
   c.ends === null ? Number.POSITIVE_INFINITY : seasonEndDay(s, c.ends);
 

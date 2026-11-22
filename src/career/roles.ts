@@ -67,7 +67,7 @@ true satisfies Same<
 >;
 
 /** A person's contract (Phase B section 5). Wage, fee and bonuses in money; `ends` the season at whose end it runs out
- *  (null for an chairman, and for the player, who are their team's for as long as they stay). */
+ *  (null for a chairman, and for the player, who are their team's for as long as they stay). */
 export interface Contract {
   team: number;
   status: Status;

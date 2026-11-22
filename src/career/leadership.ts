@@ -1,4 +1,4 @@
-// What a rival manager's and an chairman's stats do (Phase B sections 2.1, 6 and 7), as pure functions the rivals and
+// What a rival manager's and a chairman's stats do (Phase B sections 2.1, 6 and 7), as pure functions the rivals and
 // the chairmen call. A stat's u is stat / 20. Politics is read where sway is summed (Phase B section 11).
 
 import type { Rand } from './dice.ts';
@@ -99,6 +99,6 @@ export const endowment = (generosity: number, budget: number): number =>
 export const debtFloor = (generosity: number, budget: number): number =>
   -lin(E.floor, unit(generosity)) * budget;
 
-/** Meddling: the chance an chairman's dilemma is the one drawn, when one qualifies. */
+/** Meddling: the chance a chairman's dilemma is the one drawn, when one qualifies. */
 export const meddleChance = (meddling: number): number =>
   lin(E.meddling, unit(meddling));

@@ -314,7 +314,7 @@ test("at a season's start chairmen add money and set targets; at its end a targe
   assert.equal(
     verdicts(trusted, roll(trusted)).teams[last].staff.manager,
     was,
-    'an chairman who still trusts them keeps them'
+    'a chairman who still trusts them keeps them'
   );
 });
 
@@ -412,7 +412,7 @@ test('confidence falls only with sustained under-performance: not within the sla
   );
 });
 
-test('an chairman renews a trusted manager whose contract runs out, keeping their tenure; not one they doubt', () => {
+test('a chairman renews a trusted manager whose contract runs out, keeping their tenure; not one they doubt', () => {
   const s = pastGrace();
   const [a, b] = s.teams.filter((x) => !x.player && x.staff.manager !== null);
   const people = [...s.people];

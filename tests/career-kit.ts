@@ -392,7 +392,7 @@ export function spendKept(
   c: Command
 ): void {
   // Advance and a race's close pay what is owed (wages, upkeep, fines, stand-ins' fees), past the floor if need be; on
-  // TakeJob and DeclineJob the teams the player leaves or turns down have their chairmen hire a manager, as an chairman's
+  // TakeJob and DeclineJob the teams the player leaves or turns down have their chairmen hire a manager, as a chairman's
   // hire on Advance does
   if (
     ['Advance', 'RecordRace', 'TakeJob', 'DeclineJob'].includes(c.kind) ||

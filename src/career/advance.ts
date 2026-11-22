@@ -98,7 +98,7 @@ function advance(s: CareerState, roll: Dice, events: EventHandlers): Applied {
       event as Extract<Event, { kind: EventKind }>,
       roll
     );
-    // the player sacked (an chairman's verdict at the season's end) needs them at once: the posts offered wait
+    // the player sacked (a chairman's verdict at the season's end) needs them at once: the posts offered wait
     if (stopsFor(state, event) || state.player?.sacked) break;
   }
   return accept(state);

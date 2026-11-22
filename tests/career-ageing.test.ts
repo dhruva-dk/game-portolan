@@ -58,7 +58,7 @@ test("a season's growth: the young below peak rise, the old past it fall; the pl
   assert.equal(canonical(seasonGrowth(s)), canonical(t));
 });
 
-test("retirement: no one under their role's first age, everyone at its last; the retired leave their posts (a manager's and an chairman's are kept for the chairman's hiring)", () => {
+test("retirement: no one under their role's first age, everyone at its last; the retired leave their posts (a manager's and a chairman's are kept for the chairman's hiring)", () => {
   const s = founded();
   const r = retirements(s, dice(s.seed, s.streams));
   for (const id of r.retired) {

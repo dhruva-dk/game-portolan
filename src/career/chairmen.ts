@@ -147,7 +147,7 @@ export function sacked(s: CareerState, team: number, roll: Dice): CareerState {
 /** Whether a manager's reputation fits a tier. */
 const fits = (g: Person, tier: number): boolean => g.reputation >= E.fit[tier];
 
-/** The managers an chairman may hire: the free agents, and the managers of lower championships' teams (poached). The player's
+/** The managers a chairman may hire: the free agents, and the managers of lower championships' teams (poached). The player's
  *  person is never among them: posts reach the player only as offers. */
 export function managerCandidates(
   s: CareerState,
@@ -236,7 +236,7 @@ export function offerJob(s: CareerState, team: number): CareerState {
 
 /** A state with a team's open post filled: offered to the player if they may take it and stand at least as high as the
  *  best candidate (when `player` allows); else the best candidate signed (a poached manager's team then hires in turn).
- *  Nothing while an offer of the post to the player stands. An chairman never takes back the manager it sacked (`barred`). */
+ *  Nothing while an offer of the post to the player stands. A chairman never takes back the manager it sacked (`barred`). */
 export function hireManager(
   s: CareerState,
   team: number,
@@ -383,7 +383,7 @@ export function managersRenewed(s: CareerState): CareerState {
   return changed.length === 0 ? s : withPeople(s, changed);
 }
 
-/** A state with each retired chairman succeeded by a new one of the team's colony (an chairman's post never stands open). */
+/** A state with each retired chairman succeeded by a new one of the team's colony (a chairman's post never stands open). */
 function successions(s: CareerState, roll: Dice): CareerState {
   const retired = s.teams.filter(
     (c) => s.people[c.staff.chairman].retired !== null
