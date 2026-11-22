@@ -57,6 +57,7 @@ import type { Fault, Use } from '../kinds.ts';
 import type { Eye, LootDraw, Snapshot, StormDraw } from '../snapshot.ts';
 import { createSwell } from '../world/swell.ts';
 import type { Anchor } from '../world/lattice.ts';
+import { PLOTS, eachPlot, type Plot } from '../world/harbour.ts';
 import type { ShipPose } from '../world/pose.ts';
 import {
   R,
@@ -64,7 +65,9 @@ import {
   bearingAt,
   distance,
   dot,
+  fromChart,
   normalize,
+  place,
   scale,
   type Vec3,
 } from '../world/sphere.ts';
@@ -85,11 +88,16 @@ import {
 } from '../player.ts';
 import {
   REST,
+  WHOLE,
   anchorageEye,
   dragged,
   eyeOut,
+  framed,
+  harbourEye,
   relaxed,
+  seenAt,
   turned,
+  type Framing,
   type Orbit,
 } from './anchorage.ts';
 import { ARRIVAL, arriving } from './arrival.ts';
@@ -106,6 +114,13 @@ import {
   type Match,
   type Waters,
 } from './state.ts';
+
+/** How far over a harbour building's head its label is hung, metres. */
+const OVERHEAD = 3;
+/** What the lobby's camera is on: her at anchor, or the harbour she lies off. */
+type Scene = 'ship' | 'harbour';
+/** A point of the screen, px from its top left. */
+type Point2 = readonly [number, number];
 
 /**
  * Damage as the debug switches set it (debug.ts ?zones, ?faults, ?wear, ?mend):
@@ -242,6 +257,22 @@ export function createGame(
   const orbit: Orbit = { ...REST },
     berthed = eyeOut(),
     floor = (p: Vec3) => Math.max(ground(p), sea.at(p, floorAt));
+  /**
+   * What the office has the lobby's camera on (her, or the harbour) and how it
+   * would have it framed; its framing now, eased to that; and where the
+   * harbour's plots' heads are drawn (plots, refilled).
+   */
+  let scene: Scene = 'ship',
+    wanted: Readonly<Framing> = WHOLE;
+  const framing: Framing = { centre: [0, 0], size: 1 },
+    heads = eachPlot((): [number, number] => [0, 0]),
+    head: [number, number, number] = [0, 0, 0];
+  /** The framing at once as it is wanted. */
+  const reframe = () => {
+    framing.centre[0] = wanted.centre[0];
+    framing.centre[1] = wanted.centre[1];
+    framing.size = wanted.size;
+  };
   /**
    * The camera's answer to what happens, the match's time held on a blow, and
    * the last moment they answered.
@@ -489,6 +520,9 @@ export function createGame(
     anchored = anchor;
     Object.assign(orbit, REST);
     berth = null;
+    scene = 'ship';
+    wanted = WHOLE;
+    reframe();
     shake.clear();
     stops.clear();
     answered = state.deeds().at(-1)?.seq ?? answered;
@@ -519,6 +553,32 @@ export function createGame(
      */
     broadside(on: boolean) {
       aside = on;
+    },
+    /**
+     * The lobby's camera as the office stages it: on her or over the harbour,
+     * framed so (null: the lobby's own, on her and filling the screen). A cut
+     * to the other is framed at once; a new framing of the same is eased to.
+     */
+    stage(to: { scene: Scene; framing: Readonly<Framing> } | null) {
+      const cut = (to?.scene ?? 'ship') !== scene || wanted === WHOLE;
+      scene = to?.scene ?? 'ship';
+      wanted = to?.framing ?? WHOLE;
+      if (cut) reframe();
+    },
+    /**
+     * Where the head of what stands on each of the harbour's plots is drawn on
+     * a screen w by h (px, from its top left; the same object each time,
+     * refilled), while the camera is over the harbour; else null.
+     */
+    plots(w: number, h: number): Readonly<Record<Plot, Point2>> | null {
+      if (!anchored || scene !== 'harbour' || !berth) return null;
+      const { chart, plots } = world.harbour;
+      for (const id of PLOTS) {
+        const s = plots[id];
+        place(fromChart(chart, s.x, s.z), s.foot + s.tall + OVERHEAD, head);
+        seenAt(berth, head, w, h, heads[id]);
+      }
+      return heads;
     },
     /**
      * A frame of dt seconds, her hands as read for it (none while the match's
@@ -595,7 +655,14 @@ export function createGame(
         if (!read.look.held) relaxed(orbit, dt, orbit);
         turned(orbit, aside, dt, orbit);
         floorAt = state.clock(between);
-        berth = anchorageEye(last, orbit, floorAt, floor, berthed);
+        framed(framing, wanted, dt);
+        berthed.centre[0] = framing.centre[0];
+        berthed.centre[1] = framing.centre[1];
+        berthed.size = framing.size;
+        berth =
+          scene === 'harbour'
+            ? harbourEye(world.harbour, berthed)
+            : anchorageEye(last, orbit, floorAt, floor, berthed);
         return;
       }
       const followed =

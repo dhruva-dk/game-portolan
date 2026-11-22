@@ -28,6 +28,19 @@ export interface Eye {
   orientation: Turn;
   /** Its vertical field of view, degrees. */
   fov: number;
+  /**
+   * Where on the screen what it looks straight at is drawn: right and down of
+   * the screen's middle, in half-widths and half-heights of the screen (the
+   * lens shifted, not turned, so what it looks at keeps its shape). Absent: the
+   * middle.
+   */
+  centre?: readonly [number, number];
+  /**
+   * How large its picture is drawn: 1 (or absent) fills the screen; less, all
+   * it would have shown is drawn that share of the screen high about `centre`,
+   * and more of the world round it.
+   */
+  size?: number;
 }
 
 /** The vertical field of view of an eye in the air, degrees. */

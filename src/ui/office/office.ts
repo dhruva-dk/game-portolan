@@ -11,7 +11,7 @@ import { SHADOW, alpha } from '../ink.ts';
 import { PAGE, createPage } from '../kit/page.ts';
 import { el } from '../kit/part.ts';
 import { kitStyle, stylesheet } from '../kit/style.ts';
-import { boxOf, fade, screen } from '../ui.ts';
+import { boxOf, fade, onResize, screen, view } from '../ui.ts';
 import { SCREENS, type Name, type Opened } from './screens.ts';
 import { STRIP, NAV, createShell } from './shell.ts';
 
@@ -28,14 +28,36 @@ const CSS = `
 .o-body > * { position: absolute; inset: 0; }
 `;
 
-/** What a screen is handed: what it asks goes to `ask`; `draw` draws the office again (a choice of its own changed). */
+/**
+ * What a screen is handed: what it asks goes to `ask`; `draw` draws the office
+ * again (a choice of its own changed); `still` is the picture taken of the
+ * planet she lies off, from space (an image's address), once there is one.
+ */
 export interface Office {
   ask(a: Ask): void;
   draw(): void;
+  still(): string | null;
 }
 
-/** The office over `desk`, hidden until shown. */
-export function createOffice(desk: Desk) {
+/**
+ * The world behind the office, as the office stages it: the camera on her ship
+ * or over the harbour, what it looks at drawn at `centre` (right and down of
+ * the screen's middle, in half-widths and half-heights) and `size` of the
+ * screen high; null, as the lobby has it. A screen says which by its window:
+ * the element it marks o-window (data-scene="harbour" for the harbour), and
+ * within it, if not all of it, the one it marks o-subject.
+ */
+interface Backdrop {
+  stage(
+    to: {
+      scene: 'ship' | 'harbour';
+      framing: { centre: [number, number]; size: number };
+    } | null
+  ): void;
+}
+
+/** The office over `desk`, hidden until shown; the world behind it staged through `backdrop`. */
+export function createOffice(desk: Desk, backdrop?: Backdrop) {
   kitStyle();
   stylesheet(CSS);
   const root = screen();
@@ -52,6 +74,19 @@ export function createOffice(desk: Desk) {
     ahead: Name[] = [];
   /** How far each list was scrolled when last drawn, by the screen and the list's name. */
   const scrolled = new Map<string, number>();
+  /** The planet's picture, once taken. */
+  let picture: string | null = null;
+  /**
+   * The open screen's window as last laid: where it stands on the screen (px),
+   * the page's scale, and what in it is pinned to the harbour's plots (each
+   * marked data-plot).
+   */
+  let laid: {
+    left: number;
+    top: number;
+    k: number;
+    pins: HTMLElement[];
+  } | null = null;
 
   const office: Office = {
     ask(a) {
@@ -62,12 +97,15 @@ export function createOffice(desk: Desk) {
       }
     },
     draw: () => draw(),
+    still: () => picture,
   };
   const shell = createShell(office, {
     back: () => step(past, ahead),
     forward: () => step(ahead, past),
   });
   page.append(shell.strip, body, shell.nav);
+  // (a window stands elsewhere on a screen of another size)
+  onResize(() => draw());
 
   /** Each list scrolled as it was, or, not yet scrolled, to where it asks (her own row in view). */
   function settle(at: Name, keep: boolean) {
@@ -82,9 +120,12 @@ export function createOffice(desk: Desk) {
   /** The world shown clear through the open screen's window (an element it marks o-window), dimmed round it. */
   function clear() {
     const hole =
-      (open && made.get(open)?.el.querySelector('.o-window')) || null;
+      (open && made.get(open)?.el.querySelector<HTMLElement>('.o-window')) ||
+      null;
     if (!hole) {
       dim.style.clipPath = '';
+      laid = null;
+      backdrop?.stage(null);
       return;
     }
     const p = boxOf(page),
@@ -94,6 +135,24 @@ export function createOffice(desk: Desk) {
       y = (v: number) => `${((v - p.top) / k + PAST).toFixed(1)}px`;
     const [l, t, r, b] = [x(h.left), y(h.top), x(h.right), y(h.bottom)];
     dim.style.clipPath = `polygon(evenodd, 0 0, 100% 0, 100% 100%, 0 100%, 0 0, ${l} ${t}, ${l} ${b}, ${r} ${b}, ${r} ${t}, ${l} ${t})`;
+    // the camera's subject drawn in the middle of the window, or of what the screen marks within it
+    const s = boxOf(hole.querySelector('.o-subject') ?? hole);
+    backdrop?.stage({
+      scene: hole.dataset.scene === 'harbour' ? 'harbour' : 'ship',
+      framing: {
+        centre: [
+          (s.left + s.width / 2) / (view.w / 2) - 1,
+          (s.top + s.height / 2) / (view.h / 2) - 1,
+        ],
+        size: s.height / view.h,
+      },
+    });
+    laid = {
+      left: h.left,
+      top: h.top,
+      k,
+      pins: Array.from(hole.querySelectorAll<HTMLElement>('[data-plot]')),
+    };
   }
 
   /** Draws the shell and the open screen from the desk (`fresh`: just opened, its lists where they ask to be). */
@@ -161,6 +220,31 @@ export function createOffice(desk: Desk) {
     show(on: boolean) {
       fade(root, on);
       if (on) draw(true);
+      else {
+        laid = null;
+        backdrop?.stage(null);
+      }
+    },
+    /** The planet's picture, taken: the open screen drawn again with it. */
+    picture(address: string) {
+      picture = address;
+      draw();
+    },
+    /**
+     * Where the camera now draws the head of what stands on each of the
+     * harbour's plots (px on the screen, by plot; null: it is not over the
+     * harbour): what the open screen pins to them is moved there.
+     */
+    plots(at: Readonly<Record<string, readonly [number, number]>> | null) {
+      if (!at || !laid || root.hidden) return;
+      const { left, top, k } = laid;
+      for (const pin of laid.pins) {
+        const p = at[pin.dataset.plot ?? ''];
+        if (!p) continue;
+        pin.style.transform = `translate(${((p[0] - left) / k).toFixed(1)}px, ${((p[1] - top) / k).toFixed(1)}px)`;
+        // (hidden until it is first placed)
+        pin.style.visibility = 'visible';
+      }
     },
     /** Opens the screen `name`; false if it is not built. */
     go(name: Name) {

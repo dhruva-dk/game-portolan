@@ -205,12 +205,6 @@ export const EXCEPTIONS: readonly Exception[] = [
   },
   {
     rule: 'exports',
-    file: 'src/world/turn.ts',
-    name: 'inverse',
-    why: 'a turn undone, for the tests that a turn and its inverse come home',
-  },
-  {
-    rule: 'exports',
     file: 'src/world/wind.ts',
     name: 'calms',
     why: "where createWind's field vanishes, for the tests that it vanishes there alone",

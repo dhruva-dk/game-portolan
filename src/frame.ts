@@ -31,6 +31,7 @@ import type { Eye, Snapshot } from './snapshot.ts';
 import { createSky, type Sky } from './sky/sky.ts';
 import { createGround } from './land/ground.ts';
 import { createGroves } from './land/groves.ts';
+import { createHarbour } from './land/harbour.ts';
 import { createLighting } from './sky/light.ts';
 import { createSand } from './land/sand.ts';
 import { createTerrainMesh } from './land/terrain-mesh.ts';
@@ -81,6 +82,8 @@ const PLANES = { air: [0.5, 2000], space: [50, 4000] } as const;
  * reaches, metres.
  */
 const AIR = 400;
+/** An eye's middle where it says none: the screen's. */
+const MIDDLE = [0, 0] as const;
 /**
  * The eyes the frame builds its shaders from (prime): each kind's, looking at
  * the planet's centre from where the whole planet is inside its lens and its
@@ -197,14 +200,9 @@ export function createFrame(
   const sand = createSand(view, ground, floorLight, world.dunes);
   // the ground, under the sea and over it; and what stands on the land
   const terrain = createTerrainMesh(view, ground, sand, world.land);
-  const groves = createGroves(
-    world.land,
-    world.planet,
-    world.seed,
-    view,
-    light
-  );
-  shadow.cast(...groves.casters);
+  const groves = createGroves(world, view, light);
+  const harbour = createHarbour(world.harbour, light);
+  shadow.cast(...groves.casters, harbour);
   const fleet = createFleet(light, world.wind, options.fleet);
   fleet.pin(options.lod);
   fleet.simulate(options.cloth);
@@ -215,6 +213,7 @@ export function createFrame(
   scene.add(
     terrain.mesh,
     ...groves.meshes,
+    harbour.mesh,
     ...fleet.meshes,
     ...arms.meshes,
     water.mesh
@@ -397,7 +396,20 @@ export function createFrame(
     renderer.getDrawingBufferSize(size);
     camera.aspect = size.x / size.y;
     camera.fov = eye.fov;
-    camera.updateProjectionMatrix();
+    // (either works the projection out again) its picture's own size on the
+    // screen, and the screen as a window on it: its middle at the eye's centre
+    const [x, y] = eye.centre ?? MIDDLE,
+      k = eye.size ?? 1;
+    if (x !== 0 || y !== 0 || k !== 1)
+      camera.setViewOffset(
+        size.x * k,
+        size.y * k,
+        (size.x * (k - 1 - x)) / 2,
+        (size.y * (k - 1 - y)) / 2,
+        size.x,
+        size.y
+      );
+    else camera.clearViewOffset();
     camera.position.fromArray(eye.position);
     camera.quaternion.fromArray(eye.orientation);
     camera.updateMatrixWorld();
@@ -485,7 +497,8 @@ export function createFrame(
     // the clouds' march are the screen's, so the frame's scale costs only the passes drawn at it
     const camera = cameraFor(seen);
     renderer.getSize(size);
-    view.update(camera, size.y);
+    // (a picture drawn smaller is a smaller screen's: a pixel is as much wider)
+    view.update(camera, size.y * (seen.size ?? 1));
     const eye = view.eye;
     const air = sky.update(env, s.storm, seen.kind, dt, size.x, size.y);
     const ships = fleet.update(eye, env.windSpeed, dt);

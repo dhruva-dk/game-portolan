@@ -23,14 +23,25 @@ that an agent wrote for itself.
    Orders, Pit Stop) get the same treatment.
 2. Ship and Sponsors show the live 3D ship through a clear window, with MM's
    panels round it.
-3. HQ is an inked harbour chart: each building a woodcut drawing in its place
-   with a label, tapped to open its card, MM's right-hand panel beside it.
-4. Calendar follows MM's three columns, each race's planet chart standing in
-   for the circuit picture.
+3. HQ is the harbour in actual 3D, each building labelled and tapped to open
+   its card, MM's right-hand panel beside it. (The inked chart of woodcuts
+   first agreed was rejected on sight: "why is screenshot 3 just some shitty
+   svgs instead of an actual 3d environment".)
+4. Calendar follows MM's three columns, each race's planet standing in for the
+   circuit picture.
 5. Tables only where MM has tables (Scouting, Standings, Finances, the results
    table). Drivers, Staff, Mail, Team and Part Design are MM's cards.
 6. Home, Ship and HQ are redone first. No screen is done until its capture has
    been shown to the owner beside its MM reference.
+
+## Pictures (22 Nov)
+
+- No drawn stand-ins for what MM shows as a picture: "why is the top right
+  literally just a compass rose", "some shitty svg of our ship for no reason
+  that provides no value at all". Pictures come from the game's own 3D.
+- "if MM has some element that is not possible to replicate well in ours,
+  scrap it rather than making a bad version ... but you need to tell me for
+  those"
 
 ## Not to spend time on
 

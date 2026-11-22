@@ -12,10 +12,12 @@
 // made.
 
 import { AIR_FOV, type Eye } from '../snapshot.ts';
+import type { Harbour } from '../world/harbour.ts';
 import type { ShipPose } from '../world/pose.ts';
 import { clamp, lerp, smoother, wrapAngle } from '../world/scalar.ts';
 import {
   along,
+  fromChart,
   normalize,
   place,
   rotateAbout,
@@ -25,7 +27,7 @@ import {
   type Out3,
   type Vec3,
 } from '../world/sphere.ts';
-import { lookAt, type Out4 } from '../world/turn.ts';
+import { inverse, lookAt, rotate, type Out4 } from '../world/turn.ts';
 
 /**
  * The camera at rest: off her bow by `quarter` radians round from dead ahead,
@@ -142,14 +144,45 @@ export const turned = (
   return out;
 };
 
+/**
+ * How the office frames what the camera looks at: where on the screen it is
+ * drawn (snapshot.ts Eye.centre: right and down of the middle, in half-widths
+ * and half-heights), and how large (Eye.size: 1 as the lobby has it, filling
+ * the screen; less, that share of the screen high).
+ */
+export interface Framing {
+  centre: [number, number];
+  size: number;
+}
+/** The lobby's own framing: in the middle, filling the screen. */
+export const WHOLE: Readonly<Framing> = { centre: [0, 0], size: 1 };
+/** A framing closes this share of the way to another each second, as e^−FRAMED. */
+const FRAMED = 5;
+
+/** `f` eased toward `to` over dt seconds (written over). */
+export function framed(f: Framing, to: Readonly<Framing>, dt: number): Framing {
+  const k = 1 - Math.exp(-FRAMED * dt);
+  f.centre[0] += (to.centre[0] - f.centre[0]) * k;
+  f.centre[1] += (to.centre[1] - f.centre[1]) * k;
+  f.size += (to.size - f.size) * k;
+  return f;
+}
+
 /** An eye written into (anchorageEye's `out`). */
-type EyeOut = Eye & { position: Out3; orientation: Out4 };
+type EyeOut = Eye & {
+  position: Out3;
+  orientation: Out4;
+  centre: [number, number];
+  size: number;
+};
 /** An eye to be written into. */
 export const eyeOut = (): EyeOut => ({
   kind: 'air',
   position: [0, 0, 0],
   orientation: [0, 0, 0, 1],
   fov: AIR_FOV,
+  centre: [0, 0],
+  size: 1,
 });
 
 /**
@@ -166,7 +199,7 @@ const end: CourseOut = { p: [0, 0, 0], t: [0, 0, 0] };
  * The eye on her at anchor: her pose as drawn, the orbit, the world's clock (s,
  * for the drift) and the floor under a point (metres over the mean sea of the
  * higher of the land and the waves there), which the eye stays CLEAR above
- * (into `out`).
+ * (into `out`, whose framing is left as it is).
  */
 export function anchorageEye(
   pose: ShipPose,
@@ -208,4 +241,60 @@ export function anchorageEye(
   out.kind = 'air';
   out.fov = AIR_FOV;
   return out;
+}
+
+/**
+ * The camera over the harbour: out over the water before it, `back` metres
+ * from a point `height` metres over its ground and `sea` metres toward the sea
+ * from its middle (the jetty runs out that way), looking down on it at `pitch`
+ * radians, square to the shore.
+ */
+const OVERLOOK = { back: 132, pitch: 0.8, height: 6, sea: 9 } as const;
+
+/** The eye over the harbour `h` (into `out`, whose framing is left as it is). */
+export function harbourEye(h: Harbour, out = eyeOut()): Eye {
+  const { back, pitch, sea } = OVERLOOK,
+    over = h.ground + OVERLOOK.height;
+  const position = place(
+    fromChart(h.chart, 0, sea + back * Math.cos(pitch)),
+    over + back * Math.sin(pitch),
+    out.position
+  );
+  lookAt(
+    position,
+    place(fromChart(h.chart, 0, sea), over, at),
+    normalize(position, way),
+    out.orientation
+  );
+  out.kind = 'air';
+  out.fov = AIR_FOV;
+  return out;
+}
+
+/** Working vectors of `seenAt`. */
+const off: Out3 = [0, 0, 0],
+  mine: Out3 = [0, 0, 0];
+
+/**
+ * Where the world point p is drawn by `eye` on a screen w by h (px, from its
+ * top left, into `out`): false if it is behind the eye.
+ */
+export function seenAt(
+  eye: Eye,
+  p: Vec3,
+  w: number,
+  h: number,
+  out: [number, number]
+): boolean {
+  off[0] = p[0] - eye.position[0];
+  off[1] = p[1] - eye.position[1];
+  off[2] = p[2] - eye.position[2];
+  const v = rotate(off, inverse(eye.orientation), mine);
+  if (v[2] > -1e-6) return false;
+  // (its picture's half-height on the screen, px, per unit of slope off its axis)
+  const k = ((eye.size ?? 1) * h) / 2 / Math.tan((eye.fov * Math.PI) / 360),
+    [cx, cy] = eye.centre ?? WHOLE.centre;
+  out[0] = (w / 2) * (1 + cx) + (k * v[0]) / -v[2];
+  out[1] = (h / 2) * (1 + cy) - (k * v[1]) / -v[2];
+  return true;
 }

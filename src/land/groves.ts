@@ -13,9 +13,15 @@
 
 import { Sphere, Vector3 } from 'three/webgpu';
 import type { Eye, View } from '../view/view.ts';
-import type { Planet } from '../world/planet.ts';
-import { R, distance, horizonDistance, place } from '../world/sphere.ts';
-import type { Terrain } from '../world/terrain.ts';
+import type { World } from '../environment.ts';
+import { builtOn } from '../world/harbour.ts';
+import {
+  R,
+  distance,
+  fromChart,
+  horizonDistance,
+  place,
+} from '../world/sphere.ts';
 import { scatterTerrain } from '../world/terrain-scatter.ts';
 import type { Light } from '../sky/light.ts';
 import { createPalms } from './palms.ts';
@@ -48,31 +54,37 @@ const REACH = {
 };
 
 export function createGroves(
-  terrain: Terrain,
-  planet: Planet,
-  seed: number,
+  world: Pick<World, 'land' | 'planet' | 'seed' | 'harbour'>,
   view: View,
   light: Light
 ) {
-  const tiles = scatterTerrain(terrain, planet, seed, {
+  const { planet, harbour } = world;
+  const tiles = scatterTerrain(world.land, planet, world.seed, {
     shrubs: SHAPES,
     big: KINDS.big.shapes,
     boulders: KINDS.boulder.shapes,
   });
   const charts = tiles.map((t) => t.chart);
+  /** What of a tile's things stands clear of the harbour's buildings. */
+  const clear = <T extends { x: number; z: number }>(
+    kind: (t: (typeof tiles)[number]) => T[]
+  ) =>
+    tiles.map((t) =>
+      kind(t).filter((o) => !builtOn(harbour, fromChart(t.chart, o.x, o.z)))
+    );
   const rocks = createRocks(
-    tiles.map((t) => t.rocks),
+    clear((t) => t.rocks),
     charts,
     view,
     light
   );
   const palms = createPalms(
-    tiles.map((t) => t.palms),
+    clear((t) => t.palms),
     charts,
     light
   );
   const shrubs = createShrubs(
-    tiles.map((t) => t.shrubs),
+    clear((t) => t.shrubs),
     charts,
     light
   );

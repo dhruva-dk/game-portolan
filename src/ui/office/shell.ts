@@ -45,7 +45,8 @@ const CSS = `
 /* the team's plate and the chips keep their widths on every screen: the title has what is left, a long one set smaller */
 .o-team { flex: none; align-self: stretch; display: flex; align-items: center; gap: 10px; width: 216px; margin-bottom: 5px;
   padding: 0 12px 0 10px; background: var(--light); border-left: 7px solid var(--team); border-right: 1px solid var(--line); }
-.o-team > span { font: 700 15px/1.1 var(--serif); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* (a long name takes two lines) */
+.o-team > span { font: 700 15px/1.1 var(--serif); overflow: hidden; max-height: 34px; }
 .o-title { flex: 1 1 0; min-width: 0; padding: 0 12px 4px; font: 700 ${TYPE.title}px/1 var(--serif); letter-spacing: .12em;
   text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .o-title.long { font-size: 18px; letter-spacing: .04em; }
@@ -56,9 +57,10 @@ const CSS = `
 .o-chip small { font-size: ${TYPE.small}px; font-style: italic; color: var(--faint); }
 .o-chip > .k-icon:last-child { color: var(--faint); }
 .o-chip.still { padding-right: 12px; }
-.o-pill { padding: 4px 11px; background: var(--good); color: var(--on-fill); font-weight: 700; border: 1.2px solid var(--ink);
-  box-shadow: inset 0 0 0 2px var(--good), inset 0 0 0 2.7px var(--on-fill); }
-.o-pill.owing { background: var(--bad); box-shadow: inset 0 0 0 2px var(--bad), inset 0 0 0 2.7px var(--on-fill); }
+/* her balance: the chip itself the ledger's green, or its red when she owes */
+.o-chip.money { ${cut('good')} padding-left: 12px; color: var(--on-fill); font-weight: 700; }
+.o-chip.money.owing { ${cut('bad')} }
+.o-chip.money > .k-icon:last-child { color: var(--on-fill); }
 .o-count { position: absolute; right: 2px; top: -7px; min-width: 20px; height: 20px; padding: 0 5px; display: grid;
   place-items: center; border-radius: 10px; background: var(--bad); color: var(--on-fill); border: 1.2px solid var(--ink);
   font: italic 700 ${TYPE.small}px/1 var(--serif); }
@@ -93,11 +95,11 @@ export function createShell(
     nav = el('div', 'o-nav');
 
   /** A chip of the strip: a control where the screen it leads to is built, its mark a chevron; else it only shows. */
-  const chip = (to: Tab | null, ...kids: Kid[]) => {
+  const chip = (to: Tab | null, cls: string, ...kids: Kid[]) => {
     const built = to !== null && SCREENS[to] !== undefined;
     const made = el(
       'div',
-      `o-chip${built ? '' : ' still'}`,
+      `o-chip ${cls}${built ? '' : ' still'}`,
       ...kids,
       built && icon('down', 16)
     );
@@ -126,14 +128,12 @@ export function createShell(
         'o-chips',
         chip(
           'finances',
-          el(
-            'div',
-            `o-pill${v.balance < 0 ? ' owing' : ''}`,
-            `Balance ${grouped(v.balance)}`
-          )
+          v.balance < 0 ? 'money owing' : 'money',
+          el('span', 'fig', `Balance ${grouped(v.balance)}`)
         ),
         chip(
           'standings',
+          '',
           icon('cup', 22),
           el(
             'div',
@@ -144,6 +144,7 @@ export function createShell(
         ),
         chip(
           'calendar',
+          '',
           icon('cloud', 22),
           el(
             'div',
@@ -156,8 +157,8 @@ export function createShell(
             el('span', '', v.next.name)
           )
         ),
-        chip(null, icon('anchor', 22), el('span', '', 'Admiralty')),
-        chip('mail', icon('bell', 24), count(v.notices))
+        chip(null, '', icon('anchor', 22), el('span', '', 'Admiralty')),
+        chip('mail', '', icon('bell', 24), count(v.notices))
       )
     );
   }

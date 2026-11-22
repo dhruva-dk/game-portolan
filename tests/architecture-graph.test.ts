@@ -138,6 +138,7 @@ const TIERS: Record<string, readonly string[]> = {
     'pose.ts',
     'remembered.ts',
     'seeds.ts',
+    'harbour.ts',
   ],
   grids: ['cells.ts', 'lattice.ts', 'noise3.ts'],
   motions: [
@@ -157,6 +158,7 @@ const TIERS: Record<string, readonly string[]> = {
     'terrain-scatter.ts',
     'land.ts',
     'coastline.ts',
+    'harbour-site.ts',
   ],
 };
 const UNDER: Record<string, readonly string[]> = {

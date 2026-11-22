@@ -144,7 +144,7 @@ import { STEP } from './sim/fixed.ts';
 import { KINDS, SOUND, type Fault, type GunKind } from './kinds.ts';
 import { GUN, SHIP } from './sim/handling.ts';
 import { PLAYER, SHIPS } from './sim/match.ts';
-import type { ShipDraw, Snapshot, StormDraw } from './snapshot.ts';
+import type { Eye, ShipDraw, Snapshot, StormDraw } from './snapshot.ts';
 import { FIXTURE } from './office/fixtures/desk.ts';
 import type { Flow } from './ui/flow.ts';
 import { createOffice } from './ui/office/office.ts';
@@ -210,6 +210,11 @@ export interface Stage {
    * setup's meter is).
    */
   stats(on: boolean): void;
+  /**
+   * A picture of the world from `eye`, taken at the next frame drawn (drawn
+   * once more for it, unseen): an image's address.
+   */
+  still(eye: Eye): Promise<string>;
   draw(
     next: (dt: number) => Snapshot,
     drawn?: (canvas: HTMLCanvasElement) => void

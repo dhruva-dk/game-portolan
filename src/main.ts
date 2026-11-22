@@ -26,7 +26,7 @@ import { createMatches, racedApart, watersOf } from './play/setup.ts';
 import { IDLE, PATTERNS } from './player.ts';
 import type { RaceCard, RaceResult } from './race.ts';
 import { SHIPS } from './sim/match.ts';
-import type { Snapshot } from './snapshot.ts';
+import { lookingAt, type Eye, type Snapshot } from './snapshot.ts';
 import { shoresOf } from './ui/coasts.ts';
 import { createGlobe } from './ui/globe.ts';
 import { createFlow } from './ui/flow.ts';
@@ -39,6 +39,7 @@ import { createStick } from './ui/stick.ts';
 import { onPressed } from './ui/touch.ts';
 import { onResize, uiLayer, view } from './ui/ui.ts';
 import { seedOf } from './world/seeds.ts';
+import { frameAt, normalize, scale, type Vec3 } from './world/sphere.ts';
 import { MEAN, SWING } from './world/weather.ts';
 
 /**
@@ -69,6 +70,43 @@ const RELEASE: Setup = {
 
 /** Milliseconds of a frame a hurried race may spend on more steps of the sim. */
 const HURRY = 20;
+
+/**
+ * The planet's picture (the office shows it for the race sailed on it): taken
+ * from `from` metres off the planet's centre over where she lies, through a
+ * lens of `fov` degrees, which the planet all but fills; kept `side` px square.
+ */
+const PORTRAIT = { from: 1750, fov: 40, side: 640 } as const;
+/** The eye the planet's picture is taken from, over the unit vector `at`, north up. */
+const portraitEye = (at: Vec3): Eye => {
+  const position = scale(at, PORTRAIT.from);
+  return {
+    kind: 'space',
+    position,
+    orientation: lookingAt(position, [0, 0, 0], frameAt(at).north),
+    fov: PORTRAIT.fov,
+  };
+};
+/** The square at the middle of the frame just drawn on `canvas`, as an image's address. */
+function pictured(canvas: HTMLCanvasElement): string {
+  const kept = document.createElement('canvas'),
+    side = Math.min(canvas.width, canvas.height);
+  kept.width = kept.height = PORTRAIT.side;
+  kept
+    .getContext('2d')
+    ?.drawImage(
+      canvas,
+      (canvas.width - side) / 2,
+      (canvas.height - side) / 2,
+      side,
+      side,
+      0,
+      0,
+      PORTRAIT.side,
+      PORTRAIT.side
+    );
+  return kept.toDataURL('image/jpeg', 0.9);
+}
 
 loaded('script');
 
@@ -128,6 +166,9 @@ async function stage(setup: Setup): Promise<Stage> {
   const meter = createMeter(renderer, meterEl, setup.meter);
   meter.show(setup.meter);
 
+  /** A picture asked for (still): the eye it is taken from, and who it is for. */
+  let asked: { eye: Eye; taken(address: string): void } | null = null;
+
   return {
     world,
     name: setup.name,
@@ -137,6 +178,7 @@ async function stage(setup: Setup): Promise<Stage> {
     ready: frame.ready,
     stats: (on) => meter.show(setup.meter || on),
     matches: createMatches(setup.seed, world.planet, setup.hold, setup.gun),
+    still: (eye) => new Promise((taken) => (asked = { eye, taken })),
     async draw(
       next: (dt: number) => Snapshot,
       drawn?: (canvas: HTMLCanvasElement) => void
@@ -153,8 +195,18 @@ async function stage(setup: Setup): Promise<Stage> {
         const now = performance.now();
         const dt = Math.min((now - last) / 1000, 0.1);
         last = now;
-        const snapshot = next(dt),
-          begun = performance.now();
+        const snapshot = next(dt);
+        if (asked) {
+          // a picture: the world drawn once from its eye and kept, then the
+          // frame drawn over it from the game's as ever (only that is shown)
+          const own = snapshot.eye;
+          snapshot.eye = asked.eye;
+          frame.render(snapshot, 0);
+          asked.taken(pictured(renderer.domElement));
+          snapshot.eye = own;
+          asked = null;
+        }
+        const begun = performance.now();
         frame.render(snapshot, dt);
         const rendered = performance.now() - begun;
         drawn?.(renderer.domElement);
@@ -312,8 +364,11 @@ async function play(s: Stage): Promise<Played> {
         },
       }
     );
-    const office = createOffice(manager.desk);
+    const office = createOffice(manager.desk, { stage: game.stage });
     managed = { office, raced: manager.raced };
+    void s
+      .still(portraitEye(normalize(s.start.at)))
+      .then((address) => office.picture(address));
     flow.office(true);
     if (careered() && manager.founded) manager.arrive();
     else office.go('menu');
@@ -365,6 +420,8 @@ async function play(s: Stage): Promise<Played> {
         flow.screen === 'spectate',
         performance.now()
       );
+      // what the office pins to the harbour's buildings follows them as the camera draws them
+      managed?.office.plots(game.plots(view.w, view.h));
       // heard from the game's eye, even with the full map open over it; the sea going as the screens cover it
       hearing.scene = scene;
       hearing.screen = flow.screen;

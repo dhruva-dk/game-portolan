@@ -8,17 +8,15 @@
 
 import type { HomeView, NewsKind, StandingLine } from '../../office/home.ts';
 import { emblem } from '../emblem.ts';
-import { galleon } from '../ink.ts';
 import { button, dropdown, segmented } from '../kit/button.ts';
 import { bars, dial } from '../kit/chart.ts';
 import { icon, type Icon } from '../kit/icons.ts';
 import { band, card, infoMark, panel } from '../kit/panel.ts';
-import { drawn, el, ordinal } from '../kit/part.ts';
+import { el, ordinal } from '../kit/part.ts';
 import { portrait } from '../kit/portrait.ts';
 import { job, tag } from '../kit/stat.ts';
 import { stylesheet } from '../kit/style.ts';
 import { table } from '../kit/table.ts';
-import { rhumbs, rose } from '../marks.ts';
 import type { Office } from './office.ts';
 import type { Screen } from './screens.ts';
 
@@ -39,9 +37,10 @@ const CSS = `
 .h-drivers > div + div { border-left: 1px solid var(--rule); }
 .h-drivers span { max-width: 100%; padding: 0 3px; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .h-drivers b { font: 700 16px/1 var(--narrow); }
-.h-ship { position: relative; flex: 1; min-height: 0; overflow: hidden; background: var(--light); border: 1.5px solid var(--ink);
-  box-shadow: 0 2px 0 var(--shade); }
-.h-ship > svg { position: absolute; left: 0; top: 0; width: 100%; height: 100%; }
+.h-ship { position: relative; flex: 1; min-height: 0; border: 1.5px solid var(--ink);
+  box-shadow: 0 2px 0 var(--shade), inset 0 0 0 3px var(--panel), inset 0 0 0 4px var(--line); }
+/* she is drawn larger than the window is high, about a point a little over its middle: her hull and her courses fill it */
+.h-ship > .o-subject { position: absolute; left: 0; right: 0; top: 50%; height: 210px; margin-top: -113px; pointer-events: none; }
 .h-jobs .k-btn { padding: 0 9px; font-size: 14px; }
 .h-jobs .k-who { max-width: 150px; }
 .h-chair { flex: none; height: 252px; }
@@ -61,7 +60,7 @@ const CSS = `
 .h-next { flex: none; height: 226px; }
 .h-next > .k-body { padding: 0 4px 6px; gap: 6px; }
 .h-art { position: relative; flex: 1; min-height: 0; overflow: hidden; background: var(--light); border: 1.5px solid var(--ink); }
-.h-art > svg { position: absolute; left: 0; top: 0; width: 100%; height: 100%; }
+.h-art > img { position: absolute; left: 0; top: 0; width: 100%; height: 100%; object-fit: cover; }
 .h-art > .h-plate { position: absolute; left: 0; bottom: 12px; padding: 6px 18px 6px 12px; display: flex; flex-direction: column;
   background: var(--plate); color: var(--plate-ink); }
 .h-plate > span { font-size: 13px; font-style: italic; color: var(--plate-faint); }
@@ -85,6 +84,15 @@ const PICTURE: Readonly<Record<NewsKind, Icon>> = {
 /** `made`, of the classes `cls` too (a panel's place in its column). */
 const as = <T extends Element>(made: T, cls: string) => {
   made.classList.add(...cls.split(' '));
+  return made;
+};
+
+/** The planet the next race is sailed on, as it was pictured from space (nothing until it has been). */
+const pictured = (address: string | null) => {
+  if (!address) return null;
+  const made = el('img');
+  made.src = address;
+  made.alt = '';
   return made;
 };
 
@@ -149,16 +157,8 @@ export function createHome(office: Office): Screen<HomeView> {
           ]),
           'h-team'
         ),
-        el(
-          'div',
-          'h-ship',
-          drawn(
-            320,
-            156,
-            rhumbs(160, 90, 420, 0.16) +
-              galleon(160, 80, 150, { sail: v.team.colours[0], waves: true })
-          )
-        ),
+        // her ship herself, at anchor off the harbour: the world through the page
+        el('div', 'h-ship o-window', el('div', 'o-subject')),
         as(
           panel(
             'Chairman’s Happiness',
@@ -266,7 +266,7 @@ export function createHome(office: Office): Screen<HomeView> {
             el(
               'div',
               'h-art',
-              drawn(360, 170, rhumbs(250, 70, 520, 0.2) + rose(250, 70, 58, 0)),
+              pictured(office.still()),
               el(
                 'div',
                 'h-plate',

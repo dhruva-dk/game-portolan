@@ -1,10 +1,11 @@
 // What the team builds, laid out as the manager's game it follows lays them.
 //
-// Headquarters: the harbour's chart (harbour.ts), each of the nine buildings a
-// woodcut in its place under its name and level; one tapped opens its card
-// over the roads at the chart's left (what it is for, what it costs a race,
-// the next level's cost and days, and the way to build it, or how far the
-// works have got). At the right the headquarters' stats against the
+// Headquarters: the harbour itself, live, through the page: the camera stands
+// out over the water before it (play/anchorage.ts), and each of the nine
+// buildings carries its name and level over its head, pinned to it as it is
+// drawn; one tapped opens its card at the left (what it is for, what it costs
+// a race, the next level's cost and days, and the way to build it, or how far
+// the works have got). At the right the headquarters' stats against the
 // championship, and what her designer knows of each part's components.
 //
 // Ship: her ship herself, live, through the page; beside her the ships' stats
@@ -21,42 +22,38 @@ import { button, segmented } from '../kit/button.ts';
 import { bars } from '../kit/chart.ts';
 import { icon } from '../kit/icons.ts';
 import { band, panel } from '../kit/panel.ts';
-import { drawn, el, pressed, styled } from '../kit/part.ts';
+import { drawn, el, pressed } from '../kit/part.ts';
 import { job, meter } from '../kit/stat.ts';
 import { cut, stylesheet } from '../kit/style.ts';
 import { plan } from '../vitals.ts';
 import { acted, bitsStyle, lines, money } from './bits.ts';
-import { BOX, CHART, SITES, harbour, woodcut } from './harbour.ts';
 import type { Office } from './office.ts';
 import type { Screen } from './screens.ts';
 
-/** A site's box on the chart, and how many times its woodcut's box the drawing is. */
-const SITE = { w: 150, k: 1.2 } as const;
-
 const CSS = `
-.s-hq { display: grid; grid-template-columns: 1fr 330px; gap: 10px; padding: 12px 18px; }
-.q-sheet { position: relative; overflow: hidden; }
-.q-chart { position: absolute; left: 50%; top: 50%; width: ${CHART.w}px; height: ${CHART.h}px;
-  margin: ${-CHART.h / 2}px 0 0 ${-CHART.w / 2}px; }
-.q-chart > svg { position: absolute; left: 0; top: 0; }
-.q-site { position: absolute; width: ${SITE.w}px; margin-left: ${-SITE.w / 2}px; display: flex; flex-direction: column;
-  align-items: center; }
-.q-site > svg { margin-bottom: -6px; }
-.q-label { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 4px 12px 6px; ${cut('light')}
-  white-space: nowrap; }
-.q-label > b { font: 700 13px/1.1 var(--serif); letter-spacing: .1em; text-transform: uppercase; }
+.s-hq > .o-window { position: absolute; inset: 0; }
+/* the harbour is drawn in the middle of what the panels leave of the page */
+.q-subject { position: absolute; left: 0; right: 348px; top: 34px; bottom: 0; pointer-events: none; }
+/* (a card open at the left: in what that leaves, smaller) */
+.q-subject.carded { left: 316px; top: 120px; bottom: 40px; }
+.q-site { position: absolute; left: 0; top: 0; width: 0; height: 0; visibility: hidden; }
+.q-label { position: absolute; left: 0; bottom: 6px; transform: translateX(-50%); display: flex; flex-direction: column;
+  align-items: center; gap: 3px; padding: 3px 9px 5px; ${cut('light')} white-space: nowrap; }
+.q-label .h-level > i { width: 18px; height: 6px; }
+.q-label::after { content: ''; position: absolute; left: 50%; bottom: -9px; width: 1.5px; height: 8px; background: var(--ink); }
+.q-label > b { font: 700 13px/1.1 var(--serif); letter-spacing: .06em; text-transform: uppercase; }
 .q-site.chosen > .q-label { ${cut('gilt')} }
 .q-label > .q-works { width: 84px; height: 7px; background: var(--stripes); box-shadow: inset 0 0 0 .8px var(--ink); }
 .h-level { display: flex; gap: 4px; justify-content: center; }
 .h-level > i { width: 24px; height: 7px; background: var(--light); box-shadow: inset 0 0 0 1px var(--line); }
 .h-level > i.on { background: var(--hatch), var(--go); box-shadow: inset 0 0 0 1px var(--ink); }
-.q-card { position: absolute; left: 10px; top: 10px; width: 286px; }
+.q-card { position: absolute; left: 18px; top: 12px; width: 290px; }
 .q-card > .k-body { gap: 8px; }
 .q-card .k-head { padding-left: 16px; padding-right: 40px; }
-.q-pic { display: grid; place-items: center; padding: 6px 0 2px; background: var(--light); box-shadow: inset 0 0 0 1px var(--line); }
 .q-about { margin: 0; padding: 0 2px; line-height: 1.35; font-style: italic; }
 .q-top { text-align: center; font: 700 14px var(--serif); letter-spacing: .12em; text-transform: uppercase; color: var(--good); }
-.q-side { display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+.q-side { position: absolute; right: 18px; top: 12px; bottom: 12px; width: 330px; display: flex; flex-direction: column;
+  gap: 10px; }
 .q-side > .q-stats { flex: none; height: 318px; }
 .q-side .k-names > div { font-weight: 500; letter-spacing: 0; }
 .q-know { flex: 1; }
@@ -67,7 +64,9 @@ const CSS = `
 .q-part > small { font-size: 13px; font-style: italic; color: var(--faint); }
 
 .s-ship > .o-window { position: absolute; inset: 0; }
-.y-stats { position: absolute; left: 18px; top: 12px; width: 372px; height: 470px; }
+/* she is drawn in the middle of what the panels leave of the page */
+.y-subject { position: absolute; left: 0; right: 400px; top: 0; bottom: 170px; pointer-events: none; }
+.y-stats { position: absolute; right: 18px; top: 12px; width: 372px; height: 470px; }
 .y-stats > .k-body { gap: 8px; }
 .y-stats .k-names > div { font-weight: 500; letter-spacing: 0; }
 .y-doing { position: absolute; left: 18px; right: 18px; bottom: 10px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
@@ -136,14 +135,6 @@ const pips = (b: Works) =>
     ...Array.from({ length: b.top }, (_, i) => el('i', i < b.level ? 'on' : ''))
   );
 
-/** A building's woodcut, `k` times its box. */
-function cutOf(id: Building, k: number) {
-  const svg = drawn(BOX.w, BOX.h, woodcut(id));
-  svg.setAttribute('width', String(BOX.w * k));
-  svg.setAttribute('height', String(BOX.h * k));
-  return svg;
-}
-
 /** The headquarters. */
 export function createHq(office: Office): Screen<HqPaper> {
   stylesheet(CSS);
@@ -152,35 +143,33 @@ export function createHq(office: Office): Screen<HqPaper> {
   /** The building whose card is open. */
   let chosen: Building | null = null;
 
+  /** A building's name and level, pinned over its head (the office moves it there: data-plot). */
   const site = (b: Works) => {
-    const [x, y] = SITES[b.id];
-    return styled(
+    const made = el(
+      'div',
+      `q-site${b.id === chosen ? ' chosen' : ''}`,
       pressed(
         el(
           'div',
-          `q-site${b.id === chosen ? ' chosen' : ''}`,
-          cutOf(b.id, SITE.k),
-          el(
-            'div',
-            'q-label',
-            el('b', '', b.name),
-            b.under ? el('i', 'q-works') : pips(b)
-          )
+          'q-label',
+          el('b', '', b.name),
+          b.under ? el('i', 'q-works') : pips(b)
         ),
         () => {
           chosen = chosen === b.id ? null : b.id;
           office.draw();
         }
-      ),
-      { left: `${x}px`, top: `${y - BOX.h * SITE.k * 0.875}px` }
+      )
     );
+    made.dataset.plot = b.id;
+    return made;
   };
 
   const card = (b: Works) => {
     const sheet = panel(
       b.name,
       [
-        el('div', 'q-pic', cutOf(b.id, 2.2), pips(b)),
+        pips(b),
         lines([
           ['Level', `${b.level} of ${b.top}`],
           ['Cost per Race', money(b.upkeep)],
@@ -230,16 +219,12 @@ export function createHq(office: Office): Screen<HqPaper> {
     show(v) {
       const open = v.buildings.find((b) => b.id === chosen);
       const sheet = el(
-        'section',
-        'k-panel q-sheet',
-        el(
-          'div',
-          'q-chart',
-          drawn(CHART.w, CHART.h, harbour()),
-          ...v.buildings.map(site),
-          open && card(open)
-        )
+        'div',
+        'o-window',
+        el('div', `o-subject q-subject${open ? ' carded' : ''}`),
+        ...v.buildings.map(site)
       );
+      sheet.dataset.scene = 'harbour';
       const stats = panel('Headquarters Stats', [
         bars(v.stats, 'Best in Championship', 'Average Team'),
       ]);
@@ -258,7 +243,11 @@ export function createHq(office: Office): Screen<HqPaper> {
         )
       );
       know.classList.add('q-know');
-      root.replaceChildren(sheet, el('div', 'q-side', stats, know));
+      root.replaceChildren(
+        sheet,
+        ...(open ? [card(open)] : []),
+        el('div', 'q-side', stats, know)
+      );
     },
   };
 }
@@ -352,7 +341,7 @@ export function createShip(office: Office): Screen<ShipPaper> {
       return made;
     };
     return [
-      el('div', 'o-window'),
+      el('div', 'o-window', el('div', 'o-subject y-subject')),
       stats,
       el(
         'div',
