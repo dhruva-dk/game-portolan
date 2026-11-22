@@ -43,7 +43,7 @@ const CSS = `
 .s-result > .k-panel { width: 1000px; }
 .r-head { flex: none; display: flex; align-items: center; gap: 10px; padding: 12px 14px 10px;
   font: 600 19px/1 var(--narrow); letter-spacing: .08em; text-transform: uppercase; }
-.r-head > span { flex: 1; }
+.r-head > span:first-child { flex: 1; }
 .r-head > b { padding: 6px 12px; background: var(--good); color: var(--on-fill); font: 700 15px/1 var(--narrow); letter-spacing: .04em; }
 .r-head > small { font: 500 15px/1 var(--narrow); letter-spacing: .04em; color: var(--faint); }
 `;

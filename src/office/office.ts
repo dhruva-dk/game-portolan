@@ -4,7 +4,8 @@
 // from; the desk hands the views out and takes what is asked. Types and
 // constants only.
 
-import type { Call } from '../race.ts';
+import type { Call, PartType } from '../race.ts';
+import type { Command, Offer } from './command.ts';
 import type { HomeView } from './home.ts';
 import type {
   FoundView,
@@ -14,6 +15,24 @@ import type {
   StandingsView,
 } from './loop.ts';
 import type { MenuView } from './menu.ts';
+import type {
+  CalendarPaper,
+  Dyed,
+  FinancesPaper,
+  HqPaper,
+  MailPaper,
+  ShipPaper,
+  SponsorsPaper,
+} from './papers.ts';
+import type {
+  CareerView,
+  JobsView,
+  OfferView,
+  ProfileView,
+  ScoutingFilter,
+  ScoutingView,
+  TeamView,
+} from './people.ts';
 import type { ShellView } from './shell.ts';
 
 /** The nav's tabs, in the order they stand. */
@@ -58,13 +77,30 @@ export interface Views {
   plan: PlanView;
   result: ResultView;
   standings: StandingsView;
+  team: Dyed<TeamView>;
+  drivers: Dyed<TeamView>;
+  staff: Dyed<TeamView>;
+  profile: Dyed<ProfileView>;
+  offer: Dyed<OfferView>;
+  scouting: Dyed<ScoutingView>;
+  player: Dyed<CareerView>;
+  jobs: Dyed<JobsView>;
+  mail: MailPaper;
+  calendar: CalendarPaper;
+  finances: FinancesPaper;
+  sponsors: SponsorsPaper;
+  hq: HqPaper;
+  ship: ShipPaper;
 }
 export type Viewed = keyof Views;
 
 /**
  * What a screen asks: to open another screen (a tab, or one a tab leads to),
  * to go on (Continue), the menu's four ways, of a job under way its details
- * or its cancelling, the team made, and her team's call for the race's start.
+ * or its cancelling, the team made, and her team's call for the race's start;
+ * a command of the career's; a person's profile or the offer to them opened,
+ * the offer as it is drawn now, the scouting list's filter; a letter opened;
+ * the type of part on the drawing board, and a slot's card picked.
  */
 export type Ask =
   | { kind: 'open'; screen: Tab | Viewed }
@@ -72,7 +108,14 @@ export type Ask =
   | { kind: 'menu'; choice: 'new' | 'continue' | 'single' | 'preferences' }
   | { kind: 'job'; job: string; what: 'details' | 'cancel' }
   | { kind: 'found'; founding: Founding }
-  | { kind: 'call'; call: Call };
+  | { kind: 'call'; call: Call }
+  | { kind: 'send'; command: Command }
+  | { kind: 'person'; id: number; screen: 'profile' | 'offer' }
+  | { kind: 'draft'; offer: Offer }
+  | { kind: 'filter'; filter: ScoutingFilter }
+  | { kind: 'letter'; id: number }
+  | { kind: 'design'; type: PartType }
+  | { kind: 'card'; slot: number; card: string };
 
 /**
  * The desk the office is drawn from: the shell's view, each screen's, and what

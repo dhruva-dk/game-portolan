@@ -147,20 +147,8 @@ export const EXCEPTIONS: readonly Exception[] = [
   {
     rule: 'exports',
     file: 'src/career/read.ts',
-    name: 'fixtures',
-    why: "the calendar's view (MANAGER.md 5, calendar), tested; taken by the desk when that screen is built",
-  },
-  {
-    rule: 'exports',
-    file: 'src/career/read.ts',
     name: 'preview',
     why: "race preparation's view (MANAGER.md 5), tested; taken by the desk when that screen is built",
-  },
-  {
-    rule: 'exports',
-    file: 'src/career/read.ts',
-    name: 'dilemmaView',
-    why: "a dilemma's choices (MANAGER.md 5, mail), tested; taken by the desk when that screen is built",
   },
   {
     rule: 'exports',

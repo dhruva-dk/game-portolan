@@ -20,11 +20,27 @@ import {
   type Entry,
   type Look,
 } from './career/office.ts';
+import {
+  calendarPaper,
+  financesPaper,
+  hqPaper,
+  mailPaper,
+  shipPaper,
+  sponsorsPaper,
+} from './career/papers.ts';
 import type { CareerState } from './career/state.ts';
 import { createSession, type Shelf } from './desk.ts';
-import type { Command } from './office/command.ts';
+import type { Command, Offer } from './office/command.ts';
 import type { Ask, Desk, Tab, Viewed, Views } from './office/office.ts';
-import { TEAM, TEAMS, type RaceCard, type RaceResult } from './race.ts';
+import type { Dyed } from './office/papers.ts';
+import type { ScoutingFilter } from './office/people.ts';
+import {
+  TEAM,
+  TEAMS,
+  type PartType,
+  type RaceCard,
+  type RaceResult,
+} from './race.ts';
 
 /** What the manager asks of the page: its planet, its office, and its game. */
 interface Page {
@@ -69,6 +85,13 @@ export async function createManager(shelf: Shelf, look: Look, page: Page) {
     racing: Racing | null = null,
     waiting = false,
     last: Parameters<typeof resultView>[2] | null = null;
+  /** What the screens are open at: a person and the offer drawn to them, the scouting list's filter, a letter, the drawing board. */
+  let person: number | null = null,
+    draft: Offer | null = null,
+    filter: ScoutingFilter | null = null,
+    letter: number | null = null,
+    drafting: PartType = 'sails',
+    picked: (string | null)[] = [];
 
   /** The career, if one is founded. */
   const founded = (): CareerState | null => {
@@ -131,8 +154,9 @@ export async function createManager(shelf: Shelf, look: Look, page: Page) {
       // (kept while the result is still shown: the page may be sailing on under it)
       arrive();
       if (page.at() !== 'result') last = null;
-    } else if (s.player?.sacked) {
-      // (the posts offered have no screen yet: the highest championship's is taken)
+    } else if (s.player?.sacked && page.at() !== 'jobs') page.open('jobs');
+    else if (s.player?.sacked) {
+      // (Continue past the posts offered: the highest championship's is taken)
       const post = [...s.player.offers].sort(
         (a, b) =>
           (s.teams[a.team]?.tier ?? 9) - (s.teams[b.team]?.tier ?? 9) ||
@@ -180,8 +204,35 @@ export async function createManager(shelf: Shelf, look: Look, page: Page) {
       const [what, id] = a.job.split(':');
       if (a.what === 'cancel' && what === 'scout')
         await send({ kind: 'CancelScout', scout: Number(id) });
+      else if (a.what === 'details')
+        page.open(
+          what === 'scout' ? 'scouting' : what === 'design' ? 'ship' : 'hq'
+        );
     } else if (a.kind === 'continue') await goOn();
+    else if (a.kind === 'send') {
+      const no = await send(a.command);
+      if (no) return;
+      if (a.command.kind === 'StartDesign') picked = [];
+      if (a.command.kind === 'TakeJob') arrive();
+    } else if (a.kind === 'person') {
+      person = a.id;
+      draft = null;
+      page.open(a.screen);
+    } else if (a.kind === 'draft') draft = a.offer;
+    else if (a.kind === 'filter') filter = a.filter;
+    else if (a.kind === 'letter') {
+      letter = a.id;
+      if (career().mail.some((m) => m.id === a.id && !m.read))
+        await send({ kind: 'MarkRead', mail: a.id });
+    } else if (a.kind === 'design') {
+      drafting = a.type;
+      picked = [];
+    } else if (a.kind === 'card')
+      picked[a.slot] = picked[a.slot] === a.card ? null : a.card;
   }
+
+  const dyed = <V>(view: V): Dyed<V> => ({ view, dyes: look.dyes });
+  const roster = () => dyed(session.desk.team());
 
   const views: { [K in Viewed]: () => Views[K] } = {
     menu() {
@@ -197,6 +248,20 @@ export async function createManager(shelf: Shelf, look: Look, page: Page) {
     found: () => foundingView(world, look, refused),
     plan: () => planView(career(), look, waiting),
     standings: () => standingsView(career(), look),
+    team: roster,
+    drivers: roster,
+    staff: roster,
+    profile: () => dyed(session.desk.profile(person)),
+    offer: () => dyed(session.desk.offer(person, draft)),
+    scouting: () => dyed(session.desk.market(filter, [])),
+    player: () => dyed(session.desk.career()),
+    jobs: () => dyed(session.desk.jobs()),
+    mail: () => mailPaper(career(), letter),
+    calendar: () => calendarPaper(career()),
+    finances: () => financesPaper(career()),
+    sponsors: () => sponsorsPaper(career()),
+    hq: () => hqPaper(career()),
+    ship: () => shipPaper(career(), drafting, picked),
     result() {
       if (!last) throw new Error('no race has been sailed');
       return resultView(career(), look, last);

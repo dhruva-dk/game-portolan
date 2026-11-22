@@ -3,7 +3,8 @@
 // through to race day, the race sailed (her ship left to the storm, then the
 // race hurried to its end), its result, and on to the next planet. A capture
 // at each step, and what the page logged on the way.
-//   node tools/career/play.ts [--out=dir] [--races=n]
+//   node tools/career/play.ts [--out=dir] [--races=n] [--tour]
+// --tour: after the first race, every tab of the nav opened and captured.
 // It fails (exit 1) if a step's screen never comes.
 
 import { mkdirSync } from 'node:fs';
@@ -27,6 +28,23 @@ page.on(
     console.error(`[page] ${m.text()}`)
 );
 page.on('pageerror', (e) => console.error(`[page] ${e.message}`));
+
+/** The nav's tabs, in the order they stand (src/office/office.ts TABS). */
+const TABS = [
+  'home',
+  'player',
+  'mail',
+  'ship',
+  'hq',
+  'team',
+  'drivers',
+  'staff',
+  'scouting',
+  'finances',
+  'sponsors',
+  'standings',
+  'calendar',
+];
 
 let shot = 0;
 const capture = async (name: string) => {
@@ -55,6 +73,37 @@ try {
   await page.waitForTimeout(1500);
   await capture('home');
 
+  /** Every tab of the nav opened in turn and captured (the first row of a list tapped, where `into` names its screen). */
+  const tour = async (label: string) => {
+    for (let i = 1; i < TABS.length; i++) {
+      await page.locator('.o-tab').nth(i).click();
+      await at(TABS[i], 10000);
+      await page.waitForTimeout(500);
+      await capture(`${label}-${TABS[i]}`);
+    }
+    // a letter opened, a design's cards dealt, a driver's profile and the offer to a scouted person
+    await page.locator('.o-tab').nth(2).click();
+    await tap('.s-mail .k-rows > .k-tr');
+    await page.waitForTimeout(400);
+    await capture(`${label}-letter`);
+    await page.locator('.o-tab').nth(3).click();
+    await tap('.y-slot .k-btn');
+    await page.waitForTimeout(400);
+    await tap('.y-card');
+    await page.waitForTimeout(400);
+    await capture(`${label}-design`);
+    await page.locator('.o-tab').nth(8).click();
+    await tap('.s-scouting .k-rows > .k-tr');
+    await at('profile', 10000);
+    await page.waitForTimeout(400);
+    await capture(`${label}-profile`);
+    await page.locator('.s-profile .k-btn.on').click();
+    await at('offer', 10000);
+    await page.waitForTimeout(400);
+    await capture(`${label}-offer`);
+    await page.locator('.o-tab').nth(0).click();
+    await at('home', 10000);
+  };
   for (let race = 1; race <= races; race++) {
     // Continue through the days until race day's plan opens
     for (let stops = 0; stops < 40; stops++) {
@@ -104,6 +153,7 @@ try {
     await at('home');
     await page.waitForTimeout(1500);
     await capture(`race${race}-home`);
+    if (race === 1 && process.argv.includes('--tour')) await tour('tour');
   }
   console.log('played through');
 } catch (e) {

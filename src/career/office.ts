@@ -43,7 +43,7 @@ const CHAMPIONSHIPS = [
   'Second Championship',
   'Third Championship',
 ];
-const championship = (tier: number) =>
+export const championship = (tier: number) =>
   CHAMPIONSHIPS[tier] ?? `Championship ${tier + 1}`;
 
 /** The year the first season is sailed in, and the months a season runs through with their days. */
@@ -58,9 +58,9 @@ const MONTHS: readonly (readonly [string, number])[] = [
   ['September', 30],
 ];
 
-/** A day of a season as a date: its first day is the first of March. */
-function dateOf(s: CareerState): string {
-  let left = Math.max(0, s.day - (s.calendar?.start ?? s.day));
+/** A day of the season as a date: the season's first day is the first of March. */
+export function dateAt(s: CareerState, day: number): string {
+  let left = Math.max(0, day - (s.calendar?.start ?? day));
   for (const [month, days] of MONTHS) {
     if (left < days) return `${left + 1} ${month} ${YEAR_ONE + s.season}`;
     left -= days;
@@ -79,7 +79,7 @@ const named = (c: Team, look: Look): Named => ({
 });
 
 /** A person's name as a table has it (an initial and the family name), and in full. */
-const short = (g: Person) => `${g.given.charAt(0)}. ${g.family}`;
+export const short = (g: Person) => `${g.given.charAt(0)}. ${g.family}`;
 const full = (g: Person) => `${g.given} ${g.family}`;
 
 /** A name's words, each with its capital. */
@@ -111,7 +111,7 @@ export function shellView(s: CareerState, look: Look): ShellView {
       ? { name: next.planet.name, days: Math.max(0, next.day - s.day) }
       : { name: 'Season’s End', days: 0 },
     notices: unread,
-    date: dateOf(s),
+    date: dateAt(s, s.day),
     marks: {
       ...(c.design && { ship: { busy: true } }),
       ...(building && { hq: { busy: true } }),
@@ -247,17 +247,18 @@ function teamStats(s: CareerState, c: Team): HomeView['stats'] {
 }
 
 /** What a letter's category pictures, and how the news heads it. */
-const NEWS: Readonly<Record<MailCategory, readonly [NewsKind, string]>> = {
-  team: ['driver', 'Team'],
-  market: ['driver', 'Market'],
-  ship: ['part', 'Ship'],
-  hq: ['building', 'Headquarters'],
-  tier: ['vote', 'Championship'],
-  finance: ['sponsor', 'Finances'],
-  chairman: ['vote', 'Chairman'],
-};
+export const NEWS: Readonly<Record<MailCategory, readonly [NewsKind, string]>> =
+  {
+    team: ['driver', 'Team'],
+    market: ['driver', 'Market'],
+    ship: ['part', 'Ship'],
+    hq: ['building', 'Headquarters'],
+    tier: ['vote', 'Championship'],
+    finance: ['sponsor', 'Finances'],
+    chairman: ['vote', 'Chairman'],
+  };
 
-const BUILT: Readonly<Record<Building, string>> = {
+export const BUILT: Readonly<Record<Building, string>> = {
   factory: 'Factory',
   drawingLoft: 'Drawing Loft',
   testTank: 'Test Tank',
@@ -268,7 +269,7 @@ const BUILT: Readonly<Record<Building, string>> = {
   fishMarket: 'Fish Market',
   landingPad: 'Landing Pad',
 };
-const PARTS: Readonly<Record<string, string>> = {
+export const PARTS: Readonly<Record<string, string>> = {
   sails: 'Sails',
   rigging: 'Rigging',
   rudder: 'Rudder',
@@ -278,7 +279,7 @@ const PARTS: Readonly<Record<string, string>> = {
 };
 
 /** A job's share done and days left, from the days it began and ends on. */
-const span = (s: CareerState, began: number, ends: number) => ({
+export const span = (s: CareerState, began: number, ends: number) => ({
   done: Math.min(1, Math.max(0, (s.day - began) / Math.max(1, ends - began))),
   days: Math.max(0, ends - s.day),
 });

@@ -22,7 +22,12 @@ const SHELL: ShellView = {
   on: 'Continue',
 };
 
-const VIEWS: Views = {
+/** The screens the fixture has a view for (the rest are drawn from a career: ?manager). */
+const VIEWS: Pick<
+  Views,
+  'menu' | 'home' | 'found' | 'plan' | 'result' | 'standings'
+> &
+  Partial<Views> = {
   menu: {
     career: { championships: 3, teams: 3 * GRID },
     kept: { team: HERS, date: SHELL.date },
@@ -89,6 +94,10 @@ const VIEWS: Views = {
 
 export const FIXTURE: Desk = {
   shell: () => SHELL,
-  view: (screen) => VIEWS[screen],
+  view<K extends keyof Views>(screen: K): Views[K] {
+    const v: Partial<Views>[K] = VIEWS[screen];
+    if (v === undefined) throw new Error(`the fixture has no ${screen}`);
+    return v;
+  },
   ask() {},
 };

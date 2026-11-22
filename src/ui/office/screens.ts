@@ -12,13 +12,28 @@ import {
   type Viewed,
   type Views,
 } from '../../office/office.ts';
+import { createJobs, createPlayer } from './career.ts';
 import { createFound } from './found.ts';
 import { createHome } from './home.ts';
 import { createKit } from './kit.ts';
+import { createOffer, createScouting } from './market.ts';
 import { createMenu } from './menu.ts';
 import type { Office } from './office.ts';
+import {
+  createCalendar,
+  createFinances,
+  createMail,
+  createSponsors,
+} from './papers.ts';
+import {
+  createDrivers,
+  createProfile,
+  createStaff,
+  createTeam,
+} from './people.ts';
 import { createPlan, createResult } from './raceday.ts';
 import { createStandings } from './standings.ts';
+import { createHq, createShip } from './yard.ts';
 
 /** A screen's name: a tab's, a viewed screen's, or the kit's sheet. */
 export type Name = Tab | Viewed | 'kit';
@@ -29,6 +44,9 @@ export const NAMES: readonly Name[] = [
   'found',
   'plan',
   'result',
+  'profile',
+  'offer',
+  'jobs',
   'kit',
 ];
 
@@ -88,6 +106,38 @@ export const SCREENS: Readonly<Partial<Record<Name, Entry>>> = {
     title: 'Standings',
     tab: 'standings',
   }),
+  player: viewed('player', createPlayer, { title: 'Player', tab: 'player' }),
+  mail: viewed('mail', createMail, { title: 'Mail', tab: 'mail' }),
+  ship: viewed('ship', createShip, { title: 'Ship', tab: 'ship' }),
+  hq: viewed('hq', createHq, { title: 'Headquarters', tab: 'hq' }),
+  team: viewed('team', createTeam, { title: 'Team', tab: 'team' }),
+  drivers: viewed('drivers', createDrivers, {
+    title: 'Drivers',
+    tab: 'drivers',
+  }),
+  staff: viewed('staff', createStaff, { title: 'Staff', tab: 'staff' }),
+  scouting: viewed('scouting', createScouting, {
+    title: 'Scouting',
+    tab: 'scouting',
+  }),
+  finances: viewed('finances', createFinances, {
+    title: 'Finances',
+    tab: 'finances',
+  }),
+  sponsors: viewed('sponsors', createSponsors, {
+    title: 'Sponsors',
+    tab: 'sponsors',
+  }),
+  calendar: viewed('calendar', createCalendar, {
+    title: 'Calendar',
+    tab: 'calendar',
+  }),
+  profile: viewed('profile', createProfile, { title: 'Profile', tab: null }),
+  offer: viewed('offer', createOffer, {
+    title: 'Contract Negotiation',
+    tab: 'scouting',
+  }),
+  jobs: viewed('jobs', createJobs, { title: 'Job Offers', tab: 'player' }),
   menu: viewed('menu', createMenu, {
     title: 'Main Menu',
     tab: null,

@@ -53,12 +53,12 @@ const CSS = `
 .w-row.own { background: var(--chip); font-weight: 700; }
 .w-row.out { color: var(--bar-faint); text-decoration: line-through; }
 .w-mates { position: absolute; right: 12px; top: 384px; width: 196px; display: flex; flex-direction: column; gap: 4px; }
-.w-mate { display: grid; grid-template-columns: 40px 1fr; column-gap: 8px; align-items: center; padding: 5px 8px 6px;
+.w-mate { display: grid; grid-template-columns: 40px 1fr; column-gap: 8px; align-items: center; padding: 2px 8px 4px;
   background: var(--plate); color: var(--bar-ink); border: 1.5px solid var(--ink); font-size: 13px; }
 .w-mate > b { grid-row: span 2; font: 700 19px/1 var(--narrow); }
 .w-mate > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .w-mate > small { font-size: 13px; color: var(--bar-faint); }
-.w-mate > .k-meter { grid-column: span 2; height: 5px; margin-top: 3px; background: var(--chip); }
+.w-mate > .k-meter { grid-column: span 2; height: 4px; margin-top: 2px; background: var(--chip); }
 .w-mate.out { opacity: .55; }
 .w-keys { position: absolute; left: 420px; top: 96px; width: 340px; display: flex; gap: 6px; }
 .w-keys > .k-btn { flex: 1; height: 44px; padding: 0 8px; }
@@ -269,8 +269,8 @@ export function createPitwall(act: {
             el(
               'div',
               `w-job${chosen.includes(j) ? ' chosen' : ''}`,
-              JOB[j],
-              cost > 0 ? `${Math.ceil(cost)} s` : '-'
+              el('span', '', JOB[j]),
+              el('span', '', cost > 0 ? `${Math.ceil(cost)} s` : '-')
             ),
             () => {
               chosen = chosen.includes(j)
