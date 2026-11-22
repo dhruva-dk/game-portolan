@@ -117,7 +117,15 @@ try {
       await capture(`${label}-${name}`);
     };
     await asked(10, '.sp-sign .k-btn:not(.off)', 'signed');
-    await asked(4, '.s-hq .k-btn.on:not(.off)', 'building');
+    // (a building of the harbour chosen by its label: its card has what may be built)
+    await page.locator('.o-tab').nth(4).click();
+    await page.waitForTimeout(600);
+    await page
+      .locator('.q-site .q-label')
+      .first()
+      .click({ timeout: 3000 })
+      .catch(() => null);
+    await asked(4, '.q-card .k-btn:not(.off)', 'building');
     await asked(3, '.s-ship .b-act .k-btn:not(.off)', 'designing');
     await page.locator('.o-tab').nth(0).click();
     await at('home', 10000);

@@ -372,7 +372,9 @@ async function play(s: Stage): Promise<Played> {
     flow.office(true);
     if (careered() && manager.founded) manager.arrive();
     else office.go('menu');
-    office.show(true);
+    // (shown once the world can be drawn: its windows are onto it; the title
+    // covers the page till then)
+    void s.ready.then(() => office.show(true));
   }
 
   /** A career's race over, with its result: the sea made quiet again under the office, which takes the result. */

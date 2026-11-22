@@ -13,8 +13,8 @@
 // things done to a ship, each a card with how it stands and the way to it.
 // Design New Part: the six parts to choose from, the drawing board's slots
 // (each slot's cards dealt and one picked) and what the part would be and
-// cost. Fit Parts: each ship's plan with her six parts round it, and the
-// spares, each fitted to a ship by a tap.
+// cost. Fit Parts: each ship's six parts, a tile each, and the spares, each
+// fitted to a ship by a tap.
 
 import { SHIPS, type Building } from '../../office/command.ts';
 import type { HqPaper, PartLine, ShipPaper } from '../../office/papers.ts';
@@ -22,10 +22,9 @@ import { button, segmented } from '../kit/button.ts';
 import { bars } from '../kit/chart.ts';
 import { icon } from '../kit/icons.ts';
 import { band, panel } from '../kit/panel.ts';
-import { drawn, el, pressed } from '../kit/part.ts';
+import { el, pressed } from '../kit/part.ts';
 import { job, meter } from '../kit/stat.ts';
 import { cut, stylesheet } from '../kit/style.ts';
-import { plan } from '../vitals.ts';
 import { acted, bitsStyle, lines, money } from './bits.ts';
 import type { Office } from './office.ts';
 import type { Screen } from './screens.ts';
@@ -105,8 +104,7 @@ const CSS = `
 .y-fig > .k-meter { grid-column: 1 / 3; height: 9px; }
 
 .y-ships { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
-.y-ship > .k-body { display: grid; grid-template-columns: 1fr 84px 1fr; align-items: center; gap: 2px; padding: 4px 7px 10px; }
-.y-ship > .k-body > svg { justify-self: center; }
+.y-ship > .k-body { display: grid; grid-template-columns: 1fr 1fr; align-items: center; gap: 8px; padding: 4px 9px 10px; }
 .y-ship > .k-head { padding: 12px 8px 2px; }
 .y-ship > .k-head > small { display: block; margin-top: 3px; font: italic 500 13px var(--serif); letter-spacing: 0; text-transform: none;
   color: var(--faint); }
@@ -521,7 +519,7 @@ export function createShip(office: Office): Screen<ShipPaper> {
     ];
   }
 
-  /** The fitting: each ship's plan with her parts round it, and the spares. */
+  /** The fitting: each ship's six parts, and the spares. */
   function fitting(v: ShipPaper) {
     const spares = v.parts.filter((p) => p.ship === null);
     const half = Math.ceil(v.types.length / 2);
@@ -538,9 +536,6 @@ export function createShip(office: Office): Screen<ShipPaper> {
             )
           )
         );
-      const sketch = drawn(84, 92, plan());
-      sketch.setAttribute('width', '84');
-      sketch.setAttribute('height', '92');
       const made = el(
         'section',
         'k-panel y-ship',
@@ -549,7 +544,6 @@ export function createShip(office: Office): Screen<ShipPaper> {
           'div',
           'k-body',
           side(v.types.slice(0, half)),
-          sketch,
           side(v.types.slice(half))
         )
       );

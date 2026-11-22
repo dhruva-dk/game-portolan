@@ -12,7 +12,7 @@ import { button, dropdown, segmented } from '../kit/button.ts';
 import { bars, dial } from '../kit/chart.ts';
 import { icon, type Icon } from '../kit/icons.ts';
 import { band, card, infoMark, panel } from '../kit/panel.ts';
-import { el, ordinal } from '../kit/part.ts';
+import { el, ordinal, pictured } from '../kit/part.ts';
 import { portrait } from '../kit/portrait.ts';
 import { job, tag } from '../kit/stat.ts';
 import { stylesheet } from '../kit/style.ts';
@@ -84,15 +84,6 @@ const PICTURE: Readonly<Record<NewsKind, Icon>> = {
 /** `made`, of the classes `cls` too (a panel's place in its column). */
 const as = <T extends Element>(made: T, cls: string) => {
   made.classList.add(...cls.split(' '));
-  return made;
-};
-
-/** The planet the next race is sailed on, as it was pictured from space (nothing until it has been). */
-const pictured = (address: string | null) => {
-  if (!address) return null;
-  const made = el('img');
-  made.src = address;
-  made.alt = '';
   return made;
 };
 

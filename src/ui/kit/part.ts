@@ -36,6 +36,15 @@ export function drawn(w: number, h: number, body: string, cls = '') {
   return svg;
 }
 
+/** A picture taken of the world (an image's address), as an <img>; nothing until there is one. */
+export function pictured(address: string | null) {
+  if (!address) return null;
+  const made = el('img');
+  made.src = address;
+  made.alt = '';
+  return made;
+}
+
 /**
  * Makes `made` a control: a tap on it calls `act`, unless it is `off` (shown
  * unavailable, and deaf).
