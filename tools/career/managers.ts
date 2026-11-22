@@ -20,6 +20,7 @@ import { dice } from '../../src/career/dice.ts';
 import { designSlots } from '../../src/career/hq.ts';
 import { knownTo } from '../../src/career/knowledge.ts';
 import { commitment } from '../../src/career/leadership.ts';
+import { maySail } from '../../src/career/lineup.ts';
 import { roomOf } from '../../src/career/money.ts';
 import { ROWS, rowsFor, type Mind } from '../../src/career/rivals.ts';
 import type { CareerState, Team } from '../../src/career/state.ts';
@@ -184,13 +185,21 @@ function counters(s: CareerState, c: Team): Command[] {
 function plan(s: CareerState, c: Team): Command[] {
   if (s.race === null || s.race.started) return [];
   if (!c.sponsors.some((p) => p && p.objectives.length > 0)) return [];
-  const drivers = c.staff.ships.slice(1, TEAM).map((h) => h.driver);
-  if (drivers.some((d) => d === null)) return [];
+  // the ships' drivers, an unfit one replaced by the reserve if she may sail
+  let reserve = c.staff.reserve;
+  const drivers: number[] = [];
+  for (const h of c.staff.ships.slice(1, TEAM)) {
+    if (h.driver !== null && maySail(s, c.id, h.driver)) drivers.push(h.driver);
+    else if (reserve !== null && maySail(s, c.id, reserve)) {
+      drivers.push(reserve);
+      reserve = null;
+    } else return [];
+  }
   return [
     {
       kind: 'SetPlan',
       plan: {
-        drivers: drivers.flatMap((d) => (d === null ? [] : [d])),
+        drivers,
         parts: [],
         objectives: c.sponsors.map((p) =>
           p && p.objectives.length > 0 ? 0 : null
