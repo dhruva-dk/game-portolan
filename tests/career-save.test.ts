@@ -149,11 +149,11 @@ test('a refused command is not journaled; a failed append changes nothing and sa
   assert.ok(first.ok);
   if (!first.ok) return;
   const refused = await send(store, first.kept, {
-    kind: 'MovePitJob',
-    person: -1,
-    job: 'mend',
+    kind: 'FitPart',
+    part: -1,
+    ship: 0,
   });
-  assert.ok(!refused.ok && refused.reason.code === 'notPit');
+  assert.ok(!refused.ok && refused.reason.code === 'part');
   assert.equal(store.writes(), 1, 'a refused command writes nothing');
   const failed = await send(store, first.kept, { kind: 'Advance' });
   assert.ok(!failed.ok && failed.reason.code === 'unsaved');
@@ -209,9 +209,9 @@ test('a torn tail is dropped, the player told what was lost, and the store cut b
   const disk = emptyDisk();
   const { kept } = await run(memoryStore(disk), SHORT.slice(0, 10));
   const extra = entry(kept.tip, kept.seq + 1, TUNING_VERSION, {
-    kind: 'MovePitJob',
-    person: 0,
-    job: 'mend',
+    kind: 'FitPart',
+    part: 0,
+    ship: 1,
   });
   disk.entries.push(JSON.stringify(extra).slice(0, 30));
   const opened = await open(memoryStore(disk), true);
@@ -249,12 +249,9 @@ const flip = (text: string, at: number) =>
 
 test('corrupt an entry: the chain ends there; the entries before it load, the rest are reported lost', async () => {
   const { disk, kept } = await saved();
-  // an entry after the newest snapshot (one before it would be passed over by loading from the snapshot)
-  const k = Math.max(
-    Math.max(...disk.snapshots.map((x) => x.at)),
-    disk.entries.length - 5
-  );
-  assert.ok(k < disk.entries.length);
+  // an entry near the end, and no snapshot past it (loading from one would pass the entry over)
+  const k = disk.entries.length - 5;
+  disk.snapshots = disk.snapshots.filter((x) => x.at <= k);
   const e: Entry = JSON.parse(disk.entries[k]);
   disk.entries[k] = JSON.stringify({
     ...e,

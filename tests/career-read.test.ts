@@ -57,11 +57,16 @@ test('the calendar: today on race day, sailed after it, the rest ahead', () => {
   assert.equal(fixtures(AFTER).length, AFTER.calendar!.rounds.length);
 });
 
-test("race day's preview: ship two's driver, the stance and order; none off race day", () => {
+test("race day's preview: who sails each of her ships, the call; none off race day", () => {
   const p = preview(DAY)!;
   assert.equal(p.round, 0);
-  assert.equal(p.driver, DAY.teams[DAY.player!.team].staff.ships[1].driver);
-  assert.equal(p.order.length, 4);
+  assert.deepEqual(
+    p.ships.map((a) => a.driver),
+    DAY.teams[DAY.player!.team].staff.ships.map((h) => h.driver),
+    'her own ship hers (null), then her drivers'
+  );
+  assert.ok(p.ships.every((a) => !a.forfeit && !a.standIn));
+  assert.equal(p.call, 'free', 'no plan set: her ships sail free');
   assert.equal(preview(AFTER), null);
   assert.equal(
     preview(must(DAY, { kind: 'RaceStarted', round: 0 }))!.started,

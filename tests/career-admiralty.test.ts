@@ -69,7 +69,7 @@ test("a measure's change: in its range, never the rule as it stands; carried int
       const r = changed(next, c);
       assert.notDeepEqual(r, next, `${m} changes nothing`);
       assert.ok(
-        r.storm.pace >= A.paceRange[0] && r.storm.pace <= A.paceRange[1]
+        r.storm >= A.paceRange[0] && r.storm <= A.paceRange[1]
       );
       assert.ok(
         r.prizeSpread >= A.spreadRange[0] && r.prizeSpread <= A.spreadRange[1]
@@ -309,7 +309,7 @@ function offerAll(s: CareerState, team: number): CareerState {
         objectives: [],
         bonus: 0,
         races: 4,
-        tier: 1,
+        grade: 1,
       },
       expires: s.day + 10,
     })),

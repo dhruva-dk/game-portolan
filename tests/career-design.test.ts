@@ -27,7 +27,7 @@ import {
   fishIncome,
   loftFactor,
   partBuildDays,
-  sponsorTier,
+  sponsorGrade,
   upkeep,
   upkeepAt,
 } from '../src/career/hq.ts';
@@ -358,7 +358,7 @@ test("the headquarters: levels' costs, days and upkeep; each level's effect", ()
   );
   assert.ok(fishIncome(at('fishMarket', 3)) > fishIncome(at('fishMarket', 1)));
   assert.deepEqual(
-    [1, 2, 3].map((l) => sponsorTier(at('landingPad', l))),
+    [1, 2, 3].map((l) => sponsorGrade(at('landingPad', l))),
     [1, 2, 3]
   );
   assert.equal(

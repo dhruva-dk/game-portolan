@@ -69,7 +69,7 @@ function promoted(s: CareerState, moves: Map<number, number>): CareerState {
   }));
   const championships = s.championships.map((l): Championship => {
     const ids = teams.filter((c) => c.tier === l.id).map((c) => c.id);
-    return { ...l, teams: ids, standings: ids.map(fresh) };
+    return { ...l, teams: ids, standings: ids.map(fresh), drivers: [] };
   });
   return { ...s, teams, championships };
 }

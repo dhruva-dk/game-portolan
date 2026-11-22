@@ -143,9 +143,13 @@ export function lineups(s: CareerState): Sailing[] {
       team: c.id,
       ships: aboard,
       call:
-        c === mine && plan
-          ? plan.call
-          : rivalCall(s, c, aboard.find((a) => a.driver !== null)?.driver ?? null),
+        c === mine
+          ? (plan?.call ?? 'free')
+          : rivalCall(
+              s,
+              c,
+              aboard.find((a) => a.driver !== null)?.driver ?? null
+            ),
       objectives: c === mine && plan ? plan.objectives : [],
     });
   }

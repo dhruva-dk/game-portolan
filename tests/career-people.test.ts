@@ -24,7 +24,6 @@ import {
   type Setting,
 } from '../src/career/traits.ts';
 import {
-  driverStats,
   effective,
   marketability,
   mentors,
@@ -236,7 +235,7 @@ const setting = (over: Partial<Setting> = {}): Setting => ({
   round: 4,
   rules: {
     spec: ['sails'],
-    storm: { pace: 1 },
+    storm: 1,
     banned: ['mortar'],
     pointsPerSinking: 1,
     seaHeldPoint: true,
@@ -307,11 +306,11 @@ test('traits: about thirty, as data, with the required ones doing what they say'
     stats: flat(10),
     morale: 50,
   };
-  const s = driverStats(g, setting({ pace: 0.85 }));
+  const s = effective(g, setting({ pace: 0.85 }));
   assert.equal(s.stormcraft, 12);
   assert.equal(s.nerve, 12);
   assert.equal(s.consistency, 8);
-  assert.equal(driverStats(g, null).stormcraft, 10, 'unconditional only');
+  assert.equal(effective(g, null).stormcraft, 10, 'unconditional only');
 });
 
 test('traits: Pay Driver brings TUNING.traits.pay × marketability a race; Crowd Favourite lifts marketability; wage traits move the ask; Mentor', () => {

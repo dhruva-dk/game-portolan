@@ -34,9 +34,13 @@ test('apply never throws on a malformed command, and refuses it', () => {
     {},
     { kind: 4 },
     { kind: 'Nope' },
-    { kind: 'MovePitJob' },
-    { kind: 'MovePitJob', person: -1, job: 'x' },
-    { kind: 'MovePitJob', person: 1e9, job: 'mend' },
+    { kind: 'FitPart' },
+    { kind: 'FitPart', part: -1, ship: 'x' },
+    { kind: 'FitPart', part: 1e9, ship: 9 },
+    { kind: 'SetPlan' },
+    { kind: 'SetPlan', plan: { drivers: 3, parts: null, call: 7 } },
+    { kind: 'RecordRace' },
+    { kind: 'RecordRace', result: { tier: 0, order: 'x' } },
     { kind: 'Found' },
     { kind: 'DebugBalance' },
   ];
@@ -67,7 +71,7 @@ test('the same state and command give the same result; a refusal changes nothing
   assert.ok(a.ok && b.ok);
   if (a.ok && b.ok) assert.equal(canonical(a.state), canonical(b.state));
   const before = canonical(s);
-  apply(s, { kind: 'MovePitJob', person: 0, job: 'mend' });
+  apply(s, { kind: 'FitPart', part: s.teams[s.player!.team].parts[0].id, ship: 1 });
   assert.equal(canonical(s), before, 'states are never changed in place');
 });
 
@@ -104,7 +108,7 @@ test("the queue: ordered by (day, seq); scheduling keeps the order; the season's
   assert.equal(s.queue[s.queue.length - 1].kind, 'seasonEnd');
   assert.equal(
     s.queue.filter((e) => e.kind === 'review').length,
-    120,
+    s.teams.length,
     "every team's first review"
   );
   assert.deepEqual(
@@ -121,7 +125,7 @@ test("the queue: ordered by (day, seq); scheduling keeps the order; the season's
   for (let i = 0; i < 200; i++)
     t = schedule(t, Math.floor(rand() * 300), {
       kind: 'review',
-      team: i % 120,
+      team: i % s.teams.length,
     });
   assert.ok(ordered(t.queue));
   // same day: the earlier seq first
@@ -134,7 +138,7 @@ test("the queue: ordered by (day, seq); scheduling keeps the order; the season's
     [3, 9]
   );
   const u = unscheduled(t, (e) => e.kind === 'review');
-  assert.equal(u.queue.length, s.queue.length - 120);
+  assert.equal(u.queue.length, s.queue.length - s.teams.length);
 });
 
 test("stops: race day and a job offer's deadline always; a dilemma or an answer only when it is the player's", () => {
@@ -175,7 +179,7 @@ test("stops: race day and a job offer's deadline always; a dilemma or an answer 
     stopsFor(waiting, {
       kind: 'dilemma',
       id: 'x',
-      team: (mine + 1) % 120,
+      team: (mine + 1) % s.teams.length,
       day: 1,
       seq: 0,
     }),
@@ -223,12 +227,11 @@ test('every event a founded career schedules has a handler; every handled comman
     'Found',
     'Lobby',
     'MarkRead',
-    'MovePitJob',
     'OfferContract',
     'RaceStarted',
     'RecordRace',
-    'SetPlan',
     'SetImprovement',
+    'SetPlan',
     'SignSponsor',
     'StartDesign',
     'StartScout',
@@ -236,31 +239,6 @@ test('every event a founded career schedules has a handler; every handled comman
     'Vote',
     'WithdrawOffer',
   ]);
-});
-
-test('MovePitJob: a pit crew member moves to a job, swapping with whoever worked it; each refusal', () => {
-  const s = founded();
-  const pit = s.teams[s.player!.team].staff.pit;
-  const [a, b] = pit;
-  const ja = s.people[a].job!,
-    jb = s.people[b].job!;
-  const t = must(s, { kind: 'MovePitJob', person: a, job: jb });
-  assert.equal(t.people[a].job, jb);
-  assert.equal(t.people[b].job, ja);
-  invariants(t);
-  refused(s, { kind: 'MovePitJob', person: a, job: ja }, 'same');
-  const other = s.teams[(s.player!.team + 1) % 120].staff.pit[0];
-  refused(s, { kind: 'MovePitJob', person: other, job: 'mend' }, 'notPit');
-  const raceStarted = { ...must(s, { kind: 'Advance' }) };
-  refused(
-    { ...raceStarted, race: { ...raceStarted.race!, started: true } },
-    { kind: 'MovePitJob', person: a, job: jb },
-    'racing'
-  );
-  const badJob: Command = JSON.parse(
-    JSON.stringify({ kind: 'MovePitJob', person: a, job: 'sing' })
-  );
-  refused(s, badJob, 'job');
 });
 
 test("the dice: a stream's counter steps once a roll; the same counters give the same numbers; streams are independent", () => {

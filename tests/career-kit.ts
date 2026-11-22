@@ -1,12 +1,18 @@
 // Helpers for the career's tests (not a test file itself: the runner takes tests/*.test.ts). Later sections add their
 // commands to `someCommand` and their rules to `invariants`.
 import assert from 'node:assert/strict';
-import type { Command, Offer, Plan } from '../src/office.ts';
+import {
+  SHIPS,
+  type Building,
+  type Command,
+  type Offer,
+  type Plan,
+  type Ship,
+} from '../src/office.ts';
 import { raceCards } from '../src/career/card.ts';
 import { lineups } from '../src/career/lineup.ts';
 import { TEMPLATES } from '../src/career/mail.ts';
-import { SPEC } from '../src/sim/fit.ts';
-import { synthetic } from '../tools/synthetic.ts';
+import { standIn } from './career-results.ts';
 import { askOf } from '../src/career/market.ts';
 import { TUNING } from '../src/career/tuning.ts';
 import { apply, start, type CareerState } from '../src/career/career.ts';
@@ -15,8 +21,7 @@ import { allowed, fullName, words } from '../src/career/names.ts';
 import { ordered } from '../src/career/queue.ts';
 import { ROLE_STATS } from '../src/career/roles.ts';
 import { staffOf, type Team } from '../src/career/state.ts';
-import type { Job, PartType } from '../src/race.ts';
-import type { Building } from '../src/office.ts';
+import { CALLS, PARTS } from '../src/race.ts';
 import { TRADES, supplierCards } from '../src/career/suppliers.ts';
 
 /** The Found command of the tests' usual career. */
@@ -24,7 +29,7 @@ export const FOUND: Extract<Command, { kind: 'Found' }> = {
   kind: 'Found',
   seed: 20261115,
   team: 'Portolan Quills',
-  colours: { first: 2, second: 7 },
+  colours: { dye: 2, pattern: 1 },
   emblem: 3,
   given: 'Ottoline',
   family: 'Wrackham',
@@ -66,8 +71,6 @@ export function refused(s: CareerState, c: Command, code: string): void {
   assert.equal(r.ok, false, `${c.kind} should be refused (${code})`);
   if (!r.ok) assert.equal(r.reason.code, code, r.reason.sentence);
 }
-
-const JOBS: readonly Job[] = ['mend', 'gust', 'stores', 'part'];
 
 /** One of a list, or a default if empty. */
 const one = <T>(rand: () => number, list: readonly T[], or: T): T =>
@@ -113,20 +116,9 @@ export function someCommand(s: CareerState, rand: () => number): Command {
   if (r < 0.15) return { kind: 'Advance' };
   if (r < 0.18) return { kind: 'Snapshot' };
   const team = s.player ? s.teams[s.player.team] : null;
-  const pit = team ? team.staff.pit : [];
   const anyPerson = () => Math.floor(rand() * s.people.length);
-  if (r < 0.5 && pit.length > 0)
-    return {
-      kind: 'MovePitJob',
-      person: pit[Math.floor(rand() * pit.length)],
-      job: JOBS[Math.floor(rand() * 4)],
-    };
-  if (r < 0.52)
-    return {
-      kind: 'MovePitJob',
-      person: anyPerson(),
-      job: JOBS[Math.floor(rand() * 4)],
-    };
+  if (r < 0.36) return worksCommand(s, rand);
+  if (r < 0.52) return { kind: 'SetPlan', plan: somePlan(s, rand) };
   if (r < 0.6)
     return {
       kind: 'StartScout',
@@ -174,8 +166,9 @@ export function someCommand(s: CareerState, rand: () => number): Command {
   return worksCommand(s, rand);
 }
 
-/** The spec ship the tests' race cards are built on. */
-export const SPEC_SHIP = SPEC;
+/** One of the ships of a team, drawn. */
+const someShip = (rand: () => number): Ship =>
+  SHIPS[Math.floor(rand() * SHIPS.length)] ?? 0;
 
 /** A race plan the player might set: mostly sound, its driver sometimes another's or unfit. */
 export function somePlan(s: CareerState, rand: () => number): Plan {
@@ -189,35 +182,30 @@ export function somePlan(s: CareerState, rand: () => number): Plan {
         !g.player
     )
     .map((g) => g.id);
-  const mine = [c.staff.ships[1].driver, c.staff.reserve].filter(
+  const mine = [...c.staff.ships.map((h) => h.driver), c.staff.reserve].filter(
     (x): x is number => x !== null
   );
-  const driver =
-    rand() < 0.75
-      ? one(rand, mine, one(rand, free, 0))
+  // mostly her own drivers in a drawn order; sometimes a free agent, or anyone at all
+  const pool = [...mine].sort(() => rand() - 0.5);
+  const drivers = SHIPS.slice(1).map((_, k) =>
+    rand() < 0.85
+      ? (pool[k] ?? one(rand, free, 0))
       : rand() < 0.5
         ? one(rand, free, 0)
-        : Math.floor(rand() * s.people.length);
-  const order = [...JOBS].sort(() => rand() - 0.5);
-  const pit = [...c.staff.pit].sort(() => rand() - 0.5);
-  const jobs = { mend: pit[0], gust: pit[1], stores: pit[2], part: pit[3] };
+        : Math.floor(rand() * s.people.length)
+  );
   const parts = c.parts
     .filter((p) => !p.forNext && rand() < 0.3)
-    .map((p) => ({ part: p.id, ship: (rand() < 0.5 ? 0 : 1) as 0 | 1 }));
+    .map((p) => ({ part: p.id, ship: someShip(rand) }));
   return {
-    driver,
+    drivers,
     parts,
-    stance: (['hunt', 'hold', 'loot', 'shadow'] as const)[
-      Math.floor(rand() * 4)
-    ],
-    order,
-    jobs,
     objectives: c.sponsors.map((p) =>
       p && p.objectives.length > 0
         ? Math.floor(rand() * p.objectives.length)
         : null
     ),
-    call: 'withMe',
+    call: CALLS[Math.floor(rand() * CALLS.length)] ?? 'free',
   };
 }
 
@@ -230,11 +218,11 @@ function raceCommand(s: CareerState, rand: () => number): Command {
     return { kind: 'RaceStarted', round: s.race?.round ?? s.round };
   if (r < 0.75 && s.race) {
     // mostly a tier not yet recorded, sometimes any (a second result is refused)
-    const cards = raceCards(s, SPEC),
+    const cards = raceCards(s),
       open = cards.filter((_, tier) => s.race!.results[tier] === null);
     return {
       kind: 'RecordRace',
-      result: synthetic(
+      result: standIn(
         rand() < 0.85
           ? one(rand, open, cards[0])
           : cards[Math.floor(rand() * cards.length)]
@@ -254,14 +242,14 @@ function raceCommand(s: CareerState, rand: () => number): Command {
   return { kind: 'MarkRead', mail: Math.floor(rand() * (s.mail.length + 2)) };
 }
 
-/** A race day sailed: the player's race begun, the three championships' synthetic results recorded. */
+/** A race day sailed: the player's race begun, the three championships' stand-in results recorded. */
 export function sailed(s: CareerState, player = 0.5): CareerState {
   let out = s.race?.started
     ? s
     : must(s, { kind: 'RaceStarted', round: s.race!.round });
-  const cards = raceCards(out, SPEC);
+  const cards = raceCards(out);
   for (const card of cards)
-    out = must(out, { kind: 'RecordRace', result: synthetic(card, player) });
+    out = must(out, { kind: 'RecordRace', result: standIn(card, player) });
   return out;
 }
 
@@ -276,14 +264,6 @@ export function toRaceDay(s: CareerState): CareerState {
   return out;
 }
 
-const TYPES: readonly PartType[] = [
-  'sails',
-  'rigging',
-  'rudder',
-  'hull',
-  'keel',
-  'mounts',
-];
 const BUILDINGS: readonly Building[] = [
   'factory',
   'drawingLoft',
@@ -306,7 +286,7 @@ function worksCommand(s: CareerState, rand: () => number): Command {
       parts.map((p) => p.id),
       Math.floor(rand() * 2000)
     );
-  const type = () => TYPES[Math.floor(rand() * TYPES.length)];
+  const type = () => PARTS[Math.floor(rand() * PARTS.length)] ?? 'sails';
   const r = rand();
   if (r < 0.12) {
     const fitted = parts.filter((p) => p.ship !== null && rand() < 0.4);
@@ -326,7 +306,7 @@ function worksCommand(s: CareerState, rand: () => number): Command {
     return {
       kind: 'FitPart',
       part: part(),
-      ship: rand() < 0.1 ? null : rand() < 0.5 ? 0 : 1,
+      ship: rand() < 0.1 ? null : someShip(rand),
     };
   if (r < 0.38)
     return {
@@ -440,13 +420,13 @@ export function invariants(s: CareerState): void {
       );
     }
     assert.ok(
-      c.staff.pit.length <= 4,
+      c.staff.pit.length <= TUNING.world.pit,
       `team ${c.id} has ${c.staff.pit.length} pit crew members`
     );
     assert.equal(
-      new Set(c.staff.pit.map((id) => s.people[id].job)).size,
-      c.staff.pit.length,
-      `two of team ${c.id}'s pit work one job`
+      c.staff.ships.length,
+      SHIPS.length,
+      `team ${c.id} has ${c.staff.ships.length} ships`
     );
   }
   for (const g of s.people) {
@@ -541,14 +521,14 @@ function raceDay(s: CareerState): void {
 function works(s: CareerState): void {
   const ids = new Set<number>();
   for (const c of s.teams) {
-    for (const ship of [0, 1] as const) {
+    for (const ship of SHIPS) {
       const types = c.parts
         .filter((p) => p.ship === ship)
         .map((p) => p.type)
         .sort();
       assert.deepEqual(
         types,
-        [...TYPES].sort(),
+        [...PARTS].sort(),
         `team ${c.id}'s ship ${ship} carries ${types.join(', ')}`
       );
     }
@@ -556,7 +536,7 @@ function works(s: CareerState): void {
       assert.ok(!ids.has(p.id), `part ${p.id} is held twice`);
       ids.add(p.id);
       assert.ok(
-        p.ship === null || p.ship === 0 || p.ship === 1,
+        p.ship === null || SHIPS.includes(p.ship),
         `part ${p.id} is fitted to ship ${p.ship}`
       );
       assert.ok(

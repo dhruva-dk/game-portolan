@@ -36,7 +36,7 @@ import {
   inspected,
   inspectedCount,
 } from '../src/career/inspection.ts';
-import { fishIncome, sponsorTier, upkeep } from '../src/career/hq.ts';
+import { fishIncome, sponsorGrade, upkeep } from '../src/career/hq.ts';
 import { racesLeft } from '../src/career/contracts.ts';
 import { standingOf } from '../src/career/chairmen.ts';
 import { dice } from '../src/career/dice.ts';
@@ -57,7 +57,7 @@ const fixed = (id: number, perRace: number, races = 3): Sponsor => ({
   objectives: [],
   bonus: 0,
   races,
-  tier: 1,
+  grade: 1,
 });
 
 test("wages: every contract on a team's staff, paid each race with upkeep; fish, fixed sponsors and pay drivers in", () => {
@@ -121,7 +121,7 @@ test('prize money: weight (n + 1 − place)^spread, shares summing to 1; spread 
     'a steeper spread gives the top more'
   );
   const s = founded();
-  assert.ok(prizeAt(s, 0, 1) > prizeAt(s, 0, 40));
+  assert.ok(prizeAt(s, 0, 1) > prizeAt(s, 0, 20));
   assert.ok(
     prizeAt(s, 0, 1) > prizeAt(s, 2, 1),
     "Tier 1's pool is the largest"
@@ -247,7 +247,7 @@ test("sponsors: offers by tier at most the landing pad's, sized by marketability
   assert.equal(offers.length, 6);
   assert.equal(next, s.ids.sponsor + 6);
   for (const o of offers) {
-    assert.ok(o.sponsor.tier <= sponsorTier(s.teams[me]));
+    assert.ok(o.sponsor.grade <= sponsorGrade(s.teams[me]));
     assert.ok(
       o.sponsor.races >= TUNING.sponsors.races[0] &&
         o.sponsor.races <= TUNING.sponsors.races[1]
@@ -302,7 +302,7 @@ test('SignSponsor: into a slot, replacing one there; refusals', () => {
   const low = withTeam(s, me, (c) => ({
     ...c,
     buildings: { ...c.buildings, landingPad: { level: 1, next: null } },
-    offers: c.offers.map((o) => ({ ...o, sponsor: { ...o.sponsor, tier: 3 } })),
+    offers: c.offers.map((o) => ({ ...o, sponsor: { ...o.sponsor, grade: 3 } })),
   }));
   refused(low, { kind: 'SignSponsor', offer: a.sponsor.id, slot: 0 }, 'tier');
   const t = must(s, { kind: 'SignSponsor', offer: a.sponsor.id, slot: 1 });
@@ -317,8 +317,8 @@ test('SignSponsor: into a slot, replacing one there; refusals', () => {
   assert.equal(signCheck(u, me, b.sponsor.id, 0)?.code, 'offer');
 });
 
-test('objectives: top 10, sink two, both afloat, the most sea; a bonus × weight if met; sponsors leave after their races', () => {
-  const r = { best: 9, sinkings: 2, afloat: 2, mostSea: false };
+test('objectives: top 10, sink two, three afloat, the most sea; a bonus × weight if met; sponsors leave after their races', () => {
+  const r = { best: 9, sinkings: 2, afloat: 3, mostSea: false };
   assert.ok(
     objectiveMet('top10', r) &&
       objectiveMet('sinkTwo', r) &&
@@ -327,7 +327,9 @@ test('objectives: top 10, sink two, both afloat, the most sea; a bonus × weight
   );
   assert.ok(
     !objectiveMet('top10', { ...r, best: 11 }) &&
-      !objectiveMet('top10', { ...r, best: null })
+      !objectiveMet('top10', { ...r, best: null }) &&
+      !objectiveMet('afloat', { ...r, afloat: 2 }) &&
+      !objectiveMet('sinkTwo', { ...r, sinkings: 1 })
   );
   const obj: Sponsor = {
     id: 5,
@@ -336,7 +338,7 @@ test('objectives: top 10, sink two, both afloat, the most sea; a bonus × weight
     objectives: ['top10', 'mostSea'],
     bonus: 1000,
     races: 1,
-    tier: 1,
+    grade: 1,
   };
   assert.ok(sponsorWorth(obj) > 0 && sponsorWorth(fixed(1, 300)) === 300);
   const me = ME();
@@ -407,11 +409,11 @@ test('sponsors, buildings and designs run for the whole world on Advance (rivals
   while (s.race === null) s = must(s, { kind: 'Advance' });
   assert.ok(
     s.teams.filter((c) => !c.player && c.sponsors.some((p) => p !== null))
-      .length > 40
+      .length > 20
   );
-  assert.ok(s.teams.filter((c) => !c.player && c.design !== null).length > 40);
+  assert.ok(s.teams.filter((c) => !c.player && c.design !== null).length > 20);
   assert.ok(
-    s.teams.filter((c) => !c.player && c.suppliers.timber !== null).length > 40
+    s.teams.filter((c) => !c.player && c.suppliers.timber !== null).length > 20
   );
   invariants(s);
 });

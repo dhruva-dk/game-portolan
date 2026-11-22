@@ -18,7 +18,10 @@ import type { Figure, Offer } from '../src/office.ts';
 import type { CareerState } from '../src/career/state.ts';
 import { sackedOffers } from '../src/career/chairmen.ts';
 import { careerView, jobsView } from '../src/career/views-career.ts';
-import { teamView, planDraft } from '../src/career/views-team.ts';
+import { teamView } from '../src/career/views-team.ts';
+import { raceCards } from '../src/career/card.ts';
+import { staffOf } from '../src/career/state.ts';
+import { TEAM } from '../src/race.ts';
 import { seen } from '../src/career/views-person.ts';
 import { scoutingView } from '../src/career/views-scouting.ts';
 import { offerView } from '../src/career/views-offer.ts';
@@ -75,7 +78,7 @@ test('the top bar on race day reads Race plan and opens the plan', () => {
   assert.equal(t.go.blocker?.screen, 'plan');
 });
 
-test("home: the next race, both ships, the improvement, five lines of the table round the player's, four letters", () => {
+test("home: the next race, her four ships, the improvement, five lines of the table round the player's, four letters", () => {
   const s = founded(),
     h = homeView(s),
     c = s.teams[s.player!.team];
@@ -86,7 +89,9 @@ test("home: the next race, both ships, the improvement, five lines of the table 
   assert.equal(h.race.target.value, c.target);
   assert.equal(h.ships[0].you, true);
   assert.equal(h.ships[0].driver, null, 'the player sails ship one');
-  assert.ok(h.ships[1].driver, 'ship two has her driver');
+  assert.equal(h.ships.length, TEAM);
+  for (const x of h.ships.slice(1))
+    assert.ok(x.driver && !x.you, 'each other ship has her driver');
   assert.equal(h.ships[0].parts.length, 6);
   assert.ok(h.ships.every((x) => x.parts.every((p) => p.fitted)));
   assert.equal(h.table.lines.length, 5);
@@ -145,7 +150,7 @@ test('found: defaults the career takes, the same for a seed, the team it replace
   const v = foundView(FOUND.seed, FOUND.colours);
   assert.deepEqual(foundView(FOUND.seed, FOUND.colours), v);
   assert.ok(v.team.length >= 1 && v.team.length <= v.limits.team);
-  assert.equal(v.swatches, 24);
+  assert.deepEqual([v.dyes, v.patterns], [16, 3]);
   assert.equal(v.emblems, 12);
   assert.match(v.replacing, /Tier 3/);
   const r = apply(start(), {
@@ -167,11 +172,11 @@ test('found errors: each under its own field, none for a founding the career tak
   const e = foundErrors({
     ...FOUND,
     team: '',
-    colours: { first: 3, second: 3 },
+    colours: { dye: 3, pattern: 7 },
     family: 'x'.repeat(40),
   });
   assert.match(e.team ?? '', /needs a name/);
-  assert.match(e.colours ?? '', /different/);
+  assert.match(e.colours ?? '', /dye and a pattern/);
   assert.match(e.person ?? '', /too long/);
   assert.equal(e.emblem, undefined);
   assert.match(
@@ -243,7 +248,7 @@ function signable(s: CareerState): { person: number; offer: Offer } {
   throw new Error('no one to sign');
 }
 
-test('team: the roster by role with the player heading the drivers, the pit crew at four jobs, the order movable', () => {
+test('team: the roster by role with the player heading the drivers, the pit crew, and each ship\'s stop as her card carries it', () => {
   const s = founded(),
     v = teamView(s),
     c = s.teams[s.player!.team];
@@ -251,21 +256,21 @@ test('team: the roster by role with the player heading the drivers, the pit crew
   assert.equal(v.roster[1].you, true);
   assert.deepEqual(
     v.roster.filter((r) => r.kind === 'head').map((r) => r.title),
-    ['Drivers', 'Mechanics', 'Designer', 'Scouts', 'Pit', 'Chairman']
+    ['Drivers', 'Mechanics', 'Designer', 'Scouts', 'Pit crew', 'Chairman']
   );
+  const people = v.roster.filter((r) => r.kind === 'person');
+  assert.equal(people.length, staffOf(c).length, 'everyone on the staff once');
   assert.equal(v.pit.length, c.staff.pit.length);
-  assert.equal(v.order.length, 4);
-  assert.equal(v.order[0].up, null);
-  assert.equal(v.order[3].down, null);
-  explained(v);
-  const plan = v.order[1].up;
-  assert.ok(plan, v.orderWhy ?? '');
-  const moved = must(s, { kind: 'SetPlan', plan });
+  assert.equal(v.bonds.length, TEAM);
+  assert.equal(v.stops.length, TEAM);
+  const day = toRaceDay(s);
+  const card = raceCards(day)[c.tier];
   assert.deepEqual(
-    teamView(moved).order.map((o) => o.job),
-    [v.order[1].job, v.order[0].job, v.order[2].job, v.order[3].job]
+    teamView(day).stops.map((x) => [x.pace.value, x.slip.value]),
+    card.ships.slice(0, TEAM).map((x) => [x.pit.pace, x.pit.slip]),
+    'the stop shown is the stop sailed'
   );
-  assert.equal(planDraft(moved, moved.teams[c.id]), moved.teams[c.id].plan);
+  explained(v);
 });
 
 test('profile: a rival unknown in ranges, scouted then known; one of her own may be dismissed, she may not', () => {
@@ -300,6 +305,7 @@ test('profile: a rival unknown in ranges, scouted then known; one of her own may
   assert.equal(q.wants?.length, 3);
   assert.ok(q.stats.length > 0);
   const own = profileView(s, c.staff.ships[1].driver);
+  assert.equal(own.post, 'Ship 2');
   assert.equal(own.mine, true);
   assert.equal(own.dismiss.ok, true);
   assert.ok(own.dismiss.owed.value > 0);

@@ -239,8 +239,17 @@ export function teamView(s: CareerState): TeamView {
       const p = pitOf(s, c, ship);
       return {
         ship,
-        pace: fig(p.pace, `× ${p.pace.toFixed(2)}`, null, null),
-        slip: fig(p.slip, pct(p.slip), null, null),
+        pace: fig(p.pace, `× ${p.pace.toFixed(2)}`, rival('spec', '× 1.00'), {
+          title: 'Pit stop time',
+          lines: [
+            line('Bond level', bondLevel(c.bonds[ship] ?? 0)),
+            line('Pit crew', c.staff.pit.length),
+          ],
+        }),
+        slip: fig(p.slip, pct(p.slip), rival('a job', 'slips'), {
+          title: 'Slip chance',
+          lines: [line('Each job of a stop', pct(p.slip))],
+        }),
       };
     }),
   };

@@ -56,7 +56,7 @@ function asked(
       ? g.role === 'driver'
         ? 'ship'
         : 'staff'
-      : seatRole(seatOf(s.teams[team], replaces, (id) => s.people[id].job)!)
+      : seatRole(seatOf(s.teams[team], replaces)!)
           .status;
   return {
     role: g.role,
@@ -435,6 +435,7 @@ test("another team's person: no approach under contract without a break clause u
     .flatMap((x) => x.staff.pit)
     .find(
       (id) =>
+        s.people[id].contract?.breakClause === null &&
         answer(s, s.people[id], c, {
           ...asked(s, team, id, c.staff.pit[0]),
           wage: asked(s, team, id, c.staff.pit[0]).wage * 2,

@@ -57,14 +57,14 @@ test('each personality runs every hiring row, in its own order; the review is th
     'build',
     'design',
     'fill',
-    'sponsors',
+    'improvement',
     'poach',
     'renew',
     'replace',
     'scout',
+    'sponsors',
     'suppliers',
     'vote',
-    'improvement',
   ]);
   assert.notDeepEqual(rowsFor('poacher'), rowsFor('steady'));
 });

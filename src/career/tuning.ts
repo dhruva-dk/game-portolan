@@ -575,7 +575,7 @@ export const TUNING = {
    *  each way; a stand-in driver's fee a race × their ask. */
   race: {
     top: [25, 18, 15, 12, 10, 8, 6, 4, 2, 1],
-    swap: 1,
+    swap: 2,
     standIn: 1,
   },
   /** The dilemmas (Phase B section 12, career/events.ts): the chance a team draws one after a round, and their numbers. */

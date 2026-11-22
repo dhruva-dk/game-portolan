@@ -1,13 +1,12 @@
-// Every stat of every role, and the direction of what it does (Phase B section 2.1, D15).
+// Every stat of every role, and the direction of what it does.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { random } from '../src/world/random.ts';
-import * as svc from '../src/career/service.ts';
+import * as pit from '../src/career/pit.ts';
 import * as staff from '../src/career/staff.ts';
 import * as lead from '../src/career/leadership.ts';
 import { ROLE_STATS, type PersonOf } from '../src/career/roles.ts';
 import { TUNING } from '../src/career/tuning.ts';
-import type { Job } from '../src/race.ts';
 
 const LOW = 2,
   HIGH = 18;
@@ -23,15 +22,15 @@ const falls = (f: (x: number) => number, what: string) =>
     `${what} should fall with the stat: ${f(LOW)} → ${f(HIGH)}`
   );
 
-test('every role has its stats (D37)', () => {
+test('every role has its stats', () => {
   assert.deepEqual(Object.keys(ROLE_STATS).sort(), [
-    'mechanic',
-    'driver',
     'chairman',
-    'pit',
-    'manager',
-    'scout',
     'designer',
+    'driver',
+    'manager',
+    'mechanic',
+    'pit',
+    'scout',
   ]);
   assert.equal(ROLE_STATS.driver.length, 9);
   assert.equal(ROLE_STATS.mechanic.length, 8);
@@ -62,42 +61,18 @@ test('driver: Feedback gives more points, to the part furthest below its maximum
 });
 
 test('mechanic: each stat moves its factor the right way', () => {
-  rises(svc.repairsFactor, 'Repairs (part rate)');
-  rises(svc.mendingFactor, 'Mending (mend rate)');
-  falls(svc.arriveSeconds, 'Pit Handling (seconds to arrive)');
-  assert.ok(
-    Math.abs(svc.arriveSeconds(20) - 3) < 1e-9 &&
-      Math.abs(svc.arriveSeconds(0) - 5) < 1e-9
-  );
-  falls(svc.concentrationFactor, 'Concentration (botch)');
-  falls(svc.leadershipFatigue, 'Leadership (pit fatigue)');
-  rises(svc.leadershipMorale, 'Leadership (pit morale)');
-  assert.equal(svc.leadershipMorale(10), 0);
-  rises(svc.reliabilityImprovement, 'Reliability (improvement to reliability)');
-  rises(svc.perfImprovement, 'Performance (improvement to performance)');
-  rises(svc.bondGain, 'Chemistry (bond a race)');
-  assert.equal(svc.bondGain(0), 1);
-  assert.equal(svc.bondGain(20), 2);
-});
-
-test('bond: levels at 5, 12 and 20 unlock arriving sooner, a free repair and a faster Gust', () => {
-  assert.deepEqual(
-    [0, 4.9, 5, 11.9, 12, 19.9, 20, 40].map(svc.bondLevel),
-    [0, 0, 1, 1, 2, 2, 3, 3]
-  );
-  const base: svc.Teaming = {
-    mechanic: null,
-    pit: [],
-    order: ['part', 'mend', 'gust', 'stores'],
-    bond: 0,
-  };
-  const at = (bond: number) => svc.service({ ...base, bond });
-  assert.ok(at(5).arrive < at(0).arrive);
-  assert.equal(at(5).arrive, at(0).arrive - TUNING.bond.sooner);
-  assert.equal(at(5).freeRepair, false);
-  assert.equal(at(12).freeRepair, true);
-  assert.equal(at(12).gustRecharge, 1);
-  assert.equal(at(20).gustRecharge, 0.9);
+  rises(pit.repairsFactor, 'Repairs (pit work)');
+  rises(pit.mendingFactor, 'Mending (pit work)');
+  falls(pit.handlingFactor, 'Pit Handling (pit pace)');
+  falls(pit.concentrationFactor, 'Concentration (slips)');
+  falls(pit.leadershipFatigue, 'Leadership (pit crew fatigue)');
+  rises(pit.leadershipMorale, 'Leadership (pit crew morale)');
+  assert.equal(pit.leadershipMorale(10), 0);
+  rises(pit.reliabilityImprovement, 'Reliability (improvement to reliability)');
+  rises(pit.perfImprovement, 'Performance (improvement to performance)');
+  rises(pit.bondGain, 'Chemistry (bond a race)');
+  assert.equal(pit.bondGain(0), 1);
+  assert.equal(pit.bondGain(20), 2);
 });
 
 const pitStats = (v: number): PersonOf<'pit'>['stats'] => ({
@@ -108,97 +83,128 @@ const pitStats = (v: number): PersonOf<'pit'>['stats'] => ({
   nerve: v,
   stamina: v,
 });
+const mechanic = (v: number): PersonOf<'mechanic'>['stats'] => ({
+  repairs: v,
+  mending: v,
+  handling: v,
+  concentration: v,
+  leadership: v,
+  reliability: v,
+  perf: v,
+  chemistry: v,
+});
+const member = (v: number, fatigue = 0): pit.Member => ({
+  stats: pitStats(v),
+  fatigue,
+  rested: false,
+  pushed: false,
+});
+const crewOf = (v: number, fatigue = 0) =>
+  Array.from({ length: TUNING.world.pit }, () => member(v, fatigue));
 
-test("pit: each stat of a job's weights raises its rating; fatigue lowers the rate and raises botch", () => {
-  const weights = TUNING.pit.weights;
-  for (const job of Object.keys(weights) as Job[]) {
-    for (const k of Object.keys(weights[job])) {
-      rises(
-        (x) => svc.rating({ ...pitStats(10), [k]: x }, job),
-        `${k} for ${job}`
-      );
-    }
-    // a stat outside the job's weights does nothing to its rating
-    const outside = (
-      ['speed', 'strength', 'precision', 'teamwork'] as const
-    ).filter((k) => !(k in weights[job]));
-    for (const k of outside)
-      assert.equal(
-        svc.rating({ ...pitStats(10), [k]: LOW }, job),
-        svc.rating({ ...pitStats(10), [k]: HIGH }, job)
-      );
+test('bond: levels at 5, 12 and 20, each a quicker stop', () => {
+  assert.deepEqual(
+    [0, 4.9, 5, 11.9, 12, 19.9, 20, 40].map(pit.bondLevel),
+    [0, 0, 1, 1, 2, 2, 3, 3]
+  );
+  const at = (bond: number) =>
+    pit.pitCrew({ mechanic: mechanic(10), crew: crewOf(10), bond });
+  assert.deepEqual(
+    [0, 5, 12, 20].map((b) => at(b).pace / at(0).pace),
+    TUNING.bond.pace
+  );
+  assert.equal(at(20).slip, at(0).slip, 'a bond steadies no hand');
+});
+
+test("pit crew: Speed, Strength and Teamwork raise a member's work, Precision and Nerve lower their slips; fatigue does the reverse; Stamina tires them less", () => {
+  for (const k of ['speed', 'strength', 'teamwork'] as const) {
+    rises((x) => pit.work({ ...pitStats(10), [k]: x }, 0), `${k} (work)`);
+    assert.equal(
+      pit.slipOf({ ...pitStats(10), [k]: LOW }, 0),
+      pit.slipOf({ ...pitStats(10), [k]: HIGH }, 0),
+      `${k} moves no slip`
+    );
   }
-  rises((r) => svc.jobRate(r / 20, 0), 'rating (rate)');
-  falls((f) => svc.jobRate(0.5, f * 5), 'fatigue (rate)');
-  falls((p) => svc.jobBotch(p, 0), 'Precision (botch)');
-  rises((f) => svc.jobBotch(10, f * 5), 'fatigue (botch)');
-  falls((n) => svc.underFire([n, n, n, n]), 'Nerve (under fire)');
-  assert.equal(svc.underFire([20, 20, 20, 20]), 1);
-  falls(svc.fatigueGained, 'Stamina (fatigue a race)');
-  assert.equal(svc.fatigueGained(0), 37.5);
+  for (const k of ['precision', 'nerve'] as const) {
+    falls((x) => pit.slipOf({ ...pitStats(10), [k]: x }, 0), `${k} (slip)`);
+    assert.equal(
+      pit.work({ ...pitStats(10), [k]: LOW }, 0),
+      pit.work({ ...pitStats(10), [k]: HIGH }, 0),
+      `${k} moves no work`
+    );
+  }
+  assert.equal(pit.work(pitStats(10), 0), 1, 'tens, rested, work as the spec');
+  falls((f) => pit.work(pitStats(10), f * 5), 'fatigue (work)');
+  rises((f) => pit.slipOf(pitStats(10), f * 5), 'fatigue (slip)');
+  falls(pit.fatigueGained, 'Stamina (fatigue a race)');
+  assert.equal(pit.fatigueGained(0), 37.5);
 });
 
-test('pit: fatigue falls 10 × (1 + pit loft level) a day, in closed form, never below 0', () => {
+test('pit crew: fatigue falls 10 × (1 + pit house level) a day, in closed form, never below 0', () => {
   const g = { fatigue: 80, fatigueDay: 10 };
-  assert.equal(svc.fatigueOn(g, 10, 1), 80);
-  assert.equal(svc.fatigueOn(g, 12, 1), 40);
-  assert.equal(svc.fatigueOn(g, 12, 3), 0);
-  assert.equal(svc.fatigueOn(g, 100, 1), 0);
-  assert.ok(svc.recovery(3) > svc.recovery(1));
+  assert.equal(pit.fatigueOn(g, 10, 1), 80);
+  assert.equal(pit.fatigueOn(g, 12, 1), 40);
+  assert.equal(pit.fatigueOn(g, 12, 3), 0);
+  assert.equal(pit.fatigueOn(g, 100, 1), 0);
+  assert.ok(pit.recovery(3) > pit.recovery(1));
 });
 
-test("service: the mechanic's factors and the pit crew's ratings land in the Service the sim reads", () => {
-  const pit = (v: number, fatigue = 0) =>
-    (['mend', 'gust', 'stores', 'part'] as Job[]).map((job) => ({
-      job,
-      stats: pitStats(v),
-      fatigue,
-    }));
-  const mechanic = (v: number): PersonOf<'mechanic'>['stats'] => ({
-    repairs: v,
-    mending: v,
-    handling: v,
-    concentration: v,
-    leadership: v,
-    reliability: v,
-    perf: v,
-    chemistry: v,
-  });
-  const at = (b: number, f: number, fatigue = 0) =>
-    svc.service({
-      mechanic: mechanic(b),
-      pit: pit(f, fatigue),
-      order: ['part', 'mend', 'gust', 'stores'],
+test("a ship's pit: her mechanic and the pit crew land in the pace and slip the sim reads (race.ts PitCrew)", () => {
+  const at = (m: number, crew: number, fatigue = 0) =>
+    pit.pitCrew({
+      mechanic: mechanic(m),
+      crew: crewOf(crew, fatigue),
       bond: 0,
     });
-  for (const job of ['mend', 'gust', 'stores', 'part'] as Job[]) {
-    assert.ok(
-      at(10, HIGH).rate[job] > at(10, LOW).rate[job],
-      `pit raise ${job}'s rate`
-    );
-    assert.ok(
-      at(10, HIGH).botch[job] < at(10, LOW).botch[job],
-      `pit lower ${job}'s botch`
-    );
-    assert.ok(
-      at(HIGH, 10).botch[job] < at(LOW, 10).botch[job],
-      `mechanic lowers ${job}'s botch`
-    );
-    assert.ok(
-      at(10, 10, 80).rate[job] < at(10, 10, 0).rate[job],
-      `fatigue slows ${job}`
-    );
+  const spec = at(10, 10);
+  assert.ok(Math.abs(spec.pace - 1) < 1e-9, 'tens all round are the spec pace');
+  assert.ok(spec.slip > 0 && spec.slip < 1);
+  assert.ok(at(10, HIGH).pace < at(10, LOW).pace, 'a better crew is quicker');
+  assert.ok(at(10, HIGH).slip < at(10, LOW).slip, 'and slips less');
+  assert.ok(at(HIGH, 10).pace < at(LOW, 10).pace, 'a better mechanic too');
+  assert.ok(at(HIGH, 10).slip < at(LOW, 10).slip);
+  assert.ok(at(10, 10, 80).pace > at(10, 10, 0).pace, 'fatigue slows a stop');
+  assert.ok(at(10, 10, 80).slip > at(10, 10, 0).slip, 'and slips more');
+  // each of the mechanic's four stop stats on its own
+  const one = (k: 'repairs' | 'mending' | 'handling' | 'concentration') => {
+    const with1 = (v: number) =>
+      pit.pitCrew({
+        mechanic: { ...mechanic(10), [k]: v },
+        crew: crewOf(10),
+        bond: 0,
+      });
+    return [with1(LOW), with1(HIGH)];
+  };
+  for (const k of ['repairs', 'mending', 'handling'] as const) {
+    const [low, high] = one(k);
+    assert.ok(high.pace < low.pace, `${k} quickens the stop`);
+    assert.equal(high.slip, low.slip);
   }
-  assert.ok(at(HIGH, 10).rate.part > at(LOW, 10).rate.part);
-  assert.ok(at(HIGH, 10).rate.mend > at(LOW, 10).rate.mend);
-  assert.equal(
-    at(HIGH, 10).rate.gust,
-    at(LOW, 10).rate.gust,
-    'the mechanic touches only mend and part'
-  );
-  assert.ok(at(HIGH, 10).arrive < at(LOW, 10).arrive);
-  assert.ok(at(10, HIGH).underFire < at(10, LOW).underFire);
-  assert.deepEqual(at(10, 10).order, ['part', 'mend', 'gust', 'stores']);
+  const [low, high] = one('concentration');
+  assert.ok(high.slip < low.slip);
+  assert.equal(high.pace, low.pace);
+  // a place no one fills, and no mechanic, are the worst there is
+  const short = pit.pitCrew({
+    mechanic: mechanic(10),
+    crew: crewOf(10).slice(1),
+    bond: 0,
+  });
+  assert.ok(short.pace > spec.pace && short.slip > spec.slip);
+  const none = pit.pitCrew({ mechanic: null, crew: crewOf(10), bond: 0 });
+  assert.ok(none.pace > at(LOW, 10).pace && none.slip >= at(LOW, 10).slip);
+  // a dilemma's rest and push
+  const rested = pit.pitCrew({
+    mechanic: mechanic(10),
+    crew: [{ ...member(10), rested: true }, ...crewOf(10).slice(1)],
+    bond: 0,
+  });
+  assert.ok(rested.pace > spec.pace, 'a member rested works less this race');
+  const pushed = pit.pitCrew({
+    mechanic: mechanic(10),
+    crew: [{ ...member(10), pushed: true }, ...crewOf(10).slice(1)],
+    bond: 0,
+  });
+  assert.ok(pushed.slip > spec.slip, 'a member pushed on slips more');
 });
 
 test('designer: type stats start designs higher; Innovation teaches more; Speed and Accuracy shorten and narrow', () => {
