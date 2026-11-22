@@ -49,7 +49,8 @@ export const BOT = {
  * A ship as a bot sees her: who she is, how she sails, the shove she is carried
  * on by, her hull and shield (health.ts; whole and none when not given), and
  * whether she carries a gun; and her own, what she carries (battle.ts Crew: her
- * hold and gust), without which she pays her stores no heed.
+ * hold and gust), without which she pays her stores no heed; and, in a race
+ * sailed in teams, her team (none: she sails for herself).
  */
 export interface Seen {
   id: number;
@@ -59,6 +60,7 @@ export interface Seen {
   shield?: number;
   armed?: boolean;
   crew?: Crew;
+  team?: number;
 }
 
 /**

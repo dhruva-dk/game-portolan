@@ -124,8 +124,12 @@ type Logged = Change extends infer C
     : never
   : never;
 
-/** The sea of `count` ships (ids 0 … count − 1), none holding any yet. */
-export function createTerritory(count: number) {
+/**
+ * The sea of `count` ships (ids 0 … count − 1), none holding any yet; `teams`
+ * each ship's team by her id, in a race sailed in teams (none: every ship for
+ * herself).
+ */
+export function createTerritory(count: number, teams?: readonly number[]) {
   /** Who holds each cell: 0 open sea, else her id + 1. */
   const owner = new Uint8Array(CELLS);
   /**
@@ -290,9 +294,13 @@ export function createTerritory(count: number) {
     /** How many ships it holds the sea for. */
     ships: count,
 
-    /** Lays every ship her home patch round her berth, at the match's start. */
-    begin(berths: readonly Vec3[], time: number) {
+    /**
+     * Lays every ship her home patch round her berth, at the match's start
+     * (none for a ship with no berth: she does not put to sea).
+     */
+    begin(berths: readonly (Vec3 | null)[], time: number) {
       berths.forEach((at, id) => {
+        if (!at) return;
         home(id, at, time);
         under[id] = cellOf(at);
       });
@@ -354,6 +362,14 @@ export function createTerritory(count: number) {
      * open sea.
      */
     ownerAt: (p: Vec3) => owner[cellOf(p)] - 1,
+    /**
+     * The team of who holds the water at p (with no teams, her id: she is her
+     * own), or −1 for open sea.
+     */
+    teamAt: (p: Vec3) => {
+      const o = owner[cellOf(p)] - 1;
+      return o < 0 ? -1 : (teams?.[o] ?? o);
+    },
     /** Her share of the planet, 0…1. */
     share: (id: number) => area[id] / PLANET_QUANTA,
     /** Whether she holds any water. */

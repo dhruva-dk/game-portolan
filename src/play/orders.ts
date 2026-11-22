@@ -32,13 +32,15 @@ export type Sighter = (own: Seen, foe: Seen | null) => Sight;
  * sim/brain.ts), and the helm a lashed ship holds. A bot's mind is written back
  * as she thinks. A stand-in's `sights` lay her bot's gun in its stead, as a
  * player's hands would: the bot sails her and chooses when to fire, the
- * stand-in where, her balls going off within the gun's own spread.
+ * stand-in where, her balls going off within the gun's own spread. In a race
+ * sailed in teams, her `team` (none: she sails for herself).
  */
 export interface Hand {
   mind: Memory | null;
   nature: Nature;
   steady: Helm;
   sights?: Sighter;
+  team?: number;
 }
 
 /**
@@ -108,9 +110,9 @@ export function createOrders(depth: (p: Vec3) => number, chart: Chart) {
 
   /**
    * A ship as the bots see her: where she is and goes, her hit points, her gun,
-   * her crew.
+   * her crew, her team.
    */
-  const sight = (v: Vessel, c: Crew): Seen => {
+  const sight = (v: Vessel, c: Crew, team: number | undefined): Seen => {
     let s = seenById.get(v.id);
     if (!s) seenById.set(v.id, (s = { id: v.id, ship: v.ship }));
     s.ship = v.ship;
@@ -119,6 +121,7 @@ export function createOrders(depth: (p: Vec3) => number, chart: Chart) {
     s.shield = c.health.shield;
     s.armed = armed(c);
     s.crew = c;
+    if (team !== s.team) s.team = team;
     return s;
   };
 
@@ -138,7 +141,8 @@ export function createOrders(depth: (p: Vec3) => number, chart: Chart) {
     const { helm, gun, ask } = player;
     seen.length = helms.length = orders.length = 0;
     asks.clear();
-    for (const v of fleet) seen.push(sight(v, crews.get(v.id)!));
+    for (const v of fleet)
+      seen.push(sight(v, crews.get(v.id)!, aboard.get(v.id)?.team));
     sea.storm = now.storm;
     // the way into the calm, found a share each step as the storm sets the
     // next (till then, the last)

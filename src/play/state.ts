@@ -44,6 +44,7 @@ import {
 } from '../sim/battle.ts';
 import { bruised, mind, rammed, sank, shot, type Memory } from '../sim/bot.ts';
 import { DEFAULT_BRAIN, type Brain } from '../sim/brain.ts';
+import { checked, entered, teamsOf } from '../sim/carded.ts';
 import { nature, type MatchType, type Nature } from '../sim/persona.ts';
 import { afloat, stepFleet, type Vessel } from '../sim/contact.ts';
 import { STEP, blendPose } from '../sim/fixed.ts';
@@ -94,6 +95,7 @@ import {
   type Outcome,
   type Territory,
 } from '../sim/territory.ts';
+import type { RaceCard } from '../race.ts';
 import type { BallDraw, Look, Sea, ShipDraw } from '../snapshot.ts';
 import type { Hull } from '../world/swell.ts';
 import type { Planet } from '../world/planet.ts';
@@ -144,10 +146,15 @@ export interface Match {
   storm: (seconds: number) => Storm;
   gun: Arms | null;
   /**
-   * Its ships' berths (sim/spawn.ts berths, SHIPS of them), when worked out
-   * ahead of its start (play/setup.ts).
+   * Its ships' berths (sim/spawn.ts berths, one a ship), when worked out ahead
+   * of its start (play/setup.ts).
    */
   berths?: readonly Spawn[];
+  /**
+   * The card it is sailed by, a race of teams (race.ts); none: a Single Race,
+   * SHIPS ships each for herself.
+   */
+  card?: RaceCard;
 }
 
 /**
@@ -272,6 +279,11 @@ export function createState(
     rises = planet.rises;
   let match = first,
     lay = laying(match.seed, depth, match.type.rules.loot);
+  /**
+   * The card the sea is sailed by, in a race of teams, and each ship's team by
+   * her id; neither on any other sea.
+   */
+  let card: RaceCard | undefined, teams: readonly number[] | undefined;
   const seedOf = (id: number) => hash(match.seed, id);
   let fleet: Vessel[] = [];
   const aboard = new Map<number, Aboard>();
@@ -385,19 +397,23 @@ export function createState(
       ride: r,
       before: p,
       after: p,
+      ...(teams && { team: teams[id] }),
     });
   };
 
   /**
-   * Clears the sea for a new match: its loot strewn over it if `loot`, who
-   * holds it kept if `held`.
+   * Clears the sea for a new match of the ships `ids`: its loot strewn over it
+   * if `loot`, who holds it kept if `held`; sailed by the card `by`, if given.
    */
   const clear = (
     m: Match,
     ids: readonly number[],
-    { loot, held }: { loot: boolean; held: boolean }
+    { loot, held }: { loot: boolean; held: boolean },
+    by?: RaceCard
   ) => {
     match = m;
+    card = by && checked(by);
+    teams = card && teamsOf(card);
     lay = laying(m.seed, depth, m.type.rules.loot);
     flotsam = loot ? lay.strewn() : { pieces: [], next: 0 };
     dropped = loot ? 0 : Infinity;
@@ -418,9 +434,12 @@ export function createState(
         gun ? crewOf(id, gunOf(gun.kind, gun.rarity)) : crewOf(id)
       ),
       match.seed,
-      match.type.rules.aim.assist
+      match.type.rules.aim.assist,
+      teams
     );
-    territory = held ? createTerritory(Math.max(...ids) + 1) : null;
+    territory = held
+      ? createTerritory(card?.ships.length ?? Math.max(...ids) + 1, teams)
+      : null;
     generation++;
     begun = tick;
     quiet = false;
@@ -833,28 +852,44 @@ export function createState(
      * tools/harness, whole matches of bots).
      */
     start(m: Match, manned = true): ShipPose {
-      const ids = Array.from({ length: SHIPS }, (_, i) => i);
-      clear(m, ids, MATCH);
-      const at = m.berths ?? berths(water, m.seed, SHIPS, depth);
+      const by = m.card,
+        count = by ? by.ships.length : SHIPS;
+      const ids = by ? entered(by) : Array.from({ length: count }, (_, i) => i);
+      clear(m, ids, MATCH, by);
+      const at = m.berths ?? berths(water, m.seed, count, depth);
       flotsam = lay.berthed(
         flotsam,
         at.map((b) => b.at)
       );
-      // hers as she chose it, the bots' dealt by the race's seed round it
-      at.forEach((b, id) =>
+      // hers as she chose it, the bots' dealt by the race's seed round it; in
+      // a race, each as her card has her (her hands on her ship only if it
+      // names no driver for her)
+      for (const id of ids) {
+        const b = at[id],
+          entry = by?.ships[id];
         launch(
           id,
           shipAt(b.at, b.heading),
-          lookOf(id === PLAYER ? hers : dealt(m.seed, id, hers)),
+          lookOf(
+            entry
+              ? entry.colours
+              : id === PLAYER
+                ? hers
+                : dealt(m.seed, id, hers)
+          ),
           null,
-          manned
-        )
-      );
+          manned && (!entry || !entry.driver)
+        );
+      }
       territory?.begin(
-        at.map((b) => b.at),
+        at.map((b, id) => (aboard.has(id) ? b.at : null)),
         tick * STEP
       );
-      return aboard.get(PLAYER)!.after;
+      // (her ship kept ashore by a forfeit: her berth, as she would have lain)
+      const her = aboard.get(PLAYER);
+      if (her) return her.after;
+      const ashore = shipAt(at[PLAYER].at, at[PLAYER].heading);
+      return pose(ashore, settled(ashore, sea, tick * STEP, PLAYER));
     },
     /**
      * A quiet sea for the lobby: her ship alone at `start`. Returns her pose.

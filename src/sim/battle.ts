@@ -68,13 +68,15 @@ export interface Crew {
 /**
  * The fighting as it stands: every ship's crew, the balls in flight, the seed
  * the guns' spread is drawn from, and the guns' assist (its cone, radians, by
- * rarity: the match's rules, rules.ts).
+ * rarity: the match's rules, rules.ts); and, in a race sailed in teams, each
+ * ship's team by her id (carded.ts teamsOf; none: every ship for herself).
  */
 export interface Battle {
   crews: Crew[];
   balls: Ball[];
   seed: number;
   assist: readonly number[];
+  teams?: readonly number[];
 }
 
 /**
@@ -169,17 +171,20 @@ export const armed = (c: Crew) => c.guns.some((g) => g !== null);
 
 /**
  * The fighting before it starts: these crews, no balls, drawing from `seed`,
- * the guns' assist `assist` (the game's own if not given).
+ * the guns' assist `assist` (the game's own if not given), the ships' `teams`
+ * by id (none if not given).
  */
 export const battleOf = (
   crews: readonly Crew[],
   seed: number,
-  assist: readonly number[] = GUN.assist
+  assist: readonly number[] = GUN.assist,
+  teams?: readonly number[]
 ): Battle => ({
   crews: [...crews].sort((a, b) => a.id - b.id),
   balls: [],
   seed,
   assist,
+  ...(teams && { teams }),
 });
 
 /**
@@ -416,10 +421,9 @@ export function stepBattle(
 
   return {
     battle: {
+      ...b,
       crews: [...crews.values()].sort((x, y) => x.id - y.id),
       balls,
-      seed: b.seed,
-      assist: b.assist,
     },
     shots,
     strikes,

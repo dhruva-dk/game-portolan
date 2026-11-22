@@ -50,7 +50,8 @@ const LAYERS: Record<string, readonly string[]> = {
   // the world and the simulation: pure, headless, deterministic (determinism);
   // world/'s own tiers are architecture-graph.test.ts's
   'world/': ['world/'],
-  'sim/': ['sim/', 'world/', 'kinds.ts'],
+  // (of race.ts, the card a race is sailed by: sim/carded.ts reads it)
+  'sim/': ['sim/', 'world/', 'kinds.ts', 'race.ts'],
   // the kinds of gun and of loot, named once for all who tell them apart: a
   // leaf
   'kinds.ts': [],
@@ -86,7 +87,7 @@ const LAYERS: Record<string, readonly string[]> = {
   // shown (player.ts Screen)
   'audio/': ['audio/', 'world/', 'snapshot.ts', 'player.ts', 'kinds.ts'],
   // the game runs the sim and says what to draw and show, as plain data
-  'play/': ['play/', 'sim/', 'world/', 'palette.ts', ...NEUTRAL],
+  'play/': ['play/', 'sim/', 'world/', 'palette.ts', 'race.ts', ...NEUTRAL],
   // what draws the world; each sideways import named
   'view/': ['view/', ...RENDER],
   // (of sim/storm.ts its Cap and CLOUD: the storm's state is the snapshot's)
