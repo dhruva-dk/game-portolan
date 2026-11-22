@@ -47,6 +47,10 @@
 // ?cloth=0 draws every ship's canvas as the wind fills it, none simulated
 // (ship/fleet.ts).
 //
+// The office. ?screen= with a name of the office's (ui/office/screens.ts NAMES:
+// kit, menu, a tab's) opens the office at that screen on the fixture desk
+// (office/fixtures/desk.ts), over her ship at anchor, without the meter.
+//
 // The screens. ?screen= opens the UI at a screen (title, lobby, settings,
 // seed: the seed panel over the lobby, on the page's ?seed=; livery: her
 // livery's folio, her ship turned broadside above it; match, sunk,
@@ -118,7 +122,10 @@ import { KINDS, SOUND, type Fault, type GunKind } from './kinds.ts';
 import { GUN, SHIP } from './sim/handling.ts';
 import { PLAYER, SHIPS } from './sim/match.ts';
 import type { ShipDraw, Snapshot, StormDraw } from './snapshot.ts';
+import { FIXTURE } from './office/fixtures/desk.ts';
 import type { Flow } from './ui/flow.ts';
+import { createOffice } from './ui/office/office.ts';
+import { NAMES } from './ui/office/screens.ts';
 import { uiLayer } from './ui/ui.ts';
 import type { Weather } from './world/weather.ts';
 import {
@@ -215,6 +222,9 @@ const degrees = Math.PI / 180;
 const flying =
   params.has('fly') || ['lat', 'lon', 'alt', 'wall'].some((k) => params.has(k));
 
+/** ?screen= as a screen of the office's (ui/office/screens.ts), if it names one. */
+const officed = NAMES.find((n) => n === params.get('screen')) ?? null;
+
 /** A list switch's nth number (?zones=r,u,w,d), within 0…hi (0 where not given). */
 const nth = (name: string, i: number, hi: number) => {
   const v = Number((params.get(name) ?? '').split(',')[i]);
@@ -280,7 +290,8 @@ function setupOf(release: Setup): Setup {
         ? (light, world) => probeMeshes(light, world.planet.start.at)
         : release.drawing.extras,
     },
-    meter: true,
+    // (not over the office, whose nav lies where the meter does)
+    meter: !officed,
     hold: params.has('storm') ? number('storm', 0) : release.hold,
     gun:
       params.has('gun') || params.has('kind')
@@ -400,7 +411,14 @@ export async function scenario(
 function open(p: Played, others: readonly Berth[]) {
   const { game, referee, flow } = p;
   const screen = params.get('screen') ?? 'match';
-  if (
+  if (officed) {
+    // the office on the fixture desk, over her ship at anchor in the lobby's place
+    flow.go('lobby');
+    flow.office(true);
+    const office = createOffice(FIXTURE);
+    office.go(officed);
+    office.show(true);
+  } else if (
     screen === 'title' ||
     screen === 'lobby' ||
     screen === 'settings' ||

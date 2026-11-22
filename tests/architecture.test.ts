@@ -72,10 +72,15 @@ const LAYERS: Record<string, readonly string[]> = {
   'environment.ts': ['world/'],
   // the seed in the page's address: read, rolled, and sailed onto a new page
   'address.ts': ['world/'],
+  // the seam between the career and the office (MANAGER.md): each screen's
+  // view and what it asks, as plain data; its fixtures (the debug page's desk)
+  // name the palette's dyes
+  'office/': ['office/', 'race.ts', 'kinds.ts', 'colour.ts', 'palette.ts'],
   // the UI draws plain data: of the sim only the storm's Cap (the full map inks
-  // it)
+  // it); the office's screens draw the seam's views
   'ui/': [
     'ui/',
+    'office/',
     'world/',
     'sim/storm.ts',
     'snapshot.ts',
@@ -160,6 +165,9 @@ const LAYERS: Record<string, readonly string[]> = {
     'play/state.ts',
     'ui/flow.ts',
     'ui/ui.ts',
+    'ui/office/office.ts',
+    'ui/office/screens.ts',
+    'office/fixtures/desk.ts',
     ...NEUTRAL,
     'frame.ts',
     'world/',

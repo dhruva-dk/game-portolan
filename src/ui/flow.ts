@@ -90,6 +90,8 @@ export function createFlow(
   act.wardrobe.wear(keptLivery(store, names));
   /** Her end as last reported (null while she fights). */
   let end: End | null = null;
+  /** Whether the office lies over her ship at anchor, in the lobby's place. */
+  let officed = false;
 
   const veil = createVeil();
   const livery = createLivery(
@@ -174,8 +176,10 @@ export function createFlow(
     screen = next;
     // (on the way home the title is the passage's)
     if (!passage.going) title.show(next === 'title');
-    // (her livery's folio takes the lobby's place: her ship above it, nothing over her)
-    lobby.show(next === 'lobby' || next === 'settings' || next === 'seed');
+    // (her livery's folio takes the lobby's place: her ship above it, nothing over her; so does the office)
+    lobby.show(
+      !officed && (next === 'lobby' || next === 'settings' || next === 'seed')
+    );
     settingsFolio.show(next === 'settings');
     if (next === 'livery' || was === 'livery') livery.show(next === 'livery');
     // (opened afresh on the page's seed, so only as it comes or goes)
@@ -228,6 +232,14 @@ export function createFlow(
     },
     /** Opens the UI at `next` (the debug switches' way in: src/debug.ts). */
     go,
+    /**
+     * The office (office/office.ts) laid over her ship at anchor, or lifted
+     * off: the lobby's own controls give way under it.
+     */
+    office(on: boolean) {
+      officed = on;
+      go(screen);
+    },
     /**
      * Her tap on a way on, as if on what is drawn for it (the debug switches':
      * src/debug.ts).

@@ -112,6 +112,69 @@ const METER = {
   poor: '#f07a5e',
 } as const;
 
+/**
+ * The office's dress (ui/kit/, ui/office/): the navy of its strip and nav, a
+ * chip's ground on it and the strip's two inks; the parchment of a panel, a
+ * region of it a tone darker and one lighter; its ink, and its second ink for
+ * labels; the ink set on a filled control; and the fills that say what a thing
+ * is: go (a button, the chosen), bad (a loss, cancel), good, fair, warn (under
+ * way), gold (stars), and the one way on (Continue).
+ */
+export const OFFICE = {
+  bar: '#1b2431',
+  chip: '#2a3545',
+  barInk: '#efe4cc',
+  barFaint: '#aab0b8',
+  panel: '#f2e7cf',
+  dark: '#e4d2ac',
+  light: '#faf3e3',
+  ink: '#241b13',
+  faint: '#5d4b37',
+  onFill: '#fff8ea',
+  go: '#2b4fa0',
+  bad: '#a92c26',
+  good: '#2a7347',
+  fair: '#256f78',
+  warn: '#c7860f',
+  gold: '#c6951a',
+  on: '#c85a12',
+} as const;
+/**
+ * The gull's own colours (gull.ts): his feathers and their shade, his beak,
+ * its lower half and its red spot, his dark glasses and the light on them.
+ */
+export const PLUMAGE = {
+  white: '#fbf8ef',
+  shade: '#c5ccd6',
+  beak: '#f3b62c',
+  under: '#dd9020',
+  spot: '#c8342a',
+  lens: '#15171c',
+  glint: '#e9f0f6',
+} as const;
+/** What a filled thing of the office says by its colour. */
+export type Tone = 'go' | 'bad' | 'good' | 'fair' | 'warn' | 'gold';
+/**
+ * The tone of a value by its share of the best it could be (a stat of 20, a
+ * bar of the chart): good, fair, warn, then bad.
+ */
+export const toneOf = (share: number): Tone =>
+  share >= 0.75
+    ? 'good'
+    : share >= 0.5
+      ? 'fair'
+      : share >= 0.3
+        ? 'warn'
+        : 'bad';
+/**
+ * The office's faces: Avenir Next for labels, tables and figures, its
+ * condensed cut for a panel's title and the nav; the inked serif (FIGURES) for
+ * screen titles and team names alone. Its sizes, px: nothing under `small`.
+ */
+export const SANS = '"Avenir Next", Avenir, "Helvetica Neue", sans-serif',
+  NARROW = '"Avenir Next Condensed", "Avenir Next", Avenir, sans-serif';
+export const TYPE = { title: 26, head: 18, body: 15, small: 13 } as const;
+
 /** `hex` (#rrggbb) at `a` of its strength, as #rrggbbaa. */
 export const alpha = (hex: string, a: number) =>
   `${hex}${Math.round(a * 255)
