@@ -463,7 +463,7 @@ export function createGame(
    * the next step would lay it.
    */
   const aimed = (v: Vessel, gun: Gun): Laying =>
-    laid(v, gun, chase.sight(), state.vessels(), {
+    laid(v, gun, chase.sight(), state.marks(v.id), {
       seed: 0,
       depth,
       spread: 0,
@@ -757,6 +757,21 @@ export function createGame(
     share: () => state.share(PLAYER),
     ships: state.ships,
     alive: state.alive,
+    /**
+     * A race sailed in teams, as the match's flow reads it (sim/match.ts
+     * Report.race): its teams, whether it is over, and her place once it is
+     * (0 till then); none on any other sea.
+     */
+    race() {
+      const teams = state.teams();
+      if (!teams) return undefined;
+      const over = state.result() !== null;
+      return {
+        teams,
+        over,
+        place: over ? state.order().indexOf(PLAYER) + 1 : 0,
+      };
+    },
     /**
      * A new match: every ship afloat at her berth, hers the first, and the eye
      * coming down onto her from space.

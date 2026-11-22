@@ -19,7 +19,7 @@
 import { along, distance, dot, toward, type Vec3 } from '../world/sphere.ts';
 import { toEdge } from './storm.ts';
 import { logistic, ramp, utility } from './utility.ts';
-import { aggroOf, open, rotate, type Ctx, type Seen } from './captain.ts';
+import { aggroOf, mate, open, rotate, type Ctx, type Seen } from './captain.ts';
 import { ZONES } from '../kinds.ts';
 import { faultsOf } from './faults.ts';
 import { SHIP } from './handling.ts';
@@ -174,8 +174,13 @@ export function fightUrge(c: Ctx): number {
     will +=
       c.b.mind.roused *
       ramp(m.clock - m.hitT, c.b.mind.grudge + c.b.mind.cool, c.b.mind.cool);
+  // (a mate close by is no third ship to finish whoever wins)
   for (const o of c.others)
-    if (o.id !== foe.id && distance(own.ship.at, o.ship.at) < c.b.mind.crowd)
+    if (
+      o.id !== foe.id &&
+      !mate(c, o) &&
+      distance(own.ship.at, o.ship.at) < c.b.mind.crowd
+    )
       will -= c.b.mind.crowding * t.skill;
   if (strength(foe) >= strength(own) && ranFromShip(c, foe.id))
     will -= c.b.mind.beaten;

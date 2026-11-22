@@ -309,6 +309,13 @@ export function createStorm(
 }
 
 /**
+ * Seconds on a match's clock by which the storm of `table` has closed its last
+ * cap: every phase's wait and close.
+ */
+export const closedBy = (table: StormTable): number =>
+  table.phases.reduce((t, p) => t + p.wait + p.close, 0);
+
+/**
  * Metres along the surface from p (any vector from the centre) in to the cap's
  * edge: negative outside it.
  */

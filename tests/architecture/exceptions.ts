@@ -109,6 +109,18 @@ export const EXCEPTIONS: readonly Exception[] = [
   },
   {
     rule: 'exports',
+    file: 'src/play/race.ts',
+    name: 'runRace',
+    why: "a race sailed headless: the tools' and the tests' (tools/race.ts, the fleet's), and the career's worker's for the tiers she is not in (MANAGER.md 3 point 9, 4); this goes stale, and is removed, once the career takes it",
+  },
+  {
+    rule: 'exports',
+    file: 'src/play/race.ts',
+    name: 'specField',
+    why: "a field of spec ships to sail a race with: the tools' and the tests', and the debug switch's that starts a carded race for the race HUD to be drawn on (MANAGER.md 3 point 10); this goes stale, and is removed, once that takes it",
+  },
+  {
+    rule: 'exports',
     file: 'src/audio/cues.ts',
     name: 'DEEDS',
     why: 'every kind of deed, for the test that each has its cue',
@@ -154,12 +166,6 @@ export const EXCEPTIONS: readonly Exception[] = [
     file: 'src/world/lattice.ts',
     name: 'stretch',
     why: "how far a chart stretches, for the test that the lattice's cover keeps it under 1%",
-  },
-  {
-    rule: 'exports',
-    file: 'src/world/swell.ts',
-    name: 'flat',
-    why: 'a sea without waves for the matches run headless (the tests, tools/harness and tools/steps.ts)',
   },
   {
     rule: 'exports',

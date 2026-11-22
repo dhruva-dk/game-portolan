@@ -19,7 +19,7 @@ import { R, apart, distance, dot, type Vec3 } from '../world/sphere.ts';
 import type { GunKind } from '../kinds.ts';
 import { inHand } from './battle.ts';
 import { eye, hidden } from './lookout.ts';
-import type { Ctx } from './captain.ts';
+import { mate, type Ctx } from './captain.ts';
 
 /** Everything her log is tuned by. Metres and seconds. */
 export const LOGBOOK = {
@@ -72,6 +72,8 @@ export function note(c: Ctx): void {
   const was = (id: number) => fresh.find((s) => s.id === id);
   const seen: Sighting[] = [];
   for (const o of c.others) {
+    // (her own team's she keeps no note of: none is her prey or her bane)
+    if (mate(c, o)) continue;
     if (apart(own.ship.at, o.ship.at, far)) continue;
     if (distance(own.ship.at, o.ship.at) > far) continue;
     if (hidden(c, own.ship.at, o.ship.at)) continue;

@@ -12,6 +12,11 @@
 // is first and wins. With her place, how she sank and at whose hand: the
 // Storm's sinking goes to the ship that last struck her if it did so within
 // CREDIT seconds (credited). Pure: a value stepped by what the game reports.
+//
+// A race sailed in teams (Report.race) is over when the game says it is (one
+// team afloat or none, or called: carded.ts): afloat then, she has `won` her
+// way to its end, at the place she holds there; sunk, she watches a mate of
+// hers first, and a mate of the ship she watched after her.
 
 import type { GunKind } from '../kinds.ts';
 
@@ -83,12 +88,16 @@ export interface MatchState {
 
 /**
  * What the game reports each frame: every sinking so far in order, the ids of
- * every ship not sunk, and her share of the planet's water now (0…1).
+ * every ship not sunk, and her share of the planet's water now (0…1). In a
+ * race sailed in teams, besides: each ship's team by her id, whether the race
+ * is over (one team afloat or none, or called: carded.ts over), and her place
+ * as it stands (the result's order: play/result.ts finishing).
  */
 export interface Report {
   sinkings: readonly Sunk[];
   alive: readonly number[];
   share?: number;
+  race?: { teams: readonly number[]; over: boolean; place: number };
 }
 
 export const startMatch = (): MatchState => ({
@@ -103,10 +112,14 @@ export const startMatch = (): MatchState => ({
 });
 
 /**
- * Who to watch after `gone` sank, at the hand of `by`: her, if afloat, or the
- * ship afloat with the most sinkings to her name (the lowest id of those tied).
+ * Who to watch after `gone` sank, at the hand of `by`: in a race of teams, the
+ * first of `gone`'s mates afloat; else `by`, if afloat, or the ship afloat
+ * with the most sinkings to her name (the lowest id of those tied).
  */
-function next(by: number | null, r: Report): number {
+function next(gone: number, by: number | null, r: Report): number {
+  const teams = r.race?.teams,
+    mate = teams && r.alive.find((id) => teams[id] === teams[gone]);
+  if (mate !== undefined) return mate;
   if (by !== null && r.alive.includes(by)) return by;
   let best = -1,
     most = -1;
@@ -128,7 +141,7 @@ export function stepMatch(m: MatchState, r: Report, dt: number): MatchState {
   if (s.phase !== 'fighting') s.since += dt;
   if (mine && s.phase === 'fighting') {
     const place = r.alive.length + r.sinkings.length - r.sinkings.indexOf(mine);
-    const watch = next(mine.by, r);
+    const watch = next(PLAYER, mine.by, r);
     s =
       place === 1 && r.alive.length === 0
         ? { ...s, phase: 'won', place, sunk: mine }
@@ -143,9 +156,12 @@ export function stepMatch(m: MatchState, r: Report, dt: number): MatchState {
     // the ship watched has sunk: on to the one that sank her
     const gone = fresh.find((k) => k.id === s.watch);
     if (gone) {
-      const watch = next(gone.by, r);
+      const watch = next(gone.id, gone.by, r);
       if (watch >= 0) s = { ...s, watch };
     }
+  } else if (s.phase === 'fighting' && r.race) {
+    // a race is hers to end afloat, at the place she holds as it ends
+    if (r.race.over) s = { ...s, phase: 'won', place: r.race.place };
   } else if (
     s.phase === 'fighting' &&
     fresh.length > 0 &&
@@ -154,8 +170,9 @@ export function stepMatch(m: MatchState, r: Report, dt: number): MatchState {
   ) {
     s = { ...s, phase: 'won', place: 1 };
   }
-  s.over =
-    s.phase === 'won' || (s.phase === 'spectating' && r.alive.length <= 1);
+  s.over = r.race
+    ? r.race.over
+    : s.phase === 'won' || (s.phase === 'spectating' && r.alive.length <= 1);
   return s;
 }
 

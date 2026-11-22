@@ -16,7 +16,7 @@ import { distance, along, toward, type Vec3 } from '../world/sphere.ts';
 import { clearAt } from './route.ts';
 import { toEdge } from './storm.ts';
 import { ramp, utility } from './utility.ts';
-import { between, open, rotate, type Ctx } from './captain.ts';
+import { between, mate, open, rotate, type Ctx } from './captain.ts';
 
 /** Everything a bot's water is tuned by. Metres and seconds. */
 export const CLAIMER = {
@@ -85,10 +85,11 @@ export const claimMemory = (): ClaimMemory => ({
   rested: 0,
 });
 
-/** The distance to the nearest other ship. */
+/** The distance to the nearest other ship, her own team's aside. */
 const nearest = (c: Ctx) =>
   c.others.reduce(
-    (d, o) => Math.min(d, distance(c.own.ship.at, o.ship.at)),
+    (d, o) =>
+      mate(c, o) ? d : Math.min(d, distance(c.own.ship.at, o.ship.at)),
     Infinity
   );
 

@@ -2,14 +2,15 @@
 // notes the nearest ship she can see within her notice (land between hides
 // one), a ship that just rammed her seen as nearer; a foe out of sight is
 // followed to where she was last seen, and let go after `forget` seconds. What
-// she sees, the captain (bot.ts) weighs.
+// she sees, the captain (bot.ts) weighs. A ship of her own team (captain.ts
+// mate) is never the one.
 //
 // Pure arithmetic: no three, so it runs in node for the tests; deterministic
 // for the same inputs, to the bit.
 
 import { along, apart, distance, toward, type Vec3 } from '../world/sphere.ts';
 import { sighted } from './gunner.ts';
-import type { Ctx, Seen } from './captain.ts';
+import { mate, type Ctx, type Seen } from './captain.ts';
 import type { Temper } from './temper.ts';
 
 /**
@@ -66,6 +67,7 @@ export function perceive(c: Ctx): void {
   let best: Seen | null = null,
     bd = eye(c.t);
   for (const o of c.others) {
+    if (mate(c, o)) continue;
     if (apart(own.ship.at, o.ship.at, c.b.sight.sightMax)) continue;
     const d = distance(own.ship.at, o.ship.at);
     if (d > c.b.sight.sightMax) continue;

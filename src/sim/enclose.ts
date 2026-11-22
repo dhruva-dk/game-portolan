@@ -27,15 +27,19 @@ const TURN = 16;
 /**
  * The cells a loop gives ship `me` (owner value: her id + 1), given who holds
  * each cell and her run's cells in the order painted: the run's own first
- * (`loop` of them), then those it encloses.
+ * (`loop` of them), then those it encloses. Water whose owner value `ours`
+ * takes (her team's: territory.ts) fences with her own, and is not given her.
  */
 export function enclose(
   owner: Uint8Array,
   me: number,
-  run: readonly number[]
+  run: readonly number[],
+  ours?: (owner: number) => boolean
 ): { cells: Int32Array; loop: number } {
   for (const c of run) MARK[c] = 1;
-  const fenced = (c: number) => owner[c] === me || MARK[c] === 1;
+  const fenced = ours
+    ? (c: number) => owner[c] === me || MARK[c] === 1 || ours(owner[c])
+    : (c: number) => owner[c] === me || MARK[c] === 1;
   const parent: number[] = [],
     queue: number[][] = [],
     head: number[] = [],

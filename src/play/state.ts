@@ -33,6 +33,7 @@ import {
   battleOf,
   crewOf,
   inHand,
+  marksOf,
   stepBattle,
   weathered,
   type Battle,
@@ -44,7 +45,7 @@ import {
 } from '../sim/battle.ts';
 import { bruised, mind, rammed, sank, shot, type Memory } from '../sim/bot.ts';
 import { DEFAULT_BRAIN, type Brain } from '../sim/brain.ts';
-import { checked, entered, teamsOf } from '../sim/carded.ts';
+import { checked, entered, mates } from '../sim/carded.ts';
 import { nature, type MatchType, type Nature } from '../sim/persona.ts';
 import { afloat, stepFleet, type Vessel } from '../sim/contact.ts';
 import { STEP, blendPose } from '../sim/fixed.ts';
@@ -87,7 +88,7 @@ import {
 } from '../sim/stores.ts';
 import type { Chart } from '../sim/route.ts';
 import { shipAt, type Helm, type ShipState } from '../sim/ship.ts';
-import { calm, type Storm } from '../sim/storm.ts';
+import { calm, closedBy, type Storm } from '../sim/storm.ts';
 import { heard, type Report } from '../sim/hunter.ts';
 import {
   createTerritory,
@@ -95,7 +96,7 @@ import {
   type Outcome,
   type Territory,
 } from '../sim/territory.ts';
-import type { RaceCard } from '../race.ts';
+import type { RaceCard, RaceResult } from '../race.ts';
 import type { BallDraw, Look, Sea, ShipDraw } from '../snapshot.ts';
 import type { Hull } from '../world/swell.ts';
 import type { Planet } from '../world/planet.ts';
@@ -110,6 +111,7 @@ import { createHeld } from './held.ts';
 import { indexed } from './indexed.ts';
 import { createLog, NOTHING_DONE } from './moments.ts';
 import { createOrders, type Hand, type Sighter } from './orders.ts';
+import { createTally, finishing, type Tally } from './result.ts';
 import { sinking } from './sinking.ts';
 
 /** No way on and the rudder amidships. */
@@ -284,6 +286,8 @@ export function createState(
    * her id; neither on any other sea.
    */
   let card: RaceCard | undefined, teams: readonly number[] | undefined;
+  /** A race's tally as it is sailed, and its result once over (result.ts). */
+  let tally: Tally | null = null;
   const seedOf = (id: number) => hash(match.seed, id);
   let fleet: Vessel[] = [];
   const aboard = new Map<number, Aboard>();
@@ -413,7 +417,8 @@ export function createState(
   ) => {
     match = m;
     card = by && checked(by);
-    teams = card && teamsOf(card);
+    tally = card ? createTally(card, closedBy(m.type.rules.storm)) : null;
+    teams = tally?.teams;
     lay = laying(m.seed, depth, m.type.rules.loot);
     flotsam = loot ? lay.strewn() : { pieces: [], next: 0 };
     dropped = loot ? 0 : Infinity;
@@ -470,6 +475,7 @@ export function createState(
     // the bot she was sunk by is told: her mood warms (sim/fighting.ts)
     const victor = by === null ? undefined : aboard.get(by);
     if (victor?.mind) victor.mind = sank(victor.mind);
+    tally?.holds(id, territory?.share(id) ?? 0);
     territory?.sink(id, tick * STEP);
     wrecks.push({
       id,
@@ -519,9 +525,11 @@ export function createState(
     for (const v of fleet) from.set(v.id, v.ship.at);
     const met = stepFleet(fleet, helms, STEP, depth, fits);
     fleet = met.fleet;
+    // (a mate's hull against hers is no ram to her: sim/battle.ts)
     for (const b of met.blows) {
       const a = aboard.get(b.struck.id);
-      if (a?.mind) a.mind = rammed(a.mind, b.striker.id);
+      if (a?.mind && !mates(teams, b.struck.id, b.striker.id))
+        a.mind = rammed(a.mind, b.striker.id);
     }
     return { wants, met };
   };
@@ -577,15 +585,25 @@ export function createState(
     return { fought, kept };
   };
 
-  /** Whether ship `id` lies in her own water. */
+  /**
+   * Whether ship `id` lies in her own water: in a race of teams, in any of her
+   * team's.
+   */
   const home = (id: number) => {
     const v = vessel(id);
-    return !!v && !!territory && territory.ownerAt(v.ship.at) === id;
+    if (!v || !territory) return false;
+    return teams
+      ? territory.teamAt(v.ship.at) === teams[id]
+      : territory.ownerAt(v.ship.at) === id;
   };
+
+  /** The sea as a team holds it: a ship's share her team's, pooled. */
+  const pooled = { share: (id: number) => territory?.teamShare(id) ?? 0 };
 
   /**
    * Who holds the sea after the step (each strip painted, each loop closed),
-   * and each ship's shield coming back by her share of it: of the ships still
+   * and each ship's shield coming back by her share of it (in a race of teams,
+   * her team's water together: a team's water is shared): of the ships still
    * afloat, those sunk in the step (`lost`) painting and closing nothing in it.
    * Then every ship's hull mended in her own water, or leaking
    * (sim/faults.ts tended).
@@ -607,7 +625,13 @@ export function createState(
     }
     moves.length = ids.length = sailing.length;
     const did = territory.step(moves, tick * STEP, storm);
-    const back = regain(battle.crews, ids, territory, storm, STEP);
+    const back = regain(
+      battle.crews,
+      ids,
+      teams ? pooled : territory,
+      storm,
+      STEP
+    );
     battle.crews = tended(back.crews, home, STEP);
     return { held: did, regained: back.regained };
   };
@@ -661,6 +685,17 @@ export function createState(
     while (wrecks.length && !wreckAt(wrecks[0], clock(0))) wrecks.shift();
   };
 
+  /** The sea as a step left it, as a race's tally reads it (result.ts). */
+  const standing = () => ({
+    seconds: time(),
+    alive: state.alive(),
+    fleet,
+    crews: battle.crews,
+    sunk: sinkings,
+    loot: flotsam.pieces.length,
+    share: state.share,
+  });
+
   const state = {
     /**
      * One step: the player's helm, gun and stores, everyone else's from her bot
@@ -705,6 +740,7 @@ export function createState(
       rideOn(met, wants.blew);
       lap?.('ride');
       founderAll(fought);
+      tally?.settle(fought.shots, fought.strikes, standing);
       lap?.('founder');
       log.keep(
         fought,
@@ -799,6 +835,25 @@ export function createState(
       territory ? held(territory, generation, colours) : undefined,
     /** A ship's share of the planet's water now, 0…1 (none outside a match). */
     share: (id: number) => territory?.share(id) ?? 0,
+
+    /**
+     * A race's result, once it is over (race.ts RaceResult): null while it is
+     * on, and on any sea but a carded race's.
+     */
+    result: (): RaceResult | null => tally?.result() ?? null,
+    /**
+     * Every ship of the match in the order she would finish as it stands
+     * (result.ts finishing), first place first; a race's forfeits last.
+     */
+    order: (): number[] =>
+      finishing(state.alive(), sinkings, state.share, tally?.forfeit),
+    /** Each ship's team by her id, in a race of teams; else none. */
+    teams: (): readonly number[] | undefined => teams,
+    /**
+     * The ships ship `id`'s gun may be laid on by its assist: every one afloat
+     * but her own team's (sim/battle.ts marksOf).
+     */
+    marks: (id: number): readonly Vessel[] => marksOf(battle, id, fleet),
 
     /** The ships on the sea, as the sim has them. */
     vessels: (): readonly Vessel[] => fleet,

@@ -26,6 +26,7 @@
 
 import type { Rise } from '../world/planet.ts';
 import { distance, type Vec3 } from '../world/sphere.ts';
+import { mates } from './carded.ts';
 import type { Blow, Vessel } from './contact.ts';
 import type { GunKind } from '../kinds.ts';
 import { CARRIED, FALLOFF, GUN, GUNS, GUST, HEALTH } from './handling.ts';
@@ -188,6 +189,17 @@ export const battleOf = (
 });
 
 /**
+ * The ships of `fleet` the gun of ship `id` may be laid on by its assist
+ * (gun.ts laid): every one but her own team's (`fleet` itself with no teams).
+ */
+export const marksOf = (
+  b: Pick<Battle, 'teams'>,
+  id: number,
+  fleet: readonly Vessel[]
+): readonly Vessel[] =>
+  b.teams ? fleet.filter((o) => !mates(b.teams, id, o.id)) : fleet;
+
+/**
  * One step of the gun `g` in hand of crew `c`, firing by `loose` (which lays it
  * and puts its balls in flight), reloading in `reload` times its own time (her
  * handling's: handling.ts Handling); its cues told to `cue`. The gun after it.
@@ -323,8 +335,9 @@ export function stepBattle(
     if (sunk(c.health)) sunkNow.push(id);
   };
 
-  // the rams
+  // the rams (one between mates harms neither: their hulls only part)
   for (const blow of blows) {
+    if (mates(b.teams, blow.striker.id, blow.struck.id)) continue;
     deal(blow.struck.id, blow.striker.id, blow.striker.damage, blow.at, null);
     deal(blow.striker.id, blow.struck.id, blow.struck.damage, blow.at, null);
   }
@@ -341,10 +354,10 @@ export function stepBattle(
     const damage = f.ball.damage * falloff(kind, distance(f.ball.from, f.at));
     if (splash > 0) {
       // a shell bursts: every ship within its splash takes it, less toward the
-      // rim (the one it struck, all of it)
+      // rim (the one it struck, all of it), but her own team's
       for (const m of marks) {
         const d = m.id === f.struck ? 0 : offHull(m.ship, f.at);
-        if (m.id !== shooter && d <= splash)
+        if (m.id !== shooter && d <= splash && !mates(b.teams, shooter, m.id))
           deal(
             shooter,
             m.id,
@@ -354,7 +367,8 @@ export function stepBattle(
             f.ball.v
           );
       }
-    } else if (f.struck !== null)
+    } else if (f.struck !== null && !mates(b.teams, shooter, f.struck))
+      // (a ball that meets a mate's hull stops there and harms nothing)
       deal(shooter, f.struck, damage, f.at, kind, f.ball.v);
     if (f.struck === null)
       splashes.push({ shooter, gun: kind, at: f.at, land: f.land });
@@ -380,13 +394,13 @@ export function stepBattle(
           spreadOf(gun) *
           (order?.spread ?? 1) *
           (c.gust.blowing > 0 ? GUST.spread : 1);
-        const lay = laid(v, gun, order?.aim ?? null, targets, {
-          seed: b.seed,
-          depth,
-          spread,
-          cone: b.assist[gun.rarity],
-          rises,
-        });
+        const lay = laid(
+          v,
+          gun,
+          order?.aim ?? null,
+          marksOf(b, v.id, targets),
+          { seed: b.seed, depth, spread, cone: b.assist[gun.rarity], rises }
+        );
         for (const dir of lay.dirs)
           balls.push(
             loosed(

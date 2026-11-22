@@ -75,6 +75,7 @@ export function createReferee(game: Game) {
       report.sinkings = game.sinkings();
       report.alive = game.alive();
       report.share = game.share();
+      report.race = game.race();
       m = stepMatch(m, report, dt);
       if (m.watch !== was.watch || m.phase !== was.phase) aim(m);
       if (m.phase === 'fighting' || m.place === null) return null;

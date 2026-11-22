@@ -11,6 +11,13 @@
 // takes every cell outside its cap; a ship left with none paints on from where
 // she is.
 //
+// In a race sailed in teams the cells stay each ship's own, and her team's
+// water is as her own to her: her strip leaves a mate's water her mate's (a
+// mate crossing her water takes none of it), her strip coming against a mate's
+// water closes her loop as against her own, and the loop is fenced by her
+// team's water with hers (what it fences off becomes hers; her mates' stays
+// theirs).
+//
 // Her run is the cells she has painted since her strip last came against her
 // older water: what a loop's fence is made of, its flood starting there.
 //
@@ -223,7 +230,16 @@ export function createTerritory(count: number, teams?: readonly number[]) {
   };
 
   /**
+   * Whether the owner value `o` (0 open sea, else her id + 1) is a mate's of
+   * ship `id`: another ship of her team (never, with no teams).
+   */
+  const mate = (id: number, o: number) =>
+    !!teams && o !== 0 && o !== id + 1 && teams[o - 1] === teams[id];
+
+  /**
    * Paints her brush round `at` into `painted`; whether it met her older water.
+   * A mate's water she leaves her mate's (her strip does not cut it), and it
+   * is as her own older water to her: her strip against it closes her loop.
    */
   const paint = (id: number, at: Vec3, painted: number[]): boolean => {
     const me = id + 1,
@@ -236,13 +252,17 @@ export function createTerritory(count: number, teams?: readonly number[]) {
         met ||= when[c] < old;
         continue;
       }
+      if (mate(id, owner[c])) {
+        met = true;
+        continue;
+      }
       set(c, me);
       when[c] = now;
       runs[id].push(c);
       painted.push(c);
       for (let d = 0; d < 4 && !met; d++) {
         const n = neighbor(c, d);
-        met = owner[n] === me && when[n] < old;
+        met = (owner[n] === me && when[n] < old) || mate(id, owner[n]);
       }
     }
     return met;
@@ -259,7 +279,14 @@ export function createTerritory(count: number, teams?: readonly number[]) {
     const run = runs[id].filter((c) => owner[c] === me);
     runs[id] = [];
     if (!run.length) return 0;
-    const { cells, loop } = enclose(owner, me, run);
+    // (her team's water fences with her own: it counts as hers in the loop,
+    // and stays her mates')
+    const { cells, loop } = enclose(
+      owner,
+      me,
+      run,
+      teams && ((o) => mate(id, o))
+    );
     if (cells.length === loop) return 0;
     for (let k = loop; k < cells.length; k++) {
       set(cells[k], me);
@@ -372,6 +399,17 @@ export function createTerritory(count: number, teams?: readonly number[]) {
     },
     /** Her share of the planet, 0…1. */
     share: (id: number) => area[id] / PLANET_QUANTA,
+    /**
+     * Her team's share of the planet, 0…1: hers and her mates' together (her
+     * own, with no teams).
+     */
+    teamShare: (id: number) => {
+      if (!teams) return area[id] / PLANET_QUANTA;
+      let all = 0;
+      for (let k = 0; k < count; k++)
+        if (teams[k] === teams[id]) all += area[k];
+      return all / PLANET_QUANTA;
+    },
     /** Whether she holds any water. */
     holds: (id: number) => area[id] > 0,
     /**

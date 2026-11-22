@@ -196,6 +196,13 @@ export const open = (c: Ctx, p: Vec3) =>
 export const aggroOf = (c: Ctx) =>
   Math.min(1, Math.max(0, c.t.aggro + c.m.heat));
 
+/**
+ * Whether the ship `o` sails for her team (a race sailed in teams): no foe of
+ * hers, never her mark, and no stranger to keep clear of.
+ */
+export const mate = (c: Ctx, o: Seen) =>
+  c.own.team !== undefined && o.team === c.own.team;
+
 /** Whether she saw her foe when she last looked. */
 export const inSight = (c: Ctx) =>
   c.m.foe >= 0 && c.m.clock - c.m.seen < (BOT.every - 0.5) * STEP;
