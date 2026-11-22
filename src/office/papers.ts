@@ -4,7 +4,7 @@
 // as the page shows them. Types only.
 
 import type { PartType } from '../race.ts';
-import type { Building, Ship } from './command.ts';
+import type { Building, ImprovementShare, Ship } from './command.ts';
 import type { Act } from './people.ts';
 
 /** A people view with each dye's two colours as the page shows them, by the dye's number. */
@@ -120,6 +120,7 @@ export interface PartLine {
   reliability: number;
   condition: number;
   ship: Ship | null;
+  spec: boolean; // a standard part: never improved
 }
 /** A slot of the design on the drawing board: its cards once dealt, the one picked, and whether it may be dealt again. */
 interface Slot {
@@ -137,7 +138,11 @@ interface Slot {
 export interface ShipPaper {
   stats: readonly Measure[];
   suppliers: readonly { trade: string; name: string | null }[];
-  improving: { perf: number; reliability: number };
+  improving: {
+    perf: number;
+    reliability: number;
+    shares: readonly ImprovementShare[]; // each part's share of the work, as the team split it
+  };
   ships: readonly { name: string; driver: string }[];
   types: readonly { id: PartType; label: string }[];
   parts: readonly PartLine[];

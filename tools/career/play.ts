@@ -88,6 +88,19 @@ try {
     await capture(`${label}-letter`);
     await page.locator('.o-tab').nth(3).click();
     // (a card dealt and picked, where her designer knows a component of the part)
+    // (the drawing board is reached by Design New Part and a part's card)
+    await page
+      .locator('.y-do .k-btn')
+      .first()
+      .click({ timeout: 3000 })
+      .catch(() => null);
+    await page.waitForTimeout(400);
+    await page
+      .locator('.y-type')
+      .first()
+      .click({ timeout: 3000 })
+      .catch(() => null);
+    await page.waitForTimeout(400);
     if (await page.locator('.y-slot .k-btn:not(.off)').count()) {
       await tap('.y-slot .k-btn');
       await page.waitForTimeout(400);
@@ -126,7 +139,7 @@ try {
       .click({ timeout: 3000 })
       .catch(() => null);
     await asked(4, '.q-card .k-btn:not(.off)', 'building');
-    await asked(3, '.s-ship .b-act .k-btn:not(.off)', 'designing');
+    await asked(3, '.y-board .k-btn.on:not(.off)', 'designing');
     await page.locator('.o-tab').nth(0).click();
     await at('home', 10000);
     await capture(`${label}-home`);

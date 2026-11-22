@@ -327,6 +327,7 @@ export function shipPaper(
     improving: {
       perf: c.improvement.reduce((a, x) => a + x.perf, 0),
       reliability: c.improvement.reduce((a, x) => a + x.reliability, 0),
+      shares: c.improvement,
     },
     ships: c.staff.ships.map((h, i) => ({
       name: shipName(i),
@@ -345,6 +346,7 @@ export function shipPaper(
         reliability: x.reliability,
         condition: x.condition,
         ship: x.ship,
+        spec: x.spec,
       })),
     design: c.design
       ? {

@@ -19,12 +19,7 @@ import { createKit } from './kit.ts';
 import { createOffer, createScouting } from './market.ts';
 import { createMenu } from './menu.ts';
 import type { Office } from './office.ts';
-import {
-  createCalendar,
-  createFinances,
-  createMail,
-  createSponsors,
-} from './papers.ts';
+import { createFinances, createMail } from './papers.ts';
 import {
   createDrivers,
   createProfile,
@@ -32,6 +27,7 @@ import {
   createTeam,
 } from './people.ts';
 import { createPlan, createResult } from './raceday.ts';
+import { createCalendar, createSponsors } from './season.ts';
 import { createStandings } from './standings.ts';
 import { createHq, createShip } from './yard.ts';
 
@@ -134,7 +130,7 @@ export const SCREENS: Readonly<Partial<Record<Name, Entry>>> = {
   }),
   profile: viewed('profile', createProfile, { title: 'Profile', tab: null }),
   offer: viewed('offer', createOffer, {
-    title: 'Contract Negotiation',
+    title: 'Negotiation',
     tab: 'scouting',
   }),
   jobs: viewed('jobs', createJobs, { title: 'Job Offers', tab: 'player' }),
