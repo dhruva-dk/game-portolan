@@ -67,7 +67,7 @@ import {
   type Cause,
   type Sunk,
 } from '../sim/match.ts';
-import { berths, type Berthing, type Spawn } from '../sim/spawn.ts';
+import { berths, drawn, type Berthing, type Spawn } from '../sim/spawn.ts';
 import {
   hopped,
   knocked,
@@ -947,11 +947,14 @@ export function createState(
         count = by ? by.ships.length : SHIPS;
       const ids = by ? entered(by) : Array.from({ length: count }, (_, i) => i);
       clear(m, ids, MATCH, by);
-      const at = m.berths ?? berths(water, m.seed, count, depth);
+      const open = m.berths ?? berths(water, m.seed, count, depth);
       flotsam = lay.berthed(
         flotsam,
-        at.map((b) => b.at)
+        open.map((b) => b.at)
       );
+      // a race's berths are drawn among its ships (a single race's stay as
+      // dealt: hers the first)
+      const at = by ? drawn(open, m.seed) : open;
       // hers as she chose it, the bots' dealt by the race's seed round it; in
       // a race, each as her card has her (her hands on her ship only if it
       // names no driver for her)

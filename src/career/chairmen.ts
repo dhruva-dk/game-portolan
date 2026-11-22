@@ -300,14 +300,16 @@ export function sackedOffers(s: CareerState): CareerState {
 }
 
 /** A state at a season's start for every chairman: the target set (expected place by staff stars, moved up by Ambition);
- *  money added and the debt floor set (Generosity). Section 13 calls it as each season starts. */
+ *  money added, the debt floor set (Generosity) and any debt past it cleared. Section 13 calls it as each season starts. */
 export function seasonStart(s: CareerState): CareerState {
   const teams = s.teams.map((c) => {
     const g = chairmanOf(s, c).stats.generosity;
+    const floor = Math.round(debtFloor(g, c.budget));
     return {
       ...c,
-      balance: Math.round(c.balance + endowment(g, c.budget)),
-      debtFloor: Math.round(debtFloor(g, c.budget)),
+      // a debt past the floor is the chairman's to make good: it has cost the manager their confidence all season
+      balance: Math.max(floor, Math.round(c.balance + endowment(g, c.budget))),
+      debtFloor: floor,
       confidence:
         Math.round(
           confidenceCarried(c.confidence, TUNING.team.confidence) * 10

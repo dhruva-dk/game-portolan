@@ -6,7 +6,7 @@
 // A pair [a, b] is a line in u = stat / 20: a + b × u. A triple by tier is Tier 1's, Two's, Three's.
 
 /** Bump with any change to TUNING (and pin the new hash in the test). */
-export const TUNING_VERSION = 7;
+export const TUNING_VERSION = 8;
 
 const ROLE_YEARS = {
   manager: [40, 55],
@@ -95,8 +95,9 @@ export const TUNING = {
   /** Morale (Phase B section 2.3), 0 to 100. */
   morale: {
     start: 60,
-    result: 6, // most a race moves it by the result against the team's target
-    resultPerPlace: 2, //   this a place, to that most
+    result: 3, // most a race moves it by the result against the team's target
+    resultPerPlace: 1, //   this a place, to that most
+    settle: 0.12, // a race brings it this share of the way back to the start: a bad run sours a team, not for good
     status: 2, // a race on ship two, or off it as reserve, for a driver who wants status
     silence: 10, // no renewal offered in the contract's last days, once
     silenceDays: 60,
@@ -214,7 +215,7 @@ export const TUNING = {
     bigBid: 1.1, // a gambler's bids × this
     counterMost: 1.25, // a counter is met if its wage is at most the ask × this, and payable
     breakRaces: 12, // a rival's break clause, in races' wage; none at Negotiation u ≥ 0.5
-    renewBelow: 0.75, // renews staff whose worth is at least this share of the best of their role on the team
+    renewBelow: 0.6, // renews staff whose worth is at least this share of the best of their role on the team
     openFirst: 3, // worth added, in scouting, to a candidate for an open post: open posts are scouted first
     scoutLooks: 240, // the most candidates a review's scouting looks over (an even sample of a crowded market)
     /** Each personality's weights over the section 6 table's rows (higher acts first), the share of its Finance
@@ -438,7 +439,7 @@ export const TUNING = {
     spare: { perf: 300, reliability: 0.3 }, // what a ship sails with when her part of a type is confiscated and no spare is left
     wear: 0.1,
     faultWear: 0.05, // condition lost a race sailed, and more a fault
-    carry: 0.6, // a part's performance and maximum carried into the next season
+    carry: 0.85, // a part's performance and maximum carried into the next season: what a season's designs about win back
     spares: 1, // unfitted parts kept a type at the season's end (the best)
     newPartMorale: 5, // the other ships' drivers' morale lost at a second new part in a row to one ship
     fine: 0.2, // an inspection's fine: (1 + risk) × this × the part's design cost
@@ -523,8 +524,9 @@ export const TUNING = {
   },
 
   /** Money (Phase B section 10): each tier's prize pool at the season's end, shared by place by rules.prizeSpread. */
-  //   Sized so a median team's prize is about a third of its season's wages and upkeep (the sponsors bring about half).
-  money: { prize: [760000, 330000, 150000] }, // a tier's pool: its median team about balances over a season
+  //   Sized so a median team's three sponsors about pay its wages and upkeep race by race (a team that cannot pay as
+  //   it goes can renew no contract in the season), and its prize, about a tenth of them, is what it has to build with.
+  money: { prize: [250000, 110000, 50000] }, // a tier's pool
   /** Reputation (Phase B section 10), 0..100. */
   reputation: {
     perPoint: 0.1,
@@ -546,11 +548,11 @@ export const TUNING = {
     every: 42,
     offers: 2,
     stand: 14, // offers a team gets every so many days, standing so long
-    perRace: 4.6, // a fixed sponsor's money a race × the team's marketability × its tier's factor
+    perRace: 15.5, // a fixed sponsor's money a race × the team's marketability × its tier's factor
     tier: [1.7, 1, 1], //   (Tier 1's wages outrun its marketability)
     grade: [1, 1.6, 2.4], // × by the offer's grade (the landing pad's level at most)
     races: [3, 10],
-    bonus: 7, // an objective sponsor's bonus × the team's marketability × tier × the objective's weight
+    bonus: 23.5, // an objective sponsor's bonus × the team's marketability × tier × the objective's weight
     objectives: { top10: 1, sinkTwo: 1.6, afloat: 1.2, mostSea: 1.8 },
     /** What each objective asks of a team's race: a ship in the first so many, so many ships sunk, so many of its own afloat at the end. */
     need: { top: 10, sink: 2, afloat: 3 },

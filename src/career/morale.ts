@@ -21,6 +21,10 @@ export const resultMove = (target: number, standing: number): number =>
     Math.max(-M.result, M.resultPerPlace * (target - standing))
   );
 
+/** A race settles morale a share of the way back to where it starts. */
+export const settleMove = (morale: number): number =>
+  M.settle * (M.start - morale);
+
 /** Status, for a driver who wants it: a race on ship two, or one as reserve. */
 export const statusMove = (wantsStatus: boolean, sailing: boolean): number =>
   !wantsStatus ? 0 : sailing ? M.status : -M.status;

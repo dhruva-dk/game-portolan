@@ -25,6 +25,7 @@ import {
   injury,
   moraleIn,
   resultMove,
+  settleMove,
   statusMove,
   wageMove,
   wantsOut,
@@ -326,7 +327,10 @@ function spirits(s: CareerState, x: Raced, of: Closing): CareerState {
   for (const id of staffOf(c)) {
     const g = personAt(out, id);
     if (g.player || g.role === 'chairman' || g.role === 'manager') continue;
-    let by = resultMove(c.target, standing) + modifier(g.traits, null).morale;
+    let by =
+      resultMove(c.target, standing) +
+      settleMove(g.morale) +
+      modifier(g.traits, null).morale;
     if (g.contract) by += wageMove(g.contract.wage, askWage(g, c.tier));
     if (g.role === 'driver')
       by += statusMove(g.wants.includes('status'), sailed.has(id));

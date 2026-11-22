@@ -120,6 +120,22 @@ const apart = (a: Vec3, b: Vec3) =>
   (a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2;
 
 /**
+ * A race's berths drawn among its ships by its seed. The berths come roomiest
+ * first (each the farthest from those before it), so dealt in order the first
+ * teams of a championship would have the open water every race: drawn, no seat
+ * has it more than another.
+ */
+export function drawn(at: readonly Spawn[], seed: number): Spawn[] {
+  const rand = random(seed * 40503 + 7),
+    out = [...at];
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
+
+/**
  * The berths of `count` ships for the match of `seed`, from the open water: as
  * far apart as it allows, each heading the way the water is open longest. The
  * first is the player's.

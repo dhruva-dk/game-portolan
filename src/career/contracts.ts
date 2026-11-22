@@ -43,9 +43,13 @@ function seasonEndDay(s: CareerState, season: number): number {
 export const endDay = (s: CareerState, c: Contract): number =>
   c.ends === null ? Number.POSITIVE_INFINITY : seasonEndDay(s, c.ends);
 
-/** The season at whose end a contract of so many seasons signed today runs out: this one counts while races remain. */
+/** The season at whose end a contract of so many seasons signed today runs out: this one counts until its last days
+ *  (those in which its contracts are closing), after which the seasons are counted from the next. */
 export const contractEnds = (s: CareerState, seasons: number): number =>
-  s.season + seasons - 1 + (seasonOver(s) ? 1 : 0);
+  s.season +
+  seasons -
+  1 +
+  (seasonOver(s) || seasonEndDay(s, s.season) - s.day <= M.closingDays ? 1 : 0);
 
 /** Whether a contract is in its last days, when other teams may approach and sign without a break clause. */
 export const closing = (s: CareerState, c: Contract): boolean =>
@@ -194,7 +198,11 @@ export function signed(s: CareerState, deal: Signing): CareerState {
     status: offer.status,
     wage: offer.wage,
     fee: offer.fee,
-    ends: contractEnds(out, offer.seasons),
+    // a renewal runs on from the end of the contract it renews
+    ends:
+      renewal && g.contract && g.contract.ends !== null
+        ? Math.max(g.contract.ends, out.season - 1) + offer.seasons
+        : contractEnds(out, offer.seasons),
     podium: offer.podium,
     sinking: offer.sinking,
     breakClause: offer.breakClause,

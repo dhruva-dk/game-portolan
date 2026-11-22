@@ -13,7 +13,7 @@ import { offerCheck, offered } from './hiring.ts';
 import { effective } from './effective.ts';
 import { knows, tierOf, middle, sightOf, view } from './knowledge.ts';
 import { bidShare, worth } from './leadership.ts';
-import { askOf } from './market.ts';
+import { answer, askOf } from './market.ts';
 import { wantsOut } from './morale.ts';
 import { unit, type Person, inRole } from './roles.ts';
 import { inReach } from './staff.ts';
@@ -81,21 +81,43 @@ function bid(
   };
 }
 
-/** What an offer commits of the team's balance: fee, break clause, the dismissed one's pay, and the season's wages left. */
+/** What an offer commits of the team's balance: fee, break clause, the dismissed one's pay, and the season's wages left
+ *  (none for a renewal: its seat is paid already, and its terms are the coming seasons'). */
 const cost = (s: CareerState, team: number, g: Person, o: Offer): number =>
   o.fee +
   breakCost(s, g, team) +
   (o.replaces === null ? 0 : dismissalCost(s, s.people[o.replaces])) +
-  o.wage * Math.max(1, racesLeft(s));
+  (g.contract?.team === team ? 0 : o.wage * Math.max(1, racesLeft(s)));
 
-/** A state with an offer made and the Mind's room spent, if the offer is allowed and affordable; else null. */
+/**
+ * The offer a manager makes of a bid, knowing the person (every candidate is
+ * scouted, their wants read): the bid itself if they would take it; the
+ * counter they would make to it, if its wage is within what the manager
+ * meets (the ask × counterMost, by Negotiation: hiring.ts meetsCounter); null
+ * if they would refuse whatever the money.
+ */
+function meant(s: CareerState, mind: Mind, g: Person, o: Offer): Offer | null {
+  const team = s.teams[mind.team],
+    a = answer(s, g, team, o);
+  if (a.kind === 'accept') return o;
+  if (a.kind === 'refuse') return null;
+  const most =
+    askOf(s, g, team).wage *
+    R.counterMost *
+    (bidShare(mind.stats.negotiation) / bidShare(0));
+  return a.offer.wage <= most ? a.offer : null;
+}
+
+/** A state with an offer made and the Mind's room spent, if the person would take it and it is allowed and affordable; else null. */
 function tryOffer(
   s: CareerState,
   mind: Mind,
   g: Person,
-  o: Offer,
+  bidden: Offer,
   roll: Dice
 ): { state: CareerState; mind: Mind } | null {
+  const o = meant(s, mind, g, bidden);
+  if (!o) return null;
   const c = cost(s, mind.team, g, o);
   if (c > mind.room || offerCheck(s, mind.team, g.id, o) !== null) return null;
   return {
@@ -195,13 +217,48 @@ function seatedAway(
   }
 }
 
-/** Fill an empty role: the best affordable known candidate for each open post (scouting first is the scout row's). */
+/** The free agents of some roles a team does not know, by their worth as it sees them (the middle of each range), best
+ *  first: those a post is offered to when no one the team knows will take it. */
+function strangers(
+  s: CareerState,
+  mind: Mind,
+  roles: ReadonlySet<Role>,
+  roll: Dice
+): { g: Person; w: number }[] {
+  const sight = sightOf(s, mind.team);
+  const pool = s.people.filter(
+    (g) =>
+      roles.has(g.role) &&
+      g.retired === null &&
+      !g.player &&
+      g.contract === null &&
+      !knows(mind.team, g)
+  );
+  return looked(pool, roll)
+    .map((g) => {
+      const v = view(s, mind.team, g.id, sight);
+      return {
+        g,
+        w: worthTo(mind, {
+          stars: middle(v.stars),
+          potential: middle(v.potential),
+        }),
+      };
+    })
+    .sort((a, b) => b.w - a.w || a.g.id - b.g.id);
+}
+
+/** Fill an empty role: for each open post the best affordable candidate who will come, of those the team knows first,
+ *  then of the free agents it does not (an empty seat is not left for want of a scout's report). */
 export const fill: Decide = (s, mind0, roll) => {
   let state = s,
     mind = mind0;
   const posts = openPosts(s, s.teams[mind.team]);
   if (posts.length === 0) return { state, mind };
-  const pool = knownCandidates(s, mind, null);
+  const pool = [
+    ...knownCandidates(s, mind, null),
+    ...strangers(s, mind, new Set(posts.map((p) => p.role)), roll),
+  ];
   const busy = talkingWith(s, mind.team);
   for (const post of posts) {
     for (const { g } of pool) {
@@ -324,13 +381,17 @@ export const renew: Decide = (s, mind0, roll) => {
   for (const g of due) {
     const seat = seatOf(state.teams[mind.team], g.id);
     if (!seat) continue;
-    const r = tryOffer(
-      state,
-      mind,
-      g,
-      bid(state, mind, g, { status: seatRole(seat).status, replaces: null }),
-      roll
-    );
+    // no signing fee to one already aboard: a renewal is not held up by the season's low water
+    const b = bid(state, mind, g, {
+      status: seatRole(seat).status,
+      replaces: null,
+    });
+    const o = {
+      ...b,
+      fee: 0,
+      seasons: askOf(state, g, state.teams[mind.team]).seasons,
+    };
+    const r = tryOffer(state, mind, g, o, roll);
     if (r) ({ state, mind } = r);
   }
   return { state, mind };

@@ -70,7 +70,20 @@ export function satisfied(
   const building = SCHOOL[g.role];
   const facilities = building ? cap(team.buildings[building].level / 3) : 1;
   const home = team.colony === g.colony ? 1 : M.away;
-  return { money, status, tier, ambition, security, facilities, home };
+  // A team's standing, facilities and colony weigh with those who have a post to leave for it. What a person has
+  // lived with on their own team is no ground to refuse its renewal, and one out of work weighs the terms and the tier.
+  const own = g.contract?.team === team.id;
+  if (!own && g.contract !== null)
+    return { money, status, tier, ambition, security, facilities, home };
+  return {
+    money,
+    status,
+    tier: own ? Math.max(1, tier) : tier,
+    ambition: Math.max(1, ambition),
+    security,
+    facilities: Math.max(1, facilities),
+    home: Math.max(1, home),
+  };
 }
 
 /** An offer's score: the weighted sum of the person's three wants met (0.5, 0.3, 0.2). */
