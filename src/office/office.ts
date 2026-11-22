@@ -1,9 +1,10 @@
 // The seam between the career and the office (MANAGER.md, the office): what
 // the office's screens draw and what they ask, as plain data. A screen draws one
-// view (its own file here, as menu.ts is the menu's) and knows nothing of where
-// it came from; the desk hands the views out and takes what is asked. Types
-// and constants only.
+// view (its own file here: home.ts, menu.ts) and knows nothing of where it came
+// from; the desk hands the views out and takes what is asked. Types and
+// constants only.
 
+import type { HomeView } from './home.ts';
 import type { MenuView } from './menu.ts';
 import type { ShellView } from './shell.ts';
 
@@ -32,9 +33,19 @@ export interface Team {
   colours: readonly [string, string];
 }
 
+/** How a thing stands, as the tone it is shown in. */
+type Mood = 'good' | 'fair' | 'warn' | 'bad';
+
+/** A word of judgment (Very Secure, Below Target) and the mood it is said in. */
+export interface Verdict {
+  label: string;
+  mood: Mood;
+}
+
 /** Every screen of the office that draws a view, and the view it draws. */
 export interface Views {
   menu: MenuView;
+  home: HomeView;
 }
 export type Viewed = keyof Views;
 

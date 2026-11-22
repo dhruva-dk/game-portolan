@@ -5,6 +5,7 @@
 import { TEAM, TEAMS as GRID } from '../../race.ts';
 import type { Desk, Views } from '../office.ts';
 import type { ShellView } from '../shell.ts';
+import { HOME } from './home.ts';
 import { HERS } from './teams.ts';
 
 const SHELL: ShellView = {
@@ -24,6 +25,7 @@ const VIEWS: Views = {
     kept: { team: HERS, date: SHELL.date },
     single: { seed: 'Brindle', ships: GRID * TEAM },
   },
+  home: HOME,
 };
 
 export const FIXTURE: Desk = {
