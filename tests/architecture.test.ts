@@ -54,6 +54,9 @@ const LAYERS: Record<string, readonly string[]> = {
   // the kinds of gun and of loot, named once for all who tell them apart: a
   // leaf
   'kinds.ts': [],
+  // the seam between the career and a race (MANAGER.md): the card that goes in
+  // and the result that comes out, as plain data
+  'race.ts': ['kinds.ts'],
   // the plain-data seams: what the frame draws (snapshot.ts), what passes
   // between the player and the game (player.ts), and the world as built for a
   // match (environment.ts)

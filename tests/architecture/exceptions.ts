@@ -104,6 +104,11 @@ export const EXCEPTIONS: readonly Exception[] = [
   // runs, for them to read it through
   {
     rule: 'exports',
+    file: 'src/race.ts',
+    why: 'the seam is written first, for the race and the career to be built to at once (MANAGER.md 3, 4); this goes stale, and is removed, once both take every word of it',
+  },
+  {
+    rule: 'exports',
     file: 'src/audio/cues.ts',
     name: 'DEEDS',
     why: 'every kind of deed, for the test that each has its cue',
