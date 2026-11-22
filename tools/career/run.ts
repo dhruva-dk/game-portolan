@@ -26,7 +26,7 @@ import type { CareerState } from '../../src/career/state.ts';
 import { TUNING, TUNING_VERSION } from '../../src/career/tuning.ts';
 import { emptyDisk, memoryStore } from '../../src/store/memory.ts';
 import { worldOf } from '../harness/world.ts';
-import { MANAGERS, commandsOf, type Manager } from './managers.ts';
+import { MANAGERS, commandsOf } from './managers.ts';
 import { tables, turned, type Season } from './tally.ts';
 
 const [who = '', seedArg = '7', seasonsArg = '5', outPath] =
