@@ -9,11 +9,22 @@
 
 import { HEALTH } from './handling.ts';
 
-/** Her hit points. */
+/**
+ * Her hit points; and her most hull, where it is her own build's and not the
+ * table's (a race sailed by a card: play/fitted.ts).
+ */
 export interface Health {
   hull: number;
   shield: number;
+  most?: number;
 }
+
+/**
+ * The hull a cap of `cap` on the table's hull (HEALTH.hull, if not given) is
+ * on hers: the same share of her most.
+ */
+export const hullCap = (h: Health, cap: number = HEALTH.hull): number =>
+  h.most === undefined ? cap : (cap * h.most) / HEALTH.hull;
 
 /**
  * What a blow did: her health after it, what it took off the shield and off the
@@ -40,7 +51,7 @@ export function harmed(h: Health, damage: number, past = false): Harm {
   const shield = past ? 0 : Math.min(h.shield, damage);
   const hull = Math.min(h.hull, damage - shield);
   return {
-    health: { hull: h.hull - hull, shield: h.shield - shield },
+    health: { ...h, hull: h.hull - hull, shield: h.shield - shield },
     shield,
     hull,
   };
@@ -48,7 +59,8 @@ export function harmed(h: Health, damage: number, past = false): Harm {
 
 /**
  * `amount` hit points mended into her hull or her shield, up to `cap` (its most
- * by default); nothing once sunk.
+ * by default; a hull's cap is on the table's hull, and is hers by hullCap);
+ * nothing once sunk.
  */
 export function healed(
   h: Health,
@@ -56,6 +68,7 @@ export function healed(
   to: 'hull' | 'shield',
   cap: number = HEALTH[to]
 ): Health {
-  if (sunk(h) || !(amount > 0) || h[to] >= cap) return h;
-  return { ...h, [to]: Math.min(cap, h[to] + amount) };
+  const top = to === 'hull' ? hullCap(h, cap) : cap;
+  if (sunk(h) || !(amount > 0) || h[to] >= top) return h;
+  return { ...h, [to]: Math.min(top, h[to] + amount) };
 }

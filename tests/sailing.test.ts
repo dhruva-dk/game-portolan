@@ -90,7 +90,13 @@ test('she gathers way to her top speed and no further, and turns no faster than 
 });
 
 test('by her own handling: her top speed and fastest turn are hers, not the tables’; cut under her way, she sheds what is over it', () => {
-  const fit = { top: SHIP.top * 0.7, turn: SHIP.turn * 0.6, reload: 1 };
+  const fit = {
+    top: SHIP.top * 0.7,
+    turn: SHIP.turn * 0.6,
+    reload: 1,
+    gather: SHIP.gather,
+    spread: 1,
+  };
   let s = shipAt(start, north),
     fastest = 0,
     quickest = 0;

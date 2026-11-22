@@ -50,7 +50,8 @@ import { nature, type MatchType, type Nature } from '../sim/persona.ts';
 import { afloat, stepFleet, type Vessel } from '../sim/contact.ts';
 import { STEP, blendPose } from '../sim/fixed.ts';
 import { gunOf } from '../sim/gun.ts';
-import { faultsOf, fitOf, tended, wearOf } from '../sim/faults.ts';
+import { faultsIn, fitOf, tended, wearOf } from '../sim/faults.ts';
+import { fitted } from './fitted.ts';
 import { SHIP, type Handling } from '../sim/handling.ts';
 import { sunk } from '../sim/health.ts';
 import { regain, type Regained } from '../sim/holding.ts';
@@ -436,7 +437,10 @@ export function createState(
     const gun = match.gun;
     battle = battleOf(
       ids.map((id) =>
-        gun ? crewOf(id, gunOf(gun.kind, gun.rarity)) : crewOf(id)
+        fitted(
+          gun ? crewOf(id, gunOf(gun.kind, gun.rarity)) : crewOf(id),
+          card?.ships[id]
+        )
       ),
       match.seed,
       match.type.rules.aim.assist,
@@ -789,7 +793,7 @@ export function createState(
         if (g) d.gun = drawing.armed(d, g, aims.get(id) ?? ship.heading);
         if (c) {
           d.wear = wearOf(c.health.hull);
-          d.faults = faultsOf(c.health.hull, c.wear);
+          d.faults = faultsIn(c);
         }
       }
       for (const w of wrecks)

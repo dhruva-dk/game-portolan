@@ -14,7 +14,10 @@
 // Her faults are her hull and her tallies, not a state of their own (faultsOf):
 // above FAULTS.minor none; at or under it her most-hit zone minor; under
 // FAULTS.major that zone major and the next most-hit minor (ties to the first
-// in ZONES). Each costs her handling (fitOf: FAULTS.cost); a major fault on her
+// in ZONES). In a race sailed by a card each zone has its own band, by her
+// parts (Build, play/fitted.ts): her most-hit zone faults by its own, and the
+// next most-hit is minor once her hull is under that one's major.
+// Each costs her handling (fitOf: FAULTS.cost); a major fault on her
 // waterline leaks besides, FAULTS.leak hull a second past her shield, never
 // below FAULTS.floor.
 //
@@ -138,16 +141,48 @@ export const dealt = (w: Wear): Wear =>
 export const rose = (w: Wear, from: number, to: number): Wear =>
   to > from && to > FAULTS.minor ? { ...w, zones: UNWORN.zones } : w;
 
+/**
+ * The hull at or under which a zone is faulted, and under which majorly: the
+ * tables' (FAULTS.minor, FAULTS.major), or her own build's (play/fitted.ts).
+ */
+export interface Band {
+  minor: number;
+  major: number;
+}
+
+/**
+ * A ship's own build, in a race sailed by a card (play/fitted.ts): her handling
+ * whole, and each zone's band (ZONES' order).
+ */
+export interface Build {
+  fit: Handling;
+  bands: Zones<Band>;
+}
+
+const BAND: Band = { minor: FAULTS.minor, major: FAULTS.major };
+/** The tables' bands: every zone's alike. */
+const BANDS: Zones<Band> = [BAND, BAND, BAND, BAND];
+
+/** A hull's band: 0 above `b.minor`, 1 down to `b.major`, 2 under it. */
+const bandOf = (hull: number, b: Band): Fault =>
+  hull > b.minor ? 0 : hull >= b.major ? 1 : 2;
+
 /** Her hull's band: 0 above FAULTS.minor, 1 down to FAULTS.major, 2 under it. */
-export const wearOf = (hull: number): Fault =>
-  hull > FAULTS.minor ? 0 : hull >= FAULTS.major ? 1 : 2;
+export const wearOf = (hull: number): Fault => bandOf(hull, BAND);
 
 const NONE: Faults = [0, 0, 0, 0];
 
-/** Her faults (ZONES' order), by her hull and her tallies. */
-export function faultsOf(hull: number, w: Wear): Faults {
-  const band = wearOf(hull);
-  if (band === 0) return NONE;
+/**
+ * Her faults (ZONES' order), by her hull and her tallies: her most-hit zone by
+ * its band, and the next most-hit minor once her hull is under that one's
+ * major (`bands`: each zone's, the tables' if not given).
+ */
+export function faultsOf(
+  hull: number,
+  w: Wear,
+  bands: Zones<Band> = BANDS
+): Faults {
+  if (bands === BANDS && hull > BAND.minor) return NONE;
   // the most-hit zone and the next (ties to the first in ZONES)
   let first = -1,
     second = -1,
@@ -157,11 +192,20 @@ export function faultsOf(hull: number, w: Wear): Faults {
     if (t > most) [first, second, most, next] = [i, first, t, most];
     else if (t > next) [second, next] = [i, t];
   });
-  if (first < 0) return NONE;
+  const one = bands[first],
+    two = bands[second];
+  if (!one) return NONE;
+  const worst = bandOf(hull, one),
+    other: Fault = two && hull < two.major ? 1 : 0;
+  if (worst === 0 && other === 0) return NONE;
   const of = (i: number): Fault =>
-    i === first ? band : band === 2 && i === second ? 1 : 0;
+    i === first ? worst : i === second ? other : 0;
   return [of(0), of(1), of(2), of(3)];
 }
+
+/** Her faults (ZONES' order): her hull's and her tallies', by her own bands. */
+export const faultsIn = (c: Crew): Faults =>
+  faultsOf(c.health.hull, c.wear, c.build?.bands);
 
 /** Each zone's share of the hull her tallies hold (0…1, summing to 1 or 0). */
 export function sharesOf(w: Wear): Zones<number> {
@@ -170,12 +214,16 @@ export function sharesOf(w: Wear): Zones<number> {
   return all > 0 ? [a / all, b / all, c / all, d / all] : UNWORN.zones;
 }
 
-/** Her handling as she is now: the tables' with each fault's cost. */
+/**
+ * Her handling as she is now: her build's (the tables', with none) with each
+ * fault's cost.
+ */
 export function fitOf(c: Crew | undefined): Handling {
   if (!c) return SPEC;
-  const f = faultsOf(c.health.hull, c.wear);
-  if (f === NONE) return SPEC;
-  const fit = { ...SPEC };
+  const whole = c.build?.fit ?? SPEC,
+    f = faultsIn(c);
+  if (f === NONE) return whole;
+  const fit = { ...whole };
   f.forEach((fault, i) => {
     const z = ZONES[i];
     if (!z) return;
@@ -202,10 +250,7 @@ export function tended(
         quiet >= MEND.quiet - 1e-9 && c.health.hull < MEND.cap && home(c.id);
     let health = c.health;
     if (mending) health = healed(health, MEND.rate * dt, 'hull', MEND.cap);
-    else if (
-      health.hull > FAULTS.floor &&
-      faultsOf(health.hull, c.wear)[WATERLINE] === 2
-    )
+    else if (health.hull > FAULTS.floor && faultsIn(c)[WATERLINE] === 2)
       health = harmed(
         health,
         Math.min(FAULTS.leak * dt, health.hull - FAULTS.floor),

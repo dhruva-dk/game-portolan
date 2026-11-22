@@ -101,8 +101,8 @@ export function turned(s: ShipState, angle: number): Vec3 {
 
 /**
  * One step of dt seconds under `helm`, in water `depth` deep (metres at a
- * point), by her own handling (`fit`: her top speed and her fastest turn; the
- * tables' if not given). Her rudder bites by her speed through the water, as
+ * point), by her own handling (`fit`: her top speed, her fastest turn and how
+ * fast she gathers way; the tables' if not given). Her rudder bites by her speed through the water, as
  * any ship's.
  */
 export function step(
@@ -136,6 +136,6 @@ export function step(
   else
     speed =
       s.speed +
-      (want - s.speed) * close(want > s.speed ? SHIP.gather : SHIP.drag, dt);
+      (want - s.speed) * close(want > s.speed ? fit.gather : SHIP.drag, dt);
   return navigate({ ...s, speed, turn }, turned(s, turn * dt), dt, depth);
 }

@@ -40,14 +40,14 @@
 import type { World } from '../environment.ts';
 import { fixedClock } from '../sim/fixed.ts';
 import { inHand, type Crew } from '../sim/battle.ts';
-import { faultsOf, fitOf, sharesOf, UNWORN } from '../sim/faults.ts';
+import { faultsIn, fitOf, sharesOf, UNWORN } from '../sim/faults.ts';
 import { laid, reloadOf, spreadOf, type Gun, type Laying } from '../sim/gun.ts';
 import { charging } from '../sim/gust.ts';
 import { EQUIP, GUN, GUNS, GUST, HEALTH } from '../sim/handling.ts';
 import { progress } from '../sim/hold.ts';
 import { offered, rarityOf } from '../sim/loot.ts';
 import { toEdge } from '../sim/storm.ts';
-import { sunk } from '../sim/health.ts';
+import { hullCap, sunk } from '../sim/health.ts';
 import { RIDE } from '../sim/ride.ts';
 import { PLAYER } from '../sim/match.ts';
 import type { Vessel } from '../sim/contact.ts';
@@ -248,8 +248,7 @@ export function createGame(
    */
   let worn: DebugDamage | null = null;
   /** A ship's faults: as worn, else her own (sim/faults.ts). */
-  const faultsOn = (s: Crew): Faults =>
-    worn?.faults ?? faultsOf(s.health.hull, s.wear);
+  const faultsOn = (s: Crew): Faults => worn?.faults ?? faultsIn(s);
   /** Her faults as the camera last answered them. */
   let faulted: Faults = SOUND;
 
@@ -730,6 +729,7 @@ export function createGame(
       const w = (watched ? state.crew(view.watch) : c) ?? c;
       report.of = w.id;
       report.hull = w.health.hull;
+      report.hullMax = hullCap(w.health);
       report.shield = w.health.shield;
       report.zones = worn?.zones ?? sharesOf(w.wear);
       report.faults = faultsOn(w);

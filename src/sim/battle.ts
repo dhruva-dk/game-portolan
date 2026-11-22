@@ -29,9 +29,17 @@ import { distance, type Vec3 } from '../world/sphere.ts';
 import { mates } from './carded.ts';
 import type { Blow, Vessel } from './contact.ts';
 import type { GunKind } from '../kinds.ts';
-import { CARRIED, FALLOFF, GUN, GUNS, GUST, HEALTH } from './handling.ts';
-import { dealt, fitOf, struck, UNWORN, zoneOf, type Wear } from './faults.ts';
-import { harmed, sunk, whole, type Health } from './health.ts';
+import { CARRIED, FALLOFF, GUN, GUNS, GUST } from './handling.ts';
+import {
+  dealt,
+  fitOf,
+  struck,
+  UNWORN,
+  zoneOf,
+  type Build,
+  type Wear,
+} from './faults.ts';
+import { harmed, hullCap, sunk, whole, type Health } from './health.ts';
 import { outside, type Storm } from './storm.ts';
 import {
   damageOf,
@@ -64,6 +72,8 @@ export interface Crew {
   gust: Gust;
   cut: number;
   wear: Wear;
+  /** Her own build, in a race sailed by a card (play/fitted.ts); else none. */
+  build?: Build;
 }
 
 /**
@@ -393,7 +403,8 @@ export function stepBattle(
         const spread =
           spreadOf(gun) *
           (order?.spread ?? 1) *
-          (c.gust.blowing > 0 ? GUST.spread : 1);
+          (c.gust.blowing > 0 ? GUST.spread : 1) *
+          fitOf(c).spread;
         const lay = laid(
           v,
           gun,
@@ -467,7 +478,7 @@ export function weathered(
     if (!out.has(c.id) || sunk(c.health)) return c;
     const health = harmed(
       c.health,
-      storm.damage * HEALTH.hull * dt,
+      storm.damage * hullCap(c.health) * dt,
       true
     ).health;
     if (sunk(health)) sunkNow.push(c.id);

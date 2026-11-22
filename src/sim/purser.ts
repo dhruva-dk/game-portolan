@@ -21,7 +21,7 @@
 import { smoothstep } from '../world/scalar.ts';
 import { R, along, distance, dot, type Vec3 } from '../world/sphere.ts';
 import { armed, type Crew } from './battle.ts';
-import { faultsOf, MEND } from './faults.ts';
+import { faultsIn, MEND } from './faults.ts';
 import { ready } from './gust.ts';
 import type { Gun } from './gun.ts';
 import type { GunKind } from '../kinds.ts';
@@ -119,7 +119,7 @@ function mendNeed(c: Ctx, crew: Crew): number {
   return Math.max(
     ramp(crew.health.hull, hull + 8, hull - 8),
     ramp(crew.health.shield, shield + 8, shield - 8),
-    c.b.purser.faulted[Math.max(...faultsOf(crew.health.hull, crew.wear))]
+    c.b.purser.faulted[Math.max(...faultsIn(crew))]
   );
 }
 

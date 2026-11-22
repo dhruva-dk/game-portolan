@@ -26,7 +26,7 @@ import type { RaceCard, RaceResult } from '../race.ts';
 import type { Crew, Shot, Strike } from '../sim/battle.ts';
 import { over, teamsOf } from '../sim/carded.ts';
 import type { Vessel } from '../sim/contact.ts';
-import { faultsOf } from '../sim/faults.ts';
+import { faultsIn } from '../sim/faults.ts';
 import { sunk } from '../sim/health.ts';
 import type { Sunk } from '../sim/match.ts';
 
@@ -131,7 +131,7 @@ export function createTally(card: RaceCard, closes: number) {
    */
   const watch = (crews: readonly Crew[], second: number) => {
     for (const c of crews) {
-      const now = sunk(c.health) ? SOUND : faultsOf(c.health.hull, c.wear),
+      const now = sunk(c.health) ? SOUND : faultsIn(c),
         was = levels[c.id] ?? SOUND;
       if (now === was) continue;
       now.forEach((level, zone) => {

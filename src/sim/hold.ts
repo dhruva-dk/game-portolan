@@ -18,7 +18,7 @@
 // for the same inputs.
 
 import type { Use } from '../kinds.ts';
-import { healed, sunk, type Health } from './health.ts';
+import { healed, hullCap, sunk, type Health } from './health.ts';
 
 /** What mends: the four consumables (kinds.ts). */
 export type { Use };
@@ -106,7 +106,9 @@ export const useful = (health: Health, kind: Use) => {
   const u = USES[kind];
   return (
     !sunk(health) &&
-    (u.shield > 0 ? health.shield < u.cap : health.hull < u.cap)
+    (u.shield > 0
+      ? health.shield < u.cap
+      : health.hull < hullCap(health, u.cap))
   );
 };
 

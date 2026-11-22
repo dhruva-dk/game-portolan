@@ -21,7 +21,7 @@ import { toEdge } from './storm.ts';
 import { logistic, ramp, utility } from './utility.ts';
 import { aggroOf, mate, open, rotate, type Ctx, type Seen } from './captain.ts';
 import { ZONES } from '../kinds.ts';
-import { faultsOf } from './faults.ts';
+import { faultsIn } from './faults.ts';
 import { SHIP } from './handling.ts';
 import { ranFromShip } from './logbook.ts';
 import { hidden } from './lookout.ts';
@@ -255,7 +255,7 @@ export const holdsFire = (c: Ctx) =>
 function lamed(c: Ctx): number {
   const crew = c.own.crew;
   if (!crew) return 0;
-  const f = faultsOf(crew.health.hull, crew.wear);
+  const f = faultsIn(crew);
   return Math.max(f[RIGGING] ?? 0, f[RUDDER] ?? 0) / 2;
 }
 const RIGGING = ZONES.indexOf('rigging'),
