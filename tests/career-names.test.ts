@@ -7,10 +7,10 @@ import {
   NOUNS,
   allowed,
   colony,
-  crewName,
+  teamName,
   family,
   given,
-  patron,
+  sponsor,
   place,
   planet,
   words,
@@ -25,14 +25,14 @@ test('the banned rule: a banned word as a whole word, in any case', () => {
     'Mara',
     'MARA',
     'mara',
-    'Mara Gulls',
+    'Mara People',
     'The mara',
-    'Gulls of Mara',
+    'People of Mara',
     'Hale & Mara, Coopers',
     'x-Mara',
   ])
     assert.equal(allowed(bad), false, bad);
-  for (const ok of ['Marat', 'Amara', 'Maraton Gulls', 'Samara', 'Mar a'])
+  for (const ok of ['Marat', 'Amara', 'Maraton People', 'Samara', 'Mar a'])
     assert.equal(allowed(ok), true, ok);
 });
 
@@ -42,9 +42,9 @@ const kinds: Record<string, (r: () => number) => string> = {
   colony,
   place,
   planet,
-  patron,
-  gull: (r) => `${given(r)} ${family(r)}`,
-  crew: (r) => crewName(place(r), NOUNS[Math.floor(r() * NOUNS.length)]),
+  sponsor,
+  person: (r) => `${given(r)} ${family(r)}`,
+  team: (r) => teamName(place(r), NOUNS[Math.floor(r() * NOUNS.length)]),
 };
 
 for (const [kind, make] of Object.entries(kinds)) {
@@ -59,16 +59,16 @@ for (const [kind, make] of Object.entries(kinds)) {
   });
 }
 
-test("gulls' full names: drawn fresh, never one taken", () => {
+test("people' full names: drawn fresh, never one taken", () => {
   const taken = new Set<string>();
   const rand = random(4);
   for (let i = 0; i < 20_000; i++) freshName(rand, taken);
   assert.equal(taken.size, 20_000);
 });
 
-test('patrons are "<family> & <relation>, <trade>"; crews\' nouns are enough for every crew with words to spare', () => {
+test('sponsors are "<family> & <relation>, <trade>"; teams\' nouns are enough for every team with words to spare', () => {
   assert.match(
-    patron(random(3)),
+    sponsor(random(3)),
     /^[A-Z][a-z]+ & [A-Z][a-z]+, [A-Z][A-Za-z ]+$/
   );
   assert.ok(NOUNS.length >= 125);

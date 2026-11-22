@@ -1,4 +1,4 @@
-// What a captain's Feedback, a shipwright's and a scout's stats do (Phase B section 2.1), as pure functions the
+// What a driver's Feedback, a designer's and a scout's stats do (Phase B section 2.1), as pure functions the
 // sections that use them call (design, scouting, the market). A stat's u is stat / 20.
 
 import type { PartType } from '../race.ts';
@@ -8,14 +8,14 @@ import { TUNING } from './tuning.ts';
 
 const lin = (pair: readonly [number, number], u: number): number =>
   pair[0] + pair[1] * u;
-const W = TUNING.shipwright,
+const W = TUNING.designer,
   S = TUNING.scout;
 
-// ---- the captain -----------------------------------------------------------------------------------------------
+// ---- the driver -----------------------------------------------------------------------------------------------
 
 /** Feedback: free performance points after each race she sailed, to her ship's fitted part furthest below its maximum. */
 export const feedbackPoints = (feedback: number): number =>
-  TUNING.captain.feedback * unit(feedback);
+  TUNING.driver.feedback * unit(feedback);
 
 /** Which fitted part Feedback's points go to: the one furthest below its maximum (the first of equals), or null. */
 export function feedbackTarget<
@@ -32,9 +32,9 @@ export function feedbackTarget<
   return best;
 }
 
-// ---- the shipwright --------------------------------------------------------------------------------------------
+// ---- the designer --------------------------------------------------------------------------------------------
 
-/** Sails, Rigging, Rudder, Hull, Keel, Mounts: a new design of that type starts this far above the crew's best of it. */
+/** Sails, Rigging, Rudder, Hull, Keel, Mounts: a new design of that type starts this far above the team's best of it. */
 export const designHead = (typeStat: number): number => W.start * typeStat;
 
 /** Innovation: the chance a finished design teaches one unknown component of an unlocked tier. */
@@ -52,11 +52,11 @@ export const accuracyBand = (accuracy: number): number =>
 export const accuracyDraw = (accuracy: number, rand: Rand): number =>
   1 + (rand() * 2 - 1) * accuracyBand(accuracy);
 
-/** How many components a new shipwright knows. */
+/** How many components a new designer knows. */
 export const componentsKnown = (stars: number): number =>
   W.knows + Math.round(stars);
 
-/** A shipwright's stat for a part type. */
+/** A designer's stat for a part type. */
 export const typeStat = (
   stats: Readonly<Record<PartType, number>>,
   type: PartType
@@ -64,11 +64,11 @@ export const typeStat = (
 
 // ---- the scout -------------------------------------------------------------------------------------------------
 
-/** Judgement: how many stars wide the range shown of an unscouted gull is. */
+/** Judgement: how many stars wide the range shown of an unscouted person is. */
 export const starWidth = (judgement: number): number =>
   lin(S.width, 1 - unit(judgement));
 
-/** Judgement: how far off the shown range's centre is, ± (1 − u), from a seeded draw (a crew's view of a gull). */
+/** Judgement: how far off the shown range's centre is, ± (1 − u), from a seeded draw (a team's view of a person). */
 export const centreOff = (judgement: number, rand: Rand): number =>
   (rand() * 2 - 1) * S.centre * (1 - unit(judgement));
 
@@ -81,18 +81,18 @@ export const potentialWidth = (insight: number, scouted: boolean): number =>
 /** Insight: whether one trait shows unscouted. */
 export const traitShows = (insight: number): boolean => insight >= S.traitAt;
 
-/** Reach: whether a scout of a crew in `league` sees a gull in `theirs` (null: a free agent). */
+/** Reach: whether a scout of a team in `tier` sees a person in `theirs` (null: a free agent). */
 export function inReach(
   reach: number,
-  league: number,
+  tier: number,
   theirs: number | null
 ): boolean {
-  if (theirs === null || theirs === league) return true;
+  if (theirs === null || theirs === tier) return true;
   if (reach >= S.reachAll) return true;
-  return reach >= S.reachAdjacent && Math.abs(theirs - league) === 1;
+  return reach >= S.reachAdjacent && Math.abs(theirs - tier) === 1;
 }
 
-/** Speed: days to scout a gull, by the crow's nest's level (1..3). */
+/** Speed: days to scout a person, by the crow's nest's level (1..3). */
 export const scoutDays = (speed: number, nestLevel: number): number =>
   Math.max(
     1,
@@ -103,7 +103,7 @@ export const scoutDays = (speed: number, nestLevel: number): number =>
     )
   );
 
-/** Persuasion: whether the first offer made within the window of this scout's report gives the gull +1 patience, on
+/** Persuasion: whether the first offer made within the window of this scout's report gives the person +1 patience, on
  *  a draw for that offer (chance u). */
 export const persuades = (
   persuasion: number,

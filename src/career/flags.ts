@@ -1,7 +1,7 @@
 // The state's flags (Phase B sections 12 and 13): named markers a dilemma's answer or a rule leaves for later, each a
-// day. A race flag (`guest:<crew>`, `rest:<gull>`, `push:<gull>`, `cover:<gull>`, `pushed:<gull>`, `forfeit:<crew>`)
-// holds on the race day it names; a window flag (`slow:<crew>`, `exempt:<crew>`) is the day its window ends; a
-// once-flag (`storm:<crew>`, `grey:<crew>`, `newPart:<crew>`) the day it was last used.
+// day. A race flag (`guest:<team>`, `rest:<person>`, `push:<person>`, `cover:<person>`, `pushed:<person>`, `forfeit:<team>`)
+// holds on the race day it names; a window flag (`slow:<team>`, `exempt:<team>`) is the day its window ends; a
+// once-flag (`storm:<team>`, `grey:<team>`, `newPart:<team>`) the day it was last used.
 
 import type { CareerState } from './state.ts';
 

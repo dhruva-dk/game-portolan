@@ -1,5 +1,5 @@
 // Plays a career for N seasons with no UI (Phase B section 15) and prints the tables: standings, transfers, sackings,
-// coin by crew, stars by league, parts' ranks, every mail kind's count and every dilemma's. Results are synthetic
+// balance by team, stars by tier, parts' ranks, every mail kind's count and every dilemma's. Results are synthetic
 // (tools/synthetic.ts, seeded from each card) unless --real, which sails each race with runRace (slow, for the record).
 // A bot plays the player: it sets a plan now and then, answers its dilemmas, takes a post when sacked, and sends a few
 // of the random commands the tests send. It asserts the invariants after every race day and times every Advance,
@@ -14,7 +14,7 @@ import { TEMPLATES } from '../src/career/mail.ts';
 import { askOf } from '../src/career/market.ts';
 import { YEAR, stars } from '../src/career/stars.ts';
 import { TUNING } from '../src/career/tuning.ts';
-import { standingOf } from '../src/career/elders.ts';
+import { standingOf } from '../src/career/chairmen.ts';
 import { staffOf } from '../src/career/state.ts';
 import type { Command } from '../src/office.ts';
 import type { RaceCard, RaceResult } from '../src/race.ts';
@@ -85,12 +85,12 @@ const counts = {
   gaps: 0,
   wright: 0,
 };
-const coinLog: string[] = [];
+const moneyLog: string[] = [];
 const tables: string[] = [];
-let managers = s.crews.map((c) => c.staff.manager);
-let crewOf = s.gulls.map((g) => g.contract?.crew ?? null);
+let managers = s.teams.map((c) => c.staff.manager);
+let teamOf = s.people.map((g) => g.contract?.team ?? null);
 
-// A post that changed hands is a sacking only if its manager is left free (not retired, not gone to another crew).
+// A post that changed hands is a sacking only if its manager is left free (not retired, not gone to another team).
 const sacks = {
   bySeason: [] as number[],
   midSeason: 0,
@@ -101,38 +101,38 @@ const sacks = {
   retired: 0,
   expired: 0,
 };
-/** Each crew's seasons in a row finished more than the elder's slack behind its target, as of the last table. */
-let poor = s.crews.map(() => 0);
+/** Each team's seasons in a row finished more than the chairman's slack behind its target, as of the last table. */
+let poor = s.teams.map(() => 0);
 
-/** The day each crew's manager took the post, and the last season of their contract. */
-const tenure = s.crews.map(() => 0);
-let leagueAt = s.crews.map((c) => c.league);
-let lastSeasonOf = s.crews.map((c) =>
+/** The day each team's manager took the post, and the last season of their contract. */
+const tenure = s.teams.map(() => 0);
+let tierAt = s.teams.map((c) => c.tier);
+let lastSeasonOf = s.teams.map((c) =>
   c.staff.manager === null
     ? null
-    : (s.gulls[c.staff.manager].contract?.ends ?? null)
+    : (s.people[c.staff.manager].contract?.ends ?? null)
 );
 
-/** Managers sacked and hired, and gulls moved between crews, since the last look: after a race day (`ended` false; a
- *  sacking then is an elder's confidence run out) or an Advance that crossed a season's end (the verdicts). */
+/** Managers sacked and hired, and people moved between teams, since the last look: after a race day (`ended` false; a
+ *  sacking then is an chairman's confidence run out) or an Advance that crossed a season's end (the verdicts). */
 function tallied(ended = false): void {
-  const now = s.crews.map((c) => c.staff.manager);
+  const now = s.teams.map((c) => c.staff.manager);
   now.forEach((m, i) => {
     if (m === managers[i]) return;
     const old = managers[i];
     if (m !== null) counts.hirings += 1;
     if (old === null) return;
-    const g = s.gulls[old];
+    const g = s.people[old];
     if (g.retired !== null) sacks.retired += 1;
     else if (ended && lastSeasonOf[i] !== null && lastSeasonOf[i]! < s.season)
       sacks.expired += 1;
-    // poached: hired by a crew a league above (elders poach only upward); the player taking another post, or displacing
+    // poached: hired by a team a tier above (chairmen poach only upward); the player taking another post, or displacing
     // a manager by taking theirs
     else if (
       (g.contract !== null &&
-        g.contract.crew !== i &&
-        (g.player || leagueAt[g.contract.crew] < leagueAt[i])) ||
-      (m !== null && s.gulls[m].player)
+        g.contract.team !== i &&
+        (g.player || tierAt[g.contract.team] < tierAt[i])) ||
+      (m !== null && s.people[m].player)
     )
       sacks.moved += 1;
     else {
@@ -149,22 +149,22 @@ function tallied(ended = false): void {
   now.forEach((m, i) => {
     if (m !== managers[i]) tenure[i] = s.day;
   });
-  leagueAt = s.crews.map((c) => c.league);
+  tierAt = s.teams.map((c) => c.tier);
   lastSeasonOf = now.map((m) =>
-    m === null ? null : (s.gulls[m].contract?.ends ?? null)
+    m === null ? null : (s.people[m].contract?.ends ?? null)
   );
   managers = now;
-  const crews = s.gulls.map((g) => g.contract?.crew ?? null);
-  crews.forEach((c, i) => {
+  const teams = s.people.map((g) => g.contract?.team ?? null);
+  teams.forEach((c, i) => {
     if (
       c !== null &&
-      i < crewOf.length &&
-      crewOf[i] !== null &&
-      crewOf[i] !== c
+      i < teamOf.length &&
+      teamOf[i] !== null &&
+      teamOf[i] !== c
     )
       counts.transfers += 1;
   });
-  crewOf = crews;
+  teamOf = teams;
 }
 
 const TYPES = ['sails', 'rigging', 'rudder', 'hull', 'keel', 'mounts'] as const;
@@ -174,43 +174,43 @@ const BUILDINGS = [
   'testTank',
   'foundry',
   'sailingSchool',
-  'flightLoft',
+  'pitHouse',
   'crowsNest',
   'fishMarket',
   'landingPad',
 ] as const;
 
 /** What a manager means to do between race days: a design under way when none is (each slot dealt, its first card
- *  taken), a building now and then, and its free scouts sent to free captains. */
+ *  taken), a building now and then, and its free scouts sent to free drivers. */
 function works(): void {
-  const c = s.crews[s.player!.crew];
+  const c = s.teams[s.player!.team];
   counts.gaps++;
-  if (c.staff.shipwright !== null) counts.wright++;
+  if (c.staff.designer !== null) counts.wright++;
   // a new part better than ship one's goes on her
   for (const p of c.parts) {
     const on = c.parts.find((x) => x.ship === 0 && x.type === p.type);
     if (p.ship === null && !p.forNext && (!on || p.perf > on.perf))
       tryIt({ kind: 'FitPart', part: p.id, ship: 0 });
   }
-  // a shipwright's counter is met
+  // a designer's counter is met
   for (const t of s.talks)
     if (
-      t.crew === c.id &&
+      t.team === c.id &&
       t.counter !== null &&
-      s.gulls[t.gull].role === 'shipwright'
+      s.people[t.person].role === 'designer'
     )
-      tryIt({ kind: 'AcceptCounter', gull: t.gull });
+      tryIt({ kind: 'AcceptCounter', person: t.person });
   if (
-    c.staff.shipwright === null &&
+    c.staff.designer === null &&
     !s.talks.some(
-      (t) => t.crew === c.id && s.gulls[t.gull].role === 'shipwright'
+      (t) => t.team === c.id && s.people[t.person].role === 'designer'
     )
   ) {
-    // the weakest free shipwrights first: they ask least and want a post most
-    const pool = s.gulls
+    // the weakest free designers first: they ask least and want a post most
+    const pool = s.people
       .filter(
         (g) =>
-          g.role === 'shipwright' &&
+          g.role === 'designer' &&
           g.contract === null &&
           g.retired === null &&
           !g.player &&
@@ -219,22 +219,22 @@ function works(): void {
       .sort((a, b) => stars(a) - stars(b) || a.id - b.id);
     for (const g of pool.slice(0, 12)) {
       const ask = askOf(s, g, c);
-      // a crew past its floor cannot sign: the bot tops it up with DebugCoin to sign one (counted apart from the ledger)
+      // a team past its floor cannot sign: the bot tops it up with DebugBalance to sign one (counted apart from the ledger)
       const short = Math.ceil(
-        s.crews[c.id].debtFloor + ask.fee + ask.wage * 2 - s.crews[c.id].coin
+        s.teams[c.id].debtFloor + ask.fee + ask.wage * 2 - s.teams[c.id].balance
       );
       if (
         short > 0 &&
         short <= 1e6 &&
-        tryIt({ kind: 'DebugCoin', coin: short })
+        tryIt({ kind: 'DebugBalance', balance: short })
       )
         counts.topped += short;
       if (
         tryIt({
           kind: 'OfferContract',
-          gull: g.id,
+          person: g.id,
           offer: {
-            role: 'shipwright',
+            role: 'designer',
             status: 'staff',
             wage: Math.round(ask.wage * 1.5),
             fee: ask.fee,
@@ -249,15 +249,15 @@ function works(): void {
         break;
     }
   }
-  if (c.design === null && s.crews[c.id].staff.shipwright !== null) {
-    const spec = s.leagues[c.league].rules.spec;
+  if (c.design === null && s.teams[c.id].staff.designer !== null) {
+    const spec = s.championships[c.tier].rules.spec;
     const open = TYPES.filter((t) => !spec.includes(t)).sort(
       () => rand() - 0.5
     );
     for (const type of open) {
       for (let slot = 0; slot < 4; slot++)
         tryIt({ kind: 'DealComponents', type, slot });
-      const d = s.crews[c.id].draft;
+      const d = s.teams[c.id].draft;
       if (
         d &&
         d.type === type &&
@@ -276,43 +276,45 @@ function works(): void {
       kind: 'Build',
       building: BUILDINGS[Math.floor(rand() * BUILDINGS.length)],
     });
-  // the market: a low offer to a gull a rival is talking to (they sign with the rival, or lose patience and fall silent)
+  // the market: a low offer to a person a rival is talking to (they sign with the rival, or lose patience and fall silent)
   const theirs = s.talks.filter(
     (t) =>
-      t.crew !== c.id &&
-      !s.talks.some((u) => u.crew === c.id && u.gull === t.gull)
+      t.team !== c.id &&
+      !s.talks.some((u) => u.team === c.id && u.person === t.person)
   );
   if (theirs.length > 0) {
     const t = theirs[Math.floor(rand() * theirs.length)],
-      o = someOffer(s, t.gull, rand);
-    const wright = s.crews[c.id].staff.shipwright;
+      o = someOffer(s, t.person, rand);
+    const wright = s.teams[c.id].staff.designer;
     if (
-      o.role !== 'shipwright' &&
+      o.role !== 'designer' &&
       (o.replaces === null || o.replaces !== wright)
     ) {
       tryIt({
         kind: 'OfferContract',
-        gull: t.gull,
+        person: t.person,
         offer: {
           ...o,
-          wage: Math.round(askOf(s, s.gulls[t.gull], s.crews[c.id]).wage * 0.5),
+          wage: Math.round(
+            askOf(s, s.people[t.person], s.teams[c.id]).wage * 0.5
+          ),
         },
       });
     }
   }
-  const free = s.gulls.filter(
+  const free = s.people.filter(
     (g) =>
-      g.role === 'captain' &&
+      g.role === 'driver' &&
       g.contract === null &&
       g.retired === null &&
       !g.player
   );
-  for (const scout of s.crews[c.id].staff.scouts)
+  for (const scout of s.teams[c.id].staff.scouts)
     if (free.length > 0)
       tryIt({
         kind: 'StartScout',
         scout,
-        gull: free[Math.floor(rand() * free.length)].id,
+        person: free[Math.floor(rand() * free.length)].id,
       });
 }
 
@@ -320,42 +322,42 @@ const median = (xs: number[]) =>
   [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)];
 /** The season's tables, as it ends. */
 function seasonTables(): void {
-  const me = s.player!.crew;
+  const me = s.player!.team;
   const lines = [
-    `season ${s.season + 1}: the player's crew ${s.crews[me].name}, League ${['One', 'Two', 'Three'][s.crews[me].league]}, place ${standingOf(s, me)}, coin ${Math.round(s.crews[me].coin)}`,
+    `season ${s.season + 1}: the player's team ${s.teams[me].name}, Championship ${['One', 'Two', 'Three'][s.teams[me].tier]}, place ${standingOf(s, me)}, balance ${Math.round(s.teams[me].balance)}`,
   ];
-  for (const l of s.leagues) {
-    const order = [...l.crews].sort(
+  for (const l of s.championships) {
+    const order = [...l.teams].sort(
       (a, b) => standingOf(s, a) - standingOf(s, b)
     );
-    const coin = l.crews.map((id) => s.crews[id].coin);
-    const st = l.crews.map(
+    const balance = l.teams.map((id) => s.teams[id].balance);
+    const st = l.teams.map(
       (id) =>
-        staffOf(s.crews[id])
-          .map((g) => stars(s.gulls[g]))
-          .reduce((a, b) => a + b, 0) / staffOf(s.crews[id]).length
+        staffOf(s.teams[id])
+          .map((g) => stars(s.people[g]))
+          .reduce((a, b) => a + b, 0) / staffOf(s.teams[id]).length
     );
-    const perf = l.crews.map(
+    const perf = l.teams.map(
       (id) =>
-        s.crews[id].parts
+        s.teams[id].parts
           .filter((p) => p.ship === 0)
           .reduce((a, p) => a + p.perf, 0) / 6
     );
     lines.push(
-      `  League ${l.id + 1}: top ${order
+      `  Championship ${l.id + 1}: top ${order
         .slice(0, 3)
         .map(
           (id) =>
-            `${s.crews[id].name} (${l.standings.find((x) => x.crew === id)!.points})`
+            `${s.teams[id].name} (${l.standings.find((x) => x.team === id)!.points})`
         )
         .join(', ')};` +
-        ` coin median ${Math.round(median(coin))}, least ${Math.round(Math.min(...coin))}; staff stars ${(st.reduce((a, b) => a + b, 0) / st.length).toFixed(2)};` +
+        ` balance median ${Math.round(median(balance))}, least ${Math.round(Math.min(...balance))}; staff stars ${(st.reduce((a, b) => a + b, 0) / st.length).toFixed(2)};` +
         ` ship-one parts' mean ${Math.round(perf.reduce((a, b) => a + b, 0) / perf.length)}`
     );
   }
   tables.push(...lines);
-  poor = s.crews.map((c, i) =>
-    standingOf(s, c.id) - c.target > TUNING.elder.slack ? poor[i] + 1 : 0
+  poor = s.teams.map((c, i) =>
+    standingOf(s, c.id) - c.target > TUNING.chairman.slack ? poor[i] + 1 : 0
   );
 }
 
@@ -364,9 +366,9 @@ let lastSeason = s.season;
 while (s.season < seasons) {
   if (s.player!.sacked) {
     const best = [...s.player!.offers].sort(
-      (a, b) => s.crews[a.crew].league - s.crews[b.crew].league
+      (a, b) => s.teams[a.team].tier - s.teams[b.team].tier
     )[0];
-    must({ kind: 'TakeJob', crew: best.crew });
+    must({ kind: 'TakeJob', team: best.team });
     continue;
   }
   const waiting = s.mail.find((m) => m.dilemma && m.dilemma.answer === null);
@@ -401,10 +403,10 @@ while (s.season < seasons) {
   works();
   for (let k = 0; k < 4; k++) {
     const c = someCommand(s, rand);
-    // the bot keeps its shipwright (it designs every season)
-    const wright = s.crews[s.player!.crew].staff.shipwright;
+    // the bot keeps its designer (it designs every season)
+    const wright = s.teams[s.player!.team].staff.designer;
     const keeps =
-      (c.kind === 'Dismiss' && c.gull === wright) ||
+      (c.kind === 'Dismiss' && c.person === wright) ||
       (c.kind === 'OfferContract' &&
         c.offer?.replaces === wright &&
         wright !== null);
@@ -432,9 +434,9 @@ while (s.season < seasons) {
     console.log(`slow Advance: ${took.toFixed(0)} ms, day ${from} to ${s.day}`);
   if (s.season !== lastSeason) {
     lastSeason = s.season;
-    const me = s.player!.crew;
-    coinLog.push(
-      `season ${s.season}: start coin ${Math.round(s.crews[me].coin)}`
+    const me = s.player!.team;
+    moneyLog.push(
+      `season ${s.season}: start balance ${Math.round(s.teams[me].balance)}`
     );
   }
 }
@@ -448,13 +450,13 @@ console.log(
   `\n${seasons} seasons in ${((performance.now() - start0) / 1000).toFixed(1)} s, day ${s.day}`
 );
 console.log(
-  `managers sacked ${counts.sackings}, hired ${counts.hirings}; gulls moved between crews ${counts.transfers}; forfeits ${counts.forfeits}`
+  `managers sacked ${counts.sackings}, hired ${counts.hirings}; people moved between teams ${counts.transfers}; forfeits ${counts.forfeits}`
 );
 const per = Array.from({ length: seasons }, (_, k) => sacks.bySeason[k] ?? 0);
 console.log(
   `sackings a season ${per.join(' ')} (mean ${(counts.sackings / seasons).toFixed(1)}): ${sacks.midSeason} in a season, ${counts.sackings - sacks.midSeason} at its end;` +
-    ` ${sacks.early} within half a season of the post; ${sacks.afterOne} in a crew's first poor season, ${sacks.afterTwo} in its second or later;` +
-    ` posts left for another crew ${sacks.moved}, by retirement ${sacks.retired}, at a contract's end ${sacks.expired}`
+    ` ${sacks.early} within half a season of the post; ${sacks.afterOne} in a team's first poor season, ${sacks.afterTwo} in its second or later;` +
+    ` posts left for another team ${sacks.moved}, by retirement ${sacks.retired}, at a contract's end ${sacks.expired}`
 );
 const timing = (xs: number[]) => {
   const sorted = [...xs].sort((a, b) => a - b),
@@ -476,7 +478,7 @@ if (slowest > ADVANCE_MS) {
   process.exitCode = 1;
 }
 console.log(
-  `ledger of the player's crew: ${coinLog.join('; ')}; the bot's DebugCoin top-ups to sign a shipwright: ${counts.topped}; with a shipwright ${counts.wright} of ${counts.gaps} gaps`
+  `ledger of the player's team: ${moneyLog.join('; ')}; the bot's DebugBalance top-ups to sign a designer: ${counts.topped}; with a designer ${counts.wright} of ${counts.gaps} gaps`
 );
 console.log(
   'mail kinds:',

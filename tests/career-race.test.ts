@@ -23,75 +23,78 @@ import {
 } from './career-kit.ts';
 
 const DAY = toRaceDay(founded());
-const ME = DAY.player!.crew;
+const ME = DAY.player!.team;
 
-/** A state with gulls marked unfit for some races. */
+/** A state with people marked unfit for some races. */
 const unfitted = (
   s: CareerState,
   ids: readonly number[],
   races = 2
 ): CareerState => {
-  const gulls = [...s.gulls];
-  for (const id of ids) gulls[id] = { ...gulls[id], unfit: races };
-  return { ...s, gulls };
+  const people = [...s.people];
+  for (const id of ids) people[id] = { ...people[id], unfit: races };
+  return { ...s, people };
 };
 
-/** A sound plan for the player's crew. */
+/** A sound plan for the player's team. */
 function plan(s: CareerState): Plan {
-  const c = s.crews[ME];
-  const [mend, gust, stores, part] = c.staff.flight;
+  const c = s.teams[ME];
+  const [mend, gust, stores, part] = c.staff.pit;
   return {
-    captain: c.staff.ships[1].captain!,
+    driver: c.staff.ships[1].driver!,
     parts: [],
     stance: 'hold',
     call: 'withMe',
     order: ['mend', 'gust', 'stores', 'part'],
     jobs: { mend, gust, stores, part },
-    objectives: c.patrons.map(() => null),
+    objectives: c.sponsors.map(() => null),
   };
 }
 
 test('race day: the player sails ship one; every other ship has one sailor, none twice, none unfit', () => {
   assert.equal(DAY.race?.round, 0);
   const all = lineups(DAY);
-  assert.equal(all[ME].ships[0].captain, null);
+  assert.equal(all[ME].ships[0].driver, null);
   const seen = new Set<number>();
   for (const x of all)
     for (const a of x.ships) {
-      if (x.crew === ME && a === x.ships[0]) continue;
-      assert.ok(a.forfeit || a.captain !== null);
-      if (a.captain === null) continue;
-      assert.ok(!seen.has(a.captain), `gull ${a.captain} sails twice`);
-      seen.add(a.captain);
-      assert.equal(DAY.gulls[a.captain].unfit, 0);
+      if (x.team === ME && a === x.ships[0]) continue;
+      assert.ok(a.forfeit || a.driver !== null);
+      if (a.driver === null) continue;
+      assert.ok(!seen.has(a.driver), `person ${a.driver} sails twice`);
+      seen.add(a.driver);
+      assert.equal(DAY.people[a.driver].unfit, 0);
     }
   const cards = raceCards(DAY, SPEC_SHIP);
-  assert.equal(cards.length, DAY.leagues.length);
+  assert.equal(cards.length, DAY.championships.length);
   for (const card of cards)
-    assert.equal(card.ships.length, DAY.leagues[card.league].crews.length * 2);
+    assert.equal(
+      card.ships.length,
+      DAY.championships[card.tier].teams.length * 2
+    );
   assert.equal(
-    cards[DAY.crews[ME].league].ships[0].captain,
+    cards[DAY.teams[ME].tier].ships[0].driver,
     null,
     "the player's own ship is sailed, not simulated"
   );
 });
 
-test('stand-ins: a ship whose captain and reserve are unfit takes the best free captain for the race; with none she is forfeit', () => {
-  const c = DAY.crews[ME];
-  const own = [c.staff.ships[1].captain, c.staff.reserve].filter(
+test('stand-ins: a ship whose driver and reserve are unfit takes the best free driver for the race; with none she is forfeit', () => {
+  const c = DAY.teams[ME];
+  const own = [c.staff.ships[1].driver, c.staff.reserve].filter(
     (x): x is number => x !== null
   );
   const hurt = unfitted(DAY, own);
   const two = lineups(hurt)[ME].ships[1];
   assert.ok(
     two.standIn &&
-      two.captain !== null &&
-      hurt.gulls[two.captain].contract === null
+      two.driver !== null &&
+      hurt.people[two.driver].contract === null
   );
-  const free = DAY.gulls
+  const free = DAY.people
     .filter(
       (g) =>
-        g.role === 'captain' &&
+        g.role === 'driver' &&
         g.contract === null &&
         g.retired === null &&
         !g.player
@@ -105,11 +108,11 @@ test('stand-ins: a ship whose captain and reserve are unfit takes the best free 
 test('SetPlan: a sound plan is kept; each wrong part of one is refused with its reason', () => {
   const p = plan(DAY);
   const set = must(DAY, { kind: 'SetPlan', plan: p });
-  assert.deepEqual(set.crews[ME].plan?.stance, 'hold');
-  const other = DAY.crews.find((c) => c.id !== ME)!.staff.ships[0].captain!;
-  refused(DAY, { kind: 'SetPlan', plan: { ...p, captain: other } }, 'captain');
-  refused(DAY, { kind: 'SetPlan', plan: { ...p, captain: -1 } }, 'captain');
-  refused(unfitted(DAY, [p.captain]), { kind: 'SetPlan', plan: p }, 'unfit');
+  assert.deepEqual(set.teams[ME].plan?.stance, 'hold');
+  const other = DAY.teams.find((c) => c.id !== ME)!.staff.ships[0].driver!;
+  refused(DAY, { kind: 'SetPlan', plan: { ...p, driver: other } }, 'driver');
+  refused(DAY, { kind: 'SetPlan', plan: { ...p, driver: -1 } }, 'driver');
+  refused(unfitted(DAY, [p.driver]), { kind: 'SetPlan', plan: p }, 'unfit');
   refused(
     DAY,
     { kind: 'SetPlan', plan: { ...p, stance: 'dance' as Plan['stance'] } },
@@ -138,7 +141,7 @@ test('SetPlan: a sound plan is kept; each wrong part of one is refused with its 
     { kind: 'SetPlan', plan: { ...p, objectives: [7, 7, 7, 7] } },
     'objectives'
   );
-  const part = DAY.crews[ME].parts[0].id;
+  const part = DAY.teams[ME].parts[0].id;
   refused(
     DAY,
     {
@@ -166,18 +169,14 @@ test('RaceStarted, RecordRace and Forfeit: each refusal; while the race is under
   refused(founded(), { kind: 'RaceStarted', round: 0 }, 'noRace');
   refused(DAY, { kind: 'RaceStarted', round: 1 }, 'round');
   const cards = raceCards(DAY, SPEC_SHIP);
-  const mineLeague = DAY.crews[ME].league;
-  const result = synthetic(cards[mineLeague]);
+  const mineTier = DAY.teams[ME].tier;
+  const result = synthetic(cards[mineTier]);
   refused(founded(), { kind: 'RecordRace', result }, 'noRace');
   refused(DAY, { kind: 'RecordRace', result }, 'notStarted');
   refused(DAY, { kind: 'Forfeit', round: 0 }, 'notStarted');
   const on = must(DAY, { kind: 'RaceStarted', round: 0 });
   refused(on, { kind: 'RaceStarted', round: 0 }, 'racing');
-  refused(
-    on,
-    { kind: 'RecordRace', result: { ...result, league: 9 } },
-    'league'
-  );
+  refused(on, { kind: 'RecordRace', result: { ...result, tier: 9 } }, 'tier');
   refused(on, { kind: 'RecordRace', result: { ...result, round: 3 } }, 'round');
   refused(
     on,
@@ -195,7 +194,7 @@ test('RaceStarted, RecordRace and Forfeit: each refusal; while the race is under
   refused(on, { kind: 'Forfeit', round: 2 }, 'round');
   refused(
     on,
-    { kind: 'MoveFlightJob', gull: on.crews[ME].staff.flight[0], job: 'gust' },
+    { kind: 'MovePitJob', person: on.teams[ME].staff.pit[0], job: 'gust' },
     'racing'
   );
   refused(on, { kind: 'Advance' }, 'racing');
@@ -206,7 +205,7 @@ test('RaceStarted, RecordRace and Forfeit: each refusal; while the race is under
   const gone = must(on, { kind: 'Forfeit', round: 0 });
   assert.ok(gone.mail.some((m) => m.kind === 'forfeit'));
   refused(gone, { kind: 'Forfeit', round: 0 }, 'forfeited');
-  const forfeitCard = raceCards(gone, SPEC_SHIP)[mineLeague];
+  const forfeitCard = raceCards(gone, SPEC_SHIP)[mineTier];
   assert.ok(
     forfeitCard.ships[0].forfeit && !forfeitCard.ships[1].forfeit,
     "the player's ship is forfeit; ship two sails on"
@@ -221,7 +220,7 @@ test('points (D20): 25, 22, 20, 18, 16, then one less a place to 1 at 20th; a si
   const order = Array.from({ length: 40 }, (_, i) => i);
   const result = {
     seed: 1,
-    league: 0,
+    tier: 0,
     round: 0,
     order,
     sinkings: [{ id: 39, by: 0, cause: 'shot' as const, second: 100 }],
@@ -235,11 +234,11 @@ test('points (D20): 25, 22, 20, 18, 16, then one less a place to 1 at 20th; a si
     seconds: 600,
   };
   const t = tally(result, 20, { pointsPerSinking: 2, seaHeldPoint: true });
-  assert.equal(t[0].points, 25 + 22 + 2, 'crew 0: first and second, a sinking');
+  assert.equal(t[0].points, 25 + 22 + 2, 'team 0: first and second, a sinking');
   assert.equal(
     t[1].points,
     20 + 18 + 1,
-    'crew 1: third and fourth, the most sea'
+    'team 1: third and fourth, the most sea'
   );
   assert.equal(t[0].sank, 1);
   assert.equal(t[19].afloat, 1);
@@ -249,8 +248,8 @@ test('the round closes when the three results are in: standings by points, the n
   const after = sailed(DAY);
   assert.equal(after.race, null);
   assert.equal(after.round, 1);
-  for (const l of after.leagues) {
-    assert.equal(l.standings.length, l.crews.length);
+  for (const l of after.championships) {
+    assert.equal(l.standings.length, l.teams.length);
     assert.ok(l.standings.some((x) => x.points > 0));
   }
   assert.ok(after.mail.some((m) => m.kind === 'raceResult'));
@@ -286,19 +285,21 @@ test('the season ends: prizes, four up and four down, standings reset, the next 
     ]
   );
   let s = DAY;
-  const sizes = s.leagues.map((l) => l.crews.length);
+  const sizes = s.championships.map((l) => l.teams.length);
   while (s.season === 0) {
     if (s.player?.sacked)
-      s = must(s, { kind: 'TakeJob', crew: s.player.offers[0].crew });
+      s = must(s, { kind: 'TakeJob', team: s.player.offers[0].team });
     else if (s.race !== null) s = sailed(s);
     else s = must(s, { kind: 'Advance' });
   }
   assert.equal(s.season, 1);
   assert.deepEqual(
-    s.leagues.map((l) => l.crews.length),
+    s.championships.map((l) => l.teams.length),
     sizes
   );
-  assert.ok(s.leagues.every((l) => l.standings.every((x) => x.points === 0)));
+  assert.ok(
+    s.championships.every((l) => l.standings.every((x) => x.points === 0))
+  );
   assert.equal(s.calendar?.start, YEAR);
   assert.ok(s.queue.some((e) => e.kind === 'seasonEnd'));
   const opening = s.queue.find((e) => e.kind === 'seasonStart')!;
@@ -316,13 +317,13 @@ test('the season ends: prizes, four up and four down, standings reset, the next 
   invariants(s);
 });
 
-test('debug commands: only with debug allowed; DebugCoin takes a whole non-zero sum up to a million; the jumps stop at race day', () => {
+test('debug commands: only with debug allowed; DebugBalance takes a whole non-zero sum up to a million; the jumps stop at race day', () => {
   const s = founded();
-  refused(s, { kind: 'DebugCoin', coin: 0 }, 'coin');
-  refused(s, { kind: 'DebugCoin', coin: 1.5 }, 'coin');
-  refused(s, { kind: 'DebugCoin', coin: 2e6 }, 'coin');
-  const rich = must(s, { kind: 'DebugCoin', coin: 500 });
-  assert.equal(rich.crews[ME].coin, s.crews[ME].coin + 500);
+  refused(s, { kind: 'DebugBalance', balance: 0 }, 'balance');
+  refused(s, { kind: 'DebugBalance', balance: 1.5 }, 'balance');
+  refused(s, { kind: 'DebugBalance', balance: 2e6 }, 'balance');
+  const rich = must(s, { kind: 'DebugBalance', balance: 500 });
+  assert.equal(rich.teams[ME].balance, s.teams[ME].balance + 500);
   const day = must(s, { kind: 'DebugToRaceDay' });
   assert.ok(day.race !== null);
   refused(day, { kind: 'DebugToRaceDay' }, 'raceDay');
@@ -332,6 +333,6 @@ test('debug commands: only with debug allowed; DebugCoin takes a whole non-zero 
     end.race !== null || end.season === 1 || end.player!.sacked,
     "stops at a race day, the season's end, or a sacking"
   );
-  const r = apply(s, { kind: 'DebugCoin', coin: 500 });
+  const r = apply(s, { kind: 'DebugBalance', balance: 500 });
   assert.equal(r.ok, false, 'debug commands need debug allowed');
 });

@@ -9,27 +9,27 @@ import { DILEMMAS } from '../src/career/events.ts';
 import { TEMPLATES, render } from '../src/career/mail.ts';
 import { founded, invariants, must, refused, sailed } from './career-kit.ts';
 
-/** In two played seasons, the first state at which each dilemma's trigger holds for the player's crew (AT), and for
- *  any crew (ANY, with the crew). */
+/** In two played seasons, the first state at which each dilemma's trigger holds for the player's team (AT), and for
+ *  any team (ANY, with the team). */
 function found(): {
   at: Map<string, CareerState>;
-  any: Map<string, { s: CareerState; crew: number }>;
+  any: Map<string, { s: CareerState; team: number }>;
 } {
   const at = new Map<string, CareerState>(),
-    any = new Map<string, { s: CareerState; crew: number }>();
+    any = new Map<string, { s: CareerState; team: number }>();
   let s = founded();
   while (s.season < 2 && any.size < DILEMMAS.length) {
     if (s.player?.sacked)
-      s = must(s, { kind: 'TakeJob', crew: s.player.offers[0].crew });
+      s = must(s, { kind: 'TakeJob', team: s.player.offers[0].team });
     else if (s.race !== null) s = sailed(s, 0.3);
     else s = must(s, { kind: 'Advance' });
     if (s.player?.sacked || s.race !== null) continue;
     for (const d of DILEMMAS) {
-      if (!at.has(d.id) && d.trigger(s, s.crews[s.player!.crew], seeded(1, 2)))
+      if (!at.has(d.id) && d.trigger(s, s.teams[s.player!.team], seeded(1, 2)))
         at.set(d.id, s);
       if (any.has(d.id)) continue;
-      const c = s.crews.find((x) => d.trigger(s, x, seeded(1, 2)) !== null);
-      if (c) any.set(d.id, { s, crew: c.id });
+      const c = s.teams.find((x) => d.trigger(s, x, seeded(1, 2)) !== null);
+      if (c) any.set(d.id, { s, team: c.id });
     }
   }
   return { at, any };
@@ -38,10 +38,10 @@ const { at: AT, any: ANY } = found();
 
 /** A state with the player's dilemma posted, and its mail's id. */
 function posted(s: CareerState, id: string): { s: CareerState; mail: number } {
-  const crew = s.player!.crew;
+  const team = s.player!.team;
   const out = dilemmaComes(
     s,
-    { kind: 'dilemma', id, crew, day: s.day, seq: 0 },
+    { kind: 'dilemma', id, team, day: s.day, seq: 0 },
     dice(s.seed, {})
   );
   const m = out.mail.find(
@@ -51,18 +51,18 @@ function posted(s: CareerState, id: string): { s: CareerState; mail: number } {
   return { s: out, mail: m.id };
 }
 
-test("every dilemma's trigger is met for some crew within two seasons, and each personality's option answers it", () => {
+test("every dilemma's trigger is met for some team within two seasons, and each personality's option answers it", () => {
   assert.deepEqual([...ANY.keys()].sort(), DILEMMAS.map((d) => d.id).sort());
   assert.ok(AT.size >= 4, `met for the player: ${[...AT.keys()].join(', ')}`);
-  for (const [id, { s, crew }] of ANY) {
+  for (const [id, { s, team }] of ANY) {
     const d = DILEMMAS.find((x) => x.id === id)!;
-    const slots = d.trigger(s, s.crews[crew], seeded(1, 2))!;
+    const slots = d.trigger(s, s.teams[team], seeded(1, 2))!;
     for (const o of new Set([...d.rival, d.options.length - 1])) {
-      const a = d.answer(s, s.crews[crew], slots, o);
+      const a = d.answer(s, s.teams[team], slots, o);
       if ('state' in a) invariants(a.state);
       else assert.ok(a.no.code.length > 0, `${id}/${o}`);
     }
-    const last = d.answer(s, s.crews[crew], slots, d.options.length - 1);
+    const last = d.answer(s, s.teams[team], slots, d.options.length - 1);
     assert.ok(
       'state' in last,
       `${id}: the last option (a lapse) can always be taken`
@@ -123,7 +123,7 @@ test("an unanswered dilemma lapses to its last option at the next round's draw",
   let { s } = posted(s0, id);
   while (s.race === null)
     s = s.player?.sacked
-      ? must(s, { kind: 'TakeJob', crew: s.player.offers[0].crew })
+      ? must(s, { kind: 'TakeJob', team: s.player.offers[0].team })
       : must(s, { kind: 'Advance' });
   s = sailed(s);
   const m = s.mail.find((x) => x.dilemma?.id === id && x.day === s0.day)!;
@@ -133,20 +133,20 @@ test("an unanswered dilemma lapses to its last option at the next round's draw",
 test('every template renders in each wording with no slot left unfilled', () => {
   const s = founded();
   const slots = {
-    gull: 0,
-    crew: 1,
+    person: 0,
+    team: 1,
     first: 2,
     second: 3,
     third: 4,
     scout: 5,
-    bosun: 6,
-    league: 1,
+    mechanic: 6,
+    tier: 1,
     day: 30,
     expires: 40,
     closes: 50,
     firstDay: 14,
     fine: 300,
-    coin: 500,
+    balance: 500,
     prize: 1000,
     wage: 80,
     building: 'factory',
@@ -180,14 +180,14 @@ test('every template renders in each wording with no slot left unfilled', () => 
     for: 12,
     against: 8,
     job: 'mend',
-    own: s.player!.crew,
+    own: s.player!.team,
   };
   for (const [kind, tpl] of Object.entries(TEMPLATES)) {
     for (let w = 0; w < Math.max(tpl.subject.length, tpl.body.length); w++) {
       const r = render(s, {
         id: 0,
         day: 0,
-        category: 'crew',
+        category: 'team',
         sender: null,
         kind,
         slots,
@@ -206,10 +206,10 @@ test('every template renders in each wording with no slot left unfilled', () => 
   const race = render(s, {
     id: 0,
     day: 0,
-    category: 'crew',
+    category: 'team',
     sender: null,
     kind: 'raceResult',
-    slots: { place: 1, standing: 2, points: 25, league: 0 },
+    slots: { place: 1, standing: 2, points: 25, tier: 0 },
     links: [],
     wording: 0,
     read: false,

@@ -3,55 +3,55 @@
 // (tests/career-tuning.test.ts pins a hash of TUNING to it), so a journal written under other numbers is never
 // replayed whole as if it were this one's.
 //
-// A pair [a, b] is a line in u = stat / 20: a + b × u. A triple by league is League One's, Two's, Three's.
+// A pair [a, b] is a line in u = stat / 20: a + b × u. A triple by tier is Tier 1's, Two's, Three's.
 
 /** Bump with any change to TUNING (and pin the new hash in the test). */
 export const TUNING_VERSION = 5;
 
 const ROLE_YEARS = {
   manager: [40, 55],
-  captain: [26, 31],
-  bosun: [28, 34],
-  flight: [28, 34],
-  shipwright: [35, 45],
+  driver: [26, 31],
+  mechanic: [28, 34],
+  pit: [28, 34],
+  designer: [35, 45],
   scout: [35, 45],
-  elder: [45, 60],
+  chairman: [45, 60],
 } as const;
 
 export const TUNING = {
-  /** The calendar (Phase B section 13): ten races fourteen days apart, then thirty days off. One season is one year of a gull's age. */
+  /** The calendar (Phase B section 13): ten races fourteen days apart, then thirty days off. One season is one year of a person's age. */
   calendar: { rounds: 10, gap: 14, off: 30 },
 
   /** The world at the start (Phase B section 3, epic section 5). */
   world: {
-    leagues: 3,
-    crews: 40,
+    championships: 3,
+    teams: 40,
     emblems: 12,
     colonies: 40,
     free: 300, // free agents across every role
     freeManagers: 30, // of them, managers
     /** The share of the other free agents in each role. */
     freeRoles: {
-      captain: 0.3,
-      bosun: 0.15,
-      shipwright: 0.1,
+      driver: 0.3,
+      mechanic: 0.15,
+      designer: 0.1,
       scout: 0.12,
-      flight: 0.33,
+      pit: 0.33,
     },
-    flight: 4, // flight gulls a crew
-    bosuns: 2, // one a ship
-    /** A crew's staff stars by league, and the seeded spread about them (± half of it). */
+    pit: 4, // pit crew members a team
+    mechanics: 2, // one a ship
+    /** A team's staff stars by tier, and the seeded spread about them (± half of it). */
     stars: [3.5, 2.5, 1.75],
     starSpread: 1,
     /** Free agents' stars and spread. */
     freeStars: 2,
     freeSpread: 2,
-    /** How far each stat lies from its gull's mean (± this, by seed). */
+    /** How far each stat lies from its person's mean (± this, by seed). */
     statSpread: 3,
     /** The young (under the role's peak) lie this many stars below their potential a year short of peak, up to the cap. */
     youthGap: 0.35,
     youthGapMost: 2,
-    /** Each gull has 0 to 3 traits; the chance of each further trait. */
+    /** Each person has 0 to 3 traits; the chance of each further trait. */
     traitChance: 0.35,
   },
 
@@ -59,24 +59,24 @@ export const TUNING = {
   ages: {
     start: {
       manager: [36, 64],
-      captain: [18, 38],
-      bosun: [22, 50],
-      flight: [19, 40],
-      shipwright: [26, 60],
+      driver: [18, 38],
+      mechanic: [22, 50],
+      pit: [19, 40],
+      designer: [26, 60],
       scout: [26, 60],
-      elder: [50, 76],
+      chairman: [50, 76],
     },
     peak: ROLE_YEARS,
     retire: {
       manager: [58, 70],
-      captain: [34, 40],
-      bosun: [45, 55],
-      flight: [36, 42],
-      shipwright: [55, 65],
+      driver: [34, 40],
+      mechanic: [45, 55],
+      pit: [36, 42],
+      designer: [55, 65],
       scout: [55, 65],
-      elder: [70, 80],
+      chairman: [70, 80],
     },
-    young: [16, 19], // the new gulls each season
+    young: [16, 19], // the new people each season
   },
 
   /** Growth at each season's end (Phase B section 2.2). */
@@ -86,30 +86,30 @@ export const TUNING = {
     declineYear: 0.2, //   this for each year past peak
     spread: 0.3, // each stat's share by seed: 1 ± this
     school: [1, 1.25, 1.5], // the role's building, by level
-    mentor: 0.25, // growth added (as a share) to a Mentor's crew's captains under mentorAge
+    mentor: 0.25, // growth added (as a share) to a Mentor's team's drivers under mentorAge
     mentorAge: 22,
-    stamina: 0.2, // a captain's Stamina grows this more a season a sailing school level
+    stamina: 0.2, // a driver's Stamina grows this more a season a sailing school level
   },
 
   /** Morale (Phase B section 2.3), 0 to 100. */
   morale: {
     start: 60,
-    result: 6, // most a race moves it by the result against the crew's target
+    result: 6, // most a race moves it by the result against the team's target
     resultPerPlace: 2, //   this a place, to that most
-    status: 2, // a race on ship two, or off it as reserve, for a captain who wants status
+    status: 2, // a race on ship two, or off it as reserve, for a driver who wants status
     silence: 10, // no renewal offered in the contract's last days, once
     silenceDays: 60,
     renewal: 10,
     wage: [-2, 2], // most a race moves it by wage against ask, each way
     wagePerShare: 4, //   this per share of the ask above or below it
-    bond: 0.5, // a race, per bond level, for the bosun and her captain
+    bond: 0.5, // a race, per bond level, for the mechanic and her driver
     effect: 50, // stats shift (morale − 50) / this
     leave: 25, // below: asks to leave, refuses renewal
     content: 80, // above: renewal asks less by
     contentDiscount: 0.1,
   },
 
-  /** Form (Phase B section 2.3): a captain's stats shift by up to this × (1 − u Consistency) for a race. */
+  /** Form (Phase B section 2.3): a driver's stats shift by up to this × (1 − u Consistency) for a race. */
   form: 3,
 
   /** Injury (Phase B section 2.3). */
@@ -120,12 +120,12 @@ export const TUNING = {
     most: 3,
     gain: 0.08, // chance a season's end gives a trait, if under most
     lose: 0.06, // chance a season's end takes one
-    pay: 0.6, // a Pay Captain brings this × marketability Coin a race
+    pay: 0.6, // a Pay Driver brings this × marketability Coin a race
   },
 
   /** What each role's stats do (Phase B section 2.1). */
-  captain: { feedback: 30 },
-  bosun: {
+  driver: { feedback: 30 },
+  mechanic: {
     repairs: [0.7, 0.6],
     mending: [0.7, 0.6],
     concentration: [1.3, -0.6],
@@ -138,7 +138,7 @@ export const TUNING = {
     chemistry: [1, 1],
   },
   bond: { levels: [5, 12, 20], sooner: 1, gustRecharge: 0.9 },
-  shipwright: {
+  designer: {
     start: 8,
     innovation: [0.2, 0.6],
     speed: [1.3, -0.6],
@@ -157,7 +157,7 @@ export const TUNING = {
     persuasionDays: 30,
     nest: [1, 0.85, 0.7],
   },
-  flight: {
+  pit: {
     weights: {
       mend: { strength: 0.6, speed: 0.4 },
       gust: { speed: 0.6, teamwork: 0.4 },
@@ -176,18 +176,18 @@ export const TUNING = {
   /** What a rival manager's stats do (Phase B section 6). */
   manager: {
     negotiation: [1.1, -0.3], // bids at the ask × this
-    talentEye: [0.2, 0.6], // the weight on potential over stars in a gull's worth
-    finance: [0.25, 0.5], // the share of coin above the floor it will commit
-    development: [0.5, 2], // how sharply the yard's points go to the worst-ranked parts (an exponent)
+    talentEye: [0.2, 0.6], // the weight on potential over stars in a person's worth
+    finance: [0.25, 0.5], // the share of balance above the floor it will commit
+    development: [0.5, 2], // how sharply the improvement's points go to the worst-ranked parts (an exponent)
     tactics: [0.4, 0.6], // the chance the race plan takes its best choice
   },
-  /** What an elder's stats do (Phase B section 7). */
-  elder: {
+  /** What an chairman's stats do (Phase B section 7). */
+  chairman: {
     ambition: 3, // places the target is moved up, × u
     perPlace: 0.6,
     fall: -4,
     rise: 4, // confidence a race: perPlace a place past the slack (to fall) or ahead (to rise)
-    slack: 3, // places behind the target an elder lets pass
+    slack: 3, // places behind the target an chairman lets pass
     met: 1, // confidence a race at or above the target
     settle: 5, // races before the standings weigh in full (the first weighs 1/settle)
     patience: [1.3, -0.6], // a fall × this
@@ -195,28 +195,28 @@ export const TUNING = {
     verdict: 35, // at the season's end a target missed sacks only below this confidence
     grace: 0.5, // seasons a new manager serves before they can be sacked
     debt: 0,
-    pastFloor: -0.5, // a race while coin is below zero, past the floor
-    generosity: 0.3, // Coin added at the season's start, × u × the league's budget
-    floor: [0.3, 0.4], // the debt floor, × the league's budget, below zero
-    meddling: [0.2, 0.6], // the chance an elder's dilemma is the one drawn
-    words: [75, 50, 25], // confidence crossing these sends the elder's word
+    pastFloor: -0.5, // a race while balance is below zero, past the floor
+    generosity: 0.3, // Coin added at the season's start, × u × the tier's budget
+    floor: [0.3, 0.4], // the debt floor, × the tier's budget, below zero
+    meddling: [0.2, 0.6], // the chance an chairman's dilemma is the one drawn
+    words: [75, 50, 25], // confidence crossing these sends the chairman's word
     missedBy: 5, // places past the target at the season's end that sack the manager
-    fit: [55, 30, 0], // the manager's reputation an elder looks for, by league
-    jobs: [70, 45, 0], // the player's reputation a league's crews offer their post at
-    ambitious: 14, // an elder's Ambition at or above which, at the season's end, they court a better manager
+    fit: [55, 30, 0], // the manager's reputation an chairman looks for, by tier
+    jobs: [70, 45, 0], // the player's reputation a tier's teams offer their post at
+    ambitious: 14, // an chairman's Ambition at or above which, at the season's end, they court a better manager
     offerDays: 7, // a job offer stands this long
-    standing: 2, // the most job offers standing at once while the player has a crew
+    standing: 2, // the most job offers standing at once while the player has a team
   },
 
   /** Rival managers' decisions (Phase B section 6), and what each personality weighs. */
   rivals: {
-    review: 7, // days between a crew's reviews, staggered by crew id
+    review: 7, // days between a team's reviews, staggered by team id
     better: 1,
     betterGambler: 0.5, // stars a known candidate must be better by to replace the weakest
     bigBid: 1.1, // a gambler's bids × this
     counterMost: 1.25, // a counter is met if its wage is at most the ask × this, and payable
     breakRaces: 12, // a rival's break clause, in races' wage; none at Negotiation u ≥ 0.5
-    renewBelow: 0.75, // renews staff whose worth is at least this share of the best of their role on the crew
+    renewBelow: 0.75, // renews staff whose worth is at least this share of the best of their role on the team
     openFirst: 3, // worth added, in scouting, to a candidate for an open post: open posts are scouted first
     scoutLooks: 240, // the most candidates a review's scouting looks over (an even sample of a crowded market)
     /** Each personality's weights over the section 6 table's rows (higher acts first), the share of its Finance
@@ -229,8 +229,8 @@ export const TUNING = {
           replace: 2.5,
           design: 2.2,
           renew: 2,
-          patrons: 1.8,
-          yard: 1.6,
+          sponsors: 1.8,
+          improvement: 1.6,
           poach: 1.5,
           scout: 1,
           suppliers: 0.6,
@@ -245,9 +245,9 @@ export const TUNING = {
           fill: 3,
           renew: 2.5,
           scout: 2.2,
-          yard: 2,
+          improvement: 2,
           design: 1.8,
-          patrons: 1.7,
+          sponsors: 1.7,
           replace: 1.5,
           build: 1.2,
           poach: 1,
@@ -263,9 +263,9 @@ export const TUNING = {
           poach: 3.2,
           fill: 3,
           replace: 2,
-          patrons: 1.8,
+          sponsors: 1.8,
           renew: 1.5,
-          yard: 1.4,
+          improvement: 1.4,
           design: 1.3,
           scout: 1,
           build: 0.8,
@@ -278,12 +278,12 @@ export const TUNING = {
       },
       engineer: {
         order: {
-          yard: 3.5,
+          improvement: 3.5,
           design: 3.4,
           fill: 3,
           build: 2.4,
           renew: 2,
-          patrons: 1.6,
+          sponsors: 1.6,
           replace: 1.5,
           scout: 1,
           poach: 0.5,
@@ -300,9 +300,9 @@ export const TUNING = {
           replace: 2.6,
           design: 2.5,
           poach: 2,
-          yard: 1.8,
+          improvement: 1.8,
           scout: 1.5,
-          patrons: 1.4,
+          sponsors: 1.4,
           build: 1.2,
           renew: 1,
           suppliers: 0.6,
@@ -316,8 +316,8 @@ export const TUNING = {
         order: {
           fill: 3,
           renew: 2.5,
-          patrons: 2.2,
-          yard: 2,
+          sponsors: 2.2,
+          improvement: 2,
           design: 1.6,
           replace: 1.5,
           scout: 1.2,
@@ -336,8 +336,8 @@ export const TUNING = {
 
   /** The market (Phase B section 5). */
   market: {
-    answerDays: 2, // a gull answers an offer this long after it is made
-    approachDays: 7, // an approach to another crew's gull is answered this long after
+    answerDays: 2, // a person answers an offer this long after it is made
+    approachDays: 7, // an approach to another team's person is answered this long after
     counterDays: 7, // a counter stands this long
     accept: 1,
     counterFrom: 0.85,
@@ -349,29 +349,29 @@ export const TUNING = {
     closingDays: 60, // a contract's last days, in which others may approach
     silenceDays: 30, // into those days with no renewal offered, morale pays once
     expect: { podium: 0.06, sinking: 0.4 }, // the podiums and sinkings a race an offer's bonuses are worth
-    reserve: 0.3, // status's score for a captain offered the reserve
-    leagueBelow: 0.6,
-    leagueFree: 0.4, // league's score one below their level; two below when out of contract
-    levelStars: [3, 2.1], // a free agent's level by stars: League One at or above the first, Two the second
-    ambitionSpan: 50, // ambition: 1 at the crew's reputation equal to theirs, ± this per 1
+    reserve: 0.3, // status's score for a driver offered the reserve
+    tierBelow: 0.6,
+    tierFree: 0.4, // tier's score one below their level; two below when out of contract
+    levelStars: [3, 2.1], // a free agent's level by stars: Tier 1 at or above the first, Two the second
+    ambitionSpan: 50, // ambition: 1 at the team's reputation equal to theirs, ± this per 1
     securityStep: 0.35, // security's score lost a season from the length they ask
-    away: 0.5, // home's score at a crew of another colony
-    young: { count: 150, stars: [0.5, 1.5] }, // new gulls each season (ages TUNING.ages.young)
+    away: 0.5, // home's score at a team of another colony
+    young: { count: 150, stars: [0.5, 1.5] }, // new people each season (ages TUNING.ages.young)
   },
 
-  /** Wages (Phase B section 5): base a race by role, × 1.6^stars × league × (1 + marketability / 200). */
+  /** Wages (Phase B section 5): base a race by role, × 1.6^stars × tier × (1 + marketability / 200). */
   wage: {
     base: {
       manager: 30,
-      captain: 40,
-      bosun: 20,
-      shipwright: 25,
+      driver: 40,
+      mechanic: 20,
+      designer: 25,
       scout: 15,
-      flight: 10,
-      elder: 0,
+      pit: 10,
+      chairman: 0,
     },
     growth: 1.6,
-    league: [2, 1.3, 1],
+    tier: [2, 1.3, 1],
     market: 200,
     feeRaces: 4,
     /** Contract length in seasons at the start, by age: under young, under old, older. */
@@ -383,15 +383,15 @@ export const TUNING = {
   /** Marketability (Phase B section 10) at the start, 0 to 100: base + stars × perStar + youth (under youthAge), ± spread. */
   marketability: { base: 8, perStar: 12, youth: 8, youthAge: 23, spread: 10 },
 
-  /** A crew at the start, by league. */
-  crew: {
-    coin: [4000, 2200, 1200],
+  /** A team at the start, by tier. */
+  team: {
+    balance: [4000, 2200, 1200],
     budget: [6000, 3500, 2000],
     reputation: [70, 45, 20],
     reputationSpread: 16,
     confidence: 70,
     buildings: [2, 1.5, 1], // mean level, by seed: each building 1 to 3
-    /** Starting parts' performance by league (0..1000), its spread, the headroom to the maximum, reliability and its headroom. */
+    /** Starting parts' performance by tier (0..1000), its spread, the headroom to the maximum, reliability and its headroom. */
     parts: {
       perf: [620, 470, 330],
       spread: 60,
@@ -399,12 +399,12 @@ export const TUNING = {
       reliability: [0.82, 0.74, 0.66],
       reliabilityHeadroom: 0.1,
     },
-    /** A manager's reputation at the start, by league, ± half the spread. */
+    /** A manager's reputation at the start, by tier, ± half the spread. */
     managerReputation: [65, 40, 18],
     managerSpread: 20,
   },
 
-  /** Each league's rules at the start (race.ts Rules). */
+  /** Each tier's rules at the start (race.ts Rules). */
   rules: {
     spec: [],
     pace: 1,
@@ -416,7 +416,7 @@ export const TUNING = {
   },
   /** A planet's storm pace, drawn in this range at the season's making, to the nearest step. */
   planetPace: { lo: 0.8, hi: 1.25, step: 0.05 },
-  /** Starting contracts: the share with a break clause, its size in races' wage, and a captain's podium bonus in races' wage. */
+  /** Starting contracts: the share with a break clause, its size in races' wage, and a driver's podium bonus in races' wage. */
   contracts: {
     breakShare: 0.5,
     breakRaces: [8, 20],
@@ -425,9 +425,9 @@ export const TUNING = {
   },
 
   /** The player at founding: their manager's reputation, and the longest names they may give. */
-  player: { reputation: 10, crewName: 32, gullName: 20, age: 35 },
+  player: { reputation: 10, teamName: 32, personName: 20, age: 35 },
 
-  /** A gull's patience in talks (Phase B section 5). */
+  /** A person's patience in talks (Phase B section 5). */
   patience: 3,
 
   /** Parts (Phase B section 8). */
@@ -439,11 +439,11 @@ export const TUNING = {
     faultWear: 0.05, // condition lost a race sailed, and more a fault
     carry: 0.6, // a part's performance and maximum carried into the next season
     spares: 1, // unfitted parts kept a type at the season's end (the best)
-    newPartMorale: 5, // ship two's captain's morale lost at a second new part in a row to ship one
+    newPartMorale: 5, // ship two's driver's morale lost at a second new part in a row to ship one
     fine: 0.2, // an inspection's fine: (1 + risk) × this × the part's design cost
   },
-  /** The yard (Phase B section 8.4): points a day, and what a point does. */
-  yard: { condition: 0.01, perf: 1, reliability: 0.002, bosun: 0.25 },
+  /** The improvement (Phase B section 8.4): points a day, and what a point does. */
+  improvement: { condition: 0.01, perf: 1, reliability: 0.002, mechanic: 0.25 },
   /** Designing (Phase B section 8.3). */
   design: {
     days: 14,
@@ -464,9 +464,9 @@ export const TUNING = {
     },
     tier: [1, 1.6, 2.4], // the cost × this by the highest tier among its components
   },
-  /** The rookery (Phase B section 9): each building's cost, days and upkeep a race, by level 1..3 (level 1 is every
-   *  crew's from the start, so its cost and days are never paid). */
-  rookery: {
+  /** The headquarters (Phase B section 9): each building's cost, days and upkeep a race, by level 1..3 (level 1 is every
+   *  team's from the start, so its cost and days are never paid). */
+  hq: {
     works: {
       factory: {
         cost: [0, 2400, 6000],
@@ -493,7 +493,7 @@ export const TUNING = {
         days: [0, 25, 40],
         upkeep: [6, 15, 30],
       },
-      flightLoft: {
+      pitHouse: {
         cost: [0, 1200, 3000],
         days: [0, 20, 35],
         upkeep: [5, 12, 25],
@@ -514,23 +514,23 @@ export const TUNING = {
         upkeep: [5, 12, 25],
       },
     },
-    points: [10, 20, 30], // the factory's yard points a day
+    points: [10, 20, 30], // the factory's improvement points a day
     slots: [2, 3, 4], // the drawing loft's design slots
     loft: [1, 0.85, 0.7], // the drawing loft's design days ×
-    fish: [120, 80, 50], // Coin a race the fish market brings at level 1, by league
+    fish: [120, 80, 50], // Coin a race the fish market brings at level 1, by tier
     fishLevel: [1, 1.8, 2.6], //   × this by its level
   },
 
-  /** Money (Phase B section 10): each league's prize pool at the season's end, shared by place by rules.prizeSpread. */
-  //   Sized so a median crew's prize is about a third of its season's wages and upkeep (the patrons bring about half).
+  /** Money (Phase B section 10): each tier's prize pool at the season's end, shared by place by rules.prizeSpread. */
+  //   Sized so a median team's prize is about a third of its season's wages and upkeep (the sponsors bring about half).
   money: { prize: [1040000, 400000, 210000] },
   /** Reputation (Phase B section 10), 0..100. */
   reputation: {
     perPoint: 0.1,
-    most: 3, // a crew's a race: × (its points − its league's mean), to ± most
+    most: 3, // a team's a race: × (its points − its tier's mean), to ± most
     title: 10,
     promoted: 6,
-    relegated: -8, // a crew's at the season's end
+    relegated: -8, // a team's at the season's end
     perPlace: 0.5,
     managerMost: 2, // a manager's a race: × (target − standing), to ± managerMost
     playerPerPoint: 0.15,
@@ -538,21 +538,21 @@ export const TUNING = {
     playerMost: 3, // the player's own ship: × (her points − a ship's mean), + a sinking
   },
   /** Marketability's moves a race (Phase B section 10): a podium, a sinking, and the drift back toward what stars and youth give. */
-  marketMoves: { podium: 3, sinking: 1, drift: 0.1, crew: 0.4 },
-  /** Patrons (Phase B section 10). */
-  patrons: {
+  marketMoves: { podium: 3, sinking: 1, drift: 0.1, team: 0.4 },
+  /** Sponsors (Phase B section 10). */
+  sponsors: {
     slots: 3,
     every: 42,
     offers: 2,
-    stand: 14, // offers a crew gets every so many days, standing so long
-    perRace: 4.6, // a fixed patron's Coin a race × the crew's marketability × its league's factor
-    league: [1.7, 1, 1], //   (League One's wages outrun its marketability)
+    stand: 14, // offers a team gets every so many days, standing so long
+    perRace: 4.6, // a fixed sponsor's Coin a race × the team's marketability × its tier's factor
+    tier: [1.7, 1, 1], //   (Tier 1's wages outrun its marketability)
     tier: [1, 1.6, 2.4], // × by the offer's tier (the landing pad's level at most)
     races: [3, 10],
-    bonus: 7, // an objective patron's bonus × the crew's marketability × league × the objective's weight
+    bonus: 7, // an objective sponsor's bonus × the team's marketability × tier × the objective's weight
     objectives: { top10: 1, sinkTwo: 1.6, afloat: 1.2, mostSea: 1.8 },
     objectiveShare: 0.5, // the share of offers that pay for objectives
-    better: [1.5, -0.5], // a rival replaces a patron for one worth this × as much (Finance u)
+    better: [1.5, -0.5], // a rival replaces a sponsor for one worth this × as much (Finance u)
   },
   /** The Admiralty (Phase B section 11). */
   admiralty: {
@@ -568,10 +568,10 @@ export const TUNING = {
     inspectionRange: [0, 2 / 3],
     points: [0, 3],
   },
-  /** Race day (Phase B section 13, D20): points for places 1 to 5, then 21 − place to place 20; the leagues that swap at
+  /** Race day (Phase B section 13, D20): points for places 1 to 5, then 21 − place to place 20; the championships that swap at
    *  the season's end each way. */
-  race: { top: [25, 22, 20, 18, 16], last: 20, swap: 4, standIn: 1 }, // standIn: a stand-in captain's fee a race × their ask
-  /** The dilemmas (Phase B section 12, career/events.ts): the chance a crew draws one after a round, and their numbers. */
+  race: { top: [25, 22, 20, 18, 16], last: 20, swap: 4, standIn: 1 }, // standIn: a stand-in driver's fee a race × their ask
+  /** The dilemmas (Phase B section 12, career/events.ts): the chance a team draws one after a round, and their numbers. */
   dilemmas: {
     chance: 0.6,
     after: [2, 9], // a player's comes this many days after the round closes
@@ -602,11 +602,11 @@ export const TUNING = {
     slow: 0.5, // Coin a building level to repair now; else the factory at × slow for slowDays
     stamina: 6,
     relapse: 0.3,
-    relapseRaces: 2, // an unfit captain who sails: Stamina lost, the chance of more races out
+    relapseRaces: 2, // an unfit driver who sails: Stamina lost, the chance of more races out
     exemptDays: 30,
     exempt: 0.2,
     exemptCost: 5,
-    lowest: 2, // the testing exemption's yard points +, days, marketability; for the lowest crews
+    lowest: 2, // the testing exemption's improvement points +, days, marketability; for the lowest teams
   },
   /** What rivals weigh in the works (Phase B section 6): risk accepted by personality, buildings in order. */
   works: {
@@ -628,12 +628,12 @@ export const TUNING = {
         'foundry',
         'sailingSchool',
         'crowsNest',
-        'flightLoft',
+        'pitHouse',
       ],
       youthBuilder: [
         'sailingSchool',
         'crowsNest',
-        'flightLoft',
+        'pitHouse',
         'drawingLoft',
         'factory',
         'testTank',
@@ -647,7 +647,7 @@ export const TUNING = {
         'fishMarket',
         'factory',
         'sailingSchool',
-        'flightLoft',
+        'pitHouse',
         'drawingLoft',
         'testTank',
         'foundry',
@@ -657,7 +657,7 @@ export const TUNING = {
         'drawingLoft',
         'testTank',
         'foundry',
-        'flightLoft',
+        'pitHouse',
         'sailingSchool',
         'crowsNest',
         'fishMarket',
@@ -672,12 +672,12 @@ export const TUNING = {
         'fishMarket',
         'sailingSchool',
         'crowsNest',
-        'flightLoft',
+        'pitHouse',
       ],
       steady: [
         'fishMarket',
         'factory',
-        'flightLoft',
+        'pitHouse',
         'sailingSchool',
         'drawingLoft',
         'crowsNest',
@@ -688,7 +688,7 @@ export const TUNING = {
     },
     buildShare: 0.6, // a building is begun if it costs at most this of the room
     designShare: 0.5, // a design likewise
-    reliabilityBelow: 0.8, // the yard gives reliability a share while a part's is below this
+    reliabilityBelow: 0.8, // the improvement gives reliability a share while a part's is below this
   },
 } as const;
 

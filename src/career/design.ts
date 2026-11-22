@@ -1,13 +1,13 @@
-// Designing a part (Phase B section 8.3, D18): one design at a time per crew. Each of the drawing loft's slots (2, 3,
-// 4) is dealt three cards from the components the shipwright knows and the buildings allow, seeded by the design, the
-// slot and the deal's count, with one redeal a slot. The design starts from the crew's best of the type plus the
-// shipwright's rating × 8 plus the components; it costs by tier and type plus the components; it takes 14 days × the
-// shipwright's Speed × the drawing loft's factor, then 7 − the factory's level to build. When it is drawn, the
-// shipwright's Accuracy fixes the numbers and Innovation may teach a component. Rivals deal and design through these
+// Designing a part (Phase B section 8.3, D18): one design at a time per team. Each of the drawing loft's slots (2, 3,
+// 4) is dealt three cards from the components the designer knows and the buildings allow, seeded by the design, the
+// slot and the deal's count, with one redeal a slot. The design starts from the team's best of the type plus the
+// designer's rating × 8 plus the components; it costs by tier and type plus the components; it takes 14 days × the
+// designer's Speed × the drawing loft's factor, then 7 − the factory's level to build. When it is drawn, the
+// designer's Accuracy fixes the numbers and Innovation may teach a component. Rivals deal and design through these
 // same functions (career/works.ts).
 
 import type { PartType } from '../race.ts';
-import { canSpend, paid } from './coin.ts';
+import { canSpend, paid } from './balance.ts';
 import {
   accept,
   refuse,
@@ -28,8 +28,8 @@ import { effective } from './effective.ts';
 import { fitted } from './parts.ts';
 import { mine, post } from './post.ts';
 import { schedule, type Event } from './queue.ts';
-import type { GullOf } from './roles.ts';
-import { designSlots, loftFactor, partBuildDays } from './rookery.ts';
+import type { PersonOf } from './roles.ts';
+import { designSlots, loftFactor, partBuildDays } from './hq.ts';
 import {
   accuracyDraw,
   designHead,
@@ -38,7 +38,7 @@ import {
 } from './staff.ts';
 import type {
   CareerState,
-  Crew,
+  Team,
   Design,
   Draft,
   Numbers,
@@ -50,15 +50,15 @@ import { TUNING } from './tuning.ts';
 const D = TUNING.design;
 const thou = (x: number) => Math.round(x * 1000) / 1000;
 
-/** A crew's shipwright, or null. */
-const wright = (s: CareerState, c: Crew): GullOf<'shipwright'> | null =>
-  c.staff.shipwright === null
+/** A team's designer, or null. */
+const wright = (s: CareerState, c: Team): PersonOf<'designer'> | null =>
+  c.staff.designer === null
     ? null
-    : (s.gulls[c.staff.shipwright] as GullOf<'shipwright'>);
+    : (s.people[c.staff.designer] as PersonOf<'designer'>);
 
-/** The components a crew's shipwright may put on a design of a type: known, of the type, of a tier its buildings allow. */
-export function pool(s: CareerState, crew: number, type: PartType): string[] {
-  const c = s.crews[crew];
+/** The components a team's designer may put on a design of a type: known, of the type, of a tier its buildings allow. */
+export function pool(s: CareerState, team: number, type: PartType): string[] {
+  const c = s.teams[team];
   const w = wright(s, c);
   if (!w) return [];
   const open = tierOpen(c.buildings, type);
@@ -68,32 +68,32 @@ export function pool(s: CareerState, crew: number, type: PartType): string[] {
   });
 }
 
-/** The cards a slot is dealt: three of the pool, seeded by the crew, its design's number, the slot and the deal. */
+/** The cards a slot is dealt: three of the pool, seeded by the team, its design's number, the slot and the deal. */
 export function dealt(
   s: CareerState,
-  crew: number,
+  team: number,
   type: PartType,
   slot: number,
   count: number
 ): string[] {
   const rand = seeded(
-    s.seed ^ (crew * 7349 + s.crews[crew].designs * 104729),
+    s.seed ^ (team * 7349 + s.teams[team].designs * 104729),
     slot * 4 + count + TYPES.indexOf(type) * 64
   );
-  return shuffled(rand, pool(s, crew, type)).slice(0, D.deal);
+  return shuffled(rand, pool(s, team, type)).slice(0, D.deal);
 }
 
-/** Whether a crew may deal (or redeal) a slot's cards for a design of a type. */
+/** Whether a team may deal (or redeal) a slot's cards for a design of a type. */
 export function dealCheck(
   s: CareerState,
-  crew: number,
+  team: number,
   type: PartType,
   slot: number
 ): Check {
-  const c = s.crews[crew];
+  const c = s.teams[team];
   if (!TYPES.includes(type)) return why('type', 'No such part.');
   if (!wright(s, c))
-    return why('noShipwright', 'The crew has no shipwright to draw it.');
+    return why('noDesigner', 'The team has no designer to draw it.');
   if (!whole(slot, 0, designSlots(c) - 1))
     return why('slot', 'The drawing loft has no such slot.');
   const d =
@@ -107,25 +107,25 @@ export function dealCheck(
 /** A state with a slot dealt (checked first): a new draft if the type changed; a second deal of a slot is its redeal. */
 export function dealSlot(
   s: CareerState,
-  crew: number,
+  team: number,
   type: PartType,
   slot: number
 ): CareerState {
-  const c = s.crews[crew];
+  const c = s.teams[team];
   const draft: Draft = c.draft?.type === type ? c.draft : { type, deals: [] };
   const prior = draft.deals.find((x) => x.slot === slot);
-  const cards = dealt(s, crew, type, slot, prior ? 1 : 0);
+  const cards = dealt(s, team, type, slot, prior ? 1 : 0);
   const deals = [
     ...draft.deals.filter((x) => x.slot !== slot),
     { slot, cards, redealt: !!prior },
   ].sort((a, b) => a.slot - b.slot);
-  const crews = [...s.crews];
-  crews[crew] = { ...c, draft: { type, deals } };
-  return { ...s, crews };
+  const teams = [...s.teams];
+  teams[team] = { ...c, draft: { type, deals } };
+  return { ...s, teams };
 }
 
-/** The crew's best performance of a type (0 if it has none). */
-const bestOf = (c: Crew, type: PartType): number =>
+/** The team's best performance of a type (0 if it has none). */
+const bestOf = (c: Team, type: PartType): number =>
   c.parts
     .filter((p) => p.type === type)
     .reduce((a, p) => Math.max(a, p.perf), 0);
@@ -133,11 +133,11 @@ const bestOf = (c: Crew, type: PartType): number =>
 /** What a design of a type with some components would be: its projected numbers, cost and days. */
 export function projection(
   s: CareerState,
-  crew: number,
+  team: number,
   type: PartType,
   components: readonly string[]
 ): { numbers: Numbers; cost: number; days: number; build: number } {
-  const c = s.crews[crew];
+  const c = s.teams[team];
   const w = wright(s, c);
   const stats = w ? effective(w, null) : null;
   const e = summed(components);
@@ -171,7 +171,7 @@ export function projection(
   );
   const cost = Math.max(
     0,
-    Math.round(D.cost[type] * D.tier[tier - 1] * t.cost + e.coin)
+    Math.round(D.cost[type] * D.tier[tier - 1] * t.cost + e.balance)
   );
   const days = Math.max(
     1,
@@ -191,20 +191,20 @@ export function projection(
 export const forNextOpen = (s: CareerState): boolean =>
   s.round >= D.forNextFrom;
 
-/** Whether a crew may start a design. */
+/** Whether a team may start a design. */
 export function designCheck(
   s: CareerState,
-  crew: number,
+  team: number,
   type: PartType,
   components: readonly string[],
   forNext: boolean
 ): Check {
-  const c = s.crews[crew];
+  const c = s.teams[team];
   if (!TYPES.includes(type)) return why('type', 'No such part.');
   if (c.design) return why('inHand', 'A design is already in hand.');
   if (!wright(s, c))
-    return why('noShipwright', 'The crew has no shipwright to draw it.');
-  if (s.leagues[c.league].rules.spec.includes(type))
+    return why('noDesigner', 'The team has no designer to draw it.');
+  if (s.championships[c.tier].rules.spec.includes(type))
     return why(
       'spec',
       'That part is spec this season: everyone sails the standard one.'
@@ -217,28 +217,31 @@ export function designCheck(
     return why('twice', 'A component goes on a design once.');
   const deals = c.draft?.type === type ? c.draft.deals : [];
   const used = new Set<number>();
-  const allowed = pool(s, crew, type);
+  const allowed = pool(s, team, type);
   for (const id of components) {
     const d = deals.find((x) => !used.has(x.slot) && x.cards.includes(id));
     if (!d || !allowed.includes(id))
       return why('card', "Each component must be one of a slot's cards.");
     used.add(d.slot);
   }
-  if (!canSpend(c, projection(s, crew, type, components).cost))
-    return why('coin', 'The elder will not let the coin fall that far.');
+  if (!canSpend(c, projection(s, team, type, components).cost))
+    return why(
+      'balance',
+      'The chairman will not let the balance fall that far.'
+    );
   return null;
 }
 
 /** A state with a design started (checked first): paid, the draft spent, the drawing's end scheduled. */
 export function started(
   s: CareerState,
-  crew: number,
+  team: number,
   type: PartType,
   components: readonly string[],
   forNext: boolean
 ): CareerState {
-  const p = projection(s, crew, type, components);
-  const c = s.crews[crew];
+  const p = projection(s, team, type, components);
+  const c = s.teams[team];
   const design: Design = {
     type,
     components: [...components],
@@ -250,26 +253,26 @@ export function started(
     projected: p.numbers,
     drawn: null,
   };
-  const crews = [...s.crews];
-  crews[crew] = { ...c, design, draft: null, designs: c.designs + 1 };
-  const out = paid({ ...s, crews }, crew, p.cost, {
+  const teams = [...s.teams];
+  teams[team] = { ...c, design, draft: null, designs: c.designs + 1 };
+  const out = paid({ ...s, teams }, team, p.cost, {
     kind: 'design',
     what: `a new ${type}`,
   });
-  return schedule(out, design.designed, { kind: 'designed', crew });
+  return schedule(out, design.designed, { kind: 'designed', team });
 }
 
-/** The drawing finishes: the shipwright's Accuracy fixes the numbers, Innovation may teach a component; mail says so
+/** The drawing finishes: the designer's Accuracy fixes the numbers, Innovation may teach a component; mail says so
  *  and the build is scheduled. */
 export function drawn(
   s: CareerState,
   e: Extract<Event, { kind: 'designed' }>,
   roll: Dice
 ): CareerState {
-  const c = s.crews[e.crew];
+  const c = s.teams[e.team];
   const d = c.design;
   if (!d || d.drawn) return s;
-  const rand = roll.roll(`design:${e.crew}`);
+  const rand = roll.roll(`design:${e.team}`);
   const w = wright(s, c);
   const stats = w ? effective(w, null) : null;
   const pr = d.projected;
@@ -282,13 +285,13 @@ export function drawn(
     Math.round(pr.perf * accuracyDraw(stats?.accuracy ?? 0, rand))
   );
   let out: CareerState = s;
-  const crews = [...out.crews];
-  crews[e.crew] = { ...c, design: { ...d, drawn: { ...pr, perf, perfMax } } };
-  out = { ...out, crews };
+  const teams = [...out.teams];
+  teams[e.team] = { ...c, design: { ...d, drawn: { ...pr, perf, perfMax } } };
+  out = { ...out, teams };
   out = post(out, {
-    crew: e.crew,
+    team: e.team,
     category: 'ship',
-    sender: c.staff.shipwright,
+    sender: c.staff.designer,
     kind: 'designFinished',
     slots: { type: d.type, perf, perfMax },
     links: [{ to: 'screen', id: 'design' }],
@@ -297,12 +300,12 @@ export function drawn(
     const open = unknownOpen(w.components, c.buildings);
     if (open.length > 0) {
       const learnt = pick(rand, open);
-      const gulls = [...out.gulls];
-      gulls[w.id] = { ...w, components: [...w.components, learnt].sort() };
+      const people = [...out.people];
+      people[w.id] = { ...w, components: [...w.components, learnt].sort() };
       out = post(
-        { ...out, gulls },
+        { ...out, people },
         {
-          crew: e.crew,
+          team: e.team,
           category: 'ship',
           sender: w.id,
           kind: 'componentLearned',
@@ -314,17 +317,17 @@ export function drawn(
   }
   return schedule(out, Math.max(out.day, d.built), {
     kind: 'built',
-    crew: e.crew,
+    team: e.team,
   });
 }
 
-/** The part is built: it joins the crew's parts unfitted; mail says so. A rival fits it where it beats the worse of
+/** The part is built: it joins the team's parts unfitted; mail says so. A rival fits it where it beats the worse of
  *  its ships' parts of the type (not a part for next season). */
 export function built(
   s: CareerState,
   e: Extract<Event, { kind: 'built' }>
 ): CareerState {
-  const c = s.crews[e.crew];
+  const c = s.teams[e.team];
   const d = c.design;
   if (!d || !d.drawn) return s;
   const id = s.ids.part;
@@ -339,13 +342,13 @@ export function built(
     spec: false,
     cost: d.cost,
   };
-  const crews = [...s.crews];
-  crews[e.crew] = { ...c, design: null, parts: [...c.parts, part] };
-  let out: CareerState = { ...s, crews, ids: { ...s.ids, part: id + 1 } };
+  const teams = [...s.teams];
+  teams[e.team] = { ...c, design: null, parts: [...c.parts, part] };
+  let out: CareerState = { ...s, teams, ids: { ...s.ids, part: id + 1 } };
   out = post(out, {
-    crew: e.crew,
+    team: e.team,
     category: 'ship',
-    sender: c.staff.shipwright,
+    sender: c.staff.designer,
     kind: 'partBuilt',
     slots: { type: d.type, part: id },
     links: [{ to: 'part', id }],
@@ -356,7 +359,7 @@ export function built(
     perf: c.parts.find((p) => p.ship === ship && p.type === d.type)?.perf ?? 0,
   }));
   const worse = ships[1].perf < ships[0].perf ? ships[1] : ships[0];
-  return part.perf > worse.perf ? fitted(out, e.crew, id, worse.ship) : out;
+  return part.perf > worse.perf ? fitted(out, e.team, id, worse.ship) : out;
 }
 
 export const DESIGNING: Handlers = {
@@ -365,7 +368,7 @@ export const DESIGNING: Handlers = {
     if (me === null)
       return refuse(
         'sacked',
-        'You have no crew: take one of the posts offered.'
+        'You have no team: take one of the posts offered.'
       );
     const no = dealCheck(s, me, c.type, c.slot);
     return no
@@ -377,7 +380,7 @@ export const DESIGNING: Handlers = {
     if (me === null)
       return refuse(
         'sacked',
-        'You have no crew: take one of the posts offered.'
+        'You have no team: take one of the posts offered.'
       );
     const no = designCheck(s, me, c.type, c.components, c.forNext === true);
     return no

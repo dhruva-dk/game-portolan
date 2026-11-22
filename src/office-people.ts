@@ -1,4 +1,4 @@
-// The seam's people views (Phase C batch 2): crew, profile, offer, market, career and jobs, built by career/views-*.ts
+// The seam's people views (Phase C batch 2): team, profile, offer, market, career and jobs, built by career/views-*.ts
 // and drawn by ui/office/. Types only, as office.ts: plain data, every figure with its comparison and its explanation.
 
 import type { Colours, Job } from './race';
@@ -15,7 +15,7 @@ import type {
   Want,
 } from './office';
 
-/** Stars as a crew sees them: exact (lo = hi) once known, else a range. */
+/** Stars as a team sees them: exact (lo = hi) once known, else a range. */
 export interface Range {
   lo: number;
   hi: number;
@@ -27,12 +27,12 @@ export interface Act {
   why: string;
 }
 
-/** A line of the roster: a role's heading, a gull (the player, at the head of the captains), or an open post. */
+/** A line of the roster: a role's heading, a person (the player, at the head of the drivers), or an open post. */
 export interface RosterRow {
-  kind: 'head' | 'gull' | 'open';
+  kind: 'head' | 'person' | 'open';
   id: number | null;
   you: boolean;
-  title: string; // head: the role; gull: the name; open: the post wanting
+  title: string; // head: the role; person: the name; open: the post wanting
   face: Face | null;
   post: string;
   age: string;
@@ -44,8 +44,8 @@ export interface RosterRow {
   tags: readonly string[];
   find: { role: Role; status: Status } | null; // an open post: the market's filter that finds them
 }
-/** A flight gull at their job. */
-export interface FlightRow {
+/** A pit crew member at their job. */
+export interface PitRow {
   id: number;
   face: Face;
   name: string;
@@ -57,7 +57,7 @@ export interface FlightRow {
   botch: Figure;
   moves: readonly { job: Job; label: string }[];
 }
-/** A job's place in the flight's order, with the plans that move it up or down (null: it cannot go). */
+/** A job's place in the pit crew's order, with the plans that move it up or down (null: it cannot go). */
 export interface OrderRow {
   job: Job;
   label: string;
@@ -65,14 +65,14 @@ export interface OrderRow {
   up: Plan | null;
   down: Plan | null;
 }
-/** `crew`: the roster, its wages and open posts, the bonds, the flight. */
-export interface CrewView {
+/** `team`: the roster, its wages and open posts, the bonds, the pit crew. */
+export interface TeamView {
   top: TopBar;
   roster: readonly RosterRow[];
   wages: Figure;
   open: readonly { role: Role; status: Status; label: string }[];
   bonds: readonly { ship: Ship; label: string; bond: Figure; fill: number }[];
-  flight: readonly FlightRow[];
+  pit: readonly PitRow[];
   order: readonly OrderRow[];
   orderWhy: string | null; // why the order cannot be moved now (null: it can)
 }
@@ -85,18 +85,18 @@ export interface StatLine {
   arrow: -1 | 0 | 1;
   text: string;
 }
-/** A season of a gull's history. */
+/** A season of a person's history. */
 export interface HistoryLine {
   season: string;
-  crew: string;
-  league: string;
+  team: string;
+  tier: string;
   role: string;
   races: number;
   best: string;
   points: number;
   sinkings: number;
 }
-/** `profile`: any gull, of any role, as the player's crew sees them. */
+/** `profile`: any person, of any role, as the player's team sees them. */
 export interface ProfileView {
   top: TopBar;
   id: number;
@@ -109,8 +109,8 @@ export interface ProfileView {
   roleName: string;
   age: number;
   colony: string;
-  crew: string;
-  league: string;
+  team: string;
+  tier: string;
   post: string;
   stars: Range;
   potential: Range;
@@ -134,7 +134,7 @@ export interface ProfileView {
   dismiss: Act & { owed: Figure };
 }
 
-/** `offer`: the contract document, the gull's side of it, and where the talks stand. */
+/** `offer`: the contract document, the person's side of it, and where the talks stand. */
 export interface OfferView {
   top: TopBar;
   id: number;
@@ -143,7 +143,7 @@ export interface OfferView {
   role: Role;
   roleName: string;
   stars: Range;
-  crew: string;
+  team: string;
   draft: Offer; // the offer drawn: as asked of the view, else the counter, the last offer, or the ask
   ask: { wage: number; fee: number; seasons: 1 | 2 | 3 };
   statuses: readonly { id: Status; label: string }[];
@@ -163,23 +163,23 @@ export interface OfferView {
   withdraw: Act;
 }
 
-/** The market's filter. `league`: 0..2, 3 the free agents, null any. `contract`: any, free agents, in their last 60 days. */
-export interface MarketFilter {
+/** The market's filter. `tier`: 0..2, 3 the free agents, null any. `contract`: any, free agents, in their last 60 days. */
+export interface ScoutingFilter {
   role: Role;
-  league: number | null;
+  tier: number | null;
   contract: 'any' | 'free' | 'closing';
   known: boolean;
   stars: number;
 }
-/** A gull as the market lists them. */
-export interface MarketRow {
+/** A person as the market lists them. */
+export interface ScoutingRow {
   id: number;
   face: Face;
   name: string;
   age: number;
   stars: Range;
   potential: Range;
-  crew: string;
+  team: string;
   contract: string;
   ask: string;
   talk: string | null;
@@ -195,27 +195,27 @@ export interface ScoutRow {
   days: Figure | null;
   cancel: Act;
 }
-/** `market`: the gulls found by the filter, the shortlist, and the scouts. */
-export interface MarketView {
+/** `market`: the people found by the filter, the shortlist, and the scouts. */
+export interface ScoutingView {
   top: TopBar;
-  filter: MarketFilter;
+  filter: ScoutingFilter;
   roles: readonly { id: Role; label: string }[];
-  rows: readonly MarketRow[];
+  rows: readonly ScoutingRow[];
   count: string;
-  shortlist: readonly MarketRow[];
+  shortlist: readonly ScoutingRow[];
   scouts: readonly ScoutRow[];
   nest: Figure;
 }
 
-/** A crew's offer of its manager's post. */
+/** A team's offer of its manager's post. */
 export interface JobCard {
-  crew: number;
+  team: number;
   name: string;
-  league: string;
+  tier: string;
   colours: Colours;
   emblem: number;
-  elder: string;
-  elderFace: Face;
+  chairman: string;
+  chairmanFace: Face;
   target: string;
   budget: Figure;
   standing: string;
@@ -227,7 +227,7 @@ export interface CareerView {
   top: TopBar;
   face: Face;
   name: string;
-  crew: string;
+  team: string;
   age: number;
   reputation: Figure;
   rank: Figure;
@@ -235,8 +235,8 @@ export interface CareerView {
   confidence: Figure;
   record: readonly {
     season: string;
-    crew: string;
-    league: string;
+    team: string;
+    tier: string;
     role: string;
     races: number;
     points: number;
@@ -244,7 +244,7 @@ export interface CareerView {
   honours: readonly string[];
   offers: readonly JobCard[];
 }
-/** `jobs`: the elder's letter (sacked, or tempted away), and the posts offered. */
+/** `jobs`: the chairman's letter (sacked, or tempted away), and the posts offered. */
 export interface JobsView {
   sacked: boolean;
   letter: {
@@ -258,12 +258,15 @@ export interface JobsView {
 
 /** What the people screens ask of the desk (office.ts Desk extends it). */
 export interface PeopleDesk {
-  crew(): CrewView;
-  /** A gull's profile (null: the first in talks, else ship two's captain). */
-  profile(gull: number | null): ProfileView;
-  /** The offer to a gull, drawn on `draft` (null: as the talks stand). */
-  offer(gull: number | null, draft: Offer | null): OfferView;
-  market(filter: MarketFilter | null, shortlist: readonly number[]): MarketView;
+  team(): TeamView;
+  /** A person's profile (null: the first in talks, else ship two's driver). */
+  profile(person: number | null): ProfileView;
+  /** The offer to a person, drawn on `draft` (null: as the talks stand). */
+  offer(person: number | null, draft: Offer | null): OfferView;
+  market(
+    filter: ScoutingFilter | null,
+    shortlist: readonly number[]
+  ): ScoutingView;
   career(): CareerView;
   jobs(): JobsView;
 }

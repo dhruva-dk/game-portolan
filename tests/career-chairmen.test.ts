@@ -1,4 +1,4 @@
-// Phase B sections 6 and 7: rival managers' decisions through the player's own rules, the elders' confidence, word
+// Phase B sections 6 and 7: rival managers' decisions through the player's own rules, the chairmen' confidence, word
 // and verdicts, the managers' market, and the player's job offers.
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -21,7 +21,7 @@ import {
   standingOf,
   verdicts,
   wordAt,
-} from '../src/career/elders.ts';
+} from '../src/career/chairmen.ts';
 import { learned } from '../src/career/knowledge.ts';
 import { confidenceCarried, confidenceMove } from '../src/career/leadership.ts';
 import { YEAR } from '../src/career/stars.ts';
@@ -32,9 +32,9 @@ import { TUNING } from '../src/career/tuning.ts';
 import { founded, invariants, must, refused } from './career-kit.ts';
 
 const roll = (s: CareerState) => dice(s.seed, s.streams);
-const me = (s: CareerState) => s.player!.crew;
+const me = (s: CareerState) => s.player!.team;
 
-test('each personality runs every hiring row, in its own order; the review is the same rows for every crew', () => {
+test('each personality runs every hiring row, in its own order; the review is the same rows for every team', () => {
   const all: Personality[] = [
     'spender',
     'youthBuilder',
@@ -57,27 +57,27 @@ test('each personality runs every hiring row, in its own order; the review is th
     'build',
     'design',
     'fill',
-    'patrons',
+    'sponsors',
     'poach',
     'renew',
     'replace',
     'scout',
     'suppliers',
     'vote',
-    'yard',
+    'improvement',
   ]);
   assert.notDeepEqual(rowsFor('poacher'), rowsFor('steady'));
 });
 
-test("a rival with an open post fills it through the player's own checks: a talk with a gull its crew knows", () => {
+test("a rival with an open post fills it through the player's own checks: a talk with a person its team knows", () => {
   const s = founded();
-  const c = s.crews.find((x) => !x.player && mindOf(s, x.id) !== null)!;
-  assert.equal(mindOf(s, me(s)), null, "the player's crew has no rival mind");
-  const leaving = c.staff.flight[0];
-  // at founding a crew knows only its own: its scouts' reports bring it these
-  const free = s.gulls
+  const c = s.teams.find((x) => !x.player && mindOf(s, x.id) !== null)!;
+  assert.equal(mindOf(s, me(s)), null, "the player's team has no rival mind");
+  const leaving = c.staff.pit[0];
+  // at founding a team knows only its own: its scouts' reports bring it these
+  const free = s.people
     .filter(
-      (g) => g.role === 'flight' && g.contract === null && g.retired === null
+      (g) => g.role === 'pit' && g.contract === null && g.retired === null
     )
     .slice(0, 6);
   assert.equal(
@@ -90,15 +90,15 @@ test("a rival with an open post fills it through the player's own checks: a talk
     released(s, leaving)
   );
   const u = decide(t, c.id, roll(t), ['fill']);
-  const talks = u.talks.filter((x) => x.crew === c.id);
+  const talks = u.talks.filter((x) => x.team === c.id);
   const signedNow =
-    staffOf(u.crews[c.id]).length > staffOf(t.crews[c.id]).length;
+    staffOf(u.teams[c.id]).length > staffOf(t.teams[c.id]).length;
   assert.ok(talks.length > 0 || signedNow, 'the rival bids for its open post');
   for (const x of talks) {
-    assert.equal(x.offer.role, 'flight');
+    assert.equal(x.offer.role, 'pit');
     assert.ok(
-      u.gulls[x.gull].known[c.id] !== undefined,
-      'it bids only for gulls it knows'
+      u.people[x.person].known[c.id] !== undefined,
+      'it bids only for people it knows'
     );
   }
   invariants(u);
@@ -106,16 +106,16 @@ test("a rival with an open post fills it through the player's own checks: a talk
 
 test('a rival scouts with its free scouts, only through scoutCheck (in Reach, unknown, one job a scout)', () => {
   const s = founded();
-  const c = s.crews.find(
+  const c = s.teams.find(
     (x) => !x.player && x.staff.scouts.length > 0 && mindOf(s, x.id) !== null
   )!;
   const u = decide(s, c.id, roll(s), ['scout']);
-  const jobs = u.scouting.filter((x) => x.crew === c.id);
+  const jobs = u.scouting.filter((x) => x.team === c.id);
   assert.ok(jobs.length > 0 && jobs.length <= c.staff.scouts.length);
   invariants(u);
 });
 
-test("the elder's word comes as confidence crosses 75, 50 or 25, either way", () => {
+test("the chairman's word comes as confidence crosses 75, 50 or 25, either way", () => {
   assert.equal(wordAt(80, 70), 75);
   assert.equal(wordAt(70, 80), 75);
   assert.equal(wordAt(60, 55), null);
@@ -125,60 +125,60 @@ test("the elder's word comes as confidence crosses 75, 50 or 25, either way", ()
 /** A founded world half a season or more on: every manager there at founding has served their grace. */
 const pastGrace = (): CareerState => ({
   ...founded(),
-  day: Math.ceil(TUNING.elder.grace * YEAR),
+  day: Math.ceil(TUNING.chairman.grace * YEAR),
 });
 
-/** A state with one crew's fields changed. */
-const withCrewSet = (
+/** A state with one team's fields changed. */
+const withTeamSet = (
   s: CareerState,
-  crew: number,
-  set: Partial<CareerState['crews'][number]>
+  team: number,
+  set: Partial<CareerState['teams'][number]>
 ): CareerState => {
-  const crews = [...s.crews];
-  crews[crew] = { ...crews[crew], ...set };
-  return { ...s, crews };
+  const teams = [...s.teams];
+  teams[team] = { ...teams[team], ...set };
+  return { ...s, teams };
 };
 
-/** The rival crew last in its league (all level at founding: the highest id of its league). */
+/** The rival team last in its tier (all level at founding: the highest id of its tier). */
 const lastRival = (s: CareerState) =>
-  s.crews
+  s.teams
     .filter((x) => !x.player && x.staff.manager !== null)
     .sort((a, b) => standingOf(s, b.id) - standingOf(s, a.id))[0];
 
-test("a rival manager whose elder's confidence falls to nothing is sacked, and the elder hires the best manager who fits", () => {
+test("a rival manager whose chairman's confidence falls to nothing is sacked, and the chairman hires the best manager who fits", () => {
   const s = pastGrace();
-  // the crew last in its league, its target first
+  // the team last in its tier, its target first
   const c = lastRival(s);
   const was = c.staff.manager!;
   const t = afterRace(
-    withCrewSet(s, c.id, { target: 1, confidence: 0.01 }),
+    withTeamSet(s, c.id, { target: 1, confidence: 0.01 }),
     c.id,
     roll(s)
   );
   assert.equal(
-    t.crews[c.id].confidence,
-    TUNING.crew.confidence,
+    t.teams[c.id].confidence,
+    TUNING.team.confidence,
     'the new manager starts at the usual confidence'
   );
-  assert.notEqual(t.crews[c.id].staff.manager, was);
-  assert.notEqual(t.crews[c.id].staff.manager, null);
+  assert.notEqual(t.teams[c.id].staff.manager, was);
+  assert.notEqual(t.teams[c.id].staff.manager, null);
   assert.equal(
-    t.gulls[was].contract,
+    t.people[was].contract,
     null,
     'the sacked manager is a free agent'
   );
   invariants(t);
 });
 
-test("sacked by the elder directly: a rival's post filled at once; the best candidate is never the player", () => {
+test("sacked by the chairman directly: a rival's post filled at once; the best candidate is never the player", () => {
   const s = founded();
-  const c = s.crews.find((x) => !x.player && x.staff.manager !== null)!;
+  const c = s.teams.find((x) => !x.player && x.staff.manager !== null)!;
   const was = c.staff.manager!;
   const t = sacked(s, c.id, roll(s));
-  assert.equal(t.gulls[was].contract, null);
+  assert.equal(t.people[was].contract, null);
   assert.ok(
-    t.crews[c.id].staff.manager !== null ||
-      t.player!.offers.some((o) => o.crew === c.id),
+    t.teams[c.id].staff.manager !== null ||
+      t.player!.offers.some((o) => o.team === c.id),
     'the post is filled or offered'
   );
   for (const g of managerCandidates(s, c.id)) assert.ok(!g.player);
@@ -186,49 +186,49 @@ test("sacked by the elder directly: a rival's post filled at once; the best cand
   invariants(t);
 });
 
-test('the player sacked: out of a crew, Advance refused, offers shown (one from League Three), the last cannot be declined', () => {
+test('the player sacked: out of a team, Advance refused, offers shown (one from Tier 3), the last cannot be declined', () => {
   const s = founded();
-  const crew = me(s);
-  const t = sacked(s, crew, roll(s));
+  const team = me(s);
+  const t = sacked(s, team, roll(s));
   const p = t.player!;
   assert.ok(p.sacked);
-  assert.equal(t.crews[crew].player, false);
-  assert.ok(t.crews[crew].staff.manager !== p.gull);
+  assert.equal(t.teams[team].player, false);
+  assert.ok(t.teams[team].staff.manager !== p.person);
   assert.ok(
-    p.offers.some((o) => t.crews[o.crew].league === t.leagues.length - 1)
+    p.offers.some((o) => t.teams[o.team].tier === t.championships.length - 1)
   );
   assert.ok(t.mail.some((m) => m.kind === 'sacked'));
   invariants(t);
   refused(t, { kind: 'Advance' }, 'sacked');
   let u = t;
   while (u.player!.offers.length > 1)
-    u = must(u, { kind: 'DeclineJob', crew: u.player!.offers[0].crew });
-  const last = u.player!.offers[0].crew;
-  refused(u, { kind: 'DeclineJob', crew: last }, 'mustTake');
-  const v = must(u, { kind: 'TakeJob', crew: last });
+    u = must(u, { kind: 'DeclineJob', team: u.player!.offers[0].team });
+  const last = u.player!.offers[0].team;
+  refused(u, { kind: 'DeclineJob', team: last }, 'mustTake');
+  const v = must(u, { kind: 'TakeJob', team: last });
   assert.equal(v.player!.sacked, false);
-  assert.equal(v.player!.crew, last);
-  assert.equal(v.crews[last].staff.manager, v.player!.gull);
+  assert.equal(v.player!.team, last);
+  assert.equal(v.teams[last].staff.manager, v.player!.person);
   assert.equal(
-    v.crews[last].staff.ships[0].captain,
+    v.teams[last].staff.ships[0].driver,
     null,
     'the player sails ship one'
   );
   invariants(v);
 });
 
-test('posts offered to a player with a crew: only from their league or better, two at most standing; any while sacked', () => {
-  // the player's crew read as League Two's, so there is a league either side
+test('posts offered to a player with a team: only from their tier or better, two at most standing; any while sacked', () => {
+  // the player's team read as Tier 2's, so there is a tier either side
   const s0 = founded(),
     mine = 1;
   const s = {
     ...s0,
     player: { ...s0.player!, reputation: 100 },
-    crews: s0.crews.map((c) => (c.player ? { ...c, league: mine } : c)),
+    teams: s0.teams.map((c) => (c.player ? { ...c, tier: mine } : c)),
   };
-  const above = s.crews.find((c) => c.league < mine)!,
-    same = s.crews.find((c) => c.league === mine && !c.player)!;
-  const below = s.crews.find((c) => c.league > mine && !c.player)!;
+  const above = s.teams.find((c) => c.tier < mine)!,
+    same = s.teams.find((c) => c.tier === mine && !c.player)!;
+  const below = s.teams.find((c) => c.tier > mine && !c.player)!;
   assert.ok(mayOffer(s, above.id) && mayOffer(s, same.id));
   assert.equal(mayOffer(s, below.id), false, 'a post below them is no offer');
   assert.equal(mayOffer(s, me(s)), false, 'never their own');
@@ -236,9 +236,9 @@ test('posts offered to a player with a crew: only from their league or better, t
   assert.equal(
     mayOffer(
       two,
-      s.crews.find(
+      s.teams.find(
         (c) =>
-          c.league <= mine && !c.player && c.id !== above.id && c.id !== same.id
+          c.tier <= mine && !c.player && c.id !== above.id && c.id !== same.id
       )!.id
     ),
     false,
@@ -247,75 +247,74 @@ test('posts offered to a player with a crew: only from their league or better, t
   assert.equal(
     mayOffer(offerJob(s, above.id), above.id),
     false,
-    'one offer a crew'
+    'one offer a team'
   );
   const out = { ...s, player: { ...s.player!, sacked: true } };
-  assert.ok(mayOffer(out, below.id), 'out of a crew, any league offers');
+  assert.ok(mayOffer(out, below.id), 'out of a team, any tier offers');
   const low = { ...s, player: { ...s.player!, reputation: 0 } };
   assert.equal(
     mayOffer(low, above.id),
     false,
-    "under the league's reputation threshold"
+    "under the tier's reputation threshold"
   );
 });
 
-test("a crew's post offered to a player of enough reputation; TakeJob moves them and the old crew's elder hires", () => {
+test("a team's post offered to a player of enough reputation; TakeJob moves them and the old team's chairman hires", () => {
   const s0 = founded();
   const old = me(s0);
   const s = { ...s0, player: { ...s0.player!, reputation: 100 } };
-  const c = s.crews.find(
-    (x) =>
-      !x.player && x.staff.manager !== null && x.league === s.crews[old].league
+  const c = s.teams.find(
+    (x) => !x.player && x.staff.manager !== null && x.tier === s.teams[old].tier
   )!;
   const t = hireManager(released(s, c.staff.manager!), c.id, roll(s), true);
   assert.ok(
-    t.player!.offers.some((o) => o.crew === c.id),
+    t.player!.offers.some((o) => o.team === c.id),
     'the post is offered to the player'
   );
-  assert.ok(t.queue.some((e) => e.kind === 'jobExpires' && e.crew === c.id));
-  const u = must(t, { kind: 'TakeJob', crew: c.id });
-  assert.equal(u.player!.crew, c.id);
-  assert.ok(u.crews[c.id].player && !u.crews[old].player);
+  assert.ok(t.queue.some((e) => e.kind === 'jobExpires' && e.team === c.id));
+  const u = must(t, { kind: 'TakeJob', team: c.id });
+  assert.equal(u.player!.team, c.id);
+  assert.ok(u.teams[c.id].player && !u.teams[old].player);
   assert.equal(u.player!.offers.length, 0);
-  assert.notEqual(u.crews[old].staff.manager, u.player!.gull);
+  assert.notEqual(u.teams[old].staff.manager, u.player!.person);
   invariants(u);
-  refused(t, { kind: 'TakeJob', crew: old }, 'noOffer');
-  const v = must(t, { kind: 'DeclineJob', crew: c.id });
+  refused(t, { kind: 'TakeJob', team: old }, 'noOffer');
+  const v = must(t, { kind: 'DeclineJob', team: c.id });
   assert.ok(
-    v.crews[c.id].staff.manager !== null,
-    'declined, the elder hires elsewhere'
+    v.teams[c.id].staff.manager !== null,
+    'declined, the chairman hires elsewhere'
   );
   assert.equal(
-    v.queue.some((e) => e.kind === 'jobExpires' && e.crew === c.id),
+    v.queue.some((e) => e.kind === 'jobExpires' && e.team === c.id),
     false
   );
 });
 
-test("at a season's start elders add Coin and set targets; at its end a target missed by more than 5 places sacks, if confidence is low", () => {
+test("at a season's start chairmen add Coin and set targets; at its end a target missed by more than 5 places sacks, if confidence is low", () => {
   const s = pastGrace();
   const t = seasonStart(s);
-  for (const c of t.crews) assert.ok(c.coin >= s.crews[c.id].coin);
-  const league = t.leagues[0];
-  const last = [...league.crews]
-    .filter((i) => !t.crews[i].player)
+  for (const c of t.teams) assert.ok(c.balance >= s.teams[c.id].balance);
+  const tier = t.championships[0];
+  const last = [...tier.teams]
+    .filter((i) => !t.teams[i].player)
     .sort((a, b) => standingOf(t, b) - standingOf(t, a))[0];
-  const u = withCrewSet(t, last, {
+  const u = withTeamSet(t, last, {
     target: 1,
-    confidence: TUNING.elder.verdict - 1,
+    confidence: TUNING.chairman.verdict - 1,
   });
-  assert.ok(standingOf(u, last) - 1 > TUNING.elder.missedBy);
-  const was = u.crews[last].staff.manager;
+  assert.ok(standingOf(u, last) - 1 > TUNING.chairman.missedBy);
+  const was = u.teams[last].staff.manager;
   const v = verdicts(u, roll(u));
-  assert.notEqual(v.crews[last].staff.manager, was);
+  assert.notEqual(v.teams[last].staff.manager, was);
   invariants(v);
-  const trusted = withCrewSet(t, last, {
+  const trusted = withTeamSet(t, last, {
     target: 1,
-    confidence: TUNING.elder.verdict,
+    confidence: TUNING.chairman.verdict,
   });
   assert.equal(
-    verdicts(trusted, roll(trusted)).crews[last].staff.manager,
+    verdicts(trusted, roll(trusted)).teams[last].staff.manager,
     was,
-    'an elder who still trusts them keeps them'
+    'an chairman who still trusts them keeps them'
   );
 });
 
@@ -323,64 +322,64 @@ test("a new manager has half a season's grace: not sacked at confidence 0 or by 
   const s = pastGrace();
   const c = lastRival(s);
   const was = c.staff.manager!;
-  const gulls = [...s.gulls];
-  gulls[was] = {
-    ...gulls[was],
-    contract: { ...gulls[was].contract!, signed: s.day - 1 },
+  const people = [...s.people];
+  people[was] = {
+    ...people[was],
+    contract: { ...people[was].contract!, signed: s.day - 1 },
   };
-  const fresh = withCrewSet({ ...s, gulls }, c.id, {
+  const fresh = withTeamSet({ ...s, people }, c.id, {
     target: 1,
     confidence: 0.01,
   });
-  assert.ok(standingOf(fresh, c.id) - 1 > TUNING.elder.missedBy);
-  assert.equal(served(fresh, fresh.crews[c.id]), false);
+  assert.ok(standingOf(fresh, c.id) - 1 > TUNING.chairman.missedBy);
+  assert.equal(served(fresh, fresh.teams[c.id]), false);
   assert.equal(
-    afterRace(fresh, c.id, roll(fresh)).crews[c.id].staff.manager,
+    afterRace(fresh, c.id, roll(fresh)).teams[c.id].staff.manager,
     was,
     'no sacking at 0 in the grace'
   );
   assert.equal(sacksAtEnd(fresh, c.id), false, 'no verdict in the grace');
-  assert.equal(verdicts(fresh, roll(fresh)).crews[c.id].staff.manager, was);
+  assert.equal(verdicts(fresh, roll(fresh)).teams[c.id].staff.manager, was);
   const later = {
     ...fresh,
-    day: fresh.day + Math.ceil(TUNING.elder.grace * YEAR),
+    day: fresh.day + Math.ceil(TUNING.chairman.grace * YEAR),
   };
-  assert.equal(served(later, later.crews[c.id]), true);
+  assert.equal(served(later, later.teams[c.id]), true);
   assert.notEqual(
-    afterRace(later, c.id, roll(later)).crews[c.id].staff.manager,
+    afterRace(later, c.id, roll(later)).teams[c.id].staff.manager,
     was,
     'past the grace, confidence at 0 sacks'
   );
 });
 
-test('a manager meeting their target is never sacked, at any confidence, coin or patience', () => {
+test('a manager meeting their target is never sacked, at any confidence, balance or patience', () => {
   const s = pastGrace();
   const rand = random(7);
-  for (const c of s.crews
+  for (const c of s.teams
     .filter((x) => !x.player && x.staff.manager !== null)
     .slice(0, 40)) {
     const standing = standingOf(s, c.id);
     const target = standing + Math.floor(rand() * 4);
-    const t = withCrewSet(s, c.id, {
+    const t = withTeamSet(s, c.id, {
       target,
       confidence: rand() < 0.5 ? 0 : rand() * 5,
-      coin: -1e6,
+      balance: -1e6,
     });
     assert.equal(
-      afterRace(t, c.id, roll(t)).crews[c.id].staff.manager,
+      afterRace(t, c.id, roll(t)).teams[c.id].staff.manager,
       c.staff.manager,
-      `crew ${c.id} at ${standing}, target ${target}`
+      `team ${c.id} at ${standing}, target ${target}`
     );
     assert.equal(sacksAtEnd(t, c.id), false);
     assert.equal(
-      verdicts(t, roll(t)).crews[c.id].staff.manager,
+      verdicts(t, roll(t)).teams[c.id].staff.manager,
       c.staff.manager
     );
   }
 });
 
 test('confidence falls only with sustained under-performance: not within the slack, little for one early race, a run costs', () => {
-  const E = TUNING.elder;
+  const E = TUNING.chairman;
   for (const patience of [0, 10, 20]) {
     for (let behind = -10; behind <= E.slack; behind++) {
       for (let sailed = 1; sailed <= 10; sailed++)
@@ -399,13 +398,13 @@ test('confidence falls only with sustained under-performance: not within the sla
   for (let r = 1; r <= 10; r++)
     one += confidenceMove(10, 10, r === 1 ? 30 : 10, r);
   assert.ok(one >= 70);
-  // a whole season ten places behind costs a run's worth, but a patient elder keeps a first poor season's manager
+  // a whole season ten places behind costs a run's worth, but a patient chairman keeps a first poor season's manager
   let run = 70;
   for (let r = 1; r <= 10; r++) run += confidenceMove(20, 10, 20, r);
   assert.ok(run < 70 - 15, `a poor season costs (${run})`);
   assert.ok(run >= E.verdict, `but not the post, the first time (${run})`);
   // and the next poor season, from where the first left off, does
-  let second = confidenceCarried(run, TUNING.crew.confidence);
+  let second = confidenceCarried(run, TUNING.team.confidence);
   for (let r = 1; r <= 10; r++) second += confidenceMove(20, 10, 22, r);
   assert.ok(
     second < E.verdict,
@@ -413,26 +412,26 @@ test('confidence falls only with sustained under-performance: not within the sla
   );
 });
 
-test('an elder renews a trusted manager whose contract runs out, keeping their tenure; not one they doubt', () => {
+test('an chairman renews a trusted manager whose contract runs out, keeping their tenure; not one they doubt', () => {
   const s = pastGrace();
-  const [a, b] = s.crews.filter((x) => !x.player && x.staff.manager !== null);
-  const gulls = [...s.gulls];
+  const [a, b] = s.teams.filter((x) => !x.player && x.staff.manager !== null);
+  const people = [...s.people];
   for (const c of [a, b])
-    gulls[c.staff.manager!] = {
-      ...gulls[c.staff.manager!],
+    people[c.staff.manager!] = {
+      ...people[c.staff.manager!],
       contract: {
-        ...gulls[c.staff.manager!].contract!,
+        ...people[c.staff.manager!].contract!,
         ends: s.season,
         signed: 3,
       },
     };
-  let t = withCrewSet({ ...s, gulls }, a.id, {
-    confidence: TUNING.elder.verdict,
+  let t = withTeamSet({ ...s, people }, a.id, {
+    confidence: TUNING.chairman.verdict,
   });
-  t = withCrewSet(t, b.id, { confidence: TUNING.elder.verdict - 1 });
+  t = withTeamSet(t, b.id, { confidence: TUNING.chairman.verdict - 1 });
   const u = managersRenewed(t);
-  const ga = u.gulls[a.staff.manager!].contract!,
-    gb = u.gulls[b.staff.manager!].contract!;
+  const ga = u.people[a.staff.manager!].contract!,
+    gb = u.people[b.staff.manager!].contract!;
   assert.ok(ga.ends! > s.season, 'renewed');
   assert.equal(ga.signed, 3, 'tenure kept');
   assert.equal(gb.ends, s.season, 'left to run out');

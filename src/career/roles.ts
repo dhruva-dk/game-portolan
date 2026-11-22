@@ -1,16 +1,16 @@
-// Every gull and their role's stats (Phase B section 2, D15, D37). A stat is 0 to 20 at one decimal; u = stat / 20.
-// What each stat does is in career/service.ts (bosun, flight), career/staff.ts (captain, shipwright, scout) and the
-// sections that read the manager's and the elder's (rivals, elders).
+// Every person and their role's stats (Phase B section 2, D15, D37). A stat is 0 to 20 at one decimal; u = stat / 20.
+// What each stat does is in career/service.ts (mechanic, pit), career/staff.ts (driver, designer, scout) and the
+// sections that read the manager's and the chairman's (rivals, chairmen).
 //
-// The player is a gull too (D35): a manager whose stats are all 0 and never read, since the player's own choices
+// The player is a person too (D35): a manager whose stats are all 0 and never read, since the player's own choices
 // stand for them (D8).
 
-import type { Job, PartType, Stat, Style } from '../race.ts';
+import type { Job, PartType, Stat, Persona } from '../race.ts';
 import type { Personality, Role, Status, Want } from '../office.ts';
 
 /** Each role's stats, in the order a screen lists them. */
 export const ROLE_STATS = {
-  captain: [
+  driver: [
     'gunnery',
     'helm',
     'seamanship',
@@ -21,7 +21,7 @@ export const ROLE_STATS = {
     'feedback',
     'lookout',
   ],
-  bosun: [
+  mechanic: [
     'repairs',
     'mending',
     'handling',
@@ -31,7 +31,7 @@ export const ROLE_STATS = {
     'perf',
     'chemistry',
   ],
-  shipwright: [
+  designer: [
     'sails',
     'rigging',
     'rudder',
@@ -43,7 +43,7 @@ export const ROLE_STATS = {
     'accuracy',
   ],
   scout: ['judgement', 'insight', 'reach', 'speed', 'persuasion'],
-  flight: ['speed', 'strength', 'precision', 'teamwork', 'nerve', 'stamina'],
+  pit: ['speed', 'strength', 'precision', 'teamwork', 'nerve', 'stamina'],
   manager: [
     'negotiation',
     'talentEye',
@@ -52,7 +52,7 @@ export const ROLE_STATS = {
     'tactics',
     'politics',
   ],
-  elder: ['patience', 'ambition', 'generosity', 'meddling'],
+  chairman: ['patience', 'ambition', 'generosity', 'meddling'],
 } as const satisfies Record<Role, readonly string[]>;
 
 export const ROLES = Object.keys(ROLE_STATS) as readonly Role[];
@@ -60,20 +60,20 @@ export const ROLES = Object.keys(ROLE_STATS) as readonly Role[];
 export type StatOf<R extends Role> = (typeof ROLE_STATS)[R][number];
 export type StatsOf<R extends Role> = Readonly<Record<StatOf<R>, number>>;
 
-// the seam's names hold: a captain's stats are race.ts Stat, a shipwright's six are its PartType
+// the seam's names hold: a driver's stats are race.ts Stat, a designer's six are its PartType
 type Same<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
-const captainStatsAreTheSeams: Same<StatOf<'captain'>, Stat> = true;
-const shipwrightTypesAreTheSeams: Same<
-  Exclude<StatOf<'shipwright'>, 'innovation' | 'speed' | 'accuracy'>,
+const driverStatsAreTheSeams: Same<StatOf<'driver'>, Stat> = true;
+const designerTypesAreTheSeams: Same<
+  Exclude<StatOf<'designer'>, 'innovation' | 'speed' | 'accuracy'>,
   PartType
 > = true;
 export const SEAM_NAMES_HOLD =
-  captainStatsAreTheSeams && shipwrightTypesAreTheSeams;
+  driverStatsAreTheSeams && designerTypesAreTheSeams;
 
-/** A gull's contract (Phase B section 5). Wage, fee and bonuses in Coin; `ends` the season at whose end it runs out
- *  (null for an elder, and for the player, who are their crew's for as long as they stay). */
+/** A person's contract (Phase B section 5). Wage, fee and bonuses in Coin; `ends` the season at whose end it runs out
+ *  (null for an chairman, and for the player, who are their team's for as long as they stay). */
 export interface Contract {
-  crew: number;
+  team: number;
   status: Status;
   wage: number;
   fee: number;
@@ -84,7 +84,7 @@ export interface Contract {
   signed: number; // the day
 }
 
-/** What a crew knows of a gull once scouted (Phase B section 4): the day, their stars at the last season's end (a
+/** What a team knows of a person once scouted (Phase B section 4): the day, their stars at the last season's end (a
  *  screen's arrow is stars now against these), the scout whose report it was (null: their own staff), and whether
  *  that report's Persuasion has been spent on an offer. */
 export interface Known {
@@ -94,20 +94,20 @@ export interface Known {
   used: boolean;
 }
 
-/** A season of a gull's history: their crew and what they did (races sailed, or worked, for every role). */
+/** A season of a person's history: their team and what they did (races sailed, or worked, for every role). */
 export interface SeasonLine {
   season: number;
-  crew: number | null;
-  league: number | null;
+  team: number | null;
+  tier: number | null;
   role: Role;
   races: number;
-  best: number | null; // best finish, a captain's
+  best: number | null; // best finish, a driver's
   points: number;
   sinkings: number;
 }
 
-/** What every gull has, whatever their role. */
-export interface GullCore {
+/** What every person has, whatever their role. */
+export interface PersonCore {
   id: number;
   seed: number; // their headshot and every seeded spread of theirs
   given: string;
@@ -121,17 +121,17 @@ export interface GullCore {
   marketability: number; // 0..100
   wants: readonly Want[]; // three, first most
   contract: Contract | null;
-  known: Readonly<Record<string, Known>>; // by crew id
+  known: Readonly<Record<string, Known>>; // by team id
   history: readonly SeasonLine[];
-  style: Style | null; // a captain's
+  persona: Persona | null; // a driver's
   personality: Personality | null; // a manager's
   reputation: number; // a manager's, 0..100
-  fatigue: number; // a flight gull's, 0..100, as it stood on fatigueDay
+  fatigue: number; // a pit crew member's, 0..100, as it stood on fatigueDay
   fatigueDay: number;
-  job: Job | null; // a flight gull's job
-  components: readonly string[]; // a shipwright's known components (career/components.ts)
+  job: Job | null; // a pit crew member's job
+  components: readonly string[]; // a designer's known components (career/components.ts)
   unfit: number; // races still to miss injured
-  grudge: number | null; // the crew that last sank her (Grudge-holder)
+  grudge: number | null; // the team that last sank her (Grudge-holder)
   patience: number; // in talks (Phase B section 5)
   silentUntil: number; // the day talks open again after patience ran out
   silenced: boolean; // the contract's last days passed with no renewal: morale paid once
@@ -139,13 +139,13 @@ export interface GullCore {
   player: boolean;
 }
 
-export type GullOf<R extends Role> = GullCore & {
+export type PersonOf<R extends Role> = PersonCore & {
   role: R;
   stats: StatsOf<R>;
   ceiling: StatsOf<R>;
 };
-/** A gull: their role's stats now and at their projected peak (ceiling, from which their potential is read). */
-export type Gull = { [R in Role]: GullOf<R> }[Role];
+/** A person: their role's stats now and at their projected peak (ceiling, from which their potential is read). */
+export type Person = { [R in Role]: PersonOf<R> }[Role];
 
 /** A stat's u (stat / 20), clamped to 0..1. */
 export const unit = (stat: number): number =>
@@ -155,20 +155,20 @@ export const unit = (stat: number): number =>
 export const stat = (x: number): number =>
   Math.round(Math.min(20, Math.max(0, x)) * 10) / 10;
 
-/** A gull from what every gull has and a role's stats by name. The caller (the generator, growth) gives exactly the
+/** A person from what every person has and a role's stats by name. The caller (the generator, growth) gives exactly the
  *  role's stat names (ROLE_STATS), which the tests hold it to. */
-export function gullOf(
-  core: GullCore,
+export function personOf(
+  core: PersonCore,
   role: Role,
   stats: Readonly<Record<string, number>>,
   ceiling: Readonly<Record<string, number>>
-): Gull {
+): Person {
   const made: unknown = { ...core, role, stats, ceiling };
-  return made as Gull;
+  return made as Person;
 }
 
-/** A gull with new stats by name (the same names). */
+/** A person with new stats by name (the same names). */
 export const withStats = (
-  g: Gull,
+  g: Person,
   stats: Readonly<Record<string, number>>
-): Gull => gullOf(g, g.role, stats, g.ceiling);
+): Person => personOf(g, g.role, stats, g.ceiling);

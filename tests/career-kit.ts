@@ -14,7 +14,7 @@ import { random } from '../src/world/random.ts';
 import { allowed, fullName, words } from '../src/career/names.ts';
 import { ordered } from '../src/career/queue.ts';
 import { ROLE_STATS } from '../src/career/roles.ts';
-import { staffOf, type Crew } from '../src/career/state.ts';
+import { staffOf, type Team } from '../src/career/state.ts';
 import type { Job, PartType } from '../src/race.ts';
 import type { Building } from '../src/office.ts';
 import { TRADES, supplierCards } from '../src/career/suppliers.ts';
@@ -23,7 +23,7 @@ import { TRADES, supplierCards } from '../src/career/suppliers.ts';
 export const FOUND: Extract<Command, { kind: 'Found' }> = {
   kind: 'Found',
   seed: 20261115,
-  crew: 'Portolan Quills',
+  team: 'Portolan Quills',
   colours: { first: 2, second: 7 },
   emblem: 3,
   given: 'Ottoline',
@@ -42,15 +42,15 @@ export function founded(seed = FOUND.seed): CareerState {
   return r.state;
 }
 
-/** A state with a crew changed. */
-export const withCrew = (
+/** A state with a team changed. */
+export const withTeam = (
   s: CareerState,
   id: number,
-  f: (c: Crew) => Crew
+  f: (c: Team) => Team
 ): CareerState => {
-  const crews = [...s.crews];
-  crews[id] = f(s.crews[id]);
-  return { ...s, crews };
+  const teams = [...s.teams];
+  teams[id] = f(s.teams[id]);
+  return { ...s, teams };
 };
 
 /** Applies a command that must be accepted. */
@@ -73,23 +73,23 @@ const JOBS: readonly Job[] = ['mend', 'gust', 'stores', 'part'];
 const one = <T>(rand: () => number, list: readonly T[], or: T): T =>
   list.length === 0 ? or : list[Math.floor(rand() * list.length)];
 
-/** An offer a player might make to a gull: about their ask, sometimes low, sometimes naming whom they replace. */
+/** An offer a player might make to a person: about their ask, sometimes low, sometimes naming whom they replace. */
 export function someOffer(
   s: CareerState,
-  gull: number,
+  person: number,
   rand: () => number
 ): Offer {
-  const g = s.gulls[gull];
-  const crew = s.player ? s.crews[s.player.crew] : s.crews[0];
+  const g = s.people[person];
+  const team = s.player ? s.teams[s.player.team] : s.teams[0];
   const ask = g
-    ? askOf(s, g, crew)
+    ? askOf(s, g, team)
     : { wage: 50, fee: 200, seasons: 1 as const };
   const wage = Math.max(0, Math.round(ask.wage * (0.6 + rand() * 0.8)));
-  const role = g?.role ?? 'flight';
+  const role = g?.role ?? 'pit';
   const status =
-    role === 'captain' ? (rand() < 0.5 ? 'ship' : 'reserve') : 'staff';
-  const mine = staffOf(crew).filter(
-    (id) => s.gulls[id].role === role && !s.gulls[id].player
+    role === 'driver' ? (rand() < 0.5 ? 'ship' : 'reserve') : 'staff';
+  const mine = staffOf(team).filter(
+    (id) => s.people[id].role === role && !s.people[id].player
   );
   return {
     role,
@@ -112,62 +112,64 @@ export function someCommand(s: CareerState, rand: () => number): Command {
   const r = rand();
   if (r < 0.15) return { kind: 'Advance' };
   if (r < 0.18) return { kind: 'Snapshot' };
-  const crew = s.player ? s.crews[s.player.crew] : null;
-  const flight = crew ? crew.staff.flight : [];
-  const anyGull = () => Math.floor(rand() * s.gulls.length);
-  if (r < 0.5 && flight.length > 0)
+  const team = s.player ? s.teams[s.player.team] : null;
+  const pit = team ? team.staff.pit : [];
+  const anyPerson = () => Math.floor(rand() * s.people.length);
+  if (r < 0.5 && pit.length > 0)
     return {
-      kind: 'MoveFlightJob',
-      gull: flight[Math.floor(rand() * flight.length)],
+      kind: 'MovePitJob',
+      person: pit[Math.floor(rand() * pit.length)],
       job: JOBS[Math.floor(rand() * 4)],
     };
   if (r < 0.52)
     return {
-      kind: 'MoveFlightJob',
-      gull: anyGull(),
+      kind: 'MovePitJob',
+      person: anyPerson(),
       job: JOBS[Math.floor(rand() * 4)],
     };
   if (r < 0.6)
     return {
       kind: 'StartScout',
-      scout: one(rand, crew?.staff.scouts ?? [], anyGull()),
-      gull: anyGull(),
+      scout: one(rand, team?.staff.scouts ?? [], anyPerson()),
+      person: anyPerson(),
     };
   if (r < 0.63)
     return {
       kind: 'CancelScout',
-      scout: one(rand, crew?.staff.scouts ?? [], anyGull()),
+      scout: one(rand, team?.staff.scouts ?? [], anyPerson()),
     };
   if (r < 0.75) {
-    const free = s.gulls
+    const free = s.people
       .filter((g) => g.contract === null && g.retired === null && !g.player)
       .map((g) => g.id);
-    const gull = rand() < 0.6 ? one(rand, free, anyGull()) : anyGull();
-    return { kind: 'OfferContract', gull, offer: someOffer(s, gull, rand) };
+    const person = rand() < 0.6 ? one(rand, free, anyPerson()) : anyPerson();
+    return { kind: 'OfferContract', person, offer: someOffer(s, person, rand) };
   }
-  const talks = s.talks.filter((t) => t.crew === crew?.id).map((t) => t.gull);
+  const talks = s.talks.filter((t) => t.team === team?.id).map((t) => t.person);
   if (r < 0.78)
-    return { kind: 'AcceptCounter', gull: one(rand, talks, anyGull()) };
+    return { kind: 'AcceptCounter', person: one(rand, talks, anyPerson()) };
   if (r < 0.81)
-    return { kind: 'WithdrawOffer', gull: one(rand, talks, anyGull()) };
+    return { kind: 'WithdrawOffer', person: one(rand, talks, anyPerson()) };
   if (r < 0.85)
     return {
       kind: 'Dismiss',
-      gull:
-        rand() < 0.7 && crew ? one(rand, staffOf(crew), anyGull()) : anyGull(),
+      person:
+        rand() < 0.7 && team
+          ? one(rand, staffOf(team), anyPerson())
+          : anyPerson(),
     };
-  const offers = s.player?.offers.map((o) => o.crew) ?? [];
+  const offers = s.player?.offers.map((o) => o.team) ?? [];
   if (r < 0.88)
     return {
       kind: 'TakeJob',
-      crew: one(rand, offers, Math.floor(rand() * s.crews.length)),
+      team: one(rand, offers, Math.floor(rand() * s.teams.length)),
     };
   if (r < 0.9)
     return {
       kind: 'DeclineJob',
-      crew: one(rand, offers, Math.floor(rand() * s.crews.length)),
+      team: one(rand, offers, Math.floor(rand() * s.teams.length)),
     };
-  if (r < 0.91) return { kind: 'DebugCoin', coin: 100 };
+  if (r < 0.91) return { kind: 'DebugBalance', balance: 100 };
   if (r < 0.95) return raceCommand(s, rand);
   return worksCommand(s, rand);
 }
@@ -175,47 +177,42 @@ export function someCommand(s: CareerState, rand: () => number): Command {
 /** The spec ship the tests' race cards are built on. */
 export const SPEC_SHIP = SPEC;
 
-/** A race plan the player might set: mostly sound, its captain sometimes another's or unfit. */
+/** A race plan the player might set: mostly sound, its driver sometimes another's or unfit. */
 export function somePlan(s: CareerState, rand: () => number): Plan {
-  const c = s.player ? s.crews[s.player.crew] : s.crews[0];
-  const free = s.gulls
+  const c = s.player ? s.teams[s.player.team] : s.teams[0];
+  const free = s.people
     .filter(
       (g) =>
-        g.role === 'captain' &&
+        g.role === 'driver' &&
         g.contract === null &&
         g.retired === null &&
         !g.player
     )
     .map((g) => g.id);
-  const mine = [c.staff.ships[1].captain, c.staff.reserve].filter(
+  const mine = [c.staff.ships[1].driver, c.staff.reserve].filter(
     (x): x is number => x !== null
   );
-  const captain =
+  const driver =
     rand() < 0.75
       ? one(rand, mine, one(rand, free, 0))
       : rand() < 0.5
         ? one(rand, free, 0)
-        : Math.floor(rand() * s.gulls.length);
+        : Math.floor(rand() * s.people.length);
   const order = [...JOBS].sort(() => rand() - 0.5);
-  const flight = [...c.staff.flight].sort(() => rand() - 0.5);
-  const jobs = {
-    mend: flight[0],
-    gust: flight[1],
-    stores: flight[2],
-    part: flight[3],
-  };
+  const pit = [...c.staff.pit].sort(() => rand() - 0.5);
+  const jobs = { mend: pit[0], gust: pit[1], stores: pit[2], part: pit[3] };
   const parts = c.parts
     .filter((p) => !p.forNext && rand() < 0.3)
     .map((p) => ({ part: p.id, ship: (rand() < 0.5 ? 0 : 1) as 0 | 1 }));
   return {
-    captain,
+    driver,
     parts,
     stance: (['hunt', 'hold', 'loot', 'shadow'] as const)[
       Math.floor(rand() * 4)
     ],
     order,
     jobs,
-    objectives: c.patrons.map((p) =>
+    objectives: c.sponsors.map((p) =>
       p && p.objectives.length > 0
         ? Math.floor(rand() * p.objectives.length)
         : null
@@ -224,7 +221,7 @@ export function somePlan(s: CareerState, rand: () => number): Plan {
   };
 }
 
-/** A race day's command: the plan, the start, a league's result, a forfeit, the mail. */
+/** A race day's command: the plan, the start, a tier's result, a forfeit, the mail. */
 function raceCommand(s: CareerState, rand: () => number): Command {
   const r = rand();
   if (r < 0.2 && !s.race?.started)
@@ -232,9 +229,9 @@ function raceCommand(s: CareerState, rand: () => number): Command {
   if (r < 0.4 && !s.race?.started)
     return { kind: 'RaceStarted', round: s.race?.round ?? s.round };
   if (r < 0.75 && s.race) {
-    // mostly a league not yet recorded, sometimes any (a second result is refused)
+    // mostly a tier not yet recorded, sometimes any (a second result is refused)
     const cards = raceCards(s, SPEC),
-      open = cards.filter((_, league) => s.race!.results[league] === null);
+      open = cards.filter((_, tier) => s.race!.results[tier] === null);
     return {
       kind: 'RecordRace',
       result: synthetic(
@@ -257,7 +254,7 @@ function raceCommand(s: CareerState, rand: () => number): Command {
   return { kind: 'MarkRead', mail: Math.floor(rand() * (s.mail.length + 2)) };
 }
 
-/** A race day sailed: the player's race begun, the three leagues' synthetic results recorded. */
+/** A race day sailed: the player's race begun, the three championships' synthetic results recorded. */
 export function sailed(s: CareerState, player = 0.5): CareerState {
   let out = s.race?.started
     ? s
@@ -273,7 +270,7 @@ export function toRaceDay(s: CareerState): CareerState {
   let out = s;
   for (let i = 0; i < 200 && out.race === null; i++) {
     if (out.player?.sacked)
-      out = must(out, { kind: 'TakeJob', crew: out.player.offers[0].crew });
+      out = must(out, { kind: 'TakeJob', team: out.player.offers[0].team });
     out = must(out, { kind: 'Advance' });
   }
   return out;
@@ -293,16 +290,16 @@ const BUILDINGS: readonly Building[] = [
   'testTank',
   'foundry',
   'sailingSchool',
-  'flightLoft',
+  'pitHouse',
   'crowsNest',
   'fishMarket',
   'landingPad',
 ];
 
-/** A command of sections 8–11 a player might send: the yard, fitting, designing, building, suppliers, patrons, votes. */
+/** A command of sections 8–11 a player might send: the improvement, fitting, designing, building, suppliers, sponsors, votes. */
 function worksCommand(s: CareerState, rand: () => number): Command {
-  const crew = s.player && !s.player.sacked ? s.crews[s.player.crew] : null;
-  const parts = crew?.parts ?? [];
+  const team = s.player && !s.player.sacked ? s.teams[s.player.team] : null;
+  const parts = team?.parts ?? [];
   const part = () =>
     one(
       rand,
@@ -315,7 +312,7 @@ function worksCommand(s: CareerState, rand: () => number): Command {
     const fitted = parts.filter((p) => p.ship !== null && rand() < 0.4);
     let left = 1;
     return {
-      kind: 'SetYard',
+      kind: 'SetImprovement',
       shares: fitted.map((p) => {
         const perf = Math.floor(rand() * left * 100) / 100;
         left -= perf;
@@ -338,8 +335,8 @@ function worksCommand(s: CareerState, rand: () => number): Command {
       slot: Math.floor(rand() * 4),
     };
   if (r < 0.5) {
-    const t = crew?.draft?.type ?? type();
-    const cards = (crew?.draft?.deals ?? []).map((d) =>
+    const t = team?.draft?.type ?? type();
+    const cards = (team?.draft?.deals ?? []).map((d) =>
       one(rand, d.cards, 'x')
     );
     return {
@@ -356,8 +353,8 @@ function worksCommand(s: CareerState, rand: () => number): Command {
     };
   if (r < 0.72) {
     const trade = TRADES[Math.floor(rand() * TRADES.length)];
-    const cards = crew
-      ? supplierCards(s.seed, crew.id, s.season, trade).map((x) => x.id)
+    const cards = team
+      ? supplierCards(s.seed, team.id, s.season, trade).map((x) => x.id)
       : [];
     return {
       kind: 'ChooseSupplier',
@@ -367,12 +364,12 @@ function worksCommand(s: CareerState, rand: () => number): Command {
   }
   if (r < 0.84)
     return {
-      kind: 'SignPatron',
-      offer: one(rand, crew?.offers.map((o) => o.patron.id) ?? [], 0),
+      kind: 'SignSponsor',
+      offer: one(rand, team?.offers.map((o) => o.sponsor.id) ?? [], 0),
       slot: Math.floor(rand() * 4),
     };
-  const proposals = crew
-    ? s.leagues[crew.league].proposals.map((p) => p.id)
+  const proposals = team
+    ? s.championships[team.tier].proposals.map((p) => p.id)
     : [];
   const side = (['for', 'against', 'abstain'] as const)[Math.floor(rand() * 3)];
   if (r < 0.92)
@@ -381,11 +378,11 @@ function worksCommand(s: CareerState, rand: () => number): Command {
     kind: 'Lobby',
     proposal: one(rand, proposals, 0),
     side: side === 'abstain' ? 'for' : side,
-    coin: Math.floor(rand() * 400),
+    balance: Math.floor(rand() * 400),
   };
 }
 
-/** No accepted command but Advance and the debug ones takes a crew's coin past its elder's floor: owed payments
+/** No accepted command but Advance and the debug ones takes a team's balance past its chairman's floor: owed payments
  *  (wages, upkeep, fines) are made on Advance and may, but a spend never does. */
 export function spendKept(
   before: CareerState,
@@ -393,19 +390,19 @@ export function spendKept(
   c: Command
 ): void {
   // Advance and a race's close pay what is owed (wages, upkeep, fines, stand-ins' fees), past the floor if need be; on
-  // TakeJob and DeclineJob the crews the player leaves or turns down have their elders hire a manager, as an elder's
+  // TakeJob and DeclineJob the teams the player leaves or turns down have their chairmen hire a manager, as an chairman's
   // hire on Advance does
   if (
     ['Advance', 'RecordRace', 'TakeJob', 'DeclineJob'].includes(c.kind) ||
     c.kind.startsWith('Debug')
   )
     return;
-  for (const x of after.crews) {
-    const was = before.crews[x.id]?.coin ?? x.coin;
-    if (x.coin < was)
+  for (const x of after.teams) {
+    const was = before.teams[x.id]?.balance ?? x.balance;
+    if (x.balance < was)
       assert.ok(
-        x.coin >= x.debtFloor,
-        `${c.kind} took crew ${x.id}'s coin to ${x.coin}, past its floor ${x.debtFloor}`
+        x.balance >= x.debtFloor,
+        `${c.kind} took team ${x.id}'s balance to ${x.balance}, past its floor ${x.debtFloor}`
       );
   }
 }
@@ -424,63 +421,63 @@ export function script(seed: number, length: number): Command[] {
   return out;
 }
 
-/** The rules every state holds to (Phase B acceptance's property tests): one gull on at most one crew, staff and
- *  contracts agreeing, the queue in order, no two living gulls sharing a full name, no banned or shared crew words,
- *  each gull's stats their role's. */
+/** The rules every state holds to (Phase B acceptance's property tests): one person on at most one team, staff and
+ *  contracts agreeing, the queue in order, no two living people sharing a full name, no banned or shared team words,
+ *  each person's stats their role's. */
 export function invariants(s: CareerState): void {
   const on = new Map<number, number>();
-  for (const c of s.crews) {
+  for (const c of s.teams) {
     for (const id of staffOf(c)) {
       assert.ok(
         !on.has(id),
-        `gull ${id} is on crews ${on.get(id)} and ${c.id}`
+        `person ${id} is on teams ${on.get(id)} and ${c.id}`
       );
       on.set(id, c.id);
       assert.equal(
-        s.gulls[id].contract?.crew,
+        s.people[id].contract?.team,
         c.id,
-        `gull ${id} is on crew ${c.id}'s staff without its contract`
+        `person ${id} is on team ${c.id}'s staff without its contract`
       );
     }
     assert.ok(
-      c.staff.flight.length <= 4,
-      `crew ${c.id} has ${c.staff.flight.length} flight gulls`
+      c.staff.pit.length <= 4,
+      `team ${c.id} has ${c.staff.pit.length} pit crew members`
     );
     assert.equal(
-      new Set(c.staff.flight.map((id) => s.gulls[id].job)).size,
-      c.staff.flight.length,
-      `two of crew ${c.id}'s flight work one job`
+      new Set(c.staff.pit.map((id) => s.people[id].job)).size,
+      c.staff.pit.length,
+      `two of team ${c.id}'s pit work one job`
     );
   }
-  for (const g of s.gulls) {
+  for (const g of s.people) {
     if (g.contract)
       assert.equal(
         on.get(g.id),
-        g.contract.crew,
-        `gull ${g.id} holds a contract with crew ${g.contract.crew} but is not on its staff`
+        g.contract.team,
+        `person ${g.id} holds a contract with team ${g.contract.team} but is not on its staff`
       );
     assert.deepEqual(
       Object.keys(g.stats).sort(),
       [...ROLE_STATS[g.role]].sort(),
-      `gull ${g.id}'s stats are not a ${g.role}'s`
+      `person ${g.id}'s stats are not a ${g.role}'s`
     );
     for (const v of Object.values(g.stats))
-      assert.ok(v >= 0 && v <= 20, `gull ${g.id} has a stat ${v}`);
+      assert.ok(v >= 0 && v <= 20, `person ${g.id} has a stat ${v}`);
     assert.ok(
       allowed(g.given) && allowed(g.family),
-      `gull ${g.id} has a banned name`
+      `person ${g.id} has a banned name`
     );
   }
-  const living = s.gulls.filter((g) => g.retired === null).map(fullName);
+  const living = s.people.filter((g) => g.retired === null).map(fullName);
   assert.equal(
     new Set(living).size,
     living.length,
-    'two living gulls share a full name'
+    'two living people share a full name'
   );
   const seen = new Set<string>();
-  for (const c of s.crews)
+  for (const c of s.teams)
     for (const w of words(c.name)) {
-      assert.ok(!seen.has(w), `the word '${w}' is in two crews' names`);
+      assert.ok(!seen.has(w), `the word '${w}' is in two teams' names`);
       seen.add(w);
     }
   assert.ok(ordered(s.queue), 'the queue is out of order');
@@ -490,25 +487,25 @@ export function invariants(s: CareerState): void {
 }
 
 /** Race day's and the mail's rules (sections 12, 13): on race day every ship has someone to sail her (the player's ship
- *  one the player), no gull sails two ships, none sails unfit; every message has its words; a dilemma's answer is one
- *  of its options; the standings name each league's crews once. */
+ *  one the player), no person sails two ships, none sails unfit; every message has its words; a dilemma's answer is one
+ *  of its options; the standings name each tier's teams once. */
 function raceDay(s: CareerState): void {
   if (s.race !== null) {
     const aboard = new Set<number>();
     for (const x of lineups(s)) {
       x.ships.forEach((a, ship) => {
-        const theirs = s.crews[x.crew].player && ship === 0;
+        const theirs = s.teams[x.team].player && ship === 0;
         assert.ok(
-          theirs ? a.captain === null : a.captain !== null && !a.forfeit,
-          `crew ${x.crew}'s ship ${ship} has no one to sail her`
+          theirs ? a.driver === null : a.driver !== null && !a.forfeit,
+          `team ${x.team}'s ship ${ship} has no one to sail her`
         );
-        if (a.captain === null) return;
-        assert.ok(!aboard.has(a.captain), `gull ${a.captain} sails two ships`);
-        aboard.add(a.captain);
+        if (a.driver === null) return;
+        assert.ok(!aboard.has(a.driver), `person ${a.driver} sails two ships`);
+        aboard.add(a.driver);
         assert.equal(
-          s.gulls[a.captain].unfit,
+          s.people[a.driver].unfit,
           0,
-          `gull ${a.captain} sails unfit`
+          `person ${a.driver} sails unfit`
         );
       });
     }
@@ -524,26 +521,26 @@ function raceDay(s: CareerState): void {
         `dilemma ${m.id}'s answer`
       );
   }
-  for (const l of s.leagues) {
+  for (const l of s.championships) {
     assert.deepEqual(
-      l.standings.map((x) => x.crew).sort((a, b) => a - b),
-      [...l.crews].sort((a, b) => a - b),
-      `league ${l.id}'s standings`
+      l.standings.map((x) => x.team).sort((a, b) => a - b),
+      [...l.teams].sort((a, b) => a - b),
+      `tier ${l.id}'s standings`
     );
-    for (const id of l.crews)
+    for (const id of l.teams)
       assert.equal(
-        s.crews[id].league,
+        s.teams[id].tier,
         l.id,
-        `crew ${id} is listed in league ${l.id}`
+        `team ${id} is listed in tier ${l.id}`
       );
   }
 }
 
 /** The parts' and money's rules (sections 8–11): each part on at most one ship and each ship one of each type; spec
- *  parts never improved past the standard; a crew's patrons in three slots. */
+ *  parts never improved past the standard; a team's sponsors in three slots. */
 function works(s: CareerState): void {
   const ids = new Set<number>();
-  for (const c of s.crews) {
+  for (const c of s.teams) {
     for (const ship of [0, 1] as const) {
       const types = c.parts
         .filter((p) => p.ship === ship)
@@ -552,7 +549,7 @@ function works(s: CareerState): void {
       assert.deepEqual(
         types,
         [...TYPES].sort(),
-        `crew ${c.id}'s ship ${ship} carries ${types.join(', ')}`
+        `team ${c.id}'s ship ${ship} carries ${types.join(', ')}`
       );
     }
     for (const p of c.parts) {
@@ -579,28 +576,28 @@ function works(s: CareerState): void {
       }
     }
     assert.equal(
-      c.patrons.length,
-      TUNING.patrons.slots,
-      `crew ${c.id} has ${c.patrons.length} patron slots`
+      c.sponsors.length,
+      TUNING.sponsors.slots,
+      `team ${c.id} has ${c.sponsors.length} sponsor slots`
     );
   }
 }
 
-/** The market's rules (sections 4, 5, 7): talks and patience consistent, scouts at work on their own crew's staff,
+/** The market's rules (sections 4, 5, 7): talks and patience consistent, scouts at work on their own team's staff,
  *  the player's post and offers as the player's state says. */
 function market(s: CareerState): void {
   const pairs = new Set<string>();
   for (const t of s.talks) {
-    const key = `${t.crew}:${t.gull}`;
+    const key = `${t.team}:${t.person}`;
     assert.ok(
       !pairs.has(key),
-      `crew ${t.crew} holds two talks with gull ${t.gull}`
+      `team ${t.team} holds two talks with person ${t.person}`
     );
     pairs.add(key);
-    const g = s.gulls[t.gull];
+    const g = s.people[t.person];
     assert.ok(
       g && g.retired === null && !g.player,
-      `talk ${t.id} is with gull ${t.gull}, who cannot be signed`
+      `talk ${t.id} is with person ${t.person}, who cannot be signed`
     );
     assert.equal(
       t.offer.role,
@@ -617,15 +614,15 @@ function market(s: CareerState): void {
       `talk ${t.id} was due on day ${t.answer}`
     );
   }
-  for (const g of s.gulls) {
+  for (const g of s.people) {
     assert.ok(
       g.patience >= 1 && g.patience <= TUNING.market.patienceMost,
-      `gull ${g.id} has patience ${g.patience}`
+      `person ${g.id} has patience ${g.patience}`
     );
     if (g.retired !== null)
       assert.ok(
-        g.contract === null || g.role === 'manager' || g.role === 'elder',
-        `retired gull ${g.id} holds a contract`
+        g.contract === null || g.role === 'manager' || g.role === 'chairman',
+        `retired person ${g.id} holds a contract`
       );
   }
   const busy = new Set<number>();
@@ -633,51 +630,51 @@ function market(s: CareerState): void {
     assert.ok(!busy.has(x.scout), `scout ${x.scout} is on two jobs`);
     busy.add(x.scout);
     assert.ok(
-      s.crews[x.crew].staff.scouts.includes(x.scout),
-      `scout ${x.scout} works for crew ${x.crew} but is not on its staff`
+      s.teams[x.team].staff.scouts.includes(x.scout),
+      `scout ${x.scout} works for team ${x.team} but is not on its staff`
     );
     assert.ok(
       s.queue.some(
-        (e) => e.kind === 'report' && e.crew === x.crew && e.scout === x.scout
+        (e) => e.kind === 'report' && e.team === x.team && e.scout === x.scout
       ),
       `scout ${x.scout}'s report is not on the queue`
     );
   }
-  for (const c of s.crews)
+  for (const c of s.teams)
     assert.ok(
       c.staff.scouts.length <= c.buildings.crowsNest.level,
-      `crew ${c.id} has more scouts than its crow's nest has places`
+      `team ${c.id} has more scouts than its crow's nest has places`
     );
   const p = s.player;
   if (!p) return;
-  const crewsOfPlayer = s.crews.filter((c) => c.player);
+  const teamsOfPlayer = s.teams.filter((c) => c.player);
   if (p.sacked) {
-    assert.equal(crewsOfPlayer.length, 0, 'a sacked player has no crew');
-    assert.equal(s.gulls[p.gull].contract, null);
+    assert.equal(teamsOfPlayer.length, 0, 'a sacked player has no team');
+    assert.equal(s.people[p.person].contract, null);
     assert.ok(
       p.offers.length > 0,
       'a sacked player is shown at least one offer'
     );
     assert.ok(
-      p.offers.some((o) => s.crews[o.crew].league === s.leagues.length - 1),
-      'a sacked player is offered a post in League Three'
+      p.offers.some((o) => s.teams[o.team].tier === s.championships.length - 1),
+      'a sacked player is offered a post in Tier 3'
     );
   } else {
     assert.deepEqual(
-      crewsOfPlayer.map((c) => c.id),
-      [p.crew],
-      "the player's crew is the one crew marked theirs"
+      teamsOfPlayer.map((c) => c.id),
+      [p.team],
+      "the player's team is the one team marked theirs"
     );
-    assert.equal(s.crews[p.crew].staff.manager, p.gull);
+    assert.equal(s.teams[p.team].staff.manager, p.person);
     assert.equal(
-      s.crews[p.crew].staff.ships[0].captain,
+      s.teams[p.team].staff.ships[0].driver,
       null,
       'the player sails ship one'
     );
   }
   for (const o of p.offers)
     assert.ok(
-      !s.crews[o.crew].player,
-      "the player is offered their own crew's post"
+      !s.teams[o.team].player,
+      "the player is offered their own team's post"
     );
 }

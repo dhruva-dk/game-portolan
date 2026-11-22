@@ -1,15 +1,15 @@
-// The round's close (Phase B section 13): once the three leagues' results are in, each league in turn has its points
-// (D20 under its rules) and standings; then, crew by crew, its stand-ins paid, injuries, the captains' records, morale,
-// bonds, the flight's fatigue, its parts' wear and Feedback, its bonuses, the race's money, its patrons' objectives and
-// its sailors' marketability; then the league's inspection, reputations and the elders' confidence; and mail. The
+// The round's close (Phase B section 13): once the three championships' results are in, each tier in turn has its points
+// (D20 under its rules) and standings; then, team by team, its stand-ins paid, injuries, the drivers' records, morale,
+// bonds, the pit crew's fatigue, its parts' wear and Feedback, its bonuses, the race's money, its sponsors' objectives and
+// its sailors' marketability; then the tier's inspection, reputations and the chairmen' confidence; and mail. The
 // round then ends: the race day is over, the next round is next, and the dilemmas are drawn (career/dilemmas.ts).
 
 import type { RaceResult } from '../race.ts';
 import { askWage } from './asks.ts';
-import { paid } from './coin.ts';
+import { paid } from './balance.ts';
 import type { Dice } from './dice.ts';
 import { effective } from './effective.ts';
-import { afterRace, standingOf } from './elders.ts';
+import { afterRace, standingOf } from './chairmen.ts';
 import { flagsCleared, today } from './flags.ts';
 import { inspected } from './inspection.ts';
 import { leadershipFatigue, leadershipMorale } from './service.ts';
@@ -25,14 +25,14 @@ import {
   wantsOut,
 } from './morale.ts';
 import { partsAfterRace } from './parts.ts';
-import { patronsAfterRace } from './patrons.ts';
+import { sponsorsAfterRace } from './sponsors.ts';
 import { mine, post } from './post.ts';
 import {
   marketabilityAfterRace,
   reputationAfterRace,
   type ShipRace,
 } from './reputation.ts';
-import type { Gull, GullOf } from './roles.ts';
+import type { Person, PersonOf } from './roles.ts';
 import { bondGain, bondLevel, fatigueGained, fatigueOn } from './service.ts';
 import { staffOf, type CareerState, type Standing } from './state.ts';
 import { modifier } from './traits.ts';
@@ -48,9 +48,9 @@ export const placePoints = (place: number): number =>
       ? R.last + 1 - place
       : 0;
 
-/** What a crew's race came to: its points, its two ships' (null: forfeit before the start), its best place, ships
+/** What a team's race came to: its points, its two ships' (null: forfeit before the start), its best place, ships
  *  sunk by it, ships afloat at the end, and whether it held the most sea. */
-export interface CrewRace {
+export interface TeamRace {
   points: number;
   ships: readonly [ShipRace | null, ShipRace | null];
   best: number;
@@ -61,25 +61,25 @@ export interface CrewRace {
   podiums: number;
 }
 
-/** A league's result read by side (career/lineup.ts sides). */
+/** A tier's result read by side (career/lineup.ts sides). */
 export function tally(
   result: RaceResult,
-  crews: number,
+  teams: number,
   rules: { pointsPerSinking: number; seaHeldPoint: boolean }
-): CrewRace[] {
+): TeamRace[] {
   const place = new Map(result.order.map((id, i) => [id, i + 1]));
   const kills = new Map<number, number>();
   for (const k of result.sinkings)
     if (k.by !== null) kills.set(k.by, (kills.get(k.by) ?? 0) + 1);
   const sunk = new Set(result.sinkings.map((k) => k.id));
-  const sea = Array.from({ length: crews }, () => 0);
+  const sea = Array.from({ length: teams }, () => 0);
   for (const h of result.seaHeld)
-    if (h.id >> 1 < crews) sea[h.id >> 1] += h.share;
+    if (h.id >> 1 < teams) sea[h.id >> 1] += h.share;
   const most = sea.reduce((b, x, i) => (x > sea[b] ? i : b), 0);
-  return Array.from({ length: crews }, (_, side) => {
+  return Array.from({ length: teams }, (_, side) => {
     const ships = ([0, 1] as const).map((ship): ShipRace => {
       const id = side * 2 + ship,
-        p = place.get(id) ?? crews * 2;
+        p = place.get(id) ?? teams * 2;
       return {
         points: placePoints(p) + rules.pointsPerSinking * (kills.get(id) ?? 0),
         sinkings: kills.get(id) ?? 0,
@@ -87,7 +87,7 @@ export function tally(
       };
     });
     const places = [0, 1].map(
-      (ship) => place.get(side * 2 + ship) ?? crews * 2
+      (ship) => place.get(side * 2 + ship) ?? teams * 2
     );
     const mostSea = sea[most] > 0 && most === side;
     return {
@@ -106,20 +106,20 @@ export function tally(
   });
 }
 
-/** A gull with a race added to their season's line of history. */
+/** A person with a race added to their season's line of history. */
 function logged(
-  g: Gull,
+  g: Person,
   line: {
     season: number;
-    crew: number;
-    league: number;
+    team: number;
+    tier: number;
     place: number;
     points: number;
     sinkings: number;
   }
-): Gull {
+): Person {
   const last = g.history[g.history.length - 1];
-  if (last && last.season === line.season && last.crew === line.crew) {
+  if (last && last.season === line.season && last.team === line.team) {
     const next = {
       ...last,
       races: last.races + 1,
@@ -135,8 +135,8 @@ function logged(
       ...g.history,
       {
         season: line.season,
-        crew: line.crew,
-        league: line.league,
+        team: line.team,
+        tier: line.tier,
         role: g.role,
         races: 1,
         best: line.place,
@@ -147,107 +147,107 @@ function logged(
   };
 }
 
-/** Every unfit gull a race nearer fit; the player told of theirs. */
+/** Every unfit person a race nearer fit; the player told of theirs. */
 function healed(s: CareerState): CareerState {
-  const gulls = [...s.gulls];
+  const people = [...s.people];
   const fit: number[] = [];
-  for (const g of s.gulls) {
+  for (const g of s.people) {
     if (g.unfit <= 0) continue;
-    gulls[g.id] = { ...g, unfit: g.unfit - 1 };
-    if (g.unfit === 1 && g.contract?.crew === mine(s)) fit.push(g.id);
+    people[g.id] = { ...g, unfit: g.unfit - 1 };
+    if (g.unfit === 1 && g.contract?.team === mine(s)) fit.push(g.id);
   }
   return fit.reduce(
     (acc: CareerState, id) =>
       post(acc, {
-        crew: null,
-        category: 'crew',
+        team: null,
+        category: 'team',
         sender: null,
-        kind: 'captainFit',
-        slots: { gull: id },
-        links: [{ to: 'gull', id }],
+        kind: 'driverFit',
+        slots: { person: id },
+        links: [{ to: 'person', id }],
       }),
-    { ...s, gulls }
+    { ...s, people }
   );
 }
 
-/** A state with a gull's morale moved, and the player told if their gull now asks to leave. */
+/** A state with a person's morale moved, and the player told if their person now asks to leave. */
 function moved(s: CareerState, id: number, by: number): CareerState {
-  const g = s.gulls[id];
+  const g = s.people[id];
   const morale = moraleIn(g.morale + by);
-  const gulls = [...s.gulls];
-  gulls[id] = { ...g, morale };
-  const out = { ...s, gulls };
-  return !wantsOut(g.morale) && wantsOut(morale) && g.contract?.crew === mine(s)
+  const people = [...s.people];
+  people[id] = { ...g, morale };
+  const out = { ...s, people };
+  return !wantsOut(g.morale) && wantsOut(morale) && g.contract?.team === mine(s)
     ? post(out, {
-        crew: g.contract.crew,
-        category: 'crew',
+        team: g.contract.team,
+        category: 'team',
         sender: id,
         kind: 'asksToLeave',
-        slots: { gull: id },
-        links: [{ to: 'gull', id }],
+        slots: { person: id },
+        links: [{ to: 'person', id }],
       })
     : out;
 }
 
-/** A state after a race for one crew's sailors: stand-ins paid, their records, grudges against the crews that sank them. */
-function crewGulls(
+/** A state after a race for one team's sailors: stand-ins paid, their records, grudges against the teams that sank them. */
+function teamPeople(
   s: CareerState,
-  crew: number,
+  team: number,
   sailing: Sailing,
   ctx: {
-    race: CrewRace;
+    race: TeamRace;
     result: RaceResult;
     side: number;
     grid: readonly number[];
   }
 ): CareerState {
   let out = s;
-  const c = s.crews[crew];
+  const c = s.teams[team];
   const sunkBy = new Map(ctx.result.sinkings.map((k) => [k.id, k]));
   const place = new Map(ctx.result.order.map((id, i) => [id, i + 1]));
   ([0, 1] as const).forEach((ship) => {
     const a = sailing.ships[ship];
-    if (a.captain === null || a.forfeit) return;
-    const id = a.captain;
+    if (a.driver === null || a.forfeit) return;
+    const id = a.driver;
     if (a.standIn) {
-      const g = out.gulls[id];
-      const fee = Math.round(askWage(g, c.league) * R.standIn);
-      out = paid(out, crew, fee, {
+      const g = out.people[id];
+      const fee = Math.round(askWage(g, c.tier) * R.standIn);
+      out = paid(out, team, fee, {
         kind: 'standIn',
         what: `${g.given} ${g.family} for the race`,
       });
       out = post(out, {
-        crew,
-        category: 'crew',
+        team,
+        category: 'team',
         sender: null,
         kind: 'standIn',
-        slots: { gull: id, wage: fee },
-        links: [{ to: 'gull', id }],
+        slots: { person: id, wage: fee },
+        links: [{ to: 'person', id }],
       });
     }
     const race = ctx.race.ships[ship];
     const killer = sunkBy.get(ctx.side * 2 + ship)?.by ?? null;
-    const gulls = [...out.gulls];
-    const g = logged(gulls[id], {
+    const people = [...out.people];
+    const g = logged(people[id], {
       season: out.season,
-      crew,
-      league: c.league,
+      team,
+      tier: c.tier,
       place: place.get(ctx.side * 2 + ship) ?? 80,
       points: race?.points ?? 0,
       sinkings: race?.sinkings ?? 0,
     });
-    gulls[id] =
+    people[id] =
       killer === null ? g : { ...g, grudge: ctx.grid[killer >> 1] ?? null };
-    out = { ...out, gulls };
+    out = { ...out, people };
   });
   return out;
 }
 
-/** Injuries for every captain of a league whose ship was sunk (a forfeit is no injury), and a relapse for one who sailed
+/** Injuries for every driver of a tier whose ship was sunk (a forfeit is no injury), and a relapse for one who sailed
  *  unfit by a dilemma's answer. */
 function injuries(
   s: CareerState,
-  league: {
+  tier: {
     all: readonly Sailing[];
     grid: readonly number[];
     result: RaceResult;
@@ -256,79 +256,79 @@ function injuries(
 ): CareerState {
   const rand = roll.roll('injury');
   const sunk = new Set(
-    league.result.sinkings.filter((k) => k.cause !== 'forfeit').map((k) => k.id)
+    tier.result.sinkings.filter((k) => k.cause !== 'forfeit').map((k) => k.id)
   );
   let out = s;
-  league.grid.forEach((crew, side) =>
+  tier.grid.forEach((team, side) =>
     ([0, 1] as const).forEach((ship) => {
-      const id = league.all[crew].ships[ship].captain;
+      const id = tier.all[team].ships[ship].driver;
       if (id === null) return;
       let races = sunk.has(side * 2 + ship) ? injury(rand) : 0;
       if (today(out, `pushed:${id}`) && rand() < TUNING.dilemmas.relapse)
         races = Math.max(races, TUNING.dilemmas.relapseRaces);
       if (races <= 0) return;
-      const gulls = [...out.gulls];
-      gulls[id] = { ...gulls[id], unfit: Math.max(gulls[id].unfit, races) };
-      out = { ...out, gulls };
-      const k = gulls[id].contract;
-      if (k && k.crew === mine(out))
+      const people = [...out.people];
+      people[id] = { ...people[id], unfit: Math.max(people[id].unfit, races) };
+      out = { ...out, people };
+      const k = people[id].contract;
+      if (k && k.team === mine(out))
         out = post(out, {
-          crew: k.crew,
-          category: 'crew',
+          team: k.team,
+          category: 'team',
           sender: null,
-          kind: 'captainUnfit',
-          slots: { gull: id, races },
-          links: [{ to: 'gull', id }],
+          kind: 'driverUnfit',
+          slots: { person: id, races },
+          links: [{ to: 'person', id }],
         });
     })
   );
   return out;
 }
 
-/** Morale, bonds and the flight's fatigue after a race, for one crew. */
-function spirits(s: CareerState, crew: number, sailing: Sailing): CareerState {
-  const c = s.crews[crew];
-  const standing = standingOf(s, crew);
+/** Morale, bonds and the pit crew's fatigue after a race, for one team. */
+function spirits(s: CareerState, team: number, sailing: Sailing): CareerState {
+  const c = s.teams[team];
+  const standing = standingOf(s, team);
   const sailed = new Set(
-    sailing.ships.map((a) => a.captain).filter((x): x is number => x !== null)
+    sailing.ships.map((a) => a.driver).filter((x): x is number => x !== null)
   );
   const levels = c.bonds.map(bondLevel);
-  const bosuns = c.staff.ships.map((h) =>
-    h.bosun === null
+  const mechanics = c.staff.ships.map((h) =>
+    h.mechanic === null
       ? null
-      : effective(s.gulls[h.bosun] as GullOf<'bosun'>, null)
+      : effective(s.people[h.mechanic] as PersonOf<'mechanic'>, null)
   );
-  const lead = bosuns.reduce(
+  const lead = mechanics.reduce(
     (a, b) => a + (b ? leadershipMorale(b.leadership) / 2 : 0),
     0
   );
   let out = s;
   for (const id of staffOf(c)) {
-    const g = out.gulls[id];
-    if (g.player || g.role === 'elder' || g.role === 'manager') continue;
+    const g = out.people[id];
+    if (g.player || g.role === 'chairman' || g.role === 'manager') continue;
     let by = resultMove(c.target, standing) + modifier(g.traits, null).morale;
-    if (g.contract) by += wageMove(g.contract.wage, askWage(g, c.league));
-    if (g.role === 'captain')
+    if (g.contract) by += wageMove(g.contract.wage, askWage(g, c.tier));
+    if (g.role === 'driver')
       by += statusMove(g.wants.includes('status'), sailed.has(id));
     c.staff.ships.forEach((h, k) => {
-      if (h.bosun === id || h.captain === id) by += bondMove(levels[k]);
+      if (h.mechanic === id || h.driver === id) by += bondMove(levels[k]);
     });
-    if (g.role === 'flight') by += lead;
+    if (g.role === 'pit') by += lead;
     out = moved(out, id, by);
   }
   const bonds = c.staff.ships.map((h, k) =>
-    h.bosun !== null && h.captain !== null && bosuns[k]
-      ? Math.round((c.bonds[k] + bondGain(bosuns[k]!.chemistry)) * 100) / 100
+    h.mechanic !== null && h.driver !== null && mechanics[k]
+      ? Math.round((c.bonds[k] + bondGain(mechanics[k]!.chemistry)) * 100) / 100
       : c.bonds[k]
   );
-  const gulls = [...out.gulls];
-  const loft = c.buildings.flightLoft.level;
-  // the flight serves both ships: the leading bosun's Leadership (ship one's, else ship two's) sets how it tires
-  const leader = bosuns[0] ?? bosuns[1];
+  const people = [...out.people];
+  const loft = c.buildings.pitHouse.level;
+  // the pit crew serves both ships: the leading mechanic's Leadership (ship one's, else ship two's) sets how it tires
+  const leader = mechanics[0] ?? mechanics[1];
   const tires = leader ? leadershipFatigue(leader.leadership) : 1;
-  for (const id of c.staff.flight) {
-    const g = gulls[id] as GullOf<'flight'>;
-    gulls[id] = {
+  for (const id of c.staff.pit) {
+    const g = people[id] as PersonOf<'pit'>;
+    people[id] = {
       ...g,
       fatigue: Math.min(
         100,
@@ -341,21 +341,21 @@ function spirits(s: CareerState, crew: number, sailing: Sailing): CareerState {
       fatigueDay: out.day,
     };
   }
-  const crews = [...out.crews];
-  crews[crew] = { ...out.crews[crew], bonds: [bonds[0], bonds[1]] };
-  return { ...out, gulls, crews };
+  const teams = [...out.teams];
+  teams[team] = { ...out.teams[team], bonds: [bonds[0], bonds[1]] };
+  return { ...out, people, teams };
 }
 
-/** A league's standings after a race. */
+/** A tier's standings after a race. */
 function stood(
   s: CareerState,
-  league: number,
+  tier: number,
   grid: readonly number[],
-  races: readonly CrewRace[]
+  races: readonly TeamRace[]
 ): CareerState {
-  const by = new Map(grid.map((crew, side) => [crew, races[side]]));
-  const standings = s.leagues[league].standings.map((x): Standing => {
-    const r = by.get(x.crew);
+  const by = new Map(grid.map((team, side) => [team, races[side]]));
+  const standings = s.championships[tier].standings.map((x): Standing => {
+    const r = by.get(x.team);
     return r
       ? {
           ...x,
@@ -366,85 +366,85 @@ function stood(
         }
       : x;
   });
-  const leagues = [...s.leagues];
-  leagues[league] = { ...s.leagues[league], standings };
-  return { ...s, leagues };
+  const championships = [...s.championships];
+  championships[tier] = { ...s.championships[tier], standings };
+  return { ...s, championships };
 }
 
-/** A state with one league's race closed. */
-function leagueClosed(
+/** A state with one tier's race closed. */
+function tierClosed(
   s: CareerState,
-  league: number,
+  tier: number,
   all: readonly Sailing[],
   roll: Dice
 ): CareerState {
-  const result = s.race!.results[league]!;
-  const grid = sides(s, league);
-  const l = s.leagues[league];
+  const result = s.race!.results[tier]!;
+  const grid = sides(s, tier);
+  const l = s.championships[tier];
   const races = tally(result, grid.length, l.rules);
-  const pointsOf = (crew: number) => races[grid.indexOf(crew)]?.points ?? 0;
-  let out = stood(s, league, grid, races);
+  const pointsOf = (team: number) => races[grid.indexOf(team)]?.points ?? 0;
+  let out = stood(s, tier, grid, races);
   out = injuries(out, { all, grid, result }, roll);
-  grid.forEach((crew, side) => {
+  grid.forEach((team, side) => {
     const r = races[side],
-      sailing = all[crew];
-    out = crewGulls(out, crew, sailing, { race: r, result, side, grid });
-    out = spirits(out, crew, sailing);
+      sailing = all[team];
+    out = teamPeople(out, team, sailing, { race: r, result, side, grid });
+    out = spirits(out, team, sailing);
     const ids = ([0, 1] as const).map((ship) =>
       sailing.ships[ship].forfeit ? null : side * 2 + ship
     );
-    out = partsAfterRace(out, crew, [ids[0], ids[1]], result);
+    out = partsAfterRace(out, team, [ids[0], ids[1]], result);
     const earned = ([0, 1] as const).flatMap((ship) => {
-      const id = sailing.ships[ship].captain;
+      const id = sailing.ships[ship].driver;
       return id === null || !r.ships[ship]
         ? []
         : [
             {
-              gull: id,
+              person: id,
               podium: r.ships[ship]!.podium,
               sinkings: r.ships[ship]!.sinkings,
             },
           ];
     });
-    out = bonusesPaid(out, crew, earned);
-    out = raceMoney(out, crew);
-    out = patronsAfterRace(
+    out = bonusesPaid(out, team, earned);
+    out = raceMoney(out, team);
+    out = sponsorsAfterRace(
       out,
-      crew,
+      team,
       { best: r.best, sinkings: r.sank, afloat: r.afloat, mostSea: r.mostSea },
       sailing.objectives
     );
-    out = marketabilityAfterRace(out, crew, r.ships);
+    out = marketabilityAfterRace(out, team, r.ships);
   });
-  out = inspected(out, league, pointsOf, roll).state;
+  out = inspected(out, tier, pointsOf, roll).state;
   const me = mine(out);
   const myShip = me !== null && grid[0] === me ? races[0].ships[0] : null;
-  out = reputationAfterRace(out, league, pointsOf, myShip);
-  for (const crew of grid) out = afterRace(out, crew, roll);
-  return told(out, league, { grid, races, result });
+  out = reputationAfterRace(out, tier, pointsOf, myShip);
+  for (const team of grid) out = afterRace(out, team, roll);
+  return told(out, tier, { grid, races, result });
 }
 
-/** The player's mail of a league's race: their own result, or the others' podium. */
+/** The player's mail of a tier's race: their own result, or the others' podium. */
 function told(
   s: CareerState,
-  league: number,
+  tier: number,
   ctx: {
     grid: readonly number[];
-    races: readonly CrewRace[];
+    races: readonly TeamRace[];
     result: RaceResult;
   }
 ): CareerState {
   const me = mine(s);
   if (me === null) return s;
-  if (ctx.grid[0] === me && s.crews[me].league === league) {
+  if (ctx.grid[0] === me && s.teams[me].tier === tier) {
     const r = ctx.races[0];
     return post(s, {
-      crew: me,
-      category: 'league',
+      team: me,
+      category: 'tier',
       sender: null,
       kind: 'raceResult',
       slots: {
-        league,
+        tier,
         place: r.best,
         points: r.points,
         standing: standingOf(s, me),
@@ -454,19 +454,19 @@ function told(
   }
   const top = ctx.result.order.slice(0, 3).map((id) => ctx.grid[id >> 1]);
   return post(s, {
-    crew: null,
-    category: 'league',
+    team: null,
+    category: 'tier',
     sender: null,
     kind: 'roundResults',
-    slots: { league, first: top[0], second: top[1], third: top[2] },
+    slots: { tier, first: top[0], second: top[1], third: top[2] },
     links: [{ to: 'screen', id: 'standings' }],
   });
 }
 
-/** A state with the round closed: every league's race, then the race day over and the next round next. */
+/** A state with the round closed: every tier's race, then the race day over and the next round next. */
 export function roundClosed(s: CareerState, roll: Dice): CareerState {
   const all = lineups(s);
   let out = healed(s);
-  for (const l of s.leagues) out = leagueClosed(out, l.id, all, roll);
+  for (const l of s.championships) out = tierClosed(out, l.id, all, roll);
   return flagsCleared({ ...out, race: null, round: s.race!.round + 1 });
 }

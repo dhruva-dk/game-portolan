@@ -2,7 +2,7 @@
 // data. Each has a name, a type, a tier, and its effects on the design: performance and its maximum, reliability and
 // its maximum, days to design and to build, risk, and Coin. Tiers 2 and 3 of sails, rigging and keel are unlocked by
 // the test tank's level; of rudder, hull and mounts by the foundry's. Every tier has a grey component: risk for a
-// large gain. A shipwright knows some of them (dealt by seed from tiers 1 and 2) and may learn more (Innovation).
+// large gain. A designer knows some of them (dealt by seed from tiers 1 and 2) and may learn more (Innovation).
 
 import type { PartType } from '../race.ts';
 import type { Building } from '../office.ts';
@@ -18,7 +18,7 @@ export interface Effects {
   designDays: number;
   buildDays: number;
   risk: number;
-  coin: number;
+  balance: number;
 }
 
 export interface Component {
@@ -37,27 +37,27 @@ const NONE: Effects = {
   designDays: 0,
   buildDays: 0,
   risk: 0,
-  coin: 0,
+  balance: 0,
 };
 
 /** The three kinds every tier has, each tier's numbers × the tier's scale: a steady gain, a sound one (reliability),
  *  and a grey one (risk for a large gain). One type in two trades days for the steady gain's Coin. */
 const KINDS: readonly Partial<Effects>[] = [
-  { perf: 22, perfMax: 30, coin: 40, designDays: 1 },
-  { perf: 6, reliability: 0.05, reliabilityMax: 0.04, coin: 50 },
+  { perf: 22, perfMax: 30, balance: 40, designDays: 1 },
+  { perf: 6, reliability: 0.05, reliabilityMax: 0.04, balance: 50 },
   {
     perf: 45,
     perfMax: 60,
     reliability: -0.03,
     risk: 0.08,
-    coin: 30,
+    balance: 30,
     buildDays: 1,
   },
 ];
 const QUICK: Partial<Effects> = {
   perf: 14,
   perfMax: 22,
-  coin: 70,
+  balance: 70,
   designDays: -2,
   buildDays: -1,
 };
@@ -154,7 +154,7 @@ const BY_ID: ReadonlyMap<string, Component> = new Map(
 export const component = (id: string): Component | null =>
   BY_ID.get(id) ?? null;
 
-/** The highest tier of a type a crew's buildings unlock (its test tank's or foundry's level). */
+/** The highest tier of a type a team's buildings unlock (its test tank's or foundry's level). */
 export const tierOpen = (
   buildings: Readonly<Record<Building, { level: number }>>,
   type: PartType
@@ -172,13 +172,13 @@ export function summed(ids: readonly string[]): Effects {
   return out;
 }
 
-/** The components a new shipwright of so many stars knows: `3 + round(stars)`, dealt by seed from tiers 1 and 2. */
+/** The components a new designer of so many stars knows: `3 + round(stars)`, dealt by seed from tiers 1 and 2. */
 export function dealtKnown(rand: Rand, stars: number): string[] {
   const pool = COMPONENTS.filter((c) => c.tier <= 2).map((c) => c.id);
   return shuffled(rand, pool).slice(0, componentsKnown(stars)).sort();
 }
 
-/** The components a shipwright does not know of the tiers a crew's buildings unlock, in id order. */
+/** The components a designer does not know of the tiers a team's buildings unlock, in id order. */
 export const unknownOpen = (
   known: readonly string[],
   buildings: Readonly<Record<Building, { level: number }>>

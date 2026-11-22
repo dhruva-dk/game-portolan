@@ -34,11 +34,11 @@ test('apply never throws on a malformed command, and refuses it', () => {
     {},
     { kind: 4 },
     { kind: 'Nope' },
-    { kind: 'MoveFlightJob' },
-    { kind: 'MoveFlightJob', gull: -1, job: 'x' },
-    { kind: 'MoveFlightJob', gull: 1e9, job: 'mend' },
+    { kind: 'MovePitJob' },
+    { kind: 'MovePitJob', person: -1, job: 'x' },
+    { kind: 'MovePitJob', person: 1e9, job: 'mend' },
     { kind: 'Found' },
-    { kind: 'DebugCoin' },
+    { kind: 'DebugBalance' },
   ];
   for (const j of junk) {
     const parsed: Command = JSON.parse(JSON.stringify(j ?? null));
@@ -67,7 +67,7 @@ test('the same state and command give the same result; a refusal changes nothing
   assert.ok(a.ok && b.ok);
   if (a.ok && b.ok) assert.equal(canonical(a.state), canonical(b.state));
   const before = canonical(s);
-  apply(s, { kind: 'MoveFlightJob', gull: 0, job: 'mend' });
+  apply(s, { kind: 'MovePitJob', person: 0, job: 'mend' });
   assert.equal(canonical(s), before, 'states are never changed in place');
 });
 
@@ -75,7 +75,7 @@ test('Advance: from founding to the first race day, which stops it until the rac
   const s = founded();
   assert.equal(s.day, 0);
   assert.equal(s.race, null);
-  // the rivals' reviews and scouting run on the way; none of them needs the player unless it approaches their gulls
+  // the rivals' reviews and scouting run on the way; none of them needs the player unless it approaches their people
   let t = must(s, { kind: 'Advance' });
   while (t.race === null) t = must(t, { kind: 'Advance' });
   assert.equal(t.day, 14);
@@ -105,7 +105,7 @@ test("the queue: ordered by (day, seq); scheduling keeps the order; the season's
   assert.equal(
     s.queue.filter((e) => e.kind === 'review').length,
     120,
-    "every crew's first review"
+    "every team's first review"
   );
   assert.deepEqual(
     s.queue
@@ -121,13 +121,13 @@ test("the queue: ordered by (day, seq); scheduling keeps the order; the season's
   for (let i = 0; i < 200; i++)
     t = schedule(t, Math.floor(rand() * 300), {
       kind: 'review',
-      crew: i % 120,
+      team: i % 120,
     });
   assert.ok(ordered(t.queue));
   // same day: the earlier seq first
   const q = scheduled(
-    scheduled([], { kind: 'review', crew: 1, day: 5, seq: 9 }),
-    { kind: 'review', crew: 2, day: 5, seq: 3 }
+    scheduled([], { kind: 'review', team: 1, day: 5, seq: 9 }),
+    { kind: 'review', team: 2, day: 5, seq: 3 }
   );
   assert.deepEqual(
     q.map((e: Event) => e.seq),
@@ -139,15 +139,15 @@ test("the queue: ordered by (day, seq); scheduling keeps the order; the season's
 
 test("stops: race day and a job offer's deadline always; a dilemma or an answer only when it is the player's", () => {
   const s = founded();
-  const mine = s.player!.crew;
+  const mine = s.player!.team;
   assert.equal(stopsFor(s, { kind: 'race', round: 0, day: 1, seq: 0 }), true);
   assert.equal(
-    stopsFor(s, { kind: 'jobExpires', crew: 3, day: 1, seq: 0 }),
+    stopsFor(s, { kind: 'jobExpires', team: 3, day: 1, seq: 0 }),
     true
   );
   // a dilemma stops only once its mail came (its trigger still held when it fell due)
   assert.equal(
-    stopsFor(s, { kind: 'dilemma', id: 'x', crew: mine, day: 1, seq: 0 }),
+    stopsFor(s, { kind: 'dilemma', id: 'x', team: mine, day: 1, seq: 0 }),
     false
   );
   const waiting = {
@@ -156,7 +156,7 @@ test("stops: race day and a job offer's deadline always; a dilemma or an answer 
       {
         id: 0,
         day: s.day,
-        category: 'crew' as const,
+        category: 'team' as const,
         sender: null,
         kind: 'x',
         wording: 0,
@@ -168,21 +168,21 @@ test("stops: race day and a job offer's deadline always; a dilemma or an answer 
     ],
   };
   assert.equal(
-    stopsFor(waiting, { kind: 'dilemma', id: 'x', crew: mine, day: 1, seq: 0 }),
+    stopsFor(waiting, { kind: 'dilemma', id: 'x', team: mine, day: 1, seq: 0 }),
     true
   );
   assert.equal(
     stopsFor(waiting, {
       kind: 'dilemma',
       id: 'x',
-      crew: (mine + 1) % 120,
+      team: (mine + 1) % 120,
       day: 1,
       seq: 0,
     }),
     false
   );
   assert.equal(
-    stopsFor(s, { kind: 'review', crew: mine, day: 1, seq: 0 }),
+    stopsFor(s, { kind: 'review', team: mine, day: 1, seq: 0 }),
     false
   );
 });
@@ -195,7 +195,7 @@ test('every event a founded career schedules has a handler; every handled comman
     'designed',
     'built',
     'building',
-    'patronOffer',
+    'sponsorOffer',
     'proposal',
     'vote',
     'dilemma',
@@ -212,7 +212,7 @@ test('every event a founded career schedules has a handler; every handled comman
     'CancelScout',
     'ChooseSupplier',
     'DealComponents',
-    'DebugCoin',
+    'DebugBalance',
     'DebugReveal',
     'DebugToRaceDay',
     'DebugToSeasonEnd',
@@ -223,13 +223,13 @@ test('every event a founded career schedules has a handler; every handled comman
     'Found',
     'Lobby',
     'MarkRead',
-    'MoveFlightJob',
+    'MovePitJob',
     'OfferContract',
     'RaceStarted',
     'RecordRace',
     'SetPlan',
-    'SetYard',
-    'SignPatron',
+    'SetImprovement',
+    'SignSponsor',
     'StartDesign',
     'StartScout',
     'TakeJob',
@@ -238,27 +238,27 @@ test('every event a founded career schedules has a handler; every handled comman
   ]);
 });
 
-test('MoveFlightJob: a flight gull moves to a job, swapping with whoever worked it; each refusal', () => {
+test('MovePitJob: a pit crew member moves to a job, swapping with whoever worked it; each refusal', () => {
   const s = founded();
-  const flight = s.crews[s.player!.crew].staff.flight;
-  const [a, b] = flight;
-  const ja = s.gulls[a].job!,
-    jb = s.gulls[b].job!;
-  const t = must(s, { kind: 'MoveFlightJob', gull: a, job: jb });
-  assert.equal(t.gulls[a].job, jb);
-  assert.equal(t.gulls[b].job, ja);
+  const pit = s.teams[s.player!.team].staff.pit;
+  const [a, b] = pit;
+  const ja = s.people[a].job!,
+    jb = s.people[b].job!;
+  const t = must(s, { kind: 'MovePitJob', person: a, job: jb });
+  assert.equal(t.people[a].job, jb);
+  assert.equal(t.people[b].job, ja);
   invariants(t);
-  refused(s, { kind: 'MoveFlightJob', gull: a, job: ja }, 'same');
-  const other = s.crews[(s.player!.crew + 1) % 120].staff.flight[0];
-  refused(s, { kind: 'MoveFlightJob', gull: other, job: 'mend' }, 'notFlight');
+  refused(s, { kind: 'MovePitJob', person: a, job: ja }, 'same');
+  const other = s.teams[(s.player!.team + 1) % 120].staff.pit[0];
+  refused(s, { kind: 'MovePitJob', person: other, job: 'mend' }, 'notPit');
   const raceStarted = { ...must(s, { kind: 'Advance' }) };
   refused(
     { ...raceStarted, race: { ...raceStarted.race!, started: true } },
-    { kind: 'MoveFlightJob', gull: a, job: jb },
+    { kind: 'MovePitJob', person: a, job: jb },
     'racing'
   );
   const badJob: Command = JSON.parse(
-    JSON.stringify({ kind: 'MoveFlightJob', gull: a, job: 'sing' })
+    JSON.stringify({ kind: 'MovePitJob', person: a, job: 'sing' })
   );
   refused(s, badJob, 'job');
 });

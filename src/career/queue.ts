@@ -1,6 +1,6 @@
 // The career's time (D41, Phase B section 1): an event queue ordered by (day, seq). Advance pops events up to and
-// including the next that needs the player, applying each (career/advance.ts). Nothing scans every gull every day:
-// each crew acts on its own events, and daily quantities (fatigue, the yard) are worked out in closed form over the
+// including the next that needs the player, applying each (career/advance.ts). Nothing scans every person every day:
+// each team acts on its own events, and daily quantities (fatigue, the improvement) are worked out in closed form over the
 // days between them.
 //
 // Each kind names the section that schedules it and handles it.
@@ -10,20 +10,20 @@ export type Happening =
   | { kind: 'race'; round: number } // section 13: race day (needs the player)
   | { kind: 'seasonEnd' } // section 13
   | { kind: 'seasonStart' } // section 13: targets, money, the calendar
-  | { kind: 'review'; crew: number } // section 6: a rival's weekly review
-  | { kind: 'designed'; crew: number } // section 8.3: a design is drawn
-  | { kind: 'built'; crew: number } // section 8.3: its part is built
-  | { kind: 'building'; crew: number; building: string } // section 9: works finished
-  | { kind: 'answer'; talk: number } // section 5: a gull answers an offer
-  | { kind: 'report'; crew: number; scout: number } // section 4: a scout reports
+  | { kind: 'review'; team: number } // section 6: a rival's weekly review
+  | { kind: 'designed'; team: number } // section 8.3: a design is drawn
+  | { kind: 'built'; team: number } // section 8.3: its part is built
+  | { kind: 'building'; team: number; building: string } // section 9: works finished
+  | { kind: 'answer'; talk: number } // section 5: a person answers an offer
+  | { kind: 'report'; team: number; scout: number } // section 4: a scout reports
   | { kind: 'closing'; season: number } // section 5: the last days of contracts ending this season open
   | { kind: 'silence'; season: number } // section 5: those still offered no renewal lose heart
   | { kind: 'lapse'; talk: number } // section 5: a counter not taken lapses
-  | { kind: 'jobExpires'; crew: number } // section 7: a job offer lapses (needs the player)
-  | { kind: 'proposal'; league: number; round: number } // section 11: the Admiralty puts a proposal
-  | { kind: 'vote'; league: number; proposal: number } // section 11: its votes are counted
-  | { kind: 'patronOffer'; crew: number } // section 10
-  | { kind: 'dilemma'; id: string; crew: number }; // section 12
+  | { kind: 'jobExpires'; team: number } // section 7: a job offer lapses (needs the player)
+  | { kind: 'proposal'; tier: number; round: number } // section 11: the Admiralty puts a proposal
+  | { kind: 'vote'; tier: number; proposal: number } // section 11: its votes are counted
+  | { kind: 'sponsorOffer'; team: number } // section 10
+  | { kind: 'dilemma'; id: string; team: number }; // section 12
 
 export type Event = Happening & { day: number; seq: number };
 export type EventKind = Event['kind'];

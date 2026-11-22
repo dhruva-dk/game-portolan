@@ -23,25 +23,25 @@ import type {
 } from '../office.ts';
 import { advanceCheck } from './advance.ts';
 import { dice, seeded } from './dice.ts';
-import { standingOf } from './elders.ts';
+import { standingOf } from './chairmen.ts';
 import { foundingCheck, weakest } from './found.ts';
-import { NOUNS, crewName, family, given, place, words } from './names.ts';
+import { NOUNS, teamName, family, given, place, words } from './names.ts';
 import { mailView, table, unread } from './read.ts';
-import type { Gull } from './roles.ts';
-import { factoryPoints } from './rookery.ts';
+import type { Person } from './roles.ts';
+import { factoryPoints } from './hq.ts';
 import { bondLevel } from './service.ts';
 import { age, potential, stars } from './stars.ts';
-import type { CareerState, Crew, Objective } from './state.ts';
+import type { CareerState, Team, Objective } from './state.ts';
 import { trait } from './traits.ts';
 import { TUNING } from './tuning.ts';
 import { PART_TYPES, makeWorld, staffStars } from './world.ts';
-import { yardPoints } from './yard.ts';
+import { improvementPoints } from './improvement.ts';
 
 /** 1st, 2nd, 3rd, 4th, 11th. */
 export const ordinal = (n: number) =>
   `${n}${n % 100 >= 11 && n % 100 <= 13 ? 'th' : (['th', 'st', 'nd', 'rd'][n % 10] ?? 'th')}`;
 /** Coin as a figure's text: grouped by thousands, signed when asked. */
-export const coinText = (n: number, signed = false) =>
+export const moneyText = (n: number, signed = false) =>
   `${signed && n > 0 ? '+' : n < 0 ? '−' : ''}${Math.abs(Math.round(n)).toLocaleString('en-GB')}`;
 /** A line of an explanation. */
 export const line = (label: string, amount: string | number): Line => ({
@@ -62,32 +62,32 @@ export const rival = (label: string, text: string): Comparison => ({
   text,
 });
 
-/** A gull's name, as the office writes it. */
+/** A person's name, as the office writes it. */
 export const nameOf = (g: { given: string; family: string }) =>
   `${g.given} ${g.family}`;
-/** What a gull's headshot is drawn from. */
-export function faceOf(s: CareerState, g: Gull): Face {
-  const crew = g.contract ? s.crews[g.contract.crew] : null;
+/** What a person's headshot is drawn from. */
+export function faceOf(s: CareerState, g: Person): Face {
+  const team = g.contract ? s.teams[g.contract.team] : null;
   return {
     seed: g.seed,
     role: g.role,
     age: age(g, s.day),
-    colours: crew ? crew.colours : null,
-    emblem: crew ? crew.emblem : null,
+    colours: team ? team.colours : null,
+    emblem: team ? team.emblem : null,
   };
 }
-/** A gull as a line names them, or null. */
+/** A person as a line names them, or null. */
 export const named = (s: CareerState, id: number | null): Named | null =>
   id === null
     ? null
-    : { id, face: faceOf(s, s.gulls[id]), name: nameOf(s.gulls[id]) };
+    : { id, face: faceOf(s, s.people[id]), name: nameOf(s.people[id]) };
 
-/** The player's crew: the one they manage, or the one they left when sacked. */
-export const crewOf = (s: CareerState): Crew =>
-  s.crews[(s.player as NonNullable<CareerState['player']>).crew];
+/** The player's team: the one they manage, or the one they left when sacked. */
+export const teamOf = (s: CareerState): Team =>
+  s.teams[(s.player as NonNullable<CareerState['player']>).team];
 
 /** The Coin and its change this season, from the ledger. */
-function coinFigure(s: CareerState, c: Crew): Figure {
+function moneyFigure(s: CareerState, c: Team): Figure {
   const start = s.calendar?.start ?? 0,
     season = s.ledger.filter((l) => l.day >= start);
   const by = season.reduce((a, l) => a + l.amount, 0);
@@ -95,13 +95,13 @@ function coinFigure(s: CareerState, c: Crew): Figure {
   for (const l of season)
     kinds.set(l.kind, (kinds.get(l.kind) ?? 0) + l.amount);
   const lines = [
-    line("At the season's start", coinText(c.coin - by)),
-    ...[...kinds].map(([k, n]) => line(LEDGER[k] ?? k, coinText(n, true))),
+    line("At the season's start", moneyText(c.balance - by)),
+    ...[...kinds].map(([k, n]) => line(LEDGER[k] ?? k, moneyText(n, true))),
   ];
   return fig(
-    c.coin,
-    coinText(c.coin),
-    { kind: 'change', by, text: `${coinText(by, true)} this season` },
+    c.balance,
+    moneyText(c.balance),
+    { kind: 'change', by, text: `${moneyText(by, true)} this season` },
     { title: 'Coin', lines }
   );
 }
@@ -110,7 +110,7 @@ const LEDGER: Readonly<Record<string, string>> = {
   wages: 'Wages',
   pay: 'Pay',
   prize: 'Prize money',
-  patron: 'Patrons',
+  sponsor: 'Sponsors',
   upkeep: 'Upkeep',
   building: 'Building',
   design: 'Designs',
@@ -128,8 +128,8 @@ const LEDGER: Readonly<Record<string, string>> = {
 
 /** The top bar. */
 export function topBar(s: CareerState): TopBar {
-  const c = crewOf(s),
-    me = s.gulls[(s.player as NonNullable<CareerState['player']>).gull];
+  const c = teamOf(s),
+    me = s.people[(s.player as NonNullable<CareerState['player']>).person];
   const blocked = advanceCheck(s);
   const raceDay = blocked?.code === 'raceDay';
   const screen =
@@ -139,15 +139,15 @@ export function topBar(s: CareerState): TopBar {
         ? 'plan'
         : blocked.code === 'sacked'
           ? 'jobs'
-          : 'league';
+          : 'tier';
   return {
     name: nameOf(me),
     face: faceOf(s, me),
-    crew: c.name,
+    team: c.name,
     emblem: c.emblem,
     colours: c.colours,
     date: `Day ${s.day - (s.calendar?.start ?? 0) + 1}, Season ${s.season + 1}`,
-    coin: coinFigure(s, c),
+    balance: moneyFigure(s, c),
     unread: unread(s),
     dilemma: s.mail.some(
       (m) => m.dilemma !== null && m.dilemma.answer === null
@@ -161,7 +161,7 @@ export function topBar(s: CareerState): TopBar {
   };
 }
 
-/** What a patron's objective asks, in words. */
+/** What a sponsor's objective asks, in words. */
 const OBJECTIVE: Readonly<Record<Objective, string>> = {
   top10: 'a top-ten finish',
   sinkTwo: 'two ships sunk',
@@ -169,15 +169,15 @@ const OBJECTIVE: Readonly<Record<Objective, string>> = {
   mostSea: 'the most sea held',
 };
 
-function racePanel(s: CareerState, c: Crew): HomeView['race'] {
+function racePanel(s: CareerState, c: Team): HomeView['race'] {
   const cal = s.calendar;
   if (!cal || s.round >= cal.rounds.length) return null;
   const r = cal.rounds[s.round],
     days = Math.max(0, r.day - s.day),
-    league = s.leagues[c.league];
+    tier = s.championships[c.tier];
   const standing = standingOf(s, c.id),
-    E = TUNING.elder;
-  const patron = c.patrons.find((p) => p && p.objectives.length > 0) ?? null;
+    E = TUNING.chairman;
+  const sponsor = c.sponsors.find((p) => p && p.objectives.length > 0) ?? null;
   return {
     heading: s.race ? 'Race Day' : 'Next Race',
     round: `Round ${s.round + 1} of ${cal.rounds.length}`,
@@ -197,9 +197,9 @@ function racePanel(s: CareerState, c: Crew): HomeView['race'] {
     target: fig(
       c.target,
       ordinal(c.target),
-      { kind: 'rank', place: standing, of: league.crews.length },
+      { kind: 'rank', place: standing, of: tier.teams.length },
       {
-        title: "The elder's target",
+        title: "The chairman's target",
         lines: [
           line('Target', ordinal(c.target)),
           line('Standing now', ordinal(standing)),
@@ -212,7 +212,7 @@ function racePanel(s: CareerState, c: Crew): HomeView['race'] {
       String(Math.round(c.confidence)),
       rival('sacked under', String(E.verdict)),
       {
-        title: "The elder's confidence",
+        title: "The chairman's confidence",
         lines: [
           line('Each race at or above the target', `+${E.met}`),
           line('Each place past the target', `−${E.perPlace}`),
@@ -220,13 +220,13 @@ function racePanel(s: CareerState, c: Crew): HomeView['race'] {
         ],
       }
     ),
-    patron: patron
-      ? `${patron.name}: ${patron.objectives.map((o) => OBJECTIVE[o]).join(' or ')}`
+    sponsor: sponsor
+      ? `${sponsor.name}: ${sponsor.objectives.map((o) => OBJECTIVE[o]).join(' or ')}`
       : null,
   };
 }
 
-function shipHalf(s: CareerState, c: Crew, ship: 0 | 1): ShipHalf {
+function shipHalf(s: CareerState, c: Team, ship: 0 | 1): ShipHalf {
   const hands = c.staff.ships[ship],
     bond = c.bonds[ship],
     level = bondLevel(bond),
@@ -237,13 +237,13 @@ function shipHalf(s: CareerState, c: Crew, ship: 0 | 1): ShipHalf {
     );
     return { type, low: !!p && p.condition < 0.5, fitted: !!p };
   });
-  const cap = hands.captain === null ? null : s.gulls[hands.captain];
+  const cap = hands.driver === null ? null : s.people[hands.driver];
   const M = TUNING.morale;
   return {
     ship,
     you: ship === 0 && c.player,
     parts,
-    bosun: named(s, hands.bosun),
+    mechanic: named(s, hands.mechanic),
     bond: fig(
       bond,
       `Bond ${level} of ${TUNING.bond.levels.length}`,
@@ -260,7 +260,7 @@ function shipHalf(s: CareerState, c: Crew, ship: 0 | 1): ShipHalf {
         ],
       }
     ),
-    captain: cap && {
+    driver: cap && {
       ...(named(s, cap.id) as Named),
       stars: stars(cap),
       potential: potential(cap),
@@ -283,16 +283,16 @@ function shipHalf(s: CareerState, c: Crew, ship: 0 | 1): ShipHalf {
 }
 
 /** Five lines of the table round the player's: two above, theirs, two below, each with its gap to the line above. */
-function tableWindow(s: CareerState, c: Crew): StandingLine[] {
-  const rows = table(s, c.league),
-    at = rows.findIndex((r) => r.crew === c.id);
+function tableWindow(s: CareerState, c: Team): StandingLine[] {
+  const rows = table(s, c.tier),
+    at = rows.findIndex((r) => r.team === c.id);
   const from = Math.max(0, Math.min(rows.length - 5, at - 2));
   return rows.slice(from, from + 5).map((r, i) => {
     const above = from + i > 0 ? rows[from + i - 1] : null,
-      k = s.crews[r.crew];
+      k = s.teams[r.team];
     return {
       place: r.place,
-      crew: r.crew,
+      team: r.team,
       name: r.name,
       emblem: k.emblem,
       colours: k.colours,
@@ -324,26 +324,27 @@ export function letters(s: CareerState, n: number): LetterLine[] {
         from:
           sender === null
             ? "The Admiralty's secretary"
-            : nameOf(s.gulls[sender]),
-        face: sender === null ? null : faceOf(s, s.gulls[sender]),
+            : nameOf(s.people[sender]),
+        face: sender === null ? null : faceOf(s, s.people[sender]),
       };
     });
 }
 
 /** `home`. */
 export function homeView(s: CareerState): HomeView {
-  const c = crewOf(s),
-    points = yardPoints(s, c.id),
+  const c = teamOf(s),
+    points = improvementPoints(s, c.id),
     factory = factoryPoints(c);
-  const league = s.leagues[c.league].crews,
+  const tier = s.championships[c.tier].teams,
     rank =
-      1 + league.filter((k) => k !== c.id && yardPoints(s, k) > points).length;
+      1 +
+      tier.filter((k) => k !== c.id && improvementPoints(s, k) > points).length;
   const d = c.design;
   return {
     top: topBar(s),
     race: racePanel(s, c),
     ships: [shipHalf(s, c, 0), shipHalf(s, c, 1)],
-    yard: {
+    improvement: {
       design: d && {
         type: d.type,
         days: fig(
@@ -365,34 +366,34 @@ export function homeView(s: CareerState): HomeView {
       points: fig(
         points,
         points.toFixed(1),
-        { kind: 'rank', place: rank, of: league.length },
+        { kind: 'rank', place: rank, of: tier.length },
         {
-          title: 'Yard points a day',
+          title: 'Improvement points a day',
           lines: [
             line('The factory', factory.toFixed(1)),
-            line('The bosuns', (points - factory).toFixed(1)),
+            line('The mechanics', (points - factory).toFixed(1)),
           ],
         }
       ),
       works: Object.entries(c.buildings)
         .filter(([, w]) => w.next !== null)
         .map(([b, w]) => ({
-          building: b as keyof Crew['buildings'],
+          building: b as keyof Team['buildings'],
           level: (w.next as { level: number }).level,
           days: Math.max(0, (w.next as { done: number }).done - s.day),
         })),
     },
     table: {
-      league: LEAGUES[c.league] ?? `League ${c.league + 1}`,
+      tier: TIERS[c.tier] ?? `Championship ${c.tier + 1}`,
       lines: tableWindow(s, c),
     },
     mail: { letters: letters(s, 4), unread: unread(s) },
   };
 }
-/** The leagues' names. */
-export const LEAGUES = ['League One', 'League Two', 'League Three'];
+/** The championships' names. */
+export const TIERS = ['Tier 1', 'Tier 2', 'Tier 3'];
 
-/** Founding's defaults for a seed: a crew name whose words clash with no crew's, a name for the player, a face. */
+/** Founding's defaults for a seed: a team name whose words clash with no team's, a name for the player, a face. */
 const founding = new Map<string, { replacing: string; names: string[] }>();
 function worldFor(seed: number, colours: Colours) {
   const key = `${seed}.${colours.first}.${colours.second}`;
@@ -400,13 +401,13 @@ function worldFor(seed: number, colours: Colours) {
   if (!w) {
     const world = makeWorld(seed, colours, dice(seed, {}));
     const k = weakest(world),
-      elder = world.gulls[k.staff.elder];
-    const staff = world.gulls.filter(
-      (g) => g.contract?.crew === k.id && g.retired === null
+      chairman = world.people[k.staff.chairman];
+    const staff = world.people.filter(
+      (g) => g.contract?.team === k.id && g.retired === null
     );
     w = {
-      replacing: `${k.name} of ${LEAGUES[k.league]}: elder ${nameOf(elder)}, staff ${staffStars(staff).toFixed(1)} stars on average.`,
-      names: world.crews.map((x) => x.name),
+      replacing: `${k.name} of ${TIERS[k.tier]}: chairman ${nameOf(chairman)}, staff ${staffStars(staff).toFixed(1)} stars on average.`,
+      names: world.teams.map((x) => x.name),
     };
     founding.set(key, w);
     if (founding.size > 4)
@@ -420,17 +421,17 @@ export function foundView(seed: number, colours: Colours): FoundView {
   const w = worldFor(seed, colours),
     rand = seeded(seed, 0x0f0d);
   const taken = new Set(w.names.flatMap(words));
-  let crew = '';
+  let team = '';
   for (
     let k = 0;
     k < 40 &&
-    (crew === '' || words(crew).some((x) => taken.has(x)) || crew.length > 24);
+    (team === '' || words(team).some((x) => taken.has(x)) || team.length > 24);
     k++
   )
-    crew = crewName(place(rand), NOUNS[Math.floor(rand() * NOUNS.length)]);
+    team = teamName(place(rand), NOUNS[Math.floor(rand() * NOUNS.length)]);
   return {
     seed,
-    crew,
+    team,
     given: given(rand),
     family: family(rand),
     headshot: Math.floor(rand() * 0xffffffff),
@@ -439,18 +440,18 @@ export function foundView(seed: number, colours: Colours): FoundView {
     emblem: Math.floor(rand() * TUNING.world.emblems),
     swatches: SWATCHES,
     emblems: TUNING.world.emblems,
-    limits: { crew: 24, gull: TUNING.player.gullName },
+    limits: { team: 24, person: TUNING.player.personName },
     replacing: w.replacing,
   };
 }
 
 /** What the founding form gets wrong, field by field (each checked with the others set to ones the career takes), so
- *  each error shows under its own field; a field missing is right. The crew's name is held to the form's 24. */
+ *  each error shows under its own field; a field missing is right. The team's name is held to the form's 24. */
 export function foundErrors(c: CommandOf<'Found'>): FoundErrors {
   const v = foundView(c.seed, { first: 0, second: 1 });
   const good: CommandOf<'Found'> = {
     ...c,
-    crew: v.crew,
+    team: v.team,
     colours: { first: 0, second: 1 },
     emblem: 0,
     given: v.given,
@@ -460,13 +461,13 @@ export function foundErrors(c: CommandOf<'Found'>): FoundErrors {
   const say = (k: Partial<CommandOf<'Found'>>) =>
     foundingCheck({ ...good, ...k })?.sentence;
   const out: FoundErrors = {
-    crew:
-      c.crew.trim().length > v.limits.crew
-        ? `The crew's name is too long: at most ${v.limits.crew} letters.`
-        : say({ crew: c.crew }),
+    team:
+      c.team.trim().length > v.limits.team
+        ? `The team's name is too long: at most ${v.limits.team} letters.`
+        : say({ team: c.team }),
     colours: say({ colours: c.colours }),
     emblem: say({ emblem: c.emblem }),
-    gull:
+    person:
       say({ given: c.given }) ??
       say({ family: c.family }) ??
       say({ headshot: c.headshot }),

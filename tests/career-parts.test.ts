@@ -1,5 +1,5 @@
 // Parts (Phase B sections 8.1, 8.4, 8.6, 8.7): handling, fitting and the two ships' politics, wear and Feedback,
-// the yard, and the season's carry-over.
+// the improvement, and the season's carry-over.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { RaceResult } from '../src/race.ts';
@@ -17,18 +17,18 @@ import {
 } from '../src/career/parts.ts';
 import {
   worked,
-  yardCheck,
-  yardPoints,
-  yardSet,
-  yardTo,
-} from '../src/career/yard.ts';
-import { factoryPoints } from '../src/career/rookery.ts';
+  improvementCheck,
+  improvementPoints,
+  improvementSet,
+  improvementTo,
+} from '../src/career/improvement.ts';
+import { factoryPoints } from '../src/career/hq.ts';
 import { feedbackPoints } from '../src/career/staff.ts';
 import { effective } from '../src/career/effective.ts';
-import type { GullOf } from '../src/career/roles.ts';
+import type { PersonOf } from '../src/career/roles.ts';
 import type { Part } from '../src/career/state.ts';
 import { TUNING } from '../src/career/tuning.ts';
-import { founded, invariants, must, refused, withCrew } from './career-kit.ts';
+import { founded, invariants, must, refused, withTeam } from './career-kit.ts';
 
 const SPEC = {
   top: 10,
@@ -73,17 +73,17 @@ test("handling: each type's factor 1 + 0.15 × perf / 1000 on its handling; keel
   );
 });
 
-test("the world: every crew's two ships carry one part of each type", () => {
+test("the world: every team's two ships carry one part of each type", () => {
   const s = founded();
-  for (const c of s.crews) assert.ok(fullyFitted(c));
-  const me = s.crews[s.player!.crew];
+  for (const c of s.teams) assert.ok(fullyFitted(c));
+  const me = s.teams[s.player!.team];
   assert.equal(shipParts(me, 0).length, 6);
 });
 
 test('FitPart: refusals, a swap between ships, a spare in with the old part to the spares', () => {
   const s0 = founded();
-  const me = s0.player!.crew;
-  const c = s0.crews[me];
+  const me = s0.player!.team;
+  const c = s0.teams[me];
   const sails0 = c.parts.find((p) => p.ship === 0 && p.type === 'sails')!;
   const sails1 = c.parts.find((p) => p.ship === 1 && p.type === 'sails')!;
   refused(s0, { kind: 'FitPart', part: 999999, ship: 0 }, 'part');
@@ -96,13 +96,13 @@ test('FitPart: refusals, a swap between ships, a spare in with the old part to t
     'racing'
   );
   const swapped = must(s0, { kind: 'FitPart', part: sails0.id, ship: 1 });
-  const after = swapped.crews[me].parts;
+  const after = swapped.teams[me].parts;
   assert.equal(after.find((p) => p.id === sails0.id)!.ship, 1);
   assert.equal(after.find((p) => p.id === sails1.id)!.ship, 0, 'the two swap');
   const spare = part({ id: 50000, type: 'sails', perf: 999, perfMax: 999 });
-  const s1 = withCrew(s0, me, (x) => ({ ...x, parts: [...x.parts, spare] }));
+  const s1 = withTeam(s0, me, (x) => ({ ...x, parts: [...x.parts, spare] }));
   refused(
-    withCrew(s1, me, (x) => ({
+    withTeam(s1, me, (x) => ({
       ...x,
       parts: x.parts.map((p) =>
         p.id === spare.id ? { ...p, forNext: true } : p
@@ -113,21 +113,21 @@ test('FitPart: refusals, a swap between ships, a spare in with the old part to t
   );
   const t = must(s1, { kind: 'FitPart', part: spare.id, ship: 0 });
   assert.equal(
-    t.crews[me].parts.find((p) => p.id === sails0.id)!.ship,
+    t.teams[me].parts.find((p) => p.id === sails0.id)!.ship,
     null,
     'the old part goes to the spares'
   );
-  assert.ok(fullyFitted(t.crews[me]));
+  assert.ok(fullyFitted(t.teams[me]));
   invariants(t);
 });
 
-test("two ships' politics: a second new part in a row to ship one costs ship two's captain morale", () => {
+test("two ships' politics: a second new part in a row to ship one costs ship two's driver morale", () => {
   let s = founded();
-  const me = s.player!.crew;
-  // a rival crew, whose ship two has a captain
-  const rival = (me + 1) % s.crews.length;
-  const cap = s.crews[rival].staff.ships[1].captain!;
-  s = withCrew(s, rival, (x) => ({
+  const me = s.player!.team;
+  // a rival team, whose ship two has a driver
+  const rival = (me + 1) % s.teams.length;
+  const cap = s.teams[rival].staff.ships[1].driver!;
+  s = withTeam(s, rival, (x) => ({
     ...x,
     parts: [
       ...x.parts,
@@ -135,27 +135,27 @@ test("two ships' politics: a second new part in a row to ship one costs ship two
       part({ id: 50002, type: 'keel', perf: 2100, perfMax: 2100 }),
     ],
   }));
-  const morale = s.gulls[cap].morale;
+  const morale = s.people[cap].morale;
   const once = fitted(s, rival, 50001, 0);
-  assert.equal(once.crews[rival].lastNew.keel, 0);
+  assert.equal(once.teams[rival].lastNew.keel, 0);
   assert.equal(
-    once.gulls[cap].morale,
+    once.people[cap].morale,
     morale,
     'the first new part costs nothing'
   );
   assert.equal(once.flags[`newPart:${rival}`], s.day);
   const twice = fitted(once, rival, 50002, 0);
   assert.equal(
-    twice.gulls[cap].morale,
+    twice.people[cap].morale,
     Math.max(0, morale - TUNING.parts.newPartMorale)
   );
   const toTwo = fitted(once, rival, 50002, 1);
   assert.equal(
-    toTwo.gulls[cap].morale,
+    toTwo.people[cap].morale,
     morale,
     'a new part to ship two costs nothing'
   );
-  assert.equal(toTwo.crews[rival].lastNew.keel, 1);
+  assert.equal(toTwo.teams[rival].lastNew.keel, 1);
 });
 
 test("wear: 0.1 a race and 0.05 a fault, × the supplier's wear, never below 0", () => {
@@ -165,12 +165,12 @@ test("wear: 0.1 a race and 0.05 a fault, × the supplier's wear, never below 0",
   assert.equal(worn(0.05, 3, 1), 0);
 });
 
-test("after a race: the ships that sailed wear their parts by faults; the captain's Feedback goes to the part furthest below its maximum", () => {
+test("after a race: the ships that sailed wear their parts by faults; the driver's Feedback goes to the part furthest below its maximum", () => {
   let s = founded();
-  const me = s.player!.crew;
-  const rival = (me + 1) % s.crews.length;
-  s = { ...s, crews: s.crews.map((c) => ({ ...c, yardDay: s.day })) };
-  const c = s.crews[rival];
+  const me = s.player!.team;
+  const rival = (me + 1) % s.teams.length;
+  s = { ...s, teams: s.teams.map((c) => ({ ...c, improvementDay: s.day })) };
+  const c = s.teams[rival];
   const target = c.parts
     .filter((p) => p.ship === 1)
     .sort(
@@ -178,7 +178,7 @@ test("after a race: the ships that sailed wear their parts by faults; the captai
     )[0];
   const result: RaceResult = {
     seed: 1,
-    league: c.league,
+    tier: c.tier,
     round: 0,
     order: [7, 8],
     sinkings: [],
@@ -192,7 +192,7 @@ test("after a race: the ships that sailed wear their parts by faults; the captai
     ],
   };
   const t = partsAfterRace(s, rival, [null, 8], result);
-  const after = t.crews[rival].parts;
+  const after = t.teams[rival].parts;
   for (const p of c.parts.filter((x) => x.ship === 0))
     assert.equal(
       after.find((x) => x.id === p.id)!.condition,
@@ -201,7 +201,7 @@ test("after a race: the ships that sailed wear their parts by faults; the captai
     );
   const hull = after.find((x) => x.ship === 1 && x.type === 'hull')!;
   assert.equal(hull.condition, worn(1, 2, 1));
-  const cap = s.gulls[c.staff.ships[1].captain!] as GullOf<'captain'>;
+  const cap = s.people[c.staff.ships[1].driver!] as PersonOf<'driver'>;
   const gain = feedbackPoints(effective(cap, null).feedback);
   const got = after.find((x) => x.id === target.id)!;
   assert.ok(
@@ -209,18 +209,18 @@ test("after a race: the ships that sailed wear their parts by faults; the captai
   );
 });
 
-test("the yard: factory points plus each bosun's (Reliability + Performance) / 4", () => {
+test("the improvement: factory points plus each mechanic's (Reliability + Performance) / 4", () => {
   const s = founded();
-  const c = s.crews[0];
+  const c = s.teams[0];
   let want = factoryPoints(c);
   for (const ship of [0, 1] as const) {
     const b = effective(
-      s.gulls[c.staff.ships[ship].bosun!] as GullOf<'bosun'>,
+      s.people[c.staff.ships[ship].mechanic!] as PersonOf<'mechanic'>,
       null
     );
     want += (b.reliability + b.perf) / 4;
   }
-  assert.ok(Math.abs(yardPoints(s, 0) - want) < 1e-9);
+  assert.ok(Math.abs(improvementPoints(s, 0) - want) < 1e-9);
   assert.deepEqual(
     [1, 2, 3].map((level) =>
       factoryPoints({
@@ -232,7 +232,7 @@ test("the yard: factory points plus each bosun's (Reliability + Performance) / 4
   );
 });
 
-test('the yard: condition first (most worn first), then the shares, each up to its maximum; spec parts never', () => {
+test('the improvement: condition first (most worn first), then the shares, each up to its maximum; spec parts never', () => {
   const one = { perf: 1, reliability: 1 };
   const a = part({ id: 1, ship: 0, condition: 0.5, perf: 500 });
   const b = part({ id: 2, ship: 1, condition: 0.9, perf: 500 });
@@ -267,7 +267,8 @@ test('the yard: condition first (most worn first), then the shares, each up to i
     out[1].reliability,
     Math.min(
       b.reliabilityMax,
-      Math.round((b.reliability + 20 * TUNING.yard.reliability) * 1000) / 1000
+      Math.round((b.reliability + 20 * TUNING.improvement.reliability) * 1000) /
+        1000
     )
   );
   assert.equal(
@@ -279,25 +280,31 @@ test('the yard: condition first (most worn first), then the shares, each up to i
   assert.equal(out[0].perf, a.perfMax);
 });
 
-test('SetYard: each refusal; the work so far reckoned on the old split; over days in closed form', () => {
+test('SetImprovement: each refusal; the work so far reckoned on the old split; over days in closed form', () => {
   const s0 = founded();
-  const me = s0.player!.crew;
-  const c = s0.crews[me];
+  const me = s0.player!.team;
+  const c = s0.teams[me];
   const [p, q] = c.parts.filter((x) => x.ship !== null);
   refused(
     s0,
-    { kind: 'SetYard', shares: [{ part: p.id, perf: 1.2, reliability: 0 }] },
+    {
+      kind: 'SetImprovement',
+      shares: [{ part: p.id, perf: 1.2, reliability: 0 }],
+    },
     'shares'
   );
   refused(
     s0,
-    { kind: 'SetYard', shares: [{ part: 999999, perf: 0.1, reliability: 0 }] },
+    {
+      kind: 'SetImprovement',
+      shares: [{ part: 999999, perf: 0.1, reliability: 0 }],
+    },
     'part'
   );
   refused(
     s0,
     {
-      kind: 'SetYard',
+      kind: 'SetImprovement',
       shares: [
         { part: p.id, perf: 0.1, reliability: 0 },
         { part: p.id, perf: 0.1, reliability: 0 },
@@ -308,7 +315,7 @@ test('SetYard: each refusal; the work so far reckoned on the old split; over day
   refused(
     s0,
     {
-      kind: 'SetYard',
+      kind: 'SetImprovement',
       shares: [
         { part: p.id, perf: 0.6, reliability: 0 },
         { part: q.id, perf: 0.5, reliability: 0 },
@@ -316,47 +323,51 @@ test('SetYard: each refusal; the work so far reckoned on the old split; over day
     },
     'over'
   );
-  const spec = withCrew(s0, me, (x) => ({
+  const spec = withTeam(s0, me, (x) => ({
     ...x,
     parts: x.parts.map((y) => (y.id === p.id ? { ...y, spec: true } : y)),
   }));
   refused(
     spec,
-    { kind: 'SetYard', shares: [{ part: p.id, perf: 0.5, reliability: 0 }] },
+    {
+      kind: 'SetImprovement',
+      shares: [{ part: p.id, perf: 0.5, reliability: 0 }],
+    },
     'spec'
   );
   const set = must(s0, {
-    kind: 'SetYard',
+    kind: 'SetImprovement',
     shares: [{ part: p.id, perf: 1, reliability: 0 }],
   });
   const later = { ...set, day: set.day + 3 };
-  const t = yardTo(later, me);
-  const pts = 3 * yardPoints(later, me);
-  const got = t.crews[me].parts.find((x) => x.id === p.id)!;
+  const t = improvementTo(later, me);
+  const pts = 3 * improvementPoints(later, me);
+  const got = t.teams[me].parts.find((x) => x.id === p.id)!;
   assert.ok(
     got.perf > p.perf && got.perf <= Math.min(p.perfMax, p.perf + pts * 2),
     `${p.perf} → ${got.perf}`
   );
-  assert.equal(t.crews[me].yardDay, later.day);
+  assert.equal(t.teams[me].improvementDay, later.day);
   assert.equal(
-    yardSet(later, me, []).crews[me].parts.find((x) => x.id === p.id)!.perf,
+    improvementSet(later, me, []).teams[me].parts.find((x) => x.id === p.id)!
+      .perf,
     got.perf,
     'a new split reckons the old first'
   );
-  assert.equal(yardCheck(s0, me, []), null);
+  assert.equal(improvementCheck(s0, me, []), null);
 });
 
 test('carry-over: spec types standard, designs for next season whole, the rest × 0.6 with risk stripped, the best spare kept', () => {
   let s = founded();
-  const rival = (s.player!.crew + 1) % s.crews.length;
-  const league = s.crews[rival].league;
-  const leagues = [...s.leagues];
-  leagues[league] = {
-    ...leagues[league],
-    rules: { ...leagues[league].rules, spec: ['hull'] },
+  const rival = (s.player!.team + 1) % s.teams.length;
+  const tier = s.teams[rival].tier;
+  const championships = [...s.championships];
+  championships[tier] = {
+    ...championships[tier],
+    rules: { ...championships[tier].rules, spec: ['hull'] },
   };
   s = {
-    ...withCrew({ ...s, leagues }, rival, (x) => ({
+    ...withTeam({ ...s, championships }, rival, (x) => ({
       ...x,
       parts: [
         ...x.parts,
@@ -381,7 +392,7 @@ test('carry-over: spec types standard, designs for next season whole, the rest �
     })),
   };
   const t = carried(s, rival);
-  const c = t.crews[rival];
+  const c = t.teams[rival];
   assert.ok(
     c.parts
       .filter((p) => p.type === 'hull')
@@ -406,7 +417,7 @@ test('carry-over: spec types standard, designs for next season whole, the rest �
 
 test('a rival fits its best part of each type to ship one and the next to ship two', () => {
   const s = founded();
-  const c = s.crews[1];
+  const c = s.teams[1];
   const extra = part({ id: 70000, type: 'rudder', perf: 5000, perfMax: 5000 });
   const b = bestFitted({ ...c, parts: [...c.parts, extra] });
   assert.equal(b.parts.find((p) => p.id === 70000)!.ship, 0);

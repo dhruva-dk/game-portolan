@@ -56,12 +56,12 @@ export function scheduleSeason(
     kind: 'silence',
     season: calendar.season,
   });
-  // the Admiralty's proposals, each league's, standing `open` days before the rounds they are voted before
+  // the Admiralty's proposals, each tier's, standing `open` days before the rounds they are voted before
   for (const round of TUNING.admiralty.rounds) {
-    for (let league = 0; league < s.leagues.length; league++) {
+    for (let tier = 0; tier < s.championships.length; tier++) {
       out = schedule(out, calendar.rounds[round].day - TUNING.admiralty.open, {
         kind: 'proposal',
-        league,
+        tier,
         round,
       });
     }
@@ -69,28 +69,28 @@ export function scheduleSeason(
   return schedule(out, calendar.end, { kind: 'seasonEnd' });
 }
 
-/** A state with every crew's first patron offers scheduled from a day, staggered by crew id over two weeks; each
- *  offer schedules the next (career/patrons.ts). */
-export function patronsScheduled(s: CareerState, from: number): CareerState {
-  return s.crews.reduce(
+/** A state with every team's first sponsor offers scheduled from a day, staggered by team id over two weeks; each
+ *  offer schedules the next (career/sponsors.ts). */
+export function sponsorsScheduled(s: CareerState, from: number): CareerState {
+  return s.teams.reduce(
     (acc, c) =>
       schedule(acc, from + 1 + (c.id % TUNING.calendar.gap), {
-        kind: 'patronOffer',
-        crew: c.id,
+        kind: 'sponsorOffer',
+        team: c.id,
       }),
     s
   );
 }
 
-/** The day of a crew's first review (Phase B section 6): staggered by crew id over the week. */
-export const firstReview = (crew: number, from: number): number =>
-  from + 1 + (crew % TUNING.rivals.review);
+/** The day of a team's first review (Phase B section 6): staggered by team id over the week. */
+export const firstReview = (team: number, from: number): number =>
+  from + 1 + (team % TUNING.rivals.review);
 
-/** A state with every crew's first review scheduled from a day; each review schedules the next. */
+/** A state with every team's first review scheduled from a day; each review schedules the next. */
 export function reviewsScheduled(s: CareerState, from: number): CareerState {
-  return s.crews.reduce(
+  return s.teams.reduce(
     (acc, c) =>
-      schedule(acc, firstReview(c.id, from), { kind: 'review', crew: c.id }),
+      schedule(acc, firstReview(c.id, from), { kind: 'review', team: c.id }),
     s
   );
 }

@@ -1,5 +1,5 @@
-// Every generated name (Phase B section 2.4, D34): gulls' given and family names, colonies, crews ("<place> <noun>"),
-// patrons ("<family> & <relation>, <trade>") and planets, built by seed from syllable tables. No generated name of any
+// Every generated name (Phase B section 2.4, D34): people' given and family names, colonies, teams ("<place> <noun>"),
+// sponsors ("<family> & <relation>, <trade>") and planets, built by seed from syllable tables. No generated name of any
 // kind contains a BANNED word as a whole word, in any case: a generator draws again until it holds.
 
 import { pick, type Rand } from './dice.ts';
@@ -131,7 +131,7 @@ const FAMILY_START = [
   'cliff',
   'drift',
   'fair',
-  'gull',
+  'person',
   'har',
   'kel',
   'lang',
@@ -238,7 +238,7 @@ const PLACE_END = [
   'rock',
 ];
 
-/** The crews' nouns: no word is shared between two crews, so there are more of them than crews. */
+/** The teams' nouns: no word is shared between two teams, so there are more of them than teams. */
 export const NOUNS: readonly string[] = [
   'Albatrosses',
   'Anchors',
@@ -262,7 +262,7 @@ export const NOUNS: readonly string[] = [
   'Gales',
   'Gannets',
   'Guillemots',
-  'Gulls',
+  'People',
   'Gusts',
   'Halyards',
   'Harpoons',
@@ -371,7 +371,7 @@ export const NOUNS: readonly string[] = [
   'Redshanks',
   'Rigs',
   'Sextants',
-  'Shipwrights',
+  'Designers',
   'Skippers',
   'Stormbirds',
   'Tritons',
@@ -466,13 +466,13 @@ const PLANET_END = [
   'ia',
 ];
 
-/** A gull's given name. */
+/** A person's given name. */
 export const given = (rand: Rand): string =>
   clean(rand, (r) =>
     capital(pick(r, GIVEN_START) + pick(r, GIVEN_MIDDLE) + pick(r, GIVEN_END))
   );
 
-/** A gull's family name. */
+/** A person's family name. */
 export const family = (rand: Rand): string =>
   clean(rand, (r) => capital(pick(r, FAMILY_START) + pick(r, FAMILY_END)));
 
@@ -482,15 +482,15 @@ export const colony = (rand: Rand): string =>
     capital(pick(r, PLACE_START) + pick(r, PLACE_MIDDLE) + pick(r, PLACE_END))
   );
 
-/** A crew's place word (the first of its name). */
+/** A team's place word (the first of its name). */
 export const place = (rand: Rand): string => colony(rand);
 
-/** A crew's name from a place and a noun. */
-export const crewName = (placeWord: string, noun: string): string =>
+/** A team's name from a place and a noun. */
+export const teamName = (placeWord: string, noun: string): string =>
   `${placeWord} ${noun}`;
 
-/** A patron's name: "<family> & <relation>, <trade>". */
-export const patron = (rand: Rand): string =>
+/** A sponsor's name: "<family> & <relation>, <trade>". */
+export const sponsor = (rand: Rand): string =>
   clean(
     rand,
     (r) => `${family(r)} & ${pick(r, RELATIONS)}, ${pick(r, TRADES)}`
@@ -504,11 +504,11 @@ export const planet = (rand: Rand): string =>
     )
   );
 
-/** The key two gulls' full names are told apart by. */
+/** The key two people' full names are told apart by. */
 export const fullName = (g: { given: string; family: string }): string =>
   `${g.given} ${g.family}`.toLowerCase();
 
-/** Every word of a name, lower case: two crews may share none. */
+/** Every word of a name, lower case: two teams may share none. */
 export const words = (name: string): string[] =>
   name
     .toLowerCase()

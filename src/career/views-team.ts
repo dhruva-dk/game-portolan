@@ -1,10 +1,10 @@
-// `crew` (Phase C batch 2): the roster by role, its wages and open posts, the bonds, and the flight at its jobs with
+// `team` (Phase C batch 2): the roster by role, its wages and open posts, the bonds, and the pit crew at its jobs with
 // their order. Pure, read-side; the order's moves are whole race plans (SetPlan is the one command that sets it).
 
 import type { Plan } from '../office.ts';
 import type {
-  CrewView,
-  FlightRow,
+  TeamView,
+  PitRow,
   OrderRow,
   RosterRow,
 } from '../office-people.ts';
@@ -12,7 +12,7 @@ import type { Job } from '../race.ts';
 import { effective } from './effective.ts';
 import { perRace, wages } from './money.ts';
 import { planCheck } from './raceday.ts';
-import type { Gull, GullOf } from './roles.ts';
+import type { Person, PersonOf } from './roles.ts';
 import {
   JOBS,
   bondLevel,
@@ -21,7 +21,7 @@ import {
   fatigueOn,
   rating,
 } from './service.ts';
-import type { CareerState, Crew } from './state.ts';
+import type { CareerState, Team } from './state.ts';
 import { trait } from './traits.ts';
 import { TUNING } from './tuning.ts';
 import {
@@ -33,10 +33,10 @@ import {
   postOf,
   seen,
   wageText,
-} from './views-gull.ts';
+} from './views-person.ts';
 import {
-  coinText,
-  crewOf,
+  moneyText,
+  teamOf,
   faceOf,
   fig,
   line,
@@ -47,11 +47,11 @@ import {
 
 const pct = (x: number) => `${Math.round(x * 100)}%`;
 
-/** A gull's line of the roster. */
-function gullRow(s: CareerState, c: Crew, g: Gull, you = false): RosterRow {
+/** A person's line of the roster. */
+function personRow(s: CareerState, c: Team, g: Person, you = false): RosterRow {
   const v = seen(s, c.id, g.id);
   return {
-    kind: 'gull',
+    kind: 'person',
     id: g.id,
     you,
     title: you ? `${nameOf(g)} (you)` : nameOf(g),
@@ -90,61 +90,59 @@ const open = (o: ReturnType<typeof openPosts>[number]): RosterRow => ({
   find: { role: o.role, status: o.status },
 });
 
-/** The roster: the captains (the player first, as ship one's), bosuns, shipwright, scouts, flight, and the elder. */
-function roster(s: CareerState, c: Crew): RosterRow[] {
-  const g = (id: number | null) => (id === null ? null : s.gulls[id]);
+/** The roster: the drivers (the player first, as ship one's), mechanics, designer, scouts, pit, and the chairman. */
+function roster(s: CareerState, c: Team): RosterRow[] {
+  const g = (id: number | null) => (id === null ? null : s.people[id]);
   const posts = openPosts(s, c),
     opens = (role: string) => posts.filter((p) => p.role === role).map(open);
-  const rows: RosterRow[] = [head('Captains')];
-  const me = s.player ? s.gulls[s.player.gull] : null;
-  if (me && c.player) rows.push(gullRow(s, c, me, true));
-  for (const x of [g(c.staff.ships[1].captain), g(c.staff.reserve)])
-    if (x) rows.push(gullRow(s, c, x));
-  rows.push(...opens('captain'), head('Bosuns'));
+  const rows: RosterRow[] = [head('Drivers')];
+  const me = s.player ? s.people[s.player.person] : null;
+  if (me && c.player) rows.push(personRow(s, c, me, true));
+  for (const x of [g(c.staff.ships[1].driver), g(c.staff.reserve)])
+    if (x) rows.push(personRow(s, c, x));
+  rows.push(...opens('driver'), head('Mechanics'));
   for (const h of c.staff.ships) {
-    const b = g(h.bosun);
-    if (b) rows.push(gullRow(s, c, b));
+    const b = g(h.mechanic);
+    if (b) rows.push(personRow(s, c, b));
   }
-  rows.push(...opens('bosun'), head('Shipwright'));
-  const w = g(c.staff.shipwright);
-  if (w) rows.push(gullRow(s, c, w));
+  rows.push(...opens('mechanic'), head('Designer'));
+  const w = g(c.staff.designer);
+  if (w) rows.push(personRow(s, c, w));
   rows.push(
-    ...opens('shipwright'),
+    ...opens('designer'),
     head('Scouts'),
-    ...c.staff.scouts.map((id) => gullRow(s, c, s.gulls[id])),
+    ...c.staff.scouts.map((id) => personRow(s, c, s.people[id])),
     ...opens('scout'),
-    head('Flight')
+    head('Pit')
   );
-  const order = (x: Gull) => JOBS.indexOf(x.job ?? 'part');
+  const order = (x: Person) => JOBS.indexOf(x.job ?? 'part');
   rows.push(
-    ...c.staff.flight
-      .map((id) => s.gulls[id])
+    ...c.staff.pit
+      .map((id) => s.people[id])
       .sort((a, b) => order(a) - order(b))
-      .map((x) => gullRow(s, c, x)),
-    ...opens('flight')
+      .map((x) => personRow(s, c, x)),
+    ...opens('pit')
   );
-  rows.push(head('Elder'), gullRow(s, c, s.gulls[c.staff.elder]));
+  rows.push(head('Chairman'), personRow(s, c, s.people[c.staff.chairman]));
   return rows;
 }
 
-/** A flight gull at their job: rating (against the best of the four at it), fatigue, rate and botch. */
-function flightRow(
+/** A pit crew member at their job: rating (against the best of the four at it), fatigue, rate and botch. */
+function pitRow(
   s: CareerState,
-  c: Crew,
-  g: GullOf<'flight'>,
-  four: readonly GullOf<'flight'>[]
-): FlightRow {
+  c: Team,
+  g: PersonOf<'pit'>,
+  four: readonly PersonOf<'pit'>[]
+): PitRow {
   const job: Job = g.job ?? 'mend',
     st = effective(g, null),
-    loft = c.buildings.flightLoft.level;
+    loft = c.buildings.pitHouse.level;
   const r = rating(st, job),
     tired = fatigueOn(g, s.day, loft);
   const best = four
     .map((x) => ({ x, r: rating(effective(x, null), job) }))
     .sort((a, b) => b.r - a.r)[0];
-  const weights = TUNING.flight.weights[job] as Readonly<
-    Record<string, number>
-  >;
+  const weights = TUNING.pit.weights[job] as Readonly<Record<string, number>>;
   const rate = jobRate(r, tired),
     fresh = jobRate(r, 0),
     botch = jobBotch(st.precision, tired),
@@ -177,22 +175,22 @@ function flightRow(
     fatigue: fig(
       Math.round(tired),
       String(Math.round(tired)),
-      rival('a day', `−${Math.round(TUNING.flight.recovery * (1 + loft))}`),
+      rival('a day', `−${Math.round(TUNING.pit.recovery * (1 + loft))}`),
       {
         title: 'Fatigue',
         lines: [
           line('After the last race', Math.round(g.fatigue)),
           line('Recovered since', Math.round(g.fatigue - tired)),
-          line('Flight loft level', loft),
+          line('Pit loft level', loft),
         ],
       }
     ),
     rate: fig(rate, rate.toFixed(2), rival('rested', fresh.toFixed(2)), {
       title: 'Work rate',
       lines: [
-        line('Base', TUNING.flight.base),
+        line('Base', TUNING.pit.base),
         line('Rating', r.toFixed(2)),
-        line('Lost to fatigue', `−${pct((TUNING.flight.tired * tired) / 100)}`),
+        line('Lost to fatigue', `−${pct((TUNING.pit.tired * tired) / 100)}`),
       ],
     }),
     botch: fig(botch, pct(botch), rival('rested', pct(rested)), {
@@ -209,19 +207,19 @@ function flightRow(
   };
 }
 
-/** A whole race plan to carry a new flight order: the plan set, else one drawn from the crew as it stands (ship two's
- *  captain, the reserve if she has none; the jobs as worked; no parts moved; no objectives). Null if none can be. */
-export function planDraft(s: CareerState, c: Crew): Plan | null {
+/** A whole race plan to carry a new pit order: the plan set, else one drawn from the team as it stands (ship two's
+ *  driver, the reserve if she has none; the jobs as worked; no parts moved; no objectives). Null if none can be. */
+export function planDraft(s: CareerState, c: Team): Plan | null {
   if (c.plan) return c.plan;
-  const captain = c.staff.ships[1].captain ?? c.staff.reserve;
+  const driver = c.staff.ships[1].driver ?? c.staff.reserve;
   const jobs: Partial<Record<Job, number>> = {};
-  for (const id of c.staff.flight) {
-    const j = s.gulls[id].job;
+  for (const id of c.staff.pit) {
+    const j = s.people[id].job;
     if (j) jobs[j] = id;
   }
-  if (captain === null || JOBS.some((j) => jobs[j] === undefined)) return null;
+  if (driver === null || JOBS.some((j) => jobs[j] === undefined)) return null;
   return {
-    captain,
+    driver,
     parts: [],
     stance: 'hold',
     order: [...JOBS],
@@ -231,16 +229,16 @@ export function planDraft(s: CareerState, c: Crew): Plan | null {
   };
 }
 
-/** The flight's order, each job with the plans that move it a place up or down; and why it cannot move, if not. */
+/** The pit crew's order, each job with the plans that move it a place up or down; and why it cannot move, if not. */
 function order(
   s: CareerState,
-  c: Crew
+  c: Team
 ): { rows: OrderRow[]; why: string | null } {
   const plan = planDraft(s, c),
     list = plan?.order ?? JOBS;
   const no =
     plan === null
-      ? 'Ship two needs a captain and every job a flight gull before the order can change.'
+      ? 'Ship two needs a driver and every job a pit crew member before the order can change.'
       : (planCheck(s, c.id, plan)?.sentence ?? null);
   const swapped = (i: number, k: number): Plan | null => {
     if (!plan || no || k < 0 || k >= list.length) return null;
@@ -249,7 +247,7 @@ function order(
     return { ...plan, order: o };
   };
   const who = (j: Job) =>
-    c.staff.flight.map((id) => s.gulls[id]).find((g) => g.job === j);
+    c.staff.pit.map((id) => s.people[id]).find((g) => g.job === j);
   return {
     why: no,
     rows: list.map((j, i) => ({
@@ -262,23 +260,23 @@ function order(
   };
 }
 
-/** `crew`. */
-export function crewView(s: CareerState): CrewView {
-  const c = crewOf(s),
+/** `team`. */
+export function teamView(s: CareerState): TeamView {
+  const c = teamOf(s),
     total = wages(s, c),
     money = perRace(s, c.id),
-    income = money.pay + money.patrons + money.fish;
+    income = money.pay + money.sponsors + money.fish;
   const byRole = new Map<string, number>();
   for (const id of [
-    c.staff.ships[1].captain,
+    c.staff.ships[1].driver,
     c.staff.reserve,
-    ...c.staff.ships.map((h) => h.bosun),
-    c.staff.shipwright,
+    ...c.staff.ships.map((h) => h.mechanic),
+    c.staff.designer,
     ...c.staff.scouts,
-    ...c.staff.flight,
+    ...c.staff.pit,
   ]) {
     if (id === null) continue;
-    const g = s.gulls[id];
+    const g = s.people[id];
     byRole.set(
       ROLE_NAMES[g.role],
       (byRole.get(ROLE_NAMES[g.role]) ?? 0) + (g.contract?.wage ?? 0)
@@ -286,20 +284,20 @@ export function crewView(s: CareerState): CrewView {
   }
   const levels = TUNING.bond.levels,
     top = levels[levels.length - 1];
-  const four = c.staff.flight.map((id) => s.gulls[id] as GullOf<'flight'>);
+  const four = c.staff.pit.map((id) => s.people[id] as PersonOf<'pit'>);
   const o = order(s, c);
   return {
     top: topBar(s),
     roster: roster(s, c),
     wages: fig(
       total,
-      coinText(total),
-      rival('income a race', coinText(income)),
+      moneyText(total),
+      rival('income a race', moneyText(income)),
       {
         title: 'Wages a race',
         lines: [
-          ...[...byRole].map(([k, n]) => line(k, coinText(n))),
-          line('Income a race', coinText(income)),
+          ...[...byRole].map(([k, n]) => line(k, moneyText(n))),
+          line('Income a race', moneyText(income)),
         ],
       }
     ),
@@ -329,8 +327,8 @@ export function crewView(s: CareerState): CrewView {
         ),
       };
     }),
-    flight: four
-      .map((g) => flightRow(s, c, g, four))
+    pit: four
+      .map((g) => pitRow(s, c, g, four))
       .sort((a, b) => JOBS.indexOf(a.job) - JOBS.indexOf(b.job)),
     order: o.rows,
     orderWhy: o.why,

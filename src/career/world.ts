@@ -1,6 +1,6 @@
-// The world at the start (Phase B section 3): 120 crews in three leagues of forty, each named, coloured, with an
-// emblem, a home colony, a manager, an elder, coin and a budget, buildings and parts by league, and a full staff; and
-// 300 free agents across every role. Strength by league: staff about 3.5, 2.5 and 1.75 stars, spread by seed.
+// The world at the start (Phase B section 3): 120 teams in three championships of forty, each named, coloured, with an
+// emblem, a home colony, a manager, an chairman, balance and a budget, buildings and parts by tier, and a full staff; and
+// 300 free agents across every role. Strength by tier: staff about 3.5, 2.5 and 1.75 stars, spread by seed.
 // Every draw is on the 'world' stream's rolls, so a seed and the player's colours make the same world every time.
 
 import { SWATCHES, type Colours, type PartType, type Rules } from '../race.ts';
@@ -8,22 +8,22 @@ import type { Building, Role, Status } from '../office.ts';
 import { askFee, askSeasons, askWage } from './asks.ts';
 import {
   makeCalendar,
-  patronsScheduled,
+  sponsorsScheduled,
   reviewsScheduled,
   scheduleSeason,
 } from './calendar.ts';
 import { between, pick, shuffled, type Dice, type Rand } from './dice.ts';
 import { debtFloor, targetPlace } from './leadership.ts';
-import { NOUNS, colony, crewName, place } from './names.ts';
-import { makeGull } from './recruit.ts';
-import type { Gull, GullOf } from './roles.ts';
+import { NOUNS, colony, teamName, place } from './names.ts';
+import { makePerson } from './recruit.ts';
+import type { Person, PersonOf } from './roles.ts';
 import { age, stars } from './stars.ts';
 import {
   beginning,
   type CareerState,
-  type Crew,
+  type Team,
   type Hands,
-  type League,
+  type Championship,
   type Part,
   type Works,
 } from './state.ts';
@@ -35,7 +35,7 @@ export const BUILDINGS: readonly Building[] = [
   'testTank',
   'foundry',
   'sailingSchool',
-  'flightLoft',
+  'pitHouse',
   'crowsNest',
   'fishMarket',
   'landingPad',
@@ -50,9 +50,9 @@ export const PART_TYPES: readonly PartType[] = [
 ];
 const JOB_ORDER = ['mend', 'gust', 'stores', 'part'] as const;
 const W = TUNING.world,
-  C = TUNING.crew;
+  C = TUNING.team;
 
-/** The rules every league starts under. */
+/** The rules every tier starts under. */
 export function startingRules(): Rules {
   const R = TUNING.rules;
   return {
@@ -66,7 +66,7 @@ export function startingRules(): Rules {
   };
 }
 
-/** Every unordered pair of crew swatches but `taken`, each as a Colours in a seeded order. */
+/** Every unordered pair of team swatches but `taken`, each as a Colours in a seeded order. */
 function pairs(rand: Rand, taken: Colours): Colours[] {
   const out: Colours[] = [];
   for (let a = 0; a < SWATCHES; a++)
@@ -83,26 +83,26 @@ function pairs(rand: Rand, taken: Colours): Colours[] {
   return shuffled(rand, out);
 }
 
-/** What the generator gathers as it goes: gulls by id and the names taken. */
+/** What the generator gathers as it goes: people by id and the names taken. */
 interface Gathering {
-  gulls: Gull[];
+  people: Person[];
   taken: Set<string>;
   day: number;
   colonies: number;
 }
 
-/** A new gull added to the gathering. */
+/** A new person added to the gathering. */
 function recruit(
   g: Gathering,
   rand: Rand,
   role: Role,
   starsNow: number,
   colony: number
-): Gull {
+): Person {
   const [lo, hi] = TUNING.ages.start[role];
-  const gull = makeGull(
+  const person = makePerson(
     {
-      id: g.gulls.length,
+      id: g.people.length,
       role,
       stars: Math.min(5, Math.max(0.25, starsNow)),
       years: between(rand, lo, hi),
@@ -112,23 +112,23 @@ function recruit(
     rand,
     g.taken
   );
-  g.gulls.push(gull);
-  return gull;
+  g.people.push(person);
+  return person;
 }
 
-/** A gull signed to a crew at the start: their ask at its league, a length by age, some with a break clause. */
+/** A person signed to a team at the start: their ask at its tier, a length by age, some with a break clause. */
 function signed(
-  g: Gull,
-  crew: number,
-  league: number,
+  g: Person,
+  team: number,
+  tier: number,
   status: Status,
   rand: Rand
-): Gull {
-  if (g.role === 'elder')
+): Person {
+  if (g.role === 'chairman')
     return {
       ...g,
       contract: {
-        crew,
+        team,
         status,
         wage: 0,
         fee: 0,
@@ -140,41 +140,41 @@ function signed(
       },
     };
   const K = TUNING.contracts;
-  const wage = askWage(g, league);
+  const wage = askWage(g, tier);
   const years = age(g, 0);
   const breakClause =
     rand() < K.breakShare
       ? wage * between(rand, K.breakRaces[0], K.breakRaces[1])
       : null;
-  const captain = g.role === 'captain';
+  const driver = g.role === 'driver';
   return {
     ...g,
     contract: {
-      crew,
+      team,
       status,
       wage,
       fee: askFee(wage),
       ends: between(rand, 0, askSeasons(years) - 1),
-      podium: captain ? Math.round(wage * K.podium) : 0,
-      sinking: captain ? Math.round(wage * K.sinking) : 0,
+      podium: driver ? Math.round(wage * K.podium) : 0,
+      sinking: driver ? Math.round(wage * K.sinking) : 0,
       breakClause,
       signed: 0,
     },
   };
 }
 
-/** A building's starting level about a league's mean, 1..3. */
+/** A building's starting level about a tier's mean, 1..3. */
 const levelAbout = (rand: Rand, mean: number): number =>
   Math.min(3, Math.max(1, Math.round(mean + (rand() - 0.5) * 1.6)));
 
-/** A crew's starting parts: one of each type on each ship, by league. */
-function startingParts(rand: Rand, league: number, firstId: number): Part[] {
+/** A team's starting parts: one of each type on each ship, by tier. */
+function startingParts(rand: Rand, tier: number, firstId: number): Part[] {
   const P = C.parts;
   return [0, 1].flatMap((ship) =>
     PART_TYPES.map((type, i): Part => {
-      const perf = Math.round(P.perf[league] + (rand() * 2 - 1) * P.spread);
+      const perf = Math.round(P.perf[tier] + (rand() * 2 - 1) * P.spread);
       const reliability =
-        Math.round((P.reliability[league] + (rand() * 2 - 1) * 0.04) * 1000) /
+        Math.round((P.reliability[tier] + (rand() * 2 - 1) * 0.04) * 1000) /
         1000;
       return {
         id: firstId + ship * PART_TYPES.length + i,
@@ -198,101 +198,101 @@ function startingParts(rand: Rand, league: number, firstId: number): Part[] {
   );
 }
 
-/** A crew's mean staff stars (every gull on it but the elder and the player). */
-export const staffStars = (crewGulls: readonly Gull[]): number => {
-  const counted = crewGulls.filter((g) => g.role !== 'elder' && !g.player);
+/** A team's mean staff stars (every person on it but the chairman and the player). */
+export const staffStars = (teamPeople: readonly Person[]): number => {
+  const counted = teamPeople.filter((g) => g.role !== 'chairman' && !g.player);
   return (
     counted.reduce((a, g) => a + stars(g), 0) / Math.max(1, counted.length)
   );
 };
 
-/** A crew and its staff, made and signed. */
-function makeCrew(
+/** A team and its staff, made and signed. */
+function makeTeam(
   g: Gathering,
   rand: Rand,
   id: number,
-  league: number,
+  tier: number,
   name: string,
   colours: Colours
-): Crew {
+): Team {
   const home = between(rand, 0, g.colonies - 1);
-  const strength = W.stars[league] + (rand() - 0.5) * W.starSpread;
+  const strength = W.stars[tier] + (rand() - 0.5) * W.starSpread;
   const about = () => strength + (rand() - 0.5) * 0.8;
   const from = () => (rand() < 0.5 ? home : between(rand, 0, g.colonies - 1));
   const sign = (role: Role, s: number, status: Status = 'staff') => {
-    const gull = signed(
+    const person = signed(
       recruit(g, rand, role, s, from()),
       id,
-      league,
+      tier,
       status,
       rand
     );
-    g.gulls[gull.id] = gull;
-    return gull.id;
+    g.people[person.id] = person;
+    return person.id;
   };
   const buildings = {} as Record<Building, Works>;
   for (const b of BUILDINGS)
-    buildings[b] = { level: levelAbout(rand, C.buildings[league]), next: null };
+    buildings[b] = { level: levelAbout(rand, C.buildings[tier]), next: null };
   const manager = sign('manager', about());
-  g.gulls[manager] = {
-    ...g.gulls[manager],
+  g.people[manager] = {
+    ...g.people[manager],
     reputation: Math.round(
       Math.min(
         100,
         Math.max(
           0,
-          C.managerReputation[league] + (rand() - 0.5) * C.managerSpread
+          C.managerReputation[tier] + (rand() - 0.5) * C.managerSpread
         )
       )
     ),
   };
-  const elder = sign('elder', about());
-  const captains = [
-    sign('captain', about(), 'ship'),
-    sign('captain', about(), 'ship'),
+  const chairman = sign('chairman', about());
+  const drivers = [
+    sign('driver', about(), 'ship'),
+    sign('driver', about(), 'ship'),
   ];
   const ships: [Hands, Hands] = [
-    { captain: captains[0], bosun: sign('bosun', about()) },
-    { captain: captains[1], bosun: sign('bosun', about()) },
+    { driver: drivers[0], mechanic: sign('mechanic', about()) },
+    { driver: drivers[1], mechanic: sign('mechanic', about()) },
   ];
-  const reserve = sign('captain', about() - 0.5, 'reserve');
-  const shipwright = sign('shipwright', about());
+  const reserve = sign('driver', about() - 0.5, 'reserve');
+  const designer = sign('designer', about());
   const scouts = Array.from({ length: buildings.crowsNest.level }, () =>
     sign('scout', about())
   );
-  const flight = JOB_ORDER.map((job) => {
-    const fid = sign('flight', about());
-    g.gulls[fid] = { ...g.gulls[fid], job };
+  const pit = JOB_ORDER.map((job) => {
+    const fid = sign('pit', about());
+    g.people[fid] = { ...g.people[fid], job };
     return fid;
   });
-  const elderGull = g.gulls[elder] as GullOf<'elder'>;
-  const budget = C.budget[league];
+  const chairmanPerson = g.people[chairman] as PersonOf<'chairman'>;
+  const budget = C.budget[tier];
   return {
     id,
     name,
     colours,
     emblem: between(rand, 0, W.emblems - 1),
     colony: home,
-    league,
-    staff: { manager, elder, ships, reserve, shipwright, scouts, flight },
-    coin: C.coin[league],
+    tier,
+    staff: { manager, chairman, ships, reserve, designer, scouts, pit },
+    balance: C.balance[tier],
     budget,
-    debtFloor: Math.round(debtFloor(elderGull.stats.generosity, budget)),
+    debtFloor: Math.round(debtFloor(chairmanPerson.stats.generosity, budget)),
     reputation: Math.round(
       Math.min(
         100,
-        Math.max(0, C.reputation[league] + (rand() - 0.5) * C.reputationSpread)
+        Math.max(0, C.reputation[tier] + (rand() - 0.5) * C.reputationSpread)
       )
     ),
     confidence: C.confidence,
     target: 1,
     buildings,
-    parts: startingParts(rand, league, id * 12),
+    parts: startingParts(rand, tier, id * 12),
     design: null,
     draft: null,
     designs: 0,
-    yard: [],
-    yardDay: 0,
+    improvement: [],
+    improvementDay: 0,
     lastNew: {
       sails: null,
       rigging: null,
@@ -303,52 +303,52 @@ function makeCrew(
     },
     bonds: [0, 0],
     suppliers: { timber: null, canvas: null, cordage: null },
-    patrons: [null, null, null],
+    sponsors: [null, null, null],
     offers: [],
     plan: null,
     player: false,
   };
 }
 
-/** Each crew of a league's target: its expected place (by the mean of its rank by staff stars and its rank by the
- *  fitted parts' performance), moved up by its elder's Ambition. */
+/** Each team of a tier's target: its expected place (by the mean of its rank by staff stars and its rank by the
+ *  fitted parts' performance), moved up by its chairman's Ambition. */
 export function targets(
-  crews: readonly Crew[],
-  gulls: readonly Gull[]
-): Crew[] {
-  const stars = (c: Crew) =>
+  teams: readonly Team[],
+  people: readonly Person[]
+): Team[] {
+  const stars = (c: Team) =>
     staffStars(
       [
         c.staff.manager,
-        ...c.staff.ships.flatMap((h) => [h.captain, h.bosun]),
+        ...c.staff.ships.flatMap((h) => [h.driver, h.mechanic]),
         c.staff.reserve,
-        c.staff.shipwright,
+        c.staff.designer,
         ...c.staff.scouts,
-        ...c.staff.flight,
+        ...c.staff.pit,
       ]
         .filter((x): x is number => x !== null)
-        .map((i) => gulls[i])
+        .map((i) => people[i])
     );
-  const perf = (c: Crew) =>
+  const perf = (c: Team) =>
     c.parts.reduce((a, p) => a + (p.ship === null ? 0 : p.perf), 0);
-  const rankBy = (f: (c: Crew) => number) => {
-    const order = [...crews].sort((a, b) => f(b) - f(a) || a.id - b.id);
+  const rankBy = (f: (c: Team) => number) => {
+    const order = [...teams].sort((a, b) => f(b) - f(a) || a.id - b.id);
     return new Map(order.map((c, i) => [c.id, i]));
   };
   const byStars = rankBy(stars),
     byParts = rankBy(perf);
-  const expected = [...crews].sort(
+  const expected = [...teams].sort(
     (a, b) =>
       byStars.get(a.id)! +
         byParts.get(a.id)! -
         byStars.get(b.id)! -
         byParts.get(b.id)! || byStars.get(a.id)! - byStars.get(b.id)!
   );
-  return crews.map((c) => {
-    const elder = gulls[c.staff.elder] as GullOf<'elder'>;
+  return teams.map((c) => {
+    const chairman = people[c.staff.chairman] as PersonOf<'chairman'>;
     return {
       ...c,
-      target: targetPlace(elder.stats.ambition, expected.indexOf(c) + 1),
+      target: targetPlace(chairman.stats.ambition, expected.indexOf(c) + 1),
     };
   });
 }
@@ -366,37 +366,37 @@ export function makeWorld(
     if (!colonies.includes(c)) colonies.push(c);
   }
   const g: Gathering = {
-    gulls: [],
+    people: [],
     taken: new Set(),
     day: 0,
     colonies: colonies.length,
   };
   const nouns = shuffled(rand, NOUNS);
   const places = new Set<string>(nouns.map((n) => n.toLowerCase()));
-  const crews: Crew[] = [];
-  const leagues: League[] = [];
-  for (let league = 0; league < W.leagues; league++) {
+  const teams: Team[] = [];
+  const championships: Championship[] = [];
+  for (let tier = 0; tier < W.championships; tier++) {
     const deal = pairs(rand, theirs);
     const ids: number[] = [];
-    for (let k = 0; k < W.crews; k++) {
+    for (let k = 0; k < W.teams; k++) {
       let word = place(rand);
       while (places.has(word.toLowerCase())) word = place(rand);
       places.add(word.toLowerCase());
-      const id = crews.length;
-      crews.push(
-        makeCrew(g, rand, id, league, crewName(word, nouns[id]), deal[k])
+      const id = teams.length;
+      teams.push(
+        makeTeam(g, rand, id, tier, teamName(word, nouns[id]), deal[k])
       );
       ids.push(id);
     }
     const rules = startingRules();
-    leagues.push({
-      id: league,
-      crews: ids,
+    championships.push({
+      id: tier,
+      teams: ids,
       rules,
       next: startingRules(),
       proposals: [],
-      standings: ids.map((crew) => ({
-        crew,
+      standings: ids.map((team) => ({
+        team,
         points: 0,
         wins: 0,
         podiums: 0,
@@ -404,26 +404,26 @@ export function makeWorld(
       })),
     });
   }
-  const targeted = leagues.flatMap((l) =>
+  const targeted = championships.flatMap((l) =>
     targets(
-      l.crews.map((i) => crews[i]),
-      g.gulls
+      l.teams.map((i) => teams[i]),
+      g.people
     )
   );
-  for (const c of targeted) crews[c.id] = c;
+  for (const c of targeted) teams[c.id] = c;
   addFreeAgents(g, rand);
   const calendar = makeCalendar(0, 0, rand);
   const base: CareerState = {
     ...beginning(0),
     seed,
     colonies,
-    gulls: g.gulls,
-    crews,
-    leagues,
+    people: g.people,
+    teams,
+    championships,
     calendar,
-    ids: { part: crews.length * 12, mail: 0, talk: 0, proposal: 0, patron: 0 },
+    ids: { part: teams.length * 12, mail: 0, talk: 0, proposal: 0, sponsor: 0 },
   };
-  return patronsScheduled(
+  return sponsorsScheduled(
     reviewsScheduled(scheduleSeason(base, calendar), 0),
     0
   );

@@ -1,4 +1,4 @@
-// Components, designing, the rookery and suppliers (Phase B sections 8.2, 8.3, 8.7, 9).
+// Components, designing, the headquarters and suppliers (Phase B sections 8.2, 8.3, 8.7, 9).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -24,13 +24,13 @@ import {
   buildDays,
   designSlots,
   factoryPoints,
-  fishCoin,
+  fishIncome,
   loftFactor,
   partBuildDays,
-  patronTier,
+  sponsorTier,
   upkeep,
   upkeepAt,
-} from '../src/career/rookery.ts';
+} from '../src/career/hq.ts';
 import {
   SUPPLIERS,
   TRADES,
@@ -42,27 +42,27 @@ import {
 import { componentsKnown } from '../src/career/staff.ts';
 import { dice } from '../src/career/dice.ts';
 import { BUILDINGS } from '../src/career/world.ts';
-import type { CareerState, Crew } from '../src/career/state.ts';
+import type { CareerState, Team } from '../src/career/state.ts';
 import { TUNING } from '../src/career/tuning.ts';
-import { founded, invariants, must, refused, withCrew } from './career-kit.ts';
+import { founded, invariants, must, refused, withTeam } from './career-kit.ts';
 
-const ME = () => founded().player!.crew;
+const ME = () => founded().player!.team;
 
-/** The player's crew with every building at a level and a shipwright who knows every component. */
+/** The player's team with every building at a level and a designer who knows every component. */
 function ready(level = 3): CareerState {
   const s = founded();
   const me = ME();
-  const t = withCrew(s, me, (c) => ({
+  const t = withTeam(s, me, (c) => ({
     ...c,
-    coin: 1e6,
+    balance: 1e6,
     buildings: Object.fromEntries(
       BUILDINGS.map((b) => [b, { level, next: null }])
-    ) as Crew['buildings'],
+    ) as Team['buildings'],
   }));
-  const w = t.crews[me].staff.shipwright!;
-  const gulls = [...t.gulls];
-  gulls[w] = { ...gulls[w], components: COMPONENTS.map((k) => k.id) };
-  return { ...t, gulls };
+  const w = t.teams[me].staff.designer!;
+  const people = [...t.people];
+  people[w] = { ...people[w], components: COMPONENTS.map((k) => k.id) };
+  return { ...t, people };
 }
 
 test('components: 6 types × 3 tiers × 3; a grey one each tier carries risk; tiers unlocked by the test tank or foundry', () => {
@@ -78,7 +78,7 @@ test('components: 6 types × 3 tiers × 3; a grey one each tier carries risk; ti
         `${type} tier ${tier} has one grey component`
       );
     }
-  const c = founded().crews[0];
+  const c = founded().teams[0];
   assert.equal(tierOpen(c.buildings, 'sails'), c.buildings.testTank.level);
   assert.equal(tierOpen(c.buildings, 'hull'), c.buildings.foundry.level);
   assert.equal(component('nothing'), null);
@@ -93,17 +93,17 @@ test('components: 6 types × 3 tiers × 3; a grey one each tier carries risk; ti
   );
 });
 
-test('a shipwright knows 3 + round(stars) components of tiers 1 and 2, dealt by seed at founding and for new ones', () => {
+test('a designer knows 3 + round(stars) components of tiers 1 and 2, dealt by seed at founding and for new ones', () => {
   let x = 0.1;
   const rand = () => (x = (x * 9301 + 0.49297) % 1);
   const known = dealtKnown(rand, 4);
   assert.equal(known.length, componentsKnown(4));
   assert.ok(known.every((id) => component(id)!.tier <= 2));
   const s = founded();
-  for (const g of s.gulls.filter((y) => y.role === 'shipwright').slice(0, 30)) {
+  for (const g of s.people.filter((y) => y.role === 'designer').slice(0, 30)) {
     assert.ok(
       g.components.length >= 3,
-      `shipwright ${g.id} knows ${g.components.length}`
+      `designer ${g.id} knows ${g.components.length}`
     );
     assert.ok(
       g.components.every(
@@ -124,32 +124,32 @@ test('DealComponents: three cards a slot from the pool, seeded; one redeal a slo
   );
   refused(
     s,
-    { kind: 'DealComponents', type: 'sails', slot: designSlots(s.crews[me]) },
+    { kind: 'DealComponents', type: 'sails', slot: designSlots(s.teams[me]) },
     'slot'
   );
   const t = must(s, { kind: 'DealComponents', type: 'sails', slot: 0 });
-  const d = t.crews[me].draft!;
+  const d = t.teams[me].draft!;
   assert.equal(d.type, 'sails');
   assert.equal(d.deals[0].cards.length, TUNING.design.deal);
   assert.ok(d.deals[0].cards.every((id) => pool(s, me, 'sails').includes(id)));
   assert.deepEqual(d.deals[0].cards, dealt(s, me, 'sails', 0, 0), 'seeded');
   const u = must(t, { kind: 'DealComponents', type: 'sails', slot: 0 });
-  assert.equal(u.crews[me].draft!.deals[0].redealt, true);
+  assert.equal(u.teams[me].draft!.deals[0].redealt, true);
   refused(u, { kind: 'DealComponents', type: 'sails', slot: 0 }, 'redealt');
   const other = must(u, { kind: 'DealComponents', type: 'hull', slot: 0 });
   assert.equal(
-    other.crews[me].draft!.type,
+    other.teams[me].draft!.type,
     'hull',
     'a new type is a new draft'
   );
-  const none = withCrew(s, me, (c) => ({
+  const none = withTeam(s, me, (c) => ({
     ...c,
-    staff: { ...c.staff, shipwright: null },
+    staff: { ...c.staff, designer: null },
   }));
   refused(
     none,
     { kind: 'DealComponents', type: 'sails', slot: 0 },
-    'noShipwright'
+    'noDesigner'
   );
 });
 
@@ -164,7 +164,7 @@ test('the pool: known components of the type, of tiers the buildings unlock', ()
   assert.equal(pool(ready(3), me, 'keel').length, 9);
 });
 
-test('the projection: best of the type + shipwright × 8 + components; cost by tier and type; days by Speed and loft', () => {
+test('the projection: best of the type + designer × 8 + components; cost by tier and type; days by Speed and loft', () => {
   const s = ready();
   const me = ME();
   const base = projection(s, me, 'sails', []);
@@ -174,10 +174,10 @@ test('the projection: best of the type + shipwright × 8 + components; cost by t
   assert.ok(plus.numbers.risk === k.risk);
   assert.equal(
     plus.cost,
-    Math.round(TUNING.design.cost.sails * TUNING.design.tier[2] + k.coin)
+    Math.round(TUNING.design.cost.sails * TUNING.design.tier[2] + k.balance)
   );
   assert.equal(base.cost, TUNING.design.cost.sails);
-  assert.equal(base.build, partBuildDays(s.crews[me]));
+  assert.equal(base.build, partBuildDays(s.teams[me]));
   assert.ok(
     base.numbers.perfMax >= base.numbers.perf &&
       base.numbers.reliability <= base.numbers.reliabilityMax
@@ -195,9 +195,9 @@ test('StartDesign: refusals; paid; drawn by Accuracy; built unfitted with mail; 
   s = must(s, { kind: 'DealComponents', type: 'sails', slot: 0 });
   s = must(s, { kind: 'DealComponents', type: 'sails', slot: 1 });
   const [a, b] = [
-    s.crews[me].draft!.deals[0].cards[0],
-    s.crews[me].draft!.deals[1].cards.find(
-      (x) => x !== s.crews[me].draft!.deals[0].cards[0]
+    s.teams[me].draft!.deals[0].cards[0],
+    s.teams[me].draft!.deals[1].cards.find(
+      (x) => x !== s.teams[me].draft!.deals[0].cards[0]
     )!,
   ];
   refused(
@@ -231,18 +231,18 @@ test('StartDesign: refusals; paid; drawn by Accuracy; built unfitted with mail; 
     'forNext'
   );
   refused(
-    withCrew(s, me, (c) => ({ ...c, coin: c.debtFloor })),
+    withTeam(s, me, (c) => ({ ...c, balance: c.debtFloor })),
     { kind: 'StartDesign', type: 'sails', components: [a], forNext: false },
-    'coin'
+    'balance'
   );
-  const league = s.crews[me].league;
-  const leagues = [...s.leagues];
-  leagues[league] = {
-    ...leagues[league],
-    rules: { ...leagues[league].rules, spec: ['sails'] },
+  const tier = s.teams[me].tier;
+  const championships = [...s.championships];
+  championships[tier] = {
+    ...championships[tier],
+    rules: { ...championships[tier].rules, spec: ['sails'] },
   };
   refused(
-    { ...s, leagues },
+    { ...s, championships },
     { kind: 'StartDesign', type: 'sails', components: [a], forNext: false },
     'spec'
   );
@@ -253,14 +253,14 @@ test('StartDesign: refusals; paid; drawn by Accuracy; built unfitted with mail; 
     components: [a, b],
     forNext: false,
   });
-  const c = t.crews[me];
-  assert.equal(c.coin, s.crews[me].coin - p.cost);
+  const c = t.teams[me];
+  assert.equal(c.balance, s.teams[me].balance - p.cost);
   assert.equal(c.draft, null);
   assert.equal(c.designs, 1);
   assert.equal(c.design!.designed, s.day + p.days);
   assert.ok(
     t.queue.some(
-      (e) => e.kind === 'designed' && e.crew === me && e.day === s.day + p.days
+      (e) => e.kind === 'designed' && e.team === me && e.day === s.day + p.days
     )
   );
   refused(
@@ -270,21 +270,21 @@ test('StartDesign: refusals; paid; drawn by Accuracy; built unfitted with mail; 
   );
   const u = drawn(
     { ...t, day: c.design!.designed },
-    { kind: 'designed', crew: me, day: 0, seq: 0 },
+    { kind: 'designed', team: me, day: 0, seq: 0 },
     dice(t.seed, t.streams)
   );
-  const d = u.crews[me].design!.drawn!;
+  const d = u.teams[me].design!.drawn!;
   assert.ok(d.perf <= d.perfMax && d.perf > 0);
   assert.ok(u.mail.some((m) => m.kind === 'designFinished'));
-  assert.ok(u.queue.some((e) => e.kind === 'built' && e.crew === me));
+  assert.ok(u.queue.some((e) => e.kind === 'built' && e.team === me));
   const v = built(
     { ...u, day: c.design!.built },
-    { kind: 'built', crew: me, day: 0, seq: 0 }
+    { kind: 'built', team: me, day: 0, seq: 0 }
   );
-  const part = v.crews[me].parts.find((x) => x.id === u.ids.part)!;
+  const part = v.teams[me].parts.find((x) => x.id === u.ids.part)!;
   assert.equal(part.ship, null, 'the player fits it');
   assert.equal(part.perf, d.perf);
-  assert.equal(v.crews[me].design, null);
+  assert.equal(v.teams[me].design, null);
   assert.ok(v.mail.some((m) => m.kind === 'partBuilt'));
   invariants(v);
 });
@@ -294,39 +294,39 @@ test('a design for next season: from the fifth round; carried whole; never fitte
   const me = ME();
   assert.equal(designCheck(s, me, 'keel', [], true), null);
   const t = started(s, me, 'keel', [], true);
-  assert.equal(t.crews[me].design!.forNext, true);
+  assert.equal(t.teams[me].design!.forNext, true);
 });
 
 test("a rival fits a part it builds where it beats the worse ship's", () => {
   const s = founded();
-  const rival = (ME() + 1) % s.crews.length;
+  const rival = (ME() + 1) % s.teams.length;
   const t = started(
-    withCrew(s, rival, (c) => ({ ...c, coin: 1e6 })),
+    withTeam(s, rival, (c) => ({ ...c, balance: 1e6 })),
     rival,
     'rudder',
     [],
     false
   );
-  const d = t.crews[rival].design!;
-  const u = withCrew(t, rival, (c) => ({
+  const d = t.teams[rival].design!;
+  const u = withTeam(t, rival, (c) => ({
     ...c,
     design: { ...d, drawn: { ...d.projected, perf: 999, perfMax: 999 } },
   }));
-  const v = built(u, { kind: 'built', crew: rival, day: 0, seq: 0 });
+  const v = built(u, { kind: 'built', team: rival, day: 0, seq: 0 });
   assert.notEqual(
-    v.crews[rival].parts.find((p) => p.id === u.ids.part)!.ship,
+    v.teams[rival].parts.find((p) => p.id === u.ids.part)!.ship,
     null
   );
   invariants(v);
 });
 
-test("the rookery: levels' costs, days and upkeep; each level's effect", () => {
-  const c = founded().crews[0];
+test("the headquarters: levels' costs, days and upkeep; each level's effect", () => {
+  const c = founded().teams[0];
   for (const b of BUILDINGS) {
     assert.equal(
       buildCost(b, 1),
       0,
-      'every crew holds each building at level 1'
+      'every team holds each building at level 1'
     );
     for (const l of [2, 3])
       assert.ok(
@@ -336,7 +336,7 @@ test("the rookery: levels' costs, days and upkeep; each level's effect", () => {
       buildCost(b, 3) > buildCost(b, 2) && upkeepAt(b, 3) >= upkeepAt(b, 1)
     );
   }
-  const at = (b: string, level: number): Crew => ({
+  const at = (b: string, level: number): Team => ({
     ...c,
     buildings: { ...c.buildings, [b]: { level, next: null } },
   });
@@ -356,9 +356,9 @@ test("the rookery: levels' costs, days and upkeep; each level's effect", () => {
     [1, 2, 3].map((l) => loftFactor(at('drawingLoft', l))),
     [1, 0.85, 0.7]
   );
-  assert.ok(fishCoin(at('fishMarket', 3)) > fishCoin(at('fishMarket', 1)));
+  assert.ok(fishIncome(at('fishMarket', 3)) > fishIncome(at('fishMarket', 1)));
   assert.deepEqual(
-    [1, 2, 3].map((l) => patronTier(at('landingPad', l))),
+    [1, 2, 3].map((l) => sponsorTier(at('landingPad', l))),
     [1, 2, 3]
   );
   assert.equal(
@@ -369,9 +369,9 @@ test("the rookery: levels' costs, days and upkeep; each level's effect", () => {
 
 test('Build: refusals; paid; finishes after its days with mail; any number under way', () => {
   const me = ME();
-  const s = withCrew(founded(), me, (c) => ({
+  const s = withTeam(founded(), me, (c) => ({
     ...c,
-    coin: 1e6,
+    balance: 1e6,
     buildings: {
       ...c.buildings,
       factory: { level: 1, next: null },
@@ -382,9 +382,9 @@ test('Build: refusals; paid; finishes after its days with mail; any number under
   refused(s, { kind: 'Build', building: 'castle' as 'factory' }, 'building');
   refused(s, { kind: 'Build', building: 'landingPad' }, 'top');
   refused(
-    withCrew(s, me, (c) => ({ ...c, coin: c.debtFloor })),
+    withTeam(s, me, (c) => ({ ...c, balance: c.debtFloor })),
     { kind: 'Build', building: 'factory' },
-    'coin'
+    'balance'
   );
   const t = must(must(s, { kind: 'Build', building: 'factory' }), {
     kind: 'Build',
@@ -392,13 +392,13 @@ test('Build: refusals; paid; finishes after its days with mail; any number under
   });
   refused(t, { kind: 'Build', building: 'factory' }, 'underWay');
   assert.equal(
-    t.crews[me].coin,
+    t.teams[me].balance,
     1e6 - buildCost('factory', 2) - buildCost('foundry', 2)
   );
-  const done = t.crews[me].buildings.factory.next!.done;
+  const done = t.teams[me].buildings.factory.next!.done;
   assert.equal(done, s.day + buildDays('factory', 2));
   const e = t.queue.find(
-    (x) => x.kind === 'building' && x.crew === me && x.building === 'factory'
+    (x) => x.kind === 'building' && x.team === me && x.building === 'factory'
   )!;
   assert.equal(e.day, done);
 });
@@ -437,9 +437,9 @@ test('suppliers: five a trade, three cards dealt by seed; chosen once in the off
     { kind: 'ChooseSupplier', trade: 'canvas', supplier: cards[0].id },
     'season'
   );
-  const rich = withCrew(s, me, (c) => ({
+  const rich = withTeam(s, me, (c) => ({
     ...c,
-    coin: 1e5,
+    balance: 1e5,
     suppliers: { ...c.suppliers, canvas: null },
   }));
   const t = must(rich, {
@@ -447,18 +447,18 @@ test('suppliers: five a trade, three cards dealt by seed; chosen once in the off
     trade: 'canvas',
     supplier: cards[0].id,
   });
-  assert.equal(t.crews[me].coin, 1e5 - cards[0].coin);
-  assert.deepEqual(termsFor(t.crews[me].suppliers, 'sails'), cards[0].terms);
+  assert.equal(t.teams[me].balance, 1e5 - cards[0].balance);
+  assert.deepEqual(termsFor(t.teams[me].suppliers, 'sails'), cards[0].terms);
   refused(
     t,
     { kind: 'ChooseSupplier', trade: 'canvas', supplier: cards[1].id },
     'chosen'
   );
   assert.ok(
-    suppliersCleared(t).crews.every((c) => c.suppliers.canvas === null)
+    suppliersCleared(t).teams.every((c) => c.suppliers.canvas === null)
   );
   assert.deepEqual(
     termsFor({ timber: null, canvas: null, cordage: null }, 'hull'),
-    { start: 0, max: 0, reliability: 0, wear: 1, yard: 1, cost: 1 }
+    { start: 0, max: 0, reliability: 0, wear: 1, improvement: 1, cost: 1 }
   );
 });

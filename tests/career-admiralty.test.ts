@@ -20,28 +20,28 @@ import { dice } from '../src/career/dice.ts';
 import { startingRules } from '../src/career/world.ts';
 import type { CareerState, Part } from '../src/career/state.ts';
 import { TUNING } from '../src/career/tuning.ts';
-import { founded, invariants, must, refused, withCrew } from './career-kit.ts';
+import { founded, invariants, must, refused, withTeam } from './career-kit.ts';
 
-const ME = () => founded().player!.crew;
+const ME = () => founded().player!.team;
 const A = TUNING.admiralty;
 
-/** The founded career with the player's league's proposal put. */
-function put(): { s: CareerState; league: number; id: number } {
+/** The founded career with the player's tier's proposal put. */
+function put(): { s: CareerState; tier: number; id: number } {
   const s0 = founded();
-  const league = s0.crews[ME()].league;
+  const tier = s0.teams[ME()].tier;
   const s = proposalPut(
     { ...s0, day: s0.calendar!.rounds[A.rounds[0]].day - A.open },
-    { kind: 'proposal', league, round: A.rounds[0], day: 0, seq: 0 },
+    { kind: 'proposal', tier, round: A.rounds[0], day: 0, seq: 0 },
     dice(s0.seed, s0.streams)
   );
-  return { s, league, id: s0.ids.proposal };
+  return { s, tier, id: s0.ids.proposal };
 }
 
-test("the calendar: each league's proposals put 12 days before the rounds they are voted before", () => {
+test("the calendar: each tier's proposals put 12 days before the rounds they are voted before", () => {
   const s = founded();
-  for (let league = 0; league < s.leagues.length; league++) {
+  for (let tier = 0; tier < s.championships.length; tier++) {
     const days = s.queue
-      .filter((e) => e.kind === 'proposal' && e.league === league)
+      .filter((e) => e.kind === 'proposal' && e.tier === tier)
       .map((e) => e.day);
     assert.deepEqual(
       days,
@@ -99,16 +99,16 @@ test("a measure's change: in its range, never the rule as it stands; carried int
   ]);
 });
 
-test("a proposal: put by seed, its vote scheduled at its closing; the player's league is mailed", () => {
-  const { s, league, id } = put();
-  const p = proposalOf(s, league, id)!;
+test("a proposal: put by seed, its vote scheduled at its closing; the player's tier is mailed", () => {
+  const { s, tier, id } = put();
+  const p = proposalOf(s, tier, id)!;
   assert.equal(p.decided, null);
   assert.equal(p.closes, s.day + A.open - 1);
   assert.ok(
     s.queue.some(
       (e) =>
         e.kind === 'vote' &&
-        e.league === league &&
+        e.tier === tier &&
         e.proposal === id &&
         e.day === p.closes
     )
@@ -118,97 +118,109 @@ test("a proposal: put by seed, its vote scheduled at its closing; the player's l
 });
 
 test('Vote and Lobby: refusals; a vote cast; a sum lobbied paid and its sway added', () => {
-  const { s, league, id } = put();
+  const { s, tier, id } = put();
   const me = ME();
   refused(s, { kind: 'Vote', proposal: 9999, side: 'for' }, 'proposal');
   refused(s, { kind: 'Vote', proposal: id, side: 'maybe' as 'for' }, 'side');
   refused(
-    { ...s, day: proposalOf(s, league, id)!.closes + 1 },
+    { ...s, day: proposalOf(s, tier, id)!.closes + 1 },
     { kind: 'Vote', proposal: id, side: 'for' },
     'closed'
   );
   const t = must(s, { kind: 'Vote', proposal: id, side: 'against' });
-  assert.equal(proposalOf(t, league, id)!.votes[me], 'against');
+  assert.equal(proposalOf(t, tier, id)!.votes[me], 'against');
   refused(
     s,
-    { kind: 'Lobby', proposal: id, side: 'abstain' as 'for', coin: 100 },
+    { kind: 'Lobby', proposal: id, side: 'abstain' as 'for', balance: 100 },
     'side'
   );
-  refused(s, { kind: 'Lobby', proposal: id, side: 'for', coin: 0 }, 'coin');
   refused(
-    withCrew(s, me, (c) => ({ ...c, coin: c.debtFloor })),
-    { kind: 'Lobby', proposal: id, side: 'for', coin: 100 },
-    'coin'
+    s,
+    { kind: 'Lobby', proposal: id, side: 'for', balance: 0 },
+    'balance'
   );
-  const u = must(s, { kind: 'Lobby', proposal: id, side: 'for', coin: 1000 });
-  assert.equal(u.crews[me].coin, s.crews[me].coin - 1000);
-  assert.equal(proposalOf(u, league, id)!.lobbied.for, 1000 * A.lobby);
+  refused(
+    withTeam(s, me, (c) => ({ ...c, balance: c.debtFloor })),
+    { kind: 'Lobby', proposal: id, side: 'for', balance: 100 },
+    'balance'
+  );
+  const u = must(s, {
+    kind: 'Lobby',
+    proposal: id,
+    side: 'for',
+    balance: 1000,
+  });
+  assert.equal(u.teams[me].balance, s.teams[me].balance - 1000);
+  assert.equal(proposalOf(u, tier, id)!.lobbied.for, 1000 * A.lobby);
   assert.ok(u.ledger.some((l) => l.kind === 'lobby'));
 });
 
 test("sway: a rival's reputation × Politics u, the player's reputation; each side's its backers' and what was lobbied", () => {
-  const { s, league, id } = put();
+  const { s, tier, id } = put();
   const me = ME();
-  assert.equal(swayOf(s, me), s.gulls[s.player!.gull].reputation);
+  assert.equal(swayOf(s, me), s.people[s.player!.person].reputation);
   const p = {
-    ...proposalOf(s, league, id)!,
+    ...proposalOf(s, tier, id)!,
     votes: { [me]: 'for' as const },
     lobbied: { for: 5, against: 7 },
   };
-  const w = sways(s, league, p);
+  const w = sways(s, tier, p);
   assert.equal(w.for, 5 + swayOf(s, me));
   assert.equal(w.against, 7);
 });
 
 test('the count: rivals vote by their measure, the player abstains if silent, abstainers swayed; carried changes next season only', () => {
-  const { s, league, id } = put();
+  const { s, tier, id } = put();
   const me = ME();
-  const p = proposalOf(s, league, id)!;
+  const p = proposalOf(s, tier, id)!;
   const t = counted(
     { ...s, day: p.closes },
-    { kind: 'vote', league, proposal: id, day: 0, seq: 0 },
+    { kind: 'vote', tier, proposal: id, day: 0, seq: 0 },
     dice(s.seed, s.streams)
   );
-  const q = proposalOf(t, league, id)!;
+  const q = proposalOf(t, tier, id)!;
   assert.notEqual(q.decided, null);
-  assert.equal(Object.keys(q.votes).length, s.leagues[league].crews.length);
+  assert.equal(Object.keys(q.votes).length, s.championships[tier].teams.length);
   assert.equal(q.votes[me], 'abstain');
-  for (const crew of s.leagues[league].crews)
-    if (crew !== me && rivalSide(s, crew, p.change) !== 'abstain')
-      assert.equal(q.votes[crew], rivalSide(s, crew, p.change));
+  for (const team of s.championships[tier].teams)
+    if (team !== me && rivalSide(s, team, p.change) !== 'abstain')
+      assert.equal(q.votes[team], rivalSide(s, team, p.change));
   const yes = Object.values(q.votes).filter((v) => v === 'for').length,
     no = Object.values(q.votes).filter((v) => v === 'against').length;
   assert.equal(q.decided, yes > no, 'votes cast decide; a tie keeps the rule');
   assert.deepEqual(
-    t.leagues[league].rules,
-    s.leagues[league].rules,
+    t.championships[tier].rules,
+    s.championships[tier].rules,
     "this season's rules stand"
   );
   assert.deepEqual(
-    t.leagues[league].next,
+    t.championships[tier].next,
     q.decided
-      ? changed(s.leagues[league].next, p.change)
-      : s.leagues[league].next
+      ? changed(s.championships[tier].next, p.change)
+      : s.championships[tier].next
   );
   assert.ok(t.mail.some((m) => m.kind === 'voteResult'));
   assert.equal(
     counted(
       t,
-      { kind: 'vote', league, proposal: id, day: 0, seq: 0 },
+      { kind: 'vote', tier, proposal: id, day: 0, seq: 0 },
       dice(s.seed, s.streams)
     ),
     t,
     'counted once'
   );
   const turned = rulesTurned(t);
-  assert.deepEqual(turned.leagues[league].rules, t.leagues[league].next);
-  assert.equal(turned.leagues[league].proposals.length, 0);
+  assert.deepEqual(
+    turned.championships[tier].rules,
+    t.championships[tier].next
+  );
+  assert.equal(turned.championships[tier].proposals.length, 0);
 });
 
 test("a rival's measure: strong in a type, against making it spec; poor gunners, for a ban; near even, abstain", () => {
   const s = founded();
-  const rival = (ME() + 1) % s.crews.length;
-  const strong = withCrew(s, rival, (c) => ({
+  const rival = (ME() + 1) % s.teams.length;
+  const strong = withTeam(s, rival, (c) => ({
     ...c,
     parts: c.parts.map(
       (p): Part =>
@@ -228,66 +240,69 @@ test("a rival's measure: strong in a type, against making it spec; poor gunners,
     'prizeSpread',
     'inspection',
   ] as Measure[]) {
-    const c = changeOf(m, s.leagues[0].next, () => 0.3)!;
+    const c = changeOf(m, s.championships[0].next, () => 0.3)!;
     const v = lean(s, rival, c);
     assert.ok(v >= -1 && v <= 1, `${m}: ${v}`);
   }
 });
 
-test("the rivals' rows: yard, design, build, patrons, suppliers and vote, each through the player's functions", () => {
+test("the rivals' rows: improvement, design, build, sponsors, suppliers and vote, each through the player's functions", () => {
   assert.ok(
-    ['yard', 'design', 'build', 'patrons', 'suppliers', 'vote'].every(
+    ['improvement', 'design', 'build', 'sponsors', 'suppliers', 'vote'].every(
       (r) => r in ROWS
     )
   );
   let s = founded();
-  const rival = s.crews.find(
-    (c) => !c.player && c.staff.manager !== null && c.staff.shipwright !== null
+  const rival = s.teams.find(
+    (c) => !c.player && c.staff.manager !== null && c.staff.designer !== null
   )!.id;
-  s = withCrew(s, rival, (c) => ({ ...c, coin: 50000 }));
+  s = withTeam(s, rival, (c) => ({ ...c, balance: 50000 }));
   const roll = dice(s.seed, s.streams);
   assert.ok(mindOf(s, rival)!.room > 0);
-  const yard = decide(s, rival, roll, ['yard']);
-  assert.ok(yard.crews[rival].yard.length > 0, 'a split set');
+  const improvement = decide(s, rival, roll, ['improvement']);
+  assert.ok(improvement.teams[rival].improvement.length > 0, 'a split set');
   assert.ok(
-    yard.crews[rival].yard.reduce((a, x) => a + x.perf + x.reliability, 0) <=
+    improvement.teams[rival].improvement.reduce(
+      (a, x) => a + x.perf + x.reliability,
+      0
+    ) <=
       1 + 1e-9
   );
   const design = decide(s, rival, roll, ['design']);
-  assert.ok(design.crews[rival].design !== null, 'a design started');
-  assert.ok(design.crews[rival].coin < s.crews[rival].coin);
+  assert.ok(design.teams[rival].design !== null, 'a design started');
+  assert.ok(design.teams[rival].balance < s.teams[rival].balance);
   const sup = decide(s, rival, roll, ['suppliers']);
   assert.ok(
-    sup.crews[rival].suppliers.timber !== null &&
-      sup.crews[rival].suppliers.canvas !== null
+    sup.teams[rival].suppliers.timber !== null &&
+      sup.teams[rival].suppliers.canvas !== null
   );
   const off = offerAll(s, rival);
-  const pat = decide(off, rival, roll, ['patrons']);
+  const pat = decide(off, rival, roll, ['sponsors']);
   assert.ok(
-    pat.crews[rival].patrons.some((p) => p !== null),
-    'a patron signed'
+    pat.teams[rival].sponsors.some((p) => p !== null),
+    'a sponsor signed'
   );
-  const league = s.crews[rival].league;
+  const tier = s.teams[rival].tier;
   const v = proposalPut(
     s,
-    { kind: 'proposal', league, round: 3, day: 0, seq: 0 },
+    { kind: 'proposal', tier, round: 3, day: 0, seq: 0 },
     roll
   );
   const voted = decide(v, rival, roll, ['vote']);
-  const pid = v.leagues[league].proposals[0].id;
+  const pid = v.championships[tier].proposals[0].id;
   assert.equal(
-    proposalOf(voted, league, pid)!.votes[rival],
-    rivalSide(v, rival, proposalOf(v, league, pid)!.change)
+    proposalOf(voted, tier, pid)!.votes[rival],
+    rivalSide(v, rival, proposalOf(v, tier, pid)!.change)
   );
-  for (const t of [yard, design, sup, pat, voted]) invariants(t);
+  for (const t of [improvement, design, sup, pat, voted]) invariants(t);
 });
 
-/** A crew with offers standing. */
-function offerAll(s: CareerState, crew: number): CareerState {
-  return withCrew(s, crew, (c) => ({
+/** A team with offers standing. */
+function offerAll(s: CareerState, team: number): CareerState {
+  return withTeam(s, team, (c) => ({
     ...c,
     offers: [1, 2].map((i) => ({
-      patron: {
+      sponsor: {
         id: 9000 + i,
         name: `P${i}`,
         perRace: 100 * i,
@@ -303,17 +318,17 @@ function offerAll(s: CareerState, crew: number): CareerState {
 
 test("a rival builds in its personality's order when its room allows", () => {
   let s = founded();
-  const rival = s.crews.find(
+  const rival = s.teams.find(
     (c) =>
       !c.player &&
       c.staff.manager !== null &&
       Object.values(c.buildings).some((b) => b.level < 3)
   )!.id;
-  s = withCrew(s, rival, (c) => ({ ...c, coin: 200000 }));
+  s = withTeam(s, rival, (c) => ({ ...c, balance: 200000 }));
   const t = decide(s, rival, dice(s.seed, s.streams), ['build']);
   assert.ok(
-    Object.values(t.crews[rival].buildings).some((b) => b.next !== null),
+    Object.values(t.teams[rival].buildings).some((b) => b.next !== null),
     'works begun'
   );
-  assert.ok(t.queue.some((e) => e.kind === 'building' && e.crew === rival));
+  assert.ok(t.queue.some((e) => e.kind === 'building' && e.team === rival));
 });

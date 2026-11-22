@@ -149,11 +149,11 @@ test('a refused command is not journaled; a failed append changes nothing and sa
   assert.ok(first.ok);
   if (!first.ok) return;
   const refused = await send(store, first.kept, {
-    kind: 'MoveFlightJob',
-    gull: -1,
+    kind: 'MovePitJob',
+    person: -1,
     job: 'mend',
   });
-  assert.ok(!refused.ok && refused.reason.code === 'notFlight');
+  assert.ok(!refused.ok && refused.reason.code === 'notPit');
   assert.equal(store.writes(), 1, 'a refused command writes nothing');
   const failed = await send(store, first.kept, { kind: 'Advance' });
   assert.ok(!failed.ok && failed.reason.code === 'unsaved');
@@ -209,8 +209,8 @@ test('a torn tail is dropped, the player told what was lost, and the store cut b
   const disk = emptyDisk();
   const { kept } = await run(memoryStore(disk), SHORT.slice(0, 10));
   const extra = entry(kept.tip, kept.seq + 1, TUNING_VERSION, {
-    kind: 'MoveFlightJob',
-    gull: 0,
+    kind: 'MovePitJob',
+    person: 0,
     job: 'mend',
   });
   disk.entries.push(JSON.stringify(extra).slice(0, 30));
@@ -364,7 +364,7 @@ test('a save of schema 1 (the fixture) loads; a save from a newer schema is not 
   assert.equal(opened.kept.state.day, 14);
   assert.equal(opened.lost, null);
   assert.equal(
-    opened.kept.state.crews[opened.kept.state.player!.crew].name,
+    opened.kept.state.teams[opened.kept.state.player!.team].name,
     'Inkwell Quillers'
   );
   assert.equal(opened.migratedFrom, null);

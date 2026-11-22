@@ -5,7 +5,7 @@ import { random } from '../src/world/random.ts';
 import * as svc from '../src/career/service.ts';
 import * as staff from '../src/career/staff.ts';
 import * as lead from '../src/career/leadership.ts';
-import { ROLE_STATS, type GullOf } from '../src/career/roles.ts';
+import { ROLE_STATS, type PersonOf } from '../src/career/roles.ts';
 import { TUNING } from '../src/career/tuning.ts';
 import type { Job } from '../src/race.ts';
 
@@ -25,24 +25,24 @@ const falls = (f: (x: number) => number, what: string) =>
 
 test('every role has its stats (D37)', () => {
   assert.deepEqual(Object.keys(ROLE_STATS).sort(), [
-    'bosun',
-    'captain',
-    'elder',
-    'flight',
+    'mechanic',
+    'driver',
+    'chairman',
+    'pit',
     'manager',
     'scout',
-    'shipwright',
+    'designer',
   ]);
-  assert.equal(ROLE_STATS.captain.length, 9);
-  assert.equal(ROLE_STATS.bosun.length, 8);
-  assert.equal(ROLE_STATS.shipwright.length, 9);
+  assert.equal(ROLE_STATS.driver.length, 9);
+  assert.equal(ROLE_STATS.mechanic.length, 8);
+  assert.equal(ROLE_STATS.designer.length, 9);
   assert.equal(ROLE_STATS.scout.length, 5);
-  assert.equal(ROLE_STATS.flight.length, 6);
+  assert.equal(ROLE_STATS.pit.length, 6);
   assert.equal(ROLE_STATS.manager.length, 6);
-  assert.equal(ROLE_STATS.elder.length, 4);
+  assert.equal(ROLE_STATS.chairman.length, 4);
 });
 
-test('captain: Feedback gives more points, to the part furthest below its maximum', () => {
+test('driver: Feedback gives more points, to the part furthest below its maximum', () => {
   rises(staff.feedbackPoints, 'Feedback points');
   assert.equal(staff.feedbackPoints(20), 30);
   const parts = [
@@ -61,20 +61,20 @@ test('captain: Feedback gives more points, to the part furthest below its maximu
   );
 });
 
-test('bosun: each stat moves its factor the right way', () => {
+test('mechanic: each stat moves its factor the right way', () => {
   rises(svc.repairsFactor, 'Repairs (part rate)');
   rises(svc.mendingFactor, 'Mending (mend rate)');
-  falls(svc.arriveSeconds, 'Flight Handling (seconds to arrive)');
+  falls(svc.arriveSeconds, 'Pit Handling (seconds to arrive)');
   assert.ok(
     Math.abs(svc.arriveSeconds(20) - 3) < 1e-9 &&
       Math.abs(svc.arriveSeconds(0) - 5) < 1e-9
   );
   falls(svc.concentrationFactor, 'Concentration (botch)');
-  falls(svc.leadershipFatigue, 'Leadership (flight fatigue)');
-  rises(svc.leadershipMorale, 'Leadership (flight morale)');
+  falls(svc.leadershipFatigue, 'Leadership (pit fatigue)');
+  rises(svc.leadershipMorale, 'Leadership (pit morale)');
   assert.equal(svc.leadershipMorale(10), 0);
-  rises(svc.reliabilityYard, 'Reliability (yard to reliability)');
-  rises(svc.perfYard, 'Performance (yard to performance)');
+  rises(svc.reliabilityImprovement, 'Reliability (improvement to reliability)');
+  rises(svc.perfImprovement, 'Performance (improvement to performance)');
   rises(svc.bondGain, 'Chemistry (bond a race)');
   assert.equal(svc.bondGain(0), 1);
   assert.equal(svc.bondGain(20), 2);
@@ -85,9 +85,9 @@ test('bond: levels at 5, 12 and 20 unlock arriving sooner, a free repair and a f
     [0, 4.9, 5, 11.9, 12, 19.9, 20, 40].map(svc.bondLevel),
     [0, 0, 1, 1, 2, 2, 3, 3]
   );
-  const base: svc.Crewing = {
-    bosun: null,
-    flight: [],
+  const base: svc.Teaming = {
+    mechanic: null,
+    pit: [],
     order: ['part', 'mend', 'gust', 'stores'],
     bond: 0,
   };
@@ -100,7 +100,7 @@ test('bond: levels at 5, 12 and 20 unlock arriving sooner, a free repair and a f
   assert.equal(at(20).gustRecharge, 0.9);
 });
 
-const flightStats = (v: number): GullOf<'flight'>['stats'] => ({
+const pitStats = (v: number): PersonOf<'pit'>['stats'] => ({
   speed: v,
   strength: v,
   precision: v,
@@ -109,12 +109,12 @@ const flightStats = (v: number): GullOf<'flight'>['stats'] => ({
   stamina: v,
 });
 
-test("flight: each stat of a job's weights raises its rating; fatigue lowers the rate and raises botch", () => {
-  const weights = TUNING.flight.weights;
+test("pit: each stat of a job's weights raises its rating; fatigue lowers the rate and raises botch", () => {
+  const weights = TUNING.pit.weights;
   for (const job of Object.keys(weights) as Job[]) {
     for (const k of Object.keys(weights[job])) {
       rises(
-        (x) => svc.rating({ ...flightStats(10), [k]: x }, job),
+        (x) => svc.rating({ ...pitStats(10), [k]: x }, job),
         `${k} for ${job}`
       );
     }
@@ -124,8 +124,8 @@ test("flight: each stat of a job's weights raises its rating; fatigue lowers the
     ).filter((k) => !(k in weights[job]));
     for (const k of outside)
       assert.equal(
-        svc.rating({ ...flightStats(10), [k]: LOW }, job),
-        svc.rating({ ...flightStats(10), [k]: HIGH }, job)
+        svc.rating({ ...pitStats(10), [k]: LOW }, job),
+        svc.rating({ ...pitStats(10), [k]: HIGH }, job)
       );
   }
   rises((r) => svc.jobRate(r / 20, 0), 'rating (rate)');
@@ -138,7 +138,7 @@ test("flight: each stat of a job's weights raises its rating; fatigue lowers the
   assert.equal(svc.fatigueGained(0), 37.5);
 });
 
-test('flight: fatigue falls 10 × (1 + flight loft level) a day, in closed form, never below 0', () => {
+test('pit: fatigue falls 10 × (1 + pit loft level) a day, in closed form, never below 0', () => {
   const g = { fatigue: 80, fatigueDay: 10 };
   assert.equal(svc.fatigueOn(g, 10, 1), 80);
   assert.equal(svc.fatigueOn(g, 12, 1), 40);
@@ -147,14 +147,14 @@ test('flight: fatigue falls 10 × (1 + flight loft level) a day, in closed form,
   assert.ok(svc.recovery(3) > svc.recovery(1));
 });
 
-test("service: the bosun's factors and the flight's ratings land in the Service the sim reads", () => {
-  const flight = (v: number, fatigue = 0) =>
+test("service: the mechanic's factors and the pit crew's ratings land in the Service the sim reads", () => {
+  const pit = (v: number, fatigue = 0) =>
     (['mend', 'gust', 'stores', 'part'] as Job[]).map((job) => ({
       job,
-      stats: flightStats(v),
+      stats: pitStats(v),
       fatigue,
     }));
-  const bosun = (v: number): GullOf<'bosun'>['stats'] => ({
+  const mechanic = (v: number): PersonOf<'mechanic'>['stats'] => ({
     repairs: v,
     mending: v,
     handling: v,
@@ -166,23 +166,23 @@ test("service: the bosun's factors and the flight's ratings land in the Service 
   });
   const at = (b: number, f: number, fatigue = 0) =>
     svc.service({
-      bosun: bosun(b),
-      flight: flight(f, fatigue),
+      mechanic: mechanic(b),
+      pit: pit(f, fatigue),
       order: ['part', 'mend', 'gust', 'stores'],
       bond: 0,
     });
   for (const job of ['mend', 'gust', 'stores', 'part'] as Job[]) {
     assert.ok(
       at(10, HIGH).rate[job] > at(10, LOW).rate[job],
-      `flight raise ${job}'s rate`
+      `pit raise ${job}'s rate`
     );
     assert.ok(
       at(10, HIGH).botch[job] < at(10, LOW).botch[job],
-      `flight lower ${job}'s botch`
+      `pit lower ${job}'s botch`
     );
     assert.ok(
       at(HIGH, 10).botch[job] < at(LOW, 10).botch[job],
-      `bosun lowers ${job}'s botch`
+      `mechanic lowers ${job}'s botch`
     );
     assert.ok(
       at(10, 10, 80).rate[job] < at(10, 10, 0).rate[job],
@@ -194,14 +194,14 @@ test("service: the bosun's factors and the flight's ratings land in the Service 
   assert.equal(
     at(HIGH, 10).rate.gust,
     at(LOW, 10).rate.gust,
-    'the bosun touches only mend and part'
+    'the mechanic touches only mend and part'
   );
   assert.ok(at(HIGH, 10).arrive < at(LOW, 10).arrive);
   assert.ok(at(10, HIGH).underFire < at(10, LOW).underFire);
   assert.deepEqual(at(10, 10).order, ['part', 'mend', 'gust', 'stores']);
 });
 
-test('shipwright: type stats start designs higher; Innovation teaches more; Speed and Accuracy shorten and narrow', () => {
+test('designer: type stats start designs higher; Innovation teaches more; Speed and Accuracy shorten and narrow', () => {
   rises(staff.designHead, 'a type stat (start)');
   assert.equal(staff.designHead(10), 80);
   rises(staff.innovationChance, 'Innovation');
@@ -243,7 +243,7 @@ test("scout: Judgement narrows and centres the star range; Insight the potential
   assert.deepEqual(staff.shownRange(3, 1), [2.5, 3.5]);
 });
 
-test('scout: Reach sees free agents and the own league always, the adjacent at 7, all at 14; Speed shortens; Persuasion persuades', () => {
+test('scout: Reach sees free agents and the own tier always, the adjacent at 7, all at 14; Speed shortens; Persuasion persuades', () => {
   assert.equal(staff.inReach(0, 2, null), true);
   assert.equal(staff.inReach(0, 2, 2), true);
   assert.equal(staff.inReach(6.9, 2, 1), false);
@@ -270,25 +270,26 @@ test('scout: Reach sees free agents and the own league always, the adjacent at 7
   );
 });
 
-test('manager: Negotiation bids lower, Talent Eye weighs potential, Finance commits more, Development sharpens the yard, Tactics holds, Politics sways', () => {
+test('manager: Negotiation bids lower, Talent Eye weighs potential, Finance commits more, Development sharpens the improvement, Tactics holds, Politics sways', () => {
   falls(lead.bidShare, 'Negotiation (bid)');
   rises(
     (t) => lead.worth(t, 2, 4),
-    'Talent Eye (worth of a high-potential gull)'
+    'Talent Eye (worth of a high-potential person)'
   );
   falls(
     (t) => lead.worth(t, 4, 2),
-    'Talent Eye (worth of a gull past potential)'
+    'Talent Eye (worth of a person past potential)'
   );
   rises((f) => lead.commitment(f, 1000, -500), 'Finance (commitment)');
   assert.equal(lead.commitment(20, -900, -500), 0);
   const needs = [3, 1, 0.5];
   rises(
-    (d) => lead.yardSplit(d, needs)[0],
+    (d) => lead.improvementSplit(d, needs)[0],
     'Development (share to the neediest)'
   );
   assert.ok(
-    Math.abs(lead.yardSplit(10, needs).reduce((a, b) => a + b) - 1) < 1e-9
+    Math.abs(lead.improvementSplit(10, needs).reduce((a, b) => a + b) - 1) <
+      1e-9
   );
   const holds = (t: number) => {
     const rand = random(4);
@@ -300,7 +301,7 @@ test('manager: Negotiation bids lower, Talent Eye weighs potential, Finance comm
   rises((p) => lead.sway(p, 60), 'Politics (sway)');
 });
 
-test('elder: Ambition raises the target, Patience softens falls, Generosity gives and lowers the floor, Meddling meddles', () => {
+test('chairman: Ambition raises the target, Patience softens falls, Generosity gives and lowers the floor, Meddling meddles', () => {
   falls(
     (a) => lead.targetPlace(a, 20),
     'Ambition (target place, lower is higher)'
@@ -315,9 +316,9 @@ test('elder: Ambition raises the target, Patience softens falls, Generosity give
   );
   assert.equal(lead.confidenceMove(10, 10, 2, 10), 4, 'a rise is capped at 4');
   assert.ok(lead.confidenceMove(0, 1, 40, 10) >= -5 * 1.3 - 1e-9);
-  assert.equal(lead.debtMove(-10, -100), TUNING.elder.debt);
-  assert.equal(lead.debtMove(-200, -100), TUNING.elder.pastFloor);
-  assert.ok(TUNING.elder.pastFloor < 0, 'past the floor costs confidence');
+  assert.equal(lead.debtMove(-10, -100), TUNING.chairman.debt);
+  assert.equal(lead.debtMove(-200, -100), TUNING.chairman.pastFloor);
+  assert.ok(TUNING.chairman.pastFloor < 0, 'past the floor costs confidence');
   assert.equal(lead.debtMove(5, -100), 0);
   rises((g) => lead.endowment(g, 1000), 'Generosity (endowment)');
   falls((g) => lead.debtFloor(g, 1000), 'Generosity (floor, lower is deeper)');

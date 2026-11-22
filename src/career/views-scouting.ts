@@ -1,21 +1,21 @@
-// `market` (Phase C batch 2): every gull of a role the filter lets through, as the player's crew sees them, the
+// `market` (Phase C batch 2): every person of a role the filter lets through, as the player's team sees them, the
 // shortlist, and the scouts at work with the crow's nest that sets how many there may be. Pure, read-side.
 
 import type { Role } from '../office.ts';
 import type {
-  MarketFilter,
-  MarketRow,
-  MarketView,
+  ScoutingFilter,
+  ScoutingRow,
+  ScoutingView,
   ScoutRow,
 } from '../office-people.ts';
 import { closing } from './contracts.ts';
 import { effective } from './effective.ts';
-import { leagueOf } from './knowledge.ts';
+import { tierOf } from './knowledge.ts';
 import { askOf } from './market.ts';
-import type { Gull, GullOf } from './roles.ts';
+import type { Person, PersonOf } from './roles.ts';
 import { inReach } from './staff.ts';
 import { stars } from './stars.ts';
-import type { CareerState, Crew } from './state.ts';
+import type { CareerState, Team } from './state.ts';
 import {
   ROLE_NAMES,
   ageOf,
@@ -23,10 +23,10 @@ import {
   openPosts,
   seen,
   whereText,
-} from './views-gull.ts';
+} from './views-person.ts';
 import {
-  coinText,
-  crewOf,
+  moneyText,
+  teamOf,
   faceOf,
   fig,
   line,
@@ -35,40 +35,42 @@ import {
   topBar,
 } from './views.ts';
 
-/** The roles a market lists (managers and elders are hired by elders, not offered contracts). */
+/** The roles a market lists (managers and chairmen are hired by chairmen, not offered contracts). */
 const ROLES: readonly Role[] = [
-  'captain',
-  'bosun',
-  'shipwright',
+  'driver',
+  'mechanic',
+  'designer',
   'scout',
-  'flight',
+  'pit',
 ];
 
-/** The filter a market opens on: the first open post's role, else captains. */
-export function defaultFilter(s: CareerState): MarketFilter {
+/** The filter a market opens on: the first open post's role, else drivers. */
+export function defaultFilter(s: CareerState): ScoutingFilter {
   return {
-    role: openPosts(s, crewOf(s))[0]?.role ?? 'captain',
-    league: null,
+    role: openPosts(s, teamOf(s))[0]?.role ?? 'driver',
+    tier: null,
     contract: 'any',
     known: false,
     stars: 0,
   };
 }
 
-/** Whether a gull passes a filter, as a crew sees them. */
-function passes(s: CareerState, c: Crew, g: Gull, f: MarketFilter): boolean {
+/** Whether a person passes a filter, as a team sees them. */
+function passes(
+  s: CareerState,
+  c: Team,
+  g: Person,
+  f: ScoutingFilter
+): boolean {
   if (
     g.role !== f.role ||
     g.retired !== null ||
     g.player ||
-    g.contract?.crew === c.id
+    g.contract?.team === c.id
   )
     return false;
-  const league = leagueOf(s, g);
-  if (
-    f.league !== null &&
-    (f.league === 3 ? league !== null : league !== f.league)
-  )
+  const tier = tierOf(s, g);
+  if (f.tier !== null && (f.tier === 3 ? tier !== null : tier !== f.tier))
     return false;
   if (f.contract === 'free' && g.contract) return false;
   if (f.contract === 'closing' && (!g.contract || !closing(s, g.contract)))
@@ -78,10 +80,10 @@ function passes(s: CareerState, c: Crew, g: Gull, f: MarketFilter): boolean {
   return v.stars.hi >= f.stars;
 }
 
-/** A gull as the market lists them. */
-function row(s: CareerState, c: Crew, g: Gull): MarketRow {
+/** A person as the market lists them. */
+function row(s: CareerState, c: Team, g: Person): ScoutingRow {
   const v = seen(s, c.id, g.id),
-    talk = s.talks.find((t) => t.crew === c.id && t.gull === g.id);
+    talk = s.talks.find((t) => t.team === c.id && t.person === g.id);
   return {
     id: g.id,
     face: faceOf(s, g),
@@ -89,13 +91,13 @@ function row(s: CareerState, c: Crew, g: Gull): MarketRow {
     age: ageOf(s, g),
     stars: v.stars,
     potential: v.potential,
-    crew: whereText(s, g).crew,
+    team: whereText(s, g).team,
     contract: !g.contract
       ? 'Free'
       : g.contract.ends === null
         ? 'Open'
         : `S${g.contract.ends + 1}${closing(s, g.contract) ? ' · ending' : ''}`,
-    ask: coinText(askOf(s, g, c).wage),
+    ask: moneyText(askOf(s, g, c).wage),
     talk: talk
       ? talk.counter
         ? 'Countered'
@@ -108,20 +110,20 @@ function row(s: CareerState, c: Crew, g: Gull): MarketRow {
 
 const reachText = (r: number) =>
   inReach(r, 0, 2)
-    ? 'All leagues'
+    ? 'All championships'
     : inReach(r, 0, 1)
-      ? 'Next league'
-      : 'Own league';
+      ? 'Next tier'
+      : 'Own tier';
 
 /** `market` on a filter (null: the default) with the session's shortlist. */
-export function marketView(
+export function scoutingView(
   s: CareerState,
-  filter: MarketFilter | null,
+  filter: ScoutingFilter | null,
   shortlist: readonly number[]
-): MarketView {
-  const c = crewOf(s),
+): ScoutingView {
+  const c = teamOf(s),
     f = filter ?? defaultFilter(s);
-  const rows = s.gulls
+  const rows = s.people
     .filter((g) => passes(s, c, g, f))
     .map((g) => row(s, c, g))
     .sort(
@@ -130,7 +132,7 @@ export function marketView(
         a.name.localeCompare(b.name)
     );
   const scouts: ScoutRow[] = c.staff.scouts.map((id) => {
-    const g = s.gulls[id] as GullOf<'scout'>,
+    const g = s.people[id] as PersonOf<'scout'>,
       job = s.scouting.find((x) => x.scout === id) ?? null;
     const left = job ? Math.max(0, job.done - s.day) : 0;
     return {
@@ -139,7 +141,7 @@ export function marketView(
       name: nameOf(g),
       stars: Math.round(stars(g) * 2) / 2,
       reach: reachText(effective(g, null).reach),
-      on: job ? nameOf(s.gulls[job.gull]) : null,
+      on: job ? nameOf(s.people[job.person]) : null,
       days: job
         ? fig(left, `${left}d`, rival('report', dayText(s, job.done)), {
             title: 'Scouting',
@@ -160,8 +162,8 @@ export function marketView(
     rows,
     count: `${rows.length}`,
     shortlist: shortlist
-      .filter((id) => s.gulls[id] && !s.gulls[id].retired)
-      .map((id) => row(s, c, s.gulls[id])),
+      .filter((id) => s.people[id] && !s.people[id].retired)
+      .map((id) => row(s, c, s.people[id])),
     scouts,
     nest: fig(
       nest,

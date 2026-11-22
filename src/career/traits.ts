@@ -1,6 +1,6 @@
 // Traits (Phase B section 2.3), as data: an id, a name, the roles that may have one, a condition the career can
-// evaluate (the planet, the round, the rules, a rival on the grid, contract state, age, league), and a modifier (to
-// stats, morale, marketability, wants, wage, Coin a race, or the crew's young captains' growth). A gull has at most
+// evaluate (the planet, the round, the rules, a rival on the grid, contract state, age, tier), and a modifier (to
+// stats, morale, marketability, wants, wage, Coin a race, or the team's young drivers' growth). A person has at most
 // three; they gain or lose them at a season's end by seed (`turned`) and by events.
 
 import type { Rules } from '../race.ts';
@@ -13,11 +13,11 @@ export interface Setting {
   pace: number; // the race's storm pace (the planet's under the rules)
   round: number; // 0 the season's first
   rules: Rules;
-  grid: readonly number[]; // the crews on the grid
-  grudge: number | null; // the crew that last sank her
+  grid: readonly number[]; // the teams on the grid
+  grudge: number | null; // the team that last sank her
   daysLeft: number | null; // in her contract; null with none
   age: number;
-  league: number | null; // her crew's
+  tier: number | null; // her team's
 }
 
 /** What a trait changes. `all` shifts every stat of her role; a named stat shifts only if her role has it. */
@@ -27,8 +27,8 @@ export interface Modifier {
   morale: number; // a race
   marketability: number;
   wage: number; // her ask × (1 + this)
-  coin: number; // × her marketability, Coin a race to her crew
-  growth: number; // to her crew's captains under the mentor age
+  balance: number; // × her marketability, Coin a race to her team
+  growth: number; // to her team's drivers under the mentor age
   wants: Want | null; // a want she always ranks first
 }
 
@@ -41,21 +41,21 @@ export interface Trait {
 }
 
 const ALWAYS = () => true;
-const SAILORS: readonly Role[] = ['captain'];
+const SAILORS: readonly Role[] = ['driver'];
 const ANY: readonly Role[] = [
-  'captain',
-  'bosun',
-  'shipwright',
+  'driver',
+  'mechanic',
+  'designer',
   'scout',
-  'flight',
+  'pit',
   'manager',
 ];
 const HANDS: readonly Role[] = [
-  'captain',
-  'bosun',
-  'shipwright',
+  'driver',
+  'mechanic',
+  'designer',
   'scout',
-  'flight',
+  'pit',
 ];
 const T = TUNING.traits;
 const SEASON_DAYS =
@@ -84,11 +84,11 @@ export const TRAITS: readonly Trait[] = [
     mod: { marketability: 20 },
   },
   {
-    id: 'payCaptain',
-    name: 'Pay Captain',
+    id: 'payDriver',
+    name: 'Pay Driver',
     roles: SAILORS,
     when: ALWAYS,
-    mod: { coin: T.pay },
+    mod: { balance: T.pay },
   },
   {
     id: 'homebody',
@@ -114,7 +114,7 @@ export const TRAITS: readonly Trait[] = [
   {
     id: 'ironLungs',
     name: 'Iron Lungs',
-    roles: ['captain', 'flight'],
+    roles: ['driver', 'pit'],
     when: ALWAYS,
     mod: { stats: { stamina: 2 } },
   },
@@ -213,14 +213,14 @@ export const TRAITS: readonly Trait[] = [
     id: 'bigStage',
     name: 'Big Stage',
     roles: HANDS,
-    when: (s) => s.league === 0,
+    when: (s) => s.tier === 0,
     mod: { all: 1 },
   },
   {
     id: 'bigFish',
     name: 'Big Fish',
     roles: HANDS,
-    when: (s) => s.league === 2,
+    when: (s) => s.tier === 2,
     mod: { all: 1 },
   },
   { id: 'sunny', name: 'Sunny', roles: ANY, when: ALWAYS, mod: { morale: 1 } },
@@ -234,21 +234,21 @@ export const TRAITS: readonly Trait[] = [
   {
     id: 'tireless',
     name: 'Tireless',
-    roles: ['flight'],
+    roles: ['pit'],
     when: ALWAYS,
     mod: { stats: { stamina: 2, strength: 1 } },
   },
   {
     id: 'steadyHands',
     name: 'Steady Hands',
-    roles: ['flight', 'bosun'],
+    roles: ['pit', 'mechanic'],
     when: ALWAYS,
     mod: { stats: { precision: 2, concentration: 2 } },
   },
   {
     id: 'tinkerer',
     name: 'Tinkerer',
-    roles: ['shipwright'],
+    roles: ['designer'],
     when: ALWAYS,
     mod: { stats: { innovation: 2, accuracy: -1 } },
   },
@@ -267,8 +267,8 @@ export const TRAITS: readonly Trait[] = [
     mod: { stats: { negotiation: 2, persuasion: 2 } },
   },
   {
-    id: 'patronsDarling',
-    name: "Patron's Darling",
+    id: 'sponsorsDarling',
+    name: "Sponsor's Darling",
     roles: HANDS,
     when: ALWAYS,
     mod: { marketability: 8, wage: 0.05 },
@@ -306,7 +306,7 @@ const CLASH: readonly (readonly [string, string])[] = [
 export const clashes = (a: string, b: string): boolean =>
   CLASH.some(([x, y]) => (x === a && y === b) || (x === b && y === a));
 
-/** A trait a gull of a role with these traits could gain, on a draw, or null. */
+/** A trait a person of a role with these traits could gain, on a draw, or null. */
 export function gainable(
   role: Role,
   held: readonly string[],
@@ -320,7 +320,7 @@ export function gainable(
     : pick(rand, open).id;
 }
 
-/** A gull's traits after a season's end: one may be gained, one may be lost, on a draw of the 'traits' stream. */
+/** A person's traits after a season's end: one may be gained, one may be lost, on a draw of the 'traits' stream. */
 export function turned(
   role: Role,
   held: readonly string[],
@@ -336,11 +336,11 @@ export function turned(
   return out;
 }
 
-/** The unconditional modifier of each traits list already read: states are immutable, so a gull's list never changes
+/** The unconditional modifier of each traits list already read: states are immutable, so a person's list never changes
  *  (asks and marketability read it many times a review). Read only, never changed. */
 const unconditional = new WeakMap<readonly string[], Modifier>();
 
-/** What a gull's traits add up to in a setting (only those whose condition holds). Null setting: the unconditional. */
+/** What a person's traits add up to in a setting (only those whose condition holds). Null setting: the unconditional. */
 export function modifier(
   held: readonly string[],
   setting: Setting | null
@@ -360,7 +360,7 @@ function summed(held: readonly string[], setting: Setting | null): Modifier {
     morale: 0,
     marketability: 0,
     wage: 0,
-    coin: 0,
+    balance: 0,
     growth: 0,
     wants: null,
   };
@@ -374,7 +374,7 @@ function summed(held: readonly string[], setting: Setting | null): Modifier {
     out.morale += t.mod.morale ?? 0;
     out.marketability += t.mod.marketability ?? 0;
     out.wage += t.mod.wage ?? 0;
-    out.coin += t.mod.coin ?? 0;
+    out.balance += t.mod.balance ?? 0;
     out.growth += t.mod.growth ?? 0;
     out.wants = out.wants ?? t.mod.wants ?? null;
   }

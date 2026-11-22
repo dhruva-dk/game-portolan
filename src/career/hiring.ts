@@ -1,5 +1,5 @@
-// Hiring (Phase B section 5): offers, answers two days on (an approach to another crew's gull, seven), counters,
-// patience, the league rule, break clauses, dismissals, renewals and the contract's last days. The player's commands
+// Hiring (Phase B section 5): offers, answers two days on (an approach to another team's person, seven), counters,
+// patience, the tier rule, break clauses, dismissals, renewals and the contract's last days. The player's commands
 // and the rivals' bids (career/rivals.ts) go through the same checks and the same `offered` and `signed`.
 
 import type { Offer } from '../office.ts';
@@ -11,7 +11,7 @@ import {
   type Check,
   type Handlers,
 } from './command.ts';
-import { canSpend, paid } from './coin.ts';
+import { canSpend, paid } from './balance.ts';
 import {
   belowThem,
   breakCost,
@@ -29,7 +29,7 @@ import { roomOf } from './money.ts';
 import { moraleIn, silenceMove, wantsOut } from './morale.ts';
 import { mine, post } from './post.ts';
 import { schedule, unscheduled, type Event } from './queue.ts';
-import type { GullOf } from './roles.ts';
+import type { PersonOf } from './roles.ts';
 import { seatOf, seatRole, statuses } from './seats.ts';
 import { persuades } from './staff.ts';
 import type { CareerState, Talk } from './state.ts';
@@ -52,43 +52,43 @@ function shapeCheck(o: Offer): Check {
   if (!whole(o.seasons, 1, 3))
     return why('seasons', 'A contract runs one to three seasons.');
   if (o.replaces !== null && !whole(o.replaces, 0, 1e9))
-    return why('replaces', 'Name the gull they replace, or none.');
+    return why('replaces', 'Name the person they replace, or none.');
   return null;
 }
 
-/** Whether a crew may sign a gull on an offer now: who they are, the post, the league rule, the break clause, the coin.
+/** Whether a team may sign a person on an offer now: who they are, the post, the tier rule, the break clause, the balance.
  *  The checks an answer repeats on its day. */
 export function signableCheck(
   s: CareerState,
-  crew: number,
-  gull: number,
+  team: number,
+  person: number,
   o: Offer
 ): Check {
-  const c = s.crews[crew];
-  const g = s.gulls[gull];
-  if (!c || !g) return why('who', 'No such gull.');
+  const c = s.teams[team];
+  const g = s.people[person];
+  if (!c || !g) return why('who', 'No such person.');
   if (g.retired !== null) return why('retired', 'They have retired.');
-  if (g.player || g.role === 'manager' || g.role === 'elder')
+  if (g.player || g.role === 'manager' || g.role === 'chairman')
     return why(
       'role',
-      'Managers and elders are hired by elders, not offered contracts.'
+      'Managers and chairmen are hired by chairmen, not offered contracts.'
     );
   if (o.role !== g.role) return why('role', `They are a ${g.role}.`);
   if (!statuses(g.role).includes(o.status))
     return why(
       'status',
-      g.role === 'captain'
-        ? 'A captain sails a ship or is the reserve.'
+      g.role === 'driver'
+        ? 'A driver sails a ship or is the reserve.'
         : 'They join as staff.'
     );
-  const renewal = g.contract?.crew === crew;
+  const renewal = g.contract?.team === team;
   if (renewal) {
     if (o.replaces !== null)
       return why('replaces', 'A renewal keeps them where they are.');
     if (wantsOut(g.morale))
       return why('leaving', 'They have asked to leave and will not renew.');
-    const seat = seatOf(c, gull, (id) => s.gulls[id].job);
-    if (seat && g.role === 'captain' && seatRole(seat).status !== o.status)
+    const seat = seatOf(c, person, (id) => s.people[id].job);
+    if (seat && g.role === 'driver' && seatRole(seat).status !== o.status)
       return why(
         'status',
         'A renewal keeps their place: change who sails in the race plan.'
@@ -105,15 +105,15 @@ export function signableCheck(
       );
     if (belowThem(s, g, c))
       return why(
-        'league',
-        'They will not drop more than one league while under contract.'
+        'tier',
+        'They will not drop more than one tier while under contract.'
       );
     if (o.replaces !== null) {
-      const seat = seatOf(c, o.replaces, (id) => s.gulls[id].job);
+      const seat = seatOf(c, o.replaces, (id) => s.people[id].job);
       if (
         !seat ||
         seat.kind === 'manager' ||
-        s.gulls[o.replaces].role !== g.role
+        s.people[o.replaces].role !== g.role
       )
         return why(
           'replaces',
@@ -129,64 +129,70 @@ export function signableCheck(
       );
   }
   const leaving =
-    !renewal && o.replaces !== null ? dismissalCost(s, s.gulls[o.replaces]) : 0;
-  if (!canSpend(c, o.fee + breakCost(s, g, crew) + leaving))
-    return why('coin', 'The elder will not let the coin fall that low.');
+    !renewal && o.replaces !== null
+      ? dismissalCost(s, s.people[o.replaces])
+      : 0;
+  if (!canSpend(c, o.fee + breakCost(s, g, team) + leaving))
+    return why(
+      'balance',
+      'The chairman will not let the balance fall that low.'
+    );
   return null;
 }
 
-/** Whether a crew may make an offer to a gull today (the player's screens and the rivals both ask). */
+/** Whether a team may make an offer to a person today (the player's screens and the rivals both ask). */
 export function offerCheck(
   s: CareerState,
-  crew: number,
-  gull: number,
+  team: number,
+  person: number,
   o: Offer
 ): Check {
   const shape = shapeCheck(o);
   if (shape) return shape;
-  if (!whole(gull, 0, s.gulls.length - 1)) return why('who', 'No such gull.');
-  const g = s.gulls[gull];
+  if (!whole(person, 0, s.people.length - 1))
+    return why('who', 'No such person.');
+  const g = s.people[person];
   if (s.day < g.silentUntil)
     return why(
       'silent',
       `They will not talk to anyone until day ${g.silentUntil}.`
     );
-  const talk = s.talks.find((t) => t.crew === crew && t.gull === gull);
+  const talk = s.talks.find((t) => t.team === team && t.person === person);
   if (talk && talk.counter === null)
     return why('waiting', `They answer on day ${talk.answer}.`);
-  return signableCheck(s, crew, gull, o);
+  return signableCheck(s, team, person, o);
 }
 
-/** The day a gull answers an offer made today: an approach to another crew's gull waits longer, so their crew may
+/** The day a person answers an offer made today: an approach to another team's person waits longer, so their team may
  *  answer it with a renewal. */
 export const answerDay = (
   s: CareerState,
-  crew: number,
-  gull: number
+  team: number,
+  person: number
 ): number => {
-  const c = s.gulls[gull].contract;
-  return s.day + (c && c.crew !== crew ? M.approachDays : M.answerDays);
+  const c = s.people[person].contract;
+  return s.day + (c && c.team !== team ? M.approachDays : M.answerDays);
 };
 
 /** A state with an offer made (checked first): a talk opened, its answer scheduled; a scout's report within its
- *  window may lend Persuasion; the crew a gull is approached from is told. A countered talk is replaced. */
+ *  window may lend Persuasion; the team a person is approached from is told. A countered talk is replaced. */
 export function offered(
   s: CareerState,
-  crew: number,
-  gull: number,
+  team: number,
+  person: number,
   offer: Offer,
   roll: Dice
 ): CareerState {
-  let out = endTalk(s, crew, gull);
-  const g = out.gulls[gull];
-  const known = g.known[crew];
+  let out = endTalk(s, team, person);
+  const g = out.people[person];
+  const known = g.known[team];
   let patience = g.patience,
     scout: number | null = null;
   if (known && known.by !== null && !known.used) {
-    const by = out.gulls[known.by];
+    const by = out.people[known.by];
     const persuasion =
       by.role === 'scout'
-        ? effective(by as GullOf<'scout'>, null).persuasion
+        ? effective(by as PersonOf<'scout'>, null).persuasion
         : 0;
     if (persuades(persuasion, known.day, out.day, roll.roll('persuade'))) {
       patience = Math.min(M.patienceMost, patience + 1);
@@ -194,19 +200,19 @@ export function offered(
     }
   }
   const settled =
-    g.contract?.crew === crew && closing(out, g.contract) ? true : g.silenced;
-  const gulls = [...out.gulls];
-  gulls[gull] = {
+    g.contract?.team === team && closing(out, g.contract) ? true : g.silenced;
+  const people = [...out.people];
+  people[person] = {
     ...g,
     patience,
     silenced: settled,
-    known: known ? { ...g.known, [crew]: { ...known, used: true } } : g.known,
+    known: known ? { ...g.known, [team]: { ...known, used: true } } : g.known,
   };
-  const day = answerDay(out, crew, gull);
+  const day = answerDay(out, team, person);
   const talk: Talk = {
     id: out.ids.talk,
-    crew,
-    gull,
+    team,
+    person,
     offer,
     made: out.day,
     answer: day,
@@ -215,35 +221,35 @@ export function offered(
   };
   out = {
     ...out,
-    gulls,
+    people,
     talks: [...out.talks, talk],
     ids: { ...out.ids, talk: talk.id + 1 },
   };
   out = schedule(out, day, { kind: 'answer', talk: talk.id });
   const theirs = g.contract;
-  if (theirs && theirs.crew !== crew) {
+  if (theirs && theirs.team !== team) {
     out = post(out, {
-      crew: theirs.crew,
+      team: theirs.team,
       category: 'market',
-      sender: s.crews[crew].staff.manager,
+      sender: s.teams[team].staff.manager,
       kind: 'approached',
-      slots: { gull, crew, day },
+      slots: { person, team, day },
       links: [
-        { to: 'gull', id: gull },
-        { to: 'crew', id: crew },
+        { to: 'person', id: person },
+        { to: 'team', id: team },
       ],
     });
   }
   return out;
 }
 
-/** A state with a crew's talk with a gull ended (withdrawn or replaced), its events off the queue. */
+/** A state with a team's talk with a person ended (withdrawn or replaced), its events off the queue. */
 export function endTalk(
   s: CareerState,
-  crew: number,
-  gull: number
+  team: number,
+  person: number
 ): CareerState {
-  const t = s.talks.find((x) => x.crew === crew && x.gull === gull);
+  const t = s.talks.find((x) => x.team === team && x.person === person);
   if (!t) return s;
   const out = unscheduled(
     s,
@@ -252,19 +258,19 @@ export function endTalk(
   return { ...out, talks: out.talks.filter((x) => x.id !== t.id) };
 }
 
-/** Whether a rival meets a gull's counter: payable within its manager's Finance, at most the ask × counterMost. */
+/** Whether a rival meets a person's counter: payable within its manager's Finance, at most the ask × counterMost. */
 export function meetsCounter(s: CareerState, t: Talk, counter: Offer): boolean {
-  const c = s.crews[t.crew];
-  const manager = c.staff.manager === null ? null : s.gulls[c.staff.manager];
+  const c = s.teams[t.team];
+  const manager = c.staff.manager === null ? null : s.people[c.staff.manager];
   if (!manager || manager.role !== 'manager') return false;
-  const g = s.gulls[t.gull];
+  const g = s.people[t.person];
   const ask = askOf(s, g, c).wage;
-  const stats = effective(manager as GullOf<'manager'>, null);
+  const stats = effective(manager as PersonOf<'manager'>, null);
   const room = Math.min(
-    roomOf(s, t.crew, stats.finance),
-    commitment(stats.finance, c.coin, c.debtFloor)
+    roomOf(s, t.team, stats.finance),
+    commitment(stats.finance, c.balance, c.debtFloor)
   );
-  const cost = counter.fee + breakCost(s, g, t.crew);
+  const cost = counter.fee + breakCost(s, g, t.team);
   const most =
     ask *
     TUNING.rivals.counterMost *
@@ -272,22 +278,22 @@ export function meetsCounter(s: CareerState, t: Talk, counter: Offer): boolean {
   return (
     counter.wage <= most &&
     cost <= room &&
-    signableCheck(s, t.crew, t.gull, counter) === null
+    signableCheck(s, t.team, t.person, counter) === null
   );
 }
 
 /** Mail to the player of an answer to their offer. */
 const told = (s: CareerState, t: Talk, kind: string): CareerState =>
   post(s, {
-    crew: t.crew,
+    team: t.team,
     category: 'market',
     sender: null,
     kind,
-    slots: { gull: t.gull, talk: t.id },
-    links: [{ to: 'gull', id: t.gull }],
+    slots: { person: t.person, talk: t.id },
+    links: [{ to: 'person', id: t.person }],
   });
 
-/** A gull answers every offer due today at once (the others' events then find their talk answered, and do nothing): patience paid for each lowball (at none, silence for 30 days and
+/** A person answers every offer due today at once (the others' events then find their talk answered, and do nothing): patience paid for each lowball (at none, silence for 30 days and
  *  every offer refused); of the offers they would accept, the highest score is signed and the rest refused; with none
  *  to accept, each offer from 0.85 is countered and the rest refused. A rival meets a counter at once if worth it. */
 export function hear(
@@ -298,14 +304,16 @@ export function hear(
   if (!first || first.counter !== null) return s;
   const due = s.talks.filter(
     (t) =>
-      t.gull === first.gull && t.counter === null && t.answer === first.answer
+      t.person === first.person &&
+      t.counter === null &&
+      t.answer === first.answer
   );
   const ids = new Set(due.map((t) => t.id));
   let out = s;
-  const gull = first.gull;
-  let g = out.gulls[gull];
+  const person = first.person;
+  let g = out.people[person];
   for (const t of due)
-    if (lowball(out, g, out.crews[t.crew], t.offer))
+    if (lowball(out, g, out.teams[t.team], t.offer))
       g = { ...g, patience: g.patience - 1 };
   const silent = g.patience <= 0;
   if (silent)
@@ -314,32 +322,32 @@ export function hear(
       patience: TUNING.patience,
       silentUntil: out.day + M.silentDays,
     };
-  const gulls = [...out.gulls];
-  gulls[gull] = g;
-  out = { ...out, gulls, talks: out.talks.filter((t) => !ids.has(t.id)) };
+  const people = [...out.people];
+  people[person] = g;
+  out = { ...out, people, talks: out.talks.filter((t) => !ids.has(t.id)) };
   if (silent) return due.reduce((acc, t) => told(acc, t, 'silent'), out);
   const valid = due.filter(
-    (t) => signableCheck(out, t.crew, gull, t.offer) === null
+    (t) => signableCheck(out, t.team, person, t.offer) === null
   );
   const answers = valid.map((t) => ({
     t,
-    a: answer(out, g, out.crews[t.crew], t.offer),
-    sc: score(out, g, out.crews[t.crew], t.offer),
+    a: answer(out, g, out.teams[t.team], t.offer),
+    sc: score(out, g, out.teams[t.team], t.offer),
   }));
   const yes = answers
     .filter((x) => x.a.kind === 'accept')
     .sort((a, b) => b.sc - a.sc || a.t.id - b.t.id)[0];
   if (yes) {
-    out = signed(out, { crew: yes.t.crew, gull, offer: yes.t.offer });
+    out = signed(out, { team: yes.t.team, person, offer: yes.t.offer });
     out = told(out, yes.t, 'accepted');
     return due
       .filter((t) => t !== yes.t)
       .reduce((acc, t) => told(acc, t, 'signedElsewhere'), out);
   }
-  // rivals first: one that meets its counter signs the gull, and the rest are told they signed elsewhere
+  // rivals first: one that meets its counter signs the person, and the rest are told they signed elsewhere
   const order = [...due].sort(
     (a, b) =>
-      Number(out.crews[a.crew].player) - Number(out.crews[b.crew].player) ||
+      Number(out.teams[a.team].player) - Number(out.teams[b.team].player) ||
       a.id - b.id
   );
   for (const [i, t] of order.entries()) {
@@ -349,8 +357,8 @@ export function hear(
       continue;
     }
     const counter = x.a.offer;
-    if (!out.crews[t.crew].player && meetsCounter(out, t, counter)) {
-      out = signed(out, { crew: t.crew, gull, offer: counter });
+    if (!out.teams[t.team].player && meetsCounter(out, t, counter)) {
+      out = signed(out, { team: t.team, person, offer: counter });
       return order
         .slice(i + 1)
         .reduce((acc, u) => told(acc, u, 'signedElsewhere'), out);
@@ -384,16 +392,16 @@ export function closingOpens(
   const me = mine(s);
   if (me === null) return s;
   let out = s;
-  for (const g of s.gulls) {
-    if (g.contract?.crew !== me || g.contract.ends !== e.season || g.player)
+  for (const g of s.people) {
+    if (g.contract?.team !== me || g.contract.ends !== e.season || g.player)
       continue;
     out = post(out, {
-      crew: me,
+      team: me,
       category: 'market',
       sender: null,
       kind: 'contractClosing',
-      slots: { gull: g.id },
-      links: [{ to: 'gull', id: g.id }],
+      slots: { person: g.id },
+      links: [{ to: 'person', id: g.id }],
     });
   }
   return out;
@@ -404,91 +412,95 @@ export function silenceFalls(
   s: CareerState,
   e: Extract<Event, { kind: 'silence' }>
 ): CareerState {
-  const gulls = s.gulls.map((g) =>
+  const people = s.people.map((g) =>
     g.contract &&
     g.contract.ends === e.season &&
     !g.player &&
-    g.role !== 'elder' &&
+    g.role !== 'chairman' &&
     !g.silenced &&
     g.retired === null
       ? { ...g, morale: moraleIn(g.morale + silenceMove()), silenced: true }
       : g
   );
-  return { ...s, gulls };
+  return { ...s, people };
 }
 
-/** The player's crew, or the refusal. */
-function myCrew(s: CareerState): { crew: number } | { no: NonNullable<Check> } {
-  if (!s.player) return { no: why('unfounded', 'Found a crew first.') };
+/** The player's team, or the refusal. */
+function myTeam(s: CareerState): { team: number } | { no: NonNullable<Check> } {
+  if (!s.player) return { no: why('unfounded', 'Found a team first.') };
   const me = mine(s);
   return me === null
-    ? { no: why('sacked', 'You have no crew: take one of the posts offered.') }
-    : { crew: me };
+    ? { no: why('sacked', 'You have no team: take one of the posts offered.') }
+    : { team: me };
 }
 
-/** Whether the player may dismiss a gull. */
-export function dismissCheck(s: CareerState, gull: number): Check {
-  const m = myCrew(s);
+/** Whether the player may dismiss a person. */
+export function dismissCheck(s: CareerState, person: number): Check {
+  const m = myTeam(s);
   if ('no' in m) return m.no;
-  if (!whole(gull, 0, s.gulls.length - 1)) return why('who', 'No such gull.');
-  const g = s.gulls[gull];
+  if (!whole(person, 0, s.people.length - 1))
+    return why('who', 'No such person.');
+  const g = s.people[person];
   if (
-    g.contract?.crew !== m.crew ||
+    g.contract?.team !== m.team ||
     g.player ||
-    g.role === 'elder' ||
+    g.role === 'chairman' ||
     g.role === 'manager'
   )
     return why('notYours', 'You can dismiss only your own staff.');
   if (s.race?.started) return why('racing', 'The race is under way.');
-  if (!canSpend(s.crews[m.crew], dismissalCost(s, g)))
-    return why('coin', 'The elder will not let the coin fall that low.');
+  if (!canSpend(s.teams[m.team], dismissalCost(s, g)))
+    return why(
+      'balance',
+      'The chairman will not let the balance fall that low.'
+    );
   return null;
 }
 
 export const HIRING: Handlers = {
   OfferContract: (s, c, roll) => {
-    const m = myCrew(s);
+    const m = myTeam(s);
     if ('no' in m) return refuse(m.no.code, m.no.sentence);
-    const no = offerCheck(s, m.crew, c.gull, c.offer);
+    const no = offerCheck(s, m.team, c.person, c.offer);
     return no
       ? refuse(no.code, no.sentence)
-      : accept(offered(s, m.crew, c.gull, c.offer, roll));
+      : accept(offered(s, m.team, c.person, c.offer, roll));
   },
   AcceptCounter: (s, c) => {
-    const m = myCrew(s);
+    const m = myTeam(s);
     if ('no' in m) return refuse(m.no.code, m.no.sentence);
-    const t = s.talks.find((x) => x.crew === m.crew && x.gull === c.gull);
+    const t = s.talks.find((x) => x.team === m.team && x.person === c.person);
     if (!t || t.counter === null)
       return refuse('noCounter', 'They have made you no counter.');
-    const no = signableCheck(s, m.crew, c.gull, t.counter);
+    const no = signableCheck(s, m.team, c.person, t.counter);
     if (no) return refuse(no.code, no.sentence);
     return accept(
-      signed(endTalk(s, m.crew, c.gull), {
-        crew: m.crew,
-        gull: c.gull,
+      signed(endTalk(s, m.team, c.person), {
+        team: m.team,
+        person: c.person,
         offer: t.counter,
       })
     );
   },
   WithdrawOffer: (s, c) => {
-    const m = myCrew(s);
+    const m = myTeam(s);
     if ('no' in m) return refuse(m.no.code, m.no.sentence);
-    if (!s.talks.some((x) => x.crew === m.crew && x.gull === c.gull))
+    if (!s.talks.some((x) => x.team === m.team && x.person === c.person))
       return refuse('noTalk', 'You are not talking with them.');
-    return accept(endTalk(s, m.crew, c.gull));
+    return accept(endTalk(s, m.team, c.person));
   },
   Dismiss: (s, c) => {
-    const no = dismissCheck(s, c.gull);
+    const no = dismissCheck(s, c.person);
     if (no) return refuse(no.code, no.sentence);
-    const g = s.gulls[c.gull];
-    const crew = g.contract!.crew;
+    const g = s.people[c.person];
+    const team = g.contract!.team;
     return accept(
       released(
-        paid(s, crew, dismissalCost(s, g), {
+        paid(s, team, dismissalCost(s, g), {
           kind: 'dismissal',
           what: `${g.given} ${g.family} dismissed`,
         }),
-        c.gull
+        c.person
       )
     );
   },

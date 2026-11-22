@@ -8,31 +8,31 @@ import type { GunKind } from './kinds';
 import type { Call, Colours, Job, PartType, RaceResult, Stance } from './race';
 import type { PeopleDesk } from './office-people';
 
-/** The roles every gull has one of (D37). A reserve captain is a captain whose contract's status is 'reserve'. */
+/** The roles every person has one of (D37). A reserve driver is a driver whose contract's status is 'reserve'. */
 export type Role =
   | 'manager'
-  | 'captain'
-  | 'bosun'
-  | 'shipwright'
+  | 'driver'
+  | 'mechanic'
+  | 'designer'
   | 'scout'
-  | 'flight'
-  | 'elder';
-/** The rookery's nine buildings (D29, Phase B section 9). */
+  | 'pit'
+  | 'chairman';
+/** The headquarters's nine buildings (D29, Phase B section 9). */
 export type Building =
   | 'factory'
   | 'drawingLoft'
   | 'testTank'
   | 'foundry'
   | 'sailingSchool'
-  | 'flightLoft'
+  | 'pitHouse'
   | 'crowsNest'
   | 'fishMarket'
   | 'landingPad';
-/** What a gull wants of a crew, three of them ranked (Phase B section 5). */
+/** What a person wants of a team, three of them ranked (Phase B section 5). */
 export type Want =
   | 'money'
   | 'status'
-  | 'league'
+  | 'tier'
   | 'ambition'
   | 'security'
   | 'facilities'
@@ -45,21 +45,21 @@ export type Personality =
   | 'engineer'
   | 'gambler'
   | 'steady';
-/** A captain's place on her crew: sailing ship two, or the reserve. Every other role's status is 'staff'. */
+/** A driver's place on her team: sailing ship two, or the reserve. Every other role's status is 'staff'. */
 export type Status = 'ship' | 'reserve' | 'staff';
-/** The three trades a crew picks a supplier from each off-season (Phase B section 8.7). */
+/** The three trades a team picks a supplier from each off-season (Phase B section 8.7). */
 export type Trade = 'timber' | 'canvas' | 'cordage';
-/** A ship of a crew: 0 is ship one (the player's on the player's crew), 1 ship two. */
+/** A ship of a team: 0 is ship one (the player's on the player's team), 1 ship two. */
 export type Ship = 0 | 1;
 /** The mail's categories (Phase B section 12). */
 export type MailCategory =
-  | 'crew'
+  | 'team'
   | 'market'
   | 'ship'
-  | 'rookery'
-  | 'league'
+  | 'hq'
+  | 'tier'
   | 'finance'
-  | 'elder';
+  | 'chairman';
 /** What an Admiralty proposal changes (Phase B section 11). */
 export type Measure =
   | 'spec'
@@ -70,7 +70,7 @@ export type Measure =
   | 'prizeSpread'
   | 'inspection';
 
-/** An offer to a gull (Phase B section 5): wage and bonuses in Coin a race, length in seasons. */
+/** An offer to a person (Phase B section 5): wage and bonuses in Coin a race, length in seasons. */
 export interface Offer {
   role: Role;
   status: Status;
@@ -80,22 +80,22 @@ export interface Offer {
   podium: number;
   sinking: number;
   breakClause: number | null;
-  replaces: number | null; // the gull of the crew whose post they take (released on signing), or null for an open post
+  replaces: number | null; // the person of the team whose post they take (released on signing), or null for an open post
 }
 
-/** The race plan of the player's crew (Phase B section 13). */
+/** The race plan of the player's team (Phase B section 13). */
 export interface Plan {
-  captain: number; // the gull who sails ship two
+  driver: number; // the person who sails ship two
   parts: readonly { part: number; ship: Ship }[]; // which part on which ship
   stance: Stance; // ship two's
-  order: readonly Job[]; // the flight's job order
-  jobs: Readonly<Record<Job, number>>; // which flight gull works which job
-  objectives: readonly (number | null)[]; // by patron slot: the objective chosen, by index into that patron's list
+  order: readonly Job[]; // the pit crew's job order
+  jobs: Readonly<Record<Job, number>>; // which pit crew member works which job
+  objectives: readonly (number | null)[]; // by sponsor slot: the objective chosen, by index into that sponsor's list
   call: Call; // the wheel's call at the start
 }
 
-/** One part's share of the yard's points (Phase B section 8.4), the two shares 0..1 summing to at most 1. */
-export interface YardShare {
+/** One part's share of the improvement's points (Phase B section 8.4), the two shares 0..1 summing to at most 1. */
+export interface ImprovementShare {
   part: number;
   perf: number;
   reliability: number;
@@ -112,7 +112,7 @@ export type Command =
   | {
       kind: 'Found';
       seed: number;
-      crew: string;
+      team: string;
       colours: Colours;
       emblem: number;
       given: string;
@@ -121,14 +121,14 @@ export type Command =
     }
   | { kind: 'Advance' }
   | { kind: 'Snapshot' }
-  | { kind: 'StartScout'; scout: number; gull: number }
+  | { kind: 'StartScout'; scout: number; person: number }
   | { kind: 'CancelScout'; scout: number }
-  | { kind: 'OfferContract'; gull: number; offer: Offer }
-  | { kind: 'AcceptCounter'; gull: number }
-  | { kind: 'WithdrawOffer'; gull: number }
-  | { kind: 'Dismiss'; gull: number }
-  | { kind: 'MoveFlightJob'; gull: number; job: Job }
-  | { kind: 'SetYard'; shares: readonly YardShare[] }
+  | { kind: 'OfferContract'; person: number; offer: Offer }
+  | { kind: 'AcceptCounter'; person: number }
+  | { kind: 'WithdrawOffer'; person: number }
+  | { kind: 'Dismiss'; person: number }
+  | { kind: 'MovePitJob'; person: number; job: Job }
+  | { kind: 'SetImprovement'; shares: readonly ImprovementShare[] }
   | { kind: 'FitPart'; part: number; ship: Ship | null }
   | {
       kind: 'StartDesign';
@@ -138,19 +138,24 @@ export type Command =
     }
   | { kind: 'DealComponents'; type: PartType; slot: number }
   | { kind: 'Build'; building: Building }
-  | { kind: 'SignPatron'; offer: number; slot: number } // offer: the patron's id
+  | { kind: 'SignSponsor'; offer: number; slot: number } // offer: the sponsor's id
   | { kind: 'ChooseSupplier'; trade: Trade; supplier: string }
   | { kind: 'Vote'; proposal: number; side: 'for' | 'against' | 'abstain' }
-  | { kind: 'Lobby'; proposal: number; side: 'for' | 'against'; coin: number }
+  | {
+      kind: 'Lobby';
+      proposal: number;
+      side: 'for' | 'against';
+      balance: number;
+    }
   | { kind: 'AnswerDilemma'; mail: number; option: number }
   | { kind: 'MarkRead'; mail: number }
   | { kind: 'SetPlan'; plan: Plan }
   | { kind: 'RaceStarted'; round: number }
   | { kind: 'RecordRace'; result: RaceResult }
   | { kind: 'Forfeit'; round: number }
-  | { kind: 'TakeJob'; crew: number }
-  | { kind: 'DeclineJob'; crew: number }
-  | { kind: 'DebugCoin'; coin: number }
+  | { kind: 'TakeJob'; team: number }
+  | { kind: 'DeclineJob'; team: number }
+  | { kind: 'DebugBalance'; balance: number }
   | { kind: 'DebugReveal' }
   | { kind: 'DebugToRaceDay' }
   | { kind: 'DebugToSeasonEnd' };
@@ -185,7 +190,7 @@ export interface Figure {
   explain: Explanation | null;
 }
 
-/** What a gull's headshot is drawn from (ui/gull.ts): their seed, role, age in years, and their crew's colours and
+/** What a person's headshot is drawn from (ui/person.ts): their seed, role, age in years, and their team's colours and
  *  emblem (null: a free agent, on paper). */
 export interface Face {
   seed: number;
@@ -201,15 +206,15 @@ export interface Blocker {
   sentence: string;
 }
 
-/** The top bar (Phase C section 5): the player, their crew, the date, the Coin, and Continue. */
+/** The top bar (Phase C section 5): the player, their team, the date, the Coin, and Continue. */
 export interface TopBar {
   name: string;
   face: Face;
-  crew: string;
+  team: string;
   emblem: number;
   colours: Colours;
   date: string;
-  coin: Figure;
+  balance: Figure;
   unread: number;
   dilemma: boolean;
   /** Continue's label ("Continue", "Race plan"), and what stops it (null: nothing). */
@@ -222,7 +227,7 @@ export interface PartMark {
   low: boolean;
   fitted: boolean;
 }
-/** A gull as a line names them: id, face, full name. */
+/** A person as a line names them: id, face, full name. */
 export interface Named {
   id: number;
   face: Face;
@@ -232,7 +237,7 @@ export interface Named {
 export interface ShipHalf {
   ship: Ship;
   you: boolean;
-  captain:
+  driver:
     | (Named & {
         stars: number;
         potential: number;
@@ -240,14 +245,14 @@ export interface ShipHalf {
         tags: readonly string[];
       })
     | null;
-  bosun: Named | null;
+  mechanic: Named | null;
   bond: Figure;
   parts: readonly PartMark[];
 }
-/** A line of a league table: place, crew, points and the gap to the line above. */
+/** A line of a tier table: place, team, points and the gap to the line above. */
 export interface StandingLine {
   place: number;
-  crew: number;
+  team: number;
   name: string;
   emblem: number;
   colours: Colours;
@@ -277,22 +282,22 @@ export interface HomeView {
     days: Figure;
     target: Figure;
     confidence: Figure;
-    patron: string | null;
+    sponsor: string | null;
   } | null;
   ships: readonly [ShipHalf, ShipHalf];
-  yard: {
+  improvement: {
     design: { type: PartType; days: Figure } | null;
     points: Figure;
     works: readonly { building: Building; level: number; days: number }[];
   };
-  table: { league: string; lines: readonly StandingLine[] };
+  table: { tier: string; lines: readonly StandingLine[] };
   mail: { letters: readonly LetterLine[]; unread: number };
 }
 
-/** `found`: what the founding form offers and the line on the crew it replaces. */
+/** `found`: what the founding form offers and the line on the team it replaces. */
 export interface FoundView {
   seed: number;
-  crew: string;
+  team: string;
   given: string;
   family: string;
   headshot: number;
@@ -301,15 +306,15 @@ export interface FoundView {
   emblem: number;
   swatches: number;
   emblems: number;
-  limits: { crew: number; gull: number };
+  limits: { team: number; person: number };
   replacing: string;
 }
 /** What the founding form gets wrong, by field (a field missing is right). */
 export interface FoundErrors {
-  crew?: string;
+  team?: string;
   colours?: string;
   emblem?: string;
-  gull?: string;
+  person?: string;
 }
 
 /** What the office asks of the career: the session on its store, the views, and the commands. main.ts makes one

@@ -1,51 +1,51 @@
-// A rival crew's measure of an Admiralty proposal (Phase B section 11): how far its own state leans it for (+1) or
-// against (−1). Strong in a part type, against making it spec; short of coin, for a flatter prize spread; poor gunners,
-// for banning a gun kind (a result names no gun, so its captains' Gunnery stands for being sunk by guns); good captains
-// in Stormcraft, for a faster storm; good gunners with Nerve, for more points a sinking; homesteading captains, for the
-// sea-held point; a crew sailing risky parts, against more inspection.
+// A rival team's measure of an Admiralty proposal (Phase B section 11): how far its own state leans it for (+1) or
+// against (−1). Strong in a part type, against making it spec; short of balance, for a flatter prize spread; poor gunners,
+// for banning a gun kind (a result names no gun, so its drivers' Gunnery stands for being sunk by guns); good drivers
+// in Stormcraft, for a faster storm; good gunners with Nerve, for more points a sinking; homesteading drivers, for the
+// sea-held point; a team sailing risky parts, against more inspection.
 
 import type { PartType } from '../race.ts';
 import type { Change } from '../office.ts';
 import { effective } from './effective.ts';
-import { unit, type GullOf } from './roles.ts';
-import type { CareerState, Crew } from './state.ts';
+import { unit, type PersonOf } from './roles.ts';
+import type { CareerState, Team } from './state.ts';
 
 const clamp1 = (x: number) => Math.min(1, Math.max(-1, x));
 
-/** A crew's sailing captains' effective stats. */
-function captains(s: CareerState, c: Crew): GullOf<'captain'>['stats'][] {
+/** A team's sailing drivers' effective stats. */
+function drivers(s: CareerState, c: Team): PersonOf<'driver'>['stats'][] {
   return c.staff.ships
-    .map((h) => h.captain)
+    .map((h) => h.driver)
     .filter((id): id is number => id !== null)
-    .map((id) => effective(s.gulls[id] as GullOf<'captain'>, null));
+    .map((id) => effective(s.people[id] as PersonOf<'driver'>, null));
 }
 
 const meanU = (xs: readonly number[]): number =>
   xs.length === 0 ? 0.5 : xs.reduce((a, x) => a + unit(x), 0) / xs.length;
 
-/** Where a crew's best part of a type ranks in its league, 0 best .. 1 worst. */
+/** Where a team's best part of a type ranks in its tier, 0 best .. 1 worst. */
 export function rankShare(
   s: CareerState,
-  crew: number,
+  team: number,
   type: PartType
 ): number {
-  const best = (c: Crew) =>
+  const best = (c: Team) =>
     c.parts.reduce((a, p) => (p.type === type ? Math.max(a, p.perf) : a), 0);
-  const l = s.leagues[s.crews[crew].league];
-  const mine = best(s.crews[crew]);
-  const better = l.crews.filter((id) => best(s.crews[id]) > mine).length;
-  return l.crews.length <= 1 ? 0.5 : better / (l.crews.length - 1);
+  const l = s.championships[s.teams[team].tier];
+  const mine = best(s.teams[team]);
+  const better = l.teams.filter((id) => best(s.teams[id]) > mine).length;
+  return l.teams.length <= 1 ? 0.5 : better / (l.teams.length - 1);
 }
 
-/** A crew's lean on a change, −1..1. */
-export function lean(s: CareerState, crew: number, change: Change): number {
-  const c = s.crews[crew];
-  const l = s.leagues[c.league];
-  const caps = captains(s, c);
+/** A team's lean on a change, −1..1. */
+export function lean(s: CareerState, team: number, change: Change): number {
+  const c = s.teams[team];
+  const l = s.championships[c.tier];
+  const caps = drivers(s, c);
   switch (change.measure) {
     case 'spec':
       return clamp1(
-        (rankShare(s, crew, change.type) - 0.5) * 2 * (change.spec ? 1 : -1)
+        (rankShare(s, team, change.type) - 0.5) * 2 * (change.spec ? 1 : -1)
       );
     case 'storm':
       return clamp1(
@@ -65,20 +65,21 @@ export function lean(s: CareerState, crew: number, change: Change): number {
     }
     case 'seaHeldPoint': {
       const ids = c.staff.ships
-        .map((h) => h.captain)
+        .map((h) => h.driver)
         .filter((id): id is number => id !== null);
       const share =
         ids.length === 0
           ? 0.5
           : ids.filter((id) =>
-              ['homesteader', 'turtle'].includes(s.gulls[id].style ?? '')
+              ['homesteader', 'turtle'].includes(s.people[id].persona ?? '')
             ).length / ids.length;
       return clamp1((share - 0.5) * 2 * (change.on ? 1 : -1));
     }
     case 'prizeSpread': {
       const half = Math.max(1, c.budget / 2);
       return clamp1(
-        ((half - c.coin) / half) * (change.spread < l.next.prizeSpread ? 1 : -1)
+        ((half - c.balance) / half) *
+          (change.spread < l.next.prizeSpread ? 1 : -1)
       );
     }
     case 'inspection': {

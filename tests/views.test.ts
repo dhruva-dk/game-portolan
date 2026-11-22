@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { apply, start } from '../src/career/career.ts';
 import {
-  coinText,
+  moneyText,
   foundErrors,
   foundView,
   homeView,
@@ -16,11 +16,11 @@ import { table } from '../src/career/read.ts';
 import { FOUND, founded, must, sailed, toRaceDay } from './career-kit.ts';
 import type { Figure, Offer } from '../src/office.ts';
 import type { CareerState } from '../src/career/state.ts';
-import { sackedOffers } from '../src/career/elders.ts';
+import { sackedOffers } from '../src/career/chairmen.ts';
 import { careerView, jobsView } from '../src/career/views-career.ts';
-import { crewView, planDraft } from '../src/career/views-crew.ts';
-import { seen } from '../src/career/views-gull.ts';
-import { marketView } from '../src/career/views-market.ts';
+import { teamView, planDraft } from '../src/career/views-team.ts';
+import { seen } from '../src/career/views-person.ts';
+import { scoutingView } from '../src/career/views-scouting.ts';
 import { offerView } from '../src/career/views-offer.ts';
 import { profileView } from '../src/career/views-profile.ts';
 
@@ -34,7 +34,7 @@ function figures(v: unknown, out: Figure[] = []): Figure[] {
   return out;
 }
 
-test('ordinal and coin text', () => {
+test('ordinal and balance text', () => {
   assert.deepEqual([1, 2, 3, 4, 11, 12, 13, 21, 22, 40].map(ordinal), [
     '1st',
     '2nd',
@@ -47,23 +47,23 @@ test('ordinal and coin text', () => {
     '22nd',
     '40th',
   ]);
-  assert.equal(coinText(12500), '12,500');
-  assert.equal(coinText(-300), '−300');
-  assert.equal(coinText(300, true), '+300');
+  assert.equal(moneyText(12500), '12,500');
+  assert.equal(moneyText(-300), '−300');
+  assert.equal(moneyText(300, true), '+300');
 });
 
-test('the top bar: the player, their crew, day one of season one, Continue free', () => {
+test('the top bar: the player, their team, day one of season one, Continue free', () => {
   const s = founded(),
     t = topBar(s),
-    c = s.crews[s.player!.crew];
+    c = s.teams[s.player!.team];
   assert.equal(t.name, `${FOUND.given} ${FOUND.family}`);
-  assert.equal(t.crew, FOUND.crew);
+  assert.equal(t.team, FOUND.team);
   assert.equal(t.face.role, 'manager');
   assert.deepEqual(t.face.colours, FOUND.colours);
   assert.match(t.date, /^Day \d+, Season 1$/);
-  assert.equal(t.coin.value, c.coin);
-  assert.equal(t.coin.against?.kind, 'change');
-  assert.ok(t.coin.explain && t.coin.explain.lines.length >= 1);
+  assert.equal(t.balance.value, c.balance);
+  assert.equal(t.balance.against?.kind, 'change');
+  assert.ok(t.balance.explain && t.balance.explain.lines.length >= 1);
   assert.equal(t.go.label, 'Continue');
   assert.equal(t.go.blocker, null);
 });
@@ -75,24 +75,24 @@ test('the top bar on race day reads Race plan and opens the plan', () => {
   assert.equal(t.go.blocker?.screen, 'plan');
 });
 
-test("home: the next race, both ships, the yard, five lines of the table round the player's, four letters", () => {
+test("home: the next race, both ships, the improvement, five lines of the table round the player's, four letters", () => {
   const s = founded(),
     h = homeView(s),
-    c = s.crews[s.player!.crew];
+    c = s.teams[s.player!.team];
   assert.ok(h.race);
   assert.match(h.race.round, /^Round 1 of \d+$/);
   assert.equal(h.race.heading, 'Next Race');
   assert.ok(h.race.days.value >= 0);
   assert.equal(h.race.target.value, c.target);
   assert.equal(h.ships[0].you, true);
-  assert.equal(h.ships[0].captain, null, 'the player sails ship one');
-  assert.ok(h.ships[1].captain, 'ship two has her captain');
+  assert.equal(h.ships[0].driver, null, 'the player sails ship one');
+  assert.ok(h.ships[1].driver, 'ship two has her driver');
   assert.equal(h.ships[0].parts.length, 6);
   assert.ok(h.ships.every((x) => x.parts.every((p) => p.fitted)));
   assert.equal(h.table.lines.length, 5);
   assert.equal(h.table.lines.filter((l) => l.mine).length, 1);
-  const rows = table(s, c.league);
-  for (const l of h.table.lines) assert.equal(rows[l.place - 1].crew, l.crew);
+  const rows = table(s, c.tier);
+  for (const l of h.table.lines) assert.equal(rows[l.place - 1].team, l.team);
   assert.ok(h.mail.letters.length <= 4);
   for (const f of figures(h)) {
     assert.ok(f.against, `${f.text} has nothing it is set against`);
@@ -109,11 +109,11 @@ test('home on race day: the heading reads Race Day', () => {
 
 test('a part under half its condition is marked low', () => {
   const s = founded(),
-    id = s.player!.crew,
-    c = s.crews[id];
+    id = s.player!.team,
+    c = s.teams[id];
   const worn = {
     ...s,
-    crews: s.crews.map((k) =>
+    teams: s.teams.map((k) =>
       k.id !== id
         ? k
         : {
@@ -141,17 +141,17 @@ test("letters: newest first, the Admiralty's from its secretary, a dilemma seale
   }
 });
 
-test('found: defaults the career takes, the same for a seed, the crew it replaces named', () => {
+test('found: defaults the career takes, the same for a seed, the team it replaces named', () => {
   const v = foundView(FOUND.seed, FOUND.colours);
   assert.deepEqual(foundView(FOUND.seed, FOUND.colours), v);
-  assert.ok(v.crew.length >= 1 && v.crew.length <= v.limits.crew);
+  assert.ok(v.team.length >= 1 && v.team.length <= v.limits.team);
   assert.equal(v.swatches, 24);
   assert.equal(v.emblems, 12);
-  assert.match(v.replacing, /League Three/);
+  assert.match(v.replacing, /Tier 3/);
   const r = apply(start(), {
     kind: 'Found',
     seed: v.seed,
-    crew: v.crew,
+    team: v.team,
     colours: v.colours,
     emblem: v.emblem,
     given: v.given,
@@ -159,23 +159,23 @@ test('found: defaults the career takes, the same for a seed, the crew it replace
     headshot: v.headshot,
   });
   assert.ok(r.ok, r.ok ? '' : r.reason.sentence);
-  assert.notEqual(foundView(FOUND.seed + 1, FOUND.colours).crew, '');
+  assert.notEqual(foundView(FOUND.seed + 1, FOUND.colours).team, '');
 });
 
 test('found errors: each under its own field, none for a founding the career takes', () => {
   assert.deepEqual(foundErrors(FOUND), {});
   const e = foundErrors({
     ...FOUND,
-    crew: '',
+    team: '',
     colours: { first: 3, second: 3 },
     family: 'x'.repeat(40),
   });
-  assert.match(e.crew ?? '', /needs a name/);
+  assert.match(e.team ?? '', /needs a name/);
   assert.match(e.colours ?? '', /different/);
-  assert.match(e.gull ?? '', /too long/);
+  assert.match(e.person ?? '', /too long/);
   assert.equal(e.emblem, undefined);
   assert.match(
-    foundErrors({ ...FOUND, crew: 'A'.repeat(30) }).crew ?? '',
+    foundErrors({ ...FOUND, team: 'A'.repeat(30) }).team ?? '',
     /at most 24/
   );
 });
@@ -224,36 +224,36 @@ function until(
   return s;
 }
 /** A free agent the player could sign today, and the offer at their ask (naming whom they replace, if need be). */
-function signable(s: CareerState): { gull: number; offer: Offer } {
-  for (const g of s.gulls) {
+function signable(s: CareerState): { person: number; offer: Offer } {
+  for (const g of s.people) {
     if (
       g.contract ||
       g.retired !== null ||
       g.player ||
       g.role === 'manager' ||
-      g.role === 'elder'
+      g.role === 'chairman'
     )
       continue;
     const v = offerView(s, g.id, null);
     for (const r of v.replaces) {
       const offer = { ...v.draft, replaces: r.id };
-      if (offerView(s, g.id, offer).send.ok) return { gull: g.id, offer };
+      if (offerView(s, g.id, offer).send.ok) return { person: g.id, offer };
     }
   }
   throw new Error('no one to sign');
 }
 
-test('crew: the roster by role with the player heading the captains, the flight at four jobs, the order movable', () => {
+test('team: the roster by role with the player heading the drivers, the pit crew at four jobs, the order movable', () => {
   const s = founded(),
-    v = crewView(s),
-    c = s.crews[s.player!.crew];
+    v = teamView(s),
+    c = s.teams[s.player!.team];
   assert.equal(v.roster[0].kind, 'head');
   assert.equal(v.roster[1].you, true);
   assert.deepEqual(
     v.roster.filter((r) => r.kind === 'head').map((r) => r.title),
-    ['Captains', 'Bosuns', 'Shipwright', 'Scouts', 'Flight', 'Elder']
+    ['Drivers', 'Mechanics', 'Designer', 'Scouts', 'Pit', 'Chairman']
   );
-  assert.equal(v.flight.length, c.staff.flight.length);
+  assert.equal(v.pit.length, c.staff.pit.length);
   assert.equal(v.order.length, 4);
   assert.equal(v.order[0].up, null);
   assert.equal(v.order[3].down, null);
@@ -262,21 +262,21 @@ test('crew: the roster by role with the player heading the captains, the flight 
   assert.ok(plan, v.orderWhy ?? '');
   const moved = must(s, { kind: 'SetPlan', plan });
   assert.deepEqual(
-    crewView(moved).order.map((o) => o.job),
+    teamView(moved).order.map((o) => o.job),
     [v.order[1].job, v.order[0].job, v.order[2].job, v.order[3].job]
   );
-  assert.equal(planDraft(moved, moved.crews[c.id]), moved.crews[c.id].plan);
+  assert.equal(planDraft(moved, moved.teams[c.id]), moved.teams[c.id].plan);
 });
 
 test('profile: a rival unknown in ranges, scouted then known; one of her own may be dismissed, she may not', () => {
   const s = founded(),
-    c = s.crews[s.player!.crew];
-  const stranger = s.gulls.find(
+    c = s.teams[s.player!.team];
+  const stranger = s.people.find(
     (g) =>
       g.contract &&
-      g.contract.crew !== c.id &&
-      s.crews[g.contract.crew].league === c.league &&
-      g.role === 'captain' &&
+      g.contract.team !== c.id &&
+      s.teams[g.contract.team].tier === c.tier &&
+      g.role === 'driver' &&
       !seen(s, c.id, g.id).known
   )!;
   const p = profileView(s, stranger.id);
@@ -289,7 +289,7 @@ test('profile: a rival unknown in ranges, scouted then known; one of her own may
   const sent = must(s, {
     kind: 'StartScout',
     scout: p.scout.scout!,
-    gull: stranger.id,
+    person: stranger.id,
   });
   assert.equal(profileView(sent, stranger.id).scout.ok, false);
   const q = profileView(
@@ -299,32 +299,32 @@ test('profile: a rival unknown in ranges, scouted then known; one of her own may
   assert.equal(q.known, true);
   assert.equal(q.wants?.length, 3);
   assert.ok(q.stats.length > 0);
-  const own = profileView(s, c.staff.ships[1].captain);
+  const own = profileView(s, c.staff.ships[1].driver);
   assert.equal(own.mine, true);
   assert.equal(own.dismiss.ok, true);
   assert.ok(own.dismiss.owed.value > 0);
   assert.equal(own.offer.ok, false);
-  const me = profileView(s, s.player!.gull);
+  const me = profileView(s, s.player!.person);
   assert.equal(me.you, true);
   assert.equal(me.dismiss.ok, false);
   assert.equal(me.renew.ok, false);
 });
 
 test('offer: drawn at the ask, sent and locked while waiting, then answered', () => {
-  const s = must(founded(), { kind: 'DebugCoin', coin: 50000 }),
-    { gull, offer } = signable(s);
-  const v = offerView(s, gull, offer);
+  const s = must(founded(), { kind: 'DebugBalance', balance: 50000 }),
+    { person, offer } = signable(s);
+  const v = offerView(s, person, offer);
   assert.equal(v.state, 'open');
   assert.ok(v.cost.now.value >= offer.fee);
   explained(v);
-  const sent = must(s, { kind: 'OfferContract', gull, offer });
-  const w = offerView(sent, gull, null);
+  const sent = must(s, { kind: 'OfferContract', person, offer });
+  const w = offerView(sent, person, null);
   assert.equal(w.state, 'waiting');
   assert.equal(w.send.ok, false);
   assert.equal(w.withdraw.ok, true);
   const a = offerView(
-    until(sent, (x) => offerView(x, gull, null).state !== 'waiting'),
-    gull,
+    until(sent, (x) => offerView(x, person, null).state !== 'waiting'),
+    person,
     null
   );
   assert.ok(
@@ -335,26 +335,26 @@ test('offer: drawn at the ask, sent and locked while waiting, then answered', ()
   if (a.state === 'countered') assert.equal(a.accept.ok, true);
 });
 
-test('market: the filter lets through only its role, its league and its contracts; the shortlist kept', () => {
+test('market: the filter lets through only its role, its tier and its contracts; the shortlist kept', () => {
   const s = founded(),
-    v = marketView(
+    v = scoutingView(
       s,
-      { role: 'flight', league: 3, contract: 'free', known: false, stars: 0 },
-      [s.player!.gull]
+      { role: 'pit', tier: 3, contract: 'free', known: false, stars: 0 },
+      [s.player!.person]
     );
   assert.ok(v.rows.length > 0);
-  for (const r of v.rows) assert.equal(s.gulls[r.id].role, 'flight');
-  for (const r of v.rows) assert.equal(s.gulls[r.id].contract, null);
+  for (const r of v.rows) assert.equal(s.people[r.id].role, 'pit');
+  for (const r of v.rows) assert.equal(s.people[r.id].contract, null);
   assert.equal(v.shortlist.length, 1);
   assert.equal(v.count, String(v.rows.length));
-  const all = marketView(s, null, []);
+  const all = scoutingView(s, null, []);
   assert.ok(
-    all.rows.every((r) => s.gulls[r.id].contract?.crew !== s.player!.crew)
+    all.rows.every((r) => s.people[r.id].contract?.team !== s.player!.team)
   );
   explained(all);
 });
 
-test('career and jobs: reputation ranked among managers; sacked, the old elder writes and the offers wait', () => {
+test('career and jobs: reputation ranked among managers; sacked, the old chairman writes and the offers wait', () => {
   const s = founded(),
     v = careerView(s);
   assert.equal(v.rank.against?.kind, 'rank');

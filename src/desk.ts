@@ -22,8 +22,8 @@ import {
   topBar,
 } from './career/views';
 import { careerView, jobsView } from './career/views-career';
-import { crewView } from './career/views-crew';
-import { marketView } from './career/views-market';
+import { teamView } from './career/views-team';
+import { scoutingView } from './career/views-scouting';
 import { offerView } from './career/views-offer';
 import { profileView } from './career/views-profile';
 import { indexedStore, openDatabase } from './store/indexed';
@@ -69,10 +69,11 @@ export async function createDesk(shelf: Shelf, debug = false): Promise<Desk> {
         failed: opened.ok ? null : opened.sentence,
       }),
     settings: () => settingsView(shelf.backupDay.get()),
-    crew: () => crewView(must().state),
-    profile: (gull) => profileView(must().state, gull),
-    offer: (gull, draft) => offerView(must().state, gull, draft),
-    market: (filter, shortlist) => marketView(must().state, filter, shortlist),
+    team: () => teamView(must().state),
+    profile: (person) => profileView(must().state, person),
+    offer: (person, draft) => offerView(must().state, person, draft),
+    market: (filter, shortlist) =>
+      scoutingView(must().state, filter, shortlist),
     career: () => careerView(must().state),
     jobs: () => jobsView(must().state),
     async send(c: Command) {

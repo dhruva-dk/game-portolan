@@ -2,8 +2,8 @@
 // (world/random.ts), its counter kept in the state, so the same state and command give the same result.
 //
 // Stream names are a section's word, and ':' and an id where a stream belongs to one thing: 'world', 'names',
-// 'form:12' (crew 12's form draws), 'growth', 'retire', 'traits', 'injury'. A use takes one roll: a fresh generator
-// for as many numbers as that use needs (one gull's making, one race's form), and the stream's counter steps once.
+// 'form:12' (team 12's form draws), 'growth', 'retire', 'traits', 'injury'. A use takes one roll: a fresh generator
+// for as many numbers as that use needs (one person's making, one race's form), and the stream's counter steps once.
 
 import { hash, random } from '../world/random.ts';
 import { fnv } from './canon.ts';
@@ -33,8 +33,8 @@ export function dice(seed: number, streams: Streams): Dice {
   };
 }
 
-/** A generator for a fixed key that is no stream's turn: a value seeded once forever (a gull's spread of a stat by
- *  their seed, a crew's view of a gull). Draws from it never change the state. */
+/** A generator for a fixed key that is no stream's turn: a value seeded once forever (a person's spread of a stat by
+ *  their seed, a team's view of a person). Draws from it never change the state. */
 export const seeded = (a: number, b: number): Rand => random(hash(a, b));
 
 /** A whole number lo..hi (both included). */

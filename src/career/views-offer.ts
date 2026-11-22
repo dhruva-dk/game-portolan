@@ -1,4 +1,4 @@
-// `offer` (Phase C batch 2): the contract document drawn on a draft, what it costs, how it meets the gull's wants,
+// `offer` (Phase C batch 2): the contract document drawn on a draft, what it costs, how it meets the person's wants,
 // their patience, the talks so far and who else is talking to them, and where the talk stands. Pure, read-side.
 
 import type { Offer, Status } from '../office.ts';
@@ -15,11 +15,11 @@ import {
   dayText,
   seen,
   wageText,
-} from './views-gull.ts';
-import { askOffer, defaultGull } from './views-profile.ts';
+} from './views-person.ts';
+import { askOffer, defaultPerson } from './views-profile.ts';
 import {
-  coinText,
-  crewOf,
+  moneyText,
+  teamOf,
   faceOf,
   fig,
   line,
@@ -47,29 +47,29 @@ const ANSWERS: Readonly<Record<string, string>> = {
   counterLapsed: 'Counter lapsed',
 };
 
-/** `offer` to a gull (null: the default) on a draft (null: the counter, the last offer, else their ask). */
+/** `offer` to a person (null: the default) on a draft (null: the counter, the last offer, else their ask). */
 export function offerView(
   s: CareerState,
-  gull: number | null,
+  person: number | null,
   draft: Offer | null
 ): OfferView {
-  const c = crewOf(s),
-    id = gull ?? defaultGull(s, c),
-    g = s.gulls[id];
-  const talk = s.talks.find((t) => t.crew === c.id && t.gull === id) ?? null;
+  const c = teamOf(s),
+    id = person ?? defaultPerson(s, c),
+    g = s.people[id];
+  const talk = s.talks.find((t) => t.team === c.id && t.person === id) ?? null;
   const ask = askOf(s, g, c),
     v = seen(s, c.id, id);
   const d = draft ?? talk?.counter ?? talk?.offer ?? askOffer(s, c, g);
   const breaking = breakCost(s, g, c.id),
-    leaving = d.replaces === null ? 0 : dismissalCost(s, s.gulls[d.replaces]);
+    leaving = d.replaces === null ? 0 : dismissalCost(s, s.people[d.replaces]);
   const now = d.fee + breaking + leaving,
-    left = c.coin - now;
+    left = c.balance - now;
   const met = satisfied(s, g, c, d);
   const letters = s.mail.filter(
-    (m) => m.category === 'market' && m.slots.gull === id && m.kind in ANSWERS
+    (m) => m.category === 'market' && m.slots.person === id && m.kind in ANSWERS
   );
   const signedNow =
-    g.contract?.crew === c.id &&
+    g.contract?.team === c.id &&
     talk === null &&
     (letters.some(
       (m) => m.kind === 'accepted' && m.day >= (g.contract?.signed ?? Infinity)
@@ -103,14 +103,14 @@ export function offerView(
           : null;
   const mineRoles = (r: string) =>
     [
-      c.staff.ships[1].captain,
+      c.staff.ships[1].driver,
       c.staff.reserve,
-      ...c.staff.ships.map((h) => h.bosun),
-      c.staff.shipwright,
+      ...c.staff.ships.map((h) => h.mechanic),
+      c.staff.designer,
       ...c.staff.scouts,
-      ...c.staff.flight,
-    ].filter((x): x is number => x !== null && s.gulls[x].role === r);
-  const renewal = g.contract?.crew === c.id;
+      ...c.staff.pit,
+    ].filter((x): x is number => x !== null && s.people[x].role === r);
+  const renewal = g.contract?.team === c.id;
   return {
     top: topBar(s),
     id,
@@ -119,7 +119,7 @@ export function offerView(
     role: g.role,
     roleName: ROLE_NAMES[g.role],
     stars: v.stars,
-    crew: c.name,
+    team: c.name,
     draft: d,
     ask,
     statuses: statuses(g.role).map((x) => ({ id: x, label: STATUS[x] })),
@@ -129,7 +129,7 @@ export function offerView(
           { id: null, label: 'Open post' },
           ...mineRoles(g.role).map((x) => ({
             id: x,
-            label: nameOf(s.gulls[x]),
+            label: nameOf(s.people[x]),
           })),
         ],
     most: {
@@ -141,14 +141,14 @@ export function offerView(
     cost: {
       now: fig(
         now,
-        coinText(now),
-        rival('their ask', coinText(renewal ? 0 : ask.fee)),
+        moneyText(now),
+        rival('their ask', moneyText(renewal ? 0 : ask.fee)),
         {
           title: 'Cost to sign',
           lines: [
-            line('Signing fee', coinText(d.fee)),
-            line('Break clause', coinText(breaking)),
-            line('Owed the one replaced', coinText(leaving)),
+            line('Signing fee', moneyText(d.fee)),
+            line('Break clause', moneyText(breaking)),
+            line('Owed the one replaced', moneyText(leaving)),
           ],
         }
       ),
@@ -159,17 +159,17 @@ export function offerView(
         {
           title: 'A race',
           lines: [
-            line('Wage', coinText(d.wage)),
-            line('Podium bonus', coinText(d.podium)),
-            line('Sinking bonus', coinText(d.sinking)),
+            line('Wage', moneyText(d.wage)),
+            line('Podium bonus', moneyText(d.podium)),
+            line('Sinking bonus', moneyText(d.sinking)),
           ],
         }
       ),
-      left: fig(left, coinText(left), rival('floor', coinText(c.debtFloor)), {
+      left: fig(left, moneyText(left), rival('floor', moneyText(c.debtFloor)), {
         title: 'Coin left',
         lines: [
-          line('Coin', coinText(c.coin)),
-          line('Cost to sign', `−${coinText(now)}`),
+          line('Coin', moneyText(c.balance)),
+          line('Cost to sign', `−${moneyText(now)}`),
         ],
       }),
     },
@@ -188,8 +188,8 @@ export function offerView(
       .reverse()
       .map((m) => ({ day: dayText(s, m.day), answer: ANSWERS[m.kind] })),
     rivals: s.talks
-      .filter((t) => t.gull === id && t.crew !== c.id)
-      .map((t) => s.crews[t.crew].name),
+      .filter((t) => t.person === id && t.team !== c.id)
+      .map((t) => s.teams[t.team].name),
     counter: talk?.counter ?? null,
     state,
     stateText,

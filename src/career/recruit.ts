@@ -1,19 +1,25 @@
-// Making a gull (Phase B section 2): a role, a strength in stars and an age go in; a whole gull comes out, named,
+// Making a person (Phase B section 2): a role, a strength in stars and an age go in; a whole person comes out, named,
 // with stats about that strength, a ceiling (their stats at peak, from which potential is read), a peak age,
-// improvability, traits, wants, morale and marketability. The world's start and each season's young gulls use it.
+// improvability, traits, wants, morale and marketability. The world's start and each season's young people use it.
 
-import type { Style } from '../race.ts';
+import type { Persona } from '../race.ts';
 import type { Personality, Role } from '../office.ts';
 import { dealtKnown } from './components.ts';
 import { between, pick, seeded, within, type Rand } from './dice.ts';
 import { drawWants } from './asks.ts';
 import { family, fullName, given } from './names.ts';
-import { ROLE_STATS, gullOf, stat, type Gull, type GullCore } from './roles.ts';
+import {
+  ROLE_STATS,
+  personOf,
+  stat,
+  type Person,
+  type PersonCore,
+} from './roles.ts';
 import { YEAR, peakRange, starsOf } from './stars.ts';
 import { gainable } from './traits.ts';
 import { TUNING } from './tuning.ts';
 
-const STYLES: readonly Style[] = [
+const PERSONAS: readonly Persona[] = [
   'hunter',
   'homesteader',
   'raider',
@@ -29,10 +35,10 @@ const PERSONALITIES: readonly Personality[] = [
   'gambler',
   'steady',
 ];
-/** The fixed key of a shipwright's deal of known components. */
+/** The fixed key of a designer's deal of known components. */
 const KNOWN = 0x636f6d70;
 
-/** What a new gull is made from. */
+/** What a new person is made from. */
 export interface Making {
   id: number;
   role: Role;
@@ -69,7 +75,7 @@ function statsAbout(
   return out;
 }
 
-/** A gull's marketability at the start: from stars and youth, spread by seed (traits add theirs when read). */
+/** A person's marketability at the start: from stars and youth, spread by seed (traits add theirs when read). */
 const marketabilityAt = (
   starsNow: number,
   years: number,
@@ -88,8 +94,8 @@ const marketabilityAt = (
   );
 };
 
-/** A new gull. */
-export function makeGull(m: Making, rand: Rand, taken: Set<string>): Gull {
+/** A new person. */
+export function makePerson(m: Making, rand: Rand, taken: Set<string>): Person {
   const [lo, hi] = peakRange(m.role);
   const peak = between(rand, lo, hi);
   const improvability = Math.round(within(rand, 0.3, 1) * 100) / 100;
@@ -117,7 +123,7 @@ export function makeGull(m: Making, rand: Rand, taken: Set<string>): Gull {
   }
   const name = freshName(rand, taken);
   const seed = Math.floor(rand() * 4294967296) >>> 0;
-  const core: GullCore = {
+  const core: PersonCore = {
     id: m.id,
     seed,
     given: name.given,
@@ -133,15 +139,15 @@ export function makeGull(m: Making, rand: Rand, taken: Set<string>): Gull {
     contract: null,
     known: {},
     history: [],
-    style: m.role === 'captain' ? pick(rand, STYLES) : null,
+    persona: m.role === 'driver' ? pick(rand, PERSONAS) : null,
     personality: m.role === 'manager' ? pick(rand, PERSONALITIES) : null,
     reputation: m.role === 'manager' ? Math.round(within(rand, 10, 40)) : 0,
     fatigue: 0,
     fatigueDay: m.day,
     job: null,
-    // a shipwright's known components, by their own seed (no stream's turn), so every new shipwright is dealt alike
+    // a designer's known components, by their own seed (no stream's turn), so every new designer is dealt alike
     components:
-      m.role === 'shipwright'
+      m.role === 'designer'
         ? dealtKnown(seeded(seed, KNOWN), starsOf(stats))
         : [],
     unfit: 0,
@@ -152,5 +158,5 @@ export function makeGull(m: Making, rand: Rand, taken: Set<string>): Gull {
     retired: null,
     player: false,
   };
-  return gullOf(core, m.role, stats, ceiling);
+  return personOf(core, m.role, stats, ceiling);
 }

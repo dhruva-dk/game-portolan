@@ -1,6 +1,6 @@
 // What the career's screens read (Phase B section 12–13, for Phase C): pure selectors over the state, each a view a
-// screen draws as given. The mail rendered, newest first; a league's table; the season's calendar; race day's preview
-// of the player's crew; a dilemma's question and its answers.
+// screen draws as given. The mail rendered, newest first; a tier's table; the season's calendar; race day's preview
+// of the player's team; a dilemma's question and its answers.
 
 import type { Stance, Job } from '../race.ts';
 import { dilemma } from './events.ts';
@@ -39,10 +39,10 @@ export const mailView = (s: CareerState): MailView[] =>
 export const unread = (s: CareerState): number =>
   s.mail.filter((m) => !m.read).length;
 
-/** A row of a league's table. */
+/** A row of a tier's table. */
 export interface TableRow {
   place: number;
-  crew: number;
+  team: number;
   name: string;
   points: number;
   wins: number;
@@ -51,20 +51,20 @@ export interface TableRow {
   mine: boolean;
 }
 
-/** A league's table, by points, then wins, then crew id (the order the season's end promotes by). */
-export function table(s: CareerState, league: number): TableRow[] {
+/** A tier's table, by points, then wins, then team id (the order the season's end promotes by). */
+export function table(s: CareerState, tier: number): TableRow[] {
   const me = mine(s);
-  return [...s.leagues[league].standings]
-    .sort((a, b) => b.points - a.points || b.wins - a.wins || a.crew - b.crew)
+  return [...s.championships[tier].standings]
+    .sort((a, b) => b.points - a.points || b.wins - a.wins || a.team - b.team)
     .map((x, i) => ({
       place: i + 1,
-      crew: x.crew,
-      name: s.crews[x.crew].name,
+      team: x.team,
+      name: s.teams[x.team].name,
       points: x.points,
       wins: x.wins,
       podiums: x.podiums,
       sinkings: x.sinkings,
-      mine: x.crew === me,
+      mine: x.team === me,
     }));
 }
 
@@ -88,11 +88,11 @@ export function fixtures(s: CareerState): Fixture[] {
   }));
 }
 
-/** Race day's preview of the player's crew: who sails ship two (and whether a stand-in), the stance and the flight's
- *  order, whether the race may begin; null if no race is due or the player has no crew. */
+/** Race day's preview of the player's team: who sails ship two (and whether a stand-in), the stance and the pit crew's
+ *  order, whether the race may begin; null if no race is due or the player has no team. */
 export interface Preview {
   round: number;
-  captain: number | null;
+  driver: number | null;
   standIn: boolean;
   forfeit: boolean;
   stance: Stance;
@@ -107,7 +107,7 @@ export function preview(s: CareerState): Preview | null {
     two = x.ships[1];
   return {
     round: s.race.round,
-    captain: two.captain,
+    driver: two.driver,
     standIn: two.standIn,
     forfeit: two.forfeit,
     stance: x.stance,

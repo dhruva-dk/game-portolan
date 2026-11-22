@@ -1,4 +1,4 @@
-// The screens' selectors (career/read.ts): mail, a league's table, the calendar, race day's preview, a dilemma's view.
+// The screens' selectors (career/read.ts): mail, a tier's table, the calendar, race day's preview, a dilemma's view.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -25,14 +25,14 @@ test('mail: newest first, rendered, read marks it; unread counts', () => {
   assert.equal(unread(read), unread(AFTER) - 1);
 });
 
-test("a league's table: every crew once, by points, the player's marked", () => {
-  const me = AFTER.player!.crew,
-    league = AFTER.crews[me].league;
-  const t = table(AFTER, league);
-  assert.equal(t.length, AFTER.leagues[league].crews.length);
+test("a tier's table: every team once, by points, the player's marked", () => {
+  const me = AFTER.player!.team,
+    tier = AFTER.teams[me].tier;
+  const t = table(AFTER, tier);
+  assert.equal(t.length, AFTER.championships[tier].teams.length);
   for (let i = 1; i < t.length; i++) assert.ok(t[i - 1].points >= t[i].points);
   assert.deepEqual(
-    t.filter((r) => r.mine).map((r) => r.crew),
+    t.filter((r) => r.mine).map((r) => r.team),
     [me]
   );
   assert.deepEqual(
@@ -57,10 +57,10 @@ test('the calendar: today on race day, sailed after it, the rest ahead', () => {
   assert.equal(fixtures(AFTER).length, AFTER.calendar!.rounds.length);
 });
 
-test("race day's preview: ship two's captain, the stance and order; none off race day", () => {
+test("race day's preview: ship two's driver, the stance and order; none off race day", () => {
   const p = preview(DAY)!;
   assert.equal(p.round, 0);
-  assert.equal(p.captain, DAY.crews[DAY.player!.crew].staff.ships[1].captain);
+  assert.equal(p.driver, DAY.teams[DAY.player!.team].staff.ships[1].driver);
   assert.equal(p.order.length, 4);
   assert.equal(preview(AFTER), null);
   assert.equal(
@@ -76,7 +76,7 @@ test("a dilemma's view: its options and the lapse; null for a plain message", ()
     ...plain,
     id: 9999,
     kind: 'riseAsk',
-    slots: { gull: 0, own: AFTER.player!.crew },
+    slots: { person: 0, own: AFTER.player!.team },
     dilemma: {
       id: 'riseAsk',
       options: ['pay', 'refuse', 'promise'],

@@ -1,18 +1,18 @@
 // `career` and `jobs` (Phase C batch 2): the player as a manager (reputation and its rank, marketability, the
-// elder's confidence, the record by season, honours, the posts offered), and the elder's letter with the offers when
+// chairman's confidence, the record by season, honours, the posts offered), and the chairman's letter with the offers when
 // sacked or tempted. Pure, read-side.
 
 import type { JobCard, JobsView, CareerView } from '../office-people.ts';
 import { marketability } from './effective.ts';
-import { standingOf } from './elders.ts';
+import { standingOf } from './chairmen.ts';
 import { takeCheck } from './jobs.ts';
 import type { CareerState } from './state.ts';
 import { TUNING } from './tuning.ts';
-import { ROLE_NAMES, ageOf, dayText } from './views-gull.ts';
+import { ROLE_NAMES, ageOf, dayText } from './views-person.ts';
 import {
-  LEAGUES,
-  coinText,
-  crewOf,
+  TIERS,
+  moneyText,
+  teamOf,
   faceOf,
   fig,
   line,
@@ -22,29 +22,34 @@ import {
   topBar,
 } from './views.ts';
 
-/** A crew's offer of its manager's post, as a card shows it. */
-function card(s: CareerState, crew: number, expires: number): JobCard {
-  const c = s.crews[crew],
-    elder = s.gulls[c.staff.elder],
-    no = takeCheck(s, crew);
-  const place = standingOf(s, crew),
-    of = s.leagues[c.league].standings.length;
+/** A team's offer of its manager's post, as a card shows it. */
+function card(s: CareerState, team: number, expires: number): JobCard {
+  const c = s.teams[team],
+    chairman = s.people[c.staff.chairman],
+    no = takeCheck(s, team);
+  const place = standingOf(s, team),
+    of = s.championships[c.tier].standings.length;
   return {
-    crew,
+    team,
     name: c.name,
-    league: LEAGUES[c.league],
+    tier: TIERS[c.tier],
     colours: c.colours,
     emblem: c.emblem,
-    elder: nameOf(elder),
-    elderFace: faceOf(s, elder),
+    chairman: nameOf(chairman),
+    chairmanFace: faceOf(s, chairman),
     target: ordinal(c.target),
-    budget: fig(c.budget, coinText(c.budget), rival('coin', coinText(c.coin)), {
-      title: 'Budget',
-      lines: [
-        line('A season', coinText(c.budget)),
-        line('In hand', coinText(c.coin)),
-      ],
-    }),
+    budget: fig(
+      c.budget,
+      moneyText(c.budget),
+      rival('balance', moneyText(c.balance)),
+      {
+        title: 'Budget',
+        lines: [
+          line('A season', moneyText(c.budget)),
+          line('In hand', moneyText(c.balance)),
+        ],
+      }
+    ),
     standing: `${ordinal(place)} of ${of}`,
     expires: s.player?.sacked ? 'Until taken' : dayText(s, expires),
     take: { ok: no === null, why: no?.sentence ?? '' },
@@ -54,9 +59,9 @@ function card(s: CareerState, crew: number, expires: number): JobCard {
 /** `career`. */
 export function careerView(s: CareerState): CareerView {
   const p = s.player!,
-    me = s.gulls[p.gull],
-    c = crewOf(s);
-  const managers = s.gulls
+    me = s.people[p.person],
+    c = teamOf(s);
+  const managers = s.people
     .filter((g) => g.role === 'manager' && g.retired === null && !g.player)
     .map((g) => g.reputation);
   const above = managers.filter((r) => r > p.reputation).length,
@@ -70,10 +75,10 @@ export function careerView(s: CareerState): CareerView {
     if (h.best === 1) honours.push(`S${h.season + 1} · Race won`);
     if (
       next &&
-      h.crew === next.crew &&
-      h.league !== null &&
-      next.league !== null &&
-      next.league < h.league
+      h.team === next.team &&
+      h.tier !== null &&
+      next.tier !== null &&
+      next.tier < h.tier
     )
       honours.push(`S${h.season + 1} · Promoted`);
   });
@@ -81,7 +86,7 @@ export function careerView(s: CareerState): CareerView {
     top: topBar(s),
     face: faceOf(s, me),
     name: nameOf(me),
-    crew: c.name,
+    team: c.name,
     age: ageOf(s, me),
     reputation: fig(
       Math.round(p.reputation),
@@ -91,8 +96,8 @@ export function careerView(s: CareerState): CareerView {
         title: 'Reputation',
         lines: [
           line('Now', Math.round(p.reputation)),
-          line('League One posts at', TUNING.elder.jobs[0]),
-          line('League Two posts at', TUNING.elder.jobs[1]),
+          line('Tier 1 posts at', TUNING.chairman.jobs[0]),
+          line('Tier 2 posts at', TUNING.chairman.jobs[1]),
         ],
       }
     ),
@@ -120,13 +125,13 @@ export function careerView(s: CareerState): CareerView {
     confidence: fig(
       Math.round(c.confidence),
       String(Math.round(c.confidence)),
-      rival('sacked under', String(TUNING.elder.verdict)),
+      rival('sacked under', String(TUNING.chairman.verdict)),
       {
-        title: "Elder's confidence",
+        title: "Chairman's confidence",
         lines: [
           line('Now', Math.round(c.confidence)),
           line('Target place', ordinal(c.target)),
-          line('Sacked under', TUNING.elder.verdict),
+          line('Sacked under', TUNING.chairman.verdict),
         ],
       }
     ),
@@ -134,30 +139,30 @@ export function careerView(s: CareerState): CareerView {
       .reverse()
       .map((h) => ({
         season: `S${h.season + 1}`,
-        crew: h.crew === null ? 'Free' : s.crews[h.crew].name,
-        league: h.league === null ? '—' : LEAGUES[h.league],
+        team: h.team === null ? 'Free' : s.teams[h.team].name,
+        tier: h.tier === null ? '—' : TIERS[h.tier],
         role: ROLE_NAMES[h.role],
         races: h.races,
         points: h.points,
       })),
     honours,
-    offers: p.offers.map((o) => card(s, o.crew, o.expires)),
+    offers: p.offers.map((o) => card(s, o.team, o.expires)),
   };
 }
 
-/** `jobs`: sacked, the old crew's elder writes; tempted, the first offering crew's. */
+/** `jobs`: sacked, the old team's chairman writes; tempted, the first offering team's. */
 export function jobsView(s: CareerState): JobsView {
   const p = s.player!,
-    offers = p.offers.map((o) => card(s, o.crew, o.expires));
+    offers = p.offers.map((o) => card(s, o.team, o.expires));
   const from = p.sacked
-    ? s.crews[p.crew]
-    : s.crews[p.offers[0]?.crew ?? p.crew];
-  const elder = s.gulls[from.staff.elder];
+    ? s.teams[p.team]
+    : s.teams[p.offers[0]?.team ?? p.team];
+  const chairman = s.people[from.staff.chairman];
   return {
     sacked: p.sacked,
     letter: {
-      from: `${nameOf(elder)}, elder of ${from.name}`,
-      face: faceOf(s, elder),
+      from: `${nameOf(chairman)}, chairman of ${from.name}`,
+      face: faceOf(s, chairman),
       title: p.sacked ? 'You are dismissed' : `${from.name} wants you`,
       paragraphs: p.sacked
         ? [`Your time at ${from.name} is over.`]

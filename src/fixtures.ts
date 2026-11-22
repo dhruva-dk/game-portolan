@@ -1,7 +1,7 @@
 // The office's fixtures: careers on a memory store, made by the commands a player would send (Found, Advance, StartScout,
 // OfferContract, a race recorded), for ?screen= (debug.ts) and tools/capture.ts. Nothing here touches the device's own
-// career. `people` is a career past its first race: one rival captain scouted, another being scouted, and a free agent's
-// talks under way (a lowball, its answer due); `sacked` is that career with the elder's patience gone (its state set, then
+// career. `people` is a career past its first race: one rival driver scouted, another being scouted, and a free agent's
+// talks under way (a lowball, its answer due); `sacked` is that career with the chairman's patience gone (its state set, then
 // snapshotted: no run of races reliably ends in a sacking).
 
 import type { Command, Desk } from './office';
@@ -10,10 +10,10 @@ import { createDesk, type Shelf } from './desk';
 import { send, fresh, checkpoint, type Kept } from './career/session';
 import type { CareerState } from './career/career';
 import { raceCards } from './career/card';
-import { sackedOffers } from './career/elders';
+import { sackedOffers } from './career/chairmen';
 import { offerView } from './career/views-offer';
 import { profileView } from './career/views-profile';
-import { seen } from './career/views-gull';
+import { seen } from './career/views-person';
 import { topBar } from './career/views';
 import { SPEC } from './sim/fit';
 import { emptyDisk, memoryStore, type Disk } from './store/memory';
@@ -22,7 +22,7 @@ import { emptyDisk, memoryStore, type Disk } from './store/memory';
 export const FOUNDING: Extract<Command, { kind: 'Found' }> = {
   kind: 'Found',
   seed: 20261115,
-  crew: 'Portolan Quills',
+  team: 'Portolan Quills',
   colours: { first: 2, second: 7 },
   emblem: 3,
   given: 'Ottoline',
@@ -45,7 +45,7 @@ export type Fixture = (typeof FIXTURES)[number];
 /** A step of a fixture: a command, or the commands a state calls for. */
 type Step = Command | ((s: CareerState) => readonly Command[]);
 
-/** Every league's race recorded, the ships home in card order, none sunk. */
+/** Every tier's race recorded, the ships home in card order, none sunk. */
 const raced = (s: CareerState): Command[] => [
   { kind: 'RaceStarted', round: s.race!.round },
   ...raceCards(s, SPEC).map((card): Command => {
@@ -54,7 +54,7 @@ const raced = (s: CareerState): Command[] => [
       total = sea.reduce((a, _i, k) => a + 10 - k, 0);
     const result: RaceResult = {
       seed: card.seed,
-      league: card.league,
+      tier: card.tier,
       round: card.round,
       order,
       sinkings: [],
@@ -68,15 +68,15 @@ const raced = (s: CareerState): Command[] => [
   }),
 ];
 
-const mine = (s: CareerState) => s.player!.crew;
-/** The `n`th rival captain of the player's league not yet known to them. */
+const mine = (s: CareerState) => s.player!.team;
+/** The `n`th rival driver of the player's tier not yet known to them. */
 const stranger = (s: CareerState, n: number) =>
-  s.gulls.filter(
+  s.people.filter(
     (g) =>
       g.contract &&
-      g.contract.crew !== mine(s) &&
-      g.role === 'captain' &&
-      s.crews[g.contract.crew].league === s.crews[mine(s)].league &&
+      g.contract.team !== mine(s) &&
+      g.role === 'driver' &&
+      s.teams[g.contract.team].tier === s.teams[mine(s)].tier &&
       !seen(s, mine(s), g.id).known
   )[n];
 const scouted =
@@ -85,13 +85,13 @@ const scouted =
     const g = stranger(s, n),
       p = profileView(s, g.id);
     return p.scout.ok
-      ? [{ kind: 'StartScout', scout: p.scout.scout!, gull: g.id }]
+      ? [{ kind: 'StartScout', scout: p.scout.scout!, person: g.id }]
       : [];
   };
-/** A free bosun offered less than they ask, in place of the player's ship-two bosun. */
+/** A free mechanic offered less than they ask, in place of the player's ship-two mechanic. */
 const haggle = (s: CareerState): Command[] => {
-  for (const g of s.gulls) {
-    if (g.contract || g.retired !== null || g.player || g.role !== 'bosun')
+  for (const g of s.people) {
+    if (g.contract || g.retired !== null || g.player || g.role !== 'mechanic')
       continue;
     const v = offerView(s, g.id, null),
       offer = {
@@ -100,7 +100,7 @@ const haggle = (s: CareerState): Command[] => {
         wage: Math.round(v.draft.wage * 0.75),
       };
     if (offerView(s, g.id, offer).send.ok)
-      return [{ kind: 'OfferContract', gull: g.id, offer }];
+      return [{ kind: 'OfferContract', person: g.id, offer }];
   }
   return [];
 };
@@ -110,12 +110,12 @@ const until =
   (s: CareerState): Command[] =>
     done(s) || topBar(s).go.raceDay ? [] : [{ kind: 'Advance' }];
 
-/** The people fixture's gulls (for ?screen=profile, offer and ?who=): the rival captain scouted, the one being scouted,
- *  the free agent in talks, and ship two's captain. */
-export const PICKED = { scouted: -1, unknown: -1, talks: -1, captain: -1 };
+/** The people fixture's people (for ?screen=profile, offer and ?who=): the rival driver scouted, the one being scouted,
+ *  the free agent in talks, and ship two's driver. */
+export const PICKED = { scouted: -1, unknown: -1, talks: -1, driver: -1 };
 const PEOPLE: readonly Step[] = [
   FOUNDING,
-  { kind: 'DebugCoin', coin: 6400 },
+  { kind: 'DebugBalance', balance: 6400 },
   (s) => {
     PICKED.scouted = stranger(s, 0).id;
     return scouted(0)(s);
@@ -127,19 +127,19 @@ const PEOPLE: readonly Step[] = [
   ),
   (s) => {
     PICKED.unknown = stranger(s, 0).id;
-    PICKED.captain = s.crews[mine(s)].staff.ships[1].captain ?? -1;
+    PICKED.driver = s.teams[mine(s)].staff.ships[1].driver ?? -1;
     return scouted(0)(s);
   },
   (s) => {
     const c = haggle(s);
-    PICKED.talks = c[0]?.kind === 'OfferContract' ? c[0].gull : -1;
+    PICKED.talks = c[0]?.kind === 'OfferContract' ? c[0].person : -1;
     return c;
   },
 ];
 
 const COMMANDS: Readonly<Record<Fixture, readonly Step[]>> = {
   found: [],
-  home: [FOUNDING, { kind: 'DebugCoin', coin: 1250 }],
+  home: [FOUNDING, { kind: 'DebugBalance', balance: 1250 }],
   raceday: [FOUNDING, { kind: 'Advance' }],
   recover: [FOUNDING, { kind: 'Advance' }],
   people: PEOPLE,

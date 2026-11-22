@@ -1,4 +1,4 @@
-// `profile` (Phase C batch 2): any gull of any role, as the player's crew sees them: their stars (ranges until known),
+// `profile` (Phase C batch 2): any person of any role, as the player's team sees them: their stars (ranges until known),
 // traits, morale and marketability, wants once scouted, stats with which way they head, the role's own figures, the
 // history, the contract, and what the player may do (scout, offer, renew, dismiss), each with why not. Pure.
 
@@ -9,7 +9,7 @@ import { effective, marketability } from './effective.ts';
 import { offerCheck } from './hiring.ts';
 import { askOf } from './market.ts';
 import { TUNING } from './tuning.ts';
-import type { Gull, GullOf } from './roles.ts';
+import type { Person, PersonOf } from './roles.ts';
 import { scoutCheck, scoutingDays } from './scouting.ts';
 import { seatOf, seatRole } from './seats.ts';
 import { JOBS, mendingFactor, rating, repairsFactor } from './service.ts';
@@ -20,7 +20,7 @@ import {
   starWidth,
 } from './staff.ts';
 import { age } from './stars.ts';
-import type { CareerState, Crew } from './state.ts';
+import type { CareerState, Team } from './state.ts';
 import { trait } from './traits.ts';
 import {
   JOB_NAMES,
@@ -33,11 +33,11 @@ import {
   statName,
   wageText,
   whereText,
-} from './views-gull.ts';
+} from './views-person.ts';
 import {
-  LEAGUES,
-  coinText,
-  crewOf,
+  TIERS,
+  moneyText,
+  teamOf,
   faceOf,
   fig,
   line,
@@ -52,24 +52,24 @@ const act = (why: string | null | undefined): Act => ({
 });
 const pct = (x: number) => `${Math.round(x * 100)}%`;
 
-/** The gull a profile or offer opens on when none is named: the first in talks, else ship two's captain. */
-export function defaultGull(s: CareerState, c: Crew): number {
+/** The person a profile or offer opens on when none is named: the first in talks, else ship two's driver. */
+export function defaultPerson(s: CareerState, c: Team): number {
   return (
-    s.talks.find((t) => t.crew === c.id)?.gull ??
-    c.staff.ships[1].captain ??
-    c.staff.elder
+    s.talks.find((t) => t.team === c.id)?.person ??
+    c.staff.ships[1].driver ??
+    c.staff.chairman
   );
 }
 
-/** The offer a crew would make a gull at their ask: their post if theirs (a renewal), else an open one. */
-export function askOffer(s: CareerState, c: Crew, g: Gull): Offer {
+/** The offer a team would make a person at their ask: their post if theirs (a renewal), else an open one. */
+export function askOffer(s: CareerState, c: Team, g: Person): Offer {
   const ask = askOf(s, g, c),
-    mine = g.contract?.crew === c.id;
-  const seat = mine ? seatOf(c, g.id, (id) => s.gulls[id].job) : null;
+    mine = g.contract?.team === c.id;
+  const seat = mine ? seatOf(c, g.id, (id) => s.people[id].job) : null;
   const status = seat
     ? seatRole(seat).status
-    : g.role === 'captain'
-      ? c.staff.ships[1].captain === null
+    : g.role === 'driver'
+      ? c.staff.ships[1].driver === null
         ? 'ship'
         : 'reserve'
       : 'staff';
@@ -89,9 +89,9 @@ export function askOffer(s: CareerState, c: Crew, g: Gull): Offer {
 /** The role's own figures. */
 function specifics(
   s: CareerState,
-  g: Gull
+  g: Person
 ): { label: string; figure: ReturnType<typeof fig> }[] {
-  const st = effective(g as GullOf<typeof g.role>, null) as Readonly<
+  const st = effective(g as PersonOf<typeof g.role>, null) as Readonly<
     Record<string, number>
   >;
   const one = (
@@ -108,7 +108,7 @@ function specifics(
     }),
   });
   switch (g.role) {
-    case 'captain':
+    case 'driver':
       return [
         one(
           'Feedback a race',
@@ -127,7 +127,7 @@ function specifics(
           ),
         },
       ];
-    case 'bosun':
+    case 'mechanic':
       return [
         one(
           'Repairs',
@@ -144,7 +144,7 @@ function specifics(
           [['Mending', st.mending]]
         ),
       ];
-    case 'shipwright':
+    case 'designer':
       return [
         one(
           'Design speed',
@@ -171,13 +171,13 @@ function specifics(
           [['Judgement', st.judgement]]
         ),
       ];
-    case 'flight': {
+    case 'pit': {
       const best = [...JOBS].sort(
         (a, b) =>
-          rating(st as GullOf<'flight'>['stats'], b) -
-          rating(st as GullOf<'flight'>['stats'], a)
+          rating(st as PersonOf<'pit'>['stats'], b) -
+          rating(st as PersonOf<'pit'>['stats'], a)
       )[0];
-      const r = rating(st as GullOf<'flight'>['stats'], best);
+      const r = rating(st as PersonOf<'pit'>['stats'], best);
       return [
         one(
           `Best job: ${JOB_NAMES[best]}`,
@@ -186,7 +186,7 @@ function specifics(
           '50',
           JOBS.map((j) => [
             JOB_NAMES[j],
-            Math.round(rating(st as GullOf<'flight'>['stats'], j) * 100),
+            Math.round(rating(st as PersonOf<'pit'>['stats'], j) * 100),
           ])
         ),
       ];
@@ -206,13 +206,16 @@ function specifics(
   }
 }
 
-/** `profile` of a gull (null: the default). */
-export function profileView(s: CareerState, gull: number | null): ProfileView {
-  const c = crewOf(s),
-    id = gull ?? defaultGull(s, c),
-    g = s.gulls[id];
+/** `profile` of a person (null: the default). */
+export function profileView(
+  s: CareerState,
+  person: number | null
+): ProfileView {
+  const c = teamOf(s),
+    id = person ?? defaultPerson(s, c),
+    g = s.people[id];
   const v = seen(s, c.id, id),
-    mine = g.contract?.crew === c.id,
+    mine = g.contract?.team === c.id,
     you = g.player;
   const where = whereText(s, g),
     years = age(g, s.day);
@@ -230,8 +233,8 @@ export function profileView(s: CareerState, gull: number | null): ProfileView {
         }
       )
     : [];
-  const talk = s.talks.find((t) => t.crew === c.id && t.gull === id) ?? null;
-  const busy = s.scouting.find((x) => x.crew === c.id && x.gull === id);
+  const talk = s.talks.find((t) => t.team === c.id && t.person === id) ?? null;
+  const busy = s.scouting.find((x) => x.team === c.id && x.person === id);
   const free = c.staff.scouts.filter(
     (x) => !s.scouting.some((y) => y.scout === x)
   );
@@ -255,7 +258,7 @@ export function profileView(s: CareerState, gull: number | null): ProfileView {
     'retired',
     'role',
     'contracted',
-    'league',
+    'tier',
     'who',
     'leaving',
   ];
@@ -269,8 +272,8 @@ export function profileView(s: CareerState, gull: number | null): ProfileView {
   const renewWhy =
     !mine || you
       ? 'Not yours to renew.'
-      : g.role === 'elder' || g.role === 'manager'
-        ? "Elders and managers are the elder's."
+      : g.role === 'chairman' || g.role === 'manager'
+        ? "Chairmen and managers are the chairman's."
         : g.contract?.ends === null || !closing(s, g.contract!)
           ? `Opens in the contract's last ${TUNING.market.closingDays} days.`
           : (offerNo?.sentence ?? null);
@@ -278,7 +281,7 @@ export function profileView(s: CareerState, gull: number | null): ProfileView {
   const dismissNo =
     !mine || you
       ? 'Not yours.'
-      : g.role === 'elder' || g.role === 'manager'
+      : g.role === 'chairman' || g.role === 'manager'
         ? 'Not yours to dismiss.'
         : null;
   const k = g.contract;
@@ -294,8 +297,8 @@ export function profileView(s: CareerState, gull: number | null): ProfileView {
     roleName: ROLE_NAMES[g.role],
     age: years,
     colony: s.colonies[g.colony] ?? '',
-    crew: where.crew,
-    league: where.league,
+    team: where.team,
+    tier: where.tier,
     post: postOf(s, g),
     stars: v.stars,
     potential: v.potential,
@@ -341,9 +344,9 @@ export function profileView(s: CareerState, gull: number | null): ProfileView {
       .reverse()
       .map((h) => ({
         season: `S${h.season + 1}`,
-        crew: h.crew === null ? 'Free' : s.crews[h.crew].name,
-        league:
-          h.league === null ? '—' : LEAGUES[h.league].replace('League ', 'L'),
+        team: h.team === null ? 'Free' : s.teams[h.team].name,
+        tier:
+          h.tier === null ? '—' : TIERS[h.tier].replace('Championship ', 'L'),
         role: ROLE_NAMES[h.role],
         races: h.races,
         best: h.best === null ? '—' : String(h.best),
@@ -351,19 +354,19 @@ export function profileView(s: CareerState, gull: number | null): ProfileView {
         sinkings: h.sinkings,
       })),
     contract: k && {
-      title: `${ROLE_NAMES[g.role]}, ${where.crew}`,
+      title: `${ROLE_NAMES[g.role]}, ${where.team}`,
       terms: [
         line('Post', postOf(s, g)),
         line('Wage', wageText(k.wage)),
         line('Ends', endsText(s, g)),
-        line('Podium bonus', coinText(k.podium)),
-        line('Sinking bonus', coinText(k.sinking)),
+        line('Podium bonus', moneyText(k.podium)),
+        line('Sinking bonus', moneyText(k.sinking)),
         line(
           'Break clause',
-          k.breakClause === null ? 'None' : coinText(k.breakClause)
+          k.breakClause === null ? 'None' : moneyText(k.breakClause)
         ),
       ],
-      parties: [where.crew, nameOf(g)],
+      parties: [where.team, nameOf(g)],
     },
     talk: talk
       ? talk.counter
@@ -384,12 +387,12 @@ export function profileView(s: CareerState, gull: number | null): ProfileView {
       ...act(dismissNo),
       owed: fig(
         owed,
-        coinText(owed),
-        rival('wage a race', coinText(k?.wage ?? 0)),
+        moneyText(owed),
+        rival('wage a race', moneyText(k?.wage ?? 0)),
         {
           title: 'Owed on dismissal',
           lines: [
-            line('Wage a race', coinText(k?.wage ?? 0)),
+            line('Wage a race', moneyText(k?.wage ?? 0)),
             line('Races left', racesLeft(s)),
           ],
         }

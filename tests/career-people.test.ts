@@ -24,30 +24,30 @@ import {
   type Setting,
 } from '../src/career/traits.ts';
 import {
-  captainStats,
+  driverStats,
   effective,
   marketability,
   mentors,
-  payCoin,
+  payIncome,
   wageTrait,
 } from '../src/career/effective.ts';
 import { drawWants, askSeasons, askWage } from '../src/career/asks.ts';
-import { makeGull } from '../src/career/recruit.ts';
+import { makePerson } from '../src/career/recruit.ts';
 import { TUNING } from '../src/career/tuning.ts';
-import type { Gull, GullOf } from '../src/career/roles.ts';
-import type { CaptainStats } from '../src/race.ts';
+import type { Person, PersonOf } from '../src/career/roles.ts';
+import type { DriverStats } from '../src/race.ts';
 
-const captain = (
+const driver = (
   seed: number,
   starsNow: number,
   years: number
-): GullOf<'captain'> =>
-  makeGull(
-    { id: 0, role: 'captain', stars: starsNow, years, day: 0, colony: 0 },
+): PersonOf<'driver'> =>
+  makePerson(
+    { id: 0, role: 'driver', stars: starsNow, years, day: 0, colony: 0 },
     random(seed),
     new Set()
-  ) as GullOf<'captain'>;
-const flat = (v: number): CaptainStats => ({
+  ) as PersonOf<'driver'>;
+const flat = (v: number): DriverStats => ({
   gunnery: v,
   helm: v,
   seamanship: v,
@@ -65,7 +65,7 @@ test('stars are the mean of the role stats / 4, in halves, 0 to 5; potential is 
   assert.equal(starsOf(flat(0)), 0);
   assert.equal(starsOf(flat(11)), 3, '2.75 rounds to 3');
   assert.equal(starsOf(flat(10.9)), 2.5, '2.725 rounds to 2.5');
-  const g = { ...captain(1, 2, 19), stats: flat(8), ceiling: flat(16) };
+  const g = { ...driver(1, 2, 19), stats: flat(8), ceiling: flat(16) };
   assert.equal(stars(g), 2);
   assert.equal(potential(g), 4);
 });
@@ -76,20 +76,20 @@ test('age: a year a season; peak ages by role', () => {
   assert.equal(age(g, YEAR - 1), 31);
   assert.equal(YEAR, 170);
   for (let s = 0; s < 40; s++) {
-    const c = captain(s, 3, 20);
+    const c = driver(s, 3, 20);
     assert.ok(c.peak >= 26 && c.peak <= 31);
   }
-  const shipwright = makeGull(
-    { id: 0, role: 'shipwright', stars: 3, years: 30, day: 0, colony: 0 },
+  const designer = makePerson(
+    { id: 0, role: 'designer', stars: 3, years: 30, day: 0, colony: 0 },
     random(2),
     new Set()
   );
-  assert.ok(shipwright.peak >= 35 && shipwright.peak <= 45);
+  assert.ok(designer.peak >= 35 && designer.peak <= 45);
 });
 
 test('growth: below peak toward the ceiling, by improvability and school; past peak down by 0.3 + 0.2 a year', () => {
-  const young: Gull = {
-    ...captain(3, 2, 20),
+  const young: Person = {
+    ...driver(3, 2, 20),
     peak: 28,
     improvability: 0.8,
     stats: flat(8),
@@ -122,7 +122,7 @@ test('growth: below peak toward the ceiling, by improvability and school; past p
   assert.ok(
     Object.values(mentored.stats).reduce((a, b) => a + b) >
       Object.values(g1.stats).reduce((a, b) => a + b),
-    'a Mentor lifts a young captain'
+    'a Mentor lifts a young driver'
   );
   const notYoung = grown(young, 25, 0, { ...school, mentor: true });
   assert.equal(
@@ -164,15 +164,15 @@ test("retirement: 0 at the role's first age, rising to 1 at its last", () => {
     assert.equal(retireChance(role, last), 1);
     assert.equal(retireChance(role, last + 3), 1);
   }
-  assert.deepEqual([...ranges.captain], [34, 40]);
-  assert.deepEqual([...ranges.elder], [70, 80]);
-  assert.equal(retires('captain', 40, random(1)), true);
-  assert.equal(retires('captain', 30, random(1)), false);
+  assert.deepEqual([...ranges.driver], [34, 40]);
+  assert.deepEqual([...ranges.chairman], [70, 80]);
+  assert.equal(retires('driver', 40, random(1)), true);
+  assert.equal(retires('driver', 30, random(1)), false);
 });
 
 test('morale: starts at 60; each move points the right way; it shifts effective stats by (morale − 50) / 50', () => {
   assert.equal(TUNING.morale.start, 60);
-  assert.equal(captain(1, 3, 25).morale, 60);
+  assert.equal(driver(1, 3, 25).morale, 60);
   assert.ok(morale.resultMove(5, 2) > 0 && morale.resultMove(5, 9) < 0);
   assert.equal(morale.resultMove(1, 40), -6);
   assert.equal(morale.resultMove(40, 1), 6);
@@ -192,12 +192,12 @@ test('morale: starts at 60; each move points the right way; it shifts effective 
   assert.equal(morale.renewalAsk(81), 0.9);
   assert.equal(morale.renewalAsk(80), 1);
   assert.equal(morale.moraleIn(130), 100);
-  const g = { ...captain(4, 3, 25), traits: [], stats: flat(10) };
+  const g = { ...driver(4, 3, 25), traits: [], stats: flat(10) };
   assert.equal(effective({ ...g, morale: 100 }, null).helm, 11);
   assert.equal(effective({ ...g, morale: 0 }, null).helm, 9);
 });
 
-test("form: one draw shifts a captain's stats by up to ±3 × (1 − u Consistency)", () => {
+test("form: one draw shifts a driver's stats by up to ±3 × (1 − u Consistency)", () => {
   assert.equal(formReach(0), 3);
   assert.equal(formReach(20), 0);
   assert.ok(formReach(15) < formReach(5));
@@ -216,7 +216,7 @@ test("form: one draw shifts a captain's stats by up to ±3 × (1 − u Consisten
   assert.equal(shifted(flat(10), -1.25).helm, 8.8);
 });
 
-test('injury: about 4% of sinkings, for 1 to 3 races; an unfit captain cannot be picked', () => {
+test('injury: about 4% of sinkings, for 1 to 3 races; an unfit driver cannot be picked', () => {
   const rand = random(77);
   let hurt = 0;
   for (let i = 0; i < 20000; i++) {
@@ -247,7 +247,7 @@ const setting = (over: Partial<Setting> = {}): Setting => ({
   grudge: null,
   daysLeft: 300,
   age: 25,
-  league: 1,
+  tier: 1,
   ...over,
 });
 
@@ -261,7 +261,7 @@ test('traits: about thirty, as data, with the required ones doing what they say'
     'stormSpecialist',
     'hothead',
     'crowdFavourite',
-    'payCaptain',
+    'payDriver',
     'homebody',
     'mentor',
     'showboat',
@@ -291,7 +291,7 @@ test('traits: about thirty, as data, with the required ones doing what they say'
   assert.equal(
     modifier(['grudgeHolder'], setting({ grudge: 9 })).stats.nerve,
     undefined,
-    'only against a crew on the grid'
+    'only against a team on the grid'
   );
   assert.equal(modifier(['contractYear'], setting({ daysLeft: 30 })).all, 1);
   assert.equal(modifier(['fastStarter'], setting({ round: 0 })).stats.helm, 1);
@@ -302,23 +302,23 @@ test('traits: about thirty, as data, with the required ones doing what they say'
   );
   // in a race: Storm Specialist on a slow-storm planet
   const g = {
-    ...captain(5, 3, 25),
+    ...driver(5, 3, 25),
     traits: ['stormSpecialist', 'hothead'],
     stats: flat(10),
     morale: 50,
   };
-  const s = captainStats(g, setting({ pace: 0.85 }));
+  const s = driverStats(g, setting({ pace: 0.85 }));
   assert.equal(s.stormcraft, 12);
   assert.equal(s.nerve, 12);
   assert.equal(s.consistency, 8);
-  assert.equal(captainStats(g, null).stormcraft, 10, 'unconditional only');
+  assert.equal(driverStats(g, null).stormcraft, 10, 'unconditional only');
 });
 
-test('traits: Pay Captain brings TUNING.traits.pay × marketability a race; Crowd Favourite lifts marketability; wage traits move the ask; Mentor', () => {
-  const base = { ...captain(6, 3, 25), traits: [], marketability: 50 };
-  assert.equal(payCoin(base), 0);
+test('traits: Pay Driver brings TUNING.traits.pay × marketability a race; Crowd Favourite lifts marketability; wage traits move the ask; Mentor', () => {
+  const base = { ...driver(6, 3, 25), traits: [], marketability: 50 };
+  assert.equal(payIncome(base), 0);
   assert.equal(
-    payCoin({ ...base, traits: ['payCaptain'] }),
+    payIncome({ ...base, traits: ['payDriver'] }),
     Math.round(TUNING.traits.pay * 50)
   );
   assert.equal(marketability({ ...base, traits: ['crowdFavourite'] }), 70);
@@ -342,13 +342,13 @@ test('traits: each role draws only its own, never two that clash, at most three;
   let held: string[] = [];
   let changed = 0;
   for (let season = 0; season < 400; season++) {
-    const next = turned('captain', held, rand);
+    const next = turned('driver', held, rand);
     if (next.join() !== held.join()) changed++;
     held = next;
     assert.ok(held.length <= 3);
     assert.equal(new Set(held).size, held.length);
     for (const a of held) for (const b of held) assert.ok(!clashes(a, b));
-    for (const id of held) assert.ok(trait(id).roles.includes('captain'));
+    for (const id of held) assert.ok(trait(id).roles.includes('driver'));
   }
   assert.ok(changed > 20, 'traits come and go');
 });
@@ -358,7 +358,7 @@ test('wants: three, no repeats; the young lean to status and ambition, the old t
     const rand = random(years);
     const n: Record<string, number> = {};
     for (let i = 0; i < 2000; i++)
-      for (const w of drawWants('captain', years, [], rand))
+      for (const w of drawWants('driver', years, [], rand))
         n[w] = (n[w] ?? 0) + 1;
     return n;
   };
@@ -366,19 +366,19 @@ test('wants: three, no repeats; the young lean to status and ambition, the old t
     old = tally(36);
   assert.ok(young.status > old.status && young.ambition > old.ambition);
   assert.ok(old.security > young.security && old.money > young.money);
-  const w = drawWants('bosun', 30, ['homebody'], random(1));
+  const w = drawWants('mechanic', 30, ['homebody'], random(1));
   assert.equal(w[0], 'home');
   assert.equal(new Set(w).size, 3);
   assert.ok(
-    !drawWants('bosun', 20, [], random(2)).includes('status'),
-    "status is a captain's want"
+    !drawWants('mechanic', 20, [], random(2)).includes('status'),
+    "status is a driver's want"
   );
   assert.equal(askSeasons(20), 1);
   assert.equal(askSeasons(36), 3);
 });
 
-test('the ask rises with stars and league and marketability', () => {
-  const g = captain(7, 3, 25);
+test('the ask rises with stars and tier and marketability', () => {
+  const g = driver(7, 3, 25);
   assert.ok(askWage(g, 0) > askWage(g, 1) && askWage(g, 1) > askWage(g, 2));
   assert.ok(
     askWage({ ...g, stats: flat(16) }, 1) > askWage({ ...g, stats: flat(8) }, 1)

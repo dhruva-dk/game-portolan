@@ -11,17 +11,17 @@ import { ADMIRALTY, counted, proposalPut } from './admiralty.ts';
 import { timeHandlers, type EventHandlers } from './advance.ts';
 import { DESIGNING, built, drawn } from './design.ts';
 import { FITTING } from './parts.ts';
-import { PATRONS, offersCome } from './patrons.ts';
-import { BUILDING, finished } from './rookery.ts';
+import { SPONSORS, offersCome } from './sponsors.ts';
+import { BUILDING, finished } from './hq.ts';
 import { SUPPLYING } from './suppliers.ts';
-import { YARD } from './yard.ts';
+import { IMPROVEMENT } from './improvement.ts';
 import {
   refuse,
   type Applied,
   type Handler,
   type Handlers,
 } from './command.ts';
-import { CREWING } from './crewing.ts';
+import { TEAMING } from './teaming.ts';
 import { dice } from './dice.ts';
 import { FOUNDING } from './found.ts';
 import { HIRING, closingOpens, hear, lapse, silenceFalls } from './hiring.ts';
@@ -49,7 +49,7 @@ export const EVENTS: EventHandlers = {
   designed: drawn,
   built,
   building: finished,
-  patronOffer: offersCome,
+  sponsorOffer: offersCome,
   proposal: proposalPut,
   vote: counted,
   race: raceDay,
@@ -62,16 +62,16 @@ export const EVENTS: EventHandlers = {
 export const COMMANDS: Handlers = {
   ...FOUNDING,
   ...timeHandlers(EVENTS),
-  ...CREWING,
+  ...TEAMING,
   ...SCOUTING,
   ...HIRING,
   ...JOBS_TAKEN,
-  ...YARD,
+  ...IMPROVEMENT,
   ...FITTING,
   ...DESIGNING,
   ...BUILDING,
   ...SUPPLYING,
-  ...PATRONS,
+  ...SPONSORS,
   ...ADMIRALTY,
   ...RACING,
   ...MAIL,
@@ -80,7 +80,7 @@ export const COMMANDS: Handlers = {
 
 /** The commands only a debug build takes (D42). */
 const DEBUG: ReadonlySet<CommandKind> = new Set<CommandKind>([
-  'DebugCoin',
+  'DebugBalance',
   'DebugReveal',
   'DebugToRaceDay',
   'DebugToSeasonEnd',
@@ -117,7 +117,7 @@ export function apply(
   if (DEBUG.has(command.kind) && !allow.debug)
     return refuse('debug', 'Playtest orders are off.');
   if (s.player === null && command.kind !== 'Found')
-    return refuse('unfounded', 'Found a crew first.');
+    return refuse('unfounded', 'Found a team first.');
   const handler = COMMANDS[command.kind] as Handler<CommandKind> | undefined;
   if (!handler)
     return refuse('unavailable', 'The career does not take that order.');
