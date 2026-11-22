@@ -255,7 +255,8 @@ test("the dice: a stream's counter steps once a roll; the same counters give the
   assert.notEqual(dice(5, { world: 1 }).roll('world')(), a);
   assert.notEqual(dice(5, {}).roll('names')(), a);
   assert.notEqual(dice(6, {}).roll('world')(), a);
-  assert.deepEqual(founded().streams, { world: 1 });
+  // the founding draws the world once, and each established team's sponsors
+  assert.deepEqual(founded().streams, { sponsors: 59, world: 1 });
 });
 
 test('a long random session holds every invariant and never faults', () => {

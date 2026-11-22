@@ -24,6 +24,7 @@ import {
 import { standingOf } from '../src/career/standings.ts';
 import { learned } from '../src/career/knowledge.ts';
 import { confidenceCarried, confidenceMove } from '../src/career/leadership.ts';
+import { answer } from '../src/career/market.ts';
 import { YEAR } from '../src/career/stars.ts';
 import { random } from '../src/world/random.ts';
 import { decide, mindOf, rowsFor, ROWS } from '../src/career/rivals.ts';
@@ -69,39 +70,54 @@ test('each personality runs every hiring row, in its own order; the review is th
   assert.notDeepEqual(rowsFor('poacher'), rowsFor('steady'));
 });
 
-test("a rival with an open post fills it through the player's own checks: a talk with a person its team knows", () => {
-  const s = founded();
-  const c = s.teams.find((x) => !x.player && mindOf(s, x.id) !== null)!;
-  assert.equal(mindOf(s, me(s)), null, "the player's team has no rival mind");
+test("a rival with an open post fills it through the player's own checks: those it knows, then free agents it does not, and no one who would refuse", () => {
+  const s0 = founded();
+  const c = s0.teams.find((x) => !x.player && mindOf(s0, x.id) !== null)!;
+  assert.equal(mindOf(s0, me(s0)), null, "the player's team has no rival mind");
   const leaving = c.staff.pit[0];
+  // (at founding no sponsor is signed yet and the season's wages leave no room: this team is given some)
+  const open = released(withTeamSet(s0, c.id, { balance: 100000 }), leaving);
+  assert.equal(
+    decide(
+      released(withTeamSet(s0, c.id, { balance: c.debtFloor }), leaving),
+      c.id,
+      roll(s0),
+      ['fill']
+    ).talks.length,
+    open.talks.length,
+    'with no room, it bids for no one'
+  );
   // at founding a team knows only its own: its scouts' reports bring it these
-  const free = s.people
+  const free = open.people
     .filter(
       (g) => g.role === 'pit' && g.contract === null && g.retired === null
     )
     .slice(0, 6);
-  assert.equal(
-    decide(released(s, leaving), c.id, roll(s), ['fill']).talks.length,
-    released(s, leaving).talks.length,
-    'knowing no one, it bids for no one'
-  );
-  const t = free.reduce(
-    (acc, g) => learned(acc, c.id, g.id, null),
-    released(s, leaving)
-  );
-  const u = decide(t, c.id, roll(t), ['fill']);
-  const talks = u.talks.filter((x) => x.team === c.id);
-  const signedNow =
-    staffOf(u.teams[c.id]).length > staffOf(t.teams[c.id]).length;
-  assert.ok(talks.length > 0 || signedNow, 'the rival bids for its open post');
-  for (const x of talks) {
-    assert.equal(x.offer.role, 'pit');
+  const t = free.reduce((acc, g) => learned(acc, c.id, g.id, null), open);
+  for (const from of [open, t]) {
+    const u = decide(from, c.id, roll(from), ['fill']);
+    const talks = u.talks.filter((x) => x.team === c.id);
+    const signedNow =
+      staffOf(u.teams[c.id]).length > staffOf(from.teams[c.id]).length;
     assert.ok(
-      u.people[x.person].known[c.id] !== undefined,
-      'it bids only for people it knows'
+      talks.length > 0 || signedNow,
+      'the rival bids for its open post'
     );
+    for (const x of talks) {
+      const g = from.people[x.person];
+      assert.equal(x.offer.role, 'pit');
+      assert.ok(
+        g.known[c.id] !== undefined || g.contract === null,
+        'it bids for people it knows, or free agents'
+      );
+      assert.notEqual(
+        answer(from, g, from.teams[c.id], x.offer).kind,
+        'refuse',
+        'and only where it would not be refused'
+      );
+    }
+    invariants(u);
   }
-  invariants(u);
 });
 
 test('a rival scouts with its free scouts, only through scoutCheck (in Reach, unknown, one job a scout)', () => {

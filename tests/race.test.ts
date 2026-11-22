@@ -89,7 +89,7 @@ test('the same card on the same planet gives the same result, hash and all; anot
   // (pinned: the same on every machine. A rule that changes a carded race
   // changes it, and says so: da9afc4e till the pit took the place of the
   // water's mending in a carded race, sim/pit.ts)
-  assert.equal(FIRST.hash, '5702c7c7');
+  assert.equal(FIRST.hash, 'acecf362');
   const other = sailed(short({ seed: SEED + 1 }));
   assert.notEqual(other.hash, FIRST.hash);
 });

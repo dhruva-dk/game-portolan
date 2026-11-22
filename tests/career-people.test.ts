@@ -173,8 +173,11 @@ test('morale: starts at 60; each move points the right way; it shifts effective 
   assert.equal(TUNING.morale.start, 60);
   assert.equal(driver(1, 3, 25).morale, 60);
   assert.ok(morale.resultMove(5, 2) > 0 && morale.resultMove(5, 9) < 0);
-  assert.equal(morale.resultMove(1, 40), -6);
-  assert.equal(morale.resultMove(40, 1), 6);
+  assert.equal(morale.resultMove(1, 40), -3);
+  assert.equal(morale.resultMove(40, 1), 3);
+  // a race settles it a share of the way back to the start
+  assert.ok(morale.settleMove(20) > 0 && morale.settleMove(90) < 0);
+  assert.equal(morale.settleMove(60), 0);
   assert.equal(morale.statusMove(true, true), 2);
   assert.equal(morale.statusMove(true, false), -2);
   assert.equal(morale.statusMove(false, false), 0);

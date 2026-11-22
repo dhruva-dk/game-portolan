@@ -144,6 +144,23 @@ export function signedSponsor(
   return { ...s, teams };
 }
 
+/** A state with a team's empty slots filled from offers dealt today: the sponsors an established team has at the
+ *  founding (the player's, new, finds its own). */
+export function backed(s: CareerState, team: number, roll: Dice): CareerState {
+  const c = s.teams[team];
+  const empty = c.sponsors.filter((p) => p === null).length;
+  const { offers, next } = sponsorOffers(s, c, roll.roll('sponsors'), empty);
+  const teams = [...s.teams];
+  teams[team] = { ...c, offers: [...c.offers, ...offers] };
+  let out: CareerState = { ...s, teams, ids: { ...s.ids, sponsor: next } };
+  for (const o of offers) {
+    const slot = out.teams[team].sponsors.findIndex((p) => p === null);
+    if (slot >= 0 && signCheck(out, team, o.sponsor.id, slot) === null)
+      out = signedSponsor(out, team, o.sponsor.id, slot);
+  }
+  return out;
+}
+
 /** How a team's race went, for its sponsors' objectives. */
 interface Outcome {
   best: number | null;

@@ -359,7 +359,7 @@ test('SetImprovement: each refusal; the work so far reckoned on the old split; o
   assert.equal(improvementCheck(s0, me, []), null);
 });
 
-test('carry-over: spec types standard, designs for next season whole, the rest × 0.6 with risk stripped, the best spare kept', () => {
+test('carry-over: spec types standard, designs for next season whole, the rest × 0.85 with risk stripped, the best spare kept', () => {
   let s = founded();
   const rival = (s.player!.team + 1) % s.teams.length;
   const tier = s.teams[rival].tier;
@@ -407,8 +407,14 @@ test('carry-over: spec types standard, designs for next season whole, the rest �
   const keel = c.parts.find((p) => p.id === 60002)!;
   assert.deepEqual(
     [keel.perf, keel.perfMax, keel.risk, keel.condition],
-    [420, 480, 0, 1]
+    [
+      Math.round(700 * TUNING.parts.carry),
+      Math.round(800 * TUNING.parts.carry),
+      0,
+      1,
+    ]
   );
+  assert.equal(TUNING.parts.carry, 0.85);
   assert.ok(
     !c.parts.some((p) => p.id === 60003),
     'only the best spare of a type is kept'

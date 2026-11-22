@@ -125,10 +125,16 @@ test('gunnery: over seeded races the 16s land more of their shots than the 4s', 
   assert.ok(rate(high) > rate(low) + 0.05, `${rate(high)} to ${rate(low)}`);
 });
 
-test('nerve: over seeded races the 16s fight more than the 4s: more shots fired', () => {
-  const { high, low } = halves('nerve', 4);
-  console.log(`# nerve 16: ${high.fired} fired; 4: ${low.fired}`);
-  assert.ok(high.fired > low.fired * 1.1, `${high.fired} to ${low.fired}`);
+test('nerve: over seeded races the 16s fight closer than the 4s: more damage a shot', () => {
+  // (berths drawn by the race's seed: with the first eight ships always in
+  // the roomiest water this once read as more shots fired, which it is not)
+  const { high, low } = halves('nerve', 8);
+  const each = (s: typeof high) => s.dealt / s.fired;
+  console.log(
+    `# nerve 16: ${Math.round(high.dealt)} dealt by ${high.fired} fired; 4: ${Math.round(low.dealt)} by ${low.fired}`
+  );
+  assert.ok(high.fired > 50 && low.fired > 50, 'both fired');
+  assert.ok(each(high) > each(low) * 1.1, `${each(high)} to ${each(low)}`);
   // and by the arithmetic: readier to fight, in a hotter mood, running later
   for (let seed = 1; seed <= 20; seed++) {
     const a = with1(seed, 'nerve', 16).temper,

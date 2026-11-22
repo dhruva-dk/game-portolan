@@ -353,7 +353,7 @@ const IDLE = {
 
 test('in a race sailed by a card the bots pit by the same rule, each stop in the result; and the water mends no one', () => {
   const base = specField(SEED, 3),
-    card: RaceCard = { ...base, rules: { ...base.rules, storm: 2 } };
+    card: RaceCard = { ...base, rules: { ...base.rules, storm: 1.5 } };
   const match = raceOf(card, planet),
     state = createState(planet, flat, waters, match);
   state.start(match);

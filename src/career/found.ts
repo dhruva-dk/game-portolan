@@ -32,6 +32,7 @@ import {
   type Team,
 } from './state.ts';
 import { playerAboard } from './seats.ts';
+import { backed } from './sponsors.ts';
 import { TUNING } from './tuning.ts';
 import { makeWorld, staffStars } from './world.ts';
 
@@ -238,7 +239,11 @@ function found(
         'A person of that name already sails: choose another.'
       ),
     };
-  const state = takenOver(world, taking, me, c);
+  // every other team is an established one: its sponsors are signed already
+  const state = world.teams.reduce(
+    (out, k) => (k.id === taking.id ? out : backed(out, k.id, roll)),
+    takenOver(world, taking, me, c)
+  );
   return { ok: true, state: { ...state, streams: roll.counters() } };
 }
 

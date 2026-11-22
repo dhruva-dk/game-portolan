@@ -111,7 +111,11 @@ test('a designer knows 3 + round(stars) components of tiers 1 and 2, dealt by se
       )
     );
   }
-  assert.deepEqual(founded().streams, { world: 1 }, 'dealt with no stream');
+  assert.deepEqual(
+    founded().streams,
+    { sponsors: 59, world: 1 },
+    'dealt with no stream of their own'
+  );
 });
 
 test('DealComponents: three cards a slot from the pool, seeded; one redeal a slot; refusals', () => {
