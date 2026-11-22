@@ -59,14 +59,13 @@ function hex(v: number): string {
 
 /** From here on, every call of a traced function is shown to `each`, in order. */
 function watch(each: (name: number, args: number[], result: number) => void) {
-  const all = Math as unknown as Record<string, (...a: number[]) => number>;
   TRACED.forEach((name, i) => {
-    const real = all[name];
-    all[name] = (...args) => {
+    const real: (...a: number[]) => number = Math[name];
+    Reflect.set(Math, name, (...args: number[]) => {
       const result = real(...args);
       each(i, args, result);
       return result;
-    };
+    });
   });
 }
 

@@ -17,7 +17,7 @@ import {
   Worker,
   workerData,
 } from 'node:worker_threads';
-import { JOBS } from './jobs.ts';
+import { JOBS, type Ran } from './jobs.ts';
 
 /** A job's file. */
 export interface Written {
@@ -25,6 +25,8 @@ export interface Written {
   shard: string;
   hash: string;
   result: unknown;
+  /** What the kind made that is this machine's own (jobs.ts Ran), never hashed. */
+  aside?: unknown;
   machine: {
     host: string;
     arch: string;
@@ -40,14 +42,14 @@ interface Asked {
   shard: string;
 }
 
-function run({ kind, shard }: Asked): Promise<unknown> {
+function run({ kind, shard }: Asked): Promise<Ran> {
   const job = JOBS[kind];
   if (!job) throw new Error(`no kind of job "${kind}"`);
   return job.run(shard);
 }
 
 const inWorker = (asked: Asked) =>
-  new Promise<unknown>((done, fail) => {
+  new Promise<Ran>((done, fail) => {
     const w = new Worker(new URL(import.meta.url), { workerData: asked });
     w.once('message', done);
     w.once('error', fail);
@@ -60,12 +62,13 @@ else {
   if (!kind || !shard || !out || (flag && !worker))
     throw new Error('node tools/fleet/job.ts <kind> <shard> <out> [--worker]');
   const t = performance.now(),
-    result = await (worker ? inWorker : run)({ kind, shard });
+    { result, aside } = await (worker ? inWorker : run)({ kind, shard });
   const written: Written = {
     kind,
     shard,
     hash: createHash('sha256').update(JSON.stringify(result)).digest('hex'),
     result,
+    ...(aside === undefined ? {} : { aside }),
     machine: {
       host: hostname().split('.')[0],
       arch: process.arch,

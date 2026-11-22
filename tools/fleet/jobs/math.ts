@@ -71,12 +71,13 @@ export function math(shard: string) {
     out = new Float64Array(INPUTS),
     by: Record<string, string> = {},
     low: Record<string, string> = {};
-  const all = Math as unknown as Record<string, (...a: number[]) => number>;
+  const call = (name: string, args: number[]): number =>
+    Number(Reflect.apply(Reflect.get(Math, name), Math, args));
   for (const name of Object.getOwnPropertyNames(Math).sort()) {
-    const f = all[name];
-    if (typeof f !== 'function' || name === 'random') continue;
+    if (typeof Reflect.get(Math, name) !== 'function' || name === 'random')
+      continue;
     for (let i = 0; i < INPUTS; i++) {
-      const v = f(x[i], y[i]);
+      const v = call(name, [x[i], y[i]]);
       out[i] = Number.isNaN(v) ? NAN : v;
     }
     by[name] = createHash('sha256')
@@ -94,7 +95,7 @@ export function math(shard: string) {
     low,
     witnesses: WITNESSES.map(([name, ...args]) => ({
       call: `Math.${name}(${args.join(', ')})`,
-      bits: bits(all[name](...args)),
+      bits: bits(call(name, args)),
     })),
   };
 }

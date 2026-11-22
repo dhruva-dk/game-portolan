@@ -17,8 +17,8 @@
 //
 // run and verify also take: --here n (on this machine, in n runners, not the
 // lab), --worker (each shard in a Worker thread), --seconds s (a job's limit),
-// and, for a job that is not of a kind, --command "node tools/x.ts {shard}
-// {out}" --name x: any command that writes {out} as JSON with a `hash`.
+// and, for a job that is not of a kind, --command "node <script> {shard}
+// {out}" --name <name>: any command that writes {out} as JSON with a `hash`.
 //
 // Node only (tools/).
 

@@ -91,20 +91,37 @@ export function batchName(of: string, at: Date): string {
   return name;
 }
 
-/** Shards from how they are asked for: names apart by commas, `a..b` every whole number from a to b. */
+/** A piece of a shard's name as asked: `a..b` every whole number from a to b, `x|y` either, else itself. */
+const pieces = (piece: string): string[] => {
+  const range = /^(\d+)\.\.(\d+)$/.exec(piece);
+  if (!range) return piece.split('|');
+  const from = Number(range[1]),
+    to = Number(range[2]);
+  return Array.from({ length: Math.max(0, to - from + 1) }, (_, i) =>
+    String(from + i)
+  );
+};
+
+/**
+ * Shards from how they are asked for: names apart by commas, each a name of
+ * pieces apart by dashes, every piece as `pieces` reads it and every way of
+ * them taken (`sensible|shrewd-1..3-5` is six shards, `sensible-1-5` first).
+ */
 export const shardsOf = (asked: string): string[] =>
   asked
     .split(',')
     .filter(Boolean)
-    .flatMap((part) => {
-      const range = /^(\d+)\.\.(\d+)$/.exec(part);
-      if (!range) return [part];
-      const from = Number(range[1]),
-        to = Number(range[2]);
-      return Array.from({ length: Math.max(0, to - from + 1) }, (_, i) =>
-        String(from + i)
-      );
-    });
+    .flatMap((part) =>
+      part
+        .split('-')
+        .map(pieces)
+        .reduce<string[]>(
+          (names, next) =>
+            names.flatMap((name) => next.map((p) => `${name}-${p}`)),
+          ['']
+        )
+        .map((name) => name.slice(1))
+    );
 
 /**
  * This machine's seats: `runners` of them (two, to run every shard twice
