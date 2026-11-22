@@ -197,6 +197,7 @@ export function createWatching(act: {
 }) {
   const root = screen();
   const leave = piece(root, 'top left', true, true);
+  leave.dataset.way = 'leave';
   leave.innerHTML = svg(56, 56, paperDisc(28, 28, 25) + anchor(28, 29, 32));
   onTap(leave, act.leave);
   const foot = piece(root, 'bottom centre', false, true);

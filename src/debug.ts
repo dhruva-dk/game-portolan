@@ -51,6 +51,10 @@
 // kit, menu, a tab's) opens the office at that screen on the fixture desk
 // (office/fixtures/desk.ts), over her ship at anchor, without the meter.
 //
+// The manager's game. ?manager opens the page as a release does: the office at
+// its main menu over her ship at anchor, on the career this device keeps
+// (main.ts manage); a page a career sailed to (?career) opens so by itself.
+//
 // The screens. ?screen= opens the UI at a screen (title, lobby, settings,
 // seed: the seed panel over the lobby, on the page's ?seed=; livery: her
 // livery's folio, her ship turned broadside above it; match, sunk,
@@ -223,6 +227,8 @@ export interface Played {
   referee: Referee;
   flow: Flow;
   play(): void;
+  /** The manager's game opened, as a release opens it (main.ts manage). */
+  manage(): Promise<void>;
   map(): void;
   next(dt: number): Snapshot;
   drawn(canvas: HTMLCanvasElement): void;
@@ -451,6 +457,10 @@ function open(p: Played, others: readonly Berth[], world: World) {
     const office = createOffice(FIXTURE);
     office.go(officed);
     office.show(true);
+  } else if (params.has('manager') || params.has('career')) {
+    // the manager's game as released: the office on the career kept on this device
+    flow.go('lobby');
+    void p.manage();
   } else if (
     screen === 'title' ||
     screen === 'lobby' ||

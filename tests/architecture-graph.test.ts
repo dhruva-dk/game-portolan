@@ -170,7 +170,8 @@ const tierOf = (rel: string) =>
     TIERS[t].includes(rel.replace(/^world\//, ''))
   );
 /** Who may run the planet's making, outside world/: the world built once (environment.ts), the matches dealt on it
- *  (play/setup.ts) and the water sounded for them (its worker, play/sounding.ts), what draws the land (land/, whose
+ *  (play/setup.ts), the water sounded for them (its worker, play/sounding.ts) and a career's other races sailed on it
+ *  apart (their worker, play/racing.ts), what draws the land (land/, whose
  *  bake runs the making again in a worker), and the seed panel's survey of another seed's planet (its worker,
  *  play/survey.ts: the page's world is built once, so another seed's land is made apart from it, as data only). The
  *  rest take its types, and the world as built. */
@@ -178,6 +179,7 @@ const MAKERS = [
   'environment.ts',
   'play/setup.ts',
   'play/sounding.ts',
+  'play/racing.ts',
   'play/survey.ts',
   'land/',
 ];

@@ -790,6 +790,8 @@ export function createGame(
         place: over ? state.order().indexOf(PLAYER) + 1 : 0,
       };
     },
+    /** A carded race's result, once it is over (state.ts result); null till then and on any other sea. */
+    result: state.result,
     /**
      * A new match: every ship afloat at her berth, hers the first, and the eye
      * coming down onto her from space.

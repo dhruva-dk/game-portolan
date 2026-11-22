@@ -23,19 +23,20 @@ interface TeamStat {
 /** What a piece of news pictures. */
 export type NewsKind = 'building' | 'part' | 'driver' | 'sponsor' | 'vote';
 
-/** The news: its headline, what it is about, where that stands, and the screen its button opens. */
+/** The news: its headline, what it is about, where that stands, and its button: what it says and the screen it opens. */
 interface News {
   kind: NewsKind;
   headline: string;
   subject: string;
   status: string;
+  button: string;
   screen: Tab | Viewed;
 }
 
 /**
  * A job under way: who or what it is on (a driver scouted is shown by their
- * team's emblem), how far it has got (0…1), the days left, and what its
- * details button says.
+ * team's emblem), how far it has got (0…1), the days left, what its details
+ * button says, and whether it may be cancelled.
  */
 interface Job {
   id: string;
@@ -44,6 +45,7 @@ interface Job {
   done: number;
   days: number;
   details: string;
+  cancels: boolean;
 }
 
 /** The jobs of one kind (scouting, part design, a building), as the panel's chip names the kind. */

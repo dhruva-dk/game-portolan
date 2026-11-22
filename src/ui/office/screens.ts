@@ -12,14 +12,25 @@ import {
   type Viewed,
   type Views,
 } from '../../office/office.ts';
+import { createFound } from './found.ts';
+import { createHome } from './home.ts';
 import { createKit } from './kit.ts';
 import { createMenu } from './menu.ts';
 import type { Office } from './office.ts';
+import { createPlan, createResult } from './raceday.ts';
+import { createStandings } from './standings.ts';
 
 /** A screen's name: a tab's, a viewed screen's, or the kit's sheet. */
 export type Name = Tab | Viewed | 'kit';
 /** Every name a screen may have (the debug page opens the office at one: ?screen=). */
-export const NAMES: readonly Name[] = [...TABS, 'menu', 'kit'];
+export const NAMES: readonly Name[] = [
+  ...TABS,
+  'menu',
+  'found',
+  'plan',
+  'result',
+  'kit',
+];
 
 /** A screen: its element, laid over the page's body, and `show`, which draws a view. */
 export interface Screen<V> {
@@ -65,6 +76,18 @@ export const SCREENS: Readonly<Partial<Record<Name, Entry>>> = {
       return { el: s.el, draw: () => s.show(null) };
     },
   },
+  home: viewed('home', createHome, { title: 'Home', tab: 'home' }),
+  found: viewed('found', createFound, {
+    title: 'Create a New Team',
+    tab: null,
+    bare: true,
+  }),
+  plan: viewed('plan', createPlan, { title: 'Race Day', tab: null }),
+  result: viewed('result', createResult, { title: 'Race Results', tab: null }),
+  standings: viewed('standings', createStandings, {
+    title: 'Standings',
+    tab: 'standings',
+  }),
   menu: viewed('menu', createMenu, {
     title: 'Main Menu',
     tab: null,

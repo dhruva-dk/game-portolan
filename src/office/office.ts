@@ -4,7 +4,15 @@
 // from; the desk hands the views out and takes what is asked. Types and
 // constants only.
 
+import type { Call } from '../race.ts';
 import type { HomeView } from './home.ts';
+import type {
+  FoundView,
+  Founding,
+  PlanView,
+  ResultView,
+  StandingsView,
+} from './loop.ts';
 import type { MenuView } from './menu.ts';
 import type { ShellView } from './shell.ts';
 
@@ -46,19 +54,25 @@ export interface Verdict {
 export interface Views {
   menu: MenuView;
   home: HomeView;
+  found: FoundView;
+  plan: PlanView;
+  result: ResultView;
+  standings: StandingsView;
 }
 export type Viewed = keyof Views;
 
 /**
  * What a screen asks: to open another screen (a tab, or one a tab leads to),
- * to go on (Continue), the menu's four ways, and of a job under way its
- * details or its cancelling.
+ * to go on (Continue), the menu's four ways, of a job under way its details
+ * or its cancelling, the team made, and her team's call for the race's start.
  */
 export type Ask =
   | { kind: 'open'; screen: Tab | Viewed }
   | { kind: 'continue' }
   | { kind: 'menu'; choice: 'new' | 'continue' | 'single' | 'preferences' }
-  | { kind: 'job'; job: string; what: 'details' | 'cancel' };
+  | { kind: 'job'; job: string; what: 'details' | 'cancel' }
+  | { kind: 'found'; founding: Founding }
+  | { kind: 'call'; call: Call };
 
 /**
  * The desk the office is drawn from: the shell's view, each screen's, and what

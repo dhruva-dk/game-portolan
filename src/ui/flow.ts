@@ -92,6 +92,11 @@ export function createFlow(
   let end: End | null = null;
   /** Whether the office lies over her ship at anchor, in the lobby's place. */
   let officed = false;
+  /**
+   * A career's race under way: her end shows no card of its own (sunk, she
+   * watches at once; over, the office shows the result), and LEAVE is this.
+   */
+  let career: (() => void) | null = null;
 
   const veil = createVeil();
   const livery = createLivery(
@@ -157,6 +162,8 @@ export function createFlow(
     } else if (t === 'sail') {
       // a seed sailed from the panel: a new page on it, under the title, as home is
       passage.cover(() => act.seeds.sail(sailing));
+    } else if (career && (t === 'leave' || t === 'again')) {
+      career();
     } else if (t === 'leave' || t === 'again') {
       result.hide(HOME.cover);
       watching.show(false, HOME.cover);
@@ -221,7 +228,20 @@ export function createFlow(
       // (on the way home, the match's course shows nothing more)
       if (!IN_MATCH.includes(screen) || passage.going) return;
       const next = course(screen, events(now));
-      if (next !== screen) go(next);
+      if (next === screen) return;
+      if (!career) go(next);
+      else if (next === 'sunk') {
+        act.watch();
+        go('spectate');
+      } else if (next !== 'result') go(next);
+    },
+    /**
+     * A career's race begins (`leave`: what LEAVE asks, once she watches) or
+     * is done (null): the match's pieces put away under the office.
+     */
+    career(leave: (() => void) | null) {
+      career = leave;
+      if (!leave && IN_MATCH.includes(screen)) go('lobby');
     },
     /**
      * How much of the world the screens cover, 0…1: the way home's parchment

@@ -142,20 +142,8 @@ export const EXCEPTIONS: readonly Exception[] = [
     file: 'src/race.ts',
     why: 'the seam is written first, for the race and the career to be built to at once (MANAGER.md 3, 4); this goes stale, and is removed, once both take every word of it',
   },
-  {
-    rule: 'exports',
-    file: 'src/play/race.ts',
-    name: 'runRace',
-    why: "a race sailed headless: the tools' and the tests' (tools/race.ts, the fleet's), and the career's worker's for the tiers she is not in (MANAGER.md 3 point 9, 4); this goes stale, and is removed, once the career takes it",
-  },
   // the career, ported whole before the office's release flow takes it
   // (MANAGER.md 5, flow; 8 point 3): each goes stale once that flow runs it
-  {
-    rule: 'exports',
-    file: 'src/career/card.ts',
-    name: 'raceCards',
-    why: "a round's race cards, one a tier, as the career deals them: the season runner's (tools/) and the tests'; the desk deals them once race day is wired (the player's race, and the worker's two other tiers, MANAGER.md 4)",
-  },
   {
     rule: 'exports',
     file: 'src/career/read.ts',
@@ -176,12 +164,6 @@ export const EXCEPTIONS: readonly Exception[] = [
   },
   {
     rule: 'exports',
-    file: 'src/desk.ts',
-    name: 'deviceShelf',
-    why: "the career kept on this device (IndexedDB), for the menu's Continue; main.ts takes it when the office is wired into the release (MANAGER.md 8 point 3)",
-  },
-  {
-    rule: 'exports',
     file: 'src/desk-fixtures.ts',
     why: "fixture careers made by a player's commands, for ?screen= on a real career rather than made-up data (MANAGER.md 5); debug.ts takes them when the first of the career's screens is built",
   },
@@ -190,12 +172,6 @@ export const EXCEPTIONS: readonly Exception[] = [
     file: 'src/audio/cues.ts',
     name: 'DEEDS',
     why: 'every kind of deed, for the test that each has its cue',
-  },
-  {
-    rule: 'exports',
-    file: 'src/sim/route.ts',
-    name: 'chart',
-    why: 'the chart baked in-process for the tests and tools; the game bakes the same in its worker (play/sounding.ts)',
   },
   {
     rule: 'exports',

@@ -8,14 +8,12 @@
 
 import type { Ask, Desk } from '../../office/office.ts';
 import { OFFICE, alpha } from '../ink.ts';
+import { PAGE, createPage } from '../kit/page.ts';
 import { el } from '../kit/part.ts';
 import { kitStyle, stylesheet } from '../kit/style.ts';
-import { boxOf, fade, onResize, screen, view } from '../ui.ts';
+import { boxOf, fade, screen } from '../ui.ts';
 import { SCREENS, type Name, type Opened } from './screens.ts';
 import { STRIP, NAV, createShell } from './shell.ts';
-
-/** The page's size, px: the iPad Air's landscape screen. */
-const PAGE = { w: 1180, h: 820 } as const;
 
 /** How far past the page the dimming runs, px, so a screen of another shape is dimmed to its edges. */
 const PAST = 4000;
@@ -23,7 +21,6 @@ const PAST = 4000;
 const CSS = `
 .ui .o-root, .ui .o-root * { pointer-events: auto; }
 .o-root { overflow: hidden; z-index: 2; }
-.office { position: absolute; left: 0; top: 0; width: ${PAGE.w}px; height: ${PAGE.h}px; transform-origin: 0 0; }
 .o-dim { position: absolute; inset: ${-PAST}px; background: ${alpha(OFFICE.bar, 0.46)};
   -webkit-backdrop-filter: blur(9px); backdrop-filter: blur(9px); }
 .o-body { position: absolute; left: 0; right: 0; top: ${STRIP}px; bottom: ${NAV}px; }
@@ -45,7 +42,7 @@ export function createOffice(desk: Desk) {
   root.classList.add('o-root');
   const dim = el('div', 'o-dim'),
     body = el('div', 'o-body'),
-    page = el('div', 'office', dim);
+    page = createPage(dim);
   root.append(page);
 
   /** The screens made so far, the one open, and the ways back and forward from it. */
@@ -71,14 +68,6 @@ export function createOffice(desk: Desk) {
     forward: () => step(ahead, past),
   });
   page.append(shell.strip, body, shell.nav);
-
-  /** Keeps the page scaled to the screen and centred on it. */
-  const fit = () => {
-    const k = Math.min(view.w / PAGE.w, view.h / PAGE.h);
-    page.style.transform = `translate(${((view.w - PAGE.w * k) / 2).toFixed(1)}px, ${((view.h - PAGE.h * k) / 2).toFixed(1)}px) scale(${k.toFixed(4)})`;
-  };
-  onResize(fit);
-  fit();
 
   /** Each list scrolled as it was, or, not yet scrolled, to where it asks (her own row in view). */
   function settle(at: Name, keep: boolean) {
@@ -160,6 +149,8 @@ export function createOffice(desk: Desk) {
     get open() {
       return open;
     },
+    /** Draws the office again, if it is shown (something changed that it did not ask). */
+    draw,
     /** Shows the office, drawn afresh, or fades it away. */
     show(on: boolean) {
       fade(root, on);

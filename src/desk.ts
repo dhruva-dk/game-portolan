@@ -14,6 +14,7 @@ import {
   type Kept,
   type Opened,
 } from './career/session.ts';
+import type { CareerState } from './career/state.ts';
 import type { Store } from './career/store.ts';
 import {
   foundErrors,
@@ -41,10 +42,16 @@ export interface Shelf {
 }
 
 /** A desk on `shelf`, the career loaded (and verified) from it. */
-export async function createDesk(
+export const createDesk = async (
   shelf: Shelf,
   debug = false
-): Promise<CareerDesk> {
+): Promise<CareerDesk> => (await createSession(shelf, debug)).desk;
+
+/** A desk on `shelf` and the career's state as it stands (null: none is open), for what builds the office's views of it. */
+export async function createSession(
+  shelf: Shelf,
+  debug = false
+): Promise<{ desk: CareerDesk; state(): CareerState | null }> {
   let store = await shelf.open(),
     opened: Opened = await open(store, debug),
     kept: Kept | null = opened.ok ? opened.kept : null;
@@ -124,7 +131,7 @@ export async function createDesk(
       return null;
     },
   };
-  return desk;
+  return { desk, state: () => kept?.state ?? null };
 }
 
 const NAME = 'portolan',

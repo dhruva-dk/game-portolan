@@ -81,15 +81,7 @@ const LAYERS: Record<string, readonly string[]> = {
   // journal; it deals race cards and takes results (race.ts), and builds the
   // office's views (the seam's words, commands and views); it never runs a
   // race (no play/, no sim/) and never draws (no ui/)
-  'career/': [
-    'career/',
-    'office/command.ts',
-    'office/career.ts',
-    'office/people.ts',
-    'race.ts',
-    'kinds.ts',
-    'world/random.ts',
-  ],
+  'career/': ['career/', 'office/', 'race.ts', 'kinds.ts', 'world/random.ts'],
   // where the career's journal is kept: memory and IndexedDB
   // (career/store.ts Store)
   'store/': ['store/', 'career/store.ts'],
@@ -97,6 +89,9 @@ const LAYERS: Record<string, readonly string[]> = {
   // the fixture careers it is opened on, made by the commands a player sends
   'desk.ts': ['career/', 'store/', 'office/', 'race.ts'],
   'desk-fixtures.ts': ['desk.ts', 'career/', 'store/', 'office/'],
+  // the manager's game: the office's desk over the career's, and race day run
+  // on the page through what the page hands it (it names no game, no UI)
+  'manager.ts': ['desk.ts', 'career/', 'office/', 'race.ts'],
   // the UI draws plain data: of the sim only the storm's Cap (the full map inks
   // it); the office's screens draw the seam's views
   'ui/': [

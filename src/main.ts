@@ -8,8 +8,10 @@ import { WebGPUCoordinateSystem, WebGPURenderer } from 'three/webgpu';
 import { createAudio } from './audio/audio.ts';
 import type { Hearing } from './audio/listen.ts';
 import type { Played, Setup, Stage } from './debug.ts';
-import { launched, roll, sail } from './address.ts';
+import { careered, launched, roll, sail } from './address.ts';
 import { linearToHex } from './colour.ts';
+import { deviceShelf } from './desk.ts';
+import { createManager } from './manager.ts';
 import { DYES } from './play/colours.ts';
 import { SEED, createWorld } from './environment.ts';
 import { createFrame } from './frame.ts';
@@ -18,8 +20,11 @@ import { createMeter } from './meter.ts';
 import { fleetOf } from './play/fleet.ts';
 import { createGame } from './play/game.ts';
 import { surveyor } from './play/preview.ts';
+import { raceOf } from './play/race.ts';
 import { createReferee } from './play/referee.ts';
-import { createMatches, watersOf } from './play/setup.ts';
+import { createMatches, racedApart, watersOf } from './play/setup.ts';
+import { IDLE, PATTERNS } from './player.ts';
+import type { RaceCard, RaceResult } from './race.ts';
 import { SHIPS } from './sim/match.ts';
 import type { Snapshot } from './snapshot.ts';
 import { shoresOf } from './ui/coasts.ts';
@@ -28,6 +33,8 @@ import { createFlow } from './ui/flow.ts';
 import { createHud, type HudState } from './ui/hud.ts';
 import { createTitle } from './ui/screens.ts';
 import { createInput } from './ui/input.ts';
+import { createOffice } from './ui/office/office.ts';
+import { createPitwall } from './ui/pitwall.ts';
 import { createStick } from './ui/stick.ts';
 import { onPressed } from './ui/touch.ts';
 import { onResize, uiLayer, view } from './ui/ui.ts';
@@ -59,6 +66,9 @@ const RELEASE: Setup = {
   hold: null,
   gun: null,
 };
+
+/** Milliseconds of a frame a hurried race may spend on more steps of the sim. */
+const HURRY = 20;
 
 loaded('script');
 
@@ -191,9 +201,14 @@ async function play(s: Stage): Promise<Played> {
   });
   // the sound, begun on her first touch, hearing what it does in one object refilled each frame
   const audio = createAudio(s.world.planet.height);
-  // the page's one race: the seed's own (a seed is a race; the next is a new page)
+  // a race in teams adds the pit wall to the HUD: the standings, her team, its orders and her pit stop
+  const pitwall = createPitwall({ pit: input.pit, call: input.call });
+  /** A career's race on the page: its card as dealt, and, once she only watches, whether it is hurried to its end. */
+  let carded: RaceCard | null = null,
+    hurried = false;
+  // the page's one race: a career's by its card, else the seed's own (a seed is a race; the next is a new page)
   const deal = () => {
-    game.start(s.matches.race());
+    game.start(carded ? raceOf(carded, s.world.planet) : s.matches.race());
     referee.begin();
   };
   const flow = createFlow(
@@ -246,11 +261,82 @@ async function play(s: Stage): Promise<Played> {
   /** Whether the stats are shown, as last told the stage. */
   let stats: boolean | null = null;
 
+  /** The manager's game (manager.ts) and its office, once the page is managed. */
+  let managed: {
+    office: ReturnType<typeof createOffice>;
+    raced(result: RaceResult): Promise<void>;
+  } | null = null;
+  /**
+   * The manager's game opened over her ship at anchor: at the main menu, or,
+   * on a page a career sailed to (address.ts careered), where the career stands.
+   */
+  async function manage() {
+    const dyes = DYES.map(
+      (d) => [linearToHex(d.colour), linearToHex(d.mark)] as const
+    );
+    const manager = await createManager(
+      deviceShelf(),
+      {
+        dyes,
+        patterns: PATTERNS.map((p) => p.charAt(0).toUpperCase() + p.slice(1)),
+      },
+      {
+        seed: s.world.seed,
+        name: s.name,
+        open: (screen) => managed?.office.go(screen),
+        at: () => managed?.office.open ?? null,
+        draw: () => managed?.office.draw(),
+        sail: (seed) => sail(String(seed), true),
+        race(card, names) {
+          carded = card;
+          hurried = false;
+          pitwall.field({
+            names,
+            colours: card.ships.map(
+              (ship) => dyes[ship.colours.dye % dyes.length]?.[0] ?? ''
+            ),
+          });
+          managed?.office.show(false);
+          flow.career(() => (hurried = true));
+          flow.tap('play');
+        },
+        apart: (cards) => racedApart(s.world.seed, s.world.land, cards),
+        single() {
+          managed?.office.show(false);
+          flow.office(false);
+        },
+        preferences() {
+          managed?.office.show(false);
+          flow.office(false);
+          flow.tap('settings');
+        },
+      }
+    );
+    const office = createOffice(manager.desk);
+    managed = { office, raced: manager.raced };
+    flow.office(true);
+    if (careered() && manager.founded) manager.arrive();
+    else office.go('menu');
+    office.show(true);
+  }
+
+  /** A career's race over, with its result: the sea made quiet again under the office, which takes the result. */
+  function finish(result: RaceResult) {
+    carded = null;
+    hurried = false;
+    referee.end();
+    game.anchor();
+    flow.career(null);
+    managed?.office.show(true);
+    void managed?.raced(result);
+  }
+
   return {
     game,
     referee,
     flow,
     play: deal,
+    manage,
     map,
     // the full map just opened, or a cross-fade waiting, holds the game's frame the moment it is drawn; the way home
     // counts the lobby's frames
@@ -259,11 +345,26 @@ async function play(s: Stage): Promise<Played> {
       const hands = input.read();
       stick(game.steering() ? hands.stick : null);
       game.step(dt, hands);
+      // a career's race she only watches, hurried on: as many more steps as a frame has room for
+      const began = performance.now();
+      while (hurried && !game.result() && performance.now() - began < HURRY)
+        game.step(0.1, IDLE);
       // her end, sunk or won, as the screens follow it
-      flow.end(referee.update(dt));
+      const end = referee.update(dt);
+      flow.end(end);
+      // a career's race done (her end's beat past, if she saw it out): its result is the office's
+      const result = carded ? game.result() : null;
+      if (result && (!end || end.settled)) finish(result);
       // the world as the game has it, seen from its eye or, while the full map is open, from the map's
       const scene = game.snapshot();
       flow.update(hudState(), scene.sea, scene.own);
+      pitwall.update(
+        status.race,
+        (flow.screen === 'match' && status.arriving === 0) ||
+          flow.screen === 'spectate',
+        flow.screen === 'spectate',
+        performance.now()
+      );
       // heard from the game's eye, even with the full map open over it; the sea going as the screens cover it
       hearing.scene = scene;
       hearing.screen = flow.screen;
@@ -285,5 +386,6 @@ if (DEBUG) {
   // as released: the game on the stage, opening at the title
   const s = await stage(RELEASE);
   const p = await play(s);
+  await p.manage();
   await s.draw(p.next, p.drawn);
 }

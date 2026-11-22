@@ -58,7 +58,12 @@ const drivers: readonly StandingLine[] = TEAMS.flatMap((team, i) =>
   }))
 )
   .sort((a, b) => b.points - a.points)
-  .map((d, k) => ({ ...d, place: k + 1, own: d.team === HERS, ruled: k === 0 }));
+  .map((d, k) => ({
+    ...d,
+    place: k + 1,
+    own: d.team === HERS,
+    ruled: k === 0,
+  }));
 
 /** The team a scouted driver sails for: the `i`th of the table. */
 const of = (i: number) => TEAMS[i] ?? HERS;
@@ -87,6 +92,7 @@ export const HOME: HomeView = {
     headline: 'Building Unlocked',
     subject: 'Sail Loft',
     status: 'Available',
+    button: 'Sail Loft',
     screen: 'hq',
   },
   work: [
@@ -100,6 +106,7 @@ export const HOME: HomeView = {
           done: 0.62,
           days: 19,
           details: 'Driver Details',
+          cancels: true,
         },
         {
           id: 'scout-white',
@@ -108,6 +115,7 @@ export const HOME: HomeView = {
           done: 0.44,
           days: 27,
           details: 'Driver Details',
+          cancels: true,
         },
         {
           id: 'scout-kumar',
@@ -116,6 +124,7 @@ export const HOME: HomeView = {
           done: 0.4,
           days: 27,
           details: 'Driver Details',
+          cancels: true,
         },
       ],
     },
@@ -129,6 +138,7 @@ export const HOME: HomeView = {
           done: 0.3,
           days: 12,
           details: 'Part Details',
+          cancels: false,
         },
       ],
     },
