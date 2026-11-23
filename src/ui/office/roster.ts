@@ -10,64 +10,28 @@
 // in one ruled table, grouped by role; the pit crew and each ship's stop.
 
 import type { Dyed } from '../../office/papers.ts';
-import type { Range, RosterRow, TeamView } from '../../office/people.ts';
+import type { RosterRow, TeamView } from '../../office/people.ts';
 import { button } from '../chartroom/controls.ts';
-import { meter, stepped, table, terms } from '../chartroom/data.ts';
-import {
-  cut,
-  fig,
-  label,
-  name,
-  portrait,
-  stars,
-} from '../chartroom/figures.ts';
+import { gauge, stepped, table, terms } from '../chartroom/data.ts';
+import { fig, label, portrait, stars } from '../chartroom/figures.ts';
 import { kitLooks } from '../chartroom/kit.ts';
+import { column, page } from '../chartroom/layout.ts';
+import { personCard, who } from '../chartroom/person.ts';
 import { sheet } from '../chartroom/paper.ts';
 import { u } from '../chartroom/tokens.ts';
 import type { Glyph } from '../glyphs.ts';
 import { el, type Kid } from '../kit/part.ts';
 import { stylesheet } from '../kit/style.ts';
-import { jacketOf } from './bits.ts';
+import { jacketOf, morale, moraleCell, whoOf } from './faces.ts';
 import type { Office } from './office.ts';
 import type { Screen } from './screens.ts';
 
 const CSS = `
-.rs { display: grid; gap: var(--s4); padding: var(--s4) var(--s6); }
-.rs .cr-body { gap: var(--s3); }
-.rs-col { display: flex; flex-direction: column; gap: var(--s4); min-width: 0; min-height: 0; }
-.rs-grow { flex: 1; min-height: 0; }
-.rs-drivers { grid-template-columns: repeat(5, minmax(0, 1fr)); }
-.rs-staff { grid-template-columns: repeat(4, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(0, 1fr)); }
-.rs-team { grid-template-columns: ${u(168)} minmax(0, 1fr) ${u(176)}; }
-
-.rs-id { display: flex; flex-direction: column; align-items: center; gap: var(--s1); text-align: center; }
-.rs-id > .cr-name { line-height: 1.1; }
-.rs-face { position: relative; flex: none; }
-.rs-badge { position: absolute; right: ${u(-3)}; bottom: ${u(-2)}; width: ${u(15)}; height: ${u(15)}; display: grid; place-items: center;
-  border-radius: 50%; background: var(--paper-raised); box-shadow: 0 0 0 var(--w-fine) var(--ink); }
-.rs-badge > svg { width: ${u(11)}; height: ${u(11)}; }
-.rs-rating { display: grid; grid-template-columns: auto auto; align-items: center; justify-content: center; gap: ${u(1)} var(--s2); }
-.rs-who { display: flex; align-items: center; gap: var(--s3); min-width: 0; }
-.rs-who > div:last-child { display: flex; flex-direction: column; gap: ${u(1)}; min-width: 0; }
-.rs-who .cr-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.rs-gauge { display: flex; flex-direction: column; gap: var(--s1); }
-.rs-row { display: flex; justify-content: space-between; align-items: baseline; gap: var(--s2); min-width: 0; }
-.rs-row > .cr-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.rs-row b { font-weight: 600; font-variant-numeric: lining-nums; white-space: nowrap; }
-.rs-row b.harm, .rs-harm { color: var(--harm); }
 .rs-mate { display: flex; align-items: center; gap: var(--s2); min-width: 0; }
 .rs-mate > .cr-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.rs-traits { text-align: center; }
-.rs-foot { margin-top: auto; display: flex; flex-direction: column; gap: var(--s2); }
-.rs-pair { margin-top: auto; display: grid; grid-template-columns: 1fr 1fr; align-items: start; gap: var(--s2); }
-.rs-pair .cr-btn, .rs-foot .cr-btn { padding: 0 var(--s2); }
-.rs-pair > .cr-act { display: contents; }
-.rs-pair > .cr-act > .cr-label { grid-column: 1 / -1; text-align: center; white-space: nowrap; }
-.rs-note { text-align: center; }
+.rs-said { text-align: center; }
 .rs-open { flex: 1; display: grid; place-items: center; text-align: center; }
-
 .rs-sum { display: flex; flex-direction: column; align-items: center; gap: var(--s1); padding: var(--s2) 0; }
-.rs-sum > .cr-fig { font-size: var(--fig-l); }
 .rs-posts > div { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); }
 .rs-stars > svg { display: block; }
 `;
@@ -82,9 +46,8 @@ const ONE: Readonly<Record<string, string>> = {
   Chairman: 'Chairman',
 };
 
-/** Each role's woodcut, worn on the portrait. */
+/** Each staff role's woodcut, worn on the portrait. */
 const BADGE: Readonly<Record<string, Glyph>> = {
-  Drivers: 'office.drivers',
   Mechanics: 'role.mechanic',
   Designer: 'office.staff',
   Scouts: 'office.scouting',
@@ -100,52 +63,6 @@ function under(v: TeamView, title: string): RosterRow[] {
     to = rest.findIndex((r) => r.kind === 'head');
   return to < 0 ? rest : rest.slice(0, to);
 }
-
-/** How content, as the wash its meter is filled in: low harm (they will ask to leave), middling warn. */
-const moraleWash = (m: number) => (m < 25 ? 'harm' : m < 50 ? 'warn' : 'good');
-
-/** Their stars as known or as a range, and the most they may come to. */
-const rating = (s: Range | null, p: Range | null) =>
-  s &&
-  el(
-    'div',
-    'rs-rating',
-    stars(s.lo, s.hi, 10),
-    label(s.known ? 'Stars' : 'Stars, a range'),
-    p && stars(p.lo, p.hi, 8),
-    p && label('Potential')
-  );
-
-/** Morale as a figure over its meter. */
-const morale = (m: number | null) =>
-  m !== null &&
-  el(
-    'div',
-    'rs-gauge',
-    el(
-      'div',
-      'rs-row',
-      label('Morale'),
-      el('b', m < 25 ? 'harm' : '', String(m))
-    ),
-    meter(m / 100, moraleWash(m))
-  );
-
-/** A portrait, its role's woodcut on it if it has one. */
-const face = (
-  r: RosterRow,
-  dyes: Dyed<unknown>['dyes'],
-  size: number,
-  role: string
-) => {
-  const badge = BADGE[role];
-  return el(
-    'div',
-    'rs-face',
-    portrait(jacketOf(r.face, dyes), size),
-    badge && el('i', 'rs-badge', cut(badge))
-  );
-};
 
 /** What a roster screen asks of the office. */
 function asks(office: Office) {
@@ -175,20 +92,18 @@ function asks(office: Office) {
   };
 }
 
-/** The bond of the ship `post`, as the track of its levels and what it stands at. */
+/** The bond of the ship `post`: who it is with, the track of its levels, what it stands at. */
 function bondOf(v: TeamView, post: string, mate: Kid) {
   const b = v.bonds.find((x) => x.label === post);
   if (!b) return null;
   return el(
     'div',
-    'rs-gauge',
+    'cr-gauge',
     mate,
-    stepped(b.fill / 100, b.marks, b.level),
-    el(
-      'div',
-      'rs-row',
-      label(b.bond.value === 1 ? '1 race' : `${b.bond.value} races`),
-      el('b', '', b.bond.text)
+    gauge(
+      b.bond.value === 1 ? '1 race' : `${b.bond.value} races`,
+      b.bond.text,
+      stepped(b.fill / 100, b.marks, b.level)
     )
   );
 }
@@ -199,41 +114,45 @@ const renew = (r: RosterRow, go: (id: number) => () => void) =>
   r.renew &&
   button('Renew Contract', go(r.id), { off: r.renew.ok ? null : r.renew.why });
 
+/** An open post's card: no one holds it, and the way to find one. */
+const vacant = (post: string, one: string, find: () => void, cls = '') =>
+  sheet(
+    post,
+    [
+      el('div', 'rs-open', label('No one holds this post.')),
+      button(`Find a ${one}`, find),
+    ],
+    { cls }
+  );
+
+/** The way to the market, after MM's negotiations panel. */
+const market = (asking: string, go: () => void) =>
+  sheet('Negotiations', [
+    el('div', 'rs-open', label(asking)),
+    button('Scouting', go, { kind: 'plain' }),
+  ]);
+
 /** Her drivers: a card a ship, the reserve and the market in the last column. */
 export function createDrivers(office: Office): Screen<Dyed<TeamView>> {
   kitLooks();
   stylesheet(CSS);
-  const root = el('div', 'cr rs rs-drivers s-drivers');
+  const root = page({ cols: 5, rows: 1 }, 's-drivers');
   const to = asks(office);
   return {
     el: root,
     show({ view: v, dyes }) {
       const mechanics = under(v, 'Mechanics');
       const card = (r: RosterRow, cls = '') => {
-        const details = to.profile(r.id);
         if (r.kind === 'open')
-          return sheet(
-            r.title,
-            [
-              el('div', 'rs-open', label('No driver holds this post.')),
-              button('Find a Driver', to.find(r)),
-            ],
-            { cls }
+          return vacant(r.title, 'Driver', to.find(r), cls);
+        const details = to.profile(r.id),
+          mech = mechanics.find(
+            (m) => m.post === r.post && m.kind === 'person'
           );
-        const mech = mechanics.find(
-          (m) => m.post === r.post && m.kind === 'person'
-        );
-        return sheet(
+        return personCard(
           r.post,
+          whoOf(r, dyes, r.you ? `Age ${r.age} · the manager` : `Age ${r.age}`),
           [
-            el(
-              'div',
-              'rs-id',
-              face(r, dyes, 44, ''),
-              name(r.title.replace(' (you)', '')),
-              label(r.you ? `Age ${r.age} · the manager` : `Age ${r.age}`)
-            ),
-            rating(r.stars, r.potential),
             r.you
               ? button(
                   'Your Record',
@@ -259,11 +178,9 @@ export function createDrivers(office: Office): Screen<Dyed<TeamView>> {
                 ['Wage a race', r.wage],
                 ['Ends', r.ends],
               ]),
-            r.tags.length > 0 && label(r.tags.join(' · '), 'rs-traits'),
-            r.you
-              ? label('You sail her yourself.', 'rs-note rs-foot')
-              : el('div', 'rs-foot', renew(r, to.offer)),
+            r.tags.length > 0 && label(r.tags.join(' · '), 'rs-said'),
           ],
+          [r.you ? label('You sail her yourself.') : renew(r, to.offer)],
           { cls }
         );
       };
@@ -274,14 +191,9 @@ export function createDrivers(office: Office): Screen<Dyed<TeamView>> {
         rest = drivers.filter((r) => !ships.includes(r));
       root.replaceChildren(
         ...ships.map((r) => card(r)),
-        el(
-          'div',
-          'rs-col',
-          ...rest.map((r) => card(r, 'rs-grow')),
-          sheet('Negotiations', [
-            label('Looking for new drivers?', 'rs-note'),
-            button('Scouting', to.market, { kind: 'plain' }),
-          ])
+        column(
+          ...rest.map((r) => card(r, 'cr-grow')),
+          market('Looking for new drivers?', to.market)
         )
       );
     },
@@ -292,7 +204,7 @@ export function createDrivers(office: Office): Screen<Dyed<TeamView>> {
 export function createStaff(office: Office): Screen<Dyed<TeamView>> {
   kitLooks();
   stylesheet(CSS);
-  const root = el('div', 'cr rs rs-staff s-staff');
+  const root = page({ cols: 4, rows: 2 }, 's-staff');
   const to = asks(office);
   return {
     el: root,
@@ -300,30 +212,13 @@ export function createStaff(office: Office): Screen<Dyed<TeamView>> {
       const drivers = under(v, 'Drivers');
       const card = (r: RosterRow, role: string) => {
         const one = ONE[role] ?? role;
-        if (r.kind === 'open')
-          return sheet(one, [
-            el('div', 'rs-open', label('No one holds this post.')),
-            button(`Find a ${one}`, to.find(r)),
-          ]);
-        const details = to.profile(r.id);
-        const mate = drivers.find(
-          (d) => d.post === r.post && d.kind === 'person'
-        );
-        return sheet(
+        if (r.kind === 'open') return vacant(one, one, to.find(r));
+        const details = to.profile(r.id),
+          mate = drivers.find((d) => d.post === r.post && d.kind === 'person');
+        return personCard(
           one,
+          whoOf(r, dyes, `Age ${r.age}`, BADGE[role]),
           [
-            el(
-              'div',
-              'rs-who',
-              face(r, dyes, 34, role),
-              el(
-                'div',
-                '',
-                name(r.title),
-                label(`Age ${r.age}`),
-                r.stars && stars(r.stars.lo, r.stars.hi, 9)
-              )
-            ),
             role === 'Mechanics'
               ? bondOf(
                   v,
@@ -339,24 +234,23 @@ export function createStaff(office: Office): Screen<Dyed<TeamView>> {
               ['Wage a race', r.wage],
               ['Ends', r.ends],
             ]),
-            el(
-              'div',
-              'rs-pair',
-              details && button('Details', details, { kind: 'plain' }),
-              renew(r, to.offer)
-            ),
           ],
-          { aside: role === 'Mechanics' ? r.post : undefined }
+          [
+            details && button('Details', details, { kind: 'plain' }),
+            renew(r, to.offer),
+          ],
+          {
+            way: 'beside',
+            pair: true,
+            aside: role === 'Mechanics' ? r.post : undefined,
+          }
         );
       };
       root.replaceChildren(
         ...['Mechanics', 'Designer', 'Scouts'].flatMap((role) =>
           under(v, role).map((r) => card(r, role))
         ),
-        sheet('Negotiations', [
-          el('div', 'rs-open', label('Looking for new staff?')),
-          button('Scouting', to.market, { kind: 'plain' }),
-        ])
+        market('Looking for new staff?', to.market)
       );
     },
   };
@@ -366,7 +260,7 @@ export function createStaff(office: Office): Screen<Dyed<TeamView>> {
 export function createTeam(office: Office): Screen<Dyed<TeamView>> {
   kitLooks();
   stylesheet(CSS);
-  const root = el('div', 'cr rs rs-team s-team');
+  const root = page('ledger', 's-team');
   const to = asks(office);
   return {
     el: root,
@@ -378,10 +272,11 @@ export function createTeam(office: Office): Screen<Dyed<TeamView>> {
       const books = ['Drivers', 'Mechanics', 'Designer', 'Scouts'].flatMap(
         (role) => under(v, role).map((r) => ({ role, r }))
       );
+      const open = ['Drivers', 'Mechanics', 'Designer', 'Scouts', 'Pit crew']
+        .flatMap((role) => under(v, role))
+        .filter((r) => r.kind === 'open');
       root.replaceChildren(
-        el(
-          'div',
-          'rs-col',
+        column(
           sheet('Wages a Race', [
             el(
               'div',
@@ -393,45 +288,34 @@ export function createTeam(office: Office): Screen<Dyed<TeamView>> {
           ]),
           chairman &&
             sheet('The Chairman', [
-              el(
-                'div',
-                'rs-who',
-                portrait(jacketOf(chairman.face, dyes), 30),
-                el(
-                  'div',
-                  '',
-                  name(chairman.title),
-                  label(`Age ${chairman.age}`)
-                )
+              who(
+                {
+                  ...whoOf(chairman, dyes, `Age ${chairman.age}`),
+                  stars: null,
+                },
+                30,
+                'beside'
               ),
             ]),
           sheet(
             'Open Posts',
             [
-              v.open.length === 0
+              open.length === 0
                 ? label('Every post is filled.')
                 : el(
                     'div',
                     'rs-posts cr-terms',
-                    ...under(v, 'Drivers')
-                      .concat(
-                        under(v, 'Mechanics'),
-                        under(v, 'Designer'),
-                        under(v, 'Scouts'),
-                        under(v, 'Pit crew')
+                    ...open.map((r) =>
+                      el(
+                        'div',
+                        '',
+                        label(r.title),
+                        button('Find', to.find(r), { kind: 'plain' })
                       )
-                      .filter((r) => r.kind === 'open')
-                      .map((r) =>
-                        el(
-                          'div',
-                          '',
-                          label(r.title),
-                          button('Find', to.find(r), { kind: 'plain' })
-                        )
-                      )
+                    )
                   ),
             ],
-            { cls: 'rs-grow' }
+            { cls: 'cr-grow' }
           )
         ),
         sheet(
@@ -461,14 +345,7 @@ export function createTeam(office: Office): Screen<Dyed<TeamView>> {
                   head: 'Morale',
                   track: u(26),
                   num: true,
-                  cell: ({ r }) =>
-                    r.morale === null
-                      ? ''
-                      : el(
-                          'span',
-                          r.morale < 25 ? 'rs-harm' : '',
-                          String(r.morale)
-                        ),
+                  cell: ({ r }) => moraleCell(r.morale),
                 },
                 {
                   head: 'Wage',
@@ -491,11 +368,9 @@ export function createTeam(office: Office): Screen<Dyed<TeamView>> {
               }
             ),
           ],
-          { cls: 'rs-grow' }
+          { cls: 'cr-grow' }
         ),
-        el(
-          'div',
-          'rs-col',
+        column(
           sheet(
             'Pit Crew',
             [
@@ -529,7 +404,7 @@ export function createTeam(office: Office): Screen<Dyed<TeamView>> {
                 }
               ),
             ],
-            { cls: 'rs-grow' }
+            { cls: 'cr-grow' }
           ),
           sheet('Pit Stops', [
             table(

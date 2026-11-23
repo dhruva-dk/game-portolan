@@ -13,6 +13,7 @@ import { button, dropdown, segmented } from '../chartroom/controls.ts';
 import { busy, compared, meter, table, terms } from '../chartroom/data.ts';
 import { cut, label, name, portrait } from '../chartroom/figures.ts';
 import { kitLooks } from '../chartroom/kit.ts';
+import { column, page } from '../chartroom/layout.ts';
 import { paper, plate, sheet } from '../chartroom/paper.ts';
 import { brassPort } from '../chartroom/port.ts';
 import { u } from '../chartroom/tokens.ts';
@@ -24,11 +25,6 @@ import type { Office } from './office.ts';
 import type { Screen } from './screens.ts';
 
 const CSS = `
-.hm { display: grid; grid-template-columns: ${u(168)} 1fr ${u(176)}; gap: var(--s4); padding: var(--s4) var(--s6); }
-.hm-col { display: flex; flex-direction: column; gap: var(--s4); min-height: 0; min-width: 0; }
-.hm .cr-body { gap: var(--s3); }
-.hm-grow { flex: 1; min-height: 0; }
-
 .hm-plate { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s3); }
 .hm-plate > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .hm-faint { flex: none; font: italic 500 var(--t-label) var(--face); letter-spacing: 0; text-transform: none; color: var(--plate-faint); }
@@ -122,7 +118,7 @@ const happyWash = (of: number) =>
 export function createHome(office: Office): Screen<HomeView> {
   kitLooks();
   stylesheet(CSS);
-  const root = el('div', 'cr hm s-home');
+  const root = page('ledger', 'hm s-home');
   // (made once: its globe is spun by a finger, and kept between drawings)
   const port = brassPort(null);
   let shown: string | null = null,
@@ -181,7 +177,7 @@ export function createHome(office: Office): Screen<HomeView> {
           ['Standing', verdict(v.chairman.standing)],
         ]),
       ],
-      { cls: 'hm-grow' }
+      { cls: 'cr-grow' }
     );
 
   /** Her ship through the window, her team named over it; her four drivers under it. */
@@ -271,7 +267,7 @@ export function createHome(office: Office): Screen<HomeView> {
         }),
         list,
       ],
-      { cls: 'hm-grow' }
+      { cls: 'cr-grow' }
     );
   }
 
@@ -332,10 +328,8 @@ export function createHome(office: Office): Screen<HomeView> {
     el: root,
     show(v) {
       root.replaceChildren(
-        el('div', 'hm-col', nextRace(v), chairman(v)),
-        el(
-          'div',
-          'hm-col',
+        column(nextRace(v), chairman(v)),
+        column(
           ...team(v),
           sheet('Against the Grid', [
             compared(v.stats, {
@@ -345,7 +339,7 @@ export function createHome(office: Office): Screen<HomeView> {
           ]),
           news(v)
         ),
-        el('div', 'hm-col', standings(v), work(v))
+        column(standings(v), work(v))
       );
     },
   };

@@ -47,6 +47,12 @@ export const DATA_CSS = `
 .cr-key > span { display: inline-flex; align-items: center; gap: var(--s2); }
 .cr-key i.best { width: var(--w-bold); height: ${u(9)}; background: var(--ink); }
 
+/* a gauge: what it measures and where it stands, over its track */
+.cr-gauge { display: flex; flex-direction: column; gap: var(--s1); min-width: 0; }
+.cr-gauge-head { display: flex; justify-content: space-between; align-items: baseline; gap: var(--s2); min-width: 0; }
+.cr-gauge-head > .cr-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cr-gauge-head > b { font-weight: 600; font-variant-numeric: lining-nums; white-space: nowrap; }
+.cr-gauge-head > b.harm, .cr-harm { color: var(--harm); }
 /* a track reached by steps: filled as far as it has come, a node at each step, those reached inked */
 .cr-steps { position: relative; height: ${u(7)}; margin: 0 ${u(3.5)}; background: var(--paper);
   box-shadow: inset 0 0 0 var(--w-fine) var(--ink); }
@@ -134,6 +140,20 @@ export const meter = (of: number, wash = 'q2') =>
     'div',
     'cr-meter',
     styled(el('i'), { '--share': share(of), '--wash': `var(--${wash})` })
+  );
+
+/** A gauge: what it measures (`title`), where it stands (`value`, in the harm ink if `harm`), over its `track`. */
+export const gauge = (title: Kid, value: Kid, track: Kid, harm = false) =>
+  el(
+    'div',
+    'cr-gauge',
+    el(
+      'div',
+      'cr-gauge-head',
+      label(title),
+      el('b', harm ? 'harm' : '', value)
+    ),
+    track
   );
 
 /** Work under way: a ruled bar striped as far as it has got (0…1). */

@@ -24,7 +24,7 @@ import { folio, sheet } from '../chartroom/paper.ts';
 import { u } from '../chartroom/tokens.ts';
 import { el, pressed, styled, type Kid } from '../kit/part.ts';
 import { stylesheet } from '../kit/style.ts';
-import { jacketOf } from './bits.ts';
+import { jacketOf } from './faces.ts';
 import type { Office } from './office.ts';
 import type { Screen } from './screens.ts';
 
