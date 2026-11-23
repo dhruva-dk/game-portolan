@@ -135,7 +135,9 @@ export function scoutingView(
       name: nameOf(g),
       stars: Math.round(stars(g) * 2) / 2,
       reach: reachText(effective(g, null).reach),
-      on: job ? nameOf(s.people[job.person]) : null,
+      on: job
+        ? { person: job.person, name: nameOf(s.people[job.person]) }
+        : null,
       days: job
         ? fig(left, `${left}d`, rival('report', dayText(s, job.done)), {
             title: 'Scouting',

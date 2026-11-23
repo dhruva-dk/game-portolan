@@ -71,6 +71,7 @@ const NAMES = [
 const team = (name: string, i: number): Team => {
   const dye = DYES[i % DYES.length] ?? VERMILION;
   return {
+    id: i,
     name,
     emblem: i,
     colours: [linearToHex(dye), linearToHex(markOn(dye))],

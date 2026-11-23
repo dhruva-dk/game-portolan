@@ -10,7 +10,7 @@
 
 import type { StandingLine } from '../../office/home.ts';
 import type { StandingsTable, StandingsView } from '../../office/loop.ts';
-import { button, segmented } from '../chartroom/controls.ts';
+import { button, link, segmented } from '../chartroom/controls.ts';
 import { gauge, stepped, table, terms } from '../chartroom/data.ts';
 import { arrow, dyed } from '../chartroom/figures.ts';
 import { kitLooks } from '../chartroom/kit.ts';
@@ -19,6 +19,7 @@ import { plate, sheet } from '../chartroom/paper.ts';
 import { u } from '../chartroom/tokens.ts';
 import { el, grouped, ordinal } from '../kit/part.ts';
 import { stylesheet } from '../kit/style.ts';
+import { toPerson } from './links.ts';
 import type { Office } from './office.ts';
 import type { Screen } from './screens.ts';
 
@@ -56,7 +57,8 @@ function moving(c: StandingsTable, way: 'up' | 'down', to: string | null) {
 export function createStandings(office: Office): Screen<StandingsView> {
   kitLooks();
   stylesheet(CSS);
-  const root = page('side', 's-standings');
+  const root = page('side', 's-standings'),
+    profile = toPerson(office);
   let chosen: number | null = null,
     lines: 'teams' | 'drivers' = 'teams';
   return {
@@ -177,7 +179,7 @@ export function createStandings(office: Office): Screen<StandingsView> {
             {
               head: 'Driver',
               track: 'minmax(0, 1fr)',
-              cell: (r) => dyed(r.team.colours[0], r.name),
+              cell: (r) => dyed(r.team.colours[0], link(r.name)),
             },
             {
               head: 'Team',
@@ -197,6 +199,7 @@ export function createStandings(office: Office): Screen<StandingsView> {
           c.drivers,
           {
             own: (r) => r.own,
+            tap: (r) => profile(r.person),
             none: 'No one sails in it yet.',
             scrolls: { keep: `standings-drivers-${at}` },
           }

@@ -116,7 +116,11 @@ export interface ProfileView {
   potential: Range;
   traits: readonly TraitLine[];
   /** A driver's or mechanic's of her own ships: the bond with whom they sail beside, and its share of the strongest. */
-  bond: { with: string; figure: Figure; share: number } | null;
+  bond: {
+    with: { person: number; name: string };
+    figure: Figure;
+    share: number;
+  } | null;
   morale: Figure | null;
   marketability: Figure;
   wants: readonly { want: Want; label: string }[] | null; // null: not yet scouted
@@ -193,7 +197,8 @@ export interface ScoutRow {
   name: string;
   stars: number;
   reach: string;
-  on: string | null;
+  /** Whom they are scouting (null: idle). */
+  on: { person: number; name: string } | null;
   days: Figure | null;
   cancel: Act;
 }

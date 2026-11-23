@@ -10,7 +10,7 @@
 import type { Figure } from '../../office/career.ts';
 import type { Dyed } from '../../office/papers.ts';
 import type { ProfileView, TraitLine } from '../../office/people.ts';
-import { button, popover } from '../chartroom/controls.ts';
+import { button, link, popover } from '../chartroom/controls.ts';
 import { meter, statTile, table, terms } from '../chartroom/data.ts';
 import {
   label,
@@ -25,6 +25,7 @@ import { u } from '../chartroom/tokens.ts';
 import { el, pressed, styled, type Kid } from '../kit/part.ts';
 import { stylesheet } from '../kit/style.ts';
 import { jacketOf } from './faces.ts';
+import { toPerson } from './links.ts';
 import type { Office } from './office.ts';
 import type { Screen } from './screens.ts';
 
@@ -65,7 +66,7 @@ const CSS = `
 
 /** A figure's row: its name and its text; a tap opens its breakdown under it (and puts away any other). */
 function explained(
-  title: string,
+  title: Kid,
   f: Figure,
   shown: { pop: HTMLElement | null },
   below: Kid = null
@@ -258,7 +259,12 @@ export function createProfile(office: Office): Screen<Dyed<ProfileView>> {
           'pf-gauges',
           v.bond &&
             explained(
-              `Bond with ${v.bond.with}`,
+              el(
+                'span',
+                '',
+                'Bond with ',
+                link(v.bond.with.name, toPerson(office)(v.bond.with.person))
+              ),
               v.bond.figure,
               shown,
               meter(v.bond.share, 'q1')

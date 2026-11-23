@@ -10,7 +10,13 @@
 import type { Offer } from '../../office/command.ts';
 import type { Dyed } from '../../office/papers.ts';
 import type { OfferView } from '../../office/people.ts';
-import { button, dropdown, segmented, stepper } from '../chartroom/controls.ts';
+import {
+  button,
+  dropdown,
+  link,
+  segmented,
+  stepper,
+} from '../chartroom/controls.ts';
 import { gauge, meter, terms, washOf } from '../chartroom/data.ts';
 import { label, pips } from '../chartroom/figures.ts';
 import { kitLooks } from '../chartroom/kit.ts';
@@ -21,6 +27,7 @@ import { u } from '../chartroom/tokens.ts';
 import { el, grouped, type Kid } from '../kit/part.ts';
 import { stylesheet } from '../kit/style.ts';
 import { whoOf } from './faces.ts';
+import { toPerson } from './links.ts';
 import type { Office } from './office.ts';
 import type { Screen } from './screens.ts';
 
@@ -207,7 +214,13 @@ export function createOffer(office: Office): Screen<Dyed<OfferView>> {
       );
 
       const person = sheet(v.roleName, [
-        who(whoOf({ ...v, title: v.name }, dyes, `To join ${v.team}`), 44),
+        who(
+          {
+            ...whoOf({ ...v, title: v.name }, dyes, `To join ${v.team}`),
+            name: link(v.name, toPerson(office)(v.id)),
+          },
+          44
+        ),
         el(
           'div',
           'ng-patience',

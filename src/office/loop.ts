@@ -57,6 +57,8 @@ export interface PlanView {
 /** A ship's line of the result: where she came, who sailed her, what she sank and scored. */
 export interface ResultLine {
   place: number;
+  /** Who sailed it (null: no one, an empty berth). */
+  person: number | null;
   driver: string;
   team: Team;
   own: boolean;

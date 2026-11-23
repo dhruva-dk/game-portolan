@@ -92,7 +92,7 @@ export const PROFILE: ProfileView = {
     { name: 'Demanding', effect: 'Asks 15% more', lasts: 'Always', sense: -1 },
   ],
   bond: {
-    with: 'Tobin Reave',
+    with: { person: 57, name: 'Tobin Reave' },
     figure: figure('Bond', [62, 'Steady'], 'strongest', [
       ['Races together', '11'],
       ['Podiums together', '+3'],

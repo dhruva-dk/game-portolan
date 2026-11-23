@@ -83,6 +83,7 @@ const UNDYED = ['', ''] as const;
 
 /** A team as the office names it. */
 const named = (c: Team, look: Look): Named => ({
+  id: c.id,
   name: c.name,
   emblem: c.emblem,
   colours: look.dyes[c.colours.dye % look.dyes.length] ?? UNDYED,
@@ -152,6 +153,7 @@ function teamLines(
     .map((x, i) => {
       const c = teamOf(s, x.team);
       return {
+        person: null,
         place: i + 1,
         name: c.name,
         team: named(c, look),
@@ -379,7 +381,9 @@ export function homeView(s: CareerState, look: Look): HomeView {
     championship: championship(c.tier),
     drivers: mine.flatMap((id) => {
       const line = drivers.find((d) => d.person === id);
-      return line ? [{ name: line.name, place: line.place }] : [];
+      return line
+        ? [{ person: line.person, name: line.name, place: line.place }]
+        : [];
     }),
     chairman: {
       happiness: c.confidence / 100,
@@ -508,23 +512,23 @@ export function planView(
 
 /** Who sails each ship of her championship's race today, as its result will name them: by the card's ship id. */
 export interface Entry {
+  person: number | null;
   driver: string;
   team: number;
 }
 export function entries(s: CareerState): Entry[] {
   const c = myTeam(s),
     all = lineups(s),
-    me = s.player ? s.people[s.player.person] : null;
+    me = s.player?.person ?? null;
   return grid(s, c.tier).flatMap((team) =>
-    (all[team]?.ships ?? []).map((a) => ({
-      team,
-      driver:
-        a.driver !== null
-          ? short(s.people[a.driver])
-          : team === c.id && me
-            ? short(me)
-            : '',
-    }))
+    (all[team]?.ships ?? []).map((a) => {
+      const person = a.driver ?? (team === c.id ? me : null);
+      return {
+        team,
+        person,
+        driver: person !== null ? short(s.people[person]) : '',
+      };
+    })
   );
 }
 
@@ -552,6 +556,7 @@ export function resultView(
         line = teams[Math.floor(id / TEAM)]?.ships[id % TEAM];
       return {
         place: i + 1,
+        person: e?.person ?? null,
         driver: e?.driver ?? '',
         team: named(teamOf(s, e?.team ?? c.id), look),
         own: e?.team === c.id,

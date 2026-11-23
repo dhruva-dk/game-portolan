@@ -11,7 +11,8 @@
 
 import type { Dyed } from '../../office/papers.ts';
 import type { RosterRow, TeamView } from '../../office/people.ts';
-import { button } from '../chartroom/controls.ts';
+import { toPerson } from './links.ts';
+import { button, link } from '../chartroom/controls.ts';
 import { gauge, stepped, table, terms } from '../chartroom/data.ts';
 import { fig, label, portrait, stars } from '../chartroom/figures.ts';
 import { kitLooks } from '../chartroom/kit.ts';
@@ -64,13 +65,14 @@ function under(v: TeamView, title: string): RosterRow[] {
   return to < 0 ? rest : rest.slice(0, to);
 }
 
+/** A person's name, a link to their profile where `go` opens it (never hers: her record is the Player's). */
+const named = (r: Pick<RosterRow, 'title' | 'you'>, go: (() => void) | null) =>
+  go && !r.you ? link(r.title, go) : r.title;
+
 /** What a roster screen asks of the office. */
 function asks(office: Office) {
   return {
-    profile: (id: number | null) =>
-      id === null
-        ? null
-        : () => office.ask({ kind: 'person', id, screen: 'profile' }),
+    profile: toPerson(office),
     offer: (id: number) => () =>
       office.ask({ kind: 'person', id, screen: 'offer' }),
     /** The market opened on the role an open post wants. */
@@ -151,7 +153,14 @@ export function createDrivers(office: Office): Screen<Dyed<TeamView>> {
           );
         return personCard(
           r.post,
-          whoOf(r, dyes, r.you ? `Age ${r.age} · the manager` : `Age ${r.age}`),
+          {
+            ...whoOf(
+              r,
+              dyes,
+              r.you ? `Age ${r.age} · the manager` : `Age ${r.age}`
+            ),
+            name: named(r, details),
+          },
           [
             r.you
               ? button(
@@ -169,7 +178,14 @@ export function createDrivers(office: Office): Screen<Dyed<TeamView>> {
                 'rs-mate',
                 mech ? portrait(jacketOf(mech.face, dyes), 14) : null,
                 label(
-                  mech ? `Mechanic: ${mech.title}` : 'No mechanic on this ship'
+                  mech
+                    ? el(
+                        'span',
+                        '',
+                        'Mechanic: ',
+                        named(mech, to.profile(mech.id))
+                      )
+                    : 'No mechanic on this ship'
                 )
               )
             ),
@@ -217,7 +233,10 @@ export function createStaff(office: Office): Screen<Dyed<TeamView>> {
           mate = drivers.find((d) => d.post === r.post && d.kind === 'person');
         return personCard(
           one,
-          whoOf(r, dyes, `Age ${r.age}`, BADGE[role]),
+          {
+            ...whoOf(r, dyes, `Age ${r.age}`, BADGE[role]),
+            name: named(r, details),
+          },
           [
             role === 'Mechanics'
               ? bondOf(
@@ -225,7 +244,18 @@ export function createStaff(office: Office): Screen<Dyed<TeamView>> {
                   r.post,
                   label(
                     mate
-                      ? `Chemistry with ${mate.title.replace(' (you)', '')}`
+                      ? el(
+                          'span',
+                          '',
+                          'Chemistry with ',
+                          named(
+                            {
+                              ...mate,
+                              title: mate.title.replace(' (you)', ''),
+                            },
+                            mate.you ? null : to.profile(mate.id)
+                          )
+                        )
                       : `No driver sails ${r.post}`
                   )
                 )
@@ -291,6 +321,7 @@ export function createTeam(office: Office): Screen<Dyed<TeamView>> {
               who(
                 {
                   ...whoOf(chairman, dyes, `Age ${chairman.age}`),
+                  name: named(chairman, to.profile(chairman.id)),
                   stars: null,
                 },
                 30,
@@ -327,7 +358,11 @@ export function createTeam(office: Office): Screen<Dyed<TeamView>> {
                   head: 'Name',
                   track: '1fr',
                   cell: ({ r }) =>
-                    r.kind === 'open' ? label('Vacant') : r.title,
+                    r.kind === 'open'
+                      ? link('Vacant: find one')
+                      : r.you
+                        ? r.title
+                        : link(r.title),
                 },
                 {
                   head: 'Post',
@@ -376,7 +411,7 @@ export function createTeam(office: Office): Screen<Dyed<TeamView>> {
             [
               table(
                 [
-                  { head: 'Name', track: '1fr', cell: (p) => p.name },
+                  { head: 'Name', track: '1fr', cell: (p) => link(p.name) },
                   {
                     head: 'Work',
                     track: u(22),

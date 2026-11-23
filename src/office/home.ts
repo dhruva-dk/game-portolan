@@ -8,6 +8,7 @@ import type { Tab, Team, Verdict, Viewed } from './office.ts';
 
 /** A driver of her team as the team panel names them: where they stand in the drivers' table. */
 interface HomeDriver {
+  person: number;
   name: string;
   place: number;
 }
@@ -54,8 +55,10 @@ interface Work {
   jobs: readonly Job[];
 }
 
-/** A line of a table: a team's, or a driver's with their team; `ruled`, a line under it (the places that go up). */
+/** A line of a table: a team's, or a driver's with their team (`person`, theirs; null on a team's line); `ruled`, a
+ *  line under it (the places that go up). */
 export interface StandingLine {
+  person: number | null;
   place: number;
   name: string;
   team: Team;

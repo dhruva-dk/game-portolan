@@ -117,7 +117,7 @@ export const SCOUTING: ScoutingView = {
       name: 'Bel Haskett',
       stars: 3,
       reach: 'Next tier',
-      on: 'J. Penrose',
+      on: { person: 412, name: 'J. Penrose' },
       days: figure('Scouting', [9, '9d'], 'report 19 May', [
         ['Sent', '6 May'],
         ['Report', '19 May'],

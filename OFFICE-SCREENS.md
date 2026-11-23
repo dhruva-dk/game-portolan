@@ -48,15 +48,20 @@ As in MM, every named thing on every screen opens its own page: a driver their p
 its round. So a view never hands a screen a bare name: each name comes with what it names (its ref), and a screen
 draws every ref as a link (one kit piece). A name with no ref is a gap, like a command no control sends.
 
-| Thing                                     | Opens                             | Ref in the views now                       | Needs                                                                    |
-| ----------------------------------------- | --------------------------------- | ------------------------------------------ | ------------------------------------------------------------------------ |
-| A person (driver, staff, scout, chairman) | Profile (built)                   | roster, scouting, offer views only         | `person` id on standings' and result's lines, Home's drivers, news, mail |
-| A team                                    | Rival: its manager and team (new) | none: `Team` is a name, emblem and colours | `id` on `Team` (office.ts), everywhere a team is named                   |
-| A championship                            | Standings at that championship    | none                                       | its tier wherever it is named (the bar, Home, mail)                      |
-| A planet, a round                         | Calendar at that round            | a name                                     | its round on Home's next race, results, the bar                          |
-| A part, a building                        | Ship, HQ at it                    | in the yard only                           | ids on Home's work under way, mail links                                 |
-| A sponsor, a supplier                     | Sponsors, Suppliers at it         | none                                       | ids on Finances' ledger lines, mail                                      |
-| A rule, a proposal                        | Admiralty at it                   | none                                       | ids on mail's vote letters, the bar's chip                               |
+How: `link(text, go)` (`src/ui/chartroom/controls.ts`) sets a name in the act ink; alone it takes its own tap, in a
+table the row takes it (`tap`), the bigger target. `src/ui/office/links.ts` holds the ways to each page
+(`toPerson`). `tools/layout.ts` fails a link that opens nothing (dead) and a row that opens a page with no name drawn
+as a link (unmarked); `play.ts --tour` follows one (a rival's driver in Standings to their profile).
+
+| Thing                                     | Opens                             | Ref in the views now                    | Needs                                               |
+| ----------------------------------------- | --------------------------------- | --------------------------------------- | --------------------------------------------------- |
+| A person (driver, staff, scout, chairman) | Profile (built)                   | every built screen, linked (2026-11-23) | mail's senders and subjects (Mail)                  |
+| A team                                    | Rival: its manager and team (new) | `id` on every `Team` (2026-11-23)       | Rival; then every team name linked                  |
+| A championship                            | Standings at that championship    | none                                    | its tier wherever it is named (the bar, Home, mail) |
+| A planet, a round                         | Calendar at that round            | a name                                  | its round on Home's next race, results, the bar     |
+| A part, a building                        | Ship, HQ at it                    | in the yard only                        | ids on Home's work under way, mail links            |
+| A sponsor, a supplier                     | Sponsors, Suppliers at it         | none                                    | ids on Finances' ledger lines, mail                 |
+| A rule, a proposal                        | Admiralty at it                   | none                                    | ids on mail's vote letters, the bar's chip          |
 
 What the career does not keep, that a coherent office needs:
 

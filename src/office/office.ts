@@ -53,8 +53,10 @@ export const TABS = [
 ] as const;
 export type Tab = (typeof TABS)[number];
 
-/** A team as the office names it: its emblem by number, its two colours as the page shows them ('#rrggbb'). */
+/** A team as the office names it: its id (its page's), its emblem by number, its two colours as the page shows them
+ *  ('#rrggbb'). */
 export interface Team {
+  id: number;
   name: string;
   emblem: number;
   colours: readonly [string, string];

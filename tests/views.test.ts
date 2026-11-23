@@ -312,8 +312,15 @@ test('profile: a rival unknown in ranges, scouted then known; one of her own may
   const own = profileView(s, c.staff.ships[1].driver);
   const beside = c.staff.ships[1].mechanic;
   if (beside !== null) {
-    assert.equal(own.bond?.with, nameOf(s.people[beside]));
-    assert.equal(profileView(s, beside).bond?.with, own.name);
+    assert.deepEqual(own.bond?.with, {
+      person: beside,
+      name: nameOf(s.people[beside]),
+    });
+    assert.equal(profileView(s, beside).bond?.with.name, own.name);
+    assert.equal(
+      profileView(s, beside).bond?.with.person,
+      c.staff.ships[1].driver
+    );
   }
   assert.equal(own.post, 'Ship 2');
   assert.equal(own.mine, true);

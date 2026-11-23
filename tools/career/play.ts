@@ -122,6 +122,19 @@ try {
       await page.waitForTimeout(400);
       await capture(`${label}-offer`);
     }
+    // a link followed: another team's driver in the standings opens their profile
+    await page.locator('.sh-tab').nth(TABS.indexOf('standings')).click();
+    await at('standings', 10000);
+    await page
+      .locator('.s-standings .cr-seg > div', { hasText: 'Drivers' })
+      .click();
+    await page.waitForTimeout(300);
+    await tap('.s-standings .cr-rows > .cr-tr:not(.own)');
+    await page.waitForSelector('.o-body > .pf:not([hidden])', {
+      timeout: 10000,
+    });
+    await page.waitForTimeout(400);
+    await capture(`${label}-linked`);
     // what the career is asked through the screens, where it may be: a sponsor signed, a building begun, a design started
     const asked = async (tab: number, selector: string, name: string) => {
       await page.locator('.sh-tab').nth(tab).click();

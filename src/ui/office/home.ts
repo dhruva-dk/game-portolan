@@ -9,7 +9,7 @@
 
 import type { HomeView, NewsKind, StandingLine } from '../../office/home.ts';
 import type { Verdict } from '../../office/office.ts';
-import { button, dropdown, segmented } from '../chartroom/controls.ts';
+import { button, dropdown, link, segmented } from '../chartroom/controls.ts';
 import {
   busy,
   compared,
@@ -26,8 +26,9 @@ import { brassPort } from '../chartroom/port.ts';
 import { snapped, u } from '../chartroom/tokens.ts';
 import { emblem } from '../emblem.ts';
 import type { Glyph } from '../glyphs.ts';
-import { el, ordinal } from '../kit/part.ts';
+import { el, ordinal, pressed } from '../kit/part.ts';
 import { stylesheet } from '../kit/style.ts';
+import { toPerson } from './links.ts';
 import type { Office } from './office.ts';
 import type { Screen } from './screens.ts';
 
@@ -121,7 +122,8 @@ const kept = (list: HTMLElement, keep: string) => {
 export function createHome(office: Office): Screen<HomeView> {
   kitLooks();
   stylesheet(CSS);
-  const root = page('ledger', 'hm s-home');
+  const root = page('ledger', 'hm s-home'),
+    profile = toPerson(office);
   // (made once: its globe is spun by a finger, and kept between drawings)
   const port = brassPort(null);
   let shown: string | null = null,
@@ -203,17 +205,20 @@ export function createHome(office: Office): Screen<HomeView> {
         'div',
         'hm-drivers',
         ...v.drivers.map((d) =>
-          el(
-            'div',
-            '',
-            portrait(v.team.colours, 22),
+          pressed(
             el(
               'div',
               '',
-              // (her family name: four to a row, the initial has no room)
-              name(d.name.replace(/^\S+\.\s+/, '')),
-              el('b', '', ordinal(d.place))
-            )
+              portrait(v.team.colours, 22),
+              el(
+                'div',
+                '',
+                // (her family name: four to a row, the initial has no room)
+                name(link(d.name.replace(/^\S+\.\s+/, ''))),
+                el('b', '', ordinal(d.place))
+              )
+            ),
+            () => profile(d.person)?.()
           )
         )
       ),
@@ -248,12 +253,18 @@ export function createHome(office: Office): Screen<HomeView> {
         {
           head: lines === 'teams' ? 'Team' : 'Driver',
           track: '1fr',
-          cell: (r) => dyed(r.team.colours[0], r.name),
+          cell: (r) =>
+            dyed(r.team.colours[0], r.person === null ? r.name : link(r.name)),
         },
         { head: 'Pts', track: u(20), num: true, cell: (r) => r.points },
       ],
       rows,
-      { own: (r) => r.own, cut: (r) => r.ruled, scrolls: { keep: lines } }
+      {
+        own: (r) => r.own,
+        cut: (r) => r.ruled,
+        tap: (r) => profile(r.person),
+        scrolls: { keep: lines },
+      }
     );
     return sheet(
       'Standings',
@@ -275,8 +286,10 @@ export function createHome(office: Office): Screen<HomeView> {
       return sheet('Under Way', [label('No work is under way.')], {
         cls: 'hm-work idle',
       });
-    const job = (j: (typeof at.jobs)[number]) =>
-      el(
+    const job = (j: (typeof at.jobs)[number]) => {
+      const details = () =>
+        office.ask({ kind: 'job', job: j.id, what: 'details' });
+      return el(
         'div',
         'hm-job',
         el(
@@ -285,18 +298,14 @@ export function createHome(office: Office): Screen<HomeView> {
           j.team
             ? emblem(j.team.emblem, j.team.colours, 13)
             : cut(WORK[at.kind] ?? 'office.scouting'),
-          name(j.name),
+          name(link(j.name, details)),
           label(j.days === 1 ? '1 day' : `${j.days} days`)
         ),
         busy(j.done),
         el(
           'div',
           'hm-acts',
-          button(
-            j.details,
-            () => office.ask({ kind: 'job', job: j.id, what: 'details' }),
-            { kind: 'plain' }
-          ),
+          button(j.details, details, { kind: 'plain' }),
           j.cancels &&
             button(
               'Cancel',
@@ -305,6 +314,7 @@ export function createHome(office: Office): Screen<HomeView> {
             )
         )
       );
+    };
     const kinds = v.work.map((w) => w.kind);
     return sheet(
       'Under Way',

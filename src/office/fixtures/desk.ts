@@ -78,6 +78,7 @@ const VIEWS: Pick<
     title: `1716 ${HOME.next.name} - ${SHELL.championship}`,
     lines: HOME.standings.drivers.map((d, i) => ({
       place: i + 1,
+      person: d.person,
       driver: d.name,
       team: d.team,
       own: d.own,

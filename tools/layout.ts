@@ -9,6 +9,8 @@
 //   clipped a figure in a table cut short
 //   under   a table's scrolled rows over its heads
 //   squeezed a name in a table cut to a stub (under SLACK.stub px)
+//   dead    a name drawn as a link that opens nothing
+//   unmarked a row that opens a page with no name drawn as a link
 //   inset   a sheet's first words (its head, or its body's first thing) no
 //           nearer its top edge than a sheet with a head has them
 //   node tools/layout.ts [screen ...]
@@ -217,6 +219,15 @@ try {
         if (over > slack.edge)
           out.push(`under: ${name(rows)} runs ${n(over)}px up over its heads`);
       }
+
+      // dead: a name drawn as a link opens something (itself, or the row or card it names)
+      for (const a of all(body, '.cr-link').filter(shown))
+        if (!a.closest('.press'))
+          out.push(`dead: ${name(a)} looks a link and opens nothing`);
+      // unmarked: a row that opens a page says so, its name drawn as a link
+      for (const r of all(body, '.cr-tr.press').filter(shown))
+        if (!r.querySelector('.cr-link'))
+          out.push(`unmarked: ${name(r)} opens a page, no name a link`);
 
       // squeezed: a name cut to an ellipsis, but never to a stub of itself
       const cell = '.cr-tr:not(.head) > div:not(.num)';

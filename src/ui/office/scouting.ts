@@ -14,7 +14,13 @@ import type {
   ScoutingView,
   ScoutRow,
 } from '../../office/people.ts';
-import { button, dropdown, segmented, stepper } from '../chartroom/controls.ts';
+import {
+  button,
+  dropdown,
+  link,
+  segmented,
+  stepper,
+} from '../chartroom/controls.ts';
 import { table } from '../chartroom/data.ts';
 import { favourite, label, stars } from '../chartroom/figures.ts';
 import { kitLooks } from '../chartroom/kit.ts';
@@ -25,6 +31,7 @@ import { u } from '../chartroom/tokens.ts';
 import { el, pressed } from '../kit/part.ts';
 import { stylesheet } from '../kit/style.ts';
 import { jacketOf } from './faces.ts';
+import { toPerson } from './links.ts';
 import type { Office } from './office.ts';
 import type { Screen } from './screens.ts';
 
@@ -65,8 +72,7 @@ export function createScouting(office: Office): Screen<Dyed<ScoutingView>> {
 
   const search = (f: ScoutingFilter, to: Partial<ScoutingFilter>) =>
     office.ask({ kind: 'filter', filter: { ...f, ...to } });
-  const profile = (id: number) => () =>
-    office.ask({ kind: 'person', id, screen: 'profile' });
+  const profile = toPerson(office);
 
   /** The search: each of the filter's terms, labelled over its control. */
   function searching(v: ScoutingView) {
@@ -143,7 +149,9 @@ export function createScouting(office: Office): Screen<Dyed<ScoutingView>> {
             el(
               'div',
               '',
-              label(`On ${s.on}`),
+              label(
+                el('span', '', 'On ', link(s.on.name, profile(s.on.person)))
+              ),
               el('b', '', s.days ? `${s.days.text} to report` : '')
             ),
             s.cancel.ok &&
@@ -226,7 +234,7 @@ export function createScouting(office: Office): Screen<Dyed<ScoutingView>> {
                   () => office.ask({ kind: 'favourite', id: r.id })
                 ),
             },
-            { head: 'Name', track: '1fr', cell: (r) => r.name },
+            { head: 'Name', track: '1fr', cell: (r) => link(r.name) },
             {
               head: 'Age',
               track: u(18),

@@ -8,6 +8,7 @@
 // chairman's (the place expected of the team, where it stands, the verdict).
 
 import type { ResultLine, ResultView } from '../../office/loop.ts';
+import { link } from '../chartroom/controls.ts';
 import { table, terms } from '../chartroom/data.ts';
 import { fig, label, place } from '../chartroom/figures.ts';
 import { kitLooks } from '../chartroom/kit.ts';
@@ -18,6 +19,8 @@ import { u } from '../chartroom/tokens.ts';
 import { emblem } from '../emblem.ts';
 import { el, ordinal } from '../kit/part.ts';
 import { stylesheet } from '../kit/style.ts';
+import { toPerson } from './links.ts';
+import type { Office } from './office.ts';
 import type { Screen } from './screens.ts';
 
 const CSS = `
@@ -55,10 +58,16 @@ const STAMP = {
 } as const;
 
 /** A race's result: the podium and how they finished, the team's report and the chairman's. */
-export function createResult(): Screen<ResultView> {
+export function createResult(office: Office): Screen<ResultView> {
   kitLooks();
   stylesheet(CSS);
-  const root = page('aside', 's-result');
+  const root = page('aside', 's-result'),
+    profile = toPerson(office);
+  /** A driver's name, opening their profile (an empty berth's opens nothing). */
+  const named = (r: ResultLine) => {
+    const go = profile(r.person);
+    return go ? link(r.driver, go) : r.driver;
+  };
   return {
     el: root,
     show(v) {
@@ -72,7 +81,7 @@ export function createResult(): Screen<ResultView> {
               .map((r) => ({
                 who: {
                   jacket: r.team.colours,
-                  name: r.driver,
+                  name: named(r),
                   said: teamOf(r),
                 },
                 scored: fig(`+${r.points} pts`, 's'),
@@ -87,7 +96,11 @@ export function createResult(): Screen<ResultView> {
           table<ResultLine>(
             [
               { head: '', track: u(12), num: true, cell: (r) => r.place },
-              { head: 'Driver', track: '1fr', cell: (r) => r.driver },
+              {
+                head: 'Driver',
+                track: '1fr',
+                cell: (r) => (r.person === null ? r.driver : link(r.driver)),
+              },
               { head: 'Team', track: '1.2fr', cell: teamOf },
               {
                 head: 'Sank',
@@ -116,6 +129,7 @@ export function createResult(): Screen<ResultView> {
             {
               own: (r) => r.own,
               cut: (r) => r.place === 3,
+              tap: (r) => profile(r.person),
               scrolls: { keep: 'result' },
             }
           ),
@@ -136,7 +150,7 @@ export function createResult(): Screen<ResultView> {
               who(
                 {
                   jacket: r.team.colours,
-                  name: r.driver,
+                  name: named(r),
                   said: `Sank ${r.sinkings} · ${r.stops} ${r.stops === 1 ? 'stop' : 'stops'} · ${
                     r.second === null ? 'afloat' : `sunk ${clock(r.second)}`
                   }`,

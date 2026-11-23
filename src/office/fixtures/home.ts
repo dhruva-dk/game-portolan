@@ -42,6 +42,7 @@ const SHARES = Array.from(
 );
 
 const teams: readonly StandingLine[] = TEAMS.map((team, i) => ({
+  person: null,
   place: i + 1,
   name: team.name,
   team,
@@ -50,12 +51,14 @@ const teams: readonly StandingLine[] = TEAMS.map((team, i) => ({
   ruled: i === 0,
 }));
 
-const drivers: readonly StandingLine[] = TEAMS.flatMap((team, i) =>
-  SHARES.map((share, j) => ({
-    name: `${INITIALS.charAt((i + 3 * j) % INITIALS.length)}. ${SURNAMES[(i * 3 + j * 7) % SURNAMES.length] ?? ''}`,
-    team,
-    points: Math.round((POINTS[i] ?? 0) * share),
-  }))
+const drivers: readonly (StandingLine & { person: number })[] = TEAMS.flatMap(
+  (team, i) =>
+    SHARES.map((share, j) => ({
+      person: i * TEAM + j,
+      name: `${INITIALS.charAt((i + 3 * j) % INITIALS.length)}. ${SURNAMES[(i * 3 + j * 7) % SURNAMES.length] ?? ''}`,
+      team,
+      points: Math.round((POINTS[i] ?? 0) * share),
+    }))
 )
   .sort((a, b) => b.points - a.points)
   .map((d, k) => ({
@@ -73,7 +76,7 @@ export const HOME: HomeView = {
   championship: 'Third Championship',
   drivers: drivers
     .filter((d) => d.own)
-    .map(({ name, place }) => ({ name, place })),
+    .map(({ person, name, place }) => ({ person, name, place })),
   chairman: {
     happiness: 0.9,
     security: { label: 'Very Secure', mood: 'good' },

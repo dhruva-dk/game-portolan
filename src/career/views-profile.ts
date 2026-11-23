@@ -233,7 +233,7 @@ function bondOf(s: CareerState, c: Team, id: number): ProfileView['bond'] {
   const bond = c.bonds[k] ?? 0,
     strongest = TUNING.bond.levels[TUNING.bond.levels.length - 1] ?? 1;
   return {
-    with: nameOf(s.people[other]),
+    with: { person: other, name: nameOf(s.people[other]) },
     figure: bondFigure(bond),
     share: Math.min(1, bond / strongest),
   };

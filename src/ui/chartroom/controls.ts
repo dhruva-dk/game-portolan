@@ -18,6 +18,10 @@ export const CONTROLS_CSS = `
 .cr-act { display: flex; flex-direction: column; gap: var(--s1); }
 .cr-act > .cr-label { text-align: center; }
 
+/* a name that opens its page, in the act ink; alone it takes its tap a step round it, in a row the row takes it */
+.cr-link { color: var(--act); }
+.cr-link.press { padding: var(--s2) 0; margin: calc(-1 * var(--s2)) 0; transition: translate var(--press); }
+.cr-link.press:active { translate: 0 var(--u); }
 .cr-seg { display: flex; min-height: var(--touch); padding: var(--s1); }
 .cr-seg > div { flex: 1; display: grid; place-items: center; padding: 0 var(--s3); font: 500 var(--t-body)/1 var(--face);
   color: var(--ink-2); border-left: var(--w-hair) solid var(--line); }
@@ -80,6 +84,16 @@ export function button(
   });
   pressed(slip, act, !!how.off);
   return how.off ? el('div', 'cr-act', slip, label(how.off)) : slip;
+}
+
+/**
+ * A name that opens its page (a person's profile, a team's): in the act ink, a
+ * tap calls `go`. Without `go` it only looks so: the name of a table's row
+ * whose tap opens it (`table`'s `tap`), the row the bigger target.
+ */
+export function link(text: Kid, go?: (() => void) | null) {
+  const made = el('span', 'cr-link', text);
+  return go ? pressed(made, go) : made;
 }
 
 /** A choice of a few: one slip ruled into parts, the chosen gilt; a tap on another calls `choose` with its index. */
