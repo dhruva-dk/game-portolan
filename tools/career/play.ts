@@ -110,12 +110,14 @@ try {
     await capture(`${label}-design`);
     await page.locator('.sh-tab').nth(8).click();
     await tap('.s-scouting .cr-rows > .cr-tr');
-    await at('profile', 10000);
+    await page.waitForSelector('.o-body > .pf:not([hidden])', {
+      timeout: 10000,
+    });
     await page.waitForTimeout(400);
     await capture(`${label}-profile`);
     // (the offer, where one may be made: not to a driver under contract elsewhere)
-    if (await page.locator('.s-profile .k-btn.on:not(.off)').count()) {
-      await page.locator('.s-profile .k-btn.on').click();
+    if (await page.locator('.pf .cr-btn.act:not(.off)').count()) {
+      await page.locator('.pf .cr-btn.act').first().click();
       await at('offer', 10000);
       await page.waitForTimeout(400);
       await capture(`${label}-offer`);

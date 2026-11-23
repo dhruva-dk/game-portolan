@@ -2,9 +2,9 @@
 // (the balance, the chairman's floor under it, the room between) and what a
 // race brings and costs, netted. In the middle the balance's course this
 // season, dotted on to where it will end, the floor ruled under it; the
-// transactions under that, newest first. At the right this season's money by
-// what it was for, what came in first, netted; and where the season will end
-// on what is committed.
+// transactions under that, newest first. At the right where the season will
+// end on what is committed, and this season's money by what it was for, what
+// came in first, netted.
 
 import type { FinancesPaper } from '../../office/papers.ts';
 import { course, table, terms } from '../chartroom/data.ts';
@@ -116,12 +116,15 @@ export function createFinances(): Screen<FinancesPaper> {
           ['Balance at the end', sum(p.end)],
         ]),
         p.end < v.floor &&
-          label('Under the floor: the chairman will refuse to spend.'),
+          label(
+            'Under the floor: the chairman will refuse to spend.',
+            'cr-harm'
+          ),
       ]);
       root.replaceChildren(
-        column(purse, race, end),
+        column(purse, race),
         column(chart, ledger),
-        season
+        column(end, season)
       );
     },
   };
