@@ -80,11 +80,28 @@ export interface ResultView {
   place: number;
 }
 
-/** The championship's tables, whole: its teams and its drivers, and the round they stand after. */
-export interface StandingsView {
+/** Where a team would go were the season ended now: up a championship, down one, or staying. */
+export type Move = 'up' | 'down' | null;
+
+/** A championship's tables, whole: its prize money, its teams (each one's prize and move as it stands) and drivers. */
+export interface StandingsTable {
   championship: string;
+  /** The prize money shared among its teams at the season's end. */
+  pool: number;
+  teams: readonly (StandingLine & {
+    wins: number;
+    podiums: number;
+    sinkings: number;
+    prize: number;
+    move: Move;
+  })[];
+  drivers: readonly (StandingLine & { wins: number; podiums: number })[];
+}
+
+/** Every championship's tables, the round they stand after, and which is hers (`mine`, an index). */
+export interface StandingsView {
   round: number;
   rounds: number;
-  teams: readonly (StandingLine & { wins: number; sinkings: number })[];
-  drivers: readonly StandingLine[];
+  mine: number;
+  championships: readonly StandingsTable[];
 }

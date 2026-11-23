@@ -6,7 +6,7 @@
 import { bust, type Jacket } from '../gull.ts';
 import type { Glyph } from '../glyphs.ts';
 import { alpha, figure, glyph, roughCircle, svgNode } from '../ink.ts';
-import { el, type Kid } from '../kit/part.ts';
+import { el, styled, type Kid } from '../kit/part.ts';
 import { badge } from '../marks.ts';
 import { TONE, u } from './tokens.ts';
 
@@ -27,6 +27,9 @@ export const FIGURES_CSS = `
 .cr-face { flex: none; position: relative; border-radius: 50%; overflow: hidden; background: var(--sea);
   box-shadow: 0 0 0 var(--w-bold) var(--ink), inset 0 0 0 var(--s1) var(--paper), inset 0 0 0 ${u(2.5)} var(--line); }
 .cr-face > svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.cr-dyed { display: flex; align-items: center; gap: var(--s2); min-width: 0; }
+.cr-dyed > i { flex: none; width: ${u(3)}; height: ${u(9)}; background: var(--dye); box-shadow: 0 0 0 var(--w-fine) var(--ink); }
+.cr-dyed > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .cr-pips { display: inline-flex; gap: var(--s2); }
 .cr-pips > i { width: ${u(11)}; height: ${u(11)}; display: grid; place-items: center; font: 700 var(--t-label)/1 var(--face); font-style: normal;
   background: var(--paper-raised); box-shadow: 0 0 0 var(--w-fine) var(--ink); }
@@ -73,6 +76,15 @@ export const arrow = (way: number) =>
   way === 0
     ? null
     : el('span', `cr-arrow ${way > 0 ? 'up' : 'down'}`, way > 0 ? '▲' : '▼');
+
+/** A name on its team's dye: a swatch of it ruled in ink at its left (a row of a table told by team). */
+export const dyed = (dye: string, text: Kid) =>
+  el(
+    'span',
+    'cr-dyed',
+    styled(el('i'), { '--dye': dye }),
+    el('span', '', text)
+  );
 
 /** A star's outline, 20 units across. */
 const STAR =

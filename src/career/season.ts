@@ -30,8 +30,8 @@ import { TUNING } from './tuning.ts';
 
 const SWAP = TUNING.race.swap;
 
-/** Each tier's teams in final order (1 first). */
-const finalOrder = (s: CareerState): number[][] =>
+/** Each tier's teams in order as they stand (1 first): at the season's end, its final order. */
+export const finalOrder = (s: CareerState): number[][] =>
   s.championships.map((l) =>
     [...l.teams].sort((a, b) => standingOf(s, a) - standingOf(s, b))
   );

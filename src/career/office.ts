@@ -9,16 +9,20 @@ import type { Building, MailCategory, Plan } from '../office/command.ts';
 import type { HomeView, NewsKind, StandingLine } from '../office/home.ts';
 import type {
   FoundView,
+  Move,
   PlanView,
   ResultView,
+  StandingsTable,
   StandingsView,
 } from '../office/loop.ts';
 import type { Team as Named, Verdict } from '../office/office.ts';
 import type { ShellView } from '../office/shell.ts';
 import { buildDays } from './hq.ts';
 import { grid, lineups, maySail } from './lineup.ts';
+import { prizeAt } from './money.ts';
 import type { Person } from './roles.ts';
 import { tally } from './round.ts';
+import { finalOrder, movesOf } from './season.ts';
 import { standingOf } from './standings.ts';
 import { stars } from './stars.ts';
 import {
@@ -128,20 +132,22 @@ export function shellView(s: CareerState, look: Look): ShellView {
   };
 }
 
-/** A line under a place: the one that goes up, and the last that stays. */
-const ruled = (i: number, of: number, tier: number) =>
-  (tier > 0 && i === 0) ||
-  (tier < TUNING.world.championships - 1 && i === of - 2);
+/** A move as the screens name it, by the season's (−1 up, +1 down). */
+const MOVE = new Map<number | undefined, Move>([
+  [-1, 'up'],
+  [1, 'down'],
+]);
 
-/** A championship's teams as they stand. */
+/** A championship's teams as they stand: each one's prize there, and where the season's end would move it. */
 function teamLines(
   s: CareerState,
   tier: number,
   look: Look
-): StandingsView['teams'] {
+): StandingsTable['teams'] {
   const l = championshipOf(s, tier),
-    me = s.player?.team;
-  return [...l.standings]
+    me = s.player?.team,
+    moves = movesOf(finalOrder(s));
+  const lines = [...l.standings]
     .sort((a, b) => standingOf(s, a.team) - standingOf(s, b.team))
     .map((x, i) => {
       const c = teamOf(s, x.team);
@@ -151,11 +157,24 @@ function teamLines(
         team: named(c, look),
         points: x.points,
         own: x.team === me,
-        ruled: ruled(i, l.standings.length, tier),
+        ruled: false,
         wins: x.wins,
+        podiums: x.podiums,
         sinkings: x.sinkings,
+        prize: prizeAt(s, tier, i + 1),
+        move: MOVE.get(moves.get(x.team)) ?? null,
       };
     });
+  // a rule under the last that goes up, and under the last that stays over those that go down
+  return lines.map((x, i) => {
+    const next = lines[i + 1]?.move;
+    return {
+      ...x,
+      ruled:
+        (x.move === 'up' && next !== 'up') ||
+        (x.move !== 'down' && next === 'down'),
+    };
+  });
 }
 
 /** A championship's drivers as they stand: everyone who sails for a team of it or has scored in it, by person. */
@@ -163,10 +182,13 @@ function driverLines(
   s: CareerState,
   tier: number,
   look: Look
-): (StandingLine & { person: number })[] {
+): (StandingLine & { person: number; wins: number; podiums: number })[] {
   const l = championshipOf(s, tier),
     me = s.player?.team;
-  const rows = new Map<number, { team: number; points: number }>();
+  const rows = new Map<
+    number,
+    { team: number; points: number; wins: number; podiums: number }
+  >();
   for (const id of l.teams) {
     const c = teamOf(s, id);
     const sailors = [
@@ -174,10 +196,9 @@ function driverLines(
       ...c.staff.ships.map((h) => h.driver),
     ];
     for (const g of sailors)
-      if (g !== null) rows.set(g, { team: id, points: 0 });
+      if (g !== null) rows.set(g, { team: id, points: 0, wins: 0, podiums: 0 });
   }
-  for (const d of l.drivers)
-    rows.set(d.person, { team: d.team, points: d.points });
+  for (const d of l.drivers) rows.set(d.person, d);
   return [...rows]
     .sort(
       ([a, x], [b, y]) =>
@@ -193,6 +214,8 @@ function driverLines(
       points: x.points,
       own: x.team === me,
       ruled: false,
+      wins: x.wins,
+      podiums: x.podiums,
     }));
 }
 
@@ -390,11 +413,15 @@ export function homeView(s: CareerState, look: Look): HomeView {
 export function standingsView(s: CareerState, look: Look): StandingsView {
   const c = myTeam(s);
   return {
-    championship: championship(c.tier),
     round: s.round,
     rounds: TUNING.calendar.rounds,
-    teams: teamLines(s, c.tier, look),
-    drivers: driverLines(s, c.tier, look),
+    mine: c.tier,
+    championships: s.championships.map((l) => ({
+      championship: championship(l.id),
+      pool: TUNING.money.prize[l.id] ?? 0,
+      teams: teamLines(s, l.id, look),
+      drivers: driverLines(s, l.id, look),
+    })),
   };
 }
 

@@ -14,7 +14,9 @@ import { TONE, UNIT, step, u } from './tokens.ts';
 export const DATA_CSS = `
 .cr-terms > div { display: flex; justify-content: space-between; align-items: baseline; gap: var(--s4);
   padding: var(--s2) 0; border-bottom: var(--w-fine) solid var(--rule); }
-.cr-terms b { font-weight: 600; text-align: right; font-variant-numeric: tabular-nums lining-nums; }
+/* a name never wraps; a long value does, under its own right edge */
+.cr-terms > div > .cr-label { flex: none; white-space: nowrap; }
+.cr-terms b { min-width: 0; font-weight: 600; text-align: right; font-variant-numeric: tabular-nums lining-nums; }
 
 .cr-ladder { position: relative; height: ${u(5)}; background: var(--paper); box-shadow: inset 0 0 0 var(--w-fine) var(--ink); }
 .cr-ladder > .fill { position: absolute; left: ${u(1)}; top: ${u(1)}; bottom: ${u(1)}; width: calc(var(--share) - ${u(2)});
@@ -68,8 +70,10 @@ export const DATA_CSS = `
 
 .cr-table { display: flex; flex-direction: column; min-height: 0; font-variant-numeric: tabular-nums lining-nums; }
 .cr-table.scrolls { flex: 1; }
-/* a list scrolls in its own box, clipped: room inside it for its papers' cut edges and shadows, the box let out as far */
-.cr-rows { flex: 1; min-height: 0; overflow-y: auto; padding: var(--s2); margin: calc(-1 * var(--s2)); }
+/* a list scrolls in its own box, clipped: room inside it for its papers' cut edges and shadows, the box let out as
+   far at its sides and foot (never up over its heads, where a row scrolled past would show through them) */
+.cr-rows { flex: 1; min-height: 0; overflow-y: auto; padding: 0 var(--s2) var(--s2);
+  margin: 0 calc(-1 * var(--s2)) calc(-1 * var(--s2)); }
 .cr-tr { display: grid; grid-template-columns: var(--tracks); align-items: center; column-gap: var(--s4); min-height: var(--row);
   padding: 0 var(--s2); border-bottom: var(--w-fine) solid var(--rule); }
 .cr-tr.head { min-height: 0; padding-bottom: var(--s1); border-bottom: var(--w-rule) solid var(--ink);

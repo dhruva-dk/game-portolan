@@ -69,7 +69,11 @@ Each line: built on the kit from a fixture → in review → approved and live. 
       (races left, place now, its prize); the balance's course this season, by days, dotted on to the season's end, the
       floor ruled under it; the transactions; this season's money by what it was for, netted (floor, projection and the
       season's sums never shown before)
-- [ ] Standings (rows open Rival) · [ ] Sponsors (+ the slot fix) · [ ] Calendar ·
+- [ ] **Standings** _(in review)_, after MM 016: the three championships to choose among (hers first shown), its
+      plate, the season's rounds, its prize fund, the leaders, her place and its prize, her drivers' places, which
+      places go up and down and where to; its teams or its drivers, a broad table (prize at each place and where the
+      season's end would move a team, never shown before). Rows open Rival once it is built
+- [ ] Sponsors (+ the slot fix) · [ ] Calendar ·
       [ ] Mail (+ glyphs for mail kinds; a vote letter opens Admiralty)
 
 ### 3. People

@@ -6,6 +6,9 @@
 //           verdict, a stamp: anything with a ground of its own) centred in it
 //   inside  nothing past its paper's edges that its paper does not clip, and no
 //           paper past the page's; no scroller squashed under a row
+//   clipped a figure in a table cut short
+//   under   a table's scrolled rows over its heads
+//   squeezed a name in a table cut to a stub (under SLACK.stub px)
 //   inset   a sheet's first words (its head, or its body's first thing) no
 //           nearer its top edge than a sheet with a head has them
 //   node tools/layout.ts [screen ...]
@@ -26,6 +29,7 @@ const SCREENS = [
   'offer',
   'finances',
   'result',
+  'standings',
 ];
 
 /** How far apart two edges or centres may be, CSS px. */
@@ -36,6 +40,7 @@ const SLACK = {
   pixel: 0.02,
   row: 40,
   inset: 8,
+  stub: 96,
 };
 
 const asked = process.argv.slice(2).filter((a) => !a.startsWith('--'));
@@ -193,6 +198,31 @@ try {
             );
         }
       }
+
+      // clipped: a figure in a table shown whole (a name may run to an ellipsis; a number never)
+      for (const c of all(body, '.cr-tr > .num').filter(shown))
+        if (c.scrollWidth > c.clientWidth + 0.5)
+          out.push(
+            `clipped: ${name(c)} needs ${c.scrollWidth}px of ${c.clientWidth}px`
+          );
+
+      // under: a table's scrolled rows never shown over its heads
+      for (const t of all(body, '.cr-table.scrolls').filter(shown)) {
+        const head = t.querySelector(':scope > .cr-tr.head'),
+          rows = t.querySelector(':scope > .cr-rows');
+        if (!head || !rows) continue;
+        const over =
+          head.getBoundingClientRect().bottom -
+          rows.getBoundingClientRect().top;
+        if (over > slack.edge)
+          out.push(`under: ${name(rows)} runs ${n(over)}px up over its heads`);
+      }
+
+      // squeezed: a name cut to an ellipsis, but never to a stub of itself
+      const cell = '.cr-tr:not(.head) > div:not(.num)';
+      for (const c of all(body, `${cell}, ${cell} *`).filter(shown))
+        if (c.scrollWidth > c.clientWidth + 0.5 && c.clientWidth < slack.stub)
+          out.push(`squeezed: ${name(c)} cut to ${c.clientWidth}px`);
 
       // inset: a sheet's first words off its top edge, head or none
       for (const s of all(body, '.cr-sheet').filter(shown)) {

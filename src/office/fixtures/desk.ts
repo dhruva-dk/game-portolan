@@ -10,6 +10,7 @@ import { HOME } from './home.ts';
 import { PROFILE } from './profile.ts';
 import { OFFER } from './offer.ts';
 import { SCOUTING } from './scouting.ts';
+import { STANDINGS } from './standings.ts';
 import { TEAM as ROSTER } from './team.ts';
 import { HERS, TEAMS } from './teams.ts';
 
@@ -91,17 +92,7 @@ const VIEWS: Pick<
     standing: { label: 'On Target', mood: 'good' },
     place: 3,
   },
-  standings: {
-    championship: SHELL.championship,
-    round: HOME.next.round - 1,
-    rounds: HOME.next.rounds,
-    teams: HOME.standings.teams.map((t, i) => ({
-      ...t,
-      wins: i === 0 ? 2 : 0,
-      sinkings: Math.round(t.points / 3),
-    })),
-    drivers: HOME.standings.drivers,
-  },
+  standings: STANDINGS,
 };
 
 export const FIXTURE: Desk = {

@@ -18,7 +18,7 @@ import {
   terms,
   washOf,
 } from '../chartroom/data.ts';
-import { cut, label, name, portrait } from '../chartroom/figures.ts';
+import { cut, dyed, label, name, portrait } from '../chartroom/figures.ts';
 import { kitLooks } from '../chartroom/kit.ts';
 import { column, page } from '../chartroom/layout.ts';
 import { paper, plate, sheet } from '../chartroom/paper.ts';
@@ -26,7 +26,7 @@ import { brassPort } from '../chartroom/port.ts';
 import { snapped, u } from '../chartroom/tokens.ts';
 import { emblem } from '../emblem.ts';
 import type { Glyph } from '../glyphs.ts';
-import { el, ordinal, styled } from '../kit/part.ts';
+import { el, ordinal } from '../kit/part.ts';
 import { stylesheet } from '../kit/style.ts';
 import type { Office } from './office.ts';
 import type { Screen } from './screens.ts';
@@ -73,8 +73,6 @@ const CSS = `
 .hm-news > div { display: flex; flex-direction: column; gap: ${u(1)}; min-width: 0; }
 .hm-news .cr-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-.hm-team { display: flex; align-items: center; gap: var(--s2); }
-.hm-team > i { flex: none; width: ${u(3)}; height: ${u(9)}; background: var(--team); box-shadow: 0 0 0 var(--w-fine) var(--ink); }
 
 .hm-work { flex: none; height: ${u(186)}; }
 .hm-work.idle { height: auto; }
@@ -250,13 +248,7 @@ export function createHome(office: Office): Screen<HomeView> {
         {
           head: lines === 'teams' ? 'Team' : 'Driver',
           track: '1fr',
-          cell: (r) =>
-            el(
-              'span',
-              'hm-team',
-              styled(el('i'), { '--team': r.team.colours[0] }),
-              r.name
-            ),
+          cell: (r) => dyed(r.team.colours[0], r.name),
         },
         { head: 'Pts', track: u(20), num: true, cell: (r) => r.points },
       ],
