@@ -10,17 +10,16 @@
 // seasons behind them.
 
 import type { Dyed } from '../../office/papers.ts';
-import type { ProfileView, RosterRow, TeamView } from '../../office/people.ts';
+import type { RosterRow, TeamView } from '../../office/people.ts';
 import { emblem } from '../emblem.ts';
 import { button } from '../kit/button.ts';
-import { dial } from '../kit/chart.ts';
 import { band, panel } from '../kit/panel.ts';
 import { el, pressed, styled, type Kid } from '../kit/part.ts';
 import { portrait } from '../kit/portrait.ts';
-import { meter, tag, tile, tiles } from '../kit/stat.ts';
+import { meter, tag } from '../kit/stat.ts';
 import { stylesheet } from '../kit/style.ts';
 import { table } from '../kit/table.ts';
-import { acted, bitsStyle, jacketOf, lines, ranged } from './bits.ts';
+import { bitsStyle, jacketOf, lines, ranged } from './bits.ts';
 import type { Office } from './office.ts';
 import type { Screen } from './screens.ts';
 
@@ -58,8 +57,8 @@ const CSS = `
 .pp-chem > .k-meter { align-self: stretch; }
 
 .s-team { display: grid; grid-template-columns: 320px 1fr 340px; gap: 10px; padding: 12px 18px; }
-.s-team > div, .s-profile > div { display: flex; flex-direction: column; gap: 10px; min-height: 0; min-width: 0; }
-.s-team .grow, .s-profile .grow { flex: 1; }
+.s-team > div { display: flex; flex-direction: column; gap: 10px; min-height: 0; min-width: 0; }
+.s-team .grow { flex: 1; }
 .pp-flat { flex: none; }
 .pp-crest { flex: none; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 14px 8px 4px; }
 .pp-crest > b { font: 700 26px/1.1 var(--serif); letter-spacing: .03em; text-align: center; }
@@ -77,16 +76,7 @@ const CSS = `
 .pp-stops { flex: none; display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; }
 .pp-stops > div { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 2px; background: var(--dark); }
 .pp-stops span { font-size: 13px; font-style: italic; color: var(--faint); }
-
-.s-profile { display: grid; grid-template-columns: 290px 1fr 380px; gap: 10px; padding: 12px 18px; }
-.s-profile .k-body { gap: 8px; }
-.pp-person .pp-terms { flex: 0 1 auto; min-height: 54px; overflow-y: auto; }
-.pp-acts { flex: none; display: flex; flex-direction: column; gap: 6px; }
 .pp-big { text-align: center; font: italic 500 30px/1 var(--serif); }
-.pp-traits { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
-.pp-traits > div { flex: none; padding: 8px; text-align: center; font-weight: 700; background: var(--dark);
-  box-shadow: inset 0 0 0 1.2px var(--ink); }
-.pp-traits > div.want { font-weight: 500; font-style: italic; box-shadow: inset 0 0 0 1px var(--rule); }
 `;
 
 /** `made`, of the classes `cls` too (a panel's place on its screen). */
@@ -443,163 +433,6 @@ export function createTeam(office: Office): Screen<Dyed<TeamView>> {
               ),
             ]),
             'grow pp-pit'
-          )
-        )
-      );
-    },
-  };
-}
-
-/** A person's profile. */
-export function createProfile(office: Office): Screen<Dyed<ProfileView>> {
-  stylesheet(CSS);
-  bitsStyle();
-  const root = el('div', 's-profile');
-  return {
-    el: root,
-    show({ view: v, dyes }) {
-      const { id } = v;
-      root.replaceChildren(
-        of(
-          panel(
-            v.post === v.roleName ? v.roleName : `${v.roleName} · ${v.post}`,
-            [
-              el(
-                'div',
-                'pp-id',
-                portrait(jacketOf(v.face, dyes), 92),
-                el('i', '', `Age ${v.age} · ${v.colony}`),
-                el('div', 'd-name', v.name),
-                ranged(v.stars, 20),
-                el('i', '', v.team)
-              ),
-              band('Contract Details'),
-              v.contract
-                ? terms(v.contract.terms.map((l) => [l.label, l.amount]))
-                : el('div', 'pp-note', 'Under no contract.'),
-              v.talk !== null && el('div', 'pp-note', v.talk),
-              !v.you &&
-                el(
-                  'div',
-                  'pp-acts',
-                  !v.mine &&
-                    acted(v.scout.label || 'Scout', v.scout, () => {
-                      if (v.scout.scout !== null)
-                        office.ask({
-                          kind: 'send',
-                          command: {
-                            kind: 'StartScout',
-                            scout: v.scout.scout,
-                            person: id,
-                          },
-                        });
-                    }),
-                  acted(
-                    v.mine ? 'Renew Contract' : 'Offer Contract',
-                    v.mine ? v.renew : v.offer,
-                    () => office.ask({ kind: 'person', id, screen: 'offer' }),
-                    'on'
-                  ),
-                  v.mine &&
-                    acted(
-                      `Dismiss (${v.dismiss.owed.text})`,
-                      v.dismiss,
-                      () =>
-                        office.ask({
-                          kind: 'send',
-                          command: { kind: 'Dismiss', person: id },
-                        }),
-                      'danger'
-                    )
-                ),
-              v.morale && band('Morale'),
-              v.morale && dial(v.morale.value / 100, 'Low', 'High', 120),
-            ]
-          ),
-          'grow pp-person'
-        ),
-        el(
-          'div',
-          '',
-          of(
-            panel(`${v.roleName} Stats`, [
-              v.stats.length > 0
-                ? tiles(v.stats.map((s) => tile(s.label, Math.round(s.value))))
-                : el('div', 'pp-note', v.statsNote),
-              terms([
-                ['Potential', ranged(v.potential)],
-                ...v.specifics.map((s): readonly [string, Kid] => [
-                  s.label,
-                  s.figure.text,
-                ]),
-              ]),
-            ]),
-            'pp-flat'
-          ),
-          of(
-            panel(`${v.roleName} Traits`, [
-              el(
-                'div',
-                'pp-traits',
-                v.traits.length === 0 &&
-                  (v.wants?.length ?? 0) === 0 &&
-                  el(
-                    'span',
-                    'pp-note',
-                    v.known ? 'None known.' : 'Scout to read.'
-                  ),
-                ...v.traits.map((t) => el('div', '', t)),
-                ...(v.wants ?? []).map((w) =>
-                  el('div', 'want', `Wants: ${w.label}`)
-                )
-              ),
-            ]),
-            'grow'
-          )
-        ),
-        el(
-          'div',
-          '',
-          of(
-            panel('Marketability', [
-              el('div', 'pp-note', 'Marketability is what draws sponsors.'),
-              el('div', 'pp-big', v.marketability.text),
-              meter(v.marketability.value / 100, 'go'),
-            ]),
-            'pp-flat'
-          ),
-          of(
-            panel('Career History', [
-              v.history.length === 0
-                ? el('div', 'pp-note', 'No seasons behind them yet.')
-                : table(
-                    [
-                      { label: 'Season', width: '50px', cell: (h) => h.season },
-                      { label: 'Team', width: '1fr', cell: (h) => h.team },
-                      {
-                        label: 'Races',
-                        width: '44px',
-                        num: true,
-                        cell: (h) => h.races,
-                      },
-                      {
-                        label: 'Best',
-                        width: '40px',
-                        num: true,
-                        cell: (h) => h.best,
-                      },
-                      {
-                        label: 'Pts',
-                        width: '40px',
-                        num: true,
-                        cell: (h) => h.points,
-                      },
-                    ],
-                    v.history,
-                    { height: 34, keep: 'history' }
-                  ),
-            ]),
-            'grow'
           )
         )
       );

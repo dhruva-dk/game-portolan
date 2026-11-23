@@ -6,6 +6,7 @@ import { TEAM, TEAMS as GRID } from '../../race.ts';
 import type { Desk, Views } from '../office.ts';
 import type { ShellView } from '../shell.ts';
 import { HOME } from './home.ts';
+import { PROFILE } from './profile.ts';
 import { HERS, TEAMS } from './teams.ts';
 
 /** A race's points by place, as the fixture's result shows them. */
@@ -34,6 +35,7 @@ const VIEWS: Pick<
     single: { seed: 'Brindle', ships: GRID * TEAM },
   },
   home: HOME,
+  profile: { view: PROFILE, dyes: TEAMS.map((t) => t.colours) },
   found: {
     team: HERS.name,
     given: 'Ada',

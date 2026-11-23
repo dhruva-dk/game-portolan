@@ -94,6 +94,8 @@ export const PAPER_CSS = `
 .cr { --cut-mask: ${CUT.mask}; --cut-mask-bold: ${CUT.maskBold}; --cut-ink: ${CUT.ink}; --cut-ink-on: ${CUT.inkOn};
   --cut-ink-bold: ${CUT.inkBold}; --cut-formal: ${CUT.formal}; --cut-shadow: ${CUT.shadow}; }
 .cr-paper { position: relative; isolation: isolate; --edge: var(--cut-ink); --edge-mask: var(--cut-mask); }
+/* a paper with a breakdown or a menu open over it lies over the papers round it */
+.cr-paper:has(.cr-pop, .cr-menu) { z-index: 30; }
 .cr-paper::before, .cr-paper::after { content: ''; position: absolute; inset: ${u(-TILE.in / 2)}; z-index: -1;
   pointer-events: none; }
 .cr-paper::before { border-image: var(--cut-shadow) ${laid(TILE.slice, ' fill')}; transition: opacity var(--press); }
@@ -113,10 +115,13 @@ export const PAPER_CSS = `
 
 .cr-sheet { display: flex; flex-direction: column; min-width: 0; min-height: 0; padding: var(--s1) var(--s2) var(--s4); }
 .cr-sheet.formal { padding: var(--s5) var(--s6) var(--s5); }
-.cr-head { flex: none; position: relative; padding: var(--s3) var(--s4) var(--s2); text-align: center;
-  font: 700 var(--t-head)/1.1 var(--face); letter-spacing: .12em; text-transform: uppercase; white-space: nowrap; }
-.cr-head > .cr-aside { position: absolute; right: var(--s4); top: 50%; translate: 0 -40%; font: italic 500 var(--t-label) var(--face);
-  letter-spacing: 0; text-transform: none; color: var(--ink-2); }
+/* the title centred; an aside in the room at its right, never over it */
+.cr-head { flex: none; display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: baseline; column-gap: var(--s2);
+  padding: var(--s3) var(--s4) var(--s2); font: 700 var(--t-head)/1.1 var(--face); letter-spacing: .12em;
+  text-transform: uppercase; white-space: nowrap; }
+.cr-head > :first-child { grid-column: 2; }
+.cr-head > .cr-aside { grid-column: 3; justify-self: end; min-width: 0; overflow: hidden; text-overflow: ellipsis;
+  font: italic 500 var(--t-label) var(--face); letter-spacing: 0; text-transform: none; color: var(--ink-2); }
 .cr-body { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: var(--s3); padding: 0 var(--s4); }
 .cr-plate { background: var(--plate); color: var(--plate-ink); padding: var(--s2) var(--s4);
   font: 700 var(--t-title)/1 var(--face); letter-spacing: .14em; text-transform: uppercase; }
@@ -167,7 +172,7 @@ export function sheet(
     el(
       'header',
       'cr-head',
-      title,
+      el('span', '', title),
       how.aside ? el('span', 'cr-aside', how.aside) : null
     );
   return paper(

@@ -64,7 +64,7 @@ const washed = (value: number) => {
  * A stat 0…20 as a ruled track: its wash as far as its value, a rule at its
  * ceiling (the most it may come to), ticks at each fifth.
  */
-export function ladder(value: number, ceiling: number | null) {
+function ladder(value: number, ceiling: number | null) {
   const at = (v: number, cls: string) =>
     styled(el('i', cls), { '--share': share(v / TOP) });
   return el(
@@ -107,7 +107,7 @@ export const busy = (of: number) =>
   el('div', 'cr-meter cr-busy', styled(el('i'), { '--share': share(of) }));
 
 /** A column of a table: its head, its track (a grid track: a token, u(), fr or auto), whether it holds figures, its cell. */
-export interface Column<R> {
+interface Column<R> {
   head: string;
   track: string;
   num?: boolean;

@@ -239,11 +239,30 @@ function racePanel(s: CareerState, c: Team): HomeView['race'] {
   };
 }
 
-function shipHalf(s: CareerState, c: Team, ship: Ship): ShipHalf {
-  const hands = c.staff.ships[ship] ?? { driver: null, mechanic: null },
-    bond = c.bonds[ship] ?? 0,
-    level = bondLevel(bond),
+/** A ship's bond, its mechanic's and driver's, as a figure: its level, the races to the next, the levels. */
+export function bondFigure(bond: number): Figure {
+  const level = bondLevel(bond),
     next = TUNING.bond.levels[level] ?? null;
+  return fig(
+    bond,
+    `Bond ${level} of ${TUNING.bond.levels.length}`,
+    next === null
+      ? rival('the', 'strongest bond')
+      : rival('next at', `${next} races`),
+    {
+      title: 'Bond',
+      lines: [
+        line('Races together', bond),
+        ...TUNING.bond.levels.map((at, i) =>
+          line(`Level ${i + 1} at`, `${at} races`)
+        ),
+      ],
+    }
+  );
+}
+
+function shipHalf(s: CareerState, c: Team, ship: Ship): ShipHalf {
+  const hands = c.staff.ships[ship] ?? { driver: null, mechanic: null };
   const parts = PARTS.map((type) => {
     const p = c.parts.find(
       (x) => x.ship === ship && x.type === type && !x.forNext
@@ -257,22 +276,7 @@ function shipHalf(s: CareerState, c: Team, ship: Ship): ShipHalf {
     you: ship === 0 && c.player,
     parts,
     mechanic: named(s, hands.mechanic),
-    bond: fig(
-      bond,
-      `Bond ${level} of ${TUNING.bond.levels.length}`,
-      next === null
-        ? rival('the', 'strongest bond')
-        : rival('next at', `${next} races`),
-      {
-        title: 'Bond',
-        lines: [
-          line('Races together', bond),
-          ...TUNING.bond.levels.map((at, i) =>
-            line(`Level ${i + 1} at`, `${at} races`)
-          ),
-        ],
-      }
-    ),
+    bond: bondFigure(c.bonds[ship] ?? 0),
     driver: cap && {
       id: cap.id,
       face: faceOf(s, cap),

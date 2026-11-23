@@ -63,6 +63,14 @@ export interface StatLine {
   arrow: -1 | 0 | 1;
   text: string;
 }
+/** A trait as the profile reads it: what it does, when it holds, and whether it helps her team (1), hinders it (−1)
+ *  or both (0). */
+export interface TraitLine {
+  name: string;
+  effect: string;
+  lasts: string;
+  sense: -1 | 0 | 1;
+}
 /** A season of a person's history. */
 interface HistoryLine {
   season: string;
@@ -92,7 +100,9 @@ export interface ProfileView {
   post: string;
   stars: Range;
   potential: Range;
-  traits: readonly string[];
+  traits: readonly TraitLine[];
+  /** A driver's or mechanic's of her own ships: the bond with whom they sail beside, and its share of the strongest. */
+  bond: { with: string; figure: Figure; share: number } | null;
   morale: Figure | null;
   marketability: Figure;
   wants: readonly { want: Want; label: string }[] | null; // null: not yet scouted

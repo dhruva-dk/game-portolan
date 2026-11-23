@@ -12,7 +12,7 @@ import { mark } from './figures.ts';
 import { TONE, UNIT, u } from './tokens.ts';
 
 /** The port's size, units; how far its brass and ring run in from its edge to the sea. */
-const PORT ={ across: 140, rim: 13 } as const;
+const PORT = { across: 140, rim: 13 } as const;
 
 export const PORT_CSS = `
 .cr-port { position: relative; flex: none; width: ${u(PORT.across)}; height: ${u(PORT.across)}; }

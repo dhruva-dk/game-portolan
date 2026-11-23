@@ -23,7 +23,7 @@ import {
 } from './staff.ts';
 import { age } from './stars.ts';
 import type { CareerState, Team } from './state.ts';
-import { trait } from './traits.ts';
+import { traitLine } from './views-traits.ts';
 import {
   ROLE_NAMES,
   WANT_NAMES,
@@ -37,6 +37,7 @@ import {
 } from './views-person.ts';
 import {
   TIERS,
+  bondFigure,
   myTeam,
   faceOf,
   fig,
@@ -204,6 +205,26 @@ function specifics(g: Person): { label: string; figure: Figure }[] {
   }
 }
 
+/**
+ * The bond of a ship's driver or mechanic of team `c` with whom they sail beside; null if they hold no ship's seat
+ * or sail beside no one yet.
+ */
+function bondOf(s: CareerState, c: Team, id: number): ProfileView['bond'] {
+  const k = c.staff.ships.findIndex(
+    (h) => h.driver === id || h.mechanic === id
+  );
+  const hands = c.staff.ships[k],
+    other = hands?.driver === id ? hands.mechanic : hands?.driver;
+  if (!hands || other === null || other === undefined) return null;
+  const bond = c.bonds[k] ?? 0,
+    strongest = TUNING.bond.levels[TUNING.bond.levels.length - 1] ?? 1;
+  return {
+    with: nameOf(s.people[other]),
+    figure: bondFigure(bond),
+    share: Math.min(1, bond / strongest),
+  };
+}
+
 /** `profile` of a person (null: the default). */
 export function profileView(
   s: CareerState,
@@ -299,11 +320,8 @@ export function profileView(
     post: postOf(s, g),
     stars: v.stars,
     potential: v.potential,
-    traits: v.known
-      ? g.traits.map((t) => trait(t).name)
-      : v.trait
-        ? [trait(v.trait).name]
-        : [],
+    traits: (v.known ? g.traits : v.trait ? [v.trait] : []).map(traitLine),
+    bond: mine ? bondOf(s, c, id) : null,
     morale:
       v.known && !you
         ? fig(

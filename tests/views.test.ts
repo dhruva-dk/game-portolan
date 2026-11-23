@@ -26,6 +26,9 @@ import { seen } from '../src/career/views-person.ts';
 import { scoutingView } from '../src/career/views-scouting.ts';
 import { offerView } from '../src/career/views-offer.ts';
 import { profileView } from '../src/career/views-profile.ts';
+import { traitLine } from '../src/career/views-traits.ts';
+import { TRAITS } from '../src/career/traits.ts';
+import { nameOf } from '../src/career/views.ts';
 
 /** Every figure of a view carries what it is set against and what it is made of. */
 function figures(v: unknown, out: Figure[] = []): Figure[] {
@@ -304,7 +307,13 @@ test('profile: a rival unknown in ranges, scouted then known; one of her own may
   assert.equal(q.known, true);
   assert.equal(q.wants?.length, 3);
   assert.ok(q.stats.length > 0);
+  assert.equal(p.bond, null);
   const own = profileView(s, c.staff.ships[1].driver);
+  const beside = c.staff.ships[1].mechanic;
+  if (beside !== null) {
+    assert.equal(own.bond?.with, nameOf(s.people[beside]));
+    assert.equal(profileView(s, beside).bond?.with, own.name);
+  }
   assert.equal(own.post, 'Ship 2');
   assert.equal(own.mine, true);
   assert.equal(own.dismiss.ok, true);
@@ -314,6 +323,25 @@ test('profile: a rival unknown in ranges, scouted then known; one of her own may
   assert.equal(me.you, true);
   assert.equal(me.dismiss.ok, false);
   assert.equal(me.renew.ok, false);
+});
+
+test('traits: each says what it does in words, when it holds, and whether it helps or hinders its team', () => {
+  for (const t of TRAITS) {
+    const l = traitLine(t.id);
+    assert.ok(l.effect.length > 0, t.id);
+    assert.equal(l.lasts, t.lasts ?? 'Always', t.id);
+  }
+  const line = (name: string) =>
+    traitLine(TRAITS.find((t) => t.name === name)!.id);
+  assert.deepEqual(line('Storm Specialist'), {
+    name: 'Storm Specialist',
+    effect: '+2 Stormcraft',
+    lasts: 'When the storm runs slow',
+    sense: 1,
+  });
+  assert.equal(line('Fair-weather Sailor').sense, -1);
+  assert.equal(line('Old Salt').lasts, 'From age 32');
+  assert.equal(line('Sunny').lasts, 'Always');
 });
 
 test('offer: drawn at the ask, sent and locked while waiting, then answered', () => {

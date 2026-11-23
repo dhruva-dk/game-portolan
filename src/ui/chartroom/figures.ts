@@ -37,8 +37,17 @@ export function mark(w: number, h: number, body: string, cls = '') {
   return s;
 }
 
+/** A woodcut drawn `w` × `h` in its own units, shown `size` units high. */
+function sized(w: number, h: number, body: string, size: number, cls = '') {
+  const s = mark(w, h, body, cls);
+  s.style.width = u((size * w) / h);
+  s.style.height = u(size);
+  return s;
+}
+
 /** A label: italic, in the second ink. */
-export const label = (text: Kid) => el('span', 'cr-label', text);
+export const label = (text: Kid, cls = '') =>
+  el('span', `cr-label ${cls}`.trim(), text);
 
 /** A name: roman, a little heavier than the text round it. */
 export const name = (text: Kid) => el('span', 'cr-name', text);
@@ -81,29 +90,29 @@ export function stars(known: number, possible = known, size = 11) {
             : empty;
     body += `<g transform="translate(${i * 21} 0)">${star}</g>`;
   }
-  const s = mark(104, 20, body, 'cr-stars');
-  s.style.width = u((size * 104) / 20);
-  s.style.height = u(size);
-  return s;
+  return sized(104, 20, body, size, 'cr-stars');
 }
 
-/** A trait's rosette (marks.ts badge): a plus on it if the trait helps, a minus if it hinders. */
-export const traitBadge = (good: boolean) =>
-  mark(
+/** A trait's rosette (marks.ts badge), 22 units high: a plus on it if the trait helps (`sense` 1), a minus if it
+ *  hinders (−1), both if it does each. */
+export const traitBadge = (sense: number) =>
+  sized(
     28,
     34,
     badge(
       14,
       13,
-      figure(14, 13.5, good ? '+' : '−', 14, {
-        fill: good ? TONE.good : TONE.harm,
+      figure(14, 13.5, sense > 0 ? '+' : sense < 0 ? '−' : '±', 14, {
+        fill: sense > 0 ? TONE.good : sense < 0 ? TONE.harm : TONE.ink,
         weight: 700,
       })
-    )
+    ),
+    22
   );
 
-/** A place in a race, of how many: on the podium, its figure on a gilt disc (the laurel is an honour's). */
-export function place(n: number, of: number) {
+/** A place in a race, of how many, `size` units high: on the podium, its figure on a gilt disc (the laurel is an
+ *  honour's). */
+export function place(n: number, of: number, size = 30) {
   const podium = n <= 3;
   const disc = podium
     ? `<circle cx="36" cy="36" r="27" fill="${TONE.gilt}" stroke="${TONE.won}" stroke-width="3"/>` +
@@ -112,11 +121,12 @@ export function place(n: number, of: number) {
   return el(
     'div',
     'cr-place',
-    mark(
+    sized(
       72,
       72,
       disc +
-        figure(36, 36, n, n >= 10 ? 26 : 30, { weight: podium ? 600 : 400 })
+        figure(36, 36, n, n >= 10 ? 26 : 30, { weight: podium ? 600 : 400 }),
+      size
     ),
     label(`of ${of}`)
   );

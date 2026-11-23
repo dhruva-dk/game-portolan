@@ -13,6 +13,7 @@ import {
   type Views,
 } from '../../office/office.ts';
 import { createJobs, createPlayer } from './career.ts';
+import { createChartroom } from './chartroom.ts';
 import { createFound } from './found.ts';
 import { createHome } from './home.ts';
 import { createKit } from './kit.ts';
@@ -20,19 +21,15 @@ import { createOffer, createScouting } from './market.ts';
 import { createMenu } from './menu.ts';
 import type { Office } from './office.ts';
 import { createFinances, createMail } from './papers.ts';
-import {
-  createDrivers,
-  createProfile,
-  createStaff,
-  createTeam,
-} from './people.ts';
+import { createDrivers, createStaff, createTeam } from './people.ts';
+import { createProfile } from './profile.ts';
 import { createPlan, createResult } from './raceday.ts';
 import { createCalendar, createSponsors } from './season.ts';
 import { createStandings } from './standings.ts';
 import { createHq, createShip } from './yard.ts';
 
-/** A screen's name: a tab's, a viewed screen's, or the kit's sheet. */
-export type Name = Tab | Viewed | 'kit';
+/** A screen's name: a tab's, a viewed screen's, or a kit's sheet (the old kit's, the chartroom's). */
+export type Name = Tab | Viewed | 'kit' | 'chartroom';
 /** Every name a screen may have (the debug page opens the office at one: ?screen=). */
 export const NAMES: readonly Name[] = [
   ...TABS,
@@ -44,6 +41,7 @@ export const NAMES: readonly Name[] = [
   'offer',
   'jobs',
   'kit',
+  'chartroom',
 ];
 
 /** A screen: its element, laid over the page's body, and `show`, which draws a view. */
@@ -80,16 +78,20 @@ const viewed = <K extends Viewed>(
   },
 });
 
-export const SCREENS: Readonly<Partial<Record<Name, Entry>>> = {
-  kit: {
-    title: 'Kit',
-    tab: null,
-    bare: false,
-    make() {
-      const s = createKit();
-      return { el: s.el, draw: () => s.show(null) };
-    },
+/** A sheet of a kit's pieces, drawn from no view. */
+const sheetOf = (title: string, create: () => Screen<null>): Entry => ({
+  title,
+  tab: null,
+  bare: false,
+  make() {
+    const s = create();
+    return { el: s.el, draw: () => s.show(null) };
   },
+});
+
+export const SCREENS: Readonly<Partial<Record<Name, Entry>>> = {
+  kit: sheetOf('Kit', createKit),
+  chartroom: sheetOf('Chartroom', createChartroom),
   home: viewed('home', createHome, { title: 'Home', tab: 'home' }),
   found: viewed('found', createFound, {
     title: 'Create a New Team',

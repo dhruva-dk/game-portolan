@@ -56,7 +56,7 @@ export const CONTROLS_CSS = `
 `;
 
 /** What a button does: act (blue), harm (rubric), or plain paper. */
-type Kind ='act' | 'harm' | 'plain';
+type Kind = 'act' | 'harm' | 'plain';
 
 /**
  * A button: a slip washed in what it does; a tap calls `act`. `off`, it is

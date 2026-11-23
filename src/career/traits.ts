@@ -37,10 +37,15 @@ interface Trait {
   name: string;
   roles: readonly Role[];
   when: (s: Setting) => boolean;
+  /** When it holds, in words, if not always. */
+  lasts?: string;
   mod: Partial<Modifier>;
 }
 
 const ALWAYS = () => true;
+/** The ages Old Salt holds from and Prodigy under. */
+const OLD = 32,
+  YOUNG = 21;
 const SAILORS: readonly Role[] = ['driver'];
 const ANY: readonly Role[] = [
   'driver',
@@ -67,6 +72,7 @@ export const TRAITS: readonly Trait[] = [
     name: 'Storm Specialist',
     roles: SAILORS,
     when: (s) => s.pace < 1,
+    lasts: 'When the storm runs slow',
     mod: { stats: { stormcraft: 2 } },
   },
   {
@@ -123,6 +129,7 @@ export const TRAITS: readonly Trait[] = [
     name: 'Grudge-holder',
     roles: SAILORS,
     when: (s) => s.grudge !== null && s.grid.includes(s.grudge),
+    lasts: 'With the team that last sank them on the grid',
     mod: { stats: { nerve: 2 } },
   },
   {
@@ -130,6 +137,7 @@ export const TRAITS: readonly Trait[] = [
     name: 'Fast Starter',
     roles: SAILORS,
     when: (s) => s.round === 0,
+    lasts: "The season's first race",
     mod: { stats: { helm: 1, nerve: 1 } },
   },
   {
@@ -137,6 +145,7 @@ export const TRAITS: readonly Trait[] = [
     name: 'Closer',
     roles: SAILORS,
     when: (s) => s.round >= TUNING.calendar.rounds - 3,
+    lasts: "The season's last three races",
     mod: { stats: { nerve: 1, consistency: 1 } },
   },
   {
@@ -144,6 +153,7 @@ export const TRAITS: readonly Trait[] = [
     name: 'Fair-weather Sailor',
     roles: SAILORS,
     when: (s) => s.pace < 1,
+    lasts: 'When the storm runs slow',
     mod: { stats: { stormcraft: -2 } },
   },
   {
@@ -151,6 +161,7 @@ export const TRAITS: readonly Trait[] = [
     name: 'Traditionalist',
     roles: SAILORS,
     when: (s) => s.rules.banned.length === 0,
+    lasts: 'While no gun is banned',
     mod: { stats: { gunnery: 1 } },
   },
   {
@@ -158,6 +169,7 @@ export const TRAITS: readonly Trait[] = [
     name: "Engineer's Eye",
     roles: SAILORS,
     when: (s) => s.rules.spec.length === 0,
+    lasts: 'While no part is spec',
     mod: { stats: { feedback: 2 } },
   },
   {
@@ -165,6 +177,7 @@ export const TRAITS: readonly Trait[] = [
     name: 'Playing for a Contract',
     roles: HANDS,
     when: (s) => s.daysLeft !== null && s.daysLeft <= TUNING.morale.silenceDays,
+    lasts: `In the contract's last ${TUNING.morale.silenceDays} days`,
     mod: { all: 1 },
   },
   {
@@ -172,20 +185,23 @@ export const TRAITS: readonly Trait[] = [
     name: 'Complacent',
     roles: HANDS,
     when: (s) => s.daysLeft !== null && s.daysLeft > SEASON_DAYS,
+    lasts: 'With over a season left on the contract',
     mod: { all: -1 },
   },
   {
     id: 'veteran',
     name: 'Old Salt',
     roles: SAILORS,
-    when: (s) => s.age >= 32,
+    when: (s) => s.age >= OLD,
+    lasts: `From age ${OLD}`,
     mod: { stats: { consistency: 1, seamanship: 1 } },
   },
   {
     id: 'prodigy',
     name: 'Prodigy',
     roles: HANDS,
-    when: (s) => s.age < 21,
+    when: (s) => s.age < YOUNG,
+    lasts: `Under age ${YOUNG}`,
     mod: { marketability: 10 },
   },
   {
@@ -214,6 +230,7 @@ export const TRAITS: readonly Trait[] = [
     name: 'Big Stage',
     roles: HANDS,
     when: (s) => s.tier === 0,
+    lasts: 'In the first tier',
     mod: { all: 1 },
   },
   {
@@ -221,6 +238,7 @@ export const TRAITS: readonly Trait[] = [
     name: 'Big Fish',
     roles: HANDS,
     when: (s) => s.tier === 2,
+    lasts: 'In the third tier',
     mod: { all: 1 },
   },
   { id: 'sunny', name: 'Sunny', roles: ANY, when: ALWAYS, mod: { morale: 1 } },
@@ -278,6 +296,7 @@ export const TRAITS: readonly Trait[] = [
     name: 'Night Owl',
     roles: SAILORS,
     when: (s) => s.pace > 1,
+    lasts: 'When the storm runs fast',
     mod: { stats: { lookout: 2 } },
   },
 ];
