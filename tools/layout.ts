@@ -6,6 +6,8 @@
 //           verdict, a stamp: anything with a ground of its own) centred in it
 //   inside  nothing past its paper's edges that its paper does not clip, and no
 //           paper past the page's; no scroller squashed under a row
+//   inset   a sheet's first words (its head, or its body's first thing) no
+//           nearer its top edge than a sheet with a head has them
 //   node tools/layout.ts [screen ...]
 // Prints each fault; fails (exit 1) on any.
 
@@ -27,7 +29,14 @@ const SCREENS = [
 ];
 
 /** How far apart two edges or centres may be, CSS px. */
-const SLACK = { edge: 0.5, centre: 0.75, inside: 1, pixel: 0.02, row: 40 };
+const SLACK = {
+  edge: 0.5,
+  centre: 0.75,
+  inside: 1,
+  pixel: 0.02,
+  row: 40,
+  inset: 8,
+};
 
 const asked = process.argv.slice(2).filter((a) => !a.startsWith('--'));
 const { browser, url, close } = await launch();
@@ -183,6 +192,20 @@ try {
               `inside: ${name(e)} scrolls in ${e.clientHeight}px, under a row`
             );
         }
+      }
+
+      // inset: a sheet's first words off its top edge, head or none
+      for (const s of all(body, '.cr-sheet').filter(shown)) {
+        const first = s.querySelector(
+          ':scope > .cr-head > span, :scope > .cr-body > *'
+        );
+        if (!first || !shown(first)) continue;
+        const gap =
+          first.getBoundingClientRect().top - s.getBoundingClientRect().top;
+        if (gap < slack.inset)
+          out.push(
+            `inset: ${name(first)} ${n(gap)}px under the top of its sheet`
+          );
       }
       return [...new Set(out)];
     }, SLACK);

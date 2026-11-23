@@ -11,7 +11,7 @@
 import type { FoundView, Founding } from '../../office/loop.ts';
 import { button, field, stepper } from '../chartroom/controls.ts';
 import { terms } from '../chartroom/data.ts';
-import { label } from '../chartroom/figures.ts';
+import { label, stars } from '../chartroom/figures.ts';
 import { kitLooks } from '../chartroom/kit.ts';
 import { column, page } from '../chartroom/layout.ts';
 import { paper, plate, sheet } from '../chartroom/paper.ts';
@@ -179,7 +179,10 @@ export function createFound(office: Office): Screen<FoundView> {
           terms([
             ['The place of', v.replacing.team],
             ['Its chairman', v.replacing.chairman],
-            ['Its staff', `${v.replacing.staff.toFixed(1)} stars on average`],
+            [
+              'Its staff, on average',
+              stars(Math.round(v.replacing.staff * 2) / 2),
+            ],
           ]),
         ])
       ),

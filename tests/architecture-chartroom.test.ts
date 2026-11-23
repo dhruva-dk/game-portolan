@@ -2,8 +2,9 @@
 // built on it, is styled by the tokens alone. Outside its token module
 // (src/ui/chartroom/tokens.ts), such a file takes no colour from ink.ts (TONE carries them), writes no CSS
 // length but in drawn units, names no colour by its CSS name, sets no font's
-// size but by the type scale, and reads no custom property the tokens do not
-// define or the file does not set itself.
+// size but by the type scale, reads no custom property the tokens do not
+// define or the file does not set itself, and writes no star rating as a
+// number (stars() draws it).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { TOKENS } from '../src/ui/chartroom/tokens.ts';
@@ -43,6 +44,7 @@ const BANNED: readonly (readonly [RegExp, string])[] = [
     'a colour by its CSS name (a token)',
   ],
   [/\bfont(-size)?\s*:[^;{}`]*\$\{/, "a font's size not on the type scale"],
+  [/\$\{[^}]*\}\s*(★|stars?)\b/i, 'a star rating as a number (stars())'],
 ];
 
 /**
@@ -106,6 +108,7 @@ test('tokens: the rule finds what it bans', () => {
     '.x { color: white; }',
     '.x { font: 700 ${u(9)} var(--face); }',
     '.x { color: var(--crimson); }',
+    "['Its staff', `${v.staff.toFixed(1)} stars on average`],",
   ];
   for (const text of bad)
     assert.equal(offences(text).length, 1, `not found in: ${text}`);

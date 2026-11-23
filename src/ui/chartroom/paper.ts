@@ -115,6 +115,8 @@ export const PAPER_CSS = `
 
 .cr-sheet { display: flex; flex-direction: column; min-width: 0; min-height: 0; padding: var(--s1) var(--s2) var(--s4); }
 .cr-sheet.formal { padding: var(--s5) var(--s6) var(--s5); }
+/* a sheet with no head: as much paper over its body as under it (a head brings its own) */
+.cr-sheet.headless { padding-top: var(--s4); }
 /* the title centred; an aside in the room at its right, never over it */
 .cr-head { flex: none; display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: baseline; column-gap: var(--s2);
   padding: var(--s3) var(--s4) var(--s2); font: 700 var(--t-head)/1.1 var(--face); letter-spacing: .12em;
@@ -178,7 +180,7 @@ export function sheet(
   return paper(
     el(
       'section',
-      `cr-sheet${how.formal ? ' formal' : ''} ${how.cls ?? ''}`.trim(),
+      `cr-sheet${how.formal ? ' formal' : ''}${head ? '' : ' headless'} ${how.cls ?? ''}`.trim(),
       head,
       el('div', 'cr-body', ...body)
     ),
