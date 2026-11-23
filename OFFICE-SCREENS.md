@@ -42,6 +42,29 @@ business logic given a screen, and the old kit deleted. The battle HUD stays as 
 | Season's end (prize money, promotion, relegation, retirements, the new intake) only as letters | `career/season.ts`, `round.ts`                                          | Season review (new) |
 | Dead builders: `views.ts` `homeView`, `racePanel`, the `tier` blocker                          | `career/views.ts`, `desk.ts:73`                                         | Reuse or delete     |
 
+## Links: one game, not a stack of spreadsheets (2026-11-23)
+
+As in MM, every named thing on every screen opens its own page: a driver their profile, a team its page, a planet
+its round. So a view never hands a screen a bare name: each name comes with what it names (its ref), and a screen
+draws every ref as a link (one kit piece). A name with no ref is a gap, like a command no control sends.
+
+| Thing                                     | Opens                             | Ref in the views now                       | Needs                                                                    |
+| ----------------------------------------- | --------------------------------- | ------------------------------------------ | ------------------------------------------------------------------------ |
+| A person (driver, staff, scout, chairman) | Profile (built)                   | roster, scouting, offer views only         | `person` id on standings' and result's lines, Home's drivers, news, mail |
+| A team                                    | Rival: its manager and team (new) | none: `Team` is a name, emblem and colours | `id` on `Team` (office.ts), everywhere a team is named                   |
+| A championship                            | Standings at that championship    | none                                       | its tier wherever it is named (the bar, Home, mail)                      |
+| A planet, a round                         | Calendar at that round            | a name                                     | its round on Home's next race, results, the bar                          |
+| A part, a building                        | Ship, HQ at it                    | in the yard only                           | ids on Home's work under way, mail links                                 |
+| A sponsor, a supplier                     | Sponsors, Suppliers at it         | none                                       | ids on Finances' ledger lines, mail                                      |
+| A rule, a proposal                        | Admiralty at it                   | none                                       | ids on mail's vote letters, the bar's chip                               |
+
+What the career does not keep, that a coherent office needs:
+
+- **Last round's standings**: places gained and lost (▲▼) on Standings and Home.
+- **Each round's results, the season through**: a team's and a driver's form (Rival, Profile).
+- **The chairman's target place for her team**, on Standings beside where she stands (Home has it; Standings
+  should).
+
 ## The screens: 24 and the shell
 
 Each line: built on the kit from a fixture → in review → approved and live. Additions are the gaps above.
