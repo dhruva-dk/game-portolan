@@ -258,6 +258,8 @@ async function play(s: Stage): Promise<Played> {
   /** A career's race on the page: its card as dealt, and, once she only watches, whether it is hurried to its end. */
   let carded: RaceCard | null = null,
     hurried = false;
+  /** Planets' charts, surveyed in a worker: the seed panel's as she types, and the office's of this page's planet. */
+  const survey = surveyor();
   // the page's one race: a career's by its card, else the seed's own (a seed is a race; the next is a new page)
   const deal = () => {
     game.start(carded ? raceOf(carded, s.world.planet) : s.matches.race());
@@ -278,7 +280,7 @@ async function play(s: Stage): Promise<Played> {
       seeds: {
         name: s.name,
         fleet: (name) => fleetOf(seedOf(name)),
-        chart: surveyor(),
+        chart: survey,
         roll,
         sail,
       },
@@ -369,6 +371,7 @@ async function play(s: Stage): Promise<Played> {
     void s
       .still(portraitEye(normalize(s.start.at)))
       .then((address) => office.picture(address));
+    void survey(s.name).then((chart) => chart && office.charted(chart));
     flow.office(true);
     if (careered() && manager.founded) manager.arrive();
     else office.go('menu');
@@ -394,6 +397,7 @@ async function play(s: Stage): Promise<Played> {
     flow,
     play: deal,
     manage,
+    survey,
     map,
     // the full map just opened, or a cross-fade waiting, holds the game's frame the moment it is drawn; the way home
     // counts the lobby's frames

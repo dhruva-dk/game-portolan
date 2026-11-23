@@ -42,7 +42,9 @@ Each line: built on the kit from a fixture → in review → approved and live. 
 - [x] **Shell** _(approved 2026-11-23, `5983c689`)_: top bar (team, back and forward, title plate, balance, standings, next
       race, Admiralty, bell), nav (13 tabs, sunk band, chosen gilt), date and Continue as the gilt banner at the right
 - [x] **Glyphs for the 13 tabs**, the Admiralty, the bell, forward
-- [ ] **Home** (prototyped on `proto-profile`; G1–G4 decided there)
+- [ ] **Home** _(in review)_: next race (its planet in the brass port, the season's rounds), the chairman, her ship
+      through a brass-framed window under her team's plate, her drivers, the team against the grid, the news, the
+      standings (heads fixed, her row in view), the work under way
 
 ### 1. Rosters
 

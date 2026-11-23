@@ -7,6 +7,7 @@
 // are drawn again. Hidden, it is not laid out at all: it costs a race nothing.
 
 import type { Ask, Desk } from '../../office/office.ts';
+import type { Chart } from '../../player.ts';
 import { SHADOW, alpha } from '../ink.ts';
 import { PAGE, createPage } from '../kit/page.ts';
 import { el } from '../kit/part.ts';
@@ -31,12 +32,15 @@ const CSS = `
 /**
  * What a screen is handed: what it asks goes to `ask`; `draw` draws the office
  * again (a choice of its own changed); `still` is the picture taken of the
- * planet she lies off, from space (an image's address), once there is one.
+ * planet she lies off, from space (an image's address), once there is one;
+ * `chart`, that planet's chart (its coasts, for a globe), once surveyed. A
+ * career's page always lies off its next race's planet (manager.ts arrive).
  */
 export interface Office {
   ask(a: Ask): void;
   draw(): void;
   still(): string | null;
+  chart(): Chart | null;
 }
 
 /**
@@ -74,8 +78,9 @@ export function createOffice(desk: Desk, backdrop?: Backdrop) {
     ahead: Name[] = [];
   /** How far each list was scrolled when last drawn, by the screen and the list's name. */
   const scrolled = new Map<string, number>();
-  /** The planet's picture, once taken. */
-  let picture: string | null = null;
+  /** The planet's picture, once taken; its chart, once surveyed. */
+  let picture: string | null = null,
+    charted: Chart | null = null;
   /**
    * The open screen's window as last laid: where it stands on the screen (px),
    * the page's scale, and what in it is pinned to the harbour's plots (each
@@ -98,6 +103,7 @@ export function createOffice(desk: Desk, backdrop?: Backdrop) {
     },
     draw: () => draw(),
     still: () => picture,
+    chart: () => charted,
   };
   const shell = createShell(office, {
     back: () => step(past, ahead),
@@ -110,11 +116,14 @@ export function createOffice(desk: Desk, backdrop?: Backdrop) {
   /** Each list scrolled as it was, or, not yet scrolled, to where it asks (her own row in view). */
   function settle(at: Name, keep: boolean) {
     const within = made.get(at)?.el ?? body;
-    within.querySelectorAll<HTMLElement>('.k-rows').forEach((list) => {
-      const key = `${at} ${list.dataset.keep ?? ''}`;
-      if (keep) scrolled.set(key, list.scrollTop);
-      else list.scrollTop = scrolled.get(key) ?? Number(list.dataset.top ?? 0);
-    });
+    within
+      .querySelectorAll<HTMLElement>('.k-rows, .cr-rows')
+      .forEach((list) => {
+        const key = `${at} ${list.dataset.keep ?? ''}`;
+        if (keep) scrolled.set(key, list.scrollTop);
+        else
+          list.scrollTop = scrolled.get(key) ?? Number(list.dataset.top ?? 0);
+      });
   }
 
   /** The world shown clear through the open screen's window (an element it marks o-window), dimmed round it. */
@@ -233,6 +242,11 @@ export function createOffice(desk: Desk, backdrop?: Backdrop) {
     /** The planet's picture, taken: the open screen drawn again with it. */
     picture(address: string) {
       picture = address;
+      draw();
+    },
+    /** The planet's chart, surveyed: the open screen drawn again with it. */
+    charted(chart: Chart) {
+      charted = chart;
       draw();
     },
     /**

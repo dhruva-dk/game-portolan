@@ -136,6 +136,7 @@ import {
   HOTBAR,
   IDLE,
   JOBS,
+  type Chart,
   type Hands,
   type Livery,
 } from './player.ts';
@@ -234,6 +235,8 @@ export interface Played {
   play(): void;
   /** The manager's game opened, as a release opens it (main.ts manage). */
   manage(): Promise<void>;
+  /** A planet's chart, surveyed in a worker (play/preview.ts): the office's globe of a fixture's planet. */
+  survey(name: string): Promise<Chart | null>;
   map(): void;
   next(dt: number): Snapshot;
   drawn(canvas: HTMLCanvasElement): void;
@@ -462,6 +465,10 @@ function open(p: Played, others: readonly Berth[], world: World) {
     const office = createOffice(FIXTURE);
     office.go(officed);
     office.show(true);
+    // (the fixture's next race's planet, as a career page's own is surveyed)
+    void p
+      .survey(FIXTURE.view('home').next.name)
+      .then((chart) => chart && office.charted(chart));
   } else if (params.has('manager') || params.has('career')) {
     // the manager's game as released: the office on the career kept on this device
     flow.go('lobby');
