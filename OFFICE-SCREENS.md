@@ -39,7 +39,7 @@ Each line: built on the kit from a fixture → in review → approved and live. 
 
 ### 0. Shell and Home
 
-- [ ] **Shell** _(in review, `5983c689`)_: top bar (team, back and forward, title plate, balance, standings, next
+- [x] **Shell** _(approved 2026-11-23, `5983c689`)_: top bar (team, back and forward, title plate, balance, standings, next
       race, Admiralty, bell), nav (13 tabs, sunk band, chosen gilt), date and Continue as the gilt banner at the right
 - [x] **Glyphs for the 13 tabs**, the Admiralty, the bell, forward
 - [ ] **Home** (prototyped on `proto-profile`; G1–G4 decided there)
