@@ -375,6 +375,247 @@ const DRAWN = {
   'hud.boltFilled': [
     { k: 'f', d: 'M14.6 1.6L5.4 13.4H11.3L8.7 22.4L18.7 9.7H12.7Z' },
   ],
+  'menu.forward': [
+    { k: 's', d: 'M13.4 4.6L20.6 12L13.4 19.4', w: 3 },
+    { k: 's', d: 'M3.4 12H19.6', w: 3 },
+  ],
+  // the office's tabs and its strip (ui/office/shell.ts)
+  // home: the anchor (marks.ts), put in to harbour
+  'office.home': [
+    { k: 's', d: 'M12 6V20.4', w: 2.4 },
+    { k: 's', d: 'M7.2 8.8H16.8', w: 2.2 },
+    { k: 's', d: 'M12 1.6a2.2 2.2 0 1 1 0 4.4a2.2 2.2 0 1 1 0 -4.4Z', w: 1.8 },
+    { k: 's', d: 'M4.4 13.6Q5.4 20.8 12 21.2Q18.6 20.8 19.6 13.6', w: 2.2 },
+    { k: 'f', d: 'M2.2 15.4L4.2 10.8L7 14.6Z' },
+    { k: 'f', d: 'M21.8 15.4L19.8 10.8L17 14.6Z' },
+  ],
+  // the player, the manager: a quill, its nib at the lower left
+  'office.player': [
+    {
+      k: 'f',
+      d: 'M5.6 18.6C7.4 12.2 12.4 5.6 21 2.2C19.6 8.4 14.8 14.6 8 18.2Z',
+    },
+    { k: 's', d: 'M6.2 18.4L18.4 5.4', w: 0.9, cut: true },
+    {
+      k: 's',
+      d: 'M9.4 15.4L12.6 15.6M11.8 12.2L15.4 12.2',
+      w: 0.8,
+      cut: true,
+      fine: true,
+    },
+    { k: 's', d: 'M2.6 21.6L6.6 17.4', w: 1.8 },
+  ],
+  // mail: a letter folded and sealed
+  'office.mail': [
+    { k: 'f', d: 'M2.4 5.6H21.6V18.8H2.4Z' },
+    { k: 's', d: 'M2.8 6.2L12 13.2L21.2 6.2', w: 1.1, cut: true },
+    {
+      k: 's',
+      d: 'M2.8 18.4L9.4 12.2M21.2 18.4L14.6 12.2',
+      w: 0.8,
+      cut: true,
+      fine: true,
+    },
+    {
+      k: 'f',
+      d: 'M9.2 13.4a2.8 2.8 0 1 1 5.6 0a2.8 2.8 0 1 1 -5.6 0Z',
+      top: true,
+    },
+  ],
+  // the ship: a three-master, broadside
+  'office.ship': [
+    { k: 's', d: 'M7.2 15V4.4M12.6 15V1.6M17.8 15V5.6', w: 1.1 },
+    { k: 'f', d: 'M5.2 5.4H9.2Q9.6 7 9.1 8.4H5.3Q4.8 7 5.2 5.4Z' },
+    { k: 'f', d: 'M5 9.6H9.4Q9.8 11.4 9.3 13.2H5.1Q4.6 11.4 5 9.6Z' },
+    { k: 'f', d: 'M10.6 3.8H14.6Q15 5.4 14.5 7H10.7Q10.2 5.4 10.6 3.8Z' },
+    { k: 'f', d: 'M10.4 8.2H14.8Q15.2 10.5 14.7 12.8H10.5Q10 10.5 10.4 8.2Z' },
+    { k: 'f', d: 'M16 6.6H19.6Q20 8.4 19.5 10.2H16.1Q15.6 8.4 16 6.6Z' },
+    {
+      k: 'f',
+      d: 'M16 11.2H19.6Q19.9 12.4 19.5 13.6H16.1Q15.7 12.4 16 11.2Z',
+      fine: true,
+    },
+    { k: 'f', d: 'M12.6 1.4L16 2.2L12.6 3Z', fine: true },
+    { k: 'f', d: 'M1.4 14.2H4.8L5.6 15.2H22.6L19.8 20Q12 21.6 4 19.8Z' },
+    { k: 's', d: 'M3.2 17.2H21.2', w: 0.9, cut: true },
+  ],
+  // headquarters: the yard's house, gabled, its door arched
+  'office.hq': [
+    { k: 'f', d: 'M2.6 11.2L12 3.4L21.4 11.2V21H2.6Z' },
+    { k: 's', d: 'M2.6 12.6H21.4', w: 0.9, cut: true, fine: true },
+    { k: 'f', d: 'M9.4 21.2V15.4Q12 12.6 14.6 15.4V21.2Z', cut: true },
+    {
+      k: 'f',
+      d: 'M10.7 9.2a1.3 1.3 0 1 1 2.6 0a1.3 1.3 0 1 1 -2.6 0Z',
+      cut: true,
+    },
+    { k: 's', d: 'M1.2 11.8L12 2.8L22.8 11.8', w: 1.8 },
+  ],
+  // the team: its pennant on a staff, swallowtailed, banded in its second dye
+  'office.team': [
+    { k: 's', d: 'M5 2V21.6', w: 1.8 },
+    { k: 's', d: 'M2.4 21.6H7.6', w: 1.8 },
+    { k: 'f', d: 'M5.8 3H21L17.4 7.6L21 12.2H5.8Z' },
+    { k: 's', d: 'M5.8 7.6H15.6', w: 1.4, cut: true },
+  ],
+  // the drivers, the captains: a captain's bicorne, its cockade
+  'office.drivers': [
+    {
+      k: 'f',
+      d: 'M1.4 19C2.2 10.6 6.8 5 12 5C17.2 5 21.8 10.6 22.6 19C19 16.8 15.6 16 12 16C8.4 16 5 16.8 1.4 19Z',
+    },
+    {
+      k: 's',
+      d: 'M3.6 16.6C6.4 15 9 14.2 12 14.2C15 14.2 17.6 15 20.4 16.6',
+      w: 0.9,
+      cut: true,
+    },
+    {
+      k: 'f',
+      d: 'M9.6 9.6a2.4 2.4 0 1 1 4.8 0a2.4 2.4 0 1 1 -4.8 0Z',
+      top: true,
+    },
+    { k: 's', d: 'M12 8.2V11M10.6 9.6H13.4', w: 0.8, cut: true, top: true },
+  ],
+  // the staff: the chartmaker's dividers, open
+  'office.staff': [
+    { k: 'f', d: 'M10.9 5.6L4.8 21.4L6.4 21.8L12.2 7Z' },
+    { k: 'f', d: 'M13.1 5.6L19.2 21.4L17.6 21.8L11.8 7Z' },
+    { k: 's', d: 'M7.6 14.6Q12 12.8 16.4 14.6', w: 1.2 },
+    {
+      k: 'f',
+      d: 'M9.6 4.6a2.4 2.4 0 1 1 4.8 0a2.4 2.4 0 1 1 -4.8 0Z',
+      top: true,
+    },
+    {
+      k: 'f',
+      d: 'M11.2 4.6a0.8 0.8 0 1 1 1.6 0a0.8 0.8 0 1 1 -1.6 0Z',
+      cut: true,
+    },
+  ],
+  // scouting: the spyglass (marks.ts), three draws, tilted up to the right
+  'office.scouting': [
+    { k: 'f', d: 'M1.6 10.4h4.8v3.6h-4.8Z', tr: 'rotate(-22 12 12)' },
+    { k: 'f', d: 'M6.2 9.6h5.8v5.2h-5.8Z', tr: 'rotate(-22 12 12)' },
+    { k: 'f', d: 'M11.8 8.6h8.4v7.2h-8.4Z', tr: 'rotate(-22 12 12)' },
+    { k: 'f', d: 'M20 7.8h2.4v8.8h-2.4Z', tr: 'rotate(-22 12 12)' },
+    {
+      k: 's',
+      d: 'M15 8.8V15.6',
+      w: 0.8,
+      cut: true,
+      fine: true,
+      tr: 'rotate(-22 12 12)',
+    },
+  ],
+  // the finances: coins, a stack and one stood on its edge
+  'office.finances': [
+    {
+      k: 'f',
+      d: 'M2.6 14.4Q2.6 12.8 8.4 12.8Q14.2 12.8 14.2 14.4V19.8Q14.2 21.4 8.4 21.4Q2.6 21.4 2.6 19.8Z',
+    },
+    { k: 's', d: 'M2.8 14.6Q8.4 16 14 14.6', w: 0.8, cut: true },
+    { k: 's', d: 'M2.8 17.2Q8.4 18.6 14 17.2', w: 0.8, cut: true },
+    {
+      k: 'f',
+      d: 'M11.4 8.8a5.6 5.6 0 1 1 11.2 0a5.6 5.6 0 1 1 -11.2 0Z',
+      top: true,
+    },
+    {
+      k: 's',
+      d: 'M13.2 8.8a3.8 3.8 0 1 1 7.6 0a3.8 3.8 0 1 1 -7.6 0Z',
+      w: 0.8,
+      cut: true,
+      top: true,
+    },
+  ],
+  // the sponsors: a charter, rolled at its head and foot, its seal hanging
+  'office.sponsors': [
+    { k: 'f', d: 'M5.2 4.6H17.8V18.2H5.2Z' },
+    {
+      k: 'f',
+      d: 'M4 2.6h15a1.6 1.6 0 0 1 0 3.2h-15a1.6 1.6 0 0 1 0 -3.2Z',
+      top: true,
+    },
+    {
+      k: 'f',
+      d: 'M4 16.8h11a1.6 1.6 0 0 1 0 3.2h-11a1.6 1.6 0 0 1 0 -3.2Z',
+      top: true,
+    },
+    {
+      k: 's',
+      d: 'M7.4 8.6H15.6M7.4 11.2H15.6M7.4 13.8H12.4',
+      w: 0.9,
+      cut: true,
+    },
+    {
+      k: 's',
+      d: 'M17.4 19.6L16.4 23M18.8 19.6L20 23',
+      w: 1.2,
+      top: true,
+      fine: true,
+    },
+    {
+      k: 'f',
+      d: 'M15.4 18.4a2.6 2.6 0 1 1 5.2 0a2.6 2.6 0 1 1 -5.2 0Z',
+      top: true,
+    },
+  ],
+  // the standings: the cup
+  'office.standings': [
+    { k: 's', d: 'M5.8 5.2Q1.6 5.2 2.2 8.4Q2.8 11.2 6.8 11.2', w: 1.5 },
+    { k: 's', d: 'M18.2 5.2Q22.4 5.2 21.8 8.4Q21.2 11.2 17.2 11.2', w: 1.5 },
+    { k: 'f', d: 'M5.4 3H18.6V6.8Q18.6 13.4 12 14Q5.4 13.4 5.4 6.8Z' },
+    { k: 's', d: 'M5.8 6.2H18.2', w: 0.9, cut: true },
+    { k: 'f', d: 'M10.8 13.6h2.4v4.4h-2.4Z' },
+    {
+      k: 'f',
+      d: 'M7 18h10a1.2 1.2 0 0 1 1.2 1.2v1a1.2 1.2 0 0 1 -1.2 1.2h-10a1.2 1.2 0 0 1 -1.2 -1.2v-1a1.2 1.2 0 0 1 1.2 -1.2Z',
+    },
+  ],
+  // the calendar: an almanac's leaf, ringed at its head, its days ruled
+  'office.calendar': [
+    { k: 'f', d: 'M3.6 4.4H20.4V21.2H3.6Z' },
+    { k: 's', d: 'M3.8 8.8H20.2', w: 1.2, cut: true },
+    {
+      k: 'f',
+      d: 'M6.4 11.2h2.8v2.4h-2.8ZM10.6 11.2h2.8v2.4h-2.8ZM14.8 11.2h2.8v2.4h-2.8ZM6.4 15.6h2.8v2.4h-2.8ZM10.6 15.6h2.8v2.4h-2.8Z',
+      cut: true,
+    },
+    { k: 's', d: 'M8 2.2V6.6M16 2.2V6.6', w: 1.8, top: true },
+  ],
+  // the Admiralty: the scales its rules are weighed in
+  'office.admiralty': [
+    { k: 's', d: 'M12 4V19.6', w: 1.8 },
+    { k: 's', d: 'M3.6 6.4H20.4', w: 1.8 },
+    {
+      k: 's',
+      d: 'M3.8 6.8L1.6 12.6M3.8 6.8L7.4 12.6M20.2 6.8L16.6 12.6M20.2 6.8L22.4 12.6',
+      w: 0.8,
+    },
+    { k: 'f', d: 'M0.8 12.6H8.2Q8.2 16 4.5 16Q0.8 16 0.8 12.6Z' },
+    { k: 'f', d: 'M15.8 12.6H23.2Q23.2 16 19.5 16Q15.8 16 15.8 12.6Z' },
+    {
+      k: 'f',
+      d: 'M10.6 3.2a1.4 1.4 0 1 1 2.8 0a1.4 1.4 0 1 1 -2.8 0Z',
+      top: true,
+    },
+    {
+      k: 'f',
+      d: 'M7.6 19.2h8.8a1.2 1.2 0 0 1 1.2 1.2v1.2H6.4v-1.2a1.2 1.2 0 0 1 1.2 -1.2Z',
+    },
+  ],
+  // what waits to be read: the ship's bell
+  'office.bell': [
+    { k: 's', d: 'M10.2 5.6Q10.2 2.2 12 2.2Q13.8 2.2 13.8 5.6', w: 1.5 },
+    { k: 'f', d: 'M5.6 17.4Q6 8.4 8.6 6.4Q12 4.2 15.4 6.4Q18 8.4 18.4 17.4Z' },
+    { k: 's', d: 'M6.2 13.8H17.8', w: 0.9, cut: true },
+    {
+      k: 'f',
+      d: 'M4.2 17h15.6a1.2 1.2 0 0 1 1.2 1.2v0.6a1.2 1.2 0 0 1 -1.2 1.2h-15.6a1.2 1.2 0 0 1 -1.2 -1.2v-0.6a1.2 1.2 0 0 1 1.2 -1.2Z',
+    },
+    { k: 'f', d: 'M10.4 21.4a1.6 1.6 0 1 1 3.2 0a1.6 1.6 0 1 1 -3.2 0Z' },
+  ],
 } satisfies Record<string, Prim[]>;
 
 export type Glyph = keyof typeof DRAWN;

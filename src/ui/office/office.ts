@@ -192,20 +192,25 @@ export function createOffice(desk: Desk, backdrop?: Backdrop) {
     return true;
   }
 
-  /** Opens `name` as a way on from the open screen: the way back remembers where from. */
+  /**
+   * Opens `name` as a way on from the open screen: the way back remembers
+   * where from (before it is drawn, so the shell's back is ready).
+   */
   function go(name: Name) {
     const from = open;
-    if (name === from || !show(name)) return;
+    if (name === from || !SCREENS[name]) return;
     if (from) past.push(from);
     ahead.length = 0;
+    show(name);
   }
 
-  /** A step back or forward: the last of `from` opened, the screen left kept on `to`. */
+  /** A step back or forward: the last of `from` opened, the screen left kept on `to` (before it is drawn). */
   function step(from: Name[], to: Name[]) {
     const name = from.pop(),
       left = open;
-    if (!name || !show(name)) return;
+    if (!name || !SCREENS[name]) return;
     if (left) to.push(left);
+    show(name);
   }
 
   return {

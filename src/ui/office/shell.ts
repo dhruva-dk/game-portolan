@@ -1,197 +1,218 @@
-// The office's shell, round every screen but a bare one. The strip across the
-// top: her team's block (its emblem and name on its colour), the open screen's
-// title, then to the right her balance, the standings, the next race, the
-// Admiralty and what waits to be read. The nav along the bottom: back and
-// forward, the thirteen tabs (the open one lit; one whose screen is not built
-// shown unavailable; a count to be seen to, the stripes of work under way), the
-// date, and the one way on at the far right.
+// The office's shell on the chartroom kit, round every screen but a bare one.
+// The bar across the top, a bold cut paper: her team (its emblem and name),
+// the ways back and forward, the open screen's title on a plate, then her
+// balance, the standings, the next race, the Admiralty and the bell for what
+// waits to be read, each opening its screen. The nav along the bottom, a band
+// sunk into the page: the thirteen tabs, each its woodcut over its name (the
+// open one gilt; one whose screen is not built shown off; a rubric disc for
+// what is to be seen to, stripes for work under way), then the date and the
+// one way on, main's gilt banner, under the right thumb.
 
-import { TABS, type Tab } from '../../office/office.ts';
+import { TABS, type Tab, type Viewed } from '../../office/office.ts';
 import type { ShellView } from '../../office/shell.ts';
+import { mark, label, unread } from '../chartroom/figures.ts';
+import { kitLooks } from '../chartroom/kit.ts';
+import { paper, plate } from '../chartroom/paper.ts';
+import { UNIT, u } from '../chartroom/tokens.ts';
 import { emblem } from '../emblem.ts';
-import { TYPE } from '../ink.ts';
-import { icon } from '../kit/icons.ts';
-import { el, grouped, pressed, styled, type Kid } from '../kit/part.ts';
-import { cut, stylesheet } from '../kit/style.ts';
+import type { Glyph } from '../glyphs.ts';
+import { glyph } from '../ink.ts';
+import { el, grouped, pressed, type Kid } from '../kit/part.ts';
+import { stylesheet } from '../kit/style.ts';
+import { banner } from '../screens.ts';
 import type { Office } from './office.ts';
 import { SCREENS, type Name } from './screens.ts';
 
-/** The strip's and the nav's heights, px. */
-export const STRIP = 56,
-  NAV = 60;
+/** The bar's and the nav's heights, in drawn units. */
+const BAR = 34,
+  BAND = 36;
+/** The same, in the page's px, for the office to lay its body between them. */
+export const STRIP = BAR * UNIT,
+  NAV = BAND * UNIT;
 
-/** What each tab is called on the nav. */
-const LABELS: Readonly<Record<Tab, string>> = {
-  home: 'Home',
-  player: 'Player',
-  mail: 'Mail',
-  ship: 'Ship',
-  hq: 'HQ',
-  team: 'Team',
-  drivers: 'Drivers',
-  staff: 'Staff',
-  scouting: 'Scouting',
-  finances: 'Finances',
-  sponsors: 'Sponsors',
-  standings: 'Standings',
-  calendar: 'Calendar',
+/** What each tab is called on the nav, and its woodcut. */
+const TAB: Readonly<Record<Tab, { name: string; glyph: Glyph }>> = {
+  home: { name: 'Home', glyph: 'office.home' },
+  player: { name: 'Player', glyph: 'office.player' },
+  mail: { name: 'Mail', glyph: 'office.mail' },
+  ship: { name: 'Ship', glyph: 'office.ship' },
+  hq: { name: 'HQ', glyph: 'office.hq' },
+  team: { name: 'Team', glyph: 'office.team' },
+  drivers: { name: 'Drivers', glyph: 'office.drivers' },
+  staff: { name: 'Staff', glyph: 'office.staff' },
+  scouting: { name: 'Scouting', glyph: 'office.scouting' },
+  finances: { name: 'Finances', glyph: 'office.finances' },
+  sponsors: { name: 'Sponsors', glyph: 'office.sponsors' },
+  standings: { name: 'Standings', glyph: 'office.standings' },
+  calendar: { name: 'Calendar', glyph: 'office.calendar' },
 };
 
 const CSS = `
-/* the strip and the nav: two bands of the chart's margin, ruled twice on the side they face the page */
-.o-strip { position: absolute; left: 0; right: 0; top: 0; height: ${STRIP}px; display: flex; align-items: center; gap: 6px;
-  padding-right: 8px; color: var(--ink); border-bottom: 1.5px solid var(--ink); box-shadow: 0 2px 0 var(--shade);
-  background: linear-gradient(to top, transparent 3px, var(--line) 3px, var(--line) 3.8px, transparent 3.8px), var(--bar); }
-/* the team's plate and the chips keep their widths on every screen: the title has what is left, a long one set smaller */
-.o-team { flex: none; align-self: stretch; display: flex; align-items: center; gap: 10px; width: 216px; margin-bottom: 5px;
-  padding: 0 12px 0 10px; background: var(--light); border-left: 7px solid var(--team); border-right: 1px solid var(--line); }
-/* (a long name takes two lines) */
-.o-team > span { font: 700 15px/1.1 var(--serif); overflow: hidden; max-height: 34px; }
-.o-title { flex: 1 1 0; min-width: 0; padding: 0 12px 4px; font: 700 ${TYPE.title}px/1 var(--serif); letter-spacing: .12em;
-  text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.o-title.long { font-size: 18px; letter-spacing: .04em; }
-.o-chips { flex: none; display: flex; align-items: center; gap: 8px; padding-bottom: 4px; }
-.o-chip { position: relative; height: 40px; min-width: 44px; display: flex; align-items: center; gap: 6px; padding: 0 6px 0 9px;
-  ${cut('light')} white-space: nowrap; }
-.o-chip > .o-lines { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.2; }
-.o-chip small { font-size: ${TYPE.small}px; font-style: italic; color: var(--faint); }
-.o-chip > .k-icon:last-child { color: var(--faint); }
-.o-chip.still { padding-right: 12px; }
-/* her balance: the chip itself the ledger's green, or its red when she owes */
-.o-chip.money { ${cut('good')} padding-left: 12px; color: var(--on-fill); font-weight: 700; }
-.o-chip.money.owing { ${cut('bad')} }
-.o-chip.money > .k-icon:last-child { color: var(--on-fill); }
-.o-count { position: absolute; right: 2px; top: -7px; min-width: 20px; height: 20px; padding: 0 5px; display: grid;
-  place-items: center; border-radius: 10px; background: var(--bad); color: var(--on-fill); border: 1.2px solid var(--ink);
-  font: italic 700 ${TYPE.small}px/1 var(--serif); }
+.sh-bar { position: absolute; left: 0; right: 0; top: 0; height: ${u(BAR)}; padding: var(--s2) var(--s4) 0; }
+.sh-top { height: 100%; display: flex; align-items: center; gap: var(--s4); padding: 0 var(--s3) 0 var(--s4); }
+.sh-team { flex: none; display: flex; align-items: center; gap: var(--s2); max-width: ${u(96)}; }
+.sh-team > svg { flex: none; width: ${u(18)}; height: ${u(18)}; }
+.sh-team > span { font: 700 var(--t-body)/1.1 var(--face); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical; }
+.sh-hist { flex: none; display: flex; }
+.sh-key { position: relative; flex: none; width: var(--touch); height: var(--touch); display: grid; place-items: center;
+  transition: translate var(--press); }
+.sh-key.press:active { translate: 0 var(--u); }
+.sh-key > .cr-mark { width: ${u(14)}; height: ${u(14)}; }
+.sh-key > .sh-count { position: absolute; right: ${u(1)}; top: ${u(1)}; }
+.sh-title { flex: none; max-width: ${u(150)}; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sh-grow { flex: 1; }
+.sh-stat { flex: none; min-height: var(--touch); display: flex; flex-direction: column; justify-content: center;
+  align-items: flex-end; gap: ${u(0.5)}; transition: translate var(--press); }
+.sh-stat.press:active { translate: 0 var(--u); }
+.sh-stat b { font: 600 var(--t-body)/1.1 var(--face); white-space: nowrap; }
+.sh-stat .cr-label { white-space: nowrap; }
+.sh-stat .cr-fig { font-size: var(--t-name); font-variant-numeric: lining-nums tabular-nums; }
+.sh-stat.owing .cr-fig { color: var(--harm); }
+.sh-count > svg, svg.sh-count { width: ${u(11)}; height: ${u(11)}; }
 
-.o-nav { position: absolute; left: 0; right: 0; bottom: 0; height: ${NAV}px; display: flex; align-items: center;
-  padding: 4px 8px 0; color: var(--ink); border-top: 1.5px solid var(--ink);
-  background: linear-gradient(to bottom, transparent 3px, var(--line) 3px, var(--line) 3.8px, transparent 3.8px), var(--bar); }
-.o-hist { display: flex; gap: 5px; margin-right: 8px; }
-.o-hist > div { width: 42px; height: 42px; display: grid; place-items: center; ${cut('light')} }
-.o-tabs { flex: 1; align-self: stretch; display: flex; min-width: 0; padding: 5px 0 4px; }
-.o-tab { position: relative; flex: 1; min-width: 44px; display: flex; flex-direction: column; align-items: center;
-  justify-content: center; gap: 2px; border: 1.5px solid transparent; font: 500 ${TYPE.small}px/1 var(--serif); }
-.o-tab + .o-tab:not(.lit) { border-left-color: var(--rule); }
-.o-tab.lit { ${cut('gilt')} font-weight: 700; }
-.o-tab.lit + .o-tab { border-left-color: transparent; }
-.o-tab > .o-count { right: 4px; top: 0; }
-.o-tab > .o-busy { position: absolute; left: 8px; right: 8px; bottom: 0; height: 5px; background: var(--stripes);
-  box-shadow: inset 0 0 0 .8px var(--ink); }
-.o-date { height: 42px; margin: 0 10px; padding: 0 12px; display: flex; align-items: center; gap: 4px; ${cut('light')}
-  font-style: italic; white-space: nowrap; }
-.o-on { height: 44px; width: 146px; display: flex; align-items: center; justify-content: center; gap: 10px; ${cut('on')}
-  color: var(--on-fill); font-weight: 700; letter-spacing: .04em; }
+.sh-nav { position: absolute; left: 0; right: 0; bottom: 0; height: ${u(BAND)}; display: flex; align-items: stretch;
+  background: var(--paper-sunk); border-top: var(--w-bold) solid var(--ink); box-shadow: inset 0 var(--w-rule) 0 var(--paper-raised); }
+.sh-tabs { flex: 1; display: flex; min-width: 0; }
+.sh-tab { position: relative; flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: ${u(1)}; border-left: var(--w-fine) solid var(--rule); color: var(--ink-2);
+  transition: translate var(--press); }
+.sh-tab:first-child { border-left-color: transparent; }
+.sh-tab.press:active { translate: 0 var(--u); }
+.sh-tab > .cr-mark { width: ${u(15)}; height: ${u(15)}; }
+.sh-tab > span { font: 500 var(--t-label)/1 var(--face); white-space: nowrap; }
+.sh-tab.chosen { background: var(--gilt); color: var(--ink); box-shadow: inset 0 0 0 var(--w-rule) var(--ink); }
+.sh-tab.chosen + .sh-tab { border-left-color: transparent; }
+.sh-tab.chosen > span { font-weight: 700; }
+.sh-tab > .sh-count { position: absolute; left: calc(50% + ${u(5)}); top: ${u(2)}; }
+.sh-tab > .sh-busy { position: absolute; left: var(--s3); right: var(--s3); bottom: ${u(1.5)}; height: ${u(2.5)};
+  background: var(--stripes); box-shadow: inset 0 0 0 var(--w-hair) var(--ink); }
+.sh-date { flex: none; display: flex; flex-direction: column; justify-content: center; align-items: flex-end; gap: ${u(0.5)};
+  padding: 0 var(--s3) 0 var(--s4); border-left: var(--w-fine) solid var(--line); }
+.sh-date b { font: italic 600 var(--t-body)/1 var(--face); white-space: nowrap; }
+.sh-on { position: relative; flex: none; width: ${u(92)}; display: grid; place-items: center; margin-right: var(--s2);
+  transition: translate var(--press); }
+.sh-on.press:active { translate: 0 var(--u); }
+.sh-on > svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.sh-on > span { position: relative; padding-left: ${u(4)}; font: 700 var(--t-body)/1 var(--face); letter-spacing: .06em;
+  text-transform: uppercase; }
 `;
+
+/** `s` sized by the shell's CSS, not at its own size. */
+const loose = (s: SVGSVGElement) => {
+  s.removeAttribute('style');
+  return s;
+};
+
+/** A woodcut on the 24 grid. */
+const cut = (g: Glyph) => loose(mark(24, 24, glyph(g, 12, 12, 24)));
+
+/** A count to be seen to, as a rubric disc; nothing when there is none. */
+const count = (n: number | undefined) => {
+  if (n === undefined || n <= 0) return null;
+  const disc = loose(unread(n));
+  disc.classList.add('sh-count');
+  return disc;
+};
+
+/** Main's banner, gilt, as the way on, laid under its word. */
+const pennant = () => loose(mark(92, 36, banner(46, 18, 86, '', true)));
 
 /** The shell for `office`: `hist` its ways back and forward. */
 export function createShell(
   office: Office,
   hist: { back(): void; forward(): void }
 ) {
+  kitLooks();
   stylesheet(CSS);
-  const strip = el('div', 'o-strip'),
-    nav = el('div', 'o-nav');
-
-  /** A chip of the strip: a control where the screen it leads to is built, its mark a chevron; else it only shows. */
-  const chip = (to: Tab | null, cls: string, ...kids: Kid[]) => {
-    const built = to !== null && SCREENS[to] !== undefined;
-    const made = el(
-      'div',
-      `o-chip ${cls}${built ? '' : ' still'}`,
-      ...kids,
-      built && icon('down', 16)
+  const strip = el('div', 'cr sh-bar'),
+    nav = el('nav', 'cr sh-nav');
+  /** A thing of the bar that opens `to`, if its screen is built; else it only shows, off. */
+  const opens = <T extends HTMLElement>(made: T, to: Viewed | null) =>
+    pressed(
+      made,
+      () => to && office.ask({ kind: 'open', screen: to }),
+      to === null || !SCREENS[to]
     );
-    return to !== null && built
-      ? pressed(made, () => office.ask({ kind: 'open', screen: to }))
-      : made;
-  };
-  const count = (n: number | undefined) =>
-    n !== undefined && n > 0 && el('div', 'o-count', n);
 
-  /** The strip, from the view: her team, the open screen's title, the chips. */
-  function top(v: ShellView, title: string) {
+  /** The bar, from the view: her team, the ways back and forward, the title, the figures and the keys. */
+  function top(
+    v: ShellView,
+    title: string,
+    can: { back: boolean; forward: boolean }
+  ) {
+    const stat = (cls: string, caption: string, value: Kid, to: Viewed) =>
+      opens(el('div', `sh-stat ${cls}`.trim(), label(caption), value), to);
+    const next =
+      v.next.days === 0
+        ? 'Race day'
+        : v.next.days === 1
+          ? 'Next race tomorrow'
+          : `Next race in ${v.next.days} days`;
     strip.replaceChildren(
-      styled(
+      paper(
         el(
           'div',
-          'o-team',
-          emblem(v.team.emblem, v.team.colours, 36),
-          el('span', '', v.team.name)
-        ),
-        { '--team': v.team.colours[0] }
-      ),
-      el('div', title.length > 9 ? 'o-title long' : 'o-title', title),
-      el(
-        'div',
-        'o-chips',
-        chip(
-          'finances',
-          v.balance < 0 ? 'money owing' : 'money',
-          el('span', 'fig', `Balance ${grouped(v.balance)}`)
-        ),
-        chip(
-          'standings',
-          '',
-          icon('cup', 22),
+          'sh-top',
           el(
             'div',
-            'o-lines',
-            el('small', '', v.championship),
-            el('span', '', 'Standings')
-          )
-        ),
-        chip(
-          'calendar',
-          '',
-          icon('cloud', 22),
+            'sh-team',
+            emblem(v.team.emblem, v.team.colours, 24),
+            el('span', '', v.team.name)
+          ),
           el(
             'div',
-            'o-lines',
-            el(
-              'small',
-              '',
-              v.next.days > 0 ? `Next Race in ${v.next.days} Days` : 'Race Day'
+            'sh-hist',
+            pressed(
+              el('div', 'sh-key', cut('menu.back')),
+              hist.back,
+              !can.back
             ),
-            el('span', '', v.next.name)
+            pressed(
+              el('div', 'sh-key', cut('menu.forward')),
+              hist.forward,
+              !can.forward
+            )
+          ),
+          plate(el('span', 'sh-title', title)),
+          el('div', 'sh-grow'),
+          stat(
+            v.balance < 0 ? 'owing' : '',
+            'Balance',
+            el('span', 'cr-fig', grouped(v.balance)),
+            'finances'
+          ),
+          stat('', v.championship, el('b', '', 'Standings'), 'standings'),
+          stat('', next, el('b', '', v.next.name), 'calendar'),
+          opens(el('div', 'sh-key', cut('office.admiralty')), null),
+          opens(
+            el('div', 'sh-key', cut('office.bell'), count(v.notices)),
+            'mail'
           )
         ),
-        chip(null, '', icon('anchor', 22), el('span', '', 'Admiralty')),
-        chip('mail', '', icon('bell', 24), count(v.notices))
+        { fill: 'paper-raised', bold: true, flat: true }
       )
     );
   }
 
-  /** The nav, from the view: the tab `lit` filled, each unbuilt tab unavailable. */
-  function bottom(
-    v: ShellView,
-    lit: Tab | null,
-    can: { back: boolean; forward: boolean }
-  ) {
+  /** The nav, from the view: the tab `lit` gilt, each unbuilt tab off. */
+  function bottom(v: ShellView, lit: Tab | null) {
     const tab = (t: Tab) =>
-      pressed(
+      opens(
         el(
           'div',
-          `o-tab${t === lit ? ' lit' : ''}`,
-          icon(t, 24),
-          LABELS[t],
+          `sh-tab${t === lit ? ' chosen' : ''}`,
+          cut(TAB[t].glyph),
+          el('span', '', TAB[t].name),
           count(v.marks[t]?.count),
-          v.marks[t]?.busy && el('i', 'o-busy')
+          v.marks[t]?.busy && el('i', 'sh-busy')
         ),
-        () => office.ask({ kind: 'open', screen: t }),
-        SCREENS[t] === undefined
+        t
       );
     nav.replaceChildren(
-      el(
-        'div',
-        'o-hist',
-        pressed(el('div', '', icon('back', 22)), hist.back, !can.back),
-        pressed(el('div', '', icon('forward', 22)), hist.forward, !can.forward)
-      ),
-      el('div', 'o-tabs', ...TABS.map(tab)),
-      el('div', 'o-date', v.date),
-      pressed(el('div', 'o-on', v.on, icon('forward', 20)), () =>
+      el('div', 'sh-tabs', ...TABS.map(tab)),
+      el('div', 'sh-date', label('Date'), el('b', '', v.date)),
+      pressed(el('div', 'sh-on', pennant(), el('span', '', v.on)), () =>
         office.ask({ kind: 'continue' })
       )
     );
@@ -203,14 +224,14 @@ export function createShell(
     /** Draws the shell from `v` round the screen `open`, or (null) puts it away for a bare one. */
     show(
       v: ShellView | null,
-      open: Name,
+      at: Name,
       can: { back: boolean; forward: boolean }
     ) {
       strip.hidden = nav.hidden = v === null;
       if (!v) return;
-      const entry = SCREENS[open];
-      top(v, entry?.title ?? '');
-      bottom(v, entry?.tab ?? null, can);
+      const entry = SCREENS[at];
+      top(v, entry?.title ?? '', can);
+      bottom(v, entry?.tab ?? null);
     },
   };
 }

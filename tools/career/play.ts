@@ -76,17 +76,17 @@ try {
   /** Every tab of the nav opened in turn and captured (the first row of a list tapped, where `into` names its screen). */
   const tour = async (label: string) => {
     for (let i = 1; i < TABS.length; i++) {
-      await page.locator('.o-tab').nth(i).click();
+      await page.locator('.sh-tab').nth(i).click();
       await at(TABS[i], 10000);
       await page.waitForTimeout(500);
       await capture(`${label}-${TABS[i]}`);
     }
     // a letter opened, a design's cards dealt, a driver's profile and the offer to a scouted person
-    await page.locator('.o-tab').nth(2).click();
+    await page.locator('.sh-tab').nth(2).click();
     await tap('.s-mail .k-rows > .k-tr');
     await page.waitForTimeout(400);
     await capture(`${label}-letter`);
-    await page.locator('.o-tab').nth(3).click();
+    await page.locator('.sh-tab').nth(3).click();
     // (a card dealt and picked, where her designer knows a component of the part)
     // (the drawing board is reached by Design New Part and a part's card)
     await page
@@ -108,7 +108,7 @@ try {
       await page.waitForTimeout(400);
     }
     await capture(`${label}-design`);
-    await page.locator('.o-tab').nth(8).click();
+    await page.locator('.sh-tab').nth(8).click();
     await tap('.s-scouting .k-rows > .k-tr');
     await at('profile', 10000);
     await page.waitForTimeout(400);
@@ -122,7 +122,7 @@ try {
     }
     // what the career is asked through the screens, where it may be: a sponsor signed, a building begun, a design started
     const asked = async (tab: number, selector: string, name: string) => {
-      await page.locator('.o-tab').nth(tab).click();
+      await page.locator('.sh-tab').nth(tab).click();
       await page.waitForTimeout(300);
       if (!(await page.locator(selector).count())) return;
       await tap(selector);
@@ -131,7 +131,7 @@ try {
     };
     await asked(10, '.sp-sign .k-btn:not(.off)', 'signed');
     // (a building of the harbour chosen by its label: its card has what may be built)
-    await page.locator('.o-tab').nth(4).click();
+    await page.locator('.sh-tab').nth(4).click();
     await page.waitForTimeout(600);
     await page
       .locator('.q-site .q-label')
@@ -140,7 +140,7 @@ try {
       .catch(() => null);
     await asked(4, '.q-card .k-btn:not(.off)', 'building');
     await asked(3, '.y-board .k-btn.on:not(.off)', 'designing');
-    await page.locator('.o-tab').nth(0).click();
+    await page.locator('.sh-tab').nth(0).click();
     await at('home', 10000);
     await capture(`${label}-home`);
   };
