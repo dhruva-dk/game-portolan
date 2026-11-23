@@ -51,58 +51,58 @@ Each line: built on the kit from a fixture → in review → approved and live. 
 - [x] **Shell** _(approved 2026-11-23, `5983c689`)_: top bar (team, back and forward, title plate, balance, standings, next
       race, Admiralty, bell), nav (13 tabs, sunk band, chosen gilt), date and Continue as the gilt banner at the right
 - [x] **Glyphs for the 13 tabs**, the Admiralty, the bell, forward
-- [ ] **Home** _(in review)_: next race (its planet in the brass port, the season's rounds), the chairman, her ship
+- [x] **Home** _(approved 2026-11-23)_: next race (its planet in the brass port, the season's rounds), the chairman, her ship
       through a brass-framed window under her team's plate, her drivers, the team against the grid, the news, the
       standings (heads fixed, her row in view), the work under way
 
 ### 1. Rosters
 
-- [ ] **Drivers** _(in review)_, after MM 005: a card a ship (post, portrait, stars and potential, morale, the ship's mechanic and their bond by levels, the contract, traits, Renew shut with its reason), the reserve and the market in the last column
-- [ ] **Staff** _(in review)_, after MM 007: the four mechanics a row, each wearing its role's woodcut, their chemistry with the ship's driver; the designer, the scouts, an open post's Find, the market
-- [ ] **Team** _(in review)_: the ledger: wages a race against income, the chairman, open posts; everyone on the books ruled by role; the pit crew and each ship's stop
-- [ ] **Scouting** _(in review)_, after MM 009: the search (role, championship, contract, scouted only, stars at least) and her scouts under the crow's nest (on whom, days to report, Cancel; Find a Scout while there is room); the market or her shortlist, a star a row to keep them (the shortlist was in the view but never filled: `favourite` asks now)
+- [x] **Drivers** _(approved 2026-11-23)_, after MM 005: a card a ship (post, portrait, stars and potential, morale, the ship's mechanic and their bond by levels, the contract, traits, Renew shut with its reason), the reserve and the market in the last column
+- [x] **Staff** _(approved 2026-11-23)_, after MM 007: the four mechanics a row, each wearing its role's woodcut, their chemistry with the ship's driver; the designer, the scouts, an open post's Find, the market
+- [x] **Team** _(approved 2026-11-23)_: the ledger: wages a race against income, the chairman, open posts; everyone on the books ruled by role; the pit crew and each ship's stop
+- [x] **Scouting** _(approved 2026-11-23)_, after MM 009: the search (role, championship, contract, scouted only, stars at least) and her scouts under the crow's nest (on whom, days to report, Cancel; Find a Scout while there is room); the market or her shortlist, a star a row to keep them (the shortlist was in the view but never filled: `favourite` asks now)
 
 ### 2. Ledgers
 
-- [ ] **Finances** _(in review, the ledgers' pathfinder)_, after MM 013: the purse (the balance, the chairman's floor
+- [x] **Finances** _(approved 2026-11-23, the ledgers' pathfinder)_, after MM 013: the purse (the balance, the chairman's floor
       under it, the room to spend), what a race brings and costs, netted, where the season will end on what is signed
       (races left, place now, its prize); the balance's course this season, by days, dotted on to the season's end, the
       floor ruled under it; the transactions; this season's money by what it was for, netted (floor, projection and the
       season's sums never shown before)
 - [ ] Standings (rows open Rival) · [ ] Sponsors (+ the slot fix) · [ ] Calendar ·
-      [ ] Mail (+ glyphs for mail kinds; a vote letter opens Admiralty) _(after Finances is approved)_
+      [ ] Mail (+ glyphs for mail kinds; a vote letter opens Admiralty)
 
 ### 3. People
 
 - [x] Profile (layout A, chosen 2026-11-22)
-- [ ] **Negotiation** _(in review, the people's pathfinder)_, after MM 011: the person and their patience as pips, the
+- [x] **Negotiation** _(approved 2026-11-23, the people's pathfinder)_, after MM 011: the person and their patience as pips, the
       talks (the last answer, those before, who else is talking); the terms, each control beside what they ask or counter,
       the bonus terms with the break clause (never shown before); what they expect, each met so far; the cost and the
       ways on
-- [ ] Jobs (+ decline) · [ ] Player _(after Negotiation is approved)_
+- [ ] Jobs (+ decline) · [ ] Player
 
 ### 4. Race day
 
-- [ ] **Result** _(in review, race day's pathfinder)_, after MM 042–044: the podium under the race's name (the first
+- [x] **Result** _(approved 2026-11-23, race day's pathfinder)_, after MM 042–044: the podium under the race's name (the first
       three over their woodcut plinths, the winner's gilt, each with their team and points), then how every ship
       finished (the podium ruled off, her lines gilt); the team report (a line a driver: what they did, their place and
       points) and the chairman (the place expected, where the team stands, the verdict stamped)
-- [ ] Plan (+ parts for the race, each sponsor's objective, forfeit) _(after Result is approved)_
+- [ ] Plan (+ parts for the race, each sponsor's objective, forfeit)
 
 ### 5. The yard
 
 - [ ] Ship (+ design for next season, next season's parts, risk) · [ ] Suppliers (new) · [ ] HQ
-- [ ] **Glyphs for the 6 parts and 9 buildings** _(in review)_: `part.<type>` (a bellied sail on its yard, a block, the
+- [x] **Glyphs for the 6 parts and 9 buildings** _(approved 2026-11-23)_: `part.<type>` (a bellied sail on its yard, a block, the
       rudder on its stock, the hull broadside, the keel laid down with its frames, a swivel's yoke) and
       `building.<id>` (the sawtoothed shed, a set square and ship's curve, a model in the tank, the crucible pouring,
       a book open, a hammock, the crow's nest, a fish, the pier and its bollard)
 
 ### 6. Bare
 
-- [ ] **Main menu** _(in review)_, after MM 047: the mark on its plate; New Career (her ship through a brass-framed
+- [x] **Main menu** _(approved 2026-11-23)_, after MM 047: the mark on its plate; New Career (her ship through a brass-framed
       window) and Single Race (the planet, still), each a woodcut head over its picture and its plate; Continue (the
       career kept: its emblem, team and date; shut with none kept) and Preferences as strips
-- [ ] **Found** _(in review)_, after MM 048–050: the making in four steps, one open (name, owner, emblem, livery:
+- [x] **Found** _(approved 2026-11-23)_, after MM 048–050: the making in four steps, one open (name, owner, emblem, livery:
       a pattern stepped, a dye of the swatches), each shut step a strip with what it holds; her ship through the
       window, the team's plate under it (the championship it joins, whose place it takes), the owner, why the last
       making was refused, the way on. (The ship through the window does not yet wear the drafted livery.)
