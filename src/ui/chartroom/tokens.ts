@@ -34,6 +34,14 @@ export const UNIT = size(PAGE.w, PAGE.h);
 export const u = (n: number) => `calc(${n} * var(--u))`;
 
 /**
+ * `n` drawn units snapped to a whole CSS px (`to`: or to its part): a length
+ * boxes are set by (a space, a track, a touch), so their edges fall on the
+ * screen's pixels alike and never a pixel apart by rounding.
+ */
+export const snapped = (n: number, to = 1) =>
+  `round(nearest, ${u(n)}, ${to}px)`;
+
+/**
  * The colours by what they say, for SVG marks (the same values as the custom
  * properties of the same names).
  */
@@ -78,14 +86,14 @@ export const step = (v: number) =>
 
 /** The least a touch target and a word may be, CSS px (Apple's touch, the office's smallest type). */
 const FLOOR = { touch: 44, text: 13 } as const;
-const floor = (px: number, n: number) => `max(${px}px, ${u(n)})`;
+const floor = (px: number, n: number) => `max(${px}px, ${snapped(n)})`;
 
-/** Every token, by its custom property's name. */
+/** Every token, by its custom property's name (lengths that set boxes snapped to the pixel, strokes to the device's). */
 export const TOKENS: Readonly<Record<string, string>> = {
   // the unit, and the page's measure
-  gutter: u(16),
+  gutter: snapped(16),
   touch: floor(FLOOR.touch, 26),
-  row: u(20),
+  row: snapped(20),
   'row-tap': floor(FLOOR.touch, 26),
   // papers
   paper: TONE.paper,
@@ -133,17 +141,17 @@ export const TOKENS: Readonly<Record<string, string>> = {
   'fig-xl': u(25),
   'fig-xxl': u(28),
   // space
-  s1: u(2),
-  s2: u(4),
-  s3: u(6),
-  s4: u(8),
-  s5: u(12),
-  s6: u(16),
-  // strokes
-  'w-hair': u(0.5),
-  'w-fine': u(0.9),
-  'w-rule': u(1.2),
-  'w-bold': u(1.6),
+  s1: snapped(2),
+  s2: snapped(4),
+  s3: snapped(6),
+  s4: snapped(8),
+  s5: snapped(12),
+  s6: snapped(16),
+  // strokes, whole device pixels at the iPad's two to the CSS px
+  'w-hair': snapped(0.5, 0.5),
+  'w-fine': snapped(0.9, 0.5),
+  'w-rule': snapped(1.2, 0.5),
+  'w-bold': snapped(1.6, 0.5),
   // fills
   stripes: `repeating-linear-gradient(-45deg, ${WASH.ochre} 0 ${u(5)}, ${blend(WASH.ochre, INK.iron, 0.2)} ${u(5)} ${u(10)})`,
   range: `repeating-linear-gradient(-45deg, transparent 0 ${u(1.6)}, ${alpha(INK.iron, 0.45)} ${u(1.6)} ${u(2.2)})`,

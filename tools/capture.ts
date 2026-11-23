@@ -3,9 +3,9 @@
 //   node tools/capture.ts [--shots=n --every=ms] [query ...]      e.g. node tools/capture.ts t=10 t=15 t=18.6
 // --shots takes n screenshots of each page, `every` ms apart (default 1), named
 // <query>-<k>.png past the first. The page is the iPad Air's landscape screen
-// (launch.ts VIEW). --dpr=2 shows it at the iPad's own pixel density: the frame
-// is still drawn at its internal resolution (frame.ts SCALE) and the browser
-// scales it up, as the iPad does. --out=dir writes there (captures/). Starts
+// (launch.ts VIEW), at its own pixel density (DPR) unless --dpr says another:
+// the frame is still drawn at its internal resolution (frame.ts SCALE) and the
+// browser scales it up, as the iPad does. --out=dir writes there (captures/). Starts
 // the Vite dev server, opens one page per query, waits for a second and a half
 // of frames, writes captures/<query>.png. The frame rate is uncapped, so the
 // FPS printed is a cost measure; GPU timestamps read 0 when uncapped. --passes
@@ -13,7 +13,7 @@
 // (src/meter.ts).
 
 import { mkdirSync } from 'node:fs';
-import { VIEW, launch } from './launch.ts';
+import { DPR, VIEW, launch } from './launch.ts';
 
 const flag = (name: string, fallback: number) =>
   Number(
@@ -22,7 +22,7 @@ const flag = (name: string, fallback: number) =>
   );
 const shots = flag('shots', 1),
   every = flag('every', 500),
-  dpr = flag('dpr', 1);
+  dpr = flag('dpr', DPR);
 const out =
   process.argv.find((a) => a.startsWith('--out='))?.slice(6) ?? 'captures';
 const split = process.argv.includes('--passes');

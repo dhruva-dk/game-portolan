@@ -23,7 +23,7 @@ import { kitLooks } from '../chartroom/kit.ts';
 import { column, page } from '../chartroom/layout.ts';
 import { paper, plate, sheet } from '../chartroom/paper.ts';
 import { brassPort } from '../chartroom/port.ts';
-import { u } from '../chartroom/tokens.ts';
+import { snapped, u } from '../chartroom/tokens.ts';
 import { emblem } from '../emblem.ts';
 import type { Glyph } from '../glyphs.ts';
 import { el, ordinal, styled } from '../kit/part.ts';
@@ -43,7 +43,9 @@ const CSS = `
 
 .hm-mood { display: flex; flex-direction: column; gap: var(--s1); }
 .hm-ends { display: flex; justify-content: space-between; }
-.hm-verdict { padding: ${u(1)} var(--s3); font-weight: 700; box-shadow: inset 0 0 0 var(--w-fine) var(--ink); }
+/* a verdict: one size, whatever it says, centred in its row (not on its words' baseline) */
+.hm-verdict { align-self: center; display: grid; place-items: center; height: ${snapped(12)}; min-width: ${snapped(66)};
+  padding: 0 var(--s3); font-weight: 700; line-height: 1; box-shadow: inset 0 0 0 var(--w-fine) var(--ink); }
 .hm-verdict.good { background: var(--good); color: var(--on-ink); }
 .hm-verdict.bad { background: var(--harm); color: var(--on-ink); }
 .hm-verdict.warn { background: var(--warn); }

@@ -16,13 +16,24 @@ import { boxOf, fade, onResize, screen, view } from '../ui.ts';
 import { SCREENS, type Name, type Opened } from './screens.ts';
 import { STRIP, NAV, createShell } from './shell.ts';
 
-/** How far past the page the dimming runs, px, so a screen of another shape is dimmed to its edges. */
-const PAST = 4000;
+/**
+ * How far past the page the dimming runs, page px: to the screen's edges where
+ * the page is letterboxed on a screen of another shape, and no further (a
+ * blurred layer much larger than the screen outgrows the GPU's textures at two
+ * pixels to the px, and is blurred whole, its window lost).
+ */
+function margins() {
+  const k = Math.min(view.w / PAGE.w, view.h / PAGE.h);
+  return {
+    x: Math.ceil(Math.max(0, (view.w / k - PAGE.w) / 2)) + 1,
+    y: Math.ceil(Math.max(0, (view.h / k - PAGE.h) / 2)) + 1,
+  };
+}
 
 const CSS = `
 .ui .o-root, .ui .o-root * { pointer-events: auto; }
 .o-root { overflow: hidden; z-index: 2; }
-.o-dim { position: absolute; inset: ${-PAST}px; background: ${alpha(SHADOW, 0.34)};
+.o-dim { position: absolute; inset: 0; background: ${alpha(SHADOW, 0.34)};
   -webkit-backdrop-filter: blur(9px); backdrop-filter: blur(9px); }
 .o-body { position: absolute; left: 0; right: 0; top: ${STRIP}px; bottom: ${NAV}px; }
 .o-body.bare { top: 0; bottom: 0; }
@@ -128,6 +139,8 @@ export function createOffice(desk: Desk, backdrop?: Backdrop) {
 
   /** The world shown clear through the open screen's window (an element it marks o-window), dimmed round it. */
   function clear() {
+    const reach = margins();
+    dim.style.inset = `${-reach.y}px ${-reach.x}px`;
     const hole =
       (open && made.get(open)?.el.querySelector<HTMLElement>('.o-window')) ||
       null;
@@ -140,8 +153,8 @@ export function createOffice(desk: Desk, backdrop?: Backdrop) {
     const p = boxOf(page),
       h = boxOf(hole),
       k = p.width / PAGE.w;
-    const x = (v: number) => `${((v - p.left) / k + PAST).toFixed(1)}px`,
-      y = (v: number) => `${((v - p.top) / k + PAST).toFixed(1)}px`;
+    const x = (v: number) => `${((v - p.left) / k + reach.x).toFixed(1)}px`,
+      y = (v: number) => `${((v - p.top) / k + reach.y).toFixed(1)}px`;
     const [l, t, r, b] = [x(h.left), y(h.top), x(h.right), y(h.bottom)];
     dim.style.clipPath = `polygon(evenodd, 0 0, 100% 0, 100% 100%, 0 100%, 0 0, ${l} ${t}, ${l} ${b}, ${r} ${b}, ${r} ${t}, ${l} ${t})`;
     // the camera's subject drawn in the middle of the window, or of what the screen marks within it

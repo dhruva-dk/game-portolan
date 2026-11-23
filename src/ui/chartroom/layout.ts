@@ -5,13 +5,17 @@
 // stacks its sheets; a sheet told to grow takes the room left in it.
 
 import { el, type Kid } from '../kit/part.ts';
-import { u } from './tokens.ts';
+import { snapped } from './tokens.ts';
+
+/** The narrow columns' widths, snapped, so every column's edge is on a pixel. */
+const NARROW = snapped(168),
+  ASIDE = snapped(176);
 
 export const LAYOUT_CSS = `
 .cr-page { display: grid; gap: var(--s4); padding: var(--s4) var(--s6); min-height: 0; }
-.cr-page.ledger { grid-template-columns: ${u(168)} minmax(0, 1fr) ${u(176)}; }
-.cr-page.side { grid-template-columns: ${u(168)} minmax(0, 1fr); }
-.cr-page.aside { grid-template-columns: minmax(0, 1fr) ${u(176)}; }
+.cr-page.ledger { grid-template-columns: ${NARROW} minmax(0, 1fr) ${ASIDE}; }
+.cr-page.side { grid-template-columns: ${NARROW} minmax(0, 1fr); }
+.cr-page.aside { grid-template-columns: minmax(0, 1fr) ${ASIDE}; }
 .cr-page.cards { grid-template-columns: repeat(var(--cols), minmax(0, 1fr)); grid-template-rows: repeat(var(--rows), minmax(0, 1fr)); }
 .cr-col { display: flex; flex-direction: column; gap: var(--s4); min-width: 0; min-height: 0; }
 .cr-grow { flex: 1; min-height: 0; }

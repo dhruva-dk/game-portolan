@@ -48,8 +48,9 @@ const TAB: Readonly<Record<Tab, { name: string; glyph: Glyph }>> = {
 };
 
 const CSS = `
-.sh-bar { position: absolute; left: 0; right: 0; top: 0; height: ${u(BAR)}; padding: var(--s2) var(--s4) 0; }
-.sh-top { height: 100%; display: flex; align-items: center; gap: var(--s4); padding: 0 var(--s3) 0 var(--s4); }
+/* the bar on the page's own margins, its things inset as a sheet's are: its edges and its contents on the columns' */
+.sh-bar { position: absolute; left: 0; right: 0; top: 0; height: ${u(BAR)}; padding: var(--s2) var(--s6) 0; }
+.sh-top { height: 100%; display: flex; align-items: center; gap: var(--s4); padding: 0 var(--s5); }
 .sh-team { flex: none; display: flex; align-items: center; gap: var(--s2); max-width: ${u(96)}; }
 .sh-team > svg { flex: none; width: ${u(18)}; height: ${u(18)}; }
 .sh-team > span { font: 700 var(--t-body)/1.1 var(--face); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2;
@@ -71,7 +72,8 @@ const CSS = `
 .sh-stat.owing .cr-fig { color: var(--harm); }
 .sh-count > svg, svg.sh-count { width: ${u(11)}; height: ${u(11)}; }
 
-.sh-nav { position: absolute; left: 0; right: 0; bottom: 0; height: ${u(BAND)}; display: flex; align-items: stretch;
+/* the band runs the screen's width; its tabs and the way on keep to the page's margins */
+.sh-nav { position: absolute; left: 0; right: 0; bottom: 0; height: ${u(BAND)}; display: flex; align-items: stretch; padding: 0 var(--s6);
   background: var(--paper-sunk); border-top: var(--w-bold) solid var(--ink); box-shadow: inset 0 var(--w-rule) 0 var(--paper-raised); }
 .sh-tabs { flex: 1; display: flex; min-width: 0; }
 .sh-tab { position: relative; flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center;
@@ -90,7 +92,7 @@ const CSS = `
 .sh-date { flex: none; display: flex; flex-direction: column; justify-content: center; align-items: flex-end; gap: ${u(0.5)};
   padding: 0 var(--s3) 0 var(--s4); border-left: var(--w-fine) solid var(--line); }
 .sh-date b { font: italic 600 var(--t-body)/1 var(--face); white-space: nowrap; }
-.sh-on { position: relative; flex: none; width: ${u(92)}; display: grid; place-items: center; margin-right: var(--s2);
+.sh-on { position: relative; flex: none; width: ${u(92)}; display: grid; place-items: center;
   transition: translate var(--press); }
 .sh-on.press:active { translate: 0 var(--u); }
 .sh-on > svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
