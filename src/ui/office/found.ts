@@ -1,7 +1,8 @@
 // A new team made, on the chartroom kit, after MM's (048–050), on the whole
 // page. At the left its making in four steps, one open at a time: the team's
 // name, its owner's, its emblem and its ships' livery (a pattern stepped
-// through, a dye of the swatches); each shut step a strip saying what it holds.
+// through, a dye of the swatches); each shut step a strip saying what it holds;
+// under them what it takes on (whose place, their chairman, their staff).
 // At the right her ship through a brass-framed window (the world clear behind
 // the page), the team's plate under it (its emblem, its name, the championship
 // it joins and whose place it takes), and at the foot its owner, why the last
@@ -9,6 +10,7 @@
 
 import type { FoundView, Founding } from '../../office/loop.ts';
 import { button, field, stepper } from '../chartroom/controls.ts';
+import { terms } from '../chartroom/data.ts';
 import { label } from '../chartroom/figures.ts';
 import { kitLooks } from '../chartroom/kit.ts';
 import { column, page } from '../chartroom/layout.ts';
@@ -42,8 +44,8 @@ const CSS = `
 .fd-window > .o-subject { position: absolute; left: 0; right: 0; top: 50%; height: 100%; translate: 0 -50%; pointer-events: none; }
 .fd-crest { flex: none; display: flex; align-items: center; gap: var(--s4); padding: var(--s3) var(--s5); }
 .fd-crest > svg { flex: none; width: ${u(22)}; height: ${u(22)}; }
-.fd-crest b { font: 700 var(--t-title)/1 var(--face); letter-spacing: .14em; text-transform: uppercase; }
-.fd-crest span { margin-left: auto; font: italic 500 var(--t-body)/1.2 var(--face); letter-spacing: 0; text-transform: none; opacity: .8; }
+.fd-crest b { flex: none; font: 700 var(--t-title)/1 var(--face); letter-spacing: .14em; text-transform: uppercase; white-space: nowrap; }
+.fd-crest span { min-width: 0; margin-left: auto; text-align: right; font: italic 500 var(--t-body)/1.2 var(--face); letter-spacing: 0; text-transform: none; opacity: .8; }
 .fd-foot { display: grid; grid-template-columns: minmax(0, 1fr) auto ${u(90)}; align-items: center; gap: var(--s5);
   padding: var(--s3) var(--s4); }
 .fd-foot > .cr-harm { font-style: italic; }
@@ -162,11 +164,25 @@ export function createFound(office: Office): Screen<FoundView> {
     const crest = plate(
       emblem(d.emblem, jacket, 22),
       el('b', '', d.team),
-      el('span', '', `Joins the ${v.championship} in ${v.replacing}’s place`)
+      el(
+        'span',
+        '',
+        `Joins the ${v.championship} in ${v.replacing.team}’s place`
+      )
     );
     crest.classList.add('fd-crest');
     root.replaceChildren(
-      column(el('div', 'fd-title', plate('Found a Team')), ...STEPS.map(step)),
+      column(
+        el('div', 'fd-title', plate('Found a Team')),
+        ...STEPS.map(step),
+        sheet('What It Takes On', [
+          terms([
+            ['The place of', v.replacing.team],
+            ['Its chairman', v.replacing.chairman],
+            ['Its staff', `${v.replacing.staff.toFixed(1)} stars on average`],
+          ]),
+        ])
+      ),
       column(
         el(
           'div',

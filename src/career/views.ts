@@ -418,7 +418,10 @@ export function homeView(s: CareerState): HomeView {
 export const TIERS = ['Tier 1', 'Tier 2', 'Tier 3'];
 
 /** Founding's defaults for a seed: a team name whose words clash with no team's, a name for the player, a face. */
-const founding = new Map<string, { replacing: string; names: string[] }>();
+const founding = new Map<
+  string,
+  { replacing: FoundView['replacing']; names: string[] }
+>();
 function worldFor(seed: number, colours: Colours) {
   const key = `${seed}.${colours.dye}.${colours.pattern}`;
   let w = founding.get(key);
@@ -430,7 +433,11 @@ function worldFor(seed: number, colours: Colours) {
       (g) => g.contract?.team === k.id && g.retired === null
     );
     w = {
-      replacing: `${k.name} of ${TIERS[k.tier]}: chairman ${nameOf(chairman)}, staff ${staffStars(staff).toFixed(1)} stars on average.`,
+      replacing: {
+        team: k.name,
+        chairman: nameOf(chairman),
+        staff: staffStars(staff),
+      },
       names: world.teams.map((x) => x.name),
     };
     founding.set(key, w);

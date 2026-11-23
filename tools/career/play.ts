@@ -56,7 +56,7 @@ const capture = async (name: string) => {
 const at = (name: string, timeout = 120000) =>
   page.waitForSelector(`.o-body > .s-${name}:not([hidden])`, { timeout });
 const tap = (selector: string) => page.locator(selector).first().click();
-const title = () => page.locator('.o-title').innerText();
+const title = () => page.locator('.sh-title').innerText();
 
 try {
   await page.goto(`${url}?debug&manager`);
@@ -148,14 +148,14 @@ try {
     // Continue through the days until race day's plan opens
     for (let stops = 0; stops < 40; stops++) {
       if (await page.locator('.o-body > .s-plan:not([hidden])').count()) break;
-      await tap('.o-on');
+      await tap('.sh-on');
       await page.waitForTimeout(400);
     }
     await at('plan', 10000);
     await capture(`race${race}-plan`);
     console.log(`race ${race}: ${await title()}`);
     // the race: Continue from the plan; the eye comes down, the HUD shows
-    await tap('.o-on');
+    await tap('.sh-on');
     await page.waitForFunction(
       () => {
         const office = document.querySelector<HTMLElement>('.o-root');
@@ -204,7 +204,7 @@ try {
     await at('result', 10000);
     await page.waitForTimeout(800);
     await capture(`race${race}-result`);
-    await tap('.o-on');
+    await tap('.sh-on');
     await at('home');
     await page.waitForTimeout(1500);
     await capture(`race${race}-home`);

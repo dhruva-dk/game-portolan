@@ -2,6 +2,7 @@
 // prepared (plan), its result, and the championship's standings. Plain data.
 
 import type { Call } from '../race.ts';
+import type { Replacing } from './career.ts';
 import type { StandingLine } from './home.ts';
 import type { Team, Verdict } from './office.ts';
 
@@ -14,9 +15,9 @@ export interface FoundView {
   dyes: readonly (readonly [string, string])[];
   patterns: readonly string[];
   emblems: number;
-  /** The championship the new team joins, and the team whose place it takes. */
+  /** The championship the new team joins, and the team whose place it takes (its chairman and staff with it). */
   championship: string;
-  replacing: string;
+  replacing: Replacing;
   /** Why the last making asked was refused (null: none was). */
   refused: string | null;
 }

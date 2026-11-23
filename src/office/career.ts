@@ -154,7 +154,13 @@ export interface FoundView {
   patterns: number;
   emblems: number;
   limits: { team: number; person: number };
-  replacing: string;
+  replacing: Replacing;
+}
+/** The team whose place a new one takes, and what it takes on with it: the chairman and the staff (their mean stars). */
+export interface Replacing {
+  team: string;
+  chairman: string;
+  staff: number;
 }
 /** What the founding form gets wrong, by field (a field missing is right). */
 export interface FoundErrors {

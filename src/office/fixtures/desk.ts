@@ -54,7 +54,7 @@ const VIEWS: Pick<
     patterns: ['Plain', 'Band', 'Stripes'],
     emblems: 12,
     championship: SHELL.championship,
-    replacing: 'Razorbill',
+    replacing: { team: 'Razorbill', chairman: 'Maneette Greymere', staff: 1.6 },
     refused: null,
   },
   plan: {

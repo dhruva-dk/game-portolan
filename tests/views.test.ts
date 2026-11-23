@@ -155,7 +155,8 @@ test('found: defaults the career takes, the same for a seed, the team it replace
   assert.ok(v.team.length >= 1 && v.team.length <= v.limits.team);
   assert.deepEqual([v.dyes, v.patterns], [16, 3]);
   assert.equal(v.emblems, 12);
-  assert.match(v.replacing, /Tier 3/);
+  assert.ok(v.replacing.team.length > 0 && v.replacing.chairman.length > 0);
+  assert.ok(v.replacing.staff > 0);
   const r = apply(start(), {
     kind: 'Found',
     seed: v.seed,
