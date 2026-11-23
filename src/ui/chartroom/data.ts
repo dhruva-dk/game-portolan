@@ -49,7 +49,8 @@ export const DATA_CSS = `
 
 .cr-table { display: flex; flex-direction: column; min-height: 0; font-variant-numeric: tabular-nums lining-nums; }
 .cr-table.scrolls { flex: 1; }
-.cr-rows { flex: 1; min-height: 0; overflow-y: auto; }
+/* a list scrolls in its own box, clipped: room inside it for its papers' cut edges and shadows, the box let out as far */
+.cr-rows { flex: 1; min-height: 0; overflow-y: auto; padding: var(--s2); margin: calc(-1 * var(--s2)); }
 .cr-tr { display: grid; grid-template-columns: var(--tracks); align-items: center; column-gap: var(--s4); min-height: var(--row);
   padding: 0 var(--s2); border-bottom: var(--w-fine) solid var(--rule); }
 .cr-tr.head { min-height: 0; padding-bottom: var(--s1); border-bottom: var(--w-rule) solid var(--ink);

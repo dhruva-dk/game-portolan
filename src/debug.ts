@@ -459,10 +459,10 @@ function open(p: Played, others: readonly Berth[], world: World) {
   const { game, referee, flow } = p;
   const screen = params.get('screen') ?? 'match';
   if (officed) {
-    // the office on the fixture desk, over her ship at anchor in the lobby's place
+    // the office on the fixture desk, over her ship at anchor in the lobby's place, the camera staged as a career's is
     flow.go('lobby');
     flow.office(true);
-    const office = createOffice(FIXTURE);
+    const office = createOffice(FIXTURE, { stage: game.stage });
     office.go(officed);
     office.show(true);
     // (the fixture's next race's planet, as a career page's own is surveyed)

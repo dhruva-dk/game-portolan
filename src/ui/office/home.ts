@@ -47,16 +47,15 @@ const CSS = `
 .hm-verdict.warn { background: var(--warn); }
 .hm-verdict.fair { background: var(--paper-raised); }
 
-.hm-window { position: relative; flex: 1; min-height: ${u(60)}; box-shadow: 0 0 0 var(--w-bold) var(--ink),
-  inset 0 0 0 ${u(3)} var(--brass), inset 0 0 0 ${u(3.8)} var(--ink); }
+/* the window and its nameplate under it, one frame */
+.hm-framed { flex: 1; min-height: ${u(80)}; display: flex; flex-direction: column; box-shadow: 0 0 0 var(--w-bold) var(--ink); }
+.hm-window { position: relative; flex: 1; min-height: 0; box-shadow: inset 0 0 0 ${u(3)} var(--brass), inset 0 0 0 ${u(3.8)} var(--ink); }
 /* she is drawn a little larger than the window is high: her hull and her courses fill it */
 .hm-window > .o-subject { position: absolute; left: 0; right: 0; top: 50%; height: 115%; translate: 0 -50%; pointer-events: none; }
-.hm-crest { position: absolute; left: ${u(3.8)}; bottom: var(--s4); display: flex; align-items: center; gap: var(--s3);
-  max-width: 80%; padding: var(--s2) var(--s5) var(--s2) var(--s3); }
-.hm-crest > svg { flex: none; width: ${u(22)}; height: ${u(22)}; }
-.hm-crest > div { display: flex; flex-direction: column; gap: ${u(1)}; min-width: 0; }
-.hm-crest b { font: 700 var(--t-title)/1 var(--face); letter-spacing: .1em; text-transform: uppercase; white-space: nowrap;
-  overflow: hidden; text-overflow: ellipsis; }
+.hm-crest { flex: none; display: flex; align-items: center; gap: var(--s3); padding: var(--s2) var(--s4); }
+.hm-crest > svg { flex: none; width: ${u(16)}; height: ${u(16)}; }
+.hm-crest b { flex: 1; min-width: 0; font: 700 var(--t-name)/1 var(--face); letter-spacing: .12em; text-transform: uppercase;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 .hm-drivers { display: grid; grid-template-columns: repeat(4, 1fr); padding: var(--s3) var(--s2); }
 .hm-drivers > div { display: flex; align-items: center; gap: var(--s2); min-width: 0; padding: 0 var(--s2); }
@@ -197,17 +196,13 @@ export function createHome(office: Office): Screen<HomeView> {
   const team = (v: HomeView) => [
     el(
       'div',
-      'hm-window o-window',
-      el('div', 'o-subject'),
+      'hm-framed',
+      el('div', 'hm-window o-window', el('div', 'o-subject')),
       as(
         plate(
-          emblem(v.team.emblem, v.team.colours, 22),
-          el(
-            'div',
-            '',
-            el('b', '', v.team.name),
-            el('span', 'hm-faint', v.championship)
-          )
+          emblem(v.team.emblem, v.team.colours, 16),
+          el('b', '', v.team.name),
+          el('span', 'hm-faint', v.championship)
         ),
         'hm-crest'
       )
