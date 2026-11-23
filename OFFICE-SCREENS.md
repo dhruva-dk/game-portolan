@@ -17,6 +17,15 @@ business logic given a screen, and the old kit deleted. The battle HUD stays as 
 - **Rebase onto main once, at the end** (no work is being done on main).
 - **Headless Chromium is the check.**
 
+## How a screen is checked (before it is called built)
+
+1. `npm test`: the tokens test, and `tools/layout.ts` on every kit screen's fixture (frame, pixel, centre, inside,
+   inset). A new screen joins `layout.ts`'s list when it is built.
+2. `node tools/career/play.ts --tour`: the live career through it, real data, no page errors.
+3. Its 2× capture (`tools/capture.ts`, the iPad's density), looked at last: measured first, judged second.
+4. A fault found by eye becomes a rule: a check that fails on the old code and passes on the fix. A fault in a kit
+   piece is fixed in the kit, not the screen.
+
 ## Gaps found (career logic with no UI, 2026-11-23)
 
 | Gap                                                                                            | Where                                                                   | Goes to             |
