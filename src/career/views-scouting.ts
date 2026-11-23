@@ -10,6 +10,7 @@ import type {
 } from '../office/people.ts';
 import { closing } from './contracts.ts';
 import { effective } from './effective.ts';
+import { championship } from './office.ts';
 import { tierOf } from './knowledge.ts';
 import { askOf } from './market.ts';
 import type { Person } from './roles.ts';
@@ -152,6 +153,7 @@ export function scoutingView(
     top: topBar(s),
     filter: f,
     roles: ROLES.map((r) => ({ id: r, label: ROLE_NAMES[r] })),
+    tiers: [0, 1, 2].map(championship),
     rows,
     count: `${rows.length}`,
     shortlist: shortlist

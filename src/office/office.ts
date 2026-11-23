@@ -99,8 +99,9 @@ export type Viewed = keyof Views;
  * to go on (Continue), the menu's four ways, of a job under way its details
  * or its cancelling, the team made, and her team's call for the race's start;
  * a command of the career's; a person's profile or the offer to them opened,
- * the offer as it is drawn now, the scouting list's filter; a letter opened;
- * the type of part on the drawing board, and a slot's card picked.
+ * the offer as it is drawn now, the scouting list's filter, a person put on
+ * the shortlist or taken off it; a letter opened; the type of part on the
+ * drawing board, and a slot's card picked.
  */
 export type Ask =
   | { kind: 'open'; screen: Tab | Viewed }
@@ -113,6 +114,7 @@ export type Ask =
   | { kind: 'person'; id: number; screen: 'profile' | 'offer' }
   | { kind: 'draft'; offer: Offer }
   | { kind: 'filter'; filter: ScoutingFilter }
+  | { kind: 'favourite'; id: number }
   | { kind: 'letter'; id: number }
   | { kind: 'design'; type: PartType }
   | { kind: 'card'; slot: number; card: string };

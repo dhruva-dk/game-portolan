@@ -85,10 +85,11 @@ export async function createManager(shelf: Shelf, look: Look, page: Page) {
     racing: Racing | null = null,
     waiting = false,
     last: Parameters<typeof resultView>[2] | null = null;
-  /** What the screens are open at: a person and the offer drawn to them, the scouting list's filter, a letter, the drawing board. */
+  /** What the screens are open at: a person and the offer drawn to them, the scouting list's filter and shortlist, a letter, the drawing board. */
   let person: number | null = null,
     draft: Offer | null = null,
     filter: ScoutingFilter | null = null,
+    shortlist: readonly number[] = [],
     letter: number | null = null,
     drafting: PartType = 'sails',
     picked: (string | null)[] = [];
@@ -220,6 +221,10 @@ export async function createManager(shelf: Shelf, look: Look, page: Page) {
       page.open(a.screen);
     } else if (a.kind === 'draft') draft = a.offer;
     else if (a.kind === 'filter') filter = a.filter;
+    else if (a.kind === 'favourite')
+      shortlist = shortlist.includes(a.id)
+        ? shortlist.filter((id) => id !== a.id)
+        : [...shortlist, a.id];
     else if (a.kind === 'letter') {
       letter = a.id;
       if (career().mail.some((m) => m.id === a.id && !m.read))
@@ -253,7 +258,7 @@ export async function createManager(shelf: Shelf, look: Look, page: Page) {
     staff: roster,
     profile: () => dyed(session.desk.profile(person)),
     offer: () => dyed(session.desk.offer(person, draft)),
-    scouting: () => dyed(session.desk.market(filter, [])),
+    scouting: () => dyed(session.desk.market(filter, shortlist)),
     player: () => dyed(session.desk.career()),
     jobs: () => dyed(session.desk.jobs()),
     mail: () => mailPaper(career(), letter),

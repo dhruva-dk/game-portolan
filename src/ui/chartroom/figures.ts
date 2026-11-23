@@ -73,6 +73,8 @@ export const arrow = (way: number) =>
 /** A star's outline, 20 units across. */
 const STAR =
   'M10 1.4l2.7 5.6 6.1.9-4.4 4.3 1 6.1L10 15.4l-5.4 2.9 1-6.1L1.2 7.9l6.1-.9z';
+/** A star known: gold, hatched, inked round. */
+const GOLD = `<path d="${STAR}" fill="${TONE.wonWash}"/><path d="${STAR}" fill="url(#h-gold)" stroke="${TONE.ink}" stroke-width="1.1" stroke-linejoin="round"/>`;
 let clips = 0;
 
 /**
@@ -81,7 +83,7 @@ let clips = 0;
  */
 export function stars(known: number, possible = known, size = 11) {
   const half = `cr-half-${++clips}`;
-  const gold = `<path d="${STAR}" fill="${TONE.wonWash}"/><path d="${STAR}" fill="url(#h-gold)" stroke="${TONE.ink}" stroke-width="1.1" stroke-linejoin="round"/>`;
+  const gold = GOLD;
   const empty = `<path d="${STAR}" fill="${alpha(TONE.ink, 0.08)}" stroke="${alpha(TONE.ink, 0.35)}" stroke-width=".9" stroke-linejoin="round"/>`;
   const hollow = `<path d="${STAR}" fill="none" stroke="${TONE.won}" stroke-width="1.4" stroke-dasharray="2.2 1.4" stroke-linejoin="round"/>`;
   let body = `<defs><clipPath id="${half}"><rect width="10" height="20"/></clipPath></defs>`;
@@ -99,6 +101,14 @@ export function stars(known: number, possible = known, size = 11) {
     body += `<g transform="translate(${i * 21} 0)">${star}</g>`;
   }
   return sized(104, 20, body, size, 'cr-stars');
+}
+
+/** One star, `size` units high: gold if `on` (kept, a favourite), else empty. */
+export function favourite(on: boolean, size = 11) {
+  const body = on
+    ? GOLD
+    : `<path d="${STAR}" fill="none" stroke="${alpha(TONE.ink, 0.45)}" stroke-width="1.1" stroke-linejoin="round"/>`;
+  return sized(20, 20, body, size, 'cr-stars');
 }
 
 /** A trait's rosette (marks.ts badge), 22 units high: a plus on it if the trait helps (`sense` 1), a minus if it

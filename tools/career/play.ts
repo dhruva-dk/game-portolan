@@ -109,7 +109,7 @@ try {
     }
     await capture(`${label}-design`);
     await page.locator('.sh-tab').nth(8).click();
-    await tap('.s-scouting .k-rows > .k-tr');
+    await tap('.s-scouting .cr-rows > .cr-tr');
     await at('profile', 10000);
     await page.waitForTimeout(400);
     await capture(`${label}-profile`);

@@ -202,6 +202,8 @@ export interface ScoutingView {
   top: TopBar;
   filter: ScoutingFilter;
   roles: readonly { id: Role; label: string }[];
+  /** The championships by tier (the filter's 0…2), the first the highest. */
+  tiers: readonly string[];
   rows: readonly ScoutingRow[];
   count: string;
   shortlist: readonly ScoutingRow[];
