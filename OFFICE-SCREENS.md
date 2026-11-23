@@ -83,7 +83,10 @@ Each line: built on the kit from a fixture → in review → approved and live. 
 ### 5. The yard
 
 - [ ] Ship (+ design for next season, next season's parts, risk) · [ ] Suppliers (new) · [ ] HQ
-- [ ] Glyphs for the 6 parts and 9 buildings
+- [ ] **Glyphs for the 6 parts and 9 buildings** _(in review)_: `part.<type>` (a bellied sail on its yard, a block, the
+      rudder on its stock, the hull broadside, the keel laid down with its frames, a swivel's yoke) and
+      `building.<id>` (the sawtoothed shed, a set square and ship's curve, a model in the tank, the crucible pouring,
+      a book open, a hammock, the crow's nest, a fish, the pier and its bollard)
 
 ### 6. Bare
 

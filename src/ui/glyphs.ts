@@ -627,6 +627,222 @@ const DRAWN = {
     },
     { k: 'f', d: 'M10.4 21.4a1.6 1.6 0 1 1 3.2 0a1.6 1.6 0 1 1 -3.2 0Z' },
   ],
+
+  // ── the parts (race.ts PARTS), each `part.<type>` ──
+  // sails: a square sail bellied on its yard, its seams cut, its sheets at the foot
+  'part.sails': [
+    { k: 's', d: 'M12 1.2V4.4', w: 1.6 },
+    { k: 'f', d: 'M4 5H20Q22.4 12.4 21.4 19.8Q12 16.6 2.6 19.8Q1.6 12.4 4 5Z' },
+    {
+      k: 's',
+      d: 'M9.2 5.4Q8.4 11.6 8.6 17.6M14.8 5.4Q15.6 11.6 15.4 17.6',
+      w: 0.8,
+      cut: true,
+    },
+    { k: 's', d: 'M4 9.6Q12 10.8 20 9.6', w: 0.8, cut: true, fine: true },
+    { k: 's', d: 'M2.6 4.4H21.4', w: 1.8, top: true },
+    { k: 's', d: 'M4.8 19.6L2.6 22.6M19.2 19.6L21.4 22.6', w: 1, fine: true },
+  ],
+  // rigging: a block, its shell slung from its ring, its sheave cut, the fall rove through it
+  'part.rigging': [
+    { k: 's', d: 'M8.6 15.6V22.6M15.4 15.6V22.6', w: 1.3 },
+    { k: 's', d: 'M12 1.6a2.2 2.2 0 1 1 0 4.4a2.2 2.2 0 1 1 0 -4.4Z', w: 1.6 },
+    { k: 's', d: 'M12 6V7', w: 1.8 },
+    { k: 'f', d: 'M6.6 13a5.4 6.2 0 1 1 10.8 0a5.4 6.2 0 1 1 -10.8 0Z' },
+    { k: 's', d: 'M9 13a3 3 0 1 1 6 0a3 3 0 1 1 -6 0Z', w: 0.9, cut: true },
+    { k: 'f', d: 'M11 13a1 1 0 1 1 2 0a1 1 0 1 1 -2 0Z', top: true },
+  ],
+  // the rudder: its blade hung on its stock, broad aft and below, the tiller at its head
+  'part.rudder': [
+    { k: 'f', d: 'M8.8 6.4H14.8Q20.4 8.6 20.4 21.2H8.8Z' },
+    { k: 's', d: 'M9 10.4H12M9 14.6H12M9 18.8H12', w: 1, cut: true },
+    {
+      k: 's',
+      d: 'M12.6 9.6Q17.6 11.4 18.8 18.6',
+      w: 0.8,
+      cut: true,
+      fine: true,
+    },
+    { k: 's', d: 'M8 1.6V22.4', w: 2.2, top: true },
+    { k: 's', d: 'M8 3.8H2.6', w: 1.8, top: true },
+    {
+      k: 'f',
+      d: 'M1.2 3.8a1.3 1.3 0 1 1 2.6 0a1.3 1.3 0 1 1 -2.6 0Z',
+      top: true,
+    },
+  ],
+  // the hull: broadside, no masts, her sheer rising to the stem at the right, planked, her ports cut along her wale
+  'part.hull': [
+    {
+      k: 'f',
+      d: 'M1.4 7.6Q10 9.4 18.4 7.6L23 5Q22 13.4 17.8 16.8Q11.6 19.8 4.6 17.6Q2.2 14.4 1.4 7.6Z',
+    },
+    {
+      k: 'f',
+      d: 'M5 10.2h2v1.6h-2ZM10.2 10.6h2v1.6h-2ZM15.4 10.2h2v1.6h-2Z',
+      cut: true,
+    },
+    { k: 's', d: 'M2.2 13.6Q11 15.2 20.6 12.6', w: 0.9, cut: true },
+    { k: 's', d: 'M4 16Q11 17.6 18.4 15.4', w: 0.8, cut: true, fine: true },
+  ],
+  // the keel: laid down, the ship's backbone: its beam, the stem and sternpost rising from it, the frames between
+  'part.keel': [
+    {
+      k: 's',
+      d: 'M7.6 18Q6.2 12 7.8 7M11.8 18Q10.4 12 12 6.6M15.8 18Q14.4 12 16 7',
+      w: 1.6,
+    },
+    { k: 's', d: 'M3.2 18.4V5.4', w: 2.2 },
+    { k: 's', d: 'M19.6 18.4Q22.8 12 21.4 4.6', w: 2.2 },
+    { k: 'f', d: 'M1.4 17.4H21.6Q21.6 20.6 19.4 20.6H1.4Z', top: true },
+    { k: 's', d: 'M6 19H17.4', w: 0.8, cut: true, top: true, fine: true },
+  ],
+  // the mounts: a swivel's yoke on its post, the trunnions' holes cut, on its plate
+  'part.mounts': [
+    {
+      k: 's',
+      d: 'M6.4 3.2V9.4Q6.4 13.4 12 13.4Q17.6 13.4 17.6 9.4V3.2',
+      w: 2.6,
+    },
+    { k: 'f', d: 'M10.6 13.2h2.8v6.6h-2.8Z' },
+    {
+      k: 'f',
+      d: 'M5.4 19.6h13.2a1 1 0 0 1 1 1v1.4h-15.2v-1.4a1 1 0 0 1 1 -1Z',
+    },
+    {
+      k: 'f',
+      d: 'M4.2 6a2.2 2.2 0 1 1 4.4 0a2.2 2.2 0 1 1 -4.4 0ZM15.4 6a2.2 2.2 0 1 1 4.4 0a2.2 2.2 0 1 1 -4.4 0Z',
+      top: true,
+    },
+    {
+      k: 'f',
+      d: 'M5.6 6a0.8 0.8 0 1 1 1.6 0a0.8 0.8 0 1 1 -1.6 0ZM16.8 6a0.8 0.8 0 1 1 1.6 0a0.8 0.8 0 1 1 -1.6 0Z',
+      cut: true,
+      top: true,
+    },
+  ],
+
+  // ── the buildings (office/command.ts Building), each `building.<id>` ──
+  // the factory: the shipwrights' shed, its roof sawtoothed, its chimney
+  'building.factory': [
+    { k: 'f', d: 'M18.4 3.2h3v18h-3Z' },
+    { k: 'f', d: 'M2.4 21.2V11.6L7.6 7.4V11.6L12.8 7.4V11.6L18.2 7.4V21.2Z' },
+    {
+      k: 'f',
+      d: 'M4.4 14.2h2.6v2.6h-2.6ZM9.6 14.2h2.6v2.6h-2.6ZM14.4 14.2h2.4v2.6h-2.4Z',
+      cut: true,
+    },
+    { k: 's', d: 'M19.6 1.8Q21.6 1 20.8 0.2', w: 0.9, fine: true },
+    { k: 's', d: 'M1 21.8H23', w: 1.4, top: true },
+  ],
+  // the drawing loft: a set square, its middle cut out, a ship's curve over it
+  'building.drawingLoft': [
+    { k: 'f', d: 'M3 21V5L19 21Z' },
+    { k: 'f', d: 'M6.2 17.8V12.4L11.6 17.8Z', cut: true },
+    {
+      k: 's',
+      d: 'M3.4 8.2H5M3.4 10.8H5M3.4 13.4H5',
+      w: 0.7,
+      cut: true,
+      fine: true,
+    },
+    { k: 's', d: 'M9.6 3Q20.6 4 21.2 15.6', w: 2.2, top: true },
+  ],
+  // the test tank: a model hull afloat in the tank's still water
+  'building.testTank': [
+    {
+      k: 'f',
+      d: 'M3.4 13Q6 12 8.6 13T13.8 13T19 13Q19.8 12.6 20.6 13V20H3.4Z',
+    },
+    {
+      k: 's',
+      d: 'M5 16.4Q8 15.4 11 16.4T17 16.4',
+      w: 0.8,
+      cut: true,
+      fine: true,
+    },
+    { k: 's', d: 'M12 4.6V10.2', w: 1.1, top: true },
+    { k: 'f', d: 'M12.6 5.2L16.4 8.8H12.6Z', top: true, fine: true },
+    { k: 'f', d: 'M6.8 10.2H17.2L15.6 13.8H8.4Z', top: true },
+    { k: 's', d: 'M2.2 7.6V21H21.8V7.6', w: 1.8, top: true },
+  ],
+  // the foundry: the crucible tipped, its iron pouring into the mould
+  'building.foundry': [
+    { k: 's', d: 'M15.4 9.6Q16.8 12.4 16.4 17', w: 1.6 },
+    {
+      k: 'f',
+      d: 'M3.6 6.4Q3.6 12.4 9.2 12.4Q14.8 12.4 14.8 6.4Z',
+      tr: 'rotate(28 9.2 9)',
+    },
+    { k: 's', d: 'M3.6 6.4L0.8 3', w: 1.8, tr: 'rotate(28 9.2 9)' },
+    { k: 's', d: 'M4.4 7.8H14', w: 0.8, cut: true, tr: 'rotate(28 9.2 9)' },
+    { k: 'f', d: 'M10.2 17.2H22.4L21.2 21.6H11.4Z' },
+    { k: 's', d: 'M12.8 18.8H20', w: 1, cut: true },
+  ],
+  // the sailing school: a book open, its lines ruled, its ribbon hanging
+  'building.sailingSchool': [
+    { k: 'f', d: 'M12 6.2Q8 3.8 2.2 5V19.4Q8 18.2 12 20.6Z' },
+    { k: 'f', d: 'M12 6.2Q16 3.8 21.8 5V19.4Q16 18.2 12 20.6Z' },
+    { k: 's', d: 'M12 6.4V20.4', w: 1, cut: true },
+    {
+      k: 's',
+      d: 'M4.4 9Q7.6 8.4 10.2 9.6M4.4 12Q7.6 11.4 10.2 12.6M4.4 15Q7.6 14.4 10.2 15.6M13.8 9.6Q16.4 8.4 19.6 9M13.8 12.6Q16.4 11.4 19.6 12M13.8 15.6Q16.4 14.4 19.6 15',
+      w: 0.7,
+      cut: true,
+      fine: true,
+    },
+    { k: 's', d: 'M13 20L14 23.2', w: 1.4, top: true },
+  ],
+  // the pit house: a hammock slung between two posts, for the crew's rest
+  'building.pitHouse': [
+    { k: 's', d: 'M3 3V21.6M21 3V21.6', w: 2 },
+    { k: 's', d: 'M3 5.8L5 8.4M21 5.8L19 8.4', w: 1 },
+    { k: 'f', d: 'M4 8Q12 22.4 20 8Q12 16.8 4 8Z' },
+    { k: 's', d: 'M7.6 12.4Q12 16.2 16.4 12.4', w: 0.8, cut: true, fine: true },
+    { k: 's', d: 'M1.2 21.8H5.6M18.4 21.8H22.8', w: 1.4 },
+  ],
+  // the crow's nest: the barrel at the masthead, hooped, the pennant above it, the shrouds below
+  'building.crowsNest': [
+    { k: 's', d: 'M12 12.4L4.6 22.4M12 12.4L19.4 22.4', w: 0.9, fine: true },
+    { k: 's', d: 'M12 1.4V22.4', w: 1.8 },
+    { k: 's', d: 'M5.4 15.2H18.6', w: 1.4 },
+    { k: 'f', d: 'M12.6 1.4L19 3.2L12.6 5Z' },
+    { k: 'f', d: 'M6.6 6.8H17.4L16.4 12.4H7.6Z', top: true },
+    { k: 's', d: 'M7 8.8H17M7.3 10.6H16.7', w: 0.8, cut: true, top: true },
+  ],
+  // the fish market: a fish, its eye and gill cut, its scales at the finer sizes
+  'building.fishMarket': [
+    {
+      k: 'f',
+      d: 'M1.8 12Q7.4 5.4 15 8.4L20.4 4.4Q19 12 20.4 19.6L15 15.6Q7.4 18.6 1.8 12Z',
+    },
+    {
+      k: 'f',
+      d: 'M5.4 10.8a1.1 1.1 0 1 1 2.2 0a1.1 1.1 0 1 1 -2.2 0Z',
+      cut: true,
+    },
+    { k: 's', d: 'M9.4 8.8Q11 12 9.4 15.2', w: 0.9, cut: true },
+    {
+      k: 's',
+      d: 'M12 10Q13 12 12 14M14.4 10.2Q15.4 12 14.4 13.8',
+      w: 0.7,
+      cut: true,
+      fine: true,
+    },
+  ],
+  // the landing pad: the pier the sponsors come ashore at, on its piles, a bollard on its deck
+  'building.landingPad': [
+    { k: 'f', d: 'M3.4 13h2v8.6h-2ZM11 13h2v8.6h-2ZM18.6 13h2v8.6h-2Z' },
+    { k: 'f', d: 'M1.4 10.4H22.6V13.4H1.4Z' },
+    { k: 's', d: 'M1.6 11.9H22.4', w: 0.7, cut: true, fine: true },
+    { k: 'f', d: 'M9.4 3.4h5.2v2h-1v5h-3.2v-5h-1Z' },
+    {
+      k: 's',
+      d: 'M1 18.6Q3.2 17.4 5.4 18.6T9.8 18.6T14.2 18.6T18.6 18.6T23 18.6',
+      w: 1.1,
+      top: true,
+    },
+  ],
 } satisfies Record<string, Prim[]>;
 
 export type Glyph = keyof typeof DRAWN;
