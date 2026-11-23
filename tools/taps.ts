@@ -8,7 +8,7 @@
 // kth tap. --out=dir writes there (captures/).
 
 import { mkdirSync } from 'node:fs';
-import { VIEW, launch } from './launch.ts';
+import { DPR, VIEW, launch } from './launch.ts';
 
 const out =
   process.argv.find((a) => a.startsWith('--out='))?.slice(6) ?? 'captures';
@@ -20,7 +20,10 @@ const { browser, url, close } = await launch();
 mkdirSync(out, { recursive: true });
 
 try {
-  const page = await browser.newPage({ viewport: VIEW });
+  const page = await browser.newPage({
+    viewport: VIEW,
+    deviceScaleFactor: DPR,
+  });
   page.on('pageerror', (e) => console.error(e.message));
   await page.goto(`${url}?${query}`);
   await page.waitForFunction(
