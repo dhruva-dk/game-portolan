@@ -4,7 +4,8 @@
 // stars, their traits' rosettes, a place won, their portrait, a count unread.
 
 import { bust, type Jacket } from '../gull.ts';
-import { alpha, figure, roughCircle, svgNode } from '../ink.ts';
+import type { Glyph } from '../glyphs.ts';
+import { alpha, figure, glyph, roughCircle, svgNode } from '../ink.ts';
 import { el, type Kid } from '../kit/part.ts';
 import { badge } from '../marks.ts';
 import { TONE, u } from './tokens.ts';
@@ -34,6 +35,13 @@ export function mark(w: number, h: number, body: string, cls = '') {
   s.style.width = u(w);
   s.style.height = u(h);
   s.setAttribute('class', `cr-mark ${cls}`.trim());
+  return s;
+}
+
+/** A glyph's woodcut on its 24 grid, unsized: its size is the CSS of where it is set. */
+export function cut(g: Glyph) {
+  const s = mark(24, 24, glyph(g, 12, 12, 24));
+  s.removeAttribute('style');
   return s;
 }
 

@@ -33,6 +33,8 @@ export interface RosterRow {
   ends: string;
   tags: readonly string[];
   find: { role: Role; status: Status } | null; // an open post: the market's filter that finds them
+  /** A person of hers: whether their contract may be renewed now, and why not (null: a heading, an open post, her). */
+  renew: Act | null;
 }
 /** A pit crew member: their work in a stop, how often they slip, and how tired they are. */
 export interface PitRow {
@@ -49,7 +51,19 @@ export interface TeamView {
   roster: readonly RosterRow[];
   wages: Figure;
   open: readonly { role: Role; status: Status; label: string }[];
-  bonds: readonly { ship: Ship; label: string; bond: Figure; fill: number }[];
+  /**
+   * Each ship's bond between its driver and its mechanic: `fill` how far to the
+   * strongest (0…100), `marks` where each level is reached (shares of the
+   * strongest, 0…1), `level` the one reached (0: none yet).
+   */
+  bonds: readonly {
+    ship: Ship;
+    label: string;
+    bond: Figure;
+    fill: number;
+    marks: readonly number[];
+    level: number;
+  }[];
   pit: readonly PitRow[];
   /** The pit crew as a ship's stop has them (race.ts PitCrew), by ship. */
   stops: readonly { ship: Ship; pace: Figure; slip: Figure }[];

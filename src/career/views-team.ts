@@ -3,7 +3,7 @@
 // read-side.
 
 import { SHIPS } from '../office/command.ts';
-import type { TeamView, PitRow, RosterRow } from '../office/people.ts';
+import type { Act, TeamView, PitRow, RosterRow } from '../office/people.ts';
 import { pitOf } from './card.ts';
 import { effective } from './effective.ts';
 import { perRace, wages } from './money.ts';
@@ -11,6 +11,7 @@ import { bondLevel, fatigueOn, recovery, slipOf, work } from './pit.ts';
 import { hasRole, type Person, type PersonOf } from './roles.ts';
 import { staffOf, type CareerState, type Team } from './state.ts';
 import { trait } from './traits.ts';
+import { renewWhy } from './views-profile.ts';
 import { TUNING } from './tuning.ts';
 import {
   ROLE_NAMES,
@@ -45,8 +46,10 @@ function personRow(s: CareerState, c: Team, g: Person, you = false): RosterRow {
     ends: you ? '—' : endsText(s, g),
     tags: g.traits.map((t) => trait(t).name),
     find: null,
+    renew: you ? null : act(renewWhy(s, c, g)),
   };
 }
+const act = (why: string | null): Act => ({ ok: why === null, why: why ?? '' });
 const head = (title: string): RosterRow => ({
   kind: 'head',
   id: null,
@@ -62,6 +65,7 @@ const head = (title: string): RosterRow => ({
   ends: '',
   tags: [],
   find: null,
+  renew: null,
 });
 const open = (o: ReturnType<typeof openPosts>[number]): RosterRow => ({
   ...head(o.label),
@@ -208,6 +212,8 @@ export function teamView(s: CareerState): TeamView {
         ship,
         label: shipName(ship),
         fill: Math.min(100, (b / top) * 100),
+        marks: levels.map((at) => at / top),
+        level,
         bond: fig(
           b,
           `Level ${level} of ${levels.length}`,

@@ -11,14 +11,13 @@ import type { HomeView, NewsKind, StandingLine } from '../../office/home.ts';
 import type { Verdict } from '../../office/office.ts';
 import { button, dropdown, segmented } from '../chartroom/controls.ts';
 import { busy, compared, meter, table, terms } from '../chartroom/data.ts';
-import { label, mark, name, portrait } from '../chartroom/figures.ts';
+import { cut, label, name, portrait } from '../chartroom/figures.ts';
 import { kitLooks } from '../chartroom/kit.ts';
 import { paper, plate, sheet } from '../chartroom/paper.ts';
 import { brassPort } from '../chartroom/port.ts';
 import { u } from '../chartroom/tokens.ts';
 import { emblem } from '../emblem.ts';
 import type { Glyph } from '../glyphs.ts';
-import { glyph } from '../ink.ts';
 import { el, ordinal, styled } from '../kit/part.ts';
 import { stylesheet } from '../kit/style.ts';
 import type { Office } from './office.ts';
@@ -98,13 +97,6 @@ const WORK: Readonly<Record<string, Glyph>> = {
   Scouting: 'office.scouting',
   'Part Design': 'office.ship',
   Headquarters: 'office.hq',
-};
-
-/** A woodcut on the 24 grid, sized by the screen's CSS. */
-const cut = (g: Glyph) => {
-  const s = mark(24, 24, glyph(g, 12, 12, 24));
-  s.removeAttribute('style');
-  return s;
 };
 
 /** A word of judgment on a slip washed in its mood. */

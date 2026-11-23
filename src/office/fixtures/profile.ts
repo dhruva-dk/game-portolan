@@ -8,7 +8,7 @@ import { HOME } from './home.ts';
 import { HERS } from './teams.ts';
 
 /** The figure `title`, set against `against`, made of `lines`. */
-const figure = (
+export const figure = (
   title: string,
   [value, text]: readonly [number, string],
   against: string,

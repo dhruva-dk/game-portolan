@@ -478,6 +478,17 @@ const DRAWN = {
     { k: 's', d: 'M12 8.2V11M10.6 9.6H13.4', w: 0.8, cut: true, top: true },
   ],
   // the staff: the chartmaker's dividers, open
+  // a mechanic: the caulking mallet, its head bound in two hoops, its haft slanting down to the left
+  'role.mechanic': [
+    {
+      k: 'f',
+      d: 'M12.4 9.6L14.4 11.6L5.6 20.4Q4.6 21.4 3.6 20.4Q2.6 19.4 3.6 18.4Z',
+    },
+    { k: 'f', d: 'M13.2 3.2L20.8 10.8L17.2 14.4L9.6 6.8Z' },
+    { k: 's', d: 'M11.2 5.2L18.8 12.8', w: 0.9, cut: true },
+    { k: 's', d: 'M14.4 3.2L19.6 8.4', w: 0.9, cut: true, fine: true },
+    { k: 's', d: 'M10.6 7.6L16.4 13.4', w: 0.9, cut: true, fine: true },
+  ],
   'office.staff': [
     { k: 'f', d: 'M10.9 5.6L4.8 21.4L6.4 21.8L12.2 7Z' },
     { k: 'f', d: 'M13.1 5.6L19.2 21.4L17.6 21.8L11.8 7Z' },

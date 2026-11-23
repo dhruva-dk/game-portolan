@@ -48,7 +48,10 @@ Each line: built on the kit from a fixture → in review → approved and live. 
 
 ### 1. Rosters
 
-- [ ] Team · [ ] Drivers · [ ] Staff (one view, `TeamView`) · [ ] Scouting
+- [ ] **Drivers** _(in review)_, after MM 005: a card a ship (post, portrait, stars and potential, morale, the ship's mechanic and their bond by levels, the contract, traits, Renew shut with its reason), the reserve and the market in the last column
+- [ ] **Staff** _(in review)_, after MM 007: the four mechanics a row, each wearing its role's woodcut, their chemistry with the ship's driver; the designer, the scouts, an open post's Find, the market
+- [ ] **Team** _(in review)_: the ledger: wages a race against income, the chairman, open posts; everyone on the books ruled by role; the pit crew and each ship's stop
+- [ ] Scouting
 
 ### 2. Ledgers
 

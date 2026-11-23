@@ -2,10 +2,11 @@
 // line each; a stat stands on its quality ladder (UI-TOKENS.md: silver,
 // verdigris, azurite, purpure, gold) as a tile and a track with its ceiling
 // ticked; a meter is a share in a wash; shares are set against the best and
-// the average on ruled tracks; work under way is striped as far as it has got; a table is a ledger's page, figures right-set and tabular, the
-// player's own row gilt.
+// the average on ruled tracks; a track reached by steps has a node at each;
+// work under way is striped as far as it has got; a table is a ledger's page,
+// figures right-set and tabular, the player's own row gilt.
 
-import { el, share, styled, type Kid } from '../kit/part.ts';
+import { el, pressed, share, styled, type Kid } from '../kit/part.ts';
 import { arrow, fig, label } from './figures.ts';
 import { UNIT, step, u } from './tokens.ts';
 
@@ -39,12 +40,21 @@ export const DATA_CSS = `
   min-width: 0; background: var(--hatch), var(--wash); }
 .cr-bar > .avg { position: absolute; left: var(--share); top: ${u(-2.5)}; bottom: ${u(-2.5)}; border-left: var(--w-rule) dashed var(--ink); }
 .cr-bar > .best { position: absolute; left: var(--share); top: ${u(-2)}; bottom: ${u(-2)}; width: var(--w-bold);
-  margin-left: calc(var(--w-bold) / -2); background: var(--won); }
+  margin-left: calc(var(--w-bold) / -2); background: var(--ink); }
 .cr-bar > .best::before { content: ''; position: absolute; left: 50%; top: 0; translate: -50% -60%; width: ${u(5)}; height: ${u(5)};
-  background: var(--won); clip-path: polygon(0 0, 100% 0, 50% 100%); }
+  background: var(--ink); clip-path: polygon(0 0, 100% 0, 50% 100%); }
 .cr-key { display: flex; justify-content: center; gap: var(--s5); font: italic 500 var(--t-label) var(--face); color: var(--ink-2); }
 .cr-key > span { display: inline-flex; align-items: center; gap: var(--s2); }
-.cr-key i.best { width: var(--w-bold); height: ${u(9)}; background: var(--won); }
+.cr-key i.best { width: var(--w-bold); height: ${u(9)}; background: var(--ink); }
+
+/* a track reached by steps: filled as far as it has come, a node at each step, those reached inked */
+.cr-steps { position: relative; height: ${u(7)}; margin: 0 ${u(3.5)}; background: var(--paper);
+  box-shadow: inset 0 0 0 var(--w-fine) var(--ink); }
+.cr-steps > .fill { position: absolute; left: ${u(1.5)}; top: ${u(1.5)}; bottom: ${u(1.5)}; width: calc(var(--share) - ${u(3)});
+  min-width: 0; background: var(--hatch), var(--wash); }
+.cr-steps > .node { position: absolute; left: var(--share); top: 50%; width: ${u(7)}; height: ${u(7)}; translate: -50% -50%;
+  rotate: 45deg; background: var(--paper-raised); box-shadow: inset 0 0 0 var(--w-rule) var(--ink); }
+.cr-steps > .node.reached { background: var(--ink); }
 .cr-key i.avg { height: ${u(9)}; border-left: var(--w-rule) dashed var(--ink); }
 
 .cr-table { display: flex; flex-direction: column; min-height: 0; font-variant-numeric: tabular-nums lining-nums; }
@@ -60,6 +70,11 @@ export const DATA_CSS = `
 .cr-tr > div { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cr-tr > .num { text-align: right; }
 .cr-tr.empty { grid-template-columns: 1fr; color: var(--ink-2); font-style: italic; }
+.cr-tr.press { transition: translate var(--press); }
+.cr-tr.press:active { translate: 0 var(--u); background: var(--paper-sunk); }
+.cr-tr.group { grid-template-columns: 1fr; min-height: 0; padding-top: var(--s3); padding-bottom: var(--s1);
+  border-bottom: var(--w-hair) solid var(--line); font: 700 var(--t-label)/1.2 var(--face); letter-spacing: .14em;
+  text-transform: uppercase; color: var(--ink-2); }
 `;
 
 /** Names and their values, a ruled line each. */
@@ -125,6 +140,31 @@ export const meter = (of: number, wash = 'q2') =>
 export const busy = (of: number) =>
   el('div', 'cr-meter cr-busy', styled(el('i'), { '--share': share(of) }));
 
+/**
+ * A track reached by steps (a bond's levels): filled as far as it has come
+ * (0…1) in a wash, a node at each step's mark (0…1), the first `reached` of
+ * them inked.
+ */
+export const stepped = (
+  of: number,
+  marks: readonly number[],
+  reached: number,
+  wash = 'q1'
+) =>
+  el(
+    'div',
+    'cr-steps',
+    styled(el('i', 'fill'), {
+      '--share': share(of),
+      '--wash': `var(--${wash})`,
+    }),
+    ...marks.map((m, i) =>
+      styled(el('i', `node${i < reached ? ' reached' : ''}`), {
+        '--share': share(m),
+      })
+    )
+  );
+
 /** A share of something (0…1) against the best of its kind and the average. */
 interface Compared {
   name: string;
@@ -135,8 +175,9 @@ interface Compared {
 
 /**
  * Shares against the best and the average, a ruled track each: filled as far
- * as it comes, in its ladder step's wash; the best a gold rule under its
- * pennant, the average dashed; their key under them.
+ * as it comes, in its ladder step's wash; the best an ink rule under its
+ * pennant (G1: gold is for places, stars and honours), the average dashed;
+ * their key under them.
  */
 export function compared(
   rows: readonly Compared[],
@@ -189,7 +230,8 @@ interface Column<R> {
  * so in a row of its own. One that `scrolls` fills what room it is given and
  * scrolls its rows under its heads, which stay; the office keeps how far it is
  * scrolled by its `keep` name, and first scrolls it to have the player's own
- * row a few down from the top.
+ * row a few down from the top. A row `tap` gives a way to opens it on a tap;
+ * `group` names the group each row is of, a band over each group's first.
  */
 export function table<R>(
   cols: readonly Column<R>[],
@@ -197,6 +239,8 @@ export function table<R>(
   how: {
     own?: (row: R) => boolean;
     cut?: (row: R) => boolean;
+    tap?: (row: R) => (() => void) | null;
+    group?: (row: R) => string;
     none?: string;
     scrolls?: { keep: string };
   } = {}
@@ -205,13 +249,22 @@ export function table<R>(
     el('div', `cr-tr ${cls}`, ...cells);
   const cells = (pick: (c: Column<R>) => Kid) =>
     cols.map((c) => el('div', c.num ? 'num' : '', pick(c)));
+  const row = (r: R) => {
+    const made = line(
+      `${how.own?.(r) ? 'own' : ''} ${how.cut?.(r) ? 'cut' : ''}`.trim(),
+      cells((c) => c.cell(r))
+    );
+    const go = how.tap?.(r);
+    return go ? pressed(made, go) : made;
+  };
+  let last: string | undefined;
   const lines = [
-    ...rows.map((r) =>
-      line(
-        `${how.own?.(r) ? 'own' : ''} ${how.cut?.(r) ? 'cut' : ''}`.trim(),
-        cells((c) => c.cell(r))
-      )
-    ),
+    ...rows.flatMap((r) => {
+      const g = how.group?.(r),
+        fresh = g !== undefined && g !== last;
+      last = g;
+      return fresh ? [line('group', [g]), row(r)] : [row(r)];
+    }),
     rows.length === 0 && how.none ? line('empty', [how.none]) : null,
   ];
   const head = line(

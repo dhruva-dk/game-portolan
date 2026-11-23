@@ -7,6 +7,7 @@ import type { Desk, Views } from '../office.ts';
 import type { ShellView } from '../shell.ts';
 import { HOME } from './home.ts';
 import { PROFILE } from './profile.ts';
+import { TEAM as ROSTER } from './team.ts';
 import { HERS, TEAMS } from './teams.ts';
 
 /** A race's points by place, as the fixture's result shows them. */
@@ -36,6 +37,9 @@ const VIEWS: Pick<
   },
   home: HOME,
   profile: { view: PROFILE, dyes: TEAMS.map((t) => t.colours) },
+  team: { view: ROSTER, dyes: TEAMS.map((t) => t.colours) },
+  drivers: { view: ROSTER, dyes: TEAMS.map((t) => t.colours) },
+  staff: { view: ROSTER, dyes: TEAMS.map((t) => t.colours) },
   found: {
     team: HERS.name,
     given: 'Ada',

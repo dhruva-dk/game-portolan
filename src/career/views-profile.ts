@@ -92,6 +92,20 @@ export function askOffer(s: CareerState, c: Team, g: Person): Offer {
   };
 }
 
+/**
+ * Why the player may not renew `g`'s contract now (null: she may): not hers,
+ * the chairman's to make, not yet in its closing days, or refused as an offer
+ * at their ask would be.
+ */
+export function renewWhy(s: CareerState, c: Team, g: Person): string | null {
+  if (g.contract?.team !== c.id || g.player) return 'Not yours to renew.';
+  if (g.role === 'chairman' || g.role === 'manager')
+    return "Chairmen and managers are the chairman's.";
+  if (g.contract.ends === null || !closing(s, known(g.contract)))
+    return `Opens in the contract's last ${TUNING.market.closingDays} days.`;
+  return offerCheck(s, c.id, g.id, askOffer(s, c, g))?.sentence ?? null;
+}
+
 /** One of a role's own figures, set against what stats of 10 make. */
 const one = (
   label: string,
@@ -287,14 +301,6 @@ export function profileView(
       : offerNo && blocks.includes(offerNo.code)
         ? offerNo.sentence
         : null;
-  const renewWhy =
-    !mine || you
-      ? 'Not yours to renew.'
-      : g.role === 'chairman' || g.role === 'manager'
-        ? "Chairmen and managers are the chairman's."
-        : g.contract?.ends === null || !closing(s, known(g.contract))
-          ? `Opens in the contract's last ${TUNING.market.closingDays} days.`
-          : (offerNo?.sentence ?? null);
   const owed = dismissalCost(s, g);
   const dismissNo =
     !mine || you
@@ -397,7 +403,7 @@ export function profileView(
           : `Scout · ${scoutingDays(s, c.id, scout)} days`,
     },
     offer: act(offerWhy),
-    renew: act(renewWhy),
+    renew: act(renewWhy(s, c, g)),
     dismiss: {
       ...act(dismissNo),
       owed: fig(

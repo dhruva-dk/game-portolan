@@ -21,7 +21,7 @@ import { createOffer, createScouting } from './market.ts';
 import { createMenu } from './menu.ts';
 import type { Office } from './office.ts';
 import { createFinances, createMail } from './papers.ts';
-import { createDrivers, createStaff, createTeam } from './people.ts';
+import { createDrivers, createStaff, createTeam } from './roster.ts';
 import { createProfile } from './profile.ts';
 import { createPlan, createResult } from './raceday.ts';
 import { createCalendar, createSponsors } from './season.ts';
