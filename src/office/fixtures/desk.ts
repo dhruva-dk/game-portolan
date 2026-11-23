@@ -89,7 +89,7 @@ const VIEWS: Pick<
     points: 31,
     target: HOME.chairman.target,
     standing: { label: 'On Target', mood: 'good' },
-    place: 4,
+    place: 3,
   },
   standings: {
     championship: SHELL.championship,

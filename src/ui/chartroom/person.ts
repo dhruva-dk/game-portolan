@@ -7,10 +7,11 @@
 
 import type { Jacket } from '../gull.ts';
 import type { Glyph } from '../glyphs.ts';
+import { figure, roughRect, svgNode } from '../ink.ts';
 import { el, type Kid } from '../kit/part.ts';
 import { cut, label, name, portrait, stars } from './figures.ts';
 import { sheet } from './paper.ts';
-import { u } from './tokens.ts';
+import { TONE, u } from './tokens.ts';
 
 export const PERSON_CSS = `
 .cr-who { display: flex; min-width: 0; }
@@ -32,6 +33,13 @@ export const PERSON_CSS = `
 .cr-card-foot.pair > .cr-act { display: contents; }
 .cr-card-foot.pair > .cr-act > .cr-label { grid-column: 1 / -1; text-align: center; white-space: nowrap; }
 .cr-card-foot > .cr-act > .cr-label, .cr-card-foot > .cr-label { text-align: center; }
+/* the podium: three steps abutting, their feet on one line */
+.cr-podium { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: end; width: 100%; max-width: ${u(270)};
+  margin: 0 auto; }
+.cr-stood { display: flex; flex-direction: column; align-items: center; gap: ${u(1)}; min-width: 0; }
+.cr-stood > .cr-who { max-width: 100%; padding: 0 var(--s1); }
+.cr-stood .cr-name { max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cr-stood > svg { display: block; width: 100%; height: auto; margin-top: var(--s1); }
 `;
 
 /** Stars as known (lo) up to the most they may be (hi). */
@@ -100,6 +108,55 @@ export function who(w: Who, size: number, way: 'over' | 'beside' = 'over') {
       w.stars ? stars(w.stars.lo, w.stars.hi, 9) : null
     )
   );
+}
+
+/** How high each plinth stands, first to third, in its units (100 across). */
+const RISE = [44, 31, 22] as const;
+
+/** A plinth's woodcut, as wide as its place: a block cut by hand under its cap, its right hatched in shade, its
+ *  place cut in its face; the first's gilt. */
+function plinth(n: number) {
+  const h = RISE[n - 1] ?? RISE[2],
+    cap = 7,
+    face = `${roughRect(4, cap, 92, h - cap, n * 7)}`;
+  const s = svgNode(
+    100,
+    h + 1,
+    `<path d="${face}" fill="${n === 1 ? TONE.gilt : TONE.raised}"/>` +
+      `<rect x="72" y="${cap}" width="24" height="${h - cap}" fill="url(#h-iron)"/>` +
+      `<path d="${face}" fill="none" stroke="${TONE.ink}" stroke-width="1.4"/>` +
+      `<path d="${roughRect(0, 0, 100, cap, n * 7 + 1)}" fill="${TONE.raised}" stroke="${TONE.ink}" stroke-width="1.4"/>` +
+      figure(40, cap + (h - cap) / 2 + 1, n, Math.min(30, (h - cap) * 0.7), {
+        weight: 600,
+      })
+  );
+  s.removeAttribute('width');
+  s.removeAttribute('height');
+  return s;
+}
+
+/** A step of the podium: who stood on it (the line under their name their team's), and what they scored there. */
+interface Step {
+  who: Who;
+  scored: Kid;
+}
+
+/** The podium: the first three over their plinths, second, first and third from the left; the first larger. */
+export function podium(steps: readonly Step[]) {
+  const at = (i: number) => {
+    const s = steps[i];
+    return (
+      s &&
+      el(
+        'div',
+        'cr-stood',
+        who(s.who, i === 0 ? 40 : 32),
+        el('div', 'cr-scored', s.scored),
+        plinth(i + 1)
+      )
+    );
+  };
+  return el('div', 'cr-podium', at(1), at(0), at(2));
 }
 
 /** How a person's card is made. */

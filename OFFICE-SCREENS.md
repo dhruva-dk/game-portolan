@@ -74,7 +74,11 @@ Each line: built on the kit from a fixture → in review → approved and live. 
 
 ### 4. Race day
 
-- [ ] Plan (+ who sails, parts for the race, each sponsor's objective, forfeit) · [ ] Result (+ podium)
+- [ ] **Result** _(in review, race day's pathfinder)_, after MM 042–044: the podium under the race's name (the first
+      three over their woodcut plinths, the winner's gilt, each with their team and points), then how every ship
+      finished (the podium ruled off, her lines gilt); the team report (a line a driver: what they did, their place and
+      points) and the chairman (the place expected, where the team stands, the verdict stamped)
+- [ ] Plan (+ parts for the race, each sponsor's objective, forfeit) _(after Result is approved)_
 
 ### 5. The yard
 
