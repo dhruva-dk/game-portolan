@@ -55,6 +55,30 @@ is decided until it lands in code on main. Direction: **MM's layouts, drawn in t
 | D8  | Main has no pressed or disabled state.                                                                | Add both (States, below), and use them in the HUD too.                                                     |
 | D9  | 17 glyphs; the office needs ~45 subjects (13 tabs, 6 parts, 9 buildings, roles, mail kinds, actions). | Draw them as woodcuts in `glyphs.ts`; no second, line-drawn icon set.                                      |
 
+## Chosen: layout A, the Dossier (liked, 2026-11-22)
+
+The captain's profile was prototyped three ways on these tokens (branch `proto-profile`, `b848cb9b`,
+`/profile-prototype.html?variant=A`). **The owner liked A** and chose it over B (Record) and C (Rose). B's contract
+sentence and stamp are not wanted.
+
+A is MM's three columns drawn in these tokens:
+
+- **Left:** the person (portrait, name, age and home, team strip, stars and potential), their articles as ruled terms,
+  and the actions at the foot (Renew, a cut act slip; Dismiss, a cut harm slip; shut, with its reason under it).
+- **Middle:** abilities as a 3 × 3 grid of stat tiles (the figure on its ladder wash, a ruled 0–20 track under it
+  with the ceiling ticked, the way it is heading), the ladder's legend, then traits (badge, name, effect, how long).
+- **Right:** the last five races (a gilt disc on the podium), bond, morale and marketability as meters, past
+  seasons as a ruled table (her team's seasons gilt).
+- **Shell:** a cut top bar (team strip, back glyph, the title on a plate, balance and date, Continue as main's gilt
+  banner); the nav a sunk band, the chosen tab gilt.
+
+What the prototype settled, to fold into the tokens below:
+
+- **Podium = a gilt disc; laurel = honours only** (a title, a trophy). Five laurels in a row swamped the figures.
+- **Unknown = hatched range**: reads well in tiles; too faint in thin tracks (needs a heavier hatch there).
+- **Still open:** most good stats fall in 14–17, so purpure dominates a strong captain's screen, and azurite tiles sit
+  close to the act blue (they stay apart only because buttons are cut and tiles ruled). See D5.
+
 ## The tokens
 
 Units are main's drawn units; iPad px = units × 1.735. CSS names in `code`.
