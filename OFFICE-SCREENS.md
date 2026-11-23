@@ -61,7 +61,11 @@ Each line: built on the kit from a fixture → in review → approved and live. 
 ### 3. People
 
 - [x] Profile (layout A, chosen 2026-11-22)
-- [ ] Negotiation · [ ] Jobs (+ decline) · [ ] Player
+- [ ] **Negotiation** _(in review, the people's pathfinder)_, after MM 011: the person and their patience as pips, the
+      talks (the last answer, those before, who else is talking); the terms, each control beside what they ask or counter,
+      the bonus terms with the break clause (never shown before); what they expect, each met so far; the cost and the
+      ways on
+- [ ] Jobs (+ decline) · [ ] Player _(after Negotiation is approved)_
 
 ### 4. Race day
 

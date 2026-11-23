@@ -27,6 +27,10 @@ export const FIGURES_CSS = `
 .cr-face { flex: none; position: relative; border-radius: 50%; overflow: hidden; background: var(--sea);
   box-shadow: 0 0 0 var(--w-bold) var(--ink), inset 0 0 0 var(--s1) var(--paper), inset 0 0 0 ${u(2.5)} var(--line); }
 .cr-face > svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.cr-pips { display: inline-flex; gap: var(--s2); }
+.cr-pips > i { width: ${u(11)}; height: ${u(11)}; display: grid; place-items: center; font: 700 var(--t-label)/1 var(--face); font-style: normal;
+  background: var(--paper-raised); box-shadow: 0 0 0 var(--w-fine) var(--ink); }
+.cr-pips > i.used { background: var(--harm); color: var(--on-ink); }
 `;
 
 /** A woodcut `w` × `h` in its own units, shown at as many drawn units. */
@@ -102,6 +106,16 @@ export function stars(known: number, possible = known, size = 11) {
   }
   return sized(104, 20, body, size, 'cr-stars');
 }
+
+/** Pips: `of` boxes ruled in ink, the first `used` laid in harm and crossed (patience spent). */
+export const pips = (of: number, used: number) =>
+  el(
+    'span',
+    'cr-pips',
+    ...Array.from({ length: of }, (_, i) =>
+      el('i', i < used ? 'used' : '', i < used ? '✕' : '')
+    )
+  );
 
 /** One star, `size` units high: gold if `on` (kept, a favourite), else empty. */
 export function favourite(on: boolean, size = 11) {

@@ -4,13 +4,12 @@
 
 import type { Face } from '../../office/career.ts';
 import type { Dyed } from '../../office/papers.ts';
-import type { Act, Range } from '../../office/people.ts';
+import type { Act } from '../../office/people.ts';
 import type { Jacket } from '../gull.ts';
 import { OFFICE } from '../ink.ts';
 import { button } from '../kit/button.ts';
 import { el, grouped, type Kid } from '../kit/part.ts';
 import { portrait } from '../kit/portrait.ts';
-import { stars } from '../kit/stat.ts';
 import { stylesheet } from '../kit/style.ts';
 
 const CSS = `
@@ -70,10 +69,6 @@ export const lines = (rows: readonly (readonly [string, Kid])[]) =>
       el('b', '', value),
     ])
   );
-
-/** Stars as a team knows them: the known gold, up to the most they may be hollow. */
-export const ranged = (r: Range | null, size = 16) =>
-  r ? stars(r.lo, r.hi, size) : null;
 
 /** A button that is shut with its reason under it. */
 export function acted(

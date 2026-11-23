@@ -142,6 +142,10 @@ export const meter = (of: number, wash = 'q2') =>
     styled(el('i'), { '--share': share(of), '--wash': `var(--${wash})` })
   );
 
+/** A share's wash by thirds: good from two thirds, warn from one, harm under. */
+export const washOf = (of: number) =>
+  of >= 0.66 ? 'good' : of >= 0.33 ? 'warn' : 'harm';
+
 /** A gauge: what it measures (`title`), where it stands (`value`, in the harm ink if `harm`), over its `track`. */
 export const gauge = (title: Kid, value: Kid, track: Kid, harm = false) =>
   el(

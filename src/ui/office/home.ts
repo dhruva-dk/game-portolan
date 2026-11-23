@@ -10,7 +10,14 @@
 import type { HomeView, NewsKind, StandingLine } from '../../office/home.ts';
 import type { Verdict } from '../../office/office.ts';
 import { button, dropdown, segmented } from '../chartroom/controls.ts';
-import { busy, compared, meter, table, terms } from '../chartroom/data.ts';
+import {
+  busy,
+  compared,
+  meter,
+  table,
+  terms,
+  washOf,
+} from '../chartroom/data.ts';
 import { cut, label, name, portrait } from '../chartroom/figures.ts';
 import { kitLooks } from '../chartroom/kit.ts';
 import { column, page } from '../chartroom/layout.ts';
@@ -110,10 +117,6 @@ const kept = (list: HTMLElement, keep: string) => {
   return list;
 };
 
-/** How happy, as the wash a meter of it is filled in. */
-const happyWash = (of: number) =>
-  of >= 0.66 ? 'good' : of >= 0.33 ? 'warn' : 'harm';
-
 /** Home. */
 export function createHome(office: Office): Screen<HomeView> {
   kitLooks();
@@ -168,7 +171,7 @@ export function createHome(office: Office): Screen<HomeView> {
         el(
           'div',
           'hm-mood',
-          meter(v.chairman.happiness, happyWash(v.chairman.happiness)),
+          meter(v.chairman.happiness, washOf(v.chairman.happiness)),
           el('div', 'hm-ends', label('Disappointed'), label('Happy'))
         ),
         terms([
