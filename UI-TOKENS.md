@@ -58,6 +58,10 @@ is decided until it lands in code on main. Direction: **MM's layouts, drawn in t
 | D8  | Main has no pressed or disabled state.                                                                | Add both (States, below), and use them in the HUD too.                                                     |
 | D9  | 17 glyphs; the office needs ~45 subjects (13 tabs, 6 parts, 9 buildings, roles, mail kinds, actions). | Draw them as woodcuts in `glyphs.ts`; no second, line-drawn icon set.                                      |
 
+Settled: D5 (pale azurite and purpure washes, ink figures), D7 (exported, with the second ink and the pale washes, as
+`CHARTROOM` in `ink.ts`), D8 (pressed and disabled, built in `ui/chartroom`; the HUD's use is still to come). The
+rest stand as proposed until a screen proves them wrong.
+
 ## Chosen: layout A, the Dossier (liked, 2026-11-22)
 
 The captain's profile was prototyped three ways on these tokens (branch `proto-profile`, `b848cb9b`,
@@ -79,8 +83,33 @@ What the prototype settled, to fold into the tokens below:
 
 - **Podium = a gilt disc; laurel = honours only** (a title, a trophy). Five laurels in a row swamped the figures.
 - **Unknown = hatched range**: reads well in tiles; too faint in thin tracks (needs a heavier hatch there).
-- **Still open:** most good stats fall in 14–17, so purpure dominates a strong captain's screen, and azurite tiles sit
-  close to the act blue (they stay apart only because buttons are cut and tiles ruled). See D5.
+- **Ladder (D5, settled):** azurite and purpure became pale washes with ink figures, so a strong captain's screen is
+  not all purple and an azurite tile no longer reads as an act button.
+
+## Second screen: Home (tried 2026-11-22)
+
+Home was prototyped in A's manner (same branch, `/home-prototype.html?state=rest|pressed|menu|popover|modal`) to try
+every token the profile left untried. It held: stripes for work under way, the rubric new-disc, the Storm's violet tag
+(apart from the pale purpure), won gold for places, the plate-faint label, segmented, stepper (its slip off at a
+limit), dropdown and menu, the explanation popover (gains good, costs harm), the folio over the dim, and the pressed
+state with the shadow on its own layer. **Decided by the owner (2026-11-22):**
+
+- **G1. One gold on data.** A bar of the top step is gold; the league's best on a chart is an **ink** marker, not won
+  gold. Won gold stays for places, stars and honours.
+- **G2. Headline figures are lining.** At `--fig-l` and up a lone figure sets lining numerals (old-style made "12"
+  read smaller than its size). Old-style stays for figures in running text and at `--fig-s`/`--fig-m`.
+- **G3. Press is 80 ms** (`--press`); `--quick` (120 ms) is a popover's, a menu's and a tab's.
+- **G4. The dim is `SHADOW` @ 35%** (25% let the screen under a folio compete with it).
+- **The brass is the minimap's round rim**, and the window in it onto a planet is main's seed-panel globe
+  (`ui/orb.ts`) inked from the race's `Chart`, handed in as plain data (never a capture, never a second 3D view).
+- Not tried there: `--fig-xl`/`--fig-xxl` (HUD only), and motion, which a still cannot judge: on the device.
+
+## Where the kit is built
+
+`src/ui/chartroom/`, on mm. It reads only `ink.ts` for values and main's marks for drawings, and keeps the old kit's
+plumbing (`ui/kit/part.ts`: `el`, `pressed`, `styled`), which both share until the old kit is retired screen by
+screen. Its cut edges are border images (one SVG sliced nine ways), never measured, as the layout rule asks (only
+`ui.ts` reads the page's layout).
 
 ## The tokens
 
@@ -88,12 +117,13 @@ Units are main's drawn units; iPad px = units × 1.735. CSS names in `code`.
 
 ### 1. Scale
 
-| Token      | Value                  | Use                                     |
-| ---------- | ---------------------- | --------------------------------------- |
-| `--k`      | `ui.ts size()`         | every size below is multiplied by it    |
-| `--u`      | `calc(1px * var(--k))` | one drawn unit                          |
-| `--gutter` | 16u                    | screen edge to content (main's GUTTER)  |
-| `--touch`  | `max(44px, 26u)`       | least side of anything that takes a tap |
+| Token      | Value                  | Use                                                                                                                 |
+| ---------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `--k`      | `ui.ts size()`         | every size below is multiplied by it                                                                                |
+| `--u`      | `calc(1px * var(--k))` | one drawn unit                                                                                                      |
+| (office)   | `size(PAGE)` px        | on the office's page (1180 × 820, itself scaled to the screen) one unit is the k of that page, 1.735 page px, fixed |
+| `--gutter` | 16u                    | screen edge to content (main's GUTTER)                                                                              |
+| `--touch`  | `max(44px, 26u)`       | least side of anything that takes a tap                                                                             |
 
 ### 2. Paper (surfaces)
 
@@ -108,8 +138,8 @@ Units are main's drawn units; iPad px = units × 1.735. CSS names in `code`.
 | `--plate`        | `INK.iron` #261910                         | a plate: ink laid solid under words (title bar, a card's headline) |
 | `--plate-ink`    | `CUT`                                      | words on a plate                                                   |
 | `--plate-faint`  | `METER.label` #b9a98c                      | labels on a plate                                                  |
-| `--brass`        | `BRASS` #5b3a1e                            | the rim of a window onto the world (minimap, the 3D insets)        |
-| `--dim`          | `SHADOW` @ 25%                             | the world round a folio or a modal                                 |
+| `--brass`        | `BRASS` #5b3a1e                            | the round rim of a window onto the world (minimap, a race's globe) |
+| `--dim`          | `SHADOW` @ 35% (G4)                        | the world round a folio or a modal                                 |
 
 Rule: four papers and the plate. Nothing else fills a panel.
 
@@ -186,8 +216,9 @@ One face: `FIGURES` (Iowan Old Style, Palatino, Georgia).
 | `--fig-xl`  | 25    | 43.4    | figure                                 | HUD vitals                      |
 | `--fig-xxl` | 28    | 48.6    | figure                                 | HUD counts                      |
 
-Rules: figures alone are italic old-style (main's `figure`); figures in a column are roman **tabular lining** so they
-line up; nothing under 13 px. The HUD uses the figures only (D2).
+Rules: figures alone are italic old-style (main's `figure`) up to `--fig-m`, italic **lining** from `--fig-l` (G2);
+figures in a column are roman **tabular lining** so they line up; nothing under 13 px. The HUD uses the figures
+only (D2).
 
 ### 9. Space
 
@@ -233,7 +264,7 @@ Rule: **paper things are hand-cut, data is ruled.** It is main's own split (slip
 | State   | Look                                                                   |
 | ------- | ---------------------------------------------------------------------- |
 | chosen  | `--gilt` ground, `--w-rule` outline                                    |
-| pressed | down 1u, shadow gone, 80 ms (D8)                                       |
+| pressed | down 1u, shadow gone, `--press` 80 ms (D8, G3)                         |
 | off     | 42% strength, deaf; the reason under it in `--t-label`                 |
 | new     | a rubric paper disc with a figure (unread, notices)                    |
 | unknown | the quality ladder hatched over its range; stars past the known hollow |
@@ -248,7 +279,8 @@ world · dim · screen · piece · popover · folio and modal (over `--dim`) · 
 | Token      | Value                               | Use                                       |
 | ---------- | ----------------------------------- | ----------------------------------------- |
 | `--fade`   | 320 ms ease (`ways.ts` FADE)        | a screen in or out; screens never cut     |
-| `--quick`  | 120 ms ease-out                     | press, popover, a tab                     |
+| `--press`  | 80 ms ease-out (G3)                 | a press                                   |
+| `--quick`  | 120 ms ease-out                     | popover, menu, a tab                      |
 | `--settle` | `cubic-bezier(.3,1.6,.5,1)`, 240 ms | a thing landing: a stamp, a needle, a pip |
 
 Opacity and transform only. Nothing animates while the race's frame is being drawn.
