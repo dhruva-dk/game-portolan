@@ -55,8 +55,13 @@ Each line: built on the kit from a fixture → in review → approved and live. 
 
 ### 2. Ledgers
 
-- [ ] Standings (rows open Rival) · [ ] Finances (debt floor) · [ ] Sponsors (+ the slot fix) · [ ] Calendar ·
-      [ ] Mail (+ glyphs for mail kinds; a vote letter opens Admiralty)
+- [ ] **Finances** _(in review, the ledgers' pathfinder)_, after MM 013: the purse (the balance, the chairman's floor
+      under it, the room to spend), what a race brings and costs, netted, where the season will end on what is signed
+      (races left, place now, its prize); the balance's course this season, by days, dotted on to the season's end, the
+      floor ruled under it; the transactions; this season's money by what it was for, netted (floor, projection and the
+      season's sums never shown before)
+- [ ] Standings (rows open Rival) · [ ] Sponsors (+ the slot fix) · [ ] Calendar ·
+      [ ] Mail (+ glyphs for mail kinds; a vote letter opens Admiralty) _(after Finances is approved)_
 
 ### 3. People
 

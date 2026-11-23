@@ -1,21 +1,17 @@
-// The office's papers. Mail: the inbox at the left (the kinds of letter down
-// its side, a choice of all, the unread or those that wait on an answer, then
-// the letters as cards, newest first), the open letter at the right under its
-// kind and date, its sender's portrait beside its subject, its answers at its
-// foot. Finances: the balance as it has stood over the ledger at the left; at
-// the right what she has and what a race nets, over what a race brings and
-// costs.
+// The office's mail: the inbox at the left (the kinds of letter down its side,
+// a choice of all, the unread or those that wait on an answer, then the
+// letters as cards, newest first), the open letter at the right under its kind
+// and date, its sender's portrait beside its subject, its answers at its foot.
 
-import type { FinancesPaper, Letter, MailPaper } from '../../office/papers.ts';
+import type { Letter, MailPaper } from '../../office/papers.ts';
 import { button, segmented } from '../kit/button.ts';
 import { icon } from '../kit/icons.ts';
-import { band, panel } from '../kit/panel.ts';
-import { drawn, el, pressed } from '../kit/part.ts';
+import { panel } from '../kit/panel.ts';
+import { el, pressed } from '../kit/part.ts';
 import { portrait } from '../kit/portrait.ts';
 import { tag } from '../kit/stat.ts';
 import { stylesheet } from '../kit/style.ts';
-import { table } from '../kit/table.ts';
-import { bitsStyle, jacketOf, lines, money } from './bits.ts';
+import { bitsStyle, jacketOf } from './bits.ts';
 import type { Office } from './office.ts';
 import type { Screen } from './screens.ts';
 
@@ -53,28 +49,6 @@ const CSS = `
 .s-mail .b-text { flex: 1; padding: 14px; }
 .m-answers { flex: none; display: flex; gap: 8px; padding: 10px; background: var(--dark); border-top: 1px solid var(--rule); }
 .m-answers > .k-btn { flex: 1; }
-.s-finances { grid-template-columns: 524px 1fr; }
-.s-finances .k-body { gap: 8px; }
-.s-finances .grow { flex: 1; min-height: 0; }
-.s-finances .f-none .k-table { display: none; }
-.s-finances .b-lines > * { padding: 12px 14px; font-size: 17px; }
-.s-finances .b-lines > :nth-last-child(-n+2) { font-weight: 700; border-top: 1.5px solid var(--ink); }
-.f-bad { color: var(--bad); }
-.f-good { color: var(--good); }
-.f-history { flex: none; height: 290px; }
-.f-chart { flex: 1; min-height: 0; display: grid; grid-template-columns: auto 1fr; grid-template-rows: 1fr auto; gap: 4px 8px;
-  font-size: 13px; font-style: italic; color: var(--faint); }
-.f-chart > div { display: flex; justify-content: space-between; }
-.f-chart > .f-sums { flex-direction: column; text-align: right; }
-.f-chart > .f-days { grid-column: 2; }
-.f-plot { width: 100%; height: 100%; min-height: 0; background: var(--dark); border-left: 1.5px solid var(--ink); border-bottom: 1.5px solid var(--ink); }
-.f-plot > .f-ground { fill: var(--good); opacity: .3; }
-.f-plot > .f-line { fill: none; stroke: var(--ink); stroke-width: 2; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
-.f-top { flex: none; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.f-top > div { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 12px 8px 14px; background: var(--dark);
-  box-shadow: inset 0 0 0 1px var(--line); }
-.f-top span { font-size: 13px; font-style: italic; color: var(--faint); }
-.f-top b { font: 700 34px/1 var(--narrow); }
 `;
 
 /** Which letters the inbox shows: all, the unread, or those that wait on her answer. */
@@ -252,131 +226,6 @@ export function createMail(office: Office): Screen<MailPaper> {
           ),
           'm-letter'
         )
-      );
-    },
-  };
-}
-
-type Entry = FinancesPaper['ledger'][number];
-
-/** A sum, the money out in red. */
-const sum = (n: number) => el('span', n < 0 ? 'f-bad' : '', money(n));
-
-/** A figure the finances lead with: its name over the sum, in `tone`. */
-const figure = (name: string, amount: number, tone: string) =>
-  el('div', '', el('span', '', name), el('b', tone, money(amount)));
-
-/** The top of the balance's chart: a little over the most it has stood at. */
-const ceiling = (stood: readonly number[]) =>
-  Math.ceil((Math.max(1, ...stood) * 1.1) / 100) * 100;
-
-/** The balance as it has stood (`stood`, oldest first): a line over its ground, stretched to its place. */
-function history(stood: readonly number[]) {
-  const W = 400,
-    H = 200,
-    top = ceiling(stood),
-    low = Math.min(0, ...stood);
-  const line = stood
-    .map((b, i) => {
-      const x = (i / Math.max(1, stood.length - 1)) * W,
-        y = H - ((b - low) / (top - low)) * H;
-      return `${i ? 'L' : 'M'}${x.toFixed(1)} ${y.toFixed(1)}`;
-    })
-    .join('');
-  const svg = drawn(
-    W,
-    H,
-    `<path class="f-ground" d="${line}L${W} ${H}L0 ${H}Z"/><path class="f-line" d="${line}"/>`,
-    'f-plot'
-  );
-  svg.setAttribute('preserveAspectRatio', 'none');
-  return svg;
-}
-
-/** The finances. */
-export function createFinances(): Screen<FinancesPaper> {
-  stylesheet(CSS);
-  bitsStyle();
-  const root = el('div', 'b-pad s-finances');
-  return {
-    el: root,
-    show(v) {
-      // the balance as it has stood, oldest first, from what she began with
-      const past = [...v.ledger].reverse(),
-        first = past[0];
-      const stood = first
-        ? [first.balance - first.amount, ...past.map((l) => l.balance)]
-        : [v.balance, v.balance];
-      root.replaceChildren(
-        el(
-          'div',
-          'b-col',
-          classed(
-            panel('Balance', [
-              el(
-                'div',
-                'f-chart',
-                el(
-                  'div',
-                  'f-sums',
-                  el('span', '', money(ceiling(stood))),
-                  el('span', '', money(Math.min(0, ...stood)))
-                ),
-                history(stood),
-                el(
-                  'div',
-                  'f-days',
-                  el('span', '', first?.date ?? ''),
-                  el('span', '', 'Now')
-                )
-              ),
-            ]),
-            'f-history'
-          ),
-          classed(
-            panel('Transactions', [
-              v.ledger.length === 0 &&
-                el('div', 'm-none', 'Nothing has been paid or taken yet.'),
-              table<Entry>(
-                [
-                  { label: 'Date', width: '116px', cell: (r) => r.date },
-                  { label: 'Transaction', width: '1fr', cell: (r) => r.what },
-                  {
-                    label: 'Amount',
-                    width: '62px',
-                    num: true,
-                    cell: (r) => sum(r.amount),
-                  },
-                  {
-                    label: 'Balance',
-                    width: '66px',
-                    num: true,
-                    cell: (r) => sum(r.balance),
-                  },
-                ],
-                v.ledger,
-                { keep: 'ledger' }
-              ),
-            ]),
-            `grow${v.ledger.length === 0 ? ' f-none' : ''}`
-          )
-        ),
-        panel('Cashflow', [
-          el(
-            'div',
-            'f-top',
-            figure('Available Budget', v.balance, 'f-good'),
-            figure('Net Per Race', v.net, v.net < 0 ? 'f-bad' : 'f-good')
-          ),
-          band('Income and Costs Per Race'),
-          lines([
-            ...v.race.map((r): [string, HTMLElement] => [
-              r.label,
-              sum(r.amount),
-            ]),
-            ['Net', sum(v.net)],
-          ]),
-        ])
       );
     },
   };

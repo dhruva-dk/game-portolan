@@ -5,6 +5,7 @@
 import { TEAM, TEAMS as GRID } from '../../race.ts';
 import type { Desk, Views } from '../office.ts';
 import type { ShellView } from '../shell.ts';
+import { FINANCES } from './finances.ts';
 import { HOME } from './home.ts';
 import { PROFILE } from './profile.ts';
 import { OFFER } from './offer.ts';
@@ -44,6 +45,7 @@ const VIEWS: Pick<
   staff: { view: ROSTER, dyes: TEAMS.map((t) => t.colours) },
   scouting: { view: SCOUTING, dyes: TEAMS.map((t) => t.colours) },
   offer: { view: OFFER, dyes: TEAMS.map((t) => t.colours) },
+  finances: FINANCES,
   found: {
     team: HERS.name,
     given: 'Ada',

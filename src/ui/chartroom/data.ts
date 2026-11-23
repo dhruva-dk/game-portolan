@@ -6,9 +6,10 @@
 // work under way is striped as far as it has got; a table is a ledger's page,
 // figures right-set and tabular, the player's own row gilt.
 
-import { el, pressed, share, styled, type Kid } from '../kit/part.ts';
+import { alpha, figure, svgNode } from '../ink.ts';
+import { el, grouped, pressed, share, styled, type Kid } from '../kit/part.ts';
 import { arrow, fig, label } from './figures.ts';
-import { UNIT, step, u } from './tokens.ts';
+import { TONE, UNIT, step, u } from './tokens.ts';
 
 export const DATA_CSS = `
 .cr-terms > div { display: flex; justify-content: space-between; align-items: baseline; gap: var(--s4);
@@ -62,6 +63,8 @@ export const DATA_CSS = `
   rotate: 45deg; background: var(--paper-raised); box-shadow: inset 0 0 0 var(--w-rule) var(--ink); }
 .cr-steps > .node.reached { background: var(--ink); }
 .cr-key i.avg { height: ${u(9)}; border-left: var(--w-rule) dashed var(--ink); }
+
+.cr-course { display: block; width: 100%; height: auto; }
 
 .cr-table { display: flex; flex-direction: column; min-height: 0; font-variant-numeric: tabular-nums lining-nums; }
 .cr-table.scrolls { flex: 1; }
@@ -233,6 +236,94 @@ export function compared(
       el('span', '', el('i', 'avg'), key.average)
     )
   );
+}
+
+/** A sum short, for an axis: thousands as k. */
+const short = (n: number) =>
+  Math.abs(n) >= 1000 ? `${grouped(n / 1000)}k` : grouped(n);
+
+/** A round step about `rough`: 1, 2 or 5 times a power of ten. */
+function round(rough: number) {
+  const p = 10 ** Math.floor(Math.log10(Math.max(1, rough))),
+    f = rough / p;
+  return (f < 1.5 ? 1 : f < 3.5 ? 2 : f < 7.5 ? 5 : 10) * p;
+}
+
+/** The course's drawing, in its own units: its size, and the plot's edges inside it. */
+const C = { w: 400, h: 152, l: 34, r: 394, t: 12, b: 134 } as const;
+
+/**
+ * A balance's course over a season, a chart as wide as its place: the balance
+ * by days as it stepped (`points`, oldest first) over a good wash to `today`;
+ * from there dotted on to where it will stand at `end` (`ahead`); the floor
+ * under which nothing is spent ruled in harm; round sums ruled across; the
+ * dates the season runs `from` and `to` under it.
+ */
+export function course(
+  c: {
+    from: string;
+    to: string;
+    start: number;
+    today: number;
+    end: number;
+    points: readonly { day: number; balance: number }[];
+  },
+  ahead: number,
+  floor: number
+) {
+  const sums = [...c.points.map((p) => p.balance), ahead, floor, 0];
+  const by = round((Math.max(...sums) - Math.min(...sums)) / 4),
+    lo = Math.floor(Math.min(...sums) / by) * by,
+    hi = Math.ceil(Math.max(...sums) / by) * by;
+  const x = (d: number) =>
+      C.l + ((d - c.start) / Math.max(1, c.end - c.start)) * (C.r - C.l),
+    y = (v: number) => C.b - ((v - lo) / Math.max(1, hi - lo)) * (C.b - C.t);
+  const now = c.points.at(-1)?.balance ?? 0;
+  const text = (
+    at: number,
+    v: number,
+    s: string,
+    o: Parameters<typeof figure>[4]
+  ) => figure(at, v, s, 9, { fill: TONE.label, ...o });
+  let body = '';
+  for (let v = lo; v <= hi; v += by)
+    body +=
+      `<line x1="${C.l}" x2="${C.r}" y1="${y(v)}" y2="${y(v)}" stroke="${alpha(TONE.ink, v === 0 ? 0.45 : 0.14)}" stroke-width=".7"/>` +
+      text(C.l - 4, y(v), short(v), { anchor: 'end' });
+  // a day's closing balance: what was paid and taken the same day, netted
+  const days = new Map(c.points.map((p) => [p.day, p.balance]));
+  let line = '';
+  for (const [day, balance] of days)
+    line += line
+      ? `H${x(day).toFixed(1)}V${y(balance).toFixed(1)}`
+      : `M${x(day).toFixed(1)} ${y(balance).toFixed(1)}`;
+  line += `H${x(c.today).toFixed(1)}`;
+  body +=
+    `<path d="${line}V${C.b}H${x(c.start)}Z" fill="${alpha(TONE.good, 0.26)}"/>` +
+    `<line x1="${C.l}" x2="${C.r}" y1="${y(floor)}" y2="${y(floor)}" stroke="${TONE.harm}" stroke-width="1.1" stroke-dasharray="5 3"/>` +
+    text(C.r, y(floor) - 7, `floor ${short(floor)}`, {
+      anchor: 'end',
+      fill: TONE.harm,
+    }) +
+    `<line x1="${x(c.today)}" x2="${x(c.today)}" y1="${C.t}" y2="${C.b}" stroke="${alpha(TONE.ink, 0.35)}" stroke-width=".7"/>` +
+    text(x(c.today), C.t - 6, 'today', {}) +
+    `<path d="${line}" fill="none" stroke="${TONE.ink}" stroke-width="1.6" stroke-linejoin="round"/>` +
+    `<line x1="${x(c.today)}" y1="${y(now)}" x2="${x(c.end)}" y2="${y(ahead)}" stroke="${TONE.ink}" stroke-width="1.4" stroke-dasharray="0.1 4" stroke-linecap="round"/>` +
+    `<circle cx="${x(c.today)}" cy="${y(now)}" r="3" fill="${TONE.ink}" stroke="${TONE.paper}" stroke-width="1.2"/>` +
+    `<circle cx="${x(c.end)}" cy="${y(ahead)}" r="3" fill="${TONE.paper}" stroke="${TONE.ink}" stroke-width="1.2"/>` +
+    text(x(c.end) - 2, y(ahead) - 9, short(ahead), {
+      anchor: 'end',
+      fill: ahead < floor ? TONE.harm : TONE.ink,
+      weight: 600,
+    }) +
+    `<line x1="${C.l}" x2="${C.r}" y1="${C.b}" y2="${C.b}" stroke="${TONE.ink}" stroke-width=".9"/>` +
+    text(C.l, C.b + 10, c.from, { anchor: 'start' }) +
+    text(C.r, C.b + 10, c.to, { anchor: 'end' });
+  const s = svgNode(C.w, C.h, body);
+  s.removeAttribute('width');
+  s.removeAttribute('height');
+  s.setAttribute('class', 'cr-course');
+  return s;
 }
 
 /** A row's height, drawn units (--row); how many rows a scrolled table first shows above the player's own. */

@@ -27,7 +27,8 @@ import {
   upkeepAt,
 } from './hq.ts';
 import { render } from './mail.ts';
-import { perRace } from './money.ts';
+import { perRace, projection as balanceAt } from './money.ts';
+import { standingOf } from './standings.ts';
 import {
   BUILT,
   NEWS,
@@ -101,12 +102,65 @@ export function calendarPaper(s: CareerState): CalendarPaper {
   };
 }
 
+/** What each kind of the ledger's lines was for, as the finances name it; what came in first. */
+const SPENT: Readonly<Record<string, string>> = {
+  sponsor: 'Sponsors',
+  prize: 'Prize money',
+  fish: 'Fish market',
+  pay: 'Pay drivers',
+  wages: 'Wages',
+  bonus: 'Bonuses',
+  upkeep: 'Headquarters upkeep',
+  building: 'Buildings',
+  design: 'Designs',
+  supplier: 'Suppliers',
+  fee: 'Signing fees',
+  break: 'Break clauses',
+  dismissal: 'Dismissals',
+  standIn: 'Stand-ins',
+  fine: 'Fines',
+  lobby: 'Lobbying',
+  dilemma: 'Decisions',
+};
+
 /** The finances. */
 export function financesPaper(s: CareerState): FinancesPaper {
   const c = myTeam(s),
-    r = perRace(s, c.id);
+    r = perRace(s, c.id),
+    ahead = balanceAt(s, c.id);
+  const start = s.calendar?.start ?? 0,
+    end = s.calendar?.end ?? s.day,
+    season = s.ledger.filter((l) => l.day >= start);
+  const by = new Map<string, number>();
+  for (const l of season) {
+    const label = SPENT[l.kind] ?? capital(l.kind);
+    by.set(label, (by.get(label) ?? 0) + l.amount);
+  }
+  /** The balance as the season began: before its first line, else as it is. */
+  const opening = season[0] ? season[0].balance - season[0].amount : c.balance;
   return {
     balance: c.balance,
+    floor: c.debtFloor,
+    projection: {
+      races: ahead.races,
+      place: standingOf(s, c.id),
+      prize: ahead.prize,
+      end: ahead.end,
+    },
+    season: [...by]
+      .map(([label, amount]) => ({ label, amount }))
+      .sort((a, b) => b.amount - a.amount),
+    chart: {
+      from: dateAt(s, start),
+      to: dateAt(s, Math.max(end, s.day)),
+      start,
+      today: s.day,
+      end: Math.max(end, s.day),
+      points: [
+        { day: start, balance: opening },
+        ...season.map((l) => ({ day: l.day, balance: l.balance })),
+      ],
+    },
     race: [
       { label: 'Sponsors', amount: r.sponsors },
       { label: 'Fish Market', amount: r.fish },

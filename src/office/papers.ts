@@ -51,11 +51,29 @@ interface Sum {
   label: string;
   amount: number;
 }
-/** `finances`: the balance, what a race brings and costs, and the ledger, newest first. */
+/**
+ * `finances`: the balance and the chairman's floor under it (below it nothing
+ * that spends is accepted); what a race brings and costs; where the season
+ * will end on what is committed (the races left, the prize at her place now);
+ * this season's money by what it was for, what came in first; the balance day
+ * by day since the season began (the chart's line, to `today`, projected on to
+ * `end`); and the ledger, newest first.
+ */
 export interface FinancesPaper {
   balance: number;
+  floor: number;
   race: readonly Sum[];
   net: number;
+  projection: { races: number; place: number; prize: number; end: number };
+  season: readonly Sum[];
+  chart: {
+    from: string;
+    to: string;
+    start: number;
+    today: number;
+    end: number;
+    points: readonly { day: number; balance: number }[];
+  };
   ledger: readonly {
     date: string;
     what: string;
