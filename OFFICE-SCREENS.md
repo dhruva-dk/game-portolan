@@ -90,7 +90,13 @@ Each line: built on the kit from a fixture → in review → approved and live. 
 
 ### 6. Bare
 
-- [ ] Main menu · [ ] Found (create a team)
+- [ ] **Main menu** _(in review)_, after MM 047: the mark on its plate; New Career (her ship through a brass-framed
+      window) and Single Race (the planet, still), each a woodcut head over its picture and its plate; Continue (the
+      career kept: its emblem, team and date; shut with none kept) and Preferences as strips
+- [ ] **Found** _(in review)_, after MM 048–050: the making in four steps, one open (name, owner, emblem, livery:
+      a pattern stepped, a dye of the swatches), each shut step a strip with what it holds; her ship through the
+      window, the team's plate under it (the championship it joins, whose place it takes), the owner, why the last
+      making was refused, the way on. (The ship through the window does not yet wear the drafted livery.)
 
 ### 7. New
 

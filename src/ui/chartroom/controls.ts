@@ -29,6 +29,12 @@ export const CONTROLS_CSS = `
 .cr-well { display: grid; place-items: center; background: var(--paper-sunk); box-shadow: inset 0 0 0 var(--w-fine) var(--ink);
   font: 600 var(--t-name)/1 var(--face); font-variant-numeric: tabular-nums lining-nums; }
 
+.cr-field { display: flex; flex-direction: column; gap: var(--s1); }
+.cr-field > input { min-height: var(--touch); padding: 0 var(--s3); border: 0; border-radius: 0; outline: none; -webkit-appearance: none;
+  appearance: none; background: var(--paper-sunk); box-shadow: inset 0 0 0 var(--w-fine) var(--ink); color: var(--ink);
+  font: 600 var(--t-name)/1 var(--face); }
+.cr-field > input:focus { box-shadow: inset 0 0 0 var(--w-rule) var(--act); }
+
 .cr-drop-at { position: relative; }
 .cr-drop { min-height: var(--touch); display: flex; align-items: center; justify-content: space-between; gap: var(--s3);
   padding: 0 var(--s4); font: 600 var(--t-body)/1 var(--face); }
@@ -117,6 +123,27 @@ export function stepper(
     el('div', 'cr-well', text),
     side('+', up)
   );
+}
+
+/**
+ * A line typed into: its name over a sunk well ruled in ink (the action's ink
+ * round it while it is typed in), at most `most` letters; `typed` hears each
+ * change, `left` once it is left.
+ */
+export function field(
+  title: string,
+  value: string,
+  typed: (text: string) => void,
+  left: () => void,
+  most = 28
+) {
+  const input = el('input');
+  input.type = 'text';
+  input.maxLength = most;
+  input.value = value;
+  input.addEventListener('input', () => typed(input.value));
+  input.addEventListener('change', left);
+  return el('label', 'cr-field', label(title), input);
 }
 
 /** The woodcut caret of a slip that drops a menu. */

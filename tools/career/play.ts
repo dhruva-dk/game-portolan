@@ -63,11 +63,11 @@ try {
   await at('menu');
   await page.waitForTimeout(1500);
   await capture('menu');
-  await tap('.m-tile');
+  await tap('.mn-career');
   await at('found');
   await capture('found');
   // a team made: the page sails to the first race's planet, and opens at Home
-  await tap('.f-foot .k-btn');
+  await tap('.fd-foot .cr-btn');
   await page.waitForURL(/career/, { timeout: 60000 });
   await at('home');
   await page.waitForTimeout(1500);
