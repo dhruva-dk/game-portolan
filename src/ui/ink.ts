@@ -61,7 +61,7 @@ export const SHADOW = '#1a1008',
  * The parchment's light, middle and edge: the paper's gradient (DEFS), and an
  * opaque sheet's (parchment).
  */
-const PARCHMENT = ['#f7eedb', '#f0e2c4', '#dcc396'] as const;
+export const PARCHMENT = ['#f7eedb', '#f0e2c4', '#dcc396'] as const;
 /**
  * Light laid over the world, not ink on paper: the screen's flashes and rims,
  * the marks of a blow.
@@ -141,6 +141,19 @@ export const OFFICE = {
   warn: '#c7860f',
   gold: '#c6951a',
   on: '#c85a12',
+} as const;
+/**
+ * The chartroom's few inks beyond the race's (ui/chartroom/): the second ink,
+ * for labels (about 6:1 on PAPER, where sepia is near 4.5:1); the faint ink set
+ * on a plate (the frame meter's label); and the quality ladder's two middle
+ * steps as washes, azurite and purpure, pale enough to set iron on, so they
+ * never read as RARITY's inks, which mean act and the epic.
+ */
+export const CHARTROOM = {
+  label: '#5e4631',
+  plateFaint: METER.label,
+  azurite: '#7fa0cf',
+  purpure: '#a88dc2',
 } as const;
 /**
  * The gull's own colours (gull.ts): his feathers and their shade, his beak,

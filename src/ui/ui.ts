@@ -45,7 +45,7 @@ const GUTTER = 16,
  * on, 1.74 on the iPad Air's 1180 × 820), unless the screen is too narrow for
  * the drawn pieces side by side at that size.
  */
-const size = (width: number, height: number) =>
+export const size = (width: number, height: number) =>
   Math.min(height / DRAWN.h, width / LEAST);
 
 /**
