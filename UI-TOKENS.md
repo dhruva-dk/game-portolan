@@ -16,7 +16,10 @@ is decided until it lands in code on main. Direction: **MM's layouts, drawn in t
 4. **Main's meanings become rules**, written out below, and extended, never contradicted.
 5. **Two layers.** Ink on paper is shared. Light on the world (`LIGHT`, the frame's `METER`) is the race's alone.
 6. **Enforced.** The tokens module imports only `ink.ts`; an architecture test fails a kit or screen file holding a
-   hex literal or a raw px size. Tokens live on main; mm rebases onto them.
+   hex literal or a raw px size.
+7. **Where it is built (decided 2026-11-22):** on mm, `ink.ts` and `glyphs.ts` included. When the work is done, mm
+   is rebased onto main as a whole. Until then, mm changes main's files only by adding to them, so the rebase stays
+   clean.
 
 ## What main already uses (unwritten until now)
 
@@ -139,16 +142,19 @@ Rule: a meaning ink on a thing says the thing's meaning. Decoration never uses o
 
 One ladder for everything that is "how good": guns (main's `RARITY`), parts, stats, staff, facilities.
 
-| Step | Name      | Wash (D5)               | Stat 0–20 | Text on it |
-| ---- | --------- | ----------------------- | --------- | ---------- |
-| q0   | silver    | `WASH.silver` #b4b8c2   | 0–5       | ink        |
-| q1   | verdigris | `WASH.viridian` #4f9488 | 6–9       | on-ink     |
-| q2   | azurite   | `WASH.azure` #4a78b8    | 10–13     | on-ink     |
-| q3   | purpure   | new purpure wash        | 14–17     | on-ink     |
-| q4   | gold      | `WASH.gold` #d4a84a     | 18–20     | ink        |
+| Step | Name      | Wash (D5)                  | Stat 0–20 | Text on it |
+| ---- | --------- | -------------------------- | --------- | ---------- |
+| q0   | silver    | `WASH.silver` #b4b8c2      | 0–5       | ink        |
+| q1   | verdigris | `WASH.viridian` #4f9488    | 6–9       | on-ink     |
+| q2   | azurite   | new pale azure ≈ #7fa0cf   | 10–13     | ink        |
+| q3   | purpure   | new pale purpure ≈ #a88dc2 | 14–17     | ink        |
+| q4   | gold      | `WASH.gold` #d4a84a        | 18–20     | ink        |
 
 A stat of 4 is silver, not red: weak is not harm. The ladder's inks (`RARITY`) outline; its washes fill. On-ink
 on verdigris is about 3.5:1, so text on a wash is large text only (`--fig-s` and up).
+
+**Decided (D5, 2026-11-22):** azurite and purpure are pale washes with ink figures (about 6:1), so a strong captain's
+screen is not all purple and an azurite tile never reads as an act button (solid blue, light words). The bands stay.
 
 ### 6. Team
 
