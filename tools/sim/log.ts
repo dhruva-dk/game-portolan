@@ -1,4 +1,9 @@
-import { debugOf, PARTS, type Part } from '../../src/sim/engine.ts';
+import {
+  debugOf,
+  PARTS,
+  type Part,
+  type Stepped,
+} from '../../src/sim/engine.ts';
 import { STEP } from '../../src/sim/fixed.ts';
 import { GUNS } from '../../src/sim/handling.ts';
 import { isArms } from '../../src/sim/loot.ts';
@@ -13,8 +18,6 @@ import {
 } from '../../src/world/sphere.ts';
 import type { Lines } from '../out.ts';
 import type { State } from './match.ts';
-
-type Stepped = ReturnType<State['advance']>;
 
 const r1 = (x: number) => Math.round(x * 10) / 10,
   r2 = (x: number) => Math.round(x * 100) / 100,

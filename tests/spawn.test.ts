@@ -1,9 +1,17 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { SHIP } from '../src/sim/handling.ts';
-import { SHIPS } from '../src/sim/match.ts';
-import { SPAWN, berthing, berths, type Spawn } from '../src/sim/spawn.ts';
-import { createMatches } from '../src/sim/matches.ts';
+import { SETUP, createMatch } from '../src/sim/engine.ts';
+import {
+  SPAWN,
+  berthing,
+  berths,
+  drawn,
+  type Spawn,
+} from '../src/sim/spawn.ts';
+import { shipAt } from '../src/sim/ship.ts';
+import { watersAt } from '../src/sim/waters.ts';
+import { setupOf } from './setups.ts';
 import { landOf, planetOf } from '../src/world/land.ts';
 import { SEED } from '../src/world/environment.ts';
 import { R, along, distance, dot, length } from '../src/world/sphere.ts';
@@ -22,20 +30,20 @@ const depth = (p: readonly [number, number, number]) => -planet.height(p);
 const water = berthing(depth);
 
 test("a match's berths are its seed's alone: the same seed the same berths, to the bit; another seed others", () => {
-  const a = berths(water, 1234, SHIPS, depth),
-    b = berths(berthing(depth), 1234, SHIPS, depth),
-    c = berths(water, 1235, SHIPS, depth);
+  const a = berths(water, 1234, SETUP.most, depth),
+    b = berths(berthing(depth), 1234, SETUP.most, depth),
+    c = berths(water, 1235, SETUP.most, depth);
   assert.deepEqual(a, b);
   assert.notDeepEqual(
     a.map((s) => s.at),
     c.map((s) => s.at)
   );
-  assert.equal(a.length, SHIPS);
+  assert.equal(a.length, SETUP.most);
 });
 
 test('every ship starts afloat in open water, clear of land all round, heading a tangent with open water ahead', () => {
   for (const seed of [1, 2, 3]) {
-    for (const s of berths(water, seed, SHIPS, depth)) {
+    for (const s of berths(water, seed, SETUP.most, depth)) {
       assert.ok(
         Math.abs(length(s.at) - 1) < 1e-9 &&
           Math.abs(length(s.heading) - 1) < 1e-9 &&
@@ -77,7 +85,7 @@ test("the berths spread over all the open water: no two within a few ships' leng
   const open =
     water.points.length /
     Math.round((4 * Math.PI * R * R) / SPAWN.lattice ** 2);
-  for (const n of [20, 50, SHIPS, 100]) {
+  for (const n of [20, 50, SETUP.most, 100]) {
     const least = closest(berths(water, 7, n, depth)),
       even = Math.sqrt((2 * 4 * Math.PI * R * R * open) / (Math.sqrt(3) * n));
     console.log(
@@ -94,19 +102,27 @@ test("the berths spread over all the open water: no two within a few ships' leng
   }
 });
 
-test('each match is berthed ahead of its deal (off the main thread in the game), so PLAY does not work its berths out', async () => {
-  const matches = createMatches(SEED, planet, null, null),
-    asked: number[] = [];
-  matches.berthBy((seed) => {
-    asked.push(seed);
-    return Promise.resolve(berths(water, seed, SHIPS, depth));
-  });
-  await new Promise((done) => setTimeout(done, 0));
-  const first = matches.deal();
-  assert.equal(asked[0], first.seed);
-  assert.deepEqual(first.berths, berths(water, first.seed, SHIPS, depth));
-  assert.equal(asked.length, 2);
-  const second = matches.deal();
-  assert.equal(asked[1], second.seed);
-  assert.equal(second.berths, undefined);
+test('each match is berthed ahead of its start (off the main thread in the game), so PLAY does not work its berths out', () => {
+  const waters = watersAt(planet),
+    setup = setupOf(SEED),
+    count = setup.ships.length;
+  const at = (berthed?: { match: number; spawns: readonly Spawn[] }) =>
+    createMatch(setup, { ...waters, berthed })
+      .view.vessels()
+      .map((v) => v.ship.at);
+  const own = berths(water, SEED, count, depth),
+    other = berths(water, SEED + 1, count, depth);
+  const placed = (spawns: readonly Spawn[]) =>
+    drawn(spawns, SEED).map((b) => shipAt(b.at, b.heading).at);
+  assert.deepEqual(at(), placed(own), 'worked out at the start without them');
+  assert.deepEqual(
+    at({ match: SEED, spawns: other }),
+    placed(other),
+    'the berths handed it are the ones it takes'
+  );
+  assert.deepEqual(
+    at({ match: SEED + 1, spawns: other }),
+    placed(own),
+    "another match's are not"
+  );
 });

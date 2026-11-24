@@ -14,7 +14,12 @@ export function createReferee(game: Game) {
   let m: MatchState | null = null,
     of = 0,
     watching = false;
-  const report: Report = { sinkings: [], alive: [], share: 0 };
+  const report: Report = {
+    sinkings: [],
+    alive: [],
+    share: 0,
+    race: { teams: [], over: false, place: 0 },
+  };
   const aim = (s: MatchState) =>
     game.view({
       watch: watching ? s.watch : PLAYER,
@@ -48,12 +53,13 @@ export function createReferee(game: Game) {
       aim(m);
     },
     update(dt: number): End | null {
-      if (!m) return null;
+      const race = game.race();
+      if (!m || !race) return null;
       const was = m;
       report.sinkings = game.sinkings();
       report.alive = game.alive();
       report.share = game.share();
-      report.race = game.race();
+      report.race = race;
       m = stepMatch(m, report, dt);
       if (m.watch !== was.watch || m.phase !== was.phase) aim(m);
       if (m.phase === 'fighting' || m.place === null) return null;

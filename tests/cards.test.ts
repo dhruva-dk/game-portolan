@@ -5,7 +5,12 @@ import { fleetOf } from '../src/play/fleet.ts';
 import type { Sea } from '../src/render/snapshot.ts';
 import { CARD, fleetCard } from '../src/ui/lobby/fleet.ts';
 import { INK, dyeOn, percent } from '../src/ui/base/ink.ts';
+import { TYPES } from '../src/sim/persona.ts';
 import { seedOf } from '../src/world/seeds.ts';
+import { setupOf } from './setups.ts';
+
+const fleetNamed = (name: string) =>
+  fleetOf(setupOf(seedOf(name), { player: true }));
 
 test('the sea held, as a per cent: always to a tenth, never below none', () => {
   assert.equal(percent(0), '0.0%');
@@ -34,15 +39,9 @@ const texts = (svg: string) =>
     ...svg.matchAll(/<text x="([\d.-]+)" y="([\d.-]+)"[^>]*>([^<]*)<\/text>/g),
   ].map((m) => ({ x: Number(m[1]), y: Number(m[2]), text: m[3] }));
 
-test("the fleet card names its seed's match type under the type's mark", () => {
-  for (const [name, type] of [
-    ['1', 'mixed'],
-    ['4', 'bloodbath'],
-    ['5', 'gold rush'],
-    ['15', 'cagey'],
-  ]) {
-    const f = fleetOf(seedOf(name));
-    assert.equal(f.name, type, `seed ${name}`);
+test("the fleet card names its match type under the type's mark", () => {
+  for (const [k, { name: type }] of TYPES.entries()) {
+    const f = { ...fleetNamed('1'), type: k, name: type };
     const word = texts(fleetCard(100, 50, f)).find((t) => t.text === type);
     assert.ok(word, `${type}: its name on the card`);
     assert.equal(word.x, 122);
@@ -51,7 +50,7 @@ test("the fleet card names its seed's match type under the type's mark", () => {
 });
 
 test('the fleet card shows the traits only while held: the bars otherwise', () => {
-  const f = fleetOf(seedOf('1'));
+  const f = fleetNamed('1');
   const bars = fleetCard(0, 0, f),
     held = fleetCard(0, 0, f, true);
   const rating = (f.skill.mean * 5).toFixed(1);

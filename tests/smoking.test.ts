@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { SEED } from '../src/world/environment.ts';
-import { createMatches } from '../src/sim/matches.ts';
 import { createState } from '../src/play/state.ts';
 import { wearOf } from '../src/sim/health.ts';
 import { watersAt } from '../src/sim/waters.ts';
@@ -16,8 +15,10 @@ import {
   type Smoker,
 } from '../src/render/gunfire/smoking.ts';
 import { landOf, planetOf } from '../src/world/land.ts';
-import { R, type Vec3 } from '../src/world/sphere.ts';
-import { flat } from '../src/world/swell.ts';
+import { R } from '../src/world/sphere.ts';
+import { STILL } from '../src/sim/hands.ts';
+import { LIVERY } from '../src/world/livery.ts';
+import { setupOf } from './setups.ts';
 
 const ship = (
   id: number,
@@ -126,15 +127,11 @@ test('all of it together keeps no more than SMOKING.alive puffs alive, a quarter
 
 test("in the game's own match, every ship drawn shows its wear", () => {
   const planet = planetOf(SEED, landOf(SEED)),
-    depth = (p: Vec3) => -planet.height(p),
-    matches = createMatches(SEED, planet, null, null),
-    state = createState(planet, flat, watersAt(depth), matches.first);
-  state.start(matches.deal(), false);
-  const idle = { course: null, throttle: 0 },
-    still = { aim: null, fire: false };
+    state = createState(watersAt(planet), planet.start);
+  state.start(setupOf(SEED), [LIVERY]);
   let worn = false;
   while (state.time() < 400 && !worn) {
-    state.advance(idle, still);
+    state.step(STILL);
     for (const d of state.drawn(1)) {
       if (!d.afloat) continue;
       assert.equal(d.wear, wearOf(state.crew(d.id).health));

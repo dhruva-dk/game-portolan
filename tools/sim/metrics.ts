@@ -1,5 +1,5 @@
 import type { GunKind } from '../../src/sim/kinds.ts';
-import { debugOf } from '../../src/sim/engine.ts';
+import { debugOf, type Stepped } from '../../src/sim/engine.ts';
 import type { Memory } from '../../src/sim/bot.ts';
 import { BOT, type Mode } from '../../src/sim/captain.ts';
 import { GUNS, SHIP } from '../../src/sim/handling.ts';
@@ -163,8 +163,6 @@ export interface Flow {
 }
 const flow = (): Flow => ({ pieces: 0, lay: 0, fought: 0 });
 export const FOUGHT = 150;
-
-type Stepped = ReturnType<State['advance']>;
 
 export function watch(
   state: State,

@@ -19,11 +19,10 @@ import {
 } from '../src/play/shake.ts';
 import { STOPS, createStops, stopFor } from '../src/play/stops.ts';
 import { createState, debugOf } from '../src/play/state.ts';
-import type { Match } from '../src/sim/engine.ts';
 import { lookOf } from '../src/play/colors.ts';
 import { PLAYER } from '../src/sim/match.ts';
 import { watersAt } from '../src/sim/waters.ts';
-import { MIXED } from '../src/sim/persona.ts';
+import { STILL } from '../src/sim/hands.ts';
 import { calm } from '../src/sim/storm.ts';
 import { BIG, SAFE, capped, heartbeat, lowHull } from '../src/ui/sea/flash.ts';
 import { landOf, planetOf } from '../src/world/land.ts';
@@ -35,8 +34,8 @@ import {
   scale,
   type Vec3,
 } from '../src/world/sphere.ts';
-import { flat } from '../src/world/swell.ts';
 import { lookAt } from '../src/world/turn.ts';
+import { setupOf } from './setups.ts';
 
 const at: Vec3 = [0, 0, 1];
 const none: Done = {
@@ -267,25 +266,23 @@ test('as she sees it: the bearing clockwise from the look, its distance, and on 
 
 test('the match records its deeds: a ship sunk is told once, with a sink blast to draw', () => {
   const planet = planetOf(SEED, landOf(SEED)),
-    depth = (p: Vec3) => -planet.height(p),
     start = planet.start;
-  const match: Match = {
-    seed: 1,
-    type: MIXED,
-    gun: null,
-    storm: () => calm(start.at),
-  };
-  const state = createState(planet, flat, watersAt(depth), match);
+  const state = createState(watersAt(planet), start);
   const before = state.deeds().at(-1)?.seq ?? 0;
   const there = normalize([start.at[0] + 0.05, start.at[1], start.at[2]]);
-  debugOf(state).atSea(start, [
-    {
-      at: there,
-      heading: bearingAt(there, 0),
-      look: lookOf(LIVERY),
-      lashed: null,
-    },
-  ]);
+  debugOf(state).atSea(
+    setupOf(1, { perTeam: 1, player: true }),
+    start,
+    [
+      {
+        at: there,
+        heading: bearingAt(there, 0),
+        look: lookOf(LIVERY),
+        lashed: null,
+      },
+    ],
+    { storm: () => calm(start.at) }
+  );
   const other = state.vessels().find((v) => v.id !== PLAYER)!.id;
   debugOf(state).sink(other, PLAYER);
   const sank = state.deeds().filter((d) => d.seq > before && d.kind === 'sank');
@@ -294,7 +291,7 @@ test('the match records its deeds: a ship sunk is told once, with a sink blast t
     sank[0].kind === 'sank' && sank[0].ship === other && sank[0].by === PLAYER
   );
   assert.ok(state.blasts().some((b) => b.kind === 'sink'));
-  state.advance({ course: null, throttle: 0 }, { aim: null, fire: false });
+  state.step(STILL);
   assert.equal(
     state.deeds().filter((d) => d.kind === 'sank').length,
     1,

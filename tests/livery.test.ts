@@ -17,10 +17,13 @@ import {
   LIVERY,
   MARKS,
   PATTERNS,
+  liveryAt,
   markOn,
   type Livery,
 } from '../src/world/livery.ts';
-import { SHIPS } from '../src/sim/match.ts';
+import { teamLiveries } from '../src/app/race.ts';
+import { SETUP } from '../src/sim/engine.ts';
+import { setupOf } from './setups.ts';
 import type { Vec3 } from '../src/world/sphere.ts';
 
 const SEEDS = [0, 1, 7, 1234, 0xdeadbeef, 4105590181];
@@ -157,7 +160,7 @@ test('the seed deals every bot its own from the set, the same every time for the
     ]
   );
   for (const seed of SEEDS)
-    for (let id = 1; id < SHIPS; id++) {
+    for (let id = 1; id < SETUP.most; id++) {
       const a = dealt(seed, id, LIVERY);
       assert.deepEqual(
         worn(a),
@@ -166,14 +169,16 @@ test('the seed deals every bot its own from the set, the same every time for the
       );
     }
   const fleet = (seed: number) =>
-    Array.from({ length: SHIPS - 1 }, (_, i) => dealt(seed, i + 1, LIVERY));
+    Array.from({ length: SETUP.most - 1 }, (_, i) =>
+      dealt(seed, i + 1, LIVERY)
+    );
   assert.notDeepEqual(fleet(1), fleet(2));
 });
 
 test('never her dye: whatever she wears, no bot of any seed wears it', () => {
   every((chosen) => {
     for (const seed of SEEDS)
-      for (let id = 1; id < SHIPS; id++)
+      for (let id = 1; id < SETUP.most; id++)
         assert.notEqual(dealt(seed, id, chosen).dye, chosen.dye);
   });
 });
@@ -182,7 +187,7 @@ test('the fleet is dealt across the whole set: every other dye and every pattern
   every((chosen) => {
     const dyes = new Set<number>(),
       patterns = new Set<number>();
-    for (let id = 1; id < SHIPS; id++) {
+    for (let id = 1; id < SETUP.most; id++) {
       const l = dealt(1234, id, chosen);
       dyes.add(l.dye);
       patterns.add(l.pattern);
@@ -192,7 +197,8 @@ test('the fleet is dealt across the whole set: every other dye and every pattern
   });
   const counts = new Array<number>(COLORS.length).fill(0);
   for (let seed = 0; seed < 200; seed++)
-    for (let id = 1; id < SHIPS; id++) counts[dealt(seed, id, LIVERY).dye]++;
+    for (let id = 1; id < SETUP.most; id++)
+      counts[dealt(seed, id, LIVERY).dye]++;
   const others = counts.slice(1),
     mean = others.reduce((a, b) => a + b) / others.length;
   assert.equal(counts[0], 0);
@@ -201,9 +207,30 @@ test('the fleet is dealt across the whole set: every other dye and every pattern
 });
 
 test('her pattern moves no bot: only her dye is kept from them', () => {
-  for (let id = 1; id < SHIPS; id++) {
+  for (let id = 1; id < SETUP.most; id++) {
     const a = dealt(99, id, { dye: 0, pattern: 0 }),
       b = dealt(99, id, { dye: 0, pattern: 2 });
     assert.deepEqual(a, b, 'her pattern does not move the bots');
   }
+});
+
+test('until the career, every team wears the livery of its index, the player’s its own, and no other team that one', () => {
+  const race = setupOf(1, { player: true }),
+    teams = new Set(race.ships.map((s) => s.team)).size;
+  const same = (a: Livery, b: Livery) =>
+    a.dye === b.dye && a.pattern === b.pattern;
+  assert.deepEqual(
+    teamLiveries(race, LIVERY),
+    Array.from({ length: teams }, (_, t) => liveryAt(t))
+  );
+  every((chosen) => {
+    const all = teamLiveries(race, chosen);
+    assert.equal(all.length, teams);
+    assert.deepEqual(all[0], chosen);
+    assert.equal(all.filter((l) => same(l, chosen)).length, 1);
+    assert.equal(new Set(all.map((l) => `${l.dye} ${l.pattern}`)).size, teams);
+    all.forEach((l, t) =>
+      assert.ok(t === 0 || same(l, liveryAt(t)) || same(liveryAt(t), chosen))
+    );
+  });
 });

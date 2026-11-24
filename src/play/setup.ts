@@ -1,8 +1,6 @@
-import { SHIPS } from '../sim/match.ts';
-import type { Berther } from '../sim/matches.ts';
 import { charted } from '../sim/route.ts';
 import type { Spawn } from '../sim/spawn.ts';
-import type { Waters } from '../sim/waters.ts';
+import type { Berthed, Soundings } from '../sim/waters.ts';
 import type { Land } from '../world/land.ts';
 import type { Vec3 } from '../world/sphere.ts';
 
@@ -10,18 +8,20 @@ type Sounded =
   | { open: Uint8Array; clear: Uint8Array; berths: Float64Array; ms: number }
   | { match: number; spawns: Float64Array };
 
+export type Berther = (match: number, count: number) => Promise<Berthed>;
+
 export function watersOf(
   seed: number,
   land: Land
-): Promise<{ waters: Waters; ms: number; berth: Berther }> {
+): Promise<{ waters: Soundings; ms: number; berth: Berther }> {
   const worker = new Worker(new URL('./sounding.ts', import.meta.url), {
     type: 'module',
   });
   const asked = new Map<number, (spawns: Spawn[]) => void>();
-  const berth: Berther = (match) =>
+  const berth: Berther = (match, count) =>
     new Promise((resolve) => {
-      asked.set(match, resolve);
-      worker.postMessage({ match, count: SHIPS });
+      asked.set(match, (spawns) => resolve({ match, spawns }));
+      worker.postMessage({ match, count });
     });
   const vec = (b: Float64Array, i: number): Vec3 => [b[i], b[i + 1], b[i + 2]];
   return new Promise((resolve, reject) => {

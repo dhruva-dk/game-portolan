@@ -4,8 +4,6 @@ type Phase = 'fighting' | 'spectating' | 'won';
 
 export const PLAYER = 0;
 
-export const SHIPS = 80;
-
 export type Cause = 'shot' | 'ram' | 'storm';
 
 export interface Sunk {
@@ -38,7 +36,7 @@ export interface Report {
   sinkings: readonly Sunk[];
   alive: readonly number[];
   share?: number;
-  race?: { teams: readonly number[]; over: boolean; place: number };
+  race: { teams: readonly number[]; over: boolean; place: number };
 }
 
 export const startMatch = (): MatchState => ({
@@ -53,8 +51,8 @@ export const startMatch = (): MatchState => ({
 });
 
 function next(gone: number, by: number | null, r: Report): number {
-  const teams = r.race?.teams,
-    mate = teams && r.alive.find((id) => teams[id] === teams[gone]);
+  const teams = r.race.teams,
+    mate = r.alive.find((id) => teams[id] === teams[gone]);
   if (mate !== undefined) return mate;
   if (by !== null && r.alive.includes(by)) return by;
   let best = -1,
@@ -91,19 +89,10 @@ export function stepMatch(m: MatchState, r: Report, dt: number): MatchState {
       const watch = next(gone.id, gone.by, r);
       if (watch >= 0) s = { ...s, watch };
     }
-  } else if (s.phase === 'fighting' && r.race) {
-    if (r.race.over) s = { ...s, phase: 'won', place: r.race.place };
-  } else if (
-    s.phase === 'fighting' &&
-    fresh.length > 0 &&
-    r.alive.length === 1 &&
-    r.alive[0] === PLAYER
-  ) {
-    s = { ...s, phase: 'won', place: 1 };
+  } else if (s.phase === 'fighting' && r.race.over) {
+    s = { ...s, phase: 'won', place: r.race.place };
   }
-  s.over = r.race
-    ? r.race.over
-    : s.phase === 'won' || (s.phase === 'spectating' && r.alive.length <= 1);
+  s.over = r.race.over;
   return s;
 }
 

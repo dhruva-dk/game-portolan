@@ -1,178 +1,161 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { SEED } from '../src/world/environment.ts';
-import { KINDS } from '../src/sim/kinds.ts';
-import { raceOf, runRace, specField } from '../src/sim/racing.ts';
-import { TEAM, type RaceCard, type RaceResult } from '../src/sim/race.ts';
-import { nature } from '../src/sim/persona.ts';
+import { createMatch, type Match } from '../src/sim/engine.ts';
+import { STILL, type Hands } from '../src/sim/hands.ts';
+import { PLAYER } from '../src/sim/match.ts';
+import type { MatchResult } from '../src/sim/result.ts';
 import { DEFAULT_RULES } from '../src/sim/rules.ts';
-import { watersAt } from '../src/sim/waters.ts';
+import type { MatchSetup } from '../src/sim/setup.ts';
 import { closedBy } from '../src/sim/storm.ts';
+import { watersAt } from '../src/sim/waters.ts';
 import { landOf, planetOf } from '../src/world/land.ts';
-import { hash } from '../src/world/random.ts';
-import type { Vec3 } from '../src/world/sphere.ts';
+import { setupOf } from './setups.ts';
 
 const planet = planetOf(SEED, landOf(SEED)),
-  depth = (p: Vec3) => -planet.height(p),
-  waters = watersAt(depth);
+  waters = watersAt(planet);
 
-const short = (over: Partial<RaceCard> = {}): RaceCard => {
-  const card = specField(SEED, 3);
-  return { ...card, rules: { ...card.rules, storm: 3 }, ...over };
-};
-const sailed = (card: RaceCard) => runRace(card, planet, waters);
+const short = (match = SEED, over: Parameters<typeof setupOf>[1] = {}) =>
+  setupOf(match, { teams: 3, ...over });
+
+function sailed(
+  setup: MatchSetup,
+  hands: (m: Match) => Hands = () => STILL
+): MatchResult {
+  const m = createMatch(setup, waters);
+  while (!m.done) m.step(hands(m));
+  return m.result();
+}
+
 const FIRST = sailed(short());
 
-function sound(card: RaceCard, r: RaceResult) {
-  const ids = card.ships.map((s) => s.id),
-    team = (id: number) => card.ships[id].team;
+function sound(setup: MatchSetup, r: MatchResult) {
+  const team = (id: number) => setup.ships[id].team,
+    teams = new Set(setup.ships.map((s) => s.team));
+  assert.equal(r.ships.length, setup.ships.length);
   assert.deepEqual(
-    [...r.order].sort((a, b) => a - b),
-    ids,
+    r.ships.map((s) => s.place).sort((a, b) => a - b),
+    setup.ships.map((_, i) => i + 1),
     'every ship placed'
   );
-  const down = new Set(r.sinkings.map((s) => s.id)),
-    afloat = r.order.filter((id) => !down.has(id));
-  assert.equal(down.size, r.sinkings.length, 'no ship sunk twice');
-  assert.deepEqual(r.order.slice(0, afloat.length), afloat, 'the afloat first');
+  const ids = setup.ships.map((_, id) => id),
+    afloat = ids.filter((id) => r.ships[id].sunkAt === null),
+    down = ids.filter((id) => r.ships[id].sunkAt !== null);
+  for (const a of afloat)
+    for (const d of down)
+      assert.ok(r.ships[a].place < r.ships[d].place, 'the afloat first');
   assert.ok(
     new Set(afloat.map(team)).size <= 1 ||
-      r.seconds >= closedBy(raceOf(card, planet).type.rules.storm),
+      r.seconds >= closedBy(DEFAULT_RULES.storm),
     'one team afloat at the end, or none (or the race was called)'
   );
-  for (const s of r.sinkings) {
-    assert.ok(s.by === null || team(s.by) !== team(s.id), 'none by a mate');
-    assert.ok(s.second >= 0 && s.second <= r.seconds);
+  for (const id of down) {
+    const { sunkAt, sunkBy } = r.ships[id];
+    assert.ok(sunkBy === null || team(sunkBy) !== team(id), 'none by a mate');
+    assert.ok(sunkAt !== null && sunkAt >= 0 && sunkAt <= r.seconds);
   }
-  const sum = (k: 'landed' | 'taken') => r.hits.reduce((a, h) => a + h[k], 0);
-  assert.equal(sum('landed'), sum('taken'));
-  assert.ok(r.hits.every((h) => h.landed === 0 || h.fired > 0));
-  assert.deepEqual(
-    r.hits.map((h) => h.id),
-    ids
+  const sum = (k: 'damageDealt' | 'damageTaken') =>
+    r.ships.reduce((a, s) => a + s[k], 0);
+  assert.ok(Math.abs(sum('damageDealt') - sum('damageTaken')) < 1e-6);
+  assert.ok(r.ships.every((s) => s.shotsLanded === 0 || s.shotsFired > 0));
+  assert.equal(
+    r.ships.reduce((a, s) => a + s.sinkings, 0),
+    down.filter((id) => r.ships[id].sunkBy !== null).length,
+    'every sinking credited once'
   );
-  assert.deepEqual(
-    r.seaHeld.map((h) => h.id),
-    ids
-  );
-  assert.ok(r.seaHeld.every((h) => h.share >= 0 && h.share < 0.5));
+  assert.equal(r.sea.length, teams.size);
   assert.match(r.hash, /^[0-9a-f]{8}$/);
 }
 
 test('a race is sailed to its end: one team afloat, every ship placed, the tally sound', () => {
-  const card = short();
-  sound(card, FIRST);
-  assert.deepEqual(
-    [FIRST.seed, FIRST.tier, FIRST.round],
-    [card.seed, card.tier, card.round]
-  );
-  assert.ok(FIRST.sinkings.length >= card.ships.length - TEAM);
+  const setup = short();
+  sound(setup, FIRST);
   assert.ok(
-    FIRST.hits.some((h) => h.landed > 0),
+    FIRST.ships.filter((s) => s.sunkAt !== null).length >=
+      setup.ships.length - 2
+  );
+  assert.ok(
+    FIRST.ships.some((s) => s.shotsLanded > 0),
     'guns were found and fired'
   );
 });
 
-test('the same card on the same planet gives the same result, hash and all; another seed another', () => {
+test('the same setup on the same planet gives the same result, hash and all; another match seed another', () => {
   assert.deepEqual(sailed(short()), FIRST);
-  assert.equal(FIRST.hash, '1f26ff4d');
-  const other = sailed(short({ seed: SEED + 1 }));
+  assert.equal(FIRST.hash, '26c886e2');
+  const other = sailed(short(SEED + 1));
   assert.notEqual(other.hash, FIRST.hash);
 });
 
-test('a forfeit does not put to sea: placed last, listed sunk at second 0, with nothing to its name', () => {
-  const base = short(),
-    card = {
-      ...base,
-      ships: base.ships.map((s) => ({
-        ...s,
-        forfeit: s.id === 5 || s.id === 9,
-      })),
-    };
-  const r = sailed(card);
-  sound(card, r);
-  assert.deepEqual(r.order.slice(-2), [5, 9]);
-  assert.deepEqual(r.sinkings.slice(0, 2), [
-    { id: 5, by: null, cause: 'forfeit', gun: null, second: 0 },
-    { id: 9, by: null, cause: 'forfeit', gun: null, second: 0 },
-  ]);
-  for (const id of [5, 9]) {
-    assert.deepEqual(r.hits[id], {
-      id,
-      fired: 0,
-      landed: 0,
-      taken: 0,
-      dealt: 0,
-    });
-    assert.equal(r.seaHeld[id].share, 0);
-  }
-  assert.notEqual(r.hash, FIRST.hash);
+test("a ship's team is its spec's, and the teams are numbered from 0 with no gaps", () => {
+  const setup = short(SEED, { perTeam: 1 }),
+    m = createMatch(setup, waters);
+  assert.deepEqual(
+    m.view.teams(),
+    setup.ships.map((s) => s.team)
+  );
+  const mixed: MatchSetup = {
+    ...setup,
+    ships: setup.ships.map((s, id) => ({ ...s, team: id === 1 ? 2 : s.team })),
+  };
+  assert.throws(() => createMatch(mixed, waters), /team 1 has 0 ships/);
 });
 
-test("the card's rules: a banned gun is never laid, the storm's pace quickens its waits and closings alike", () => {
-  const banned = KINDS.filter((k) => k !== 'scatter'),
-    base = short(),
-    card = { ...base, rules: { ...base.rules, banned } };
-  const m = raceOf(card, planet);
-  assert.deepEqual(m.type.rules.loot.kinds, [
-    0,
-    DEFAULT_RULES.loot.kinds[1],
-    0,
-    0,
-    0,
-  ]);
-  assert.ok(
-    Math.abs(closedBy(m.type.rules.storm) - closedBy(DEFAULT_RULES.storm) / 3) <
-      1e-9
-  );
-  assert.equal(m.storm(0).damage, DEFAULT_RULES.storm.phases[0].damage);
-  const r = sailed(card);
-  sound(card, r);
-  assert.ok(r.sinkings.every((s) => s.gun === null || s.gun === 'scatter'));
-  const own = raceOf(specField(SEED, 3), planet).type.rules;
-  assert.equal(own.loot, DEFAULT_RULES.loot);
-  assert.equal(own.storm, DEFAULT_RULES.storm);
+test('a setup the sim cannot sail is refused: too few ships, a team of three, the player off ship 0', () => {
+  const two = short(SEED, { teams: 2, perTeam: 1 });
   assert.throws(
-    () => raceOf({ ...base, rules: { ...base.rules, storm: 0 } }, planet),
-    /pace/
+    () => createMatch({ ...two, ships: two.ships.slice(0, 1) }, waters),
+    /2 to 80 ships, not 1/
+  );
+  const three = short(SEED, { teams: 2 });
+  assert.throws(
+    () =>
+      createMatch(
+        {
+          ...three,
+          ships: three.ships.map((s, id) => ({ ...s, team: id < 3 ? 0 : 1 })),
+        },
+        waters
+      ),
+    /team 0 has 3 ships/
   );
   assert.throws(
-    () => raceOf({ ...base, rules: { ...base.rules, banned: KINDS } }, planet),
-    /banned/
+    () =>
+      createMatch(
+        {
+          ...two,
+          ships: two.ships.map((s, id) => ({
+            ...s,
+            hands: id === 1 ? 'player' : s.hands,
+          })),
+        },
+        waters
+      ),
+    /ship 1 has the player's hands/
   );
 });
 
-test("ship 0 with no driver is sailed by the pilot's hands, asked every step; with one, by its bot", () => {
-  const card = specField(SEED, 3, true),
-    quick = { ...card, rules: { ...card.rules, storm: 3 } };
-  assert.equal(quick.ships[0].driver, null);
-  const asked: number[] = [];
-  const r = runRace(quick, planet, waters, (second) => {
-    asked.push(second);
-    return {
-      helm: { course: null, throttle: 0 },
-      gun: { aim: null, fire: false },
-    };
+test("ship 0 with the player's hands is sailed by them, asked every step; with a driver, by its bot, whatever the hands", () => {
+  const quick = short(SEED, { player: true });
+  assert.equal(quick.ships[PLAYER].hands, 'player');
+  let asked = 0;
+  const r = sailed(quick, () => {
+    asked++;
+    return STILL;
   });
   sound(quick, r);
-  assert.equal(asked[0], 0);
-  assert.ok(Math.abs(asked.length - r.seconds * 30) < 1e-6, 'asked every step');
-  assert.equal(r.hits[0].fired, 0, 'its hands idle, it fired nothing');
-  assert.notEqual(r.hash, FIRST.hash, 'a bot sailed it otherwise');
-  assert.deepEqual(runRace(quick, planet, waters), r);
-});
-
-test('a spec field: teams of four by id, each in its own livery, every driver the bot of its berth', () => {
-  const card = specField(7);
-  assert.equal(card.ships.length, 80);
-  for (const s of card.ships) {
-    assert.equal(s.team, Math.floor(s.id / TEAM));
-    assert.deepEqual(s.colors, card.ships[s.team * TEAM].colors);
-    assert.equal(s.driver?.seed, hash(7, s.id));
-    assert.equal(s.driver?.persona, nature(hash(7, s.id)).persona);
-  }
-  const liveries = new Set(
-    card.ships.map((s) => `${s.colors.dye} ${s.colors.pattern}`)
+  assert.ok(Math.abs(asked - r.seconds * 30) < 1e-6, 'asked every step');
+  assert.equal(
+    r.ships[PLAYER].shotsFired,
+    0,
+    'its hands idle, it fired nothing'
   );
-  assert.equal(liveries.size, 20);
+  assert.notEqual(r.hash, FIRST.hash, 'a bot sailed it otherwise');
+  assert.deepEqual(sailed(quick), r);
+  const busy: Hands = { ...STILL, throttle: 1, fire: true, gust: true };
+  assert.deepEqual(
+    sailed(short(), () => busy),
+    FIRST,
+    'no ship has the hands: they are ignored'
+  );
 });

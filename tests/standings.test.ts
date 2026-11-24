@@ -1,32 +1,23 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { SEED } from '../src/world/environment.ts';
-import { raceOf, specField } from '../src/sim/racing.ts';
 import { createState, debugOf } from '../src/play/state.ts';
-import type { Match } from '../src/sim/engine.ts';
 import type { Race } from '../src/play/player.ts';
-import { TEAM } from '../src/sim/race.ts';
+import { STILL } from '../src/sim/hands.ts';
 import { HEALTH } from '../src/sim/handling.ts';
 import { PLAYER } from '../src/sim/match.ts';
 import { watersAt } from '../src/sim/waters.ts';
+import { LIVERY } from '../src/world/livery.ts';
 import { landOf, planetOf } from '../src/world/land.ts';
-import type { Vec3 } from '../src/world/sphere.ts';
-import { flat } from '../src/world/swell.ts';
+import { setupOf } from './setups.ts';
 
 const planet = planetOf(SEED, landOf(SEED)),
-  depth = (p: Vec3) => -planet.height(p),
-  waters = watersAt(depth);
-const IDLE = {
-  helm: { course: null, throttle: 0 },
-  gun: { aim: null, fire: false },
-};
-function begun(storm = 3) {
-  const base = specField(SEED, 3, true),
-    card = { ...base, rules: { ...base.rules, storm } };
-  const match = raceOf(card, planet),
-    state = createState(planet, flat, waters, match);
-  state.start(match);
-  return { card, state };
+  waters = watersAt(planet);
+function begun() {
+  const race = setupOf(SEED, { teams: 6, player: true }),
+    state = createState(waters, planet.start);
+  state.start(race, [LIVERY]);
+  return { race, state };
 }
 function sound(r: Race, ships: number) {
   assert.equal(r.of, ships);
@@ -48,25 +39,22 @@ function sound(r: Race, ships: number) {
   }
 }
 
-test('a match with no card has no race to read', () => {
-  const match: Match = { ...raceOf(specField(SEED, 3), planet) };
-  delete match.card;
-  const state = createState(planet, flat, waters, match);
-  state.start(match);
-  state.advance(IDLE.helm, IDLE.gun);
+test('at anchor there is no race to read', () => {
+  const state = createState(waters, planet.start);
+  state.step(STILL);
   assert.equal(state.race(PLAYER), null);
 });
 
-test('as a race begins: its team, its three teammates whole and afloat, every ship in the standings', () => {
-  const { card, state } = begun();
-  state.advance(IDLE.helm, IDLE.gun);
+test('as a race begins: its team, its mate whole and afloat, every ship in the standings', () => {
+  const { race, state } = begun();
+  state.step(STILL);
   const r = state.race(PLAYER);
   assert.ok(r);
-  sound(r, card.ships.length);
+  sound(r, race.ships.length);
   assert.equal(r.team, 0);
   assert.deepEqual(
     r.mates.map((m) => m.id),
-    [1, 2, 3]
+    [1]
   );
   for (const m of r.mates) {
     assert.deepEqual(
@@ -78,64 +66,61 @@ test('as a race begins: its team, its three teammates whole and afloat, every sh
   assert.ok(r.tower.every((p) => p.afloat && p.sinkings === 0));
   assert.deepEqual(
     r.tower.map((p) => p.team),
-    r.tower.map((p) => Math.floor(p.id / TEAM))
+    r.tower.map((p) => race.ships[p.id].team)
   );
   assert.equal(state.race(PLAYER), r);
   const other = state.race(5);
   assert.ok(other);
-  assert.equal(other.team, 1);
+  assert.equal(other.team, 2);
   assert.deepEqual(
     other.mates.map((m) => m.id),
-    [4, 6, 7]
+    [4]
   );
 });
 
 test('a mate sunk, and the ship that sank it credited and placed first', () => {
-  const { card, state } = begun();
-  state.advance(IDLE.helm, IDLE.gun);
-  debugOf(state).sink(2, 5);
-  state.advance(IDLE.helm, IDLE.gun);
+  const { race, state } = begun();
+  state.step(STILL);
+  debugOf(state).sink(1, 5);
+  state.step(STILL);
   const r = state.race(PLAYER);
   assert.ok(r);
-  sound(r, card.ships.length);
-  const mate = r.mates.find((m) => m.id === 2);
+  sound(r, race.ships.length);
+  const mate = r.mates.find((m) => m.id === 1);
   assert.deepEqual(
     [mate?.doing, mate?.hull, mate?.place],
-    ['sunk', 0, card.ships.length]
+    ['sunk', 0, race.ships.length]
   );
   assert.deepEqual(r.tower[0], {
     id: 5,
-    team: 1,
+    team: 2,
     place: 1,
     afloat: true,
     sinkings: 1,
   });
-  assert.equal(r.tower[r.of - 1].id, 2);
+  assert.equal(r.tower[r.of - 1].id, 1);
 });
 
 test('through a whole race the standings hold, and at its end they are the result', () => {
-  const { card, state } = begun();
+  const { race, state } = begun();
   const seen = new Set<string>();
-  for (let tick = 1; !state.result(); tick++) {
-    state.advance(IDLE.helm, IDLE.gun);
+  for (let tick = 1; !state.done(); tick++) {
+    state.step(STILL);
     if (tick % 90 !== 0) continue;
     const r = state.race(PLAYER);
     assert.ok(r);
-    sound(r, card.ships.length);
+    sound(r, race.ships.length);
     for (const m of r.mates) seen.add(m.doing);
   }
   const r = state.race(PLAYER),
     result = state.result();
-  assert.ok(r && result);
-  sound(r, card.ships.length);
+  assert.ok(r);
+  sound(r, race.ships.length);
   assert.deepEqual(
-    r.tower.map((p) => p.id),
-    result.order
+    r.tower.map((p) => p.place),
+    r.tower.map((p) => result.ships[p.id].place)
   );
   for (const p of r.tower)
-    assert.equal(
-      p.sinkings,
-      result.sinkings.filter((s) => s.by === p.id).length
-    );
+    assert.equal(p.sinkings, result.ships[p.id].sinkings);
   assert.ok(seen.has('sailing') && seen.size >= 3, [...seen].join(' '));
 });

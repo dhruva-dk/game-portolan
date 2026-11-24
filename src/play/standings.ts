@@ -1,5 +1,4 @@
 import type { Doing, Mate, Placed, Race } from './player.ts';
-import type { RaceCard } from '../sim/race.ts';
 import type { Crew } from '../sim/battle.ts';
 import type { Mode } from '../sim/captain.ts';
 import { HEALTH } from '../sim/handling.ts';
@@ -27,8 +26,8 @@ const DOING: Record<Mode, Doing> = {
   storm: 'storm',
 };
 
-export function createStandings(card: RaceCard) {
-  const rows: Placed[] = card.ships.map(({ id, team }) => ({
+export function createStandings(teams: readonly number[]) {
+  const rows: Placed[] = teams.map((team, id) => ({
     id,
     team,
     place: 0,
@@ -37,7 +36,7 @@ export function createStandings(card: RaceCard) {
   }));
   const tower: Placed[] = [],
     mates: Mate[] = [];
-  const race: Race = { team: 0, place: 0, of: card.ships.length, mates, tower };
+  const race: Race = { team: 0, place: 0, of: teams.length, mates, tower };
   let made = -1,
     seat = -1;
 
@@ -56,12 +55,12 @@ export function createStandings(card: RaceCard) {
       rows[k].place = i + 1;
       tower.push(rows[k]);
     });
-    race.team = card.ships[id].team;
+    race.team = teams[id];
     race.place = rows[id].place;
     let n = 0;
-    for (const s of card.ships) {
-      if (s.team !== race.team || s.id === id) continue;
-      const c = crews.get(s.id),
+    for (let k = 0; k < teams.length; k++) {
+      if (teams[k] !== race.team || k === id) continue;
+      const c = crews.get(k),
         m = (mates[n++] ??= {
           id: 0,
           hull: 0,
@@ -71,12 +70,12 @@ export function createStandings(card: RaceCard) {
           doing: 'sunk',
           place: 0,
         });
-      m.id = s.id;
+      m.id = k;
       m.hull = c?.health.hull ?? 0;
       m.hullMax = c ? hullCap(c.health) : HEALTH.hull;
       m.shield = c?.health.shield ?? 0;
-      m.doing = !rows[s.id].afloat ? 'sunk' : DOING[at.mode(s.id) ?? 'roam'];
-      m.place = rows[s.id].place;
+      m.doing = !rows[k].afloat ? 'sunk' : DOING[at.mode(k) ?? 'roam'];
+      m.place = rows[k].place;
     }
     mates.length = n;
     return race;

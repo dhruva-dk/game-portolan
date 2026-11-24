@@ -1,25 +1,20 @@
-import type { RaceCard, RaceResult } from './race.ts';
 import type { Crew, Shot, Strike } from './battle.ts';
-import { over, teamsOf } from './carded.ts';
 import type { Vessel } from './contact.ts';
 import { sunk } from './health.ts';
 import type { Sunk } from './match.ts';
+import type { MatchResult, ShipResult } from './result.ts';
+import { over } from './teams.ts';
 
 export function finishing(
   alive: readonly number[],
   sunk: readonly Pick<Sunk, 'id' | 'by'>[],
-  share: (id: number) => number,
-  forfeit: readonly number[] = []
+  share: (id: number) => number
 ): number[] {
   const credit = (id: number) => sunk.filter((s) => s.by === id).length;
   const top = [...alive].sort(
     (a, b) => credit(b) - credit(a) || share(b) - share(a) || a - b
   );
-  return [
-    ...top,
-    ...sunk.map((s) => s.id).reverse(),
-    ...[...forfeit].sort((a, b) => a - b),
-  ];
+  return [...top, ...sunk.map((s) => s.id).reverse()];
 }
 
 function fingerprint(numbers: readonly number[]): string {
@@ -29,7 +24,7 @@ function fingerprint(numbers: readonly number[]): string {
   return h.toString(16).padStart(8, '0');
 }
 
-interface Standing {
+export interface Standing {
   seconds: number;
   alive: readonly number[];
   fleet: readonly Vessel[];
@@ -55,85 +50,70 @@ function numbers(s: Standing): number[] {
   return n;
 }
 
-export function createTally(card: RaceCard, closes: number) {
-  const count = card.ships.length,
-    teams = teamsOf(card),
+export function createTally(teams: readonly number[], closes: number) {
+  const count = teams.length,
+    sides = Math.max(-1, ...teams) + 1,
     zeros = () => new Array<number>(count).fill(0);
   const fired = zeros(),
     landed = zeros(),
     taken = zeros(),
-    dealt = zeros(),
-    held = zeros();
-  const forfeit = card.ships.filter((s) => s.forfeit).map((s) => s.id);
-  let made: RaceResult | null = null;
+    dealt = zeros();
+  let made: MatchResult | null = null;
 
   const fought = (shots: readonly Shot[], strikes: readonly Strike[]) => {
     for (const s of shots) fired[s.shooter]++;
     for (const s of strikes) {
       if (s.shooter === s.struck) continue;
       dealt[s.shooter] += s.damage;
+      taken[s.struck] += s.damage;
       if (s.ram) continue;
       landed[s.shooter]++;
-      taken[s.struck]++;
     }
   };
 
-  const result = (s: Standing): RaceResult => {
-    const afloat = new Set(s.alive),
-      ids = card.ships.map((k) => k.id);
-    const share = (id: number) => (afloat.has(id) ? s.share(id) : held[id]);
-    const out: RaceResult['sinkings'] = forfeit.map((id) => ({
-      id,
-      by: null,
-      cause: 'forfeit',
-      gun: null,
-      second: 0,
-    }));
+  const result = (s: Standing): MatchResult => {
+    const place = zeros();
+    finishing(s.alive, s.sunk, s.share).forEach((id, i) => {
+      place[id] = i + 1;
+    });
+    const ship = (id: number): ShipResult => {
+      const sank = s.sunk.find((k) => k.id === id);
+      return {
+        place: place[id] || count,
+        sunkAt: sank ? sank.time : null,
+        sunkBy: sank ? sank.by : null,
+        sinkings: s.sunk.filter((k) => k.by === id).length,
+        shotsFired: fired[id],
+        shotsLanded: landed[id],
+        damageDealt: dealt[id],
+        damageTaken: taken[id],
+        afloatAtPhaseFour: !sank,
+      };
+    };
     return {
-      seed: card.seed,
-      tier: card.tier,
-      round: card.round,
-      order: finishing(s.alive, s.sunk, s.share, forfeit),
-      sinkings: [
-        ...out,
-        ...s.sunk.map(({ id, by, cause, gun, time: second }) => ({
-          id,
-          by,
-          cause,
-          gun,
-          second,
-        })),
-      ],
-      seaHeld: ids.map((id) => ({ id, share: share(id) })),
-      hits: ids.map((id) => ({
-        id,
-        fired: fired[id],
-        landed: landed[id],
-        taken: taken[id],
-        dealt: dealt[id],
-      })),
       seconds: s.seconds,
       hash: fingerprint(numbers(s)),
+      ships: teams.map((_, id) => ship(id)),
+      sea: Array.from({ length: sides }, () => []),
     };
   };
 
   return {
     teams,
-    forfeit,
-    holds(id: number, share: number) {
-      held[id] = share;
-    },
     settle(
       shots: readonly Shot[],
       strikes: readonly Strike[],
-      standing: () => Standing
+      standing: () => Standing,
+      decides = true
     ) {
       if (made) return;
       fought(shots, strikes);
+      if (!decides) return;
       const s = standing();
       if (over(teams, s.alive, s.seconds - closes)) made = result(s);
     },
-    result: (): RaceResult | null => made,
+    made: (): MatchResult | null => made,
+    result: (s: Standing): MatchResult => made ?? result(s),
   };
 }
 
