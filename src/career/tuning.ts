@@ -212,3 +212,21 @@ export const PAPER = { headlines: 5 };
 export const NAMES = { longest: 16, teams: 60, sponsors: 60, planets: 200 };
 
 export const RACE_RATINGS = [1, 2, 3, 4, 5] as const;
+
+export const STAND_IN_RESULT = {
+  seconds: 480,
+  firstSinking: 30,
+  sinkingSpan: 420,
+  teammateAfloatShare: 8,
+  phaseFourShare: 4,
+  samples: 7,
+  sampleSpacing: 8,
+  playerStat: 10,
+  shotsFired: 100,
+  landedBase: 0.1,
+  landedPerGunnery: 0.4,
+  damagePerSinking: 100,
+  damageSunk: 100,
+  damageAfloat: 50,
+  sea: 0.8,
+};
