@@ -116,22 +116,6 @@ export function runMatch(sc: MatchScenario, dir?: string): Summary {
   return sail(m, w, sc, brainOf, (id) => byName.get(brainOf(id))!, dir);
 }
 
-/**
- * A race of the career's, `card` on the planet of `planet`, sailed as
- * play/race.ts runRace sails it and recorded; its result is the summary's.
- */
-export function runCard(card: RaceCard, planet: number, dir?: string): Summary {
-  const w = worldOf(planet);
-  return sail(
-    raceOf(card, w.planet),
-    w,
-    { kind: 'match', planet },
-    () => 'card',
-    undefined,
-    dir
-  );
-}
-
 function sail(
   m: Match,
   w: ReturnType<typeof worldOf>,

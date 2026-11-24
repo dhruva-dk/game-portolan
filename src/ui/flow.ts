@@ -90,13 +90,6 @@ export function createFlow(
   act.wardrobe.wear(keptLivery(store, names));
   /** Her end as last reported (null while she fights). */
   let end: End | null = null;
-  /** Whether the office lies over her ship at anchor, in the lobby's place. */
-  let officed = false;
-  /**
-   * A career's race under way: her end shows no card of its own (sunk, she
-   * watches at once; over, the office shows the result), and LEAVE is this.
-   */
-  let career: (() => void) | null = null;
 
   const veil = createVeil();
   const livery = createLivery(
@@ -162,8 +155,6 @@ export function createFlow(
     } else if (t === 'sail') {
       // a seed sailed from the panel: a new page on it, under the title, as home is
       passage.cover(() => act.seeds.sail(sailing));
-    } else if (career && (t === 'leave' || t === 'again')) {
-      career();
     } else if (t === 'leave' || t === 'again') {
       result.hide(HOME.cover);
       watching.show(false, HOME.cover);
@@ -183,10 +174,8 @@ export function createFlow(
     screen = next;
     // (on the way home the title is the passage's)
     if (!passage.going) title.show(next === 'title');
-    // (her livery's folio takes the lobby's place: her ship above it, nothing over her; so does the office)
-    lobby.show(
-      !officed && (next === 'lobby' || next === 'settings' || next === 'seed')
-    );
+    // (her livery's folio takes the lobby's place: her ship above it, nothing over her)
+    lobby.show(next === 'lobby' || next === 'settings' || next === 'seed');
     settingsFolio.show(next === 'settings');
     if (next === 'livery' || was === 'livery') livery.show(next === 'livery');
     // (opened afresh on the page's seed, so only as it comes or goes)
@@ -229,19 +218,7 @@ export function createFlow(
       if (!IN_MATCH.includes(screen) || passage.going) return;
       const next = course(screen, events(now));
       if (next === screen) return;
-      if (!career) go(next);
-      else if (next === 'sunk') {
-        act.watch();
-        go('spectate');
-      } else if (next !== 'result') go(next);
-    },
-    /**
-     * A career's race begins (`leave`: what LEAVE asks, once she watches) or
-     * is done (null): the match's pieces put away under the office.
-     */
-    career(leave: (() => void) | null) {
-      career = leave;
-      if (!leave && IN_MATCH.includes(screen)) go('lobby');
+      go(next);
     },
     /**
      * How much of the world the screens cover, 0…1: the way home's parchment
@@ -252,14 +229,6 @@ export function createFlow(
     },
     /** Opens the UI at `next` (the debug switches' way in: src/debug.ts). */
     go,
-    /**
-     * The office (office/office.ts) laid over her ship at anchor, or lifted
-     * off: the lobby's own controls give way under it.
-     */
-    office(on: boolean) {
-      officed = on;
-      go(screen);
-    },
     /**
      * Her tap on a way on, as if on what is drawn for it (the debug switches':
      * src/debug.ts).
