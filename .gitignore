@@ -7,7 +7,6 @@ out/
 captures/
 ios/DerivedData/
 .claude/*
-!.claude/hooks/
 !.claude/settings.json
 public/scans/
 public/tex/**/*.astc
