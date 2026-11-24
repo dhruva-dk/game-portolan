@@ -10,8 +10,8 @@ import {
   transport,
   type Vec3,
 } from '../world/sphere.ts';
-import { RAM, SHIP, SPEC, type Handling } from './handling.ts';
-import { step, type Helm, type ShipState } from './ship.ts';
+import { RAM, SHIP } from './handling.ts';
+import { step, type Helm, type Sailing, type ShipState } from './ship.ts';
 import { hullAt, moved, under, type Depth } from './shoal.ts';
 
 export interface Vessel {
@@ -288,7 +288,7 @@ function sailed(
   helm: Helm,
   dt: number,
   depth: Depth,
-  fit: Handling
+  fit: Sailing
 ): Working {
   let ship = step(v.ship, helm, dt, depth, fit);
   let shove = transport(v.shove, v.ship.at, ship.at);
@@ -311,14 +311,12 @@ export function stepFleet(
   helms: readonly Helm[],
   dt: number,
   depth: Depth,
-  fits: readonly Handling[] = []
+  fits: readonly Sailing[]
 ): { fleet: Vessel[]; blows: Blow[]; jolts: Vec3[] } {
   const order = fleet
     .map((_, i) => i)
     .sort((i, j) => fleet[i].id - fleet[j].id);
-  const ws = order.map((i) =>
-    sailed(fleet[i], helms[i], dt, depth, fits[i] ?? SPEC)
-  );
+  const ws = order.map((i) => sailed(fleet[i], helms[i], dt, depth, fits[i]));
   const pairs = (each: (a: Working, b: Working) => void) => {
     for (let i = 0; i < ws.length; i++)
       for (let j = i + 1; j < ws.length; j++) each(ws[i], ws[j]);

@@ -14,6 +14,7 @@ import {
   type Territory,
 } from '../src/sim/territory.ts';
 import { along, bearingAt, distance, fromLatLon } from '../src/world/sphere.ts';
+import { EVEN_SHIP, aboard } from './setups.ts';
 
 const start = fromLatLon(0.2, 0.3);
 const deep: Depth = () => 30;
@@ -59,8 +60,8 @@ function voyage(
       const m = minds[i];
       if (!m) return o.held!(v);
       const r = think(
-        v,
-        fleet.filter((k) => k.id !== v.id),
+        aboard(v),
+        fleet.filter((k) => k.id !== v.id).map((k) => aboard(k)),
         { depth: deep, storm: o.storm ?? null, holdings: t },
         m,
         nature(seeds[i]!)
@@ -69,7 +70,13 @@ function voyage(
       return r.helm;
     });
     const from = fleet.map((v) => v.ship.at),
-      moved = stepFleet(fleet, helms, STEP, deep).fleet;
+      moved = stepFleet(
+        fleet,
+        helms,
+        STEP,
+        deep,
+        fleet.map(() => EVEN_SHIP)
+      ).fleet;
     fleet = fleet.map((v, i) => ({ ...v, ...moved[i] }));
     const did = t.step(
       fleet.map((v, i) => ({ id: v.id, from: from[i], to: v.ship.at })),

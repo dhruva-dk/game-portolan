@@ -1,4 +1,4 @@
-import type { GunKind, LootKind } from '../sim/kinds.ts';
+import type { GunKind, Use } from '../sim/kinds.ts';
 import type { Cap } from '../sim/storm.ts';
 import type { ReadCells } from '../world/cells.ts';
 import type { ShipPose } from '../world/pose.ts';
@@ -37,7 +37,7 @@ export interface ShipDraw {
   look: Look;
   velocity: Vec3;
   afloat: boolean;
-  gun: { kind: GunKind; rarity: number; aim: Vec3 } | null;
+  gun: { kind: GunKind; aim: Vec3 } | null;
   wear: 0 | 1 | 2;
 }
 
@@ -64,7 +64,7 @@ export interface BallDraw {
 export interface LootDraw {
   id: number;
   at: Vec3;
-  kind: LootKind;
+  kind: Use;
   rarity: number;
   born: number;
 }

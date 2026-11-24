@@ -3,7 +3,7 @@ import { debugOf, type Stepped } from '../../src/sim/engine.ts';
 import type { Memory } from '../../src/sim/bot.ts';
 import { BOT, type Mode } from '../../src/sim/captain.ts';
 import { GUNS, SHIP } from '../../src/sim/handling.ts';
-import { PIECE, isArms } from '../../src/sim/loot.ts';
+import { PIECE } from '../../src/sim/loot.ts';
 import { distance, type Vec3 } from '../../src/world/sphere.ts';
 import type { State } from './match.ts';
 
@@ -44,11 +44,9 @@ export interface ShipResult {
   fell: Record<Band, Fell>;
   place: number;
   sunk: { time: number; cause: string; by: number | null } | null;
-  armed: number | null;
-  second: number | null;
   fighting: Fighting;
   hand: Partial<Record<GunKind, number>>;
-  took: { guns: number; rarest: number; stores: number };
+  took: { stores: number };
   modes: Partial<Record<Mode, number>>;
   stuck: Partial<Record<Mode, number>>;
   aground: number;
@@ -100,7 +98,6 @@ export interface MatchResult {
         }
       >
     >;
-    rarity: Record<number, Count>;
   };
   quiet: number;
   lull: number;
@@ -110,7 +107,6 @@ export interface MatchResult {
     end: number;
     taken: Record<'first' | 'later', Flow>;
     kinds: Record<string, number>;
-    rarity: Record<number, number>;
   };
   ships: ShipResult[];
 }
@@ -125,7 +121,6 @@ interface Watch {
   health: { hull: number; shield: number };
   last: {
     kind: GunKind;
-    rarity: number;
     band: Band;
     target: number | null;
     home: boolean;
@@ -195,8 +190,6 @@ export function watch(
         },
         place: 0,
         sunk: null,
-        armed: k.armed ? 0 : null,
-        second: null,
         fighting: {
           shots: {},
           hits: 0,
@@ -206,7 +199,7 @@ export function watch(
           kills: 0,
         },
         hand: {},
-        took: { guns: 0, rarest: -1, stores: 0 },
+        took: { stores: 0 },
         modes: {},
         stuck: {},
         aground: 0,
@@ -230,12 +223,11 @@ export function watch(
     shallow: pieces.filter((l) => depth(l.at) < SHIP.draft + PIECE.open).length,
     taken: { first: flow(), later: flow() },
     kinds: {},
-    rarity: {},
   };
   const born = new Map<number, number>(),
     firstLater = state.loot().next;
   let seenNext = firstLater;
-  const shots: MatchResult['shots'] = { band: bands(), kind: {}, rarity: {} };
+  const shots: MatchResult['shots'] = { band: bands(), kind: {} };
   let lastShot = 0,
     quiet = 0,
     lastBlow = 0,
@@ -260,9 +252,7 @@ export function watch(
       for (const s of did.shots) {
         const w = ships.get(s.shooter);
         if (!w) continue;
-        const c = state.crew(s.shooter),
-          rarity = c.guns[c.hand]?.rarity ?? 0,
-          from = where(s.shooter);
+        const from = where(s.shooter);
         let range = Infinity;
         for (const v of state.vessels())
           if (
@@ -272,7 +262,7 @@ export function watch(
           )
             range = Math.min(range, distance(from, v.ship.at));
         const band = bandOf(range);
-        w.last = { kind: s.gun, rarity, band, target: s.target, home: false };
+        w.last = { kind: s.gun, band, target: s.target, home: false };
         bump(w.r.fighting.shots, s.gun);
         (w.r.aim[s.gun] ??= bands())[band].shots++;
         shots.band[band].shots++;
@@ -286,7 +276,6 @@ export function watch(
         k.shots++;
         k.bands[band].shots++;
         k.balls += GUNS[s.gun].pellets;
-        (shots.rarity[rarity] ??= count()).shots++;
         if (now > 30) quiet = Math.max(quiet, now - Math.max(30, lastShot));
         lastShot = now;
       }
@@ -319,8 +308,6 @@ export function watch(
           k.hits++;
           k.bands[l.band].hits++;
         }
-        const r = shots.rarity[l.rarity];
-        if (r) r.hits++;
       }
       for (const s of did.splashes) {
         const k = shots.kind[s.gun];
@@ -341,14 +328,9 @@ export function watch(
         )
           f.fought++;
         bump(loot.kinds, t.goods.kind);
-        if (isArms(t.goods))
-          loot.rarity[t.goods.rarity] = (loot.rarity[t.goods.rarity] ?? 0) + 1;
         const w = ships.get(t.ship);
         if (!w) continue;
-        if (isArms(t.goods)) {
-          w.r.took.guns++;
-          w.r.took.rarest = Math.max(w.r.took.rarest, t.goods.rarity);
-        } else w.r.took.stores++;
+        w.r.took.stores++;
       }
       const f = state.loot();
       if (f.next > seenNext) {
@@ -390,12 +372,7 @@ export function watch(
         w.afloat++;
         w.speedSum += v.ship.speed;
         bump(w.r.modes, mode);
-        const guns = crew.guns.filter((g) => g !== null),
-          inHand = crew.guns[crew.hand];
-        if (inHand) bump(w.r.hand, inHand.kind);
-        if (w.r.armed === null && guns.length) w.r.armed = s;
-        if (w.r.second === null && new Set(guns.map((g) => g.kind)).size > 1)
-          w.r.second = s;
+        bump(w.r.hand, crew.gun.kind);
         if (at >= 0) w.r.held[at] = state.share(v.id);
         w.path.push(v.ship.at);
         w.speeds.push(v.ship.speed);

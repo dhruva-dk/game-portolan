@@ -18,7 +18,7 @@ const VIEWS: { name: string; q: string; own?: Partial<Budget> }[] = [
   { name: 'map', q: 'screen=match&map' },
   {
     name: 'worst',
-    q: 'screen=match&ships=79&pack&arm&ahead=6&kit&loot=60&gun=4&kind=mortar&fire=',
+    q: 'screen=match&ships=79&pack&ahead=6&kit&loot=60&kind=mortar&fire=',
   },
 ];
 

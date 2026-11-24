@@ -12,11 +12,11 @@ import {
 } from '../src/sim/battle.ts';
 import { afloat, type Vessel } from '../src/sim/contact.ts';
 import { STEP } from '../src/sim/fixed.ts';
-import { falloff, gunOf } from '../src/sim/gun.ts';
+import { damageOf, falloff } from '../src/sim/gun.ts';
 import { KINDS, type GunKind } from '../src/sim/kinds.ts';
-import { EQUIP, FALLOFF, GUNS, RIGGING } from '../src/sim/handling.ts';
+import { FALLOFF, GUNS, RIGGING } from '../src/sim/handling.ts';
 import { crewed, stored } from '../src/sim/stores.ts';
-import { LOOT, isArms, laying } from '../src/sim/loot.ts';
+import { LOOT, laying } from '../src/sim/loot.ts';
 import { toEdge } from '../src/sim/storm.ts';
 import { loosed } from '../src/sim/shot.ts';
 import type { Depth } from '../src/sim/shoal.ts';
@@ -30,6 +30,7 @@ import {
   scale,
   type Vec3,
 } from '../src/world/sphere.ts';
+import { EVEN_SHIP, valuesAt } from './setups.ts';
 
 const deep: Depth = () => 30;
 const center = fromLatLon(0.2, 0.3);
@@ -75,9 +76,12 @@ function fight(
 }
 
 function ttk(kind: GunKind, shield: number) {
-  const target = { ...crewOf(2), health: { hull: 100, shield } };
+  const target = {
+    ...crewOf(2, EVEN_SHIP),
+    health: { hull: 100, shield, most: 100 },
+  };
   return fight(
-    [crewOf(1, gunOf(kind, 0)), target],
+    [crewOf(1, { ...valuesAt(50, kind), damageFactor: 1 }), target],
     [
       afloat(1, lying(center, 0)),
       afloat(2, lying(east(BEST[kind]), Math.PI / 2)),
@@ -114,7 +118,7 @@ test('each gun sinks a ship at its best range in a band: 1–5 s against its hul
 test("a scatter's grape cuts the rigging of the ship it strikes: it sails at RIGGING of the speed it asks till it is mended; a cannon's ball cuts none", () => {
   const struck = (kind: GunKind) =>
     fight(
-      [crewOf(1, gunOf(kind, 0)), crewOf(2)],
+      [crewOf(1, valuesAt(50, kind)), crewOf(2, EVEN_SHIP)],
       [
         afloat(1, lying(center, 0)),
         afloat(2, lying(east(BEST.scatter), Math.PI / 2)),
@@ -144,7 +148,7 @@ test("a scatter's grape cuts the rigging of the ship it strikes: it sails at RIG
 
 const alone = (kind: GunKind, seconds: number, crew: Partial<Crew> = {}) =>
   fight(
-    [{ ...crewOf(1, gunOf(kind, 0)), ...crew }],
+    [{ ...crewOf(1, valuesAt(50, kind)), ...crew }],
     [afloat(1, lying(center, 0))],
     seconds,
     undefined,
@@ -163,8 +167,9 @@ test('held, a gun fires its magazine at its interval, reloads, and fires again',
       );
     }
     const gap = shots[g.mag] - shots[g.mag - 1];
+    const reload = g.reload * EVEN_SHIP.reloadFactor;
     assert.ok(
-      gap >= g.reload && gap <= g.reload + 2 * STEP + 1e-9,
+      gap >= reload && gap <= reload + 2 * STEP + 1e-9,
       `${k}: the reload ${gap.toFixed(3)} s`
     );
     assert.deepEqual(
@@ -195,16 +200,9 @@ test('the harpoon and the mortar wind up before each shot, seen as a cue; their 
   }
   const h = alone('harpoon', 5).shots;
   assert.ok(
-    h[1] - h[0] >= GUNS.harpoon.reload + GUNS.harpoon.windup,
+    h[1] - h[0] >=
+      GUNS.harpoon.reload * EVEN_SHIP.reloadFactor + GUNS.harpoon.windup,
     'the harpoon reloads after every bolt'
-  );
-});
-
-test('a gun just taken up fires only after EQUIP', () => {
-  const { shots } = alone('cannon', 1, { equip: EQUIP });
-  assert.ok(
-    shots[0] >= EQUIP - 1e-9 && shots[0] <= EQUIP + STEP,
-    `${shots[0]}`
   );
 });
 
@@ -240,10 +238,10 @@ test("a mortar's shell bursts over its splash: the ship struck takes all of it, 
     afloat(4, lying(east(110), Math.PI / 2)),
   ];
   const crews = [
-    crewOf(1, gunOf('mortar', 0)),
+    crewOf(1, valuesAt(50, 'mortar')),
     ...[2, 3, 4].map((id) => ({
-      ...crewOf(id),
-      health: { hull: 100, shield: 100 },
+      ...crewOf(id, EVEN_SHIP),
+      health: { hull: 100, shield: 100, most: 100 },
     })),
   ];
   const { battle } = fight(crews, fleet, 4, undefined, {
@@ -255,9 +253,9 @@ test("a mortar's shell bursts over its splash: the ship struck takes all of it, 
     const c = battle.crews.find((x) => x.id === id)!;
     return 200 - c.health.hull - c.health.shield;
   };
-  assert.equal(
-    lost(2) % GUNS.mortar.damage,
-    0,
+  const whole = lost(2) / damageOf('mortar', EVEN_SHIP.damageFactor);
+  assert.ok(
+    Math.abs(whole - Math.round(whole)) < 1e-9,
     `ship 2 struck whole: ${lost(2)}`
   );
   assert.ok(
@@ -275,7 +273,10 @@ test("a mortar's shell bursts over its splash: the ship struck takes all of it, 
     GUNS.mortar.damage
   );
   const near = [afloat(1, lying(center, 0)), afloat(2, lying(by(12), 0))];
-  let b: Battle = { ...battleOf([crewOf(1), crewOf(2)], 1), balls: [ball] };
+  let b: Battle = {
+    ...battleOf([crewOf(1, EVEN_SHIP), crewOf(2, EVEN_SHIP)], 1),
+    balls: [ball],
+  };
   for (let i = 0; i < 90; i++)
     b = stepBattle(
       b,
@@ -288,8 +289,12 @@ test("a mortar's shell bursts over its splash: the ship struck takes all of it, 
       STEP,
       deep
     ).battle;
-  assert.equal(b.crews[0].health.hull, 100, 'the shooter is spared');
-  assert.ok(b.crews[1].health.hull < 100, 'the other is not');
+  assert.equal(
+    b.crews[0].health.hull,
+    EVEN_SHIP.hullPoints,
+    'the shooter is spared'
+  );
+  assert.ok(b.crews[1].health.hull < EVEN_SHIP.hullPoints, 'the other is not');
 });
 
 test('the same guns fight the same way, to the bit', () => {
@@ -298,7 +303,7 @@ test('the same guns fight the same way, to the bit', () => {
       afloat(i + 1, lying(east(i * 40), i % 2 ? Math.PI / 2 : 0))
     );
     let b: Battle = battleOf(
-      KINDS.map((k, i) => crewOf(i + 1, gunOf(k, i % 5))),
+      KINDS.map((k, i) => crewOf(i + 1, valuesAt(50, k))),
       3
     );
     for (let i = 0; i < 180; i++) {
@@ -316,23 +321,13 @@ test('the same guns fight the same way, to the bit', () => {
   assert.deepEqual(run(), run());
 });
 
-test('the sea is strewn with some 850–950 pieces, a third of them guns, the cannon the commonest, the harpoon and the mortar the rarest', () => {
-  const f = laying(5, deep).strewn(),
-    guns = f.pieces.map((p) => p.goods).filter(isArms);
+test('the sea is strewn with some 850–950 pieces', () => {
+  const f = laying(5, deep).strewn();
   assert.ok(
     f.pieces.length > 850 &&
       f.pieces.length < 950 &&
       f.pieces.length < (1 + LOOT.second + 0.1) * LOOT.spots,
     `${f.pieces.length}`
-  );
-  const count = (k: GunKind) => guns.filter((g) => g.kind === k).length;
-  assert.ok(
-    Math.abs(guns.length / f.pieces.length - LOOT.gun) < 0.08,
-    `${guns.length} of ${f.pieces.length}`
-  );
-  assert.ok(KINDS.every((k) => k === 'cannon' || count('cannon') > count(k)));
-  assert.ok(
-    count('harpoon') < count('scatter') && count('mortar') < count('repeater')
   );
 });
 
@@ -353,10 +348,6 @@ test("a phase's cache is dropped in the heart of the next cap, rare and the same
   );
   for (const l of drop) {
     assert.ok(toEdge(l.at, cap) >= (1 - LOOT.cache.within) * 150 - 1e-6);
-    assert.ok(
-      isArms(l.goods)
-        ? l.goods.rarity >= 2
-        : l.goods.kind === 'bigShield' || l.goods.kind === 'fullRepair'
-    );
+    assert.ok(l.goods.kind === 'bigShield' || l.goods.kind === 'fullRepair');
   }
 });

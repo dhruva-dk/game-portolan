@@ -93,7 +93,7 @@ const giveUp = (c: Ctx) => {
 export function huntUrge(c: Ctx): number {
   const { m, own, t } = c,
     h = c.b.hunting;
-  if (!own.armed || c.foe || m.clock - m.restT < h.rest) return 0;
+  if (c.foe || m.clock - m.restT < h.rest) return 0;
   const r = nearest(c);
   if (r) {
     if (!m.hunt) m.waitT = m.clock;
@@ -108,7 +108,7 @@ export function huntUrge(c: Ctx): number {
     if (w) [m.hunt, m.huntT, m.waitT] = [w.at, m.clock, -Infinity];
   }
   if (!m.hunt) return 0;
-  const strength = (own.hull ?? 100) + (own.shield ?? 0);
+  const strength = own.hull + own.shield;
   return utility(
     t.fight * (0.6 + 0.4 * aggroOf(c)),
     ramp(strength, h.weak, h.whole),

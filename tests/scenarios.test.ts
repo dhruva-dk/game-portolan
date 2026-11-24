@@ -3,7 +3,13 @@ import assert from 'node:assert/strict';
 import { crewOf } from '../src/sim/battle.ts';
 import { DEFAULT_BRAIN, type Brain } from '../src/sim/brain.ts';
 import { nature } from '../src/sim/persona.ts';
-import { mind, think, type Memory, type Seen } from '../src/sim/bot.ts';
+import {
+  mind,
+  think,
+  type Memory,
+  type Own,
+  type Seen,
+} from '../src/sim/bot.ts';
 import { afloat, stepFleet, type Vessel } from '../src/sim/contact.ts';
 import { STEP } from '../src/sim/fixed.ts';
 import {
@@ -25,6 +31,7 @@ import {
   toward,
   type Vec3,
 } from '../src/world/sphere.ts';
+import { WORST } from './setups.ts';
 
 const c0 = fromLatLon(0.3, 0.1);
 const { east, north } = frameAt(c0);
@@ -51,13 +58,15 @@ const SEED = (() => {
 
 function run(depth: Depth, brain: Brain, seconds: number) {
   const ch = chart(depth),
-    crew = { ...crewOf(0), health: { hull: 12, shield: 0 } },
+    crew = {
+      ...crewOf(0, WORST),
+      health: { hull: 12, shield: 0, most: WORST.hullPoints },
+    },
     foe: Seen = {
       id: 1,
       ship: shipAt(at(-100, 0), east),
       hull: 100,
       shield: 50,
-      armed: true,
     },
     second = Math.round(1 / STEP);
   let fleet: Vessel[] = [afloat(0, shipAt(c0, north))],
@@ -73,11 +82,17 @@ function run(depth: Depth, brain: Brain, seconds: number) {
       if (n > 0 && distance(was, here) < 1) pinned++;
       was = here;
     }
-    const own: Seen = { ...fleet[0], crew, hull: 12, shield: 0, armed: false };
+    const own: Own = { ...fleet[0], crew, hull: 12, shield: 0 };
     const r = think(own, [foe], { depth, chart: ch }, m, nature(SEED, brain));
     m = r.memory;
     if (modes.at(-1) !== m.mode) modes.push(m.mode);
-    fleet = stepFleet(fleet, [r.helm], STEP, depth).fleet;
+    fleet = stepFleet(
+      fleet,
+      [r.helm],
+      STEP,
+      depth,
+      fleet.map(() => WORST)
+    ).fleet;
   }
   return { modes, hidden, pinned };
 }

@@ -10,7 +10,6 @@ import {
   type Vessel,
 } from '../src/sim/contact.ts';
 import { STEP } from '../src/sim/fixed.ts';
-import { RAM, SHIP } from '../src/sim/handling.ts';
 import { clearance, type Depth } from '../src/sim/shoal.ts';
 import { shipAt, type Helm } from '../src/sim/ship.ts';
 import { toEdge, type Cap, type Storm } from '../src/sim/storm.ts';
@@ -25,6 +24,8 @@ import {
   normalize,
   type Vec3,
 } from '../src/world/sphere.ts';
+import { EVEN_SHIP, WORST, aboard } from './setups.ts';
+import type { ShipValues } from '../src/sim/setup.ts';
 
 const deg = Math.PI / 180;
 const start = fromLatLon(0.2, 0.3);
@@ -45,7 +46,8 @@ function sail(
   depth: Depth,
   held?: (v: Vessel, fleet: Vessel[]) => Helm,
   each?: (f: Vessel[], t: number) => void,
-  storm?: (t: number) => Storm
+  storm?: (t: number) => Storm,
+  values: ShipValues = EVEN_SHIP
 ) {
   let minds: (Memory | null)[] = fleet.map((v, i) =>
     seeds[i] === null ? null : mind(seeds[i]!, v.ship.at)
@@ -56,8 +58,8 @@ function sail(
       const m = minds[i];
       if (!m) return held!(v, fleet);
       const r = think(
-        v,
-        fleet.filter((o) => o.id !== v.id),
+        aboard(v, values),
+        fleet.filter((o) => o.id !== v.id).map((o) => aboard(o, values)),
         { depth, storm: storm?.(n * STEP) },
         m,
         nature(seeds[i]!)
@@ -65,7 +67,13 @@ function sail(
       minds[i] = r.memory;
       return r.helm;
     });
-    const r = stepFleet(fleet, helms, STEP, depth);
+    const r = stepFleet(
+      fleet,
+      helms,
+      STEP,
+      depth,
+      fleet.map(() => values)
+    );
     fleet = r.fleet;
     for (const b of r.blows) {
       blows.push(b);
@@ -153,35 +161,11 @@ test('a bot never grounds nor lies pinned on a shore over a long voyage round th
     assert.ok(least >= 0, `${seed}: ${least} m under its keel`);
     assert.ok(pinned < 10, `${seed}: ${pinned.toFixed(1)} s pinned`);
     assert.ok(
-      made > 300 * SHIP.top * 0.6,
+      made > 300 * EVEN_SHIP.topSpeed * 0.6,
       `${seed}: made ${made.toFixed(0)} m`
     );
     assert.ok(r.minds[0]!.mode === 'roam');
   }
-});
-
-test('a hunter rams a steady ship on its side, above the ram threshold, from ahead, abeam or astern of it', () => {
-  const bold = seedsWhere((t) => t.fight > 0.7, 3);
-  for (const seed of bold)
-    for (const from of [20, 90, 160]) {
-      const target = placed(2, 0, 0, 0, 6),
-        hunter = placed(1, from * deg, 140, (from + 180) * deg);
-      const r = sail([hunter, target], [seed, null], 60, deep, () => ({
-        course: null,
-        throttle: 0.5,
-      }));
-      const first = r.blows.find((b) => b.striker.id === 1);
-      assert.ok(first, `${seed} from ${from}°: no ram`);
-      assert.ok(
-        first.closing > RAM.least,
-        `${seed} from ${from}°: closing ${first.closing}`
-      );
-      assert.equal(
-        first.struck.part,
-        'side',
-        `${seed} from ${from}°: struck its ${first.struck.part}`
-      );
-    }
 });
 
 test('the same seed sails the same way; different seeds, different ways', () => {
@@ -215,7 +199,13 @@ test('a bot answering a ram takes less of it than a ship holding its course', ()
   for (const from of [60, 90, 120])
     for (const seed of sharp) {
       const victim = placed(2, 0, 0, 0, 4),
-        rammer = placed(1, from * deg, 80, (from + 180) * deg, SHIP.top);
+        rammer = placed(
+          1,
+          from * deg,
+          80,
+          (from + 180) * deg,
+          EVEN_SHIP.topSpeed
+        );
       const chase = (v: Vessel, f: Vessel[]): Helm => {
         if (v.id === 2) return { course: null, throttle: 1 / 3 };
         const t = f.find((o) => o.id === 2)!.ship.at;
@@ -318,7 +308,8 @@ test('a bot outside the next cap makes for it in time, and is never caught outsi
       (f, t) => {
         worst = Math.min(worst, toEdge(f[0].ship.at, storm(t)));
       },
-      storm
+      storm,
+      WORST
     );
     const inside = toEdge(r.fleet[0].ship.at, storm(100).next);
     console.log(
@@ -331,7 +322,16 @@ test('a bot outside the next cap makes for it in time, and is never caught outsi
       `${seed}: ${(-inside).toFixed(0)} m outside the next cap`
     );
   }
-  const free = sail([placed(1, 0, 30, 0)], [captains[0]], 70, deep);
+  const free = sail(
+    [placed(1, 0, 30, 0)],
+    [captains[0]],
+    70,
+    deep,
+    undefined,
+    undefined,
+    undefined,
+    WORST
+  );
   assert.ok(
     toEdge(free.fleet[0].ship.at, {
       center: along(start, bearingAt(start, 0), 400).p,
@@ -355,7 +355,8 @@ test('a bot inside the cap never leaves it, roaming or with the next one closing
         (f, t) => {
           worst = Math.min(worst, toEdge(f[0].ship.at, storm(t)));
         },
-        storm
+        storm,
+        WORST
       );
       assert.ok(worst > 0, `${seed}: ${(-worst).toFixed(0)} m outside`);
     }
@@ -370,7 +371,9 @@ test('a bot inside the cap never leaves it, roaming or with the next one closing
       undefined,
       (f) => {
         if (toEdge(f[0].ship.at, { center: start, radius: 260 / R }) < 0) out++;
-      }
+      },
+      undefined,
+      WORST
     );
   }
   assert.ok(out > 0);

@@ -1,4 +1,4 @@
-import { inHand, type Crew } from '../sim/battle.ts';
+import type { Crew } from '../sim/battle.ts';
 import {
   createMatch,
   createMooring,
@@ -17,7 +17,7 @@ import { PLAYER } from '../sim/match.ts';
 import type { Memory } from '../sim/bot.ts';
 import type { Nature } from '../sim/persona.ts';
 import type { Sighter } from '../sim/orders.ts';
-import type { MatchSetup } from '../sim/setup.ts';
+import type { MatchSetup, ShipValues } from '../sim/setup.ts';
 import type { Berthed, Waters } from '../sim/waters.ts';
 import type { BallDraw, Look, Sea, ShipDraw } from '../render/snapshot.ts';
 import type { Hull } from '../world/swell.ts';
@@ -52,11 +52,12 @@ const later =
 
 export function createState(
   waters: Waters,
-  start: { at: Vec3; bearing: number }
+  start: { at: Vec3; bearing: number },
+  moored: ShipValues
 ) {
   let offset = 0;
   const shifted = (): Waters => ({ ...waters, sea: later(waters.sea, offset) });
-  let match: Match = createMooring(shifted(), start);
+  let match: Match = createMooring(shifted(), start, moored);
   const view = () => match.view;
   const byId = indexed<Crew>().of;
   const looks = new Map<number, Look>(),
@@ -147,13 +148,12 @@ export function createState(
         const { id, ship, shove } = fleet[i],
           a = v.poses(id),
           look = looks.get(id),
-          c = crews.get(id),
-          g = c && inHand(c);
+          c = crews.get(id);
         if (!a || !look) continue;
         const d = drawing.slot(n++, id, look, true);
         blendPose(a.before, a.after, between, d.pose);
         add(scale(ship.heading, ship.speed, d.velocity), shove, 1, d.velocity);
-        if (g) d.gun = drawing.armed(d, g, v.aim(id) ?? ship.heading);
+        if (c) d.gun = drawing.armed(d, c.gun, v.aim(id) ?? ship.heading);
         if (c) d.wear = wearOf(c.health);
       }
       for (const w of wrecks)
@@ -196,7 +196,6 @@ export function createState(
     vessels: () => view().vessels(),
     vessel: (id: number) => view().vessel(id),
     crew: (id: number) => view().crew(id),
-    assist: () => view().assist(),
     mine: () => view().mine(),
     alive: () => view().alive(),
     sinkings: () => view().sinkings(),
@@ -212,7 +211,7 @@ export function createState(
       return view().after(PLAYER)!;
     },
     anchor(start: { at: Vec3; bearing: number }): ShipPose {
-      next((w) => createMooring(w, start));
+      next((w) => createMooring(w, start, moored));
       cleared(true);
       dress(PLAYER, lookOf(livery));
       return view().after(PLAYER)!;

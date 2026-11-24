@@ -3,20 +3,13 @@ import { distance, type Vec3 } from '../world/sphere.ts';
 import { mates } from './teams.ts';
 import type { Blow, Vessel } from './contact.ts';
 import type { GunKind } from './kinds.ts';
-import {
-  CARRIED,
-  FALLOFF,
-  GUN,
-  GUNS,
-  GUST,
-  SPEC,
-  type Handling,
-} from './handling.ts';
-import { harmed, hullCap, sunk, whole, type Health } from './health.ts';
+import { FALLOFF, GUNS, GUST } from './handling.ts';
+import { harmed, sunk, whole, type Health } from './health.ts';
 import { outside, type Storm } from './storm.ts';
 import {
   damageOf,
   falloff,
+  gunOf,
   laid,
   reloadOf,
   spreadOf,
@@ -27,24 +20,22 @@ import { broken, emptyHold, type Hold } from './hold.ts';
 import { gustOf, type Gust } from './gust.ts';
 import type { Sight } from './sight.ts';
 import type { Depth } from './shoal.ts';
+import type { ShipValues } from './setup.ts';
 
 export interface Crew {
   id: number;
+  values: ShipValues;
   health: Health;
-  guns: readonly (Gun | null)[];
-  hand: number;
-  equip: number;
+  gun: Gun;
   hold: Hold;
   gust: Gust;
   cut: number;
-  build?: Build;
 }
 
 export interface Battle {
   crews: Crew[];
   balls: Ball[];
   seed: number;
-  assist: readonly number[];
   teams?: readonly number[];
 }
 
@@ -84,40 +75,28 @@ export interface Splash {
 export interface Cue {
   ship: number;
   at: Vec3;
-  kind: 'winding' | 'reloading' | 'reloaded' | 'swapped';
+  kind: 'winding' | 'reloading' | 'reloaded';
   gun: GunKind;
 }
 
-export const crewOf = (id: number, ...guns: Gun[]): Crew => ({
+export const crewOf = (id: number, values: ShipValues): Crew => ({
   id,
-  health: whole(),
-  guns: Array.from({ length: CARRIED }, (_, i) => guns[i] ?? null),
-  hand: 0,
-  equip: 0,
+  values,
+  health: whole(values.hullPoints),
+  gun: gunOf(values.gun),
   hold: emptyHold(),
   gust: gustOf(),
   cut: 0,
 });
 
-export interface Build {
-  fit: Handling;
-}
-
-export const fitOf = (c: Crew | undefined): Handling => c?.build?.fit ?? SPEC;
-
-export const inHand = (c: Crew): Gun | null => c.guns[c.hand] ?? null;
-export const armed = (c: Crew) => c.guns.some((g) => g !== null);
-
 export const battleOf = (
   crews: readonly Crew[],
   seed: number,
-  assist: readonly number[] = GUN.assist,
   teams?: readonly number[]
 ): Battle => ({
   crews: [...crews].sort((a, b) => a.id - b.id),
   balls: [],
   seed,
-  assist,
   ...(teams && { teams }),
 });
 
@@ -129,7 +108,6 @@ export const marksOf = (
   b.teams ? fleet.filter((o) => !mates(b.teams, id, o.id)) : fleet;
 
 function worked(
-  c: Crew,
   g: Gun,
   trigger: boolean,
   dt: number,
@@ -151,7 +129,7 @@ function worked(
     };
     fired = true;
     if (gun.rounds <= 0) {
-      gun = { ...gun, reload: reloadOf(gun, reload) };
+      gun = { ...gun, reload: reloadOf(gun.kind, reload) };
       cue('reloading');
     }
   };
@@ -165,9 +143,9 @@ function worked(
       cue('reloaded');
     }
   } else if (gun.rounds <= 0) {
-    gun = { ...gun, reload: reloadOf(gun, reload) };
+    gun = { ...gun, reload: reloadOf(gun.kind, reload) };
     cue('reloading');
-  } else if (trigger && gun.cool <= 1e-9 && c.equip <= 1e-9) {
+  } else if (trigger && gun.cool <= 1e-9) {
     if (bore.windup > 0) {
       gun = { ...gun, windup: bore.windup };
       cue('winding');
@@ -193,7 +171,6 @@ export function stepBattle(
   sunk: number[];
 } {
   const crews = new Map(b.crews.map((c) => [c.id, { ...c }]));
-  for (const v of fleet) if (!crews.has(v.id)) crews.set(v.id, crewOf(v.id));
   const afloat = (id: number) => {
     const c = crews.get(id);
     return !!c && !sunk(c.health);
@@ -281,23 +258,21 @@ export function stepBattle(
     .map((v, i) => [v, orders[i]] as const)
     .sort(([a], [c]) => a.id - c.id)
     .forEach(([v, order]) => {
-      const c = crews.get(v.id)!;
-      if (sunk(c.health)) return;
-      c.equip = Math.max(0, c.equip - dt);
-      const g = inHand(c);
-      if (!g) return;
+      const c = crews.get(v.id);
+      if (!c || sunk(c.health)) return;
+      const g = c.gun,
+        values = c.values;
       const loose = (gun: Gun) => {
         const spread =
-          spreadOf(gun) *
+          spreadOf(gun.kind, values.spreadFactor) *
           (order?.spread ?? 1) *
-          (c.gust.blowing > 0 ? GUST.spread : 1) *
-          fitOf(c).spread;
+          (c.gust.blowing > 0 ? GUST.spread : 1);
         const lay = laid(
           v,
           gun,
           order?.aim ?? null,
           marksOf(b, v.id, targets),
-          { seed: b.seed, depth, spread, cone: b.assist[gun.rarity], rises }
+          { seed: b.seed, depth, spread, cone: values.assistCone, rises }
         );
         for (const dir of lay.dirs)
           balls.push(
@@ -307,7 +282,7 @@ export function stepBattle(
               lay.from,
               dir,
               lay.speed,
-              damageOf(gun),
+              damageOf(gun.kind, values.damageFactor),
               lay.fall
             )
           );
@@ -319,16 +294,9 @@ export function stepBattle(
           target: lay.target,
         });
       };
-      const gun = worked(
-        c,
-        g,
-        !!order?.fire,
-        dt,
-        fitOf(c).reload,
-        loose,
-        (kind) => cues.push({ ship: v.id, at: v.ship.at, kind, gun: g.kind })
+      c.gun = worked(g, !!order?.fire, dt, values.reloadFactor, loose, (kind) =>
+        cues.push({ ship: v.id, at: v.ship.at, kind, gun: g.kind })
       );
-      c.guns = c.guns.map((k, i) => (i === c.hand ? gun : k));
     });
 
   return {
@@ -360,7 +328,7 @@ export function weathered(
     if (!out.has(c.id) || sunk(c.health)) return c;
     const health = harmed(
       c.health,
-      storm.damage * hullCap(c.health) * dt,
+      storm.damage * c.health.most * dt,
       true
     ).health;
     if (sunk(health)) sunkNow.push(c.id);

@@ -11,13 +11,12 @@ import { HOTBAR, IDLE, type Thumbs } from '../play/player.ts';
 import type { Livery } from '../world/livery.ts';
 import { probeMeshes } from './probe.ts';
 import { STEP } from '../sim/fixed.ts';
-import { KINDS, type GunKind } from '../sim/kinds.ts';
-import { GUN, SHIP } from '../sim/handling.ts';
+import { KINDS, STORES, type GunKind } from '../sim/kinds.ts';
 import { PLAYER } from '../sim/match.ts';
 import { SETUP, type Rig } from '../sim/engine.ts';
 import type { MatchSetup } from '../sim/setup.ts';
 import { createStorm } from '../sim/storm.ts';
-import { raceSetup, teamLiveries } from './race.ts';
+import { RACE_SHIP, raceSetup, teamLiveries } from './race.ts';
 import type { ShipDraw, Snapshot, StormDraw } from '../render/snapshot.ts';
 import type { Flow } from './flow.ts';
 import { uiLayer } from '../ui/base/ui.ts';
@@ -44,7 +43,7 @@ export interface Setup {
   drawing: FrameOptions;
   meter: boolean;
   hold: number | null;
-  gun: { kind: GunKind; rarity: number } | null;
+  gun: GunKind;
 }
 
 const kindOf = (name: string | null): GunKind =>
@@ -58,6 +57,7 @@ export interface Stage {
   anchors: readonly Anchor[];
   ready: Promise<number>;
   rig: Rig | null;
+  gun: GunKind;
   stats(on: boolean): void;
   draw(
     next: (dt: number) => Snapshot,
@@ -124,10 +124,7 @@ function setupOf(release: Setup): Setup {
     },
     meter: true,
     hold: params.has('storm') ? number('storm', 0) : release.hold,
-    gun:
-      params.has('gun') || params.has('kind')
-        ? { kind: kindOf(params.get('kind')), rarity: number('gun', 0) }
-        : release.gun,
+    gun: params.has('kind') ? kindOf(params.get('kind')) : release.gun,
   };
 }
 
@@ -238,7 +235,7 @@ function open(p: Played, others: readonly Berth[], s: Stage) {
     flow.go(screen);
   else if (params.has('race')) {
     const teams = number('race', 0) || undefined,
-      race = raceSetup(s.name, s.world.seed, teams),
+      race = raceSetup(s.name, s.world.seed, teams, s.gun),
       liveries = teamLiveries(race, game.worn());
     game.start(race, liveries);
     if (s.rig) game.debug.rig(s.rig, race, liveries);
@@ -301,39 +298,22 @@ function kit(game: Game) {
   const { at, heading } = game.status(),
     step = () => game.step(STEP, IDLE);
   const under: Goods[] = [
-    { kind: 'cannon', rarity: 2 },
     { kind: 'smallShield', count: 3 },
     { kind: 'bigShield', count: 2 },
     { kind: 'repairKit', count: 2 },
   ];
   game.debug.strew(at, under);
   step();
-  game.debug.strew(at, [{ kind: 'scatter', rarity: 1 }]);
-  step();
-  game.debug.strew(along(at, heading, 3).p, [{ kind: 'mortar', rarity: 4 }]);
+  game.debug.strew(along(at, heading, 3).p, [{ kind: 'fullRepair', count: 1 }]);
   step();
 }
 
 function stock(game: Game) {
   const { at, heading, facing } = game.status();
   if (params.get('kit') === '') kit(game);
-  if (params.has('arm')) {
-    for (const s of game.ships())
-      if (s.id !== PLAYER && s.afloat)
-        game.debug.strew(s.at, [
-          { kind: KINDS[s.id % KINDS.length], rarity: 4 },
-        ]);
-    game.step(STEP, IDLE);
-  }
   const row = params.has('loot') ? number('loot', 0) : 0;
   if (row > 0) {
-    const all: Goods[] = [
-      ...KINDS.map((kind, rarity): Goods => ({ kind, rarity })),
-      { kind: 'smallShield', count: 1 },
-      { kind: 'bigShield', count: 1 },
-      { kind: 'repairKit', count: 1 },
-      { kind: 'fullRepair', count: 1 },
-    ];
+    const all: Goods[] = STORES.map((kind) => ({ kind, count: 1 }));
     all.forEach((g, i) => {
       const side = Math.tan(((i - (all.length - 1) / 2) * 7 * Math.PI) / 180);
       game.debug.strew(
@@ -345,10 +325,7 @@ function stock(game: Game) {
     [25, 50, 90, 140, 200, 250, 300, 350, 420].forEach((m, i) => {
       const side = (i % 2 ? 1 : -1) * (0.45 - 0.035 * i),
         turned = normalize(add(heading, cross(at, heading), side));
-      const piece: Goods =
-        i === 1
-          ? { kind: 'smallShield', count: 1 }
-          : { kind: KINDS[i % 5], rarity: i % 5 };
+      const piece: Goods = { kind: STORES[i % STORES.length], count: 1 };
       game.debug.strew(along(at, turned, m).p, [piece]);
     });
   }
@@ -423,16 +400,11 @@ function flyer(
     pitch: number('look', -6) * degrees,
   });
   const kind = params.get('kind'),
-    rarity = params.get('rarity'),
     armed = (i: number, o: Berth): ShipDraw['gun'] =>
       kind === null
         ? null
         : {
             kind: kind === 'all' ? KINDS[i % KINDS.length] : kindOf(kind),
-            rarity:
-              rarity === 'all'
-                ? Math.floor(i / KINDS.length) % GUN.rarities.length
-                : number('rarity', 0),
             aim: normalize(add(o.heading, cross(o.heading, o.at), 0.6)),
           };
   const ships: ShipDraw[] = others.map((o, i) => ({
@@ -497,7 +469,8 @@ function demoShips(
       at: u,
       heading: forward,
       look: lookOf(dealt(seed, i + 1, livery)),
-      lashed: way > 0 ? { course: null, throttle: way / SHIP.top } : null,
+      lashed:
+        way > 0 ? { course: null, throttle: way / RACE_SHIP.topSpeed } : null,
     });
   }
   return others;

@@ -3,11 +3,8 @@ import { HEALTH } from './handling.ts';
 export interface Health {
   hull: number;
   shield: number;
-  most?: number;
+  most: number;
 }
-
-export const hullCap = (h: Health, cap: number = HEALTH.hull): number =>
-  h.most === undefined ? cap : (cap * h.most) / HEALTH.hull;
 
 interface Harm {
   health: Health;
@@ -15,9 +12,10 @@ interface Harm {
   hull: number;
 }
 
-export const whole = (): Health => ({
-  hull: HEALTH.hull,
+export const whole = (most: number): Health => ({
+  hull: most,
   shield: HEALTH.start,
+  most,
 });
 
 export const sunk = (h: Health) => h.hull <= 0;
@@ -25,7 +23,7 @@ export const sunk = (h: Health) => h.hull <= 0;
 export const SMOKE = { light: 0.4, heavy: 0.25 } as const;
 
 export const wearOf = (h: Health): 0 | 1 | 2 => {
-  const share = h.hull / hullCap(h);
+  const share = h.hull / h.most;
   return share < SMOKE.heavy ? 2 : share < SMOKE.light ? 1 : 0;
 };
 
@@ -44,9 +42,8 @@ export function healed(
   h: Health,
   amount: number,
   to: 'hull' | 'shield',
-  cap: number = HEALTH[to]
+  cap: number = to === 'hull' ? h.most : HEALTH.shield
 ): Health {
-  const top = to === 'hull' ? hullCap(h, cap) : cap;
-  if (sunk(h) || !(amount > 0) || h[to] >= top) return h;
-  return { ...h, [to]: Math.min(top, h[to] + amount) };
+  if (sunk(h) || !(amount > 0) || h[to] >= cap) return h;
+  return { ...h, [to]: Math.min(cap, h[to] + amount) };
 }

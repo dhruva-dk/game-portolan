@@ -7,8 +7,11 @@ import {
   scale,
   type Vec3,
 } from '../world/sphere.ts';
-import { GUST, SHIP, SPEC, type Handling } from './handling.ts';
+import { GUST, SHIP } from './handling.ts';
+import type { ShipValues } from './setup.ts';
 import { navigate, type Depth } from './shoal.ts';
+
+export type Sailing = Pick<ShipValues, 'topSpeed' | 'gather' | 'turnRate'>;
 
 export interface ShipState {
   at: Vec3;
@@ -40,11 +43,8 @@ export function offCourse(s: ShipState, course: Vec3): number {
   return ahead === 0 && across === 0 ? 0 : Math.atan2(across, ahead);
 }
 
-const bite = (speed: number) =>
-  Math.min(
-    1,
-    SHIP.bite + ((1 - SHIP.bite) * speed) / (SHIP.fullBite * SHIP.top)
-  );
+const bite = (speed: number, top: number) =>
+  Math.min(1, SHIP.bite + ((1 - SHIP.bite) * speed) / (SHIP.fullBite * top));
 
 const close = (rate: number, dt: number) => 1 - Math.exp(-rate * dt);
 
@@ -63,7 +63,7 @@ export function step(
   helm: Helm,
   dt: number,
   depth: Depth,
-  fit: Handling = SPEC
+  fit: Sailing
 ): ShipState {
   const rudder =
     helm.course && length(helm.course) > 0
@@ -71,9 +71,13 @@ export function step(
       : 0;
   const turn =
     s.turn +
-    (rudder * fit.turn * (helm.gust ? GUST.turn : 1) * bite(s.speed) - s.turn) *
+    (rudder *
+      fit.turnRate *
+      (helm.gust ? GUST.turn : 1) *
+      bite(s.speed, fit.topSpeed) -
+      s.turn) *
       close(SHIP.answer, dt);
-  const want = Math.max(0, Math.min(1, helm.throttle)) * fit.top;
+  const want = Math.max(0, Math.min(1, helm.throttle)) * fit.topSpeed;
   let speed: number;
   if (helm.gust)
     speed =
@@ -82,8 +86,8 @@ export function step(
         -GUST.accel * dt,
         Math.min(GUST.accel * dt, want + GUST.speed - s.speed)
       );
-  else if (s.speed > fit.top)
-    speed = Math.max(fit.top, s.speed - GUST.shed * dt);
+  else if (s.speed > fit.topSpeed)
+    speed = Math.max(fit.topSpeed, s.speed - GUST.shed * dt);
   else
     speed =
       s.speed +

@@ -17,7 +17,7 @@ import { createReferee } from '../play/referee.ts';
 import { watersOf } from '../play/setup.ts';
 import { SETUP } from '../sim/engine.ts';
 import type { Berthed } from '../sim/waters.ts';
-import { raceSetup, rigOf, teamLiveries } from './race.ts';
+import { RACE_SHIP, raceSetup, rigOf, teamLiveries } from './race.ts';
 import type { Snapshot } from '../render/snapshot.ts';
 import { shoresOf } from '../ui/base/coasts.ts';
 import { createGlobe } from '../ui/base/globe.ts';
@@ -51,7 +51,7 @@ const RELEASE: Setup = {
   },
   meter: false,
   hold: null,
-  gun: null,
+  gun: 'cannon',
 };
 
 loaded('script');
@@ -103,6 +103,7 @@ async function stage(setup: Setup): Promise<Stage> {
     ready: frame.ready,
     stats: (on) => meter.show(setup.meter || on),
     rig: rigOf(setup, world),
+    gun: setup.gun,
     async draw(
       next: (dt: number) => Snapshot,
       drawn?: (canvas: HTMLCanvasElement) => void
@@ -135,10 +136,10 @@ async function play(s: Stage): Promise<Played> {
   const { waters, ms, berth } = await watersOf(s.world.seed, s.world.land);
   console.info(`water sounded in ${ms.toFixed(0)} ms`);
   loaded('sounded');
-  const race = raceSetup(s.name, s.world.seed);
+  const race = raceSetup(s.name, s.world.seed, undefined, s.gun);
   let berthed: Berthed | undefined;
   void berth(race.match, race.ships.length).then((b) => (berthed = b));
-  const game = createGame(s.world, s.anchors, waters, s.start);
+  const game = createGame(s.world, s.anchors, waters, s.start, RACE_SHIP);
   const referee = createReferee(game);
 
   const input = createInput(s.canvas, () => game.steering());

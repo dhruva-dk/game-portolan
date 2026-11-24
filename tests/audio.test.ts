@@ -9,13 +9,7 @@ import {
   soundOf,
   type Happening,
 } from '../src/audio/cues.ts';
-import {
-  TOP,
-  createListen,
-  type Call,
-  type Hearing,
-} from '../src/audio/listen.ts';
-import { SHIP } from '../src/sim/handling.ts';
+import { createListen, type Call, type Hearing } from '../src/audio/listen.ts';
 import {
   FALL,
   NEAR,
@@ -55,7 +49,6 @@ const each = (ship: number, gun: GunKind = 'cannon'): Happening[] =>
       case 'winding':
       case 'reloading':
       case 'reloaded':
-      case 'swapped':
         return { ...base, kind, gun };
       case 'fell':
         return { ...base, kind, land: false };
@@ -72,16 +65,13 @@ const each = (ship: number, gun: GunKind = 'cannon'): Happening[] =>
       case 'sank':
         return { ...base, kind, by: null };
       case 'took':
-        return { ...base, kind, piece: gun, rarity: 0, slot: 0 };
+        return { ...base, kind, piece: 'smallShield', rarity: 0, slot: 1 };
       case 'mended':
         return { ...base, kind, piece: 'repairKit' };
       case 'gust':
         return { ...base, kind };
     }
   });
-
-test("the bed hears its speed as a share of its top: the sim's", () =>
-  assert.equal(TOP, SHIP.top));
 
 test('the table: every kind of deed, its own, is heard; every cue plays a sound there is; every sound is played by some cue', () => {
   for (const h of each(0)) assert.ok(cueOf(h, 0), `its ${h.kind} has a cue`);
@@ -107,7 +97,7 @@ test('the table: every kind of deed, its own, is heard; every cue plays a sound 
   }
 });
 
-test('its blows: its ward taking all of one rings, its last breaks it, the rest is on its hull; a gun taken up is the swap', () => {
+test('its blows: its ward taking all of one rings, its last breaks it, the rest is on its hull', () => {
   const blow = (shield: number, hull: number, broke: boolean): Happening => ({
     seq: 1,
     time: 0,
@@ -124,22 +114,6 @@ test('its blows: its ward taking all of one rings, its last breaks it, the rest 
   assert.equal(cueOf(blow(10, 10, true), 0), 'shatter');
   assert.equal(cueOf(blow(0, 20, false), 0), 'hurt');
   assert.equal(cueOf(blow(0, 20, false), 3), 'strike');
-  assert.equal(
-    cueOf(
-      {
-        seq: 1,
-        time: 0,
-        at,
-        ship: 0,
-        kind: 'took',
-        piece: 'harpoon',
-        rarity: 2,
-        slot: 0,
-      },
-      0
-    ),
-    'swap'
-  );
   assert.equal(
     cueOf(
       {
@@ -330,19 +304,12 @@ const status = (over: Partial<Status & Kit> = {}): Status & Kit => ({
   heading: [1, 0, 0],
   facing: [1, 0, 0],
   arriving: 0,
+  top: 16,
   hull: 100,
   hullMax: 100,
   shield: 30,
   shieldMax: 50,
-  gun: {
-    kind: 'cannon',
-    rarity: 0,
-    rounds: 8,
-    ready: 1,
-    charge: null,
-    swapping: 0,
-    locked: false,
-  },
+  gun: { kind: 'cannon', rounds: 8, ready: 1, charge: null, locked: false },
   afloat: 2,
   sunk: false,
   storm: 30,
@@ -353,7 +320,7 @@ const status = (over: Partial<Status & Kit> = {}): Status & Kit => ({
   reticle: null,
   moments: [],
   race: null,
-  guns: [{ kind: 'cannon', rarity: 0, rounds: 8, mag: 8, reload: null }, null],
+  guns: [{ kind: 'cannon', rounds: 8, mag: 8, reload: null }],
   items: [null, null, null],
   chosen: 0,
   using: null,
@@ -372,7 +339,7 @@ const hearing = (
   covered = 0
 ): Hearing => ({ scene: s, status: st, screen, map, covered });
 
-test('listen: a ball passing near whistles once; a slot of its stores taken in hand, not a gun; the screens; its water', () => {
+test('listen: a ball passing near whistles once; a slot of its stores taken in hand, not its gun; the screens; its water', () => {
   const l = createListen(() => -20),
     out: Call[] = [];
   const dt = 1 / 30,
@@ -396,14 +363,10 @@ test('listen: a ball passing near whistles once; a slot of its stores taken in h
     l.listen(h, dt, out);
     return out.map((c) => c.cue);
   };
-  assert.deepEqual(
-    cues(hearing(scene(2), status({ chosen: 1 }))),
-    [],
-    "its other gun taken in hand: its deed's (swapped)"
-  );
   assert.deepEqual(cues(hearing(scene(2.1), status({ chosen: HOTBAR.guns }))), [
     'select',
   ]);
+  assert.deepEqual(cues(hearing(scene(2.12), status({ chosen: 0 }))), []);
   cues(hearing(scene(2.15), status()));
   assert.deepEqual(cues(hearing(scene(2.2), status(), 'won')), ['salute']);
   assert.deepEqual(cues(hearing(scene(2.3), status(), 'lobby')), []);
@@ -456,6 +419,17 @@ test('listen: a ball passing near whistles once; a slot of its stores taken in h
     l.listen(hearing(scene(3.6), status(), 'lobby', false, 0), dt, out).covered,
     0
   );
+});
+
+test('the bed hears its speed as a share of its own top', () => {
+  const speedAt = (top: number) =>
+    createListen(() => -20).listen(
+      hearing(scene(0), status({ top })),
+      1 / 30,
+      []
+    ).speed;
+  assert.equal(speedAt(12), 0.5);
+  assert.equal(speedAt(24), 0.25);
 });
 
 test('listen: the storm closing thunders, then its wind', () => {

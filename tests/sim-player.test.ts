@@ -11,7 +11,12 @@ const at: Vec3 = normalize([0.3, 0.5, 0.8]),
 
 const seen = (id: number, meters: number): Seen => {
   const { p, t } = along(at, east, meters);
-  return { id, ship: { at: p, heading: t, speed: 0, turn: 0 } };
+  return {
+    id,
+    ship: { at: p, heading: t, speed: 0, turn: 0 },
+    hull: 100,
+    shield: 0,
+  };
 };
 
 test('its eye is on its foe’s body, never further off it than a thumb wanders', () => {

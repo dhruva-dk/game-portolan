@@ -1,6 +1,5 @@
 import { R, apart, distance, dot, type Vec3 } from '../world/sphere.ts';
 import type { GunKind } from './kinds.ts';
-import { inHand } from './battle.ts';
 import { eye, hidden } from './lookout.ts';
 import { mate, type Ctx } from './captain.ts';
 
@@ -27,7 +26,7 @@ export interface LogMemory {
 
 export const logMemory = (): LogMemory => ({ log: [] });
 
-const strengthOf = (c: Ctx) => (c.own.hull ?? 100) + (c.own.shield ?? 0);
+const strengthOf = (c: Ctx) => c.own.hull + c.own.shield;
 
 export function note(c: Ctx): void {
   const { m, own } = c,
@@ -43,12 +42,11 @@ export function note(c: Ctx): void {
     if (apart(own.ship.at, o.ship.at, far)) continue;
     if (distance(own.ship.at, o.ship.at) > far) continue;
     if (hidden(c, own.ship.at, o.ship.at)) continue;
-    const g = o.crew ? inHand(o.crew) : null;
     seen.push({
       id: o.id,
       at: o.ship.at,
-      strength: (o.hull ?? 100) + (o.shield ?? 0),
-      gun: g ? g.kind : null,
+      strength: o.hull + o.shield,
+      gun: o.crew ? o.crew.gun.kind : null,
       t: m.clock,
       fled:
         m.mode === 'flee' && m.foe === o.id

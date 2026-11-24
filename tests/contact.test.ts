@@ -25,6 +25,8 @@ import {
   type Vec3,
 } from '../src/world/sphere.ts';
 import { flat } from '../src/world/swell.ts';
+import type { ShipValues } from '../src/sim/setup.ts';
+import { WORST } from './setups.ts';
 
 const deep: Depth = () => 30;
 const deg = Math.PI / 180;
@@ -44,11 +46,18 @@ const run = (
   orders: Orders,
   seconds: number,
   depth = deep,
-  each?: (f: Vessel[]) => void
+  each?: (f: Vessel[]) => void,
+  values: ShipValues = WORST
 ) => {
   const blows: Blow[] = [];
   for (let i = 0; i < Math.round(seconds / STEP); i++) {
-    const r = stepFleet(fleet, orders(fleet), STEP, depth);
+    const r = stepFleet(
+      fleet,
+      orders(fleet),
+      STEP,
+      depth,
+      fleet.map(() => values)
+    );
     fleet = r.fleet;
     blows.push(...r.blows);
     each?.(fleet);
@@ -178,7 +187,7 @@ test('hulls never overlap, from any angle, at any speed, wherever it is struck',
           let least = { module: Infinity, apart: Infinity };
           const { blows } = run(
             approach(angle * deg, speed, aim, ahead),
-            holding(speed / SHIP.top, ahead / SHIP.top),
+            holding(speed / WORST.topSpeed, ahead / WORST.topSpeed),
             45 / speed + 4,
             deep,
             (f) => {
@@ -199,7 +208,15 @@ test('a glancing blow slides along it and goes on, losing little way and doing n
   for (const angle of [10, 15, 20]) {
     let touched = false;
     const { fleet, blows } = run(
-      approach(-angle * deg, SHIP.top, 0, 0, center, undefined, SHIP.beam),
+      approach(
+        -angle * deg,
+        WORST.topSpeed,
+        0,
+        0,
+        center,
+        undefined,
+        SHIP.beam
+      ),
       holding(1, 0),
       12,
       deep,
@@ -210,7 +227,7 @@ test('a glancing blow slides along it and goes on, losing little way and doing n
     assert.ok(touched, `${angle}°: they met`);
     assert.equal(blows.length, 0, `${angle}°`);
     assert.ok(
-      fleet[0].ship.speed > 0.95 * SHIP.top,
+      fleet[0].ship.speed > 0.95 * WORST.topSpeed,
       `${angle}°: ${fleet[0].ship.speed} m/s`
     );
     const past =
@@ -221,14 +238,14 @@ test('a glancing blow slides along it and goes on, losing little way and doing n
 });
 
 test('bow into its side: the struck ship takes far more than the striker', () => {
-  const { blows } = run(approach(90 * deg, SHIP.top), holding(1, 0), 6);
+  const { blows } = run(approach(90 * deg, WORST.topSpeed), holding(1, 0), 6);
   assert.equal(blows.length, 1);
   const [{ striker, struck, closing }] = blows;
   assert.deepEqual(
     [striker.id, striker.part, struck.id, struck.part],
     [1, 'bow', 2, 'side']
   );
-  assert.ok(Math.abs(closing - SHIP.top) < 0.01, `${closing}`);
+  assert.ok(Math.abs(closing - WORST.topSpeed) < 0.01, `${closing}`);
   const whole = RAM.damage * (closing - RAM.past);
   assert.ok(
     Math.abs(striker.damage - whole * RAM.bear * RAM.bow) < 1e-9 &&
@@ -242,25 +259,29 @@ test('bow into its side: the struck ship takes far more than the striker', () =>
     [9, 'side'],
     [-9, 'side'],
   ] as const) {
-    const b = run(approach(90 * deg, SHIP.top, aim), holding(1, 0), 6).blows;
+    const b = run(
+      approach(90 * deg, WORST.topSpeed, aim),
+      holding(1, 0),
+      6
+    ).blows;
     assert.equal(b.length, 1);
     assert.deepEqual([b[0].striker.part, b[0].struck.part], ['bow', part]);
     assert.ok(b[0].struck.damage > 4 * b[0].striker.damage);
   }
-  const s = run(approach(0, SHIP.top), holding(1, 0), 8).blows;
+  const s = run(approach(0, WORST.topSpeed), holding(1, 0), 8).blows;
   assert.deepEqual([s[0].striker.part, s[0].struck.part], ['bow', 'stern']);
   assert.ok(s[0].struck.damage > 3 * s[0].striker.damage);
 });
 
 test('head on, both take it alike', () => {
   const { blows } = run(
-    approach(180 * deg, SHIP.top, 0, SHIP.top),
+    approach(180 * deg, WORST.topSpeed, 0, WORST.topSpeed),
     holding(1, 1),
     4
   );
   assert.equal(blows.length, 1);
   const [{ striker, struck, closing }] = blows;
-  assert.ok(Math.abs(closing - 2 * SHIP.top) < 0.05, `${closing}`);
+  assert.ok(Math.abs(closing - 2 * WORST.topSpeed) < 0.05, `${closing}`);
   assert.deepEqual([striker.part, struck.part], ['bow', 'bow']);
   assert.ok(
     Math.abs(striker.damage - struck.damage) < 1e-9 * struck.damage,
@@ -273,7 +294,7 @@ test('a nudge, or lying alongside and leaning on it, does no damage', () => {
   let touched = false;
   const nudge = run(
     approach(90 * deg, RAM.least - 0.3),
-    holding((RAM.least - 0.3) / SHIP.top, 0),
+    holding((RAM.least - 0.3) / WORST.topSpeed, 0),
     12,
     deep,
     (f) => {
@@ -282,13 +303,13 @@ test('a nudge, or lying alongside and leaning on it, does no damage', () => {
   );
   assert.ok(touched);
   assert.equal(nudge.blows.length, 0);
-  const a = lying(center, 0, SHIP.top),
+  const a = lying(center, 0, WORST.topSpeed),
     b = {
       ...shipAt(
         along(center, cross(center, a.heading), SHIP.beam + 0.5).p,
         a.heading
       ),
-      speed: SHIP.top,
+      speed: WORST.topSpeed,
     };
   const fleet = [afloat(1, a), afloat(2, b)];
   const leaning: Orders = (f) => [
@@ -304,7 +325,7 @@ test('a nudge, or lying alongside and leaning on it, does no damage', () => {
 });
 
 test('one ram, one blow, however long it presses on; drawn clear, it may ram again', () => {
-  const first = run(approach(90 * deg, SHIP.top), holding(1, 0), 20);
+  const first = run(approach(90 * deg, WORST.topSpeed), holding(1, 0), 20);
   assert.equal(first.blows.length, 1);
   assert.deepEqual(
     first.fleet.map((v) => v.engaged),
@@ -313,7 +334,7 @@ test('one ram, one blow, however long it presses on; drawn clear, it may ram aga
   const [, target] = first.fleet,
     again = approach(
       90 * deg,
-      SHIP.top,
+      WORST.topSpeed,
       0,
       0,
       target.ship.at,
@@ -329,7 +350,7 @@ test('one ram, one blow, however long it presses on; drawn clear, it may ram aga
 
 test('coming about alongside another, its stern swings clear of the other, never through', () => {
   for (const side of [-1, 1])
-    for (const speed of [3, SHIP.top]) {
+    for (const speed of [3, WORST.topSpeed]) {
       const b = lying(center, 0, speed),
         port = cross(center, b.heading);
       const at = along(center, port, SHIP.beam + 0.3).p;
@@ -337,7 +358,7 @@ test('coming about alongside another, its stern swings clear of the other, never
       let least = Infinity;
       const orders: Orders = (f) => [
         { course: turned(f[0].ship, side * 1.5), throttle: 1 },
-        { course: null, throttle: speed / SHIP.top },
+        { course: null, throttle: speed / WORST.topSpeed },
       ];
       run([afloat(1, a), afloat(2, b)], orders, 15, deep, (f) => {
         least = Math.min(least, leastOf(f).apart);
@@ -358,7 +379,7 @@ test('three driving into one another stay clear of each other, and settle', () =
     ).p;
     return afloat(k + 1, {
       ...shipAt(p, add3(center, p, -1)),
-      speed: SHIP.top,
+      speed: WORST.topSpeed,
     });
   });
   let least = Infinity,
@@ -372,7 +393,7 @@ test('three driving into one another stay clear of each other, and settle', () =
   });
   assert.ok(blows.length >= 2, `${blows.length} rams`);
   assert.ok(least >= -1e-3, `${least}`);
-  assert.ok(fastest <= SHIP.top + 1e-9, `${fastest} m/s`);
+  assert.ok(fastest <= WORST.topSpeed + 1e-9, `${fastest} m/s`);
   const last = track.slice(-150);
   for (let k = 0; k < 3; k++)
     for (let i = 2; i < last.length; i++) {
@@ -395,7 +416,7 @@ test('pressed against the shore by another, it is neither set aground nor pushed
     const b = shipAt(at, frameAt(at).north);
     const heading = turned(b, angle * deg),
       from = along(at, heading, -40);
-    const a = { ...shipAt(from.p, from.t), speed: SHIP.top };
+    const a = { ...shipAt(from.p, from.t), speed: WORST.topSpeed };
     let least = Infinity,
       grounded = Infinity,
       fastest = 0;
@@ -419,7 +440,7 @@ test('pressed against the shore by another, it is neither set aground nor pushed
     assert.equal(blows.length, 1, `${angle}°`);
     assert.ok(least >= -1e-3, `${angle}°: ${least} m between them`);
     assert.ok(grounded >= 0, `${angle}°: ${grounded} m under a keel`);
-    assert.ok(fastest <= SHIP.top + 1e-9, `${angle}°: ${fastest} m/s`);
+    assert.ok(fastest <= WORST.topSpeed + 1e-9, `${angle}°: ${fastest} m/s`);
     const last = track.slice(-150);
     for (let k = 0; k < 2; k++)
       for (let i = 2; i < last.length; i++) {
@@ -433,11 +454,15 @@ test('pressed against the shore by another, it is neither set aground nor pushed
 });
 
 test('over the pole, the same ram as anywhere', () => {
-  const here = run(approach(90 * deg, SHIP.top, 3), holding(1, 0), 6).blows;
+  const here = run(
+    approach(90 * deg, WORST.topSpeed, 3),
+    holding(1, 0),
+    6
+  ).blows;
   let least = Infinity;
   const pole: Vec3 = [0, 1, 0];
   const there = run(
-    approach(90 * deg, SHIP.top, 3, 0, pole, [1, 0, 0]),
+    approach(90 * deg, WORST.topSpeed, 3, 0, pole, [1, 0, 0]),
     holding(1, 0),
     6,
     deep,
@@ -460,8 +485,16 @@ test('over the pole, the same ram as anywhere', () => {
   assert.ok(distance(there[0].at, pole) < SHIP.length);
 });
 
-test('the ram scaled by top speed: a full-speed ram square into a still ship does what it did at a top of 14.5 m/s', () => {
-  const { blows } = run(approach(90 * deg, SHIP.top), holding(1, 0), 6);
+test('the ram scaled by top speed: a full-speed ram square into a still ship of a top of 16 m/s does what it did at a top of 14.5 m/s', () => {
+  const sixteen = { ...WORST, topSpeed: 16 };
+  const { blows } = run(
+    approach(90 * deg, sixteen.topSpeed),
+    holding(1, 0),
+    6,
+    deep,
+    undefined,
+    sixteen
+  );
   assert.ok(
     Math.abs(blows[0].struck.damage - (14.5 - 5) * 2.2) < 0.2,
     `${blows[0].struck.damage}`
@@ -469,16 +502,23 @@ test('the ram scaled by top speed: a full-speed ram square into a still ship doe
 });
 
 test('rammed square in its side, it heels away from the blow, a few degrees, and the rammer not at all', () => {
-  let fleet = approach(90 * deg, SHIP.top);
-  let rides = fleet.map((v) => settled(v.ship, flat, 0));
+  let fleet = approach(90 * deg, WORST.topSpeed);
+  let rides = fleet.map((v) => settled(v.ship, WORST.topSpeed, flat, 0));
   let most = [0, 0];
   for (let i = 0; i < Math.round(8 / STEP); i++) {
-    const r = stepFleet(fleet, holding(1, 0)(fleet), STEP, deep);
+    const r = stepFleet(
+      fleet,
+      holding(1, 0)(fleet),
+      STEP,
+      deep,
+      fleet.map(() => WORST)
+    );
     fleet = r.fleet;
     rides = rides.map((m, k) =>
       ride(
         knocked(m, fleet[k].ship, r.jolts[k]),
         fleet[k].ship,
+        WORST.topSpeed,
         flat,
         i * STEP,
         STEP

@@ -1,8 +1,8 @@
-import { fitOf, type Crew, type Cue } from './battle.ts';
+import type { Crew, Cue } from './battle.ts';
 import type { Vessel } from './contact.ts';
 import { reloadOf } from './gun.ts';
 import { spent, stepGust } from './gust.ts';
-import { CARRIED, EQUIP, GUNS, RIGGING } from './handling.ts';
+import { GUNS, RIGGING } from './handling.ts';
 import { sunk } from './health.ts';
 import { stepUse, tapped, USING, type Use } from './hold.ts';
 import {
@@ -19,7 +19,6 @@ import type { Depth } from './shoal.ts';
 
 export interface Ask {
   tap: number | null;
-  arm: number | null;
   gust: boolean;
   take: number | null;
 }
@@ -29,48 +28,17 @@ export interface Mended {
   use: Use;
 }
 
-export const NOTHING: Ask = { tap: null, arm: null, gust: false, take: null };
+export const NOTHING: Ask = { tap: null, gust: false, take: null };
 
-function armed(
-  crew: Crew,
-  slot: number,
-  gunOffered: boolean,
-  cue: (c: Omit<Cue, 'at'>) => void
-): { crew: Crew; take: boolean } {
-  if (slot < 0 || slot >= CARRIED) return { crew, take: false };
-  const hold =
-      crew.hold.chosen !== 0
-        ? { ...crew.hold, chosen: 0, using: null }
-        : crew.hold,
-    g = crew.guns[slot];
-  if (slot !== crew.hand) {
-    if (!g)
-      return {
-        crew: hold === crew.hold ? crew : { ...crew, hold },
-        take: false,
-      };
-    const guns = crew.guns.map((k, i) =>
-      i === crew.hand && k ? { ...k, windup: 0, reload: 0 } : k
-    );
-    cue({ ship: crew.id, kind: 'swapped', gun: g.kind });
-    return {
-      crew: { ...crew, guns, hand: slot, equip: EQUIP, hold },
-      take: false,
-    };
-  }
-  if (gunOffered) return { crew, take: true };
-  if (hold !== crew.hold) return { crew: { ...crew, hold }, take: false };
-  if (!g || g.rounds >= GUNS[g.kind].mag || g.reload > 0 || g.windup > 0)
-    return { crew, take: false };
+function gunTapped(crew: Crew, cue: (c: Omit<Cue, 'at'>) => void): Crew {
+  if (crew.hold.chosen !== 0)
+    return { ...crew, hold: { ...crew.hold, chosen: 0, using: null } };
+  const g = crew.gun;
+  if (g.rounds >= GUNS[g.kind].mag || g.reload > 0 || g.windup > 0) return crew;
   cue({ ship: crew.id, kind: 'reloading', gun: g.kind });
   return {
-    crew: {
-      ...crew,
-      guns: crew.guns.map((k, i) =>
-        i === slot ? { ...g, reload: reloadOf(g, fitOf(crew).reload) } : k
-      ),
-    },
-    take: false,
+    ...crew,
+    gun: { ...g, reload: reloadOf(g.kind, crew.values.reloadFactor) },
   };
 }
 
@@ -90,16 +58,11 @@ export function asked(
     if (!ask || !p || sunk(c.health)) return c;
     let crew = c;
     if (ask.take !== null) takes.set(c.id, ask.take);
-    const arm = ask.arm ?? (ask.tap === 0 ? crew.hand : null);
-    if (arm !== null) {
-      const a = armed(crew, arm, offered(crew, p, flotsam).gun !== null, (k) =>
-        cues.push({ ...k, at: p })
-      );
-      crew = a.crew;
-      if (a.take) takes.set(c.id, 0);
-    } else if (ask.tap !== null) {
+    if (ask.tap === 0)
+      crew = gunTapped(crew, (k) => cues.push({ ...k, at: p }));
+    else if (ask.tap !== null) {
       const o = offered(crew, p, flotsam);
-      if (ask.tap > 0 && ask.tap === crew.hold.chosen && o.item)
+      if (ask.tap > 0 && ask.tap === crew.hold.chosen && o)
         takes.set(c.id, ask.tap);
       else crew = { ...crew, hold: tapped(crew.hold, ask.tap, crew.health) };
     }
@@ -173,7 +136,6 @@ export function spilled(
   const gone = new Set(sunkNow);
   const emptied = (c: Crew): Crew => ({
     ...c,
-    guns: c.guns.map(() => null),
     hold: { ...c.hold, items: c.hold.items.map(() => null), using: null },
   });
   return {

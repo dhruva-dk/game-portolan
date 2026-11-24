@@ -2,7 +2,6 @@ import { along, distance, dot, toward, type Vec3 } from '../world/sphere.ts';
 import { toEdge } from './storm.ts';
 import { logistic, ramp, utility } from './utility.ts';
 import { aggroOf, mate, open, rotate, type Ctx, type Seen } from './captain.ts';
-import { SHIP } from './handling.ts';
 import { ranFromShip } from './logbook.ts';
 import { hidden } from './lookout.ts';
 import { keptInside } from './storming.ts';
@@ -20,8 +19,6 @@ export const MIND = {
   closeFrom: 50,
   closeAt: 35,
   letGo: 90,
-  outrun: [0.75 * SHIP.top, 0.95 * SHIP.top] as const,
-  outran: [0.55 * SHIP.top, 0.75 * SHIP.top] as const,
   run: 120,
   cover: 180,
   rings: 3,
@@ -72,7 +69,7 @@ export function fightUrge(c: Ctx): number {
   if (!foe) return 0;
   const d = c.foeD;
   let will = t.fight * (0.6 + 0.4 * aggroOf(c));
-  const strength = (s: Seen) => (s.hull ?? 100) + (s.shield ?? 0);
+  const strength = (s: Seen) => s.hull + s.shield;
   will += ((0.1 + 0.5 * t.skill) * (strength(own) - strength(foe))) / 100;
   if (m.hitBy === foe.id)
     will +=
@@ -98,14 +95,8 @@ export function fightUrge(c: Ctx): number {
   const from = toward(foe.ship.at, own.ship.at),
     off = from ? -dot(foe.ship.heading, from) : 0;
   const past = ramp(d, c.b.mind.letGo - 10, c.b.mind.letGo + 15);
-  const go = !own.armed
-    ? 1 -
-      past *
-        ramp(
-          off * foe.ship.speed,
-          ...(m.mode === 'fight' ? c.b.mind.outrun : c.b.mind.outran)
-        )
-    : restraint > 0
+  const go =
+    restraint > 0
       ? 1 -
         past *
           (m.mode === 'fight' ? ramp(off, 0, 0.35) : ramp(off, -0.45, -0.15))
@@ -138,7 +129,7 @@ export const holdsFire = (c: Ctx) =>
 const losing = (c: Ctx) =>
   c.foe
     ? utility(
-        ramp(c.own.hull ?? 100, c.t.run + 8, c.t.run - 4),
+        ramp(c.own.hull, c.t.run + 8, c.t.run - 4),
         ramp(c.foeD, 160, 130)
       )
     : 0;

@@ -1,13 +1,13 @@
 import type { World } from '../world/environment.ts';
 import { fixedClock } from '../sim/fixed.ts';
-import { fitOf, inHand, type Crew } from '../sim/battle.ts';
+import type { Crew } from '../sim/battle.ts';
 import { laid, reloadOf, spreadOf, type Gun, type Laying } from '../sim/gun.ts';
 import { charging } from '../sim/gust.ts';
-import { EQUIP, GUN, GUNS, GUST, HEALTH } from '../sim/handling.ts';
+import { GUN, GUNS, GUST, HEALTH } from '../sim/handling.ts';
 import { progress } from '../sim/hold.ts';
 import { offered, rarityOf } from '../sim/loot.ts';
 import { toEdge } from '../sim/storm.ts';
-import { hullCap, sunk } from '../sim/health.ts';
+import { sunk } from '../sim/health.ts';
 import { RIDE } from '../sim/ride.ts';
 import { PLAYER } from '../sim/match.ts';
 import type { Vessel } from '../sim/contact.ts';
@@ -66,7 +66,7 @@ import { answerTo, createShake } from './shake.ts';
 import { createStops, stopFor } from './stops.ts';
 import { createState, debugOf, type Berth } from './state.ts';
 import type { Rig } from '../sim/engine.ts';
-import type { MatchSetup } from '../sim/setup.ts';
+import type { MatchSetup, ShipValues } from '../sim/setup.ts';
 import { watered, type Berthed, type Soundings } from '../sim/waters.ts';
 import type { Livery } from '../world/livery.ts';
 
@@ -79,7 +79,7 @@ const DRAWN = 700,
   RIDES = 320;
 const LONG_AGO = 1e3;
 const reloading = (g: Gun, c: Crew): number | null =>
-  g.reload > 0 ? 1 - g.reload / reloadOf(g, fitOf(c).reload) : null;
+  g.reload > 0 ? 1 - g.reload / reloadOf(g.kind, c.values.reloadFactor) : null;
 const ITEM: Record<Use, Item> = {
   smallShield: 'item.smallShield',
   bigShield: 'item.bigShield',
@@ -87,11 +87,8 @@ const ITEM: Record<Use, Item> = {
   fullRepair: 'item.fullRepair',
 };
 const itemSlot = (n: number) => HOTBAR.guns - 1 + n;
-const tapOf = (tapped: number | null) => ({
-  arm: tapped !== null && tapped < HOTBAR.guns ? tapped : null,
-  tap:
-    tapped !== null && tapped >= HOTBAR.guns ? tapped - HOTBAR.guns + 1 : null,
-});
+const tapOf = (tapped: number | null) =>
+  tapped === null ? null : Math.max(0, tapped - HOTBAR.guns + 1);
 
 interface View {
   watch: number;
@@ -104,7 +101,8 @@ export function createGame(
   world: World,
   anchors: readonly Anchor[],
   soundings: Soundings,
-  start: { at: Vec3; bearing: number }
+  start: { at: Vec3; bearing: number },
+  moored: ShipValues
 ) {
   const ground = world.planet.height,
     depth = (p: Vec3) => -ground(p),
@@ -112,7 +110,11 @@ export function createGame(
   const sea = createSwell(anchors, ground, world.climate.seaWind, {
     shortest: RIDE.shortest,
   });
-  const state = createState(watered(world.planet, soundings, sea.hull), start);
+  const state = createState(
+    watered(world.planet, soundings, sea.hull),
+    start,
+    moored
+  );
   const chase = createChase(ground, sea.at);
   const clock = fixedClock();
   let pulled = false,
@@ -169,8 +171,9 @@ export function createGame(
     heading: start.at,
     facing: start.at,
     arriving: 0,
+    top: moored.topSpeed,
     hull: 0,
-    hullMax: HEALTH.hull,
+    hullMax: moored.hullPoints,
     shield: 0,
     shieldMax: HEALTH.shield,
     gun: null,
@@ -187,11 +190,9 @@ export function createGame(
   };
   const holding: NonNullable<Status['gun']> = {
     kind: 'cannon',
-    rarity: 0,
     rounds: 0,
     ready: 1,
     charge: null,
-    swapping: 0,
     locked: false,
   };
   const aim: NonNullable<Status['reticle']> = {
@@ -209,10 +210,10 @@ export function createGame(
   const gunSlots: GunSlot[] = [],
     itemSlots: Slot[] = [];
   const carried: Kit & {
-    guns: [GunSlot | null, GunSlot | null];
+    guns: [GunSlot | null];
     items: [Slot | null, Slot | null, Slot | null];
   } = {
-    guns: [null, null],
+    guns: [null],
     items: [null, null, null],
     chosen: 0,
     using: null,
@@ -222,24 +223,16 @@ export function createGame(
     blowing: false,
   };
   for (let i = 0; i < HOTBAR.guns; i++)
-    gunSlots.push({
-      kind: 'cannon',
-      rarity: 0,
-      rounds: 0,
-      mag: 0,
-      reload: null,
-    });
+    gunSlots.push({ kind: 'cannon', rounds: 0, mag: 0, reload: null });
   for (let i = 0; i < HOTBAR.items; i++)
     itemSlots.push({ item: ITEM.repairKit });
   const moments: Moment[] = [];
 
   const inHandOf = (g: Gun, c: Crew, locked: boolean) => {
     holding.kind = g.kind;
-    holding.rarity = g.rarity;
     holding.rounds = g.rounds;
     holding.ready = reloading(g, c) ?? 1;
     holding.charge = g.windup > 0 ? 1 - g.windup / GUNS[g.kind].windup : null;
-    holding.swapping = c.equip / EQUIP;
     holding.locked = locked;
     return holding;
   };
@@ -308,12 +301,12 @@ export function createGame(
     blasts: [],
   };
 
-  const aimed = (v: Vessel, gun: Gun): Laying =>
-    laid(v, gun, chase.sight(), state.marks(v.id), {
+  const aimed = (v: Vessel, c: Crew): Laying =>
+    laid(v, c.gun, chase.sight(), state.marks(v.id), {
       seed: 0,
       depth,
       spread: 0,
-      cone: state.assist()[gun.rarity],
+      cone: c.values.assistCone,
       rises,
     });
 
@@ -383,15 +376,13 @@ export function createGame(
           : held
             ? held(v.ship)
             : orders(hands.stick);
-        const { arm, tap } = tapOf(tapped);
         state.step({
           course: helm.course,
           throttle: helm.throttle,
           aim: chase.sight(),
           fire: !!v && pulled,
           gust: gusted,
-          heal: tap,
-          arm,
+          heal: tapOf(tapped),
         });
         [tapped, gusted] = [null, false];
       }
@@ -445,7 +436,7 @@ export function createGame(
           d = (floating[n] ??= {
             id: 0,
             at,
-            kind: 'cannon',
+            kind: 'repairKit',
             rarity: 0,
             born: 0,
           });
@@ -478,18 +469,13 @@ export function createGame(
         h = c.hold,
         slots = carried.guns,
         items = carried.items;
-      for (let i = 0; i < slots.length; i++) {
-        const g = c.guns[i],
-          slot = gunSlots[i];
-        if (g) {
-          slot.kind = g.kind;
-          slot.rarity = g.rarity;
-          slot.rounds = g.rounds;
-          slot.mag = GUNS[g.kind].mag;
-          slot.reload = reloading(g, c);
-        }
-        slots[i] = g ? slot : null;
-      }
+      const g = c.gun,
+        slot = gunSlots[0];
+      slot.kind = g.kind;
+      slot.rounds = g.rounds;
+      slot.mag = GUNS[g.kind].mag;
+      slot.reload = reloading(g, c);
+      slots[0] = slot;
       for (let i = 0; i < items.length; i++) {
         const k = h.items[i],
           slot = itemSlots[i];
@@ -501,13 +487,9 @@ export function createGame(
       }
       const o = v ? offered(c, v.ship.at, state.loot()) : null,
         charge = charging(c.gust);
-      carried.chosen = h.chosen === 0 ? c.hand : itemSlot(h.chosen);
+      carried.chosen = h.chosen === 0 ? 0 : itemSlot(h.chosen);
       carried.using = progress(h);
-      carried.offer = o?.gun
-        ? c.hand
-        : o?.item
-          ? itemSlot(Math.max(1, h.chosen))
-          : null;
+      carried.offer = o ? itemSlot(Math.max(1, h.chosen)) : null;
       carried.gust = c.gust.charges + (charge < 1 ? charge : 0);
       carried.blowing = c.gust.blowing > 0;
       return carried;
@@ -516,13 +498,16 @@ export function createGame(
       const c = state.crew(PLAYER),
         v = state.mine(),
         s = state.storm(between),
-        g = inHand(c),
+        g = c.gun,
         eye = chase.eye();
       screen.width = width;
       screen.height = height;
-      const lay = g && v && steering() ? aimed(v, g) : null;
+      const lay = v && steering() ? aimed(v, c) : null;
       const off =
-          lay && v && g ? distance(v.ship.at, lay.fall) * spreadOf(g) : 0,
+          lay && v
+            ? distance(v.ship.at, lay.fall) *
+              spreadOf(g.kind, c.values.spreadFactor)
+            : 0,
         seen = lay ? far(eye, lay.fall) : 1;
       const radius = Math.round(s.radius * R);
       if (radius !== calm.radius || moved(s.center, calm.center))
@@ -538,9 +523,10 @@ export function createGame(
         arrival === null ? 0 : Math.max(0, 1 - arrival / ARRIVAL.seconds);
       const w = (watched ? state.crew(view.watch) : c) ?? c;
       report.hull = w.health.hull;
-      report.hullMax = hullCap(w.health);
+      report.top = w.values.topSpeed;
+      report.hullMax = w.health.most;
       report.shield = w.health.shield;
-      report.gun = g ? inHandOf(g, c, lay?.target != null) : null;
+      report.gun = inHandOf(g, c, lay?.target != null);
       report.afloat = state.alive().length;
       report.sunk = sunk(c.health);
       report.storm = Number.isFinite(s.secondsToNext) ? s.secondsToNext : 0;

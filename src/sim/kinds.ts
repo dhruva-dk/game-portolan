@@ -23,10 +23,5 @@ export const STORES = [
 ] as const;
 export type Use = (typeof STORES)[number];
 
-export type LootKind = GunKind | Use;
-
-const GUNS: ReadonlySet<LootKind> = new Set(KINDS);
-export const isGun = (k: LootKind): k is GunKind => GUNS.has(k);
-
 const ORDER = perKind((k) => KINDS.indexOf(k));
 export const gunOrder = (k: GunKind): number => ORDER[k];

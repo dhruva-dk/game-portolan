@@ -7,7 +7,7 @@ import { add, put, type Out3, type Vec3 } from '../world/sphere.ts';
 interface Drawing extends ShipDraw {
   pose: PoseOut;
   velocity: Out3;
-  held: { kind: GunKind; rarity: number; aim: Vec3 };
+  held: { kind: GunKind; aim: Vec3 };
 }
 interface Flight extends BallDraw {
   at: Out3;
@@ -31,7 +31,7 @@ export function createDrawing() {
             afloat,
             gun: null,
             wear: 0,
-            held: { kind: 'cannon', rarity: 0, aim: [0, 0, 1] },
+            held: { kind: 'cannon', aim: [0, 0, 1] },
           });
       d.id = id;
       d.look = look;
@@ -41,13 +41,8 @@ export function createDrawing() {
       d.wear = 0;
       return d;
     },
-    armed(
-      d: Drawing,
-      gun: { kind: GunKind; rarity: number },
-      aim: Vec3
-    ): ShipDraw['gun'] {
+    armed(d: Drawing, gun: { kind: GunKind }, aim: Vec3): ShipDraw['gun'] {
       d.held.kind = gun.kind;
-      d.held.rarity = gun.rarity;
       d.held.aim = aim;
       return d.held;
     },

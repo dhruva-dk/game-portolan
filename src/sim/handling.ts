@@ -1,10 +1,7 @@
 import type { GunKind } from './kinds.ts';
 
 export const SHIP = {
-  top: 16,
-  gather: 1.3,
   drag: 0.5,
-  turn: 0.6,
   answer: 4.5,
   bite: 0.55,
   fullBite: 0.32,
@@ -14,21 +11,6 @@ export const SHIP = {
   beam: 6.5,
   rig: 21.5,
 } as const;
-
-export interface Handling {
-  top: number;
-  turn: number;
-  reload: number;
-  gather: number;
-  spread: number;
-}
-export const SPEC: Handling = {
-  top: SHIP.top,
-  turn: SHIP.turn,
-  reload: 1,
-  gather: SHIP.gather,
-  spread: 1,
-};
 
 export const RAM = {
   least: 7.72,
@@ -50,7 +32,7 @@ export const RAM = {
   rearm: 3,
 } as const;
 
-export const HEALTH = { hull: 100, shield: 100, start: 0 } as const;
+export const HEALTH = { shield: 100, start: 0 } as const;
 
 export const HOLDING = { shield: 4.5, full: 0.01 } as const;
 
@@ -177,15 +159,7 @@ export const GUNS: Readonly<Record<GunKind, Bore>> = {
 
 export const FALLOFF = { hold: 0.6, floor: 0.5, edge: 0.6 } as const;
 
-export const EQUIP = 0.22,
-  CARRIED = 2;
-
 export const GUN = {
-  rarities: ['common', 'uncommon', 'rare', 'epic', 'legendary'],
-  damageBy: [1, 1.08, 1.16, 1.24, 1.32],
-  reloadBy: [1, 0.95, 0.9, 0.85, 0.8],
-  spreadBy: [1, 0.867, 0.733, 0.6, 0.467],
-  assist: [0.06, 0.07, 0.08, 0.09, 0.1],
   nearer: 0.5,
   ahead: -1.44,
   up: 2.63,

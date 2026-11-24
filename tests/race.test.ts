@@ -10,7 +10,9 @@ import type { MatchSetup } from '../src/sim/setup.ts';
 import { closedBy } from '../src/sim/storm.ts';
 import { watersAt } from '../src/sim/waters.ts';
 import { landOf, planetOf } from '../src/world/land.ts';
-import { setupOf } from './setups.ts';
+import { KINDS, STORES } from '../src/sim/kinds.ts';
+import type { Loot } from '../src/sim/loot.ts';
+import { setupOf, valuesAt } from './setups.ts';
 
 const planet = planetOf(SEED, landOf(SEED)),
   waters = watersAt(planet);
@@ -82,9 +84,38 @@ test('a race is sailed to its end: one team afloat, every ship placed, the tally
 
 test('the same setup on the same planet gives the same result, hash and all; another match seed another', () => {
   assert.deepEqual(sailed(short()), FIRST);
-  assert.equal(FIRST.hash, '26c886e2');
+  assert.equal(FIRST.hash, 'c4100ba1');
   const other = sailed(short(SEED + 1));
   assert.notEqual(other.hash, FIRST.hash);
+});
+
+test("a ship's gun is its spec's from the first step to the last, and no gun is ever laid as loot", () => {
+  const setup = short(SEED, {
+      values: (ship) => valuesAt(50, KINDS[ship % KINDS.length]),
+    }),
+    m = createMatch(setup, waters),
+    specced = setup.ships.map((s) => s.gun);
+  const stores = (l: Loot) => STORES.some((k) => k === l.goods.kind);
+  let seen = 0,
+    steps = 0;
+  const check = () => {
+    assert.deepEqual(
+      m.view.crews().map((c) => c.gun.kind),
+      specced,
+      `step ${steps}`
+    );
+    const f = m.view.loot();
+    for (const l of f.pieces)
+      if (l.id >= seen) assert.ok(stores(l), `piece ${l.id}`);
+    seen = f.next;
+  };
+  check();
+  while (!m.done) {
+    m.step(STILL);
+    steps++;
+    check();
+  }
+  assert.ok(new Set(specced).size === KINDS.length && steps > 1000);
 });
 
 test("a ship's team is its spec's, and the teams are numbered from 0 with no gaps", () => {

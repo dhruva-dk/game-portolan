@@ -13,6 +13,7 @@ import {
   frameAt,
   fromLatLon,
 } from '../src/world/sphere.ts';
+import { aboard } from './setups.ts';
 
 const center = fromLatLon(0.2, 0.3),
   { north } = frameAt(center);
@@ -36,17 +37,17 @@ test('it picks a place inside the next cap, keeps it, and makes for it when it i
     const sea = { depth: deep, storm: storm(100) };
     let m = mind(seed, at);
     for (let k = 0; k < 7 * 12; k++)
-      m = think(own, [], sea, m, nature(seed)).memory;
+      m = think(aboard(own), [], sea, m, nature(seed)).memory;
     const place = m.place;
     assert.ok(place, `${seed}: no place`);
     assert.ok(distance(place, center) <= 400, `${seed}: outside the cap`);
     for (let k = 0; k < 7 * 12; k++)
-      m = think(own, [], sea, m, nature(seed)).memory;
+      m = think(aboard(own), [], sea, m, nature(seed)).memory;
     assert.deepEqual(m.place, place, `${seed}: moved`);
     assert.equal(m.mode, 'roam');
     const late = { depth: deep, storm: storm(5) };
     for (let k = 0; k < 360; k++)
-      m = think(own, [], late, m, nature(seed)).memory;
+      m = think(aboard(own), [], late, m, nature(seed)).memory;
     assert.equal(m.mode, 'roam', `${seed}: ${m.mode}`);
     assert.ok(distance(m.goal, place) <= 50, `${seed}: not to its place`);
   }

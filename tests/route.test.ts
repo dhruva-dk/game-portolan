@@ -5,7 +5,6 @@ import { mind, think, type Memory } from '../src/sim/bot.ts';
 import { ROAMING } from '../src/sim/roaming.ts';
 import { afloat, stepFleet, type Vessel } from '../src/sim/contact.ts';
 import { STEP } from '../src/sim/fixed.ts';
-import { SHIP } from '../src/sim/handling.ts';
 import {
   ROUTE,
   cellCenter,
@@ -31,6 +30,7 @@ import {
   type Vec3,
 } from '../src/world/sphere.ts';
 import { random } from '../src/world/random.ts';
+import { EVEN_SHIP, aboard } from './setups.ts';
 
 const start = fromLatLon(0.2, 0.3);
 const { east, north } = frameAt(start);
@@ -149,9 +149,21 @@ function voyage(
     least = Infinity;
   for (let n = 1; n <= most / STEP; n++) {
     m = { ...m, goal: mark, since: 0 };
-    const r = think(fleet[0], [], { depth, chart: ch }, m, nature(seed));
+    const r = think(
+      aboard(fleet[0]),
+      [],
+      { depth, chart: ch },
+      m,
+      nature(seed)
+    );
     m = r.memory;
-    fleet = stepFleet(fleet, [r.helm], STEP, depth).fleet;
+    fleet = stepFleet(
+      fleet,
+      [r.helm],
+      STEP,
+      depth,
+      fleet.map(() => EVEN_SHIP)
+    ).fleet;
     least = Math.min(
       least,
       clearance(fleet[0].ship.at, fleet[0].ship.heading, depth).least
@@ -173,7 +185,7 @@ test('a bot reaches a mark behind an island in near the least time, which withou
       arc = rc * (Math.PI - Math.acos(rc / d) - Math.acos(rc / 130));
     const least =
       (tangent + arc + Math.sqrt(130 * 130 - rc * rc) - ROAMING.arrive) /
-      SHIP.top;
+      EVEN_SHIP.topSpeed;
     const routed = voyage(round, roundChart, ship, mark, 3),
       felt = voyage(round, null, ship, mark, 3);
     console.log(
@@ -309,8 +321,8 @@ test('on the real planet: the chart, a route and 16 routed bots, timed', () => {
       const t0 = performance.now();
       const helms = fleet.map((v, i) => {
         const r = think(
-          v,
-          fleet.filter((o) => o.id !== v.id),
+          aboard(v),
+          fleet.filter((o) => o.id !== v.id).map((o) => aboard(o)),
           { depth, chart: ch },
           minds[i],
           nature(v.id + 1)
@@ -319,7 +331,13 @@ test('on the real planet: the chart, a route and 16 routed bots, timed', () => {
         return r.helm;
       });
       const t1 = performance.now();
-      fleet = stepFleet(fleet, helms, STEP, depth).fleet;
+      fleet = stepFleet(
+        fleet,
+        helms,
+        STEP,
+        depth,
+        fleet.map(() => EVEN_SHIP)
+      ).fleet;
       thinking[n] = Math.min(thinking[n], t1 - t0);
       whole[n] = Math.min(whole[n], performance.now() - t0);
     }

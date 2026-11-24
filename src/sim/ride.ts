@@ -61,11 +61,12 @@ function water(at: Vec3, heading: Vec3, sea: Sea, time: number): Water {
   };
 }
 
-const lean = (s: ShipState) =>
-  -RIDE.heel * s.turn * Math.min(1, s.speed / SHIP.top);
+const lean = (s: ShipState, top: number) =>
+  -RIDE.heel * s.turn * Math.min(1, s.speed / top);
 
 export function settled(
   s: ShipState,
+  top: number,
   sea: Sea,
   time: number,
   slot = 0,
@@ -81,7 +82,7 @@ export function settled(
     pitchRate: 0,
     roll: w.roll,
     rollRate: 0,
-    heel: lean(s),
+    heel: lean(s, top),
     water: w,
     read: {
       from: w,
@@ -107,6 +108,7 @@ function ahead(
 export function ride(
   r: Ride,
   s: ShipState,
+  top: number,
   sea: Sea,
   time: number,
   dt: number
@@ -154,7 +156,8 @@ export function ride(
     r.water.roll,
     RIDE.roll
   );
-  const heel = r.heel + (lean(s) - r.heel) * (1 - Math.exp(-RIDE.lean * dt));
+  const heel =
+    r.heel + (lean(s, top) - r.heel) * (1 - Math.exp(-RIDE.lean * dt));
   return {
     heave,
     heaveRate,

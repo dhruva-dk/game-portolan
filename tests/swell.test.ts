@@ -24,6 +24,7 @@ import {
   type Vec3,
 } from '../src/world/sphere.ts';
 import { createWind } from '../src/world/wind.ts';
+import { EVEN_SHIP } from './setups.ts';
 
 const all = anchors(icosphere(FREQUENCY), createWind(3), CASCADES[0]);
 const open = () => -40;
@@ -35,6 +36,7 @@ const places = (n: number) =>
     t: i * 1.37,
   }));
 const DEG = Math.PI / 180;
+const TOP = EVEN_SHIP.topSpeed;
 
 test('the modes kept hold nearly all the long waves', () => {
   for (const [wind, share] of [
@@ -140,12 +142,12 @@ function voyages(sea: Hull, every: number, seconds: number) {
     const p = fromLatLon(Math.asin(2 * ((k * 0.618) % 1) - 1) * 0.9, k * 2.4),
       b = k * 1.1;
     let s: ShipState = { ...shipAt(p, bearingAt(p, b)), speed: 2 + 2.5 * k };
-    let r: Ride = settled(s, sea, 0, k, every);
+    let r: Ride = settled(s, TOP, sea, 0, k, every);
     const out: number[][] = [];
     for (let i = 1; i < seconds / STEP; i++) {
       const on = along(s.at, s.heading, s.speed * STEP);
       s = { ...s, at: on.p, heading: on.t };
-      r = ride(r, s, sea, i * STEP, STEP);
+      r = ride(r, s, TOP, sea, i * STEP, STEP);
       out.push([r.heave, r.pitch, r.roll]);
     }
     return out;
@@ -195,7 +197,7 @@ test('the hull rides the swell: its level follows the water under it, its pitch 
       shortest: RIDE.shortest,
     }).hull;
     const s = shipAt(fromLatLon(0.3, 1.1), frameAt(fromLatLon(0.3, 1.1)).north);
-    let r = settled(s, swell, 0);
+    let r = settled(s, TOP, swell, 0);
     const level: number[] = [],
       miss: number[] = [],
       pitch: number[] = [],
@@ -204,7 +206,7 @@ test('the hull rides the swell: its level follows the water under it, its pitch 
       rolled: number[] = [];
     for (let i = 1; i < 60 / STEP; i++) {
       const t = i * STEP;
-      r = ride(r, s, swell, t, STEP);
+      r = ride(r, s, TOP, swell, t, STEP);
       const { bow, stern, port, starboard } = swell(
         s.at,
         s.heading,

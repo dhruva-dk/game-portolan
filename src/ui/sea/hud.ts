@@ -15,7 +15,6 @@ import {
   GILT,
   INK,
   PAPER,
-  RARITY,
   WASH,
   alpha,
   figure,
@@ -177,11 +176,7 @@ export function createHud(layer: HTMLElement, shores: Shores, act: HudActions) {
       const g = s.gun,
         c = FIRE + 2,
         step = (v: number) => Math.floor(clamp(v) * 48);
-      const loaded = g
-          ? g.swapping > 0
-            ? step(1 - g.swapping)
-            : step(g.ready)
-          : -1,
+      const loaded = g ? step(g.ready) : -1,
         wound = g && g.charge !== null ? step(g.charge) : -1;
       if (changed(fire, g?.kind, g?.rounds, loaded, wound)) {
         fire.innerHTML = svg(
@@ -323,10 +318,9 @@ export function createHud(layer: HTMLElement, shores: Shores, act: HudActions) {
     const reload = k && k.reload !== null ? Math.floor(k.reload * 32) : -1;
     const used = chosen && s.using !== null ? Math.floor(s.using * 32) : reload;
     const name = k ? k.kind : item ? item.item : null,
-      count = k ? k.rounds : item ? item.count : null,
-      rarity = k ? k.rarity : null;
+      count = k ? k.rounds : item ? item.count : null;
     const el = slots[i];
-    if (changed(el, name, count, rarity, chosen, used, offer)) {
+    if (changed(el, name, count, chosen, used, offer)) {
       const bob = offer
         ? `<g><path d="M${SLOT / 2 - 7} -15h14l-7 9z" fill="${WASH.gold}" stroke="${INK.iron}" stroke-width="1"/>` +
           `<animateTransform attributeName="transform" type="translate" values="0 0;0 -4;0 0" dur="0.9s" repeatCount="indefinite"/></g>`
@@ -343,8 +337,7 @@ export function createHud(layer: HTMLElement, shores: Shores, act: HudActions) {
             bob
         );
       } else {
-        const ink = k ? RARITY[k.rarity] : undefined,
-          low = !!k && k.rounds === 0,
+        const low = !!k && k.rounds === 0,
           mine: Glyph = k ? mark(k.kind) : item!.item;
         el.innerHTML = svg(
           SLOT,
@@ -356,15 +349,7 @@ export function createHud(layer: HTMLElement, shores: Shores, act: HudActions) {
             (chosen
               ? `<rect x="2" y="2" width="${SLOT - 4}" height="${SLOT - 4}" fill="none" stroke="${WASH.gold}" stroke-width="${gun ? 2.6 : 1.6}"/>`
               : '') +
-            (ink !== undefined
-              ? `<rect x="9" y="${SLOT - 9}" width="${SLOT - 18}" height="4" fill="${ink}" stroke="${INK.iron}" stroke-width=".6"/>`
-              : '') +
-            glyph(
-              mine,
-              SLOT / 2 - 3,
-              SLOT / 2 - (ink !== undefined ? 3 : 0),
-              31
-            ) +
+            glyph(mine, SLOT / 2 - 3, SLOT / 2, 31) +
             (count != null
               ? figure(SLOT - 4, SLOT / 2 + 12, count, 17, {
                   fill: low ? INK.rubric : INK.iron,
