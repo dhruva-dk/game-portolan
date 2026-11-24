@@ -25,15 +25,12 @@ import { SOUND, type Faults } from '../kinds.ts';
 import type { Race } from '../player.ts';
 import type { RaceCard, RaceResult } from '../race.ts';
 import type { Crew, Shot, Strike } from '../sim/battle.ts';
-import { called } from '../sim/called.ts';
 import type { Mode } from '../sim/captain.ts';
 import { over, teamsOf } from '../sim/carded.ts';
 import type { Vessel } from '../sim/contact.ts';
 import { faultsIn } from '../sim/faults.ts';
 import { sunk } from '../sim/health.ts';
 import type { Sunk } from '../sim/match.ts';
-import type { Nature } from '../sim/persona.ts';
-import type { Ask } from '../sim/stores.ts';
 import { createStandings } from './standings.ts';
 
 /**
@@ -116,8 +113,6 @@ export function createTally(card: RaceCard, closes: number) {
   /** Each ship's faults as last watched. */
   const levels: Faults[] = [];
   const forfeit = card.ships.filter((s) => s.forfeit).map((s) => s.id);
-  /** The call each ship's team sails under, by her id. */
-  const calls = card.ships.map((s) => s.call);
   const standings = createStandings(card);
   let made: RaceResult | null = null;
 
@@ -209,30 +204,9 @@ export function createTally(card: RaceCard, closes: number) {
       sea: { mode(id: number): Mode | undefined }
     ): Race =>
       standings(id, s, {
-        call: calls[id],
         order: () => finishing(s.alive, s.sunk, s.share, forfeit),
         mode: sea.mode,
       }),
-    /**
-     * A step's asks of the race (sim/stores.ts Ask), done once the sea is
-     * held: a team's call changed by a ship of it, every bot of that team
-     * (`aboard`, by id) sailing under it from now (sim/called.ts).
-     */
-    tend(
-      asks: ReadonlyMap<number, Ask>,
-      sea: { aboard: ReadonlyMap<number, { nature: Nature }> }
-    ) {
-      for (const [id, { call }] of asks) {
-        if (!call) continue;
-        for (const s of card.ships) {
-          if (s.team !== teams[id]) continue;
-          calls[s.id] = call;
-          const a = sea.aboard.get(s.id);
-          if (a)
-            a.nature = { ...a.nature, brain: called(a.nature.brain, call) };
-        }
-      }
-    },
     /**
      * A step of the race tallied: what its guns and rams did (`shots`,
      * `strikes`) and how it left the sea (`standing`, asked for once the

@@ -404,15 +404,9 @@ export function createState(
     aboard.set(id, {
       look,
       mind: bot ? mind(driver?.seed ?? seedOf(id), ship.at) : null,
-      // (a card's driver is her own bot, under her team's call; else the bot
-      // her berth's seed deals)
+      // (a card's driver is her own bot; else the bot her berth's seed deals)
       nature: driver
-        ? natureOf(
-            driver,
-            closedBy(match.type.rules.storm),
-            brainOf(id),
-            carded?.call
-          )
+        ? natureOf(driver, closedBy(match.type.rules.storm), brainOf(id))
         : nature(seedOf(id), brainOf(id), match.type.mix),
       steady: lashed ?? AMIDSHIPS,
       ride: r,
@@ -757,7 +751,6 @@ export function createState(
       lap?.('fight');
       tick++;
       const did = hold(storm);
-      tally?.tend(told.asks, { aboard });
       lap?.('hold');
       rideOn(met, wants.blew);
       lap?.('ride');

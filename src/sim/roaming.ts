@@ -2,8 +2,7 @@
 // mark every `roam` s or within `arrive` m of the last, `near`–`far` m off a
 // random way, drawn in toward the storm's middle as its cap shrinks; or, once
 // it is time, to her place for the phase and about it (placing.ts). A shy one
-// roams clear of guns she hears (PLAN layer 4). Under her team's call to form
-// (called.ts) she roams about the first ship of her team instead.
+// roams clear of guns she hears (PLAN layer 4).
 //
 // Pure arithmetic: no three, so it runs in node for the tests; deterministic
 // for the same inputs, to the bit.
@@ -18,7 +17,7 @@ import {
   type Vec3,
 } from '../world/sphere.ts';
 import { toEdge } from './storm.ts';
-import { between, mate, open, rotate, type Ctx, type Seen } from './captain.ts';
+import { between, open, rotate, type Ctx } from './captain.ts';
 import { deepest } from './helmsman.ts';
 import { placeNow } from './placing.ts';
 import { inward, late, reach } from './storming.ts';
@@ -42,24 +41,7 @@ export const ROAMING = {
    * them no heed; a turtle's and a homesteader's: persona.ts).
    */
   shy: 0,
-  /**
-   * Under her team's call to form (called.ts; 0: she roams as she will): she
-   * roams about the first ship of her team afloat, within `home` m of her.
-   */
-  lead: 0,
 } as const;
-
-/**
- * Where the ship she forms on lies: the first of her team afloat, if that is
- * not she; null with none, or under no call to form.
- */
-function leadOf(c: Ctx): Vec3 | null {
-  if (c.b.roaming.lead <= 0) return null;
-  let first: Seen | null = null;
-  for (const o of c.others)
-    if (mate(c, o) && o.id < (first ?? c.own).id) first = o;
-  return first ? first.ship.at : null;
-}
 
 /** Whether q lies within her `shy` m of guns she hears. */
 function loud(c: Ctx, q: Vec3): boolean {
@@ -82,10 +64,8 @@ export function roamGoal(c: Ctx): Vec3 {
     s = c.sea.storm,
     margin = c.t.margin;
   const keep = s && (late(c) ? s.next : s);
-  // the ship she forms on, while that one keeps inside the storm; else her
-  // place for the phase, once it is time (placing.ts): there, and about it
-  const lead = leadOf(c),
-    home = lead && (!keep || toEdge(lead, keep) > margin) ? lead : placeNow(c);
+  // her place for the phase, once it is time (placing.ts): there, and about it
+  const home = placeNow(c);
   if (home && distance(p, home) > c.b.roaming.home) return home;
   for (let tries = 0; tries < 8; tries++) {
     let q = home

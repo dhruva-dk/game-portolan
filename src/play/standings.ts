@@ -1,4 +1,4 @@
-// A race sailed by a card as its HUD reads it (player.ts Race): for one ship of it, her team's call, her teammates, the standings
+// A race sailed by a card as its HUD reads it (player.ts Race): for one ship of it, her teammates, the standings
 // of every ship. Plain data made of the sea as a step left it
 // (result.ts Standing), once a step however often it is asked for: one object,
 // refilled, its rows too.
@@ -8,7 +8,7 @@
 // result gives her if nothing more happens.
 
 import type { Doing, Mate, Placed, Race } from '../player.ts';
-import type { Call, RaceCard } from '../race.ts';
+import type { RaceCard } from '../race.ts';
 import type { Crew } from '../sim/battle.ts';
 import type { Mode } from '../sim/captain.ts';
 import { HEALTH } from '../sim/handling.ts';
@@ -25,13 +25,11 @@ interface Sea {
 }
 
 /**
- * The ship they are read for, as the step left her: her team's call, the
- * finishing order as it stands (asked for only when the standings are made
+ * The ship they are read for, as the step left her: the finishing order as it stands (asked for only when the standings are made
  * anew), and what a ship's bot is about (none: no bot sails her, or she is
  * sunk).
  */
 interface Seat {
-  call: Call;
   order(): readonly number[];
   mode(id: number): Mode | undefined;
 }
@@ -59,14 +57,7 @@ export function createStandings(card: RaceCard) {
   }));
   const tower: Placed[] = [],
     mates: Mate[] = [];
-  const race: Race = {
-    team: 0,
-    call: 'free',
-    place: 0,
-    of: card.ships.length,
-    mates,
-    tower,
-  };
+  const race: Race = { team: 0, place: 0, of: card.ships.length, mates, tower };
   /** The step and the ship the standings were last made for. */
   let made = -1,
     seat = -1;
@@ -76,7 +67,6 @@ export function createStandings(card: RaceCard) {
    * `at`).
    */
   return (id: number, sea: Sea, at: Seat): Race => {
-    race.call = at.call;
     if (sea.seconds === made && id === seat) return race;
     [made, seat] = [sea.seconds, id];
     const crews = new Map(sea.crews.map((c) => [c.id, c]));

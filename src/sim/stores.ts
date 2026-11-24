@@ -19,7 +19,6 @@
 // Pure arithmetic: no three, so it runs in node for the tests; deterministic
 // for the same inputs.
 
-import type { Call } from '../race.ts';
 import type { Crew, Cue } from './battle.ts';
 import type { Vessel } from './contact.ts';
 import { fitOf, rose } from './faults.ts';
@@ -44,15 +43,13 @@ import type { Depth } from './shoal.ts';
  * What a ship asks of her stores this step: an item slot tapped (1–3; 0 the
  * guns back in hand; null none), a gun slot tapped (0 or 1; null none), whether
  * to spend a gust, and a swap asked for outright (a bot's: the slot to swap
- * into, 0 the gun in hand; null none). In a race sailed by a card, besides: her
- * team's call changed (called.ts; her hands alone ask it).
+ * into, 0 the gun in hand; null none).
  */
 export interface Ask {
   tap: number | null;
   arm: number | null;
   gust: boolean;
   take: number | null;
-  call?: Call;
 }
 
 /** A ship's mending done this step: whose, and what she mended with. */

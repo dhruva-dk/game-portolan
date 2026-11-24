@@ -87,8 +87,7 @@
 // A race. ?race starts a race sailed by a card (play/race.ts: a field of spec
 // ships in teams of four, ?race=n teams of them, 20 by default), her hands on
 // ship 0 and the eye coming down from space as PLAY's does, so the race's HUD
-// has its data (player.ts Status.race); ?call=name,seconds changes her team's
-// call so many seconds into the frames drawn (free, attack, hold, form). The race as its HUD reads it is
+// has its data (player.ts Status.race). The race as its HUD reads it is
 // set on the page each second drawn, for the tools (the body's data-race, as
 // JSON).
 //
@@ -120,7 +119,7 @@ import type { Referee } from './play/referee.ts';
 import { dealt, lookOf, worn } from './play/colours.ts';
 import type { Matches } from './play/setup.ts';
 import type { Berth } from './play/state.ts';
-import { CALLS, HOTBAR, IDLE, type Hands, type Livery } from './player.ts';
+import { HOTBAR, IDLE, type Hands, type Livery } from './player.ts';
 import { probeMeshes } from './probe.ts';
 import { STEP } from './sim/fixed.ts';
 import { KINDS, SOUND, type Fault, type GunKind } from './kinds.ts';
@@ -344,8 +343,6 @@ export async function scenario(
   const [slot, use] = (params.get('use') ?? '').split(',').map(Number),
     tap = params.get('tap')?.split(',').map(Number);
   const [fireAt, held] = (params.get('fire') ?? '').split(',').map(Number);
-  const [named, callAt] = (params.get('call') ?? '').split(','),
-    call = CALLS.find((c) => c === named);
   const timed: { at: number; hands: Partial<Hands> }[] = [
     ...(slot > 0
       ? [
@@ -358,7 +355,6 @@ export async function scenario(
       ? [{ at: number('gust', 0), hands: { gust: true } }]
       : []),
     ...(params.get('fire') ? [{ at: fireAt || 0, hands: { fire: true } }] : []),
-    ...(call ? [{ at: Number(callAt) || 0, hands: { call } }] : []),
     ...(swing
       ? [
           {
