@@ -18,8 +18,8 @@ import {
   type Survey,
 } from './anchorage.ts';
 
-/** How far over a building's head its label is hung, metres. */
-const OVERHEAD = 3;
+/** How far over a building's head its label is hung, metres: none, so near to, the label stays on its roof. */
+const OVERHEAD = 0;
 /** Along the shore, the metres between the points a building's scale on the screen is measured across. */
 const ACROSS = 10;
 

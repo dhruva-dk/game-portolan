@@ -345,11 +345,12 @@ export function anchorageEye(
 
 /**
  * The camera over the harbour: out over the water before it, `back` metres
- * from a point `height` metres over its ground and `sea` metres toward the sea
- * from its middle (the jetty runs out that way), looking down on it at `pitch`
+ * from a point `height` metres over its ground, looking down on it at `pitch`
  * radians, square to the shore.
  */
-const OVERLOOK = { back: 96, pitch: 0.8, height: 6, sea: 9 } as const;
+const OVERLOOK = { back: 270, pitch: 0.65, height: 2 } as const;
+/** The camera over the harbour's field of view, degrees: narrow, so the campus reads near square-on, as a plan drawn in depth. */
+const HARBOUR_FOV = 24;
 
 /**
  * Where the camera over the harbour looks: `x` along the shore and `z` toward
@@ -367,15 +368,15 @@ export interface Survey {
  * how far back it stands on a building chosen (`near`).
  */
 export const PAN = {
-  x: [-40, 40],
-  z: [-36, 24],
-  home: { x: -20, z: 10, back: OVERLOOK.back },
-  near: 60,
+  x: [-45, 45],
+  z: [-45, 32],
+  home: { x: 0, z: -20, back: OVERLOOK.back },
+  near: 120,
 } as const;
 /** The survey on a building standing at (x, z) on the harbour's chart: it in the middle, from near. */
 export const onPlot = (x: number, z: number): Survey => ({
   x,
-  z: z - OVERLOOK.sea,
+  z,
   back: PAN.near,
 });
 /** The survey of the whole campus from where `s` looks: from as far back as at first. */
@@ -395,7 +396,7 @@ export function panned(
   size: number
 ): Survey {
   const k =
-    (2 * s.back * Math.tan((AIR_FOV * Math.PI) / 360)) /
+    (2 * s.back * Math.tan((HARBOUR_FOV * Math.PI) / 360)) /
     VIEWPORT.height /
     Math.max(0.1, size);
   s.x = clamp(s.x - look.x * k, PAN.x[0], PAN.x[1]);
@@ -424,21 +425,20 @@ export function harbourEye(
 ): Eye {
   const { pitch } = OVERLOOK,
     { x, z, back } = survey,
-    sea = OVERLOOK.sea + z,
     over = h.ground + OVERLOOK.height;
   const position = place(
-    fromChart(h.chart, x, sea + back * Math.cos(pitch)),
+    fromChart(h.chart, x, z + back * Math.cos(pitch)),
     over + back * Math.sin(pitch),
     out.position
   );
   lookAt(
     position,
-    place(fromChart(h.chart, x, sea), over, at),
+    place(fromChart(h.chart, x, z), over, at),
     normalize(position, way),
     out.orientation
   );
   out.kind = 'air';
-  out.fov = AIR_FOV;
+  out.fov = HARBOUR_FOV;
   return out;
 }
 

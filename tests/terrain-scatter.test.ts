@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { terrainPlanet } from '../src/world/planet-terrain.ts';
+import { planetOf } from '../src/world/land.ts';
 import { distance, fromChart } from '../src/world/sphere.ts';
 import { between, locate, taps } from '../src/world/terrain-grid.ts';
 import { createTerrain } from '../src/world/terrain.ts';
@@ -13,7 +13,7 @@ import {
 
 const SHAPES = { shrubs: 4, big: 3, boulders: 3 };
 const terrain = createTerrain(3);
-const planet = terrainPlanet(terrain, 3);
+const planet = planetOf(3, terrain);
 const tiles = scatterTerrain(terrain, planet, 3, SHAPES);
 const at = taps();
 const shoreAt = (t: Tile, x: number, z: number) => {

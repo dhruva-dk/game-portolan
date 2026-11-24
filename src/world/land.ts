@@ -5,6 +5,7 @@
 //
 // Pure arithmetic: no three, so it runs in node for the tests.
 
+import { levelled } from './harbour-site.ts';
 import type { Planet } from './planet.ts';
 import { terrainPlanet } from './planet-terrain.ts';
 import { createTerrain, type Terrain } from './terrain.ts';
@@ -14,6 +15,6 @@ export type Land = Terrain;
 /** The land of a planet of this seed. */
 export const landOf = (seed: number): Land => createTerrain(seed);
 
-/** The planet of this seed on its land. */
+/** The planet of this seed on its land, its harbour cut into it (harbour-site.ts). */
 export const planetOf = (seed: number, land: Land): Planet =>
-  terrainPlanet(land, seed);
+  levelled(terrainPlanet(land, seed));

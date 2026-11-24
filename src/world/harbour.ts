@@ -35,33 +35,45 @@ export const eachPlot = <T>(of: (id: Plot) => T): Record<Plot, T> => ({
 });
 
 /**
+ * The campus's site on the harbour's chart, metres: one level terrace from `x`
+ * to `x` along the shore and `z` inland to `z` at its quay on the sea; the
+ * roads across it (each [x0, x1, z0, z1]): two avenues from the gates at its
+ * back to the quay, and two streets between the rows.
+ */
+export const SITE = {
+  x: [-60, 60],
+  z: [-52, 40],
+  roads: [
+    [-21, -15, -52, 40],
+    [15, 21, -52, 40],
+    [-60, 60, 10, 15],
+    [-60, 60, -21, -16],
+  ],
+} as const;
+
+/**
  * The plots' places on the harbour's chart, metres: x along the shore (to the
  * right as seen from her berth), z toward the sea; and how tall what is built
  * on each stands over its foot (land/harbour.ts builds it; a label is hung
- * over its head). Three rows: on the water's edge what is launched or landed
- * there, behind them what is worked at, and at the back what stands tall.
+ * over its head). Three rows between the avenues and the streets: on the quay
+ * what is launched or landed there, behind them what is worked at, and at the
+ * back what stands tall.
  */
 export const PLACES: Readonly<
   Record<Plot, readonly [x: number, z: number, tall: number]>
 > = {
-  factory: [-33, 28, 12],
-  hospitality: [1, 31, 5],
-  pitCentre: [33, 28, 7],
-  commercialCentre: [-36, -2, 6],
-  towingTank: [-3, 0, 5.2],
-  simulator: [32, -3, 9],
-  compositesPlant: [-31, -31, 17.5],
-  designCentre: [2, -33, 15],
-  scoutingCentre: [33, -31, 21],
+  factory: [-38, 28, 12],
+  hospitality: [0, 28, 5],
+  pitCentre: [38, 28, 7],
+  commercialCentre: [-38, -3, 6],
+  towingTank: [0, -3, 5.2],
+  simulator: [38, -3, 9],
+  compositesPlant: [-38, -35, 10],
+  designCentre: [0, -35, 15],
+  scoutingCentre: [38, -35, 21],
 };
-/** The three on the water's edge: what is launched or landed there. */
-export const WATERSIDE: readonly Plot[] = [
-  'factory',
-  'hospitality',
-  'pitCentre',
-];
 /** How far toward the sea from its plot's middle the landing's jetty runs, metres. */
-export const JETTY = 18;
+export const JETTY = 26;
 
 /**
  * A plot as it stands: where on the harbour's chart, its foot's height over the
@@ -77,22 +89,23 @@ interface Stand {
 export interface Harbour {
   /** The chart it is laid on: about its middle, x along the shore, z toward the sea (PLACES). */
   chart: Chart;
-  /** Its middle's ground, metres over the sea (at least the feet's). */
+  /** The terrace's height over the sea, metres: every building's foot. */
   ground: number;
   plots: Readonly<Record<Plot, Stand>>;
   /** How well it stands, as its site was chosen by (harbour-site.ts): the most there. */
   sound: number;
 }
 
-/** Nothing grows or lies within this of a plot's middle, metres. */
-const CLEARED = 13;
+/** Nothing grows or lies within this of the terrace (its bank, harbour-site.ts), metres. */
+const CLEARED = 12;
 
-/** Whether the point p (a unit vector) is built on: within a plot's clearing. */
+/** Whether the point p (a unit vector) is built on: on the terrace, or within CLEARED of it. */
 export function builtOn(h: Harbour, p: Vec3): boolean {
   const [x, z] = toChart(h.chart, p);
-  for (const id of PLOTS) {
-    const s = h.plots[id];
-    if (Math.hypot(x - s.x, z - s.z) < CLEARED) return true;
-  }
-  return false;
+  return (
+    x > SITE.x[0] - CLEARED &&
+    x < SITE.x[1] + CLEARED &&
+    z > SITE.z[0] - CLEARED &&
+    z < SITE.z[1] + CLEARED
+  );
 }

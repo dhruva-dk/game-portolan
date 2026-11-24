@@ -17,7 +17,7 @@
 
 import { CELLS, N, centreOf } from './cells.ts';
 import { createNoise3 } from './noise3.ts';
-import { START, type Cover, type Planet, type Rise } from './planet.ts';
+import { START, type Cover, type Ground, type Rise } from './planet.ts';
 import { clamp, smoothstep } from './scalar.ts';
 import {
   R,
@@ -149,7 +149,7 @@ function heartOf(t: Terrain, from: Vec3): Vec3 {
   return centreOf(best);
 }
 
-export function terrainPlanet(t: Terrain, seed: number): Planet {
+export function terrainPlanet(t: Terrain, seed: number): Ground {
   const noise = createNoise3(seed + 104729),
     at = taps();
   const o = t.options;

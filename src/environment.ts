@@ -6,7 +6,6 @@
 // by the frame alone each frame and read by every system that draws.
 
 import { coastLines } from './world/coastline.ts';
-import { harbourOf } from './world/harbour-site.ts';
 import type { Harbour } from './world/harbour.ts';
 import { landOf, planetOf, type Land } from './world/land.ts';
 import { duneHeight } from './world/planet-terrain.ts';
@@ -76,7 +75,7 @@ export function createWorld(
     seed,
     land,
     planet,
-    harbour: harbourOf(planet),
+    harbour: planet.harbour,
     coasts: coastLines(land.shore),
     dunes: duneHeight(land.stats.summit),
     wind: createWind(seed),

@@ -32,8 +32,9 @@ const CSS = `
   /* set on each by the office as it is drawn (office.ts plots): its foot's drop under the pin, a metre across it */
   --drop: 0; --metre: 0; }
 .hq-pin > .cr-plate { position: absolute; bottom: var(--s2); left: 0; translate: -50% 0; white-space: nowrap;
-  display: flex; flex-direction: column; align-items: center; gap: var(--s1); padding: var(--s1) var(--s3);
-  font: 600 var(--t-label)/1.1 var(--face); }
+  display: flex; align-items: center; gap: var(--s2); padding: var(--s1) var(--s2);
+  font: 600 var(--t-label)/1.1 var(--face); letter-spacing: .04em; text-transform: none; }
+.hq-pin > .cr-plate .hq-lv > i { width: var(--s2); height: var(--s2); }
 .hq-pin.chosen > .cr-plate { background: var(--gilt); color: var(--ink); }
 .hq-hit { position: absolute; top: 0; left: calc(var(--metre) * -11); width: calc(var(--metre) * 22);
   height: var(--drop); }
@@ -90,17 +91,18 @@ export function createHq(office: Office): Screen<HqPaper> {
     office.draw();
   };
 
-  /** A building's nameplate and levels, pinned over its head, its hit running down to its foot (data-plot). */
-  const pin = (b: Works) => {
-    const made = el(
-      'div',
-      `hq-pin${b.id === chosen ? ' chosen' : ''}`,
-      pressed(el('div', 'hq-hit'), choose(b.id)),
-      pressed(plate(el('span', '', b.name), levels(b)), choose(b.id))
-    );
-    made.dataset.plot = b.id;
-    return made;
+  /** Pinned over a building's head (data-plot): `made` in it. */
+  const pinned = (b: Works, made: HTMLElement) => {
+    const at = el('div', `hq-pin${b.id === chosen ? ' chosen' : ''}`, made);
+    at.dataset.plot = b.id;
+    return at;
   };
+  /** A building's hit, from its head down to its foot. */
+  const hit = (b: Works) =>
+    pinned(b, pressed(el('div', 'hq-hit'), choose(b.id)));
+  /** A building's nameplate and levels. */
+  const pin = (b: Works) =>
+    pinned(b, pressed(plate(el('span', '', b.name), levels(b)), choose(b.id)));
 
   /** The campus through its window. */
   const campus = (v: HqPaper) => {
@@ -108,6 +110,8 @@ export function createHq(office: Office): Screen<HqPaper> {
       'div',
       'cr-window o-window',
       el('div', 'o-subject'),
+      // every plate over every hit (each pin is a layer of its own)
+      ...v.buildings.map(hit),
       ...v.buildings.map(pin)
     );
     pane.dataset.scene = 'harbour';
