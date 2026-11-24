@@ -6,7 +6,7 @@
 // every option herself and takes the one that scores best. Under form, besides,
 // when she roams she roams about the first ship of her team afloat
 // (roaming.ts), looking to her mark again every few seconds as that ship sails
-// on. Her pit stops are her own: no call weighs them.
+// on.
 //
 // Free is her brain as it is, to the bit. A called brain is made once for each
 // brain and call, and kept, so every bot of one persona under one call shares
@@ -46,7 +46,6 @@ const weighed = (
   hunt: c.hunt * (by.hunt ?? 1),
   loot: c.loot * (by.loot ?? 1),
   claim: c.claim * (by.claim ?? 1),
-  pit: c.pit * (by.pit ?? 1),
   roam: c.roam * (by.roam ?? 1),
 });
 

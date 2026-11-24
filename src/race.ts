@@ -66,16 +66,6 @@ export interface Fitted {
   reliability: number;
 }
 
-/**
- * A team's pit crew, as the sim reads them: `pace` times the spec time of
- * every job (1 is spec; less is quicker), and the chance a job slips (0…1),
- * which adds a delay and harms nothing.
- */
-export interface PitCrew {
-  pace: number;
-  slip: number;
-}
-
 /** The order a team sails under: each biases her bots' own choosing. */
 export const CALLS = ['free', 'attack', 'hold', 'form'] as const;
 export type Call = (typeof CALLS)[number];
@@ -97,7 +87,6 @@ export interface RaceShip {
   colours: Colours;
   parts: Readonly<Record<PartType, Fitted>>;
   driver: Driver | null;
-  pit: PitCrew;
   call: Call;
   forfeit: boolean;
 }
@@ -155,13 +144,6 @@ export interface RaceResult {
     zone: number;
     level: number;
     second: number;
-  }[];
-  pits: readonly {
-    id: number;
-    second: number;
-    seconds: number;
-    jobs: number;
-    slips: number;
   }[];
   hits: readonly {
     id: number;

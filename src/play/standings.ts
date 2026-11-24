@@ -1,5 +1,5 @@
 // A race sailed by a card as its HUD reads it (player.ts Race): for one ship of it, her team's call, her teammates, the standings
-// of every ship, and her pit. Plain data made of the sea as a step left it
+// of every ship. Plain data made of the sea as a step left it
 // (result.ts Standing), once a step however often it is asked for: one object,
 // refilled, its rows too.
 //
@@ -7,14 +7,12 @@
 // now (result.ts finishing), so a ship's place on the HUD is the place the
 // result gives her if nothing more happens.
 
-import { JOBS } from '../kinds.ts';
 import type { Doing, Mate, Placed, Race } from '../player.ts';
 import type { Call, RaceCard } from '../race.ts';
 import type { Crew } from '../sim/battle.ts';
 import type { Mode } from '../sim/captain.ts';
 import { HEALTH } from '../sim/handling.ts';
 import { hullCap, sunk } from '../sim/health.ts';
-import { jobTime } from '../sim/pit.ts';
 
 /**
  * The sea as the standings read it: its clock, every crew, and the sinkings so
@@ -29,13 +27,12 @@ interface Sea {
 /**
  * The ship they are read for, as the step left her: her team's call, the
  * finishing order as it stands (asked for only when the standings are made
- * anew), whether she lies in her team's water, and what a ship's bot is about
- * (none: no bot sails her, or she is sunk).
+ * anew), and what a ship's bot is about (none: no bot sails her, or she is
+ * sunk).
  */
 interface Seat {
   call: Call;
   order(): readonly number[];
-  home: boolean;
   mode(id: number): Mode | undefined;
 }
 
@@ -49,7 +46,6 @@ const DOING: Record<Mode, Doing> = {
   hunt: 'fighting',
   flee: 'fleeing',
   storm: 'storm',
-  pit: 'pit',
 };
 
 /** The standings of the race dealt `card`, for a ship of it. */
@@ -62,8 +58,7 @@ export function createStandings(card: RaceCard) {
     sinkings: 0,
   }));
   const tower: Placed[] = [],
-    mates: Mate[] = [],
-    costs: number[] = JOBS.map(() => 0);
+    mates: Mate[] = [];
   const race: Race = {
     team: 0,
     call: 'free',
@@ -71,7 +66,6 @@ export function createStandings(card: RaceCard) {
     of: card.ships.length,
     mates,
     tower,
-    pit: { open: false, costs, stop: null },
   };
   /** The step and the ship the standings were last made for. */
   let made = -1,
@@ -116,38 +110,10 @@ export function createStandings(card: RaceCard) {
       m.hull = c?.health.hull ?? 0;
       m.hullMax = c ? hullCap(c.health) : HEALTH.hull;
       m.shield = c?.health.shield ?? 0;
-      m.doing = !rows[s.id].afloat
-        ? 'sunk'
-        : c?.pit
-          ? 'pit'
-          : DOING[at.mode(s.id) ?? 'roam'];
+      m.doing = !rows[s.id].afloat ? 'sunk' : DOING[at.mode(s.id) ?? 'roam'];
       m.place = rows[s.id].place;
     }
     mates.length = n;
-    const own = crews.get(id),
-      pace = card.ships[id].pit.pace,
-      stop = own?.pit ?? null;
-    JOBS.forEach((job, i) => {
-      costs[i] = own && rows[id].afloat ? jobTime(own, job, pace) : 0;
-    });
-    race.pit.open = rows[id].afloat && at.home && !stop;
-    race.pit.stop =
-      own && stop
-        ? {
-            jobs: stop.jobs,
-            at: stop.at,
-            done: stop.done,
-            slips: stop.slips,
-            // (the job in hand, begun or about to be, and those after it)
-            left: stop.jobs.reduce(
-              (t, job, i) =>
-                i < stop.at || (i === stop.at && stop.left > 0)
-                  ? t
-                  : t + jobTime(own, job, pace),
-              Math.max(0, stop.left)
-            ),
-          }
-        : null;
     return race;
   };
 }

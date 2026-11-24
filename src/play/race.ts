@@ -43,7 +43,7 @@ import { createState, type Match, type Waters } from './state.ts';
 /**
  * The spec ship and the spec championship: what specField deals every ship
  * and its card. A part of performance 1 and reliability 0.5, a driver of 10 in
- * every stat, a pit crew at pace 1 that slips one job in ten, the call free;
+ * every stat, the call free;
  * the storm at today's pace, no gun banned, every part spec.
  */
 const PART: Fitted = { performance: 1, reliability: 0.5 };
@@ -67,7 +67,6 @@ const SPEC = {
     feedback: 10,
     lookout: 10,
   },
-  pit: { pace: 1, slip: 0.1 },
   call: 'free',
   rules: {
     storm: 1,
@@ -179,7 +178,6 @@ export function specField(
         hands && id === 0
           ? null
           : { seed: own, persona: nature(own).persona, stats: SPEC.stats },
-      pit: SPEC.pit,
       call: SPEC.call,
       forfeit: false,
     };

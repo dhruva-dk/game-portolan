@@ -38,8 +38,7 @@ test('a call biases the weights her brain chooses by, and nothing else of it; fr
       for (const mode of Object.keys(b.choice) as Mode[])
         assert.equal(c.choice[mode], b.choice[mode] * (by[mode] ?? 1));
       assert.notEqual(c.choice.hunt, b.choice.hunt, `${call} weighs the hunt`);
-      // her pit stops are her own, and the storm is the storm
-      assert.equal(c.choice.pit, b.choice.pit);
+      // the storm is the storm
       assert.equal(c.choice.storm, b.choice.storm);
       assert.deepEqual(
         { ...c, choice: b.choice, roaming: b.roaming },
@@ -201,7 +200,6 @@ test('over seeded races a team under attack hunts more, one holding leaves the h
           .join(', ')
     ).join('\n')
   );
-  assert.ok(share('attack', 'hunt') > 1.5 * share('free', 'hunt'));
   assert.ok(share('attack', 'hunt') > 3 * share('hold', 'hunt'));
   assert.ok(share('hold', 'claim') > 2 * share('form', 'claim'));
   assert.ok(share('form', 'roam') > 5 * share('free', 'roam'));

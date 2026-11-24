@@ -11,7 +11,7 @@
 // pressed (gust), with a finger or a click. What they mean is the game's
 // business (play/game.ts step); this only reports them.
 
-import type { Call, Hands, Job } from '../player.ts';
+import type { Call, Hands } from '../player.ts';
 import { clamp } from '../world/scalar.ts';
 import { view } from './ui.ts';
 
@@ -57,7 +57,6 @@ export function createInput(element: HTMLElement, steers: () => boolean) {
     holding = false,
     tapped: number | null = null,
     gusted = false,
-    pitted: readonly Job[] | undefined,
     called: Call | undefined;
 
   element.addEventListener('pointerdown', (e) => {
@@ -135,14 +134,9 @@ export function createInput(element: HTMLElement, steers: () => boolean) {
       fired = gusted = false;
       tapped = null;
       const hands: Hands = { stick, look, fire, tap, gust };
-      if (pitted !== undefined) hands.pit = pitted;
       if (called !== undefined) hands.call = called;
-      pitted = called = undefined;
+      called = undefined;
       return hands;
-    },
-    /** A pit stop asked for these jobs (none: the stop called off), read once. */
-    pit(jobs: readonly Job[]) {
-      pitted = jobs;
     },
     /** Her team's call changed, read once. */
     call(c: Call) {

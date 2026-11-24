@@ -30,11 +30,9 @@ import type { Mode } from '../sim/captain.ts';
 import { over, teamsOf } from '../sim/carded.ts';
 import type { Vessel } from '../sim/contact.ts';
 import { faultsIn } from '../sim/faults.ts';
-import { STEP } from '../sim/fixed.ts';
 import { sunk } from '../sim/health.ts';
 import type { Sunk } from '../sim/match.ts';
 import type { Nature } from '../sim/persona.ts';
-import { pitted } from '../sim/pit.ts';
 import type { Ask } from '../sim/stores.ts';
 import { createStandings } from './standings.ts';
 
@@ -114,8 +112,7 @@ export function createTally(card: RaceCard, closes: number) {
     taken = zeros(),
     dealt = zeros(),
     held = zeros();
-  const faults: RaceResult['faults'][number][] = [],
-    pits: RaceResult['pits'][number][] = [];
+  const faults: RaceResult['faults'][number][] = [];
   /** Each ship's faults as last watched. */
   const levels: Faults[] = [];
   const forfeit = card.ships.filter((s) => s.forfeit).map((s) => s.id);
@@ -181,7 +178,6 @@ export function createTally(card: RaceCard, closes: number) {
       ],
       seaHeld: ids.map((id) => ({ id, share: share(id) })),
       faults: faults.slice(),
-      pits: pits.slice(),
       hits: ids.map((id) => ({
         id,
         fired: fired[id],
@@ -205,36 +201,27 @@ export function createTally(card: RaceCard, closes: number) {
     },
     /**
      * The race as ship `id`'s HUD reads it (standings.ts), the sea as the
-     * last step left it: `home` whether a ship lies in her team's water,
-     * `mode` what a ship's bot is about.
+     * last step left it: `mode` what a ship's bot is about.
      */
     view: (
       id: number,
       s: Standing,
-      sea: { home(id: number): boolean; mode(id: number): Mode | undefined }
+      sea: { mode(id: number): Mode | undefined }
     ): Race =>
       standings(id, s, {
         call: calls[id],
         order: () => finishing(s.alive, s.sunk, s.share, forfeit),
-        home: sea.home(id),
         mode: sea.mode,
       }),
     /**
      * A step's asks of the race (sim/stores.ts Ask), done once the sea is
-     * held, at step `tick`: a team's call changed by a ship of it, every bot
-     * of that team (`aboard`, by id) sailing under it from now
-     * (sim/called.ts); and the pit (sim/pit.ts), for the ships in their team's
-     * water (`home`), each stop that ended noted. Returns the crews after.
+     * held: a team's call changed by a ship of it, every bot of that team
+     * (`aboard`, by id) sailing under it from now (sim/called.ts).
      */
     tend(
-      crews: readonly Crew[],
       asks: ReadonlyMap<number, Ask>,
-      sea: {
-        home(id: number): boolean;
-        tick: number;
-        aboard: ReadonlyMap<number, { nature: Nature }>;
-      }
-    ): Crew[] {
+      sea: { aboard: ReadonlyMap<number, { nature: Nature }> }
+    ) {
       for (const [id, { call }] of asks) {
         if (!call) continue;
         for (const s of card.ships) {
@@ -245,21 +232,6 @@ export function createTally(card: RaceCard, closes: number) {
             a.nature = { ...a.nature, brain: called(a.nature.brain, call) };
         }
       }
-      const lane = {
-        seed: card.seed,
-        tick: sea.tick,
-        crew: (id: number) => card.ships[id].pit,
-      };
-      const served = pitted(crews, asks, sea.home, lane, STEP);
-      for (const { id, seconds, jobs, slips } of served.stops)
-        pits.push({
-          id,
-          second: sea.tick * STEP - seconds,
-          seconds,
-          jobs,
-          slips,
-        });
-      return served.crews;
     },
     /**
      * A step of the race tallied: what its guns and rams did (`shots`,
