@@ -209,7 +209,7 @@ export function record(
         emit('loot', {
           ship: k.ship,
           piece: k.id,
-          goods: { store: k.goods.kind, count: k.goods.count },
+          heal: k.heal,
           slot: k.slot,
           lay: r1(now - (born ?? 0)),
           nearest: Number.isFinite(near) ? r1(near) : null,
@@ -277,9 +277,8 @@ export function record(
           u = c.hold.using,
           was = using.get(v.id);
         if (u && !was) {
-          const item = c.hold.items[u.slot - 1];
           using.set(v.id, {
-            item: item ? item.kind : null,
+            item: c.hold.items[u.slot],
             t: now,
             hull: c.health.hull,
             shield: c.health.shield,
@@ -389,7 +388,7 @@ export function record(
           hull: r1(c.health.hull),
           shield: r1(c.health.shield),
           gun: { kind: c.gun.kind, rounds: c.gun.rounds },
-          hold: c.hold.items.map((k) => k && `${k.kind}x${k.count}`),
+          hold: c.hold.items,
           using: c.hold.using,
           share: r4(state.share(v.id)),
           mode: m?.mode ?? null,

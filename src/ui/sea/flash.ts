@@ -59,10 +59,6 @@ export const SCREEN = {
   gust: {
     vignette: { color: LIGHT.ice, alpha: 0.22, reach: 0.35, decay: 0.5 },
   },
-  shield: {
-    flash: { color: LIGHT.ice, alpha: 0.08, decay: 0.2 },
-    vignette: { color: LIGHT.azure, alpha: 0.25, reach: 0.4, decay: 0.5 },
-  },
   repair: {
     flash: { color: LIGHT.mint, alpha: 0.06, decay: 0.2 },
     vignette: { color: LIGHT.green, alpha: 0.18, reach: 0.4, decay: 0.5 },

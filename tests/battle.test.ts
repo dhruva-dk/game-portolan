@@ -153,11 +153,6 @@ test('healing mends hull or shield up to its cap, never past it, and nothing onc
     shield: 25,
     most: 100,
   });
-  assert.deepEqual(healed(h, 25, 'shield', 20), {
-    hull: 50,
-    shield: 20,
-    most: 100,
-  });
   assert.deepEqual(healed(h, 80, 'hull'), { hull: 100, shield: 0, most: 100 });
   assert.equal(healed({ hull: 0, shield: 0, most: 100 }, 50, 'hull').hull, 0);
 });

@@ -5,6 +5,7 @@ import {
   type Moment,
   type Status,
 } from '../../play/player.ts';
+import { rankOf } from '../../sim/kinds.ts';
 import { clamp } from '../../world/scalar.ts';
 import { createFlash, PICKUP, SCREEN } from './flash.ts';
 import { createHits } from './hits.ts';
@@ -150,8 +151,8 @@ export function createJuice(body: HTMLElement, parts: Parts) {
       case 'took': {
         if (m.ship !== PLAYER_SHIP) return;
         const slot = parts.slots[m.slot];
-        if (slot) fly(`item.${m.piece}`, m.seen, slot);
-        const r = clamp(m.rarity, 0, 4);
+        if (slot) fly('heal', m.seen, slot);
+        const r = clamp(rankOf(m.heal) + 1, 0, 4);
         if (PICKUP.flash[r] > 0)
           flash.flash({
             color: LIGHT.white,
@@ -169,12 +170,8 @@ export function createJuice(body: HTMLElement, parts: Parts) {
       }
       case 'mended': {
         if (m.ship !== PLAYER_SHIP) return;
-        const r =
-          m.piece === 'smallShield' || m.piece === 'bigShield'
-            ? SCREEN.shield
-            : SCREEN.repair;
-        flash.flash(r.flash);
-        flash.vignette(r.vignette);
+        flash.flash(SCREEN.repair.flash);
+        flash.vignette(SCREEN.repair.vignette);
         pop(parts.vitals, 1.08, 300);
         return;
       }

@@ -22,14 +22,9 @@ import { regain, type Regained } from './holding.ts';
 import { PLAYER, credited, type Cause, type Sunk } from './match.ts';
 import { berths, drawn, type Spawn } from './spawn.ts';
 import { hopped, knocked, pose, ride, settled, type Ride } from './ride.ts';
-import {
-  laying,
-  overboard,
-  type Flotsam,
-  type Goods,
-  type Taken,
-} from './loot.ts';
+import { laying, overboard, type Flotsam, type Taken } from './loot.ts';
 import { asked, crewed, spilled, stored, type Ask } from './stores.ts';
+import type { Rarity } from './kinds.ts';
 import type { Berthed, Waters } from './waters.ts';
 import { shipAt, type Helm, type ShipState } from './ship.ts';
 import { calm, closedBy, createStorm, type Storm } from './storm.ts';
@@ -68,6 +63,7 @@ export interface Rig {
 interface Course {
   seed: number;
   type: MatchType;
+  heals: MatchSetup['heals'] | null;
   storm: (seconds: number) => Storm;
 }
 
@@ -166,18 +162,19 @@ function checked(setup: MatchSetup): MatchSetup {
 const courseOf = (setup: MatchSetup, depth: (p: Vec3) => number): Course => ({
   seed: setup.match,
   type: MIXED,
+  heals: setup.heals,
   storm: createStorm(setup.match, depth, MIXED.rules.storm),
 });
 
 const helmOf = (h: Hands): Helm => ({ course: h.course, throttle: h.throttle });
 const orderOf = (h: Hands): Order => ({ aim: h.aim, fire: h.fire });
-const askOf = (h: Hands): Ask => ({ tap: h.heal, gust: h.gust, take: null });
+const askOf = (h: Hands): Ask => ({ heal: h.heal, gust: h.gust });
 
 function createSea(waters: Waters, first: Course) {
   const { chart, water, sea, rises } = waters;
   const depth = remembered(waters.depth);
   let match = first,
-    lay = laying(match.seed, depth, match.type.rules.loot);
+    lay: ReturnType<typeof laying> | null = null;
   let specs: readonly ShipSpec[] | null = null,
     teams: readonly number[] | undefined,
     kept: Berthed | undefined;
@@ -260,9 +257,12 @@ function createSea(waters: Waters, first: Course) {
     teams = by;
     tally = by ? createTally(by, closedBy(match.type.rules.storm)) : null;
     loose = false;
-    lay = laying(match.seed, depth, match.type.rules.loot);
-    flotsam = loot ? lay.strewn() : { pieces: [], next: 0 };
-    dropped = loot ? 0 : Infinity;
+    lay =
+      loot && match.heals !== null
+        ? laying(match.seed, depth, match.heals)
+        : null;
+    flotsam = lay ? lay.strewn() : { pieces: [], next: 0 };
+    dropped = lay ? 0 : Infinity;
     gunfire = [];
     fleet = [];
     aboard.clear();
@@ -316,7 +316,7 @@ function createSea(waters: Waters, first: Course) {
   const clock = (between: number) => (tick - 1 + between) * STEP;
 
   const sail = (helms: Helm[], asks: ReadonlyMap<number, Ask>) => {
-    const wants = asked(battle.crews, fleet, flotsam, asks);
+    const wants = asked(battle.crews, asks);
     battle.crews = wants.crews;
     const manned = byId(wants.crews);
     for (let i = 0; i < fleet.length; i++) {
@@ -336,12 +336,7 @@ function createSea(waters: Waters, first: Course) {
     return { wants, met };
   };
 
-  const fight = (
-    orders: readonly Order[],
-    met: Met,
-    storm: Storm,
-    wants: Wants
-  ) => {
+  const fight = (orders: readonly Order[], met: Met, storm: Storm) => {
     const fought = stepBattle(
       battle,
       fleet,
@@ -368,7 +363,6 @@ function createSea(waters: Waters, first: Course) {
       worn.battle.crews,
       flotsam,
       fleet,
-      wants.takes,
       lost,
       STEP,
       depth,
@@ -460,7 +454,7 @@ function createSea(waters: Waters, first: Course) {
   const advance = (helm: Helm, gun: Order, ask: Ask): Stepped => {
     founded.length = 0;
     const storm = stormAt(time());
-    if (storm.phase > dropped && !storm.final) {
+    if (lay && storm.phase > dropped && !storm.final) {
       const before = flotsam.next;
       flotsam = lay.cached(flotsam, storm.next, storm.phase);
       for (let id = before; id < flotsam.next; id++) born.set(id, tick * STEP);
@@ -478,7 +472,7 @@ function createSea(waters: Waters, first: Course) {
     lap?.('command');
     const { wants, met } = sail(told.helms, told.asks);
     lap?.('sail');
-    const { fought, kept } = fight(told.orders, met, storm, wants);
+    const { fought, kept } = fight(told.orders, met, storm);
     if (fought.shots.length > 0 || gunfire.length > 0)
       gunfire = heard(gunfire, fought.shots, time());
     lap?.('fight');
@@ -631,9 +625,9 @@ function createSea(waters: Waters, first: Course) {
       match = { ...match, ...(storm && { storm }) };
       if (specs) start(specs, kept);
     },
-    strew(at: Vec3, goods: readonly Goods[]) {
+    strew(at: Vec3, heals: readonly Rarity[]) {
       const n = flotsam.pieces.length;
-      const f = overboard(flotsam, at, goods, -1, match.seed);
+      const f = overboard(flotsam, at, heals, match.seed);
       const still = (l: Flotsam['pieces'][number], i: number): typeof l =>
         i < n ? l : { ...l, way: [0, 0, 0], age: 10 };
       flotsam = { ...f, pieces: f.pieces.map(still) };
@@ -706,6 +700,7 @@ export function createMooring(
   const sea = createSea(waters, {
     seed: 0,
     type: MIXED,
+    heals: null,
     storm: () => calm(at.at),
   });
   sea.anchor(at, values);
@@ -715,7 +710,7 @@ export function createMooring(
 interface Debug {
   atSea(start: { at: Vec3; bearing: number }, others: readonly Mooring[]): void;
   rig(rig: Rig): void;
-  strew(at: Vec3, goods: readonly Goods[]): void;
+  strew(at: Vec3, heals: readonly Rarity[]): void;
   sink(id: number, by: number | null): void;
   mindOf(id: number): Readonly<Memory> | null;
   natureOf(id: number): Nature | null;

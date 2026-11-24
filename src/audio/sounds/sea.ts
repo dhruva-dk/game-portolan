@@ -159,26 +159,6 @@ export function took(rate: number, seed: number): Samples {
   return normal(finish(t)).x;
 }
 
-export function mendWard(rate: number, seed: number): Samples {
-  const t = take(1.7, rate, seed);
-  const rise = layer(t);
-  noise(rise, swell(0.6, 1.25, 0.35));
-  filter(rise, 'bandpass', (s) => 700 * 2 ** (1.9 * s), 4);
-  mix(t, rise, 0, 2.2);
-  modes(
-    t,
-    [
-      [587, 0.8, 0.3],
-      [1403, 0.6, 0.25],
-      [2234, 0.45, 0.2],
-      [3399, 0.35, 0.15],
-    ],
-    0.95,
-    0.02
-  );
-  return normal(finish(t, 0.02, 0.3)).x;
-}
-
 export function mendHull(rate: number, seed: number): Samples {
   const t = take(1.2, rate, seed);
   timber(t, (s) => 30 + 110 * s, swell(0.1, 0.55, 0.15), 0, 0.55, 340, 1);

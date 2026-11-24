@@ -10,7 +10,6 @@ import {
   LatheGeometry,
   Mesh,
   MeshBasicNodeMaterial,
-  OctahedronGeometry,
   Vector2,
 } from 'three/webgpu';
 import {
@@ -34,9 +33,9 @@ import {
   varying,
   vec3,
 } from 'three/tsl';
-import { GILDING, GLINT, ICE, RARITY_GLOW, TAR, TIMBER } from '../palette.ts';
+import { GILDING, RARITY_GLOW, TAR, TIMBER } from '../palette.ts';
 import type { Light } from '../sky/light.ts';
-import type { Use } from '../../sim/kinds.ts';
+import { rankOf, type Rarity } from '../../sim/kinds.ts';
 import type { LootDraw } from '../snapshot.ts';
 import type { Eye } from '../view/view.ts';
 import { additive } from '../gpu.ts';
@@ -64,22 +63,20 @@ const EMIT = 1.3,
   BEAM_EMIT = 3,
   HALO_EMIT = 1.2,
   RIM = 0.62;
-const SIZE: Record<Use, number> = {
-  smallShield: 1.7,
-  bigShield: 2.25,
-  repairKit: 1.6,
-  fullRepair: 2.1,
+const SIZE: Record<Rarity, number> = {
+  common: 1.6,
+  rare: 1.8,
+  epic: 2.05,
+  legendary: 2.3,
+};
+const GLOW: Record<Rarity, number> = {
+  common: 0,
+  rare: 2,
+  epic: 3,
+  legendary: 4,
 };
 
-const CRYSTALS = 0,
-  CASKS = 1,
-  BEAMS = 2;
-const GROUP: Record<Use, number> = {
-  smallShield: CRYSTALS,
-  bigShield: CRYSTALS,
-  repairKit: CASKS,
-  fullRepair: CASKS,
-};
+const BEAMS = 1;
 
 let changed = false;
 function put(
@@ -170,8 +167,7 @@ export function createLoot(light: Light) {
       new Float32Array(PIECES * STRIDE),
       STRIDE
     ).setUsage(DynamicDrawUsage);
-  const crystals = buffer(),
-    casks = buffer(),
+  const casks = buffer(),
     beams = buffer();
 
   const at = attribute('lootAt', 'vec4'),
@@ -235,17 +231,6 @@ export function createLoot(light: Light) {
     return { mesh, geometry };
   };
 
-  const crystalMesh = piece(
-    instanced(new OctahedronGeometry(0.6).scale(0.8, 1.3, 0.8), crystals),
-    (p, n) =>
-      light.polished(
-        p,
-        n,
-        vec3(...ICE.lit),
-        vec3(...ICE.shadow),
-        vec3(...GLINT)
-      )
-  );
   const caskMesh = piece(instanced(cask(), casks), (p, n, l) => {
     const hoop = smoothstep(0.035, 0.015, abs(abs(l.y).sub(0.33))).max(
       smoothstep(0.035, 0.015, abs(abs(l.y).sub(0.47)))
@@ -328,7 +313,6 @@ export function createLoot(light: Light) {
   beamMesh.renderOrder = 2;
 
   const drawn = [
-    { buffer: crystals, geometry: crystalMesh.geometry },
     { buffer: casks, geometry: caskMesh.geometry },
     { buffer: beams, geometry: beamGeometry },
   ];
@@ -349,13 +333,9 @@ export function createLoot(light: Light) {
         const dx = l.at[0] - eye[0],
           dy = l.at[1] - eye[1],
           dz = l.at[2] - eye[2];
-        if (
-          GROUP[l.kind] !== group ||
-          dx * dx + dy * dy + dz * dz >= SHAPE * SHAPE
-        )
-          continue;
+        if (dx * dx + dy * dy + dz * dz >= SHAPE * SHAPE) continue;
       }
-      const c = RARITY_GLOW[l.rarity],
+      const c = RARITY_GLOW[GLOW[l.heal]],
         o = n++ * STRIDE;
       (put(array, o, l.at[0]),
         put(array, o + 1, l.at[1]),
@@ -364,8 +344,8 @@ export function createLoot(light: Light) {
       (put(array, o + 4, c[0]),
         put(array, o + 5, c[1]),
         put(array, o + 6, c[2]),
-        put(array, o + 7, l.rarity));
-      (put(array, o + 8, l.born), put(array, o + 9, SIZE[l.kind]));
+        put(array, o + 7, rankOf(l.heal) + 1));
+      (put(array, o + 8, l.born), put(array, o + 9, SIZE[l.heal]));
     }
     if (changed) {
       buffer.clearUpdateRanges();
@@ -378,7 +358,7 @@ export function createLoot(light: Light) {
   };
 
   return {
-    meshes: [crystalMesh.mesh, caskMesh.mesh, beamMesh],
+    meshes: [caskMesh.mesh, beamMesh],
     draw(
       time: number,
       pieces: readonly LootDraw[],

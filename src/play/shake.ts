@@ -1,5 +1,6 @@
 import { blowOf, felt, type Blow, type Deed } from './player.ts';
 import type { Eye } from '../render/snapshot.ts';
+import { rankOf } from '../sim/kinds.ts';
 import { hash01 } from '../world/random.ts';
 import { clamp, easeInOut, lerp, smoother } from '../world/scalar.ts';
 import { add, type Out3, type Vec3 } from '../world/sphere.ts';
@@ -85,7 +86,6 @@ export const CAMERA = {
     kick: { back: 1.4, up: 0.5, pitch: -0.6 },
     fov: { deg: 9, attack: 0.12, hold: 0.35, release: 0.7 },
   },
-  shield: { fov: { deg: 1.5, attack: 0.1, hold: 0.1, release: 0.4 } },
   repair: { fov: { deg: 1, attack: 0.1, hold: 0.1, release: 0.4 } },
   pickup: [
     {},
@@ -142,18 +142,10 @@ export function answerTo(
     }
     case 'took':
       return d.ship === me
-        ? { answer: CAMERA.pickup[d.rarity] ?? {}, strength: 1 }
+        ? { answer: CAMERA.pickup[rankOf(d.heal) + 1] ?? {}, strength: 1 }
         : null;
-    case 'mended': {
-      if (d.ship !== me) return null;
-      return {
-        answer:
-          d.piece === 'smallShield' || d.piece === 'bigShield'
-            ? CAMERA.shield
-            : CAMERA.repair,
-        strength: 1,
-      };
-    }
+    case 'mended':
+      return d.ship === me ? { answer: CAMERA.repair, strength: 1 } : null;
     case 'gust':
       return d.ship === me ? { answer: CAMERA.gust, strength: 1 } : null;
     default:

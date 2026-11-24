@@ -2,7 +2,8 @@ import { smoothstep } from '../world/scalar.ts';
 import { R, distance, dot, type Vec3 } from '../world/sphere.ts';
 import type { Crew } from './battle.ts';
 import { ready } from './gust.ts';
-import { roomFor, useful, type Use } from './hold.ts';
+import { restored, stowing, useful } from './hold.ts';
+import { RARITIES, rankOf } from './kinds.ts';
 import type { Loot } from './loot.ts';
 import { NOTHING, type Ask } from './stores.ts';
 import { toEdge } from './storm.ts';
@@ -22,31 +23,26 @@ export const PURSER = {
   patience: 30,
 } as const;
 
-const WORTH: Record<Use, (c: Crew) => number> = {
-  fullRepair: (c) => (c.health.hull < 45 ? 4 : 0),
-  repairKit: (c) => (c.health.hull < 75 ? 3 : 0),
-  bigShield: (c) => (c.health.shield < 50 ? 2.5 : 0),
-  smallShield: (c) => (c.health.shield < 50 ? 2 : 0),
-};
-
 export function healSlot(c: Crew): number {
+  if (!useful(c.health)) return -1;
+  const missing = c.health.most - c.health.hull;
   let best = -1,
-    bv = 0;
-  c.hold.items.forEach((s, i) => {
-    if (!s || s.count <= 0 || !useful(c.health, s.kind)) return;
-    const v = WORTH[s.kind](c);
-    if (v > bv) [bv, best] = [v, i + 1];
+    most = -Infinity;
+  c.hold.items.forEach((k, i) => {
+    if (!k) return;
+    const worth =
+      restored(k, c.values) >= missing
+        ? 2 * RARITIES.length - rankOf(k)
+        : rankOf(k);
+    if (worth > most) [best, most] = [i, worth];
   });
   return best;
 }
 
 function mendNeed(c: Ctx, crew: Crew): number {
   const hull = c.t.mend + 20 * c.t.skill,
-    shield = 25 + 25 * c.t.skill;
-  return Math.max(
-    ramp(crew.health.hull, hull + 8, hull - 8),
-    ramp(crew.health.shield, shield + 8, shield - 8)
-  );
+    share = (100 * crew.health.hull) / crew.health.most;
+  return ramp(share, hull + 8, hull - 8);
 }
 
 export const healUrge = (c: Ctx) => {
@@ -57,7 +53,7 @@ export const healUrge = (c: Ctx) => {
 };
 
 const worth = (crew: Crew, l: Loot) =>
-  roomFor(crew.hold, l.goods.kind) >= 0 ? 0.5 : 0;
+  stowing(crew.hold, l.heal) >= 0 ? 0.5 : 0;
 
 function nearerTo(others: Ctx['others'], at: Vec3, cos: number): boolean {
   for (let i = 0; i < others.length; i++)
@@ -145,11 +141,11 @@ export function purse(c: Ctx): Ask {
   const { m } = c,
     crew = c.own.crew;
   if (!crew) return NOTHING;
-  let tap: number | null = null,
+  let heal: number | null = null,
     gust = false;
   if (m.mode === 'heal' && !crew.hold.using) {
     const s = healSlot(crew);
-    if (s >= 0) tap = s;
+    if (s >= 0) heal = s;
   }
   if (ready(crew.gust) && !crew.hold.using) {
     const fleeing = m.mode === 'flee' || m.mode === 'storm';
@@ -161,5 +157,5 @@ export function purse(c: Ctx): Ask {
     )
       gust = true;
   }
-  return tap === null && !gust ? NOTHING : { tap, take: null, gust };
+  return heal === null && !gust ? NOTHING : { heal, gust };
 }

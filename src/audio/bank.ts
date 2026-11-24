@@ -18,15 +18,7 @@ import {
   thud,
   whistle,
 } from './sounds/blows.ts';
-import {
-  claim,
-  closing,
-  gust,
-  mendHull,
-  mendWard,
-  thunder,
-  took,
-} from './sounds/sea.ts';
+import { claim, closing, gust, mendHull, thunder, took } from './sounds/sea.ts';
 import { close, launch, lost, open, salute, tap } from './sounds/ui.ts';
 
 interface Sound {
@@ -90,7 +82,6 @@ const SOUND = {
   sink: { make: sink, takes: 2, level: -4, priority: 7, reach: 1400 },
   gust: { make: gust, takes: 2, level: -7, priority: 6, reach: 0 },
   took: { make: took, takes: 2, level: -5, priority: 6, reach: 0 },
-  mendWard: { make: mendWard, takes: 1, level: -11, priority: 6, reach: 0 },
   mendHull: { make: mendHull, takes: 1, level: -6, priority: 6, reach: 0 },
   claim: { make: claim, takes: 1, level: -6, priority: 7, reach: 0 },
   closing: { make: closing, takes: 1, level: -10, priority: 5, reach: 0 },

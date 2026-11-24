@@ -1,5 +1,5 @@
 import type { Cue, Shot, Splash, Strike } from '../sim/battle.ts';
-import { rarityOf, type Taken } from '../sim/loot.ts';
+import type { Taken } from '../sim/loot.ts';
 import type { Mended } from '../sim/stores.ts';
 import { bearingFrom, type Blast, type Eye } from '../render/snapshot.ts';
 import { HOTBAR, LIFT, type Deed, type Moment } from './player.ts';
@@ -98,15 +98,14 @@ export function deedsOf(
     });
   for (const t of done.took) {
     if (t.ship !== me) continue;
-    const slot = HOTBAR.guns - 1 + t.slot;
+    const slot = HOTBAR.guns + t.slot;
     out.push({
       seq: next(),
       time,
       at: t.at,
       ship: me,
       kind: 'took',
-      piece: t.goods.kind,
-      rarity: rarityOf(t.goods),
+      heal: t.heal,
       slot,
     });
   }
@@ -120,7 +119,7 @@ export function deedsOf(
         at: own,
         ship: me,
         kind: 'mended',
-        piece: m.use,
+        heal: m.heal,
       });
   if (done.blew.includes(me))
     out.push({ seq: next(), time, at: own, ship: me, kind: 'gust' });
@@ -201,13 +200,12 @@ export function createLog(me: number) {
     },
     keep(
       fought: Pick<Done, 'shots' | 'splashes' | 'strikes' | 'cues'>,
-      asked: Pick<Done, 'cues' | 'blew'>,
+      asked: Pick<Done, 'blew'>,
       stored: Pick<Done, 'took' | 'mended'>,
       own: Vec3 | null,
       time: number
     ) {
       cues.length = 0;
-      for (const c of asked.cues) cues.push(c);
       for (const c of fought.cues) cues.push(c);
       done.shots = fought.shots;
       done.splashes = fought.splashes;

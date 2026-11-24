@@ -327,7 +327,7 @@ export function watch(
             .some((v) => v.id !== t.ship && distance(v.ship.at, by) < FOUGHT)
         )
           f.fought++;
-        bump(loot.kinds, t.goods.kind);
+        bump(loot.kinds, t.heal);
         const w = ships.get(t.ship);
         if (!w) continue;
         w.r.took.stores++;

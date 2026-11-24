@@ -5,14 +5,12 @@ import { laid, reloadOf, spreadOf, type Gun, type Laying } from '../sim/gun.ts';
 import { charging } from '../sim/gust.ts';
 import { GUN, GUNS, GUST, HEALTH } from '../sim/handling.ts';
 import { progress } from '../sim/hold.ts';
-import { offered, rarityOf } from '../sim/loot.ts';
 import { toEdge } from '../sim/storm.ts';
 import { sunk } from '../sim/health.ts';
 import { RIDE } from '../sim/ride.ts';
 import { PLAYER } from '../sim/match.ts';
 import type { Vessel } from '../sim/contact.ts';
 import type { Helm, ShipState } from '../sim/ship.ts';
-import type { Use } from '../sim/kinds.ts';
 import type { Eye, LootDraw, Snapshot, StormDraw } from '../render/snapshot.ts';
 import { createSwell } from '../world/swell.ts';
 import type { Anchor } from '../world/lattice.ts';
@@ -34,7 +32,6 @@ import {
   type Deed,
   type GunSlot,
   type Thumbs,
-  type Item,
   type Kit,
   type Moment,
   type Slot,
@@ -80,15 +77,9 @@ const DRAWN = 700,
 const LONG_AGO = 1e3;
 const reloading = (g: Gun, c: Crew): number | null =>
   g.reload > 0 ? 1 - g.reload / reloadOf(g.kind, c.values.reloadFactor) : null;
-const ITEM: Record<Use, Item> = {
-  smallShield: 'item.smallShield',
-  bigShield: 'item.bigShield',
-  repairKit: 'item.repairKit',
-  fullRepair: 'item.fullRepair',
-};
-const itemSlot = (n: number) => HOTBAR.guns - 1 + n;
+const itemSlot = (n: number) => HOTBAR.guns + n;
 const tapOf = (tapped: number | null) =>
-  tapped === null ? null : Math.max(0, tapped - HOTBAR.guns + 1);
+  tapped === null || tapped < HOTBAR.guns ? null : tapped - HOTBAR.guns;
 
 interface View {
   watch: number;
@@ -217,15 +208,13 @@ export function createGame(
     items: [null, null, null],
     chosen: 0,
     using: null,
-    offer: null,
     gust: 0,
     gusts: GUST.charges,
     blowing: false,
   };
   for (let i = 0; i < HOTBAR.guns; i++)
     gunSlots.push({ kind: 'cannon', rounds: 0, mag: 0, reload: null });
-  for (let i = 0; i < HOTBAR.items; i++)
-    itemSlots.push({ item: ITEM.repairKit });
+  for (let i = 0; i < HOTBAR.items; i++) itemSlots.push({ heal: 'common' });
   const moments: Moment[] = [];
 
   const inHandOf = (g: Gun, c: Crew, locked: boolean) => {
@@ -433,19 +422,12 @@ export function createGame(
             dot(near, l.at) > Math.cos(RIDES / R) ? sea.at(l.at, time) : 0,
           k = R + up;
         const at = (spots[n] ??= [0, 0, 0]),
-          d = (floating[n] ??= {
-            id: 0,
-            at,
-            kind: 'repairKit',
-            rarity: 0,
-            born: 0,
-          });
+          d = (floating[n] ??= { id: 0, at, heal: 'common', born: 0 });
         at[0] = l.at[0] * k;
         at[1] = l.at[1] * k;
         at[2] = l.at[2] * k;
         d.id = l.id;
-        d.kind = l.goods.kind;
-        d.rarity = rarityOf(l.goods);
+        d.heal = l.heal;
         d.born = state.born(l.id) ?? -LONG_AGO;
         loot[n++] = d;
       }
@@ -465,7 +447,6 @@ export function createGame(
     },
     kit(): Kit {
       const c = state.crew(PLAYER),
-        v = state.mine(),
         h = c.hold,
         slots = carried.guns,
         items = carried.items;
@@ -479,17 +460,12 @@ export function createGame(
       for (let i = 0; i < items.length; i++) {
         const k = h.items[i],
           slot = itemSlots[i];
-        if (k) {
-          slot.item = ITEM[k.kind];
-          slot.count = k.count;
-        }
+        if (k) slot.heal = k;
         items[i] = k ? slot : null;
       }
-      const o = v ? offered(c, v.ship.at, state.loot()) : null,
-        charge = charging(c.gust);
-      carried.chosen = h.chosen === 0 ? 0 : itemSlot(h.chosen);
+      const charge = charging(c.gust);
+      carried.chosen = h.using ? itemSlot(h.using.slot) : 0;
       carried.using = progress(h);
-      carried.offer = o ? itemSlot(Math.max(1, h.chosen)) : null;
       carried.gust = c.gust.charges + (charge < 1 ? charge : 0);
       carried.blowing = c.gust.blowing > 0;
       return carried;

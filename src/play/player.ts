@@ -1,4 +1,4 @@
-import type { GunKind, Use } from '../sim/kinds.ts';
+import type { GunKind, Rarity } from '../sim/kinds.ts';
 import type { Livery } from '../world/livery.ts';
 import type { Vec3 } from '../world/sphere.ts';
 
@@ -85,8 +85,8 @@ export type Deed = { seq: number; time: number; at: Vec3; ship: number } & (
       ram: boolean;
     }
   | { kind: 'sank'; by: number | null }
-  | { kind: 'took'; piece: Use; rarity: number; slot: number }
-  | { kind: 'mended'; piece: Use }
+  | { kind: 'took'; heal: Rarity; slot: number }
+  | { kind: 'mended'; heal: Rarity }
   | { kind: 'gust' }
 );
 
@@ -182,11 +182,8 @@ export type Moment = Deed & {
   whence: number | null;
 };
 
-export type Item = `item.${Use}`;
-
 export interface Slot {
-  item: Item;
-  count?: number;
+  heal: Rarity;
 }
 
 export interface GunSlot {
@@ -201,7 +198,6 @@ export interface Kit {
   items: readonly [Slot | null, Slot | null, Slot | null];
   chosen: number;
   using: number | null;
-  offer: number | null;
   gust: number;
   gusts: number;
   blowing: boolean;

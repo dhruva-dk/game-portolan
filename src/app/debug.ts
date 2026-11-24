@@ -11,7 +11,7 @@ import { HOTBAR, IDLE, type Thumbs } from '../play/player.ts';
 import type { Livery } from '../world/livery.ts';
 import { probeMeshes } from './probe.ts';
 import { STEP } from '../sim/fixed.ts';
-import { KINDS, STORES, type GunKind } from '../sim/kinds.ts';
+import { KINDS, RARITIES, type GunKind } from '../sim/kinds.ts';
 import { PLAYER } from '../sim/match.ts';
 import { SETUP, type Rig } from '../sim/engine.ts';
 import type { MatchSetup } from '../sim/setup.ts';
@@ -162,12 +162,7 @@ export async function scenario(
     tap = params.get('tap')?.split(',').map(Number);
   const [fireAt, held] = (params.get('fire') ?? '').split(',').map(Number);
   const timed: { at: number; hands: Partial<Thumbs> }[] = [
-    ...(slot > 0
-      ? [
-          { at: use || 0, hands: { tap: item + slot } },
-          { at: use || 0, hands: { tap: item + slot } },
-        ]
-      : []),
+    ...(slot > 0 ? [{ at: use || 0, hands: { tap: item + slot } }] : []),
     ...(tap ? [{ at: tap[1] || 0, hands: { tap: tap[0] || 0 } }] : []),
     ...(params.has('gust')
       ? [{ at: number('gust', 0), hands: { gust: true } }]
@@ -292,19 +287,12 @@ function winPlayerShip(game: Game) {
   );
 }
 
-type Goods = Parameters<Game['debug']['strew']>[1][number];
-
 function kit(game: Game) {
   const { at, heading } = game.status(),
     step = () => game.step(STEP, IDLE);
-  const under: Goods[] = [
-    { kind: 'smallShield', count: 3 },
-    { kind: 'bigShield', count: 2 },
-    { kind: 'repairKit', count: 2 },
-  ];
-  game.debug.strew(at, under);
+  game.debug.strew(at, ['common', 'rare', 'epic']);
   step();
-  game.debug.strew(along(at, heading, 3).p, [{ kind: 'fullRepair', count: 1 }]);
+  game.debug.strew(along(at, heading, 3).p, ['legendary']);
   step();
 }
 
@@ -313,9 +301,10 @@ function stock(game: Game) {
   if (params.get('kit') === '') kit(game);
   const row = params.has('loot') ? number('loot', 0) : 0;
   if (row > 0) {
-    const all: Goods[] = STORES.map((kind) => ({ kind, count: 1 }));
-    all.forEach((g, i) => {
-      const side = Math.tan(((i - (all.length - 1) / 2) * 7 * Math.PI) / 180);
+    RARITIES.forEach((g, i) => {
+      const side = Math.tan(
+        ((i - (RARITIES.length - 1) / 2) * 7 * Math.PI) / 180
+      );
       game.debug.strew(
         along(at, normalize(add(facing, cross(at, facing), side)), row).p,
         [g]
@@ -325,8 +314,7 @@ function stock(game: Game) {
     [25, 50, 90, 140, 200, 250, 300, 350, 420].forEach((m, i) => {
       const side = (i % 2 ? 1 : -1) * (0.45 - 0.035 * i),
         turned = normalize(add(heading, cross(at, heading), side));
-      const piece: Goods = { kind: STORES[i % STORES.length], count: 1 };
-      game.debug.strew(along(at, turned, m).p, [piece]);
+      game.debug.strew(along(at, turned, m).p, [RARITIES[i % RARITIES.length]]);
     });
   }
 }

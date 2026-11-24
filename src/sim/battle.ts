@@ -16,7 +16,7 @@ import {
   type Gun,
 } from './gun.ts';
 import { fly, loosed, offHull, type Ball } from './shot.ts';
-import { broken, emptyHold, type Hold } from './hold.ts';
+import { emptyHold, type Hold } from './hold.ts';
 import { gustOf, type Gust } from './gust.ts';
 import type { Sight } from './sight.ts';
 import type { Depth } from './shoal.ts';
@@ -191,7 +191,6 @@ export function stepBattle(
     if (!c || !ship || sunk(c.health)) return;
     const harm = harmed(c.health, damage);
     c.health = harm.health;
-    c.hold = broken(c.hold);
     if (gun) c.cut = Math.max(c.cut, GUNS[gun].cuts);
     const broke = harm.shield > 0 && c.health.shield <= 0;
     const same = ram

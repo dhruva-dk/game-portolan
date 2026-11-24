@@ -62,8 +62,6 @@ export const BALL_SPARK: Rgb = [6, 3, 0.9];
 export const TRACER: Rgb = [5, 2.2, 0.6];
 export const FALL_MARK: Rgb = [3.2, 0.9, 0.35];
 
-export const ICE = tones('#8FE0F5', '#3F8FC9');
-export const GLINT = ink('#FFFFFF');
 export const RARITY_GLOW: readonly Rgb[] = [
   '#C9D1DA',
   '#55E05A',

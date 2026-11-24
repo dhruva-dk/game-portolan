@@ -31,7 +31,6 @@ export const CUE_NAMES = [
   'sank',
   'sunk',
   'took',
-  'mendWard',
   'mendHull',
   'gust',
   'ready',
@@ -75,7 +74,6 @@ export const CUES: Record<Cue, CueSound> = {
   sank: { sound: 'sink', level: 0, bus: 'world' },
   sunk: { sound: 'sink', level: 2, bus: 'own' },
   took: { sound: 'took', level: 0, bus: 'own' },
-  mendWard: { sound: 'mendWard', level: 0, bus: 'own' },
   mendHull: { sound: 'mendHull', level: 0, bus: 'own' },
   gust: { sound: 'gust', level: 0, bus: 'own' },
   ready: { sound: 'ready', level: 0, bus: 'own' },
@@ -118,11 +116,7 @@ export function cueOf(h: Happening, own: number | null): Cue | null {
     case 'took':
       return mine ? 'took' : null;
     case 'mended':
-      return !mine
-        ? null
-        : h.piece === 'smallShield' || h.piece === 'bigShield'
-          ? 'mendWard'
-          : 'mendHull';
+      return mine ? 'mendHull' : null;
     case 'gust':
       return mine ? 'gust' : null;
   }
