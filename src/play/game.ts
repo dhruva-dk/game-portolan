@@ -34,7 +34,7 @@ import {
   IDLE,
   type Deed,
   type GunSlot,
-  type Hands,
+  type Thumbs,
   type Item,
   type Kit,
   type Moment,
@@ -148,7 +148,7 @@ export function createGame(
   let answered = 0;
   let worn: DebugDamage | null = null;
 
-  const orders = (stick: Hands['stick']): Helm => {
+  const orders = (stick: Thumbs['stick']): Helm => {
     const push = stick ? Math.hypot(stick.x, stick.y) : 0;
     if (!stick || push < DEAD) return { course: null, throttle: 0 };
     const { ahead, right } = chase.axes();
@@ -355,7 +355,7 @@ export function createGame(
       nudge.y += y;
       nudge.held = held;
     },
-    step(dt: number, read: Hands) {
+    step(dt: number, read: Thumbs) {
       const hands = steering() ? read : IDLE;
       if (hands.stick || hands.look.held) held = null;
       pulled ||= hands.fire;

@@ -1,4 +1,4 @@
-import type { Hands } from '../../play/player.ts';
+import type { Thumbs } from '../../play/player.ts';
 import { INK, PAPER, alpha } from '../base/ink.ts';
 import { STICK } from './input.ts';
 import { show } from '../base/ui.ts';
@@ -18,7 +18,7 @@ export function createStick(layer: HTMLElement) {
   ring.appendChild(knob);
   layer.prepend(ring);
 
-  return (stick: Hands['stick']) => {
+  return (stick: Thumbs['stick']) => {
     show(ring, !!stick?.center);
     if (!stick?.center) return;
     ring.style.translate = `${stick.center[0] - STICK}px ${stick.center[1] - STICK}px`;

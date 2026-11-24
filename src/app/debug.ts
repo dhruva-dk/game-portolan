@@ -8,7 +8,7 @@ import type { Referee } from '../play/referee.ts';
 import { dealt, lookOf, worn } from '../play/colors.ts';
 import type { Matches } from '../sim/matches.ts';
 import type { Berth } from '../play/state.ts';
-import { HOTBAR, IDLE, type Hands } from '../play/player.ts';
+import { HOTBAR, IDLE, type Thumbs } from '../play/player.ts';
 import type { Livery } from '../world/livery.ts';
 import { probeMeshes } from './probe.ts';
 import { STEP } from '../sim/fixed.ts';
@@ -161,7 +161,7 @@ export async function scenario(
   const [slot, use] = (params.get('use') ?? '').split(',').map(Number),
     tap = params.get('tap')?.split(',').map(Number);
   const [fireAt, held] = (params.get('fire') ?? '').split(',').map(Number);
-  const timed: { at: number; hands: Partial<Hands> }[] = [
+  const timed: { at: number; hands: Partial<Thumbs> }[] = [
     ...(slot > 0
       ? [
           { at: use || 0, hands: { tap: item + slot } },

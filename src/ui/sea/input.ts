@@ -1,4 +1,4 @@
-import type { Hands } from '../../play/player.ts';
+import type { Thumbs } from '../../play/player.ts';
 import { clamp } from '../../world/scalar.ts';
 import { view } from '../base/ui.ts';
 
@@ -76,8 +76,8 @@ export function createInput(element: HTMLElement, steers: () => boolean) {
   };
 
   return {
-    read(): Hands {
-      let stick: Hands['stick'] = null;
+    read(): Thumbs {
+      let stick: Thumbs['stick'] = null;
       if (thumb.id >= 0) {
         const reach = STICK * view.k;
         const x = (thumb.x - thumb.cx) / reach,

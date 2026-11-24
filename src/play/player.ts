@@ -2,7 +2,7 @@ import type { GunKind, LootKind, Use } from '../sim/kinds.ts';
 import type { Livery } from '../world/livery.ts';
 import type { Vec3 } from '../world/sphere.ts';
 
-export interface Hands {
+export interface Thumbs {
   stick: { x: number; y: number; center: [number, number] | null } | null;
   look: { x: number; y: number; held: boolean };
   fire: boolean;
@@ -10,7 +10,7 @@ export interface Hands {
   gust: boolean;
 }
 
-export const IDLE: Hands = {
+export const IDLE: Thumbs = {
   stick: null,
   look: { x: 0, y: 0, held: false },
   fire: false,
