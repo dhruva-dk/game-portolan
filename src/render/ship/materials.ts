@@ -42,8 +42,9 @@ import {
 } from './build.ts';
 import { braced, bracedAbout, breath, type Cloth } from './cloth.ts';
 import { CLOTH } from './kit.ts';
-import { DYE_GLOW, MARKS, TAR } from '../palette.ts';
+import { DYE_GLOW, TAR } from '../palette.ts';
 import { SAIL_MARKS } from '../snapshot.ts';
+import { MARKS } from '../../world/livery.ts';
 import { createWood, shaded } from './wood.ts';
 import { line, type FloatNode, type Vec3Node } from '../tsl.ts';
 

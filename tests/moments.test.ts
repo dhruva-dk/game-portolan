@@ -1,12 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import {
-  PLAYER_SHIP,
-  HOTBAR,
-  LIFT,
-  LIVERY,
-  type Deed,
-} from '../src/play/player.ts';
+import { PLAYER_SHIP, HOTBAR, LIFT, type Deed } from '../src/play/player.ts';
+import { LIVERY } from '../src/world/livery.ts';
 import {
   KEEP,
   bearingFrom,

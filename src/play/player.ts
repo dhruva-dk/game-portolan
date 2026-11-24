@@ -1,4 +1,5 @@
 import type { GunKind, LootKind, Use } from '../sim/kinds.ts';
+import type { Livery } from '../world/livery.ts';
 import type { Vec3 } from '../world/sphere.ts';
 
 export interface Hands {
@@ -134,14 +135,6 @@ export const SCREENS = [
   'result',
 ] as const;
 export type Screen = (typeof SCREENS)[number];
-
-export const PATTERNS = ['plain', 'band', 'stripes'] as const;
-
-export interface Livery {
-  dye: number;
-  pattern: number;
-}
-export const LIVERY: Livery = { dye: 0, pattern: 0 };
 
 export interface Wardrobe {
   dyes: readonly { name: string; dye: string; mark: string }[];

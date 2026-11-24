@@ -2,6 +2,8 @@ import { clamp } from './scalar.ts';
 
 export type Rgb = readonly [number, number, number];
 
+export const luma = (c: Rgb) => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+
 export const srgbToLinear = (c: number) =>
   c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
 

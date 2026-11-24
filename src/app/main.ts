@@ -5,7 +5,7 @@ import type { Played, Setup, Stage } from './debug.ts';
 
 import { launched, roll, sail } from './address.ts';
 import { linearToHex } from '../world/color.ts';
-import { DYES } from '../play/colors.ts';
+import { DYES } from '../world/livery.ts';
 import { SEED, createWorld } from '../world/environment.ts';
 import { createFrame } from '../render/frame.ts';
 import { loaded } from '../render/load.ts';
