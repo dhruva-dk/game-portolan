@@ -2,7 +2,6 @@
 // chart and the ships' berths, and the matches dealt one after another, each
 // with its storm, its berths and its bots' minds.
 
-import type { RaceCard, RaceResult } from '../race.ts';
 import { SHIPS } from '../sim/match.ts';
 import { charted } from '../sim/route.ts';
 import { dealt, type MatchType } from '../sim/persona.ts';
@@ -68,30 +67,6 @@ export function watersOf(
     };
     worker.onerror = (e) => reject(new Error(e.message));
     worker.postMessage({ seed, land });
-  });
-}
-
-/**
- * Races sailed to their ends by their cards on a planet of this seed and land,
- * in a worker of their own (racing.ts), which is let go once they are done:
- * their results, in the cards' order.
- */
-export function racedApart(
-  seed: number,
-  land: Land,
-  cards: readonly RaceCard[]
-): Promise<RaceResult[]> {
-  if (cards.length === 0) return Promise.resolve([]);
-  const worker = new Worker(new URL('./racing.ts', import.meta.url), {
-    type: 'module',
-  });
-  return new Promise((resolve, reject) => {
-    worker.onmessage = (e: MessageEvent<RaceResult[]>) => {
-      worker.terminate();
-      resolve(e.data);
-    };
-    worker.onerror = (e) => reject(new Error(e.message));
-    worker.postMessage({ seed, land, cards });
   });
 }
 
