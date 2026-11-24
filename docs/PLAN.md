@@ -254,7 +254,7 @@ Only your team has limited knowledge; the rivals' policy uses true values.
    - The marked seat's role gets a **full deal**.
    - Any other role for which the team holds an approach (§1.6.3) gets a **one-person deal**: the approached person alone.
 3. **At the off-season stop** every role gets a full deal.
-4. A full deal is built as: the approached person for that role, if the team holds one; then free agents of that role who are **eligible** for the team (§1.6.4), taken in the order of a keyed draw (§2.3), until the deal has three people or the eligible run out. An approached person who has left the game, or who is by now the team's own employee, is left out of either kind of deal. A full deal may therefore hold fewer than three or be empty, and a one-person deal whose person is left out is not dealt at all.
+4. A full deal is built as: the approached person for that role, if the team holds one; then other free agents of that role who are **eligible** for the team (§1.6.4), taken in the order of a keyed draw (§2.3), until the deal has three people or the eligible run out. An approached person who has left the game, or who is by now the team's own employee, is left out of either kind of deal. A full deal may therefore hold fewer than three or be empty, and a one-person deal whose person is left out is not dealt at all.
 5. Holding an approach is used up when its deal is dealt.
 6. The same free agent may be in several teams' deals at once. If another team signs them first they stay in your deal, and signing them now means buying out their new contract (§1.6.6).
 7. **One candidate per deal:** the first offer sent to a candidate locks that deal to them. No offer can be sent to the deal's other candidates.
@@ -311,7 +311,7 @@ The **willingness bar** on screen shows `score` for the terms being edited on a 
 3. **On signing:** the costs are paid; the previous holder of the seat, if any, becomes a free agent; the person's old seat at another team, if any, empties at once; the person takes the seat with a new contract; the team's deal for that role is discarded and its approach for that role, if it holds one, is dropped; its talks with the person stay, with the answer signed, until the next deal.
 4. **A contract** holds the team, the wage, the clause and `racesLeft`. Signed in the lobby before race `r` of a season, `racesLeft = (11 − r) + (seasons − 1) × 10`. Signed during the off-season stop, `racesLeft = seasons × 10`.
 5. After each race `racesLeft` falls by 1. It reaches 0 after race ten of the contract's last season. People with `racesLeft` 0 stay in their seat through the off-season stop and leave when it finishes (§1.9), unless renewed.
-6. **Renewing** is an offer to your own employee. It can be sent only when their `racesLeft` is 10 or less. It does not use a deal. Its cost to sign is the fee alone. If it signs, the wage and clause change at once and `racesLeft` rises by `seasons × 10`.
+6. **Renewing** is an offer to your own employee. It can be sent only when their `racesLeft` is 10 or less. It does not use a deal. Its cost to sign is the fee alone. If it signs, the wage and clause change at once and `racesLeft` rises by `seasons × 10`; item 3 does not apply, so the team's deals and approaches stay as they are.
 7. **Release** costs `ceil(0.5 × wage × racesLeft)` and makes the person a free agent. Release is the one purchase allowed to take a balance below zero: it is never refused for `funds`.
 8. **Wages** are paid per race (§1.8.1).
 
@@ -553,7 +553,7 @@ One gun per ship, fixed for the match. There is no gun loot, no gun switching an
 
 ### 1.11.6 Territory, shield and hull
 
-1. Claiming sea works as today (`sim/territory.ts`): a home patch, a brush along the course, and enclosing a loop floods the smaller side. A team's two ships share their water.
+1. Claiming sea works as today (`sim/territory.ts`): a home patch, a brush along the course, and enclosing a loop floods the smaller side. A team's ships share their water.
 2. **Sea-share samples:** at the moment each of the seven storm phases finishes closing, the sim records each team's share of the sea that is inside the storm's ring (0 to 1). The result carries seven samples per team. If the match ends before a phase finishes closing, each missing sample is 0 for a team with no ship afloat at the end, and otherwise that team's share at the moment the match ended.
 3. **Shield:** starts at 0, maximum 100, absorbs before the hull. It refills wherever the ship is, by today's rule (`sim/holding.ts`): the rate is the ship's shield rate (§1.5.2) when the team holds at least 1% of the sea inside the ring, and proportionally less below that. A team holding no sea gets no shield.
 4. **Hull:** the ship's hull points (§1.4.1). Hull never mends by itself; the hull mending that exists today is deleted. Only heals restore it.
@@ -611,7 +611,7 @@ If a stat's effect is not visible when comparing 20 against 1, widen that stat's
 
 ### 1.11.9 Where ships start
 
-Berths are found as today (`sim/spawn.ts`). They are then assigned by standing: order the berths along a path that starts at a berth chosen by the match seed and repeatedly visits the nearest unvisited berth; order the teams by the standing in their ship specs; give each team two consecutive berths, slot 0 first. Teams of similar standing therefore start near each other, and the bottom of the league starts far from the top.
+Berths are found as today (`sim/spawn.ts`). They are then assigned by standing: order the berths along a path that starts at a berth chosen by the match seed and repeatedly visits the nearest unvisited berth; order the teams by the standing in their ship specs; give each team consecutive berths for its ships, slot 0 first. Teams of similar standing therefore start near each other, and the bottom of the league starts far from the top.
 
 ### 1.11.10 How a match ends and how ships are placed
 
@@ -699,7 +699,7 @@ The home screen whenever a career exists, no race is under way and no flow is sh
 **Sidebar, top to bottom:**
 1. The line's glyph and its word.
 2. **Design level:** a large numeral over a 0 to 100 bar.
-3. **Two ship rows**, slot 0 then slot 1. Each shows who sails it (a helm glyph for you; the driver's or Uncle's small portrait), the fitted level as a numeral and a mark on a 0 to 100 bar, and a **Build** button showing the cost with a coin glyph and the gain as "+14". Build is faint, with the reason drawn as a glyph, when fitted equals design (a tick) or the balance is short (a red coin). Tap sends `Build`.
+3. **Two ship rows**, slot 0 then slot 1. Each shows who sails it (a helm glyph for you; the driver's or Uncle's small portrait), the fitted level as a numeral and a mark on a 0 to 100 bar, and a **Build** button showing the cost with a coin glyph and the gain as "+14". Build is faint, with the reason drawn as a glyph, when fitted equals design (a tick) or the balance is short (the **short-balance mark**: a faint coin under a rubric cross). Tap sends `Build`.
 4. **Focus button:** the word Focus, the designer's small portrait and this line's gain per race at the focused rate, to one decimal, as "+2.4". When this line is the focus it is drawn pressed, and a tap clears the focus (`SetFocus` with nothing). Otherwise a tap makes it the focus. With no designer it is faint and shows an empty portrait outline.
 
 **The gun stop adds:**
@@ -768,7 +768,7 @@ A sheet over the Team sheet, the same size, replacing the deal sheet while open.
 
 | Element | Detail |
 |---|---|
-| Wage | The word, a stepper (minus, numeral, plus) in steps of 10 |
+| Wage | The word, a stepper (minus, numeral, plus) in steps of 10. A stepper's two signs are the characters − and + in the numeral face, not glyphs |
 | Seasons | The word, a three-way picker: 1, 2, 3 |
 | Fee | The word, a stepper in steps of 100 |
 | Clause | The word, a stepper in steps of 500 |
@@ -818,7 +818,7 @@ Your row is highlighted. The list opens scrolled so your row is in view.
 | Two ship columns | For each ship: seven rows, one per line, each the line's glyph and a 0 to 100 range bar with your own slot 0 fitted level as a tick; and the ship's gun-kind glyph |
 | Four small cards | Owner, driver, designer, mechanic: portrait, name, role glyph, star range. An empty seat is an outline |
 
-Tapping a small card enlarges it as a candidate card (§1.12.5), with **Report** beneath it, and **Approach** as well unless it is the owner. Your own row opens your team with exact values and no buttons; its owner card is a helm glyph.
+Tapping a small card enlarges it as a candidate card (§1.12.5), with **Report** beneath it, and **Approach** as well unless it is the owner. The holder overlaid and compared is whoever holds the same seat in your team: Uncle for your empty driver seat, nobody for another empty seat. An owner's card has no holder outline, no ticks, no blue or red, no wage and no clause. Your own row opens your team with exact values and no buttons; its owner card is a helm glyph.
 
 ### 1.12.9 Planet
 
@@ -844,7 +844,7 @@ Shown on launch whenever the career's `unread` flag is set (§2.9.1), which is t
 | Podium | The emblems and names of the teams of the ships placed 1, 2 and 3 |
 | Points | Star-burst glyph and "+n" |
 
-**Step 2, the money.** A sheet across the center. Rows appear one at a time and count up, each with its glyph: place, sinkings, sea, each sponsor (emblem, a tick or cross for its objective, the amount), wages (negative), interest if any (negative), then a rule and the total. Below: coin glyph, the balance before, an arrow, the balance after; laurel glyph, the standing before, an arrow, the standing after.
+**Step 2, the money.** A sheet across the center. Rows appear one at a time and count up, each with its mark: place (the laurel), sinkings (the gun glyph), sea (the territory glyph), each sponsor (emblem, a tick or cross for its objective, the amount), wages (the small portraits of the people paid; negative), interest if any (the short-balance mark of §1.12.3; negative), then a rule and the total. Below: coin glyph, the balance before, an arrow, the balance after; laurel glyph, the standing before, an arrow, the standing after.
 
 **Step 3, the paper** (§1.13.1). After race ten the off-season report (§1.12.11) takes this step's place.
 
@@ -864,7 +864,7 @@ Shown in place of step 3 after race ten, drawn from the career's `lastOffseason`
 | Page | Shows |
 |---|---|
 | 1. The table | The top three teams (emblem, name, points) with the champion's emblem large; your own row with your final standing; coin glyph and your season prize |
-| 2. Your people | Your three seats as enlarged cards. Each compass rose shows last season's shape as a thin outline under this season's filled shape (the comparison of §1.12.13), so growth and decline read as the gap between the two. Beside each numeral, a stat that changed shows its change in blue (up) or red (down). Age shows "+1". A retired person's card is drawn struck through beside an empty seat outline. Pips show races left; a card with none left is drawn with an hourglass glyph |
+| 2. Your people | Your three seats as three **season cards** side by side. A season card is the front of a person card (§1.12.4) with these differences: the role is its glyph alone; the age is a numeral without its word; there is no Wage row and there are no buttons; and under the rose every stat is drawn as its glyph, a numeral and a 1 to 20 bar, without its word. A seat that was empty is an empty seat outline, and Uncle is not drawn. Each compass rose shows last season's shape as a thin outline under this season's filled shape (the comparison of §1.12.13), so growth and decline read as the gap between the two. Beside each numeral, a stat that changed shows its change in blue (up) or red (down). Age shows "+1". A retired person's card is drawn struck through beside an empty seat outline. Pips show races left; a card with none left is drawn with an hourglass glyph |
 | 3. Winter | The seven lines as rows. Each row is the line's glyph and three 0 to 100 bars: design, slot 0 fitted, slot 1 fitted. Each bar is filled to the level after winter, with the part lost drawn faint beyond the fill and the new level as one numeral at the bar's end. A winter glyph heads the page. No other numerals |
 | 4. The paper | The season edition (§1.13.1). Continue is faint, showing a turning ring, until the world is built; it sends `MarkRead` and goes to the lobby |
 
@@ -900,7 +900,7 @@ The stat shape on every person card.
 |---|---|---|
 | Top left | Vitals slip | Shield bar (blue) with numeral, hull bar with numeral. Half the width of today's slip. A small plus glyph beside the shield bar while the shield is refilling. The ship diagram is removed |
 | Top center, left to right | Storm clock | As today |
-| | Ships afloat | As today |
+| | Ships afloat | As today, with the ship glyph at 24 |
 | | Sea share | Territory glyph and your team's current share of the sea inside the ring, as a percentage |
 | | Wingman chip | Your driver's (or Uncle's) small portrait and slot 1's hull bar; a cross when sunk |
 | | Pause button | §1.12.12 |
@@ -978,7 +978,7 @@ All names come from fixed data in `career/names.ts`, chosen by keyed draw. The t
 
 | List | Size | Rule |
 |---|---|---|
-| People and owners | built, not listed: an initial and a family name, such as "M. Brackwater". The initial is the first letter, in upper case, of a keyed pick from `GIVEN_START`; the family name is a keyed pick from `FAMILY_START` joined to one from `FAMILY_END`, with a capital. These three tables are today's, in `career/names.ts` | Two people may share a name. A name that `allowed` rejects (it contains a word in `BANNED`) is drawn again with the next attempt number (§2.3) |
+| People and owners | built, not listed: an initial and a family name, such as "M. Brackwater". The initial is the first letter, in upper case, of a keyed pick from `GIVEN_START`; the family name is a keyed pick from `FAMILY_START` joined to one from `FAMILY_END`, with a capital. These three tables are today's, in `career/names.ts`, with two changes made in step M1.10: `'person'` is removed from `FAMILY_START` (it is the residue of an old search and replace) and `'grey'` becomes `'gray'` | Two people may share a name. A name that `allowed` rejects (it contains a word in `BANNED`) is drawn again with the next attempt number (§2.3) |
 | Teams | at least 60 | The 39 rivals have 39 different names. Your own name is typed and may equal one |
 | Sponsors | a roster of exactly 60, each a name and an emblem number | §1.8.5 item 3 |
 | Planets | at least 200 | Chosen by keyed draw for each race; names may repeat |
@@ -987,7 +987,7 @@ Write the team, sponsor and planet lists in the tone of §0.1. Each name is at m
 
 ### 1.13.4 Liveries and emblems
 
-A **livery** is a dye and a pattern, as today: 16 dyes (`DYES` in today's `play/colours.ts`) and 3 patterns (`PATTERNS` in today's `player.ts`: plain, band, stripes), which gives 48 liveries. An **emblem** is one of the 12 devices in today's `ui/emblem.ts`, drawn in the team's dye. A team has one livery and one emblem; both its ships wear them. Emblems may repeat between teams; liveries may not.
+A **livery** is a dye and a pattern, as today: 16 dyes (`DYES` in today's `play/colours.ts`) and 3 patterns (`PATTERNS` in today's `player.ts`: plain, band, stripes), which gives 48 liveries. An **emblem** is one of the 12 devices in today's `ui/emblem.ts`, drawn in the team's dye. The count of emblems is a constant in `world/livery.ts` beside the dyes and patterns, so that `career/` can use it; the drawings stay in `ui/base/emblem.ts`. A team has one livery and one emblem; both its ships wear them. Emblems may repeat between teams; liveries may not.
 
 ---
 
@@ -1062,7 +1062,7 @@ export type MatchSetup = {
 ```
 
 - `ships` has 2 to 80 entries and the index is the ship's id. Teams are the `team` numbers the specs carry, numbered from 0 with no gaps; a team has one or two ships.
-- A race of a career always has 80 ships, with the ship of team `t` and slot `s` at index `2 × t + s`. Smaller setups exist only for tests and the `duel` scenario and come from `sim/even.ts`.
+- A race of a career always has 80 ships, with the ship of team `t` and slot `s` at index `2 × t + s`. Every other setup comes from `evenSetup` in `sim/even.ts` (step M2.2), which tests, the harness and debug states use, and the app until milestone 6.
 - At most one ship has `hands: 'player'`, and when present it is ship 0.
 - `standing` is the team's standing (1 to 40), used only for berths (§1.11.9).
 - The sim knows nothing about levels, staff, money, liveries or names. `career/fit.ts` turns levels and staff into the physical values, using §1.4.1 and §1.5.2.
@@ -1247,7 +1247,7 @@ export type Applied =
 | `FitGun` | slot, kind | lobby, offseason | §1.7.4 |
 | `Repaint` | livery, emblem | lobby, offseason | §1.8.6 |
 | `SetScoutSeat` | role | lobby, offseason | §1.6.2 |
-| `BuyReport` | person or owner | lobby, offseason | §1.6.3 |
+| `BuyReport` | person (the id of a person or of an owner) | lobby, offseason | §1.6.3 |
 | `Approach` | person | lobby, offseason | §1.6.3 |
 | `Offer` | person, terms | lobby, offseason | §1.6.5, §1.6.6 |
 | `AcceptCounter` | person | lobby, offseason | Signs at the open counter's terms |
@@ -1389,13 +1389,13 @@ All UI is DOM elements placed over the canvas and filled with inline SVG produce
 4. A screen may keep local state that no rule depends on: which card is enlarged, the terms being edited, a lifted sponsor offer, scroll position, the page of a flow.
 5. `career/commands.ts` defines `Command` and `Reason` and re-exports the state types that commands and views are written in (`Role`, `Line`, `Terms`, `Focus`, `GunKind`, `Livery`). Screens import career types from it and from `career/views/` and from nowhere else in `career/`.
 
-   View functions: `newCareerView` (the prefilled team name, which is the first name in the team list, and the dyes, patterns and emblems to choose from), `lobbyView` (which also carries the career seed for the settings sheet), `shipView`, `paintView`, `teamView`, `dealView`, `negotiationView` (takes the terms being edited and returns the willingness and cost), `sponsorsView`, `opponentsView`, `teamSheetView`, `planetView`, `resultView`, `offseasonView`, `paperView`.
+   View functions: `newCareerView` (the one view that takes no career state: the prefilled team name, which is the first name in the team list, and the dyes, patterns and emblems to choose from), `lobbyView` (which also carries the career seed for the settings sheet), `shipView`, `paintView`, `teamView`, `dealView`, `negotiationView` (takes the terms being edited and returns the willingness and cost), `sponsorsView`, `opponentsView`, `teamSheetView`, `planetView`, `resultView`, `offseasonView`, `paperView`.
 6. **The port** is defined in `ui/lobby/port.ts` and implemented in `app/`:
 
 ```ts
 export type LobbyPort = {
   send(command: Command): Reason | null;
-  open(screen: ScreenName, argument?: string | number): void;
+  open(screen: ScreenName, argument?: ScreenArgument): void;
   close(): void;
   scene: {
     stop(index: number | null): void;
@@ -1408,7 +1408,16 @@ export type LobbyPort = {
 ```
 
 - `send` applies the command, saves, redraws the open screens from fresh views, and returns the refusal reason or null.
-- `open` and `close` move through the screens and sheets of §1.12.0.
+- `open` and `close` move through the screens and sheets of §1.12.0. The same file defines the names and the argument:
+
+```ts
+export type ScreenName =
+  | 'ship' | 'paint' | 'team' | 'deal' | 'negotiation'
+  | 'sponsors' | 'opponents' | 'teamSheet' | 'planet' | 'settings';
+export type ScreenArgument = { role?: Role; person?: number; team?: number };
+```
+
+  `deal` takes the `role`. `negotiation` takes the `person` (a candidate or your own employee). `teamSheet` takes the `team`, and a `person` to open with that person's card enlarged; a link in the paper (§1.13.1) opens it this way. The other screens take no argument. New Career, the result flow and the off-season report are not opened through the port; the app shows them (§2.9).
 - `scene.stop` moves the lobby camera to a Ship stop, or back to the lobby pose with null. `scene.wear` previews a livery and emblem on the anchored ship, or restores the real ones with nulls. `scene.planet` switches between the anchorage and the planet seen from space.
 - `chart` returns the inked-globe data for the built planet (`Chart` in `play/player.ts`), or null while it is being prepared.
 - `marks` returns what the Planet screen marks on the globe (`PlanetMarks` in `play/player.ts`): your two berths and the center and radius of the storm's first ring, or null while the planet is being prepared. `app/` computes them from the next race's `MatchSetup` and the built planet with the engine's own berth and storm functions, so the career never needs them.
@@ -1465,11 +1474,12 @@ Glyphs carry meanings that words used to carry, so they are drawn richer than to
 | `role.driver` | A sailor's cap above sunglasses | iron | 40 | new |
 | `role.designer` | A pair of dividers standing on a ship's plan | iron | 40 | new |
 | `role.mechanic` | A caulking mallet crossed with an iron | iron | 40 | redraw |
-| `ship` | A two-masted ship from the side | iron | 40 | redraw of `hud.shipsLeft` |
+| `ship` | A two-masted ship from the side | iron | 24 | redraw of `hud.shipsLeft` |
 | `afloat` | The ship upright on a waterline with a tick-shaped pennant | iron | 40 | new |
 | `heal` | A caulking mallet over a patched plank | green | 40 | new, replaces the four `item.` glyphs |
-| `storm` | The storm's swirl | storm | 40 | redraw of `hud.storm` |
-| `gust` | Three wind strokes curling at their ends | iron | 40 | redraw of `hud.gust` |
+| `storm` | The storm's swirl | storm | 32 | redraw of `hud.storm` |
+| `storm.holding`, `storm.closing` | The storm clock's mark: a lightning bolt in outline while the ring holds, the same bolt filled while it closes | storm | 24 | redraw of `hud.bolt` and `hud.boltFilled` |
+| `gust` | Three wind strokes curling at their ends | iron | 32 | redraw of `hud.gust` |
 | `target` | Three rings with a shot hole off-center | rubric | 40 | new |
 | `pennant` | A long swallow-tailed pennant on a staff | iron | 40 | new |
 | `table` | Three stacked rows that shorten downward, a laurel beside the top one | iron | 40 | new |
@@ -1488,7 +1498,7 @@ Glyphs carry meanings that words used to carry, so they are drawn richer than to
 | `pin` | A map pin | iron | 24 | new |
 | `hourglass` | An hourglass with the sand nearly run | iron | 24 | new |
 
-`cross` is the one glyph whose ink the caller chooses, between iron and rubric. In §1.12 the "helm glyph" is `role.owner`, the "gun glyph" is `part.gun`, the "star-burst" is `starburst`, the "counter mark" is `counter`, and the "gull glyph" on the Team button is the gull's head drawn by `gull.ts`, not a glyph.
+`cross` is the one glyph whose ink the caller chooses, between iron and rubric. In §1.12 the "helm glyph" is `role.owner`, the "gun glyph" is `part.gun`, the "star-burst" is `starburst`, the "counter mark" is `counter`, the "short-balance mark" is `coin` drawn faint with a rubric `cross` over it, and the "gull glyph" on the Team button is the gull's head drawn by `gull.ts`, not a glyph.
 
 **The glyph sheet.** The debug screen `glyphs` (§2.8.3) draws every glyph in the table and every mark of rule 6 on paper, each at its smallest size, at 40 units if that is larger, and at 64 units, with its name beneath, once inked and once faint. The agent drawing or changing a glyph screenshots this sheet with `npm run browser`, looks at the picture, and redraws until each glyph plainly shows what its row says and no two glyphs could be confused at their smallest sizes. Nobody else approves the glyphs.
 
@@ -1538,14 +1548,14 @@ Judgement (feel, look, comedy) is the user's, on the iPad.
 
 `career/standin.ts` produces a plausible `MatchResult` from a `MatchSetup` instantly and deterministically:
 With `N` ships:
-- **Strength** of a ship: the mean of its physical values, each scaled 0 to 1 between its level-0 and level-100 values (§1.4.1), plus the mean of its driver stats over 20. A ship with `hands: 'player'` counts 10 in every stat.
+- **Strength** of a ship: the mean of its nine values of §1.4.1 (top speed, `gather`, Gust capacity, turn rate, hull points, spread factor, reload factor, damage factor, aim-assist cone), each scaled 0 to 1 between its level-0 and level-100 values, plus the mean of its six driver stats over 20. The shield and heal values do not count. A ship with `hands: 'player'` counts 10 in every stat, here and in the shots and sea rules below.
 - **Places** are a keyed ordering weighted by strength.
-- **Afloat at the end:** the two ships of the winner's team if both placed in the top `ceil(N / 8)`, otherwise the winner alone. Every other ship is sunk.
+- **Afloat at the end:** the winner, and the winner's teammate if it has one and the teammate placed in the top `ceil(N / 8)`. Every other ship is sunk. A ship afloat has `sunkAt` and `sunkBy` null.
 - **`seconds`** is 480. A sunk ship's `sunkAt` is `30 + 420 × (N − place) / (N − 1)`, rounded, so the last place sinks first.
-- **`sunkBy`** for each sunk ship is a keyed pick, weighted by strength, among the ships of other teams with a better place. `sinkings` are the counts that follow from it.
+- **`sunkBy`** for each sunk ship is a keyed pick, weighted by strength, among the ships of other teams with a better place, or null when there is none. `sinkings` are the counts that follow from it.
 - **`afloatAtPhaseFour`** is true for places 1 to `ceil(N / 4)`.
 - **Shots:** `shotsFired` is 100; `shotsLanded` is `round(100 × (0.1 + 0.4 × Gunnery / 20))`. `damageDealt` is 100 per sinking; `damageTaken` is 100 for a sunk ship and 50 for one afloat.
-- **Sea:** each of the seven samples gives each team a share in proportion to the summed strength and Territory of its ships still afloat at that sample's time (sample `k` of 7 is taken at `480 × k / 8`), the shares summing to 0.8.
+- **Sea:** sample `k` of 7 is taken at `480 × k / 8`. A team's weight at a sample is the sum, over its ships not yet sunk at that time, of `strength + Territory / 20`. Its share is its weight divided by the total of all teams' weights, times 0.8.
 - **`hash`** is a hash of the rest of the result.
 
 Its keyed draws use the keys `'standin'`, the setup's match seed, the ship id and the field name.
@@ -1648,18 +1658,18 @@ Goal: the old career, office and cut sea features are gone; what remains is toda
 - [ ] **M1.7 Delete the campus.** `world/harbour.ts`, `world/harbour-site.ts`, `land/harbour.ts`, `land/site.ts`, `play/overlook.ts`, the camera over the harbor in `play/anchorage.ts`, and the terrace cut into the planet (`planetOf` in `world/land.ts` becomes the plain terrain planet). The lobby anchorage itself stays.
 - [ ] **M1.8 Delete every comment.** Write a one-off script (do not commit it) that uses the TypeScript scanner to remove every comment in `src/`, `tests/`, `tools/` and the root config files except ESLint directive comments, then run the formatter. Remove the CSS comments in `index.html` by hand.
 - [ ] **M1.9 Remove ship pronouns.** In test titles and any remaining strings, replace "she" and "her" used of a ship with "it" and "its". Do it mechanically and fix what reads wrongly; do not rewrite titles otherwise. Rename the constant `HER` in `player.ts` to `PLAYER_SHIP`.
-- [ ] **M1.10 US English.** Rename identifiers, file names and strings: colour to color, centre to center, metre to meter, grey to gray, neighbour to neighbor, honour to honor, favour to favor, harbour to harbor. Take care that `metre` renames do not collide with the frame-cost `meter`.
-- [ ] **M1.11 Move to the new layout.** Per §2.1 and Appendix A: create `render/` and `app/`, move the root files, split `ui/` into `base/`, `sea/` and `lobby/`. Move `race.ts` to `sim/race.ts` for now (step M2.3 replaces it). Move the livery list to `world/livery.ts` and the storm clock to `ui/base/clock.ts` (Appendix A.3). Add the import rules to `eslint.config.js`; where a file still breaks a rule, move the shared symbol down a layer rather than loosening the rule. Add the `check` script (§2.7.5). The engine still lives in `play/` after this step; the lint rule "every rule of the match is in `sim/`" is met by step M2.1.
+- [ ] **M1.10 US English.** Rename identifiers, file names and strings: colour to color, centre to center, metre to meter, grey to gray, neighbour to neighbor, honour to honor, favour to favor, harbour to harbor. Take care that `metre` renames do not collide with the frame-cost `meter`. In `career/names.ts`, remove `'person'` from `FAMILY_START` (§1.13.3).
+- [ ] **M1.11 Move to the new layout.** Per §2.1 and Appendix A: create `render/` and `app/`, move the root files, split `ui/` into `base/`, `sea/` and `lobby/`. Move `race.ts` to `sim/race.ts` for now (step M2.3 replaces it). Move the livery list and the count of emblems to `world/livery.ts` and the storm clock to `ui/base/clock.ts` (Appendix A.3). Add the import rules to `eslint.config.js`; where a file still breaks a rule, move the shared symbol down a layer rather than loosening the rule. Add the `check` script (§2.7.5). The engine still lives in `play/` after this step; the lint rule "every rule of the match is in `sim/`" is met by step M2.1.
 
 **Harness check:** `npm run sim -- match` completes and reports no failed check of its own. A search for comments in `src/`, `tests/` and `tools/` finds only ESLint directives. `npm run browser` still draws the lobby and a match within the frame budget.
 
 ## Milestone 2. The sim contract
 
-Goal: the match engine is in `sim/`; a match is created from a `MatchSetup` of 80 ship specs and returns a `MatchResult`; the sea rules of §1.11 are in place.
+Goal: the match engine is in `sim/`; a match is created from a `MatchSetup` of 2 to 80 ship specs and returns a `MatchResult`; the sea rules of §1.11 are in place.
 
 - [ ] **M2.1 Move the engine into `sim/`.** No behavior changes. Today the match is stepped by `play/state.ts`, with `play/orders.ts`, `play/result.ts`, `play/setup.ts`, `play/race.ts` and `play/indexed.ts`, mixed with building what is drawn. Split it by one rule: whatever decides what happens goes to `sim/`; whatever decides what is shown stays in `play/`. Create `sim/engine.ts` holding the stepping, with `createMatch` taking the arguments today's `createState` takes (it takes a `MatchSetup` from step M2.3), with `sim/orders.ts`, `sim/tally.ts` (the tally and `finishing`), `sim/waters.ts` and `sim/indexed.ts` beside it, and `sim/hands.ts` for the `Hands` type. `play/state.ts` becomes the adapter that steps the engine and fills snapshots and HUD data from its `view`. Afterwards `tools/` and `tests/` run a match without importing `src/play/`, and the clock ban covers all of it. **Check:** the hash printed by `npm run sim -- match` is the same before and after this step.
-- [ ] **M2.2 Contract files.** `sim/kinds.ts`, `sim/setup.ts`, `sim/result.ts` (§2.2.1). Add `sim/even.ts`: `evenSetup({ teams?, perTeam?, values, stats, standings? })` returns a setup of `teams` teams (1 to 40, default 40) of `perTeam` ships each (1 or 2, default 2), where `values` and `stats` are either one set for every ship or a function of the ship index. A duel is two teams of one ship. It is used by tests, the harness and debug.
-- [ ] **M2.3 Matches from a setup.** `createMatch` takes a `MatchSetup`. Teams come from `ShipSpec.team`. Delete `sim/race.ts`, the race-card types, the free-for-all mode, `play/fitted.ts`, and the constants `TEAM`, `TEAMS` and `SHIPS`. Keep the team functions (mates, shared water, no friendly fire). Until milestone 6 the app gives every team a livery by its index from `world/livery.ts`, and its existing way into a match (the title, the seed panel) builds the setup with `evenSetup`: the physical values of level 50 (§1.4.1) and of a mechanic with 10 in every stat (§1.5.2), 10 in every driver stat, standings in team order, and ship 0 as `player`.
+- [ ] **M2.2 Contract files.** `sim/kinds.ts`, `sim/setup.ts`, `sim/result.ts` (§2.2.1). Add `sim/even.ts`: `evenSetup({ teams?, perTeam?, values, stats, standings?, player? })` returns a setup of `teams` teams (2 to 40, default 40) of `perTeam` ships each (1 or 2, default 2), where `values` (the physical fields of a `ShipSpec`, `topSpeed` to `healFactor`) and `stats` are either one set for every ship or a function of the ship index. `standings` defaults to team order: team `t` has standing `t + 1`. With `player: true`, ship 0 has `hands: 'player'`. A duel is two teams of one ship. Tests, the harness and debug states use it, and so does the app until milestone 6. Also start two career files here, because this milestone needs the numbers of §1.4.1 and §1.5.2 and §2.6 rule 3 allows them in one place only: `career/tuning.ts` holding those two tables, and `career/fit.ts` holding one pure function from seven fitted levels, a gun kind and a mechanic's Shield, Heal speed and Heal amount (or no mechanic) to the physical fields of a `ShipSpec`. The app, the harness and the tests take their level-0, level-50 and level-100 values from that function. Steps M3.1 and M3.6 add the rest of both files.
+- [ ] **M2.3 Matches from a setup.** `createMatch` takes a `MatchSetup`. Teams come from `ShipSpec.team`. Delete `sim/race.ts`, the race-card types, the free-for-all mode, `play/fitted.ts`, and the constants `TEAM`, `TEAMS` and `SHIPS`. Keep the team functions (mates, shared water, no friendly fire). Until milestone 6 the app gives every team a livery by its index from `world/livery.ts`, and its existing way into a match (the title, the seed panel) builds the setup with `evenSetup`: the physical values, from `career/fit.ts`, of level 50 on every line with a cannon and a mechanic with 10 in every stat; 10 in every driver stat; standings in team order; and `player: true`.
 - [ ] **M2.4 Per-ship physical values.** Top speed, `gather`, turn rate, hull points, spread factor and reload factor come from the ship's spec, replacing the shared values in `sim/handling.ts`.
 - [ ] **M2.5 One gun.** Remove the second gun, gun switching, the equip delay, gun loot and the rarity tiers. Damage factor and assist cone come from the spec (§1.11.4).
 - [ ] **M2.6 Heals.** §1.11.5.
@@ -1678,12 +1688,12 @@ Goal: the match engine is in `sim/`; a match is created from a `MatchSetup` of 8
 
 Goal: a career can be created from a seed and played for whole seasons in the harness, with rivals that do nothing yet.
 
-- [ ] **M3.1 Skeleton.** `career/state.ts`, `commands.ts`, `apply.ts` with phases and the refusal reasons `team`, `phase`, `invalid` and `unknown`; `career/tuning.ts` holding every Part 1 number outside §1.11. Write the whole of `CareerState` (§2.2.2) now, so later steps fill fields in rather than add them.
+- [ ] **M3.1 Skeleton.** `career/state.ts`, `commands.ts`, `apply.ts` with phases and the refusal reasons `team`, `phase`, `invalid` and `unknown`; `career/tuning.ts` (started in step M2.2) extended to hold every Part 1 number outside §1.11. Write the whole of `CareerState` (§2.2.2) now, so later steps fill fields in rather than add them.
 - [ ] **M3.2 Draws and names.** `career/draw.ts` (§2.3) and `career/names.ts` (§1.13.3).
 - [ ] **M3.3 People.** Generation, stars, ageing, asking wage (§1.5, §1.6.4).
 - [ ] **M3.4 `newCareer`.** The league, owners, staff with contracts, and the free agents (§1.10.1, §1.5.8, §1.8.7). Sponsors are left empty until step M4.2.
 - [ ] **M3.5 Points, standing, reputation.** §1.3.
-- [ ] **M3.6 Fit.** `career/fit.ts`: levels and staff to `ShipSpec` (§1.4.1, §1.5.2, §1.5.7); `matchSetup(state, { hands })`; the race's planet seed, planet name, match seed and ratings (§2.3).
+- [ ] **M3.6 Fit.** `career/fit.ts` (started in step M2.2): levels and staff to `ShipSpec` (§1.4.1, §1.5.2, §1.5.7); `matchSetup(state, { hands })`; the race's planet seed, planet name, match seed and ratings (§2.3). In the `offseason` phase "the race" for all of these is race 1 of season + 1 (§2.9.1), and `matchSetup` gives each team its current standing, which is the standing it holds when that race starts (§1.9). The next-race slip, the Planet screen and the port's `marks` therefore need no special case.
 - [ ] **M3.7 Stand-in.** `career/standin.ts` (§2.7.3).
 - [ ] **M3.8 `StartRace`, `RecordRace`, `MarkRead`.** With no policy yet. Of §2.2.5: steps 1, 2 (place, sinkings, sea, wages, interest), 5 (contracts), 8, 9 (without deals and offers) and 10.
 - [ ] **M3.9 The off-season.** §1.9 steps 1 to 3, `lastOffseason`, and `FinishOffseason`.
