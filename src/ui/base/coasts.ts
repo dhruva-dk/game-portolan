@@ -1,5 +1,5 @@
-import type { Planet } from '../world/planet.ts';
-import { add, distance, normalize, type Vec3 } from '../world/sphere.ts';
+import type { Planet } from '../../world/planet.ts';
+import { add, distance, normalize, type Vec3 } from '../../world/sphere.ts';
 
 export interface Coast {
   center: Vec3;

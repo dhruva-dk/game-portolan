@@ -5,13 +5,13 @@ import {
   isGun,
   type Moment,
   type Status,
-} from '../play/player.ts';
-import { clamp } from '../world/scalar.ts';
+} from '../../play/player.ts';
+import { clamp } from '../../world/scalar.ts';
 import { createFlash, PICKUP, SCREEN } from './flash.ts';
 import { createHits } from './hits.ts';
-import { LIGHT, glyph, svgNode } from './ink.ts';
-import type { Glyph } from './glyphs.ts';
-import { boxOf, view } from './ui.ts';
+import { LIGHT, glyph, svgNode } from '../base/ink.ts';
+import type { Glyph } from '../base/glyphs.ts';
+import { boxOf, view } from '../base/ui.ts';
 
 interface Parts {
   vitals: HTMLElement;

@@ -30,7 +30,7 @@ import { chart } from '../src/sim/route.ts';
 import { MIXED } from '../src/sim/persona.ts';
 import { berthing } from '../src/sim/spawn.ts';
 import { calm } from '../src/sim/storm.ts';
-import { BIG, SAFE, capped, heartbeat, lowHull } from '../src/ui/flash.ts';
+import { BIG, SAFE, capped, heartbeat, lowHull } from '../src/ui/sea/flash.ts';
 import { landOf, planetOf } from '../src/world/land.ts';
 import { SEED } from '../src/world/environment.ts';
 import {

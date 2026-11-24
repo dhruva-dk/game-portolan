@@ -1,5 +1,5 @@
-import { clamp } from '../world/scalar.ts';
-import { INK, LIGHT } from './ink.ts';
+import { clamp } from '../../world/scalar.ts';
+import { INK, LIGHT } from '../base/ink.ts';
 
 interface Flash {
   color: string;

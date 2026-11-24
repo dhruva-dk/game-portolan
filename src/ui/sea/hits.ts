@@ -1,4 +1,4 @@
-import { FIGURES, INK, LIGHT, svgNode } from './ink.ts';
+import { FIGURES, INK, LIGHT, svgNode } from '../base/ink.ts';
 
 const MARK = { cross: 0.28, kill: 0.8, figure: 0.9 } as const;
 const MERGE = 0.35,

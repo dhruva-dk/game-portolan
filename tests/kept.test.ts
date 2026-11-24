@@ -6,7 +6,7 @@ import {
   keptLivery,
   keptSettings,
   type Store,
-} from '../src/ui/kept.ts';
+} from '../src/app/kept.ts';
 import { LIVERY } from '../src/play/player.ts';
 
 const NAMES = ['vermilion', 'coral', 'lemon', 'charcoal'];

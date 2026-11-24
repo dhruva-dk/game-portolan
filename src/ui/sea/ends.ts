@@ -1,4 +1,4 @@
-import type { End } from '../play/player.ts';
+import type { End } from '../../play/player.ts';
 import {
   INK,
   PAPER,
@@ -13,11 +13,11 @@ import {
   slip,
   svg,
   uid,
-} from './ink.ts';
-import { again, anchor, die, laurel, ram, spyglass } from './marks.ts';
-import { banner, sheet } from './screens.ts';
-import { onTap, region } from './touch.ts';
-import { at, fade, piece, screen } from './ui.ts';
+} from '../base/ink.ts';
+import { again, anchor, die, laurel, ram, spyglass } from '../base/marks.ts';
+import { banner, sheet } from '../base/screens.ts';
+import { onTap, region } from '../base/touch.ts';
+import { at, fade, piece, screen } from '../base/ui.ts';
 
 const placed = (place: number) =>
   place === 1

@@ -1,4 +1,4 @@
-import { clamp } from '../world/scalar.ts';
+import { clamp } from '../../world/scalar.ts';
 import {
   GILT,
   INK,

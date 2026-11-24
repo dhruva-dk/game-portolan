@@ -14,7 +14,7 @@ import {
   type Leg,
   type Screen,
   type Trigger,
-} from '../src/ui/ways.ts';
+} from '../src/ui/base/ways.ts';
 
 const taps: readonly Trigger[] = TAPS,
   happenings: readonly Trigger[] = EVENTS;

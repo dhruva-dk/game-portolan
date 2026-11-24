@@ -1,4 +1,4 @@
-import type { Fleet, Spread } from '../play/player.ts';
+import type { Fleet, Spread } from '../../play/player.ts';
 import {
   CUT,
   GILT,
@@ -10,8 +10,8 @@ import {
   paperDisc,
   slip,
   uid,
-} from './ink.ts';
-import { badge, ram, rose } from './marks.ts';
+} from '../base/ink.ts';
+import { badge, ram, rose } from '../base/marks.ts';
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
 

@@ -1,4 +1,4 @@
-import { SCREENS, type Screen } from '../play/player.ts';
+import { SCREENS, type Screen } from '../../play/player.ts';
 
 export { SCREENS, type Screen };
 

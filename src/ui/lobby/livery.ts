@@ -1,8 +1,8 @@
-import { PATTERNS, type Livery, type Wardrobe } from '../play/player.ts';
-import { SAIL_MARKS } from '../render/snapshot.ts';
-import { INK, roughCircle } from './ink.ts';
-import { folio } from './screens.ts';
-import { region } from './touch.ts';
+import { PATTERNS, type Livery, type Wardrobe } from '../../play/player.ts';
+import { SAIL_MARKS } from '../../render/snapshot.ts';
+import { INK, roughCircle } from '../base/ink.ts';
+import { folio } from '../base/screens.ts';
+import { region } from '../base/touch.ts';
 
 const ROW = 8,
   CELL = 32,

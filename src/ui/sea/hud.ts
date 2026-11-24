@@ -1,9 +1,14 @@
-import { HOTBAR, type GunKind, type Kit, type Status } from '../play/player.ts';
-import type { Sea } from '../render/snapshot.ts';
-import { clamp, lerp } from '../world/scalar.ts';
-import type { Shores } from './coasts.ts';
-import { createChanged } from './drawn.ts';
-import { stormMark, type Glyph } from './glyphs.ts';
+import {
+  HOTBAR,
+  type GunKind,
+  type Kit,
+  type Status,
+} from '../../play/player.ts';
+import type { Sea } from '../../render/snapshot.ts';
+import { clamp, lerp } from '../../world/scalar.ts';
+import type { Shores } from '../base/coasts.ts';
+import { createChanged } from '../base/drawn.ts';
+import { stormMark, type Glyph } from '../base/glyphs.ts';
 import {
   DUSK,
   GILT,
@@ -18,11 +23,11 @@ import {
   ring as sweep,
   slip,
   svg,
-} from './ink.ts';
+} from '../base/ink.ts';
 import { createJuice } from './juice.ts';
 import { createMinimap, type More } from './minimap.ts';
-import { onHold, onTap } from './touch.ts';
-import { piece, show, view } from './ui.ts';
+import { onHold, onTap } from '../base/touch.ts';
+import { piece, show, view } from '../base/ui.ts';
 import { createVitals } from './vitals.ts';
 
 export type HudState = Status & Kit;

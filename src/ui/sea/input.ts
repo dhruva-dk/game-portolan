@@ -1,6 +1,6 @@
-import type { Hands } from '../play/player.ts';
-import { clamp } from '../world/scalar.ts';
-import { view } from './ui.ts';
+import type { Hands } from '../../play/player.ts';
+import { clamp } from '../../world/scalar.ts';
+import { view } from '../base/ui.ts';
 
 export const STICK = 56;
 const LEFT = 0.45;

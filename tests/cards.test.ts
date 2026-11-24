@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import { linearToHex } from '../src/world/color.ts';
 import { fleetOf } from '../src/play/fleet.ts';
 import type { Sea } from '../src/render/snapshot.ts';
-import { CARD, fleetCard } from '../src/ui/fleet.ts';
-import { INK, dyeOn, percent } from '../src/ui/ink.ts';
+import { CARD, fleetCard } from '../src/ui/lobby/fleet.ts';
+import { INK, dyeOn, percent } from '../src/ui/base/ink.ts';
 import { seedOf } from '../src/world/seeds.ts';
 
 test('the sea held, as a per cent: always to a tenth, never below none', () => {

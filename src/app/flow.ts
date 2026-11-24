@@ -1,10 +1,10 @@
-import type { Globe } from './globe.ts';
-import type { Hud, HudState } from './hud.ts';
+import type { Globe } from '../ui/base/globe.ts';
+import type { Hud, HudState } from '../ui/sea/hud.ts';
 import type { End, Seeds, Wardrobe } from '../play/player.ts';
-import { createLivery } from './livery.ts';
-import { createSeedPanel } from './panel.ts';
+import { createLivery } from '../ui/lobby/livery.ts';
+import { createSeedPanel } from '../ui/lobby/panel.ts';
 import type { Sea } from '../render/snapshot.ts';
-import { createResult, createWatching } from './ends.ts';
+import { createResult, createWatching } from '../ui/sea/ends.ts';
 import {
   keepLivery,
   keepSettings,
@@ -12,11 +12,11 @@ import {
   keptSettings,
   type Store,
 } from './kept.ts';
-import { createLobby, createSettings, type Title } from './screens.ts';
-import { fade } from './ui.ts';
-import { INK, dyeOn } from './ink.ts';
-import { createPassage } from './passage.ts';
-import { createVeil } from './veil.ts';
+import { createLobby, createSettings, type Title } from '../ui/base/screens.ts';
+import { fade } from '../ui/base/ui.ts';
+import { INK, dyeOn } from '../ui/base/ink.ts';
+import { createPassage } from '../ui/base/passage.ts';
+import { createVeil } from '../ui/base/veil.ts';
 import {
   HOME,
   IN_MATCH,
@@ -25,7 +25,7 @@ import {
   way,
   type Screen,
   type Tap,
-} from './ways.ts';
+} from '../ui/base/ways.ts';
 
 const DRY = 600;
 

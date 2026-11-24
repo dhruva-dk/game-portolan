@@ -1,6 +1,6 @@
-import type { Cap } from '../sim/storm.ts';
-import { lookingAt, type Eye } from '../render/snapshot.ts';
-import { clamp } from '../world/scalar.ts';
+import type { Cap } from '../../sim/storm.ts';
+import { lookingAt, type Eye } from '../../render/snapshot.ts';
+import { clamp } from '../../world/scalar.ts';
 import {
   R,
   along,
@@ -10,7 +10,7 @@ import {
   normalize,
   scale,
   type Vec3,
-} from '../world/sphere.ts';
+} from '../../world/sphere.ts';
 import {
   createRings,
   head,
@@ -22,7 +22,7 @@ import {
 } from './calm.ts';
 import type { Coast } from './coasts.ts';
 import { GLYPHS, stormMark } from './glyphs.ts';
-import { clock, type HudState } from './hud.ts';
+import { clock, type HudState } from '../sea/hud.ts';
 import {
   CUT,
   INK,
