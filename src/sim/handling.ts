@@ -32,10 +32,6 @@ export const RAM = {
   rearm: 3,
 } as const;
 
-export const HEALTH = { shield: 100, start: 0 } as const;
-
-export const HOLDING = { shield: 4.5, full: 0.01 } as const;
-
 export const GUST = {
   charges: 2,
   recharge: 6.5,

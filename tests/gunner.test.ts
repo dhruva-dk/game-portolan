@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import { nature } from '../src/sim/persona.ts';
 import assert from 'node:assert/strict';
 import type { GunKind } from '../src/sim/kinds.ts';
-import { HEALTH } from '../src/sim/handling.ts';
+import { SHIELD } from '../src/sim/tuning.ts';
 import {
   battleOf,
   crewOf,
@@ -58,7 +58,7 @@ function battle(
       ...crewOf(v.id, WORST),
       health: {
         hull: WORST.hullPoints,
-        shield: HEALTH.shield,
+        shield: SHIELD.most,
         most: WORST.hullPoints,
       },
     })),

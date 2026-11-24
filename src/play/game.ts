@@ -3,7 +3,8 @@ import { fixedClock } from '../sim/fixed.ts';
 import type { Crew } from '../sim/battle.ts';
 import { laid, reloadOf, spreadOf, type Gun, type Laying } from '../sim/gun.ts';
 import { charging } from '../sim/gust.ts';
-import { GUN, GUNS, GUST, HEALTH } from '../sim/handling.ts';
+import { GUN, GUNS, GUST } from '../sim/handling.ts';
+import { SHIELD } from '../sim/tuning.ts';
 import { progress } from '../sim/hold.ts';
 import { toEdge } from '../sim/storm.ts';
 import { sunk } from '../sim/health.ts';
@@ -166,7 +167,7 @@ export function createGame(
     hull: 0,
     hullMax: moored.hullPoints,
     shield: 0,
-    shieldMax: HEALTH.shield,
+    shieldMax: SHIELD.most,
     gun: null,
     afloat: 0,
     sunk: false,

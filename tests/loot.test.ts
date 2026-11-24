@@ -12,7 +12,7 @@ import { STEP } from '../src/sim/fixed.ts';
 import { charging, gustOf, ready, spent, stepGust } from '../src/sim/gust.ts';
 import { RARITIES, rankOf, type Rarity } from '../src/sim/kinds.ts';
 import { GUST, SHIP } from '../src/sim/handling.ts';
-import { HEALTH } from '../src/sim/handling.ts';
+import { SHIELD } from '../src/sim/tuning.ts';
 import {
   begun,
   emptyHold,
@@ -467,5 +467,5 @@ test('a ship sunk takes nothing', () => {
     [vessel(1, c0)]
   );
   assert.deepEqual(r.crews[0].hold.items, [null, null, null]);
-  assert.equal(HEALTH.start, 0, 'it puts to sea with no shield');
+  assert.equal(SHIELD.start, 0, 'it puts to sea with no shield');
 });

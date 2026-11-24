@@ -9,7 +9,8 @@ import {
 } from '../src/sim/battle.ts';
 import { afloat } from '../src/sim/contact.ts';
 import { STEP } from '../src/sim/fixed.ts';
-import { HEALTH, SHIP } from '../src/sim/handling.ts';
+import { SHIP } from '../src/sim/handling.ts';
+import { SHIELD } from '../src/sim/tuning.ts';
 import { harmed, healed, sunk } from '../src/sim/health.ts';
 import { useful } from '../src/sim/hold.ts';
 import type { ShipValues } from '../src/sim/setup.ts';
@@ -178,7 +179,7 @@ test('its hull points are its own: the storm takes its share of them, heals mend
   assert.equal(healed(blown, 100, 'hull').hull, 120);
   assert.equal(useful({ ...blown, hull: 110 }), true);
   assert.equal(useful({ ...spec.health, hull: 100 }), false);
-  assert.equal(healed(blown, 100, 'shield').shield, HEALTH.shield);
+  assert.equal(healed(blown, 100, 'shield').shield, SHIELD.most);
   const v = afloat(1, shipAt(here, frameAt(here).east)),
     storm = { center: scale(here, -1), radius: 0.1, damage: 0.1 };
   const after = (c: Crew) =>

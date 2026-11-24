@@ -15,7 +15,8 @@ import { RACE, mates, over } from '../src/sim/teams.ts';
 import { afloat, stepFleet, type Vessel } from '../src/sim/contact.ts';
 import { STEP } from '../src/sim/fixed.ts';
 import { gunOf, laid } from '../src/sim/gun.ts';
-import { HEALTH, SHIP } from '../src/sim/handling.ts';
+import { SHIP } from '../src/sim/handling.ts';
+import { SHIELD } from '../src/sim/tuning.ts';
 import { startMatch, stepMatch, type Report } from '../src/sim/match.ts';
 import { nature } from '../src/sim/persona.ts';
 import type { Depth } from '../src/sim/shoal.ts';
@@ -90,7 +91,7 @@ function fired(
 }
 const hulls = (b: Battle) =>
   new Map(b.crews.map((c) => [c.id, c.health.hull + c.health.shield]));
-const WHOLE = EVEN_SHIP.hullPoints + HEALTH.start;
+const WHOLE = EVEN_SHIP.hullPoints + SHIELD.start;
 
 test('mates: ships of one team, never a ship and itself, and none with no teams', () => {
   assert.equal(mates(TEAMS, 1, 2), true);

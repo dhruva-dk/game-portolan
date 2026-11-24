@@ -1,6 +1,6 @@
 import type { Mate, Race } from './player.ts';
 import type { Crew } from '../sim/battle.ts';
-import { HEALTH } from '../sim/handling.ts';
+import { SHIELD } from '../sim/tuning.ts';
 
 interface Sea {
   seconds: number;
@@ -36,7 +36,7 @@ export function createStandings(teams: readonly number[]) {
           hull: 0,
           hullMax: 0,
           shield: 0,
-          shieldMax: HEALTH.shield,
+          shieldMax: SHIELD.most,
           place: 0,
         });
       m.id = k;

@@ -20,6 +20,8 @@ export const HEAL = {
   cache: { count: number; found: Record<Rarity, number> };
 };
 
+export const SHIELD = { start: 0, most: 100, held: 0.01 } as const;
+
 export const HEAL_COUNT: Readonly<Record<MatchSetup['heals'], number>> = {
   1: 0.5,
   2: 0.75,
