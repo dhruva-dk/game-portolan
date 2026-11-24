@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { SEED } from '../src/world/environment.ts';
-import { createMatches } from '../src/play/setup.ts';
+import { createMatches } from '../src/sim/matches.ts';
 import { createState } from '../src/play/state.ts';
 import { wearOf } from '../src/sim/health.ts';
 import { watersAt } from '../src/sim/waters.ts';

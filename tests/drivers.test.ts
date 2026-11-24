@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { SEED } from '../src/world/environment.ts';
-import { runRace, specField } from '../src/play/race.ts';
+import { runRace, specField } from '../src/sim/racing.ts';
 import {
   STATS,
   type Driver,
