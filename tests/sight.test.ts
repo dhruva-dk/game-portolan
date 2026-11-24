@@ -131,20 +131,20 @@ test("looked for only near the land's rises, a sight meets what it met looking a
 });
 
 test("a ship's body: on the line it stands 0 off; beside it, the angle to its nearest point; behind the eye, nowhere", () => {
-  const her = shipAt(along(at, f.north, 100).p, f.east);
-  assert.equal(offSight(onto(20, 100), her)!.angle, 0);
+  const target = shipAt(along(at, f.north, 100).p, f.east);
+  assert.equal(offSight(onto(20, 100), target)!.angle, 0);
   const from = scale(at, R + 20),
     high = {
       from,
-      dir: normalize(add(scale(her.at, R + SHIP.rig - 1), from, -1)),
+      dir: normalize(add(scale(target.at, R + SHIP.rig - 1), from, -1)),
     };
-  assert.equal(offSight(high, her)!.angle, 0);
-  const past = along(her.at, her.heading, SHIP.length / 2 + 10).p;
+  assert.equal(offSight(high, target)!.angle, 0);
+  const past = along(target.at, target.heading, SHIP.length / 2 + 10).p;
   const beside = { from, dir: normalize(add(scale(past, R + 5), from, -1)) },
-    o = offSight(beside, her)!;
+    o = offSight(beside, target)!;
   assert.ok(
     Math.tan(o.angle) * o.along > 9 && Math.tan(o.angle) * o.along <= 10,
     `${Math.tan(o.angle) * o.along} m`
   );
-  assert.equal(offSight({ from, dir: scale(f.north, -1) }, her), null);
+  assert.equal(offSight({ from, dir: scale(f.north, -1) }, target), null);
 });

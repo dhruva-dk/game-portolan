@@ -62,10 +62,10 @@ const apart = (a: Vec3, b: Vec3) => {
 test('the set: sixteen dyes, three patterns; hers by default vermilion, plain', () => {
   assert.equal(COLORS.length, 16);
   assert.deepEqual([...PATTERNS], ['plain', 'band', 'stripes']);
-  const hers = lookOf(LIVERY);
-  assert.deepEqual(hers.sail, [...hexToLinear('#D2332A')]);
-  assert.deepEqual(hers.paint, hers.sail);
-  assert.equal(hers.pattern, 'plain');
+  const chosen = lookOf(LIVERY);
+  assert.deepEqual(chosen.sail, [...hexToLinear('#D2332A')]);
+  assert.deepEqual(chosen.paint, chosen.sail);
+  assert.equal(chosen.pattern, 'plain');
 });
 
 test('every dye stands apart from every other, and from the sea, the foam and the storm', () => {
@@ -171,19 +171,19 @@ test('the seed deals every bot its own from the set, the same every time for the
 });
 
 test('never her dye: whatever she wears, no bot of any seed wears it', () => {
-  every((hers) => {
+  every((chosen) => {
     for (const seed of SEEDS)
       for (let id = 1; id < SHIPS; id++)
-        assert.notEqual(dealt(seed, id, hers).dye, hers.dye);
+        assert.notEqual(dealt(seed, id, chosen).dye, chosen.dye);
   });
 });
 
 test('the fleet is dealt across the whole set: every other dye and every pattern at sea in a race', () => {
-  every((hers) => {
+  every((chosen) => {
     const dyes = new Set<number>(),
       patterns = new Set<number>();
     for (let id = 1; id < SHIPS; id++) {
-      const l = dealt(1234, id, hers);
+      const l = dealt(1234, id, chosen);
       dyes.add(l.dye);
       patterns.add(l.pattern);
     }

@@ -124,13 +124,13 @@ test("her taps: on the gun in hand with a gun in reach, a swap; on the item in h
     { kind: 'bigShield', count: 1 },
     { kind: 'fullRepair', count: 1 },
   ] as const;
-  const her: Crew = {
+  const playerCrew: Crew = {
     ...crewOf(0, gunOf('cannon', 1), gunOf('scatter', 0)),
     hold: { ...emptyHold(), items, chosen: 1 },
   };
   const tap = (slot: number, pieces: Loot[], arm: number | null = null) =>
     asked(
-      [her],
+      [playerCrew],
       fleet,
       { pieces, next: 9 },
       new Map([[0, { ...NOTHING, tap: arm === null ? slot : null, arm }]])

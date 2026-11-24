@@ -63,30 +63,36 @@ function loop(m: Match, state = createState(planet, flat, waters, m)) {
 
 test('her livery: worn at anchor at once; her ship in it at sea, the bots dealt round it, her water her dye', () => {
   const state = createState(planet, flat, waters, deadly(Infinity)),
-    hers = { dye: 4, pattern: 2 };
-  const her = () => state.drawn(1).find((d) => d.id === PLAYER)!.look;
+    chosen = { dye: 4, pattern: 2 };
+  const playerLook = () => state.drawn(1).find((d) => d.id === PLAYER)!.look;
   state.anchor(start);
-  assert.deepEqual(her(), lookOf(LIVERY), 'vermilion, plain, till she chooses');
-  state.wear(hers);
-  assert.deepEqual(her(), lookOf(hers), 'at anchor, in it at once');
+  assert.deepEqual(
+    playerLook(),
+    lookOf(LIVERY),
+    'vermilion, plain, till she chooses'
+  );
+  state.wear(chosen);
+  assert.deepEqual(playerLook(), lookOf(chosen), 'at anchor, in it at once');
   state.start(deadly(Infinity));
   const drawn = state.drawn(1);
   assert.equal(drawn.length, SHIPS);
   for (const d of drawn)
     assert.deepEqual(
       d.look,
-      lookOf(d.id === PLAYER ? hers : dealt(1, d.id, hers)),
+      lookOf(d.id === PLAYER ? chosen : dealt(1, d.id, chosen)),
       `ship ${d.id}`
     );
-  assert.ok(drawn.every((d) => d.id === PLAYER || d.look.sail !== her().sail));
+  assert.ok(
+    drawn.every((d) => d.id === PLAYER || d.look.sail !== playerLook().sail)
+  );
   const sea = state.sea(1)!;
-  assert.deepEqual(sea.colors[PLAYER], COLORS[hers.dye]);
+  assert.deepEqual(sea.colors[PLAYER], COLORS[chosen.dye]);
   drawn.forEach((d) => assert.deepEqual(sea.colors[d.id], d.look.sail));
   state.wear(LIVERY);
-  assert.deepEqual(her(), lookOf(hers));
+  assert.deepEqual(playerLook(), lookOf(chosen));
   state.anchor(start);
   state.wear({ dye: 99, pattern: 1 });
-  assert.deepEqual(her(), lookOf({ dye: 0, pattern: 1 }));
+  assert.deepEqual(playerLook(), lookOf({ dye: 0, pattern: 1 }));
 });
 
 test('a ship sunk in a step lays, closes and cuts nothing in it: its water only drains', () => {
