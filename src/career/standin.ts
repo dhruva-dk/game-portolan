@@ -3,7 +3,12 @@ import type { DriverStats, MatchSetup, ShipSpec } from '../sim/setup.ts';
 import { hash } from '../world/random.ts';
 import { draw } from './draw.ts';
 import { DRIVER_STATS } from './state.ts';
-import { LEVEL_VALUES, STAND_IN_RESULT, STAT_SPAN } from './tuning.ts';
+import {
+  LEVEL_VALUES,
+  RACE_MONEY,
+  STAND_IN_RESULT,
+  STAT_SPAN,
+} from './tuning.ts';
 
 type Field = 'place' | 'sunkBy';
 
@@ -31,7 +36,7 @@ const PLAYER_STATS: DriverStats = {
 const mean = (values: readonly number[]): number =>
   values.reduce((sum, x) => sum + x, 0) / values.length;
 
-export const handsStats = (ship: ShipSpec): DriverStats =>
+const handsStats = (ship: ShipSpec): DriverStats =>
   ship.hands === 'player' ? PLAYER_STATS : ship.hands;
 
 export function strength(ship: ShipSpec): number {
@@ -77,7 +82,7 @@ function weightedPick(
   return candidates[Math.floor(u * candidates.length)];
 }
 
-export const sinkingTime = (place: number, ships: number): number =>
+const sinkingTime = (place: number, ships: number): number =>
   Math.round(
     STAND_IN_RESULT.firstSinking +
       (STAND_IN_RESULT.sinkingSpan * (ships - place)) / (ships - 1)
@@ -90,7 +95,7 @@ export const shotsLanded = (gunnery: number): number =>
         (STAND_IN_RESULT.landedPerGunnery * gunnery) / STAT_SPAN.most)
   );
 
-export const sampleTime = (k: number): number =>
+const sampleTime = (k: number): number =>
   (STAND_IN_RESULT.seconds * k) / STAND_IN_RESULT.sampleSpacing;
 
 export function resultHash(rest: Omit<MatchResult, 'hash'>): string {
@@ -105,7 +110,7 @@ function seaSamples(
   sunkAt: readonly (number | null)[]
 ): number[][] {
   const teams = Math.max(...setup.ships.map((ship) => ship.team)) + 1;
-  const samples = Array.from({ length: STAND_IN_RESULT.samples }, (_, i) => {
+  const samples = Array.from({ length: RACE_MONEY.seaSamples }, (_, i) => {
     const time = sampleTime(i + 1);
     const weights = Array.from({ length: teams }, () => 0);
     setup.ships.forEach((ship, id) => {

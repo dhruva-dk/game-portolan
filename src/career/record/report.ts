@@ -3,18 +3,17 @@ import { planetName } from '../fit.ts';
 import { seatHolder } from '../lookup.ts';
 import { meanShare } from '../rules/race-money.ts';
 import { standings } from '../rules/standing.ts';
-import type {
-  CareerState,
-  MoneyRows,
-  RaceReport,
-  ShipReport,
-  Workshop,
+import {
+  YOURS,
+  type CareerState,
+  type MoneyRows,
+  type RaceReport,
+  type ShipReport,
+  type Workshop,
 } from '../state.ts';
-import { POINTS } from '../tuning.ts';
+import { RACE_REPORT } from '../tuning.ts';
 import { placedTeam, teamOfShip, teamShips } from './finish.ts';
 import { racePoints } from './score.ts';
-
-const YOURS = 0;
 
 export type RaceRecord = {
   before: CareerState;
@@ -64,7 +63,9 @@ export function raceReport(record: RaceRecord): RaceReport {
     shotsFired: ships.reduce((sum, ship) => sum + ship.shotsFired, 0),
     shotsLanded: ships.reduce((sum, ship) => sum + ship.shotsLanded, 0),
     sea: meanShare(result.sea[YOURS]),
-    podium: POINTS.podium.map((_, index) => placedTeam(result, index + 1)),
+    podium: Array.from({ length: RACE_REPORT.podium }, (_, index) =>
+      placedTeam(result, index + 1)
+    ),
     points: racePoints(result, YOURS),
     money,
     balance: {

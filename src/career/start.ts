@@ -25,6 +25,8 @@ import { generateOwner } from './rules/owner.ts';
 import { generatePerson, type Origin } from './rules/person.ts';
 import { shipRange } from './rules/ship-range.ts';
 import {
+  FIRST_RACE,
+  FIRST_SEASON,
   ROLES,
   VERSION,
   perLine,
@@ -55,8 +57,6 @@ export type CareerOptions = {
   emblem: number;
 };
 
-const START_SEASON = 1;
-const START_RACE = 1;
 const CANNON: GunKind = 'cannon';
 
 const LIVERIES: readonly Livery[] = DYES.flatMap((_, dye) =>
@@ -202,7 +202,7 @@ function shipRanges(
   team: Team,
   index: number
 ): Record<Line, Range>[] {
-  const year = knowledgeYear({ season: START_SEASON, phase: 'lobby' });
+  const year = knowledgeYear({ season: FIRST_SEASON, phase: 'lobby' });
   return team.ships.map((ship, slot) =>
     perLine((line) =>
       shipRange(
@@ -255,8 +255,8 @@ export function newCareer(options: CareerOptions): CareerState {
   return {
     version: VERSION,
     seed,
-    season: START_SEASON,
-    race: START_RACE,
+    season: FIRST_SEASON,
+    race: FIRST_RACE,
     phase: 'lobby',
     unread: false,
     teams,

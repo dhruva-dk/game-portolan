@@ -8,6 +8,8 @@ export const LEVEL_SPAN = { least: 0, most: 100 } as const;
 
 export const LEAGUE = { teams: 40, shipsPerTeam: 2, racesPerSeason: 10 };
 
+export const RACE_REPORT = { podium: 3 };
+
 export const POINTS = {
   podium: [50, 44, 40],
   lastScoring: 40,
@@ -16,8 +18,6 @@ export const POINTS = {
 };
 
 export const STANDING = { noRaceYet: 81 };
-
-export const REPUTATION = { best: 1, worst: 40 };
 
 export const SHIPS = { leastLevel: 5 };
 
@@ -219,7 +219,6 @@ export const STAND_IN_RESULT = {
   sinkingSpan: 420,
   teammateAfloatShare: 8,
   phaseFourShare: 4,
-  samples: 7,
   sampleSpacing: 8,
   playerStat: 10,
   shotsFired: 100,

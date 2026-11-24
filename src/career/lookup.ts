@@ -17,7 +17,7 @@ export function ownerOf(state: CareerState, id: number): Owner | null {
   return null;
 }
 
-export const isId = (state: CareerState, id: number): boolean =>
+const isId = (state: CareerState, id: number): boolean =>
   personOf(state, id) !== null || ownerOf(state, id) !== null;
 
 export function known(state: CareerState, command: Command): boolean {

@@ -245,6 +245,25 @@ test('place prize, sinkings, sea and interest follow §1.8.1', () => {
   assert.equal(interestOn(-1001), Math.ceil(RACE_MONEY.interest * 1000) + 1);
 });
 
+test('the race money of §1.8.1 at hand-worked points', () => {
+  assert.equal(placePrize(1), 3000);
+  assert.equal(placePrize(21), 1688);
+  assert.equal(placePrize(41), 750);
+  assert.equal(placePrize(61), 188);
+  assert.equal(placePrize(80), 0);
+  assert.equal(sinkingMoney(1), 150);
+  assert.equal(sinkingMoney(3), 450);
+  assert.equal(seaMoney([1, 1, 1, 1, 1, 1, 1]), 40000);
+  assert.equal(seaMoney([0, 0, 0, 0, 0, 0, 0]), 0);
+  assert.equal(seaMoney([0.03, 0.03, 0.03, 0.03, 0.03, 0.03, 0.03]), 1200);
+  assert.equal(seaMoney([0.25, 0.75, 0.25, 0.75, 0.25, 0.75, 0.25]), 18571);
+  assert.equal(interestOn(-10), 1);
+  assert.equal(interestOn(-1000), 50);
+  assert.equal(interestOn(-1001), 51);
+  assert.equal(interestOn(-10000), 500);
+  assert.equal(interestOn(5000), 0);
+});
+
 test('a team’s ships are 2t and 2t + 1 in a result', () => {
   const result = handResult(5);
   for (let team = 0; team < TEAMS; team++) {

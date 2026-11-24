@@ -3,6 +3,7 @@ import { aged, retires } from '../rules/ageing.ts';
 import { seasonPrize } from '../rules/season-prize.ts';
 import { standingOrder, standings } from '../rules/standing.ts';
 import {
+  YOURS,
   perRole,
   type CareerState,
   type OffseasonReport,
@@ -10,9 +11,7 @@ import {
   type SeasonCard,
 } from '../state.ts';
 
-const YOURS = 0;
-
-export function seasonCard(person: Person): SeasonCard {
+function seasonCard(person: Person): SeasonCard {
   const older = aged(person);
   return {
     name: person.name,

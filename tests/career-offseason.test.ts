@@ -206,6 +206,20 @@ test('the season prize and winter loss follow §1.8.2 and §1.9', () => {
   assert.equal(wintered(100, winterLoss(null)), 100 - WINTER.lossWithout);
 });
 
+test('the season prize and winter loss at hand-worked points', () => {
+  assert.equal(seasonPrize(1), 60000);
+  assert.equal(seasonPrize(11), 33750);
+  assert.equal(seasonPrize(21), 15000);
+  assert.equal(seasonPrize(31), 3750);
+  assert.equal(seasonPrize(40), 38);
+  assert.equal(winterLoss(null), 11);
+  assert.equal(winterLoss(1), 9.7);
+  assert.equal(winterLoss(10), 7);
+  assert.equal(winterLoss(20), 4);
+  assert.equal(wintered(50, 4), 46);
+  assert.equal(wintered(12, 11), 5);
+});
+
 test('step 1 pays every team the prize for its final standing and nothing else', () => {
   for (const seed of SEEDS) {
     const ready = lastRaceOf(seed);

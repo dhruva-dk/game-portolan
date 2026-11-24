@@ -19,7 +19,7 @@ import { publishNews } from './record/news.ts';
 import { payRace, raceMoney } from './record/pay.ts';
 import { fileReport, raceReport } from './record/report.ts';
 import { scoreRace } from './record/score.ts';
-import type { CareerState } from './state.ts';
+import { YOURS, type CareerState } from './state.ts';
 
 export { newCareer, type CareerOptions } from './start.ts';
 
@@ -60,8 +60,6 @@ const offerSponsors = seam;
 const seasonEvents = seam;
 const redrawKnowledge = seam;
 const dealOffseason = seam;
-
-const YOURS = 0;
 
 const accepted = (state: CareerState): Applied => ({ ok: true, state });
 
