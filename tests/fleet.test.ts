@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { fleetOf, naturesOf } from '../src/play/fleet.ts';
-import { createMatches } from '../src/play/setup.ts';
+import { createMatches } from '../src/sim/matches.ts';
 import { createMatch, debugOf } from '../src/sim/engine.ts';
 import { PLAYER, SHIPS } from '../src/sim/match.ts';
 import { PERSONAS, TYPES, dealt } from '../src/sim/persona.ts';

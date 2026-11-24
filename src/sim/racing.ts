@@ -1,4 +1,4 @@
-import { KINDS } from '../sim/kinds.ts';
+import { KINDS } from './kinds.ts';
 import { COLORS, PATTERNS } from '../world/livery.ts';
 import {
   PARTS,
@@ -8,19 +8,19 @@ import {
   type RaceCard,
   type RaceResult,
   type RaceShip,
-} from '../sim/race.ts';
-import type { Order } from '../sim/battle.ts';
-import { MIXED, nature } from '../sim/persona.ts';
-import { DEFAULT_RULES, ruled, type Rules } from '../sim/rules.ts';
-import type { Helm } from '../sim/ship.ts';
-import { NOTHING, type Ask } from '../sim/stores.ts';
-import { createStorm } from '../sim/storm.ts';
+} from './race.ts';
+import type { Order } from './battle.ts';
+import { MIXED, nature } from './persona.ts';
+import { DEFAULT_RULES, ruled, type Rules } from './rules.ts';
+import type { Helm } from './ship.ts';
+import { NOTHING, type Ask } from './stores.ts';
+import { createStorm } from './storm.ts';
 import type { Planet } from '../world/planet.ts';
 import { hash } from '../world/random.ts';
 import type { Vec3 } from '../world/sphere.ts';
 import { flat } from '../world/swell.ts';
-import { createMatch, type Match } from '../sim/engine.ts';
-import type { Waters } from '../sim/waters.ts';
+import { createMatch, type Match } from './engine.ts';
+import type { Waters } from './waters.ts';
 
 const PART: Fitted = { performance: 1 };
 const SPEC = {

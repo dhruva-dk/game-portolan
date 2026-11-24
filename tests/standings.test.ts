@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { SEED } from '../src/world/environment.ts';
-import { raceOf, specField } from '../src/play/race.ts';
+import { raceOf, specField } from '../src/sim/racing.ts';
 import { createState, debugOf } from '../src/play/state.ts';
 import type { Match } from '../src/sim/engine.ts';
 import type { Race } from '../src/play/player.ts';

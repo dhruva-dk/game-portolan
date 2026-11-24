@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { SHIP } from '../src/sim/handling.ts';
 import { SHIPS } from '../src/sim/match.ts';
 import { SPAWN, berthing, berths, type Spawn } from '../src/sim/spawn.ts';
-import { createMatches } from '../src/play/setup.ts';
+import { createMatches } from '../src/sim/matches.ts';
 import { landOf, planetOf } from '../src/world/land.ts';
 import { SEED } from '../src/world/environment.ts';
 import { R, along, distance, dot, length } from '../src/world/sphere.ts';

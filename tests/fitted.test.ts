@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { specField } from '../src/play/race.ts';
+import { specField } from '../src/sim/racing.ts';
 import type { Fitted, PartType, RaceShip } from '../src/sim/race.ts';
 import {
   battleOf,

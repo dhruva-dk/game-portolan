@@ -1,7 +1,7 @@
 import { join } from 'node:path';
 import { RIDE } from '../../src/sim/ride.ts';
-import { createMatches } from '../../src/play/setup.ts';
-import { raceOf, specField } from '../../src/play/race.ts';
+import { createMatches } from '../../src/sim/matches.ts';
+import { raceOf, specField } from '../../src/sim/racing.ts';
 import {
   createMatch,
   debugOf,
