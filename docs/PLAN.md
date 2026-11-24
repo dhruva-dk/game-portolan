@@ -1317,6 +1317,8 @@ In this order:
 9. If `race` is less than 10: `race` rises by 1, the phase becomes `lobby`, and each team is dealt its deals (§1.6.2) and sponsor offers (§1.8.5). If `race` is 10: the phase becomes `offseason` and the five steps of §1.9 run, filling in `lastOffseason`.
 10. `news` is replaced (§2.2.4).
 
+In the reports a money row that takes money (wages, interest) is stored negative, so a balance's change is the sum of its rows. The race report's balance "after" is taken after step 2. `paid` holds portrait seeds, not ids, because a person may retire in the same step. The report's shots are both your ships' totals and its sea share the mean of your seven samples.
+
 ## 2.3 Seeds and determinism
 
 1. A career has one seed, a string the player types or rolls.
@@ -1325,7 +1327,7 @@ In this order:
 | Draw | Keys |
 |---|---|
 | A person's or an owner's generated values | `'person'`, id, field name (and stat index for `u_i`; and for the name, the part and an attempt number counted from 0) |
-| A rival team's generated values | `'team'`, team index, field name (and slot and line where needed) |
+| A team's generated values | `'team'`, team index, field name (and slot and line where needed; and for the name and the livery an attempt number counted from 0, redrawn until no earlier team has it). Your team's gun taste is drawn this way too. A staff member's level and contract length are drawn under that person's `'person'` keys |
 | The planet's name for a race | `'planet'`, season, race |
 | The match seed, storm stars, heal stars | `'match'` / `'storm'` / `'heals'`, season, race |
 | The order of eligible free agents for a deal | `'deal'`, season, race, team, role, person id |
@@ -1351,7 +1353,7 @@ During the off-season stop the race key is 11.
 2. `app/save.ts` defines a `Store` with `read(key): Promise<string | null>` and `write(entries): Promise<void>`, where `write` stores several keys in one transaction and resolves only when the transaction has completed. Two implementations: IndexedDB (database `portolan`, one object store) and in-memory (for tests and the harness).
 3. After every accepted command from team 0, the app writes, in one transaction, the previous state to `career.bak` and the new state to `career`.
 4. Writes go through one queue, so they land in order. Before any page reload the app waits for the queue to empty.
-5. On load: read `career`; if it is missing or does not parse, read `career.bak`. If the state's `version` differs from the code's `VERSION`, treat it as no career.
+5. On load: read `career`; if it is missing or does not parse, read `career.bak`. If the state's `version` differs from the code's `VERSION`, treat it as no career, without trying the backup. A read that fails, or JSON that is not an object, counts as not parsing.
 6. There are no migrations (Part 4). Raise `VERSION` whenever `CareerState` changes shape.
 7. Settings (§1.12.12) are saved separately in `localStorage` under `portolan.settings`.
 
@@ -1549,7 +1551,7 @@ Judgement (feel, look, comedy) is the user's, on the iPad.
 `career/standin.ts` produces a plausible `MatchResult` from a `MatchSetup` instantly and deterministically:
 With `N` ships:
 - **Strength** of a ship: the mean of its nine values of §1.4.1 (top speed, `gather`, Gust capacity, turn rate, hull points, spread factor, reload factor, damage factor, aim-assist cone), each scaled 0 to 1 between its level-0 and level-100 values, plus the mean of its six driver stats over 20. The shield and heal values do not count. A ship with `hands: 'player'` counts 10 in every stat, here and in the shots and sea rules below.
-- **Places** are a keyed ordering weighted by strength.
+- **Places** are a keyed ordering weighted by strength: each ship draws `u` and takes the time `−ln(1 − u) / strength`, and the earliest finishes first, so a ship's chance of winning is in proportion to its strength. A ship with no strength finishes last.
 - **Afloat at the end:** the winner, and the winner's teammate if it has one and the teammate placed in the top `ceil(N / 8)`. Every other ship is sunk. A ship afloat has `sunkAt` and `sunkBy` null.
 - **`seconds`** is 480. A sunk ship's `sunkAt` is `30 + 420 × (N − place) / (N − 1)`, rounded, so the last place sinks first.
 - **`sunkBy`** for each sunk ship is a keyed pick, weighted by strength, among the ships of other teams with a better place, or null when there is none. `sinkings` are the counts that follow from it.
@@ -1558,7 +1560,7 @@ With `N` ships:
 - **Sea:** sample `k` of 7 is taken at `480 × k / 8`. A team's weight at a sample is the sum, over its ships not yet sunk at that time, of `strength + Territory / 20`. Its share is its weight divided by the total of all teams' weights, times 0.8.
 - **`hash`** is a hash of the rest of the result.
 
-Its keyed draws use the keys `'standin'`, the setup's match seed, the ship id and the field name.
+Its keyed draws use `'standin'` as the seed and the keys of the setup's match seed, the ship id and the field name. A ship whose `sunkAt` equals a sample's time counts as sunk at that sample. With eight ships or fewer `ceil(N / 8)` is 1, so only the winner is afloat.
 
 Career and view tests, debug screens and screenshots use it. The harness uses it when asked (`--standin`, §2.8).
 
@@ -1592,7 +1594,7 @@ Career and view tests, debug screens and screenshots use it. The harness uses it
 | `career` | `--seasons n` seasons | Per season: your standing, balance, mean level, staff stars; the league's spread of balances, levels and staff stars; repossessions |
 | `terrain` | Planet surveys | As today |
 
-`season` and `career` run real matches unless `--standin` is given. A real match costs about 10 s on one core, so a real season costs about two minutes divided by the number of workers.
+`season` and `career` run real matches unless `--standin` is given. A real match costs about 10 s on one core, so a real season costs about two minutes. Each race's setup depends on the standings the race before it left, so one career runs on one worker; `--workers` spreads the `--runs` careers, whose seeds are `s`, `s-2`, `s-3` and so on.
 
 ### 2.8.2 Your seat in the harness
 
@@ -1688,18 +1690,18 @@ Goal: the match engine is in `sim/`; a match is created from a `MatchSetup` of 2
 
 Goal: a career can be created from a seed and played for whole seasons in the harness, with rivals that do nothing yet.
 
-- [ ] **M3.1 Skeleton.** `career/state.ts`, `commands.ts`, `apply.ts` with phases and the refusal reasons `team`, `phase`, `invalid` and `unknown`; `career/tuning.ts` (started in step M2.2) extended to hold every Part 1 number outside §1.11. Write the whole of `CareerState` (§2.2.2) now, so later steps fill fields in rather than add them.
-- [ ] **M3.2 Draws and names.** `career/draw.ts` (§2.3) and `career/names.ts` (§1.13.3).
-- [ ] **M3.3 People.** Generation, stars, ageing, asking wage (§1.5, §1.6.4).
-- [ ] **M3.4 `newCareer`.** The league, owners, staff with contracts, and the free agents (§1.10.1, §1.5.8, §1.8.7). Sponsors are left empty until step M4.2.
-- [ ] **M3.5 Points, standing, reputation.** §1.3.
-- [ ] **M3.6 Fit.** `career/fit.ts` (started in step M2.2): levels and staff to `ShipSpec` (§1.4.1, §1.5.2, §1.5.7); `matchSetup(state, { hands })`; the race's planet seed, planet name, match seed and ratings (§2.3). In the `offseason` phase "the race" for all of these is race 1 of season + 1 (§2.9.1), and `matchSetup` gives each team its current standing, which is the standing it holds when that race starts (§1.9). The next-race slip, the Planet screen and the port's `marks` therefore need no special case.
-- [ ] **M3.7 Stand-in.** `career/standin.ts` (§2.7.3).
-- [ ] **M3.8 `StartRace`, `RecordRace`, `MarkRead`.** With no policy yet. Of §2.2.5: steps 1, 2 (place, sinkings, sea, wages, interest), 5 (contracts), 8, 9 (without deals and offers) and 10.
-- [ ] **M3.9 The off-season.** §1.9 steps 1 to 3, `lastOffseason`, and `FinishOffseason`.
-- [ ] **M3.10 Saving.** `app/save.ts` and its two stores (§2.4).
-- [ ] **M3.11 Harness.** The `season` and `career` scenarios, with real matches and with `--standin` (§2.8).
-- [ ] **M3.12 End to end.** The two end-to-end tests of §2.7.2.
+- [x] **M3.1 Skeleton.** `career/state.ts`, `commands.ts`, `apply.ts` with phases and the refusal reasons `team`, `phase`, `invalid` and `unknown`; `career/tuning.ts` (started in step M2.2) extended to hold every Part 1 number outside §1.11. Write the whole of `CareerState` (§2.2.2) now, so later steps fill fields in rather than add them.
+- [x] **M3.2 Draws and names.** `career/draw.ts` (§2.3) and `career/names.ts` (§1.13.3).
+- [x] **M3.3 People.** Generation, stars, ageing, asking wage (§1.5, §1.6.4).
+- [x] **M3.4 `newCareer`.** The league, owners, staff with contracts, and the free agents (§1.10.1, §1.5.8, §1.8.7). Sponsors are left empty until step M4.2.
+- [x] **M3.5 Points, standing, reputation.** §1.3.
+- [x] **M3.6 Fit.** `career/fit.ts` (started in step M2.2): levels and staff to `ShipSpec` (§1.4.1, §1.5.2, §1.5.7); `matchSetup(state, { hands })`; the race's planet seed, planet name, match seed and ratings (§2.3). In the `offseason` phase "the race" for all of these is race 1 of season + 1 (§2.9.1), and `matchSetup` gives each team its current standing, which is the standing it holds when that race starts (§1.9). The next-race slip, the Planet screen and the port's `marks` therefore need no special case.
+- [x] **M3.7 Stand-in.** `career/standin.ts` (§2.7.3).
+- [x] **M3.8 `StartRace`, `RecordRace`, `MarkRead`.** With no policy yet. Of §2.2.5: steps 1, 2 (place, sinkings, sea, wages, interest), 5 (contracts), 8, 9 (without deals and offers) and 10.
+- [x] **M3.9 The off-season.** §1.9 steps 1 to 3, `lastOffseason`, and `FinishOffseason`.
+- [x] **M3.10 Saving.** `app/save.ts` and its two stores (§2.4).
+- [x] **M3.11 Harness.** The `season` and `career` scenarios, with real matches and with `--standin` (§2.8).
+- [x] **M3.12 End to end.** The two end-to-end tests of §2.7.2.
 
 **Harness check:** `npm run sim -- season --seed test` completes ten real races and prints a table of 40 teams; running it twice prints the same final state hash.
 
