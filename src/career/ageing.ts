@@ -15,7 +15,7 @@ import { turned } from './traits.ts';
  *  agent grows as at level 1, with no Mentor. */
 export function schoolingOf(s: CareerState, g: Person): Schooling {
   const team = g.contract ? s.teams[g.contract.team] : null;
-  if (!team) return { school: 1, mentor: false, sailingSchool: 0 };
+  if (!team) return { school: 1, mentor: false, simulator: 0 };
   const building = SCHOOL[g.role];
   const level = building ? team.buildings[building].level : 1;
   return {
@@ -25,7 +25,7 @@ export function schoolingOf(s: CareerState, g: Person): Schooling {
         .filter((id) => id !== g.id)
         .map((id) => s.people[id])
     ),
-    sailingSchool: team.buildings.sailingSchool.level,
+    simulator: team.buildings.simulator.level,
   };
 }
 

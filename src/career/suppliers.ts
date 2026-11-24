@@ -1,5 +1,5 @@
-// Suppliers: in the off-season each team chooses one each of timber (hull, keel), canvas
-// (sails, rigging) and cordage (rudder, mounts) from three cards a trade, dealt by seed from this table. Each gives a
+// Suppliers: in the off-season each team chooses one each of composites (hull, keel), sailmaker
+// (sails, rigging) and hydraulics (rudder, mounts) from three cards a trade, dealt by seed from this table. Each gives a
 // trade-off for its parts for the season, and costs money once. The window is the off-season up to the season's first
 // race (the founding included). Rivals choose by personality (career/works.ts).
 
@@ -31,18 +31,22 @@ interface Supplier {
   terms: Terms;
 }
 
-export const TRADES: readonly Trade[] = ['timber', 'canvas', 'cordage'];
+export const TRADES: readonly Trade[] = [
+  'composites',
+  'sailmaker',
+  'hydraulics',
+];
 
 /** The part types each trade supplies. */
 const SUPPLIES: Readonly<Record<Trade, readonly PartType[]>> = {
-  timber: ['hull', 'keel'],
-  canvas: ['sails', 'rigging'],
-  cordage: ['rudder', 'mounts'],
+  composites: ['hull', 'keel'],
+  sailmaker: ['sails', 'rigging'],
+  hydraulics: ['rudder', 'mounts'],
 };
 
 /** A part type's trade. */
 export const tradeOf = (type: PartType): Trade =>
-  TRADES.find((t) => SUPPLIES[t].includes(type)) ?? 'timber';
+  TRADES.find((t) => SUPPLIES[t].includes(type)) ?? 'composites';
 
 const T = (
   start: number,
@@ -57,107 +61,107 @@ const T = (
  *  with headroom, and an even one. */
 export const SUPPLIERS: readonly Supplier[] = [
   {
-    id: 'timber.0',
-    name: 'Halloway Sawmills',
-    trade: 'timber',
+    id: 'composites.0',
+    name: 'Halloway Composites',
+    trade: 'composites',
     balance: 300,
     terms: T(30, -40, 0, 1, 1, 1),
   },
   {
-    id: 'timber.1',
-    name: 'Greyoak & Daughters',
-    trade: 'timber',
+    id: 'composites.1',
+    name: 'Greyoak Structures',
+    trade: 'composites',
     balance: 260,
     terms: T(0, 0, 0.06, 1.3, 1, 1),
   },
   {
-    id: 'timber.2',
-    name: 'Bracken Improvement Seconds',
-    trade: 'timber',
+    id: 'composites.2',
+    name: 'Bracken Fibre Works',
+    trade: 'composites',
     balance: 80,
     terms: T(0, 0, 0, 1, 0.8, 0.8),
   },
   {
-    id: 'timber.3',
-    name: 'Ironwood Consolidated',
-    trade: 'timber',
+    id: 'composites.3',
+    name: 'Ironwood Advanced Materials',
+    trade: 'composites',
     balance: 600,
     terms: T(-10, 60, 0.02, 1, 1, 1.2),
   },
   {
-    id: 'timber.4',
-    name: 'Fenwick Timber Co.',
-    trade: 'timber',
+    id: 'composites.4',
+    name: 'Fenwick Carbon',
+    trade: 'composites',
     balance: 200,
     terms: T(10, 10, 0.01, 1, 1, 1),
   },
   {
-    id: 'canvas.0',
-    name: 'Saltmarsh Weavers',
-    trade: 'canvas',
+    id: 'sailmaker.0',
+    name: 'Saltmarsh Wing Systems',
+    trade: 'sailmaker',
     balance: 300,
     terms: T(30, -40, 0, 1, 1, 1),
   },
   {
-    id: 'canvas.1',
-    name: 'Lindqvist Duck Cloth',
-    trade: 'canvas',
+    id: 'sailmaker.1',
+    name: 'Lindqvist Membranes',
+    trade: 'sailmaker',
     balance: 260,
     terms: T(0, 0, 0.06, 1.3, 1, 1),
   },
   {
-    id: 'canvas.2',
-    name: 'Harbour Remnants',
-    trade: 'canvas',
+    id: 'sailmaker.2',
+    name: 'Harbour Sail Supply',
+    trade: 'sailmaker',
     balance: 80,
     terms: T(0, 0, 0, 1, 0.8, 0.8),
   },
   {
-    id: 'canvas.3',
+    id: 'sailmaker.3',
     name: 'Albatross Laminates',
-    trade: 'canvas',
+    trade: 'sailmaker',
     balance: 600,
     terms: T(-10, 60, 0.02, 1, 1, 1.2),
   },
   {
-    id: 'canvas.4',
-    name: 'Pell & Rowe Sailcloth',
-    trade: 'canvas',
+    id: 'sailmaker.4',
+    name: 'Pell & Rowe Sails',
+    trade: 'sailmaker',
     balance: 200,
     terms: T(10, 10, 0.01, 1, 1, 1),
   },
   {
-    id: 'cordage.0',
-    name: 'Quickline Ropeworks',
-    trade: 'cordage',
+    id: 'hydraulics.0',
+    name: 'Quickline Hydraulics',
+    trade: 'hydraulics',
     balance: 300,
     terms: T(30, -40, 0, 1, 1, 1),
   },
   {
-    id: 'cordage.1',
-    name: 'Tarbrook Hawsers',
-    trade: 'cordage',
+    id: 'hydraulics.1',
+    name: 'Tarbrook Actuation',
+    trade: 'hydraulics',
     balance: 260,
     terms: T(0, 0, 0.06, 1.3, 1, 1),
   },
   {
-    id: 'cordage.2',
-    name: 'Dockside Cordage',
-    trade: 'cordage',
+    id: 'hydraulics.2',
+    name: 'Dockside Fluid Power',
+    trade: 'hydraulics',
     balance: 80,
     terms: T(0, 0, 0, 1, 0.8, 0.8),
   },
   {
-    id: 'cordage.3',
-    name: 'Kestrel Braided Lines',
-    trade: 'cordage',
+    id: 'hydraulics.3',
+    name: 'Kestrel Motion Control',
+    trade: 'hydraulics',
     balance: 600,
     terms: T(-10, 60, 0.02, 1, 1, 1.2),
   },
   {
-    id: 'cordage.4',
-    name: 'Moorgate Chandlers',
-    trade: 'cordage',
+    id: 'hydraulics.4',
+    name: 'Moorgate Systems',
+    trade: 'hydraulics',
     balance: 200,
     terms: T(10, 10, 0.01, 1, 1, 1),
   },
@@ -273,7 +277,7 @@ export function suppliersCleared(s: CareerState): CareerState {
     ...s,
     teams: s.teams.map((c) => ({
       ...c,
-      suppliers: { timber: null, canvas: null, cordage: null },
+      suppliers: { composites: null, sailmaker: null, hydraulics: null },
     })),
   };
 }

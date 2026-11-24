@@ -736,7 +736,7 @@ const DRAWN = {
     { k: 's', d: 'M1 21.8H23', w: 1.4, top: true },
   ],
   // the drawing loft: a set square, its middle cut out, a ship's curve over it
-  'building.drawingLoft': [
+  'building.designCentre': [
     { k: 'f', d: 'M3 21V5L19 21Z' },
     { k: 'f', d: 'M6.2 17.8V12.4L11.6 17.8Z', cut: true },
     {
@@ -749,7 +749,7 @@ const DRAWN = {
     { k: 's', d: 'M9.6 3Q20.6 4 21.2 15.6', w: 2.2, top: true },
   ],
   // the test tank: a model hull afloat in the tank's still water
-  'building.testTank': [
+  'building.towingTank': [
     {
       k: 'f',
       d: 'M3.4 13Q6 12 8.6 13T13.8 13T19 13Q19.8 12.6 20.6 13V20H3.4Z',
@@ -766,8 +766,8 @@ const DRAWN = {
     { k: 'f', d: 'M6.8 10.2H17.2L15.6 13.8H8.4Z', top: true },
     { k: 's', d: 'M2.2 7.6V21H21.8V7.6', w: 1.8, top: true },
   ],
-  // the foundry: the crucible tipped, its iron pouring into the mould
-  'building.foundry': [
+  // the compositesPlant: the crucible tipped, its iron pouring into the mould
+  'building.compositesPlant': [
     { k: 's', d: 'M15.4 9.6Q16.8 12.4 16.4 17', w: 1.6 },
     {
       k: 'f',
@@ -780,7 +780,7 @@ const DRAWN = {
     { k: 's', d: 'M12.8 18.8H20', w: 1, cut: true },
   ],
   // the sailing school: a book open, its lines ruled, its ribbon hanging
-  'building.sailingSchool': [
+  'building.simulator': [
     { k: 'f', d: 'M12 6.2Q8 3.8 2.2 5V19.4Q8 18.2 12 20.6Z' },
     { k: 'f', d: 'M12 6.2Q16 3.8 21.8 5V19.4Q16 18.2 12 20.6Z' },
     { k: 's', d: 'M12 6.4V20.4', w: 1, cut: true },
@@ -794,7 +794,7 @@ const DRAWN = {
     { k: 's', d: 'M13 20L14 23.2', w: 1.4, top: true },
   ],
   // the pit house: a hammock slung between two posts, for the crew's rest
-  'building.pitHouse': [
+  'building.pitCentre': [
     { k: 's', d: 'M3 3V21.6M21 3V21.6', w: 2 },
     { k: 's', d: 'M3 5.8L5 8.4M21 5.8L19 8.4', w: 1 },
     { k: 'f', d: 'M4 8Q12 22.4 20 8Q12 16.8 4 8Z' },
@@ -802,7 +802,7 @@ const DRAWN = {
     { k: 's', d: 'M1.2 21.8H5.6M18.4 21.8H22.8', w: 1.4 },
   ],
   // the crow's nest: the barrel at the masthead, hooped, the pennant above it, the shrouds below
-  'building.crowsNest': [
+  'building.scoutingCentre': [
     { k: 's', d: 'M12 12.4L4.6 22.4M12 12.4L19.4 22.4', w: 0.9, fine: true },
     { k: 's', d: 'M12 1.4V22.4', w: 1.8 },
     { k: 's', d: 'M5.4 15.2H18.6', w: 1.4 },
@@ -811,7 +811,7 @@ const DRAWN = {
     { k: 's', d: 'M7 8.8H17M7.3 10.6H16.7', w: 0.8, cut: true, top: true },
   ],
   // the fish market: a fish, its eye and gill cut, its scales at the finer sizes
-  'building.fishMarket': [
+  'building.commercialCentre': [
     {
       k: 'f',
       d: 'M1.8 12Q7.4 5.4 15 8.4L20.4 4.4Q19 12 20.4 19.6L15 15.6Q7.4 18.6 1.8 12Z',
@@ -831,7 +831,7 @@ const DRAWN = {
     },
   ],
   // the landing pad: the pier the sponsors come ashore at, on its piles, a bollard on its deck
-  'building.landingPad': [
+  'building.hospitality': [
     { k: 'f', d: 'M3.4 13h2v8.6h-2ZM11 13h2v8.6h-2ZM18.6 13h2v8.6h-2Z' },
     { k: 'f', d: 'M1.4 10.4H22.6V13.4H1.4Z' },
     { k: 's', d: 'M1.6 11.9H22.4', w: 0.7, cut: true, fine: true },

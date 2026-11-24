@@ -1,4 +1,4 @@
-// The fixture's mail on 10 May 1716: the season's letters so far, newest
+// The fixture's mail on 10 May 2026: the season's letters so far, newest
 // first, as the career's templates word them; the open one a dilemma from her
 // driver, unanswered, naming them and the team's drivers. Names as long as a
 // career's.
@@ -34,7 +34,7 @@ const SEC = "The Admiralty's secretary";
 const LETTERS: readonly Letter[] = [
   letter(
     12,
-    '10 May 1716',
+    '10 May 2026',
     'Corvin Ashdown-Pell Wants a Rise',
     'Corvin Ashdown-Pell',
     41,
@@ -44,7 +44,7 @@ const LETTERS: readonly Letter[] = [
   ),
   letter(
     11,
-    '9 May 1716',
+    '9 May 2026',
     'Report on Isolde Varrenhythe',
     'Mabry Quill',
     52,
@@ -54,7 +54,7 @@ const LETTERS: readonly Letter[] = [
   ),
   letter(
     10,
-    '8 May 1716',
+    '8 May 2026',
     'The Rudder Design Is Drawn',
     'Tamsin Orrely',
     47,
@@ -64,7 +64,7 @@ const LETTERS: readonly Letter[] = [
   ),
   letter(
     9,
-    '6 May 1716',
+    '6 May 2026',
     'A Grey Component',
     'Tamsin Orrely',
     47,
@@ -74,7 +74,7 @@ const LETTERS: readonly Letter[] = [
   ),
   letter(
     8,
-    '2 May 1716',
+    '2 May 2026',
     'Results from Tharvenna',
     SEC,
     null,
@@ -83,8 +83,8 @@ const LETTERS: readonly Letter[] = [
   ),
   letter(
     7,
-    '28 April 1716',
-    'The Foundry Is Built',
+    '28 April 2026',
+    'The Composites Plant Is Built',
     SEC,
     null,
     'Headquarters',
@@ -92,7 +92,7 @@ const LETTERS: readonly Letter[] = [
   ),
   letter(
     6,
-    '24 April 1716',
+    '24 April 2026',
     'A Word from the Chairman',
     'Maneette Greymere',
     3,
@@ -101,7 +101,7 @@ const LETTERS: readonly Letter[] = [
   ),
   letter(
     5,
-    '18 April 1716',
+    '18 April 2026',
     'Results from Ulmoreth',
     SEC,
     null,
@@ -110,7 +110,7 @@ const LETTERS: readonly Letter[] = [
   ),
   letter(
     4,
-    '12 April 1716',
+    '12 April 2026',
     'Grey Harbour Signs On',
     SEC,
     null,
@@ -119,7 +119,7 @@ const LETTERS: readonly Letter[] = [
   ),
   letter(
     3,
-    '4 April 1716',
+    '4 April 2026',
     'A Rival Approaches Wenna Strathcairn',
     'Mabry Quill',
     52,
@@ -128,7 +128,7 @@ const LETTERS: readonly Letter[] = [
   ),
   letter(
     2,
-    '1 April 1716',
+    '1 April 2026',
     'The Season’s Calendar',
     SEC,
     null,
@@ -137,7 +137,7 @@ const LETTERS: readonly Letter[] = [
   ),
   letter(
     1,
-    '1 April 1716',
+    '1 April 2026',
     `Welcome to ${HERS.name}`,
     'Maneette Greymere',
     3,

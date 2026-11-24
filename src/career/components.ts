@@ -1,7 +1,7 @@
 // The components a design is made of: six part types × three tiers × three components, as
 // data. Each has a name, a type, a tier, and its effects on the design: performance and its maximum, reliability and
 // its maximum, days to design and to build, risk, and money. Tiers 2 and 3 of sails, rigging and keel are unlocked by
-// the test tank's level; of rudder, hull and mounts by the foundry's. Every tier has a grey component: risk for a
+// the towing tank's level; of rudder, hull and mounts by the composites plant's. Every tier has a grey component: risk for a
 // large gain. A designer knows some of them (dealt by seed from tiers 1 and 2) and may learn more (Innovation).
 
 import type { PartType } from '../race.ts';
@@ -82,33 +82,33 @@ const NAMES: Readonly<
   Record<PartType, readonly (readonly [string, string, string])[]>
 > = {
   sails: [
-    ['Flax Canvas', 'Double-Stitched Luff', 'Cut-Down Leech'],
+    ['Dacron Panels', 'Reinforced Luff Tape', 'Cut-Down Leech'],
     ['Glass-Fibre Battens', 'Bonded Seams', 'Paper-Thin Laminate'],
     ['Wind-Tunnel Cut', 'Kevlar Clew Patches', 'Membrane Mainsail'],
   ],
   rigging: [
-    ['Tarred Hemp', 'Doubled Shrouds', 'Shaved Blocks'],
+    ['Dyneema Sheets', 'Doubled Shrouds', 'Low-Friction Blocks'],
     ['Steel Wire Stays', 'Swaged Terminals', 'Hollow Spars'],
     ['Rod Rigging', 'Titanium Chainplates', 'Carbon Mast'],
   ],
   rudder: [
-    ['Oak Blade', 'Bronze Pintles', 'Thinned Trailing Edge'],
+    ['Glass-Fibre Blade', 'Stainless Pintles', 'Thinned Trailing Edge'],
     ['Balanced Rudder', 'Sealed Gudgeons', 'Spade Rudder'],
     ['Foil-Section Blade', 'Self-Aligning Bearings', 'Twin Rudders'],
   ],
   hull: [
-    ['Clinker Planking', 'Doubled Frames', 'Lightened Garboards'],
-    ['Carvel Planking', 'Copper Sheathing', 'Cold-Moulded Skin'],
-    ['Glued Strip Planking', 'Iron Knees', 'Hollow-Keel Hull'],
+    ['Glass-Fibre Monocoque', 'Doubled Frames', 'Lightened Bulkheads'],
+    ['Foam-Core Sandwich', 'Low-Drag Coating', 'Vacuum-Infused Skin'],
+    ['Pre-Preg Carbon Hull', 'Titanium Bulkhead Fittings', 'Hollow-Keel Hull'],
   ],
   keel: [
-    ['Iron Ballast', 'Bolted Keelson', 'Shifting Ballast'],
+    ['Steel Fin', 'Bolted Keel Box', 'Water Ballast'],
     ['Lead Bulb', 'Through-Bolts', 'Fin Keel'],
     ['Winged Keel', 'Forged Keel Bolts', 'Canting Keel'],
   ],
   mounts: [
-    ['Oak Carriages', 'Breeching Ropes', 'Lightened Trucks'],
-    ['Iron Slides', 'Recoil Springs', 'Swivel Mounts'],
+    ['Steel Carriages', 'Shock Cords', 'Lightened Trucks'],
+    ['Machined Slides', 'Recoil Springs', 'Swivel Mounts'],
     ['Hydraulic Buffers', 'Gimballed Cradles', 'Pivot Rails'],
   ],
 };
@@ -124,12 +124,12 @@ export const TYPES: readonly PartType[] = [
 
 /** The building whose level unlocks a type's tiers. */
 const UNLOCKS: Readonly<Record<PartType, Building>> = {
-  sails: 'testTank',
-  rigging: 'testTank',
-  keel: 'testTank',
-  rudder: 'foundry',
-  hull: 'foundry',
-  mounts: 'foundry',
+  sails: 'towingTank',
+  rigging: 'towingTank',
+  keel: 'towingTank',
+  rudder: 'compositesPlant',
+  hull: 'compositesPlant',
+  mounts: 'compositesPlant',
 };
 
 const scaled = (e: Partial<Effects>, k: number): Effects => {
@@ -168,7 +168,7 @@ const BY_ID: ReadonlyMap<string, Component> = new Map(
 export const component = (id: string): Component | null =>
   BY_ID.get(id) ?? null;
 
-/** The highest tier of a type a team's buildings unlock (its test tank's or foundry's level). */
+/** The highest tier of a type a team's buildings unlock (its towing tank's or composites plant's level). */
 export const tierOpen = (
   buildings: Readonly<Record<Building, { level: number }>>,
   type: PartType

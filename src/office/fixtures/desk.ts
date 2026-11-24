@@ -31,7 +31,7 @@ const SHELL: ShellView = {
   championship: 'Third Championship',
   next: { name: 'Brindle', days: 16 },
   notices: 6,
-  date: '10 May 1716',
+  date: '10 May 2026',
   marks: { ship: { busy: true }, hq: { busy: true }, scouting: { count: 6 } },
   on: 'Continue',
 };
@@ -68,7 +68,7 @@ const VIEWS: Pick<
   },
   plan: PLAN,
   result: {
-    title: `1716 ${HOME.next.name} - ${SHELL.championship}`,
+    title: `2026 ${HOME.next.name} - ${SHELL.championship}`,
     lines: HOME.standings.drivers.map((d, i) => ({
       place: i + 1,
       person: d.person,

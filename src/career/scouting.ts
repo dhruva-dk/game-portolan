@@ -53,7 +53,7 @@ export function scoutingDays(
 ): number {
   return scoutDays(
     effective(inRole(s.people[scout], 'scout'), null).speed,
-    s.teams[team].buildings.crowsNest.level
+    s.teams[team].buildings.scoutingCentre.level
   );
 }
 

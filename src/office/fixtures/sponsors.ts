@@ -9,14 +9,14 @@ import type { SponsorsPaper } from '../papers.ts';
 const OPEN = { ok: true, why: '' };
 const PAD = {
   ok: false,
-  why: 'The landing pad cannot receive a sponsor of that standing.',
+  why: 'The hospitality suite cannot host a sponsor of that standing.',
 };
 
 export const SPONSORS: SponsorsPaper = {
   slots: [
     {
       id: 1,
-      name: 'Greymere & Daughters, Saltworks',
+      name: 'Greymere Energy',
       grade: 2,
       races: 6,
       perRace: 24000,
@@ -25,7 +25,7 @@ export const SPONSORS: SponsorsPaper = {
     },
     {
       id: 2,
-      name: 'Varnhollow & Sons, Ropemakers',
+      name: 'Varnhollow Logistics Group',
       grade: 1,
       races: 3,
       perRace: 0,
@@ -40,7 +40,7 @@ export const SPONSORS: SponsorsPaper = {
   offers: [
     {
       id: 7,
-      name: 'Esketh & Brothers, Chandlers',
+      name: 'Esketh Telecom',
       grade: 2,
       races: 8,
       perRace: 19500,
@@ -51,7 +51,7 @@ export const SPONSORS: SponsorsPaper = {
     },
     {
       id: 8,
-      name: 'Holloway & Partners, Lamp Oil',
+      name: 'Holloway Capital',
       grade: 1,
       races: 5,
       perRace: 0,
@@ -66,7 +66,7 @@ export const SPONSORS: SponsorsPaper = {
     },
     {
       id: 9,
-      name: 'Corrigan & Cousins, Shipwrights',
+      name: 'Corrigan Aerospace',
       grade: 3,
       races: 10,
       perRace: 36000,

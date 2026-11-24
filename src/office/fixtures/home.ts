@@ -93,9 +93,9 @@ export const HOME: HomeView = {
   news: {
     kind: 'building',
     headline: 'Building Unlocked',
-    subject: 'Sail Loft',
+    subject: 'Towing Tank',
     status: 'Available',
-    button: 'Sail Loft',
+    button: 'Towing Tank',
     screen: 'hq',
   },
   work: [

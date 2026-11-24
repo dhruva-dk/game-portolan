@@ -122,7 +122,7 @@ export function signCheck(
   if (o.sponsor.grade > sponsorGrade(c))
     return why(
       'tier',
-      'The landing pad cannot receive a sponsor of that standing.'
+      'The hospitality suite cannot host a sponsor of that standing.'
     );
   return null;
 }

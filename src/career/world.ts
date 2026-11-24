@@ -40,14 +40,14 @@ import { TUNING } from './tuning.ts';
 
 export const BUILDINGS: readonly Building[] = [
   'factory',
-  'drawingLoft',
-  'testTank',
-  'foundry',
-  'sailingSchool',
-  'pitHouse',
-  'crowsNest',
-  'fishMarket',
-  'landingPad',
+  'designCentre',
+  'towingTank',
+  'compositesPlant',
+  'simulator',
+  'pitCentre',
+  'scoutingCentre',
+  'commercialCentre',
+  'hospitality',
 ];
 const W = TUNING.world,
   C = TUNING.team;
@@ -164,14 +164,14 @@ function startingBuildings(rand: Rand, tier: number): Record<Building, Works> {
   });
   return {
     factory: drawn(),
-    drawingLoft: drawn(),
-    testTank: drawn(),
-    foundry: drawn(),
-    sailingSchool: drawn(),
-    pitHouse: drawn(),
-    crowsNest: drawn(),
-    fishMarket: drawn(),
-    landingPad: drawn(),
+    designCentre: drawn(),
+    towingTank: drawn(),
+    compositesPlant: drawn(),
+    simulator: drawn(),
+    pitCentre: drawn(),
+    scoutingCentre: drawn(),
+    commercialCentre: drawn(),
+    hospitality: drawn(),
   };
 }
 
@@ -260,7 +260,7 @@ function makeTeam(g: Gathering, rand: Rand, m: Making): Team {
   const reserve = sign('driver', about() - 0.5, 'reserve').id;
   const designer = sign('designer', about()).id;
   const scouts = Array.from(
-    { length: buildings.crowsNest.level },
+    { length: buildings.scoutingCentre.level },
     () => sign('scout', about()).id
   );
   const pit = Array.from({ length: W.pit }, () => sign('pit', about()).id);
@@ -305,7 +305,7 @@ function makeTeam(g: Gathering, rand: Rand, m: Making): Team {
       mounts: null,
     },
     bonds: SHIPS.map(() => 0),
-    suppliers: { timber: null, canvas: null, cordage: null },
+    suppliers: { composites: null, sailmaker: null, hydraulics: null },
     sponsors: [null, null, null],
     offers: [],
     plan: null,

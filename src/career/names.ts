@@ -380,39 +380,39 @@ export const NOUNS: readonly string[] = [
   'Zephyrs',
 ];
 
-const RELATIONS = [
-  'Daughters',
-  'Sons',
-  'Nieces',
-  'Nephews',
-  'Cousins',
-  'Partners',
-  'Heirs',
-  'Kin',
-  'Company',
-  'Brothers',
-  'Sisters',
-  'Fledglings',
+const SECTORS = [
+  'Logistics',
+  'Energy',
+  'Telecom',
+  'Software',
+  'Aerospace',
+  'Capital',
+  'Insurance',
+  'Freight',
+  'Pharmaceuticals',
+  'Motors',
+  'Robotics',
+  'Mining',
+  'Beverages',
+  'Watches',
+  'Semiconductors',
+  'Shipping',
+  'Data',
+  'Apparel',
 ];
-const TRADES = [
-  'Ropewalkers',
-  'Chandlers',
-  'Sailmakers',
-  'Fishmongers',
-  'Coopers',
-  'Tar Merchants',
-  'Lamplighters',
-  'Net Menders',
-  'Salt Traders',
-  'Shipbrokers',
-  'Insurers',
-  'Chartsellers',
-  'Biscuit Bakers',
-  'Pewterers',
-  'Glassblowers',
-  'Lens Grinders',
-  'Clockmakers',
-  'Ink Makers',
+const SUFFIXES = [
+  '',
+  '',
+  '',
+  '',
+  ' Group',
+  ' Holdings',
+  ' Systems',
+  ' International',
+  ' Labs',
+  ' Partners',
+  ' Industries',
+  ' Global',
 ];
 
 const PLANET_START = [
@@ -489,12 +489,13 @@ export const place = (rand: Rand): string => colony(rand);
 export const teamName = (placeWord: string, noun: string): string =>
   `${placeWord} ${noun}`;
 
-/** A sponsor's name: "<family> & <relation>, <trade>". */
+/** A sponsor's name: a modern firm, "<family> <sector>[ <suffix>]" (the suffix drawn first, as the relation was). */
 export const sponsor = (rand: Rand): string =>
-  clean(
-    rand,
-    (r) => `${family(r)} & ${pick(r, RELATIONS)}, ${pick(r, TRADES)}`
-  );
+  clean(rand, (r) => {
+    const name = family(r),
+      suffix = pick(r, SUFFIXES);
+    return `${name} ${pick(r, SECTORS)}${suffix}`;
+  });
 
 /** A planet's name. */
 export const planet = (rand: Rand): string =>

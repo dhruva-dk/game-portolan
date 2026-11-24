@@ -6,7 +6,7 @@
 // A pair [a, b] is a line in u = stat / 20: a + b × u. A triple by tier is Tier 1's, Two's, Three's.
 
 /** Bump with any change to TUNING (and pin the new hash in the test). */
-export const TUNING_VERSION = 11;
+export const TUNING_VERSION = 12;
 
 const ROLE_YEARS = {
   manager: [40, 55],
@@ -89,7 +89,7 @@ export const TUNING = {
     school: [1, 1.25, 1.5], // the role's building, by level
     mentor: 0.25, // growth added (as a share) to a Mentor's team's drivers under mentorAge
     mentorAge: 22,
-    stamina: 0.2, // a driver's Stamina grows this more a season a sailing school level
+    stamina: 0.2, // a driver's Stamina grows this more a season a driver simulator level
   },
 
   /** Morale, 0 to 100. */
@@ -488,51 +488,51 @@ export const TUNING = {
         days: [0, 30, 50],
         upkeep: [10, 25, 50],
       },
-      drawingLoft: {
+      designCentre: {
         cost: [0, 2000, 5000],
         days: [0, 25, 45],
         upkeep: [8, 20, 40],
       },
-      testTank: {
+      towingTank: {
         cost: [0, 2200, 5500],
         days: [0, 30, 50],
         upkeep: [8, 20, 40],
       },
-      foundry: {
+      compositesPlant: {
         cost: [0, 2200, 5500],
         days: [0, 30, 50],
         upkeep: [8, 20, 40],
       },
-      sailingSchool: {
+      simulator: {
         cost: [0, 1800, 4500],
         days: [0, 25, 40],
         upkeep: [6, 15, 30],
       },
-      pitHouse: {
+      pitCentre: {
         cost: [0, 1200, 3000],
         days: [0, 20, 35],
         upkeep: [5, 12, 25],
       },
-      crowsNest: {
+      scoutingCentre: {
         cost: [0, 1200, 3000],
         days: [0, 20, 35],
         upkeep: [5, 12, 25],
       },
-      fishMarket: {
+      commercialCentre: {
         cost: [0, 1500, 4000],
         days: [0, 20, 35],
         upkeep: [0, 0, 0],
       },
-      landingPad: {
+      hospitality: {
         cost: [0, 1600, 4200],
         days: [0, 25, 40],
         upkeep: [5, 12, 25],
       },
     },
     points: [10, 20, 30], // the factory's improvement points a day
-    slots: [2, 3, 4], // the drawing loft's design slots
-    loft: [1, 0.85, 0.7], // the drawing loft's design days ×
-    fish: [120, 80, 50], // money a race the fish market brings at level 1, by tier
+    slots: [2, 3, 4], // the design centre's design slots
+    loft: [1, 0.85, 0.7], // the design centre's design days ×
+    fish: [120, 80, 50], // money a race the commercial centre brings at level 1, by tier
     fishLevel: [1, 1.8, 2.6], //   × this by its level
   },
 
@@ -563,7 +563,7 @@ export const TUNING = {
     stand: 14, // offers a team gets every so many days, standing so long
     perRace: 15.5, // a fixed sponsor's money a race × the team's marketability × its tier's factor
     tier: [1.7, 1, 1], //   (Tier 1's wages outrun its marketability)
-    grade: [1, 1.6, 2.4], // × by the offer's grade (the landing pad's level at most)
+    grade: [1, 1.6, 2.4], // × by the offer's grade (the hospitality suite's level at most)
     races: [3, 10],
     bonus: 23.5, // an objective sponsor's bonus × the team's marketability × tier × the objective's weight
     objectives: { top10: 1, sinkTwo: 1.6, afloat: 1.2, mostSea: 1.8 },
@@ -644,70 +644,70 @@ export const TUNING = {
     },
     build: {
       spender: [
-        'fishMarket',
-        'landingPad',
+        'commercialCentre',
+        'hospitality',
         'factory',
-        'drawingLoft',
-        'testTank',
-        'foundry',
-        'sailingSchool',
-        'crowsNest',
-        'pitHouse',
+        'designCentre',
+        'towingTank',
+        'compositesPlant',
+        'simulator',
+        'scoutingCentre',
+        'pitCentre',
       ],
       youthBuilder: [
-        'sailingSchool',
-        'crowsNest',
-        'pitHouse',
-        'drawingLoft',
+        'simulator',
+        'scoutingCentre',
+        'pitCentre',
+        'designCentre',
         'factory',
-        'testTank',
-        'foundry',
-        'fishMarket',
-        'landingPad',
+        'towingTank',
+        'compositesPlant',
+        'commercialCentre',
+        'hospitality',
       ],
       poacher: [
-        'crowsNest',
-        'landingPad',
-        'fishMarket',
+        'scoutingCentre',
+        'hospitality',
+        'commercialCentre',
         'factory',
-        'sailingSchool',
-        'pitHouse',
-        'drawingLoft',
-        'testTank',
-        'foundry',
+        'simulator',
+        'pitCentre',
+        'designCentre',
+        'towingTank',
+        'compositesPlant',
       ],
       engineer: [
         'factory',
-        'drawingLoft',
-        'testTank',
-        'foundry',
-        'pitHouse',
-        'sailingSchool',
-        'crowsNest',
-        'fishMarket',
-        'landingPad',
+        'designCentre',
+        'towingTank',
+        'compositesPlant',
+        'pitCentre',
+        'simulator',
+        'scoutingCentre',
+        'commercialCentre',
+        'hospitality',
       ],
       gambler: [
-        'testTank',
-        'foundry',
-        'landingPad',
+        'towingTank',
+        'compositesPlant',
+        'hospitality',
         'factory',
-        'drawingLoft',
-        'fishMarket',
-        'sailingSchool',
-        'crowsNest',
-        'pitHouse',
+        'designCentre',
+        'commercialCentre',
+        'simulator',
+        'scoutingCentre',
+        'pitCentre',
       ],
       steady: [
-        'fishMarket',
+        'commercialCentre',
         'factory',
-        'pitHouse',
-        'sailingSchool',
-        'drawingLoft',
-        'crowsNest',
-        'landingPad',
-        'testTank',
-        'foundry',
+        'pitCentre',
+        'simulator',
+        'designCentre',
+        'scoutingCentre',
+        'hospitality',
+        'towingTank',
+        'compositesPlant',
       ],
     },
     buildShare: 0.6, // a building is begun if it costs at most this of the room

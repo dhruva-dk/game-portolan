@@ -76,7 +76,7 @@ function strengthOf(s: CareerState, c: Team): TeamSeason['strength'] {
     reliability: mean(fitted.map((p) => p.reliability)),
     risk: mean(fitted.map((p) => p.risk)),
     buildings: Object.values(c.buildings).reduce((a, w) => a + w.level, 0),
-    school: c.buildings.sailingSchool.level,
+    school: c.buildings.simulator.level,
     wages: wages(s, c),
   };
 }

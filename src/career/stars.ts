@@ -55,16 +55,16 @@ function share(g: Person, season: number, i: number): number {
 export interface Schooling {
   school: number;
   mentor: boolean;
-  sailingSchool: number;
+  simulator: number;
 }
 
 /** The building whose level schools each role; managers and chairmen have none. */
 export const SCHOOL: Readonly<Record<Role, Building | null>> = {
-  driver: 'sailingSchool',
-  pit: 'pitHouse',
+  driver: 'simulator',
+  pit: 'pitCentre',
   mechanic: 'factory',
-  designer: 'drawingLoft',
-  scout: 'crowsNest',
+  designer: 'designCentre',
+  scout: 'scoutingCentre',
   manager: null,
   chairman: null,
 };
@@ -93,7 +93,7 @@ export function grown<G extends Person>(
       const gap = Math.max(0, ceiling[k] - s);
       const stamina =
         g.role === 'driver' && k === 'stamina'
-          ? TUNING.growth.stamina * schooling.sailingSchool
+          ? TUNING.growth.stamina * schooling.simulator
           : 0;
       out[k] = stat(
         s +

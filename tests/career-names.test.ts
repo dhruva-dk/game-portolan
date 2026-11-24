@@ -66,11 +66,12 @@ test("people' full names: drawn fresh, never one taken", () => {
   assert.equal(taken.size, 20_000);
 });
 
-test('sponsors are "<family> & <relation>, <trade>"; teams\' nouns are enough for every team with words to spare', () => {
-  assert.match(
-    sponsor(random(3)),
-    /^[A-Z][a-z]+ & [A-Z][a-z]+, [A-Z][A-Za-z ]+$/
-  );
+test('sponsors are modern firms, "<family> <sector>[ <suffix>]"; teams\' nouns are enough for every team with words to spare', () => {
+  for (let i = 0; i < 50; i++)
+    assert.match(
+      sponsor(random(i)),
+      /^[A-Z][a-z]+ [A-Z][a-z]+( [A-Z][a-z]+)?$/
+    );
   assert.ok(NOUNS.length >= 125);
   assert.equal(new Set(NOUNS.map((n) => n.toLowerCase())).size, NOUNS.length);
   for (const n of NOUNS) assert.equal(words(n).length, 1);

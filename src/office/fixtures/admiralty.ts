@@ -71,7 +71,7 @@ const TEAMS_ON: readonly Leaning[] = TEAMS.map((team, i) => {
 
 export const ADMIRALTY: AdmiraltyView = {
   championship: 'Second Championship',
-  season: 1719,
+  season: 2029,
   rules: [
     {
       name: 'Spec parts',
@@ -125,7 +125,7 @@ export const ADMIRALTY: AdmiraltyView = {
     rule: 'The storm’s pace',
     from: '×1.0',
     to: '×1.1',
-    closes: '14 July 1719',
+    closes: '14 July 2029',
     days: 9,
     carried: null,
     count: { for: 2, against: 2, abstain: 1 },
@@ -153,7 +153,7 @@ export const ADMIRALTY: AdmiraltyView = {
       rule: 'The sea-held point',
       from: 'Given',
       to: 'None',
-      closes: '30 April 1719',
+      closes: '30 April 2029',
       days: 0,
       carried: true,
       count: { for: 11, against: 7, abstain: 2 },

@@ -94,7 +94,7 @@ function driverOf(
 
 /** A team's pit crew today: each member's effective stats and fatigue, a dilemma's rest, push or cover taken. */
 function membersOf(s: CareerState, c: Team): Member[] {
-  const house = c.buildings.pitHouse.level;
+  const house = c.buildings.pitCentre.level;
   return c.staff.pit.flatMap((id) => {
     const g = s.people[id];
     if (!g || !hasRole(g, 'pit')) return [];

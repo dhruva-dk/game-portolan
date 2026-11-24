@@ -209,7 +209,7 @@ export function calendarPaper(
 const SPENT: Readonly<Record<string, string>> = {
   sponsor: 'Sponsors',
   prize: 'Prize money',
-  fish: 'Fish market',
+  fish: 'Commercial Centre',
   pay: 'Pay drivers',
   wages: 'Wages',
   bonus: 'Bonuses',
@@ -266,7 +266,7 @@ export function financesPaper(s: CareerState): FinancesPaper {
     },
     race: [
       { label: 'Sponsors', amount: r.sponsors },
-      { label: 'Fish Market', amount: r.fish },
+      { label: 'Commercial Centre', amount: r.fish },
       { label: 'Pay Drivers', amount: r.pay },
       { label: 'Wages', amount: -r.wages },
       { label: 'Headquarters Upkeep', amount: -r.upkeep },
@@ -362,27 +362,31 @@ function measured(
 const ABOUT: Readonly<Record<Building, string>> = {
   factory:
     'Where parts are built and improved between races. Each level gives more improvement work a day and builds a part sooner.',
-  drawingLoft:
+  designCentre:
     'Where parts are designed. Each level gives a design another component, shortens it, and brings designers on faster.',
-  testTank: 'Hulls proved in still water. Each level opens better components.',
-  foundry: 'Iron cast for the ships. Each level opens better components.',
-  sailingSchool: 'Where drivers are taught. Each level brings them on faster.',
-  pitHouse: 'Where the pit crew rest. Each level mends their fatigue sooner.',
-  crowsNest:
-    'Where the scouts keep watch. Each level takes on another scout and shortens a scouting.',
-  fishMarket: 'The team’s stall on the quay. It brings in money every race.',
-  landingPad:
-    'Where sponsors come ashore. Each level lets a better sponsor be signed.',
+  towingTank:
+    'Hydrodynamics: sails, rigging and keel tested at scale. Each level opens better components.',
+  compositesPlant:
+    'Carbon lay-up and machining for rudder, hull and mounts. Each level opens better components.',
+  simulator: 'Where drivers train. Each level brings them on faster.',
+  pitCentre:
+    'Where the pit crew train and recover. Each level mends their fatigue sooner.',
+  scoutingCentre:
+    'Data and travel for the scouts. Each level takes on another scout and shortens a scouting.',
+  commercialCentre:
+    'Merchandise, licensing and the fan store. It brings in money every race.',
+  hospitality:
+    'Where sponsors are entertained. Each level lets a better sponsor be signed.',
 };
 
 /** What the buildings are for, a bar of the headquarters' chart each: its name, and the buildings counted in it. */
 const WINGS: readonly (readonly [string, readonly Building[]])[] = [
   ['Overall', BUILDINGS],
-  ['Design', ['drawingLoft', 'testTank', 'foundry']],
+  ['Design', ['designCentre', 'towingTank', 'compositesPlant']],
   ['Factory', ['factory']],
-  ['Crew', ['sailingSchool', 'pitHouse']],
-  ['Scouting', ['crowsNest']],
-  ['Income', ['fishMarket', 'landingPad']],
+  ['Crew', ['simulator', 'pitCentre']],
+  ['Scouting', ['scoutingCentre']],
+  ['Income', ['commercialCentre', 'hospitality']],
 ];
 
 /** The headquarters. */

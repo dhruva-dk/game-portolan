@@ -376,7 +376,7 @@ export const DILEMMAS: readonly Dilemma[] = [
         race = nextRace(s) ?? s.day;
       if (o === 1) return ok(flagged(s, `push:${id}`, race));
       if (o === 0) {
-        const loft = c.buildings.pitHouse.level;
+        const loft = c.buildings.pitCentre.level;
         const rested = personSet(s, id, (g) => ({
           ...g,
           fatigue: Math.max(0, fatigueOn(g, s.day, loft) - D.restFatigue),

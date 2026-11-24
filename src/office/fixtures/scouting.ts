@@ -126,7 +126,7 @@ export const SCOUTING: ScoutingView = {
       cancel: { ok: true, why: '' },
     },
   ],
-  nest: figure("Crow's nest", [2, 'Level 2'], 'scouts 1 of 2', [
+  nest: figure('Scouting Department', [2, 'Level 2'], 'scouts 1 of 2', [
     ['Level', '2'],
     ['Scouts allowed', '2'],
     ['Scouts hired', '1'],

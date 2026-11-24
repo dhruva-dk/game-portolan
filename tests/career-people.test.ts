@@ -94,7 +94,7 @@ test('growth: below peak toward the ceiling, by improvability and school; past p
     stats: flat(8),
     ceiling: flat(16),
   };
-  const school = { school: 1, mentor: false, sailingSchool: 0 };
+  const school = { school: 1, mentor: false, simulator: 0 };
   const g1 = grown(young, 20, 0, school);
   for (const [k, v] of Object.entries(g1.stats)) {
     assert.ok(v > 8 && v < 16, `${k} grows toward its ceiling: ${v}`);
@@ -129,7 +129,7 @@ test('growth: below peak toward the ceiling, by improvability and school; past p
     Object.values(grown(young, 25, 0, school).stats).reduce((a, b) => a + b),
     'not at 22 or over'
   );
-  const stamina = grown(young, 20, 0, { ...school, sailingSchool: 3 });
+  const stamina = grown(young, 20, 0, { ...school, simulator: 3 });
   assert.ok(
     Math.abs(stamina.stats.stamina - g1.stats.stamina - 0.6) < 0.11,
     'the sailing school adds Stamina a level'

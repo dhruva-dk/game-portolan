@@ -114,7 +114,7 @@ function pitRow(
   best: number
 ): PitRow {
   const st = effective(g, null),
-    house = c.buildings.pitHouse.level,
+    house = c.buildings.pitCentre.level,
     tired = fatigueOn(g, s.day, house);
   const now = work(st, tired),
     fresh = work(st, 0),
@@ -147,7 +147,7 @@ function pitRow(
         lines: [
           line('After the last race', Math.round(g.fatigue)),
           line('Recovered since', Math.round(g.fatigue - tired)),
-          line('Pit house level', house),
+          line('Pit crew centre level', house),
         ],
       }
     ),
@@ -160,7 +160,7 @@ function pitRows(s: CareerState, c: Team): PitRow[] {
     const g = s.people[id];
     return g && hasRole(g, 'pit') ? [g] : [];
   });
-  const house = c.buildings.pitHouse.level;
+  const house = c.buildings.pitCentre.level;
   const best = Math.max(
     0,
     ...members.map((g) => work(effective(g, null), fatigueOn(g, s.day, house)))

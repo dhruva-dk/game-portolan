@@ -552,7 +552,7 @@ test('mail: each letter its kind and sender; the open one its sender’s face an
         links: [
           { to: 'person', id: person },
           { to: 'team', id: rival.id },
-          { to: 'building', id: 'foundry' },
+          { to: 'building', id: 'compositesPlant' },
           { to: 'part', id: 'rudder' },
           { to: 'screen', id: 'suppliers' },
           { to: 'screen', id: 'no such screen' },
@@ -573,7 +573,7 @@ test('mail: each letter its kind and sender; the open one its sender’s face an
       ask: { kind: 'person', id: person, screen: 'profile' },
     },
     { name: rival.name, ask: { kind: 'team', id: rival.id } },
-    { name: 'Foundry', ask: { kind: 'open', screen: 'hq' } },
+    { name: 'Composites Plant', ask: { kind: 'open', screen: 'hq' } },
     { name: 'Rudder', ask: { kind: 'open', screen: 'ship' } },
     { name: 'Suppliers', ask: { kind: 'open', screen: 'ship' } },
   ]);

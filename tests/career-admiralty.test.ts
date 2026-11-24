@@ -271,8 +271,8 @@ test("the rivals' rows: improvement, design, build, sponsors, suppliers and vote
   assert.ok(design.teams[rival].balance < s.teams[rival].balance);
   const sup = decide(s, rival, roll, ['suppliers']);
   assert.ok(
-    sup.teams[rival].suppliers.timber !== null &&
-      sup.teams[rival].suppliers.canvas !== null
+    sup.teams[rival].suppliers.composites !== null &&
+      sup.teams[rival].suppliers.sailmaker !== null
   );
   const off = offerAll(s, rival);
   const pat = decide(off, rival, roll, ['sponsors']);

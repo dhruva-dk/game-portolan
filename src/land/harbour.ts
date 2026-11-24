@@ -316,7 +316,7 @@ const BUILT: Readonly<
     },
   },
   // a jetty out over the water, a pavilion at its head
-  landingPad: {
+  hospitality: {
     turn: 0,
     build(s) {
       s.footing(9, 7, 0, -4);
@@ -338,7 +338,7 @@ const BUILT: Readonly<
     },
   },
   // a boathouse, its door open on a ramp to the water, spars stacked by it
-  pitHouse: {
+  pitCentre: {
     turn: -0.05,
     build(s) {
       s.footing(16, 14);
@@ -371,7 +371,7 @@ const BUILT: Readonly<
     },
   },
   // a stall under a striped awning, the catch laid out on its counter
-  fishMarket: {
+  commercialCentre: {
     turn: 0.08,
     build(s) {
       s.footing(15, 11);
@@ -401,7 +401,7 @@ const BUILT: Readonly<
     },
   },
   // a long low shed, and the still basin before it a hull is towed down
-  testTank: {
+  towingTank: {
     turn: 0,
     build(s) {
       s.footing(21, 14);
@@ -423,7 +423,7 @@ const BUILT: Readonly<
     },
   },
   // a small house under its pennant, a dinghy for the learning drawn up by it
-  sailingSchool: {
+  simulator: {
     turn: -0.1,
     build(s) {
       s.footing(15, 12);
@@ -447,7 +447,7 @@ const BUILT: Readonly<
     },
   },
   // a saw-toothed roof, a stack, the fire in its door
-  foundry: {
+  compositesPlant: {
     turn: 0.04,
     build(s) {
       s.footing(17, 13);
@@ -475,7 +475,7 @@ const BUILT: Readonly<
     },
   },
   // a tall house, a great window in its gable for the light
-  drawingLoft: {
+  designCentre: {
     turn: -0.03,
     build(s) {
       s.footing(14, 12);
@@ -500,7 +500,7 @@ const BUILT: Readonly<
     },
   },
   // a watch tower, its gallery and its pennant
-  crowsNest: {
+  scoutingCentre: {
     turn: 0.3,
     build(s) {
       s.footing(9, 9);

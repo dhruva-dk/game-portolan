@@ -1,5 +1,5 @@
-// The fixture's player as a manager, four seasons in (1716 to 1718 behind her,
-// 1719 under way), and two posts offered: one she may take, one shut. The jobs
+// The fixture's player as a manager, four seasons in (2026 to 2028 behind her,
+// 2029 under way), and two posts offered: one she may take, one shut. The jobs
 // screen's letter as the career writes it when she is sought. Names as long as
 // a career's.
 
@@ -36,7 +36,7 @@ const post = (
     ]),
     standing: '9th of 20',
     ranks: { ships: '11th', drivers: '7th', hq: '14th' },
-    expires: '24 May 1716',
+    expires: '24 May 2026',
     take: { ok: true, why: '' },
     decline: { ok: true, why: '' },
     ...more,
@@ -53,7 +53,7 @@ const OFFERS: readonly JobCard[] = [
       ['A season', '1,250,000'],
       ['In hand', '480,000'],
     ]),
-    expires: '2 June 1716',
+    expires: '2 June 2026',
     take: { ok: false, why: 'It is race day: sail it first.' },
   }),
 ];
@@ -93,7 +93,7 @@ export const PLAYER: CareerView = {
   ],
   record: [
     {
-      season: '1719',
+      season: '2029',
       teamId: HERS.id,
       team: HERS.name,
       tier: 'Third Championship',
@@ -104,7 +104,7 @@ export const PLAYER: CareerView = {
       review: null,
     },
     {
-      season: '1718',
+      season: '2028',
       teamId: HERS.id,
       team: HERS.name,
       tier: 'Third Championship',
@@ -115,7 +115,7 @@ export const PLAYER: CareerView = {
       review: 2,
     },
     {
-      season: '1717',
+      season: '2027',
       teamId: TEAMS[5]?.id ?? null,
       team: TEAMS[5]?.name ?? 'Free',
       tier: 'Second Championship',
@@ -126,7 +126,7 @@ export const PLAYER: CareerView = {
       review: 1,
     },
     {
-      season: '1716',
+      season: '2026',
       teamId: null,
       team: 'Free',
       tier: '—',

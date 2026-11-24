@@ -28,7 +28,7 @@ test('the world: three championships of twenty teams, a full staff each, 300 fre
     assert.equal(count('designer'), 1);
     assert.equal(
       count('scout'),
-      c.buildings.crowsNest.level,
+      c.buildings.scoutingCentre.level,
       "one scout a crow's nest level"
     );
     assert.equal(count('pit'), TUNING.world.pit);

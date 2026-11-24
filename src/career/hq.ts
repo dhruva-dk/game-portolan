@@ -1,10 +1,10 @@
 // The headquarters: nine buildings, levels 1 to 3 (every team holds each at level 1 at least), any
 // number under way at once. Each level has a cost, days to build and an upkeep a race (TUNING.hq). What each
 // level gives is read where it acts, through the functions here: the factory's improvement points and build days, the
-// drawing loft's slots, design days and designers' growth (stars.ts SCHOOL), the test tank's and the foundry's
-// component tiers (components.ts), the sailing school's drivers' growth, the pit crew loft's fatigue recovery
-// (pit.ts recovery), the crow's nest's scouts and scouting days (staff.ts scoutDays), the fish market's money and
-// the landing pad's sponsor tiers.
+// design centre's slots, design days and designers' growth (stars.ts SCHOOL), the towing tank's and the composites
+// plant's component tiers (components.ts), the driver simulator's drivers' growth, the pit crew centre's fatigue
+// recovery (pit.ts recovery), the scouting department's scouts and scouting days (staff.ts scoutDays), the
+// commercial centre's money and the hospitality suite's sponsor tiers.
 
 import type { Building } from '../office/command.ts';
 import { canSpend, paid } from './balance.ts';
@@ -39,19 +39,19 @@ export const factoryPoints = (c: Team): number =>
 /** The factory: days to build a designed part (7 − level, at least 1). */
 export const partBuildDays = (c: Team): number =>
   Math.max(1, TUNING.design.build - c.buildings.factory.level);
-/** The drawing loft: design slots, and design days ×. */
+/** The design centre: design slots, and design days ×. */
 export const designSlots = (c: Team): number =>
-  K.slots[at(c.buildings.drawingLoft.level)];
+  K.slots[at(c.buildings.designCentre.level)];
 export const loftFactor = (c: Team): number =>
-  K.loft[at(c.buildings.drawingLoft.level)];
-/** The fish market: money a race, by tier. */
+  K.loft[at(c.buildings.designCentre.level)];
+/** The commercial centre: money a race, by tier. */
 export const fishIncome = (c: Team): number =>
   Math.round(
     K.fish[Math.min(K.fish.length - 1, c.tier)] *
-      K.fishLevel[at(c.buildings.fishMarket.level)]
+      K.fishLevel[at(c.buildings.commercialCentre.level)]
   );
-/** The landing pad: the highest sponsor tier a team may sign. */
-export const sponsorGrade = (c: Team): number => c.buildings.landingPad.level;
+/** The hospitality suite: the highest sponsor tier a team may sign. */
+export const sponsorGrade = (c: Team): number => c.buildings.hospitality.level;
 
 /** Whether a team may raise a building a level now. */
 export function buildCheck(s: CareerState, team: number, b: Building): Check {

@@ -49,7 +49,7 @@ export const PROFILE: ProfileView = {
     team: HERS.name,
     emblem: HERS.emblem,
     colours: COLOURS,
-    date: '10 May 1716',
+    date: '10 May 2026',
     balance: figure('Balance', [211000, '211,000'], 'last race', []),
     unread: 6,
     dilemma: false,

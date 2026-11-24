@@ -151,7 +151,7 @@ export function scoutingView(
       cancel: { ok: job !== null, why: job ? '' : 'Idle.' },
     };
   });
-  const nest = c.buildings.crowsNest.level;
+  const nest = c.buildings.scoutingCentre.level;
   return {
     top: topBar(s),
     filter: f,
@@ -168,7 +168,7 @@ export function scoutingView(
       `Level ${nest}`,
       rival('scouts', `${c.staff.scouts.length} of ${nest}`),
       {
-        title: "Crow's nest",
+        title: 'Scouting Department',
         lines: [
           line('Level', nest),
           line('Scouts allowed', nest),

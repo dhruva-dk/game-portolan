@@ -128,7 +128,7 @@ const LEDGER: Readonly<Record<string, string>> = {
   building: 'Building',
   design: 'Designs',
   fee: 'Fees',
-  fish: 'Fish market',
+  fish: 'Commercial Centre',
   lobby: 'Lobbying',
   fine: 'Fines',
   bonus: 'Bonuses',

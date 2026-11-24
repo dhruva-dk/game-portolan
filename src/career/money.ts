@@ -68,7 +68,10 @@ export function raceMoney(s: CareerState, team: number): CareerState {
     kind: 'upkeep',
     what: "the headquarters's upkeep",
   });
-  out = paid(out, team, -r.fish, { kind: 'fish', what: 'the fish market' });
+  out = paid(out, team, -r.fish, {
+    kind: 'fish',
+    what: 'the commercial centre',
+  });
   out = paid(out, team, -r.sponsors, {
     kind: 'sponsor',
     what: "the sponsors' sums",

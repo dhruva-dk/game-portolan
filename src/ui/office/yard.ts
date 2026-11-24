@@ -514,7 +514,7 @@ export function createShip(office: Office): Screen<ShipPaper> {
       );
     };
     const choose = v.design
-      ? panel('In the Drawing Loft', [
+      ? panel('In the Design Centre', [
           job(
             { mark: null, name: v.design.name },
             v.design.done,
@@ -524,7 +524,7 @@ export function createShip(office: Office): Screen<ShipPaper> {
           el(
             'div',
             'y-none',
-            `The drawing loft is at work on the ${v.design.name.toLowerCase()}. One part is designed at a time.`
+            `The design centre is at work on the ${v.design.name.toLowerCase()}. One part is designed at a time.`
           ),
         ])
       : panel('Choose a Part to Design', [

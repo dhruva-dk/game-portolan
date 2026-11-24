@@ -138,7 +138,7 @@ export function openPosts(
   });
   if (c.staff.designer === null)
     out.push({ role: 'designer', status: 'staff', label: 'A designer' });
-  const nest = c.buildings.crowsNest.level;
+  const nest = c.buildings.scoutingCentre.level;
   if (c.staff.scouts.length < nest)
     out.push({
       role: 'scout',

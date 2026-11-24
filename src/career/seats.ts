@@ -83,7 +83,7 @@ export function openSeat(c: Team, role: Role, status: Status): Seat | null {
     case 'designer':
       return st.designer === null ? { kind: 'designer' } : null;
     case 'scout':
-      return st.scouts.length < c.buildings.crowsNest.level
+      return st.scouts.length < c.buildings.scoutingCentre.level
         ? { kind: 'scout' }
         : null;
     case 'pit':

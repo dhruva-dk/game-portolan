@@ -1,8 +1,8 @@
-// Designing a part: one design at a time per team. Each of the drawing loft's slots (2, 3,
+// Designing a part: one design at a time per team. Each of the design centre's slots (2, 3,
 // 4) is dealt three cards from the components the designer knows and the buildings allow, seeded by the design, the
 // slot and the deal's count, with one redeal a slot. The design starts from the team's best of the type plus the
 // designer's rating × 8 plus the components; it costs by tier and type plus the components; it takes 14 days × the
-// designer's Speed × the drawing loft's factor, then 7 − the factory's level to build. When it is drawn, the
+// designer's Speed × the design centre's factor, then 7 − the factory's level to build. When it is drawn, the
 // designer's Accuracy fixes the numbers and Innovation may teach a component. Rivals deal and design through these
 // same functions (career/works.ts).
 
@@ -98,7 +98,7 @@ function dealCheck(
   if (!wright(s, c))
     return why('noDesigner', 'The team has no designer to draw it.');
   if (!whole(slot, 0, designSlots(c) - 1))
-    return why('slot', 'The drawing loft has no such slot.');
+    return why('slot', 'The design centre has no such slot.');
   const d =
     c.draft?.type === type
       ? c.draft.deals.find((x) => x.slot === slot)
@@ -215,7 +215,7 @@ export function designCheck(
   if (forNext && !forNextOpen(s))
     return why('forNext', "Next season's designs begin from round five.");
   if (!Array.isArray(components) || components.length > designSlots(c))
-    return why('slots', 'More components than the drawing loft has slots.');
+    return why('slots', 'More components than the design centre has slots.');
   if (new Set(components).size !== components.length)
     return why('twice', 'A component goes on a design once.');
   const deals = c.draft?.type === type ? c.draft.deals : [];

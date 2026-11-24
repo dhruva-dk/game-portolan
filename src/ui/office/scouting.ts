@@ -175,7 +175,7 @@ export function createScouting(office: Office): Screen<Dyed<ScoutingView>> {
       'Scouts',
       [
         label(
-          `Crow's nest: ${v.scouts.length} of ${v.nest.value} scouts`,
+          `Scouting Department: ${v.scouts.length} of ${v.nest.value} scouts`,
           'sc-nest'
         ),
         ...v.scouts.map((s) => scout(s, dyes)),

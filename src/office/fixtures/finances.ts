@@ -1,4 +1,4 @@
-// The fixture's finances: a season begun on 1 March 1716, five races sailed by
+// The fixture's finances: a season begun on 1 March 2026, five races sailed by
 // 10 May, each paying and costing as the last, and the season's one-off sums
 // between them; the balance where the shell has it.
 
@@ -20,16 +20,16 @@ const MONTHS = [
 function dated(day: number) {
   let d = day;
   for (const [month, days] of MONTHS) {
-    if (d < days) return `${d + 1} ${month} 1716`;
+    if (d < days) return `${d + 1} ${month} 2026`;
     d -= days;
   }
-  return `${d + 1} Nov 1716`;
+  return `${d + 1} Nov 2026`;
 }
 
 /** What a race brings and costs. */
 const RACE = [
   ['Sponsors', 42000],
-  ['Fish market', 5500],
+  ['Commercial Centre', 5500],
   ['Pay drivers', 3000],
   ['Wages', -51000],
   ['Headquarters upkeep', -12500],
@@ -46,7 +46,7 @@ const LINES: readonly {
     RACE.map(([kind, amount]) => ({ day, kind, what: kind, amount }))
   ),
   { day: 12, kind: 'Designs', what: 'Design: Keel, Mark II', amount: -18000 },
-  { day: 27, kind: 'Buildings', what: 'Building: Sail loft', amount: -30000 },
+  { day: 27, kind: 'Buildings', what: 'Building: Towing Tank', amount: -30000 },
   {
     day: 40,
     kind: 'Signing fees',

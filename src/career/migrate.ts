@@ -6,21 +6,13 @@ import type { Json } from './canon.ts';
 import type { CareerState } from './state.ts';
 
 /** The schema a state is written in now. */
-export const SCHEMA = 2;
+export const SCHEMA = 1;
 
 type Record_ = { readonly [key: string]: Json };
 
-/** Each migration takes a state of version v (as parsed JSON) to v + 1: MIGRATIONS[v]. */
-const MIGRATIONS: Readonly<Record<number, (old: Record_) => Record_>> = {
-  // 2: the player keeps their chairman's confidence race by race, what they asked of him, and their seasons; a
-  // career of schema 1 has kept none of them yet
-  1: (old) => {
-    const p = old.player;
-    return p !== null && typeof p === 'object' && !Array.isArray(p)
-      ? { ...old, player: { ...p, board: [], asks: [], seasons: [] } }
-      : old;
-  },
-};
+/** Each migration takes a state of version v (as parsed JSON) to v + 1: MIGRATIONS[v]. None yet: no save is kept
+ *  across a change of the state's shape until the game ships. */
+const MIGRATIONS: Readonly<Record<number, (old: Record_) => Record_>> = {};
 
 /** A parsed state brought to the present schema, or why it cannot be. */
 export function migrated(

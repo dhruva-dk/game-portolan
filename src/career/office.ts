@@ -58,7 +58,7 @@ export const titled = (text: string) =>
   );
 
 /** The year the first season is sailed in, and the months a season runs through with their days. */
-const YEAR_ONE = 1716;
+const YEAR_ONE = 2026;
 const MONTHS: readonly (readonly [string, number])[] = [
   ['March', 31],
   ['April', 30],
@@ -312,14 +312,14 @@ export const NEWS: Readonly<Record<MailCategory, readonly [NewsKind, string]>> =
 
 export const BUILT: Readonly<Record<Building, string>> = {
   factory: 'Factory',
-  drawingLoft: 'Drawing Loft',
-  testTank: 'Test Tank',
-  foundry: 'Foundry',
-  sailingSchool: 'Sailing School',
-  pitHouse: 'Pit House',
-  crowsNest: 'Crow’s Nest',
-  fishMarket: 'Fish Market',
-  landingPad: 'Landing Pad',
+  designCentre: 'Design Centre',
+  towingTank: 'Towing Tank',
+  compositesPlant: 'Composites Plant',
+  simulator: 'Driver Simulator',
+  pitCentre: 'Pit Crew Training Centre',
+  scoutingCentre: 'Scouting Department',
+  commercialCentre: 'Commercial Centre',
+  hospitality: 'Hospitality Suite',
 };
 export const PARTS: Readonly<Record<string, string>> = {
   sails: 'Sails',
@@ -640,7 +640,7 @@ export function resultView(
   const stops = new Map<number, number>();
   for (const p of result.pits) stops.set(p.id, (stops.get(p.id) ?? 0) + 1);
   return {
-    title: `${YEAR_ONE + s.season} ${race.name} - ${championship(c.tier)}`,
+    title: `${seasonYear(s)} ${race.name} - ${championship(c.tier)}`,
     lines: result.order.map((id, i) => {
       const e = sheet[id],
         line = teams[Math.floor(id / TEAM)]?.ships[id % TEAM];

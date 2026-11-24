@@ -61,7 +61,7 @@ const READ = [
 function laid(planet: Planet, chart: Chart) {
   let sound = 0,
     rough = 0;
-  const [jx, jz] = PLACES.landingPad;
+  const [jx, jz] = PLACES.hospitality;
   // (the jetty's head over water counts as three: a harbour is on the sea)
   if (planet.height(fromChart(chart, jx, jz + JETTY)) < 0) sound += 3;
   const plots = eachPlot((id) => {
@@ -84,7 +84,7 @@ function laid(planet: Planet, chart: Chart) {
     rough += Math.min(high - Math.max(low, 0), 12);
     // (the jetty's deck clears whatever ground lies under its run)
     let run = -Infinity;
-    if (id === 'landingPad')
+    if (id === 'hospitality')
       for (let r = 0; r <= JETTY; r += 3)
         run = Math.max(run, planet.height(fromChart(chart, x, z + r)) + CLEAR);
     // (by the water it stands at its middle's ground, cut into the bank

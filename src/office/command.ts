@@ -17,14 +17,14 @@ export type Role =
 /** The headquarters's nine buildings. */
 export type Building =
   | 'factory'
-  | 'drawingLoft'
-  | 'testTank'
-  | 'foundry'
-  | 'sailingSchool'
-  | 'pitHouse'
-  | 'crowsNest'
-  | 'fishMarket'
-  | 'landingPad';
+  | 'designCentre'
+  | 'towingTank'
+  | 'compositesPlant'
+  | 'simulator'
+  | 'pitCentre'
+  | 'scoutingCentre'
+  | 'commercialCentre'
+  | 'hospitality';
 /** What a person wants of a team, three of them ranked. */
 export type Want =
   | 'money'
@@ -45,7 +45,7 @@ export type Personality =
 /** A driver's place on her team: sailing a ship, or the reserve. Every other role's status is 'staff'. */
 export type Status = 'ship' | 'reserve' | 'staff';
 /** The three trades a team picks a supplier from each off-season. */
-export type Trade = 'timber' | 'canvas' | 'cordage';
+export type Trade = 'composites' | 'sailmaker' | 'hydraulics';
 /** A ship of a team (race.ts TEAM of them): 0 is the player's on the player's team. */
 export type Ship = 0 | 1 | 2 | 3;
 /** A team's ships, in order. */

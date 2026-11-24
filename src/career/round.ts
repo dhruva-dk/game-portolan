@@ -353,7 +353,7 @@ function spirits(s: CareerState, x: Raced, of: Closing): CareerState {
     (p) => Math.floor(p.id / TEAM) === x.place
   );
   if (!worked) return out;
-  const house = c.buildings.pitHouse.level;
+  const house = c.buildings.pitCentre.level;
   const tires = mean(led.map(leadershipFatigue), 1);
   return withPeople(
     out,

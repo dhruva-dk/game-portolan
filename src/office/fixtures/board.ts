@@ -1,7 +1,7 @@
 // The board and a season's review as the fixture career has them. The board
-// four races into 1719: a chairman ambitious and tight with money, confidence
+// four races into 2029: a chairman ambitious and tight with money, confidence
 // sliding below the line after a poor run, money asked for and refused. The
-// review: 1718 in the Third Championship, fourth against a target of sixth,
+// review: 2028 in the Third Championship, fourth against a target of sixth,
 // with two promoted, the rules turned for the season after.
 
 import type { BoardView, SeasonView } from '../board.ts';
@@ -82,10 +82,10 @@ export const BOARD: BoardView = {
 };
 
 export const SEASON: SeasonView = {
-  year: '1718',
+  year: '2028',
   seasons: [
-    { season: 2, year: '1718' },
-    { season: 1, year: '1717' },
+    { season: 2, year: '2028' },
+    { season: 1, year: '2027' },
   ],
   season: 2,
   teamId: HERS.id,

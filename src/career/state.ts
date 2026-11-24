@@ -32,7 +32,7 @@ export interface Staff {
   ships: readonly Hands[]; // race.ts TEAM of them, by ship
   reserve: number | null;
   designer: number | null;
-  scouts: readonly number[]; // one a crow's nest level at most
+  scouts: readonly number[]; // one a scouting department level at most
   pit: readonly number[]; // the pit crew, TUNING.world.pit of them at most
 }
 

@@ -289,7 +289,7 @@ test('SignSponsor: into a slot, replacing one there; refusals', () => {
   );
   const s = withTeam(t0, me, (c) => ({
     ...c,
-    buildings: { ...c.buildings, landingPad: { level: 3, next: null } },
+    buildings: { ...c.buildings, hospitality: { level: 3, next: null } },
   }));
   const [a, b] = s.teams[me].offers;
   refused(s, { kind: 'SignSponsor', offer: a.sponsor.id, slot: 3 }, 'slot');
@@ -301,7 +301,7 @@ test('SignSponsor: into a slot, replacing one there; refusals', () => {
   );
   const low = withTeam(s, me, (c) => ({
     ...c,
-    buildings: { ...c.buildings, landingPad: { level: 1, next: null } },
+    buildings: { ...c.buildings, hospitality: { level: 1, next: null } },
     offers: c.offers.map((o) => ({
       ...o,
       sponsor: { ...o.sponsor, grade: 3 },
@@ -416,7 +416,8 @@ test('sponsors, buildings and designs run for the whole world on Advance (rivals
   );
   assert.ok(s.teams.filter((c) => !c.player && c.design !== null).length > 20);
   assert.ok(
-    s.teams.filter((c) => !c.player && c.suppliers.timber !== null).length > 20
+    s.teams.filter((c) => !c.player && c.suppliers.composites !== null).length >
+      20
   );
   invariants(s);
 });

@@ -10,28 +10,28 @@ import { toChart, type Chart, type Vec3 } from './sphere.ts';
 /** The nine buildings, each with a plot. */
 export const PLOTS = [
   'factory',
-  'landingPad',
-  'pitHouse',
-  'fishMarket',
-  'testTank',
-  'sailingSchool',
-  'foundry',
-  'drawingLoft',
-  'crowsNest',
+  'hospitality',
+  'pitCentre',
+  'commercialCentre',
+  'towingTank',
+  'simulator',
+  'compositesPlant',
+  'designCentre',
+  'scoutingCentre',
 ] as const;
 export type Plot = (typeof PLOTS)[number];
 
 /** Something for each plot, as `of` makes it. */
 export const eachPlot = <T>(of: (id: Plot) => T): Record<Plot, T> => ({
   factory: of('factory'),
-  landingPad: of('landingPad'),
-  pitHouse: of('pitHouse'),
-  fishMarket: of('fishMarket'),
-  testTank: of('testTank'),
-  sailingSchool: of('sailingSchool'),
-  foundry: of('foundry'),
-  drawingLoft: of('drawingLoft'),
-  crowsNest: of('crowsNest'),
+  hospitality: of('hospitality'),
+  pitCentre: of('pitCentre'),
+  commercialCentre: of('commercialCentre'),
+  towingTank: of('towingTank'),
+  simulator: of('simulator'),
+  compositesPlant: of('compositesPlant'),
+  designCentre: of('designCentre'),
+  scoutingCentre: of('scoutingCentre'),
 });
 
 /**
@@ -45,17 +45,21 @@ export const PLACES: Readonly<
   Record<Plot, readonly [x: number, z: number, tall: number]>
 > = {
   factory: [-33, 28, 11.5],
-  landingPad: [1, 31, 12],
-  pitHouse: [33, 28, 11],
-  fishMarket: [-36, -2, 5.5],
-  testTank: [-3, 0, 7],
-  sailingSchool: [32, -3, 13.5],
-  foundry: [-31, -31, 21],
-  drawingLoft: [2, -33, 17],
-  crowsNest: [33, -31, 30],
+  hospitality: [1, 31, 12],
+  pitCentre: [33, 28, 11],
+  commercialCentre: [-36, -2, 5.5],
+  towingTank: [-3, 0, 7],
+  simulator: [32, -3, 13.5],
+  compositesPlant: [-31, -31, 21],
+  designCentre: [2, -33, 17],
+  scoutingCentre: [33, -31, 30],
 };
 /** The three on the water's edge: what is launched or landed there. */
-export const WATERSIDE: readonly Plot[] = ['factory', 'landingPad', 'pitHouse'];
+export const WATERSIDE: readonly Plot[] = [
+  'factory',
+  'hospitality',
+  'pitCentre',
+];
 /** How far toward the sea from its plot's middle the landing's jetty runs, metres. */
 export const JETTY = 18;
 

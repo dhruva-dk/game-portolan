@@ -288,14 +288,14 @@ export function toRaceDay(s: CareerState): CareerState {
 
 const BUILDINGS: readonly Building[] = [
   'factory',
-  'drawingLoft',
-  'testTank',
-  'foundry',
-  'sailingSchool',
-  'pitHouse',
-  'crowsNest',
-  'fishMarket',
-  'landingPad',
+  'designCentre',
+  'towingTank',
+  'compositesPlant',
+  'simulator',
+  'pitCentre',
+  'scoutingCentre',
+  'commercialCentre',
+  'hospitality',
 ];
 
 /** A command of sections 8–11 a player might send: the improvement, fitting, designing, building, suppliers, sponsors, votes. */
@@ -644,7 +644,7 @@ function market(s: CareerState): void {
   }
   for (const c of s.teams)
     assert.ok(
-      c.staff.scouts.length <= c.buildings.crowsNest.level,
+      c.staff.scouts.length <= c.buildings.scoutingCentre.level,
       `team ${c.id} has more scouts than its crow's nest has places`
     );
   const p = s.player;

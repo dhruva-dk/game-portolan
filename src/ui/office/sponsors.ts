@@ -133,7 +133,7 @@ export function createSponsors(office: Office): Screen<SponsorsPaper> {
           terms([
             ['Marketability', `${v.marketability} of 100`],
             [
-              'Landing pad receives',
+              'Hospitality suite hosts',
               link(`Grade ${v.grade} of ${v.grades}`, () =>
                 office.ask({ kind: 'open', screen: 'hq' })
               ),

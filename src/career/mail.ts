@@ -303,8 +303,8 @@ export const TEMPLATES: Readonly<Record<string, Template>> = {
   supplierDue: t(
     ['Choose your suppliers', 'Suppliers for the season'],
     [
-      'Timber, canvas and cordage: choose one supplier of each before the first race.',
-      "The suppliers' agents are waiting. Pick our timber, canvas and cordage before the first race.",
+      'Composites, sails and hydraulics: choose one supplier of each before the first race.',
+      'The suppliers’ account managers are waiting. Pick our composites, sails and hydraulics before the first race.',
     ]
   ),
   // the dilemmas (career/events.ts)
@@ -397,14 +397,14 @@ export const TEMPLATES: Readonly<Record<string, Template>> = {
 const TIERS = ['Tier 1', 'Tier 2', 'Tier 3'];
 const BUILDINGS: Readonly<Record<string, string>> = {
   factory: 'factory',
-  drawingLoft: 'drawing loft',
-  testTank: 'test tank',
-  foundry: 'foundry',
-  sailingSchool: 'sailing school',
-  pitHouse: 'pit loft',
-  crowsNest: "crow's nest",
-  fishMarket: 'fish market',
-  landingPad: 'landing pad',
+  designCentre: 'design centre',
+  towingTank: 'towing tank',
+  compositesPlant: 'composites plant',
+  simulator: 'driver simulator',
+  pitCentre: 'pit crew training centre',
+  scoutingCentre: 'scouting department',
+  commercialCentre: 'commercial centre',
+  hospitality: 'hospitality suite',
 } satisfies Record<Building, string>;
 const MEASURES: Readonly<Record<string, string>> = {
   spec: 'the spec parts',

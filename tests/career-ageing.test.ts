@@ -22,17 +22,17 @@ test("schooling: the role's building on their team; a free agent as at level 1",
   const s = founded();
   const team = s.teams[0];
   const driver = s.people[team.staff.ships[0].driver!];
-  assert.equal(
-    schoolingOf(s, driver).school,
-    team.buildings.sailingSchool.level
-  );
+  assert.equal(schoolingOf(s, driver).school, team.buildings.simulator.level);
   const scout = s.people[team.staff.scouts[0]];
-  assert.equal(schoolingOf(s, scout).school, team.buildings.crowsNest.level);
+  assert.equal(
+    schoolingOf(s, scout).school,
+    team.buildings.scoutingCentre.level
+  );
   const free = s.people.find((g) => g.contract === null)!;
   assert.deepEqual(schoolingOf(s, free), {
     school: 1,
     mentor: false,
-    sailingSchool: 0,
+    simulator: 0,
   });
 });
 
