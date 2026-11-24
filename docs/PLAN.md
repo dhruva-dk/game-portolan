@@ -550,6 +550,7 @@ One gun per ship, fixed for the match. There is no gun loot, no gun switching an
 4. Using a heal takes the ship's heal use time (§1.5.2). While using, the ship sails at 0.6 of the speed asked, as today. **A hit does not cancel it.**
 5. Heals come from three places: spots strewn at the start (today's 640 spots, times the race's heal count factor, rounded), one cache of 8 at the start of each storm phase after the first (rarities 50% rare, 35% epic, 15% legendary), and a sunk ship's unused heals spilled where it sank.
 6. Shield items, repair kits and gun pickups are deleted.
+7. A spot holds one heal, and a second with today's chance of 40%. A heal cannot be started at full hull. The slot being used is never the one replaced. Gust may be switched on while healing.
 
 ### 1.11.6 Territory, shield and hull
 
@@ -1674,9 +1675,9 @@ Goal: the match engine is in `sim/`; a match is created from a `MatchSetup` of 2
 - [x] **M2.3 Matches from a setup.** `createMatch` takes a `MatchSetup` and returns the `Match` of §2.2.1; add `sim/hands.ts` and rename the touch-input type in `play/player.ts` to `Thumbs` (§2.2.1). Teams come from `ShipSpec.team`. Delete `sim/race.ts`, the race-card types and their dealing (in `sim/racing.ts` and `sim/matches.ts` since step M2.1), the free-for-all mode, `sim/fitted.ts`, and the constants `TEAM`, `TEAMS` and `SHIPS`. Keep the team functions (mates, shared water, no friendly fire). Until milestone 6 the app gives every team a livery by its index from `world/livery.ts`, and its existing way into a match (the title, the seed panel) builds the setup with `evenSetup`: the physical values, from `career/fit.ts`, of level 50 on every line with a cannon and a mechanic with 10 in every stat; 10 in every driver stat; standings in team order; and `player: true`.
 - [x] **M2.4 Per-ship physical values.** Top speed, `gather`, turn rate, hull points, spread factor and reload factor come from the ship's spec, replacing the shared values in `sim/handling.ts`.
 - [x] **M2.5 One gun.** Remove the second gun, gun switching, the equip delay, gun loot and the rarity tiers. Damage factor and assist cone come from the spec (§1.11.4).
-- [ ] **M2.6 Heals.** §1.11.5.
-- [ ] **M2.7 Shield.** §1.11.6 item 3.
-- [ ] **M2.8 Gust meter.** §1.11.7.
+- [x] **M2.6 Heals.** §1.11.5.
+- [x] **M2.7 Shield.** §1.11.6 item 3.
+- [x] **M2.8 Gust meter.** §1.11.7.
 - [ ] **M2.9 Drivers from stats.** §1.11.8: add `sim/driver.ts`; delete `sim/persona.ts` (`sim/driven.ts` went in step M2.3), the styles and seeded draws of `sim/temper.ts` (keep the parameter type), and the match types.
 - [ ] **M2.10 Race conditions.** Storm scaling and the two ratings (§1.11.2, §1.11.3).
 - [ ] **M2.11 Berths by standing.** §1.11.9.
