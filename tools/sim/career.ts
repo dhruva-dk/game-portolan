@@ -10,6 +10,7 @@ import {
   ROLES,
   type CareerState,
   type Team,
+  YOURS,
 } from '../../src/career/state.ts';
 import { LEAGUE } from '../../src/career/tuning.ts';
 import { createMatch } from '../../src/sim/engine.ts';
@@ -48,8 +49,6 @@ export const YOU: DriverStats = {
   stormcraft: STAT,
   lookout: STAT,
 };
-
-const YOURS = 0;
 
 const TEAM = {
   name: 'Harness Racing',
