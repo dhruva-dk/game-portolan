@@ -9,27 +9,25 @@ import {
 } from '../src/sim/battle.ts';
 import type { Vessel } from '../src/sim/contact.ts';
 import { STEP } from '../src/sim/fixed.ts';
-import { reloadOf } from '../src/sim/gun.ts';
 import { charging, gustOf, ready, spent, stepGust } from '../src/sim/gust.ts';
-import { STORES } from '../src/sim/kinds.ts';
-import { GUST, HEALTH, SHIP } from '../src/sim/handling.ts';
+import { RARITIES, rankOf, type Rarity } from '../src/sim/kinds.ts';
+import { GUST, SHIP } from '../src/sim/handling.ts';
+import { HEALTH } from '../src/sim/handling.ts';
 import {
   begun,
   emptyHold,
   progress,
-  roomFor,
+  restored,
   stepUse,
   stowed,
-  tapped,
   useful,
-  USES,
+  type Hold,
 } from '../src/sim/hold.ts';
 import {
   cargo,
   drifted,
+  healSpots,
   laying,
-  LOOT,
-  offered,
   overboard,
   PIECE,
   rolled,
@@ -37,9 +35,10 @@ import {
   type Flotsam,
   type Loot,
 } from '../src/sim/loot.ts';
-import { asked, NOTHING, stored } from '../src/sim/stores.ts';
+import { asked, crewed, NOTHING, stored } from '../src/sim/stores.ts';
 import { shipAt, step, type ShipState } from '../src/sim/ship.ts';
 import type { Depth } from '../src/sim/shoal.ts';
+import { HEAL } from '../src/sim/tuning.ts';
 import { random } from '../src/world/random.ts';
 import {
   R,
@@ -53,7 +52,7 @@ import {
   scale,
   type Vec3,
 } from '../src/world/sphere.ts';
-import { EVEN_SHIP } from './setups.ts';
+import { EVEN_SHIP, TENDED, UNTENDED } from './setups.ts';
 
 const deep: Depth = () => 30;
 const c0 = fromLatLon(0.1, 0.2);
@@ -65,14 +64,22 @@ const vessel = (id: number, p: Vec3): Vessel => ({
   shove: [0, 0, 0],
   engaged: [],
 });
-const piece = (
-  id: number,
-  p: Vec3,
-  goods: Loot['goods'],
-  from = -1,
-  age = 10
-): Loot => ({ id, at: p, goods, from, age, way: [0, 0, 0] });
+const piece = (id: number, p: Vec3, heal: Rarity): Loot => ({
+  id,
+  at: p,
+  heal,
+  age: 10,
+  way: [0, 0, 0],
+});
 const lying = (...pieces: Loot[]): Flotsam => ({ pieces, next: 100 });
+const holding = (...items: (Rarity | null)[]): Hold => ({
+  ...emptyHold(),
+  items,
+});
+const hurt = (c: Crew, hull: number): Crew => ({
+  ...c,
+  health: { ...c.health, hull },
+});
 
 test('a gust spends a charge, blows its time, and the charges come back one at a time', () => {
   let g = gustOf();
@@ -181,94 +188,114 @@ test('a ball fired in a gust goes off wider', () => {
   assert.ok(spreadOf(1) > spreadOf(0) * 1.3);
 });
 
-test('stacks fill up to their most, then empty slots; what does not fit is left over', () => {
-  let h = emptyHold();
-  h = stowed(h, 'smallShield', 3).hold;
-  h = stowed(h, 'smallShield', 3).hold;
-  assert.deepEqual(h.items, [{ kind: 'smallShield', count: 6 }, null, null]);
-  const r = stowed(h, 'smallShield', 2);
-  assert.deepEqual(r.hold.items[1], { kind: 'smallShield', count: 2 });
-  h = stowed(stowed(r.hold, 'repairKit', 4).hold, 'bigShield', 1).hold;
-  assert.equal(roomFor(h, 'bigShield'), -1);
-  assert.equal(roomFor(h, 'repairKit'), 2);
-  assert.equal(stowed(h, 'fullRepair', 1).left, 1);
+test('a heal restores its rarity’s share of the hull points times the heal factor, more for each rarer one', () => {
+  const amounts = RARITIES.map((r) => restored(r, EVEN_SHIP));
+  for (let i = 1; i < amounts.length; i++)
+    assert.ok(amounts[i] > amounts[i - 1], RARITIES[i]);
+  const plain = { hullPoints: 100, healFactor: 1 };
+  assert.equal(restored('legendary', plain), 100, 'a legendary is all of it');
+  assert.ok(
+    restored('rare', { ...plain, hullPoints: 200 }) > restored('rare', plain),
+    'a share of its own hull points'
+  );
+  assert.ok(
+    restored('rare', { ...plain, healFactor: 1.5 }) > restored('rare', plain),
+    'times its heal factor'
+  );
 });
 
-test('a tap chooses a slot; a tap on the chosen begins it; done, it mends to its cap and one is gone', () => {
-  const hurt = { hull: 40, shield: 0, most: 100 };
-  let h = stowed(
-    stowed(emptyHold(), 'smallShield', 2).hold,
-    'repairKit',
-    1
-  ).hold;
-  h = tapped(h, 1, hurt);
-  assert.deepEqual([h.chosen, h.using], [1, null]);
-  h = tapped(h, 1, hurt);
-  assert.deepEqual(h.using, { slot: 1, left: USES.smallShield.time });
-  let health = hurt;
-  for (let t = 0; t < USES.smallShield.time - 0.1; t += STEP)
-    ({ hold: h, health } = stepUse(h, health, STEP));
-  assert.ok(progress(h)! > 0.8 && h.using);
-  for (let t = 0; t < 0.2; t += STEP)
-    ({ hold: h, health } = stepUse(h, health, STEP));
-  assert.deepEqual(health, { hull: 40, shield: 25, most: 100 });
-  assert.deepEqual(h.items[0], { kind: 'smallShield', count: 1 });
+test('its heal factor: the best-tended ship mends more with the same heal than the worst-tended one', () => {
+  assert.ok(TENDED.healFactor > UNTENDED.healFactor);
+  const mended = (values: typeof EVEN_SHIP) => {
+    let c: Crew = hurt(
+      { ...crewOf(1, values), hold: holding('common', null, null) },
+      10
+    );
+    c = asked([c], new Map([[1, { ...NOTHING, heal: 0 }]])).crews[0];
+    for (let t = 0; t < 3; t += STEP)
+      c = stored([c], lying(), [], [], STEP, deep, 1).crews[0];
+    return c.health.hull - 10;
+  };
+  assert.ok(mended(TENDED) > mended(UNTENDED));
+});
+
+test('one tap uses a heal: it takes the heal time, then mends and empties its slot; never past the hull points', () => {
+  const values = { ...EVEN_SHIP, healTime: 1.5 };
+  let h = begun(
+    holding(null, 'rare', 'legendary'),
+    1,
+    { hull: 40, shield: 0, most: 140 },
+    1.5
+  );
+  assert.deepEqual(h.using, { slot: 1, left: 1.5, of: 1.5 });
+  let health = { hull: 40, shield: 0, most: values.hullPoints };
+  for (let t = 0; t < 1.4; t += STEP)
+    ({ hold: h, health } = stepUse(h, health, values, STEP));
+  assert.ok(progress(h)! > 0.9 && h.using);
+  assert.equal(health.hull, 40, 'nothing until it is done');
+  let done: Rarity | null = null;
+  for (let t = 0; t < 0.2 && !done; t += STEP)
+    ({ hold: h, health, done } = stepUse(h, health, values, STEP));
+  assert.equal(done, 'rare');
+  assert.ok(Math.abs(health.hull - (40 + restored('rare', values))) < 1e-9);
+  assert.deepEqual(h.items, [null, null, 'legendary']);
   assert.equal(h.using, null);
-  health = { hull: 40, shield: 40, most: 100 };
-  h = begun(h, 1, health);
-  for (let t = 0; t < 1.1; t += STEP)
-    ({ hold: h, health } = stepUse(h, health, STEP));
-  assert.equal(health.shield, 50);
-  assert.equal(h.items[0], null, 'the last one gone empties the slot');
-  health = { hull: 70, shield: 0, most: 100 };
-  h = tapped(tapped(h, 2, health), 2, health);
+  h = begun(h, 2, health, 1.5);
   for (let t = 0; t < 2; t += STEP)
-    ({ hold: h, health } = stepUse(h, health, STEP));
-  assert.equal(health.hull, 75);
+    ({ hold: h, health } = stepUse(h, health, values, STEP));
+  assert.equal(health.hull, values.hullPoints, 'a legendary fills it, no more');
 });
 
-test('nothing is begun that would do nothing, and choosing another slot breaks it off', () => {
-  const h = stowed(emptyHold(), 'smallShield', 1).hold;
-  assert.equal(
-    useful({ hull: 100, shield: 50, most: 100 }, 'smallShield'),
-    false
-  );
-  assert.equal(begun(h, 1, { hull: 100, shield: 50, most: 100 }).using, null);
-  assert.equal(
-    begun(h, 1, { hull: 0, shield: 0, most: 100 }).using,
-    null,
-    'not when sunk'
-  );
-  const using = begun(h, 1, { hull: 100, shield: 0, most: 100 });
-  assert.ok(using.using);
-  assert.equal(
-    tapped(using, 0, { hull: 100, shield: 0, most: 100 }).using,
-    null
-  );
+test('its heal time: the best-tended ship finishes a heal sooner than the worst-tended one', () => {
+  assert.ok(TENDED.healTime < UNTENDED.healTime);
+  const took = (values: typeof EVEN_SHIP) => {
+    let c: Crew = hurt(
+      { ...crewOf(1, values), hold: holding('rare', null, null) },
+      10
+    );
+    c = asked([c], new Map([[1, { ...NOTHING, heal: 0 }]])).crews[0];
+    let t = 0;
+    while (c.hold.using) {
+      c = stored([c], lying(), [], [], STEP, deep, 1).crews[0];
+      t += STEP;
+    }
+    return t;
+  };
+  assert.ok(took(TENDED) < took(UNTENDED));
 });
 
-test('a blow breaks off what it is mending with; the storm does not', () => {
+test('no heal is begun at full hull, sunk, from an empty slot, or while another is in use', () => {
+  const h = holding('common', null, 'epic'),
+    most = 100;
+  assert.equal(useful({ hull: most, shield: 0, most }), false);
+  assert.equal(begun(h, 0, { hull: most, shield: 0, most }, 1).using, null);
+  assert.equal(begun(h, 0, { hull: 0, shield: 0, most }, 1).using, null);
+  assert.equal(begun(h, 1, { hull: 50, shield: 0, most }, 1).using, null);
+  const using = begun(h, 0, { hull: 50, shield: 0, most }, 1);
+  assert.equal(using.using?.slot, 0);
+  assert.equal(begun(using, 2, { hull: 50, shield: 0, most }, 1), using);
+});
+
+test('a hit does not break off a heal, nor does the storm', () => {
   const p = c0,
     q = at(60);
   const fleet = [vessel(1, p), vessel(2, q)];
-  const h = begun(stowed(emptyHold(), 'bigShield', 1).hold, 1, {
-    hull: 100,
-    shield: 0,
-    most: 100,
-  });
+  const h = begun(
+    holding('epic', null, null),
+    0,
+    { hull: 50, shield: 0, most: 140 },
+    5
+  );
   let b = battleOf(
-    [
-      { ...crewOf(1, EVEN_SHIP), health: { hull: 100, shield: 0, most: 100 } },
-      { ...crewOf(2, EVEN_SHIP), hold: h },
-    ],
+    [crewOf(1, EVEN_SHIP), { ...hurt(crewOf(2, EVEN_SHIP), 50), hold: h }],
     1
   );
   const aim = {
     from: scale(p, R + 20),
     dir: normalize(add(scale(q, R), scale(p, R + 20), -1)),
   };
-  let broke = false;
-  for (let i = 0; i < 60 && !broke; i++) {
+  let struck = false;
+  for (let i = 0; i < 60; i++) {
     const r = stepBattle(
       b,
       fleet,
@@ -281,62 +308,118 @@ test('a blow breaks off what it is mending with; the storm does not', () => {
       deep
     );
     b = r.battle;
-    if (r.strikes.length) broke = b.crews[1].hold.using === null;
+    struck ||= r.strikes.length > 0;
   }
-  assert.ok(broke);
+  assert.ok(struck && b.crews[1].health.hull < 50);
+  assert.ok(b.crews[1].hold.using, 'still at it');
   const out = { center: frameAt(c0).north, radius: 1, damage: 0.01 };
   const w = weathered(
-    battleOf(
-      [
-        {
-          ...crewOf(2, EVEN_SHIP),
-          health: { hull: 100, shield: 0, most: 100 },
-          hold: h,
-        },
-      ],
-      1
-    ),
+    battleOf([{ ...hurt(crewOf(2, EVEN_SHIP), 50), hold: h }], 1),
     [vessel(2, q)],
     out,
     STEP
   );
-  assert.ok(
-    w.battle.crews[0].health.hull < 100 && w.battle.crews[0].hold.using
+  assert.ok(w.battle.crews[0].health.hull < 50 && w.battle.crews[0].hold.using);
+});
+
+test('while it uses a heal it sails at the share of the throttle asked', () => {
+  const helm = { course: null, throttle: 1 };
+  const c = {
+    ...crewOf(1, EVEN_SHIP),
+    hold: begun(
+      holding('common', null, null),
+      0,
+      { hull: 50, shield: 0, most: 140 },
+      1
+    ),
+  };
+  assert.equal(crewed(helm, c).throttle, HEAL.using);
+  assert.equal(crewed(helm, crewOf(1, EVEN_SHIP)).throttle, 1);
+});
+
+const held = (c: Crew) => [...c.hold.items];
+
+test('it carries three heals, one a slot, and takes what it sails over while a slot is free', () => {
+  assert.equal(emptyHold().items.length, HEAL.slots);
+  const f = lying(
+    piece(2, at(-5), 'common'),
+    piece(3, at(4), 'epic'),
+    piece(4, at(30), 'rare')
+  );
+  const r = swept(f, [crewOf(1, EVEN_SHIP)], [vessel(1, c0)]);
+  assert.deepEqual(held(r.crews[0]), ['common', 'epic', null]);
+  assert.deepEqual(
+    r.flotsam.pieces.map((l) => l.id),
+    [4],
+    'out of reach: left'
+  );
+  assert.deepEqual(
+    r.took.map((t) => [t.id, t.slot, t.heal]),
+    [
+      [2, 0, 'common'],
+      [3, 1, 'epic'],
+    ]
   );
 });
 
-test('the pieces drawn come in their shares of stores, each in its count', () => {
-  const draw = random(7),
-    n = 20000;
-  const g = Array.from({ length: n }, () => rolled(draw));
-  for (const kind of STORES) {
-    const of = g.filter((x) => x.kind === kind);
-    assert.ok(
-      Math.abs(of.length / n - LOOT.shares[kind]) < 0.02,
-      `${kind}: ${of.length / n}`
-    );
-    assert.ok(of.every((x) => x.count === LOOT.counts[kind]));
-  }
+test('its slots full, a rarer heal takes the place of its lowest, which goes over where it is; another is left', () => {
+  const c = {
+    ...crewOf(1, EVEN_SHIP),
+    hold: holding('rare', 'common', 'epic'),
+  };
+  const r = swept(lying(piece(5, at(2), 'epic')), [c], [vessel(1, c0)]);
+  assert.deepEqual(held(r.crews[0]), ['rare', 'epic', 'epic']);
+  assert.equal(r.flotsam.pieces.length, 1);
+  const dropped = r.flotsam.pieces[0];
+  assert.equal(dropped.heal, 'common');
+  assert.ok(distance(dropped.at, c0) < 1e-6, 'where the ship is');
+  assert.equal(dropped.id, 100);
+  const again = swept(r.flotsam, r.crews, [vessel(1, c0)]);
+  assert.deepEqual(held(again.crews[0]), ['rare', 'epic', 'epic'], 'left');
+  assert.deepEqual(again.took, []);
+  const same = swept(lying(piece(6, at(2), 'common')), [c], [vessel(1, c0)]);
+  assert.deepEqual(held(same.crews[0]), ['rare', 'common', 'epic']);
+  assert.deepEqual(
+    same.flotsam.pieces.map((l) => l.id),
+    [6],
+    'no rarer than its lowest: left'
+  );
+  assert.ok(stowed(c.hold, 'legendary'));
+  assert.equal(stowed(c.hold, 'common'), null);
 });
 
-test('the loot is strewn evenly over the planet, on open water only, the same for a seed', () => {
+test('heals are found in their shares of rarity; a cache’s are never common', () => {
+  const draw = random(7),
+    n = 20000;
+  const shares = (found: Readonly<Record<Rarity, number>>) => {
+    const g = Array.from({ length: n }, () => rolled(draw, found));
+    return RARITIES.map((r) => g.filter((x) => x === r).length / n);
+  };
+  const strewn = shares(HEAL.found),
+    cached = shares(HEAL.cache.found);
+  RARITIES.forEach((r, i) => {
+    assert.ok(Math.abs(strewn[i] - HEAL.found[r]) < 0.02, `${r}: ${strewn[i]}`);
+    assert.ok(Math.abs(cached[i] - HEAL.cache.found[r]) < 0.02, r);
+  });
+  assert.equal(cached[rankOf('common')], 0);
+  for (let i = 1; i < RARITIES.length; i++)
+    assert.ok(strewn[i] < strewn[i - 1], 'the rarer, the fewer');
+});
+
+test('the heals are strewn evenly over the planet, on open water only, the same for a seed', () => {
   const isle = fromLatLon(0, 0);
   const depth: Depth = (p) => (distance(p, isle) < 120 ? -5 : 20);
-  const f = laying(5, depth).strewn();
-  assert.deepEqual(f, laying(5, depth).strewn());
+  const f = laying(5, depth, 3).strewn();
+  assert.deepEqual(f, laying(5, depth, 3).strewn());
   assert.notDeepEqual(
     f.pieces.map((l) => l.at),
-    laying(6, depth)
+    laying(6, depth, 3)
       .strewn()
       .pieces.map((l) => l.at)
   );
   assert.ok(f.pieces.every((l) => depth(l.at) >= SHIP.draft + PIECE.open));
-  assert.ok(
-    f.pieces.length > LOOT.spots * 1.3 && f.pieces.length < LOOT.spots * 1.5,
-    `${f.pieces.length}`
-  );
   assert.ok(f.pieces.some((l) => distance(l.at, isle) < 140));
-  const cell = Math.sqrt((4 * Math.PI * R * R) / LOOT.spots);
+  const cell = Math.sqrt((4 * Math.PI * R * R) / healSpots(3));
   const draw = random(3);
   for (let k = 0; k < 200; k++) {
     const p = fromLatLon(Math.asin(2 * draw() - 1), draw() * 2 * Math.PI);
@@ -345,127 +428,27 @@ test('the loot is strewn evenly over the planet, on open water only, the same fo
   }
 });
 
-const stowedOf = (c: Crew) =>
-  c.hold.items.map((k) => k && `${k.kind} ${k.count}`);
-
-test('it takes what fits within reach: stacks into its slots', () => {
-  const f = lying(
-    piece(2, at(-5), { kind: 'repairKit', count: 4 }),
-    piece(3, at(30), { kind: 'bigShield', count: 1 })
+test('more heal stars strew more heals: as many spots as the race’s heal count factor says', () => {
+  assert.equal(healSpots(3), HEAL.spots);
+  const counts = ([1, 2, 3, 4, 5] as const).map(
+    (k) => laying(5, deep, k).strewn().pieces.length
   );
-  const r = swept(f, [crewOf(1, EVEN_SHIP)], [vessel(1, c0)], new Map(), 1);
-  assert.deepEqual(r.crews[0].hold.items[0], { kind: 'repairKit', count: 4 });
-  assert.deepEqual(
-    r.flotsam.pieces.map((l) => l.id),
-    [3]
-  );
+  for (let k = 1; k < counts.length; k++)
+    assert.ok(counts[k] > counts[k - 1], `${counts}`);
+  assert.ok(healSpots(1) < healSpots(3) && healSpots(5) > healSpots(3));
 });
 
-test('asked, it swaps the stack in hand for the one offered, and its own goes over the side and lies until it is clear', () => {
-  let h = emptyHold();
-  for (const k of ['smallShield', 'repairKit', 'bigShield'] as const)
-    h = stowed(h, k, 1).hold;
-  const full = { ...crewOf(1, EVEN_SHIP), hold: { ...h, chosen: 2 } };
-  const f = lying(piece(4, at(3), { kind: 'fullRepair', count: 1 }));
-  const r = swept(f, [full], [vessel(1, c0)], new Map([[1, 2]]), 1);
+test('a ship sunk spills its unused heals where it lies, gone from it, kicked out to drift to a stop', () => {
+  const c = { ...crewOf(1, EVEN_SHIP), hold: holding('common', null, 'epic') };
+  const s = stored([c], lying(), [vessel(1, c0)], [1], STEP, deep, 9);
   assert.deepEqual(
-    stowedOf(r.crews[0]),
-    ['smallShield 1', 'fullRepair 1', 'bigShield 1'],
-    'into the slot in hand'
-  );
-  assert.equal(r.flotsam.pieces.length, 1);
-  const old = r.flotsam.pieces[0];
-  assert.deepEqual([old.goods, old.from], [{ kind: 'repairKit', count: 1 }, 1]);
-  const bare = {
-    ...r.crews[0],
-    hold: {
-      ...r.crews[0].hold,
-      items: [r.crews[0].hold.items[0], null, r.crews[0].hold.items[2]],
-    },
-  };
-  let fl = drifted(r.flotsam, 2, deep);
-  assert.deepEqual(
-    stowedOf(swept(fl, [bare], [vessel(1, c0)], new Map(), 1).crews[0]),
-    ['smallShield 1', null, 'bigShield 1'],
-    'not while it is over it'
-  );
-  fl = swept(fl, [bare], [vessel(1, at(40))], new Map(), 1).flotsam;
-  assert.deepEqual(
-    stowedOf(swept(fl, [bare], [vessel(1, c0)], new Map(), 1).crews[0]),
-    ['smallShield 1', 'repairKit 1', 'bigShield 1']
-  );
-});
-
-test('a tap on its gun reloads it, if it is not full; with stores in hand, it takes the gun in hand', () => {
-  const c = crewOf(1, EVEN_SHIP);
-  const ask = (crew: Crew) =>
-    asked(
-      [crew],
-      [vessel(1, c0)],
-      lying(),
-      new Map([[1, { ...NOTHING, tap: 0 }]])
-    );
-  const spent = { ...c, gun: { ...c.gun, rounds: 3 } };
-  const b = ask(spent);
-  assert.ok(
-    Math.abs(
-      b.crews[0].gun.reload - reloadOf('cannon', EVEN_SHIP.reloadFactor)
-    ) < 1e-9
-  );
-  assert.deepEqual(
-    b.cues.map((k) => k.kind),
-    ['reloading']
-  );
-  assert.deepEqual(ask(c).cues, []);
-  const chose = ask({ ...spent, hold: { ...spent.hold, chosen: 2 } });
-  assert.deepEqual(
-    [chose.crews[0].hold.chosen, chose.crews[0].gun.reload, chose.cues],
-    [0, 0, []]
-  );
-});
-
-test('with its slots full, a take swaps the stack in hand for what is offered', () => {
-  let h = emptyHold();
-  for (const k of ['smallShield', 'repairKit', 'bigShield'] as const)
-    h = stowed(h, k, 1).hold;
-  const c = { ...crewOf(1, EVEN_SHIP), hold: h };
-  const f = lying(piece(5, at(2), { kind: 'fullRepair', count: 1 }));
-  assert.equal(offered(c, c0, f)?.id, 5);
-  const r = swept(f, [c], [vessel(1, c0)], new Map([[1, 2]]), 1);
-  assert.deepEqual(r.crews[0].hold.items[1], { kind: 'fullRepair', count: 1 });
-  assert.deepEqual(
-    r.flotsam.pieces.map((l) => l.goods),
-    [{ kind: 'repairKit', count: 1 }]
-  );
-});
-
-test('a ship sunk spills all its stores where it lies, gone from it, kicked out to drift to a stop', () => {
-  const c = {
-    ...crewOf(1, EVEN_SHIP),
-    hold: stowed(stowed(emptyHold(), 'smallShield', 4).hold, 'repairKit', 2)
-      .hold,
-  };
-  const s = stored(
-    [c],
-    lying(),
-    [vessel(1, c0)],
-    new Map(),
-    [1],
-    STEP,
-    deep,
-    9
-  );
-  assert.deepEqual(
-    s.flotsam.pieces.map((l) => l.goods),
-    [
-      { kind: 'smallShield', count: 4 },
-      { kind: 'repairKit', count: 2 },
-    ]
+    s.flotsam.pieces.map((l) => l.heal),
+    ['common', 'epic']
   );
   assert.deepEqual(s.crews[0].hold.items, [null, null, null]);
-  const goods = cargo(c);
-  assert.equal(goods.length, 2);
-  let f = overboard({ pieces: [], next: 0 }, c0, goods, 1, 9);
+  const heals = cargo(c);
+  assert.equal(heals.length, 2);
+  let f = overboard({ pieces: [], next: 0 }, c0, heals, 9);
   assert.ok(f.pieces.every((l) => Math.hypot(...l.way) >= PIECE.kick));
   for (let t = 0; t < 5; t += STEP) f = drifted(f, STEP, deep);
   const out = f.pieces.map((l) => distance(c0, l.at));
@@ -477,18 +460,12 @@ test('a ship sunk spills all its stores where it lies, gone from it, kicked out 
 });
 
 test('a ship sunk takes nothing', () => {
-  const f = lying(piece(1, c0, { kind: 'repairKit', count: 1 }));
+  const f = lying(piece(1, c0, 'common'));
   const r = swept(
     f,
     [{ ...crewOf(1, EVEN_SHIP), health: { hull: 0, shield: 0, most: 100 } }],
-    [vessel(1, c0)],
-    new Map(),
-    1
+    [vessel(1, c0)]
   );
   assert.deepEqual(r.crews[0].hold.items, [null, null, null]);
-  assert.equal(
-    HEALTH.start,
-    0,
-    'it puts to sea with no shield, filled from loot'
-  );
+  assert.equal(HEALTH.start, 0, 'it puts to sea with no shield');
 });

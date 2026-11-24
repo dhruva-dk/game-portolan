@@ -73,7 +73,7 @@ test('the game deals each type about as often as it says, the same for a seed ev
   assert.equal(MIXED.rules, DEFAULT_RULES);
 });
 
-test("a bloodbath's storm closes sooner than a mixed match's, and a cagey one's later; a gold rush lays more", () => {
+test("a bloodbath's storm closes sooner than a mixed match's, and a cagey one's later", () => {
   const course = (name: string) =>
     TYPES.find((t) => t.name === name)!.rules.storm.phases.reduce(
       (t, p) => t + p.wait + p.close,
@@ -81,6 +81,4 @@ test("a bloodbath's storm closes sooner than a mixed match's, and a cagey one's 
     );
   assert.ok(course('bloodbath') < course('mixed'));
   assert.ok(course('cagey') > course('mixed'));
-  const rush = TYPES.find((t) => t.name === 'gold rush')!;
-  assert.ok(rush.rules.loot.spots > DEFAULT_RULES.loot.spots);
 });

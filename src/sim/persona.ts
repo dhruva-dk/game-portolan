@@ -127,44 +127,25 @@ export const MIXED: MatchType = {
 const waits = (by: number) =>
   DEFAULT_RULES.storm.phases.map((p) => ({ ...p, wait: p.wait * by }));
 
-const LAID = DEFAULT_RULES.loot;
-const cache = (pieces: number, more: number) => ({
-  ...LAID.cache,
-  pieces: Math.round(LAID.cache.pieces * pieces),
-  more: Math.round(LAID.cache.pieces * more),
-});
-
 export const TYPES: readonly (MatchType & { readonly dealt: number })[] = [
   { ...MIXED, dealt: 0.55 },
   {
     name: 'bloodbath',
     dealt: 0.15,
     mix: { ...EVEN, hunter: 3, brawler: 3, raider: 2, turtle: 0.5 },
-    rules: ruled({
-      loot: { cache: cache(1.2, 0) },
-      storm: { phases: waits(0.8) },
-    }),
+    rules: ruled({ storm: { phases: waits(0.8) } }),
   },
   {
     name: 'gold rush',
     dealt: 0.15,
     mix: { ...EVEN, scavenger: 3, raider: 2, homesteader: 2 },
-    rules: ruled({
-      loot: {
-        spots: Math.round(LAID.spots * 1.375),
-        second: 0.55,
-        cache: cache(1.4, 0.4),
-      },
-    }),
+    rules: DEFAULT_RULES,
   },
   {
     name: 'cagey',
     dealt: 0.15,
     mix: { ...EVEN, turtle: 3, homesteader: 3, brawler: 0.5 },
-    rules: ruled({
-      loot: { cache: cache(0.8, 0) },
-      storm: { phases: waits(1.15) },
-    }),
+    rules: ruled({ storm: { phases: waits(1.15) } }),
   },
 ];
 

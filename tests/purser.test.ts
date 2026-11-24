@@ -12,12 +12,13 @@ import {
 import { mind, think, type Memory, type Own } from '../src/sim/bot.ts';
 import { afloat, stepFleet, type Vessel } from '../src/sim/contact.ts';
 import { STEP } from '../src/sim/fixed.ts';
-import { emptyHold, stowed } from '../src/sim/hold.ts';
+import { emptyHold, type Hold } from '../src/sim/hold.ts';
+import type { Rarity } from '../src/sim/kinds.ts';
 import type { Flotsam, Loot } from '../src/sim/loot.ts';
 import { healSlot, PURSER } from '../src/sim/purser.ts';
 import { shipAt, turned, type Helm } from '../src/sim/ship.ts';
 import type { Depth } from '../src/sim/shoal.ts';
-import { asked, crewed, NOTHING, stored, type Ask } from '../src/sim/stores.ts';
+import { asked, crewed, stored, type Ask } from '../src/sim/stores.ts';
 import { temper } from '../src/sim/temper.ts';
 import {
   along,
@@ -32,13 +33,16 @@ const DEEP: Depth = () => 30;
 const c0 = fromLatLon(0.3, 0.1);
 const out = (m: number, b = 0) =>
   along(c0, turned(shipAt(c0, frameAt(c0).east), b), m).p;
-const piece = (id: number, at: Vec3, goods: Loot['goods']): Loot => ({
+const piece = (id: number, at: Vec3, heal: Rarity): Loot => ({
   id,
   at,
-  goods,
-  from: -1,
+  heal,
   age: 10,
   way: [0, 0, 0],
+});
+const holding = (...items: (Rarity | null)[]): Hold => ({
+  ...emptyHold(),
+  items,
 });
 
 function sail(
@@ -79,7 +83,7 @@ function sail(
       asks.set(v.id, r.ask);
       if (modes[v.id].at(-1) !== r.memory.mode) modes[v.id].push(r.memory.mode);
     });
-    const w = asked(battle.crews, fleet, f, asks);
+    const w = asked(battle.crews, asks);
     const manned = new Map(w.crews.map((c) => [c.id, c]));
     fleet.forEach((v, i) => {
       helms[i] = crewed(helms[i], manned.get(v.id));
@@ -109,7 +113,6 @@ function sail(
       ).battle.crews,
       f,
       fleet,
-      w.takes,
       [],
       STEP,
       deep,
@@ -121,64 +124,29 @@ function sail(
   return { fleet, crews: battle.crews, flotsam: f, minds, modes };
 }
 
-test("her taps: on the item in hand with stores in reach, a swap; else the hold's", () => {
-  const fleet: Vessel[] = [afloat(0, shipAt(c0, frameAt(c0).north))];
-  const items = [
-    { kind: 'smallShield', count: 2 },
-    { kind: 'bigShield', count: 1 },
-    { kind: 'fullRepair', count: 1 },
-  ] as const;
-  const playerCrew: Crew = {
-    ...crewOf(0, EVEN_SHIP),
-    hold: { ...emptyHold(), items, chosen: 1 },
-  };
-  const tap = (slot: number, pieces: Loot[]) =>
-    asked(
-      [playerCrew],
-      fleet,
-      { pieces, next: 9 },
-      new Map([[0, { ...NOTHING, tap: slot }]])
-    );
-  const stores = [piece(2, out(4), { kind: 'repairKit', count: 1 })];
-  assert.equal(tap(0, []).takes.size, 0, 'none: nothing to take');
-  assert.equal(
-    tap(1, stores).takes.get(0),
-    1,
-    'stores in reach, the slot in hand: swaps'
-  );
-  const chose = tap(2, stores);
-  assert.deepEqual(
-    [chose.takes.size, chose.crews[0].hold.chosen],
-    [0, 2],
-    'another slot: chosen, no swap'
-  );
-  const far = tap(1, [piece(2, out(40), { kind: 'repairKit', count: 1 })]);
-  assert.equal(far.takes.size, 0, "out of reach: the tap is the hold's");
-});
-
 const seeds = (ok: (s: number) => boolean, n: number) => {
   const r: number[] = [];
   for (let s = 1; r.length < n; s++) if (ok(s)) r.push(s);
   return r;
 };
 
-test('it mends with the slot worth most to it as it is', () => {
-  let h = emptyHold();
-  for (const k of ['smallShield', 'repairKit', 'fullRepair'] as const)
-    h = stowed(h, k, 1).hold;
-  const at = (hull: number, shield: number) =>
+test('it heals with the least heal that fills its hull, else with its greatest; at full hull, with none', () => {
+  const values = { ...EVEN_SHIP, hullPoints: 100, healFactor: 1 };
+  const at = (hull: number, hold = holding('legendary', 'common', 'epic')) =>
     healSlot({
-      ...crewOf(0, EVEN_SHIP),
-      hold: h,
-      health: { hull, shield, most: 100 },
+      ...crewOf(0, values),
+      hold,
+      health: { hull, shield: 0, most: 100 },
     });
-  assert.equal(at(100, 0), 1, 'a shield');
-  assert.equal(at(60, 60), 2, 'a kit');
-  assert.equal(at(30, 0), 3, 'a full repair');
-  assert.equal(at(100, 60), -1, 'nothing worth it');
+  assert.equal(at(90), 1, 'a common fills it');
+  assert.equal(at(60), 2, 'an epic fills it');
+  assert.equal(at(20), 0, 'only a legendary fills it');
+  assert.equal(at(20, holding(null, 'common', 'rare')), 2, 'none fills it');
+  assert.equal(at(100), -1, 'nothing to mend');
+  assert.equal(at(50, holding(null, null, null)), -1, 'nothing to mend with');
 });
 
-const stowedOf = (c: Crew) => c.hold.items.flatMap((k) => (k ? [k.kind] : []));
+const stowedOf = (c: Crew) => c.hold.items.flatMap((k) => (k ? [k] : []));
 
 test('a piece abeam, inside the circle it turns at its top speed, it slows to come round to it, not sail round it', () => {
   for (const seed of seeds((s) => temper(s).lootReach >= 110, 4)) {
@@ -186,15 +154,12 @@ test('a piece abeam, inside the circle it turns at its top speed, it slows to co
       [c0],
       [seed],
       [crewOf(0, EVEN_SHIP)],
-      {
-        pieces: [piece(1, out(28, 0), { kind: 'repairKit', count: 1 })],
-        next: 2,
-      },
+      { pieces: [piece(1, out(28, 0), 'common')], next: 2 },
       15
     );
     assert.deepEqual(
       stowedOf(r.crews[0]),
-      ['repairKit'],
+      ['common'],
       `${seed}: ${r.modes[0]}`
     );
   }
@@ -202,11 +167,7 @@ test('a piece abeam, inside the circle it turns at its top speed, it slows to co
 
 test('a hurt bot with something to mend with uses it', () => {
   for (const seed of seeds(() => true, 4)) {
-    const hold = stowed(
-      stowed(emptyHold(), 'repairKit', 2).hold,
-      'smallShield',
-      2
-    ).hold;
+    const hold = holding('common', 'rare', null);
     const r = sail(
       [c0],
       [seed],
@@ -214,7 +175,7 @@ test('a hurt bot with something to mend with uses it', () => {
         {
           ...crewOf(0, EVEN_SHIP),
           hold,
-          health: { hull: 40, shield: 0, most: 100 },
+          health: { hull: 40, shield: 0, most: EVEN_SHIP.hullPoints },
         },
       ],
       { pieces: [], next: 0 },
@@ -222,7 +183,7 @@ test('a hurt bot with something to mend with uses it', () => {
     );
     const c = r.crews[0];
     assert.ok(
-      c.health.hull > 40 && c.health.shield > 0,
+      c.health.hull > 40 && c.hold.items.includes(null),
       `${seed}: ${JSON.stringify(c.health)} ${r.modes[0]}`
     );
   }
@@ -234,7 +195,7 @@ test('bots near one piece do not all pile on it: one takes it, and none goes for
     at,
     [1, 2, 3, 4, 5, 6],
     at.map((_, i) => crewOf(i, EVEN_SHIP)),
-    { pieces: [piece(1, c0, { kind: 'repairKit', count: 1 })], next: 2 },
+    { pieces: [piece(1, c0, 'common')], next: 2 },
     60
   );
   assert.equal(r.crews.filter((c) => stowedOf(c).length > 0).length, 1);
@@ -258,7 +219,7 @@ test('a piece it can not come to it gives up after a while, and leaves be', () =
       [c0],
       [seed],
       [crewOf(0, HANDY)],
-      { pieces: [piece(1, lagoon, { kind: 'repairKit', count: 1 })], next: 2 },
+      { pieces: [piece(1, lagoon, 'common')], next: 2 },
       PURSER.patience + 15,
       reef
     );

@@ -95,10 +95,7 @@ function battle(
       orders.push(r.order);
       asks.set(v.id, r.ask);
     });
-    b = {
-      ...b,
-      crews: asked(b.crews, fleet, { pieces: [], next: 0 }, asks).crews,
-    };
+    b = { ...b, crews: asked(b.crews, asks).crews };
     const met = stepFleet(
       fleet,
       helms,

@@ -15,13 +15,10 @@ export const perKind = <T>(f: (k: GunKind) => T): Record<GunKind, T> => ({
   mortar: f('mortar'),
 });
 
-export const STORES = [
-  'smallShield',
-  'repairKit',
-  'bigShield',
-  'fullRepair',
-] as const;
-export type Use = (typeof STORES)[number];
+export const RARITIES = ['common', 'rare', 'epic', 'legendary'] as const;
+export type Rarity = (typeof RARITIES)[number];
+
+export const rankOf = (r: Rarity): number => RARITIES.indexOf(r);
 
 const ORDER = perKind((k) => KINDS.indexOf(k));
 export const gunOrder = (k: GunKind): number => ORDER[k];

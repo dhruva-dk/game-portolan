@@ -41,9 +41,9 @@ export function harmed(h: Health, damage: number, past = false): Harm {
 export function healed(
   h: Health,
   amount: number,
-  to: 'hull' | 'shield',
-  cap: number = to === 'hull' ? h.most : HEALTH.shield
+  to: 'hull' | 'shield'
 ): Health {
+  const cap = to === 'hull' ? h.most : HEALTH.shield;
   if (sunk(h) || !(amount > 0) || h[to] >= cap) return h;
   return { ...h, [to]: Math.min(cap, h[to] + amount) };
 }

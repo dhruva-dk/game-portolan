@@ -12,7 +12,7 @@ import { STEP, blendPose } from '../sim/fixed.ts';
 import type { Hands } from '../sim/hands.ts';
 import { wearOf } from '../sim/health.ts';
 import { indexed } from '../sim/indexed.ts';
-import type { Goods } from '../sim/loot.ts';
+import type { Rarity } from '../sim/kinds.ts';
 import { PLAYER } from '../sim/match.ts';
 import type { Memory } from '../sim/bot.ts';
 import type { Nature } from '../sim/persona.ts';
@@ -243,8 +243,8 @@ export function createState(
       dressed(setup, liveries);
       return view().after(PLAYER)!;
     },
-    strew: (at: Vec3, goods: readonly Goods[]) =>
-      debugOfMatch(match).strew(at, goods),
+    strew: (at: Vec3, heals: readonly Rarity[]) =>
+      debugOfMatch(match).strew(at, heals),
     sink(id: number, by: number | null) {
       if (!view().poses(id)) return;
       debugOfMatch(match).sink(id, by);
@@ -267,7 +267,7 @@ interface Debug {
     rig?: Rig
   ): ShipPose;
   rig(rig: Rig, setup: MatchSetup, liveries: readonly Livery[]): ShipPose;
-  strew(at: Vec3, goods: readonly Goods[]): void;
+  strew(at: Vec3, heals: readonly Rarity[]): void;
   sink(id: number, by: number | null): void;
   mindOf(id: number): Readonly<Memory> | null;
   natureOf(id: number): Nature | null;

@@ -9,7 +9,11 @@ const LEVEL = 50,
   STAT = 10,
   RATING = 3;
 
-export const valuesAt = (level: number, gun: GunKind = 'cannon'): ShipValues =>
+export const valuesAt = (
+  level: number,
+  gun: GunKind = 'cannon',
+  mechanic = STAT
+): ShipValues =>
   shipValues(
     {
       sails: level,
@@ -21,12 +25,15 @@ export const valuesAt = (level: number, gun: GunKind = 'cannon'): ShipValues =>
       gun: level,
     },
     gun,
-    { shield: STAT, healSpeed: STAT, healAmount: STAT }
+    { shield: mechanic, healSpeed: mechanic, healAmount: mechanic }
   );
 
 export const EVEN_SHIP: ShipValues = valuesAt(LEVEL);
 export const WORST = valuesAt(0),
   BEST = valuesAt(100);
+
+export const UNTENDED = valuesAt(LEVEL, 'cannon', 1),
+  TENDED = valuesAt(LEVEL, 'cannon', 20);
 
 export const HANDY: ShipValues = {
   ...EVEN_SHIP,

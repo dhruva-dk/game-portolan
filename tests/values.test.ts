@@ -170,15 +170,14 @@ test('its gun: the level-100 assist cone lays on a ship further off its sight th
   assert.equal(struck(only('assistCone', WORST), off).laid, null);
 });
 
-test('its hull points are its own: the storm takes its share of them, its stores mend up to their share of them, a blow leaves them its own', () => {
+test('its hull points are its own: the storm takes its share of them, heals mend up to them, a blow leaves them its own', () => {
   const stout: Crew = crewOf(1, { ...EVEN_SHIP, hullPoints: 120 }),
     spec: Crew = crewOf(1, { ...EVEN_SHIP, hullPoints: 100 });
   const blown = harmed(stout.health, 70).health;
   assert.deepEqual(blown, { hull: 50, shield: 0, most: 120 });
   assert.equal(healed(blown, 100, 'hull').hull, 120);
-  assert.equal(healed(blown, 100, 'hull', 90).hull, 90);
-  assert.equal(useful({ ...blown, hull: 80 }, 'repairKit'), true);
-  assert.equal(useful({ ...spec.health, hull: 80 }, 'repairKit'), false);
+  assert.equal(useful({ ...blown, hull: 110 }), true);
+  assert.equal(useful({ ...spec.health, hull: 100 }), false);
   assert.equal(healed(blown, 100, 'shield').shield, HEALTH.shield);
   const v = afloat(1, shipAt(here, frameAt(here).east)),
     storm = { center: scale(here, -1), radius: 0.1, damage: 0.1 };

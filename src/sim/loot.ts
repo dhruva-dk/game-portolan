@@ -11,42 +11,19 @@ import {
 } from '../world/sphere.ts';
 import type { Crew } from './battle.ts';
 import type { Vessel } from './contact.ts';
-import { STORES } from './kinds.ts';
+import { RARITIES, type Rarity } from './kinds.ts';
 import { SHIP } from './handling.ts';
-import { roomFor, stowed, USES, type Use } from './hold.ts';
+import { stowed } from './hold.ts';
 import type { Depth } from './shoal.ts';
+import type { MatchSetup } from './setup.ts';
 import { toEdge, type Cap } from './storm.ts';
-import type { Widen } from './tables.ts';
-
-export const LOOT = {
-  spots: 640,
-  second: 0.4,
-  shares: {
-    smallShield: 0.26,
-    repairKit: 0.32,
-    bigShield: 0.2,
-    fullRepair: 0.22,
-  } satisfies Record<Use, number>,
-  counts: {
-    smallShield: 4,
-    bigShield: 1,
-    repairKit: 5,
-    fullRepair: 1,
-  } satisfies Record<Use, number>,
-  cache: { pieces: 8, more: 0, within: 0.5 },
-} as const;
-
-export type LootTable = Widen<typeof LOOT>;
+import { weighed } from './tables.ts';
+import { HEAL, HEAL_COUNT } from './tuning.ts';
 
 export const PIECE = {
-  rarity: {
-    smallShield: 1,
-    bigShield: 2,
-    repairKit: 1,
-    fullRepair: 3,
-  } satisfies Record<Use, number>,
+  second: 0.4,
+  within: 0.5,
   reach: 9.5,
-  settle: 0.6,
   drift: 2.2,
   kick: 3,
   open: 1,
@@ -55,13 +32,10 @@ export const PIECE = {
   shore: 240,
 } as const;
 
-export type Goods = { kind: Use; count: number };
-
 export interface Loot {
   id: number;
   at: Vec3;
-  goods: Goods;
-  from: number;
+  heal: Rarity;
   age: number;
   way: Vec3;
 }
@@ -73,16 +47,19 @@ export interface Flotsam {
 
 const STILL: Vec3 = [0, 0, 0];
 
-export const rarityOf = (g: Goods) => PIECE.rarity[g.kind];
+export const healSpots = (rating: MatchSetup['heals']): number =>
+  Math.round(HEAL.spots * HEAL_COUNT[rating]);
 
-export function rolled(draw: () => number, t: LootTable = LOOT): Goods {
-  let r = draw();
-  for (const kind of STORES) {
-    if (r < t.shares[kind]) return { kind, count: t.counts[kind] };
-    r -= t.shares[kind];
-  }
-  return { kind: 'fullRepair', count: t.counts.fullRepair };
-}
+export const rolled = (
+  draw: () => number,
+  shares: Readonly<Record<Rarity, number>> = HEAL.found
+): Rarity =>
+  RARITIES[
+    weighed(
+      RARITIES.map((r) => shares[r]),
+      draw()
+    )
+  ];
 
 const open = (depth: Depth, p: Vec3) => depth(p) >= SHIP.draft + PIECE.open;
 
@@ -106,17 +83,28 @@ function opened(depth: Depth, p: Vec3): Vec3 | null {
   return null;
 }
 
-export function laying(seed: number, depth: Depth, table: LootTable = LOOT) {
+export function laying(
+  seed: number,
+  depth: Depth,
+  rating: MatchSetup['heals']
+) {
   return {
-    strewn: () => strewn(seed, depth, table),
+    strewn: () => strewn(seed, depth, healSpots(rating)),
     cached: (f: Flotsam, cap: Cap, phase: number) =>
-      cached(f, cap, phase, seed, depth, table),
+      cached(f, cap, phase, seed, depth),
   };
 }
 
-function strewn(seed: number, depth: Depth, t: LootTable): Flotsam {
-  const spots = t.spots,
-    draw = random(hash(seed, 0x100f));
+const lying = (id: number, at: Vec3, heal: Rarity): Loot => ({
+  id,
+  at,
+  heal,
+  age: 0,
+  way: STILL,
+});
+
+function strewn(seed: number, depth: Depth, spots: number): Flotsam {
+  const draw = random(hash(seed, 0x100f));
   const pieces: Loot[] = [];
   const axis = normalize([draw() - 0.5, draw() - 0.5, draw() - 0.5]),
     turn = draw() * 2 * Math.PI;
@@ -134,21 +122,14 @@ function strewn(seed: number, depth: Depth, t: LootTable): Flotsam {
       draw() * cell * 0.4
     ).p;
     const at = opened(depth, p);
-    const goods = rolled(draw, t),
-      twice = draw() < t.second,
+    const heal = rolled(draw),
+      twice = draw() < PIECE.second,
       side = draw() * 2 * Math.PI;
     if (!at) continue;
-    pieces.push({ id: pieces.length, at, goods, from: -1, age: 0, way: STILL });
+    pieces.push(lying(pieces.length, at, heal));
     if (twice) {
       const q = along(at, tangentAt(at, side), 4).p;
-      pieces.push({
-        id: pieces.length,
-        at: open(depth, q) ? q : at,
-        goods: rolled(draw, t),
-        from: -1,
-        age: 0,
-        way: STILL,
-      });
+      pieces.push(lying(pieces.length, open(depth, q) ? q : at, rolled(draw)));
     }
   }
   return { pieces, next: pieces.length };
@@ -159,27 +140,21 @@ function cached(
   cap: Cap,
   phase: number,
   seed: number,
-  depth: Depth,
-  t: LootTable
+  depth: Depth
 ): Flotsam {
-  const draw = random(hash(seed, 0xcac0 + phase)),
-    k = t.cache;
+  const draw = random(hash(seed, 0xcac0 + phase));
   const pieces = [...f.pieces];
   let next = f.next;
-  const count = k.pieces + k.more * Math.max(0, phase - 1);
-  for (let i = 0; i < count; i++) {
+  for (let i = 0; i < HEAL.cache.count; i++) {
     const p = along(
       cap.center,
       tangentAt(cap.center, draw() * 2 * Math.PI),
-      R * cap.radius * k.within * Math.sqrt(draw())
+      R * cap.radius * PIECE.within * Math.sqrt(draw())
     ).p;
-    const goods: Goods =
-      draw() < 0.5
-        ? { kind: 'bigShield', count: t.counts.bigShield }
-        : { kind: 'fullRepair', count: t.counts.fullRepair };
+    const heal = rolled(draw, HEAL.cache.found);
     const at = opened(depth, p);
     if (!at || toEdge(at, cap) < 0) continue;
-    pieces.push({ id: next++, at, goods, from: -1, age: 0, way: STILL });
+    pieces.push(lying(next++, at, heal));
   }
   return { pieces, next };
 }
@@ -187,29 +162,24 @@ function cached(
 export function overboard(
   f: Flotsam,
   at: Vec3,
-  goods: readonly Goods[],
-  from: number,
+  heals: readonly Rarity[],
   seed: number
 ): Flotsam {
   const draw = random(hash(seed, f.next));
-  const thrown = goods.map(
-    (g, k): Loot => ({
-      id: f.next + k,
-      at,
-      goods: g,
-      from,
-      age: 0,
+  const thrown = heals.map(
+    (heal, k): Loot => ({
+      ...lying(f.next + k, at, heal),
       way: scale(tangentAt(at, draw() * 2 * Math.PI), PIECE.kick + k),
     })
   );
-  return { pieces: [...f.pieces, ...thrown], next: f.next + goods.length };
+  return { pieces: [...f.pieces, ...thrown], next: f.next + heals.length };
 }
 
 export function drifted(f: Flotsam, dt: number, depth: Depth): Flotsam {
-  if (f.pieces.every((l) => l.way === STILL && l.from < 0)) return f;
+  if (f.pieces.every((l) => l.way === STILL)) return f;
   const k = Math.max(0, 1 - dt * PIECE.drift);
   const pieces = f.pieces.map((l): Loot => {
-    if (l.way === STILL && l.from < 0) return l;
+    if (l.way === STILL) return l;
     const speed = Math.hypot(...l.way);
     if (speed < 1e-3) return { ...l, age: l.age + dt, way: STILL };
     const moved = along(l.at, scale(l.way, 1 / speed), speed * dt);
@@ -220,28 +190,14 @@ export function drifted(f: Flotsam, dt: number, depth: Depth): Flotsam {
   return { ...f, pieces };
 }
 
-const REACH = Math.cos(PIECE.reach / R);
+export const REACH = Math.cos(PIECE.reach / R);
 
-const fits = (c: Crew, g: Goods) => roomFor(c.hold, g.kind) >= 0;
-
-const reachable = (id: number, p: Vec3, l: Loot) =>
-  dot(p, l.at) > REACH && l.from !== id;
-
-export function offered(c: Crew, at: Vec3, f: Flotsam): Loot | null {
-  let item: Loot | null = null,
-    near = REACH;
-  for (const l of f.pieces) {
-    if (!reachable(c.id, at, l) || fits(c, l.goods)) continue;
-    const d = dot(at, l.at);
-    if (d > near) [item, near] = [l, d];
-  }
-  return item;
-}
+export const within = (p: Vec3, l: Loot) => dot(p, l.at) > REACH;
 
 export interface Taken {
   id: number;
   ship: number;
-  goods: Goods;
+  heal: Rarity;
   at: Vec3;
   slot: number;
 }
@@ -249,9 +205,7 @@ export interface Taken {
 export function swept(
   f: Flotsam,
   crews: readonly Crew[],
-  fleet: readonly Vessel[],
-  takes: ReadonlyMap<number, number>,
-  seed: number
+  fleet: readonly Vessel[]
 ): { flotsam: Flotsam; crews: Crew[]; took: Taken[] } {
   let pieces = f.pieces,
     next = f.next;
@@ -261,85 +215,22 @@ export function swept(
     let c = by.get(v.id);
     if (!c || c.health.hull <= 0) continue;
     const p = v.ship.at;
-    let near = false;
-    for (let i = 0; i < pieces.length && !near; i++) {
-      const l = pieces[i];
-      near =
-        l.from === v.id
-          ? l.age >= PIECE.settle && dot(p, l.at) <= REACH
-          : dot(p, l.at) > REACH && fits(c, l.goods);
-    }
-    if (near) {
-      const kept: Loot[] = [];
-      for (const l of pieces) {
-        if (l.from === v.id) {
-          kept.push(
-            l.age >= PIECE.settle && dot(p, l.at) <= REACH
-              ? { ...l, from: -1 }
-              : l
-          );
-          continue;
-        }
-        if (!reachable(v.id, p, l)) {
-          kept.push(l);
-          continue;
-        }
-        const g = l.goods;
-        const s = stowed(c.hold, g.kind, g.count);
-        c = { ...c, hold: s.hold };
-        if (s.left < g.count) {
-          const slot = 1 + s.hold.items.findIndex((k) => k?.kind === g.kind);
-          took.push({
-            id: l.id,
-            ship: v.id,
-            goods: { kind: g.kind, count: g.count - s.left },
-            at: l.at,
-            slot,
-          });
-        }
-        if (s.left > 0)
-          kept.push(
-            s.left === g.count
-              ? l
-              : { ...l, goods: { kind: g.kind, count: s.left } }
-          );
+    if (!pieces.some((l) => within(p, l))) continue;
+    const kept: Loot[] = [],
+      thrown: Loot[] = [];
+    for (const l of pieces) {
+      const s: ReturnType<typeof stowed> = within(p, l)
+        ? stowed(c.hold, l.heal)
+        : null;
+      if (!s) {
+        kept.push(l);
+        continue;
       }
-      pieces = kept;
+      c = { ...c, hold: s.hold };
+      took.push({ id: l.id, ship: v.id, heal: l.heal, at: l.at, slot: s.slot });
+      if (s.dropped) thrown.push(lying(next++, p, s.dropped));
     }
-    const slot = takes.get(v.id);
-    if (slot !== undefined && slot >= 1 && slot <= c.hold.items.length) {
-      const swap = offered(c, p, { pieces, next });
-      if (swap) {
-        const goods = swap.goods,
-          had = c.hold.items[slot - 1],
-          old: Goods | null = had && { kind: had.kind, count: had.count };
-        pieces = pieces.filter((l) => l.id !== swap.id);
-        took.push({ id: swap.id, ship: v.id, goods, at: swap.at, slot });
-        const items = [...c.hold.items];
-        items[slot - 1] = {
-          kind: goods.kind,
-          count: Math.min(goods.count, USES[goods.kind].stack),
-        };
-        c = {
-          ...c,
-          hold: {
-            ...c.hold,
-            items,
-            using: c.hold.using?.slot === slot ? null : c.hold.using,
-          },
-        };
-        if (old) {
-          const thrown = overboard({ pieces, next }, p, [old], v.id, seed);
-          [pieces, next] = [
-            [
-              ...thrown.pieces.slice(0, -1),
-              { ...thrown.pieces[thrown.pieces.length - 1], way: STILL },
-            ],
-            thrown.next,
-          ];
-        }
-      }
-    }
+    pieces = [...kept, ...thrown];
     by.set(v.id, c);
   }
   return {
@@ -349,9 +240,8 @@ export function swept(
   };
 }
 
-export function cargo(c: Crew): Goods[] {
-  const goods: Goods[] = [];
-  for (const s of c.hold.items)
-    if (s) goods.push({ kind: s.kind, count: s.count });
-  return goods;
+export function cargo(c: Crew): Rarity[] {
+  const heals: Rarity[] = [];
+  for (const k of c.hold.items) if (k) heals.push(k);
+  return heals;
 }

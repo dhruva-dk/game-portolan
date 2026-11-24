@@ -313,18 +313,13 @@ export function createHud(layer: HTMLElement, shores: Shores, act: HudActions) {
       k = gun ? s.guns[i] : null,
       item = gun ? null : s.items[i - HOTBAR.guns];
     const chosen = s.chosen === i,
-      offer = s.offer === i,
       full = gun ? !!k : !!item;
     const reload = k && k.reload !== null ? Math.floor(k.reload * 32) : -1;
     const used = chosen && s.using !== null ? Math.floor(s.using * 32) : reload;
-    const name = k ? k.kind : item ? item.item : null,
-      count = k ? k.rounds : item ? item.count : null;
+    const name = k ? k.kind : item ? item.heal : null,
+      count = k ? k.rounds : null;
     const el = slots[i];
-    if (changed(el, name, count, chosen, used, offer)) {
-      const bob = offer
-        ? `<g><path d="M${SLOT / 2 - 7} -15h14l-7 9z" fill="${WASH.gold}" stroke="${INK.iron}" stroke-width="1"/>` +
-          `<animateTransform attributeName="transform" type="translate" values="0 0;0 -4;0 0" dur="0.9s" repeatCount="indefinite"/></g>`
-        : '';
+    if (changed(el, name, count, chosen, used)) {
       if (!full) {
         el.innerHTML = svg(
           SLOT,
@@ -333,12 +328,11 @@ export function createHud(layer: HTMLElement, shores: Shores, act: HudActions) {
             `<rect x="2" y="2" width="${SLOT - 4}" height="${SLOT - 4}" fill="none" stroke="${INK.white}" stroke-width="1.2" opacity=".85"/>` +
             (gun
               ? `<g opacity=".5">${glyph('weapon.cannon', SLOT / 2, SLOT / 2, 28, { ink: 'white' })}</g>`
-              : '') +
-            bob
+              : '')
         );
       } else {
         const low = !!k && k.rounds === 0,
-          mine: Glyph = k ? mark(k.kind) : item!.item;
+          mine: Glyph = k ? mark(k.kind) : 'heal';
         el.innerHTML = svg(
           SLOT,
           SLOT,
@@ -367,8 +361,7 @@ export function createHud(layer: HTMLElement, shores: Shores, act: HudActions) {
                     : WASH.gold,
                   3.5
                 )
-              : '') +
-            bob
+              : '')
         );
       }
     }

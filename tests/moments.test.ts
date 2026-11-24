@@ -88,18 +88,12 @@ test(
       ],
       sunk: [{ id: 2, by: 0, at }],
       took: [
-        {
-          id: 2,
-          ship: 0,
-          goods: { kind: 'smallShield', count: 3 },
-          at,
-          slot: 2,
-        },
-        { id: 3, ship: 5, goods: { kind: 'repairKit', count: 1 }, at, slot: 1 },
+        { id: 2, ship: 0, heal: 'epic', at, slot: 1 },
+        { id: 3, ship: 5, heal: 'common', at, slot: 0 },
       ],
       mended: [
-        { ship: 0, use: 'bigShield' },
-        { ship: 5, use: 'repairKit' },
+        { ship: 0, heal: 'rare' },
+        { ship: 5, heal: 'common' },
       ],
       blew: [0, 5],
       cues: [
@@ -142,7 +136,7 @@ test(
     const stores = d[6];
     assert.ok(
       stores.kind === 'took' &&
-        stores.piece === 'smallShield' &&
+        stores.heal === 'epic' &&
         stores.slot === HOTBAR.guns + 1
     );
     assert.deepEqual(

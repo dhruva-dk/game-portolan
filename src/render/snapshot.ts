@@ -1,4 +1,4 @@
-import type { GunKind, Use } from '../sim/kinds.ts';
+import type { GunKind, Rarity } from '../sim/kinds.ts';
 import type { Cap } from '../sim/storm.ts';
 import type { ReadCells } from '../world/cells.ts';
 import type { ShipPose } from '../world/pose.ts';
@@ -64,8 +64,7 @@ export interface BallDraw {
 export interface LootDraw {
   id: number;
   at: Vec3;
-  kind: Use;
-  rarity: number;
+  heal: Rarity;
   born: number;
 }
 

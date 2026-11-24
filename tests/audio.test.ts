@@ -65,9 +65,9 @@ const each = (ship: number, gun: GunKind = 'cannon'): Happening[] =>
       case 'sank':
         return { ...base, kind, by: null };
       case 'took':
-        return { ...base, kind, piece: 'smallShield', rarity: 0, slot: 1 };
+        return { ...base, kind, heal: 'common', slot: 1 };
       case 'mended':
-        return { ...base, kind, piece: 'repairKit' };
+        return { ...base, kind, heal: 'rare' };
       case 'gust':
         return { ...base, kind };
     }
@@ -116,26 +116,14 @@ test('its blows: its ward taking all of one rings, its last breaks it, the rest 
   assert.equal(cueOf(blow(0, 20, false), 3), 'strike');
   assert.equal(
     cueOf(
-      {
-        seq: 1,
-        time: 0,
-        at,
-        ship: 0,
-        kind: 'took',
-        piece: 'smallShield',
-        rarity: 0,
-        slot: 1,
-      },
+      { seq: 1, time: 0, at, ship: 0, kind: 'took', heal: 'common', slot: 1 },
       0
     ),
     'took'
   );
   assert.equal(
-    cueOf(
-      { seq: 1, time: 0, at, ship: 0, kind: 'mended', piece: 'bigShield' },
-      0
-    ),
-    'mendWard'
+    cueOf({ seq: 1, time: 0, at, ship: 0, kind: 'mended', heal: 'epic' }, 0),
+    'mendHull'
   );
 });
 
@@ -324,7 +312,6 @@ const status = (over: Partial<Status & Kit> = {}): Status & Kit => ({
   items: [null, null, null],
   chosen: 0,
   using: null,
-  offer: null,
   gust: 2,
   gusts: 2,
   blowing: false,
