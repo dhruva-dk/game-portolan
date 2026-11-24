@@ -4,7 +4,7 @@ import { createChanged } from '../src/ui/drawn.ts';
 import { GLYPHS, stormMark } from '../src/ui/glyphs.ts';
 import { RING, glow, sectorOf } from '../src/ui/hits.ts';
 
-test('a blow on her lights the sector of the ring toward its dealer: eight, ahead first, clockwise', () => {
+test('a blow on it lights the sector of the ring toward its dealer: eight, ahead first, clockwise', () => {
   const step = Math.PI / 4,
     e = 1e-6;
   for (let i = 0; i < 8; i++) {

@@ -50,7 +50,7 @@ const card = (ships: RaceShip[]): RaceCard => ({
   ships,
 });
 
-test('carded: a ship’s team is the card’s, by her id; a forfeit does not put to sea', () => {
+test('carded: a ship’s team is the card’s, by its id; a forfeit does not put to sea', () => {
   const c = card([
     ship(0, { driver: null }),
     ship(1),

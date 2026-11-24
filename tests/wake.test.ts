@@ -35,7 +35,7 @@ const sail = (
   return { points, at, t };
 };
 
-test('the first point is laid where she is; at rest no more are', () => {
+test('the first point is laid where it is; at rest no more are', () => {
   const points: WakePoint[] = [];
   assert.equal(
     lay(points, start, 0, 0),

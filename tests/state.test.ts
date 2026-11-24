@@ -89,20 +89,23 @@ test('her livery: worn at anchor at once; her ship in it at sea, the bots dealt 
   assert.deepEqual(her(), lookOf({ dye: 0, pattern: 1 }));
 });
 
-test('a ship sunk in a step lays, closes and cuts nothing in it: her water only drains', () => {
+test('a ship sunk in a step lays, closes and cuts nothing in it: its water only drains', () => {
   const sailed = loop(deadly(Infinity));
-  assert.ok(sailed.closed !== null, 'her loop closes');
+  assert.ok(sailed.closed !== null, 'its loop closes');
   const sunk = loop(deadly(sailed.closed));
-  assert.equal(sunk.state.mine(), null, 'she sank');
+  assert.equal(sunk.state.mine(), null, 'it sank');
   assert.deepEqual(sunk.did?.held?.claimed, []);
   assert.deepEqual(sunk.did?.regained, []);
   const changes = sunk.state.sea(1)!.changes.filter((c) => c.ship === PLAYER);
-  assert.ok(!changes.some((c) => c.kind === 'claim'), 'no loop of hers closed');
+  assert.ok(
+    !changes.some((c) => c.kind === 'claim'),
+    'no loop of its own closed'
+  );
   assert.equal(changes.at(-1)?.kind, 'drain');
   assert.equal(sunk.state.share(PLAYER), 0);
 });
 
-test("a second match on the same state starts clean: its sea as a new state's, her loop closing as it did", () => {
+test("a second match on the same state starts clean: its sea as a new state's, its loop closing as it did", () => {
   const alone = loop(deadly(Infinity)),
     first = loop(deadly(Infinity));
   for (let k = 0; k < 240; k++)
@@ -116,13 +119,13 @@ test("a second match on the same state starts clean: its sea as a new state's, h
   const was = first.state.sea(1)!;
   assert.ok(
     was.changes.some((c) => c.kind === 'paint' && c.ship === PLAYER),
-    "her strip painted at the first match's end"
+    "its strip painted at the first match's end"
   );
   const second = loop(deadly(Infinity), first.state);
   assert.equal(
     second.closed,
     alone.closed,
-    'her loop closes at the same moment of its match'
+    'its loop closes at the same moment of its match'
   );
   const a = alone.state.sea(1)!,
     b = second.state.sea(1)!,

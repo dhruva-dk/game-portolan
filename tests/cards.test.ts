@@ -16,7 +16,7 @@ test('the sea held, as a per cent: always to a tenth, never below none', () => {
   assert.equal(percent(-0.2), '0.0%');
 });
 
-test("her dye, from the sea's colours: hers by her id, white while it is not known", () => {
+test("its dye, from the sea's colours: its own by its id, white while it is not known", () => {
   const colours: Sea['colours'] = [
     [1, 0, 0],
     [0.9, 0.7, 0.1],

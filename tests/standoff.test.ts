@@ -19,7 +19,7 @@ const only = (p: Persona) =>
     number
   >;
 
-test('a raider stands off guns she hears while they ring, and falls on them when they fall silent; a hunter goes straight in', () => {
+test('a raider stands off guns it hears while they ring, and falls on them when they fall silent; a hunter goes straight in', () => {
   let hunted = 0;
   for (let seed = 1; seed <= 24; seed++) {
     for (const p of ['raider', 'hunter'] as const) {

@@ -67,7 +67,7 @@ function fired(
     [fleet[0], on],
     { seed: 7, depth: deep, spread: 0 }
   );
-  assert.equal(lay.target, on.id, 'laid on her');
+  assert.equal(lay.target, on.id, 'laid on it');
   const ball: Ball = loosed(1, kind, lay.from, lay.dirs[0], lay.speed, 40);
   let b: Battle = {
     ...battleOf(
@@ -93,7 +93,7 @@ const hulls = (b: Battle) =>
   new Map(b.crews.map((c) => [c.id, c.health.hull + c.health.shield]));
 const WHOLE = HEALTH.hull + HEALTH.start;
 
-test('mates: ships of one team, never a ship and herself, and none with no teams', () => {
+test('mates: ships of one team, never a ship and itself, and none with no teams', () => {
   assert.equal(mates(TEAMS, 1, 2), true);
   assert.equal(mates(TEAMS, 2, 3), false);
   assert.equal(mates(TEAMS, 1, 1), false);
@@ -110,11 +110,11 @@ test("a ball that meets a mate's hull stops there and harms nothing; another tea
   assert.ok(foe.hull.get(2)! < WHOLE);
   const mate = fired('cannon', fleet, fleet[1], TEAMS);
   assert.deepEqual(mate.strikes, [], 'no strike on a mate');
-  assert.equal(mate.hull.get(2), WHOLE, 'she is whole');
+  assert.equal(mate.hull.get(2), WHOLE, 'it is whole');
   assert.equal(mate.splashes, 0, 'and the ball went no further: no splash');
 });
 
-test("a shell's burst spares her team, and still takes the other ships within it", () => {
+test("a shell's burst spares its team, and still takes the other ships within it", () => {
   const fleet = [lying(1, 0, 0), lying(2, 120, 0), lying(3, 120, 9)];
   const free = fired('mortar', fleet, fleet[1]);
   assert.deepEqual(
@@ -127,7 +127,7 @@ test("a shell's burst spares her team, and still takes the other ships within it
     r.strikes.map((s) => [s.shooter, s.struck]),
     [[1, 3]]
   );
-  assert.equal(r.hull.get(2), WHOLE, 'her mate is whole');
+  assert.equal(r.hull.get(2), WHOLE, 'its mate is whole');
   assert.ok(r.hull.get(3)! < WHOLE, 'the other is not');
 });
 
@@ -174,7 +174,7 @@ test('a ram between mates harms neither, and their hulls still part; between tea
   assert.deepEqual([ours.hull.get(1), ours.hull.get(2)], [WHOLE, WHOLE]);
 });
 
-test("the gun's assist never lays on a mate: her marks are every ship but her team's", () => {
+test("the gun's assist never lays on a mate: its marks are every ship but its team's", () => {
   const fleet = [lying(1, 0, 0), lying(2, 80, 0), lying(3, 140, 0)];
   const b = battleOf([], 0, undefined, TEAMS);
   assert.deepEqual(
@@ -199,7 +199,7 @@ test("the gun's assist never lays on a mate: her marks are every ship but her te
   );
 });
 
-test('a bot never takes a mate for her foe, nor notes her in her log; a ship of another team she does', () => {
+test('a bot never takes a mate for its foe, nor notes it in its log; a ship of another team it does', () => {
   const own = (team: number) => ({
     id: 1,
     ship: shipAt(centre, north),
@@ -222,10 +222,10 @@ test('a bot never takes a mate for her foe, nor notes her in her log; a ship of 
       foe = think(own(1), [other], { depth: deep }, foe, nature(seed)).memory;
       mate = think(own(0), [other], { depth: deep }, mate, nature(seed)).memory;
     }
-    assert.equal(foe.foe, 2, `${seed}: another team's ship is in her eye`);
+    assert.equal(foe.foe, 2, `${seed}: another team's ship is in its eye`);
     assert.ok(foe.log.some((s) => s.id === 2));
-    assert.equal(mate.foe, -1, `${seed}: her mate is not`);
-    assert.deepEqual(mate.log, [], `${seed}: nor in her log`);
+    assert.equal(mate.foe, -1, `${seed}: its mate is not`);
+    assert.deepEqual(mate.log, [], `${seed}: nor in its log`);
   }
 });
 
@@ -248,16 +248,16 @@ function sail(t: Sea, id: number, ...points: Vec3[]) {
   return claimed;
 }
 
-test("a mate crossing her water takes none of it; another team's strip does", () => {
+test("a mate crossing its water takes none of it; another team's strip does", () => {
   for (const teams of [[0, 0], undefined]) {
     const t = createTerritory(2, teams);
     t.begin([at(0, 0), at(70, 0)], 0);
     const theirs = t.share(1);
     sail(t, 0, at(0, 0), at(140, 0));
     if (teams) {
-      assert.equal(t.ownerAt(at(70, 0)), 1, "her mate's patch is her mate's");
+      assert.equal(t.ownerAt(at(70, 0)), 1, "its mate's patch is its mate's");
       assert.equal(t.share(1), theirs, 'all of it');
-      assert.equal(t.ownerAt(at(125, 0)), 0, 'beyond it she paints her own');
+      assert.equal(t.ownerAt(at(125, 0)), 0, 'beyond it, it paints its own');
       assert.equal(t.teamAt(at(70, 0)), 0);
       assert.equal(t.teamAt(at(125, 0)), 0);
       assert.equal(t.teamAt(at(0, 300)), -1, 'open sea is no team’s');
@@ -266,13 +266,13 @@ test("a mate crossing her water takes none of it; another team's strip does", ()
     } else {
       assert.equal(t.ownerAt(at(70, 0)), 0);
       assert.ok(t.share(1) < theirs);
-      assert.equal(t.teamAt(at(70, 0)), 0, 'with no teams, she is her own');
+      assert.equal(t.teamAt(at(70, 0)), 0, 'with no teams, it is its own');
       assert.equal(t.teamShare(0), t.share(0));
     }
   }
 });
 
-test("her strip coming against her mate's water closes her loop, fenced by her team's water; the mate's stays hers", () => {
+test("its strip coming against its mate's water closes its loop, fenced by its team's water; the mate's stays its own", () => {
   for (const teams of [[0, 0], undefined]) {
     const t = createTerritory(2, teams);
     t.begin([at(0, -100), at(0, 0)], 0);
@@ -292,13 +292,13 @@ test("her strip coming against her mate's water closes her loop, fenced by her t
         claimed[0] > 0.5 * 140 * 60 && claimed[0] < 140 * 60,
         `it took ${claimed[0].toFixed(0)} m²`
       );
-      assert.equal(t.ownerAt(at(70, 30)), 0, 'what it fences off is hers');
-      assert.equal(t.ownerAt(at(70, 0)), 1, "her mate's strip is her mate's");
+      assert.equal(t.ownerAt(at(70, 30)), 0, 'what it fences off is its own');
+      assert.equal(t.ownerAt(at(70, 0)), 1, "its mate's strip is its mate's");
       assert.equal(t.share(1), strip);
     } else {
       assert.deepEqual(claimed, [], 'with no teams, no loop');
       assert.equal(t.ownerAt(at(70, 30)), -1);
-      assert.ok(t.share(1) < strip, 'and her strip cut the other’s');
+      assert.ok(t.share(1) < strip, 'and its strip cut the other’s');
     }
   }
 });
@@ -426,7 +426,7 @@ test("a race's tally: shots fired, strikes landed and taken (a ram is neither), 
   assert.deepEqual(late.result()?.order.slice(0, 5), [1, 4, 3, 2, 0]);
 });
 
-test("a race's flow: afloat as it ends she has her place there; sunk, she watches a mate first; it is over when the game says", () => {
+test("a race's flow: afloat as it ends it has its place there; sunk, it watches a mate first; it is over when the game says", () => {
   const teams = [0, 0, 1, 1, 2, 2];
   const race = (o: boolean, place = 0) => ({ teams, over: o, place });
   let m = startMatch();
@@ -457,7 +457,7 @@ test("a race's flow: afloat as it ends she has her place there; sunk, she watche
     STEP
   );
   assert.deepEqual([s.phase, s.place, s.over], ['spectating', 6, false]);
-  assert.equal(s.watch, 1, 'she watches her mate, not the ship that sank her');
+  assert.equal(s.watch, 1, 'it watches its mate, not the ship that sank it');
   const mate = { id: 1, by: 3, cause: 'ram' as const, gun: null };
   s = stepMatch(
     s,
@@ -471,5 +471,5 @@ test("a race's flow: afloat as it ends she has her place there; sunk, she watche
     STEP
   );
   assert.equal(s.over, true, 'one team afloat: over, though two ships are');
-  assert.equal(s.place, 6, 'her place is as she sank');
+  assert.equal(s.place, 6, 'its place is as it sank');
 });

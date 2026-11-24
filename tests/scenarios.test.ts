@@ -84,7 +84,7 @@ function run(depth: Depth, brain: Brain, seconds: number) {
 
 const isle = islands([at(60, 35), 28]);
 
-test('a bot running from a foe makes for cover behind an island off her bow, out of his sight; told never to, she runs on in plain view', () => {
+test('a bot running from a foe makes for cover behind an island off its bow, out of his sight; told never to, it runs on in plain view', () => {
   const hid = run(isle, DEFAULT_BRAIN, 16),
     plain = run(
       isle,
@@ -96,7 +96,7 @@ test('a bot running from a foe makes for cover behind an island off her bow, out
   assert.ok(hid.hidden > plain.hidden + 3, told);
 });
 
-test("a bot routed round an island's shoulder keeps her bow off it: she is never pinned on it, by either way round", () => {
+test("a bot routed round an island's shoulder keeps its bow off it: it is never pinned on it, by either way round", () => {
   for (const cover of [DEFAULT_BRAIN.mind.cover, 0]) {
     const r = run(
       isle,

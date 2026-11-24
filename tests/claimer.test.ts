@@ -81,7 +81,7 @@ function voyage(
   return { fleet, minds };
 }
 
-test('a bot sails out of her water on a loop and back into it, and takes the water it closes', () => {
+test('a bot sails out of its water on a loop and back into it, and takes the water it closes', () => {
   const seed = seedWhere((k) => k.claim > 0.8),
     t = createTerritory(1);
   t.begin([start], 0);
@@ -99,7 +99,7 @@ test('a bot sails out of her water on a loop and back into it, and takes the wat
   assert.ok(out > 50, `the farthest out ${out.toFixed(0)} m`);
   assert.ok(
     closed >= 1 && back === closed,
-    `${closed} loops closed, ${back} of them back in her water`
+    `${closed} loops closed, ${back} of them back in its water`
   );
-  assert.ok(t.share(0) > 2 * home, `her share ${t.share(0)} from ${home}`);
+  assert.ok(t.share(0) > 2 * home, `its share ${t.share(0)} from ${home}`);
 });

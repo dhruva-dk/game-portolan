@@ -40,12 +40,12 @@ const angle = (a: Vec3, b: Vec3) =>
   Math.acos(Math.max(-1, Math.min(1, dot(normalize(a), normalize(b)))));
 const still = { x: 0, y: 0 };
 
-test('panned, the look stays where it is left: its bearing against the world, however she turns under it', () => {
+test('panned, the look stays where it is left: its bearing against the world, however the ship turns under it', () => {
   const chase = createChase(flat, calm);
   chase.reset(pose(up, north), 0);
   assert.ok(
     angle(chase.axes().ahead, north) < 1e-6,
-    'it starts along her heading'
+    "it starts along the ship's heading"
   );
   chase.update(
     pose(up, north),
@@ -72,7 +72,7 @@ test('panned, the look stays where it is left: its bearing against the world, ho
   assert.ok(angle(chase.sight().dir, dir) < 1e-6, 'its line of sight too');
 });
 
-test('as she sails on, the look is carried along with her over the sphere, its bearing kept', () => {
+test('as it sails on, the look is carried along with it over the sphere, its bearing kept', () => {
   const chase = createChase(flat, calm);
   chase.reset(pose(up, north), 0);
   let at = up,
@@ -106,13 +106,13 @@ test('the middle of the screen is the line of sight, and it passes clear of her 
     );
     assert.ok(
       offSight(s, shipAt(up, heading))!.angle > 0,
-      `her heading ${off}° off the look: the line on her`
+      `its heading ${off}° off the look: the line on it`
     );
   }
   assert.ok(PITCH > 0.1 && PITCH < 0.5);
 });
 
-test('as it starts, she is seen whole, low and left in the frame, her trucks about level with the reticle and her stern above the foot', () => {
+test('as it starts, the ship is seen whole, low and left in the frame, its trucks about level with the reticle and its stern above the foot', () => {
   const chase = createChase(flat, calm);
   chase.reset(pose(up, north), 0);
   const right = cross(north, up);
@@ -125,15 +125,15 @@ test('as it starts, she is seen whole, low and left in the frame, her trucks abo
     bow = seen(12, 4);
   assert.ok(
     truck.y > 220 - 12,
-    `her mainmast's truck at ${truck.y.toFixed(0)}, over the reticle`
+    `its mainmast's truck at ${truck.y.toFixed(0)}, over the reticle`
   );
   assert.ok(
     stern.y < 380,
-    `her stern at ${stern.y.toFixed(0)}, cut by the foot`
+    `its stern at ${stern.y.toFixed(0)}, cut by the foot`
   );
   assert.ok(
     stern.y - truck.y < 0.4 * 440,
-    `she stands ${(stern.y - truck.y).toFixed(0)} px tall`
+    `it stands ${(stern.y - truck.y).toFixed(0)} px tall`
   );
   for (const q of [truck, stern, bow])
     assert.ok(
@@ -153,7 +153,7 @@ test("as it starts, the look meets the sea within a lobbed gun's reach, and wher
     off = R * angle(hit, up);
   assert.ok(
     off > GUNS.mortar.least + 10 && off < 90,
-    `the sea met ${off.toFixed(0)} m from her`
+    `the sea met ${off.toFixed(0)} m from it`
   );
   const q = onScreen(chase.eye(), normalize(hit), 956, 440, 0);
   assert.ok(q && q.y > 0 && q.y < 440, 'on the screen');
@@ -186,7 +186,7 @@ test('looked as high or as low as it goes, the eye stays over the sea; by a hill
   assert.ok(angle(hilly.sight().dir, before) < 1e-6, 'its look unchanged');
 });
 
-test('by the storm, looked as low as it goes or in her sunk shot, the eye stays under its cloud; in the calm it is not drawn in', () => {
+test("by the storm, looked as low as it goes or in the ship's sunk shot, the eye stays under its cloud; in the calm it is not drawn in", () => {
   const calmOf = (metres: number, ahead: number) => ({
     centre: along(up, north, ahead).p,
     radius: metres / R,

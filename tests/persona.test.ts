@@ -12,7 +12,7 @@ const counts = (xs: readonly string[]) => {
   return m;
 };
 
-test('in a mixed match a bot is the temper she always was, her persona named by it', () => {
+test('in a mixed match a bot is the temper it always was, its persona named by it', () => {
   const names = new Set<string>();
   for (const s of SEEDS.slice(0, 200)) {
     const n = nature(s);

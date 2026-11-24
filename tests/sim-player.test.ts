@@ -14,7 +14,7 @@ const seen = (id: number, metres: number): Seen => {
   return { id, ship: { at: p, heading: t, speed: 0, turn: 0 } };
 };
 
-test('her eye is on her foe’s body, never further off it than a thumb wanders', () => {
+test('its eye is on its foe’s body, never further off it than a thumb wanders', () => {
   const eye = standIn(7),
     own = seen(1, 0),
     foe = seen(2, 120);
@@ -22,14 +22,14 @@ test('her eye is on her foe’s body, never further off it than a thumb wanders'
   for (let i = 0; i < 600; i++) {
     const s = eye(own, foe),
       off = offSight(s, foe.ship);
-    assert.ok(off, 'not behind her');
+    assert.ok(off, 'not behind it');
     most = Math.max(most, off.angle);
   }
-  assert.ok(most < 0.04, `${most.toFixed(3)} rad off her body at most`);
+  assert.ok(most < 0.04, `${most.toFixed(3)} rad off its body at most`);
   assert.ok(most > 0, 'it wanders');
 });
 
-test('her eye is the same for the same seed, and another for another', () => {
+test('its eye is the same for the same seed, and another for another', () => {
   const run = (seed: number) => {
     const eye = standIn(seed),
       own = seen(1, 0),

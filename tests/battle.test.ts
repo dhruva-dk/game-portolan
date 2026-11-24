@@ -138,7 +138,7 @@ test('healing mends hull or shield up to its cap, never past it, and nothing onc
   assert.equal(healed({ hull: 0, shield: 0 }, 50, 'hull').hull, 0);
 });
 
-test('a ram takes off each ship what contact.ts reported, through her shield (none, putting to sea) into her hull', () => {
+test('a ram takes off each ship what contact.ts reported, through its shield (none, putting to sea) into its hull', () => {
   const target = lying(centre, 0);
   const from = along(
     target.at,
@@ -287,7 +287,7 @@ test('led with no spread, a ball strikes a ship on a steady course, at any range
       assert.equal(
         lay.target,
         2,
-        `${metres} m, crossing ${crossing}°: laid on her`
+        `${metres} m, crossing ${crossing}°: laid on it`
       );
       let balls: Ball[] = [
           loosed(1, 'cannon', lay.from, lay.dirs[0], lay.speed, 20),
@@ -316,7 +316,7 @@ test('led with no spread, a ball strikes a ship on a steady course, at any range
         struck = r2.strikes[0]?.struck ?? null;
         if (r2.strikes[0]) assert.equal(r2.strikes[0].gun, 'cannon');
       }
-      assert.equal(struck, 2, `${metres} m, crossing ${crossing}°: struck her`);
+      assert.equal(struck, 2, `${metres} m, crossing ${crossing}°: struck it`);
     }
 });
 
@@ -351,7 +351,7 @@ test('with no ship in the assist cone the gun is laid along the sight, at full r
       laid(fleet[0], g, swung(fleet[0], fleet[1], k * a), fleet, flat(1))
         .target,
       2,
-      'inside: laid on her'
+      'inside: laid on it'
     );
     while (
       offSight(swung(fleet[0], fleet[1], k * a), fleet[1].ship)!.angle <
@@ -360,7 +360,7 @@ test('with no ship in the assist cone the gun is laid along the sight, at full r
       a += 1e-4;
     const sight = swung(fleet[0], fleet[1], k * a),
       lay = laid(fleet[0], g, sight, fleet, flat(1));
-    assert.equal(lay.target, null, 'outside: not laid on her');
+    assert.equal(lay.target, null, 'outside: not laid on it');
     assert.equal(lay.reached, false, 'the sight meets nothing');
     const dir = lay.dirs[0],
       up = normalize(lay.from),
@@ -593,7 +593,7 @@ test('the land is in the way: a ball laid over an island falls on it', () => {
   }
 });
 
-test('a ship with no gun fires nothing, whatever she is ordered', () => {
+test('a ship with no gun fires nothing, whatever it is ordered', () => {
   const fleet = pair(100, 0, 0, 0);
   const r = fight(
     fleet,
@@ -684,7 +684,7 @@ test('the same fleet under the same orders fights the same way, to the bit', () 
   assert.deepEqual(a, b);
 });
 
-test('the storm wears at a ship outside its cap, past her shield, and sinks her; inside it, nothing', () => {
+test('the storm wears at a ship outside its cap, past its shield, and sinks it; inside it, nothing', () => {
   const inside = afloat(0, lying(centre, 0)),
     beyond = afloat(1, lying(out(centre, 0, 120), 0));
   const storm = { centre, radius: 50 / R, damage: 0.05 };

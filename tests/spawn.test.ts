@@ -43,7 +43,7 @@ test('every ship starts afloat in open water, clear of land all round, heading a
       );
       assert.ok(
         depth(s.at) >= SHIP.draught + SPAWN.depth,
-        `${depth(s.at)} m under her`
+        `${depth(s.at)} m under it`
       );
       for (let k = 0; k < 24; k++) {
         const t = along(s.at, s.heading, 1).t,
@@ -61,7 +61,7 @@ test('every ship starts afloat in open water, clear of land all round, heading a
         ] as const;
         assert.ok(
           depth(along(s.at, dir, SPAWN.clear).p) >= SHIP.draught,
-          'land within her clearance'
+          'land within its clearance'
         );
       }
       for (let d = 8; d <= 40; d += 8)

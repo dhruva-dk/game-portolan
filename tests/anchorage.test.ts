@@ -35,7 +35,7 @@ const where = (p: Vec3) => {
   };
 };
 
-test('at rest it stands off her starboard bow on the quarter, a little above her, and looks at her', () => {
+test("at rest it stands off the ship's starboard bow on the quarter, a little above it, and looks at it", () => {
   const e = anchorageEye(pose, { orbit: REST, focus: LOOSE }, 0, flat),
     w = where(e.position);
   assert.ok(Math.abs(w.off - LOBBY.quarter) < 0.01, `${w.off}`);
@@ -49,7 +49,7 @@ test('at rest it stands off her starboard bow on the quarter, a little above her
   assert.equal(e.kind, 'air');
 });
 
-test('a drag turns it freely round her, and tilts it only within its limits', () => {
+test('a drag turns it freely round the ship, and tilts it only within its limits', () => {
   let o = REST;
   for (let i = 0; i < 40; i++) o = dragged(o, { x: 120, y: 0 });
   assert.ok(Math.abs(o.yaw) <= Math.PI);
@@ -93,7 +93,7 @@ test('it never goes under the sea or into the land, at any turn and tilt', () =>
   }
 });
 
-test('her livery folio open, it eases round to her broadside and stays there; closed, it eases back to its rest', () => {
+test("her livery folio open, it eases round to the ship's broadside and stays there; closed, it eases back to its rest", () => {
   let o = REST;
   for (let i = 0; i < 90; i++) o = turned(o, true, 1 / 30);
   assert.ok(o.broadside > 0.99 && o.broadside <= 1, `${o.broadside}`);

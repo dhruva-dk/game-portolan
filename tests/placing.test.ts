@@ -29,7 +29,7 @@ const storm = (secondsToNext: number): Storm => ({
   damage: 0.03,
 });
 
-test('she picks a place inside the next cap, keeps it, and makes for it when it is time', () => {
+test('it picks a place inside the next cap, keeps it, and makes for it when it is time', () => {
   const at = along(centre, north, 250).p,
     own = afloat(1, shipAt(at, north));
   for (const seed of [1, 2, 3, 4, 5, 6]) {
@@ -48,6 +48,6 @@ test('she picks a place inside the next cap, keeps it, and makes for it when it 
     for (let k = 0; k < 360; k++)
       m = think(own, [], late, m, nature(seed)).memory;
     assert.equal(m.mode, 'roam', `${seed}: ${m.mode}`);
-    assert.ok(distance(m.goal, place) <= 50, `${seed}: not to her place`);
+    assert.ok(distance(m.goal, place) <= 50, `${seed}: not to its place`);
   }
 });

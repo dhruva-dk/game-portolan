@@ -75,11 +75,11 @@ const each = (ship: number, gun: GunKind = 'cannon'): Happening[] =>
     }
   });
 
-test("the bed hears her speed as a share of her top: the sim's", () =>
+test("the bed hears its speed as a share of its top: the sim's", () =>
   assert.equal(TOP, SHIP.top));
 
-test('the table: every kind of deed, hers, is heard; every cue plays a sound there is; every sound is played by some cue', () => {
-  for (const h of each(0)) assert.ok(cueOf(h, 0), `her ${h.kind} has a cue`);
+test('the table: every kind of deed, its own, is heard; every cue plays a sound there is; every sound is played by some cue', () => {
+  for (const h of each(0)) assert.ok(cueOf(h, 0), `it ${h.kind} has a cue`);
   for (const h of [...each(0), ...each(5)]) {
     const c = cueOf(h, 0);
     if (c)
@@ -102,7 +102,7 @@ test('the table: every kind of deed, hers, is heard; every cue plays a sound the
   }
 });
 
-test('her blows: her ward taking all of one rings, its last breaks it, the rest is on her hull; a gun taken up is the swap', () => {
+test('its blows: its ward taking all of one rings, its last breaks it, the rest is on its hull; a gun taken up is the swap', () => {
   const blow = (shield: number, hull: number, broke: boolean): Happening => ({
     seq: 1,
     time: 0,
@@ -367,7 +367,7 @@ const hearing = (
   covered = 0
 ): Hearing => ({ scene: s, status: st, screen, map, covered });
 
-test('listen: a ball passing near whistles once; a slot of her stores taken in hand, not a gun; the screens; her water', () => {
+test('listen: a ball passing near whistles once; a slot of its stores taken in hand, not a gun; the screens; its water', () => {
   const l = createListen(() => -20),
     out: Call[] = [];
   const dt = 1 / 30,
@@ -394,7 +394,7 @@ test('listen: a ball passing near whistles once; a slot of her stores taken in h
   assert.deepEqual(
     cues(hearing(scene(2), status({ chosen: 1 }))),
     [],
-    "her other gun taken in hand: her deed's (swapped)"
+    "its other gun taken in hand: its deed's (swapped)"
   );
   assert.deepEqual(cues(hearing(scene(2.1), status({ chosen: HOTBAR.guns }))), [
     'select',
@@ -435,7 +435,7 @@ test('listen: a ball passing near whistles once; a slot of her stores taken in h
       )
     ),
     ['claim'],
-    'a loop closed heard, her strip not'
+    'a loop closed heard, its strip not'
   );
   assert.deepEqual(
     cues(hearing(scene(3.2, [], [], [], sea(2)), status())),
@@ -466,7 +466,7 @@ test('listen: the storm closing thunders, then its wind', () => {
   assert.deepEqual(cues(0.6, { closing: true }), []);
 });
 
-test('the bed: the storm heard from afar and all about her inside; surf only near a coast; levels bounded', () => {
+test('the bed: the storm heard from afar and all about it inside; surf only near a coast; levels bounded', () => {
   assert.equal(galeOf(1000), 0);
   for (let w = 400; w > -100; w -= 10)
     assert.ok(
@@ -494,7 +494,7 @@ test('the bed: the storm heard from afar and all about her inside; surf only nea
   assert.equal(levelsOf({ ...bed, covered: 1 }, levels()).uncovered, 0);
   assert.equal(levelsOf({ ...bed, covered: 0.25 }, levels()).uncovered, 0.75);
   assert.ok(levelsOf({ ...bed, coast: 25 }, levels()).surf > 0);
-  assert.equal(levelsOf(bed, levels()).strain, 0, 'her hull whole, no strain');
+  assert.equal(levelsOf(bed, levels()).strain, 0, 'its hull whole, no strain');
   assert.ok(levelsOf({ ...bed, hull: 0.1 }, levels()).strain > 0);
   for (const v of Object.values(
     levelsOf({ ...bed, wall: -200, coast: 20, hull: 0, speed: 3 }, levels())

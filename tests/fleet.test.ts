@@ -13,7 +13,7 @@ import { seedOf } from '../src/world/seeds.ts';
 import type { Vec3 } from '../src/world/sphere.ts';
 import { flat } from '../src/world/swell.ts';
 
-test("the fleet the panel shows is the race's: its type, and every bot's nature as she is launched", () => {
+test("the fleet the panel shows is the race's: its type, and every bot's nature as it is launched", () => {
   const planet = planetOf(SEED, landOf(SEED));
   const depth = (p: Vec3) => -planet.height(p);
   const race = createMatches(SEED, planet, null, null).race();

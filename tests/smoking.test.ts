@@ -125,7 +125,7 @@ test('all of it together keeps no more than SMOKING.alive puffs alive, a quarter
   near(one.wear, 8);
 });
 
-test("in the game's own match, every ship drawn shows her wear", () => {
+test("in the game's own match, every ship drawn shows its wear", () => {
   const planet = planetOf(SEED, landOf(SEED)),
     depth = (p: Vec3) => -planet.height(p),
     matches = createMatches(SEED, planet, null, null),

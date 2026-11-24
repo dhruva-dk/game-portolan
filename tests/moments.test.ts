@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { HER, HOTBAR, LIFT, LIVERY, type Deed } from '../src/player.ts';
+import { PLAYER_SHIP, HOTBAR, LIFT, LIVERY, type Deed } from '../src/player.ts';
 import {
   KEEP,
   bearingFrom,
@@ -54,12 +54,12 @@ const counter = () => {
   return () => ++n;
 };
 
-test("her id in the deeds is the match's player", () => {
-  assert.equal(HER, PLAYER);
+test("its id in the deeds is the match's player", () => {
+  assert.equal(PLAYER_SHIP, PLAYER);
 });
 
 test(
-  "a step's deeds: numbered in order, swapped, fired (by kind), wound and reloaded, fell, struck, sank, then her stores; " +
+  "a step's deeds: numbered in order, swapped, fired (by kind), wound and reloaded, fell, struck, sank, then its stores; " +
     "others' stores and reloads unreported",
   () => {
     const done: Done = {
@@ -241,7 +241,7 @@ test('as she sees it: the bearing clockwise from the look, its distance, and on 
     seq: 2,
     time: 0,
     at: ahead,
-    ship: HER,
+    ship: PLAYER_SHIP,
     kind: 'struck',
     by: 4,
     shield: 0,
@@ -306,7 +306,7 @@ test('the match records its deeds: a ship sunk is told once, with a sink blast t
   );
 });
 
-test("the camera answers: her blows, the blows on her, her sinking of one; others' blows on others not at all", () => {
+test("the camera answers: its blows, the blows on it, its sinking of one; others' blows on others not at all", () => {
   const struck = (
     by: number,
     ship: number,
@@ -395,7 +395,7 @@ test("hit-stop: held, then eased back; a sinking's outlasts a hit's; a run of hi
   void t;
 });
 
-test('flashes: no more than BIG strong ones a second; the heartbeat from 30% of her hull, quicker the lower', () => {
+test('flashes: no more than BIG strong ones a second; the heartbeat from 30% of its hull, quicker the lower', () => {
   assert.equal(capped(0.28, BIG - 1), 0.28);
   assert.equal(capped(0.28, BIG), SAFE);
   assert.equal(capped(0.08, BIG), 0.08);

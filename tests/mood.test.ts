@@ -19,14 +19,14 @@ const ctx = (m = mind(7, fromLatLon(0.1, 0.2))): Ctx => ({
   seed: 7,
 });
 
-test('a mood stands at her temper till something befalls her', () => {
+test('a mood stands at its temper till something befalls it', () => {
   const c = ctx();
   mood(c, 10);
   assert.equal(c.m.heat, 0);
   assert.equal(aggroOf(c), c.t.aggro);
 });
 
-test('a hundred hit points taken cool her; a ship sunk warms her; both settle back by half each `settle` s', () => {
+test('a hundred hit points taken cool it; a ship sunk warms it; both settle back by half each `settle` s', () => {
   const c = ctx(shot(mind(7, fromLatLon(0.1, 0.2)), 3, 100));
   mood(c, 0);
   assert.ok(Math.abs(c.m.heat + MIND.hurt) < 1e-12);
@@ -38,7 +38,7 @@ test('a hundred hit points taken cool her; a ship sunk warms her; both settle ba
   assert.ok(Math.abs(c.m.heat - (MIND.won - MIND.hurt / 2)) < 1e-12);
 });
 
-test('her mood keeps within its band of her temper, and her aggro within 0..1', () => {
+test('its mood keeps within its band of its temper, and its aggro within 0..1', () => {
   const c = ctx(shot(mind(7, fromLatLon(0.1, 0.2)), 3, 1000));
   mood(c, 0);
   assert.equal(c.m.heat, -MIND.band);
