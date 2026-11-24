@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "ios": "npm run build && cap run ios",
-    "test": "tsc --noEmit && tsc --noEmit -p tsconfig.node.json && eslint src tests tools && prettier --log-level warn --check src tests tools capacitor.config.ts eslint.config.js && node --test tests/*.test.ts",
+    "check": "tsc --noEmit && tsc --noEmit -p tsconfig.node.json && eslint src tests tools && prettier --log-level warn --check src tests tools capacitor.config.ts eslint.config.js",
+    "test": "npm run check && node --test tests/*.test.ts",
     "format": "prettier --log-level warn --write src tests tools capacitor.config.ts eslint.config.js",
     "sim": "node tools/sim/cli.ts",
     "browser": "node tools/browser.ts"
