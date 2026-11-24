@@ -4,19 +4,23 @@
 // livery looks on the page is the page's to say (Look): the career names a
 // dye by its number.
 
-import { TEAM, type Call, type RaceResult } from '../race.ts';
-import type { Building, MailCategory, Plan } from '../office/command.ts';
+import { TEAM, type RaceResult } from '../race.ts';
+import { SHIPS, type Building, type MailCategory } from '../office/command.ts';
 import type { HomeView, NewsKind, StandingLine } from '../office/home.ts';
 import type {
   FoundView,
   Move,
   PlanView,
   ResultView,
+  Sailor,
   StandingsTable,
   StandingsView,
 } from '../office/loop.ts';
 import type { Team as Named, Verdict } from '../office/office.ts';
+import type { PartLine } from '../office/papers.ts';
 import type { ShellView } from '../office/shell.ts';
+import { askWage } from './asks.ts';
+import { TYPES } from './components.ts';
 import { buildDays } from './hq.ts';
 import { grid, lineups, maySail } from './lineup.ts';
 import { prizeAt } from './money.ts';
@@ -29,6 +33,8 @@ import {
   championshipOf,
   teamOf,
   type CareerState,
+  type Objective,
+  type Part,
   type Team,
 } from './state.ts';
 import { TUNING } from './tuning.ts';
@@ -308,6 +314,19 @@ export const PARTS: Readonly<Record<string, string>> = {
   mounts: 'Mounts',
 };
 
+/** A part as the office lists it. */
+export const partLine = (x: Part): PartLine => ({
+  id: x.id,
+  type: x.type,
+  name: PARTS[x.type] ?? x.type,
+  perf: x.perf,
+  perfMax: x.perfMax,
+  reliability: x.reliability,
+  condition: x.condition,
+  ship: x.ship,
+  spec: x.spec,
+});
+
 /** A job's share done and days left, from the days it began and ends on. */
 export const span = (s: CareerState, began: number, ends: number) => ({
   done: Math.min(1, Math.max(0, (s.day - began) / Math.max(1, ends - began))),
@@ -452,61 +471,113 @@ export function foundingView(
   };
 }
 
-/** Her ships' drivers as they would sail today: each ship's own if fit, else the reserve, else none. */
-function sailing(s: CareerState, c: Team): (number | null)[] {
-  let reserve = c.staff.reserve;
-  return c.staff.ships.slice(1, TEAM).map((h) => {
-    if (h.driver !== null && maySail(s, c.id, h.driver)) return h.driver;
-    const stand = reserve;
-    reserve = null;
-    return stand !== null && maySail(s, c.id, stand) ? stand : null;
-  });
-}
+/** A sponsor's objectives as the plan names them. */
+const OBJECTIVES: Readonly<Record<Objective, string>> = {
+  top10: 'Finish in the top ten',
+  sinkTwo: 'Sink two ships',
+  afloat: 'Three ships afloat',
+  mostSea: 'Hold the most sea',
+};
 
-/** The plan her team sails under `call` with its drivers as they stand (null: a ship has no one fit to sail her). */
-export function planOf(s: CareerState, call: Call): Plan | null {
-  const c = myTeam(s),
-    drivers = sailing(s, c);
-  if (drivers.some((d) => d === null)) return null;
-  return {
-    drivers: drivers.flatMap((d) => (d === null ? [] : [d])),
-    parts: [],
-    objectives: c.sponsors.map((p) =>
-      p && p.objectives.length > 0 ? (c.plan?.objectives[0] ?? 0) : null
-    ),
-    call,
-  };
-}
+/** How many free drivers the plan offers to stand in, the best first. */
+const STAND_INS = 6;
 
-/** Race day's plan. */
+/** Race day's plan: who sails each ship as the lineup has it (the plan's drivers where they may sail, else each ship's
+ *  own, the reserve, a stand-in), who else may, each ship's parts and what may be fitted instead, her sponsors'
+ *  objectives as chosen (the first, if none is), and the call. */
 export function planView(
   s: CareerState,
   look: Look,
   waiting: boolean
 ): PlanView {
   const c = myTeam(s),
-    me = s.player ? s.people[s.player.person] : null,
-    next = nextRound(s);
-  const unmanned = lineups(s)[c.id]?.ships.some((a) => a.forfeit) ?? false;
+    next = nextRound(s),
+    aboard = lineups(s)[c.id]?.ships ?? [];
+  const sailor = (person: number): Sailor => {
+    const g = s.people[person],
+      standIn = g.contract === null;
+    return {
+      person,
+      name: full(g),
+      stars: stars(g),
+      standIn,
+      fee: standIn ? Math.round(askWage(g, c.tier) * TUNING.race.standIn) : 0,
+    };
+  };
+  const own = [...c.staff.ships.map((h) => h.driver), c.staff.reserve].filter(
+    (d): d is number => d !== null && maySail(s, c.id, d)
+  );
+  const free = s.people
+    .filter(
+      (g) =>
+        g.role === 'driver' &&
+        g.contract === null &&
+        g.retired === null &&
+        !g.player &&
+        maySail(s, c.id, g.id)
+    )
+    .sort((a, b) => stars(b) - stars(a) || a.id - b.id)
+    .slice(0, STAND_INS);
+  const drivers = aboard.slice(1).map((a) => a.driver);
+  for (const d of drivers)
+    if (d !== null && !own.includes(d) && !free.some((g) => g.id === d))
+      free.push(s.people[d]);
+  const parts = c.parts.filter((x) => !x.forNext).map(partLine);
+  const planned = c.plan?.objectives ?? [];
+  const sponsors = c.sponsors.flatMap((p, slot) =>
+    p && p.objectives.length > 0
+      ? [
+          {
+            slot,
+            name: p.name,
+            bonus: p.bonus,
+            objectives: p.objectives.map((o) => OBJECTIVES[o]),
+            chosen:
+              typeof planned[slot] === 'number' &&
+              (planned[slot] ?? 0) < p.objectives.length
+                ? planned[slot]
+                : 0,
+          },
+        ]
+      : []
+  );
   return {
     team: named(c, look),
     round: roundOf(s),
     rounds: TUNING.calendar.rounds,
     name: next?.planet.name ?? '',
     championship: championship(c.tier),
-    ships: [
-      { name: me ? full(me) : '', stars: null, you: true },
-      ...sailing(s, c).map((d) => ({
-        name: d === null ? 'No Driver' : full(s.people[d]),
-        stars: d === null ? null : stars(s.people[d]),
-        you: false,
-      })),
-    ],
+    ships: SHIPS.map((ship) => {
+      const d = aboard[ship]?.driver ?? null;
+      return {
+        ship,
+        you: ship === 0,
+        driver: ship === 0 || d === null ? null : sailor(d),
+        parts: TYPES.map((type) => ({
+          type,
+          label: PARTS[type] ?? type,
+          fitted: parts.find((x) => x.ship === ship && x.type === type) ?? null,
+          others: parts.filter((x) => x.ship !== ship && x.type === type),
+        })),
+      };
+    }),
+    sailors: [...own.map(sailor), ...free.map((g) => sailor(g.id))],
+    sponsors,
+    drivers,
+    objectives: c.sponsors.map(
+      (_, slot) => sponsors.find((x) => x.slot === slot)?.chosen ?? null
+    ),
+    set:
+      s.race === null
+        ? { ok: false, why: 'No race today.' }
+        : s.race.started
+          ? { ok: false, why: 'The race is under way.' }
+          : { ok: true, why: '' },
     call: c.plan?.call ?? 'free',
     blocked:
       s.race === null
         ? 'No race today'
-        : unmanned
+        : aboard.some((a) => a.forfeit)
           ? 'A ship has no driver'
           : null,
     waiting,

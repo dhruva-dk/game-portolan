@@ -4,7 +4,7 @@
 // from; the desk hands the views out and takes what is asked. Types and
 // constants only.
 
-import type { Call, PartType } from '../race.ts';
+import type { PartType } from '../race.ts';
 import type { AdmiraltyView } from './admiralty.ts';
 import type { Command, Offer } from './command.ts';
 import type { HomeView } from './home.ts';
@@ -103,8 +103,8 @@ export type Viewed = keyof Views;
 /**
  * What a screen asks: to open another screen (a tab, or one a tab leads to),
  * to go on (Continue), the menu's four ways, of a job under way its details
- * or its cancelling, the team made, and her team's call for the race's start;
- * a command of the career's; a person's profile or the offer to them opened, a team's page,
+ * or its cancelling, the team made; a command of the career's (race day's plan
+ * among them); a person's profile or the offer to them opened, a team's page,
  * the offer as it is drawn now, the scouting list's filter, a person put on
  * the shortlist or taken off it; a letter opened; the type of part on the
  * drawing board, and a slot's card picked.
@@ -115,7 +115,6 @@ export type Ask =
   | { kind: 'menu'; choice: 'new' | 'continue' | 'single' | 'preferences' }
   | { kind: 'job'; job: string; what: 'details' | 'cancel' }
   | { kind: 'found'; founding: Founding }
-  | { kind: 'call'; call: Call }
   | { kind: 'send'; command: Command }
   | { kind: 'person'; id: number; screen: 'profile' | 'offer' }
   | { kind: 'team'; id: number }

@@ -28,7 +28,8 @@ import { offerView } from '../src/career/views-offer.ts';
 import { profileView } from '../src/career/views-profile.ts';
 import { rivalView } from '../src/career/views-rival.ts';
 import { calendarPaper, mailPaper } from '../src/career/papers.ts';
-import { standingsView } from '../src/career/office.ts';
+import { planView, standingsView } from '../src/career/office.ts';
+import { lineups } from '../src/career/lineup.ts';
 import { traitLine } from '../src/career/views-traits.ts';
 import { TRAITS } from '../src/career/traits.ts';
 import { nameOf } from '../src/career/views.ts';
@@ -465,6 +466,66 @@ test('admiralty: the rules now and next; a proposal’s teams each cast or leani
   assert.equal(v.proposal!.vote.ok, false);
   const held = v.rules.find((r) => r.name === 'The sea-held point')!;
   assert.notEqual(held.now, held.next);
+});
+
+test('plan: each ship sailed as the lineup has it; drivers swapped, a stand-in put aboard at a fee, the call and an objective kept; a part fitted from another ship; shut once the race is under way', () => {
+  const look = { dyes: [['#000000', '#ffffff'] as const], patterns: ['Plain'] };
+  let s = toRaceDay(founded());
+  let v = planView(s, look, false);
+  const me = s.player!.team;
+  assert.equal(v.ships.length, TEAM);
+  assert.ok(v.ships[0]!.you && v.ships[0]!.driver === null);
+  const aboard = lineups(s)[me]!.ships;
+  v.ships
+    .slice(1)
+    .forEach((x, i) =>
+      assert.equal(x.driver?.person ?? null, aboard[i + 1]!.driver)
+    );
+  assert.ok(v.set.ok);
+  assert.ok(v.ships.every((x) => x.parts.length === 6));
+  // drivers swapped, the call changed
+  const [a, b, c] = v.drivers as number[];
+  s = must(s, {
+    kind: 'SetPlan',
+    plan: {
+      drivers: [b!, a!, c!],
+      parts: [],
+      objectives: v.objectives,
+      call: 'attack',
+    },
+  });
+  v = planView(s, look, false);
+  assert.deepEqual(v.drivers, [b, a, c]);
+  assert.equal(v.call, 'attack');
+  // a stand-in aboard ship 4: a fee shown
+  const free = v.sailors.find((x) => x.standIn)!;
+  assert.ok(free.fee > 0);
+  s = must(s, {
+    kind: 'SetPlan',
+    plan: {
+      drivers: [b!, a!, free.person],
+      parts: [],
+      objectives: v.objectives,
+      call: 'attack',
+    },
+  });
+  v = planView(s, look, false);
+  assert.equal(v.ships[3]!.driver?.person, free.person);
+  assert.ok(v.ships[3]!.driver?.standIn);
+  // a part of ship 2's fitted to ship 1: swapped
+  const sails = v.ships[0]!.parts.find((p) => p.type === 'sails')!;
+  const other = sails.others.find((p) => p.ship === 1)!;
+  s = must(s, { kind: 'FitPart', part: other.id, ship: 0 });
+  v = planView(s, look, false);
+  const now = v.ships[0]!.parts.find((p) => p.type === 'sails')!;
+  assert.equal(now.fitted?.id, other.id);
+  assert.equal(
+    v.ships[1]!.parts.find((p) => p.type === 'sails')!.fitted?.id,
+    sails.fitted?.id
+  );
+  // under way: shut
+  s = must(s, { kind: 'RaceStarted', round: s.race!.round });
+  assert.equal(planView(s, look, false).set.ok, false);
 });
 
 test('mail: each letter its kind and sender; the open one its sender’s face and what it links to, each named with the way to its page', () => {

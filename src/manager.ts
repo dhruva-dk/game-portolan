@@ -12,7 +12,6 @@ import {
   entries,
   foundingView,
   homeView,
-  planOf,
   planView,
   resultView,
   shellView,
@@ -202,9 +201,6 @@ export async function createManager(shelf: Shelf, look: Look, page: Page) {
         headshot: 0,
       });
       if (refused === null) arrive();
-    } else if (a.kind === 'call') {
-      const plan = planOf(career(), a.call);
-      if (plan) await send({ kind: 'SetPlan', plan });
     } else if (a.kind === 'job') {
       const [what, id] = a.job.split(':');
       if (a.what === 'cancel' && what === 'scout')

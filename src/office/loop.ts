@@ -1,10 +1,13 @@
 // The views of the screens a season turns on: the team made (found), the race
 // prepared (plan), its result, and the championship's standings. Plain data.
 
-import type { Call } from '../race.ts';
+import type { Call, PartType } from '../race.ts';
 import type { Replacing } from './career.ts';
+import type { Ship } from './command.ts';
 import type { StandingLine } from './home.ts';
 import type { Team, Verdict } from './office.ts';
+import type { PartLine } from './papers.ts';
+import type { Act } from './people.ts';
 
 /** What the team's making offers: names to start from, the liveries and emblems to choose among. */
 export interface FoundView {
@@ -32,14 +35,45 @@ export interface Founding {
   emblem: number;
 }
 
-/** A ship of her team on race day: who sails her (stars 0…5 by halves; herself, none shown). */
-interface PlanShip {
+/** A driver who may sail a ship of hers today: one of hers, or a free one standing in for the race at a fee (stars 0…5
+ *  by halves). */
+export interface Sailor {
+  person: number;
   name: string;
-  stars: number | null;
-  you: boolean;
+  stars: number;
+  standIn: boolean;
+  fee: number;
 }
 
-/** Race day before the race: the race, her four ships, and the call her team sails under at the start. */
+/** A type of part on a ship: the one fitted (null: none), and the others of its type she may fit there instead (the
+ *  spares, and another ship's, swapped). */
+interface Fitting {
+  type: PartType;
+  label: string;
+  fitted: PartLine | null;
+  others: readonly PartLine[];
+}
+
+/** A ship of her team on race day: who sails her (herself, the first; null: no one fit), and her parts. */
+interface PlanShip {
+  ship: Ship;
+  you: boolean;
+  driver: Sailor | null;
+  parts: readonly Fitting[];
+}
+
+/** A sponsor of hers with objectives: the bonus for the one chosen (null: none chosen) met. */
+interface Sponsoring {
+  slot: number;
+  name: string;
+  bonus: number;
+  objectives: readonly string[];
+  chosen: number | null;
+}
+
+/** Race day before the race: the race, her four ships and who sails each, who else may, her sponsors' objectives, and
+ *  the call her team sails under at the start. `drivers` and `objectives` as the plan stands (SetPlan sends them with
+ *  one changed); `set`, whether a plan may be set now. */
 export interface PlanView {
   team: Team;
   round: number;
@@ -47,6 +81,11 @@ export interface PlanView {
   name: string;
   championship: string;
   ships: readonly PlanShip[];
+  sailors: readonly Sailor[];
+  sponsors: readonly Sponsoring[];
+  drivers: readonly (number | null)[];
+  objectives: readonly (number | null)[];
+  set: Act;
   call: Call;
   /** Why the race cannot be sailed yet (null: it can). */
   blocked: string | null;

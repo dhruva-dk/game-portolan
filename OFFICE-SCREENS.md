@@ -34,7 +34,7 @@ business logic given a screen, and the old kit deleted. The battle HUD stays as 
 | ~~`Vote`, `Lobby` never sent; proposals, this season's and next season's rules in no view~~ (Admiralty, 2026-11-23)         | `office/command.ts:138`, `career/admiralty.ts`, `state.ts:180`          | Admiralty (new)     |
 | ~~The strip's Admiralty chip opens nothing~~ (opens Admiralty, 2026-11-23)                                                  | `ui/office/shell.ts:160`                                                | Shell               |
 | `ChooseSupplier` never sent; supplier cards and window in no view                                                           | `career/suppliers.ts:181,198,282`                                       | Suppliers (new)     |
-| Race plan fixed: drivers as they stand, `parts: []`, sponsor objective 0; `Forfeit` never sent                              | `career/office.ts:433`                                                  | Race day            |
+| ~~Race plan fixed: drivers as they stand, `parts: []`, sponsor objective 0~~ (Plan, 2026-11-23); `Forfeit` never sent       | `career/office.ts:433`                                                  | Race day            |
 | Can't design for next season (`forNext` false); next season's parts hidden; no part risk shown                              | `ui/office/yard.ts:655`, `career/papers.ts:339`, `office/papers.ts:114` | Ship                |
 | ~~A sponsor offer's sign check looks at slot 0 only, though three slots are offered (bug)~~ (each slot checked, 2026-11-23) | `career/papers.ts`                                                      | Sponsors            |
 | ~~`DeclineJob` never sent~~ (Jobs, 2026-11-23); Continue takes the best post unasked                                        | `ui/office/career.ts:75`, `manager.ts:158`                              | Jobs                |
@@ -149,7 +149,14 @@ Each line: built on the kit from a fixture → in review → approved and live. 
       three over their woodcut plinths, the winner's gilt, each with their team and points), then how every ship
       finished (the podium ruled off, her lines gilt); the team report (a line a driver: what they did, their place and
       points) and the chairman (the place expected, where the team stands, the verdict stamped)
-- [ ] Plan (+ parts for the race, each sponsor's objective, forfeit)
+- [ ] **Plan** _(in review, 2026-11-23)_, after MM's pre-race: at the left the race (planet, round, why it cannot be
+      sailed yet), the team's orders (the call, what it asks) and each sponsor's objective with its bonus. In the
+      middle your ship through the window over your four ships (who sails each, their stars, a stand-in's fee, the
+      ship's parts' mean performance); a tap chooses one. At the right the ship chosen: who sails her, from your
+      drivers and the six best free ones (a stand-in's fee and the chairman's displeasure said), and each part with
+      what may be fitted instead (a spare, or another ship's, swapped). The screen sends `SetPlan` itself (drivers,
+      objectives, call) and `FitPart`; the old `call` ask and `planOf` are gone. Forfeit stays with the race: the
+      career takes it only once the race has begun
 
 ### 5. The yard
 

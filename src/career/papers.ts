@@ -37,6 +37,7 @@ import {
   PARTS,
   championship,
   dateAt,
+  partLine,
   seasonYear,
   short,
   span,
@@ -499,19 +500,7 @@ export function shipPaper(
         h.driver !== null ? short(s.people[h.driver]) : me ? short(me) : '',
     })),
     types: TYPES.map((t) => ({ id: t, label: PARTS[t] ?? t })),
-    parts: c.parts
-      .filter((x) => !x.forNext)
-      .map((x) => ({
-        id: x.id,
-        type: x.type,
-        name: PARTS[x.type] ?? x.type,
-        perf: x.perf,
-        perfMax: x.perfMax,
-        reliability: x.reliability,
-        condition: x.condition,
-        ship: x.ship,
-        spec: x.spec,
-      })),
+    parts: c.parts.filter((x) => !x.forNext).map(partLine),
     design: c.design
       ? {
           name: PARTS[c.design.type] ?? c.design.type,

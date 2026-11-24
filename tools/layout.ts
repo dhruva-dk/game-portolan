@@ -43,6 +43,7 @@ const SCREENS = [
   'player',
   'jobs',
   'admiralty',
+  'plan',
 ];
 
 /** How far apart two edges or centres may be, CSS px. */

@@ -11,6 +11,7 @@ import { JOBS, PLAYER } from './career.ts';
 import { FINANCES } from './finances.ts';
 import { HOME } from './home.ts';
 import { MAIL } from './mail.ts';
+import { PLAN } from './plan.ts';
 import { PROFILE } from './profile.ts';
 import { OFFER } from './offer.ts';
 import { RIVAL } from './rival.ts';
@@ -64,22 +65,7 @@ const VIEWS: Pick<
     replacing: { team: 'Razorbill', chairman: 'Maneette Greymere', staff: 1.6 },
     refused: null,
   },
-  plan: {
-    team: HERS,
-    round: HOME.next.round,
-    rounds: HOME.next.rounds,
-    name: HOME.next.name,
-    championship: SHELL.championship,
-    ships: [
-      { name: 'Ada Holt', stars: null, you: true },
-      ...HOME.drivers
-        .slice(1)
-        .map((d, i) => ({ name: d.name, stars: 3.5 - i, you: false })),
-    ],
-    call: 'free',
-    blocked: null,
-    waiting: false,
-  },
+  plan: PLAN,
   result: {
     title: `1716 ${HOME.next.name} - ${SHELL.championship}`,
     lines: HOME.standings.drivers.map((d, i) => ({
