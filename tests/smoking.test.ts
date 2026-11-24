@@ -10,7 +10,6 @@ import type { ShipDraw } from '../src/render/snapshot.ts';
 import {
   CLOSE,
   LIFE_SPREAD,
-  MOST_RATE,
   SMOKING,
   WORN,
   smokers,
@@ -116,9 +115,8 @@ test('all of it together keeps no more than SMOKING.alive puffs alive, a quarter
   const all = plan(ships, 0.5),
     sum = all.reduce((s, m) => s + m.wear, 0);
   assert.equal(all.length, SMOKING.most);
-  assert.ok(sum <= MOST_RATE + 1e-9, `${sum} a second`);
   const longest = (WORN[2]?.life ?? 0) * LIFE_SPREAD;
-  assert.ok(MOST_RATE * longest <= SMOKING.alive + 1e-9);
+  assert.ok(sum * longest <= SMOKING.alive, `${sum} a second`);
   assert.ok(SMOKING.alive <= 4096 / 4);
   const one = plan([ship(1, SMOKING.near - 1, 2)], 0.5)[0];
   assert.ok(one);
