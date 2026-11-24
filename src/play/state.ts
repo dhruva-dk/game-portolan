@@ -188,11 +188,7 @@ export function createState(
     done: () => match.done,
     result: () => match.result(),
     race: (id: number): Race | null =>
-      standings &&
-      standings(id, view().standing(), {
-        order: view().order,
-        mode: view().mode,
-      }),
+      standings && standings(id, view().standing(), { order: view().order }),
     order: () => view().order(),
     teams: () => view().teams(),
     marks: (id: number) => view().marks(id),
