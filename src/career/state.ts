@@ -231,6 +231,22 @@ export const LINES: readonly Line[] = [
 
 export const ROLES: readonly Role[] = ['driver', 'designer', 'mechanic'];
 
+export const perLine = <T>(f: (line: Line) => T): Record<Line, T> => ({
+  sails: f('sails'),
+  rigging: f('rigging'),
+  rudder: f('rudder'),
+  hull: f('hull'),
+  keel: f('keel'),
+  mounts: f('mounts'),
+  gun: f('gun'),
+});
+
+export const perRole = <T>(f: (role: Role) => T): Record<Role, T> => ({
+  driver: f('driver'),
+  designer: f('designer'),
+  mechanic: f('mechanic'),
+});
+
 export const DRIVER_STATS = [
   'gunnery',
   'helm',

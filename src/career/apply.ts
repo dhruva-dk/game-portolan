@@ -9,6 +9,8 @@ import { fieldsValid, isIndex } from './fields.ts';
 import { known } from './lookup.ts';
 import type { CareerState } from './state.ts';
 
+export { newCareer, type CareerOptions } from './start.ts';
+
 export type Applied =
   | { ok: true; state: CareerState }
   | { ok: false; reason: Reason };

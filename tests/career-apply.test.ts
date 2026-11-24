@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { apply, type Applied } from '../src/career/apply.ts';
+import { apply, newCareer, type Applied } from '../src/career/apply.ts';
 import {
   COMMANDS,
   REASONS,
@@ -13,14 +13,10 @@ import {
   LINES,
   PHASES,
   ROLES,
-  VERSION,
   type CareerState,
-  type Levels,
-  type Line,
-  type Person,
   type Phase,
-  type Range,
   type Role,
+  type Sponsor,
   type Team,
   type Terms,
 } from '../src/career/state.ts';
@@ -29,142 +25,75 @@ import {
   NEGOTIATION,
   RACE_MONEY,
   SPONSORS,
-  STANDING,
 } from '../src/career/tuning.ts';
-import { KINDS, perKind } from '../src/sim/kinds.ts';
 import type { MatchResult } from '../src/sim/result.ts';
 import { DYES, EMBLEMS, PATTERNS } from '../src/world/livery.ts';
 import { random } from '../src/world/random.ts';
 
 const TEAMS = LEAGUE.teams;
 const SHIPS = TEAMS * LEAGUE.shipsPerTeam;
-const FREE = 1;
-const MINE = 2;
-const THEIRS = 3;
-const OWNER = 1001;
 const RIVAL = 5;
-
-const perLine = <T>(f: (line: Line) => T): Record<Line, T> => ({
-  sails: f('sails'),
-  rigging: f('rigging'),
-  rudder: f('rudder'),
-  hull: f('hull'),
-  keel: f('keel'),
-  mounts: f('mounts'),
-  gun: f('gun'),
-});
-
-const levels = (n: number): Levels => perLine(() => n);
-
-const perRole = <T>(f: (role: Role) => T): Record<Role, T> => ({
-  driver: f('driver'),
-  designer: f('designer'),
-  mechanic: f('mechanic'),
-});
-
 const TERMS: Terms = { wage: 500, seasons: 2, fee: 0, clause: 5000 };
 
-function person(id: number, role: Role, team: number | null): Person {
-  return {
-    id,
-    role,
-    name: 'A. Person',
-    portrait: id,
-    age: 25,
-    peakAge: 28,
-    retireAge: 38,
-    peak: [10, 10, 10, 10, 10, 10],
-    stats: [10, 10, 10, 10, 10, 10],
-    wants: { money: 0.5, standing: 0.3, security: 0.2 },
-    preferred: 2,
-    wageFactor: 1,
-    contract:
-      team === null ? null : { team, wage: 500, clause: 5000, racesLeft: 5 },
-  };
+const BASE = newCareer({
+  seed: 'test',
+  name: 'Gull Racing',
+  livery: { dye: 0, pattern: 0 },
+  emblem: 0,
+});
+
+function idOf(found: { id: number } | null | undefined): number {
+  if (!found) throw new Error('no such person in the new career');
+  return found.id;
 }
 
-function team(index: number): Team {
+const freeAgent = (role: Role): number =>
+  idOf(BASE.people.find((p) => p.contract === null && p.role === role));
+
+function seated(team: number, role: Role): number {
+  const id = BASE.teams[team].seats[role];
+  if (id === null) throw new Error('an empty seat in the new career');
+  return id;
+}
+
+const FREE = freeAgent('driver');
+const MINE = freeAgent('mechanic');
+const THEIRS = seated(RIVAL, 'designer');
+const OWNER = idOf(BASE.teams[4].owner);
+const UNKNOWN = BASE.nextPersonId;
+
+const OFFER: Sponsor = {
+  sponsor: 0,
+  fee: 500,
+  bonus: 1000,
+  objective: 'top10',
+  racesLeft: 6,
+};
+
+function yours(team: Team): Team {
   return {
-    name: `Team ${index}`,
-    livery: { dye: index % DYES.length, pattern: index % PATTERNS.length },
-    emblem: index % EMBLEMS,
-    taste: [...KINDS],
-    owner:
-      index === 0
-        ? null
-        : {
-            id: OWNER + index - 1,
-            name: 'O. Wner',
-            portrait: index,
-            stats: [],
-          },
-    balance: 100000,
-    design: levels(50),
-    unlocked: ['cannon', 'scatter'],
-    unlockProgress: perKind(() => 0),
-    focus: null,
-    ships: [
-      { fitted: levels(40), gun: 'cannon' },
-      { fitted: levels(40), gun: 'cannon' },
-    ],
-    seats: {
-      driver: null,
-      designer: index === RIVAL ? THEIRS : null,
-      mechanic: index === 0 ? MINE : null,
-    },
-    scoutSeat: 'designer',
-    approached: perRole(() => null),
-    deals: {
-      driver: index === 0 ? { candidates: [FREE], locked: null } : null,
-      designer: null,
-      mechanic: null,
-    },
-    talks:
-      index === 0
-        ? [{ person: FREE, attempts: 1, answer: 'countered', counter: TERMS }]
-        : [],
-    sponsors: [null, null, null],
-    offers: [
-      { sponsor: 0, fee: 500, bonus: 1000, objective: 'top10', racesLeft: 6 },
-    ],
+    ...team,
+    seats: { ...team.seats, mechanic: MINE },
+    deals: { ...team.deals, driver: { candidates: [FREE], locked: null } },
+    talks: [{ person: FREE, attempts: 1, answer: 'countered', counter: TERMS }],
   };
 }
 
 function career(phase: Phase): CareerState {
-  const standings = Array.from({ length: TEAMS }, (_, t) => (t === 0 ? 40 : t));
+  const state = structuredClone(BASE);
   return {
-    version: VERSION,
-    seed: 'test',
-    season: 1,
-    race: phase === 'offseason' ? 10 : 1,
+    ...state,
     phase,
-    unread: false,
-    teams: Array.from({ length: TEAMS }, (_, t) => team(t)),
-    people: [
-      person(FREE, 'driver', null),
-      person(MINE, 'mechanic', 0),
-      person(THEIRS, 'designer', RIVAL),
-    ],
-    nextPersonId: OWNER + TEAMS,
-    points: Array.from({ length: TEAMS }, () => 0),
-    bestPlace: Array.from({ length: TEAMS }, () => STANDING.noRaceYet),
-    previousStanding: standings,
-    lastStanding: [...standings],
-    winStreak: null,
-    lineLeaders: perLine(() => null),
-    knowledge: {
-      reports: [],
-      lines: Array.from({ length: TEAMS }, (_, t) =>
-        t === 0
-          ? []
-          : [0, 1].map(() => perLine((): Range => ({ lo: 20, hi: 50 })))
-      ),
-    },
-    lastRace: null,
-    lastOffseason: null,
-    pendingEvents: [],
-    news: [],
-    seen: [],
+    race: phase === 'offseason' ? LEAGUE.racesPerSeason : 1,
+    teams: state.teams.map((team, t) => {
+      const offered = { ...team, offers: [OFFER] };
+      return t === 0 ? yours(offered) : offered;
+    }),
+    people: state.people.map((p) =>
+      p.id === MINE
+        ? { ...p, contract: { team: 0, wage: 500, clause: 5000, racesLeft: 5 } }
+        : p
+    ),
   };
 }
 
@@ -425,7 +354,7 @@ test('no such person, owner, offer or bubble is refused for unknown', () => {
   ];
   for (const type of people)
     assert.equal(
-      reasonOf(send(state, { ...sample(type, 0), person: 999 })),
+      reasonOf(send(state, { ...sample(type, 0), person: UNKNOWN })),
       'unknown',
       type
     );
@@ -439,7 +368,7 @@ test('no such person, owner, offer or bubble is refused for unknown', () => {
   );
   for (const type of people)
     assert.notEqual(
-      reasonOf(send(state, { ...sample(type, 0), person: OWNER + 3 })),
+      reasonOf(send(state, { ...sample(type, 0), person: OWNER })),
       'unknown',
       `${type} names an owner`
     );
@@ -454,8 +383,8 @@ test('when several reasons apply the first in the order of §2.2.3 is given', ()
     [racing, { ...sample('Build', TEAMS), slot: 9 }, 'team'],
     [lobby, { ...sample('RecordRace', 0), result: null }, 'phase'],
     [racing, { ...sample('Build', 0), slot: 9 }, 'phase'],
-    [racing, { ...sample('BuyReport', 0), person: 999 }, 'phase'],
-    [lobby, { ...sample('Offer', 0), person: 999, terms: null }, 'invalid'],
+    [racing, { ...sample('BuyReport', 0), person: UNKNOWN }, 'phase'],
+    [lobby, { ...sample('Offer', 0), person: UNKNOWN, terms: null }, 'invalid'],
     [lobby, { ...sample('SignSponsor', 0), offer: 9, slot: 9 }, 'invalid'],
     [racing, { ...sample('MarkSeen', 0), id: 7 }, 'invalid'],
     [racing, { ...sample('MarkSeen', 0), id: 'nope' }, 'unknown'],
