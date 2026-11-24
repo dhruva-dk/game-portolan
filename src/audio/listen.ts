@@ -4,8 +4,8 @@ import {
   type Kit,
   type Screen,
   type Status,
-} from '../player.ts';
-import type { ShipDraw, Snapshot } from '../snapshot.ts';
+} from '../play/player.ts';
+import type { ShipDraw, Snapshot } from '../render/snapshot.ts';
 import { clamp } from '../world/scalar.ts';
 import { R, distance, dot, type Vec3 } from '../world/sphere.ts';
 import type { Cue } from './cues.ts';

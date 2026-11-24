@@ -1,5 +1,5 @@
 import type { Cap } from '../sim/storm.ts';
-import { lookingAt, type Eye } from '../snapshot.ts';
+import { lookingAt, type Eye } from '../render/snapshot.ts';
 import { clamp } from '../world/scalar.ts';
 import {
   R,

@@ -1,4 +1,4 @@
-import type { Use } from '../kinds.ts';
+import type { Use } from './kinds.ts';
 import { healed, hullCap, sunk, type Health } from './health.ts';
 
 export type { Use };

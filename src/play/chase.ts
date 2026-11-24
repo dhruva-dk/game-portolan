@@ -1,5 +1,5 @@
 import { CLOUD, toEdge, type Cap } from '../sim/storm.ts';
-import { AIR_FOV, type Eye } from '../snapshot.ts';
+import { AIR_FOV, type Eye } from '../render/snapshot.ts';
 import type { ShipPose } from '../world/pose.ts';
 import { smoother } from '../world/scalar.ts';
 import {

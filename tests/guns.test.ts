@@ -13,7 +13,7 @@ import {
 import { afloat, type Vessel } from '../src/sim/contact.ts';
 import { STEP } from '../src/sim/fixed.ts';
 import { falloff, gunOf } from '../src/sim/gun.ts';
-import { KINDS, type GunKind } from '../src/kinds.ts';
+import { KINDS, type GunKind } from '../src/sim/kinds.ts';
 import { EQUIP, FALLOFF, GUNS, RIGGING } from '../src/sim/handling.ts';
 import { crewed, stored } from '../src/sim/stores.ts';
 import { LOOT, isArms, laying } from '../src/sim/loot.ts';
@@ -223,7 +223,7 @@ test("a ball's bite holds to 60% of its range, then falls to half at full range;
 
 test("a mortar's fall mark is drawn its splash's size (gunfire/marks.ts MARK, which may not import the sim)", () => {
   const text = readFileSync(
-    new URL('../src/gunfire/marks.ts', import.meta.url),
+    new URL('../src/render/gunfire/marks.ts', import.meta.url),
     'utf8'
   );
   assert.equal(

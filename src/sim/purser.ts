@@ -3,7 +3,7 @@ import { R, distance, dot, type Vec3 } from '../world/sphere.ts';
 import { armed, type Crew } from './battle.ts';
 import { ready } from './gust.ts';
 import type { Gun } from './gun.ts';
-import type { GunKind } from '../kinds.ts';
+import type { GunKind } from './kinds.ts';
 import { roomFor, useful, type Use } from './hold.ts';
 import { isArms, type Loot } from './loot.ts';
 import { NOTHING, type Ask } from './stores.ts';

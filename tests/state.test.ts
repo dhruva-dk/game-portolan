@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createState, debugOf, type Match } from '../src/play/state.ts';
 import { COLORS, dealt, lookOf } from '../src/play/colors.ts';
-import { LIVERY } from '../src/player.ts';
+import { LIVERY } from '../src/play/player.ts';
 import { PLAYER, SHIPS } from '../src/sim/match.ts';
 import { chart } from '../src/sim/route.ts';
 import { MIXED } from '../src/sim/persona.ts';
@@ -10,7 +10,7 @@ import { berthing } from '../src/sim/spawn.ts';
 import { calm, type Storm } from '../src/sim/storm.ts';
 import type { Helm } from '../src/sim/ship.ts';
 import { landOf, planetOf } from '../src/world/land.ts';
-import { SEED } from '../src/environment.ts';
+import { SEED } from '../src/world/environment.ts';
 import { add, bearingAt, type Vec3 } from '../src/world/sphere.ts';
 import { flat } from '../src/world/swell.ts';
 

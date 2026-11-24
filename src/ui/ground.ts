@@ -1,4 +1,4 @@
-import { hexToLinear, linearToSrgbRgb, type Rgb } from '../color.ts';
+import { hexToLinear, linearToSrgbRgb, type Rgb } from '../world/color.ts';
 import { lerp } from '../world/scalar.ts';
 import { distance, type Vec3 } from '../world/sphere.ts';
 import {

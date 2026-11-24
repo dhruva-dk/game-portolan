@@ -7,7 +7,7 @@ import { CLOUD, toEdge } from '../src/sim/storm.ts';
 import { GUNS } from '../src/sim/handling.ts';
 import { offSight } from '../src/sim/sight.ts';
 import { shipAt } from '../src/sim/ship.ts';
-import type { Eye } from '../src/snapshot.ts';
+import type { Eye } from '../src/render/snapshot.ts';
 import {
   R,
   add,

@@ -1,4 +1,4 @@
-import type { Fleet, Spread } from '../player.ts';
+import type { Fleet, Spread } from '../play/player.ts';
 import {
   CUT,
   GILT,

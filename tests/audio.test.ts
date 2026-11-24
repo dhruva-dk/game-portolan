@@ -29,15 +29,20 @@ import {
 } from '../src/audio/space.ts';
 import { VOICES, claim, pool, type Pool } from '../src/audio/voices.ts';
 import { breakers, galeOf, levels, levelsOf } from '../src/audio/bed.ts';
-import { KINDS } from '../src/kinds.ts';
-import { HOTBAR, type GunKind, type Kit, type Status } from '../src/player.ts';
+import { KINDS } from '../src/sim/kinds.ts';
+import {
+  HOTBAR,
+  type GunKind,
+  type Kit,
+  type Status,
+} from '../src/play/player.ts';
 import type {
   BallDraw,
   Blast,
   Eye,
   ShipDraw,
   Snapshot,
-} from '../src/snapshot.ts';
+} from '../src/render/snapshot.ts';
 import { R, scale, type Vec3 } from '../src/world/sphere.ts';
 import { inverse, lookAt, rotate } from '../src/world/turn.ts';
 

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { hexToLinear, linearToSrgbRgb } from '../src/color.ts';
+import { hexToLinear, linearToSrgbRgb } from '../src/world/color.ts';
 import { ColorManagement, Vector3 } from 'three';
 import { COLORS, DYES, dealt, lookOf, worn } from '../src/play/colors.ts';
 import {
@@ -12,8 +12,8 @@ import {
   SEA_MIDDLE,
   SEA_SHALLOW,
   STORM,
-} from '../src/palette.ts';
-import { LIVERY, PATTERNS, type Livery } from '../src/player.ts';
+} from '../src/render/palette.ts';
+import { LIVERY, PATTERNS, type Livery } from '../src/play/player.ts';
 import { SHIPS } from '../src/sim/match.ts';
 import type { Vec3 } from '../src/world/sphere.ts';
 

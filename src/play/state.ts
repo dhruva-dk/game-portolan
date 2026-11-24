@@ -72,15 +72,15 @@ import {
   type Outcome,
   type Territory,
 } from '../sim/territory.ts';
-import type { RaceCard, RaceResult } from '../race.ts';
-import type { BallDraw, Look, Sea, ShipDraw } from '../snapshot.ts';
+import type { RaceCard, RaceResult } from '../sim/race.ts';
+import type { BallDraw, Look, Sea, ShipDraw } from '../render/snapshot.ts';
 import type { Hull } from '../world/swell.ts';
 import type { Planet } from '../world/planet.ts';
 import { remembered } from '../world/remembered.ts';
 import type { PoseOut, ShipPose } from '../world/pose.ts';
 import { hash } from '../world/random.ts';
 import { add, bearingAt, scale, type Vec3 } from '../world/sphere.ts';
-import { LIVERY, type Livery, type Race } from '../player.ts';
+import { LIVERY, type Livery, type Race } from './player.ts';
 import { dealt, lookOf, worn } from './colors.ts';
 import { createDrawing } from './drawing.ts';
 import { createHeld } from './held.ts';

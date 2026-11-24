@@ -4,7 +4,7 @@ import { DEFAULT_RULES, ruled, type Rules } from './rules.ts';
 import { weighed } from './tables.ts';
 import { driven } from './driven.ts';
 import { temper, type Temper } from './temper.ts';
-import type { Driver } from '../race.ts';
+import type { Driver } from './race.ts';
 
 export const PERSONAS = [
   'hunter',

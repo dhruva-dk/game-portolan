@@ -4,7 +4,7 @@ import {
   type Blow,
   type Deed,
   type GunKind,
-} from '../player.ts';
+} from '../play/player.ts';
 import type { SoundName } from './bank.ts';
 
 export type Happening = Deed;

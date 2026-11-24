@@ -11,7 +11,7 @@ import type { Vessel } from '../src/sim/contact.ts';
 import { STEP } from '../src/sim/fixed.ts';
 import { gunOf, reloadOf } from '../src/sim/gun.ts';
 import { charging, gustOf, ready, spent, stepGust } from '../src/sim/gust.ts';
-import { KINDS } from '../src/kinds.ts';
+import { KINDS } from '../src/sim/kinds.ts';
 import { EQUIP, GUNS, GUST, HEALTH, SHIP } from '../src/sim/handling.ts';
 import {
   begun,

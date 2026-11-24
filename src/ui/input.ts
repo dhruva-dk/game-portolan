@@ -1,4 +1,4 @@
-import type { Hands } from '../player.ts';
+import type { Hands } from '../play/player.ts';
 import { clamp } from '../world/scalar.ts';
 import { view } from './ui.ts';
 

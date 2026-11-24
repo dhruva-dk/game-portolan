@@ -1,4 +1,4 @@
-import type { DriverStats } from '../race.ts';
+import type { DriverStats } from './race.ts';
 import type { Temper } from './temper.ts';
 
 export const DRIVER = {

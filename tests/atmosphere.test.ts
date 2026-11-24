@@ -8,7 +8,7 @@ import {
   transmittance,
   transmittanceRMu,
   transmittanceUV,
-} from '../src/sky/atmosphere.ts';
+} from '../src/render/sky/atmosphere.ts';
 
 const near = (a: number, b: number, tol: number) =>
   assert.ok(Math.abs(a - b) <= tol, `${a} not within ${tol} of ${b}`);

@@ -1,4 +1,4 @@
-import type { Chart, Seeds } from '../player.ts';
+import type { Chart, Seeds } from '../play/player.ts';
 import { named } from '../world/seeds.ts';
 import { CARD, fleetCard } from './fleet.ts';
 import {

@@ -1,4 +1,4 @@
-import type { Hands } from '../player.ts';
+import type { Hands } from '../play/player.ts';
 import { INK, PAPER, alpha } from './ink.ts';
 import { STICK } from './input.ts';
 import { show } from './ui.ts';

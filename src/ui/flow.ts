@@ -1,9 +1,9 @@
 import type { Globe } from './globe.ts';
 import type { Hud, HudState } from './hud.ts';
-import type { End, Seeds, Wardrobe } from '../player.ts';
+import type { End, Seeds, Wardrobe } from '../play/player.ts';
 import { createLivery } from './livery.ts';
 import { createSeedPanel } from './panel.ts';
-import type { Sea } from '../snapshot.ts';
+import type { Sea } from '../render/snapshot.ts';
 import { createResult, createWatching } from './ends.ts';
 import {
   keepLivery,

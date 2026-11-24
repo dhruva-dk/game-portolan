@@ -8,7 +8,7 @@ import {
   faceDir,
   type Vec3,
 } from '../src/world/sphere.ts';
-import { SEED } from '../src/environment.ts';
+import { SEED } from '../src/world/environment.ts';
 import { START, bakeFaces } from '../src/world/planet.ts';
 import { remembered } from '../src/world/remembered.ts';
 import { landOf, planetOf } from '../src/world/land.ts';

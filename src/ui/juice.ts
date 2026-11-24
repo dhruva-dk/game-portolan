@@ -5,7 +5,7 @@ import {
   isGun,
   type Moment,
   type Status,
-} from '../player.ts';
+} from '../play/player.ts';
 import { clamp } from '../world/scalar.ts';
 import { createFlash, PICKUP, SCREEN } from './flash.ts';
 import { createHits } from './hits.ts';

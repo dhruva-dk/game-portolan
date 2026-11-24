@@ -1,5 +1,5 @@
-import { linearToHex } from '../color.ts';
-import type { Sea } from '../snapshot.ts';
+import { linearToHex } from '../world/color.ts';
+import type { Sea } from '../render/snapshot.ts';
 import { hash01 } from '../world/random.ts';
 import { GLYPHS, type Glyph, type Prim } from './glyphs.ts';
 

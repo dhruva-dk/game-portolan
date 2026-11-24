@@ -13,7 +13,7 @@ import {
   type Vec3,
 } from '../world/sphere.ts';
 import type { Vessel } from './contact.ts';
-import type { GunKind } from '../kinds.ts';
+import type { GunKind } from './kinds.ts';
 import { FALLOFF, GUN, GUNS } from './handling.ts';
 import { hullAt, type Depth } from './shoal.ts';
 import { thrown } from './shot.ts';

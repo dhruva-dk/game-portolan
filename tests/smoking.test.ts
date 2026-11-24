@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { SEED } from '../src/environment.ts';
+import { SEED } from '../src/world/environment.ts';
 import { createMatches } from '../src/play/setup.ts';
 import { createState } from '../src/play/state.ts';
 import { wearOf } from '../src/sim/health.ts';
 import { chart } from '../src/sim/route.ts';
 import { berthing } from '../src/sim/spawn.ts';
-import type { ShipDraw } from '../src/snapshot.ts';
+import type { ShipDraw } from '../src/render/snapshot.ts';
 import {
   CLOSE,
   LIFE_SPREAD,
@@ -15,7 +15,7 @@ import {
   WORN,
   smokers,
   type Smoker,
-} from '../src/gunfire/smoking.ts';
+} from '../src/render/gunfire/smoking.ts';
 import { landOf, planetOf } from '../src/world/land.ts';
 import { R, type Vec3 } from '../src/world/sphere.ts';
 import { flat } from '../src/world/swell.ts';

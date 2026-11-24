@@ -1,10 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { SEED } from '../src/environment.ts';
+import { SEED } from '../src/world/environment.ts';
 import { raceOf, specField } from '../src/play/race.ts';
 import { createState, debugOf, type Match } from '../src/play/state.ts';
-import type { Race } from '../src/player.ts';
-import { TEAM } from '../src/race.ts';
+import type { Race } from '../src/play/player.ts';
+import { TEAM } from '../src/sim/race.ts';
 import { HEALTH } from '../src/sim/handling.ts';
 import { PLAYER } from '../src/sim/match.ts';
 import { chart } from '../src/sim/route.ts';

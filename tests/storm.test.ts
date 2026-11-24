@@ -10,7 +10,7 @@ import {
   type Cap,
 } from '../src/sim/storm.ts';
 import { landOf, planetOf } from '../src/world/land.ts';
-import { SEED } from '../src/environment.ts';
+import { SEED } from '../src/world/environment.ts';
 import {
   R,
   add,

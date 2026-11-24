@@ -8,7 +8,7 @@ import { db } from './dsp.ts';
 import { createListen, type Call, type Hearing } from './listen.ts';
 import { createMixer } from './mixer.ts';
 import { close, hear, heard } from './space.ts';
-import { LIFT, type Screen } from '../player.ts';
+import { LIFT, type Screen } from '../play/player.ts';
 
 const LOOP = 6;
 

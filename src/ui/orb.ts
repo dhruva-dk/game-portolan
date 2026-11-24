@@ -1,4 +1,4 @@
-import type { Chart } from '../player.ts';
+import type { Chart } from '../play/player.ts';
 import { clamp } from '../world/scalar.ts';
 import { INK, LAND, WASH, alpha } from './ink.ts';
 import { onDrag } from './touch.ts';

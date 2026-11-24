@@ -1,4 +1,4 @@
-import type { End } from '../player.ts';
+import type { End } from '../play/player.ts';
 import {
   INK,
   PAPER,

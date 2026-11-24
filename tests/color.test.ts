@@ -7,7 +7,7 @@ import {
   linearToSrgb,
   linearToSrgbRgb,
   srgbToLinear,
-} from '../src/color.ts';
+} from '../src/world/color.ts';
 
 test("hexToLinear is three's sRGB to linear, from a string or a number", () => {
   for (const hex of [

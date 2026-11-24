@@ -1,6 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { PLAYER_SHIP, HOTBAR, LIFT, LIVERY, type Deed } from '../src/player.ts';
+import {
+  PLAYER_SHIP,
+  HOTBAR,
+  LIFT,
+  LIVERY,
+  type Deed,
+} from '../src/play/player.ts';
 import {
   KEEP,
   bearingFrom,
@@ -26,7 +32,7 @@ import { berthing } from '../src/sim/spawn.ts';
 import { calm } from '../src/sim/storm.ts';
 import { BIG, SAFE, capped, heartbeat, lowHull } from '../src/ui/flash.ts';
 import { landOf, planetOf } from '../src/world/land.ts';
-import { SEED } from '../src/environment.ts';
+import { SEED } from '../src/world/environment.ts';
 import {
   R,
   bearingAt,

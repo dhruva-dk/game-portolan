@@ -1,4 +1,4 @@
-import { LIVERY, PATTERNS, type Livery } from '../player.ts';
+import { LIVERY, PATTERNS, type Livery } from '../play/player.ts';
 import type { Settings } from './screens.ts';
 
 export type Store = Pick<Storage, 'getItem' | 'setItem'>;

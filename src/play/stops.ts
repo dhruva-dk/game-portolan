@@ -1,4 +1,4 @@
-import { blowOf, felt, type Blow, type Deed } from '../player.ts';
+import { blowOf, felt, type Blow, type Deed } from './player.ts';
 import { easeInOut } from '../world/scalar.ts';
 
 const PRIORITY = { hurt: 0, hit: 1, break: 2, kill: 3 } as const;

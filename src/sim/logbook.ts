@@ -1,5 +1,5 @@
 import { R, apart, distance, dot, type Vec3 } from '../world/sphere.ts';
-import type { GunKind } from '../kinds.ts';
+import type { GunKind } from './kinds.ts';
 import { inHand } from './battle.ts';
 import { eye, hidden } from './lookout.ts';
 import { mate, type Ctx } from './captain.ts';

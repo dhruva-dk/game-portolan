@@ -1,9 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { SEED } from '../src/environment.ts';
-import { KINDS } from '../src/kinds.ts';
+import { SEED } from '../src/world/environment.ts';
+import { KINDS } from '../src/sim/kinds.ts';
 import { raceOf, runRace, specField } from '../src/play/race.ts';
-import { TEAM, type RaceCard, type RaceResult } from '../src/race.ts';
+import { TEAM, type RaceCard, type RaceResult } from '../src/sim/race.ts';
 import { nature } from '../src/sim/persona.ts';
 import { DEFAULT_RULES } from '../src/sim/rules.ts';
 import { chart } from '../src/sim/route.ts';

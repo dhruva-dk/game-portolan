@@ -1,4 +1,4 @@
-import type { RaceCard } from '../race.ts';
+import type { RaceCard } from './race.ts';
 
 export const RACE = { overtime: 180 } as const;
 

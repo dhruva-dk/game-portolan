@@ -1,5 +1,5 @@
-import { PATTERNS, type Livery, type Wardrobe } from '../player.ts';
-import { SAIL_MARKS } from '../snapshot.ts';
+import { PATTERNS, type Livery, type Wardrobe } from '../play/player.ts';
+import { SAIL_MARKS } from '../render/snapshot.ts';
 import { INK, roughCircle } from './ink.ts';
 import { folio } from './screens.ts';
 import { region } from './touch.ts';

@@ -1,4 +1,4 @@
-import type { Sea } from '../snapshot.ts';
+import type { Sea } from '../render/snapshot.ts';
 import { R, along, dot, type Vec3 } from '../world/sphere.ts';
 import {
   createRings,

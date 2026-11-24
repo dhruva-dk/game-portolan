@@ -1,4 +1,4 @@
-import { SEED } from '../../src/environment.ts';
+import { SEED } from '../../src/world/environment.ts';
 import type { Waters } from '../../src/play/state.ts';
 import { chart } from '../../src/sim/route.ts';
 import { berthing } from '../../src/sim/spawn.ts';

@@ -6,7 +6,7 @@ import {
   type MatchState,
   type Report,
 } from '../sim/match.ts';
-import type { End } from '../player.ts';
+import type { End } from './player.ts';
 import { FINALE } from './finale.ts';
 import type { Game } from './game.ts';
 
