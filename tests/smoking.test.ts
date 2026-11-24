@@ -3,7 +3,8 @@ import { test } from 'node:test';
 import { SEED } from '../src/world/environment.ts';
 import { createMatches } from '../src/sim/matches.ts';
 import { createState } from '../src/play/state.ts';
-import { wearOf } from '../src/sim/health.ts';
+import { HEALTH } from '../src/sim/handling.ts';
+import { SMOKE, wearOf } from '../src/sim/health.ts';
 import { watersAt } from '../src/sim/waters.ts';
 import type { ShipDraw } from '../src/render/snapshot.ts';
 import {
@@ -142,4 +143,16 @@ test("in the game's own match, every ship drawn shows its wear", () => {
     }
   }
   assert.ok(worn, 'a ship was worn');
+});
+
+test('a ship smokes lightly below SMOKE.light of its full hull, heavily below SMOKE.heavy', () => {
+  const most = HEALTH.hull * 1.5,
+    by = 0.01;
+  const at = (share: number) => wearOf({ hull: most * share, shield: 0, most });
+  assert.equal(at(1), 0);
+  assert.equal(at(SMOKE.light + by), 0);
+  assert.equal(at(SMOKE.light - by), 1);
+  assert.equal(at(SMOKE.heavy + by), 1);
+  assert.equal(at(SMOKE.heavy - by), 2);
+  assert.equal(at(by), 2);
 });
