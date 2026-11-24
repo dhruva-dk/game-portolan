@@ -21,10 +21,9 @@ import { spreadBy } from '../src/sim/gunner.ts';
 import { SHIP } from '../src/sim/handling.ts';
 import { eye } from '../src/sim/lookout.ts';
 import { PERSONAS, nature, natureOf, type Nature } from '../src/sim/persona.ts';
-import { chart } from '../src/sim/route.ts';
+import { watersAt } from '../src/sim/waters.ts';
 import type { Depth } from '../src/sim/shoal.ts';
 import { shipAt, type Helm } from '../src/sim/ship.ts';
-import { berthing } from '../src/sim/spawn.ts';
 import { toEdge, type Storm } from '../src/sim/storm.ts';
 import { tempered } from '../src/sim/temper.ts';
 import { landOf, planetOf } from '../src/world/land.ts';
@@ -68,7 +67,7 @@ test("ten in every stat is today's bot of that seed and persona, to the bit; its
 
 const planet = planetOf(SEED, landOf(SEED)),
   depth = (p: Vec3) => -planet.height(p),
-  waters = { chart: chart(depth), water: berthing(depth) };
+  waters = watersAt(depth);
 
 function halves(stat: Stat, races: number) {
   const sums = [16, 4].map(() => ({ fired: 0, landed: 0, dealt: 0 }));

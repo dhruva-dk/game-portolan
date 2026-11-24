@@ -1,7 +1,5 @@
 import { SEED } from '../../src/world/environment.ts';
-import type { Waters } from '../../src/play/state.ts';
-import { chart } from '../../src/sim/route.ts';
-import { berthing } from '../../src/sim/spawn.ts';
+import { watersAt, type Waters } from '../../src/sim/waters.ts';
 import { landOf, planetOf } from '../../src/world/land.ts';
 import type { Planet } from '../../src/world/planet.ts';
 import type { Vec3 } from '../../src/world/sphere.ts';
@@ -34,7 +32,7 @@ export function worldOf(seed: number = SEED): World {
   const t = performance.now();
   const planet = planetOf(seed, landOf(seed));
   const depth = (p: Vec3) => -planet.height(p);
-  const waters = { chart: chart(depth), water: berthing(depth) };
+  const waters = watersAt(depth);
   const w = { seed, planet, depth, waters, ms: performance.now() - t };
   made.set(seed, w);
   return w;

@@ -7,15 +7,14 @@ import type { Race } from '../src/play/player.ts';
 import { TEAM } from '../src/sim/race.ts';
 import { HEALTH } from '../src/sim/handling.ts';
 import { PLAYER } from '../src/sim/match.ts';
-import { chart } from '../src/sim/route.ts';
-import { berthing } from '../src/sim/spawn.ts';
+import { watersAt } from '../src/sim/waters.ts';
 import { landOf, planetOf } from '../src/world/land.ts';
 import type { Vec3 } from '../src/world/sphere.ts';
 import { flat } from '../src/world/swell.ts';
 
 const planet = planetOf(SEED, landOf(SEED)),
   depth = (p: Vec3) => -planet.height(p),
-  waters = { chart: chart(depth), water: berthing(depth) };
+  waters = watersAt(depth);
 const IDLE = {
   helm: { course: null, throttle: 0 },
   gun: { aim: null, fire: false },

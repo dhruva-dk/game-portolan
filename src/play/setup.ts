@@ -7,7 +7,8 @@ import type { Land } from '../world/land.ts';
 import type { Planet } from '../world/planet.ts';
 import { STRIDE } from '../world/random.ts';
 import type { Vec3 } from '../world/sphere.ts';
-import type { Match, Waters } from './state.ts';
+import type { Match } from './state.ts';
+import type { Waters } from '../sim/waters.ts';
 
 type Berther = (match: number) => Promise<Spawn[]>;
 type Sounded =

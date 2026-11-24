@@ -4,8 +4,7 @@ import { SEED } from '../src/world/environment.ts';
 import { createMatches } from '../src/play/setup.ts';
 import { createState } from '../src/play/state.ts';
 import { wearOf } from '../src/sim/health.ts';
-import { chart } from '../src/sim/route.ts';
-import { berthing } from '../src/sim/spawn.ts';
+import { watersAt } from '../src/sim/waters.ts';
 import type { ShipDraw } from '../src/render/snapshot.ts';
 import {
   CLOSE,
@@ -129,12 +128,7 @@ test("in the game's own match, every ship drawn shows its wear", () => {
   const planet = planetOf(SEED, landOf(SEED)),
     depth = (p: Vec3) => -planet.height(p),
     matches = createMatches(SEED, planet, null, null),
-    state = createState(
-      planet,
-      flat,
-      { chart: chart(depth), water: berthing(depth) },
-      matches.first
-    );
+    state = createState(planet, flat, watersAt(depth), matches.first);
   state.start(matches.deal(), false);
   const idle = { course: null, throttle: 0 },
     still = { aim: null, fire: false };
