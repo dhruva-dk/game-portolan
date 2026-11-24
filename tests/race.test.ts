@@ -6,8 +6,7 @@ import { raceOf, runRace, specField } from '../src/play/race.ts';
 import { TEAM, type RaceCard, type RaceResult } from '../src/sim/race.ts';
 import { nature } from '../src/sim/persona.ts';
 import { DEFAULT_RULES } from '../src/sim/rules.ts';
-import { chart } from '../src/sim/route.ts';
-import { berthing } from '../src/sim/spawn.ts';
+import { watersAt } from '../src/sim/waters.ts';
 import { closedBy } from '../src/sim/storm.ts';
 import { landOf, planetOf } from '../src/world/land.ts';
 import { hash } from '../src/world/random.ts';
@@ -15,7 +14,7 @@ import type { Vec3 } from '../src/world/sphere.ts';
 
 const planet = planetOf(SEED, landOf(SEED)),
   depth = (p: Vec3) => -planet.height(p),
-  waters = { chart: chart(depth), water: berthing(depth) };
+  waters = watersAt(depth);
 
 const short = (over: Partial<RaceCard> = {}): RaceCard => {
   const card = specField(SEED, 3);

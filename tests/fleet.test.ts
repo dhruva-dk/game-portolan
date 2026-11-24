@@ -5,8 +5,7 @@ import { createMatches } from '../src/play/setup.ts';
 import { createState, debugOf } from '../src/play/state.ts';
 import { PLAYER, SHIPS } from '../src/sim/match.ts';
 import { PERSONAS, TYPES, dealt } from '../src/sim/persona.ts';
-import { chart } from '../src/sim/route.ts';
-import { berthing } from '../src/sim/spawn.ts';
+import { watersAt } from '../src/sim/waters.ts';
 import { SEED } from '../src/world/environment.ts';
 import { landOf, planetOf } from '../src/world/land.ts';
 import { seedOf } from '../src/world/seeds.ts';
@@ -17,12 +16,7 @@ test("the fleet the panel shows is the race's: its type, and every bot's nature 
   const planet = planetOf(SEED, landOf(SEED));
   const depth = (p: Vec3) => -planet.height(p);
   const race = createMatches(SEED, planet, null, null).race();
-  const state = createState(
-    planet,
-    flat,
-    { chart: chart(depth), water: berthing(depth) },
-    race
-  );
+  const state = createState(planet, flat, watersAt(depth), race);
   state.start(race);
   const natures = naturesOf(SEED),
     fleet = fleetOf(SEED);

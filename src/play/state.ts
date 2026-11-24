@@ -37,7 +37,7 @@ import {
   type Cause,
   type Sunk,
 } from '../sim/match.ts';
-import { berths, drawn, type Berthing, type Spawn } from '../sim/spawn.ts';
+import { berths, drawn, type Spawn } from '../sim/spawn.ts';
 import {
   hopped,
   knocked,
@@ -62,7 +62,7 @@ import {
   stored,
   type Ask,
 } from '../sim/stores.ts';
-import type { Chart } from '../sim/route.ts';
+import type { Waters } from '../sim/waters.ts';
 import { shipAt, type Helm, type ShipState } from '../sim/ship.ts';
 import { calm, closedBy, type Storm } from '../sim/storm.ts';
 import { heard, type Report } from '../sim/hunter.ts';
@@ -168,11 +168,6 @@ interface Wreck {
   pose: ShipPose;
   tick: number;
   side: number;
-}
-
-export interface Waters {
-  chart: Chart;
-  water: Berthing;
 }
 
 export function createState(

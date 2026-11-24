@@ -1,9 +1,9 @@
-import { sound } from '../sim/route.ts';
-import { berthing, berths, type Berthing } from '../sim/spawn.ts';
+import { berths, type Berthing } from '../sim/spawn.ts';
+import { sounded } from '../sim/waters.ts';
 import { planetOf, type Land } from '../world/land.ts';
 import type { Vec3 } from '../world/sphere.ts';
 
-let sounded: { water: Berthing; depth: (p: Vec3) => number } | null = null;
+let kept: { water: Berthing; depth: (p: Vec3) => number } | null = null;
 
 self.onmessage = (
   e: MessageEvent<
@@ -12,9 +12,7 @@ self.onmessage = (
 ) => {
   if ('match' in e.data) {
     const { match, count } = e.data;
-    const dealt = sounded
-      ? berths(sounded.water, match, count, sounded.depth)
-      : [];
+    const dealt = kept ? berths(kept.water, match, count, kept.depth) : [];
     const spawns = Float64Array.from(
       dealt.flatMap((b) => [...b.at, ...b.heading])
     );
@@ -24,9 +22,8 @@ self.onmessage = (
   const t = performance.now();
   const planet = planetOf(e.data.seed, e.data.land);
   const depth = (p: Vec3) => -planet.height(p);
-  const { open, clear } = sound(depth);
-  const water = berthing(depth);
-  sounded = { water, depth };
+  const { open, clear, water } = sounded(depth);
+  kept = { water, depth };
   const points = Float64Array.from(water.points.flat());
   const ms = performance.now() - t;
   self.postMessage(
