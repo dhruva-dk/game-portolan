@@ -1,137 +1,150 @@
 import { join } from 'node:path';
+import { shipValues } from '../../src/career/fit.ts';
 import { RIDE } from '../../src/sim/ride.ts';
-import { createMatches } from '../../src/sim/matches.ts';
-import { raceOf, specField } from '../../src/sim/racing.ts';
 import {
+  SETUP,
   createMatch,
   debugOf,
-  type Engine,
-  type Match,
+  type MatchView,
 } from '../../src/sim/engine.ts';
-import type { RaceCard } from '../../src/sim/race.ts';
+import { evenSetup } from '../../src/sim/even.ts';
 import { STEP } from '../../src/sim/fixed.ts';
-import { SHIPS } from '../../src/sim/match.ts';
+import { STILL } from '../../src/sim/hands.ts';
+import { MIXED } from '../../src/sim/persona.ts';
+import type { MatchSetup } from '../../src/sim/setup.ts';
 import { berths } from '../../src/sim/spawn.ts';
+import type { Waters } from '../../src/sim/waters.ts';
 import { CASCADES } from '../../src/world/cascades.ts';
 import { FREQUENCY, anchors, icosphere } from '../../src/world/lattice.ts';
-import { hash } from '../../src/world/random.ts';
-import { createSwell, flat, type Hull } from '../../src/world/swell.ts';
+import { STRIDE, hash } from '../../src/world/random.ts';
+import { createSwell, type Hull } from '../../src/world/swell.ts';
 import { distance, type Vec3 } from '../../src/world/sphere.ts';
 import { MEAN } from '../../src/world/weather.ts';
 import { createWind } from '../../src/world/wind.ts';
 import { lines, writeJson } from '../out.ts';
-import { brainNamed } from './brains.ts';
 import { record } from './log.ts';
 import { watch, type MatchResult } from './metrics.ts';
 import { standIn, type Thumb } from './player.ts';
-import { ruledBy } from './rules.ts';
-import { typeNamed } from './types.ts';
 import { worldOf } from './world.ts';
 
 export interface MatchScenario {
   kind: 'match';
   planet?: number;
   match?: number;
-  race?: { teams: number; ships: number; close?: boolean };
-  brains?: string[];
-  type?: string;
-  rules?: string;
+  teams?: number;
+  perTeam?: 1 | 2;
+  close?: boolean;
   players?: number;
   thumb?: Thumb;
   seconds?: number;
   sea?: 'flat' | 'swell';
 }
 
-export type State = Engine;
+export type State = MatchView;
+
+const LEVEL = 50,
+  STAT = 10,
+  RATING = 3;
+
+const EVEN_SHIP = shipValues(
+  {
+    sails: LEVEL,
+    rigging: LEVEL,
+    rudder: LEVEL,
+    hull: LEVEL,
+    keel: LEVEL,
+    mounts: LEVEL,
+    gun: LEVEL,
+  },
+  'cannon',
+  { shield: STAT, healSpeed: STAT, healAmount: STAT }
+);
+
+const EVEN_DRIVER = {
+  gunnery: STAT,
+  helm: STAT,
+  nerve: STAT,
+  territory: STAT,
+  stormcraft: STAT,
+  lookout: STAT,
+};
 
 function swellOf(seed: number, height: (p: Vec3) => number): Hull {
   const sea = anchors(icosphere(FREQUENCY), createWind(seed), CASCADES[0]);
   return createSwell(sea, height, MEAN.wind, { shortest: RIDE.shortest }).hull;
 }
 
-function cardOf(seed: number, teams: number, ships: number): RaceCard {
-  const full = specField(seed, teams);
-  const kept = full.ships.filter(
-    (s) => s.id % (full.ships.length / teams) < ships
-  );
-  return { ...full, ships: kept.map((s, id) => ({ ...s, id })) };
-}
-
 export type Summary = ReturnType<typeof summaryOf>;
 
 export function runMatch(sc: MatchScenario, dir?: string): Summary {
   const w = worldOf(sc.planet),
-    n = sc.match ?? 1;
-  if (sc.race && (sc.brains || sc.type || sc.rules || sc.players))
-    throw new Error(
-      'a race is sailed by its card: no brains, type, rules or players'
-    );
-  const brains = sc.brains ?? ['default'];
-  const brainOf = (id: number) =>
-    sc.race ? 'card' : brains[(id + n) % brains.length];
-  const byName = new Map(brains.map((b) => [b, brainNamed(b)]));
-  const matches = createMatches(
-    w.seed,
-    w.planet,
-    null,
-    null,
-    ruledBy(typeNamed(sc.type), sc.rules)
-  );
-  let dealt = matches.deal();
-  for (let k = 1; k < n; k++) dealt = matches.deal();
-  let m: Match = sc.race
-    ? raceOf(cardOf(dealt.seed, sc.race.teams, sc.race.ships), w.planet)
-    : dealt;
-  if (sc.race?.close) {
-    const all = berths(w.waters.water, m.seed, SHIPS, w.depth),
+    n = sc.match ?? 1,
+    seed = w.seed + STRIDE * n;
+  const setup = evenSetup({
+    planet: String(w.seed),
+    match: seed,
+    storm: RATING,
+    heals: RATING,
+    teams: sc.teams,
+    perTeam: sc.perTeam,
+    values: EVEN_SHIP,
+    stats: EVEN_DRIVER,
+  });
+  const count = setup.ships.length;
+  let waters: Waters = {
+    ...w.waters,
+    ...(sc.sea === 'swell' && { sea: swellOf(w.seed, w.planet.height) }),
+  };
+  if (sc.close) {
+    const all = berths(w.waters.water, seed, SETUP.most, w.depth),
       first = all[0].at;
     const near = [...all].sort(
       (x, y) => distance(x.at, first) - distance(y.at, first)
     );
-    m = { ...m, berths: near.slice(0, sc.race.teams * sc.race.ships) };
+    waters = {
+      ...waters,
+      berthed: { match: seed, spawns: near.slice(0, count) },
+    };
   }
-  return sail(m, w, sc, brainOf, (id) => byName.get(brainOf(id))!, dir);
+  return sail(setup, waters, sc, dir);
 }
 
 function sail(
-  m: Match,
-  w: ReturnType<typeof worldOf>,
+  setup: MatchSetup,
+  waters: Waters,
   sc: MatchScenario,
-  brainOf: (id: number) => string,
-  brain: ((id: number) => ReturnType<typeof brainNamed>) | undefined,
   dir: string | undefined
 ) {
-  const sea = sc.sea === 'swell' ? swellOf(w.seed, w.planet.height) : flat;
-  const state = createMatch(w.planet, sea, w.waters, m, brain);
-  state.start(m, false);
+  const m = createMatch(setup, waters),
+    state = m.view,
+    seed = setup.match,
+    brainOf = () => 'default';
   const players = new Set<number>();
   if (sc.players)
     for (const k of state.ships())
       if ((k.id + (sc.match ?? 1)) % sc.players === 0) {
         players.add(k.id);
-        debugOf(state).standIn(k.id, standIn(hash(m.seed, k.id), sc.thumb));
+        debugOf(m).standIn(k.id, standIn(hash(seed, k.id), sc.thumb));
       }
-  const course = m.type.rules.storm.phases.reduce(
+  const course = MIXED.rules.storm.phases.reduce(
       (t, p) => t + p.wait + p.close,
       0
     ),
     end = sc.seconds ?? course + 120;
   const events = dir ? lines(join(dir, 'events.jsonl')) : null,
     ships = dir ? lines(join(dir, 'ships.jsonl')) : null;
-  const seen = watch(state, brainOf, w.depth, m.type.name, players),
-    log = record(state, w.planet.height, brainOf, events, ships);
-  log.start(m.seed, m.type.name, m.type.rules);
-  const idle = { course: null, throttle: 0 },
-    still = { aim: null, fire: false },
-    each = Math.round(1 / STEP);
-  const over = () =>
-    m.card ? state.result() !== null : state.alive().length <= 1;
+  const seen = watch(state, brainOf, waters.depth, MIXED.name, players),
+    log = record(state, (p) => -waters.depth(p), brainOf, events, ships);
+  log.start(seed, MIXED.name, MIXED.rules);
+  debugOf(m).lap(log.lap);
+  const each = Math.round(1 / STEP);
   let steps = 0;
   const began = performance.now();
   log.second();
-  while (!over() && state.time() < end) {
+  while (!m.done && state.time() < end) {
     log.before();
-    const did = state.advance(idle, still, undefined, log.lap);
+    m.step(STILL);
+    const did = state.last();
     log.after(did);
     seen.step(did);
     if (++steps % each === 0) {
@@ -142,21 +155,21 @@ function sail(
   const ms = performance.now() - began;
   const account = seen.end(steps, ms),
     kept = log.end(),
-    why = over() ? (m.card ? 'race decided' : 'one left') : 'out of time';
-  const h = fingerprint(numbersOf(state));
+    why = m.done ? 'race decided' : 'out of time',
+    result = m.result();
   events?.write({
     t: r2(state.time()),
     step: steps,
     type: 'end',
     why,
     left: state.alive(),
-    hash: h,
+    hash: result.hash,
   });
-  const summary = summaryOf(sc, m, account, kept, {
+  const summary = summaryOf(sc, seed, account, kept, {
     why,
-    hash: h,
+    hash: result.hash,
     wallMs: ms,
-    result: state.result(),
+    result,
   });
   if (dir) {
     events?.close();
@@ -174,14 +187,14 @@ const r2 = (x: number) => Math.round(x * 100) / 100,
 
 function summaryOf(
   sc: MatchScenario,
-  m: Match,
+  seed: number,
   a: MatchResult,
   kept: ReturnType<ReturnType<typeof record>['end']>,
   end: {
     why: string;
     hash: string;
     wallMs: number;
-    result: ReturnType<State['result']>;
+    result: ReturnType<ReturnType<typeof createMatch>['result']>;
   }
 ) {
   const ships = a.ships,
@@ -193,7 +206,7 @@ function summaryOf(
     .sort((x, y) => x - y);
   return {
     scenario: sc,
-    seed: m.seed,
+    seed,
     type: a.type,
     end: end.why,
     hash: end.hash,
@@ -276,20 +289,4 @@ function summaryOf(
     result: end.result,
     account: a,
   };
-}
-
-export function fingerprint(numbers: readonly number[]): string {
-  const bytes = new Uint8Array(new Float64Array(numbers).buffer);
-  let h = 0x811c9dc5;
-  for (const b of bytes) h = Math.imul(h ^ b, 0x01000193) >>> 0;
-  return h.toString(16).padStart(8, '0');
-}
-
-export function numbersOf(state: State): number[] {
-  const numbers: number[] = [state.time(), state.loot().pieces.length];
-  for (const v of state.vessels())
-    numbers.push(v.id, ...v.ship.at, ...v.ship.heading, v.ship.speed);
-  for (const k of state.ships())
-    numbers.push(k.id, k.hull, k.shield, state.share(k.id), k.afloat ? 1 : 0);
-  return numbers;
 }

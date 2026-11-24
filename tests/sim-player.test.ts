@@ -41,15 +41,9 @@ test('its eye is the same for the same seed, and another for another', () => {
 });
 
 test('a match with stand-ins runs the same every time, and they fire', () => {
-  const spec = {
-    kind: 'match',
-    match: 1,
-    brains: ['default'],
-    players: 4,
-    seconds: 60,
-  } as const;
-  const a = runMatch({ ...spec, brains: [...spec.brains] }),
-    b = runMatch({ ...spec, brains: [...spec.brains] });
+  const spec = { kind: 'match', match: 1, players: 4, seconds: 60 } as const;
+  const a = runMatch(spec),
+    b = runMatch(spec);
   assert.equal(a.hash, b.hash);
   const players = a.account.ships.filter((s) => s.player);
   assert.equal(players.length, a.account.ships.length / 4);

@@ -1,31 +1,27 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createState, debugOf } from '../src/play/state.ts';
-import type { Match } from '../src/sim/engine.ts';
-import { dealt, lookOf } from '../src/play/colors.ts';
+import { lookOf } from '../src/play/colors.ts';
+import { teamLiveries } from '../src/app/race.ts';
 import { COLORS, LIVERY } from '../src/world/livery.ts';
-import { PLAYER, SHIPS } from '../src/sim/match.ts';
+import { STILL } from '../src/sim/hands.ts';
+import { PLAYER } from '../src/sim/match.ts';
 import { watersAt } from '../src/sim/waters.ts';
-import { MIXED } from '../src/sim/persona.ts';
 import { calm, type Storm } from '../src/sim/storm.ts';
-import type { Helm } from '../src/sim/ship.ts';
 import { landOf, planetOf } from '../src/world/land.ts';
 import { SEED } from '../src/world/environment.ts';
-import { add, bearingAt, type Vec3 } from '../src/world/sphere.ts';
-import { flat } from '../src/world/swell.ts';
+import { add, bearingAt } from '../src/world/sphere.ts';
+import { setupOf } from './setups.ts';
 
 const planet = planetOf(SEED, landOf(SEED));
-const depth = (p: Vec3) => -planet.height(p);
-const waters = watersAt(depth);
+const waters = watersAt(planet);
 const start = planet.start;
-const still = { aim: null, fire: false };
 const degrees = Math.PI / 180;
+const race = setupOf(1, { player: true });
 
-const deadly = (at: number): Match => ({
-  seed: 1,
-  type: MIXED,
-  gun: null,
-  storm: (t): Storm =>
+const deadly =
+  (at: number) =>
+  (t: number): Storm =>
     t < at
       ? calm(start.at)
       : {
@@ -33,58 +29,62 @@ const deadly = (at: number): Match => ({
           radius: 1e-6,
           next: { center: start.at, radius: 1e-6 },
           damage: 1e6,
-        },
-});
+        };
 
-function loop(m: Match, state = createState(planet, flat, waters, m)) {
-  debugOf(state).atSea(start, []);
+function loop(at: number, state = createState(waters, start)) {
+  debugOf(state).atSea(race, start, [], { storm: deadly(at) });
   const legs: [number, number][] = [
     [180, 5],
     [90, 4],
   ];
-  const helm = (k: number): Helm => {
-    const at = state.vessels()[0]?.ship.at ?? start.at;
+  const course = (k: number) => {
+    const here = state.vessels()[0]?.ship.at ?? start.at;
     let s = k / 30;
     for (const [b, seconds] of legs) {
-      if (s < seconds)
-        return { course: bearingAt(at, b * degrees), throttle: 1 };
+      if (s < seconds) return bearingAt(here, b * degrees);
       s -= seconds;
     }
-    return { course: add(start.at, at, -1), throttle: 1 };
+    return add(start.at, here, -1);
   };
   for (let k = 0; k < 30 * 30; k++) {
     const time = state.time(),
-      did = state.advance(helm(k), still);
+      did = state.step({ ...STILL, course: course(k), throttle: 1 });
     if (did.held?.claimed.some((c) => c.id === PLAYER) || !state.mine())
       return { closed: time, did, state };
   }
   return { closed: null, did: null, state };
 }
 
-test('her livery: worn at anchor at once; her ship in it at sea, the bots dealt round it, her water her dye', () => {
-  const state = createState(planet, flat, waters, deadly(Infinity)),
+test('its livery: worn at anchor at once; its ship in it at sea, every team in the livery of its index round it, its water its dye', () => {
+  const state = createState(waters, start),
     chosen = { dye: 4, pattern: 2 };
   const playerLook = () => state.drawn(1).find((d) => d.id === PLAYER)!.look;
   state.anchor(start);
   assert.deepEqual(
     playerLook(),
     lookOf(LIVERY),
-    'vermilion, plain, till she chooses'
+    'vermilion, plain, till it is chosen'
   );
   state.wear(chosen);
   assert.deepEqual(playerLook(), lookOf(chosen), 'at anchor, in it at once');
-  state.start(deadly(Infinity));
+  const liveries = teamLiveries(race, state.worn());
+  state.start(race, liveries);
   const drawn = state.drawn(1);
-  assert.equal(drawn.length, SHIPS);
+  assert.equal(drawn.length, race.ships.length);
   for (const d of drawn)
     assert.deepEqual(
       d.look,
-      lookOf(d.id === PLAYER ? chosen : dealt(1, d.id, chosen)),
+      lookOf(liveries[race.ships[d.id].team]),
       `ship ${d.id}`
     );
-  assert.ok(
-    drawn.every((d) => d.id === PLAYER || d.look.sail !== playerLook().sail)
-  );
+  assert.deepEqual(playerLook(), lookOf(chosen));
+  for (const d of drawn)
+    assert.equal(
+      race.ships[d.id].team === race.ships[PLAYER].team,
+      d.look.sail === playerLook().sail &&
+        d.look.pattern === playerLook().pattern,
+      `ship ${d.id}: only its team in its livery`
+    );
   const sea = state.sea(1)!;
   assert.deepEqual(sea.colors[PLAYER], COLORS[chosen.dye]);
   drawn.forEach((d) => assert.deepEqual(sea.colors[d.id], d.look.sail));
@@ -96,9 +96,9 @@ test('her livery: worn at anchor at once; her ship in it at sea, the bots dealt 
 });
 
 test('a ship sunk in a step lays, closes and cuts nothing in it: its water only drains', () => {
-  const sailed = loop(deadly(Infinity));
+  const sailed = loop(Infinity);
   assert.ok(sailed.closed !== null, 'its loop closes');
-  const sunk = loop(deadly(sailed.closed));
+  const sunk = loop(sailed.closed);
   assert.equal(sunk.state.mine(), null, 'it sank');
   assert.deepEqual(sunk.did?.held?.claimed, []);
   assert.deepEqual(sunk.did?.regained, []);
@@ -112,22 +112,20 @@ test('a ship sunk in a step lays, closes and cuts nothing in it: its water only 
 });
 
 test("a second match on the same state starts clean: its sea as a new state's, its loop closing as it did", () => {
-  const alone = loop(deadly(Infinity)),
-    first = loop(deadly(Infinity));
+  const alone = loop(Infinity),
+    first = loop(Infinity);
   for (let k = 0; k < 240; k++)
-    first.state.advance(
-      {
-        course: bearingAt(first.state.mine()!.ship.at, 180 * degrees),
-        throttle: 1,
-      },
-      still
-    );
+    first.state.step({
+      ...STILL,
+      course: bearingAt(first.state.mine()!.ship.at, 180 * degrees),
+      throttle: 1,
+    });
   const was = first.state.sea(1)!;
   assert.ok(
     was.changes.some((c) => c.kind === 'paint' && c.ship === PLAYER),
     "its strip painted at the first match's end"
   );
-  const second = loop(deadly(Infinity), first.state);
+  const second = loop(Infinity, first.state);
   assert.equal(
     second.closed,
     alone.closed,

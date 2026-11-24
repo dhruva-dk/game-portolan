@@ -13,7 +13,6 @@ import { PLAYER } from '../sim/match.ts';
 import type { Vessel } from '../sim/contact.ts';
 import type { Helm, ShipState } from '../sim/ship.ts';
 import type { Use } from '../sim/kinds.ts';
-import { PARTS, type PartType } from '../sim/race.ts';
 import type { Eye, LootDraw, Snapshot, StormDraw } from '../render/snapshot.ts';
 import { createSwell } from '../world/swell.ts';
 import type { Anchor } from '../world/lattice.ts';
@@ -44,6 +43,7 @@ import {
 import {
   FOCI,
   LOOSE,
+  PARTS,
   REST,
   WHOLE,
   anchorageEye,
@@ -55,6 +55,7 @@ import {
   turned,
   type Framing,
   type Orbit,
+  type PartType,
 } from './anchorage.ts';
 import { ARRIVAL, arriving } from './arrival.ts';
 import { createChase } from './chase.ts';
@@ -64,8 +65,10 @@ import { see, seenOf } from './moments.ts';
 import { answerTo, createShake } from './shake.ts';
 import { createStops, stopFor } from './stops.ts';
 import { createState, debugOf, type Berth } from './state.ts';
-import type { Match } from '../sim/engine.ts';
-import type { Waters } from '../sim/waters.ts';
+import type { Rig } from '../sim/engine.ts';
+import type { MatchSetup } from '../sim/setup.ts';
+import { watered, type Berthed, type Soundings } from '../sim/waters.ts';
+import type { Livery } from '../world/livery.ts';
 
 export interface DebugDamage {
   wear: 0 | 1 | 2;
@@ -100,9 +103,8 @@ interface View {
 export function createGame(
   world: World,
   anchors: readonly Anchor[],
-  waters: Waters,
-  start: { at: Vec3; bearing: number },
-  first: Match
+  soundings: Soundings,
+  start: { at: Vec3; bearing: number }
 ) {
   const ground = world.planet.height,
     depth = (p: Vec3) => -ground(p),
@@ -110,7 +112,7 @@ export function createGame(
   const sea = createSwell(anchors, ground, world.climate.seaWind, {
     shortest: RIDE.shortest,
   });
-  const state = createState(world.planet, sea.hull, waters, first);
+  const state = createState(watered(world.planet, soundings, sea.hull), start);
   const chase = createChase(ground, sea.at);
   const clock = fixedClock();
   let pulled = false,
@@ -388,11 +390,15 @@ export function createGame(
             ? held(v.ship)
             : orders(hands.stick);
         const { arm, tap } = tapOf(tapped);
-        state.advance(
-          helm,
-          { aim: chase.sight(), fire: !!v && pulled },
-          { tap, arm, gust: gusted, take: null }
-        );
+        state.step({
+          course: helm.course,
+          throttle: helm.throttle,
+          aim: chase.sight(),
+          fire: !!v && pulled,
+          gust: gusted,
+          heal: tap,
+          arm,
+        });
         [tapped, gusted] = [null, false];
       }
       if (time.steps > 0) pulled = false;
@@ -568,17 +574,18 @@ export function createGame(
     alive: state.alive,
     race() {
       const teams = state.teams();
-      if (!teams) return undefined;
-      const over = state.result() !== null;
+      if (!teams) return null;
+      const over = state.done();
       return {
         teams,
         over,
         place: over ? state.order().indexOf(PLAYER) + 1 : 0,
       };
     },
+    done: state.done,
     result: state.result,
-    start(m: Match) {
-      restart(state.start(m));
+    start(setup: MatchSetup, liveries: readonly Livery[], berthed?: Berthed) {
+      restart(state.start(setup, liveries, berthed));
       arrival = 0;
     },
     anchor() {
@@ -590,8 +597,12 @@ export function createGame(
       view = next;
     },
     debug: {
-      atSea(others: readonly Berth[]) {
-        restart(debugOf(state).atSea(start, others));
+      atSea(setup: MatchSetup, others: readonly Berth[], rig?: Rig) {
+        restart(debugOf(state).atSea(setup, start, others, rig));
+      },
+      rig(rig: Rig, setup: MatchSetup, liveries: readonly Livery[]) {
+        restart(debugOf(state).rig(rig, setup, liveries));
+        arrival = 0;
       },
       lash(helm: (s: ShipState) => Helm) {
         held = helm;

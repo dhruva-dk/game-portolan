@@ -1,16 +1,16 @@
 import { DEFAULT_BRAIN } from '../sim/brain.ts';
 import { eye } from '../sim/lookout.ts';
-import { PLAYER, SHIPS } from '../sim/match.ts';
-import { PERSONAS, TYPES, dealt, nature, type Nature } from '../sim/persona.ts';
+import { MIXED, PERSONAS, TYPES, nature, type Nature } from '../sim/persona.ts';
+import type { MatchSetup } from '../sim/setup.ts';
 import { hash } from '../world/random.ts';
 import type { Fleet, Spread, Standout } from './player.ts';
 
-export function naturesOf(seed: number): Map<number, Nature> {
-  const mix = dealt(seed).mix,
-    natures = new Map<number, Nature>();
-  for (let id = 0; id < SHIPS; id++)
-    if (id !== PLAYER)
-      natures.set(id, nature(hash(seed, id), DEFAULT_BRAIN, mix));
+export function naturesOf(setup: MatchSetup): Map<number, Nature> {
+  const natures = new Map<number, Nature>();
+  setup.ships.forEach((s, id) => {
+    if (s.hands !== 'player')
+      natures.set(id, nature(hash(setup.match, id), DEFAULT_BRAIN, MIXED.mix));
+  });
   return natures;
 }
 
@@ -46,14 +46,14 @@ function most(
   return best;
 }
 
-export function fleetOf(seed: number): Fleet {
-  const type = dealt(seed),
-    natures = naturesOf(seed),
+export function fleetOf(setup: MatchSetup): Fleet {
+  const type = MIXED,
+    natures = naturesOf(setup),
     all = [...natures.values()];
   const counts = PERSONAS.map((p) => all.filter((n) => n.persona === p).length);
   const common = counts.indexOf(Math.max(...counts));
   return {
-    type: TYPES.findIndex((t) => t === type),
+    type: TYPES.findIndex((t) => t.name === type.name),
     name: type.name,
     counts,
     common,

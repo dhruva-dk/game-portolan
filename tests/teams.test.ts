@@ -2,7 +2,6 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { KINDS } from '../src/sim/kinds.ts';
 import { createTally, finishing } from '../src/sim/tally.ts';
-import { specField } from '../src/sim/racing.ts';
 import {
   battleOf,
   crewOf,
@@ -12,7 +11,7 @@ import {
   type Strike,
 } from '../src/sim/battle.ts';
 import { mind, think } from '../src/sim/bot.ts';
-import { RACE, mates, over } from '../src/sim/carded.ts';
+import { RACE, mates, over } from '../src/sim/teams.ts';
 import { afloat, stepFleet, type Vessel } from '../src/sim/contact.ts';
 import { STEP } from '../src/sim/fixed.ts';
 import { gunOf, laid } from '../src/sim/gun.ts';
@@ -314,7 +313,7 @@ test('a race is over when every ship afloat is of one team, or none is; or calle
   assert.equal(over(teams, [1, 2], RACE.overtime), true, 'called');
 });
 
-test('the finishing order: the afloat by sinkings, then share, then id; the sunk, last sunk first; forfeits last', () => {
+test('the finishing order: the afloat by sinkings, then share, then id; the sunk, last sunk first', () => {
   const sunk = [
     { id: 7, by: 2 },
     { id: 4, by: null },
@@ -323,19 +322,17 @@ test('the finishing order: the afloat by sinkings, then share, then id; the sunk
   ];
   const share = (id: number) => (id === 3 ? 0.2 : 0.1);
   assert.deepEqual(
-    finishing([1, 2, 3, 6], sunk, share, [9, 8]),
-    [2, 6, 3, 1, 0, 5, 4, 7, 8, 9]
+    finishing([1, 2, 3, 6], sunk, share),
+    [2, 6, 3, 1, 0, 5, 4, 7]
   );
   assert.deepEqual(finishing([], sunk, share), [0, 5, 4, 7]);
 });
 
-test("a race's tally: shots fired, strikes landed and taken (a ram is neither), damage dealt, the sea held, and the forfeits", () => {
-  const card = specField(11, 2),
-    ships = card.ships.map((s) => ({ ...s, forfeit: s.id === 6 }));
-  const tally = () => createTally({ ...card, ships }, 400),
+test("a race's tally: shots fired and landed (a ram is no shot), damage dealt and taken (a ram's too), the places", () => {
+  const teams = [0, 0, 0, 0, 1, 1, 1, 1];
+  const tally = () => createTally(teams, 400),
     t = tally();
-  assert.deepEqual(t.teams, [0, 0, 0, 0, 1, 1, 1, 1]);
-  assert.deepEqual(t.forfeit, [6]);
+  assert.deepEqual(t.teams, teams);
   const strike = (shooter: number, struck: number, ram: boolean): Strike => ({
     shooter,
     struck,
@@ -354,6 +351,7 @@ test("a race's tally: shots fired, strikes landed and taken (a ram is neither), 
     fleet: [],
     crews: [],
     sunk: [
+      { id: 6, by: null, cause: 'storm' as const, gun: null, time: 30 },
       { id: 5, by: 1, cause: 'shot' as const, gun: KINDS[0], time: 40 },
       { id: 7, by: null, cause: 'storm' as const, gun: null, time: 55 },
       { id: 4, by: 1, cause: 'ram' as const, gun: null, time: 60 },
@@ -366,64 +364,57 @@ test("a race's tally: shots fired, strikes landed and taken (a ram is neither), 
     [strike(1, 4, false)],
     standing([0, 1, 2, 3, 4], 9)
   );
-  assert.equal(t.result(), null, 'two teams afloat: the race is on');
-  t.holds(4, 0.03);
+  assert.equal(t.made(), null, 'two teams afloat: the race is on');
   const last = [strike(4, 1, true), strike(1, 4, true), strike(1, 5, false)];
   t.settle([], last, standing([0, 1, 2, 3], 9));
-  const r = t.result();
+  const r = t.made();
   assert.ok(r, 'one team afloat: over, and its result made');
   t.settle([shot], last, standing([0], 2));
-  assert.equal(t.result(), r, 'nothing more is tallied once it is over');
-  assert.deepEqual(r.order, [1, 3, 2, 0, 4, 7, 5, 6]);
-  assert.deepEqual(r.sinkings[0], {
-    id: 6,
-    by: null,
-    cause: 'forfeit',
-    gun: null,
-    second: 0,
-  });
+  assert.equal(t.made(), r, 'nothing more is tallied once it is over');
   assert.deepEqual(
-    r.sinkings.map((s) => s.id),
-    [6, 5, 7, 4]
+    r.ships.map((s) => s.place),
+    [4, 1, 3, 2, 5, 7, 8, 6]
   );
-  assert.deepEqual(r.hits[1], {
-    id: 1,
-    fired: 2,
-    landed: 2,
-    taken: 0,
-    dealt: 30,
-  });
-  assert.deepEqual(r.hits[4], {
-    id: 4,
-    fired: 1,
-    landed: 0,
-    taken: 1,
-    dealt: 10,
-  });
-  assert.deepEqual(r.hits[6], {
-    id: 6,
-    fired: 0,
-    landed: 0,
-    taken: 0,
-    dealt: 0,
-  });
   assert.deepEqual(
-    r.seaHeld.map((s) => s.share),
-    [0, 0.01, 0.02, 0.03, 0.03, 0, 0, 0],
-    'the afloat as they hold it, the sunk as they held it going down'
+    r.ships.map((s) => [s.sunkAt, s.sunkBy]),
+    [
+      [null, null],
+      [null, null],
+      [null, null],
+      [null, null],
+      [60, 1],
+      [40, 1],
+      [30, null],
+      [55, null],
+    ]
   );
-  assert.deepEqual([r.seed, r.tier, r.round, r.seconds], [11, 0, 0, 61]);
+  assert.equal(r.ships[1].sinkings, 2);
+  const tallied = (id: number) => {
+    const s = r.ships[id];
+    return [s.shotsFired, s.shotsLanded, s.damageDealt, s.damageTaken];
+  };
+  assert.deepEqual(tallied(1), [2, 2, 30, 10]);
+  assert.deepEqual(tallied(4), [1, 0, 10, 20]);
+  assert.deepEqual(tallied(5), [0, 0, 0, 10]);
+  assert.deepEqual(tallied(6), [0, 0, 0, 0]);
+  assert.equal(r.seconds, 61);
   assert.match(r.hash, /^[0-9a-f]{8}$/);
   const hashOf = (loot: number) => {
     const again = tally();
     again.settle([], [], standing([0, 1, 2, 3], loot));
-    return again.result()?.hash;
+    return again.made()?.hash;
   };
   assert.equal(hashOf(9), r.hash);
   assert.notEqual(hashOf(8), r.hash);
-  const late = createTally(card, 61 - RACE.overtime);
+  const late = createTally(teams, 61 - RACE.overtime);
   late.settle([], [], standing([0, 1, 2, 3, 4], 9));
-  assert.deepEqual(late.result()?.order.slice(0, 5), [1, 4, 3, 2, 0]);
+  assert.deepEqual(
+    late
+      .made()
+      ?.ships.slice(0, 5)
+      .map((s) => s.place),
+    [5, 1, 4, 3, 2]
+  );
 });
 
 test("a race's flow: afloat as it ends it has its place there; sunk, it watches a mate first; it is over when the game says", () => {

@@ -3,10 +3,8 @@ import type { World } from '../world/environment.ts';
 import type { FrameOptions } from '../render/frame.ts';
 import { createFly } from './fly.ts';
 import type { DebugDamage, Game } from '../play/game.ts';
-import { raceOf, specField } from '../sim/racing.ts';
 import type { Referee } from '../play/referee.ts';
 import { dealt, lookOf, worn } from '../play/colors.ts';
-import type { Matches } from '../sim/matches.ts';
 import type { Berth } from '../play/state.ts';
 import { HOTBAR, IDLE, type Thumbs } from '../play/player.ts';
 import type { Livery } from '../world/livery.ts';
@@ -14,7 +12,11 @@ import { probeMeshes } from './probe.ts';
 import { STEP } from '../sim/fixed.ts';
 import { KINDS, type GunKind } from '../sim/kinds.ts';
 import { GUN, SHIP } from '../sim/handling.ts';
-import { PLAYER, SHIPS } from '../sim/match.ts';
+import { PLAYER } from '../sim/match.ts';
+import { SETUP, type Rig } from '../sim/engine.ts';
+import type { MatchSetup } from '../sim/setup.ts';
+import { createStorm } from '../sim/storm.ts';
+import { raceSetup, teamLiveries } from './race.ts';
 import type { ShipDraw, Snapshot, StormDraw } from '../render/snapshot.ts';
 import type { Flow } from './flow.ts';
 import { uiLayer } from '../ui/base/ui.ts';
@@ -54,7 +56,7 @@ export interface Stage {
   canvas: HTMLElement;
   anchors: readonly Anchor[];
   ready: Promise<number>;
-  matches: Matches;
+  rig: Rig | null;
   stats(on: boolean): void;
   draw(
     next: (dt: number) => Snapshot,
@@ -66,6 +68,7 @@ export interface Played {
   game: Game;
   referee: Referee;
   flow: Flow;
+  race: MatchSetup;
   play(): void;
   map(): void;
   next(dt: number): Snapshot;
@@ -133,27 +136,25 @@ export async function scenario(
   play: (s: Stage) => Promise<Played>,
   title: { show(on: boolean): void }
 ) {
-  const s = await stage(setupOf(release));
-  const room = Math.max(SHIPS, number('ships', 0) + 1);
+  const setup = setupOf(release);
+  const s = await stage(setup);
+  const room = Math.max(SETUP.most, number('ships', 0) + 1);
   if (flying) {
     void s.ready.then(() => title.show(false));
+    const closing = createStorm(s.world.seed, (p) => -s.world.planet.height(p));
     return s.draw(
       flyer(
         s.canvas,
         s.start.at,
         demoShips(s.start.at, room, s.world.seed, asked),
-        s.matches.storm
+        (t) => closing(setup.hold ?? t)
       )
     );
   }
   const p = await play(s);
   safeArea(uiLayer());
   if (params.has('livery')) p.game.wear(asked);
-  open(
-    p,
-    demoShips(s.start.at, room - 1, s.world.seed, p.game.worn()),
-    s.world
-  );
+  open(p, demoShips(s.start.at, room - 1, s.world.seed, p.game.worn()), s);
   const paused = params.has('pause'),
     slow = number('slow', 1);
   const swing = params.get('swing')?.split(',').map(Number),
@@ -222,7 +223,7 @@ export async function scenario(
   }, p.drawn);
 }
 
-function open(p: Played, others: readonly Berth[], world: World) {
+function open(p: Played, others: readonly Berth[], s: Stage) {
   const { game, referee, flow } = p;
   const screen = params.get('screen') ?? 'match';
   if (
@@ -234,15 +235,18 @@ function open(p: Played, others: readonly Berth[], world: World) {
   )
     flow.go(screen);
   else if (params.has('race')) {
-    const teams = number('race', 0) || undefined;
-    game.start(raceOf(specField(world.seed, teams, true), world.planet));
+    const teams = number('race', 0) || undefined,
+      race = raceSetup(s.name, s.world.seed, teams),
+      liveries = teamLiveries(race, game.worn());
+    game.start(race, liveries);
+    if (s.rig) game.debug.rig(s.rig, race, liveries);
     referee.begin();
     flow.go('match');
   } else if (screen === 'play') {
     p.play();
     flow.go('match');
   } else {
-    game.debug.atSea(others);
+    game.debug.atSea(p.race, others, s.rig ?? undefined);
     drive(game, params.get('drive') ?? '');
     referee.begin();
     if (screen === 'sunk' || screen === 'spectate' || screen === 'result')

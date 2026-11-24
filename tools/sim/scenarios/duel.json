@@ -1,5 +1,1 @@
-{
-  "kind": "match",
-  "match": 1,
-  "race": { "teams": 2, "ships": 1, "close": true }
-}
+{ "kind": "match", "match": 1, "teams": 2, "perTeam": 1, "close": true }
