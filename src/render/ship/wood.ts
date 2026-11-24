@@ -32,10 +32,17 @@ const TONES: Record<keyof typeof KIND, Tones | null> = {
   gilt: GILDING,
   iron: TAR,
 };
-// eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- Object.keys is string[]; KIND is a closed literal
-const ORDER = (Object.keys(KIND) as (keyof typeof KIND)[]).sort(
-  (a, b) => KIND[a] - KIND[b]
-);
+const ORDER = (
+  [
+    'planks',
+    'paint',
+    'dark',
+    'deck',
+    'spar',
+    'gilt',
+    'iron',
+  ] satisfies (keyof typeof KIND)[]
+).sort((a, b) => KIND[a] - KIND[b]);
 
 export const shaded = (dye: Vec3Node): Vec3Node => dye.mul(vec3(...DYE_SHADE));
 
