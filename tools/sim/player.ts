@@ -1,6 +1,6 @@
 // A stand-in for a player (PLAN H7): a bot of the match whose gun is laid as a
 // player lays hers, so the assist's help to a player can be set beside what the
-// bots hit (tools/harness/aim.ts). Her bot sails her and chooses when to fire;
+// bots hit. Her bot sails her and chooses when to fire;
 // this eye chooses where (play/orders.ts Sighter, set by state.ts debugOf
 // standIn). It measures fairness, not feel: feel needs hands on an iPad.
 //

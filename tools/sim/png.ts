@@ -1,5 +1,5 @@
 // A PNG of 8-bit RGB pixels, no alpha channel: the terrain maps
-// (tools/terrain-map.ts).
+// (terrain.ts).
 import { deflateSync } from 'node:zlib';
 
 /** CRC-32, for the PNG's chunks. */

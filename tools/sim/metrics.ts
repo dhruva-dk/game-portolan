@@ -31,7 +31,7 @@ import { faultsOf } from '../../src/sim/faults.ts';
 import { GUNS, SHIP } from '../../src/sim/handling.ts';
 import { PIECE, isArms } from '../../src/sim/loot.ts';
 import { distance, type Vec3 } from '../../src/world/sphere.ts';
-import type { State } from './run.ts';
+import type { State } from './match.ts';
 
 export const STUCK = 15,
   WINDOW = 30,

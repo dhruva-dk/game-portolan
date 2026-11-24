@@ -18,7 +18,7 @@ import { merged, type Changes } from './tables.ts';
 /**
  * The aim: the guns' assist, its cone (radians) by rarity (gun.ts laid): the
  * game's own handling.ts GUN.assist; the harness's variants measure what it
- * gives a player (tools/harness/player.ts).
+ * gives a player (tools/sim/player.ts).
  */
 interface AimTable {
   readonly assist: readonly number[];

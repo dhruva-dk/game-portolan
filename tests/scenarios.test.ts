@@ -1,6 +1,6 @@
 // Set pieces: a few ships placed just so on a made sea, sailed some seconds by
 // their bots, and what came of it. Each stands for a behaviour the harness
-// (tools/harness) measured over whole matches, held here in miniature, fast.
+// (tools/sim) measured over whole matches, held here in miniature, fast.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { crewOf } from '../src/sim/battle.ts';

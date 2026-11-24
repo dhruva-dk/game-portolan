@@ -1,9 +1,8 @@
-// A look at the planet-wide terrain (src/world/terrain.ts), no browser needed.
-//   node tools/terrain-map.ts [seeds=1,2,3,4,5,6] [land shares=0.4,0.45,0.5] [feature size, metres=TERRAIN.size]
-// Writes captures/terrain/size<size>/s<seed>-l<share>.png (the planet from two
-// sides, hill-shaded), the same with -marks (the channels the repair dug in
-// red, the water it filled in violet), and sheet.png beside them (a row a seed,
-// a column a share); prints each one's stats, and fails if any is left with
+// The planet-wide terrain (src/world/terrain.ts) mapped for seeds and land
+// shares, headless: for each, <seed>-<share>.png (the planet from two sides,
+// hill-shaded), the same with -marks (the channels the repair dug in red, the
+// water it filled in violet), and sheet.png (a row a seed, a column a share);
+// stats.jsonl, each one's terrain stats in full. Fails if any is left with
 // more than one sailable body of water.
 //
 // The land in the game's own tones (palette.ts) where the game lays them
@@ -11,19 +10,27 @@
 // height and cover), lit toward the upper left; the sea by its depth in the
 // palette's blues. Not drawn: what the shader adds at a metre's scale (stones
 // and weed on the floor, strata, a cliff's rock).
+//
+// Node only (tools/).
 
-import { mkdirSync, writeFileSync } from 'node:fs';
-import { R, normalize, type Vec3 } from '../src/world/sphere.ts';
-import { cellOf } from '../src/world/cells.ts';
-import type { Cover } from '../src/world/planet.ts';
+import { writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { lines, writeJson } from '../out.ts';
+import { R, normalize, type Vec3 } from '../../src/world/sphere.ts';
+import { cellOf } from '../../src/world/cells.ts';
+import type { Cover } from '../../src/world/planet.ts';
 import {
   BANDS,
   duneHeight,
   terrainPlanet,
-} from '../src/world/planet-terrain.ts';
-import { clamp, lerp as mix } from '../src/world/scalar.ts';
-import { TERRAIN, createTerrain, type Terrain } from '../src/world/terrain.ts';
-import { linearToSrgb } from '../src/colour.ts';
+} from '../../src/world/planet-terrain.ts';
+import { clamp, lerp as mix } from '../../src/world/scalar.ts';
+import {
+  TERRAIN,
+  createTerrain,
+  type Terrain,
+} from '../../src/world/terrain.ts';
+import { linearToSrgb } from '../../src/colour.ts';
 import {
   ROCK,
   SAND,
@@ -37,14 +44,16 @@ import {
   SEA_SHALLOW,
   type Rgb,
   type Tones,
-} from '../src/palette.ts';
+} from '../../src/palette.ts';
 import { png } from './png.ts';
 
-const seeds = (process.argv[2] ?? '1,2,3,4,5,6').split(',').map(Number);
-const shares = (process.argv[3] ?? '0.4,0.45,0.5').split(',').map(Number);
-const size = Number(process.argv[4] ?? TERRAIN.size);
-const OUT = `captures/terrain/size${size}`;
-mkdirSync(OUT, { recursive: true });
+/** Seeds and land shares to map (the planet's whole land share), and the terrain's feature size, m (TERRAIN.size if not given). */
+export interface TerrainScenario {
+  kind: 'terrain';
+  seeds: number[];
+  shares: number[];
+  size?: number;
+}
 
 /** t of the way from colour a to colour b, t held within 0…1. */
 const lerp = (a: Rgb, b: Rgb, t: number): Rgb => {
@@ -148,45 +157,64 @@ function globes(
 }
 
 const pct = (x: number) => `${(100 * x).toFixed(1)}%`;
-const CELL = 200,
-  sheet = new Uint8Array(shares.length * CELL * 2 * seeds.length * CELL * 3),
-  sheetW = shares.length * CELL * 2;
-let bad = 0;
-console.log(
-  'seed land  | before→after land | sailable before→after | water bodies | channels dug (m²) | ponds filled (m²)' +
-    ' | landmasses, largest | summit | ms'
-);
-for (const [row, seed] of seeds.entries()) {
-  for (const [col, land] of shares.entries()) {
-    const t0 = performance.now();
-    const t = createTerrain(seed, { ...TERRAIN, land, size });
-    const ms = performance.now() - t0,
-      s = t.stats;
-    if (s.sailableAfter !== 1) bad++;
-    console.log(
-      `${String(seed).padStart(4)} ${land.toFixed(2)} | ${pct(s.landBefore)}→${pct(s.landAfter)}` +
-        ` | ${s.sailableBefore}→${s.sailableAfter} | ${s.waterBodies} | ${s.channels} (${s.dugArea.toFixed(0)})` +
-        ` | ${s.filled} (${s.filledArea.toFixed(0)}) | ${s.landmasses}, ${pct(s.largestLand)} | ${s.summit.toFixed(1)} m` +
-        ` | ${ms.toFixed(0)}`
-    );
-    const name = `${OUT}/s${seed}-l${land}`;
-    writeFileSync(`${name}.png`, png(1024, 512, globes(t, seed, 512, false)));
-    writeFileSync(
-      `${name}-marks.png`,
-      png(1024, 512, globes(t, seed, 512, true))
-    );
-    const small = globes(t, seed, CELL, true);
-    for (let j = 0; j < CELL; j++) {
-      sheet.set(
-        small.subarray(j * CELL * 2 * 3, (j + 1) * CELL * 2 * 3),
-        ((row * CELL + j) * sheetW + col * CELL * 2) * 3
+const CELL = 200;
+
+/** The maps made into `dir`; false if any is left with more than one sailable body. */
+export function runTerrain(sc: TerrainScenario, dir: string): boolean {
+  const { seeds, shares } = sc,
+    size = sc.size ?? TERRAIN.size;
+  const sheetW = shares.length * CELL * 2,
+    sheet = new Uint8Array(sheetW * seeds.length * CELL * 3),
+    stats = lines(join(dir, 'stats.jsonl')),
+    bad: string[] = [];
+  console.log(
+    'seed land  | before→after land | sailable before→after | water bodies | channels dug (m²) | ponds filled (m²)' +
+      ' | landmasses, largest | summit | ms'
+  );
+  for (const [row, seed] of seeds.entries()) {
+    for (const [col, land] of shares.entries()) {
+      const t0 = performance.now();
+      const t = createTerrain(seed, { ...TERRAIN, land, size });
+      const ms = performance.now() - t0,
+        s = t.stats;
+      if (s.sailableAfter !== 1)
+        bad.push(
+          `seed ${seed} land ${land}: ${s.sailableAfter} sailable bodies`
+        );
+      stats.write({ seed, land, size, ms: Math.round(ms), ...s });
+      console.log(
+        `${String(seed).padStart(4)} ${land.toFixed(2)} | ${pct(s.landBefore)}→${pct(s.landAfter)}` +
+          ` | ${s.sailableBefore}→${s.sailableAfter} | ${s.waterBodies} | ${s.channels} (${s.dugArea.toFixed(0)})` +
+          ` | ${s.filled} (${s.filledArea.toFixed(0)}) | ${s.landmasses}, ${pct(s.largestLand)} | ${s.summit.toFixed(1)} m` +
+          ` | ${ms.toFixed(0)}`
       );
+      const name = join(dir, `s${seed}-l${land}`);
+      writeFileSync(`${name}.png`, png(1024, 512, globes(t, seed, 512, false)));
+      writeFileSync(
+        `${name}-marks.png`,
+        png(1024, 512, globes(t, seed, 512, true))
+      );
+      const small = globes(t, seed, CELL, true);
+      for (let j = 0; j < CELL; j++)
+        sheet.set(
+          small.subarray(j * CELL * 2 * 3, (j + 1) * CELL * 2 * 3),
+          ((row * CELL + j) * sheetW + col * CELL * 2) * 3
+        );
     }
   }
-}
-writeFileSync(`${OUT}/sheet.png`, png(sheetW, seeds.length * CELL, sheet));
-console.log(`wrote ${OUT}/`);
-if (bad) {
-  console.error(`${bad} left with more than one sailable body`);
-  process.exit(1);
+  stats.close();
+  writeFileSync(
+    join(dir, 'sheet.png'),
+    png(sheetW, seeds.length * CELL, sheet)
+  );
+  writeJson(join(dir, 'summary.json'), {
+    scenario: sc,
+    maps: seeds.length * shares.length,
+    bad,
+  });
+  for (const b of bad) console.log(`MORE THAN ONE SAILABLE BODY: ${b}`);
+  console.log(
+    `→ ${dir}  (summary.json; stats.jsonl; s<seed>-l<share>.png and -marks.png; sheet.png)`
+  );
+  return bad.length === 0;
 }

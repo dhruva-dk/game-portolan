@@ -9,11 +9,11 @@
     "ios": "npm run build && cap run ios",
     "test": "tsc --noEmit && tsc --noEmit -p tsconfig.node.json && eslint src tests tools && prettier --log-level warn --check src tests tools capacitor.config.ts eslint.config.js && node --test tests/*.test.ts",
     "format": "prettier --log-level warn --write src tests tools capacitor.config.ts eslint.config.js",
+    "sim": "node tools/sim/cli.ts",
     "capture": "node tools/capture.ts",
     "hero": "node tools/hero.ts",
     "budget": "node tools/budget.ts",
-    "hitch": "node tools/hitch.ts",
-    "steps": "node tools/steps.ts"
+    "hitch": "node tools/hitch.ts"
   },
   "dependencies": {
     "@capacitor/core": "8.6.0",

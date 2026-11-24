@@ -4,7 +4,7 @@
 // rules its match type deals (sim/persona.ts TYPES), as a share of their own
 // where it can be, so a bloodbath under `sparse` is still a bloodbath, with
 // less on the water.
-//   node tools/harness/cli.ts --rules sparse
+//   a match scenario with "rules": "sparse"
 //
 // Node only (tools/).
 

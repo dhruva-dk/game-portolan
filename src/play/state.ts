@@ -723,7 +723,7 @@ export function createState(
      * or her lashed helm; then the fleet's step and the fighting's, who holds
      * the sea, and what it all did kept to be drawn. Returns what it did
      * (Stepped). `lap`, if given, is told as each of its parts is done
-     * (tools/steps.ts times them).
+     * (tools/sim times them).
      */
     advance(
       helm: Helm,
@@ -940,7 +940,7 @@ export function createState(
      * A new match: SHIPS ships, hers the first, the rest bots, every one afloat
      * at her berth (sim/spawn.ts) with a gun in reach of it (sim/loot.ts
      * berthed). Returns her pose. manned: false puts a bot at her helm too (for
-     * tools/harness, whole matches of bots).
+     * tools/sim, whole matches of bots).
      */
     start(m: Match, manned = true): ShipPose {
       const by = m.card,
@@ -1082,18 +1082,18 @@ export function createState(
     /**
      * A bot's mind as it stands after the last step (what she is about, her
      * goal, her route), or null for a ship no bot sails or one sunk: to be
-     * read, never written (tools/harness watches the bots by it).
+     * read, never written (tools/sim watches the bots by it).
      */
     mindOf: (id: number): Readonly<Memory> | null =>
       aboard.get(id)?.mind ?? null,
     /**
      * A ship's nature (her persona, her crew's brain, her temperament), or
-     * null for one sunk (tools/harness tells the bots apart by it).
+     * null for one sunk (tools/sim tells the bots apart by it).
      */
     natureOf: (id: number): Nature | null => aboard.get(id)?.nature ?? null,
     /**
      * Makes a bot of this match a stand-in for a player (orders.ts Hand):
-     * `sights` lays her gun, her bot the rest (tools/harness/player.ts). For
+     * `sights` lays her gun, her bot the rest (tools/sim/player.ts). For
      * this match only: the next start puts a bot at every helm again.
      */
     standIn: (id: number, sights: Sighter) => {

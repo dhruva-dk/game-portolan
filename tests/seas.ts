@@ -1,7 +1,7 @@
 // Seas for the water's copy of the cells (water/claimed.ts) to follow, as the
 // game hands them to the frame: a match of ships biting out of their homes, and
 // a loop round half the planet closed in one step. tests/sea.test.ts checks
-// what is drawn of them; tools/steps.ts times a frame's work on them.
+// what is drawn of them.
 
 import {
   createTerritory,

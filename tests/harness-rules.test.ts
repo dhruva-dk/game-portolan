@@ -1,11 +1,11 @@
-// The harness's rule variants (tools/harness/rules.ts): changes on the rules
+// The harness's rule variants (tools/sim/rules.ts): changes on the rules
 // each match type deals, none at all unless one is named.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { dealt, TYPES } from '../src/sim/persona.ts';
 import { DEFAULT_RULES } from '../src/sim/rules.ts';
-import { RULES, ruledBy } from '../tools/harness/rules.ts';
-import { typeNamed } from '../tools/harness/types.ts';
+import { RULES, ruledBy } from '../tools/sim/rules.ts';
+import { typeNamed } from '../tools/sim/types.ts';
 
 test('no variant named leaves the dealing as it was, the game’s own', () => {
   assert.equal(ruledBy(undefined), undefined);

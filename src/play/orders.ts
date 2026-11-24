@@ -20,7 +20,7 @@ import type { Cap, Storm } from '../sim/storm.ts';
 import { distance, R, type Vec3 } from '../world/sphere.ts';
 
 /**
- * A stand-in's eye (state.ts debugOf standIn; tools/harness/player.ts): each
+ * A stand-in's eye (state.ts debugOf standIn; tools/sim/player.ts): each
  * step, her gun's line of sight, given her own ship and the foe her bot
  * fights (null: none).
  */

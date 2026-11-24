@@ -65,7 +65,7 @@ export const LOOT = {
   /**
    * The share of pieces that are guns (brought down from 0.62, then from 0.5 as
    * the spots grew, so the first is still a scramble, most ships armed by
-   * 20–30 s: tools/harness; then from 0.42 as they doubled, so the guns grew
+   * 20–30 s: tools/sim; then from 0.42 as they doubled, so the guns grew
    * by some 70% and the mending by 2.2 times), their kinds' weights (in
    * kinds.ts KINDS' order: cannon, scatter, repeater, harpoon, mortar), and
    * their rarities' weights, common to legendary.
@@ -77,7 +77,7 @@ export const LOOT = {
    * The share of the rest of each consumable, how many come together, and the
    * rarity each reads as. The hull's mending leans the larger (it was 0.36,
    * 0.22, 0.28, 0.14): with loot plenty, ships' slots full of shields mended
-   * no more hull (tools/harness).
+   * no more hull (tools/sim).
    */
   shares: {
     smallShield: 0.26,

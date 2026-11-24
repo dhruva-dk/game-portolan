@@ -13,22 +13,22 @@
 // design.ts fits a rival's), meet a counter of at most TUNING.rivals.counterMost of the ask, and choose each
 // objective sponsor's first objective in a race plan of the team's drivers as they stand.
 
-import type { Command, Personality } from '../src/office/command.ts';
-import { SHIPS } from '../src/office/command.ts';
-import { askWage } from '../src/career/asks.ts';
-import { dice } from '../src/career/dice.ts';
-import { designSlots } from '../src/career/hq.ts';
-import { knownTo } from '../src/career/knowledge.ts';
-import { commitment } from '../src/career/leadership.ts';
-import { maySail } from '../src/career/lineup.ts';
-import { roomOf } from '../src/career/money.ts';
-import { ROWS, rowsFor, type Mind } from '../src/career/rivals.ts';
-import type { CareerState, Team } from '../src/career/state.ts';
-import { TRADES } from '../src/career/suppliers.ts';
-import { TUNING } from '../src/career/tuning.ts';
-import { BUILDINGS } from '../src/career/world.ts';
-import { canonical } from '../src/career/canon.ts';
-import { TEAM } from '../src/race.ts';
+import type { Command, Personality } from '../../src/office/command.ts';
+import { SHIPS } from '../../src/office/command.ts';
+import { askWage } from '../../src/career/asks.ts';
+import { dice } from '../../src/career/dice.ts';
+import { designSlots } from '../../src/career/hq.ts';
+import { knownTo } from '../../src/career/knowledge.ts';
+import { commitment } from '../../src/career/leadership.ts';
+import { maySail } from '../../src/career/lineup.ts';
+import { roomOf } from '../../src/career/money.ts';
+import { ROWS, rowsFor, type Mind } from '../../src/career/rivals.ts';
+import type { CareerState, Team } from '../../src/career/state.ts';
+import { TRADES } from '../../src/career/suppliers.ts';
+import { TUNING } from '../../src/career/tuning.ts';
+import { BUILDINGS } from '../../src/career/world.ts';
+import { canonical } from '../../src/career/canon.ts';
+import { TEAM } from '../../src/race.ts';
 
 export type Manager = 'idle' | 'sensible' | 'shrewd';
 export const MANAGERS: readonly Manager[] = ['idle', 'sensible', 'shrewd'];

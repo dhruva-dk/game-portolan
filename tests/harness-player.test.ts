@@ -1,4 +1,4 @@
-// The stand-in for a player (tools/harness/player.ts): her eye on her foe's
+// The stand-in for a player (tools/sim/player.ts): her eye on her foe's
 // body as a player's reticle is, wandering no further than a thumb does; the
 // same for the same seed; and a match with stand-ins played the same, every
 // time, her bot sailing her.
@@ -7,8 +7,8 @@ import assert from 'node:assert/strict';
 import type { Seen } from '../src/sim/bot.ts';
 import { offSight } from '../src/sim/sight.ts';
 import { along, normalize, type Vec3 } from '../src/world/sphere.ts';
-import { standIn } from '../tools/harness/player.ts';
-import { runMatch } from '../tools/harness/run.ts';
+import { standIn } from '../tools/sim/player.ts';
+import { runMatch } from '../tools/sim/match.ts';
 
 const at: Vec3 = normalize([0.3, 0.5, 0.8]),
   east: Vec3 = normalize([0.8, 0, -0.3]);
@@ -48,13 +48,18 @@ test('her eye is the same for the same seed, and another for another', () => {
 });
 
 test('a match with stand-ins runs the same every time, and they fire', () => {
-  const spec = { match: 1, brains: ['default'], players: 4, seconds: 60 };
-  const a = runMatch(spec),
-    b = runMatch(spec);
-  const strip = (r: typeof a) => ({ ...r, msPerStep: 0 });
-  assert.deepEqual(strip(a), strip(b));
-  const players = a.ships.filter((s) => s.player);
-  assert.equal(players.length, a.ships.length / 4);
+  const spec = {
+    kind: 'match',
+    match: 1,
+    brains: ['default'],
+    players: 4,
+    seconds: 60,
+  } as const;
+  const a = runMatch({ ...spec, brains: [...spec.brains] }),
+    b = runMatch({ ...spec, brains: [...spec.brains] });
+  assert.equal(a.hash, b.hash);
+  const players = a.account.ships.filter((s) => s.player);
+  assert.equal(players.length, a.account.ships.length / 4);
   assert.ok(
     players.some((s) => Object.keys(s.aim).length > 0),
     'a stand-in fired'
