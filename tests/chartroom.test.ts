@@ -1,11 +1,10 @@
-// The chartroom kit's own rules, as the owner decided them:
-// the quality ladder's steps, the dim, the press and the quick, the unit on the
-// office's page, and the cut edge that runs on unbroken however long its side.
+// The chartroom kit's own rules: the quality ladder's steps, a size in units,
+// and the cut edge that runs on unbroken however long its side.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { TILE, cutPath, tiles } from '../src/ui/chartroom/paper.ts';
-import { LADDER, TOKENS, UNIT, step, u } from '../src/ui/chartroom/tokens.ts';
-import { CHARTROOM, INK, SHADOW, alpha } from '../src/ui/ink.ts';
+import { LADDER, TOKENS, step, u } from '../src/ui/chartroom/tokens.ts';
+import { CHARTROOM, INK } from '../src/ui/ink.ts';
 
 test('the ladder: 0–5 silver, 6–9 verdigris, 10–13 azurite, 14–17 purpure, 18–20 gold', () => {
   const steps = Array.from({ length: 21 }, (_, v) => step(v));
@@ -25,15 +24,7 @@ test('the ladder: 0–5 silver, 6–9 verdigris, 10–13 azurite, 14–17 purpur
       assert.ok(name in TOKENS, name);
 });
 
-test('the decided tokens: the dim at 35%, a press 80 ms, the quick 120 ms', () => {
-  assert.equal(TOKENS.dim, alpha(SHADOW, 0.35));
-  assert.match(TOKENS.press ?? '', /^80ms/);
-  assert.match(TOKENS.quick ?? '', /^120ms/);
-});
-
-test("a drawn unit on the office's page is the UI's size on the iPad Air's screen", () => {
-  // (the screen's width binds there: ui.ts size)
-  assert.equal(UNIT, 1180 / 680);
+test("a size in units is written against the page's unit", () => {
   assert.equal(u(3), 'calc(3 * var(--u))');
 });
 

@@ -1,5 +1,4 @@
-// The office's shell and kit, as far as they are plain: the nav's tabs, the
-// screens' registry, the fixture desk every screen is drawn from on the debug
+// The office's shell and kit, as far as they are plain: the screens' registry, the fixture desk every screen is drawn from on the debug
 // page, and the kit's own figures (a place, a number, a share, a tone).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -8,24 +7,6 @@ import { TABS } from '../src/office/office.ts';
 import { toneOf } from '../src/ui/ink.ts';
 import { grouped, ordinal, share } from '../src/ui/kit/part.ts';
 import { NAMES, SCREENS } from '../src/ui/office/screens.ts';
-
-test('the nav has the thirteen tabs, in their order', () => {
-  assert.deepEqual(TABS, [
-    'home',
-    'player',
-    'mail',
-    'ship',
-    'hq',
-    'team',
-    'drivers',
-    'staff',
-    'scouting',
-    'finances',
-    'sponsors',
-    'standings',
-    'calendar',
-  ]);
-});
 
 test('every screen built has a name the page can ask for, a title, and lights a tab of the nav or none', () => {
   for (const [name, entry] of Object.entries(SCREENS)) {

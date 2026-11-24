@@ -36,13 +36,18 @@ import { lines, writeJson } from '../out.ts';
 import { commandsOf, MANAGERS, type Manager } from './managers.ts';
 import { runCard } from './match.ts';
 
-/** A career: its seed, its manager, how many seasons; `races: false` sails them unrecorded (faster). */
+/**
+ * A career: its seed, its manager, how many seasons; `races: false` sails
+ * them unrecorded (faster); `commands`: stop once so many are sent (a short
+ * look, or a test).
+ */
 export interface LobbyScenario {
   kind: 'lobby';
   seed: number;
   manager: Manager;
   seasons: number;
   races?: boolean;
+  commands?: number;
 }
 
 /** The most changes logged a command; the rest counted. */
@@ -225,7 +230,10 @@ export async function runLobby(
       line: ReturnType<typeof seasonLine> | null = null;
     const t0 = performance.now();
     let seasonBegan = t0;
-    while (seasons.length < sc.seasons) {
+    while (
+      seasons.length < sc.seasons &&
+      !(sc.commands !== undefined && sent >= sc.commands)
+    ) {
       if (s.player?.sacked) {
         const offers = [...(s.player.offers ?? [])].sort(
           (a, b) =>

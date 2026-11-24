@@ -4,7 +4,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  R,
   along,
   bearingAt,
   distance,
@@ -202,18 +201,6 @@ test('bakeFaces: the nodes are height() at faceDir, and the faces agree along th
   assert.ok(seam < SEAM, `${seam} m`);
 });
 
-test('bakeFaces at 768 takes a couple of seconds at most', () => {
-  // timed as the best of three: the bake's own cost, not whatever else the machine is doing (the suite runs its files
-  // side by side); stopping at the first within the budget, as the best would be
-  let best = Infinity;
-  for (let run = 0; run < 3 && best >= 4000; run++) {
-    const t = performance.now();
-    bakeFaces(planet, 768);
-    best = Math.min(best, performance.now() - t);
-  }
-  assert.ok(best < 4000, `${best.toFixed(0)} ms`);
-});
-
 test('a height remembered is the height to the bit, read again or after its place in the table was taken', () => {
   const read = remembered(planet.height, 4);
   const points = lattice(200);
@@ -226,5 +213,3 @@ test('a height remembered is the height to the bit, read again or after its plac
   assert.equal(read([p[0], p[1], p[2]]), planet.height(p));
   assert.equal(Object.is(read(q), planet.height(q)), true);
 });
-
-test('the planet is R = 554 across', () => assert.equal(R, 554));

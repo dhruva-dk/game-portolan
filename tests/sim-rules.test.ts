@@ -1,4 +1,4 @@
-// The harness's rule variants (tools/sim/rules.ts): changes on the rules
+// The sim's rule variants (tools/sim/rules.ts): changes on the rules
 // each match type deals, none at all unless one is named.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
