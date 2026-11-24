@@ -26,6 +26,8 @@ import { seen } from '../src/career/views-person.ts';
 import { scoutingView } from '../src/career/views-scouting.ts';
 import { offerView } from '../src/career/views-offer.ts';
 import { profileView } from '../src/career/views-profile.ts';
+import { rivalView } from '../src/career/views-rival.ts';
+import { standingsView } from '../src/career/office.ts';
 import { traitLine } from '../src/career/views-traits.ts';
 import { TRAITS } from '../src/career/traits.ts';
 import { nameOf } from '../src/career/views.ts';
@@ -331,6 +333,39 @@ test('profile: a rival unknown in ranges, scouted then known; one of her own may
   assert.equal(me.you, true);
   assert.equal(me.dismiss.ok, false);
   assert.equal(me.renew.ok, false);
+});
+
+test('rival: every team page names its own people, stands where the standings have it, and links what it names', () => {
+  const s = sailed(toRaceDay(founded())),
+    me = s.player!.team;
+  const look = { dyes: [['#000000', '#ffffff'] as const], patterns: ['Plain'] };
+  const lines = standingsView(s, look).championships;
+  for (const c of s.teams) {
+    const v = rivalView(s, look, c.id);
+    assert.equal(v.team.id, c.id);
+    assert.equal(v.own, c.id === me);
+    const line = lines[c.tier]?.teams.find((t) => t.team.id === c.id);
+    assert.equal(v.season.place, line?.place);
+    assert.equal(v.season.points, line?.points);
+    assert.equal(v.championship, lines[c.tier]?.championship);
+    // everyone named is on its books (her own page: she sails ship 1)
+    const books = new Set([
+      ...staffOf(c),
+      ...(c.player ? [s.player!.person] : []),
+    ]);
+    for (const h of [...v.drivers, ...v.staff])
+      assert.ok(books.has(h.person), `${c.name}: ${h.name}`);
+    assert.equal(v.chairman.person, c.staff.chairman);
+    if (v.manager) {
+      assert.equal(v.manager.you, c.player);
+      assert.equal(v.manager.personality === null, c.player);
+      assert.ok(c.player || v.manager.first.length === 3, c.name);
+    }
+    if (c.player) assert.equal(v.season.hers, null);
+    else if (c.tier === s.teams[me].tier) assert.notEqual(v.season.hers, null);
+  }
+  // her own page, when none is named
+  assert.equal(rivalView(s, look, null).own, true);
 });
 
 test('traits: each says what it does in words, when it holds, and whether it helps or hinders its team', () => {

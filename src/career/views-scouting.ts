@@ -86,6 +86,7 @@ function row(s: CareerState, c: Team, g: Person): ScoutingRow {
     stars: v.stars,
     potential: v.potential,
     team: whereText(s, g).team,
+    teamId: g.contract?.team ?? null,
     contract: !g.contract
       ? 'Free'
       : g.contract.ends === null

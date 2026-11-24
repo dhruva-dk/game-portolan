@@ -29,6 +29,7 @@ import {
   sponsorsPaper,
 } from './career/papers.ts';
 import type { CareerState } from './career/state.ts';
+import { rivalView } from './career/views-rival.ts';
 import { createSession, type Shelf } from './desk.ts';
 import type { Command, Offer } from './office/command.ts';
 import type { Ask, Desk, Tab, Viewed, Views } from './office/office.ts';
@@ -85,8 +86,9 @@ export async function createManager(shelf: Shelf, look: Look, page: Page) {
     racing: Racing | null = null,
     waiting = false,
     last: Parameters<typeof resultView>[2] | null = null;
-  /** What the screens are open at: a person and the offer drawn to them, the scouting list's filter and shortlist, a letter, the drawing board. */
+  /** What the screens are open at: a person and the offer drawn to them, a team's page, the scouting list's filter and shortlist, a letter, the drawing board. */
   let person: number | null = null,
+    team: number | null = null,
     draft: Offer | null = null,
     filter: ScoutingFilter | null = null,
     shortlist: readonly number[] = [],
@@ -219,6 +221,9 @@ export async function createManager(shelf: Shelf, look: Look, page: Page) {
       person = a.id;
       draft = null;
       page.open(a.screen);
+    } else if (a.kind === 'team') {
+      team = a.id;
+      page.open('rival');
     } else if (a.kind === 'draft') draft = a.offer;
     else if (a.kind === 'filter') filter = a.filter;
     else if (a.kind === 'favourite')
@@ -267,6 +272,7 @@ export async function createManager(shelf: Shelf, look: Look, page: Page) {
     sponsors: () => sponsorsPaper(career()),
     hq: () => hqPaper(career()),
     ship: () => shipPaper(career(), drafting, picked),
+    rival: () => rivalView(career(), look, team),
     result() {
       if (!last) throw new Error('no race has been sailed');
       return resultView(career(), look, last);

@@ -6,7 +6,7 @@
 // laid over its disc by the unit's fixed size, never by measuring the page.
 
 import type { Chart } from '../../player.ts';
-import { el } from '../kit/part.ts';
+import { el, styled, type Kid } from '../kit/part.ts';
 import { createOrb } from '../orb.ts';
 import { mark } from './figures.ts';
 import { TONE, UNIT, u } from './tokens.ts';
@@ -16,7 +16,30 @@ const PORT = { across: 140, rim: 13 } as const;
 
 export const PORT_CSS = `
 .cr-port { position: relative; flex: none; width: ${u(PORT.across)}; height: ${u(PORT.across)}; }
+/* the window and what is set under it (a nameplate), one frame */
+.cr-framed { flex: 1; min-height: 0; display: flex; flex-direction: column; box-shadow: 0 0 0 var(--w-bold) var(--ink); }
+.cr-window { position: relative; flex: 1; min-height: 0; box-shadow: inset 0 0 0 ${u(3)} var(--brass), inset 0 0 0 ${u(3.8)} var(--ink); }
+.cr-window > .o-subject { position: absolute; left: 0; right: 0; top: 50%; height: var(--subject, 100%); translate: 0 -50%;
+  pointer-events: none; }
 `;
+
+/**
+ * Her ship through a window framed in brass, `under` it in the same frame (a
+ * nameplate). The office draws the world clear through it (office.ts
+ * o-window), her ship filling `subject` of its height (more than all of it: her
+ * hull and courses fill the window).
+ */
+export const shipWindow = (under: Kid, subject = 1) =>
+  el(
+    'div',
+    'cr-framed',
+    el(
+      'div',
+      'cr-window o-window',
+      styled(el('div', 'o-subject'), { '--subject': `${subject * 100}%` })
+    ),
+    under
+  );
 
 /** The rim drawn round a port `across` units wide. */
 const rim = (across: number) => {

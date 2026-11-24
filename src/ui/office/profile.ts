@@ -25,7 +25,7 @@ import { u } from '../chartroom/tokens.ts';
 import { el, pressed, styled, type Kid } from '../kit/part.ts';
 import { stylesheet } from '../kit/style.ts';
 import { jacketOf } from './faces.ts';
-import { toPerson } from './links.ts';
+import { toPerson, toTeam } from './links.ts';
 import type { Office } from './office.ts';
 import type { Screen } from './screens.ts';
 
@@ -208,7 +208,8 @@ export function createProfile(office: Office): Screen<Dyed<ProfileView>> {
               'div',
               'pf-team',
               styled(el('i'), { '--team': jacket[0] }),
-              v.tier ? `${v.team} · ${v.tier}` : v.team
+              link(v.team, toTeam(office)(v.teamId)),
+              v.teamId === null ? null : ` · ${v.tier}`
             )
           ),
           rating(v),
@@ -291,7 +292,11 @@ export function createProfile(office: Office): Screen<Dyed<ProfileView>> {
           table(
             [
               { head: 'Season', track: u(24), cell: (h) => h.season },
-              { head: 'Team', track: '1fr', cell: (h) => h.team },
+              {
+                head: 'Team',
+                track: '1fr',
+                cell: (h) => (h.teamId === null ? h.team : link(h.team)),
+              },
               { head: 'Races', track: u(19), num: true, cell: (h) => h.races },
               { head: 'Best', track: u(15), num: true, cell: (h) => h.best },
               { head: 'Pts', track: u(15), num: true, cell: (h) => h.points },
@@ -299,6 +304,7 @@ export function createProfile(office: Office): Screen<Dyed<ProfileView>> {
             v.history,
             {
               own: (h) => v.mine && h.team === v.top.team,
+              tap: (h) => toTeam(office)(h.teamId),
               none: 'No seasons behind them yet.',
             }
           ),

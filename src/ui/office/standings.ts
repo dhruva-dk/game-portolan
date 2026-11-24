@@ -1,31 +1,37 @@
-// The standings on the chartroom kit, after MM's (016). At the left the
-// championship: the three to choose among (hers first shown), its name on its
-// plate, the season's rounds sailed, its prize fund, who leads it, where she
-// stands and what that pays, which places go up and down, the way to the
-// calendar. At the right its teams or its drivers, a whole table broad enough
-// for a career's names: the teams' wins, podiums, sinkings, points, how far
-// behind the leader, the prize each place would take, an arrow where the
-// season's end would move a team, the places that move ruled off; the drivers'
-// teams, wins, podiums, points and gap. Her lines gilt and scrolled into view.
+// The standings on the chartroom kit, after MM's (016). At the left your
+// season, whichever championship is shown: your place and points, what the
+// chairman asks and how you stand to it, the team just ahead and the team just
+// behind and the points between, what your place pays against one place up,
+// your drivers and where each stands, the way to the calendar. At the right a
+// championship's tables, the three to choose among (yours first shown): its
+// teams (wins, podiums, sinkings, points, how far behind the leader, the prize
+// each place would take, an arrow where the season's end would move a team, the
+// places that move ruled off) or its drivers (their teams, wins, podiums,
+// points and gap). Your lines gilt and scrolled into view; every name opens its
+// page.
 
 import type { StandingLine } from '../../office/home.ts';
 import type { StandingsTable, StandingsView } from '../../office/loop.ts';
 import { button, link, segmented } from '../chartroom/controls.ts';
-import { gauge, stepped, table, terms } from '../chartroom/data.ts';
-import { arrow, dyed } from '../chartroom/figures.ts';
+import { table, terms } from '../chartroom/data.ts';
+import { arrow, dyed, label, place, verdict } from '../chartroom/figures.ts';
 import { kitLooks } from '../chartroom/kit.ts';
 import { column, page } from '../chartroom/layout.ts';
-import { plate, sheet } from '../chartroom/paper.ts';
+import { sheet } from '../chartroom/paper.ts';
 import { u } from '../chartroom/tokens.ts';
 import { el, grouped, ordinal } from '../kit/part.ts';
 import { stylesheet } from '../kit/style.ts';
-import { toPerson } from './links.ts';
+import { toPerson, toTeam } from './links.ts';
 import type { Office } from './office.ts';
 import type { Screen } from './screens.ts';
 
 const CSS = `
-.s-standings .cr-plate { text-align: center; }
 .s-standings .st-calendar { margin-top: auto; }
+.st-stand { display: flex; align-items: center; gap: var(--s4); }
+.st-stand > .cr-terms { flex: 1; min-width: 0; }
+.st-switch { display: flex; gap: var(--s4); }
+.st-switch > :first-child { flex: 3; }
+.st-switch > :last-child { flex: 2; }
 `;
 
 type TeamLine = StandingsTable['teams'][number];
@@ -40,97 +46,112 @@ const behind = (r: StandingLine, all: readonly StandingLine[]) => {
   return gap === 0 ? '—' : grouped(gap);
 };
 
-/** Who a move takes, in words: the places that go `way`, and where to. */
-function moving(c: StandingsTable, way: 'up' | 'down', to: string | null) {
-  const places = c.teams.filter((t) => t.move === way).map((t) => t.place);
-  if (!places.length || to === null) return 'None';
-  const which =
-    places.length === 1
-      ? way === 'up'
-        ? 'The first'
-        : 'The last'
-      : `${way === 'up' ? 'The first' : 'The last'} ${places.length}`;
-  return `${which}, to the ${to}`;
-}
+/** A count of points signed: ahead (+) or behind (−), level a dash. */
+const signed = (n: number) =>
+  n === 0 ? '—' : n > 0 ? `+${grouped(n)}` : grouped(n);
 
-/** The standings: a championship's at a time, hers first. */
+/** The standings: your season at the left, a championship's tables at the right. */
 export function createStandings(office: Office): Screen<StandingsView> {
   kitLooks();
   stylesheet(CSS);
   const root = page('side', 's-standings'),
-    profile = toPerson(office);
+    profile = toPerson(office),
+    teamPage = toTeam(office);
   let chosen: number | null = null,
     lines: 'teams' | 'drivers' = 'teams';
+
+  /** Your season: place, objective, the teams either side, the prize, your drivers. */
+  function yours(v: StandingsView) {
+    const c = v.championships[v.mine];
+    const at = c?.teams.findIndex((t) => t.own) ?? -1;
+    const mine = c?.teams[at];
+    if (!c || !mine)
+      return sheet('Your Season', [label('Your team sails in none.')], {
+        cls: 'cr-grow',
+      });
+    const up = c.teams[at - 1];
+    const near = [up, mine, c.teams[at + 1]].filter(
+      (t): t is TeamLine => t !== undefined
+    );
+    return sheet(
+      'Your Season',
+      [
+        el(
+          'div',
+          'st-stand',
+          place(mine.place, c.teams.length, 30),
+          terms([
+            ['Points', String(mine.points)],
+            ['Objective', `${ordinal(v.chairman.target)} or better`],
+            ['Standing', verdict(v.chairman.standing)],
+          ])
+        ),
+        table<TeamLine>(
+          [
+            { head: 'Pos', track: u(14), num: true, cell: (r) => r.place },
+            {
+              head: 'Around you',
+              track: 'minmax(0, 1fr)',
+              cell: (r) =>
+                dyed(r.team.colours[0], r.own ? 'Your team' : link(r.name)),
+            },
+            {
+              head: 'Pts',
+              track: u(20),
+              num: true,
+              cell: (r) => (r.own ? r.points : signed(r.points - mine.points)),
+            },
+          ],
+          near,
+          {
+            own: (r) => r.own,
+            tap: (r) => (r.own ? null : teamPage(r.team.id)),
+          }
+        ),
+        terms([
+          ['Your place pays', grouped(mine.prize)],
+          ...(up
+            ? ([
+                [
+                  `${ordinal(up.place)} pays`,
+                  `${grouped(up.prize)} (+${grouped(up.prize - mine.prize)})`,
+                ],
+              ] as const)
+            : []),
+        ]),
+        table<DriverLine>(
+          [
+            {
+              head: 'Your drivers',
+              track: 'minmax(0, 1fr)',
+              cell: (r) => link(r.name),
+            },
+            { head: 'Pos', track: u(14), num: true, cell: (r) => r.place },
+            { head: 'Pts', track: u(20), num: true, cell: (r) => r.points },
+          ],
+          c.drivers.filter((d) => d.own),
+          { tap: (r) => profile(r.person), none: 'No one sails yet.' }
+        ),
+        el(
+          'div',
+          'st-calendar',
+          button(
+            'Season Calendar',
+            () => office.ask({ kind: 'open', screen: 'calendar' }),
+            { kind: 'plain' }
+          )
+        ),
+      ],
+      { cls: 'cr-grow' }
+    );
+  }
+
   return {
     el: root,
     show(v) {
       const at = chosen ?? v.mine;
       const c = v.championships[at] ?? v.championships[v.mine];
       if (!c) return;
-      const name = (i: number) => TIERS[i] ?? String(i + 1);
-      const mine = c.teams.find((t) => t.own);
-      const round = `Round ${v.round} of ${v.rounds}`;
-
-      const championship = sheet(
-        null,
-        [
-          segmented(
-            v.championships.map((_, i) => name(i)),
-            at,
-            (i) => {
-              chosen = i;
-              office.draw();
-            }
-          ),
-          plate(c.championship),
-          gauge(
-            'The season',
-            round,
-            stepped(
-              v.round / v.rounds,
-              Array.from({ length: v.rounds }, (_, i) => (i + 1) / v.rounds),
-              v.round
-            )
-          ),
-          terms([
-            ['Prize fund', grouped(c.pool)],
-            ['Leading team', c.teams[0]?.name ?? '—'],
-            ['Leading driver', c.drivers[0]?.name ?? '—'],
-            ...(mine
-              ? ([
-                  ['Her place', ordinal(mine.place)],
-                  ['Its prize', grouped(mine.prize)],
-                  [
-                    'Her drivers',
-                    c.drivers
-                      .filter((d) => d.own)
-                      .map((d) => ordinal(d.place))
-                      .join(', ') || '—',
-                  ],
-                ] as const)
-              : []),
-            ['Go up', moving(c, 'up', at > 0 ? name(at - 1) : null)],
-            [
-              'Go down',
-              moving(
-                c,
-                'down',
-                at < v.championships.length - 1 ? name(at + 1) : null
-              ),
-            ],
-          ]),
-          el(
-            'div',
-            'st-calendar',
-            button(
-              'Season Calendar',
-              () => office.ask({ kind: 'open', screen: 'calendar' }),
-              { kind: 'plain' }
-            )
-          ),
-        ],
-        { cls: 'cr-grow' }
-      );
 
       const teams = () =>
         table<TeamLine>(
@@ -145,7 +166,7 @@ export function createStandings(office: Office): Screen<StandingsView> {
             {
               head: 'Team',
               track: 'minmax(0, 1fr)',
-              cell: (r) => dyed(r.team.colours[0], r.name),
+              cell: (r) => dyed(r.team.colours[0], link(r.name)),
             },
             { head: 'Wins', track: u(17), num: true, cell: (r) => r.wins },
             { head: 'Pod', track: u(15), num: true, cell: (r) => r.podiums },
@@ -168,6 +189,7 @@ export function createStandings(office: Office): Screen<StandingsView> {
           {
             own: (r) => r.own,
             cut: (r) => r.ruled,
+            tap: (r) => teamPage(r.team.id),
             scrolls: { keep: `standings-teams-${at}` },
           }
         );
@@ -184,7 +206,7 @@ export function createStandings(office: Office): Screen<StandingsView> {
             {
               head: 'Team',
               track: 'minmax(0, 1.2fr)',
-              cell: (r) => r.team.name,
+              cell: (r) => link(r.team.name, teamPage(r.team.id)),
             },
             { head: 'Wins', track: u(17), num: true, cell: (r) => r.wins },
             { head: 'Pod', track: u(15), num: true, cell: (r) => r.podiums },
@@ -208,16 +230,31 @@ export function createStandings(office: Office): Screen<StandingsView> {
       const tables = sheet(
         c.championship,
         [
-          segmented(['Teams', 'Drivers'], lines === 'teams' ? 0 : 1, (i) => {
-            lines = i === 0 ? 'teams' : 'drivers';
-            office.draw();
-          }),
+          el(
+            'div',
+            'st-switch',
+            segmented(
+              v.championships.map((_, i) => TIERS[i] ?? String(i + 1)),
+              at,
+              (i) => {
+                chosen = i;
+                office.draw();
+              }
+            ),
+            segmented(['Teams', 'Drivers'], lines === 'teams' ? 0 : 1, (i) => {
+              lines = i === 0 ? 'teams' : 'drivers';
+              office.draw();
+            })
+          ),
           lines === 'teams' ? teams() : drivers(),
         ],
-        { aside: round, cls: 'cr-grow' }
+        {
+          aside: `Round ${v.round} of ${v.rounds} · Prize fund ${grouped(c.pool)}`,
+          cls: 'cr-grow',
+        }
       );
 
-      root.replaceChildren(column(championship), column(tables));
+      root.replaceChildren(column(yours(v)), column(tables));
     },
   };
 }

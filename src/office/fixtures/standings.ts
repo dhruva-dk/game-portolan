@@ -17,7 +17,7 @@ const NAMES = [
 /** The ports the teams sail from, put before their names as the career's are (the names as long as a career's). */
 const PORTS = [
   'Talanness',
-  'Esketh',
+  'Galermouth',
   'Varrowmouth',
   'Dunanhaven',
   'Galrock',
@@ -103,5 +103,6 @@ export const STANDINGS: StandingsView = {
   round: HOME.next.round - 1,
   rounds: HOME.next.rounds,
   mine: MINE,
+  chairman: { target: HOME.chairman.target, standing: HOME.chairman.standing },
   championships: [table(0, 7), table(1, 13), table(2, 0)],
 };

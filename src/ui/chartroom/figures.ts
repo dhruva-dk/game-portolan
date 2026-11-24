@@ -8,7 +8,8 @@ import type { Glyph } from '../glyphs.ts';
 import { alpha, figure, glyph, roughCircle, svgNode } from '../ink.ts';
 import { el, styled, type Kid } from '../kit/part.ts';
 import { badge } from '../marks.ts';
-import { TONE, u } from './tokens.ts';
+import type { Verdict } from '../../office/office.ts';
+import { TONE, snapped, u } from './tokens.ts';
 
 export const FIGURES_CSS = `
 .cr-label { font: italic 500 var(--t-label)/1.25 var(--face); color: var(--ink-2); }
@@ -30,6 +31,13 @@ export const FIGURES_CSS = `
 .cr-dyed { display: flex; align-items: center; gap: var(--s2); min-width: 0; }
 .cr-dyed > i { flex: none; width: ${u(3)}; height: ${u(9)}; background: var(--dye); box-shadow: 0 0 0 var(--w-fine) var(--ink); }
 .cr-dyed > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+/* a verdict: one size, whatever it says, centred in its row (not on its words' baseline) */
+.cr-verdict { align-self: center; display: grid; place-items: center; height: ${snapped(12)}; min-width: ${snapped(66)};
+  padding: 0 var(--s3); font-weight: 700; line-height: 1; box-shadow: inset 0 0 0 var(--w-fine) var(--ink); }
+.cr-verdict.good { background: var(--good); color: var(--on-ink); }
+.cr-verdict.bad { background: var(--harm); color: var(--on-ink); }
+.cr-verdict.warn { background: var(--warn); }
+.cr-verdict.fair { background: var(--paper-raised); }
 .cr-pips { display: inline-flex; gap: var(--s2); }
 .cr-pips > i { width: ${u(11)}; height: ${u(11)}; display: grid; place-items: center; font: 700 var(--t-label)/1 var(--face); font-style: normal;
   background: var(--paper-raised); box-shadow: 0 0 0 var(--w-fine) var(--ink); }
@@ -85,6 +93,10 @@ export const dyed = (dye: string, text: Kid) =>
     styled(el('i'), { '--dye': dye }),
     el('span', '', text)
   );
+
+/** A word of judgment (Very Secure, Below Target) on a slip washed in its mood. */
+export const verdict = (v: Verdict) =>
+  el('span', `cr-verdict ${v.mood}`, v.label);
 
 /** A star's outline, 20 units across. */
 const STAR =

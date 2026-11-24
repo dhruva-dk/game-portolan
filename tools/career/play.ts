@@ -129,12 +129,27 @@ try {
       .locator('.s-standings .cr-seg > div', { hasText: 'Drivers' })
       .click();
     await page.waitForTimeout(300);
-    await tap('.s-standings .cr-rows > .cr-tr:not(.own)');
+    // (the championship's table, the right column: the left has the teams around hers; the driver's name, as the
+    // row's team is a link of its own)
+    await tap(
+      '.s-standings > :last-child .cr-rows > .cr-tr:not(.own) .cr-link:not(.press)'
+    );
     await page.waitForSelector('.o-body > .pf:not([hidden])', {
       timeout: 10000,
     });
     await page.waitForTimeout(400);
     await capture(`${label}-linked`);
+    // and a rival team in the standings opens its page
+    await page.locator('.sh-tab').nth(TABS.indexOf('standings')).click();
+    await at('standings', 10000);
+    await page
+      .locator('.s-standings .cr-seg > div', { hasText: 'Teams' })
+      .click();
+    await page.waitForTimeout(300);
+    await tap('.s-standings > :last-child .cr-rows > .cr-tr:not(.own)');
+    await at('rival', 10000);
+    await page.waitForTimeout(400);
+    await capture(`${label}-rival`);
     // what the career is asked through the screens, where it may be: a sponsor signed, a building begun, a design started
     const asked = async (tab: number, selector: string, name: string) => {
       await page.locator('.sh-tab').nth(tab).click();
@@ -144,7 +159,11 @@ try {
       await page.waitForTimeout(500);
       await capture(`${label}-${name}`);
     };
-    await asked(10, '.sp-sign .k-btn:not(.off)', 'signed');
+    await asked(
+      TABS.indexOf('sponsors'),
+      '.sp-sign > .press:not(.off)',
+      'signed'
+    );
     // (a building of the harbour chosen by its label: its card has what may be built)
     await page.locator('.sh-tab').nth(4).click();
     await page.waitForTimeout(600);

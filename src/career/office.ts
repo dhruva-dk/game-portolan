@@ -32,7 +32,7 @@ import {
   type Team,
 } from './state.ts';
 import { TUNING } from './tuning.ts';
-import { foundView, letters, myTeam } from './views.ts';
+import { TIERS, foundView, letters, myTeam } from './views.ts';
 import { BUILDINGS } from './world.ts';
 
 /** How the page shows a livery: each dye's colour and its mark, and the patterns' names. */
@@ -41,14 +41,9 @@ export interface Look {
   patterns: readonly string[];
 }
 
-/** The championships, the first the highest. */
-const CHAMPIONSHIPS = [
-  'First Championship',
-  'Second Championship',
-  'Third Championship',
-];
+/** A championship's name, the first the highest. */
 export const championship = (tier: number) =>
-  CHAMPIONSHIPS[tier] ?? `Championship ${tier + 1}`;
+  TIERS[tier] ?? `Championship ${tier + 1}`;
 
 /** A letter's words with each championship named as the office names it. */
 export const titled = (text: string) =>
@@ -82,7 +77,7 @@ export function dateAt(s: CareerState, day: number): string {
 const UNDYED = ['', ''] as const;
 
 /** A team as the office names it. */
-const named = (c: Team, look: Look): Named => ({
+export const named = (c: Team, look: Look): Named => ({
   id: c.id,
   name: c.name,
   emblem: c.emblem,
@@ -140,7 +135,7 @@ const MOVE = new Map<number | undefined, Move>([
 ]);
 
 /** A championship's teams as they stand: each one's prize there, and where the season's end would move it. */
-function teamLines(
+export function teamLines(
   s: CareerState,
   tier: number,
   look: Look
@@ -180,7 +175,7 @@ function teamLines(
 }
 
 /** A championship's drivers as they stand: everyone who sails for a team of it or has scored in it, by person. */
-function driverLines(
+export function driverLines(
   s: CareerState,
   tier: number,
   look: Look
@@ -221,8 +216,8 @@ function driverLines(
     }));
 }
 
-/** How secure her job is, by the chairman's confidence. */
-function security(confidence: number): Verdict {
+/** How secure a manager's job is, by the chairman's confidence. */
+export function security(confidence: number): Verdict {
   const [high, mid] = TUNING.chairman.words;
   return confidence >= high
     ? { label: 'Very Secure', mood: 'good' }
@@ -233,8 +228,8 @@ function security(confidence: number): Verdict {
         : { label: 'At Risk', mood: 'bad' };
 }
 
-/** How her team stands to the chairman's target. */
-const standing = (place: number, target: number): Verdict =>
+/** How a team stands to its chairman's target. */
+export const standing = (place: number, target: number): Verdict =>
   place <= target
     ? { label: 'On Target', mood: 'good' }
     : { label: 'Below Target', mood: 'bad' };
@@ -261,8 +256,8 @@ function measures(s: CareerState, c: Team): number[] {
 }
 const MEASURES = ['Ship', 'Drivers', 'Headquarters', 'Staff', 'Sponsors'];
 
-/** Her team's stats against its championship: each a share of the most any team of the career has. */
-function teamStats(s: CareerState, c: Team): HomeView['stats'] {
+/** A team's stats against its championship: each a share of the most any team of the career has. */
+export function teamStats(s: CareerState, c: Team): HomeView['stats'] {
   const all = s.teams.map((x) => measures(s, x)),
     tier = championshipOf(s, c.tier).teams.map((id) => all[id] ?? []);
   return MEASURES.map((name, k) => {
@@ -420,6 +415,10 @@ export function standingsView(s: CareerState, look: Look): StandingsView {
     round: s.round,
     rounds: TUNING.calendar.rounds,
     mine: c.tier,
+    chairman: {
+      target: c.target,
+      standing: standing(standingOf(s, c.id), c.target),
+    },
     championships: s.championships.map((l) => ({
       championship: championship(l.id),
       pool: TUNING.money.prize[l.id] ?? 0,

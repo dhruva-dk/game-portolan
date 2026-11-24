@@ -72,6 +72,7 @@ export const PROFILE: ProfileView = {
   age: AGE,
   colony: 'Brindle',
   team: HERS.name,
+  teamId: HERS.id,
   tier: 'Third Championship',
   post: 'Ship 2',
   stars: { lo: 3.5, hi: 3.5, known: true },
@@ -142,7 +143,8 @@ export const PROFILE: ProfileView = {
     {
       season: 'S3',
       team: HERS.name,
-      tier: 'L3',
+      teamId: HERS.id,
+      tier: 'Third',
       role: 'Driver',
       races: 3,
       best: '2',
@@ -152,7 +154,8 @@ export const PROFILE: ProfileView = {
     {
       season: 'S2',
       team: HERS.name,
-      tier: 'L3',
+      teamId: HERS.id,
+      tier: 'Third',
       role: 'Driver',
       races: 8,
       best: '1',
@@ -162,7 +165,8 @@ export const PROFILE: ProfileView = {
     {
       season: 'S1',
       team: 'Petrel',
-      tier: 'L3',
+      teamId: 5,
+      tier: 'Third',
       role: 'Driver',
       races: 8,
       best: '5',

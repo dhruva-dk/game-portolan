@@ -89,6 +89,8 @@ export interface TraitLine {
 interface HistoryLine {
   season: string;
   team: string;
+  /** The team's id, its page's (null: free). */
+  teamId: number | null;
   tier: string;
   role: string;
   races: number;
@@ -110,6 +112,8 @@ export interface ProfileView {
   age: number;
   colony: string;
   team: string;
+  /** Their team's id, its page's (null: free). */
+  teamId: number | null;
   tier: string;
   post: string;
   stars: Range;
@@ -186,6 +190,8 @@ export interface ScoutingRow {
   stars: Range;
   potential: Range;
   team: string;
+  /** Their team's id, its page's (null: free). */
+  teamId: number | null;
   contract: string;
   ask: string;
   talk: string | null;

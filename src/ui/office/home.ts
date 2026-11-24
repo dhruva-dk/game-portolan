@@ -8,7 +8,6 @@
 // under way, a kind at a time, each job striped as far as it has got.
 
 import type { HomeView, NewsKind, StandingLine } from '../../office/home.ts';
-import type { Verdict } from '../../office/office.ts';
 import { button, dropdown, link, segmented } from '../chartroom/controls.ts';
 import {
   busy,
@@ -18,17 +17,24 @@ import {
   terms,
   washOf,
 } from '../chartroom/data.ts';
-import { cut, dyed, label, name, portrait } from '../chartroom/figures.ts';
+import {
+  cut,
+  dyed,
+  label,
+  name,
+  portrait,
+  verdict,
+} from '../chartroom/figures.ts';
 import { kitLooks } from '../chartroom/kit.ts';
 import { column, page } from '../chartroom/layout.ts';
 import { paper, plate, sheet } from '../chartroom/paper.ts';
-import { brassPort } from '../chartroom/port.ts';
-import { snapped, u } from '../chartroom/tokens.ts';
+import { brassPort, shipWindow } from '../chartroom/port.ts';
+import { u } from '../chartroom/tokens.ts';
 import { emblem } from '../emblem.ts';
 import type { Glyph } from '../glyphs.ts';
 import { el, ordinal, pressed } from '../kit/part.ts';
 import { stylesheet } from '../kit/style.ts';
-import { toPerson } from './links.ts';
+import { toPerson, toTeam } from './links.ts';
 import type { Office } from './office.ts';
 import type { Screen } from './screens.ts';
 
@@ -44,19 +50,8 @@ const CSS = `
 
 .hm-mood { display: flex; flex-direction: column; gap: var(--s1); }
 .hm-ends { display: flex; justify-content: space-between; }
-/* a verdict: one size, whatever it says, centred in its row (not on its words' baseline) */
-.hm-verdict { align-self: center; display: grid; place-items: center; height: ${snapped(12)}; min-width: ${snapped(66)};
-  padding: 0 var(--s3); font-weight: 700; line-height: 1; box-shadow: inset 0 0 0 var(--w-fine) var(--ink); }
-.hm-verdict.good { background: var(--good); color: var(--on-ink); }
-.hm-verdict.bad { background: var(--harm); color: var(--on-ink); }
-.hm-verdict.warn { background: var(--warn); }
-.hm-verdict.fair { background: var(--paper-raised); }
 
-/* the window and its nameplate under it, one frame */
-.hm-framed { flex: 1; min-height: ${u(80)}; display: flex; flex-direction: column; box-shadow: 0 0 0 var(--w-bold) var(--ink); }
-.hm-window { position: relative; flex: 1; min-height: 0; box-shadow: inset 0 0 0 ${u(3)} var(--brass), inset 0 0 0 ${u(3.8)} var(--ink); }
-/* she is drawn a little larger than the window is high: her hull and her courses fill it */
-.hm-window > .o-subject { position: absolute; left: 0; right: 0; top: 50%; height: 115%; translate: 0 -50%; pointer-events: none; }
+.hm .cr-framed { min-height: ${u(80)}; }
 .hm-crest { flex: none; display: flex; align-items: center; gap: var(--s3); padding: var(--s2) var(--s4); }
 .hm-crest > svg { flex: none; width: ${u(16)}; height: ${u(16)}; }
 .hm-crest b { flex: 1; min-width: 0; font: 700 var(--t-name)/1 var(--face); letter-spacing: .12em; text-transform: uppercase;
@@ -103,9 +98,6 @@ const WORK: Readonly<Record<string, Glyph>> = {
   Headquarters: 'office.hq',
 };
 
-/** A word of judgment on a slip washed in its mood. */
-const verdict = (v: Verdict) => el('span', `hm-verdict ${v.mood}`, v.label);
-
 /** `made`, of the class `cls` too. */
 const as = <T extends Element>(made: T, cls: string) => {
   made.classList.add(cls);
@@ -123,7 +115,8 @@ export function createHome(office: Office): Screen<HomeView> {
   kitLooks();
   stylesheet(CSS);
   const root = page('ledger', 'hm s-home'),
-    profile = toPerson(office);
+    profile = toPerson(office),
+    teamPage = toTeam(office);
   // (made once: its globe is spun by a finger, and kept between drawings)
   const port = brassPort(null);
   let shown: string | null = null,
@@ -187,10 +180,8 @@ export function createHome(office: Office): Screen<HomeView> {
 
   /** Her ship through the window, her team named over it; her four drivers under it. */
   const team = (v: HomeView) => [
-    el(
-      'div',
-      'hm-framed',
-      el('div', 'hm-window o-window', el('div', 'o-subject')),
+    // (she is drawn a little larger than the window is high: her hull and her courses fill it)
+    shipWindow(
       as(
         plate(
           emblem(v.team.emblem, v.team.colours, 16),
@@ -198,7 +189,8 @@ export function createHome(office: Office): Screen<HomeView> {
           el('span', 'hm-faint', v.championship)
         ),
         'hm-crest'
-      )
+      ),
+      1.15
     ),
     paper(
       el(
@@ -253,8 +245,7 @@ export function createHome(office: Office): Screen<HomeView> {
         {
           head: lines === 'teams' ? 'Team' : 'Driver',
           track: '1fr',
-          cell: (r) =>
-            dyed(r.team.colours[0], r.person === null ? r.name : link(r.name)),
+          cell: (r) => dyed(r.team.colours[0], link(r.name)),
         },
         { head: 'Pts', track: u(20), num: true, cell: (r) => r.points },
       ],
@@ -262,7 +253,8 @@ export function createHome(office: Office): Screen<HomeView> {
       {
         own: (r) => r.own,
         cut: (r) => r.ruled,
-        tap: (r) => profile(r.person),
+        tap: (r) =>
+          r.person === null ? teamPage(r.team.id) : profile(r.person),
         scrolls: { keep: lines },
       }
     );

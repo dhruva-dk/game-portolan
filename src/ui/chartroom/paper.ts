@@ -122,7 +122,7 @@ export const PAPER_CSS = `
   padding: var(--s3) var(--s4) var(--s2); font: 700 var(--t-head)/1.1 var(--face); letter-spacing: .12em;
   text-transform: uppercase; white-space: nowrap; }
 .cr-head > :first-child { grid-column: 2; }
-.cr-head > .cr-aside { grid-column: 3; justify-self: end; min-width: 0; overflow: hidden; text-overflow: ellipsis;
+.cr-head > .cr-aside { grid-column: 3; justify-self: end; min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis;
   font: italic 500 var(--t-label) var(--face); letter-spacing: 0; text-transform: none; color: var(--ink-2); }
 .cr-body { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: var(--s3); padding: 0 var(--s4); }
 .cr-plate { background: var(--plate); color: var(--plate-ink); padding: var(--s2) var(--s4);

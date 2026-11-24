@@ -32,6 +32,7 @@ const someone = (
   stars: { lo, hi, known: lo === hi },
   potential: { lo: plo, hi: phi, known: plo === phi },
   team: of === null ? 'Free agent' : (TEAMS[of]?.name ?? 'A team'),
+  teamId: of,
   contract,
   ask,
   talk,

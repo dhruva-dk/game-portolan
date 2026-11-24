@@ -1,58 +1,18 @@
-// The season's two screens, laid out as the manager's game it follows lays
-// them.
-//
-// Sponsors: her ship herself, live, through the page (where that game stands
-// the car in its sponsors' paint); the offers standing at the left, a card
-// each, signed into a slot by a tap; along the foot the three slots, a card
-// each, with what its sponsor pays and how long the deal has to run.
-//
-// Calendar: the season's races down the left, a row each (sailed, today's, to
+// The calendar, laid out as the manager's game it follows lays it: the season's races down the left, a row each (sailed, today's, to
 // come); in the middle the next race under its planet pictured from space; at
 // the right the race before it and how far the season has got.
 
-import type {
-  Backer,
-  CalendarPaper,
-  SponsorsPaper,
-} from '../../office/papers.ts';
+import type { CalendarPaper } from '../../office/papers.ts';
 import { button } from '../kit/button.ts';
-import { band, panel } from '../kit/panel.ts';
+import { panel } from '../kit/panel.ts';
 import { el, pictured } from '../kit/part.ts';
-import { stars, tag } from '../kit/stat.ts';
+import { tag } from '../kit/stat.ts';
 import { cut, stylesheet } from '../kit/style.ts';
-import { bitsStyle, lines, money } from './bits.ts';
+import { bitsStyle, lines } from './bits.ts';
 import type { Office } from './office.ts';
 import type { Screen } from './screens.ts';
 
 const CSS = `
-.s-sponsors > .o-window { position: absolute; inset: 0; }
-/* she is drawn in the middle of what the panels leave of the page */
-.sp-subject { position: absolute; left: 330px; right: 0; top: 0; bottom: 206px; pointer-events: none; }
-.sp-offers { position: absolute; left: 18px; top: 12px; width: 312px; max-height: calc(100% - 230px); }
-.sp-offers > .k-body { gap: 8px; }
-.sp-list { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding: 3px; }
-.sp-offer { flex: none; display: flex; flex-direction: column; gap: 5px; padding: 9px 10px 10px; ${cut('light')} }
-.sp-offer > b { font: 700 17px/1.15 var(--serif); }
-.sp-offer > header { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-.sp-offer small, .sp-slot small { font-size: 13px; font-style: italic; color: var(--faint); }
-.sp-pays { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
-.sp-pays > b { font: italic 500 24px/1 var(--serif); font-variant-numeric: oldstyle-nums; }
-.sp-pays > span { font-weight: 700; white-space: nowrap; }
-.sp-offer > p { margin: 0; line-height: 1.25; }
-.sp-sign { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
-.sp-sign > .k-btn { height: 36px; min-width: 0; padding: 0; }
-.sp-none { padding: 14px 8px; text-align: center; font-style: italic; color: var(--faint); }
-.sp-slots { position: absolute; left: 18px; right: 18px; bottom: 10px; }
-.sp-slots > .k-body { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-.sp-slot { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 0 10px 9px; text-align: center; min-width: 0;
-  ${cut('light')} }
-.sp-slot > .k-band { align-self: stretch; margin: 0 -10px 3px; }
-.sp-slot > b { max-width: 100%; font: 700 19px/1.2 var(--serif); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.sp-slot > span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.sp-slot > hr { align-self: stretch; margin: 3px 0 1px; border: 0; border-top: 1px solid var(--rule); }
-.sp-slot > strong { font: 700 16px/1.1 var(--serif); letter-spacing: .04em; }
-.sp-slot.vacant > b { font-weight: 500; font-style: italic; color: var(--faint); }
-
 .s-calendar { display: grid; grid-template-columns: 318px 1fr 300px; gap: 10px; padding: 12px 18px; }
 .s-calendar > div { display: flex; flex-direction: column; gap: 10px; min-height: 0; min-width: 0; }
 .c-races { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 5px; padding: 3px; }
@@ -94,95 +54,6 @@ const placed = <T extends Element>(made: T, cls: string) => {
   made.classList.add(...cls.split(' '));
   return made;
 };
-
-/** So many races, as a deal's length is said. */
-const races = (n: number) => `${n} ${n === 1 ? 'Race' : 'Races'}`;
-
-type Standing = SponsorsPaper['offers'][number];
-
-/** The sponsors. */
-export function createSponsors(office: Office): Screen<SponsorsPaper> {
-  stylesheet(CSS);
-  bitsStyle();
-  const root = el('div', 's-sponsors');
-
-  /** An offer standing: who, how good, what it pays and for what, and the slots it may be signed into. */
-  const offer = (r: Standing, slots: number) =>
-    el(
-      'div',
-      'sp-offer',
-      el('b', '', r.name),
-      el(
-        'header',
-        '',
-        stars(r.grade, r.grade, 14),
-        el('small', '', `Stands ${r.days} ${r.days === 1 ? 'Day' : 'Days'}`)
-      ),
-      el(
-        'div',
-        'sp-pays',
-        el('b', '', money(r.amount)),
-        el('span', '', races(r.races))
-      ),
-      el('p', '', r.pays),
-      el(
-        'div',
-        'sp-sign',
-        ...Array.from({ length: slots }, (_, slot) =>
-          button(
-            `Slot ${slot + 1}`,
-            () =>
-              office.ask({
-                kind: 'send',
-                command: { kind: 'SignSponsor', offer: r.id, slot },
-              }),
-            { kind: 'on', off: !r.sign.ok }
-          )
-        )
-      ),
-      !r.sign.ok && r.sign.why !== '' && el('div', 'b-why', r.sign.why)
-    );
-
-  /** A slot: its sponsor, what it pays and for what, and the races its deal has left; or vacant. */
-  const slot = (b: Backer | null, i: number) =>
-    el(
-      'div',
-      `sp-slot${b ? '' : ' vacant'}`,
-      band(`Slot ${i + 1}`),
-      el('b', '', b?.name ?? 'Vacant'),
-      el(
-        'span',
-        '',
-        b ? `${money(b.amount)} · ${b.pays}` : 'No sponsor signed'
-      ),
-      el('hr'),
-      el('small', '', 'Sponsor deal time remaining:'),
-      el('strong', '', b ? races(b.races) : '–')
-    );
-
-  return {
-    el: root,
-    show(v) {
-      root.replaceChildren(
-        // her ship herself, at anchor: the world through the page
-        el('div', 'o-window', el('div', 'o-subject sp-subject')),
-        placed(
-          panel('Sponsor Offers', [
-            v.offers.length > 0
-              ? el(
-                  'div',
-                  'sp-list',
-                  ...v.offers.map((r) => offer(r, v.slots.length))
-                )
-              : el('div', 'sp-none', 'No offers stand.'),
-          ]),
-          'sp-offers'
-        ),
-        placed(panel('Sponsors', v.slots.map(slot)), 'sp-slots')
-      );
-    },
-  };
-}
 
 type Race = CalendarPaper['races'][number];
 

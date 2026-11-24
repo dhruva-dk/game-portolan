@@ -82,19 +82,33 @@ export interface FinancesPaper {
   }[];
 }
 
-/** A sponsor: what it pays and for what, for how many races, and its standing. */
+/** A sponsor: its grade, the races it has left, a fixed sum a race or a bonus for the objective chosen in each race's
+ *  plan (each objective what meeting it pays), and what it is reckoned worth a race. */
 export interface Backer {
   id: number;
   name: string;
-  pays: string;
-  amount: number;
-  races: number;
   grade: number;
+  races: number;
+  perRace: number;
+  objectives: readonly { label: string; pays: number }[];
+  worth: number;
 }
-/** `sponsors`: the three slots, and the offers standing (each with the days it stands and whether it may be signed). */
+/**
+ * `sponsors`: the three slots; the offers standing, each with the days it
+ * stands and whether it may be signed into each slot (`into`, by slot: an
+ * empty one, or over the sponsor there); the market: her team's
+ * marketability (0…100, what offers are sized by), the highest grade the
+ * landing pad receives, the days to the next offers (null: none to come), and
+ * what the slots are worth a race together.
+ */
 export interface SponsorsPaper {
   slots: readonly (Backer | null)[];
-  offers: readonly (Backer & { days: number; sign: Act })[];
+  offers: readonly (Backer & { days: number; into: readonly Act[] })[];
+  marketability: number;
+  grade: number;
+  grades: number;
+  next: number | null;
+  worth: number;
 }
 
 /** A bar of a chart against the championship: three shares (0…1), hers, the best and the average. */

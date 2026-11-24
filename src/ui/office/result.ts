@@ -19,7 +19,7 @@ import { u } from '../chartroom/tokens.ts';
 import { emblem } from '../emblem.ts';
 import { el, ordinal } from '../kit/part.ts';
 import { stylesheet } from '../kit/style.ts';
-import { toPerson } from './links.ts';
+import { toPerson, toTeam } from './links.ts';
 import type { Office } from './office.ts';
 import type { Screen } from './screens.ts';
 
@@ -40,15 +40,6 @@ const CSS = `
 const clock = (second: number) =>
   `${Math.floor(second / 60)}:${String(Math.floor(second % 60)).padStart(2, '0')}`;
 
-/** A team as a line names it: its emblem, its name. */
-const teamOf = (r: ResultLine) =>
-  el(
-    'span',
-    'rs-team',
-    emblem(r.team.emblem, r.team.colours, 14),
-    el('span', '', r.team.name)
-  );
-
 /** The paper a verdict is stamped on, by its mood: good and bad inked solid, a warning washed, else plain. */
 const STAMP = {
   good: 'good',
@@ -62,7 +53,16 @@ export function createResult(office: Office): Screen<ResultView> {
   kitLooks();
   stylesheet(CSS);
   const root = page('aside', 's-result'),
-    profile = toPerson(office);
+    profile = toPerson(office),
+    teamPage = toTeam(office);
+  /** A team as a line names it: its emblem, its name, opening its page. */
+  const teamOf = (r: ResultLine) =>
+    el(
+      'span',
+      'rs-team',
+      emblem(r.team.emblem, r.team.colours, 14),
+      el('span', '', link(r.team.name, teamPage(r.team.id)))
+    );
   /** A driver's name, opening their profile (an empty berth's opens nothing). */
   const named = (r: ResultLine) => {
     const go = profile(r.person);

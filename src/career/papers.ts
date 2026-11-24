@@ -24,6 +24,7 @@ import {
   buildCost,
   buildDays,
   designSlots,
+  sponsorGrade,
   upkeepAt,
 } from './hq.ts';
 import { render } from './mail.ts';
@@ -40,7 +41,8 @@ import {
   titled,
 } from './office.ts';
 import { dilemmaView, fixtures } from './read.ts';
-import { signCheck } from './sponsors.ts';
+import { signCheck, sponsorWorth } from './sponsors.ts';
+import { teamMarketability } from './reputation.ts';
 import {
   championshipOf,
   type CareerState,
@@ -180,38 +182,53 @@ export function financesPaper(s: CareerState): FinancesPaper {
   };
 }
 
-/** What a sponsor asks for its bonus. */
+const SP = TUNING.sponsors;
+
+/** What a sponsor asks of a race for its bonus, in words. */
 const OBJECTIVES: Readonly<Record<Objective, string>> = {
-  top10: 'Top Ten',
-  sinkTwo: 'Two Sinkings',
-  afloat: 'Afloat at the End',
-  mostSea: 'Most Sea Held',
+  top10: `A ship in the first ${SP.need.top}`,
+  sinkTwo: `${SP.need.sink} ships sunk`,
+  afloat: `${SP.need.afloat} of yours afloat at the end`,
+  mostSea: 'The most sea held',
 };
 
 const backer = (p: Sponsor): Backer => ({
   id: p.id,
   name: p.name,
-  pays:
-    p.objectives.length === 0
-      ? 'Every Race'
-      : p.objectives.map((o) => OBJECTIVES[o]).join(' / '),
-  amount: p.objectives.length === 0 ? p.perRace : p.bonus,
-  races: p.races,
   grade: p.grade,
+  races: p.races,
+  perRace: p.objectives.length === 0 ? p.perRace : 0,
+  objectives: p.objectives.map((o) => ({
+    label: OBJECTIVES[o],
+    pays: Math.round(p.bonus * SP.objectives[o]),
+  })),
+  worth: Math.round(sponsorWorth(p)),
 });
 
-/** The sponsors. */
+/** The sponsors: the slots, the offers (each signable into any slot, over the sponsor there), and the market. */
 export function sponsorsPaper(s: CareerState): SponsorsPaper {
   const c = myTeam(s);
+  const next = s.queue.find(
+    (e) => e.kind === 'sponsorOffer' && e.team === c.id
+  );
+  const slots = Array.from(
+    { length: SP.slots },
+    (_, i) => c.sponsors[i] ?? null
+  );
   return {
-    slots: c.sponsors.map((p) => (p ? backer(p) : null)),
+    slots: slots.map((p) => (p ? backer(p) : null)),
     offers: c.offers
       .filter((o) => o.expires >= s.day)
       .map((o) => ({
         ...backer(o.sponsor),
         days: o.expires - s.day,
-        sign: act(signCheck(s, c.id, o.sponsor.id, 0)),
+        into: slots.map((_, i) => act(signCheck(s, c.id, o.sponsor.id, i))),
       })),
+    marketability: Math.round(teamMarketability(s, c)),
+    grade: sponsorGrade(c),
+    grades: SP.grade.length,
+    next: next ? Math.max(0, next.day - s.day) : null,
+    worth: slots.reduce((a, p) => a + (p ? Math.round(sponsorWorth(p)) : 0), 0),
   };
 }
 

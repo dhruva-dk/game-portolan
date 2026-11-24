@@ -70,12 +70,13 @@ type Kind = 'act' | 'harm' | 'plain';
 
 /**
  * A button: a slip washed in what it does; a tap calls `act`. `off`, it is
- * shown unavailable and deaf, with why under it.
+ * shown unavailable and deaf, with why under it (`true`: why is said once
+ * under a row of them, by their holder).
  */
 export function button(
   text: string,
   act: () => void,
-  how: { kind?: Kind; off?: string | null } = {}
+  how: { kind?: Kind; off?: string | boolean | null } = {}
 ) {
   const kind = how.kind ?? 'act';
   const slip = paper(el('div', `cr-btn ${kind}`, text), {
@@ -83,7 +84,9 @@ export function button(
     bold: true,
   });
   pressed(slip, act, !!how.off);
-  return how.off ? el('div', 'cr-act', slip, label(how.off)) : slip;
+  return typeof how.off === 'string' && how.off !== ''
+    ? el('div', 'cr-act', slip, label(how.off))
+    : slip;
 }
 
 /**

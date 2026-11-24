@@ -100,10 +100,12 @@ export interface StandingsTable {
   drivers: readonly (StandingLine & { wins: number; podiums: number })[];
 }
 
-/** Every championship's tables, the round they stand after, and which is hers (`mine`, an index). */
+/** Every championship's tables, the round they stand after, which is hers (`mine`, an index), and her chairman's
+ *  objective (the place asked for, or better) and how she stands to it. */
 export interface StandingsView {
   round: number;
   rounds: number;
   mine: number;
+  chairman: { target: number; standing: Verdict };
   championships: readonly StandingsTable[];
 }

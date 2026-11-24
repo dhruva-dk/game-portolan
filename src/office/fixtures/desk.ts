@@ -9,7 +9,9 @@ import { FINANCES } from './finances.ts';
 import { HOME } from './home.ts';
 import { PROFILE } from './profile.ts';
 import { OFFER } from './offer.ts';
+import { RIVAL } from './rival.ts';
 import { SCOUTING } from './scouting.ts';
+import { SPONSORS } from './sponsors.ts';
 import { STANDINGS } from './standings.ts';
 import { TEAM as ROSTER } from './team.ts';
 import { HERS, TEAMS } from './teams.ts';
@@ -94,6 +96,8 @@ const VIEWS: Pick<
     place: 3,
   },
   standings: STANDINGS,
+  rival: RIVAL,
+  sponsors: SPONSORS,
 };
 
 export const FIXTURE: Desk = {

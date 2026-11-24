@@ -16,6 +16,7 @@ import { kitLooks } from '../chartroom/kit.ts';
 import { column, page } from '../chartroom/layout.ts';
 import { paper, plate, sheet } from '../chartroom/paper.ts';
 import { who } from '../chartroom/person.ts';
+import { shipWindow } from '../chartroom/port.ts';
 import { u } from '../chartroom/tokens.ts';
 import { emblem } from '../emblem.ts';
 import { el, pressed, styled, type Kid } from '../kit/part.ts';
@@ -39,9 +40,6 @@ const CSS = `
   box-shadow: inset 0 0 0 var(--w-fine) var(--ink); }
 .fd-dye.chosen { box-shadow: inset 0 0 0 var(--w-bold) var(--ink), 0 0 0 var(--s1) var(--gilt), 0 0 0 calc(var(--s1) + var(--w-fine)) var(--ink); }
 /* the window and the team's plate under it, one frame; the window no paper's, the world shows through it */
-.fd-framed { flex: 1; min-height: 0; display: flex; flex-direction: column; box-shadow: 0 0 0 var(--w-bold) var(--ink); }
-.fd-window { position: relative; flex: 1; min-height: 0; box-shadow: inset 0 0 0 ${u(3)} var(--brass), inset 0 0 0 ${u(3.8)} var(--ink); }
-.fd-window > .o-subject { position: absolute; left: 0; right: 0; top: 50%; height: 100%; translate: 0 -50%; pointer-events: none; }
 .fd-crest { flex: none; display: flex; align-items: center; gap: var(--s4); padding: var(--s3) var(--s5); }
 .fd-crest > svg { flex: none; width: ${u(22)}; height: ${u(22)}; }
 .fd-crest b { flex: none; font: 700 var(--t-title)/1 var(--face); letter-spacing: .14em; text-transform: uppercase; white-space: nowrap; }
@@ -187,12 +185,7 @@ export function createFound(office: Office): Screen<FoundView> {
         ])
       ),
       column(
-        el(
-          'div',
-          'fd-framed',
-          el('div', 'fd-window o-window', el('div', 'o-subject')),
-          crest
-        ),
+        shipWindow(crest),
         paper(
           el(
             'div',

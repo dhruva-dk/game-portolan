@@ -31,7 +31,7 @@ import { u } from '../chartroom/tokens.ts';
 import { el, pressed } from '../kit/part.ts';
 import { stylesheet } from '../kit/style.ts';
 import { jacketOf } from './faces.ts';
-import { toPerson } from './links.ts';
+import { toPerson, toTeam } from './links.ts';
 import type { Office } from './office.ts';
 import type { Screen } from './screens.ts';
 
@@ -253,7 +253,14 @@ export function createScouting(office: Office): Screen<Dyed<ScoutingView>> {
               cell: (r) =>
                 el('span', 'sc-cell', stars(r.potential.lo, r.potential.hi, 8)),
             },
-            { head: 'Team', track: u(52), cell: (r) => r.team },
+            {
+              head: 'Team',
+              track: u(52),
+              cell: (r) =>
+                r.teamId === null
+                  ? r.team
+                  : link(r.team, toTeam(office)(r.teamId)),
+            },
             { head: 'Contract', track: u(52), cell: (r) => r.contract },
             { head: 'Asks', track: u(28), num: true, cell: (r) => r.ask },
             {

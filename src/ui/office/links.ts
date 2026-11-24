@@ -11,3 +11,9 @@ export const toPerson =
     id === null
       ? null
       : () => office.ask({ kind: 'person', id, screen: 'profile' });
+
+/** A team's page. */
+export const toTeam =
+  (office: Office) =>
+  (id: number | null): (() => void) | null =>
+    id === null ? null : () => office.ask({ kind: 'team', id });

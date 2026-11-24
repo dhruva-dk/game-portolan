@@ -20,7 +20,8 @@ business logic given a screen, and the old kit deleted. The battle HUD stays as 
 ## How a screen is checked (before it is called built)
 
 1. `npm test`: the tokens test, and `tools/layout.ts` on every kit screen's fixture (frame, pixel, centre, inside,
-   inset). A new screen joins `layout.ts`'s list when it is built.
+   clipped, under, squeezed, dead, unmarked, crowded, broken, inset). A new screen joins `layout.ts`'s list when it is
+   built; its fixture's names are as long as a career's.
 2. `node tools/career/play.ts --tour`: the live career through it, real data, no page errors.
 3. Its 2× capture (`tools/capture.ts`, the iPad's density), looked at last: measured first, judged second.
 4. A fault found by eye becomes a rule: a check that fails on the old code and passes on the fix. A fault in a kit
@@ -35,9 +36,9 @@ business logic given a screen, and the old kit deleted. The battle HUD stays as 
 | `ChooseSupplier` never sent; supplier cards and window in no view                              | `career/suppliers.ts:181,198,282`                                       | Suppliers (new)     |
 | Race plan fixed: drivers as they stand, `parts: []`, sponsor objective 0; `Forfeit` never sent | `career/office.ts:433`                                                  | Race day            |
 | Can't design for next season (`forNext` false); next season's parts hidden; no part risk shown | `ui/office/yard.ts:655`, `career/papers.ts:339`, `office/papers.ts:114` | Ship                |
-| A sponsor offer's sign check looks at slot 0 only, though three slots are offered (bug)        | `career/papers.ts:159`                                                  | Sponsors            |
+| ~~A sponsor offer's sign check looks at slot 0 only, though three slots are offered (bug)~~ (each slot checked, 2026-11-23) | `career/papers.ts`                                         | Sponsors            |
 | `DeclineJob` never sent; Continue takes the best post unasked                                  | `ui/office/career.ts:75`, `manager.ts:158`                              | Jobs                |
-| Rivals: managers' personalities and moves, their teams; standings rows lead nowhere            | `career/rivals.ts`, `leadership.ts`, `ui/office/standings.ts`           | Rival (new)         |
+| ~~Rivals: managers' personalities, their teams; standings rows lead nowhere~~ (Rival, 2026-11-23); their moves kept nowhere | `career/rivals.ts`, `leadership.ts`                    | Rival (new)         |
 | Chairman's temper, own budget and debt floor, sacking rules, team reputation and marketability | `career/chairmen.ts`, `reputation.ts`, `views.ts:210`                   | Board (new)         |
 | Season's end (prize money, promotion, relegation, retirements, the new intake) only as letters | `career/season.ts`, `round.ts`                                          | Season review (new) |
 | Dead builders: `views.ts` `homeView`, `racePanel`, the `tier` blocker                          | `career/views.ts`, `desk.ts:73`                                         | Reuse or delete     |
@@ -50,15 +51,19 @@ draws every ref as a link (one kit piece). A name with no ref is a gap, like a c
 
 How: `link(text, go)` (`src/ui/chartroom/controls.ts`) sets a name in the act ink; alone it takes its own tap, in a
 table the row takes it (`tap`), the bigger target. `src/ui/office/links.ts` holds the ways to each page
-(`toPerson`). `tools/layout.ts` fails a link that opens nothing (dead) and a row that opens a page with no name drawn
-as a link (unmarked); `play.ts --tour` follows one (a rival's driver in Standings to their profile).
+(`toPerson`, `toTeam`). `tools/layout.ts` fails a link that opens nothing (dead) and a row that opens a page with no
+name drawn as a link (unmarked); `play.ts --tour` follows two (a rival's driver in Standings to their profile, a rival
+team to its page).
+
+The screens speak to the player as "you" (Your Season, Your team), never "her": "her" is the code's voice for the
+player, not the page's.
 
 | Thing                                     | Opens                             | Ref in the views now                    | Needs                                               |
 | ----------------------------------------- | --------------------------------- | --------------------------------------- | --------------------------------------------------- |
 | A person (driver, staff, scout, chairman) | Profile (built)                   | every built screen, linked (2026-11-23) | mail's senders and subjects (Mail)                  |
-| A team                                    | Rival: its manager and team (new) | `id` on every `Team` (2026-11-23)       | Rival; then every team name linked                  |
-| A championship                            | Standings at that championship    | none                                    | its tier wherever it is named (the bar, Home, mail) |
-| A planet, a round                         | Calendar at that round            | a name                                  | its round on Home's next race, results, the bar     |
+| A team                                    | Rival: the team's page (built)    | every built screen, linked (2026-11-23) | Negotiation's other bidders (names only), mail      |
+| A championship                            | Standings at that championship    | one name for each, `TIERS` (2026-11-23) | Standings opened at a tier, not only at hers        |
+| A planet, a round                         | Calendar at that round (building) | a name                                  | Home's next race, results, the bar's next race      |
 | A part, a building                        | Ship, HQ at it                    | in the yard only                        | ids on Home's work under way, mail links            |
 | A sponsor, a supplier                     | Sponsors, Suppliers at it         | none                                    | ids on Finances' ledger lines, mail                 |
 | A rule, a proposal                        | Admiralty at it                   | none                                    | ids on mail's vote letters, the bar's chip          |
@@ -67,8 +72,9 @@ What the career does not keep, that a coherent office needs:
 
 - **Last round's standings**: places gained and lost (▲▼) on Standings and Home.
 - **Each round's results, the season through**: a team's and a driver's form (Rival, Profile).
-- **The chairman's target place for her team**, on Standings beside where she stands (Home has it; Standings
-  should).
+- ~~The chairman's target place on Standings~~ (in the view, 2026-11-23).
+- **What a rival has done**: its signings, its parts, its buildings, its votes, as news. The rivals act
+  (`career/rivals.ts`) but nothing is kept of it, so Rival shows who runs a team and how, never what they did.
 
 ## The screens: 24 and the shell
 
@@ -97,12 +103,23 @@ Each line: built on the kit from a fixture → in review → approved and live. 
       (races left, place now, its prize); the balance's course this season, by days, dotted on to the season's end, the
       floor ruled under it; the transactions; this season's money by what it was for, netted (floor, projection and the
       season's sums never shown before)
-- [ ] **Standings** _(in review)_, after MM 016: the three championships to choose among (hers first shown), its
-      plate, the season's rounds, its prize fund, the leaders, her place and its prize, her drivers' places, which
-      places go up and down and where to; its teams or its drivers, a broad table (prize at each place and where the
-      season's end would move a team, never shown before). Rows open Rival once it is built
-- [ ] Sponsors (+ the slot fix) · [ ] Calendar ·
-      [ ] Mail (+ glyphs for mail kinds; a vote letter opens Admiralty)
+- [ ] **Standings** _(in review again, the left redone 2026-11-23)_, after MM 016: at the left your season (your place
+      and points, the chairman's objective and how you stand to it, the teams just ahead and behind and the points
+      between, what your place pays against one place up, your drivers, the calendar); at the right a championship's
+      table, the three to choose among beside Teams and Drivers, the round and prize fund at its head (prize at each
+      place and where the season's end would move a team, never shown before). Every team and driver opens its page
+- [ ] **Sponsors** _(in review, 2026-11-23)_, after MM's: the offers at the left, a card each (grade, races, how long
+      it stands, what it pays: a sum a race or each objective's bonus; a button a slot, over the sponsor there; shut,
+      why once under them); your ship through the brass window, the market under it (what your slots are worth a race,
+      marketability, the grade the landing pad receives, the next offers: never shown before); your three slots at
+      the right. The brass window is the kit's (`shipWindow`), Home's and Found's too
+- [ ] **Calendar** _(being built, 2026-11-23)_, after MM's: at the left the round chosen (its planet in the brass port,
+      charted once you sail for it; its date, how far off, the storm's pace there, the Admiralty's vote closed on it);
+      in the middle the season's rounds, a tap choosing one; at the right the season's other days as the career has
+      them scheduled (the Admiralty's proposals and votes, the contracts' closing days, the season's end, next
+      season's first race: never shown before) and how far it has got. A round is a ref now: Home's next race opens
+      it
+- [ ] Mail (+ glyphs for mail kinds; a vote letter opens Admiralty)
 
 ### 3. People
 
@@ -141,8 +158,13 @@ Each line: built on the kit from a fixture → in review → approved and live. 
 
 ### 7. New
 
+- [ ] **Rival** _(in review, 2026-11-23)_, the team's page, any team's (yours too): its plate, championship, port,
+      reputation; who runs it (the manager: their character, how freely they spend, what they see to first, how
+      secure their post; the chairman: the objective, how the team stands to it); everyone on its books with their
+      stars as your scouts know them; its season (place, tally, behind the leader, against your team, its prize,
+      where the season's end takes it); against the grid. Every team name in the office opens it
 - [ ] Admiralty (proposals, vote, lobby, the rules now and next) · [ ] Board (chairman, budget, floor, reputation) ·
-      [ ] Rival (manager and team) · [ ] Season review
+      [ ] Season review
 
 A new screen's view and fixture are built first (`src/career/views-*.ts`, `src/office/`), then the screen.
 

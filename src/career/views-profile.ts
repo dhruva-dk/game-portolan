@@ -322,6 +322,7 @@ export function profileView(
     age: years,
     colony: s.colonies[g.colony] ?? '',
     team: where.team,
+    teamId: g.contract?.team ?? null,
     tier: where.tier,
     post: postOf(s, g),
     stars: v.stars,
@@ -366,8 +367,9 @@ export function profileView(
       .map((h) => ({
         season: `S${h.season + 1}`,
         team: h.team === null ? 'Free' : s.teams[h.team].name,
+        teamId: h.team,
         tier:
-          h.tier === null ? '—' : TIERS[h.tier].replace('Championship ', 'L'),
+          h.tier === null ? '—' : TIERS[h.tier].replace(' Championship', ''),
         role: ROLE_NAMES[h.role],
         races: h.races,
         best: h.best === null ? '—' : String(h.best),

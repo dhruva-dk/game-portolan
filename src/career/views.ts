@@ -414,8 +414,12 @@ export function homeView(s: CareerState): HomeView {
     mail: { letters: letters(s, 4), unread: unread(s) },
   };
 }
-/** The championships' names. */
-export const TIERS = ['Tier 1', 'Tier 2', 'Tier 3'];
+/** The championships' names, the first the highest: as every screen and letter names them. */
+export const TIERS = [
+  'First Championship',
+  'Second Championship',
+  'Third Championship',
+];
 
 /** Founding's defaults for a seed: a team name whose words clash with no team's, a name for the player, a face. */
 const founding = new Map<

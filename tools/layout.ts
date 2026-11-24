@@ -11,6 +11,8 @@
 //   squeezed a name in a table cut to a stub (under SLACK.stub px)
 //   dead    a name drawn as a link that opens nothing
 //   unmarked a row that opens a page with no name drawn as a link
+//   crowded a head's aside over its title, or cut short
+//   broken  a word set on two lines
 //   inset   a sheet's first words (its head, or its body's first thing) no
 //           nearer its top edge than a sheet with a head has them
 //   node tools/layout.ts [screen ...]
@@ -32,6 +34,8 @@ const SCREENS = [
   'finances',
   'result',
   'standings',
+  'rival',
+  'sponsors',
 ];
 
 /** How far apart two edges or centres may be, CSS px. */
@@ -234,6 +238,36 @@ try {
       for (const c of all(body, `${cell}, ${cell} *`).filter(shown))
         if (c.scrollWidth > c.clientWidth + 0.5 && c.clientWidth < slack.stub)
           out.push(`squeezed: ${name(c)} cut to ${c.clientWidth}px`);
+
+      // crowded: a head's aside clear of its title, and shown whole
+      for (const a of all(body, '.cr-head > .cr-aside').filter(shown)) {
+        const title = a.parentElement?.firstElementChild;
+        if (!title || title === a) continue;
+        const gap =
+          a.getBoundingClientRect().left - title.getBoundingClientRect().right;
+        if (gap < 0 || a.scrollWidth > a.clientWidth + 0.5)
+          out.push(
+            `crowded: ${name(a)} ${gap < 0 ? `over its title by ${n(-gap)}px` : 'cut short'}`
+          );
+      }
+
+      // broken: a word set on two lines (its letters' boxes on more than one line)
+      const walk = document.createTreeWalker(body, NodeFilter.SHOW_TEXT);
+      for (let t = walk.nextNode(); t; t = walk.nextNode()) {
+        const text = t.textContent ?? '';
+        for (const m of text.matchAll(/\S+/g)) {
+          const word = document.createRange();
+          word.setStart(t, m.index);
+          word.setEnd(t, m.index + m[0].length);
+          const tops = new Set(
+            Array.from(word.getClientRects())
+              .filter((r) => r.width > 0)
+              .map((r) => Math.round(r.top))
+          );
+          if (tops.size > 1)
+            out.push(`broken: "${m[0]}" set on ${tops.size} lines`);
+        }
+      }
 
       // inset: a sheet's first words off its top edge, head or none
       for (const s of all(body, '.cr-sheet').filter(shown)) {
