@@ -1,7 +1,6 @@
 import { smoothstep } from '../world/scalar.ts';
 import { R, distance, dot, type Vec3 } from '../world/sphere.ts';
 import type { Crew } from './battle.ts';
-import { ready } from './gust.ts';
 import { restored, stowing, useful } from './hold.ts';
 import { RARITIES, rankOf } from './kinds.ts';
 import type { Loot } from './loot.ts';
@@ -17,7 +16,6 @@ export const PURSER = {
   room: 2,
   clear: 60,
   take: 9,
-  low: 40,
   far: 120,
   ceded: 0.7,
   patience: 30,
@@ -147,15 +145,10 @@ export function purse(c: Ctx): Ask {
     const s = healSlot(crew);
     if (s >= 0) heal = s;
   }
-  if (ready(crew.gust) && !crew.hold.using) {
-    const fleeing = m.mode === 'flee' || m.mode === 'storm';
-    const run =
-      fleeing && (crew.gust.charges >= 2 || crew.health.hull < c.b.purser.low);
-    if (
-      run ||
-      (m.mode === 'fight' && distance(c.own.ship.at, m.goal) > c.b.purser.far)
-    )
-      gust = true;
-  }
+  const wants =
+    m.mode === 'flee' ||
+    m.mode === 'storm' ||
+    (m.mode === 'fight' && distance(c.own.ship.at, m.goal) > c.b.purser.far);
+  if (wants !== crew.gust.on) gust = true;
   return heal === null && !gust ? NOTHING : { heal, gust };
 }

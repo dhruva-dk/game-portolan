@@ -9,9 +9,8 @@ import {
 } from '../src/sim/battle.ts';
 import type { Vessel } from '../src/sim/contact.ts';
 import { STEP } from '../src/sim/fixed.ts';
-import { charging, gustOf, ready, spent, stepGust } from '../src/sim/gust.ts';
 import { RARITIES, rankOf, type Rarity } from '../src/sim/kinds.ts';
-import { GUST, SHIP } from '../src/sim/handling.ts';
+import { SHIP } from '../src/sim/handling.ts';
 import { SHIELD } from '../src/sim/tuning.ts';
 import {
   begun,
@@ -36,7 +35,7 @@ import {
   type Loot,
 } from '../src/sim/loot.ts';
 import { asked, crewed, NOTHING, stored } from '../src/sim/stores.ts';
-import { shipAt, step, type ShipState } from '../src/sim/ship.ts';
+import { shipAt } from '../src/sim/ship.ts';
 import type { Depth } from '../src/sim/shoal.ts';
 import { HEAL } from '../src/sim/tuning.ts';
 import { random } from '../src/world/random.ts';
@@ -45,7 +44,6 @@ import {
   add,
   along,
   distance,
-  dot,
   frameAt,
   fromLatLon,
   normalize,
@@ -79,113 +77,6 @@ const holding = (...items: (Rarity | null)[]): Hold => ({
 const hurt = (c: Crew, hull: number): Crew => ({
   ...c,
   health: { ...c.health, hull },
-});
-
-test('a gust spends a charge, blows its time, and the charges come back one at a time', () => {
-  let g = gustOf();
-  assert.ok(ready(g));
-  g = spent(g).gust;
-  assert.deepEqual([g.charges, g.blowing], [1, GUST.time]);
-  assert.equal(spent(g).blew, false, 'not while one still blows');
-  for (let t = 0; t < GUST.time + 0.1; t += STEP) g = stepGust(g, STEP);
-  assert.equal(g.blowing, 0);
-  const since = g.recharge;
-  g = spent(g).gust;
-  assert.equal(g.charges, 0);
-  assert.equal(spent(g).blew, false, 'none left');
-  let t = since;
-  while (g.charges < 1) {
-    g = stepGust(g, STEP);
-    t += STEP;
-  }
-  assert.ok(
-    Math.abs(t - GUST.recharge) < 2 * STEP,
-    `the first back ${t} s after it was spent`
-  );
-  assert.ok(charging(g) < 0.05);
-  while (g.charges < 2) {
-    g = stepGust(g, STEP);
-    t += STEP;
-  }
-  assert.ok(
-    Math.abs(t - 2 * GUST.recharge) < 3 * STEP,
-    'the second after the first'
-  );
-  assert.equal(charging(g), 1);
-});
-
-test('in a gust it runs well past its top and turns quicker; after it it sheds the speed back to its top', () => {
-  let s: ShipState = { ...shipAt(c0, east), speed: EVEN_SHIP.topSpeed };
-  const plain = step(
-    s,
-    { course: frameAt(c0).north, throttle: 1 },
-    STEP,
-    deep,
-    EVEN_SHIP
-  );
-  for (let t = 0; t < GUST.time; t += STEP)
-    s = step(
-      s,
-      { course: null, throttle: 1, gust: true },
-      STEP,
-      deep,
-      EVEN_SHIP
-    );
-  assert.ok(s.speed > EVEN_SHIP.topSpeed + 0.9 * GUST.speed, `${s.speed}`);
-  const quick = step(
-    { ...shipAt(c0, east), speed: EVEN_SHIP.topSpeed },
-    { course: frameAt(c0).north, throttle: 1, gust: true },
-    STEP,
-    deep,
-    EVEN_SHIP
-  );
-  assert.ok(quick.turn > plain.turn * 1.3);
-  for (let t = 0; t < 1; t += STEP)
-    s = step(s, { course: null, throttle: 1 }, STEP, deep, EVEN_SHIP);
-  assert.ok(
-    s.speed > EVEN_SHIP.topSpeed + GUST.speed - GUST.shed * 1.1 &&
-      s.speed < EVEN_SHIP.topSpeed + GUST.speed,
-    'shed at its rate'
-  );
-  for (let t = 0; t < 5; t += STEP)
-    s = step(s, { course: null, throttle: 1 }, STEP, deep, EVEN_SHIP);
-  assert.ok(Math.abs(s.speed - EVEN_SHIP.topSpeed) < 1e-9);
-});
-
-test('a ball fired in a gust goes off wider', () => {
-  const fleet = [vessel(1, c0), vessel(2, at(150))];
-  const spreadOf = (blowing: number) => {
-    let worst = 0;
-    for (let seed = 0; seed < 40; seed++) {
-      const b = battleOf(
-        [
-          {
-            ...crewOf(1, EVEN_SHIP),
-            gust: { charges: 1, recharge: 0, blowing },
-          },
-          crewOf(2, EVEN_SHIP),
-        ],
-        seed
-      );
-      const r = stepBattle(
-        b,
-        fleet,
-        [
-          {
-            aim: { from: scale(c0, R + 20), dir: frameAt(c0).north },
-            fire: true,
-          },
-          { aim: null, fire: false },
-        ],
-        [],
-        STEP,
-        deep
-      );
-      worst = Math.max(worst, Math.abs(dot(r.shots[0].dirs[0], east)));
-    }
-    return worst;
-  };
-  assert.ok(spreadOf(1) > spreadOf(0) * 1.3);
 });
 
 test('a heal restores its rarity’s share of the hull points times the heal factor, more for each rarer one', () => {

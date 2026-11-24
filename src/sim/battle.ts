@@ -85,7 +85,7 @@ export const crewOf = (id: number, values: ShipValues): Crew => ({
   health: whole(values.hullPoints),
   gun: gunOf(values.gun),
   hold: emptyHold(),
-  gust: gustOf(),
+  gust: gustOf(values.gustCapacity),
   cut: 0,
 });
 
@@ -265,7 +265,7 @@ export function stepBattle(
         const spread =
           spreadOf(gun.kind, values.spreadFactor) *
           (order?.spread ?? 1) *
-          (c.gust.blowing > 0 ? GUST.spread : 1);
+          (c.gust.on ? GUST.spread : 1);
         const lay = laid(
           v,
           gun,

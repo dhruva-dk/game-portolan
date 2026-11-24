@@ -1,36 +1,36 @@
-import { GUST } from './handling.ts';
+import { GUST_METER } from './tuning.ts';
 
 export interface Gust {
-  charges: number;
-  recharge: number;
-  blowing: number;
+  meter: number;
+  on: boolean;
 }
 
-export const gustOf = (): Gust => ({
-  charges: GUST.charges,
-  recharge: 0,
-  blowing: 0,
+export const gustOf = (capacity: number): Gust => ({
+  meter: capacity,
+  on: false,
 });
 
-export const ready = (g: Gust) => g.charges > 0 && g.blowing <= 0;
+export const startable = (g: Gust, capacity: number) =>
+  g.meter >= GUST_METER.least * capacity;
 
-export function spent(g: Gust): { gust: Gust; blew: boolean } {
-  if (!ready(g)) return { gust: g, blew: false };
+export function toggled(g: Gust, capacity: number): Gust {
+  if (g.on) return { ...g, on: false };
+  return startable(g, capacity) ? { ...g, on: true } : g;
+}
+
+export function stepGust(g: Gust, capacity: number, dt: number): Gust {
+  if (g.on) {
+    const meter = g.meter - GUST_METER.drain * dt;
+    return meter > 1e-9 ? { meter, on: true } : { meter: 0, on: false };
+  }
+  if (g.meter >= capacity) return g;
   return {
-    gust: { ...g, charges: g.charges - 1, blowing: GUST.time },
-    blew: true,
+    meter: Math.min(
+      capacity,
+      g.meter + GUST_METER.refill * GUST_METER.drain * dt
+    ),
+    on: false,
   };
 }
 
-export function stepGust(g: Gust, dt: number): Gust {
-  const blowing = Math.max(0, g.blowing - dt);
-  if (g.charges >= GUST.charges)
-    return { charges: g.charges, recharge: 0, blowing };
-  const recharge = g.recharge + dt;
-  return recharge >= GUST.recharge
-    ? { charges: g.charges + 1, recharge: 0, blowing }
-    : { charges: g.charges, recharge, blowing };
-}
-
-export const charging = (g: Gust) =>
-  g.charges >= GUST.charges ? 1 : g.recharge / GUST.recharge;
+export const charged = (g: Gust, capacity: number) => g.meter / capacity;

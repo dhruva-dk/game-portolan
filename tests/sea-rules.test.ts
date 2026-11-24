@@ -80,3 +80,30 @@ test('at sea, its shield fills from nothing on its own water, faster for the bes
     quick = after(TENDED);
   assert.ok(slow > 0 && quick > slow, `${slow} ${quick}`);
 });
+
+test('Hands.gust is a tap: one turns it on and the ship runs faster on its meter, the next turns it off', () => {
+  const ahead = (m: Match): Hands => ({
+    ...STILL,
+    course: m.view.mine()!.ship.heading,
+    throttle: 1,
+  });
+  const speedAfter = (taps: number) => {
+    const m = duel();
+    sail(m, 3);
+    for (let i = 0; i < taps; i++) {
+      m.step({ ...ahead(m), gust: true });
+      m.step(ahead(m));
+    }
+    for (let i = 0; i < SECOND; i++) m.step(ahead(m));
+    return { m, speed: m.view.mine()!.ship.speed };
+  };
+  const plain = speedAfter(0),
+    on = speedAfter(1),
+    off = speedAfter(2);
+  assert.ok(
+    crew(on.m).gust.on && !crew(off.m).gust.on && !crew(plain.m).gust.on
+  );
+  assert.ok(on.speed > plain.speed + 1, `${on.speed} ${plain.speed}`);
+  assert.ok(crew(on.m).gust.meter < EVEN_SHIP.gustCapacity - 0.9);
+  assert.equal(crew(plain.m).gust.meter, EVEN_SHIP.gustCapacity);
+});

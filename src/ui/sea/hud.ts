@@ -14,7 +14,6 @@ import {
   DUSK,
   GILT,
   INK,
-  PAPER,
   WASH,
   alpha,
   figure,
@@ -152,24 +151,21 @@ export function createHud(layer: HTMLElement, shores: Shores, act: HudActions) {
         );
       }
 
-      const charge = Math.floor(s.gust),
-        back = Math.floor((s.gust - charge) * 24);
-      if (changed(gust, charge, back, s.gusts, s.blowing)) {
-        let pips = '';
-        for (let i = 0; i < s.gusts; i++) {
-          const x = 30 + (i - (s.gusts - 1) / 2) * 10;
-          pips += `<circle cx="${x}" cy="44" r="2.8" fill="${i < charge ? INK.iron : PAPER}" stroke="${INK.iron}" stroke-width=".8"/>`;
-          if (i === charge && back > 0)
-            pips += sweep(x, 44, 2.8, back / 24, INK.iron, 1.6);
-        }
+      const meter = Math.floor(clamp(s.gust) * 48);
+      if (changed(gust, meter, s.blowing)) {
         gust.innerHTML = svg(
           60,
           60,
-          `<g opacity="${charge > 0 ? 1 : 0.55}">${paperDisc(30, 30, 28, s.blowing ? WASH.gold : INK.iron)}` +
-            (s.blowing
-              ? `<circle cx="30" cy="30" r="25" fill="none" stroke="${WASH.gold}" stroke-width="2.4"/>`
-              : '') +
-            `${glyph('gust', 30, 26, 32)}${pips}</g>`
+          `<g>${paperDisc(30, 30, 28, s.blowing ? WASH.gold : INK.iron)}` +
+            sweep(
+              30,
+              30,
+              25,
+              meter / 48,
+              s.blowing ? WASH.gold : INK.iron,
+              2.4
+            ) +
+            `${glyph('gust', 30, 30, 32)}</g>`
         );
       }
 

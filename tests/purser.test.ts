@@ -59,7 +59,8 @@ function sail(
   const minds: Memory[] = at.map((p, i) => mind(seeds[i], p));
   let battle: Battle = battleOf(crews, 1),
     f = flotsam;
-  const modes: string[][] = at.map(() => []);
+  const modes: string[][] = at.map(() => []),
+    took: number[] = [];
   for (let n = 0; n < Math.round(seconds / STEP); n++) {
     const by = new Map(battle.crews.map((c) => [c.id, c]));
     const seen: Own[] = fleet.map((v) => ({
@@ -120,8 +121,9 @@ function sail(
     );
     battle = { ...fought.battle, crews: k.crews };
     f = k.flotsam;
+    for (const t of k.took) took.push(t.ship);
   }
-  return { fleet, crews: battle.crews, flotsam: f, minds, modes };
+  return { fleet, crews: battle.crews, flotsam: f, minds, modes, took };
 }
 
 const seeds = (ok: (s: number) => boolean, n: number) => {
@@ -198,7 +200,8 @@ test('bots near one piece do not all pile on it: one takes it, and none goes for
     { pieces: [piece(1, c0, 'common')], next: 2 },
     60
   );
-  assert.equal(r.crews.filter((c) => stowedOf(c).length > 0).length, 1);
+  assert.equal(r.took.length, 1);
+  assert.equal(r.flotsam.pieces.length, 0);
   assert.ok(
     r.minds.every((m) => m.target !== 1 || m.mode !== 'loot'),
     'none still after it'

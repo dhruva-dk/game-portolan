@@ -1,5 +1,5 @@
 import type { Crew } from './battle.ts';
-import { spent, stepGust } from './gust.ts';
+import { stepGust, toggled } from './gust.ts';
 import { RIGGING } from './handling.ts';
 import { sunk } from './health.ts';
 import { begun, stepUse } from './hold.ts';
@@ -43,12 +43,10 @@ export function asked(
         ...crew,
         hold: begun(crew.hold, ask.heal, crew.health, crew.values.healTime),
       };
-    if (ask.gust && !crew.hold.using) {
-      const g = spent(crew.gust);
-      if (g.blew) {
-        crew = { ...crew, gust: g.gust };
-        blew.push(c.id);
-      }
+    if (ask.gust) {
+      const gust = toggled(crew.gust, crew.values.gustCapacity);
+      if (gust.on && !crew.gust.on) blew.push(c.id);
+      crew = { ...crew, gust };
     }
     return crew;
   });
@@ -57,7 +55,7 @@ export function asked(
 
 export function crewed(h: Helm, c: Crew | undefined): Helm {
   if (!c) return h;
-  const gust = c.gust.blowing > 0;
+  const gust = c.gust.on;
   const throttle =
     h.throttle * (c.hold.using ? HEAL.using : 1) * (c.cut > 0 ? RIGGING : 1);
   return gust || throttle !== h.throttle ? { ...h, throttle, gust } : h;
@@ -82,7 +80,7 @@ export function stored(
       ...c,
       hold: u.hold,
       health: u.health,
-      gust: stepGust(c.gust, dt),
+      gust: stepGust(c.gust, c.values.gustCapacity, dt),
       cut: c.cut - dt > 1e-9 ? c.cut - dt : 0,
     };
   });

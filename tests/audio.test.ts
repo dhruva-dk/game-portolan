@@ -312,8 +312,7 @@ const status = (over: Partial<Status & Kit> = {}): Status & Kit => ({
   items: [null, null, null],
   chosen: 0,
   using: null,
-  gust: 2,
-  gusts: 2,
+  gust: 1,
   blowing: false,
   ...over,
 });

@@ -2,8 +2,8 @@ import type { World } from '../world/environment.ts';
 import { fixedClock } from '../sim/fixed.ts';
 import type { Crew } from '../sim/battle.ts';
 import { laid, reloadOf, spreadOf, type Gun, type Laying } from '../sim/gun.ts';
-import { charging } from '../sim/gust.ts';
-import { GUN, GUNS, GUST } from '../sim/handling.ts';
+import { charged } from '../sim/gust.ts';
+import { GUN, GUNS } from '../sim/handling.ts';
 import { SHIELD } from '../sim/tuning.ts';
 import { progress } from '../sim/hold.ts';
 import { toEdge } from '../sim/storm.ts';
@@ -209,8 +209,7 @@ export function createGame(
     items: [null, null, null],
     chosen: 0,
     using: null,
-    gust: 0,
-    gusts: GUST.charges,
+    gust: 1,
     blowing: false,
   };
   for (let i = 0; i < HOTBAR.guns; i++)
@@ -464,11 +463,10 @@ export function createGame(
         if (k) slot.heal = k;
         items[i] = k ? slot : null;
       }
-      const charge = charging(c.gust);
       carried.chosen = h.using ? itemSlot(h.using.slot) : 0;
       carried.using = progress(h);
-      carried.gust = c.gust.charges + (charge < 1 ? charge : 0);
-      carried.blowing = c.gust.blowing > 0;
+      carried.gust = charged(c.gust, c.values.gustCapacity);
+      carried.blowing = c.gust.on;
       return carried;
     },
     status(width = 0, height = 0): Status {
