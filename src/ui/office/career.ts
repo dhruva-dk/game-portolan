@@ -1,186 +1,220 @@
-// The player as a manager, and the posts offered. Player: at the left who she
-// is and how she is rated (her reputation, marketability and the chairman's
-// confidence, a tile each); in the middle her seasons so far and her honours;
-// at the right the chairman's confidence on its dial over the posts offered
-// her. Jobs: the chairman's letter (she is dismissed, or sought) beside the
-// posts offered, each a card: the team under its emblem, its championship, its
-// chairman, what he expects and what he gives, and the way to take it.
+// The player as a manager, and the posts offered, on the chartroom kit.
+// Player: at the left you (your portrait, your team, how you are rated, the
+// chairman's confidence against the line you are sacked under); in the middle your
+// seasons, a row each (its team opens its page), and your honours; at the right
+// what your reputation opens (the reputation each championship offers its
+// posts at, on one track) and the posts offered you. Jobs: the chairman's
+// letter (you are dismissed, or sought) beside the posts offered. A post is a
+// card: the team under its emblem (a link), its championship, its chairman (a
+// link), where it stands, what he expects and gives, until when; Take and
+// Decline, each shut with its reason.
 
 import type { Dyed } from '../../office/papers.ts';
 import type { CareerView, JobCard, JobsView } from '../../office/people.ts';
+import { button, link } from '../chartroom/controls.ts';
+import {
+  gauge,
+  meter,
+  stepped,
+  table,
+  terms,
+  washOf,
+} from '../chartroom/data.ts';
+import { label } from '../chartroom/figures.ts';
+import { kitLooks } from '../chartroom/kit.ts';
+import { column, page } from '../chartroom/layout.ts';
+import { sheet } from '../chartroom/paper.ts';
+import { who } from '../chartroom/person.ts';
+import { u } from '../chartroom/tokens.ts';
 import { emblem } from '../emblem.ts';
-import { dial } from '../kit/chart.ts';
-import { band, panel } from '../kit/panel.ts';
 import { el } from '../kit/part.ts';
-import { portrait } from '../kit/portrait.ts';
-import { tag, tile, tiles } from '../kit/stat.ts';
-import { cut, stylesheet } from '../kit/style.ts';
-import { table } from '../kit/table.ts';
-import { acted, bitsStyle, jacketOf, lines, who } from './bits.ts';
+import { stylesheet } from '../kit/style.ts';
+import { jacketOf } from './faces.ts';
+import { toPerson, toTeam } from './links.ts';
 import type { Office } from './office.ts';
 import type { Screen } from './screens.ts';
 
 const CSS = `
-.s-player { grid-template-columns: 300px 1fr 340px; }
-.s-jobs { grid-template-columns: 400px 1fr; }
-.s-player .k-body, .s-jobs .k-body { gap: 8px; }
-.j-me { flex: none; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 12px 0 6px; text-align: center; }
-.j-me > b { font: 700 22px/1.1 var(--serif); }
-.j-rank { flex: none; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px; background: var(--dark); }
-.j-rank > b { font: 700 30px/1 var(--narrow); }
-.j-rank > span, .j-none { font-style: italic; color: var(--faint); }
-.j-none { flex: 1; display: grid; place-items: center; text-align: center; padding: 12px; }
-.j-history { flex: 1; min-height: 0; display: flex; }
-.j-history ~ .j-none { flex: none; }
-.j-chair > .k-head { padding-left: 10px; padding-right: 10px; letter-spacing: .06em; }
-.j-honours { flex: none; max-height: 180px; overflow-y: auto; display: flex; flex-direction: column; gap: 1px; }
-.j-honours > div { padding: 7px 10px; background: var(--dark); }
-.j-chair { flex: none; }
-.j-chair > .k-body { align-items: center; gap: 6px; }
-.j-chair .b-faint { text-align: center; }
-.j-offers { flex: 1; }
-.j-list { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
-.j-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 10px; overflow-y: auto; align-content: start; }
-.j-post { flex: none; display: flex; flex-direction: column; gap: 8px; padding: 10px; ${cut('light')} }
-.j-post > header { display: flex; align-items: center; gap: 10px; min-width: 0; }
-.j-post > header > div { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.j-post > header b { font: 700 18px/1.1 var(--serif); letter-spacing: .03em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.jb-crest { display: flex; align-items: center; gap: var(--s3); min-width: 0; }
+.jb-crest > svg { flex: none; width: ${u(26)}; height: ${u(26)}; }
+.jb-crest > div { min-width: 0; display: flex; flex-direction: column; gap: ${u(1)}; }
+.jb-crest .cr-link { font: 700 var(--t-name)/1.15 var(--face); overflow-wrap: break-word; }
+.jb-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s4); align-content: start; overflow-y: auto; }
+.jb-tiers { display: flex; flex-direction: column; }
+.jb-tiers > div { display: flex; justify-content: space-between; gap: var(--s2); padding: var(--s1) 0; border-bottom: var(--w-fine) solid var(--rule); }
+.jb-tiers > div > span { font: 500 var(--t-body)/1.2 var(--face); }
+.jb-tiers > div.shut > span { color: var(--ink-2); }
+.jb-words { display: flex; flex-direction: column; gap: var(--s3); }
+.jb-words > p { margin: 0; font: 400 var(--t-name)/1.45 var(--face); }
 `;
 
-/** `made`, of the class `cls` too (a panel's place in its column). */
-const as = <T extends Element>(made: T, cls: string) => {
-  made.classList.add(cls);
-  return made;
-};
+type Dyes = Dyed<unknown>['dyes'];
 
 /** A team's offer of its manager's post, a card. */
-function post(c: JobCard, dyes: Dyed<unknown>['dyes'], office: Office) {
-  return el(
-    'div',
-    'j-post',
+function post(c: JobCard, dyes: Dyes, office: Office) {
+  const send = (kind: 'TakeJob' | 'DeclineJob') => () =>
+    office.ask({ kind: 'send', command: { kind, team: c.team } });
+  const dye = dyes[c.colours.dye % Math.max(1, dyes.length)];
+  return sheet(null, [
     el(
-      'header',
-      '',
-      // (the chairman wears his team's dye: the emblem is drawn in it)
-      emblem(c.emblem, jacketOf(c.chairmanFace, dyes), 44),
-      el('div', '', el('b', '', c.name), el('span', 'b-faint', c.tier))
+      'div',
+      'jb-crest',
+      dye ? emblem(c.emblem, dye, 26) : null,
+      el('div', '', link(c.name, toTeam(office)(c.team)), label(c.tier))
     ),
-    who(c.chairmanFace, dyes, `${c.chairman}, Chairman`, 36),
-    lines([
+    who(
+      {
+        jacket: jacketOf(c.chairmanFace, dyes),
+        name: link(c.chairman, toPerson(office)(c.chairmanId)),
+        said: 'Chairman',
+      },
+      26,
+      'beside'
+    ),
+    terms([
       ['Stands', c.standing],
-      ['Season Objective', c.target],
+      ['Objective', c.target],
       ['Budget', c.budget.text],
-      ['Offer Stands', c.expires],
+      ['Offer stands', c.expires],
     ]),
-    acted(
-      'Take Job',
-      c.take,
-      () =>
-        office.ask({
-          kind: 'send',
-          command: { kind: 'TakeJob', team: c.team },
-        }),
-      'on'
-    )
-  );
+    el(
+      'div',
+      'cr-card-foot pair',
+      button('Take', send('TakeJob'), { off: c.take.ok ? null : c.take.why }),
+      button('Decline', send('DeclineJob'), {
+        kind: 'plain',
+        off: c.decline.ok ? null : c.decline.why,
+      })
+    ),
+  ]);
 }
 
 /** The player. */
 export function createPlayer(office: Office): Screen<Dyed<CareerView>> {
+  kitLooks();
   stylesheet(CSS);
-  bitsStyle();
-  const root = el('div', 'b-pad s-player');
+  const root = page('side', 's-player'),
+    teamPage = toTeam(office);
+
+  /** You, and how you are rated. */
+  const you = (v: CareerView, dyes: Dyes) => {
+    const sacked =
+        v.confidence.explain?.lines.find((l) => l.label === 'Sacked under')
+          ?.amount ?? '',
+      of = v.rank.against?.kind === 'rank' ? v.rank.against.of : null,
+      wash = washOf(v.confidence.value / 100),
+      marks = v.posts
+        .map((p) => p.at / 100)
+        .filter((m) => m > 0)
+        .sort((a, b) => a - b);
+    return sheet(
+      null,
+      [
+        who(
+          {
+            jacket: jacketOf(v.face, dyes),
+            name: v.name,
+            said: el(
+              'span',
+              '',
+              'Manager of ',
+              link(v.team, teamPage(v.teamId))
+            ),
+          },
+          64
+        ),
+        label(`Age ${v.age}`),
+        terms([
+          [
+            'Rank of managers',
+            of === null ? v.rank.text : `${v.rank.text} of ${of}`,
+          ],
+          ['Marketability', `${v.marketability.text} of 100`],
+        ]),
+        gauge(
+          'Reputation',
+          v.reputation.text,
+          stepped(
+            v.reputation.value / 100,
+            marks,
+            marks.filter((m) => v.reputation.value / 100 >= m).length
+          )
+        ),
+        el(
+          'div',
+          'jb-tiers',
+          ...v.posts.map((p) =>
+            el(
+              'div',
+              p.open ? '' : 'shut',
+              el('span', '', p.tier),
+              label(p.open ? 'Posts open' : `At ${p.at}`)
+            )
+          )
+        ),
+        gauge(
+          'Chairman’s confidence',
+          `${v.confidence.text} of 100`,
+          meter(v.confidence.value / 100, wash),
+          wash === 'harm'
+        ),
+        sacked && label(`Under ${sacked}, the chairman lets you go.`),
+      ],
+      { cls: 'cr-grow' }
+    );
+  };
+
+  /** Your seasons, newest first, each with its honours. */
+  const record = (v: CareerView) =>
+    sheet(
+      'Your Career',
+      [
+        table(
+          [
+            { head: 'Season', track: u(32), cell: (r) => r.season },
+            {
+              head: 'Team',
+              track: 'minmax(0, 1fr)',
+              cell: (r) => (r.teamId === null ? r.team : link(r.team)),
+            },
+            { head: 'Championship', track: u(92), cell: (r) => r.tier },
+            { head: 'Races', track: u(28), num: true, cell: (r) => r.races },
+            { head: 'Points', track: u(32), num: true, cell: (r) => r.points },
+            {
+              head: 'Honours',
+              track: u(92),
+              cell: (r) => r.honours.join(', '),
+            },
+          ],
+          v.record,
+          {
+            tap: (r) => teamPage(r.teamId),
+            none: 'Your first season is under way.',
+            scrolls: { keep: 'record' },
+          }
+        ),
+      ],
+      { cls: 'cr-grow', aside: `${v.record.length} seasons` }
+    );
+
+  /** The posts offered you, side by side. */
+  const offers = (v: CareerView, dyes: Dyes) =>
+    sheet(
+      'Posts Offered',
+      [
+        v.offers.length > 0
+          ? el('div', 'jb-cards', ...v.offers.map((c) => post(c, dyes, office)))
+          : label('No team has offered you its post.'),
+      ],
+      { aside: `${v.offers.length}` }
+    );
+
   return {
     el: root,
     show({ view: v, dyes }) {
       root.replaceChildren(
-        panel('Team Manager', [
-          el(
-            'div',
-            'j-me',
-            portrait(jacketOf(v.face, dyes), 132),
-            el('b', '', v.name),
-            tag(v.team, 'go', 'boxed'),
-            el('span', 'b-faint', `Age ${v.age}`)
-          ),
-          band('Manager Stats'),
-          tiles([
-            tile('Reputation', v.reputation.value, 100),
-            tile('Marketability', v.marketability.value, 100),
-            tile('Confidence', v.confidence.value, 100),
-          ]),
-          el(
-            'div',
-            'j-rank',
-            el('span', '', 'Rank of Managers'),
-            el('b', '', v.rank.text)
-          ),
-        ]),
-        panel('Career History', [
-          el(
-            'div',
-            'j-history',
-            v.record.length > 0
-              ? table(
-                  [
-                    { label: 'Season', width: '64px', cell: (r) => r.season },
-                    { label: 'Team', width: '1fr', cell: (r) => r.team },
-                    {
-                      label: 'Championship',
-                      width: '1fr',
-                      cell: (r) => r.tier,
-                    },
-                    { label: 'Role', width: '90px', cell: (r) => r.role },
-                    {
-                      label: 'Races',
-                      width: '50px',
-                      num: true,
-                      cell: (r) => r.races,
-                    },
-                    {
-                      label: 'Points',
-                      width: '54px',
-                      num: true,
-                      cell: (r) => r.points,
-                    },
-                  ],
-                  v.record,
-                  { keep: 'record' }
-                )
-              : el(
-                  'div',
-                  'j-none',
-                  'Her first season is under way: no season is on her record yet.'
-                )
-          ),
-          band('Honours'),
-          v.honours.length > 0
-            ? el('div', 'j-honours', ...v.honours.map((h) => el('div', '', h)))
-            : el('div', 'j-none', 'None yet.'),
-        ]),
-        el(
-          'div',
-          'b-col',
-          as(
-            panel('Chairman’s Confidence', [
-              dial(v.confidence.value / 100, 'Disappointed', 'Happy', 150),
-              el('div', 'b-faint', `${v.confidence.text} of 100`),
-            ]),
-            'j-chair'
-          ),
-          as(
-            panel('Job Offers', [
-              v.offers.length > 0
-                ? el(
-                    'div',
-                    'j-list',
-                    ...v.offers.map((c) => post(c, dyes, office))
-                  )
-                : el('div', 'j-none', 'No team has offered her its post.'),
-            ]),
-            'j-offers'
-          )
-        )
+        column(you(v, dyes)),
+        column(record(v), offers(v, dyes))
       );
     },
   };
@@ -188,18 +222,46 @@ export function createPlayer(office: Office): Screen<Dyed<CareerView>> {
 
 /** The posts offered. */
 export function createJobs(office: Office): Screen<Dyed<JobsView>> {
+  kitLooks();
   stylesheet(CSS);
-  bitsStyle();
-  const root = el('div', 'b-pad s-jobs');
+  const root = page('side', 's-jobs');
   return {
     el: root,
     show({ view: v, dyes }) {
+      const l = v.letter;
       root.replaceChildren(
-        panel(v.letter.title, [
-          who(v.letter.face, dyes, v.letter.from, 44),
-          el('div', 'b-text', v.letter.paragraphs.join('\n\n')),
-        ]),
-        el('div', 'j-cards', ...v.offers.map((c) => post(c, dyes, office)))
+        column(
+          sheet(
+            v.sacked ? 'Dismissed' : 'An Offer',
+            [
+              who(
+                {
+                  jacket: jacketOf(l.face, dyes),
+                  name: l.title,
+                  said: link(l.from, toPerson(office)(l.fromId)),
+                },
+                48
+              ),
+              el('div', 'jb-words', ...l.paragraphs.map((p) => el('p', '', p))),
+            ],
+            { cls: 'cr-grow' }
+          )
+        ),
+        column(
+          sheet(
+            'Posts Offered',
+            [
+              v.offers.length > 0
+                ? el(
+                    'div',
+                    'jb-cards',
+                    ...v.offers.map((c) => post(c, dyes, office))
+                  )
+                : label('No team has offered you its post.'),
+            ],
+            { cls: 'cr-grow', aside: `${v.offers.length}` }
+          )
+        )
       );
     },
   };

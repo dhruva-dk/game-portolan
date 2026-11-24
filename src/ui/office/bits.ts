@@ -2,14 +2,9 @@
 // list of names and values, a range of stars, a button that says why it is
 // shut, and money as the office sets it.
 
-import type { Face } from '../../office/career.ts';
-import type { Dyed } from '../../office/papers.ts';
 import type { Act } from '../../office/people.ts';
-import type { Jacket } from '../gull.ts';
-import { OFFICE } from '../ink.ts';
 import { button } from '../kit/button.ts';
 import { el, grouped, type Kid } from '../kit/part.ts';
-import { portrait } from '../kit/portrait.ts';
 import { stylesheet } from '../kit/style.ts';
 
 const CSS = `
@@ -34,30 +29,6 @@ const CSS = `
 
 /** The bits' styles, once. */
 export const bitsStyle = () => stylesheet(CSS);
-
-/** A free agent's jacket: no team's. */
-const PLAIN: Jacket = [OFFICE.faint, OFFICE.panel];
-
-/** The jacket a face wears: their team's dye as the page shows it. */
-export const jacketOf = (
-  face: Face | null,
-  dyes: Dyed<unknown>['dyes']
-): Jacket =>
-  (face?.colours && dyes[face.colours.dye % Math.max(1, dyes.length)]) || PLAIN;
-
-/** A person named beside their portrait. */
-export const who = (
-  face: Face | null,
-  dyes: Dyed<unknown>['dyes'],
-  name: string,
-  size = 30
-) =>
-  el(
-    'div',
-    'b-who',
-    portrait(jacketOf(face, dyes), size),
-    el('span', '', name)
-  );
 
 /** Names and their values, a line each. */
 export const lines = (rows: readonly (readonly [string, Kid])[]) =>

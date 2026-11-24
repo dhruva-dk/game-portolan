@@ -73,19 +73,22 @@ export function careerView(s: CareerState): CareerView {
   const reps = [...managers].sort((a, b) => b - a),
     best = reps[0] ?? p.reputation;
   const lines = me.history;
-  const honours: string[] = [];
-  lines.forEach((h, i) => {
-    const next = lines[i + 1];
-    if (h.best === 1) honours.push(`${seasonYear(h)} · Race won`);
-    if (
+  /** A season's honours: a race won, the team promoted at its end. */
+  const honours = (i: number): string[] => {
+    const h = lines[i],
+      next = lines[i + 1];
+    if (!h) return [];
+    const promoted =
       next &&
       h.team === next.team &&
       h.tier !== null &&
       next.tier !== null &&
-      next.tier < h.tier
-    )
-      honours.push(`${seasonYear(h)} · Promoted`);
-  });
+      next.tier < h.tier;
+    return [
+      ...(h.best === 1 ? ['Race won'] : []),
+      ...(promoted ? ['Promoted'] : []),
+    ];
+  };
   return {
     top: topBar(s),
     face: faceOf(s, me),
@@ -144,9 +147,8 @@ export function careerView(s: CareerState): CareerView {
       const at = TUNING.chairman.jobs[i] ?? 0;
       return { tier, at, open: p.reputation >= at };
     }),
-    record: [...lines]
-      .reverse()
-      .map((h) => ({
+    record: lines
+      .map((h, i) => ({
         season: String(seasonYear(h)),
         teamId: h.team,
         team: h.team === null ? 'Free' : s.teams[h.team].name,
@@ -154,8 +156,9 @@ export function careerView(s: CareerState): CareerView {
         role: ROLE_NAMES[h.role],
         races: h.races,
         points: h.points,
-      })),
-    honours,
+        honours: honours(i),
+      }))
+      .reverse(),
     offers: p.offers.map((o) => card(s, o.team, o.expires)),
   };
 }

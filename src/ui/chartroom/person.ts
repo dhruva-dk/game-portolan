@@ -27,7 +27,7 @@ export const PERSON_CSS = `
 .cr-badge > svg { width: ${u(11)}; height: ${u(11)}; }
 .cr-rating { display: grid; grid-template-columns: auto auto; align-items: center; justify-content: center; gap: ${u(1)} var(--s2); }
 .cr-card-foot { margin-top: auto; display: flex; flex-direction: column; gap: var(--s2); }
-.cr-card-foot.pair { display: grid; grid-template-columns: 1fr 1fr; align-items: start; }
+.cr-card-foot.pair { display: grid; grid-template-columns: 1fr 1fr; grid-auto-flow: row dense; align-items: start; }
 .cr-card-foot .cr-btn { padding: 0 var(--s2); }
 /* a shut way's reason under both of a pair, on one line */
 .cr-card-foot.pair > .cr-act { display: contents; }

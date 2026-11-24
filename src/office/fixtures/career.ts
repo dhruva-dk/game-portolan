@@ -69,10 +69,13 @@ export const PLAYER: CareerView = {
     ['First Championship posts at', '70'],
     ['Second Championship posts at', '45'],
   ]),
-  rank: figure('Rank of managers', [14, '14th'], 'of 60', [
-    ['Above you', '13'],
-    ['Managers', '60'],
-  ]),
+  rank: {
+    ...figure('Rank of managers', [14, '14th'], 'of 60', [
+      ['Above you', '13'],
+      ['Managers', '60'],
+    ]),
+    against: { kind: 'rank', place: 14, of: 60 },
+  },
   marketability: figure('Marketability', [46, '46'], 'of 100', [
     ['Raw', '41'],
     ['With traits', '46'],
@@ -96,6 +99,7 @@ export const PLAYER: CareerView = {
       role: 'Manager',
       races: 2,
       points: 31,
+      honours: [],
     },
     {
       season: '1718',
@@ -105,15 +109,17 @@ export const PLAYER: CareerView = {
       role: 'Manager',
       races: 10,
       points: 148,
+      honours: ['Race won'],
     },
     {
       season: '1717',
       teamId: TEAMS[5]?.id ?? null,
       team: TEAMS[5]?.name ?? 'Free',
-      tier: 'Third Championship',
+      tier: 'Second Championship',
       role: 'Manager',
       races: 10,
       points: 92,
+      honours: ['Race won'],
     },
     {
       season: '1716',
@@ -123,9 +129,9 @@ export const PLAYER: CareerView = {
       role: 'Manager',
       races: 0,
       points: 0,
+      honours: [],
     },
   ],
-  honours: ['1718 · Race won', '1718 · Race won', '1717 · Promoted'],
   offers: OFFERS,
 };
 

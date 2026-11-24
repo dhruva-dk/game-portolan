@@ -14,6 +14,7 @@
 //   crowded a head's aside over its title, or cut short
 //   broken  a word set on two lines
 //   wrapped a control's words (a button's, a choice's part) on two lines
+//   parted  a pair of ways not side by side
 //   inset   a sheet's first words (its head, or its body's first thing) no
 //           nearer its top edge than a sheet with a head has them
 //   node tools/layout.ts [screen ...]
@@ -39,6 +40,8 @@ const SCREENS = [
   'sponsors',
   'calendar',
   'mail',
+  'player',
+  'jobs',
 ];
 
 /** How far apart two edges or centres may be, CSS px. */
@@ -286,6 +289,16 @@ try {
         );
         if (tops.size > 1)
           out.push(`wrapped: ${name(c)} set on ${tops.size} lines`);
+      }
+
+      // parted: a pair of ways not side by side (a shut one's reason between them)
+      for (const f of all(body, '.cr-card-foot.pair').filter(shown)) {
+        const tops = new Set(
+          all(f, '.cr-btn')
+            .filter(shown)
+            .map((b) => Math.round(b.getBoundingClientRect().top))
+        );
+        if (tops.size > 1) out.push(`parted: ${name(f)} on ${tops.size} lines`);
       }
 
       // inset: a sheet's first words off its top edge, head or none

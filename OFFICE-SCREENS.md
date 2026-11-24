@@ -20,7 +20,7 @@ business logic given a screen, and the old kit deleted. The battle HUD stays as 
 ## How a screen is checked (before it is called built)
 
 1. `npm test`: the tokens test, and `tools/layout.ts` on every kit screen's fixture (frame, pixel, centre, inside,
-   clipped, under, squeezed, dead, unmarked, crowded, broken, wrapped, inset). A new screen joins `layout.ts`'s list when it is
+   clipped, under, squeezed, dead, unmarked, crowded, broken, wrapped, parted, inset). A new screen joins `layout.ts`'s list when it is
    built; its fixture's names are as long as a career's.
 2. `node tools/career/play.ts --tour`: the live career through it, real data, no page errors.
 3. Its 2× capture (`tools/capture.ts`, the iPad's density), looked at last: measured first, judged second.
@@ -37,7 +37,7 @@ business logic given a screen, and the old kit deleted. The battle HUD stays as 
 | Race plan fixed: drivers as they stand, `parts: []`, sponsor objective 0; `Forfeit` never sent                              | `career/office.ts:433`                                                  | Race day            |
 | Can't design for next season (`forNext` false); next season's parts hidden; no part risk shown                              | `ui/office/yard.ts:655`, `career/papers.ts:339`, `office/papers.ts:114` | Ship                |
 | ~~A sponsor offer's sign check looks at slot 0 only, though three slots are offered (bug)~~ (each slot checked, 2026-11-23) | `career/papers.ts`                                                      | Sponsors            |
-| `DeclineJob` never sent; Continue takes the best post unasked                                                               | `ui/office/career.ts:75`, `manager.ts:158`                              | Jobs                |
+| ~~`DeclineJob` never sent~~ (Jobs, 2026-11-23); Continue takes the best post unasked                                        | `ui/office/career.ts:75`, `manager.ts:158`                              | Jobs                |
 | ~~Rivals: managers' personalities, their teams; standings rows lead nowhere~~ (Rival, 2026-11-23); their moves kept nowhere | `career/rivals.ts`, `leadership.ts`                                     | Rival (new)         |
 | Chairman's temper, own budget and debt floor, sacking rules, team reputation and marketability                              | `career/chairmen.ts`, `reputation.ts`, `views.ts:210`                   | Board (new)         |
 | Season's end (prize money, promotion, relegation, retirements, the new intake) only as letters                              | `career/season.ts`, `round.ts`                                          | Season review (new) |
@@ -133,7 +133,15 @@ Each line: built on the kit from a fixture → in review → approved and live. 
       talks (the last answer, those before, who else is talking); the terms, each control beside what they ask or counter,
       the bonus terms with the break clause (never shown before); what they expect, each met so far; the cost and the
       ways on
-- [ ] Jobs (+ decline) · [ ] Player
+- [ ] **Player** _(in review, 2026-11-23)_: at the left you (your team a link; rank of managers, marketability; your
+      reputation on a track with a node at each championship's threshold, and which championships' posts are open to
+      you, never shown before; the chairman's confidence and the line you are sacked under); your career, a season a
+      row (its team opens its page, its honours on it, seasons as years now); the posts offered, a card each
+- [ ] **Jobs** _(in review, 2026-11-23)_: the chairman's letter (dismissed, or an offer; the chairman a link) beside
+      the posts offered. A post is a card: the team (a link) under its emblem, its championship, its chairman (a
+      link), where it stands, what he expects and gives, until when; **Take and Decline** (Decline was never sent;
+      sacked, the last post cannot be declined), each shut with its reason under the pair. Thin: the letter is one
+      line, and a post says nothing of the team's ships, drivers or HQ (to discuss)
 
 ### 4. Race day
 

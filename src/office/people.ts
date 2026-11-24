@@ -239,7 +239,7 @@ export interface JobCard {
   take: Act;
   decline: Act;
 }
-/** `career`: the player as a manager: who, how rated, the reputation each championship's posts are offered at (open: hers is enough), the record by season, honours, the posts offered. */
+/** `career`: the player as a manager: who, how rated, the reputation each championship's posts are offered at (open: hers is enough), the record by season with its honours, the posts offered. */
 export interface CareerView {
   top: TopBar;
   face: Face;
@@ -260,8 +260,9 @@ export interface CareerView {
     role: string;
     races: number;
     points: number;
+    /** The season's honours: a race won, promotion. */
+    honours: readonly string[];
   }[];
-  honours: readonly string[];
   offers: readonly JobCard[];
 }
 /** `jobs`: the chairman's letter (sacked, or tempted away), and the posts offered. */

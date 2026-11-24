@@ -519,3 +519,27 @@ test('career and jobs: reputation ranked among managers; sacked, the old chairma
   assert.ok(j.offers.every((o) => o.expires === 'Until taken'));
   explained(j);
 });
+
+test('career and jobs: each championship’s posts open at a reputation, hers enough or not; the letter’s chairman and each post’s are people; sacked with one post left, it cannot be declined', () => {
+  const s = founded(),
+    v = careerView(s),
+    rep = s.player!.reputation;
+  assert.equal(v.posts.length, 3);
+  for (const p of v.posts) assert.equal(p.open, rep >= p.at);
+  assert.equal(v.teamId, s.player!.team);
+  const sacked = sackedOffers({ ...s, player: { ...s.player!, sacked: true } });
+  const j = jobsView(sacked);
+  assert.equal(
+    j.letter.fromId,
+    sacked.teams[sacked.player!.team]!.staff.chairman
+  );
+  for (const o of j.offers)
+    assert.equal(o.chairmanId, sacked.teams[o.team]!.staff.chairman);
+  const one = jobsView({
+    ...sacked,
+    player: { ...sacked.player!, offers: sacked.player!.offers.slice(0, 1) },
+  });
+  assert.equal(one.offers[0]?.decline.ok, false);
+  assert.match(one.offers[0]?.decline.why ?? '', /take this post/);
+  if (j.offers.length > 1) assert.ok(j.offers.every((o) => o.decline.ok));
+});
