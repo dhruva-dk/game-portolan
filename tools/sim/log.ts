@@ -1,4 +1,4 @@
-import { debugOf, PARTS, type Part } from '../../src/play/state.ts';
+import { debugOf, PARTS, type Part } from '../../src/sim/engine.ts';
 import { STEP } from '../../src/sim/fixed.ts';
 import { GUNS } from '../../src/sim/handling.ts';
 import { isArms } from '../../src/sim/loot.ts';

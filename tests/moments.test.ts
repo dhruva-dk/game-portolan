@@ -18,7 +18,8 @@ import {
   noise,
 } from '../src/play/shake.ts';
 import { STOPS, createStops, stopFor } from '../src/play/stops.ts';
-import { createState, debugOf, type Match } from '../src/play/state.ts';
+import { createState, debugOf } from '../src/play/state.ts';
+import type { Match } from '../src/sim/engine.ts';
 import { lookOf } from '../src/play/colors.ts';
 import { PLAYER } from '../src/sim/match.ts';
 import { watersAt } from '../src/sim/waters.ts';

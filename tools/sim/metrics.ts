@@ -1,5 +1,5 @@
 import type { GunKind } from '../../src/sim/kinds.ts';
-import { debugOf } from '../../src/play/state.ts';
+import { debugOf } from '../../src/sim/engine.ts';
 import type { Memory } from '../../src/sim/bot.ts';
 import { BOT, type Mode } from '../../src/sim/captain.ts';
 import { GUNS, SHIP } from '../../src/sim/handling.ts';
