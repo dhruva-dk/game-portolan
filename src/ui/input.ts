@@ -11,7 +11,7 @@
 // pressed (gust), with a finger or a click. What they mean is the game's
 // business (play/game.ts step); this only reports them.
 
-import type { Call, Hands } from '../player.ts';
+import type { Hands } from '../player.ts';
 import { clamp } from '../world/scalar.ts';
 import { view } from './ui.ts';
 
@@ -56,8 +56,7 @@ export function createInput(element: HTMLElement, steers: () => boolean) {
     fired = false,
     holding = false,
     tapped: number | null = null,
-    gusted = false,
-    called: Call | undefined;
+    gusted = false;
 
   element.addEventListener('pointerdown', (e) => {
     element.setPointerCapture(e.pointerId);
@@ -133,14 +132,7 @@ export function createInput(element: HTMLElement, steers: () => boolean) {
         gust = gusted;
       fired = gusted = false;
       tapped = null;
-      const hands: Hands = { stick, look, fire, tap, gust };
-      if (called !== undefined) hands.call = called;
-      called = undefined;
-      return hands;
-    },
-    /** Her team's call changed, read once. */
-    call(c: Call) {
-      called = c;
+      return { stick, look, fire, tap, gust };
     },
     /**
      * Fire pressed (down) or let go: her gun fires while it is held, at its

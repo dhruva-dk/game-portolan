@@ -33,7 +33,6 @@ const ship = (id: number, over: Partial<RaceShip> = {}): RaceShip => ({
       lookout: 10,
     },
   },
-  call: 'free',
   forfeit: false,
   ...over,
 });

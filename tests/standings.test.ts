@@ -1,4 +1,4 @@
-// The race as its HUD reads it (player.ts Race, play/standings.ts): her teammates, the standings and her team's call, as
+// The race as its HUD reads it (player.ts Race, play/standings.ts): her teammates and the standings, as
 // plain data off the state of a carded race.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -11,7 +11,6 @@ import { HEALTH } from '../src/sim/handling.ts';
 import { PLAYER } from '../src/sim/match.ts';
 import { chart } from '../src/sim/route.ts';
 import { berthing } from '../src/sim/spawn.ts';
-import { NOTHING } from '../src/sim/stores.ts';
 import { landOf, planetOf } from '../src/world/land.ts';
 import type { Vec3 } from '../src/world/sphere.ts';
 import { flat } from '../src/world/swell.ts';
@@ -62,13 +61,13 @@ test('a match with no card has no race to read', () => {
   assert.equal(state.race(PLAYER), null);
 });
 
-test('as a race begins: her team and its call, her three teammates whole and afloat, every ship in the standings', () => {
+test('as a race begins: her team, her three teammates whole and afloat, every ship in the standings', () => {
   const { card, state } = begun();
   state.advance(IDLE.helm, IDLE.gun);
   const r = state.race(PLAYER);
   assert.ok(r);
   sound(r, card.ships.length);
-  assert.deepEqual([r.team, r.call], [0, 'free']);
+  assert.equal(r.team, 0);
   assert.deepEqual(
     r.mates.map((m) => m.id),
     [1, 2, 3]
@@ -97,15 +96,12 @@ test('as a race begins: her team and its call, her three teammates whole and afl
   );
 });
 
-test("her team's call as she changes it; a mate sunk, and the ship that sank her credited and placed first", () => {
+test('a mate sunk, and the ship that sank her credited and placed first', () => {
   const { card, state } = begun();
-  state.advance(IDLE.helm, IDLE.gun, { ...NOTHING, call: 'hold' });
-  let r = state.race(PLAYER);
-  assert.equal(r?.call, 'hold');
-  assert.equal(state.race(5)?.call, 'free', "another team's is its own");
+  state.advance(IDLE.helm, IDLE.gun);
   debugOf(state).sink(2, 5);
   state.advance(IDLE.helm, IDLE.gun);
-  r = state.race(PLAYER);
+  const r = state.race(PLAYER);
   assert.ok(r);
   sound(r, card.ships.length);
   const mate = r.mates.find((m) => m.id === 2);

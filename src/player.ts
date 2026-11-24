@@ -5,7 +5,6 @@
 // reports comes out (Status, read by ui/hud.ts), with what she carries (Kit).
 
 import type { Faults, GunKind, LootKind, Use, Zones } from './kinds.ts';
-import type { Call } from './race.ts';
 import type { Vec3 } from './world/sphere.ts';
 
 /** Her hands, as read for a frame. */
@@ -32,11 +31,6 @@ export interface Hands {
   tap: number | null;
   /** Whether Gust has been pressed since the last read. */
   gust: boolean;
-  /**
-   * In a race sailed by a card (Status.race): her team's call as she changed it
-   * since the last read.
-   */
-  call?: Call | null;
 }
 
 /** No hand on anything. */
@@ -150,15 +144,14 @@ export interface Status {
 }
 
 /**
- * A race sailed by a card, as its HUD reads it (play/standings.ts): her team
- * and the call it sails under (hers to change: Hands.call); her place now (1
+ * A race sailed by a card, as its HUD reads it (play/standings.ts): her team;
+ * her place now (1
  * first) of the ships on the card; her teammates, in the order of their ids;
  * and the standings, every ship of the card, first place first. The same
  * object each time, refilled, its rows too.
  */
 export interface Race {
   team: number;
-  call: Call;
   place: number;
   of: number;
   mates: readonly Mate[];
@@ -200,10 +193,6 @@ export interface Placed {
   afloat: boolean;
   sinkings: number;
 }
-
-/** A team's calls (race.ts). */
-export { CALLS } from './race.ts';
-export type { Call } from './race.ts';
 
 /**
  * Her ship's id in what the match reports (Deed): sim/match.ts PLAYER, which

@@ -66,10 +66,6 @@ export interface Fitted {
   reliability: number;
 }
 
-/** The order a team sails under: each biases her bots' own choosing. */
-export const CALLS = ['free', 'attack', 'hold', 'form'] as const;
-export type Call = (typeof CALLS)[number];
-
 /** A ship's livery: her dye and pattern, as play/colours.ts deals them. */
 export interface Colours {
   dye: number;
@@ -87,7 +83,6 @@ export interface RaceShip {
   colours: Colours;
   parts: Readonly<Record<PartType, Fitted>>;
   driver: Driver | null;
-  call: Call;
   forfeit: boolean;
 }
 
