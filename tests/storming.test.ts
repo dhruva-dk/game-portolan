@@ -16,8 +16,8 @@ import {
   fromLatLon,
 } from '../src/world/sphere.ts';
 
-const centre = fromLatLon(0.2, 0.3),
-  { north, east } = frameAt(centre);
+const center = fromLatLon(0.2, 0.3),
+  { north, east } = frameAt(center);
 const offsets = (p: readonly number[]) => ({
   n: R * Math.asin(dot(p as [number, number, number], north)),
   e: R * Math.asin(dot(p as [number, number, number], east)),
@@ -27,12 +27,12 @@ const walled: Depth = (p) => {
   return Math.abs(n - 200) < 15 && Math.abs(e) < 350 ? -4 : 20;
 };
 const ch = chart(walled);
-const next: Cap = { centre, radius: 300 / R },
+const next: Cap = { center, radius: 300 / R },
   heart = 0.6 * 300;
-const found = building(ch, (p) => distance(p, centre) <= heart);
+const found = building(ch, (p) => distance(p, center) <= heart);
 while (!found.build(1e6));
 const storm: Storm = {
-  centre,
+  center,
   radius: 900 / R,
   next,
   closing: false,
@@ -43,7 +43,7 @@ const storm: Storm = {
 };
 
 test('a bot behind a wall inside the next cap reckons itself outside it by water, and makes down the way in', () => {
-  const at = along(centre, north, 240).p;
+  const at = along(center, north, 240).p;
   const sea = {
     depth: walled,
     chart: ch,

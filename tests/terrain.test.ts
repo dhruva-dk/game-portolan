@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { CELLS, N, centreOf } from '../src/world/cells.ts';
+import { CELLS, N, centerOf } from '../src/world/cells.ts';
 import {
   R,
   add,
@@ -11,7 +11,7 @@ import {
 } from '../src/world/sphere.ts';
 import {
   CELL,
-  centres,
+  centers,
   components,
   shoreOf,
 } from '../src/world/terrain-grid.ts';
@@ -48,7 +48,7 @@ test('the same seed makes the same terrain, to the bit', () => {
 
 test('the distance to the coast is to a smooth contour, within a fraction of a cell', () => {
   const a = 0.3,
-    p = centres(),
+    p = centers(),
     field = Float32Array.from({ length: CELLS }, (_, c) => p[3 * c + 1]);
   const shore = shoreOf(field, a);
   let worst = 0,
@@ -65,7 +65,7 @@ test('the distance to the coast is to a smooth contour, within a fraction of a c
   assert.ok(sum / CELLS < 0.01 * CELL, `mean ${(sum / CELLS).toFixed(4)} m`);
 });
 
-test("read at a cell's centre, the height is the cell's own", () => {
+test("read at a cell's center, the height is the cell's own", () => {
   const t = terrains.get(1)!,
     h = heightAt(t),
     next = random(7);
@@ -78,7 +78,7 @@ test("read at a cell's centre, the height is the cell's own", () => {
   ];
   for (let k = 0; k < 400; k++) cells.push(Math.floor(next() * CELLS));
   for (const c of cells)
-    assert.ok(Math.abs(h(centreOf(c)) - t.height[c]) < 1e-3, `cell ${c}`);
+    assert.ok(Math.abs(h(centerOf(c)) - t.height[c]) < 1e-3, `cell ${c}`);
 });
 
 test('the height is continuous and gentle everywhere, across faces too', () => {

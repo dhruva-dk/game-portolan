@@ -126,7 +126,7 @@ test('its most hull is its own: the storm takes its share of it, its stores mend
   assert.equal(useful({ ...spec.health, hull: 80 }, 'repairKit'), false);
   assert.equal(healed(blown, 100, 'shield').shield, HEALTH.shield);
   const v = afloat(1, shipAt(here, frameAt(here).east)),
-    storm = { centre: scale(here, -1), radius: 0.1, damage: 0.1 };
+    storm = { center: scale(here, -1), radius: 0.1, damage: 0.1 };
   const after = (c: Crew) =>
     weathered(battleOf([c], 1), [v], storm, 1).battle.crews[0].health.hull;
   assert.ok(Math.abs(after(spec) - 90) < 1e-9);

@@ -182,14 +182,14 @@ function mixed(a: Look, b: Look, t: FloatNode): Mixed {
   };
 }
 
-function looked(l: Mixed, colour: Vec3Node): Vec3Node {
+function looked(l: Mixed, color: Vec3Node): Vec3Node {
   const balance = vec3(
     float(1).add(l.temp.mul(0.09)).sub(l.tint.mul(0.02)),
     float(1).add(l.tint.mul(0.05)),
     float(1).sub(l.temp.mul(0.09)).sub(l.tint.mul(0.02))
   );
   const c = pow(
-    max(colour.mul(balance), vec3(1e-6)).div(0.18),
+    max(color.mul(balance), vec3(1e-6)).div(0.18),
     vec3(l.contrast)
   ).mul(0.18);
   const mx = max(max(c.x, c.y), c.z),
@@ -203,9 +203,9 @@ function looked(l: Mixed, colour: Vec3Node): Vec3Node {
       c.x.sub(c.y).div(chroma).add(4)
     )
   ).mul(60);
-  const band = (centre: number, width: number) =>
+  const band = (center: number, width: number) =>
     max(
-      float(1).sub(abs(mod(hue.sub(centre - 540), 360).sub(180)).div(width)),
+      float(1).sub(abs(mod(hue.sub(center - 540), 360).sub(180)).div(width)),
       0
     );
   const s = l.saturation.mul(

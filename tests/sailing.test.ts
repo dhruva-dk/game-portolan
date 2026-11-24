@@ -172,7 +172,7 @@ test('over the pole: still on its great circle, its heading still a unit tangent
     speed: SHIP.top,
   };
   const plane = cross(s0.at, s0.heading);
-  let travelled = 0,
+  let traveled = 0,
     last = s0.at,
     most = -1;
   run(
@@ -181,7 +181,7 @@ test('over the pole: still on its great circle, its heading still a unit tangent
     30,
     deep,
     (s) => {
-      travelled += distance(last, s.at);
+      traveled += distance(last, s.at);
       last = s.at;
       most = Math.max(most, s.at[1]);
       assert.ok(
@@ -192,7 +192,7 @@ test('over the pole: still on its great circle, its heading still a unit tangent
     }
   );
   assert.ok(most > Math.cos(0.1 * deg), 'it passes over the pole');
-  assert.ok(Math.abs(travelled - 30 * SHIP.top) < 1e-6, `${travelled}`);
+  assert.ok(Math.abs(traveled - 30 * SHIP.top) < 1e-6, `${traveled}`);
   const away: Vec3 = [0, 0, -1];
   const pole = run(
     { ...shipAt([0, 1, 0], [1, 0, 0]), speed: 5 },
@@ -236,9 +236,9 @@ const coast = along(start, north, 120).p;
 const seaward = frameAt(coast).east;
 const offshore = (p: Vec3) => R * Math.asin(dot(normalize(p), seaward));
 const shoal: Depth = (p) => Math.min(20, -6 + offshore(p) / 4);
-const DRY = 4 * (6 + SHIP.draught);
+const DRY = 4 * (6 + SHIP.draft);
 
-test('it never sails into water shallower than its draught, at any angle, and slides along the shore', () => {
+test('it never sails into water shallower than its draft, at any angle, and slides along the shore', () => {
   for (const angle of [0, 20, 45, 70]) {
     const from = along(coast, seaward, DRY + 80).p;
     const s0 = shipAt(from, scale(frameAt(from).east, -1));
@@ -298,7 +298,7 @@ const underHull = (s: ShipState, depth: Depth) => {
         hullAt(s.at, s.heading, [-0.3 * SHIP.length, side * 0.3 * SHIP.beam])
       )
     );
-  return least - SHIP.draught;
+  return least - SHIP.draft;
 };
 
 test('coming about close along the shore, its stern swings clear of it, not onto it', () => {

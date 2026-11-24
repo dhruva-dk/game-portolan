@@ -52,8 +52,8 @@ export function hullAt(
       across,
       off
     ),
-    metres = length(d);
-  const p = along(at, scale(d, 1 / metres, off), metres, reached).p;
+    meters = length(d);
+  const p = along(at, scale(d, 1 / meters, off), meters, reached).p;
   return put(out, p[0], p[1], p[2]);
 }
 
@@ -64,7 +64,7 @@ export function under(at: Vec3, heading: Vec3, depth: Depth): number {
   let least = Infinity;
   shoalest = -1;
   for (let i = 0; i < HULL.length; i++) {
-    const c = depth(hullAt(at, heading, HULL[i], sounded)) - SHIP.draught;
+    const c = depth(hullAt(at, heading, HULL[i], sounded)) - SHIP.draft;
     if (c < least) {
       least = c;
       shoalest = i;
@@ -101,7 +101,7 @@ function swing(s: ShipState, angle: number, depth: Depth): Vec3 {
   for (const [ahead, across] of HULL) {
     if (ahead === 0 && across === 0) continue;
     const p = hullAt(s.at, s.heading, [ahead, across]),
-      c = depth(p) - SHIP.draught;
+      c = depth(p) - SHIP.draft;
     if (c >= WARNING) continue;
     const n = deeper(p, depth);
     if (!n) continue;
@@ -118,9 +118,9 @@ export function moved(
   heading: Vec3,
   move: Vec3
 ): { at: Vec3; heading: Vec3 } {
-  const metres = length(move);
-  if (metres === 0) return { at, heading };
-  const to = along(at, scale(move, 1 / metres), metres).p;
+  const meters = length(move);
+  if (meters === 0) return { at, heading };
+  const to = along(at, scale(move, 1 / meters), meters).p;
   return { at: to, heading: normalize(transport(heading, at, to)) };
 }
 

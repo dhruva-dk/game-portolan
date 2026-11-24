@@ -22,7 +22,7 @@ test('the waterline runs from the transom to the stem, no wider than its beam', 
   for (const h of half) assert.ok(h >= 0 && h <= (BEAM / 2) * SCALE);
 });
 
-test('the outline follows the lines to within a few centimetres', () => {
+test('the outline follows the lines to within a few centimeters', () => {
   for (let s = 0.02; s < 0.97; s += 0.05) {
     const off = Math.abs(at(zOf(s, 0) * SCALE) - halfAt(s, 0) * SCALE);
     assert.ok(off < 0.06, `${off.toFixed(3)} m off at station ${s.toFixed(2)}`);

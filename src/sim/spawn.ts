@@ -36,7 +36,7 @@ function lattice(count: number): Vec3[] {
 }
 
 function open(p: Vec3, depth: Depth): boolean {
-  const deep = SHIP.draught + SPAWN.depth;
+  const deep = SHIP.draft + SPAWN.depth;
   if (depth(p) < deep) return false;
   for (let r = SPAWN.ring; r <= SPAWN.clear; r += SPAWN.ring) {
     const n = Math.max(6, Math.round((SPAWN.round * r) / SPAWN.clear));
@@ -54,7 +54,7 @@ export function berthing(depth: Depth): Berthing {
 }
 
 function run(p: Vec3, t: Vec3, depth: Depth): number {
-  const deep = SHIP.draught + SPAWN.depth;
+  const deep = SHIP.draft + SPAWN.depth;
   for (let d = SPAWN.step; d <= SPAWN.ahead; d += SPAWN.step)
     if (depth(along(p, t, d).p) < deep) return d - SPAWN.step;
   return SPAWN.ahead;

@@ -264,7 +264,7 @@ test('a blow breaks off what it is mending with; the storm does not', () => {
     if (r.strikes.length) broke = b.crews[1].hold.using === null;
   }
   assert.ok(broke);
-  const out = { centre: frameAt(c0).north, radius: 1, damage: 0.01 };
+  const out = { center: frameAt(c0).north, radius: 1, damage: 0.01 };
   const w = weathered(
     battleOf([{ ...crewOf(2), health: { hull: 100, shield: 0 }, hold: h }], 1),
     [vessel(2, q)],
@@ -321,7 +321,7 @@ test('the loot is strewn evenly over the planet, on open water only, the same fo
       .strewn()
       .pieces.map((l) => l.at)
   );
-  assert.ok(f.pieces.every((l) => depth(l.at) >= SHIP.draught + PIECE.open));
+  assert.ok(f.pieces.every((l) => depth(l.at) >= SHIP.draft + PIECE.open));
   assert.ok(
     f.pieces.length > LOOT.spots * 1.3 && f.pieces.length < LOOT.spots * 1.5,
     `${f.pieces.length}`
@@ -354,7 +354,7 @@ test('every berth has a gun within reach of it at the start, on open water; one 
       f.pieces.some((l) => isArms(l.goods) && distance(l.at, b) < LOOT.berth)
     );
   for (const l of f.pieces.slice(2))
-    assert.ok(depth(l.at) >= SHIP.draught + PIECE.open);
+    assert.ok(depth(l.at) >= SHIP.draft + PIECE.open);
   assert.deepEqual(
     f,
     laying(9, depth).berthed(

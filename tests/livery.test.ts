@@ -1,8 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { hexToLinear, linearToSrgbRgb } from '../src/colour.ts';
+import { hexToLinear, linearToSrgbRgb } from '../src/color.ts';
 import { ColorManagement, Vector3 } from 'three';
-import { COLOURS, DYES, dealt, lookOf, worn } from '../src/play/colours.ts';
+import { COLORS, DYES, dealt, lookOf, worn } from '../src/play/colors.ts';
 import {
   CREAM,
   MARKS,
@@ -19,7 +19,7 @@ import type { Vec3 } from '../src/world/sphere.ts';
 
 const SEEDS = [0, 1, 7, 1234, 0xdeadbeef, 4105590181];
 const every = (f: (l: Livery) => void) => {
-  for (let dye = 0; dye < COLOURS.length; dye++)
+  for (let dye = 0; dye < COLORS.length; dye++)
     for (let pattern = 0; pattern < PATTERNS.length; pattern++)
       f({ dye, pattern });
 };
@@ -54,7 +54,7 @@ const apart = (a: Vec3, b: Vec3) => {
 };
 
 test('the set: sixteen dyes, three patterns; hers by default vermilion, plain', () => {
-  assert.equal(COLOURS.length, 16);
+  assert.equal(COLORS.length, 16);
   assert.deepEqual([...PATTERNS], ['plain', 'band', 'stripes']);
   const hers = lookOf(LIVERY);
   assert.deepEqual(hers.sail, [...hexToLinear('#D2332A')]);
@@ -63,11 +63,11 @@ test('the set: sixteen dyes, three patterns; hers by default vermilion, plain', 
 });
 
 test('every dye stands apart from every other, and from the sea, the foam and the storm', () => {
-  for (let i = 0; i < COLOURS.length; i++) {
-    for (let j = i + 1; j < COLOURS.length; j++)
+  for (let i = 0; i < COLORS.length; i++) {
+    for (let j = i + 1; j < COLORS.length; j++)
       assert.ok(
-        apart(COLOURS[i], COLOURS[j]) > 0.15,
-        `dyes ${i} and ${j}: ${apart(COLOURS[i], COLOURS[j]).toFixed(3)}`
+        apart(COLORS[i], COLORS[j]) > 0.15,
+        `dyes ${i} and ${j}: ${apart(COLORS[i], COLORS[j]).toFixed(3)}`
       );
     for (const [name, c] of Object.entries({
       SEA_SHALLOW,
@@ -78,10 +78,10 @@ test('every dye stands apart from every other, and from the sea, the foam and th
       STORM: STORM.lit,
     }))
       assert.ok(
-        apart(COLOURS[i], [...c]) > 0.18,
-        `dye ${i} near ${name}: ${apart(COLOURS[i], [...c]).toFixed(3)}`
+        apart(COLORS[i], [...c]) > 0.18,
+        `dye ${i} near ${name}: ${apart(COLORS[i], [...c]).toFixed(3)}`
       );
-    const { h, s } = hsl(COLOURS[i]);
+    const { h, s } = hsl(COLORS[i]);
     if (s > 0.2)
       assert.ok(h < 150 || h > 295, `dye ${i}'s hue ${h.toFixed(0)}°`);
   }
@@ -98,11 +98,11 @@ const contrast = (a: readonly number[], b: readonly number[]) => {
 
 test('every dye has its marks in an ink that stands out on it: cream on the dark, tar on the light', () => {
   for (const d of DYES) {
-    assert.deepEqual(d.mark, [...markOn(d.colour)]);
-    const c = contrast(d.colour, d.mark);
+    assert.deepEqual(d.mark, [...markOn(d.color)]);
+    const c = contrast(d.color, d.mark);
     assert.ok(c >= 3, `${d.name}'s marks ${c.toFixed(2)} : 1`);
     const other = d.mark[0] === MARKS.light[0] ? MARKS.dark : MARKS.light;
-    assert.ok(c >= contrast(d.colour, other), `${d.name}: the other ink`);
+    assert.ok(c >= contrast(d.color, other), `${d.name}: the other ink`);
   }
   const ink = (name: string) => DYES.find((d) => d.name === name)?.mark;
   for (const name of ['lemon', 'peach', 'chartreuse', 'rose', 'ochre'])
@@ -111,11 +111,11 @@ test('every dye has its marks in an ink that stands out on it: cream on the dark
     assert.deepEqual(ink(name), [...MARKS.light], name);
 });
 
-test('every dye has a name of its own, and its colour is the set’s', () => {
+test('every dye has a name of its own, and its color is the set’s', () => {
   assert.equal(new Set(DYES.map((d) => d.name)).size, DYES.length);
   assert.deepEqual(
-    DYES.map((d) => d.colour),
-    COLOURS
+    DYES.map((d) => d.color),
+    COLORS
   );
   assert.equal(DYES[LIVERY.dye].name, 'vermilion');
 });
@@ -123,8 +123,8 @@ test('every dye has a name of its own, and its colour is the set’s', () => {
 test("a livery's look: its dye as paint and canvas, its pattern; one past the set is hers by default", () => {
   every((l) => {
     const look = lookOf(l);
-    assert.deepEqual(look.paint, COLOURS[l.dye]);
-    assert.deepEqual(look.sail, COLOURS[l.dye]);
+    assert.deepEqual(look.paint, COLORS[l.dye]);
+    assert.deepEqual(look.sail, COLORS[l.dye]);
     assert.equal(look.pattern, PATTERNS[l.pattern]);
   });
   for (const bad of [
@@ -181,10 +181,10 @@ test('the fleet is dealt across the whole set: every other dye and every pattern
       dyes.add(l.dye);
       patterns.add(l.pattern);
     }
-    assert.equal(dyes.size, COLOURS.length - 1);
+    assert.equal(dyes.size, COLORS.length - 1);
     assert.equal(patterns.size, PATTERNS.length);
   });
-  const counts = new Array<number>(COLOURS.length).fill(0);
+  const counts = new Array<number>(COLORS.length).fill(0);
   for (let seed = 0; seed < 200; seed++)
     for (let id = 1; id < SHIPS; id++) counts[dealt(seed, id, LIVERY).dye]++;
   const others = counts.slice(1),

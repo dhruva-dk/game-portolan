@@ -2,14 +2,14 @@ import { clamp } from '../world/scalar.ts';
 import { INK, LIGHT } from './ink.ts';
 
 interface Flash {
-  colour: string;
+  color: string;
   alpha: number;
   hold?: number;
   decay: number;
   mode?: 'add' | 'tint';
 }
 interface Vignette {
-  colour: string;
+  color: string;
   alpha: number;
   reach: number;
   attack?: number;
@@ -19,17 +19,17 @@ interface Vignette {
 }
 
 export const SCREEN = {
-  fire: { flash: { colour: LIGHT.warm, alpha: 0.1, hold: 0.033, decay: 0.16 } },
-  hit: { flash: { colour: LIGHT.white, alpha: 0.08, decay: 0.12 } },
-  shieldHit: { flash: { colour: LIGHT.ice, alpha: 0.04, decay: 0.12 } },
+  fire: { flash: { color: LIGHT.warm, alpha: 0.1, hold: 0.033, decay: 0.16 } },
+  hit: { flash: { color: LIGHT.white, alpha: 0.08, decay: 0.12 } },
+  shieldHit: { flash: { color: LIGHT.ice, alpha: 0.04, decay: 0.12 } },
   shieldBreak: {
-    flash: { colour: LIGHT.ice, alpha: 0.28, decay: 0.22 },
-    vignette: { colour: LIGHT.azure, alpha: 0.35, reach: 0.45, decay: 0.4 },
+    flash: { color: LIGHT.ice, alpha: 0.28, decay: 0.22 },
+    vignette: { color: LIGHT.azure, alpha: 0.35, reach: 0.45, decay: 0.4 },
   },
   shieldLost: {
-    flash: { colour: LIGHT.ice, alpha: 0.22, decay: 0.25 },
+    flash: { color: LIGHT.ice, alpha: 0.22, decay: 0.25 },
     vignette: {
-      colour: LIGHT.azure,
+      color: LIGHT.azure,
       alpha: 0.55,
       reach: 0.55,
       hold: 0.08,
@@ -39,14 +39,14 @@ export const SCREEN = {
   },
   hurt: {
     flash: {
-      colour: LIGHT.red,
+      color: LIGHT.red,
       alpha: 0.14,
       hold: 0.02,
       decay: 0.3,
       mode: 'tint',
     },
     vignette: {
-      colour: INK.scarlet,
+      color: INK.scarlet,
       alpha: 0.6,
       reach: 0.5,
       attack: 0.02,
@@ -55,17 +55,17 @@ export const SCREEN = {
       aimed: true,
     },
   },
-  sink: { flash: { colour: LIGHT.white, alpha: 0.2, decay: 0.3 } },
+  sink: { flash: { color: LIGHT.white, alpha: 0.2, decay: 0.3 } },
   gust: {
-    vignette: { colour: LIGHT.ice, alpha: 0.22, reach: 0.35, decay: 0.5 },
+    vignette: { color: LIGHT.ice, alpha: 0.22, reach: 0.35, decay: 0.5 },
   },
   shield: {
-    flash: { colour: LIGHT.ice, alpha: 0.08, decay: 0.2 },
-    vignette: { colour: LIGHT.azure, alpha: 0.25, reach: 0.4, decay: 0.5 },
+    flash: { color: LIGHT.ice, alpha: 0.08, decay: 0.2 },
+    vignette: { color: LIGHT.azure, alpha: 0.25, reach: 0.4, decay: 0.5 },
   },
   repair: {
-    flash: { colour: LIGHT.mint, alpha: 0.06, decay: 0.2 },
-    vignette: { colour: LIGHT.green, alpha: 0.18, reach: 0.4, decay: 0.5 },
+    flash: { color: LIGHT.mint, alpha: 0.06, decay: 0.2 },
+    vignette: { color: LIGHT.green, alpha: 0.18, reach: 0.4, decay: 0.5 },
   },
 } as const satisfies Record<string, { flash?: Flash; vignette?: Vignette }>;
 
@@ -83,7 +83,7 @@ const LOW_HULL = {
   start: 0.3,
   floor: 0.05,
   bpm: [72, 128],
-  colour: INK.scarlet,
+  color: INK.scarlet,
   rest: [0.1, 0.32],
   beat: [0.12, 0.28],
   reach: [0.42, 0.6],
@@ -136,7 +136,7 @@ export function createFlash(parent: HTMLElement) {
       const el = f.mode === 'tint' ? tint : wash,
         hold = f.hold ?? 0,
         all = (hold + f.decay) * 1000;
-      el.style.background = f.colour;
+      el.style.background = f.color;
       el.animate(
         [
           { opacity: alpha },
@@ -151,7 +151,7 @@ export function createFlash(parent: HTMLElement) {
       const cx = aimed ? 50 + Math.sin(bearing) * 55 : 50,
         cy = aimed ? 50 - Math.cos(bearing) * 55 : 50;
       const inner = Math.round((1 - v.reach) * 100);
-      rim.style.background = `radial-gradient(ellipse at ${cx.toFixed(0)}% ${cy.toFixed(0)}%, transparent ${inner}%, ${v.colour} 135%)`;
+      rim.style.background = `radial-gradient(ellipse at ${cx.toFixed(0)}% ${cy.toFixed(0)}%, transparent ${inner}%, ${v.color} 135%)`;
       const attack = (v.attack ?? 0.03) * 1000,
         hold = (v.hold ?? 0) * 1000,
         all = attack + hold + v.decay * 1000;
@@ -187,7 +187,7 @@ export function createFlash(parent: HTMLElement) {
       const inner = Math.round((1 - reach) * 100),
         opacity = Math.min(1, alpha * low).toFixed(3);
       if (inner !== reached)
-        heart.style.background = `radial-gradient(ellipse at 50% 50%, transparent ${(reached = inner)}%, ${LOW_HULL.colour} 135%)`;
+        heart.style.background = `radial-gradient(ellipse at 50% 50%, transparent ${(reached = inner)}%, ${LOW_HULL.color} 135%)`;
       if (heart.style.opacity !== opacity) heart.style.opacity = opacity;
     },
   };

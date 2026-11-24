@@ -81,15 +81,15 @@ test('the packed meshes are whole: finite positions, unit normals, indices in ra
     }
 });
 
-test('it is a galleon at 0.6×: about 26 m from beak to taffrail, the mainmast 21 m up, 2 m of draught', () => {
+test('it is a galleon at 0.6×: about 26 m from beak to taffrail, the mainmast 21 m up, 2 m of draft', () => {
   for (const s of ships) {
     const { min, max } = s.bounds;
     const length = max[2] - min[2],
       height = max[1],
-      draught = -min[1];
+      draft = -min[1];
     assert.ok(length > 24 && length < 28, `length ${length}`);
     assert.ok(height > 19.5 && height < 23, `height ${height}`);
-    assert.ok(draught > 1.6 && draught < 2.6, `draught ${draught}`);
+    assert.ok(draft > 1.6 && draft < 2.6, `draft ${draft}`);
     assert.ok(
       max[0] < 6 && min[0] > -6,
       `breadth with the yards ${min[0]}…${max[0]}`

@@ -25,7 +25,7 @@ function among(i: number, n: number): boolean {
 
 export function moor(
   berths: (Berth | null)[],
-  metres: ArrayLike<number>,
+  meters: ArrayLike<number>,
   own: number,
   dt: number
 ): (Berth | null)[] {
@@ -33,9 +33,9 @@ export function moor(
   for (; n < BERTHS; n++) {
     let best = -1,
       bestRank = Infinity;
-    for (let i = 0; i < metres.length; i++) {
-      if ((i !== own && !(metres[i] < CLOTH_REACH)) || among(i, n)) continue;
-      const rank = i === own ? -1 : metres[i] / (holds(berths, i) ? KEEP : 1);
+    for (let i = 0; i < meters.length; i++) {
+      if ((i !== own && !(meters[i] < CLOTH_REACH)) || among(i, n)) continue;
+      const rank = i === own ? -1 : meters[i] / (holds(berths, i) ? KEEP : 1);
       if (rank < bestRank) {
         best = i;
         bestRank = rank;

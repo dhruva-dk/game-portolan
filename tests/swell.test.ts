@@ -62,7 +62,7 @@ test('the modes kept hold nearly all the long waves', () => {
   }
 });
 
-test('under a hull the kept modes read as all of them do, to a few centimetres', () => {
+test('under a hull the kept modes read as all of them do, to a few centimeters', () => {
   const every = createSwell(all, open, 10, { count: Infinity }).at,
     kept = createSwell(all, open, 10).at;
   const err: number[] = [],

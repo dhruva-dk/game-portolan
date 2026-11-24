@@ -30,7 +30,7 @@ import {
 import {
   CELLS,
   N,
-  centreOf,
+  centerOf,
   columnOf,
   faceOf,
   rowOf,
@@ -222,7 +222,7 @@ test("the cube's faces are FACES's (the table the shaders' view/cube.ts is built
     nearV(d, normalize(p), 1e-12, 'faceDir');
   }
   for (let c = 0; c < CELLS; c += 997) {
-    const t = table(centreOf(c));
+    const t = table(centerOf(c));
     assert.equal(t.face, faceOf(c));
     near(((t.u + 1) / 2) * N - 0.5, columnOf(c), 1e-9, 'column');
     near(((t.v + 1) / 2) * N - 0.5, rowOf(c), 1e-9, 'row');
@@ -238,13 +238,13 @@ test('apart never says so of points within the distance, and says so of nearly a
       1 + (i % 3)
     );
     const b = fromLatLon(Math.asin(2 * ((i * 0.377) % 1) - 1), i * 1.7);
-    for (const metres of [5, 90, 370, 700]) {
+    for (const meters of [5, 90, 370, 700]) {
       const d = distance(a, b);
-      if (d <= metres)
-        assert.ok(!apart(a, b, metres), `${d} m within ${metres}`);
-      else if (d > metres * 1.01 + 1) {
+      if (d <= meters)
+        assert.ok(!apart(a, b, meters), `${d} m within ${meters}`);
+      else if (d > meters * 1.01 + 1) {
         beyond++;
-        if (!apart(a, b, metres)) missed++;
+        if (!apart(a, b, meters)) missed++;
       }
     }
   }

@@ -121,7 +121,7 @@ export function createTables() {
     vec3(
       exp(h.negate().div(A.RAYLEIGH_SCALE_HEIGHT)),
       exp(h.negate().div(A.MIE_SCALE_HEIGHT)).mul(haze),
-      max(float(1).sub(abs(h.sub(A.OZONE_CENTRE)).div(A.OZONE_HALF_WIDTH)), 0)
+      max(float(1).sub(abs(h.sub(A.OZONE_CENTER)).div(A.OZONE_HALF_WIDTH)), 0)
     );
 
   const sunTransmittance = (

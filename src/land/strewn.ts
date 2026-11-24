@@ -33,11 +33,11 @@ const ball = (
   const h = (o: number): FloatNode =>
     mx_cell_noise_float(cell.add(k + o * 7.31));
   const r = mix(float(radius[0]), float(radius[1]), h(0));
-  const centre = vec3(h(1), h(2), h(3))
+  const center = vec3(h(1), h(2), h(3))
     .mul(float(1).sub(r.mul(2)))
     .add(r);
   const inside = float(1)
-    .sub(length(f.sub(centre)).div(r))
+    .sub(length(f.sub(center)).div(r))
     .clamp(0, 1);
   return inside.mul(select(h(4).lessThan(share), float(1), float(0)));
 };

@@ -166,16 +166,16 @@ export const turned = (
 };
 
 export interface Framing {
-  centre: [number, number];
+  center: [number, number];
   size: number;
 }
-export const WHOLE: Readonly<Framing> = { centre: [0, 0], size: 1 };
+export const WHOLE: Readonly<Framing> = { center: [0, 0], size: 1 };
 const FRAMED = 5;
 
 export function framed(f: Framing, to: Readonly<Framing>, dt: number): Framing {
   const k = 1 - Math.exp(-FRAMED * dt);
-  f.centre[0] += (to.centre[0] - f.centre[0]) * k;
-  f.centre[1] += (to.centre[1] - f.centre[1]) * k;
+  f.center[0] += (to.center[0] - f.center[0]) * k;
+  f.center[1] += (to.center[1] - f.center[1]) * k;
   f.size += (to.size - f.size) * k;
   return f;
 }
@@ -183,7 +183,7 @@ export function framed(f: Framing, to: Readonly<Framing>, dt: number): Framing {
 type EyeOut = Eye & {
   position: Out3;
   orientation: Out4;
-  centre: [number, number];
+  center: [number, number];
   size: number;
 };
 export const eyeOut = (): EyeOut => ({
@@ -191,7 +191,7 @@ export const eyeOut = (): EyeOut => ({
   position: [0, 0, 0],
   orientation: [0, 0, 0, 1],
   fov: AIR_FOV,
-  centre: [0, 0],
+  center: [0, 0],
   size: 1,
 });
 

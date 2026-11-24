@@ -14,7 +14,7 @@ import {
   scale,
   type Vec3,
 } from '../src/world/sphere.ts';
-import { CELLS, centreOf } from '../src/world/cells.ts';
+import { CELLS, centerOf } from '../src/world/cells.ts';
 import { landOf, planetOf } from '../src/world/land.ts';
 import { SEED } from '../src/environment.ts';
 import { random } from '../src/world/random.ts';
@@ -112,7 +112,7 @@ test('the one place the bearing is undefined is on land, far in from the coast a
   const away = angle(pole, places.anchor);
   assert.ok(away >= Math.PI / 2 - 1e-9, `${away / degrees}° from the start`);
   for (let c = 0; c < CELLS; c += 7) {
-    if (!land.water[c] && dot(centreOf(c), places.anchor) <= 0)
+    if (!land.water[c] && dot(centerOf(c), places.anchor) <= 0)
       assert.ok(land.shore[c] >= -inland - 0.01, `cell ${c}`);
   }
 });
@@ -121,12 +121,12 @@ function sail(
   places: ReturnType<typeof sunPlaces>,
   p: Vec3,
   t: Vec3,
-  metres: number,
+  meters: number,
   turn: (i: number) => number
 ) {
   let s = sunAt(places, 15, p);
   const pole = sunPole(places);
-  for (let i = 0; i < metres; i++) {
+  for (let i = 0; i < meters; i++) {
     const a = turn(i),
       u = normalize(p);
     t = normalize(add(scale(t, Math.cos(a)), cross(u, t), Math.sin(a)));

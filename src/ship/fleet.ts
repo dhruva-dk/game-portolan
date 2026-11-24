@@ -129,7 +129,7 @@ export function createFleet(light: Light, wind: Wind, capacity: number) {
     spin: [0, 0, 0],
     spinning: [0, 0, 0],
   }));
-  const metres = new Float64Array(capacity).fill(Infinity);
+  const meters = new Float64Array(capacity).fill(Infinity);
   const filled = new Uint32Array(levels);
   const records: Afloat[] = [],
     afloat: Afloat[] = [];
@@ -170,7 +170,7 @@ export function createFleet(light: Light, wind: Wind, capacity: number) {
 
   function sail(windSpeed: number, dt: number): readonly Compute[] {
     for (let i = 0; i < count; i++) {
-      metres[i] = Infinity;
+      meters[i] = Infinity;
       if (!shown[i]) continue;
       const pose = poses[i],
         speed = length(velocities[i]);
@@ -183,9 +183,9 @@ export function createFleet(light: Light, wind: Wind, capacity: number) {
         ? trim(blowing, speed, 0)
         : hauled(braces[i], blowing, speed, dt);
       filling(blowing, speed, braces[i], (sails[i] ??= [0, 0, 0]));
-      if (simulating) metres[i] = eye.distanceTo(middleOf(pose));
+      if (simulating) meters[i] = eye.distanceTo(middleOf(pose));
     }
-    moor(berths, metres, simulating && shown[own] ? own : -1, dt);
+    moor(berths, meters, simulating && shown[own] ? own : -1, dt);
     for (let k = 0; k < BERTHS; k++) {
       const b = berths[k];
       if (!b) {

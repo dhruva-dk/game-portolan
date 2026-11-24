@@ -100,7 +100,7 @@ function sail(
       weathered(
         fought.battle,
         fleet,
-        { centre: c0, radius: 4, damage: 0 },
+        { center: c0, radius: 4, damage: 0 },
         STEP
       ).battle.crews,
       f,

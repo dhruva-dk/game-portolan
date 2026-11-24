@@ -45,7 +45,7 @@ export interface Fitted {
   performance: number;
 }
 
-export interface Colours {
+export interface Colors {
   dye: number;
   pattern: number;
 }
@@ -53,7 +53,7 @@ export interface Colours {
 export interface RaceShip {
   id: number;
   team: number;
-  colours: Colours;
+  colors: Colors;
   parts: Readonly<Record<PartType, Fitted>>;
   driver: Driver | null;
   forfeit: boolean;

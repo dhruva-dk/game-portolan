@@ -5,7 +5,7 @@ import { createFly } from './fly.ts';
 import type { DebugDamage, Game } from './play/game.ts';
 import { raceOf, specField } from './play/race.ts';
 import type { Referee } from './play/referee.ts';
-import { dealt, lookOf, worn } from './play/colours.ts';
+import { dealt, lookOf, worn } from './play/colors.ts';
 import type { Matches } from './play/setup.ts';
 import type { Berth } from './play/state.ts';
 import { HOTBAR, IDLE, type Hands, type Livery } from './player.ts';
@@ -359,7 +359,7 @@ function drive(game: Game, legs: string) {
   }
   if (params.has('inward')) {
     const { next, eye } = game.status(),
-      goal = (next ?? eye).centre;
+      goal = (next ?? eye).center;
     game.debug.lash((s) => ({
       course: add(goal, s.at, -dot(goal, s.at)),
       throttle: 1,
@@ -396,7 +396,7 @@ function flyer(
   storm: (seconds: number) => StormDraw
 ) {
   const cap = storm(0),
-    c = cap.centre,
+    c = cap.center,
     out = normalize(add(start, c, -dot(start, c))),
     a = cap.radius - number('wall', 0) / R;
   const over = params.has('wall')

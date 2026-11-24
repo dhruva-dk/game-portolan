@@ -78,7 +78,7 @@ function nearest(p0: P, p1: P, q0: P, q1: P): [s: number, t: number] {
 }
 
 interface Laid {
-  centre: P;
+  center: P;
   ahead: P;
   stern: P;
   stem: P;
@@ -107,7 +107,7 @@ function lay(s: ShipState, east: Vec3, north: Vec3): Laid {
   const stern = flat(hullAt(s.at, s.heading, [-KEEL, 0]), east, north),
     stem = flat(hullAt(s.at, s.heading, [KEEL, 0]), east, north);
   return {
-    centre: flat(s.at, east, north),
+    center: flat(s.at, east, north),
     ahead: [x / l, y / l],
     stern,
     stem,
@@ -132,7 +132,7 @@ function meet(a: ShipState, b: ShipState): Meeting | null {
   let n: P;
   if (apart > 1e-9) n = [d[0] / apart, d[1] / apart];
   else {
-    const m = sub(lb.centre, la.centre),
+    const m = sub(lb.center, la.center),
       l = Math.hypot(m[0], m[1]);
     n = l > 1e-9 ? [m[0] / l, m[1] / l] : [la.ahead[1], -la.ahead[0]];
   }
@@ -200,8 +200,8 @@ function jolted(w: Working, m: Meeting, dv: P, turn: number): void {
 }
 
 function strike(a: Working, b: Working, m: Meeting): Blow | null {
-  const ra = sub(m.c, m.a.centre),
-    rb = sub(m.c, m.b.centre);
+  const ra = sub(m.c, m.a.center),
+    rb = sub(m.c, m.b.center);
   const va = velocity(a, m, ra),
     vb = velocity(b, m, rb);
   const rel = sub(vb, va),
@@ -256,13 +256,13 @@ function pushed(
   s: ShipState,
   m: Meeting,
   u: P,
-  metres: number,
+  meters: number,
   depth: Depth
 ): ShipState | null {
-  if (metres === 0) return s;
+  if (meters === 0) return s;
   let d = add(scale(m.east, u[0]), m.north, u[1]);
   d = normalize(add(d, s.at, -dot(d, s.at)));
-  const to = moved(s.at, s.heading, scale(d, metres));
+  const to = moved(s.at, s.heading, scale(d, meters));
   const c = under(to.at, to.heading, depth);
   return c >= 0 || c >= under(s.at, s.heading, depth) ? { ...s, ...to } : null;
 }
@@ -292,8 +292,8 @@ function sailed(
 ): Working {
   let ship = step(v.ship, helm, dt, depth, fit);
   let shove = transport(v.shove, v.ship.at, ship.at);
-  const metres = length(shove) * dt;
-  if (metres > 0) {
+  const meters = length(shove) * dt;
+  if (meters > 0) {
     const to = moved(ship.at, ship.heading, scale(shove, dt));
     const c = under(to.at, to.heading, depth);
     if (c >= 0 || c >= under(ship.at, ship.heading, depth)) {

@@ -64,7 +64,7 @@ export function cubeCells(n: number) {
   return {
     cellOf,
     tan,
-    centre: (c: number, out?: Out3): Vec3 =>
+    center: (c: number, out?: Out3): Vec3 =>
       normalize(
         onFace(
           c >> (2 * log),
@@ -95,7 +95,7 @@ export const rowOf = (c: number) => (c >> LOG) & (N - 1);
 
 export const cellOf = CUBE.cellOf;
 
-export const centreOf = CUBE.centre;
+export const centerOf = CUBE.center;
 
 const toward: Out3 = [0, 0, 0];
 

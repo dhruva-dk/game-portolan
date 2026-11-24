@@ -61,7 +61,7 @@ const HAZE_SPECTRUM = [0.85, 1, 1.12] as const,
   HAZE_SUN = 0.22,
   HAZE_G = 0.72;
 const HAZE_ABOVE = [40, 200] as const;
-export const SKY_METRES = 1e4;
+export const SKY_METERS = 1e4;
 
 export interface Sky {
   sun(p: Vec3Node): Vec3Node;
@@ -132,9 +132,9 @@ export function createSky(view: View, bolt: boolean) {
   const aerial = (
     color: Vec3Node,
     dir: Vec3Node,
-    metres: FloatNode
+    meters: FloatNode
   ): Vec3Node => {
-    const T = exp(seaLevelExtinction.mul(metres).mul(-0.001));
+    const T = exp(seaLevelExtinction.mul(meters).mul(-0.001));
     const d = view.toSky(dir);
     const glow = skyRadiance(normalize(vec3(d.x, max(d.y, 0), d.z)), skySun);
     return color.mul(T).add(glow.mul(float(1).sub(T)));
@@ -165,16 +165,16 @@ export function createSky(view: View, bolt: boolean) {
     REFERENCE_EYE;
   const hazeDepth = haze.mul(HAZE_DEPTH);
 
-  const fog = (color: Vec3Node, dir: Vec3Node, metres: FloatNode): Vec3Node => {
-    const end = view.position.add(dir.mul(metres));
+  const fog = (color: Vec3Node, dir: Vec3Node, meters: FloatNode): Vec3Node => {
+    const end = view.position.add(dir.mul(meters));
     const density = meanDensity(view.height, length(end).sub(sphere.R)).div(
       reference
     );
     const near = hazeDepth
-      .mul(pow(metres.div(HAZE_DISTANCE), HAZE_SHAPE))
+      .mul(pow(meters.div(HAZE_DISTANCE), HAZE_SHAPE))
       .mul(density);
     const band = hazeDepth.mul(exp(max(view.toSky(dir).y, 0).div(-HAZE_BAND)));
-    const tau = select(metres.greaterThan(SKY_METRES), band, near).mul(
+    const tau = select(meters.greaterThan(SKY_METERS), band, near).mul(
       float(1).sub(smoothstep(HAZE_ABOVE[0], HAZE_ABOVE[1], view.height))
     );
     const T = exp(
@@ -239,10 +239,10 @@ export function createSky(view: View, bolt: boolean) {
     light,
     fog,
     aerial,
-    veil: (color: Vec3Node, dir: Vec3Node, metres: FloatNode): Vec3Node =>
-      storm.veil(color, dir, metres, stormLight),
-    deck: (color: Vec3Node, dir: Vec3Node, metres: FloatNode): Vec3Node =>
-      storm.deck(color, dir, metres, stormLight),
+    veil: (color: Vec3Node, dir: Vec3Node, meters: FloatNode): Vec3Node =>
+      storm.veil(color, dir, meters, stormLight),
+    deck: (color: Vec3Node, dir: Vec3Node, meters: FloatNode): Vec3Node =>
+      storm.deck(color, dir, meters, stormLight),
     bake: clouds.bake,
     update(
       env: Environment,

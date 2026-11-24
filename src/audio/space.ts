@@ -27,19 +27,19 @@ export const heard = (): Heard => ({
   pan: 0,
 });
 
-export function rolloff(metres: number, reach: number): number {
-  if (metres >= reach) return 0;
-  const edge = Math.min(1, (reach - metres) / (reach * 0.2));
+export function rolloff(meters: number, reach: number): number {
+  if (meters >= reach) return 0;
+  const edge = Math.min(1, (reach - meters) / (reach * 0.2));
   return (
-    Math.min(1, NEAR / Math.max(NEAR, metres)) ** FALL *
+    Math.min(1, NEAR / Math.max(NEAR, meters)) ** FALL *
     edge *
     edge *
     (3 - 2 * edge)
   );
 }
 
-export const cutoffAt = (metres: number) =>
-  Math.max(FLOOR, OPEN / (1 + metres / DULL));
+export const cutoffAt = (meters: number) =>
+  Math.max(FLOOR, OPEN / (1 + meters / DULL));
 
 export const panOf = (bearing: number) => 0.85 * Math.sin(bearing);
 
@@ -47,14 +47,14 @@ export function hear(eye: Eye, p: Vec3, reach: number, out: Heard): Heard {
   const dx = p[0] - eye.position[0],
     dy = p[1] - eye.position[1],
     dz = p[2] - eye.position[2];
-  const metres = Math.sqrt(dx * dx + dy * dy + dz * dz),
-    gain = rolloff(metres, reach);
+  const meters = Math.sqrt(dx * dx + dy * dy + dz * dz),
+    gain = rolloff(meters, reach);
   out.audible = gain >= QUIET;
-  out.delay = metres / SPEED;
+  out.delay = meters / SPEED;
   out.gain = gain;
   const bearing = bearingFrom(eye, p),
     behind = Math.max(0, -Math.cos(bearing));
-  out.cutoff = cutoffAt(metres) * (1 - 0.35 * behind);
+  out.cutoff = cutoffAt(meters) * (1 - 0.35 * behind);
   out.pan = panOf(bearing);
   return out;
 }

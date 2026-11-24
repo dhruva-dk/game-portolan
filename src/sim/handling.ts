@@ -9,7 +9,7 @@ export const SHIP = {
   bite: 0.55,
   fullBite: 0.32,
   steer: 1.2,
-  draught: 2.2,
+  draft: 2.2,
   length: 26,
   beam: 6.5,
   rig: 21.5,

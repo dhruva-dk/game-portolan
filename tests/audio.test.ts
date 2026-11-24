@@ -311,7 +311,7 @@ function scene(
       fov: 50,
     },
     clock: t,
-    storm: { centre: at, radius: 1, closing: false },
+    storm: { center: at, radius: 1, closing: false },
     ships: [her, ...ships],
     own: 0,
     balls,
@@ -342,7 +342,7 @@ const status = (over: Partial<Status & Kit> = {}): Status & Kit => ({
   sunk: false,
   storm: 30,
   closing: false,
-  eye: { centre: at, radius: 2000 },
+  eye: { center: at, radius: 2000 },
   next: null,
   outside: 0,
   reticle: null,
@@ -415,7 +415,7 @@ test('listen: a ball passing near whistles once; a slot of its stores taken in h
     owner: [],
     seq,
     changes,
-    colours: [],
+    colors: [],
   });
   cues(hearing(scene(3, [], [], [], sea(0)), status()));
   assert.deepEqual(

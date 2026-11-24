@@ -82,7 +82,7 @@ export function createTitle() {
     (p) =>
       at(
         p,
-        'centre',
+        'center',
         'middle',
         rhumbs(478, 182, 1100, 0.3) +
           rose(478, 182, 126, 0) +

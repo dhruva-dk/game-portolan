@@ -24,7 +24,7 @@ import {
 
 const deep = () => 30,
   N = 200;
-const centre = fromLatLon(0.2, 0.3);
+const center = fromLatLon(0.2, 0.3);
 
 function sightOn(v: Vessel, o: Vessel, off: number): Sight {
   const chase = createChase(
@@ -57,14 +57,14 @@ function sightOn(v: Vessel, o: Vessel, off: number): Sight {
   return swung(a);
 }
 
-function rate(rarity: number, metres: number, off = 0, k = 1): number {
+function rate(rarity: number, meters: number, off = 0, k = 1): number {
   let hits = 0;
   for (let n = 0; n < N; n++) {
     const bearing = 0.3 + n * 0.031,
       side = n % 2 ? 1 : -1;
-    const a = shipAt(centre, frameAt(centre).east),
+    const a = shipAt(center, frameAt(center).east),
       toward = turned(a, bearing);
-    const p = along(centre, toward, metres).p,
+    const p = along(center, toward, meters).p,
       b = shipAt(p, frameAt(p).east);
     let fleet: Vessel[] = [
       afloat(1, a),

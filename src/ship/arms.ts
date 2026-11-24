@@ -78,7 +78,7 @@ export function createArms(light: Light, capacity: number) {
       float(1).sub(abs(dotNode(n, eye)))
     ).mul(fine);
     return mix(
-      gunSurface(light, wp, n, made, { colour: glow, share: fine.mul(TINT) }),
+      gunSurface(light, wp, n, made, { color: glow, share: fine.mul(TINT) }),
       glow.mul(light.level(wp).mul(EMIT)),
       edge
     );

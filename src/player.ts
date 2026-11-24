@@ -2,7 +2,7 @@ import type { GunKind, LootKind, Use } from './kinds.ts';
 import type { Vec3 } from './world/sphere.ts';
 
 export interface Hands {
-  stick: { x: number; y: number; centre: [number, number] | null } | null;
+  stick: { x: number; y: number; center: [number, number] | null } | null;
   look: { x: number; y: number; held: boolean };
   fire: boolean;
   tap: number | null;
@@ -39,8 +39,8 @@ export interface Status {
   sunk: boolean;
   storm: number;
   closing: boolean;
-  eye: { centre: Vec3; radius: number };
-  next: { centre: Vec3; radius: number } | null;
+  eye: { center: Vec3; radius: number };
+  next: { center: Vec3; radius: number } | null;
   outside: number;
   reticle: {
     fall: { x: number; y: number } | null;
@@ -203,7 +203,7 @@ export const felt = {
 export type Moment = Deed & {
   seen: { x: number; y: number } | null;
   bearing: number;
-  metres: number;
+  meters: number;
   whence: number | null;
 };
 

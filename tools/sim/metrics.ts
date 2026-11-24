@@ -138,7 +138,7 @@ function whyNow(m: Readonly<Memory>, depth: (p: Vec3) => number): Why[] {
   if (m.backT !== 0) out.push('back');
   if (m.mode !== 'fight' && m.route && distance(m.route.to, m.goal) > SHORT)
     out.push('short');
-  if (depth(m.goal) < SHIP.draught + BOT.open) out.push('dry');
+  if (depth(m.goal) < SHIP.draft + BOT.open) out.push('dry');
   return out.length ? out : ['none'];
 }
 
@@ -229,8 +229,7 @@ export function watch(
   const pieces = state.loot().pieces;
   const loot: Omit<MatchResult['loot'], 'end'> = {
     start: pieces.length,
-    shallow: pieces.filter((l) => depth(l.at) < SHIP.draught + PIECE.open)
-      .length,
+    shallow: pieces.filter((l) => depth(l.at) < SHIP.draft + PIECE.open).length,
     taken: { first: flow(), later: flow() },
     kinds: {},
     rarity: {},

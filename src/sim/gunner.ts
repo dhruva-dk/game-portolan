@@ -113,23 +113,23 @@ export const sighted = (g: Gunner, clock: number, skill: number) => {
   g.react = clock + reactTime(skill);
 };
 
-function suits(g: { kind: GunKind; rarity: number }, metres: number): number {
+function suits(g: { kind: GunKind; rarity: number }, meters: number): number {
   const b = GUNS[g.kind];
-  if (metres > b.range || metres < b.least) return 0;
+  if (meters > b.range || meters < b.least) return 0;
   const cycle = b.mag * (b.interval + b.windup) + reloadOf(g),
-    across = spreadOf(g) * metres;
+    across = spreadOf(g) * meters;
   return (
     ((damageOf(g) * b.pellets * b.mag) / cycle) *
-    falloff(g.kind, metres) *
+    falloff(g.kind, meters) *
     Math.min(1, SHIP.beam / Math.max(1e-9, across))
   );
 }
 
-export function armFor(x: Ctx, metres: number | null): number | null {
+export function armFor(x: Ctx, meters: number | null): number | null {
   const c = x.own.crew,
     t = x.b.gunnery;
   if (!c) return null;
-  const d = metres ?? t.idle;
+  const d = meters ?? t.idle;
   const score = (i: number) => {
     const g = c.guns[i];
     return g

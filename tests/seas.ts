@@ -16,14 +16,14 @@ import {
   type Vec3,
 } from '../src/world/sphere.ts';
 
-export const WHOLE: Cap = { centre: [0, 1, 0], radius: Math.PI };
+export const WHOLE: Cap = { center: [0, 1, 0], radius: Math.PI };
 
 export const seaOf = (t: Territory, generation: number): Sea => ({
   generation,
   owner: t.owner,
   seq: t.last(),
   changes: t.changes(),
-  colours: [],
+  colors: [],
 });
 
 export function match(
@@ -34,17 +34,17 @@ export function match(
 ) {
   const draw = random(seed),
     ships = 6,
-    centre = normalize([0.3, 0.9, 0.2]);
+    center = normalize([0.3, 0.9, 0.2]);
   const [e1, e2] = [
-    normalize(cross(centre, [0, 0, 1])),
-    normalize(cross(centre, normalize(cross(centre, [0, 0, 1])))),
+    normalize(cross(center, [0, 0, 1])),
+    normalize(cross(center, normalize(cross(center, [0, 0, 1])))),
   ];
   const homes = Array.from(
     { length: ships },
     (_, i): Vec3 =>
       normalize(
         add(
-          add(centre, e1, (90 * Math.cos(i)) / R),
+          add(center, e1, (90 * Math.cos(i)) / R),
           e2,
           (90 * Math.sin(i * 1.7)) / R
         )
@@ -80,7 +80,7 @@ export function match(
     }
     const radius =
       time < 40 ? Math.PI : Math.max(60, 400 - (time - 40) * 12) / R;
-    t.step(moves, time, { centre, radius });
+    t.step(moves, time, { center, radius });
     if (draw() < 0.0015 && sunk.size < ships - 2) {
       const id = Math.floor(draw() * ships);
       if (!sunk.has(id)) {

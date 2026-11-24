@@ -46,10 +46,10 @@ export const reloadOf = (g: Pick<Gun, 'kind' | 'rarity'>, by = 1) =>
 export const spreadOf = (g: Pick<Gun, 'kind' | 'rarity'>) =>
   GUNS[g.kind].spread * GUN.spreadBy[g.rarity];
 
-export function falloff(kind: GunKind, metres: number): number {
+export function falloff(kind: GunKind, meters: number): number {
   const g = GUNS[kind];
   if (!g.falls) return 1;
-  const k = metres / g.range;
+  const k = meters / g.range;
   return k <= FALLOFF.hold
     ? 1
     : Math.max(
@@ -96,11 +96,11 @@ export function chosen(
   let best: Vessel | null = null,
     score = Infinity;
   for (const o of [...others].sort((a, b) => a.id - b.id)) {
-    const metres = distance(up, o.ship.at);
-    if (metres > range) continue;
+    const meters = distance(up, o.ship.at);
+    if (meters > range) continue;
     const seen = offSight(sight, o.ship);
     if (!seen || seen.angle > cone || seen.along > hidden) continue;
-    const s = seen.angle / cone + (GUN.nearer * metres) / range;
+    const s = seen.angle / cone + (GUN.nearer * meters) / range;
     if (s < score) [best, score] = [o, s];
   }
   return best;
@@ -159,10 +159,10 @@ export function laid(
   const point = at ?? normalize(pointOn(s, meet ?? BEYOND));
   const t = toward(up, point) ?? toward(up, s.dir) ?? shooter.ship.heading;
   const d = distance(up, point),
-    metres = Math.max(g.least, Math.min(d, g.range));
+    meters = Math.max(g.least, Math.min(d, g.range));
   const reached = !!at || (meet !== null && d <= g.range && d >= g.least);
-  const fall = along(up, t, metres).p;
-  const how = thrown(gun.kind, metres)!;
+  const fall = along(up, t, meters).p;
+  const how = thrown(gun.kind, meters)!;
   const dir = off(up, t, how.elevation);
   const draw = random(
     (seed ^

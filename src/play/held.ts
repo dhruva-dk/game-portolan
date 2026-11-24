@@ -8,7 +8,7 @@ export function createHeld() {
   return (
     territory: Territory,
     generation: number,
-    colours: readonly Vec3[]
+    colors: readonly Vec3[]
   ): Sea => {
     if (kept?.generation !== generation)
       kept = {
@@ -16,7 +16,7 @@ export function createHeld() {
         owner: territory.owner,
         seq: 0,
         changes: territory.changes(),
-        colours: colours.slice(0, territory.ships),
+        colors: colors.slice(0, territory.ships),
       };
     kept.owner = territory.owner;
     kept.seq = territory.last();

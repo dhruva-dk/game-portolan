@@ -266,7 +266,7 @@ export function see(
   if (!spot) spots.set(m, (spot = { x: 0, y: 0 }));
   m.seen = view.width > 0 ? placed(spot, eye, m.at, LIFT[m.kind], view) : null;
   m.bearing = bearingFrom(eye, where);
-  m.metres = Math.hypot(where[0] - p[0], where[1] - p[1], where[2] - p[2]);
+  m.meters = Math.hypot(where[0] - p[0], where[1] - p[1], where[2] - p[2]);
   return m;
 }
 
@@ -278,7 +278,7 @@ export const seenOf = (
   by: Readonly<Vec3> | null = null
 ): Moment =>
   see(
-    { ...d, seen: null, bearing: 0, metres: 0, whence: null },
+    { ...d, seen: null, bearing: 0, meters: 0, whence: null },
     eye,
     { width, height },
     by

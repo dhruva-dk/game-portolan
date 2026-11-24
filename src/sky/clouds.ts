@@ -246,7 +246,7 @@ const SHADOW_STEPS = 12;
 function createShadow(view: View, field: CloudField) {
   const { eye, sunDir } = field.inputs;
   const map = storageTable(SHADOW_N, SHADOW_N);
-  const centre = uniform(new Vector3());
+  const center = uniform(new Vector3());
 
   const kernel = Fn(() => {
     const x = instanceIndex.mod(SHADOW_N),
@@ -257,9 +257,9 @@ function createShadow(view: View, field: CloudField) {
       .sub(0.5)
       .mul(SHADOW_EXTENT);
     const sea = vec3(
-      ground.x.add(centre.x).sub(eye.x),
+      ground.x.add(center.x).sub(eye.x),
       eye.y.negate(),
-      ground.y.add(centre.z).sub(eye.z)
+      ground.y.add(center.z).sub(eye.z)
     );
     const up = max(sunDir.y, 0.05);
     const t0 = float(BASE).div(up),
@@ -283,13 +283,13 @@ function createShadow(view: View, field: CloudField) {
 
   return {
     kernel,
-    centre,
+    center,
     at: (p: Vec3Node): FloatNode => {
       const uv = view
         .local(p)
         .mul(0.001)
         .add(eye.xz)
-        .sub(centre.xz)
+        .sub(center.xz)
         .div(SHADOW_EXTENT)
         .add(0.5);
       const edge = smoothstep(
@@ -332,10 +332,10 @@ export function createClouds(view: View, tables: Tables) {
   const historyDistanceTexture = texture(passes.historyDistance[0]);
 
   return {
-    at(uv: Vec2Node): { color: Vec4Node; metres: FloatNode } {
+    at(uv: Vec2Node): { color: Vec4Node; meters: FloatNode } {
       return {
         color: historyTexture.sample(uv),
-        metres: historyDistanceTexture.sample(uv).x.mul(1000),
+        meters: historyDistanceTexture.sample(uv).x.mul(1000),
       };
     },
     shadow: shadow.at,
@@ -403,7 +403,7 @@ export function createClouds(view: View, tables: Tables) {
       historyDistanceTexture.value = passes.historyDistance[write];
 
       if (frame % 4 === 0) {
-        shadow.centre.value.set(
+        shadow.center.value.set(
           Math.round(eye.value.x),
           0,
           Math.round(eye.value.z)

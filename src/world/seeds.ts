@@ -25,7 +25,7 @@ const WORDS = (
   'cliff cave arch stack light beacon flare lamp fire smoke cannon shot ' +
   'grape powder flint pistol cutlass musket crow parrot dog cat rat goat pig ' +
   'hen duck goose otter mink jade amber ivory ebony teak oak pine elm ash yew ' +
-  'red blue green grey black white brass iron tin copper'
+  'red blue green gray black white brass iron tin copper'
 ).split(' ');
 
 export function rolled(u: () => number): string {

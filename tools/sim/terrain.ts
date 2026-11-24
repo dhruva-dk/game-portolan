@@ -15,7 +15,7 @@ import {
   createTerrain,
   type Terrain,
 } from '../../src/world/terrain.ts';
-import { linearToSrgb } from '../../src/colour.ts';
+import { linearToSrgb } from '../../src/color.ts';
 import {
   ROCK,
   SAND,

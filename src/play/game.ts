@@ -139,12 +139,12 @@ export function createGame(
     floor = (p: Vec3) => Math.max(ground(p), sea.at(p, floorAt));
   let wanted: Readonly<Framing> = WHOLE,
     part: PartType | null = null;
-  const framing: Framing = { centre: [0, 0], size: 1 },
+  const framing: Framing = { center: [0, 0], size: 1 },
     seat = { orbit, focus: { ...LOOSE } },
     nudge = { x: 0, y: 0, held: false };
   const reframe = () => {
-    framing.centre[0] = wanted.centre[0];
-    framing.centre[1] = wanted.centre[1];
+    framing.center[0] = wanted.center[0];
+    framing.center[1] = wanted.center[1];
     framing.size = wanted.size;
   };
   const shake = createShake(),
@@ -162,8 +162,8 @@ export function createGame(
     };
   };
 
-  let calm: { centre: Vec3; radius: number } = {
-    centre: [0, 0, 1],
+  let calm: { center: Vec3; radius: number } = {
+    center: [0, 0, 1],
     radius: -1,
   };
 
@@ -205,8 +205,8 @@ export function createGame(
   };
   const fallAt: Point = { x: 0, y: 0 },
     screen: Viewport = { width: 0, height: 0 };
-  const closesTo: { centre: Vec3; radius: number } = {
-    centre: start.at,
+  const closesTo: { center: Vec3; radius: number } = {
+    center: start.at,
     radius: 0,
   };
   const gunSlots: GunSlot[] = [],
@@ -254,8 +254,8 @@ export function createGame(
     aim.lob = GUNS[g.kind].lob > 0;
     return aim;
   };
-  const nextOf = (next: { centre: Vec3; radius: number }) => {
-    closesTo.centre = next.centre;
+  const nextOf = (next: { center: Vec3; radius: number }) => {
+    closesTo.center = next.center;
     closesTo.radius = Math.round(next.radius * R);
     return closesTo;
   };
@@ -296,7 +296,7 @@ export function createGame(
     floating: LootDraw[] = [],
     spots: [number, number, number][] = [];
   const storm: StormDraw = {
-    centre: state.storm(0).centre,
+    center: state.storm(0).center,
     radius: state.storm(0).radius,
     closing: false,
   };
@@ -377,7 +377,7 @@ export function createGame(
           a.answer,
           a.strength,
           d.ship === me ? undefined : seen.bearing,
-          seen.metres
+          seen.meters
         );
         const stop = stopFor(d, me);
         if (stop) stops.request(stop.stop, stop.strength);
@@ -412,8 +412,8 @@ export function createGame(
         focused(seat.focus, part ? FOCI[part] : LOOSE, dt);
         floorAt = state.clock(between);
         framed(framing, wanted, dt);
-        berthed.centre[0] = framing.centre[0];
-        berthed.centre[1] = framing.centre[1];
+        berthed.center[0] = framing.center[0];
+        berthed.center[1] = framing.center[1];
         berthed.size = framing.size;
         berth = anchorageEye(last, seat, floorAt, floor, berthed);
         return;
@@ -469,7 +469,7 @@ export function createGame(
       drawn.eye = seen;
       drawn.clock = time;
       const st = state.storm(between);
-      storm.centre = st.centre;
+      storm.center = st.center;
       storm.radius = st.radius;
       storm.closing = st.closing && view.end !== 'won';
       drawn.ships = state.drawn(between);
@@ -532,8 +532,8 @@ export function createGame(
           lay && v && g ? distance(v.ship.at, lay.fall) * spreadOf(g) : 0,
         seen = lay ? far(eye, lay.fall) : 1;
       const radius = Math.round(s.radius * R);
-      if (radius !== calm.radius || moved(s.centre, calm.centre))
-        calm = { centre: s.centre, radius };
+      if (radius !== calm.radius || moved(s.center, calm.center))
+        calm = { center: s.center, radius };
       const watched =
         view.watch !== PLAYER || sunk(c.health)
           ? (state.vessel(view.watch)?.ship ?? state.sinking(view.watch))

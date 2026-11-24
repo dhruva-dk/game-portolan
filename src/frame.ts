@@ -47,7 +47,7 @@ import { BLOOM_LEVELS, bloom } from './post/bloom.ts';
 import { film } from './post/film.ts';
 import { createGrade, encode } from './post/grade.ts';
 import { createShafts, type Shafts } from './post/shafts.ts';
-import { SKY_METRES } from './sky/sky.ts';
+import { SKY_METERS } from './sky/sky.ts';
 import { SPACE } from './palette.ts';
 import { clamp } from './world/scalar.ts';
 import { loaded } from './load.ts';
@@ -137,7 +137,7 @@ export function createFrame(
         color,
         depth,
         dir: normalize(world.mul(vec4(position, 0)).xyz),
-        metres: length(position),
+        meters: length(position),
       };
     };
     return { seen, depth: scenePass.getTextureNode('depth'), pass: scenePass };
@@ -165,10 +165,10 @@ export function createFrame(
   const airCamera = new PerspectiveCamera(60, 1, ...PLANES.air);
   const airSeen = look(airCamera);
   const airPost = Fn(() => {
-    const { color, depth, dir, metres } = airSeen.seen();
+    const { color, depth, dir, meters } = airSeen.seen();
     const open = depth.greaterThanEqual(1);
-    const { color: cloud, metres: cloudAt } = sky.clouds.at(screenUV);
-    const inFront = open.or(cloudAt.lessThan(metres));
+    const { color: cloud, meters: cloudAt } = sky.clouds.at(screenUV);
+    const inFront = open.or(cloudAt.lessThan(meters));
     const clouded = select(
       inFront,
       color.rgb.mul(cloud.a).add(cloud.rgb),
@@ -177,19 +177,19 @@ export function createFrame(
     const hazed = sky.fog(
       clouded,
       dir,
-      select(open, float(SKY_METRES * 2), metres)
+      select(open, float(SKY_METERS * 2), meters)
     );
-    return vec4(sky.veil(hazed, dir, select(open, float(1e5), metres)), 1);
+    return vec4(sky.veil(hazed, dir, select(open, float(1e5), meters)), 1);
   })();
 
   const spaceCamera = new PerspectiveCamera(40, 1, ...PLANES.space);
   const spaceSeen = look(spaceCamera);
   const spacePost = Fn(() => {
-    const { color, depth, dir, metres } = spaceSeen.seen();
+    const { color, depth, dir, meters } = spaceSeen.seen();
     const seen = sky.deck(
-      sky.aerial(color.rgb, dir, view.under(dir, metres, AIR)),
+      sky.aerial(color.rgb, dir, view.under(dir, meters, AIR)),
       dir,
-      metres
+      meters
     );
     return vec4(select(depth.greaterThanEqual(1), vec3(...SPACE), seen), 1);
   })();
@@ -259,7 +259,7 @@ export function createFrame(
     renderer.getDrawingBufferSize(size);
     camera.aspect = size.x / size.y;
     camera.fov = eye.fov;
-    const [x, y] = eye.centre ?? MIDDLE,
+    const [x, y] = eye.center ?? MIDDLE,
       k = eye.size ?? 1;
     if (x !== 0 || y !== 0 || k !== 1)
       camera.setViewOffset(

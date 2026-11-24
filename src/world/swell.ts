@@ -169,9 +169,9 @@ export function createSwell(
     heights = new Float64Array(4);
   const charts = new Int32Array(12),
     weights = new Float64Array(12 * 4);
-  const hull: Hull = (centre, heading, reach, rail, time) => {
+  const hull: Hull = (center, heading, reach, rail, time) => {
     sums.at(time);
-    const [ax, ay, az] = centre,
+    const [ax, ay, az] = center,
       [hx, hy, hz] = heading;
     const px = ay * hz - az * hy,
       py = az * hx - ax * hz,
@@ -179,10 +179,10 @@ export function createSwell(
     moveAt(ax, ay, az);
     let found = 0;
     for (let i = 0; i < 4; i++) {
-      const metres =
+      const meters =
           i === 0 ? reach : i === 1 ? -reach : i === 2 ? rail : -rail,
         ahead = i < 2;
-      const a = metres / R,
+      const a = meters / R,
         c = Math.cos(a),
         s = Math.sin(a);
       const x = ax * c + (ahead ? hx : px) * s,

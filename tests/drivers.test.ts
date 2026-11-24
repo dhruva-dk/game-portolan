@@ -125,11 +125,11 @@ const deep: Depth = () => 30;
 const placed = (
   id: number,
   bearing: number,
-  metres: number,
+  meters: number,
   heading: number,
   speed = 0
 ): Vessel => {
-  const at = along(start, bearingAt(start, bearing), metres).p;
+  const at = along(start, bearingAt(start, bearing), meters).p;
   return afloat(id, { ...shipAt(at, bearingAt(at, heading)), speed });
 };
 
@@ -228,13 +228,13 @@ test('stormcraft: making for the next cap as it closes in seeded voyages, the 16
   const inside = (stormcraft: number) => {
     let sum = 0;
     for (let seed = 1; seed <= 12; seed++) {
-      const centre = along(start, bearingAt(start, seed * 0.9), 400).p,
-        next = { centre, radius: 120 / R };
+      const center = along(start, bearingAt(start, seed * 0.9), 400).p,
+        next = { center, radius: 120 / R };
       const storm = (t: number): Storm => {
         const f = Math.min(1, Math.max(0, (t - 20) / 70)),
           done = t >= 90;
         return {
-          centre,
+          center,
           radius: (600 - 480 * f) / R,
           next,
           closing: t >= 20 && !done,

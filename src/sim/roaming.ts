@@ -52,11 +52,11 @@ export function roamGoal(c: Ctx): Vec3 {
           between(c.m, c.b.roaming.near, c.b.roaming.far)
         ).p;
     if (!home && s && reach(s) < c.b.roaming.drift)
-      q = normalize(add(q, add(s.centre, q, -1), c.b.roaming.drawn));
+      q = normalize(add(q, add(s.center, q, -1), c.b.roaming.drawn));
     if (open(c, q) && (!keep || toEdge(q, keep) > margin) && !loud(c, q))
       return q;
   }
   if (s && toEdge(p, s) < 2 * margin)
-    return inward(c, p, s.centre, Math.max(0, reach(s) - 2 * margin));
+    return inward(c, p, s.center, Math.max(0, reach(s) - 2 * margin));
   return along(p, rotate(p, f, deepest(c)), c.b.roaming.near).p;
 }

@@ -1,4 +1,4 @@
-import { CELLS, N, centreOf, wrapped } from './cells.ts';
+import { CELLS, N, centerOf, wrapped } from './cells.ts';
 import { normalize, type Vec3 } from './sphere.ts';
 
 export const BLOCK = 16;
@@ -10,8 +10,8 @@ export function coastLines(shore: ArrayLike<number>, block = BLOCK): Vec3[][] {
     const key = a < b ? a * CELLS + b : b * CELLS + a;
     if (!points.has(key)) {
       const t = shore[a] / (shore[a] - shore[b]),
-        p = centreOf(a),
-        q = centreOf(b);
+        p = centerOf(a),
+        q = centerOf(b);
       points.set(
         key,
         normalize([

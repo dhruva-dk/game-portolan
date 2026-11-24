@@ -50,7 +50,7 @@ const PAGE = pageFor(DRAWN.w, DRAWN.h, DRAWN.insets);
 
 export function at(
   p: Page,
-  x: 'left' | 'centre' | 'right',
+  x: 'left' | 'center' | 'right',
   y: 'top' | 'middle' | 'bottom',
   body: string
 ) {
@@ -85,7 +85,7 @@ const STYLE = `
 .ui .bottom { bottom: ${edge('bottom')}; }
 .ui .left { left: ${edge('left')}; }
 .ui .right { right: ${edge('right')}; }
-.ui .centre { left: 50%; translate: -50% 0; }
+.ui .center { left: 50%; translate: -50% 0; }
 .ui .sized { scale: var(--k); }
 .ui .mark { position: absolute; transform: translate(-50%, -50%) scale(var(--k)); }
 .ui .screen { position: absolute; inset: 0; }

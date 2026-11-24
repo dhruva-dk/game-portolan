@@ -114,7 +114,7 @@ export function rolled(draw: () => number, t: LootTable = LOOT): Goods {
   return { kind: 'fullRepair', count: t.counts.fullRepair };
 }
 
-const open = (depth: Depth, p: Vec3) => depth(p) >= SHIP.draught + PIECE.open;
+const open = (depth: Depth, p: Vec3) => depth(p) >= SHIP.draft + PIECE.open;
 
 function roomy(depth: Depth, p: Vec3): boolean {
   if (!open(depth, p)) return false;
@@ -201,8 +201,8 @@ function cached(
   const count = k.pieces + k.more * Math.max(0, phase - 1);
   for (let i = 0; i < count; i++) {
     const p = along(
-      cap.centre,
-      tangentAt(cap.centre, draw() * 2 * Math.PI),
+      cap.center,
+      tangentAt(cap.center, draw() * 2 * Math.PI),
       R * cap.radius * k.within * Math.sqrt(draw())
     ).p;
     const goods: Goods =

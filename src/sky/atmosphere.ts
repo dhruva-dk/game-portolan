@@ -1,4 +1,4 @@
-import type { Rgb } from '../colour.ts';
+import type { Rgb } from '../color.ts';
 
 export const BOTTOM = 6360;
 export const TOP = 6460;
@@ -11,7 +11,7 @@ export const MIE_EXTINCTION = 0.102;
 export const MIE_SCALE_HEIGHT = 0.8;
 export const MIE_G = 0.8;
 export const OZONE_ABSORPTION = [0.65e-3, 1.881e-3, 0.085e-3] as const;
-export const OZONE_CENTRE = 25;
+export const OZONE_CENTER = 25;
 export const OZONE_HALF_WIDTH = 15;
 export const GROUND_ALBEDO = 0.3;
 export const SEA_ALBEDO = 0.06;
@@ -21,7 +21,7 @@ const H = Math.sqrt(TOP * TOP - BOTTOM * BOTTOM);
 function extinction(h: number): Rgb {
   const rayleigh = Math.exp(-h / RAYLEIGH_SCALE_HEIGHT);
   const mie = Math.exp(-h / MIE_SCALE_HEIGHT);
-  const ozone = Math.max(0, 1 - Math.abs(h - OZONE_CENTRE) / OZONE_HALF_WIDTH);
+  const ozone = Math.max(0, 1 - Math.abs(h - OZONE_CENTER) / OZONE_HALF_WIDTH);
   const at = (i: 0 | 1 | 2) =>
     RAYLEIGH_SCATTERING[i] * rayleigh +
     MIE_EXTINCTION * mie +

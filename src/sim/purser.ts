@@ -163,7 +163,7 @@ export function lootAct(c: Ctx): Vec3 {
   return l.at;
 }
 
-export const healAct = (c: Ctx, clearOf: (metres: number) => Vec3): Vec3 =>
+export const healAct = (c: Ctx, clearOf: (meters: number) => Vec3): Vec3 =>
   (c.own.crew && healSlot(c.own.crew) < 0) || !c.foe
     ? c.own.ship.at
     : clearOf(c.b.purser.clear);

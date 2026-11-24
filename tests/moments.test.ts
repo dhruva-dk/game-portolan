@@ -18,7 +18,7 @@ import {
 } from '../src/play/shake.ts';
 import { STOPS, createStops, stopFor } from '../src/play/stops.ts';
 import { createState, debugOf, type Match } from '../src/play/state.ts';
-import { lookOf } from '../src/play/colours.ts';
+import { lookOf } from '../src/play/colors.ts';
 import { PLAYER } from '../src/sim/match.ts';
 import { chart } from '../src/sim/route.ts';
 import { MIXED } from '../src/sim/persona.ts';
@@ -231,7 +231,7 @@ test('as she sees it: the bearing clockwise from the look, its distance, and on 
   );
   assert.ok(
     Math.abs(
-      seen.metres -
+      seen.meters -
         Math.hypot(...[0, 1, 2].map((i) => scale(ahead, R)[i] - position[i]))
     ) < 1e-6
   );

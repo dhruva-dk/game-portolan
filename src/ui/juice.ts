@@ -160,13 +160,13 @@ export function createJuice(body: HTMLElement, parts: Parts) {
         const r = clamp(m.rarity, 0, 4);
         if (PICKUP.flash[r] > 0)
           flash.flash({
-            colour: LIGHT.white,
+            color: LIGHT.white,
             alpha: PICKUP.flash[r],
             decay: PICKUP.decay[r],
           });
         if (PICKUP.vignette[r] > 0)
           flash.vignette({
-            colour: LIGHT.gold,
+            color: LIGHT.gold,
             alpha: PICKUP.vignette[r],
             reach: 0.45,
             decay: PICKUP.fades[r],

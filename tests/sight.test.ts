@@ -24,11 +24,11 @@ import {
 const at = fromLatLon(0.4, -0.7),
   f = frameAt(at),
   deep = () => 30;
-const onto = (height: number, metres: number) => {
+const onto = (height: number, meters: number) => {
   const from = scale(at, R + height);
   return {
     from,
-    dir: normalize(add(scale(along(at, f.north, metres).p, R), from, -1)),
+    dir: normalize(add(scale(along(at, f.north, meters).p, R), from, -1)),
   };
 };
 
@@ -56,7 +56,7 @@ test('a sight onto the sea meets it there; one level or above the horizon never 
   assert.equal(meets(level, deep), null);
 });
 
-test('the land in the way is met first, within a few centimetres of its face', () => {
+test('the land in the way is met first, within a few centimeters of its face', () => {
   const cliff = (p: Vec3) => (dot(p, f.north) > Math.sin(60 / R) ? -15 : 30);
   const s = onto(20, 120),
     t = meets(s, cliff)!,

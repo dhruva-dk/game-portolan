@@ -6,7 +6,7 @@ import { R } from '../src/world/sphere.ts';
 
 const eye: [number, number, number] = [0, 0, R + 20];
 const storm = (closing: boolean): StormDraw => ({
-  centre: [0, 0, 1],
+  center: [0, 0, 1],
   radius: 1,
   closing,
 });

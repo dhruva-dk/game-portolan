@@ -113,16 +113,16 @@ export function offSight(
   const o = local(add(s.from, base, -1)),
     d = local(s.dir);
   const half: Vec3 = [SHIP.length / 2, SHIP.beam / 2, SHIP.rig / 2],
-    centre: Vec3 = [0, 0, SHIP.rig / 2];
+    center: Vec3 = [0, 0, SHIP.rig / 2];
   const gap = (t: number) => {
     let g = 0;
     for (let k = 0; k < 3; k++) {
-      const x = Math.abs(o[k] + d[k] * t - centre[k]) - half[k];
+      const x = Math.abs(o[k] + d[k] * t - center[k]) - half[k];
       if (x > 0) g += x * x;
     }
     return Math.sqrt(g);
   };
-  const near = -dot(add(o, centre, -1), d),
+  const near = -dot(add(o, center, -1), d),
     span = length(half) + 1;
   let lo = Math.max(0, near - span),
     hi = Math.max(0, near + span);

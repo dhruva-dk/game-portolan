@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createState, debugOf, type Match } from '../src/play/state.ts';
-import { COLOURS, dealt, lookOf } from '../src/play/colours.ts';
+import { COLORS, dealt, lookOf } from '../src/play/colors.ts';
 import { LIVERY } from '../src/player.ts';
 import { PLAYER, SHIPS } from '../src/sim/match.ts';
 import { chart } from '../src/sim/route.ts';
@@ -31,7 +31,7 @@ const deadly = (at: number): Match => ({
       : {
           ...calm(start.at),
           radius: 1e-6,
-          next: { centre: start.at, radius: 1e-6 },
+          next: { center: start.at, radius: 1e-6 },
           damage: 1e6,
         },
 });
@@ -80,8 +80,8 @@ test('her livery: worn at anchor at once; her ship in it at sea, the bots dealt 
     );
   assert.ok(drawn.every((d) => d.id === PLAYER || d.look.sail !== her().sail));
   const sea = state.sea(1)!;
-  assert.deepEqual(sea.colours[PLAYER], COLOURS[hers.dye]);
-  drawn.forEach((d) => assert.deepEqual(sea.colours[d.id], d.look.sail));
+  assert.deepEqual(sea.colors[PLAYER], COLORS[hers.dye]);
+  drawn.forEach((d) => assert.deepEqual(sea.colors[d.id], d.look.sail));
   state.wear(LIVERY);
   assert.deepEqual(her(), lookOf(hers));
   state.anchor(start);

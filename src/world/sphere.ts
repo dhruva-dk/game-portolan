@@ -162,11 +162,11 @@ const u0: Out3 = [0, 0, 0],
 export function along(
   p: Vec3,
   t: Vec3,
-  metres: number,
+  meters: number,
   out?: CourseOut
 ): Course {
   const u = normalize(p, u0),
-    a = metres / R,
+    a = meters / R,
     c = Math.cos(a),
     s = Math.sin(a);
   const q = normalize(add(scale(u, c, q0), t, s, q0), q0);
@@ -278,8 +278,8 @@ export function distance(a: Vec3, b: Vec3): number {
   );
 }
 
-export function apart(a: Vec3, b: Vec3, metres: number): boolean {
-  const t = metres / R,
+export function apart(a: Vec3, b: Vec3, meters: number): boolean {
+  const t = meters / R,
     k = 1 - (t * t) / 2,
     c = dot(a, b),
     c2 = c * c,

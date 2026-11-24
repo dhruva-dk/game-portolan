@@ -115,8 +115,8 @@ export function cover(frequency: number): number {
     const A = points[a],
       B = points[b],
       C = points[c];
-    const centre = normalize(cross(add(B, A, -1), add(C, A, -1)));
-    most = Math.max(most, distance(centre, A));
+    const center = normalize(cross(add(B, A, -1), add(C, A, -1)));
+    most = Math.max(most, distance(center, A));
   }
   return most;
 }
@@ -128,7 +128,7 @@ function r2(n: number, span: number): [number, number] {
   return [((0.5 + n / g) % 1) * span, ((0.5 + n / (g * g)) % 1) * span];
 }
 
-export function neighbours(points: Vec3[]): number[][] {
+export function neighbors(points: Vec3[]): number[][] {
   return points.map((p, i) => {
     const d = points.map((q) => distance(p, q));
     const least = Math.min(...d.filter((_, j) => j !== i));
@@ -178,7 +178,7 @@ export function anchors(
     };
   });
   if (!alike) return all;
-  const next = neighbours(points);
+  const next = neighbors(points);
   all.forEach((a, n) => {
     let best = Infinity,
       chosen = a.offset;
@@ -299,5 +299,5 @@ export function weighInto(
 
 const arc = (c: number) => R * Math.acos(Math.min(Math.max(c, -1), 1));
 
-export const stretch = (metres: number) =>
-  metres === 0 ? 1 : metres / R / Math.sin(metres / R);
+export const stretch = (meters: number) =>
+  meters === 0 ? 1 : meters / R / Math.sin(meters / R);

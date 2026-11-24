@@ -61,7 +61,7 @@ export interface Move {
 }
 
 export interface Outcome {
-  claimed: { id: number; metres: number }[];
+  claimed: { id: number; meters: number }[];
 }
 
 type Logged = Change extends infer C
@@ -198,7 +198,7 @@ export function createTerritory(count: number, teams?: readonly number[]) {
     const cos = Math.cos(cap.radius),
       lost: number[] = [];
     for (let c = 0; c < CELLS; c++) {
-      if (owner[c] && cosTo(c, cap.centre) < cos) {
+      if (owner[c] && cosTo(c, cap.center) < cos) {
         lost.push(c);
         set(c, 0);
       }
@@ -245,8 +245,8 @@ export function createTerritory(count: number, teams?: readonly number[]) {
             cells: Int32Array.from(painted),
           });
         if (!met) continue;
-        const metres = claim(id, time);
-        if (metres > 0) outcome.claimed.push({ id, metres });
+        const meters = claim(id, time);
+        if (meters > 0) outcome.claimed.push({ id, meters });
       }
       if (++steps % TERRITORY.sweep === 0) sweep(cap, time);
       return outcome;

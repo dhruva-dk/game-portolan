@@ -115,7 +115,7 @@ export const between = (m: Memory, lo: number, hi: number) =>
   lo + (hi - lo) * roll(m);
 
 export const open = (c: Ctx, p: Vec3) =>
-  c.sea.depth(p) >= SHIP.draught + BOT.open;
+  c.sea.depth(p) >= SHIP.draft + BOT.open;
 
 export const aggroOf = (c: Ctx) =>
   Math.min(1, Math.max(0, c.t.aggro + c.m.heat));

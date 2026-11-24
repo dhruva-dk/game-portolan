@@ -14,12 +14,12 @@ import {
   fromLatLon,
 } from '../src/world/sphere.ts';
 
-const centre = fromLatLon(0.2, 0.3),
-  { north } = frameAt(centre);
+const center = fromLatLon(0.2, 0.3),
+  { north } = frameAt(center);
 const deep: Depth = () => 20;
-const next: Cap = { centre, radius: 400 / R };
+const next: Cap = { center, radius: 400 / R };
 const storm = (secondsToNext: number): Storm => ({
-  centre,
+  center,
   radius: 900 / R,
   next,
   closing: false,
@@ -30,7 +30,7 @@ const storm = (secondsToNext: number): Storm => ({
 });
 
 test('it picks a place inside the next cap, keeps it, and makes for it when it is time', () => {
-  const at = along(centre, north, 250).p,
+  const at = along(center, north, 250).p,
     own = afloat(1, shipAt(at, north));
   for (const seed of [1, 2, 3, 4, 5, 6]) {
     const sea = { depth: deep, storm: storm(100) };
@@ -39,7 +39,7 @@ test('it picks a place inside the next cap, keeps it, and makes for it when it i
       m = think(own, [], sea, m, nature(seed)).memory;
     const place = m.place;
     assert.ok(place, `${seed}: no place`);
-    assert.ok(distance(place, centre) <= 400, `${seed}: outside the cap`);
+    assert.ok(distance(place, center) <= 400, `${seed}: outside the cap`);
     for (let k = 0; k < 7 * 12; k++)
       m = think(own, [], sea, m, nature(seed)).memory;
     assert.deepEqual(m.place, place, `${seed}: moved`);

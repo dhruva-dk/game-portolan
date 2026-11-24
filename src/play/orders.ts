@@ -37,9 +37,9 @@ const CALM_WORK = 8000;
 
 const same = (a: Cap, b: Cap) =>
   a.radius === b.radius &&
-  a.centre[0] === b.centre[0] &&
-  a.centre[1] === b.centre[1] &&
-  a.centre[2] === b.centre[2];
+  a.center[0] === b.center[0] &&
+  a.center[1] === b.center[1] &&
+  a.center[2] === b.center[2];
 
 export function createOrders(depth: (p: Vec3) => number, chart: Chart) {
   const seenById = new Map<number, Seen>(),
@@ -95,11 +95,11 @@ export function createOrders(depth: (p: Vec3) => number, chart: Chart) {
       !(sea.calm && same(sea.calm.cap, next))
     ) {
       const heart = HEART * next.radius * R,
-        centre = next.centre;
+        center = next.center;
       coming = {
-        cap: { centre, radius: next.radius },
+        cap: { center, radius: next.radius },
         heart,
-        found: building(chart, (p) => distance(p, centre) <= heart),
+        found: building(chart, (p) => distance(p, center) <= heart),
       };
     }
     if (coming?.found.build(CALM_WORK)) {

@@ -9,7 +9,7 @@ import {
   geodesic,
   icosphere,
   near,
-  neighbours,
+  neighbors,
   overlap,
   spacing,
   stretch,
@@ -139,7 +139,7 @@ test('weights change smoothly along great circles, across every border they cros
   assert.ok(crossings > 50, `${crossings} borders crossed`);
 });
 
-test("anchors: axes are unit tangents along the prevailing wind; neighbours' offsets differ", () => {
+test("anchors: axes are unit tangents along the prevailing wind; neighbors' offsets differ", () => {
   for (const a of all) {
     assert.ok(
       Math.abs(length(a.axis) - 1) < 1e-12 &&
@@ -147,9 +147,9 @@ test("anchors: axes are unit tangents along the prevailing wind; neighbours' off
     );
     assert.ok(dot(a.axis, wind(a.at)) > 0.999999);
   }
-  const next = neighbours(all.map((a) => a.at));
+  const next = neighbors(all.map((a) => a.at));
   next.forEach((ns, i) => {
-    assert.ok(ns.length === 5 || ns.length === 6, `${ns.length} neighbours`);
+    assert.ok(ns.length === 5 || ns.length === 6, `${ns.length} neighbors`);
     for (const j of ns) {
       const dx = Math.abs(all[i].offset[0] - all[j].offset[0]),
         dz = Math.abs(all[i].offset[1] - all[j].offset[1]);
@@ -165,8 +165,8 @@ test("anchors: axes are unit tangents along the prevailing wind; neighbours' off
   });
 });
 
-test('neighbouring charts read nearly independent seas along their borders, at any wind', () => {
-  const next = neighbours(all.map((a) => a.at));
+test('neighboring charts read nearly independent seas along their borders, at any wind', () => {
+  const next = neighbors(all.map((a) => a.at));
   for (const wind of [5, 7.6, 12, 20]) {
     CASCADES.forEach((L, c) => {
       const alike = likeness(SIZE, L, { wind, fetch: FETCH }, BANDS[c], 1500);
@@ -178,7 +178,7 @@ test('neighbouring charts read nearly independent seas along their borders, at a
       );
       assert.ok(
         worst < 0.25,
-        `wind ${wind}, ${L} m patch: neighbours correlate by ${worst}`
+        `wind ${wind}, ${L} m patch: neighbors correlate by ${worst}`
       );
     });
   }

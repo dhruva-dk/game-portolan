@@ -89,7 +89,7 @@ test('the same land and seed make the same planet; another seed only another cov
 test('it starts on the water START m off the coast, facing the land', () => {
   const { at: p, bearing } = planet.start;
   assert.ok(
-    planet.height(p) < -SHIP.draught,
+    planet.height(p) < -SHIP.draft,
     `${planet.height(p).toFixed(2)} m under it`
   );
   assert.ok(
@@ -109,7 +109,7 @@ test('no hidden shallows: water too shallow to sail lies only within WADE of the
     farthest = 0;
   for (const p of lattice(120000)) {
     const h = planet.height(p);
-    if (h > 0 || h <= -SHIP.draught) continue;
+    if (h > 0 || h <= -SHIP.draft) continue;
     shallow++;
     farthest = Math.max(farthest, -inland(p));
     assert.ok(

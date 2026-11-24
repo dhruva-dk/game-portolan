@@ -81,11 +81,11 @@ function sail(
 const placed = (
   id: number,
   bearing: number,
-  metres: number,
+  meters: number,
   heading: number,
   speed = 0
 ): Vessel => {
-  const at = along(start, bearingAt(start, bearing), metres).p;
+  const at = along(start, bearingAt(start, bearing), meters).p;
   return afloat(id, { ...shipAt(at, bearingAt(at, heading)), speed });
 };
 const seedsWhere = (
@@ -275,18 +275,18 @@ test('16 bots for five minutes keep clear of the shores', () => {
 });
 
 function closing(
-  centre: Vec3,
+  center: Vec3,
   from: number,
   to: number,
   wait: number,
   close: number
 ): (t: number) => Storm {
-  const next: Cap = { centre, radius: to / R };
+  const next: Cap = { center, radius: to / R };
   return (t) => {
     const f = Math.min(1, Math.max(0, (t - wait) / close)),
       done = t >= wait + close;
     return {
-      centre,
+      center,
       radius: (from + (to - from) * f) / R,
       next,
       closing: t >= wait && !done,
@@ -306,8 +306,8 @@ const captains = [
 
 test('a bot outside the next cap makes for it in time, and is never caught outside the closing one', () => {
   for (const [k, seed] of captains.entries()) {
-    const centre = along(start, bearingAt(start, k * 0.9), 400).p,
-      storm = closing(centre, 600, 120, 20, 70);
+    const center = along(start, bearingAt(start, k * 0.9), 400).p,
+      storm = closing(center, 600, 120, 20, 70);
     let worst = Infinity;
     const r = sail(
       [placed(1, k * 0.7, 30, k * 1.9)],
@@ -334,7 +334,7 @@ test('a bot outside the next cap makes for it in time, and is never caught outsi
   const free = sail([placed(1, 0, 30, 0)], [captains[0]], 70, deep);
   assert.ok(
     toEdge(free.fleet[0].ship.at, {
-      centre: along(start, bearingAt(start, 0), 400).p,
+      center: along(start, bearingAt(start, 0), 400).p,
       radius: 120 / R,
     }) < 0
   );
@@ -369,7 +369,7 @@ test('a bot inside the cap never leaves it, roaming or with the next one closing
       deep,
       undefined,
       (f) => {
-        if (toEdge(f[0].ship.at, { centre: start, radius: 260 / R }) < 0) out++;
+        if (toEdge(f[0].ship.at, { center: start, radius: 260 / R }) < 0) out++;
       }
     );
   }

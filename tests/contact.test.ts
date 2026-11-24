@@ -83,7 +83,7 @@ const leastOf = (fleet: readonly Vessel[]) => {
   return { module, apart };
 };
 
-const centre = fromLatLon(0.2, 0.3);
+const center = fromLatLon(0.2, 0.3);
 const lying = (c: Vec3, bearing: number, speed = 0): ShipState => {
   const f = frameAt(c),
     s = shipAt(c, f.east);
@@ -94,7 +94,7 @@ const approach = (
   speed: number,
   aim = 0,
   ahead = 0,
-  c = centre,
+  c = center,
   east?: Vec3,
   across = 0
 ): Vessel[] => {
@@ -114,12 +114,12 @@ test('the same fleet under the same orders meets the same way, to the bit', () =
   const four = (): Vessel[] =>
     [0, 1, 2, 3].map((k) => {
       const p = along(
-        centre,
-        turned(lying(centre, 0), (k * Math.PI) / 2 + 0.3),
+        center,
+        turned(lying(center, 0), (k * Math.PI) / 2 + 0.3),
         35
       ).p;
       return afloat(10 - k, {
-        ...shipAt(p, add3(centre, p, -1)),
+        ...shipAt(p, add3(center, p, -1)),
         speed: 4 + k,
       });
     });
@@ -138,11 +138,11 @@ test('it makes no difference in which order the fleet is listed', () => {
   const three = (): Vessel[] =>
     [0, 1, 2].map((k) => {
       const p = along(
-        centre,
-        turned(lying(centre, 0), (k * 2 * Math.PI) / 3),
+        center,
+        turned(lying(center, 0), (k * 2 * Math.PI) / 3),
         30 + k
       ).p;
-      return afloat(k + 1, { ...shipAt(p, add3(centre, p, -1)), speed: 9 + k });
+      return afloat(k + 1, { ...shipAt(p, add3(center, p, -1)), speed: 9 + k });
     });
   const orders: Orders = (f) =>
     f.map((v) => ({
@@ -199,7 +199,7 @@ test('a glancing blow slides along it and goes on, losing little way and doing n
   for (const angle of [10, 15, 20]) {
     let touched = false;
     const { fleet, blows } = run(
-      approach(-angle * deg, SHIP.top, 0, 0, centre, undefined, SHIP.beam),
+      approach(-angle * deg, SHIP.top, 0, 0, center, undefined, SHIP.beam),
       holding(1, 0),
       12,
       deep,
@@ -282,10 +282,10 @@ test('a nudge, or lying alongside and leaning on it, does no damage', () => {
   );
   assert.ok(touched);
   assert.equal(nudge.blows.length, 0);
-  const a = lying(centre, 0, SHIP.top),
+  const a = lying(center, 0, SHIP.top),
     b = {
       ...shipAt(
-        along(centre, cross(centre, a.heading), SHIP.beam + 0.5).p,
+        along(center, cross(center, a.heading), SHIP.beam + 0.5).p,
         a.heading
       ),
       speed: SHIP.top,
@@ -330,9 +330,9 @@ test('one ram, one blow, however long it presses on; drawn clear, it may ram aga
 test('coming about alongside another, its stern swings clear of the other, never through', () => {
   for (const side of [-1, 1])
     for (const speed of [3, SHIP.top]) {
-      const b = lying(centre, 0, speed),
-        port = cross(centre, b.heading);
-      const at = along(centre, port, SHIP.beam + 0.3).p;
+      const b = lying(center, 0, speed),
+        port = cross(center, b.heading);
+      const at = along(center, port, SHIP.beam + 0.3).p;
       const a = { ...shipAt(at, b.heading), speed };
       let least = Infinity;
       const orders: Orders = (f) => [
@@ -352,12 +352,12 @@ test('coming about alongside another, its stern swings clear of the other, never
 test('three driving into one another stay clear of each other, and settle', () => {
   const three = [0, 1, 2].map((k) => {
     const p = along(
-      centre,
-      turned(lying(centre, 0), (k * 2 * Math.PI) / 3),
+      center,
+      turned(lying(center, 0), (k * 2 * Math.PI) / 3),
       25
     ).p;
     return afloat(k + 1, {
-      ...shipAt(p, add3(centre, p, -1)),
+      ...shipAt(p, add3(center, p, -1)),
       speed: SHIP.top,
     });
   });
@@ -383,11 +383,11 @@ test('three driving into one another stay clear of each other, and settle', () =
     }
 });
 
-const coast = along(centre, frameAt(centre).north, 120).p;
+const coast = along(center, frameAt(center).north, 120).p;
 const seaward = frameAt(coast).east;
 const offshore = (p: Vec3) => R * Math.asin(dot(normalize(p), seaward));
 const shoal: Depth = (p) => Math.min(20, -6 + offshore(p) / 4);
-const DRY = 4 * (6 + SHIP.draught);
+const DRY = 4 * (6 + SHIP.draft);
 
 test('pressed against the shore by another, it is neither set aground nor pushed through the other', () => {
   for (const angle of [90, 60]) {

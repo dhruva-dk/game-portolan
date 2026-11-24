@@ -20,13 +20,13 @@ const EMBLEMS = DEVICES.length;
 
 const SHIELD = 'M3.5 2.5h17v9.5c0 5-3.5 8.3-8.5 10-5-1.7-8.5-5-8.5-10z';
 
-export function emblem(device: number, colours: Jacket, size: number) {
+export function emblem(device: number, colors: Jacket, size: number) {
   const charge = DEVICES[((device % EMBLEMS) + EMBLEMS) % EMBLEMS] ?? '';
   const svg = svgNode(
     24,
     24,
-    `<path d="${SHIELD}" fill="${colours[0]}" stroke="${INK.iron}" stroke-width="1.3" stroke-linejoin="round"/>` +
-      `<g fill="${colours[1]}" transform="translate(12 11.5) scale(.72) translate(-12 -11.5)">${charge}</g>`
+    `<path d="${SHIELD}" fill="${colors[0]}" stroke="${INK.iron}" stroke-width="1.3" stroke-linejoin="round"/>` +
+      `<g fill="${colors[1]}" transform="translate(12 11.5) scale(.72) translate(-12 -11.5)">${charge}</g>`
   );
   svg.setAttribute('width', String(size));
   svg.setAttribute('height', String(size));

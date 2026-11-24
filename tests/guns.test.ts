@@ -32,13 +32,13 @@ import {
 } from '../src/world/sphere.ts';
 
 const deep: Depth = () => 30;
-const centre = fromLatLon(0.2, 0.3);
+const center = fromLatLon(0.2, 0.3);
 const lying = (c: Vec3, bearing: number): ShipState => {
   const s = shipAt(c, frameAt(c).east);
   return { ...s, heading: turned(s, bearing), speed: 0 };
 };
-const east = (metres: number) =>
-  along(centre, lying(centre, 0).heading, metres).p;
+const east = (meters: number) =>
+  along(center, lying(center, 0).heading, meters).p;
 const BEST: Record<GunKind, number> = {
   cannon: 100,
   scatter: 30,
@@ -79,7 +79,7 @@ function ttk(kind: GunKind, shield: number) {
   return fight(
     [crewOf(1, gunOf(kind, 0)), target],
     [
-      afloat(1, lying(centre, 0)),
+      afloat(1, lying(center, 0)),
       afloat(2, lying(east(BEST[kind]), Math.PI / 2)),
     ],
     20,
@@ -116,7 +116,7 @@ test("a scatter's grape cuts the rigging of the ship it strikes: it sails at RIG
     fight(
       [crewOf(1, gunOf(kind, 0)), crewOf(2)],
       [
-        afloat(1, lying(centre, 0)),
+        afloat(1, lying(center, 0)),
         afloat(2, lying(east(BEST.scatter), Math.PI / 2)),
       ],
       0.5
@@ -145,7 +145,7 @@ test("a scatter's grape cuts the rigging of the ship it strikes: it sails at RIG
 const alone = (kind: GunKind, seconds: number, crew: Partial<Crew> = {}) =>
   fight(
     [{ ...crewOf(1, gunOf(kind, 0)), ...crew }],
-    [afloat(1, lying(centre, 0))],
+    [afloat(1, lying(center, 0))],
     seconds,
     undefined,
     { aim: null, fire: true }
@@ -234,7 +234,7 @@ test("a mortar's fall mark is drawn its splash's size (gunfire/marks.ts MARK, wh
 
 test("a mortar's shell bursts over its splash: the ship struck takes all of it, one beside it less, the shooter none", () => {
   const fleet = [
-    afloat(1, lying(centre, 0)),
+    afloat(1, lying(center, 0)),
     afloat(2, lying(east(80), Math.PI / 2)),
     afloat(3, lying(east(87), Math.PI / 2)),
     afloat(4, lying(east(110), Math.PI / 2)),
@@ -265,7 +265,7 @@ test("a mortar's shell bursts over its splash: the ship struck takes all of it, 
     `${lost(2)} ${lost(3)}`
   );
   assert.equal(lost(4), 0);
-  const by = (m: number) => along(centre, frameAt(centre).north, m).p;
+  const by = (m: number) => along(center, frameAt(center).north, m).p;
   const ball = loosed(
     1,
     'mortar',
@@ -274,7 +274,7 @@ test("a mortar's shell bursts over its splash: the ship struck takes all of it, 
     3,
     GUNS.mortar.damage
   );
-  const near = [afloat(1, lying(centre, 0)), afloat(2, lying(by(12), 0))];
+  const near = [afloat(1, lying(center, 0)), afloat(2, lying(by(12), 0))];
   let b: Battle = { ...battleOf([crewOf(1), crewOf(2)], 1), balls: [ball] };
   for (let i = 0; i < 90; i++)
     b = stepBattle(
@@ -339,7 +339,7 @@ test('the sea is strewn with some 850–950 pieces, a third of them guns, the ca
 test("a phase's cache is dropped in the heart of the next cap, rare and the same for the same seed", () => {
   const lay = laying(5, deep),
     f = lay.strewn(),
-    cap = { centre: [0, 1, 0] as Vec3, radius: 150 / R };
+    cap = { center: [0, 1, 0] as Vec3, radius: 150 / R };
   const a = lay.cached(f, cap, 3),
     b = laying(5, deep).cached(f, cap, 3);
   assert.deepEqual(a, b);

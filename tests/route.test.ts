@@ -8,7 +8,7 @@ import { STEP } from '../src/sim/fixed.ts';
 import { SHIP } from '../src/sim/handling.ts';
 import {
   ROUTE,
-  cellCentre,
+  cellCenter,
   chart,
   course,
   findPath,
@@ -54,13 +54,13 @@ const sea =
 const length = (cells: readonly number[]) =>
   cells
     .slice(1)
-    .reduce((s, c, i) => s + distance(cellCentre(cells[i]), cellCentre(c)), 0);
+    .reduce((s, c, i) => s + distance(cellCenter(cells[i]), cellCenter(c)), 0);
 const allOpen = (ch: Chart, cells: readonly number[]) =>
   cells.every((c) => ch.open[c] === 1);
 const stepsOpen = (ch: Chart, cells: readonly number[]) =>
   cells.slice(1).every((c, i) => {
-    const a = cellCentre(cells[i]),
-      b = cellCentre(c);
+    const a = cellCenter(cells[i]),
+      b = cellCenter(c);
     return distance(a, b) < 12 && openAt(ch, normalize(add(a, b)));
   });
 
@@ -84,7 +84,7 @@ test('a route is found round a round island, all open water, not much longer tha
   );
   assert.ok(got < 1.15 * least, `${got} m`);
   assert.ok(
-    Math.min(...r.cells.map((c) => distance(cellCentre(c), start))) > 77.5
+    Math.min(...r.cells.map((c) => distance(cellCenter(c), start))) > 77.5
   );
 });
 
@@ -113,7 +113,7 @@ test('a route goes through a strait rather than round', () => {
   const r = findPath(ch, at(0, -120), at(0, 120));
   assert.ok(r.found && allOpen(ch, r.cells) && stepsOpen(ch, r.cells));
   const through = Math.min(
-    ...r.cells.map((c) => distance(cellCentre(c), start))
+    ...r.cells.map((c) => distance(cellCenter(c), start))
   );
   console.log(
     `# through the strait: ${length(r.cells).toFixed(0)} m, ${through.toFixed(1)} m off its middle at the nearest`
@@ -128,7 +128,7 @@ test('no route into enclosed water: the route runs to the nearest it can reach',
   const r = findPath(ch, at(0, -200), start);
   assert.equal(r.found, false);
   assert.ok(allOpen(ch, r.cells));
-  const end = cellCentre(r.cells.at(-1)!);
+  const end = cellCenter(r.cells.at(-1)!);
   assert.ok(
     distance(end, start) > 90 && distance(end, start) < 110,
     `${distance(end, start)} m`
@@ -263,7 +263,7 @@ test('on the real planet: the chart, a route and 16 routed bots, timed', () => {
     })[0];
     times.push(best);
     found += +r.found;
-    assert.ok(distance(cellCentre(r.cells.at(-1)!), b) < distance(a, b));
+    assert.ok(distance(cellCenter(r.cells.at(-1)!), b) < distance(a, b));
     assert.ok(stepsOpen(ch, r.cells));
   }
   const mean = times.reduce((s, x) => s + x, 0) / times.length;
@@ -290,8 +290,8 @@ test('on the real planet: the chart, a route and 16 routed bots, timed', () => {
   );
 
   const home = planet.start.at;
-  const ring = (bearing: number, metres: number) =>
-    along(home, bearingAt(home, bearing), metres).p;
+  const ring = (bearing: number, meters: number) =>
+    along(home, bearingAt(home, bearing), meters).p;
   const berthed: Vessel[] = [];
   for (let k = 0; berthed.length < 16; k++) {
     const p = ring(k * 0.7, 20 + 6 * k);
