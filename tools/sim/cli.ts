@@ -40,13 +40,15 @@ const num = (s: string | undefined) =>
   s === undefined ? undefined : Number(s);
 const seed = num(a.seed),
   runs = Number(a.runs);
+const word = seed !== undefined && !Number.isFinite(seed) ? a.seed : undefined;
 const subject = a.subject ?? basename(named, '.json');
 
 let failed = false;
 if (sc.kind === 'match') {
   const one: MatchScenario = {
     ...sc,
-    ...(seed !== undefined && { match: seed }),
+    ...(seed !== undefined && word === undefined && { match: seed }),
+    ...(word !== undefined && { seed: word }),
     ...(a.planet !== undefined && { planet: Number(a.planet) }),
     ...(a.seconds !== undefined && { seconds: Number(a.seconds) }),
   };
@@ -63,7 +65,15 @@ if (sc.kind === 'match') {
         `run-${String(k + 1).padStart(2, '0')}-match-${from + k}`
       );
       mkdirSync(sub);
-      return { scenario: { ...one, match: from + k }, dir: sub };
+      const scenario =
+        word === undefined
+          ? { ...one, match: from + k }
+          : {
+              ...one,
+              match: from + k,
+              seed: k === 0 ? word : `${word}-${k + 1}`,
+            };
+      return { scenario, dir: sub };
     });
     console.log(
       `${runs} matches on ${Math.min(Number(a.workers), runs)} workers`
