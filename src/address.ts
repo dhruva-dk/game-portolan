@@ -19,21 +19,15 @@ export function launched(otherwise: () => string): string {
   return given || otherwise();
 }
 
-/** Whether this page was sailed to by a career (?career): it opens on the career kept. */
-export const careered = () =>
-  new URLSearchParams(location.search).has('career');
-
 /**
  * The page again, sailing the seed `name`: of the address only ?debug is kept,
  * so a debug switch that set the last page going (?leave) does not again.
- * `career`: the new page opens on the career kept (?career), not the menu.
  */
-export function sail(name: string, career = false) {
+export function sail(name: string) {
   const at = new URL(location.href),
     debug = at.searchParams.get('debug'),
     query = new URLSearchParams();
   if (debug !== null) query.set('debug', debug);
-  if (career) query.set('career', '');
   query.set('seed', named(name));
   at.search = query.toString();
   at.hash = '';
