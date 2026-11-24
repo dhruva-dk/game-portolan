@@ -1,3 +1,4 @@
+import type { MatchResult } from '../sim/result.ts';
 import {
   COMMANDS,
   VALID_IN,
@@ -7,6 +8,12 @@ import {
 } from './commands.ts';
 import { fieldsValid, isIndex } from './fields.ts';
 import { known } from './lookup.ts';
+import { enterPhase, nextRaceLobby, seasonOver } from './record/advance.ts';
+import { countDownContracts } from './record/contracts.ts';
+import { publishNews } from './record/news.ts';
+import { payRace, raceMoney } from './record/pay.ts';
+import { fileReport, raceReport } from './record/report.ts';
+import { scoreRace } from './record/score.ts';
 import type { CareerState } from './state.ts';
 
 export { newCareer, type CareerOptions } from './start.ts';
@@ -33,16 +40,68 @@ function refusal(state: CareerState, command: Command): Reason | null {
 
 const notYet = (state: CareerState): Applied => ({ ok: true, state });
 
+const seam = (state: CareerState): CareerState => state;
+
+type Repossession = { state: CareerState; teams: readonly number[] };
+
+const runPolicies = seam;
+const repossess = (state: CareerState): Repossession => ({ state, teams: [] });
+const develop = seam;
+const countDownSponsors = seam;
+const narrowRanges = seam;
+const raceEvents = seam;
+const dealAfterRace = seam;
+const offerSponsors = seam;
+
+const YOURS = 0;
+
+const accepted = (state: CareerState): Applied => ({ ok: true, state });
+
+const startRace = (state: CareerState): Applied =>
+  accepted(enterPhase(runPolicies(state), 'racing'));
+
+function recordRace(state: CareerState, result: MatchResult): Applied {
+  const scored = scoreRace(state, result);
+  const money = raceMoney(scored, result);
+  const paid = payRace(scored, money);
+  const repossession = repossess(paid);
+  const developed = develop(repossession.state);
+  const counted = countDownSponsors(countDownContracts(developed));
+  const narrowed = narrowRanges(counted);
+  const told = raceEvents(narrowed);
+  const filed = fileReport(
+    told,
+    raceReport({
+      before: state,
+      paid,
+      after: told,
+      result,
+      money: money[YOURS],
+      repossessed: repossession.teams,
+    })
+  );
+  const advanced = seasonOver(filed)
+    ? enterOffseason(filed)
+    : offerSponsors(dealAfterRace(nextRaceLobby(filed)));
+  return accepted(publishNews(advanced));
+}
+
+const enterOffseason = (state: CareerState): CareerState =>
+  enterPhase(state, 'offseason');
+
+const markRead = (state: CareerState): Applied =>
+  accepted({ ...state, unread: false });
+
 function effect(state: CareerState, command: Command): Applied {
   switch (command.type) {
     case 'StartRace':
-      return notYet(state);
+      return startRace(state);
     case 'RecordRace':
-      return notYet(state);
+      return recordRace(state, command.result);
     case 'FinishOffseason':
       return notYet(state);
     case 'MarkRead':
-      return notYet(state);
+      return markRead(state);
     case 'MarkSeen':
       return markSeen(state, command.id);
     case 'SetFocus':

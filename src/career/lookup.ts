@@ -1,5 +1,12 @@
 import type { Command } from './commands.ts';
-import { BUBBLES, type CareerState, type Owner, type Person } from './state.ts';
+import {
+  BUBBLES,
+  ROLES,
+  type CareerState,
+  type Owner,
+  type Person,
+  type Role,
+} from './state.ts';
 
 export const personOf = (state: CareerState, id: number): Person | null =>
   state.people.find((person) => person.id === id) ?? null;
@@ -28,4 +35,20 @@ export function known(state: CareerState, command: Command): boolean {
     default:
       return true;
   }
+}
+
+export const employees = (state: CareerState, team: number): Person[] =>
+  ROLES.flatMap((role) =>
+    state.people.filter(
+      (person) => person.role === role && person.contract?.team === team
+    )
+  );
+
+export function seatHolder(
+  state: CareerState,
+  team: number,
+  role: Role
+): Person | null {
+  const id = state.teams[team].seats[role];
+  return id === null ? null : personOf(state, id);
 }
