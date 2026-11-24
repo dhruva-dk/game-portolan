@@ -126,7 +126,7 @@ function mendNeed(c: Ctx, crew: Crew): number {
 /**
  * The nearest of her own water (territory.ts) within PURSER.reach of her
  * (captain.ts waterNear); null with none, and in a race sailed in teams, where
- * her water mends no one (the pit does: pitting.ts).
+ * her water mends no one.
  */
 function ownWater(c: Ctx): Vec3 | null {
   const h = c.sea.holdings,

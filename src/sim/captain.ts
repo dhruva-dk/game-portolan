@@ -1,6 +1,6 @@
 // What a bot is, shared by all her parts (bot.ts her mind, lookout.ts,
 // storming.ts, fighting.ts, roaming.ts, tactician.ts, pilot.ts, helmsman.ts,
-// gunner.ts, purser.ts, claimer.ts, hunter.ts, pitting.ts): what they all are
+// gunner.ts, purser.ts, claimer.ts, hunter.ts): what they all are
 // tuned by, how she sees a ship, what she carries from one step to the next (each
 // part's own, gathered), what she means, what a step of her weighs, and the few
 // bits of the sphere and of chance they all reach for.
@@ -101,8 +101,7 @@ export type Mode =
   | 'heal'
   | 'loot'
   | 'claim'
-  | 'hunt'
-  | 'pit';
+  | 'hunt';
 
 /**
  * What she means, as her mind hands it to her tactician (tactician.ts): where

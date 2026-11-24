@@ -134,7 +134,7 @@ export interface DebugDamage {
 /** How little of the stick's push counts as none. */
 const DEAD = 0.15;
 /** Nothing asked of a race. */
-const UNASKED: Pick<Ask, 'pit' | 'call'> = {};
+const UNASKED: Pick<Ask, 'call'> = {};
 /**
  * Loot is drawn within DRAWN m of the eye (so none from space), floating on the
  * waves within RIDES m of the eye's ship. (Never on the disc: the sea is
@@ -220,10 +220,10 @@ export function createGame(
     gusted = false,
     between = 0;
   /**
-   * What her hands asked of a race since the last frame that stepped: a pit
-   * stop, her team's call (sim/stores.ts Ask).
+   * What her hands asked of a race since the last frame that stepped: her
+   * team's call (sim/stores.ts Ask).
    */
-  let raced: Pick<Ask, 'pit' | 'call'> = UNASKED;
+  let raced: Pick<Ask, 'call'> = UNASKED;
   /** The camera: what the flow sets, and seconds since her end's shot began. */
   let view: View = { watch: PLAYER, hands: true, look: true, end: null },
     ended = 0;
@@ -615,12 +615,7 @@ export function createGame(
       if (hands.tap !== null) tapped = hands.tap;
       // (her team's call is hers to change with her hands off her ship too:
       // sunk, she calls it still)
-      if (hands.pit || read.call)
-        raced = {
-          ...raced,
-          ...(hands.pit && { pit: hands.pit }),
-          ...(read.call && { call: read.call }),
-        };
+      if (read.call) raced = { ...raced, call: read.call };
       // what happened since the last frame, answered from where the camera now
       // looks
       const me = view.watch,

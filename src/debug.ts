@@ -87,11 +87,8 @@
 // A race. ?race starts a race sailed by a card (play/race.ts: a field of spec
 // ships in teams of four, ?race=n teams of them, 20 by default), her hands on
 // ship 0 and the eye coming down from space as PLAY's does, so the race's HUD
-// has its data (player.ts Status.race); ?pit=seconds asks a pit stop of every
-// job so many seconds into the frames drawn (it begins if she lies in her
-// team's water, as at her berth she does, and her hands are on her ship: once
-// the eye is down, so ?pit=7 or with ?ahead), and ?call=name,seconds changes her
-// team's call then (free, attack, hold, form). The race as its HUD reads it is
+// has its data (player.ts Status.race); ?call=name,seconds changes her team's
+// call so many seconds into the frames drawn (free, attack, hold, form). The race as its HUD reads it is
 // set on the page each second drawn, for the tools (the body's data-race, as
 // JSON).
 //
@@ -123,14 +120,7 @@ import type { Referee } from './play/referee.ts';
 import { dealt, lookOf, worn } from './play/colours.ts';
 import type { Matches } from './play/setup.ts';
 import type { Berth } from './play/state.ts';
-import {
-  CALLS,
-  HOTBAR,
-  IDLE,
-  JOBS,
-  type Hands,
-  type Livery,
-} from './player.ts';
+import { CALLS, HOTBAR, IDLE, type Hands, type Livery } from './player.ts';
 import { probeMeshes } from './probe.ts';
 import { STEP } from './sim/fixed.ts';
 import { KINDS, SOUND, type Fault, type GunKind } from './kinds.ts';
@@ -368,9 +358,6 @@ export async function scenario(
       ? [{ at: number('gust', 0), hands: { gust: true } }]
       : []),
     ...(params.get('fire') ? [{ at: fireAt || 0, hands: { fire: true } }] : []),
-    ...(params.has('pit')
-      ? [{ at: number('pit', 0), hands: { pit: JOBS } }]
-      : []),
     ...(call ? [{ at: Number(callAt) || 0, hands: { call } }] : []),
     ...(swing
       ? [

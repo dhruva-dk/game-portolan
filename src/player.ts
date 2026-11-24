@@ -4,7 +4,7 @@
 // (Hands: read by ui/input.ts, given to play/game.ts step); what the match
 // reports comes out (Status, read by ui/hud.ts), with what she carries (Kit).
 
-import type { Faults, GunKind, Job, LootKind, Use, Zones } from './kinds.ts';
+import type { Faults, GunKind, LootKind, Use, Zones } from './kinds.ts';
 import type { Call } from './race.ts';
 import type { Vec3 } from './world/sphere.ts';
 
@@ -33,13 +33,9 @@ export interface Hands {
   /** Whether Gust has been pressed since the last read. */
   gust: boolean;
   /**
-   * In a race sailed by a card (Status.race): a pit stop asked since the last
-   * read, its jobs in the order she wants them (JOBS; none of them: the stop
-   * she is at called off); it begins if she lies in her team's water and is
-   * not being served (Pit.open).
+   * In a race sailed by a card (Status.race): her team's call as she changed it
+   * since the last read.
    */
-  pit?: readonly Job[] | null;
-  /** In such a race: her team's call as she changed it since the last read. */
   call?: Call | null;
 }
 
@@ -157,8 +153,8 @@ export interface Status {
  * A race sailed by a card, as its HUD reads it (play/standings.ts): her team
  * and the call it sails under (hers to change: Hands.call); her place now (1
  * first) of the ships on the card; her teammates, in the order of their ids;
- * the standings, every ship of the card, first place first; and her pit. The
- * same object each time, refilled, its rows too.
+ * and the standings, every ship of the card, first place first. The same
+ * object each time, refilled, its rows too.
  */
 export interface Race {
   team: number;
@@ -167,7 +163,6 @@ export interface Race {
   of: number;
   mates: readonly Mate[];
   tower: readonly Placed[];
-  pit: Pit;
 }
 
 /**
@@ -187,16 +182,9 @@ export interface Mate {
 /**
  * What a teammate is about: sailing (roaming, claiming water, after loot or
  * mending), fighting (or hunting to the sound of guns), fleeing, making in
- * from the storm, in the pit (making for it, or served), or sunk (so too one
- * that never put to sea).
+ * from the storm, or sunk (so too one that never put to sea).
  */
-export type Doing =
-  | 'sailing'
-  | 'fighting'
-  | 'fleeing'
-  | 'storm'
-  | 'pit'
-  | 'sunk';
+export type Doing = 'sailing' | 'fighting' | 'fleeing' | 'storm' | 'sunk';
 
 /**
  * A ship in the standings: her id and team, her place now (1 first: the ships
@@ -213,30 +201,7 @@ export interface Placed {
   sinkings: number;
 }
 
-/**
- * Her pit (sim/pit.ts): whether a stop asked now would begin (she lies in her
- * team's water, afloat, and is not being served); what each job would cost her
- * now, seconds by her own pit crew if it does not slip (JOBS' order; 0: nothing
- * for it to do, and it is passed over), so a stop costs the sum of its jobs';
- * and the stop she is at (null: none): its jobs as asked, the one in hand (its
- * place among them), how many are done and how many slipped, and the seconds
- * left of it all if no more slip. (Race['pit'].)
- */
-interface Pit {
-  open: boolean;
-  costs: readonly number[];
-  stop: {
-    jobs: readonly Job[];
-    at: number;
-    done: number;
-    slips: number;
-    left: number;
-  } | null;
-}
-
-/** The jobs of a pit stop (kinds.ts) and a team's calls (race.ts). */
-export { JOBS } from './kinds.ts';
-export type { Job } from './kinds.ts';
+/** A team's calls (race.ts). */
 export { CALLS } from './race.ts';
 export type { Call } from './race.ts';
 

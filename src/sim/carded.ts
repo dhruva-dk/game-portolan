@@ -23,17 +23,13 @@ export const RACE = {
 /**
  * The card's ships, checked: numbered 0 … n − 1 in order (a ship's id is her
  * place on the card, as it is her place in the fleet), none but the first
- * without a driver (only ship 0 is ever sailed by hand), and every pit crew of
- * a pace above nought and a chance to slip of 0 to 1. An error naming what is
- * wrong otherwise.
+ * without a driver (only ship 0 is ever sailed by hand). An error naming what
+ * is wrong otherwise.
  */
 export function checked(card: RaceCard): RaceCard {
   card.ships.forEach((s, i) => {
     if (s.id !== i) throw new Error(`card: ship ${i} is numbered ${s.id}`);
     if (i > 0 && !s.driver) throw new Error(`card: ship ${i} has no driver`);
-    const { pace, slip } = s.pit;
-    if (!(pace > 0 && slip >= 0 && slip <= 1))
-      throw new Error(`card: ship ${i}'s pit crew is ${pace} by ${slip}`);
   });
   return card;
 }

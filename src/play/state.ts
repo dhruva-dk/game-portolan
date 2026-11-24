@@ -652,7 +652,7 @@ export function createState(
       storm,
       STEP
     );
-    // (in a race sailed by a card her water mends no one: the pit does)
+    // (in a race sailed by a card her water mends no one)
     battle.crews = tended(back.crews, tally ? () => false : home, STEP);
     return { held: did, regained: back.regained };
   };
@@ -757,12 +757,7 @@ export function createState(
       lap?.('fight');
       tick++;
       const did = hold(storm);
-      if (tally)
-        battle.crews = tally.tend(battle.crews, told.asks, {
-          home,
-          tick,
-          aboard,
-        });
+      tally?.tend(told.asks, { aboard });
       lap?.('hold');
       rideOn(met, wants.blew);
       lap?.('ride');
@@ -873,10 +868,8 @@ export function createState(
      * standings.ts): null in a match with no card.
      */
     race: (id: number): Race | null =>
-      tally?.view(id, standing(), {
-        home,
-        mode: (k) => aboard.get(k)?.mind?.mode,
-      }) ?? null,
+      tally?.view(id, standing(), { mode: (k) => aboard.get(k)?.mind?.mode }) ??
+      null,
     /**
      * Every ship of the match in the order she would finish as it stands
      * (result.ts finishing), first place first; a race's forfeits last.
