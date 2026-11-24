@@ -11,7 +11,7 @@ import {
   type Crew,
 } from '../src/sim/battle.ts';
 import { afloat } from '../src/sim/contact.ts';
-import { fitted } from '../src/play/fitted.ts';
+import { fitted } from '../src/sim/fitted.ts';
 import { STEP } from '../src/sim/fixed.ts';
 import { gunOf } from '../src/sim/gun.ts';
 import { HEALTH, SPEC } from '../src/sim/handling.ts';

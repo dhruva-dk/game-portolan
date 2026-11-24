@@ -1,6 +1,6 @@
-import { PARTS, type RaceShip } from '../sim/race.ts';
-import type { Crew } from '../sim/battle.ts';
-import { HEALTH, SPEC } from '../sim/handling.ts';
+import { PARTS, type RaceShip } from './race.ts';
+import type { Crew } from './battle.ts';
+import { HEALTH, SPEC } from './handling.ts';
 
 export function fitted(c: Crew, ship?: RaceShip): Crew {
   if (!ship) return c;
