@@ -19,9 +19,9 @@ export function createStick(layer: HTMLElement) {
   layer.prepend(ring);
 
   return (stick: Hands['stick']) => {
-    show(ring, !!stick?.centre);
-    if (!stick?.centre) return;
-    ring.style.translate = `${stick.centre[0] - STICK}px ${stick.centre[1] - STICK}px`;
+    show(ring, !!stick?.center);
+    if (!stick?.center) return;
+    ring.style.translate = `${stick.center[0] - STICK}px ${stick.center[1] - STICK}px`;
     knob.style.transform = `translate(${stick.x * STICK}px, ${-stick.y * STICK}px)`;
   };
 }

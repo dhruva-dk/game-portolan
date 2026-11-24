@@ -117,7 +117,7 @@ function shape(lean: number, seed: number, detail: Detail): BufferGeometry {
     nrm: number[] = [],
     uvs: number[] = [],
     nut: number[] = [];
-  const centres: Vector3[] = [],
+  const centers: Vector3[] = [],
     tangents: Vector3[] = [];
   const c = new Vector3();
   const fine = NEAR.along,
@@ -126,7 +126,7 @@ function shape(lean: number, seed: number, detail: Detail): BufferGeometry {
     const s = i / fine,
       a = lean * (1 - 0.75 * s);
     if (i % step === 0) {
-      centres.push(c.clone());
+      centers.push(c.clone());
       tangents.push(new Vector3(Math.sin(a), Math.cos(a), 0));
     }
     c.addScaledVector(new Vector3(Math.sin(a), Math.cos(a), 0), HEIGHT / fine);
@@ -144,7 +144,7 @@ function shape(lean: number, seed: number, detail: Detail): BufferGeometry {
           .clone()
           .multiplyScalar(Math.cos(f))
           .addScaledVector(v, Math.sin(f));
-      pos.push(...centres[i].clone().addScaledVector(out, radius(s)).toArray());
+      pos.push(...centers[i].clone().addScaledVector(out, radius(s)).toArray());
       nrm.push(...out.toArray());
       uvs.push((j / AROUND) * 2, s * HEIGHT);
       nut.push(0);
@@ -160,7 +160,7 @@ function shape(lean: number, seed: number, detail: Detail): BufferGeometry {
         e = d + 1;
       index.push(a, d, b, b, d, e);
     }
-  const top = centres[ALONG],
+  const top = centers[ALONG],
     up = tangents[ALONG];
   const nuts = random(seed);
   for (let k = 0; k < (detail.nut > 0 ? 7 : 0); k++) {

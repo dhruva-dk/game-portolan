@@ -4,7 +4,7 @@ import {
   FREQUENCY,
   geodesic,
   icosphere,
-  neighbours,
+  neighbors,
   spacing,
 } from '../src/world/lattice.ts';
 import {
@@ -56,16 +56,16 @@ test('the wind is a unit tangent everywhere, and depends on the seed and the poi
   assert.notDeepEqual(createWind(1)(p), createWind(2)(p));
 });
 
-test('the calms are antipodal triangle centres within 40° of the poles, and the wind vanishes there only', () => {
+test('the calms are antipodal triangle centers within 40° of the poles, and the wind vanishes there only', () => {
   const { points: ps, triangles } = geodesic(FREQUENCY);
-  const centres = triangles.map(([i, j, k]) =>
+  const centers = triangles.map(([i, j, k]) =>
     normalize(add(add(ps[i], ps[j]), ps[k]))
   );
   for (const seed of SEEDS) {
     const [north, south] = calms(seed);
     assert.ok(north[1] > Math.cos((40 * Math.PI) / 180));
     for (const c of [north, south])
-      assert.ok(centres.some((x) => distance(x, c) < 1e-6));
+      assert.ok(centers.some((x) => distance(x, c) < 1e-6));
     for (const a of icosphere(FREQUENCY))
       assert.ok(
         Math.min(distance(a, north), distance(a, south)) >
@@ -99,15 +99,15 @@ test('the calms are antipodal triangle centres within 40° of the poles, and the
       const q = along(p, normalize(cross(p, [0.3, 0.5, 0.8])), 1).p;
       assert.ok(
         turn(w, p, q) < 1.5,
-        `seed ${seed}: the wind turns ${turn(w, p, q)}° over a metre`
+        `seed ${seed}: the wind turns ${turn(w, p, q)}° over a meter`
       );
     }
   }
 });
 
-test("neighbouring anchors' winds differ by no more than 30°, but round the calms", () => {
+test("neighboring anchors' winds differ by no more than 30°, but round the calms", () => {
   const ps = icosphere(FREQUENCY),
-    next = neighbours(ps);
+    next = neighbors(ps);
   for (const seed of SEEDS) {
     const w = createWind(seed),
       cs = calms(seed);
@@ -132,7 +132,7 @@ test("neighbouring anchors' winds differ by no more than 30°, but round the cal
     );
     assert.ok(
       rough < 40,
-      `seed ${seed}: ${rough} of 270 neighbouring pairs differ by more than 30°`
+      `seed ${seed}: ${rough} of 270 neighboring pairs differ by more than 30°`
     );
   }
 });

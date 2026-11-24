@@ -122,7 +122,7 @@ export function createResult(
       ? `<g id="watch">${banner(282, 370, 176, spyglass(278, 366, 68))}</g>${homes(478, 176)}`
       : homes(380, 176, won);
     s.set(
-      (p) => at(p, 'centre', 'top', body) + at(p, 'centre', 'bottom', ways),
+      (p) => at(p, 'center', 'top', body) + at(p, 'center', 'bottom', ways),
       (el) => {
         region(el, 'leave', act.leave);
         region(el, 'again', act.again);
@@ -161,7 +161,7 @@ export function createWatching(act: {
   leave.dataset.way = 'leave';
   leave.innerHTML = svg(56, 56, paperDisc(28, 28, 25) + anchor(28, 29, 32));
   onTap(leave, act.leave);
-  const foot = piece(root, 'bottom centre', false, true);
+  const foot = piece(root, 'bottom center', false, true);
   foot.innerHTML = svg(196, 60, slip(64, 10, 68, 42) + spyglass(98, 31, 52));
   for (const by of [-1, 1]) {
     const arrow = piece(foot, '', true);

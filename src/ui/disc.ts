@@ -57,7 +57,7 @@ export function layAt(l: Lay, at: Vec3, c: number, k: number): Lay {
 
 const xy: [number, number] = [0, 0];
 
-export function metres(l: Lay, q: Vec3): readonly [number, number] {
+export function meters(l: Lay, q: Vec3): readonly [number, number] {
   const a = l.at,
     cos = Math.min(1, Math.max(-1, q[0] * a[0] + q[1] * a[1] + q[2] * a[2]));
   const tx = q[0] - a[0] * cos,
@@ -75,7 +75,7 @@ export function metres(l: Lay, q: Vec3): readonly [number, number] {
 }
 
 export function place(l: Lay, q: Vec3): readonly [number, number] {
-  const m = metres(l, q);
+  const m = meters(l, q);
   xy[0] = l.c + m[0] * l.k;
   xy[1] = l.c - m[1] * l.k;
   return xy;

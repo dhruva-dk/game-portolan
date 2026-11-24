@@ -85,13 +85,13 @@ export function shunned(c: Ctx, q: Vec3): boolean {
   return c.m.log.some((s) => ranFrom(s) && dot(q, s.at) > within);
 }
 
-export function hurtNear(c: Ctx, q: Vec3, metres: number): boolean {
-  const within = Math.cos(metres / R),
+export function hurtNear(c: Ctx, q: Vec3, meters: number): boolean {
+  const within = Math.cos(meters / R),
     weak = c.b.logbook.wounded * strengthOf(c);
   return c.m.log.some((s) => s.strength <= weak && dot(q, s.at) > within);
 }
 
-export function knownNear(c: Ctx, q: Vec3, metres: number): number {
-  const within = Math.cos(metres / R);
+export function knownNear(c: Ctx, q: Vec3, meters: number): number {
+  const within = Math.cos(meters / R);
   return c.m.log.filter((s) => dot(q, s.at) > within).length;
 }

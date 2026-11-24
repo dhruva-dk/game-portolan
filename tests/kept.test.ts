@@ -74,7 +74,7 @@ test('what cannot be read is hers by default: not JSON, not a record, out of the
   }
   for (const [dye, pattern] of [
     [3, 1],
-    ['ultramarine', 'chequers'],
+    ['ultramarine', 'checkers'],
     [null, -1],
   ]) {
     store.items.set('portolan.livery', JSON.stringify({ dye, pattern }));

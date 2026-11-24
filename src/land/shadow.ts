@@ -50,7 +50,7 @@ export function createShadow(): Shadow {
   const matrix = uniform(new Matrix4());
   const map = texture<'float'>(target.depthTexture);
   const stands: { stand: InstancedMesh; caster: Instances }[] = [];
-  const centre = new Vector3(),
+  const center = new Vector3(),
     up = new Vector3(),
     north = new Vector3(),
     axis = new Vector3(),
@@ -103,16 +103,16 @@ export function createShadow(): Shadow {
         covered = shade;
         camera.left = camera.bottom = -shade.reach;
         camera.right = camera.top = shade.reach;
-        centre.set(...place(shade.chart.at, 0));
+        center.set(...place(shade.chart.at, 0));
         up.set(...shade.chart.at);
         north.copy(up).cross(axis.set(...shade.chart.axis));
       }
       for (const { stand, caster } of stands)
         stand.count = caster.casting().count;
       last.copy(sun);
-      camera.position.copy(centre).addScaledVector(sun, SPAN);
+      camera.position.copy(center).addScaledVector(sun, SPAN);
       camera.up.copy(Math.abs(sun.dot(up)) > 0.99 ? north : up);
-      camera.lookAt(centre);
+      camera.lookAt(center);
       camera.updateMatrixWorld();
       camera.updateProjectionMatrix();
       matrix.value.multiplyMatrices(

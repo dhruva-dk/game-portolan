@@ -19,7 +19,7 @@ export interface RoseInks {
   ring: string;
   weight: number;
   breadth: number;
-  chequer: number;
+  checker: number;
   quarter: readonly [string, string];
   half: readonly [string, string];
   ordinal: readonly [string, string];
@@ -34,7 +34,7 @@ export const ROSE: RoseInks = {
   ring: INK.iron,
   weight: 1,
   breadth: 1,
-  chequer: 0.035,
+  checker: 0.035,
   quarter: [WASH.vermilion, PAPER],
   half: [INK.green, PAPER],
   ordinal: [INK.iron, PAPER],
@@ -57,7 +57,7 @@ export function rose(
   let s =
     `<circle cx="${cx}" cy="${cy}" r="${R}" fill="${o.face}" stroke="${o.ring}" stroke-width="${w(2)}"/>` +
     `<circle cx="${cx}" cy="${cy}" r="${r2(R * 0.93)}" fill="none" stroke="${o.ring}" stroke-width="${w(1)}"/>` +
-    `<circle cx="${cx}" cy="${cy}" r="${r2(R * 0.965)}" fill="none" stroke="${o.ring}" stroke-width="${r2(R * o.chequer)}" stroke-dasharray="${r2((R * 0.9651 * Math.PI * 2) / 64)}"/>`;
+    `<circle cx="${cx}" cy="${cy}" r="${r2(R * 0.965)}" fill="none" stroke="${o.ring}" stroke-width="${r2(R * o.checker)}" stroke-dasharray="${r2((R * 0.9651 * Math.PI * 2) / 64)}"/>`;
   const point = (
     a: number,
     L: number,
@@ -106,10 +106,10 @@ export function rose(
   return s;
 }
 
-export function laurel(cx: number, cy: number, r: number, colour: string) {
+export function laurel(cx: number, cy: number, r: number, color: string) {
   let s = '';
   for (const side of [-1, 1]) {
-    s += `<path d="${side < 0 ? arcPath(cx, cy, r, Math.PI * 0.58, Math.PI * 1.32) : arcPath(cx, cy, r, -Math.PI * 0.32, Math.PI * 0.42)}" fill="none" stroke="${colour}" stroke-width="2"/>`;
+    s += `<path d="${side < 0 ? arcPath(cx, cy, r, Math.PI * 0.58, Math.PI * 1.32) : arcPath(cx, cy, r, -Math.PI * 0.32, Math.PI * 0.42)}" fill="none" stroke="${color}" stroke-width="2"/>`;
     for (let i = 0; i < 12; i++) {
       const a =
         side < 0 ? Math.PI * (0.6 + i * 0.06) : Math.PI * (0.4 - i * 0.06);
@@ -119,7 +119,7 @@ export function laurel(cx: number, cy: number, r: number, colour: string) {
       for (const o of [-1, 1]) {
         const ex = r2(px + Math.cos(a) * o * 7),
           ey = r2(py + Math.sin(a) * o * 7);
-        s += `<ellipse cx="${ex}" cy="${ey}" rx="3.4" ry="8" transform="rotate(${r2(deg + o * 28 * side)} ${ex} ${ey})" fill="${colour}" stroke="${INK.iron}" stroke-width=".5" opacity=".95"/>`;
+        s += `<ellipse cx="${ex}" cy="${ey}" rx="3.4" ry="8" transform="rotate(${r2(deg + o * 28 * side)} ${ex} ${ey})" fill="${color}" stroke="${INK.iron}" stroke-width=".5" opacity=".95"/>`;
       }
     }
   }

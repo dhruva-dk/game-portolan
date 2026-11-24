@@ -29,7 +29,7 @@ const depth = (p: Vec3) => -planet.height(p);
 const between = (a: Vec3, b: Vec3) =>
   Math.atan2(Math.hypot(...cross(a, b)), dot(a, b));
 const holds = (a: Cap, b: Cap) =>
-  between(a.centre, b.centre) + b.radius <= a.radius + 0.01 / R;
+  between(a.center, b.center) + b.radius <= a.radius + 0.01 / R;
 const match = (seed: number, step = 0.5) => {
   const storm = createStorm(seed, depth);
   return Array.from({ length: Math.ceil((DURATION + 30) / step) }, (_, i) =>
@@ -43,8 +43,8 @@ test('the same seed gives the same storm', () => {
   for (const t of [0, 61, 200, 333.3, DURATION, DURATION + 25])
     assert.deepEqual(a(t), b(t));
   assert.notDeepEqual(
-    createStorm(4, depth)(DURATION).centre,
-    a(DURATION).centre
+    createStorm(4, depth)(DURATION).center,
+    a(DURATION).center
   );
 });
 
@@ -101,16 +101,16 @@ test('each cap lies within the last, and holds the one it closes to; the radius 
   }
 });
 
-test('every centre lies over water, the last over open water with water all round its rim', () => {
+test('every center lies over water, the last over open water with water all round its rim', () => {
   for (const seed of SEEDS) {
-    const centres = planStorm(seed, depth),
-      last = centres[centres.length - 1];
-    centres.forEach((c, k) =>
-      assert.ok(depth(scale(c, R)) > 0, `seed ${seed}: centre ${k} on land`)
+    const centers = planStorm(seed, depth),
+      last = centers[centers.length - 1];
+    centers.forEach((c, k) =>
+      assert.ok(depth(scale(c, R)) > 0, `seed ${seed}: center ${k} on land`)
     );
     assert.ok(
       depth(scale(last, R)) >= STORM.open,
-      `seed ${seed}: final centre in ${depth(scale(last, R)).toFixed(1)} m`
+      `seed ${seed}: final center in ${depth(scale(last, R)).toFixed(1)} m`
     );
   }
 });
@@ -124,7 +124,7 @@ test('damage rises by phase, and keeps rising once the last cap has closed', () 
 
 test('outside is past the edge and inside short of it', () => {
   const storm = createStorm(5, depth)(200),
-    c = storm.centre;
+    c = storm.center;
   const t = normalize(add([0, 1, 0], c, -dot([0, 1, 0], c)));
   const edge = storm.radius * R;
   const at = (m: number) => scale(along(c, t, m).p, R + 3);

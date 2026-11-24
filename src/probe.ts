@@ -31,8 +31,8 @@ export function probeMeshes(sky: Sky, eye: Vec3): Mesh[] {
   const f = frameAt(eye);
   const stand = (mesh: Mesh, north: number, east: number, height: number) => {
     const out = add(add([0, 0, 0], f.north, north), f.east, east);
-    const metres = length(out);
-    const at: Vec3 = metres > 0 ? along(f.up, normalize(out), metres).p : f.up;
+    const meters = length(out);
+    const at: Vec3 = meters > 0 ? along(f.up, normalize(out), meters).p : f.up;
     const g = frameAt(at);
     mesh.matrixAutoUpdate = false;
     mesh.matrix
@@ -61,16 +61,16 @@ export function probeMeshes(sky: Sky, eye: Vec3): Mesh[] {
     .mul(sky.cloudShadow(p))
     .mul(max(dot(normalWorld, sky.sun(p)), 0));
   material.colorNode = albedo.mul(sun.add(sky.ambient(p, normalWorld)));
-  for (const [metres, x] of [
+  for (const [meters, x] of [
     [30, -12],
     [60, 25],
     [100, -40],
     [150, 60],
   ]) {
-    const size = metres / 10;
+    const size = meters / 10;
     stand(
       new Mesh(new BoxGeometry(size, size * 1.5, size), material),
-      metres,
+      meters,
       x,
       size * 0.75 - 1
     );

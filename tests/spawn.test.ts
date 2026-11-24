@@ -42,7 +42,7 @@ test('every ship starts afloat in open water, clear of land all round, heading a
           Math.abs(dot(s.at, s.heading)) < 1e-9
       );
       assert.ok(
-        depth(s.at) >= SHIP.draught + SPAWN.depth,
+        depth(s.at) >= SHIP.draft + SPAWN.depth,
         `${depth(s.at)} m under it`
       );
       for (let k = 0; k < 24; k++) {
@@ -60,13 +60,13 @@ test('every ship starts afloat in open water, clear of land all round, heading a
           t[2] * round[0] + port[2] * round[1],
         ] as const;
         assert.ok(
-          depth(along(s.at, dir, SPAWN.clear).p) >= SHIP.draught,
+          depth(along(s.at, dir, SPAWN.clear).p) >= SHIP.draft,
           'land within its clearance'
         );
       }
       for (let d = 8; d <= 40; d += 8)
         assert.ok(
-          depth(along(s.at, s.heading, d).p) >= SHIP.draught + SPAWN.depth,
+          depth(along(s.at, s.heading, d).p) >= SHIP.draft + SPAWN.depth,
           `shoal ${d} m ahead`
         );
     }

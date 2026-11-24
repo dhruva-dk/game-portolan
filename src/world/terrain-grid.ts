@@ -3,7 +3,7 @@ import {
   N,
   PLANET_QUANTA,
   areaQuanta,
-  centreOf,
+  centerOf,
   columnOf,
   faceOf,
   neighbor,
@@ -17,15 +17,15 @@ export const areaOf = (c: number) => areaQuanta(c) * AREA_M2;
 export const CELL = (R * Math.PI) / 2 / N;
 
 let XYZ: Float64Array | null = null;
-export function centres(): Float64Array {
+export function centers(): Float64Array {
   if (XYZ) return XYZ;
   XYZ = new Float64Array(3 * CELLS);
-  for (let c = 0; c < CELLS; c++) XYZ.set(centreOf(c), 3 * c);
+  for (let c = 0; c < CELLS; c++) XYZ.set(centerOf(c), 3 * c);
   return XYZ;
 }
 
 function arc(a: number, b: number): number {
-  const p = centres(),
+  const p = centers(),
     dx = p[3 * a] - p[3 * b],
     dy = p[3 * a + 1] - p[3 * b + 1],
     dz = p[3 * a + 2] - p[3 * b + 2];
@@ -99,7 +99,7 @@ export function seaLevel(field: Float32Array, share: number): number {
 }
 
 export function shoreOf(field: ArrayLike<number>, level: number): Float32Array {
-  const p = centres(),
+  const p = centers(),
     dist = new Float64Array(CELLS).fill(Infinity),
     src = new Float64Array(3 * CELLS),
     h = heap();

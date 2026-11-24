@@ -348,7 +348,7 @@ export function stepBattle(
 export function weathered(
   b: Battle,
   fleet: readonly Vessel[],
-  storm: Pick<Storm, 'centre' | 'radius' | 'damage'>,
+  storm: Pick<Storm, 'center' | 'radius' | 'damage'>,
   dt: number
 ): { battle: Battle; sunk: number[] } {
   const out = new Set(

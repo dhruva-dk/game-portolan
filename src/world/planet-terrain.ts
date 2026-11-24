@@ -1,4 +1,4 @@
-import { CELLS, N, centreOf } from './cells.ts';
+import { CELLS, N, centerOf } from './cells.ts';
 import { createNoise3 } from './noise3.ts';
 import { START, type Cover, type Planet, type Rise } from './planet.ts';
 import { clamp, smoothstep } from './scalar.ts';
@@ -38,7 +38,7 @@ function risesOf(t: Terrain): Rise[] {
         const top = tops[(face * blocks + bj) * blocks + bi];
         if (top < 0) continue;
         const corner = (i: number, j: number) =>
-          centreOf(face * N * N + j * N + i);
+          centerOf(face * N * N + j * N + i);
         const lo = bi * BLOCK,
           hi = lo + BLOCK - 1,
           low = bj * BLOCK,
@@ -67,15 +67,15 @@ function startOf(t: Terrain): { at: Vec3; bearing: number } {
   let summit = 0;
   for (let c = 0; c < CELLS; c++)
     if (t.height[c] > t.height[summit]) summit = c;
-  const top = centreOf(summit);
+  const top = centerOf(summit);
   let best = -1,
     near = Infinity;
   for (let c = 0; c < CELLS; c++) {
     if (!t.water[c] || Math.abs(t.shore[c] - START) > CELL) continue;
-    const d = distance(centreOf(c), top);
+    const d = distance(centerOf(c), top);
     if (d < near) [best, near] = [c, d];
   }
-  const at = centreOf(best),
+  const at = centerOf(best),
     f = frameAt(at),
     toward = add(top, at, -dot(top, at));
   return { at, bearing: Math.atan2(dot(toward, f.east), dot(toward, f.north)) };
@@ -87,14 +87,14 @@ function heartOf(t: Terrain, from: Vec3): Vec3 {
     if (
       t.water[c] ||
       (best >= 0 && t.shore[c] >= t.shore[best]) ||
-      dot(centreOf(c), from) > 0
+      dot(centerOf(c), from) > 0
     )
       continue;
     best = c;
   }
   if (best < 0)
     throw new Error('no land on the far side of the planet from the start');
-  return centreOf(best);
+  return centerOf(best);
 }
 
 export function terrainPlanet(t: Terrain, seed: number): Planet {

@@ -226,7 +226,7 @@ export function createLoot(light: Light) {
     .mul(grow.min(3))
     .add(sin(now.mul(BOB_RATE).add(id)).mul(BOB))
     .sub(float(1).sub(pop).mul(SINK));
-  const centre = at.xyz.add(up.mul(height));
+  const center = at.xyz.add(up.mul(height));
   const shown = select(far.lessThan(SHAPE), float(1), float(0));
   const local = attribute('position', 'vec3'),
     normal = attribute('normal', 'vec3');
@@ -238,12 +238,12 @@ export function createLoot(light: Light) {
     surface: (p: Vec3Node, n: Vec3Node, l: Vec3Node) => Vec3Node
   ) => {
     const m = new MeshBasicNodeMaterial();
-    m.positionNode = centre.add(turn(local).mul(grow)).mul(shown);
-    const p = varying(centre.add(turn(local).mul(grow))),
+    m.positionNode = center.add(turn(local).mul(grow)).mul(shown);
+    const p = varying(center.add(turn(local).mul(grow))),
       n = varying(turn(normal)),
       l = varying(local);
     const tint = varying(glow.rgb),
-      base = varying(centre);
+      base = varying(center);
     m.colorNode = Fn(() => {
       const nn = normalize(n),
         eye = normalize(cameraPosition.sub(p));

@@ -114,7 +114,7 @@ function puffMesh(light: Light, now: FloatNode) {
   const alive = age.greaterThanEqual(0).and(t.lessThan(1));
   const up = normalize(o.xyz),
     k = max(f.z, 1e-3);
-  const centre = o.xyz
+  const center = o.xyz
     .add(
       w.xyz.mul(
         float(1)
@@ -123,7 +123,7 @@ function puffMesh(light: Light, now: FloatNode) {
       )
     )
     .sub(up.mul(f.w.mul(0.5).mul(age).mul(age)));
-  const toEye = cameraPosition.sub(centre),
+  const toEye = cameraPosition.sub(center),
     seen = smoothstep(EYE[0], EYE[1], toEye.length());
   const size = select(
     alive.and(seen.greaterThan(0)),
@@ -143,12 +143,12 @@ function puffMesh(light: Light, now: FloatNode) {
     0
   );
   const m = new MeshBasicNodeMaterial({ transparent: true, depthWrite: false });
-  m.positionNode = centre.add(
+  m.positionNode = center.add(
     right.mul(turned.x).add(upward.mul(turned.y)).mul(size)
   );
   const uv = varying(local.xy),
     upright = varying(turned.y),
-    mid = varying(centre);
+    mid = varying(center);
   const tv = varying(t),
     near = varying(seen);
   const lobes = (uvv: Vec2Node) => {

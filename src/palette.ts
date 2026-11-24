@@ -1,4 +1,4 @@
-import { hexToLinear as ink, type Rgb } from './colour.ts';
+import { hexToLinear as ink, type Rgb } from './color.ts';
 
 export type { Rgb };
 export interface Tones {

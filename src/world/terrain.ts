@@ -14,7 +14,7 @@ import {
   CELL,
   areaOf,
   between,
-  centres,
+  centers,
   components,
   disc,
   heap,
@@ -72,7 +72,7 @@ interface TerrainStats {
 function relief(seed: number, o: TerrainOptions = TERRAIN): Float32Array {
   const noise = createNoise3(seed),
     warpNoise = createNoise3(seed + STRIDE),
-    p = centres(),
+    p = centers(),
     out = new Float32Array(CELLS);
   const fbm = (x: number, y: number, z: number, octaves: number) => {
     let v = 0,

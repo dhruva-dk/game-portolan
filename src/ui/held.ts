@@ -1,4 +1,4 @@
-import { linearToSrgb } from '../colour.ts';
+import { linearToSrgb } from '../color.ts';
 import type { Sea } from '../snapshot.ts';
 import { cellOf } from '../world/cells.ts';
 import { distance } from '../world/sphere.ts';
@@ -37,7 +37,7 @@ export function createHeld(span: number) {
   const stats = { samplings: 0, ms: 0 };
 
   let inks: number[][] = [],
-    from: Sea['colours'] | null = null;
+    from: Sea['colors'] | null = null;
   const q: Mutable = [0, 0, 0];
 
   function sample(l: Lay, sea: Sea, me: number) {
@@ -48,8 +48,8 @@ export function createHeld(span: number) {
       ahead[m] = l.ahead[m];
     }
     sampled = true;
-    if (sea.colours !== from)
-      [inks, from] = [sea.colours.map((c) => c.map(srgb)), sea.colours];
+    if (sea.colors !== from)
+      [inks, from] = [sea.colors.map((c) => c.map(srgb)), sea.colors];
     const owner = sea.owner,
       reach = span * span;
     any = false;

@@ -10,7 +10,7 @@ export interface Eye {
   position: Vec3;
   orientation: Turn;
   fov: number;
-  centre?: readonly [number, number];
+  center?: readonly [number, number];
   size?: number;
 }
 
@@ -100,7 +100,7 @@ export interface Sea {
   owner: ReadCells;
   seq: number;
   changes: readonly SeaChange[];
-  colours: readonly Vec3[];
+  colors: readonly Vec3[];
 }
 
 export interface StormDraw extends Cap {

@@ -114,15 +114,15 @@ export const reach = (k: number, pixel: number): number =>
 
 export function chooseDetail(
   was: number,
-  metres: number,
+  meters: number,
   pixel: number
 ): number {
   let k = 0;
-  while (k + 1 < DETAILS.length && metres > reach(k + 1, pixel)) k++;
+  while (k + 1 < DETAILS.length && meters > reach(k + 1, pixel)) k++;
   if (was < 0 || k === was) return k;
   const edge = reach(Math.max(k, was), pixel);
-  return metres > edge / SLACK &&
-    metres < edge * SLACK &&
+  return meters > edge / SLACK &&
+    meters < edge * SLACK &&
     Math.abs(k - was) === 1
     ? was
     : k;

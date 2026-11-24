@@ -141,12 +141,12 @@ const linear = (lab: Vec3Node): Vec3Node => {
 };
 function tinted(
   c: Vec3Node,
-  colour: Vec3Node,
+  color: Vec3Node,
   a: FloatNode,
   far: FloatNode
 ): Vec3Node {
   const lab = oklab(c),
-    hers = oklab(colour),
+    hers = oklab(color),
     chroma = length(hers.yz),
     ratio = chroma.div(max(hers.x, 1e-3));
   const light = lab.x.mul(mix(float(1), hers.x.div(MIDDLE), a.mul(TINT_LIGHT)));

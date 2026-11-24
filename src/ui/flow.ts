@@ -70,7 +70,7 @@ export function createFlow(
   const worn = () =>
     act.wardrobe.dyes[act.wardrobe.worn().dye]?.dye ?? INK.white;
   let sailed: string | null = null,
-    seen: Sea['colours'] | null = null;
+    seen: Sea['colors'] | null = null;
   const lobby = createLobby(act.seeds.name, worn, {
     play: () => tap('play'),
     settings: () => tap('settings'),
@@ -170,8 +170,8 @@ export function createFlow(
     go,
     tap,
     update(s: HudState, sea?: Sea, own?: number | null) {
-      if (screen === 'match' && sea && own != null && sea.colours !== seen) {
-        seen = sea.colours;
+      if (screen === 'match' && sea && own != null && sea.colors !== seen) {
+        seen = sea.colors;
         sailed = dyeOn(sea, own);
       }
       if (IN_MATCH.includes(screen)) {

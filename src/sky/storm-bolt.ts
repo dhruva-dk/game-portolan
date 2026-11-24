@@ -55,7 +55,7 @@ export function createBolt(held: boolean) {
   const foot = uniform(new Vector3(0, 1, 0)),
     flash = uniform(0),
     seed = uniform(0);
-  const centre = (): Vec3Node => foot.mul(R + BASE + 15);
+  const center = (): Vec3Node => foot.mul(R + BASE + 15);
   const tinted = (air: Vec3Node): Vec3Node =>
     vec3(luminance(air)).mul(vec3(...TINT));
   const u = new Vector3(),
@@ -73,7 +73,7 @@ export function createBolt(held: boolean) {
     glow: (air: Vec3Node, q: Vec3Node): Vec3Node =>
       tinted(air).mul(
         flash
-          .mul(exp(length(q.sub(centre())).div(REACH).pow(2).negate()))
+          .mul(exp(length(q.sub(center())).div(REACH).pow(2).negate()))
           .mul(FLASH)
       ),
     nearest: (o: Vec3Node, d: Vec3Node): FloatNode => {
@@ -88,7 +88,7 @@ export function createBolt(held: boolean) {
       air: Vec3Node,
       o: Vec3Node,
       d: Vec3Node,
-      metres: FloatNode,
+      meters: FloatNode,
       through: FloatNode
     ): Vec3Node => {
       const w = o.sub(foot.mul(R)),
@@ -111,7 +111,7 @@ export function createBolt(held: boolean) {
       );
       const along = smoothstep(-2, 2, s)
         .mul(smoothstep(BASE + 10, BASE - 5, s))
-        .mul(smoothstep(0, 1, metres.sub(t)));
+        .mul(smoothstep(0, 1, meters.sub(t)));
       return tinted(air).mul(
         core
           .mul(along)
@@ -138,7 +138,7 @@ export function createBolt(held: boolean) {
       if (!flash.value) return;
       seed.value = hash01(n, 3);
       u.fromArray(eye).normalize();
-      c.fromArray(cap.centre);
+      c.fromArray(cap.center);
       out.copy(u).addScaledVector(c, -u.dot(c)).normalize();
       side.crossVectors(c, out);
       const off = (Math.acos(clamp(u.dot(c), -1, 1)) - cap.radius) * R;

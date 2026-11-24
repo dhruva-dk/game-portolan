@@ -79,7 +79,7 @@ for (const [name, eye] of eyes) {
   });
 
   test(
-    `terrain lod ${name}: neighbouring patches differ by a level at most, ` +
+    `terrain lod ${name}: neighboring patches differ by a level at most, ` +
       "and where they meet the finer is its parent's grid and the coarser unmorphed",
     () => {
       const list = patches(eye),

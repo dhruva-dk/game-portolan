@@ -19,7 +19,7 @@ import type { Planet } from '../world/planet.ts';
 import { hash } from '../world/random.ts';
 import type { Vec3 } from '../world/sphere.ts';
 import { flat } from '../world/swell.ts';
-import { COLOURS } from './colours.ts';
+import { COLORS } from './colors.ts';
 import { createState, type Match, type Waters } from './state.ts';
 
 const PART: Fitted = { performance: 1 };
@@ -128,9 +128,9 @@ export function specField(
     return {
       id,
       team,
-      colours: {
-        dye: team % COLOURS.length,
-        pattern: Math.floor(team / COLOURS.length) % PATTERNS.length,
+      colors: {
+        dye: team % COLORS.length,
+        pattern: Math.floor(team / COLORS.length) % PATTERNS.length,
       },
       parts: SPEC.parts,
       driver:

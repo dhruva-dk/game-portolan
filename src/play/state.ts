@@ -81,7 +81,7 @@ import type { PoseOut, ShipPose } from '../world/pose.ts';
 import { hash } from '../world/random.ts';
 import { add, bearingAt, scale, type Vec3 } from '../world/sphere.ts';
 import { LIVERY, type Livery, type Race } from '../player.ts';
-import { dealt, lookOf, worn } from './colours.ts';
+import { dealt, lookOf, worn } from './colors.ts';
 import { createDrawing } from './drawing.ts';
 import { createHeld } from './held.ts';
 import { indexed } from './indexed.ts';
@@ -206,7 +206,7 @@ export function createState(
   let territory: Territory | null = null;
   const held = createHeld();
   let hers: Livery = LIVERY;
-  const colours: Vec3[] = [];
+  const colors: Vec3[] = [];
   let generation = 0;
   const orders = createOrders(depth, chart);
 
@@ -232,7 +232,7 @@ export function createState(
   ) => {
     fleet.push(afloat(id, ship));
     vessels.stale();
-    colours[id] = look.sail;
+    colors[id] = look.sail;
     const r = settled(ship, sea, tick * STEP, id),
       p = pose(ship, r);
     const bot = (id !== PLAYER || !manned) && !lashed,
@@ -268,7 +268,7 @@ export function createState(
     gunfire = [];
     fleet = [];
     aboard.clear();
-    colours.length = 0;
+    colors.length = 0;
     aims.clear();
     wrecks = [];
     log.clear();
@@ -298,7 +298,7 @@ export function createState(
 
   const time = () => (tick - begun) * STEP;
   const stormAt = (seconds: number): Storm =>
-    quiet ? calm(match.storm(0).centre) : match.storm(seconds);
+    quiet ? calm(match.storm(0).center) : match.storm(seconds);
 
   const founder = ({ id, by, cause, gun }: Sunk) => {
     alive = null;
@@ -575,7 +575,7 @@ export function createState(
     born: (id: number): number | undefined => born.get(id),
     deeds: log.deeds,
     sea: (_between = 1): Sea | undefined =>
-      territory ? held(territory, generation, colours) : undefined,
+      territory ? held(territory, generation, colors) : undefined,
     share: (id: number) => territory?.share(id) ?? 0,
 
     result: (): RaceResult | null => tally?.result() ?? null,
@@ -636,7 +636,7 @@ export function createState(
           shipAt(b.at, b.heading),
           lookOf(
             entry
-              ? entry.colours
+              ? entry.colors
               : id === PLAYER
                 ? hers
                 : dealt(m.seed, id, hers)

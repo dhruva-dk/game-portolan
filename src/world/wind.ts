@@ -23,10 +23,10 @@ type Matrix = [Vec3, Vec3, Vec3];
 function potential(seed: number): { a: Vec3; m: Matrix } {
   const next = random(seed ^ 0x77696e64);
   const { points, triangles } = geodesic(FREQUENCY);
-  const centres = triangles
+  const centers = triangles
     .map(([i, j, k]) => normalize(add(add(points[i], points[j]), points[k])))
     .filter((c) => c[1] > Math.cos(TILT));
-  const a = centres[Math.floor(next() * centres.length)];
+  const a = centers[Math.floor(next() * centers.length)];
   const east = frameAt(a).east,
     north = cross(a, east),
     turn = 2 * Math.PI * next();

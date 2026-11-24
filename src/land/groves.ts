@@ -112,11 +112,11 @@ export function createGroves(
       const nearest = order[0];
       if (nearest !== cast) {
         cast = nearest;
-        const centre = tiles[nearest].chart.at;
+        const center = tiles[nearest].chart.at;
         let m = 0;
         for (let i = 0; i < n; i++)
           if (
-            distance(tiles[i].chart.at, centre) <
+            distance(tiles[i].chart.at, center) <
             SHADE + tiles[i].reach + LEANS
           )
             covered[m++] = i;

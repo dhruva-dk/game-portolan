@@ -48,8 +48,8 @@ function candidate(c: Ctx, cap: Cap, k: number): Vec3 | null {
   const key = (c.seed ^ Math.floor(cap.radius * 1e7)) >>> 0,
     a = 2 * Math.PI * unitHash(key, 2 * k + 1),
     r = Math.sqrt(unitHash(key, 2 * k + 2)) * (cap.radius * R - c.t.margin);
-  if (r <= 0) return cap.centre;
-  const q = along(cap.centre, tangentAt(cap.centre, a), r).p;
+  if (r <= 0) return cap.center;
+  const q = along(cap.center, tangentAt(cap.center, a), r).p;
   return water(c, q) ? q : null;
 }
 

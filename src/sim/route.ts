@@ -42,7 +42,7 @@ interface Space {
   readonly from: Int32Array;
   readonly seen: Int32Array;
   readonly marks: Int32Array;
-  readonly centre: Float64Array;
+  readonly center: Float64Array;
   readonly heap: Int32Array;
   readonly key: Float64Array;
   stamp: number;
@@ -55,8 +55,8 @@ const N = ROUTE.n,
 
 const GRID = cubeCells(N),
   cellOf = GRID.cellOf,
-  neighbour = GRID.neighbor;
-export const cellCentre = GRID.centre;
+  neighbor = GRID.neighbor;
+export const cellCenter = GRID.center;
 
 const SOUNDINGS = [
   [1, 0],
@@ -79,10 +79,10 @@ interface Soundings {
 export function sound(depth: Depth): Soundings {
   const open = new Uint8Array(CELLS),
     clear = new Uint8Array(CELLS),
-    deep = SHIP.draught + ROUTE.open,
+    deep = SHIP.draft + ROUTE.open,
     s = ROUTE.sounding / R;
   for (let c = 0; c < CELLS; c++) {
-    const p = cellCentre(c);
+    const p = cellCenter(c);
     let ok = depth(p) >= deep;
     if (ok) {
       const { east, north } = frameAt(p);
@@ -100,7 +100,7 @@ export function sound(depth: Depth): Soundings {
     for (let c = 0; c < CELLS; c++) {
       if (clear[c] <= round) continue;
       for (let k = 0; k < 4; k++)
-        if (clear[neighbour(c, k)] === round) {
+        if (clear[neighbor(c, k)] === round) {
           clear[c] = round + 1;
           break;
         }
@@ -119,7 +119,7 @@ export const openAt = (ch: Chart, p: Vec3): boolean => ch.open[cellOf(p)] === 1;
 export const clearAt = (ch: Chart, p: Vec3): number => ch.clear[cellOf(p)];
 
 const looked: Out3 = [0, 0, 0],
-  centre: Out3 = [0, 0, 0];
+  center: Out3 = [0, 0, 0];
 
 function clearLine(ch: Chart, a: Vec3, b: Vec3, step = 4): boolean {
   const k = Math.max(1, Math.ceil(distance(a, b) / step)),
@@ -140,14 +140,14 @@ const HEAP = 8 * ROUTE.work * 4 + 1;
 const STRIDE = 12;
 
 function space(): Space {
-  const centre = new Float64Array(CELLS * 3);
-  for (let c = 0; c < CELLS; c++) centre.set(cellCentre(c), 3 * c);
+  const center = new Float64Array(CELLS * 3);
+  for (let c = 0; c < CELLS; c++) center.set(cellCenter(c), 3 * c);
   return {
     g: new Float64Array(CELLS),
     from: new Int32Array(CELLS),
     seen: new Int32Array(CELLS),
     marks: new Int32Array(CELLS),
-    centre,
+    center,
     heap: new Int32Array(HEAP),
     key: new Float64Array(HEAP),
     stamp: 0,
@@ -183,7 +183,7 @@ function nearestOpen(ch: Chart, s: Space, p: Vec3, reach: number): number {
       continue;
     }
     for (let k = 0; k < 4; k++) {
-      const m = neighbour(c, k);
+      const m = neighbor(c, k);
       if (s.marks[m] !== mark) {
         s.marks[m] = mark;
         queue.push(m);
@@ -194,7 +194,7 @@ function nearestOpen(ch: Chart, s: Space, p: Vec3, reach: number): number {
 }
 
 function gap(s: Space, a: number, b: number): number {
-  const C = s.centre;
+  const C = s.center;
   return (
     R *
     Math.hypot(
@@ -206,7 +206,7 @@ function gap(s: Space, a: number, b: number): number {
 }
 
 function gapTo(s: Space, a: number, p: Vec3): number {
-  const C = s.centre;
+  const C = s.center;
   return (
     R * Math.hypot(C[3 * a] - p[0], C[3 * a + 1] - p[1], C[3 * a + 2] - p[2])
   );
@@ -259,12 +259,12 @@ const STEPS = new Int32Array(8);
 
 function stepsOf(ch: Chart, c: number, out: Int32Array): number {
   let n = 0;
-  for (let k = 0; k < 4; k++) out[n++] = neighbour(c, k);
+  for (let k = 0; k < 4; k++) out[n++] = neighbor(c, k);
   for (let k = 4; k < 8; k++) {
-    const x = neighbour(c, k & 1),
-      y = neighbour(c, 2 + ((k >> 1) & 1));
+    const x = neighbor(c, k & 1),
+      y = neighbor(c, 2 + ((k >> 1) & 1));
     if (!ch.open[x] || !ch.open[y]) continue;
-    const m = neighbour(x, 2 + ((k >> 1) & 1));
+    const m = neighbor(x, 2 + ((k >> 1) & 1));
     if (gap(ch.space, c, m) > STRIDE) continue;
     out[n++] = m;
   }
@@ -369,7 +369,7 @@ export function building(ch: Chart, into: (p: Vec3) => boolean): Building {
   const build = (work: number): boolean => {
     for (; seeded < CELLS && work > 0; seeded++, work--) {
       const c = seeded;
-      if (ch.open[c] && into(cellCentre(c, looked))) {
+      if (ch.open[c] && into(cellCenter(c, looked))) {
         cost[c] = 0;
         put(size, c);
         up(size++);
@@ -414,10 +414,10 @@ export function downField(ch: Chart, f: Field, at: Vec3): Vec3 | null {
     }
     if (next < 0) break;
     c = next;
-    if (to >= 0 && !clearLine(ch, at, cellCentre(c, centre), ROUTE.step)) break;
+    if (to >= 0 && !clearLine(ch, at, cellCenter(c, center), ROUTE.step)) break;
     to = c;
   }
-  return to < 0 ? null : cellCentre(to);
+  return to < 0 ? null : cellCenter(to);
 }
 
 export function fieldAt(ch: Chart, f: Field, at: Vec3): number {
@@ -444,7 +444,7 @@ export function downTo(
     if (next < 0) break;
     c = next;
   }
-  return cellCentre(c);
+  return cellCenter(c);
 }
 
 export interface Route {
@@ -496,7 +496,7 @@ export function course(
   let leg = r.leg;
   while (
     leg < cells.length - 1 &&
-    distance(at, cellCentre(cells[leg], centre)) < ROUTE.reached
+    distance(at, cellCenter(cells[leg], center)) < ROUTE.reached
   )
     leg++;
   let k = leg;
@@ -504,9 +504,9 @@ export function course(
     !shoaled &&
     k + 1 < cells.length &&
     k < leg + ROUTE.ahead &&
-    clearLine(ch, at, cellCentre(cells[k + 1], centre), ROUTE.step)
+    clearLine(ch, at, cellCenter(cells[k + 1], center), ROUTE.step)
   ) {
     k++;
   }
-  return { to: cellCentre(cells[k]), route: { ...r, leg } };
+  return { to: cellCenter(cells[k]), route: { ...r, leg } };
 }

@@ -48,7 +48,7 @@ export function createStormLook(
   shape: Storage3DTexture,
   held: boolean
 ) {
-  const centre = uniform(new Vector3(0, 1, 0));
+  const center = uniform(new Vector3(0, 1, 0));
   const radius = uniform(Math.PI);
   const outerCosine = uniform(-1);
   const clock = uniform(0),
@@ -59,7 +59,7 @@ export function createStormLook(
   ];
   const size = uniform(R);
   const field = createStormField(
-    { centre, radius, whole, clock, across, size },
+    { center, radius, whole, clock, across, size },
     shape
   );
   const bolt = createBolt(held);
@@ -69,13 +69,13 @@ export function createStormLook(
 
   const span = (
     dir: Vec3Node,
-    metres: FloatNode
+    meters: FloatNode
   ): { enter: FloatNode; leave: FloatNode } => {
     const o = view.position,
       d = dir,
       k = outerCosine;
-    const a = dot(o, centre),
-      b = dot(d, centre),
+    const a = dot(o, center),
+      b = dot(d, center),
       oo = dot(o, o),
       od = dot(o, d),
       k2 = k.mul(k);
@@ -85,7 +85,7 @@ export function createStormLook(
     const hi = select(
       h.lessThan(0),
       lo,
-      max(min(od.negate().add(half), metres), lo)
+      max(min(od.negate().add(half), meters), lo)
     );
     const A = b.mul(b).sub(k2),
       B = a.mul(b).sub(k2.mul(od)).mul(2),
@@ -108,12 +108,12 @@ export function createStormLook(
   const through = (
     c: Vec3Node,
     dir: Vec3Node,
-    metres: FloatNode,
+    meters: FloatNode,
     light: StormLight
   ): Vec3Node =>
     Fn(() => {
       const seen = c.toVar();
-      const { enter, leave } = span(dir, metres);
+      const { enter, leave } = span(dir, meters);
       If(leave.greaterThan(enter), () => {
         const o = view.position;
         const lit: FieldLight = {
@@ -136,7 +136,7 @@ export function createStormLook(
             .add(far.mul(m.T.mul(float(1).sub(rest))))
         );
         If(bolt.flash.greaterThan(0), () => {
-          seen.addAssign(bolt.channel(light.air, o, dir, metres, m.atMark));
+          seen.addAssign(bolt.channel(light.air, o, dir, meters, m.atMark));
         });
       });
       return seen;
@@ -145,10 +145,10 @@ export function createStormLook(
   const veil = (
     c: Vec3Node,
     dir: Vec3Node,
-    metres: FloatNode,
+    meters: FloatNode,
     light: StormLight
   ): Vec3Node => {
-    const seen = through(c, dir, metres, light);
+    const seen = through(c, dir, meters, light);
     const d = view.toSky(dir);
     const down = d.y
       .add(d.x.mul(STREAK_LEAN))
@@ -182,14 +182,14 @@ export function createStormLook(
     dim,
     deck: through,
     update(cap: StormDraw, seconds: number, eye: Vec3) {
-      centre.value.fromArray(cap.centre);
+      center.value.fromArray(cap.center);
       radius.value = cap.radius;
       const [one, two] = across;
-      one.value.set(0, 1, 0).cross(centre.value);
+      one.value.set(0, 1, 0).cross(center.value);
       if (one.value.lengthSq() < 1e-6)
-        one.value.set(1, 0, 0).cross(centre.value);
+        one.value.set(1, 0, 0).cross(center.value);
       one.value.normalize();
-      two.value.crossVectors(centre.value, one.value);
+      two.value.crossVectors(center.value, one.value);
       size.value = R * Math.sin(Math.min(cap.radius, Math.PI - 0.01));
       const all = cap.radius >= Math.PI - 0.01;
       whole.value = all ? 1 : 0;

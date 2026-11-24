@@ -32,8 +32,8 @@ interface Fall {
 }
 
 const MUZZLE = R + GUN.up;
-const nuFor = (metres: number) => {
-  const s = Math.sin(metres / R / 2);
+const nuFor = (meters: number) => {
+  const s = Math.sin(meters / R / 2);
   return (2 * s) / (1 + s);
 };
 const PULL = perKind((k) => {
@@ -70,11 +70,11 @@ interface Throw {
   time: number;
 }
 
-export function thrown(kind: GunKind, metres: number): Throw | null {
+export function thrown(kind: GunKind, meters: number): Throw | null {
   const g = GUNS[kind],
     { nu, mu } = PULL[kind];
-  if (metres > g.range + 1e-9 || metres < g.least - 1e-9) return null;
-  const t = Math.tan(Math.max(metres, 1e-3) / R / 2);
+  if (meters > g.range + 1e-9 || meters < g.least - 1e-9) return null;
+  const t = Math.tan(Math.max(meters, 1e-3) / R / 2);
   if (g.lob > 0) {
     const c = Math.cos(g.lob),
       n = t / (c * (Math.sin(g.lob) + t * c));
@@ -86,7 +86,7 @@ export function thrown(kind: GunKind, metres: number): Throw | null {
   }
   const root = nu * nu - 4 * t * t * (1 - nu);
   const elevation =
-    metres <= 0 ? 0 : Math.atan((nu - Math.sqrt(Math.max(0, root))) / (2 * t));
+    meters <= 0 ? 0 : Math.atan((nu - Math.sqrt(Math.max(0, root))) / (2 * t));
   return { elevation, speed: g.speed, time: flight(nu, mu, elevation) };
 }
 

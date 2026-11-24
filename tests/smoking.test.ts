@@ -22,11 +22,11 @@ import { flat } from '../src/world/swell.ts';
 
 const ship = (
   id: number,
-  metres: number,
+  meters: number,
   wear: ShipDraw['wear'],
   afloat = true
 ): ShipDraw => {
-  const a = metres / R;
+  const a = meters / R;
   return {
     id,
     pose: {
@@ -92,7 +92,7 @@ test('only the worn smoke, and only afloat', () => {
 });
 
 test('fewer puffs the farther, from SMOKING.near on; thinner close by the eye', () => {
-  const at = (metres: number) => plan([ship(1, metres, 2)], 0.5)[0];
+  const at = (meters: number) => plan([ship(1, meters, 2)], 0.5)[0];
   const full = at(SMOKING.near - 1),
     twice = at(2 * SMOKING.near);
   assert.ok(full && twice);

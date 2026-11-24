@@ -187,9 +187,9 @@ test('looked as high or as low as it goes, the eye stays over the sea; by a hill
 });
 
 test("by the storm, looked as low as it goes or in the ship's sunk shot, the eye stays under its cloud; in the calm it is not drawn in", () => {
-  const calmOf = (metres: number, ahead: number) => ({
-    centre: along(up, north, ahead).p,
-    radius: metres / R,
+  const calmOf = (meters: number, ahead: number) => ({
+    center: along(up, north, ahead).p,
+    radius: meters / R,
   });
   const height = (c: ReturnType<typeof createChase>) =>
     length(c.eye().position) - R;

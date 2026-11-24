@@ -229,7 +229,7 @@ export function record(
       for (const k of did.held?.claimed ?? [])
         emit('claim', {
           ship: k.id,
-          metres: r1(k.metres),
+          meters: r1(k.meters),
           share: r4(state.share(k.id)),
         });
 
@@ -244,10 +244,10 @@ export function record(
           phase: st.phase,
           closing: st.closing,
           final: st.final,
-          centre: latLon(st.centre),
+          center: latLon(st.center),
           radius: r1(st.radius * R),
           next: {
-            centre: latLon(st.next.centre),
+            center: latLon(st.next.center),
             radius: r1(st.next.radius * R),
           },
           secondsToNext: Number.isFinite(st.secondsToNext)

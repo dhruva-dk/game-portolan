@@ -37,10 +37,10 @@ import {
 } from '../src/world/sphere.ts';
 
 const deep: Depth = () => 30;
-const centre = fromLatLon(0.2, 0.3),
-  { east, north } = frameAt(centre);
+const center = fromLatLon(0.2, 0.3),
+  { east, north } = frameAt(center);
 const at = (x: number, y: number): Vec3 =>
-  normalize(add(add(centre, east, x / R), north, y / R));
+  normalize(add(add(center, east, x / R), north, y / R));
 const lying = (id: number, x: number, y: number): Vessel => {
   const p = at(x, y);
   return afloat(id, shipAt(p, frameAt(p).east));
@@ -202,22 +202,22 @@ test("the gun's assist never lays on a mate: its marks are every ship but its te
 test('a bot never takes a mate for its foe, nor notes it in its log; a ship of another team it does', () => {
   const own = (team: number) => ({
     id: 1,
-    ship: shipAt(centre, north),
+    ship: shipAt(center, north),
     hull: 100,
     armed: true,
     team,
   });
   const other = {
     id: 2,
-    ship: shipAt(along(centre, north, 70).p, north),
+    ship: shipAt(along(center, north, 70).p, north),
     hull: 20,
     shield: 0,
     armed: true,
     team: 0,
   };
   for (const seed of [1, 2, 3, 4, 5]) {
-    let foe = mind(seed, centre),
-      mate = mind(seed, centre);
+    let foe = mind(seed, center),
+      mate = mind(seed, center);
     for (let k = 0; k < 12; k++) {
       foe = think(own(1), [other], { depth: deep }, foe, nature(seed)).memory;
       mate = think(own(0), [other], { depth: deep }, mate, nature(seed)).memory;
@@ -229,7 +229,7 @@ test('a bot never takes a mate for its foe, nor notes it in its log; a ship of a
   }
 });
 
-const CALM: Cap = { centre: [0, 1, 0], radius: Math.PI };
+const CALM: Cap = { center: [0, 1, 0], radius: Math.PI };
 type Sea = ReturnType<typeof createTerritory>;
 function sail(t: Sea, id: number, ...points: Vec3[]) {
   const claimed: number[] = [];
@@ -241,7 +241,7 @@ function sail(t: Sea, id: number, ...points: Vec3[]) {
     for (let i = 1; i <= n; i++) {
       const to = normalize(add(scale(a, 1 - i / n), b, i / n));
       for (const c of t.step([{ id, from, to }], 0, CALM).claimed)
-        claimed.push(c.metres);
+        claimed.push(c.meters);
       from = to;
     }
   }
@@ -343,11 +343,11 @@ test("a race's tally: shots fired, strikes landed and taken (a ram is neither), 
     shield: 4,
     hull: 6,
     broke: false,
-    at: centre,
+    at: center,
     ram,
     gun: ram ? null : KINDS[0],
   });
-  const shot = { shooter: 1, gun: KINDS[0], from: centre, dirs: [], target: 4 };
+  const shot = { shooter: 1, gun: KINDS[0], from: center, dirs: [], target: 4 };
   const standing = (alive: number[], loot: number) => () => ({
     seconds: 61,
     alive,

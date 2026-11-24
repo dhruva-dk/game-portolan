@@ -57,10 +57,10 @@ function openNear(c: Ctx, q: Vec3): Vec3 {
   return q;
 }
 
-export function inward(c: Ctx, p: Vec3, centre: Vec3, r: number): Vec3 {
-  if (distance(p, centre) <= r) return p;
-  const t = toward(centre, p);
-  return openNear(c, t ? along(centre, t, r * c.b.storming.inward).p : centre);
+export function inward(c: Ctx, p: Vec3, center: Vec3, r: number): Vec3 {
+  if (distance(p, center) <= r) return p;
+  const t = toward(center, p);
+  return openNear(c, t ? along(center, t, r * c.b.storming.inward).p : center);
 }
 
 function calmOf(c: Ctx, cap: Cap) {
@@ -69,9 +69,9 @@ function calmOf(c: Ctx, cap: Cap) {
   return k &&
     ch &&
     k.cap.radius === cap.radius &&
-    k.cap.centre[0] === cap.centre[0] &&
-    k.cap.centre[1] === cap.centre[1] &&
-    k.cap.centre[2] === cap.centre[2]
+    k.cap.center[0] === cap.center[0] &&
+    k.cap.center[1] === cap.center[1] &&
+    k.cap.center[2] === cap.center[2]
     ? { ch, field: k.field, gap: reach(cap) - k.heart }
     : null;
 }
@@ -104,13 +104,13 @@ export function stormGoal(c: Ctx): Vec3 {
     toEdge(p, s) < margin * c.b.storming.nearEdge || !late(c) ? s : s.next;
   return (
     (cap === s.next && downCalm(c, s)) ||
-    inward(c, p, cap.centre, Math.max(0, reach(cap) - margin))
+    inward(c, p, cap.center, Math.max(0, reach(cap) - margin))
   );
 }
 
 export const keptInside = (c: Ctx, q: Vec3): Vec3 => {
   const s = c.sea.storm;
   return s && toEdge(q, s) < c.t.margin
-    ? inward(c, q, s.centre, Math.max(0, reach(s) - c.t.margin))
+    ? inward(c, q, s.center, Math.max(0, reach(s) - c.t.margin))
     : q;
 };

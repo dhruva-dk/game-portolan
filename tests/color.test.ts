@@ -7,7 +7,7 @@ import {
   linearToSrgb,
   linearToSrgbRgb,
   srgbToLinear,
-} from '../src/colour.ts';
+} from '../src/color.ts';
 
 test("hexToLinear is three's sRGB to linear, from a string or a number", () => {
   for (const hex of [
@@ -38,7 +38,7 @@ test('linearToSrgb undoes srgbToLinear', () => {
   );
 });
 
-test('linearToHex writes back the hex a colour was read from', () => {
+test('linearToHex writes back the hex a color was read from', () => {
   for (const hex of ['#000000', '#ffffff', '#d2332a', '#0a0b0c', '#f4e06a'])
     assert.equal(linearToHex(hexToLinear(hex)), hex);
 });

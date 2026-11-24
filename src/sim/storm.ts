@@ -44,7 +44,7 @@ export const STORM = {
 export const CLOUD = { base: 58, lowest: 40, out: 50 } as const;
 
 export interface Cap {
-  centre: Vec3;
+  center: Vec3;
   radius: number;
 }
 
@@ -58,12 +58,12 @@ export interface Storm extends Cap {
 }
 
 const WHOLE = Math.PI;
-const angle = (metres: number) => metres / R;
+const angle = (meters: number) => meters / R;
 
-export const calm = (centre: Vec3): Storm => ({
-  centre,
+export const calm = (center: Vec3): Storm => ({
+  center,
   radius: WHOLE,
-  next: { centre, radius: WHOLE },
+  next: { center, radius: WHOLE },
   closing: false,
   secondsToNext: Infinity,
   phase: 0,
@@ -111,12 +111,12 @@ export function planStorm(
     if (s > score) [best, score] = [u, s];
     if (s >= 0) break;
   }
-  const centres: Vec3[] = new Array(n);
-  centres[n - 1] = best;
+  const centers: Vec3[] = new Array(n);
+  centers[n - 1] = best;
   for (let k = n - 2; k >= 0; k--) {
-    const inner = centres[k + 1],
+    const inner = centers[k + 1],
       room = angle(phases[k].radius - phases[k + 1].radius) * table.wander;
-    centres[k] = inner;
+    centers[k] = inner;
     for (let i = 0; i < table.tries; i++) {
       const c = normalize(
         along(
@@ -126,12 +126,12 @@ export function planStorm(
         ).p
       );
       if (wet(c) > 0) {
-        centres[k] = c;
+        centers[k] = c;
         break;
       }
     }
   }
-  return centres;
+  return centers;
 }
 
 export function createStorm(
@@ -139,15 +139,15 @@ export function createStorm(
   depth: Depth,
   table: StormTable = STORM
 ) {
-  const centres = planStorm(seed, depth, table),
+  const centers = planStorm(seed, depth, table),
     phases = table.phases,
     n = phases.length;
   const held = (k: number): Cap =>
     k === 0
-      ? { centre: centres[0], radius: WHOLE }
-      : { centre: centres[k - 1], radius: angle(phases[k - 1].radius) };
+      ? { center: centers[0], radius: WHOLE }
+      : { center: centers[k - 1], radius: angle(phases[k - 1].radius) };
   const target = (k: number): Cap => ({
-    centre: centres[k],
+    center: centers[k],
     radius: angle(phases[k].radius),
   });
   return (seconds: number): Storm => {
@@ -169,10 +169,10 @@ export function createStorm(
       t -= p.wait;
       if (t < p.close) {
         const f = t / p.close;
-        const centre = slerp(from.centre, to.centre, f),
+        const center = slerp(from.center, to.center, f),
           radius = from.radius + (to.radius - from.radius) * f;
         return {
-          centre,
+          center,
           radius,
           next: to,
           closing: true,
@@ -203,6 +203,6 @@ export const closedBy = (table: StormTable): number =>
   table.phases.reduce((t, p) => t + p.wait + p.close, 0);
 
 export const toEdge = (p: Vec3, cap: Cap) =>
-  (cap.radius - between(normalize(p), cap.centre)) * R;
+  (cap.radius - between(normalize(p), cap.center)) * R;
 
 export const outside = (p: Vec3, cap: Cap) => toEdge(p, cap) < 0;

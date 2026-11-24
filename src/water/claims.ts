@@ -44,8 +44,8 @@ const LINE_HALF = 1.1,
 const FAINTEST = 0.5;
 const INK = 1;
 
-const lineLight = (colour: Vec3Node): Vec3Node =>
-  colour.div(max(max(colour.x, colour.y), max(colour.z, 0.02))).mul(INK);
+const lineLight = (color: Vec3Node): Vec3Node =>
+  color.div(max(max(color.x, color.y), max(color.z, 0.02))).mul(INK);
 const CREST = 0.03,
   CREST_GAIN = 1.2;
 
@@ -68,10 +68,10 @@ export function createClaims(ships: number) {
   const cellBuf = storage(cellsAttr, 'uint', WORDS).toReadOnly(),
     revBuf = storage(revealAttr, 'float', WORDS).toReadOnly();
   const values = Array.from({ length: ships + 1 }, () => new Vector4());
-  const colours = uniformArray<'vec4'>(values, 'vec4');
+  const colors = uniformArray<'vec4'>(values, 'vec4');
   const clock = uniform(0);
 
-  const colourOf = (id: FloatNode): Vec4Node => colours.element(int(id));
+  const colorOf = (id: FloatNode): Vec4Node => colors.element(int(id));
   const hers = (w: FloatNode) => clamp(w.sub(1).div(OWN_LINE - 1), 0, 1);
 
   return {
@@ -117,7 +117,7 @@ export function createClaims(ships: number) {
           .bitAnd(255)
           .equal(255)
           .and(r0.lessThanEqual(settled));
-      const c = colourOf(own);
+      const c = colorOf(own);
       dye.assign(
         vec4(c.xyz, select(own.greaterThan(0), tintOf(c.w), float(0)))
       );
@@ -279,8 +279,8 @@ export function createClaims(ships: number) {
         };
         const shade = (f: ReturnType<typeof field>) => {
           const t = clamp(f.v.div(f.px).add(0.5), 0, 1);
-          const lo = colourOf(f.lo),
-            hi = colourOf(f.hi);
+          const lo = colorOf(f.lo),
+            hi = colorOf(f.hi);
           const aLo = select(f.lo.greaterThan(0), float(1), float(0)),
             aHi = select(f.hi.greaterThan(0), float(1), float(0));
           const tint = vec4(
@@ -301,7 +301,7 @@ export function createClaims(ships: number) {
             tint,
             strength,
             ink: vec4(light.mul(cover), cover),
-            colour: side.xyz,
+            color: side.xyz,
             light,
           };
         };
@@ -319,10 +319,10 @@ export function createClaims(ships: number) {
         );
         const tc = mix(sB.tint.mul(fade), sN.tint, tf);
         const strength = mix(sB.strength.mul(fade), sN.strength, tf);
-        const colour = select(
+        const color = select(
           tc.w.greaterThan(1e-3),
           tc.xyz.div(max(tc.w, 1e-3)),
-          mix(sB.colour, sN.colour, tf)
+          mix(sB.color, sN.color, tf)
         );
         const changing = select(
           length(sN.tint.sub(sB.tint)).greaterThan(1e-3),
@@ -350,7 +350,7 @@ export function createClaims(ships: number) {
             vec4(sN.light.mul(crest.mul(INK)), crest).mul(float(1).sub(lines.w))
           )
         );
-        dye.assign(vec4(colour, strength));
+        dye.assign(vec4(color, strength));
       });
       return { dye, ink, drain, far };
     },
@@ -368,12 +368,8 @@ export function createClaims(ships: number) {
       }
       if (!sea) return;
       clock.value = now;
-      for (
-        let id = 0;
-        id < sea.colours.length && id + 1 < values.length;
-        id++
-      ) {
-        const c = sea.colours[id];
+      for (let id = 0; id < sea.colors.length && id + 1 < values.length; id++) {
+        const c = sea.colors[id];
         values[id + 1].set(c[0], c[1], c[2], id === own ? OWN_LINE : 1);
       }
     },

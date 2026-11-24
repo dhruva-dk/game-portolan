@@ -168,12 +168,12 @@ test('a spec field: teams of four by id, each in its own livery, every driver th
   assert.equal(card.ships.length, 80);
   for (const s of card.ships) {
     assert.equal(s.team, Math.floor(s.id / TEAM));
-    assert.deepEqual(s.colours, card.ships[s.team * TEAM].colours);
+    assert.deepEqual(s.colors, card.ships[s.team * TEAM].colors);
     assert.equal(s.driver?.seed, hash(7, s.id));
     assert.equal(s.driver?.persona, nature(hash(7, s.id)).persona);
   }
   const liveries = new Set(
-    card.ships.map((s) => `${s.colours.dye} ${s.colours.pattern}`)
+    card.ships.map((s) => `${s.colors.dye} ${s.colors.pattern}`)
   );
   assert.equal(liveries.size, 20);
 });

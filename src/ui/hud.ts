@@ -70,7 +70,7 @@ export function createHud(layer: HTMLElement, shores: Shores, act: HudActions) {
   const face = document.createElement('div');
   vitals.appendChild(face);
   const drawVitals = createVitals(face);
-  const readings = piece(body, 'top centre', false, true);
+  const readings = piece(body, 'top center', false, true);
   const map = piece(body, 'top right', true, true);
   const thumb = piece(body, 'right bottom', false, true);
   const disc = 2 * FIRE + 4;
@@ -89,7 +89,7 @@ export function createHud(layer: HTMLElement, shores: Shores, act: HudActions) {
     `box-shadow:inset 0 0 calc(80px * var(--k)) calc(18px * var(--k)) ${alpha(DUSK, 0.6)}`;
   body.prepend(rim);
   onHold(fire, act.fire);
-  const hotbar = piece(body, 'bottom centre', false, true);
+  const hotbar = piece(body, 'bottom center', false, true);
 
   const drawMap = createMinimap(map, MINIMAP, shores);
   onTap(map, () => act.map());

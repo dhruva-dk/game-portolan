@@ -70,7 +70,7 @@ const SUNLIT = 0.55,
   LINING_G = 0.6;
 
 interface CapNodes {
-  centre: Vec3Node;
+  center: Vec3Node;
   radius: FloatNode;
   whole: FloatNode;
   clock: FloatNode;
@@ -94,7 +94,7 @@ interface Marched {
 
 export function createStormField(cap: CapNodes, shape: Storage3DTexture) {
   const edge = (u: Vec3Node): FloatNode =>
-    acos(clamp(dot(u, cap.centre), -1, 1))
+    acos(clamp(dot(u, cap.center), -1, 1))
       .sub(cap.radius)
       .mul(R)
       .sub(cap.whole.mul(1e4));
@@ -144,7 +144,7 @@ export function createStormField(cap: CapNodes, shape: Storage3DTexture) {
     const up = normalize(q),
       h = length(q).sub(R);
     const c = cloudAt(q, up, h, edge(up));
-    const out = normalize(up.mul(dot(up, cap.centre)).sub(cap.centre));
+    const out = normalize(up.mul(dot(up, cap.center)).sub(cap.center));
     const onTop = c.top.lessThan(min(c.face, c.under)),
       onBase = c.under.lessThan(c.face);
     const flat = select(

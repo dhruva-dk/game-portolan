@@ -137,35 +137,35 @@ test('a square sail hangs before its mast and is braced about it; the lateen bef
   }
 });
 
-const ships = (n: number, metres: (i: number) => number) =>
-  Array.from({ length: n }, (_, i) => metres(i));
+const ships = (n: number, meters: (i: number) => number) =>
+  Array.from({ length: n }, (_, i) => meters(i));
 const run = (
   berths: (Berth | null)[],
-  metres: number[],
+  meters: number[],
   own: number,
   seconds: number,
   dt = 1 / 30
 ) => {
   let b = berths;
-  for (let t = 0; t < seconds; t += dt) b = moor(b, metres, own, dt);
+  for (let t = 0; t < seconds; t += dt) b = moor(b, meters, own, dt);
   return b;
 };
 const held = (b: (Berth | null)[]) =>
   b.flatMap((x) => (x ? [x.ship] : [])).sort((p, q) => p - q);
 
 test('the berths go to the player and the nearest within reach, the cloth settling unseen before it is shown', () => {
-  const metres = ships(10, (i) => 20 + i * 15);
-  metres[7] = 5;
+  const meters = ships(10, (i) => 20 + i * 15);
+  meters[7] = 5;
   const empty = () => new Array(BERTHS).fill(null);
-  const first = moor(empty(), metres, 9, 1 / 30);
+  const first = moor(empty(), meters, 9, 1 / 30);
   assert.deepEqual(held(first), [0, 1, 7, 9]);
   assert.ok(first.every((b) => b && b.fresh && b.share === 0));
-  const settling = run(first, metres, 9, SETTLE * 0.9);
+  const settling = run(first, meters, 9, SETTLE * 0.9);
   assert.ok(
     settling.every((b) => b && !b.fresh && b.share === 0),
     'unseen while it settles'
   );
-  const shown = run(settling, metres, 9, FADE + 0.2);
+  const shown = run(settling, meters, 9, FADE + 0.2);
   assert.ok(
     shown.every((b) => b && b.share === 1),
     'shown in full after it fades in'
@@ -184,10 +184,10 @@ test('the berths go to the player and the nearest within reach, the cloth settli
 });
 
 test('a ship that is no longer among the nearest fades out before its berth goes to another, with no jump', () => {
-  const metres = ships(5, (i) => 20 + i * 10);
-  let b = run(new Array(BERTHS).fill(null), metres, -1, SETTLE + FADE + 0.1);
+  const meters = ships(5, (i) => 20 + i * 10);
+  let b = run(new Array(BERTHS).fill(null), meters, -1, SETTLE + FADE + 0.1);
   assert.deepEqual(held(b), [0, 1, 2, 3]);
-  const after = [...metres];
+  const after = [...meters];
   after[4] = 10;
   after[3] = 100;
   let last = b.find((x) => x?.ship === 3)!.share;
@@ -210,11 +210,11 @@ test('a ship that is no longer among the nearest fades out before its berth goes
 });
 
 test("two ships at about the same distance don't trade a berth back and forth", () => {
-  const metres = ships(BERTHS + 1, (i) => 20 + i * 10);
-  let b = run(new Array(BERTHS).fill(null), metres, -1, 3);
+  const meters = ships(BERTHS + 1, (i) => 20 + i * 10);
+  let b = run(new Array(BERTHS).fill(null), meters, -1, 3);
   const last = BERTHS - 1;
-  metres[BERTHS] = metres[last] - 2;
-  b = run(b, metres, -1, 3);
+  meters[BERTHS] = meters[last] - 2;
+  b = run(b, meters, -1, 3);
   assert.ok(held(b).includes(last) && !held(b).includes(BERTHS));
 });
 

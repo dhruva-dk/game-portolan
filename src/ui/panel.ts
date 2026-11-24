@@ -46,7 +46,7 @@ export function createSeedPanel(
   seeds: Seeds,
   act: { close(): void; sail(name: string): void }
 ) {
-  const f = folio(BOX, ['centre', 'middle'], act.close);
+  const f = folio(BOX, ['center', 'middle'], act.close);
   const orb = createOrb();
   const input = document.createElement('input');
   Object.assign(input, {

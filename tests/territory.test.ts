@@ -6,7 +6,7 @@ import {
   PLANET_QUANTA,
   adjacent,
   cellOf,
-  centreOf,
+  centerOf,
   neighbor,
   wrapped,
 } from '../src/world/cells.ts';
@@ -30,7 +30,7 @@ import {
 import { random } from '../src/world/random.ts';
 import type { Cap } from '../src/sim/storm.ts';
 
-const WHOLE: Cap = { centre: [0, 1, 0], radius: Math.PI };
+const WHOLE: Cap = { center: [0, 1, 0], radius: Math.PI };
 const PLANET = 4 * Math.PI * R * R;
 const RHO = TERRITORY.home / R;
 const STRIDE = 12 / 30;
@@ -87,7 +87,7 @@ function sail(t: Territory, path: readonly Vec3[], id = 0, cap = WHOLE) {
       (k * STRIDE) / 12,
       cap
     );
-    for (const c of o.claimed) claimed.push(c.metres);
+    for (const c of o.claimed) claimed.push(c.meters);
   }
   return { claimed };
 }
@@ -115,7 +115,7 @@ function line(a: Vec3, b: Vec3): Vec3[] {
   );
 }
 
-test('the cells: 6·N² of them, neighbours across every face edge returning, the areas summing to the sphere', () => {
+test('the cells: 6·N² of them, neighbors across every face edge returning, the areas summing to the sphere', () => {
   assert.equal(CELLS, 6 * N * N);
   assert.ok(Math.abs(PLANET_QUANTA / (1 << 20) - PLANET) / PLANET < 1e-6);
   for (let c = 0; c < CELLS; c += 97) {
@@ -123,14 +123,14 @@ test('the cells: 6·N² of them, neighbours across every face edge returning, th
       const n = neighbor(c, k);
       assert.ok(
         adjacent(n, c),
-        `cell ${c}'s neighbour ${k} (${n}) has it as a neighbour`
+        `cell ${c}'s neighbor ${k} (${n}) has it as a neighbor`
       );
       assert.ok(
-        distance(centreOf(c), centreOf(n)) < DIAGONAL,
-        'neighbours are near'
+        distance(centerOf(c), centerOf(n)) < DIAGONAL,
+        'neighbors are near'
       );
     }
-    assert.equal(cellOf(centreOf(c)), c);
+    assert.equal(cellOf(centerOf(c)), c);
   }
   for (let f = 0; f < 6; f++) {
     assert.equal(wrapped(f, -1, 7), neighbor(f * N * N + 7 * N, 0));
@@ -210,7 +210,7 @@ test('what a loop encloses is taken from others, islands and all; it floods from
   const claim = t.changes().find((c) => c.kind === 'claim');
   assert.ok(claim && claim.kind === 'claim' && claim.loop > 0);
   for (let k = 0; k < claim.loop; k++) {
-    const off: number = distance(centreOf(claim.cells[k]), pole) - R * theta;
+    const off: number = distance(centerOf(claim.cells[k]), pole) - R * theta;
     assert.ok(
       Math.abs(off) <= TERRITORY.brush + DIAGONAL,
       `the flood starts from its strip (${off.toFixed(1)} m off its course)`
@@ -235,7 +235,7 @@ test('sailing paints a strip as wide as its beam, its own at once: no line to cu
   for (const m of [50, 80, 110]) {
     const p = path[Math.round(m / STRIDE)];
     assert.equal(t.ownerAt(p), 0, `its own under its course, ${m} m out`);
-    assert.equal(t.ownerAt(aside(p, end, 1)), 0, 'its own a metre to the side');
+    assert.equal(t.ownerAt(aside(p, end, 1)), 0, 'its own a meter to the side');
     assert.equal(t.ownerAt(aside(p, end, -1)), 0, 'and to the other');
     assert.equal(t.ownerAt(aside(p, end, 9)), -1, 'open sea 9 m off');
   }
@@ -284,7 +284,7 @@ test("the storm takes the water outside its cap; a sunk ship's drains away; a sh
     a: Vec3 = [0, 1, 0],
     b = normalize([0, 0.2, 1]);
   t.begin([a, b], 0);
-  const cap: Cap = { centre: a, radius: 0.5 };
+  const cap: Cap = { center: a, radius: 0.5 };
   for (let k = 0; k < TERRITORY.sweep; k++) t.step([], k, cap);
   assert.ok(t.holds(0) && !t.holds(1), 'the storm took its own');
   const drain = t.changes().find((c) => c.kind === 'drain');

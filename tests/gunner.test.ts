@@ -31,11 +31,11 @@ const deg = Math.PI / 180;
 const placed = (
   id: number,
   bearing: number,
-  metres: number,
+  meters: number,
   heading: number,
   speed = 0
 ): Vessel => {
-  const at = along(start, bearingAt(start, bearing), metres).p;
+  const at = along(start, bearingAt(start, bearing), meters).p;
   return afloat(id, { ...shipAt(at, bearingAt(at, heading)), speed });
 };
 const bold = (() => {
@@ -191,9 +191,9 @@ test('an unarmed bot never orders its gun fired', () => {
 });
 
 const stormIn = (phase: number): Storm => ({
-  centre: start,
+  center: start,
   radius: Math.PI,
-  next: { centre: start, radius: Math.PI },
+  next: { center: start, radius: Math.PI },
   closing: false,
   secondsToNext: phase < 7 ? 60 : Infinity,
   phase,

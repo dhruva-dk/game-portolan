@@ -4,8 +4,8 @@ import type { Hearing } from './audio/listen.ts';
 import type { Played, Setup, Stage } from './debug.ts';
 
 import { launched, roll, sail } from './address.ts';
-import { linearToHex } from './colour.ts';
-import { DYES } from './play/colours.ts';
+import { linearToHex } from './color.ts';
+import { DYES } from './play/colors.ts';
 import { SEED, createWorld } from './environment.ts';
 import { createFrame } from './frame.ts';
 import { loaded } from './load.ts';
@@ -176,7 +176,7 @@ async function play(s: Stage): Promise<Played> {
       wardrobe: {
         dyes: DYES.map((d) => ({
           name: d.name,
-          dye: linearToHex(d.colour),
+          dye: linearToHex(d.color),
           mark: linearToHex(d.mark),
         })),
         worn: game.worn,

@@ -210,7 +210,7 @@ export function createListen(ground: (p: Vec3) => number) {
       bed.roll = roll;
       bed.wind = Math.min(1, 0.22 + 0.5 * bed.speed + (s.blowing ? 0.5 : 0));
       sound(s.at);
-      bed.wall = s.eye.radius - distance(s.at, s.eye.centre);
+      bed.wall = s.eye.radius - distance(s.at, s.eye.center);
       bed.hull = s.hullMax > 0 ? s.hull / s.hullMax : 1;
       bed.presence = (1 - s.arriving) * (shown === 'title' ? 0.6 : 1);
       bed.muffle = open

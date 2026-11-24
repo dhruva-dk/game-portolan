@@ -334,7 +334,7 @@ export function createGlobe(coasts: readonly Coast[]) {
     ctx.globalAlpha = 0.55;
     ctx.lineWidth = k;
     for (const coast of coasts) {
-      if (dot(coast.centre, e.c) * e.d < 0.9) continue;
+      if (dot(coast.center, e.c) * e.d < 0.9) continue;
       trace(e, coast.ring, false);
       ctx.stroke();
     }
@@ -347,7 +347,7 @@ export function createGlobe(coasts: readonly Coast[]) {
       ctx.lineWidth = 0.8;
       for (const q of SWIRLS) {
         const p = project(e, q, seen);
-        if (p.facing < 0.15 || dot(q, cap.centre) > calm) continue;
+        if (p.facing < 0.15 || dot(q, cap.center) > calm) continue;
         const size = s * Math.min(1, p.facing * 2) * 1.1;
         ctx.save();
         ctx.translate(p.x, p.y);
@@ -358,7 +358,7 @@ export function createGlobe(coasts: readonly Coast[]) {
         ctx.stroke(SWIRL);
         ctx.restore();
       }
-      trace(e, rings(cap.centre, cap.radius * R), true);
+      trace(e, rings(cap.center, cap.radius * R), true);
       ctx.strokeStyle = INKS.halo;
       ctx.lineWidth = 6 * k;
       ctx.stroke();
@@ -383,7 +383,7 @@ export function createGlobe(coasts: readonly Coast[]) {
   function calms(e: Sight, s: HudState, k: number) {
     const next = s.next && s.next.radius < R * Math.PI * 0.99 ? s.next : null;
     if (next) {
-      trace(e, rings(next.centre, next.radius), true);
+      trace(e, rings(next.center, next.radius), true);
       strokeNext(ctx, k);
     }
     const calm = s.eye.radius < R * Math.PI * 0.99 ? s.eye : null,

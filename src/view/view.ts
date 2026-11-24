@@ -200,10 +200,10 @@ export function createView() {
     fromSky,
     position,
     height,
-    under: (dir: Vec3Node, metres: FloatNode, top: number): FloatNode => {
+    under: (dir: Vec3Node, meters: FloatNode, top: number): FloatNode => {
       const od = dot(position, dir),
         h = od.mul(od).sub(dot(position, position).sub((R + top) * (R + top)));
-      return max(metres.sub(max(od.negate().sub(sqrt(max(h, 0))), 0)), 0);
+      return max(meters.sub(max(od.negate().sub(sqrt(max(h, 0))), 0)), 0);
     },
     local: (p: Vec3Node): Vec2Node => eyeChart(p).q,
     onEye: (p: Vec3Node): Charted => eyeChart(p),

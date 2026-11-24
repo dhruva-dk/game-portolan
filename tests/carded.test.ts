@@ -7,7 +7,7 @@ const SPEC = { performance: 1 };
 const ship = (id: number, over: Partial<RaceShip> = {}): RaceShip => ({
   id,
   team: Math.floor(id / 2),
-  colours: { dye: 0, pattern: 0 },
+  colors: { dye: 0, pattern: 0 },
   parts: {
     sails: SPEC,
     rigging: SPEC,

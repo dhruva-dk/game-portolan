@@ -22,7 +22,7 @@ import type { Look } from '../snapshot.ts';
 import { hash } from '../world/random.ts';
 import type { Vec3 } from '../world/sphere.ts';
 
-export const DYES: readonly { name: string; colour: Vec3; mark: Vec3 }[] =
+export const DYES: readonly { name: string; color: Vec3; mark: Vec3 }[] =
   Object.entries({
     vermilion: VERMILION,
     coral: CORAL,
@@ -42,26 +42,26 @@ export const DYES: readonly { name: string; colour: Vec3; mark: Vec3 }[] =
     charcoal: CHARCOAL,
   }).map(([name, c]) => ({
     name,
-    colour: [c[0], c[1], c[2]],
+    color: [c[0], c[1], c[2]],
     mark: [...markOn(c)],
   }));
-export const COLOURS: readonly Vec3[] = DYES.map((d) => d.colour);
+export const COLORS: readonly Vec3[] = DYES.map((d) => d.color);
 
 export const worn = (l: Livery): Livery => ({
-  dye: within(l.dye, COLOURS.length) ? l.dye : LIVERY.dye,
+  dye: within(l.dye, COLORS.length) ? l.dye : LIVERY.dye,
   pattern: within(l.pattern, PATTERNS.length) ? l.pattern : LIVERY.pattern,
 });
 const within = (i: number, n: number) => Number.isInteger(i) && i >= 0 && i < n;
 
 export const lookOf = (l: Livery): Look => {
   const { dye, pattern } = worn(l),
-    c = COLOURS[dye];
+    c = COLORS[dye];
   return { paint: c, sail: c, pattern: PATTERNS[pattern] };
 };
 
 export function dealt(seed: number, id: number, hers: Livery): Livery {
   const h = hash(seed, id),
-    others = COLOURS.length - 1,
+    others = COLORS.length - 1,
     k = h % others,
     mine = worn(hers).dye;
   return {

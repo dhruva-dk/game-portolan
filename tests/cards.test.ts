@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { linearToHex } from '../src/colour.ts';
+import { linearToHex } from '../src/color.ts';
 import { fleetOf } from '../src/play/fleet.ts';
 import type { Sea } from '../src/snapshot.ts';
 import { CARD, fleetCard } from '../src/ui/fleet.ts';
@@ -16,12 +16,12 @@ test('the sea held, as a per cent: always to a tenth, never below none', () => {
   assert.equal(percent(-0.2), '0.0%');
 });
 
-test("its dye, from the sea's colours: its own by its id, white while it is not known", () => {
-  const colours: Sea['colours'] = [
+test("its dye, from the sea's colors: its own by its id, white while it is not known", () => {
+  const colors: Sea['colors'] = [
     [1, 0, 0],
     [0.9, 0.7, 0.1],
   ];
-  const on = (own: number | null | undefined) => dyeOn({ colours }, own);
+  const on = (own: number | null | undefined) => dyeOn({ colors }, own);
   assert.equal(on(0), '#ff0000');
   assert.equal(on(1), linearToHex([0.9, 0.7, 0.1]));
   assert.equal(on(2), INK.white);

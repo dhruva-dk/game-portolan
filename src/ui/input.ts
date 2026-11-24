@@ -83,12 +83,12 @@ export function createInput(element: HTMLElement, steers: () => boolean) {
         const x = (thumb.x - thumb.cx) / reach,
           y = (thumb.cy - thumb.y) / reach,
           over = Math.max(1, Math.hypot(x, y));
-        stick = { x: x / over, y: y / over, centre: [thumb.cx, thumb.cy] };
+        stick = { x: x / over, y: y / over, center: [thumb.cx, thumb.cy] };
       } else {
         const x = pressed(KEYS.right) - pressed(KEYS.left),
           y = pressed(KEYS.up) - pressed(KEYS.down);
         const size = Math.hypot(x, y);
-        if (size > 0) stick = { x: x / size, y: y / size, centre: null };
+        if (size > 0) stick = { x: x / size, y: y / size, center: null };
       }
       const look = { x: lookX, y: lookY, held: looks.size > 0 };
       lookX = lookY = 0;

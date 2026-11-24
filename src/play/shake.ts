@@ -244,10 +244,10 @@ export function createShake(seed = 1) {
   const axis: Out3 = [0, 0, 0];
 
   return {
-    play(a: Answer, strength: number, bearing?: number, metres?: number) {
+    play(a: Answer, strength: number, bearing?: number, meters?: number) {
       let k = strength * GENTLE;
-      if (a.falloff && metres !== undefined)
-        k *= clamp((a.falloff[1] - metres) / (a.falloff[1] - a.falloff[0]));
+      if (a.falloff && meters !== undefined)
+        k *= clamp((a.falloff[1] - meters) / (a.falloff[1] - a.falloff[0]));
       if (k <= 0) return;
       if (a.shake)
         trauma[a.band ?? 'hit'] = Math.min(

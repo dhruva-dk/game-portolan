@@ -10,7 +10,7 @@ import {
   type Storm,
 } from './calm.ts';
 import type { Shores } from './coasts.ts';
-import { laid, layAt, metres, newLay, place, type LayOnto } from './disc.ts';
+import { laid, layAt, meters, newLay, place, type LayOnto } from './disc.ts';
 import { createGround } from './ground.ts';
 import { createHeld } from './held.ts';
 import { BRASS, INK, PAPER, WASH, alpha, dyeOn, svgNode } from './ink.ts';
@@ -65,7 +65,7 @@ export function createMinimap(
   const held = createHeld(SPAN * 1.15);
   const land = createGround(ground.height, SPAN + 50, ground.top);
   const rings = createRings(RINGS),
-    ringOf = (s: Storm) => rings(s.centre, s.radius);
+    ringOf = (s: Storm) => rings(s.center, s.radius);
   const stats = { draws: 0, ms: 0, since: performance.now() };
 
   const l = newLay();
@@ -112,7 +112,7 @@ export function createMinimap(
       z = Math.round(at[2] * 1e6),
       turned = Math.round(bearing(heading) * 10);
     const calmR = more.calm?.radius ?? NaN,
-      calmAt = more.calm?.centre[0] ?? NaN,
+      calmAt = more.calm?.center[0] ?? NaN,
       nextR = more.next?.radius ?? NaN;
     if (
       x === was.x &&
@@ -157,7 +157,7 @@ export function createMinimap(
     if (calm) {
       const ring = ringOf(calm);
       trace(ring, true);
-      const farOut = -dot(at, calm.centre) < Math.cos(calm.radius / R);
+      const farOut = -dot(at, calm.center) < Math.cos(calm.radius / R);
       if (farOut) ctx.rect(canvas.width, 0, -canvas.width, canvas.height);
       ctx.fillStyle = STORM;
       ctx.fill('evenodd');
@@ -188,7 +188,7 @@ export function createMinimap(
   };
 
   function way(at: Vec3, to: Vec3, gap: number, c: number, k: number) {
-    const m = metres(l, along(at, to, 1).p),
+    const m = meters(l, along(at, to, 1).p),
       len = Math.hypot(m[0], m[1]);
     const ux = m[0] / len,
       uy = -m[1] / len,
@@ -209,7 +209,7 @@ export function createMinimap(
   function shores(at: Vec3) {
     ctx.lineCap = ctx.lineJoin = 'round';
     for (const coast of coasts) {
-      if (dot(coast.centre, at) <= Math.cos((SPAN * 1.45 + coast.reach) / R))
+      if (dot(coast.center, at) <= Math.cos((SPAN * 1.45 + coast.reach) / R))
         continue;
       trace(coast.ring, false);
       ctx.strokeStyle = WASH.shore;

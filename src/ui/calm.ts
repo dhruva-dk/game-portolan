@@ -11,7 +11,7 @@ import {
 import { INK, alpha } from './ink.ts';
 
 export interface Storm {
-  centre: Vec3;
+  center: Vec3;
   radius: number;
 }
 
@@ -24,11 +24,11 @@ const DOTS = [0.1, 4.4],
   NONE: number[] = [];
 
 function stormRing(storm: Storm, n = 96): Vec3[] {
-  const { north, east } = frameAt(storm.centre);
+  const { north, east } = frameAt(storm.center);
   return Array.from({ length: n }, (_, i) => {
     const a = (i / n) * Math.PI * 2;
     return along(
-      storm.centre,
+      storm.center,
       add(scale(north, Math.cos(a)), east, Math.sin(a)),
       storm.radius
     ).p;
@@ -36,29 +36,29 @@ function stormRing(storm: Storm, n = 96): Vec3[] {
 }
 
 export function createRings(keep: number, n = 180) {
-  const rings: { centre: Vec3; radius: number; ring: Vec3[] }[] = [];
-  return (centre: Vec3, radius: number): Vec3[] => {
-    const [x, y, z] = centre;
+  const rings: { center: Vec3; radius: number; ring: Vec3[] }[] = [];
+  return (center: Vec3, radius: number): Vec3[] => {
+    const [x, y, z] = center;
     for (const k of rings)
       if (
         k.radius === radius &&
-        k.centre[0] === x &&
-        k.centre[1] === y &&
-        k.centre[2] === z
+        k.center[0] === x &&
+        k.center[1] === y &&
+        k.center[2] === z
       )
         return k.ring;
     if (rings.length >= keep) rings.shift();
     const c: Vec3 = [x, y, z],
-      ring = stormRing({ centre: c, radius }, n);
-    rings.push({ centre: c, radius, ring });
+      ring = stormRing({ center: c, radius }, n);
+    rings.push({ center: c, radius, ring });
     return ring;
   };
 }
 
 export function wayIn(at: Vec3, goal: Storm): { to: Vec3; gap: number } | null {
-  const gap = distance(at, goal.centre) - goal.radius;
+  const gap = distance(at, goal.center) - goal.radius;
   if (gap <= 0) return null;
-  return { to: normalize(add(goal.centre, at, -dot(goal.centre, at))), gap };
+  return { to: normalize(add(goal.center, at, -dot(goal.center, at))), gap };
 }
 
 export function traceWay(

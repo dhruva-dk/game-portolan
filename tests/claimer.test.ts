@@ -17,15 +17,15 @@ import { along, bearingAt, distance, fromLatLon } from '../src/world/sphere.ts';
 
 const start = fromLatLon(0.2, 0.3);
 const deep: Depth = () => 30;
-const WHOLE = { centre: start, radius: Math.PI };
+const WHOLE = { center: start, radius: Math.PI };
 
 const placed = (
   id: number,
   bearing: number,
-  metres: number,
+  meters: number,
   heading: number
 ): Vessel => {
-  const at = along(start, bearingAt(start, bearing), metres).p;
+  const at = along(start, bearingAt(start, bearing), meters).p;
   return afloat(id, shipAt(at, bearingAt(at, heading)));
 };
 const seedWhere = (ok: (t: ReturnType<typeof temper>) => boolean) => {

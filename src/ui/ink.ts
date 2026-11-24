@@ -1,4 +1,4 @@
-import { linearToHex } from '../colour.ts';
+import { linearToHex } from '../color.ts';
 import type { Sea } from '../snapshot.ts';
 import { hash01 } from '../world/random.ts';
 import { GLYPHS, type Glyph, type Prim } from './glyphs.ts';
@@ -246,10 +246,10 @@ export const percent = (share: number) =>
   `${(Math.max(0, share) * 100).toFixed(1)}%`;
 
 export function dyeOn(
-  sea: Pick<Sea, 'colours'> | undefined,
+  sea: Pick<Sea, 'colors'> | undefined,
   own: number | null | undefined
 ) {
-  const c = sea && own != null ? sea.colours[own] : undefined;
+  const c = sea && own != null ? sea.colors[own] : undefined;
   return c ? linearToHex(c) : INK.white;
 }
 
@@ -348,13 +348,13 @@ export function ring(
   y: number,
   r: number,
   frac: number,
-  colour: string,
+  color: string,
   width = 3
 ) {
   if (frac <= 0) return '';
   const a0 = -Math.PI / 2,
     a1 = a0 + Math.PI * 2 * Math.min(frac, 0.999);
-  return `<path d="${arcPath(x, y, r, a0, a1)}" fill="none" stroke="${colour}" stroke-width="${width}" stroke-linecap="round"/>`;
+  return `<path d="${arcPath(x, y, r, a0, a1)}" fill="none" stroke="${color}" stroke-width="${width}" stroke-linecap="round"/>`;
 }
 
 export function galleon(

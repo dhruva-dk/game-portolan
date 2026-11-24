@@ -16,13 +16,13 @@ export function gunSurface(
   p: Vec3Node,
   n: Vec3Node,
   made: FloatNode,
-  tint?: { colour: Vec3Node; share: FloatNode }
+  tint?: { color: Vec3Node; share: FloatNode }
 ): Vec3Node {
   const iron = made.greaterThan(METAL.iron - 0.5),
     oak = made.greaterThan(METAL.oak - 0.5).and(iron.not());
   const bronze = (of: (t: Tones) => Rgb, dim: number): Vec3Node =>
     tint
-      ? mix(vec3(...of(GILDING)), tint.colour.mul(dim), tint.share)
+      ? mix(vec3(...of(GILDING)), tint.color.mul(dim), tint.share)
       : vec3(...of(GILDING));
   const tone = (of: (t: Tones) => Rgb, dim: number): Vec3Node =>
     select(

@@ -9,8 +9,8 @@ import { runMatch } from '../tools/sim/match.ts';
 const at: Vec3 = normalize([0.3, 0.5, 0.8]),
   east: Vec3 = normalize([0.8, 0, -0.3]);
 
-const seen = (id: number, metres: number): Seen => {
-  const { p, t } = along(at, east, metres);
+const seen = (id: number, meters: number): Seen => {
+  const { p, t } = along(at, east, meters);
   return { id, ship: { at: p, heading: t, speed: 0, turn: 0 } };
 };
 

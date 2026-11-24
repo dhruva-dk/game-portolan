@@ -5,8 +5,8 @@ import { HEALTH, HOLDING } from '../src/sim/handling.ts';
 import { calmShare, regain, regainRate } from '../src/sim/holding.ts';
 import type { Cap } from '../src/sim/storm.ts';
 
-const WHOLE: Cap = { centre: [0, 1, 0], radius: Math.PI };
-const QUARTER: Cap = { centre: [0, 1, 0], radius: Math.PI / 3 };
+const WHOLE: Cap = { center: [0, 1, 0], radius: Math.PI };
+const QUARTER: Cap = { center: [0, 1, 0], radius: Math.PI / 3 };
 const shielded = (id: number, shield: number): Crew => ({
   ...crewOf(id),
   health: { hull: HEALTH.hull, shield },
