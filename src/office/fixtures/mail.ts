@@ -29,7 +29,7 @@ const letter = (
   sealed: more.sealed ?? false,
 });
 
-const SEC = "The Admiralty's secretary";
+const SEC = "The Federation's secretary";
 
 const LETTERS: readonly Letter[] = [
   letter(

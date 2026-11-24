@@ -1,5 +1,5 @@
 // The fixture's calendar: the season of 2026 as the shell has it on 10 May
-// (day 70), two rounds sailed, Brindle the third in 16 days; the Admiralty's
+// (day 70), two rounds sailed, Brindle the third in 16 days; the Federation's
 // proposals put twelve days before rounds 4 and 8 and voted on them; the
 // contracts' closing days sixty before the season's end. Dates as the career
 // writes them; planet names as long as a career's.
@@ -37,11 +37,11 @@ export const CALENDAR: CalendarPaper = {
     vote: i === 3 || i === 7,
   })),
   dates: [
-    { date: '28 May 2026', what: 'The Admiralty puts a proposal' },
-    { date: '9 June 2026', what: 'The Admiralty votes' },
+    { date: '28 May 2026', what: 'The Federation puts a proposal' },
+    { date: '9 June 2026', what: 'The Federation votes' },
     { date: '3 July 2026', what: 'Contracts ending may be approached' },
-    { date: '23 July 2026', what: 'The Admiralty puts a proposal' },
-    { date: '4 August 2026', what: 'The Admiralty votes' },
+    { date: '23 July 2026', what: 'The Federation puts a proposal' },
+    { date: '4 August 2026', what: 'The Federation votes' },
     { date: '1 September 2026', what: 'The season ends' },
     { date: '15 March 2027', what: 'Next season’s first race' },
   ],

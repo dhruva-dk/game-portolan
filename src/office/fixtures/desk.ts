@@ -5,7 +5,7 @@
 import { TEAM, TEAMS as GRID } from '../../race.ts';
 import type { Desk, Views } from '../office.ts';
 import type { ShellView } from '../shell.ts';
-import { ADMIRALTY } from './admiralty.ts';
+import { ADMIRALTY } from './regulations.ts';
 import { BOARD, SEASON } from './board.ts';
 import { CALENDAR } from './calendar.ts';
 import { JOBS, PLAYER } from './career.ts';
@@ -93,7 +93,7 @@ const VIEWS: Pick<
   mail: { view: MAIL, dyes: TEAMS.map((t) => t.colours) },
   player: { view: PLAYER, dyes: TEAMS.map((t) => t.colours) },
   jobs: { view: JOBS, dyes: TEAMS.map((t) => t.colours) },
-  admiralty: ADMIRALTY,
+  regulations: ADMIRALTY,
   board: { view: BOARD, dyes: TEAMS.map((t) => t.colours) },
   season: SEASON,
 };

@@ -7,7 +7,7 @@
 // yet is refused, never guessed at.
 
 import type { Command, CommandKind } from '../office/command.ts';
-import { ADMIRALTY, counted, proposalPut } from './admiralty.ts';
+import { ADMIRALTY, counted, proposalPut } from './regulations.ts';
 import { timeHandlers, type EventHandlers } from './advance.ts';
 import { DESIGNING, built, drawn } from './design.ts';
 import { FITTING } from './parts.ts';

@@ -56,14 +56,14 @@ export function scheduleSeason(
     kind: 'silence',
     season: calendar.season,
   });
-  // the Admiralty's proposals, each tier's, standing `open` days before the rounds they are voted before
-  for (const round of TUNING.admiralty.rounds) {
+  // the Federation's proposals, each tier's, standing `open` days before the rounds they are voted before
+  for (const round of TUNING.regulations.rounds) {
     for (let tier = 0; tier < s.championships.length; tier++) {
-      out = schedule(out, calendar.rounds[round].day - TUNING.admiralty.open, {
-        kind: 'proposal',
-        tier,
-        round,
-      });
+      out = schedule(
+        out,
+        calendar.rounds[round].day - TUNING.regulations.open,
+        { kind: 'proposal', tier, round }
+      );
     }
   }
   return schedule(out, calendar.end, { kind: 'seasonEnd' });

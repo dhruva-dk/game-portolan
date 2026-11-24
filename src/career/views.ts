@@ -343,7 +343,7 @@ export function letters(s: CareerState, n: number): LetterLine[] {
         sealed: m.open,
         from:
           sender === null
-            ? "The Admiralty's secretary"
+            ? "The Federation's secretary"
             : nameOf(s.people[sender]),
         face: sender === null ? null : faceOf(s, s.people[sender]),
       };

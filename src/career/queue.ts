@@ -22,7 +22,7 @@ type Happening =
   | { kind: 'silence'; season: number } // section 5: those still offered no renewal lose heart
   | { kind: 'lapse'; talk: number } // section 5: a counter not taken lapses
   | { kind: 'jobExpires'; team: number } // section 7: a job offer lapses (needs the player)
-  | { kind: 'proposal'; tier: number; round: number } // section 11: the Admiralty puts a proposal
+  | { kind: 'proposal'; tier: number; round: number } // section 11: the Federation puts a proposal
   | { kind: 'vote'; tier: number; proposal: number } // section 11: its votes are counted
   | { kind: 'sponsorOffer'; team: number } // section 10
   | { kind: 'dilemma'; id: string; team: number }; // section 12

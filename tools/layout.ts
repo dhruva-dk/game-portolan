@@ -42,7 +42,7 @@ const SCREENS = [
   'mail',
   'player',
   'jobs',
-  'admiralty',
+  'regulations',
   'plan',
   'board',
   'season',

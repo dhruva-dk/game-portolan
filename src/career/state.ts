@@ -152,7 +152,7 @@ export interface Standing {
   sinkings: number;
 }
 
-/** An Admiralty proposal: voted before `round`, on day `closes`. `votes` by team id; `lobbied`
+/** An Federation proposal: voted before `round`, on day `closes`. `votes` by team id; `lobbied`
  *  the sway money has added to each side; `decided` true (carried), false (the rule kept), null (open). */
 export interface Proposal {
   id: number;
@@ -214,7 +214,7 @@ export interface Mail {
   id: number;
   day: number;
   category: MailCategory;
-  sender: number | null; // a person, or null for the Admiralty's secretary
+  sender: number | null; // a person, or null for the Federation's secretary
   kind: string; // the template (career/mail.ts)
   wording: number;
   slots: Readonly<Record<string, string | number>>;

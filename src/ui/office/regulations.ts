@@ -1,4 +1,4 @@
-// The Admiralty on the chartroom kit, after MM's rule votes: at the left the
+// The Federation on the chartroom kit, after MM's rule votes: at the left the
 // proposal standing (else the last counted): the rule it changes, from what
 // next season's rules read to what, when its vote closes or how it was
 // counted, each side's sway; your vote and what you lobby. In the middle each
@@ -8,11 +8,11 @@
 // proposals counted.
 
 import type {
-  AdmiraltyView,
+  RegulationsView,
   Leaning,
   ProposalLine,
   Side,
-} from '../../office/admiralty.ts';
+} from '../../office/regulations.ts';
 import type { Command } from '../../office/command.ts';
 import { button, link, segmented } from '../chartroom/controls.ts';
 import { gauge, meter, table, terms } from '../chartroom/data.ts';
@@ -57,11 +57,11 @@ const off = (days: number) =>
 const counted = (p: ProposalLine) =>
   `${p.carried ? 'Carried' : 'Lost'}, ${p.count.for} to ${p.count.against}`;
 
-/** The Admiralty. */
-export function createAdmiralty(office: Office): Screen<AdmiraltyView> {
+/** The Federation. */
+export function createRegulations(office: Office): Screen<RegulationsView> {
   kitLooks();
   stylesheet(CSS);
-  const root = page('ledger', 's-admiralty'),
+  const root = page('ledger', 's-regulations'),
     profile = toPerson(office),
     teamPage = toTeam(office);
   let sum = 0;
@@ -70,7 +70,7 @@ export function createAdmiralty(office: Office): Screen<AdmiraltyView> {
     office.ask({ kind: 'send', command });
 
   /** The proposal: what it changes, when it is counted, the sway, your vote and lobbying. */
-  function proposal(v: AdmiraltyView) {
+  function proposal(v: RegulationsView) {
     const p = v.proposal;
     if (!p)
       return sheet(
@@ -78,7 +78,7 @@ export function createAdmiralty(office: Office): Screen<AdmiraltyView> {
         [
           label(
             v.next
-              ? `None stands. The Admiralty puts its next on ${v.next}.`
+              ? `None stands. The Federation puts its next on ${v.next}.`
               : 'None stands, and none is to come this season.'
           ),
         ],
@@ -161,7 +161,7 @@ export function createAdmiralty(office: Office): Screen<AdmiraltyView> {
   }
 
   /** Each team on the proposal. */
-  const teams = (v: AdmiraltyView) =>
+  const teams = (v: RegulationsView) =>
     sheet(
       'The Championship',
       [
@@ -212,7 +212,7 @@ export function createAdmiralty(office: Office): Screen<AdmiraltyView> {
             own: (r) => r.you,
             tap: (r) => (r.you ? null : teamPage(r.team.id)),
             none: 'No proposal this season yet.',
-            scrolls: { keep: 'admiralty' },
+            scrolls: { keep: 'regulations' },
           }
         ),
       ],
@@ -220,7 +220,7 @@ export function createAdmiralty(office: Office): Screen<AdmiraltyView> {
     );
 
   /** The rules now and next, and the season's proposals counted. */
-  const rules = (v: AdmiraltyView) =>
+  const rules = (v: RegulationsView) =>
     sheet(
       'The Rules',
       [
@@ -257,7 +257,7 @@ export function createAdmiralty(office: Office): Screen<AdmiraltyView> {
       { cls: 'cr-grow', aside: String(v.season) }
     );
 
-  function draw(v: AdmiraltyView) {
+  function draw(v: RegulationsView) {
     root.replaceChildren(
       column(proposal(v)),
       column(teams(v)),

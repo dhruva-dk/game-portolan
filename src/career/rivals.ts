@@ -5,8 +5,8 @@
 // checks (hiring.ts offerCheck, scouting.ts scoutCheck) and the same `offered` and `sent`.
 //
 // The hiring rows (fill, replace, renew, poach, bid, scout) are career/bidding.ts's. The rows of parts, buildings,
-// sponsors, suppliers and the Admiralty's vote (improvement, design, build, sponsors, suppliers, vote) are career/works.ts's;
-// a rival yet to vote when the count comes votes by its measure then (admiralty.ts counted). The race plan
+// sponsors, suppliers and the Federation's vote (improvement, design, build, sponsors, suppliers, vote) are career/works.ts's;
+// a rival yet to vote when the count comes votes by its measure then (regulations.ts counted). The race plan
 // (section 13) is decided on its own event with the same Mind.
 
 import type { Personality } from '../office/command.ts';

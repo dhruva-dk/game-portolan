@@ -7,14 +7,14 @@
 // - build: buildings in its personality's order, when the balance it commits allows;
 // - sponsors: signs the best offers standing, and replaces a weaker sponsor for one worth enough more (Finance);
 // - suppliers: in the window, the card its personality weighs best;
-// - vote: by its measure (admiralty.ts rivalSide).
+// - vote: by its measure (regulations.ts rivalSide).
 //
 // Each acts only through the player's own checks and functions, and spends from the Mind's room.
 
 import { known } from './canon.ts';
 import type { PartType } from '../race.ts';
 import type { Building } from '../office/command.ts';
-import { cast, rivalSide } from './admiralty.ts';
+import { cast, rivalSide } from './regulations.ts';
 import { canSpend } from './balance.ts';
 import { TYPES, component } from './components.ts';
 import {

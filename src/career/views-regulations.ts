@@ -1,15 +1,15 @@
-// `admiralty`: your championship's rules this season and next, each said as it
+// `regulations`: your championship's rules this season and next, each said as it
 // plays out (the champion's prize against the last's, how many teams are
 // inspected); the proposal standing with each team's side (cast, or how it
 // leans), each side's sway, your vote and what you may lobby; the season's
 // proposals counted. Pure.
 
 import type {
-  AdmiraltyView,
+  RegulationsView,
   Leaning,
   ProposalLine,
   RuleLine,
-} from '../office/admiralty.ts';
+} from '../office/regulations.ts';
 import type { Change, Measure } from '../office/command.ts';
 import type { Act } from '../office/people.ts';
 import type { Rules } from '../race.ts';
@@ -20,7 +20,7 @@ import {
   swayOf,
   sways,
   voteCheck,
-} from './admiralty.ts';
+} from './regulations.ts';
 import type { Check } from './command.ts';
 import { inspectedCount } from './inspection.ts';
 import { prizeShares } from './money.ts';
@@ -37,7 +37,7 @@ import type { CareerState, Proposal } from './state.ts';
 import { TUNING } from './tuning.ts';
 import { myTeam, nameOf } from './views.ts';
 
-const A = TUNING.admiralty;
+const A = TUNING.regulations;
 
 /** The sums the office offers to lobby. */
 const SUMS = [100, 250, 500, 1000] as const;
@@ -54,7 +54,7 @@ const RULES: readonly (readonly [Measure, string, string])[] = [
   [
     'spec',
     'Spec parts',
-    'Every team fits the one part the Admiralty issues of these: none of its own design.',
+    'Every team fits the one part the Federation issues of these: none of its own design.',
   ],
   ['ban', 'Banned guns', 'No ship of the championship may mount these.'],
   [
@@ -152,8 +152,8 @@ function line(
   };
 }
 
-/** The Admiralty, for your team's championship. */
-export function admiraltyView(s: CareerState, look: Look): AdmiraltyView {
+/** The Federation, for your team's championship. */
+export function regulationsView(s: CareerState, look: Look): RegulationsView {
   const c = myTeam(s),
     me = mine(s),
     l = s.championships[c.tier],

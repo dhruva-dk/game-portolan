@@ -1,5 +1,5 @@
-// The Admiralty: each tier votes on its own next season's rules twice a season (before rounds
-// 4 and 8 as players count them). The Admiralty puts one proposal: which part types are spec; the storm's pace;
+// The Federation: each tier votes on its own next season's rules twice a season (before rounds
+// 4 and 8 as players count them). The Federation puts one proposal: which part types are spec; the storm's pace;
 // banning a gun kind; points per sinking; the sea-held point; prize money's spread; the inspection rate.
 //
 // Each team has one vote. A rival votes by a measure of its own state (measure.ts); one near even abstains, unless
@@ -31,7 +31,7 @@ import { TUNING } from './tuning.ts';
 import { inRole } from './roles.ts';
 import { TYPES } from './components.ts';
 
-const A = TUNING.admiralty;
+const A = TUNING.regulations;
 const MEASURES: readonly Measure[] = [
   'spec',
   'storm',
@@ -112,13 +112,13 @@ export function changed(r: Rules, c: Change): Rules {
   }
 }
 
-/** The Admiralty puts a tier's proposal: one measure by seed, its vote scheduled; the tier's teams are told. */
+/** The Federation puts a tier's proposal: one measure by seed, its vote scheduled; the tier's teams are told. */
 export function proposalPut(
   s: CareerState,
   e: Extract<Event, { kind: 'proposal' }>,
   roll: Dice
 ): CareerState {
-  const rand = roll.roll('admiralty');
+  const rand = roll.roll('regulations');
   const l = s.championships[e.tier];
   let change: Change | null = null;
   for (const m of shuffled(rand, MEASURES))
@@ -150,7 +150,7 @@ export function proposalPut(
       sender: null,
       kind: 'voteDue',
       slots: { proposal: id, measure: change.measure, closes },
-      links: [{ to: 'screen', id: 'admiralty' }],
+      links: [{ to: 'screen', id: 'regulations' }],
     });
   }
   return schedule(out, closes, { kind: 'vote', tier: e.tier, proposal: id });
@@ -277,7 +277,7 @@ export function counted(
         for: yes,
         against: no,
       },
-      links: [{ to: 'screen', id: 'admiralty' }],
+      links: [{ to: 'screen', id: 'regulations' }],
     });
   }
   return out;
@@ -338,7 +338,7 @@ function lobbied(
   });
   return paid(out, team, balance, {
     kind: 'lobby',
-    what: 'lobbying the Admiralty',
+    what: 'lobbying the Federation',
   });
 }
 

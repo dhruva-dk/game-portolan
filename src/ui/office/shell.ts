@@ -1,7 +1,7 @@
 // The office's shell on the chartroom kit, round every screen but a bare one.
 // The bar across the top, a bold cut paper: her team (its emblem and name),
 // the ways back and forward, the open screen's title on a plate, then her
-// balance, the standings, the next race, the Admiralty and the bell for what
+// balance, the standings, the next race, the Federation and the bell for what
 // waits to be read, each opening its screen. The nav along the bottom, a band
 // sunk into the page: the thirteen tabs, each its woodcut over its name (the
 // open one gilt; one whose screen is not built shown off; a rubric disc for
@@ -186,7 +186,7 @@ export function createShell(
           ),
           stat('', v.championship, el('b', '', 'Standings'), 'standings'),
           stat('', next, el('b', '', v.next.name), 'calendar'),
-          opens(el('div', 'sh-key', cut('office.admiralty')), 'admiralty'),
+          opens(el('div', 'sh-key', cut('office.regulations')), 'regulations'),
           opens(
             el('div', 'sh-key', cut('office.bell'), count(v.notices)),
             'mail'

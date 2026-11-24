@@ -595,8 +595,8 @@ const DRAWN = {
     },
     { k: 's', d: 'M8 2.2V6.6M16 2.2V6.6', w: 1.8, top: true },
   ],
-  // the Admiralty: the scales its rules are weighed in
-  'office.admiralty': [
+  // the Federation: the scales its rules are weighed in
+  'office.regulations': [
     { k: 's', d: 'M12 4V19.6', w: 1.8 },
     { k: 's', d: 'M3.6 6.4H20.4', w: 1.8 },
     {

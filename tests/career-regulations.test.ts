@@ -1,4 +1,4 @@
-// The Admiralty and the rivals' rows of sections 8–11 (section 6's table).
+// The Federation and the rivals' rows of sections 8–11 (section 6's table).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { Change, Measure } from '../src/office/command.ts';
@@ -13,7 +13,7 @@ import {
   rulesTurned,
   sways,
   swayOf,
-} from '../src/career/admiralty.ts';
+} from '../src/career/regulations.ts';
 import { lean, rankShare } from '../src/career/measure.ts';
 import { decide, mindOf, ROWS } from '../src/career/rivals.ts';
 import { dice } from '../src/career/dice.ts';
@@ -23,7 +23,7 @@ import { TUNING } from '../src/career/tuning.ts';
 import { founded, invariants, must, refused, withTeam } from './career-kit.ts';
 
 const ME = () => founded().player!.team;
-const A = TUNING.admiralty;
+const A = TUNING.regulations;
 
 /** The founded career with the player's tier's proposal put. */
 function put(): { s: CareerState; tier: number; id: number } {

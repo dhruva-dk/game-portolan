@@ -189,11 +189,11 @@ export const TEMPLATES: Readonly<Record<string, Template>> = {
     ['{name} leaves us', "The end of {name}'s backing"],
     ["{name}'s agreement has run its course.", '{name} has paid its last race.']
   ),
-  // inspection and the Admiralty (sections 8.5, 11)
+  // inspection and the Federation (sections 8.5, 11)
   inspectionClean: t(
     ['Inspection: clean', 'The inspectors found nothing'],
     [
-      "The Admiralty's inspectors went over our ships and found nothing.",
+      "The Federation's inspectors went over our ships and found nothing.",
       'Inspected and clean.',
     ]
   ),
@@ -208,18 +208,18 @@ export const TEMPLATES: Readonly<Record<string, Template>> = {
     ["{tier}: the inspectors' round", 'Inspections in {tier}'],
     [
       '{inspected} teams were inspected. Caught: {found}.',
-      'The Admiralty inspected {inspected} teams. Found wanting: {found}.',
+      'The Federation inspected {inspected} teams. Found wanting: {found}.',
     ]
   ),
   voteDue: t(
-    ['A vote is due: {measure}', 'The Admiralty proposes: {measure}'],
+    ['A vote is due: {measure}', 'The Federation proposes: {measure}'],
     [
-      'The Admiralty puts a change to {measure} to the tier. The vote closes on {closes}.',
+      'The Federation puts a change to {measure} to the tier. The vote closes on {closes}.',
       'A proposal on {measure}: cast our vote by {closes}.',
     ]
   ),
   voteResult: t(
-    ['The vote is counted', "The Admiralty's count"],
+    ['The vote is counted', "The Federation's count"],
     [
       'The proposal was {carried}: {for} for, {against} against.',
       '{for} for, {against} against: {carried}.',
@@ -290,7 +290,7 @@ export const TEMPLATES: Readonly<Record<string, Template>> = {
     ["The season's calendar", 'Ten planets'],
     [
       'Season {season} is set: ten races, the first on {planet} on {firstDay}.',
-      'The Admiralty has fixed the season: {planet} opens it on {firstDay}.',
+      'The Federation has fixed the season: {planet} opens it on {firstDay}.',
     ]
   ),
   raceResult: t(
@@ -332,7 +332,7 @@ export const TEMPLATES: Readonly<Record<string, Template>> = {
   greyComponent: t(
     ['A grey component', 'An offer under the counter'],
     [
-      '{person} has been offered a component the Admiralty would not like, for the {type}.',
+      '{person} has been offered a component the Federation would not like, for the {type}.',
       'A supplier has slipped {person} something for our {type} design. It is not quite legal.',
     ]
   ),
@@ -386,10 +386,10 @@ export const TEMPLATES: Readonly<Record<string, Template>> = {
     ]
   ),
   testingExemption: t(
-    ['The Admiralty offers an exemption', 'A testing exemption'],
+    ['The Federation offers an exemption', 'A testing exemption'],
     [
       "As one of the tier's two lowest teams, we may take extra testing time.",
-      'The Admiralty offers the lowest teams more improvement time. The press will notice.',
+      'The Federation offers the lowest teams more improvement time. The press will notice.',
     ]
   ),
 };

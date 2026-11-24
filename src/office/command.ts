@@ -59,7 +59,7 @@ export type MailCategory =
   | 'tier'
   | 'finance'
   | 'chairman';
-/** What an Admiralty proposal changes. */
+/** What an Federation proposal changes. */
 export type Measure =
   | 'spec'
   | 'storm'

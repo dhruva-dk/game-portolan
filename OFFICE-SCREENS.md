@@ -31,8 +31,8 @@ business logic given a screen, and the old kit deleted. The battle HUD stays as 
 
 | Gap                                                                                                                         | Where                                                                   | Goes to             |
 | --------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- | ------------------- |
-| ~~`Vote`, `Lobby` never sent; proposals, this season's and next season's rules in no view~~ (Admiralty, 2026-11-23)         | `office/command.ts:138`, `career/admiralty.ts`, `state.ts:180`          | Admiralty (new)     |
-| ~~The strip's Admiralty chip opens nothing~~ (opens Admiralty, 2026-11-23)                                                  | `ui/office/shell.ts:160`                                                | Shell               |
+| ~~`Vote`, `Lobby` never sent; proposals, this season's and next season's rules in no view~~ (Federation, 2026-11-23)         | `office/command.ts:138`, `career/regulations.ts`, `state.ts:180`          | Federation (new)     |
+| ~~The strip's Federation chip opens nothing~~ (opens Federation, 2026-11-23)                                                  | `ui/office/shell.ts:160`                                                | Shell               |
 | `ChooseSupplier` never sent; supplier cards and window in no view                                                           | `career/suppliers.ts:181,198,282`                                       | Suppliers (new)     |
 | ~~Race plan fixed: drivers as they stand, `parts: []`, sponsor objective 0~~ (Plan, 2026-11-23); `Forfeit` never sent       | `career/office.ts:433`                                                  | Race day            |
 | Can't design for next season (`forNext` false); next season's parts hidden; no part risk shown                              | `ui/office/yard.ts:655`, `career/papers.ts:339`, `office/papers.ts:114` | Ship                |
@@ -66,7 +66,7 @@ player, not the page's.
 | A planet, a round                         | Calendar at that round (built) | Calendar's rounds, Home's Calendar        | results, the bar's next race                  |
 | A part, a building                        | Ship, HQ at it                 | in the yard; mail's links (to the screen) | ids on Home's work under way; Ship, HQ at one |
 | A sponsor, a supplier                     | Sponsors, Suppliers at it      | none                                      | ids on Finances' ledger lines, mail           |
-| A rule, a proposal                        | Admiralty (built)              | the bar's chip, mail's vote letters       | Calendar's vote days                          |
+| A rule, a proposal                        | Federation (built)              | the bar's chip, mail's vote letters       | Calendar's vote days                          |
 
 What the career does not keep, that a coherent office needs:
 
@@ -83,8 +83,8 @@ Each line: built on the kit from a fixture → in review → approved and live. 
 ### 0. Shell and Home
 
 - [x] **Shell** _(approved 2026-11-23, `5983c689`)_: top bar (team, back and forward, title plate, balance, standings, next
-      race, Admiralty, bell), nav (13 tabs, sunk band, chosen gilt), date and Continue as the gilt banner at the right
-- [x] **Glyphs for the 13 tabs**, the Admiralty, the bell, forward
+      race, Federation, bell), nav (13 tabs, sunk band, chosen gilt), date and Continue as the gilt banner at the right
+- [x] **Glyphs for the 13 tabs**, the Federation, the bell, forward
 - [x] **Home** _(approved 2026-11-23)_: next race (its planet in the brass port, the season's rounds), the chairman, her ship
       through a brass-framed window under her team's plate, her drivers, the team against the grid, the news, the
       standings (heads fixed, her row in view), the work under way
@@ -114,9 +114,9 @@ Each line: built on the kit from a fixture → in review → approved and live. 
       marketability, the grade the landing pad receives, the next offers: never shown before); your three slots at
       the right. The brass window is the kit's (`shipWindow`), Home's and Found's too
 - [ ] **Calendar** _(in review, 2026-11-23)_, after MM's: at the left the round chosen (its planet in the brass port,
-      charted once you sail for it; its date, how far off, the storm's pace there, the Admiralty's vote closed on it);
+      charted once you sail for it; its date, how far off, the storm's pace there, the Federation's vote closed on it);
       in the middle the season's rounds, a tap choosing one; at the right the season's other days as the career has
-      them scheduled (the Admiralty's proposals and votes, the contracts' closing days, the season's end, next
+      them scheduled (the Federation's proposals and votes, the contracts' closing days, the season's end, next
       season's first race: never shown before) and how far it has got. A round is a ref now: Home's next race opens
       it
 - [ ] **Mail** _(in review, 2026-11-23)_, after MM's: at the left the inbox: the folder (all, or a kind of letter,
@@ -124,7 +124,7 @@ Each line: built on the kit from a fixture → in review → approved and live. 
       with its kind's woodcut (the tab its business is done on), the open one gilt; at the right the open letter
       under its kind and date: its sender (a link to their profile), its words, what it names (every link the
       career kept on it, never shown before: a person, a team, a building, a part, a screen), a dilemma's answers
-      with the one it comes to if left unanswered, Newer and Older. A vote letter opens Admiralty once it exists
+      with the one it comes to if left unanswered, Newer and Older. A vote letter opens Federation once it exists
 
 ### 3. People
 
@@ -183,7 +183,7 @@ Each line: built on the kit from a fixture → in review → approved and live. 
       secure their post; the chairman: the objective, how the team stands to it); everyone on its books with their
       stars as your scouts know them; its season (place, tally, behind the leader, against your team, its prize,
       where the season's end takes it); against the grid. Every team name in the office opens it
-- [ ] **Admiralty** _(in review, 2026-11-23)_, after MM's rule votes: at the left the proposal standing (else the
+- [ ] **Regulations** _(in review, 2026-11-23; the Admiralty renamed: the body is the Federation)_, after MM's rule votes: at the left the proposal standing (else the
       last counted): the rule it changes, from what next season's rules read to what, when its vote closes or how it
       was counted, each side's sway (its backers' managers' standing and what is lobbied for it); your vote (For,
       Against, Abstain) and a sum lobbied for or against, shut with why. In the middle each team of your championship:

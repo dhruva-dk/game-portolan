@@ -8,7 +8,7 @@
 import { known } from './canon.ts';
 import type { EventHandler } from './advance.ts';
 import { newsworthy, retirements, seasonGrowth, traitTurns } from './ageing.ts';
-import { rulesTurned } from './admiralty.ts';
+import { rulesTurned } from './regulations.ts';
 import { archived } from './archive.ts';
 import { makeCalendar, nextStart, scheduleSeason } from './calendar.ts';
 import {

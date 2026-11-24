@@ -1,9 +1,9 @@
-// The Admiralty as the fixture career has it, mid-season: the storm's pace put
+// The Federation as the fixture career has it, mid-season: the storm's pace put
 // to the vote, closing in nine days; a few teams have voted, the rest lean; you
 // have not voted; the first proposal of the season (the sea-held point) was
 // carried, so next season's rules differ from this one's there.
 
-import type { AdmiraltyView, Leaning, Side } from '../admiralty.ts';
+import type { RegulationsView, Leaning, Side } from '../regulations.ts';
 import { HERS, TEAMS } from './teams.ts';
 
 const MANAGERS = [
@@ -69,7 +69,7 @@ const TEAMS_ON: readonly Leaning[] = TEAMS.map((team, i) => {
   };
 });
 
-export const ADMIRALTY: AdmiraltyView = {
+export const ADMIRALTY: RegulationsView = {
   championship: 'Second Championship',
   season: 2029,
   rules: [
@@ -78,7 +78,7 @@ export const ADMIRALTY: AdmiraltyView = {
       now: 'Keel',
       next: 'Keel',
       about:
-        'Every team fits the one part the Admiralty issues of these: none of its own design.',
+        'Every team fits the one part the Federation issues of these: none of its own design.',
     },
     {
       name: 'Banned guns',

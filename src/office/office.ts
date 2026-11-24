@@ -5,7 +5,7 @@
 // constants only.
 
 import type { PartType } from '../race.ts';
-import type { AdmiraltyView } from './admiralty.ts';
+import type { RegulationsView } from './regulations.ts';
 import type { BoardView, SeasonView } from './board.ts';
 import type { Command, Offer } from './command.ts';
 import type { HomeView } from './home.ts';
@@ -97,7 +97,7 @@ export interface Views {
   hq: HqPaper;
   ship: ShipPaper;
   rival: RivalView;
-  admiralty: AdmiraltyView;
+  regulations: RegulationsView;
   board: Dyed<BoardView>;
   /** null: no season has ended yet. */
   season: SeasonView | null;

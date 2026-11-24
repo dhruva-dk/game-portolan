@@ -24,7 +24,7 @@ export type LetterKind =
   | 'tier'
   | 'finance'
   | 'chairman';
-/** A letter as the list has it: what it is about (its kind, and the kind's name), who sent it (a person, or null: the Admiralty's secretary). */
+/** A letter as the list has it: what it is about (its kind, and the kind's name), who sent it (a person, or null: the Federation's secretary). */
 export interface Letter {
   id: number;
   date: string;
@@ -59,7 +59,7 @@ export interface MailPaper {
  * `calendar`: the season's races, the one chosen (by index: the next unless
  * another was asked for), each with how many days off it is (0 or less:
  * today or sailed), the storm's pace on its planet (× the rules' own), and
- * whether the Admiralty's vote closes on it; and the season's other days, as
+ * whether the Federation's vote closes on it; and the season's other days, as
  * the career has them scheduled.
  */
 export interface CalendarPaper {

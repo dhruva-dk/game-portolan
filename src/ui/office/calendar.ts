@@ -1,10 +1,10 @@
 // The calendar on the chartroom kit, after MM's: at the left the round
 // chosen (the next, unless another is asked for): its planet in the brass port
 // (charted once she sails for it), its date and how far off, the storm's pace
-// there under this season's rules, the Admiralty's vote closed on it. In the
+// there under this season's rules, the Federation's vote closed on it. In the
 // middle the season's rounds, a row each (a tap chooses it), the next marked.
 // At the right the season's other days, as the career has them scheduled: the
-// Admiralty's proposals and votes, the contracts' closing days, the season's
+// Federation's proposals and votes, the contracts' closing days, the season's
 // end, the next season's first race; and how far the season has got.
 
 import type { CalendarPaper } from '../../office/papers.ts';
@@ -82,10 +82,10 @@ export function createCalendar(office: Office): Screen<CalendarPaper> {
           ['Date', r.date],
           ['When', r.when === 'sailed' ? 'Sailed' : off(r.days)],
           ['The storm', storm(r.storm)],
-          ...(r.vote ? ([['Admiralty', 'Its vote closes']] as const) : []),
+          ...(r.vote ? ([['Federation', 'Its vote closes']] as const) : []),
         ]),
         label(
-          'The storm closes in on the sea at its pace, times the pace the Admiralty’s rules set: above 1 it comes on quicker, below 1 slower.'
+          'The storm closes in on the sea at its pace, times the pace the Federation’s rules set: above 1 it comes on quicker, below 1 slower.'
         ),
       ],
       { cls: 'cr-grow' }

@@ -1,4 +1,4 @@
-// The Admiralty as your team sees it: your championship's rules this season
+// The Federation as your team sees it: your championship's rules this season
 // and next (as voted so far), each said as it plays; the proposal standing, or
 // the last, with what it changes, when its vote closes, how each team leans or
 // voted and the sway each side has; your vote and what you may lobby; and the
@@ -48,7 +48,7 @@ interface Lobbying {
   act: Act;
 }
 
-export interface AdmiraltyView {
+export interface RegulationsView {
   championship: string;
   season: number;
   rules: readonly RuleLine[];
@@ -67,6 +67,6 @@ export interface AdmiraltyView {
     | null;
   /** The season's proposals counted, the newest first. */
   counted: readonly ProposalLine[];
-  /** When the Admiralty puts its next proposal (null: none this season). */
+  /** When the Federation puts its next proposal (null: none this season). */
   next: string | null;
 }

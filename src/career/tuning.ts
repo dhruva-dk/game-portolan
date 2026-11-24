@@ -6,7 +6,7 @@
 // A pair [a, b] is a line in u = stat / 20: a + b × u. A triple by tier is Tier 1's, Two's, Three's.
 
 /** Bump with any change to TUNING (and pin the new hash in the test). */
-export const TUNING_VERSION = 12;
+export const TUNING_VERSION = 13;
 
 const ROLE_YEARS = {
   manager: [40, 55],
@@ -572,8 +572,8 @@ export const TUNING = {
     objectiveShare: 0.5, // the share of offers that pay for objectives
     better: [1.5, -0.5], // a rival replaces a sponsor for one worth this × as much (Finance u)
   },
-  /** The Admiralty. */
-  admiralty: {
+  /** The Federation. */
+  regulations: {
     rounds: [3, 7], // the votes come before these rounds (0 the first)
     open: 12, // days a proposal stands before its vote
     abstain: 0.2, // a measure nearer even than this abstains

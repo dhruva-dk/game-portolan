@@ -19,7 +19,7 @@ import { inRole } from './roles.ts';
 import { standingOf } from './standings.ts';
 import type { CareerState, SeasonLine } from './state.ts';
 import { TUNING } from './tuning.ts';
-import { ruleChanges } from './views-admiralty.ts';
+import { ruleChanges } from './views-regulations.ts';
 import { ROLE_NAMES, ageOf } from './views-person.ts';
 import { TIERS, faceOf, myTeam, nameOf } from './views.ts';
 

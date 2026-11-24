@@ -90,7 +90,7 @@ const NEWS: Readonly<Record<NewsKind, Glyph>> = {
   part: 'office.ship',
   driver: 'office.drivers',
   sponsor: 'office.sponsors',
-  vote: 'office.admiralty',
+  vote: 'office.regulations',
 };
 const WORK: Readonly<Record<string, Glyph>> = {
   Scouting: 'office.scouting',

@@ -1,4 +1,4 @@
-// A rival team's measure of an Admiralty proposal: how far its own state leans it for (+1) or
+// A rival team's measure of an Federation proposal: how far its own state leans it for (+1) or
 // against (−1). Strong in a part type, against making it spec; short of balance, for a flatter prize spread; poor gunners,
 // for banning a gun kind (a result names no gun, so its drivers' Gunnery stands for being sunk by guns); good drivers
 // in Stormcraft, for a faster storm; good gunners with Nerve, for more points a sinking; homesteading drivers, for the

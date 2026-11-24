@@ -38,8 +38,8 @@ import { lineups } from '../src/career/lineup.ts';
 import { traitLine } from '../src/career/views-traits.ts';
 import { TRAITS } from '../src/career/traits.ts';
 import { nameOf } from '../src/career/views.ts';
-import { admiraltyView } from '../src/career/views-admiralty.ts';
-import { rivalSide } from '../src/career/admiralty.ts';
+import { regulationsView } from '../src/career/views-regulations.ts';
+import { rivalSide } from '../src/career/regulations.ts';
 
 /** Every figure of a view carries what it is set against and what it is made of. */
 function figures(v: unknown, out: Figure[] = []): Figure[] {
@@ -148,7 +148,7 @@ test('a part under half its condition is marked low', () => {
   assert.equal(marks.filter((p) => p.low).length, 1);
 });
 
-test("letters: newest first, the Admiralty's from its secretary, a dilemma sealed", () => {
+test("letters: newest first, the Federation's from its secretary, a dilemma sealed", () => {
   const s = toRaceDay(founded()),
     ls = letters(s, 50);
   for (let i = 1; i < ls.length; i++) assert.ok(ls[i - 1].day >= ls[i].day);
@@ -156,7 +156,7 @@ test("letters: newest first, the Admiralty's from its secretary, a dilemma seale
     const m = s.mail.find((x) => x.id === l.id)!;
     assert.equal(l.unread, !m.read);
     assert.equal(l.sealed, m.dilemma !== null && m.dilemma.answer === null);
-    if (m.sender === null) assert.equal(l.from, "The Admiralty's secretary");
+    if (m.sender === null) assert.equal(l.from, "The Federation's secretary");
   }
 });
 
@@ -398,12 +398,12 @@ test('calendar: opened at the next round unless one is asked for; each round its
   assert.ok(v.dates.some((d) => d.what === 'The season ends'));
 });
 
-test('admiralty: the rules now and next; a proposal’s teams each cast or leaning as they would vote, the sway as counted; your vote and lobbying go through, a sum past the floor refused', () => {
+test('regulations: the rules now and next; a proposal’s teams each cast or leaning as they would vote, the sway as counted; your vote and lobbying go through, a sum past the floor refused', () => {
   const s0 = sailed(toRaceDay(founded())),
     me = s0.player!.team,
     tier = s0.teams[me]!.tier,
     look = { dyes: [['#000000', '#ffffff'] as const], patterns: ['Plain'] };
-  assert.equal(admiraltyView(s0, look).proposal, null);
+  assert.equal(regulationsView(s0, look).proposal, null);
   const l = s0.championships[tier]!;
   const championships = [...s0.championships];
   championships[tier] = {
@@ -421,7 +421,7 @@ test('admiralty: the rules now and next; a proposal’s teams each cast or leani
     ],
   };
   let s: CareerState = { ...s0, championships };
-  let v = admiraltyView(s, look);
+  let v = regulationsView(s, look);
   const p = v.proposal!;
   assert.equal(p.rule, 'The sea-held point');
   assert.notEqual(p.from, p.to);
@@ -442,14 +442,14 @@ test('admiralty: the rules now and next; a proposal’s teams each cast or leani
   // a vote and a sum lobbied
   s = must(s, { kind: 'Vote', proposal: 0, side: 'for' });
   s = must(s, { kind: 'Lobby', proposal: 0, side: 'for', balance: 100 });
-  v = admiraltyView(s, look);
+  v = regulationsView(s, look);
   assert.equal(v.proposal!.yours, 'for');
   assert.equal(v.proposal!.lobbied.for, 100);
   assert.ok(v.proposal!.teams.find((t) => t.you)!.cast);
   assert.ok(v.proposal!.sway.for >= 10);
   // past the floor: refused, said
   const poor = must(s, { kind: 'DebugBalance', balance: -900000 });
-  const shut = admiraltyView(poor, look).proposal!.sums.at(-1)!;
+  const shut = regulationsView(poor, look).proposal!.sums.at(-1)!;
   assert.equal(shut.act.ok, false);
   assert.match(shut.act.why, /balance/);
   // carried: next season reads the change, the proposal is counted
@@ -465,7 +465,7 @@ test('admiralty: the rules now and next; a proposal’s teams each cast or leani
         : c
     ),
   };
-  v = admiraltyView(carried, look);
+  v = regulationsView(carried, look);
   assert.equal(v.counted.length, 1);
   assert.equal(v.proposal!.carried, true);
   assert.equal(v.proposal!.vote.ok, false);

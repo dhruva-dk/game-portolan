@@ -86,7 +86,7 @@ export function inspected(
     out = { ...out, teams, championships, ids: { ...out.ids, part: id } };
     out = paid(out, team, fine, {
       kind: 'fine',
-      what: "the Admiralty's inspection",
+      what: "the Federation's inspection",
     });
     out = post(out, {
       team,

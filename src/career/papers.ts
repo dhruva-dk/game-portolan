@@ -113,9 +113,9 @@ const SCREENS: Readonly<Record<string, Named>> = {
   calendar: { name: 'Calendar', ask: { kind: 'open', screen: 'calendar' } },
   suppliers: { name: 'Suppliers', ask: { kind: 'open', screen: 'ship' } },
   design: { name: 'The drawing board', ask: { kind: 'open', screen: 'ship' } },
-  admiralty: {
-    name: 'The Admiralty',
-    ask: { kind: 'open', screen: 'admiralty' },
+  regulations: {
+    name: 'The Federation',
+    ask: { kind: 'open', screen: 'regulations' },
   },
 };
 
@@ -159,7 +159,7 @@ export function calendarPaper(
 ): CalendarPaper {
   const list = fixtures(s),
     cal = s.calendar,
-    A = TUNING.admiralty;
+    A = TUNING.regulations;
   const next = list.findIndex((f) => f.when !== 'sailed');
   const days = cal
     ? [
@@ -168,8 +168,8 @@ export function calendarPaper(
           return day === undefined
             ? []
             : [
-                { day: day - A.open, what: 'The Admiralty puts a proposal' },
-                { day, what: 'The Admiralty votes' },
+                { day: day - A.open, what: 'The Federation puts a proposal' },
+                { day, what: 'The Federation votes' },
               ];
         }),
         {
