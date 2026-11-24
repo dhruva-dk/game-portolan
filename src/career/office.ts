@@ -64,7 +64,8 @@ const MONTHS: readonly (readonly [string, number])[] = [
 ];
 
 /** The year a career's season is sailed in. */
-export const seasonYear = (s: CareerState): number => YEAR_ONE + s.season;
+export const seasonYear = (s: Pick<CareerState, 'season'>): number =>
+  YEAR_ONE + s.season;
 
 /** A day of the season as a date: the season's first day is the first of March. */
 export function dateAt(s: CareerState, day: number): string {

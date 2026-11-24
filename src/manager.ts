@@ -270,7 +270,7 @@ export async function createManager(shelf: Shelf, look: Look, page: Page) {
     scouting: () => dyed(session.desk.market(filter, shortlist)),
     player: () => dyed(session.desk.career()),
     jobs: () => dyed(session.desk.jobs()),
-    mail: () => mailPaper(career(), letter),
+    mail: () => dyed(mailPaper(career(), letter)),
     calendar: () => calendarPaper(career(), round),
     finances: () => financesPaper(career()),
     sponsors: () => sponsorsPaper(career()),

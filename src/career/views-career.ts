@@ -6,7 +6,8 @@ import { known } from './canon.ts';
 import type { JobCard, JobsView, CareerView } from '../office/people.ts';
 import { marketability } from './effective.ts';
 import { standingOf } from './standings.ts';
-import { takeCheck } from './jobs.ts';
+import { declineCheck, takeCheck } from './jobs.ts';
+import { seasonYear } from './office.ts';
 import type { CareerState } from './state.ts';
 import { TUNING } from './tuning.ts';
 import { ROLE_NAMES, ageOf, dayText } from './views-person.ts';
@@ -26,7 +27,8 @@ import { moneyText, ordinal } from './names.ts';
 function card(s: CareerState, team: number, expires: number): JobCard {
   const c = s.teams[team],
     chairman = s.people[c.staff.chairman],
-    no = takeCheck(s, team);
+    no = takeCheck(s, team),
+    stay = declineCheck(s, team);
   const place = standingOf(s, team),
     of = s.championships[c.tier].standings.length;
   return {
@@ -35,6 +37,7 @@ function card(s: CareerState, team: number, expires: number): JobCard {
     tier: TIERS[c.tier],
     colours: c.colours,
     emblem: c.emblem,
+    chairmanId: chairman.id,
     chairman: nameOf(chairman),
     chairmanFace: faceOf(s, chairman),
     target: ordinal(c.target),
@@ -53,6 +56,7 @@ function card(s: CareerState, team: number, expires: number): JobCard {
     standing: `${ordinal(place)} of ${of}`,
     expires: s.player?.sacked ? 'Until taken' : dayText(s, expires),
     take: { ok: no === null, why: no?.sentence ?? '' },
+    decline: { ok: stay === null, why: stay?.sentence ?? '' },
   };
 }
 
@@ -72,7 +76,7 @@ export function careerView(s: CareerState): CareerView {
   const honours: string[] = [];
   lines.forEach((h, i) => {
     const next = lines[i + 1];
-    if (h.best === 1) honours.push(`S${h.season + 1} · Race won`);
+    if (h.best === 1) honours.push(`${seasonYear(h)} · Race won`);
     if (
       next &&
       h.team === next.team &&
@@ -80,12 +84,13 @@ export function careerView(s: CareerState): CareerView {
       next.tier !== null &&
       next.tier < h.tier
     )
-      honours.push(`S${h.season + 1} · Promoted`);
+      honours.push(`${seasonYear(h)} · Promoted`);
   });
   return {
     top: topBar(s),
     face: faceOf(s, me),
     name: nameOf(me),
+    teamId: c.id,
     team: c.name,
     age: ageOf(s, me),
     reputation: fig(
@@ -135,10 +140,15 @@ export function careerView(s: CareerState): CareerView {
         ],
       }
     ),
+    posts: TIERS.map((tier, i) => {
+      const at = TUNING.chairman.jobs[i] ?? 0;
+      return { tier, at, open: p.reputation >= at };
+    }),
     record: [...lines]
       .reverse()
       .map((h) => ({
-        season: `S${h.season + 1}`,
+        season: String(seasonYear(h)),
+        teamId: h.team,
         team: h.team === null ? 'Free' : s.teams[h.team].name,
         tier: h.tier === null ? '—' : TIERS[h.tier],
         role: ROLE_NAMES[h.role],
@@ -162,6 +172,7 @@ export function jobsView(s: CareerState): JobsView {
     sacked: p.sacked,
     letter: {
       from: `${nameOf(chairman)}, chairman of ${from.name}`,
+      fromId: chairman.id,
       face: faceOf(s, chairman),
       title: p.sacked ? 'You are dismissed' : `${from.name} wants you`,
       paragraphs: p.sacked

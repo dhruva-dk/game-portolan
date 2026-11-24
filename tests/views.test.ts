@@ -27,7 +27,7 @@ import { scoutingView } from '../src/career/views-scouting.ts';
 import { offerView } from '../src/career/views-offer.ts';
 import { profileView } from '../src/career/views-profile.ts';
 import { rivalView } from '../src/career/views-rival.ts';
-import { calendarPaper } from '../src/career/papers.ts';
+import { calendarPaper, mailPaper } from '../src/career/papers.ts';
 import { standingsView } from '../src/career/office.ts';
 import { traitLine } from '../src/career/views-traits.ts';
 import { TRAITS } from '../src/career/traits.ts';
@@ -388,6 +388,58 @@ test('calendar: opened at the next round unless one is asked for; each round its
   );
   assert.equal(v.dates.at(-1)?.what, 'Next season’s first race');
   assert.ok(v.dates.some((d) => d.what === 'The season ends'));
+});
+
+test('mail: each letter its kind and sender; the open one its sender’s face and what it links to, each named with the way to its page', () => {
+  const s = sailed(toRaceDay(founded())),
+    person = s.teams[0]!.staff.ships[0]!.driver!,
+    rival = s.teams[1]!;
+  const linked: CareerState = {
+    ...s,
+    mail: [
+      ...s.mail,
+      {
+        id: 9999,
+        day: s.day,
+        category: 'market',
+        sender: person,
+        kind: 'a kind with no template',
+        wording: 0,
+        slots: {},
+        links: [
+          { to: 'person', id: person },
+          { to: 'team', id: rival.id },
+          { to: 'building', id: 'foundry' },
+          { to: 'part', id: 'rudder' },
+          { to: 'screen', id: 'suppliers' },
+          { to: 'screen', id: 'no such screen' },
+        ],
+        read: false,
+        dilemma: null,
+      },
+    ],
+  };
+  const v = mailPaper(linked, 9999),
+    o = v.open!;
+  assert.equal(o.sender, person);
+  assert.equal(o.kind, 'market');
+  assert.equal(o.face?.seed, linked.people[person]!.seed);
+  assert.deepEqual(o.names, [
+    {
+      name: nameOf(linked.people[person]!),
+      ask: { kind: 'person', id: person, screen: 'profile' },
+    },
+    { name: rival.name, ask: { kind: 'team', id: rival.id } },
+    { name: 'Foundry', ask: { kind: 'open', screen: 'hq' } },
+    { name: 'Rudder', ask: { kind: 'open', screen: 'ship' } },
+    { name: 'Suppliers', ask: { kind: 'open', screen: 'ship' } },
+  ]);
+  for (const l of v.letters) {
+    const m = linked.mail.find((x) => x.id === l.id)!;
+    assert.equal(l.kind, m.category);
+    assert.equal(l.sender, m.sender);
+  }
+  assert.equal(mailPaper(linked, null).open, null);
 });
 
 test('traits: each says what it does in words, when it holds, and whether it helps or hinders its team', () => {

@@ -21,7 +21,7 @@ import { createMenu } from './menu.ts';
 import { createOffer } from './negotiation.ts';
 import type { Office } from './office.ts';
 import { createFinances } from './finances.ts';
-import { createMail } from './papers.ts';
+import { createMail } from './mail.ts';
 import { createDrivers, createStaff, createTeam } from './roster.ts';
 import { createScouting } from './scouting.ts';
 import { createProfile } from './profile.ts';

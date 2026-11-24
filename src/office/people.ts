@@ -229,6 +229,7 @@ export interface JobCard {
   tier: string;
   colours: Colours;
   emblem: number;
+  chairmanId: number;
   chairman: string;
   chairmanFace: Face;
   target: string;
@@ -236,20 +237,24 @@ export interface JobCard {
   standing: string;
   expires: string;
   take: Act;
+  decline: Act;
 }
-/** `career`: the player as a manager. */
+/** `career`: the player as a manager: who, how rated, the reputation each championship's posts are offered at (open: hers is enough), the record by season, honours, the posts offered. */
 export interface CareerView {
   top: TopBar;
   face: Face;
   name: string;
+  teamId: number;
   team: string;
   age: number;
   reputation: Figure;
   rank: Figure;
   marketability: Figure;
   confidence: Figure;
+  posts: readonly { tier: string; at: number; open: boolean }[];
   record: readonly {
     season: string;
+    teamId: number | null;
     team: string;
     tier: string;
     role: string;
@@ -264,6 +269,7 @@ export interface JobsView {
   sacked: boolean;
   letter: {
     from: string;
+    fromId: number | null;
     face: Face | null;
     title: string;
     paragraphs: readonly string[];

@@ -13,6 +13,7 @@
 //   unmarked a row that opens a page with no name drawn as a link
 //   crowded a head's aside over its title, or cut short
 //   broken  a word set on two lines
+//   wrapped a control's words (a button's, a choice's part) on two lines
 //   inset   a sheet's first words (its head, or its body's first thing) no
 //           nearer its top edge than a sheet with a head has them
 //   node tools/layout.ts [screen ...]
@@ -37,6 +38,7 @@ const SCREENS = [
   'rival',
   'sponsors',
   'calendar',
+  'mail',
 ];
 
 /** How far apart two edges or centres may be, CSS px. */
@@ -268,6 +270,22 @@ try {
           if (tops.size > 1)
             out.push(`broken: "${m[0]}" set on ${tops.size} lines`);
         }
+      }
+
+      // wrapped: a control's words (a button's, a choice's part) set on more than one line
+      for (const c of all(
+        body,
+        '.cr-btn, .cr-seg > div, .cr-drop > span'
+      ).filter(shown)) {
+        const words = document.createRange();
+        words.selectNodeContents(c);
+        const tops = new Set(
+          Array.from(words.getClientRects())
+            .filter((r) => r.width > 0)
+            .map((r) => Math.round(r.top))
+        );
+        if (tops.size > 1)
+          out.push(`wrapped: ${name(c)} set on ${tops.size} lines`);
       }
 
       // inset: a sheet's first words off its top edge, head or none

@@ -130,7 +130,7 @@ function taken(s: CareerState, team: number, roll: Dice): CareerState {
 }
 
 /** Whether the player may decline a team's offer. */
-function declineCheck(s: CareerState, team: number): Check {
+export function declineCheck(s: CareerState, team: number): Check {
   const p = s.player;
   if (!p) return why('unfounded', 'Found a team first.');
   if (!p.offers.some((o) => o.team === team))

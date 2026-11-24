@@ -5,6 +5,8 @@
 
 import type { PartType } from '../race.ts';
 import type { Building, ImprovementShare, Ship } from './command.ts';
+import type { Face } from './career.ts';
+import type { Ask } from './office.ts';
 import type { Act } from './people.ts';
 
 /** A people view with each dye's two colours as the page shows them, by the dye's number. */
@@ -13,22 +15,40 @@ export interface Dyed<V> {
   dyes: readonly (readonly [string, string])[];
 }
 
-/** A letter as the list has it. */
+/** What a letter is about, as the career files it. */
+export type LetterKind =
+  | 'team'
+  | 'market'
+  | 'ship'
+  | 'hq'
+  | 'tier'
+  | 'finance'
+  | 'chairman';
+/** A letter as the list has it: what it is about (its kind, and the kind's name), who sent it (a person, or null: the Admiralty's secretary). */
 export interface Letter {
   id: number;
   date: string;
   subject: string;
   from: string;
+  sender: number | null;
   about: string;
+  kind: LetterKind;
   unread: boolean;
   sealed: boolean;
 }
-/** `mail`: the letters, newest first, and the one open: its words, and a dilemma's answers (the one given, if any). */
+/** A thing a letter names, and the way to its page. */
+export interface Named {
+  name: string;
+  ask: Extract<Ask, { kind: 'person' | 'team' | 'open' }>;
+}
+/** `mail`: the letters, newest first, and the one open: its sender's face, its words, what it names, and a dilemma's answers (the one given, if any). */
 export interface MailPaper {
   letters: readonly Letter[];
   open:
     | (Letter & {
+        face: Face | null;
         body: string;
+        names: readonly Named[];
         options: readonly string[];
         answer: number | null;
       })

@@ -88,7 +88,7 @@ export interface Views {
   scouting: Dyed<ScoutingView>;
   player: Dyed<CareerView>;
   jobs: Dyed<JobsView>;
-  mail: MailPaper;
+  mail: Dyed<MailPaper>;
   calendar: CalendarPaper;
   finances: FinancesPaper;
   sponsors: SponsorsPaper;

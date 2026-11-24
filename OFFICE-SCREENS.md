@@ -20,7 +20,7 @@ business logic given a screen, and the old kit deleted. The battle HUD stays as 
 ## How a screen is checked (before it is called built)
 
 1. `npm test`: the tokens test, and `tools/layout.ts` on every kit screen's fixture (frame, pixel, centre, inside,
-   clipped, under, squeezed, dead, unmarked, crowded, broken, inset). A new screen joins `layout.ts`'s list when it is
+   clipped, under, squeezed, dead, unmarked, crowded, broken, wrapped, inset). A new screen joins `layout.ts`'s list when it is
    built; its fixture's names are as long as a career's.
 2. `node tools/career/play.ts --tour`: the live career through it, real data, no page errors.
 3. Its 2× capture (`tools/capture.ts`, the iPad's density), looked at last: measured first, judged second.
@@ -58,15 +58,15 @@ team to its page).
 The screens speak to the player as "you" (Your Season, Your team), never "her": "her" is the code's voice for the
 player, not the page's.
 
-| Thing                                     | Opens                          | Ref in the views now                    | Needs                                          |
-| ----------------------------------------- | ------------------------------ | --------------------------------------- | ---------------------------------------------- |
-| A person (driver, staff, scout, chairman) | Profile (built)                | every built screen, linked (2026-11-23) | mail's senders and subjects (Mail)             |
-| A team                                    | Rival: the team's page (built) | every built screen, linked (2026-11-23) | Negotiation's other bidders (names only), mail |
-| A championship                            | Standings at that championship | one name for each, `TIERS` (2026-11-23) | Standings opened at a tier, not only at hers   |
-| A planet, a round                         | Calendar at that round (built) | Calendar's rounds, Home's Calendar      | results, the bar's next race                   |
-| A part, a building                        | Ship, HQ at it                 | in the yard only                        | ids on Home's work under way, mail links       |
-| A sponsor, a supplier                     | Sponsors, Suppliers at it      | none                                    | ids on Finances' ledger lines, mail            |
-| A rule, a proposal                        | Admiralty at it                | none                                    | ids on mail's vote letters, the bar's chip     |
+| Thing                                     | Opens                          | Ref in the views now                      | Needs                                         |
+| ----------------------------------------- | ------------------------------ | ----------------------------------------- | --------------------------------------------- |
+| A person (driver, staff, scout, chairman) | Profile (built)                | every built screen, linked (2026-11-23)   | ~~mail's senders~~ (Mail, 2026-11-23)         |
+| A team                                    | Rival: the team's page (built) | every built screen, linked (2026-11-23)   | Negotiation's other bidders (names only)      |
+| A championship                            | Standings at that championship | one name for each, `TIERS` (2026-11-23)   | Standings opened at a tier, not only at hers  |
+| A planet, a round                         | Calendar at that round (built) | Calendar's rounds, Home's Calendar        | results, the bar's next race                  |
+| A part, a building                        | Ship, HQ at it                 | in the yard; mail's links (to the screen) | ids on Home's work under way; Ship, HQ at one |
+| A sponsor, a supplier                     | Sponsors, Suppliers at it      | none                                      | ids on Finances' ledger lines, mail           |
+| A rule, a proposal                        | Admiralty at it                | none                                      | ids on mail's vote letters, the bar's chip    |
 
 What the career does not keep, that a coherent office needs:
 
@@ -119,7 +119,12 @@ Each line: built on the kit from a fixture → in review → approved and live. 
       them scheduled (the Admiralty's proposals and votes, the contracts' closing days, the season's end, next
       season's first race: never shown before) and how far it has got. A round is a ref now: Home's next race opens
       it
-- [ ] Mail (+ glyphs for mail kinds; a vote letter opens Admiralty)
+- [ ] **Mail** _(in review, 2026-11-23)_, after MM's: at the left the inbox: the folder (all, or a kind of letter,
+      with how many unread) and which letters (all, unread, those waiting on your answer), then the letters, each
+      with its kind's woodcut (the tab its business is done on), the open one gilt; at the right the open letter
+      under its kind and date: its sender (a link to their profile), its words, what it names (every link the
+      career kept on it, never shown before: a person, a team, a building, a part, a screen), a dilemma's answers
+      with the one it comes to if left unanswered, Newer and Older. A vote letter opens Admiralty once it exists
 
 ### 3. People
 

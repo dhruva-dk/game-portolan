@@ -11,6 +11,7 @@ import type {
   HqPaper,
   MailPaper,
   Measure,
+  Named,
   ShipPaper,
   SponsorsPaper,
 } from '../office/papers.ts';
@@ -47,13 +48,14 @@ import { teamMarketability } from './reputation.ts';
 import {
   championshipOf,
   type CareerState,
+  type Mail,
   type Objective,
   type Sponsor,
   type Team,
 } from './state.ts';
 import { TRADES, supplier } from './suppliers.ts';
 import { TUNING } from './tuning.ts';
-import { letters, myTeam } from './views.ts';
+import { letters, myTeam, nameOf } from './views.ts';
 import { shipName } from './views-person.ts';
 import { BUILDINGS } from './world.ts';
 
@@ -66,15 +68,18 @@ const capital = (word: string) => word.charAt(0).toUpperCase() + word.slice(1);
 /** The mail, the letter `open` open (null, or gone: none). */
 export function mailPaper(s: CareerState, open: number | null): MailPaper {
   const start = s.calendar?.start ?? 0;
-  const all = letters(s, s.mail.length).map((l) => ({
-    id: l.id,
-    date: dateAt(s, start + l.day - 1),
-    subject: titled(l.subject),
-    from: l.from,
-    about: NEWS[l.category][1],
-    unread: l.unread,
-    sealed: l.sealed,
-  }));
+  const lines = letters(s, s.mail.length),
+    all = lines.map((l) => ({
+      id: l.id,
+      date: dateAt(s, start + l.day - 1),
+      subject: titled(l.subject),
+      from: l.from,
+      sender: s.mail.find((m) => m.id === l.id)?.sender ?? null,
+      about: NEWS[l.category][1],
+      kind: l.category,
+      unread: l.unread,
+      sealed: l.sealed,
+    }));
   const letter = all.find((l) => l.id === open),
     mail = s.mail.find((m) => m.id === open),
     asked = letter ? dilemmaView(s, letter.id) : null;
@@ -84,12 +89,55 @@ export function mailPaper(s: CareerState, open: number | null): MailPaper {
       letter && mail
         ? {
             ...letter,
+            face: lines.find((l) => l.id === letter.id)?.face ?? null,
             body: titled(render(s, mail).body),
+            names: mail.links.flatMap((k) => named(s, k)),
             options: (asked?.options ?? []).map(capital),
             answer: asked?.answer ?? null,
           }
         : null,
   };
+}
+
+/** The screens a letter may name, by the name the career gives them: what each is called, and the page it is on. */
+const SCREENS: Readonly<Record<string, Named>> = {
+  standings: { name: 'Standings', ask: { kind: 'open', screen: 'standings' } },
+  calendar: { name: 'Calendar', ask: { kind: 'open', screen: 'calendar' } },
+  suppliers: { name: 'Suppliers', ask: { kind: 'open', screen: 'ship' } },
+  design: { name: 'The drawing board', ask: { kind: 'open', screen: 'ship' } },
+};
+
+/** A thing a letter links to, named, with the way to its page (none, if it is gone). */
+function named(s: CareerState, k: Mail['links'][number]): Named[] {
+  const id = Number(k.id),
+    key = String(k.id);
+  switch (k.to) {
+    case 'person': {
+      const g = s.people[id];
+      return g
+        ? [{ name: nameOf(g), ask: { kind: 'person', id, screen: 'profile' } }]
+        : [];
+    }
+    case 'team': {
+      const t = s.teams[id];
+      return t ? [{ name: t.name, ask: { kind: 'team', id } }] : [];
+    }
+    case 'building':
+      return [
+        {
+          name: Object.entries(BUILT).find(([b]) => b === key)?.[1] ?? key,
+          ask: { kind: 'open', screen: 'hq' },
+        },
+      ];
+    case 'part':
+      return [
+        { name: PARTS[key] ?? key, ask: { kind: 'open', screen: 'ship' } },
+      ];
+    case 'screen': {
+      const n = SCREENS[key];
+      return n ? [n] : [];
+    }
+  }
 }
 
 /** The season's races, `chosen` the one asked for (null: the next), and its other days as they are scheduled. */

@@ -6,8 +6,10 @@ import { TEAM, TEAMS as GRID } from '../../race.ts';
 import type { Desk, Views } from '../office.ts';
 import type { ShellView } from '../shell.ts';
 import { CALENDAR } from './calendar.ts';
+import { JOBS, PLAYER } from './career.ts';
 import { FINANCES } from './finances.ts';
 import { HOME } from './home.ts';
+import { MAIL } from './mail.ts';
 import { PROFILE } from './profile.ts';
 import { OFFER } from './offer.ts';
 import { RIVAL } from './rival.ts';
@@ -100,6 +102,9 @@ const VIEWS: Pick<
   rival: RIVAL,
   sponsors: SPONSORS,
   calendar: CALENDAR,
+  mail: { view: MAIL, dyes: TEAMS.map((t) => t.colours) },
+  player: { view: PLAYER, dyes: TEAMS.map((t) => t.colours) },
+  jobs: { view: JOBS, dyes: TEAMS.map((t) => t.colours) },
 };
 
 export const FIXTURE: Desk = {
