@@ -11,6 +11,7 @@ import { TEAM, type RaceResult } from '../race.ts';
 import { SHIPS } from '../office/command.ts';
 import { askWage } from './asks.ts';
 import { paid } from './balance.ts';
+import { boardKept } from './board.ts';
 import { afterRace } from './chairmen.ts';
 import { standingOf } from './standings.ts';
 import type { Dice } from './dice.ts';
@@ -496,6 +497,8 @@ function tierClosed(
     first && first.team === mine(out) ? (first.race.ships[0] ?? null) : null;
   out = reputationAfterRace(out, of.tier, pointsOf, hers);
   for (const team of of.teams) out = afterRace(out, team, roll);
+  const me = mine(out);
+  if (me !== null && of.teams.includes(me)) out = boardKept(out);
   return told(out, of, raced);
 }
 

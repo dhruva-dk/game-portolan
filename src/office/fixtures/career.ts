@@ -101,6 +101,7 @@ export const PLAYER: CareerView = {
       races: 2,
       points: 31,
       honours: [],
+      review: null,
     },
     {
       season: '1718',
@@ -111,6 +112,7 @@ export const PLAYER: CareerView = {
       races: 10,
       points: 148,
       honours: ['Race won'],
+      review: 2,
     },
     {
       season: '1717',
@@ -121,6 +123,7 @@ export const PLAYER: CareerView = {
       races: 10,
       points: 92,
       honours: ['Race won'],
+      review: 1,
     },
     {
       season: '1716',
@@ -131,6 +134,7 @@ export const PLAYER: CareerView = {
       races: 0,
       points: 0,
       honours: [],
+      review: null,
     },
   ],
   offers: OFFERS,

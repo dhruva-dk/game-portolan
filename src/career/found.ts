@@ -203,6 +203,9 @@ function takenOver(
       reputation: P.reputation,
       sacked: false,
       offers: [],
+      board: [],
+      asks: [],
+      seasons: [],
     },
   };
 }

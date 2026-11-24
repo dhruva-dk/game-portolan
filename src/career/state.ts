@@ -5,6 +5,7 @@
 
 import type { Colours, PartType, RaceResult, Rules } from '../race.ts';
 import type {
+  BoardAsk,
   Building,
   Change,
   MailCategory,
@@ -266,13 +267,50 @@ export interface JobOffer {
   expires: number;
 }
 
-/** The player: their person, their team, their manager's reputation, and the posts they are offered. */
+/** The player's chairman's confidence after one of their races, with the team's balance and place then. */
+interface BoardLine {
+  season: number;
+  round: number;
+  team: number;
+  confidence: number;
+  balance: number;
+  place: number;
+}
+
+/** A season the player managed, as its end left it (career/archive.ts). */
+export interface SeasonLine {
+  season: number;
+  team: number;
+  tier: number;
+  sacked: boolean;
+  place: number;
+  of: number;
+  target: number;
+  points: number;
+  wins: number;
+  podiums: number;
+  sinkings: number;
+  prize: number;
+  confidence: number;
+  champions: readonly number[]; // by tier
+  moves: readonly { team: number; tier: number; move: number }[]; // −1 up, +1 down, from `tier`
+  retired: readonly number[];
+  arrivals: readonly number[];
+  rules: Rules; // the player's championship's, that season
+  next: Rules; // and the next, as voted
+}
+
+/** The player: their person, their team, their manager's reputation, the posts they are offered; their chairman's
+ *  confidence race by race, what they asked of him, and the seasons they managed. */
 interface Player {
   person: number;
   team: number;
   reputation: number;
   sacked: boolean;
   offers: readonly JobOffer[];
+  board: readonly BoardLine[];
+  asks: readonly { season: number; ask: BoardAsk; granted: boolean }[];
+  seasons: readonly SeasonLine[];
 }
 
 export interface CareerState {

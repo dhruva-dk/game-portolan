@@ -173,6 +173,7 @@ export function createPlayer(office: Office): Screen<Dyed<CareerView>> {
           wash === 'harm'
         ),
         sacked && label(`Under ${sacked}, the chairman lets you go.`),
+        link('The board', () => office.ask({ kind: 'open', screen: 'board' })),
       ],
       { cls: 'cr-grow' }
     );
@@ -185,11 +186,16 @@ export function createPlayer(office: Office): Screen<Dyed<CareerView>> {
       [
         table(
           [
-            { head: 'Season', track: u(32), cell: (r) => r.season },
+            {
+              head: 'Season',
+              track: u(32),
+              cell: (r) => (r.review === null ? r.season : link(r.season)),
+            },
             {
               head: 'Team',
               track: 'minmax(0, 1fr)',
-              cell: (r) => (r.teamId === null ? r.team : link(r.team)),
+              cell: (r) =>
+                r.teamId === null || r.review !== null ? r.team : link(r.team),
             },
             { head: 'Championship', track: u(92), cell: (r) => r.tier },
             { head: 'Races', track: u(28), num: true, cell: (r) => r.races },
@@ -202,7 +208,11 @@ export function createPlayer(office: Office): Screen<Dyed<CareerView>> {
           ],
           v.record,
           {
-            tap: (r) => teamPage(r.teamId),
+            // (a season ended opens its review, which links its team; one under way, the team)
+            tap: (r) =>
+              r.review === null
+                ? teamPage(r.teamId)
+                : () => office.ask({ kind: 'season', season: r.review ?? 0 }),
             none: 'Your first season is under way.',
             scrolls: { keep: 'record' },
           }

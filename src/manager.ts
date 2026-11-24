@@ -30,6 +30,7 @@ import {
 import type { CareerState } from './career/state.ts';
 import { rivalView } from './career/views-rival.ts';
 import { admiraltyView } from './career/views-admiralty.ts';
+import { boardView, seasonView } from './career/views-board.ts';
 import { createSession, type Shelf } from './desk.ts';
 import type { Command, Offer } from './office/command.ts';
 import type { Ask, Desk, Tab, Viewed, Views } from './office/office.ts';
@@ -86,10 +87,11 @@ export async function createManager(shelf: Shelf, look: Look, page: Page) {
     racing: Racing | null = null,
     waiting = false,
     last: Parameters<typeof resultView>[2] | null = null;
-  /** What the screens are open at: a person and the offer drawn to them, a team's page, the calendar's round, the scouting list's filter and shortlist, a letter, the drawing board. */
+  /** What the screens are open at: a person and the offer drawn to them, a team's page, the calendar's round, the season reviewed, the scouting list's filter and shortlist, a letter, the drawing board. */
   let person: number | null = null,
     team: number | null = null,
     round: number | null = null,
+    review: number | null = null,
     draft: Offer | null = null,
     filter: ScoutingFilter | null = null,
     shortlist: readonly number[] = [],
@@ -165,8 +167,13 @@ export async function createManager(shelf: Shelf, look: Look, page: Page) {
       if (page.at() !== 'plan') page.open('plan');
       else if (!waiting && !racing) await sailRace();
     } else {
+      const season = s.season;
       await send({ kind: 'Advance' });
-      arrive();
+      if (career().season > season) {
+        // (a season ended on the way: its review first)
+        review = season;
+        page.open('season');
+      } else arrive();
     }
   }
 
@@ -218,6 +225,9 @@ export async function createManager(shelf: Shelf, look: Look, page: Page) {
     } else if (a.kind === 'round') {
       round = a.round;
       page.open('calendar');
+    } else if (a.kind === 'season') {
+      review = a.season;
+      page.open('season');
     } else if (a.kind === 'draft') draft = a.offer;
     else if (a.kind === 'filter') filter = a.filter;
     else if (a.kind === 'favourite')
@@ -268,6 +278,8 @@ export async function createManager(shelf: Shelf, look: Look, page: Page) {
     ship: () => shipPaper(career(), drafting, picked),
     rival: () => rivalView(career(), look, team),
     admiralty: () => admiraltyView(career(), look),
+    board: () => dyed(boardView(career())),
+    season: () => seasonView(career(), review),
     result() {
       if (!last) throw new Error('no race has been sailed');
       return resultView(career(), look, last);

@@ -30,6 +30,8 @@ import { createResult } from './result.ts';
 import { createRival } from './rival.ts';
 import { createCalendar } from './calendar.ts';
 import { createAdmiralty } from './admiralty.ts';
+import { createBoard } from './board.ts';
+import { createSeason } from './season.ts';
 import { createSponsors } from './sponsors.ts';
 import { createStandings } from './standings.ts';
 import { createHq, createShip } from './yard.ts';
@@ -48,6 +50,8 @@ export const NAMES: readonly Name[] = [
   'jobs',
   'rival',
   'admiralty',
+  'board',
+  'season',
   'kit',
   'chartroom',
 ];
@@ -148,6 +152,11 @@ export const SCREENS: Readonly<Partial<Record<Name, Entry>>> = {
   admiralty: viewed('admiralty', createAdmiralty, {
     title: 'Admiralty',
     tab: null,
+  }),
+  board: viewed('board', createBoard, { title: 'The Board', tab: 'player' }),
+  season: viewed('season', createSeason, {
+    title: 'Season Review',
+    tab: 'player',
   }),
   menu: viewed('menu', createMenu, {
     title: 'Main Menu',

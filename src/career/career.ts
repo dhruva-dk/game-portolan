@@ -21,6 +21,7 @@ import {
   type Handler,
   type Handlers,
 } from './command.ts';
+import { BOARD } from './board.ts';
 import { dice } from './dice.ts';
 import { FOUNDING } from './found.ts';
 import { HIRING, closingOpens, hear, lapse, silenceFalls } from './hiring.ts';
@@ -73,6 +74,7 @@ export const COMMANDS: Handlers = {
   ...ADMIRALTY,
   ...RACING,
   ...MAIL,
+  ...BOARD,
   ...debugHandlers(EVENTS),
 };
 

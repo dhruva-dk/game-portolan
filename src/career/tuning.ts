@@ -6,7 +6,7 @@
 // A pair [a, b] is a line in u = stat / 20: a + b × u. A triple by tier is Tier 1's, Two's, Three's.
 
 /** Bump with any change to TUNING (and pin the new hash in the test). */
-export const TUNING_VERSION = 10;
+export const TUNING_VERSION = 11;
 
 const ROLE_YEARS = {
   manager: [40, 55],
@@ -206,6 +206,18 @@ export const TUNING = {
     ambitious: 14, // a chairman's Ambition at or above which, at the season's end, they court a better manager
     offerDays: 7, // a job offer stands this long
     standing: 2, // the most job offers standing at once while the player has a team
+  },
+
+  /** What the player may ask of their chairman, each once a season (career/board.ts). */
+  board: {
+    generosity: [70, -30], // the confidence money or a lower floor wants, + this × u Generosity
+    ambition: [45, 30], // the confidence an easier target wants, + this × u Ambition
+    behind: 3, // and more a place the team stands behind its target
+    money: 0.1, // × the season's budget, into the balance
+    floor: 0.1, // × the season's budget, off the debt floor
+    places: 2, // places the target is eased
+    granted: 3,
+    refused: 6, // confidence an ask costs, granted or refused
   },
 
   /** Rival managers' decisions, and what each personality weighs. */

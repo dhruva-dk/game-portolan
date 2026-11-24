@@ -109,6 +109,14 @@ function reads(r: Rules, m: Measure, teams: number): string {
   }
 }
 
+/** The rules that read otherwise in `now` than in `was`, as a championship of `teams` plays them. */
+export const ruleChanges = (was: Rules, now: Rules, teams: number) =>
+  RULES.map(([m, name]) => ({
+    name,
+    was: reads(was, m, teams),
+    now: reads(now, m, teams),
+  })).filter((r) => r.was !== r.now);
+
 /** A check as a button's state. */
 const act = (c: Check): Act => ({ ok: c === null, why: c?.sentence ?? '' });
 

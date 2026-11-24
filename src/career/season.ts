@@ -9,6 +9,7 @@ import { known } from './canon.ts';
 import type { EventHandler } from './advance.ts';
 import { newsworthy, retirements, seasonGrowth, traitTurns } from './ageing.ts';
 import { rulesTurned } from './admiralty.ts';
+import { archived } from './archive.ts';
 import { makeCalendar, nextStart, scheduleSeason } from './calendar.ts';
 import {
   expired,
@@ -158,8 +159,8 @@ function traitsTurned(s: CareerState, roll: Dice): CareerState {
 export const seasonEnded: EventHandler<'seasonEnd'> = (s, _e, roll) => {
   const order = finalOrder(s);
   const moves = movesOf(order);
-  let out = judged(s, order, moves);
-  out = rulesTurned(turnover(out, roll));
+  let out = archived(s, turnover(judged(s, order, moves), roll), order, moves);
+  out = rulesTurned(out);
   out = verdicts(out, roll);
   out = promoted(out, moves);
   out = traitsTurned(seasonGrowth(knowledgeTurned(out)), roll);

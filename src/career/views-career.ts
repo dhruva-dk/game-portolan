@@ -10,6 +10,7 @@ import { declineCheck, takeCheck } from './jobs.ts';
 import { seasonYear, teamRanks } from './office.ts';
 import type { CareerState } from './state.ts';
 import { TUNING } from './tuning.ts';
+import { honoursOf } from './views-board.ts';
 import { ROLE_NAMES, ageOf, dayText } from './views-person.ts';
 import {
   TIERS,
@@ -82,23 +83,36 @@ export function careerView(s: CareerState): CareerView {
     of = managers.length + 1;
   const reps = [...managers].sort((a, b) => b - a),
     best = reps[0] ?? p.reputation;
-  const lines = me.history;
-  /** A season's honours: a race won, the team promoted at its end. */
-  const honours = (i: number): string[] => {
-    const h = lines[i],
-      next = lines[i + 1];
-    if (!h) return [];
-    const promoted =
-      next &&
-      h.team === next.team &&
-      h.tier !== null &&
-      next.tier !== null &&
-      next.tier < h.tier;
-    return [
-      ...(h.best === 1 ? ['Race won'] : []),
-      ...(promoted ? ['Promoted'] : []),
-    ];
-  };
+  /** The player's races for a team in a season: the chairman's marks. */
+  const races = (season: number, team: number) =>
+    p.board.filter((l) => l.season === season && l.team === team).length;
+  /** Each season kept, then the one under way. */
+  const record = [
+    ...p.seasons.map((a) => ({
+      season: String(seasonYear(a)),
+      teamId: a.team,
+      team: s.teams[a.team].name,
+      tier: TIERS[a.tier],
+      role: ROLE_NAMES.manager,
+      races: races(a.season, a.team),
+      points: a.points,
+      honours: honoursOf(a),
+      review: a.season,
+    })),
+    {
+      season: String(seasonYear(s)),
+      teamId: c.id,
+      team: c.name,
+      tier: TIERS[c.tier],
+      role: ROLE_NAMES.manager,
+      races: races(s.season, c.id),
+      points:
+        s.championships[c.tier].standings.find((x) => x.team === c.id)
+          ?.points ?? 0,
+      honours: [],
+      review: null,
+    },
+  ];
   return {
     top: topBar(s),
     face: faceOf(s, me),
@@ -157,18 +171,7 @@ export function careerView(s: CareerState): CareerView {
       const at = TUNING.chairman.jobs[i] ?? 0;
       return { tier, at, open: p.reputation >= at };
     }),
-    record: lines
-      .map((h, i) => ({
-        season: String(seasonYear(h)),
-        teamId: h.team,
-        team: h.team === null ? 'Free' : s.teams[h.team].name,
-        tier: h.tier === null ? '—' : TIERS[h.tier],
-        role: ROLE_NAMES[h.role],
-        races: h.races,
-        points: h.points,
-        honours: honours(i),
-      }))
-      .reverse(),
+    record: record.reverse(),
     offers: p.offers.map((o) => card(s, o.team, o.expires)),
   };
 }

@@ -365,7 +365,11 @@ test('a save of schema 1 (the fixture) loads; a save from a newer schema is not 
     opened.kept.state.teams[opened.kept.state.player!.team].name,
     'Inkwell Quillers'
   );
-  assert.equal(opened.migratedFrom, null);
+  // schema 2's player keeps their board, asks and seasons: schema 1's had none yet
+  assert.equal(opened.migratedFrom, 1);
+  assert.equal(opened.kept.state.schema, 2);
+  const p = opened.kept.state.player!;
+  assert.deepEqual([p.board, p.asks, p.seasons], [[], [], []]);
   // a newer schema's snapshot is skipped; the journal still holds
   const newer = snapshotOf({ ...fresh().state, schema: 99 }, 0, ORIGIN);
   const d2: Disk = {

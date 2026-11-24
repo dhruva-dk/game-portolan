@@ -137,6 +137,7 @@ const LEDGER: Readonly<Record<string, string>> = {
   break: 'Break clauses',
   dilemma: 'Dilemmas',
   dismissal: 'Dismissals',
+  board: 'The chairman',
 };
 
 /** The top bar. */

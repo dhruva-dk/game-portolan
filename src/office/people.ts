@@ -264,6 +264,8 @@ export interface CareerView {
     points: number;
     /** The season's honours: a race won, promotion. */
     honours: readonly string[];
+    /** The season its review opens (null: none kept, or still under way). */
+    review: number | null;
   }[];
   offers: readonly JobCard[];
 }

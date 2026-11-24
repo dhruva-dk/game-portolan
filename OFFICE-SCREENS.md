@@ -190,15 +190,20 @@ Each line: built on the kit from a fixture → in review → approved and live. 
       its manager, its side (cast, or how it leans), its sway; a tap opens its page. At the right the rules, each said
       as it plays out (the champion's prize against the last's, how many teams are inspected), next season's where a
       vote has changed them, and the season's proposals counted. The bar's chip and the vote letters open it
-- [ ] **Board** _(decided 2026-11-23: read + requests)_: the chairman's temper (ambition, generosity, patience,
-      meddling), the budget, the debt floor, confidence over the season (a chart: the career keeps its history) and
-      the line you are sacked under; and a few requests, after MM's: more budget, a lower debt floor, an easier
-      objective, each granted by the chairman's temper and how you stand, a refusal or asking too often costing
-      confidence
-- [ ] **Season review** _(decided 2026-11-23: a screen and an archive)_: Continue at the season's end opens it: the
-      final standings, your place against the objective, prize money, who moved up or down, honours, retirements and
-      arrivals, next season's rules. The career keeps a compact summary of each season, so Player's seasons open
-      their reviews later
+- [ ] **Board** _(in review, 2026-11-23)_: at the left the chairman (a link) and their temper (ambition,
+      patience, generosity, meddling), each said as what it means for you; in the middle their confidence, now and
+      race by race this season (a line chart over the season's rounds, the career keeping a mark after each of your
+      races) against the line you are let go under, with your place, target, budget, balance and debt floor; at the
+      right three requests (money into the balance, a lower debt floor, an easier target), each once a season, each
+      with what it gives and the confidence it wants (from the chairman's generosity or ambition, higher the further
+      you are behind target); granted at that bar, refused under it, either way costing confidence (AskBoard).
+      Player's confidence gauge links here
+- [ ] **Season review** _(in review, 2026-11-23)_: Continue at the season's end opens it. At the left your season
+      (the team a link, its place against the target, points, wins, podiums, ships sunk, prize money, the chairman's
+      confidence, honours; a dropdown of the seasons kept); in the middle each championship's champion and the teams
+      moved up and down; at the right who retired and the most promising newcomers (links), and next season's rules
+      changed. The career archives each season at its end (save schema 2); Player's record is now built from that
+      archive (the manager's person history was never written) and each kept season opens its review
 
 Decided too (2026-11-23): a dilemma's answers each say who they please or anger and roughly what they cost, in
 words; sacked, Continue waits on Jobs until you take a post (time runs on while none is offered), and a post's card

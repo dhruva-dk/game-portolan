@@ -6,6 +6,7 @@
 
 import type { PartType } from '../race.ts';
 import type { AdmiraltyView } from './admiralty.ts';
+import type { BoardView, SeasonView } from './board.ts';
 import type { Command, Offer } from './command.ts';
 import type { HomeView } from './home.ts';
 import type {
@@ -97,6 +98,9 @@ export interface Views {
   ship: ShipPaper;
   rival: RivalView;
   admiralty: AdmiraltyView;
+  board: Dyed<BoardView>;
+  /** null: no season has ended yet. */
+  season: SeasonView | null;
 }
 export type Viewed = keyof Views;
 
@@ -105,7 +109,7 @@ export type Viewed = keyof Views;
  * to go on (Continue), the menu's four ways, of a job under way its details
  * or its cancelling, the team made; a command of the career's (race day's plan
  * among them); a person's profile or the offer to them opened, a team's page,
- * the offer as it is drawn now, the scouting list's filter, a person put on
+ * the offer as it is drawn now, a season's review, the scouting list's filter, a person put on
  * the shortlist or taken off it; a letter opened; the type of part on the
  * drawing board, and a slot's card picked.
  */
@@ -119,6 +123,7 @@ export type Ask =
   | { kind: 'person'; id: number; screen: 'profile' | 'offer' }
   | { kind: 'team'; id: number }
   | { kind: 'round'; round: number }
+  | { kind: 'season'; season: number }
   | { kind: 'draft'; offer: Offer }
   | { kind: 'filter'; filter: ScoutingFilter }
   | { kind: 'favourite'; id: number }

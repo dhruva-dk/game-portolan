@@ -69,6 +69,9 @@ export type Measure =
   | 'prizeSpread'
   | 'inspection';
 
+/** What the player may ask of their chairman: money, a lower debt floor, an easier target. */
+export type BoardAsk = 'money' | 'floor' | 'target';
+
 /** An offer to a person: wage and bonuses in money a race, length in seasons. */
 export interface Offer {
   role: Role;
@@ -150,6 +153,7 @@ export type Command =
   | { kind: 'Forfeit'; round: number }
   | { kind: 'TakeJob'; team: number }
   | { kind: 'DeclineJob'; team: number }
+  | { kind: 'AskBoard'; ask: BoardAsk }
   | { kind: 'DebugBalance'; balance: number }
   | { kind: 'DebugReveal' }
   | { kind: 'DebugToRaceDay' }

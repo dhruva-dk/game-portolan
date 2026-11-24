@@ -5,7 +5,7 @@ import type { Rand } from './dice.ts';
 import { unit } from './roles.ts';
 import { TUNING } from './tuning.ts';
 
-const lin = (pair: readonly [number, number], u: number): number =>
+export const lin = (pair: readonly [number, number], u: number): number =>
   pair[0] + pair[1] * u;
 const M = TUNING.manager,
   E = TUNING.chairman;

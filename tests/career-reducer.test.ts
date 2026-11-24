@@ -216,6 +216,7 @@ test('every event a founded career schedules has a handler; every handled comman
     'AcceptCounter',
     'Advance',
     'AnswerDilemma',
+    'AskBoard',
     'Build',
     'CancelScout',
     'ChooseSupplier',
