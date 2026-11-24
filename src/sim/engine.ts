@@ -497,7 +497,6 @@ export function createMatch(
     seed: (): number => match.seed,
     card: (): RaceCard | undefined => card,
     standing,
-    mode: (id: number) => aboard.get(id)?.mind?.mode,
 
     result: (): RaceResult | null => tally?.result() ?? null,
     order: (): number[] =>

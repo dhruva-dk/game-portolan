@@ -58,7 +58,6 @@ export interface Race {
   place: number;
   of: number;
   mates: readonly Mate[];
-  tower: readonly Placed[];
 }
 
 export interface Mate {
@@ -67,18 +66,7 @@ export interface Mate {
   hullMax: number;
   shield: number;
   shieldMax: number;
-  doing: Doing;
   place: number;
-}
-
-export type Doing = 'sailing' | 'fighting' | 'fleeing' | 'storm' | 'sunk';
-
-export interface Placed {
-  id: number;
-  team: number;
-  place: number;
-  afloat: boolean;
-  sinkings: number;
 }
 
 export const PLAYER_SHIP = 0;
