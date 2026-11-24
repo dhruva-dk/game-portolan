@@ -47,14 +47,6 @@
 // ?cloth=0 draws every ship's canvas as the wind fills it, none simulated
 // (ship/fleet.ts).
 //
-// The office. ?screen= with a name of the office's (ui/office/screens.ts NAMES:
-// kit, menu, a tab's) opens the office at that screen on the fixture desk
-// (office/fixtures/desk.ts), over her ship at anchor, without the meter.
-//
-// The manager's game. ?manager opens the page as a release does: the office at
-// its main menu over her ship at anchor, on the career this device keeps
-// (main.ts manage); a page a career sailed to (?career) opens so by itself.
-//
 // The screens. ?screen= opens the UI at a screen (title, lobby, settings,
 // seed: the seed panel over the lobby, on the page's ?seed=; livery: her
 // livery's folio, her ship turned broadside above it; match, sunk,
@@ -136,7 +128,6 @@ import {
   HOTBAR,
   IDLE,
   JOBS,
-  type Chart,
   type Hands,
   type Livery,
 } from './player.ts';
@@ -145,12 +136,9 @@ import { STEP } from './sim/fixed.ts';
 import { KINDS, SOUND, type Fault, type GunKind } from './kinds.ts';
 import { GUN, SHIP } from './sim/handling.ts';
 import { PLAYER, SHIPS } from './sim/match.ts';
-import type { Eye, ShipDraw, Snapshot, StormDraw } from './snapshot.ts';
-import { FIXTURE } from './office/fixtures/desk.ts';
+import type { ShipDraw, Snapshot, StormDraw } from './snapshot.ts';
 import type { Flow } from './ui/flow.ts';
-import { createOffice } from './ui/office/office.ts';
-import { NAMES } from './ui/office/screens.ts';
-import { uiLayer, view } from './ui/ui.ts';
+import { uiLayer } from './ui/ui.ts';
 import type { Weather } from './world/weather.ts';
 import {
   R,
@@ -211,11 +199,6 @@ export interface Stage {
    * setup's meter is).
    */
   stats(on: boolean): void;
-  /**
-   * A picture of the world from `eye`, taken at the next frame drawn (drawn
-   * once more for it, unseen): an image's address.
-   */
-  still(eye: Eye): Promise<string>;
   draw(
     next: (dt: number) => Snapshot,
     drawn?: (canvas: HTMLCanvasElement) => void
@@ -233,10 +216,6 @@ export interface Played {
   referee: Referee;
   flow: Flow;
   play(): void;
-  /** The manager's game opened, as a release opens it (main.ts manage). */
-  manage(): Promise<void>;
-  /** A planet's chart, surveyed in a worker (play/preview.ts): the office's globe of a fixture's planet. */
-  survey(name: string): Promise<Chart | null>;
   map(): void;
   next(dt: number): Snapshot;
   drawn(canvas: HTMLCanvasElement): void;
@@ -254,9 +233,6 @@ const degrees = Math.PI / 180;
 /** The debug camera flies instead of the game. */
 const flying =
   params.has('fly') || ['lat', 'lon', 'alt', 'wall'].some((k) => params.has(k));
-
-/** ?screen= as a screen of the office's (ui/office/screens.ts), if it names one. */
-const officed = NAMES.find((n) => n === params.get('screen')) ?? null;
 
 /** A list switch's nth number (?zones=r,u,w,d), within 0…hi (0 where not given). */
 const nth = (name: string, i: number, hi: number) => {
@@ -323,8 +299,7 @@ function setupOf(release: Setup): Setup {
         ? (light, world) => probeMeshes(light, world.planet.start.at)
         : release.drawing.extras,
     },
-    // (not over the office, whose nav lies where the meter does)
-    meter: !officed,
+    meter: true,
     hold: params.has('storm') ? number('storm', 0) : release.hold,
     gun:
       params.has('gun') || params.has('kind')
@@ -458,31 +433,7 @@ export async function scenario(
 function open(p: Played, others: readonly Berth[], world: World) {
   const { game, referee, flow } = p;
   const screen = params.get('screen') ?? 'match';
-  if (officed) {
-    // the office on the fixture desk, over her ship at anchor in the lobby's place, the camera staged as a career's is
-    flow.go('lobby');
-    flow.office(true);
-    const office = createOffice(FIXTURE, {
-      stage: game.stage,
-      look: game.look,
-    });
-    office.go(officed);
-    office.show(true);
-    // what the office pins to the harbour's buildings follows them, each frame, as a career's does (main.ts)
-    const pin = () => {
-      office.plots(game.plots(view.w, view.h));
-      requestAnimationFrame(pin);
-    };
-    requestAnimationFrame(pin);
-    // (the fixture's next race's planet, as a career page's own is surveyed)
-    void p
-      .survey(FIXTURE.view('home').next.name)
-      .then((chart) => chart && office.charted(chart));
-  } else if (params.has('manager') || params.has('career')) {
-    // the manager's game as released: the office on the career kept on this device
-    flow.go('lobby');
-    void p.manage();
-  } else if (
+  if (
     screen === 'title' ||
     screen === 'lobby' ||
     screen === 'settings' ||
