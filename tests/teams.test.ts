@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { KINDS } from '../src/sim/kinds.ts';
-import { createTally, finishing } from '../src/play/result.ts';
+import { createTally, finishing } from '../src/sim/tally.ts';
 import { specField } from '../src/play/race.ts';
 import {
   battleOf,

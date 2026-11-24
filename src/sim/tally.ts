@@ -1,12 +1,9 @@
-import type { Race } from './player.ts';
-import type { RaceCard, RaceResult } from '../sim/race.ts';
-import type { Crew, Shot, Strike } from '../sim/battle.ts';
-import type { Mode } from '../sim/captain.ts';
-import { over, teamsOf } from '../sim/carded.ts';
-import type { Vessel } from '../sim/contact.ts';
-import { sunk } from '../sim/health.ts';
-import type { Sunk } from '../sim/match.ts';
-import { createStandings } from './standings.ts';
+import type { RaceCard, RaceResult } from './race.ts';
+import type { Crew, Shot, Strike } from './battle.ts';
+import { over, teamsOf } from './carded.ts';
+import type { Vessel } from './contact.ts';
+import { sunk } from './health.ts';
+import type { Sunk } from './match.ts';
 
 export function finishing(
   alive: readonly number[],
@@ -68,7 +65,6 @@ export function createTally(card: RaceCard, closes: number) {
     dealt = zeros(),
     held = zeros();
   const forfeit = card.ships.filter((s) => s.forfeit).map((s) => s.id);
-  const standings = createStandings(card);
   let made: RaceResult | null = null;
 
   const fought = (shots: readonly Shot[], strikes: readonly Strike[]) => {
@@ -127,15 +123,6 @@ export function createTally(card: RaceCard, closes: number) {
     holds(id: number, share: number) {
       held[id] = share;
     },
-    view: (
-      id: number,
-      s: Standing,
-      sea: { mode(id: number): Mode | undefined }
-    ): Race =>
-      standings(id, s, {
-        order: () => finishing(s.alive, s.sunk, s.share, forfeit),
-        mode: sea.mode,
-      }),
     settle(
       shots: readonly Shot[],
       strikes: readonly Strike[],

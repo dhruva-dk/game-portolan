@@ -1,4 +1,4 @@
-import type { Sighter } from '../../src/play/orders.ts';
+import type { Sighter } from '../../src/sim/orders.ts';
 import { STEP } from '../../src/sim/fixed.ts';
 import { SHIP } from '../../src/sim/handling.ts';
 import type { Sight } from '../../src/sim/sight.ts';

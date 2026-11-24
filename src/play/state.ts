@@ -26,7 +26,7 @@ import {
 import { afloat, stepFleet, type Vessel } from '../sim/contact.ts';
 import { STEP, blendPose } from '../sim/fixed.ts';
 import { gunOf } from '../sim/gun.ts';
-import { fitted } from './fitted.ts';
+import { fitted } from '../sim/fitted.ts';
 import { SHIP, type Handling } from '../sim/handling.ts';
 import { sunk, wearOf } from '../sim/health.ts';
 import { regain, type Regained } from '../sim/holding.ts';
@@ -85,10 +85,11 @@ import type { Race } from './player.ts';
 import { dealt, lookOf, worn } from './colors.ts';
 import { createDrawing } from './drawing.ts';
 import { createHeld } from './held.ts';
-import { indexed } from './indexed.ts';
+import { indexed } from '../sim/indexed.ts';
 import { createLog, NOTHING_DONE } from './moments.ts';
-import { createOrders, type Hand, type Sighter } from './orders.ts';
-import { createTally, finishing, type Tally } from './result.ts';
+import { createOrders, type Hand, type Sighter } from '../sim/orders.ts';
+import { createTally, finishing, type Tally } from '../sim/tally.ts';
+import { createStandings } from './standings.ts';
 import { sinking } from './sinking.ts';
 
 const AMIDSHIPS: Helm = { course: null, throttle: 0 };
@@ -187,6 +188,7 @@ export function createState(
     lay = laying(match.seed, depth, match.type.rules.loot);
   let card: RaceCard | undefined, teams: readonly number[] | undefined;
   let tally: Tally | null = null;
+  let standings: ReturnType<typeof createStandings> | null = null;
   const seedOf = (id: number) => hash(match.seed, id);
   let fleet: Vessel[] = [];
   const aboard = new Map<number, Aboard>();
@@ -262,6 +264,7 @@ export function createState(
     match = m;
     card = by && checked(by);
     tally = card ? createTally(card, closedBy(m.type.rules.storm)) : null;
+    standings = card ? createStandings(card) : null;
     teams = tally?.teams;
     lay = laying(m.seed, depth, m.type.rules.loot);
     flotsam = loot ? lay.strewn() : { pieces: [], next: 0 };
@@ -580,9 +583,15 @@ export function createState(
     share: (id: number) => territory?.share(id) ?? 0,
 
     result: (): RaceResult | null => tally?.result() ?? null,
-    race: (id: number): Race | null =>
-      tally?.view(id, standing(), { mode: (k) => aboard.get(k)?.mind?.mode }) ??
-      null,
+    race: (id: number): Race | null => {
+      if (!tally || !standings) return null;
+      const s = standing(),
+        forfeit = tally.forfeit;
+      return standings(id, s, {
+        order: () => finishing(s.alive, s.sunk, s.share, forfeit),
+        mode: (k) => aboard.get(k)?.mind?.mode,
+      });
+    },
     order: (): number[] =>
       finishing(state.alive(), sinkings, state.share, tally?.forfeit),
     teams: (): readonly number[] | undefined => teams,
