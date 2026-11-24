@@ -5,6 +5,7 @@ import {
   type Status,
 } from '../../play/player.ts';
 import type { Sea } from '../../render/snapshot.ts';
+import { clock } from '../base/clock.ts';
 import { clamp, lerp } from '../../world/scalar.ts';
 import type { Shores } from '../base/coasts.ts';
 import { createChanged } from '../base/drawn.ts';
@@ -56,11 +57,6 @@ const RETICLE = 10,
 const RIM = [0.35, 1] as const,
   RIM_DEEP = 80;
 const FADE = 0.25;
-
-export const clock = (s: number) => {
-  const t = Math.max(0, Math.ceil(s));
-  return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`;
-};
 
 export function createHud(layer: HTMLElement, shores: Shores, act: HudActions) {
   const root = document.createElement('div');

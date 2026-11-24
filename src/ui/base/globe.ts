@@ -1,5 +1,5 @@
-import type { Cap } from '../../sim/storm.ts';
-import { lookingAt, type Eye } from '../../render/snapshot.ts';
+import type { Status } from '../../play/player.ts';
+import { lookingAt, type Eye, type StormDraw } from '../../render/snapshot.ts';
 import { clamp } from '../../world/scalar.ts';
 import {
   R,
@@ -22,7 +22,7 @@ import {
 } from './calm.ts';
 import type { Coast } from './coasts.ts';
 import { GLYPHS, stormMark } from './glyphs.ts';
-import { clock, type HudState } from '../sea/hud.ts';
+import { clock } from './clock.ts';
 import {
   CUT,
   INK,
@@ -41,6 +41,11 @@ import {
 import { rhumbs } from './marks.ts';
 import { dragged, onTap } from './touch.ts';
 import { insets, onResize, screen, view, type Insets } from './ui.ts';
+
+export type GlobeState = Pick<
+  Status,
+  'at' | 'heading' | 'afloat' | 'storm' | 'closing' | 'eye' | 'next'
+>;
 
 const PANEL = 0.8,
   SIDE = 112,
@@ -220,7 +225,7 @@ export function createGlobe(coasts: readonly Coast[]) {
   onTap(shut, () => close());
 
   const spin: Spin = { lat: 0, lon: 0, vLat: 0, vLon: 0 };
-  let state: HudState | null = null,
+  let state: GlobeState | null = null,
     want = FARTHEST,
     d = FARTHEST,
     read = '';
@@ -319,7 +324,7 @@ export function createGlobe(coasts: readonly Coast[]) {
     }
   }
 
-  function ink(e: Sight, cap: Cap) {
+  function ink(e: Sight, cap: StormDraw) {
     const win = L,
       dpr = canvas.width / L.w,
       k = L.k;
@@ -380,7 +385,7 @@ export function createGlobe(coasts: readonly Coast[]) {
     }
   }
 
-  function calms(e: Sight, s: HudState, k: number) {
+  function calms(e: Sight, s: GlobeState, k: number) {
     const next = s.next && s.next.radius < R * Math.PI * 0.99 ? s.next : null;
     if (next) {
       trace(e, rings(next.center, next.radius), true);
@@ -507,7 +512,7 @@ export function createGlobe(coasts: readonly Coast[]) {
     get open() {
       return state !== null;
     },
-    show(s: HudState) {
+    show(s: GlobeState) {
       state = s;
       spin.lat = latitude(Math.asin(s.at[1]));
       spin.lon = Math.atan2(-s.at[2], s.at[0]);
@@ -531,12 +536,12 @@ export function createGlobe(coasts: readonly Coast[]) {
       root.hidden = false;
     },
     close,
-    update(s: HudState) {
+    update(s: GlobeState) {
       if (!state) return;
       state = s;
       readout();
     },
-    step(dt: number, cap: Cap): Eye | null {
+    step(dt: number, cap: StormDraw): Eye | null {
       if (!state || !held) return null;
       if (!fingers.size) {
         spin.lon += spin.vLon * dt;
