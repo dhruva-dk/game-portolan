@@ -505,7 +505,7 @@ const html = `<!doctype html>
 <section><h2>What’s built</h2><div class="status">
 <div><b>Built</b>${count} custom properties in <code>TOKENS</code>, every colour read from <code>ink.ts</code>: scale, papers, inks, meanings, the ladder (q0–q4 × wash, rim, on), type, space, strokes, fills, motion.</div>
 <div><b>Built as a kit piece, not a token</b><code>--edge-cut</code>, <code>--rule-in</code>, <code>--rule-twice</code>, <code>--shadow</code> are the cut tiles of <code>paper.ts</code> (<code>--cut-*</code> border images). <code>--cut</code> is in <code>TONE</code> only.</div>
-<div class="part"><b>Glyphs</b>${glyphs.length} woodcuts drawn; UI-TOKENS.md D9 asks for about 45 subjects (tabs, parts, buildings, roles, mail kinds).</div>
+<div class="part"><b>Glyphs</b>${glyphs.length} woodcuts drawn.</div>
 <div class="no"><b>Not built</b><code>--team</code> / <code>--team-2</code> (livery dyes) and <code>--halo</code> (HUD only, <code>figure({ halo })</code>).</div>
 </div></section>
 

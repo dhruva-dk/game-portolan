@@ -1,4 +1,4 @@
-// The chartroom kit's own rules, as the owner decided them (UI-TOKENS.md):
+// The chartroom kit's own rules, as the owner decided them:
 // the quality ladder's steps, the dim, the press and the quick, the unit on the
 // office's page, and the cut edge that runs on unbroken however long its side.
 import { test } from 'node:test';

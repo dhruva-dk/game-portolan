@@ -1,5 +1,5 @@
 // The chartroom's data: ruled, never cut. Terms are names and values a ruled
-// line each; a stat stands on its quality ladder (UI-TOKENS.md: silver,
+// line each; a stat stands on its quality ladder (silver,
 // verdigris, azurite, purpure, gold) as a tile and a track with its ceiling
 // ticked; a meter is a share in a wash; shares are set against the best and
 // the average on ruled tracks; a track reached by steps has a node at each;

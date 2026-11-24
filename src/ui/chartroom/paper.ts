@@ -3,7 +3,7 @@
 // element as a border image, so it runs on unbroken at any size and nothing is
 // measured: its silhouette masks the paper's fill, its ink is drawn over it,
 // and its shadow lies on a layer of its own under it, so a pressed paper can
-// lose its shadow and keep its edge (UI-TOKENS.md, States). Data is not paper:
+// lose its shadow and keep its edge. Data is not paper:
 // it is ruled (data.ts).
 
 import { hash01 } from '../../world/random.ts';

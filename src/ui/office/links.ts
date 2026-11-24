@@ -1,4 +1,4 @@
-// The ways a screen opens a named thing's page (OFFICE-SCREENS.md, Links):
+// The ways a screen opens a named thing's page:
 // each gives what a tap calls, or null where the thing has no page yet (an
 // empty berth). A name so opened is drawn as a link (src/ui/chartroom/controls.ts).
 

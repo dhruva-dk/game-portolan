@@ -1,4 +1,4 @@
-// The chartroom kit's one rule (UI-TOKENS.md): a piece of it, and a screen
+// The chartroom kit's one rule: a piece of it, and a screen
 // built on it, is styled by the tokens alone. Outside its token module
 // (src/ui/chartroom/tokens.ts), such a file takes no colour from ink.ts (TONE carries them), writes no CSS
 // length but in drawn units, names no colour by its CSS name, sets no font's

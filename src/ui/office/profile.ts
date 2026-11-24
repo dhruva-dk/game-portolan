@@ -1,4 +1,4 @@
-// A person's profile, laid out as a dossier (UI-TOKENS.md, layout A) on the
+// A person's profile, laid out as a dossier on the
 // chartroom kit. At the left, who they are: their portrait, name, age and
 // colony, their team, their stars and the most they may come to, their
 // contract and what may be done about it. In the middle, their stats on the
