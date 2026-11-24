@@ -13,12 +13,10 @@
 
 import { AIR_FOV, type Eye } from '../snapshot.ts';
 import type { PartType } from '../race.ts';
-import type { Harbour } from '../world/harbour.ts';
 import type { ShipPose } from '../world/pose.ts';
 import { clamp, lerp, smoother, wrapAngle } from '../world/scalar.ts';
 import {
   along,
-  fromChart,
   normalize,
   place,
   rotateAbout,
@@ -28,7 +26,7 @@ import {
   type Out3,
   type Vec3,
 } from '../world/sphere.ts';
-import { inverse, lookAt, rotate, type Out4 } from '../world/turn.ts';
+import { lookAt, type Out4 } from '../world/turn.ts';
 
 /**
  * The camera at rest: off her bow by `quarter` radians round from dead ahead,
@@ -341,131 +339,4 @@ export function anchorageEye(
   out.kind = 'air';
   out.fov = AIR_FOV;
   return out;
-}
-
-/**
- * The camera over the harbour: out over the water before it, `back` metres
- * from a point `height` metres over its ground, looking down on it at `pitch`
- * radians, square to the shore.
- */
-const OVERLOOK = { back: 270, pitch: 0.65, height: 2 } as const;
-/** The camera over the harbour's field of view, degrees: narrow, so the campus reads near square-on, as a plan drawn in depth. */
-const HARBOUR_FOV = 24;
-
-/**
- * Where the camera over the harbour looks: `x` along the shore and `z` toward
- * the sea from its middle, metres, and from how far back.
- */
-export interface Survey {
-  x: number;
-  z: number;
-  back: number;
-}
-/**
- * How far a drag pans the camera over the harbour: what it looks at kept
- * within `x` along the shore and `z` toward the sea of its middle, metres;
- * where it looks first (`home`: toward the factory, the campus's showpiece);
- * how far back it stands on a building chosen (`near`).
- */
-export const PAN = {
-  x: [-45, 45],
-  z: [-45, 32],
-  home: { x: 0, z: -20, back: OVERLOOK.back },
-  near: 120,
-} as const;
-/** The survey on a building standing at (x, z) on the harbour's chart: it in the middle, from near. */
-export const onPlot = (x: number, z: number): Survey => ({
-  x,
-  z,
-  back: PAN.near,
-});
-/** The survey of the whole campus from where `s` looks: from as far back as at first. */
-export const overall = (s: Readonly<Survey>): Survey => ({
-  x: s.x,
-  z: s.z,
-  back: OVERLOOK.back,
-});
-
-/**
- * The survey after a drag of the look (CSS px: right and down), the picture
- * `size` of the screen high: the ground follows the finger (written over).
- */
-export function panned(
-  s: Survey,
-  look: { x: number; y: number },
-  size: number
-): Survey {
-  const k =
-    (2 * s.back * Math.tan((HARBOUR_FOV * Math.PI) / 360)) /
-    VIEWPORT.height /
-    Math.max(0.1, size);
-  s.x = clamp(s.x - look.x * k, PAN.x[0], PAN.x[1]);
-  s.z = clamp(
-    s.z - (look.y * k) / Math.sin(OVERLOOK.pitch),
-    PAN.z[0],
-    PAN.z[1]
-  );
-  return s;
-}
-
-/** `s` eased toward `to` over dt seconds, as a focus is (written over). */
-export function surveyed(s: Survey, to: Readonly<Survey>, dt: number): Survey {
-  const k = 1 - Math.exp(-FOCUSED * dt);
-  s.x += (to.x - s.x) * k;
-  s.z += (to.z - s.z) * k;
-  s.back += (to.back - s.back) * k;
-  return s;
-}
-
-/** The eye over the harbour `h`, as `survey` looks (into `out`, whose framing is left as it is). */
-export function harbourEye(
-  h: Harbour,
-  survey: Readonly<Survey> = PAN.home,
-  out = eyeOut()
-): Eye {
-  const { pitch } = OVERLOOK,
-    { x, z, back } = survey,
-    over = h.ground + OVERLOOK.height;
-  const position = place(
-    fromChart(h.chart, x, z + back * Math.cos(pitch)),
-    over + back * Math.sin(pitch),
-    out.position
-  );
-  lookAt(
-    position,
-    place(fromChart(h.chart, x, z), over, at),
-    normalize(position, way),
-    out.orientation
-  );
-  out.kind = 'air';
-  out.fov = HARBOUR_FOV;
-  return out;
-}
-
-/** Working vectors of `seenAt`. */
-const off: Out3 = [0, 0, 0],
-  mine: Out3 = [0, 0, 0];
-
-/**
- * Where the world point p is drawn by `eye` on a screen w by h (px, from its
- * top left, into `out`): false if it is behind the eye.
- */
-export function seenAt(
-  eye: Eye,
-  p: Vec3,
-  w: number,
-  h: number,
-  out: [number, number]
-): boolean {
-  off[0] = p[0] - eye.position[0];
-  off[1] = p[1] - eye.position[1];
-  off[2] = p[2] - eye.position[2];
-  const v = rotate(off, inverse(eye.orientation), mine);
-  if (v[2] > -1e-6) return false;
-  // (its picture's half-height on the screen, px, per unit of slope off its axis)
-  const k = ((eye.size ?? 1) * h) / 2 / Math.tan((eye.fov * Math.PI) / 360),
-    [cx, cy] = eye.centre ?? WHOLE.centre;
-  out[0] = (w / 2) * (1 + cx) + (k * v[0]) / -v[2];
-  out[1] = (h / 2) * (1 + cy) - (k * v[1]) / -v[2];
-  return true;
 }

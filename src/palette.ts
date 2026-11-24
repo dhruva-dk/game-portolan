@@ -55,23 +55,6 @@ export const SEABED_SAND = tones('#E8D08A', '#B89A6A');
 export const SEABED_STONE = tones('#8FA08A', '#55707A');
 export const SEABED_WEED = tones('#4F9A6E', '#2E6A62');
 
-// ---- the harbour's campus (land/harbour.ts): its red (the awning's, for
-// now the team's), near-white cladding shading cool, charcoal roofs, poured
-// concrete, dark blue-grey glass, an open door's dark, the terrace's mown lawn
-// (two stripes), its paving, asphalt and its painted lines, and its hedge
-export const AWNING = tones('#D2332A', '#8A2238');
-export const CLADDING = tones('#F5F4F0', '#B4BAC6');
-export const ROOF_METAL = tones('#5D606B', '#34353F');
-export const CONCRETE = tones('#D9D4CB', '#9A97A0');
-export const GLAZING = tones('#4D6F8F', '#2A3B56');
-export const INTERIOR = tones('#2E2C3A', '#1B1726');
-export const WORKSHOP = tones('#F3DDB0', '#B79474');
-export const LAWN = tones('#9DB874', '#5E7E60');
-export const LAWN_MOWN = tones('#AEC584', '#6B8A6A');
-export const PAVING = tones('#E7E1D5', '#A8A3A9');
-export const ASPHALT = tones('#6A6C73', '#3C3D48');
-export const HEDGE = tones('#5E8C4C', '#2E5646');
-
 // ---- the ships
 export const TIMBER = tones('#9A5A2C', '#5A2F2E');
 export const DECK = tones('#D9A86A', '#9A6548');
