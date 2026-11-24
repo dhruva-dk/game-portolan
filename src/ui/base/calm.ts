@@ -7,7 +7,7 @@ import {
   normalize,
   scale,
   type Vec3,
-} from '../world/sphere.ts';
+} from '../../world/sphere.ts';
 import { INK, alpha } from './ink.ts';
 
 export interface Storm {

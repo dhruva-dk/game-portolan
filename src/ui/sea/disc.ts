@@ -1,4 +1,4 @@
-import { R, type Vec3 } from '../world/sphere.ts';
+import { R, type Vec3 } from '../../world/sphere.ts';
 
 export type Mutable = [number, number, number];
 

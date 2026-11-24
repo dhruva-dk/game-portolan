@@ -1,8 +1,8 @@
-import type { Chart } from '../play/player.ts';
-import { clamp } from '../world/scalar.ts';
-import { INK, LAND, WASH, alpha } from './ink.ts';
-import { onDrag } from './touch.ts';
-import { view } from './ui.ts';
+import type { Chart } from '../../play/player.ts';
+import { clamp } from '../../world/scalar.ts';
+import { INK, LAND, WASH, alpha } from '../base/ink.ts';
+import { onDrag } from '../base/touch.ts';
+import { view } from '../base/ui.ts';
 
 const MOST_LAT = 1.2,
   DRAG = 2.2,

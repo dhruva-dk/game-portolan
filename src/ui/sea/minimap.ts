@@ -1,5 +1,5 @@
-import type { Sea } from '../render/snapshot.ts';
-import { R, along, dot, type Vec3 } from '../world/sphere.ts';
+import type { Sea } from '../../render/snapshot.ts';
+import { R, along, dot, type Vec3 } from '../../world/sphere.ts';
 import {
   createRings,
   head,
@@ -8,13 +8,13 @@ import {
   wayHead,
   wayIn,
   type Storm,
-} from './calm.ts';
-import type { Shores } from './coasts.ts';
+} from '../base/calm.ts';
+import type { Shores } from '../base/coasts.ts';
 import { laid, layAt, meters, newLay, place, type LayOnto } from './disc.ts';
 import { createGround } from './ground.ts';
 import { createHeld } from './held.ts';
-import { BRASS, INK, PAPER, WASH, alpha, dyeOn, svgNode } from './ink.ts';
-import { view } from './ui.ts';
+import { BRASS, INK, PAPER, WASH, alpha, dyeOn, svgNode } from '../base/ink.ts';
+import { view } from '../base/ui.ts';
 
 const SPAN = 408;
 const RATE = 30;

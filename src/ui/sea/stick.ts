@@ -1,7 +1,7 @@
-import type { Hands } from '../play/player.ts';
-import { INK, PAPER, alpha } from './ink.ts';
+import type { Hands } from '../../play/player.ts';
+import { INK, PAPER, alpha } from '../base/ink.ts';
 import { STICK } from './input.ts';
-import { show } from './ui.ts';
+import { show } from '../base/ui.ts';
 
 const LINE = alpha(INK.iron, 0.7),
   KNOB_FILL = alpha(PAPER, 0.3);

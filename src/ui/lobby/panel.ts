@@ -1,5 +1,5 @@
-import type { Chart, Seeds } from '../play/player.ts';
-import { named } from '../world/seeds.ts';
+import type { Chart, Seeds } from '../../play/player.ts';
+import { named } from '../../world/seeds.ts';
 import { CARD, fleetCard } from './fleet.ts';
 import {
   FIGURES,
@@ -9,12 +9,12 @@ import {
   paperDisc,
   roughCircle,
   slip,
-} from './ink.ts';
-import { die } from './marks.ts';
+} from '../base/ink.ts';
+import { die } from '../base/marks.ts';
 import { createOrb } from './orb.ts';
-import { banner, folio } from './screens.ts';
-import { keep, onHold, region } from './touch.ts';
-import { boxOf, view } from './ui.ts';
+import { banner, folio } from '../base/screens.ts';
+import { keep, onHold, region } from '../base/touch.ts';
+import { boxOf, view } from '../base/ui.ts';
 
 const BOX = { x: 160, y: 18, w: 636, h: 398 };
 const FIELD = { x: 186, y: 44, w: 246, h: 40 },

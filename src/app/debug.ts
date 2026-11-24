@@ -15,8 +15,8 @@ import { KINDS, type GunKind } from '../sim/kinds.ts';
 import { GUN, SHIP } from '../sim/handling.ts';
 import { PLAYER, SHIPS } from '../sim/match.ts';
 import type { ShipDraw, Snapshot, StormDraw } from '../render/snapshot.ts';
-import type { Flow } from '../ui/flow.ts';
-import { uiLayer } from '../ui/ui.ts';
+import type { Flow } from './flow.ts';
+import { uiLayer } from '../ui/base/ui.ts';
 import type { Weather } from '../world/weather.ts';
 import {
   R,

@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { createChanged } from '../src/ui/drawn.ts';
-import { GLYPHS, stormMark } from '../src/ui/glyphs.ts';
-import { RING, glow, sectorOf } from '../src/ui/hits.ts';
+import { createChanged } from '../src/ui/base/drawn.ts';
+import { GLYPHS, stormMark } from '../src/ui/base/glyphs.ts';
+import { RING, glow, sectorOf } from '../src/ui/sea/hits.ts';
 
 test('a blow on it lights the sector of the ring toward its dealer: eight, ahead first, clockwise', () => {
   const step = Math.PI / 4,
