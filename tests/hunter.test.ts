@@ -65,7 +65,7 @@ function sail(gunned: boolean, gunfire: readonly Report[], seconds: number) {
   return { modes, at: fleet[0].ship.at };
 }
 
-test('armed, a bot goes to the guns she hears; unarmed, she lets them be', () => {
+test('armed, a bot goes to the guns it hears; unarmed, it lets them be', () => {
   const guns = [{ at: east(320), by: 7, t: 0 }];
   const hunter = sail(true, guns, 12);
   assert.ok(hunter.modes.includes('hunt'), hunter.modes.join(' '));

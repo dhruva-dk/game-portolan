@@ -145,7 +145,7 @@ test("her taps: on the gun in hand with a gun in reach, a swap; on the item in h
   assert.equal(
     tap(0, gun, 0).takes.get(0),
     0,
-    'and so on her gun slot in hand'
+    'and so on its gun slot in hand'
   );
   assert.deepEqual(
     [tap(0, gun, 1).takes.size, tap(0, gun, 1).crews[0].hand],
@@ -209,7 +209,7 @@ test('a gun is worth most to a ship with none; then one of another kind; with bo
   );
 });
 
-test('she mends with the slot worth most to her as she is', () => {
+test('it mends with the slot worth most to it as it is', () => {
   let h = emptyHold();
   for (const k of ['smallShield', 'repairKit', 'fullRepair'] as const)
     h = stowed(h, k, 1).hold;
@@ -223,7 +223,7 @@ test('she mends with the slot worth most to her as she is', () => {
 
 const kinds = (c: Crew) => c.guns.map((g) => g && `${g.kind} ${g.rarity}`);
 
-test('an unarmed bot sails to a gun she sees and takes it; with one, a second kind; with two, she swaps for a better', () => {
+test('an unarmed bot sails to a gun it sees and takes it; with one, a second kind; with two, it swaps for a better', () => {
   for (const seed of seeds((s) => temper(s).lootReach >= 110, 4)) {
     const r = sail(
       [c0],
@@ -273,12 +273,12 @@ test('an unarmed bot sails to a gun she sees and takes it; with one, a second ki
     assert.deepEqual(
       s.flotsam.pieces.map((l) => l.goods),
       [{ kind: 'cannon', rarity: 0 }],
-      `${seed}: hers over the side`
+      `${seed}: its own over the side`
     );
   }
 });
 
-test('a gun abeam, inside the circle she turns at her top speed, she slows to come round to it, not sail round it', () => {
+test('a gun abeam, inside the circle it turns at its top speed, it slows to come round to it, not sail round it', () => {
   for (const seed of seeds((s) => temper(s).lootReach >= 110, 4)) {
     const r = sail(
       [c0],
@@ -342,7 +342,7 @@ test('bots near one piece do not all pile on it: one takes it, and none goes for
   );
 });
 
-test('a piece she can not come to she gives up after a while, and leaves be', () => {
+test('a piece it can not come to it gives up after a while, and leaves be', () => {
   const lagoon = out(100),
     reef: Depth = (p) => {
       const d = distance(p, lagoon);

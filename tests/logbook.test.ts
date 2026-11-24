@@ -20,7 +20,7 @@ const weak = (at: typeof here) => ({
   armed: true,
 });
 
-test('a wounded ship she saw and lost she goes back for, to where she saw her; not one she ran from', () => {
+test('a wounded ship it saw and lost, it goes back for, to where it saw that ship; not one it ran from', () => {
   for (const seed of [1, 2, 3, 4, 5]) {
     let m = mind(seed, here);
     for (let k = 0; k < 12; k++)
@@ -31,8 +31,8 @@ test('a wounded ship she saw and lost she goes back for, to where she saw her; n
     );
     for (let k = 0; k < 30 * 6; k++)
       m = think(own, [weak(goneTo)], { depth: deep }, m, nature(seed)).memory;
-    assert.equal(m.foe, -1, `${seed}: still in her eye`);
-    assert.deepEqual(m.hunt, seenAt, `${seed}: not back for her`);
+    assert.equal(m.foe, -1, `${seed}: still in its eye`);
+    assert.deepEqual(m.hunt, seenAt, `${seed}: not back for it`);
     let ran = mind(seed, here);
     for (let k = 0; k < 12; k++)
       ran = think(
@@ -50,6 +50,6 @@ test('a wounded ship she saw and lost she goes back for, to where she saw her; n
         ran,
         nature(seed)
       ).memory;
-    assert.equal(ran.hunt, null, `${seed}: back for one she ran from`);
+    assert.equal(ran.hunt, null, `${seed}: back for one it ran from`);
   }
 });

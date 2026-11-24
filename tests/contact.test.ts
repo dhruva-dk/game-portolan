@@ -170,7 +170,7 @@ test('it makes no difference in which order the fleet is listed', () => {
   assert.ok(a.blows.length > 0, 'they met');
 });
 
-test('hulls never overlap, from any angle, at any speed, wherever she is struck', () => {
+test('hulls never overlap, from any angle, at any speed, wherever it is struck', () => {
   for (let angle = 0; angle < 360; angle += 30)
     for (const speed of [3, 12])
       for (const aim of [-10, 0, 10])
@@ -189,13 +189,13 @@ test('hulls never overlap, from any angle, at any speed, wherever she is struck'
               };
             }
           );
-          const what = `${angle}° at ${speed} m/s, aimed ${aim} m ahead, she making ${ahead}: ${least.module} m, ${least.apart} m apart`;
+          const what = `${angle}° at ${speed} m/s, aimed ${aim} m ahead, it making ${ahead}: ${least.module} m, ${least.apart} m apart`;
           assert.ok(least.module >= 0 && least.apart >= -1e-3, what);
           assert.ok(blows.length <= 1, `${what}: ${blows.length} rams`);
         }
 });
 
-test('a glancing blow slides along her and goes on, losing little way and doing no damage', () => {
+test('a glancing blow slides along it and goes on, losing little way and doing no damage', () => {
   for (const angle of [10, 15, 20]) {
     let touched = false;
     const { fleet, blows } = run(
@@ -220,7 +220,7 @@ test('a glancing blow slides along her and goes on, losing little way and doing 
   }
 });
 
-test('bow into her side: the struck ship takes far more than the striker', () => {
+test('bow into its side: the struck ship takes far more than the striker', () => {
   const { blows } = run(approach(90 * deg, SHIP.top), holding(1, 0), 6);
   assert.equal(blows.length, 1);
   const [{ striker, struck, closing }] = blows;
@@ -269,7 +269,7 @@ test('head on, both take it alike', () => {
   assert.ok(striker.damage > 10 && striker.damage <= RAM.most);
 });
 
-test('a nudge, or lying alongside and leaning on her, does no damage', () => {
+test('a nudge, or lying alongside and leaning on it, does no damage', () => {
   let touched = false;
   const nudge = run(
     approach(90 * deg, RAM.least - 0.3),
@@ -303,7 +303,7 @@ test('a nudge, or lying alongside and leaning on her, does no damage', () => {
   assert.ok(least >= -1e-3, `${least}`);
 });
 
-test('one ram, one blow, however long she presses on; drawn clear, she may ram again', () => {
+test('one ram, one blow, however long it presses on; drawn clear, it may ram again', () => {
   const first = run(approach(90 * deg, SHIP.top), holding(1, 0), 20);
   assert.equal(first.blows.length, 1);
   assert.deepEqual(
@@ -327,7 +327,7 @@ test('one ram, one blow, however long she presses on; drawn clear, she may ram a
   assert.equal(second.blows.length, 1);
 });
 
-test('coming about alongside her, her stern swings clear of the other, never through', () => {
+test('coming about alongside another, its stern swings clear of the other, never through', () => {
   for (const side of [-1, 1])
     for (const speed of [3, SHIP.top]) {
       const b = lying(centre, 0, speed),
@@ -344,7 +344,7 @@ test('coming about alongside her, her stern swings clear of the other, never thr
       });
       assert.ok(
         least >= -1e-3,
-        `helm ${side > 0 ? 'toward port' : 'toward her'} at ${speed}: ${least}`
+        `helm ${side > 0 ? 'toward port' : 'toward it'} at ${speed}: ${least}`
       );
     }
 });
@@ -389,7 +389,7 @@ const offshore = (p: Vec3) => R * Math.asin(dot(normalize(p), seaward));
 const shoal: Depth = (p) => Math.min(20, -6 + offshore(p) / 4);
 const DRY = 4 * (6 + SHIP.draught);
 
-test('pressed against the shore by another, she is neither set aground nor pushed through her', () => {
+test('pressed against the shore by another, it is neither set aground nor pushed through the other', () => {
   for (const angle of [90, 60]) {
     const at = along(coast, seaward, DRY + SHIP.beam / 2 + 4).p;
     const b = shipAt(at, frameAt(at).north);
@@ -468,7 +468,7 @@ test('the ram scaled by top speed: a full-speed ram square into a still ship doe
   );
 });
 
-test('rammed square in her side, she heels away from the blow, a few degrees, and the rammer not at all', () => {
+test('rammed square in its side, it heels away from the blow, a few degrees, and the rammer not at all', () => {
   let fleet = approach(90 * deg, SHIP.top);
   let rides = fleet.map((v) => settled(v.ship, flat, 0));
   let most = [0, 0];

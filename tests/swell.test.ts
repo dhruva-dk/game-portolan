@@ -117,7 +117,7 @@ const pointwise =
     };
   };
 
-test('the hull read is the surface at her four points, but for the waves too short for her and the move read once', () => {
+test('the hull read is the surface at its four points, but for the waves too short for it and the move read once', () => {
   const swell = createSwell(all, open, 10, { shortest: RIDE.shortest }),
     points = pointwise(swell.at);
   const err: number[] = [],
@@ -153,7 +153,7 @@ function voyages(sea: Hull, every: number, seconds: number) {
 }
 
 test(
-  'her ride on the hull read, five times a second, is her ride on the whole surface read every step: ' +
+  'its ride on the hull read, five times a second, is its ride on the whole surface read every step: ' +
     'to a few cm and a fraction of a degree',
   () => {
     for (const wind of [7.6, 15]) {
@@ -189,7 +189,7 @@ test(
   }
 );
 
-test('the hull rides the swell: her level follows the water under her, her pitch and roll its slope', () => {
+test('the hull rides the swell: its level follows the water under it, its pitch and roll its slope', () => {
   for (const wind of [10, 15]) {
     const swell = createSwell(all, open, wind, {
       shortest: RIDE.shortest,

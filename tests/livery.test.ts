@@ -138,7 +138,7 @@ test("a livery's look: its dye as paint and canvas, its pattern; one past the se
   assert.deepEqual(worn({ dye: 5, pattern: 2 }), { dye: 5, pattern: 2 });
 });
 
-test('the seed deals every bot hers from the set, the same every time for the same seed', () => {
+test('the seed deals every bot its own from the set, the same every time for the same seed', () => {
   assert.deepEqual(
     [1, 2, 3, 4, 5, 6].map((id) => dealt(1234, id, LIVERY)),
     [

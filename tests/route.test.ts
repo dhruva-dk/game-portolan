@@ -162,7 +162,7 @@ function voyage(
   return { seconds: Infinity, least, memory: m };
 }
 
-test('a bot reaches a mark behind an island in near the least time, which without routes she takes far longer to', () => {
+test('a bot reaches a mark behind an island in near the least time, which without routes it takes far longer to', () => {
   const mark = at(130, 0),
     rc = 77.5;
   for (const y of [-25, 0, 25]) {
@@ -177,7 +177,7 @@ test('a bot reaches a mark behind an island in near the least time, which withou
     const routed = voyage(round, roundChart, ship, mark, 3),
       felt = voyage(round, null, ship, mark, 3);
     console.log(
-      `# behind the island from ${y} m: ${routed.seconds.toFixed(1)} s by routes, ${felt.seconds.toFixed(1)} s feeling her way,` +
+      `# behind the island from ${y} m: ${routed.seconds.toFixed(1)} s by routes, ${felt.seconds.toFixed(1)} s feeling its way,` +
         ` ${least.toFixed(1)} s at top speed all the way`
     );
     assert.ok(routed.least >= 0);
@@ -202,7 +202,7 @@ test('a bot reaches a mark behind an island in near the least time, which withou
   const routed = voyage(depth, ch, ship, at(160, 0), 3),
     felt = voyage(depth, null, ship, at(160, 0), 3);
   console.log(
-    `# behind a bay: ${routed.seconds.toFixed(1)} s by routes, ${felt.seconds.toFixed(1)} s feeling her way`
+    `# behind a bay: ${routed.seconds.toFixed(1)} s by routes, ${felt.seconds.toFixed(1)} s feeling its way`
   );
   assert.ok(
     routed.least >= 0 &&

@@ -107,7 +107,7 @@ test('a gust spends a charge, blows its time, and the charges come back one at a
   assert.equal(charging(g), 1);
 });
 
-test('in a gust she runs well past her top and turns quicker; after it she sheds the speed back to her top', () => {
+test('in a gust it runs well past its top and turns quicker; after it it sheds the speed back to its top', () => {
   let s: ShipState = { ...shipAt(c0, east), speed: SHIP.top };
   const plain = step(s, { course: frameAt(c0).north, throttle: 1 }, STEP, deep);
   for (let t = 0; t < GUST.time; t += STEP)
@@ -228,7 +228,7 @@ test('nothing is begun that would do nothing, and choosing another slot breaks i
   assert.equal(tapped(using, 0, { hull: 100, shield: 0 }).using, null);
 });
 
-test('a blow breaks off what she is mending with; the storm does not', () => {
+test('a blow breaks off what it is mending with; the storm does not', () => {
   const p = c0,
     q = at(60);
   const fleet = [vessel(1, p), vessel(2, q)];
@@ -369,7 +369,7 @@ test('every berth has a gun within reach of it at the start, on open water; one 
 
 const kinds = (c: Crew) => c.guns.map((g) => g && `${g.kind} ${g.rarity}`);
 
-test('she takes what fits within reach: a gun into each empty gun slot, the one in hand first, stacks into her slots', () => {
+test('it takes what fits within reach: a gun into each empty gun slot, the one in hand first, stacks into its slots', () => {
   const f = lying(
     piece(1, at(5), { kind: 'scatter', rarity: 2 }),
     piece(2, at(-5), { kind: 'repairKit', count: 4 }),
@@ -385,7 +385,7 @@ test('she takes what fits within reach: a gun into each empty gun slot, the one 
   assert.equal(
     r.crews[0].equip,
     EQUIP,
-    'taken into her hand, it fires after EQUIP'
+    'taken into its hand, it fires after EQUIP'
   );
   assert.deepEqual(r.crews[0].hold.items[0], { kind: 'repairKit', count: 4 });
   assert.deepEqual(
@@ -414,7 +414,7 @@ test('she takes what fits within reach: a gun into each empty gun slot, the one 
   assert.equal(offered(r3.crews[0], c0, r3.flotsam).gun?.id, 5);
 });
 
-test('asked, she swaps the gun in hand for the one offered, and hers goes over the side and lies until she is clear', () => {
+test('asked, it swaps the gun in hand for the one offered, and its own goes over the side and lies until it is clear', () => {
   const both = {
     ...crewOf(1, gunOf('cannon', 0), gunOf('scatter', 1)),
     hand: 1,
@@ -434,7 +434,7 @@ test('asked, she swaps the gun in hand for the one offered, and hers goes over t
   assert.deepEqual(
     kinds(swept(fl, [bare], [vessel(1, c0)], new Map(), 1).crews[0]),
     ['cannon 0', null],
-    'not while she is over it'
+    'not while it is over it'
   );
   fl = swept(fl, [bare], [vessel(1, at(40))], new Map(), 1).flotsam;
   assert.deepEqual(
@@ -443,7 +443,7 @@ test('asked, she swaps the gun in hand for the one offered, and hers goes over t
   );
 });
 
-test('a tap on her other gun takes it in hand (EQUIP), letting go the wind-up or reload of the one put down; on the one in hand, a reload', () => {
+test('a tap on its other gun takes it in hand (EQUIP), letting go the wind-up or reload of the one put down; on the one in hand, a reload', () => {
   const g = { ...gunOf('harpoon', 0), windup: 0.4 },
     c = { ...crewOf(1, g, gunOf('cannon', 2)), hand: 0 };
   const ask = (arm: number | null, crew = c) =>
@@ -478,7 +478,7 @@ test('a tap on her other gun takes it in hand (EQUIP), letting go the wind-up or
   assert.equal(ask(1, crewOf(1, gunOf('cannon', 0))).crews[0].hand, 0);
 });
 
-test('with her slots full, a take swaps the stack in hand for what is offered', () => {
+test('with its slots full, a take swaps the stack in hand for what is offered', () => {
   let h = emptyHold();
   for (const k of ['smallShield', 'repairKit', 'bigShield'] as const)
     h = stowed(h, k, 1).hold;
@@ -493,7 +493,7 @@ test('with her slots full, a take swaps the stack in hand for what is offered', 
   );
 });
 
-test('a ship sunk spills both her guns and all her stores where she lies, gone from her, kicked out to drift to a stop', () => {
+test('a ship sunk spills both its guns and all its stores where it lies, gone from it, kicked out to drift to a stop', () => {
   const c = {
     ...crewOf(1, gunOf('cannon', 2), gunOf('mortar', 1)),
     hold: stowed(stowed(emptyHold(), 'smallShield', 4).hold, 'repairKit', 2)
@@ -551,6 +551,6 @@ test('a ship sunk takes nothing', () => {
   assert.equal(
     HEALTH.start,
     0,
-    'she puts to sea with no shield, filled from loot'
+    'it puts to sea with no shield, filled from loot'
   );
 });

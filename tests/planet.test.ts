@@ -86,11 +86,11 @@ test('the same land and seed make the same planet; another seed only another cov
   assert.ok(differ > points.length / 2, `${differ} of ${points.length} differ`);
 });
 
-test('she starts on the water START m off the coast, facing the land', () => {
+test('it starts on the water START m off the coast, facing the land', () => {
   const { at: p, bearing } = planet.start;
   assert.ok(
     planet.height(p) < -SHIP.draught,
-    `${planet.height(p).toFixed(2)} m under her`
+    `${planet.height(p).toFixed(2)} m under it`
   );
   assert.ok(
     Math.abs(-inland(p) - START) < 1.5 * CELL,
@@ -99,7 +99,7 @@ test('she starts on the water START m off the coast, facing the land', () => {
   const ahead = bearingAt(p, bearing);
   assert.ok(
     inland(along(p, ahead, START + 4 * CELL).p) > 0,
-    'no land ahead of her'
+    'no land ahead of it'
   );
   assert.ok(Math.abs(dot(ahead, p)) < 1e-9);
 });

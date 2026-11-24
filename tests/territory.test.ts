@@ -193,11 +193,11 @@ test('a loop wider than a hemisphere takes the smaller side, the other one', () 
   );
   assert.ok(
     t.ownerAt(scale(pole, -1)) === 0 && t.ownerAt(pole) === -1,
-    'the antipode is hers, the pole open sea'
+    'the antipode is its own, the pole open sea'
   );
 });
 
-test('what a loop encloses is taken from others, islands and all; it floods from her strip', () => {
+test('what a loop encloses is taken from others, islands and all; it floods from its strip', () => {
   const pole: Vec3 = normalize([0.3, 0.8, -0.5]),
     theta = 0.12,
     path = circlePath(pole, theta);
@@ -205,7 +205,7 @@ test('what a loop encloses is taken from others, islands and all; it floods from
   t.begin([path[0], pole], 0);
   assert.equal(t.ownerAt(pole), 1);
   sail(t, path);
-  assert.equal(t.ownerAt(pole), 0, 'her water inside the loop is taken');
+  assert.equal(t.ownerAt(pole), 0, 'its water inside the loop is taken');
   assert.equal(t.holds(1), false);
   const claim = t.changes().find((c) => c.kind === 'claim');
   assert.ok(claim && claim.kind === 'claim' && claim.loop > 0);
@@ -213,12 +213,12 @@ test('what a loop encloses is taken from others, islands and all; it floods from
     const off: number = distance(centreOf(claim.cells[k]), pole) - R * theta;
     assert.ok(
       Math.abs(off) <= TERRITORY.brush + DIAGONAL,
-      `the flood starts from her strip (${off.toFixed(1)} m off her course)`
+      `the flood starts from its strip (${off.toFixed(1)} m off its course)`
     );
   }
 });
 
-test('sailing paints a strip as wide as her beam, hers at once: no line to cut, nothing given up', () => {
+test('sailing paints a strip as wide as its beam, its own at once: no line to cut, nothing given up', () => {
   const start: Vec3 = normalize([0.2, -0.4, 0.9]),
     t = createTerritory(1);
   t.begin([start], 0);
@@ -234,8 +234,8 @@ test('sailing paints a strip as wide as her beam, hers at once: no line to cut, 
   );
   for (const m of [50, 80, 110]) {
     const p = path[Math.round(m / STRIDE)];
-    assert.equal(t.ownerAt(p), 0, `hers under her course, ${m} m out`);
-    assert.equal(t.ownerAt(aside(p, end, 1)), 0, 'hers a metre to the side');
+    assert.equal(t.ownerAt(p), 0, `its own under its course, ${m} m out`);
+    assert.equal(t.ownerAt(aside(p, end, 1)), 0, 'its own a metre to the side');
     assert.equal(t.ownerAt(aside(p, end, -1)), 0, 'and to the other');
     assert.equal(t.ownerAt(aside(p, end, 9)), -1, 'open sea 9 m off');
   }
@@ -245,11 +245,11 @@ test('sailing paints a strip as wide as her beam, hers at once: no line to cut, 
   sail(t, line(end, path[Math.round(60 / STRIDE)]));
   assert.ok(
     t.changes().every((c) => c.seq <= seq || c.kind !== 'paint'),
-    'nothing painted over her own water'
+    'nothing painted over its own water'
   );
 });
 
-test("her strip takes others' water as it passes; theirs is left smaller, not cut off", () => {
+test("its strip takes others' water as it passes; theirs is left smaller, not cut off", () => {
   const a: Vec3 = normalize([0.6, 0.6, 0.5]),
     t = createTerritory(2);
   const b = normalize(add(a, basis(a)[0], 70 / R));
@@ -257,12 +257,12 @@ test("her strip takes others' water as it passes; theirs is left smaller, not cu
   const theirs = t.share(1);
   const through = normalize(add(a, basis(a)[0], 140 / R));
   sail(t, line(a, through));
-  assert.equal(t.ownerAt(b), 0, "the middle of ship 1's patch is hers");
+  assert.equal(t.ownerAt(b), 0, "the middle of ship 1's patch is ship 0's");
   assert.ok(t.share(1) < theirs && t.holds(1), "ship 1's is smaller");
   assert.ok(t.share(1) > theirs * 0.5);
 });
 
-test('crossing her own strip, far from where she painted it, closes a loop', () => {
+test('crossing its own strip, far from where it painted it, closes a loop', () => {
   const pole: Vec3 = normalize([-0.4, 0.3, 0.85]),
     theta = 50 / R;
   const home = onCircle(pole, theta + 120 / R, 0),
@@ -275,18 +275,18 @@ test('crossing her own strip, far from where she painted it, closes a loop', () 
   ];
   const { claimed } = sail(t, path);
   assert.equal(claimed.length, 1, 'one loop closed, far from home');
-  assert.equal(t.ownerAt(pole), 0, 'the middle of the loop is hers');
+  assert.equal(t.ownerAt(pole), 0, 'the middle of the loop is its own');
   assert.ok(claimed[0] > 0.8 * Math.PI * 50 * 50);
 });
 
-test("the storm takes the water outside its cap; a sunk ship's drains away; a ship with none paints on where she is", () => {
+test("the storm takes the water outside its cap; a sunk ship's drains away; a ship with none paints on where it is", () => {
   const t = createTerritory(2),
     a: Vec3 = [0, 1, 0],
     b = normalize([0, 0.2, 1]);
   t.begin([a, b], 0);
   const cap: Cap = { centre: a, radius: 0.5 };
   for (let k = 0; k < TERRITORY.sweep; k++) t.step([], k, cap);
-  assert.ok(t.holds(0) && !t.holds(1), 'the storm took hers');
+  assert.ok(t.holds(0) && !t.holds(1), 'the storm took its own');
   const drain = t.changes().find((c) => c.kind === 'drain');
   assert.ok(
     drain &&
@@ -296,7 +296,7 @@ test("the storm takes the water outside its cap; a sunk ship's drains away; a sh
   );
   const path = line(b, normalize([0.1, 0.25, 1]));
   sail(t, path, 1, WHOLE);
-  assert.ok(t.holds(1), 'water of her own again');
+  assert.ok(t.holds(1), 'water of its own again');
   assert.ok(!t.changes().some((c) => c.kind === 'home' && c.time > 0));
   t.sink(0, 50);
   assert.equal(t.share(0), 0);

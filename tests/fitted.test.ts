@@ -49,7 +49,7 @@ test("a spec ship is the tables' own: their handling, their hull; a match with n
   assert.equal(fitOf(bare), SPEC);
 });
 
-test('performance makes her handling: sails her top speed, rigging her gathering way, rudder her turn, hull her most hull, keel her spread, mounts her reload', () => {
+test('performance makes its handling: sails its top speed, rigging its gathering way, rudder its turn, hull its most hull, keel its spread, mounts its reload', () => {
   const fit = (over: Parameters<typeof crew>[0]) => crew(over).build?.fit;
   assert.deepEqual(fit({ sails: { performance: 1.1 } }), {
     ...SPEC,
@@ -76,7 +76,7 @@ test('performance makes her handling: sails her top speed, rigging her gathering
   assert.deepEqual(stout.health, { hull: 120, shield: 0, most: 120 });
 });
 
-test('her own handling sails her: better rigging gathers way sooner to the same top, better sails a higher top', () => {
+test('its own handling sails it: better rigging gathers way sooner to the same top, better sails a higher top', () => {
   const sailed = (c: Crew, seconds: number) => {
     let s = shipAt(here, frameAt(here).east);
     for (let i = 0; i < seconds / STEP; i++)
@@ -92,7 +92,7 @@ test('her own handling sails her: better rigging gathers way sooner to the same 
   assert.ok(Math.abs(sailed(canvas, 30) - SPEC.top * 1.1) < 1e-6);
 });
 
-test("her keel steadies her guns: the same draw goes off closer to the gun's line", () => {
+test("its keel steadies its guns: the same draw goes off closer to the gun's line", () => {
   const off = (keel: number) => {
     const c = { ...crew({ keel: { performance: keel } }), ...armed() },
       v = afloat(1, shipAt(here, frameAt(here).east));
@@ -103,7 +103,7 @@ test("her keel steadies her guns: the same draw goes off closer to the gun's lin
       const dir = r.shots[0]?.dirs[0];
       if (dir) return dir;
     }
-    throw new Error('she never fired');
+    throw new Error('it never fired');
   };
   const armed = () => ({ guns: crewOf(1, gunOf('cannon', 0)).guns });
   const true0 = off(1e9),
@@ -113,7 +113,7 @@ test("her keel steadies her guns: the same draw goes off closer to the gun's lin
   assert.ok(away(0.5) > 1.9 * away(1), 'half the keel: twice');
 });
 
-test('her most hull is hers: the storm takes its share of it, her stores mend up to their share of it, and a blow leaves it hers', () => {
+test('its most hull is its own: the storm takes its share of it, its stores mend up to their share of it, and a blow leaves it its own', () => {
   const stout = crew({ hull: { performance: 1.2 } }),
     spec = crew();
   const blown = harmed(stout.health, 70).health;

@@ -148,9 +148,9 @@ test('a bot never grounds nor lies pinned on a shore over a long voyage round th
       }
     );
     console.log(
-      `# seed ${seed}: ${pinned.toFixed(1)} s pinned, ${made.toFixed(0)} m made, least ${least.toFixed(2)} m under her`
+      `# seed ${seed}: ${pinned.toFixed(1)} s pinned, ${made.toFixed(0)} m made, least ${least.toFixed(2)} m under it`
     );
-    assert.ok(least >= 0, `${seed}: ${least} m under her keel`);
+    assert.ok(least >= 0, `${seed}: ${least} m under its keel`);
     assert.ok(pinned < 10, `${seed}: ${pinned.toFixed(1)} s pinned`);
     assert.ok(
       made > 300 * SHIP.top * 0.6,
@@ -160,7 +160,7 @@ test('a bot never grounds nor lies pinned on a shore over a long voyage round th
   }
 });
 
-test('a hunter rams a steady ship on her side, above the ram threshold, from ahead, abeam or astern of her', () => {
+test('a hunter rams a steady ship on its side, above the ram threshold, from ahead, abeam or astern of it', () => {
   const bold = seedsWhere((t) => t.fight > 0.7, 3);
   for (const seed of bold)
     for (const from of [20, 90, 160]) {
@@ -179,7 +179,7 @@ test('a hunter rams a steady ship on her side, above the ram threshold, from ahe
       assert.equal(
         first.struck.part,
         'side',
-        `${seed} from ${from}°: struck her ${first.struck.part}`
+        `${seed} from ${from}°: struck its ${first.struck.part}`
       );
     }
 });
@@ -208,7 +208,7 @@ test('the same seed sails the same way; different seeds, different ways', () => 
   assert.ok(new Set(tempers.map((t) => t.notice.toFixed(1))).size === 16);
 });
 
-test('a bot answering a ram takes less of it than a ship holding her course', () => {
+test('a bot answering a ram takes less of it than a ship holding its course', () => {
   const sharp = seedsWhere((t) => t.skill > 0.8 && t.fight < 0.4, 3);
   let answered = 0,
     holding = 0;
@@ -340,7 +340,7 @@ test('a bot outside the next cap makes for it in time, and is never caught outsi
   );
 });
 
-test('a bot inside the cap never leaves it, roaming or with the next one closing round her', () => {
+test('a bot inside the cap never leaves it, roaming or with the next one closing round it', () => {
   for (const seed of captains) {
     const holding = closing(start, 260, 260, Infinity, 1),
       shrinking = closing(start, 260, 200, 0, 30);

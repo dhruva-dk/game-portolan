@@ -87,7 +87,7 @@ function ttk(kind: GunKind, shield: number) {
   ).time;
 }
 
-test('each gun sinks a ship at its best range in a band: 1–5 s against her hull, 2.5–10 s against hull and shield', () => {
+test('each gun sinks a ship at its best range in a band: 1–5 s against its hull, 2.5–10 s against hull and shield', () => {
   const rows = KINDS.map((k) => [k, ttk(k, 0), ttk(k, 100)] as const);
   console.log(
     rows
@@ -111,7 +111,7 @@ test('each gun sinks a ship at its best range in a band: 1–5 s against her hul
   assert.ok(Math.max(...both) / Math.min(...both) < 3.5);
 });
 
-test("a scatter's grape cuts the rigging of the ship it strikes: she sails at RIGGING of the speed she asks till it is mended; a cannon's ball cuts none", () => {
+test("a scatter's grape cuts the rigging of the ship it strikes: it sails at RIGGING of the speed it asks till it is mended; a cannon's ball cuts none", () => {
   const struck = (kind: GunKind) =>
     fight(
       [crewOf(1, gunOf(kind, 0)), crewOf(2)],
@@ -232,7 +232,7 @@ test("a mortar's fall mark is drawn its splash's size (gunfire/marks.ts MARK, wh
   );
 });
 
-test("a mortar's shell bursts over its splash: the ship struck takes all of it, one beside her less, the shooter none", () => {
+test("a mortar's shell bursts over its splash: the ship struck takes all of it, one beside it less, the shooter none", () => {
   const fleet = [
     afloat(1, lying(centre, 0)),
     afloat(2, lying(east(80), Math.PI / 2)),

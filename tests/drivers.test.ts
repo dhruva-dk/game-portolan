@@ -48,7 +48,7 @@ const driver = (seed: number, over: Partial<DriverStats> = {}): Driver => ({
 const with1 = (seed: number, stat: Stat, value: number): Nature =>
   natureOf(driver(seed, { [stat]: value }), LENGTH);
 
-test("ten in every stat is today's bot of that seed and persona, to the bit; her persona is her card's whatever her seed", () => {
+test("ten in every stat is today's bot of that seed and persona, to the bit; its persona is its card's whatever its seed", () => {
   for (let seed = 1; seed <= 60; seed++) {
     assert.deepEqual(natureOf(driver(seed), LENGTH), nature(seed), `${seed}`);
     for (const stat of STATS)
@@ -198,7 +198,7 @@ test('helm: with a rammer driving at them in seeded encounters, fewer of the 16s
     );
 });
 
-test('lookout: a ship lying where a ten would just miss her, the 16s have in their eye and the 4s have not', () => {
+test('lookout: a ship lying where a ten would just miss it, the 16s have in their eye and the 4s have not', () => {
   const seeds: number[] = [];
   for (let s = 1; seeds.length < 12; s++)
     if (eye(nature(s).temper) < 170) seeds.push(s);
@@ -214,7 +214,7 @@ test('lookout: a ship lying where a ten would just miss her, the 16s have in the
         m = think(own, [other], { depth: deep }, m, who).memory;
       return m.foe;
     };
-    assert.equal(sees(16), 2, `${seed}: 16 sees her at ${far.toFixed(0)} m`);
+    assert.equal(sees(16), 2, `${seed}: 16 sees it at ${far.toFixed(0)} m`);
     assert.equal(sees(10), -1, `${seed}: 10 does not`);
     assert.equal(sees(4), -1, `${seed}: 4 does not`);
     const a = with1(seed, 'lookout', 16).temper,

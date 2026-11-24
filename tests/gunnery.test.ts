@@ -118,7 +118,7 @@ const row = (f: (m: number) => number) => RANGES.map(f);
 const show = (rates: number[]) =>
   rates.map((r, i) => `${RANGES[i]} m ${Math.round(100 * r)}%`).join(', ');
 
-test('the reticle on a crossing ship: a common gun strikes her 9 balls in 10 or more out to 180 m; rarity strikes more', () => {
+test('the reticle on a crossing ship: a common gun strikes it 9 balls in 10 or more out to 180 m; rarity strikes more', () => {
   const by = [0, 2, 4].map((rarity) => row((m) => rate(rarity, m)));
   by.forEach((r, i) => console.log(`# rarity ${[0, 2, 4][i]}: ${show(r)}`));
   const [common, , legendary] = by;
@@ -130,7 +130,7 @@ test('the reticle on a crossing ship: a common gun strikes her 9 balls in 10 or 
     );
 });
 
-test("the assist: a thumb's slip (2° off her body) is led onto her; well off her (5°) it is not", () => {
+test("the assist: a thumb's slip (2° off its body) is led onto it; well off it (5°) it is not", () => {
   const slip = row((m) => rate(0, m, 2 * (Math.PI / 180))),
     wide = row((m) => rate(0, m, 5 * (Math.PI / 180)));
   console.log(`# common, 2° off: ${show(slip)}`);

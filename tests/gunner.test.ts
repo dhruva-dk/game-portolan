@@ -123,7 +123,7 @@ function battle(
   return { fleet, battle: b, minds, fired, strikes, blows, ranges };
 }
 
-test("an armed bot holds off at her gun's range and shoots a steady ship, rather than ramming her", () => {
+test("an armed bot holds off at its gun's range and shoots a steady ship, rather than ramming it", () => {
   for (const seed of bold) {
     const r = battle(
       [placed(0, 0, 0, 90 * deg), placed(1, 0, 150, 0)],
@@ -146,7 +146,7 @@ test("an armed bot holds off at her gun's range and shoots a steady ship, rather
   }
 });
 
-test('an armed bot holds her fire till she has got over first seeing her foe', () => {
+test('an armed bot holds its fire till it has got over first seeing its foe', () => {
   for (const seed of bold) {
     const r = battle(
       [placed(0, 0, 0, 0), placed(1, 0, 120, 90 * deg)],
@@ -180,7 +180,7 @@ test('two armed bots fight it out, the same every time, till one is sunk', () =>
   );
 });
 
-test('an unarmed bot never orders her gun fired', () => {
+test('an unarmed bot never orders its gun fired', () => {
   const r = battle(
     [placed(0, 0, 0, 0), placed(1, 0, 100, 90 * deg)],
     [bold[0], null],
@@ -207,7 +207,7 @@ const mild = (() => {
   return out;
 })();
 
-test('early in a match a mild armed bot keeps out of a fight she would take up late in it', () => {
+test('early in a match a mild armed bot keeps out of a fight it would take up late in it', () => {
   for (const seed of mild) {
     const fights = (phase: number) =>
       battle(
@@ -228,7 +228,7 @@ test('early in a match a mild armed bot keeps out of a fight she would take up l
   }
 });
 
-test('holding back, she still fires back at a ship close by that is shooting her', () => {
+test('holding back, it still fires back at a ship close by that is shooting it', () => {
   for (const seed of mild) {
     const r = battle(
       [placed(0, 0, 0, 90 * deg), placed(1, 0, 70, 180 * deg)],

@@ -81,7 +81,7 @@ test('the same card on the same planet gives the same result, hash and all; anot
   assert.notEqual(other.hash, FIRST.hash);
 });
 
-test('a forfeit does not put to sea: placed last, listed sunk at second 0, with nothing to her name', () => {
+test('a forfeit does not put to sea: placed last, listed sunk at second 0, with nothing to its name', () => {
   const base = short(),
     card = {
       ...base,
@@ -143,7 +143,7 @@ test("the card's rules: a banned gun is never laid, the storm's pace quickens it
   );
 });
 
-test("ship 0 with no driver is sailed by the pilot's hands, asked every step; with one, by her bot", () => {
+test("ship 0 with no driver is sailed by the pilot's hands, asked every step; with one, by its bot", () => {
   const card = specField(SEED, 3, true),
     quick = { ...card, rules: { ...card.rules, storm: 3 } };
   assert.equal(quick.ships[0].driver, null);
@@ -158,12 +158,12 @@ test("ship 0 with no driver is sailed by the pilot's hands, asked every step; wi
   sound(quick, r);
   assert.equal(asked[0], 0);
   assert.ok(Math.abs(asked.length - r.seconds * 30) < 1e-6, 'asked every step');
-  assert.equal(r.hits[0].fired, 0, 'her hands idle, she fired nothing');
-  assert.notEqual(r.hash, FIRST.hash, 'a bot sailed her otherwise');
+  assert.equal(r.hits[0].fired, 0, 'its hands idle, it fired nothing');
+  assert.notEqual(r.hash, FIRST.hash, 'a bot sailed it otherwise');
   assert.deepEqual(runRace(quick, planet, waters), r);
 });
 
-test('a spec field: teams of four by id, each in its own livery, every driver the bot of her berth', () => {
+test('a spec field: teams of four by id, each in its own livery, every driver the bot of its berth', () => {
   const card = specField(7);
   assert.equal(card.ships.length, 80);
   for (const s of card.ships) {

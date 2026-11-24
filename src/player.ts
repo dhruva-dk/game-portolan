@@ -80,7 +80,7 @@ export interface Placed {
   sinkings: number;
 }
 
-export const HER = 0;
+export const PLAYER_SHIP = 0;
 
 export { isGun } from './kinds.ts';
 export type { GunKind, LootKind } from './kinds.ts';

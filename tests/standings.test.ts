@@ -57,7 +57,7 @@ test('a match with no card has no race to read', () => {
   assert.equal(state.race(PLAYER), null);
 });
 
-test('as a race begins: her team, her three teammates whole and afloat, every ship in the standings', () => {
+test('as a race begins: its team, its three teammates whole and afloat, every ship in the standings', () => {
   const { card, state } = begun();
   state.advance(IDLE.helm, IDLE.gun);
   const r = state.race(PLAYER);
@@ -90,7 +90,7 @@ test('as a race begins: her team, her three teammates whole and afloat, every sh
   );
 });
 
-test('a mate sunk, and the ship that sank her credited and placed first', () => {
+test('a mate sunk, and the ship that sank it credited and placed first', () => {
   const { card, state } = begun();
   state.advance(IDLE.helm, IDLE.gun);
   debugOf(state).sink(2, 5);

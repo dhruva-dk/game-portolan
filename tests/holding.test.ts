@@ -12,14 +12,14 @@ const shielded = (id: number, shield: number): Crew => ({
   health: { hull: HEALTH.hull, shield },
 });
 
-test('her share of the calm: of the whole planet before the storm closes, of what is left inside it after', () => {
+test('its share of the calm: of the whole planet before the storm closes, of what is left inside it after', () => {
   assert.equal(calmShare(0.05, WHOLE), 0.05);
   assert.ok(Math.abs(calmShare(0.05, QUARTER) - 0.2) < 1e-12);
   assert.equal(calmShare(0.3, QUARTER), 1, 'never more than all of it');
   assert.equal(calmShare(0, QUARTER), 0);
 });
 
-test('her shield comes back in proportion to her share of the calm, at HOLDING.shield a second from HOLDING.full of it', () => {
+test('its shield comes back in proportion to its share of the calm, at HOLDING.shield a second from HOLDING.full of it', () => {
   assert.equal(regainRate(0), 0, 'none with no water');
   assert.ok(
     Math.abs(regainRate(HOLDING.full / 2) - HOLDING.shield / 2) < 1e-12,
@@ -30,7 +30,7 @@ test('her shield comes back in proportion to her share of the calm, at HOLDING.s
   assert.equal(regainRate(HOLDING.full), 4.5);
 });
 
-test('every ship afloat regains by her own share wherever she lies, up to her most; the rest do not', () => {
+test('every ship afloat regains by its own share wherever it lies, up to its most; the rest do not', () => {
   const dt = 1 / 30,
     crews = [
       shielded(0, 40),

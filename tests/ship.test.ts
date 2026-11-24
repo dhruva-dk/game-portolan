@@ -81,7 +81,7 @@ test('the packed meshes are whole: finite positions, unit normals, indices in ra
     }
 });
 
-test('she is a galleon at 0.6×: about 26 m from beak to taffrail, the mainmast 21 m up, 2 m of draught', () => {
+test('it is a galleon at 0.6×: about 26 m from beak to taffrail, the mainmast 21 m up, 2 m of draught', () => {
   for (const s of ships) {
     const { min, max } = s.bounds;
     const length = max[2] - min[2],
@@ -121,7 +121,7 @@ test('every sail and pennant is a whole grid of the cloth, in order, the whole o
   assert.deepEqual([course.columns, course.rows], [14, 9]);
 });
 
-test('a ship changes level at its reach, and near a boundary stays where she was', () => {
+test('a ship changes level at its reach, and near a boundary stays where it was', () => {
   const px = 0.0026;
   assert.equal(chooseDetail(-1, 10, px), 0);
   assert.equal(chooseDetail(-1, 1e4, px), DETAILS.length - 1);
@@ -136,7 +136,7 @@ test('a ship changes level at its reach, and near a boundary stays where she was
   }
 });
 
-test('the gun mount stands on her waist, carried with her pose', () => {
+test('the gun mount stands on its waist, carried with its pose', () => {
   assert.equal(GUN_MOUNT[0], 0);
   assert.ok(
     GUN_MOUNT[1] > 1.5 && GUN_MOUNT[1] < 3,

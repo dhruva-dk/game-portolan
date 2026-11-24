@@ -183,7 +183,7 @@ test('the berths go to the player and the nearest within reach, the cloth settli
   );
 });
 
-test('a ship that is no longer among the nearest fades out before her berth goes to another, with no jump', () => {
+test('a ship that is no longer among the nearest fades out before its berth goes to another, with no jump', () => {
   const metres = ships(5, (i) => 20 + i * 10);
   let b = run(new Array(BERTHS).fill(null), metres, -1, SETTLE + FADE + 0.1);
   assert.deepEqual(held(b), [0, 1, 2, 3]);
@@ -224,7 +224,7 @@ const pose = (forward: Vec3, up: Vec3, at: Vec3 = [0, R, 0]): ShipPose => ({
   up: normalize(up),
 });
 
-test('her motion: still, she feels gravity alone, straight down her mast', () => {
+test('its motion: still, it feels gravity alone, straight down its mast', () => {
   let m: Motion | null = null;
   const p = pose([0, 0, 1], [0, 1, 0]);
   for (let i = 0; i < 60; i++) m = moved(m, p, 1 / 30);
@@ -237,7 +237,7 @@ test('her motion: still, she feels gravity alone, straight down her mast', () =>
   assert.ok(length(f.spin) < 1e-9);
 });
 
-test('her motion: rolling, she feels the roll about her fore-and-aft axis; heeled, gravity across her', () => {
+test('its motion: rolling, it feels the roll about its fore-and-aft axis; heeled, gravity across it', () => {
   let m: Motion | null = null;
   const rate = 0.1,
     dt = 1 / 30;
@@ -254,11 +254,11 @@ test('her motion: rolling, she feels the roll about her fore-and-aft axis; heele
   );
   assert.ok(
     f.weight[0] < -2,
-    `heeled to starboard, gravity pulls her canvas to starboard: ${f.weight}`
+    `heeled to starboard, gravity pulls its canvas to starboard: ${f.weight}`
   );
 });
 
-test('her motion: gathering way, her canvas is thrown aft; a jump is not a jolt', () => {
+test('its motion: gathering way, its canvas is thrown aft; a jump is not a jolt', () => {
   let m: Motion | null = null;
   const dt = 1 / 30,
     north: Vec3 = [0, 0, 1];
@@ -281,7 +281,7 @@ test('her motion: gathering way, her canvas is thrown aft; a jump is not a jolt'
   );
 });
 
-test('at rest, her yards are trimmed to the wind: square to it from astern, hard round when it is forward of the beam', () => {
+test('at rest, its yards are trimmed to the wind: square to it from astern, hard round when it is forward of the beam', () => {
   assert.equal(trim([0, 0, 5], 0, 0), 0);
   const quarter = trim([3, 0, 3], 0, 0);
   assert.ok(
@@ -306,7 +306,7 @@ const through = (w: Vec3, b: number) => ({
   lateen: Math.abs(normalize(w)[0]),
 });
 
-test('under way, her sails always draw: on every heading, in a light wind or a gale, at any speed', () => {
+test('under way, its sails always draw: on every heading, in a light wind or a gale, at any speed', () => {
   for (const blow of [1, 7.6, 14])
     for (let d = 0; d < 360; d += 5)
       for (const speed of [WAY, 4, 12]) {
@@ -335,7 +335,7 @@ test('under way, her sails always draw: on every heading, in a light wind or a g
       }
 });
 
-test("the sails' wind fills more the faster she goes; at rest it is the true wind, weakened", () => {
+test("the sails' wind fills more the faster it goes; at rest it is the true wind, weakened", () => {
   const wind: Vec3 = [0, 0, -3];
   const strengths = [WAY, 3, 6, 12].map((s) =>
     length(filling(wind, s, BRACED))
@@ -351,7 +351,7 @@ test("the sails' wind fills more the faster she goes; at rest it is the true win
   }
 });
 
-test("the true wind crossing her stern or her bow, her yards and her sails' wind swing across together, in seconds", () => {
+test("the true wind crossing its stern or its bow, its yards and its sails' wind swing across together, in seconds", () => {
   for (const [from, to] of [
     [0.5, -0.5],
     [Math.PI - 0.5, -Math.PI + 0.5],

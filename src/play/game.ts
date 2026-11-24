@@ -29,7 +29,7 @@ import {
   type Vec3,
 } from '../world/sphere.ts';
 import {
-  HER,
+  PLAYER_SHIP,
   HOTBAR,
   IDLE,
   type Deed,
@@ -288,7 +288,7 @@ export function createGame(
     return moments;
   };
   const dealer = (d: Deed) =>
-    d.kind === 'struck' && d.ship === HER && !d.ram && d.by !== d.ship
+    d.kind === 'struck' && d.ship === PLAYER_SHIP && !d.ram && d.by !== d.ship
       ? (state.vessel(d.by)?.ship.at ?? null)
       : null;
 

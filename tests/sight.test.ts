@@ -130,7 +130,7 @@ test("looked for only near the land's rises, a sight meets what it met looking a
   );
 });
 
-test("a ship's body: on the line it stands 0 off; beside it, the angle to her nearest point; behind the eye, nowhere", () => {
+test("a ship's body: on the line it stands 0 off; beside it, the angle to its nearest point; behind the eye, nowhere", () => {
   const her = shipAt(along(at, f.north, 100).p, f.east);
   assert.equal(offSight(onto(20, 100), her)!.angle, 0);
   const from = scale(at, R + 20),

@@ -42,7 +42,7 @@ const storm: Storm = {
   damage: 0.03,
 };
 
-test('a bot behind a wall inside the next cap reckons herself outside it by water, and makes down the way in', () => {
+test('a bot behind a wall inside the next cap reckons itself outside it by water, and makes down the way in', () => {
   const at = along(centre, north, 240).p;
   const sea = {
     depth: walled,

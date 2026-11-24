@@ -12,7 +12,7 @@ const at = (z: number) => {
   return half[i] + (half[Math.min(i + 1, half.length - 1)] - half[i]) * (t - i);
 };
 
-test('the waterline runs from the transom to the stem, no wider than her beam', () => {
+test('the waterline runs from the transom to the stem, no wider than its beam', () => {
   assert.ok(
     Math.abs(stern - zOf(0, 0) * SCALE) < 1e-9 &&
       Math.abs(stem - zOf(1, 0) * SCALE) < 1e-9

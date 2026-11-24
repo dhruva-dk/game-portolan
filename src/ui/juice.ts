@@ -1,5 +1,5 @@
 import {
-  HER,
+  PLAYER_SHIP,
   blowOf,
   felt,
   isGun,
@@ -103,14 +103,14 @@ export function createJuice(body: HTMLElement, parts: Parts) {
       above = 18 * k;
     switch (m.kind) {
       case 'fired':
-        if (m.ship !== HER || then - fired < FIRED_APART) return;
+        if (m.ship !== PLAYER_SHIP || then - fired < FIRED_APART) return;
         fired = then;
         flash.flash(SCREEN.fire.flash);
         pop(parts.fire, 0.86, 220);
         return;
       case 'struck': {
         const points = m.shield + m.hull;
-        if (m.by === HER && m.ship !== HER) {
+        if (m.by === PLAYER_SHIP && m.ship !== PLAYER_SHIP) {
           const { cross, look: r } = DEALT[blowOf(m)];
           hits.cross(cross, middle.x, middle.y);
           if (m.seen)
@@ -124,7 +124,7 @@ export function createJuice(body: HTMLElement, parts: Parts) {
             );
           flash.flash(r.flash, m.broke ? 1 : felt.dealt(points));
           if ('vignette' in r) flash.vignette(r.vignette);
-        } else if (m.ship === HER && points > 0) {
+        } else if (m.ship === PLAYER_SHIP && points > 0) {
           const r = {
             broke: SCREEN.shieldLost,
             hull: SCREEN.hurt,
@@ -142,14 +142,14 @@ export function createJuice(body: HTMLElement, parts: Parts) {
         return;
       }
       case 'sank':
-        if (m.by !== HER || m.ship === HER) return;
+        if (m.by !== PLAYER_SHIP || m.ship === PLAYER_SHIP) return;
         hits.cross('kill', middle.x, middle.y);
         if (m.seen)
           hits.figure(m.ship, 0.0001, false, true, m.seen.x, m.seen.y - above);
         flash.flash(SCREEN.sink.flash);
         return;
       case 'took': {
-        if (m.ship !== HER) return;
+        if (m.ship !== PLAYER_SHIP) return;
         const slot = parts.slots[m.slot];
         if (slot)
           fly(
@@ -174,7 +174,7 @@ export function createJuice(body: HTMLElement, parts: Parts) {
         return;
       }
       case 'mended': {
-        if (m.ship !== HER) return;
+        if (m.ship !== PLAYER_SHIP) return;
         const r =
           m.piece === 'smallShield' || m.piece === 'bigShield'
             ? SCREEN.shield
@@ -185,7 +185,7 @@ export function createJuice(body: HTMLElement, parts: Parts) {
         return;
       }
       case 'gust':
-        if (m.ship !== HER) return;
+        if (m.ship !== PLAYER_SHIP) return;
         flash.vignette(SCREEN.gust.vignette);
         pop(parts.gust, 1.2, 300);
         return;

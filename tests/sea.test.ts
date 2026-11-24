@@ -91,7 +91,7 @@ test("a new match's changes are read from its first: its loops closed are not ta
       .map((c) => c.kind)
       .filter((k) => k !== 'paint'),
     ['claim'],
-    'her strips painted, and one loop closed'
+    'its strips painted, and one loop closed'
   );
   assert.equal(cursor.read(sea).from, sea.changes.length);
   assert.equal(cursor.read(undefined).fresh, true);
@@ -215,7 +215,7 @@ test("the water's copy of the cells keeps up with the sea: loops, drains, the st
 
 test('a loop round half the planet is drawn over some frames, none over its budget', () => {
   const { territory: t, before, after, time } = halfLoop();
-  assert.ok(t.share(0) > 0.45, `she holds ${t.share(0)}`);
+  assert.ok(t.share(0) > 0.45, `it holds ${t.share(0)}`);
   const claimed = createClaimed();
   claimed.follow(before);
   claimed.follow(after);
