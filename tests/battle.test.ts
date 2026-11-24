@@ -26,7 +26,7 @@ import { flown, loosed, reach, thrown, type Ball } from '../src/sim/shot.ts';
 import type { Depth } from '../src/sim/shoal.ts';
 import { offSight, seaAlong, type Sight } from '../src/sim/sight.ts';
 
-const cannon = (rarity: number) => gunOf('cannon', rarity),
+const cannon = () => gunOf('cannon'),
   RANGE = GUNS.cannon.range;
 const BEST = Math.PI / 4 - GUNS.cannon.carry / R / 4;
 import { shipAt, turned, type Helm, type ShipState } from '../src/sim/ship.ts';
@@ -44,10 +44,15 @@ import {
   scale,
   type Vec3,
 } from '../src/world/sphere.ts';
-import { EVEN_SHIP, WORST } from './setups.ts';
+import { BEST as TOP, EVEN_SHIP, WORST, valuesAt } from './setups.ts';
 
 const deep: Depth = () => 30;
-const flat = (seed: number) => ({ seed, depth: deep, spread: 0 });
+const flat = (seed: number, cone = EVEN_SHIP.assistCone) => ({
+  seed,
+  depth: deep,
+  spread: 0,
+  cone,
+});
 const deg = Math.PI / 180;
 const center = fromLatLon(0.2, 0.3);
 const lying = (c: Vec3, bearing: number, speed = 0): ShipState => {
@@ -309,10 +314,10 @@ test('led with no spread, a ball strikes a ship on a steady course, at any range
       );
       const lay = laid(
         fleet[0],
-        cannon(0),
+        cannon(),
         on(fleet[0].ship, turned(fleet[0].ship, bearing), meters),
         fleet,
-        { seed: 7, depth: deep, spread: 0 }
+        flat(7, WORST.assistCone)
       );
       assert.equal(
         lay.target,
@@ -371,8 +376,8 @@ const swung = (v: Vessel, o: Vessel, angle: number): Sight => {
 };
 
 test('with no ship in the assist cone the gun is laid along the sight, at full range when it meets nothing', () => {
-  const g = cannon(2),
-    cone = GUN.assist[2],
+  const g = cannon(),
+    cone = EVEN_SHIP.assistCone,
     fleet = pair(120, 0, 0, 0);
   for (const k of [-1, 1]) {
     let a = 0;
@@ -416,7 +421,7 @@ test('with no ship in the assist cone the gun is laid along the sight, at full r
     chosen(
       on(far[0].ship, far[0].ship.heading, RANGE + 10),
       muzzle(far[0]),
-      GUN.assist[4],
+      TOP.assistCone,
       far.slice(1),
       RANGE
     ),
@@ -428,7 +433,7 @@ test('with no ship in the cone, the ball is laid to come down where the sight me
   const fleet = [afloat(1, lying(center, 0))];
   for (const meters of [30, 80, 140]) {
     const sight = on(fleet[0].ship, fleet[0].ship.heading, meters),
-      lay = laid(fleet[0], cannon(0), sight, fleet, flat(1));
+      lay = laid(fleet[0], cannon(), sight, fleet, flat(1));
     const meet = normalize(add(sight.from, sight.dir, seaAlong(sight)!));
     assert.ok(
       distance(lay.fall, meet) < 1e-6,
@@ -454,42 +459,32 @@ test('of two in the cone, the gun takes the one nearer the sight, and of two on 
   const sight = on(fleet[0].ship, fleet[0].ship.heading, 140);
   assert.ok(
     offSight(sight, fleet[1].ship)!.angle > 0.02 &&
-      offSight(sight, fleet[1].ship)!.angle < GUN.assist[4],
+      offSight(sight, fleet[1].ship)!.angle < TOP.assistCone,
     'both in the cone'
   );
-  assert.equal(laid(fleet[0], cannon(4), sight, fleet, flat(1)).target, 2);
+  const wide = flat(1, TOP.assistCone);
+  assert.equal(laid(fleet[0], cannon(), sight, fleet, wide).target, 2);
   const both = [fleet[0], afloat(3, lying(out(center, 0, 80), 1)), fleet[2]];
-  assert.equal(laid(both[0], cannon(4), sight, both, flat(1)).target, 3);
-  assert.equal(
-    laid(fleet[0], cannon(4), sight, fleet, { ...flat(1), cone: 0 }).target,
-    null
-  );
+  assert.equal(laid(both[0], cannon(), sight, both, wide).target, 3);
+  assert.equal(laid(fleet[0], cannon(), sight, fleet, flat(1, 0)).target, null);
 });
 
-test('the spread closes up with rarity, and is the same for the same seed', () => {
-  const misses = GUN.rarities.map((_, rarity) => {
-    const fleet = pair(150, 0, 90 * deg, 0);
-    let sum = 0;
-    for (let n = 0; n < 300; n++) {
-      const gun = { ...cannon(rarity), fired: n };
-      const sight = on(fleet[0].ship, fleet[0].ship.heading, 150),
-        lay = laid(fleet[0], gun, sight, fleet, { seed: 99, depth: deep }),
-        clean = laid(fleet[0], gun, sight, fleet, flat(99));
-      assert.deepEqual(
-        lay,
-        laid(fleet[0], gun, sight, fleet, { seed: 99, depth: deep })
-      );
-      const angle = Math.acos(Math.min(1, dot(lay.dirs[0], clean.dirs[0])));
-      assert.ok(angle <= spreadOf(gun) + 1e-9, 'within the cone');
-      sum += angle;
-    }
-    return sum / 300;
-  });
-  for (let i = 1; i < misses.length; i++)
-    assert.ok(
-      misses[i] < misses[i - 1] * 0.9,
-      `rarity ${i}: ${misses.join(', ')}`
-    );
+test("the spread is the same for the same seed, and within the gun's", () => {
+  const fleet = pair(150, 0, 90 * deg, 0),
+    spread = spreadOf('cannon', EVEN_SHIP.spreadFactor),
+    lay = { seed: 99, depth: deep, spread, cone: EVEN_SHIP.assistCone };
+  let sum = 0;
+  for (let n = 0; n < 300; n++) {
+    const gun = { ...cannon(), fired: n };
+    const sight = on(fleet[0].ship, fleet[0].ship.heading, 150),
+      spread = laid(fleet[0], gun, sight, fleet, lay),
+      clean = laid(fleet[0], gun, sight, fleet, flat(99));
+    assert.deepEqual(spread, laid(fleet[0], gun, sight, fleet, lay));
+    const angle = Math.acos(Math.min(1, dot(spread.dirs[0], clean.dirs[0])));
+    assert.ok(angle <= lay.spread + 1e-9, 'within the cone');
+    sum += angle;
+  }
+  assert.ok(sum > 0, 'spread at all');
 });
 
 test("an order's spread widens the gun's by that many times: the same draw, further off, and fewer hits", () => {
@@ -499,7 +494,7 @@ test("an order's spread widens the gun's by that many times: the same draw, furt
       fleet,
       battleOf(
         [
-          crewOf(1, EVEN_SHIP, cannon(2)),
+          crewOf(1, EVEN_SHIP),
           {
             ...crewOf(2, EVEN_SHIP),
             health: { hull: 1e6, shield: 0, most: 1e6 },
@@ -526,7 +521,7 @@ test("an order's spread widens the gun's by that many times: the same draw, furt
     wide < plain - 0.1,
     `hits ${plain} plain, ${wide} at 2.5 times the spread`
   );
-  const gun = cannon(2),
+  const gun = cannon(),
     sight = on(fleet[0].ship, fleet[0].ship.heading, 150),
     clean = laid(fleet[0], gun, sight, fleet, flat(5)).dirs[0];
   const off = (k: number) =>
@@ -536,7 +531,7 @@ test("an order's spread widens the gun's by that many times: the same draw, furt
         dot(
           laid(fleet[0], gun, sight, fleet, {
             ...flat(5),
-            spread: spreadOf(gun) * k,
+            spread: spreadOf('cannon', EVEN_SHIP.spreadFactor) * k,
           }).dirs[0],
           clean
         )
@@ -569,7 +564,7 @@ test('the land is in the way: a ball laid over an island falls on it', () => {
     Math.abs(distance(center, p) - 75) < 4 ? -20 : 30;
   const r = fight(
     fleet,
-    battleOf([crewOf(1, EVEN_SHIP, cannon(4)), crewOf(2, EVEN_SHIP)], 3),
+    battleOf([crewOf(1, EVEN_SHIP), crewOf(2, EVEN_SHIP)], 3),
     once(on(fleet[0].ship, fleet[0].ship.heading, 150)),
     3,
     [0, 0],
@@ -581,7 +576,7 @@ test('the land is in the way: a ball laid over an island falls on it', () => {
   assert.equal(
     fight(
       fleet,
-      battleOf([crewOf(1, EVEN_SHIP, cannon(4)), crewOf(2, EVEN_SHIP)], 3),
+      battleOf([crewOf(1, EVEN_SHIP), crewOf(2, EVEN_SHIP)], 3),
       once(on(fleet[0].ship, fleet[0].ship.heading, 150)),
       3,
       [0, 0]
@@ -630,26 +625,13 @@ test('the land is in the way: a ball laid over an island falls on it', () => {
   }
 });
 
-test('a ship with no gun fires nothing, whatever it is ordered', () => {
-  const fleet = pair(100, 0, 0, 0);
-  const r = fight(
-    fleet,
-    battleOf([], 3),
-    (f) => f.map(() => ({ aim: null, fire: true })),
-    5,
-    [0, 0]
-  );
-  assert.equal(r.shots, 0);
-  assert.ok(r.battle.crews.every((c) => c.guns.every((g) => g === null)));
-});
-
 test('a ship struck to 0 hull is sunk, reported once, and takes and fires no more', () => {
   const fleet = pair(100, 0, 0, 0);
   const b = battleOf(
     [
-      crewOf(1, EVEN_SHIP, cannon(4)),
+      crewOf(1, EVEN_SHIP),
       {
-        ...crewOf(2, EVEN_SHIP, cannon(0)),
+        ...crewOf(2, EVEN_SHIP),
         health: { hull: 30, shield: 0, most: EVEN_SHIP.hullPoints },
       },
     ],
@@ -695,9 +677,7 @@ test('the same fleet under the same orders fights the same way, to the bit', () 
       )
     );
   const crews = () =>
-    [10, 9, 8, 7].map((id, k) =>
-      crewOf(id, EVEN_SHIP, gunOf(KINDS[k + 1], k), gunOf(KINDS[k], 4 - k))
-    );
+    [10, 9, 8, 7].map((id, k) => crewOf(id, valuesAt(0, KINDS[k + 1])));
   const orders = (f: readonly Vessel[], t: number) =>
     f.map((v, i) => ({
       aim: on(v.ship, turned(v.ship, Math.sin(t * 0.05 + i) * 3), 100),

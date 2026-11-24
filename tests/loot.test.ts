@@ -9,10 +9,10 @@ import {
 } from '../src/sim/battle.ts';
 import type { Vessel } from '../src/sim/contact.ts';
 import { STEP } from '../src/sim/fixed.ts';
-import { gunOf, reloadOf } from '../src/sim/gun.ts';
+import { reloadOf } from '../src/sim/gun.ts';
 import { charging, gustOf, ready, spent, stepGust } from '../src/sim/gust.ts';
-import { KINDS } from '../src/sim/kinds.ts';
-import { EQUIP, GUNS, GUST, HEALTH, SHIP } from '../src/sim/handling.ts';
+import { STORES } from '../src/sim/kinds.ts';
+import { GUST, HEALTH, SHIP } from '../src/sim/handling.ts';
 import {
   begun,
   emptyHold,
@@ -27,7 +27,6 @@ import {
 import {
   cargo,
   drifted,
-  isArms,
   laying,
   LOOT,
   offered,
@@ -154,7 +153,7 @@ test('a ball fired in a gust goes off wider', () => {
       const b = battleOf(
         [
           {
-            ...crewOf(1, EVEN_SHIP, gunOf('cannon', 0)),
+            ...crewOf(1, EVEN_SHIP),
             gust: { charges: 1, recharge: 0, blowing },
           },
           crewOf(2, EVEN_SHIP),
@@ -259,10 +258,7 @@ test('a blow breaks off what it is mending with; the storm does not', () => {
   });
   let b = battleOf(
     [
-      {
-        ...crewOf(1, EVEN_SHIP, gunOf('cannon', 4)),
-        health: { hull: 100, shield: 0, most: 100 },
-      },
+      { ...crewOf(1, EVEN_SHIP), health: { hull: 100, shield: 0, most: 100 } },
       { ...crewOf(2, EVEN_SHIP), hold: h },
     ],
     1
@@ -309,38 +305,18 @@ test('a blow breaks off what it is mending with; the storm does not', () => {
   );
 });
 
-test('the pieces drawn come in their shares: half of them guns (first three in five), mostly common, the cannon commonest', () => {
+test('the pieces drawn come in their shares of stores, each in its count', () => {
   const draw = random(7),
     n = 20000;
   const g = Array.from({ length: n }, () => rolled(draw));
-  const guns = g.filter(isArms);
-  assert.ok(Math.abs(guns.length / n - LOOT.gun) < 0.02);
-  const common = guns.filter((x) => x.rarity === 0).length / guns.length;
-  const legendary = guns.filter((x) => x.rarity === 4).length / guns.length;
-  assert.ok(
-    Math.abs(common - 0.42) < 0.02 && Math.abs(legendary - 0.03) < 0.01,
-    `${common} ${legendary}`
-  );
-  const total = LOOT.kinds.reduce((a, b) => a + b, 0);
-  KINDS.forEach((kind, i) => {
-    const share = guns.filter((x) => x.kind === kind).length / guns.length;
+  for (const kind of STORES) {
+    const of = g.filter((x) => x.kind === kind);
     assert.ok(
-      Math.abs(share - LOOT.kinds[i] / total) < 0.02,
-      `${kind}: ${share}`
+      Math.abs(of.length / n - LOOT.shares[kind]) < 0.02,
+      `${kind}: ${of.length / n}`
     );
-  });
-  assert.ok(
-    LOOT.kinds[0] > Math.max(...LOOT.kinds.slice(1)) &&
-      LOOT.kinds[3] < LOOT.kinds[1] &&
-      LOOT.kinds[4] < LOOT.kinds[1],
-    'the cannon commonest, the harpoon and mortar rarest'
-  );
-  const small = g.filter((x) => x.kind === 'smallShield');
-  assert.ok(
-    small.every(
-      (x) => x.kind === 'smallShield' && x.count === LOOT.counts.smallShield
-    )
-  );
+    assert.ok(of.every((x) => x.count === LOOT.counts[kind]));
+  }
 });
 
 test('the loot is strewn evenly over the planet, on open water only, the same for a seed', () => {
@@ -369,151 +345,82 @@ test('the loot is strewn evenly over the planet, on open water only, the same fo
   }
 });
 
-test('every berth has a gun within reach of it at the start, on open water; one laid only where there was none', () => {
-  const depth: Depth = (p) =>
-    dot(p, east) > 0 && distance(p, c0) < 60 ? 1 : 20;
-  const berths = [c0, at(400), at(-300)];
-  const f = laying(9, depth).berthed(
-    lying(
-      piece(0, at(410), { kind: 'cannon', rarity: 1 }),
-      piece(1, at(-300), { kind: 'repairKit', count: 4 })
-    ),
-    berths
-  );
-  assert.equal(f.pieces.length, 4);
-  assert.equal(f.next, 102);
-  for (const b of berths)
-    assert.ok(
-      f.pieces.some((l) => isArms(l.goods) && distance(l.at, b) < LOOT.berth)
-    );
-  for (const l of f.pieces.slice(2))
-    assert.ok(depth(l.at) >= SHIP.draft + PIECE.open);
-  assert.deepEqual(
-    f,
-    laying(9, depth).berthed(
-      lying(
-        piece(0, at(410), { kind: 'cannon', rarity: 1 }),
-        piece(1, at(-300), { kind: 'repairKit', count: 4 })
-      ),
-      berths
-    )
-  );
-});
+const stowedOf = (c: Crew) =>
+  c.hold.items.map((k) => k && `${k.kind} ${k.count}`);
 
-const kinds = (c: Crew) => c.guns.map((g) => g && `${g.kind} ${g.rarity}`);
-
-test('it takes what fits within reach: a gun into each empty gun slot, the one in hand first, stacks into its slots', () => {
+test('it takes what fits within reach: stacks into its slots', () => {
   const f = lying(
-    piece(1, at(5), { kind: 'scatter', rarity: 2 }),
     piece(2, at(-5), { kind: 'repairKit', count: 4 }),
-    piece(3, at(30), { kind: 'harpoon', rarity: 4 })
+    piece(3, at(30), { kind: 'bigShield', count: 1 })
   );
   const r = swept(f, [crewOf(1, EVEN_SHIP)], [vessel(1, c0)], new Map(), 1);
-  assert.deepEqual(kinds(r.crews[0]), ['scatter 2', null]);
-  assert.equal(
-    r.crews[0].guns[0]?.rounds,
-    GUNS.scatter.mag,
-    'found with its magazine full'
-  );
-  assert.equal(
-    r.crews[0].equip,
-    EQUIP,
-    'taken into its hand, it fires after EQUIP'
-  );
   assert.deepEqual(r.crews[0].hold.items[0], { kind: 'repairKit', count: 4 });
   assert.deepEqual(
     r.flotsam.pieces.map((l) => l.id),
     [3]
   );
-  const r2 = swept(
-    lying(piece(4, at(3), { kind: 'mortar', rarity: 0 })),
-    r.crews,
-    [vessel(1, c0)],
-    new Map(),
-    1
-  );
-  assert.deepEqual(
-    [kinds(r2.crews[0]), r2.crews[0].hand],
-    [['scatter 2', 'mortar 0'], 0]
-  );
-  const r3 = swept(
-    lying(piece(5, at(3), { kind: 'cannon', rarity: 1 })),
-    r2.crews,
-    [vessel(1, c0)],
-    new Map(),
-    1
-  );
-  assert.deepEqual(kinds(r3.crews[0]), ['scatter 2', 'mortar 0']);
-  assert.equal(offered(r3.crews[0], c0, r3.flotsam).gun?.id, 5);
 });
 
-test('asked, it swaps the gun in hand for the one offered, and its own goes over the side and lies until it is clear', () => {
-  const both = {
-    ...crewOf(1, EVEN_SHIP, gunOf('cannon', 0), gunOf('scatter', 1)),
-    hand: 1,
-  };
-  const f = lying(piece(4, at(3), { kind: 'harpoon', rarity: 3 }));
-  const r = swept(f, [both], [vessel(1, c0)], new Map([[1, 0]]), 1);
+test('asked, it swaps the stack in hand for the one offered, and its own goes over the side and lies until it is clear', () => {
+  let h = emptyHold();
+  for (const k of ['smallShield', 'repairKit', 'bigShield'] as const)
+    h = stowed(h, k, 1).hold;
+  const full = { ...crewOf(1, EVEN_SHIP), hold: { ...h, chosen: 2 } };
+  const f = lying(piece(4, at(3), { kind: 'fullRepair', count: 1 }));
+  const r = swept(f, [full], [vessel(1, c0)], new Map([[1, 2]]), 1);
   assert.deepEqual(
-    kinds(r.crews[0]),
-    ['cannon 0', 'harpoon 3'],
+    stowedOf(r.crews[0]),
+    ['smallShield 1', 'fullRepair 1', 'bigShield 1'],
     'into the slot in hand'
   );
   assert.equal(r.flotsam.pieces.length, 1);
   const old = r.flotsam.pieces[0];
-  assert.deepEqual([old.goods, old.from], [{ kind: 'scatter', rarity: 1 }, 1]);
-  const bare = { ...r.crews[0], guns: [r.crews[0].guns[0], null] };
+  assert.deepEqual([old.goods, old.from], [{ kind: 'repairKit', count: 1 }, 1]);
+  const bare = {
+    ...r.crews[0],
+    hold: {
+      ...r.crews[0].hold,
+      items: [r.crews[0].hold.items[0], null, r.crews[0].hold.items[2]],
+    },
+  };
   let fl = drifted(r.flotsam, 2, deep);
   assert.deepEqual(
-    kinds(swept(fl, [bare], [vessel(1, c0)], new Map(), 1).crews[0]),
-    ['cannon 0', null],
+    stowedOf(swept(fl, [bare], [vessel(1, c0)], new Map(), 1).crews[0]),
+    ['smallShield 1', null, 'bigShield 1'],
     'not while it is over it'
   );
   fl = swept(fl, [bare], [vessel(1, at(40))], new Map(), 1).flotsam;
   assert.deepEqual(
-    kinds(swept(fl, [bare], [vessel(1, c0)], new Map(), 1).crews[0]),
-    ['cannon 0', 'scatter 1']
+    stowedOf(swept(fl, [bare], [vessel(1, c0)], new Map(), 1).crews[0]),
+    ['smallShield 1', 'repairKit 1', 'bigShield 1']
   );
 });
 
-test('a tap on its other gun takes it in hand (EQUIP), letting go the wind-up or reload of the one put down; on the one in hand, a reload', () => {
-  const g = { ...gunOf('harpoon', 0), windup: 0.4 },
-    c = { ...crewOf(1, EVEN_SHIP, g, gunOf('cannon', 2)), hand: 0 };
-  const ask = (arm: number | null, crew = c) =>
+test('a tap on its gun reloads it, if it is not full; with stores in hand, it takes the gun in hand', () => {
+  const c = crewOf(1, EVEN_SHIP);
+  const ask = (crew: Crew) =>
     asked(
       [crew],
       [vessel(1, c0)],
       lying(),
-      new Map([[1, { ...NOTHING, arm }]])
+      new Map([[1, { ...NOTHING, tap: 0 }]])
     );
-  const a = ask(1);
-  assert.deepEqual(
-    [a.crews[0].hand, a.crews[0].equip, a.crews[0].guns[0]?.windup],
-    [1, EQUIP, 0]
-  );
-  assert.deepEqual(
-    a.cues.map((k) => [k.kind, k.gun]),
-    [['swapped', 'cannon']]
-  );
-  const spent = {
-    ...a.crews[0],
-    guns: [a.crews[0].guns[0], { ...gunOf('cannon', 2), rounds: 3 }],
-  };
-  const b = ask(1, spent);
+  const spent = { ...c, gun: { ...c.gun, rounds: 3 } };
+  const b = ask(spent);
   assert.ok(
     Math.abs(
-      b.crews[0].guns[1]!.reload -
-        reloadOf(gunOf('cannon', 2), EVEN_SHIP.reloadFactor)
+      b.crews[0].gun.reload - reloadOf('cannon', EVEN_SHIP.reloadFactor)
     ) < 1e-9
   );
   assert.deepEqual(
     b.cues.map((k) => k.kind),
     ['reloading']
   );
-  assert.deepEqual(ask(1, a.crews[0]).cues, []);
-  assert.equal(
-    ask(1, crewOf(1, EVEN_SHIP, gunOf('cannon', 0))).crews[0].hand,
-    0
+  assert.deepEqual(ask(c).cues, []);
+  const chose = ask({ ...spent, hold: { ...spent.hold, chosen: 2 } });
+  assert.deepEqual(
+    [chose.crews[0].hold.chosen, chose.crews[0].gun.reload, chose.cues],
+    [0, 0, []]
   );
 });
 
@@ -523,7 +430,7 @@ test('with its slots full, a take swaps the stack in hand for what is offered', 
     h = stowed(h, k, 1).hold;
   const c = { ...crewOf(1, EVEN_SHIP), hold: h };
   const f = lying(piece(5, at(2), { kind: 'fullRepair', count: 1 }));
-  assert.equal(offered(c, c0, f).item?.id, 5);
+  assert.equal(offered(c, c0, f)?.id, 5);
   const r = swept(f, [c], [vessel(1, c0)], new Map([[1, 2]]), 1);
   assert.deepEqual(r.crews[0].hold.items[1], { kind: 'fullRepair', count: 1 });
   assert.deepEqual(
@@ -532,9 +439,9 @@ test('with its slots full, a take swaps the stack in hand for what is offered', 
   );
 });
 
-test('a ship sunk spills both its guns and all its stores where it lies, gone from it, kicked out to drift to a stop', () => {
+test('a ship sunk spills all its stores where it lies, gone from it, kicked out to drift to a stop', () => {
   const c = {
-    ...crewOf(1, EVEN_SHIP, gunOf('cannon', 2), gunOf('mortar', 1)),
+    ...crewOf(1, EVEN_SHIP),
     hold: stowed(stowed(emptyHold(), 'smallShield', 4).hold, 'repairKit', 2)
       .hold,
   };
@@ -551,21 +458,13 @@ test('a ship sunk spills both its guns and all its stores where it lies, gone fr
   assert.deepEqual(
     s.flotsam.pieces.map((l) => l.goods),
     [
-      { kind: 'cannon', rarity: 2 },
-      { kind: 'mortar', rarity: 1 },
       { kind: 'smallShield', count: 4 },
       { kind: 'repairKit', count: 2 },
     ]
   );
-  assert.deepEqual(
-    [kinds(s.crews[0]), s.crews[0].hold.items],
-    [
-      [null, null],
-      [null, null, null],
-    ]
-  );
+  assert.deepEqual(s.crews[0].hold.items, [null, null, null]);
   const goods = cargo(c);
-  assert.equal(goods.length, 4);
+  assert.equal(goods.length, 2);
   let f = overboard({ pieces: [], next: 0 }, c0, goods, 1, 9);
   assert.ok(f.pieces.every((l) => Math.hypot(...l.way) >= PIECE.kick));
   for (let t = 0; t < 5; t += STEP) f = drifted(f, STEP, deep);
@@ -578,7 +477,7 @@ test('a ship sunk spills both its guns and all its stores where it lies, gone fr
 });
 
 test('a ship sunk takes nothing', () => {
-  const f = lying(piece(1, c0, { kind: 'cannon', rarity: 1 }));
+  const f = lying(piece(1, c0, { kind: 'repairKit', count: 1 }));
   const r = swept(
     f,
     [{ ...crewOf(1, EVEN_SHIP), health: { hull: 0, shield: 0, most: 100 } }],
@@ -586,7 +485,7 @@ test('a ship sunk takes nothing', () => {
     new Map(),
     1
   );
-  assert.deepEqual(kinds(r.crews[0]), [null, null]);
+  assert.deepEqual(r.crews[0].hold.items, [null, null, null]);
   assert.equal(
     HEALTH.start,
     0,

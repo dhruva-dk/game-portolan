@@ -10,7 +10,6 @@ import {
   type Vessel,
 } from '../src/sim/contact.ts';
 import { STEP } from '../src/sim/fixed.ts';
-import { RAM } from '../src/sim/handling.ts';
 import { clearance, type Depth } from '../src/sim/shoal.ts';
 import { shipAt, type Helm } from '../src/sim/ship.ts';
 import { toEdge, type Cap, type Storm } from '../src/sim/storm.ts';
@@ -25,7 +24,7 @@ import {
   normalize,
   type Vec3,
 } from '../src/world/sphere.ts';
-import { EVEN_SHIP, HANDY, WORST, aboard } from './setups.ts';
+import { EVEN_SHIP, WORST, aboard } from './setups.ts';
 import type { ShipValues } from '../src/sim/setup.ts';
 
 const deg = Math.PI / 180;
@@ -167,36 +166,6 @@ test('a bot never grounds nor lies pinned on a shore over a long voyage round th
     );
     assert.ok(r.minds[0]!.mode === 'roam');
   }
-});
-
-test('a hunter rams a steady ship on its side, above the ram threshold, from ahead, abeam or astern of it', () => {
-  const bold = seedsWhere((t) => t.fight > 0.7, 3);
-  for (const seed of bold)
-    for (const from of [20, 90, 160]) {
-      const target = placed(2, 0, 0, 0, 6),
-        hunter = placed(1, from * deg, 140, (from + 180) * deg);
-      const r = sail(
-        [hunter, target],
-        [seed, null],
-        60,
-        deep,
-        () => ({ course: null, throttle: 0.5 }),
-        undefined,
-        undefined,
-        HANDY
-      );
-      const first = r.blows.find((b) => b.striker.id === 1);
-      assert.ok(first, `${seed} from ${from}°: no ram`);
-      assert.ok(
-        first.closing > RAM.least,
-        `${seed} from ${from}°: closing ${first.closing}`
-      );
-      assert.equal(
-        first.struck.part,
-        'side',
-        `${seed} from ${from}°: struck its ${first.struck.part}`
-      );
-    }
 });
 
 test('the same seed sails the same way; different seeds, different ways', () => {

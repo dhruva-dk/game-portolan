@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { isArms, laying, LOOT } from '../src/sim/loot.ts';
+import { LOOT } from '../src/sim/loot.ts';
 import { DEFAULT_RULES, ruled } from '../src/sim/rules.ts';
 import { createStorm, STORM, type StormTable } from '../src/sim/storm.ts';
 import type { Depth } from '../src/sim/shoal.ts';
@@ -13,30 +13,15 @@ test('the game’s rules are its tables, and a variant keeps every key in their 
   assert.equal(DEFAULT_RULES.loot, LOOT);
   assert.equal(DEFAULT_RULES.storm, STORM);
   assert.equal(ruled({}).loot, LOOT);
-  const r = ruled({ loot: { gun: 0.8 }, storm: { rise: 1 } });
+  const r = ruled({ loot: { second: 0.8 }, storm: { rise: 1 } });
   assert.deepEqual(Object.keys(r.loot), Object.keys(LOOT));
   assert.deepEqual(Object.keys(r.storm), Object.keys(STORM));
-  assert.equal(r.loot.gun, 0.8);
+  assert.equal(r.loot.second, 0.8);
   assert.equal(r.loot.spots, LOOT.spots);
   assert.throws(
     () => ruled({ loot: { gunz: 1 } as never }),
     /loot has no gunz/
   );
-});
-
-test('richer rules lay more guns, and of rarer tiers', () => {
-  const rich = ruled({ loot: { gun: 0.8, weights: [0, 10, 30, 40, 20] } });
-  const plain = laying(5, deep)
-      .strewn()
-      .pieces.map((l) => l.goods),
-    lavish = laying(5, deep, rich.loot)
-      .strewn()
-      .pieces.map((l) => l.goods);
-  const guns = (g: typeof plain) => g.filter(isArms);
-  assert.ok(guns(lavish).length > 1.5 * guns(plain).length);
-  const rarity = (g: typeof plain) =>
-    guns(g).reduce((a, k) => a + k.rarity, 0) / guns(g).length;
-  assert.ok(rarity(lavish) > rarity(plain) + 1);
 });
 
 test('a quicker storm closes sooner, by the rules the match is dealt', () => {

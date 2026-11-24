@@ -1,9 +1,9 @@
 import { distance, type Vec3 } from '../world/sphere.ts';
-import { inHand, type Order } from './battle.ts';
+import type { Order } from './battle.ts';
 import type { Brain } from './brain.ts';
 import type { Nature } from './persona.ts';
 import { STEP } from './fixed.ts';
-import { aimAndFire, armFor, gunner } from './gunner.ts';
+import { aimAndFire, gunner } from './gunner.ts';
 import type { Helm } from './ship.ts';
 import { choose, momentum, type Option } from './utility.ts';
 import {
@@ -162,17 +162,10 @@ export function think(
     way = navigate(c, mark(c, intent, dt), intent.foe, dt),
     { helm, lost } = steer(c, way, dt);
   if (lost) lose(m);
-  const held = own.crew ? inHand(own.crew) : null,
-    seen = inSight(c) ? c.foe : null;
-  const order: Order = held
-    ? aimAndFire(c, seen, held.kind, holdsFire(c), dt)
-    : { aim: null, fire: false };
+  const seen = inSight(c) ? c.foe : null;
+  const order: Order = aimAndFire(c, seen, own.crew.gun.kind, holdsFire(c), dt);
   const ask = m.think === BOT.every ? purse(c) : NOTHING;
-  const arm =
-    own.crew && ask.take === null && ask.tap === null && !own.crew.hold.using
-      ? armFor(c, seen ? c.foeD : null)
-      : null;
-  return { helm, order, ask: arm === null ? ask : { ...ask, arm }, memory: m };
+  return { helm, order, ask, memory: m };
 }
 
 const intentOf = (m: Memory): Intent => ({

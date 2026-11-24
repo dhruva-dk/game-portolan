@@ -19,8 +19,6 @@ export const MIND = {
   closeFrom: 50,
   closeAt: 35,
   letGo: 90,
-  outrun: [0.75, 0.95] as const,
-  outran: [0.55, 0.75] as const,
   run: 120,
   cover: 180,
   rings: 3,
@@ -97,14 +95,8 @@ export function fightUrge(c: Ctx): number {
   const from = toward(foe.ship.at, own.ship.at),
     off = from ? -dot(foe.ship.heading, from) : 0;
   const past = ramp(d, c.b.mind.letGo - 10, c.b.mind.letGo + 15);
-  const go = !own.armed
-    ? 1 -
-      past *
-        ramp(
-          (off * foe.ship.speed) / own.crew.values.topSpeed,
-          ...(m.mode === 'fight' ? c.b.mind.outrun : c.b.mind.outran)
-        )
-    : restraint > 0
+  const go =
+    restraint > 0
       ? 1 -
         past *
           (m.mode === 'fight' ? ramp(off, 0, 0.35) : ramp(off, -0.45, -0.15))

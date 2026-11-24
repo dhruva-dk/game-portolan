@@ -8,7 +8,6 @@ export type Hands = {
   readonly fire: boolean;
   readonly gust: boolean;
   readonly heal: number | null;
-  readonly arm: number | null;
 };
 
 export const STILL: Hands = {
@@ -18,5 +17,4 @@ export const STILL: Hands = {
   fire: false,
   gust: false,
   heal: null,
-  arm: null,
 };

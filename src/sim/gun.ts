@@ -21,7 +21,6 @@ import { meets, offSight, pointOn, type Sight } from './sight.ts';
 
 export interface Gun {
   kind: GunKind;
-  rarity: number;
   rounds: number;
   cool: number;
   reload: number;
@@ -29,9 +28,8 @@ export interface Gun {
   fired: number;
 }
 
-export const gunOf = (kind: GunKind, rarity: number): Gun => ({
+export const gunOf = (kind: GunKind): Gun => ({
   kind,
-  rarity: Math.max(0, Math.min(GUN.rarities.length - 1, Math.round(rarity))),
   rounds: GUNS[kind].mag,
   cool: 0,
   reload: 0,
@@ -39,12 +37,12 @@ export const gunOf = (kind: GunKind, rarity: number): Gun => ({
   fired: 0,
 });
 
-export const damageOf = (g: Pick<Gun, 'kind' | 'rarity'>) =>
-  GUNS[g.kind].damage * GUN.damageBy[g.rarity];
-export const reloadOf = (g: Pick<Gun, 'kind' | 'rarity'>, by = 1) =>
-  GUNS[g.kind].reload * GUN.reloadBy[g.rarity] * by;
-export const spreadOf = (g: Pick<Gun, 'kind' | 'rarity'>) =>
-  GUNS[g.kind].spread * GUN.spreadBy[g.rarity];
+export const damageOf = (kind: GunKind, factor: number) =>
+  GUNS[kind].damage * factor;
+export const reloadOf = (kind: GunKind, factor: number) =>
+  GUNS[kind].reload * factor;
+export const spreadOf = (kind: GunKind, factor: number) =>
+  GUNS[kind].spread * factor;
 
 export function falloff(kind: GunKind, meters: number): number {
   const g = GUNS[kind];
@@ -122,8 +120,8 @@ const BEYOND = 1000;
 interface Lay {
   seed: number;
   depth: Depth;
-  spread?: number;
-  cone?: number;
+  spread: number;
+  cone: number;
   rises?: readonly Rise[];
 }
 
@@ -134,13 +132,7 @@ export function laid(
   others: readonly Vessel[],
   lay: Lay
 ): Laying {
-  const {
-    seed,
-    depth,
-    spread = spreadOf(gun),
-    cone = GUN.assist[gun.rarity],
-    rises,
-  } = lay;
+  const { seed, depth, spread, cone, rises } = lay;
   const g = GUNS[gun.kind],
     from = muzzle(shooter),
     up = normalize(from);

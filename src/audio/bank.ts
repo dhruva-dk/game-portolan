@@ -5,7 +5,6 @@ import {
   reload,
   report,
   select,
-  swap,
   wind,
   type GunKind,
 } from './sounds/guns.ts';
@@ -80,7 +79,6 @@ const SOUND = {
   ready: { make: ready, takes: 2, level: -12, priority: 6, reach: 0 },
   wind: { make: wind, takes: 2, level: -10, priority: 6, reach: 160 },
   reload: { make: reload, takes: 2, level: -13, priority: 5, reach: 0 },
-  swap: { make: swap, takes: 2, level: -7, priority: 7, reach: 0 },
   select: { make: select, takes: 2, level: -14, priority: 3, reach: 0 },
   whistle: { make: whistle, takes: 3, level: -12, priority: 6, reach: 60 },
   splash: { make: splash, takes: 3, level: -8, priority: 4, reach: 700 },

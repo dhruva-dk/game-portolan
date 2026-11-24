@@ -2,7 +2,6 @@ import {
   PLAYER_SHIP,
   blowOf,
   felt,
-  isGun,
   type Moment,
   type Status,
 } from '../../play/player.ts';
@@ -151,12 +150,7 @@ export function createJuice(body: HTMLElement, parts: Parts) {
       case 'took': {
         if (m.ship !== PLAYER_SHIP) return;
         const slot = parts.slots[m.slot];
-        if (slot)
-          fly(
-            isGun(m.piece) ? `weapon.${m.piece}` : `item.${m.piece}`,
-            m.seen,
-            slot
-          );
+        if (slot) fly(`item.${m.piece}`, m.seen, slot);
         const r = clamp(m.rarity, 0, 4);
         if (PICKUP.flash[r] > 0)
           flash.flash({

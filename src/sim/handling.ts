@@ -159,15 +159,7 @@ export const GUNS: Readonly<Record<GunKind, Bore>> = {
 
 export const FALLOFF = { hold: 0.6, floor: 0.5, edge: 0.6 } as const;
 
-export const EQUIP = 0.22,
-  CARRIED = 2;
-
 export const GUN = {
-  rarities: ['common', 'uncommon', 'rare', 'epic', 'legendary'],
-  damageBy: [1, 1.08, 1.16, 1.24, 1.32],
-  reloadBy: [1, 0.95, 0.9, 0.85, 0.8],
-  spreadBy: [1, 0.867, 0.733, 0.6, 0.467],
-  assist: [0.06, 0.07, 0.08, 0.09, 0.1],
   nearer: 0.5,
   ahead: -1.44,
   up: 2.63,

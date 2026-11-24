@@ -6,7 +6,6 @@ import {
 } from '../../src/sim/engine.ts';
 import { STEP } from '../../src/sim/fixed.ts';
 import { GUNS } from '../../src/sim/handling.ts';
-import { isArms } from '../../src/sim/loot.ts';
 import {
   cross,
   distance,
@@ -127,7 +126,7 @@ export function record(
           heading: v ? compass(v.ship.at, v.ship.heading) : null,
           hull: r1(k.hull),
           shield: r1(k.shield),
-          guns: c.guns.map((g) => g && { kind: g.kind, rarity: g.rarity }),
+          gun: c.gun.kind,
         };
       }),
     });
@@ -150,13 +149,11 @@ export function record(
       for (const s of did.shots) {
         const v = where(s.shooter),
           c = state.crew(s.shooter),
-          g = c.guns[c.hand],
           to = s.target === null ? null : where(s.target);
         emit('shot', {
           ship: s.shooter,
           gun: s.gun,
-          rarity: g?.rarity ?? null,
-          rounds: g?.rounds ?? null,
+          rounds: c.gun.rounds,
           pellets: GUNS[s.gun].pellets,
           target: s.target,
           range: v && to ? r1(distance(v.ship.at, to.ship.at)) : null,
@@ -212,9 +209,7 @@ export function record(
         emit('loot', {
           ship: k.ship,
           piece: k.id,
-          goods: isArms(k.goods)
-            ? { gun: k.goods.kind, rarity: k.goods.rarity }
-            : { store: k.goods.kind, count: k.goods.count },
+          goods: { store: k.goods.kind, count: k.goods.count },
           slot: k.slot,
           lay: r1(now - (born ?? 0)),
           nearest: Number.isFinite(near) ? r1(near) : null,
@@ -383,8 +378,7 @@ export function record(
       const now = t();
       for (const v of state.vessels()) {
         const c = state.crew(v.id),
-          m = debugOf(state).mindOf(v.id),
-          g = c.guns[c.hand];
+          m = debugOf(state).mindOf(v.id);
         ships.write({
           t: now,
           id: v.id,
@@ -394,8 +388,7 @@ export function record(
           turn: r4(v.ship.turn),
           hull: r1(c.health.hull),
           shield: r1(c.health.shield),
-          hand: g ? { gun: g.kind, rarity: g.rarity, rounds: g.rounds } : null,
-          guns: c.guns.map((k) => k && `${k.kind}:${k.rarity}`),
+          gun: { kind: c.gun.kind, rounds: c.gun.rounds },
           hold: c.hold.items.map((k) => k && `${k.kind}x${k.count}`),
           using: c.hold.using,
           share: r4(state.share(v.id)),

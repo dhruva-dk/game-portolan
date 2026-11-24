@@ -128,12 +128,10 @@ const waits = (by: number) =>
   DEFAULT_RULES.storm.phases.map((p) => ({ ...p, wait: p.wait * by }));
 
 const LAID = DEFAULT_RULES.loot;
-const times = (k: number, of: number) => Math.round(k * of * 100) / 100;
-const cache = (pieces: number, more: number, gun = LAID.cache.gun) => ({
+const cache = (pieces: number, more: number) => ({
   ...LAID.cache,
   pieces: Math.round(LAID.cache.pieces * pieces),
   more: Math.round(LAID.cache.pieces * more),
-  gun,
 });
 
 export const TYPES: readonly (MatchType & { readonly dealt: number })[] = [
@@ -143,11 +141,7 @@ export const TYPES: readonly (MatchType & { readonly dealt: number })[] = [
     dealt: 0.15,
     mix: { ...EVEN, hunter: 3, brawler: 3, raider: 2, turtle: 0.5 },
     rules: ruled({
-      loot: {
-        gun: times(LAID.gun, 1.31),
-        weights: [30, 32, 22, 11, 5],
-        cache: cache(1.2, 0, 0.75),
-      },
+      loot: { cache: cache(1.2, 0) },
       storm: { phases: waits(0.8) },
     }),
   },
@@ -159,10 +153,6 @@ export const TYPES: readonly (MatchType & { readonly dealt: number })[] = [
       loot: {
         spots: Math.round(LAID.spots * 1.375),
         second: 0.55,
-        weights: [28, 30, 24, 12, 6],
-        berth: 80,
-        near: 30,
-        far: 60,
         cache: cache(1.4, 0.4),
       },
     }),
@@ -172,7 +162,7 @@ export const TYPES: readonly (MatchType & { readonly dealt: number })[] = [
     dealt: 0.15,
     mix: { ...EVEN, turtle: 3, homesteader: 3, brawler: 0.5 },
     rules: ruled({
-      loot: { gun: times(LAID.gun, 0.81), cache: cache(0.8, 0, 0.25) },
+      loot: { cache: cache(0.8, 0) },
       storm: { phases: waits(1.15) },
     }),
   },

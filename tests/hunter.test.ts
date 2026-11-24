@@ -1,11 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { armed, crewOf, type Shot } from '../src/sim/battle.ts';
+import { crewOf, type Shot } from '../src/sim/battle.ts';
 import { nature } from '../src/sim/persona.ts';
 import { mind, think, type Memory, type Seen } from '../src/sim/bot.ts';
 import { afloat, stepFleet, type Vessel } from '../src/sim/contact.ts';
 import { STEP } from '../src/sim/fixed.ts';
-import { gunOf } from '../src/sim/gun.ts';
 import { heard, type Report } from '../src/sim/hunter.ts';
 import { shipAt, type Helm } from '../src/sim/ship.ts';
 import type { Depth } from '../src/sim/shoal.ts';
@@ -44,10 +43,8 @@ test('the sea keeps each ship’s last shot ringing for a few seconds, then lets
   assert.deepEqual(heard(r, [], 30), []);
 });
 
-function sail(gunned: boolean, gunfire: readonly Report[], seconds: number) {
-  const crew = gunned
-    ? crewOf(0, EVEN_SHIP, gunOf('cannon', 1))
-    : crewOf(0, EVEN_SHIP);
+function sail(gunfire: readonly Report[], seconds: number) {
+  const crew = crewOf(0, EVEN_SHIP);
   let fleet: Vessel[] = [afloat(0, shipAt(c0, frameAt(c0).north))];
   let m: Memory = mind(11, c0);
   const modes: string[] = [];
@@ -57,7 +54,6 @@ function sail(gunned: boolean, gunfire: readonly Report[], seconds: number) {
       crew,
       hull: crew.health.hull,
       shield: crew.health.shield,
-      armed: armed(crew),
     };
     const r = think(aboard(own), [], { depth: DEEP, gunfire }, m, nature(11));
     m = r.memory;
@@ -74,16 +70,14 @@ function sail(gunned: boolean, gunfire: readonly Report[], seconds: number) {
   return { modes, at: fleet[0].ship.at };
 }
 
-test('armed, a bot goes to the guns it hears; unarmed, it lets them be', () => {
+test('a bot goes to the guns it hears; too far off, it lets them be', () => {
   const guns = [{ at: east(320), by: 7, t: 0 }];
-  const hunter = sail(true, guns, 12);
+  const hunter = sail(guns, 12);
   assert.ok(hunter.modes.includes('hunt'), hunter.modes.join(' '));
   assert.ok(
     distance(hunter.at, east(320)) < 320 - 100,
     `${distance(hunter.at, east(320)).toFixed(0)} m off`
   );
-  const bare = sail(false, guns, 12);
-  assert.ok(!bare.modes.includes('hunt'), bare.modes.join(' '));
-  const far = sail(true, [{ at: east(900), by: 7, t: 0 }], 6);
+  const far = sail([{ at: east(900), by: 7, t: 0 }], 6);
   assert.ok(!far.modes.includes('hunt'), far.modes.join(' '));
 });

@@ -11,11 +11,10 @@ import {
   toward,
   type Vec3,
 } from '../world/sphere.ts';
-import { inHand, type Order } from './battle.ts';
+import type { Order } from './battle.ts';
 import { roll, type Ctx } from './captain.ts';
-import { damageOf, falloff, reloadOf, spreadOf } from './gun.ts';
 import type { GunKind } from './kinds.ts';
-import { GUNS, SHIP } from './handling.ts';
+import { GUNS } from './handling.ts';
 import type { ShipState } from './ship.ts';
 import { thrown } from './shot.ts';
 import type { Sight } from './sight.ts';
@@ -53,9 +52,6 @@ export const GUNNERY = {
     harpoon: 0,
     mortar: 0,
   } satisfies Record<GunKind, number>,
-  swap: 1.3,
-  reloading: 0.5,
-  idle: 100,
   weave: [4, 9] as const,
   reach: {
     cannon: 0.95,
@@ -113,44 +109,9 @@ export const sighted = (g: Gunner, clock: number, skill: number) => {
   g.react = clock + reactTime(skill);
 };
 
-function suits(g: { kind: GunKind; rarity: number }, meters: number): number {
-  const b = GUNS[g.kind];
-  if (meters > b.range || meters < b.least) return 0;
-  const cycle = b.mag * (b.interval + b.windup) + reloadOf(g),
-    across = spreadOf(g) * meters;
-  return (
-    ((damageOf(g) * b.pellets * b.mag) / cycle) *
-    falloff(g.kind, meters) *
-    Math.min(1, SHIP.beam / Math.max(1e-9, across))
-  );
-}
-
-export function armFor(x: Ctx, meters: number | null): number | null {
-  const c = x.own.crew,
-    t = x.b.gunnery;
-  if (!c) return null;
-  const d = meters ?? t.idle;
-  const score = (i: number) => {
-    const g = c.guns[i];
-    return g
-      ? suits(g, d) * (g.reload > 0 || g.rounds <= 0 ? t.reloading : 1)
-      : 0;
-  };
-  const mine = c.guns[c.hand];
-  if (mine && mine.windup > 0) return null;
-  let best = c.hand,
-    bs = score(c.hand);
-  c.guns.forEach((g, i) => {
-    if (g && i !== c.hand && score(i) > Math.max(bs * t.swap, mine ? 1e-9 : 0))
-      [best, bs] = [i, score(i)];
-  });
-  if (!mine && best === c.hand) best = c.guns.findIndex((g) => g !== null);
-  return best >= 0 && best !== c.hand ? best : null;
-}
-
 const loaded = (c: Ctx) => {
-  const g = c.own.crew ? inHand(c.own.crew) : null;
-  return !!g && g.reload <= 0 && g.rounds > 0;
+  const g = c.own.crew.gun;
+  return g.reload <= 0 && g.rounds > 0;
 };
 
 export const rushing = (c: Ctx, kind: GunKind) =>

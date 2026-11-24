@@ -1,11 +1,9 @@
 import { smoothstep } from '../world/scalar.ts';
 import { R, distance, dot, type Vec3 } from '../world/sphere.ts';
-import { armed, type Crew } from './battle.ts';
+import type { Crew } from './battle.ts';
 import { ready } from './gust.ts';
-import type { Gun } from './gun.ts';
-import type { GunKind } from './kinds.ts';
 import { roomFor, useful, type Use } from './hold.ts';
-import { isArms, type Loot } from './loot.ts';
+import type { Loot } from './loot.ts';
 import { NOTHING, type Ask } from './stores.ts';
 import { toEdge } from './storm.ts';
 import { ramp, utility } from './utility.ts';
@@ -22,8 +20,6 @@ export const PURSER = {
   far: 120,
   ceded: 0.7,
   patience: 30,
-  bare: 2,
-  other: 0.7,
 } as const;
 
 const WORTH: Record<Use, (c: Crew) => number> = {
@@ -60,49 +56,8 @@ export const healUrge = (c: Ctx) => {
   return healSlot(crew) < 0 ? 0 : utility(mendNeed(c, crew), clear);
 };
 
-function pairWorth(
-  guns: readonly (Pick<Gun, 'kind' | 'rarity'> | null)[],
-  other: number
-): number {
-  const [a, b] = guns
-    .filter((g) => g !== null)
-    .map((g) => ({ kind: g.kind, v: 1 + 0.2 * g.rarity }))
-    .sort((x, y) => y.v - x.v);
-  return !a ? 0 : a.v + (b ? (b.kind === a.kind ? 0.1 : other) * b.v : 0);
-}
-
-export function weaponWorth(
-  guns: readonly (Gun | null)[],
-  kind: GunKind,
-  rarity: number,
-  other: number
-): { worth: number; slot: number } {
-  const now = pairWorth(guns, other);
-  let best = { worth: 0, slot: -1 };
-  guns.forEach((_, i) => {
-    const w =
-      pairWorth(
-        guns.map((g, k) => (k === i ? { kind, rarity } : g)),
-        other
-      ) - now;
-    if (
-      w > best.worth + 1e-9 &&
-      (guns[i] === null || guns.every((g) => g !== null))
-    )
-      best = { worth: w, slot: i };
-  });
-  return best;
-}
-
-function worth(c: Ctx, crew: Crew, l: Loot): number {
-  const g = l.goods;
-  if (isArms(g))
-    return (
-      weaponWorth(crew.guns, g.kind, g.rarity, c.b.purser.other).worth *
-      (armed(crew) ? 1 : c.b.purser.bare)
-    );
-  return roomFor(crew.hold, g.kind) >= 0 ? 0.5 : 0;
-}
+const worth = (crew: Crew, l: Loot) =>
+  roomFor(crew.hold, l.goods.kind) >= 0 ? 0.5 : 0;
 
 function nearerTo(others: Ctx['others'], at: Vec3, cos: number): boolean {
   for (let i = 0; i < others.length; i++)
@@ -129,7 +84,7 @@ export function lootUrge(c: Ctx): number {
     if (dot(p, l.at) < within || l.id === m.shun) continue;
     if (s && toEdge(l.at, s) < c.b.purser.edge) continue;
     if (ch && clearAt(ch, l.at) < c.b.purser.room) continue;
-    const w = worth(c, crew, l);
+    const w = worth(crew, l);
     if (w <= 0) continue;
     const d = distance(p, l.at);
     if (
@@ -191,30 +146,10 @@ export function purse(c: Ctx): Ask {
     crew = c.own.crew;
   if (!crew) return NOTHING;
   let tap: number | null = null,
-    take: number | null = null,
-    arm: number | null = null,
     gust = false;
   if (m.mode === 'heal' && !crew.hold.using) {
     const s = healSlot(crew);
     if (s >= 0) tap = s;
-  }
-  if (
-    m.mode === 'loot' &&
-    m.target >= 0 &&
-    crew.guns.every((g) => g !== null)
-  ) {
-    const l = c.sea.loot?.find((k) => k.id === m.target);
-    const w =
-      l && isArms(l.goods)
-        ? weaponWorth(crew.guns, l.goods.kind, l.goods.rarity, c.b.purser.other)
-        : null;
-    if (
-      l &&
-      w &&
-      w.worth > 0 &&
-      distance(c.own.ship.at, l.at) < c.b.purser.take
-    )
-      [take, arm] = [0, w.slot === crew.hand ? null : w.slot];
   }
   if (ready(crew.gust) && !crew.hold.using) {
     const fleeing = m.mode === 'flee' || m.mode === 'storm';
@@ -226,7 +161,5 @@ export function purse(c: Ctx): Ask {
     )
       gust = true;
   }
-  return tap === null && take === null && !gust
-    ? NOTHING
-    : { tap, arm, take, gust };
+  return tap === null && !gust ? NOTHING : { tap, take: null, gust };
 }

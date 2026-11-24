@@ -1,7 +1,7 @@
 import { shipValues } from '../career/fit.ts';
 import type { Rig } from '../sim/engine.ts';
 import { evenSetup } from '../sim/even.ts';
-import type { Arms } from '../sim/loot.ts';
+import type { GunKind } from '../sim/kinds.ts';
 import type { MatchSetup } from '../sim/setup.ts';
 import { createStorm } from '../sim/storm.ts';
 import type { World } from '../world/environment.ts';
@@ -11,19 +11,22 @@ const LEVEL = 50,
   STAT = 10,
   RATING = 3;
 
-export const RACE_SHIP = shipValues(
-  {
-    sails: LEVEL,
-    rigging: LEVEL,
-    rudder: LEVEL,
-    hull: LEVEL,
-    keel: LEVEL,
-    mounts: LEVEL,
-    gun: LEVEL,
-  },
-  'cannon',
-  { shield: STAT, healSpeed: STAT, healAmount: STAT }
-);
+const raceShip = (gun: GunKind) =>
+  shipValues(
+    {
+      sails: LEVEL,
+      rigging: LEVEL,
+      rudder: LEVEL,
+      hull: LEVEL,
+      keel: LEVEL,
+      mounts: LEVEL,
+      gun: LEVEL,
+    },
+    gun,
+    { shield: STAT, healSpeed: STAT, healAmount: STAT }
+  );
+
+export const RACE_SHIP = raceShip('cannon');
 
 export const RACE_DRIVER = {
   gunnery: STAT,
@@ -37,7 +40,8 @@ export const RACE_DRIVER = {
 export const raceSetup = (
   planet: string,
   match: number,
-  teams?: number
+  teams?: number,
+  gun: GunKind = 'cannon'
 ): MatchSetup =>
   evenSetup({
     planet,
@@ -45,7 +49,7 @@ export const raceSetup = (
     storm: RATING,
     heals: RATING,
     teams,
-    values: RACE_SHIP,
+    values: raceShip(gun),
     stats: RACE_DRIVER,
     player: true,
   });
@@ -62,16 +66,10 @@ export function teamLiveries(setup: MatchSetup, own: Livery): Livery[] {
 }
 
 export function rigOf(
-  { hold, gun }: { hold: number | null; gun: Arms | null },
+  { hold }: { hold: number | null },
   world: World
 ): Rig | null {
-  if (hold === null && gun === null) return null;
-  const closing =
-    hold === null
-      ? null
-      : createStorm(world.seed, (p) => -world.planet.height(p));
-  return {
-    ...(closing && hold !== null && { storm: () => closing(hold) }),
-    gun,
-  };
+  if (hold === null) return null;
+  const closing = createStorm(world.seed, (p) => -world.planet.height(p));
+  return { storm: () => closing(hold) };
 }
