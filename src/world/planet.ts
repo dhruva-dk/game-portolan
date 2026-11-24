@@ -5,7 +5,6 @@
 //
 // Pure arithmetic: no three, so it runs in node for the tests.
 
-import type { Harbour } from './harbour.ts';
 import type { Vec3 } from './sphere.ts';
 
 /** Metres off the coast she lies at the start. */
@@ -61,12 +60,7 @@ export interface Planet {
   cover(p: Vec3): Cover;
   /** Both at once: the height, and what lies there written into `cover`. */
   sample(p: Vec3, cover: Cover): number;
-  /** Her team's headquarters on the shore off her berth, its terrace cut level into the ground (world/harbour-site.ts). */
-  harbour: Harbour;
 }
-
-/** The planet's ground as its terrain grows it, before its harbour is cut into it. */
-export type Ground = Omit<Planet, 'harbour'>;
 
 /**
  * The planet baked onto the six cube faces (sphere.ts faceDir), n × n nodes

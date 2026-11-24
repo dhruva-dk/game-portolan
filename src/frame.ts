@@ -31,7 +31,6 @@ import type { Eye, Snapshot } from './snapshot.ts';
 import { createSky, type Sky } from './sky/sky.ts';
 import { createGround } from './land/ground.ts';
 import { createGroves } from './land/groves.ts';
-import { createHarbour } from './land/harbour.ts';
 import { createLighting } from './sky/light.ts';
 import { createSand } from './land/sand.ts';
 import { createTerrainMesh } from './land/terrain-mesh.ts';
@@ -200,8 +199,7 @@ export function createFrame(
   // the ground, under the sea and over it; and what stands on the land
   const terrain = createTerrainMesh(view, ground, sand, world.land);
   const groves = createGroves(world, view, light);
-  const harbour = createHarbour(world.harbour, light);
-  shadow.cast(...groves.casters, harbour);
+  shadow.cast(...groves.casters);
   const fleet = createFleet(light, world.wind, options.fleet);
   fleet.pin(options.lod);
   fleet.simulate(options.cloth);
@@ -211,7 +209,6 @@ export function createFrame(
   scene.add(
     terrain.mesh,
     ...groves.meshes,
-    harbour.mesh,
     ...fleet.meshes,
     ...arms.meshes,
     water.mesh
