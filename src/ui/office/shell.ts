@@ -186,7 +186,7 @@ export function createShell(
           ),
           stat('', v.championship, el('b', '', 'Standings'), 'standings'),
           stat('', next, el('b', '', v.next.name), 'calendar'),
-          opens(el('div', 'sh-key', cut('office.admiralty')), null),
+          opens(el('div', 'sh-key', cut('office.admiralty')), 'admiralty'),
           opens(
             el('div', 'sh-key', cut('office.bell'), count(v.notices)),
             'mail'

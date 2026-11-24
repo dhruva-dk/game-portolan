@@ -150,7 +150,7 @@ export function proposalPut(
       sender: null,
       kind: 'voteDue',
       slots: { proposal: id, measure: change.measure, closes },
-      links: [],
+      links: [{ to: 'screen', id: 'admiralty' }],
     });
   }
   return schedule(out, closes, { kind: 'vote', tier: e.tier, proposal: id });
@@ -277,14 +277,14 @@ export function counted(
         for: yes,
         against: no,
       },
-      links: [],
+      links: [{ to: 'screen', id: 'admiralty' }],
     });
   }
   return out;
 }
 
 /** Whether the player's team may vote on, or lobby for, a proposal now. */
-function voteCheck(
+export function voteCheck(
   s: CareerState,
   team: number,
   proposal: number,
@@ -302,7 +302,7 @@ function voteCheck(
 }
 
 /** Whether the player's team may lobby a sum for a side. */
-function lobbyCheck(
+export function lobbyCheck(
   s: CareerState,
   team: number,
   proposal: number,

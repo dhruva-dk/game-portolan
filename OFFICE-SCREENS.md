@@ -31,8 +31,8 @@ business logic given a screen, and the old kit deleted. The battle HUD stays as 
 
 | Gap                                                                                                                         | Where                                                                   | Goes to             |
 | --------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- | ------------------- |
-| `Vote`, `Lobby` never sent; proposals, this season's and next season's rules in no view                                     | `office/command.ts:138`, `career/admiralty.ts`, `state.ts:180`          | Admiralty (new)     |
-| The strip's Admiralty chip opens nothing                                                                                    | `ui/office/shell.ts:160`                                                | Shell               |
+| ~~`Vote`, `Lobby` never sent; proposals, this season's and next season's rules in no view~~ (Admiralty, 2026-11-23)         | `office/command.ts:138`, `career/admiralty.ts`, `state.ts:180`          | Admiralty (new)     |
+| ~~The strip's Admiralty chip opens nothing~~ (opens Admiralty, 2026-11-23)                                                  | `ui/office/shell.ts:160`                                                | Shell               |
 | `ChooseSupplier` never sent; supplier cards and window in no view                                                           | `career/suppliers.ts:181,198,282`                                       | Suppliers (new)     |
 | Race plan fixed: drivers as they stand, `parts: []`, sponsor objective 0; `Forfeit` never sent                              | `career/office.ts:433`                                                  | Race day            |
 | Can't design for next season (`forNext` false); next season's parts hidden; no part risk shown                              | `ui/office/yard.ts:655`, `career/papers.ts:339`, `office/papers.ts:114` | Ship                |
@@ -66,7 +66,7 @@ player, not the page's.
 | A planet, a round                         | Calendar at that round (built) | Calendar's rounds, Home's Calendar        | results, the bar's next race                  |
 | A part, a building                        | Ship, HQ at it                 | in the yard; mail's links (to the screen) | ids on Home's work under way; Ship, HQ at one |
 | A sponsor, a supplier                     | Sponsors, Suppliers at it      | none                                      | ids on Finances' ledger lines, mail           |
-| A rule, a proposal                        | Admiralty at it                | none                                      | ids on mail's vote letters, the bar's chip    |
+| A rule, a proposal                        | Admiralty (built)              | the bar's chip, mail's vote letters       | Calendar's vote days                          |
 
 What the career does not keep, that a coherent office needs:
 
@@ -176,8 +176,14 @@ Each line: built on the kit from a fixture → in review → approved and live. 
       secure their post; the chairman: the objective, how the team stands to it); everyone on its books with their
       stars as your scouts know them; its season (place, tally, behind the leader, against your team, its prize,
       where the season's end takes it); against the grid. Every team name in the office opens it
-- [ ] Admiralty (proposals, vote, lobby, the rules now and next) · [ ] Board (chairman, budget, floor, reputation) ·
-      [ ] Season review
+- [ ] **Admiralty** _(in review, 2026-11-23)_, after MM's rule votes: at the left the proposal standing (else the
+      last counted): the rule it changes, from what next season's rules read to what, when its vote closes or how it
+      was counted, each side's sway (its backers' managers' standing and what is lobbied for it); your vote (For,
+      Against, Abstain) and a sum lobbied for or against, shut with why. In the middle each team of your championship:
+      its manager, its side (cast, or how it leans), its sway; a tap opens its page. At the right the rules, each said
+      as it plays out (the champion's prize against the last's, how many teams are inspected), next season's where a
+      vote has changed them, and the season's proposals counted. The bar's chip and the vote letters open it
+- [ ] Board (chairman, budget, floor, reputation) · [ ] Season review
 
 A new screen's view and fixture are built first (`src/career/views-*.ts`, `src/office/`), then the screen.
 

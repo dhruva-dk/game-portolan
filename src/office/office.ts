@@ -5,6 +5,7 @@
 // constants only.
 
 import type { Call, PartType } from '../race.ts';
+import type { AdmiraltyView } from './admiralty.ts';
 import type { Command, Offer } from './command.ts';
 import type { HomeView } from './home.ts';
 import type {
@@ -95,6 +96,7 @@ export interface Views {
   hq: HqPaper;
   ship: ShipPaper;
   rival: RivalView;
+  admiralty: AdmiraltyView;
 }
 export type Viewed = keyof Views;
 

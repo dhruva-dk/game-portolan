@@ -32,6 +32,8 @@ import { standingsView } from '../src/career/office.ts';
 import { traitLine } from '../src/career/views-traits.ts';
 import { TRAITS } from '../src/career/traits.ts';
 import { nameOf } from '../src/career/views.ts';
+import { admiraltyView } from '../src/career/views-admiralty.ts';
+import { rivalSide } from '../src/career/admiralty.ts';
 
 /** Every figure of a view carries what it is set against and what it is made of. */
 function figures(v: unknown, out: Figure[] = []): Figure[] {
@@ -388,6 +390,81 @@ test('calendar: opened at the next round unless one is asked for; each round its
   );
   assert.equal(v.dates.at(-1)?.what, 'Next season’s first race');
   assert.ok(v.dates.some((d) => d.what === 'The season ends'));
+});
+
+test('admiralty: the rules now and next; a proposal’s teams each cast or leaning as they would vote, the sway as counted; your vote and lobbying go through, a sum past the floor refused', () => {
+  const s0 = sailed(toRaceDay(founded())),
+    me = s0.player!.team,
+    tier = s0.teams[me]!.tier,
+    look = { dyes: [['#000000', '#ffffff'] as const], patterns: ['Plain'] };
+  assert.equal(admiraltyView(s0, look).proposal, null);
+  const l = s0.championships[tier]!;
+  const championships = [...s0.championships];
+  championships[tier] = {
+    ...l,
+    proposals: [
+      {
+        id: 0,
+        round: 3,
+        closes: s0.day + 5,
+        change: { measure: 'seaHeldPoint', on: !l.next.seaHeldPoint },
+        votes: {},
+        lobbied: { for: 0, against: 0 },
+        decided: null,
+      },
+    ],
+  };
+  let s: CareerState = { ...s0, championships };
+  let v = admiraltyView(s, look);
+  const p = v.proposal!;
+  assert.equal(p.rule, 'The sea-held point');
+  assert.notEqual(p.from, p.to);
+  assert.equal(p.days, 5);
+  assert.equal(p.teams.length, l.teams.length);
+  for (const t of p.teams) {
+    assert.equal(t.cast, false);
+    if (!t.you && t.manager)
+      assert.equal(
+        t.side,
+        rivalSide(s, t.team.id, s.championships[tier]!.proposals[0]!.change)
+      );
+  }
+  assert.ok(p.vote.ok);
+  assert.equal(p.yours, null);
+  assert.equal(v.rules.length, 7);
+  assert.ok(v.rules.every((r) => r.now === r.next));
+  // a vote and a sum lobbied
+  s = must(s, { kind: 'Vote', proposal: 0, side: 'for' });
+  s = must(s, { kind: 'Lobby', proposal: 0, side: 'for', balance: 100 });
+  v = admiraltyView(s, look);
+  assert.equal(v.proposal!.yours, 'for');
+  assert.equal(v.proposal!.lobbied.for, 100);
+  assert.ok(v.proposal!.teams.find((t) => t.you)!.cast);
+  assert.ok(v.proposal!.sway.for >= 10);
+  // past the floor: refused, said
+  const poor = must(s, { kind: 'DebugBalance', balance: -900000 });
+  const shut = admiraltyView(poor, look).proposal!.sums.at(-1)!;
+  assert.equal(shut.act.ok, false);
+  assert.match(shut.act.why, /balance/);
+  // carried: next season reads the change, the proposal is counted
+  const carried: CareerState = {
+    ...s,
+    championships: s.championships.map((c, i) =>
+      i === tier
+        ? {
+            ...c,
+            next: { ...c.next, seaHeldPoint: !c.next.seaHeldPoint },
+            proposals: c.proposals.map((x) => ({ ...x, decided: true })),
+          }
+        : c
+    ),
+  };
+  v = admiraltyView(carried, look);
+  assert.equal(v.counted.length, 1);
+  assert.equal(v.proposal!.carried, true);
+  assert.equal(v.proposal!.vote.ok, false);
+  const held = v.rules.find((r) => r.name === 'The sea-held point')!;
+  assert.notEqual(held.now, held.next);
 });
 
 test('mail: each letter its kind and sender; the open one its sender’s face and what it links to, each named with the way to its page', () => {

@@ -30,6 +30,7 @@ import {
 } from './career/papers.ts';
 import type { CareerState } from './career/state.ts';
 import { rivalView } from './career/views-rival.ts';
+import { admiraltyView } from './career/views-admiralty.ts';
 import { createSession, type Shelf } from './desk.ts';
 import type { Command, Offer } from './office/command.ts';
 import type { Ask, Desk, Tab, Viewed, Views } from './office/office.ts';
@@ -277,6 +278,7 @@ export async function createManager(shelf: Shelf, look: Look, page: Page) {
     hq: () => hqPaper(career()),
     ship: () => shipPaper(career(), drafting, picked),
     rival: () => rivalView(career(), look, team),
+    admiralty: () => admiraltyView(career(), look),
     result() {
       if (!last) throw new Error('no race has been sailed');
       return resultView(career(), look, last);

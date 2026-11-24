@@ -105,6 +105,10 @@ const SCREENS: Readonly<Record<string, Named>> = {
   calendar: { name: 'Calendar', ask: { kind: 'open', screen: 'calendar' } },
   suppliers: { name: 'Suppliers', ask: { kind: 'open', screen: 'ship' } },
   design: { name: 'The drawing board', ask: { kind: 'open', screen: 'ship' } },
+  admiralty: {
+    name: 'The Admiralty',
+    ask: { kind: 'open', screen: 'admiralty' },
+  },
 };
 
 /** A thing a letter links to, named, with the way to its page (none, if it is gone). */

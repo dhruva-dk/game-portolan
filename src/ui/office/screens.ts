@@ -29,6 +29,7 @@ import { createPlan } from './raceday.ts';
 import { createResult } from './result.ts';
 import { createRival } from './rival.ts';
 import { createCalendar } from './calendar.ts';
+import { createAdmiralty } from './admiralty.ts';
 import { createSponsors } from './sponsors.ts';
 import { createStandings } from './standings.ts';
 import { createHq, createShip } from './yard.ts';
@@ -46,6 +47,7 @@ export const NAMES: readonly Name[] = [
   'offer',
   'jobs',
   'rival',
+  'admiralty',
   'kit',
   'chartroom',
 ];
@@ -143,6 +145,10 @@ export const SCREENS: Readonly<Partial<Record<Name, Entry>>> = {
   }),
   jobs: viewed('jobs', createJobs, { title: 'Job Offers', tab: 'player' }),
   rival: viewed('rival', createRival, { title: 'Team Page', tab: null }),
+  admiralty: viewed('admiralty', createAdmiralty, {
+    title: 'Admiralty',
+    tab: null,
+  }),
   menu: viewed('menu', createMenu, {
     title: 'Main Menu',
     tab: null,
