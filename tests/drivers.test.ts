@@ -61,7 +61,7 @@ test("ten in every stat is today's bot of that seed and persona, to the bit; its
     const n = natureOf({ seed: 7, persona, stats: TENS }, LENGTH);
     assert.equal(n.persona, persona);
   }
-  for (const stat of ['consistency', 'feedback'] as const)
+  for (const stat of ['consistency', 'feedback', 'seamanship'] as const)
     assert.deepEqual(with1(3, stat, 16), with1(3, stat, 4));
 });
 
