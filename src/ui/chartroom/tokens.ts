@@ -1,7 +1,7 @@
 // The chartroom's tokens: the one table every piece of the kit
 // is styled by, every value ink.ts's or the drawn unit's. They are set as CSS
 // custom properties on the kit's root (`.cr`); a piece names `var(--token)` and
-// never a colour or a length of its own (tests/architecture-chartroom.test.ts).
+// never a colour or a length of its own.
 // Marks drawn as SVG, where a custom property does not reach (a border image's
 // data URI), take their colours from TONE, which is the same table's.
 

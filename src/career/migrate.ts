@@ -21,6 +21,7 @@ export function migrated(
   const m = stepped(parsed);
   if (!m.ok) return m;
   const plain: unknown = m.state;
+  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- a save checked (journal.ts) and migrated to this schema
   return { ok: true, state: plain as CareerState, from: m.from };
 }
 

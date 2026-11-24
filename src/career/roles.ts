@@ -159,6 +159,7 @@ export function personOf(
   ceiling: Readonly<Record<string, number>>
 ): Person {
   const made: unknown = { ...core, role, stats, ceiling };
+  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- a discriminated union built from data: the role and its ROLE_STATS names
   return made as Person;
 }
 
@@ -175,6 +176,7 @@ export function mapped<S extends Readonly<Record<string, number>>>(
 ): S {
   const out: Record<string, number> = {};
   for (const [k, v] of Object.entries(stats)) out[k] = f(v, k);
+  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- the same stats, mapped name for name
   return out as S;
 }
 

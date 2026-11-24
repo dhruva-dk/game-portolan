@@ -64,7 +64,7 @@ const LOOSEN = 1.5,
 /**
  * What the shafts need of the eye: where it stands (world), camera to world,
  * its projection, and world to clip. Said here, as post/ knows nothing of the
- * view (tests/architecture.test.ts LAYERS); view/view.ts's Eye gives them.
+ * view; view/view.ts's Eye gives them.
  */
 interface Seen {
   readonly position: readonly number[];

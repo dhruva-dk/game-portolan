@@ -51,6 +51,7 @@ const TONES: Record<keyof typeof KIND, Tones | null> = {
   gilt: GILDING,
   iron: TAR,
 };
+// eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- Object.keys is string[]; KIND is a closed literal
 const ORDER = (Object.keys(KIND) as (keyof typeof KIND)[]).sort(
   (a, b) => KIND[a] - KIND[b]
 );

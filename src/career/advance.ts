@@ -90,11 +90,13 @@ function advance(s: CareerState, roll: Dice, events: EventHandlers): Applied {
   let state = s;
   while (state.queue.length > 0) {
     const [event, ...rest] = state.queue;
+    // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- correlated union: TypeScript can't tie a kind to its handler
     const handler = events[event.kind] as EventHandler<EventKind> | undefined;
     if (!handler)
       throw new Error(`Advance: no handler for a '${event.kind}' event`);
     state = handler(
       { ...state, queue: rest, day: Math.max(state.day, event.day) },
+      // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- correlated union: the event its handler takes
       event as Extract<Event, { kind: EventKind }>,
       roll
     );

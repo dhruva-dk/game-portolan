@@ -1,7 +1,7 @@
 // A bot's brain: what each part of her is tuned by, gathered. The brain adds
 // nothing of its own: each slice is a part's own table, kept and documented
 // where that part reads it (BOTS.md 1.3), and a part reads only its own
-// slices, from the brain it is given (tests/architecture-bots.test.ts). The
+// slices, from the brain it is given. The
 // game's is DEFAULT_BRAIN, which each persona's crew changes (persona.ts); the
 // harness (tools/) gives others.
 //

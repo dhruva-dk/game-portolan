@@ -123,7 +123,7 @@ interface Chance {
 
 /**
  * What a bot carries from one step to the next: each part's own, declared and
- * written by that part alone (tests/architecture-bots.test.ts): her mind's
+ * written by that part alone: her mind's
  * (bot.ts), her mood (fighting.ts), her lookout's, her tactician's, pilot's and helm's, her
  * purser's, claimer's and hunter's, her place's, her log's, her gunner's; and her chance. This is the
  * crew's roster: a new part's memory is added here.

@@ -114,6 +114,7 @@ export function grown<G extends Person>(
       );
     }
   });
+  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- the same role and stat names, for the caller's narrowed type
   return withStats(g, out) as G;
 }
 

@@ -1,5 +1,5 @@
 // The management game: pure, headless, deterministic (no DOM, no three, no Date, no Math.random). It imports only
-// itself, world/random.ts, race.ts, office.ts and kinds.ts (tests/architecture.test.ts LAYERS). It never runs a race:
+// itself, world/random.ts, race.ts, office.ts and kinds.ts. It never runs a race:
 // it says which are due (race.ts RaceCard) and takes their results (RaceResult); the screens read it through office.ts.
 //
 // `apply(state, command)` is the reducer: the new state, or a typed refusal with a sentence for the player. It never
@@ -118,6 +118,7 @@ export function apply(
     return refuse('debug', 'Playtest orders are off.');
   if (s.player === null && command.kind !== 'Found')
     return refuse('unfounded', 'Found a team first.');
+  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- correlated union: TypeScript can't tie a kind to its handler
   const handler = COMMANDS[command.kind] as Handler<CommandKind> | undefined;
   if (!handler)
     return refuse('unavailable', 'The career does not take that order.');

@@ -28,12 +28,14 @@ function ran(
   let state = s;
   while (state.queue.length > 0) {
     const [event, ...rest] = state.queue;
+    // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- correlated union: a kind's handler, as advance.ts
     const handler = ctx.events[event.kind] as
       | EventHandler<EventKind>
       | undefined;
     if (!handler) throw new Error(`no handler for a '${event.kind}' event`);
     state = handler(
       { ...state, queue: rest, day: Math.max(state.day, event.day) },
+      // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- correlated union: the event its handler takes
       event as Extract<typeof event, { kind: EventKind }>,
       roll
     );
