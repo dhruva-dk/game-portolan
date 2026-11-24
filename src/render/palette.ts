@@ -1,4 +1,5 @@
-import { hexToLinear as ink, type Rgb } from '../world/color.ts';
+import { hexToLinear as ink, luma, type Rgb } from '../world/color.ts';
+import { MARKS } from '../world/livery.ts';
 
 export type { Rgb };
 export interface Tones {
@@ -10,7 +11,6 @@ const tones = (lit: string, shadow: string): Tones => ({
   lit: ink(lit),
   shadow: ink(shadow),
 });
-const luma = (c: Rgb) => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
 export const tint = (c: Rgb, y: number): Rgb => {
   const k = y / luma(c);
   return [c[0] * k, c[1] * k, c[2] * k];
@@ -34,9 +34,9 @@ export const SEABED_WEED = tones('#4F9A6E', '#2E6A62');
 
 export const TIMBER = tones('#9A5A2C', '#5A2F2E');
 export const DECK = tones('#D9A86A', '#9A6548');
-export const TAR = tones('#3A2A2E', '#221827');
+export const TAR: Tones = { lit: MARKS.dark, shadow: ink('#221827') };
 export const GILDING = tones('#F5C542', '#B8792A');
-export const CREAM = ink('#F3E6C8');
+export const CREAM = MARKS.light;
 export const IRON = tones('#4A4450', '#2A2233');
 
 export const SEA_SHALLOW = ink('#22B4B6');
@@ -77,26 +77,3 @@ export const STORM_SLATE: Rgb = [0.13, 0.1, 0.19];
 
 export const DYE_SHADE: Rgb = [0.56, 0.4, 0.42];
 export const DYE_GLOW = { deepen: 0.35, gain: 1.25 } as const;
-export const VERMILION = ink('#D2332A');
-export const OCHRE = ink('#E8A21C');
-export const MOSS = ink('#7F9A2A');
-export const ROSE = ink('#F2A0B4');
-export const LEMON = ink('#F4E06A');
-export const MURREY = ink('#8A2A6A');
-export const CHARCOAL = ink('#2E2A33');
-export const CORAL = ink('#EE6E5C');
-export const TANGERINE = ink('#F2801E');
-export const CHARTREUSE = ink('#BCC82C');
-export const OLIVE = ink('#5C5A1E');
-export const OXBLOOD = ink('#741A22');
-export const UMBER = ink('#6E4222');
-export const CERISE = ink('#D63C88');
-export const PEACH = ink('#F6BC8C');
-export const PEWTER = ink('#8E8882');
-export const MARKS = {
-  light: CREAM,
-  dark: TAR.lit,
-  turn: Math.sqrt((luma(CREAM) + 0.05) * (luma(TAR.lit) + 0.05)) - 0.05,
-} as const;
-export const markOn = (c: Rgb): Rgb =>
-  luma(c) > MARKS.turn ? MARKS.dark : MARKS.light;

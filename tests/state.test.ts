@@ -1,8 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createState, debugOf, type Match } from '../src/play/state.ts';
-import { COLORS, dealt, lookOf } from '../src/play/colors.ts';
-import { LIVERY } from '../src/play/player.ts';
+import { dealt, lookOf } from '../src/play/colors.ts';
+import { COLORS, LIVERY } from '../src/world/livery.ts';
 import { PLAYER, SHIPS } from '../src/sim/match.ts';
 import { chart } from '../src/sim/route.ts';
 import { MIXED } from '../src/sim/persona.ts';

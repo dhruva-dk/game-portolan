@@ -1,3 +1,4 @@
+import { EMBLEMS } from '../../world/livery.ts';
 import { INK, svgNode } from './ink.ts';
 import type { Jacket } from './gull.ts';
 
@@ -15,8 +16,6 @@ const DEVICES = [
   '<path d="M11 4h2v2.5h2.5v2H13v6.8c1.8-.3 3-1.4 3.5-3h-1.5l2.5-2.5 2.5 2.5h-1.4c-.7 3-3.3 5.2-6.6 5.2s-5.9-2.2-6.6-5.2H4l2.5-2.5L9 12.3H7.5c.5 1.6 1.7 2.7 3.5 3V8.5H8.5v-2H11z"/>',
   '<path d="M5.5 5h13v2.5l-3.5 4 3.5 4V18h-13v-2.5l3.5-4-3.5-4z"/>',
 ] as const;
-
-const EMBLEMS = DEVICES.length;
 
 const SHIELD = 'M3.5 2.5h17v9.5c0 5-3.5 8.3-8.5 10-5-1.7-8.5-5-8.5-10z';
 
