@@ -40,6 +40,7 @@ export interface MatchScenario {
   seconds?: number;
   sea?: 'flat' | 'swell';
   career?: boolean;
+  seed?: string;
 }
 
 export type State = MatchView;
@@ -80,7 +81,7 @@ export type Summary = ReturnType<typeof summaryOf>;
 
 export function runMatch(sc: MatchScenario, dir?: string): Summary {
   if (sc.career) {
-    const race = firstRace(String(sc.match ?? 1));
+    const race = firstRace(sc.seed ?? String(sc.match ?? 1));
     return sail(race.setup, race.waters, sc, dir);
   }
   const w = worldOf(sc.planet),
