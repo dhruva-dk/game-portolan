@@ -1,7 +1,6 @@
 import { KINDS, perKind, type GunKind } from '../sim/kinds.ts';
 import { DYES, EMBLEMS, PATTERNS, type Livery } from '../world/livery.ts';
 import {
-  draw,
   knowledgeYear,
   ordered,
   pick,
@@ -9,6 +8,7 @@ import {
   whole,
   type Key,
 } from './draw.ts';
+import { leagueLines } from './knowledge/ships.ts';
 import { TEAM_NAMES } from './names.ts';
 import { ask } from './rules/ask.ts';
 import { standardClause } from './rules/clause.ts';
@@ -23,7 +23,6 @@ import {
 import { lineLeader } from './rules/line-leader.ts';
 import { generateOwner } from './rules/owner.ts';
 import { generatePerson, type Origin } from './rules/person.ts';
-import { shipRange } from './rules/ship-range.ts';
 import { drawOffers } from './sponsors/offers.ts';
 import { slotsOf } from './sponsors/slots.ts';
 import {
@@ -35,9 +34,7 @@ import {
   perRole,
   type CareerState,
   type Levels,
-  type Line,
   type Person,
-  type Range,
   type Role,
   type Ship,
   type Team,
@@ -46,7 +43,6 @@ import {
   HEADCOUNT,
   LEAGUE,
   LEAGUE_START,
-  RIVAL_SHIPS,
   STANDING,
   START,
   YOUR_START,
@@ -210,23 +206,6 @@ function staffMember(
   };
 }
 
-function shipRanges(
-  seed: string,
-  team: Team,
-  index: number
-): Record<Line, Range>[] {
-  const year = knowledgeYear({ season: FIRST_SEASON, phase: 'lobby' });
-  return team.ships.map((ship, slot) =>
-    perLine((line) =>
-      shipRange(
-        ship.fitted[line],
-        RIVAL_SHIPS.width,
-        draw(seed, 'line', year, index, slot, line)
-      )
-    )
-  );
-}
-
 export function newCareer(options: CareerOptions): CareerState {
   const { seed } = options;
   let nextPersonId = 0;
@@ -283,8 +262,10 @@ export function newCareer(options: CareerOptions): CareerState {
     lineLeaders: perLine((line) => lineLeader(teams, line)),
     knowledge: {
       reports: [],
-      lines: teams.map((team, index) =>
-        index === 0 ? [] : shipRanges(seed, team, index)
+      lines: leagueLines(
+        seed,
+        teams,
+        knowledgeYear({ season: FIRST_SEASON, phase: 'lobby' })
       ),
     },
     lastRace: null,

@@ -20,6 +20,9 @@ import { dealAfterRace, dealOffseason } from './hiring/deal.ts';
 import { offer, offerRefusal } from './hiring/offer.ts';
 import { release, releaseRefusal } from './hiring/release.ts';
 import { scoutRefusal, setScoutSeat } from './hiring/scout.ts';
+import { buyReport, reportRefusal } from './knowledge/report.ts';
+import { narrowShipLines, redrawBuilt } from './knowledge/ships.ts';
+import { redrawKnowledge } from './knowledge/year.ts';
 import { known } from './lookup.ts';
 import { releaseExpired, turnSeason } from './offseason/finish.ts';
 import { ageLeague } from './offseason/people.ts';
@@ -68,10 +71,8 @@ type Repossession = { state: CareerState; teams: readonly number[] };
 
 const runPolicies = seam;
 const repossess = (state: CareerState): Repossession => ({ state, teams: [] });
-const narrowRanges = seam;
 const raceEvents = seam;
 const seasonEvents = seam;
-const redrawKnowledge = seam;
 
 const accepted = (state: CareerState): Applied => ({ ok: true, state });
 
@@ -88,7 +89,7 @@ function recordRace(state: CareerState, result: MatchResult): Applied {
   const repossession = repossess(paid);
   const developed = develop(repossession.state);
   const counted = countDownSponsors(countDownContracts(developed));
-  const narrowed = narrowRanges(counted);
+  const narrowed = narrowShipLines(counted);
   const told = raceEvents(narrowed);
   const filed = fileReport(
     told,
@@ -143,12 +144,24 @@ function effect(state: CareerState, command: Command): Applied {
     case 'Build':
       return unless(
         buildRefusal(state, command.team, command.slot, command.line),
-        () => build(state, command.team, command.slot, command.line)
+        () =>
+          redrawBuilt(
+            build(state, command.team, command.slot, command.line),
+            command.team,
+            command.slot,
+            command.line
+          )
       );
     case 'FitGun':
       return unless(
         fitRefusal(state, command.team, command.slot, command.kind),
-        () => fitGun(state, command.team, command.slot, command.kind)
+        () =>
+          redrawBuilt(
+            fitGun(state, command.team, command.slot, command.kind),
+            command.team,
+            command.slot,
+            'gun'
+          )
       );
     case 'Repaint':
       return notYet(state);
@@ -157,7 +170,9 @@ function effect(state: CareerState, command: Command): Applied {
         setScoutSeat(state, command.team, command.role)
       );
     case 'BuyReport':
-      return notYet(state);
+      return unless(reportRefusal(state, command.team, command.person), () =>
+        buyReport(state, command.team, command.person)
+      );
     case 'Approach':
       return unless(approachRefusal(state, command.team, command.person), () =>
         approach(state, command.team, command.person)

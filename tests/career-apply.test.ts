@@ -231,6 +231,7 @@ test('every command in every phase is accepted or refused for phase as the table
 });
 
 const FROM_A_RIVAL: Partial<Record<CommandType, Reason>> = {
+  BuyReport: 'same',
   Approach: 'fixed',
   Offer: 'seat',
   AcceptCounter: 'seat',
