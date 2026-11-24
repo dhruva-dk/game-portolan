@@ -3,8 +3,7 @@
 // seeded random, the RBJ cookbook's filters (fixed, or swept along the sound),
 // damped modes (wood, iron, a ward's ring), stick-slip trains (a creak),
 // bubbles, and the envelopes and shaping that join them. Pure: no Web Audio
-// here, so every sound can be made and measured headless (tools/audio.ts) and
-// in node (tests).
+// here, so every sound can be made and measured headless, in node (tests).
 
 import { random } from '../world/random.ts';
 

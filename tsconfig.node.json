@@ -3,6 +3,5 @@
   "compilerOptions": {
     "types": ["node", "@webgpu/types", "vite/client"]
   },
-  "include": ["tests", "tools"],
-  "exclude": ["tools/_fly.ts"]
+  "include": ["tests", "tools"]
 }

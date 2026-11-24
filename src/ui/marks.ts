@@ -68,7 +68,7 @@ export const ROSE: RoseInks = {
  * The 32-point rose, radius R: iron principal points, green half winds, rubric
  * quarter winds, a gilt fleur-de-lis at north and a blue needle turned `needle`
  * degrees (in a group with id "needle" so it can be swung); `inks` recolours it
- * (the app's icon, tools/appicon.ts).
+ * (the app's icon).
  */
 export function rose(
   cx: number,

@@ -1,4 +1,4 @@
-// The headquarters and the ship as a founded career has them (written by tools/fixture-yard.ts).
+// The headquarters and the ship as a founded career has them (generated once from a founded career).
 
 import type { HqPaper, ShipPaper } from '../papers.ts';
 

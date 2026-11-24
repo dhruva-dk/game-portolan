@@ -1,6 +1,5 @@
-// A PNG of 8-bit RGB pixels, no alpha channel: the spectrograms
-// (tools/audio.ts) and the app's icon (tools/appicon.ts), which iOS refuses if
-// it carries one.
+// A PNG of 8-bit RGB pixels, no alpha channel: the terrain maps
+// (tools/terrain-map.ts).
 import { deflateSync } from 'node:zlib';
 
 /** CRC-32, for the PNG's chunks. */

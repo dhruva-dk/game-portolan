@@ -1,11 +1,11 @@
-// The career harness's scripted managers (tools/career/managers.ts): idle sends nothing; sensible and shrewd send
+// The career harness's scripted managers (tests/managers.ts): idle sends nothing; sensible and shrewd send
 // the player's own commands, the same for the same state, which the career takes. Over a season of stand-in results
 // (the career's tests' kit) each spends as a manager does and keeps its team staffed.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { apply } from '../src/career/career.ts';
 import type { CareerState } from '../src/career/state.ts';
-import { commandsOf, type Manager } from '../tools/career/managers.ts';
+import { commandsOf, type Manager } from './managers.ts';
 import { founded, must, sailed, toRaceDay } from './career-kit.ts';
 
 /** Every command a manager sends at a stop, applied: how many were taken and refused. */

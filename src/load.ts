@@ -1,7 +1,7 @@
 // The load's stages, each said once as it is reached: when (ms since the page
 // began, performance.now) and how long since the last. One console line each,
 // `load <stage> <at> ms (+<since>)`, read by tools and, on the iPad, through
-// the native console (tools/ipad.sh --console); all of them kept as `loads` for
+// the native console; all of them kept as `loads` for
 // the page's tools.
 
 /**

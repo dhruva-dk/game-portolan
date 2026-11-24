@@ -12,7 +12,7 @@ import { STEP } from '../src/sim/fixed.ts';
 import type { Sea } from '../src/snapshot.ts';
 import { createClaimed } from '../src/water/claimed.ts';
 import { random } from '../src/world/random.ts';
-import { halfLoop, match } from './seas.ts';
+import { halfLoop, match } from '../tests/seas.ts';
 import { RIDE } from '../src/sim/ride.ts';
 import { chart } from '../src/sim/route.ts';
 import { berthing } from '../src/sim/spawn.ts';
@@ -121,7 +121,7 @@ export function steps(w: ReturnType<typeof world>, seconds = 60): Steps {
 
 /**
  * What the water's copy of the cells (water/claimed.ts) costs a frame, ms, on
- * the seas of tools/seas.ts: the mean frame of two matches followed (frames now
+ * the seas of tests/seas.ts: the mean frame of two matches followed (frames now
  * and then missed), the middle one of the frames that took a sea whole, and the
  * worst frame of a loop round half the planet drawn (the best of five runs).
  */

@@ -24,7 +24,7 @@ import {
   scale,
   type Vec3,
 } from '../src/world/sphere.ts';
-import { WHOLE, halfLoop, match, seaOf } from '../tools/seas.ts';
+import { WHOLE, halfLoop, match, seaOf } from './seas.ts';
 
 /**
  * Points along the great circle from a to b, about 0.4 m apart (a step at her

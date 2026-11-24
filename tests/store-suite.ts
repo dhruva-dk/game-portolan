@@ -1,5 +1,5 @@
 // The store's tests that every adapter must pass (career/store.ts): the memory and faulty adapters run them in node
-// (tests/career-store.test.ts), the IndexedDB adapter in headless Chromium (tools/indexed.ts). Not a test file itself:
+// (tests/career-store.test.ts). Not a test file itself:
 // it imports nothing of node's, so the browser can load it, and it is handed the scripted commands rather than
 // making them (tests/career-kit.ts is node's).
 

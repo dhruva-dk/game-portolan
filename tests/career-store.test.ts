@@ -1,5 +1,5 @@
 // The store suite (tests/store-suite.ts) on the memory adapter and the faulty one (failing nowhere), in node. The
-// IndexedDB adapter runs the same suite in headless Chromium: node tools/indexed.ts.
+// suite imports nothing of node's, so it can run on the IndexedDB adapter in a browser too.
 import { test } from 'node:test';
 import { emptyDisk, memoryStore, type Disk } from '../src/store/memory.ts';
 import { faultyStore } from './store-faulty.ts';

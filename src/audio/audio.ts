@@ -2,8 +2,8 @@
 // (listen.ts Hearing), and nothing else. Every sound is made in code
 // (sounds/*.ts: neither ambientCG nor Poly Haven offers recordings); no music.
 //
-// The engine (createEngine) runs on any context, the page's or an offline one
-// (tools/audio.ts renders through it): each frame the deeds on the sea (the
+// The engine (createEngine) runs on any context, the page's or an offline one:
+// each frame the deeds on the sea (the
 // match's own: status.moments) and the rest of what is heard (listen.ts) become
 // cues (cues.ts CUES, the one table), each played as heard from the eye
 // (space.ts) in a voice (mixer.ts), and the bed follows her (bed.ts). The

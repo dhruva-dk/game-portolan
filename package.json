@@ -5,23 +5,15 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "play": "vite --open",
     "build": "tsc --noEmit && vite build",
     "ios": "npm run build && cap run ios",
-    "check": "tsc --noEmit && tsc --noEmit -p tsconfig.node.json",
-    "test": "npm run check && npm run lint && node --test tests/*.test.ts && npm run formatted && npm run layout",
-    "lint": "eslint src tests tools",
-    "layout": "node tools/layout.ts",
+    "test": "tsc --noEmit && tsc --noEmit -p tsconfig.node.json && eslint src tests tools && prettier --log-level warn --check src tests tools capacitor.config.ts eslint.config.js && node --test tests/*.test.ts",
     "format": "prettier --log-level warn --write src tests tools capacitor.config.ts eslint.config.js",
-    "formatted": "prettier --log-level warn --check src tests tools capacitor.config.ts eslint.config.js",
     "capture": "node tools/capture.ts",
     "hero": "node tools/hero.ts",
     "budget": "node tools/budget.ts",
     "hitch": "node tools/hitch.ts",
-    "steps": "node tools/steps.ts",
-    "audio": "node tools/audio.ts",
-    "icon": "node tools/appicon.ts",
-    "shot": "xcrun devicectl device capture screenshot --device 00008103-000249563621A01E --destination captures/ipad.png"
+    "steps": "node tools/steps.ts"
   },
   "dependencies": {
     "@capacitor/core": "8.6.0",

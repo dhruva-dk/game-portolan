@@ -71,7 +71,7 @@ const GUNNER = {
    * fair one's (0.6) 2, a sharp one's (0.85) 1.1, the best's the gun's own as
    * a player's is. (It was 1 + 4.5 (1 − skill), and left the best bots short
    * of a player at mid range by up to 13 points, the same ships set beside
-   * each other: PLAN A3, tools/harness/aim.ts --against.)
+   * each other.)
    */
   unsteady: 6,
   /**
