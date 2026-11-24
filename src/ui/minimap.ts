@@ -223,7 +223,7 @@ export function createMinimap(
     stats.draws++;
     stats.ms += performance.now() - now;
     if (now - stats.since > 2000) {
-      // the disc's cost, for tools/capture.ts and the meter's readers: ms a redraw and redraws a second; the held
+      // the disc's cost, for tools/browser.ts and the meter's readers: ms a redraw and redraws a second; the held
       // water's ms a sampling and samplings a second
       const s = (now - stats.since) / 1000;
       host.dataset.cost =

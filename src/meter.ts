@@ -33,7 +33,7 @@ import {
  * the meshes shown, in the camera's view if culled by it, with instances to
  * draw, counted as three draws them; what a pass draws besides (its backdrop)
  * is the gap between the two. The means per frame over the last second are in
- * the meter's data-passes and data-objects (tools/capture.ts prints them).
+ * the meter's data-passes and data-objects (tools/browser.ts logs them).
  *
  * Shown, it is a panel in the screen's bottom-left corner (index.html #meter),
  * as the settings' stats switch or the debug page has it.

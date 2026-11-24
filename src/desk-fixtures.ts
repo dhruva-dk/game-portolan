@@ -1,6 +1,6 @@
 // The office's fixtures: careers on a memory store, made by the commands a
 // player would send (Found, Advance, StartScout, OfferContract), for ?screen=
-// (debug.ts) and tools/capture.ts. Nothing here touches the device's own
+// (debug.ts) and tools/browser.ts. Nothing here touches the device's own
 // career, and no race is sailed here: every fixture stands before the season's
 // first race, or on its day. `people` has one rival driver scouted, another
 // being scouted, and a free agent's talks under way (a lowball, its answer

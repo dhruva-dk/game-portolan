@@ -587,7 +587,7 @@ function stock(game: Game) {
   if (params.has('arm')) {
     // every other ship a legendary gun under her, the kinds in turn, swept up
     // at her next step: once they fight (?ahead), every kind of shot is in the
-    // air (tools/budget.ts worst)
+    // air (tools/browser.ts --budget, worst)
     for (const s of game.ships())
       if (s.id !== PLAYER && s.afloat)
         game.debug.strew(s.at, [
