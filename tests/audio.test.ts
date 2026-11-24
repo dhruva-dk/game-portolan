@@ -299,7 +299,7 @@ function scene(
   balls: Snapshot['balls'] = [],
   sea?: Snapshot['sea']
 ): Snapshot {
-  const her: ShipDraw = {
+  const playerShip: ShipDraw = {
     id: 0,
     pose: { position: scale(at, R), forward: [1, 0, 0], up: at },
     look: { paint: [1, 0, 0], sail: [1, 1, 1], pattern: 'plain' },
@@ -317,7 +317,7 @@ function scene(
     },
     clock: t,
     storm: { center: at, radius: 1, closing: false },
-    ships: [her, ...ships],
+    ships: [playerShip, ...ships],
     own: 0,
     balls,
     loot: [],

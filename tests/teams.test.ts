@@ -450,10 +450,10 @@ test("a race's flow: afloat as it ends it has its place there; sunk, it watches 
   );
   assert.deepEqual([m.phase, m.place, m.over], ['won', 2, true]);
   let s = stepMatch(startMatch(), on, STEP);
-  const hers = { id: 0, by: 4, cause: 'shot' as const, gun: KINDS[0] };
+  const playerSinking = { id: 0, by: 4, cause: 'shot' as const, gun: KINDS[0] };
   s = stepMatch(
     s,
-    { sinkings: [hers], alive: [1, 2, 3, 4, 5], race: race(false) },
+    { sinkings: [playerSinking], alive: [1, 2, 3, 4, 5], race: race(false) },
     STEP
   );
   assert.deepEqual([s.phase, s.place, s.over], ['spectating', 6, false]);
@@ -461,13 +461,13 @@ test("a race's flow: afloat as it ends it has its place there; sunk, it watches 
   const mate = { id: 1, by: 3, cause: 'ram' as const, gun: null };
   s = stepMatch(
     s,
-    { sinkings: [hers, mate], alive: [2, 3, 4, 5], race: race(false) },
+    { sinkings: [playerSinking, mate], alive: [2, 3, 4, 5], race: race(false) },
     STEP
   );
   assert.deepEqual([s.watch, s.over], [3, false]);
   s = stepMatch(
     s,
-    { sinkings: [hers, mate], alive: [2, 3], race: race(true, 5) },
+    { sinkings: [playerSinking, mate], alive: [2, 3], race: race(true, 5) },
     STEP
   );
   assert.equal(s.over, true, 'one team afloat: over, though two ships are');
