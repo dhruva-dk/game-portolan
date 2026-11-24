@@ -8,6 +8,11 @@ import {
 } from './commands.ts';
 import { fieldsValid, isIndex } from './fields.ts';
 import { known } from './lookup.ts';
+import { releaseExpired, turnSeason } from './offseason/finish.ts';
+import { ageLeague } from './offseason/people.ts';
+import { payPrizes } from './offseason/prize.ts';
+import { fileOffseasonReport, offseasonReport } from './offseason/report.ts';
+import { winter } from './offseason/winter.ts';
 import { enterPhase, nextRaceLobby, seasonOver } from './record/advance.ts';
 import { countDownContracts } from './record/contracts.ts';
 import { publishNews } from './record/news.ts';
@@ -52,6 +57,9 @@ const narrowRanges = seam;
 const raceEvents = seam;
 const dealAfterRace = seam;
 const offerSponsors = seam;
+const seasonEvents = seam;
+const redrawKnowledge = seam;
+const dealOffseason = seam;
 
 const YOURS = 0;
 
@@ -86,8 +94,19 @@ function recordRace(state: CareerState, result: MatchResult): Applied {
   return accepted(publishNews(advanced));
 }
 
-const enterOffseason = (state: CareerState): CareerState =>
-  enterPhase(state, 'offseason');
+function enterOffseason(state: CareerState): CareerState {
+  const stopped = enterPhase(state, 'offseason');
+  const prized = payPrizes(stopped);
+  const wintered = winter(prized);
+  const aged = ageLeague(wintered);
+  const redrawn = redrawKnowledge(aged);
+  const dealt = dealOffseason(redrawn);
+  const told = seasonEvents(dealt);
+  return fileOffseasonReport(told, offseasonReport(stopped, told));
+}
+
+const finishOffseason = (state: CareerState): Applied =>
+  accepted(enterPhase(turnSeason(releaseExpired(runPolicies(state))), 'lobby'));
 
 const markRead = (state: CareerState): Applied =>
   accepted({ ...state, unread: false });
@@ -99,7 +118,7 @@ function effect(state: CareerState, command: Command): Applied {
     case 'RecordRace':
       return recordRace(state, command.result);
     case 'FinishOffseason':
-      return notYet(state);
+      return finishOffseason(state);
     case 'MarkRead':
       return markRead(state);
     case 'MarkSeen':

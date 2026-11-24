@@ -564,9 +564,11 @@ test('the race counter and phase after races 1 to 9 and after race 10', () => {
     if (race < SEASON) {
       assert.equal(next.race, race + 1);
       assert.equal(next.phase, 'lobby');
+      assert.equal(next.lastOffseason, null);
     } else {
       assert.equal(next.race, SEASON);
       assert.equal(next.phase, 'offseason');
+      assert.ok(next.lastOffseason);
     }
   }
 });
@@ -726,6 +728,7 @@ test('a ten-race season through apply alone, from three seeds', () => {
     assert.equal(state.phase, 'offseason');
     assert.equal(state.season, 1);
     assert.equal(state.race, SEASON);
+    assert.ok(state.lastOffseason);
     for (const person of state.people)
       assert.ok((person.contract?.racesLeft ?? 0) >= 0);
   }
