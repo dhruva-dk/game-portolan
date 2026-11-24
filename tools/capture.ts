@@ -10,7 +10,8 @@
 // of frames, writes captures/<query>.png. The frame rate is uncapped, so the
 // FPS printed is a cost measure; GPU timestamps read 0 when uncapped. --passes
 // prints the meter's split of a frame's draw calls by pass and by what is drawn
-// (src/meter.ts).
+// (src/meter.ts). --tap=text taps that text, and --drag=dx,dy drags a finger
+// across the middle of the screen, before the screenshots.
 
 import { mkdirSync } from 'node:fs';
 import { DPR, VIEW, launch } from './launch.ts';
@@ -53,6 +54,24 @@ try {
       { timeout: 60000 }
     );
     await page.waitForTimeout(1500);
+    // --tap=text: that text tapped first; --drag=dx,dy: a finger dragged so across the middle of the screen; each given
+    // time to settle
+    const tap = process.argv.find((a) => a.startsWith('--tap='))?.slice(6),
+      drag = process.argv.find((a) => a.startsWith('--drag='))?.slice(7);
+    if (tap) {
+      await page.getByText(tap, { exact: true }).first().click();
+      await page.waitForTimeout(2500);
+    }
+    if (drag) {
+      const [dx, dy] = drag.split(',').map(Number),
+        x = VIEW.width / 2,
+        y = VIEW.height / 2;
+      await page.mouse.move(x, y);
+      await page.mouse.down();
+      await page.mouse.move(x + dx, y + dy, { steps: 12 });
+      await page.mouse.up();
+      await page.waitForTimeout(1500);
+    }
     for (let k = 0; k < shots; k++) {
       if (k > 0) await page.waitForTimeout(every);
       const file = `${out}/${q.replace(/[^\w.=-]+/g, '_') || 'default'}${k > 0 ? `-${k}` : ''}.png`;

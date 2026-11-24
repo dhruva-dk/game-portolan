@@ -55,15 +55,18 @@ export const SEABED_SAND = tones('#E8D08A', '#B89A6A');
 export const SEABED_STONE = tones('#8FA08A', '#55707A');
 export const SEABED_WEED = tones('#4F9A6E', '#2E6A62');
 
-// ---- the harbour (land/harbour.ts): lime-washed walls, tiled roofs, the
-// quay's stone, a foundry's brick, an awning's stripes, a window's glass
-export const PLASTER = tones('#F7EBD0', '#C9A096');
-export const ROOF_TILE = tones('#C9573A', '#7C2F47');
-export const QUAY = tones('#CDB995', '#86707E');
-export const BRICK = tones('#A9523C', '#662C40');
+// ---- the harbour's campus (land/harbour.ts): its red (the awning's, for
+// now the team's), white cladding, a roof's standing-seam metal, poured
+// concrete, curtain-wall glazing, an open door's dark, asphalt and its painted
+// lines
 export const AWNING = tones('#D2332A', '#8A2238');
-export const CANVAS = tones('#F3E6C8', '#C3A090');
-export const GLASS = tones('#2F6FA8', '#27437A');
+export const CLADDING = tones('#F6F3EC', '#BBA7B1');
+export const ROOF_METAL = tones('#A9A7B3', '#5E546C');
+export const CONCRETE = tones('#DED5C6', '#9C8A95');
+export const GLAZING = tones('#74C1E0', '#2F5E8E');
+export const INTERIOR = tones('#2E2C3A', '#1B1726');
+export const ASPHALT = tones('#6E6874', '#3B3346');
+export const LINE_PAINT = tones('#FFF8E6', '#CFBAAC');
 
 // ---- the ships
 export const TIMBER = tones('#9A5A2C', '#5A2F2E');

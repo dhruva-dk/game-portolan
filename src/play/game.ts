@@ -54,10 +54,11 @@ import type { Vessel } from '../sim/contact.ts';
 import type { Helm, ShipState } from '../sim/ship.ts';
 import type { Ask } from '../sim/stores.ts';
 import type { Fault, Use } from '../kinds.ts';
+import { PARTS, type PartType } from '../race.ts';
 import type { Eye, LootDraw, Snapshot, StormDraw } from '../snapshot.ts';
 import { createSwell } from '../world/swell.ts';
 import type { Anchor } from '../world/lattice.ts';
-import { PLOTS, eachPlot, type Plot } from '../world/harbour.ts';
+import type { Plot } from '../world/harbour.ts';
 import type { ShipPose } from '../world/pose.ts';
 import {
   R,
@@ -65,9 +66,7 @@ import {
   bearingAt,
   distance,
   dot,
-  fromChart,
   normalize,
-  place,
   scale,
   type Vec3,
 } from '../world/sphere.ts';
@@ -87,19 +86,21 @@ import {
   type Status,
 } from '../player.ts';
 import {
+  FOCI,
+  LOOSE,
   REST,
   WHOLE,
   anchorageEye,
   dragged,
   eyeOut,
+  focused,
   framed,
-  harbourEye,
   relaxed,
-  seenAt,
   turned,
   type Framing,
   type Orbit,
 } from './anchorage.ts';
+import { createOverlook, type Point4 } from './overlook.ts';
 import { ARRIVAL, arriving } from './arrival.ts';
 import { createChase } from './chase.ts';
 import { placed, type Point, type View as Viewport } from './lens.ts';
@@ -115,12 +116,8 @@ import {
   type Waters,
 } from './state.ts';
 
-/** How far over a harbour building's head its label is hung, metres. */
-const OVERHEAD = 3;
 /** What the lobby's camera is on: her at anchor, or the harbour she lies off. */
 type Scene = 'ship' | 'harbour';
-/** A point of the screen, px from its top left. */
-type Point2 = readonly [number, number];
 
 /**
  * Damage as the debug switches set it (debug.ts ?zones, ?faults, ?wear, ?mend):
@@ -263,10 +260,15 @@ export function createGame(
    * harbour's plots' heads are drawn (plots, refilled).
    */
   let scene: Scene = 'ship',
-    wanted: Readonly<Framing> = WHOLE;
+    wanted: Readonly<Framing> = WHOLE,
+    /** The part of her the office has the camera on (null: all of her). */
+    part: PartType | null = null;
   const framing: Framing = { centre: [0, 0], size: 1 },
-    heads = eachPlot((): [number, number] => [0, 0]),
-    head: [number, number, number] = [0, 0, 0];
+    /** The camera's focus on her as eased so far, with its orbit; the camera over the harbour. */
+    seat = { orbit, focus: { ...LOOSE } },
+    overlook = createOverlook(world.harbour),
+    /** The office's drag of its window since the last frame (px), and whether it is held. */
+    nudge = { x: 0, y: 0, held: false };
   /** The framing at once as it is wanted. */
   const reframe = () => {
     framing.centre[0] = wanted.centre[0];
@@ -522,6 +524,9 @@ export function createGame(
     berth = null;
     scene = 'ship';
     wanted = WHOLE;
+    part = null;
+    Object.assign(seat.focus, LOOSE);
+    overlook.reset();
     reframe();
     shake.clear();
     stops.clear();
@@ -556,29 +561,46 @@ export function createGame(
     },
     /**
      * The lobby's camera as the office stages it: on her or over the harbour,
-     * framed so (null: the lobby's own, on her and filling the screen). A cut
-     * to the other is framed at once; a new framing of the same is eased to.
+     * framed so (null: the lobby's own, on her and filling the screen), its
+     * `focus` a part of her or a building on the harbour (null: all). A cut
+     * to the other is framed at once; a new framing of the same is eased to,
+     * and a building newly chosen is glided to (none: back out over all).
      */
-    stage(to: { scene: Scene; framing: Readonly<Framing> } | null) {
+    stage(
+      to: {
+        scene: Scene;
+        framing: Readonly<Framing>;
+        focus?: string | null;
+      } | null
+    ) {
       const cut = (to?.scene ?? 'ship') !== scene || wanted === WHOLE;
       scene = to?.scene ?? 'ship';
       wanted = to?.framing ?? WHOLE;
+      part = PARTS.find((p) => p === to?.focus) ?? null;
+      overlook.choose(to?.focus ?? null);
       if (cut) reframe();
     },
     /**
-     * Where the head of what stands on each of the harbour's plots is drawn on
-     * a screen w by h (px, from its top left; the same object each time,
-     * refilled), while the camera is over the harbour; else null.
+     * The office's window dragged (CSS px, right and down, since the last
+     * call; `held` while the finger is down): over the harbour it pans, on her
+     * it turns the camera round her.
      */
-    plots(w: number, h: number): Readonly<Record<Plot, Point2>> | null {
-      if (!anchored || scene !== 'harbour' || !berth) return null;
-      const { chart, plots } = world.harbour;
-      for (const id of PLOTS) {
-        const s = plots[id];
-        place(fromChart(chart, s.x, s.z), s.foot + s.tall + OVERHEAD, head);
-        seenAt(berth, head, w, h, heads[id]);
-      }
-      return heads;
+    look(x: number, y: number, held: boolean) {
+      nudge.x += x;
+      nudge.y += y;
+      nudge.held = held;
+    },
+    /**
+     * Where what stands on each of the harbour's plots is drawn on a screen w
+     * by h, while the camera is over the harbour (else null): its label's
+     * place over its head (px, from the top left), how far down its foot is
+     * drawn (px), and the px a metre across at its head (the same object each
+     * time, refilled).
+     */
+    plots(w: number, h: number): Readonly<Record<Plot, Point4>> | null {
+      return anchored && scene === 'harbour' && berth
+        ? overlook.plots(berth, w, h)
+        : null;
     },
     /**
      * A frame of dt seconds, her hands as read for it (none while the match's
@@ -649,11 +671,16 @@ export function createGame(
       between = time.between;
       last = state.poseOf(PLAYER, between) ?? last;
       if (anchored) {
-        // at anchor, the look's drag turns the camera round her; let go, it
-        // eases home
-        dragged(orbit, read.look, orbit);
-        if (!read.look.held) relaxed(orbit, dt, orbit);
+        // at anchor, the look's drag (or the office window's) turns the camera
+        // round her, or pans it over the harbour; let go, the turn eases home
+        const drag = { x: read.look.x + nudge.x, y: read.look.y + nudge.y },
+          held = read.look.held || nudge.held;
+        nudge.x = nudge.y = 0;
+        if (scene === 'harbour') overlook.step(drag, framing.size, dt);
+        else dragged(orbit, drag, orbit);
+        if (!held) relaxed(orbit, dt, orbit);
         turned(orbit, aside, dt, orbit);
+        focused(seat.focus, part ? FOCI[part] : LOOSE, dt);
         floorAt = state.clock(between);
         framed(framing, wanted, dt);
         berthed.centre[0] = framing.centre[0];
@@ -661,8 +688,8 @@ export function createGame(
         berthed.size = framing.size;
         berth =
           scene === 'harbour'
-            ? harbourEye(world.harbour, berthed)
-            : anchorageEye(last, orbit, floorAt, floor, berthed);
+            ? overlook.eye(berthed)
+            : anchorageEye(last, seat, floorAt, floor, berthed);
         return;
       }
       const followed =
@@ -689,7 +716,7 @@ export function createGame(
         time = state.clock(between),
         near = normalize(last.position);
       const seen = anchored
-        ? (berth ?? anchorageEye(last, orbit, time, ground, berthed))
+        ? (berth ?? anchorageEye(last, seat, time, ground, berthed))
         : (arrival !== null && arriving(arrival, last, eye)) || shake.on(eye);
       let n = 0;
       for (const l of state.loot().pieces) {

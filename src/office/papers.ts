@@ -164,8 +164,15 @@ export interface HqPaper {
     id: Building;
     name: string;
     about: string;
+    /** Its level, the highest any may reach (5), and the highest her championship lets it (cap). */
     level: number;
     top: number;
+    cap: number;
+    /** The building it needs at the level below its next first (null: none), and that one's level now. */
+    needs: { name: string; level: number } | null;
+    /** What it gives now, and at its next level (null: at its highest). */
+    now: readonly string[];
+    next: readonly string[] | null;
     upkeep: number;
     cost: number;
     days: number;

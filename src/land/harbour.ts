@@ -1,15 +1,21 @@
 // The harbour's buildings (world/harbour.ts says where each stands): her
-// team's headquarters on the shore she lies off, built once of flat-sided
-// solids and drawn as one mesh. Each is the one thing that tells it from its
-// neighbours: the factory's shed and the hull on its slip, the loft's great
-// window, the tank's long basin, the foundry's stack, the school's dinghy, the
-// pit house's boat door, the crow's nest's tower, the market's striped awning,
-// the landing's jetty. Each stands on a footing of the quay's stone carried
-// down into the ground, so a slope under it shows as a terrace's wall.
+// team's headquarters on the shore she lies off, a modern campus (white
+// cladding, standing-seam roofs, curtain walls, the team's colour in a stripe
+// round each), built once of flat-sided solids and drawn as one mesh. The
+// factory is the showpiece: its composites hall under a ribbed barrel roof, its
+// office wing glazed full height, a timber hull half out of its doors on the
+// cradle that runs her down the slipway, a car park, trees, flags and the
+// team's pylon before it. Each other is the one thing that tells it from its
+// neighbours: the design centre's three glazed floors, the tank's long basin
+// and gantry, the composites plant's sawtooth and stack, the simulator's dome,
+// the pit crew's hangar door, the scouting department's tower, the commercial
+// centre's canopy, the hospitality suite's pavilion on the jetty. Each stands
+// on a footing of concrete carried down into the ground, so a slope under it
+// shows as a terrace's wall.
 //
 // Each face one tone in the sun and one out of it (palette.ts), lit like
 // everything else (sky/light.ts), and casting on the land as the palms do
-// (shadow.ts). Some 1,500 triangles, one draw.
+// (shadow.ts). Some 4,000 triangles, one draw.
 
 import {
   BufferGeometry,
@@ -20,18 +26,20 @@ import {
 } from 'three/webgpu';
 import { attribute, normalWorld, positionWorld } from 'three/tsl';
 import {
+  ASPHALT,
   AWNING,
-  BRICK,
-  CANVAS,
+  CLADDING,
+  CONCRETE,
   DECK,
-  FIRE,
-  GLASS,
+  GLAZING,
+  INTERIOR,
   IRON,
-  PLASTER,
-  QUAY,
-  ROOF_TILE,
+  LINE_PAINT,
+  PALM_TRUNK,
+  ROOF_METAL,
   SEA_MIDDLE,
   SEA_SHALLOW,
+  SHRUB,
   TAR,
   TIMBER,
   type Tones,
@@ -49,9 +57,10 @@ type Ring = readonly [P, P, P, P];
 const DEEP = 9;
 /** The buildings are drawn this many times their measures here. */
 const LARGER = 1.25;
-/** A fire's glow, and still water: the same in the sun and out of it, or nearly. */
-const GLOW: Tones = { lit: FIRE, shadow: FIRE },
-  WATER: Tones = { lit: SEA_SHALLOW, shadow: SEA_MIDDLE };
+/** Still water: nearly the same in the sun and out of it. */
+const WATER: Tones = { lit: SEA_SHALLOW, shadow: SEA_MIDDLE };
+/** The team's colour, in the stripe round each building, its pylon, its flags. */
+const ACCENT = AWNING;
 
 /** What the buildings are built with: solids added to one mesh's triangles, each through the matrix last set. */
 function createShaper() {
@@ -223,9 +232,9 @@ function createShaper() {
       tri(at(i, h, k), at(i + 1, h, k), [x, y + h, z], t, from);
     }
   }
-  /** The footing under a building w by d: the quay's stone, from its foot down. */
+  /** The footing under a building w by d: concrete, from its foot down, its top the building's apron. */
   const footing = (w: number, d: number, x = 0, z = 0) =>
-    box(x, -DEEP, z, w, DEEP, d, QUAY);
+    box(x, -DEEP, z, w, DEEP, d, CONCRETE);
   /** A pole h high at (x, z), and a pennant flown from its head toward +x. */
   function pennant(x: number, y: number, z: number, h: number) {
     box(x, y, z, 0.22, h, 0.22, TIMBER);
@@ -268,54 +277,241 @@ function createShaper() {
 }
 type Shaper = ReturnType<typeof createShaper>;
 
+/** A barrel roof over w (along x) by d, rising `rise` at its crown in `n` facets, its gables of `gable`; a rib of `rib` each `every` metres along it. */
+function vault(
+  s: Shaper,
+  [x, y, z]: P,
+  [w, d, rise]: readonly [number, number, number],
+  n: number,
+  t: Tones,
+  gable: Tones,
+  rib: Tones,
+  every: number
+) {
+  const arc = (i: number, out = 0): [number, number] => {
+    const u = i / n;
+    return [
+      z - d / 2 - out + (d + 2 * out) * u,
+      y + (rise + out) * Math.sin(Math.PI * u),
+    ];
+  };
+  const x0 = x - w / 2,
+    x1 = x + w / 2,
+    from: P = [x, y + rise / 3, z];
+  for (let i = 0; i < n; i++) {
+    const [za, ya] = arc(i),
+      [zb, yb] = arc(i + 1);
+    s.quad([x0, ya, za], [x0, yb, zb], [x1, yb, zb], [x1, ya, za], t, from);
+    s.tri([x0, y, z], [x0, ya, za], [x0, yb, zb], gable, from);
+    s.tri([x1, y, z], [x1, ya, za], [x1, yb, zb], gable, from);
+  }
+  // (each rib a band standing a little proud of the roof)
+  for (let rx = x0 + every / 2; rx < x1; rx += every)
+    for (let i = 0; i < n; i++) {
+      const [za, ya] = arc(i, 0.08),
+        [zb, yb] = arc(i + 1, 0.08);
+      s.quad(
+        [rx - 0.1, ya, za],
+        [rx - 0.1, yb, zb],
+        [rx + 0.1, yb, zb],
+        [rx + 0.1, ya, za],
+        rib,
+        from
+      );
+    }
+}
+
+/** A glazed wall w across and h high on the face z = zf (looking toward +z), its foot at y: the glass, a mullion each `bay` metres, and `rows` rows between transoms. */
+function curtain(
+  s: Shaper,
+  x: number,
+  y: number,
+  zf: number,
+  w: number,
+  h: number,
+  bay: number,
+  rows: number
+) {
+  s.box(x, y, zf + 0.04, w, h, 0.08, GLAZING);
+  const n = Math.max(1, Math.round(w / bay));
+  for (let i = 0; i <= n; i++)
+    s.box(x - w / 2 + (i * w) / n, y, zf + 0.11, 0.14, h, 0.1, IRON);
+  for (let j = 0; j <= rows; j++)
+    s.box(x, y + (j * h) / rows - 0.07, zf + 0.11, w, 0.14, 0.1, IRON);
+}
+
+/** A strip between (x0, y0, z0) and (x1, y1, z1), `lift` thick: a ramp's rail, a slope's kerb. */
+const strip = (
+  s: Shaper,
+  [x0, y0, z0]: P,
+  [x1, y1, z1]: P,
+  lift: number,
+  t: Tones
+) =>
+  s.slab(
+    [
+      [x0, y0, z0],
+      [x0, y1, z1],
+      [x1, y1, z1],
+      [x1, y0, z0],
+    ],
+    [
+      [x0, y0 + lift, z0],
+      [x0, y1 + lift, z1],
+      [x1, y1 + lift, z1],
+      [x1, y0 + lift, z0],
+    ],
+    t
+  );
+
+/** A tree in a planter at (x, z): a stem and a round crown. */
+function tree(s: Shaper, x: number, z: number, y = 0) {
+  s.box(x, y, z, 1.5, 0.6, 1.5, CONCRETE);
+  s.box(x, y + 0.6, z, 0.22, 1.5, 0.22, PALM_TRUNK);
+  s.round(x, y + 1.7, z, 0.7, 1, 1.9, 7, SHRUB);
+  s.round(x, y + 2.7, z, 1.33, 1.9, 0.12, 7, SHRUB);
+}
+
+/** A car parked at (x, z), nose toward +z, painted t. */
+function car(s: Shaper, x: number, z: number, t: Tones) {
+  s.box(x, 0, z, 1.5, 0.3, 3.4, INTERIOR);
+  s.box(x, 0.3, z, 1.8, 0.55, 4.2, t);
+  s.box(x, 0.85, z - 0.25, 1.6, 0.5, 2.2, GLAZING);
+  s.box(x, 1.35, z - 0.25, 1.5, 0.06, 1.9, t);
+}
+
+/** A lamp standard at (x, z), its head reaching toward +x. */
+function lamp(s: Shaper, x: number, z: number) {
+  s.box(x, 0, z, 0.16, 4.6, 0.16, IRON);
+  s.box(x + 0.45, 4.5, z, 1, 0.16, 0.34, IRON);
+}
+
+/** A flag of tone t on a pole h high at (x, z), flown toward +x. */
+function flag(s: Shaper, x: number, z: number, h: number, t: Tones) {
+  s.box(x, 0, z, 0.14, h, 0.14, ROOF_METAL);
+  s.sheet(
+    [x, h - 0.1, z],
+    [x + 2.2, h - 0.25, z + 0.1],
+    [x + 2.2, h - 1.45, z + 0.1],
+    [x, h - 1.4, z],
+    t
+  );
+}
+
 /** Each building, built about its foot's middle; and how far it is turned from square to the shore, radians. */
 const BUILT: Readonly<
   Record<Plot, { turn: number; build: (s: Shaper) => void }>
 > = {
-  // a shed with its doors open on the sea, and a hull on the slip beside it
+  // the composites hall under its ribbed barrel roof, its office wing glazed
+  // full height, and a hull half out of its doors on the cradle that runs her
+  // down the slipway to the sea; a car park, trees, flags and the team's pylon
+  // before it
   factory: {
     turn: 0.06,
     build(s) {
-      s.footing(21, 15);
-      s.box(-3.5, 0, -1, 11, 5.6, 10, TIMBER);
-      s.roof(-3.5, 5.6, -1, 12.4, 3.6, 11.4, 'z', TAR, TIMBER);
-      s.box(-3.5, 0, 4.02, 5.6, 4.2, 0.12, TAR);
-      s.box(-3.5, 6.2, 4.02, 1.6, 1.3, 0.12, GLASS);
-      // the slip, falling to the sea, and the hull's cradle on it
-      s.slab(
-        s.ring(6.2, 0, 1.5, 5.4, 11),
-        s.ring(6.2, 0.9, 1.5, 5.4, 11),
-        QUAY
+      s.footing(26, 18, -0.5, 0.5);
+      // the hall: its walls on a dark plinth, the team's stripe round it, the
+      // roof and its skylight along the crown
+      s.box(2, 0, -1.5, 16, 6, 11, CLADDING);
+      s.box(2, 0, -1.5, 16.06, 0.7, 11.06, IRON);
+      s.box(2, 4.6, -1.5, 16.06, 0.45, 11.06, ACCENT);
+      vault(
+        s,
+        [2, 6, -1.5],
+        [16.4, 11.4, 2.6],
+        8,
+        ROOF_METAL,
+        CLADDING,
+        IRON,
+        2
       );
-      for (const z of [-2, 1, 4]) s.box(6.2, 0.9, z, 3.6, 0.5, 0.5, TIMBER);
-      // her hull: the run of it, and the bow drawn in
+      s.box(2, 8.52, -1.5, 13, 0.2, 1.3, GLAZING);
+      for (const x of [-2.5, 6.5])
+        s.round(x, 8.1, -4.6, 0.45, 1.6, 1, 8, ROOF_METAL);
+      // its face to the sea: a glazed bay and the great door, open
+      curtain(s, -2.6, 0.7, 4, 5.8, 3.7, 1.45, 2);
+      s.box(5, 0, 4.02, 7, 5.2, 0.08, INTERIOR);
+      s.box(5, 5.2, 4.08, 7.6, 0.4, 0.22, IRON);
+      for (const x of [1.35, 8.65]) s.box(x, 0, 4.08, 0.3, 5.2, 0.22, IRON);
+      s.box(5, 5.62, 4.2, 7.4, 0.5, 0.4, ROOF_METAL);
+      // the office wing: glazed full height across two floors, a floor's edge
+      // across it, a dark coping, the plant on its roof, a cantilevered canopy
+      s.box(-8.5, 0, 0, 7, 8.4, 9, CLADDING);
+      curtain(s, -8.5, 0.3, 4.5, 6.2, 7.7, 1.25, 4);
+      s.box(-8.5, 3.95, 4.7, 7, 0.4, 0.3, CLADDING);
+      s.box(-8.5, 8.4, 0, 7.2, 0.5, 9.2, IRON);
+      for (const y of [1, 4.8]) s.box(-12.03, y, 0, 0.08, 2.4, 7, GLAZING);
+      s.box(-9.6, 8.9, -2, 3, 1.2, 2.6, ROOF_METAL);
+      s.box(-6.8, 8.9, -2.6, 1.4, 0.9, 1.4, ROOF_METAL);
+      s.box(-8.5, 3.3, 6.3, 5.2, 0.24, 3.6, CLADDING, true);
+      // the team's pylon at the forecourt's corner, its mark on it
+      s.box(-12.4, 0, 8.4, 2.4, 9.6, 0.6, ACCENT);
+      s.box(-12.4, 6.2, 8.72, 1.4, 1.4, 0.06, CLADDING);
+      s.box(-12.4, 1.2, 8.72, 1.7, 0.24, 0.06, CLADDING);
+      // the hull, a timber ship's in the modern works, half out of the door
+      // on her cradle; the rails it runs on, out and down the slipway
       s.slab(
-        s.ring(6.2, 1.4, 0, 1.5, 7),
-        s.ring(6.2, 3.1, 0, 2.9, 7.6),
+        s.ring(5, 1.4, 4.6, 1.5, 7),
+        s.ring(5, 3.1, 4.6, 2.9, 7.6),
         DECK,
         true
       );
       s.slab(
         [
-          [5.45, 1.4, 3.5],
-          [6.2, 1.9, 6.4],
-          [6.2, 1.9, 6.4],
-          [6.95, 1.4, 3.5],
+          [4.25, 1.4, 8.1],
+          [5, 1.9, 11],
+          [5, 1.9, 11],
+          [5.75, 1.4, 8.1],
         ],
         [
-          [4.75, 3.1, 3.8],
-          [6.2, 3.3, 7],
-          [6.2, 3.3, 7],
-          [7.65, 3.1, 3.8],
+          [3.55, 3.1, 8.4],
+          [5, 3.3, 11.6],
+          [5, 3.3, 11.6],
+          [6.45, 3.1, 8.4],
         ],
         DECK,
         true
       );
-      for (const z of [-3, -1.5, 0, 1.5, 3])
-        s.box(6.2, 3.1, z, 3, 0.16, 0.24, TIMBER);
+      s.box(5, 2.55, 4.6, 2.95, 0.22, 7.65, TAR);
+      for (const z of [2.6, 5.2, 7.8]) {
+        s.box(5, 0.1, z, 3.4, 0.3, 0.6, IRON);
+        for (const x of [3.9, 6.1]) s.box(x, 0.4, z, 0.3, 1.1, 0.4, IRON);
+      }
+      s.slab(
+        s.ring(5, -DEEP, 13, 6, 7),
+        [
+          [2, 0, 9.5],
+          [2, -2.6, 16.5],
+          [8, -2.6, 16.5],
+          [8, 0, 9.5],
+        ],
+        CONCRETE
+      );
+      for (const x of [3.8, 6.2]) {
+        s.box(x, 0, 4.5, 0.2, 0.1, 10, IRON);
+        strip(s, [x - 0.1, 0, 9.5], [x + 0.1, -2.6, 16.5], 0.1, IRON);
+      }
+      // the car park before the glazed bay: its asphalt, its lines, two cars
+      s.box(-1.9, 0, 7.3, 8, 0.03, 4.4, ASPHALT);
+      for (const x of [-5.8, -3.2, -0.6, 2])
+        s.box(x, 0.03, 7.3, 0.14, 0.02, 4, LINE_PAINT);
+      car(s, -4.5, 7.2, CLADDING);
+      car(s, 0.7, 7.4, ACCENT);
+      // trees, lamps and flags round the forecourt
+      for (const [x, z] of [
+        [11.2, -6],
+        [11.2, 0],
+        [-12.6, -6.4],
+      ] as const)
+        tree(s, x, z);
+      for (const x of [-6.2, 2.8]) lamp(s, x, 9.3);
+      flag(s, 9.4, 8.8, 8, ACCENT);
+      flag(s, 10.4, 8.8, 8, CLADDING);
+      flag(s, 11.4, 8.8, 8, ACCENT);
     },
   },
-  // a jetty out over the water, a pavilion at its head
+  // a glass pavilion at the jetty's head under a floating roof, the jetty out
+  // over the water
   hospitality: {
     turn: 0,
     build(s) {
@@ -323,29 +519,33 @@ const BUILT: Readonly<
       s.box(0, -0.5, 4, 6, 0.5, 18, DECK, true);
       for (const z of [-2, 3, 8, 12.5])
         for (const x of [-2.6, 2.6])
-          s.box(x, -DEEP, z, 0.5, DEEP - 0.5, 0.5, TAR);
+          s.box(x, -DEEP, z, 0.5, DEEP - 0.5, 0.5, IRON);
       for (const z of [2, 7, 12])
         for (const x of [-2.7, 2.7]) s.round(x, 0, z, 0.3, 0.9, 0.8, 6, IRON);
-      s.box(0, 0, -4.4, 6, 3.3, 4.6, PLASTER);
-      s.spire(0, 3.3, -4.4, 7.4, 2.6, 6, ROOF_TILE);
-      s.box(0, 0, -2.08, 1.5, 2.3, 0.12, TIMBER);
-      s.box(-2, 1.2, -2.08, 1, 1.1, 0.12, GLASS);
-      s.box(2, 1.2, -2.08, 1, 1.1, 0.12, GLASS);
-      s.pennant(0, 5.9, -4.4, 4);
-      // what was landed: a crate or two
-      s.box(-1.8, 0, 9, 1.2, 1, 1.2, TIMBER);
-      s.box(-1.5, 0, 10.5, 0.9, 0.8, 0.9, DECK);
+      s.box(0, 0, -4.4, 6, 3.2, 4.6, GLAZING);
+      for (const [x, z] of [
+        [-3.6, -7.3],
+        [3.6, -7.3],
+        [3.6, -1.5],
+        [-3.6, -1.5],
+      ] as const)
+        s.box(x, 0, z, 0.2, 3.2, 0.2, IRON);
+      s.box(0, 3.05, -4.4, 8.02, 0.14, 6.42, ACCENT);
+      s.box(0, 3.2, -4.4, 8, 0.36, 6.4, CLADDING, true);
+      flag(s, 0, -1, 7, ACCENT);
     },
   },
-  // a boathouse, its door open on a ramp to the water, spars stacked by it
+  // a hangar, its door open on a ramp to the water, spars racked by it
   pitCentre: {
     turn: -0.05,
     build(s) {
       s.footing(16, 14);
-      s.box(-1, 0, -1, 10.5, 4.6, 10, PLASTER);
-      s.roof(-1, 4.6, -1, 12, 4, 11.4, 'z', ROOF_TILE, PLASTER);
-      s.box(-1, 0, 4.02, 6.4, 3.6, 0.12, TAR);
-      s.box(-1, 5.6, 4.02, 1.4, 1.4, 0.12, GLASS);
+      s.box(-1, 0, -1, 10.5, 5.2, 10, CLADDING);
+      s.box(-1, 0, -1, 10.56, 0.6, 10.06, IRON);
+      s.box(-1, 3.9, -1, 10.56, 0.4, 10.06, ACCENT);
+      s.box(-1, 5.2, -1, 10.7, 0.4, 10.2, ROOF_METAL);
+      s.box(-1, 0, 4.02, 7, 4.2, 0.08, INTERIOR);
+      s.box(-1, 4.2, 4.08, 7.5, 0.3, 0.2, IRON);
       s.slab(
         [
           [-4.2, -0.6, 4],
@@ -359,7 +559,7 @@ const BUILT: Readonly<
           [2.2, -0.5, 7],
           [2.2, 0.02, 4],
         ],
-        QUAY
+        CONCRETE
       );
       for (const [x, y] of [
         [5.4, 0],
@@ -367,94 +567,71 @@ const BUILT: Readonly<
         [5.7, 0.42],
       ] as const)
         s.box(x, y, 0, 0.4, 0.4, 9, DECK);
-      s.box(5.7, 0, -4, 1.6, 1.2, 1.6, TIMBER);
+      s.box(5.7, 0, -4, 1.6, 1.2, 1.6, ROOF_METAL);
     },
   },
-  // a stall under a striped awning, the catch laid out on its counter
+  // a shop under the team's canopy, glazed along its front, its name on the roof
   commercialCentre: {
     turn: 0.08,
     build(s) {
       s.footing(15, 11);
-      s.box(0, 0, -3.4, 11, 3.2, 0.5, PLASTER);
-      for (const x of [-5.2, 5.2]) {
-        s.box(x, 0, 3.4, 0.3, 3.1, 0.3, TIMBER);
-        s.box(x, 0, -3, 0.3, 4.2, 0.3, TIMBER);
-      }
-      for (let i = 0; i < 7; i++) {
-        const x0 = -5.6 + i * 1.6,
-          x1 = x0 + 1.6;
-        s.sheet(
-          [x0, 4.3, -3.4],
-          [x0, 3.1, 3.9],
-          [x1, 3.1, 3.9],
-          [x1, 4.3, -3.4],
-          i % 2 ? CANVAS : AWNING
-        );
-      }
-      s.box(0, 0, 2, 9, 1, 1.5, TIMBER);
-      s.box(0, 1, 2, 9.3, 0.12, 1.8, DECK);
-      for (const x of [-3.2, -1, 1.2, 3.3])
-        s.box(x, 1.12, 2, 1.3, 0.22, 1, { lit: SEA_SHALLOW, shadow: IRON.lit });
-      for (const x of [-4, -2.9]) s.round(x, 0, -1.6, 0.6, 1.3, 0.9, 8, TIMBER);
-      s.box(3.6, 0, -1.6, 1.4, 0.9, 1.4, DECK);
-      s.box(3.8, 0.9, -1.6, 1, 0.7, 1, DECK);
+      s.box(0, 0, -1.5, 11, 3.8, 6, CLADDING);
+      curtain(s, 0, 0.2, 1.5, 9, 3, 1.5, 1);
+      s.box(0, 3.1, 2.7, 11.4, 0.25, 2.6, ACCENT, true);
+      s.box(0, 3.8, 0.9, 5.4, 1, 0.3, ACCENT);
+      s.box(0, 3.8, -1.5, 11.2, 0.3, 6.2, ROOF_METAL);
+      for (const x of [-4, 4]) tree(s, x, 4.6);
     },
   },
-  // a long low shed, and the still basin before it a hull is towed down
+  // a long low hall with a ribbon of glass, and the still basin before it a
+  // hull is towed down under the carriage's gantry
   towingTank: {
     turn: 0,
     build(s) {
       s.footing(21, 14);
-      s.box(0, 0, -3.8, 18, 3.4, 5, PLASTER);
-      s.roof(0, 3.4, -3.8, 19.2, 2.2, 6.2, 'x', ROOF_TILE, PLASTER);
-      for (const x of [-6.6, -3.3, 0, 3.3, 6.6])
-        s.box(x, 0.9, -1.28, 1.5, 1.7, 0.12, GLASS);
-      s.box(0, 0, 2.8, 18.6, 0.9, 6.4, QUAY);
+      s.box(0, 0, -3.8, 18, 3.8, 5, CLADDING);
+      s.box(0, 0, -3.8, 18.06, 0.5, 5.06, IRON);
+      s.box(0, 3.8, -3.8, 18.2, 0.35, 5.2, ROOF_METAL);
+      s.box(0, 1.2, -1.24, 16, 1.4, 0.08, GLAZING);
+      s.box(0, 0, 2.8, 18.6, 0.9, 6.4, CONCRETE);
       s.box(0, 0.9, 2.8, 17.2, 0.06, 5, WATER);
-      // the gantry she is towed under, and the model in the water
-      for (const x of [-9, 9]) s.box(x, 0, 2.8, 0.36, 3.2, 0.36, TIMBER);
-      s.box(0, 3.2, 2.8, 18.4, 0.36, 0.36, TIMBER);
+      for (const x of [-9, 9]) s.box(x, 0, 2.8, 0.36, 3.2, 0.36, IRON);
+      s.box(0, 3.2, 2.8, 18.4, 0.36, 0.36, IRON);
+      s.box(-3, 2.6, 2.8, 1.6, 0.6, 1.2, ACCENT);
       s.slab(
         s.ring(-3, 0.96, 2.8, 2.6, 0.7),
         s.ring(-3, 1.4, 2.8, 3.2, 1),
         DECK
       );
-      s.box(-3, 1.4, 2.8, 0.1, 1.8, 0.1, TAR);
+      s.box(-3, 1.4, 2.8, 0.1, 1.2, 0.1, IRON);
     },
   },
-  // a small house under its pennant, a dinghy for the learning drawn up by it
+  // a white cube banded in dark glass, the simulator's dome on its roof
   simulator: {
     turn: -0.1,
     build(s) {
       s.footing(15, 12);
-      s.box(-2.8, 0, -1, 7.4, 4, 6.6, PLASTER);
-      s.roof(-2.8, 4, -1, 8.6, 2.8, 7.8, 'x', ROOF_TILE, PLASTER);
-      s.box(-2.8, 0, 2.32, 1.5, 2.4, 0.12, TIMBER);
-      s.box(-5, 1.3, 2.32, 1.1, 1.2, 0.12, GLASS);
-      s.box(-0.6, 1.3, 2.32, 1.1, 1.2, 0.12, GLASS);
-      s.pennant(-2.8, 6.8, -1, 4.2);
-      // the dinghy on her chocks, her sail set to dry
-      s.slab(
-        s.ring(4.2, 0.3, 1, 1, 4.4),
-        s.ring(4.2, 1.1, 1, 1.9, 5.2),
-        DECK,
-        true
-      );
-      s.box(4.2, 1.1, 1.8, 0.14, 6.2, 0.14, TIMBER);
-      s.sheet([4.2, 7, 1.8], [4.2, 1.9, 1.8], [4.2, 1.9, -1.8], null, CANVAS);
-      s.box(4.2, 0, 2.6, 1.6, 0.3, 0.3, TIMBER);
-      s.box(4.2, 0, -0.6, 1.6, 0.3, 0.3, TIMBER);
+      s.box(-1.5, 0, -1, 8, 5.2, 7, CLADDING);
+      s.box(-1.5, 2, -1, 8.06, 1.6, 7.06, GLAZING);
+      s.box(-1.5, 4.5, -1, 8.06, 0.3, 7.06, ACCENT);
+      s.round(-1.5, 5.2, -1, 2.4, 1.2, 0.72, 10, ROOF_METAL);
+      s.round(-1.5, 6.4, -1, 1.73, 0.7, 0.3, 10, ROOF_METAL);
+      s.box(-1.5, 0, 2.54, 1.6, 2, 0.08, INTERIOR);
+      tree(s, 4.6, 2);
+      tree(s, 4.6, -3);
     },
   },
-  // a saw-toothed roof, a stack, the fire in its door
+  // a sawtooth hall, glass in each tooth's face, the extract's stack by it
   compositesPlant: {
     turn: 0.04,
     build(s) {
       s.footing(17, 13);
-      s.box(-1.8, 0, 0, 11, 6, 9, BRICK);
+      s.box(-1.8, 0, 0, 11, 6, 9, CLADDING);
+      s.box(-1.8, 0, 0, 11.06, 0.6, 9.06, IRON);
+      s.box(-1.8, 4.9, 0, 11.06, 0.4, 9.06, ACCENT);
       for (let i = 0; i < 3; i++) {
-        const x = -1.8 - 11 / 2 + (i + 0.5) * (11 / 3),
-          w = 11 / 3;
+        const w = 11 / 3,
+          x = -1.8 - 11 / 2 + (i + 0.5) * w;
         s.slab(
           s.ring(x, 6, 0, w, 9),
           [
@@ -463,63 +640,48 @@ const BUILT: Readonly<
             [x + w / 2, 6.05, 4.5],
             [x + w / 2, 6.05, -4.5],
           ],
-          TAR
+          ROOF_METAL
         );
+        s.box(x - w / 2 - 0.03, 6.2, 0, 0.06, 2, 8.4, GLAZING);
       }
-      s.box(-1.8, 0, 4.52, 3, 3, 0.12, GLOW);
-      s.box(-1.8, 3, 4.52, 3.6, 0.4, 0.2, IRON);
-      for (const x of [-5.6, 2]) s.box(x, 2.4, 4.52, 1.2, 1.6, 0.12, GLASS);
-      s.taper(5.9, 0, -2, 2.6, 16, 2.6, 0.62, BRICK);
-      s.box(5.9, 16, -2, 2, 0.6, 2, IRON);
-      s.taper(6, 0, 3.4, 3.4, 1.7, 3.4, 0.25, TAR);
+      s.box(-1.8, 0, 4.52, 4, 3.6, 0.08, INTERIOR);
+      s.round(5.9, 0, -2, 1, 14, 0.8, 8, ROOF_METAL);
+      s.round(5.9, 11.5, -2, 0.85, 0.8, 1, 8, ACCENT);
     },
   },
-  // a tall house, a great window in its gable for the light
+  // three floors glazed full height, a lower wing beside it, plant on its roof
   designCentre: {
     turn: -0.03,
     build(s) {
-      s.footing(14, 12);
-      s.box(-1, 0, 0, 8, 8.4, 8, PLASTER);
-      s.roof(-1, 8.4, 0, 9.2, 5, 9.2, 'z', ROOF_TILE, PLASTER);
-      s.box(-1, 3.8, 4.02, 3.6, 3.8, 0.12, GLASS);
-      s.box(-1, 9.6, 4.02, 1.5, 1.5, 0.12, GLASS);
-      s.box(-1, 0, 4.02, 1.6, 2.6, 0.12, TIMBER);
-      for (const x of [-3.6, 1.6]) s.box(x, 1.2, 4.02, 1, 1.4, 0.12, GLASS);
-      s.box(4.9, 0, -0.6, 3.8, 3.8, 5.6, PLASTER);
-      s.slab(
-        s.ring(4.9, 3.8, -0.6, 4.4, 6.2),
-        [
-          [2.7, 5.6, -3.7],
-          [2.7, 5.6, 2.5],
-          [7.1, 3.85, 2.5],
-          [7.1, 3.85, -3.7],
-        ],
-        ROOF_TILE
-      );
-      s.box(-3.2, 9.4, -2, 1, 4.4, 1, BRICK);
+      s.footing(15, 12);
+      s.box(-1, 0, 0, 9, 10.2, 8, CLADDING);
+      curtain(s, -1, 0.4, 4, 8, 9.4, 1.33, 3);
+      s.box(-1, 10.2, 0, 9.2, 0.5, 8.2, IRON);
+      s.box(-2, 10.7, -1.5, 3, 1.2, 2.4, ROOF_METAL);
+      s.box(5.4, 0, -0.6, 3.8, 4, 5.6, CLADDING);
+      s.box(5.4, 1.2, 2.24, 3, 1.6, 0.08, GLAZING);
+      s.box(5.4, 3.6, -0.6, 3.86, 0.4, 5.66, ACCENT);
     },
   },
-  // a watch tower, its gallery and its pennant
+  // a slender tower, a slot of glass up it, a glazed lookout and a mast on top
   scoutingCentre: {
     turn: 0.3,
     build(s) {
       s.footing(9, 9);
-      s.taper(0, 0, 0, 5.2, 14, 5.2, 0.66, QUAY);
-      s.box(0, 0, 2.62, 1.3, 2.4, 0.12, TIMBER);
-      for (const y of [5, 9.5]) s.box(0, y, 2.2, 0.7, 1.1, 0.5, GLASS);
-      s.box(0, 14, 0, 6.4, 0.4, 6.4, TIMBER, true);
+      s.box(0, 0, 0, 4, 14, 4, CLADDING);
+      s.box(0, 1, 2.02, 1.1, 12, 0.08, GLAZING);
+      s.box(0, 0, 2.02, 1.6, 2.4, 0.1, INTERIOR);
+      s.box(0, 14, 0, 5.6, 2.6, 5.6, GLAZING);
       for (const [x, z] of [
-        [-3, -3],
-        [3, -3],
-        [3, 3],
-        [-3, 3],
+        [-2.8, -2.8],
+        [2.8, -2.8],
+        [2.8, 2.8],
+        [-2.8, 2.8],
       ] as const)
-        s.box(x, 14.4, z, 0.2, 1.2, 0.2, TIMBER);
-      for (const z of [-3, 3]) s.box(0, 15.5, z, 6.2, 0.14, 0.14, TIMBER);
-      for (const x of [-3, 3]) s.box(x, 15.5, 0, 0.14, 0.14, 6.2, TIMBER);
-      s.box(0, 14.4, 0, 3, 2.6, 3, PLASTER);
-      s.spire(0, 17, 0, 4.4, 2.6, 4.4, ROOF_TILE);
-      s.pennant(0, 19.6, 0, 4.6);
+        s.box(x, 14, z, 0.18, 2.6, 0.18, IRON);
+      s.box(0, 16.6, 0, 6.4, 0.36, 6.4, CLADDING, true);
+      s.box(0, 16.4, 0, 6.42, 0.2, 6.42, ACCENT);
+      s.box(0, 16.96, 0, 0.16, 4, 0.16, IRON);
     },
   },
 };

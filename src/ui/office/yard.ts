@@ -1,12 +1,5 @@
-// What the team builds, laid out as the manager's game it follows lays them.
-//
-// Headquarters: the harbour itself, live, through the page: the camera stands
-// out over the water before it (play/anchorage.ts), and each of the nine
-// buildings carries its name and level over its head, pinned to it as it is
-// drawn; one tapped opens its card at the left (what it is for, what it costs
-// a race, the next level's cost and days, and the way to build it, or how far
-// the works have got). At the right the headquarters' stats against the
-// championship, and what her designer knows of each part's components.
+// The ship, laid out as the manager's game it follows lays it (the
+// headquarters are hq.ts's).
 //
 // Ship: her ship herself, live, through the page; beside her the ships' stats
 // against the championship and who supplies them; along the foot the three
@@ -16,8 +9,8 @@
 // cost. Fit Parts: each ship's six parts, a tile each, and the spares, each
 // fitted to a ship by a tap.
 
-import { SHIPS, type Building } from '../../office/command.ts';
-import type { HqPaper, PartLine, ShipPaper } from '../../office/papers.ts';
+import { SHIPS } from '../../office/command.ts';
+import type { PartLine, ShipPaper } from '../../office/papers.ts';
 import { button, segmented, stepper } from '../kit/button.ts';
 import { bars } from '../kit/chart.ts';
 import { icon } from '../kit/icons.ts';
@@ -30,41 +23,17 @@ import type { Office } from './office.ts';
 import type { Screen } from './screens.ts';
 
 const CSS = `
-.s-hq > .o-window { position: absolute; inset: 0; }
-/* the harbour is drawn in the middle of what the panels leave of the page */
-.q-subject { position: absolute; left: 0; right: 348px; top: 34px; bottom: 0; pointer-events: none; }
-/* (a card open at the left: in what that leaves, smaller) */
-.q-subject.carded { left: 316px; top: 120px; bottom: 40px; }
-.q-site { position: absolute; left: 0; top: 0; width: 0; height: 0; visibility: hidden; }
-.q-label { position: absolute; left: 0; bottom: 6px; transform: translateX(-50%); display: flex; flex-direction: column;
-  align-items: center; gap: 3px; padding: 3px 9px 5px; ${cut('light')} white-space: nowrap; }
-.q-label .h-level > i { width: 18px; height: 6px; }
-.q-label::after { content: ''; position: absolute; left: 50%; bottom: -9px; width: 1.5px; height: 8px; background: var(--ink); }
-.q-label > b { font: 700 13px/1.1 var(--serif); letter-spacing: .06em; text-transform: uppercase; }
-.q-site.chosen > .q-label { ${cut('gilt')} }
-.q-label > .q-works { width: 84px; height: 7px; background: var(--stripes); box-shadow: inset 0 0 0 .8px var(--ink); }
-.h-level { display: flex; gap: 4px; justify-content: center; }
-.h-level > i { width: 24px; height: 7px; background: var(--light); box-shadow: inset 0 0 0 1px var(--line); }
-.h-level > i.on { background: var(--hatch), var(--go); box-shadow: inset 0 0 0 1px var(--ink); }
-.q-card { position: absolute; left: 18px; top: 12px; width: 290px; }
-.q-card > .k-body { gap: 8px; }
-.q-card .k-head { padding-left: 16px; padding-right: 40px; }
-.q-about { margin: 0; padding: 0 2px; line-height: 1.35; font-style: italic; }
-.q-top { text-align: center; font: 700 14px var(--serif); letter-spacing: .12em; text-transform: uppercase; color: var(--good); }
-.q-side { position: absolute; right: 18px; top: 12px; bottom: 12px; width: 330px; display: flex; flex-direction: column;
-  gap: 10px; }
-.q-side > .q-stats { flex: none; height: 318px; }
-.q-side .k-names > div { font-weight: 500; letter-spacing: 0; }
-.q-know { flex: 1; }
-.q-know > .k-body { gap: 0; justify-content: space-around; }
-.q-part { display: grid; grid-template-columns: 26px 1fr auto; align-items: center; gap: 8px; padding: 0 4px; }
-.q-part > .k-meter { grid-column: 2 / 4; height: 7px; }
-.q-part > span { font-weight: 700; }
-.q-part > small { font-size: 13px; font-style: italic; color: var(--faint); }
-
 .s-ship > .o-window { position: absolute; inset: 0; }
 /* she is drawn in the middle of what the panels leave of the page */
 .y-subject { position: absolute; left: 0; right: 400px; top: 0; bottom: 170px; pointer-events: none; }
+/* a part looked at: the chips across the top, the part on each ship at the left, the camera on it in what is left */
+.y-subject.aside { left: 330px; top: 60px; }
+.y-look { position: absolute; left: 18px; top: 12px; display: flex; gap: 6px; }
+.y-chip { display: flex; align-items: center; gap: 6px; height: 40px; padding: 0 12px; ${cut('light')}
+  font: 700 13px/1 var(--serif); letter-spacing: .1em; text-transform: uppercase; }
+.y-chip.on { ${cut('gilt')} }
+.y-fitted { position: absolute; left: 18px; top: 64px; width: 300px; }
+.y-fitted > .k-body { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 .y-stats { position: absolute; right: 18px; top: 12px; width: 372px; height: 470px; }
 .y-stats > .k-body { gap: 8px; }
 .y-stats .k-names > div { font-weight: 500; letter-spacing: 0; }
@@ -94,6 +63,9 @@ const CSS = `
 .y-type > .y-fig { align-self: stretch; font-size: 13px; }
 .y-type > .y-fig > b { font-size: 18px; }
 .y-type > .y-fig > .k-meter { height: 7px; }
+.y-type.on { ${cut('gilt')} }
+.y-choose .k-btn.wide { flex: none; }
+.y-choose > .k-body > .y-none { flex: none; padding: 6px; }
 .y-board { flex: 1; min-height: 0; display: grid; grid-template-columns: 1fr 330px; gap: 10px; }
 .y-board .k-body { gap: 8px; }
 /* the board's head: how many slots are filled, the part, and what the cards beneath are */
@@ -184,134 +156,8 @@ const CSS = `
 .y-fit > .k-btn { height: 36px; min-width: 0; padding: 0; }
 `;
 
-type Works = HqPaper['buildings'][number];
 /** A part's type, as the ship's paper names it. */
 type PartType = ShipPaper['types'][number]['id'];
-
-/** A building's levels, a pip each, the ones it has filled. */
-const pips = (b: Works) =>
-  el(
-    'div',
-    'h-level',
-    ...Array.from({ length: b.top }, (_, i) => el('i', i < b.level ? 'on' : ''))
-  );
-
-/** The headquarters. */
-export function createHq(office: Office): Screen<HqPaper> {
-  stylesheet(CSS);
-  bitsStyle();
-  const root = el('div', 's-hq');
-  /** The building whose card is open. */
-  let chosen: Building | null = null;
-
-  /** A building's name and level, pinned over its head (the office moves it there: data-plot). */
-  const site = (b: Works) => {
-    const made = el(
-      'div',
-      `q-site${b.id === chosen ? ' chosen' : ''}`,
-      pressed(
-        el(
-          'div',
-          'q-label',
-          el('b', '', b.name),
-          b.under ? el('i', 'q-works') : pips(b)
-        ),
-        () => {
-          chosen = chosen === b.id ? null : b.id;
-          office.draw();
-        }
-      )
-    );
-    made.dataset.plot = b.id;
-    return made;
-  };
-
-  const card = (b: Works) => {
-    const sheet = panel(
-      b.name,
-      [
-        pips(b),
-        lines([
-          ['Level', `${b.level} of ${b.top}`],
-          ['Cost per Race', money(b.upkeep)],
-        ]),
-        el('p', 'q-about', b.about),
-        ...(b.under
-          ? [
-              band('The Works'),
-              job(
-                { mark: null, name: `Level ${b.level + 1}` },
-                b.under.done,
-                `${b.under.days} Days`,
-                []
-              ),
-            ]
-          : b.level < b.top
-            ? [
-                band(`To Level ${b.level + 1}`),
-                lines([
-                  ['Build Time', `${b.days} Days`],
-                  ['Cost', money(b.cost)],
-                ]),
-                acted(
-                  'Upgrade',
-                  b.build,
-                  () =>
-                    office.ask({
-                      kind: 'send',
-                      command: { kind: 'Build', building: b.id },
-                    }),
-                  'on'
-                ),
-              ]
-            : [el('div', 'q-top', 'At its highest level')]),
-      ],
-      pressed(el('div', 'k-mark', icon('close', 18)), () => {
-        chosen = null;
-        office.draw();
-      })
-    );
-    sheet.classList.add('q-card');
-    return sheet;
-  };
-
-  return {
-    el: root,
-    show(v) {
-      const open = v.buildings.find((b) => b.id === chosen);
-      const sheet = el(
-        'div',
-        'o-window',
-        el('div', `o-subject q-subject${open ? ' carded' : ''}`),
-        ...v.buildings.map(site)
-      );
-      sheet.dataset.scene = 'harbour';
-      const stats = panel('Headquarters Stats', [
-        bars(v.stats, 'Best in Championship', 'Average Team'),
-      ]);
-      stats.classList.add('q-stats');
-      const know = panel(
-        'Part Knowledge',
-        v.knowledge.map((k, i) =>
-          el(
-            'div',
-            'q-part',
-            icon(TYPE_ICONS[i] ?? 'ship', 24),
-            el('span', '', k.part),
-            el('small', '', `${k.known} of ${k.of}`),
-            meter(k.of > 0 ? k.known / k.of : 0, 'fair')
-          )
-        )
-      );
-      know.classList.add('q-know');
-      root.replaceChildren(
-        sheet,
-        ...(open ? [card(open)] : []),
-        el('div', 'q-side', stats, know)
-      );
-    },
-  };
-}
 
 /** The six parts' pictograms, in the order the career lists them. */
 const TYPE_ICONS = [
@@ -355,11 +201,42 @@ export function createShip(office: Office): Screen<ShipPaper> {
   let versus: Versus = 'perf';
   /** The share of the improvement's work that goes to performance where both departments have parts. */
   let lean = 0.5;
+  /** The part the camera is on (null: all of her). */
+  let focus: PartType | null = null;
   const to = (next: Mode) => () => {
     mode = next;
     board = false;
+    focus = null;
     office.draw();
   };
+  /** The camera onto part `t`, or back off it if it is on it already. */
+  const look = (t: PartType) => () => {
+    focus = focus === t ? null : t;
+    office.draw();
+  };
+  /** Her ship's window, the camera on the part looked at (data-focus: office.ts), she drawn in its subject (`cls`). */
+  const pane = (cls: string) => {
+    const made = el('div', 'o-window', el('div', `o-subject ${cls}`));
+    if (focus) made.dataset.focus = focus;
+    return made;
+  };
+  /** The six parts to look at, a chip each over her window: the one looked at gilt. */
+  const chips = (v: ShipPaper) =>
+    el(
+      'div',
+      'y-look',
+      ...v.types.map((t) =>
+        pressed(
+          el(
+            'div',
+            `y-chip${focus === t.id ? ' on' : ''}`,
+            mark(t.id, 18),
+            t.label
+          ),
+          look(t.id)
+        )
+      )
+    );
   /** The sheets' tabs, at the foot as the nav's are. */
   const tabs = () => {
     const made = segmented<Mode>(
@@ -419,8 +296,25 @@ export function createShip(office: Office): Screen<ShipPaper> {
       made.classList.add('y-do');
       return made;
     };
+    // the part looked at, on each of her ships
+    const f = focus,
+      fitted =
+        f &&
+        panel(
+          v.types.find((t) => t.id === f)?.label ?? '',
+          v.ships.map((s, i) =>
+            tile(
+              f,
+              s.name,
+              v.parts.find((p) => p.type === f && p.ship === i)
+            )
+          )
+        );
+    fitted?.classList.add('y-fitted');
     return [
-      el('div', 'o-window', el('div', 'o-subject y-subject')),
+      pane(focus ? 'y-subject aside' : 'y-subject'),
+      chips(v),
+      ...(fitted ? [fitted] : []),
       stats,
       el(
         'div',
@@ -491,7 +385,7 @@ export function createShip(office: Office): Screen<ShipPaper> {
       return pressed(
         el(
           'div',
-          'y-type',
+          `y-type${focus === t.id ? ' on' : ''}`,
           el('b', '', t.label),
           mark(t.id, 36),
           el('small', '', 'Current Best Part'),
@@ -507,12 +401,10 @@ export function createShip(office: Office): Screen<ShipPaper> {
             (top?.reliability ?? 1) < 0.5
           )
         ),
-        () => {
-          board = true;
-          office.ask({ kind: 'design', type: t.id });
-        }
+        look(t.id)
       );
     };
+    const picked = v.types.find((t) => t.id === focus);
     const choose = v.design
       ? panel('In the Design Centre', [
           job(
@@ -529,14 +421,19 @@ export function createShip(office: Office): Screen<ShipPaper> {
         ])
       : panel('Choose a Part to Design', [
           el('div', 'y-types', ...v.types.map(card)),
+          picked
+            ? button(
+                `Design New ${picked.label}`,
+                () => {
+                  board = true;
+                  office.ask({ kind: 'design', type: picked.id });
+                },
+                { wide: true }
+              )
+            : el('div', 'y-none', 'Tap a part to look at it on your ship.'),
         ]);
     choose.classList.add('y-choose');
-    return [
-      el('div', 'o-window', el('div', 'o-subject y-subject above')),
-      stats,
-      choose,
-      tabs(),
-    ];
+    return [pane('y-subject above'), stats, choose, tabs()];
   }
 
   /** The drawing board: the part's slots, each one's cards dealt and one picked, and what the part would be. */

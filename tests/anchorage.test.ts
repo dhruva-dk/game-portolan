@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 import {
   BROADSIDE,
   LOBBY,
+  LOOSE,
   ORBIT,
   REST,
   anchorageEye,
@@ -42,7 +43,7 @@ const where = (p: Vec3) => {
 };
 
 test('at rest it stands off her starboard bow on the quarter, a little above her, and looks at her', () => {
-  const e = anchorageEye(pose, REST, 0, flat),
+  const e = anchorageEye(pose, { orbit: REST, focus: LOOSE }, 0, flat),
     w = where(e.position);
   assert.ok(Math.abs(w.off - LOBBY.quarter) < 0.01, `${w.off}`);
   assert.ok(
@@ -66,9 +67,16 @@ test('a drag turns it freely round her, and tilts it only within its limits', ()
   assert.equal(dragged(REST, { x: 0, y: 1e4 }).pitch, ORBIT.pitch[1]);
   assert.equal(dragged(REST, { x: 0, y: -1e4 }).pitch, ORBIT.pitch[0]);
   // dragged right, it goes round to her port side of where it was
-  const before = where(anchorageEye(pose, REST, 0, flat).position).off,
+  const before = where(
+      anchorageEye(pose, { orbit: REST, focus: LOOSE }, 0, flat).position
+    ).off,
     after = where(
-      anchorageEye(pose, dragged(REST, { x: 100, y: 0 }), 0, flat).position
+      anchorageEye(
+        pose,
+        { orbit: dragged(REST, { x: 100, y: 0 }), focus: LOOSE },
+        0,
+        flat
+      ).position
     ).off;
   assert.ok(after > before);
 });
@@ -78,10 +86,17 @@ test('it never goes under the sea or into the land, at any turn and tilt', () =>
     for (const pitch of ORBIT.pitch) {
       for (const broadside of [0, 0.5, 1]) {
         const o = { yaw, pitch, broadside };
-        assert.ok(where(anchorageEye(pose, o, 37, flat).position).height > 1.5);
+        assert.ok(
+          where(
+            anchorageEye(pose, { orbit: o, focus: LOOSE }, 37, flat).position
+          ).height > 1.5
+        );
         // a hill under it: it stands over it
         assert.ok(
-          where(anchorageEye(pose, o, 37, () => 20).position).height >=
+          where(
+            anchorageEye(pose, { orbit: o, focus: LOOSE }, 37, () => 20)
+              .position
+          ).height >=
             21.5 - 1e-9
         );
       }
@@ -98,19 +113,22 @@ test('her livery folio open, it eases round to her broadside and stays there; cl
   assert.equal(o.broadside, 1);
   // there, square off her starboard beam, and still at any clock (no drift)
   for (const clock of [0, 22.5, 45]) {
-    const w = where(anchorageEye(pose, o, clock, flat).position);
+    const w = where(
+      anchorageEye(pose, { orbit: o, focus: LOOSE }, clock, flat).position
+    );
     assert.ok(Math.abs(w.off - BROADSIDE.quarter) < 0.01, `${w.off}`);
   }
   // looking below the pivot it rests on, so she stands higher on the screen, over the folio
-  const e = anchorageEye(pose, o, 0, flat),
+  const e = anchorageEye(pose, { orbit: o, focus: LOOSE }, 0, flat),
     look = rotate([0, 0, -1], e.orientation),
     pivot = normalize(add(scale(up, R + LOBBY.height), e.position, -1));
   assert.ok(dot(look, up) < dot(pivot, up));
   // a drag still turns it, and let go it comes back to the broadside
   const off = dragged(o, { x: 200, y: 0 });
   assert.notEqual(
-    where(anchorageEye(pose, off, 0, flat).position).off,
-    where(anchorageEye(pose, o, 0, flat).position).off
+    where(anchorageEye(pose, { orbit: off, focus: LOOSE }, 0, flat).position)
+      .off,
+    where(anchorageEye(pose, { orbit: o, focus: LOOSE }, 0, flat).position).off
   );
   let back = off;
   for (let i = 0; i < 300; i++)
@@ -118,7 +136,8 @@ test('her livery folio open, it eases round to her broadside and stays there; cl
   assert.equal(back.broadside, 1);
   assert.ok(
     Math.abs(
-      where(anchorageEye(pose, back, 0, flat).position).off - BROADSIDE.quarter
+      where(anchorageEye(pose, { orbit: back, focus: LOOSE }, 0, flat).position)
+        .off - BROADSIDE.quarter
     ) < 0.01,
     JSON.stringify(back)
   );
@@ -127,7 +146,8 @@ test('her livery folio open, it eases round to her broadside and stays there; cl
   assert.equal(o.broadside, 0);
   assert.ok(
     Math.abs(
-      where(anchorageEye(pose, o, 0, flat).position).off - LOBBY.quarter
+      where(anchorageEye(pose, { orbit: o, focus: LOOSE }, 0, flat).position)
+        .off - LOBBY.quarter
     ) < 0.01
   );
 });

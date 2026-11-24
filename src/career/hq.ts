@@ -89,6 +89,62 @@ export const hosted = (c: Team): number =>
 export const scoutsOf = (c: Team): number =>
   K.scouts[lv(c.buildings.scoutingCentre.level)];
 
+/** How much faster the staff a building schools grow at a level, per cent (stars.ts: its rating, 1..3). */
+const growth = (level: number): number =>
+  Math.round(
+    TUNING.growth.school * (Math.min(3, Math.max(1, rated(level))) - 1) * 100
+  );
+/** A share of the time, as its text. */
+const share = (k: number) => `${Math.round(k * 100)}% of the time`;
+
+/** What a building gives at a level, a line a thing, for a team of championship `tier` (as each is read where it acts). */
+export function gives(b: Building, level: number, tier: number): string[] {
+  const l = lv(level),
+    tiered = `Tier ${K.tiers[l]} components`;
+  switch (b) {
+    case 'factory':
+      return [
+        `${K.points[l]} improvement points a day`,
+        `Parts built in ${Math.max(1, TUNING.design.build - l)} days`,
+        `Mechanics grow ${growth(l)}% faster`,
+      ];
+    case 'designCentre':
+      return [
+        `${K.slots[l]} design slots`,
+        `Designs take ${share(K.loft[l])}`,
+        `Designers grow ${growth(l)}% faster`,
+      ];
+    case 'towingTank':
+      return [`Sails, rigging and keels: ${tiered}`];
+    case 'compositesPlant':
+      return [`Rudders, hulls and mounts: ${tiered}`];
+    case 'simulator':
+      return [
+        `Drivers grow ${growth(l)}% faster`,
+        `Stamina +${Math.round(TUNING.growth.stamina * rated(l) * 10) / 10} a season`,
+      ];
+    case 'pitCentre':
+      return [
+        `Pit crew recover ${1 + rated(l)}× as fast`,
+        `Pit crew grow ${growth(l)}% faster`,
+      ];
+    case 'scoutingCentre':
+      return [
+        `${K.scouts[l]} scouts`,
+        `Scouting takes ${share(TUNING.scout.nest[l])}`,
+      ];
+    case 'commercialCentre':
+      return [
+        `${Math.round(K.fish[Math.min(K.fish.length - 1, tier)] * K.fishLevel[l])} a race in trade`,
+      ];
+    case 'hospitality':
+      return [
+        `Sponsors up to grade ${K.grade[l]}`,
+        `Sponsors pay ${Math.round(K.hosted[l] * 100)}%`,
+      ];
+  }
+}
+
 /** Whether a team may raise a building a level now. */
 export function buildCheck(s: CareerState, team: number, b: Building): Check {
   if (!BUILDINGS.includes(b)) return why('building', 'No such building.');

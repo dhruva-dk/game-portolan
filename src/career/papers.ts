@@ -24,6 +24,9 @@ import {
   buildCheck,
   buildCost,
   buildDays,
+  capOf,
+  gives,
+  needs,
   designSlots,
   BUILT,
   sponsorGrade,
@@ -392,7 +395,8 @@ const WINGS: readonly (readonly [string, readonly Building[]])[] = [
 /** The headquarters. */
 export function hqPaper(s: CareerState): HqPaper {
   const c = myTeam(s),
-    top = (b: Building) => TUNING.hq.works[b].cost.length;
+    top = () => TUNING.hq.top,
+    cap = capOf(c);
   return {
     stats: measured(
       s,
@@ -400,7 +404,7 @@ export function hqPaper(s: CareerState): HqPaper {
       WINGS.map(([name]) => name),
       (x) =>
         WINGS.map(([, of]) => of.reduce((a, b) => a + x.buildings[b].level, 0)),
-      (k) => (WINGS[k]?.[1] ?? []).reduce((a, b) => a + top(b), 0)
+      (k) => (WINGS[k]?.[1] ?? []).length * top()
     ),
     knowledge: TYPES.map((t) => ({
       part: PARTS[t] ?? t,
@@ -409,13 +413,20 @@ export function hqPaper(s: CareerState): HqPaper {
     })),
     buildings: BUILDINGS.map((b) => {
       const w = c.buildings[b],
-        next = Math.min(top(b), w.level + 1);
+        next = Math.min(top(), w.level + 1),
+        parent = needs(b);
       return {
         id: b,
         name: BUILT[b],
         about: ABOUT[b],
         level: w.level,
-        top: top(b),
+        top: top(),
+        cap,
+        needs: parent
+          ? { name: BUILT[parent], level: c.buildings[parent].level }
+          : null,
+        now: gives(b, w.level, c.tier),
+        next: w.level < top() ? gives(b, next, c.tier) : null,
         upkeep: upkeepAt(b, w.level),
         cost: buildCost(b, next),
         days: buildDays(b, next),

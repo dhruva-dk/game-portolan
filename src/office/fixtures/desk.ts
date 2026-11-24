@@ -21,6 +21,7 @@ import { SPONSORS } from './sponsors.ts';
 import { STANDINGS } from './standings.ts';
 import { TEAM as ROSTER } from './team.ts';
 import { HERS, TEAMS } from './teams.ts';
+import { HQ, SHIP } from './yard.ts';
 
 /** A race's points by place, as the fixture's result shows them. */
 const POINTS = [25, 18, 15, 12, 10, 8, 6, 4, 2, 1];
@@ -96,6 +97,8 @@ const VIEWS: Pick<
   regulations: ADMIRALTY,
   board: { view: BOARD, dyes: TEAMS.map((t) => t.colours) },
   season: SEASON,
+  hq: HQ,
+  ship: SHIP,
 };
 
 export const FIXTURE: Desk = {

@@ -12,6 +12,7 @@
 // made.
 
 import { AIR_FOV, type Eye } from '../snapshot.ts';
+import type { PartType } from '../race.ts';
 import type { Harbour } from '../world/harbour.ts';
 import type { ShipPose } from '../world/pose.ts';
 import { clamp, lerp, smoother, wrapAngle } from '../world/scalar.ts';
@@ -81,6 +82,100 @@ export const ORBIT = {
  * The camera never comes nearer the sea or the land under it than this, metres.
  */
 const CLEAR = 1.5;
+
+/**
+ * What the camera at anchor looks at on her and from where: a point `ahead`
+ * metres along her from her middle (aft, less than 0) and `height` metres over
+ * the sea, from `quarter` radians round from dead ahead on a boom `boom` metres
+ * long rising `pitch` radians; drifting `drift` radians either way round her.
+ */
+interface Focus {
+  ahead: number;
+  height: number;
+  quarter: number;
+  boom: number;
+  pitch: number;
+  drift: number;
+}
+/** The lobby's own focus: the whole of her, drifting (LOBBY). */
+export const LOOSE: Readonly<Focus> = {
+  ahead: 0,
+  height: LOBBY.height,
+  quarter: LOBBY.quarter,
+  boom: LOBBY.boom,
+  pitch: LOBBY.pitch,
+  drift: LOBBY.drift,
+};
+/**
+ * The camera on each of her six parts, still: her sails whole from off the bow;
+ * her foremast's shrouds and stays from ahead, looking up; her rudder from the
+ * quarter, low; her hull square off the beam; her keel along the waterline;
+ * her gun's mount from above the waist.
+ */
+export const FOCI: Readonly<Record<PartType, Readonly<Focus>>> = {
+  sails: {
+    ahead: 0.5,
+    height: 12,
+    quarter: 1.25,
+    boom: 29,
+    pitch: 0.12,
+    drift: 0,
+  },
+  rigging: {
+    ahead: 4,
+    height: 12,
+    quarter: 0.55,
+    boom: 24,
+    pitch: 0.3,
+    drift: 0,
+  },
+  rudder: {
+    ahead: -9,
+    height: 1.2,
+    quarter: 2.55,
+    boom: 13,
+    pitch: 0.18,
+    drift: 0,
+  },
+  hull: {
+    ahead: 0,
+    height: 2,
+    quarter: Math.PI / 2,
+    boom: 30,
+    pitch: 0.06,
+    drift: 0,
+  },
+  keel: {
+    ahead: 1,
+    height: 0.2,
+    quarter: 1.9,
+    boom: 16,
+    pitch: 0.02,
+    drift: 0,
+  },
+  mounts: {
+    ahead: -1.4,
+    height: 2.6,
+    quarter: 1.2,
+    boom: 11,
+    pitch: 0.55,
+    drift: 0,
+  },
+};
+/** A focus closes this share of the way to another each second, as e^−FOCUSED. */
+const FOCUSED = 3;
+
+/** `a` eased toward `to` over dt seconds (written over). */
+export function focused(a: Focus, to: Readonly<Focus>, dt: number): Focus {
+  const k = 1 - Math.exp(-FOCUSED * dt);
+  a.ahead += (to.ahead - a.ahead) * k;
+  a.height += (to.height - a.height) * k;
+  a.quarter += (to.quarter - a.quarter) * k;
+  a.boom += (to.boom - a.boom) * k;
+  a.pitch += (to.pitch - a.pitch) * k;
+  a.drift += (to.drift - a.drift) * k;
+  return a;
+}
 
 /**
  * Where a finger has taken the camera off its rest: its turn round her
@@ -193,48 +288,53 @@ const up: Out3 = [0, 0, 0],
   ahead: Out3 = [0, 0, 0],
   way: Out3 = [0, 0, 0],
   at: Out3 = [0, 0, 0];
-const end: CourseOut = { p: [0, 0, 0], t: [0, 0, 0] };
+const end: CourseOut = { p: [0, 0, 0], t: [0, 0, 0] },
+  pivot: CourseOut = { p: [0, 0, 0], t: [0, 0, 0] };
 
 /**
- * The eye on her at anchor: her pose as drawn, the orbit, the world's clock (s,
- * for the drift) and the floor under a point (metres over the mean sea of the
- * higher of the land and the waves there), which the eye stays CLEAR above
- * (into `out`, whose framing is left as it is).
+ * The eye on her at anchor: her pose as drawn, how it is turned (the orbit)
+ * and on what of her (the focus), the world's clock (s, for the drift) and the
+ * floor under a point (metres over the mean sea of the higher of the land and
+ * the waves there), which the eye stays CLEAR above (into `out`, whose framing
+ * is left as it is).
  */
 export function anchorageEye(
   pose: ShipPose,
-  o: Orbit,
+  on: { orbit: Readonly<Orbit>; focus: Readonly<Focus> },
   clock: number,
   floor: (p: Vec3) => number,
   out = eyeOut()
 ): Eye {
+  const { orbit: o, focus } = on;
   normalize(pose.position, up);
   normalize(tangent(pose.forward, up, ahead), ahead);
   // (the broadside's share of the turn, eased in and out)
   const b = smoother(clamp(o.broadside));
   const yaw =
     Math.PI -
-    lerp(LOBBY.quarter, BROADSIDE.quarter, b) +
-    (1 - b) * LOBBY.drift * Math.sin((clock / LOBBY.period) * Math.PI * 2) +
+    lerp(focus.quarter, BROADSIDE.quarter, b) +
+    (1 - b) * focus.drift * Math.sin((clock / LOBBY.period) * Math.PI * 2) +
     o.yaw;
-  // the boom runs from the pivot back along `boom`'s way, rising at `pitch`
-  const pitch = LOBBY.pitch + o.pitch,
-    boom = lerp(LOBBY.boom, BROADSIDE.boom, b),
-    height = lerp(LOBBY.height, BROADSIDE.height, b);
+  // the pivot, `ahead` along her; the boom runs from it back along `boom`'s
+  // way, rising at `pitch`
+  const pitch = focus.pitch + o.pitch,
+    boom = lerp(focus.boom, BROADSIDE.boom, b),
+    height = lerp(focus.height, BROADSIDE.height, b);
+  const middle = along(up, ahead, focus.ahead, pivot).p;
   const under = along(
-    up,
+    middle,
     scale(rotateAbout(ahead, up, yaw, way), -1, way),
     boom * Math.cos(pitch),
     end
   ).p;
   const position = place(
     under,
-    Math.max(LOBBY.height + boom * Math.sin(pitch), floor(under) + CLEAR),
+    Math.max(focus.height + boom * Math.sin(pitch), floor(under) + CLEAR),
     out.position
   );
   lookAt(
     position,
-    place(up, height, at),
+    place(middle, height, at),
     normalize(position, way),
     out.orientation
   );
@@ -249,20 +349,91 @@ export function anchorageEye(
  * from its middle (the jetty runs out that way), looking down on it at `pitch`
  * radians, square to the shore.
  */
-const OVERLOOK = { back: 132, pitch: 0.8, height: 6, sea: 9 } as const;
+const OVERLOOK = { back: 96, pitch: 0.8, height: 6, sea: 9 } as const;
 
-/** The eye over the harbour `h` (into `out`, whose framing is left as it is). */
-export function harbourEye(h: Harbour, out = eyeOut()): Eye {
-  const { back, pitch, sea } = OVERLOOK,
+/**
+ * Where the camera over the harbour looks: `x` along the shore and `z` toward
+ * the sea from its middle, metres, and from how far back.
+ */
+export interface Survey {
+  x: number;
+  z: number;
+  back: number;
+}
+/**
+ * How far a drag pans the camera over the harbour: what it looks at kept
+ * within `x` along the shore and `z` toward the sea of its middle, metres;
+ * where it looks first (`home`: toward the factory, the campus's showpiece);
+ * how far back it stands on a building chosen (`near`).
+ */
+export const PAN = {
+  x: [-40, 40],
+  z: [-36, 24],
+  home: { x: -20, z: 10, back: OVERLOOK.back },
+  near: 60,
+} as const;
+/** The survey on a building standing at (x, z) on the harbour's chart: it in the middle, from near. */
+export const onPlot = (x: number, z: number): Survey => ({
+  x,
+  z: z - OVERLOOK.sea,
+  back: PAN.near,
+});
+/** The survey of the whole campus from where `s` looks: from as far back as at first. */
+export const overall = (s: Readonly<Survey>): Survey => ({
+  x: s.x,
+  z: s.z,
+  back: OVERLOOK.back,
+});
+
+/**
+ * The survey after a drag of the look (CSS px: right and down), the picture
+ * `size` of the screen high: the ground follows the finger (written over).
+ */
+export function panned(
+  s: Survey,
+  look: { x: number; y: number },
+  size: number
+): Survey {
+  const k =
+    (2 * s.back * Math.tan((AIR_FOV * Math.PI) / 360)) /
+    VIEWPORT.height /
+    Math.max(0.1, size);
+  s.x = clamp(s.x - look.x * k, PAN.x[0], PAN.x[1]);
+  s.z = clamp(
+    s.z - (look.y * k) / Math.sin(OVERLOOK.pitch),
+    PAN.z[0],
+    PAN.z[1]
+  );
+  return s;
+}
+
+/** `s` eased toward `to` over dt seconds, as a focus is (written over). */
+export function surveyed(s: Survey, to: Readonly<Survey>, dt: number): Survey {
+  const k = 1 - Math.exp(-FOCUSED * dt);
+  s.x += (to.x - s.x) * k;
+  s.z += (to.z - s.z) * k;
+  s.back += (to.back - s.back) * k;
+  return s;
+}
+
+/** The eye over the harbour `h`, as `survey` looks (into `out`, whose framing is left as it is). */
+export function harbourEye(
+  h: Harbour,
+  survey: Readonly<Survey> = PAN.home,
+  out = eyeOut()
+): Eye {
+  const { pitch } = OVERLOOK,
+    { x, z, back } = survey,
+    sea = OVERLOOK.sea + z,
     over = h.ground + OVERLOOK.height;
   const position = place(
-    fromChart(h.chart, 0, sea + back * Math.cos(pitch)),
+    fromChart(h.chart, x, sea + back * Math.cos(pitch)),
     over + back * Math.sin(pitch),
     out.position
   );
   lookAt(
     position,
-    place(fromChart(h.chart, 0, sea), over, at),
+    place(fromChart(h.chart, x, sea), over, at),
     normalize(position, way),
     out.orientation
   );

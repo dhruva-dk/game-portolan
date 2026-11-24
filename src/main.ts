@@ -366,7 +366,10 @@ async function play(s: Stage): Promise<Played> {
         },
       }
     );
-    const office = createOffice(manager.desk, { stage: game.stage });
+    const office = createOffice(manager.desk, {
+      stage: game.stage,
+      look: game.look,
+    });
     managed = { office, raced: manager.raced };
     void s
       .still(portraitEye(normalize(s.start.at)))

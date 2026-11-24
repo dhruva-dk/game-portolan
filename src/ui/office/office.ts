@@ -12,6 +12,7 @@ import { SHADOW, alpha } from '../ink.ts';
 import { PAGE, createPage } from '../kit/page.ts';
 import { el } from '../kit/part.ts';
 import { kitStyle, stylesheet } from '../kit/style.ts';
+import { onLook } from '../touch.ts';
 import { boxOf, fade, onResize, screen, view } from '../ui.ts';
 import { SCREENS, type Name, type Opened } from './screens.ts';
 import { STRIP, NAV, createShell } from './shell.ts';
@@ -38,6 +39,7 @@ const CSS = `
 .o-body { position: absolute; left: 0; right: 0; top: ${STRIP}px; bottom: ${NAV}px; }
 .o-body.bare { top: 0; bottom: 0; }
 .o-body > * { position: absolute; inset: 0; }
+.o-window { touch-action: none; }
 `;
 
 /**
@@ -67,8 +69,12 @@ interface Backdrop {
     to: {
       scene: 'ship' | 'harbour';
       framing: { centre: [number, number]; size: number };
+      /** What in it the camera is on (data-focus: a part of her ship, or a building), if anything. */
+      focus: string | null;
     } | null
   ): void;
+  /** The window dragged (px, right and down, since the last call), and whether the finger is still down. */
+  look(x: number, y: number, held: boolean): void;
 }
 
 /** The office over `desk`, hidden until shown; the world behind it staged through `backdrop`. */
@@ -123,6 +129,9 @@ export function createOffice(desk: Desk, backdrop?: Backdrop) {
   page.append(shell.strip, body, shell.nav);
   // (a window stands elsewhere on a screen of another size)
   onResize(() => draw());
+  // a finger come down on the open screen's window, anywhere in it, drags the
+  // world behind it
+  onLook(body, '.o-window', (x, y, held) => backdrop?.look(x, y, held));
 
   /** Each list scrolled as it was, or, not yet scrolled, to where it asks (her own row in view). */
   function settle(at: Name, keep: boolean) {
@@ -161,6 +170,7 @@ export function createOffice(desk: Desk, backdrop?: Backdrop) {
     const s = boxOf(hole.querySelector('.o-subject') ?? hole);
     backdrop?.stage({
       scene: hole.dataset.scene === 'harbour' ? 'harbour' : 'ship',
+      focus: hole.dataset.focus ?? null,
       framing: {
         centre: [
           (s.left + s.width / 2) / (view.w / 2) - 1,
@@ -267,13 +277,20 @@ export function createOffice(desk: Desk, backdrop?: Backdrop) {
      * harbour's plots (px on the screen, by plot; null: it is not over the
      * harbour): what the open screen pins to them is moved there.
      */
-    plots(at: Readonly<Record<string, readonly [number, number]>> | null) {
+    plots(
+      at: Readonly<
+        Record<string, readonly [number, number, number, number]>
+      > | null
+    ) {
       if (!at || !laid || root.hidden) return;
       const { left, top, k } = laid;
       for (const pin of laid.pins) {
         const p = at[pin.dataset.plot ?? ''];
         if (!p) continue;
         pin.style.transform = `translate(${((p[0] - left) / k).toFixed(1)}px, ${((p[1] - top) / k).toFixed(1)}px)`;
+        // (how far down its foot is drawn, and a metre across, page px: what it pins may cover the building)
+        pin.style.setProperty('--drop', `${((p[2] - p[1]) / k).toFixed(1)}px`);
+        pin.style.setProperty('--metre', `${(p[3] / k).toFixed(3)}px`);
         // (hidden until it is first placed)
         pin.style.visibility = 'visible';
       }

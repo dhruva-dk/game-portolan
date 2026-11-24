@@ -34,7 +34,8 @@ import { createBoard } from './board.ts';
 import { createSeason } from './season.ts';
 import { createSponsors } from './sponsors.ts';
 import { createStandings } from './standings.ts';
-import { createHq, createShip } from './yard.ts';
+import { createHq } from './hq.ts';
+import { createShip } from './yard.ts';
 
 /** A screen's name: a tab's, a viewed screen's, or a kit's sheet (the old kit's, the chartroom's). */
 export type Name = Tab | Viewed | 'kit' | 'chartroom';

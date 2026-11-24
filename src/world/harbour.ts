@@ -44,15 +44,15 @@ export const eachPlot = <T>(of: (id: Plot) => T): Record<Plot, T> => ({
 export const PLACES: Readonly<
   Record<Plot, readonly [x: number, z: number, tall: number]>
 > = {
-  factory: [-33, 28, 11.5],
-  hospitality: [1, 31, 12],
-  pitCentre: [33, 28, 11],
-  commercialCentre: [-36, -2, 5.5],
-  towingTank: [-3, 0, 7],
-  simulator: [32, -3, 13.5],
-  compositesPlant: [-31, -31, 21],
-  designCentre: [2, -33, 17],
-  scoutingCentre: [33, -31, 30],
+  factory: [-33, 28, 12],
+  hospitality: [1, 31, 5],
+  pitCentre: [33, 28, 7],
+  commercialCentre: [-36, -2, 6],
+  towingTank: [-3, 0, 5.2],
+  simulator: [32, -3, 9],
+  compositesPlant: [-31, -31, 17.5],
+  designCentre: [2, -33, 15],
+  scoutingCentre: [33, -31, 21],
 };
 /** The three on the water's edge: what is launched or landed there. */
 export const WATERSIDE: readonly Plot[] = [

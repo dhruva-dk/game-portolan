@@ -150,7 +150,7 @@ import { FIXTURE } from './office/fixtures/desk.ts';
 import type { Flow } from './ui/flow.ts';
 import { createOffice } from './ui/office/office.ts';
 import { NAMES } from './ui/office/screens.ts';
-import { uiLayer } from './ui/ui.ts';
+import { uiLayer, view } from './ui/ui.ts';
 import type { Weather } from './world/weather.ts';
 import {
   R,
@@ -462,9 +462,18 @@ function open(p: Played, others: readonly Berth[], world: World) {
     // the office on the fixture desk, over her ship at anchor in the lobby's place, the camera staged as a career's is
     flow.go('lobby');
     flow.office(true);
-    const office = createOffice(FIXTURE, { stage: game.stage });
+    const office = createOffice(FIXTURE, {
+      stage: game.stage,
+      look: game.look,
+    });
     office.go(officed);
     office.show(true);
+    // what the office pins to the harbour's buildings follows them, each frame, as a career's does (main.ts)
+    const pin = () => {
+      office.plots(game.plots(view.w, view.h));
+      requestAnimationFrame(pin);
+    };
+    requestAnimationFrame(pin);
     // (the fixture's next race's planet, as a career page's own is surveyed)
     void p
       .survey(FIXTURE.view('home').next.name)
