@@ -47,7 +47,7 @@ const none: Done = {
   mended: [],
   blew: [],
   cues: [],
-  her: at,
+  own: at,
 };
 const counter = () => {
   let n = 0;
@@ -156,7 +156,7 @@ test(
         stores.slot === HOTBAR.guns + 1
     );
     assert.deepEqual(
-      deedsOf({ ...done, her: null }, 0, counter(), 12).map((x) => x.kind),
+      deedsOf({ ...done, own: null }, 0, counter(), 12).map((x) => x.kind),
       [
         'swapped',
         'fired',

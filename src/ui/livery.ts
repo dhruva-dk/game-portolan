@@ -93,22 +93,22 @@ export function createLivery(
     rule = x0 + ROW * CELL + GAP / 2,
     s0 = x0 + ROW * CELL + GAP;
   const draw = () => {
-    const hers = wardrobe.worn(),
-      { dye, mark } = wardrobe.dyes[hers.dye] ?? { dye: '', mark: '' };
+    const worn = wardrobe.worn(),
+      { dye, mark } = wardrobe.dyes[worn.dye] ?? { dye: '', mark: '' };
     let body = `<path d="M${rule} ${y0 + 4}V${y0 + 2 * CELL - 4}" stroke="${INK.iron}" stroke-width=".8" opacity=".6"/>`;
     wardrobe.dyes.forEach((d, i) => {
       const cx = x0 + (i % ROW) * CELL + CELL / 2,
         cy = y0 + Math.floor(i / ROW) * CELL + CELL / 2;
       body +=
         `<g id="dye-${i}"><rect x="${cx - CELL / 2}" y="${cy - CELL / 2}" width="${CELL}" height="${CELL}" fill="transparent"/>` +
-        `${daub(cx, cy, d.dye, i * 7 + 3)}${i === hers.dye ? chosen(cx, cy, 15.5) : ''}</g>`;
+        `${daub(cx, cy, d.dye, i * 7 + 3)}${i === worn.dye ? chosen(cx, cy, 15.5) : ''}</g>`;
     });
     PATTERNS.forEach((_, i) => {
       const cx = s0 + i * SAIL.w + SAIL.w / 2,
         cy = y0 + CELL;
       body +=
         `<g id="pattern-${i}"><rect x="${cx - SAIL.w / 2}" y="${y0}" width="${SAIL.w}" height="${2 * CELL}" fill="transparent"/>` +
-        `${sail(cx, cy, dye, mark, i)}${i === hers.pattern ? chosen(cx, cy + 2, 28) : ''}</g>`;
+        `${sail(cx, cy, dye, mark, i)}${i === worn.pattern ? chosen(cx, cy + 2, 28) : ''}</g>`;
     });
     f.draw(body, (el) => {
       const choose = (l: Livery) => () => {

@@ -19,7 +19,7 @@ export interface Done {
   took: readonly Taken[];
   mended: readonly Mended[];
   blew: readonly number[];
-  her: Vec3 | null;
+  own: Vec3 | null;
 }
 
 const FIRST: readonly Cue['kind'][] = ['swapped'],
@@ -112,20 +112,20 @@ export function deedsOf(
       slot,
     });
   }
-  const her = done.her;
-  if (!her) return out;
+  const own = done.own;
+  if (!own) return out;
   for (const m of done.mended)
     if (m.ship === me)
       out.push({
         seq: next(),
         time,
-        at: her,
+        at: own,
         ship: me,
         kind: 'mended',
         piece: m.use,
       });
   if (done.blew.includes(me))
-    out.push({ seq: next(), time, at: her, ship: me, kind: 'gust' });
+    out.push({ seq: next(), time, at: own, ship: me, kind: 'gust' });
   return out;
 }
 
@@ -194,7 +194,7 @@ export function createLog(me: number) {
     took: [],
     mended: [],
     blew: [],
-    her: null,
+    own: null,
   };
   const next = () => ++seq;
   return {
@@ -205,7 +205,7 @@ export function createLog(me: number) {
       fought: Pick<Done, 'shots' | 'splashes' | 'strikes' | 'cues'>,
       asked: Pick<Done, 'cues' | 'blew'>,
       stored: Pick<Done, 'took' | 'mended'>,
-      her: Vec3 | null,
+      own: Vec3 | null,
       time: number
     ) {
       cues.length = 0;
@@ -217,7 +217,7 @@ export function createLog(me: number) {
       done.took = stored.took;
       done.mended = stored.mended;
       done.blew = asked.blew;
-      done.her = her;
+      done.own = own;
       fresh.length = 0;
       deeds = kept(deeds, deedsOf(done, me, next, time, fresh), time);
       blasts = blastsOf(blasts, done, time);

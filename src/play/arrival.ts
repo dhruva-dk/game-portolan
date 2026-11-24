@@ -12,10 +12,10 @@ export const ARRIVAL = {
   onto: 0.6,
 } as const;
 
-export function arriving(t: number, her: ShipPose, chase: Eye): Eye | null {
+export function arriving(t: number, ship: ShipPose, chase: Eye): Eye | null {
   if (t >= ARRIVAL.seconds) return null;
   const s = smoother(clamp(t / ARRIVAL.seconds));
-  const from = normalize(her.position),
+  const from = normalize(ship.position),
     to = normalize(chase.position);
   const r0 = Math.log(R + ARRIVAL.height),
     r1 = Math.log(length(chase.position)),
@@ -26,14 +26,14 @@ export function arriving(t: number, her: ShipPose, chase: Eye): Eye | null {
     ),
     turn = smoother(air);
   const up = normalize(
-    add(scale(her.forward, 1 - turn), normalize(position), turn)
+    add(scale(ship.forward, 1 - turn), normalize(position), turn)
   );
   const onto = smoother(clamp((air - ARRIVAL.onto) / (1 - ARRIVAL.onto)));
   return {
     kind: Math.exp(r) - R > ARRIVAL.air ? 'space' : 'air',
     position,
     orientation: slerp(
-      lookAt(position, her.position, up),
+      lookAt(position, ship.position, up),
       chase.orientation,
       onto
     ),

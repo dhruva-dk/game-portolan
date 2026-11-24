@@ -146,10 +146,10 @@ function tinted(
   far: FloatNode
 ): Vec3Node {
   const lab = oklab(c),
-    hers = oklab(color),
-    chroma = length(hers.yz),
-    ratio = chroma.div(max(hers.x, 1e-3));
-  const light = lab.x.mul(mix(float(1), hers.x.div(MIDDLE), a.mul(TINT_LIGHT)));
+    dyed = oklab(color),
+    chroma = length(dyed.yz),
+    ratio = chroma.div(max(dyed.x, 1e-3));
+  const light = lab.x.mul(mix(float(1), dyed.x.div(MIDDLE), a.mul(TINT_LIGHT)));
   const strength = mix(
     length(lab.yz).mul(min(ratio.div(TINT_RICH), 1).mul(TINT_CHROMA)),
     light.mul(ratio).mul(FAR_RICH),
@@ -158,7 +158,7 @@ function tinted(
   const keep = float(1).sub(a);
   const kept = lab.yz.mul(keep.mul(keep).mul(mix(float(1), keep, far)));
   return linear(
-    vec3(light, kept.add(hers.yz.div(max(chroma, 1e-4)).mul(strength.mul(a))))
+    vec3(light, kept.add(dyed.yz.div(max(chroma, 1e-4)).mul(strength.mul(a))))
   );
 }
 

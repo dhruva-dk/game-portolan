@@ -72,7 +72,7 @@ export function createClaims(ships: number) {
   const clock = uniform(0);
 
   const colorOf = (id: FloatNode): Vec4Node => colors.element(int(id));
-  const hers = (w: FloatNode) => clamp(w.sub(1).div(OWN_LINE - 1), 0, 1);
+  const owned = (w: FloatNode) => clamp(w.sub(1).div(OWN_LINE - 1), 0, 1);
 
   return {
     at(p: Vec3Node, dpx: Vec3Node, dpy: Vec3Node): Claim {
@@ -104,7 +104,7 @@ export function createClaims(ships: number) {
       const settled = clock.sub(HOLD);
       const far = smoothstep(0.6, 2, max(length(jx), length(jy)));
       const tintOf = (w: FloatNode): FloatNode =>
-        mix(mix(float(TINT), float(OWN_TINT), hers(w)), float(FAR_TINT), far);
+        mix(mix(float(TINT), float(OWN_TINT), owned(w)), float(FAR_TINT), far);
 
       const dye = vec4(0).toVar(),
         ink = vec4(0).toVar(),
@@ -291,7 +291,7 @@ export function createClaims(ships: number) {
           const d = abs(f.v).div(f.px);
           const strength = mix(aHi.mul(tintOf(hi.w)), aLo.mul(tintOf(lo.w)), t);
           const wide = float(LINE_HALF).mul(
-            mix(float(1), float(OWN_WIDE), hers(max(hi.w, lo.w.mul(aLo))))
+            mix(float(1), float(OWN_WIDE), owned(max(hi.w, lo.w.mul(aLo))))
           );
           const cover = clamp(wide.sub(d).add(0.5), 0, 1)
             .mul(mix(float(1), float(FAINTEST), far))

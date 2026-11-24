@@ -458,7 +458,7 @@ function demoShips(
   south: Vec3,
   most: number,
   seed: number,
-  hers: Livery
+  livery: Livery
 ): Berth[] {
   const others: Berth[] = [];
   const ships = Math.min(number('ships', 0), most),
@@ -489,7 +489,7 @@ function demoShips(
     others.push({
       at: u,
       heading: forward,
-      look: lookOf(dealt(seed, i + 1, hers)),
+      look: lookOf(dealt(seed, i + 1, livery)),
       lashed: way > 0 ? { course: null, throttle: way / SHIP.top } : null,
     });
   }

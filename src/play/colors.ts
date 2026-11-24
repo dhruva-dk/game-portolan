@@ -59,11 +59,11 @@ export const lookOf = (l: Livery): Look => {
   return { paint: c, sail: c, pattern: PATTERNS[pattern] };
 };
 
-export function dealt(seed: number, id: number, hers: Livery): Livery {
+export function dealt(seed: number, id: number, player: Livery): Livery {
   const h = hash(seed, id),
     others = COLORS.length - 1,
     k = h % others,
-    mine = worn(hers).dye;
+    mine = worn(player).dye;
   return {
     dye: k >= mine ? k + 1 : k,
     pattern: Math.floor(h / others) % PATTERNS.length,
