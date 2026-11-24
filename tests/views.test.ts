@@ -28,7 +28,12 @@ import { offerView } from '../src/career/views-offer.ts';
 import { profileView } from '../src/career/views-profile.ts';
 import { rivalView } from '../src/career/views-rival.ts';
 import { calendarPaper, mailPaper } from '../src/career/papers.ts';
-import { planView, standingsView } from '../src/career/office.ts';
+import {
+  planView,
+  shellView,
+  standingsView,
+  teamRanks,
+} from '../src/career/office.ts';
 import { lineups } from '../src/career/lineup.ts';
 import { traitLine } from '../src/career/views-traits.ts';
 import { TRAITS } from '../src/career/traits.ts';
@@ -680,4 +685,14 @@ test('career and jobs: each championship’s posts open at a reputation, hers en
   assert.equal(one.offers[0]?.decline.ok, false);
   assert.match(one.offers[0]?.decline.why ?? '', /take this post/);
   if (j.offers.length > 1) assert.ok(j.offers.every((o) => o.decline.ok));
+  // each post's team against its championship, as the ranks have it
+  const look = { dyes: [['#000000', '#ffffff'] as const], patterns: ['Plain'] };
+  for (const o of j.offers) {
+    const r = teamRanks(sacked, sacked.teams[o.team]!);
+    assert.equal(o.ranks.ships, ordinal(r[0]!.place));
+    assert.equal(o.ranks.hq, ordinal(r[2]!.place));
+  }
+  // sacked, the way on is a post taken
+  assert.equal(shellView(sacked, look).on, 'Take a Post');
+  assert.equal(shellView(s, look).on, 'Continue');
 });

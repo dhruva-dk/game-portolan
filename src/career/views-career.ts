@@ -7,7 +7,7 @@ import type { JobCard, JobsView, CareerView } from '../office/people.ts';
 import { marketability } from './effective.ts';
 import { standingOf } from './standings.ts';
 import { declineCheck, takeCheck } from './jobs.ts';
-import { seasonYear } from './office.ts';
+import { seasonYear, teamRanks } from './office.ts';
 import type { CareerState } from './state.ts';
 import { TUNING } from './tuning.ts';
 import { ROLE_NAMES, ageOf, dayText } from './views-person.ts';
@@ -30,7 +30,12 @@ function card(s: CareerState, team: number, expires: number): JobCard {
     no = takeCheck(s, team),
     stay = declineCheck(s, team);
   const place = standingOf(s, team),
-    of = s.championships[c.tier].standings.length;
+    of = s.championships[c.tier].standings.length,
+    ranks = teamRanks(s, c);
+  const rank = (name: string) => {
+    const r = ranks.find((x) => x.name === name);
+    return r ? ordinal(r.place) : '';
+  };
   return {
     team,
     name: c.name,
@@ -54,6 +59,11 @@ function card(s: CareerState, team: number, expires: number): JobCard {
       }
     ),
     standing: `${ordinal(place)} of ${of}`,
+    ranks: {
+      ships: rank('Ship'),
+      drivers: rank('Drivers'),
+      hq: rank('Headquarters'),
+    },
     expires: s.player?.sacked ? 'Until taken' : dayText(s, expires),
     take: { ok: no === null, why: no?.sentence ?? '' },
     decline: { ok: stay === null, why: stay?.sentence ?? '' },

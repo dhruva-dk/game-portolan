@@ -190,7 +190,19 @@ Each line: built on the kit from a fixture → in review → approved and live. 
       its manager, its side (cast, or how it leans), its sway; a tap opens its page. At the right the rules, each said
       as it plays out (the champion's prize against the last's, how many teams are inspected), next season's where a
       vote has changed them, and the season's proposals counted. The bar's chip and the vote letters open it
-- [ ] Board (chairman, budget, floor, reputation) · [ ] Season review
+- [ ] **Board** _(decided 2026-11-23: read + requests)_: the chairman's temper (ambition, generosity, patience,
+      meddling), the budget, the debt floor, confidence over the season (a chart: the career keeps its history) and
+      the line you are sacked under; and a few requests, after MM's: more budget, a lower debt floor, an easier
+      objective, each granted by the chairman's temper and how you stand, a refusal or asking too often costing
+      confidence
+- [ ] **Season review** _(decided 2026-11-23: a screen and an archive)_: Continue at the season's end opens it: the
+      final standings, your place against the objective, prize money, who moved up or down, honours, retirements and
+      arrivals, next season's rules. The career keeps a compact summary of each season, so Player's seasons open
+      their reviews later
+
+Decided too (2026-11-23): a dilemma's answers each say who they please or anger and roughly what they cost, in
+words; sacked, Continue waits on Jobs until you take a post (time runs on while none is offered), and a post's card
+shows its team's ships against its championship, its drivers' stars and its HQ.
 
 A new screen's view and fixture are built first (`src/career/views-*.ts`, `src/office/`), then the screen.
 

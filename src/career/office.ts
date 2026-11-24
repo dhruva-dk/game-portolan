@@ -134,7 +134,7 @@ export function shellView(s: CareerState, look: Look): ShellView {
       ...(scouting > 0 && { scouting: { count: scouting } }),
       ...(unread > 0 && { mail: { count: unread } }),
     },
-    on: 'Continue',
+    on: s.player?.sacked ? 'Take a Post' : 'Continue',
   };
 }
 
@@ -280,6 +280,22 @@ export function teamStats(s: CareerState, c: Team): HomeView['stats'] {
       average: mean(tier.map(share)),
     };
   });
+}
+
+/** Where a team stands in its championship by each of its measures (1 the best). */
+export function teamRanks(
+  s: CareerState,
+  c: Team
+): { name: string; place: number; of: number }[] {
+  const tier = championshipOf(s, c.tier).teams.map((id) =>
+    measures(s, s.teams[id])
+  );
+  const own = measures(s, c);
+  return MEASURES.map((name, k) => ({
+    name,
+    place: 1 + tier.filter((m) => (m[k] ?? 0) > (own[k] ?? 0)).length,
+    of: tier.length,
+  }));
 }
 
 /** What a letter's category pictures, and how the news heads it. */

@@ -158,16 +158,9 @@ export async function createManager(shelf: Shelf, look: Look, page: Page) {
       // (kept while the result is still shown: the page may be sailing on under it)
       arrive();
       if (page.at() !== 'result') last = null;
-    } else if (s.player?.sacked && page.at() !== 'jobs') page.open('jobs');
-    else if (s.player?.sacked) {
-      // (Continue past the posts offered: the highest championship's is taken)
-      const post = [...s.player.offers].sort(
-        (a, b) =>
-          (s.teams[a.team]?.tier ?? 9) - (s.teams[b.team]?.tier ?? 9) ||
-          a.made - b.made
-      )[0];
-      if (post) await send({ kind: 'TakeJob', team: post.team });
-      arrive();
+    } else if (s.player?.sacked) {
+      // (sacked, the way on is a post you take: Continue waits on the posts offered, one always among them)
+      if (page.at() !== 'jobs') page.open('jobs');
     } else if (s.race !== null) {
       if (page.at() !== 'plan') page.open('plan');
       else if (!waiting && !racing) await sailRace();

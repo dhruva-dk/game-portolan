@@ -35,6 +35,7 @@ const post = (
       ['In hand', '212,000'],
     ]),
     standing: '9th of 20',
+    ranks: { ships: '11th', drivers: '7th', hq: '14th' },
     expires: '24 May 1716',
     take: { ok: true, why: '' },
     decline: { ok: true, why: '' },

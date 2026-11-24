@@ -235,6 +235,8 @@ export interface JobCard {
   target: string;
   budget: Figure;
   standing: string;
+  /** Where its ships, its drivers and its headquarters stand in its championship ('8th'). */
+  ranks: { ships: string; drivers: string; hq: string };
   expires: string;
   take: Act;
   decline: Act;

@@ -40,6 +40,9 @@ const CSS = `
 .jb-crest > div { min-width: 0; display: flex; flex-direction: column; gap: ${u(1)}; }
 .jb-crest .cr-link { font: 700 var(--t-name)/1.15 var(--face); overflow-wrap: break-word; }
 .jb-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s4); align-content: start; overflow-y: auto; }
+.jb-ranks { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s2); text-align: center; }
+.jb-ranks > div { display: flex; flex-direction: column; gap: ${u(0.5)}; }
+.jb-ranks b { font: 600 var(--t-body)/1.2 var(--face); }
 .jb-tiers { display: flex; flex-direction: column; }
 .jb-tiers > div { display: flex; justify-content: space-between; gap: var(--s2); padding: var(--s1) 0; border-bottom: var(--w-fine) solid var(--rule); }
 .jb-tiers > div > span { font: 500 var(--t-body)/1.2 var(--face); }
@@ -77,6 +80,17 @@ function post(c: JobCard, dyes: Dyes, office: Office) {
       ['Budget', c.budget.text],
       ['Offer stands', c.expires],
     ]),
+    el(
+      'div',
+      'jb-ranks',
+      ...(
+        [
+          ['Ships', c.ranks.ships],
+          ['Drivers', c.ranks.drivers],
+          ['HQ', c.ranks.hq],
+        ] as const
+      ).map(([k, v]) => el('div', '', label(k), el('b', '', v)))
+    ),
     el(
       'div',
       'cr-card-foot pair',
