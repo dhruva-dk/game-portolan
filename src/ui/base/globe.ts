@@ -76,7 +76,7 @@ const SWIRLS: Vec3[] = Array.from({ length: 60 }, (_, i) => {
 });
 const SWIRL = (() => {
   const path = new Path2D();
-  for (const p of GLYPHS['hud.storm']) {
+  for (const p of GLYPHS.storm) {
     const turn = Number(/rotate\((\d+)/.exec(p.tr ?? '')?.[1] ?? 0);
     path.addPath(
       new Path2D(p.d),
@@ -413,7 +413,7 @@ export function createGlobe(coasts: readonly Coast[]) {
       80,
       96,
       slip(1, 1, 78, 94, { flat: true }) +
-        glyph('hud.shipsLeft', 40, 30, 30) +
+        glyph('ship', 40, 30, 30) +
         figure(40, 70, state.afloat, 28)
     );
     storm.innerHTML = svg(

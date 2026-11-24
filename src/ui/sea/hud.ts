@@ -148,7 +148,7 @@ export function createHud(layer: HTMLElement, shores: Shores, act: HudActions) {
             }) +
             figure(60, 19, time, 23, { fill: closing ? INK.storm : INK.iron }) +
             slip(95, 2, 88, 34) +
-            glyph('hud.shipsLeft', 116, 19, 22) +
+            glyph('ship', 116, 19, 22) +
             figure(154, 19, s.afloat, 23)
         );
       }
@@ -170,7 +170,7 @@ export function createHud(layer: HTMLElement, shores: Shores, act: HudActions) {
             (s.blowing
               ? `<circle cx="30" cy="30" r="25" fill="none" stroke="${WASH.gold}" stroke-width="2.4"/>`
               : '') +
-            `${glyph('hud.gust', 30, 26, 32)}${pips}</g>`
+            `${glyph('gust', 30, 26, 32)}${pips}</g>`
         );
       }
 
