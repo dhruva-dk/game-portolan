@@ -2,12 +2,14 @@ import { mkdirSync, readFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import { parseArgs } from 'node:util';
 import { outDir, writeJson } from '../out.ts';
+import type { CareerScenario } from './career.ts';
+import { runCareerScenario } from './careers.ts';
 import { runMatch, type MatchScenario, type Summary } from './match.ts';
 import { CORES, runPool } from './pool.ts';
 import { pooled, printMatch, printPooled } from './print.ts';
 import { runTerrain, type TerrainScenario } from './terrain.ts';
 
-type Scenario = MatchScenario | TerrainScenario;
+type Scenario = MatchScenario | TerrainScenario | CareerScenario;
 
 const { values: a, positionals } = parseArgs({
   allowPositionals: true,
@@ -18,13 +20,15 @@ const { values: a, positionals } = parseArgs({
     seconds: { type: 'string' },
     workers: { type: 'string', default: String(CORES) },
     subject: { type: 'string' },
+    seasons: { type: 'string' },
+    standin: { type: 'boolean', default: false },
   },
 });
 
 const named = positionals[0];
 if (!named) {
   console.error(
-    'usage: npm run sim -- <scenario | file.json> [--seed n] [--planet n] [--runs n] [--seconds n] [--workers n] [--subject name]'
+    'usage: npm run sim -- <scenario | file.json> [--seed n] [--planet n] [--runs n] [--seconds n] [--seasons n] [--workers n] [--standin] [--subject name]'
   );
   process.exit(2);
 }
@@ -77,6 +81,15 @@ if (sc.kind === 'match') {
     printPooled(p, dir);
     failed = all.some((s) => s.invariants.broken > 0);
   }
+} else if (sc.kind === 'season' || sc.kind === 'career') {
+  await runCareerScenario(sc, {
+    seed: a.seed,
+    runs,
+    seasons: num(a.seasons),
+    workers: Number(a.workers),
+    standin: a.standin,
+    subject,
+  });
 } else if (sc.kind === 'terrain') {
   const one: TerrainScenario = {
     ...sc,
