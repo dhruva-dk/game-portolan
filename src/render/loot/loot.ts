@@ -8,7 +8,6 @@ import {
   InstancedInterleavedBuffer,
   InterleavedBufferAttribute,
   LatheGeometry,
-  Matrix4,
   Mesh,
   MeshBasicNodeMaterial,
   OctahedronGeometry,
@@ -37,14 +36,7 @@ import {
 } from 'three/tsl';
 import { GILDING, GLINT, ICE, RARITY_GLOW, TAR, TIMBER } from '../palette.ts';
 import type { Light } from '../sky/light.ts';
-import {
-  KINDS,
-  gunOrder,
-  type GunKind,
-  type LootKind,
-} from '../../sim/kinds.ts';
-import { gunSurface } from '../ship/gun.ts';
-import { gunShape } from '../ship/gun-shape.ts';
+import type { Use } from '../../sim/kinds.ts';
 import type { LootDraw } from '../snapshot.ts';
 import type { Eye } from '../view/view.ts';
 import { additive } from '../gpu.ts';
@@ -72,27 +64,17 @@ const EMIT = 1.3,
   BEAM_EMIT = 3,
   HALO_EMIT = 1.2,
   RIM = 0.62;
-const SIZE: Record<LootKind, number> = {
-  cannon: 2.3,
-  scatter: 2.1,
-  repeater: 2.2,
-  harpoon: 2.4,
-  mortar: 2.1,
+const SIZE: Record<Use, number> = {
   smallShield: 1.7,
   bigShield: 2.25,
   repairKit: 1.6,
   fullRepair: 2.1,
 };
 
-const CRYSTALS = KINDS.length,
-  CASKS = KINDS.length + 1,
-  BEAMS = KINDS.length + 2;
-const GROUP: Record<LootKind, number> = {
-  cannon: gunOrder('cannon'),
-  scatter: gunOrder('scatter'),
-  repeater: gunOrder('repeater'),
-  harpoon: gunOrder('harpoon'),
-  mortar: gunOrder('mortar'),
+const CRYSTALS = 0,
+  CASKS = 1,
+  BEAMS = 2;
+const GROUP: Record<Use, number> = {
   smallShield: CRYSTALS,
   bigShield: CRYSTALS,
   repairKit: CASKS,
@@ -119,7 +101,7 @@ function instanced(
 ): InstancedBufferGeometry {
   const g = new InstancedBufferGeometry();
   if (shape.getIndex()) g.setIndex(shape.getIndex());
-  for (const name of ['position', 'normal', 'uv', 'part', 'metal']) {
+  for (const name of ['position', 'normal', 'uv', 'part']) {
     if (shape.getAttribute(name))
       g.setAttribute(name, shape.getAttribute(name));
   }
@@ -128,20 +110,6 @@ function instanced(
   g.setAttribute('lootLife', new InterleavedBufferAttribute(buffer, 4, 8));
   g.instanceCount = 0;
   return g;
-}
-
-function gun(kind: GunKind): BufferGeometry {
-  const s = gunShape(kind),
-    g = new BufferGeometry();
-  g.setAttribute('position', new BufferAttribute(s.position, 3));
-  g.setAttribute('normal', new BufferAttribute(s.normal, 3));
-  g.setAttribute('metal', new BufferAttribute(s.metal, 1));
-  g.setIndex(new BufferAttribute(s.index, 1));
-  g.applyMatrix4(new Matrix4().makeRotationX(kind === 'mortar' ? -0.1 : -0.4));
-  g.computeBoundingBox();
-  const box = g.boundingBox!,
-    mid = box.min.clone().add(box.max).multiplyScalar(0.5);
-  return g.translate(-mid.x, -mid.y, -mid.z);
 }
 
 const cask = () => {
@@ -202,8 +170,7 @@ export function createLoot(light: Light) {
       new Float32Array(PIECES * STRIDE),
       STRIDE
     ).setUsage(DynamicDrawUsage);
-  const guns = KINDS.map(buffer),
-    crystals = buffer(),
+  const crystals = buffer(),
     casks = buffer(),
     beams = buffer();
 
@@ -268,12 +235,6 @@ export function createLoot(light: Light) {
     return { mesh, geometry };
   };
 
-  const made = varying(attribute('metal', 'float'));
-  const gunMeshes = KINDS.map((kind, i) =>
-    piece(instanced(gun(kind), guns[i]), (p, n) =>
-      gunSurface(light, p, n, made)
-    )
-  );
   const crystalMesh = piece(
     instanced(new OctahedronGeometry(0.6).scale(0.8, 1.3, 0.8), crystals),
     (p, n) =>
@@ -367,7 +328,6 @@ export function createLoot(light: Light) {
   beamMesh.renderOrder = 2;
 
   const drawn = [
-    ...gunMeshes.map((g, i) => ({ buffer: guns[i], geometry: g.geometry })),
     { buffer: crystals, geometry: crystalMesh.geometry },
     { buffer: casks, geometry: caskMesh.geometry },
     { buffer: beams, geometry: beamGeometry },
@@ -418,12 +378,7 @@ export function createLoot(light: Light) {
   };
 
   return {
-    meshes: [
-      ...gunMeshes.map((g) => g.mesh),
-      crystalMesh.mesh,
-      caskMesh.mesh,
-      beamMesh,
-    ],
+    meshes: [crystalMesh.mesh, caskMesh.mesh, beamMesh],
     draw(
       time: number,
       pieces: readonly LootDraw[],

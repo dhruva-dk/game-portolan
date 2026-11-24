@@ -1,8 +1,6 @@
 import {
-  armed,
   battleOf,
   crewOf,
-  inHand,
   marksOf,
   stepBattle,
   weathered,
@@ -19,7 +17,6 @@ import { mates, teamsOf } from './teams.ts';
 import { MIXED, nature, type MatchType, type Nature } from './persona.ts';
 import { afloat, stepFleet, type Vessel } from './contact.ts';
 import { STEP } from './fixed.ts';
-import { gunOf } from './gun.ts';
 import { sunk } from './health.ts';
 import { regain, type Regained } from './holding.ts';
 import { PLAYER, credited, type Cause, type Sunk } from './match.ts';
@@ -28,7 +25,6 @@ import { hopped, knocked, pose, ride, settled, type Ride } from './ride.ts';
 import {
   laying,
   overboard,
-  type Arms,
   type Flotsam,
   type Goods,
   type Taken,
@@ -67,14 +63,12 @@ export interface Mooring {
 
 export interface Rig {
   storm?: (seconds: number) => Storm;
-  gun?: Arms | null;
 }
 
 interface Course {
   seed: number;
   type: MatchType;
   storm: (seconds: number) => Storm;
-  gun: Arms | null;
 }
 
 interface Sinking extends Sunk {
@@ -89,7 +83,6 @@ interface Afloat {
   heading: Vec3;
   hull: number;
   shield: number;
-  armed: boolean;
   afloat: boolean;
 }
 
@@ -174,17 +167,11 @@ const courseOf = (setup: MatchSetup, depth: (p: Vec3) => number): Course => ({
   seed: setup.match,
   type: MIXED,
   storm: createStorm(setup.match, depth, MIXED.rules.storm),
-  gun: null,
 });
 
 const helmOf = (h: Hands): Helm => ({ course: h.course, throttle: h.throttle });
 const orderOf = (h: Hands): Order => ({ aim: h.aim, fire: h.fire });
-const askOf = (h: Hands): Ask => ({
-  tap: h.heal,
-  arm: h.arm,
-  gust: h.gust,
-  take: null,
-});
+const askOf = (h: Hands): Ask => ({ tap: h.heal, gust: h.gust, take: null });
 
 function createSea(waters: Waters, first: Course) {
   const { chart, water, sea, rises } = waters;
@@ -199,7 +186,7 @@ function createSea(waters: Waters, first: Course) {
   const seedOf = (id: number) => hash(match.seed, id);
   let fleet: Vessel[] = [];
   const aboard = new Map<number, Aboard>();
-  let battle: Battle = battleOf([], match.seed, match.type.rules.aim.assist);
+  let battle: Battle = battleOf([], match.seed);
   const aims = new Map<number, Vec3 | null>();
   const from = new Map<number, Vec3>();
   const born = new Map<number, number>();
@@ -287,15 +274,9 @@ function createSea(waters: Waters, first: Course) {
     sinkings.length = 0;
     struck.clear();
     alive = null;
-    const gun = match.gun;
     battle = battleOf(
-      ids.map((id) =>
-        gun
-          ? crewOf(id, valuesOf(id), gunOf(gun.kind, gun.rarity))
-          : crewOf(id, valuesOf(id))
-      ),
+      ids.map((id) => crewOf(id, valuesOf(id))),
       match.seed,
-      match.type.rules.aim.assist,
       teams
     );
     territory = held
@@ -553,7 +534,6 @@ function createSea(waters: Waters, first: Course) {
     vessel,
     crew: (id: number): Crew => byId(battle.crews).get(id)!,
     crews: (): readonly Crew[] => battle.crews,
-    assist: (): readonly number[] => battle.assist,
     mine: () => vessel(PLAYER),
     alive: (): readonly number[] => {
       if (alive) return alive;
@@ -576,7 +556,6 @@ function createSea(waters: Waters, first: Course) {
           heading: s.heading,
           hull,
           shield,
-          armed: armed(c),
           afloat: !sunk(c.health),
         };
       }),
@@ -592,10 +571,6 @@ function createSea(waters: Waters, first: Course) {
       berthed?.match === match.seed && berthed.spawns.length === count
         ? berthed.spawns
         : berths(water, match.seed, count, depth);
-    flotsam = lay.berthed(
-      flotsam,
-      open.map((b) => b.at)
-    );
     const at: Spawn[] = drawn(open, match.seed);
     for (const id of ids)
       launch(
@@ -652,12 +627,8 @@ function createSea(waters: Waters, first: Course) {
         tick * STEP
       );
     },
-    rig({ storm, gun }: Rig) {
-      match = {
-        ...match,
-        ...(storm && { storm }),
-        ...(gun !== undefined && { gun }),
-      };
+    rig({ storm }: Rig) {
+      match = { ...match, ...(storm && { storm }) };
       if (specs) start(specs, kept);
     },
     strew(at: Vec3, goods: readonly Goods[]) {
@@ -677,13 +648,12 @@ function createSea(waters: Waters, first: Course) {
       const gone = (c: Crew): Crew =>
         c.id === id ? { ...c, health: { ...c.health, hull: 0, shield: 0 } } : c;
       battle = { ...battle, crews: s.crews.map(gone) };
-      const held = battle.crews.find((c) => c.id === by),
-        g = held && inHand(held);
+      const held = battle.crews.find((c) => c.id === by);
       founder({
         id,
         by,
         cause: by === null ? 'storm' : 'shot',
-        gun: g ? g.kind : null,
+        gun: held ? held.gun.kind : null,
       });
     },
     mindOf: (id: number): Readonly<Memory> | null =>
@@ -737,7 +707,6 @@ export function createMooring(
     seed: 0,
     type: MIXED,
     storm: () => calm(at.at),
-    gun: null,
   });
   sea.anchor(at, values);
   return sea.played;

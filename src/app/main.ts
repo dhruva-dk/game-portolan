@@ -51,7 +51,7 @@ const RELEASE: Setup = {
   },
   meter: false,
   hold: null,
-  gun: null,
+  gun: 'cannon',
 };
 
 loaded('script');
@@ -103,6 +103,7 @@ async function stage(setup: Setup): Promise<Stage> {
     ready: frame.ready,
     stats: (on) => meter.show(setup.meter || on),
     rig: rigOf(setup, world),
+    gun: setup.gun,
     async draw(
       next: (dt: number) => Snapshot,
       drawn?: (canvas: HTMLCanvasElement) => void
@@ -135,7 +136,7 @@ async function play(s: Stage): Promise<Played> {
   const { waters, ms, berth } = await watersOf(s.world.seed, s.world.land);
   console.info(`water sounded in ${ms.toFixed(0)} ms`);
   loaded('sounded');
-  const race = raceSetup(s.name, s.world.seed);
+  const race = raceSetup(s.name, s.world.seed, undefined, s.gun);
   let berthed: Berthed | undefined;
   void berth(race.match, race.ships.length).then((b) => (berthed = b));
   const game = createGame(s.world, s.anchors, waters, s.start, RACE_SHIP);

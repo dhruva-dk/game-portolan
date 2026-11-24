@@ -31,7 +31,6 @@ export interface Seen {
   shove?: Vec3;
   hull: number;
   shield: number;
-  armed?: boolean;
   crew?: Crew;
   team?: number;
 }

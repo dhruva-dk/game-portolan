@@ -1,6 +1,5 @@
 import { R, apart, distance, dot, type Vec3 } from '../world/sphere.ts';
 import type { GunKind } from './kinds.ts';
-import { inHand } from './battle.ts';
 import { eye, hidden } from './lookout.ts';
 import { mate, type Ctx } from './captain.ts';
 
@@ -43,12 +42,11 @@ export function note(c: Ctx): void {
     if (apart(own.ship.at, o.ship.at, far)) continue;
     if (distance(own.ship.at, o.ship.at) > far) continue;
     if (hidden(c, own.ship.at, o.ship.at)) continue;
-    const g = o.crew ? inHand(o.crew) : null;
     seen.push({
       id: o.id,
       at: o.ship.at,
       strength: o.hull + o.shield,
-      gun: g ? g.kind : null,
+      gun: o.crew ? o.crew.gun.kind : null,
       t: m.clock,
       fled:
         m.mode === 'flee' && m.foe === o.id

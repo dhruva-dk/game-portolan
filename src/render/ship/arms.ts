@@ -23,7 +23,6 @@ import {
   vec3,
 } from 'three/tsl';
 import { KINDS, gunOrder, type GunKind } from '../../sim/kinds.ts';
-import { RARITY_GLOW, type Rgb } from '../palette.ts';
 import type { Light } from '../sky/light.ts';
 import type { ShipDraw } from '../snapshot.ts';
 import type { Vec3Node } from '../tsl.ts';
@@ -47,7 +46,6 @@ const FLOATS = 12;
 const EMIT = 1.3,
   RIM = 0.5;
 const TINT = 0.7;
-const NONE: Rgb = [0, 0, 0];
 
 export function createArms(light: Light, capacity: number) {
   const at = attribute('gunAt', 'vec4'),
@@ -127,12 +125,11 @@ export function createArms(light: Light, capacity: number) {
         const flat = add(sh.gun.aim, pose.up, -dot(sh.gun.aim, pose.up), laid),
           size = length(flat);
         const toward = size > 1e-3 ? scale(flat, 1 / size, laid) : pose.forward;
-        const glow = sh.gun.rarity > 0 ? RARITY_GLOW[sh.gun.rarity] : NONE;
         for (let j = 0; j < 3; j++) {
           a[o + j] = mount[j];
           a[o + 4 + j] = toward[j];
           a[o + 8 + j] = pose.up[j];
-          a[o + 3 + 4 * j] = glow[j];
+          a[o + 3 + 4 * j] = 0;
         }
       }
       for (let k = 0; k < drawn.length; k++) {

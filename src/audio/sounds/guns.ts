@@ -220,55 +220,6 @@ export function ready(rate: number, seed: number): Samples {
   return normal(finish(t)).x;
 }
 
-export function swap(rate: number, seed: number): Samples {
-  const t = take(1, rate, seed);
-  const drag = layer(t, 0.2);
-  noise(drag, (s) => Math.sin((Math.PI * s) / 0.12) * (s < 0.12 ? 1 : 0));
-  filter(drag, 'bandpass', (s) => 1500 - 5000 * s, 1.4);
-  mix(t, drag, 0, 0.25);
-  const at = 0.11;
-  modes(
-    t,
-    [
-      [92, 0.4, 0.45],
-      [151, 0.32, 0.6],
-      [236, 0.24, 0.95],
-      [362, 0.16, 0.75],
-      [548, 0.1, 0.4],
-    ],
-    at,
-    0.02
-  );
-  tone(
-    t,
-    (s) => 120 * (0.5 + 0.5 * Math.exp(-s / 0.04)),
-    (s) => 0.4 * ar(0.002, 0.08)(s),
-    at,
-    0.4
-  );
-  const hit = layer(t, 0.3);
-  noise(hit, ar(0.001, 0.025));
-  filter(hit, 'lowpass', 1600);
-  filter(hit, 'peak', 280, 1.2, 6);
-  mix(t, hit, at, 1.6);
-  modes(
-    t,
-    [
-      [1480, 0.14, 0.12],
-      [2350, 0.09, 0.08],
-    ],
-    at,
-    0.02
-  );
-  const chain = layer(t, 0.5);
-  crackle(chain, 14, 0, 0.28, 0.6, 0.003);
-  filter(chain, 'bandpass', 3400, 1.2);
-  mix(t, chain, at + 0.05, 0.4);
-  filter(t, 'lowshelf', 120, 0.7, -6);
-  saturate(t, 1.8);
-  return normal(finish(t)).x;
-}
-
 export function wind(rate: number, seed: number): Samples {
   const t = take(0.8, rate, seed);
   const pawl = layer(t, 0.7);

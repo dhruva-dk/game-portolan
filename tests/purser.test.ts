@@ -2,7 +2,6 @@ import { test } from 'node:test';
 import { nature } from '../src/sim/persona.ts';
 import assert from 'node:assert/strict';
 import {
-  armed,
   battleOf,
   crewOf,
   stepBattle,
@@ -13,10 +12,9 @@ import {
 import { mind, think, type Memory, type Own } from '../src/sim/bot.ts';
 import { afloat, stepFleet, type Vessel } from '../src/sim/contact.ts';
 import { STEP } from '../src/sim/fixed.ts';
-import { gunOf } from '../src/sim/gun.ts';
 import { emptyHold, stowed } from '../src/sim/hold.ts';
 import type { Flotsam, Loot } from '../src/sim/loot.ts';
-import { healSlot, weaponWorth, PURSER } from '../src/sim/purser.ts';
+import { healSlot, PURSER } from '../src/sim/purser.ts';
 import { shipAt, turned, type Helm } from '../src/sim/ship.ts';
 import type { Depth } from '../src/sim/shoal.ts';
 import { asked, crewed, NOTHING, stored, type Ask } from '../src/sim/stores.ts';
@@ -65,7 +63,6 @@ function sail(
       crew: by.get(v.id)!,
       hull: by.get(v.id)!.health.hull,
       shield: by.get(v.id)!.health.shield,
-      armed: armed(by.get(v.id)!),
     }));
     const helms: Helm[] = [],
       asks = new Map<number, Ask>();
@@ -124,7 +121,7 @@ function sail(
   return { fleet, crews: battle.crews, flotsam: f, minds, modes };
 }
 
-test("her taps: on the gun in hand with a gun in reach, a swap; on the item in hand with stores in reach, a swap; else the hold's", () => {
+test("her taps: on the item in hand with stores in reach, a swap; else the hold's", () => {
   const fleet: Vessel[] = [afloat(0, shipAt(c0, frameAt(c0).north))];
   const items = [
     { kind: 'smallShield', count: 2 },
@@ -132,33 +129,17 @@ test("her taps: on the gun in hand with a gun in reach, a swap; on the item in h
     { kind: 'fullRepair', count: 1 },
   ] as const;
   const playerCrew: Crew = {
-    ...crewOf(0, EVEN_SHIP, gunOf('cannon', 1), gunOf('scatter', 0)),
+    ...crewOf(0, EVEN_SHIP),
     hold: { ...emptyHold(), items, chosen: 1 },
   };
-  const tap = (slot: number, pieces: Loot[], arm: number | null = null) =>
+  const tap = (slot: number, pieces: Loot[]) =>
     asked(
       [playerCrew],
       fleet,
       { pieces, next: 9 },
-      new Map([[0, { ...NOTHING, tap: arm === null ? slot : null, arm }]])
+      new Map([[0, { ...NOTHING, tap: slot }]])
     );
-  const gun = [piece(1, out(4), { kind: 'harpoon', rarity: 3 })],
-    stores = [piece(2, out(4), { kind: 'repairKit', count: 1 })];
-  assert.equal(
-    tap(0, gun).takes.get(0),
-    0,
-    'a gun in reach: the gun in hand swaps'
-  );
-  assert.equal(
-    tap(0, gun, 0).takes.get(0),
-    0,
-    'and so on its gun slot in hand'
-  );
-  assert.deepEqual(
-    [tap(0, gun, 1).takes.size, tap(0, gun, 1).crews[0].hand],
-    [0, 1],
-    'on the other: that one taken in hand'
-  );
+  const stores = [piece(2, out(4), { kind: 'repairKit', count: 1 })];
   assert.equal(tap(0, []).takes.size, 0, 'none: nothing to take');
   assert.equal(
     tap(1, stores).takes.get(0),
@@ -181,41 +162,6 @@ const seeds = (ok: (s: number) => boolean, n: number) => {
   return r;
 };
 
-test('a gun is worth most to a ship with none; then one of another kind; with both slots full, only a better one', () => {
-  const bare = [null, null];
-  assert.deepEqual(weaponWorth(bare, 'cannon', 0, PURSER.other), {
-    worth: 1,
-    slot: 0,
-  });
-  assert.ok(
-    weaponWorth(bare, 'cannon', 4, PURSER.other).worth >
-      weaponWorth(bare, 'cannon', 0, PURSER.other).worth
-  );
-  const one = [gunOf('cannon', 2), null];
-  assert.equal(
-    weaponWorth(one, 'scatter', 0, PURSER.other).slot,
-    1,
-    'into the empty slot'
-  );
-  assert.ok(
-    weaponWorth(one, 'scatter', 0, PURSER.other).worth >
-      3 * weaponWorth(one, 'cannon', 0, PURSER.other).worth,
-    'another kind, for another range'
-  );
-  const both = [gunOf('cannon', 1), gunOf('scatter', 0)];
-  assert.equal(weaponWorth(both, 'cannon', 1, PURSER.other).worth, 0);
-  assert.equal(weaponWorth(both, 'cannon', 0, PURSER.other).worth, 0);
-  assert.equal(
-    weaponWorth(both, 'cannon', 3, PURSER.other).slot,
-    0,
-    'the one it betters'
-  );
-  assert.ok(
-    weaponWorth(both, 'cannon', 3, PURSER.other).worth >
-      weaponWorth(both, 'cannon', 2, PURSER.other).worth
-  );
-});
-
 test('it mends with the slot worth most to it as it is', () => {
   let h = emptyHold();
   for (const k of ['smallShield', 'repairKit', 'fullRepair'] as const)
@@ -232,78 +178,23 @@ test('it mends with the slot worth most to it as it is', () => {
   assert.equal(at(100, 60), -1, 'nothing worth it');
 });
 
-const kinds = (c: Crew) => c.guns.map((g) => g && `${g.kind} ${g.rarity}`);
+const stowedOf = (c: Crew) => c.hold.items.flatMap((k) => (k ? [k.kind] : []));
 
-test('an unarmed bot sails to a gun it sees and takes it; with one, a second kind; with two, it swaps for a better', () => {
+test('a piece abeam, inside the circle it turns at its top speed, it slows to come round to it, not sail round it', () => {
   for (const seed of seeds((s) => temper(s).lootReach >= 110, 4)) {
     const r = sail(
       [c0],
       [seed],
       [crewOf(0, EVEN_SHIP)],
       {
-        pieces: [piece(1, out(90, 0.7), { kind: 'cannon', rarity: 1 })],
-        next: 2,
-      },
-      40
-    );
-    assert.deepEqual(
-      kinds(r.crews[0]),
-      ['cannon 1', null],
-      `${seed}: ${r.modes[0]}`
-    );
-    const o = sail(
-      [c0],
-      [seed],
-      [crewOf(0, EVEN_SHIP, gunOf('cannon', 0))],
-      {
-        pieces: [piece(1, out(60, -1), { kind: 'scatter', rarity: 0 })],
-        next: 2,
-      },
-      40
-    );
-    assert.deepEqual(
-      kinds(o.crews[0]),
-      ['cannon 0', 'scatter 0'],
-      `${seed}: a second; ${o.modes[0]}`
-    );
-    const s = sail(
-      [c0],
-      [seed],
-      [crewOf(0, EVEN_SHIP, gunOf('cannon', 0), gunOf('scatter', 0))],
-      {
-        pieces: [piece(1, out(60, -1), { kind: 'cannon', rarity: 3 })],
-        next: 2,
-      },
-      40
-    );
-    assert.deepEqual(
-      kinds(s.crews[0]),
-      ['cannon 3', 'scatter 0'],
-      `${seed}: swapped`
-    );
-    assert.deepEqual(
-      s.flotsam.pieces.map((l) => l.goods),
-      [{ kind: 'cannon', rarity: 0 }],
-      `${seed}: its own over the side`
-    );
-  }
-});
-
-test('a gun abeam, inside the circle it turns at its top speed, it slows to come round to it, not sail round it', () => {
-  for (const seed of seeds((s) => temper(s).lootReach >= 110, 4)) {
-    const r = sail(
-      [c0],
-      [seed],
-      [crewOf(0, EVEN_SHIP)],
-      {
-        pieces: [piece(1, out(28, 0), { kind: 'cannon', rarity: 1 })],
+        pieces: [piece(1, out(28, 0), { kind: 'repairKit', count: 1 })],
         next: 2,
       },
       15
     );
     assert.deepEqual(
-      kinds(r.crews[0]),
-      ['cannon 1', null],
+      stowedOf(r.crews[0]),
+      ['repairKit'],
       `${seed}: ${r.modes[0]}`
     );
   }
@@ -321,7 +212,7 @@ test('a hurt bot with something to mend with uses it', () => {
       [seed],
       [
         {
-          ...crewOf(0, EVEN_SHIP, gunOf('cannon', 0)),
+          ...crewOf(0, EVEN_SHIP),
           hold,
           health: { hull: 40, shield: 0, most: 100 },
         },
@@ -343,10 +234,10 @@ test('bots near one piece do not all pile on it: one takes it, and none goes for
     at,
     [1, 2, 3, 4, 5, 6],
     at.map((_, i) => crewOf(i, EVEN_SHIP)),
-    { pieces: [piece(1, c0, { kind: 'cannon', rarity: 2 })], next: 2 },
+    { pieces: [piece(1, c0, { kind: 'repairKit', count: 1 })], next: 2 },
     60
   );
-  assert.equal(r.crews.filter(armed).length, 1);
+  assert.equal(r.crews.filter((c) => stowedOf(c).length > 0).length, 1);
   assert.ok(
     r.minds.every((m) => m.target !== 1 || m.mode !== 'loot'),
     'none still after it'
@@ -367,7 +258,7 @@ test('a piece it can not come to it gives up after a while, and leaves be', () =
       [c0],
       [seed],
       [crewOf(0, HANDY)],
-      { pieces: [piece(1, lagoon, { kind: 'cannon', rarity: 0 })], next: 2 },
+      { pieces: [piece(1, lagoon, { kind: 'repairKit', count: 1 })], next: 2 },
       PURSER.patience + 15,
       reef
     );

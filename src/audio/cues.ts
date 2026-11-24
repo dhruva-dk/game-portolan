@@ -1,10 +1,4 @@
-import {
-  blowOf,
-  isGun,
-  type Blow,
-  type Deed,
-  type GunKind,
-} from '../play/player.ts';
+import { blowOf, type Blow, type Deed, type GunKind } from '../play/player.ts';
 import type { SoundName } from './bank.ts';
 
 export type Happening = Deed;
@@ -14,7 +8,6 @@ export const DEEDS = [
   'winding',
   'reloading',
   'reloaded',
-  'swapped',
   'fell',
   'struck',
   'sank',
@@ -38,7 +31,6 @@ export const CUE_NAMES = [
   'sank',
   'sunk',
   'took',
-  'swap',
   'mendWard',
   'mendHull',
   'gust',
@@ -83,7 +75,6 @@ export const CUES: Record<Cue, CueSound> = {
   sank: { sound: 'sink', level: 0, bus: 'world' },
   sunk: { sound: 'sink', level: 2, bus: 'own' },
   took: { sound: 'took', level: 0, bus: 'own' },
-  swap: { sound: 'swap', level: 0, bus: 'own' },
   mendWard: { sound: 'mendWard', level: 0, bus: 'own' },
   mendHull: { sound: 'mendHull', level: 0, bus: 'own' },
   gust: { sound: 'gust', level: 0, bus: 'own' },
@@ -118,8 +109,6 @@ export function cueOf(h: Happening, own: number | null): Cue | null {
       return mine ? 'reload' : null;
     case 'reloaded':
       return mine ? 'ready' : null;
-    case 'swapped':
-      return mine ? 'swap' : null;
     case 'fell':
       return h.land ? 'thud' : 'splash';
     case 'struck':
@@ -127,7 +116,7 @@ export function cueOf(h: Happening, own: number | null): Cue | null {
     case 'sank':
       return mine ? 'sunk' : 'sank';
     case 'took':
-      return !mine ? null : isGun(h.piece) ? 'swap' : 'took';
+      return mine ? 'took' : null;
     case 'mended':
       return !mine
         ? null

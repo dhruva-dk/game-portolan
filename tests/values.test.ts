@@ -9,13 +9,23 @@ import {
 } from '../src/sim/battle.ts';
 import { afloat } from '../src/sim/contact.ts';
 import { STEP } from '../src/sim/fixed.ts';
-import { gunOf } from '../src/sim/gun.ts';
-import { HEALTH } from '../src/sim/handling.ts';
+import { HEALTH, SHIP } from '../src/sim/handling.ts';
 import { harmed, healed, sunk } from '../src/sim/health.ts';
 import { useful } from '../src/sim/hold.ts';
 import type { ShipValues } from '../src/sim/setup.ts';
 import { shipAt, step, turned, type Sailing } from '../src/sim/ship.ts';
-import { dot, frameAt, fromLatLon, scale } from '../src/world/sphere.ts';
+import { offSight, type Sight } from '../src/sim/sight.ts';
+import {
+  R,
+  add,
+  along,
+  cross,
+  dot,
+  frameAt,
+  fromLatLon,
+  normalize,
+  scale,
+} from '../src/world/sphere.ts';
 import { BEST, EVEN_SHIP, WORST } from './setups.ts';
 
 const here = fromLatLon(0.2, 0.3),
@@ -72,7 +82,7 @@ test('its hull: the level-100 hull survives the blows that sink the level-0 one'
 
 const firstShot = (values: ShipValues) => {
   const v = afloat(1, shipAt(here, frameAt(here).east));
-  let b = battleOf([crewOf(1, values, gunOf('cannon', 0))], 9);
+  let b = battleOf([crewOf(1, values)], 9);
   for (let i = 0; i < 200; i++) {
     const r = stepBattle(b, [v], [{ aim: null, fire: true }], [], STEP, deep);
     b = r.battle;
@@ -98,7 +108,7 @@ test('its keel: the level-100 spread factor groups its shots tighter than the le
 test('its mounts: the level-100 reload factor fires again sooner than the level-0 one', () => {
   const shotsIn = (values: ShipValues, seconds: number) => {
     const v = afloat(1, shipAt(here, frameAt(here).east));
-    let b = battleOf([crewOf(1, values, gunOf('cannon', 0))], 9);
+    let b = battleOf([crewOf(1, values)], 9);
     const at: number[] = [];
     for (let i = 1; i <= Math.round(seconds / STEP); i++) {
       const r = stepBattle(b, [v], [{ aim: null, fire: true }], [], STEP, deep);
@@ -110,6 +120,54 @@ test('its mounts: the level-100 reload factor fires again sooner than the level-
   const low = shotsIn(only('reloadFactor', WORST), 10),
     high = shotsIn(only('reloadFactor', BEST), 10);
   assert.ok(high.length > low.length, `${high.length} against ${low.length}`);
+});
+
+const struck = (values: ShipValues, off = 0) => {
+  const p = shipAt(here, frameAt(here).east),
+    q = along(here, frameAt(here).north, 60).p;
+  const fleet = [afloat(1, p), afloat(2, shipAt(q, frameAt(q).east))];
+  const from = scale(here, R + 20),
+    up = normalize(from),
+    d = normalize(add(scale(q, R + SHIP.rig / 2), from, -1));
+  const swung = (a: number): Sight => ({
+    from,
+    dir: normalize(
+      add(
+        add(scale(d, Math.cos(a)), cross(up, d), Math.sin(a)),
+        up,
+        dot(up, d) * (1 - Math.cos(a))
+      )
+    ),
+  });
+  let a = 0;
+  while (offSight(swung(a), fleet[1].ship)!.angle < off) a += 1e-4;
+  const dir = swung(a).dir;
+  let b = battleOf([crewOf(1, values), crewOf(2, EVEN_SHIP)], 4);
+  const orders = [
+    { aim: { from, dir }, fire: true, spread: 1e-9 },
+    { aim: null, fire: false },
+  ];
+  const r = stepBattle(b, fleet, orders, [], STEP, deep);
+  b = r.battle;
+  for (let i = 0; i < 120; i++) {
+    const k = stepBattle(b, fleet, [orders[1], orders[1]], [], STEP, deep);
+    b = k.battle;
+    if (k.strikes.length) return { laid: r.shots[0].target, ...k.strikes[0] };
+  }
+  return { laid: r.shots[0].target, damage: 0 };
+};
+
+test('its gun: the level-100 damage factor does more damage a hit than the level-0 one', () => {
+  const low = struck(only('damageFactor', WORST)).damage,
+    high = struck(only('damageFactor', BEST)).damage;
+  assert.ok(low > 0, 'struck');
+  assert.ok(high > low, `${high} against ${low}`);
+});
+
+test('its gun: the level-100 assist cone lays on a ship further off its sight than the level-0 one', () => {
+  const off = (WORST.assistCone + BEST.assistCone) / 2;
+  assert.equal(struck(only('assistCone', BEST), off).laid, 2);
+  assert.equal(struck(only('assistCone', WORST), off).laid, null);
 });
 
 test('its hull points are its own: the storm takes its share of them, its stores mend up to their share of them, a blow leaves them its own', () => {

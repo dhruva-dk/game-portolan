@@ -10,7 +10,7 @@ import { aboard } from './setups.ts';
 const here = fromLatLon(0.2, 0.3),
   { north } = frameAt(here);
 const deep: Depth = () => 20;
-const own = { id: 1, ship: shipAt(here, north), hull: 100, armed: true };
+const own = { id: 1, ship: shipAt(here, north), hull: 100 };
 const guns = along(here, north, 320).p;
 const ringing = [{ at: guns, by: 5, t: 0 }];
 type Persona = (typeof PERSONAS)[number];

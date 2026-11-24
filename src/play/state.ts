@@ -1,4 +1,4 @@
-import { inHand, type Crew } from '../sim/battle.ts';
+import type { Crew } from '../sim/battle.ts';
 import {
   createMatch,
   createMooring,
@@ -148,13 +148,12 @@ export function createState(
         const { id, ship, shove } = fleet[i],
           a = v.poses(id),
           look = looks.get(id),
-          c = crews.get(id),
-          g = c && inHand(c);
+          c = crews.get(id);
         if (!a || !look) continue;
         const d = drawing.slot(n++, id, look, true);
         blendPose(a.before, a.after, between, d.pose);
         add(scale(ship.heading, ship.speed, d.velocity), shove, 1, d.velocity);
-        if (g) d.gun = drawing.armed(d, g, v.aim(id) ?? ship.heading);
+        if (c) d.gun = drawing.armed(d, c.gun, v.aim(id) ?? ship.heading);
         if (c) d.wear = wearOf(c.health);
       }
       for (const w of wrecks)
@@ -197,7 +196,6 @@ export function createState(
     vessels: () => view().vessels(),
     vessel: (id: number) => view().vessel(id),
     crew: (id: number) => view().crew(id),
-    assist: () => view().assist(),
     mine: () => view().mine(),
     alive: () => view().alive(),
     sinkings: () => view().sinkings(),

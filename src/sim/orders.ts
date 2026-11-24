@@ -1,4 +1,4 @@
-import { armed, type Crew, type Order } from './battle.ts';
+import type { Crew, Order } from './battle.ts';
 import type { Sight } from './sight.ts';
 import { think, type Memory, type Own, type Sea, type Seen } from './bot.ts';
 import type { Nature } from './persona.ts';
@@ -80,7 +80,6 @@ export function createOrders(depth: (p: Vec3) => number, chart: Chart) {
     s.shove = v.shove;
     s.hull = c.health.hull;
     s.shield = c.health.shield;
-    s.armed = armed(c);
     s.crew = c;
     if (team !== s.team) s.team = team;
     return s;

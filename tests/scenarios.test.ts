@@ -67,7 +67,6 @@ function run(depth: Depth, brain: Brain, seconds: number) {
       ship: shipAt(at(-100, 0), east),
       hull: 100,
       shield: 50,
-      armed: true,
     },
     second = Math.round(1 / STEP);
   let fleet: Vessel[] = [afloat(0, shipAt(c0, north))],
@@ -83,7 +82,7 @@ function run(depth: Depth, brain: Brain, seconds: number) {
       if (n > 0 && distance(was, here) < 1) pinned++;
       was = here;
     }
-    const own: Own = { ...fleet[0], crew, hull: 12, shield: 0, armed: false };
+    const own: Own = { ...fleet[0], crew, hull: 12, shield: 0 };
     const r = think(own, [foe], { depth, chart: ch }, m, nature(SEED, brain));
     m = r.memory;
     if (modes.at(-1) !== m.mode) modes.push(m.mode);

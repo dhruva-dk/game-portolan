@@ -59,7 +59,7 @@ test("its id in the deeds is the match's player", () => {
 });
 
 test(
-  "a step's deeds: numbered in order, swapped, fired (by kind), wound and reloaded, fell, struck, sank, then its stores; " +
+  "a step's deeds: numbered in order, fired (by kind), wound and reloaded, fell, struck, sank, then its stores; " +
     "others' stores and reloads unreported",
   () => {
     const done: Done = {
@@ -88,7 +88,6 @@ test(
       ],
       sunk: [{ id: 2, by: 0, at }],
       took: [
-        { id: 1, ship: 0, goods: { kind: 'harpoon', rarity: 3 }, at, slot: 1 },
         {
           id: 2,
           ship: 0,
@@ -107,34 +106,31 @@ test(
         { ship: 0, at, kind: 'reloaded', gun: 'cannon' },
         { ship: 5, at, kind: 'reloading', gun: 'cannon' },
         { ship: 5, at, kind: 'winding', gun: 'mortar' },
-        { ship: 0, at, kind: 'swapped', gun: 'harpoon' },
       ],
     };
     const d = deedsOf(done, 0, counter(), 12);
     assert.deepEqual(
       d.map((x) => [x.seq, x.kind, x.ship]),
       [
-        [1, 'swapped', 0],
-        [2, 'fired', 2],
-        [3, 'reloaded', 0],
-        [4, 'winding', 5],
-        [5, 'fell', 2],
-        [6, 'struck', 2],
-        [7, 'sank', 2],
-        [8, 'took', 0],
-        [9, 'took', 0],
-        [10, 'mended', 0],
-        [11, 'gust', 0],
+        [1, 'fired', 2],
+        [2, 'reloaded', 0],
+        [3, 'winding', 5],
+        [4, 'fell', 2],
+        [5, 'struck', 2],
+        [6, 'sank', 2],
+        [7, 'took', 0],
+        [8, 'mended', 0],
+        [9, 'gust', 0],
       ]
     );
     assert.ok(d.every((x) => x.time === 12));
     assert.ok(
-      d[1].kind === 'fired' &&
-        d[1].gun === 'scatter' &&
-        d[3].kind === 'winding' &&
-        d[3].gun === 'mortar'
+      d[0].kind === 'fired' &&
+        d[0].gun === 'scatter' &&
+        d[2].kind === 'winding' &&
+        d[2].gun === 'mortar'
     );
-    const struck = d[5];
+    const struck = d[4];
     assert.ok(
       struck.kind === 'struck' &&
         struck.by === 0 &&
@@ -143,13 +139,7 @@ test(
         struck.broke,
       'the blow carried'
     );
-    const [gun, stores] = [d[7], d[8]];
-    assert.ok(
-      gun.kind === 'took' &&
-        gun.piece === 'harpoon' &&
-        gun.rarity === 3 &&
-        gun.slot === 1
-    );
+    const stores = d[6];
     assert.ok(
       stores.kind === 'took' &&
         stores.piece === 'smallShield' &&
@@ -157,17 +147,7 @@ test(
     );
     assert.deepEqual(
       deedsOf({ ...done, own: null }, 0, counter(), 12).map((x) => x.kind),
-      [
-        'swapped',
-        'fired',
-        'reloaded',
-        'winding',
-        'fell',
-        'struck',
-        'sank',
-        'took',
-        'took',
-      ]
+      ['fired', 'reloaded', 'winding', 'fell', 'struck', 'sank', 'took']
     );
   }
 );

@@ -1,5 +1,5 @@
 import type { Cue, Shot, Splash, Strike } from '../sim/battle.ts';
-import { isArms, rarityOf, type Taken } from '../sim/loot.ts';
+import { rarityOf, type Taken } from '../sim/loot.ts';
 import type { Mended } from '../sim/stores.ts';
 import { bearingFrom, type Blast, type Eye } from '../render/snapshot.ts';
 import { HOTBAR, LIFT, type Deed, type Moment } from './player.ts';
@@ -22,8 +22,7 @@ export interface Done {
   own: Vec3 | null;
 }
 
-const FIRST: readonly Cue['kind'][] = ['swapped'],
-  AFTER: readonly Cue['kind'][] = ['winding', 'reloading', 'reloaded'];
+const AFTER: readonly Cue['kind'][] = ['winding', 'reloading', 'reloaded'];
 
 function cued(
   out: Deed[],
@@ -54,7 +53,6 @@ export function deedsOf(
   time: number,
   out: Deed[] = []
 ): Deed[] {
-  cued(out, done, FIRST, me, next, time);
   for (const s of done.shots)
     out.push({
       seq: next(),
@@ -100,7 +98,7 @@ export function deedsOf(
     });
   for (const t of done.took) {
     if (t.ship !== me) continue;
-    const slot = isArms(t.goods) ? t.slot : HOTBAR.guns - 1 + t.slot;
+    const slot = HOTBAR.guns - 1 + t.slot;
     out.push({
       seq: next(),
       time,

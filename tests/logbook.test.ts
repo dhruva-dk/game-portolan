@@ -10,7 +10,7 @@ import { aboard } from './setups.ts';
 const here = fromLatLon(0.2, 0.3),
   { north } = frameAt(here);
 const deep: Depth = () => 20;
-const own = { id: 1, ship: shipAt(here, north), hull: 100, armed: true };
+const own = { id: 1, ship: shipAt(here, north), hull: 100 };
 const seenAt = along(here, north, 90).p,
   goneTo = along(here, north, 900).p;
 const weak = (at: typeof here) => ({
@@ -18,7 +18,6 @@ const weak = (at: typeof here) => ({
   ship: shipAt(at, north),
   hull: 20,
   shield: 0,
-  armed: true,
 });
 
 test('a wounded ship it saw and lost, it goes back for, to where it saw that ship; not one it ran from', () => {

@@ -46,13 +46,6 @@ export const LIGHT = {
   green: '#7be36b',
   mint: '#c8ffb0',
 } as const;
-export const RARITY = [
-  '#969aa0',
-  INK.green,
-  INK.blue,
-  '#6a3a8e',
-  INK.gold,
-] as const;
 export const LAND = {
   apron: '#f4f0d6',
   low: '#ecdcac',

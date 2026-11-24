@@ -1,4 +1,4 @@
-import type { GunKind, LootKind, Use } from '../sim/kinds.ts';
+import type { GunKind, Use } from '../sim/kinds.ts';
 import type { Livery } from '../world/livery.ts';
 import type { Vec3 } from '../world/sphere.ts';
 
@@ -30,11 +30,9 @@ export interface Status {
   shieldMax: number;
   gun: {
     kind: GunKind;
-    rarity: number;
     rounds: number;
     ready: number;
     charge: number | null;
-    swapping: number;
     locked: boolean;
   } | null;
   afloat: number;
@@ -72,15 +70,11 @@ export interface Mate {
 
 export const PLAYER_SHIP = 0;
 
-export { isGun } from '../sim/kinds.ts';
-export type { GunKind, LootKind } from '../sim/kinds.ts';
-export const HOTBAR = { guns: 2, items: 3 } as const;
+export type { GunKind } from '../sim/kinds.ts';
+export const HOTBAR = { guns: 1, items: 3 } as const;
 
 export type Deed = { seq: number; time: number; at: Vec3; ship: number } & (
-  | {
-      kind: 'fired' | 'winding' | 'reloading' | 'reloaded' | 'swapped';
-      gun: GunKind;
-    }
+  | { kind: 'fired' | 'winding' | 'reloading' | 'reloaded'; gun: GunKind }
   | { kind: 'fell'; land: boolean }
   | {
       kind: 'struck';
@@ -91,8 +85,8 @@ export type Deed = { seq: number; time: number; at: Vec3; ship: number } & (
       ram: boolean;
     }
   | { kind: 'sank'; by: number | null }
-  | { kind: 'took'; piece: LootKind; rarity: number; slot: number }
-  | { kind: 'mended'; piece: LootKind }
+  | { kind: 'took'; piece: Use; rarity: number; slot: number }
+  | { kind: 'mended'; piece: Use }
   | { kind: 'gust' }
 );
 
@@ -101,7 +95,6 @@ export const LIFT: Record<Deed['kind'], number> = {
   winding: 3,
   reloading: 3,
   reloaded: 3,
-  swapped: 3,
   fell: 0,
   struck: 2,
   sank: 2,
@@ -198,14 +191,13 @@ export interface Slot {
 
 export interface GunSlot {
   kind: GunKind;
-  rarity: number;
   rounds: number;
   mag: number;
   reload: number | null;
 }
 
 export interface Kit {
-  guns: readonly [GunSlot | null, GunSlot | null];
+  guns: readonly [GunSlot | null];
   items: readonly [Slot | null, Slot | null, Slot | null];
   chosen: number;
   using: number | null;

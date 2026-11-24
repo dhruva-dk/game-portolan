@@ -21,7 +21,8 @@ import {
   normalize,
   scale,
 } from '../src/world/sphere.ts';
-import { WORST } from './setups.ts';
+import type { ShipValues } from '../src/sim/setup.ts';
+import { EVEN_SHIP, WORST } from './setups.ts';
 
 const deep = () => 30,
   N = 200;
@@ -58,7 +59,12 @@ function sightOn(v: Vessel, o: Vessel, off: number): Sight {
   return swung(a);
 }
 
-function rate(rarity: number, meters: number, off = 0, k = 1): number {
+function rate(
+  meters: number,
+  off = 0,
+  k = 1,
+  values: ShipValues = EVEN_SHIP
+): number {
   let hits = 0;
   for (let n = 0; n < N; n++) {
     const bearing = 0.3 + n * 0.031,
@@ -75,13 +81,18 @@ function rate(rarity: number, meters: number, off = 0, k = 1): number {
         speed: WORST.topSpeed,
       }),
     ];
-    const gun = { ...gunOf('cannon', rarity), fired: n };
+    const gun = { ...gunOf('cannon'), fired: n };
     const lay = laid(
       fleet[0],
       gun,
       sightOn(fleet[0], fleet[1], off * side),
       fleet,
-      { seed: 11, depth: deep, spread: spreadOf(gun) * k }
+      {
+        seed: 11,
+        depth: deep,
+        spread: spreadOf('cannon', values.spreadFactor) * k,
+        cone: values.assistCone,
+      }
     );
     let battle = {
         ...battleOf([crewOf(1, WORST), crewOf(2, WORST)], 0),
@@ -120,31 +131,25 @@ const row = (f: (m: number) => number) => RANGES.map(f);
 const show = (rates: number[]) =>
   rates.map((r, i) => `${RANGES[i]} m ${Math.round(100 * r)}%`).join(', ');
 
-test('the reticle on a crossing ship: a common gun strikes it 9 balls in 10 or more out to 180 m; rarity strikes more', () => {
-  const by = [0, 2, 4].map((rarity) => row((m) => rate(rarity, m)));
-  by.forEach((r, i) => console.log(`# rarity ${[0, 2, 4][i]}: ${show(r)}`));
-  const [common, , legendary] = by;
-  for (const r of common) assert.ok(r >= 0.88, show(common));
-  for (let i = 0; i < RANGES.length; i++)
-    assert.ok(
-      legendary[i] >= common[i],
-      `${show(common)} / ${show(legendary)}`
-    );
+test('the reticle on a crossing ship: a gun strikes it 9 balls in 10 or more out to 180 m', () => {
+  const on = row((m) => rate(m));
+  console.log(`# on it: ${show(on)}`);
+  for (const r of on) assert.ok(r >= 0.88, show(on));
 });
 
 test("the assist: a thumb's slip (2° off its body) is led onto it; well off it (5°) it is not", () => {
-  const slip = row((m) => rate(0, m, 2 * (Math.PI / 180))),
-    wide = row((m) => rate(0, m, 5 * (Math.PI / 180)));
-  console.log(`# common, 2° off: ${show(slip)}`);
-  console.log(`# common, 5° off: ${show(wide)}`);
+  const slip = row((m) => rate(m, 2 * (Math.PI / 180))),
+    wide = row((m) => rate(m, 5 * (Math.PI / 180)));
+  console.log(`# 2° off: ${show(slip)}`);
+  console.log(`# 5° off: ${show(wide)}`);
   for (let i = 0; i < 4; i++) assert.ok(slip[i] >= 0.85, show(slip));
   for (const r of wide) assert.ok(r <= 0.25, show(wide));
 });
 
 test("a bot's unsteady hand: a green captain's balls strike less often than a sharp one's", () => {
-  const green = row((m) => rate(0, m, 0, spreadBy(0))),
-    sharp = row((m) => rate(0, m, 0, spreadBy(1)));
-  console.log(`# common, a green captain's hand: ${show(green)}`);
+  const green = row((m) => rate(m, 0, spreadBy(0))),
+    sharp = row((m) => rate(m, 0, spreadBy(1)));
+  console.log(`# a green captain's hand: ${show(green)}`);
   for (let i = 1; i < RANGES.length; i++)
     assert.ok(green[i] < sharp[i] - 0.15, `${show(green)} / ${show(sharp)}`);
 });
