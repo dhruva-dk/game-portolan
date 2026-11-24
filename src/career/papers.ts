@@ -28,6 +28,7 @@ import {
   sponsorGrade,
   upkeepAt,
 } from './hq.ts';
+import { hints } from './hints.ts';
 import { render } from './mail.ts';
 import { perRace, projection as balanceAt } from './money.ts';
 import { standingOf } from './standings.ts';
@@ -93,11 +94,17 @@ export function mailPaper(s: CareerState, open: number | null): MailPaper {
             face: lines.find((l) => l.id === letter.id)?.face ?? null,
             body: titled(render(s, mail).body),
             names: mail.links.flatMap((k) => named(s, k)),
-            options: (asked?.options ?? []).map(capital),
+            options: answers(s, mail, asked?.options ?? []),
             answer: asked?.answer ?? null,
           }
         : null,
   };
+}
+
+/** A dilemma's answers, each with what it comes to. */
+function answers(s: CareerState, m: Mail, options: readonly string[]) {
+  const said = m.dilemma ? hints(s, m.dilemma.id, m.slots, options.length) : [];
+  return options.map((o, i) => ({ text: capital(o), hint: said[i] ?? '' }));
 }
 
 /** The screens a letter may name, by the name the career gives them: what each is called, and the page it is on. */

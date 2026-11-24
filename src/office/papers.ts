@@ -41,7 +41,7 @@ export interface Named {
   name: string;
   ask: Extract<Ask, { kind: 'person' | 'team' | 'open' }>;
 }
-/** `mail`: the letters, newest first, and the one open: its sender's face, its words, what it names, and a dilemma's answers (the one given, if any). */
+/** `mail`: the letters, newest first, and the one open: its sender's face, its words, what it names, and a dilemma's answers (the one given, if any), each with what it comes to: whom it pleases or angers, and roughly what it costs. */
 export interface MailPaper {
   letters: readonly Letter[];
   open:
@@ -49,7 +49,7 @@ export interface MailPaper {
         face: Face | null;
         body: string;
         names: readonly Named[];
-        options: readonly string[];
+        options: readonly { text: string; hint: string }[];
         answer: number | null;
       })
     | null;

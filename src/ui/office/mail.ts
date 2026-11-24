@@ -40,8 +40,9 @@ const CSS = `
 .ml-words > p { margin: 0; font: 400 var(--t-name)/1.45 var(--face); }
 .ml-names { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--s1) var(--s4); }
 .ml-answers { flex: none; display: flex; flex-direction: column; gap: var(--s2); padding-top: var(--s3); border-top: var(--w-rule) solid var(--ink); }
-.ml-answers > div { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: var(--s2); }
+.ml-answers > div { display: grid; grid-template-columns: ${u(72)} minmax(0, 1fr); align-items: center; gap: var(--s3); }
 .ml-answers .cr-btn { padding: 0 var(--s2); }
+.ml-answers p { margin: 0; font: italic 400 var(--t-body)/1.3 var(--face); color: var(--ink-2); }
 .ml-steps { flex: none; display: grid; grid-template-columns: 1fr 1fr; gap: var(--s2); }
 .ml-none { flex: 1; display: grid; place-items: center; }
 `;
@@ -176,7 +177,7 @@ export function createMail(office: Office): Screen<Dyed<MailPaper>> {
         [el('div', 'ml-none', label('No letter is open.')), steps],
         { cls: 'cr-grow' }
       );
-    const lapse = o.options[o.options.length - 1];
+    const lapse = o.options[o.options.length - 1]?.text;
     return sheet(
       o.about,
       [
@@ -212,13 +213,13 @@ export function createMail(office: Office): Screen<Dyed<MailPaper>> {
             'ml-answers',
             label(
               o.answer !== null
-                ? `You answered: ${o.options[o.answer]}.`
-                : `Your answer. Left unanswered, it comes to “${lapse}”.`
+                ? `You answered: ${o.options[o.answer]?.text ?? ''}.`
+                : `Your answer. Left unanswered, it comes to “${lapse ?? ''}”.`
             ),
-            el(
-              'div',
-              '',
-              ...o.options.map((text, option) =>
+            ...o.options.map(({ text, hint }, option) =>
+              el(
+                'div',
+                '',
                 button(
                   text,
                   () =>
@@ -233,7 +234,8 @@ export function createMail(office: Office): Screen<Dyed<MailPaper>> {
                         : 'plain',
                     off: o.answer !== null,
                   }
-                )
+                ),
+                el('p', '', hint)
               )
             )
           ),

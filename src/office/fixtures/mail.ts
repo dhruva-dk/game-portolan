@@ -168,7 +168,20 @@ export const MAIL: MailPaper = {
           },
           { name: 'Drivers', ask: { kind: 'open', screen: 'drivers' } },
         ],
-        options: ['Pay', 'Refuse', 'Promise'],
+        options: [
+          {
+            text: 'Pay',
+            hint: 'Pleases Corvin Ashdown-Pell. Their wage rises by 54 a race.',
+          },
+          {
+            text: 'Refuse',
+            hint: 'Angers Corvin Ashdown-Pell greatly. Costs nothing.',
+          },
+          {
+            text: 'Promise',
+            hint: 'Pleases Corvin Ashdown-Pell a little. A bonus of 180, paid only on a podium.',
+          },
+        ],
         answer: null,
       }
     : null,

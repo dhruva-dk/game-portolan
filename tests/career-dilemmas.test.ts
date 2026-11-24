@@ -6,6 +6,7 @@ import { apply, type CareerState } from '../src/career/career.ts';
 import { dice, seeded } from '../src/career/dice.ts';
 import { dilemmaComes } from '../src/career/dilemmas.ts';
 import { DILEMMAS } from '../src/career/events.ts';
+import { hints } from '../src/career/hints.ts';
 import { TEMPLATES, render } from '../src/career/mail.ts';
 import { founded, invariants, must, refused, sailed } from './career-kit.ts';
 
@@ -67,6 +68,19 @@ test("every dilemma's trigger is met for some team within two seasons, and each 
       'state' in last,
       `${id}: the last option (a lapse) can always be taken`
     );
+  }
+});
+
+test('every answer of every dilemma says what it comes to, whole: whom it pleases or angers, what it costs', () => {
+  for (const [id, { s, team }] of ANY) {
+    const d = DILEMMAS.find((x) => x.id === id)!;
+    const slots = d.trigger(s, s.teams[team], seeded(1, 2))!;
+    const said = hints(s, id, slots, d.options.length);
+    assert.equal(said.length, d.options.length, id);
+    for (const h of said) {
+      assert.ok(h.length > 0, `${id}: a hint for every answer`);
+      assert.doesNotMatch(h, /undefined|NaN|\bThey\b|\bpart\b/, `${id}: ${h}`);
+    }
   }
 });
 
