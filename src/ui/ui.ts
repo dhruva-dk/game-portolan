@@ -81,16 +81,12 @@ const STYLE = `
 .ui .press, .ui .press * { pointer-events: auto; cursor: pointer; }
 .ui .piece { position: absolute; }
 .ui svg { display: block; }
-/* the safe area's edges, plus a margin, and never nearer the screen's edge than the gutter (--safe-* stand in for the
-   device's insets off it: debug.ts ?safe); --k is the UI's size (size()) */
 .ui .top { top: ${edge('top')}; }
 .ui .bottom { bottom: ${edge('bottom')}; }
 .ui .left { left: ${edge('left')}; }
 .ui .right { right: ${edge('right')}; }
 .ui .centre { left: 50%; translate: -50% 0; }
-/* a piece drawn at the drawn size, grown by the UI's size about its own corner of the screen */
 .ui .sized { scale: var(--k); }
-/* a mark drawn at the drawn size, centred on its place (left, top) and grown by the UI's size about it */
 .ui .mark { position: absolute; transform: translate(-50%, -50%) scale(var(--k)); }
 .ui .screen { position: absolute; inset: 0; }
 .ui .screen.press { pointer-events: auto; }
