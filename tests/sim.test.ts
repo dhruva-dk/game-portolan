@@ -9,7 +9,9 @@ const MATCH: MatchScenario = { kind: 'match', match: 1, seconds: 60 };
 const DUEL: MatchScenario = {
   kind: 'match',
   match: 1,
-  race: { teams: 2, ships: 1, close: true },
+  teams: 2,
+  perTeam: 1,
+  close: true,
 };
 
 const jsonl = (path: string): Record<string, unknown>[] =>

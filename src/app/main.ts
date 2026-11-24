@@ -14,9 +14,10 @@ import { fleetOf } from '../play/fleet.ts';
 import { createGame } from '../play/game.ts';
 import { surveyor } from '../play/preview.ts';
 import { createReferee } from '../play/referee.ts';
-import { createMatches } from '../sim/matches.ts';
 import { watersOf } from '../play/setup.ts';
-import { SHIPS } from '../sim/match.ts';
+import { SETUP } from '../sim/engine.ts';
+import type { Berthed } from '../sim/waters.ts';
+import { raceSetup, rigOf, teamLiveries } from './race.ts';
 import type { Snapshot } from '../render/snapshot.ts';
 import { shoresOf } from '../ui/base/coasts.ts';
 import { createGlobe } from '../ui/base/globe.ts';
@@ -41,7 +42,13 @@ const RELEASE: Setup = {
   mean: MEAN,
   swing: SWING,
   hours: 16.3,
-  drawing: { sea: 'water', fleet: SHIPS, lod: null, cloth: true, bolt: false },
+  drawing: {
+    sea: 'water',
+    fleet: SETUP.most,
+    lod: null,
+    cloth: true,
+    bolt: false,
+  },
   meter: false,
   hold: null,
   gun: null,
@@ -95,7 +102,7 @@ async function stage(setup: Setup): Promise<Stage> {
     anchors: frame.anchors,
     ready: frame.ready,
     stats: (on) => meter.show(setup.meter || on),
-    matches: createMatches(setup.seed, world.planet, setup.hold, setup.gun),
+    rig: rigOf(setup, world),
     async draw(
       next: (dt: number) => Snapshot,
       drawn?: (canvas: HTMLCanvasElement) => void
@@ -128,8 +135,10 @@ async function play(s: Stage): Promise<Played> {
   const { waters, ms, berth } = await watersOf(s.world.seed, s.world.land);
   console.info(`water sounded in ${ms.toFixed(0)} ms`);
   loaded('sounded');
-  s.matches.berthRace(berth);
-  const game = createGame(s.world, s.anchors, waters, s.start, s.matches.first);
+  const race = raceSetup(s.name, s.world.seed);
+  let berthed: Berthed | undefined;
+  void berth(race.match, race.ships.length).then((b) => (berthed = b));
+  const game = createGame(s.world, s.anchors, waters, s.start);
   const referee = createReferee(game);
 
   const input = createInput(s.canvas, () => game.steering());
@@ -154,7 +163,9 @@ async function play(s: Stage): Promise<Played> {
   const audio = createAudio(s.world.planet.height);
   const survey = surveyor();
   const deal = () => {
-    game.start(s.matches.race());
+    const liveries = teamLiveries(race, game.worn());
+    game.start(race, liveries, berthed);
+    if (s.rig) game.debug.rig(s.rig, race, liveries);
     referee.begin();
   };
   const flow = createFlow(
@@ -169,7 +180,7 @@ async function play(s: Stage): Promise<Played> {
       switch: (by) => referee.switch(by),
       seeds: {
         name: s.name,
-        fleet: (name) => fleetOf(seedOf(name)),
+        fleet: (name) => fleetOf(raceSetup(name, seedOf(name))),
         chart: survey,
         roll,
         sail,
@@ -206,6 +217,7 @@ async function play(s: Stage): Promise<Played> {
     game,
     referee,
     flow,
+    race,
     play: deal,
     map,
     drawn: (canvas) => flow.drawn(canvas),

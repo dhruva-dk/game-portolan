@@ -2,7 +2,7 @@ import type { GunKind, LootKind, Use } from '../sim/kinds.ts';
 import type { Livery } from '../world/livery.ts';
 import type { Vec3 } from '../world/sphere.ts';
 
-export interface Hands {
+export interface Thumbs {
   stick: { x: number; y: number; center: [number, number] | null } | null;
   look: { x: number; y: number; held: boolean };
   fire: boolean;
@@ -10,7 +10,7 @@ export interface Hands {
   gust: boolean;
 }
 
-export const IDLE: Hands = {
+export const IDLE: Thumbs = {
   stick: null,
   look: { x: 0, y: 0, held: false },
   fire: false,
@@ -58,7 +58,6 @@ export interface Race {
   place: number;
   of: number;
   mates: readonly Mate[];
-  tower: readonly Placed[];
 }
 
 export interface Mate {
@@ -67,18 +66,7 @@ export interface Mate {
   hullMax: number;
   shield: number;
   shieldMax: number;
-  doing: Doing;
   place: number;
-}
-
-export type Doing = 'sailing' | 'fighting' | 'fleeing' | 'storm' | 'sunk';
-
-export interface Placed {
-  id: number;
-  team: number;
-  place: number;
-  afloat: boolean;
-  sinkings: number;
 }
 
 export const PLAYER_SHIP = 0;

@@ -1,3 +1,4 @@
+import { EVEN } from '../../src/sim/even.ts';
 import type { Summary } from './match.ts';
 
 const pc = (x: number | null) => (x === null ? '-' : `${Math.round(100 * x)}%`);
@@ -19,9 +20,7 @@ const parts = (s: Summary) =>
 export function printMatch(s: Summary, dir: string) {
   const sc = s.scenario,
     win = s.placements.filter((p) => p.place === 1);
-  const fleet = sc.race
-    ? `race of ${sc.race.teams}×${sc.race.ships}`
-    : `${s.placements.length} ships, brains ${(sc.brains ?? ['default']).join(',')}`;
+  const fleet = `race of ${sc.teams ?? EVEN.teams.most}×${sc.perTeam ?? 2}`;
   const c = s.combat;
   console.log(
     `match ${sc.match ?? 1} on planet ${sc.planet ?? 'default'} · ${s.type} · ${fleet} · ${sc.sea ?? 'flat'} sea · seed ${s.seed}`

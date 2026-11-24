@@ -1,5 +1,4 @@
 import { AIR_FOV, type Eye } from '../render/snapshot.ts';
-import type { PartType } from '../sim/race.ts';
 import type { ShipPose } from '../world/pose.ts';
 import { clamp, lerp, smoother, wrapAngle } from '../world/scalar.ts';
 import {
@@ -58,6 +57,16 @@ export const LOOSE: Readonly<Focus> = {
   pitch: LOBBY.pitch,
   drift: LOBBY.drift,
 };
+export const PARTS = [
+  'sails',
+  'rigging',
+  'rudder',
+  'hull',
+  'keel',
+  'mounts',
+] as const;
+export type PartType = (typeof PARTS)[number];
+
 export const FOCI: Readonly<Record<PartType, Readonly<Focus>>> = {
   sails: {
     ahead: 0.5,

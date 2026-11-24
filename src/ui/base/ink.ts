@@ -68,33 +68,6 @@ const METER = {
   poor: '#f07a5e',
 } as const;
 
-export const OFFICE = {
-  band: '#ead9b4',
-  plate: INK.iron,
-  plateInk: CUT,
-  plateFaint: '#cbb994',
-  panel: '#f2e7cf',
-  dark: '#e4d2ac',
-  light: '#faf3e3',
-  gilt: GILT,
-  sea: WASH.sea,
-  ink: '#241b13',
-  faint: '#5d4b37',
-  onFill: '#fff8ea',
-  go: '#2b4fa0',
-  bad: '#a92c26',
-  good: '#2a7347',
-  fair: '#256f78',
-  warn: '#c7860f',
-  gold: '#c6951a',
-  on: '#c85a12',
-} as const;
-export const CHARTROOM = {
-  label: '#5e4631',
-  plateFaint: METER.label,
-  azurite: '#7fa0cf',
-  purpure: '#a88dc2',
-} as const;
 export const PLUMAGE = {
   white: '#fbf8ef',
   shade: '#c5ccd6',
@@ -104,16 +77,6 @@ export const PLUMAGE = {
   lens: '#15171c',
   glint: '#e9f0f6',
 } as const;
-export type Tone = 'go' | 'bad' | 'good' | 'fair' | 'warn' | 'gold';
-export const toneOf = (share: number): Tone =>
-  share >= 0.75
-    ? 'good'
-    : share >= 0.5
-      ? 'fair'
-      : share >= 0.3
-        ? 'warn'
-        : 'bad';
-export const TYPE = { title: 26, head: 18, body: 15, small: 13 } as const;
 
 export const alpha = (hex: string, a: number) =>
   `${hex}${Math.round(a * 255)
@@ -265,21 +228,24 @@ export function glyph(
   size: number,
   o: GlyphStyle = {}
 ) {
-  const ink = INK[o.ink ?? 'iron'],
-    paper = o.paper ?? CUT,
+  const paper = o.paper ?? CUT,
     s = size / 24,
     big = size >= 40;
   const outline = (Math.max(0.9, size / 34) / s) * 0.85;
-  const hatch = `url(#h-${o.ink ?? 'iron'}${size >= 56 ? '-d' : ''})`;
   const one = (p: Prim, cut: boolean) => {
+    const tint = p.ink ?? o.ink ?? 'iron',
+      ink = INK[tint],
+      hatch = `url(#h-${tint}${size >= 56 ? '-d' : ''})`;
     const tr = p.tr ? ` transform="${p.tr}"` : '',
-      op = p.op != null ? ` opacity="${p.op}"` : '';
+      op = p.op != null ? ` opacity="${p.op}"` : '',
+      rule = p.evenodd ? ' fill-rule="evenodd"' : '';
     if (p.k === 'f') {
       return cut
-        ? `<path d="${p.d}" fill="${paper}"${tr}${op}/>`
-        : `<path d="${p.d}" fill="${hatch}" stroke="${ink}" stroke-width="${r2(outline)}" stroke-linejoin="round"${tr}${op}/>`;
+        ? `<path d="${p.d}" fill="${paper}"${rule}${tr}${op}/>`
+        : `<path d="${p.d}" fill="${hatch}"${rule} stroke="${ink}" stroke-width="${r2(outline)}" stroke-linejoin="round"${tr}${op}/>`;
     }
-    return `<path d="${p.d}" fill="none" stroke="${cut ? paper : ink}" stroke-width="${p.w ?? 1.5}" stroke-linecap="round" stroke-linejoin="round"${tr}${op}/>`;
+    const dash = p.dash ? ` stroke-dasharray="${p.dash}"` : '';
+    return `<path d="${p.d}" fill="none" stroke="${cut ? paper : ink}" stroke-width="${p.w ?? 1.5}" stroke-linecap="${p.cap ?? 'round'}" stroke-linejoin="round"${dash}${tr}${op}/>`;
   };
   let under = '',
     cuts = '',

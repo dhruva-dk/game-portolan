@@ -32,7 +32,7 @@ export function worldOf(seed: number = SEED): World {
   const t = performance.now();
   const planet = planetOf(seed, landOf(seed));
   const depth = (p: Vec3) => -planet.height(p);
-  const waters = watersAt(depth);
+  const waters = watersAt(planet);
   const w = { seed, planet, depth, waters, ms: performance.now() - t };
   made.set(seed, w);
   return w;

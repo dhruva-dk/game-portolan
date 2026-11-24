@@ -140,7 +140,7 @@ export function createLobby(
               p,
               'right',
               'top',
-              `<g id="wheel"><circle cx="866" cy="40" r="26" fill="url(#pg)" stroke="${INK.iron}" stroke-width="1.6" filter="url(#sh)"/>${glyph('menu.wheel', 866, 40, 34)}</g>` +
+              `<g id="wheel"><circle cx="866" cy="40" r="26" fill="url(#pg)" stroke="${INK.iron}" stroke-width="1.6" filter="url(#sh)"/>${glyph('wheel', 866, 40, 34)}</g>` +
                 `<g id="livery"><circle cx="802" cy="40" r="26" fill="url(#pg)" stroke="${INK.iron}" stroke-width="1.6" filter="url(#sh)"/>${dyePot(801, 42, 36, pot)}</g>`
             ) +
             at(
@@ -184,7 +184,7 @@ export function folio(
               `<path d="${roughRect(x, y, w, h, 9)}" fill="url(#pg)" stroke="${INK.iron}" stroke-width="1" filter="url(#sh)"/>` +
               `<rect x="${x + 10}" y="${y + 10}" width="${w - 20}" height="${h - 20}" fill="none" stroke="${INK.iron}" stroke-width="1.2"/>` +
               `<rect x="${x + 14}" y="${y + 14}" width="${w - 28}" height="${h - 28}" fill="none" stroke="${INK.iron}" stroke-width=".5"/>${body}</g>` +
-              `<g id="close">${paperDisc(x + w - 4, y + 4, 19)}${glyph('menu.close', x + w - 4, y + 4, 20)}</g>`
+              `<g id="close">${paperDisc(x + w - 4, y + 4, 19)}${glyph('cross', x + w - 4, y + 4, 20)}</g>`
           ),
         (el) => {
           const inner = el.querySelector<SVGGElement>('#folio')!;

@@ -10,12 +10,25 @@ import {
   type MatchState,
   type Sunk,
 } from '../src/sim/match.ts';
+import { over } from '../src/sim/teams.ts';
+
+const ALONE = Array.from({ length: 10 }, (_, id) => id);
+
+const raceOf = (alive: readonly number[]) => {
+  const ended = over(ALONE, alive, 0);
+  return {
+    teams: ALONE,
+    over: ended,
+    place: ended && alive.includes(PLAYER) ? 1 : 0,
+  };
+};
 
 const run = (
   m: MatchState,
   frames: { sinkings: Sunk[]; alive: number[]; share?: number }[],
   dt = 1 / 30
-) => frames.reduce((s, f) => stepMatch(s, f, dt), m);
+) =>
+  frames.reduce((s, f) => stepMatch(s, { ...f, race: raceOf(f.alive) }, dt), m);
 
 test('sunk, it places one behind the ships still afloat, and watches the one that sank it', () => {
   const sinkings: Sunk[] = [
@@ -92,7 +105,7 @@ test('nothing moves on by itself: its end counts its seconds, and the match is o
   );
 });
 
-test('the last afloat, it wins: first place, and the match is over', () => {
+test('the last team afloat, it wins: first place, and the match is over', () => {
   const sinkings: Sunk[] = [
     { id: 1, by: PLAYER, cause: 'shot', gun: 'cannon' },
     { id: 2, by: 1, cause: 'shot', gun: 'cannon' },
@@ -111,14 +124,6 @@ test('the last afloat, it wins: first place, and the match is over', () => {
     Array.from({ length: 300 }, () => ({ sinkings, alive: [0] }))
   );
   assert.deepEqual([m.phase, m.over], ['won', true]);
-});
-
-test('alone on the sea from the start is no win', () => {
-  const m = run(
-    startMatch(),
-    Array.from({ length: 90 }, () => ({ sinkings: [], alive: [0] }))
-  );
-  assert.deepEqual([m.phase, m.over], ['fighting', false]);
 });
 
 test('spectating, she turns to the next ship afloat or the one before, round and round; fighting, not at all', () => {

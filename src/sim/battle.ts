@@ -1,6 +1,6 @@
 import type { Rise } from '../world/planet.ts';
 import { distance, type Vec3 } from '../world/sphere.ts';
-import { mates } from './carded.ts';
+import { mates } from './teams.ts';
 import type { Blow, Vessel } from './contact.ts';
 import type { GunKind } from './kinds.ts';
 import {

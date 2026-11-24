@@ -106,31 +106,30 @@ export function rose(
   return s;
 }
 
-export function laurel(cx: number, cy: number, r: number, color: string) {
+export function laurel(cx: number, cy: number, r: number) {
   let s = '';
   for (const side of [-1, 1]) {
-    s += `<path d="${side < 0 ? arcPath(cx, cy, r, Math.PI * 0.58, Math.PI * 1.32) : arcPath(cx, cy, r, -Math.PI * 0.32, Math.PI * 0.42)}" fill="none" stroke="${color}" stroke-width="2"/>`;
+    s += `<path d="${side < 0 ? arcPath(0, 0, 48, Math.PI * 0.58, Math.PI * 1.32) : arcPath(0, 0, 48, -Math.PI * 0.32, Math.PI * 0.42)}" fill="none" stroke-width="2.4"/>`;
     for (let i = 0; i < 12; i++) {
       const a =
         side < 0 ? Math.PI * (0.6 + i * 0.06) : Math.PI * (0.4 - i * 0.06);
-      const px = cx + Math.cos(a) * r,
-        py = cy + Math.sin(a) * r,
+      const px = Math.cos(a) * 48,
+        py = Math.sin(a) * 48,
         deg = (a * 180) / Math.PI + (side < 0 ? 90 : -90);
       for (const o of [-1, 1]) {
         const ex = r2(px + Math.cos(a) * o * 7),
           ey = r2(py + Math.sin(a) * o * 7);
-        s += `<ellipse cx="${ex}" cy="${ey}" rx="3.4" ry="8" transform="rotate(${r2(deg + o * 28 * side)} ${ex} ${ey})" fill="${color}" stroke="${INK.iron}" stroke-width=".5" opacity=".95"/>`;
+        s += `<ellipse cx="${ex}" cy="${ey}" rx="3.4" ry="8" transform="rotate(${r2(deg + o * 28 * side)} ${ex} ${ey})" fill="url(#h-iron)"/>`;
       }
     }
   }
-  return s;
+  return `<g transform="translate(${cx} ${cy}) scale(${r2(r / 48)})" stroke="${INK.iron}" stroke-width="1" stroke-linejoin="round">${s}</g>`;
 }
 
 export const spyglass = (x: number, y: number, s: number) => {
   const k = s / 80;
   const tube = (x0: number, w: number, h: number) =>
-    `<rect x="${x0}" y="${-h / 2}" width="${w}" height="${h}" rx="1.5" fill="url(#h-gold-d)" stroke="${INK.iron}" stroke-width="1.6"/>` +
-    `<rect x="${x0}" y="${-h / 2}" width="${w}" height="${h}" rx="1.5" fill="${WASH.gold}" opacity=".55"/>`;
+    `<rect x="${x0}" y="${-h / 2}" width="${w}" height="${h}" rx="1.5" fill="url(#h-iron-d)" stroke="${INK.iron}" stroke-width="1.6"/>`;
   return (
     `<g transform="translate(${x} ${y}) rotate(-16) scale(${k})" stroke-linejoin="round">` +
     tube(-40, 18, 10) +
@@ -161,9 +160,9 @@ export const pencil = (x: number, y: number, s: number) =>
 
 export const dyePot = (x: number, y: number, s: number, dye: string) =>
   `<g transform="translate(${x} ${y}) scale(${s / 24})" stroke="${INK.iron}" stroke-linejoin="round" stroke-linecap="round">` +
-  `<path d="M3 -3L10 -12" stroke="${INK.sepia}" stroke-width="2.2"/>` +
+  `<path d="M3 -3L10 -12" stroke-width="2.2"/>` +
   `<path d="M9 -11L11.5 -14L13 -12.5L10.5 -10Z" fill="${dye}" stroke-width=".8"/>` +
-  `<path d="M-9 -3Q-11.5 7 -6 10.5H6Q11.5 7 9 -3Z" fill="url(#h-sepia)" stroke-width="1.3"/>` +
+  `<path d="M-9 -3Q-11.5 7 -6 10.5H6Q11.5 7 9 -3Z" fill="url(#h-iron)" stroke-width="1.3"/>` +
   `<path d="M-9.5 3.5H9.5" stroke-width=".6" fill="none"/>` +
   `<ellipse cx="0" cy="-3.5" rx="10" ry="3" fill="${PAPER}" stroke-width="1.2"/>` +
   `<ellipse cx="0" cy="-3.4" rx="7.6" ry="1.9" fill="${dye}" stroke-width=".7"/>` +
@@ -222,7 +221,7 @@ export const die = (x: number, y: number, s: number) => {
       [0.5, 0.5],
       [0.75, 0.75],
     ]) +
-    `</g><circle cx="${mx}" cy="${my}" r="2.7" fill="${WASH.gold}" stroke-width=".9"/></g>`
+    `</g><circle cx="${mx}" cy="${my}" r="2.7" fill="${INK.iron}" stroke-width=".9"/></g>`
   );
 };
 

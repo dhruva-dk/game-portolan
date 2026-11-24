@@ -900,7 +900,7 @@ The stat shape on every person card.
 |---|---|---|
 | Top left | Vitals slip | Shield bar (blue) with numeral, hull bar with numeral. Half the width of today's slip. A small plus glyph beside the shield bar while the shield is refilling. The ship diagram is removed |
 | Top center, left to right | Storm clock | As today |
-| | Ships afloat | As today, with the ship glyph at 24 |
+| | Ships afloat | As today |
 | | Sea share | Territory glyph and your team's current share of the sea inside the ring, as a percentage |
 | | Wingman chip | Your driver's (or Uncle's) small portrait and slot 1's hull bar; a cross when sunk |
 | | Pause button | §1.12.12 |
@@ -1110,7 +1110,7 @@ export type Match = {
 };
 ```
 
-- `Waters` is what the engine needs from a built planet (depth, the routing chart, the berths). `sim/waters.ts` holds the computation that today's `play/sounding.ts` does, without its timing calls. `play/` keeps the Worker that runs it in the browser (`watersOf`); `tools/` and `tests/` call it directly.
+- `Waters` is what the engine needs from a built planet (depth, the routing chart, the berths, and the swell worked out ahead of time). `sim/waters.ts` holds the computation that today's `play/sounding.ts` does, without its timing calls. `play/` keeps the Worker that runs it in the browser (`watersOf`); `tools/` and `tests/` call it directly.
 - `step` advances one fixed step of 1/30 s. `hands` is ignored when no ship has `hands: 'player'`.
 - `view` is read-only access to the state `play/` draws from: ships, shots, heals, the storm, territory, and what happened in the last step. Only `play/`, `tools/` and `tests/` read it.
 
@@ -1213,7 +1213,7 @@ export type CareerState = {
 - Free agents are the people with `contract: null`. Retired people are removed from `people`.
 - `points[t]`, `bestPlace[t]`, `previousStanding[t]` and `lastStanding[t]` are per team. `bestPlace[t]` is 81 until team `t` has raced this season. `lastStanding` is the standing before the last recorded race (for movement arrows).
 - `knowledge.lines[t][slot]` is your range for each line of that rival ship (§1.7.6). Entry 0 is unused.
-- `RaceReport` holds exactly what the result flow shows (§1.12.10): season, race, planet name; for each of your ships its place, sinkings, the team that sank it or null, and whether anybody was credited; shots fired and landed; mean sea share; the podium teams; points gained; each money row; balance and standing before and after; the workshop strip's before and after; and whether you were repossessed.
+- `RaceReport` holds exactly what the result flow shows (§1.12.10): season, race, planet name; for each of your ships its place, sinkings, whether it sank, the team that sank it or null, and whether anybody was credited; the portrait seed of the driver who sailed slot 1, or null for Uncle (the driver may retire in the same step); shots fired and landed; mean sea share; the podium teams; points gained; each money row; balance and standing before and after; the workshop strip's before and after; and whether you were repossessed.
 - `OffseasonReport` holds exactly what the off-season report shows (§1.12.11): the final standings order and points; your prize; for each of your three seats, as it was when race ten was recorded, the person's name, role, portrait seed, age before and after, stats before and after, races left, and whether they retired (an empty seat is recorded as empty); and your design and fitted levels before and after winter. The report copies these values because a retired person is no longer in `people`.
 - Uncle and other stand-ins are not in the state; their stats are in `career/tuning.ts`.
 - Standing, reputation, stars and asking wages are computed by functions in `career/rules/`, never stored.
@@ -1256,7 +1256,7 @@ export type Applied =
 
 That is 16 commands. Only team 0 may send the first five.
 
-**Refusal reasons** are codes, never sentences. A command is checked in the order of this table and refused with the first reason that applies.
+**Refusal reasons** are codes, never sentences. A command is checked in the order of this table and refused with the first reason that applies. Before any of them, a command that is not an object or whose type is not one of the 16 is refused `invalid`. A `RecordRace` result is `invalid` unless it has 80 ships with each place from 1 to 80 used once, `sunkBy` ids that are ships, and 40 teams of seven sea samples each from 0 to 1. `SignSponsor`'s `offer` is an index into the team's offers. `MarkSeen` of an id already seen is accepted and changes nothing.
 
 | Reason | When |
 |---|---|
@@ -1443,7 +1443,7 @@ Glyphs carry meanings that words used to carry, so they are drawn richer than to
 | iron | everything else |
 
 3. **Outline first.** A glyph must be recognizable from its filled outline alone at its smallest size in the table below. Detail and color add to the meaning and never carry it. Shapes marked `fine` are drawn only at 40 units and above, and carry the detail.
-4. **Smallest size.** No screen draws a glyph smaller than its smallest size in the table, in points on the 1180 × 820 screen. Where §1.12 calls a glyph small, it means this size.
+4. **Smallest size.** No screen draws a glyph smaller than its smallest size in the table, in points on the 1180 × 820 screen. Where §1.12 calls a glyph small, it means this size. Screens draw in UI units, not points: one unit is `view.k` (`ui/base/ui.ts`), about 1.735 points on that screen, so 40 points is 23 units and 24 points is 14 units.
 5. **Callers do not recolor.** A screen may draw a whole glyph faint (locked, disabled) or in red iron for a negative amount. It never changes a shape's own ink.
 6. The marks in `marks.ts` that the screens use (spyglass, die, dye pot, laurel) stay as functions and follow rules 2 to 5.
 
@@ -1506,7 +1506,7 @@ Glyphs carry meanings that words used to carry, so they are drawn richer than to
 
 1. **No comments.** The only comments allowed are ESLint directives with their reason (`// eslint-disable-next-line rule -- why`). Names carry the meaning. History belongs in commits.
 2. **US English** in identifiers, file names and on-screen text.
-3. **Every number from Part 1 lives in a tuning file** and nowhere else: `sim/tuning.ts` for §1.11, `career/tuning.ts` for everything else. Formulas read from these; no literal from a Part 1 table appears in logic.
+3. **Every number from Part 1 lives in a tuning file** and nowhere else: `sim/tuning.ts` for §1.11, `career/tuning.ts` for everything else. Formulas read from these; no literal from a Part 1 table appears in logic. The one exception is a number used only where `career/` may not be imported (the sea bubbles' timings of §1.13.2, the six sunglasses styles of §1.5.9, the layout numbers of §1.12): it lives as a named constant beside its use.
 4. **Every formula in Part 1 is a named pure function** in `career/rules/` (or `sim/` for §1.11), one concept per file.
 5. **Units are those of §1.1.** Do not put units in names.
 6. **A ship is "it"**, in code and on screen. No gendered pronouns for ships anywhere.
@@ -1669,13 +1669,13 @@ Goal: the match engine is in `sim/`; a match is created from a `MatchSetup` of 2
 
 - [x] **M2.1 Move the engine into `sim/`.** No behavior changes. Today the match is stepped by `play/state.ts`, with `play/orders.ts`, `play/result.ts`, `play/setup.ts`, `play/race.ts` and `play/indexed.ts`, mixed with building what is drawn. Split it by one rule: whatever decides what happens goes to `sim/`; whatever decides what is shown stays in `play/`. Create `sim/engine.ts` holding the stepping, with `createMatch` taking the arguments today's `createState` takes (it takes a `MatchSetup` from step M2.3), with `sim/orders.ts`, `sim/tally.ts` (the tally and `finishing`), `sim/waters.ts` and `sim/indexed.ts` beside it. `play/state.ts` becomes the adapter that steps the engine and fills snapshots and HUD data from its `view`. Afterwards `tools/` and `tests/` run a match without importing `src/play/`, and the clock ban covers all of it. **Check:** the hash printed by `npm run sim -- match` is the same before and after this step.
 - [x] **M2.2 Contract files.** `sim/kinds.ts`, `sim/setup.ts`, `sim/result.ts` (§2.2.1). Add `sim/even.ts`: `evenSetup({ planet, match, storm, heals, teams?, perTeam?, values, stats, standings?, player? })` passes `planet`, `match`, `storm` and `heals` straight into the setup and returns a setup of `teams` teams (2 to 40, default 40) of `perTeam` ships each (1 or 2, default 2), where `values` (the physical fields of a `ShipSpec`, `topSpeed` to `healFactor`) and `stats` are either one set for every ship or a function of the ship index. `standings` defaults to team order: team `t` has standing `t + 1`. With `player: true`, ship 0 has `hands: 'player'`. A duel is two teams of one ship. Tests, the harness and debug states use it, and so does the app until milestone 6. Also start two career files here, because this milestone needs the numbers of §1.4.1 and §1.5.2 and §2.6 rule 3 allows them in one place only: `career/tuning.ts` holding those two tables, and `career/fit.ts` holding one pure function from seven fitted levels, a gun kind and a mechanic's Shield, Heal speed and Heal amount (or no mechanic) to the physical fields of a `ShipSpec`. The app, the harness and the tests take their level-0, level-50 and level-100 values from that function. Steps M3.1 and M3.6 add the rest of both files.
-- [ ] **M2.3 Matches from a setup.** `createMatch` takes a `MatchSetup` and returns the `Match` of §2.2.1; add `sim/hands.ts` and rename the touch-input type in `play/player.ts` to `Thumbs` (§2.2.1). Teams come from `ShipSpec.team`. Delete `sim/race.ts`, the race-card types and their dealing (in `sim/racing.ts` and `sim/matches.ts` since step M2.1), the free-for-all mode, `sim/fitted.ts`, and the constants `TEAM`, `TEAMS` and `SHIPS`. Keep the team functions (mates, shared water, no friendly fire). Until milestone 6 the app gives every team a livery by its index from `world/livery.ts`, and its existing way into a match (the title, the seed panel) builds the setup with `evenSetup`: the physical values, from `career/fit.ts`, of level 50 on every line with a cannon and a mechanic with 10 in every stat; 10 in every driver stat; standings in team order; and `player: true`.
+- [x] **M2.3 Matches from a setup.** `createMatch` takes a `MatchSetup` and returns the `Match` of §2.2.1; add `sim/hands.ts` and rename the touch-input type in `play/player.ts` to `Thumbs` (§2.2.1). Teams come from `ShipSpec.team`. Delete `sim/race.ts`, the race-card types and their dealing (in `sim/racing.ts` and `sim/matches.ts` since step M2.1), the free-for-all mode, `sim/fitted.ts`, and the constants `TEAM`, `TEAMS` and `SHIPS`. Keep the team functions (mates, shared water, no friendly fire). Until milestone 6 the app gives every team a livery by its index from `world/livery.ts`, and its existing way into a match (the title, the seed panel) builds the setup with `evenSetup`: the physical values, from `career/fit.ts`, of level 50 on every line with a cannon and a mechanic with 10 in every stat; 10 in every driver stat; standings in team order; and `player: true`.
 - [ ] **M2.4 Per-ship physical values.** Top speed, `gather`, turn rate, hull points, spread factor and reload factor come from the ship's spec, replacing the shared values in `sim/handling.ts`.
 - [ ] **M2.5 One gun.** Remove the second gun, gun switching, the equip delay, gun loot and the rarity tiers. Damage factor and assist cone come from the spec (§1.11.4).
 - [ ] **M2.6 Heals.** §1.11.5.
 - [ ] **M2.7 Shield.** §1.11.6 item 3.
 - [ ] **M2.8 Gust meter.** §1.11.7.
-- [ ] **M2.9 Drivers from stats.** §1.11.8: add `sim/driver.ts`; delete `sim/persona.ts`, `sim/driven.ts`, the styles and seeded draws of `sim/temper.ts` (keep the parameter type), and the match types.
+- [ ] **M2.9 Drivers from stats.** §1.11.8: add `sim/driver.ts`; delete `sim/persona.ts` (`sim/driven.ts` went in step M2.3), the styles and seeded draws of `sim/temper.ts` (keep the parameter type), and the match types.
 - [ ] **M2.10 Race conditions.** Storm scaling and the two ratings (§1.11.2, §1.11.3).
 - [ ] **M2.11 Berths by standing.** §1.11.9.
 - [ ] **M2.12 The result.** Sea samples, `afloatAtPhaseFour`, the end rule and places (§1.11.6, §1.11.10); `result()` returns a `MatchResult`.
@@ -1724,8 +1724,8 @@ Goal: every rule of §1.6 to §1.10 works, and rivals play.
 Goal: every screen of §1.12 exists and can be opened on a debug state.
 
 - [ ] **M5.1 Mock-up.** Build the base pieces needed for the lobby and the Team screen and draw both from hard-coded view data behind `?debug&screen=mockup`. The user judges them on the iPad through the dev server. Changes to §1.12 that follow need the user's approval. Delete the hard-coded data afterwards.
-- [ ] **M5.2 Base pieces and glyphs.** §2.5.2 and §2.5.4: extend the glyph format, draw and redraw the full set, delete the rest, and add the `glyphs` debug screen. Check the glyph sheet as §2.5.4 says before ticking.
-- [ ] **M5.3 Portraits.** Jacket color and six sunglasses styles from the portrait seed; Uncle's fixed portrait (§1.5.9).
+- [ ] **M5.2 Base pieces and glyphs.** §2.5.2 and §2.5.4: extend the glyph format, draw and redraw the full set, delete the rest, and add the `glyphs` debug screen. Check the glyph sheet as §2.5.4 says before ticking. The glyph half is done (the format, the set, the sheet); the `ui/base/` pieces of §2.5.2 remain.
+- [x] **M5.3 Portraits.** Jacket color and six sunglasses styles from the portrait seed; Uncle's fixed portrait (§1.5.9).
 - [ ] **M5.4 Views.** Every view function and its test (§2.5.3).
 - [ ] **M5.5 The port and the debug screens.** `ui/lobby/port.ts`, its implementation in `app/` with the screen stack of §1.12.0, and `?debug&screen=` (§2.8.3); update the screen list in `tools/browser.ts`.
 - [ ] **M5.6 New Career.** §1.12.1.

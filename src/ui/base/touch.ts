@@ -72,35 +72,6 @@ export function onDrag(
     });
 }
 
-export function onLook(
-  layer: HTMLElement,
-  within: string,
-  look: (dx: number, dy: number, held: boolean) => void
-) {
-  let id = -1,
-    x = 0,
-    y = 0;
-  layer.addEventListener(
-    'pointerdown',
-    (e) => {
-      if (!(e.target instanceof Element) || !e.target.closest(within)) return;
-      [id, x, y] = [e.pointerId, e.clientX, e.clientY];
-    },
-    { capture: true }
-  );
-  addEventListener('pointermove', (e) => {
-    if (e.pointerId !== id) return;
-    look(e.clientX - x, e.clientY - y, true);
-    [x, y] = [e.clientX, e.clientY];
-  });
-  for (const end of ['pointerup', 'pointercancel'] as const)
-    addEventListener(end, (e) => {
-      if (e.pointerId !== id) return;
-      id = -1;
-      look(0, 0, false);
-    });
-}
-
 export function keep(el: Element) {
   el.addEventListener('pointerdown', (e) => e.stopPropagation());
 }

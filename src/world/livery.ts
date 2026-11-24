@@ -62,3 +62,8 @@ export const DYES: readonly { name: string; color: Vec3; mark: Vec3 }[] =
     mark: [...markOn(c)],
   }));
 export const COLORS: readonly Vec3[] = DYES.map((d) => d.color);
+
+export const liveryAt = (index: number): Livery => ({
+  dye: index % COLORS.length,
+  pattern: Math.floor(index / COLORS.length) % PATTERNS.length,
+});
