@@ -4,7 +4,7 @@ import { SEED } from '../src/world/environment.ts';
 import { createState, debugOf } from '../src/play/state.ts';
 import type { Race } from '../src/play/player.ts';
 import { STILL } from '../src/sim/hands.ts';
-import { HEALTH } from '../src/sim/handling.ts';
+import { SHIELD } from '../src/sim/tuning.ts';
 import { PLAYER } from '../src/sim/match.ts';
 import { watersAt } from '../src/sim/waters.ts';
 import { LIVERY } from '../src/world/livery.ts';
@@ -47,7 +47,7 @@ test('as a race begins: its team, its mate whole', () => {
   for (const m of r.mates) {
     assert.deepEqual(
       [m.hull, m.hullMax, m.shieldMax],
-      [EVEN_SHIP.hullPoints, EVEN_SHIP.hullPoints, HEALTH.shield]
+      [EVEN_SHIP.hullPoints, EVEN_SHIP.hullPoints, SHIELD.most]
     );
   }
   assert.equal(state.race(PLAYER), r);

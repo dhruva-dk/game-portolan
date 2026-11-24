@@ -1,4 +1,4 @@
-import { HEALTH } from './handling.ts';
+import { SHIELD } from './tuning.ts';
 
 export interface Health {
   hull: number;
@@ -14,7 +14,7 @@ interface Harm {
 
 export const whole = (most: number): Health => ({
   hull: most,
-  shield: HEALTH.start,
+  shield: SHIELD.start,
   most,
 });
 
@@ -43,7 +43,7 @@ export function healed(
   amount: number,
   to: 'hull' | 'shield'
 ): Health {
-  const cap = to === 'hull' ? h.most : HEALTH.shield;
+  const cap = to === 'hull' ? h.most : SHIELD.most;
   if (sunk(h) || !(amount > 0) || h[to] >= cap) return h;
   return { ...h, [to]: Math.min(cap, h[to] + amount) };
 }

@@ -18,7 +18,8 @@ import {
 import { STEP } from '../src/sim/fixed.ts';
 import { chosen, gunOf, laid, muzzle, spreadOf } from '../src/sim/gun.ts';
 import { KINDS, type GunKind } from '../src/sim/kinds.ts';
-import { GUN, GUNS, HEALTH, SHIP } from '../src/sim/handling.ts';
+import { GUN, GUNS, SHIP } from '../src/sim/handling.ts';
+import { SHIELD } from '../src/sim/tuning.ts';
 import { FOOT } from '../src/render/ship/gun-shape.ts';
 import { GUN_DRAWN, GUN_MOUNT } from '../src/render/ship/mount.ts';
 import { harmed, healed, sunk, whole } from '../src/sim/health.ts';
@@ -119,10 +120,10 @@ const once =
 test('the shield takes a blow first, the hull the rest; past the shield, the hull alone; sunk at 0 hull', () => {
   assert.deepEqual(whole(EVEN_SHIP.hullPoints), {
     hull: EVEN_SHIP.hullPoints,
-    shield: HEALTH.start,
+    shield: SHIELD.start,
     most: EVEN_SHIP.hullPoints,
   });
-  const h = { hull: 100, shield: HEALTH.shield, most: 100 };
+  const h = { hull: 100, shield: SHIELD.most, most: 100 };
   const a = harmed(h, 30);
   assert.deepEqual(
     [a.health, a.shield, a.hull],
@@ -184,11 +185,11 @@ test('a ram takes off each ship what contact.ts reported, through its shield (no
   );
   assert.equal(
     by.get(blow.struck.id)!.hull,
-    EVEN_SHIP.hullPoints + HEALTH.start - blow.struck.damage
+    EVEN_SHIP.hullPoints + SHIELD.start - blow.struck.damage
   );
   assert.equal(
     by.get(blow.striker.id)!.hull,
-    EVEN_SHIP.hullPoints + HEALTH.start - blow.striker.damage
+    EVEN_SHIP.hullPoints + SHIELD.start - blow.striker.damage
   );
   assert.deepEqual(
     r.strikes.map((s) => [s.struck, s.shooter, s.ram, s.gun]),
@@ -711,6 +712,6 @@ test('the storm wears at a ship outside its cap, past its shield, and sinks it; 
     sank = sank.concat(w.sunk);
   }
   assert.deepEqual(b.crews[0].health, whole(EVEN_SHIP.hullPoints));
-  assert.equal(b.crews[1].health.shield, HEALTH.start);
+  assert.equal(b.crews[1].health.shield, SHIELD.start);
   assert.deepEqual(sank, [1]);
 });

@@ -9,7 +9,7 @@ import { watersAt } from '../src/sim/waters.ts';
 import { SEED } from '../src/world/environment.ts';
 import { landOf, planetOf } from '../src/world/land.ts';
 import { scale } from '../src/world/sphere.ts';
-import { EVEN_SHIP, setupOf } from './setups.ts';
+import { EVEN_SHIP, TENDED, UNTENDED, setupOf } from './setups.ts';
 
 const planet = planetOf(SEED, landOf(SEED)),
   waters = watersAt(planet);
@@ -67,4 +67,16 @@ test('Hands.heal uses the heal in that slot: the hull mends once its heal time i
   sail(used, 0.4);
   assert.ok(crew(used).health.hull > before);
   assert.deepEqual(crew(used).hold.items, [null, null, null]);
+});
+
+test('at sea, its shield fills from nothing on its own water, faster for the best-tended ship than the worst-tended one', () => {
+  const after = (values: ShipValues) => {
+    const m = duel(values);
+    assert.equal(crew(m).health.shield, 0);
+    sail(m, 4);
+    return crew(m).health.shield;
+  };
+  const slow = after(UNTENDED),
+    quick = after(TENDED);
+  assert.ok(slow > 0 && quick > slow, `${slow} ${quick}`);
 });
