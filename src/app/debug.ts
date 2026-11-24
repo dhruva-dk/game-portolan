@@ -2,6 +2,7 @@ import type { Anchor } from '../world/lattice.ts';
 import type { World } from '../world/environment.ts';
 import type { FrameOptions } from '../render/frame.ts';
 import { createFly } from './fly.ts';
+import { specimen } from './specimen.ts';
 import type { DebugDamage, Game } from '../play/game.ts';
 import { raceOf, specField } from '../play/race.ts';
 import type { Referee } from '../play/referee.ts';
@@ -133,6 +134,7 @@ export async function scenario(
   play: (s: Stage) => Promise<Played>,
   title: { show(on: boolean): void }
 ) {
+  if (params.get('screen') === 'glyphs') return specimen(number('page', 1));
   const s = await stage(setupOf(release));
   const room = Math.max(SHIPS, number('ships', 0) + 1);
   if (flying) {

@@ -265,21 +265,24 @@ export function glyph(
   size: number,
   o: GlyphStyle = {}
 ) {
-  const ink = INK[o.ink ?? 'iron'],
-    paper = o.paper ?? CUT,
+  const paper = o.paper ?? CUT,
     s = size / 24,
     big = size >= 40;
   const outline = (Math.max(0.9, size / 34) / s) * 0.85;
-  const hatch = `url(#h-${o.ink ?? 'iron'}${size >= 56 ? '-d' : ''})`;
   const one = (p: Prim, cut: boolean) => {
+    const tint = p.ink ?? o.ink ?? 'iron',
+      ink = INK[tint],
+      hatch = `url(#h-${tint}${size >= 56 ? '-d' : ''})`;
     const tr = p.tr ? ` transform="${p.tr}"` : '',
-      op = p.op != null ? ` opacity="${p.op}"` : '';
+      op = p.op != null ? ` opacity="${p.op}"` : '',
+      rule = p.evenodd ? ' fill-rule="evenodd"' : '';
     if (p.k === 'f') {
       return cut
-        ? `<path d="${p.d}" fill="${paper}"${tr}${op}/>`
-        : `<path d="${p.d}" fill="${hatch}" stroke="${ink}" stroke-width="${r2(outline)}" stroke-linejoin="round"${tr}${op}/>`;
+        ? `<path d="${p.d}" fill="${paper}"${rule}${tr}${op}/>`
+        : `<path d="${p.d}" fill="${hatch}"${rule} stroke="${ink}" stroke-width="${r2(outline)}" stroke-linejoin="round"${tr}${op}/>`;
     }
-    return `<path d="${p.d}" fill="none" stroke="${cut ? paper : ink}" stroke-width="${p.w ?? 1.5}" stroke-linecap="round" stroke-linejoin="round"${tr}${op}/>`;
+    const dash = p.dash ? ` stroke-dasharray="${p.dash}"` : '';
+    return `<path d="${p.d}" fill="none" stroke="${cut ? paper : ink}" stroke-width="${p.w ?? 1.5}" stroke-linecap="${p.cap ?? 'round'}" stroke-linejoin="round"${dash}${tr}${op}/>`;
   };
   let under = '',
     cuts = '',

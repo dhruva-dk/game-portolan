@@ -52,7 +52,7 @@ const cause = (x: number, y: number, { how, gun }: End) => {
     how === 'shot'
       ? glyph(`weapon.${gun ?? 'cannon'}`, x, y, 32)
       : how === 'storm'
-        ? glyph('hud.storm', x, y, 32, { ink: 'storm' })
+        ? glyph('storm', x, y, 32, { ink: 'storm' })
         : ram(x, y);
   return paperDisc(x, y, r, how === 'storm' ? INK.storm : INK.iron) + mark;
 };
@@ -90,10 +90,10 @@ export function createResult(
   let shown = false,
     watching = false;
   const place = (x: number, y: number, r: number, end: End) => {
-    const [wreath, numeral] = placed(end.place),
+    const [, numeral] = placed(end.place),
       k = r / 48;
     return (
-      laurel(x, y, r, wreath) +
+      laurel(x, y, r) +
       figure(x, y - 8 * k, end.place, 50 * k, { fill: numeral }) +
       `<path d="M${x - 15 * k} ${y + 16 * k}H${x + 15 * k}" stroke="${INK.iron}" stroke-width="1.4"/>` +
       figure(x, y + 29 * k, end.of, 17 * k)
