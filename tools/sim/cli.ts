@@ -6,17 +6,15 @@
 // your own. Its `kind`:
 //   match   a match of bots (match.ts MatchScenario): a dealt match of SHIPS
 //           ships, or a race of spec ships (a duel: two teams of one)
-//   lobby   a career run by a scripted manager through the lobby's reducer
-//           (lobby.ts LobbyScenario), its races sailed as matches
 //   terrain the planet's terrain mapped for seeds and land shares
 //           (terrain.ts TerrainScenario)
-// --seed: the match dealt (match), the career's seed (lobby), the one seed
+// --seed: the match dealt (match), the one seed
 // mapped (terrain). --planet: the planet's seed (match). --seconds: the most a
 // match runs. --runs n: n matches, from the scenario's on, across --workers
 // threads, each in its own folder, pooled at the end (match only).
 //
 // Writes captures/YYYY-MM-DD-HHMM-<subject>/ (out.ts): run.json, and what the
-// kind writes (see match.ts, lobby.ts, terrain.ts). Prints a summary ending in
+// kind writes (see match.ts, terrain.ts). Prints a summary ending in
 // the folder. Exits 1 if an invariant broke, or the run failed.
 //
 // Node only (tools/).
@@ -25,13 +23,12 @@ import { mkdirSync, readFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import { parseArgs } from 'node:util';
 import { outDir, writeJson } from '../out.ts';
-import { runLobby, type LobbyScenario } from './lobby.ts';
 import { runMatch, type MatchScenario, type Summary } from './match.ts';
 import { CORES, runPool } from './pool.ts';
 import { pooled, printMatch, printPooled } from './print.ts';
 import { runTerrain, type TerrainScenario } from './terrain.ts';
 
-type Scenario = MatchScenario | LobbyScenario | TerrainScenario;
+type Scenario = MatchScenario | TerrainScenario;
 
 const { values: a, positionals } = parseArgs({
   allowPositionals: true,
@@ -102,11 +99,6 @@ if (sc.kind === 'match') {
     printPooled(p, dir);
     failed = all.some((s) => s.invariants.broken > 0);
   }
-} else if (sc.kind === 'lobby') {
-  const one: LobbyScenario = { ...sc, ...(seed !== undefined && { seed }) };
-  if (runs > 1) throw new Error('--runs is for matches');
-  const dir = outDir(subject, { scenario: one });
-  failed = !(await runLobby(one, dir));
 } else if (sc.kind === 'terrain') {
   const one: TerrainScenario = {
     ...sc,
@@ -115,7 +107,7 @@ if (sc.kind === 'match') {
   const dir = outDir(subject, { scenario: one });
   failed = !runTerrain(one, dir);
 } else {
-  console.error(`${path}: no kind (match, lobby or terrain)`);
+  console.error(`${path}: no kind (match or terrain)`);
   process.exit(2);
 }
 process.exit(failed ? 1 : 0);
