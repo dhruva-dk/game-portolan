@@ -2,6 +2,7 @@ import type { Command } from './commands.ts';
 import {
   BUBBLES,
   ROLES,
+  STATS,
   type CareerState,
   type Owner,
   type Person,
@@ -51,4 +52,14 @@ export function seatHolder(
 ): Person | null {
   const id = state.teams[team].seats[role];
   return id === null ? null : personOf(state, id);
+}
+
+export function seatStat(
+  state: CareerState,
+  team: number,
+  role: Role,
+  stat: string
+): number | null {
+  const person = seatHolder(state, team, role);
+  return person === null ? null : person.stats[STATS[role].indexOf(stat)];
 }

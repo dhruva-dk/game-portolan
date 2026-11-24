@@ -79,16 +79,32 @@ function yours(team: Team): Team {
   };
 }
 
+function ready(team: Team): Team {
+  const ship = team.ships[1];
+  return {
+    ...team,
+    balance: 1000000,
+    focus: null,
+    design: { ...team.design, keel: 60 },
+    unlocked: ['cannon', 'scatter'],
+    ships: [
+      { ...team.ships[0], gun: 'cannon' },
+      { ...ship, fitted: { ...ship.fitted, keel: 20 } },
+    ],
+    sponsors: [null, null, null],
+    offers: [OFFER],
+  };
+}
+
 function career(phase: Phase): CareerState {
   const state = structuredClone(BASE);
   return {
     ...state,
     phase,
     race: phase === 'offseason' ? LEAGUE.racesPerSeason : 1,
-    teams: state.teams.map((team, t) => {
-      const offered = { ...team, offers: [OFFER] };
-      return t === 0 ? yours(offered) : offered;
-    }),
+    teams: state.teams.map((team, t) =>
+      t === 0 ? yours(ready(team)) : ready(team)
+    ),
     people: state.people.map((p) =>
       p.id === MINE
         ? { ...p, contract: { team: 0, wage: 500, clause: 5000, racesLeft: 5 } }

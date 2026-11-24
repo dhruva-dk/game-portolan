@@ -6,6 +6,13 @@ import {
   type Command,
   type Reason,
 } from './commands.ts';
+import {
+  build,
+  buildRefusal,
+  fitGun,
+  fitRefusal,
+} from './development/build.ts';
+import { focusRefusal, setFocus } from './development/focus.ts';
 import { fieldsValid, isIndex } from './fields.ts';
 import { known } from './lookup.ts';
 import { releaseExpired, turnSeason } from './offseason/finish.ts';
@@ -15,6 +22,7 @@ import { fileOffseasonReport, offseasonReport } from './offseason/report.ts';
 import { winter } from './offseason/winter.ts';
 import { enterPhase, nextRaceLobby, seasonOver } from './record/advance.ts';
 import { countDownContracts } from './record/contracts.ts';
+import { develop } from './record/develop.ts';
 import { publishNews } from './record/news.ts';
 import { payRace, raceMoney } from './record/pay.ts';
 import { fileReport, raceReport } from './record/report.ts';
@@ -51,7 +59,6 @@ type Repossession = { state: CareerState; teams: readonly number[] };
 
 const runPolicies = seam;
 const repossess = (state: CareerState): Repossession => ({ state, teams: [] });
-const develop = seam;
 const countDownSponsors = seam;
 const narrowRanges = seam;
 const raceEvents = seam;
@@ -62,6 +69,9 @@ const redrawKnowledge = seam;
 const dealOffseason = seam;
 
 const accepted = (state: CareerState): Applied => ({ ok: true, state });
+
+const unless = (reason: Reason | null, run: () => CareerState): Applied =>
+  reason === null ? accepted(run()) : { ok: false, reason };
 
 const startRace = (state: CareerState): Applied =>
   accepted(enterPhase(runPolicies(state), 'racing'));
@@ -122,11 +132,19 @@ function effect(state: CareerState, command: Command): Applied {
     case 'MarkSeen':
       return markSeen(state, command.id);
     case 'SetFocus':
-      return notYet(state);
+      return unless(focusRefusal(state, command.team, command.focus), () =>
+        setFocus(state, command.team, command.focus)
+      );
     case 'Build':
-      return notYet(state);
+      return unless(
+        buildRefusal(state, command.team, command.slot, command.line),
+        () => build(state, command.team, command.slot, command.line)
+      );
     case 'FitGun':
-      return notYet(state);
+      return unless(
+        fitRefusal(state, command.team, command.slot, command.kind),
+        () => fitGun(state, command.team, command.slot, command.kind)
+      );
     case 'Repaint':
       return notYet(state);
     case 'SetScoutSeat':

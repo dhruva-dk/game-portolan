@@ -136,6 +136,7 @@ export const BUILD = {
   perLevel: 30,
   designScale: 25,
   thriftCut: 0.02,
+  noThrift: 0,
   leastFit: 200,
 };
 
