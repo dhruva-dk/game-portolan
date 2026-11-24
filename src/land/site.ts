@@ -1,15 +1,3 @@
-// Where the land's things lie on the planet. What stands on a tile of the land
-// (world/terrain-scatter.ts) is worked out flat, in metres on the tile's own
-// chart (world/sphere.ts); this lays them on the sphere: a chart point and a
-// height become a world position, and the chart's x, up and z there become what
-// stands there's axes.
-//
-// Each kind of thing comes in a few shapes, each drawn once (instanced) for all
-// of that shape on the tiles in view: the tiles' instances are written into the
-// shape's buffer nearest tile first, and only those in view are drawn — the
-// buffer is rewritten only when the tiles in view change. The shadow map's
-// stand-ins (shadow.ts) have a buffer of their own, of the tiles it covers.
-
 import {
   InstancedBufferAttribute,
   InstancedMesh,
@@ -26,10 +14,6 @@ import {
   type Vec3,
 } from '../world/sphere.ts';
 
-/**
- * The world position `height` metres up at chart point (x, z), and the chart's
- * axes there: x (e1), up, z (e2).
- */
 function onSphere(
   chart: Chart,
   x: number,
@@ -46,11 +30,6 @@ const basis = new Matrix4(),
   up = new Vector3(),
   e2 = new Vector3();
 
-/**
- * The world matrix of a thing standing at chart point (x, z), its foot `height`
- * metres up: its own matrix `local` (turned and scaled, in the chart's axes: x,
- * up, z) carried to the sphere.
- */
 export function standing(
   chart: Chart,
   x: number,
@@ -66,9 +45,6 @@ export function standing(
   return out.multiplyMatrices(basis, local);
 }
 
-/**
- * One instance: its world matrix, and its tint (0…1) for shapes that take one.
- */
 export interface Placed {
   matrix: Matrix4;
   tint?: number;
@@ -76,25 +52,11 @@ export interface Placed {
 
 export interface Instances {
   mesh: InstancedMesh;
-  /**
-   * Draws the instances on tiles[from…to) (indices into the list it was made
-   * with), nearest first.
-   */
   show(tiles: ArrayLike<number>, from: number, to: number): void;
-  /**
-   * The instances the shadow map draws (shadow.ts), apart from those shown, so
-   * the world pass draws only the tiles in view and the map those it covers,
-   * seen or not: their matrices, and how many. Made when first asked for.
-   */
   casting(): { matrices: InstancedBufferAttribute; count: number };
-  /** Writes the instances on tiles[from…to) into casting(). */
   cast(tiles: ArrayLike<number>, from: number, to: number): void;
 }
 
-/**
- * Sends the first `count` items of an instanced attribute (`size` floats each)
- * up to the GPU, and no more.
- */
 function send(
   attribute: InstancedBufferAttribute,
   count: number,
@@ -105,11 +67,6 @@ function send(
   attribute.needsUpdate = true;
 }
 
-/**
- * One shape's instances, named `name` (for the meter's split: meter.ts),
- * `placed[i]` those on tile i. With tints, the geometry gets an instanced
- * 'tint'.
- */
 export function createInstances(
   name: string,
   geometry: BufferGeometry,
@@ -126,8 +83,6 @@ export function createInstances(
   const tint = new InstancedBufferAttribute(new Float32Array(total), 1);
   if (tinted) geometry.setAttribute('tint', tint);
   mesh.count = 0;
-  // the instances stand all over the planet; whether a tile is in view is
-  // decided per tile
   mesh.frustumCulled = false;
   let shadow: { matrices: InstancedBufferAttribute; count: number } | null =
     null;
@@ -148,7 +103,6 @@ export function createInstances(
         }
       }
       mesh.count = k;
-      // (only what is drawn goes up to the GPU)
       send(mesh.instanceMatrix, k, 16);
       send(tint, k, 1);
     },

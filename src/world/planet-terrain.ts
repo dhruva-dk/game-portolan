@@ -1,20 +1,3 @@
-// The planet (planet.ts) as the terrain makes it (terrain.ts): what everything
-// that stands on the planet stands on (the ground's bake, the sea's sounding,
-// the ships, the sights).
-//
-// What lies on the ground is worked out from the terrain's own two fields at
-// the point, the way in from the coast and the height, with noise only to break
-// edges into patches: nothing is placed by hand, so every band follows the
-// land. Under water the cover is sea grass on the banks and rubble round the
-// land's foot and strewn over the floor; on land its channels carry the land's
-// own (sand.ts lays them):
-//   grass   growth: patches inland past the beach where the shrubs grow (terrain-scatter.ts) on earthier sand
-//           (sand.ts), shrinking as the land rises (patches shrink, they don't fade)
-//   rubble  bare rock breaking out toward the tops
-//
-// Pure arithmetic: no three, so it runs in node for the tests; deterministic
-// for the terrain and the seed.
-
 import { CELLS, N, centreOf } from './cells.ts';
 import { createNoise3 } from './noise3.ts';
 import { START, type Cover, type Planet, type Rise } from './planet.ts';
@@ -31,22 +14,8 @@ import {
 import { CELL, between, locate, taps } from './terrain-grid.ts';
 import { heightBounds, profile, type Terrain } from './terrain.ts';
 
-/**
- * Where the land's cover changes, metres: grass begins this far in past the
- * beach; rubble lies round the land's foot under water between these distances
- * out.
- */
 const GRASS_IN = [20, 45] as const,
   FOOT = [2, 5, 15, 35] as const;
-/**
- * Where the land's tones lie over its height and cover (land/sand.ts lays them;
- * tools/terrain-map.ts draws them): the heights over the sea, metres, where the
- * shore's pale sand, the beach and the dry sand begin; the share of the way up
- * to the summit past which the dunes'; the cover past which the sand is
- * earthier (its growth: where the shrubs grow), and past which rubble lies (on
- * the land's tops, bare rock); how far up or down the ground's mottling moves a
- * band's edge, metres (the dunes' six times as far).
- */
 export const BANDS = {
   shore: -0.15,
   beach: 0.45,
@@ -56,22 +25,9 @@ export const BANDS = {
   rubble: 0.7,
   ragged: 0.5,
 } as const;
-/**
- * The height past which the sand is the dunes', metres, on land whose summit is
- * this high.
- */
 export const duneHeight = (summit: number) => BANDS.dunes * summit;
-/**
- * The cells along a side of a block one rise stands for (sim/sight.ts looks for
- * land only near one).
- */
 const BLOCK = 16;
 
-/**
- * The rises of the land: one for each block of BLOCK² cells that land may stand
- * in, as high as the block's ground (terrain.ts heightBounds) and as wide as
- * its farthest cell, and two cells more.
- */
 function risesOf(t: Terrain): Rise[] {
   const rises: Rise[] = [],
     blocks = N / BLOCK,
@@ -107,10 +63,6 @@ function risesOf(t: Terrain): Rise[] {
   return rises;
 }
 
-/**
- * Where she starts: on the water START metres off the coast, nearest the land's
- * highest point, heading toward it.
- */
 function startOf(t: Terrain): { at: Vec3; bearing: number } {
   let summit = 0;
   for (let c = 0; c < CELLS; c++)
@@ -129,10 +81,6 @@ function startOf(t: Terrain): { at: Vec3; bearing: number } {
   return { at, bearing: Math.atan2(dot(toward, f.east), dot(toward, f.north)) };
 }
 
-/**
- * The land's heart: of the cells a quarter of the way round the planet or more
- * from `from`, the one farthest in from the coast.
- */
 function heartOf(t: Terrain, from: Vec3): Vec3 {
   let best = -1;
   for (let c = 0; c < CELLS; c++) {
@@ -153,14 +101,12 @@ export function terrainPlanet(t: Terrain, seed: number): Planet {
   const noise = createNoise3(seed + 104729),
     at = taps();
   const o = t.options;
-  // the point being read, in metres from the centre
   let qx = 0,
     qy = 0,
     qz = 0;
   const read = (size: number, shift: number) =>
     noise.value(qx / size + shift, qy / size, qz / size);
 
-  /** The ground at direction p, and (if `cover`) what lies on it. */
   const ground = (p: Vec3, cover: Cover | null): number => {
     locate(p, at);
     const s = between(t.shore, at),
@@ -171,8 +117,6 @@ export function terrainPlanet(t: Terrain, seed: number): Planet {
     qy = p[1] * k;
     qz = p[2] * k;
     if (s < 0) {
-      // how high up the land, 0 at the sea to 1 at the summit: grass in patches
-      // that shrink as it rises, and rock breaking out above
       const up = clamp(h / o.summit);
       const patch = read(9, 11.3) + 0.5 * read(40, 23.9);
       cover.grass =

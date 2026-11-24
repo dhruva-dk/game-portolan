@@ -1,25 +1,3 @@
-// The planet as the eye sees it: the one place the shaders do the sphere's
-// arithmetic (its CPU half is world/sphere.ts, which this mirrors). Every
-// system that needs "up", a height, the sky's direction or a chart asks this,
-// given to it by the frame.
-//
-//   up(p)        unit vector up at world position p (straight away from the planet's centre)
-//   altitude(p)  metres above the sea's level at p
-//   place(u, h)  the world position h metres above the sea over the unit vector u
-//   toSky(dir)   a world direction as the eye's sky sees it (sky.ts's tables, the clouds, the reflection): in the
-//                eye's frame, x east, y up, z south, its elevation stretched so the sky's horizon lies on the sea's
-//                (world/sphere.ts, skyElevation)
-//   fromSky(d)   the inverse: a sky direction back to the world, for the frame given
-//   local(p)     where p lies on the eye's chart, metres east (x) and south (z) of the point under the eye
-//   onEye(p)     the same, with the eye's chart's axes carried to p
-//   under(d,m,h) how much of a ray from the eye lies under a height
-//   rings(...)   a grid of rings round the point under the eye, laid on the sphere out to the horizon
-//
-// The eye is worked out once a frame from the camera (update), on the CPU and
-// into uniforms: the one place outside the frame that reads the camera. The
-// systems take the eye (Eye) instead: where it stands, what it sees (frustum),
-// how wide a pixel is, and the camera's matrices for the clouds' reprojection.
-
 import {
   BufferGeometry,
   Float32BufferAttribute,
@@ -61,35 +39,19 @@ import {
   type Vec3Node,
 } from '../tsl.ts';
 
-/** The eye, as the CPU sees it. */
 export interface Eye {
   position: Vec3;
   frame: Frame;
-  /** Metres above the sea's level. */
   height: number;
-  /** How far below the level the sea's horizon lies, radians. */
   dip: number;
-  /**
-   * How wide a pixel of the screen is at the middle of the view, per metre
-   * away.
-   */
   pixel: number;
-  /** What the eye sees. */
   frustum: Frustum;
-  /**
-   * The camera's projection and its inverse; camera to world; and world to
-   * clip.
-   */
   projection: Matrix4;
   projectionInverse: Matrix4;
   world: Matrix4;
   viewProjection: Matrix4;
 }
 
-/**
- * A point's place on a chart (metres), the chart's x and z axes carried to it,
- * up there, and its arc from the centre (radians).
- */
 interface Charted {
   q: Vec2Node;
   e1: Vec3Node;
@@ -98,11 +60,6 @@ interface Charted {
   theta: FloatNode;
 }
 
-/**
- * A chart given by its centre `A` and axes `a1`, `a2` = a1 × A, as nodes
- * (constants, uniforms or a uniform array's elements): the one place the
- * shaders work out where a point lies on a chart.
- */
 export function chartNodes(A: Vec3Node, a1: Vec3Node, a2: Vec3Node) {
   return (p: Vec3Node): Charted => {
     const u = normalize(p);
@@ -113,8 +70,6 @@ export function chartNodes(A: Vec3Node, a1: Vec3Node, a2: Vec3Node) {
     const theta = atan(s, c);
     const cp = dot(dir, a1),
       sp = dot(dir, a2);
-    // the radial direction carried to p, and the one across it, which the
-    // carrying leaves as it is
     const g = dir.mul(cos(theta)).sub(A.mul(sin(theta)));
     const t = cross(dir, A);
     return {
@@ -150,10 +105,6 @@ export function createView() {
     world: new Matrix4(),
     viewProjection: new Matrix4(),
   };
-  /**
-   * The eye as the systems read it; and where the camera stands, worked out
-   * into this each frame.
-   */
   const seen: Readonly<Eye> = eye,
     at = new Vector3();
 
@@ -175,10 +126,6 @@ export function createView() {
     return vec3(flat.x.mul(cos(e)), sin(e), flat.y.mul(cos(e)));
   };
 
-  /**
-   * A sky direction back to a world direction, for a frame (east, up, south
-   * nodes) and its dip.
-   */
   const fromSky = (
     d: Vec3Node,
     frame: { east: Vec3Node; up: Vec3Node; south: Vec3Node; dip: FloatNode }
@@ -196,14 +143,6 @@ export function createView() {
 
   const eyeChart = chartNodes(up0, east, south);
 
-  /**
-   * A grid of rings round the point under the eye, on the sphere: a centre,
-   * then rings `first` metres out and each `growth` times further than the
-   * last, with `spokes` spokes, out to the far side of the planet; only the
-   * rings out to the horizon (and as far past it as something `crest` metres
-   * high stands over it) are drawn. The geometry holds (arc distance, 0,
-   * bearing); `up` is the unit vector under each vertex and `arc` its distance.
-   */
   function rings(first: number, growth: number, spokes: number) {
     const radii = [0];
     for (let r = first; ; r *= growth) {
@@ -216,7 +155,6 @@ export function createView() {
         positions.push(radii[k], 0, (s / spokes) * 2 * Math.PI);
     const at = (k: number, s: number) => 1 + (k - 1) * spokes + (s % spokes);
     const index: number[] = [];
-    // wound as seen from above
     for (let s = 0; s < spokes; s++) index.push(0, at(1, s + 1), at(1, s));
     for (let k = 1; k < radii.length - 1; k++)
       for (let s = 0; s < spokes; s++) {
@@ -241,10 +179,6 @@ export function createView() {
       geometry,
       arc,
       up: up0.mul(cos(theta)).add(out.mul(sin(theta))),
-      /**
-       * Draws only the rings that can be seen; returns how far out the last
-       * drawn ring lies, metres.
-       */
       update(crest: number): number {
         const reach = Math.min(
           R * (horizonDip(eye.height) + horizonDip(crest)),
@@ -264,13 +198,8 @@ export function createView() {
     place,
     toSky,
     fromSky,
-    /** The eye's position (world, metres) and height, as nodes. */
     position,
     height,
-    /**
-     * How many of the first `metres` along world direction dir from the eye lie
-     * under `top` metres over the sea.
-     */
     under: (dir: Vec3Node, metres: FloatNode, top: number): FloatNode => {
       const od = dot(position, dir),
         h = od.mul(od).sub(dot(position, position).sub((R + top) * (R + top)));
@@ -279,14 +208,7 @@ export function createView() {
     local: (p: Vec3Node): Vec2Node => eyeChart(p).q,
     onEye: (p: Vec3Node): Charted => eyeChart(p),
     rings,
-    /** The eye on the CPU, as of the last update. */
     eye: seen,
-    /**
-     * Each frame, once the camera is placed: the eye it gives, on a screen
-     * `screen` CSS pixels high. Its position and frame are new each frame,
-     * values the systems may keep (clouds.ts keeps the last position to find
-     * the eye's step).
-     */
     update(camera: PerspectiveCamera, screen: number) {
       const p = camera.getWorldPosition(at);
       eye.pixel =

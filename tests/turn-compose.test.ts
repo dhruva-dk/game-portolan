@@ -1,5 +1,3 @@
-// world/turn.ts's axisAngle and multiply are three's setFromAxisAngle and
-// multiplyQuaternions, to the last bit.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Quaternion, Vector3 } from 'three';

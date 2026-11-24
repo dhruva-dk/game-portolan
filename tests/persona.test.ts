@@ -1,5 +1,3 @@
-// Who a bot is (sim/persona.ts): her persona and its crew, and the match's
-// type, which weighs the personas and sets the rules.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DEFAULT_BRAIN, variant } from '../src/sim/brain.ts';
@@ -18,7 +16,6 @@ test('in a mixed match a bot is the temper she always was, her persona named by 
   const names = new Set<string>();
   for (const s of SEEDS.slice(0, 200)) {
     const n = nature(s);
-    // her temper as drawn uniformly over the six (the draw before personas)
     assert.deepEqual(n.temper, temper(s));
     names.add(n.persona);
   }
@@ -35,20 +32,16 @@ test('each persona sails one crew, made once, changed from the brain given only 
   }
   const brawler = by.get('brawler')!,
     homesteader = by.get('homesteader')!;
-  // the slices a crew leaves alone are the very brain's
   assert.equal(brawler.helm, DEFAULT_BRAIN.helm);
   assert.equal(brawler.claimer, DEFAULT_BRAIN.claimer);
   assert.ok(brawler.choice.fight > DEFAULT_BRAIN.choice.fight);
   assert.ok(homesteader.choice.claim > DEFAULT_BRAIN.choice.claim);
   assert.ok(homesteader.hunting.earshot < brawler.hunting.earshot);
-  // on a brain the harness gives, the persona's changes sit on top of its own
   const keen = variant({ helm: { ...DEFAULT_BRAIN.helm } }),
     k = nature(SEEDS.find((s) => nature(s).persona === 'brawler')!, keen);
   assert.equal(k.persona, 'brawler');
   assert.equal(k.brain.helm, keen.helm);
   assert.equal(k.brain.choice.fight, brawler.choice.fight);
-  // a crew's changes are shares of the brain's own: never seeking cover, a
-  // turtle seeks none
   const bare = variant({ mind: { cover: 0 } }),
     turtle = SEEDS.find((s) => nature(s).persona === 'turtle')!;
   assert.ok(nature(turtle).brain.mind.cover > DEFAULT_BRAIN.mind.cover);

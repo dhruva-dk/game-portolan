@@ -1,16 +1,5 @@
-// The voices: at most VOICES one-shot sounds play at once (the phone's audio
-// thread kept light), each in a slot the mixer keeps wired (mixer.ts). A new
-// sound takes a free slot (one whose sound has ended), else the slot of the
-// sound of lowest priority, the oldest among those, if that is no higher than
-// its own; else it is not played. Pure: which slot, by numbers alone.
-
-/** The most one-shot sounds playing at once. */
 export const VOICES = 16;
 
-/**
- * Each slot's sound: when it began and ends (the context's clock, s), and its
- * priority.
- */
 export interface Pool {
   begins: Float64Array;
   ends: Float64Array;
@@ -23,10 +12,6 @@ export const pool = (n = VOICES): Pool => ({
   priority: new Float64Array(n),
 });
 
-/**
- * The slot a sound of `priority` from `begins` to `ends` takes at `now`, marked
- * as its; −1 if none may be had.
- */
 export function claim(
   p: Pool,
   now: number,
@@ -53,7 +38,6 @@ export function claim(
   return slot;
 }
 
-/** Every slot freed (a new sea: nothing carries over). */
 export function clear(p: Pool) {
   p.begins.fill(0);
   p.ends.fill(0);

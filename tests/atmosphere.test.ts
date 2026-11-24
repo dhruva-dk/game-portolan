@@ -17,7 +17,7 @@ test('transmittance table mapping round-trips', () => {
   for (const r of [BOTTOM, BOTTOM + 0.5, BOTTOM + 30, TOP - 1]) {
     for (const mu of [-0.1, 0, 0.05, 0.5, 1]) {
       const horizon = -Math.sqrt(1 - (BOTTOM * BOTTOM) / (r * r));
-      if (mu < horizon) continue; // rays into the ground have no entry
+      if (mu < horizon) continue;
       const [u, v] = transmittanceUV(r, mu);
       const [r2, mu2] = transmittanceRMu(u, v);
       near(r2, r, 1e-6);
@@ -27,7 +27,6 @@ test('transmittance table mapping round-trips', () => {
 });
 
 test('straight up from the sea, the air passes most red and less blue', () => {
-  // Optical depth ≈ Rayleigh·8 km + Mie·its scale height + ozone·15 km.
   const mie = MIE_EXTINCTION * MIE_SCALE_HEIGHT;
   const [r, g, b] = transmittance(BOTTOM, 1, 200);
   near(r, Math.exp(-(5.802e-3 * 8 + mie + 0.65e-3 * 15)), 0.01);

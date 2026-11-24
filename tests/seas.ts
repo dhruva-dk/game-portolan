@@ -1,8 +1,3 @@
-// Seas for the water's copy of the cells (water/claimed.ts) to follow, as the
-// game hands them to the frame: a match of ships biting out of their homes, and
-// a loop round half the planet closed in one step. tests/sea.test.ts checks
-// what is drawn of them.
-
 import {
   createTerritory,
   type Move,
@@ -23,10 +18,6 @@ import {
 
 export const WHOLE: Cap = { centre: [0, 1, 0], radius: Math.PI };
 
-/**
- * The sea as the game hands it to the frame (play/state.ts sea), for match
- * `generation`.
- */
 export const seaOf = (t: Territory, generation: number): Sea => ({
   generation,
   owner: t.owner,
@@ -35,12 +26,6 @@ export const seaOf = (t: Territory, generation: number): Sea => ({
   colours: [],
 });
 
-/**
- * Ships sailing bites out of their homes near `centre`, painting over each
- * other's water, some sunk, under a storm that closes after `calm` s: `steps` steps of
- * a match, each handed to `frame` once its sea is (generation `generation`),
- * with the clock, read or not, as the frames fall.
- */
 export function match(
   seed: number,
   generation: number,
@@ -76,7 +61,6 @@ export function match(
     for (let id = 0; id < ships; id++) {
       if (sunk.has(id)) continue;
       if (!plans[id].length) {
-        // a bite: out on a bearing drawn, across, and back to her berth
         const a = draw() * 2 * Math.PI,
           dir = add(scale(e1, Math.cos(a)), e2, Math.sin(a)),
           side = add(scale(e1, -Math.sin(a)), e2, Math.cos(a));
@@ -108,11 +92,6 @@ export function match(
   }
 }
 
-/**
- * Her loop just short of a great circle, closed in one step at its end: the
- * territory after, the sea the step before (the loop's water open) and after,
- * and the clock then.
- */
 export function halfLoop() {
   const pole: Vec3 = [0, 0, 1],
     theta = Math.PI / 2 - 0.01,

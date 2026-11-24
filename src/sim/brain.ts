@@ -1,13 +1,3 @@
-// A bot's brain: what each part of her is tuned by, gathered. The brain adds
-// nothing of its own: each slice is a part's own table, kept and documented
-// where that part reads it (BOTS.md 1.3), and a part reads only its own
-// slices, from the brain it is given. The
-// game's is DEFAULT_BRAIN, which each persona's crew changes (persona.ts); the
-// harness (tools/) gives others.
-//
-// Pure arithmetic: no three, so it runs in node for the tests; deterministic
-// for the same inputs, to the bit.
-
 import { CHOICE } from './bot.ts';
 import { CLAIMER } from './claimer.ts';
 import { MIND } from './fighting.ts';
@@ -24,15 +14,6 @@ import { RAMMING } from './tactician.ts';
 import { merged, type Changes, type Widen } from './tables.ts';
 import { STYLES } from './temper.ts';
 
-/**
- * What each part of a bot is tuned by: the weights of her options (bot.ts), her
- * sight (lookout.ts), her weighing of a fight and a run (fighting.ts), her
- * roaming (roaming.ts) and her storm (storming.ts), her ramming
- * (tactician.ts), her helm (helmsman.ts), her stores (purser.ts), her water
- * (claimer.ts), her ear (hunter.ts), how she fights her guns (gunner.ts), her
- * place for a phase (placing.ts), her log (logbook.ts), and the temperaments she may be born to
- * (temper.ts).
- */
 export interface Brain {
   readonly choice: Widen<typeof CHOICE>;
   readonly sight: Widen<typeof SIGHT>;
@@ -50,7 +31,6 @@ export interface Brain {
   readonly styles: Widen<typeof STYLES>;
 }
 
-/** The brain every ship in the game sails with. */
 export const DEFAULT_BRAIN: Brain = {
   choice: CHOICE,
   sight: SIGHT,
@@ -68,18 +48,10 @@ export const DEFAULT_BRAIN: Brain = {
   styles: STYLES,
 };
 
-/**
- * What a variant of a brain changes: any keys of any of its tables, and the
- * temperaments whole.
- */
 export type Over = Changes<Omit<Brain, 'styles'>> & {
   readonly styles?: Brain['styles'];
 };
 
-/**
- * A whole brain: `base` with `over`'s changes, every slice and key in the
- * default's order (one shape for every brain: tables.ts).
- */
 export function variant(over: Over, base: Brain = DEFAULT_BRAIN): Brain {
   return {
     choice: merged('choice', base.choice, over.choice),

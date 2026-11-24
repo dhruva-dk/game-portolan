@@ -1,5 +1,3 @@
-// A bot's water (sim/claimer.ts), as she sails it against who holds the sea
-// (sim/territory.ts): out on a loop and back, taking the water it closes.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mind, think, type Memory } from '../src/sim/bot.ts';
@@ -21,7 +19,6 @@ const start = fromLatLon(0.2, 0.3);
 const deep: Depth = () => 30;
 const WHOLE = { centre: start, radius: Math.PI };
 
-/** Ship `id` `metres` from the start on a bearing, heading `heading`. */
 const placed = (
   id: number,
   bearing: number,
@@ -37,18 +34,8 @@ const seedWhere = (ok: (t: ReturnType<typeof temper>) => boolean) => {
   return s;
 };
 
-/**
- * A ship as a bot sees her: as she lies, with her shield (full unless given).
- */
 type Seen = Vessel & { shield?: number; hull?: number };
 
-/**
- * `seconds` of the fleet sailing on territory `t` (its ids the fleet's): a bot
- * for each seed (null: a ship holding `held`'s orders), each with her mind (or
- * the one `minds` gives), under `storm`, from `since` s on the territory's
- * clock; after each step, `each` is told the fleet, the bots' minds and what
- * the step did to who holds the sea.
- */
 function voyage(
   fleet: Seen[],
   seeds: (number | null)[],

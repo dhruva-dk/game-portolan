@@ -1,6 +1,3 @@
-// Set pieces: a few ships placed just so on a made sea, sailed some seconds by
-// their bots, and what came of it. Each stands for a behaviour the harness
-// (tools/sim) measured over whole matches, held here in miniature, fast.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { crewOf } from '../src/sim/battle.ts';
@@ -31,16 +28,13 @@ import {
 
 const c0 = fromLatLon(0.3, 0.1);
 const { east, north } = frameAt(c0);
-/** The point `e` m east and `n` m north of c0. */
 const at = (e: number, n: number) => along(along(c0, east, e).p, north, n).p;
 
-/** Open sea 30 m deep, with round islands (centre, radius m) 10 m high. */
 const islands =
   (...isles: [Vec3, number][]): Depth =>
   (p) =>
     isles.some(([c, r]) => distance(p, c) < r) ? -10 : 30;
 
-/** Whether land stands between a and b (as the bots' lookout has it). */
 function blocked(depth: Depth, a: Vec3, b: Vec3): boolean {
   const t = toward(a, b);
   if (!t) return false;
@@ -49,19 +43,12 @@ function blocked(depth: Depth, a: Vec3, b: Vec3): boolean {
   return false;
 }
 
-/** A captain who keeps a ship in her eye well past 100 m, as she runs from it. */
 const SEED = (() => {
   let s = 1;
   while (eye(temper(s)) < 150) s++;
   return s;
 })();
 
-/**
- * A battered, unarmed bot (SEED) at c0 heading north, with an armed foe lying
- * still 100 m west of her, sailed `seconds` with `brain` on a chart of `depth`: her
- * modes in turn, the seconds land hid her from her foe, and the seconds she
- * made good less than a metre in.
- */
 function run(depth: Depth, brain: Brain, seconds: number) {
   const ch = chart(depth),
     crew = { ...crewOf(0), health: { hull: 12, shield: 0 } },
@@ -95,8 +82,6 @@ function run(depth: Depth, brain: Brain, seconds: number) {
   return { modes, hidden, pinned };
 }
 
-// an island 70 m off to the east-north-east, its near side some 40 m off her,
-// on her way out of her foe's sight
 const isle = islands([at(60, 35), 28]);
 
 test('a bot running from a foe makes for cover behind an island off her bow, out of his sight; told never to, she runs on in plain view', () => {
@@ -112,8 +97,6 @@ test('a bot running from a foe makes for cover behind an island off her bow, out
 });
 
 test("a bot routed round an island's shoulder keeps her bow off it: she is never pinned on it, by either way round", () => {
-  // (her route's look ahead once cut the shoulder through the cells by the
-  // shore, and she lay with her bow on it for good: ROUTE.wide)
   for (const cover of [DEFAULT_BRAIN.mind.cover, 0]) {
     const r = run(
       isle,
@@ -124,7 +107,6 @@ test("a bot routed round an island's shoulder keeps her bow off it: she is never
   }
 });
 
-/** Metres east and north of c0, of a point near it. */
 function en(p: Vec3): [number, number] {
   const t = toward(c0, p),
     d = distance(c0, p);
@@ -134,8 +116,6 @@ function en(p: Vec3): [number, number] {
 }
 
 test('the way into the calm leads round the end of a long wall, where a route given up on runs to the wall nearest it', () => {
-  // a wall of land 20 m thick from 300 m west to 200 m east; she lies 50 m
-  // south of it, the calm's heart 60 m north
   const depth: Depth = (p) => {
       const [e, n] = en(p);
       return Math.abs(n) < 10 && e > -300 && e < 200 ? -10 : 30;
@@ -143,10 +123,8 @@ test('the way into the calm leads round the end of a long wall, where a route gi
     ch = chart(depth),
     heart = at(0, 60),
     from = at(0, -50);
-  // the pathfinder given little work gives up, its route ending at the wall
   const gaveUp = findPath(ch, from, heart, 200);
   assert.ok(!gaveUp.found);
-  // the field, found a share at a time, leads round
   const f = building(ch, (p) => distance(p, heart) < 30);
   let shares = 0;
   while (!f.build(5000)) shares++;

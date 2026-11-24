@@ -1,9 +1,3 @@
-// A driver's stats on her bot (sim/driven.ts): ten in
-// every stat is today's bot of her seed and persona; and, a test a stat, two
-// drivers alike but for that stat at 4 and at 16 differ the expected way: over
-// seeded races where a race's result shows it (gunnery, nerve), over seeded
-// encounters on the sim where it does not (helm, lookout, stormcraft), and by
-// the arithmetic alone where the stat is one number's (stamina).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { SEED } from '../src/environment.ts';
@@ -45,15 +39,12 @@ import {
 } from '../src/world/sphere.ts';
 
 const TENS: DriverStats = specField(1, 1).ships[1].driver!.stats;
-/** The seconds a race's storm has closed by, for these tests. */
 const LENGTH = 400;
-/** The driver of `seed`, of the persona her seed deals, ten in every stat but `over`. */
 const driver = (seed: number, over: Partial<DriverStats> = {}): Driver => ({
   seed,
   persona: nature(seed).persona,
   stats: { ...TENS, ...over },
 });
-/** Her nature with `stat` at `value`. */
 const with1 = (seed: number, stat: Stat, value: number): Nature =>
   natureOf(driver(seed, { [stat]: value }), LENGTH);
 
@@ -71,23 +62,14 @@ test("ten in every stat is today's bot of that seed and persona, to the bit; her
     const n = natureOf({ seed: 7, persona, stats: TENS }, LENGTH);
     assert.equal(n.persona, persona);
   }
-  // consistency and feedback are the career's: the sim reads neither
   for (const stat of ['consistency', 'feedback'] as const)
     assert.deepEqual(with1(3, stat, 16), with1(3, stat, 4));
 });
-
-// ------------------------------------------------------------------ races
 
 const planet = planetOf(SEED, landOf(SEED)),
   depth = (p: Vec3) => -planet.height(p),
   waters = { chart: chart(depth), water: berthing(depth) };
 
-/**
- * Seeded races of sixteen ships in four teams, the storm three times as
- * quick: ships 0 to 7 have `stat` at 16, ships 8 to 15 at 4, and ship k + 8 is
- * driven by ship k's own driver otherwise (her seed, her persona, tens). What
- * each half did, summed over the races.
- */
 function halves(stat: Stat, races: number) {
   const sums = [16, 4].map(() => ({ fired: 0, landed: 0, dealt: 0 }));
   for (let k = 0; k < races; k++) {
@@ -123,8 +105,6 @@ test('gunnery: over seeded races the 16s land more of their shots than the 4s', 
 });
 
 test('nerve: over seeded races the 16s fight closer than the 4s: more damage a shot', () => {
-  // (berths drawn by the race's seed: with the first eight ships always in
-  // the roomiest water this once read as more shots fired, which it is not)
   const { high, low } = halves('nerve', 8);
   const each = (s: typeof high) => s.dealt / s.fired;
   console.log(
@@ -132,7 +112,6 @@ test('nerve: over seeded races the 16s fight closer than the 4s: more damage a s
   );
   assert.ok(high.fired > 50 && low.fired > 50, 'both fired');
   assert.ok(each(high) > each(low) * 1.1, `${each(high)} to ${each(low)}`);
-  // and by the arithmetic: readier to fight, in a hotter mood, running later
   for (let seed = 1; seed <= 20; seed++) {
     const a = with1(seed, 'nerve', 16).temper,
       b = with1(seed, 'nerve', 4).temper;
@@ -140,12 +119,9 @@ test('nerve: over seeded races the 16s fight closer than the 4s: more damage a s
   }
 });
 
-// ------------------------------------------------------------------ encounters
-
 const deg = Math.PI / 180;
 const start = fromLatLon(0.2, 0.3);
 const deep: Depth = () => 30;
-/** A ship `metres` from the start on a bearing, heading `heading` (radians clockwise from north). */
 const placed = (
   id: number,
   bearing: number,
@@ -157,10 +133,6 @@ const placed = (
   return afloat(id, { ...shipAt(at, bearingAt(at, heading)), speed });
 };
 
-/**
- * The fleet sailed `seconds`, each ship by her nature's bot (null: by `held`);
- * the rams there were, told to the struck; `each` told the fleet every step.
- */
 function sail(
   fleet: Vessel[],
   who: (Nature | null)[],
@@ -197,8 +169,6 @@ function sail(
 }
 
 test('helm: with a rammer driving at them in seeded encounters, fewer of the 16s are struck than of the 4s', () => {
-  // a rammer drives at her at full speed from 80 m off, steering for her,
-  // from five quarters: whether it has struck her 12 s on
   const rammed = (helm: number) => {
     let rams = 0;
     for (const from of [30, 60, 90, 120, 150])
@@ -222,7 +192,6 @@ test('helm: with a rammer driving at them in seeded encounters, fewer of the 16s
     low = rammed(4);
   console.log(`# struck, of 120 encounters: helm 16 ${high}, 4 ${low}`);
   assert.ok(low > 10 && high <= 0.8 * low, `${high} to ${low}`);
-  // and by the arithmetic: her helm is the sharper
   for (let seed = 1; seed <= 20; seed++)
     assert.ok(
       with1(seed, 'helm', 16).temper.helm > with1(seed, 'helm', 4).temper.helm
@@ -230,7 +199,6 @@ test('helm: with a rammer driving at them in seeded encounters, fewer of the 16s
 });
 
 test('lookout: a ship lying where a ten would just miss her, the 16s have in their eye and the 4s have not', () => {
-  // (captains whose eye is well short of the furthest any lookout sees)
   const seeds: number[] = [];
   for (let s = 1; seeds.length < 12; s++)
     if (eye(nature(s).temper) < 170) seeds.push(s);
@@ -257,8 +225,6 @@ test('lookout: a ship lying where a ten would just miss her, the 16s have in the
 });
 
 test('stormcraft: making for the next cap as it closes in seeded voyages, the 16s end further inside it than the 4s', () => {
-  // the next cap, 120 m round a point 400 m off; it starts to close from 600
-  // m in 20 s, over 70 s
   const inside = (stormcraft: number) => {
     let sum = 0;
     for (let seed = 1; seed <= 12; seed++) {
@@ -323,7 +289,6 @@ test('stamina: alike till the midpoint of the race; by its end the 16s shoot and
     const end = (n: typeof a) => tempered(n, LENGTH);
     assert.ok(end(a).gunnery > ten.gunnery && ten.gunnery > end(b).gunnery);
     assert.deepEqual(tempered(a, LENGTH * 2), end(a), 'and stays there');
-    // her gunner's hand: the same gun's spread
     assert.ok(spreadBy(end(a).gunnery) < spreadBy(end(b).gunnery));
   }
 });

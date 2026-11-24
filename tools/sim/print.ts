@@ -1,8 +1,3 @@
-// What npm run sim prints: a match's headline figures, or many matches pooled.
-// The terminal gets the summary; the folder named last has everything.
-//
-// Node only (tools/).
-
 import type { Summary } from './match.ts';
 
 const pc = (x: number | null) => (x === null ? '-' : `${Math.round(100 * x)}%`);
@@ -14,7 +9,6 @@ const median = (xs: readonly number[]) => {
   return s.length ? s[s.length >> 1] : 0;
 };
 
-/** The parts of a step, dearest first. */
 const parts = (s: Summary) =>
   Object.entries(s.cost.parts)
     .filter(([k]) => k !== 'step')
@@ -89,7 +83,6 @@ export function printMatch(s: Summary, dir: string) {
   );
 }
 
-/** Many matches' figures pooled: over all, and by brain and by persona. */
 export function pooled(all: readonly Summary[]) {
   const ships = all.flatMap((s) => s.placements);
   const group = (key: (p: (typeof ships)[number]) => string) => {

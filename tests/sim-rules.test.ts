@@ -1,5 +1,3 @@
-// The sim's rule variants (tools/sim/rules.ts): changes on the rules
-// each match type deals, none at all unless one is named.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { dealt, TYPES } from '../src/sim/persona.ts';

@@ -1,30 +1,3 @@
-// Terrain over the whole planet: the land the game stands on (land.ts), made a
-// Planet by planet-terrain.ts, its things placed by terrain-scatter.ts and its
-// coast traced by coastline.ts. Land is random, never placed by hand; only its
-// share of the planet and the sea's connection are guaranteed.
-//
-// On the sea's cells (cells.ts, 6 × 256², about 3.4 m a cell), in stages, each
-// a pure function of the last:
-//   relief     domain-warped fractal noise over the sphere (noise3.ts), read at each cell's centre
-//   sea level  the area-weighted quantile of the relief that leaves `land` of the planet dry, exactly
-//   repair     the sailable water (a ship's centre at least `clear` metres from any shore) must be one body: every
-//              other body large enough is joined to the largest by a channel dug along the cheapest way through the
-//              relief (low ground first, so it follows a valley), wide enough to sail; ponds too small to join, and
-//              water no ship fits in that leads nowhere, are filled (mirrored through the sea level into low rises)
-//   shore      the signed distance to the coast, metres (positive at sea), to the sea level's contour between cells
-//   height     land rising from a beach to its relief, no steeper than `slope` from the coast inward; the sea
-//              shelving from the beach down to its banks
-//
-// Between the cells' centres, heightAt reads the relief and the shore smoothly
-// (terrain-grid.ts locate, bicubic) and shapes the height from them there: the
-// profile is applied after reading, not read from heights the profile made at
-// the centres, so a beach a cell wide keeps its curve rather than becoming a
-// straight ramp between two samples.
-//
-// A Terrain is plain data (typed arrays and numbers), so it can be built once
-// and handed to a worker whole. Pure arithmetic: no three, so it runs in node
-// for the tests; deterministic for the seed.
-
 import {
   CELLS,
   N,
@@ -52,90 +25,50 @@ import {
 } from './terrain-grid.ts';
 
 export const TERRAIN = {
-  /** The share of the planet's area that is land. */
   land: 0.45,
-  /**
-   * The relief's coarsest features, metres; its octaves, each half the last's
-   * size, and each's share of the last's.
-   */
   size: 220,
   octaves: 5,
   gain: 0.5,
-  /** How far the relief's domain is warped, in units of `size`. */
   warp: 0.55,
-  /**
-   * How far a ship's centre keeps from any shore, metres: half the narrowest
-   * strait.
-   */
   clear: 14,
-  /**
-   * Sailable water smaller than this, square metres, is filled rather than
-   * joined.
-   */
   pond: 3000,
-  /**
-   * The highest the land stands, metres; the steepest it rises from the coast
-   * inward (rise over run).
-   */
   summit: 50,
   slope: 0.35,
-  /** The beach's slope at the waterline, and the berm it levels at, metres. */
   beach: 1 / 8,
   berm: 1.5,
-  /** The banks' depth, shallowest to deepest, metres. */
   bank: [4, 16] satisfies readonly [number, number],
 };
 
 type TerrainOptions = typeof TERRAIN;
 
 export interface Terrain {
-  /**
-   * The relief after repair, the sea level in it (water where relief < level),
-   * and its lowest and highest.
-   */
   relief: Float32Array;
   level: number;
   lo: number;
   hi: number;
-  /** 1 where the cell is water. */
   water: Uint8Array;
-  /** Signed distance to the coast, metres, positive at sea. */
   shore: Float32Array;
-  /** Metres above the sea (negative below) at each cell's centre. */
   height: Float32Array;
-  /** 1 where the repair dug a channel, 2 where it filled water. */
   changed: Uint8Array;
   options: TerrainOptions;
   stats: TerrainStats;
 }
 
 interface TerrainStats {
-  /** Land's share before and after the repair. */
   landBefore: number;
   landAfter: number;
-  /**
-   * Sailable bodies before and after the repair (after must be 1); water bodies
-   * after.
-   */
   sailableBefore: number;
   sailableAfter: number;
   waterBodies: number;
-  /** Channels dug, ponds filled, and the area each changed, square metres. */
   channels: number;
   filled: number;
   dugArea: number;
   filledArea: number;
-  /**
-   * Landmasses, the largest's share of the land, and the highest point, metres.
-   */
   landmasses: number;
   largestLand: number;
   summit: number;
 }
 
-// ---------------------------------------------------------------- the stages
-
-/** The relief at every cell: domain-warped fractal noise, about −1…1. */
 function relief(seed: number, o: TerrainOptions = TERRAIN): Float32Array {
   const noise = createNoise3(seed),
     warpNoise = createNoise3(seed + STRIDE),
@@ -174,11 +107,6 @@ const share = (mask: Uint8Array, value: number) => {
 const largest = (area: number[]) =>
   area.reduce((best, a, i) => (a > area[best] ? i : best), 0);
 
-/**
- * The relief repaired so the sailable water is one body: rounds of filling what
- * can't be joined and digging a channel from each other sailable body to the
- * largest along the cheapest way through the relief. Changes `field` in place.
- */
 function repair(
   field: Float32Array,
   level: number,
@@ -197,9 +125,6 @@ function repair(
       changed[n] = 1;
     }
   };
-  // a pond filled is turned inside out, its depth become a rise as gentle: no
-  // flat plain where it was, and no step at its rim, where the relief is the
-  // sea level from either side
   const fill = (n: number) => {
     field[n] = Math.max(2 * level - field[n], level + 0.002);
     changed[n] = 2;
@@ -215,8 +140,6 @@ function repair(
       W = components(water);
     if (sailableBefore < 0) sailableBefore = S.area.length;
     const main = largest(S.area);
-    // the water bodies, and how much sailable water each holds that isn't the
-    // main body's
     const holdsMain = new Uint8Array(W.area.length),
       sailIn = new Float64Array(W.area.length);
     for (let c = 0; c < CELLS; c++) {
@@ -224,8 +147,6 @@ function repair(
       if (S.part[c] === main) holdsMain[W.part[c]] = 1;
       else sailIn[W.part[c]] += areaOf(c);
     }
-    // fill each water body that doesn't hold the main and has too little
-    // sailable water to be worth a channel
     let any = false;
     for (let c = 0; c < CELLS; c++) {
       const w = W.part[c];
@@ -236,8 +157,6 @@ function repair(
     }
     for (let w = 0; w < W.area.length; w++)
       if (!holdsMain[w] && sailIn[w] < o.pond) filled++;
-    // the sailable bodies left to join: those in bodies big enough (in the main
-    // water, or apart from it)
     const join = new Set<number>();
     for (let c = 0; c < CELLS; c++) {
       if (
@@ -249,9 +168,6 @@ function repair(
     }
     if (!join.size && !any) break;
     if (!join.size) continue;
-    // the cheapest way from the main body to every cell: free across sailable
-    // water, cheap across water too narrow to sail, dearer the higher the
-    // ground
     const cost = new Float64Array(CELLS).fill(Infinity),
       from = new Int32Array(CELLS).fill(-1),
       h = heap();
@@ -278,8 +194,6 @@ function repair(
         }
       }
     }
-    // each body joined from its cheapest cell back to the main, a channel
-    // `clear` and a cell and a half to either side
     const nearest = new Map<number, number>();
     for (let c = 0; c < CELLS; c++) {
       const s = S.part[c];
@@ -295,34 +209,14 @@ function repair(
   return { changed, channels, filled, sailableBefore };
 }
 
-// ---------------------------------------------------------------- the height
-
-/**
- * log(1 + eˣ), smoothed over w: 0 well below 0, x well above, and a curve
- * instead of max(0, x)'s corner.
- */
 const soft = (x: number, w: number) =>
   x > 30 * w ? x : w * Math.log1p(Math.exp(x / w));
-/**
- * The lesser of two non-negative numbers, rounded where they meet (a power
- * mean): never above either, and 0 if either is.
- */
 function softMin(a: number, b: number) {
   const lo = Math.min(a, b),
     hi = Math.max(a, b);
   return hi <= 0 ? 0 : lo * (1 + (lo / hi) ** 6) ** (-1 / 6);
 }
 
-/**
- * Metres above the sea, from the relief `f` and the signed distance `s` to the
- * coast (metres, positive at sea). 0 at the coast from either side, and smooth
- * through it and everywhere else: every corner rounded, so slope-banded shading
- * never finds a crease.
- *   land   a beach rising at `beach` to a berm, then the relief's height (up to `summit`), but no higher than `slope`
- *          times the way in from the berm: low land and narrow land both stay gentle
- *   sea    a beach shelving at `beach`, steepening past 3 m out, easing to the bank's depth (deeper where the relief is
- *          lower)
- */
 export function profile(
   t: Pick<Terrain, 'level' | 'lo' | 'hi' | 'options'>,
   f: number,
@@ -342,11 +236,6 @@ export function profile(
   return -bank * (1 - Math.exp(-q / bank));
 }
 
-/**
- * A reader of the terrain's height anywhere: metres above the sea at unit
- * vector p, read smoothly between cells. Each reader keeps its own scratch, so
- * make one a user.
- */
 export function heightAt(t: Terrain): (p: Vec3) => number {
   const at = taps();
   return (p) => {
@@ -355,13 +244,6 @@ export function heightAt(t: Terrain): (p: Vec3) => number {
   };
 }
 
-/**
- * The lowest and highest the ground stands over each of n × n blocks of a cube
- * face's cells (row j, column i, face by face), metres: from the cells in the
- * block and two round it (heightAt's reading reaches that far), and half a
- * metre either way for what the reading makes between them. For drawing: a
- * block's bounds, never its shape.
- */
 export function heightBounds(
   t: Terrain,
   n: number
@@ -387,7 +269,6 @@ export function heightBounds(
   return { lo, hi };
 }
 
-/** The planet's terrain for `seed`. */
 export function createTerrain(
   seed: number,
   o: TerrainOptions = TERRAIN

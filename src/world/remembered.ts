@@ -1,15 +1,5 @@
-// A function of a point remembered: its answers kept by the point's exact bits,
-// so each is worked out once while it stays in the table. Pure arithmetic over
-// the point alone.
-
 import type { Vec3 } from './sphere.ts';
 
-/**
- * `read`, a function of the point alone, through a table of its last 2^bits
- * answers kept by the point's exact bits: the same answers, each worked out
- * once while it stays in the table (a ship's hull read again where she lies,
- * step after step). Nothing is made per read.
- */
 export function remembered(
   read: (p: Vec3) => number,
   bits = 12

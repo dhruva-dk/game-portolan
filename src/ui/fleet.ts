@@ -1,17 +1,3 @@
-// The seed panel's fleet card (panel.ts): what a seed's race is sailed by, in
-// drawn marks and numerals (the house style: no words but the match type's).
-// At its head the match's type in a paper disc, its one word under it, the
-// persona most of the bots are in a gilt one, and the two captains who stand
-// out, each by a badge and her ship's number: the sharpest (a star on it) and
-// the most reckless (a flame). Under it a bar for each persona, its count over
-// it and its mark under it, the most common gilt. Held, the card shows in the
-// bars' place five rows, one a trait: its mark, then skill as a rating of five
-// stars (the last filled in part), and each other trait a rule from nothing to
-// the most it runs to with the fleet's spread washed over it and its average
-// ticked; the average and the spread in numerals. Skill is read in stars (to a
-// tenth), aggression as hundredths; notice and the storm margin in metres; flee
-// hull in the hull's hundred.
-
 import type { Fleet, Spread } from '../player.ts';
 import {
   CUT,
@@ -29,27 +15,17 @@ import { badge, ram, rose } from './marks.ts';
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
 
-/** A mark's group: centred on (x, y), drawn on a 24-unit square grown to `s`. */
 const grid = (x: number, y: number, s: number, body: string) =>
   `<g transform="translate(${r2(x)} ${r2(y)}) scale(${r2(s / 24)})" stroke="${INK.iron}" stroke-linejoin="round" stroke-linecap="round">${body}</g>`;
 
-/** A gold coin, 9 across its half, at (x, y) of a mark's grid. */
 const coin = (x: number, y: number) =>
   `<circle cx="${x}" cy="${y}" r="8" fill="${WASH.gold}" stroke-width="1.4"/>` +
   `<circle cx="${x}" cy="${y}" r="5.2" fill="none" stroke-width=".6"/>` +
   `<path d="M${x} ${y - 3}V${y + 3}M${x - 3} ${y}H${x + 3}" stroke-width="1.2"/>`;
 
-/**
- * Each persona's mark, `s` across, in sim/persona.ts's order: the hunter's
- * hunting horn (she runs down the guns she hears from far off); the
- * homesteader's pennant staked in her ground (she keeps to her water); the
- * raider's black flag; the turtle; the scavenger's coin (the loot before
- * anything); the brawler's ram.
- */
 function personaMark(i: number, x: number, y: number, s: number) {
   if (i === 5) return ram(x, y, s / 30);
   const body = [
-    // the horn's baldric over it, its brass curving from the mouthpiece down and up to the bell, banded twice
     `<path d="M-10 -5Q-1 -17 10 -6" fill="none" stroke="${INK.sepia}" stroke-width="1.3"/>` +
       `<path d="M-12 -6Q-11 7 2 7Q8 7 11 1L15 -2L9 -8L8 -3Q5 3 1 3Q-8 3 -9 -6Z" fill="${WASH.gold}" stroke-width="1.3"/>` +
       `<path d="M-13.5 -6.5H-7.5" stroke-width="2.4"/><path d="M-6.4 2.2L-7.8 5.6M4.4 3.2L5.8 6.4" stroke-width="1"/>`,
@@ -66,17 +42,10 @@ function personaMark(i: number, x: number, y: number, s: number) {
   return grid(x, y, s, body ?? '');
 }
 
-/** A small coin of a heap, 3.6 across its half, at (x, y) of a mark's grid. */
 const piece = (x: number, y: number) =>
   `<circle cx="${x}" cy="${y}" r="3.6" fill="${WASH.gold}" stroke-width="1"/>` +
   `<circle cx="${x}" cy="${y}" r="2" fill="none" stroke-width=".5"/>`;
 
-/**
- * Each match type's mark, `s` across, in sim/persona.ts TYPES's order: a
- * rose (mixed: every persona alike, the game's own rules); crossed cutlasses
- * with a drop of blood (a bloodbath); coins heaped (a gold rush); a great
- * shield, a heater blazoned with a gilt cross (cagey).
- */
 function typeMark(i: number, x: number, y: number, s: number) {
   if (i === 0) return rose(x, y, s * 0.5);
   if (i === 3)
@@ -89,7 +58,6 @@ function typeMark(i: number, x: number, y: number, s: number) {
         `<path d="M-10 -12H10V-2C10 6 5 10 0 13C-5 10 -10 6 -10 -2Z" fill="none" stroke-width="1.6"/>`
     );
   if (i === 2) {
-    // a heap of them on the ground, the rows behind drawn first
     let heap = `<path d="M-14 11.5H14" stroke-width="1"/>`;
     for (const [y0, xs] of [
       [-10, [0]],
@@ -100,7 +68,6 @@ function typeMark(i: number, x: number, y: number, s: number) {
       for (const x0 of xs) heap += piece(x0, y0);
     return grid(x, y, s, heap);
   }
-  // each blade curving from its hilt to its point, its grip and pommel past a guard
   const blade = (side: number) =>
     `<path d="M${-7 * side} 7Q${2 * side} 0 ${10 * side} -12" fill="none" stroke-width="3.6"/>` +
     `<path d="M${-7 * side} 7Q${2 * side} 0 ${10 * side} -12" fill="none" stroke="${CUT}" stroke-width="1.4"/>` +
@@ -117,7 +84,6 @@ function typeMark(i: number, x: number, y: number, s: number) {
   );
 }
 
-/** A five-pointed star's outline about (x, y), `r` to its points, one point up. */
 const starPath = (x: number, y: number, r: number) =>
   Array.from({ length: 10 }, (_, k) => {
     const a = (k * Math.PI) / 5 - Math.PI / 2,
@@ -125,12 +91,6 @@ const starPath = (x: number, y: number, r: number) =>
     return `${k ? 'L' : 'M'}${r2(x + d * Math.cos(a))} ${r2(y + d * Math.sin(a))}`;
   }).join('') + 'Z';
 
-/**
- * A rating in stars, `n` of five (0…5), each `r` to its points, `gap` apart,
- * the first centred on (x, y): every star outlined, filled gilt as far as the
- * rating reaches, the last of them only in part (clipped at its share of its
- * width).
- */
 function stars(x: number, y: number, n: number, r: number, gap: number) {
   let s = '';
   for (let k = 0; k < 5; k++) {
@@ -149,7 +109,6 @@ function stars(x: number, y: number, n: number, r: number, gap: number) {
   return s;
 }
 
-/** The traits' marks, `s` across: skill's star, aggression's flame, notice's eye, the Storm's whirl, a hull running. */
 const TRAIT_MARKS = [
   `<path d="${starPath(0, 1, 11)}" fill="${WASH.gold}" stroke-width="1.3"/>`,
   `<path d="M0 11C-7 11 -9 4 -5 -3C-4 0 -2 1 -1 0C-3 -5 0 -9 2 -12C3 -6 8 -3 7 3C6 8 3 11 0 11Z" fill="${WASH.vermilion}" stroke-width="1.2"/>` +
@@ -161,16 +120,11 @@ const TRAIT_MARKS = [
     `<path d="M3 -10L10 -3L3 -1Z" fill="${CUT}" stroke-width="1"/>` +
     `<path d="M-8 -3h-4M-7 1h-5M-8 5h-4" stroke="${WASH.ultramarine}" stroke-width="1.4"/>`,
 ] as const;
-/** Trait `i`'s mark, `s` across, centred on (x, y). */
 const traitMark = (i: number, x: number, y: number, s: number) =>
   i === 3
     ? glyph('hud.storm', x, y, s, { ink: 'storm' })
     : grid(x, y, s, TRAIT_MARKS[i] ?? '');
 
-/**
- * The five traits as the card reads them: which of the fleet's, how far its
- * rule runs, how a reading is put in numerals, and its wash.
- */
 const TRAITS: readonly {
   of: (f: Fleet) => Spread;
   most: number;
@@ -184,17 +138,9 @@ const TRAITS: readonly {
   { of: (f) => f.flee, most: 60, by: 1, wash: WASH.ochre },
 ];
 
-/** The card's width, at the drawn size. */
 export const CARD = 264;
 
-/**
- * The fleet card for `f`, its top left at (x, y), CARD across and about 230
- * down, edged: its head, then a bar a persona; or, `traits`, the five trait
- * rows in the bars' place (held: panel.ts). Every part of it, inked or not,
- * takes her touch.
- */
 export function fleetCard(x: number, y: number, f: Fleet, traits = false) {
-  // its edge, a hairline, all of it taking her hold; its corner turned down while the bars show (more behind them)
   const l = x - 4,
     t = y - 8,
     r = x + CARD + 4,
@@ -205,7 +151,6 @@ export function fleetCard(x: number, y: number, f: Fleet, traits = false) {
     (ear
       ? `<path d="M${r} ${b - ear}L${r - ear} ${b}L${r - ear + 3} ${b - ear + 3}Z" fill="${PAPER}" stroke="${INK.iron}" stroke-width=".8" stroke-linejoin="round"/>`
       : '');
-  // its head: the type and its name under it, the most common persona, and the two who stand out, each badged
   const hy = y + 24;
   s +=
     paperDisc(x + 22, hy, 21) +
@@ -222,7 +167,6 @@ export function fleetCard(x: number, y: number, f: Fleet, traits = false) {
       figure(sx + 38, hy, `#${who.id}`, 17, { anchor: 'start' });
   }
   if (!traits) {
-    // a bar a persona
     const base = y + 198,
       tallest = Math.max(1, ...f.counts);
     s += `<path d="M${x + 2} ${base}H${x + CARD - 2}" stroke="${INK.iron}" stroke-width="1"/>`;
@@ -239,14 +183,12 @@ export function fleetCard(x: number, y: number, f: Fleet, traits = false) {
     });
     return s;
   }
-  // a row a trait
   TRAITS.forEach((t, i) => {
     const ty = y + 120 + i * 26,
       { mean, spread } = t.of(f),
       bx = x + 30,
       bw = 140,
       on = (v: number) => bx + (bw * Math.min(Math.max(v, 0), t.most)) / t.most;
-    // skill as a rating, out of five stars (the plainest read of how good a captain is)
     if (i === 0) {
       s +=
         traitMark(i, x + 12, ty, 20) +

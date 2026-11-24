@@ -1,27 +1,10 @@
-// The galleon's geometry kit: an accumulator per draw (body, sails, ropes) and
-// the few shapes everything on her is made of — lofted sheets, tubes along a
-// path, lathed profiles, boxes and hanging ropes. Pure arithmetic (three's math
-// classes only, no renderer), so it runs in node for the tests.
-//
-// Every vertex carries, besides its position, normal and uv, what the shaders
-// need to know about it, set on the accumulator as a brush before a shape is
-// drawn:
-//   kind    which surface it is (KIND for the body, CLOTH for the sails)
-//   ao      how much of the sky reaches it, 0…1 (decks and the bulwarks' insides see less of it)
-//   pivot   the mast its yard turns about when the yards are braced (PIVOT), and swing: how much of that turn it
-//           takes, 1 on the yard … 0 at a rope's fixed end
-//   belly   on a sail, how far the wind has blown this point out of the sail's flat, metres (the shader scales it)
-//   radius  on a rope, its radius (the shader widens a rope to about a pixel far off)
-
 import { Matrix3, Matrix4, Quaternion, Euler, Vector3 } from 'three/webgpu';
 import { lerp } from '../world/scalar.ts';
 
 export const V = (x = 0, y = 0, z = 0): Vector3 => new Vector3(x, y, z);
-/** n + 1 numbers from a to b. */
 export const range = (a: number, b: number, n: number): number[] =>
   Array.from({ length: n + 1 }, (_, i) => lerp(a, b, i / n));
 
-/** The body's surfaces. */
 export const KIND = {
   planks: 0,
   paint: 1,
@@ -31,16 +14,13 @@ export const KIND = {
   gilt: 5,
   iron: 6,
 } as const;
-/** The cloth's: square sails, the lateen, the pennants. */
 export const CLOTH = { square: 0, lateen: 1, pennant: 2 } as const;
-/** What a braced yard turns about: nothing, the foremast, the mainmast. */
 export const PIVOT = { none: 0, fore: 1, main: 2 } as const;
 
 export class Acc {
   readonly p: number[] = [];
   readonly n: number[] = [];
   readonly uv: number[] = [];
-  /** kind, ao, pivot, swing, belly, radius per vertex. */
   readonly a: number[] = [];
   readonly i: number[] = [];
   kind = 0;
@@ -79,9 +59,6 @@ export class Acc {
   quad(a: number, b: number, c: number, d: number): void {
     this.i.push(a, b, c, a, c, d);
   }
-  /**
-   * Draws with this brush for the length of `draw`, then puts the old one back.
-   */
   with(
     brush: Partial<Pick<Acc, 'kind' | 'ao' | 'pivot' | 'swing'>>,
     draw: () => void
@@ -98,13 +75,7 @@ export class Acc {
   }
 }
 
-// ---------------------------------------------------------------- frames
-
 const Y = V(0, 1, 0);
-/**
- * A matrix whose +y runs along `dir` from `at`, its +z kept as near `hint` as
- * the direction allows.
- */
 export function along(at: Vector3, dir: Vector3, hint = V(0, 0, 1)): Matrix4 {
   const y = dir.clone().normalize();
   let x = new Vector3().crossVectors(y, hint);
@@ -117,7 +88,6 @@ export function along(at: Vector3, dir: Vector3, hint = V(0, 0, 1)): Matrix4 {
   const z = new Vector3().crossVectors(x, y);
   return new Matrix4().makeBasis(x, y, z).setPosition(at);
 }
-/** Translation, rotation (Euler XYZ, radians) and scale in one. */
 export function trs(
   at: Vector3,
   rx = 0,
@@ -129,14 +99,6 @@ export function trs(
   return new Matrix4().compose(at, q, typeof s === 'number' ? V(s, s, s) : s);
 }
 
-// ---------------------------------------------------------------- sheets
-
-/**
- * A surface through a grid of points (rows × columns), normals from its own
- * slopes, wound so the middle normal points along `facing`. `belly`, if given,
- * is each point's belly (sails). Returns whether it was wound against the
- * grid's own order (its normal the negative of (down the rows) × (along them)).
- */
 export function sheet(
   acc: Acc,
   grid: Vector3[][],
@@ -157,8 +119,6 @@ export function sheet(
       return new Vector3().crossVectors(a, b).normalize();
     })
   );
-  // where an edge closes to a point (a lateen's peak, a pennant's tip) the
-  // cross product vanishes: borrow the nearest good normal
   const good = (n: Vector3) => n.lengthSq() > 0.5;
   nrm.forEach((row, i) =>
     row.forEach((n, j) => {
@@ -199,28 +159,13 @@ export function sheet(
   return flip;
 }
 
-// ---------------------------------------------------------------- tubes
-
 interface TubeOptions {
-  /** Metres along the tube per unit of v. */
   vScale?: number;
-  /**
-   * Marks it a rope: each vertex carries its radius, for the rope shader's
-   * widening.
-   */
   rope?: boolean;
   caps?: boolean;
-  /**
-   * The swing at each end, interpolated along (ropes from a braced yard to
-   * something fixed).
-   */
   swing?: [number, number];
 }
 
-/**
- * A tube along a path, its section carried by parallel transport so it never
- * twists. Radius per point or one for all.
- */
 export function tube(
   acc: Acc,
   path: Vector3[],
@@ -294,7 +239,6 @@ export function tube(
     }
 }
 
-/** A straight spar from a to b, tapering r0 → r1. */
 export function rod(
   acc: Acc,
   a: Vector3,
@@ -308,10 +252,6 @@ export function rod(
   tube(acc, [a, b], [r0, r1], sides, { caps, vScale });
 }
 
-/**
- * A rope from a to b hanging `sag` metres at its middle, in `segs` straight
- * pieces (one if it barely sags).
- */
 export function rope(
   acc: Acc,
   a: Vector3,
@@ -331,13 +271,6 @@ export function rope(
   tube(acc, pts, r, 3, { rope: true, vScale: 1, swing });
 }
 
-// ---------------------------------------------------------------- lathes and
-// boxes
-
-/**
- * A profile [radius, height] spun round +y and placed by `m`. u round, v up the
- * profile in metres over vScale.
- */
 export function lathe(
   acc: Acc,
   prof: [number, number][],
@@ -381,10 +314,6 @@ export function lathe(
     }
 }
 
-/**
- * A box of size (sx, sy, sz) centred on m's origin; uvs in metres over
- * `uvScale`.
- */
 export function box(
   acc: Acc,
   m: Matrix4,
@@ -431,10 +360,6 @@ export function box(
   }
 }
 
-/**
- * A box spanning from a to b along its length (y), w wide (x) and d deep (z), z
- * toward `hint`.
- */
 export function beam(
   acc: Acc,
   a: Vector3,
@@ -455,7 +380,6 @@ export function beam(
   );
 }
 
-/** A flat convex polygon, facing n. */
 export function fan(acc: Acc, pts: Vector3[], n: Vector3, uvScale = 1): void {
   const c = pts.reduce((s, p) => s.add(p), V()).multiplyScalar(1 / pts.length);
   const t = pts[0].clone().sub(c).normalize(),

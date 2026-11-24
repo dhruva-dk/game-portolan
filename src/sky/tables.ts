@@ -1,12 +1,3 @@
-// The atmosphere's lookup tables, integrated on the GPU (Hillaire 2020):
-//   transmittance  256×64   light surviving from a height along a direction to the top of the air
-//   multiple       32×32    light scattered more than once, per height and sun elevation
-//   sky view       200×100  the sky's radiance round an eye at the sea, per direction relative to the sun
-//   ambient        3×1      from the sky view: upward irradiance / π, the horizon's and the zenith's radiance
-// The first two depend only on the air and are redone when the haze changes;
-// the others when the sun moves. Mappings and constants match atmosphere.ts,
-// where the tests check them.
-
 import { NearestFilter } from 'three/webgpu';
 import {
   Fn,
@@ -45,9 +36,6 @@ import {
 import * as A from './atmosphere.ts';
 
 const H = Math.sqrt(A.TOP * A.TOP - A.BOTTOM * A.BOTTOM);
-/**
- * The air's Rayleigh scattering at the sea, per km, as a node (atmosphere.ts).
- */
 export const RAYLEIGH = vec3(...A.RAYLEIGH_SCATTERING);
 const OZONE = vec3(...A.OZONE_ABSORPTION);
 
@@ -56,16 +44,8 @@ const T_W = 256,
   M_N = 32,
   V_W = 200,
   V_H = 100;
-/**
- * The least change in the haze, as a share of it, that the air's tables are
- * integrated again for.
- */
 const HAZE_STEP = 0.01;
 
-/**
- * Nearest and farthest hits of a ray from o along unit d with a sphere of
- * radius r at the origin; (-1,-1) if none.
- */
 const raySphere = Fn(([o, d, r]: [Vec3Node, Vec3Node, FloatNode]) => {
   const b = dot(o, d),
     c = dot(o, o).sub(r.mul(r));
@@ -86,11 +66,6 @@ const extinctionOf = (dens: Vec3Node): Vec3Node =>
 const rayleighPhase = (c: FloatNode): FloatNode =>
   float(3 / (16 * Math.PI)).mul(c.mul(c).add(1));
 
-/**
- * Cornette-Shanks: Henyey-Greenstein (tsl.ts) with a Rayleigh-like (1 + c²)
- * factor, renormalised, as Hillaire's tables are integrated with; a different
- * lobe, so it is not that one.
- */
 const miePhase = (c: FloatNode): FloatNode => {
   const g = A.MIE_G,
     g2 = g * g;
@@ -124,14 +99,11 @@ const transmittanceUV = (r: FloatNode, mu: FloatNode): Vec2Node => {
   return vec2(d.sub(dMin).div(dMax.sub(dMin)), rho.div(H));
 };
 
-// Sky view (Hillaire §5.3): latitude packed toward the horizon, longitude round
-// the sun packed toward it.
 const VIEW_R = A.BOTTOM + A.VIEW_HEIGHT;
 const COS_BETA = Math.sqrt(VIEW_R * VIEW_R - A.BOTTOM * A.BOTTOM) / VIEW_R;
 const BETA = Math.acos(COS_BETA);
 const ZENITH_HORIZON = Math.PI - BETA;
 
-/** Radius of the eye for sampling transmittance from the sea. */
 export const VIEW_RADIUS = VIEW_R;
 
 export type Tables = ReturnType<typeof createTables>;
@@ -142,12 +114,9 @@ export function createTables() {
   const skyViewTable = storageTable(V_W, V_H);
   const ambientTable = storageTable(3, 1, { filter: NearestFilter });
 
-  /** Multiple of a clear day's aerosol (Environment.haze). */
   const haze = uniform(1);
-  /** Cosine of the sun's zenith angle the sky view was last integrated for. */
   const sunCosZenith = uniform(1);
 
-  /** Rayleigh, Mie and ozone densities at height h. */
   const densities = (h: FloatNode): Vec3Node =>
     vec3(
       exp(h.negate().div(A.RAYLEIGH_SCALE_HEIGHT)),
@@ -155,10 +124,6 @@ export function createTables() {
       max(float(1).sub(abs(h.sub(A.OZONE_CENTRE)).div(A.OZONE_HALF_WIDTH)), 0)
     );
 
-  /**
-   * Sunlight reaching radius r from a sun at cosine mu off the zenith; zero
-   * once the planet hides it.
-   */
   const sunTransmittance = (
     radius: FloatNode | number,
     mu: FloatNode
@@ -210,10 +175,6 @@ export function createTables() {
     textureStore(transmittanceTable, uvec2(x, y), vec4(exp(depth.negate()), 1));
   })().compute(T_W * T_H, [64]);
 
-  /**
-   * Second-order light for an isotropic phase, and the transfer fms; Ψ = L₂ /
-   * (1 − fms) (Hillaire §5.5).
-   */
   const multipleKernel = Fn(() => {
     const x = instanceIndex.mod(M_N),
       y = instanceIndex.div(M_N);
@@ -231,7 +192,6 @@ export function createTables() {
     const DIRS = 64,
       STEPS = 20;
     loop('dir', DIRS, (dir) => {
-      // Fibonacci sphere
       const k = float(dir).add(0.5);
       const z = float(1).sub(k.mul(2 / DIRS)),
         a = k.mul(Math.PI * (3 - Math.sqrt(5)));
@@ -312,7 +272,6 @@ export function createTables() {
       T = vec3(1).toVar();
     const STEPS = 30;
     loop('step', STEPS, (i) => {
-      // quadratic spacing: fine near the eye, coarse far away
       const t0 = float(i).div(STEPS),
         t1 = float(i).add(1).div(STEPS);
       const dt = t1.mul(t1).sub(t0.mul(t0)).mul(tMax);
@@ -336,10 +295,6 @@ export function createTables() {
     textureStore(skyViewTable, uvec2(x, y), vec4(L, 1));
   })().compute(V_W * V_H, [64]);
 
-  /**
-   * The sky's radiance toward sky direction dir (unit, y up) for a sun at
-   * sunDir, per unit sun illuminance.
-   */
   const skyRadiance = (dir: Vec3Node, sunDir: Vec3Node): Vec3Node => {
     const cosZenith = clamp(dir.y, -1, 1);
     const zenithAngle = acos(cosZenith);
@@ -357,8 +312,6 @@ export function createTables() {
     const flat = (w: Vec3Node) => w.xz.div(max(length(w.xz), 1e-4));
     const cosLight = dot(flat(dir), flat(sunDir));
     const u = sqrt(cosLight.mul(-0.5).add(0.5));
-    // keep half a texel off each edge so the bilinear lookup never reads across
-    // the wrap
     const uv = vec2(
       clamp(u, 0.5 / V_W, 1 - 0.5 / V_W),
       clamp(v, 0.5 / V_H, 1 - 0.5 / V_H)
@@ -366,10 +319,6 @@ export function createTables() {
     return texture(skyViewTable).sample(uv).level(float(0)).rgb;
   };
 
-  /**
-   * Integrates the sky view over the upper hemisphere, once per sky-view
-   * update.
-   */
   const ambientKernel = Fn(() => {
     const AZ = 16,
       EL = 8;
@@ -381,8 +330,6 @@ export function createTables() {
     const up = vec3(0).toVar(),
       horizon = vec3(0).toVar();
     loop('el', EL, (e) => {
-      // midpoint rule in cos θ; the cosine weight and solid angle make each
-      // cell's weight equal for irradiance
       const cosT = float(e).add(0.5).div(EL),
         sinT = sqrt(float(1).sub(cosT.mul(cosT)));
       loop('az', AZ, (a) => {
@@ -393,8 +340,6 @@ export function createTables() {
           vec3(sinT.mul(cos(phi)), cosT, sinT.mul(sin(phi))),
           sun
         );
-        // E/π = (1/π)∫L cosθ dω; with dω = dcosθ dφ, the sum of L·cosθ over
-        // cells times (1/EL)(2π/AZ)/π
         up.addAssign(L.mul(cosT).mul(2 / (EL * AZ)));
       });
     });
@@ -422,41 +367,17 @@ export function createTables() {
 
   let lastCos = NaN,
     lastHaze = NaN;
-  /**
-   * The air's tables, in the order they are integrated (each reads the one
-   * before), and the next due, if any.
-   */
   const air = [transmittanceKernel, multipleKernel];
   let next = air.length;
-  /** The passes due this frame (update's, laid afresh each time). */
   const due: Compute[] = [];
   return {
-    /**
-     * Multiple of a clear day's aerosol the air's tables were last integrated
-     * for (Environment.haze).
-     */
     haze,
     sunTransmittance,
     skyRadiance,
-    /**
-     * Irradiance from the whole sky on an upward surface, over π: the radiance
-     * of an evenly lit sky giving the same light.
-     */
     skyAmbientUp: ambientAt(0),
-    /** The sky's mean radiance just above the horizon. */
     skyHorizon: ambientAt(1),
-    /** The sky's radiance at the zenith. */
     skyZenith: ambientAt(2),
-    /**
-     * Re-integrates what has changed: the air's tables with the haze, the sky
-     * view and ambient with the sun. The haze drifts (world/weather.ts), so it
-     * is taken in steps of HAZE_STEP of itself, far finer than the eye can
-     * tell, and its tables are integrated one a frame (each is about a
-     * millisecond on the Mac), the sky view on the last. Returns the passes
-     * that are due, in order.
-     */
     update(sunY: number, hazeAmount: number): readonly Compute[] {
-      // the first time all at once
       const first = Number.isNaN(lastHaze);
       if (
         next === air.length &&

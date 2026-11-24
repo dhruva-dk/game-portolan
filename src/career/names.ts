@@ -1,7 +1,5 @@
-/** Words no generated name may contain as a whole word, in any case. */
 export const BANNED: readonly string[] = ['mara'];
 
-/** Whether a name holds no banned word as a whole word, in any case. */
 export function allowed(name: string): boolean {
   const words = name.toLowerCase().split(/[^a-z]+/);
   return !words.some((w) => BANNED.includes(w));

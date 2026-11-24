@@ -1,28 +1,3 @@
-// What stands on the terrain's land (terrain.ts): palms, shrubs and rocks,
-// placed by the land's two fields, how far in from the coast and how high, so
-// every grove follows the land.
-//
-// The land is cut into tiles, BLOCK² cells each, and each tile's things are
-// worked out on its own chart (sphere.ts), x and z metres from its middle
-// (land/site.ts draws them there). Candidates are drawn cell by cell, each cell
-// in exactly one tile, so the tiles meet without a seam, a gap or a doubled
-// grove; the fields that gather them into groves and clumps are noise in world
-// metres, so they run on across the tiles' edges. Each tile has its own random
-// stream from the seed and its index: a tile's things are the same whatever
-// else is.
-//
-// Palms: in groves, thickest along the top of the beach and thinning inland and
-// as the land rises; none high up.
-//   Each leans out toward the sea (down the shore distance's slope), the nearer the coast the more.
-// Shrubs: a broken hedge along the top of the beach; inland, clumps where the
-// grass grows (planet-terrain.ts cover),
-//   lower the higher they stand, where the wind keeps them down; none on the bare rock.
-// Rocks: outcrops heaped on the tops, and on the shoulders above some beaches,
-// never where a ship could sail; boulders
-//   round them. None of the others stand on a rock.
-//
-// Pure arithmetic: no three, so it runs in node for the tests.
-
 import { N } from './cells.ts';
 import { createNoise3 } from './noise3.ts';
 import type { Cover, Planet } from './planet.ts';
@@ -43,44 +18,26 @@ import {
 import { CELL, between, locate, taps } from './terrain-grid.ts';
 import { heightBounds, type Terrain } from './terrain.ts';
 
-/** The cells along a side of a tile (as planet-terrain.ts's rises). */
 const BLOCK = 16;
 
-/**
- * How far out from the waterline the water may be too shallow for a ship (a
- * keel 2.2 m down: sim/handling.ts), metres, at most: no rock's foot reaches
- * past it.
- */
 export const WADE = 7;
 
 export interface Rock {
   x: number;
-  /**
-   * The rock's centre's height: the ground's under it, less how deep it is
-   * sunk.
-   */
   y: number;
   z: number;
-  /** Its radius, metres, before its shape's own stretching. */
   size: number;
-  /** Turned about the vertical, radians. */
   yaw: number;
-  /** One of the big masses (else a boulder round them). */
   big: boolean;
-  /** Which of its kind's shapes it is. */
   shape: number;
 }
 
 export interface Palm {
   x: number;
-  /** The trunk's foot: the ground's height, less a little where it is sunk. */
   y: number;
   z: number;
-  /** Metres from the foot to the crown. */
   height: number;
-  /** How far the trunk leans at its foot, radians from the vertical. */
   lean: number;
-  /** Which way it leans, radians about the vertical (atan2(z, x)). */
   heading: number;
 }
 
@@ -88,25 +45,17 @@ export interface Shrub {
   x: number;
   y: number;
   z: number;
-  /** Across, metres. */
   size: number;
   yaw: number;
-  /** Which of the shapes it is. */
   shape: number;
-  /** 0…1: a little paler or darker than the rest. */
   tint: number;
 }
 
-/** Whether (x, z) lies within `margin` metres of a rock's footprint. */
 export const onRock = (rocks: Rock[], x: number, z: number, margin: number) =>
   rocks.some((r) => Math.hypot(r.x - x, r.z - z) < r.size * 1.05 + margin);
 
 export interface Tile {
   chart: Chart;
-  /**
-   * How far from the chart's centre the tile's cells reach, metres; the highest
-   * ground in it, metres.
-   */
   reach: number;
   top: number;
   palms: Palm[];
@@ -114,38 +63,21 @@ export interface Tile {
   rocks: Rock[];
 }
 
-/** How many shapes each kind is drawn in (land/: shrubs.ts, rocks.ts). */
 interface Shapes {
   shrubs: number;
   big: number;
   boulders: number;
 }
 
-/** A tile whose ground rises no higher than this, metres, has nothing on it. */
 const LOWEST = 0.5;
-/**
- * Palms: from the beach's top inland (shore distance, metres, negative inland);
- * the chance of one in a cell where the grove is thickest at the coast; at
- * least how far apart; how fast they thin inland (metres) and with height (the
- * share of the summit between which they go).
- */
 const BEACH_TOP = -4,
   PALM_RATE = 0.35,
   SPACING = 3.5,
   INLAND = 25,
   PALM_UP = [0.4, 0.75] as const;
-/**
- * Shrubs: the hedge's band; two candidates a cell, each kept at most this
- * often; under the hedge's or clumps' cover.
- */
 const HEDGE = [-14, -5] as const,
   SHRUB_RATE = 0.3,
   BARE = 0.7;
-/**
- * Rocks: tops are above this share of the summit; the chance of an outcrop in a
- * top's cell, at most so many to a tile; the chance a tile with a beach has one
- * on its shoulder; masses' and boulders' radii and counts.
- */
 const TOP = 0.6,
   TOP_OUTCROP = 0.03,
   TOP_OUTCROPS = 2,
@@ -170,7 +102,6 @@ export function scatterTerrain(
   const noise = createNoise3(seed + STRIDE),
     at = taps(),
     cover: Cover = { grass: 0, rubble: 0, mottle: 0, clump: 0 };
-  /** Noise about −1…1 at unit direction p, features `size` metres across. */
   const read = (p: Vec3, size: number, shift: number) =>
     noise.value(
       (p[0] * R) / size + shift,
@@ -190,7 +121,6 @@ export function scatterTerrain(
           top = tops[k];
         if (top < LOWEST) continue;
         const rand = random(hash(seed, k + 1));
-        // the chart at the tile's middle, its x along the face's u
         const uv = (i: number) => -1 + (2 * i) / N;
         const [u0, v0, u1, v1] = [
           uv(bi * BLOCK),
@@ -214,7 +144,6 @@ export function scatterTerrain(
         );
         const groundAt = (x: number, z: number) =>
           planet.height(fromChart(chart, x, z));
-        /** A point somewhere in cell (i, j) of the tile, chosen at random. */
         const within = (i: number, j: number): Vec3 =>
           faceDir(
             face,
@@ -226,12 +155,8 @@ export function scatterTerrain(
             for (let i = 0; i < BLOCK; i++)
               visit(face * N * N + (bj * BLOCK + j) * N + bi * BLOCK + i, i, j);
         };
-        // (a point in a cell is no more than this much nearer the coast than
-        // the cell's middle)
         const slack = CELL * 0.75;
 
-        // ---- rocks: an outcrop's masses heaped against each other, then
-        // boulders round their feet
         const rocks: Rock[] = [];
         const clear = (x: number, z: number, size: number, big: boolean) =>
           rocks.every(
@@ -270,8 +195,6 @@ export function scatterTerrain(
               x = m.x + Math.cos(a) * out;
               z = m.z + Math.sin(a) * out;
             }
-            // never out where a ship could sail: its foot short of the water
-            // too shallow for her
             if (
               shoreAt(fromChart(chart, x, z)) + FOOT * size > WADE - 1 ||
               !clear(x, z, size, true)
@@ -339,7 +262,6 @@ export function scatterTerrain(
           outcrop(within(i, j), BIG[1] * 0.8);
         }
 
-        // ---- palms: one candidate a cell
         const palms: Palm[] = [];
         cells((c, i, j) => {
           if (t.shore[c] - slack > BEACH_TOP) return;
@@ -366,7 +288,6 @@ export function scatterTerrain(
             onRock(rocks, x, z, 1)
           )
             return;
-          // out toward the sea: up the shore distance's slope
           const gx = shoreAt(fromChart(chart, x + 1, z)) - s,
             gz = shoreAt(fromChart(chart, x, z + 1)) - s;
           palms.push({
@@ -379,7 +300,6 @@ export function scatterTerrain(
           });
         });
 
-        // ---- shrubs: two candidates a cell
         const shrubs: Shrub[] = [];
         cells((c, i, j) => {
           if (t.shore[c] - slack > HEDGE[1]) return;
@@ -387,8 +307,6 @@ export function scatterTerrain(
             const p = within(i, j),
               s = shoreAt(p);
             if (s > HEDGE[1]) continue;
-            // the hedge, broken into stretches; inland, clumps where the noise
-            // says, kept where the grass grows
             const hedge =
               s > HEDGE[0] ? clamp((read(p, 14, 3.3) + 0.2) / 0.3) : 0;
             const clump = clamp((read(p, 10, 5.5) - 0.05) / 0.25) * 0.6;

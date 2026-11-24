@@ -1,16 +1,3 @@
-// The storm's lightning (storm.ts draws it): every BOLT seconds a stroke from
-// the cloud's base to the sea, a way into the storm, flickering two or three
-// times. Each flicker lights the cloud and the rain round the stroke from
-// within, and the stroke itself shows as a jagged white channel wherever the
-// rain in front of it lets it through. As the storm begins to close, a stroke
-// of its own at once, on the edge nearest the eye, flickering longer (the
-// thunder is the sound's: audio/listen.ts).
-//
-// Worked out on the CPU from the world's clock, so every frame of a moment
-// agrees: where the stroke stands (in the wall within sight of the eye along
-// it, when the eye is in the calm; somewhere about the eye, in the storm), and
-// how bright its flicker is now.
-
 import { Vector3 } from 'three/webgpu';
 import {
   abs,
@@ -36,24 +23,12 @@ import { R, type Vec3 } from '../world/sphere.ts';
 import { BASE } from './storm-field.ts';
 import type { FloatNode, Vec3Node } from '../tsl.ts';
 
-/**
- * One stroke in each BOLT seconds, at a moment within it; its flickers (seconds
- * from the stroke, and each one's strength). It stands IN metres in from the
- * edge, along the edge from the eye's nearest point of it by up to ALONG of the
- * eye's distance from it (at least NEAR metres), so it falls in the eye's view
- * of the wall; or, in the storm, DISTANCE (min, max) metres from the eye.
- */
 const BOLT = 4.5,
   FLICKER = [
     [0, 0.07, 1],
     [0.1, 0.15, 0.4],
     [0.21, 0.34, 0.85],
   ] as const;
-/**
- * As a closing begins (the snapshot's storm closing, as it was not), a stroke
- * of its own at once: its flickers, longer and brighter; on the edge, EDGE
- * metres in.
- */
 const STRIKE = [
     [0, 0.09, 1],
     [0.13, 0.22, 0.55],
@@ -65,13 +40,6 @@ const IN = 30,
   ALONG = 0.7,
   NEAR = 50,
   DISTANCE = [70, 200] as const;
-/**
- * How far round the stroke the cloud and rain are lit, metres (a Gaussian's
- * width), and how brightly, as a multiple of the storm's air light's luminance;
- * the stroke's own channel: its radiance in the same units, its width (metres,
- * and at least this many radians, about a pixel), and how far it zigzags either
- * side (metres, over three scales of its height).
- */
 const REACH = 50,
   FLASH = 9,
   CHANNEL = 260,
@@ -79,63 +47,35 @@ const REACH = 50,
   PIXEL = 0.0016;
 const ZIG = [6, 3, 1.1] as const,
   ZIG_LONG = [21, 8.3, 2.9] as const;
-/**
- * The flash's colour, against the storm's own light's (its luminance kept): the
- * palette's lightning.
- */
 const TINT = tint(LIGHTNING, 0.88);
 
-/** A zigzag, −0.5…0.5, of period 1. */
 const zig = (x: FloatNode): FloatNode => abs(fract(x).sub(0.5)).mul(2).sub(0.5);
 
-/**
- * held: the flicker held at its brightest (debug.ts ?bolt), for a still of it.
- */
 export function createBolt(held: boolean) {
-  /**
-   * Up over the stroke's foot, its flicker now (0 between strokes), and a seed
-   * for its shape.
-   */
   const foot = uniform(new Vector3(0, 1, 0)),
     flash = uniform(0),
     seed = uniform(0);
-  /** Where the flash lights the cloud from: in the base, over the stroke. */
   const centre = (): Vec3Node => foot.mul(R + BASE + 15);
-  /**
-   * The flash's colour in the storm's air light: its luminance, the lightning's
-   * tint.
-   */
   const tinted = (air: Vec3Node): Vec3Node =>
     vec3(luminance(air)).mul(vec3(...TINT));
-  /** update's working vectors (world, unit). */
   const u = new Vector3(),
     c = new Vector3(),
     out = new Vector3(),
     side = new Vector3(),
     way = new Vector3(),
     at = new Vector3();
-  /**
-   * The world's clock at the last update, and whether the storm was closing
-   * then (none yet: as if it were, so a first frame strikes nothing); when its
-   * closing began (its stroke).
-   */
   let last = -Infinity,
     closing = true,
     struck = -Infinity;
 
   return {
     flash,
-    /**
-     * The flash's light at world position q, radiance (air: the storm's air
-     * light).
-     */
     glow: (air: Vec3Node, q: Vec3Node): Vec3Node =>
       tinted(air).mul(
         flash
           .mul(exp(length(q.sub(centre())).div(REACH).pow(2).negate()))
           .mul(FLASH)
       ),
-    /** How far along the ray from o along unit d it passes the stroke, m. */
     nearest: (o: Vec3Node, d: Vec3Node): FloatNode => {
       const w = o.sub(foot.mul(R)),
         b = dot(d, foot);
@@ -144,11 +84,6 @@ export function createBolt(held: boolean) {
         .sub(dot(d, w))
         .div(max(float(1).sub(b.mul(b)), 1e-4));
     },
-    /**
-     * The stroke's channel as the ray from o along unit d sees it, radiance
-     * (air: the storm's air light), if what the pixel shows is no nearer than
-     * `metres`; `through` of it reaches the eye.
-     */
     channel: (
       air: Vec3Node,
       o: Vec3Node,
@@ -163,8 +98,6 @@ export function createBolt(held: boolean) {
         k = max(float(1).sub(b.mul(b)), 1e-4);
       const t = b.mul(uw).sub(dw).div(k),
         s = uw.sub(b.mul(dw)).div(k);
-      // its height s along the stroke, and how far to one side of it the ray
-      // passes, across the view
       const side = normalize(cross(foot, d)),
         off = dot(w, side);
       const jag = ZIG.map(
@@ -188,14 +121,7 @@ export function createBolt(held: boolean) {
           .mul(min(float(WIDTH).div(width), 1))
       );
     },
-    /**
-     * The stroke now (cap: the storm drawn, snapshot.ts; seconds: the world's
-     * clock; eye: where the eye is, world m; whole: the eye over the whole
-     * planet, which sees none).
-     */
     update(cap: StormDraw, seconds: number, eye: Vec3, whole: boolean) {
-      // a closing begun: closing now, as it was not (on a new sea, or the
-      // clock run back, none: what it is then is where it starts from)
       if (seconds < last || !Number.isFinite(last)) struck = -Infinity;
       else if (cap.closing && !closing) struck = seconds;
       closing = cap.closing;
@@ -211,17 +137,13 @@ export function createBolt(held: boolean) {
       flash.value = whole ? 0 : held ? FLICKER[0][2] : lit;
       if (!flash.value) return;
       seed.value = hash01(n, 3);
-      // the eye's up, the cap's centre, and out from the centre toward the eye
-      // and across that, square to the eye's up
       u.fromArray(eye).normalize();
       c.fromArray(cap.centre);
       out.copy(u).addScaledVector(c, -u.dot(c)).normalize();
       side.crossVectors(c, out);
       const off = (Math.acos(clamp(u.dot(c), -1, 1)) - cap.radius) * R;
-      // (the closing's stroke at the edge nearest her, square in her view of it)
       const turn = striking ? 0 : (hash01(n, 1) - 0.5) * 2;
       if (off > 0) {
-        // in the storm: a way off the eye, any way round
         const far = DISTANCE[0] + hash01(n, 2) * (DISTANCE[1] - DISTANCE[0]);
         way
           .copy(out)
@@ -231,8 +153,6 @@ export function createBolt(held: boolean) {
           .addScaledVector(way, far / R)
           .normalize();
       } else {
-        // in the calm: IN metres into the wall, along it either way from the
-        // eye's nearest point of it (the closing's on its edge)
         const a = cap.radius + (striking ? EDGE : IN) / R,
           round =
             (turn * Math.max(NEAR, -off * ALONG)) /

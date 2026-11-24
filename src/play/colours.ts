@@ -1,10 +1,3 @@
-// The ships' colours (snapshot.ts Look): one set of liveries for every ship,
-// COLOURS (the palette's dyes) × PATTERNS (player.ts). Hers is her own choice,
-// kept on her device (the UI's); the seed deals every bot hers from the
-// same set (dealt), never her dye: her colour is hers alone at sea.
-//
-// Pure arithmetic: no three, so it runs in node for the tests.
-
 import {
   CERISE,
   CHARCOAL,
@@ -29,14 +22,6 @@ import type { Look } from '../snapshot.ts';
 import { hash } from '../world/random.ts';
 import type { Vec3 } from '../world/sphere.ts';
 
-/**
- * The dyes by name, linear rgb: her hull's paint and her canvas both of the one
- * dye, and its marks in the ink that stands out on it (palette.ts markOn). Two
- * rows of eight as the folio lays them out: the bright and the light (her
- * vermilion first), then the deep and the dull. None a blue, a green near the
- * sea's, the foam's cream or the storm's violet. Her choice is kept by its
- * name, so the set may be reordered or grown.
- */
 export const DYES: readonly { name: string; colour: Vec3; mark: Vec3 }[] =
   Object.entries({
     vermilion: VERMILION,
@@ -60,32 +45,20 @@ export const DYES: readonly { name: string; colour: Vec3; mark: Vec3 }[] =
     colour: [c[0], c[1], c[2]],
     mark: [...markOn(c)],
   }));
-/** The dyes' colours, in the set's order. */
 export const COLOURS: readonly Vec3[] = DYES.map((d) => d.colour);
 
-/** A livery held to the set: a dye or a pattern past it is hers by default. */
 export const worn = (l: Livery): Livery => ({
   dye: within(l.dye, COLOURS.length) ? l.dye : LIVERY.dye,
   pattern: within(l.pattern, PATTERNS.length) ? l.pattern : LIVERY.pattern,
 });
 const within = (i: number, n: number) => Number.isInteger(i) && i >= 0 && i < n;
 
-/**
- * A livery's colours: its dye as her paint and her canvas, and its pattern; her
- * marks on them in the ink that stands out on the dye (her paint would not
- * show on her own canvas: ship/materials.ts UNSEEN, palette.ts markOn).
- */
 export const lookOf = (l: Livery): Look => {
   const { dye, pattern } = worn(l),
     c = COLOURS[dye];
   return { paint: c, sail: c, pattern: PATTERNS[pattern] };
 };
 
-/**
- * The livery of the bot `id` in the race of `seed`, she wearing `hers`: by
- * hash(seed, id), any of the other dyes, any pattern. The same every time for
- * the same seed and her dye.
- */
 export function dealt(seed: number, id: number, hers: Livery): Livery {
   const h = hash(seed, id),
     others = COLOURS.length - 1,

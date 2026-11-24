@@ -1,5 +1,3 @@
-// The race as its HUD reads it (player.ts Race, play/standings.ts): her teammates and the standings, as
-// plain data off the state of a carded race.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { SEED } from '../src/environment.ts';
@@ -22,7 +20,6 @@ const IDLE = {
   helm: { course: null, throttle: 0 },
   gun: { aim: null, fire: false },
 };
-/** A race of three teams begun, her hands on ship 0. */
 function begun(storm = 3) {
   const base = specField(SEED, 3, true),
     card = { ...base, rules: { ...base.rules, storm } };
@@ -31,7 +28,6 @@ function begun(storm = 3) {
   state.start(match);
   return { card, state };
 }
-/** What every reading holds to. */
 function sound(r: Race, ships: number) {
   assert.equal(r.of, ships);
   assert.deepEqual(
@@ -84,9 +80,7 @@ test('as a race begins: her team, her three teammates whole and afloat, every sh
     r.tower.map((p) => p.team),
     r.tower.map((p) => Math.floor(p.id / TEAM))
   );
-  // one object, refilled: asked again in the step, the same
   assert.equal(state.race(PLAYER), r);
-  // and read for another ship, hers
   const other = state.race(5);
   assert.ok(other);
   assert.equal(other.team, 1);

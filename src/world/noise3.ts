@@ -1,23 +1,12 @@
-// Seeded 3D gradient noise (Perlin's improved noise), with its gradient: for
-// fields over the sphere, read at a point's position in metres (direction × R)
-// over a feature size, so there are no seams or poles.
-//
-// Pure arithmetic: no three, so it runs in node for the tests.
-
 import { random } from './random.ts';
 
-/**
- * The twelve edge directions of a cube, Perlin's gradients, as x, y, z triples.
- */
 const G = new Float64Array([
   1, 1, 0, -1, 1, 0, 1, -1, 0, -1, -1, 0, 1, 0, 1, -1, 0, 1, 1, 0, -1, -1, 0,
   -1, 0, 1, 1, 0, -1, 1, 0, 1, -1, 0, -1, -1,
 ]);
 
 interface Noise3 {
-  /** About −1…1, features about one unit apart. */
   value(x: number, y: number, z: number): number;
-  /** The same value, its gradient written into `grad` (x, y, z). */
   withGradient(x: number, y: number, z: number, grad: Float64Array): number;
 }
 
@@ -28,8 +17,6 @@ export function createNoise3(seed: number): Noise3 {
     const j = Math.floor(rand() * (i + 1));
     [p[i], p[j]] = [p[j], p[i]];
   }
-  // the permutation, doubled so lookups never wrap; each lattice point's
-  // gradient as an offset into G
   const perm = new Uint8Array(512).map((_, i) => p[i & 255]);
   const gi = new Uint8Array(512).map((_, i) => (perm[i] % 12) * 3);
 
@@ -48,7 +35,6 @@ export function createNoise3(seed: number): Noise3 {
     const fx = x - xf,
       fy = y - yf,
       fz = z - zf;
-    // the corners' hashes
     const A = perm[X] + Y,
       B = perm[X + 1] + Y;
     const AA = perm[A] + Z,
@@ -74,7 +60,6 @@ export function createNoise3(seed: number): Noise3 {
     const vf = G[f] * gx + G[f + 1] * fy + G[f + 2] * gz;
     const vg = G[g] * fx + G[g + 1] * gy + G[g + 2] * gz;
     const vh = G[h] * gx + G[h + 1] * gy + G[h + 2] * gz;
-    // quintic fade
     const u = fx * fx * fx * (fx * (fx * 6 - 15) + 10),
       v = fy * fy * fy * (fy * (fy * 6 - 15) + 10);
     const w = fz * fz * fz * (fz * (fz * 6 - 15) + 10);
@@ -98,7 +83,6 @@ export function createNoise3(seed: number): Noise3 {
       const du = 30 * fx * fx * (fx - 1) * (fx - 1),
         dv = 30 * fy * fy * (fy - 1) * (fy - 1),
         dw = 30 * fz * fz * (fz - 1) * (fz - 1);
-      // the gradients blended as the values are, plus the fades' own change
       for (let i = 0; i < 3; i++) {
         const ga = G[a + i],
           g1 = G[b + i] - ga,

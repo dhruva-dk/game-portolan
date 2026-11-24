@@ -1,31 +1,3 @@
-// The full map: the live planet itself, seen from space through a round window
-// in a parchment panel laid over the game, opened from the minimap. The frame
-// draws the world from the eye this hands it (snapshot.ts Eye, in space); this
-// draws only the paper and what is inked over the window.
-//
-// The panel stands in the middle of the screen, PANEL of its height (inside the
-// safe area), its window in the middle, a drawn roundel with a saltire at its
-// top right corner that shuts it. Round the panel the game is still seen,
-// dimmed: as the frame draws the world from one eye, and while the map is open
-// that is the map's, what is seen there is the game's last frame before the map
-// opened (hold: main.ts hands the canvas over the moment it is drawn).
-//
-// The eye is on an orbit about the planet's centre, looking at it, north up; it
-// opens over her ship. One finger spins the planet and it runs on when let go;
-// two pinch it, from the whole planet down to its coasts; a wheel does the
-// same. A tap on the panel does nothing; a tap off it, or on the roundel, shuts
-// it (a tap as touch.ts tells one). The window is cut once, for the whole
-// planet seen from the farthest the eye goes (the eye's field of view set to
-// fit), and a pinch zooms within it.
-//
-// Over the window, placed each frame by projecting world points with the eye's
-// numbers: the coasts (coasts.ts), inked lightly over their real ground; the
-// Storm's edge in its violet (the Storm itself is the world's own, its cloud
-// seen from above); as on the minimap (calm.ts), the circle it next closes to
-// and the way in to it, and her mark, a small arrowhead turned to her heading.
-// Whatever is on the planet's far side is not shown. Beside the window, the two readings that matter: ships afloat and
-// the Storm's clock.
-
 import type { Cap } from '../sim/storm.ts';
 import { lookingAt, type Eye } from '../snapshot.ts';
 import { clamp } from '../world/scalar.ts';
@@ -70,60 +42,26 @@ import { rhumbs } from './marks.ts';
 import { dragged, onTap } from './touch.ts';
 import { insets, onResize, screen, view, type Insets } from './ui.ts';
 
-/**
- * The panel's height, a share of the screen's; the room each side of the window
- * for a reading, px at the drawn size; the window's radius, a share of the
- * panel's height; the close roundel's side, px at the drawn size (over 44 pt to
- * the touch). Every mark on the panel is drawn at the drawn size and grown by
- * the UI's size (ui.ts size).
- */
 const PANEL = 0.8,
   SIDE = 112,
   WINDOW = 0.37,
   CLOSE = 50;
-/** Half her mark's side, px at the drawn size. */
 const MARK = 10;
-/** Metres between the points of the way in as traced over the planet. */
 const WAY_STEP = 12;
-/**
- * The eye's distance from the planet's centre at its farthest (where it opens)
- * and nearest, in radii: from the farthest the whole planet fills the window;
- * the nearest stays over the Storm's top (sky/storm.ts, 320 m).
- */
 const FARTHEST = 3.2,
   NEAREST = 1 + 380 / R;
-/**
- * How fast the eye goes to the distance the fingers ask, per second; how fast a
- * let-go spin dies, per second.
- */
 const FLY = 12,
   DRAG = 2.5;
-/**
- * How far north or south the planet can be turned, radians: short of where
- * north up loses its meaning.
- */
 const MOST_LAT = 1.3;
-/**
- * A latitude kept within MOST_LAT; an eye's distance kept between NEAREST and
- * FARTHEST.
- */
 const latitude = (lat: number) => clamp(lat, -MOST_LAT, MOST_LAT);
 const reach = (d: number) => clamp(d, NEAREST, FARTHEST);
-/**
- * The Storm's swirls, white over an iron line; the pale halo under its edge.
- */
 const INKS = {
   swirl: alpha(INK.white, 0.5),
   swirlLine: alpha(INK.iron, 0.55),
   halo: alpha(INK.white, 0.75),
 } as const;
-/** Degrees in a radian. */
 const DEGREES = 180 / Math.PI;
 
-/**
- * Swirls inked over the Storm: points spread evenly over the sphere (a
- * Fibonacci lattice).
- */
 const SWIRLS: Vec3[] = Array.from({ length: 60 }, (_, i) => {
   const n = 60,
     y = 1 - (2 * (i + 0.5)) / n,
@@ -131,10 +69,6 @@ const SWIRLS: Vec3[] = Array.from({ length: 60 }, (_, i) => {
     a = i * Math.PI * (3 - Math.sqrt(5));
   return [r * Math.cos(a), y, r * Math.sin(a)];
 });
-/**
- * The Storm's glyph as one path: its eye and its four arms, each turned about
- * the glyph's centre as its `tr` says.
- */
 const SWIRL = (() => {
   const path = new Path2D();
   for (const p of GLYPHS['hud.storm']) {
@@ -147,10 +81,6 @@ const SWIRL = (() => {
   return path;
 })();
 
-/**
- * How the planet is spun under the eye: the point under it (radians, lat and
- * lon as debug.ts reads them) and its spin.
- */
 interface Spin {
   lat: number;
   lon: number;
@@ -158,18 +88,12 @@ interface Spin {
   vLon: number;
 }
 
-/** The point under the eye, as a unit vector. */
 const under = (t: Spin): Vec3 => [
   Math.cos(t.lat) * Math.cos(t.lon),
   Math.sin(t.lat),
   -Math.cos(t.lat) * Math.sin(t.lon),
 ];
 
-/**
- * The eye for a frame, as the ink over the window is projected: where it
- * stands, its axes on the screen, its focal length (CSS px) and its distance
- * (radii).
- */
 interface Sight {
   at: Vec3;
   c: Vec3;
@@ -181,12 +105,6 @@ interface Sight {
   d: number;
 }
 
-/**
- * The map laid out on a screen `w` × `h` CSS px, the UI's size `k` on it: the
- * window (its centre, the screen's, and radius), the eye's focal length (CSS
- * px) and field of view (degrees) that fit the whole planet in it from the
- * farthest the eye goes, and the panel.
- */
 interface Layout {
   w: number;
   h: number;
@@ -200,8 +118,6 @@ interface Layout {
 }
 
 function layoutFor(w: number, h: number, k: number, safe: Insets): Layout {
-  // centred on the screen (where the eye looks), inside the safe area on every
-  // side
   const roomH = h - 2 * Math.max(safe.top, safe.bottom) - 8,
     roomW = w - 2 * Math.max(safe.left, safe.right) - 8;
   const ph = Math.min(h * PANEL, roomH, roomW - 2 * SIDE * k),
@@ -237,19 +153,13 @@ function eyeFor(t: Spin, d: number, l: Layout): Sight {
   };
 }
 
-/**
- * A point projected: on the screen, CSS px, and how far round the limb it is
- * facing the eye (above 0 it is seen).
- */
 interface Seen {
   x: number;
   y: number;
   facing: number;
 }
-/** Scratch for project: the eye to the point. */
 const toward: [number, number, number] = [0, 0, 0];
 
-/** A point on the planet (unit vector, or any length) projected into `out`. */
 function project(e: Sight, q: Vec3, out: Seen): Seen {
   const n = length(q),
     s = R / n;
@@ -264,8 +174,6 @@ function project(e: Sight, q: Vec3, out: Seen): Seen {
 }
 
 export function createGlobe(coasts: readonly Coast[]) {
-  // over the HUD; touches are the map's, not the page's; shown once the game's
-  // frame round it is held (hold)
   const root = screen(true);
   root.style.zIndex = '2';
   root.style.touchAction = 'none';
@@ -276,32 +184,25 @@ export function createGlobe(coasts: readonly Coast[]) {
     return el;
   };
 
-  // the game round the panel, as last drawn before the map opened, dimmed; its window cut out
   const backdrop = document.createElement('canvas');
   backdrop.style.cssText = 'position:absolute;left:0;top:0';
   root.appendChild(backdrop);
   const dim = backdrop.getContext('2d')!;
   let held: HTMLCanvasElement | null = null;
-  // the panel, with its window cut; laid out as the map opens, or the screen changes while it is open
   const sheet = layer('inset:0');
-  // what is inked over the window
   const canvas = document.createElement('canvas');
   canvas.style.cssText = 'position:absolute;left:0;top:0';
   root.appendChild(canvas);
   const ctx = canvas.getContext('2d')!;
-  // her mark, the minimap's arrowhead turned to her heading as it is seen, centred on her place and grown by the UI's
-  // size
   const mark = layer(`left:-${MARK}px;top:-${MARK}px`);
   mark.innerHTML = svg(
     MARK * 2,
     MARK * 2,
     `<path transform="translate(${MARK} ${MARK})" d="${head(6)}" fill="${INK.white}" stroke="${INK.iron}" stroke-width="1.3" stroke-linejoin="round"/>`
   );
-  // the readings, each side of the window: ships afloat, and the Storm's clock
   const afloat = layer(''),
     storm = layer('');
   afloat.className = storm.className = 'mark';
-  // the close roundel: a paper disc ringed in iron, a saltire inked across it
   const shut = layer('');
   shut.className = 'mark press';
   shut.dataset.close = '';
@@ -324,16 +225,10 @@ export function createGlobe(coasts: readonly Coast[]) {
     d = FARTHEST,
     read = '';
   let L = layoutFor(1, 1, 1, { top: 0, right: 0, bottom: 0, left: 0 });
-  /** Scratch for each point projected this frame. */
   const seen: Seen = { x: 0, y: 0, facing: 0 };
-  /** The Storm's edge and the circle it next closes to, as traced. */
   const rings = createRings(4);
-  /** Scratch for her heading's point projected. */
   const ahead: Seen = { x: 0, y: 0, facing: 0 };
 
-  /** The panel laid out on the screen as it is now: parchment framed in a double rule, its rhumb lines, and a round
-   *  window cut in it inside a graduated ring, drawn at the drawn size and grown by the UI's size; the readings beside
-   *  the window and the roundel at its corner; the game round it, dimmed. */
   function lay() {
     L = layoutFor(view.w, view.h, view.k, insets());
     const { w, h, k } = L,
@@ -366,7 +261,6 @@ export function createGlobe(coasts: readonly Coast[]) {
         `<g clip-path="url(#${clip})">${rhumbs(x, y, p.w, 0.22)}` +
         `<rect x="${p.x + 8}" y="${p.y + 8}" width="${p.w - 16}" height="${p.h - 16}" fill="none" stroke="${INK.iron}" stroke-width="1.2"/>` +
         `<rect x="${p.x + 12}" y="${p.y + 12}" width="${p.w - 24}" height="${p.h - 24}" fill="none" stroke="${INK.iron}" stroke-width=".5"/>` +
-        // the window's shade on the paper, its ring and its degrees
         `<circle cx="${x}" cy="${y}" r="${r + band + 6}" fill="none" stroke="${INK.iron}" stroke-opacity=".12" stroke-width="10"/>` +
         `<circle cx="${x}" cy="${y}" r="${r + band / 2}" fill="${PAPER}" fill-opacity="0" stroke="${PAPER}" stroke-width="${band}"/>` +
         `<path d="${ticks}" stroke="${INK.iron}" stroke-width=".8"/>` +
@@ -376,7 +270,6 @@ export function createGlobe(coasts: readonly Coast[]) {
     drawn.setAttribute('width', `${w}`);
     drawn.setAttribute('height', `${h}`);
     sheet.replaceChildren(drawn);
-    // each reading in the middle of the paper beside the window; the roundel over the panel's top right corner
     const side = ((p.w / 2 + r + band) / 2) * k;
     afloat.style.left = `${L.x - side}px`;
     storm.style.left = `${L.x + side}px`;
@@ -396,7 +289,6 @@ export function createGlobe(coasts: readonly Coast[]) {
     if (state) lay();
   });
 
-  /** The game round the panel: its last frame, dimmed, the window cut out of it (the planet is seen through it). */
   function paint() {
     const W = backdrop.width,
       H = backdrop.height,
@@ -406,7 +298,6 @@ export function createGlobe(coasts: readonly Coast[]) {
     if (held) dim.drawImage(held, 0, 0, W, H);
     dim.fillStyle = alpha(SHADOW, 0.45);
     dim.fillRect(0, 0, W, H);
-    // (cut out: only the fill's strength counts)
     dim.globalCompositeOperation = 'destination-out';
     dim.fillStyle = INK.iron;
     dim.beginPath();
@@ -414,7 +305,6 @@ export function createGlobe(coasts: readonly Coast[]) {
     dim.fill();
   }
 
-  /** A ring of points on the planet, inked as the runs of it that face the eye. */
   function trace(e: Sight, ring: readonly Vec3[], closed: boolean) {
     ctx.beginPath();
     let pen = false;
@@ -429,7 +319,6 @@ export function createGlobe(coasts: readonly Coast[]) {
     }
   }
 
-  /** The ink over the window this frame, its lines grown by the UI's size. */
   function ink(e: Sight, cap: Cap) {
     const win = L,
       dpr = canvas.width / L.w,
@@ -441,7 +330,6 @@ export function createGlobe(coasts: readonly Coast[]) {
     ctx.arc(win.x, win.y, win.r, 0, Math.PI * 2);
     ctx.clip();
     ctx.lineJoin = 'round';
-    // the coasts, a light hand over the ground
     ctx.strokeStyle = INK.iron;
     ctx.globalAlpha = 0.55;
     ctx.lineWidth = k;
@@ -451,8 +339,6 @@ export function createGlobe(coasts: readonly Coast[]) {
       ctx.stroke();
     }
     ctx.globalAlpha = 1;
-    // the Storm: swirls over its cloud, foreshortened toward the limb; its edge, a pale halo then its violet (none while
-    // its calm is still the whole planet)
     if (cap.radius < Math.PI - 0.01) {
       const calm = Math.cos(cap.radius + 40 / R),
         s = Math.min(1.4, perRadian() / 250);
@@ -472,7 +358,6 @@ export function createGlobe(coasts: readonly Coast[]) {
         ctx.stroke(SWIRL);
         ctx.restore();
       }
-      // its edge traced afresh only as the calm closes
       trace(e, rings(cap.centre, cap.radius * R), true);
       ctx.strokeStyle = INKS.halo;
       ctx.lineWidth = 6 * k;
@@ -483,7 +368,6 @@ export function createGlobe(coasts: readonly Coast[]) {
     }
     if (state) calms(e, state, k);
     ctx.restore();
-    // her mark, on this side only, fading as it nears the limb, turned to her heading as seen
     const p = state ? project(e, state.at, seen) : null;
     const shown =
       !!p && p.facing > 0 && Math.hypot(p.x - win.x, p.y - win.y) < win.r;
@@ -496,8 +380,6 @@ export function createGlobe(coasts: readonly Coast[]) {
     }
   }
 
-  /** As on the minimap: the circle the Storm next closes to, and outside it (or the calm, with none to come) the way
-   *  in, a line over the planet to its nearest point ending in an arrowhead (at the limb when that is out of sight). */
   function calms(e: Sight, s: HudState, k: number) {
     const next = s.next && s.next.radius < R * Math.PI * 0.99 ? s.next : null;
     if (next) {
@@ -521,7 +403,6 @@ export function createGlobe(coasts: readonly Coast[]) {
     const key = `${state.afloat} ${clock(state.storm)} ${state.closing}`;
     if (key === read) return;
     read = key;
-    // (as the clock's: its bolt filled while the Storm closes, violet while it does and under 30 s)
     const closing = state.closing || state.storm < 30;
     afloat.innerHTML = svg(
       80,
@@ -543,12 +424,9 @@ export function createGlobe(coasts: readonly Coast[]) {
     );
   }
 
-  // ── the fingers: one spins, two pinch; a press off the panel that did neither shuts the map ──
   const fingers = new Map<number, { x: number; y: number; t: number }>();
   let tap: { id: number; x: number; y: number; off: boolean } | null = null;
-  /** Pixels a radian of the planet's surface spans under the eye. */
   const perRadian = () => L.f / (d - 1);
-  /** Whether a point on the screen (CSS px) is off the panel. */
   const off = (x: number, y: number) =>
     x < L.panel.x ||
     x > L.panel.x + L.panel.w ||
@@ -582,7 +460,6 @@ export function createGlobe(coasts: readonly Coast[]) {
     if (!f) return;
     if (tap && dragged(tap.x, tap.y, e.clientX, e.clientY)) tap = null;
     if (fingers.size === 1 && !tap) {
-      // the ground under the finger goes with it; its speed, smoothed, is what it runs on with when let go
       const moved = carry(e.clientX - f.x, e.clientY - f.y),
         s = Math.max(0.004, (e.timeStamp - f.t) / 1000);
       spin.vLon = spin.vLon * 0.5 + (moved.lon / s) * 0.5;
@@ -603,7 +480,6 @@ export function createGlobe(coasts: readonly Coast[]) {
     const f = fingers.get(e.pointerId);
     if (!f) return;
     fingers.delete(e.pointerId);
-    // a finger held still before it lifts lets the planet go still
     if (e.timeStamp - f.t > 80 || fingers.size) spin.vLat = spin.vLon = 0;
     if (tap && tap.off && tap.id === e.pointerId && e.type === 'pointerup')
       close();
@@ -631,7 +507,6 @@ export function createGlobe(coasts: readonly Coast[]) {
     get open() {
       return state !== null;
     },
-    /** Opens the map, the whole planet with her ship facing the eye. */
     show(s: HudState) {
       state = s;
       spin.lat = latitude(Math.asin(s.at[1]));
@@ -640,15 +515,12 @@ export function createGlobe(coasts: readonly Coast[]) {
       want = d = FARTHEST;
       read = '';
       held = null;
-      // laid out now, shown once the game's frame round it is held (hold)
       lay();
       readout();
     },
-    /** Whether the map, just opened, waits for the game's frame to show round it. */
     get waiting() {
       return state !== null && held === null;
     },
-    /** The game's frame, the moment it is drawn (the world's canvas), held to show round the panel while it is open. */
     hold(picture: HTMLCanvasElement) {
       if (!state || held) return;
       held = document.createElement('canvas');
@@ -659,16 +531,11 @@ export function createGlobe(coasts: readonly Coast[]) {
       root.hidden = false;
     },
     close,
-    /** While open: follows what the HUD reads. */
     update(s: HudState) {
       if (!state) return;
       state = s;
       readout();
     },
-    /**
-     * Each frame, with the Storm's safe cap now: while open, turns the planet on by its spin, inks the window over it
-     * and returns the eye the frame is to draw the world from; shut, null.
-     */
     step(dt: number, cap: Cap): Eye | null {
       if (!state || !held) return null;
       if (!fingers.size) {

@@ -44,12 +44,6 @@ const bold = (() => {
   return out;
 })();
 
-/**
- * Bots `seeds` (null: a ship holding `held`, firing along her heading if
- * `fire`) sailing and fighting `seconds`; armed as `guns` (a cannon's rarity,
- * the guns she carries, or null); in `storm` if given; bots told of the balls
- * that strike them, and the guns they ask for taken in hand.
- */
 function battle(
   fleet: Vessel[],
   seeds: (number | null)[],
@@ -61,8 +55,6 @@ function battle(
   const minds: (Memory | null)[] = fleet.map((v, i) =>
     seeds[i] === null ? null : mind(seeds[i]!, v.ship.at)
   );
-  // every ship put to sea with a full shield, as she would be with a few
-  // fights' loot in her, so a test runs its length
   const carried = (g: number | Gun[] | null): Gun[] =>
     g === null ? [] : typeof g === 'number' ? [gunOf('cannon', g)] : g;
   let b: Battle = battleOf(
@@ -109,7 +101,6 @@ function battle(
       orders.push(r.order);
       asks.set(v.id, r.ask);
     });
-    // the guns she asks for taken in hand
     b = {
       ...b,
       crews: asked(b.crews, fleet, { pieces: [], next: 0 }, asks).crews,
@@ -199,7 +190,6 @@ test('an unarmed bot never orders her gun fired', () => {
   assert.equal(r.fired.length, 0);
 });
 
-/** The storm in its first phase (her restraint at its most), or once its last cap has closed (none left). */
 const stormIn = (phase: number): Storm => ({
   centre: start,
   radius: Math.PI,
@@ -210,8 +200,6 @@ const stormIn = (phase: number): Storm => ({
   final: phase >= 7,
   damage: 0,
 });
-// mild captains who see a ship 110 m off (a scavenger, her eyes on the loot,
-// sees one no further than some 85 m)
 const mild = (() => {
   const out: number[] = [];
   for (let s = 1; out.length < 3; s++)
@@ -242,7 +230,6 @@ test('early in a match a mild armed bot keeps out of a fight she would take up l
 
 test('holding back, she still fires back at a ship close by that is shooting her', () => {
   for (const seed of mild) {
-    // a ship 70 m off, bow on to her, firing along her heading
     const r = battle(
       [placed(0, 0, 0, 90 * deg), placed(1, 0, 70, 180 * deg)],
       [seed, null],
@@ -269,9 +256,6 @@ test("a green bot's balls spread wider than a sharp one's, and hit less", () => 
   assert.ok(
     spreadBy(temper(green[0]).skill) > 2 * spreadBy(1) && spreadBy(1) === 1
   );
-  // the share of her balls that strike home in her first 15 s on him (before either could sink him), over eight
-  // captains of each (four, since the bore moved aft and up with the drawn plinth, tell them apart by less than the
-  // margin: 27% against 13%)
   const share = (seeds: number[]) => {
     const rs = seeds.map((seed) =>
       battle(
@@ -300,7 +284,6 @@ test("a green bot's balls spread wider than a sharp one's, and hit less", () => 
 
 test('a bot with two guns takes in hand the one for the range: a scatter close, a harpoon far off', () => {
   for (const seed of bold) {
-    // the scatter in hand to begin with, her foe far off; then the harpoon in hand, her foe close
     const far = battle(
       [placed(0, 0, 0, 90 * deg), placed(1, 0, 200, 0)],
       [seed, null],
@@ -322,8 +305,6 @@ test('a bot with two guns takes in hand the one for the range: a scatter close, 
           .map((f) => f.gun)
       ),
     ];
-    // far off: while her foe is out of the scatter's reach (she closes on him,
-    // so she may take it up once he is within it)
     const out = kinds(far, GUNS.scatter.range);
     console.log(`# seed ${seed}: far ${out}, near ${kinds(near)}`);
     assert.deepEqual(out, ['harpoon'], `${seed}: far off`);

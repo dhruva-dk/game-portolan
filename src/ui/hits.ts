@@ -1,36 +1,12 @@
-// The marks of a blow, laid on the HUD: a cross, figures and arcs.
-//   cross    her ball home: four ticks round the reticle in the middle of the screen, popping out and gone in a
-//            moment; white on a hull, azure brackets on a shield, the brackets thrown wide with shards where it
-//            broke; a gold cross turned a quarter and ringed where she sank the ship
-//   figure   the hit points the blow took, a numeral rising from the struck ship and fading: rubric off a hull, azure
-//            off a shield; blows on one ship close together summed in one figure; gold and bigger for the last
-//   ring     a ring of eight sectors round the reticle, faint at rest: a blow on her from a ship lights the sector
-//            toward it rubric, brighter the heavier, held and fading over 2 s
-// No words; numerals only. Its own layer, over the world and under the HUD's
-// pieces; it runs on the page's clock.
-
 import { FIGURES, INK, LIGHT, svgNode } from './ink.ts';
 
-/**
- * How long each lasts, s; how close together blows on one ship sum, s; the most
- * figures at once.
- */
 const MARK = { cross: 0.28, kill: 0.8, figure: 0.9 } as const;
 const MERGE = 0.35,
   MOST = 12;
-/**
- * The cross's ticks: length, width and gap from the middle (px), and its pop.
- */
 const TICK = 13,
   WIDE = 3.5,
   GAP = 8,
   POP = 1.55;
-/**
- * The ring round the reticle: its radius (px at the drawn size, clear of the
- * reticle at its widest, hud.ts SPREAD), its sectors and the gap between them
- * (radians), its look at rest, and lit: the least and most brightness (by the
- * blow's weight) and how long it is held fading, s.
- */
 export const RING = {
   radius: 66,
   sectors: 8,
@@ -39,34 +15,18 @@ export const RING = {
   lit: [0.45, 1],
   held: 2,
 } as const;
-/** The shield's azure, and the gold of a sinking. */
 const AZURE = LIGHT.azure,
   GOLD = LIGHT.gold;
 
-/**
- * A figure's size for a blow of `points`, by how heavy it was; ×1.6 for the
- * last.
- */
 const figureSize = (points: number, last: boolean) =>
   (points < 15 ? 15 : points < 40 ? 19 : 25) * (last ? 1.6 : 1);
 
-/**
- * The ring's sector a blow from `bearing` (radians clockwise from ahead) lights:
- * 0 ahead, at the top, and on clockwise; each from half a sector before its
- * middle up to, not including, half a sector after.
- */
 export function sectorOf(bearing: number) {
   const n = RING.sectors,
-    // (a hair over, so a boundary's rounding never drops it to the sector before)
     s = Math.floor((bearing / (2 * Math.PI)) * n + 0.5 + 1e-9);
   return ((s % n) + n) % n;
 }
 
-/**
- * A sector's light for a blow felt `weight` (player.ts felt; 1 and over the
- * heaviest): its brightness over the time it is held, struck at once and fading
- * out, and how long, ms.
- */
 export function glow(weight: number) {
   const w = Math.min(1, Math.max(0, weight)),
     top = RING.lit[0] + (RING.lit[1] - RING.lit[0]) * w;
@@ -81,7 +41,6 @@ export function glow(weight: number) {
   };
 }
 
-/** The ring's sector `i` as an arc round (c, c), radius r, its gap left. */
 const sectorArc = (i: number, c: number, r: number) => {
   const step = (2 * Math.PI) / RING.sectors,
     a = i * step - step / 2 + RING.gap / 2,
@@ -99,10 +58,6 @@ export function createHits(parent: HTMLElement) {
     'position:absolute;inset:0;pointer-events:none;overflow:hidden';
   parent.prepend(layer);
   const now = () => performance.now() / 1000;
-  /**
-   * The figures showing: on which ship, its total, when it began and was last
-   * added to, and its element.
-   */
   let figures: {
     ship: number;
     total: number;
@@ -111,8 +66,6 @@ export function createHits(parent: HTMLElement) {
     kill: boolean;
   }[] = [];
 
-  // the ring round the reticle: its sectors faint at rest, and over each its
-  // light, a rubric arc on iron in a rubric glow, unseen till a blow lights it
   const c = RING.radius + 10,
     rests: string[] = [],
     lights: string[] = [];
@@ -140,11 +93,6 @@ export function createHits(parent: HTMLElement) {
     lighting: (Animation | null)[] = lit.map(() => null);
   let showing = true;
 
-  /**
-   * A mark at (x, y) CSS px, drawn at the drawn size and grown by the UI's size
-   * about its place (ui.ts .mark): what holds it, and what is drawn in it,
-   * which moves.
-   */
   const placed = (x: number, y: number, el: HTMLElement | SVGSVGElement) => {
     const at = document.createElement('div');
     at.className = 'mark';
@@ -158,7 +106,6 @@ export function createHits(parent: HTMLElement) {
     (a.onfinish = () => el.remove());
 
   return {
-    /** The cross round the reticle, at `x`, `y`. */
     cross(kind: Kind, x: number, y: number) {
       const s = 72,
         c = s / 2,
@@ -174,7 +121,6 @@ export function createHits(parent: HTMLElement) {
         [-1, -1],
       ]) {
         if (kind === 'shield' || kind === 'break') {
-          // brackets: a corner at each diagonal
           const ox = c + dx * (gap + 4),
             oy = c + dy * (gap + 4);
           path += `M${ox} ${oy - dy * len * 0.7}L${ox} ${oy}L${ox - dx * len * 0.7} ${oy}`;
@@ -220,7 +166,6 @@ export function createHits(parent: HTMLElement) {
         )
       );
     },
-    /** The figure for `points` off `ship` (`shield` all of it off her shield; `kill` her last), rising from `x`, `y`. */
     figure(
       ship: number,
       points: number,
@@ -247,7 +192,6 @@ export function createHits(parent: HTMLElement) {
         `-webkit-text-stroke:${(size / 9).toFixed(1)}px ${INK.iron};paint-order:stroke;white-space:nowrap`;
       const el = placed(x, y, text);
       figures.push({ ship, total, last: t, el, kill: last });
-      // rising from its place (the mark centres it there), drifting aside
       const drift = (ship % 2 ? 1 : -1) * 10;
       gone(
         el,
@@ -268,8 +212,6 @@ export function createHits(parent: HTMLElement) {
         )
       );
     },
-    /** A blow on her from a ship at `bearing` (radians clockwise from ahead), felt `weight` (player.ts felt): its
-     *  sector of the ring lit, held and fading (a blow again on it lights it afresh). */
     struck(bearing: number, weight: number) {
       const i = sectorOf(bearing),
         { frames, ms } = glow(weight);
@@ -280,13 +222,11 @@ export function createHits(parent: HTMLElement) {
         if (lighting[i] === a) lighting[i] = null;
       };
     },
-    /** The ring shown, or not (she is watching another ship, or arriving). */
     show(on: boolean) {
       if (on === showing) return;
       showing = on;
       ringAt.style.display = on ? '' : 'none';
     },
-    /** Every mark taken off, the ring dark (a new match, or she is watching another ship). */
     clear() {
       layer.replaceChildren();
       figures = [];

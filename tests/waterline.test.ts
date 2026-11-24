@@ -4,10 +4,6 @@ import { BEAM, SCALE, halfAt, zOf } from '../src/ship/lines.ts';
 import { WATERLINE } from '../src/ship/waterline.ts';
 
 const { stern, stem, half } = WATERLINE;
-/**
- * The outline's half-breadth at z, as the sea's shader reads it: linear between
- * the points.
- */
 const at = (z: number) => {
   const t =
       Math.max(0, Math.min(1, (z - stern) / (stem - stern))) *

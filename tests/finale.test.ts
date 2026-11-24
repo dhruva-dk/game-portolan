@@ -15,7 +15,6 @@ for (const end of ['sunk', 'won'] as const) {
     assert.ok(Math.abs(at(f.rise).boom! - (BOOM + f.back)) < 1e-9);
     assert.ok(Math.abs(at(f.rise * 4).boom! - (BOOM + f.back)) < 1e-9);
     assert.ok(Math.abs(at(f.rise).tilt! - f.tilt) < 1e-9);
-    // turning at its full rate once eased in
     const rate = (at(f.rise + 2).spin! - at(f.rise + 1).spin!) / 1;
     assert.ok(Math.abs(rate - f.turn) < 1e-9, `${rate}`);
   });

@@ -22,18 +22,14 @@ import {
   type Vec3,
 } from '../src/world/sphere.ts';
 
-/** The matches' seeds, each on the release's planet. */
 const SEEDS = [1, 2, 3, 4, 5, 6];
-/** Seconds from the match's start until the last cap has closed. */
 const DURATION = STORM.phases.reduce((s, p) => s + p.wait + p.close, 0);
 const planet = planetOf(SEED, landOf(SEED));
 const depth = (p: Vec3) => -planet.height(p);
 const between = (a: Vec3, b: Vec3) =>
   Math.atan2(Math.hypot(...cross(a, b)), dot(a, b));
-/** Whether cap b lies wholly within cap a (to a centimetre). */
 const holds = (a: Cap, b: Cap) =>
   between(a.centre, b.centre) + b.radius <= a.radius + 0.01 / R;
-/** The match every `step` seconds, a little past the last close. */
 const match = (seed: number, step = 0.5) => {
   const storm = createStorm(seed, depth);
   return Array.from({ length: Math.ceil((DURATION + 30) / step) }, (_, i) =>
@@ -81,7 +77,6 @@ test('it starts as the whole planet and closes to a cap small enough to force a 
   const storm = createStorm(3, depth);
   assert.equal(storm(0).radius, Math.PI);
   assert.ok(!outside([0, -R, 0], storm(0)) && !outside([0, R, 0], storm(0)));
-  // a fight: no wider than a gun's range across; and the chase's eye, some 54 m astern, inside it with her at its middle
   assert.ok(storm(DURATION).radius * R <= 100);
   assert.ok(storm(DURATION).radius * R >= 70);
 });

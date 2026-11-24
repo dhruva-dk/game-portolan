@@ -1,32 +1,14 @@
-// The seed panel's globe (panel.ts): a seed's planet inked on a parchment disc
-// as a chartmaker would, from the plain data a worker surveyed for it
-// (player.ts Chart). Seen from afar, straight on (orthographic), north up, the
-// far side hidden: faint meridians and parallels every 30°, the land
-// stippled, the coasts in iron, and where she lies at the start a small ringed
-// point. A finger spins it (touch.ts onDrag); let go, it runs on and settles,
-// drawn only while it moves. The paper, its ring and its degrees are the
-// panel's; this is the canvas over them, the ink.
-//
-// As the full map turns its planet (globe.ts): the point under the eye by its
-// latitude and longitude, a drag carrying the ground under the finger with it.
-
 import type { Chart } from '../player.ts';
 import { clamp } from '../world/scalar.ts';
 import { INK, LAND, WASH, alpha } from './ink.ts';
 import { onDrag } from './touch.ts';
 import { view } from './ui.ts';
 
-/**
- * How far north or south it turns, radians; how fast a let-go spin dies, per
- * second; the slowest spin drawn on, radians a second.
- */
 const MOST_LAT = 1.2,
   DRAG = 2.2,
   STILL = 0.01;
-/** Its tilt as a chart opens: a little north of her start, so her pole shows. */
 const TILT = 0.25;
 
-/** The graticule: parallels and meridians every 30°, as runs of points (the Chart's form). */
 const GRATICULE = (() => {
   const points: number[] = [],
     runs = [0];
@@ -57,18 +39,12 @@ export function createOrb() {
   el.style.cssText =
     'position:absolute;touch-action:none;border-radius:50%;transition:opacity .35s ease';
   const ctx = el.getContext('2d');
-  /**
-   * Its diameter, CSS px; the chart inked; whether it is turning, and when it
-   * was last drawn turning (ms).
-   */
   let size = 0,
     chart: Chart | null = null,
     moving = false,
     last = 0;
   const spin = { lat: TILT, lon: 0, vLat: 0, vLon: 0 };
-  /** Whether a finger is on it. */
   let held = false;
-  /** The eye's axes this frame: toward it, its right, its up (the planet's frame). */
   const c: [number, number, number] = [1, 0, 0],
     right: [number, number, number] = [0, 0, -1],
     up: [number, number, number] = [0, 1, 0];
@@ -78,12 +54,10 @@ export function createOrb() {
       co = Math.cos(spin.lon),
       so = Math.sin(spin.lon);
     [c[0], c[1], c[2]] = [cl * co, sl, -cl * so];
-    // right: north × c, level; up: c × right
     [right[0], right[1], right[2]] = [-so, 0, -co];
     [up[0], up[1], up[2]] = [-sl * co, cl, sl * so];
   };
 
-  /** Strokes runs of points facing the eye, each run broken where it goes round the limb. */
   const trace = (
     g: CanvasRenderingContext2D,
     points: Float32Array,
@@ -111,7 +85,6 @@ export function createOrb() {
     g.stroke();
   };
 
-  /** Inks the globe as it is turned now. */
   function draw() {
     if (!ctx || !size) return;
     const dpr = el.width / size,
@@ -120,7 +93,6 @@ export function createOrb() {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, size, size);
     axes();
-    // the sea's wash, deepening to the limb
     const sea = ctx.createRadialGradient(r * 0.8, r * 0.75, r * 0.1, r, r, r);
     sea.addColorStop(0, alpha(WASH.sea, 0.25));
     sea.addColorStop(1, alpha(WASH.sea, 0.75));
@@ -133,7 +105,6 @@ export function createOrb() {
     ctx.lineWidth = 0.6 * k;
     trace(ctx, GRATICULE.points, GRATICULE.runs, r);
     if (chart) {
-      // the land stippled, the coasts over it
       const land = chart.land,
         d = 1.3 * k;
       ctx.fillStyle = alpha(LAND.high, 0.7);
@@ -141,9 +112,6 @@ export function createOrb() {
         const x = land[i] ?? 0,
           y = land[i + 1] ?? 0,
           z = land[i + 2] ?? 0;
-        // foreshortened toward the limb the dots crowd; kept in the share
-        // they face the eye (by the golden ratio's even sieve), they lie as
-        // thick on the paper there as at the middle, with no moiré
         const facing = x * c[0] + y * c[1] + z * c[2];
         if (facing <= 0.02 || ((i / 3) * 0.618034) % 1 > facing * 1.3) continue;
         ctx.fillRect(
@@ -156,7 +124,6 @@ export function createOrb() {
       ctx.strokeStyle = INK.iron;
       ctx.lineWidth = 0.9 * k;
       trace(ctx, chart.points, chart.runs, r);
-      // her anchorage, on this side only
       const [x, y, z] = chart.start;
       if (x * c[0] + y * c[1] + z * c[2] > 0) {
         ctx.beginPath();
@@ -174,7 +141,6 @@ export function createOrb() {
         ctx.stroke();
       }
     }
-    // the limb, shaded
     const limb = ctx.createRadialGradient(r, r, r * 0.7, r, r, r);
     limb.addColorStop(0, alpha(INK.iron, 0));
     limb.addColorStop(1, alpha(INK.iron, 0.22));
@@ -184,7 +150,6 @@ export function createOrb() {
     ctx.fill();
   }
 
-  /** Turns it on by its spin while it moves, drawing each frame, until it settles. */
   function run(now: number) {
     const dt = Math.min(0.1, (now - last) / 1000);
     last = now;
@@ -214,7 +179,6 @@ export function createOrb() {
         lat = dy / r;
       spin.lon += lon;
       spin.lat = clamp(spin.lat + lat, -MOST_LAT, MOST_LAT);
-      // its speed, smoothed, is what it runs on with when let go
       const s = Math.max(4, ms) / 1000;
       spin.vLon = ms ? spin.vLon * 0.5 + (lon / s) * 0.5 : 0;
       spin.vLat = ms ? spin.vLat * 0.5 + (lat / s) * 0.5 : 0;
@@ -222,7 +186,6 @@ export function createOrb() {
     },
     lift(still) {
       held = false;
-      // a finger held still before it lifts lets it go still
       if (still > 80) spin.vLat = spin.vLon = 0;
       go();
     },
@@ -230,7 +193,6 @@ export function createOrb() {
 
   return {
     el,
-    /** Lays it over the disc: its top left and its diameter, CSS px. */
     place(left: number, top: number, across: number) {
       size = across;
       const dpr = Math.min(view.dpr, 2);
@@ -244,11 +206,6 @@ export function createOrb() {
       });
       draw();
     },
-    /**
-     * Inks `next` (null: none yet), or, while a seed's chart is being
-     * surveyed (`waiting`), keeps the last faded under it. A new planet opens
-     * over her start, still.
-     */
     show(next: Chart | null, waiting: boolean) {
       el.style.opacity = waiting ? '0.3' : '1';
       if (waiting || next === chart) return;

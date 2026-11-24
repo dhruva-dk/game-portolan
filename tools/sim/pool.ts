@@ -1,17 +1,9 @@
-// Matches sailed on a pool of workers (worker.ts), each its own thread with
-// its own planets, every summary handed back in the jobs' order. A job that
-// fails fails the run, with its error; one that runs past `timeout` ms too.
-//
-// Node only (tools/).
-
 import { availableParallelism } from 'node:os';
 import { Worker } from 'node:worker_threads';
 import type { MatchScenario, Summary } from './match.ts';
 
-/** As many workers as the machine has cores, less one for everything else. */
 export const CORES = Math.max(1, availableParallelism() - 1);
 
-/** A match to sail, and the folder its record goes in. */
 export interface Job {
   scenario: MatchScenario;
   dir: string;

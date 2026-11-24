@@ -30,10 +30,6 @@ import { between, locate, taps } from '../src/world/terrain-grid.ts';
 const land = landOf(SEED),
   planet = planetOf(SEED, land);
 const places = sunPlaces(planet.start.at, planet.heart);
-/**
- * Some other places it might be set: a start anywhere, and its heart anywhere a
- * quarter of the way round or more.
- */
 const others: SunPlaces[] = Array.from({ length: 4 }, (_, k) => {
   const draw = random(k + 11),
     start = normalize([draw() - 0.5, draw() - 0.5, draw() - 0.5]);
@@ -43,13 +39,9 @@ const others: SunPlaces[] = Array.from({ length: 4 }, (_, k) => {
 });
 const angle = (a: Vec3, b: Vec3) => Math.atan2(length(cross(a, b)), dot(a, b));
 const degrees = Math.PI / 180;
-/** The point where the sun's bearing is undefined: the origin's antipode. */
 const sunPole = (places: SunPlaces): Vec3 =>
   scale(normalize(places.origin), -1);
 
-/**
- * Points spread evenly over the sphere (a Fibonacci lattice), and both poles.
- */
 const points = (n: number): Vec3[] => [
   [0, 1, 0],
   [0, -1, 0],
@@ -119,19 +111,12 @@ test('the one place the bearing is undefined is on land, far in from the coast a
   );
   const away = angle(pole, places.anchor);
   assert.ok(away >= Math.PI / 2 - 1e-9, `${away / degrees}° from the start`);
-  // no land on that side of the planet farther in
   for (let c = 0; c < CELLS; c += 7) {
     if (!land.water[c] && dot(centreOf(c), places.anchor) <= 0)
       assert.ok(land.shore[c] >= -inland - 0.01, `cell ${c}`);
   }
 });
 
-/**
- * Sails `metres` from p along a path that turns `turn(i)` radians each metre, checking each metre's change of the sun
- * against the curve's own (a metre turns the up 1/R) and the field's turning across the great circles from the
- * origin (tan(θ/2) of the curve's, θ from the origin): never more than 5 times the curve's 300 m and more from the
- * undefined point.
- */
 function sail(
   places: ReturnType<typeof sunPlaces>,
   p: Vec3,
@@ -166,13 +151,10 @@ test('sailing anywhere, over the poles too, the sun turns smoothly: never a flip
   const rand = random(7);
   for (const set of [places, ...others]) {
     const pole = sunPole(set);
-    // round the planet over both poles, along and across the great circles from
-    // the origin
     for (const lon of [0, 45, 90, 135]) {
       const p = fromLatLon(0, lon * degrees);
       sail(set, p, frameAt(p).north, Math.round(2 * Math.PI * R), () => 0);
     }
-    // wandering paths, kept off the land round the one undefined point
     for (let k = 0; k < 20; k++) {
       let p = normalize([rand() * 2 - 1, rand() * 2 - 1, rand() * 2 - 1]);
       if (distance(p, pole) < 600) p = scale(p, -1);

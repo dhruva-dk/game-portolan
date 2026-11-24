@@ -12,16 +12,12 @@ import {
 const start = fromLatLon(0.2, 0.3);
 const north = frameAt(start).north;
 
-/** A wake begun where she is, at `t`, going `speed`. */
 const begun = (at: Vec3, t: number, speed: number): WakePoint[] => {
   const points: WakePoint[] = [];
   lay(points, at, t, speed);
   return points;
 };
 
-/**
- * Sails `seconds` north at `speed`, laying the wake `points` on every 1/30 s.
- */
 const sail = (
   points: WakePoint[],
   from: Vec3,
@@ -71,7 +67,6 @@ test("old points are let go, and a stopped ship's wake fades away entirely", () 
   const { points: still, at, t } = sail(begun(start, 0, 8), start, 0, 8, 5);
   assert.ok(still.length > 10);
   for (let s = t; s < t + WAKE.life + 1; s += 0.5) lay(still, at, s, 0);
-  // only the point she lays where she stands outlives the life
   assert.ok(still.every((p) => t + WAKE.life + 0.5 - p.time < WAKE.life + 0.5));
   assert.ok(still.length <= 1);
 });

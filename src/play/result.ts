@@ -1,25 +1,3 @@
-// A race's result (race.ts RaceResult), tallied as it is sailed (state.ts keeps
-// one tally for a carded race) and made the step it is over (sim/carded.ts
-// over).
-//
-// The finishing order: the ships afloat at the end first, by the sinkings
-// credited to each, then her share of the sea, then the lower id; then the
-// sunk, the last sunk first; then those that forfeited, in the order of their
-// ids. A forfeit is listed among the sinkings at second 0, before the rest.
-//
-// The tally: each ship's shots fired (a scatter's charge is one shot), her
-// strikes landed on another ship and taken from one (a ball's or a burst's: a
-// ram is no shot, and counts in neither), and the hit points her balls and
-// her rams took off others; her share of the sea as she last held it afloat
-// (a sunk ship's water drains: what she held as she went down is kept, so the
-// sea a team held is its ships' together, sunk or not).
-//
-// The hash is FNV-1a over the bits of the final state's numbers, as eight hex
-// digits: its clock, the loot left, every ship afloat (her place, heading and
-// speed), every crew (her hit points, her share of the sea, whether she
-// floats) and every sinking, in order. The same race gives the same hash
-// wherever it is run.
-
 import type { Race } from '../player.ts';
 import type { RaceCard, RaceResult } from '../race.ts';
 import type { Crew, Shot, Strike } from '../sim/battle.ts';
@@ -30,11 +8,6 @@ import { sunk } from '../sim/health.ts';
 import type { Sunk } from '../sim/match.ts';
 import { createStandings } from './standings.ts';
 
-/**
- * The finishing order, first place first: `alive` (the ships afloat at the
- * end) by sinkings credited, then `share`, then id; then `sunk`, in the order
- * they went down, the last first; then `forfeit`, by id.
- */
 export function finishing(
   alive: readonly number[],
   sunk: readonly Pick<Sunk, 'id' | 'by'>[],
@@ -52,7 +25,6 @@ export function finishing(
   ];
 }
 
-/** FNV-1a over the bits of every number given, as eight hex digits. */
 function fingerprint(numbers: readonly number[]): string {
   const bytes = new Uint8Array(new Float64Array(numbers).buffer);
   let h = 0x811c9dc5;
@@ -60,12 +32,6 @@ function fingerprint(numbers: readonly number[]): string {
   return h.toString(16).padStart(8, '0');
 }
 
-/**
- * The sea as a race's step left it (state.ts): its clock, the ships afloat
- * (their ids, and as the sim has them), every crew, every sinking so far in
- * order with its second, the pieces of loot left, and a ship's share of the
- * sea now.
- */
 interface Standing {
   seconds: number;
   alive: readonly number[];
@@ -76,7 +42,6 @@ interface Standing {
   share: (id: number) => number;
 }
 
-/** The numbers a race's hash is made of, as it stands. */
 function numbers(s: Standing): number[] {
   const n: number[] = [s.seconds, s.loot];
   for (const v of [...s.fleet].sort((a, b) => a.id - b.id))
@@ -93,10 +58,6 @@ function numbers(s: Standing): number[] {
   return n;
 }
 
-/**
- * The tally of the race dealt `card`, whose storm has closed its last cap by
- * `closes` seconds on its clock.
- */
 export function createTally(card: RaceCard, closes: number) {
   const count = card.ships.length,
     teams = teamsOf(card),
@@ -110,7 +71,6 @@ export function createTally(card: RaceCard, closes: number) {
   const standings = createStandings(card);
   let made: RaceResult | null = null;
 
-  /** What the guns and the rams did in a step. */
   const fought = (shots: readonly Shot[], strikes: readonly Strike[]) => {
     for (const s of shots) fired[s.shooter]++;
     for (const s of strikes) {
@@ -122,7 +82,6 @@ export function createTally(card: RaceCard, closes: number) {
     }
   };
 
-  /** The result of the race as it stands at its end. */
   const result = (s: Standing): RaceResult => {
     const afloat = new Set(s.alive),
       ids = card.ships.map((k) => k.id);
@@ -163,18 +122,11 @@ export function createTally(card: RaceCard, closes: number) {
   };
 
   return {
-    /** Each ship's team, by her id. */
     teams,
-    /** The ships that did not put to sea. */
     forfeit,
-    /** A ship's share of the sea, as she holds it afloat. */
     holds(id: number, share: number) {
       held[id] = share;
     },
-    /**
-     * The race as ship `id`'s HUD reads it (standings.ts), the sea as the
-     * last step left it: `mode` what a ship's bot is about.
-     */
     view: (
       id: number,
       s: Standing,
@@ -184,12 +136,6 @@ export function createTally(card: RaceCard, closes: number) {
         order: () => finishing(s.alive, s.sunk, s.share, forfeit),
         mode: sea.mode,
       }),
-    /**
-     * A step of the race tallied: what its guns and rams did (`shots`,
-     * `strikes`) and how it left the sea (`standing`, asked for once the
-     * tally is taken); and the result made, the step the race is over. Once
-     * it is, nothing more is tallied.
-     */
     settle(
       shots: readonly Shot[],
       strikes: readonly Strike[],
@@ -200,7 +146,6 @@ export function createTally(card: RaceCard, closes: number) {
       const s = standing();
       if (over(teams, s.alive, s.seconds - closes)) made = result(s);
     },
-    /** The race's result, once it is over; null while it is on. */
     result: (): RaceResult | null => made,
   };
 }

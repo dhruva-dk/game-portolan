@@ -1,17 +1,3 @@
-// The seed panel: a folio over the lobby (screens.ts folio), opened from the
-// seed's chip, on the seed this page sails. At its top left a field to type a
-// seed in (any text, as seeds are: world/seeds.ts), the die beside it rolling
-// a new one into it (the die of her end's new seed, marks.ts); under them the seed's planet inked on a
-// parchment disc (orb.ts), spun by a finger; at the right what its race is
-// sailed by (fleet.ts), its captains' traits shown while the card is held;
-// under that the SAIL banner, her galleon on it, which
-// sails the seed in the field (a new page on it, under the title).
-//
-// As she types, the preview follows: the fleet at once (arithmetic), the
-// planet once she pauses (a worker's, a second or two: play/survey.ts), the
-// last one faded under it meanwhile, an ask overtaken by her typing dropped.
-// Nothing here waits on the worker: the lobby's frames go on as she types.
-
 import type { Chart, Seeds } from '../player.ts';
 import { named } from '../world/seeds.ts';
 import { CARD, fleetCard } from './fleet.ts';
@@ -30,20 +16,14 @@ import { banner, folio } from './screens.ts';
 import { keep, onHold, region } from './touch.ts';
 import { boxOf, view } from './ui.ts';
 
-/** The folio on the drawn page, centred on whatever screen. */
 const BOX = { x: 160, y: 18, w: 636, h: 398 };
-/** The field, the globe's disc (centre, radius) and the card's corner, on the drawn page. */
 const FIELD = { x: 186, y: 44, w: 246, h: 40 },
   DISC = { x: 336, y: 250, r: 136 },
   CARD_AT = { x: 506, y: 40 };
-/** The longest seed she may type. */
 const LONGEST = 24;
-/** Ms of her pause in typing before the fleet, and the planet, are worked out. */
 const PAUSE = { fleet: 90, chart: 380 };
-/** Ms the fleet card is held before it shows the traits. */
 const HOLD = 350;
 
-/** The disc the globe is inked on: shaded on the paper, ringed, its degrees ticked round it. */
 function disc() {
   const { x, y, r } = DISC,
     band = 9;
@@ -68,7 +48,6 @@ export function createSeedPanel(
 ) {
   const f = folio(BOX, ['centre', 'middle'], act.close);
   const orb = createOrb();
-  // the field: an input laid over its slip, in the numerals' face
   const input = document.createElement('input');
   Object.assign(input, {
     type: 'text',
@@ -85,22 +64,17 @@ export function createSeedPanel(
     `font-family:${FIGURES};font-style:italic;color:${INK.iron};caret-color:${INK.rubric};` +
     '-webkit-user-select:text;user-select:text;touch-action:manipulation';
   keep(input);
-  /** Whether she is typing in it (kept across a redraw). */
   let typing = false;
   input.addEventListener('focus', () => (typing = true));
   input.addEventListener('blur', () => (typing = false));
 
-  /** The card's group, and the last chart asked for. */
   let card: SVGGElement | null = null,
     chart: Chart | null = null;
   const timers = { fleet: 0, chart: 0 };
-  /** The seed in the field, as it is read. */
   const text = () => named(input.value);
 
-  /** Whether the card shows the traits (held a while), and the wait before it does. */
   let traits = false,
     holding = 0;
-  /** The fleet of the seed in the field, drawn on the card (none for none). */
   const fleet = () => {
     const name = text();
     if (card)
@@ -108,7 +82,6 @@ export function createSeedPanel(
         ? fleetCard(CARD_AT.x, CARD_AT.y, seeds.fleet(name), traits)
         : '';
   };
-  /** The card held (its traits shown once it has been HOLD ms), or let go (the bars back). */
   const hold = (on: boolean) => {
     clearTimeout(holding);
     if (on)
@@ -121,19 +94,16 @@ export function createSeedPanel(
       fleet();
     }
   };
-  /** The planet of the seed in the field, asked of the worker; the last faded under it until it comes. */
   const survey = () => {
     const name = text();
     if (!name || chart?.name === name) return orb.show(chart, false);
     orb.show(chart, true);
     void seeds.chart(name).then((c) => {
-      // (null: overtaken by a later ask)
       if (!c || c.name !== text()) return;
       chart = c;
       orb.show(c, false);
     });
   };
-  /** The preview after her pause in typing (or at once, `now`). */
   const preview = (now = false) => {
     clearTimeout(timers.fleet);
     clearTimeout(timers.chart);
@@ -172,7 +142,6 @@ export function createSeedPanel(
           onHold(card, hold);
         }
         fleet();
-        // the field's input and the globe's canvas over their places, as the page lays them out now
         f.root.append(input, orb.el);
         const field = el.querySelector('#sp-field'),
           round = el.querySelector('#sp-disc');
@@ -195,9 +164,7 @@ export function createSeedPanel(
     );
 
   return {
-    /** Opens it on the seed this page sails, or closes it. */
     show(on: boolean) {
-      // (shown before it is drawn: the field and the globe are laid over their places as the page lays them out)
       f.show(on);
       if (on) {
         input.value = seeds.name;

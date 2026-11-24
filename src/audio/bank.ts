@@ -1,10 +1,3 @@
-// Every sound there is, as a table (SOUNDS): how it is made (its recipe:
-// sounds/*.ts), how many takes of it to make (each its own seed, so a sound
-// heard again is not the same one), its level, its priority for a voice
-// (voices.ts) and how far off it carries. The takes are made once the sound has
-// begun (audio.ts), a few each frame (fill), never on the frame a sound is
-// wanted.
-
 import type { Samples } from './dsp.ts';
 import {
   GUNS,
@@ -37,14 +30,6 @@ import {
 } from './sounds/sea.ts';
 import { close, launch, lost, open, salute, tap } from './sounds/ui.ts';
 
-/**
- * A sound:
- *   make      its recipe, at the context's rate, from a seed
- *   takes     how many to make
- *   level     its level, dB (the recipes are made to a peak of 0.9; this sets them against each other)
- *   priority  for a voice when all are taken (voices.ts): a sound takes the voice of one lower, never higher
- *   reach     metres past which it is not heard (placed sounds)
- */
 interface Sound {
   make: (rate: number, seed: number) => Samples;
   takes: number;
@@ -53,10 +38,6 @@ interface Sound {
   reach: number;
 }
 
-/**
- * Each gun's report, by kind (sounds/guns.ts GUNS): the repeater's quieter and
- * with more takes, as it fires ten a second; the mortar's carrying furthest.
- */
 const REPORTS: Record<GunKind, Sound> = {
   cannon: {
     make: report(GUNS.cannon),
@@ -124,12 +105,10 @@ const SOUND = {
   salute: { make: salute, takes: 1, level: -5, priority: 9, reach: 0 },
 } as const satisfies Record<string, Sound>;
 
-/** A sound's name: a gun's kind, or one of the rest. */
 export type SoundName = GunKind | keyof typeof SOUND;
 
 export const SOUNDS: Record<SoundName, Sound> = { ...REPORTS, ...SOUND };
 
-/** Every sound's name. */
 export const NAMES: readonly SoundName[] = Object.keys(SOUNDS).filter(
   (k): k is SoundName => k in SOUNDS
 );

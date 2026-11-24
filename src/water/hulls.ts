@@ -1,22 +1,3 @@
-// The hulls standing in the sea, as the sea's shader sees them: for the few
-// ships nearest the eye, where the water lies against each one's waterline
-// (ship/waterline.ts), in her own frame as she heaves, pitches and rolls.
-//
-// There is no water inside a hull, so the sea's surface is cut away there:
-// else, as she rides down into a trough or rolls, the crests of the short waves
-// the hull doesn't follow would show through her deck. Only the nearest few
-// need it: further off a crest through her deck is too small to see. The cut is
-// the waterline's outline (her sides are near upright about it) brought in a
-// hand's breadth, so no water is ever cut away outside her: a sliver left
-// inside is hidden under her deck and behind her sides.
-//
-// Beside her, the hull shades the water: it hides half the sky from the water
-// against it, and the water under her from the light, so the sea glows less
-// there, a dark band hugging her that fades within a couple of metres.
-//
-// The ships are handed over each frame nearest first; the slots past the last
-// are parked far off the planet.
-
 import { Vector4 } from 'three/webgpu';
 import {
   abs,
@@ -45,25 +26,14 @@ import {
   type Vec3Node,
 } from '../tsl.ts';
 
-/** The ships nearest the eye whose hulls the sea fits round. */
 const NEAREST = 4;
-/** The cut is brought in this far from the waterline, metres. */
 const INSET = 0.12;
-/**
- * The shade beside her: how much of the sea's glow she takes away against her
- * side, and how fast it fades out, metres.
- */
 const SHADE = 0.55,
   SHADE_REACH = 1.6;
 
 const last = WATERLINE.half.length - 1;
 const halves = uniformArray<'float'>(WATERLINE.half, 'float');
 
-/**
- * How far outside her waterline a point lies in her frame (across: metres to
- * port, along: metres forward of her middle): the distance to the outline,
- * negative inside it (then the distance in from her side, near enough).
- */
 export function outside(across: FloatNode, along: FloatNode): FloatNode {
   const t = clamp(
     along.sub(WATERLINE.stern).div(WATERLINE.stem - WATERLINE.stern),
@@ -87,19 +57,13 @@ export function outside(across: FloatNode, along: FloatNode): FloatNode {
 
 export function createHulls() {
   const slots = () => Array.from({ length: NEAREST }, () => new Vector4());
-  /** The three uniform arrays' values, a slot each. */
   const values = { at: slots(), fwd: slots(), up: slots() };
   const at = uniformArray<'vec4'>(values.at, 'vec4'),
     fwd = uniformArray<'vec4'>(values.fwd, 'vec4');
   const up = uniformArray<'vec4'>(values.up, 'vec4');
-  /**
-   * The nearest ships' indices and their nearness (minus the eye's dot with
-   * them: least is nearest), kept between frames.
-   */
   const chosen = new Int32Array(NEAREST),
     nearness = new Float64Array(NEAREST);
 
-  /** The least of each hull's `outside` at world position p, metres. */
   const nearest = (p: Vec3Node): FloatNode => {
     let d: FloatNode = float(1e4);
     for (let k = 0; k < NEAREST; k++) {
@@ -112,10 +76,6 @@ export function createHulls() {
   };
 
   return {
-    /**
-     * Whether world position p lies inside a hull (cut it away), and how much
-     * of the sea's glow is left there, 0…1.
-     */
     at(p: Vec3Node): { inside: BoolNode; glow: FloatNode } {
       const d = nearest(p);
       return {
@@ -123,12 +83,7 @@ export function createHulls() {
         glow: float(1).sub(exp(max(d, 0).div(-SHADE_REACH)).mul(SHADE)),
       };
     },
-    /**
-     * Each frame: the ships, and the eye (world, metres), the nearest NEAREST
-     * taken.
-     */
     update(ships: readonly { pose: ShipPose }[], eye: sphere.Vec3) {
-      // the nearest NEAREST, nearest first, by insertion into a short list
       let taken = 0;
       for (let i = 0; i < ships.length; i++) {
         const d = -sphere.dot(ships[i].pose.position, eye);
@@ -142,7 +97,6 @@ export function createHulls() {
         chosen[k] = i;
       }
       for (let k = 0; k < NEAREST; k++) {
-        // the empty slots parked far off, square, so nothing lies inside them
         if (k < taken) {
           const { position, forward, up } = ships[chosen[k]].pose;
           values.at[k].set(position[0], position[1], position[2], 0);

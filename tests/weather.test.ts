@@ -8,7 +8,6 @@ import {
 } from '../src/world/weather.ts';
 
 const KEYS = ['wind', 'cloud', 'haze'] as const;
-/** A match's weather every `step` seconds for an hour. */
 const hour = (seed: number, step = 1, mean = MEAN, swing = SWING) => {
   const w = createWeather(seed, mean, swing);
   return Array.from({ length: 3600 / step + 1 }, (_, i) => w(i * step));
@@ -38,7 +37,6 @@ test('the weather changes over minutes, never suddenly', () => {
     const days = hour(seed);
     for (const k of KEYS) {
       const range = 2 * (k === 'haze' ? MEAN.haze * SWING.haze : SWING[k]);
-      // no faster than across its whole range in a little under two minutes
       for (let i = 1; i < days.length; i++)
         assert.ok(
           Math.abs(days[i][k] - days[i - 1][k]) < range / 100,

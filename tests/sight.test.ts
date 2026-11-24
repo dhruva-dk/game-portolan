@@ -1,5 +1,3 @@
-// A line of sight (sim/sight.ts): where it meets the sea and the land, and how
-// far off it a ship's body stands.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { SHIP } from '../src/sim/handling.ts';
@@ -26,7 +24,6 @@ import {
 const at = fromLatLon(0.4, -0.7),
   f = frameAt(at),
   deep = () => 30;
-/** A sight from `height` m over `at` onto the sea `metres` north. */
 const onto = (height: number, metres: number) => {
   const from = scale(at, R + height);
   return {
@@ -60,7 +57,6 @@ test('a sight onto the sea meets it there; one level or above the horizon never 
 });
 
 test('the land in the way is met first, within a few centimetres of its face', () => {
-  // a cliff 15 m high from 60 m north on
   const cliff = (p: Vec3) => (dot(p, f.north) > Math.sin(60 / R) ? -15 : 30);
   const s = onto(20, 120),
     t = meets(s, cliff)!,
@@ -84,7 +80,6 @@ test("looked for only near the land's rises, a sight meets what it met looking a
     sights = 0,
     met = 0;
   const depth = (p: Vec3) => (reads++, -planet.height(p));
-  /** A point on the water near the land, and the bearing back to the rise it was drawn beside. */
   const offshore = (): { base: Vec3; back: number } => {
     for (;;) {
       const rise = rises[Math.floor(draw() * rises.length)],
@@ -98,7 +93,6 @@ test("looked for only near the land's rises, a sight meets what it met looking a
         return { base, back: out + Math.PI };
     }
   };
-  /** A point on the water anywhere. */
   const anywhere = (): Vec3 => {
     for (;;) {
       const p = normalize([draw() - 0.5, draw() - 0.5, draw() - 0.5]);
@@ -106,8 +100,6 @@ test("looked for only near the land's rises, a sight meets what it met looking a
     }
   };
   for (let k = 0; k < 600; k++) {
-    // an eye 2–40 m up over the water anywhere, looking out over the sea or down to it; every third one off the land,
-    // low and looking back toward it, where the land is in the way
     const ashore = k % 3 === 0,
       off = ashore ? offshore() : null;
     const base = off ? off.base : anywhere();
@@ -127,7 +119,6 @@ test("looked for only near the land's rises, a sight meets what it met looking a
     sights++;
     if (whole !== null && length(pointOn(s, whole)) - R > 0.01) met++;
   }
-  // land met, and some sights passing near no rise read no height at all (the land is everywhere: few pass near none)
   console.log(
     `# a sight: ${(all / sights).toFixed(0)} heights read looking all along it, ${(fewer / sights).toFixed(1)} ` +
       `near the rises; ${met} met land, ${none} read none`
@@ -141,7 +132,6 @@ test("looked for only near the land's rises, a sight meets what it met looking a
 
 test("a ship's body: on the line it stands 0 off; beside it, the angle to her nearest point; behind the eye, nowhere", () => {
   const her = shipAt(along(at, f.north, 100).p, f.east);
-  // through her hull, through her rig
   assert.equal(offSight(onto(20, 100), her)!.angle, 0);
   const from = scale(at, R + 20),
     high = {
@@ -149,7 +139,6 @@ test("a ship's body: on the line it stands 0 off; beside it, the angle to her ne
       dir: normalize(add(scale(her.at, R + SHIP.rig - 1), from, -1)),
     };
   assert.equal(offSight(high, her)!.angle, 0);
-  // lying across the line, her bow 13 m off to the east: a line 10 m past it (and slanting to it) stands 9–10 m off her
   const past = along(her.at, her.heading, SHIP.length / 2 + 10).p;
   const beside = { from, dir: normalize(add(scale(past, R + 5), from, -1)) },
     o = offSight(beside, her)!;
@@ -157,6 +146,5 @@ test("a ship's body: on the line it stands 0 off; beside it, the angle to her ne
     Math.tan(o.angle) * o.along > 9 && Math.tan(o.angle) * o.along <= 10,
     `${Math.tan(o.angle) * o.along} m`
   );
-  // looking away from her
   assert.equal(offSight({ from, dir: scale(f.north, -1) }, her), null);
 });

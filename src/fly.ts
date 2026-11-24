@@ -1,8 +1,3 @@
-// A free camera for reviewing the world (debug.ts: ?fly): drag to look, WASD to
-// move, E/Q (or space and C) up and down, shift to go faster. It flies over the
-// planet: along the level at where it is, its up always away from the planet's
-// centre, its heading carried along with it. It stays above the water.
-
 import { Matrix4, Quaternion, Vector3 } from 'three/webgpu';
 import { AIR_FOV, type Eye } from './snapshot.ts';
 import { clamp } from './world/scalar.ts';
@@ -19,14 +14,10 @@ import {
   transport,
 } from './world/sphere.ts';
 
-/** Metres a second; shift multiplies it. */
 const SPEED = 15;
 const FAST = 6;
-/** The lowest it goes, metres: there is no underwater view. */
 const LOWEST = 2;
-/** Radians a pixel of drag. */
 const TURN = 0.004;
-/** Each way it flies, by either of two keys. */
 type Keys = readonly [string, string];
 const KEYS: Record<
   'right' | 'left' | 'forward' | 'back' | 'up' | 'down',
@@ -40,17 +31,11 @@ const KEYS: Record<
   down: ['KeyQ', 'KeyC'],
 };
 
-/**
- * Where the camera starts: radians, but for its height above the sea, in
- * metres.
- */
 interface Start {
   lat: number;
   lon: number;
   height: number;
-  /** Which way it faces, clockwise from north. */
   bearing: number;
-  /** How far it looks up (negative: down). */
   pitch: number;
 }
 
@@ -60,8 +45,6 @@ export function createFly(element: HTMLElement, start: Start) {
   let heading = bearingAt(at, start.bearing);
   let pitch = start.pitch;
 
-  // (its listeners are never removed: the flyer is made once, on a debug page,
-  // and flies until the page is left)
   const held = new Set<string>();
   addEventListener('keydown', (e) => held.add(e.code));
   addEventListener('keyup', (e) => held.delete(e.code));
@@ -77,7 +60,6 @@ export function createFly(element: HTMLElement, start: Start) {
   });
   element.addEventListener('pointermove', (e) => {
     if (!dragging) return;
-    // turned left (toward up × heading) by a drag to the left
     const a = -e.movementX * TURN;
     heading = normalize(
       add(scale(heading, Math.cos(a)), cross(at, heading), Math.sin(a))
@@ -92,15 +74,10 @@ export function createFly(element: HTMLElement, start: Start) {
     y = new Vector3(),
     z = new Vector3(),
     axis = new Vector3(1, 0, 0);
-  /**
-   * 1 for either key of `plus` held, −1 for either of `minus`, 0 for both or
-   * neither.
-   */
   const either = (k: Keys) => held.has(k[0]) || held.has(k[1]);
   const key = (plus: Keys, minus: Keys) =>
     (either(plus) ? 1 : 0) - (either(minus) ? 1 : 0);
 
-  /** The eye after dt seconds of flying. */
   return (dt: number): Eye => {
     const right = key(KEYS.right, KEYS.left),
       forward = key(KEYS.forward, KEYS.back),
@@ -123,8 +100,6 @@ export function createFly(element: HTMLElement, start: Start) {
     }
 
     const up = normalize(at);
-    // the camera looks down its −z, its x to the right, y up; then pitched
-    // about its x
     basis.makeBasis(
       x.fromArray(cross(heading, up)),
       y.fromArray(up),
@@ -133,7 +108,6 @@ export function createFly(element: HTMLElement, start: Start) {
     orientation
       .setFromRotationMatrix(basis)
       .multiply(turn.setFromAxisAngle(axis, pitch));
-    // (a new eye each frame, as the game's are: what reads it may keep it)
     const { x: qx, y: qy, z: qz, w: qw } = orientation;
     return {
       kind: 'air',

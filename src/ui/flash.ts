@@ -1,22 +1,6 @@
-// The screen's answer to a blow: a flash, a vignette and the low-hull
-// heartbeat. A flash washes the whole screen in a colour for a moment (`add` a
-// pale wash of light, `tint` the colour laid over it); a vignette darkens the
-// screen's rim in a colour, drawn toward where a blow came from; while her hull
-// is low, a heartbeat of rubric beats at the rim, faster the lower it is.
-//
-// Photosensitivity (WCAG 2.3.1): no more than BIG flashes stronger than SAFE in
-// any second; past that a flash is held to SAFE.
-//
-// A layer of the HUD under all its pieces (no touch); it runs on the page's
-// clock.
-
 import { clamp } from '../world/scalar.ts';
 import { INK, LIGHT } from './ink.ts';
 
-/**
- * A flash: its colour, strength at its peak (0…1), how long it holds there and
- * fades (s), and how it is laid.
- */
 interface Flash {
   colour: string;
   alpha: number;
@@ -24,11 +8,6 @@ interface Flash {
   decay: number;
   mode?: 'add' | 'tint';
 }
-/**
- * A vignette: its colour, strength (0…1), how far in it reaches (of the
- * half-screen), its attack, hold and decay (s), and whether it is drawn toward
- * the blow's bearing.
- */
 interface Vignette {
   colour: string;
   alpha: number;
@@ -39,11 +18,6 @@ interface Vignette {
   aimed?: boolean;
 }
 
-/**
- * The screen's answers, by name: a warm flash for her own shot, pale ones for
- * blows dealt, ice and azure for a shield, red for a blow on her hull, green
- * for a mend.
- */
 export const SCREEN = {
   fire: { flash: { colour: LIGHT.warm, alpha: 0.1, hold: 0.033, decay: 0.16 } },
   hit: { flash: { colour: LIGHT.white, alpha: 0.08, decay: 0.12 } },
@@ -95,10 +69,6 @@ export const SCREEN = {
   },
 } as const satisfies Record<string, { flash?: Flash; vignette?: Vignette }>;
 
-/**
- * A pickup's flash and vignette by rarity: none for the commonest two, more for
- * each up.
- */
 export const PICKUP = {
   flash: [0, 0, 0.05, 0.08, 0.14],
   decay: [0, 0, 0.18, 0.25, 0.4],
@@ -106,16 +76,9 @@ export const PICKUP = {
   fades: [0, 0, 0, 0.5, 0.9],
 } as const;
 
-/** At most BIG flashes a second stronger than SAFE. */
 export const BIG = 3,
   SAFE = 0.12;
 
-/**
- * The low-hull heartbeat: from `start` of her hull, its fastest at `floor`;
- * beats a minute from slowest to fastest; its colour, her blood's; its strength
- * resting and on the beat; its reach; how much the second beat of each pair is
- * of the first; how long it takes to fade once she is mended (s).
- */
 const LOW_HULL = {
   start: 0.3,
   floor: 0.05,
@@ -128,17 +91,9 @@ const LOW_HULL = {
   fade: 9,
 } as const;
 
-/**
- * How strong a flash of `alpha` plays when `recent` big ones have played in the
- * last second.
- */
 export const capped = (alpha: number, recent: number) =>
   alpha > SAFE && recent >= BIG ? SAFE : alpha;
 
-/**
- * 0…1 of a heartbeat `t` s in, at `bpm`: a lub and, a sixth of a beat later, a
- * dub (`dub` of it).
- */
 export function heartbeat(t: number, bpm: number, dub: number): number {
   const p = ((t * bpm) / 60) % 1,
     pulse = (x: number) =>
@@ -146,10 +101,6 @@ export function heartbeat(t: number, bpm: number, dub: number): number {
   return Math.max(pulse(p), pulse(p - 0.18) * dub);
 }
 
-/**
- * The heartbeat's strength (0…1) and pace (bpm) for her hull's share `share`, 0
- * above its start.
- */
 export function lowHull(share: number): { k: number; bpm: number } {
   const k = clamp((LOW_HULL.start - share) / (LOW_HULL.start - LOW_HULL.floor));
   return {
@@ -165,13 +116,10 @@ export function createFlash(parent: HTMLElement) {
     parent.prepend(el);
     return el;
   };
-  // the wash laid over in plain alpha, not blended: its colours are near white, where the two are all but one, and a
-  // full-screen blend is costly to composite on the phone
   const wash = layer(''),
     tint = layer(''),
     rim = layer(''),
     heart = layer('');
-  /** When the big flashes of the last second played (s on the page's clock); the heartbeat's inner edge as laid. */
   let big: number[] = [],
     beat = 0,
     low = 0,
@@ -179,7 +127,6 @@ export function createFlash(parent: HTMLElement) {
   const now = () => performance.now() / 1000;
 
   return {
-    /** A flash `strength` strong. */
     flash(f: Flash, strength = 1) {
       const t = now();
       big = big.filter((b) => b > t - 1);
@@ -199,7 +146,6 @@ export function createFlash(parent: HTMLElement) {
         { duration: all, easing: 'ease-out' }
       );
     },
-    /** A vignette `strength` strong, toward `bearing` (radians clockwise from ahead) when it is aimed. */
     vignette(v: Vignette, strength = 1, bearing?: number) {
       const aimed = v.aimed && bearing !== undefined;
       const cx = aimed ? 50 + Math.sin(bearing) * 55 : 50,
@@ -220,10 +166,8 @@ export function createFlash(parent: HTMLElement) {
         { duration: all, easing: 'ease-out' }
       );
     },
-    /** Each frame, dt s on: her hull's share (0…1; the heartbeat), and whether the HUD shows hers. */
     update(dt: number, share: number, shown: boolean) {
       const { k, bpm } = lowHull(shown ? share : 1);
-      // eased in, and out slowly once she is mended
       low =
         k > low
           ? Math.min(k, low + dt * 2)
@@ -240,7 +184,6 @@ export function createFlash(parent: HTMLElement) {
         LOW_HULL.rest[0] +
         (LOW_HULL.rest[1] - LOW_HULL.rest[0]) * low +
         (LOW_HULL.beat[0] + (LOW_HULL.beat[1] - LOW_HULL.beat[0]) * low) * b;
-      // the gradient laid anew only as its reach moves on (a whole percent), its beat in opacity alone
       const inner = Math.round((1 - reach) * 100),
         opacity = Math.min(1, alpha * low).toFixed(3);
       if (inner !== reached)

@@ -1,24 +1,10 @@
-// A module Worker: surveys a seed's planet for the seed panel (ui/panel.ts),
-// off the main thread, as she types it: its land made (world/land.ts landOf,
-// a second or two), its coasts traced (world/coastline.ts), points on its land
-// to stipple, and where she would lie at the start; handed back as plain
-// arrays. Nothing is built on the GPU, and the storm is not worked out at all:
-// the panel never shows it. One seed at a time; an ask overtaken by a later
-// one is cut off by the page ending the worker (preview.ts).
-//   in:  { name } (a seed's text)   out: player.ts Chart
-
 import type { Chart } from '../player.ts';
 import { cellOf } from '../world/cells.ts';
 import { coastLines } from '../world/coastline.ts';
 import { landOf, planetOf } from '../world/land.ts';
 import { seedOf } from '../world/seeds.ts';
 
-/**
- * A coast's points kept, one in so many (its last always): the panel's globe
- * is a few hundred pixels across, and a coast's points are about a cell apart.
- */
 const EVERY = 2;
-/** Points laid evenly over the sphere (a Fibonacci lattice), to stipple the land. */
 const DOTS = 14000;
 
 self.onmessage = (e: MessageEvent<{ name: string }>) => {

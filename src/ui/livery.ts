@@ -1,32 +1,14 @@
-// Her livery (player.ts Livery), chosen in the lobby: a slim folio docked at
-// the foot of the screen, to the right, opened from the dye pot beside the
-// lobby's wheel, her ship at anchor turned broadside above it
-// (play/anchorage.ts BROADSIDE), changing as she taps. At its left the set's dyes, two rows of eight daubs (bright and
-// light over deep and dull); at its right three small sails in the dye she has
-// chosen, one a pattern (plain, a band, stripes), each with her cross, the
-// marks where her canvas has them (snapshot.ts SAIL_MARKS) and in the ink that
-// stands out on the dye (the Wardrobe's: palette.ts markOn). The chosen daub
-// and the chosen sail are gilt-ringed. Every target a cell of its own, nothing
-// moving as she taps; no words.
-
 import { PATTERNS, type Livery, type Wardrobe } from '../player.ts';
 import { SAIL_MARKS } from '../snapshot.ts';
 import { INK, roughCircle } from './ink.ts';
 import { folio } from './screens.ts';
 import { region } from './touch.ts';
 
-/** A dye's daubs a row; a daub's cell, a sail's cell (drawn units, square for the daubs). */
 const ROW = 8,
   CELL = 32,
   SAIL = { w: 62, h: 64 };
-/** The folio's inner margin, and the gap the rule between the daubs and the sails stands in. */
 const PAD = 24,
   GAP = 28;
-/**
- * The folio on the drawn page, docked at its foot to the right, its close mark
- * inside the page's edge (screens.ts folio): the bottom-left corner is the
- * meter's, over every screen.
- */
 const BOX = (() => {
   const w = PAD * 2 + ROW * CELL + GAP + PATTERNS.length * SAIL.w,
     h = PAD * 2 + 2 * CELL;
@@ -35,20 +17,16 @@ const BOX = (() => {
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
 
-/** A daub of `dye` about (x, y): a blot of it, inked round, a glint of light on it. */
 const daub = (x: number, y: number, dye: string, seed: number) =>
   `<path d="${roughCircle(x, y, 12.5, seed, 2.2)}" fill="${dye}" stroke="${INK.iron}" stroke-width="1"/>` +
   `<path d="M${x - 7} ${y - 3}Q${x - 6} ${y - 8} ${x - 1} ${y - 9}" fill="none" stroke="${INK.white}" stroke-width="1.6" stroke-linecap="round" opacity=".55"/>`;
 
-/** The gilt ring round the chosen, `r` across its half. */
 const chosen = (x: number, y: number, r: number) =>
   `<circle cx="${x}" cy="${y}" r="${r + 1.6}" fill="none" stroke="${INK.iron}" stroke-width=".7"/>` +
   `<circle cx="${x}" cy="${y}" r="${r}" fill="none" stroke="${INK.gold}" stroke-width="2.8"/>`;
 
-/** Her cross on a sail `w` × `h` about (x, y), as SAIL_MARKS lays it out, grown by `d` (of its reach). */
 function cross(x: number, y: number, w: number, h: number, d: number) {
   const { arm, flare, reach } = SAIL_MARKS;
-  // each arm a trapeze from the middle out, narrow there and flaring at its end
   const limb = (ux: number, uy: number, along: number, across: number) => {
     const p = (t: number, s: number) =>
       `${r2(x + ux * along * t - uy * across * s)} ${r2(y + uy * along * t + ux * across * s)}`;
@@ -64,13 +42,11 @@ function cross(x: number, y: number, w: number, h: number, d: number) {
   );
 }
 
-/** The marks of each pattern but the cross, on a sail from (l, t), `w` × `h`: none; the band; the stripes. */
 function marks(pattern: number, l: number, t: number, w: number, h: number) {
   const { band, stripes } = SAIL_MARKS;
   if (pattern === 1)
     return `<rect x="${l}" y="${r2(t + h * band[0])}" width="${w}" height="${r2(h * (band[1] - band[0]))}"/>`;
   if (pattern !== 2) return '';
-  // the middle stripe and every other, each a stripe's width, held to the sail
   let s = '';
   for (let k = -stripes; k <= stripes; k++) {
     const a = Math.max(0, 0.5 + (2 * k - 0.5) / stripes),
@@ -81,11 +57,6 @@ function marks(pattern: number, l: number, t: number, w: number, h: number) {
   return s;
 }
 
-/**
- * A small square sail in `dye` with `pattern` on it in `mark`, about (x, y):
- * bellied a little, hung from its yard; the stripes parted from the cross by a
- * fringe of the dye (as her canvas has them).
- */
 function sail(
   x: number,
   y: number,
@@ -111,11 +82,6 @@ function sail(
   );
 }
 
-/**
- * Her livery's folio over the lobby: `wardrobe` the game's (her livery worn as
- * she taps, the camera turned broadside while it is open), `keep` hers kept on
- * the device as she chooses it, `close` the way back to the lobby.
- */
 export function createLivery(
   wardrobe: Wardrobe,
   keep: (l: Livery) => void,
@@ -158,7 +124,6 @@ export function createLivery(
     });
   };
   return {
-    /** Opens it, the camera coming round to her broadside; or closes it, the camera going back. */
     show(on: boolean) {
       if (on) draw();
       f.show(on);

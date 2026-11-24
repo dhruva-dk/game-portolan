@@ -1,9 +1,3 @@
-// The woodcut glyphs the UI draws, as data: each baked to its primitives on a
-// 24-unit square. ink.ts cuts them.
-//   k: 'f' a filled shape, hatched in its ink and outlined; 's' a stroke of width w
-//   cut: drawn in the paper's colour over the rest (a white line cut into the block); top: drawn last
-//   fine: only at 40 units and up; bold: only below; tr: an SVG transform; op: opacity
-
 export interface Prim {
   k: 'f' | 's';
   d: string;
@@ -368,7 +362,6 @@ const DRAWN = {
     { k: 's', d: 'M16 8.4C17.8 10.4 17.8 13.6 16 15.6', w: 1.9 },
     { k: 's', d: 'M18.8 5.8C22 9.4 22 14.6 18.8 18.2', w: 1.9 },
   ],
-  // the Storm's mark: a bolt, hollow while it holds, filled while it closes
   'hud.bolt': [
     { k: 's', d: 'M14.6 1.6L5.4 13.4H11.3L8.7 22.4L18.7 9.7H12.7Z', w: 1.9 },
   ],
@@ -379,8 +372,6 @@ const DRAWN = {
     { k: 's', d: 'M13.4 4.6L20.6 12L13.4 19.4', w: 3 },
     { k: 's', d: 'M3.4 12H19.6', w: 3 },
   ],
-  // the office's tabs and its strip (ui/office/shell.ts)
-  // home: the anchor (marks.ts), put in to harbour
   'office.home': [
     { k: 's', d: 'M12 6V20.4', w: 2.4 },
     { k: 's', d: 'M7.2 8.8H16.8', w: 2.2 },
@@ -389,7 +380,6 @@ const DRAWN = {
     { k: 'f', d: 'M2.2 15.4L4.2 10.8L7 14.6Z' },
     { k: 'f', d: 'M21.8 15.4L19.8 10.8L17 14.6Z' },
   ],
-  // the player, the manager: a quill, its nib at the lower left
   'office.player': [
     {
       k: 'f',
@@ -405,7 +395,6 @@ const DRAWN = {
     },
     { k: 's', d: 'M2.6 21.6L6.6 17.4', w: 1.8 },
   ],
-  // mail: a letter folded and sealed
   'office.mail': [
     { k: 'f', d: 'M2.4 5.6H21.6V18.8H2.4Z' },
     { k: 's', d: 'M2.8 6.2L12 13.2L21.2 6.2', w: 1.1, cut: true },
@@ -422,7 +411,6 @@ const DRAWN = {
       top: true,
     },
   ],
-  // the ship: a three-master, broadside
   'office.ship': [
     { k: 's', d: 'M7.2 15V4.4M12.6 15V1.6M17.8 15V5.6', w: 1.1 },
     { k: 'f', d: 'M5.2 5.4H9.2Q9.6 7 9.1 8.4H5.3Q4.8 7 5.2 5.4Z' },
@@ -439,7 +427,6 @@ const DRAWN = {
     { k: 'f', d: 'M1.4 14.2H4.8L5.6 15.2H22.6L19.8 20Q12 21.6 4 19.8Z' },
     { k: 's', d: 'M3.2 17.2H21.2', w: 0.9, cut: true },
   ],
-  // headquarters: the yard's house, gabled, its door arched
   'office.hq': [
     { k: 'f', d: 'M2.6 11.2L12 3.4L21.4 11.2V21H2.6Z' },
     { k: 's', d: 'M2.6 12.6H21.4', w: 0.9, cut: true, fine: true },
@@ -451,14 +438,12 @@ const DRAWN = {
     },
     { k: 's', d: 'M1.2 11.8L12 2.8L22.8 11.8', w: 1.8 },
   ],
-  // the team: its pennant on a staff, swallowtailed, banded in its second dye
   'office.team': [
     { k: 's', d: 'M5 2V21.6', w: 1.8 },
     { k: 's', d: 'M2.4 21.6H7.6', w: 1.8 },
     { k: 'f', d: 'M5.8 3H21L17.4 7.6L21 12.2H5.8Z' },
     { k: 's', d: 'M5.8 7.6H15.6', w: 1.4, cut: true },
   ],
-  // the drivers, the captains: a captain's bicorne, its cockade
   'office.drivers': [
     {
       k: 'f',
@@ -477,8 +462,6 @@ const DRAWN = {
     },
     { k: 's', d: 'M12 8.2V11M10.6 9.6H13.4', w: 0.8, cut: true, top: true },
   ],
-  // the staff: the chartmaker's dividers, open
-  // a mechanic: the caulking mallet, its head bound in two hoops, its haft slanting down to the left
   'role.mechanic': [
     {
       k: 'f',
@@ -504,7 +487,6 @@ const DRAWN = {
       cut: true,
     },
   ],
-  // scouting: the spyglass (marks.ts), three draws, tilted up to the right
   'office.scouting': [
     { k: 'f', d: 'M1.6 10.4h4.8v3.6h-4.8Z', tr: 'rotate(-22 12 12)' },
     { k: 'f', d: 'M6.2 9.6h5.8v5.2h-5.8Z', tr: 'rotate(-22 12 12)' },
@@ -519,7 +501,6 @@ const DRAWN = {
       tr: 'rotate(-22 12 12)',
     },
   ],
-  // the finances: coins, a stack and one stood on its edge
   'office.finances': [
     {
       k: 'f',
@@ -540,7 +521,6 @@ const DRAWN = {
       top: true,
     },
   ],
-  // the sponsors: a charter, rolled at its head and foot, its seal hanging
   'office.sponsors': [
     { k: 'f', d: 'M5.2 4.6H17.8V18.2H5.2Z' },
     {
@@ -572,7 +552,6 @@ const DRAWN = {
       top: true,
     },
   ],
-  // the standings: the cup
   'office.standings': [
     { k: 's', d: 'M5.8 5.2Q1.6 5.2 2.2 8.4Q2.8 11.2 6.8 11.2', w: 1.5 },
     { k: 's', d: 'M18.2 5.2Q22.4 5.2 21.8 8.4Q21.2 11.2 17.2 11.2', w: 1.5 },
@@ -584,7 +563,6 @@ const DRAWN = {
       d: 'M7 18h10a1.2 1.2 0 0 1 1.2 1.2v1a1.2 1.2 0 0 1 -1.2 1.2h-10a1.2 1.2 0 0 1 -1.2 -1.2v-1a1.2 1.2 0 0 1 1.2 -1.2Z',
     },
   ],
-  // the calendar: an almanac's leaf, ringed at its head, its days ruled
   'office.calendar': [
     { k: 'f', d: 'M3.6 4.4H20.4V21.2H3.6Z' },
     { k: 's', d: 'M3.8 8.8H20.2', w: 1.2, cut: true },
@@ -595,7 +573,6 @@ const DRAWN = {
     },
     { k: 's', d: 'M8 2.2V6.6M16 2.2V6.6', w: 1.8, top: true },
   ],
-  // the Federation: the scales its rules are weighed in
   'office.regulations': [
     { k: 's', d: 'M12 4V19.6', w: 1.8 },
     { k: 's', d: 'M3.6 6.4H20.4', w: 1.8 },
@@ -616,7 +593,6 @@ const DRAWN = {
       d: 'M7.6 19.2h8.8a1.2 1.2 0 0 1 1.2 1.2v1.2H6.4v-1.2a1.2 1.2 0 0 1 1.2 -1.2Z',
     },
   ],
-  // what waits to be read: the ship's bell
   'office.bell': [
     { k: 's', d: 'M10.2 5.6Q10.2 2.2 12 2.2Q13.8 2.2 13.8 5.6', w: 1.5 },
     { k: 'f', d: 'M5.6 17.4Q6 8.4 8.6 6.4Q12 4.2 15.4 6.4Q18 8.4 18.4 17.4Z' },
@@ -628,8 +604,6 @@ const DRAWN = {
     { k: 'f', d: 'M10.4 21.4a1.6 1.6 0 1 1 3.2 0a1.6 1.6 0 1 1 -3.2 0Z' },
   ],
 
-  // ── the parts (race.ts PARTS), each `part.<type>` ──
-  // sails: a square sail bellied on its yard, its seams cut, its sheets at the foot
   'part.sails': [
     { k: 's', d: 'M12 1.2V4.4', w: 1.6 },
     { k: 'f', d: 'M4 5H20Q22.4 12.4 21.4 19.8Q12 16.6 2.6 19.8Q1.6 12.4 4 5Z' },
@@ -643,7 +617,6 @@ const DRAWN = {
     { k: 's', d: 'M2.6 4.4H21.4', w: 1.8, top: true },
     { k: 's', d: 'M4.8 19.6L2.6 22.6M19.2 19.6L21.4 22.6', w: 1, fine: true },
   ],
-  // rigging: a block, its shell slung from its ring, its sheave cut, the fall rove through it
   'part.rigging': [
     { k: 's', d: 'M8.6 15.6V22.6M15.4 15.6V22.6', w: 1.3 },
     { k: 's', d: 'M12 1.6a2.2 2.2 0 1 1 0 4.4a2.2 2.2 0 1 1 0 -4.4Z', w: 1.6 },
@@ -652,7 +625,6 @@ const DRAWN = {
     { k: 's', d: 'M9 13a3 3 0 1 1 6 0a3 3 0 1 1 -6 0Z', w: 0.9, cut: true },
     { k: 'f', d: 'M11 13a1 1 0 1 1 2 0a1 1 0 1 1 -2 0Z', top: true },
   ],
-  // the rudder: its blade hung on its stock, broad aft and below, the tiller at its head
   'part.rudder': [
     { k: 'f', d: 'M8.8 6.4H14.8Q20.4 8.6 20.4 21.2H8.8Z' },
     { k: 's', d: 'M9 10.4H12M9 14.6H12M9 18.8H12', w: 1, cut: true },
@@ -671,7 +643,6 @@ const DRAWN = {
       top: true,
     },
   ],
-  // the hull: broadside, no masts, her sheer rising to the stem at the right, planked, her ports cut along her wale
   'part.hull': [
     {
       k: 'f',
@@ -685,7 +656,6 @@ const DRAWN = {
     { k: 's', d: 'M2.2 13.6Q11 15.2 20.6 12.6', w: 0.9, cut: true },
     { k: 's', d: 'M4 16Q11 17.6 18.4 15.4', w: 0.8, cut: true, fine: true },
   ],
-  // the keel: laid down, the ship's backbone: its beam, the stem and sternpost rising from it, the frames between
   'part.keel': [
     {
       k: 's',
@@ -697,7 +667,6 @@ const DRAWN = {
     { k: 'f', d: 'M1.4 17.4H21.6Q21.6 20.6 19.4 20.6H1.4Z', top: true },
     { k: 's', d: 'M6 19H17.4', w: 0.8, cut: true, top: true, fine: true },
   ],
-  // the mounts: a swivel's yoke on its post, the trunnions' holes cut, on its plate
   'part.mounts': [
     {
       k: 's',
@@ -724,9 +693,7 @@ const DRAWN = {
 } satisfies Record<string, Prim[]>;
 
 export type Glyph = keyof typeof DRAWN;
-/** Each glyph's primitives. */
 export const GLYPHS: Readonly<Record<Glyph, readonly Prim[]>> = DRAWN;
 
-/** The Storm's mark (the clock's, the full map's): its bolt filled while it closes, hollow while it holds. */
 export const stormMark = (closing: boolean): Glyph =>
   closing ? 'hud.boltFilled' : 'hud.bolt';

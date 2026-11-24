@@ -62,7 +62,6 @@ test('no palm stands on a rock', () => {
 });
 
 test('palms are thickest along the top of the beach, and thin inland', () => {
-  // palms per cell of land in each band of shore distance
   const band = (lo: number, hi: number) => {
     let cells = 0;
     for (let c = 0; c < terrain.shore.length; c++)
@@ -92,6 +91,5 @@ test('palms lean out toward the sea', () => {
     toward += Math.cos(p.heading - Math.atan2(gz, gx));
     n++;
   }
-  // headings spread ±0.7 rad about seaward: their mean cosine is sin(0.7)/0.7
   assert.ok(toward / n > 0.85, `mean ${(toward / n).toFixed(3)}`);
 });

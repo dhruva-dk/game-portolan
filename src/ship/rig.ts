@@ -1,16 +1,3 @@
-// The galleon's rig: three masts — the fore and main with lower masts, plain
-// tops, topmasts, crosstrees and topgallant poles, the mizzen with a pole
-// topmast — a plain bowsprit, the yards, and the ropes: shrouds set up with
-// deadeyes on channels (no ratlines), stays forward, and the running lines
-// (ties, lifts, clewlines, sheets, tacks, braces). The sails themselves are
-// sails.ts's.
-//
-// The square yards and everything on them carry their mast as a pivot (kit.ts)
-// so the shader can brace them; a rope from a yard to something fixed swings
-// fully at the yard and not at all at its other end.
-//
-// Design metres (lines.ts). Spars go into the body, ropes into their own draw.
-
 import { Vector3 } from 'three/webgpu';
 import type { Detail } from './detail.ts';
 import {
@@ -56,7 +43,6 @@ import {
   type Yard,
 } from './sails.ts';
 
-/** Each top's radius, and how many shrouds a side each mast has. */
 const TOP_R: Record<MastName, number> = { main: 2.0, fore: 1.75, mizzen: 1.15 };
 const SHROUDS: Record<MastName, number> = { main: 6, fore: 5, mizzen: 4 };
 export function buildRig(body: Acc, ropes: Acc, D: Detail): void {
@@ -72,9 +58,6 @@ export function buildRig(body: Acc, ropes: Acc, D: Detail): void {
   if (D.ropes === 'running') lateenLines(ropes, D);
 }
 
-// ---------------------------------------------------------------- masts
-
-/** A round cap at a mast's tip (no finial): where the pennant flies. */
 const truckCap = (acc: Acc, at: Vector3, sides: number) =>
   lathe(
     acc,
@@ -94,8 +77,6 @@ function mast(acc: Acc, D: Detail, name: MastName): void {
     foot = mastFoot(name),
     r = m.r;
   const small = D.topSides > 0;
-  // the lower mast, from the deck to its head over the top, bound with
-  // wooldings near
   rod(
     acc,
     foot.clone().add(V(0, -0.2, 0)),
@@ -127,7 +108,6 @@ function mast(acc: Acc, D: Detail, name: MastName): void {
       );
     });
   if (small) top(acc, D, name, m.top, z, r * 0.8);
-  // the topmast stands forward of the lower masthead, held by the cap
   const tr = r * 0.55,
     tz = topmastZ(name);
   rod(
@@ -152,7 +132,6 @@ function mast(acc: Acc, D: Detail, name: MastName): void {
     if (small) truckCap(acc, V(0, m.tip + 0.08, tz), D.mastSides);
     return;
   }
-  // crosstrees at the topmast's head, the topgallant pole forward of it
   const pr = tr * 0.55,
     pz = poleZ(name);
   if (small) {
@@ -181,10 +160,6 @@ function mast(acc: Acc, D: Detail, name: MastName): void {
   );
 }
 
-/**
- * A top: a plain round platform on its trestles and crosstrees, dished up to
- * its rim.
- */
 function top(
   acc: Acc,
   D: Detail,
@@ -229,7 +204,6 @@ function top(
   );
 }
 
-/** The bowsprit: a plain spar, lashed down to the knee of the head. */
 function bowsprit(acc: Acc, D: Detail): void {
   rod(acc, BOWSPRIT.heel, sprit(1), 0.33, 0.13, D.mastSides, D.topSides > 0, 3);
   if (D.fittings)
@@ -250,7 +224,6 @@ function bowsprit(acc: Acc, D: Detail): void {
     });
 }
 
-/** The lateen's yard, slung across the mizzen to port of it, raked up aft. */
 function lateenYard(acc: Acc, D: Detail): void {
   const n = D.yardSegs,
     pts = range(0, 1, n).map((t) => lateenTack().lerp(lateenPeak(), t));
@@ -263,22 +236,17 @@ function lateenYard(acc: Acc, D: Detail): void {
   tube(acc, pts, radii, D.sparSides, { vScale: 3, caps: D.topSides > 0 });
 }
 
-// ---------------------------------------------------------------- square yards
-// and their lines
-
 function yard(body: Acc, ropes: Acc, D: Detail, Y: Yard): void {
   const pivot = PIVOT[Y.mast],
     m = MASTS[Y.mast],
     z = mastZ(Y.mast);
   body.with({ kind: KIND.spar, pivot, swing: 1 }, () => {
-    // thick in its slings, tapering to the arms
     const n = D.yardSegs,
       pts = range(-Y.len / 2, Y.len / 2, n).map((x) => arm(Y, x));
     const radii = pts.map(
       (_, i) => Y.r * (0.42 + 0.58 * Math.sin((Math.PI * i) / n) ** 0.6)
     );
     tube(body, pts, radii, D.sparSides, { vScale: 3, caps: D.topSides > 0 });
-    // the parrel holding it to the mast
     const parrel: [number, number][] = [
       [m.r * 1.15, -0.15],
       [m.r * 1.3, 0],
@@ -300,7 +268,6 @@ function yard(body: Acc, ropes: Acc, D: Detail, Y: Yard): void {
     swing: [number, number]
   ) => rope(ropes, a, b, r, sag, D.sag, swing);
   ropes.with({ pivot }, () => {
-    // the ties up to the masthead, and the lifts from the yardarms
     for (const sx of [1, -1]) {
       line(arm(Y, sx * 0.25), V(0, mh, z + 0.4), 0.05, 0, [1, 1]);
       line(
@@ -313,8 +280,6 @@ function yard(body: Acc, ropes: Acc, D: Detail, Y: Yard): void {
       const clew = squarePoint(Y, sx > 0 ? 0 : 1, 1);
       line(clew, arm(Y, sx * 1.5), 0.018, 0.05, [1, 1]);
       if (lower) {
-        // the sheet aft to the side, the tack forward, the brace from the
-        // yardarm aft and down to the quarter
         const s = m.s,
           aft = s - 0.13,
           fwd = Math.min(0.97, s + 0.12),
@@ -349,8 +314,6 @@ function yard(body: Acc, ropes: Acc, D: Detail, Y: Yard): void {
           [1, 0]
         );
       } else {
-        // the topsail's sheets to the course's yardarms below; its braces aft
-        // to the next mast's top
         const below = YARDS.find((y) => y.mast === Y.mast && y.y < Y.y)!;
         line(clew, arm(below, sx * (below.len / 2 - 0.4)), 0.022, 0.05, [1, 1]);
         const next: MastName = Y.mast === 'fore' ? 'main' : 'mizzen';
@@ -396,13 +359,6 @@ function lateenLines(ropes: Acc, D: Detail): void {
   );
 }
 
-// ---------------------------------------------------------------- shrouds and
-// stays
-
-/**
- * A deadeye: a round block of dark wood, turned to face out of the shroud's
- * plane.
- */
 function deadeye(acc: Acc, at: Vector3, dir: Vector3, side: number): void {
   acc.with({ kind: KIND.dark }, () =>
     lathe(
@@ -427,8 +383,6 @@ function shrouds(body: Acc, ropes: Acc, D: Detail, name: MastName): void {
   const hy = m.top - 0.35;
   const sAtZ = (zz: number) => zz / LEN + 0.5;
   for (const side of [1, -1]) {
-    // the channel: a broad plank bolted to the side, the shrouds set up along
-    // its edge
     const zs = range(0, 1, n - 1).map((t) => z + 0.4 - t * (n - 1) * 0.78);
     const ch = zs.map((zz) => {
       const s = sAtZ(zz),
@@ -453,8 +407,6 @@ function shrouds(body: Acc, ropes: Acc, D: Detail, name: MastName): void {
         rope(ropes, lo, head, 0.04, 0, 1);
         return;
       }
-      // a pair of deadeyes and the lanyard between, the chainplate down the
-      // side, the shroud above
       const dir = masthead.clone().sub(lo).normalize(),
         hi = lo.clone().addScaledVector(dir, 0.95);
       deadeye(body, lo, dir, side);
@@ -478,7 +430,6 @@ function shrouds(body: Acc, ropes: Acc, D: Detail, name: MastName): void {
       );
       rope(ropes, hi.clone().addScaledVector(dir, 0.18), head, 0.04, 0, 1);
     });
-    // a backstay from the topmast head down past the channel's after end
     if (m.cross)
       rope(
         ropes,
@@ -489,8 +440,6 @@ function shrouds(body: Acc, ropes: Acc, D: Detail, name: MastName): void {
         1
       );
     if (D.topSides === 0) continue;
-    // the topmast's shrouds from the top's rim to the crosstrees or the pole's
-    // head, with futtocks under the rim
     const thead = V(side * 0.22, (m.cross || m.tip) - 0.3, topmastZ(name));
     range(0, 1, name === 'mizzen' ? 1 : 2)
       .map((t) => V(side * R * 0.92, m.top + 0.15, z + 0.4 - t * R * 0.9))
@@ -515,12 +464,8 @@ function stays(ropes: Acc, D: Detail): void {
     V(0, MASTS[m].cross - 0.1, mastZ(m) + MASTS[m].r * 1.35 + 0.1);
   const stay = (a: Vector3, b: Vector3, r: number) =>
     rope(ropes, a, b, r, (0.06 * a.distanceTo(b)) / 10, D.sag);
-  // the main stay to the knee of the head beside the foremast, its topmast stay
-  // to the fore top
   stay(top('main'), V(0, sideTop(0.96) + 0.3, zAt(0.965)), 0.075);
   stay(tTop('main'), V(0, MASTS.fore.top + 0.4, mastZ('fore') - 0.2), 0.04);
-  // the fore stay and fore topmast stay to the bowsprit, the topgallant stays
-  // to its end and to the fore crosstrees
   stay(top('fore'), sprit(0.42), 0.065);
   stay(tTop('fore'), sprit(0.92), 0.04);
   stay(V(0, MASTS.fore.tip - 0.2, poleZ('fore')), sprit(1), 0.025);
@@ -529,14 +474,12 @@ function stays(ropes: Acc, D: Detail): void {
     V(0, MASTS.fore.cross + 0.2, mastZ('fore') + 0.5),
     0.025
   );
-  // the mizzen's stays forward to the mainmast
   stay(top('mizzen'), V(0, 7.0, mastZ('main') - 0.4), 0.045);
   stay(
     V(0, MASTS.mizzen.tip - 0.3, topmastZ('mizzen')),
     V(0, MASTS.main.top + 0.2, mastZ('main') - 0.6),
     0.025
   );
-  // the bowsprit's shrouds out to the bows
   if (D.ropes !== 'running') return;
   for (const side of [1, -1])
     rope(

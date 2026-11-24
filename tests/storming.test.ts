@@ -1,6 +1,3 @@
-// The storm by water (storming.ts, PLAN layer 1): a bot inside the next cap as
-// the crow flies, but in water far round by sea from its heart, reckons herself
-// outside it, and makes down the chart's way in.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mind, think } from '../src/sim/bot.ts';
@@ -21,14 +18,10 @@ import {
 
 const centre = fromLatLon(0.2, 0.3),
   { north, east } = frameAt(centre);
-/** Metres north and east of the centre. */
 const offsets = (p: readonly number[]) => ({
   n: R * Math.asin(dot(p as [number, number, number], north)),
   e: R * Math.asin(dot(p as [number, number, number], east)),
 });
-// a wall of land 30 m thick, 200 m north of the centre and 700 m long: the
-// water north of it lies 60 m from the heart's edge as the crow flies, and
-// some 400 m round by sea
 const walled: Depth = (p) => {
   const { n, e } = offsets(p);
   return Math.abs(n - 200) < 15 && Math.abs(e) < 350 ? -4 : 20;
@@ -62,11 +55,9 @@ test('a bot behind a wall inside the next cap reckons herself outside it by wate
     let m = mind(seed, at);
     for (let k = 0; k < 7; k++) m = think(own, [], sea, m, nature(seed)).memory;
     assert.equal(m.mode, 'storm', `${seed}: ${m.mode}`);
-    // her mark lies down the way in, not where she is
     const here = fieldAt(ch, found.field, at),
       there = fieldAt(ch, found.field, m.goal);
     assert.ok(there < here - 100, `${seed}: ${here} -> ${there}`);
-    // and without the way in, as the crow flies she is inside: no hurry
     let free = mind(seed, at);
     for (let k = 0; k < 7; k++)
       free = think(

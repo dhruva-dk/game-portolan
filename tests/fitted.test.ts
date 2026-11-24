@@ -1,6 +1,3 @@
-// A ship fitted out by her card (play/fitted.ts): her
-// parts' performance makes her handling and her most hull. A spec ship is the
-// tables' own.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { specField } from '../src/play/race.ts';
@@ -24,7 +21,6 @@ import { shipAt, step } from '../src/sim/ship.ts';
 import { dot, frameAt, fromLatLon, scale } from '../src/world/sphere.ts';
 
 const SHIP = specField(5, 1).ships[1];
-/** A spec ship but for the parts given. */
 const built = (over: Partial<Record<PartType, Partial<Fitted>>>): RaceShip => ({
   ...SHIP,
   parts: {
@@ -97,7 +93,6 @@ test('her own handling sails her: better rigging gathers way sooner to the same 
 });
 
 test("her keel steadies her guns: the same draw goes off closer to the gun's line", () => {
-  /** How far off her heading her first ball flies, radians. */
   const off = (keel: number) => {
     const c = { ...crew({ keel: { performance: keel } }), ...armed() },
       v = afloat(1, shipAt(here, frameAt(here).east));
@@ -123,7 +118,6 @@ test('her most hull is hers: the storm takes its share of it, her stores mend up
     spec = crew();
   const blown = harmed(stout.health, 70).health;
   assert.deepEqual(blown, { hull: 50, shield: 0, most: 120 });
-  // a repair kit mends to 75 of a 100 hull: 90 of hers
   const cap = USES.repairKit.cap;
   assert.equal(hullCap(blown, cap), 90);
   assert.equal(healed(blown, 100, 'hull', cap).hull, 90);
@@ -131,7 +125,6 @@ test('her most hull is hers: the storm takes its share of it, her stores mend up
   assert.equal(useful({ ...blown, hull: 80 }, 'repairKit'), true);
   assert.equal(useful({ ...spec.health, hull: 80 }, 'repairKit'), false);
   assert.equal(healed(blown, 100, 'shield').shield, HEALTH.shield);
-  // a second of the storm at a tenth of a hull a second
   const v = afloat(1, shipAt(here, frameAt(here).east)),
     storm = { centre: scale(here, -1), radius: 0.1, damage: 0.1 };
   const after = (c: Crew) =>

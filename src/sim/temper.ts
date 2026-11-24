@@ -1,25 +1,6 @@
-// A bot's temperament: one of six, each bot's varied a little by her seed, with
-// her skill and mood drawn by it too.
-//
-// Pure arithmetic: no three, so it runs in node for the tests; the same for a
-// seed every time.
-
 import { random } from '../world/random.ts';
 import { weighed } from './tables.ts';
 
-/**
- * A captain's temperament: how readily she fights, 0–1; how far off she notices
- * a ship, m; the hull she runs below; m she keeps inside the Storm's edge
- * (seam); the share of a gun's range she closes to (seam); how much she wants
- * loot, and how far off she goes for it, m; the hull she mends from (before her
- * skill's part); how much she wants water (claimer.ts, 0–1: the homesteader and
- * the turtle most, the brawler least). With her skill, 0–1, and her mood
- * (aggro), 0–1; and her skill at three trades, each 0–1 and each her skill
- * itself unless a driver's stats say otherwise (driven.ts): her gunnery (her
- * gunner's hand: gunner.ts), her helm (her answer to a ram: helmsman.ts) and
- * her lookout (how far she sees and how soon she answers: lookout.ts). A
- * driver's stamina gives her a late race besides (Late).
- */
 export interface Temper {
   fight: number;
   notice: number;
@@ -38,10 +19,6 @@ export interface Temper {
   late?: Late;
 }
 
-/**
- * A driver's late race: from `from` seconds on her clock her gunnery and her
- * helm move, evenly, to these by `to` seconds, and stay there.
- */
 interface Late {
   from: number;
   to: number;
@@ -49,20 +26,11 @@ interface Late {
   helm: number;
 }
 
-/** A style: a temperament before a bot's own skill and mood are drawn. */
 type Style = Omit<
   Temper,
   'skill' | 'aggro' | 'gunnery' | 'helm' | 'lookout' | 'late'
 >;
 
-/**
- * The six temperaments: hunter, homesteader, raider, turtle, scavenger,
- * brawler (persona.ts PERSONAS, in this order). Balanced by the ratings
- * (PLAN P6): a captain who sees every ship from far off slips away from
- * every fight, and outlasts those who fight; so the scavenger, her eyes on
- * the loot, notices a ship late, and the turtle, in her shell, not much
- * sooner.
- */
 export const STYLES: readonly Style[] = [
   {
     fight: 0.8,
@@ -132,13 +100,6 @@ export const STYLES: readonly Style[] = [
   },
 ];
 
-/**
- * The skill each style is drawn from, least to most (hunter … brawler): the
- * fighters sharper, as fighting is their trade, the scavenger, who lives by
- * keeping out of it, the least; each within 0–1. The raider's and the
- * turtle's were trimmed when the hand steadied with skill (gunner.ts
- * `unsteady`, PLAN A3), which gave most to the middling and put them ahead.
- */
 const SKILL: readonly (readonly [number, number])[] = [
   [0.55, 1],
   [0.35, 0.9],
@@ -148,13 +109,6 @@ const SKILL: readonly (readonly [number, number])[] = [
   [0.55, 1],
 ];
 
-/**
- * A bot's temperament, by her seed: one of the `styles` (her brain's; the six
- * if not given), drawn by `weights` (each as likely as the next if not given:
- * a match's mix of personas, persona.ts), varied a little (but not her loot,
- * her mending or her claim, which are the style's own); her skill (by her
- * style, SKILL), and her mood (0.2–1). With the style drawn, by its index.
- */
 export function temper(
   seed: number,
   styles: readonly Style[] = STYLES,
@@ -182,10 +136,6 @@ export function temper(
   return { ...drawn, gunnery: skill, helm: skill, lookout: skill };
 }
 
-/**
- * Her temperament `seconds` into her race: as it is, but for a driver's late
- * race (Temper.late), her gunnery and her helm part of the way to its end's.
- */
 export function tempered(t: Temper, seconds: number): Temper {
   const l = t.late;
   if (!l || seconds <= l.from) return t;

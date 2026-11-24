@@ -42,7 +42,6 @@ import { R, scale, type Vec3 } from '../src/world/sphere.ts';
 import { inverse, lookAt, rotate } from '../src/world/turn.ts';
 
 const at: Vec3 = [0, 0, 1];
-/** A deed of each kind, befalling `ship`. */
 const each = (ship: number, gun: GunKind = 'cannon'): Happening[] =>
   DEEDS.map((kind): Happening => {
     const base = { seq: 1, time: 0, at, ship };
@@ -93,13 +92,10 @@ test('the table: every kind of deed, hers, is heard; every cue plays a sound the
     ...KINDS.flatMap((k) => CUE_NAMES.map((c) => soundOf(CUES[c], k))),
   ]);
   for (const n of NAMES) assert.ok(played.has(n), `${n} is played by a cue`);
-  // a gun's report is its own kind's
   for (const k of KINDS)
     assert.equal(soundOf(CUES[cueOf(each(5, k)[0], 0)!], k), k);
-  // another's wind-up is heard from where she lies, a warning; her reloads are hers alone
   assert.equal(cueOf(each(5)[DEEDS.indexOf('winding')], 0), 'wound');
   assert.equal(cueOf(each(5)[DEEDS.indexOf('reloading')], 0), null);
-  // others' deeds are placed in the world; hers are heard close
   for (const h of each(5)) {
     const c = cueOf(h, 0);
     if (c) assert.equal(CUES[c].bus, 'world', `another's ${h.kind}`);
@@ -180,7 +176,6 @@ test('every sound is made: samples within full scale, finite, starting and endin
       Math.abs(x[0]) < 0.05 && Math.abs(x[x.length - 1]) < 1e-3,
       `${n} ends at rest`
     );
-    // (the mean of a click a tenth of a second long is its low partials', not a standing offset: −50 dB is none)
     assert.ok(Math.abs(sum / x.length) < 3e-3, `${n} DC`);
   }
 });
@@ -188,7 +183,6 @@ test('every sound is made: samples within full scale, finite, starting and endin
 test("each kind's report is its own: unlike the others in length and in where its weight lies", () => {
   const rate = 24000;
   const made = KINDS.map((k) => SOUNDS[k].make(rate, 1));
-  /** Seconds till it has fallen 40 dB under its peak for good; the share of its energy over 1.5 kHz (one-pole split). */
   const length = (x: Float32Array) => {
     let last = 0;
     for (let i = 0; i < x.length; i++) if (Math.abs(x[i]) > 0.009) last = i;
@@ -263,7 +257,6 @@ test('bearing and pan: ahead 0, right +π/2, behind ±π, as the eye is turned; 
   assert.ok(Math.abs(bearingFrom(eye, [10, 0, 0]) - Math.PI / 2) < 1e-9);
   assert.ok(Math.abs(Math.abs(bearingFrom(eye, [0, 0, 10])) - Math.PI) < 1e-9);
   assert.ok(panOf(Math.PI / 2) > 0 && panOf(-Math.PI / 2) < 0);
-  // as world/turn.ts turns: any eye, any point
   const turned = look([3, -2, 5], [-4, 1, 9]);
   const points: Vec3[] = [
     [10, 4, -3],
@@ -294,7 +287,6 @@ test('voices: never more than VOICES at once; a new sound takes a free slot, els
   assert.equal(claim(p, 3, 1, 3, 4), 0, 'once ended, a slot is free to any');
 });
 
-/** A plain scene: her ship (id 0) at `at`, others where given, the eye behind her. */
 function scene(
   t: number,
   blasts: Blast[] = [],
@@ -384,7 +376,6 @@ test('listen: a ball passing near whistles once; a slot of her stores taken in h
   let whistles = 0;
   for (let t = 0; t < 1.5; t += dt) {
     out.length = 0;
-    // closest to the eye, 5 m off, at t = 1
     const ball: BallDraw = {
       at: [eye[0] + 5, eye[1] + 136 * (t - 1), eye[2]],
       way,
@@ -413,7 +404,6 @@ test('listen: a ball passing near whistles once; a slot of her stores taken in h
   assert.deepEqual(cues(hearing(scene(2.3), status(), 'lobby')), []);
   assert.deepEqual(cues(hearing(scene(2.4), status(), 'settings')), ['open']);
   assert.deepEqual(cues(hearing(scene(2.5), status(), 'lobby')), ['close']);
-  // her livery's folio, as the settings'
   assert.deepEqual(cues(hearing(scene(2.52), status(), 'livery')), ['open']);
   assert.deepEqual(cues(hearing(scene(2.54), status(), 'lobby')), ['close']);
   assert.deepEqual(cues(hearing(scene(2.6), status(), 'match')), ['launch']);
@@ -452,7 +442,6 @@ test('listen: a ball passing near whistles once; a slot of her stores taken in h
     [],
     'each change heard once'
   );
-  // the way home's parchment: the bed follows how much of the world it covers
   assert.equal(
     l.listen(hearing(scene(3.5), status(), 'result', false, 0.4), dt, out)
       .covered,
@@ -501,7 +490,6 @@ test('the bed: the storm heard from afar and all about her inside; surf only nea
     clock: 3,
   };
   assert.equal(levelsOf(bed, levels()).surf, 0);
-  // the sea goes as the screens cover the world, and comes back as they lift
   assert.equal(levelsOf(bed, levels()).uncovered, 1);
   assert.equal(levelsOf({ ...bed, covered: 1 }, levels()).uncovered, 0);
   assert.equal(levelsOf({ ...bed, covered: 0.25 }, levels()).uncovered, 0.75);

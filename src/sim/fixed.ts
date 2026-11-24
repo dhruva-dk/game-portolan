@@ -1,23 +1,9 @@
-// The simulation runs in fixed steps, whatever the frame rate, so it does the
-// same thing on every device and every run; what is drawn is blended between
-// the last two steps by how far the frame has got into the next.
-//
-// Pure arithmetic: no three, so it runs in node for the tests.
-
 import type { PoseOut, ShipPose } from '../world/pose.ts';
 import { add, dot, normalize, scale, type Out3 } from '../world/sphere.ts';
 
-/** Seconds a step. */
 export const STEP = 1 / 30;
-/**
- * The most steps a frame takes; a longer stall is let go rather than caught up.
- */
 const MOST = 4;
 
-/**
- * A clock of fixed steps: given a frame's seconds, how many steps to take, and
- * how far into the next it then is (0–1).
- */
 export function fixedClock(step = STEP) {
   let banked = 0;
   return (dt: number) => {
@@ -28,13 +14,8 @@ export function fixedClock(step = STEP) {
   };
 }
 
-/** blendPose's forward, before it is squared to up. */
 const f0: Out3 = [0, 0, 0];
 
-/**
- * A pose t of the way from a to b (0–1): positions straight between, axes
- * turned between and kept square (into `out`, which may be a but not b).
- */
 export function blendPose(
   a: ShipPose,
   b: ShipPose,

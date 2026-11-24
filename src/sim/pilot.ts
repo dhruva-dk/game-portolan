@@ -1,39 +1,19 @@
-// A bot's pilot, every step: the way to what she makes for (tactician.ts
-// Mark), by a route round land (route.ts) when the water to it isn't clear and
-// she has a chart; straight for it otherwise. What she steers along is handed
-// on as a Way (helmsman.ts). Her route is hers alone to keep: found, followed,
-// and let go when her helm finds itself lost.
-//
-// Pure arithmetic: no three, so it runs in node for the tests; deterministic
-// for the same inputs, to the bit.
-
 import { distance, toward, type Vec3 } from '../world/sphere.ts';
 import { course, downField, type Route } from './route.ts';
 import { toEdge } from './storm.ts';
 import type { Ctx } from './captain.ts';
 import type { Mark, Pace } from './tactician.ts';
 
-/** What her pilot carries: the route round land she follows, if any. */
 export interface PilotMemory {
   route: Route | null;
 }
 
-/** A pilot's memory as she puts to sea. */
 export const pilotMemory = (): PilotMemory => ({ route: null });
 
-/**
- * Lets her route go: her helm found her lost, or her mind has set her about
- * something new.
- */
 export const lose = (m: PilotMemory) => {
   m.route = null;
 };
 
-/**
- * What her helm steers along this step: a tangent at her place (null: none),
- * metres to where it leads, her pace, and the ship she means to strike (-1:
- * none), whose ram coming at her she doesn't answer.
- */
 export interface Way {
   want: Vec3 | null;
   distance: number;
@@ -41,10 +21,6 @@ export interface Way {
   foe: number;
 }
 
-/**
- * The way to `mark` this step of dt seconds; `foe` the ship she means to
- * strike. Updates her route.
- */
 export function navigate(c: Ctx, mark: Mark, foe: number, dt: number): Way {
   const { m } = c,
     at = c.own.ship.at;
@@ -58,8 +34,6 @@ export function navigate(c: Ctx, mark: Mark, foe: number, dt: number): Way {
   const ch = c.sea.chart,
     r = ch && course(ch, at, mark.at, m.route, dt);
   m.route = r ? r.route : null;
-  // a mark in the calm her route doesn't reach (the pathfinder gave up round a
-  // long coast): down the chart's way in, not to the cell nearest it
   const calm = c.sea.calm,
     by =
       ch && r?.route && !r.route.found && calm && toEdge(mark.at, calm.cap) > 0

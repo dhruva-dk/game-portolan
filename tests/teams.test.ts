@@ -1,7 +1,3 @@
-// A race sailed in teams: no ship harms a mate,
-// by ball, burst or ram; no gun's assist and no bot takes a mate for a mark; a
-// team's water is as her own to each of its ships; and the race is over when
-// one team is afloat.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { KINDS } from '../src/kinds.ts';
@@ -43,10 +39,8 @@ import {
 const deep: Depth = () => 30;
 const centre = fromLatLon(0.2, 0.3),
   { east, north } = frameAt(centre);
-/** The point `x` metres east and `y` north of the centre. */
 const at = (x: number, y: number): Vec3 =>
   normalize(add(add(centre, east, x / R), north, y / R));
-/** A ship lying still at (x, y), heading east. */
 const lying = (id: number, x: number, y: number): Vessel => {
   const p = at(x, y);
   return afloat(id, shipAt(p, frameAt(p).east));
@@ -54,13 +48,8 @@ const lying = (id: number, x: number, y: number): Vessel => {
 const still = (f: readonly Vessel[]) =>
   f.map(() => ({ aim: null, fire: false }));
 
-/** Ships 1 and 2 are mates, 3 another team's (0 is not at sea). */
 const TEAMS = [9, 0, 0, 1];
 
-/**
- * A ball of `kind` loosed by ship 1 at the ship `on`, laid with no spread, and
- * flown among `fleet` until it is spent: the strikes, and the battle after.
- */
 function fired(
   kind: 'cannon' | 'mortar',
   fleet: Vessel[],
@@ -126,8 +115,6 @@ test("a ball that meets a mate's hull stops there and harms nothing; another tea
 });
 
 test("a shell's burst spares her team, and still takes the other ships within it", () => {
-  // the shell comes down on her mate (2); another team's ship (3) lies
-  // alongside, within its burst
   const fleet = [lying(1, 0, 0), lying(2, 120, 0), lying(3, 120, 9)];
   const free = fired('mortar', fleet, fleet[1]);
   assert.deepEqual(
@@ -195,8 +182,6 @@ test("the gun's assist never lays on a mate: her marks are every ship but her te
     [1, 3]
   );
   assert.equal(marksOf(battleOf([], 0), 1, fleet), fleet, 'no teams: all');
-  // her sight on her mate, the other team's ship beyond her on the same line:
-  // the gun is laid on that one
   const from = scale(fleet[0].ship.at, R + 20),
     sight = {
       from,
@@ -244,11 +229,8 @@ test('a bot never takes a mate for her foe, nor notes her in her log; a ship of 
   }
 });
 
-// ------------------------------------------------------------------ team water
-
 const CALM: Cap = { centre: [0, 1, 0], radius: Math.PI };
 type Sea = ReturnType<typeof createTerritory>;
-/** Ship `id` sailed from point to point, a brush's stride a step. */
 function sail(t: Sea, id: number, ...points: Vec3[]) {
   const claimed: number[] = [];
   for (let k = 1; k < points.length; k++) {
@@ -271,7 +253,6 @@ test("a mate crossing her water takes none of it; another team's strip does", ()
     const t = createTerritory(2, teams);
     t.begin([at(0, 0), at(70, 0)], 0);
     const theirs = t.share(1);
-    // straight through the middle of ship 1's home patch and out the far side
     sail(t, 0, at(0, 0), at(140, 0));
     if (teams) {
       assert.equal(t.ownerAt(at(70, 0)), 1, "her mate's patch is her mate's");
@@ -294,13 +275,9 @@ test("a mate crossing her water takes none of it; another team's strip does", ()
 test("her strip coming against her mate's water closes her loop, fenced by her team's water; the mate's stays hers", () => {
   for (const teams of [[0, 0], undefined]) {
     const t = createTerritory(2, teams);
-    // her mate (1) has painted a strip 160 m east from her berth; she (0) lies
-    // 100 m south of that berth
     t.begin([at(0, -100), at(0, 0)], 0);
     sail(t, 1, at(0, 0), at(160, 0));
     const strip = t.share(1);
-    // north across her mate's patch, east alongside the strip 60 m off it, and
-    // south onto it again
     const claimed = sail(
       t,
       0,
@@ -325,8 +302,6 @@ test("her strip coming against her mate's water closes her loop, fenced by her t
     }
   }
 });
-
-// ------------------------------------------------------------------ the end
 
 test('a race is over when every ship afloat is of one team, or none is; or called on its overtime', () => {
   const teams = [0, 0, 1, 1, 2, 2];
@@ -373,7 +348,6 @@ test("a race's tally: shots fired, strikes landed and taken (a ram is neither), 
     gun: ram ? null : KINDS[0],
   });
   const shot = { shooter: 1, gun: KINDS[0], from: centre, dirs: [], target: 4 };
-  /** The sea with the ships `alive` afloat, `loot` pieces left on it. */
   const standing = (alive: number[], loot: number) => () => ({
     seconds: 61,
     alive,
@@ -440,7 +414,6 @@ test("a race's tally: shots fired, strikes landed and taken (a ram is neither), 
   );
   assert.deepEqual([r.seed, r.tier, r.round, r.seconds], [11, 0, 0, 61]);
   assert.match(r.hash, /^[0-9a-f]{8}$/);
-  // the hash is the final state's: the same sea the same, another another
   const hashOf = (loot: number) => {
     const again = tally();
     again.settle([], [], standing([0, 1, 2, 3], loot));
@@ -448,7 +421,6 @@ test("a race's tally: shots fired, strikes landed and taken (a ram is neither), 
   };
   assert.equal(hashOf(9), r.hash);
   assert.notEqual(hashOf(8), r.hash);
-  // a race still on RACE.overtime after its storm has closed is called
   const late = createTally(card, 61 - RACE.overtime);
   late.settle([], [], standing([0, 1, 2, 3, 4], 9));
   assert.deepEqual(late.result()?.order.slice(0, 5), [1, 4, 3, 2, 0]);
@@ -457,7 +429,6 @@ test("a race's tally: shots fired, strikes landed and taken (a ram is neither), 
 test("a race's flow: afloat as it ends she has her place there; sunk, she watches a mate first; it is over when the game says", () => {
   const teams = [0, 0, 1, 1, 2, 2];
   const race = (o: boolean, place = 0) => ({ teams, over: o, place });
-  // one team left afloat with her (her mate 1): the race is hers to end
   let m = startMatch();
   const on: Report = {
     sinkings: [],
@@ -478,7 +449,6 @@ test("a race's flow: afloat as it ends she has her place there; sunk, she watche
     STEP
   );
   assert.deepEqual([m.phase, m.place, m.over], ['won', 2, true]);
-  // two ships afloat, of two teams: card-less it would not be over, nor is it
   let s = stepMatch(startMatch(), on, STEP);
   const hers = { id: 0, by: 4, cause: 'shot' as const, gun: KINDS[0] };
   s = stepMatch(
@@ -488,7 +458,6 @@ test("a race's flow: afloat as it ends she has her place there; sunk, she watche
   );
   assert.deepEqual([s.phase, s.place, s.over], ['spectating', 6, false]);
   assert.equal(s.watch, 1, 'she watches her mate, not the ship that sank her');
-  // her mate sunk too: on to the ship that sank her mate
   const mate = { id: 1, by: 3, cause: 'ram' as const, gun: null };
   s = stepMatch(
     s,

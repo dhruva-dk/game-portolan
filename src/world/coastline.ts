@@ -1,38 +1,11 @@
-// The terrain's coast as lines, for the charts (ui/coasts.ts): the contour
-// where the distance to the coast is nought (terrain.ts shore), traced by
-// marching squares over the cells' centres, cut into one run of lines a block
-// of cells.
-//
-// The squares are the cells' centres four at a time, across the faces' edges
-// too (cells.ts wrapped); at a corner of the cube, where three cells meet, a
-// triangle. A square that straddles a face's edge is met from both faces and
-// traced once. The coast crosses a side of a square where its two cells lie
-// either side of it, at the point between their centres where the distance,
-// read straight between them, is nought; a square crossed on all four sides (a
-// saddle) is split by its middle's reading. Each crossing is one point, shared
-// by the two squares either side, so the segments join into lines; a line ends
-// where it leaves its block.
-//
-// Pure arithmetic: no three, so it runs in node for the tests.
-
 import { CELLS, N, centreOf, wrapped } from './cells.ts';
 import { normalize, type Vec3 } from './sphere.ts';
 
-/** Cells a block's side. */
 export const BLOCK = 16;
 
-/**
- * The coast as lines of points on the unit sphere, each within one block of
- * cells (a closed run's last point is its first). `shore` is a signed distance
- * to the coast per cell, negative on land.
- */
 export function coastLines(shore: ArrayLike<number>, block = BLOCK): Vec3[][] {
   const land = (c: number) => shore[c] < 0;
   const points = new Map<number, Vec3>();
-  /**
-   * The crossing between two cells, as a key (the pair, in order) whose point
-   * is worked out once.
-   */
   const crossing = (a: number, b: number) => {
     const key = a < b ? a * CELLS + b : b * CELLS + a;
     if (!points.has(key)) {
@@ -57,8 +30,6 @@ export function coastLines(shore: ArrayLike<number>, block = BLOCK): Vec3[][] {
   for (let f = 0; f < 6; f++) {
     for (let j = -1; j < N; j++) {
       for (let i = -1; i < N; i++) {
-        // the square's cells in turn round it, each once (at a corner of the
-        // cube two of the four are one)
         ring.length = 0;
         for (const c of [
           wrapped(f, i, j),
@@ -74,7 +45,6 @@ export function coastLines(shore: ArrayLike<number>, block = BLOCK): Vec3[][] {
           if (land(ring[k]) !== land(ring[(k + 1) % ring.length]))
             crossed.push(k);
         if (crossed.length === 0) continue;
-        // (a square on a face's edge is met from both faces)
         if (i < 0 || j < 0 || i === N - 1 || j === N - 1) {
           const key = [...ring].sort((a, b) => a - b).join();
           if (met.has(key)) continue;
@@ -90,8 +60,6 @@ export function coastLines(shore: ArrayLike<number>, block = BLOCK): Vec3[][] {
         if (!segs) blocks.set(own, (segs = []));
         if (crossed.length === 2) segs.push(side(crossed[0]), side(crossed[1]));
         else {
-          // a saddle: its middle alike with the first cell joins it to the
-          // third, so the second and fourth are cut off
           let middle = 0;
           for (const c of ring) middle += shore[c];
           if (land(ring[0]) === middle < 0)
@@ -107,10 +75,6 @@ export function coastLines(shore: ArrayLike<number>, block = BLOCK): Vec3[][] {
   return lines;
 }
 
-/**
- * Segments (pairs of keys, flat) joined end to end into runs of keys: the open
- * runs first, then the closed.
- */
 function chain(segs: readonly number[]): number[][] {
   const n = segs.length / 2,
     ends = new Map<number, number[]>(),

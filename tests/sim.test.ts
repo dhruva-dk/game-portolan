@@ -1,6 +1,3 @@
-// The headless harness (tools/sim): the same scenario sails the same match to
-// the bit, a different one does not; and what each runner writes is well
-// formed, every line of it, for an agent to read.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, readFileSync } from 'node:fs';

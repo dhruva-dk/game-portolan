@@ -1,22 +1,3 @@
-// The puffs: soft round sprites facing the eye, one draw for all of them, a
-// single instanced mesh. Each is written once into a ring of instances when the
-// battle reports what made it, and moved from then on wholly in the vertex
-// stage: carried off at its velocity with its drag (exponential) and under its
-// pull (gravity, or a lift for warm smoke), growing, then fading.
-// Each event lays a few kinds:
-//   a gun fired    a flash at the muzzle (light it gives, added), and a bank of white powder smoke blown down the bore
-//   a ball in sea  a column of spray thrown up and falling back, and mist off it; on land, dust
-//   a ball home    a flash, splinters thrown out of her side and falling, and dark smoke
-//   a ram          splinters
-//   a ball flying  a ribbon of thin grey smoke along the way it came (its kind's trail, balls.ts SHOT)
-//   a worn ship    thin grey wisps off her waist (wear 1), a sooty column (wear 2): as smoking.ts
-//                  plans it, the nearest few, fewer and bigger puffs the farther she is, none past sight (worn)
-// A puff thins away close by the eye (EYE), and nearest it is not drawn.
-// Smoke and spray are flat shapes in two tones (palette.ts: powder smoke cream,
-// rose beneath; spray the foam's white), as bright as the place and the hour
-// (sky/light.ts level), and blended premultiplied: a flash is all added light,
-// smoke and spray cover what is behind them.
-
 import {
   DynamicDrawUsage,
   InstancedBufferGeometry,
@@ -63,25 +44,12 @@ import {
   type Smoker,
 } from './smoking.ts';
 
-/** The most puffs alive at once. */
 const PUFFS = 4096;
-/**
- * Floats a puff: at+born, way+life, size+grow+drag+pull, ink+glow,
- * opacity+seed+softness+fade-in; each a vec4.
- */
 const STRIDE = 20;
-/**
- * A ball's trail, a ribbon of smoke: its puffs' growth (m/s), life (s), ink and
- * opacity.
- */
 const TRAIL_GROW = 1.4,
   TRAIL_LIFE = 1.6,
   TRAIL_INK: sphere.Vec3 = SMOKE.lit,
   TRAIL_OPACITY = 0.26;
-/**
- * Each kind's firing: its flashes, their size, its puffs of smoke, how wide
- * they spread, and how dense.
- */
 const FIRING: Record<
   GunKind,
   readonly [number, number, number, number, number]
@@ -95,40 +63,19 @@ const FIRING: Record<
 
 type Vec3 = sphere.Vec3;
 
-/**
- * How near the eye a puff thins away (metres from it to the puff's middle: none
- * at the first, whole from the second), so smoke on the lens neither walls off
- * the view nor costs its fill.
- */
 const EYE = [3, 12] as const;
 
-/**
- * A puff's flat shape: its edge's radius on its sprite and half that edge's
- * width; how far its lobes scallop it; how far below its middle its shadow tone
- * begins; and how many times its opacity it covers until it thins away.
- */
 const SHAPE = 0.86,
   CRISP = 0.04,
   SCALLOP = 0.2,
   UNDER = -0.18,
   SOLID = 2.5;
-/**
- * A puff's shadow tone, of its ink: as powder smoke's cream goes to its rose
- * (palette.ts SMOKE).
- */
 const SHADE: sphere.Vec3 = [
   SMOKE.shadow[0] / SMOKE.lit[0],
   SMOKE.shadow[1] / SMOKE.lit[1],
   SMOKE.shadow[2] / SMOKE.lit[2],
 ];
 
-/**
- * One puff as it is laid: where it starts (metres) and its velocity (m/s), its
- * size (m, radius) and how fast it grows (m/s), its drag (per second) and pull
- * (m/s² down; negative rises), life (s), colour (linear; a glow's is radiance
- * per unit of sun), glow, opacity (0 for a glow), softness (0 a hard drop, 1 a
- * soft cloud) and share of its life fading in.
- */
 interface Puff {
   at: sphere.Vec3;
   way: sphere.Vec3;
@@ -167,7 +114,6 @@ function puffMesh(light: Light, now: FloatNode) {
   const alive = age.greaterThanEqual(0).and(t.lessThan(1));
   const up = normalize(o.xyz),
     k = max(f.z, 1e-3);
-  // carried off against its drag, and pulled down (or lifted)
   const centre = o.xyz
     .add(
       w.xyz.mul(
@@ -177,7 +123,6 @@ function puffMesh(light: Light, now: FloatNode) {
       )
     )
     .sub(up.mul(f.w.mul(0.5).mul(age).mul(age)));
-  // thinning away near the eye (EYE), and gone, not drawn at all, nearest it
   const toEye = cameraPosition.sub(centre),
     seen = smoothstep(EYE[0], EYE[1], toEye.length());
   const size = select(
@@ -189,7 +134,6 @@ function puffMesh(light: Light, now: FloatNode) {
   const right = normalize(cross(up, eye)),
     upward = cross(eye, right);
   const local = attribute('position', 'vec3');
-  // each turned its own way, so a bank of them doesn't read as a grid
   const a = look.y.mul(6.283),
     c = cos(a),
     s = sin(a);
@@ -202,16 +146,11 @@ function puffMesh(light: Light, now: FloatNode) {
   m.positionNode = centre.add(
     right.mul(turned.x).add(upward.mul(turned.y)).mul(size)
   );
-  // (its place on the sprite as the eye sees it, y up the world: its underside
-  // is its shadow's)
   const uv = varying(local.xy),
     upright = varying(turned.y),
     mid = varying(centre);
   const tv = varying(t),
     near = varying(seen);
-  // a flat shape with a crisp edge: a drop's disc, or a cloud's, scalloped
-  // round its edge by a few lobes (its own, by its seed); a glow's stays soft,
-  // as light is
   const lobes = (uvv: Vec2Node) => {
     const angle = atan(uvv.y, uvv.x);
     return sin(angle.mul(5).add(look.y.mul(40)))
@@ -226,8 +165,6 @@ function puffMesh(light: Light, now: FloatNode) {
     exp(r.mul(r).mul(-2.5)).mul(smoothstep(1, 0.55, r));
   const fade = (tt: FloatNode) =>
     smoothstep(0, max(look.w, 1e-3), tt).mul(pow(float(1).sub(tt).max(0), 1.5));
-  // it thins only at the end of its life: until then the shape is whole, as
-  // painted
   const alpha = Fn(() =>
     shapeOf(uv.length())
       .mul(look.x.mul(fade(tv)).mul(SOLID).min(1))
@@ -235,8 +172,6 @@ function puffMesh(light: Light, now: FloatNode) {
   )();
   m.colorNode = Fn(() => {
     const r = uv.length();
-    // two tones: its ink, and on its underside its shadow's (a cloud's rose:
-    // palette.ts SMOKE)
     const under = smoothstep(
       UNDER + CRISP,
       UNDER - CRISP,
@@ -249,31 +184,18 @@ function puffMesh(light: Light, now: FloatNode) {
       .add(ink.rgb.mul(ink.w).mul(glowOf(r)).mul(fade(tv)).mul(near));
   })();
   m.opacityNode = alpha;
-  // premultiplied: a glow adds its light, smoke covers what is behind
   premultiplied(m);
   const mesh = new Mesh(g, m);
   mesh.frustumCulled = false;
-  // after the sea, which reads what was drawn before it
   mesh.renderOrder = 2;
   return { mesh, buffer, data, geometry: g };
 }
 
-/**
- * light: how the world is lit (sky/light.ts); now: the world's clock
- * (gunfire.ts sets it).
- */
 export function createPuffs(light: Light, now: FloatNode) {
   const puffs = puffMesh(light, now);
   const array = puffs.data;
-  /** The world's clock when the balls' trails, and the worn ships' smoke, were last laid. */
   let drawn = -Infinity,
     wornAt = -Infinity;
-  /**
-   * Each smoking ship's share of a puff owed, by her id and the kind (smoking.ts
-   * Smoker: smoke); the smoking this frame (smoking.ts smokers,
-   * its entries kept); the puff they lay, rewritten for each, and the ways it
-   * is worked out in (so none is made).
-   */
   const owed = new Map<number, number>(),
     smoking: Smoker[] = [],
     wornAt3: [number, number, number] = [0, 0, 0],
@@ -293,7 +215,6 @@ export function createPuffs(light: Light, now: FloatNode) {
       fadeIn: 0,
     },
     rand: [number, number, number] = [0, 0, 0];
-  /** The puff a ball's trail lays, rewritten for each (so none is made). */
   const trailAt: [number, number, number] = [0, 0, 0];
   const trailPuff: Puff = {
     at: trailAt,
@@ -309,27 +230,17 @@ export function createPuffs(light: Light, now: FloatNode) {
     soft: 1,
     fadeIn: 0.02,
   };
-  /**
-   * The ring's next slot, how many hold a puff, and how many were laid since
-   * the last were sent (only those go up).
-   */
   let head = 0,
     laid = 0,
     fresh = 0;
   const draw = random(0x6a11);
   const u = (lo: number, hi: number) => lo + (hi - lo) * draw();
-  /** A random unit vector (into `out`, if given). */
   const any = (out?: [number, number, number]): sphere.Vec3 => {
     const z = u(-1, 1),
       a = u(0, 2 * Math.PI),
       s = Math.sqrt(1 - z * z);
     return sphere.put(out, s * Math.cos(a), s * Math.sin(a), z);
   };
-  /**
-   * How many puffs of kind `j` (Smoker's order) ship `id` lays now, laying
-   * `rate` a second for `since` s: what is owed carried over, a frame's
-   * fraction at a time.
-   */
   const owe = (id: number, j: number, rate: number, since: number) => {
     const key = id * 3 + j,
       due = (owed.get(key) ?? draw()) + rate * since,
@@ -337,14 +248,9 @@ export function createPuffs(light: Light, now: FloatNode) {
     owed.set(key, due - k);
     return k;
   };
-  /** A random unit tangent at `up`: one random direction, laid in the plane. */
   const across = (up: sphere.Vec3): sphere.Vec3 =>
     sphere.normalize(sphere.tangent(any(), up));
 
-  /**
-   * Writes puff `p`, born at `born`, into the ring's next slot (its floats in
-   * STRIDE's order), a seed of its own drawn.
-   */
   function lay(born: number, p: Puff) {
     const o = head * STRIDE;
     ((array[o] = p.at[0]),
@@ -371,10 +277,6 @@ export function createPuffs(light: Light, now: FloatNode) {
     laid = Math.min(PUFFS, laid + 1);
     fresh++;
   }
-  /**
-   * The puffs laid since the last were sent, as the ring's ranges to send (one,
-   * or two where it wraps).
-   */
   function send() {
     if (fresh === 0) return;
     const b = puffs.buffer,
@@ -430,10 +332,6 @@ export function createPuffs(light: Light, now: FloatNode) {
     soft: 1,
     fadeIn: 0,
   });
-  /**
-   * A mote of a shield's light thrown off it: a small hard azure spark, falling
-   * slowly.
-   */
   const shard = (at: Vec3, speed: number): Puff => ({
     at,
     way: sphere.scale(any(), u(speed / 2, speed)),
@@ -465,10 +363,6 @@ export function createPuffs(light: Light, now: FloatNode) {
       fadeIn: 0,
     };
   };
-  /**
-   * Spray thrown up off the sea: foam-white drops, `at` where it starts, `way`
-   * its velocity, as big as `size` m.
-   */
   const spray = (
     at: Vec3,
     way: Vec3,
@@ -493,13 +387,6 @@ export function createPuffs(light: Light, now: FloatNode) {
 
   return {
     mesh: puffs.mesh,
-    /**
-     * A gun of `gun` fired at `time` (the world's clock, s) from `from`
-     * (metres, from the centre) along `dir` (unit): the cannon's flash and bank
-     * of smoke; the scatter's wide burst; the repeater's small quick flash and
-     * a wisp; the harpoon's no fire, a kick of dust off its stock; the mortar's
-     * flash and a great bank thrown up.
-     */
     shot(time: number, from: Vec3, dir: Vec3, gun: GunKind) {
       const [flashes, size, puffs, spread, ink] = FIRING[gun];
       for (let i = 0; i < flashes; i++) {
@@ -525,11 +412,6 @@ export function createPuffs(light: Light, now: FloatNode) {
         );
       }
     },
-    /**
-     * A ball of `gun` come down at `at` (a unit vector), in the sea or on the
-     * land: a scatter's pellet or a repeater's round a small spout; a mortar's
-     * shell bursting, its flash, its spray over its splash's breadth.
-     */
     splash(time: number, at: Vec3, land: boolean, gun: GunKind) {
       const p = sphere.scale(at, sphere.R);
       const [k, wide] =
@@ -569,11 +451,6 @@ export function createPuffs(light: Light, now: FloatNode) {
         });
       }
     },
-    /**
-     * A ball home in a hull at `at` (a unit vector), or a ram; whether her
-     * shield took all of it (a glint of azure and no splinters), and whether it
-     * broke (a burst of shards).
-     */
     strike(
       time: number,
       at: Vec3,
@@ -601,10 +478,6 @@ export function createPuffs(light: Light, now: FloatNode) {
         lay(time, smoke(p, way, SOOT, 0.7, u(2.5, 4), 1));
       }
     },
-    /**
-     * A ship gone down at `at` (a unit vector): her timbers thrown, the sea
-     * heaved white over her, a pall of smoke.
-     */
     sink(time: number, at: Vec3) {
       const p = sphere.scale(at, sphere.R + 1);
       for (let i = 0; i < 30; i++)
@@ -626,12 +499,6 @@ export function createPuffs(light: Light, now: FloatNode) {
         lay(time, smoke(from, way, SOOT, 0.75, u(4, 7), 2));
       }
     },
-    /**
-     * Each frame, at `time` (the world's clock, s), before draw: the smoke of
-     * the worn among `ships` (ShipDraw.wear), seen from `eye` (metres), as
-     * smoking.ts plans it; bigger puffs the farther she is, and lower and
-     * smaller close by the eye. Makes nothing.
-     */
     worn(time: number, ships: readonly ShipDraw[], eye: Vec3) {
       const since =
         time - wornAt > 0 && time - wornAt < 0.25 ? time - wornAt : 0;
@@ -650,7 +517,6 @@ export function createPuffs(light: Light, now: FloatNode) {
           low = CLOSE.rise + (1 - CLOSE.rise) * m.close,
           small = CLOSE.size + (1 - CLOSE.size) * m.close;
         const { position: p, up, forward } = s.pose;
-        // her wear's smoke off her waist
         if (!w) continue;
         for (let k = owe(s.id, 0, m.wear, since); k > 0; k--) {
           sphere.add(p, up, SMOKING.over * low, at);
@@ -672,15 +538,7 @@ export function createPuffs(light: Light, now: FloatNode) {
         }
       }
     },
-    /**
-     * Each frame, at `time` (the world's clock, s): the trails of the first `n`
-     * balls in flight, then every puff laid since the last frame sent up.
-     */
     draw(time: number, flying: readonly BallDraw[], n: number) {
-      // each ball's trail along the way it came since the last frame (none on
-      // the first, or after a pause), its puffs laid when the ball passed, from
-      // a start that slides with the clock so they don't stand in step frame to
-      // frame
       const since = time - drawn > 0 && time - drawn < 0.25 ? time - drawn : 0;
       for (let i = 0; i < n; i++) {
         const { at, way, gun } = flying[i],

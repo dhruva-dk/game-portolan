@@ -74,7 +74,6 @@ test('she gathers way to her top speed and no further, and turns no faster than 
     quickest <= SHIP.turn + 1e-9 && quickest > SHIP.turn * 0.99,
     `${quickest}`
   );
-  // the throttle asks for a share of top speed; never astern
   const half = run(
     shipAt(start, north),
     () => ({ course: null, throttle: 0.5 }),
@@ -113,7 +112,6 @@ test('by her own handling: her top speed and fastest turn are hers, not the tabl
     quickest <= fit.turn + 1e-9 && quickest > fit.turn * 0.99,
     `${quickest}`
   );
-  // at her old top, her top cut: down to the new one within a few seconds
   let t: ShipState = { ...shipAt(start, north), speed: SHIP.top };
   for (let i = 0; i < Math.round(3 / STEP); i++)
     t = step(t, { course: null, throttle: 1 }, STEP, deep, fit);
@@ -137,7 +135,6 @@ test('let go, she coasts and slows by her drag alone', () => {
     Math.abs(s.speed - SHIP.top * Math.exp(-SHIP.drag * 5)) < 1e-9,
     `${s.speed}`
   );
-  // she runs on about top / drag metres in all
   const far = run(s0, () => ({ course: null, throttle: 0 }), 40);
   assert.ok(
     Math.abs(distance(start, far.at) - SHIP.top / SHIP.drag) < 0.5,
@@ -159,7 +156,6 @@ test('a straight course is a great circle: round the planet and back to the star
     }
   );
   assert.ok(off < 1e-6, `strays ${off} m off the circle`);
-  // (within the part of a step the circle's length leaves over)
   assert.ok(
     distance(s.at, start) < SHIP.top * STEP,
     `${distance(s.at, start)} m from the start`
@@ -197,7 +193,6 @@ test('over the pole: still on her great circle, her heading still a unit tangent
   );
   assert.ok(most > Math.cos(0.1 * deg), 'she passes over the pole');
   assert.ok(Math.abs(travelled - 30 * SHIP.top) < 1e-6, `${travelled}`);
-  // and from the pole itself she comes round onto a course and holds it
   const away: Vec3 = [0, 0, -1];
   const pole = run(
     { ...shipAt([0, 1, 0], [1, 0, 0]), speed: 5 },
@@ -221,15 +216,12 @@ test('she comes round onto a course without swinging past it', () => {
     const course = turned(s0, angle * deg);
     let worst = 0,
       settled = Infinity;
-    // (her course a fixed vector, a tangent where she starts: held for less than a quarter of the way round, 870 m,
-    // where it would lie astern of her)
     run(
       s0,
       () => ({ course, throttle: speed / SHIP.top }),
       45,
       deep,
       (s) => {
-        // past the course: the error's sign has flipped
         worst = Math.max(worst, -Math.sign(angle) * offCourse(s, course));
         if (Math.abs(offCourse(s, course)) > 0.5 * deg) settled = Infinity;
         else settled = Math.min(settled, 0);
@@ -240,18 +232,14 @@ test('she comes round onto a course without swinging past it', () => {
   }
 });
 
-// A straight shore: the great circle through `coast` across `seaward`; the floor rises 1 m in 4 toward it from the
-// sea's 20 m and dries 6 m past it.
 const coast = along(start, north, 120).p;
 const seaward = frameAt(coast).east;
 const offshore = (p: Vec3) => R * Math.asin(dot(normalize(p), seaward));
 const shoal: Depth = (p) => Math.min(20, -6 + offshore(p) / 4);
-/** How far off the shore the draught's contour lies. */
 const DRY = 4 * (6 + SHIP.draught);
 
 test('she never sails into water shallower than her draught, at any angle, and slides along the shore', () => {
   for (const angle of [0, 20, 45, 70]) {
-    // from 80 m off the contour, her course `angle` off straight at the shore
     const from = along(coast, seaward, DRY + 80).p;
     const s0 = shipAt(from, scale(frameAt(from).east, -1));
     const course = turned(s0, angle * deg);
@@ -261,14 +249,12 @@ test('she never sails into water shallower than her draught, at any angle, and s
       run(s, helm, seconds, shoal, (s) => {
         least = Math.min(least, clearance(s.at, s.heading, shoal).least);
       });
-    // at the shore by 30 s; then how fast she makes her way along it
     const a = sail(s0, 30),
       b = sail(a, 30);
     assert.ok(least >= 0, `${angle}°: ${least} m under her keel`);
     const off = offshore(b.at) - DRY,
       rate = distance(a.at, b.at) / 30;
     assert.ok(off < 15, `${angle}°: ${off} m off the contour`);
-    // straight at it, she all but stops: a twentieth of her top speed at most
     assert.ok(
       rate >= [0, 0.5, 1.5, 3.5][[0, 20, 45, 70].indexOf(angle)] &&
         (angle > 0 || rate < 0.05 * SHIP.top),
@@ -296,8 +282,6 @@ test('set down in the shallows, she can work her way out to deep water', () => {
   assert.ok(clearance(s.at, s.heading, shoal).least > 5);
 });
 
-/** The least water under any of her hull, metres past her draught: her keel from sternpost to forefoot every metre,
- * and her quarters. */
 const underHull = (s: ShipState, depth: Depth) => {
   let least = Infinity;
   for (
@@ -320,7 +304,6 @@ const underHull = (s: ShipState, depth: Depth) => {
 test('coming about close along the shore, her stern swings clear of it, not onto it', () => {
   for (const off of [1, 3, 6])
     for (const away of [90, 135]) {
-      // sailing along the contour `off` metres outside it, then put about `away` degrees to seaward
       const from = along(coast, seaward, DRY + off).p;
       let s = run(
         shipAt(from, frameAt(from).north),
@@ -353,7 +336,6 @@ test('coming about close along the shore, her stern swings clear of it, not onto
 test('however she meets the shore, steered away she gets off it, her whole hull clear all the while', () => {
   for (const angle of [0, 30, 60, 89])
     for (const side of [-1, 1]) {
-      // into the shore `angle` off square to it, until she lies against it
       const from = along(coast, seaward, DRY + 40).p;
       const s0 = shipAt(from, scale(frameAt(from).east, -1));
       const course = turned(s0, side * angle * deg);
@@ -366,7 +348,6 @@ test('however she meets the shore, steered away she gets off it, her whole hull 
         offshore(a.at) - DRY < 16,
         `${angle}° ${side}: she reached the shore`
       );
-      // then put about for the open sea
       const b = run(
         a,
         () => ({ course: seaward, throttle: 1 }),

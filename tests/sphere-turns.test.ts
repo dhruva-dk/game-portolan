@@ -1,5 +1,3 @@
-// world/sphere.ts's turns of directions: the tangent at a point, a turn about
-// an axis, and the great circle's slerp; and its helpers written into an out.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -44,7 +42,6 @@ test('tangent takes away the part along up, and nothing else', () => {
 });
 
 test('rotateAbout turns a tangent at up to port, keeps lengths, and leaves the axis where it is', () => {
-  // at the north pole (+y), east is −z there by sphere.ts's frame at the pole, so +x turned a quarter to port is −z
   near(rotateAbout([1, 0, 0], [0, 1, 0], Math.PI / 2), [0, 0, -1]);
   for (const up of ups) {
     const v: Vec3 = [0.4, -1.3, 2.2];
@@ -63,7 +60,6 @@ test('rotateAbout turns a tangent at up to port, keeps lengths, and leaves the a
 
 test('the helpers written into an out are what they make, to the bit, even into a vector they read', () => {
   const vs: Vec3[] = [[0.4, -1.3, 2.2], [3, 0, -1], [1e-3, 5, 2e-4], ...ups];
-  /** Written into a fresh out and into a copy of its first argument, and each the same as made. */
   const both = (
     made: Vec3,
     write: (out: Out3, own: Out3) => Vec3,
@@ -132,7 +128,6 @@ test('arc runs evenly in angle along the great circle from a to b', () => {
       `f ${f}`
     );
   }
-  // all but the same, or opposite: b
   near(arc(a, a, 0.3), a);
   near(arc(a, [-a[0], -a[1], -a[2]], 0.3), [-a[0], -a[1], -a[2]]);
 });

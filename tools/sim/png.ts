@@ -1,8 +1,5 @@
-// A PNG of 8-bit RGB pixels, no alpha channel: the terrain maps
-// (terrain.ts).
 import { deflateSync } from 'node:zlib';
 
-/** CRC-32, for the PNG's chunks. */
 const CRC = Uint32Array.from({ length: 256 }, (_, n) => {
   let c = n;
   for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
@@ -14,7 +11,6 @@ const crc32 = (b: Buffer) => {
   return (c ^ 0xffffffff) >>> 0;
 };
 
-/** The PNG of `rgb`, three bytes a pixel, row by row. */
 export function png(width: number, height: number, rgb: Uint8Array): Buffer {
   const chunk = (type: string, data: Buffer) => {
     const len = Buffer.alloc(4),

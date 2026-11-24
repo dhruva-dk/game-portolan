@@ -1,5 +1,3 @@
-// Who holds the sea, as the frame follows it (snapshot.ts Sea): a reader's
-// place in its changes (water/cursor.ts).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createTerritory, type Territory } from '../src/sim/territory.ts';
@@ -26,10 +24,6 @@ import {
 } from '../src/world/sphere.ts';
 import { WHOLE, halfLoop, match, seaOf } from './seas.ts';
 
-/**
- * Points along the great circle from a to b, about 0.4 m apart (a step at her
- * top speed).
- */
 function line(a: Vec3, b: Vec3): Vec3[] {
   const d = distance(a, b),
     n = Math.max(1, Math.ceil(d / 0.4));
@@ -46,11 +40,6 @@ function line(a: Vec3, b: Vec3): Vec3[] {
   );
 }
 
-/**
- * The k-th bite out of her home patch at the pole and back: out on a bearing a
- * sixth of a turn round from the last's, each further out than the last, across
- * 30 m, and home again.
- */
 const bite = (k: number): Vec3[] => {
   const a = (k * Math.PI) / 3,
     at: Vec3 = [0, 1, 0];
@@ -61,10 +50,6 @@ const bite = (k: number): Vec3[] => {
   return [at, ...line(at, out), ...line(out, across), ...line(across, at)];
 };
 
-/**
- * Sails ship 0 of `t` along `path` from `time`, a step a point; returns the
- * clock after.
- */
 function sail(t: Territory, path: readonly Vec3[], time: number): number {
   for (let k = 1; k < path.length; k++)
     t.step(
@@ -78,7 +63,6 @@ function sail(t: Territory, path: readonly Vec3[], time: number): number {
 test("a new match's changes are read from its first: its loops closed are not taken for ones already read", () => {
   const home: Vec3 = [0, 1, 0],
     cursor = createCursor();
-  // the first match: many loops closed, each read as it comes
   const first = createTerritory(1);
   let time = 0;
   first.begin([home], time);
@@ -94,8 +78,6 @@ test("a new match's changes are read from its first: its loops closed are not ta
     );
   }
   assert.ok(first.changes().at(-1)!.seq > 10);
-  // the second: a new sea, read whole, then its first loop read as a loop
-  // closed
   const second = createTerritory(1);
   second.begin([home], 0);
   assert.equal(cursor.read(seaOf(second, 2)).fresh, true);
@@ -111,15 +93,12 @@ test("a new match's changes are read from its first: its loops closed are not ta
     ['claim'],
     'her strips painted, and one loop closed'
   );
-  // read again, nothing new; and no sea at all starts over once
   assert.equal(cursor.read(sea).from, sea.changes.length);
   assert.equal(cursor.read(undefined).fresh, true);
   assert.equal(cursor.read(undefined).fresh, false);
 });
 
 test("a match's whole fleet painting is drawn in the frame it is read, every frame past the match's start, within its budget", () => {
-  // 80 ships about the planet, each sailing out of her home patch at her top
-  // speed (0.53 m a step), turning gently, a frame drawn every step
   const ships = 80,
     t = createTerritory(ships),
     claimed = createClaimed();
@@ -154,8 +133,6 @@ test("a match's whole fleet painting is drawn in the frame it is read, every fra
     claimed.follow(seaOf(t, 1));
     claimed.work(s / 30);
     most = Math.max(most, claimed.used());
-    // (at the start, the grid taken whole, some hundred slices, and every ship
-    // leaving her home patch at once: some frames to catch up)
     if (s > 45 && !claimed.idle()) behind++;
   }
   assert.ok(
@@ -164,11 +141,6 @@ test("a match's whole fleet painting is drawn in the frame it is read, every fra
   );
   assert.equal(behind, 0, 'frames that ended with strips left to draw');
   assert.ok(most <= SLICES, `${most} slices in a frame`);
-  // the same sea taken whole, every share counted afresh: the shares kept as
-  // the strips came the same, to a rounding, away from the faces' edges (near
-  // them a window reaching onto the next face is not the mirror of the
-  // other's, and a change may leave a share there a little off: as it did when
-  // every share near a change was counted afresh)
   const fresh = createClaimed();
   fresh.follow(seaOf(t, 2));
   for (let f = 0; f < 600 && !fresh.idle(); f++) fresh.work(10 + f);
@@ -221,39 +193,29 @@ test("the water's copy of the cells keeps up with the sea: loops, drains, the st
     match(generation * 101, generation, 3600, (sea, time) => {
       for (const k of sea.changes) kinds.add(k.kind);
       last = sea;
-      // most frames one step or two apart; now and then none drawn for ten
-      // seconds (the changes kept only eight)
       if (wait-- > 0) return;
       wait = draw() < 0.004 ? 300 : draw() < 0.5 ? 1 : 0;
       frame(sea, time);
-      // (what is drawn is the sea's once every change read is: a large one
-      // takes a few frames)
       if (claimed.idle() && (frames % 8 === 0 || wait === 300))
         same(sea.owner, `match ${generation}, ${time.toFixed(1)} s`);
     });
-    // the last steps' changes read, and every change drawn
     frame(last);
     for (let f = 0; f < 600 && !claimed.idle(); f++)
       claimed.work(clock + f / 60);
     same(last!.owner, `match ${generation}'s end`);
-    // the lobby between: no sea, all open (once taken, over some frames)
     frame(undefined);
     for (let f = 0; f < 600 && !claimed.idle(); f++) frame(undefined);
     same(new Uint8Array(CELLS), 'the lobby');
   }
   assert.deepEqual([...kinds].sort(), ['claim', 'drain', 'home', 'paint']);
-  // whole for each match's first frame and each lobby's, and again after frames
-  // missed
   assert.ok(whole > 4, `taken whole ${whole} times`);
   assert.ok(checked > 100);
-  // no frame's work over its budget (what that costs, ms: npm run steps)
   assert.ok(most <= SLICES, `${most} slices in a frame`);
 });
 
 test('a loop round half the planet is drawn over some frames, none over its budget', () => {
   const { territory: t, before, after, time } = halfLoop();
   assert.ok(t.share(0) > 0.45, `she holds ${t.share(0)}`);
-  // the sea taken whole the step before (the loop's water open), and the loop read after
   const claimed = createClaimed();
   claimed.follow(before);
   claimed.follow(after);
@@ -268,7 +230,5 @@ test('a loop round half the planet is drawn over some frames, none over its budg
         `cell ${c} is ${claimed.ownerOf(c)}, the sea's ${t.owner[c]}`
       );
   }
-  // spread over a second or so of frames: more than a few, fewer than two
-  // seconds' at 30 FPS
   assert.ok(claimed.idle() && frames > 3 && frames < 60, `${frames} frames`);
 });

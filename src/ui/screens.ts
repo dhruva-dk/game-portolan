@@ -1,21 +1,3 @@
-// The screens round the lobby. Each was drawn on the drawn page (ui.ts DRAWN:
-// 956 × 440 with its own safe insets); on any screen the page is scaled by the
-// UI's size (ui.ts size: the iPad's 1180 × 820 takes it 1.74×, as the HUD) and
-// grows or shrinks to the screen's own shape, and each of its pieces keeps to
-// the edge it was drawn against, the screen's safe area there or the gutter
-// (ui.ts at): no shape of screen letterboxes it. Each fades in and out (ways.ts
-// FADE), never cut to.
-//   title   an opaque sheet over the world loading: rhumb lines, the rose whose needle swings while the world loads and
-//           settles north when it is ready, her galleon gilt below; it moves on by itself (flow.ts)
-//   lobby   over her ship at anchor: the wheel (tap: settings), the PLAY banner with her galleon on it, the seed's
-//           chip at the top left, its name and a pencil (tap: the seed panel, panel.ts), and the dye pot beside the
-//           wheel in her dye (tap: her livery, livery.ts). No tabs. Elsewhere a drag reaches the world: it turns the camera round
-//           her.
-//   settings a small folio: sound and look speed, each a bar set by a tap along it; the stats (the frame's cost in
-//           the bottom-left corner: meter.ts), a box ticked by a tap
-// Each folio has its close mark at its corner; a tap outside it closes it too.
-// Her match's end is ends.ts's. No words anywhere; numerals only (but the seed's name, which is hers to give).
-
 import { clamp } from '../world/scalar.ts';
 import {
   GILT,
@@ -38,32 +20,16 @@ import { dyePot, pencil, rhumbs, rose } from './marks.ts';
 import { keep, onTap, region } from './touch.ts';
 import { at, boxOf, fade, onResize, page, screen, type Page } from './ui.ts';
 
-/**
- * Sound and look speed, each 0–1; whether the frame's cost shows in its corner
- * (meter.ts).
- */
 export interface Settings {
   sound: number;
   look: number;
   stats: boolean;
 }
 
-/**
- * A full-screen sheet: an <svg> of the page on this screen. `opaque` lays
- * parchment under it; `press` makes the whole sheet take touches (else only its
- * regions do, and the rest reach the world under it).
- */
 export function sheet(opaque: boolean, press = true) {
   const root = screen(press);
   if (opaque) root.style.background = parchment;
-  /**
-   * The last drawing, made again when the screen changes shape while it shows.
-   */
   let last: (() => SVGSVGElement) | null = null;
-  /**
-   * Draws `body` on the page as it is on this screen, then `bind`s what takes
-   * touches in it.
-   */
   const set = (
     body: (p: Page) => string,
     bind?: (el: SVGSVGElement) => void
@@ -85,11 +51,6 @@ export function sheet(opaque: boolean, press = true) {
   return { root, set, show: (on: boolean, ms?: number) => fade(root, on, ms) };
 }
 
-/**
- * The banner every way on is drawn on (the lobby's PLAY): a pennant `w` wide
- * centred on (x, y), its swallowtail at the left and its point at the right,
- * with `mark` laid on it. `gilt` washes it gold.
- */
 export function banner(
   x: number,
   y: number,
@@ -110,12 +71,8 @@ export function banner(
   );
 }
 
-/** The needle's swing (its keyframes: ui.ts). */
 const SWING = 'needle 1.6s ease-in-out infinite alternate';
 
-/** The title, the one loading screen, made once (main.ts): shown while the world is made, and again over the way home
- *  while the lobby is made under it (passage.ts), over every other screen; its needle swinging until then. It takes no
- *  tap: the flow moves on to the lobby as the world is ready (flow.ts). */
 export function createTitle() {
   const s = sheet(true);
   s.root.style.zIndex = '3';
@@ -139,14 +96,12 @@ export function createTitle() {
   return {
     root: s.root,
     show: s.show,
-    /** Loading again: the needle swings. */
     swing() {
       settled = false;
       needle.style.transition = 'none';
       needle.style.transform = '';
       needle.style.animation = SWING;
     },
-    /** The world is ready: the needle settles north, with one small overshoot, as the title fades. */
     ready() {
       settled = true;
       needle.style.animation = 'none';
@@ -158,8 +113,6 @@ export function createTitle() {
 
 export type Title = ReturnType<typeof createTitle>;
 
-/** The seed's chip: a slip at the lobby's top left, the seed's name (the one piece of text the screens set down, as a
- *  seed is any text she gives it) and a small pencil after it, sized to the name. */
 function seedChip(x: number, y: number, name: string) {
   const w = 56 + Math.max(2, name.length) * 10.5;
   return (
@@ -168,15 +121,12 @@ function seedChip(x: number, y: number, name: string) {
   );
 }
 
-/** The lobby over her ship at anchor: `dye` her livery's dye now, for the pot. */
 export function createLobby(
   name: string,
   dye: () => string,
   act: { play(): void; settings(): void; seed(): void; livery(): void }
 ) {
-  // a drag anywhere off its controls turns the camera round her (play/anchorage.ts)
   const s = sheet(false, false);
-  /** The dye its pot was last drawn in (null: not yet drawn). */
   let drawn: string | null = null;
   return {
     show(on: boolean) {
@@ -191,7 +141,6 @@ export function createLobby(
               'right',
               'top',
               `<g id="wheel"><circle cx="866" cy="40" r="26" fill="url(#pg)" stroke="${INK.iron}" stroke-width="1.6" filter="url(#sh)"/>${glyph('menu.wheel', 866, 40, 34)}</g>` +
-                // (beside the wheel: the meter has the bottom-left corner, over every screen)
                 `<g id="livery"><circle cx="802" cy="40" r="26" fill="url(#pg)" stroke="${INK.iron}" stroke-width="1.6" filter="url(#sh)"/>${dyePot(801, 42, 36, pot)}</g>`
             ) +
             at(
@@ -213,9 +162,6 @@ export function createLobby(
   };
 }
 
-/** A folio laid over the lobby, its box drawn at (x, y) on the phone's page and kept to the page's edges as `place`
- *  says (at); its close mark at its top right corner; a tap outside it closes it too. `shade` dims the world round it
- *  (not round her livery's, which shows her ship as she is dyed). */
 export function folio(
   { x, y, w, h }: { x: number; y: number; w: number; h: number },
   place: [Parameters<typeof at>[1], Parameters<typeof at>[2]],
@@ -228,7 +174,6 @@ export function folio(
   onTap(s.root, close);
   return {
     ...s,
-    /** Draws it with `body` inside, then `bind`s what takes touches in it. */
     draw(body: string, bind?: (el: SVGSVGElement) => void) {
       return s.set(
         (p) =>
@@ -253,14 +198,11 @@ export function folio(
   };
 }
 
-/** Settings, lean: sound and look speed, each a bar, a tap along a bar sets it; and the stats, a box ticked or not
- *  beside a small graph, a tap on the row turns them on or off. */
 export function createSettings(
   get: () => Settings,
   set: (s: Settings) => void,
   close: () => void
 ) {
-  // (its close mark, standing out past its corner, kept clear of the screen's edge)
   const x = 540,
     y = 86,
     w = 332,
@@ -276,7 +218,6 @@ export function createSettings(
       wash: string
     ) =>
       `<g id="${id}">${icon}<rect x="${x + 90}" y="${cy - 22}" width="214" height="44" fill="transparent"/>${bar(x + 96, cy, 200, 22, value, wash)}</g>`;
-    /** Look speed's mark: an eye, an arrow either side of it, the way the look turns. */
     const look = (cy: number) => {
       const c = x + 54;
       return (
@@ -286,7 +227,6 @@ export function createSettings(
         `<path d="M${c - 15} ${cy - 5}L${c - 20} ${cy}L${c - 15} ${cy + 5}M${c + 15} ${cy - 5}L${c + 20} ${cy}L${c + 15} ${cy + 5}" fill="none"/></g>`
       );
     };
-    /** The stats' mark: a small graph, the frame's cost over time. */
     const graph = (cy: number) => {
       const l = x + 42,
         b = cy + 13;
@@ -297,7 +237,6 @@ export function createSettings(
         `<path d="M${l + 3} ${b - 13}L${l + 10} ${b - 21}L${l + 17} ${b - 17}L${l + 24} ${b - 25}" stroke="${INK.rubric}" stroke-width="1.6"/></g>`
       );
     };
-    /** The stats' box, 28 across, ticked when they show. */
     const box = (cy: number, on: boolean) =>
       `<path d="${roughRect(x + 96, cy - 14, 28, 28, 5)}" fill="${on ? WASH.viridian : PAPER}" fill-opacity="${on ? 0.85 : 1}" stroke="${INK.iron}" stroke-width=".9"/>` +
       (on
@@ -321,7 +260,6 @@ export function createSettings(
         });
         for (const id of ['sound', 'look'] as const) {
           const row = region(el, id, (e) => {
-            // where along the bar: its hit box runs 6 units before the bar's 200 and 8 past it
             const bar = boxOf(row!),
               bx = 6 / 214;
             const t = clamp(

@@ -1,22 +1,3 @@
-// The camera's answer to what happens: a shake, a knock and a punch of the
-// field of view, laid over the eye the chase camera has placed, and nothing
-// else of the camera.
-//
-// Shake is Eiserloh's trauma model: a blow adds trauma (0…1), which drains
-// linearly, and the eye shakes by trauma² along smooth seeded noise, so a knock
-// stays small and a slam is violent. Two bands: `hit`, a fast judder, and
-// `rumble`, a slow heave. A kick knocks the eye (metres along its own right, up
-// and back; degrees of pitch, yaw and roll) on springs that snap home past
-// their rest once; a pulse narrows the field of view (a punch-in) or widens it,
-// over an attack, a hold and a release. A blow from a bearing kicks the eye
-// away from it and rolls it away.
-//
-// Gentle enough for a tablet held in the hands: everything at GENTLE of its
-// full strength (CAMERA), its widest pulse held to PULSE degrees. Runs on real
-// time, so the shake plays over a hit-stop's held frame (stops.ts).
-//
-// Pure: no three, no page.
-
 import { blowOf, felt, type Blow, type Deed } from '../player.ts';
 import type { Eye } from '../snapshot.ts';
 import { hash01 } from '../world/random.ts';
@@ -30,20 +11,11 @@ import {
   type Turn,
 } from '../world/turn.ts';
 
-/**
- * All of it at this share of CAMERA's, and no field-of-view pulse past this
- * many degrees either way.
- */
 const GENTLE = 0.75,
   PULSE = 6;
 
 type Band = 'hit' | 'rumble';
 const BAND_NAMES: readonly Band[] = ['hit', 'rumble'];
-/**
- * Each band: noise cells a second, trauma lost a second, metres at full shake
- * (right, up, back), degrees (pitch, yaw, roll): roll the most, since it reads
- * best from a chase camera and keeps the aim where it was.
- */
 const BANDS: Record<
   Band,
   { freq: number; decay: number; pos: Vec3; rot: Vec3 }
@@ -52,11 +24,6 @@ const BANDS: Record<
   rumble: { freq: 4, decay: 0.8, pos: [0.6, 0.5, 0.4], rot: [1.4, 1.6, 3] },
 };
 
-/**
- * A knock: metres along the eye's right, up and back, degrees of pitch (up),
- * yaw (left) and roll (clockwise), and metres pushed and degrees rolled away
- * from the blow's bearing, when there is one.
- */
 interface Kick {
   right?: number;
   up?: number;
@@ -67,18 +34,12 @@ interface Kick {
   away?: number;
   tilt?: number;
 }
-/** A pulse of the field of view, degrees (− punches in), over seconds. */
 interface Pulse {
   deg: number;
   attack: number;
   hold: number;
   release: number;
 }
-/**
- * How the camera answers a moment: trauma added to a band, a kick, a pulse, and
- * the metres over which it fades out with distance (full at the first, none
- * past the second).
- */
 interface Answer {
   shake?: number;
   band?: Band;
@@ -87,10 +48,6 @@ interface Answer {
   falloff?: readonly [number, number];
 }
 
-/**
- * The camera's answers, by what asks them (at full strength: GENTLE of it is
- * played).
- */
 export const CAMERA = {
   fire: { shake: 0.2, kick: { back: 0.5, pitch: 0.9, roll: 0.4 } },
   hit: {
@@ -147,17 +104,12 @@ export const CAMERA = {
   ],
 } as const satisfies Record<string, Answer | readonly Answer[]>;
 
-/** The camera's answer to a blow she dealt. */
 const DEALT: Record<Blow, Answer> = {
   broke: CAMERA.shieldBreak,
   hull: CAMERA.hit,
   shield: CAMERA.shieldHit,
 };
 
-/**
- * The camera's answer to a deed seen from `me` (her id; −1 watching another's
- * ship: only the world's rumbles reach her), and how strongly; null for none.
- */
 export function answerTo(
   d: Deed,
   me: number
@@ -209,9 +161,7 @@ export function answerTo(
   }
 }
 
-/** Smooth seeded noise in about −1…1, a lattice cell a unit of x. */
 export function noise(x: number, seed: number): number {
-  // a slope at each lattice point, −1…1
   const slope = (i: number) => hash01(i, seed) * 2 - 1;
   const i = Math.floor(x),
     f = x - i,
@@ -220,10 +170,6 @@ export function noise(x: number, seed: number): number {
   return lerp(a, b, smoother(f)) * 2;
 }
 
-/**
- * A damped spring at rest at 0 (a kick's: 7 Hz, damping 0.55), stepped in small
- * substeps.
- */
 function spring(freq = 7, damping = 0.55) {
   let x = 0,
     v = 0;
@@ -238,8 +184,6 @@ function spring(freq = 7, damping = 0.55) {
     }
     return x;
   };
-  // how far its first swing carries for unit velocity, so a kick is given as
-  // its peak
   const peak = (() => {
     let p = 0;
     v = 1;
@@ -254,10 +198,6 @@ function spring(freq = 7, damping = 0.55) {
   };
 }
 
-/**
- * 0 → 1 → 1 → 0 over a pulse `age` seconds in: a snappy attack (expo out), the
- * hold, a gentle release (cubic in-out).
- */
 export function envelope(p: Pulse, age: number): number {
   if (age < p.attack) return 1 - Math.pow(2, (-10 * age) / p.attack);
   if (age < p.attack + p.hold) return 1;
@@ -266,22 +206,12 @@ export function envelope(p: Pulse, age: number): number {
 }
 
 const DEG = Math.PI / 180;
-/** The eye's own axes. */
 const X: Vec3 = [1, 0, 0],
   Y: Vec3 = [0, 1, 0],
   Z: Vec3 = [0, 0, 1];
-/** A turn about one of them. */
 const about: Out4 = [0, 0, 0, 1];
-/**
- * q turned by `a` radians about its own unit axis `k` (into `out`, which may be
- * q).
- */
 const turned = (q: Turn, k: Vec3, a: number, out?: Out4): Turn =>
   multiply(q, axisAngle(k, a, about), out);
-/**
- * A band's noise on one axis (0–5: right, up, back, pitch, yaw, roll) `f` cells
- * in, `amount` strong.
- */
 const shook = (
   f: number,
   axis: number,
@@ -304,15 +234,7 @@ export function createShake(seed = 1) {
   const all = Object.values(springs),
     pulses: (Pulse & { age: number })[] = [];
   let t = 0;
-  /**
-   * The offset this frame: metres along the eye's right, up and back; degrees
-   * of pitch, yaw and roll; of the fov.
-   */
   const o = { x: 0, y: 0, z: 0, pitch: 0, yaw: 0, roll: 0, fov: 0 };
-  /**
-   * The eye on() hands back, written over each frame; and an axis of the eye's,
-   * in the world.
-   */
   const shaken: Eye & { position: Out3; orientation: Out4 } = {
     kind: 'air',
     position: [0, 0, 0],
@@ -322,10 +244,6 @@ export function createShake(seed = 1) {
   const axis: Out3 = [0, 0, 0];
 
   return {
-    /**
-     * An answer played `strength` strong, from `bearing` (radians clockwise
-     * from the look) `metres` away.
-     */
     play(a: Answer, strength: number, bearing?: number, metres?: number) {
       let k = strength * GENTLE;
       if (a.falloff && metres !== undefined)
@@ -354,7 +272,6 @@ export function createShake(seed = 1) {
           age: 0,
         });
     },
-    /** dt seconds of real time on. */
     update(dt: number) {
       t += dt;
       o.x = o.y = o.z = o.pitch = o.yaw = o.roll = 0;
@@ -379,7 +296,6 @@ export function createShake(seed = 1) {
       o.yaw += springs.yaw.step(dt);
       o.roll += springs.roll.step(dt);
       o.fov = 0;
-      // each pulse played, and those done dropped in place
       let n = 0;
       for (const p of pulses) {
         o.fov += p.deg * envelope(p, (p.age += dt));
@@ -387,10 +303,6 @@ export function createShake(seed = 1) {
       }
       pulses.length = n;
     },
-    /**
-     * The eye as the camera placed it, knocked and shaken (three's
-     * translateX/Y/Z, rotateY, rotateX, rotateZ).
-     */
     on(eye: Eye): Eye {
       const q = eye.orientation,
         p = shaken.position,
@@ -416,11 +328,6 @@ export function createShake(seed = 1) {
       shaken.fov = eye.fov + o.fov;
       return shaken;
     },
-    /**
-     * What the tests read of it, nothing the game does: copies of the offset
-     * now and of the trauma left in each band (what on() lays over an eye, and
-     * what drains, before they are mixed into one).
-     */
     offset: () => ({ ...o }),
     trauma: () => ({ ...trauma }),
     clear() {

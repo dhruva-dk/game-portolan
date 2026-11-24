@@ -1,26 +1,9 @@
-// Hit-stop: a blow's moment held for a few hundredths of a second. The match
-// steps on the time this returns (game.ts), so a stop slows the ships, the
-// balls and the sea drawn from them, while the camera's shake and the HUD keep
-// real time: the shake playing over the held frame is what sells the blow.
-//
-// Stops never add up: overlapping ones take the deepest. One in its hold masks
-// every stop of a lower priority. Below a sinking, frozen time is budgeted
-// (BUDGET seconds of it a rolling second), so a run of blows cannot make a
-// slideshow: over it a stop is trimmed, or dropped if under a frame. None holds
-// past MAX_HOLD.
-//
-// Pure: no three, no page.
-
 import { blowOf, felt, type Blow, type Deed } from '../player.ts';
 import { easeInOut } from '../world/scalar.ts';
 
 const PRIORITY = { hurt: 0, hit: 1, break: 2, kill: 3 } as const;
 type Priority = keyof typeof PRIORITY;
 
-/**
- * The time's scale while held (0 stops it), real seconds held at it and easing
- * back, and its priority.
- */
 interface Stop {
   scale: number;
   hold: number;
@@ -28,7 +11,6 @@ interface Stop {
   priority: Priority;
 }
 
-/** The stops, by what asks them. */
 export const STOPS = {
   hit: { scale: 0.05, hold: 0.045, release: 0.06, priority: 'hit' },
   shieldHit: { scale: 0.1, hold: 0.035, release: 0.05, priority: 'hit' },
@@ -37,26 +19,17 @@ export const STOPS = {
   hurt: { scale: 0.35, hold: 0.04, release: 0.08, priority: 'hurt' },
   sink: { scale: 0.2, hold: 0.32, release: 0.35, priority: 'kill' },
 } as const satisfies Record<string, Stop>;
-/** The stop for a blow she dealt. */
 const DEALT: Record<Blow, Stop> = {
   broke: STOPS.shieldBreak,
   hull: STOPS.hit,
   shield: STOPS.shieldHit,
 };
 
-/**
- * Frozen seconds a rolling second allows below a sinking; the longest hold; a
- * frame.
- */
 const BUDGET = 0.2,
   WINDOW = 1,
   MAX_HOLD = 0.6,
   FRAME = 1 / 60;
 
-/**
- * The stop a deed asks, seen from ship `me`, and how strongly: her blows and
- * her sinkings of others, the blows she takes.
- */
 export function stopFor(
   d: Deed,
   me: number
@@ -88,26 +61,17 @@ const valueOf = (s: Live) =>
       (1 - s.scale) *
         easeInOut(Math.min(1, (s.age - s.hold) / Math.max(1e-6, s.release)));
 const budgeted = (s: Stop) => PRIORITY[s.priority] < PRIORITY.kill;
-/** Frozen time still to come from a live stop. */
 const toCome = (s: Live) =>
   (1 - s.scale) *
   (Math.max(0, s.hold - s.age) +
     (Math.min(s.release, s.hold + s.release - s.age) * 2) / 3);
 
 export function createStops() {
-  /**
-   * The stops live; the frozen time spent, each frame's (the moment it was
-   * spent, and how much), oldest first.
-   */
   const live: Live[] = [],
     spentAt: number[] = [],
     frozen: number[] = [];
   let now = 0;
 
-  /**
-   * The scale now: the deepest of the stops at or above the highest priority
-   * still holding.
-   */
   const current = () => {
     let floor = -1;
     for (const s of live)
@@ -117,10 +81,6 @@ export function createStops() {
       if (PRIORITY[s.priority] >= floor) scale = Math.min(scale, valueOf(s));
     return scale;
   };
-  /**
-   * Frozen time already spent this rolling second, and still to come from the
-   * live budgeted stops.
-   */
   const used = () => {
     let spent = 0,
       coming = 0;
@@ -130,7 +90,6 @@ export function createStops() {
   };
 
   return {
-    /** A stop asked `strength` strong (0…1: shallower, and held for less). */
     request(spec: Stop, strength = 1) {
       const depth = (1 - spec.scale) * Math.min(1, strength);
       let hold = Math.min(
@@ -146,13 +105,9 @@ export function createStops() {
       }
       live.push({ ...spec, scale: 1 - depth, hold, age: 0 });
     },
-    /**
-     * dt seconds of real time on; the seconds of the match's time they make.
-     */
     update(dt: number): number {
       const scale = current();
       now += dt;
-      // those done, and the frozen time older than the window, dropped in place
       let n = 0;
       for (const s of live) {
         s.age += dt;

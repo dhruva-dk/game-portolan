@@ -1,6 +1,3 @@
-// A carded race sailed headless (play/race.ts runRace):
-// a pure function of its card and its planet, with the result the career reads
-// (race.ts RaceResult).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { SEED } from '../src/environment.ts';
@@ -20,9 +17,6 @@ const planet = planetOf(SEED, landOf(SEED)),
   depth = (p: Vec3) => -planet.height(p),
   waters = { chart: chart(depth), water: berthing(depth) };
 
-/**
- * A short race: three teams of spec ships, the storm three times as quick.
- */
 const short = (over: Partial<RaceCard> = {}): RaceCard => {
   const card = specField(SEED, 3);
   return { ...card, rules: { ...card.rules, storm: 3 }, ...over };
@@ -30,7 +24,6 @@ const short = (over: Partial<RaceCard> = {}): RaceCard => {
 const sailed = (card: RaceCard) => runRace(card, planet, waters);
 const FIRST = sailed(short());
 
-/** What every result holds to, whatever the race. */
 function sound(card: RaceCard, r: RaceResult) {
   const ids = card.ships.map((s) => s.id),
     team = (id: number) => card.ships[id].team;
@@ -83,8 +76,6 @@ test('a race is sailed to its end: one team afloat, every ship placed, the tally
 
 test('the same card on the same planet gives the same result, hash and all; another seed another', () => {
   assert.deepEqual(sailed(short()), FIRST);
-  // (pinned: the same on every machine. A rule that changes a carded race
-  // changes it, and says so)
   assert.equal(FIRST.hash, '1f26ff4d');
   const other = sailed(short({ seed: SEED + 1 }));
   assert.notEqual(other.hash, FIRST.hash);
@@ -139,7 +130,6 @@ test("the card's rules: a banned gun is never laid, the storm's pace quickens it
   const r = sailed(card);
   sound(card, r);
   assert.ok(r.sinkings.every((s) => s.gun === null || s.gun === 'scatter'));
-  // today's pace and no ban: the game's own rules, themselves
   const own = raceOf(specField(SEED, 3), planet).type.rules;
   assert.equal(own.loot, DEFAULT_RULES.loot);
   assert.equal(own.storm, DEFAULT_RULES.storm);
@@ -170,7 +160,6 @@ test("ship 0 with no driver is sailed by the pilot's hands, asked every step; wi
   assert.ok(Math.abs(asked.length - r.seconds * 30) < 1e-6, 'asked every step');
   assert.equal(r.hits[0].fired, 0, 'her hands idle, she fired nothing');
   assert.notEqual(r.hash, FIRST.hash, 'a bot sailed her otherwise');
-  // idle hands by default
   assert.deepEqual(runRace(quick, planet, waters), r);
 });
 

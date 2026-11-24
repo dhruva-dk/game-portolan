@@ -1,5 +1,3 @@
-// A bot's mood (sim/fighting.ts mood): the blows she takes cool it, the ships
-// she sinks warm it, and it settles back to her temper's.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mind, sank, shot } from '../src/sim/bot.ts';
@@ -9,7 +7,6 @@ import { mood, MIND } from '../src/sim/fighting.ts';
 import { temper } from '../src/sim/temper.ts';
 import { fromLatLon } from '../src/world/sphere.ts';
 
-/** What `mood` and `aggroOf` read of a think: her memory, brain and temper. */
 const ctx = (m = mind(7, fromLatLon(0.1, 0.2))): Ctx => ({
   own: null as never,
   others: [],

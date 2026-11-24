@@ -1,8 +1,3 @@
-// The UI's sounds, in the world's manner, no tune anywhere: a tap a quill's
-// tick on parchment; a folio unfolding and folded shut; PLAY her canvas filling
-// and the sea taking her; her end, sunk, the sea closing over; her win, a great
-// swell and a salute of guns far off.
-
 import {
   ar,
   brown,
@@ -24,7 +19,6 @@ import {
 } from '../dsp.ts';
 import { timber } from './blows.ts';
 
-/** A tap: a quill's tick on parchment. */
 export function tap(rate: number, seed: number): Samples {
   const t = take(0.09, rate, seed);
   noise(t, fall(0.004));
@@ -41,7 +35,6 @@ export function tap(rate: number, seed: number): Samples {
   return normal(finish(t, 0.0005, 0.02)).x;
 }
 
-/** Parchment handled: crinkle and rustle over `seconds`, from `at`. */
 const parchment = (t: Take, at: number, seconds: number, grains: number) => {
   const p = layer(t);
   crackle(p, grains, at, seconds, 0.8, 0.002);
@@ -55,7 +48,6 @@ const parchment = (t: Take, at: number, seconds: number, grains: number) => {
   mix(t, rustle, 0, 0.35);
 };
 
-/** A folio opened: parchment unfolding, laid down. */
 export function open(rate: number, seed: number): Samples {
   const t = take(0.55, rate, seed);
   parchment(t, 0, 0.32, 55);
@@ -71,7 +63,6 @@ export function open(rate: number, seed: number): Samples {
   return normal(finish(t)).x;
 }
 
-/** A folio closed: folded shut on a soft thump. */
 export function close(rate: number, seed: number): Samples {
   const t = take(0.4, rate, seed);
   parchment(t, 0, 0.14, 25);
@@ -91,10 +82,6 @@ export function close(rate: number, seed: number): Samples {
   return normal(finish(t)).x;
 }
 
-/**
- * PLAY: her canvas filling with a great crack, the sea taking her, her timbers
- * answering.
- */
 export function launch(rate: number, seed: number): Samples {
   const t = take(2.6, rate, seed);
   const crack = layer(t, 0.1);
@@ -140,10 +127,6 @@ export function launch(rate: number, seed: number): Samples {
   return normal(finish(t, 0.002, 0.4)).x;
 }
 
-/**
- * Her end, sunk: the sea closing over, deep and muffled, the last of her going
- * down.
- */
 export function lost(rate: number, seed: number): Samples {
   const t = take(3.4, rate, seed);
   const under = layer(t);
@@ -157,10 +140,6 @@ export function lost(rate: number, seed: number): Samples {
   return normal(finish(t, 0.03, 0.8)).x;
 }
 
-/**
- * Her win: a great swell of the sea, and a salute of guns fired far off, one
- * after another.
- */
 export function salute(rate: number, seed: number): Samples {
   const t = take(6, rate, seed);
   const sea = layer(t);

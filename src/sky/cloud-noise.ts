@@ -1,10 +1,3 @@
-// The clouds' patterns (cloud-field.ts), baked once into textures: a
-// Perlin-Worley volume for the billows, a Worley volume to erode their edges,
-// and a weather map of where cloud may form. All tile.
-//
-// Each pattern's finest octave keeps at least four texels per period, so the
-// trilinear reads stay crisp rather than aliasing into mush.
-
 import {
   LinearFilter,
   RepeatWrapping,
@@ -55,7 +48,6 @@ function volume(n: number): Storage3DTexture {
   return t;
 }
 
-/** Tiling Worley noise of the given period, inverted: 1 at feature points. */
 const worley = Fn(([p, period]: [Vec3Node, FloatNode]) => {
   const cell = floor(p),
     f = fract(p);
@@ -76,7 +68,6 @@ const worley = Fn(([p, period]: [Vec3Node, FloatNode]) => {
   ],
 });
 
-/** Tiling gradient noise in [-1, 1]. */
 const perlin = Fn(([p, period]: [Vec3Node, FloatNode]) => {
   const i = floor(p),
     f = fract(p);
@@ -115,12 +106,6 @@ const perlin = Fn(([p, period]: [Vec3Node, FloatNode]) => {
   ],
 });
 
-/**
- * Cumulus cells on a tiling 2D lattice of the given period: each cell's feature
- * point raises a cone of slope 1 (in cells) and random height v = 0.1 + 0.9u²,
- * most cells weak and a few strong; the highest cone wins. Returns its value
- * here and its peak.
- */
 const cells = Fn(([p, period]: [Vec2Node, FloatNode]) => {
   const cell = floor(p),
     f = fract(p);
@@ -158,10 +143,6 @@ function texel3(n: number) {
   return { at: uvec3(x, y, z), uvw: vec3(x, y, z).add(0.5).div(n) };
 }
 
-/**
- * R: Perlin-Worley billows (4–16 periods a tile); G, B, A: Worley at 4, 8 and
- * 16, to lift the billows' floor.
- */
 const shapeKernel = (shapeVolume: Storage3DTexture) =>
   Fn(() => {
     const { at, uvw } = texel3(SHAPE_N);
@@ -174,7 +155,6 @@ const shapeKernel = (shapeVolume: Storage3DTexture) =>
     textureStore(shapeVolume, at, vec4(pw, w4, w8, w16));
   })().compute(SHAPE_N ** 3, [64]);
 
-/** Worley at 4, 8 and 16 periods a tile: the erosion's octaves. */
 const detailKernel = (detailVolume: Storage3DTexture) =>
   Fn(() => {
     const { at, uvw } = texel3(DETAIL_N);
@@ -190,42 +170,17 @@ const detailKernel = (detailVolume: Storage3DTexture) =>
     );
   })().compute(DETAIL_N ** 3, [64]);
 
-/** The weather map's tile, km. */
 export const WEATHER_TILE = 40;
-/**
- * Spacing of the cells at each of the weather map's three sizes of cloud, km.
- */
 const CELL_SIZES = [1, 0.5, 0.25] as const;
-/**
- * The map's potential (km) at each tenth of its area, measured by sampling the
- * same construction, hash3 and all, on the CPU (0 to 100%; the last is the
- * 99.5th percentile; a 600 × 600 grid). Cloud stands where the potential passes
- * its value at the share of the map that is to stay clear.
- */
 export const POTENTIAL_DECILES = [
   0, 0, 0.0187, 0.0773, 0.1297, 0.1812, 0.2356, 0.2972, 0.3745, 0.495, 0.8682,
 ] as const;
 
-/**
- * How the cells' round outlines are broken up, so that noise rather than the
- * cells draws the clouds: the map is warped by WARP km (gradient noise of 2.5
- * km down to 600 m), which bends them out of round and draws them into lobes
- * and tails, and the potential is roughened by RAGGED km of noise (1.25 km down
- * to 300 m; its sum is mostly within a sixth of that either way), which merges
- * neighbours into ragged masses, frays the edges and leaves scraps between: a
- * broad spread of sizes, from scraps of a hundred metres to masses of several
- * km.
- */
 const WARP = 0.8,
   WARP_PERIODS = 16,
   RAGGED = 1.2,
   RAGGED_PERIODS = 32;
 
-/**
- * R: cumulus cells at three sizes as a potential in km: past the threshold the
- * cover sets, how far a point lies inside its cloud's edge; G: the large-scale
- * field (0–1) that gathers them into fields of cloud with clear sky between.
- */
 const weatherKernel = (weatherMap: StorageTexture) =>
   Fn(() => {
     const x = instanceIndex.mod(WEATHER_N),
@@ -252,15 +207,9 @@ const weatherKernel = (weatherMap: StorageTexture) =>
 
 export type CloudNoise = ReturnType<typeof createCloudNoise>;
 
-/**
- * The patterns, and `bake`: the passes that fill them, to be run once before
- * the clouds are first drawn.
- */
 export function createCloudNoise() {
   const shape = volume(SHAPE_N);
   const detail = volume(DETAIL_N);
-  // half floats: it holds a potential in km, from which the clouds' tops are
-  // worked out
   const weather = storageTable(WEATHER_N, WEATHER_N, { wrap: RepeatWrapping });
   const bake: Compute[] = [
     shapeKernel(shape),

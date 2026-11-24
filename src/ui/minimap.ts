@@ -1,18 +1,3 @@
-// The minimap: a disc of the sea round her, SPAN metres to its rim, read at a
-// glance, in the chart's hand. North is always up (the rim's vermilion mark,
-// fixed): the disc never turns, her arrow turns on it.
-//
-// On the plain sea, from the bottom up: who holds the water, a wash in each
-// holder's colour, hers the deeper (held.ts); the land, its shallows a pale
-// wash, its parchment going ochre up the hills (from the ground round her,
-// ground.ts), its coasts inked (coasts.ts); the Storm's side of its edge washed in its own violet and the edge a
-// violet line; the circle it next closes to, a white dotted line. Nothing else:
-// no other ship and no loot (those are found by eye). Outside the next circle a
-// white line runs from her to its nearest point, ending in an arrowhead (on the
-// rim when the circle is off the disc). Her mark at the centre is a small
-// arrowhead in her dye (ink.ts dyeOn) turned to her heading. Drawn in canvas
-// 2D when what it shows has changed; tapped, it opens the full map.
-
 import type { Sea } from '../snapshot.ts';
 import { R, along, dot, type Vec3 } from '../world/sphere.ts';
 import {
@@ -31,25 +16,12 @@ import { createHeld } from './held.ts';
 import { BRASS, INK, PAPER, WASH, alpha, dyeOn, svgNode } from './ink.ts';
 import { view } from './ui.ts';
 
-/**
- * Metres from her to the disc's rim: at her 16 m/s some 25 s of sailing, twice
- * a cannon's 200 m reach; some 4.5 m a pixel on the hud's disc (hud.ts
- * MINIMAP).
- */
 const SPAN = 408;
-/** The most redraws a second. */
 const RATE = 30;
-/** The Storm's wash and its edge. */
 const STORM = alpha(WASH.storm, 0.4),
   EDGE = INK.storm;
-/** Rings of the Storm kept traced, the oldest let go. */
 const RINGS = 8;
 
-/**
- * What else the disc may show: her arrow gilt, for a ship watched after a
- * sinking; the Storm's calm and the calm it next closes to (radius in metres);
- * who holds the sea, and her number in it (her id).
- */
 export interface More {
   gilt?: boolean;
   calm?: Storm;
@@ -58,10 +30,8 @@ export interface More {
   own?: number | null;
 }
 
-/** Whether two readings are the same, none (NaN) the same as none. */
 const same = (a: number, b: number) => a === b || (a !== a && b !== b);
 
-/** size: the disc's diameter, CSS px. */
 export function createMinimap(
   host: HTMLElement,
   size: number,
@@ -70,7 +40,6 @@ export function createMinimap(
   const r = size / 2,
     inner = r - 8;
   host.style.width = host.style.height = `${size}px`;
-  // the brass rim, graduated, and the paper under the sea
   const rim = svgNode(
     size,
     size,
@@ -80,11 +49,9 @@ export function createMinimap(
   );
   rim.style.position = 'absolute';
   const canvas = document.createElement('canvas');
-  // its pixels as many as it is shown at, grown by the UI's size (ui.ts)
   const dpr = Math.min(view.dpr * view.k, 4);
   canvas.width = canvas.height = Math.round(inner * 2 * dpr);
   canvas.style.cssText = `position:absolute;left:${r - inner}px;top:${r - inner}px;width:${inner * 2}px;height:${inner * 2}px;border-radius:50%`;
-  // north on the rim, and her arrowhead, over the canvas
   const over = svgNode(
     size,
     size,
@@ -96,20 +63,16 @@ export function createMinimap(
   const her = over.lastElementChild!;
   const ctx = canvas.getContext('2d')!;
   const held = createHeld(SPAN * 1.15);
-  // (the plate reaches past the rim by as far as she sails before it is taken afresh, and a margin)
   const land = createGround(ground.height, SPAN + 50, ground.top);
   const rings = createRings(RINGS),
     ringOf = (s: Storm) => rings(s.centre, s.radius);
   const stats = { draws: 0, ms: 0, since: performance.now() };
 
-  /** The disc as laid this redraw (disc.ts). */
   const l = newLay();
-  /** Lays an image on `o`'s own chart onto the disc (disc.ts laid). */
   const lay: LayOnto = (o, e, n, w, h, m) => {
     const t = laid(l, o, e, n, w, h, m);
     ctx.setTransform(t[0], t[1], t[2], t[3], t[4], t[5]);
   };
-  /** Begins a path through `ring`'s points on the disc. */
   const trace = (ring: readonly Vec3[], closed: boolean) => {
     ctx.beginPath();
     for (let i = 0; i < ring.length; i++) {
@@ -119,12 +82,9 @@ export function createMinimap(
     }
     if (closed) ctx.closePath();
   };
-  /** A direction's bearing on the disc, degrees clockwise from up. */
   const bearing = (t: Vec3) =>
     (Math.atan2(dot(t, l.right), dot(t, l.ahead)) * 180) / Math.PI;
 
-  /** What was last drawn: where she was (millionths), her heading (tenths of a degree), gilt or not, the calm's size and
-   *  place, the next's size and the sea's last change. */
   const was = {
     x: NaN,
     y: NaN,
@@ -139,7 +99,6 @@ export function createMinimap(
   let drawnFill = '',
     then = performance.now();
   return (at: Vec3, heading: Vec3, more: More) => {
-    // at most RATE times a second
     const now = performance.now(),
       dt = (now - then) / 1000;
     if (dt < 1 / RATE - 0.002) return;
@@ -181,7 +140,6 @@ export function createMinimap(
       'transform',
       `translate(${r} ${r}) rotate(${(turned / 10).toFixed(1)})`
     );
-    // her arrowhead in her dye (white till her ship's colour is known); gilt watching another ship after a sinking
     const fill = more.gilt ? WASH.gold : dyeOn(sea, more.own);
     if (fill !== drawnFill) {
       drawnFill = fill;
@@ -197,7 +155,6 @@ export function createMinimap(
     const calm =
       more.calm && more.calm.radius < R * Math.PI * 0.99 ? more.calm : null;
     if (calm) {
-      // the Storm's side of its edge: outside the ring as laid if the far side of the planet is the Storm's, else inside
       const ring = ringOf(calm);
       trace(ring, true);
       const farOut = -dot(at, calm.centre) < Math.cos(calm.radius / R);
@@ -212,19 +169,15 @@ export function createMinimap(
     const next =
       more.next && more.next.radius < R * Math.PI * 0.99 ? more.next : null;
     if (next) {
-      // the circle it next closes to: white, dotted, over a faint iron halo
       trace(ringOf(next), true);
       strokeNext(ctx, dpr);
     }
-    // outside the next circle (or the calm, with none to come), the way in: a line to its nearest point
     const goal = next ?? calm,
       w = goal && wayIn(at, goal);
     if (w) way(at, w.to, w.gap, c, k);
     stats.draws++;
     stats.ms += performance.now() - now;
     if (now - stats.since > 2000) {
-      // the disc's cost, for tools/browser.ts and the meter's readers: ms a redraw and redraws a second; the held
-      // water's ms a sampling and samplings a second
       const s = (now - stats.since) / 1000;
       host.dataset.cost =
         `${(stats.ms / stats.draws).toFixed(2)} ${(stats.draws / s).toFixed(1)} ` +
@@ -234,8 +187,6 @@ export function createMinimap(
     }
   };
 
-  /** The way in from `at` along `to`, `gap` metres to the circle: a line ending in an arrowhead at the circle, or on
-   *  the rim when the circle is off the disc. */
   function way(at: Vec3, to: Vec3, gap: number, c: number, k: number) {
     const m = metres(l, along(at, to, 1).p),
       len = Math.hypot(m[0], m[1]);
@@ -252,11 +203,9 @@ export function createMinimap(
     ctx.moveTo(c + ux * from, c + uy * from);
     ctx.lineTo(x2 - ux * a * 0.6, y2 - uy * a * 0.6);
     strokeWay(ctx, dpr);
-    // its arrowhead, at the circle or on the rim
     wayHead(ctx, { x: x2, y: y2, ux, uy }, dpr);
   }
 
-  /** The coasts near her, inked. */
   function shores(at: Vec3) {
     ctx.lineCap = ctx.lineJoin = 'round';
     for (const coast of coasts) {

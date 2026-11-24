@@ -29,7 +29,6 @@ const all = anchors(icosphere(FREQUENCY), createWind(3), CASCADES[0]);
 const open = () => -40;
 const rms = (xs: number[]) =>
   Math.sqrt(xs.reduce((s, x) => s + x * x, 0) / xs.length);
-/** Spread points over the sphere, and times. */
 const places = (n: number) =>
   Array.from({ length: n }, (_, i) => ({
     p: fromLatLon(Math.asin(2 * ((i * 0.618) % 1) - 1), i * 2.4),
@@ -56,7 +55,6 @@ test('the modes kept hold nearly all the long waves', () => {
     });
     const m = longModes(wind);
     let kept = 0;
-    // each kept mode stands for k and −k
     for (let i = 0; i < m.length; i += 8)
       kept +=
         2 * (m[i + 4] ** 2 + m[i + 5] ** 2 + m[i + 6] ** 2 + m[i + 7] ** 2);
@@ -91,7 +89,6 @@ test('under a hull the kept modes read as all of them do, to a few centimetres',
 test('the swell is as high as the sea state, repeats every PERIOD, and is cut by the depth', () => {
   const swell = createSwell(all, open, 10).at;
   const h = places(300).map(({ p, t }) => swell(p, t));
-  // σ = Hs/4, less the little the short cascade and the modes left out hold, and less a little where three charts meet
   assert.ok(
     Math.abs(rms(h) / (seaState(10, FETCH).hs / 4) - 0.95) < 0.12,
     `${rms(h)}`
@@ -107,8 +104,6 @@ test('the swell is as high as the sea state, repeats every PERIOD, and is cut by
   }
 });
 
-/** The water under a hull read point by point from the surface, each point's move its own (what the hull read stands
- *  for). */
 const pointwise =
   (sea: Surface): Hull =>
   (at, heading, reach, rail, time) => {
@@ -140,7 +135,6 @@ test('the hull read is the surface at her four points, but for the waves too sho
   assert.ok(rms(err) < 0.05 * rms(height), `${rms(err)} m of ${rms(height)} m`);
 });
 
-/** Ships on a sea for `seconds`, each sailing on at her own speed and bearing; each step's pose as heave, pitch, roll. */
 function voyages(sea: Hull, every: number, seconds: number) {
   return Array.from({ length: 6 }, (_, k) => {
     const p = fromLatLon(Math.asin(2 * ((k * 0.618) % 1) - 1) * 0.9, k * 2.4),
@@ -165,7 +159,6 @@ test(
     for (const wind of [7.6, 15]) {
       const swell = createSwell(all, open, wind, { shortest: RIDE.shortest });
       const got = voyages(swell.hull, RIDE.every, 30);
-      // every mode kept read point by point, every step: the surface as the eye sees it, all of it
       const truth = voyages(pointwise(createSwell(all, open, wind).at), 1, 30);
       const err: number[][] = [[], [], []],
         size: number[][] = [[], [], []];
@@ -228,7 +221,6 @@ test('the hull rides the swell: her level follows the water under her, her pitch
       pitch.push(slope);
       pitchMiss.push(r.pitch - slope);
     }
-    // she lags the water a little, as a hull of her weight does, but never floats clear of it or sinks into it
     assert.ok(
       rms(miss) < 0.3 * rms(level),
       `wind ${wind}: level off by ${rms(miss)} m of ${rms(level)} m`
@@ -241,12 +233,10 @@ test('the hull rides the swell: her level follows the water under her, her pitch
       rms(pitchMiss) < 0.5 * rms(pitch),
       `wind ${wind}: pitch off by ${rms(pitchMiss)} of ${rms(pitch)}`
     );
-    // the chop rocks the water under her rails more than it rolls her
     assert.ok(
       rms(rolled) < rms(roll) && rms(rolled) > 0.5 * rms(roll),
       `wind ${wind}: rolls ${rms(rolled)} on ${rms(roll)}`
     );
-    // and her pose is a placement: square axes, on her level
     const placed = pose(s, r);
     assert.ok(
       Math.abs(dot(placed.forward, placed.up)) < 1e-12 &&

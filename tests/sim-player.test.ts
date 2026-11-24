@@ -1,7 +1,3 @@
-// The stand-in for a player (tools/sim/player.ts): her eye on her foe's
-// body as a player's reticle is, wandering no further than a thumb does; the
-// same for the same seed; and a match with stand-ins played the same, every
-// time, her bot sailing her.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { Seen } from '../src/sim/bot.ts';
@@ -13,7 +9,6 @@ import { runMatch } from '../tools/sim/match.ts';
 const at: Vec3 = normalize([0.3, 0.5, 0.8]),
   east: Vec3 = normalize([0.8, 0, -0.3]);
 
-/** A ship lying still `metres` east of `at`, her bow east. */
 const seen = (id: number, metres: number): Seen => {
   const { p, t } = along(at, east, metres);
   return { id, ship: { at: p, heading: t, speed: 0, turn: 0 } };
@@ -30,8 +25,6 @@ test('her eye is on her foe’s body, never further off it than a thumb wanders'
     assert.ok(off, 'not behind her');
     most = Math.max(most, off.angle);
   }
-  // the reticle wanders up to 0.04 rad off her middle; her body's half-width
-  // takes some of that up
   assert.ok(most < 0.04, `${most.toFixed(3)} rad off her body at most`);
   assert.ok(most > 0, 'it wanders');
 });

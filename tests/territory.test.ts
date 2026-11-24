@@ -1,14 +1,3 @@
-// The territory (sim/territory.ts, sim/enclose.ts, world/cells.ts): its
-// geometry and the battle royale's rules.
-//
-// Geometry: a ship sails once round a circle at angle θ from a pole, starting
-// and ending in her home patch, and closes the loop. Her water must then be the
-// spherical cap 2πR²(1 − cos θ) plus the part of the home patch outside it.
-// With P the circle's length, d the largest cell diagonal, b the strip's half
-// width and ρ the patch's radius, the cells claimed are those her strip painted
-// (within b + d of the circle), those enclosed, and the patch's (centres in
-// it), so measured − expected lies in [−πρd, P·(b + d) + πρd] (the path here is
-// the circle itself).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -44,10 +33,8 @@ import type { Cap } from '../src/sim/storm.ts';
 const WHOLE: Cap = { centre: [0, 1, 0], radius: Math.PI };
 const PLANET = 4 * Math.PI * R * R;
 const RHO = TERRITORY.home / R;
-/** Metres a step at a ship's top speed. */
 const STRIDE = 12 / 30;
 
-/** The largest cell diagonal, metres. */
 const DIAGONAL = (() => {
   let worst = 0;
   for (let j = 0; j < N; j++) {
@@ -63,13 +50,11 @@ const DIAGONAL = (() => {
   return worst;
 })();
 
-/** Two unit tangents at u, square to it. */
 function basis(u: Vec3): [Vec3, Vec3] {
   const e1 = normalize(cross(Math.abs(u[0]) < 0.9 ? [1, 0, 0] : [0, 0, 1], u));
   return [e1, cross(u, e1)];
 }
 
-/** The point at angle φ round the circle θ from `pole`. */
 function onCircle(pole: Vec3, theta: number, phi: number): Vec3 {
   const [e1, e2] = basis(pole);
   return normalize(
@@ -81,10 +66,6 @@ function onCircle(pole: Vec3, theta: number, phi: number): Vec3 {
   );
 }
 
-/**
- * The area of the home patch (radius ρ, centred on the circle) outside the cap
- * of angle θ.
- */
 function patchOutsideCap(theta: number): number {
   const steps = 20000;
   let sum = 0;
@@ -98,10 +79,6 @@ function patchOutsideCap(theta: number): number {
   return sum * (RHO / steps) * R * R;
 }
 
-/**
- * Sails ship 0 of `t` along `path` (unit vectors), a step from each to the
- * next; returns the square metres of each loop she closed.
- */
 function sail(t: Territory, path: readonly Vec3[], id = 0, cap = WHOLE) {
   const claimed: number[] = [];
   for (let k = 1; k < path.length; k++) {
@@ -115,17 +92,12 @@ function sail(t: Territory, path: readonly Vec3[], id = 0, cap = WHOLE) {
   return { claimed };
 }
 
-/** The point `m` metres from `p` square to the great circle from `p` toward `q`, to its left. */
 function aside(p: Vec3, q: Vec3, m: number): Vec3 {
   const ahead = normalize(add(q, p, -dot(p, q))),
     left = cross(p, ahead);
   return normalize(add(p, left, m / R));
 }
 
-/**
- * Points along the circle θ from `pole`, from φ0 round `turns` times, STRIDE
- * metres apart.
- */
 function circlePath(pole: Vec3, theta: number, phi0 = 0, turns = 1.05): Vec3[] {
   const steps = Math.ceil((turns * 2 * Math.PI * R * Math.sin(theta)) / STRIDE);
   return Array.from({ length: steps + 1 }, (_, k) =>
@@ -133,7 +105,6 @@ function circlePath(pole: Vec3, theta: number, phi0 = 0, turns = 1.05): Vec3[] {
   );
 }
 
-/** Points along the great circle from a to b, STRIDE apart. */
 function line(a: Vec3, b: Vec3): Vec3[] {
   const d = distance(a, b),
     n = Math.max(1, Math.ceil(d / STRIDE));
@@ -161,8 +132,6 @@ test('the cells: 6·N² of them, neighbours across every face edge returning, th
     }
     assert.equal(cellOf(centreOf(c)), c);
   }
-  // past an edge, wrapped is the neighbour across it; at a corner one of the
-  // three cells there, the same from each face
   for (let f = 0; f < 6; f++) {
     assert.equal(wrapped(f, -1, 7), neighbor(f * N * N + 7 * N, 0));
     assert.equal(wrapped(f, 5, N), neighbor(f * N * N + (N - 1) * N + 5, 3));
@@ -212,7 +181,6 @@ test('a loop wider than a hemisphere takes the smaller side, the other one', () 
   const t = createTerritory(1);
   t.begin([path[0]], 0);
   sail(t, path);
-  // the side taken is the cap of 70° round the antipode, with the patch's part beyond it
   const small = Math.PI - theta,
     expected =
       2 * Math.PI * R * R * (1 - Math.cos(small)) + patchOutsideCap(small);
@@ -234,7 +202,6 @@ test('what a loop encloses is taken from others, islands and all; it floods from
     theta = 0.12,
     path = circlePath(pole, theta);
   const t = createTerritory(2);
-  // ship 1's home lies inside the circle ship 0 sails round
   t.begin([path[0], pole], 0);
   assert.equal(t.ownerAt(pole), 1);
   sail(t, path);
@@ -256,7 +223,6 @@ test('sailing paints a strip as wide as her beam, hers at once: no line to cut, 
     t = createTerritory(1);
   t.begin([start], 0);
   const before = t.share(0) * PLANET;
-  // 120 m straight out from her home patch, out of it after 30
   const end = normalize(add(start, basis(start)[0], 120 / R)),
     path = line(start, end);
   sail(t, path);
@@ -275,7 +241,6 @@ test('sailing paints a strip as wide as her beam, hers at once: no line to cut, 
   }
   const paints = t.changes().filter((c) => c.kind === 'paint');
   assert.ok(paints.length > 0 && paints.every((c) => c.ship === 0));
-  // sailing on in her own water paints nothing more
   const seq = t.last();
   sail(t, line(end, path[Math.round(60 / STRIDE)]));
   assert.ok(
@@ -290,7 +255,6 @@ test("her strip takes others' water as it passes; theirs is left smaller, not cu
   const b = normalize(add(a, basis(a)[0], 70 / R));
   t.begin([a, b], 0);
   const theirs = t.share(1);
-  // straight through the middle of ship 1's home patch and out the far side
   const through = normalize(add(a, basis(a)[0], 140 / R));
   sail(t, line(a, through));
   assert.equal(t.ownerAt(b), 0, "the middle of ship 1's patch is hers");
@@ -304,7 +268,6 @@ test('crossing her own strip, far from where she painted it, closes a loop', () 
   const home = onCircle(pole, theta + 120 / R, 0),
     t = createTerritory(1);
   t.begin([home], 0);
-  // out to the circle, once round it and on across her own strip there
   const enter = onCircle(pole, theta, 0);
   const path = [
     ...line(home, enter),
@@ -331,8 +294,6 @@ test("the storm takes the water outside its cap; a sunk ship's drains away; a sh
       drain.ship === null &&
       drain.cells.length > 100
   );
-  // not sunk: sailing on, she paints water of her own where she is, no new
-  // home patch laid
   const path = line(b, normalize([0.1, 0.25, 1]));
   sail(t, path, 1, WHOLE);
   assert.ok(t.holds(1), 'water of her own again');
@@ -344,7 +305,6 @@ test("the storm takes the water outside its cap; a sunk ship's drains away; a sh
   assert.ok(sunk && sunk.kind === 'drain' && sunk.ship === 0);
 });
 
-/** 80 ships wandering for `steps` steps from berths spread over the planet, each turning at random. */
 function wander(seed: number, steps: number, ships = 80) {
   const rand = random(seed),
     t = createTerritory(ships);

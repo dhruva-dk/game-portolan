@@ -1,6 +1,3 @@
-// The chase camera (play/chase.ts): over her shoulder, the look held where it
-// is left against the world, the middle of the screen its line of sight, never
-// under the sea or in the land.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createChase, PITCH } from '../src/play/chase.ts';
@@ -30,22 +27,13 @@ const north = normalize(cross([1, 0, 0], up));
 const flat = () => -30,
   calm = () => 0;
 const deg = Math.PI / 180;
-/**
- * Where p, `up` m over the sea, falls through `e` on a view `width` × `height`:
- * placed, into a point of its own.
- */
 const onScreen = (e: Eye, p: Vec3, width: number, height: number, up = 0) =>
   placed({ x: 0, y: 0 }, e, p, up, { width, height });
-/**
- * Her pose at `at`, heading `forward` (any vector; its part along the surface
- * counts).
- */
 const pose = (at: Vec3, forward: Vec3) => ({
   position: scale(at, R),
   forward: normalize(add(forward, at, -dot(forward, at))),
   up: at,
 });
-/** `t` turned `a` radians to port about `u`. */
 const turned = (t: Vec3, u: Vec3, a: number) =>
   normalize(add(scale(t, Math.cos(a)), cross(u, t), Math.sin(a)));
 const angle = (a: Vec3, b: Vec3) =>
@@ -59,8 +47,6 @@ test('panned, the look stays where it is left: its bearing against the world, ho
     angle(chase.axes().ahead, north) < 1e-6,
     'it starts along her heading'
   );
-  // dragged 90° to port, then let go for 5 s while she comes round through a
-  // whole turn and more
   chase.update(
     pose(up, north),
     { x: -Math.PI / 2 / 0.0056, y: 0 },
@@ -93,7 +79,6 @@ test('as she sails on, the look is carried along with her over the sphere, its b
     facing = north,
     heading = cross(north, up);
   for (let i = 1; i <= 300; i++) {
-    // sailing east at 12 m/s, her look still north
     const next = along(at, heading, 12 / 30);
     facing = transport(facing, at, next.p);
     [at, heading] = [next.p, next.t];
@@ -119,7 +104,6 @@ test('the middle of the screen is the line of sight, and it passes clear of her 
       Math.abs(q.x - 478) < 1e-6 && Math.abs(q.y - 220) < 1e-6,
       `${q.x}, ${q.y}`
     );
-    // her own body (hull and rig) is never on the line
     assert.ok(
       offSight(s, shipAt(up, heading))!.angle > 0,
       `her heading ${off}° off the look: the line on her`
@@ -132,7 +116,6 @@ test('as it starts, she is seen whole, low and left in the frame, her trucks abo
   const chase = createChase(flat, calm);
   chase.reset(pose(up, north), 0);
   const right = cross(north, up);
-  /** Where a point of her stands on the 956×440 screen: `fwd` m ahead of her middle, `high` m up, `side` m to starboard. */
   const seen = (fwd: number, high: number, side = 0) => {
     const p = add(add(scale(up, R + high), north, fwd), right, side);
     return onScreen(chase.eye(), normalize(p), 956, 440, length(p) - R)!;
@@ -188,7 +171,6 @@ test('looked as high or as low as it goes, the eye stays over the sea; by a hill
       'never looking far up into the sky'
     );
   }
-  // a hill 22 m high from 15 m behind her: the eye drawn in toward her, the look's way kept
   const south = scale(north, -1);
   const hill = (p: Vec3) => (dot(p, south) > Math.sin(15 / R) * 1 ? 22 : -30);
   const hilly = createChase(hill, calm);
@@ -205,7 +187,6 @@ test('looked as high or as low as it goes, the eye stays over the sea; by a hill
 });
 
 test('by the storm, looked as low as it goes or in her sunk shot, the eye stays under its cloud; in the calm it is not drawn in', () => {
-  /** A calm `metres` round a centre that far from her, along her look's line (so the eye, astern, is farther out). */
   const calmOf = (metres: number, ahead: number) => ({
     centre: along(up, north, ahead).p,
     radius: metres / R,
@@ -228,8 +209,6 @@ test('by the storm, looked as low as it goes or in her sunk shot, the eye stays 
         shot
       );
   };
-  // her at the last cap's middle (75 m), the eye some 50 m astern in reach of the cloud's front: as it starts, looked
-  // as low as it goes, and in her sunk shot; and her out in the storm
   for (const [cap, y, shot] of [
     [calmOf(75, 0), 0, {}],
     [calmOf(75, 0), 5000, {}],
@@ -239,14 +218,12 @@ test('by the storm, looked as low as it goes or in her sunk shot, the eye stays 
     const chase = createChase(flat, calm);
     chase.reset(pose(up, north), 0);
     settle(chase, cap, y, shot);
-    // under its lowest, or farther into the calm than its front stands out
     const inside = toEdge(chase.eye().position, cap);
     assert.ok(
       height(chase) < CLOUD.lowest || inside > CLOUD.out,
       `${height(chase).toFixed(1)} m up, ${inside.toFixed(1)} m into the calm`
     );
   }
-  // far from it, looked as low as it goes, it stands as high as the boom takes it
   const far = createChase(flat, calm);
   far.reset(pose(up, north), 0);
   settle(far, calmOf(400, 0), 5000);

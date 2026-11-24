@@ -1,93 +1,43 @@
-// A bot's water (territory.ts): the loops she sails to claim more of it. She
-// paints her water wherever she sails; a loop closed fills in what it fences
-// off. Her claims are bites (out, across, back), weighed among her other
-// options (bot.ts) by the same utility scoring:
-// - claim: a bite out past the edge of her water along a bearing open and
-//   inside the storm, across, and back in a little way inside the edge she
-//   left by. Sooner the more she wants water (Temper claim) and the fewer ships
-//   about; a bite begun, finishing it comes first (only the storm, a fight or a
-//   run outrank it). Back at its last mark the bite is done, and she rests a
-//   while.
-//
-// Pure arithmetic: no three, so it runs in node for the tests; deterministic
-// for the same inputs, to the bit.
-
 import { distance, along, toward, type Vec3 } from '../world/sphere.ts';
 import { clearAt } from './route.ts';
 import { toEdge } from './storm.ts';
 import { ramp, utility } from './utility.ts';
 import { between, mate, open, rotate, type Ctx } from './captain.ts';
 
-/** Everything a bot's water is tuned by. Metres and seconds. */
 export const CLAIMER = {
-  /**
-   * A bite reaches `depth` m past her edge and runs `width` m along it, from
-   * timid to greedy (some 16–34 units out and 16–34 along, at 1.5–2.5 m a
-   * unit); the edge looked for every `probe` m, out to `edgeMost`; the way back
-   * ends `inside` m in from it.
-   */
   depth: [30, 90] as const,
   width: [30, 80] as const,
   probe: 5,
   edgeMost: 200,
   inside: 10,
-  /**
-   * Her marks out lie `room` chart cells from the shore at least (some 20 m):
-   * she comes about at each, at speed, and one hard by a shore had her drive
-   * her bow on to it coming round.
-   */
   room: 3,
-  /**
-   * A bite's marks are reached within `arrive` m. A bite done, she rests `rest`
-   * s, less the greedier.
-   */
   arrive: 14,
   rest: [4, 16] as const,
-  /**
-   * A ship within `danger` m keeps her from setting out; none within `clear`
-   * m, she sets out freely.
-   */
   danger: 110,
   clear: 160,
-  /** How much a bite in hand counts, and a new one at most (by her greed). */
   out: 0.75,
   setOut: 0.45,
-  /**
-   * With no bite to sail, she circles on a mark `round` m ahead, turned to her
-   * side, her water `past` m beyond it.
-   */
   round: 22,
   past: 10,
 } as const;
 
-/**
- * Who holds the sea, as a bot knows it (territory.ts): who holds the water at a
- * point (her id, −1 none), and which team (−1 none: with no teams, each ship
- * is her own).
- */
 export interface Holdings {
   ownerAt(p: Vec3): number;
   teamAt(p: Vec3): number;
 }
 
-/**
- * What her claimer carries: the bite she sails (its marks), the one she makes
- * for, and when she may set out on the next.
- */
 export interface ClaimMemory {
   bite: Vec3[] | null;
   leg: number;
   rested: number;
 }
 
-/** A claimer's memory as she puts to sea. */
 export const claimMemory = (): ClaimMemory => ({
   bite: null,
   leg: 0,
   rested: 0,
 });
 
-/** The distance to the nearest other ship, her own team's aside. */
 const nearest = (c: Ctx) =>
   c.others.reduce(
     (d, o) =>
@@ -95,7 +45,6 @@ const nearest = (c: Ctx) =>
     Infinity
   );
 
-/** How much she wants to sail a loop now. */
 export function claimUrge(c: Ctx): number {
   const { m } = c;
   if (!c.sea.holdings) return 0;
@@ -105,10 +54,6 @@ export function claimUrge(c: Ctx): number {
   return c.b.claimer.setOut * utility(c.t.claim, safe);
 }
 
-/**
- * Plans a bite out from her water at p along a bearing that is open and inside
- * the storm, or null if she finds none.
- */
 function plan(c: Ctx, p: Vec3): Vec3[] | null {
   const h = c.sea.holdings!,
     s = c.sea.storm,
@@ -156,14 +101,9 @@ function plan(c: Ctx, p: Vec3): Vec3[] | null {
   return null;
 }
 
-/**
- * Sails her bite: planned where she is, its marks in turn. Her goal: the mark
- * she makes for, or one to circle on in her water if she has no bite.
- */
 export function claimAct(c: Ctx): Vec3 {
   const { m } = c,
     p = c.own.ship.at;
-  // back at its last mark: the bite is done
   if (
     m.bite &&
     m.leg === m.bite.length - 1 &&
@@ -191,11 +131,6 @@ export function claimAct(c: Ctx): Vec3 {
   return m.bite[m.leg];
 }
 
-/**
- * A mark `round` m ahead and turned to her side, in her own water and open: she
- * keeps way on in it, no sitting target (the other side, else about astern, at
- * her water's edge heading out, else straight on, if none to her side is).
- */
 function circle(c: Ctx): Vec3 {
   const p = c.own.ship.at,
     f = c.own.ship.heading,
@@ -204,7 +139,6 @@ function circle(c: Ctx): Vec3 {
   for (const a of [0.6, 1.1, 1.7, -0.6, -1.1, -1.7, 2.4, -2.4, Math.PI]) {
     const way = rotate(p, f, side * a),
       q = along(p, way, c.b.claimer.round).p;
-    // and her water past it, room for the way she carries on by it
     if (
       h.ownerAt(q) === c.own.id &&
       h.ownerAt(along(p, way, c.b.claimer.round + c.b.claimer.past).p) ===

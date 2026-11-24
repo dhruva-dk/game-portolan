@@ -74,8 +74,6 @@ const piece = (
 ): Loot => ({ id, at: p, goods, from, age, way: [0, 0, 0] });
 const lying = (...pieces: Loot[]): Flotsam => ({ pieces, next: 100 });
 
-// ------------------------------------------------------------------ gust
-
 test('a gust spends a charge, blows its time, and the charges come back one at a time', () => {
   let g = gustOf();
   assert.ok(ready(g));
@@ -170,8 +168,6 @@ test('a ball fired in a gust goes off wider', () => {
   assert.ok(spreadOf(1) > spreadOf(0) * 1.3);
 });
 
-// ------------------------------------------------------------------ hold
-
 test('stacks fill up to their most, then empty slots; what does not fit is left over', () => {
   let h = emptyHold();
   h = stowed(h, 'smallShield', 3).hold;
@@ -205,14 +201,12 @@ test('a tap chooses a slot; a tap on the chosen begins it; done, it mends to its
   assert.deepEqual(health, { hull: 40, shield: 25 });
   assert.deepEqual(h.items[0], { kind: 'smallShield', count: 1 });
   assert.equal(h.using, null);
-  // a second to its cap: a small shield gives up to 50
   health = { hull: 40, shield: 40 };
   h = begun(h, 1, health);
   for (let t = 0; t < 1.1; t += STEP)
     ({ hold: h, health } = stepUse(h, health, STEP));
   assert.equal(health.shield, 50);
   assert.equal(h.items[0], null, 'the last one gone empties the slot');
-  // a kit: hull up to 75
   health = { hull: 70, shield: 0 };
   h = tapped(tapped(h, 2, health), 2, health);
   for (let t = 0; t < 2; t += STEP)
@@ -282,8 +276,6 @@ test('a blow breaks off what she is mending with; the storm does not', () => {
   );
 });
 
-// ------------------------------------------------------------------ loot
-
 test('the pieces drawn come in their shares: half of them guns (first three in five), mostly common, the cannon commonest', () => {
   const draw = random(7),
     n = 20000;
@@ -319,7 +311,6 @@ test('the pieces drawn come in their shares: half of them guns (first three in f
 });
 
 test('the loot is strewn evenly over the planet, on open water only, the same for a seed', () => {
-  // a world with a round island: its middle dry, its rim shallow
   const isle = fromLatLon(0, 0);
   const depth: Depth = (p) => (distance(p, isle) < 120 ? -5 : 20);
   const f = laying(5, depth).strewn();
@@ -335,9 +326,7 @@ test('the loot is strewn evenly over the planet, on open water only, the same fo
     f.pieces.length > LOOT.spots * 1.3 && f.pieces.length < LOOT.spots * 1.5,
     `${f.pieces.length}`
   );
-  // the island's spots are moved to its shore, not lost
   assert.ok(f.pieces.some((l) => distance(l.at, isle) < 140));
-  // everywhere has some within a cell or so
   const cell = Math.sqrt((4 * Math.PI * R * R) / LOOT.spots);
   const draw = random(3);
   for (let k = 0; k < 200; k++) {
@@ -348,7 +337,6 @@ test('the loot is strewn evenly over the planet, on open water only, the same fo
 });
 
 test('every berth has a gun within reach of it at the start, on open water; one laid only where there was none', () => {
-  // a shoal bank to the east of the berths: no gun is laid on it
   const depth: Depth = (p) =>
     dot(p, east) > 0 && distance(p, c0) < 60 ? 1 : 20;
   const berths = [c0, at(400), at(-300)];
@@ -379,7 +367,6 @@ test('every berth has a gun within reach of it at the start, on open water; one 
   );
 });
 
-/** Her guns' kinds and rarities, slot by slot (null: empty). */
 const kinds = (c: Crew) => c.guns.map((g) => g && `${g.kind} ${g.rarity}`);
 
 test('she takes what fits within reach: a gun into each empty gun slot, the one in hand first, stacks into her slots', () => {
@@ -405,7 +392,6 @@ test('she takes what fits within reach: a gun into each empty gun slot, the one 
     r.flotsam.pieces.map((l) => l.id),
     [3]
   );
-  // a second fills the other slot, not her hand
   const r2 = swept(
     lying(piece(4, at(3), { kind: 'mortar', rarity: 0 })),
     r.crews,
@@ -417,7 +403,6 @@ test('she takes what fits within reach: a gun into each empty gun slot, the one 
     [kinds(r2.crews[0]), r2.crews[0].hand],
     [['scatter 2', 'mortar 0'], 0]
   );
-  // with both full, a third is offered, not taken
   const r3 = swept(
     lying(piece(5, at(3), { kind: 'cannon', rarity: 1 })),
     r2.crews,
@@ -444,7 +429,6 @@ test('asked, she swaps the gun in hand for the one offered, and hers goes over t
   assert.equal(r.flotsam.pieces.length, 1);
   const old = r.flotsam.pieces[0];
   assert.deepEqual([old.goods, old.from], [{ kind: 'scatter', rarity: 1 }, 1]);
-  // she lies over it with a slot empty: her own is not taken back
   const bare = { ...r.crews[0], guns: [r.crews[0].guns[0], null] };
   let fl = drifted(r.flotsam, 2, deep);
   assert.deepEqual(
@@ -452,7 +436,6 @@ test('asked, she swaps the gun in hand for the one offered, and hers goes over t
     ['cannon 0', null],
     'not while she is over it'
   );
-  // clear of it, then back: hers again
   fl = swept(fl, [bare], [vessel(1, at(40))], new Map(), 1).flotsam;
   assert.deepEqual(
     kinds(swept(fl, [bare], [vessel(1, c0)], new Map(), 1).crews[0]),
@@ -479,7 +462,6 @@ test('a tap on her other gun takes it in hand (EQUIP), letting go the wind-up or
     a.cues.map((k) => [k.kind, k.gun]),
     [['swapped', 'cannon']]
   );
-  // on the one in hand, part spent: a reload begun; full, nothing
   const spent = {
     ...a.crews[0],
     guns: [a.crews[0].guns[0], { ...gunOf('cannon', 2), rounds: 3 }],
@@ -493,7 +475,6 @@ test('a tap on her other gun takes it in hand (EQUIP), letting go the wind-up or
     ['reloading']
   );
   assert.deepEqual(ask(1, a.crews[0]).cues, []);
-  // an empty slot is not taken in hand
   assert.equal(ask(1, crewOf(1, gunOf('cannon', 0))).crews[0].hand, 0);
 });
 

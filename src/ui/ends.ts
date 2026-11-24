@@ -1,17 +1,3 @@
-// Her match's end, laid over the world as it goes on (never an opaque sheet),
-// after the camera's beat on it:
-//   result   sunk, a band across the top: her place in its laurel over how many began (17 over 80), what sank her (a
-//            ball, a ram, the Storm) in a paper disc, the sea she held (her share of the planet's water); the middle of
-//            the screen, her ship going down, left clear. The sea held is marked by a patch of waves in her dye, its
-//            share always to a tenth (0.0%).
-//            Won, her place gilt in a sunburst beside the sea she held. At the foot her ways on, each
-//            a banner: the spyglass (watch the match on: spectate) while ships still fight, the circular arrow (home,
-//            this seed sailed again) and the die (home, a new seed)
-//   watching small marks at the edges while she watches another ship: the anchor's disc at the top left (home, a new
-//            seed), and
-//            at the foot the spyglass between the arrows that turn her to the next ship or the one before
-// No words; numerals only.
-
 import type { End } from '../player.ts';
 import {
   INK,
@@ -33,10 +19,6 @@ import { banner, sheet } from './screens.ts';
 import { onTap, region } from './touch.ts';
 import { at, fade, piece, screen } from './ui.ts';
 
-/**
- * A place's laurel and numeral: gold for the first, silver for the top five,
- * red for the top ten, ink below.
- */
 const placed = (place: number) =>
   place === 1
     ? [WASH.gold, INK.gold]
@@ -48,8 +30,6 @@ const placed = (place: number) =>
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
 
-/** The sea held's mark: a disc of the chart's sea, waves inked across it, a patch of it washed in her dye and its
- *  border inked in it (her water's own look on the sea), `r` across its half. */
 const held = (x: number, y: number, r: number, dye: string) => {
   const clip = uid('held'),
     wave = (wy: number) =>
@@ -63,12 +43,9 @@ const held = (x: number, y: number, r: number, dye: string) => {
   );
 };
 
-/** A chevron pointing `side` (−1 left, +1 right). */
 const chevron = (x: number, y: number, side: number) =>
   `<path d="M${x - 6 * side} ${y - 11}L${x + 6 * side} ${y}L${x - 6 * side} ${y + 11}" fill="none" stroke="${INK.iron}" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>`;
 
-/** What sank her, in a paper disc: for a ball the gun it came from (a cannon, not known), two hulls met for a ram,
- *  the Storm's whirl. */
 const cause = (x: number, y: number, { how, gun }: End) => {
   const r = 22;
   const mark =
@@ -80,7 +57,6 @@ const cause = (x: number, y: number, { how, gun }: End) => {
   return paperDisc(x, y, r, how === 'storm' ? INK.storm : INK.iron) + mark;
 };
 
-/** The sunburst behind a win's laurel: straight rays and flames by turns, gilt, turning slowly. */
 const sunburst = (x: number, y: number, r: number) => {
   let rays = '';
   for (let i = 0; i < 32; i++) {
@@ -103,21 +79,16 @@ const sunburst = (x: number, y: number, r: number) => {
   );
 };
 
-/** Her result over the world: what it shows, and its ways on (watch: null while there is no match on to watch);
- *  `dye` her livery's, as the display shows it, for the sea she held. */
 export function createResult(
   dye: () => string,
   act: { watch(): void; leave(): void; again(): void }
 ) {
   const s = sheet(false, false);
-  // shade at the top and the foot, under the band and the ways on; the middle, where her ship is, left clear
   const shade = alpha(SHADOW, 0.42),
     clear = alpha(SHADOW, 0);
   s.root.style.background = `linear-gradient(to bottom, ${shade}, ${clear} 40%, ${clear} 66%, ${shade})`;
-  /** Whether it is shown, and with its way to watch. */
   let shown = false,
     watching = false;
-  /** Her place over how many began, in its laurel, `r` across, at (x, y). */
   const place = (x: number, y: number, r: number, end: End) => {
     const [wreath, numeral] = placed(end.place),
       k = r / 48;
@@ -128,8 +99,6 @@ export function createResult(
       figure(x, y + 29 * k, end.of, 17 * k)
     );
   };
-  /** Draws her end afresh: sunk, a band across the top of the screen, so the world under it, her ship going down,
-   *  shows whole; won, her place gilt in its sunburst beside the sea she held. Her ways on at the foot. */
   const draw = (end: End) => {
     const won = end.how === 'won',
       y = 72;
@@ -146,14 +115,12 @@ export function createResult(
         cause(476, y, end) +
         held(530, y, 16, dye()) +
         figure(552, y, percent(end.share), 26, { anchor: 'start' });
-    // the circular arrow (this seed again) and the die (a new one), the spyglass before them while ships still fight
     const homes = (x: number, w: number, gilt = false) =>
       `<g id="again">${banner(x, 370, w, again(x - 4, 366, 50), gilt)}</g>` +
       `<g id="leave">${banner(x + w + 20, 370, w, die(x + w + 16, 366, 50), gilt)}</g>`;
     const ways = watching
       ? `<g id="watch">${banner(282, 370, 176, spyglass(278, 366, 68))}</g>${homes(478, 176)}`
       : homes(380, 176, won);
-    // the band at the top of the screen, the ways on at its foot (on another shape of screen, each kept to its edge)
     s.set(
       (p) => at(p, 'centre', 'top', body) + at(p, 'centre', 'bottom', ways),
       (el) => {
@@ -164,12 +131,9 @@ export function createResult(
     );
   };
   return {
-    /** Shows her end, with WATCH while the match goes on; or hides it. Shown already, it only loses WATCH once the
-     *  match is over. */
     show(on: boolean, end?: End) {
       if (on && end && !shown) draw(end);
       else if (on && end?.over && watching) {
-        // the match ended under it: WATCH fades, LEAVE stays where it is
         const w = s.root.querySelector<SVGGElement>('#watch');
         if (w) {
           w.classList.remove('press');
@@ -181,7 +145,6 @@ export function createResult(
       shown = on;
       s.show(on);
     },
-    /** Hides it over `ms`. */
     hide(ms: number) {
       shown = false;
       s.show(false, ms);
@@ -189,8 +152,6 @@ export function createResult(
   };
 }
 
-/** While she watches: the anchor's disc (home) at the top left, and at the foot the spyglass between the arrows that
- *  turn her to the ship before (−1) or the next (+1). */
 export function createWatching(act: {
   leave(): void;
   switch(by: number): void;

@@ -1,11 +1,3 @@
-// The algorithms the terrain (terrain.ts) runs over the planet's cells
-// (cells.ts, 6 × 256², about 3.4 m a cell): the level that leaves a share of
-// the planet's area above it, the distance to a contour, connected parts,
-// discs; and reading a per-cell value smoothly at any point, between the cells'
-// centres.
-//
-// Pure arithmetic: no three, so it runs in node for the tests.
-
 import {
   CELLS,
   N,
@@ -20,14 +12,11 @@ import {
 import { smoothstep } from './scalar.ts';
 import { R, faceUV, type Vec3 } from './sphere.ts';
 
-/** Square metres in an area quantum (cells.ts), and a cell's area. */
 const AREA_M2 = (4 * Math.PI * R * R) / PLANET_QUANTA;
 export const areaOf = (c: number) => areaQuanta(c) * AREA_M2;
-/** A cell's breadth at a face's middle, metres. */
 export const CELL = (R * Math.PI) / 2 / N;
 
 let XYZ: Float64Array | null = null;
-/** Every cell centre's unit vector, x, y, z a cell. */
 export function centres(): Float64Array {
   if (XYZ) return XYZ;
   XYZ = new Float64Array(3 * CELLS);
@@ -35,7 +24,6 @@ export function centres(): Float64Array {
   return XYZ;
 }
 
-/** Metres along the surface between two cells' centres. */
 function arc(a: number, b: number): number {
   const p = centres(),
     dx = p[3 * a] - p[3 * b],
@@ -46,7 +34,6 @@ function arc(a: number, b: number): number {
   );
 }
 
-/** A binary min-heap of cells by key. */
 export function heap() {
   let key = new Float64Array(4096),
     val = new Int32Array(4096),
@@ -75,7 +62,6 @@ export function heap() {
       key[i] = k;
       val[i] = v;
     },
-    /** The least key's cell; its key in `top`. */
     pop(): number {
       const v = val[0];
       this.top = key[0];
@@ -99,10 +85,6 @@ export function heap() {
   };
 }
 
-/**
- * The level in `field` below which `1 − share` of the planet's area lies
- * (area-weighted, so exact whatever the cells' sizes).
- */
 export function seaLevel(field: Float32Array, share: number): number {
   const order = Int32Array.from({ length: CELLS }, (_, c) => c).sort(
     (a, b) => field[a] - field[b]
@@ -116,21 +98,7 @@ export function seaLevel(field: Float32Array, share: number): number {
   return field[order[CELLS - 1]];
 }
 
-/**
- * Signed distance from each cell's centre to the coast, metres, positive at sea
- * (where `field` < `level`).
- *
- * The coast is the level's contour through the field, found between cells:
- * wherever two neighbours lie either side of it, the field crosses it at the
- * point a straight line between their centres says. Those points seed a vector
- * propagation outward (each cell keeps the nearest seed point any neighbour
- * knows, measured from itself), one sweep for both sides at once. So the
- * distance is to a smooth coast, not to a cell's square across it, and the
- * coast it gives reads as a curve rather than a staircase of cells.
- */
 export function shoreOf(field: ArrayLike<number>, level: number): Float32Array {
-  // (float64: a float32 rounding a distance up would let the same distance
-  // improve on itself, without end)
   const p = centres(),
     dist = new Float64Array(CELLS).fill(Infinity),
     src = new Float64Array(3 * CELLS),
@@ -184,10 +152,6 @@ export function shoreOf(field: ArrayLike<number>, level: number): Float32Array {
   );
 }
 
-/**
- * The connected parts of `mask` (sides shared): each cell's part (−1 off the
- * mask), and each part's area, m².
- */
 export function components(mask: Uint8Array): {
   part: Int32Array;
   area: number[];
@@ -217,10 +181,6 @@ export function components(mask: Uint8Array): {
   return { part, area };
 }
 
-/**
- * Every cell within `radius` metres of cell `c`'s centre, passed to `visit`;
- * `seen` and a fresh `mark` keep each to once.
- */
 export function disc(
   c: number,
   radius: number,
@@ -243,10 +203,6 @@ export function disc(
   }
 }
 
-/**
- * The sixteen cells whose centres surround a point and each one's weight, `n`
- * in all: near a corner of the cube up to sixteen more (locate).
- */
 interface Taps {
   cell: Int32Array;
   weight: Float64Array;
@@ -258,10 +214,6 @@ export const taps = (): Taps => ({
   n: 16,
 });
 
-/**
- * Catmull-Rom's four weights at fraction t between the middle two of four
- * evenly spaced samples.
- */
 function catmullRom(t: number, w: Float64Array) {
   const t2 = t * t,
     t3 = t2 * t;
@@ -271,12 +223,6 @@ function catmullRom(t: number, w: Float64Array) {
   w[3] = 0.5 * (t3 - t2);
 }
 
-// Each face's lattice carried on past each of its sides (0 −u, 1 +u, 2 −v, 3
-// +v) as the next face unfolds flat beside it, five numbers a side: that face;
-// whether a place along the edge is a row of that face's (1) or a column (0);
-// the sign and offset taking a place along this face's edge to one along that
-// face's; and its column or row at the edge. Along an edge the two faces' cells
-// line up one for one (cells.ts), so unfolded they make one lattice across it.
 const FOLD = new Int32Array(24 * 5);
 for (let f = 0; f < 6; f++)
   for (let s = 0; s < 4; s++) {
@@ -298,13 +244,7 @@ for (let f = 0; f < 6; f++)
     );
   }
 
-/** unfold's answer: a face, column and row. */
 const SPOT = new Int32Array(3);
-/**
- * Column i, row j of face f's lattice, past its side s (and maybe past another
- * side too), as the column and row of the next face's lattice unfolded beside
- * it, into SPOT.
- */
 function unfold(f: number, i: number, j: number, s: number) {
   const o = 5 * (4 * f + s),
     depth = s === 0 ? -1 - i : s === 1 ? i - N : s === 2 ? -1 - j : j - N;
@@ -315,21 +255,12 @@ function unfold(f: number, i: number, j: number, s: number) {
   SPOT[2] = FOLD[o + 1] ? along : across;
 }
 
-/**
- * The cell at column i, row j of face f's lattice, past at most one of its
- * sides: there, the unfolded next face's.
- */
 function past(f: number, i: number, j: number): number {
   if (i >= 0 && i < N && j >= 0 && j < N) return f * N * N + j * N + i;
   unfold(f, i, j, i < 0 ? 0 : i >= N ? 1 : j < 0 ? 2 : 3);
   return past(SPOT[0], SPOT[1], SPOT[2]);
 }
 
-/**
- * The cell at column i, row j of face f's lattice, past two sides at once
- * (beyond a corner of the cube, where no cell lies): unfolded across side s
- * first, then on past the next face's side as `past` reads it there.
- */
 function pastCorner(f: number, i: number, j: number, s: number): number {
   unfold(f, i, j, s);
   return past(SPOT[0], SPOT[1], SPOT[2]);
@@ -337,23 +268,6 @@ function pastCorner(f: number, i: number, j: number, s: number): number {
 
 const WU = new Float64Array(4),
   WV = new Float64Array(4);
-/**
- * Where unit vector p falls among the cells' centres, into `at`: the 4 × 4
- * round it on its face's lattice of centres (equi-angular, as cells.ts lays
- * them) and their bicubic Catmull-Rom weights. Read through them a field is
- * smooth, its slope continuous (no creases along the cells' rows for the light
- * to catch), and at a cell's centre it is exactly the cell's own value.
- *
- * Past the face's edge the lattice runs on over the next face unfolded flat
- * beside it, so a point on the edge reads the same cells with the same weights
- * from either face, and the field runs on across the seam without a step.
- * Beyond a corner of the cube, where three faces meet and the unfolded lattices
- * can't all agree, a tap is read both ways (across one edge then the other, and
- * the other way round), each weighted by how near the point lies to the edge
- * that way agrees with. That leaves the corner itself read differently from
- * each way into it, so within half a cell of it (short of the corner cells'
- * centres) the reading eases into one all three faces share there.
- */
 export function locate(p: Vec3, at: Taps): void {
   const { face, u, v } = faceUV(p);
   const x = (u + 1) * 0.5 * N - 0.5,
@@ -372,9 +286,6 @@ export function locate(p: Vec3, at: Taps): void {
       }
     return;
   }
-  // how far the point lies from the nearer u and v edges, cells; and the share
-  // of a tap beyond a corner read across the u edge first, which is the reading
-  // that agrees with the next face's there
   const du = Math.min(x + 0.5, N - 0.5 - x),
     dv = Math.min(y + 0.5, N - 0.5 - y);
   const first = du + dv > 0 ? dv / (du + dv) : 0.5;
@@ -398,17 +309,7 @@ export function locate(p: Vec3, at: Taps): void {
   if (corner > 0) cornerTaps(face, x < N / 2, y < N / 2, corner, at);
 }
 
-/**
- * Catmull-Rom's weights at the middle of the nearer and farther cell either
- * side of it.
- */
 const MID = [9 / 16, -1 / 16] as const;
-/**
- * Eases `at` by `share` into the reading at the corner of face f nearest the
- * point (low u if `lowU`, low v if `lowV`) that all three faces meeting there
- * share: each face's 2 × 2 cells at the corner, weighted as the bicubic weighs
- * them there, the three faces alike.
- */
 function cornerTaps(
   f: number,
   lowU: boolean,
@@ -431,7 +332,6 @@ function cornerTaps(
     }
 }
 
-/** A per-cell value read smoothly where `at` was located. */
 export function between(values: ArrayLike<number>, at: Taps): number {
   let v = 0;
   for (let k = 0; k < at.n; k++) v += values[at.cell[k]] * at.weight[k];

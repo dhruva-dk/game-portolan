@@ -1,6 +1,3 @@
-// A match's rules (sim/rules.ts): the game's own leave a match as it was; a
-// variant changes what is laid and how the storm closes; and nothing reads the
-// tables round them.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';

@@ -111,8 +111,6 @@ test('every sail and pennant is a whole grid of the cloth, in order, the whole o
         );
     });
     assert.equal(next, s.cloth.vertices);
-    // the four square sails and the lateen at every level, in the same order; a
-    // pennant at each masthead but the farthest
     assert.deepEqual(
       s.sails.map((g) => g.name).slice(0, 5),
       ships[0].sails.map((g) => g.name).slice(0, 5)
@@ -131,7 +129,6 @@ test('a ship changes level at its reach, and near a boundary stays where she was
     const edge = reach(k, px);
     assert.equal(chooseDetail(-1, edge * 0.99, px), k - 1);
     assert.equal(chooseDetail(-1, edge * 1.01, px), k);
-    // within the slack she keeps her level, either way
     assert.equal(chooseDetail(k - 1, edge * 1.05, px), k - 1);
     assert.equal(chooseDetail(k, edge * 0.95, px), k);
     assert.equal(chooseDetail(k - 1, edge * SLACK * 1.01, px), k);
@@ -156,7 +153,6 @@ test('the gun mount stands on her waist, carried with her pose', () => {
     forward: east,
     up,
   };
-  // (where arms.ts puts the gun)
   const m = toWorld(pose, GUN_MOUNT);
   assert.ok(
     Math.abs(length(add(m, pose.position, -1)) - Math.hypot(...GUN_MOUNT)) <

@@ -1,6 +1,3 @@
-// What happened on the sea, as the match reports it (play/moments.ts), and what
-// answers it: the camera's shake and the match's held time (play/shake.ts,
-// play/stops.ts), and the screen's flashes and heartbeat (ui/flash.ts).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { HER, HOTBAR, LIFT, LIVERY, type Deed } from '../src/player.ts';
@@ -146,7 +143,6 @@ test(
         struck.broke,
       'the blow carried'
     );
-    // a gun to its gun slot, stores to theirs on the hotbar after the guns
     const [gun, stores] = [d[7], d[8]];
     assert.ok(
       gun.kind === 'took' &&
@@ -159,7 +155,6 @@ test(
         stores.piece === 'smallShield' &&
         stores.slot === HOTBAR.guns + 1
     );
-    // sunk, she mends nothing and spends no gust
     assert.deepEqual(
       deedsOf({ ...done, her: null }, 0, counter(), 12).map((x) => x.kind),
       [
@@ -242,8 +237,6 @@ test('as she sees it: the bearing clockwise from the look, its distance, and on 
   );
   assert.equal(seenOf({ ...d, at: behind }, eye, 956, 440).seen, null);
   void north;
-  // a blow on her: whence is her dealer's bearing from the eye, wherever on or
-  // off the screen it lies; none without a dealer
   const blow: Deed = {
     seq: 2,
     time: 0,
@@ -380,7 +373,6 @@ test('shake: trauma drains, the shake is bounded and at rest after; a pulse rise
   assert.ok(envelope(p, 0.3) > 0 && envelope(p, 0.3) < 1);
   assert.equal(envelope(p, 0.5), 0);
   for (let x = 0; x < 20; x += 0.37) assert.ok(Math.abs(noise(x, 3)) <= 1.01);
-  // far off, a rumble fades to nothing
   const far = createShake(1);
   far.play(CAMERA.near, 1, 0, 400);
   assert.equal(far.trauma().rumble, 0);

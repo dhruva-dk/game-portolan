@@ -1,6 +1,3 @@
-// Her log (logbook.ts, PLAN layer 3): the ships she has seen, for a while. A
-// wounded ship she saw and lost she goes back for, to where she saw her; a
-// ship she ran from she lets be.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mind, think } from '../src/sim/bot.ts';
@@ -32,12 +29,10 @@ test('a wounded ship she saw and lost she goes back for, to where she saw her; n
       m.log.some((s) => s.id === 2 && s.strength === 20),
       `${seed}: not noted`
     );
-    // gone from sight: her lookout lets her go, her log keeps where she was
     for (let k = 0; k < 30 * 6; k++)
       m = think(own, [weak(goneTo)], { depth: deep }, m, nature(seed)).memory;
     assert.equal(m.foe, -1, `${seed}: still in her eye`);
     assert.deepEqual(m.hunt, seenAt, `${seed}: not back for her`);
-    // had she run from her, she would not go back
     let ran = mind(seed, here);
     for (let k = 0; k < 12; k++)
       ran = think(

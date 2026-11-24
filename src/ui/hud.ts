@@ -1,40 +1,3 @@
-// The match's HUD, laid on the world as the chartmaker's slips:
-//   top left    the vitals slip (vitals.ts): shield (azure) over hull, each a bar with its numeral
-//   top centre  the Storm's clock (its bolt, hollow while it holds and filled while it closes, m:ss; in the Storm's violet
-//               while it closes and under 30 s) and the ships afloat (a ship, a count)
-//   top right   the minimap (minimap.ts), north up: who holds the sea, the land and its coast, the Storm's calm and the next, the
-//               way in from outside it, her arrow (no other ship, no loot); a tap opens the full map
-//   right       under the right thumb, Fire, in the corner: the mark of the gun in hand on a
-//               paper disc, its rounds left under it; while reloading or taking it up a rubric ring running round its
-//               border, while winding up a gold one; faint and struck through with no gun (she is unarmed); held, it
-//               fires at the gun's interval. Gust above it, with a pip for each charge, the next filling as it comes
-//               back, faint with none, gilt while one blows
-//   reticle     four arms round a gap, fixed in the middle of the screen where her gun is aimed
-//               (play/chase.ts), set out to the spread its balls go off within; gilt and drawn in while the aim
-//               assist has a ship (sim/gun.ts), faint when the ball falls short of what it is on; a rubric ring while
-//               reloading and a gold one winding up, running round it; a small ring where the ball will come down, if
-//               clear of it, and for a lobbed gun a cross in a wide ring, the mark to lay on its target; none with no gun
-//   bottom      the hotbar, centred: the two guns' slots (each its kind's mark, its
-//               rarity's ink under it, its rounds; a rubric ring running round it while it reloads), a gap, then
-//               three of stores; the one in hand gilt and raised, a gold ring running round it while it is used, and a
-//               gold mark bobbing over the slot a tap would swap for what lies within reach. A tap on
-//               the other gun takes it in hand; on the one in hand, reloads it
-//   rim         washed the Storm's violet while she is outside its calm, the deeper the further out
-//   blows       what happens answered (juice.ts): the hit cross round the reticle, the figures off a struck ship, the
-//               arcs toward a blow on her, the screen's flashes and rims, the pieces knocked, a piece taken up flown
-//               to its slot
-// No words. Each piece is drawn at the drawn size and grown by the UI's size
-// (ui.ts size), the same share of the screen's short edge on any screen, in the
-// gutter on every side. The stick is drawn under it (stick.ts); look drags take
-// the rest of the screen. Once she has sunk it watches another ship (watch):
-// only the Storm's clock, the ships afloat and the disc stay, her arrow gilt.
-// While the eye comes down from space at a match's start (play/arrival.ts) none
-// of it shows; it fades in over the last of the way down (FADE), as the game
-// reports it (Status.arriving).
-//
-// It reads a plain HudState each frame and redraws a piece only when what it
-// shows has changed.
-
 import { HOTBAR, type GunKind, type Kit, type Status } from '../player.ts';
 import type { Sea } from '../snapshot.ts';
 import { clamp, lerp } from '../world/scalar.ts';
@@ -62,9 +25,6 @@ import { onHold, onTap } from './touch.ts';
 import { piece, show, view } from './ui.ts';
 import { createVitals } from './vitals.ts';
 
-/**
- * What the HUD shows: the match as the game reports it, and what she carries.
- */
 export type HudState = Status & Kit;
 
 interface HudActions {
@@ -74,38 +34,24 @@ interface HudActions {
   fire(down: boolean): void;
 }
 
-/**
- * A slot's side, the gap between slots and between the guns' and the stores',
- * px.
- */
 const SLOT = 50,
   GAP = 6,
   APART = 16;
-/** Slots on the hotbar: each one's left, px. */
 const SLOTS = HOTBAR.guns + HOTBAR.items,
   LEFT = (i: number) => i * (SLOT + GAP) + (i >= HOTBAR.guns ? APART - GAP : 0);
-/** A gun's mark. */
 const mark = (k: GunKind): Glyph => `weapon.${k}`;
-/** The minimap's diameter, px (its metres a pixel: minimap.ts SPAN). */
 const MINIMAP = 198;
-/** Fire's radius, px, in the corner on the gutter's lines, as the minimap over it and the hotbar beside it are; Gust's
- *  centre from Fire's, left and up. */
 const FIRE = 40,
   GUST_RIGHT = 6,
   GUST_UP = 86;
-/** The reticle's radius, px, and drawn in to this share of it with the assist on a ship; the radius of the ring where
- *  the ball will come down; the most the reticle is set out to, px. */
 const RETICLE = 10,
   LOCKED = 0.75,
   FALL = 4,
   SPREAD = 48;
-/** The rim's wash outside the calm: its least and most strength, and the metres out it deepens over. */
 const RIM = [0.35, 1] as const,
   RIM_DEEP = 80;
-/** The share of the arrival (play/arrival.ts ARRIVAL.seconds, 2.8 s) over whose last the HUD fades in. */
 const FADE = 0.25;
 
-/** m:ss */
 export const clock = (s: number) => {
   const t = Math.max(0, Math.ceil(s));
   return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`;
@@ -116,20 +62,16 @@ export function createHud(layer: HTMLElement, shores: Shores, act: HudActions) {
   root.className = 'screen';
   root.hidden = true;
   layer.appendChild(root);
-  // what fades in at the end of the arrival (the flow fades the root itself on a win)
   const body = document.createElement('div');
   body.className = 'screen';
   root.appendChild(body);
 
-  // each piece drawn at the drawn size and grown by the UI's size about its corner, standing in the gutter (ui.ts)
   const vitals = piece(body, 'top left', false, true);
-  // what the vitals show, inside the piece: what is knocked (juice.ts), so its knock does not undo the piece's size
   const face = document.createElement('div');
   vitals.appendChild(face);
   const drawVitals = createVitals(face);
   const readings = piece(body, 'top centre', false, true);
   const map = piece(body, 'top right', true, true);
-  // the right thumb's: Fire in the corner, Gust over it
   const thumb = piece(body, 'right bottom', false, true);
   const disc = 2 * FIRE + 4;
   thumb.style.width = `${disc}px`;
@@ -138,17 +80,14 @@ export function createHud(layer: HTMLElement, shores: Shores, act: HudActions) {
   gust.style.cssText = `right:${disc / 2 + GUST_RIGHT - 30}px;bottom:${disc / 2 + GUST_UP - 30}px`;
   const fire = piece(thumb, '', true);
   fire.style.cssText = `right:0;bottom:0;width:${disc}px;height:${disc}px`;
-  // in the middle of the screen, and where the ball comes down: marks centred on their place (ui.ts)
   const reticle = piece(body, 'mark');
   reticle.style.cssText = 'left:50%;top:50%';
   const fall = piece(body, 'mark');
-  // the rim's wash outside the calm, under everything else
   const rim = document.createElement('div');
   rim.style.cssText =
     'position:absolute;inset:0;pointer-events:none;opacity:0;' +
     `box-shadow:inset 0 0 calc(80px * var(--k)) calc(18px * var(--k)) ${alpha(DUSK, 0.6)}`;
   body.prepend(rim);
-  // fired as the thumb comes down, and held till it lifts; the touch kept from the canvas
   onHold(fire, act.fire);
   const hotbar = piece(body, 'bottom centre', false, true);
 
@@ -156,7 +95,6 @@ export function createHud(layer: HTMLElement, shores: Shores, act: HudActions) {
   onTap(map, () => act.map());
   onTap(gust, () => act.gust());
 
-  // the hotbar's slots, each its own target
   const slots = Array.from({ length: SLOTS }, (_, i) => {
     const el = document.createElement('div');
     el.className = 'press';
@@ -165,24 +103,18 @@ export function createHud(layer: HTMLElement, shores: Shores, act: HudActions) {
     onTap(el, () => act.slot(i));
     return el;
   });
-  /** Whether each slot is raised (the gun in hand). */
   const raised = slots.map(() => false);
   hotbar.style.width = `${LEFT(SLOTS - 1) + SLOT}px`;
   hotbar.style.height = `${SLOT}px`;
   const juice = createJuice(body, { vitals: face, fire, gust, slots });
 
-  /** Whether a piece is to show other than it does (drawn.ts). */
   const changed = createChanged<HTMLElement>();
-  /** The HUD's strength and the rim's as last set, hundredths; where the fall's ring was last put, tenths of a px. */
   let strength = -1,
     wash = -1,
     fallX = NaN,
     fallY = NaN;
-  /** What the minimap is asked to show, kept for each frame. */
   const more: More = {};
 
-  /** She has sunk and the HUD watches another ship: only the Storm's clock, the count and the disc stay, her arrow on
-   *  it gilt, and the disc takes no touch. */
   let watching = false;
   const hers = [vitals, thumb, reticle, fall, hotbar, rim];
 
@@ -193,8 +125,6 @@ export function createHud(layer: HTMLElement, shores: Shores, act: HudActions) {
       for (const el of hers) show(el, !on);
       map.classList.toggle('press', !on);
     },
-    /** A frame: the match as reported, who holds the sea (and her id in it) as the frame draws it; `covered`, the full
-     *  map is open over it (which would show it under its window). */
     update(s: HudState, sea?: Sea, own?: number | null, covered = false) {
       const shown = clamp(1 - s.arriving / FADE),
         now = Math.round(shown * 100);
@@ -205,7 +135,6 @@ export function createHud(layer: HTMLElement, shores: Shores, act: HudActions) {
       show(body, now > 0 && !covered);
       drawVitals.update(s);
 
-      // in the Storm's violet as it closes or is about to; its bolt filled while it closes
       const closing = s.closing || s.storm < 30;
       if (changed(readings, Math.ceil(s.storm), s.afloat, closing, s.closing)) {
         const time = clock(s.storm);
@@ -223,7 +152,6 @@ export function createHud(layer: HTMLElement, shores: Shores, act: HudActions) {
         );
       }
 
-      // each charge a pip; the one coming back filling round, in steps of a 24th
       const charge = Math.floor(s.gust),
         back = Math.floor((s.gust - charge) * 24);
       if (changed(gust, charge, back, s.gusts, s.blowing)) {
@@ -245,8 +173,6 @@ export function createHud(layer: HTMLElement, shores: Shores, act: HudActions) {
         );
       }
 
-      // Fire: the gun in hand's mark and rounds; its reload, or its taking up, a rubric sweep and its winding a gold
-      // one, each in steps of a 48th, so it is redrawn a few times a second at most
       const g = s.gun,
         c = FIRE + 2,
         step = (v: number) => Math.floor(clamp(v) * 48);
@@ -286,9 +212,6 @@ export function createHud(layer: HTMLElement, shores: Shores, act: HudActions) {
         );
       }
 
-      // the reticle, in the middle where the gun is aimed, set out to its spread (CSS px, so at the drawn size its
-      // share of the UI's size): iron under lead white, or gilt while the assist has a ship, faint when the ball falls
-      // short of what it is on; reloading or winding, its sweep round it, in steps of a 12th
       const k = view.k,
         lock =
           g && s.reticle
@@ -332,7 +255,6 @@ export function createHud(layer: HTMLElement, shores: Shores, act: HudActions) {
         }
         reticle.innerHTML = html;
       }
-      // where it will come down, if clear of the reticle: a small ring; for a lobbed gun, a cross in a wide ring
       const f = s.reticle?.fall,
         lob = !!s.reticle?.lob;
       const away = f
@@ -366,14 +288,10 @@ export function createHud(layer: HTMLElement, shores: Shores, act: HudActions) {
         );
       }
 
-      // the guns' slots hold her guns, each its rarity's ink under it and its rounds, reloading its rubric sweep; then
-      // her items. The one being used has a gold ring running round it, in steps of a 32nd; the one a tap would swap
-      // for loot a gold mark bobbing
       for (let i = 0; i < SLOTS; i++) drawSlot(s, i);
 
       juice.update(s, !watching && s.arriving <= 0);
 
-      // the rim's wash, outside the calm
       const deep =
         s.outside > 0 && !watching
           ? Math.round(
@@ -394,7 +312,6 @@ export function createHud(layer: HTMLElement, shores: Shores, act: HudActions) {
     },
   };
 
-  /** The hotbar's slot `i` as she now holds it. */
   function drawSlot(s: HudState, i: number) {
     const gun = i < HOTBAR.guns,
       k = gun ? s.guns[i] : null,
@@ -414,7 +331,6 @@ export function createHud(layer: HTMLElement, shores: Shores, act: HudActions) {
           `<animateTransform attributeName="transform" type="translate" values="0 0;0 -4;0 0" dur="0.9s" repeatCount="indefinite"/></g>`
         : '';
       if (!full) {
-        // lead white over an iron halo, to hold on bright water; an empty gun slot shows a faint gun's ghost
         el.innerHTML = svg(
           SLOT,
           SLOT,
@@ -470,7 +386,6 @@ export function createHud(layer: HTMLElement, shores: Shores, act: HudActions) {
         );
       }
     }
-    // the gun in hand raised
     const up = chosen && gun && full;
     if (up !== raised[i]) {
       raised[i] = up;

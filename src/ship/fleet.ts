@@ -1,33 +1,3 @@
-// Every ship on the sea, drawn as instances: the galleon at each of its levels
-// of detail (detail.ts) is three meshes — body, cloth, ropes — and each is
-// drawn once a frame for all the ships at that level, nine draws at most for
-// the fleet beyond the three of the nearest level. Each frame, every ship in
-// view gets a level by how big she looks (with some slack, so she doesn't
-// flicker between two), and her pose and look are packed into her level's
-// instance buffer, which its three meshes share.
-//
-// A ship's pose is world/pose.ts's; her look the captain's colours. Her canvas
-// is filled by her sails' wind (motion.ts's filling(): at rest the planet's at
-// her, weakened; under way, from her quarter whatever her heading, so it always
-// draws), in her own frame: her crew haul her square yards round to it, and
-// sails and pennants lean with it, drawn in the shader or simulated. (Not the
-// wind she feels through her own motion, which would lay her sails aback as she
-// sails into it: her speed doesn't come from the wind. Pennants streaming aft
-// over sails filled from astern would tell two stories.)
-//
-// One ship may be the player's own (`own`): she is always drawn at the finest
-// level.
-//
-// A ship going down is drawn but not afloat: the sea neither fits round her
-// hull nor takes her wake or shadow, so it closes over her. One gone is
-// dropped, and not drawn.
-//
-// Her canvas and pennants are simulated as cloth while she is among the few
-// nearest the eye (berths.ts, cloth.ts), the player's own always: each frame
-// the berths are handed out, and each berthed ship's sails' wind and motion
-// (motion.ts) handed to the cloth, before it is moved on. Every other ship's
-// are the drawn shape the shader fills.
-
 import {
   BufferAttribute,
   DynamicDrawUsage,
@@ -64,32 +34,20 @@ import {
   type FeelingOut,
 } from './motion.ts';
 
-/** A sails' pattern as the instance carries it (instance.ts). */
 const PATTERNS: Record<Look['pattern'], number> = {
   plain: 0,
   band: 1,
   stripes: 2,
 };
-/**
- * Her middle, above the waterline, metres, and a sphere round her whole rig
- * from there.
- */
 const MIDDLE = 9,
   RADIUS = 18;
-/**
- * The wind at which the sails are full and the pennants stream straight, metres
- * per second.
- */
 const FULL = 8;
-/** Each level's three draws, by name (for the meter's split: meter.ts). */
 const PARTS = ['body', 'cloth', 'ropes'] as const;
 
 const levels = DETAILS.length;
 
-/** Ship i's own phase, radians, so no two ships' canvas moves in step. */
 const phaseOf = (i: number) => (i * 2.399) % (2 * Math.PI);
 
-/** The draw for one packed mesh, sharing its level's instances. */
 function drawOf(
   name: string,
   p: Packed,
@@ -112,29 +70,19 @@ function drawOf(
   const mesh = new Mesh(geometry, material);
   mesh.name = name;
   mesh.frustumCulled = false;
-  // the blended ropes after the sea, which reads what is behind it from what
-  // was drawn before it
   mesh.renderOrder = material.transparent ? 1 : 0;
   return { mesh, geometry };
 }
 
-/**
- * A ship afloat as the sea takes her (water/wake.ts): her pose, look (and her
- * yards' brace) and velocity.
- */
 interface Afloat {
   pose: ShipPose;
   look: Look & { brace: number };
   velocity: Vec3;
 }
 
-/** capacity: the most ships there will be. */
-/** A ship's velocity when none is given: still. */
 const STILL: Vec3 = [0, 0, 0];
 
 export function createFleet(light: Light, wind: Wind, capacity: number) {
-  // a pixel's angle, radians: the target's until the first frame gives the
-  // eye's (update)
   const pixel = uniform(PIXEL);
   const cloth = createCloth();
   const materials = createShipMaterials(light, pixel, cloth);
@@ -149,7 +97,6 @@ export function createFleet(light: Light, wind: Wind, capacity: number) {
     const ship = buildShip(k),
       parts = [ship.body, ship.cloth, ship.ropes] as const;
     const made = [materials.body, materials.cloth, materials.ropes] as const;
-    // (the farthest level has no ropes, and so no rope draw)
     return PARTS.flatMap((part, j) =>
       parts[j].triangles > 0
         ? [drawOf(`ship ${part} ${k}`, parts[j], buffer, made[j])]
@@ -162,24 +109,18 @@ export function createFleet(light: Light, wind: Wind, capacity: number) {
     looks: Look[] = [],
     velocities: Vec3[] = [],
     was: number[] = [];
-  /** Whether ship i floats (else she is going down), and whether she is drawn at all. */
   const floats: boolean[] = [],
     shown: boolean[] = [];
-  /** How each ship's square yards are braced, radians (+ turns the port arm aft); and, this frame, her sails' wind, her
-   * frame, metres a second. */
   const braces: number[] = [],
     sails: Out3[] = [];
-  /** The true wind at a ship, her frame (worked out for each in turn). */
   const blowing: Out3 = [0, 0, 0];
   let count = 0,
     pinned = -1,
     own = -1,
     simulating = true;
   const berths: (Berth | null)[] = new Array(BERTHS).fill(null);
-  /** Each berth's ship's motion, written over each frame, and whether it holds one (none once the berth is let go). */
   const motions = Array.from({ length: BERTHS }, motionOut),
     moving: boolean[] = new Array(BERTHS).fill(false);
-  /** Each berth's ship's feeling, handed to the cloth. */
   const felts = Array.from({ length: BERTHS }, (): Felt & FeelingOut => ({
     brace: 0,
     phase: 0,
@@ -188,11 +129,8 @@ export function createFleet(light: Light, wind: Wind, capacity: number) {
     spin: [0, 0, 0],
     spinning: [0, 0, 0],
   }));
-  /** Each ship's distance from the eye, metres (Infinity for one not drawn), for the berths. */
   const metres = new Float64Array(capacity).fill(Infinity);
-  /** How many ships each level draws this frame. */
   const filled = new Uint32Array(levels);
-  /** Each ship afloat, as the sea takes her, and those afloat this frame (ships). */
   const records: Afloat[] = [],
     afloat: Afloat[] = [];
   const eye = new Vector3(),
@@ -211,8 +149,6 @@ export function createFleet(light: Light, wind: Wind, capacity: number) {
     share: 0,
   };
 
-  /** The ship i's pose and look, and as `how` has her (each as given there, if it is): her velocity (metres per second,
-   * world space; still) and whether she floats (afloat); ships 0…count−1 are drawn, but those dropped. */
   function set(
     i: number,
     pose: ShipPose,
@@ -228,17 +164,13 @@ export function createFleet(light: Light, wind: Wind, capacity: number) {
     looks[i] = look;
     velocities[i] = velocity;
     was[i] ??= -1;
-    // (her yards trimmed to the wind she first feels, then hauled round as it changes)
     braces[i] ??= NaN;
     count = Math.max(count, i + 1);
   }
 
-  /** Each ship's yards hauled round dt seconds on, her sails' wind found, and the berths handed out; returns the passes
-   * that move each berthed ship's canvas on dt seconds. */
   function sail(windSpeed: number, dt: number): readonly Compute[] {
     for (let i = 0; i < count; i++) {
       metres[i] = Infinity;
-      // (a ship not drawn, or never set, has no canvas to fill)
       if (!shown[i]) continue;
       const pose = poses[i],
         speed = length(velocities[i]);
@@ -253,7 +185,6 @@ export function createFleet(light: Light, wind: Wind, capacity: number) {
       filling(blowing, speed, braces[i], (sails[i] ??= [0, 0, 0]));
       if (simulating) metres[i] = eye.distanceTo(middleOf(pose));
     }
-    // (her own berthed only while she is drawn: never set, or dropped, none)
     moor(berths, metres, simulating && shown[own] ? own : -1, dt);
     for (let k = 0; k < BERTHS; k++) {
       const b = berths[k];
@@ -262,7 +193,6 @@ export function createFleet(light: Light, wind: Wind, capacity: number) {
         cloth.set(k, null);
         continue;
       }
-      // (a berth's ship stays hers till it is let go: a new one comes fresh)
       const motion = moved(
           b.fresh || !moving[k] ? null : motions[k],
           poses[b.ship],
@@ -280,7 +210,6 @@ export function createFleet(light: Light, wind: Wind, capacity: number) {
     return cloth.update(dt);
   }
 
-  /** The middle of her rig (MIDDLE over her waterline), into the sphere round it. */
   function middleOf(pose: ShipPose): Vector3 {
     const p = pose.position,
       u = pose.up;
@@ -291,10 +220,6 @@ export function createFleet(light: Light, wind: Wind, capacity: number) {
     );
   }
 
-  /**
-   * Each frame, once the eye has moved (view.ts): windSpeed in metres per second; dt the seconds since the last.
-   * Returns what is due: the near ships' canvas as cloth.
-   */
   function update(
     seen: Readonly<Eye>,
     windSpeed: number,
@@ -317,7 +242,6 @@ export function createFleet(light: Light, wind: Wind, capacity: number) {
         was[i] = -1;
         continue;
       }
-      // (the player's own ship always whole: the chase camera holds her at the finest level's edge)
       const k =
         pinned >= 0
           ? pinned
@@ -325,7 +249,6 @@ export function createFleet(light: Light, wind: Wind, capacity: number) {
             ? 0
             : chooseDetail(was[i], eye.distanceTo(sphere.center), pixel.value);
       was[i] = k;
-      // her sails' wind, as a share of FULL across her and along her
       const w = sails[i],
         size = length(w),
         part = size > 0 ? Math.min(size / FULL, 1) / size : 0;
@@ -350,7 +273,6 @@ export function createFleet(light: Light, wind: Wind, capacity: number) {
       pack(lists[k], filled[k]++ * STRIDE, drawn);
     }
     for (let k = 0; k < levels; k++) {
-      // (only the ships written go up: the buffer holds the most ships' worth)
       if (filled[k] > 0) {
         instances[k].clearUpdateRanges();
         instances[k].addUpdateRange(0, filled[k] * STRIDE);
@@ -365,24 +287,18 @@ export function createFleet(light: Light, wind: Wind, capacity: number) {
     meshes,
     set,
     update,
-    /** Ship i is the player's own (or none, for null): she is always drawn at the finest level. */
     own(i: number | null) {
       own = i ?? -1;
     },
-    /** Ship i is gone: not drawn till she is set again. */
     drop(i: number) {
       shown[i] = false;
     },
-    /** Simulate the near ships' canvas as cloth, or (false: a debug view) draw every ship's as its wind fills it. */
     simulate(on: boolean) {
       simulating = on;
     },
-    /** Draw every ship at level k, or by her size again for null (a debug view). */
     pin(k: number | null) {
       pinned = k ?? -1;
     },
-    /** The ships afloat as last set: each one's pose, look (and her yards' brace) and velocity (for the marks she leaves
-     * on the sea). The same list each time, made over: read it before the next. */
     get ships(): readonly Afloat[] {
       afloat.length = 0;
       for (let i = 0; i < count; i++) {

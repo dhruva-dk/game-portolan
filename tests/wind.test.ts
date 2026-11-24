@@ -21,7 +21,6 @@ import {
 } from '../src/world/sphere.ts';
 import { calms, createWind } from '../src/world/wind.ts';
 
-/** A deterministic spread of points over the sphere (Fibonacci). */
 const points = (n: number): Vec3[] =>
   Array.from({ length: n }, (_, i) => {
     const y = 1 - (2 * (i + 0.5)) / n,
@@ -30,7 +29,6 @@ const points = (n: number): Vec3[] =>
     return [r * Math.cos(a), y, r * Math.sin(a)] as Vec3;
   });
 
-/** Degrees between the wind at a, carried to b, and the wind at b. */
 const turn = (w: (p: Vec3) => Vec3, a: Vec3, b: Vec3) => {
   const t = transport(w(a), a, b),
     v = w(b);
@@ -68,14 +66,11 @@ test('the calms are antipodal triangle centres within 40° of the poles, and the
     assert.ok(north[1] > Math.cos((40 * Math.PI) / 180));
     for (const c of [north, south])
       assert.ok(centres.some((x) => distance(x, c) < 1e-6));
-    // every anchor lies well away from both
     for (const a of icosphere(FREQUENCY))
       assert.ok(
         Math.min(distance(a, north), distance(a, south)) >
           0.5 * spacing(FREQUENCY)
       );
-    // the wind turns round each calm once (a small loop), and nowhere else does
-    // it turn quickly
     const w = createWind(seed);
     for (const c of [north, south]) {
       const t0 = normalize(cross(c, [0.1, 0.2, 0.3]));
@@ -124,7 +119,6 @@ test("neighbouring anchors' winds differ by no more than 30°, but round the cal
         const near = Math.min(
           ...[ps[i], ps[j]].flatMap((p) => cs.map((c) => distance(p, c)))
         );
-        // the triangle round a calm meets at 120° (and the curvature it holds); the next ring, by no more than 60°
         assert.ok(a < 135, `seed ${seed}: anchors ${i}, ${j} differ by ${a}°`);
         if (near > 0.75 * spacing(FREQUENCY))
           assert.ok(a < 60, `seed ${seed}: anchors ${i}, ${j} differ by ${a}°`);
