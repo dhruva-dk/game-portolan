@@ -63,7 +63,8 @@ import { finale, type Ending } from './finale.ts';
 import { see, seenOf } from './moments.ts';
 import { answerTo, createShake } from './shake.ts';
 import { createStops, stopFor } from './stops.ts';
-import { createState, debugOf, type Berth, type Match } from './state.ts';
+import { createState, debugOf, type Berth } from './state.ts';
+import type { Match } from '../sim/engine.ts';
 import type { Waters } from '../sim/waters.ts';
 
 export interface DebugDamage {

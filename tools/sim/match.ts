@@ -2,7 +2,12 @@ import { join } from 'node:path';
 import { RIDE } from '../../src/sim/ride.ts';
 import { createMatches } from '../../src/play/setup.ts';
 import { raceOf, specField } from '../../src/play/race.ts';
-import { createState, debugOf, type Match } from '../../src/play/state.ts';
+import {
+  createMatch,
+  debugOf,
+  type Engine,
+  type Match,
+} from '../../src/sim/engine.ts';
 import type { RaceCard } from '../../src/sim/race.ts';
 import { STEP } from '../../src/sim/fixed.ts';
 import { SHIPS } from '../../src/sim/match.ts';
@@ -37,7 +42,7 @@ export interface MatchScenario {
   sea?: 'flat' | 'swell';
 }
 
-export type State = ReturnType<typeof createState>;
+export type State = Engine;
 
 function swellOf(seed: number, height: (p: Vec3) => number): Hull {
   const sea = anchors(icosphere(FREQUENCY), createWind(seed), CASCADES[0]);
@@ -97,7 +102,7 @@ function sail(
   dir: string | undefined
 ) {
   const sea = sc.sea === 'swell' ? swellOf(w.seed, w.planet.height) : flat;
-  const state = createState(w.planet, sea, w.waters, m, brain);
+  const state = createMatch(w.planet, sea, w.waters, m, brain);
   state.start(m, false);
   const players = new Set<number>();
   if (sc.players)

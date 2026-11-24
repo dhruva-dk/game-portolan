@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createState, debugOf, type Match } from '../src/play/state.ts';
+import { createState, debugOf } from '../src/play/state.ts';
+import type { Match } from '../src/sim/engine.ts';
 import { dealt, lookOf } from '../src/play/colors.ts';
 import { COLORS, LIVERY } from '../src/world/livery.ts';
 import { PLAYER, SHIPS } from '../src/sim/match.ts';
