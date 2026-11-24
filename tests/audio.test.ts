@@ -84,7 +84,7 @@ test("the bed hears its speed as a share of its top: the sim's", () =>
   assert.equal(TOP, SHIP.top));
 
 test('the table: every kind of deed, its own, is heard; every cue plays a sound there is; every sound is played by some cue', () => {
-  for (const h of each(0)) assert.ok(cueOf(h, 0), `it ${h.kind} has a cue`);
+  for (const h of each(0)) assert.ok(cueOf(h, 0), `its ${h.kind} has a cue`);
   for (const h of [...each(0), ...each(5)]) {
     const c = cueOf(h, 0);
     if (c)
