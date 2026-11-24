@@ -111,7 +111,7 @@ export function deedsOf(
       land: s.land,
     });
   for (const s of done.strikes) {
-    const { shooter: by, shield, hull, broke, ram, zone } = s;
+    const { shooter: by, shield, hull, broke, ram } = s;
     out.push({
       seq: next(),
       time,
@@ -123,7 +123,6 @@ export function deedsOf(
       hull,
       broke,
       ram,
-      zone,
     });
   }
   for (const s of done.sunk)

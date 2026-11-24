@@ -17,7 +17,6 @@ import {
   type GunKind,
 } from './sounds/guns.ts';
 import {
-  fault,
   hurt,
   ring,
   shatter,
@@ -109,7 +108,6 @@ const SOUND = {
   hurt: { make: hurt, takes: 2, level: -3, priority: 9, reach: 0 },
   ring: { make: ring, takes: 2, level: -4, priority: 8, reach: 0 },
   shatter: { make: shatter, takes: 1, level: -5, priority: 9, reach: 0 },
-  fault: { make: fault, takes: 1, level: -3, priority: 9, reach: 0 },
   sink: { make: sink, takes: 2, level: -4, priority: 7, reach: 1400 },
   gust: { make: gust, takes: 2, level: -7, priority: 6, reach: 0 },
   took: { make: took, takes: 2, level: -5, priority: 6, reach: 0 },

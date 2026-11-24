@@ -79,16 +79,13 @@ test('a race is sailed to its end: one team afloat, every ship placed, the tally
     FIRST.hits.some((h) => h.landed > 0),
     'guns were found and fired'
   );
-  assert.ok(FIRST.faults.length > 0, 'and faults came on');
-  for (const f of FIRST.faults)
-    assert.ok(f.zone >= 0 && f.zone < 4 && f.level >= 1 && f.level <= 2);
 });
 
 test('the same card on the same planet gives the same result, hash and all; another seed another', () => {
   assert.deepEqual(sailed(short()), FIRST);
   // (pinned: the same on every machine. A rule that changes a carded race
   // changes it, and says so)
-  assert.equal(FIRST.hash, '683d8a7c');
+  assert.equal(FIRST.hash, '1f26ff4d');
   const other = sailed(short({ seed: SEED + 1 }));
   assert.notEqual(other.hash, FIRST.hash);
 });

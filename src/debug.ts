@@ -91,12 +91,9 @@
 // set on the page each second drawn, for the tools (the body's data-race, as
 // JSON).
 //
-// Damage. ?zones=r,u,w,d sets her zones' shares of her hull's damage (rigging,
-// rudder, waterline, deck: player.ts ZONES), ?faults=a,b,c,d their faults (0
-// none, 1 minor, 2 major) on her and every ship, ?wear=0…2 every ship's wear
-// (her smoke), ?mend her water mending her; held over the match's own
-// (game.ts debug.wear), from ?worn=seconds into the frames drawn (0 by
-// default: from the first; later, a fault comes on in view).
+// Damage. ?wear=0…2 sets every ship's wear (her smoke); held over the match's
+// own (game.ts debug.wear), from ?worn=seconds into the frames drawn (0 by
+// default: from the first).
 //
 // Her loop. ?flood=seconds, after ?drive='s legs, steers her back to where she
 // began until her loop closes (her strip back against her older water), then sails
@@ -122,7 +119,7 @@ import type { Berth } from './play/state.ts';
 import { HOTBAR, IDLE, type Hands, type Livery } from './player.ts';
 import { probeMeshes } from './probe.ts';
 import { STEP } from './sim/fixed.ts';
-import { KINDS, SOUND, type Fault, type GunKind } from './kinds.ts';
+import { KINDS, type GunKind } from './kinds.ts';
 import { GUN, SHIP } from './sim/handling.ts';
 import { PLAYER, SHIPS } from './sim/match.ts';
 import type { ShipDraw, Snapshot, StormDraw } from './snapshot.ts';
@@ -223,33 +220,12 @@ const degrees = Math.PI / 180;
 const flying =
   params.has('fly') || ['lat', 'lon', 'alt', 'wall'].some((k) => params.has(k));
 
-/** A list switch's nth number (?zones=r,u,w,d), within 0…hi (0 where not given). */
-const nth = (name: string, i: number, hi: number) => {
-  const v = Number((params.get(name) ?? '').split(',')[i]);
-  return Math.min(hi, Math.max(0, Number.isFinite(v) ? v : 0));
-};
-/** A fault or a wear as a switch gives it: 0, 1 or 2. */
-const grade = (v: number): Fault => (v >= 1.5 ? 2 : v >= 0.5 ? 1 : 0);
-/** The damage ?zones, ?faults, ?wear and ?mend set (null with none of them). */
-const damage: DebugDamage | null = ['zones', 'faults', 'wear', 'mend'].some(
-  (k) => params.has(k)
-)
-  ? {
-      zones: [
-        nth('zones', 0, 1),
-        nth('zones', 1, 1),
-        nth('zones', 2, 1),
-        nth('zones', 3, 1),
-      ],
-      faults: [
-        grade(nth('faults', 0, 2)),
-        grade(nth('faults', 1, 2)),
-        grade(nth('faults', 2, 2)),
-        grade(nth('faults', 3, 2)),
-      ],
-      mending: params.has('mend'),
-      wear: grade(number('wear', 0)),
-    }
+/** A wear as a switch gives it: 0, 1 or 2. */
+const grade = (v: number): DebugDamage['wear'] =>
+  v >= 1.5 ? 2 : v >= 0.5 ? 1 : 0;
+/** The damage ?wear sets (null without it). */
+const damage: DebugDamage | null = params.has('wear')
+  ? { wear: grade(number('wear', 0)) }
   : null;
 
 /**
@@ -664,7 +640,6 @@ function flyer(
     afloat: true,
     gun: armed(i, o),
     wear: damage?.wear ?? 0,
-    faults: damage?.faults ?? SOUND,
   }));
   let clock = 0;
   return (dt: number): Snapshot => {

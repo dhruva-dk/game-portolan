@@ -12,8 +12,7 @@
 // ram is no shot, and counts in neither), and the hit points her balls and
 // her rams took off others; her share of the sea as she last held it afloat
 // (a sunk ship's water drains: what she held as she went down is kept, so the
-// sea a team held is its ships' together, sunk or not); and each fault as it
-// came on or worsened.
+// sea a team held is its ships' together, sunk or not).
 //
 // The hash is FNV-1a over the bits of the final state's numbers, as eight hex
 // digits: its clock, the loot left, every ship afloat (her place, heading and
@@ -21,14 +20,12 @@
 // floats) and every sinking, in order. The same race gives the same hash
 // wherever it is run.
 
-import { SOUND, type Faults } from '../kinds.ts';
 import type { Race } from '../player.ts';
 import type { RaceCard, RaceResult } from '../race.ts';
 import type { Crew, Shot, Strike } from '../sim/battle.ts';
 import type { Mode } from '../sim/captain.ts';
 import { over, teamsOf } from '../sim/carded.ts';
 import type { Vessel } from '../sim/contact.ts';
-import { faultsIn } from '../sim/faults.ts';
 import { sunk } from '../sim/health.ts';
 import type { Sunk } from '../sim/match.ts';
 import { createStandings } from './standings.ts';
@@ -109,9 +106,6 @@ export function createTally(card: RaceCard, closes: number) {
     taken = zeros(),
     dealt = zeros(),
     held = zeros();
-  const faults: RaceResult['faults'][number][] = [];
-  /** Each ship's faults as last watched. */
-  const levels: Faults[] = [];
   const forfeit = card.ships.filter((s) => s.forfeit).map((s) => s.id);
   const standings = createStandings(card);
   let made: RaceResult | null = null;
@@ -125,22 +119,6 @@ export function createTally(card: RaceCard, closes: number) {
       if (s.ram) continue;
       landed[s.shooter]++;
       taken[s.struck]++;
-    }
-  };
-
-  /**
-   * The crews after a step, at `second` of the race: each fault come on or
-   * worsened since the step before is noted.
-   */
-  const watch = (crews: readonly Crew[], second: number) => {
-    for (const c of crews) {
-      const now = sunk(c.health) ? SOUND : faultsIn(c),
-        was = levels[c.id] ?? SOUND;
-      if (now === was) continue;
-      now.forEach((level, zone) => {
-        if (level > was[zone]) faults.push({ id: c.id, zone, level, second });
-      });
-      levels[c.id] = now;
     }
   };
 
@@ -172,7 +150,6 @@ export function createTally(card: RaceCard, closes: number) {
         })),
       ],
       seaHeld: ids.map((id) => ({ id, share: share(id) })),
-      faults: faults.slice(),
       hits: ids.map((id) => ({
         id,
         fired: fired[id],
@@ -221,7 +198,6 @@ export function createTally(card: RaceCard, closes: number) {
       if (made) return;
       fought(shots, strikes);
       const s = standing();
-      watch(s.crews, s.seconds);
       if (over(teams, s.alive, s.seconds - closes)) made = result(s);
     },
     /** The race's result, once it is over; null while it is on. */

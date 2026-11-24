@@ -1,6 +1,5 @@
 // The match's HUD, laid on the world as the chartmaker's slips:
-//   top left    the vitals slip (vitals.ts): her ship from above, each of her zones washed by the damage it has
-//               taken and marked when faulted, beside shield (azure) over hull, each a bar with its numeral
+//   top left    the vitals slip (vitals.ts): shield (azure) over hull, each a bar with its numeral
 //   top centre  the Storm's clock (its bolt, hollow while it holds and filled while it closes, m:ss; in the Storm's violet
 //               while it closes and under 30 s) and the ships afloat (a ship, a count)
 //   top right   the minimap (minimap.ts), north up: who holds the sea, the land and its coast, the Storm's calm and the next, the
@@ -170,13 +169,7 @@ export function createHud(layer: HTMLElement, shores: Shores, act: HudActions) {
   const raised = slots.map(() => false);
   hotbar.style.width = `${LEFT(SLOTS - 1) + SLOT}px`;
   hotbar.style.height = `${SLOT}px`;
-  const juice = createJuice(body, {
-    vitals: face,
-    struck: drawVitals.struck,
-    fire,
-    gust,
-    slots,
-  });
+  const juice = createJuice(body, { vitals: face, fire, gust, slots });
 
   /** Whether a piece is to show other than it does (drawn.ts). */
   const changed = createChanged<HTMLElement>();

@@ -10,8 +10,7 @@
 // her go once it is past reach, as a ram can't catch a ship as fast as she is.
 // Early in a match she holds back. She runs from a fight she is losing, or from
 // a ship that rams her that she won't fight: behind land if there is any near,
-// else straight away. Lamed (her rigging or rudder faulted: faults.ts), she
-// can't outrun one, so she runs the less and, cornered, fights the more.
+// else straight away.
 //
 // Pure arithmetic: no three, so it runs in node for the tests; deterministic
 // for the same inputs, to the bit.
@@ -20,8 +19,6 @@ import { along, distance, dot, toward, type Vec3 } from '../world/sphere.ts';
 import { toEdge } from './storm.ts';
 import { logistic, ramp, utility } from './utility.ts';
 import { aggroOf, mate, open, rotate, type Ctx, type Seen } from './captain.ts';
-import { ZONES } from '../kinds.ts';
-import { faultsIn } from './faults.ts';
 import { SHIP } from './handling.ts';
 import { ranFromShip } from './logbook.ts';
 import { hidden } from './lookout.ts';
@@ -110,15 +107,6 @@ export const MIND = {
   hurt: 0.45,
   settle: 45,
   band: 0.5,
-  /**
-   * Lamed, her rigging or rudder faulted (faults.ts: half for a minor fault,
-   * wholly for a major), she can't outrun a foe: her will to run falls by
-   * `lame` of it, and with her foe within `letGo` m her will to fight rises by
-   * `cornered`, each by her temper's will to fight (a timid ship lamed still
-   * runs).
-   */
-  lame: 0.6,
-  cornered: 0.3,
 } as const;
 
 /**
@@ -184,7 +172,6 @@ export function fightUrge(c: Ctx): number {
       will -= c.b.mind.crowding * t.skill;
   if (strength(foe) >= strength(own) && ranFromShip(c, foe.id))
     will -= c.b.mind.beaten;
-  if (d < c.b.mind.letGo) will += c.b.mind.cornered * t.fight * lamed(c);
   const restraint = holdBack(c);
   will -= restraint;
   // close aboard she fights whatever her will, from nearer while she holds back
@@ -249,29 +236,15 @@ export const holdsFire = (c: Ctx) =>
   );
 
 /**
- * How lame she is: her rigging's or her rudder's fault, the worse (faults.ts),
- * 0 whole, 0.5 minor, 1 major.
- */
-function lamed(c: Ctx): number {
-  const crew = c.own.crew;
-  if (!crew) return 0;
-  const f = faultsIn(crew);
-  return Math.max(f[RIGGING] ?? 0, f[RUDDER] ?? 0) / 2;
-}
-const RIGGING = ZONES.indexOf('rigging'),
-  RUDDER = ZONES.indexOf('rudder');
-
-/**
  * Losing a fight: her hull down past where her temperament runs, with the foe
- * close (a seam for health.ts); lamed, she runs the less.
+ * close (a seam for health.ts).
  */
 const losing = (c: Ctx) =>
   c.foe
     ? utility(
         ramp(c.own.hull ?? 100, c.t.run + 8, c.t.run - 4),
         ramp(c.foeD, 160, 130)
-      ) *
-      (1 - c.b.mind.lame * c.t.fight * lamed(c))
+      )
     : 0;
 
 /**

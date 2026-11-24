@@ -45,6 +45,15 @@ export const whole = (): Health => ({
 /** Sunk: no hull left. */
 export const sunk = (h: Health) => h.hull <= 0;
 
+/** Under these shares of her most hull she smokes, and smokes heavily. */
+export const SMOKE = { light: 0.4, heavy: 0.25 } as const;
+
+/** Her hull's wear, for her smoke: 0 whole enough, 1 smoking, 2 heavily. */
+export const wearOf = (h: Health): 0 | 1 | 2 => {
+  const share = h.hull / hullCap(h);
+  return share < SMOKE.heavy ? 2 : share < SMOKE.light ? 1 : 0;
+};
+
 /** `damage` hit points dealt her, through the shield first unless `past` it. */
 export function harmed(h: Health, damage: number, past = false): Harm {
   if (sunk(h) || !(damage > 0)) return { health: h, shield: 0, hull: 0 };

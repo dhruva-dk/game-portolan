@@ -42,11 +42,10 @@ import { createState, type Match, type Waters } from './state.ts';
 
 /**
  * The spec ship and the spec championship: what specField deals every ship
- * and its card. A part of performance 1 and reliability 0.5, a driver of 10 in
- * every stat;
- * the storm at today's pace, no gun banned, every part spec.
+ * and its card. A part of performance 1, a driver of 10 in every stat; the
+ * storm at today's pace, no gun banned, every part spec.
  */
-const PART: Fitted = { performance: 1, reliability: 0.5 };
+const PART: Fitted = { performance: 1 };
 const SPEC = {
   parts: {
     sails: PART,

@@ -58,12 +58,10 @@ export type PartType = (typeof PARTS)[number];
 
 /**
  * A part as fitted for a race: its performance, as so many times the spec
- * part's (1 is spec), and its reliability (0…1; 0.5 is spec): the sim makes her
- * handling of the first and the hull at which her zones fault of the second.
+ * part's (1 is spec): the sim makes her handling of it.
  */
 export interface Fitted {
   performance: number;
-  reliability: number;
 }
 
 /** A ship's livery: her dye and pattern, as play/colours.ts deals them. */
@@ -134,12 +132,6 @@ export interface RaceResult {
     second: number;
   }[];
   seaHeld: readonly { id: number; share: number }[];
-  faults: readonly {
-    id: number;
-    zone: number;
-    level: number;
-    second: number;
-  }[];
   hits: readonly {
     id: number;
     fired: number;

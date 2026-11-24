@@ -9,8 +9,7 @@
 //   a ball home    a flash, splinters thrown out of her side and falling, and dark smoke
 //   a ram          splinters
 //   a ball flying  a ribbon of thin grey smoke along the way it came (its kind's trail, balls.ts SHOT)
-//   a worn ship    thin grey wisps off her waist (wear 1), a sooty column (wear 2); spray off her side where her
-//                  waterline is holed, smoke from her gun ports where her deck is (her faults): as smoking.ts
+//   a worn ship    thin grey wisps off her waist (wear 1), a sooty column (wear 2): as smoking.ts
 //                  plans it, the nearest few, fewer and bigger puffs the farther she is, none past sight (worn)
 // A puff thins away close by the eye (EYE), and nearest it is not drawn.
 // Smoke and spray are flat shapes in two tones (palette.ts: powder smoke cream,
@@ -57,9 +56,7 @@ import { SHOT } from './balls.ts';
 import { MARK } from './marks.ts';
 import {
   CLOSE,
-  HOLED,
   LIFE_SPREAD,
-  PORTS,
   SMOKING,
   WORN,
   smokers,
@@ -273,7 +270,7 @@ export function createPuffs(light: Light, now: FloatNode) {
     wornAt = -Infinity;
   /**
    * Each smoking ship's share of a puff owed, by her id and the kind (smoking.ts
-   * Smoker: smoke, spray, ports); the smoking this frame (smoking.ts smokers,
+   * Smoker: smoke); the smoking this frame (smoking.ts smokers,
    * its entries kept); the puff they lay, rewritten for each, and the ways it
    * is worked out in (so none is made).
    */
@@ -295,7 +292,6 @@ export function createPuffs(light: Light, now: FloatNode) {
       soft: 1,
       fadeIn: 0,
     },
-    side: [number, number, number] = [0, 0, 0],
     rand: [number, number, number] = [0, 0, 0];
   /** The puff a ball's trail lays, rewritten for each (so none is made). */
   const trailAt: [number, number, number] = [0, 0, 0];
@@ -632,8 +628,7 @@ export function createPuffs(light: Light, now: FloatNode) {
     },
     /**
      * Each frame, at `time` (the world's clock, s), before draw: the smoke of
-     * the worn among `ships` (ShipDraw.wear), and the spray and ports' smoke
-     * of the holed and afire (ShipDraw.faults), seen from `eye` (metres), as
+     * the worn among `ships` (ShipDraw.wear), seen from `eye` (metres), as
      * smoking.ts plans it; bigger puffs the farther she is, and lower and
      * smaller close by the eye. Makes nothing.
      */
@@ -655,44 +650,6 @@ export function createPuffs(light: Light, now: FloatNode) {
           low = CLOSE.rise + (1 - CLOSE.rise) * m.close,
           small = CLOSE.size + (1 - CLOSE.size) * m.close;
         const { position: p, up, forward } = s.pose;
-        sphere.cross(up, forward, side);
-        // her side's spray where her waterline is holed
-        for (let k = owe(s.id, 1, m.spray, since); k > 0; k--) {
-          const out = Math.sign(u(-1, 1));
-          sphere.add(p, side, out * HOLED.beam, at);
-          sphere.add(at, forward, u(-HOLED.length, HOLED.length), at);
-          sphere.scale(up, u(2, 5), way);
-          sphere.add(way, side, out * u(1, 3), way);
-          q.size = u(0.4, 0.8) * big;
-          q.grow = 0.6;
-          q.drag = 0.3;
-          q.pull = 9.8;
-          q.life = u(0.8, HOLED.life);
-          q.ink = FOAM;
-          q.opacity = 0.9;
-          q.soft = 0.3;
-          q.fadeIn = 0;
-          lay(time - u(0, since), q);
-        }
-        // her ports' smoke where her deck is afire
-        for (let k = owe(s.id, 2, m.ports, since); k > 0; k--) {
-          const out = Math.sign(u(-1, 1));
-          sphere.add(p, up, PORTS.over, at);
-          sphere.add(at, side, out * HOLED.beam, at);
-          sphere.add(at, forward, u(-PORTS.length, PORTS.length), at);
-          sphere.scale(side, out * u(1, 2.5), way);
-          sphere.add(way, up, u(1, 2.5) * low, way);
-          q.size = 0.55 * big * small;
-          q.grow = 0.9 * big * small;
-          q.drag = 0.8;
-          q.pull = -0.6 * low;
-          q.life = u(2, PORTS.life);
-          q.ink = SOOT;
-          q.opacity = PORTS.opacity;
-          q.soft = 1;
-          q.fadeIn = 0.05;
-          lay(time - u(0, since), q);
-        }
         // her wear's smoke off her waist
         if (!w) continue;
         for (let k = owe(s.id, 0, m.wear, since); k > 0; k--) {

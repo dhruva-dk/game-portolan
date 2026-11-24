@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import type { RaceCard, RaceShip } from '../src/race.ts';
 import { checked, entered, teamsOf } from '../src/sim/carded.ts';
 
-const SPEC = { performance: 1, reliability: 0.5 };
+const SPEC = { performance: 1 };
 const ship = (id: number, over: Partial<RaceShip> = {}): RaceShip => ({
   id,
   team: Math.floor(id / 2),

@@ -64,8 +64,8 @@ export const SHIP = {
  * (m/s), her fastest turn (rad/s), how many times its kind's and rarity's
  * time her gun takes to reload (gun.ts reloadOf), the share of the gap to the
  * speed she asks that she gathers a second, and how many times its own spread
- * her gun's balls go off within. Her build and her faults make it of her
- * (faults.ts fitOf); SPEC is the tables' own, a whole ship's.
+ * her gun's balls go off within. Her build makes it of her (battle.ts
+ * fitOf); SPEC is the tables' own, a whole ship's.
  */
 export interface Handling {
   top: number;

@@ -32,6 +32,7 @@ import {
   armed,
   battleOf,
   crewOf,
+  fitOf,
   inHand,
   marksOf,
   stepBattle,
@@ -55,10 +56,9 @@ import {
 import { afloat, stepFleet, type Vessel } from '../sim/contact.ts';
 import { STEP, blendPose } from '../sim/fixed.ts';
 import { gunOf } from '../sim/gun.ts';
-import { faultsIn, fitOf, tended, wearOf } from '../sim/faults.ts';
 import { fitted } from './fitted.ts';
 import { SHIP, type Handling } from '../sim/handling.ts';
-import { sunk } from '../sim/health.ts';
+import { sunk, wearOf } from '../sim/health.ts';
 import { regain, type Regained } from '../sim/holding.ts';
 import {
   PLAYER,
@@ -599,18 +599,6 @@ export function createState(
     return { fought, kept };
   };
 
-  /**
-   * Whether ship `id` lies in her own water: in a race of teams, in any of her
-   * team's.
-   */
-  const home = (id: number) => {
-    const v = vessel(id);
-    if (!v || !territory) return false;
-    return teams
-      ? territory.teamAt(v.ship.at) === teams[id]
-      : territory.ownerAt(v.ship.at) === id;
-  };
-
   /** The sea as a team holds it: a ship's share her team's, pooled. */
   const pooled = { share: (id: number) => territory?.teamShare(id) ?? 0 };
 
@@ -619,14 +607,9 @@ export function createState(
    * and each ship's shield coming back by her share of it (in a race of teams,
    * her team's water together: a team's water is shared): of the ships still
    * afloat, those sunk in the step (`lost`) painting and closing nothing in it.
-   * Then every ship's hull mended in her own water, or leaking
-   * (sim/faults.ts tended).
    */
   const hold = (storm: Storm): Held => {
-    if (!territory) {
-      battle.crews = tended(battle.crews, () => false, STEP);
-      return UNHELD;
-    }
+    if (!territory) return UNHELD;
     sailing.length = 0;
     for (const v of fleet) if (!lost.includes(v.id)) sailing.push(v);
     for (let i = 0; i < sailing.length; i++) {
@@ -646,8 +629,7 @@ export function createState(
       storm,
       STEP
     );
-    // (in a race sailed by a card her water mends no one)
-    battle.crews = tended(back.crews, tally ? () => false : home, STEP);
+    battle.crews = back.crews;
     return { held: did, regained: back.regained };
   };
 
@@ -787,7 +769,7 @@ export function createState(
     },
     /**
      * Every ship drawn at the moment `between` of the way through the last
-     * step: afloat, her wear and faults hers (sim/faults.ts), or going down.
+     * step: afloat, her wear hers (sim/health.ts wearOf), or going down.
      */
     drawn(between: number): readonly ShipDraw[] {
       const now = clock(between),
@@ -802,10 +784,7 @@ export function createState(
         blendPose(a.before, a.after, between, d.pose);
         add(scale(ship.heading, ship.speed, d.velocity), shove, 1, d.velocity);
         if (g) d.gun = drawing.armed(d, g, aims.get(id) ?? ship.heading);
-        if (c) {
-          d.wear = wearOf(c.health.hull);
-          d.faults = faultsIn(c);
-        }
+        if (c) d.wear = wearOf(c.health);
       }
       for (const w of wrecks)
         if (wreckAt(w, now, drawing.slot(n, w.id, w.look, false).pose)) n++;

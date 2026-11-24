@@ -41,7 +41,6 @@ import { createWater, type SeaShows } from './water/water.ts';
 import { createFleet } from './ship/fleet.ts';
 import { createGunfire } from './gunfire/gunfire.ts';
 import { createArms, muzzle } from './ship/arms.ts';
-import { createFaults } from './ship/faults.ts';
 import { createLoot } from './loot/loot.ts';
 import type { Out3 } from './world/sphere.ts';
 import { sunAt, sunInSky } from './world/sun.ts';
@@ -206,8 +205,7 @@ export function createFrame(
   const fleet = createFleet(light, world.wind, options.fleet);
   fleet.pin(options.lod);
   fleet.simulate(options.cloth);
-  const arms = createArms(light, options.fleet),
-    faults = createFaults();
+  const arms = createArms(light, options.fleet);
   const gunfire = createGunfire(light);
   const loot = createLoot(light);
   scene.add(
@@ -416,19 +414,15 @@ export function createFrame(
     return camera;
   }
 
-  /** A gun's mouth carried onto her as drawn (faults.ts carried); refilled. */
-  const mouth: [number, number, number] = [0, 0, 0];
   /** The ships, the guns' work and the loot, as the snapshot has them. */
   function stage(s: Snapshot) {
     fleet.own(s.own);
     now.clear();
-    // each drawn with her faults on her (ship/faults.ts)
-    const ships = faults.apply(s.ships, s.clock);
+    const ships = s.ships;
     for (const ship of ships) {
       fleet.set(ship.id, ship.pose, ship.look, {
         velocity: ship.velocity,
         afloat: ship.afloat,
-        slack: faults.slack(ship.id),
       });
       now.add(ship.id);
     }
@@ -440,14 +434,9 @@ export function createFrame(
     for (const b of s.blasts) {
       latest = Math.max(latest, b.time);
       if (b.time <= laid) continue;
-      // the flash at the drawn gun's mouth (on her as drawn: listed, turned)
+      // the flash at the drawn gun's mouth
       if (b.kind === 'shot')
-        gunfire.shot(
-          b.time,
-          muzzle(faults.carried(b.from, s.ships, mouth), b.dir, b.gun),
-          b.dir,
-          b.gun
-        );
+        gunfire.shot(b.time, muzzle(b.from, b.dir, b.gun), b.dir, b.gun);
       else if (b.kind === 'splash') gunfire.splash(b.time, b.at, b.land, b.gun);
       else if (b.kind === 'strike')
         gunfire.strike(b.time, b.at, b.ram, b.shield, b.broke);

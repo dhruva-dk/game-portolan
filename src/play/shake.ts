@@ -17,14 +17,7 @@
 //
 // Pure: no three, no page.
 
-import {
-  blowOf,
-  felt,
-  worsened,
-  type Blow,
-  type Deed,
-  type Faults,
-} from '../player.ts';
+import { blowOf, felt, type Blow, type Deed } from '../player.ts';
 import type { Eye } from '../snapshot.ts';
 import { hash01 } from '../world/random.ts';
 import { clamp, easeInOut, lerp, smoother } from '../world/scalar.ts';
@@ -119,13 +112,6 @@ export const CAMERA = {
     fov: { deg: -2.5, attack: 0.04, hold: 0.05, release: 0.35 },
   },
   hurt: { shake: 0.38, kick: { away: 0.55, tilt: 2 } },
-  // a fault come on her: a bigger beat than any one blow
-  fault: {
-    shake: 0.55,
-    band: 'rumble',
-    kick: { away: 0.9, tilt: 3.2, pitch: 0.6 },
-    fov: { deg: -4, attack: 0.05, hold: 0.1, release: 0.5 },
-  },
   sink: {
     shake: 0.45,
     fov: { deg: -6, attack: 0.08, hold: 0.25, release: 0.6 },
@@ -172,14 +158,6 @@ const DEALT: Record<Blow, Answer> = {
  * The camera's answer to a deed seen from `me` (her id; −1 watching another's
  * ship: only the world's rumbles reach her), and how strongly; null for none.
  */
-/**
- * The camera's answer to her faults going from `was` to `now`: CAMERA.fault,
- * once, as one comes on or worsens (player.ts worsened) while she is at sea
- * (not anchored, arriving or sunk); else none.
- */
-export const faultAnswer = (was: Faults, now: Faults, atSea: boolean) =>
-  atSea && worsened(was, now) ? CAMERA.fault : null;
-
 export function answerTo(
   d: Deed,
   me: number
