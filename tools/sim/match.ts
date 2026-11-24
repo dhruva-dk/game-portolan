@@ -22,6 +22,7 @@ import { distance, type Vec3 } from '../../src/world/sphere.ts';
 import { MEAN } from '../../src/world/weather.ts';
 import { createWind } from '../../src/world/wind.ts';
 import { lines, writeJson } from '../out.ts';
+import { firstRace } from './career.ts';
 import { record } from './log.ts';
 import { watch, type MatchResult } from './metrics.ts';
 import { standIn, type Thumb } from './player.ts';
@@ -38,6 +39,7 @@ export interface MatchScenario {
   thumb?: Thumb;
   seconds?: number;
   sea?: 'flat' | 'swell';
+  career?: boolean;
 }
 
 export type State = MatchView;
@@ -77,6 +79,10 @@ function swellOf(seed: number, height: (p: Vec3) => number): Hull {
 export type Summary = ReturnType<typeof summaryOf>;
 
 export function runMatch(sc: MatchScenario, dir?: string): Summary {
+  if (sc.career) {
+    const race = firstRace(String(sc.match ?? 1));
+    return sail(race.setup, race.waters, sc, dir);
+  }
   const w = worldOf(sc.planet),
     n = sc.match ?? 1,
     seed = w.seed + STRIDE * n;

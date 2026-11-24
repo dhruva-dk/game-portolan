@@ -1,0 +1,12 @@
+{
+  "kind": "season",
+  "seed": "1",
+  "you": {
+    "gunnery": 10,
+    "helm": 10,
+    "nerve": 10,
+    "territory": 10,
+    "stormcraft": 10,
+    "lookout": 10
+  }
+}
