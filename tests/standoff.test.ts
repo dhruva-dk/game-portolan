@@ -5,6 +5,7 @@ import { PERSONAS, nature } from '../src/sim/persona.ts';
 import type { Depth } from '../src/sim/shoal.ts';
 import { shipAt } from '../src/sim/ship.ts';
 import { along, distance, frameAt, fromLatLon } from '../src/world/sphere.ts';
+import { aboard } from './setups.ts';
 
 const here = fromLatLon(0.2, 0.3),
   { north } = frameAt(here);
@@ -27,7 +28,13 @@ test('a raider stands off guns it hears while they ring, and falls on them when 
       assert.equal(who.persona, p);
       let m = mind(seed, here);
       for (let k = 0; k < 12; k++)
-        m = think(own, [], { depth: deep, gunfire: ringing }, m, who).memory;
+        m = think(
+          aboard(own),
+          [],
+          { depth: deep, gunfire: ringing },
+          m,
+          who
+        ).memory;
       if (m.mode !== 'hunt') continue;
       if (p === 'raider') hunted++;
       const off = distance(m.goal, guns);
@@ -36,7 +43,7 @@ test('a raider stands off guns it hears while they ring, and falls on them when 
       else assert.ok(off < 1, `${seed} hunter: ${off} m off`);
       if (p === 'hunter') continue;
       for (let k = 0; k < 12; k++)
-        m = think(own, [], { depth: deep, gunfire: [] }, m, who).memory;
+        m = think(aboard(own), [], { depth: deep, gunfire: [] }, m, who).memory;
       if (m.mode === 'hunt')
         assert.ok(distance(m.goal, guns) < 1, `${seed}: not falling on`);
     }

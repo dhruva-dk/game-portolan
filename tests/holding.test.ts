@@ -4,12 +4,13 @@ import { crewOf, type Crew } from '../src/sim/battle.ts';
 import { HEALTH, HOLDING } from '../src/sim/handling.ts';
 import { calmShare, regain, regainRate } from '../src/sim/holding.ts';
 import type { Cap } from '../src/sim/storm.ts';
+import { EVEN_SHIP } from './setups.ts';
 
 const WHOLE: Cap = { center: [0, 1, 0], radius: Math.PI };
 const QUARTER: Cap = { center: [0, 1, 0], radius: Math.PI / 3 };
 const shielded = (id: number, shield: number): Crew => ({
-  ...crewOf(id),
-  health: { hull: HEALTH.hull, shield },
+  ...crewOf(id, EVEN_SHIP),
+  health: { hull: EVEN_SHIP.hullPoints, shield, most: EVEN_SHIP.hullPoints },
 });
 
 test('its share of the calm: of the whole planet before the storm closes, of what is left inside it after', () => {

@@ -29,11 +29,15 @@ export interface Seen {
   id: number;
   ship: ShipState;
   shove?: Vec3;
-  hull?: number;
-  shield?: number;
+  hull: number;
+  shield: number;
   armed?: boolean;
   crew?: Crew;
   team?: number;
+}
+
+export interface Own extends Seen {
+  crew: Crew;
 }
 
 export interface Sea {
@@ -88,7 +92,7 @@ export interface Memory
     Gunner {}
 
 export interface Ctx {
-  own: Seen;
+  own: Own;
   others: readonly Seen[];
   sea: Sea;
   m: Memory;

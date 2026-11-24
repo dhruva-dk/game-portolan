@@ -1,6 +1,6 @@
 import { armed, type Crew, type Order } from './battle.ts';
 import type { Sight } from './sight.ts';
-import { think, type Memory, type Sea, type Seen } from './bot.ts';
+import { think, type Memory, type Own, type Sea, type Seen } from './bot.ts';
 import type { Nature } from './persona.ts';
 import { building, type Chart } from './route.ts';
 import type { Vessel } from './contact.ts';
@@ -42,8 +42,8 @@ const same = (a: Cap, b: Cap) =>
   a.center[2] === b.center[2];
 
 export function createOrders(depth: (p: Vec3) => number, chart: Chart) {
-  const seenById = new Map<number, Seen>(),
-    seen: Seen[] = [],
+  const seenById = new Map<number, Own>(),
+    seen: Own[] = [],
     others: Seen[] = [];
   const helms: Helm[] = [],
     orders: Order[] = [],
@@ -63,9 +63,19 @@ export function createOrders(depth: (p: Vec3) => number, chart: Chart) {
     found: ReturnType<typeof building>;
   } | null = null;
 
-  const sight = (v: Vessel, c: Crew, team: number | undefined): Seen => {
+  const sight = (v: Vessel, c: Crew, team: number | undefined): Own => {
     let s = seenById.get(v.id);
-    if (!s) seenById.set(v.id, (s = { id: v.id, ship: v.ship }));
+    if (!s)
+      seenById.set(
+        v.id,
+        (s = {
+          id: v.id,
+          ship: v.ship,
+          crew: c,
+          hull: c.health.hull,
+          shield: c.health.shield,
+        })
+      );
     s.ship = v.ship;
     s.shove = v.shove;
     s.hull = c.health.hull;

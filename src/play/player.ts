@@ -23,6 +23,7 @@ export interface Status {
   heading: Vec3;
   facing: Vec3;
   arriving: number;
+  top: number;
   hull: number;
   hullMax: number;
   shield: number;

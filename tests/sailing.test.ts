@@ -24,6 +24,7 @@ import {
   scale,
   type Vec3,
 } from '../src/world/sphere.ts';
+import { WORST } from './setups.ts';
 
 const deep: Depth = () => 30;
 const run = (
@@ -34,7 +35,7 @@ const run = (
   each?: (s: ShipState) => void
 ) => {
   for (let i = 0; i < Math.round(seconds / STEP); i++) {
-    s = step(s, helm(s), STEP, depth);
+    s = step(s, helm(s), STEP, depth, WORST);
     each?.(s);
   }
   return s;
@@ -67,11 +68,11 @@ test('it gathers way to its top speed and no further, and turns no faster than i
     }
   );
   assert.ok(
-    fastest <= SHIP.top + 1e-9 && s.speed > SHIP.top * 0.99,
+    fastest <= WORST.topSpeed + 1e-9 && s.speed > WORST.topSpeed * 0.99,
     `${fastest}, ${s.speed}`
   );
   assert.ok(
-    quickest <= SHIP.turn + 1e-9 && quickest > SHIP.turn * 0.99,
+    quickest <= WORST.turnRate + 1e-9 && quickest > WORST.turnRate * 0.99,
     `${quickest}`
   );
   const half = run(
@@ -79,7 +80,7 @@ test('it gathers way to its top speed and no further, and turns no faster than i
     () => ({ course: null, throttle: 0.5 }),
     60
   );
-  assert.ok(Math.abs(half.speed - SHIP.top / 2) < 0.05, `${half.speed}`);
+  assert.ok(Math.abs(half.speed - WORST.topSpeed / 2) < 0.05, `${half.speed}`);
   const astern = run(
     shipAt(start, north),
     () => ({ course: null, throttle: -1 }),
@@ -90,11 +91,9 @@ test('it gathers way to its top speed and no further, and turns no faster than i
 
 test('by its own handling: its top speed and fastest turn are its own, not the tables’; cut under its way, it sheds what is over it', () => {
   const fit = {
-    top: SHIP.top * 0.7,
-    turn: SHIP.turn * 0.6,
-    reload: 1,
-    gather: SHIP.gather,
-    spread: 1,
+    topSpeed: WORST.topSpeed * 0.7,
+    turnRate: WORST.turnRate * 0.6,
+    gather: WORST.gather,
   };
   let s = shipAt(start, north),
     fastest = 0,
@@ -105,21 +104,21 @@ test('by its own handling: its top speed and fastest turn are its own, not the t
     quickest = Math.max(quickest, Math.abs(s.turn));
   }
   assert.ok(
-    fastest <= fit.top + 1e-9 && s.speed > fit.top * 0.99,
+    fastest <= fit.topSpeed + 1e-9 && s.speed > fit.topSpeed * 0.99,
     `${fastest}, ${s.speed}`
   );
   assert.ok(
-    quickest <= fit.turn + 1e-9 && quickest > fit.turn * 0.99,
+    quickest <= fit.turnRate + 1e-9 && quickest > fit.turnRate * 0.99,
     `${quickest}`
   );
-  let t: ShipState = { ...shipAt(start, north), speed: SHIP.top };
+  let t: ShipState = { ...shipAt(start, north), speed: WORST.topSpeed };
   for (let i = 0; i < Math.round(3 / STEP); i++)
     t = step(t, { course: null, throttle: 1 }, STEP, deep, fit);
-  assert.ok(Math.abs(t.speed - fit.top) < 1e-9, `${t.speed}`);
+  assert.ok(Math.abs(t.speed - fit.topSpeed) < 1e-9, `${t.speed}`);
 });
 
 test('let go, it coasts and slows by its drag alone', () => {
-  const s0: ShipState = { ...shipAt(start, north), speed: SHIP.top };
+  const s0: ShipState = { ...shipAt(start, north), speed: WORST.topSpeed };
   let last = s0.speed;
   const s = run(
     s0,
@@ -132,24 +131,24 @@ test('let go, it coasts and slows by its drag alone', () => {
     }
   );
   assert.ok(
-    Math.abs(s.speed - SHIP.top * Math.exp(-SHIP.drag * 5)) < 1e-9,
+    Math.abs(s.speed - WORST.topSpeed * Math.exp(-SHIP.drag * 5)) < 1e-9,
     `${s.speed}`
   );
   const far = run(s0, () => ({ course: null, throttle: 0 }), 40);
   assert.ok(
-    Math.abs(distance(start, far.at) - SHIP.top / SHIP.drag) < 0.5,
+    Math.abs(distance(start, far.at) - WORST.topSpeed / SHIP.drag) < 0.5,
     `${distance(start, far.at)}`
   );
 });
 
 test('a straight course is a great circle: round the planet and back to the start', () => {
-  const s0 = { ...shipAt(start, north), speed: SHIP.top };
+  const s0 = { ...shipAt(start, north), speed: WORST.topSpeed };
   const plane = cross(s0.at, s0.heading);
   let off = 0;
   const s = run(
     s0,
     () => ({ course: null, throttle: 1 }),
-    (2 * Math.PI * R) / SHIP.top,
+    (2 * Math.PI * R) / WORST.topSpeed,
     deep,
     (s) => {
       off = Math.max(off, Math.abs(dot(s.at, plane)) * R);
@@ -157,7 +156,7 @@ test('a straight course is a great circle: round the planet and back to the star
   );
   assert.ok(off < 1e-6, `strays ${off} m off the circle`);
   assert.ok(
-    distance(s.at, start) < SHIP.top * STEP,
+    distance(s.at, start) < WORST.topSpeed * STEP,
     `${distance(s.at, start)} m from the start`
   );
   assert.ok(dot(s.heading, north) > 1 - 1e-6);
@@ -169,7 +168,7 @@ test('over the pole: still on its great circle, its heading still a unit tangent
       fromLatLon(85 * deg, 0.7),
       frameAt(fromLatLon(85 * deg, 0.7)).north
     ),
-    speed: SHIP.top,
+    speed: WORST.topSpeed,
   };
   const plane = cross(s0.at, s0.heading);
   let traveled = 0,
@@ -192,7 +191,7 @@ test('over the pole: still on its great circle, its heading still a unit tangent
     }
   );
   assert.ok(most > Math.cos(0.1 * deg), 'it passes over the pole');
-  assert.ok(Math.abs(traveled - 30 * SHIP.top) < 1e-6, `${traveled}`);
+  assert.ok(Math.abs(traveled - 30 * WORST.topSpeed) < 1e-6, `${traveled}`);
   const away: Vec3 = [0, 0, -1];
   const pole = run(
     { ...shipAt([0, 1, 0], [1, 0, 0]), speed: 5 },
@@ -207,8 +206,8 @@ test('over the pole: still on its great circle, its heading still a unit tangent
 
 test('it comes round onto a course without swinging past it', () => {
   for (const [angle, speed] of [
-    [-90, SHIP.top],
-    [150, SHIP.top],
+    [-90, WORST.topSpeed],
+    [150, WORST.topSpeed],
     [30, 2],
     [-170, 1],
   ] as const) {
@@ -218,7 +217,7 @@ test('it comes round onto a course without swinging past it', () => {
       settled = Infinity;
     run(
       s0,
-      () => ({ course, throttle: speed / SHIP.top }),
+      () => ({ course, throttle: speed / WORST.topSpeed }),
       45,
       deep,
       (s) => {
@@ -257,7 +256,7 @@ test('it never sails into water shallower than its draft, at any angle, and slid
     assert.ok(off < 15, `${angle}°: ${off} m off the contour`);
     assert.ok(
       rate >= [0, 0.5, 1.5, 3.5][[0, 20, 45, 70].indexOf(angle)] &&
-        (angle > 0 || rate < 0.05 * SHIP.top),
+        (angle > 0 || rate < 0.05 * WORST.topSpeed),
       `${angle}°: ${rate} m/s`
     );
   }

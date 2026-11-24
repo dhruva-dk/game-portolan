@@ -1,24 +1,52 @@
 import { shipValues } from '../src/career/fit.ts';
+import { crewOf } from '../src/sim/battle.ts';
+import type { Own, Seen } from '../src/sim/bot.ts';
 import { evenSetup, type EvenOptions } from '../src/sim/even.ts';
+import type { GunKind } from '../src/sim/kinds.ts';
 import type { DriverStats, MatchSetup, ShipValues } from '../src/sim/setup.ts';
 
 const LEVEL = 50,
   STAT = 10,
   RATING = 3;
 
-export const EVEN_SHIP: ShipValues = shipValues(
-  {
-    sails: LEVEL,
-    rigging: LEVEL,
-    rudder: LEVEL,
-    hull: LEVEL,
-    keel: LEVEL,
-    mounts: LEVEL,
-    gun: LEVEL,
-  },
-  'cannon',
-  { shield: STAT, healSpeed: STAT, healAmount: STAT }
-);
+export const valuesAt = (level: number, gun: GunKind = 'cannon'): ShipValues =>
+  shipValues(
+    {
+      sails: level,
+      rigging: level,
+      rudder: level,
+      hull: level,
+      keel: level,
+      mounts: level,
+      gun: level,
+    },
+    gun,
+    { shield: STAT, healSpeed: STAT, healAmount: STAT }
+  );
+
+export const EVEN_SHIP: ShipValues = valuesAt(LEVEL);
+export const WORST = valuesAt(0),
+  BEST = valuesAt(100);
+
+export const HANDY: ShipValues = {
+  ...EVEN_SHIP,
+  topSpeed: 16,
+  gather: 1.3,
+  turnRate: 0.6,
+};
+
+type Sighted = Omit<Seen, 'hull' | 'shield'> &
+  Partial<Pick<Seen, 'hull' | 'shield'>>;
+
+export const aboard = (s: Sighted, values: ShipValues = EVEN_SHIP): Own => {
+  const crew = s.crew ?? crewOf(s.id, values);
+  return {
+    ...s,
+    crew,
+    hull: s.hull ?? crew.health.hull,
+    shield: s.shield ?? crew.health.shield,
+  };
+};
 
 export const TENS: DriverStats = {
   gunnery: STAT,

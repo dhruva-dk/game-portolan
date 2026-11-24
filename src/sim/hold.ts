@@ -1,5 +1,5 @@
 import type { Use } from './kinds.ts';
-import { healed, hullCap, sunk, type Health } from './health.ts';
+import { healed, sunk, type Health } from './health.ts';
 
 export type { Use };
 
@@ -16,6 +16,9 @@ export const USES: Readonly<
 };
 
 export const USING = 0.6;
+
+const PERCENT = 100;
+const hullTop = (health: Health, cap: number) => (cap * health.most) / PERCENT;
 
 const SLOTS = 3;
 
@@ -67,7 +70,7 @@ export const useful = (health: Health, kind: Use) => {
     !sunk(health) &&
     (u.shield > 0
       ? health.shield < u.cap
-      : health.hull < hullCap(health, u.cap))
+      : health.hull < hullTop(health, u.cap))
   );
 };
 
@@ -101,7 +104,7 @@ export function stepUse(
   const mended =
     u.shield > 0
       ? healed(health, u.shield, 'shield', u.cap)
-      : healed(health, u.hull, 'hull', u.cap);
+      : healed(health, u.hull, 'hull', hullTop(health, u.cap));
   const items = [...h.items];
   items[i] = s.count > 1 ? { ...s, count: s.count - 1 } : null;
   return { hold: { ...h, items, using: null }, health: mended, done: s.kind };

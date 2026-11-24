@@ -24,6 +24,7 @@ import { temper } from '../src/sim/temper.ts';
 import { eye } from '../src/sim/lookout.ts';
 import { sunk } from '../src/sim/health.ts';
 import type { Storm } from '../src/sim/storm.ts';
+import { WORST } from './setups.ts';
 
 const deep: Depth = () => 30;
 const start = fromLatLon(0.2, 0.3);
@@ -59,8 +60,12 @@ function battle(
     g === null ? [] : typeof g === 'number' ? [gunOf('cannon', g)] : g;
   let b: Battle = battleOf(
     fleet.map((v, i) => ({
-      ...crewOf(v.id, ...carried(guns[i])),
-      health: { hull: HEALTH.hull, shield: HEALTH.shield },
+      ...crewOf(v.id, WORST, ...carried(guns[i])),
+      health: {
+        hull: WORST.hullPoints,
+        shield: HEALTH.shield,
+        most: WORST.hullPoints,
+      },
     })),
     7
   );
@@ -105,7 +110,13 @@ function battle(
       ...b,
       crews: asked(b.crews, fleet, { pieces: [], next: 0 }, asks).crews,
     };
-    const met = stepFleet(fleet, helms, STEP, deep);
+    const met = stepFleet(
+      fleet,
+      helms,
+      STEP,
+      deep,
+      fleet.map(() => WORST)
+    );
     fleet = met.fleet;
     blows += met.blows.length;
     const f = stepBattle(b, fleet, orders, met.blows, STEP, deep);

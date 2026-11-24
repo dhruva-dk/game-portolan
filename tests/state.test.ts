@@ -11,7 +11,7 @@ import { calm, type Storm } from '../src/sim/storm.ts';
 import { landOf, planetOf } from '../src/world/land.ts';
 import { SEED } from '../src/world/environment.ts';
 import { add, bearingAt } from '../src/world/sphere.ts';
-import { setupOf } from './setups.ts';
+import { EVEN_SHIP, setupOf } from './setups.ts';
 
 const planet = planetOf(SEED, landOf(SEED));
 const waters = watersAt(planet);
@@ -31,7 +31,7 @@ const deadly =
           damage: 1e6,
         };
 
-function loop(at: number, state = createState(waters, start)) {
+function loop(at: number, state = createState(waters, start, EVEN_SHIP)) {
   debugOf(state).atSea(race, start, [], { storm: deadly(at) });
   const legs: [number, number][] = [
     [180, 5],
@@ -56,7 +56,7 @@ function loop(at: number, state = createState(waters, start)) {
 }
 
 test('its livery: worn at anchor at once; its ship in it at sea, every team in the livery of its index round it, its water its dye', () => {
-  const state = createState(waters, start),
+  const state = createState(waters, start, EVEN_SHIP),
     chosen = { dye: 4, pattern: 2 };
   const playerLook = () => state.drawn(1).find((d) => d.id === PLAYER)!.look;
   state.anchor(start);

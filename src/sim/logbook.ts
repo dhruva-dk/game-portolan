@@ -27,7 +27,7 @@ export interface LogMemory {
 
 export const logMemory = (): LogMemory => ({ log: [] });
 
-const strengthOf = (c: Ctx) => (c.own.hull ?? 100) + (c.own.shield ?? 0);
+const strengthOf = (c: Ctx) => c.own.hull + c.own.shield;
 
 export function note(c: Ctx): void {
   const { m, own } = c,
@@ -47,7 +47,7 @@ export function note(c: Ctx): void {
     seen.push({
       id: o.id,
       at: o.ship.at,
-      strength: (o.hull ?? 100) + (o.shield ?? 0),
+      strength: o.hull + o.shield,
       gun: g ? g.kind : null,
       t: m.clock,
       fled:

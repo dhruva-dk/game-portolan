@@ -39,7 +39,6 @@ export interface Bed {
   clock: number;
 }
 
-export const TOP = 16;
 const RING = [25, 60, 110, 200] as const,
   WAYS = 8;
 const PASS = 30,
@@ -201,7 +200,8 @@ export function createListen(ground: (p: Vec3) => number) {
               ((height - lift) / dt - bed.heave) * Math.min(1, dt * 6)
             : 0;
         lift = height;
-        bed.speed = Math.sqrt(dot(own.velocity, own.velocity)) / TOP;
+        bed.speed =
+          s.top > 0 ? Math.sqrt(dot(own.velocity, own.velocity)) / s.top : 0;
       } else {
         bed.heave = 0;
         bed.speed = 0;

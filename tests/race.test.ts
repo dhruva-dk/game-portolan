@@ -82,7 +82,7 @@ test('a race is sailed to its end: one team afloat, every ship placed, the tally
 
 test('the same setup on the same planet gives the same result, hash and all; another match seed another', () => {
   assert.deepEqual(sailed(short()), FIRST);
-  assert.equal(FIRST.hash, '26c886e2');
+  assert.equal(FIRST.hash, 'e0caafbb');
   const other = sailed(short(SEED + 1));
   assert.notEqual(other.hash, FIRST.hash);
 });

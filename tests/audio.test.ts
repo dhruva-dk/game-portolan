@@ -9,13 +9,7 @@ import {
   soundOf,
   type Happening,
 } from '../src/audio/cues.ts';
-import {
-  TOP,
-  createListen,
-  type Call,
-  type Hearing,
-} from '../src/audio/listen.ts';
-import { SHIP } from '../src/sim/handling.ts';
+import { createListen, type Call, type Hearing } from '../src/audio/listen.ts';
 import {
   FALL,
   NEAR,
@@ -79,9 +73,6 @@ const each = (ship: number, gun: GunKind = 'cannon'): Happening[] =>
         return { ...base, kind };
     }
   });
-
-test("the bed hears its speed as a share of its top: the sim's", () =>
-  assert.equal(TOP, SHIP.top));
 
 test('the table: every kind of deed, its own, is heard; every cue plays a sound there is; every sound is played by some cue', () => {
   for (const h of each(0)) assert.ok(cueOf(h, 0), `its ${h.kind} has a cue`);
@@ -330,6 +321,7 @@ const status = (over: Partial<Status & Kit> = {}): Status & Kit => ({
   heading: [1, 0, 0],
   facing: [1, 0, 0],
   arriving: 0,
+  top: 16,
   hull: 100,
   hullMax: 100,
   shield: 30,
@@ -456,6 +448,17 @@ test('listen: a ball passing near whistles once; a slot of its stores taken in h
     l.listen(hearing(scene(3.6), status(), 'lobby', false, 0), dt, out).covered,
     0
   );
+});
+
+test('the bed hears its speed as a share of its own top', () => {
+  const speedAt = (top: number) =>
+    createListen(() => -20).listen(
+      hearing(scene(0), status({ top })),
+      1 / 30,
+      []
+    ).speed;
+  assert.equal(speedAt(12), 0.5);
+  assert.equal(speedAt(24), 0.25);
 });
 
 test('listen: the storm closing thunders, then its wind', () => {

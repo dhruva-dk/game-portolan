@@ -34,6 +34,7 @@ import {
   scale,
   type Vec3,
 } from '../src/world/sphere.ts';
+import { EVEN_SHIP, aboard } from './setups.ts';
 
 const deep: Depth = () => 30;
 const center = fromLatLon(0.2, 0.3),
@@ -70,7 +71,7 @@ function fired(
   const ball: Ball = loosed(1, kind, lay.from, lay.dirs[0], lay.speed, 40);
   let b: Battle = {
     ...battleOf(
-      fleet.map((v) => crewOf(v.id)),
+      fleet.map((v) => crewOf(v.id, EVEN_SHIP)),
       0,
       undefined,
       teams
@@ -90,7 +91,7 @@ function fired(
 }
 const hulls = (b: Battle) =>
   new Map(b.crews.map((c) => [c.id, c.health.hull + c.health.shield]));
-const WHOLE = HEALTH.hull + HEALTH.start;
+const WHOLE = EVEN_SHIP.hullPoints + HEALTH.start;
 
 test('mates: ships of one team, never a ship and itself, and none with no teams', () => {
   assert.equal(mates(TEAMS, 1, 2), true);
@@ -139,10 +140,15 @@ test('a ram between mates harms neither, and their hulls still part; between tea
       -45 - SHIP.length / 2
     );
     let fleet = [
-      afloat(1, { ...shipAt(from.p, from.t), speed: SHIP.top }),
+      afloat(1, { ...shipAt(from.p, from.t), speed: EVEN_SHIP.topSpeed }),
       afloat(2, target),
     ];
-    let b = battleOf([crewOf(1), crewOf(2)], 1, undefined, teams),
+    let b = battleOf(
+        [crewOf(1, EVEN_SHIP), crewOf(2, EVEN_SHIP)],
+        1,
+        undefined,
+        teams
+      ),
       blows = 0;
     const strikes: Strike[] = [];
     for (let i = 0; i < 6 / STEP; i++) {
@@ -153,7 +159,8 @@ test('a ram between mates harms neither, and their hulls still part; between tea
           { course: null, throttle: 0 },
         ],
         STEP,
-        deep
+        deep,
+        fleet.map(() => EVEN_SHIP)
       );
       fleet = met.fleet;
       blows += met.blows.length;
@@ -218,8 +225,20 @@ test('a bot never takes a mate for its foe, nor notes it in its log; a ship of a
     let foe = mind(seed, center),
       mate = mind(seed, center);
     for (let k = 0; k < 12; k++) {
-      foe = think(own(1), [other], { depth: deep }, foe, nature(seed)).memory;
-      mate = think(own(0), [other], { depth: deep }, mate, nature(seed)).memory;
+      foe = think(
+        aboard(own(1)),
+        [other],
+        { depth: deep },
+        foe,
+        nature(seed)
+      ).memory;
+      mate = think(
+        aboard(own(0)),
+        [other],
+        { depth: deep },
+        mate,
+        nature(seed)
+      ).memory;
     }
     assert.equal(foe.foe, 2, `${seed}: another team's ship is in its eye`);
     assert.ok(foe.log.some((s) => s.id === 2));

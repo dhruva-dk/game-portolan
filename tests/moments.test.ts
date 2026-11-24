@@ -35,7 +35,7 @@ import {
   type Vec3,
 } from '../src/world/sphere.ts';
 import { lookAt } from '../src/world/turn.ts';
-import { setupOf } from './setups.ts';
+import { EVEN_SHIP, setupOf } from './setups.ts';
 
 const at: Vec3 = [0, 0, 1];
 const none: Done = {
@@ -267,7 +267,7 @@ test('as she sees it: the bearing clockwise from the look, its distance, and on 
 test('the match records its deeds: a ship sunk is told once, with a sink blast to draw', () => {
   const planet = planetOf(SEED, landOf(SEED)),
     start = planet.start;
-  const state = createState(watersAt(planet), start);
+  const state = createState(watersAt(planet), start, EVEN_SHIP);
   const before = state.deeds().at(-1)?.seq ?? 0;
   const there = normalize([start.at[0] + 0.05, start.at[1], start.at[2]]);
   debugOf(state).atSea(

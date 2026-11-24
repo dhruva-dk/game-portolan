@@ -17,7 +17,7 @@ import { PLAYER } from '../sim/match.ts';
 import type { Memory } from '../sim/bot.ts';
 import type { Nature } from '../sim/persona.ts';
 import type { Sighter } from '../sim/orders.ts';
-import type { MatchSetup } from '../sim/setup.ts';
+import type { MatchSetup, ShipValues } from '../sim/setup.ts';
 import type { Berthed, Waters } from '../sim/waters.ts';
 import type { BallDraw, Look, Sea, ShipDraw } from '../render/snapshot.ts';
 import type { Hull } from '../world/swell.ts';
@@ -52,11 +52,12 @@ const later =
 
 export function createState(
   waters: Waters,
-  start: { at: Vec3; bearing: number }
+  start: { at: Vec3; bearing: number },
+  moored: ShipValues
 ) {
   let offset = 0;
   const shifted = (): Waters => ({ ...waters, sea: later(waters.sea, offset) });
-  let match: Match = createMooring(shifted(), start);
+  let match: Match = createMooring(shifted(), start, moored);
   const view = () => match.view;
   const byId = indexed<Crew>().of;
   const looks = new Map<number, Look>(),
@@ -212,7 +213,7 @@ export function createState(
       return view().after(PLAYER)!;
     },
     anchor(start: { at: Vec3; bearing: number }): ShipPose {
-      next((w) => createMooring(w, start));
+      next((w) => createMooring(w, start, moored));
       cleared(true);
       dress(PLAYER, lookOf(livery));
       return view().after(PLAYER)!;

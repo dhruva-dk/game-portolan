@@ -15,6 +15,7 @@ import {
   frameAt,
   fromLatLon,
 } from '../src/world/sphere.ts';
+import { aboard } from './setups.ts';
 
 const center = fromLatLon(0.2, 0.3),
   { north, east } = frameAt(center);
@@ -53,7 +54,8 @@ test('a bot behind a wall inside the next cap reckons itself outside it by water
   for (const seed of [1, 2, 3, 4, 5]) {
     const own = afloat(1, shipAt(at, north));
     let m = mind(seed, at);
-    for (let k = 0; k < 7; k++) m = think(own, [], sea, m, nature(seed)).memory;
+    for (let k = 0; k < 7; k++)
+      m = think(aboard(own), [], sea, m, nature(seed)).memory;
     assert.equal(m.mode, 'storm', `${seed}: ${m.mode}`);
     const here = fieldAt(ch, found.field, at),
       there = fieldAt(ch, found.field, m.goal);
@@ -61,7 +63,7 @@ test('a bot behind a wall inside the next cap reckons itself outside it by water
     let free = mind(seed, at);
     for (let k = 0; k < 7; k++)
       free = think(
-        own,
+        aboard(own),
         [],
         { depth: walled, chart: ch, storm },
         free,

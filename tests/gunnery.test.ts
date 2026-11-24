@@ -6,7 +6,7 @@ import { afloat, stepFleet, type Vessel } from '../src/sim/contact.ts';
 import { STEP } from '../src/sim/fixed.ts';
 import { gunOf, laid, spreadOf } from '../src/sim/gun.ts';
 import { spreadBy } from '../src/sim/gunner.ts';
-import { GUN, SHIP } from '../src/sim/handling.ts';
+import { GUN } from '../src/sim/handling.ts';
 import { loosed } from '../src/sim/shot.ts';
 import { offSight, type Sight } from '../src/sim/sight.ts';
 import { shipAt, turned } from '../src/sim/ship.ts';
@@ -21,6 +21,7 @@ import {
   normalize,
   scale,
 } from '../src/world/sphere.ts';
+import { WORST } from './setups.ts';
 
 const deep = () => 30,
   N = 200;
@@ -71,7 +72,7 @@ function rate(rarity: number, meters: number, off = 0, k = 1): number {
       afloat(2, {
         ...b,
         heading: turned(b, bearing + (side * Math.PI) / 2),
-        speed: SHIP.top,
+        speed: WORST.topSpeed,
       }),
     ];
     const gun = { ...gunOf('cannon', rarity), fired: n };
@@ -83,7 +84,7 @@ function rate(rarity: number, meters: number, off = 0, k = 1): number {
       { seed: 11, depth: deep, spread: spreadOf(gun) * k }
     );
     let battle = {
-        ...battleOf([crewOf(1), crewOf(2)], 0),
+        ...battleOf([crewOf(1, WORST), crewOf(2, WORST)], 0),
         balls: [loosed(1, 'cannon', lay.from, lay.dirs[0], lay.speed, 1)],
       },
       struck = false;
@@ -95,7 +96,8 @@ function rate(rarity: number, meters: number, off = 0, k = 1): number {
           { course: null, throttle: 1 },
         ],
         STEP,
-        deep
+        deep,
+        fleet.map(() => WORST)
       ).fleet;
       const r = stepBattle(
         battle,
