@@ -205,7 +205,7 @@ export function createState(
   let quiet = false;
   let territory: Territory | null = null;
   const held = createHeld();
-  let hers: Livery = LIVERY;
+  let livery: Livery = LIVERY;
   const colors: Vec3[] = [];
   let generation = 0;
   const orders = createOrders(depth, chart);
@@ -638,8 +638,8 @@ export function createState(
             entry
               ? entry.colors
               : id === PLAYER
-                ? hers
-                : dealt(m.seed, id, hers)
+                ? livery
+                : dealt(m.seed, id, livery)
           ),
           null,
           manned && (!entry || !entry.driver)
@@ -649,8 +649,8 @@ export function createState(
         at.map((b, id) => (aboard.has(id) ? b.at : null)),
         tick * STEP
       );
-      const her = aboard.get(PLAYER);
-      if (her) return her.after;
+      const own = aboard.get(PLAYER);
+      if (own) return own.after;
       const ashore = shipAt(at[PLAYER].at, at[PLAYER].heading);
       return pose(ashore, settled(ashore, sea, tick * STEP, PLAYER));
     },
@@ -660,17 +660,17 @@ export function createState(
       launch(
         PLAYER,
         shipAt(start.at, bearingAt(start.at, start.bearing)),
-        lookOf(hers)
+        lookOf(livery)
       );
       return aboard.get(PLAYER)!.after;
     },
     wear(l: Livery): Livery {
-      hers = worn(l);
-      const her = aboard.get(PLAYER);
-      if (quiet && her) her.look = lookOf(hers);
-      return hers;
+      livery = worn(l);
+      const own = aboard.get(PLAYER);
+      if (quiet && own) own.look = lookOf(livery);
+      return livery;
     },
-    worn: (): Livery => hers,
+    worn: (): Livery => livery,
   };
   DEBUG.set(state, {
     atSea(
@@ -681,7 +681,7 @@ export function createState(
       launch(
         PLAYER,
         shipAt(start.at, bearingAt(start.at, start.bearing)),
-        lookOf(hers)
+        lookOf(livery)
       );
       others.forEach((o, i) => {
         const way = (o.lashed?.throttle ?? 0) * SHIP.top;

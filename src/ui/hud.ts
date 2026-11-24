@@ -116,13 +116,13 @@ export function createHud(layer: HTMLElement, shores: Shores, act: HudActions) {
   const more: More = {};
 
   let watching = false;
-  const hers = [vitals, thumb, reticle, fall, hotbar, rim];
+  const aboard = [vitals, thumb, reticle, fall, hotbar, rim];
 
   return {
     root,
     watch(on: boolean) {
       watching = on;
-      for (const el of hers) show(el, !on);
+      for (const el of aboard) show(el, !on);
       map.classList.toggle('press', !on);
     },
     update(s: HudState, sea?: Sea, own?: number | null, covered = false) {

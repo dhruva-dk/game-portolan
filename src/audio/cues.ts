@@ -108,33 +108,33 @@ const TAKEN = {
 } as const satisfies Record<Blow, Cue>;
 
 export function cueOf(h: Happening, own: number | null): Cue | null {
-  const hers = h.ship === own;
+  const mine = h.ship === own;
   switch (h.kind) {
     case 'fired':
-      return hers ? 'fire' : 'fired';
+      return mine ? 'fire' : 'fired';
     case 'winding':
-      return hers ? 'wind' : 'wound';
+      return mine ? 'wind' : 'wound';
     case 'reloading':
-      return hers ? 'reload' : null;
+      return mine ? 'reload' : null;
     case 'reloaded':
-      return hers ? 'ready' : null;
+      return mine ? 'ready' : null;
     case 'swapped':
-      return hers ? 'swap' : null;
+      return mine ? 'swap' : null;
     case 'fell':
       return h.land ? 'thud' : 'splash';
     case 'struck':
-      return !hers ? 'strike' : TAKEN[blowOf(h)];
+      return !mine ? 'strike' : TAKEN[blowOf(h)];
     case 'sank':
-      return hers ? 'sunk' : 'sank';
+      return mine ? 'sunk' : 'sank';
     case 'took':
-      return !hers ? null : isGun(h.piece) ? 'swap' : 'took';
+      return !mine ? null : isGun(h.piece) ? 'swap' : 'took';
     case 'mended':
-      return !hers
+      return !mine
         ? null
         : h.piece === 'smallShield' || h.piece === 'bigShield'
           ? 'mendWard'
           : 'mendHull';
     case 'gust':
-      return hers ? 'gust' : null;
+      return mine ? 'gust' : null;
   }
 }

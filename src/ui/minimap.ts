@@ -60,7 +60,7 @@ export function createMinimap(
   );
   over.style.position = 'absolute';
   host.append(rim, canvas, over);
-  const her = over.lastElementChild!;
+  const marker = over.lastElementChild!;
   const ctx = canvas.getContext('2d')!;
   const held = createHeld(SPAN * 1.15);
   const land = createGround(ground.height, SPAN + 50, ground.top);
@@ -136,14 +136,14 @@ export function createMinimap(
     was.next = nextR;
     was.seq = seq;
     then = now;
-    her.setAttribute(
+    marker.setAttribute(
       'transform',
       `translate(${r} ${r}) rotate(${(turned / 10).toFixed(1)})`
     );
     const fill = more.gilt ? WASH.gold : dyeOn(sea, more.own);
     if (fill !== drawnFill) {
       drawnFill = fill;
-      her.innerHTML = `<path d="${head(6)}" fill="${fill}" stroke="${INK.iron}" stroke-width="1.3" stroke-linejoin="round"/>`;
+      marker.innerHTML = `<path d="${head(6)}" fill="${fill}" stroke="${INK.iron}" stroke-width="1.3" stroke-linejoin="round"/>`;
     }
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, canvas.width, canvas.height);

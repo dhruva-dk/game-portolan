@@ -320,7 +320,7 @@ export function createGame(
       rises,
     });
 
-  const restart = (her: ShipPose, anchor = false) => {
+  const restart = (pose: ShipPose, anchor = false) => {
     view = { watch: PLAYER, hands: true, look: true, end: null };
     ended = 0;
     anchored = anchor;
@@ -335,7 +335,7 @@ export function createGame(
     answered = state.deeds().at(-1)?.seq ?? answered;
     held = null;
     arrival = null;
-    last = her;
+    last = pose;
     chase.reset(last, state.clock(1));
   };
   const steering = () => view.hands && !anchored && arrival === null;
