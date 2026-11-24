@@ -14,6 +14,12 @@ import {
 } from './development/build.ts';
 import { focusRefusal, setFocus } from './development/focus.ts';
 import { fieldsValid, isIndex } from './fields.ts';
+import { approach, approachRefusal } from './hiring/approach.ts';
+import { acceptCounter, counterRefusal } from './hiring/counter.ts';
+import { dealAfterRace, dealOffseason } from './hiring/deal.ts';
+import { offer, offerRefusal } from './hiring/offer.ts';
+import { release, releaseRefusal } from './hiring/release.ts';
+import { scoutRefusal, setScoutSeat } from './hiring/scout.ts';
 import { known } from './lookup.ts';
 import { releaseExpired, turnSeason } from './offseason/finish.ts';
 import { ageLeague } from './offseason/people.ts';
@@ -64,10 +70,8 @@ const runPolicies = seam;
 const repossess = (state: CareerState): Repossession => ({ state, teams: [] });
 const narrowRanges = seam;
 const raceEvents = seam;
-const dealAfterRace = seam;
 const seasonEvents = seam;
 const redrawKnowledge = seam;
-const dealOffseason = seam;
 
 const accepted = (state: CareerState): Applied => ({ ok: true, state });
 
@@ -149,17 +153,28 @@ function effect(state: CareerState, command: Command): Applied {
     case 'Repaint':
       return notYet(state);
     case 'SetScoutSeat':
-      return notYet(state);
+      return unless(scoutRefusal(state, command.team, command.role), () =>
+        setScoutSeat(state, command.team, command.role)
+      );
     case 'BuyReport':
       return notYet(state);
     case 'Approach':
-      return notYet(state);
+      return unless(approachRefusal(state, command.team, command.person), () =>
+        approach(state, command.team, command.person)
+      );
     case 'Offer':
-      return notYet(state);
+      return unless(
+        offerRefusal(state, command.team, command.person, command.terms),
+        () => offer(state, command.team, command.person, command.terms)
+      );
     case 'AcceptCounter':
-      return notYet(state);
+      return unless(counterRefusal(state, command.team, command.person), () =>
+        acceptCounter(state, command.team, command.person)
+      );
     case 'Release':
-      return notYet(state);
+      return unless(releaseRefusal(state, command.team, command.person), () =>
+        release(state, command.team, command.person)
+      );
     case 'SignSponsor':
       return unless(signRefusal(state, command.team, command.slot), () =>
         signSponsor(state, command.team, command.offer, command.slot)

@@ -230,6 +230,13 @@ test('every command in every phase is accepted or refused for phase as the table
   }
 });
 
+const FROM_A_RIVAL: Partial<Record<CommandType, Reason>> = {
+  Approach: 'fixed',
+  Offer: 'seat',
+  AcceptCounter: 'seat',
+  Release: 'seat',
+};
+
 test('only team 0 may send the first five commands', () => {
   for (const phase of PHASES) {
     const state = career(phase);
@@ -239,7 +246,7 @@ test('only team 0 may send the first five commands', () => {
       else
         assert.equal(
           reason,
-          TABLE[type].includes(phase) ? null : 'phase',
+          TABLE[type].includes(phase) ? (FROM_A_RIVAL[type] ?? null) : 'phase',
           `${type} from a rival in ${phase}`
         );
     }
