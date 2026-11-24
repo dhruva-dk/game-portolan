@@ -1,7 +1,5 @@
 // Which ships smoke, and how much: the plan puffs.ts worn lays each frame. A
-// worn ship (ShipDraw.wear) trails smoke off her waist; one holed at her
-// waterline throws spray off her side; one whose deck is afire smokes from her
-// gun ports (ShipDraw.faults). Only the nearest SMOKING.most afloat within
+// worn ship (ShipDraw.wear) trails smoke off her waist. Only the nearest SMOKING.most afloat within
 // sight smoke, fewer puffs the farther; one close by the eye (her own, under
 // the chase camera) thinner and lower, so her smoke does not wall off the view;
 // and all of it together lays no more than keeps SMOKING.alive puffs alive.
@@ -49,30 +47,6 @@ export const WORN = [
 ] as const;
 export const LIFE_SPREAD = 1.1;
 /**
- * A ship holed at her waterline (her faults, kinds.ts ZONES): spray thrown off
- * her side, puffs a second near by fault (none, minor, major), from half her
- * beam out and along her length's middle (metres, ship/lines.ts at her SCALE),
- * and its most life (s).
- */
-export const HOLED = {
-  rate: [0, 7, 16],
-  beam: 2.7,
-  length: 5,
-  life: 1.4,
-} as const;
-/**
- * Her deck afire: smoke from her gun ports, puffs a second near by fault, from
- * how high over her waterline, along how much of her, how dense, and its most
- * life (s).
- */
-export const PORTS = {
-  rate: [0, 5, 12],
-  over: 1.3,
-  length: 6,
-  opacity: 0.75,
-  life: 3.2,
-} as const;
-/**
  * The smoking ships: the most at once (the nearest), how near the eye she
  * smokes in full (metres; farther, fewer puffs and bigger), and past how far
  * none; where on her it rises (metres over her waterline and aft of her
@@ -99,24 +73,20 @@ export const CLOSE = { rate: 0.4, rise: 0.5, size: 0.7 } as const;
 /** The longest any of it lives, s. */
 const LONGEST = Math.max(
   (WORN[2]?.life ?? 0) * LIFE_SPREAD,
-  (WORN[1]?.life ?? 0) * LIFE_SPREAD,
-  HOLED.life,
-  PORTS.life
+  (WORN[1]?.life ?? 0) * LIFE_SPREAD
 );
 /** The most puffs a second all of it lays: as many as keep SMOKING.alive alive. */
 export const MOST_RATE = SMOKING.alive / LONGEST;
 
 /**
  * A smoking ship this frame: her, how far from the eye (m), her puffs a second
- * of smoke (wear), spray (holed) and ports' smoke (afire), and how close she is
+ * of smoke (wear), and how close she is
  * (0 at SMOKING.close's first, 1 from its second on).
  */
 export interface Smoker {
   ship: ShipDraw;
   away: number;
   wear: number;
-  spray: number;
-  ports: number;
   close: number;
 }
 
@@ -143,8 +113,7 @@ const closeShare = (close: number) => CLOSE.rate + (1 - CLOSE.rate) * close;
 
 /**
  * The smoking among `ships` as seen from `eye` (metres), into `out` (its
- * entries reused, filled from the first): of those afloat, worn, holed or
- * afire, within SMOKING.far and over the horizon, the nearest SMOKING.most,
+ * entries reused, filled from the first): of those afloat and worn, within SMOKING.far and over the horizon, the nearest SMOKING.most,
  * nearest first; each her rates thinned by distance and, close by the eye, by
  * CLOSE; all of them scaled down together where their sum is over MOST_RATE.
  * How many.
@@ -156,7 +125,7 @@ export function smokers(
 ): number {
   let n = 0;
   for (const s of ships) {
-    if (!s.afloat || !(s.wear || s.faults[2] || s.faults[3])) continue;
+    if (!s.afloat || !s.wear) continue;
     const p = s.pose.position,
       d = Math.hypot(p[0] - eye[0], p[1] - eye[1], p[2] - eye[2]);
     if (d > SMOKING.far || !overHorizon(eye, p)) continue;
@@ -165,9 +134,7 @@ export function smokers(
     const full = n === SMOKING.most;
     let i = full ? n - 1 : n;
     if (full && d >= (out[i]?.away ?? 0)) continue;
-    const spare =
-      out[i] ??
-      (out[i] = { ship: s, away: 0, wear: 0, spray: 0, ports: 0, close: 1 });
+    const spare = out[i] ?? (out[i] = { ship: s, away: 0, wear: 0, close: 1 });
     for (; i > 0 && (out[i - 1]?.away ?? 0) > d; i--)
       out[i] = out[i - 1] ?? spare;
     out[i] = spare;
@@ -187,9 +154,7 @@ export function smokers(
       share = closeShare(close) / far;
     m.close = close;
     m.wear = (WORN[s.wear]?.rate ?? 0) * share;
-    m.spray = (HOLED.rate[s.faults[2]] ?? 0) / far;
-    m.ports = (PORTS.rate[s.faults[3]] ?? 0) * share;
-    sum += m.wear + m.spray + m.ports;
+    sum += m.wear;
   }
   if (sum > MOST_RATE) {
     const k = MOST_RATE / sum;
@@ -197,8 +162,6 @@ export function smokers(
       const m = out[i];
       if (!m) continue;
       m.wear *= k;
-      m.spray *= k;
-      m.ports *= k;
     }
   }
   return n;

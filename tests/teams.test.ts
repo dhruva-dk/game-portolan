@@ -371,7 +371,6 @@ test("a race's tally: shots fired, strikes landed and taken (a ram is neither), 
     at: centre,
     ram,
     gun: ram ? null : KINDS[0],
-    zone: 0,
   });
   const shot = { shooter: 1, gun: KINDS[0], from: centre, dirs: [], target: 4 };
   /** The sea with the ships `alive` afloat, `loot` pieces left on it. */

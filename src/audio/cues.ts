@@ -51,7 +51,6 @@ export const CUE_NAMES = [
   'hurt',
   'ring',
   'shatter',
-  'fault',
   'sank',
   'sunk',
   'took',
@@ -113,8 +112,6 @@ export const CUES: Record<Cue, CueSound> = {
   hurt: { sound: 'hurt', level: 0, bus: 'own' },
   ring: { sound: 'ring', level: 0, bus: 'own' },
   shatter: { sound: 'shatter', level: 0, bus: 'own' },
-  // a fault come on her
-  fault: { sound: 'fault', level: 0, bus: 'own' },
   // a ship going down from where she lies; hers, close
   sank: { sound: 'sink', level: 0, bus: 'world' },
   sunk: { sound: 'sink', level: 2, bus: 'own' },

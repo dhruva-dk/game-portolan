@@ -11,9 +11,7 @@
 // it reloads, and it fires again full. A ship sunk takes no more, fires no
 // more, and is no longer laid on or struck; her crew is kept, sunk, for the
 // game to take her off the sea. A blow that strikes breaks off whatever she was
-// mending with (hold.ts), lands on one of her zones and breaks the quiet of
-// both ships (faults.ts: what her hull is in each zone her faults; a gun
-// reloads by her handling, fitOf); a gun fired in a gust goes off wider
+// mending with (hold.ts) (a gun reloads by her handling, fitOf); a gun fired in a gust goes off wider
 // (gust.ts); a gun that cuts rigging (the scatter's grape) leaves her slowed a
 // while (stores.ts crewed).
 //
@@ -29,16 +27,15 @@ import { distance, type Vec3 } from '../world/sphere.ts';
 import { mates } from './carded.ts';
 import type { Blow, Vessel } from './contact.ts';
 import type { GunKind } from '../kinds.ts';
-import { CARRIED, FALLOFF, GUN, GUNS, GUST } from './handling.ts';
 import {
-  dealt,
-  fitOf,
-  struck,
-  UNWORN,
-  zoneOf,
-  type Build,
-  type Wear,
-} from './faults.ts';
+  CARRIED,
+  FALLOFF,
+  GUN,
+  GUNS,
+  GUST,
+  SPEC,
+  type Handling,
+} from './handling.ts';
 import { harmed, hullCap, sunk, whole, type Health } from './health.ts';
 import { outside, type Storm } from './storm.ts';
 import {
@@ -60,7 +57,7 @@ import type { Depth } from './shoal.ts';
  * carries (CARRIED slots, null empty) and the slot in hand, seconds till the
  * gun in hand may fire after she took it up (EQUIP), her hold (hold.ts), her
  * gust (gust.ts), seconds till her rigging is mended, cut by a gun that cuts
- * it (GUNS `cuts`; 0 whole), and what her blows have done to her (faults.ts).
+ * it (GUNS `cuts`; 0 whole).
  */
 export interface Crew {
   id: number;
@@ -71,7 +68,6 @@ export interface Crew {
   hold: Hold;
   gust: Gust;
   cut: number;
-  wear: Wear;
   /** Her own build, in a race sailed by a card (play/fitted.ts); else none. */
   build?: Build;
 }
@@ -132,8 +128,6 @@ export interface Strike {
   at: Vec3;
   ram: boolean;
   gun: GunKind | null;
-  /** The zone of her it landed on (kinds.ts ZONES' order: faults.ts zoneOf). */
-  zone: number;
 }
 
 /**
@@ -172,8 +166,18 @@ export const crewOf = (id: number, ...guns: Gun[]): Crew => ({
   hold: emptyHold(),
   gust: gustOf(),
   cut: 0,
-  wear: UNWORN,
 });
+
+/**
+ * A ship's own build, in a race sailed by a card (play/fitted.ts): her handling
+ * whole.
+ */
+export interface Build {
+  fit: Handling;
+}
+
+/** Her handling: her build's, the tables' with none. */
+export const fitOf = (c: Crew | undefined): Handling => c?.build?.fit ?? SPEC;
 
 /** The gun in her hand, or null. */
 export const inHand = (c: Crew): Gun | null => c.guns[c.hand] ?? null;
@@ -294,16 +298,13 @@ export function stepBattle(
   };
   const strikes: Strike[] = [],
     sunkNow: number[] = [];
-  // a blow (a ball coming along `way`) on the zone of her it lands on
-  // (faults.ts zoneOf), and both ships' quiet broken
   const ships = new Map(fleet.map((v) => [v.id, v.ship]));
   const deal = (
     by: number,
     id: number,
     damage: number,
     at: Vec3,
-    gun: GunKind | null,
-    way = at
+    gun: GunKind | null
   ) => {
     const ram = gun === null;
     const c = crews.get(id),
@@ -312,10 +313,6 @@ export function stepBattle(
     const harm = harmed(c.health, damage);
     c.health = harm.health;
     c.hold = broken(c.hold);
-    const zone = zoneOf(ship, at, way, gun);
-    c.wear = struck(c.wear, zone, harm.hull);
-    const d = crews.get(by);
-    if (d) d.wear = dealt(d.wear);
     if (gun) c.cut = Math.max(c.cut, GUNS[gun].cuts);
     const broke = harm.shield > 0 && c.health.shield <= 0;
     // a scatter's pellets on one ship in one step: one strike
@@ -323,8 +320,6 @@ export function stepBattle(
       ? undefined
       : strikes.find((s) => !s.ram && s.shooter === by && s.struck === id);
     if (same) {
-      // (the zone of the first pellet to reach her hull)
-      if (same.hull === 0 && harm.hull > 0) same.zone = zone;
       same.damage += harm.shield + harm.hull;
       same.shield += harm.shield;
       same.hull += harm.hull;
@@ -340,7 +335,6 @@ export function stepBattle(
         at,
         ram,
         gun,
-        zone,
       });
     if (sunk(c.health)) sunkNow.push(id);
   };
@@ -373,13 +367,12 @@ export function stepBattle(
             m.id,
             damage * (1 - (FALLOFF.edge * d) / splash),
             f.at,
-            kind,
-            f.ball.v
+            kind
           );
       }
     } else if (f.struck !== null && !mates(b.teams, shooter, f.struck))
       // (a ball that meets a mate's hull stops there and harms nothing)
-      deal(shooter, f.struck, damage, f.at, kind, f.ball.v);
+      deal(shooter, f.struck, damage, f.at, kind);
     if (f.struck === null)
       splashes.push({ shooter, gun: kind, at: f.at, land: f.land });
   }

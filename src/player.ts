@@ -4,7 +4,7 @@
 // (Hands: read by ui/input.ts, given to play/game.ts step); what the match
 // reports comes out (Status, read by ui/hud.ts), with what she carries (Kit).
 
-import type { Faults, GunKind, LootKind, Use, Zones } from './kinds.ts';
+import type { GunKind, LootKind, Use } from './kinds.ts';
 import type { Vec3 } from './world/sphere.ts';
 
 /** Her hands, as read for a frame. */
@@ -65,24 +65,13 @@ export interface Status {
    */
   arriving: number;
   /**
-   * The ship the hit points, zones and faults below are: hers, or once she has
-   * sunk the one she watches (a change of it is no blow nor fault come on).
+   * Her hit points, and their most: hers, or once she has sunk the one she
+   * watches.
    */
-  of: number;
-  /** Her hit points, and their most. */
   hull: number;
   hullMax: number;
   shield: number;
   shieldMax: number;
-  /**
-   * Her hull's zones (ZONES' order, sim/faults.ts): each one's share of the
-   * hull she has lost to blows since it was last mended above 40 (0…1, summing
-   * to 1, or all 0 with none), each one's fault, and whether her own water
-   * mends her hull now.
-   */
-  zones: Zones<number>;
-  faults: Faults;
-  mending: boolean;
   /**
    * The gun in her hand, for Fire and the reticle: its kind and rarity (0–4,
    * sim/handling.ts GUN.rarities), the rounds left in its magazine, how far
@@ -206,17 +195,6 @@ export const HER = 0;
  */
 export { isGun } from './kinds.ts';
 export type { GunKind, LootKind } from './kinds.ts';
-/** A ship's four zones and their faults (none, minor, major): kinds.ts. */
-export { SOUND, ZONES } from './kinds.ts';
-export type { Fault, Faults, Zone, Zones } from './kinds.ts';
-
-/**
- * Whether a fault came on, or worsened, from `was` to `now` (each zone's, in
- * ZONES' order): the beat the camera, the sound and the HUD give it once.
- */
-export const worsened = (was: Faults, now: Faults) =>
-  now[0] > was[0] || now[1] > was[1] || now[2] > was[2] || now[3] > was[3];
-
 /** The hotbar's slots: the guns' first, then the items'. */
 export const HOTBAR = { guns: 2, items: 3 } as const;
 
@@ -232,8 +210,7 @@ export const HOTBAR = { guns: 2, items: 3 } as const;
  *   swapped   she took her gun of a kind in hand (only hers)
  *   fell      a ball came down in the sea, or on the land: a miss (ship: who fired it)
  *   struck    a ball or a ram home in ship, dealt by `by`: the hit points it took off her shield and off her hull,
- *             whether it took the last of her shield, whether it was a ram, and the zone of her it landed on
- *             (ZONES' order)
+ *             whether it took the last of her shield, and whether it was a ram
  *   sank     ship went down, sunk by `by` (null: the storm)
  *   took      ship took up a piece of loot (only hers is reported): what, its rarity (0–4) and the hotbar's slot it
  *             went to (HOTBAR)
@@ -253,7 +230,6 @@ export type Deed = { seq: number; time: number; at: Vec3; ship: number } & (
       hull: number;
       broke: boolean;
       ram: boolean;
-      zone: number;
     }
   | { kind: 'sank'; by: number | null }
   | { kind: 'took'; piece: LootKind; rarity: number; slot: number }

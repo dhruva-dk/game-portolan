@@ -27,8 +27,6 @@ import type { Temper } from './temper.ts';
  *   stamina     her gunnery and her helm as stats, `tire` points more by the
  *               race's end at twenty and as many fewer at nought, moving
  *               evenly from its midpoint
- *   seamanship  the hull her zones fault at (`seamanship` less of each band at
- *               twenty: play/fitted.ts)
  *
  * Her skill at all else goes with the mean of her gunnery, helm and lookout.
  * Her consistency and her feedback are the career's to read: her form is on
@@ -40,7 +38,6 @@ export const DRIVER = {
   run: 0.3,
   margin: 0.5,
   tire: 4,
-  seamanship: 0.25,
 } as const;
 
 /** A stat as a lean: −1 at nought, 0 at ten, 1 at twenty. */

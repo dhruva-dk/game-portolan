@@ -2,7 +2,7 @@
 // deeds on the sea are the match's moments: status.moments, her guns' among
 // them): a slot of her stores taken in hand, a ball passing near the eye, her
 // water (a loop closed), the storm beginning to close (its thunder, then its
-// wind), a fault coming on her, and the screens
+// wind), and the screens
 // (a folio opened and closed, PLAY, her end); and what the bed follows (Bed):
 // her speed, the wind in her rig, her heave and roll, the nearest coast, the
 // storm's wall, her hull, and how much of the sea is heard at all (and how much
@@ -14,9 +14,6 @@
 
 import {
   HOTBAR,
-  SOUND,
-  worsened,
-  type Faults,
   type GunKind,
   type Kit,
   type Screen,
@@ -132,10 +129,8 @@ export function createListen(ground: (p: Vec3) => number) {
     generation = -1,
     seq = 0,
     closing = false;
-  /** Her hotbar's slot in hand; the faults last heard, and whose (Status of). */
-  let chosen = 0,
-    faulted: Faults = SOUND,
-    faultsOf = NaN;
+  /** Her hotbar's slot in hand. */
+  let chosen = 0;
   let lift = NaN,
     roll = 0,
     whistled = -Infinity;
@@ -238,12 +233,6 @@ export function createListen(ground: (p: Vec3) => number) {
         call(out, 'closing');
       }
       closing = s.closing;
-      // a fault come on her, or worsened: a beam giving way (not another
-      // ship's, watched in her place)
-      if (!fresh && s.of === faultsOf && worsened(faulted, s.faults) && !s.sunk)
-        call(out, 'fault');
-      faulted = s.faults;
-      faultsOf = s.of;
 
       // a ball passing near the eye: its whistle begun WHISTLE s before its
       // closest

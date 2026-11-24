@@ -6,7 +6,7 @@
 //   her ball home       the cross round the reticle (hits.ts) and the figure rising off the ship; a flash, the
 //                       stronger where it broke a shield
 //   a blow on her       from a ship, the ring's sector toward it lit (hits.ts), as bright as the blow is heavy; the
-//                       vignette darker on that side; the vitals slip jolted (the zone struck flashes: vitals.ts)
+//                       vignette darker on that side; the vitals slip jolted
 //   her sinking of one  the gold cross and the gold figure
 //   took up             the piece's mark flies from where it lay to its slot, which pops; a flash and a rim of
 //                       light the rarer it is
@@ -31,13 +31,11 @@ import type { Glyph } from './glyphs.ts';
 import { boxOf, view } from './ui.ts';
 
 /**
- * The HUD's pieces it moves: the vitals slip (and its zone a blow on her hull
- * landed on, flashed: vitals.ts struck), the Fire and Gust discs, and the
+ * The HUD's pieces it moves: the vitals slip, the Fire and Gust discs, and the
  * hotbar's slots (gun's first).
  */
 interface Parts {
   vitals: HTMLElement;
-  struck: (zone: number) => void;
   fire: HTMLElement;
   gust: HTMLElement;
   slots: readonly HTMLElement[];
@@ -186,7 +184,6 @@ export function createJuice(body: HTMLElement, parts: Parts) {
             flash.vignette(r.vignette, weight, whence);
           }
           jolt(parts.vitals);
-          if (m.hull > 0) parts.struck(m.zone);
         }
         return;
       }

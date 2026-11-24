@@ -14,9 +14,7 @@
 //
 // Node only (tools/).
 
-import { ZONES } from '../../src/kinds.ts';
 import { debugOf, PARTS, type Part } from '../../src/play/state.ts';
-import { faultsOf } from '../../src/sim/faults.ts';
 import { STEP } from '../../src/sim/fixed.ts';
 import { GUNS } from '../../src/sim/handling.ts';
 import { isArms } from '../../src/sim/loot.ts';
@@ -215,7 +213,6 @@ export function record(
           broke: s.broke,
           ram: s.ram,
           gun: s.gun,
-          zone: ZONES[s.zone] ?? s.zone,
           range: by && on ? r1(distance(by.ship.at, on.ship.at)) : null,
           left: h ? { hull: r1(h.hull), shield: r1(h.shield) } : null,
         });
@@ -438,8 +435,6 @@ export function record(
           turn: r4(v.ship.turn),
           hull: r1(c.health.hull),
           shield: r1(c.health.shield),
-          faults: faultsOf(c.health.hull, c.wear),
-          mending: c.wear.mending,
           hand: g ? { gun: g.kind, rarity: g.rarity, rounds: g.rounds } : null,
           guns: c.guns.map((k) => k && `${k.kind}:${k.rarity}`),
           hold: c.hold.items.map((k) => k && `${k.kind}x${k.count}`),

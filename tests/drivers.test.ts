@@ -3,11 +3,10 @@
 // drivers alike but for that stat at 4 and at 16 differ the expected way: over
 // seeded races where a race's result shows it (gunnery, nerve), over seeded
 // encounters on the sim where it does not (helm, lookout, stormcraft), and by
-// the arithmetic alone where the stat is one number's (stamina, seamanship).
+// the arithmetic alone where the stat is one number's (stamina).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { SEED } from '../src/environment.ts';
-import { fitted } from '../src/play/fitted.ts';
 import { runRace, specField } from '../src/play/race.ts';
 import {
   STATS,
@@ -16,7 +15,6 @@ import {
   type RaceCard,
   type Stat,
 } from '../src/race.ts';
-import { crewOf } from '../src/sim/battle.ts';
 import { mind, think, type Memory } from '../src/sim/bot.ts';
 import {
   afloat,
@@ -24,7 +22,6 @@ import {
   type Blow,
   type Vessel,
 } from '../src/sim/contact.ts';
-import { faultsIn } from '../src/sim/faults.ts';
 import { STEP } from '../src/sim/fixed.ts';
 import { spreadBy } from '../src/sim/gunner.ts';
 import { SHIP } from '../src/sim/handling.ts';
@@ -329,31 +326,4 @@ test('stamina: alike till the midpoint of the race; by its end the 16s shoot and
     // her gunner's hand: the same gun's spread
     assert.ok(spreadBy(end(a).gunnery) < spreadBy(end(b).gunnery));
   }
-});
-
-test('seamanship: the same blows on the same ship fault the 4s where the 16s hold', () => {
-  const ship = specField(5, 1).ships[1];
-  const worn = (seamanship: number, hull: number) => {
-    const c = fitted(crewOf(1), { ...ship, driver: driver(9, { seamanship }) });
-    return faultsIn({
-      ...c,
-      health: { ...c.health, hull },
-      wear: { zones: [0, 0, 30, 10], quiet: 0, mending: false },
-    });
-  };
-  // the tables fault her waterline at 40 and majorly under 25: a 16 holds
-  // till 34 and 21.25, a 4 goes at 46 and 28.75
-  assert.deepEqual(worn(10, 42), [0, 0, 0, 0]);
-  assert.deepEqual(worn(4, 42), [0, 0, 1, 0]);
-  assert.deepEqual(worn(16, 38), [0, 0, 0, 0]);
-  assert.deepEqual(worn(10, 38), [0, 0, 1, 0]);
-  assert.deepEqual(worn(16, 27), [0, 0, 1, 0]);
-  assert.deepEqual(worn(4, 27), [0, 0, 2, 1]);
-  let high = 0,
-    low = 0;
-  for (let hull = 100; hull > 0; hull -= 1) {
-    high += worn(16, hull).reduce((a: number, b) => a + b, 0);
-    low += worn(4, hull).reduce((a: number, b) => a + b, 0);
-  }
-  assert.ok(high < low, 'over a whole hull lost, the 16 is the less faulted');
 });

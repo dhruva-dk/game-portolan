@@ -87,7 +87,6 @@ test(
           at,
           ram: false,
           gun: 'scatter',
-          zone: 3,
         },
       ],
       sunk: [{ id: 2, by: 0, at }],
@@ -144,9 +143,8 @@ test(
         struck.by === 0 &&
         struck.shield === 10 &&
         struck.hull === 20 &&
-        struck.broke &&
-        struck.zone === 3,
-      'the zone it landed on carried (the vitals flash it)'
+        struck.broke,
+      'the blow carried'
     );
     // a gun to its gun slot, stores to theirs on the hotbar after the guns
     const [gun, stores] = [d[7], d[8]];
@@ -257,7 +255,6 @@ test('as she sees it: the bearing clockwise from the look, its distance, and on 
     hull: 10,
     broke: false,
     ram: false,
-    zone: 0,
   };
   for (const by of [ahead, right, behind])
     assert.ok(
@@ -334,7 +331,6 @@ test("the camera answers: her blows, the blows on her, her sinking of one; other
     hull,
     broke,
     ram: false,
-    zone: 0,
   });
   assert.equal(answerTo(struck(0, 2, 0, 20), 0)?.answer, CAMERA.hit);
   assert.equal(answerTo(struck(0, 2, 20, 0), 0)?.answer, CAMERA.shieldHit);

@@ -1,6 +1,6 @@
 // A ship fitted out by her card (play/fitted.ts): her
-// parts' performance makes her handling and her most hull, their reliability
-// the hull at which her zones fault. A spec ship is the tables' own.
+// parts' performance makes her handling and her most hull. A spec ship is the
+// tables' own.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { specField } from '../src/play/race.ts';
@@ -8,13 +8,13 @@ import type { Fitted, PartType, RaceShip } from '../src/race.ts';
 import {
   battleOf,
   crewOf,
+  fitOf,
   stepBattle,
   weathered,
   type Crew,
 } from '../src/sim/battle.ts';
 import { afloat } from '../src/sim/contact.ts';
-import { FAULTS, faultsIn, faultsOf, fitOf } from '../src/sim/faults.ts';
-import { FITTED, fitted } from '../src/play/fitted.ts';
+import { fitted } from '../src/play/fitted.ts';
 import { STEP } from '../src/sim/fixed.ts';
 import { gunOf } from '../src/sim/gun.ts';
 import { HEALTH, SPEC } from '../src/sim/handling.ts';
@@ -39,13 +39,9 @@ const crew = (over: Partial<Record<PartType, Partial<Fitted>>> = {}): Crew =>
 const here = fromLatLon(0.2, 0.3),
   deep = () => 30;
 
-test("a spec ship is the tables' own: their handling, their bands, their hull; a match with no card fits nothing", () => {
+test("a spec ship is the tables' own: their handling, their hull; a match with no card fits nothing", () => {
   const c = crew();
   assert.deepEqual(c.build?.fit, SPEC);
-  assert.deepEqual(
-    c.build?.bands,
-    [0, 1, 2, 3].map(() => ({ minor: FAULTS.minor, major: FAULTS.major }))
-  );
   assert.deepEqual(c.health, {
     hull: HEALTH.hull,
     shield: HEALTH.start,
@@ -122,69 +118,6 @@ test("her keel steadies her guns: the same draw goes off closer to the gun's lin
   assert.ok(away(0.5) > 1.9 * away(1), 'half the keel: twice');
 });
 
-test("reliability moves the hull her zones fault at: 0.5 the tables', the most reliable less by FITTED.sway of them, the least as much more; each zone by its own parts", () => {
-  const bands = (over: Parameters<typeof crew>[0]) => crew(over).build!.bands;
-  const lo = 1 - FITTED.sway,
-    hi = 1 + FITTED.sway,
-    band = (by: number) => ({
-      minor: FAULTS.minor * by,
-      major: FAULTS.major * by,
-    });
-  const [rig, rudder, water, deck] = [0, 1, 2, 3];
-  assert.deepEqual(bands({ rudder: { reliability: 1 } })[rudder], band(lo));
-  assert.deepEqual(bands({ rudder: { reliability: 0 } })[rudder], band(hi));
-  assert.deepEqual(bands({ rudder: { reliability: 1 } })[rig], band(1));
-  assert.deepEqual(bands({ mounts: { reliability: 0 } })[deck], band(hi));
-  // two parts to a zone: the mean of them
-  assert.deepEqual(bands({ sails: { reliability: 1 } })[rig], band(0.75));
-  assert.deepEqual(
-    bands({ sails: { reliability: 1 }, rigging: { reliability: 0 } })[rig],
-    band(1)
-  );
-  assert.deepEqual(bands({ hull: { reliability: 0 } })[water], band(1.25));
-  assert.deepEqual(bands({ keel: { reliability: 0 } })[water], band(1.25));
-});
-
-test('her faults by her own bands: her most-hit zone by its band, the next minor under its own major', () => {
-  // her rudder has taken the most, her rigging the next
-  const worn = (c: Crew, hull: number): Crew => ({
-    ...c,
-    health: { ...c.health, hull },
-    wear: { zones: [10, 30, 0, 0], quiet: 0, mending: false },
-  });
-  const spec = crew(),
-    sound = crew({ rudder: { reliability: 1 } }),
-    frail = crew({ rudder: { reliability: 0 } }),
-    rigged = crew({
-      rudder: { reliability: 1 },
-      sails: { reliability: 0 },
-      rigging: { reliability: 0 },
-    });
-  // at 50 hull: only a frail rudder (minor at 60) has gone
-  assert.deepEqual(faultsIn(worn(spec, 50)), [0, 0, 0, 0]);
-  assert.deepEqual(faultsIn(worn(frail, 50)), [0, 1, 0, 0]);
-  // at 30: the spec rudder is minor, the frail major (under 37.5), the sound
-  // whole (minor at 20)
-  assert.deepEqual(faultsIn(worn(spec, 30)), [0, 1, 0, 0]);
-  assert.deepEqual(faultsIn(worn(frail, 30)), [0, 2, 0, 0]);
-  assert.deepEqual(faultsIn(worn(sound, 30)), [0, 0, 0, 0]);
-  // her frail rigging, the next most-hit, is minor under its own major
-  // (37.5) though her sound rudder holds
-  assert.deepEqual(faultsIn(worn(rigged, 30)), [1, 0, 0, 0]);
-  assert.deepEqual(faultsIn(worn(rigged, 15)), [1, 1, 0, 0]);
-  // a spec ship's are the tables', at every hull
-  for (let hull = 0; hull <= 100; hull += 2.5)
-    assert.deepEqual(
-      faultsIn(worn(spec, hull)),
-      faultsOf(hull, worn(spec, hull).wear),
-      `${hull}`
-    );
-  // and her faults cost her own handling
-  const fast = worn(crew({ sails: { performance: 1.1 } }), 30),
-    torn: Crew = { ...fast, wear: { ...fast.wear, zones: [30, 10, 0, 0] } };
-  assert.equal(fitOf(torn).top, SPEC.top * 1.1 * FAULTS.cost.rigging.by[1]);
-});
-
 test('her most hull is hers: the storm takes its share of it, her stores mend up to their share of it, and a blow leaves it hers', () => {
   const stout = crew({ hull: { performance: 1.2 } }),
     spec = crew();
@@ -207,8 +140,6 @@ test('her most hull is hers: the storm takes its share of it, her stores mend up
   assert.ok(Math.abs(after(stout) - 108) < 1e-9);
 });
 
-test('a card with a part of no performance, or a reliability out of 0 to 1, is refused', () => {
+test('a card with a part of no performance is refused', () => {
   assert.throws(() => crew({ keel: { performance: 0 } }), /ship 1's keel/);
-  assert.throws(() => crew({ hull: { reliability: 1.2 } }), /ship 1's hull/);
-  assert.throws(() => crew({ sails: { reliability: -0.1 } }), /ship 1's sails/);
 });

@@ -1,30 +1,34 @@
 // Which ships smoke and how much (gunfire/smoking.ts): the nearest few within
-// sight, thinner the farther and close by the eye, the right puffs for each
-// fault, and all of it within its budget.
+// sight, thinner the farther and close by the eye, and all of it within its
+// budget; and in a match, each ship's wear her hull's.
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import type { Fault, Faults } from '../src/kinds.ts';
+import { SEED } from '../src/environment.ts';
+import { createMatches } from '../src/play/setup.ts';
+import { createState } from '../src/play/state.ts';
+import { wearOf } from '../src/sim/health.ts';
+import { chart } from '../src/sim/route.ts';
+import { berthing } from '../src/sim/spawn.ts';
 import type { ShipDraw } from '../src/snapshot.ts';
 import {
   CLOSE,
-  HOLED,
   LIFE_SPREAD,
   MOST_RATE,
-  PORTS,
   SMOKING,
   WORN,
   smokers,
   type Smoker,
 } from '../src/gunfire/smoking.ts';
-import { R } from '../src/world/sphere.ts';
+import { landOf, planetOf } from '../src/world/land.ts';
+import { R, type Vec3 } from '../src/world/sphere.ts';
+import { flat } from '../src/world/swell.ts';
 
 /** A ship `metres` round the sea from under the eye. */
 const ship = (
   id: number,
   metres: number,
-  wear: Fault,
-  faults: Faults = [0, 0, 0, 0],
+  wear: ShipDraw['wear'],
   afloat = true
 ): ShipDraw => {
   const a = metres / R;
@@ -40,7 +44,6 @@ const ship = (
     afloat,
     gun: null,
     wear,
-    faults,
   };
 };
 /** An eye `height` metres over the sea. */
@@ -91,46 +94,30 @@ test('none past SMOKING.far, nor over the horizon', () => {
   assert.equal(plan([ship(1, 250, 2)], 150).length, 1);
 });
 
-test('only the worn, the holed at her waterline and the afire smoke, and only afloat', () => {
+test('only the worn smoke, and only afloat', () => {
   const [wisps] = plan([ship(1, 50, 1)]);
-  assert.ok(wisps && wisps.wear > 0 && wisps.spray === 0 && wisps.ports === 0);
-  const [holed] = plan([ship(1, 50, 0, [0, 0, 1, 0])]);
-  assert.ok(holed && holed.spray > 0 && holed.wear === 0 && holed.ports === 0);
-  const [afire] = plan([ship(1, 50, 0, [0, 0, 0, 2])]);
-  assert.ok(afire && afire.ports > 0 && afire.wear === 0 && afire.spray === 0);
-  // her rigging and rudder make none; nor does a ship sinking
-  assert.equal(plan([ship(1, 50, 0, [2, 2, 0, 0])]).length, 0);
-  assert.equal(plan([ship(1, 50, 2, [0, 0, 2, 2], false)]).length, 0);
-  // a major fault, more than a minor
-  const [minor] = plan([ship(1, 50, 0, [0, 0, 1, 1])]),
-    [major] = plan([ship(1, 50, 0, [0, 0, 2, 2])]);
-  assert.ok(minor && major);
-  assert.ok(major.spray > minor.spray && major.ports > minor.ports);
+  assert.ok(wisps && wisps.wear > 0);
+  assert.equal(plan([ship(1, 50, 0)]).length, 0);
+  // nor does a ship sinking
+  assert.equal(plan([ship(1, 50, 2, false)]).length, 0);
 });
 
 test('fewer puffs the farther, from SMOKING.near on; thinner close by the eye', () => {
   // (an eye just over the sea, so her distance is near what she is round it)
-  const at = (metres: number) =>
-    plan([ship(1, metres, 2, [0, 0, 2, 2])], 0.5)[0];
+  const at = (metres: number) => plan([ship(1, metres, 2)], 0.5)[0];
   const full = at(SMOKING.near - 1),
     twice = at(2 * SMOKING.near);
   assert.ok(full && twice);
   near(full.wear, WORN[2].rate);
-  near(full.spray, HOLED.rate[2]);
-  near(full.ports, PORTS.rate[2]);
   const by = SMOKING.near / twice.away;
   assert.ok(by > 0.45 && by < 0.55);
   near(twice.wear, WORN[2].rate * by);
-  near(twice.spray, HOLED.rate[2] * by);
-  near(twice.ports, PORTS.rate[2] * by);
   // close by the eye: her smoke at CLOSE's share, and less of it lower (its
-  // closeness 0); her spray, low on the water, not thinned
+  // closeness 0)
   const close = at(SMOKING.close[0] - 2);
   assert.ok(close);
   assert.equal(close.close, 0);
   near(close.wear, WORN[2].rate * CLOSE.rate);
-  near(close.ports, PORTS.rate[2] * CLOSE.rate);
-  near(close.spray, HOLED.rate[2]);
   assert.equal(at(SMOKING.close[1] + 1)?.close, 1);
   const between = at((SMOKING.close[0] + SMOKING.close[1]) / 2);
   assert.ok(between && between.close > 0.3 && between.close < 0.7);
@@ -138,23 +125,43 @@ test('fewer puffs the farther, from SMOKING.near on; thinner close by the eye', 
 
 test('all of it together keeps no more than SMOKING.alive puffs alive, a quarter of the ring at most', () => {
   const ships = Array.from({ length: 20 }, (_, i) =>
-    ship(i, SMOKING.close[1] + 1 + i * 0.1, 2, [0, 0, 2, 2])
+    ship(i, SMOKING.close[1] + 1 + i * 0.1, 2)
   );
   const all = plan(ships, 0.5),
-    sum = all.reduce((s, m) => s + m.wear + m.spray + m.ports, 0);
+    sum = all.reduce((s, m) => s + m.wear, 0);
   assert.equal(all.length, SMOKING.most);
   assert.ok(sum <= MOST_RATE + 1e-9, `${sum} a second`);
-  assert.ok(sum > MOST_RATE * 0.99, 'scaled to the budget, not under it');
   // what lives longest, at the most a second, is all that can be alive
-  const longest = Math.max(
-    (WORN[2]?.life ?? 0) * LIFE_SPREAD,
-    HOLED.life,
-    PORTS.life
-  );
+  const longest = (WORN[2]?.life ?? 0) * LIFE_SPREAD;
   assert.ok(MOST_RATE * longest <= SMOKING.alive + 1e-9);
   assert.ok(SMOKING.alive <= 4096 / 4);
   // under it, nothing is scaled
-  const one = plan([ship(1, SMOKING.near - 1, 2, [0, 0, 2, 2])], 0.5)[0];
+  const one = plan([ship(1, SMOKING.near - 1, 2)], 0.5)[0];
   assert.ok(one);
-  near(one.wear + one.spray + one.ports, 8 + 16 + 12);
+  near(one.wear, 8);
+});
+
+test("in the game's own match, every ship drawn shows her wear", () => {
+  const planet = planetOf(SEED, landOf(SEED)),
+    depth = (p: Vec3) => -planet.height(p),
+    matches = createMatches(SEED, planet, null, null),
+    state = createState(
+      planet,
+      flat,
+      { chart: chart(depth), water: berthing(depth) },
+      matches.first
+    );
+  state.start(matches.deal(), false);
+  const idle = { course: null, throttle: 0 },
+    still = { aim: null, fire: false };
+  let worn = false;
+  while (state.time() < 400 && !worn) {
+    state.advance(idle, still);
+    for (const d of state.drawn(1)) {
+      if (!d.afloat) continue;
+      assert.equal(d.wear, wearOf(state.crew(d.id).health));
+      worn ||= d.wear > 0;
+    }
+  }
+  assert.ok(worn, 'a ship was worn');
 });

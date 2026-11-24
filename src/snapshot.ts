@@ -3,7 +3,7 @@
 // one hands the other a Snapshot; nothing else passes between them, and nothing
 // outside the frame touches what it draws with.
 
-import type { Fault, Faults, GunKind, LootKind } from './kinds.ts';
+import type { GunKind, LootKind } from './kinds.ts';
 import type { Cap } from './sim/storm.ts';
 import type { ReadCells } from './world/cells.ts';
 import type { ShipPose } from './world/pose.ts';
@@ -82,9 +82,8 @@ export const SAIL_MARKS = {
  * fits the sea round her nor marks it), and the gun in her hand (its kind:
  * kinds.ts GunKind, and rarity, 0 common to 4 legendary), mounted on her
  * plinth, with the way it is laid (a unit vector, world; it trains round to
- * it), or null with none. Her hull's wear (0 above 40, 1 down to 25, 2 under
- * it) and each zone's fault (kinds.ts ZONES' order: sim/faults.ts), for her
- * smoke and her zones' marks.
+ * it), or null with none. Her hull's wear (sim/health.ts wearOf), for her
+ * smoke.
  */
 export interface ShipDraw {
   id: number;
@@ -93,8 +92,7 @@ export interface ShipDraw {
   velocity: Vec3;
   afloat: boolean;
   gun: { kind: GunKind; rarity: number; aim: Vec3 } | null;
-  wear: Fault;
-  faults: Faults;
+  wear: 0 | 1 | 2;
 }
 
 /**

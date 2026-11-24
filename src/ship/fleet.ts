@@ -164,8 +164,7 @@ export function createFleet(light: Light, wind: Wind, capacity: number) {
     was: number[] = [];
   /** Whether ship i floats (else she is going down), and whether she is drawn at all. */
   const floats: boolean[] = [],
-    shown: boolean[] = [],
-    slacks: number[] = [];
+    shown: boolean[] = [];
   /** How each ship's square yards are braced, radians (+ turns the port arm aft); and, this frame, her sails' wind, her
    * frame, metres a second. */
   const braces: number[] = [],
@@ -213,18 +212,16 @@ export function createFleet(light: Light, wind: Wind, capacity: number) {
   };
 
   /** The ship i's pose and look, and as `how` has her (each as given there, if it is): her velocity (metres per second,
-   * world space; still), whether she floats (afloat), and the share of her sails' wind her canvas takes (1 whole; less,
-   * slack: her rigging cut, faults.ts); ships 0…count−1 are drawn, but those dropped. */
+   * world space; still) and whether she floats (afloat); ships 0…count−1 are drawn, but those dropped. */
   function set(
     i: number,
     pose: ShipPose,
     look: Look,
-    how: { velocity?: Vec3; afloat?: boolean; slack?: number } = {}
+    how: { velocity?: Vec3; afloat?: boolean } = {}
   ) {
-    const { velocity = STILL, afloat = true, slack = 1 } = how;
+    const { velocity = STILL, afloat = true } = how;
     if (i >= capacity)
       throw new Error(`fleet: ship ${i} past capacity ${capacity}`);
-    slacks[i] = slack;
     floats[i] = afloat;
     shown[i] = true;
     poses[i] = pose;
@@ -254,7 +251,6 @@ export function createFleet(light: Light, wind: Wind, capacity: number) {
         ? trim(blowing, speed, 0)
         : hauled(braces[i], blowing, speed, dt);
       filling(blowing, speed, braces[i], (sails[i] ??= [0, 0, 0]));
-      if (slacks[i] < 1) scale(sails[i], slacks[i], sails[i]);
       if (simulating) metres[i] = eye.distanceTo(middleOf(pose));
     }
     // (her own berthed only while she is drawn: never set, or dropped, none)
