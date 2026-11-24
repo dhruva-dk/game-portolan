@@ -1,5 +1,5 @@
 import type { Territory } from '../sim/territory.ts';
-import type { Sea } from '../snapshot.ts';
+import type { Sea } from '../render/snapshot.ts';
 import type { Vec3 } from '../world/sphere.ts';
 
 export function createHeld() {

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { SEED } from '../src/environment.ts';
+import { SEED } from '../src/world/environment.ts';
 import { runRace, specField } from '../src/play/race.ts';
 import {
   STATS,
@@ -8,7 +8,7 @@ import {
   type DriverStats,
   type RaceCard,
   type Stat,
-} from '../src/race.ts';
+} from '../src/sim/race.ts';
 import { mind, think, type Memory } from '../src/sim/bot.ts';
 import {
   afloat,

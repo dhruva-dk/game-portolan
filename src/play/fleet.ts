@@ -3,7 +3,7 @@ import { eye } from '../sim/lookout.ts';
 import { PLAYER, SHIPS } from '../sim/match.ts';
 import { PERSONAS, TYPES, dealt, nature, type Nature } from '../sim/persona.ts';
 import { hash } from '../world/random.ts';
-import type { Fleet, Spread, Standout } from '../player.ts';
+import type { Fleet, Spread, Standout } from './player.ts';
 
 export function naturesOf(seed: number): Map<number, Nature> {
   const mix = dealt(seed).mix,

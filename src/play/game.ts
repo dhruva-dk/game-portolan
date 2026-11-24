@@ -1,4 +1,4 @@
-import type { World } from '../environment.ts';
+import type { World } from '../world/environment.ts';
 import { fixedClock } from '../sim/fixed.ts';
 import { fitOf, inHand, type Crew } from '../sim/battle.ts';
 import { laid, reloadOf, spreadOf, type Gun, type Laying } from '../sim/gun.ts';
@@ -12,9 +12,9 @@ import { RIDE } from '../sim/ride.ts';
 import { PLAYER } from '../sim/match.ts';
 import type { Vessel } from '../sim/contact.ts';
 import type { Helm, ShipState } from '../sim/ship.ts';
-import type { Use } from '../kinds.ts';
-import { PARTS, type PartType } from '../race.ts';
-import type { Eye, LootDraw, Snapshot, StormDraw } from '../snapshot.ts';
+import type { Use } from '../sim/kinds.ts';
+import { PARTS, type PartType } from '../sim/race.ts';
+import type { Eye, LootDraw, Snapshot, StormDraw } from '../render/snapshot.ts';
 import { createSwell } from '../world/swell.ts';
 import type { Anchor } from '../world/lattice.ts';
 import type { ShipPose } from '../world/pose.ts';
@@ -40,7 +40,7 @@ import {
   type Moment,
   type Slot,
   type Status,
-} from '../player.ts';
+} from './player.ts';
 import {
   FOCI,
   LOOSE,

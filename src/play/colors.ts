@@ -16,9 +16,9 @@ import {
   UMBER,
   VERMILION,
   markOn,
-} from '../palette.ts';
-import { LIVERY, PATTERNS, type Livery } from '../player.ts';
-import type { Look } from '../snapshot.ts';
+} from '../render/palette.ts';
+import { LIVERY, PATTERNS, type Livery } from './player.ts';
+import type { Look } from '../render/snapshot.ts';
 import { hash } from '../world/random.ts';
 import type { Vec3 } from '../world/sphere.ts';
 

@@ -1,9 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createTerritory, type Territory } from '../src/sim/territory.ts';
-import type { Sea } from '../src/snapshot.ts';
-import { SLICES, createClaimed } from '../src/water/claimed.ts';
-import { createCursor } from '../src/water/cursor.ts';
+import type { Sea } from '../src/render/snapshot.ts';
+import { SLICES, createClaimed } from '../src/render/water/claimed.ts';
+import { createCursor } from '../src/render/water/cursor.ts';
 import {
   CELLS,
   N,

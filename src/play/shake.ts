@@ -1,5 +1,5 @@
-import { blowOf, felt, type Blow, type Deed } from '../player.ts';
-import type { Eye } from '../snapshot.ts';
+import { blowOf, felt, type Blow, type Deed } from './player.ts';
+import type { Eye } from '../render/snapshot.ts';
 import { hash01 } from '../world/random.ts';
 import { clamp, easeInOut, lerp, smoother } from '../world/scalar.ts';
 import { add, type Out3, type Vec3 } from '../world/sphere.ts';

@@ -1,5 +1,5 @@
-import type { Doing, Mate, Placed, Race } from '../player.ts';
-import type { RaceCard } from '../race.ts';
+import type { Doing, Mate, Placed, Race } from './player.ts';
+import type { RaceCard } from '../sim/race.ts';
 import type { Crew } from '../sim/battle.ts';
 import type { Mode } from '../sim/captain.ts';
 import { HEALTH } from '../sim/handling.ts';

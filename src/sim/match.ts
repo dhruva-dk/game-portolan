@@ -1,4 +1,4 @@
-import type { GunKind } from '../kinds.ts';
+import type { GunKind } from './kinds.ts';
 
 type Phase = 'fighting' | 'spectating' | 'won';
 

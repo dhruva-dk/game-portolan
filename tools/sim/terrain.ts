@@ -15,7 +15,7 @@ import {
   createTerrain,
   type Terrain,
 } from '../../src/world/terrain.ts';
-import { linearToSrgb } from '../../src/color.ts';
+import { linearToSrgb } from '../../src/world/color.ts';
 import {
   ROCK,
   SAND,
@@ -29,7 +29,7 @@ import {
   SEA_SHALLOW,
   type Rgb,
   type Tones,
-} from '../../src/palette.ts';
+} from '../../src/render/palette.ts';
 import { png } from './png.ts';
 
 export interface TerrainScenario {

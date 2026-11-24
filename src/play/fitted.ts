@@ -1,4 +1,4 @@
-import { PARTS, type RaceShip } from '../race.ts';
+import { PARTS, type RaceShip } from '../sim/race.ts';
 import type { Crew } from '../sim/battle.ts';
 import { HEALTH, SPEC } from '../sim/handling.ts';
 

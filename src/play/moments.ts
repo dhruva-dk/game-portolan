@@ -1,12 +1,12 @@
 import type { Cue, Shot, Splash, Strike } from '../sim/battle.ts';
 import { isArms, rarityOf, type Taken } from '../sim/loot.ts';
 import type { Mended } from '../sim/stores.ts';
-import { bearingFrom, type Blast, type Eye } from '../snapshot.ts';
-import { HOTBAR, LIFT, type Deed, type Moment } from '../player.ts';
+import { bearingFrom, type Blast, type Eye } from '../render/snapshot.ts';
+import { HOTBAR, LIFT, type Deed, type Moment } from './player.ts';
 import { R, normalize, type Vec3 } from '../world/sphere.ts';
 import { placed, type Point, type View } from './lens.ts';
 
-export { bearingFrom } from '../snapshot.ts';
+export { bearingFrom } from '../render/snapshot.ts';
 
 export const KEEP = 1;
 

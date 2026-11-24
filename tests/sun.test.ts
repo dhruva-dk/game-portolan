@@ -16,7 +16,7 @@ import {
 } from '../src/world/sphere.ts';
 import { CELLS, centerOf } from '../src/world/cells.ts';
 import { landOf, planetOf } from '../src/world/land.ts';
-import { SEED } from '../src/environment.ts';
+import { SEED } from '../src/world/environment.ts';
 import { random } from '../src/world/random.ts';
 import {
   sunAt,

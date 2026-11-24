@@ -1,5 +1,5 @@
-import { linearToSrgb } from '../color.ts';
-import type { Sea } from '../snapshot.ts';
+import { linearToSrgb } from '../world/color.ts';
+import type { Sea } from '../render/snapshot.ts';
 import { cellOf } from '../world/cells.ts';
 import { distance } from '../world/sphere.ts';
 import { outInto, type Lay, type LayOnto, type Mutable } from './disc.ts';

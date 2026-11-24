@@ -12,7 +12,7 @@ import {
 import type { Crew } from './battle.ts';
 import type { Vessel } from './contact.ts';
 import { gunOf } from './gun.ts';
-import { KINDS as GUN_KINDS, STORES, isGun, type GunKind } from '../kinds.ts';
+import { KINDS as GUN_KINDS, STORES, isGun, type GunKind } from './kinds.ts';
 import { EQUIP, GUN, SHIP } from './handling.ts';
 import { roomFor, stowed, USES, type Use } from './hold.ts';
 import type { Depth } from './shoal.ts';

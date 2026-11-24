@@ -18,7 +18,7 @@ import {
 import { clearance, type Depth } from '../src/sim/shoal.ts';
 import { shipAt } from '../src/sim/ship.ts';
 import { landOf, planetOf } from '../src/world/land.ts';
-import { SEED } from '../src/environment.ts';
+import { SEED } from '../src/world/environment.ts';
 import {
   add,
   along,

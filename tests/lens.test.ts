@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { placed } from '../src/play/lens.ts';
-import { AIR_FOV, type Eye } from '../src/snapshot.ts';
+import { AIR_FOV, type Eye } from '../src/render/snapshot.ts';
 import {
   R,
   add,

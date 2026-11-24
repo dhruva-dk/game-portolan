@@ -5,7 +5,7 @@ import {
   STRIDE,
   createLod,
   type LodEye,
-} from '../src/land/terrain-lod.ts';
+} from '../src/render/land/terrain-lod.ts';
 import {
   FACES,
   R,

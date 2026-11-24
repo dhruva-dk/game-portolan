@@ -1,4 +1,4 @@
-import type { GunKind } from '../../player.ts';
+import type { GunKind } from '../../play/player.ts';
 import {
   ar,
   brown,

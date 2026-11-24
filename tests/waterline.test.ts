@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { BEAM, SCALE, halfAt, zOf } from '../src/ship/lines.ts';
-import { WATERLINE } from '../src/ship/waterline.ts';
+import { BEAM, SCALE, halfAt, zOf } from '../src/render/ship/lines.ts';
+import { WATERLINE } from '../src/render/ship/waterline.ts';
 
 const { stern, stem, half } = WATERLINE;
 const at = (z: number) => {

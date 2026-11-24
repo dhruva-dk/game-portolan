@@ -1,4 +1,4 @@
-import type { Eye } from '../snapshot.ts';
+import type { Eye } from '../render/snapshot.ts';
 import type { ShipPose } from '../world/pose.ts';
 import { clamp, smoother } from '../world/scalar.ts';
 import { R, add, arc, length, normalize, scale } from '../world/sphere.ts';

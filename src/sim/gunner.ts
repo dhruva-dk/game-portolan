@@ -14,7 +14,7 @@ import {
 import { inHand, type Order } from './battle.ts';
 import { roll, type Ctx } from './captain.ts';
 import { damageOf, falloff, reloadOf, spreadOf } from './gun.ts';
-import type { GunKind } from '../kinds.ts';
+import type { GunKind } from './kinds.ts';
 import { GUNS, SHIP } from './handling.ts';
 import type { ShipState } from './ship.ts';
 import { thrown } from './shot.ts';

@@ -4,7 +4,7 @@ import {
   type Territory,
 } from '../src/sim/territory.ts';
 import type { Cap } from '../src/sim/storm.ts';
-import type { Sea } from '../src/snapshot.ts';
+import type { Sea } from '../src/render/snapshot.ts';
 import { random } from '../src/world/random.ts';
 import {
   R,

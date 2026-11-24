@@ -17,10 +17,10 @@ import {
 } from '../src/sim/contact.ts';
 import { STEP } from '../src/sim/fixed.ts';
 import { chosen, gunOf, laid, muzzle, spreadOf } from '../src/sim/gun.ts';
-import { KINDS, type GunKind } from '../src/kinds.ts';
+import { KINDS, type GunKind } from '../src/sim/kinds.ts';
 import { GUN, GUNS, HEALTH, SHIP } from '../src/sim/handling.ts';
-import { FOOT } from '../src/ship/gun-shape.ts';
-import { GUN_DRAWN, GUN_MOUNT } from '../src/ship/mount.ts';
+import { FOOT } from '../src/render/ship/gun-shape.ts';
+import { GUN_DRAWN, GUN_MOUNT } from '../src/render/ship/mount.ts';
 import { harmed, healed, sunk, whole } from '../src/sim/health.ts';
 import { flown, loosed, reach, thrown, type Ball } from '../src/sim/shot.ts';
 import type { Depth } from '../src/sim/shoal.ts';

@@ -1,4 +1,4 @@
-import type { Chart } from '../player.ts';
+import type { Chart } from './player.ts';
 
 export function surveyor(): (name: string) => Promise<Chart | null> {
   let worker: Worker | null = null,

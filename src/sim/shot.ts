@@ -8,7 +8,7 @@ import {
   type Vec3,
 } from '../world/sphere.ts';
 import { KEEL, RADIUS } from './contact.ts';
-import { perKind, type GunKind } from '../kinds.ts';
+import { perKind, type GunKind } from './kinds.ts';
 import { GUN, GUNS, SHIP } from './handling.ts';
 import type { ShipState } from './ship.ts';
 import type { Depth } from './shoal.ts';

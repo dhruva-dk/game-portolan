@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createBolt } from '../src/sky/storm-bolt.ts';
-import type { StormDraw } from '../src/snapshot.ts';
+import { createBolt } from '../src/render/sky/storm-bolt.ts';
+import type { StormDraw } from '../src/render/snapshot.ts';
 import { R } from '../src/world/sphere.ts';
 
 const eye: [number, number, number] = [0, 0, R + 20];

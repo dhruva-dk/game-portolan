@@ -1,4 +1,4 @@
-import type { Eye } from '../snapshot.ts';
+import type { Eye } from '../render/snapshot.ts';
 import { R, type Vec3 } from '../world/sphere.ts';
 
 export interface Point {

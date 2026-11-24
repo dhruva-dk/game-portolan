@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import { nature } from '../src/sim/persona.ts';
 import assert from 'node:assert/strict';
-import type { GunKind } from '../src/kinds.ts';
+import type { GunKind } from '../src/sim/kinds.ts';
 import { GUNS, HEALTH } from '../src/sim/handling.ts';
 import {
   armed,

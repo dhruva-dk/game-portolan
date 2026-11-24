@@ -1,5 +1,5 @@
-import { AIR_FOV, type Eye } from '../snapshot.ts';
-import type { PartType } from '../race.ts';
+import { AIR_FOV, type Eye } from '../render/snapshot.ts';
+import type { PartType } from '../sim/race.ts';
 import type { ShipPose } from '../world/pose.ts';
 import { clamp, lerp, smoother, wrapAngle } from '../world/scalar.ts';
 import {

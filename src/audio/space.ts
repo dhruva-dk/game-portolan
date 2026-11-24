@@ -1,7 +1,7 @@
-import { bearingFrom, type Eye } from '../snapshot.ts';
+import { bearingFrom, type Eye } from '../render/snapshot.ts';
 import type { Vec3 } from '../world/sphere.ts';
 
-export { bearingFrom } from '../snapshot.ts';
+export { bearingFrom } from '../render/snapshot.ts';
 
 export const SPEED = 340;
 export const NEAR = 14,

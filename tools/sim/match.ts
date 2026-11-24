@@ -3,7 +3,7 @@ import { RIDE } from '../../src/sim/ride.ts';
 import { createMatches } from '../../src/play/setup.ts';
 import { raceOf, specField } from '../../src/play/race.ts';
 import { createState, debugOf, type Match } from '../../src/play/state.ts';
-import type { RaceCard } from '../../src/race.ts';
+import type { RaceCard } from '../../src/sim/race.ts';
 import { STEP } from '../../src/sim/fixed.ts';
 import { SHIPS } from '../../src/sim/match.ts';
 import { berths } from '../../src/sim/spawn.ts';

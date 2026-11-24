@@ -1,12 +1,17 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildShip, type Packed } from '../src/ship/build.ts';
-import { DETAILS, SLACK, chooseDetail, reach } from '../src/ship/detail.ts';
-import { buildHull } from '../src/ship/hull.ts';
-import { Acc } from '../src/ship/kit.ts';
-import { GUN_MOUNT, toWorld } from '../src/ship/mount.ts';
-import { buildRig } from '../src/ship/rig.ts';
-import { buildSails } from '../src/ship/sails.ts';
+import { buildShip, type Packed } from '../src/render/ship/build.ts';
+import {
+  DETAILS,
+  SLACK,
+  chooseDetail,
+  reach,
+} from '../src/render/ship/detail.ts';
+import { buildHull } from '../src/render/ship/hull.ts';
+import { Acc } from '../src/render/ship/kit.ts';
+import { GUN_MOUNT, toWorld } from '../src/render/ship/mount.ts';
+import { buildRig } from '../src/render/ship/rig.ts';
+import { buildSails } from '../src/render/ship/sails.ts';
 import {
   R,
   add,

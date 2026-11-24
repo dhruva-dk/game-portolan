@@ -7,7 +7,7 @@ import {
   keptSettings,
   type Store,
 } from '../src/ui/kept.ts';
-import { LIVERY } from '../src/player.ts';
+import { LIVERY } from '../src/play/player.ts';
 
 const NAMES = ['vermilion', 'coral', 'lemon', 'charcoal'];
 const DEFAULT = { sound: 0.8, look: 0.5, stats: false };

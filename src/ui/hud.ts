@@ -1,5 +1,5 @@
-import { HOTBAR, type GunKind, type Kit, type Status } from '../player.ts';
-import type { Sea } from '../snapshot.ts';
+import { HOTBAR, type GunKind, type Kit, type Status } from '../play/player.ts';
+import type { Sea } from '../render/snapshot.ts';
 import { clamp, lerp } from '../world/scalar.ts';
 import type { Shores } from './coasts.ts';
 import { createChanged } from './drawn.ts';

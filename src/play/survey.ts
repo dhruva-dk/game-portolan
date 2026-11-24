@@ -1,4 +1,4 @@
-import type { Chart } from '../player.ts';
+import type { Chart } from './player.ts';
 import { cellOf } from '../world/cells.ts';
 import { coastLines } from '../world/coastline.ts';
 import { landOf, planetOf } from '../world/land.ts';

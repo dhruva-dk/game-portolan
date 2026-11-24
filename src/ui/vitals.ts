@@ -1,4 +1,4 @@
-import type { Status } from '../player.ts';
+import type { Status } from '../play/player.ts';
 import { INK, WASH, bar, figure, slip, svg } from './ink.ts';
 
 const VITALS = { w: 226, h: 92 } as const;

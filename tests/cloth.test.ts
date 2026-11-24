@@ -7,10 +7,10 @@ import {
   SETTLE,
   moor,
   type Berth,
-} from '../src/ship/berths.ts';
-import { buildShip } from '../src/ship/build.ts';
-import { cutCanvas, lashed } from '../src/ship/canvas.ts';
-import { CLOTH } from '../src/ship/kit.ts';
+} from '../src/render/ship/berths.ts';
+import { buildShip } from '../src/render/ship/build.ts';
+import { cutCanvas, lashed } from '../src/render/ship/canvas.ts';
+import { CLOTH } from '../src/render/ship/kit.ts';
 import {
   BRACED,
   WAY,
@@ -20,7 +20,7 @@ import {
   moved,
   trim,
   type Motion,
-} from '../src/ship/motion.ts';
+} from '../src/render/ship/motion.ts';
 import type { ShipPose } from '../src/world/pose.ts';
 import {
   R,

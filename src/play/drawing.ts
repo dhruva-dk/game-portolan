@@ -1,6 +1,6 @@
-import type { GunKind } from '../kinds.ts';
+import type { GunKind } from '../sim/kinds.ts';
 import type { Ball } from '../sim/shot.ts';
-import type { BallDraw, Look, ShipDraw } from '../snapshot.ts';
+import type { BallDraw, Look, ShipDraw } from '../render/snapshot.ts';
 import { poseOut, type PoseOut } from '../world/pose.ts';
 import { add, put, type Out3, type Vec3 } from '../world/sphere.ts';
 

@@ -7,7 +7,7 @@ import { PLAYER, SHIPS } from '../src/sim/match.ts';
 import { PERSONAS, TYPES, dealt } from '../src/sim/persona.ts';
 import { chart } from '../src/sim/route.ts';
 import { berthing } from '../src/sim/spawn.ts';
-import { SEED } from '../src/environment.ts';
+import { SEED } from '../src/world/environment.ts';
 import { landOf, planetOf } from '../src/world/land.ts';
 import { seedOf } from '../src/world/seeds.ts';
 import type { Vec3 } from '../src/world/sphere.ts';

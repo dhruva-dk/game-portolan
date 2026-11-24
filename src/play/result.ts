@@ -1,5 +1,5 @@
-import type { Race } from '../player.ts';
-import type { RaceCard, RaceResult } from '../race.ts';
+import type { Race } from './player.ts';
+import type { RaceCard, RaceResult } from '../sim/race.ts';
 import type { Crew, Shot, Strike } from '../sim/battle.ts';
 import type { Mode } from '../sim/captain.ts';
 import { over, teamsOf } from '../sim/carded.ts';

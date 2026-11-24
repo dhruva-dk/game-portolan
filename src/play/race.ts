@@ -1,5 +1,5 @@
-import { KINDS } from '../kinds.ts';
-import { PATTERNS } from '../player.ts';
+import { KINDS } from '../sim/kinds.ts';
+import { PATTERNS } from './player.ts';
 import {
   PARTS,
   TEAM,
@@ -8,7 +8,7 @@ import {
   type RaceCard,
   type RaceResult,
   type RaceShip,
-} from '../race.ts';
+} from '../sim/race.ts';
 import type { Order } from '../sim/battle.ts';
 import { MIXED, nature } from '../sim/persona.ts';
 import { DEFAULT_RULES, ruled, type Rules } from '../sim/rules.ts';
