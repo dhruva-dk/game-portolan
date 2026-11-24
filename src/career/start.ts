@@ -24,6 +24,8 @@ import { lineLeader } from './rules/line-leader.ts';
 import { generateOwner } from './rules/owner.ts';
 import { generatePerson, type Origin } from './rules/person.ts';
 import { shipRange } from './rules/ship-range.ts';
+import { drawOffers } from './sponsors/offers.ts';
+import { slotsOf } from './sponsors/slots.ts';
 import {
   FIRST_RACE,
   FIRST_SEASON,
@@ -165,6 +167,17 @@ function rivalTeam(seed: string, index: number, identity: Identity): Team {
     unlocked,
     ships: [ship(0), ship(1)],
     seats: identity.seats,
+    sponsors: slotsOf(
+      drawOffers({
+        seed,
+        season: FIRST_SEASON,
+        race: FIRST_RACE,
+        team: index,
+        reputation: index,
+        held: [],
+        races: LEAGUE_START.sponsorRaces,
+      })
+    ),
   };
 }
 

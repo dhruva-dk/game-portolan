@@ -23,10 +23,13 @@ import { winter } from './offseason/winter.ts';
 import { enterPhase, nextRaceLobby, seasonOver } from './record/advance.ts';
 import { countDownContracts } from './record/contracts.ts';
 import { develop } from './record/develop.ts';
+import { countDownSponsors } from './record/sponsors.ts';
 import { publishNews } from './record/news.ts';
 import { payRace, raceMoney } from './record/pay.ts';
 import { fileReport, raceReport } from './record/report.ts';
 import { scoreRace } from './record/score.ts';
+import { dealOffers } from './sponsors/offers.ts';
+import { signRefusal, signSponsor } from './sponsors/sign.ts';
 import { YOURS, type CareerState } from './state.ts';
 
 export { newCareer, type CareerOptions } from './start.ts';
@@ -59,11 +62,9 @@ type Repossession = { state: CareerState; teams: readonly number[] };
 
 const runPolicies = seam;
 const repossess = (state: CareerState): Repossession => ({ state, teams: [] });
-const countDownSponsors = seam;
 const narrowRanges = seam;
 const raceEvents = seam;
 const dealAfterRace = seam;
-const offerSponsors = seam;
 const seasonEvents = seam;
 const redrawKnowledge = seam;
 const dealOffseason = seam;
@@ -98,7 +99,7 @@ function recordRace(state: CareerState, result: MatchResult): Applied {
   );
   const advanced = seasonOver(filed)
     ? enterOffseason(filed)
-    : offerSponsors(dealAfterRace(nextRaceLobby(filed)));
+    : dealOffers(dealAfterRace(nextRaceLobby(filed)));
   return accepted(publishNews(advanced));
 }
 
@@ -108,7 +109,7 @@ function enterOffseason(state: CareerState): CareerState {
   const wintered = winter(prized);
   const aged = ageLeague(wintered);
   const redrawn = redrawKnowledge(aged);
-  const dealt = dealOffseason(redrawn);
+  const dealt = dealOffers(dealOffseason(redrawn));
   const told = seasonEvents(dealt);
   return fileOffseasonReport(told, offseasonReport(stopped, told));
 }
@@ -160,7 +161,9 @@ function effect(state: CareerState, command: Command): Applied {
     case 'Release':
       return notYet(state);
     case 'SignSponsor':
-      return notYet(state);
+      return unless(signRefusal(state, command.team, command.slot), () =>
+        signSponsor(state, command.team, command.offer, command.slot)
+      );
   }
 }
 

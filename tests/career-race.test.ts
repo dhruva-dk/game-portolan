@@ -201,9 +201,42 @@ const prizeFor = (place: number): number =>
         RACE_MONEY.prizePower
   );
 
+function expectedSponsors(
+  state: CareerState,
+  result: MatchResult,
+  team: number
+) {
+  const ships = shipsOf(result, team);
+  const samples = result.sea[team];
+  const met = (objective: string): boolean => {
+    if (objective === 'top10') return ships.some((s) => s.place <= 10);
+    if (objective === 'sinkTwo')
+      return ships[0].sinkings + ships[1].sinkings >= 2;
+    if (objective === 'sea')
+      return samples.reduce((a, b) => a + b, 0) / samples.length >= 0.03;
+    return ships.every((s) => s.afloatAtPhaseFour);
+  };
+  return state.teams[team].sponsors.flatMap((sponsor) =>
+    sponsor === null
+      ? []
+      : [
+          {
+            sponsor: sponsor.sponsor,
+            objective: sponsor.objective,
+            met: met(sponsor.objective),
+            amount: sponsor.fee + (met(sponsor.objective) ? sponsor.bonus : 0),
+          },
+        ]
+  );
+}
+
 function expectedMoney(state: CareerState, result: MatchResult, team: number) {
   const ships = shipsOf(result, team);
   const samples = result.sea[team];
+  const sponsors = expectedSponsors(state, result, team).reduce(
+    (sum, row) => sum + row.amount,
+    0
+  );
   const place = ships.reduce((sum, s) => sum + prizeFor(s.place), 0);
   const sinkings = ships.reduce(
     (sum, s) => sum + RACE_MONEY.perSinking * s.sinkings,
@@ -215,9 +248,10 @@ function expectedMoney(state: CareerState, result: MatchResult, team: number) {
   const wages = state.people
     .filter((p) => p.contract?.team === team)
     .reduce((sum, p) => sum + (p.contract?.wage ?? 0), 0);
-  const then = state.teams[team].balance + place + sinkings + sea - wages;
+  const then =
+    state.teams[team].balance + place + sinkings + sea + sponsors - wages;
   const interest = then < 0 ? Math.ceil(RACE_MONEY.interest * -then) : 0;
-  return { place, sinkings, sea, wages, interest, then };
+  return { place, sinkings, sea, sponsors, wages, interest, then };
 }
 
 test('place prize, sinkings, sea and interest follow §1.8.1', () => {
@@ -314,12 +348,17 @@ test('step 2 pays every team its rows, and the change is their sum', () => {
     assert.equal(rows.place, want.place, `place ${team}`);
     assert.equal(rows.sinkings, want.sinkings, `sinkings ${team}`);
     assert.equal(rows.sea, want.sea, `sea ${team}`);
-    assert.deepEqual(rows.sponsors, []);
+    assert.deepEqual(rows.sponsors, expectedSponsors(state, result, team));
     assert.equal(rows.wages, want.wages === 0 ? 0 : -want.wages);
     assert.equal(rows.interest, want.interest === 0 ? 0 : -want.interest);
     assert.deepEqual(rows, teamMoney(state, result, team));
     const sum =
-      rows.place + rows.sinkings + rows.sea + rows.wages + rows.interest;
+      rows.place +
+      rows.sinkings +
+      rows.sea +
+      want.sponsors +
+      rows.wages +
+      rows.interest;
     assert.equal(moneyTotal(rows), sum);
     assert.equal(
       paid.teams[team].balance - state.teams[team].balance,
@@ -345,7 +384,12 @@ test('step 2 pays every team its rows, and the change is their sum', () => {
 test('interest is charged only when the balance after the other rows is negative', () => {
   const result = handResult(0);
   const income = expectedMoney(staffed(1, 'racing', 0), result, YOURS);
-  const net = income.place + income.sinkings + income.sea - income.wages;
+  const net =
+    income.place +
+    income.sinkings +
+    income.sea +
+    income.sponsors -
+    income.wages;
   const just = staffed(1, 'racing', -net);
   assert.equal(teamMoney(just, result, YOURS).interest, 0);
   const under = staffed(1, 'racing', -net - 1);

@@ -259,7 +259,8 @@ test('every rival team is generated as §1.10.1 says', () => {
       assert.deepEqual([...team.unlocked].sort(), expected.sort());
       const first = team.taste.find((k) => team.unlocked.includes(k));
       for (const ship of team.ships) assert.equal(ship.gun, first);
-      assert.deepEqual(team.sponsors, [null, null, null]);
+      assert.equal(team.sponsors.length, 3);
+      assert.ok(team.sponsors.every((sponsor) => sponsor !== null));
       assert.deepEqual(team.offers, []);
       assert.equal(team.focus, null);
       assert.equal(team.scoutSeat, 'designer');

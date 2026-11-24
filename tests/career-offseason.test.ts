@@ -238,6 +238,7 @@ test('step 1 pays every team the prize for its final standing and nothing else',
         rows.place +
           rows.sinkings +
           rows.sea +
+          rows.sponsors.reduce((sum, row) => sum + row.amount, 0) +
           rows.wages +
           rows.interest +
           expectedPrize(final[team]),
