@@ -1,5 +1,7 @@
 import type { DriverStats } from '../sim/setup.ts';
 
+type Seasons = 1 | 2 | 3;
+
 export const STAT_SPAN = { least: 1, most: 20 };
 
 export const LEVEL_SPAN = { least: 0, most: 100 } as const;
@@ -91,6 +93,7 @@ export const WANTS = {
   leastStanding: 0.1,
   standingAndMoney: 0.9,
   wageFactor: { lo: 0.7, hi: 1.3 },
+  preferred: [1, 2, 3] satisfies Seasons[],
   askPerStar: 60,
   askLeastStars: 0.5,
   askPower: 3,
