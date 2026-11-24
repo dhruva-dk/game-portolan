@@ -199,7 +199,6 @@ export interface Kit {
   chosen: number;
   using: number | null;
   gust: number;
-  gusts: number;
   blowing: boolean;
 }
 

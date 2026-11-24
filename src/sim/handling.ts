@@ -33,9 +33,6 @@ export const RAM = {
 } as const;
 
 export const GUST = {
-  charges: 2,
-  recharge: 6.5,
-  time: 1.15,
   speed: 12.1,
   accel: 26,
   shed: 4.2,
