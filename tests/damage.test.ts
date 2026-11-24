@@ -1,5 +1,3 @@
-// Damage as the player sees it.
-
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { createChanged } from '../src/ui/drawn.ts';
@@ -10,12 +8,10 @@ test('a blow on her lights the sector of the ring toward its dealer: eight, ahea
   const step = Math.PI / 4,
     e = 1e-6;
   for (let i = 0; i < 8; i++) {
-    // its middle, either way round, and just inside both its ends
     assert.equal(sectorOf(i * step), i);
     assert.equal(sectorOf(i * step - 2 * Math.PI), i);
     assert.equal(sectorOf(i * step - step / 2 + e), i);
     assert.equal(sectorOf(i * step + step / 2 - e), i);
-    // a boundary belongs to the sector clockwise of it
     assert.equal(sectorOf(i * step + step / 2), (i + 1) % 8);
   }
   assert.equal(sectorOf(Math.PI / 2), 2, 'right');
@@ -52,7 +48,6 @@ test('a piece is drawn again only when what it shows changes (the clock turning 
   const changed = createChanged<object>(),
     clock = {},
     other = {};
-  // the clock's: its seconds, ships afloat, in violet, closing (hud.ts)
   assert.equal(changed(clock, 40, 6, false, false), true, 'first drawn');
   for (let i = 0; i < 5; i++)
     assert.equal(changed(clock, 40, 6, false, false), false);

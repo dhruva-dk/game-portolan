@@ -1,111 +1,3 @@
-// Every debug switch, read from the page's query, and the scenario they set up.
-// None of it runs, or is even fetched, in a release build unless the page asks
-// with ?debug: off Vite's dev server (import.meta.env.DEV) and without ?debug
-// main.ts sets the page up as released, opening at the title, and never loads
-// this. The scenario drives the game, its referee
-// and the screens' flow only through what they offer anyone (main.ts builds
-// them; this only sets them going).
-//
-// The look and the weather. ?mood= puts the whole look on one of its
-// alternates: dawn, a low morning sun in a rose mist; warm, a low evening sun
-// over a deeper sea; noon, a high sun, bright and saturated (MOODS: the hour
-// and the haze; the grade and the haze follow the sun's height). ?t=hours sets
-// the time of day (the same everywhere: world/sun.ts); ?wind=m/s the wind's
-// speed, ?haze= the air's aerosol and ?cloud= the cloud cover (0–1) each hold
-// at that instead of drifting (world/weather.ts); ?seed= the race's, any text
-// (address.ts; on a debug page environment.ts SEED by default). ?debug=charts colours the sea by its
-// charts' weights, ?debug=wake shows the ships' marks on it (water/water.ts).
-//
-// The debug camera. ?lat=&lon= degrees put the camera over a point of the
-// planet and ?alt= metres above the sea; ?yaw=deg turns it (clockwise from
-// north: 90 east) and ?look=deg pitches it. The planet is 554 m in radius, so a
-// degree is 9.67 m. ?fly, or any of lat, lon and alt, flies the debug camera
-// (fly.ts) instead of sailing, starting over where she would lie by default;
-// there ?kind= puts a gun of that kind on every ship's plinth (?kind=all: each
-// ship the next kind), and ?rarity= of that rarity (0 common to 4; ?rarity=all:
-// each the next, after each kind). ?wall=m flies it m metres short of the storm's edge, in
-// the calm (with ?storm=, the cap held then; negative: in the storm), on the
-// line from the cap's centre toward where she would lie, looking out across the
-// edge (?yaw= turns from that). ?bolt holds the storm's lightning lit
-// (sky/storm-bolt.ts), for a still of it.
-//
-// Her course and her hands. ?drive=bearing,throttle,seconds;… sails her, her
-// helm lashed to each leg in turn (bearings in degrees clockwise from north
-// where she is), before the first frame; she holds the last until a hand takes
-// the helm. ?gun=0…4 arms every ship with a gun of that rarity, ?kind= (cannon,
-// scatter, repeater, harpoon, mortar) of that kind (sim/gun.ts; a common cannon
-// by default with either); ?fire fires hers at the first step, ?fire=seconds so
-// many seconds into the frames drawn, ?fire=seconds,held holds its trigger that
-// long; ?tap=slot,seconds taps that slot of the hotbar then (0–1 her guns', 2–4
-// her items': a swap, or a reload); ?storm=seconds holds the storm at that
-// moment of its clock.
-//
-// The frame. ?probe stands grey blocks and mirrors ahead (probe.ts). The meter
-// (meter.ts) shows the frame's cost. ?safe=top,right,bottom,left px stands in
-// for the device's safe-area insets (the iPad Air in landscape: ?safe=0,0,20,0,
-// the home indicator's). ?lod=0…3 draws every ship at that level of detail;
-// ?cloth=0 draws every ship's canvas as the wind fills it, none simulated
-// (ship/fleet.ts).
-//
-// The screens. ?screen= opens the UI at a screen (title, lobby, settings,
-// seed: the seed panel over the lobby, on the page's ?seed=; livery: her
-// livery's folio, her ship turned broadside above it; match, sunk,
-// spectate, won, result; ui/ways.ts; also map), at sea among
-// ?ships=n others by default: play starts a match as PLAY does (every ship at
-// her berth, the eye coming down from space: play/arrival.ts); sunk sinks her
-// by the first other ship (?by=storm: by the storm) and the screens follow her
-// end as the match would bring it (the camera's beat, then her result);
-// spectate sinks her and watches; won sinks every other, the last by her;
-// result sinks her and all but one other, so the match is over. ?sink=seconds
-// sinks her so many seconds into the frames drawn, ?win=seconds every other
-// ship then, so she wins; ?leave=seconds taps LEAVE then (home, a new page on
-// a new seed under the title, where her screen has that way: ui/passage.ts).
-//
-// The sea about her. ?ships= sets them on the sea ahead of her (demoShips;
-// ?pack: in rows of ten, a fan of them filling the view),
-// ?way=m/s gives them a straight course at that speed, their helms lashed, and
-// ?heading=deg turns them all. ?livery=dye,pattern puts her in that livery
-// (play/colours.ts DYES, player.ts PATTERNS, by index), the others dealt
-// round it. ?ahead=seconds sails the game on that long before the first
-// frame, and ?pause holds it there from then on (the frame still draws: the
-// arrival's stills). The ships in a match are sim/match.ts
-// SHIPS; the frame has room for that many, or for ?ships= more. At sea, ?kit
-// (?kit=seconds: then) puts stores under her for her to sweep up (two guns, a
-// cannon and a scatter, unless ?gun arms her, and three slots of stores), with
-// a better gun beside them, a mortar, offered; ?use=1…3,seconds sets her
-// mending from that slot so many seconds into the frames drawn, ?gust=seconds
-// spends a gust then, ?fire=seconds fires then and ?down=seconds sinks one by
-// her then; ?arm gives every other ship a legendary gun (the kinds in turn), so
-// with ?ahead they are fighting; ?loot strews a piece of each kind and rarity in a fan ahead of her,
-// 25 m out to 420 m (?loot=m: every kind of gun, each of another rarity, and
-// the stores, in a row across the look m metres out); ?swing=px,px,seconds
-// drags the look that far right and down and lets it go, so many seconds into
-// the frames drawn (0 by default; the look stays where it is put:
-// play/chase.ts); ?slow=k runs the game at k of its speed (for catching a ball
-// in flight).
-//
-// A race. ?race starts a race sailed by a card (play/race.ts: a field of spec
-// ships in teams of four, ?race=n teams of them, 20 by default), her hands on
-// ship 0 and the eye coming down from space as PLAY's does, so the race's HUD
-// has its data (player.ts Status.race). The race as its HUD reads it is
-// set on the page each second drawn, for the tools (the body's data-race, as
-// JSON).
-//
-// Damage. ?wear=0…2 sets every ship's wear (her smoke); held over the match's
-// own (game.ts debug.wear), from ?worn=seconds into the frames drawn (0 by
-// default: from the first).
-//
-// Her loop. ?flood=seconds, after ?drive='s legs, steers her back to where she
-// began until her loop closes (her strip back against her older water), then sails
-// on that many seconds more (?inward=seconds, after the legs, sails her that
-// long toward the middle of the storm's next circle, then lies to): with
-// ?pause, the flood stopped mid-sweep. ?homeward, after the legs, steers her
-// back to where she began in the frames drawn, her loop closing in view. ?map
-// opens the full map once ?ahead= has run (with screen=play, the whole match's
-// water from space).
-//
-// `node tools/terrain-map.ts <seeds>` charts planets' land.
-
 import type { Anchor } from './world/lattice.ts';
 import type { World } from './environment.ts';
 import type { FrameOptions } from './frame.ts';
@@ -139,17 +31,8 @@ import {
   type Vec3,
 } from './world/sphere.ts';
 
-/**
- * How the page is set up (main.ts RELEASE, or as the switches change it): the
- * planet's seed, the weather's mean and swing (world/weather.ts) and the time
- * of day (hours); how the frame draws; whether the meter always shows the
- * frame's cost, split by pass (the debug page's; else only as the settings'
- * stats switch has it); the seconds the storm is held at (null: it runs) and
- * the gun every ship is armed with (null: none).
- */
 export interface Setup {
   seed: number;
-  /** The seed as named (address.ts): what the number came from. */
   name: string;
   mean: Weather;
   swing: Weather;
@@ -160,30 +43,17 @@ export interface Setup {
   gun: { kind: GunKind; rarity: number } | null;
 }
 
-/** ?kind's gun kind, a cannon by default. */
 const kindOf = (name: string | null): GunKind =>
   KINDS.find((k) => k === name) ?? 'cannon';
 
-/**
- * The world on a setup, as main.ts builds it: the world, where she lies at the
- * start, the canvas the world is drawn on, the sea's anchors and the ground's
- * bake (frame.ts), the matches dealt; and the drawing begun, each frame from
- * `next` (given the seconds since the last, the world as it is to be drawn),
- * once the ground is baked.
- */
 export interface Stage {
   world: World;
-  /** The seed the page sails, as named. */
   name: string;
   start: { at: Vec3; bearing: number };
   canvas: HTMLElement;
   anchors: readonly Anchor[];
   ready: Promise<number>;
   matches: Matches;
-  /**
-   * Shows the frame's cost in its corner, or hides it (always shown when the
-   * setup's meter is).
-   */
   stats(on: boolean): void;
   draw(
     next: (dt: number) => Snapshot,
@@ -191,12 +61,6 @@ export interface Stage {
   ): Promise<void>;
 }
 
-/**
- * The game on a stage with its UI over it, as main.ts builds it: the game, its
- * referee and the screens' flow; PLAY (a match dealt, every ship at her berth);
- * the full map opened (the HUD's tap); a frame of it, and what follows once it
- * is drawn (the canvas then holds it).
- */
 export interface Played {
   game: Game;
   referee: Referee;
@@ -210,35 +74,26 @@ export interface Played {
 const params = new URLSearchParams(location.search);
 const number = (name: string, fallback: number) =>
   params.has(name) ? Number(params.get(name)) : fallback;
-/** ?livery=dye,pattern: hers (player.ts Livery), held to the set; else hers by default. */
 const asked: Livery = (() => {
   const [dye, pattern] = (params.get('livery') ?? '').split(',').map(Number);
   return worn({ dye: dye || 0, pattern: pattern || 0 });
 })();
 const degrees = Math.PI / 180;
-/** The debug camera flies instead of the game. */
 const flying =
   params.has('fly') || ['lat', 'lon', 'alt', 'wall'].some((k) => params.has(k));
 
-/** A wear as a switch gives it: 0, 1 or 2. */
 const grade = (v: number): DebugDamage['wear'] =>
   v >= 1.5 ? 2 : v >= 0.5 ? 1 : 0;
-/** The damage ?wear sets (null without it). */
 const damage: DebugDamage | null = params.has('wear')
   ? { wear: grade(number('wear', 0)) }
   : null;
 
-/**
- * The art direction's alternates (?mood=): the hour, and the haze's mean as a
- * share of the release's.
- */
 const MOODS: Record<string, { hours: number; haze: number }> = {
   dawn: { hours: 6.8, haze: 1.6 },
   warm: { hours: 17.4, haze: 1.2 },
   noon: { hours: 12.6, haze: 0.7 },
 };
 
-/** The release's setup as the switches change it. */
 function setupOf(release: Setup): Setup {
   const mood = MOODS[params.get('mood') ?? ''];
   const mean = { ...release.mean, haze: release.mean.haze * (mood?.haze ?? 1) },
@@ -247,7 +102,6 @@ function setupOf(release: Setup): Setup {
     if (params.has(k)) [mean[k], swing[k]] = [number(k, 0), 0];
   const sea = params.get('debug');
   return {
-    // (?seed= is the release's too, read before this: address.ts)
     seed: release.seed,
     name: release.name,
     mean,
@@ -255,7 +109,6 @@ function setupOf(release: Setup): Setup {
     hours: number('t', mood?.hours ?? release.hours),
     drawing: {
       sea: sea === 'charts' || sea === 'wake' ? sea : release.drawing.sea,
-      // (room for ?ships= past a match's, for judging the frame with more)
       fleet: Math.max(release.drawing.fleet, number('ships', 0) + 1),
       lod: params.has('lod') ? number('lod', 0) : release.drawing.lod,
       cloth: params.get('cloth') !== '0' && release.drawing.cloth,
@@ -273,14 +126,6 @@ function setupOf(release: Setup): Setup {
   };
 }
 
-/**
- * The page set going, debugging (main.ts loads this only then): the stage and
- * the game on it, built by main.ts's `stage` and `play` from the setup the
- * switches make of `release`; then opened where the switches say (at sea among
- * the demo ships by default), or the flyer drawn instead of the game. `title`
- * is the title the page painted first: the game's flow takes it down; the
- * flyer, which has no flow, takes it down itself once the ground is baked.
- */
 export async function scenario(
   release: Setup,
   stage: (setup: Setup) => Promise<Stage>,
@@ -302,8 +147,6 @@ export async function scenario(
   }
   const p = await play(s);
   safeArea(uiLayer());
-  // ?livery: hers, worn before the sea about her is laid (else hers as the
-  // device keeps it, as the flow found it); the others dealt round it
   if (params.has('livery')) p.game.wear(asked);
   open(
     p,
@@ -312,8 +155,6 @@ export async function scenario(
   );
   const paused = params.has('pause'),
     slow = number('slow', 1);
-  // ?use: the item's slot tapped twice (chosen, then used); ?tap's slot tapped;
-  // ?gust and ?fire pressed; ?swing's drag; so many seconds in
   const swing = params.get('swing')?.split(',').map(Number),
     item = HOTBAR.guns - 1;
   const [slot, use] = (params.get('use') ?? '').split(',').map(Number),
@@ -342,8 +183,6 @@ export async function scenario(
         ]
       : []),
   ];
-  // ?sink and ?win: her end, and ?down: one sunk by her, so many seconds into
-  // the frames drawn; ?leave: her tap on LEAVE
   const ends = [
     ...(params.has('leave')
       ? [{ at: number('leave', 0), act: () => p.flow.tap('leave') }]
@@ -372,12 +211,9 @@ export async function scenario(
     for (const t of timed)
       if (drawn <= t.at && drawn + dt > t.at)
         p.game.step(STEP, { ...IDLE, ...t.hands });
-    // ?fire's trigger held: pressed for the frames' next steps
     if (held > 0 && drawn > fireAt && drawn <= fireAt + held)
       p.game.step(0, { ...IDLE, fire: true });
     for (const e of ends) if (drawn <= e.at && drawn + dt > e.at) e.act();
-    // ?race: the race as its HUD reads it, set on the page each second drawn
-    // for the tools to read (the body's data-race, as JSON)
     if (params.has('race') && Math.floor(drawn + dt) > Math.floor(drawn))
       document.body.dataset.race = JSON.stringify(p.game.status().race);
     drawn += dt;
@@ -385,10 +221,6 @@ export async function scenario(
   }, p.drawn);
 }
 
-/**
- * Opens the game where ?screen= says, among `others` at sea (or, with ?race, in
- * a carded race on `world`); then sails it on ?ahead= seconds.
- */
 function open(p: Played, others: readonly Berth[], world: World) {
   const { game, referee, flow } = p;
   const screen = params.get('screen') ?? 'match';
@@ -401,7 +233,6 @@ function open(p: Played, others: readonly Berth[], world: World) {
   )
     flow.go(screen);
   else if (params.has('race')) {
-    // a carded race of spec ships, her hands on ship 0 (play/race.ts)
     const teams = number('race', 0) || undefined;
     game.start(raceOf(specField(world.seed, teams, true), world.planet));
     referee.begin();
@@ -413,8 +244,6 @@ function open(p: Played, others: readonly Berth[], world: World) {
     game.debug.atSea(others);
     drive(game, params.get('drive') ?? '');
     referee.begin();
-    // her end, as the match's own course would bring it: the screens follow it
-    // from the match (ui/ways.ts)
     if (screen === 'sunk' || screen === 'spectate' || screen === 'result')
       sinkHer(game);
     if (screen === 'result')
@@ -428,7 +257,6 @@ function open(p: Played, others: readonly Berth[], world: World) {
     }
   }
   if (screen === 'match') stock(game);
-  // ordered now, fired at her first step
   if (params.get('fire') === '') game.step(0, { ...IDLE, fire: true });
   for (let t = 0; t < number('ahead', 0); t += 0.1) {
     game.step(0.1, IDLE);
@@ -437,7 +265,6 @@ function open(p: Played, others: readonly Berth[], world: World) {
   if (screen === 'map' || params.has('map')) p.map();
 }
 
-/** Sinks her by the first other ship afloat (?by=storm: by the Storm). */
 function sinkHer(game: Game) {
   const by = game.alive().find((id) => id !== PLAYER);
   game.debug.sink(
@@ -446,13 +273,11 @@ function sinkHer(game: Game) {
   );
 }
 
-/** The first other ship afloat, sunk by her. */
 function downOne(game: Game) {
   const one = game.alive().find((id) => id !== PLAYER);
   if (one !== undefined) game.debug.sink(one, PLAYER);
 }
 
-/** Sinks every other ship afloat, the last by her, so she wins. */
 function winHer(game: Game) {
   const others = game.alive().filter((id) => id !== PLAYER);
   others.forEach((id, i) =>
@@ -463,13 +288,8 @@ function winHer(game: Game) {
   );
 }
 
-/** A piece the game's debug strews on the sea: a gun or stores. */
 type Goods = Parameters<Game['debug']['strew']>[1][number];
 
-/**
- * ?kit: her stores strewn under her (two guns and three slots of stores), a
- * better gun beside them, and her first steps to sweep them up.
- */
 function kit(game: Game) {
   const { at, heading } = game.status(),
     step = () => game.step(STEP, IDLE);
@@ -487,17 +307,10 @@ function kit(game: Game) {
   step();
 }
 
-/**
- * ?kit and ?loot: her stores and the loot about her, through what the game
- * offers anyone.
- */
 function stock(game: Game) {
   const { at, heading, facing } = game.status();
   if (params.get('kit') === '') kit(game);
   if (params.has('arm')) {
-    // every other ship a legendary gun under her, the kinds in turn, swept up
-    // at her next step: once they fight (?ahead), every kind of shot is in the
-    // air (tools/browser.ts --budget, worst)
     for (const s of game.ships())
       if (s.id !== PLAYER && s.afloat)
         game.debug.strew(s.at, [
@@ -507,8 +320,6 @@ function stock(game: Game) {
   }
   const row = params.has('loot') ? number('loot', 0) : 0;
   if (row > 0) {
-    // a row across her bow: the guns, each kind of another rarity, worst to
-    // best, then the stores, a few degrees apart
     const all: Goods[] = [
       ...KINDS.map((kind, rarity): Goods => ({ kind, rarity })),
       { kind: 'smallShield', count: 1 },
@@ -524,8 +335,6 @@ function stock(game: Game) {
       );
     });
   } else if (params.has('loot')) {
-    // a fan ahead of her, clear of her own hull: the rarities worst to best
-    // near to far, then again further out
     [25, 50, 90, 140, 200, 250, 300, 350, 420].forEach((m, i) => {
       const side = (i % 2 ? 1 : -1) * (0.45 - 0.035 * i),
         turned = normalize(add(heading, cross(at, heading), side));
@@ -538,10 +347,6 @@ function stock(game: Game) {
   }
 }
 
-/**
- * ?drive's legs ("bearing,throttle,seconds;…"), each sailed with her helm
- * lashed to it.
- */
 function drive(game: Game, legs: string) {
   const began = game.status().at;
   for (const leg of legs.split(';').filter(Boolean)) {
@@ -553,7 +358,6 @@ function drive(game: Game, legs: string) {
     for (let i = 0; i < Math.round(seconds / STEP); i++) game.step(STEP, IDLE);
   }
   if (params.has('inward')) {
-    // toward the middle of the circle the storm next closes to (or its calm)
     const { next, eye } = game.status(),
       goal = (next ?? eye).centre;
     game.debug.lash((s) => ({
@@ -564,8 +368,6 @@ function drive(game: Game, legs: string) {
       game.step(STEP, IDLE);
     game.debug.lash((s) => ({ course: s.heading, throttle: 0 }));
   }
-  // ?homeward: back toward where she began in the frames drawn, so her loop
-  // closes and floods in view
   if (params.has('homeward'))
     game.debug.lash((s) => ({ course: add(began, s.at, -1), throttle: 1 }));
   if (!params.has('flood')) return;
@@ -579,7 +381,6 @@ function drive(game: Game, legs: string) {
     game.step(STEP, IDLE);
 }
 
-/** ?safe's insets, set on the UI's layer (ui/ui.ts). */
 function safeArea(layer: HTMLElement) {
   const insets = params.get('safe')?.split(',').map(Number);
   if (insets)
@@ -588,15 +389,12 @@ function safeArea(layer: HTMLElement) {
     );
 }
 
-/** The debug camera, flown from over `start` (or ?lat/?lon), keeping the world's clock itself, over `others` lying
- *  still (drawn as if making ?way=) and the storm as it stands by that clock. */
 function flyer(
   element: HTMLElement,
   start: Vec3,
   others: readonly Berth[],
   storm: (seconds: number) => StormDraw
 ) {
-  // ?wall: over the storm's edge, looking out across it
   const cap = storm(0),
     c = cap.centre,
     out = normalize(add(start, c, -dot(start, c))),
@@ -617,8 +415,6 @@ function flyer(
       (params.has('wall') ? Math.atan2(dot(away, east), dot(away, north)) : 0),
     pitch: number('look', -6) * degrees,
   });
-  // ?kind arms each with a gun of that kind (?kind=all: each the next kind), laid over her starboard bow; ?rarity of
-  // that rarity (0 common, the default, to 4; ?rarity=all: each the next, through the kinds first)
   const kind = params.get('kind'),
     rarity = params.get('rarity'),
     armed = (i: number, o: Berth): ShipDraw['gun'] =>
@@ -658,14 +454,6 @@ function flyer(
   };
 }
 
-/**
- * ?ships=n (at most `most`) galleons on the sea ahead of `south` (looking
- * north), 30, 60, 100, 150 m out and on past, on the mean sea, each on her
- * own heading and in her colours as `seed` deals them round `hers`
- * (play/colours.ts dealt): bots, or with ?way= m/s their helms lashed to a
- * straight course at that speed. ?heading=deg turns them all that much further
- * (clockwise seen from above).
- */
 function demoShips(
   south: Vec3,
   most: number,
@@ -678,7 +466,6 @@ function demoShips(
     way = number('way', 0);
   const pack = params.has('pack');
   for (let i = 0; i < ships; i++) {
-    // packed: rows of ten in a fan ahead of her, 40 m out and on every 40
     const row = Math.floor(i / 10),
       col = (i % 10) - 4.5;
     const out = pack

@@ -1,26 +1,3 @@
-// Caustics: how much the waves above focus the sunlight reaching a point under
-// the water.
-//
-// A bit of the surface refracts its light down onto the floor a depth D below,
-// moving it sideways by D·(1 − 1/n)·∇h; the patch it lights is the surface's
-// own area times the determinant J of I + D·(1 − 1/n)·H (H, the height's second
-// derivatives; D eased to at most FOCUS), so the light there is 1/|J| as
-// bright. Under a crest, which bulges like a lens, J < 1: the bright net on the
-// floor. H is the two smaller cascades' curvature (waves.ts), read where the
-// light came in (toward the sun), through each of the sea's charts and turned
-// into the first chart's axes, summed with the chart's weight (H is linear in
-// the height, which sums so).
-//
-// Band-limited: 1/|J| is sharp-edged, so the net of a wave shorter than a few
-// pixels breaks into a grain of single bright pixels, not a net. And deeper
-// down, the short waves' nets are past their focus and blurred by the sun's
-// disc and the skylight round it into an even light. So each cascade's
-// curvature is read already averaged (its mipmaps) over the wider of: PIXELS of
-// the floor's footprint on the screen, and BLUR per metre of depth. Only the
-// waves longer than about twice that width shape the net; the shorter average
-// away, and far off, where the floor's footprint is wide, the net fades into an
-// even light of itself.
-
 import {
   Fn,
   If,
@@ -46,23 +23,10 @@ import { N_WATER } from './optics.ts';
 import { CURVED, type Waves } from './waves.ts';
 import type { FloatNode, Vec3Node } from '../tsl.ts';
 
-/** Caustics focus as if the floor were no deeper than about this, metres. */
 const FOCUS = 2.5;
-/**
- * The net is drawn no finer than this many of the floor's pixels across: its
- * lines a pixel or two wide at the least.
- */
 const PIXELS = 4;
-/**
- * How far the net blurs per metre of depth: the sun's disc (0.7 cm/m in water),
- * its aureole and the swaying of the short waves' foci (about 3°).
- */
 const BLUR = 0.05;
 
-/**
- * shallows(p): how much of the long (the first LONG cascades) and short waves
- * the depth at p lets through.
- */
 export function createCaustics(
   view: View,
   sky: Sky,
@@ -82,14 +46,11 @@ export function createCaustics(
       const across = flat
         .div(max(length(flat), 1e-4))
         .mul(depth.mul(bent).div(sqrt(float(1).sub(bent.mul(bent)))));
-      // the width each cascade is averaged over, metres (worked out before the
-      // charts' branches: derivatives)
       const footprint = max(length(dFdx(p)), length(dFdy(p)));
       const width = max(footprint.mul(PIXELS), depth.mul(BLUR));
       const E1 = vec3(1, 0, 0).toVar(),
         E2 = vec3(0, 0, 1).toVar(),
         H = vec3(0).toVar();
-      // only under water: the dry ground is spared the charts and their reads
       If(depth.greaterThan(0), () =>
         charts.each(p, (c, slot) => {
           if (slot === 0) {
@@ -107,7 +68,6 @@ export function createCaustics(
                 .xyz.mul(k < LONG ? long : short)
             );
           });
-          // (hxx, hzz, hxz) on this chart's axes, onto the first's
           const a = dot(c.e1, E1),
             b = dot(c.e2, E1),
             e = dot(c.e1, E2),

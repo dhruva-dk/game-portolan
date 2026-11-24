@@ -1,18 +1,3 @@
-// The planet-wide terrain (src/world/terrain.ts) mapped for seeds and land
-// shares, headless: for each, <seed>-<share>.png (the planet from two sides,
-// hill-shaded), the same with -marks (the channels the repair dug in red, the
-// water it filled in violet), and sheet.png (a row a seed, a column a share);
-// stats.jsonl, each one's terrain stats in full. Fails if any is left with
-// more than one sailable body of water.
-//
-// The land in the game's own tones (palette.ts) where the game lays them
-// (world/planet-terrain.ts BANDS, as land/sand.ts lays them from the ground's
-// height and cover), lit toward the upper left; the sea by its depth in the
-// palette's blues. Not drawn: what the shader adds at a metre's scale (stones
-// and weed on the floor, strata, a cliff's rock).
-//
-// Node only (tools/).
-
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { lines, writeJson } from '../out.ts';
@@ -47,7 +32,6 @@ import {
 } from '../../src/palette.ts';
 import { png } from './png.ts';
 
-/** Seeds and land shares to map (the planet's whole land share), and the terrain's feature size, m (TERRAIN.size if not given). */
 export interface TerrainScenario {
   kind: 'terrain';
   seeds: number[];
@@ -55,16 +39,13 @@ export interface TerrainScenario {
   size?: number;
 }
 
-/** t of the way from colour a to colour b, t held within 0…1. */
 const lerp = (a: Rgb, b: Rgb, t: number): Rgb => {
   const k = clamp(t);
   return [mix(a[0], b[0], k), mix(a[1], b[1], k), mix(a[2], b[2], k)];
 };
 const step = (v: number, at: number) => (v >= at ? 1 : 0);
-/** Linear to the display's sRGB, 0…255. */
 const srgb = (v: number) => Math.round(255 * linearToSrgb(Math.min(v, 1)));
 
-/** The land's two tones at height h over its cover, laid in land/sand.ts's order; dunes past `dune` metres. */
 function land(h: number, c: Cover, dune: number): Tones {
   const mottle = c.mottle - 0.5,
     level = h + mottle * BANDS.ragged;
@@ -87,7 +68,6 @@ function land(h: number, c: Cover, dune: number): Tones {
   );
   return { lit, shadow };
 }
-/** The sea at depth d: its floor's sand through the clear shallows, deepening to the palette's blues. */
 const sea = (d: number): Rgb =>
   d < 3
     ? lerp(SEABED_SAND.lit, SEA_SHALLOW, 0.35 + 0.65 * (d / 3))
@@ -95,7 +75,6 @@ const sea = (d: number): Rgb =>
       ? lerp(SEA_SHALLOW, SEA_MIDDLE, (d - 3) / 9)
       : lerp(SEA_MIDDLE, SEA_DEEP, (d - 12) / 18);
 
-/** The planet from the front and the back, tilted 25° to show a pole, `size` pixels a globe. */
 function globes(
   t: Terrain,
   seed: number,
@@ -120,7 +99,6 @@ function globes(
           d = x * x + y * y;
         if (d > 1) continue;
         const z = Math.sqrt(1 - d);
-        // tilted toward the viewer, then the far side turned round
         const y1 = y * Math.cos(tilt) + z * Math.sin(tilt),
           z1 = -y * Math.sin(tilt) + z * Math.cos(tilt);
         const p: Vec3 = g === 0 ? [x, y1, z1] : [-x, y1, -z1];
@@ -144,7 +122,6 @@ function globes(
         (at(Math.min(i + 1, W - 1), j) - at(Math.max(i - 1, 0), j)) / (2 * mpp);
       const dz =
         (at(i, Math.min(j + 1, H - 1)) - at(i, Math.max(j - 1, 0))) / (2 * mpp);
-      // land: its shadow tone turning to its lit as the slope faces the light; the sea flat; both darkening to the limb
       const light = clamp(0.75 + (-dx + dz) * 1.5),
         limb = 0.6 + 0.4 * zs[k];
       let c =
@@ -159,7 +136,6 @@ function globes(
 const pct = (x: number) => `${(100 * x).toFixed(1)}%`;
 const CELL = 200;
 
-/** The maps made into `dir`; false if any is left with more than one sailable body. */
 export function runTerrain(sc: TerrainScenario, dir: string): boolean {
   const { seeds, shares } = sc,
     size = sc.size ?? TERRAIN.size;

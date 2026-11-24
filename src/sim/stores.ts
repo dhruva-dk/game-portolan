@@ -1,23 +1,3 @@
-// What each ship carries, stepped with the fleet: her hold (hold.ts), her gust
-// (gust.ts) and the loot on the water (loot.ts), as one step's work round the
-// fleet's and the fighting's:
-// - before the fleet sails (asked): what each ship asks of her stores, a
-// player's tap or a bot's, done: a tap on the
-//   gun slot not in hand takes that gun in hand (it fires only after EQUIP; its windup or reload let go); a tap on
-//   the gun in hand swaps it for a gun offered, else takes the guns back in hand from her items, else reloads it if
-//   its magazine isn't full; a tap on the item slot in hand with something offered and her slots full swaps it
-//   likewise; any other tap chooses that slot, or begins it if it is in hand (hold.ts tapped); a gust asked for is
-//   spent if one may be (not while she mends);
-// - her helm as her stores sail her (crewed): a gust blowing drives her on
-// (ship.ts), and mending she sails at
-//   hold.ts USING of the speed she asks, her rigging cut RIGGING of it;
-// - after the fighting (stored): what she mends with, her gust and her cut rigging stepped on,
-// the loot drifted and swept up (and
-//   the swaps asked for made), and every ship sunk this step spilling what she had.
-//
-// Pure arithmetic: no three, so it runs in node for the tests; deterministic
-// for the same inputs.
-
 import { fitOf, type Crew, type Cue } from './battle.ts';
 import type { Vessel } from './contact.ts';
 import { reloadOf } from './gun.ts';
@@ -37,12 +17,6 @@ import {
 import type { Helm } from './ship.ts';
 import type { Depth } from './shoal.ts';
 
-/**
- * What a ship asks of her stores this step: an item slot tapped (1–3; 0 the
- * guns back in hand; null none), a gun slot tapped (0 or 1; null none), whether
- * to spend a gust, and a swap asked for outright (a bot's: the slot to swap
- * into, 0 the gun in hand; null none).
- */
 export interface Ask {
   tap: number | null;
   arm: number | null;
@@ -50,20 +24,13 @@ export interface Ask {
   take: number | null;
 }
 
-/** A ship's mending done this step: whose, and what she mended with. */
 export interface Mended {
   ship: number;
   use: Use;
 }
 
-/** Nothing asked. */
 export const NOTHING: Ask = { tap: null, arm: null, gust: false, take: null };
 
-/**
- * Her crew after a tap on gun slot `slot`, with what is offered her: the swap
- * asked for (0) if a gun is offered for the one in hand, and what her gun did
- * (cues).
- */
 function armed(
   crew: Crew,
   slot: number,
@@ -77,8 +44,6 @@ function armed(
         : crew.hold,
     g = crew.guns[slot];
   if (slot !== crew.hand) {
-    // an empty slot isn't taken in hand; the other gun is, what the one put
-    // down was doing let go
     if (!g)
       return {
         crew: hold === crew.hold ? crew : { ...crew, hold },
@@ -109,11 +74,6 @@ function armed(
   };
 }
 
-/**
- * The asks done, before the fleet sails: each ship's crew after her taps and
- * gusts, the swaps asked for (her id to the slot), the ships a gust was spent
- * for, and what their guns did. `asks` by ship id; `fleet` for where each lies.
- */
 export function asked(
   crews: readonly Crew[],
   fleet: readonly Vessel[],
@@ -155,10 +115,6 @@ export function asked(
   return { crews: after, takes, blew, cues };
 }
 
-/**
- * Her helm as her stores sail her: driven on by a gust blowing, held back while
- * she mends, and while her rigging is cut (RIGGING).
- */
 export function crewed(h: Helm, c: Crew | undefined): Helm {
   if (!c) return h;
   const gust = c.gust.blowing > 0;
@@ -167,13 +123,6 @@ export function crewed(h: Helm, c: Crew | undefined): Helm {
   return gust || throttle !== h.throttle ? { ...h, throttle, gust } : h;
 }
 
-/**
- * After the fighting: dt seconds of every crew's mending and gust, the loot
- * drifting and swept up by `fleet` (the swaps `takes` asks for made), and the
- * ships of `sunkNow` (still in `fleet`) spilling all they had where they lie.
- * Over water `depth` deep; `seed` the match's, for the spill's kicks. Also what
- * was taken up, and the mending done.
- */
 export function stored(
   crews: readonly Crew[],
   flotsam: Flotsam,
@@ -206,10 +155,6 @@ export function stored(
   };
 }
 
-/**
- * The ships `sunkNow` (in `fleet` as they went down) put their guns and slots
- * over the side where each lay, and carry them no more.
- */
 export function spilled(
   crews: readonly Crew[],
   flotsam: Flotsam,
@@ -225,7 +170,6 @@ export function spilled(
     const goods = cargo(c);
     if (goods.length) f = overboard(f, v.ship.at, goods, id, seed);
   }
-  // what she spilled is gone from her
   const gone = new Set(sunkNow);
   const emptied = (c: Crew): Crew => ({
     ...c,

@@ -1,14 +1,5 @@
-// Seeded random numbers, the same for a seed every time.
-//
-// Pure arithmetic: no three, so it runs in node for the tests.
-
-/**
- * A prime a seed is stepped by to seed another stream apart from it: the next
- * match's, a second noise's, a take's.
- */
 export const STRIDE = 7919;
 
-/** A seeded generator, 0…1 (mulberry32). */
 export function random(seed: number): () => number {
   let a = seed >>> 0;
   return () => {
@@ -20,10 +11,6 @@ export function random(seed: number): () => number {
   };
 }
 
-/**
- * Two numbers mixed into one well-spread 32-bit seed (murmur3's finaliser over
- * both): hash(match, slot).
- */
 export function hash(a: number, b: number): number {
   let h =
     Math.imul((a >>> 0) ^ 0x9e3779b9, 0x85ebca6b) ^
@@ -35,8 +22,4 @@ export function hash(a: number, b: number): number {
   return (h ^ (h >>> 16)) >>> 0;
 }
 
-/**
- * hash(a, b) as a number in [0, 1): a steady pseudo-random number for a pair of
- * integers (a cell and a stream, a step and a seed), the same every time.
- */
 export const hash01 = (a: number, b: number) => hash(a, b) / 4294967296;

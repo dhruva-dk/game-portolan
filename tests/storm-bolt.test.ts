@@ -1,8 +1,3 @@
-// The storm's lightning as its closing begins (sky/storm-bolt.ts): a stroke of
-// its own at once on the edge nearest the eye when the snapshot's storm turns
-// to closing; none on the first frame, nor while it closes on, nor after a
-// pause, nor on a new sea.
-
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createBolt } from '../src/sky/storm-bolt.ts';
@@ -16,10 +11,6 @@ const storm = (closing: boolean): StormDraw => ({
   closing,
 });
 
-/**
- * A moment from `from` on that the regular strokes (one at a moment of each
- * 4.5 s) leave dark about, seen by a bolt of its own, the storm held.
- */
 const quiet = (from: number) => {
   const probe = createBolt(false);
   for (let t = from; ; t += 0.05) {
@@ -39,7 +30,6 @@ test('a closing begun strikes at once at the edge nearest the eye; closing on, a
     return bolt.flash.value;
   };
   const t0 = quiet(10);
-  // the first frame, closing already: no stroke
   assert.equal(lit(t0 - 1, true), 0, 'first frame: dark');
   for (let t = t0 - 1; t < t0; t += 1 / 30) lit(t, false);
   assert.equal(lit(t0, false), 0, 'held: dark');
@@ -48,11 +38,9 @@ test('a closing begun strikes at once at the edge nearest the eye; closing on, a
   for (let t = t0 + 2 / 30; t < t0 + 0.6; t += 1 / 30)
     after += lit(t, true) > 0 ? 1 : 0;
   assert.ok(after >= 3, `it flickers on: ${after} frames`);
-  // still closing a second on: no new stroke of its own
   const t1 = quiet(t0 + 1);
   for (let t = t0 + 0.6; t < t1; t += 1 / 30) lit(t, true);
   assert.equal(lit(t1, true), 0, 'closing on: no second stroke');
-  // the clock held (paused) mid-closing, then going on: none
   for (let k = 0; k < 90; k++) lit(t1 + 0.05, true);
   const t2 = quiet(t1 + 0.1);
   for (let t = t1 + 0.1; t < t2; t += 1 / 30) lit(t, true);
@@ -68,11 +56,9 @@ test('a new sea (the clock run back) strikes nothing, closing or not; its next c
   const t0 = quiet(40),
     t1 = quiet(10);
   for (let t = t0 - 1; t < t0; t += 1 / 30) lit(t, false);
-  // a new sea, its clock begun again, its storm closing at once: no stroke
   assert.equal(lit(t1, true), 0, 'a new sea, closing: dark');
   for (let t = t1; t < t1 + 0.6; t += 1 / 30)
     assert.equal(lit(t, true), 0, 'nor after');
-  // held, then closing: struck
   const t2 = quiet(t1 + 1);
   for (let t = t1 + 0.6; t < t2; t += 1 / 30) lit(t, false);
   assert.ok(lit(t2, true) > 0, 'its closing: struck');

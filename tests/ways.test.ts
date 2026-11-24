@@ -39,8 +39,6 @@ test("only the match's screens are moved on by the match; every other screen wai
       if (happenings.includes(t))
         assert.ok(IN_MATCH.includes(s), `${s} is moved on by ${t}`);
   }
-  // the screens with no tap of hers to leave by are the match's moments that its course ends: the fight, and the
-  // camera's beats on her end
   const tapless = SCREENS.filter(
     (s) => !ways(s).some(([t]) => taps.includes(t))
   );
@@ -67,7 +65,6 @@ test('her result and the folios each have their own drawn way on: home, or close
   assert.equal(way('spectate', 'leave'), 'lobby');
   assert.equal(way('result', 'leave'), 'lobby');
   assert.equal(way('settings', 'close'), 'lobby');
-  // the seed panel: opened from the lobby's chip; closed, or a seed sailed (a new page, by the lobby)
   assert.equal(way('lobby', 'seed'), 'seed');
   assert.equal(way('seed', 'close'), 'lobby');
   assert.equal(way('seed', 'sail'), 'lobby');
@@ -77,13 +74,11 @@ test('her result and the folios each have their own drawn way on: home, or close
     'no race from the panel but a seed sailed'
   );
   assert.equal(way('settings', 'seed'), null);
-  // her livery's folio: opened from the lobby's dye pot, closed back to it; nothing else from it
   assert.equal(way('lobby', 'livery'), 'livery');
   assert.deepEqual(WAYS.livery, { close: 'lobby' });
   assert.equal(way('settings', 'livery'), null);
   assert.equal(way('title', 'begin'), 'lobby');
   assert.equal(way('lobby', 'play'), 'match');
-  // a tap that is not one of the screen's ways does nothing
   assert.equal(way('match', 'leave'), null);
   assert.equal(way('result', 'watch'), null);
 });
@@ -99,16 +94,12 @@ test('sunk: the beat on her ship going down, then her result; watching, it waits
   assert.equal(course('match', events(end(false, false))), 'sinking');
   assert.equal(course('sinking', events(end(false, false))), 'sinking');
   assert.equal(course('sinking', events(end(true, false))), 'sunk');
-  // her result waits for her, however long the match goes on
   assert.equal(course('sunk', events(end(true, false))), 'sunk');
   assert.equal(course('spectate', events(end(true, false))), 'spectate');
-  // the match over: her result, whether she watched or not
   assert.equal(course('spectate', events(end(true, true))), 'result');
   assert.equal(course('sunk', events(end(true, true))), 'result');
-  // sunk as the match ends, the beat first all the same, then straight to the result
   assert.equal(course('match', events(end(false, true))), 'sinking');
   assert.equal(course('sinking', events(end(true, true))), 'result');
-  // and once there, it stays till she taps
   assert.equal(course('result', events(end(true, true))), 'result');
 });
 
@@ -120,7 +111,6 @@ test('won: the beat circling her, then her result', () => {
   assert.equal(course('result', events(end(true))), 'result');
 });
 
-/** The way home begun at 1000 ms, a frame drawn every `every` ms till `until`: each leg come to, and when. */
 function walk(every: number, until: number) {
   const home = wayHome(1000),
     legs: { leg: Leg; at: number }[] = [];
@@ -133,7 +123,6 @@ function walk(every: number, until: number) {
 
 test('home: the parchment covers the match, then the change is made under it', () => {
   const { legs } = walk(10, 1600);
-  // covered first, the change only once it is whole
   assert.deepEqual(legs[0], { leg: 'hold', at: 1000 + HOME.cover });
   const home = wayHome(0);
   assert.equal(home.covered(0), 0);
@@ -147,7 +136,6 @@ test('home: the parchment covers the match, then the change is made under it', (
 });
 
 test("home: held at least HOME.hold, and until the lobby's frames are drawn; then lifted, then home", () => {
-  // frames quick: held the least it is held
   const quick = walk(10, 3000).legs;
   assert.deepEqual(
     quick.map((l) => l.leg),
@@ -155,11 +143,9 @@ test("home: held at least HOME.hold, and until the lobby's frames are drawn; the
   );
   assert.equal(quick[1].at - quick[0].at, HOME.hold);
   assert.equal(quick[2].at - quick[1].at, HOME.lift);
-  // frames slow (the lobby long in coming): held till its frames are drawn, however long that is
   const slow = walk(400, 6000).legs;
   assert.equal(slow[1].leg, 'lift');
   assert.equal(slow[1].at - slow[0].at, HOME.frames * 400);
-  // never lifted on the clock alone: no frame drawn, it holds
   const home = wayHome(0);
   home.drawn(HOME.cover);
   assert.equal(home.leg, 'hold');

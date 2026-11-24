@@ -1,8 +1,3 @@
-// The five guns (sim/handling.ts GUNS) as they fight (sim/battle.ts): how long
-// each takes to sink a ship at its best range, its magazine, interval, reload
-// and wind-up, the time to take one up, the fall-off of its bite, the mortar's
-// burst, the scatter's cut rigging, and the same fight every time. (What is dropped on a sinking:
-// loot.test.ts; a bot's choice by range: gunner.test.ts.)
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -38,15 +33,12 @@ import {
 
 const deep: Depth = () => 30;
 const centre = fromLatLon(0.2, 0.3);
-/** A ship at `c` heading `bearing` (radians to port of east), still. */
 const lying = (c: Vec3, bearing: number): ShipState => {
   const s = shipAt(c, frameAt(c).east);
   return { ...s, heading: turned(s, bearing), speed: 0 };
 };
-/** The point `metres` east of the centre. */
 const east = (metres: number) =>
   along(centre, lying(centre, 0).heading, metres).p;
-/** Each kind's best range, m: inside its fall-off's hold, the scatter close. */
 const BEST: Record<GunKind, number> = {
   cannon: 100,
   scatter: 30,
@@ -55,11 +47,6 @@ const BEST: Record<GunKind, number> = {
   mortar: 100,
 };
 
-/**
- * The still fleet fought for `seconds` (or till `until`), ship 1 holding her
- * trigger with no spread, laid along her heading (the assist on what stands
- * there); each step's shots, cues and sinkings, timed.
- */
 function fight(
   crews: Crew[],
   fleet: Vessel[],
@@ -80,7 +67,6 @@ function fight(
       deep
     );
     b = r.battle;
-    // (each at the step's end)
     shots.push(...r.shots.map(() => (i + 1) * STEP));
     cues.push(...r.cues.map((cue) => ({ t: (i + 1) * STEP, cue })));
     if (until(r.sunk)) return { battle: b, shots, cues, time: (i + 1) * STEP };
@@ -88,10 +74,6 @@ function fight(
   return { battle: b, shots, cues, time: Infinity };
 }
 
-/**
- * Seconds a common gun of `kind` takes to sink a still ship of 100 hull and
- * `shield` lying across its line at its best range.
- */
 function ttk(kind: GunKind, shield: number) {
   const target = { ...crewOf(2), health: { hull: 100, shield } };
   return fight(
@@ -105,9 +87,6 @@ function ttk(kind: GunKind, shield: number) {
   ).time;
 }
 
-// Every ball home, the flight counted: the scatter quickest close, the repeater
-// quickest through a shield, the harpoon and the mortar slowest (the one
-// out-ranging all, the other bursting over several and lobbing over land).
 test('each gun sinks a ship at its best range in a band: 1–5 s against her hull, 2.5–10 s against hull and shield', () => {
   const rows = KINDS.map((k) => [k, ttk(k, 0), ttk(k, 100)] as const);
   console.log(
@@ -128,7 +107,6 @@ test('each gun sinks a ship at its best range in a band: 1–5 s against her hul
       `${k} against 100+100: ${both.toFixed(2)} s`
     );
   }
-  // none takes more than three and a half times another's through a shield
   const both = rows.map((r) => r[2]);
   assert.ok(Math.max(...both) / Math.min(...both) < 3.5);
 });
@@ -148,7 +126,6 @@ test("a scatter's grape cuts the rigging of the ship it strikes: she sails at RI
   assert.ok(c.cut > 0 && c.cut <= GUNS.scatter.cuts, `${c.cut}`);
   const helm = { course: null, throttle: 0.8 };
   assert.equal(crewed(helm, c).throttle, 0.8 * RIGGING);
-  // mended after the fighting, as the seconds pass
   let crews = [c];
   for (let i = 0; i < Math.ceil(GUNS.scatter.cuts / STEP); i++)
     crews = stored(
@@ -165,7 +142,6 @@ test("a scatter's grape cuts the rigging of the ship it strikes: she sails at RI
   assert.equal(crewed(helm, crews[0]).throttle, 0.8);
 });
 
-/** Ship 1 alone with a common gun of `kind` (more given after it), her trigger held for `seconds`, out at sea. */
 const alone = (kind: GunKind, seconds: number, crew: Partial<Crew> = {}) =>
   fight(
     [{ ...crewOf(1, gunOf(kind, 0)), ...crew }],
@@ -257,7 +233,6 @@ test("a mortar's fall mark is drawn its splash's size (gunfire/marks.ts MARK, wh
 });
 
 test("a mortar's shell bursts over its splash: the ship struck takes all of it, one beside her less, the shooter none", () => {
-  // laid on ship 2 at 80 m; ship 3 lies 7 m beyond her, ship 4 well clear
   const fleet = [
     afloat(1, lying(centre, 0)),
     afloat(2, lying(east(80), Math.PI / 2)),
@@ -290,7 +265,6 @@ test("a mortar's shell bursts over its splash: the ship struck takes all of it, 
     `${lost(2)} ${lost(3)}`
   );
   assert.equal(lost(4), 0);
-  // a shell dropped beside the shooter herself: the other ship by her takes it, she none
   const by = (m: number) => along(centre, frameAt(centre).north, m).p;
   const ball = loosed(
     1,
@@ -345,7 +319,6 @@ test('the same guns fight the same way, to the bit', () => {
 test('the sea is strewn with some 850–950 pieces, a third of them guns, the cannon the commonest, the harpoon and the mortar the rarest', () => {
   const f = laying(5, deep).strewn(),
     guns = f.pieces.map((p) => p.goods).filter(isArms);
-  // some 1.4 a spot, from 640 spots
   assert.ok(
     f.pieces.length > 850 &&
       f.pieces.length < 950 &&
@@ -379,7 +352,6 @@ test("a phase's cache is dropped in the heart of the next cap, rare and the same
     drop.map((_, i) => f.next + i)
   );
   for (const l of drop) {
-    // within its share of the cap's radius of the centre
     assert.ok(toEdge(l.at, cap) >= (1 - LOOT.cache.within) * 150 - 1e-6);
     assert.ok(
       isArms(l.goods)

@@ -1,7 +1,3 @@
-// How a match is set up on the world: the planet's water sounded for the bots'
-// chart and the ships' berths, and the matches dealt one after another, each
-// with its storm, its berths and its bots' minds.
-
 import { SHIPS } from '../sim/match.ts';
 import { charted } from '../sim/route.ts';
 import { dealt, type MatchType } from '../sim/persona.ts';
@@ -13,24 +9,11 @@ import { STRIDE } from '../world/random.ts';
 import type { Vec3 } from '../world/sphere.ts';
 import type { Match, Waters } from './state.ts';
 
-/** A match's berths worked out off the main thread, by its seed. */
 type Berther = (match: number) => Promise<Spawn[]>;
-/**
- * What the sounding worker answers: the water sounded (once), or a match's
- * berths (sounding.ts).
- */
 type Sounded =
   | { open: Uint8Array; clear: Uint8Array; berths: Float64Array; ms: number }
   | { match: number; spawns: Float64Array };
 
-/**
- * The water of a planet of this seed and land as the match reads it (state.ts
- * Waters), sounded in a worker (sounding.ts) while the ground's bakes in its
- * own (land/bake.ts); the milliseconds the sounding took; and the worker kept
- * to berth each match on it. The worker lives as long as the page: every match
- * dealt asks it for its berths ahead of its start (createMatches berthBy), and
- * it holds the water it sounded to work them out on.
- */
 export function watersOf(
   seed: number,
   land: Land
@@ -70,13 +53,6 @@ export function watersOf(
   });
 }
 
-/**
- * The matches on a planet of this seed: the first on the planet's own seed (the
- * game's race: race), each next one dealt a seed of its own (its storm and its
- * bots' minds come from it; the harness and the tests deal them). hold: seconds the storm is held at, or null to let it run; gun: the
- * gun every ship is armed with, or null for none; typeOf: each match's type by
- * its seed (sim/persona.ts: as the game deals them if not given).
- */
 export function createMatches(
   seed: number,
   planet: Planet,
@@ -92,9 +68,6 @@ export function createMatches(
   };
   let played = 0,
     berth: Berther | null = null;
-  /**
-   * The next match's seed, and its berths once worked out ahead of its deal.
-   */
   const next = () => seed + STRIDE * (played + 1);
   let ahead: { seed: number; berths: Spawn[] } | null = null;
   const prepare = () => {
@@ -104,33 +77,18 @@ export function createMatches(
     });
   };
   const first = match(seed);
-  /** The race's own berths, once worked out (berthRace). */
   let own: Spawn[] | undefined;
   return {
     first,
-    /**
-     * The seed's own race, as the game sails it (a seed is one race): the
-     * first match, its berths with it if worked out in time (berthRace).
-     */
     race: (): Match => ({ ...first, berths: own }),
-    /** The race's berths worked out by `by` (watersOf's) ahead of PLAY. */
     berthRace(by: Berther) {
       void by(seed).then((berths) => (own = berths));
     },
-    /** The storm of the first match, by its clock (s). */
     storm: (t: number): Storm => first.storm(t),
-    /**
-     * Each next match's berths worked out by `by` (watersOf's) while the one
-     * before is in hand.
-     */
     berthBy(by: Berther) {
       berth = by;
       prepare();
     },
-    /**
-     * The next match, for PLAY: its berths with it if they were worked out in
-     * time.
-     */
     deal(): Match {
       const s = seed + STRIDE * ++played,
         berths = ahead?.seed === s ? ahead.berths : undefined;

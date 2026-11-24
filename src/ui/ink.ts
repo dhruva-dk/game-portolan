@@ -1,21 +1,8 @@
-// The chartmaker's hand, shared by every piece of the UI: the UI's palette
-// (every colour it draws is named here, and the page's own CSS reads them as
-// custom properties: cssInks) and the marks he lays on the world (paper slips
-// with rough-cut edges, paper discs, woodcut glyphs, ruled bars, italic
-// numerals). Each mark is SVG markup in the piece's own units; a piece sets it
-// into an <svg>, and the page carries DEFS once (ui.ts).
-
 import { linearToHex } from '../colour.ts';
 import type { Sea } from '../snapshot.ts';
 import { hash01 } from '../world/random.ts';
 import { GLYPHS, type Glyph, type Prim } from './glyphs.ts';
 
-/**
- * Inks: iron for outlines and figures, rubric for harm, the Storm's violet for
- * the Storm alone, gold for the chosen and the won, silver for the runners-up,
- * scarlet for her own water and her blood. Lead white only ever over an iron
- * halo, so it holds on bright water.
- */
 export const INK = {
   iron: '#261910',
   rubric: '#b8301a',
@@ -29,7 +16,6 @@ export const INK = {
   white: '#fcf6e6',
 } as const;
 type Ink = keyof typeof INK;
-/** Washes laid over the paper. */
 export const WASH = {
   ultramarine: '#3d5f9e',
   viridian: '#4f9488',
@@ -43,29 +29,13 @@ export const WASH = {
   shore: '#8a6a3a',
   umber: '#6e6152',
 } as const;
-/**
- * The paper; the paper a woodcut's cut lines show; paper gilt (the chosen, the
- * won); the brass of the minimap's rim.
- */
 export const PAPER = '#f1e4c8',
   CUT = '#f4e8cf',
   GILT = '#f3dfa8',
   BRASS = '#5b3a1e';
-/**
- * The shade under a slip, or over the world round a sheet; the Storm's shade at
- * the screen's rim outside its calm.
- */
 export const SHADOW = '#1a1008',
   DUSK = '#3e1860';
-/**
- * The parchment's light, middle and edge: the paper's gradient (DEFS), and an
- * opaque sheet's (parchment).
- */
 export const PARCHMENT = ['#f7eedb', '#f0e2c4', '#dcc396'] as const;
-/**
- * Light laid over the world, not ink on paper: the screen's flashes and rims,
- * the marks of a blow.
- */
 export const LIGHT = {
   warm: '#ffd9a0',
   white: '#fff1d8',
@@ -76,12 +46,6 @@ export const LIGHT = {
   green: '#7be36b',
   mint: '#c8ffb0',
 } as const;
-/**
- * The rarities' inks, worst to best (0–4: sim/loot.ts, snapshot.ts LootDraw),
- * under a gun's slot: silver, verdigris, azurite, then purpure, so the epic
- * reads purple on the chart as it glows on the water (palette.ts RARITY_GLOW),
- * and not the red of the blows' figures; gold.
- */
 export const RARITY = [
   '#969aa0',
   INK.green,
@@ -89,20 +53,12 @@ export const RARITY = [
   '#6a3a8e',
   INK.gold,
 ] as const;
-/**
- * The land on the minimap: its shallows' pale wash, its lowland and its
- * hilltops; its contours sepia (ground.ts).
- */
 export const LAND = {
   apron: '#f4f0d6',
   low: '#ecdcac',
   high: '#b08c58',
   contour: INK.sepia,
 } as const;
-/**
- * The frame's meter (index.html): its ground, its words and labels, and a
- * reading good, fair or poor.
- */
 const METER = {
   ground: SHADOW,
   text: PAPER,
@@ -112,15 +68,6 @@ const METER = {
   poor: '#f07a5e',
 } as const;
 
-/**
- * The office's dress (ui/kit/, ui/office/), the chartmaker's own: the paper of
- * its strip and nav (band); a plate (a label inked solid) and the two inks set
- * on one; the parchment of a panel, a region of it a tone darker and one
- * lighter, and gilt for the chosen; the sea behind a face; its ink, and its
- * second ink for labels; the ink set on a filled control; and the fills that
- * say what a thing is: go (a button), bad (a loss, cancel), good, fair, warn
- * (under way), gold (stars), and the one way on (Continue).
- */
 export const OFFICE = {
   band: '#ead9b4',
   plate: INK.iron,
@@ -142,23 +89,12 @@ export const OFFICE = {
   gold: '#c6951a',
   on: '#c85a12',
 } as const;
-/**
- * The chartroom's few inks beyond the race's (ui/chartroom/): the second ink,
- * for labels (about 6:1 on PAPER, where sepia is near 4.5:1); the faint ink set
- * on a plate (the frame meter's label); and the quality ladder's two middle
- * steps as washes, azurite and purpure, pale enough to set iron on, so they
- * never read as RARITY's inks, which mean act and the epic.
- */
 export const CHARTROOM = {
   label: '#5e4631',
   plateFaint: METER.label,
   azurite: '#7fa0cf',
   purpure: '#a88dc2',
 } as const;
-/**
- * The gull's own colours (gull.ts): his feathers and their shade, his beak,
- * its lower half and its red spot, his dark glasses and the light on them.
- */
 export const PLUMAGE = {
   white: '#fbf8ef',
   shade: '#c5ccd6',
@@ -168,12 +104,7 @@ export const PLUMAGE = {
   lens: '#15171c',
   glint: '#e9f0f6',
 } as const;
-/** What a filled thing of the office says by its colour. */
 export type Tone = 'go' | 'bad' | 'good' | 'fair' | 'warn' | 'gold';
-/**
- * The tone of a value by its share of the best it could be (a stat of 20, a
- * bar of the chart): good, fair, warn, then bad.
- */
 export const toneOf = (share: number): Tone =>
   share >= 0.75
     ? 'good'
@@ -182,19 +113,13 @@ export const toneOf = (share: number): Tone =>
       : share >= 0.3
         ? 'warn'
         : 'bad';
-/**
- * The office's sizes, px: nothing under `small`. Its one face is the
- * chartmaker's serif (FIGURES), as the race's is.
- */
 export const TYPE = { title: 26, head: 18, body: 15, small: 13 } as const;
 
-/** `hex` (#rrggbb) at `a` of its strength, as #rrggbbaa. */
 export const alpha = (hex: string, a: number) =>
   `${hex}${Math.round(a * 255)
     .toString(16)
     .padStart(2, '0')}`;
 
-/** `a` laid `t` of the way to `b` (each #rrggbb), as #rrggbb. */
 export const blend = (a: string, b: string, t: number) => {
   let out = '#';
   for (const i of [1, 3, 5]) {
@@ -207,10 +132,8 @@ export const blend = (a: string, b: string, t: number) => {
   return out;
 };
 
-/** An opaque sheet's ground: the parchment, light in the middle. */
 export const parchment = `radial-gradient(ellipse at 50% 45%, ${PARCHMENT[0]} 0%, ${PARCHMENT[1]} 60%, ${PARCHMENT[2]} 100%)`;
 
-/** The inks the page's own CSS reads (index.html), as custom properties set on the document (ui.ts). */
 export const cssInks: readonly (readonly [string, string])[] = [
   ['--paper', PAPER],
   ['--meter-ground', alpha(METER.ground, 0.62)],
@@ -221,10 +144,8 @@ export const cssInks: readonly (readonly [string, string])[] = [
   ['--meter-poor', METER.poor],
 ];
 
-/** The numerals' face: an italic old style, iOS's own. */
 export const FIGURES = '"Iowan Old Style", "Palatino", Georgia, serif';
 
-/** The shared defs: the paper's gradient, the slips' shadow, a hatch per ink (and a denser one for large glyphs). */
 export const DEFS = (() => {
   let d =
     `<radialGradient id="pg" cx="50%" cy="45%" r="75%"><stop offset="0" stop-color="${PARCHMENT[0]}"/>` +
@@ -246,7 +167,6 @@ export const DEFS = (() => {
 const r2 = (n: number) => Math.round(n * 100) / 100;
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
 
-/** A rectangle with a hand-cut edge. */
 export function roughRect(
   x: number,
   y: number,
@@ -268,7 +188,6 @@ export function roughRect(
   return `M${pts.map(([a, b]) => `${r2(a)} ${r2(b)}`).join('L')}Z`;
 }
 
-/** A circle with a hand-cut edge, wandering `amp` across. */
 export function roughCircle(
   cx: number,
   cy: number,
@@ -286,7 +205,6 @@ export function roughCircle(
   return `${s}Z`;
 }
 
-/** An arc of radius r about (cx, cy) from angle a0 to a1 (radians, clockwise on the screen). */
 export function arcPath(
   cx: number,
   cy: number,
@@ -308,7 +226,6 @@ interface FigureStyle {
   haloWidth?: number;
   weight?: number;
 }
-/** A numeral (or a few), centred on y, in the chartmaker's italic. */
 export function figure(
   x: number,
   y: number,
@@ -325,15 +242,9 @@ export function figure(
   );
 }
 
-/** A share (0…1) as a per cent, always to a tenth (0.0%), never below none. */
 export const percent = (share: number) =>
   `${(Math.max(0, share) * 100).toFixed(1)}%`;
 
-/**
- * Ship `own`'s dye on `sea` as the display shows it ('#rrggbb': the colours
- * the sea is drawn with, her water's and her ship's), or white while it is not
- * known.
- */
 export function dyeOn(
   sea: Pick<Sea, 'colours'> | undefined,
   own: number | null | undefined
@@ -347,7 +258,6 @@ interface GlyphStyle {
   paper?: string;
   opacity?: number;
 }
-/** A woodcut glyph `size` across, centred on (x, y): its shapes hatched in the ink and outlined, its cuts in paper. */
 export function glyph(
   name: Glyph,
   x: number,
@@ -390,7 +300,6 @@ interface SlipStyle {
   flat?: boolean;
   rule?: boolean;
 }
-/** A paper slip laid on the world: rough-cut, shadowed, ruled inside its edge. */
 export function slip(
   x: number,
   y: number,
@@ -407,7 +316,6 @@ export function slip(
   );
 }
 
-/** A paper disc with a hand-cut edge and a ruled ring inside it. */
 export function paperDisc(
   x: number,
   y: number,
@@ -420,7 +328,6 @@ export function paperDisc(
   );
 }
 
-/** A ruled bar `frac` full of a wash, centred on y. */
 export function bar(
   x: number,
   y: number,
@@ -436,7 +343,6 @@ export function bar(
   );
 }
 
-/** A ring `frac` of the way round from the top, clockwise. */
 export function ring(
   x: number,
   y: number,
@@ -451,7 +357,6 @@ export function ring(
   return `<path d="${arcPath(x, y, r, a0, a1)}" fill="none" stroke="${colour}" stroke-width="${width}" stroke-linecap="round"/>`;
 }
 
-/** A galleon's mark, `size` across, centred on (x, y). */
 export function galleon(
   x: number,
   y: number,
@@ -479,12 +384,10 @@ export function galleon(
   );
 }
 
-/** An <svg> of the given size in its own units (the shared defs are set in the page once: ui.ts). */
 export function svg(w: number, h: number, body = '') {
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" overflow="visible">${body}</svg>`;
 }
 
-/** svg()'s <svg> as an element, `body` set into it. */
 export function svgNode(w: number, h: number, body = ''): SVGSVGElement {
   const el = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
   el.setAttribute('viewBox', `0 0 ${w} ${h}`);
@@ -495,7 +398,5 @@ export function svgNode(w: number, h: number, body = ''): SVGSVGElement {
   return el;
 }
 
-/** How many ids have been given out (uid). */
 let ids = 0;
-/** An id no other element of the page has, for a def a drawing makes for itself (a clip). */
 export const uid = (name: string) => `${name}-${++ids}`;

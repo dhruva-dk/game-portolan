@@ -1,6 +1,3 @@
-// The planet (world/planet.ts, as world/planet-terrain.ts makes it from the
-// terrain): its rises, where she starts, its cover, its baked faces and its
-// remembered heights. The terrain's own shape is terrain.test.ts's.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -23,10 +20,6 @@ import { random } from '../src/world/random.ts';
 const land = landOf(SEED),
   planet = planetOf(SEED, land);
 
-/**
- * Points spread evenly over the sphere (a Fibonacci lattice): each stands for
- * an equal share of its area.
- */
 const lattice = (count: number): Vec3[] =>
   Array.from({ length: count }, (_, i) => {
     const y = 1 - (2 * (i + 0.5)) / count,
@@ -34,7 +27,6 @@ const lattice = (count: number): Vec3[] =>
       a = i * Math.PI * (3 - Math.sqrt(5));
     return [Math.cos(a) * s, y, Math.sin(a) * s] as Vec3;
   });
-/** Metres in from the coast at p (negative on the water). */
 const at = taps();
 const inland = (p: Vec3) => (locate(p, at), -between(land.shore, at));
 
@@ -47,7 +39,6 @@ test('the land stands only within its rises: under the top of every rise whose r
       if (r.top > top && distance(q, r.at) < r.reach) top = r.top;
     return top;
   };
-  // all over the sphere, and close round the rises' edges
   const points = lattice(20000);
   for (let k = 0; k < 10000; k++) {
     const r = rises[Math.floor(draw() * rises.length)],
@@ -105,7 +96,6 @@ test('she starts on the water START m off the coast, facing the land', () => {
     Math.abs(-inland(p) - START) < 1.5 * CELL,
     `${(-inland(p)).toFixed(1)} m off the coast`
   );
-  // the coast is ahead of her: within START and a little more along her heading
   const ahead = bearingAt(p, bearing);
   assert.ok(
     inland(along(p, ahead, START + 4 * CELL).p) > 0,
@@ -153,9 +143,6 @@ test('bakeFaces: the nodes are height() at faceDir, and the faces agree along th
   const { height, cover } = bakeFaces(planet, n);
   assert.equal(height.length, 6);
   const byDirection = new Map<string, number[]>();
-  // on a cube face's edge the terrain is read from whichever face the point falls on, and the readings either side
-  // of the edge, and at the cube's corners, are one (terrain-grid.ts locate): the faces' nodes there part only by the
-  // rounding of their directions
   const SEAM = 1e-4;
   let seam = 0;
   for (let face = 0; face < 6; face++)
@@ -189,7 +176,6 @@ test('bakeFaces: the nodes are height() at faceDir, and the faces agree along th
           `face ${face} (${i}, ${j})`
         );
       }
-  // each edge node but the corners lies on two faces, each corner on three
   const counts = [...byDirection.values()].map((v) => v.length).sort();
   assert.equal(counts.filter((c) => c === 2).length, 12 * (n - 2));
   assert.equal(counts.filter((c) => c === 3).length, 8);
@@ -207,7 +193,6 @@ test('a height remembered is the height to the bit, read again or after its plac
   for (let pass = 0; pass < 3; pass++)
     for (const p of points)
       assert.equal(Object.is(read(p), planet.height(p)), true);
-  // the same point by another array, and points a bit apart, are told apart
   const p = points[7],
     q: Vec3 = [p[0], p[1], p[2] + 1e-16];
   assert.equal(read([p[0], p[1], p[2]]), planet.height(p));

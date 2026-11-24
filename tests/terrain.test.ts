@@ -47,7 +47,6 @@ test('the same seed makes the same terrain, to the bit', () => {
 });
 
 test('the distance to the coast is to a smooth contour, within a fraction of a cell', () => {
-  // the coast a circle of latitude, y = a: the true distance along the surface is R |asin y − asin a|
   const a = 0.3,
     p = centres(),
     field = Float32Array.from({ length: CELLS }, (_, c) => p[3 * c + 1]);
@@ -59,7 +58,6 @@ test('the distance to the coast is to a smooth contour, within a fraction of a c
     worst = Math.max(worst, e);
     sum += e;
   }
-  // (measured: 0.42 m worst, 3 mm on average; the distance to the nearest cell across the coast was 1.7 m and 1.2 m)
   assert.ok(
     worst < 0.15 * CELL,
     `worst ${worst.toFixed(3)} m, a cell ${CELL.toFixed(2)} m`
@@ -71,7 +69,6 @@ test("read at a cell's centre, the height is the cell's own", () => {
   const t = terrains.get(1)!,
     h = heightAt(t),
     next = random(7);
-  // inner cells, and cells on faces' edges and corners, where the reading reaches onto the next face
   const cells = [
     0,
     N - 1,
@@ -90,7 +87,6 @@ test('the height is continuous and gentle everywhere, across faces too', () => {
     next = random(11),
     step = 0.25;
   const sign = () => (next() < 0.5 ? -1 : 1);
-  // a point near one of the cube's twelve edges (two of |x|, |y|, |z| alike), where the reading wraps onto a next face
   const nearEdge = (): Vec3 => {
     const v = [sign(), sign() * (1 + (next() - 0.5) * 0.02), next() * 2 - 1],
       r = Math.floor(next() * 3);
@@ -110,7 +106,6 @@ test('the height is continuous and gentle everywhere, across faces too', () => {
     const run = R * Math.hypot(q[0] - p[0], q[1] - p[1], q[2] - p[2]);
     if (run > 1e-3) steepest = Math.max(steepest, Math.abs(h(q) - h(p)) / run);
   }
-  // (the relief's grades scale with the summit: 0.75 for a summit of 20 m; a jump at a seam would be many times that)
   assert.ok(
     steepest < 0.0375 * t.options.summit,
     `steepest ${steepest.toFixed(2)}`
@@ -118,7 +113,6 @@ test('the height is continuous and gentle everywhere, across faces too', () => {
 });
 
 test('the height runs on across every edge of the cube without a step, to its corners', () => {
-  // each face's four sides, and the face past each: the cube's twelve edges, each from both its faces
   const edges = new Set<string>();
   let worst = 0,
     where = '';
@@ -126,13 +120,11 @@ test('the height runs on across every edge of the cube without a step, to its co
     const h = heightAt(t);
     for (let face = 0; face < 6; face++)
       for (let side = 0; side < 4; side++) {
-        // the point s of the way out to this side (1 on it), k along it
         const sign = side % 2 ? 1 : -1;
         const on = (s: number, k: number) =>
           side < 2 ? faceDir(face, sign * s, k) : faceDir(face, k, sign * s);
         edges.add([face, faceUV(on(1.01, 0)).face].sort().join());
         for (let n = 0; n <= 2000; n++) {
-          // a point on the edge (the cube's corners too), and two a hair either side of it across the edge
           const k = n / 1000 - 1,
             e = on(1, k),
             out = normalize(add(e, on(0.999, k), -1));

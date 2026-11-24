@@ -1,31 +1,3 @@
-// The near ships' sails and pennants as cloth, simulated on the GPU: extended
-// position-based dynamics (Macklin, Müller and Chentanez, "XPBD", MIG 2016)
-// taken in many small steps of one Jacobi iteration each (Macklin et al.,
-// "Small Steps in Physics Simulation", SCA 2019), which converges well enough
-// for canvas without colouring the constraints.
-//
-// Each berth (berths.ts) holds one ship's canvas (canvas.ts: the finest level's
-// grids, a particle a vertex), in her own frame — a square sail's in its
-// yard's, before the yard is braced — so her way over the sea moves nothing,
-// and only what she feels reaches it, each frame from the fleet:
-//   - her sails' wind (motion.ts's filling(), metres a second), gusting slowly and swirling along the canvas, so a
-//     sail breathes as it fills, a slack one shivers and a pennant flutters. It presses on the cloth along its normal
-//     as the square of the wind through it, and drags along it: a sail fills on whichever side the wind comes from,
-//     and lifts and shakes where the wind runs along it;
-//   - gravity, less her own acceleration (a turn, gathering way, the heave), as she tilts it;
-//   - her roll and pitch: each particle is swung with her rig about her waterline, which throws the canvas aloft and
-//     moves it through the air (a masthead goes metres a second as she rolls).
-// The canvas is cut full (canvas.ts), so it fills to its drawn belly and no
-// further; pushed together it buckles rather than shortening; the long-range
-// attachments keep it from stretching, and a mast stands in it as a cylinder it
-// lies against when it goes aback.
-//
-// Budget: 783 particles a ship, BERTHS (4) ships; SUBSTEPS (8) steps of two
-// dispatches a frame, and one for the normals: 17 dispatches of 3132 threads,
-// nothing when no berth is held. Nothing is read back: the cloth's material
-// reads the particles straight from their buffers in the vertex stage
-// (materials.ts).
-
 import { Vector4, type StorageBufferNode } from 'three/webgpu';
 import {
   Fn,
@@ -62,34 +34,16 @@ import {
   type Vec3Node,
 } from '../tsl.ts';
 
-/**
- * Steps a frame, each a prediction and one Jacobi pass; and the longest frame
- * they cover, seconds.
- */
 const SUBSTEPS = 8,
   LONGEST = 1 / 20;
-/**
- * Air pushing on canvas and on bunting, per (m/s)² through it: ½ρC over the
- * cloth's weight a square metre.
- */
 const PRESS_SAIL = 1.1,
   PRESS_FLAG = 3.2;
-/** Air dragging along it, per (m/s)². */
 const DRAG_SAIL = 0.02,
   DRAG_FLAG = 0.22;
-/**
- * The eddies in the wind over the canvas, as a share of its speed: everywhere
- * (EDDY), and more where it runs along the canvas rather than through it
- * (LUFF), a sail's and a pennant's; their wavelengths, metres.
- */
 const EDDY = 0.06,
   LUFF_SAIL = 0.45,
   LUFF_FLAG = 0.7,
   EDDY_WAVES = [2.6, 1.5];
-/**
- * The constraints: each neighbour's offset in the grid, its compliance (m/N),
- * and whether it counts toward the average (the bending ones are too soft to).
- */
 const STENCIL: readonly (readonly [number, number, number, boolean])[] = [
   [1, 0, 1e-8, true],
   [-1, 0, 1e-8, true],
@@ -104,40 +58,18 @@ const STENCIL: readonly (readonly [number, number, number, boolean])[] = [
   [0, 2, 1e-4, false],
   [0, -2, 1e-4, false],
 ];
-/** How much softer canvas is pushed together than pulled apart. */
 const BUCKLE = 400;
-/**
- * Over-relaxation of the averaged Jacobi corrections (Macklin et al., "Unified
- * Particle Physics", 2014).
- */
 const OMEGA = 1.5;
-/**
- * How fast the cloth's own motion dies away, per second; and the fastest it may
- * move, m/s.
- */
 const DAMPING = 1.2,
   FASTEST = 40;
-/** How far off a mast's surface the canvas lies against it, metres. */
 const CLEAR = 0.06;
-/** Each berth's parameters, in vec4s (set()). */
 const PARAMS = 5;
 
-/**
- * The wind's slow breath at a time (seconds) for a ship's phase: its strength
- * as a share of its mean. The fleet's far ships' sails breathe with it too
- * (materials.ts), so a ship's canvas does the same before and after it is
- * simulated.
- */
 export const breath = (clock: FloatNode, phase: FloatNode): FloatNode =>
   float(1)
     .add(sin(clock.mul(0.83).add(phase)).mul(0.12))
     .add(sin(clock.mul(2.1).add(phase.mul(2.3))).mul(0.07));
 
-/**
- * A direction in her frame turned about the vertical by `angle`, as a square
- * yard is braced (the port arm aft for positive): the cloth's and the drawn
- * ship's (materials.ts).
- */
 export const braced = (v: Vec3Node, angle: FloatNode): Vec3Node => {
   const c = cos(angle),
     s = sin(angle);
@@ -147,30 +79,17 @@ export const braced = (v: Vec3Node, angle: FloatNode): Vec3Node => {
     v.x.negate().mul(s).add(v.z.mul(c))
   );
 };
-/** A point turned so about the vertical through z = pivot (its mast). */
 export const bracedAbout = (
   p: Vec3Node,
   angle: FloatNode,
   pivot: FloatNode | number
 ): Vec3Node => braced(p.sub(vec3(0, 0, pivot)), angle).add(vec3(0, 0, pivot));
 
-/**
- * What a berth's ship feels this frame, in her own frame (x to port, y up, z
- * forward).
- */
 export interface Felt {
-  /** Her yards' brace, radians. */
   brace: number;
-  /** A phase of her own, radians, so no two ships' canvas moves in step. */
   phase: number;
-  /** Her sails' wind (motion.ts's filling()), metres a second. */
   wind: Vec3;
-  /** Gravity less her acceleration, m/s². */
   weight: Vec3;
-  /**
-   * Her rate of turn (roll, pitch, yaw together), rad/s, and its rate of
-   * change, rad/s².
-   */
   spin: Vec3;
   spinning: Vec3;
 }
@@ -194,20 +113,12 @@ export function createCloth() {
   const values = Array.from({ length: BERTHS * PARAMS }, () => new Vector4());
   const params = uniformArray<'vec4'>(values, 'vec4');
   const h = uniform(1 / 240);
-  /**
-   * Seconds, the cloth's own clock (the far ships' sails breathe on it too).
-   */
   const clock = uniform(0);
-  /**
-   * Each grid's first particle and last column and row, for the vertex stage to
-   * find its particles.
-   */
   const grids = uniformArray<'vec4'>(
     canvas.grids.map((g) => new Vector4(g.first, g.columns, g.rows, g.kind)),
     'vec4'
   );
 
-  /** Which berth and which particle of the canvas a thread is. */
   const where = () => {
     const id = int(instanceIndex);
     const slot = id.div(n);
@@ -220,10 +131,6 @@ export function createCloth() {
       p0: params.element(slot.mul(PARAMS)),
     };
   };
-  /**
-   * The particle at column i, row j of the grid at `g0`, in the berth from
-   * `base`, in buffer B.
-   */
   const at = (
     B: StorageBufferNode<'vec4'>,
     base: IntNode,
@@ -261,8 +168,6 @@ export function createCloth() {
       j = int(c.y);
     const x = X.element(id).xyz,
       v = Vel.element(id).xyz;
-    // the cloth's normal here, across its neighbours (either way round: the
-    // wind presses on whichever side it meets)
     const tu = at(X, base, g0, row, minInt(i.add(1), nu), j).sub(
       at(X, base, g0, row, maxInt(i.sub(1), 0), j)
     );
@@ -271,8 +176,6 @@ export function createCloth() {
     );
     const nn = cross(tu, tv);
     const normal = nn.div(max(length(nn), 1e-6));
-    // what she feels, from her frame to the sail's: a square sail's yard is
-    // braced
     const p1 = params.element(slot.mul(PARAMS).add(1)),
       p2 = params.element(slot.mul(PARAMS).add(2));
     const spin = params.element(slot.mul(PARAMS).add(3)).xyz,
@@ -280,18 +183,12 @@ export function createCloth() {
     const square = kind.lessThan(CLOTH.lateen - 0.5);
     const angle = select(square, p0.z, float(0));
     const r = bracedAbout(x, angle, m.z);
-    // swung with her rig about her waterline: thrown outward and along, and
-    // carried through the air
     const swing = cross(spinning, r).add(cross(spin, cross(spin, r)));
     const weight = braced(p2.xyz.sub(swing), angle.negate());
     const wind = braced(
       p1.xyz.mul(breath(clock, p0.w)).sub(cross(spin, r)),
       angle.negate()
     );
-    // The wind's eddies, carried over the canvas at about its speed, pushing it
-    // in and out: a little everywhere, so a full sail ripples, and hard where
-    // the wind runs along the canvas, so a sail edge-on to it lifts and shakes
-    // and a pennant flutters.
     const flag = kind.greaterThan(CLOTH.pennant - 0.5),
       speed = length(wind),
       down = wind.div(max(speed, 1e-3));
@@ -385,7 +282,6 @@ export function createCloth() {
           const dv = p.sub(q);
           const len = max(length(dv), 1e-6);
           const C = len.sub(restLength);
-          // pushed together, canvas buckles
           const compliance = select(
             C.lessThan(0),
             float(alpha * (counts ? BUCKLE : 1)),
@@ -400,7 +296,6 @@ export function createCloth() {
       );
     }
     const x = p.add(sum.mul(float(OMEGA).div(max(count, 1)))).toVar();
-    // never further from the nearest lashing than across the cloth as cut
     const pin = int(c.z);
     If(pin.greaterThanEqual(0), () => {
       const anchor = P.element(base.add(pin)).xyz;
@@ -411,8 +306,6 @@ export function createCloth() {
         x.assign(anchor.add(off.mul(most.div(far))));
       });
     });
-    // the mast stands in the canvas: in a square sail's yard's frame it stands
-    // where the brace turns it back to
     If(m.y.greaterThan(0), () => {
       const square = g.w.lessThan(CLOTH.lateen - 0.5);
       const mast = bracedAbout(
@@ -438,10 +331,6 @@ export function createCloth() {
     X.element(id).assign(vec4(x, 1));
   })().compute(total, [64]);
 
-  // each particle's normal, as sheet() would give the drawn grid (kit.ts):
-  // (down the rows) × (along them), turned as the grid was wound; where the
-  // grid closes to a point (the lateen's clew, a pennant's tip) taken a row or
-  // a column short of it
   const normals = Fn(() => {
     const { id, t, base, p0 } = where();
     If(p0.x.lessThan(0.5), () => {
@@ -483,29 +372,17 @@ export function createCloth() {
     ...Array.from({ length: SUBSTEPS }, () => [predict, solve]).flat(),
     normals,
   ];
-  // what update returns: the steps, or none
   const due: Compute[] = [steps],
     idle: Compute[] = [];
   let live = false;
-  /** A berth's k-th vec4 of parameters set to v (her frame) and 0. */
   const put = (k: number, v: Vec3) => values[k].set(v[0], v[1], v[2], 0);
 
   return {
-    /** Particles a berth. */
     count: n,
-    /**
-     * The particles' positions and normals, a berth after another, for the
-     * vertex stage.
-     */
     positions: X.value,
     normals: Nrm.value,
     grids,
     clock,
-    /**
-     * Berth k this frame: empty (null), or a ship feeling `felt`, her cloth
-     * laid out as cut first if `fresh`. Every berth is set every frame, before
-     * the update: a fresh berth is fresh for that frame's steps only.
-     */
     set(k: number, felt: Felt | null, fresh = false) {
       const o = k * PARAMS;
       if (!felt) {
@@ -519,10 +396,6 @@ export function createCloth() {
       put(o + 4, felt.spinning);
       live = true;
     },
-    /**
-     * Each frame, after the berths are set: the steps that move the cloth on dt
-     * seconds, in one pass; none while no berth is held.
-     */
     update(dt: number): Compute[] {
       clock.value += dt;
       if (!live || dt <= 0) return idle;

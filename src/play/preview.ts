@@ -1,10 +1,3 @@
-// A seed's chart for the seed panel, asked of a worker (survey.ts) as she
-// types: making a planet's land takes a second or two, which the lobby's
-// frames must not wait on. One ask at a time: a later one overtakes it, the
-// worker on the earlier ended where it stands (a worker cannot be stopped
-// otherwise) and a new one set going, the earlier answered null. The last
-// chart is kept, so the seed asked again is answered at once.
-
 import type { Chart } from '../player.ts';
 
 export function surveyor(): (name: string) => Promise<Chart | null> {

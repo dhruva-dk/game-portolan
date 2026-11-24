@@ -1,22 +1,13 @@
-// The vitals slip (hud.ts, top left): her shield and hull as ruled bars, each
-// with its numeral (the hull's large, the shield's small).
-//
-// Redrawn only when what it shows changes.
-
 import type { Status } from '../player.ts';
 import { INK, WASH, bar, figure, slip, svg } from './ink.ts';
 
-/** The slip's size, drawn units. */
 const VITALS = { w: 226, h: 92 } as const;
 
-/** The bars: their left, width, and the shield's and the hull's middle and height; the numerals' left. */
 const BARS = { x: 90, w: 82, shield: [26, 12], hull: [56, 18], figures: 178 };
 
-/** Draws into `face` (the piece juice.ts knocks): the slip. */
 export function createVitals(face: HTMLElement) {
   const drawn = document.createElement('div');
   face.append(drawn);
-  /** What was last drawn: the numbers. */
   const was = [NaN, NaN, NaN];
 
   return {

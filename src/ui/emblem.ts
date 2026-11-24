@@ -1,11 +1,6 @@
-// A team's emblem: a shield in its first colour, inked, charged with one of the
-// set's devices in its second. The team's mark wherever the office names it:
-// the strip's block, the team panel, a table's row.
-
 import { INK, svgNode } from './ink.ts';
 import type { Jacket } from './gull.ts';
 
-/** The devices a shield may carry, each drawn on a 24 grid about (12, 12). */
 const DEVICES = [
   '<circle cx="12" cy="11.5" r="5"/>',
   '<path d="M12 4.5 18.5 11.5 12 18.5 5.5 11.5z"/>',
@@ -21,13 +16,10 @@ const DEVICES = [
   '<path d="M5.5 5h13v2.5l-3.5 4 3.5 4V18h-13v-2.5l3.5-4-3.5-4z"/>',
 ] as const;
 
-/** How many devices there are: an emblem is one of them, by its number. */
 const EMBLEMS = DEVICES.length;
 
-/** The shield's outline on the 24 grid. */
 const SHIELD = 'M3.5 2.5h17v9.5c0 5-3.5 8.3-8.5 10-5-1.7-8.5-5-8.5-10z';
 
-/** The emblem numbered `device` in `colours`, `size` px across. */
 export function emblem(device: number, colours: Jacket, size: number) {
   const charge = DEVICES[((device % EMBLEMS) + EMBLEMS) % EMBLEMS] ?? '';
   const svg = svgNode(

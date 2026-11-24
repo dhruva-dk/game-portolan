@@ -1,30 +1,19 @@
-// The sound's workshop: what the recipes (sounds/*.ts) build each sound from,
-// sample by sample into plain Float32Arrays at the context's rate. Noise of a
-// seeded random, the RBJ cookbook's filters (fixed, or swept along the sound),
-// damped modes (wood, iron, a ward's ring), stick-slip trains (a creak),
-// bubbles, and the envelopes and shaping that join them. Pure: no Web Audio
-// here, so every sound can be made and measured headless, in node (tests).
-
 import { random } from '../world/random.ts';
 
-/** A sound's samples, each −1…1. */
 export type Samples = Float32Array<ArrayBuffer>;
 
-/** A sound being made: its samples, the rate, and its seeded random. */
 export interface Take {
   x: Samples;
   rate: number;
   r: () => number;
 }
 
-/** A take `seconds` long at `rate`, its random seeded by `seed`. */
 export const take = (seconds: number, rate: number, seed: number): Take => ({
   x: new Float32Array(Math.ceil(seconds * rate)),
   rate,
   r: random(seed),
 });
 
-/** A gain in decibels as a factor. */
 export const db = (d: number) => 10 ** (d / 20);
 
 type Shape =
@@ -35,10 +24,6 @@ type Shape =
   | 'lowshelf'
   | 'highshelf';
 
-/**
- * The RBJ cookbook's biquad for `shape` at `f` Hz, `q`, `gain` dB (peak and
- * shelves), into `c` (b0 b1 b2 a1 a2, a0 = 1).
- */
 function design(
   c: Float64Array,
   shape: Shape,
@@ -111,16 +96,8 @@ function design(
   c[4] = a2 / a0;
 }
 
-/**
- * A frequency that holds, or one that moves along the sound (`t`, seconds from
- * its start).
- */
 type Hz = number | ((t: number) => number);
 
-/**
- * Filters `x[from…to)` in place through one biquad; a moving frequency is
- * followed every 16 samples.
- */
 export function filter(
   t: Take,
   shape: Shape,
@@ -151,7 +128,6 @@ export function filter(
   return t;
 }
 
-/** A layer made apart and added into `t` at `at` s, times `gain`. */
 export function mix(t: Take, layer: Take, at = 0, gain = 1) {
   const o = Math.round(at * t.rate);
   for (let i = 0; i < layer.x.length && o + i < t.x.length; i++)
@@ -159,21 +135,15 @@ export function mix(t: Take, layer: Take, at = 0, gain = 1) {
   return t;
 }
 
-/** A fresh layer as long as `t`, its own seed drawn from `t`'s random. */
 export const layer = (t: Take, seconds = t.x.length / t.rate): Take =>
   take(seconds, t.rate, Math.floor(t.r() * 2 ** 31));
 
-/** White noise into `t`, times `env(time)` (s). */
 export function noise(t: Take, env: (s: number) => number = () => 1) {
   for (let i = 0; i < t.x.length; i++)
     t.x[i] += (t.r() * 2 - 1) * env(i / t.rate);
   return t;
 }
 
-/**
- * Brown noise (white, leaked through an integrator): weight low, falling 6 dB
- * an octave; times `env`.
- */
 export function brown(t: Take, env: (s: number) => number = () => 1) {
   let y = 0;
   for (let i = 0; i < t.x.length; i++) {
@@ -183,10 +153,6 @@ export function brown(t: Take, env: (s: number) => number = () => 1) {
   return t;
 }
 
-/**
- * Damped modes, each `[Hz, seconds to fall 60 dB, amplitude]`, struck at `at`
- * s; each a little detuned by the random.
- */
 export function modes(
   t: Take,
   list: readonly (readonly [number, number, number])[],
@@ -208,10 +174,6 @@ export function modes(
   return t;
 }
 
-/**
- * A sine whose frequency moves (`f(t)`), times `env(t)`: a thump's falling
- * pitch, a bubble's rising one.
- */
 export function tone(
   t: Take,
   f: (s: number) => number,
@@ -230,11 +192,6 @@ export function tone(
   return t;
 }
 
-/**
- * A stick-slip train: impulses at `rate(t)` a second (jittered by `jitter` of a
- * period), each of height `env(t)`, from `at` s for `seconds`: what wood and
- * rope do under load, before the resonance that colours it (filter after).
- */
 export function slips(
   t: Take,
   rate: (s: number) => number,
@@ -253,10 +210,6 @@ export function slips(
   return t;
 }
 
-/**
- * `count` bubbles from `at` over `spread` s: short rising sines, `low`…`high`
- * Hz, each `gain`, fewer as they go.
- */
 export function bubbles(
   t: Take,
   count: number,
@@ -282,10 +235,6 @@ export function bubbles(
   return t;
 }
 
-/**
- * Sparse crackle: `count` tiny noise grains from `at` over `spread` s, each up
- * to `gain`, thinning as they go.
- */
 export function crackle(
   t: Take,
   count: number,
@@ -305,10 +254,6 @@ export function crackle(
   return t;
 }
 
-/**
- * The echoes alone of `t` as it is, each `[delay s, gain]`, as a new layer (the
- * sea's and the air's slap back).
- */
 export function echoes(
   t: Take,
   list: readonly (readonly [number, number])[]
@@ -321,20 +266,12 @@ export function echoes(
   return wet;
 }
 
-/**
- * Soft saturation (tanh, `drive` into it, the level kept): density without a
- * hard edge.
- */
 export function saturate(t: Take, drive: number) {
   const k = Math.tanh(drive);
   for (let i = 0; i < t.x.length; i++) t.x[i] = Math.tanh(t.x[i] * drive) / k;
   return t;
 }
 
-/**
- * Takes out any DC (a blocker, a one-pole highpass at some 5 Hz), then fades
- * over the first `attack` and last `release` seconds (no click at either end).
- */
 export function finish(t: Take, attack = 0.0015, release = 0.02) {
   const x = t.x,
     n = x.length,
@@ -352,9 +289,6 @@ export function finish(t: Take, attack = 0.0015, release = 0.02) {
   return t;
 }
 
-/**
- * Scaled so its peak is `peak` (a sound's level is then its table's: bank.ts).
- */
 export function normal(t: Take, peak = 0.9) {
   let m = 0;
   for (let i = 0; i < t.x.length; i++) m = Math.max(m, Math.abs(t.x[i]));
@@ -362,20 +296,12 @@ export function normal(t: Take, peak = 0.9) {
   return t;
 }
 
-/**
- * Envelopes: rise over `a` s then fall with time constant `tau`; an exponential
- * fall alone.
- */
 export const ar = (a: number, tau: number) => (s: number) =>
   s < a ? s / a : Math.exp(-(s - a) / tau);
 export const fall =
   (tau: number, at = 0) =>
   (s: number) =>
     s < at ? 0 : Math.exp(-(s - at) / tau);
-/**
- * A swell: up over `up` s (a raised cosine), held, down over `down` s, ending
- * at `end`.
- */
 export const swell = (up: number, end: number, down: number) => (s: number) =>
   s < up
     ? 0.5 - 0.5 * Math.cos((Math.PI * s) / up)

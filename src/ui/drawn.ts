@@ -1,12 +1,3 @@
-// What each piece of the UI shows, as last drawn: a piece is drawn again only
-// when what it shows changes (hud.ts: its clock, its bolt filled or hollow,
-// its gust, its slots).
-
-/**
- * A watch over pieces: changed(piece, a…f) is true, and keeps a…f as what the
- * piece shows, when it has not been drawn or any of them differs from what it
- * was drawn with; false otherwise. Makes nothing after a piece's first.
- */
 export function createChanged<K extends object>() {
   const drawn = new WeakMap<K, unknown[]>();
   return (

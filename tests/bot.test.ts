@@ -31,10 +31,6 @@ const start = fromLatLon(0.2, 0.3);
 const north = frameAt(start).north;
 const deep: Depth = () => 30;
 
-// sailing.test.ts's straight shore, here 120 m north of the start, the floor
-// rising 1 in 4 from 20 m and drying 6 m past it (so the draught's contour lies
-// 87 m north of the start); and a round island 140 m across, its floor rising 1
-// in 3, 150 m east of the start.
 const coast = along(start, north, 120).p;
 const seaward = frameAt(coast).north;
 const offshore = (p: Vec3) => -R * Math.asin(dot(normalize(p), seaward));
@@ -42,10 +38,6 @@ const isle = along(start, frameAt(start).east, 150).p;
 const shores: Depth = (p) =>
   Math.min(20, -6 + offshore(p) / 4, (distance(p, isle) - 70) / 3);
 
-/**
- * Bots `seeds` (null: a ship holding `held`'s orders) sailed `seconds` from
- * `fleet`; the rams there were, told to the struck.
- */
 function sail(
   fleet: Vessel[],
   seeds: (number | null)[],
@@ -86,10 +78,6 @@ function sail(
   return { fleet, minds, blows };
 }
 
-/**
- * A ship `metres` from the start on a bearing (radians clockwise from north),
- * heading `heading` likewise.
- */
 const placed = (
   id: number,
   bearing: number,
@@ -100,7 +88,6 @@ const placed = (
   const at = along(start, bearingAt(start, bearing), metres).p;
   return afloat(id, { ...shipAt(at, bearingAt(at, heading)), speed });
 };
-/** Seeds whose temper passes `ok`. */
 const seedsWhere = (
   ok: (t: ReturnType<typeof temper>) => boolean,
   n: number
@@ -116,7 +103,6 @@ test('the same bots from the same places sail the same voyage, to the bit', () =
   const a = sail(fleet(), [1, 2, 3, 4, 5, 6], 60, shores),
     b = sail(fleet(), [1, 2, 3, 4, 5, 6], 60, shores);
   assert.deepEqual(a, b);
-  // and with a storm closing on them
   const storm = closing(along(start, north, -150).p, 220, 80, 10, 30);
   const c = sail(
       fleet(),
@@ -178,7 +164,6 @@ test('a hunter rams a steady ship on her side, above the ram threshold, from ahe
   const bold = seedsWhere((t) => t.fight > 0.7, 3);
   for (const seed of bold)
     for (const from of [20, 90, 160]) {
-      // the target heads north at 6 m/s; the hunter lies 140 m off, `from` degrees round from her bow
       const target = placed(2, 0, 0, 0, 6),
         hunter = placed(1, from * deg, 140, (from + 180) * deg);
       const r = sail([hunter, target], [seed, null], 60, deep, () => ({
@@ -219,7 +204,6 @@ test('the same seed sails the same way; different seeds, different ways', () => 
       apart(track(a), track(b)) > 30,
       `${a}, ${b}: ${apart(track(a), track(b))} m`
     );
-  // and their temperaments differ
   const tempers = Array.from({ length: 16 }, (_, s) => temper(s));
   assert.ok(new Set(tempers.map((t) => t.notice.toFixed(1))).size === 16);
 });
@@ -230,7 +214,6 @@ test('a bot answering a ram takes less of it than a ship holding her course', ()
     holding = 0;
   for (const from of [60, 90, 120])
     for (const seed of sharp) {
-      // a rammer drives at her from 80 m off `from` degrees round from her bow at full speed, steering for her
       const victim = placed(2, 0, 0, 0, 4),
         rammer = placed(1, from * deg, 80, (from + 180) * deg, SHIP.top);
       const chase = (v: Vessel, f: Vessel[]): Helm => {
@@ -291,8 +274,6 @@ test('16 bots for five minutes keep clear of the shores', () => {
     assert.ok(clearance(v.ship.at, v.ship.heading, shores).least >= 0);
 });
 
-/** A storm (storm.ts) that holds a cap `from` m round `centre` for `wait` s, then closes over `close` s to one `to` m
- *  round the same centre, and holds that. */
 function closing(
   centre: Vec3,
   from: number,
@@ -316,7 +297,6 @@ function closing(
     };
   };
 }
-/** Every sort of captain: a seed for each temperament's margin, from the boldest to the most careful, green and sharp. */
 const captains = [
   ...seedsWhere((t) => t.skill < 0.5, 3),
   ...seedsWhere((t) => t.skill > 0.8, 3),
@@ -325,8 +305,6 @@ const captains = [
 ];
 
 test('a bot outside the next cap makes for it in time, and is never caught outside the closing one', () => {
-  // the next cap, 120 m round a point 400 m off; it starts to close from 600 m in 20 s, over 70 s (its edge at 7 m/s,
-  // as fast as any phase after the first)
   for (const [k, seed] of captains.entries()) {
     const centre = along(start, bearingAt(start, k * 0.9), 400).p,
       storm = closing(centre, 600, 120, 20, 70);
@@ -353,7 +331,6 @@ test('a bot outside the next cap makes for it in time, and is never caught outsi
       `${seed}: ${(-inside).toFixed(0)} m outside the next cap`
     );
   }
-  // and without the storm she pays it no heed (so it is the storm that brings her in)
   const free = sail([placed(1, 0, 30, 0)], [captains[0]], 70, deep);
   assert.ok(
     toEdge(free.fleet[0].ship.at, {
@@ -365,7 +342,6 @@ test('a bot outside the next cap makes for it in time, and is never caught outsi
 
 test('a bot inside the cap never leaves it, roaming or with the next one closing round her', () => {
   for (const seed of captains) {
-    // a cap 260 m round her start, holding (and so the next), for 3 minutes of roaming; then one closing to 200 m
     const holding = closing(start, 260, 260, Infinity, 1),
       shrinking = closing(start, 260, 200, 0, 30);
     for (const storm of [holding, shrinking]) {
@@ -384,7 +360,6 @@ test('a bot inside the cap never leaves it, roaming or with the next one closing
       assert.ok(worst > 0, `${seed}: ${(-worst).toFixed(0)} m outside`);
     }
   }
-  // without the storm, she roams out past it
   let out = 0;
   for (const seed of captains) {
     sail(

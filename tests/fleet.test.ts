@@ -1,6 +1,3 @@
-// The seed panel's fleet card (play/fleet.ts): the same for a seed every time,
-// and the fleet the game itself puts to sea in that seed's race (play/state.ts
-// as play/setup.ts deals it).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { fleetOf, naturesOf } from '../src/play/fleet.ts';
@@ -74,6 +71,5 @@ test('a fleet is the same for a seed every time, and its numbers hold together',
     }
     assert.ok(fleet.skill.mean <= 1 && fleet.aggression.mean <= 1);
   }
-  // seeds apart sail fleets apart
   assert.notDeepEqual(fleetOf(seedOf('dogdog')), fleetOf(seedOf('catcat')));
 });

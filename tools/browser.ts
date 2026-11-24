@@ -1,70 +1,27 @@
-// npm run browser: the game in headless Chromium with WebGPU, at the iPad
-// Air's landscape screen (1180×820 CSS px, 2 px each), on the Vite dev server.
-//   npm run browser -- "<query>" [--tap what]... [--drag dx,dy]... [--shots n]
-//     [--every ms] [--settle ms] [--early] [--dpr n] [--subject name]
-//   npm run browser -- --budget [--subject name]
-//
-// Opens the page at ?<query> (the switches src/debug.ts reads: screen=, t=,
-// ships=, mood=, …), waits for the meter's first reading and --settle ms more
-// (1500; --early: neither, for watching the load), then does each --tap (a CSS
-// selector, its nth match with @n, or else the exact text shown) and --drag (a
-// finger across the middle of the screen) in the order given, a shot after
-// each, then --shots more (1), --every ms apart (500).
-//
-// Writes captures/YYYY-MM-DD-HHMM-<subject>/ (out.ts):
-//   run.json      the command, commit, Chromium's version and the GPU adapter
-//   NN-<label>.png        each shot
-//   NN-<label>.txt        the page's accessibility outline at that shot (what
-//                         the DOM shows, as text: the canvas is not in it)
-//   console.jsonl every console message, page error, failed request and HTTP
-//                 error, timed from navigation
-//   meter.jsonl   each second's reading of the meter (src/meter.ts): fps, CPU
-//                 and GPU ms, draws, triangles, passes, and the draws split by
-//                 pass and by what is drawn
-// The frame rate is uncapped, so fps is a cost measure, not a cap.
-// Exits 1 on a page error.
-//
-// --budget: each view of VIEWS held still (?pause) and read once settled,
-// against BUDGET (or the view's own); a shot and its meter split each, and
-// budget.json. Exits 1 if any is over. The counts are three's, so they do not
-// depend on the machine.
-//
-// Node only (tools/).
-
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { chromium, type Page } from 'playwright';
 import { createServer } from 'vite';
 import { lines, outDir, writeJson, type Lines } from './out.ts';
 
-/** The iPad Air (M1) in landscape, CSS pixels, and its pixels per CSS pixel. */
 const VIEW = { width: 1180, height: 820 } as const,
   DPR = 2;
 
-/** Per displayed frame, every pass summed. The iPad pays CPU for each draw before the GPU does anything. */
 const BUDGET = { draws: 100, triangles: 900_000, passes: 20 };
 type Budget = typeof BUDGET;
 
-/** The views --budget reads: each one's switches, and its own budget where it differs. */
 const VIEWS: { name: string; q: string; own?: Partial<Budget> }[] = [
   { name: 'sea', q: 'screen=match&drive=150,1,14' },
   { name: 'coast', q: 'screen=match' },
   { name: 'ships', q: 'screen=match&ships=12' },
   { name: 'lobby', q: 'screen=lobby' },
-  // the whole planet from space: its palms and rocks at their distant levels
   { name: 'map', q: 'screen=match&map' },
-  // the worst a match can ask: every other ship packed in a fan ahead, each
-  // with a legendary gun, six seconds into fighting, every kind of piece on the
-  // water. Beyond play, so held to a ceiling of its own: new art must not
-  // raise it
   {
     name: 'worst',
     q: 'screen=match&ships=79&pack&arm&ahead=6&kit&loot=60&gun=4&kind=mortar&fire=',
     own: { draws: 77, triangles: 920_000 },
   },
 ];
-
-// ------------------------------------------------------------------ the args
 
 type Action = { tap: string } | { drag: [number, number] };
 const argv = process.argv.slice(2);
@@ -93,8 +50,6 @@ if (query === null && !budget) {
 const num = (k: string, d: number) =>
   opt[k] === undefined ? d : Number(opt[k]);
 
-// ---------------------------------------------------------------- the browser
-
 const server = await createServer({
   logLevel: 'error',
   server: { port: 5199, strictPort: false },
@@ -112,7 +67,6 @@ const browser = await chromium.launch({
   ],
 });
 
-/** The GPU adapter the page gets, as WebGPU describes it. */
 async function adapterOf(page: Page) {
   return page.evaluate(async () => {
     const a = await navigator.gpu?.requestAdapter();
@@ -127,7 +81,6 @@ async function adapterOf(page: Page) {
   });
 }
 
-/** A page at `q`, its console and network written into `log` as they come. */
 async function open(q: string, log: Lines | null, dpr = DPR) {
   const page = await browser.newPage({
     viewport: VIEW,
@@ -178,7 +131,6 @@ const firstReading = (page: Page) =>
     { timeout: 60000 }
   );
 
-/** The meter's line read into numbers ('–' a null). */
 function reading(line: string) {
   const m =
     /^(\d+)\s+cpu (\S+) \((\S+)\)\s+gpu (?:(\S+) \+ (\S+)|–)\s+(\d+) draws (\d+)k tri (\d+) passes/.exec(
@@ -209,7 +161,6 @@ const meterOf = async (page: Page) =>
     };
   });
 
-/** Each second's new meter reading written to `log`, until stopped. */
 function watchMeter(page: Page, log: Lines, at: () => number) {
   let last = '',
     on = true;
@@ -226,9 +177,7 @@ function watchMeter(page: Page, log: Lines, at: () => number) {
             byObject: m.objects?.split('\n') ?? null,
           });
         }
-      } catch {
-        // (the page navigating or closing)
-      }
+      } catch {}
       await new Promise((r) => setTimeout(r, 250));
     }
   };
@@ -263,7 +212,6 @@ try {
       const limit: Budget = { ...BUDGET, ...own };
       const { page, errors } = await open(`${q}&pause`, log, 1);
       await firstReading(page);
-      // the first reading holds the shaders' compiling; the second is a settled second's
       const first = await page.getAttribute('#meter', 'data-line');
       await page.waitForFunction(
         (t) => document.getElementById('meter')?.dataset.line !== t,
@@ -366,7 +314,6 @@ try {
         try {
           await target.click({ timeout: 10000 });
         } catch (e) {
-          // what the page showed instead, for finding what to tap
           await shot(`failed-tap-${what}`);
           console.log(
             `TAP FAILED: ${css ? 'selector' : 'text'} "${what}"${nth !== '0' ? ` @${nth}` : ''}: ${(e instanceof Error ? e.message : String(e)).split('\n')[0]}`

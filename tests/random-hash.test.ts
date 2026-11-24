@@ -1,4 +1,3 @@
-// world/random.ts hash01: steady, within [0, 1), and spread evenly over it.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { hash, hash01 } from '../src/world/random.ts';

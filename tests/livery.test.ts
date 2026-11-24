@@ -1,5 +1,3 @@
-// The liveries (play/colours.ts): one set for every ship, hers her own choice,
-// the bots' dealt by the seed round it, never in her dye.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { hexToLinear, linearToSrgbRgb } from '../src/colour.ts';
@@ -26,7 +24,6 @@ const every = (f: (l: Livery) => void) => {
       f({ dye, pattern });
 };
 
-/** A linear colour's hue (degrees), saturation and lightness, as the display shows it. */
 function hsl(c: Vec3) {
   const s = linearToSrgbRgb(c);
   const hi = Math.max(...s),
@@ -44,11 +41,9 @@ function hsl(c: Vec3) {
           : (s[0] - s[1]) / d + 4;
   return { h: h * 60, s: sat, l };
 }
-/** How far apart two colours are, as the display shows them (the sRGB cube's diagonal is 1). */
 const apart = (a: Vec3, b: Vec3) => {
   const x = hsl(a),
     y = hsl(b);
-  // as a cone: hue round, saturation out, lightness up
   const p = (c: typeof x) => [
     c.s * (1 - Math.abs(2 * c.l - 1)) * Math.cos((c.h * Math.PI) / 180),
     c.s * (1 - Math.abs(2 * c.l - 1)) * Math.sin((c.h * Math.PI) / 180),
@@ -86,19 +81,16 @@ test('every dye stands apart from every other, and from the sea, the foam and th
         apart(COLOURS[i], [...c]) > 0.18,
         `dye ${i} near ${name}: ${apart(COLOURS[i], [...c]).toFixed(3)}`
       );
-    // no blue or green of the sea's (its hues 160°–230°), no violet of the storm's (250°–290°)
     const { h, s } = hsl(COLOURS[i]);
     if (s > 0.2)
       assert.ok(h < 150 || h > 295, `dye ${i}'s hue ${h.toFixed(0)}°`);
   }
 });
 
-/** A linear colour's relative luminance, by three's own coefficients (not the palette's). */
 const lum = (c: readonly number[]) => {
   const k = ColorManagement.getLuminanceCoefficients(new Vector3());
   return k.x * c[0] + k.y * c[1] + k.z * c[2];
 };
-/** Two colours' contrast ratio, as the web measures it: 1 none, 21 black on white. */
 const contrast = (a: readonly number[], b: readonly number[]) => {
   const [hi, lo] = [lum(a), lum(b)].sort((x, y) => y - x);
   return (hi + 0.05) / (lo + 0.05);
@@ -109,11 +101,9 @@ test('every dye has its marks in an ink that stands out on it: cream on the dark
     assert.deepEqual(d.mark, [...markOn(d.colour)]);
     const c = contrast(d.colour, d.mark);
     assert.ok(c >= 3, `${d.name}'s marks ${c.toFixed(2)} : 1`);
-    // and the other ink would stand out no more
     const other = d.mark[0] === MARKS.light[0] ? MARKS.dark : MARKS.light;
     assert.ok(c >= contrast(d.colour, other), `${d.name}: the other ink`);
   }
-  // the pale dyes take the dark ink, the deep ones cream
   const ink = (name: string) => DYES.find((d) => d.name === name)?.mark;
   for (const name of ['lemon', 'peach', 'chartreuse', 'rose', 'ochre'])
     assert.deepEqual(ink(name), [...MARKS.dark], name);
@@ -149,8 +139,6 @@ test("a livery's look: its dye as paint and canvas, its pattern; one past the se
 });
 
 test('the seed deals every bot hers from the set, the same every time for the same seed', () => {
-  // the first six bots of seed 1234, she in hers by default: cerise banded,
-  // lemon, cerise and cerise striped, umber striped, chartreuse plain
   assert.deepEqual(
     [1, 2, 3, 4, 5, 6].map((id) => dealt(1234, id, LIVERY)),
     [
@@ -171,7 +159,6 @@ test('the seed deals every bot hers from the set, the same every time for the sa
         `seed ${seed} ship ${id}: ${JSON.stringify(a)}`
       );
     }
-  // another seed, another fleet
   const fleet = (seed: number) =>
     Array.from({ length: SHIPS - 1 }, (_, i) => dealt(seed, i + 1, LIVERY));
   assert.notDeepEqual(fleet(1), fleet(2));
@@ -197,7 +184,6 @@ test('the fleet is dealt across the whole set: every other dye and every pattern
     assert.equal(dyes.size, COLOURS.length - 1);
     assert.equal(patterns.size, PATTERNS.length);
   });
-  // over many seeds, none of the others much more common than another
   const counts = new Array<number>(COLOURS.length).fill(0);
   for (let seed = 0; seed < 200; seed++)
     for (let id = 1; id < SHIPS; id++) counts[dealt(seed, id, LIVERY).dye]++;

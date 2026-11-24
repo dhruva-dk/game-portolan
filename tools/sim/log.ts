@@ -1,19 +1,3 @@
-// The record of a match as it is sailed: every event a step makes, stamped
-// with its step (events.jsonl), and every ship afloat once a second
-// (ships.jsonl). Beside the account (metrics.ts), which sums the match up, this
-// is what happened, line by line, for an agent to search. Also kept here: the
-// invariants checked each step (a break is an event and fails the run), the
-// time each kill took, and what each part of a step cost.
-//
-// Places are [latitude, longitude] in degrees (on a planet of R = 554 m a
-// degree is about 9.7 m), headings and bearings in degrees (0 north, 90 east;
-// a bearing off her bow, + to starboard), ranges and the storm's radius in
-// metres along the surface, times in seconds of the match's clock. A kill's
-// time (ttk, a sinking's `fight`) runs from the killer's first ball home on
-// her, not a ram.
-//
-// Node only (tools/).
-
 import { debugOf, PARTS, type Part } from '../../src/play/state.ts';
 import { STEP } from '../../src/sim/fixed.ts';
 import { GUNS } from '../../src/sim/handling.ts';
@@ -37,26 +21,22 @@ const r1 = (x: number) => Math.round(x * 10) / 10,
   r4 = (x: number) => Math.round(x * 1e4) / 1e4,
   deg = (rad: number) => (rad * 180) / Math.PI;
 
-/** A unit vector as [latitude, longitude], degrees. */
 export const latLon = (p: Vec3): [number, number] => [
   r4(deg(Math.asin(Math.max(-1, Math.min(1, p[1]))))),
   r4(deg(Math.atan2(-p[2], p[0]))),
 ];
 
-/** A heading at `at` as a compass bearing, degrees. */
 const compass = (at: Vec3, h: Vec3) => {
   const f = frameAt(at);
   return r1((deg(Math.atan2(dot(h, f.east), dot(h, f.north))) + 360) % 360);
 };
 
-/** Where `to` lies off the bow of a ship at `at` heading `h`: degrees, + to starboard. */
 const offBow = (at: Vec3, h: Vec3, to: Vec3) => {
   const d = toward(at, to);
   if (!d) return 0;
   return r1(deg(Math.atan2(dot(d, cross(h, at)), dot(d, h))));
 };
 
-/** A part's cost over the steps, ms. */
 export interface Cost {
   median: number;
   p95: number;
@@ -76,7 +56,6 @@ const costOf = (xs: readonly number[]): Cost => {
   };
 };
 
-/** An invariant broken: what, and on which ship. */
 export interface Break {
   t: number;
   step: number;
@@ -85,12 +64,6 @@ export interface Break {
   detail: string;
 }
 
-/**
- * A record kept of `state` (begun, not yet stepped) into `events` and
- * `ships`, or nowhere if they are null. `height`: the planet's ground above the
- * sea, m (a ship's middle over ground above 0 is on land). `brainOf` names
- * each ship's brain.
- */
 export function record(
   state: State,
   height: (p: Vec3) => number,
@@ -105,27 +78,21 @@ export function record(
   const where = (id: number) =>
     state.vessels().find((v) => v.id === id) ?? null;
 
-  // what each bot last showed: her mode, her foe, the loot she makes for
   const minds = new Map<number, { mode: string; foe: number; loot: number }>();
-  // the stores in use: what, since when, and her health then
   const using = new Map<
     number,
     { item: string | null; t: number; hull: number; shield: number }
   >();
-  // the storm as last logged
   let storm = { phase: -1, closing: false, final: false };
   let sunk = 0,
     laid = state.loot().next,
     alive = state.alive().length,
     last = state.time();
-  // when each ship first struck each other: `${by}>${on}`
   const firstBlow = new Map<string, number>();
   const ttk: { by: number; on: number; seconds: number }[] = [];
   const breaks: Break[] = [];
   let broken = 0;
-  // ships logged on land, so an episode is one event
   const onLand = new Set<number>();
-  // the part laps: times per part, and the step's whole
   const parts = new Map<Part | 'step', number[]>(
     [...PARTS, 'step' as const].map((k) => [k, []])
   );
@@ -164,17 +131,14 @@ export function record(
 
   return {
     start,
-    /** Hand this to advance as its `lap`. */
     lap(part: Part) {
       const now = performance.now();
       parts.get(part)!.push(now - mark);
       mark = now;
     },
-    /** Call just before a step. */
     before() {
       began = mark = performance.now();
     },
-    /** Call with what a step did, just after it. */
     after(did: Stepped) {
       parts.get('step')!.push(performance.now() - began);
       step++;
@@ -217,7 +181,6 @@ export function record(
           left: h ? { hull: r1(h.hull), shield: r1(h.shield) } : null,
         });
       }
-      // splashes come a ball at a time: one line a shooter and gun a step
       const splashes = new Map<
         string,
         { ship: number; gun: string; balls: number; land: number }
@@ -270,7 +233,6 @@ export function record(
           share: r4(state.share(k.id)),
         });
 
-      // the storm, as its phase turns or it starts or stops closing
       const st = state.storm(1);
       if (
         st.phase !== storm.phase ||
@@ -295,7 +257,6 @@ export function record(
         });
       }
 
-      // the sunk, in the order they went down
       const sinkings = state.sinkings();
       for (; sunk < sinkings.length; sunk++) {
         const k = sinkings[sunk],
@@ -313,13 +274,12 @@ export function record(
         });
       }
 
-      // stores used: a line as each use ends, with what it mended
       for (const v of state.vessels()) {
         const c = state.crew(v.id),
           u = c.hold.using,
           was = using.get(v.id);
         if (u && !was) {
-          const item = c.hold.items[u.slot - 1]; // (slot 0 is the gun's)
+          const item = c.hold.items[u.slot - 1];
           using.set(v.id, {
             item: item ? item.kind : null,
             t: now,
@@ -330,7 +290,6 @@ export function record(
           using.delete(v.id);
           const hull = c.health.hull - was.hull,
             shield = c.health.shield - was.shield;
-          // (a blow breaks a use off: nothing given)
           emit('heal', {
             ship: v.id,
             item: was.item,
@@ -343,7 +302,6 @@ export function record(
         }
       }
 
-      // the bots' minds: a line as one changes her mode, her foe or her loot
       for (const v of state.vessels()) {
         const m = debugOf(state).mindOf(v.id);
         if (!m) continue;
@@ -374,7 +332,6 @@ export function record(
         });
       }
 
-      // the invariants
       const left = state.alive().length;
       if (left > alive)
         fail('afloat-rose', null, `${alive} afloat became ${left}`);
@@ -418,7 +375,6 @@ export function record(
           fail('health', v.id, `hull ${h.hull}, shield ${h.shield}`);
       }
     },
-    /** Call once a second of the match's clock: a line for every ship afloat. */
     second() {
       if (!ships) return;
       const now = t();
@@ -449,7 +405,6 @@ export function record(
         });
       }
     },
-    /** What was kept: the kills' times, the invariants broken, the parts' costs. */
     end() {
       const kills = ttk.map((k) => k.seconds).sort((a, b) => a - b);
       return {

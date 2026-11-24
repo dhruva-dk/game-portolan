@@ -1,22 +1,5 @@
-// The sea's wave spectrum, on the CPU: how much of the sea's height lives at
-// each wavevector, and one random sea drawn from it for the FFT to move on
-// (Tessendorf, "Simulating Ocean Water", 2001).
-//
-// The sea state is fetch-limited (Hasselmann et al. 1973, JONSWAP) and capped
-// at a fully developed sea (Pierson–Moskowitz). The spectrum's shape is
-// JONSWAP's; its spread about the wind is Donelan–Banner's (as in Horvath,
-// "Empirical directional wave spectra for computer graphics", 2015). Its scale
-// is set so that its variance is exactly (Hs/4)²: the sea is as high as the sea
-// state says.
-//
-// Pure arithmetic: no three, so it runs in node for the tests.
-
 export const G = 9.81;
 
-/**
- * The sea's significant height (m) and the peak's angular frequency (rad/s) for
- * a wind (m/s) over a fetch (m).
- */
 export function seaState(wind: number, fetch: number) {
   const U = Math.max(wind, 0.5),
     F = Math.max(fetch, 50);
@@ -27,7 +10,6 @@ export function seaState(wind: number, fetch: number) {
 
 const GAMMA = 3.3;
 
-/** JONSWAP's shape over angular frequency, without its scale α. */
 function jonswap(w: number, peak: number): number {
   if (w <= 0) return 0;
   const sigma = w <= peak ? 0.07 : 0.09;
@@ -35,10 +17,6 @@ function jonswap(w: number, peak: number): number {
   return ((G * G) / w ** 5) * Math.exp(-1.25 * (peak / w) ** 4) * GAMMA ** r;
 }
 
-/**
- * Donelan–Banner spreading: the share of the waves at frequency w running θ off
- * the wind, over −π…π it sums to 1.
- */
 export function spread(w: number, peak: number, theta: number): number {
   const x = w / peak;
   const beta =
@@ -52,7 +30,6 @@ export function spread(w: number, peak: number, theta: number): number {
   return (beta / (2 * Math.tanh(beta * Math.PI))) * sech * sech;
 }
 
-/** The scale α that makes ∫ α·jonswap dω = (hs/4)². */
 function scale(hs: number, peak: number): number {
   let sum = 0;
   const top = peak * 30,
@@ -62,20 +39,11 @@ function scale(hs: number, peak: number): number {
   return (hs / 4) ** 2 / sum;
 }
 
-/**
- * A sea: the wind's speed (m/s), blowing along +x, and how far it has blown
- * over the water (m).
- */
 export interface Sea {
   wind: number;
   fetch: number;
 }
 
-/**
- * The spectrum over the wavevector plane, m⁴ (variance per dkx·dkz):
- * S(ω)·D(θ)·(dω/dk)/k, with deep water's ω² = g k. Returns a function of (kx,
- * kz) for this sea.
- */
 export function spectrum(sea: Sea): (kx: number, kz: number) => number {
   const { hs, peak } = seaState(sea.wind, sea.fetch);
   const alpha = scale(hs, peak);
@@ -93,10 +61,6 @@ export function spectrum(sea: Sea): (kx: number, kz: number) => number {
   };
 }
 
-/**
- * The wavenumbers a patch holds, rad/m: [from, to). Patches of different sizes
- * hold different bands, so no wave is drawn twice.
- */
 type Band = [number, number];
 
 const banded =
@@ -106,10 +70,6 @@ const banded =
     return k >= lo && k < hi ? S(kx, kz) : 0;
   };
 
-/**
- * The mean square slope (both axes together) of the waves an N×N patch L wide
- * holds in its band.
- */
 export function meanSquareSlope(
   N: number,
   L: number,
@@ -128,12 +88,6 @@ export function meanSquareSlope(
   return sum;
 }
 
-/**
- * How alike two reads of one drawn sea are, (x, z) metres apart on an N×N patch
- * L wide: the correlation of their heights, Σ S(k)·cos(k·lag) / Σ S(k), over
- * the `modes` wavevectors that hold the most of it (the rest only add to the
- * total), so it is quick enough to be asked often.
- */
 export function likeness(
   N: number,
   L: number,
@@ -149,7 +103,6 @@ export function likeness(
     for (let x = 0; x < N; x++) {
       const kx = (x - N / 2) * dk,
         kz = (y - N / 2) * dk;
-      // a real sea's height holds k and −k alike
       const s = (S(kx, kz) + S(-kx, -kz)) / 2;
       if (s > 0) all.push([kx, kz, s]);
       total += s;
@@ -162,23 +115,11 @@ export function likeness(
   };
 }
 
-/**
- * The sea's whole mean square slope, ripples included, by wind (Cox & Munk
- * 1954, clean surface).
- */
 export const coxMunk = (wind: number) => 0.003 + 5.12e-3 * wind;
 
-/**
- * The share of the sea white with breaking waves, by wind (Monahan &
- * O'Muircheartaigh 1980).
- */
 export const whitecaps = (wind: number) =>
   Math.min(3.84e-6 * Math.max(wind, 0) ** 3.41, 0.5);
 
-/**
- * The z with P(Z < z) = p for a standard normal Z (Acklam's rational
- * approximation, ~1e-9).
- */
 export function normalQuantile(p: number): number {
   const a = [
     -39.69683028665376, 220.9460984245205, -275.9285104469687, 138.357751867269,
@@ -214,7 +155,6 @@ export function normalQuantile(p: number): number {
   );
 }
 
-/** A seeded generator of standard normal numbers (mulberry32, Box–Muller). */
 function normals(seed: number) {
   let s = seed >>> 0;
   const uniform = () => {
@@ -227,14 +167,6 @@ function normals(seed: number) {
     Math.sqrt(-2 * Math.log(uniform())) * Math.cos(2 * Math.PI * uniform());
 }
 
-/**
- * One sea drawn from the spectrum, for an N×N grid of wavevectors over a patch
- * L metres wide: texel (x, y) holds k = ((x − N/2), (y − N/2))·2π/L. Each texel
- * is (h₀(k), conj h₀(−k)) as RGBA, so the GPU can move it on in time without
- * looking anywhere else. E|h₀|² = S·Δk²/2, so the height's variance, Σ|h̃|², is
- * the spectrum's. The same seed gives the same sea, so a change of wind changes
- * the waves' sizes, not where they are.
- */
 export function initialSpectrum(
   N: number,
   L: number,

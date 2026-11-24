@@ -8,7 +8,6 @@ import { landOf, planetOf } from '../src/world/land.ts';
 import { SEED } from '../src/environment.ts';
 import { R, along, distance, dot, length } from '../src/world/sphere.ts';
 
-/** The least distance between any two berths, metres along the surface. */
 function closest(spawns: readonly Spawn[]): number {
   let least = Infinity;
   for (let i = 0; i < spawns.length; i++) {
@@ -65,7 +64,6 @@ test('every ship starts afloat in open water, clear of land all round, heading a
           'land within her clearance'
         );
       }
-      // the first 40 m ahead of her are open
       for (let d = 8; d <= 40; d += 8)
         assert.ok(
           depth(along(s.at, s.heading, d).p) >= SHIP.draught + SPAWN.depth,
@@ -76,8 +74,6 @@ test('every ship starts afloat in open water, clear of land all round, heading a
 });
 
 test("the berths spread over all the open water: no two within a few ships' lengths, the nearest pair far apart", () => {
-  // an even spread of n ships over the open water (the share of the planet's lattice open) would have them about this
-  // far apart; the berths keep nearly all of it
   const open =
     water.points.length /
     Math.round((4 * Math.PI * R * R) / SPAWN.lattice ** 2);
@@ -105,13 +101,11 @@ test('each match is berthed ahead of its deal (off the main thread in the game),
     asked.push(seed);
     return Promise.resolve(berths(water, seed, SHIPS, depth));
   });
-  // the first asked for at once, and dealt with its berths once they are back; the next asked for as it is dealt
   await new Promise((done) => setTimeout(done, 0));
   const first = matches.deal();
   assert.equal(asked[0], first.seed);
   assert.deepEqual(first.berths, berths(water, first.seed, SHIPS, depth));
   assert.equal(asked.length, 2);
-  // dealt before they are back: without them (the match works them out itself)
   const second = matches.deal();
   assert.equal(asked[1], second.seed);
   assert.equal(second.berths, undefined);

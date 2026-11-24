@@ -1,24 +1,3 @@
-// npm run sim: the game run headless and deterministic, no browser, no GPU.
-//   npm run sim -- <scenario | file.json> [--seed n] [--planet n] [--runs n]
-//     [--seconds n] [--workers n] [--subject name]
-//
-// A scenario is data: one of tools/sim/scenarios/ by name, or a JSON file of
-// your own. Its `kind`:
-//   match   a match of bots (match.ts MatchScenario): a dealt match of SHIPS
-//           ships, or a race of spec ships (a duel: two teams of one)
-//   terrain the planet's terrain mapped for seeds and land shares
-//           (terrain.ts TerrainScenario)
-// --seed: the match dealt (match), the one seed
-// mapped (terrain). --planet: the planet's seed (match). --seconds: the most a
-// match runs. --runs n: n matches, from the scenario's on, across --workers
-// threads, each in its own folder, pooled at the end (match only).
-//
-// Writes captures/YYYY-MM-DD-HHMM-<subject>/ (out.ts): run.json, and what the
-// kind writes (see match.ts, terrain.ts). Prints a summary ending in
-// the folder. Exits 1 if an invariant broke, or the run failed.
-//
-// Node only (tools/).
-
 import { mkdirSync, readFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import { parseArgs } from 'node:util';
@@ -52,7 +31,6 @@ if (!named) {
 const path = named.endsWith('.json')
   ? named
   : join(import.meta.dirname, 'scenarios', `${named}.json`);
-// (a scenario file is checked as its kind's runner reads it)
 const sc: Scenario = JSON.parse(readFileSync(path, 'utf8'));
 const num = (s: string | undefined) =>
   s === undefined ? undefined : Number(s);

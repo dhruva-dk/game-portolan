@@ -1,5 +1,3 @@
-// A race's card as the sim reads it (sim/carded.ts): its ships checked, their
-// teams, and which of them put to sea.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { RaceCard, RaceShip } from '../src/race.ts';

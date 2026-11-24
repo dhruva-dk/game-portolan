@@ -1,16 +1,3 @@
-// The sky as a reflection: a 256×128 panorama of the air and the clouds round
-// the eye, redone every few frames, and filtered at once into a chain of
-// levels, each the sky as a surface of one roughness mirrors it. It is the
-// eye's sky, so it is laid out in the sky's directions (view.toSky) and read
-// along them. The sun's disc is left out: surfaces draw its glint themselves.
-//
-// The filter is three's PMREM's (GGX, the view along the normal, weighted by
-// n·l; the same roughness at each level and the same level read for a
-// roughness), so a surface blurs the sky as it did, but kept in the panorama's
-// own layout and done in compute: one pass of seven dispatches, not a cube's 42
-// render passes and their mip chains, which on the phone and the iPad added
-// 13–20 ms of GPU work to the one frame, a frame dropped every half second.
-
 import {
   LinearMipmapLinearFilter,
   RepeatWrapping,
@@ -56,42 +43,19 @@ import type { Tables } from './tables.ts';
 
 const W = 256,
   H = 128;
-/** Frames between bakes: the clouds and the sun move slowly. */
 const EVERY = 30;
-/**
- * Levels below the panorama, each half the size of the one before: 128×64 down
- * to 8×4.
- */
 const LEVELS = 5;
-/**
- * Levels from this one on are wide enough to integrate the reduced panorama;
- * those before it sample the panorama.
- */
 const ROUGH = 3;
-/** The reduced panorama: 4×4 of the panorama's texels to one. */
 const RW = W / 4,
   RH = H / 4;
-/** Samples of the lobe at a sharp level. */
 const SAMPLES = 64;
 
-/**
- * The roughness a level holds (three's PMREMGenerator.lodToRoughness); read
- * back by `level` below.
- */
 const roughnessAt = (k: number) => 1 - Math.sqrt(1 - k / LEVELS);
-/**
- * The level to read for a roughness: between two levels, the hardware blends
- * them.
- */
 const level = (roughness: FloatNode): FloatNode => {
   const r = float(roughness).clamp();
   return r.mul(float(2).sub(r)).mul(LEVELS);
 };
 
-/**
- * The direction at the centre of texel (x, y) of a w×h panorama: the inverse of
- * three's equirectUV.
- */
 function texelDirection(
   x: UintNode | IntNode,
   y: UintNode | IntNode,
@@ -107,11 +71,6 @@ function texelDirection(
   return vec3(cos(theta).mul(cos(phi)), sin(theta), cos(theta).mul(sin(phi)));
 }
 
-/**
- * A sharp level: the GGX lobe of its roughness round each texel's direction, in
- * SAMPLES directions drawn from it (Hammersley; three's VNDF sampling with the
- * view along the normal) as (x, y, z) in the lobe's frame and n·l.
- */
 function sharp(
   k: number,
   panorama: StorageTexture,
@@ -163,10 +122,6 @@ function sharp(
   })().compute(w * h, [64]);
 }
 
-/**
- * A rough level: every texel of the reduced panorama, weighted by the GGX lobe,
- * n·l and its solid angle.
- */
 function rough(
   k: number,
   reduced: StorageTexture,
@@ -186,8 +141,6 @@ function rough(
       loop('column', RW, (j) => {
         const l = texelDirection(j, i, RW, RH);
         const nl = max(dot(n, l), 0);
-        // with the view along the normal, (n·h)² = (1 + n·l)/2; the cosine of
-        // the latitude is the texel's solid angle
         const d = nl.mul(a2 - 1).add(a2 + 1);
         const weight = nl.mul(l.y.mul(l.y).oneMinus().sqrt()).div(d.mul(d));
         sum.addAssign(textureLoad(reduced, ivec2(j, i)).rgb.mul(weight));
@@ -202,11 +155,6 @@ function rough(
   })().compute(w * h, [64]);
 }
 
-/**
- * skyRadiance: the air's (tables.ts); sunDirection: toward the sun, as the
- * eye's sky shows it; cloudsAlong: the clouds' light (rgb) and transmittance
- * (a) along a sky direction, marched in at most so many steps.
- */
 export function createReflection(
   view: View,
   skyRadiance: Tables['skyRadiance'],
@@ -215,11 +163,6 @@ export function createReflection(
 ) {
   const panorama = storageTable(W, H);
   const reduced = storageTable(RW, RH);
-  /**
-   * The panorama and its levels, as one texture's mips: three allots the whole
-   * chain of mips and leaves them alone, and the compute passes below write the
-   * first LEVELS + 1.
-   */
   const reflection = storageTable(W, H, {
     min: LinearMipmapLinearFilter,
     mipmaps: true,
@@ -227,10 +170,6 @@ export function createReflection(
   reflection.wrapS = RepeatWrapping;
   reflection.mipmapsAutoUpdate = false;
 
-  /**
-   * The panorama: the sky, and the clouds in it unless they are left out (seen
-   * from space).
-   */
   const bakeOf = (cloudy: boolean) =>
     Fn(() => {
       const x = instanceIndex.mod(W),
@@ -269,10 +208,6 @@ export function createReflection(
     reduce,
     ...Array.from({ length: LEVELS }, (_, i) => filter(i + 1)),
   ];
-  /**
-   * What update hands back: all the passes, one after another in one pass, or
-   * none.
-   */
   const due: Record<'cloudy' | 'clear' | 'none', readonly Compute[]> = {
     cloudy: [[bakeOf(true), ...levels]],
     clear: [[bakeOf(false), ...levels]],
@@ -282,11 +217,6 @@ export function createReflection(
   let frame = 0,
     wasClear = false;
   return {
-    /**
-     * The sky's light reflected toward world direction dir off a surface of the
-     * given roughness (0–1). Only the sky above its horizon: a ray from the sea
-     * past the horizon's edge still meets the sky's horizon.
-     */
     reflect: (dir: Vec3Node, roughness: FloatNode): Vec3Node => {
       const d = view.toSky(dir);
       return texture(
@@ -294,11 +224,6 @@ export function createReflection(
         equirectUV(normalize(vec3(d.x, max(d.y, 0), d.z)))
       ).level(level(roughness)).rgb;
     },
-    /**
-     * The passes due this frame: all of them, one after another in one pass,
-     * every EVERY frames, and at once when the clouds are left out or put back
-     * (clear: the sky alone, for an eye in space).
-     */
     update(clear: boolean): readonly Compute[] {
       if (clear !== wasClear) frame = 0;
       wasClear = clear;

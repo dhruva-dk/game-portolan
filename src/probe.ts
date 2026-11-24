@@ -1,14 +1,3 @@
-// Debug only (?probe): grey blocks at 30, 60, 100 and 150 m north of where she
-// (or the flyer) starts, lit by the sky's light, to judge the light and the
-// haze; and a mirror and a rough sphere 60 m north, to judge the sky's
-// reflection. Each stands upright on the sphere.
-//
-// The blocks are lit straight from the sky (Sky: the sun through the air and
-// the clouds' shadow, Lambert, and the sky's ambient), not through
-// sky/light.ts's Light: that sets every surface in two chosen tones under one
-// level, which would hide the very light and shading the probe is there to
-// show.
-
 import {
   BoxGeometry,
   Matrix4,
@@ -37,17 +26,9 @@ import {
   type Vec3,
 } from './world/sphere.ts';
 
-/**
- * The probe's meshes, standing north of `eye` (world metres), for the frame to
- * stand in its scene.
- */
 export function probeMeshes(sky: Sky, eye: Vec3): Mesh[] {
   const meshes: Mesh[] = [];
   const f = frameAt(eye);
-  /**
-   * Stands a mesh `north` and `east` metres from under the eye, its foot
-   * `height` up, upright there.
-   */
   const stand = (mesh: Mesh, north: number, east: number, height: number) => {
     const out = add(add([0, 0, 0], f.north, north), f.east, east);
     const metres = length(out);

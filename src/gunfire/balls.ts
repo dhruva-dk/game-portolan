@@ -1,16 +1,3 @@
-// The balls in flight: two draws, each a single instanced mesh sharing one
-// buffer, one instance a ball, placed each frame where the battle has them.
-//
-// Each is drawn out along its flight, at least a few pixels across so it is
-// seen at the far end of its range: a dark iron core with a hot rim, so it reads
-// dark against the bright sky and bright against the sea; behind it a warm
-// tracer, glowing (the bloom takes it) and tapering back over its kind's share
-// of its flight. (The ribbon of thin grey smoke behind that is puffs, laid along
-// the way it came: puffs.ts.) Each kind's its own (SHOT): the cannon's ball; the
-// scatter's pellets, small and many, short-tailed; the repeater's slim rounds
-// with long hot tracers, no smoke; the harpoon's bolt, a long dark shaft and no
-// fire behind it; the mortar's shell, big, smoking heavily as it lobs.
-
 import {
   DoubleSide,
   DynamicDrawUsage,
@@ -42,17 +29,7 @@ import type { BallDraw } from '../snapshot.ts';
 import { additive, quad } from '../gpu.ts';
 import type { FloatNode } from '../tsl.ts';
 
-/** The most balls in flight at once. */
 const BALLS = 512;
-/**
- * Each kind's ball:
- *   size    its radius, m
- *   pixels  the fewest pixels it is drawn across
- *   long    its least half-length along its flight, m (the harpoon's bolt a shaft)
- *   hot     how much its rim glows (0: none, a dark shape)
- *   tracer  seconds of its flight its tracer trails over (0: none), and its glow
- *   trail   metres between its smoke's puffs (0: none), and their size
- */
 interface Shot {
   size: number;
   pixels: number;
@@ -115,39 +92,21 @@ export const SHOT: Record<GunKind, Shot> = {
     puff: 0.55,
   },
 };
-/**
- * A ball's streak (seconds of its flight it is drawn out along); its rim
- * (palette.ts BALL_SPARK about its BALL_IRON) from where the surface turns this
- * far from the eye (the cosine).
- */
 const STREAK = 0.02,
   RIM = 0.55;
-/**
- * Its tracer: its width at the ball (m, and the fewest pixels); its glow there
- * is palette.ts TRACER.
- */
 const TRACER_WIDE = 0.22,
   TRACER_PIXELS = 3;
 
-/**
- * A node taking each kind's value of `f`, by the kind's index `k` (its place in
- * KINDS: gunOrder, as a ball carries it to its shader).
- */
 const byKind = (k: FloatNode, f: (s: Shot) => number): FloatNode =>
   KINDS.slice(0, -1).reduceRight<FloatNode>(
     (rest, kind, i) => select(k.lessThan(i + 0.5), float(f(SHOT[kind])), rest),
     float(f(SHOT[KINDS[KINDS.length - 1]]))
   );
 
-/**
- * The balls and their tracers; `pixel` is how wide a pixel is per metre away
- * (gunfire.ts sets it each frame).
- */
 export function createBalls(pixel: FloatNode) {
   const ico = new IcosahedronGeometry(1, 1);
   const g = new InstancedBufferGeometry();
   g.setAttribute('position', ico.getAttribute('position'));
-  // where each is, and its velocity
   const data = new Float32Array(BALLS * 8);
   const buffer = new InstancedInterleavedBuffer(data, 8).setUsage(
     DynamicDrawUsage
@@ -166,8 +125,6 @@ export function createBalls(pixel: FloatNode) {
     byKind(kind, (s) => s.size),
     far.mul(pixel).mul(byKind(kind, (s) => s.pixels / 2))
   );
-  // drawn out along its flight: its half-length the streak's, its kind's least,
-  // or its radius, whichever the most
   const speed = way.length().max(1e-3),
     along = way.div(speed);
   const stretch = max(
@@ -177,8 +134,6 @@ export function createBalls(pixel: FloatNode) {
   m.positionNode = at.add(
     local.add(along.mul(local.dot(along).mul(stretch.sub(1)))).mul(radius)
   );
-  // the iron where it faces the eye, the rim's glow where it turns away (none
-  // on the harpoon's bolt)
   const facing = varying(
       abs(normalize(local).dot(normalize(cameraPosition.sub(at))))
     ),
@@ -190,8 +145,6 @@ export function createBalls(pixel: FloatNode) {
   const mesh = new Mesh(g, m);
   mesh.frustumCulled = false;
 
-  // the tracer: a ribbon facing the eye, from the ball back along its way, x
-  // across it (−1…1) and y back (0…1)
   const t = quad(new InstancedBufferGeometry(), 0);
   t.setAttribute('ballAt', new InterleavedBufferAttribute(buffer, 4, 0));
   t.setAttribute('ballWay', new InterleavedBufferAttribute(buffer, 4, 4));
@@ -227,10 +180,6 @@ export function createBalls(pixel: FloatNode) {
 
   return {
     meshes: [mesh, tracer],
-    /**
-     * Each frame, every ball in flight written where it is: how many are
-     * drawn (no more than BALLS).
-     */
     draw(flying: readonly BallDraw[]): number {
       const n = Math.min(flying.length, BALLS);
       for (let i = 0; i < n; i++) {

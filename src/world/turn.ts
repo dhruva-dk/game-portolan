@@ -1,21 +1,8 @@
-// Turns as unit quaternions, for the eyes the world is seen from: three's own
-// arithmetic (Matrix4.lookAt with Quaternion.setFromRotationMatrix,
-// Quaternion.slerp, Vector3.applyQuaternion) done on plain numbers, step for
-// step, so the game and the UI turn an eye exactly as three would, without
-// three (tests/turn.test.ts holds them to it). lookAt, slerp, axisAngle,
-// multiply and rotate take a last, optional `out` to write into, as sphere.ts's
-// helpers do.
-//
-// Pure arithmetic: no three, so it runs in node for the tests.
-
 import { put, type Out3, type Vec3 } from './sphere.ts';
 
-/** A unit quaternion (x, y, z, w). */
 export type Turn = readonly [number, number, number, number];
-/** A turn the helpers write their answer into (their `out`). */
 export type Out4 = [number, number, number, number];
 
-/** (x, y, z, w) set into `out`, or made if there is none. */
 function put4(
   out: Out4 | undefined,
   x: number,
@@ -31,13 +18,7 @@ function put4(
   return out;
 }
 
-/**
- * The turn of an eye at `eye` looking at `at`, `up` up the screen: it looks
- * down its −z, its y up.
- */
 export function lookAt(eye: Vec3, at: Vec3, up: Vec3, out?: Out4): Turn {
-  // (three's steps, on plain numbers: z from the eye, made unit, nudged off up
-  // if along it; x = up × z; y = z × x)
   let zx = eye[0] - at[0],
     zy = eye[1] - at[1],
     zz = eye[2] - at[2];
@@ -53,7 +34,6 @@ export function lookAt(eye: Vec3, at: Vec3, up: Vec3, out?: Out4): Turn {
     xy = uz * zx - ux * zz,
     xz = ux * zy - uy * zx;
   if (xx * xx + xy * xy + xz * xz === 0) {
-    // up and z are parallel
     if (Math.abs(uz) === 1) zx += 0.0001;
     else zz += 0.0001;
     k = 1 / (Math.sqrt(zx * zx + zy * zy + zz * zz) || 1);
@@ -71,7 +51,6 @@ export function lookAt(eye: Vec3, at: Vec3, up: Vec3, out?: Out4): Turn {
   const yx = zy * xz - zz * xy,
     yy = zz * xx - zx * xz,
     yz = zx * xy - zy * xx;
-  // the rotation whose columns are x, y and z, as a quaternion
   const m11 = xx,
     m12 = yx,
     m13 = zx,
@@ -116,7 +95,6 @@ export function lookAt(eye: Vec3, at: Vec3, up: Vec3, out?: Out4): Turn {
   return put4(out, (m13 + m31) / s, (m23 + m32) / s, 0.25 * s, (m21 - m12) / s);
 }
 
-/** The turn t of the way from a to b (0–1), the short way round. */
 export function slerp(a: Turn, b: Turn, t: number, out?: Out4): Turn {
   let x = b[0],
     y = b[1],
@@ -144,7 +122,6 @@ export function slerp(a: Turn, b: Turn, t: number, out?: Out4): Turn {
       a[3] * s + w * t
     );
   }
-  // for small angles, straight between and made unit again
   const qx = a[0] * s + x * t,
     qy = a[1] * s + y * t,
     qz = a[2] * s + z * t,
@@ -155,19 +132,11 @@ export function slerp(a: Turn, b: Turn, t: number, out?: Out4): Turn {
   return put4(out, qx * k, qy * k, qz * k, qw * k);
 }
 
-/**
- * The turn of `angle` radians about the unit vector `axis`, as three's
- * Quaternion.setFromAxisAngle.
- */
 export function axisAngle(axis: Vec3, angle: number, out?: Out4): Turn {
   const s = Math.sin(angle / 2);
   return put4(out, axis[0] * s, axis[1] * s, axis[2] * s, Math.cos(angle / 2));
 }
 
-/**
- * a then b in a's own frame (a·b), as three's Quaternion.multiplyQuaternions(a,
- * b): q.multiply(b) turns q about its own axes.
- */
 export function multiply(a: Turn, b: Turn, out?: Out4): Turn {
   const ax = a[0],
     ay = a[1],
@@ -186,10 +155,8 @@ export function multiply(a: Turn, b: Turn, out?: Out4): Turn {
   );
 }
 
-/** The turn undone. */
 export const inverse = (q: Turn): Turn => [-q[0], -q[1], -q[2], q[3]];
 
-/** v turned by q. */
 export function rotate(v: Vec3, q: Turn, out?: Out3): Vec3 {
   const vx = v[0],
     vy = v[1],

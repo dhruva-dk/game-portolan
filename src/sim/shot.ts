@@ -1,30 +1,3 @@
-// A ball in flight: one fixed step of it, and where it ends, in a hull, in the
-// sea or on the land.
-//
-// It flies a true orbit about the planet's centre, pulled by MU / r², from the
-// muzzle. On a planet this small a ball fired flat at these speeds would go
-// round it, so each kind of gun (handling.ts GUNS) has its own pull, the one
-// that makes its `carry` the furthest its ball goes at the best elevation: the
-// cannon's some 14 g at the sea, its carry its range; the harpoon's far less
-// for its speed, so its bolt flies flat. Its flight is stepped by velocity
-// Verlet on the fixed step; how far it carries and how long it takes are also
-// had in closed form, from the orbit itself, for laying the gun (gun.ts): a
-// ball fired at an elevation comes back down to the muzzle's height at the same
-// angle, the range angle ψ across the centre given by tan(ψ/2) = ν sin φ cos φ
-// / (1 − ν cos² φ), ν its speed squared against the speed of a circular orbit
-// there. A gun laid low takes the low elevation for the distance at its muzzle
-// speed; a lobbed one (the mortar) its fixed elevation, with the charge (ν, so
-// the muzzle speed) the distance needs. The balls take nothing of the ship's
-// own way: laid on a point, a ball goes to it, whatever she is making.
-//
-// Each step its path is looked along every GUN.probe metres: a hull there (the
-// capsule of contact.ts standing to GUN.freeboard) is struck, the first along
-// the path; or it is in the sea, or the land is in the way (Depth, negative on
-// land) and it falls there. It never strikes the ship that fired it.
-//
-// Pure arithmetic: no three, so it runs in node for the tests; deterministic
-// for the same inputs.
-
 import {
   R,
   add,
@@ -40,12 +13,6 @@ import { GUN, GUNS, SHIP } from './handling.ts';
 import type { ShipState } from './ship.ts';
 import type { Depth } from './shoal.ts';
 
-/**
- * A ball in flight: who fired it and from what kind of gun, where it is
- * (metres, from the planet's centre), its velocity (m/s), the hit points it
- * takes off (before its fall-off), where it was fired from and where it was
- * laid to come down (unit vectors), and how long it has flown (s).
- */
 export interface Ball {
   shooter: number;
   kind: GunKind;
@@ -57,10 +24,6 @@ export interface Ball {
   age: number;
 }
 
-/**
- * Where a ball ended: the ship it struck (or null), where (a unit vector), and
- * whether on the land.
- */
 interface Fall {
   ball: Ball;
   struck: number | null;
@@ -68,44 +31,24 @@ interface Fall {
   land: boolean;
 }
 
-/** The muzzle's distance from the centre. */
 const MUZZLE = R + GUN.up;
-/**
- * ν for a carry of `metres` at the best elevation: sin(ψ/2) = ν / (2 − ν)
- * there.
- */
 const nuFor = (metres: number) => {
   const s = Math.sin(metres / R / 2);
   return (2 * s) / (1 + s);
 };
-/** Each kind's ν at its muzzle speed, and its pull, m³/s² (MU / r² at r). */
 const PULL = perKind((k) => {
   const nu = nuFor(GUNS[k].carry);
   return { nu, mu: (GUNS[k].speed * GUNS[k].speed * MUZZLE) / nu };
 });
 
-/**
- * Metres along the sea at which a ball with speed ratio ν fired at `elevation`
- * comes back to the muzzle's height.
- */
 const carried = (nu: number, elevation: number) => {
   const c = Math.cos(elevation);
   return 2 * R * Math.atan2(nu * Math.sin(elevation) * c, 1 - nu * c * c);
 };
 
-/**
- * Metres along the sea at which a ball of `kind`, at its muzzle speed, fired at
- * `elevation` (radians above the level), comes back to the muzzle's height; its
- * carry at the best elevation.
- */
 export const reach = (kind: GunKind, elevation: number) =>
   carried(PULL[kind].nu, elevation);
 
-/**
- * Seconds a ball with speed ratio ν fired at `elevation` flies before it is
- * back at the muzzle's height: twice the time from the muzzle to the top of its
- * orbit, by Kepler's equation.
- */
 function flight(nu: number, mu: number, elevation: number): number {
   const c = Math.cos(elevation);
   const e = Math.sqrt(1 + nu * (nu - 2) * c * c);
@@ -121,22 +64,12 @@ function flight(nu: number, mu: number, elevation: number): number {
   return (2 * (Math.PI - mean)) / Math.sqrt(mu / (a * a * a));
 }
 
-/**
- * How a ball is thrown to come back down to the muzzle's height `metres` along
- * the sea: its elevation (radians), its muzzle speed (m/s) and its time in the
- * air (s).
- */
 interface Throw {
   elevation: number;
   speed: number;
   time: number;
 }
 
-/**
- * How a gun of `kind` throws a ball `metres` along the sea: low at its muzzle
- * speed, or lobbed at its elevation with the charge the distance needs; null
- * past its range (or, lobbed, nearer than its least).
- */
 export function thrown(kind: GunKind, metres: number): Throw | null {
   const g = GUNS[kind],
     { nu, mu } = PULL[kind];
@@ -157,11 +90,6 @@ export function thrown(kind: GunKind, metres: number): Throw | null {
   return { elevation, speed: g.speed, time: flight(nu, mu, elevation) };
 }
 
-/**
- * A ball of `kind` fired from `from` (metres, from the centre) along `dir` (a
- * unit vector) at `speed`, laid to come down at `to` (a unit vector; where it
- * was fired from if not given).
- */
 export const loosed = (
   shooter: number,
   kind: GunKind,
@@ -186,7 +114,6 @@ const pull = (p: Vec3, mu: number): Vec3 => {
   return scale(p, -mu / (r * r * r));
 };
 
-/** A ball's flight dt seconds on, nothing in its way (velocity Verlet). */
 export function flown(b: Ball, dt: number): Ball {
   const mu = PULL[b.kind].mu,
     a0 = pull(b.p, mu);
@@ -195,10 +122,6 @@ export function flown(b: Ball, dt: number): Ball {
   return { ...b, p, v, age: b.age + dt };
 }
 
-/**
- * How far the point q (a unit vector) lies outside her hull's capsule along the
- * sea, metres (0 inside its plan).
- */
 export function offHull(s: ShipState, q: Vec3): number {
   const d = add(scale(q, R), s.at, -R);
   const ahead = dot(d, s.heading),
@@ -207,11 +130,6 @@ export function offHull(s: ShipState, q: Vec3): number {
   return Math.max(0, Math.hypot(off, across) - RADIUS);
 }
 
-/**
- * Whether the point q (metres, from the centre) is inside her hull: within the
- * capsule along her keel, from the waterline up to her freeboard. On her own
- * flat chart: a few millimetres off the sphere along her length.
- */
 function inHull(s: ShipState, q: Vec3): boolean {
   const r = length(q),
     height = r - R;
@@ -219,17 +137,11 @@ function inHull(s: ShipState, q: Vec3): boolean {
   return offHull(s, scale(q, 1 / r)) <= 0;
 }
 
-/** A ship a ball may strike: who she is and how she lies. */
 interface Mark {
   id: number;
   ship: ShipState;
 }
 
-/**
- * Every ball one step of dt seconds on, among `marks` (each listed once; sunk
- * ships left out) over water `depth` deep: the balls still flying and those
- * that came down, in the order they are listed.
- */
 export function fly(
   balls: readonly Ball[],
   marks: readonly Mark[],
@@ -242,7 +154,6 @@ export function fly(
   for (const b of balls) {
     const next = flown(b, dt);
     const span = length(add(next.p, b.p, -1));
-    // the ships near enough to the path to be struck by it
     const reach = span + SHIP.length / 2 + GUN.freeboard + 1;
     const near = order.filter(
       (m) =>

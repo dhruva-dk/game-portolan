@@ -55,7 +55,6 @@ function patches(eye: LodEye): Patch[] {
   return list;
 }
 
-/** The point at (u, v) on a face, at sea level. */
 function at(face: number, u: number, v: number): Vec3 {
   const f = FACES[face],
     d: [number, number, number] = [0, 0, 0];
@@ -89,7 +88,6 @@ for (const [name, eye] of eyes) {
       for (const a of list)
         for (const b of list) {
           if (a.face !== b.face || b.level <= a.level) continue;
-          // b finer than a: do they share a stretch of edge?
           const touchU =
             Math.abs(a.u + a.s - b.u) < eps || Math.abs(b.u + b.s - a.u) < eps;
           const touchV =
@@ -101,7 +99,6 @@ for (const [name, eye] of eyes) {
           if (!((touchU && overlapV) || (touchV && overlapU))) continue;
           assert.equal(b.level - a.level, 1, 'levels two apart side by side');
           seams++;
-          // along the shared stretch, by the sea-level distance the shader morphs by: b has finished its morph, a not begun
           for (let t = 0; t <= 8; t++) {
             const u = touchU
               ? Math.abs(a.u + a.s - b.u) < eps

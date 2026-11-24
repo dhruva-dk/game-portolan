@@ -1,21 +1,8 @@
-// What a touch on the UI amounts to, one way for every piece of it: a tap is a
-// pointer that comes down on a thing and lifts on it without travelling past
-// TAP; past that it is a drag. The full map's fingers (globe.ts) tell its spin
-// and pinch from a tap by the same travel; the canvas's stick and look
-// (input.ts) take every finger as a drag, as the seed panel's globe takes its
-// one (onDrag, orb.ts).
-
-/** How far a press may travel and still be a tap, CSS px. */
 const TAP = 8;
 
-/** Whether a press from (x0, y0) to (x1, y1) has travelled past a tap. */
 export const dragged = (x0: number, y0: number, x1: number, y1: number) =>
   Math.hypot(x1 - x0, y1 - y0) > TAP;
 
-/**
- * Calls `act` on a tap of `el`, and keeps the touch from whatever is under it
- * (the canvas, a sheet's own tap).
- */
 export function onTap(el: GlobalEventHandlers, act: (e: PointerEvent) => void) {
   let id = -1,
     x = 0,
@@ -36,11 +23,6 @@ export function onTap(el: GlobalEventHandlers, act: (e: PointerEvent) => void) {
   });
 }
 
-/**
- * Calls `held(true)` as a touch comes down on `el` and `held(false)` as it
- * lifts, wherever it has gone meanwhile (the element keeps it); the touch kept
- * from whatever is under it.
- */
 export function onHold(
   el: GlobalEventHandlers & Pick<Element, 'setPointerCapture'>,
   held: (on: boolean) => void
@@ -58,12 +40,6 @@ export function onHold(
     el.addEventListener(lift, () => held(false));
 }
 
-/**
- * One finger dragged on `el` (the seed panel's globe): `drag.move` as it goes,
- * by the CSS px it went and the ms that took; `drag.lift` as it lifts, with the
- * ms it was held still before; the touch kept from whatever is under it, and
- * the element keeping it wherever it goes.
- */
 export function onDrag(
   el: HTMLElement,
   drag: {
@@ -96,12 +72,6 @@ export function onDrag(
     });
 }
 
-/**
- * A finger come down on anything of `layer`'s within `within` (a selector: the
- * office's window, its pins too, which take a tap, not a drag), heard before
- * they hear it: `look(dx, dy, true)` by the CSS px it goes as it goes,
- * wherever it goes; `look(0, 0, false)` as it lifts.
- */
 export function onLook(
   layer: HTMLElement,
   within: string,
@@ -131,18 +101,10 @@ export function onLook(
     });
 }
 
-/**
- * Keeps a touch on `el` from whatever is under it, doing nothing with it (a
- * sheet's paper, under its own taps).
- */
 export function keep(el: Element) {
   el.addEventListener('pointerdown', (e) => e.stopPropagation());
 }
 
-/**
- * Calls `act` as a touch comes down on anything of `layer`'s that takes one
- * (`.press`), before that thing hears it.
- */
 export function onPressed(layer: HTMLElement, act: () => void) {
   layer.addEventListener(
     'pointerdown',
@@ -153,10 +115,6 @@ export function onPressed(layer: HTMLElement, act: () => void) {
   );
 }
 
-/**
- * A part of a sheet's drawing, by its id, made to take a tap; the part, if
- * there is one.
- */
 export function region(
   el: SVGSVGElement,
   id: string,
@@ -164,8 +122,6 @@ export function region(
 ): SVGElement | null {
   const r = el.querySelector<SVGElement>(`#${id}`);
   if (!r) return null;
-  // the class, not a style on the group: a touch lands on the shapes inside it, which the layer's rule would
-  // otherwise leave untouchable (ui.ts)
   r.classList.add('press');
   onTap(r, act);
   return r;

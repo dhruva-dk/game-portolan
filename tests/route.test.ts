@@ -45,10 +45,6 @@ const at = (x: number, y: number): Vec3 =>
     Math.hypot(x, y)
   ).p;
 
-/**
- * A round island `r` m across its dry land at c, its floor rising 1 in 3, in
- * water 30 m deep.
- */
 const island = (c: Vec3, r: number) => (p: Vec3) => (distance(p, c) - r) / 3;
 const sea =
   (...parts: ((p: Vec3) => number)[]): Depth =>
@@ -61,11 +57,6 @@ const length = (cells: readonly number[]) =>
     .reduce((s, c, i) => s + distance(cellCentre(cells[i]), cellCentre(c)), 0);
 const allOpen = (ch: Chart, cells: readonly number[]) =>
   cells.every((c) => ch.open[c] === 1);
-/**
- * Every step of a route is to a cell beside the last (a diagonal at most, ~9.6
- * m), over open water all the way: the middle of each step, a diagonal's
- * corner, lies in an open cell.
- */
 const stepsOpen = (ch: Chart, cells: readonly number[]) =>
   cells.slice(1).every((c, i) => {
     const a = cellCentre(cells[i]),
@@ -83,8 +74,6 @@ test('a route is found round a round island, all open water, not much longer tha
   assert.ok(
     r.found && allOpen(roundChart, r.cells) && stepsOpen(roundChart, r.cells)
   );
-  // the shortest way round keeps off the draught's contour (77.5 m): straight
-  // to its tangent, round, and out
   const rc = 77.5,
     tangent = Math.sqrt(110 * 110 - rc * rc),
     arc = rc * (Math.PI - 2 * Math.acos(rc / 110));
@@ -93,8 +82,6 @@ test('a route is found round a round island, all open water, not much longer tha
   console.log(
     `# round the island: ${got.toFixed(0)} m by the route, ${least.toFixed(0)} m at the least`
   );
-  // (a route of cells, each to one of the eight round it, runs up to 1.08 times as far as a straight line, one of
-  // four up to √2; the helm cuts its corners, looking along it as far as the water is clear)
   assert.ok(got < 1.15 * least, `${got} m`);
   assert.ok(
     Math.min(...r.cells.map((c) => distance(cellCentre(c), start))) > 77.5
@@ -102,8 +89,6 @@ test('a route is found round a round island, all open water, not much longer tha
 });
 
 test('ships in open water wanting a route in one step look for it over the next few, not all in that step', () => {
-  // twenty ships west of the island, along a line, all making for a mark due
-  // east of it (the island between): as when the storm sets its next calm
   const ships = Array.from({ length: 20 }, (_, i) => at(-130, -95 + 10 * i)),
     mark = at(130, 0);
   const routes = ships.map(() => null as ReturnType<typeof course>['route']);
@@ -118,13 +103,11 @@ test('ships in open water wanting a route in one step look for it over the next 
     looked.push(n);
   }
   console.log(`# ships finding their route, step by step: ${looked}`);
-  // each has her route within `spread` steps, and no step finds most of them
   assert.ok(routes.every((r) => r && r.cells.length > 0 && r.found));
   assert.ok(Math.max(...looked) <= ships.length / 2, `${looked}`);
 });
 
 test('a route goes through a strait rather than round', () => {
-  // two islands 140 m across, their dry land 60 m apart (about 45 m of open water between their draught contours)
   const depth = sea(island(at(-100, 0), 70), island(at(100, 0), 70)),
     ch = chart(depth);
   const r = findPath(ch, at(0, -120), at(0, 120));
@@ -139,7 +122,6 @@ test('a route goes through a strait rather than round', () => {
 });
 
 test('no route into enclosed water: the route runs to the nearest it can reach', () => {
-  // a ring of land 60–90 m from the start round a lagoon 20 m deep
   const depth = sea((p) => (Math.abs(distance(p, start) - 75) - 15) / 3),
     ch = chart(depth);
   assert.ok(openAt(ch, start));
@@ -151,12 +133,9 @@ test('no route into enclosed water: the route runs to the nearest it can reach',
     distance(end, start) > 90 && distance(end, start) < 110,
     `${distance(end, start)} m`
   );
-  // and none out of it either
   assert.equal(findPath(ch, start, at(0, -200)).found, false);
 });
 
-/** A bot told to make for `mark` (a roaming mark, held), sailed until she is there; the seconds it took, and her least
- *  water under her. */
 function voyage(
   depth: Depth,
   ch: Chart | null,
@@ -208,7 +187,6 @@ test('a bot reaches a mark behind an island in near the least time, which withou
       `${y}: ${felt.seconds} s without`
     );
   }
-  // and behind a bay opening toward her, which feeling her way along the shore leads her into
   const bay = at(0, 0),
     mouth = at(-75, 0);
   const depth: Depth = (p) =>
@@ -226,8 +204,6 @@ test('a bot reaches a mark behind an island in near the least time, which withou
   console.log(
     `# behind a bay: ${routed.seconds.toFixed(1)} s by routes, ${felt.seconds.toFixed(1)} s feeling her way`
   );
-  // (should her route give out at ROUTE.work cells, short of the way round, she follows it on until her next, 2 s on,
-  // finds the whole way)
   assert.ok(
     routed.least >= 0 &&
       routed.seconds < 40 &&
@@ -256,7 +232,6 @@ test('on the real planet: the chart, a route and 16 routed bots, timed', () => {
   const ch = chart(depth);
   const bake = performance.now() - t,
     open = ch.open.reduce((s, o) => s + o, 0);
-  // open water to open water 150–400 m off, with land between, all over the planet
   const rand = random(17),
     pairs: { p: Vec3; q: Vec3; d: number }[] = [];
   while (pairs.length < 300) {
@@ -274,14 +249,11 @@ test('on the real planet: the chart, a route and 16 routed bots, timed', () => {
     if (openAt(ch, p) && openAt(ch, q) && !line.every((x) => openAt(ch, x)))
       pairs.push({ p, q, d });
   }
-  // across the land, the first 24 of those under 250 m (the first warms the code)
   const across = pairs.filter((r) => r.d < 250).slice(0, 24);
   findPath(ch, across[0].p, across[0].q);
   const times: number[] = [];
   let found = 0;
   for (const { p: a, q: b } of across) {
-    // timed as the best of five: the search's own cost, not whatever else the machine is doing (the suite runs its
-    // files side by side); a search that does more work is slower every time
     let best = Infinity;
     const r = Array.from({ length: 5 }, () => {
       t = performance.now();
@@ -291,7 +263,6 @@ test('on the real planet: the chart, a route and 16 routed bots, timed', () => {
     })[0];
     times.push(best);
     found += +r.found;
-    // given out short of the way, a route still runs nearer (the next, from further on, goes on)
     assert.ok(distance(cellCentre(r.cells.at(-1)!), b) < distance(a, b));
     assert.ok(stepsOpen(ch, r.cells));
   }
@@ -302,8 +273,6 @@ test('on the real planet: the chart, a route and 16 routed bots, timed', () => {
   );
   assert.ok(across.length === 24 && found >= 20);
 
-  // all of them whose way round is short, under half as far again as the straight line (as the widest search finds it:
-  // the land is everywhere, so many pairs lie in waters a continent apart): found within ROUTE.work cells
   const tally = { near: [0, 0], far: [0, 0] };
   for (const { p, q, d } of pairs) {
     const wide = findPath(ch, p, q, ROUTE.work * 4);
@@ -320,7 +289,6 @@ test('on the real planet: the chart, a route and 16 routed bots, timed', () => {
     tally.near[1] >= 0.95 * tally.near[0] && tally.far[1] >= 0.8 * tally.far[0]
   );
 
-  // 16 bots on the water round where she starts, for 20 s
   const home = planet.start.at;
   const ring = (bearing: number, metres: number) =>
     along(home, bearingAt(home, bearing), metres).p;
@@ -330,8 +298,6 @@ test('on the real planet: the chart, a route and 16 routed bots, timed', () => {
     if (openAt(ch, p) && depth(p) > 6)
       berthed.push(afloat(berthed.length, shipAt(p, frameAt(p).east)));
   }
-  // sailed twice, the same 20 s each time, each step timed as the lesser of the two: the bots' own cost, not whatever
-  // else the machine is doing (the suite runs its files side by side)
   const steps = 20 / STEP,
     thinking = new Array<number>(steps).fill(Infinity),
     whole = thinking.slice();

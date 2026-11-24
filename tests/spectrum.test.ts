@@ -15,7 +15,6 @@ import { BANDS, CASCADES, SIZE } from '../src/world/cascades.ts';
 const near = (a: number, b: number, tol: number) =>
   assert.ok(Math.abs(a - b) <= tol, `${a} not within ${tol} of ${b}`);
 
-/** The inverse FFT the GPU runs (waves.ts), step for step: radix-2 Stockham, thread i of N/2 at each stage p. */
 function inverseFFT(
   re: Float64Array,
   im: Float64Array
@@ -100,7 +99,6 @@ test('a drawn sea is real, and the FFT keeps its energy', () => {
   const N = 256,
     L = 256,
     data = initialSpectrum(N, L, sea, 7);
-  // at t = 0 the spectrum of the height is h₀(k) + conj h₀(−k)
   const re = new Float64Array(N * N),
     im = new Float64Array(N * N);
   let drawn = 0;
@@ -109,7 +107,6 @@ test('a drawn sea is real, and the FFT keeps its energy', () => {
     im[i] = data[i * 4 + 1] + data[i * 4 + 3];
     drawn += re[i] * re[i] + im[i] * im[i];
   }
-  // rows, then columns, then undo the centred k with (−1)^(x+y)
   for (let y = 0; y < N; y++) {
     const [r, m] = inverseFFT(
       re.slice(y * N, y * N + N),
@@ -139,8 +136,8 @@ test('a drawn sea is real, and the FFT keeps its energy', () => {
     imag = Math.max(imag, Math.abs(im[i]));
   }
   square /= N * N;
-  near(imag, 0, 1e-6); // Hermitian: the sea is real
-  near(square, drawn, drawn * 1e-6); // Parseval: the FFT neither gains nor loses
+  near(imag, 0, 1e-6);
+  near(square, drawn, drawn * 1e-6);
 });
 
 test('drawn seas are as high as their spectrum, on average', () => {
@@ -193,5 +190,5 @@ test('the normal quantile and the whitecaps', () => {
   near(normalQuantile(0.975), 1.959964, 1e-6);
   near(normalQuantile(0.5), 0, 1e-9);
   near(normalQuantile(0.001), -3.090232, 1e-6);
-  near(whitecaps(10), 0.0099, 0.0003); // about 1% at 10 m/s
+  near(whitecaps(10), 0.0099, 0.0003);
 });

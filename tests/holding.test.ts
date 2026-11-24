@@ -1,5 +1,3 @@
-// Her water's rules (sim/holding.ts): her shield comes back wherever she is,
-// the faster the more of the sea inside the storm is hers.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { crewOf, type Crew } from '../src/sim/battle.ts';
@@ -8,7 +6,6 @@ import { calmShare, regain, regainRate } from '../src/sim/holding.ts';
 import type { Cap } from '../src/sim/storm.ts';
 
 const WHOLE: Cap = { centre: [0, 1, 0], radius: Math.PI };
-/** A calm of a quarter of the planet: 1 − cos r = 1/2. */
 const QUARTER: Cap = { centre: [0, 1, 0], radius: Math.PI / 3 };
 const shielded = (id: number, shield: number): Crew => ({
   ...crewOf(id),
@@ -30,8 +27,6 @@ test('her shield comes back in proportion to her share of the calm, at HOLDING.s
   );
   assert.equal(regainRate(HOLDING.full), HOLDING.shield);
   assert.equal(regainRate(0.9), HOLDING.shield, 'no faster past it');
-  // raised with her hull's faults (tuned by the harness): a full
-  // holding, 4.5 a second
   assert.equal(regainRate(HOLDING.full), 4.5);
 });
 
@@ -43,8 +38,6 @@ test('every ship afloat regains by her own share wherever she lies, up to her mo
       shielded(2, HEALTH.shield - 0.01),
       shielded(3, 40),
     ];
-  // ship 0 HOLDING.full of the calm (a quarter of the planet), ship 1 half as
-  // much, ship 2 near her most, ship 3 none; ship 3 sunk besides
   const full = HOLDING.full / 4,
     shares = [full, full / 2, full, 0],
     held = { share: (id: number) => shares[id] };
@@ -63,7 +56,6 @@ test('every ship afloat regains by her own share wherever she lies, up to her mo
     [0, 1, 2]
   );
   assert.ok(Math.abs(r.regained[2].shield - 0.01) < 1e-9);
-  // at her most, or with no water, nothing: the same crew, nothing regained
   const none = regain(
     [shielded(0, HEALTH.shield), shielded(3, 10)],
     [0, 3],

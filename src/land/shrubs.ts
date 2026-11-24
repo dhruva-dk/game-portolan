@@ -1,13 +1,3 @@
-// The beach shrubs (world/terrain-scatter.ts says where). A few shapes, each
-// drawn once for all its shrubs on the tiles in view (site.ts).
-//
-// A shrub: a few overlapping rounded masses of fleshy leaves, each leaf its own
-// two triangles (no cut-out texture). Leaves lie mostly on the masses'
-// surfaces, some inside. Each leaf's normal is bent halfway toward its mass's:
-// the many small leaves of a dense bush, taken together, shade like the bush's
-// rounded surface, which one leaf's own facing alone would scatter into noise.
-// Leaves deeper in a mass see less of the sky and are darker.
-
 import {
   BufferGeometry,
   DoubleSide,
@@ -39,31 +29,17 @@ import {
 } from './site.ts';
 import { cut } from '../tsl.ts';
 
-/** How many shapes the shrubs come in. */
 export const SHAPES = 4;
-/** Its leaves, near. */
 const LEAVES = 450;
-/**
- * Each level of detail, nearest first (groves.ts says how far off each is
- * drawn): its leaves, fewer and larger farther off, covering the same masses
- * as much; and how many of the shapes it is drawn in (far, a shrub a few pixels
- * across, all as the first).
- */
 const LEVELS = [
   { name: 'shrubs', leaves: LEAVES, shapes: SHAPES },
   { name: 'shrubs coarse', leaves: 70, shapes: SHAPES },
   { name: 'shrubs far', leaves: 20, shapes: 1 },
 ];
-/** A leaf's length, as a share of the shrub's size. */
 const LEAF = 0.095;
-/**
- * How much one shrub's green differs from the next's; and how deep in its mass
- * (0.7 the deepest … 1.05 on its surface) a leaf is drawn in its shadow tone.
- */
 const VARIED = 0.3,
   SHADED = 0.76;
 
-/** One shrub, 1 across at its widest, standing on y = 0. */
 function shape(seed: number, leaves: number): BufferGeometry {
   const rand = random(seed);
   const masses = Array.from({ length: 3 + Math.floor(rand() * 3) }, (_, i) => {
@@ -88,14 +64,12 @@ function shape(seed: number, leaves: number): BufferGeometry {
   const size = LEAF * Math.sqrt(LEAVES / leaves);
   for (let i = 0; i < leaves; i++) {
     const m = masses[Math.floor(rand() * masses.length)];
-    // a direction on the mass, not its underside
     do dir.set(rand() * 2 - 1, rand() * 2 - 1, rand() * 2 - 1);
     while (dir.lengthSq() > 1 || dir.lengthSq() < 0.01 || dir.y < -0.4);
     dir.normalize();
     const deep = 0.7 + 0.35 * rand();
     at.copy(dir).multiply(m.size).multiplyScalar(deep).add(m.c);
     if (at.y < 0.03) continue;
-    // the leaf faces out from its mass and up, more or less
     facing
       .copy(dir)
       .addScaledVector(up, 0.5)
@@ -109,7 +83,6 @@ function shape(seed: number, leaves: number): BufferGeometry {
     const len = size * (0.7 + 0.5 * rand());
     const base = at.clone().addScaledVector(along, -len / 2),
       tip = at.clone().addScaledVector(along, len / 2);
-    // folded a little along the midrib
     const l = at
       .clone()
       .addScaledVector(across, len * 0.28)
@@ -132,11 +105,6 @@ function shape(seed: number, leaves: number): BufferGeometry {
   return g;
 }
 
-/**
- * shrubs[i]: those on tile i, whose chart is charts[i]; each one of SHAPES
- * shapes. For each level of detail (LEVELS, nearest first), the instances of
- * each of its shapes.
- */
 export function createShrubs(
   shrubs: Shrub[][],
   charts: Chart[],
@@ -144,12 +112,8 @@ export function createShrubs(
 ): Instances[][] {
   const material = new MeshBasicNodeMaterial({ side: DoubleSide });
   material.colorNode = Fn(() => {
-    // the normal as the shape has it, bent toward its mass's, whichever side of
-    // the leaf is seen: the bush is lit as one rounded thing
     const p = positionWorld,
       n = normalize(normalWorldGeometry);
-    // each shrub a little paler or darker than the next; and deep in a mass,
-    // where less of the sky reaches, a leaf keeps its shadow tone
     const own = attribute('tint', 'float').sub(0.5).mul(VARIED).add(1);
     const shadow = vec3(...SHRUB.shadow).mul(own);
     return light.toon(

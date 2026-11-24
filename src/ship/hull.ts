@@ -1,17 +1,3 @@
-// The galleon's hull and what is fixed to it: the planked skin and flat
-// transom, the wales and the painted strakes over them (the captain's colour),
-// the solid bulwarks with their cap rail, the decks and the bulkheads where
-// they step, the transom's framing (gilt rails, dark stiles, panels of upright
-// planking, a frieze in her colour) and crest, the rudder, the beakhead (bare:
-// no figure), the catheads and anchors, gratings, and the plinth amidships that
-// a gun will stand on.
-//
-// Left out, by the owner's rule that nothing on her shows that anyone was ever
-// aboard: windows, the stern lantern, quarter galleries, doors, ladders, the
-// ship's boat, the capstan, the whipstaff's hood and the gunports.
-//
-// Design metres (lines.ts). `D` says how finely (detail.ts).
-
 import { Vector3 } from 'three/webgpu';
 import type { Detail } from './detail.ts';
 import { lerp, smoothstep } from '../world/scalar.ts';
@@ -47,9 +33,7 @@ import {
   zOf,
 } from './lines.ts';
 
-/** The planks' texture repeats every this many design metres. */
 const PLANK_TILE = 3.4;
-/** The decks' runs across: the inboard faces see less of the sky. */
 const DECK_AO = 0.75,
   INBOARD_AO = 0.8;
 
@@ -70,21 +54,11 @@ export function buildHull(body: Acc, D: Detail): void {
   if (D.fittings) fittings(body);
 }
 
-// ---------------------------------------------------------------- the skin
-
-/**
- * Stations from transom to stem, closer together at either end where the lines
- * turn fastest.
- */
 const stations = (n: number) =>
   Array.from(
     { length: n },
     (_, i) => 0.5 - 0.5 * Math.cos((Math.PI * i) / (n - 1))
   );
-/**
- * Heights up a station from keel to the side's top, closer together round the
- * bilge.
- */
 const heightAt = (s: number, t: number) => {
   const k = keel(s);
   return k + (sideTop(s) - k) * (t < 0.5 ? 0.5 * (2 * t) ** 1.25 : t);
@@ -116,7 +90,6 @@ function skin(acc: Acc, D: Detail): void {
   });
   if (!D.head) return;
   acc.with({ kind: KIND.dark }, () => {
-    // the keel's flat underside between the two garboards
     const kg: Vector3[][] = S.map((s) => [
       onSkin(s, keel(s), -1),
       onSkin(s, keel(s), 1),
@@ -127,8 +100,6 @@ function skin(acc: Acc, D: Detail): void {
       kg.map((r) => r.map((p): [number, number] => [p.z / 3, p.x / 3])),
       V(0, -1, 0)
     );
-    // the keel timber and the stem, one curve from the sternpost's foot round
-    // the forefoot to the head
     const n = Math.max(6, D.stations >> 1),
       path: Vector3[] = [];
     for (let i = 0; i <= n; i++) {
@@ -162,13 +133,6 @@ function transom(acc: Acc, D: Detail): void {
   acc.with({ kind: KIND.planks }, () => sheet(acc, grid, uvs, V(0, 0, -1)));
 }
 
-// ---------------------------------------------------------------- wales and
-// strakes
-
-/**
- * A rounded wale standing proud of the skin along a height line y(s), over
- * stations a..b.
- */
 function wale(
   acc: Acc,
   D: Detail,
@@ -187,7 +151,6 @@ function wale(
   }
 }
 
-/** A painted band laid on the skin between two height lines. */
 function strake(
   acc: Acc,
   D: Detail,
@@ -218,8 +181,6 @@ function strake(
 function strakes(acc: Acc, D: Detail): void {
   if (D.run === 0) return;
   const md = mainDeck;
-  // the main wale at the waist deck, a lower wale over the waterline, and one
-  // along each castle
   if (D.waleSides)
     acc.with({ kind: KIND.dark }, () => {
       wale(acc, D, (s) => md(s) - 0.35, 0.0, 0.985, 0.13);
@@ -236,9 +197,6 @@ function strakes(acc: Acc, D: Detail): void {
       );
       wale(acc, D, (s) => md(s) + 4.3 - 0.3, 0.0, 0.13, 0.08);
     });
-  // the painted strakes just over each wale, and a band along the waist's
-  // sheer: the captain's colour. Twice the drawings' height where there is no
-  // wale to show them, so they still read from afar.
   const k = D.waleSides ? 1 : 2;
   acc.with({ kind: KIND.paint }, () => {
     strake(
@@ -292,9 +250,6 @@ function strakes(acc: Acc, D: Detail): void {
   });
 }
 
-// ---------------------------------------------------------------- bulwarks and
-// the rail's cap
-
 function bulwarks(acc: Acc, D: Detail): void {
   acc.with({ kind: KIND.planks, ao: INBOARD_AO }, () => {
     for (const l of LEVELS)
@@ -323,8 +278,6 @@ function bulwarks(acc: Acc, D: Detail): void {
         );
       }
   });
-  // the cap rail over the side's top, outer edge to inner, from the stern to
-  // the stem
   acc.with({ kind: KIND.spar }, () => {
     for (const side of [1, -1]) {
       const grid = range(0.0, 0.992, D.run * 2).map((s) => {
@@ -364,9 +317,6 @@ function bulwarks(acc: Acc, D: Detail): void {
   });
 }
 
-// ---------------------------------------------------------------- decks and
-// bulkheads
-
 function decks(acc: Acc, D: Detail): void {
   acc.with({ kind: KIND.deck, ao: D.inboard ? DECK_AO : 1 }, () => {
     for (const l of LEVELS) {
@@ -385,10 +335,6 @@ function decks(acc: Acc, D: Detail): void {
   });
 }
 
-/**
- * A plain planked bulkhead across her at station s, from the lower deck to the
- * upper, facing `dir` (+1 forward).
- */
 function bulkhead(
   acc: Acc,
   D: Detail,
@@ -416,7 +362,6 @@ function bulkhead(
       V(0, 0, dir)
     )
   );
-  // the beam under the upper deck's edge
   if (!D.fittings) return;
   const zf = zOf(s, y1) + dir * 0.08,
     w = inside(s, y1);
@@ -432,18 +377,8 @@ function bulkheads(acc: Acc, D: Detail): void {
   bulkhead(acc, D, fore.a, 2, 3, -1);
 }
 
-// ---------------------------------------------------------------- the stern
-
-/**
- * The transom's face at height y, a hair aft of its planking; and the way it
- * faces (aft, and down as it rakes).
- */
 const zT = (y: number) => zOf(0, y) - 0.04;
 const AFT = V(0, -0.2, -1).normalize();
-/**
- * The transom's rails, bottom to top: the counter's, under and over the
- * quarterdeck, under the poop, the taffrail.
- */
 const railsAt = () => {
   const qd = levelDeck(LEVELS[1], 0),
     pd = levelDeck(LEVELS[0], 0);
@@ -455,17 +390,9 @@ const railsAt = () => {
     sideTop(0) - 0.05,
   ];
 };
-/**
- * Panels across each tier between two rails; one is a frieze in the captain's
- * colour.
- */
 const TIERS = [2, 1, 3, 3],
   FRIEZE = 1;
 
-/**
- * A flat panel on the transom between heights y0 and y1, from fraction a to b
- * of its breadth, `out` proud of it.
- */
 function panel(
   acc: Acc,
   y0: number,
@@ -482,7 +409,6 @@ function panel(
       V(x, y, zT(y) - out)
     );
   });
-  // upright: its planks run up and down, across the transom's own
   const uv = (p: Vector3): [number, number] =>
     upright
       ? [p.y / PLANK_TILE, p.x / PLANK_TILE + 0.2]
@@ -495,10 +421,6 @@ function panel(
   );
 }
 
-/**
- * The frieze in the captain's colour between the quarterdeck's rails, the one
- * part of the stern every level shows.
- */
 function frieze(acc: Acc): void {
   const rails = railsAt();
   acc.with({ kind: KIND.paint }, () =>
@@ -506,12 +428,6 @@ function frieze(acc: Acc): void {
   );
 }
 
-/**
- * The transom framed: gilt rails across her at each deck and the counter, dark
- * stiles between them, and between those plain panels of upright planking, the
- * frieze in her colour; the fashion pieces up either edge; a carved crest over
- * the taffrail.
- */
 function stern(acc: Acc): void {
   const rails = railsAt();
   acc.with({ kind: KIND.gilt }, () => {
@@ -545,8 +461,6 @@ function stern(acc: Acc): void {
         panel(acc, y0, y1, k / n, (k + 1) / n, 0.14, 0.015, true);
     });
   });
-  // the fashion pieces: where the transom meets her sides, from the counter's
-  // foot to the taffrail
   acc.with({ kind: KIND.dark }, () => {
     for (const side of [1, -1]) {
       const pts = range(0.5, sideTop(0) - 0.05, 10).map((y) =>
@@ -580,13 +494,6 @@ function stern(acc: Acc): void {
   });
 }
 
-// ---------------------------------------------------------------- the rudder
-
-/**
- * The rudder hung on the sternpost, tapering from 1.5 m at its foot to 0.55 at
- * its head, capped; at the finest level its iron straps (the pintles' and
- * gudgeons').
- */
 function rudder(acc: Acc, D: Detail): void {
   const y0 = keel(0) + 0.1,
     y1 = mainDeck(0) + 0.9;
@@ -643,15 +550,10 @@ function rudder(acc: Acc, D: Detail): void {
   });
 }
 
-// ---------------------------------------------------------------- the beakhead
-
 function beakhead(acc: Acc, D: Detail): void {
   const stem = (y: number) => V(0, y, zOf(1, y) + 0.1);
   const tip = V(0, 3.75, zOf(1, 3.5) + 4.8);
   const n = D.fittings ? 10 : 5;
-  // the knee of the head: a deep timber from the cutwater sweeping forward and
-  // up to the beak's tip, planked and oiled as the hull is (in pitch it stood
-  // off her bow as a black boat of its own)
   const bez = (t: number) => {
     const p0 = stem(1.9),
       p1 = V(0, 2.5, tip.z - 1.4),
@@ -685,7 +587,6 @@ function beakhead(acc: Acc, D: Detail): void {
       caps: true,
     })
   );
-  // the beak's platform, narrowing to the tip
   const yb = 3.6,
     z0 = zOf(1, yb) - 0.4;
   const plat = [
@@ -710,7 +611,6 @@ function beakhead(acc: Acc, D: Detail): void {
       beam(acc, port, starboard, 0.06, 0.06, V(0, 1, 0));
     }
   });
-  // head rails: three a side, sweeping from the tip up and aft onto the bow
   for (const side of [1, -1]) {
     for (let r = 0; r < 3; r++) {
       const end = onSkin(0.955, 4.0 + r * 0.55, side);
@@ -734,7 +634,6 @@ function beakhead(acc: Acc, D: Detail): void {
         tube(acc, pts, 0.065, 6, { caps: true })
       );
     }
-    // the cathead, and the anchor hanging from it
     const ch = onSkin(0.91, deckAt(0.91) + 0.25, side),
       end = ch.clone().add(V(side * 1.3, 0.35, 0.55));
     acc.with({ kind: KIND.spar }, () =>
@@ -744,7 +643,6 @@ function beakhead(acc: Acc, D: Detail): void {
   }
 }
 
-/** A great anchor: shank, curved arms with flukes, a wooden stock. */
 function anchor(acc: Acc, top: Vector3, side: number): void {
   const down = V(side * 0.15, -1, 0.35).normalize();
   const crown = top.clone().addScaledVector(down, 3.0);
@@ -787,13 +685,6 @@ function anchor(acc: Acc, top: Vector3, side: number): void {
   );
 }
 
-// ---------------------------------------------------------------- the gun's
-// plinth and the gratings
-
-/**
- * The gun's mount: a turned plinth on the waist's centreline, its flat top the
- * mount point (mount.ts: GUN_MOUNT).
- */
 function plinth(acc: Acc, D: Detail): void {
   const y = levelDeck(LEVELS[2], MOUNT_S),
     z = zAt(MOUNT_S),
@@ -814,7 +705,6 @@ function plinth(acc: Acc, D: Detail): void {
 }
 
 function fittings(acc: Acc): void {
-  // gratings on the forecastle and the poop
   for (const [l, s] of [
     [LEVELS[3], 0.86],
     [LEVELS[0], 0.06],

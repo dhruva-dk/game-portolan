@@ -1,5 +1,3 @@
-// What the device keeps for her (ui/kept.ts): her settings and her livery, read
-// back as kept, and whatever cannot be read hers by default.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -14,7 +12,6 @@ import { LIVERY } from '../src/player.ts';
 const NAMES = ['vermilion', 'coral', 'lemon', 'charcoal'];
 const DEFAULT = { sound: 0.8, look: 0.5, stats: false };
 
-/** A store of its own, as a page's localStorage is. */
 function memory(): Store & { items: Map<string, string> } {
   const items = new Map<string, string>();
   return {
@@ -23,7 +20,6 @@ function memory(): Store & { items: Map<string, string> } {
     setItem: (k, v) => void items.set(k, String(v)),
   };
 }
-/** A store that refuses: a private window's. */
 const refusing: Store = {
   getItem: () => {
     throw new Error('refused');
@@ -53,7 +49,6 @@ test('her livery is kept by name: the set reordered or grown, she wears the same
   });
   const grown = ['charcoal', 'peach', 'lemon', 'vermilion', 'coral'];
   assert.deepEqual(keptLivery(store, grown), { dye: 2, pattern: 1 });
-  // a dye gone from the set: hers by default, her pattern still hers
   assert.deepEqual(keptLivery(store, ['vermilion', 'coral']), {
     dye: LIVERY.dye,
     pattern: 1,
@@ -77,7 +72,6 @@ test('what cannot be read is hers by default: not JSON, not a record, out of the
     assert.deepEqual(keptSettings(store), DEFAULT, garbage);
     assert.deepEqual(keptLivery(store, NAMES), LIVERY, garbage);
   }
-  // a dye by its old index, a dye or pattern not in the set
   for (const [dye, pattern] of [
     [3, 1],
     ['ultramarine', 'chequers'],
@@ -86,13 +80,11 @@ test('what cannot be read is hers by default: not JSON, not a record, out of the
     store.items.set('portolan.livery', JSON.stringify({ dye, pattern }));
     assert.deepEqual(keptLivery(store, NAMES), LIVERY);
   }
-  // settings out of their range, of the wrong kind: each by default, the rest kept
   store.items.set(
     'portolan.settings',
     JSON.stringify({ sound: 7, look: 0.25, stats: 'yes' })
   );
   assert.deepEqual(keptSettings(store), { ...DEFAULT, look: 0.25 });
-  // a livery out of the set is kept as hers by default
   keepLivery(store, { dye: 99, pattern: -1 }, NAMES);
   assert.deepEqual(keptLivery(store, NAMES), LIVERY);
 });

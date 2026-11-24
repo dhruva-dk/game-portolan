@@ -1,8 +1,3 @@
-// The balls' sounds and the blows they deal: a ball passing near, its fall in
-// the sea or on land, home in a hull (a ship's, heard from off; hers, heard
-// close and dull), on a ward (its shield: a ring, or its shattering as it
-// breaks), and a ship going down: her timbers' groan and the sea rushing in.
-
 import {
   ar,
   brown,
@@ -25,10 +20,6 @@ import {
   type Take,
 } from '../dsp.ts';
 
-/**
- * A hull's timbers struck: their low modes, a sharp crack over them, splinters
- * after.
- */
 const hull = (t: Take, weight: number, splinters: number) => {
   const tick = layer(t, 0.05);
   noise(tick, fall(0.003));
@@ -68,7 +59,6 @@ const hull = (t: Take, weight: number, splinters: number) => {
   mix(t, body, 0, 1.6 * weight);
 };
 
-/** A ball home in a hull, as heard from off. */
 export function strike(rate: number, seed: number): Samples {
   const t = take(1.1, rate, seed);
   hull(t, 1, 110);
@@ -77,9 +67,6 @@ export function strike(rate: number, seed: number): Samples {
   return normal(finish(t)).x;
 }
 
-/**
- * A blow on her own hull: close, heavy and dull, her timbers groaning after it.
- */
 export function hurt(rate: number, seed: number): Samples {
   const t = take(1.6, rate, seed);
   hull(t, 2.2, 70);
@@ -97,7 +84,6 @@ export function hurt(rate: number, seed: number): Samples {
   return normal(finish(t)).x;
 }
 
-/** The ward's modes: a plate's inharmonic partials, not a scale's. */
 const WARD: readonly (readonly [number, number, number])[] = [
   [587, 1.1, 0.5],
   [1403, 0.8, 0.42],
@@ -107,10 +93,6 @@ const WARD: readonly (readonly [number, number, number])[] = [
   [6210, 0.2, 0.1],
 ];
 
-/**
- * A blow taken by her ward: a struck ring, beating against itself, over a soft
- * rush of the blow.
- */
 export function ring(rate: number, seed: number): Samples {
   const t = take(1.4, rate, seed);
   modes(t, WARD, 0, 0.03);
@@ -132,10 +114,6 @@ export function ring(rate: number, seed: number): Samples {
   return normal(finish(t)).x;
 }
 
-/**
- * Her ward broken: its ring cut short and shattering into glassy grains, a
- * whump of the blow under it.
- */
 export function shatter(rate: number, seed: number): Samples {
   const t = take(1.5, rate, seed);
   modes(
@@ -169,10 +147,6 @@ export function shatter(rate: number, seed: number): Samples {
   return normal(finish(t)).x;
 }
 
-/**
- * A ship going down: her timbers' long groan, splintering, the sea rushing in,
- * and great bubbles as she goes.
- */
 export function sink(rate: number, seed: number): Samples {
   const t = take(4.8, rate, seed);
   timber(t, (s) => 34 - 4 * s, swell(0.4, 3.4, 1), 0, 3.4, 230, 0.9);
@@ -207,10 +181,6 @@ export function sink(rate: number, seed: number): Samples {
   return normal(finish(t, 0.05, 0.6)).x;
 }
 
-/**
- * Slips of timber under load, as heard in a creak or a groan: a train through
- * two wooden resonances.
- */
 export function timber(
   t: Take,
   rate: (s: number) => number,
@@ -230,10 +200,6 @@ export function timber(
   mix(t, b, 0, gain * 4);
 }
 
-/**
- * A ball passing near: air torn, its pitch falling as it goes by (Doppler) at
- * its closest some 0.3 s in.
- */
 export function whistle(rate: number, seed: number): Samples {
   const t = take(0.75, rate, seed);
   const by = 0.3,
@@ -255,10 +221,6 @@ export function whistle(rate: number, seed: number): Samples {
   return normal(finish(t, 0.02, 0.05)).x;
 }
 
-/**
- * A ball down in the sea: the plop, the spray thrown up, the column falling
- * back, and its bubbles.
- */
 export function splash(rate: number, seed: number): Samples {
   const t = take(1.4, rate, seed);
   const plop = layer(t, 0.3);
@@ -279,7 +241,6 @@ export function splash(rate: number, seed: number): Samples {
   return normal(finish(t)).x;
 }
 
-/** A ball down on land: a thud into the ground, earth and stones thrown. */
 export function thud(rate: number, seed: number): Samples {
   const t = take(0.9, rate, seed);
   const blow = layer(t, 0.3);

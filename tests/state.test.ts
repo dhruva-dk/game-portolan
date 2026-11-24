@@ -1,5 +1,3 @@
-// The match afloat (play/state.ts), as the game steps it: who holds the sea
-// through a step, and a match after another.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createState, debugOf, type Match } from '../src/play/state.ts';
@@ -23,10 +21,6 @@ const start = planet.start;
 const still = { aim: null, fire: false };
 const degrees = Math.PI / 180;
 
-/**
- * A match whose storm lies calm until `at` s on its clock, then shrinks to
- * nothing and sinks every ship in a step.
- */
 const deadly = (at: number): Match => ({
   seed: 1,
   type: MIXED,
@@ -42,12 +36,6 @@ const deadly = (at: number): Match => ({
         },
 });
 
-/**
- * Her loop sailed alone from her berth in a match at sea (a new one on `state`,
- * if given): south, east, and home; each step's helm, until it closes. Returns
- * the match's clock at the start of the step that closed it (null: it never
- * did), and the state.
- */
 function loop(m: Match, state = createState(planet, flat, waters, m)) {
   debugOf(state).atSea(start, []);
   const legs: [number, number][] = [
@@ -91,14 +79,11 @@ test('her livery: worn at anchor at once; her ship in it at sea, the bots dealt 
       `ship ${d.id}`
     );
   assert.ok(drawn.every((d) => d.id === PLAYER || d.look.sail !== her().sail));
-  // who holds the sea: each ship's water her canvas's dye
   const sea = state.sea(1)!;
   assert.deepEqual(sea.colours[PLAYER], COLOURS[hers.dye]);
   drawn.forEach((d) => assert.deepEqual(sea.colours[d.id], d.look.sail));
-  // a match under way keeps the colours it was put to sea in
   state.wear(LIVERY);
   assert.deepEqual(her(), lookOf(hers));
-  // a livery past the set is held to it
   state.anchor(start);
   state.wear({ dye: 99, pattern: 1 });
   assert.deepEqual(her(), lookOf({ dye: 0, pattern: 1 }));
@@ -107,7 +92,6 @@ test('her livery: worn at anchor at once; her ship in it at sea, the bots dealt 
 test('a ship sunk in a step lays, closes and cuts nothing in it: her water only drains', () => {
   const sailed = loop(deadly(Infinity));
   assert.ok(sailed.closed !== null, 'her loop closes');
-  // the same loop, the storm sinking her in the very step it would have closed
   const sunk = loop(deadly(sailed.closed));
   assert.equal(sunk.state.mine(), null, 'she sank');
   assert.deepEqual(sunk.did?.held?.claimed, []);
@@ -121,8 +105,6 @@ test('a ship sunk in a step lays, closes and cuts nothing in it: her water only 
 test("a second match on the same state starts clean: its sea as a new state's, her loop closing as it did", () => {
   const alone = loop(deadly(Infinity)),
     first = loop(deadly(Infinity));
-  // the first match sailed on a while past its loop, painting on, then the
-  // second begun on its state
   for (let k = 0; k < 240; k++)
     first.state.advance(
       {
@@ -142,9 +124,6 @@ test("a second match on the same state starts clean: its sea as a new state's, h
     alone.closed,
     'her loop closes at the same moment of its match'
   );
-  // nothing of the first: the same changes in the same order (on the world's
-  // clock, later by as long as it ran before), the same water held; those
-  // both still keep (the clock's rounding may keep one more at the far end)
   const a = alone.state.sea(1)!,
     b = second.state.sea(1)!,
     later = b.changes.at(-1)!.time - a.changes.at(-1)!.time,

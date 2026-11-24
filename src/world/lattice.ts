@@ -1,24 +1,3 @@
-// The sea's anchors: a fixed lattice of points over the planet, each the centre
-// of a chart (sphere.ts) that the waves' flat patches tile. A point of the sea
-// is read through its nearest anchor's chart, and near the border with the
-// next, through both, blended over a band: never stretched more than the chart
-// stretches within its own cell (about 1%), and the same everywhere on the
-// planet, whatever the eye does — the sea is a function of place and time.
-//
-// The anchors are the vertices of an icosphere: an icosahedron's faces cut into
-// F × F triangles, pushed out onto the sphere. Each anchor's chart has its x
-// axis along the prevailing wind there (wind.ts; the waves' patches blow along
-// +x), and reads the patches from its own offset into them, so that
-// neighbouring charts show different seas.
-//
-// Weights: w = smoothstep(band, 0, d − d_min) for each anchor d metres away,
-// scaled so Σw² = 1, since the sum of independent seas, each times w, then has
-// one sea's variance. The band is narrower than the gap between any point's
-// third- and fourth-nearest anchors (tested), so at most three anchors ever
-// weigh in.
-//
-// Pure arithmetic: no three, so it runs in node for the tests.
-
 import { smoothstep } from './scalar.ts';
 import {
   R,
@@ -33,25 +12,15 @@ import {
   type Vec3,
 } from './sphere.ts';
 
-/**
- * The icosphere's frequency: each of the icosahedron's edges is cut into this
- * many.
- */
 export const FREQUENCY = 3;
-/** The blend band, as a share of the anchors' spacing. */
 const BAND_SHARE = 0.2;
 
-/**
- * A chart of the sea: centred `at` (a unit vector), x along `axis` (a unit
- * tangent there), read from `offset` (metres).
- */
 export interface Anchor {
   at: Vec3;
   axis: Vec3;
   offset: [number, number];
 }
 
-/** The icosahedron: its 12 corners and 20 faces. */
 function icosahedron(): { corners: Vec3[]; faces: [number, number, number][] } {
   const g = (1 + Math.sqrt(5)) / 2;
   const corners = (
@@ -95,10 +64,6 @@ function icosahedron(): { corners: Vec3[]; faces: [number, number, number][] } {
   return { corners, faces };
 }
 
-/**
- * The icosphere of a frequency: its points (10F² + 2 unit vectors) and its
- * triangles.
- */
 export function geodesic(frequency: number): {
   points: Vec3[];
   triangles: [number, number, number][];
@@ -120,7 +85,6 @@ export function geodesic(frequency: number): {
   const triangles: [number, number, number][] = [];
   const F = frequency;
   for (const [a, b, c] of faces) {
-    // the face's points i steps from a toward b and j from a toward c
     const at = (i: number, j: number) =>
       vertex(
         normalize(
@@ -140,20 +104,10 @@ export function geodesic(frequency: number): {
 export const icosphere = (frequency: number): Vec3[] =>
   geodesic(frequency).points;
 
-/**
- * About how far apart neighbouring anchors lie, metres: the icosahedron's edge
- * cut F times.
- */
 export const spacing = (frequency: number) => (R * Math.atan(2)) / frequency;
 
-/** The blend band, metres. */
 export const band = (frequency: number) => BAND_SHARE * spacing(frequency);
 
-/**
- * The furthest any point of the sphere lies from its nearest anchor, metres:
- * the largest triangle's circumradius (the cells' corners are the triangles'
- * circumcentres).
- */
 export function cover(frequency: number): number {
   const { points, triangles } = geodesic(frequency);
   let most = 0;
@@ -167,25 +121,13 @@ export function cover(frequency: number): number {
   return most;
 }
 
-/**
- * How alike two reads of the patches are, `x`, `z` metres apart on them: 0
- * unrelated, ±1 the same (or opposite) sea.
- */
 export type Likeness = (x: number, z: number) => number;
 
-/**
- * Where the R2 low-discrepancy sequence (Roberts 2018) puts its n-th point, in
- * [0, span)².
- */
 function r2(n: number, span: number): [number, number] {
-  const g = 1.324717957244746; // the plastic number
+  const g = 1.324717957244746;
   return [((0.5 + n / g) % 1) * span, ((0.5 + n / (g * g)) % 1) * span];
 }
 
-/**
- * Each point's neighbours: the points whose cells meet its own (nearer than 1.4
- * times its nearest).
- */
 export function neighbours(points: Vec3[]): number[][] {
   return points.map((p, i) => {
     const d = points.map((q) => distance(p, q));
@@ -194,10 +136,6 @@ export function neighbours(points: Vec3[]): number[][] {
   });
 }
 
-/**
- * Points along the border between anchors a and b, where both weigh in: its
- * middle and either side of it.
- */
 function border(a: Vec3, b: Vec3): Vec3[] {
   const mid = normalize(add(a, b));
   const across = normalize(cross(a, b));
@@ -205,10 +143,6 @@ function border(a: Vec3, b: Vec3): Vec3[] {
   return [mid, along(mid, across, reach).p, along(mid, across, -reach).p];
 }
 
-/**
- * The worst likeness between anchor a's reads and anchor b's along the border
- * between them.
- */
 export function overlap(a: Anchor, b: Anchor, alike: Likeness): number {
   let worst = 0;
   for (const p of border(a.at, b.at)) {
@@ -227,16 +161,6 @@ export function overlap(a: Anchor, b: Anchor, alike: Likeness): number {
   return worst;
 }
 
-/**
- * The anchors at the given points, each chart's x axis along `wind` there (made
- * a unit tangent), and each reading the patches from its own offset within
- * `span` metres. The offsets come from a low-discrepancy sequence (R2), so they
- * lie far apart; given `alike`, each anchor in turn takes, of `tries` such
- * offsets, the one whose reads are least like its neighbours' already placed,
- * along the borders between them (the blend bands sum the seas as independent:
- * alike ones would stand higher there, or lower). The same offsets on every
- * run.
- */
 export function anchors(
   points: Vec3[],
   wind: (p: Vec3) => Vec3,
@@ -262,7 +186,6 @@ export function anchors(
     for (let t = 0; t < tries; t++) {
       const offset = r2(n * tries + t, span);
       let worst = 0;
-      // (no further once it can't beat the best so far)
       for (const m of placed)
         if (
           (worst = Math.max(worst, overlap({ ...a, offset }, all[m], alike))) >=
@@ -276,13 +199,8 @@ export function anchors(
   return all;
 }
 
-/** Each anchor's distance, as near last measured it. */
 const measured: number[] = [];
 
-/**
- * The anchors within `reach` metres of p, nearest first (of two as near, the
- * first), written into `out` (made if none is given): nothing else is made.
- */
 export function near(
   all: readonly Anchor[],
   p: Vec3,
@@ -293,7 +211,6 @@ export function near(
   for (let i = 0; i < all.length; i++) {
     const d = (measured[i] = distance(all[i].at, p));
     if (d > reach) continue;
-    // (an insertion sort, which keeps the order of those as near)
     let k = out.length;
     out.push(i);
     for (; k > 0 && measured[out[k - 1]] > d; k--) out[k] = out[k - 1];
@@ -302,10 +219,6 @@ export function near(
   return out;
 }
 
-/**
- * Each distance's weight (metres; the nearest counts in full), scaled so Σw² =
- * 1.
- */
 export function blend(distances: number[], width: number): number[] {
   const least = Math.min(...distances);
   const w = distances.map((d) => smoothstep(width, 0, d - least));
@@ -313,11 +226,6 @@ export function blend(distances: number[], width: number): number[] {
   return w.map((x) => x / size);
 }
 
-/**
- * The anchors that weigh in at p and their weights (the GPU's choice,
- * charts.ts: the three nearest, by their dot products with p, no sorting): a
- * function of p alone.
- */
 export function weigh(
   all: readonly Anchor[],
   p: Vec3,
@@ -332,10 +240,6 @@ export function weigh(
   };
 }
 
-/**
- * weigh's choice at the point (x, y, z), written into `index` and `weight`
- * (three each) with nothing made, the nearest first: returns how many weigh in.
- */
 export function weighInto(
   all: readonly Anchor[],
   x: number,
@@ -375,8 +279,6 @@ export function weighInto(
       b2 = i;
     }
   }
-  // blend's weights: the nearest counts in full, the others by how much further
-  // they lie, scaled so Σw² = 1
   const a0 = arc(c0),
     w1 = smoothstep(width, 0, arc(c1) - a0),
     w2 = smoothstep(width, 0, arc(c2) - a0);
@@ -395,12 +297,7 @@ export function weighInto(
   return n;
 }
 
-/** The arc to an anchor whose dot product with the point is c, metres. */
 const arc = (c: number) => R * Math.acos(Math.min(Math.max(c, -1), 1));
 
-/**
- * θ / sin θ: how much a chart stretches across its bearing at `metres` from its
- * centre.
- */
 export const stretch = (metres: number) =>
   metres === 0 ? 1 : metres / R / Math.sin(metres / R);

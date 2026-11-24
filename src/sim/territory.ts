@@ -1,33 +1,3 @@
-// Who holds the sea: territory, painted as she sails.
-//
-// Every ship starts with a small home patch of sea round her berth. Wherever
-// she sails she paints a strip of the sea her own, `brush` metres either side
-// of her course and running `ahead` metres before her bow, at once: open sea and others' water alike (theirs is left the
-// smaller). Her strip coming back against her older water (her patch, an
-// earlier strip, a loop she closed before, or her own strip from further back
-// than her length) closes a loop: the smaller side of the planet it cuts off,
-// whatever lies there (others' water, land), becomes hers (enclose.ts). Nothing
-// is open to be cut. A sunk ship's water drains back to open sea, and the storm
-// takes every cell outside its cap; a ship left with none paints on from where
-// she is.
-//
-// In a race sailed in teams the cells stay each ship's own, and her team's
-// water is as her own to her: her strip leaves a mate's water her mate's (a
-// mate crossing her water takes none of it), her strip coming against a mate's
-// water closes her loop as against her own, and the loop is fenced by her
-// team's water with hers (what it fences off becomes hers; her mates' stays
-// theirs).
-//
-// Her run is the cells she has painted since her strip last came against her
-// older water: what a loop's fence is made of, its flood starting there.
-//
-// What changed is logged (Change) for the frame to draw: a strip painted, a
-// claim flooding in from its loop, a home patch, water draining. The grid
-// itself, one byte a cell, is kept in place and read by reference.
-//
-// Pure arithmetic: no three, so it runs in node for the tests; the same moves
-// give the same grid, to the bit.
-
 import {
   CELLS,
   PLANET_QUANTA,
@@ -44,43 +14,14 @@ import { SHIP } from './handling.ts';
 import type { Cap } from './storm.ts';
 
 export const TERRITORY = {
-  /**
-   * The home patch round her berth, metres: a little more than her length
-   * either way.
-   */
   home: 30,
-  /**
-   * Metres either side of her course she paints: a strip some 1.5 times her
-   * beam as drawn (the border's smoothing takes about a metre off its 11).
-   */
   brush: 5.5,
-  /**
-   * Metres her strip runs ahead of her bow as she sails: the brush is centred
-   * her half length and this, less its own reach, ahead of her middle.
-   */
   ahead: 3,
-  /**
-   * Her newest cells, in cells her course has crossed (about her length), that
-   * her strip does not close a loop against: what she has only just painted.
-   */
   grace: 8,
-  /**
-   * Steps between the storm's sweeps over the cells (half a second at 30 a
-   * second).
-   */
   sweep: 15,
-  /** Seconds a change is kept for the frame to draw. */
   kept: 8,
 } as const;
 
-/**
- * What changed, numbered in order (seq), at a moment on the clock the game
- * steps it by (s: play/state.ts gives the world's, the frame's own):
- *   paint  her strip: `cells` became `ship`'s as she sailed over them
- *   claim  a loop closed: `cells` became `ship`'s, the first `loop` of them her run's (the flood comes from there)
- *   home   a home patch laid: `cells` became `ship`'s, from `at` outward
- *   drain  `cells` went back to open sea: `ship`'s as she sank, or (ship null) the storm's
- */
 type Change =
   | {
       seq: number;
@@ -113,14 +54,12 @@ type Change =
       cells: Int32Array;
     };
 
-/** A ship's move over one step: from where to where (unit vectors). */
 export interface Move {
   id: number;
   from: Vec3;
   to: Vec3;
 }
 
-/** What a step did: loops closed (whose, how many square metres they took). */
 export interface Outcome {
   claimed: { id: number; metres: number }[];
 }
@@ -131,32 +70,16 @@ type Logged = Change extends infer C
     : never
   : never;
 
-/**
- * The sea of `count` ships (ids 0 … count − 1), none holding any yet; `teams`
- * each ship's team by her id, in a race sailed in teams (none: every ship for
- * herself).
- */
 export function createTerritory(count: number, teams?: readonly number[]) {
-  /** Who holds each cell: 0 open sea, else her id + 1. */
   const owner = new Uint8Array(CELLS);
-  /**
-   * When its holder painted each cell, in cells her course had crossed then
-   * (walked); 0 for a patch's or a loop's.
-   */
   const when = new Int32Array(CELLS);
   const area = new Float64Array(count);
-  /** Cells each ship's course has crossed, from past her grace on. */
   const walked = new Int32Array(count).fill(TERRITORY.grace + 1);
-  /** Each ship's run: the cells painted since her strip last met her older water. */
   const runs: number[][] = Array.from({ length: count }, () => []);
-  /** The cell under each ship at her last step (−1: not seen yet). */
   const under = new Int32Array(count).fill(-1);
-  /** The way each ship last moved (unit tangents; 0: not yet). */
   const way: Vec3[] = Array.from({ length: count }, () => [0, 0, 0]);
-  /** The brush's scratch: each cell's last stamp, and the cells reached. */
   const stamp = new Int32Array(CELLS),
     reached: number[] = [];
-  /** The log, and the copy of it last handed out (null: changed since). */
   const changes: Change[] = [];
   let handed: readonly Change[] | null = null,
     seq = 0,
@@ -166,10 +89,6 @@ export function createTerritory(count: number, teams?: readonly number[]) {
     cosBrush = Math.cos(TERRITORY.brush / R),
     lead = (SHIP.length / 2 + TERRITORY.ahead - TERRITORY.brush) / R;
 
-  /**
-   * Where her brush is centred, she at `to` from `from`: `lead` ahead of her
-   * the way she moves (the way she last moved, still).
-   */
   const brushAt = (id: number, from: Vec3, to: Vec3): Vec3 => {
     const d = add(to, from, -1),
       along = add(d, to, -dot(d, to)),
@@ -179,7 +98,6 @@ export function createTerritory(count: number, teams?: readonly number[]) {
   };
 
   const log = (c: Logged) => {
-    // (oldest first: those too old are the first few)
     let gone = 0;
     while (
       gone < changes.length &&
@@ -198,10 +116,6 @@ export function createTerritory(count: number, teams?: readonly number[]) {
     owner[c] = to;
   };
 
-  /**
-   * The cells whose centres lie within `cos` (of the angle) of `at`, reached
-   * from the cell under it: written into `reached`.
-   */
   const round = (at: Vec3, cos: number) => {
     const first = cellOf(at),
       s = ++stamps;
@@ -217,7 +131,6 @@ export function createTerritory(count: number, teams?: readonly number[]) {
       }
   };
 
-  /** Lays her a home patch round `at`, wherever it is not another's. */
   const home = (id: number, at: Vec3, time: number) => {
     const u = normalize(at);
     round(u, cosHome);
@@ -229,18 +142,9 @@ export function createTerritory(count: number, teams?: readonly number[]) {
     log({ kind: 'home', time, ship: id, cells: Int32Array.from(cells), at: u });
   };
 
-  /**
-   * Whether the owner value `o` (0 open sea, else her id + 1) is a mate's of
-   * ship `id`: another ship of her team (never, with no teams).
-   */
   const mate = (id: number, o: number) =>
     !!teams && o !== 0 && o !== id + 1 && teams[o - 1] === teams[id];
 
-  /**
-   * Paints her brush round `at` into `painted`; whether it met her older water.
-   * A mate's water she leaves her mate's (her strip does not cut it), and it
-   * is as her own older water to her: her strip against it closes her loop.
-   */
   const paint = (id: number, at: Vec3, painted: number[]): boolean => {
     const me = id + 1,
       now = walked[id],
@@ -268,19 +172,12 @@ export function createTerritory(count: number, teams?: readonly number[]) {
     return met;
   };
 
-  /**
-   * Closes her loop: what her run and her water fence off becomes hers.
-   * Returns the square metres it took (0: it fenced nothing off).
-   */
   const claim = (id: number, time: number): number => {
     const me = id + 1,
       before = area[id];
-    // (only the run's cells still hers: another's strip may have taken some)
     const run = runs[id].filter((c) => owner[c] === me);
     runs[id] = [];
     if (!run.length) return 0;
-    // (her team's water fences with her own: it counts as hers in the loop,
-    // and stays her mates')
     const { cells, loop } = enclose(
       owner,
       me,
@@ -296,7 +193,6 @@ export function createTerritory(count: number, teams?: readonly number[]) {
     return ((area[id] - before) / PLANET_QUANTA) * 4 * Math.PI * R * R;
   };
 
-  /** Every cell outside the storm's cap goes back to open sea. */
   const sweep = (cap: Cap, time: number) => {
     if (cap.radius >= Math.PI) return;
     const cos = Math.cos(cap.radius),
@@ -313,18 +209,9 @@ export function createTerritory(count: number, teams?: readonly number[]) {
 
   const held: ReadCells = owner;
   return {
-    /**
-     * Who holds each cell (0 open sea, else her id + 1): every change logged so
-     * far, applied in order.
-     */
     owner: held,
-    /** How many ships it holds the sea for. */
     ships: count,
 
-    /**
-     * Lays every ship her home patch round her berth, at the match's start
-     * (none for a ship with no berth: she does not put to sea).
-     */
     begin(berths: readonly (Vec3 | null)[], time: number) {
       berths.forEach((at, id) => {
         if (!at) return;
@@ -333,11 +220,6 @@ export function createTerritory(count: number, teams?: readonly number[]) {
       });
     },
 
-    /**
-     * One step: each ship's move (those afloat), at `time` (that clock), under
-     * the storm's cap, in the order of their ids: each paints her strip where
-     * she now is, and closes her loop if it met her older water.
-     */
     step(moves: readonly Move[], time: number, cap: Cap): Outcome {
       const outcome: Outcome = { claimed: [] },
         walk: number[] = [];
@@ -370,7 +252,6 @@ export function createTerritory(count: number, teams?: readonly number[]) {
       return outcome;
     },
 
-    /** She sank: her water drains back to open sea. */
     sink(id: number, time: number) {
       const me = id + 1,
         cells: number[] = [];
@@ -384,25 +265,12 @@ export function createTerritory(count: number, teams?: readonly number[]) {
       log({ kind: 'drain', time, ship: id, cells: Int32Array.from(cells) });
     },
 
-    /**
-     * Who holds the water at p (any vector from the centre): her id, or −1 for
-     * open sea.
-     */
     ownerAt: (p: Vec3) => owner[cellOf(p)] - 1,
-    /**
-     * The team of who holds the water at p (with no teams, her id: she is her
-     * own), or −1 for open sea.
-     */
     teamAt: (p: Vec3) => {
       const o = owner[cellOf(p)] - 1;
       return o < 0 ? -1 : (teams?.[o] ?? o);
     },
-    /** Her share of the planet, 0…1. */
     share: (id: number) => area[id] / PLANET_QUANTA,
-    /**
-     * Her team's share of the planet, 0…1: hers and her mates' together (her
-     * own, with no teams).
-     */
     teamShare: (id: number) => {
       if (!teams) return area[id] / PLANET_QUANTA;
       let all = 0;
@@ -410,20 +278,10 @@ export function createTerritory(count: number, teams?: readonly number[]) {
         if (teams[k] === teams[id]) all += area[k];
       return all / PLANET_QUANTA;
     },
-    /** Whether she holds any water. */
     holds: (id: number) => area[id] > 0,
-    /**
-     * What changed in the last `kept` seconds, oldest first, numbered from 1
-     * with none left out: a copy, kept as it was when handed out.
-     */
     changes: (): readonly Change[] => (handed ??= changes.slice()),
-    /** The number of the last change made (0: none yet), kept or not. */
     last: () => seq,
 
-    /**
-     * The grid's fingerprint (FNV-1a over who holds each cell and when it was
-     * painted).
-     */
     hash(): string {
       let h = 0x811c9dc5;
       for (let c = 0; c < CELLS; c++)

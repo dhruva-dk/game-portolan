@@ -1,7 +1,3 @@
-// Her ship and her sea's sounds: a gust filling her canvas, the loot she takes
-// up and the stores she mends with, and her water: a loop closed (the sea
-// rushing as her colour floods it), the storm beginning to close.
-
 import {
   ar,
   brown,
@@ -23,7 +19,6 @@ import {
 } from '../dsp.ts';
 import { timber } from './blows.ts';
 
-/** Canvas filling at once: a crack with a low body, its flutter after. */
 const canvas = (t: Take, at: number, gain: number) => {
   const crack = layer(t, 0.1);
   noise(crack, fall(0.006));
@@ -55,10 +50,6 @@ const canvas = (t: Take, at: number, gain: number) => {
   mix(t, flutter, at + 0.03, 0.8 * gain);
 };
 
-/**
- * A gust: the wind's rush through her rig, her canvas cracking full as it takes
- * her.
- */
 export function gust(rate: number, seed: number): Samples {
   const t = take(1.9, rate, seed);
   const rush = layer(t);
@@ -75,10 +66,6 @@ export function gust(rate: number, seed: number): Samples {
   return normal(finish(t)).x;
 }
 
-/**
- * A loop closed: the sea's rush swelling as her colour floods the water,
- * settling after.
- */
 export function claim(rate: number, seed: number): Samples {
   const t = take(3.4, rate, seed);
   const peak = (s: number) => Math.exp(-(((s - 1.05) / 0.6) ** 2));
@@ -99,10 +86,6 @@ export function claim(rate: number, seed: number): Samples {
   return normal(finish(t, 0.05, 0.4)).x;
 }
 
-/**
- * The storm beginning to close: a far, heavy roll of wind rising and passing
- * on.
- */
 export function closing(rate: number, seed: number): Samples {
   const t = take(5, rate, seed);
   const env = swell(1.6, 4.9, 2.6);
@@ -127,10 +110,6 @@ export function closing(rate: number, seed: number): Samples {
   return normal(finish(t, 0.1, 0.6)).x;
 }
 
-/**
- * The storm's bolt at its edge as it begins to close: the stroke's tearing
- * crack, and its thunder rolling away under it, broken by the cloud.
- */
 export function thunder(rate: number, seed: number): Samples {
   const t = take(4.5, rate, seed);
   const tear = layer(t, 0.5);
@@ -155,10 +134,6 @@ export function thunder(rate: number, seed: number): Samples {
   return normal(finish(t, 0.002, 0.8)).x;
 }
 
-/**
- * Loot taken up: the crate scraping aboard and set down, the sea running off
- * it.
- */
 export function took(rate: number, seed: number): Samples {
   const t = take(1, rate, seed);
   const scrape = layer(t, 0.15);
@@ -184,9 +159,6 @@ export function took(rate: number, seed: number): Samples {
   return normal(finish(t)).x;
 }
 
-/**
- * Her ward made good: a shimmer rising, and the ward's own ring as it holds.
- */
 export function mendWard(rate: number, seed: number): Samples {
   const t = take(1.7, rate, seed);
   const rise = layer(t);
@@ -207,9 +179,6 @@ export function mendWard(rate: number, seed: number): Samples {
   return normal(finish(t, 0.02, 0.3)).x;
 }
 
-/**
- * Her hull made good: her timbers drawn tight, two knocks of them seating home.
- */
 export function mendHull(rate: number, seed: number): Samples {
   const t = take(1.2, rate, seed);
   timber(t, (s) => 30 + 110 * s, swell(0.1, 0.55, 0.15), 0, 0.55, 340, 1);

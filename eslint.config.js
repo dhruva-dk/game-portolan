@@ -1,10 +1,6 @@
-// Lint: types kept honest, imports runnable, the simulation deterministic and
-// three.js used through its public API. An exception says why, inline:
-//   // eslint-disable-next-line <rule> -- why it stands
 import comments from '@eslint-community/eslint-plugin-eslint-comments';
 import tseslint from 'typescript-eslint';
 
-/** Relative imports name their .ts: Node runs the .ts files directly. */
 const EXTENSIONS = [
   'ImportDeclaration',
   'ExportNamedDeclaration',
@@ -15,7 +11,6 @@ const EXTENSIONS = [
   message: 'Name a relative import with its .ts',
 }));
 
-/** No three.js hacks: its public API only. */
 const THREE = [
   {
     selector: 'Identifier[name=/^on(Before|After)(Compile|Render|Shadow)$/]',

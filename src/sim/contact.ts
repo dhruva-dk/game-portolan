@@ -1,44 +1,3 @@
-// Ships meeting: hull against hull, and the rams among them. One fixed step of
-// a whole fleet, each ship under her own helm (ship.ts), then kept off every
-// other.
-//
-// Her hull, for meeting another's, is a capsule along her keel: as wide as her
-// beam and as long as her length, its ends rounded by half her beam, so her
-// stem is a blunt half-circle and her sides straight. Where two meet is found
-// on a flat chart about the point between them (a few millimetres off the
-// sphere at these sizes; the hulls are held a centimetre apart, RAM.skin, which
-// covers it).
-//
-// Two that meet closing get one blow between them, as two rigid hulls do: equal
-// of mass ahead, but each far heavier to shove broadside (the water she must
-// shoulder aside with her), and turning as a plank turns. They part at a fifth
-// of the speed they met at, and their sides grip only lightly as they slide, so
-// a glancing blow scrapes along her and goes on. What the blow does to her way
-// ahead goes into her speed; what it does across her, or to her astern, is a
-// shove that carries her on and dies away in the water; what it does to her
-// turn, into her turn, which her rudder takes back. Then wherever they still
-// overlap they are pushed apart, each by as much as she gives (one shoved
-// broadside moves the less), over a few passes for a pile of them. A push that
-// would set her on the shallows (shoal.ts) is not made, and the other takes all
-// of it; so one pressed against the shore stands, and the ship pressing her is
-// held off. If any still overlap after that, they are put back where they began
-// the step, all way off: as she does on the shallows, she stays put rather than
-// go through. So hulls that begin clear of each other stay clear.
-//
-// A blow closing faster than RAM.least is a ram: its damage grows with the
-// closing, each ship takes a share of it by how little of the closing was her
-// own doing and by where it landed on her, her bow taking it best and her side
-// worst. A pair that has rammed may not ram again until they have drawn
-// RAM.rearm metres clear: one ram, one blow, however long the rammer then
-// presses on.
-//
-// Every pair is looked at, a few dot products each until two lie within a
-// ship's length: 496 pairs for 32 ships. Pairs are taken in order of the ships'
-// ids, so it makes no difference in which order the fleet is listed.
-//
-// Pure arithmetic: no three, so it runs in node for the tests; deterministic
-// for the same inputs.
-
 import { clamp } from '../world/scalar.ts';
 import {
   R,
@@ -55,11 +14,6 @@ import { RAM, SHIP, SPEC, type Handling } from './handling.ts';
 import { step, type Helm, type ShipState } from './ship.ts';
 import { hullAt, moved, under, type Depth } from './shoal.ts';
 
-/**
- * A ship in a fleet: who she is (an id no other in the fleet has), how she
- * sails, the shove she is carried on by (m/s, a tangent at her place), and the
- * ships she has rammed or been rammed by and not yet drawn clear of.
- */
 export interface Vessel {
   id: number;
   ship: ShipState;
@@ -67,24 +21,14 @@ export interface Vessel {
   engaged: readonly number[];
 }
 
-/** Where a blow lands on her. */
 type Part = 'bow' | 'side' | 'stern';
 
-/**
- * One ship's side of a ram: who she is, where it landed on her, and the hit
- * points it took off her.
- */
 interface Hit {
   id: number;
   part: Part;
   damage: number;
 }
 
-/**
- * A ram: the ship that drove it home (the more of the closing hers) and the one
- * she struck, how fast they closed where they met (m/s), and where that was (a
- * unit vector).
- */
 export interface Blow {
   striker: Hit;
   struck: Hit;
@@ -92,7 +36,6 @@ export interface Blow {
   at: Vec3;
 }
 
-/** A ship in a fleet, under no shove and engaged with none. */
 export const afloat = (id: number, ship: ShipState): Vessel => ({
   id,
   ship,
@@ -100,29 +43,17 @@ export const afloat = (id: number, ship: ShipState): Vessel => ({
   engaged: [],
 });
 
-/**
- * Her hull's half-width, and how far ahead and astern of amidships its rounded
- * ends are centred.
- */
 export const RADIUS = SHIP.beam / 2;
 export const KEEL = SHIP.length / 2 - RADIUS;
-/** Passes of pushing apart, for a pile. */
 const PASSES = 8;
 
 type P = readonly [number, number];
 const sub = (a: P, b: P): P => [a[0] - b[0], a[1] - b[1]];
 const dot2 = (a: P, b: P) => a[0] * b[0] + a[1] * b[1];
-/** a × b, up: positive turning a toward b anticlockwise seen from above. */
 const cross2 = (a: P, b: P) => a[0] * b[1] - a[1] * b[0];
 const along2 = (a: P, b: P, k: number): P => [a[0] + b[0] * k, a[1] + b[1] * k];
 const scale2 = (a: P, k: number): P => [a[0] * k, a[1] * k];
 
-/**
- * The points nearest each other on the segments p0–p1 and q0–q1, as shares of
- * the way along each. Lying parallel and overlapping, the middle of the
- * overlap, so a hull alongside is met at the middle of where she lies
- * alongside.
- */
 function nearest(p0: P, p1: P, q0: P, q1: P): [s: number, t: number] {
   const d1 = sub(p1, p0),
     d2 = sub(q1, q0),
@@ -146,10 +77,6 @@ function nearest(p0: P, p1: P, q0: P, q1: P): [s: number, t: number] {
   return [s, t];
 }
 
-/**
- * One ship as the chart about a meeting sees her: amidships, the way her bow
- * points, and her keel, stern to stem.
- */
 interface Laid {
   centre: P;
   ahead: P;
@@ -157,11 +84,6 @@ interface Laid {
   stem: P;
 }
 
-/**
- * Two hulls on a chart about the point between them: how far apart (m, negative
- * overlapping), the way from the first to the second where they are nearest,
- * and the point midway there; with the chart's axes and centre.
- */
 interface Meeting {
   gap: number;
   n: P;
@@ -173,13 +95,11 @@ interface Meeting {
   middle: Vec3;
 }
 
-/** A point on the chart with axes east and north. */
 const flat = (p: Vec3, east: Vec3, north: Vec3): P => [
   R * dot(p, east),
   R * dot(p, north),
 ];
 
-/** A ship laid on the chart with axes east and north. */
 function lay(s: ShipState, east: Vec3, north: Vec3): Laid {
   const x = dot(s.heading, east),
     y = dot(s.heading, north),
@@ -194,11 +114,6 @@ function lay(s: ShipState, east: Vec3, north: Vec3): Laid {
   };
 }
 
-/**
- * How a and b lie toward each other, or null if they lie too far apart to
- * matter (and then made without making anything: it is asked of every pair,
- * many times a step).
- */
 function meet(a: ShipState, b: ShipState): Meeting | null {
   const dx = a.at[0] - b.at[0],
     dy = a.at[1] - b.at[1],
@@ -217,8 +132,6 @@ function meet(a: ShipState, b: ShipState): Meeting | null {
   let n: P;
   if (apart > 1e-9) n = [d[0] / apart, d[1] / apart];
   else {
-    // keel across keel: the way between them amidships, or, one right over the
-    // other, to the first's starboard
     const m = sub(lb.centre, la.centre),
       l = Math.hypot(m[0], m[1]);
     n = l > 1e-9 ? [m[0] / l, m[1] / l] : [la.ahead[1], -la.ahead[0]];
@@ -235,26 +148,14 @@ function meet(a: ShipState, b: ShipState): Meeting | null {
   };
 }
 
-/**
- * Metres of open water between two hulls where they are nearest, negative where
- * they overlap; Infinity far apart.
- */
 export const gap = (a: ShipState, b: ShipState) => meet(a, b)?.gap ?? Infinity;
 
-/**
- * How much a push along u (a unit vector on the chart) moves her, against a
- * push along her keel: 1 along it, 1/sway square across it.
- */
 const yields = (l: Laid, u: P) => {
   const ahead = dot2(l.ahead, u),
     across = cross2(l.ahead, u);
   return ahead * ahead + (across * across) / RAM.sway;
 };
 
-/**
- * Her velocity on the chart change by an impulse J there (per unit of her mass
- * ahead).
- */
 const given = (l: Laid, j: P): P => {
   const ahead = dot2(l.ahead, j),
     across = cross2(l.ahead, j) / RAM.sway;
@@ -264,17 +165,12 @@ const given = (l: Laid, j: P): P => {
   ];
 };
 
-/**
- * Where a blow meets her, by the way it comes at her (a unit vector on the
- * chart, from her hull outward).
- */
 function part(l: Laid, out: P): Part {
   const c = dot2(out, l.ahead),
     stem = Math.cos(RAM.stem);
   return c > stem ? 'bow' : c < -stem ? 'stern' : 'side';
 }
 
-/** A ship as the step works on her. */
 interface Working {
   id: number;
   ship: ShipState;
@@ -283,10 +179,6 @@ interface Working {
   jolt: Vec3;
 }
 
-/**
- * Her way through the water and her shove together, on the chart, and at a
- * point of her (r from amidships).
- */
 function velocity(w: Working, m: Meeting, r: P): P {
   const v = add(scale(w.ship.heading, w.ship.speed), w.shove);
   return [
@@ -295,11 +187,6 @@ function velocity(w: Working, m: Meeting, r: P): P {
   ];
 }
 
-/**
- * A change of velocity dv (on the chart) and of turn given to her: what is
- * along her keel to her speed, the rest to her shove; never astern through the
- * water.
- */
 function jolted(w: Working, m: Meeting, dv: P, turn: number): void {
   let d = add(scale(m.east, dv[0]), m.north, dv[1]);
   d = add(d, w.ship.at, -dot(d, w.ship.at));
@@ -312,10 +199,6 @@ function jolted(w: Working, m: Meeting, dv: P, turn: number): void {
   w.jolt = add(w.jolt, d);
 }
 
-/**
- * The blow between a and b, met as `m`, if they are closing: their velocities
- * changed, and the ram it was, if any.
- */
 function strike(a: Working, b: Working, m: Meeting): Blow | null {
   const ra = sub(m.c, m.a.centre),
     rb = sub(m.c, m.b.centre);
@@ -331,8 +214,6 @@ function strike(a: Working, b: Working, m: Meeting): Blow | null {
     cross2(ra, u) ** 2 / k2 +
     cross2(rb, u) ** 2 / k2;
   const jn = ((1 + RAM.bounce) * closing) / heft(m.n);
-  // the grip along their sides, against their sliding, no more than it takes to
-  // stop it
   const slide = along2(rel, m.n, closing),
     sliding = Math.hypot(slide[0], slide[1]);
   let j: P = scale2(m.n, jn);
@@ -343,8 +224,6 @@ function strike(a: Working, b: Working, m: Meeting): Blow | null {
   jolted(a, m, scale2(given(m.a, j), -1), -cross2(ra, j) / k2);
   jolted(b, m, given(m.b, j), cross2(rb, j) / k2);
   if (closing <= RAM.least || a.engaged.includes(b.id)) return null;
-  // a ram: shared by how little of the closing was each one's own, and by where
-  // on her it landed
   a.engaged.push(b.id);
   b.engaged.push(a.id);
   const fa = Math.max(0, dot2(va, m.n)),
@@ -373,10 +252,6 @@ function strike(a: Working, b: Working, m: Meeting): Blow | null {
     : { striker: hb, struck: ha, closing, at };
 }
 
-/**
- * The place `metres` along u (a unit vector on the chart) takes her, or null if
- * it would set her on the shallows.
- */
 function pushed(
   s: ShipState,
   m: Meeting,
@@ -392,10 +267,6 @@ function pushed(
   return c >= 0 || c >= under(s.at, s.heading, depth) ? { ...s, ...to } : null;
 }
 
-/**
- * a and b pushed apart along the way between them, each by as much as she
- * gives, unless the shallows hold her, when the other is pushed the whole way.
- */
 function heldApart(a: Working, b: Working, m: Meeting, depth: Depth): void {
   const want = RAM.skin - m.gap;
   const wa = yields(m.a, m.n),
@@ -412,10 +283,6 @@ function heldApart(a: Working, b: Working, m: Meeting, depth: Depth): void {
   }
 }
 
-/**
- * Her own step under her helm, then on along her shove, as far as the shallows
- * let her; the shove dying away.
- */
 function sailed(
   v: Vessel,
   helm: Helm,
@@ -439,13 +306,6 @@ function sailed(
   return { id: v.id, ship, shove, engaged: [...v.engaged], jolt: [0, 0, 0] };
 }
 
-/**
- * One step of dt seconds for a fleet, each ship under her own helm (helms[i]
- * for fleet[i]) and by her own handling (fits[i]; the tables' if not given), in
- * water `depth` deep; the fleet after it (in the same order), the rams there
- * were, and the change of velocity each ship's meetings gave her (m/s, a
- * tangent at her place), for her ride to show.
- */
 export function stepFleet(
   fleet: readonly Vessel[],
   helms: readonly Helm[],
@@ -463,14 +323,12 @@ export function stepFleet(
     for (let i = 0; i < ws.length; i++)
       for (let j = i + 1; j < ws.length; j++) each(ws[i], ws[j]);
   };
-  // the blows between hulls that meet
   const blows: Blow[] = [];
   pairs((a, b) => {
     const m = meet(a.ship, b.ship);
     const blow = m && m.gap < RAM.skin ? strike(a, b, m) : null;
     if (blow) blows.push(blow);
   });
-  // pushed apart wherever they overlap
   for (let pass = 0, again = true; pass < PASSES && again; pass++) {
     again = false;
     pairs((a, b) => {
@@ -480,8 +338,6 @@ export function stepFleet(
       again = true;
     });
   }
-  // any still overlapping are put back where they were, all way off, and so any
-  // they then overlap
   const was = new Map(fleet.map((v) => [v.id, v]));
   const back = new Set<number>();
   for (let again = true; again; ) {
@@ -498,7 +354,6 @@ export function stepFleet(
         }
     });
   }
-  // a pair drawn far enough clear may ram again
   const byId = new Map(ws.map((w) => [w.id, w]));
   for (const w of ws)
     w.engaged = w.engaged.filter(

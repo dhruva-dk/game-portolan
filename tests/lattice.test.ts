@@ -30,7 +30,6 @@ import { createWind } from '../src/world/wind.ts';
 import { likeness } from '../src/world/spectrum.ts';
 import { BANDS, CASCADES, SIZE } from '../src/world/cascades.ts';
 
-/** A deterministic spread of points over the sphere (Fibonacci). */
 const points = (n: number): Vec3[] =>
   Array.from({ length: n }, (_, i) => {
     const y = 1 - (2 * (i + 0.5)) / n,
@@ -170,7 +169,6 @@ test('neighbouring charts read nearly independent seas along their borders, at a
   const next = neighbours(all.map((a) => a.at));
   for (const wind of [5, 7.6, 12, 20]) {
     CASCADES.forEach((L, c) => {
-      // more of the spectrum than the anchors were chosen with
       const alike = likeness(SIZE, L, { wind, fetch: FETCH }, BANDS[c], 1500);
       let worst = 0;
       next.forEach((ns, i) =>
@@ -187,7 +185,6 @@ test('neighbouring charts read nearly independent seas along their borders, at a
 });
 
 test('the anchors and weights at a point depend on the point alone, not on where the eye is', () => {
-  // the shaders' choice (charts.ts): from the eye's list, the three with the largest dot product, then blend
   const margin = cover(FREQUENCY) + width;
   const gpu = (eye: Vec3, reach: number, p: Vec3) => {
     const list = near(all, eye, Math.PI * R).slice(
@@ -207,7 +204,6 @@ test('the anchors and weights at a point depend on the point alone, not on where
   for (const p of points(300)) {
     const { index, weight } = weigh(all, p, width);
     const truth = index.map((i, k) => ({ i, w: weight[k] }));
-    // eyes all round p, near and far, low and high, with the sea drawn out to p and beyond
     for (const [k, eye] of points(12).entries()) {
       const e = along(p, normalize(cross(p, eye)), (k / 12) * 300).p;
       const reach = distance(e, p) + 20 * k;

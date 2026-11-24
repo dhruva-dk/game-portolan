@@ -1,8 +1,3 @@
-// The cannon as the player lays it: along the chase camera's look
-// (play/chase.ts sight), on a ship crossing her bow at top speed, N balls at
-// each range, every one flown among the ships as they sail. How many strike
-// her, by its rarity, with the reticle on her and with it off her by a thumb's
-// slip; and with a bot's unsteady hand (gunner.ts spreadBy).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createChase } from '../src/play/chase.ts';
@@ -31,11 +26,6 @@ const deep = () => 30,
   N = 200;
 const centre = fromLatLon(0.2, 0.3);
 
-/**
- * The sight from the chase camera over her shoulder, looking at `o`'s hull
- * (half her freeboard up), or with `off` swung about the eye's up (to port if
- * `off` > 0) until her body stands that many radians off it: a thumb's slip.
- */
 function sightOn(v: Vessel, o: Vessel, off: number): Sight {
   const chase = createChase(
     () => -30,
@@ -67,11 +57,6 @@ function sightOn(v: Vessel, o: Vessel, off: number): Sight {
   return swung(a);
 }
 
-/**
- * The share of N balls from a gun of `rarity` that strike a ship `metres` off
- * crossing at top speed, the reticle `off` radians from her, the spread `k`
- * times the gun's.
- */
 function rate(rarity: number, metres: number, off = 0, k = 1): number {
   let hits = 0;
   for (let n = 0; n < N; n++) {

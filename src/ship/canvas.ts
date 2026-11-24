@@ -1,60 +1,17 @@
-// The canvas as the cloth simulation takes it (cloth.ts): a particle for every
-// vertex of the finest level's sails and pennants, in the same order, so that
-// level's cloth is the simulation's own grid and every coarser level finds its
-// vertices' places on it by their (u, v).
-//
-// The canvas is cut full: its rest shape is the drawn one, the sails bellied as
-// deep as the wind can fill them (and no deeper: canvas doesn't stretch), the
-// pennants straight. A square sail is lashed along its yard and held at its
-// clews by the sheets; the lateen along its yard and at its clew (where its
-// grid closes to a point); a pennant at its truck. Every other particle is kept
-// within its nearest lashing's reach: the shortest way to it across the canvas
-// as cut (Kim, Chentanez and Müller, "Long Range Attachments", SCA 2012), so a
-// sail blown hard can't stretch however few iterations the solver takes, yet
-// hangs, folds and shakes freely inside it.
-//
-// Positions are in metres in the ship's frame, a square sail's before its yard
-// is braced (cloth.ts braces the wind).
-//
-// Pure: no renderer, runs in node for the tests.
-
 import { PIVOT_Z, buildShip } from './build.ts';
 import { CLOTH } from './kit.ts';
 import { SCALE } from './lines.ts';
 import type { SailGrid } from './sails.ts';
 
-/** Four vec4s a particle, as the simulation reads them. */
 interface Canvas {
-  /** Particles a ship. */
   count: number;
-  /**
-   * Each sail's and pennant's grid (build.ts's for the finest level: the cloth
-   * vertices' `grid`s index it).
-   */
   grids: readonly SailGrid[];
-  /** Where it was cut (metres), and 1 if it is free, 0 if lashed. */
   rest: Float32Array;
-  /**
-   * Its grid's first particle, last column and last row (columns − 1, rows −
-   * 1), and the grid's kind (CLOTH).
-   */
   grid: Float32Array;
-  /**
-   * Its column and row in the grid, its nearest lashing (−1 for none: it is
-   * one) and how far that is across the cloth.
-   */
   cell: Float32Array;
-  /**
-   * The mast it hangs before (its z, its radius; 0 for none), the mast its yard
-   * is braced about (z), and −1 where the grid was wound against its order
-   * (else 1).
-   */
   mast: Float32Array;
 }
 
-/**
- * Whether particle (i, j) of a grid `nu` × `nv` cells of this kind is lashed.
- */
 export function lashed(
   kind: number,
   i: number,
@@ -67,7 +24,6 @@ export function lashed(
   return j === 0 || (j === nv && (i === 0 || i === nu));
 }
 
-/** The canvas, cut once. */
 let cut: Canvas | null = null;
 
 export function cutCanvas(): Canvas {
@@ -95,8 +51,6 @@ export function cutCanvas(): Canvas {
       row = nu + 1,
       count = row * (nv + 1);
     const pivot = cloth.part[g.first * 4 + 1];
-    // its mast's place and radius, the square sails' pivot, and which way the
-    // grid was wound: the same for each particle
     const standing = [
       g.mast ? g.mast.z * SCALE : 0,
       g.mast ? g.mast.r * SCALE : 0,
@@ -111,8 +65,6 @@ export function cutCanvas(): Canvas {
         cell.set([i, j, -1, 0], k * 4);
         mast.set(standing, k * 4);
       }
-    // each free particle's nearest lashing across the cloth: Dijkstra from all
-    // of them at once, over the grid's sides and diagonals as cut
     const reach = new Float64Array(count).fill(Infinity),
       from = new Int32Array(count).fill(-1),
       done = new Uint8Array(count);

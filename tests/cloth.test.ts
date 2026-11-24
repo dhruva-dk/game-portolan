@@ -123,7 +123,6 @@ test('a square sail hangs before its mast and is braced about it; the lateen bef
       continue;
     }
     assert.ok(mr > 0.1 && mr < 0.4, `${g.name}: mast radius ${mr}`);
-    // its head (the yard) lies just before the mast's axis
     const head = vec(canvas.rest, g.first + (g.columns >> 1));
     assert.ok(
       Math.hypot(head[0] * (g.kind === CLOTH.lateen ? 0 : 1), head[2] - mz) < 2,
@@ -156,8 +155,7 @@ const held = (b: (Berth | null)[]) =>
 
 test('the berths go to the player and the nearest within reach, the cloth settling unseen before it is shown', () => {
   const metres = ships(10, (i) => 20 + i * 15);
-  metres[7] = 5; // a near ship far down the list
-  // (moor moves the berths on in place)
+  metres[7] = 5;
   const empty = () => new Array(BERTHS).fill(null);
   const first = moor(empty(), metres, 9, 1 / 30);
   assert.deepEqual(held(first), [0, 1, 7, 9]);
@@ -172,7 +170,6 @@ test('the berths go to the player and the nearest within reach, the cloth settli
     shown.every((b) => b && b.share === 1),
     'shown in full after it fades in'
   );
-  // nobody past reach
   assert.deepEqual(
     held(
       moor(
@@ -190,7 +187,6 @@ test('a ship that is no longer among the nearest fades out before her berth goes
   const metres = ships(5, (i) => 20 + i * 10);
   let b = run(new Array(BERTHS).fill(null), metres, -1, SETTLE + FADE + 0.1);
   assert.deepEqual(held(b), [0, 1, 2, 3]);
-  // ship 4 comes close and ship 3 sails off
   const after = [...metres];
   after[4] = 10;
   after[3] = 100;
@@ -217,7 +213,6 @@ test("two ships at about the same distance don't trade a berth back and forth", 
   const metres = ships(BERTHS + 1, (i) => 20 + i * 10);
   let b = run(new Array(BERTHS).fill(null), metres, -1, 3);
   const last = BERTHS - 1;
-  // the one outside is now a little nearer than the last one in
   metres[BERTHS] = metres[last] - 2;
   b = run(b, metres, -1, 3);
   assert.ok(held(b).includes(last) && !held(b).includes(BERTHS));
@@ -251,7 +246,6 @@ test('her motion: rolling, she feels the roll about her fore-and-aft axis; heele
     m = moved(m, pose([0, 0, 1], [-Math.sin(a), Math.cos(a), 0]), dt);
   }
   const f = feeling(m!);
-  // rolling to starboard (her up toward −x, the world's starboard): a turn about +z, forward
   assert.ok(
     Math.abs(f.spin[2] - rate) < 0.01 &&
       Math.abs(f.spin[0]) < 1e-3 &&
@@ -288,7 +282,6 @@ test('her motion: gathering way, her canvas is thrown aft; a jump is not a jolt'
 });
 
 test('at rest, her yards are trimmed to the wind: square to it from astern, hard round when it is forward of the beam', () => {
-  // the way it blows, her frame: from right astern, from the starboard quarter, from the port bow
   assert.equal(trim([0, 0, 5], 0, 0), 0);
   const quarter = trim([3, 0, 3], 0, 0);
   assert.ok(
@@ -296,22 +289,18 @@ test('at rest, her yards are trimmed to the wind: square to it from astern, hard
       quarter === Math.min(BRACED, Math.PI / 4)
   );
   assert.equal(trim([-4, 0, -2], 0, 0), -BRACED);
-  // near dead ahead, they stay on the side they were
   assert.equal(trim([0.1, 0, -5], 0, -BRACED), -BRACED);
   assert.equal(trim([-0.1, 0, -5], 0, BRACED), BRACED);
-  // and are hauled round over a few seconds, not at once
   let b = 0;
   for (let t = 0; t < 1; t += 0.1) b = hauled(b, [3, 0, 3], 0, 0.1);
   assert.ok(b > 0.2 && b < quarter);
   for (let t = 0; t < 5; t += 0.1) b = hauled(b, [3, 0, 3], 0, 0.1);
   assert.ok(Math.abs(b - quarter) < 1e-9);
-  // the sail they set then faces into the wind's way: it fills
   const n: Vec3 = [Math.sin(b), 0, Math.cos(b)];
   assert.ok(dot(n, normalize([3, 0, 3])) > 0.95);
   assert.ok(length(cross(scale(n, 1), [0, 1, 0])) > 0.99);
 });
 
-/** How a square sail braced b and the lateen fill in a wind (her frame): its share through each, of its speed. */
 const through = (w: Vec3, b: number) => ({
   square: dot(normalize(w), [Math.sin(b), 0, Math.cos(b)]),
   lateen: Math.abs(normalize(w)[0]),
@@ -321,7 +310,6 @@ test('under way, her sails always draw: on every heading, in a light wind or a g
   for (const blow of [1, 7.6, 14])
     for (let d = 0; d < 360; d += 5)
       for (const speed of [WAY, 4, 12]) {
-        // the true wind, her frame, from every side; her yards hauled round to it from square
         const wind: Vec3 = [
           blow * Math.sin((d * Math.PI) / 180),
           0,
@@ -336,16 +324,13 @@ test('under way, her sails always draw: on every heading, in a light wind or a g
         );
         const w = filling(wind, speed, b),
           fill = through(w, b);
-        // from her quarter, on the side the wind blows to unless it is near her fore-and-aft line
         assert.ok(w[2] > 0 && w[1] === 0);
         if (Math.abs(wind[0]) > 0.3 * Math.abs(wind[2]))
           assert.equal(Math.sign(w[0]), Math.sign(wind[0]));
-        // square to the squares, and across the lateen
         assert.ok(
           fill.square > 0.95 && fill.lateen > 0.7,
           `${d}°: ${fill.square} ${fill.lateen}`
         );
-        // as strong as the wind and her way together
         assert.ok(length(w) >= Math.max(blow, 1.3 * speed) - 1e-9);
       }
 });
@@ -358,7 +343,6 @@ test("the sails' wind fills more the faster she goes; at rest it is the true win
   strengths.slice(1).forEach((s, k) => assert.ok(s > strengths[k]));
   const still = filling(wind, 0, BRACED);
   assert.ok(length(add(still, scale(wind, 0.4), -1)) < 1e-9);
-  // and it comes from the true wind to the sails' as she gathers way, without a jump
   let was = still;
   for (let s = 0.01; s <= 2; s += 0.01) {
     const w = filling(wind, s, BRACED);
@@ -368,7 +352,6 @@ test("the sails' wind fills more the faster she goes; at rest it is the true win
 });
 
 test("the true wind crossing her stern or her bow, her yards and her sails' wind swing across together, in seconds", () => {
-  // she turns at 0.2 rad/s, the true wind going from her port quarter to her starboard, and later from bow to bow
   for (const [from, to] of [
     [0.5, -0.5],
     [Math.PI - 0.5, -Math.PI + 0.5],
@@ -382,7 +365,6 @@ test("the true wind crossing her stern or her bow, her yards and her sails' wind
         wind: Vec3 = [7 * Math.sin(a), 0, 7 * Math.cos(a)];
       b = hauled(b, wind, 10, dt);
       const next = filling(wind, 10, b);
-      // a frame's change is small: no flip
       assert.ok(length(add(next, w, -1)) < 0.25, `${t.toFixed(2)} s`);
       assert.ok(through(next, b).square > 0.95);
       w = next;

@@ -31,7 +31,6 @@ import {
 
 const DEEP: Depth = () => 30;
 const c0 = fromLatLon(0.3, 0.1);
-/** The point `m` metres from c0 on a bearing `b` radians to port of east. */
 const out = (m: number, b = 0) =>
   along(c0, turned(shipAt(c0, frameAt(c0).east), b), m).p;
 const piece = (id: number, at: Vec3, goods: Loot['goods']): Loot => ({
@@ -43,10 +42,6 @@ const piece = (id: number, at: Vec3, goods: Loot['goods']): Loot => ({
   way: [0, 0, 0],
 });
 
-/**
- * Bots sailed `seconds` with their stores, as play/state.ts steps them: what
- * became of them.
- */
 function sail(
   at: Vec3[],
   seeds: number[],
@@ -124,8 +119,6 @@ function sail(
 
 test("her taps: on the gun in hand with a gun in reach, a swap; on the item in hand with stores in reach, a swap; else the hold's", () => {
   const fleet: Vessel[] = [afloat(0, shipAt(c0, frameAt(c0).north))];
-  // a full hold, the first of her stores in hand: a repair kit fits nowhere, so
-  // it is offered, not swept up
   const items = [
     { kind: 'smallShield', count: 2 },
     { kind: 'bigShield', count: 1 },
@@ -228,7 +221,6 @@ test('she mends with the slot worth most to her as she is', () => {
   assert.equal(at(100, 60), -1, 'nothing worth it');
 });
 
-/** Her guns' kinds and rarities, slot by slot (null: empty). */
 const kinds = (c: Crew) => c.guns.map((g) => g && `${g.kind} ${g.rarity}`);
 
 test('an unarmed bot sails to a gun she sees and takes it; with one, a second kind; with two, she swaps for a better', () => {
@@ -287,7 +279,6 @@ test('an unarmed bot sails to a gun she sees and takes it; with one, a second ki
 });
 
 test('a gun abeam, inside the circle she turns at her top speed, she slows to come round to it, not sail round it', () => {
-  // she heads north at c0 at her top; the gun lies 28 m off her beam, about the circle she turns at her top
   for (const seed of seeds((s) => temper(s).lootReach >= 110, 4)) {
     const r = sail(
       [c0],
@@ -352,13 +343,11 @@ test('bots near one piece do not all pile on it: one takes it, and none goes for
 });
 
 test('a piece she can not come to she gives up after a while, and leaves be', () => {
-  // the piece in a lagoon with no way in: a ring of reef round it
   const lagoon = out(100),
     reef: Depth = (p) => {
       const d = distance(p, lagoon);
       return d > 15 && d < 45 ? -2 : 30;
     };
-  // those who want loot and look for it as far off as the lagoon
   for (const seed of seeds(
     (s) => temper(s).loot >= 0.5 && temper(s).lootReach > 100,
     3

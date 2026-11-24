@@ -1,4 +1,3 @@
-// src/colour.ts: the sRGB curve both ways, as three's ColorManagement has it.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Color, SRGBColorSpace } from 'three';
@@ -32,7 +31,6 @@ test("hexToLinear is three's sRGB to linear, from a string or a number", () => {
 test('linearToSrgb undoes srgbToLinear', () => {
   for (let i = 0; i <= 255; i++)
     assert.ok(Math.abs(linearToSrgb(srgbToLinear(i / 255)) - i / 255) < 1e-12);
-  // held within 0…1
   const held = linearToSrgbRgb([-1, 2, 0]);
   assert.ok(
     held[0] === 0 && Math.abs(held[1] - 1) < 1e-12 && held[2] === 0,

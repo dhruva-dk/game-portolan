@@ -1,22 +1,9 @@
-// The chart's larger marks: the compass rose and its rhumb lines, the laurel
-// for a place, and the marks more than one screen draws, or that mean one
-// thing wherever they are (the spyglass, a ram, a badge, the pencil, the dye
-// pot, the circular arrow, the die, the anchor).
-
 import { INK, PAPER, WASH, alpha, arcPath } from './ink.ts';
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
 
-/**
- * The rhumb lines' inks, round the 32 winds: principal iron, half green,
- * quarter vermilion.
- */
 const WINDS = [INK.iron, WASH.vermilion, INK.green, WASH.vermilion] as const;
 
-/**
- * 32 rhumb lines from (cx, cy), `reach` long: principal winds iron, half green,
- * quarter vermilion.
- */
 export function rhumbs(cx: number, cy: number, reach: number, opacity = 0.3) {
   let s = '';
   for (let i = 0; i < 32; i++) {
@@ -26,12 +13,6 @@ export function rhumbs(cx: number, cy: number, reach: number, opacity = 0.3) {
   return `<g opacity="${opacity}">${s}</g>`;
 }
 
-/**
- * A rose's inks: its face, its lines and its ring (and how heavy its lines are
- * drawn, how broad its points and how wide its ring's chequer, a share of R),
- * the dark and light halves of each rank of point, the fleur-de-lis, the needle
- * (null: none) and the hub.
- */
 export interface RoseInks {
   face: string;
   line: string;
@@ -47,7 +28,6 @@ export interface RoseInks {
   needle: string | null;
   hub: string;
 }
-/** The chart's rose, as the screens draw it. */
 export const ROSE: RoseInks = {
   face: alpha(PAPER, 0.55),
   line: INK.iron,
@@ -64,12 +44,6 @@ export const ROSE: RoseInks = {
   hub: WASH.gold,
 };
 
-/**
- * The 32-point rose, radius R: iron principal points, green half winds, rubric
- * quarter winds, a gilt fleur-de-lis at north and a blue needle turned `needle`
- * degrees (in a group with id "needle" so it can be swung); `inks` recolours it
- * (the app's icon).
- */
 export function rose(
   cx: number,
   cy: number,
@@ -132,7 +106,6 @@ export function rose(
   return s;
 }
 
-/** A laurel of radius r round (cx, cy), open at the top. */
 export function laurel(cx: number, cy: number, r: number, colour: string) {
   let s = '';
   for (const side of [-1, 1]) {
@@ -153,7 +126,6 @@ export function laurel(cx: number, cy: number, r: number, colour: string) {
   return s;
 }
 
-/** The spyglass: a brass glass of three draws, its eye end at the left, tilted up to the right; `s` its length. */
 export const spyglass = (x: number, y: number, s: number) => {
   const k = s / 80;
   const tube = (x0: number, w: number, h: number) =>
@@ -170,13 +142,11 @@ export const spyglass = (x: number, y: number, s: number) => {
   );
 };
 
-/** A ram: two hulls met bow to bow, a rubric spark between them; about 34 across at `s` 1. */
 export const ram = (x: number, y: number, s = 1) =>
   `<g transform="translate(${x} ${y}) scale(${s})" stroke="${INK.iron}" stroke-width="1.4" stroke-linejoin="round">` +
   `<path d="M-17 -2L-3 -2L1 2L-3 7L-15 7Z" fill="url(#h-iron)"/><path d="M17 -2L3 -2L-1 2L3 7L15 7Z" fill="url(#h-iron)" transform="scale(1 -1) translate(0 -5)"/>` +
   `<path d="M0 -12l2 6l5 -4l-2 6l6 1l-6 2l3 5" fill="none" stroke="${INK.rubric}" stroke-width="1.6"/></g>`;
 
-/** A badge about (x, y): a gilt rosette, its two ribbon tails under it, `body` (a trait's mark) on its face. */
 export const badge = (x: number, y: number, body: string) =>
   `<g stroke="${INK.iron}" stroke-width=".9" stroke-linejoin="round">` +
   `<path d="M${x - 7} ${y + 6}L${x - 10} ${y + 19}L${x - 5} ${y + 15}L${x - 2} ${y + 19}L${x - 1} ${y + 8}Z" fill="${WASH.vermilion}"/>` +
@@ -184,14 +154,11 @@ export const badge = (x: number, y: number, body: string) =>
   `<circle cx="${x}" cy="${y}" r="12.5" fill="${WASH.gold}" stroke-width="1.2" stroke-dasharray="2.6 1.4"/>` +
   `<circle cx="${x}" cy="${y}" r="9.5" fill="${PAPER}" stroke-width=".8"/></g>${body}`;
 
-/** A small pencil, `s` long, its point at the lower left: a thing to be written in (the seed's chip). */
 export const pencil = (x: number, y: number, s: number) =>
   `<g transform="translate(${x} ${y}) rotate(-45) scale(${s / 24})" stroke="${INK.iron}" stroke-width="1.3" stroke-linejoin="round">` +
   `<path d="M-6 -3.2H9V3.2H-6Z" fill="${WASH.ochre}"/><path d="M9 -3.2H12.5V3.2H9Z" fill="${WASH.vermilion}"/>` +
   `<path d="M-6 -3.2L-12 0L-6 3.2Z" fill="${PAPER}"/><path d="M-10 -1.1L-12 0L-10 1.1Z" fill="${INK.iron}"/></g>`;
 
-/** The dye pot (her livery's folio), `s` across, about (x, y): an earthen pot brimming with her `dye`, a dribble of
- *  it down its lip, a brush standing in it. */
 export const dyePot = (x: number, y: number, s: number, dye: string) =>
   `<g transform="translate(${x} ${y}) scale(${s / 24})" stroke="${INK.iron}" stroke-linejoin="round" stroke-linecap="round">` +
   `<path d="M3 -3L10 -12" stroke="${INK.sepia}" stroke-width="2.2"/>` +
@@ -202,8 +169,6 @@ export const dyePot = (x: number, y: number, s: number, dye: string) =>
   `<ellipse cx="0" cy="-3.4" rx="7.6" ry="1.9" fill="${dye}" stroke-width=".7"/>` +
   `<path d="M-6.5 -2.4Q-7.4 1 -6.6 3.2Q-5.6 1 -5.6 -2.2Z" fill="${dye}" stroke-width=".6"/></g>`;
 
-/** The circular arrow (this seed sailed again: round once more), `s` across: most of a ring, a band of paper inked
- *  either side, its gilt head at the top. */
 export const again = (x: number, y: number, s: number) => {
   const ring = 'M-15.6 -9A18 18 0 1 0 0 -18';
   return (
@@ -214,13 +179,10 @@ export const again = (x: number, y: number, s: number) => {
   );
 };
 
-/** The die (a seed rolled: a new world), `s` across: a cube of paper seen from above a corner, inked, its right side
- *  hatched; five pips on its top (the middle one gilt), two and three on its sides. */
 export const die = (x: number, y: number, s: number) => {
   const a = 20,
     c = a * 0.87;
   type P = readonly [number, number];
-  /** The point (u, v) of a face from `o` along its edges `e` and `f`. */
   const on = (o: P, e: P, f: P, u: number, v: number) =>
     [r2(o[0] + u * e[0] + v * f[0]), r2(o[1] + u * e[1] + v * f[1])] as const;
   const pips = (o: P, e: P, f: P, uv: readonly P[]) =>
@@ -264,7 +226,6 @@ export const die = (x: number, y: number, s: number) => {
   );
 };
 
-/** The anchor (home: put in to harbour), `s` high: its ring, stock and shank, the arms curving up to their flukes. */
 export const anchor = (x: number, y: number, s: number) =>
   `<g transform="translate(${x} ${y}) scale(${r2(s / 48)})" stroke="${INK.iron}" stroke-linecap="round" stroke-linejoin="round" fill="none">` +
   `<circle cx="0" cy="-18" r="4.5" stroke-width="3"/>` +

@@ -6,7 +6,6 @@ import { named, rolled, seedOf } from '../src/world/seeds.ts';
 test('a seed of digits is that number, so the planets known by number keep theirs', () => {
   assert.equal(seedOf('3'), 3);
   assert.equal(seedOf(' 4294967295 '), 4294967295);
-  // past 32 bits it is text like any other
   assert.notEqual(seedOf('4294967296'), 4294967296);
   assert.ok(seedOf('4294967296') <= 0xffffffff);
 });

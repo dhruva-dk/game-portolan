@@ -1,81 +1,26 @@
-// How finely each level of detail builds the galleon, and which level a ship is
-// drawn at.
-//
-// A level is drawn once what it leaves out or bends out of place (`error`,
-// metres) covers less than a pixel: a ship d metres off, seen at `pixel`
-// radians a pixel, shows a thing of e metres over e / (d · pixel) pixels. On
-// the target (PIXEL: the iPad in landscape, 820 CSS pixels high, through the
-// chase camera's 50° lens) a pixel is 1.14 mrad: 2.8 cm at 25 m.
-//
-//   L0  everything: the hull's planking runs, wales, inboard faces, tops, deadeyes, every rope, sails on
-//       cloth-sized grids (14 × 9 a square sail)                                 own ship, and up to ~105 m
-//   L1  coarser lofts and sails, no small fittings, the running rigging on single spans    to ~265 m
-//   L2  the hull's shape and the castles, bare spars, sails as small grids, shrouds and stays only    to ~615 m
-//   L3  a speck: a hull, three masts, five sails                                               beyond
-//
-// A ship moves to a coarser level once it is SLACK further than the level's
-// distance, and back once it is that much nearer, so a ship sitting at a
-// boundary doesn't flicker between the two.
-//
-// Pure arithmetic: runs in node for the tests.
-
 import { AIR_FOV } from '../snapshot.ts';
 
-/**
- * The target's screen height, CSS pixels (the iPad in landscape, 1180 × 820);
- * and the angle a pixel of it spans through the chase camera's lens, radians
- * (the eye works out the screen's own each frame: view/view.ts).
- */
 const SCREEN = 820;
 export const PIXEL = (2 * Math.tan((AIR_FOV * Math.PI) / 360)) / SCREEN;
 
 export interface Detail {
-  /**
-   * Stations along her, and rows up each side of the skin from keel to rail.
-   */
   stations: number;
   rows: number;
-  /**
-   * Points along each wale and painted strake; sides round a wale (0: none, the
-   * strakes carry them).
-   */
   run: number;
   waleSides: number;
-  /** The bulwarks' inner faces, the cap rail and the castles' bulkheads. */
   inboard: boolean;
-  /** Each deck's grid: along it, across it. */
   deck: [number, number];
-  /**
-   * Sides round a mast and round a yard or the bowsprit; pieces along a yard.
-   */
   mastSides: number;
   sparSides: number;
   yardSegs: number;
-  /** Sides round a top's platform (0: no tops, crosstrees only). */
   topSides: number;
-  /** A square sail's grid, columns × rows, and the lateen's. */
   square: [number, number];
   lateen: [number, number];
-  /** Pieces along each pennant (0: none). */
   pennant: number;
-  /**
-   * Which ropes: shrouds, stays and every running line; shrouds and stays only;
-   * none.
-   */
   ropes: 'running' | 'standing' | 'none';
-  /** Pieces along a sagging rope. */
   sag: number;
-  /**
-   * Small fittings: deadeyes and chainplates, anchors, gratings, gammoning, the
-   * stern's mouldings, the channels.
-   */
   fittings: boolean;
-  /** The beakhead's knee, rails and grating, and the rudder. */
   head: boolean;
-  /**
-   * The largest thing this level leaves out or bends out of place, metres (at
-   * the ship's scale).
-   */
   error: number;
 }
 
@@ -162,23 +107,11 @@ export const DETAILS: readonly Detail[] = [
   },
 ];
 
-/**
- * How far past a level's distance a ship goes before it changes level: a tenth
- * either way.
- */
 export const SLACK = 1.1;
 
-/**
- * The distance, metres, past which a ship may be drawn at level k, for a pixel
- * of `pixel` radians.
- */
 export const reach = (k: number, pixel: number): number =>
   DETAILS[k].error / pixel;
 
-/**
- * The level to draw a ship at `metres` off, which was drawn at `was` (or −1 if
- * it wasn't drawn).
- */
 export function chooseDetail(
   was: number,
   metres: number,
@@ -187,7 +120,6 @@ export function chooseDetail(
   let k = 0;
   while (k + 1 < DETAILS.length && metres > reach(k + 1, pixel)) k++;
   if (was < 0 || k === was) return k;
-  // within the slack of the boundary it would cross, it stays where it was
   const edge = reach(Math.max(k, was), pixel);
   return metres > edge / SLACK &&
     metres < edge * SLACK &&

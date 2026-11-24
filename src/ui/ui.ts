@@ -1,60 +1,20 @@
-// The UI's layer over the world's canvas: one fixed element the size of the
-// screen holding every screen and piece, the ink's shared defs set into the
-// page once, the rules that place pieces inside the safe area, and the one rule
-// that sizes all of it (size).
-//
-// Hit regions are explicit: the layer and every piece let touches through
-// (pointer-events: none) to the canvas, where input.ts reads the stick and the
-// look; only an element marked `.press` takes a touch, and a touch it takes
-// never reaches the canvas, so it can neither move the stick nor drag the look
-// (touch.ts). A finger already on the stick or the look keeps it (the canvas
-// captures its pointer) even when it slides over a control.
-//
-// Shown and hidden one way: `show` at once (the `hidden` attribute), `fade`
-// over a time and then hidden.
-
 import { DEFS, cssInks, svgNode } from './ink.ts';
 import { FADE } from './ways.ts';
 
-/**
- * The page every piece and screen was drawn on, CSS px: a phone's landscape
- * screen, and its safe insets.
- */
 const DRAWN = {
   w: 956,
   h: 440,
   insets: { top: 0, right: 62, bottom: 20, left: 62 },
 } as const;
-/**
- * The least width the drawn pieces need side by side at their own size (the
- * HUD's top row: the vitals, a gap, then half the readings, to the middle, is
- * 340).
- */
 const LEAST = 680;
-/**
- * Every piece stands at least GUTTER px (at the drawn size) from the screen's
- * edge, and INSET px in from the safe area's.
- */
 const GUTTER = 16,
   INSET = 2;
 
-/**
- * The UI's size on a screen `width` × `height` CSS px, the one rule every piece
- * and screen is scaled by: a factor on the drawn size, so a piece is the same
- * share of the screen's short edge on any screen (1 on the page it was drawn
- * on, 1.74 on the iPad Air's 1180 × 820), unless the screen is too narrow for
- * the drawn pieces side by side at that size.
- */
 export const size = (width: number, height: number) =>
   Math.min(height / DRAWN.h, width / LEAST);
 
-/**
- * The screen now, CSS px, the UI's size on it and the device's pixels to a CSS
- * px: kept by the one resize listener.
- */
 export const view = { w: 0, h: 0, k: 1, dpr: 1 };
 
-/** The safe area's insets, CSS px. */
 export interface Insets {
   top: number;
   right: number;
@@ -62,10 +22,6 @@ export interface Insets {
   left: number;
 }
 
-/**
- * The page on a screen, in the drawn page's units: its size, and the safe
- * area's edges with a margin inside them.
- */
 export interface Page {
   w: number;
   h: number;
@@ -75,10 +31,6 @@ export interface Page {
   bottom: number;
 }
 
-/**
- * The page on a screen `width` × `height` CSS px with the given safe insets:
- * scaled by the UI's size, grown to the screen's shape.
- */
 function pageFor(width: number, height: number, safe: Insets): Page {
   const k = size(width, height),
     w = width / k,
@@ -94,14 +46,8 @@ function pageFor(width: number, height: number, safe: Insets): Page {
   };
 }
 
-/** The page as drawn, on the phone with its insets. */
 const PAGE = pageFor(DRAWN.w, DRAWN.h, DRAWN.insets);
 
-/**
- * `body`, drawn on the drawn page, kept to this page's edges: `x` to its left
- * or right, or centred between them, and `y` to its top or bottom, or centred
- * between them.
- */
 export function at(
   p: Page,
   x: 'left' | 'centre' | 'right',
@@ -152,16 +98,12 @@ const STYLE = `
 @keyframes needle { from { transform: rotate(-38deg) } to { transform: rotate(52deg) } }
 `;
 
-/** Shows `el` or hides it, at once. */
 export function show(el: HTMLElement, on: boolean) {
   if (el.hidden === on) el.hidden = !on;
 }
 
-/** Each element fading, and the timer that hides it once faded out. */
 const fading = new WeakMap<HTMLElement, number>();
 
-/** Fades `el` in or out over `ms`: shown, it takes touches at once; going, none, and once faded it is hidden.
- *  Already as asked, nothing changes. */
 export function fade(el: HTMLElement, on: boolean, ms = FADE) {
   if (on === (!el.hidden && !el.classList.contains('gone'))) return;
   clearTimeout(fading.get(el));
@@ -186,31 +128,25 @@ export function fade(el: HTMLElement, on: boolean, ms = FADE) {
   }
 }
 
-/** Lays `el` out now, as it stands: a transition begun after it starts from there (the usual way to start one). */
 export function reflow(el: HTMLElement) {
   void el.offsetWidth;
 }
 
-/** Where `el` stands on the screen now, CSS px. It asks the page to lay itself out: on a touch, never each frame. */
 export const boxOf = (el: Element): DOMRect => el.getBoundingClientRect();
 
-/** What is told when the screen changes size, after `view` is. */
 const resizes = new Set<() => void>();
 
-/** Calls `fn` whenever the screen changes size (the one listener for it); returns what stops it. */
 export function onResize(fn: () => void): () => void {
   resizes.add(fn);
   return () => resizes.delete(fn);
 }
 
-/** The layer, made the first time it is asked for. */
 let layer: HTMLElement | null = null;
 export function uiLayer(): HTMLElement {
   if (layer) return layer;
   const style = document.createElement('style');
   style.textContent = STYLE;
   document.head.appendChild(style);
-  // the inks the page's own CSS reads (index.html)
   for (const [name, value] of cssInks)
     document.documentElement.style.setProperty(name, value);
   const defs = svgNode(0, 0, DEFS);
@@ -235,8 +171,6 @@ export function uiLayer(): HTMLElement {
   return el;
 }
 
-/** The safe area's insets now, CSS px, read off an unseen element's padding (--safe-* stand in for them off the
- *  device: debug.ts ?safe). Not each frame: it asks the page for its style. */
 let probe: HTMLElement | null = null;
 export function insets(): Insets {
   if (!probe) {
@@ -256,10 +190,8 @@ export function insets(): Insets {
   };
 }
 
-/** The page on this screen now. */
 export const page = () => pageFor(view.w, view.h, insets());
 
-/** A full-screen element of the layer, hidden until shown; `press` makes all of it take touches. */
 export function screen(press = false): HTMLDivElement {
   const el = document.createElement('div');
   el.className = press ? 'screen press' : 'screen';
@@ -268,8 +200,6 @@ export function screen(press = false): HTMLDivElement {
   return el;
 }
 
-/** A piece of the UI placed by its classes (e.g. 'top left'); `press` makes it take touches; `sized` grows it by the
- *  UI's size about the corner (or edge) it is placed at. */
 export function piece(
   parent: HTMLElement,
   place: string,

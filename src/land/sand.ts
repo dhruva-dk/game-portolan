@@ -1,18 +1,3 @@
-// The ground's look, wherever it is: sand in flat bands by height, each of two
-// tones (palette.ts) with a crisp edge to the next: the sea floor's pale sand,
-// with rubble and sea grass where the ground's cover says (ground.ts) and
-// stones and weed strewn over it (strewn.ts); a paler band along the waterline;
-// the beach; the deeper, drier sand higher up. The bands' edges wander with the
-// ground's mottling, so none is a contour line. Where the ground is steeper
-// than sand lies, a cliff's bare rock in strata. On land the cover carries the
-// land's own (world/planet-terrain.ts): earthier sand in patches where the
-// shrubs grow, and the tops' bare rock. High up, the pale dunes (halfway to the
-// summit: world/planet-terrain.ts BANDS).
-//
-// Everything is a function of the world position alone (the ground's mesh
-// changes its detail under the eye: terrain-mesh.ts). Lit like everything else
-// (sky/light.ts).
-
 import { dot, float, fract, max, mix, vec3 } from 'three/tsl';
 import {
   ROCK,
@@ -34,7 +19,6 @@ import type { Light } from '../sky/light.ts';
 import { createStrewn } from './strewn.ts';
 import { cut, type FloatNode, type Vec3Node } from '../tsl.ts';
 
-/** Where each band lies (world/planet-terrain.ts BANDS). */
 const {
   shore: SHORE,
   beach: BEACH,
@@ -43,23 +27,15 @@ const {
   rubble: RUBBLE,
   ragged: RAGGED,
 } = BANDS;
-/** The ground's cover (0…1) past which sea grass grows on the floor. */
 const GRASS = 0.65;
-/**
- * Ground steeper than a cliff's face (CLIFF, rise over run) by SHEER is bare
- * rock (BARE: the cosine of its tilt), so a dune's steep scraps stay sand; its
- * strata this many metres apart, the pale band this share of each.
- */
 const CLIFF = 1.2,
   SHEER = 2.2,
   BARE = 1 / Math.hypot(1, CLIFF * SHEER),
   STRATA = 2.2,
   STRATUM_SHARE = 0.35;
 
-/** The colour of the ground at world position p, n its normal (world). */
 export type Sand = (p: Vec3Node, n: Vec3Node) => Vec3Node;
 
-/** dune: the height past which the sand is the dunes', metres (BANDS). */
 export function createSand(
   view: View,
   ground: Ground,
@@ -78,26 +54,19 @@ export function createSand(
       lit = mix(lit, vec3(...t.lit), share);
       shadow = mix(shadow, vec3(...t.shadow), share);
     };
-    // on the floor: rubble and sea grass in patches, stones and weed over them
     lay(SEABED_STONE, cut(cover.y.add(mottle.mul(0.3)), RUBBLE));
     lay(SEABED_WEED, cut(cover.x.add(cover.w.sub(0.5).mul(0.3)), GRASS));
     const strewed = strewn(p, height, cover);
     lay(SEABED_STONE, strewed.x);
     lay(SEABED_WEED, strewed.y);
-    // up the beach
     lay(SAND_SHORE, cut(level, SHORE));
     lay(SAND, cut(level, BEACH));
     lay(SAND_DRY, cut(level, DRY));
-    // inland, earthier sand in patches where the shrubs grow (the cover's
-    // growth, ragged by the clumps); and high up, the pale sand the wind has
-    // bleached and heaped
     lay(
       SAND_LOAM,
       cut(cover.x.add(cover.w.sub(0.5).mul(0.25)), LOAM_AT).mul(cut(level, DRY))
     );
     lay(SAND_DUNE, cut(level.add(mottle.mul(RAGGED * 6)), dune));
-    // a cliff's face, or the bare rock of the tops: rock above the sea, in
-    // strata of two tones
     const cliff = cut(float(1).sub(dot(n, view.up(p))), 1 - BARE);
     const tops = cut(cover.y.add(mottle.mul(0.3)), RUBBLE).mul(cut(level, DRY));
     const bare = max(cliff, tops).mul(cut(height, SHORE));

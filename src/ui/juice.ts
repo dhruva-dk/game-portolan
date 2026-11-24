@@ -1,20 +1,3 @@
-// The HUD's answer to what happens (player.ts Moment): the screen's and the
-// HUD's part of it. Each moment is answered once (by its seq), and only those
-// that befall her or that she dealt; the camera's part is the game's
-// (play/shake.ts), the sound's the sound's.
-//   her gun fired       a warm flash; the Fire disc knocked in (no oftener than FIRED_APART)
-//   her ball home       the cross round the reticle (hits.ts) and the figure rising off the ship; a flash, the
-//                       stronger where it broke a shield
-//   a blow on her       from a ship, the ring's sector toward it lit (hits.ts), as bright as the blow is heavy; the
-//                       vignette darker on that side; the vitals slip jolted
-//   her sinking of one  the gold cross and the gold figure
-//   took up             the piece's mark flies from where it lay to its slot, which pops; a flash and a rim of
-//                       light the rarer it is
-//   mended              azure or green at the rim, the vitals popped
-//   gust                a pale rim, the Gust disc popped
-//   her hull low        the heartbeat at the rim (flash.ts)
-// No words; numerals only.
-
 import {
   HER,
   blowOf,
@@ -30,10 +13,6 @@ import { LIGHT, glyph, svgNode } from './ink.ts';
 import type { Glyph } from './glyphs.ts';
 import { boxOf, view } from './ui.ts';
 
-/**
- * The HUD's pieces it moves: the vitals slip, the Fire and Gust discs, and the
- * hotbar's slots (gun's first).
- */
 interface Parts {
   vitals: HTMLElement;
   fire: HTMLElement;
@@ -41,23 +20,10 @@ interface Parts {
   slots: readonly HTMLElement[];
 }
 
-/**
- * A piece's flight to its slot: its burst out, its flight, and its size along
- * the way.
- */
 const FLY = { burst: 0.24, flight: 0.56, scale: [0.35, 1.15, 0.7] } as const;
 
-/**
- * The fewest ms between answers to her firing: the repeater's run of shots (one
- * every 100 ms) flashes and knocks the Fire disc at half its rate, not with
- * every shot.
- */
 const FIRED_APART = 180;
 
-/**
- * A blow she dealt: its cross over the reticle (hits.ts), and its look
- * (flash.ts).
- */
 const DEALT = {
   broke: { cross: 'break', look: SCREEN.shieldBreak },
   hull: { cross: 'hit', look: SCREEN.hit },
@@ -67,18 +33,10 @@ const DEALT = {
 export function createJuice(body: HTMLElement, parts: Parts) {
   const flash = createFlash(body),
     hits = createHits(body);
-  /**
-   * The last moment answered; the page's clock (ms) at this frame, and when her
-   * firing was last answered.
-   */
   let heard = 0,
     then = performance.now(),
     fired = -Infinity;
 
-  /**
-   * A piece knocked: scaled to `k` and back on a spring, or jolted a few px and
-   * settled.
-   */
   const pop = (el: HTMLElement, k: number, ms = 260) =>
     el.animate(
       [{ scale: '1' }, { scale: String(k), offset: 0.3 }, { scale: '1' }],
@@ -100,10 +58,6 @@ export function createJuice(body: HTMLElement, parts: Parts) {
       { duration: 250, easing: 'cubic-bezier(.2,.7,.3,1)' }
     );
 
-  /**
-   * The piece's mark flown from `from` (CSS px) to the slot, drawn at the drawn
-   * size and grown by the UI's size.
-   */
   const fly = (
     name: Glyph,
     from: { x: number; y: number } | null,
@@ -241,7 +195,6 @@ export function createJuice(body: HTMLElement, parts: Parts) {
   };
 
   return {
-    /** Each frame: the match as reported, and whether the HUD shows her own (not watching another, nor the arrival). */
     update(s: Status, shown: boolean) {
       const t = performance.now(),
         dt = Math.min(0.1, (t - then) / 1000);

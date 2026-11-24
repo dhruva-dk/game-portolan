@@ -1,31 +1,3 @@
-// Routes round land: a chart of the open water, a pathfinder over it, and the
-// helm that follows what it finds.
-//
-// The chart: a coarse grid of open water over the sphere, 128 cells along each
-// edge of the cube's six faces (the same equi-angular cube as world/sphere.ts
-// faceUV), about 6.8 m a cell. A cell is open when the water is deep enough for
-// a ship, with a little to spare, at its centre and at eight soundings across
-// it (so a bar thinner than a cell still shows); each open cell knows how many
-// cells it lies from the shore, up to 4. Baked once from a Depth (chart), some
-// tenths of a second on a desktop; the world is fixed, so it is the same all
-// game. (It keeps no tide, columns, logs or heights for line of sight: this sea
-// has none of the first three, and bot.ts sees past land itself.)
-//
-// Routes are found by A* over the open cells, a cell near the shore costing
-// more to cross so a route keeps off it where it can, and are followed
-// (course): straight for the mark while the water to it is clear, else along
-// the route, looking as far ahead along it as the water is clear. A route steps
-// to the eight cells round each, not only the four beside it, the diagonals
-// only where they cut no corner of land. Over blocked pairs of open water on
-// the release's planet whose way round is under 1.5 times the straight line, it
-// is found within ROUTE.work cells every time at 150–250 m and 84% at 250–400 m
-// (where four neighbours found 91% and 50% of what eight found 99% and 91% of,
-// eight took half the time and ran 1.1–1.15 times the straight line to four's
-// 1.3–1.4).
-//
-// Pure arithmetic: no three, so it runs in node for the tests; deterministic,
-// to the bit.
-
 import { cubeCells } from '../world/cells.ts';
 import {
   add,
@@ -40,36 +12,15 @@ import {
 import { SHIP } from './handling.ts';
 import type { Depth } from './shoal.ts';
 
-/** Everything the chart and its routes are tuned by. Metres and seconds. */
 export const ROUTE = {
-  /** Cells along a cube face's edge (a power of two): about 6.8 m cells. */
   n: 128,
-  /**
-   * Open water: this deep past her draught at the centre and at soundings
-   * `sounding` m east, west, north, south and on the diagonals of it.
-   */
   open: 0.3,
   sounding: 2.3,
-  /**
-   * Within `offshore` cells of the shore a cell costs `hug` times as much to
-   * cross; the A* is greedy by `greed`.
-   */
   offshore: 2,
   hug: 2.5,
   greed: 1.2,
-  /**
-   * Cells a route may look through before it gives up; how far round a ship on
-   * a bank it looks for open water, cells.
-   */
   work: 4000,
   wade: 6,
-  /**
-   * Routing: from further than `far` m, with the water to the mark not clear; a
-   * new route every `repath` s, or when the mark has moved `moved` m (the
-   * first, in open water, within `spread` steps of wanting it); a cell
-   * `reached` within this many m; up to `ahead` cells looked ahead along it,
-   * and the water looked along every `step` m.
-   */
   far: 12,
   repath: 2,
   moved: 30,
@@ -77,27 +28,15 @@ export const ROUTE = {
   reached: 10,
   ahead: 6,
   step: 6,
-  /** Cells from the shore water must lie to count as clear, steering by eye. */
   wide: 2,
 } as const;
 
-/**
- * The chart: whether each cell is open water, how many cells it lies from the
- * shore (0: not open; up to 4), and its pathfinder's working space (findPath's
- * alone).
- */
 export interface Chart {
   readonly open: Uint8Array;
   readonly clear: Uint8Array;
   readonly space: Space;
 }
 
-/**
- * A pathfinder's working space, kept with its chart between queries (a query
- * leaves nothing in it that the next reads: each is stamped). Cell centres, and
- * for each cell its cost so far, the cell it was reached from and the stamps of
- * the queries that saw and marked it; the open heap.
- */
 interface Space {
   readonly g: Float64Array;
   readonly from: Int32Array;
@@ -107,9 +46,6 @@ interface Space {
   readonly heap: Int32Array;
   readonly key: Float64Array;
   stamp: number;
-  /**
-   * How many are on the heap; and the rings of cells nearestOpen looks through.
-   */
   size: number;
   readonly queue: number[];
 }
@@ -117,19 +53,10 @@ interface Space {
 const N = ROUTE.n,
   CELLS = 6 * N * N;
 
-// ---------------------------------------------------------------- the grid
-
-/**
- * The chart's cells: world/cells.ts's cube, coarser. The cell direction p lies
- * in; the unit direction of a cell's centre (into `out`); a cell's neighbour k,
- * 0 west, 1 east, 2 south, 3 north on its face.
- */
 const GRID = cubeCells(N),
   cellOf = GRID.cellOf,
   neighbour = GRID.neighbor;
 export const cellCentre = GRID.centre;
-
-// ---------------------------------------------------------------- the chart
 
 const SOUNDINGS = [
   [1, 0],
@@ -142,20 +69,13 @@ const SOUNDINGS = [
   [-1, -1],
 ] as const;
 
-/** Bakes the chart of the water `depth` gives. */
 export const chart = (depth: Depth): Chart => charted(sound(depth));
 
-/**
- * The soundings a chart is made of: which cells are open water, and how many
- * cells each lies from the shore (up to 4). Plain arrays, so a worker can hand
- * them over (play/sounding.ts).
- */
 interface Soundings {
   readonly open: Uint8Array;
   readonly clear: Uint8Array;
 }
 
-/** Sounds the water `depth` gives, cell by cell. */
 export function sound(depth: Depth): Soundings {
   const open = new Uint8Array(CELLS),
     clear = new Uint8Array(CELLS),
@@ -175,7 +95,6 @@ export function sound(depth: Depth): Soundings {
     }
     open[c] = ok ? 1 : 0;
   }
-  // distance to shore, by a few rounds of erosion
   for (let c = 0; c < CELLS; c++) clear[c] = open[c] ? 4 : 0;
   for (let round = 0; round < 4; round++) {
     for (let c = 0; c < CELLS; c++) {
@@ -190,10 +109,6 @@ export function sound(depth: Depth): Soundings {
   return { open, clear };
 }
 
-/**
- * The chart of these soundings, with the pathfinder's working space made now
- * rather than at the first route, which it would hold up some tens of ms.
- */
 export const charted = (s: Soundings): Chart => ({
   open: s.open,
   clear: s.clear,
@@ -201,22 +116,11 @@ export const charted = (s: Soundings): Chart => ({
 });
 
 export const openAt = (ch: Chart, p: Vec3): boolean => ch.open[cellOf(p)] === 1;
-/** How many cells the water at p lies from the shore (0: not open; up to 4). */
 export const clearAt = (ch: Chart, p: Vec3): number => ch.clear[cellOf(p)];
 
-/**
- * Where along a chord clearLine looks; and a cell's centre, as course looks
- * along the route.
- */
 const looked: Out3 = [0, 0, 0],
   centre: Out3 = [0, 0, 0];
 
-/**
- * Water all along the chord from a to b, looked at every `step` m, at least
- * ROUTE.wide cells from the shore, or as far as a or b itself is (from water
- * close in she may still leave, and make for it): a chord through the cells
- * by the shore takes her round a point with her bow on it.
- */
 function clearLine(ch: Chart, a: Vec3, b: Vec3, step = 4): boolean {
   const k = Math.max(1, Math.ceil(distance(a, b) / step)),
     need = Math.max(1, Math.min(ROUTE.wide, clearAt(ch, a), clearAt(ch, b)));
@@ -232,21 +136,9 @@ function clearLine(ch: Chart, a: Vec3, b: Vec3, step = 4): boolean {
   return true;
 }
 
-// ---------------------------------------------------------------- finding a
-// route
-
-/**
- * The heap's room: a query pushes at most eight for each cell it looks through,
- * and looks through at most four times ROUTE.work.
- */
 const HEAP = 8 * ROUTE.work * 4 + 1;
-/**
- * A step to a cell further than this, m, is no step: round a cube's corner,
- * where a diagonal has no cell.
- */
 const STRIDE = 12;
 
-/** A fresh working space. */
 function space(): Space {
   const centre = new Float64Array(CELLS * 3);
   for (let c = 0; c < CELLS; c++) centre.set(cellCentre(c), 3 * c);
@@ -264,10 +156,6 @@ function space(): Space {
   };
 }
 
-/**
- * The nearest open cell to p within `reach` cells, by rings of neighbours: the
- * nearest of the first ring to hold one.
- */
 function nearestOpen(ch: Chart, s: Space, p: Vec3, reach: number): number {
   const start = cellOf(p),
     mark = ++s.stamp,
@@ -305,7 +193,6 @@ function nearestOpen(ch: Chart, s: Space, p: Vec3, reach: number): number {
   return best;
 }
 
-/** Metres between cell a's centre and cell b's. */
 function gap(s: Space, a: number, b: number): number {
   const C = s.centre;
   return (
@@ -318,7 +205,6 @@ function gap(s: Space, a: number, b: number): number {
   );
 }
 
-/** Metres between cell a's centre and the point p (a unit vector). */
 function gapTo(s: Space, a: number, p: Vec3): number {
   const C = s.centre;
   return (
@@ -326,10 +212,6 @@ function gapTo(s: Space, a: number, p: Vec3): number {
   );
 }
 
-// The open heap, of cells by their keys (the least first; of two the same, the
-// lower cell), its size `s.size`.
-
-/** Whether the heap's ith entry comes before its jth. */
 const less = (s: Space, i: number, j: number) =>
   s.key[i] < s.key[j] || (s.key[i] === s.key[j] && s.heap[i] < s.heap[j]);
 
@@ -373,15 +255,8 @@ function pop(s: Space): number {
   return top;
 }
 
-/** stepsOf's cells. */
 const STEPS = new Int32Array(8);
 
-/**
- * The cells a route may step to from c (into `out`), how many: its four
- * neighbours, west, east, south, north on its face; then its diagonals, west or
- * east and then south or north, each only with both cells beside it open, so
- * it cuts no corner of land, and only to a cell beside this one. Open or not.
- */
 function stepsOf(ch: Chart, c: number, out: Int32Array): number {
   let n = 0;
   for (let k = 0; k < 4; k++) out[n++] = neighbour(c, k);
@@ -396,12 +271,6 @@ function stepsOf(ch: Chart, c: number, out: Int32Array): number {
   return n;
 }
 
-/**
- * A route of cells from p to q over open water, keeping off the shore where it
- * can. Gives up after `work` cells. `found` false when there is none: `cells`
- * then runs to the cell nearest q that it reached, or is empty when p is on
- * land with no open water near.
- */
 export function findPath(
   ch: Chart,
   p: Vec3,
@@ -455,29 +324,13 @@ export function findPath(
   return { cells: cells.reverse(), found };
 }
 
-// ---------------------------------------------------------------- a way in
-
-/**
- * The chart's way into some water from everywhere: for each cell, what the
- * cheapest route from it into that water costs (as findPath reckons it: metres,
- * the shore's cells dearer), 0 in it, Infinity where none reaches. Found once
- * for every ship, it has the ways round a long coast the pathfinder gives up on
- * within its work, where its route ran to the cell nearest the mark: the head
- * of the cove pointing at it.
- */
 export type Field = Float32Array;
 
-/**
- * A field being found, a share at a time: `build(work)` looks at about `work`
- * cells more, and says whether the field is whole. Some 200,000 in all; done
- * at once, some 20 ms, more than a frame has.
- */
 interface Building {
   readonly field: Field;
   build(work: number): boolean;
 }
 
-/** The field into the open cells whose centres `into` holds, to be found. */
 export function building(ch: Chart, into: (p: Vec3) => boolean): Building {
   const cost = new Float32Array(CELLS).fill(Infinity),
     heap = new Int32Array(CELLS),
@@ -485,8 +338,6 @@ export function building(ch: Chart, into: (p: Vec3) => boolean): Building {
     steps = new Int32Array(8);
   let size = 0,
     seeded = 0;
-  // an indexed heap of cells by cost (the least first; of two the same, the
-  // lower cell)
   const before = (a: number, b: number) =>
     cost[a] < cost[b] || (cost[a] === cost[b] && a < b);
   const put = (i: number, c: number) => {
@@ -516,7 +367,6 @@ export function building(ch: Chart, into: (p: Vec3) => boolean): Building {
     put(i, c);
   };
   const build = (work: number): boolean => {
-    // the water it leads into, every cell looked at
     for (; seeded < CELLS && work > 0; seeded++, work--) {
       const c = seeded;
       if (ch.open[c] && into(cellCentre(c, looked))) {
@@ -525,7 +375,6 @@ export function building(ch: Chart, into: (p: Vec3) => boolean): Building {
         up(size++);
       }
     }
-    // then out from it, the cheapest first
     for (; size > 0 && work > 0; work--) {
       const c = heap[0];
       at[c] = -2;
@@ -533,7 +382,6 @@ export function building(ch: Chart, into: (p: Vec3) => boolean): Building {
         put(0, heap[size]);
         down(0);
       }
-      // the way from each open cell beside it, its cost stepping into this one
       const step = ch.clear[c] >= ROUTE.offshore ? 1 : ROUTE.hug,
         n = stepsOf(ch, c, steps);
       for (let i = 0; i < n; i++) {
@@ -553,11 +401,6 @@ export function building(ch: Chart, into: (p: Vec3) => boolean): Building {
   return { field: cost, build };
 }
 
-/**
- * Where a ship at `at` steers down field `f`: the cell furthest down it, up to
- * ROUTE.ahead cells on, that the water to is clear (the first in any case);
- * null in the water it leads into, or where none of it reaches her.
- */
 export function downField(ch: Chart, f: Field, at: Vec3): Vec3 | null {
   let c = nearestOpen(ch, ch.space, at, ROUTE.wade);
   if (c < 0 || !(f[c] > 0 && f[c] < Infinity)) return null;
@@ -577,21 +420,11 @@ export function downField(ch: Chart, f: Field, at: Vec3): Vec3 | null {
   return to < 0 ? null : cellCentre(to);
 }
 
-/**
- * What the way down field `f` costs from `at` (as the field reckons it:
- * metres, the shore's cells dearer): its nearest open cell's; Infinity where
- * none of it reaches her.
- */
 export function fieldAt(ch: Chart, f: Field, at: Vec3): number {
   const c = nearestOpen(ch, ch.space, at, ROUTE.wade);
   return c < 0 ? Infinity : f[c];
 }
 
-/**
- * Where the way down field `f` from `at` first costs no more than `until`:
- * stepping always to the cheapest cell beside, at most `most` cells on (so a
- * look costs at most so many); null where none of it reaches her.
- */
 export function downTo(
   ch: Chart,
   f: Field,
@@ -614,30 +447,14 @@ export function downTo(
   return cellCentre(c);
 }
 
-// ---------------------------------------------------------------- following
-// one
-
-/**
- * A route being followed: its cells, the mark it was found for, the cell being
- * made for, seconds to a new one.
- */
 export interface Route {
   readonly cells: readonly number[];
   readonly to: Vec3;
   readonly leg: number;
   readonly repath: number;
-  /** Whether it reaches the mark (else it runs to the cell nearest it). */
   readonly found: boolean;
 }
 
-/**
- * Where a ship at `at` making for `want` steers this step of dt seconds: null
- * to steer straight for it, as the water there is clear (or it is close); else
- * a point on her route, found afresh every ROUTE.repath s or when the mark
- * moves, and the route as it now stands. From shoal water she follows the route
- * cell by cell, as a line from there isn't to be trusted (a bar under her may
- * lie between her and the water beyond).
- */
 export function course(
   ch: Chart,
   at: Vec3,
@@ -651,12 +468,7 @@ export function course(
     (!shoaled && clearLine(ch, at, want, ROUTE.step))
   )
     return { to: null, route: null };
-  // (with no route, as on one, it looks again every `repath` s, not every step)
   let r = route && { ...route, repath: route.repath - dt };
-  // wanting a route where she had none, in open water, she looks for it on a
-  // step of her own, one of the next `spread` by the cell she is in: when the
-  // storm sets its next calm, every ship's mark moves in one step, and the
-  // ships whose water to it was clear would otherwise all look in that step
   const wait = r || shoaled ? 0 : cellOf(at) % ROUTE.spread;
   if (wait > 0)
     return {
@@ -671,9 +483,6 @@ export function course(
     };
   if (!r || r.repath <= 0 || distance(r.to, want) > ROUTE.moved) {
     const { cells, found } = findPath(ch, at, want);
-    // the next look a step or a few later or sooner by the cell she is in, so
-    // ships that looked in one step (berthed by the shore, they all look in the
-    // first) don't go on looking in one step every `repath` s
     r = {
       cells,
       to: want,
@@ -690,7 +499,6 @@ export function course(
     distance(at, cellCentre(cells[leg], centre)) < ROUTE.reached
   )
     leg++;
-  // look ahead along the route as far as the water is clear
   let k = leg;
   while (
     !shoaled &&

@@ -1,5 +1,3 @@
-// world/turn.ts turns an eye exactly as three does: the same numbers, to the
-// last bit.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Matrix4, Quaternion, Vector3 } from 'three';
@@ -14,7 +12,6 @@ import {
 } from '../src/world/turn.ts';
 import type { Out3, Vec3 } from '../src/world/sphere.ts';
 
-/** A deterministic spread of awkward and ordinary vectors. */
 const vectors: Vec3[] = [
   [0, 0, 1],
   [0, 0, -1],

@@ -41,7 +41,6 @@ const near = (a: number, b: number, eps: number, what = '') =>
 const nearV = (a: Vec3, b: Vec3, eps: number, what = '') =>
   near(length(add(a, b, -1)), 0, eps, what);
 
-/** A deterministic spread of points over the sphere (Fibonacci). */
 const points = (n: number): Vec3[] =>
   Array.from({ length: n }, (_, i) => {
     const y = 1 - (2 * (i + 0.5)) / n,
@@ -67,7 +66,7 @@ test('frames are right-handed and orthonormal, with east × up = south', () => {
 test('chart round trips, and distances from the anchor are kept', () => {
   for (const p of points(200)) {
     const [x, z] = toChart(island, p);
-    if (Math.hypot(x, z) > R * 3) continue; // the antipode is the chart's one singular point
+    if (Math.hypot(x, z) > R * 3) continue;
     nearV(fromChart(island, x, z), normalize(p), 1e-9, 'round trip');
     near(Math.hypot(x, z), distance(island.at, p), 1e-7, 'distance');
   }
@@ -101,7 +100,6 @@ test("the chart basis is the chart's own axes, carried to the point", () => {
     near(dot(e1, up), 0, 1e-9);
     near(dot(e1, e2), 0, 1e-9);
     nearV(cross(e1, up), e2, 1e-9, 'e1 × up = e2');
-    // a short step along e1 moves the chart's x on: by the chart's stretch across the radius, at most θ / sin θ
     const [x0, z0] = toChart(island, p);
     const [x1, z1] = toChart(island, add(scale(up, R), e1, 0.01));
     const theta = Math.hypot(x0, z0) / R,
@@ -127,7 +125,6 @@ test('transport keeps tangents tangent and their length', () => {
     near(length(u), 2.5, 1e-9, 'length');
     near(dot(u, normalize(b)), 0, 1e-9, 'tangent');
   }
-  // along a meridian, east stays east
   const a = fromLatLon(0.1, 0.3),
     b = fromLatLon(0.7, 0.3);
   nearV(transport(frameAt(a).east, a, b), frameAt(b).east, 1e-12);
@@ -162,7 +159,6 @@ test('faceUV and faceDir round trip on all six faces, and meet without a gap acr
     const { face, u, v } = faceUV(p);
     nearV(faceDir(face, u, v), normalize(p), 1e-12);
   }
-  // walking across every face's edges, neighbouring points stay neighbours
   for (let face = 0; face < 6; face++)
     for (const [u, v] of [
       [1, 0.2],
@@ -189,7 +185,6 @@ test("the sky puts its horizon on the sea's and keeps the zenith", () => {
   near(skyElevation(-dip, dip), 0, 1e-12);
   near(skyElevation(Math.PI / 2, dip), Math.PI / 2, 1e-12);
   const f = frameAt(fromLatLon(0.3, 1));
-  // a ray dipping to the sea's horizon, due north: the sky's horizon, due north (−z)
   const ray = add(scale(f.north, Math.cos(dip)), f.up, -Math.sin(dip));
   nearV(toSky(f, dip, ray), [0, 0, -1], 1e-12);
   nearV(toSky(f, dip, f.up), [0, 1, 0], 1e-6);
@@ -198,7 +193,6 @@ test("the sky puts its horizon on the sea's and keeps the zenith", () => {
 
 test("the cube's faces are FACES's (the table the shaders' view/cube.ts is built from): faceUV's, faceDir's and the cells'", () => {
   const signed = (q: Vec3, [axis, sign]: Axis) => sign * q[axis];
-  /** The face FACES gives p (its largest component, ties to x before y before z), and p's u and v there. */
   const table = (p: Vec3) => {
     const a = p.map(Math.abs),
       axis = a[0] >= a[1] && a[0] >= a[2] ? 0 : a[1] >= a[2] ? 1 : 2;
@@ -223,12 +217,10 @@ test("the cube's faces are FACES's (the table the shaders' view/cube.ts is built
     assert.equal(f.face, t.face, `${p}`);
     near(f.u, t.u, 1e-15, 'u');
     near(f.v, t.v, 1e-15, 'v');
-    // faceDir: across its face's axis, and its u and v the table's
     const d = faceDir(t.face, t.u, t.v);
     assert.ok(signed(d, FACES[t.face].across) > 0);
     nearV(d, normalize(p), 1e-12, 'faceDir');
   }
-  // every face's cells' centres lie on it, at their column and row
   for (let c = 0; c < CELLS; c += 997) {
     const t = table(centreOf(c));
     assert.equal(t.face, faceOf(c));

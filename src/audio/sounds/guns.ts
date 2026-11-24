@@ -1,18 +1,3 @@
-// The guns' sounds: a report for each kind of gun (GUNS, a row each), the
-// reload's clunk as the gun comes ready, the THUNK of a gun swapped onto her
-// plinth, the light knock of a slot of the hotbar taken in hand, the ratchet of
-// a gun wound up, and the reload begun.
-//
-// A report is built as a real one is heard: the muzzle's crack (a few
-// milliseconds, bright), the blast's body (noise through a lowpass falling from
-// the bright to the dull in some 30 ms), the thump (a falling sine for
-// headphones and, for a phone's small speaker that hears little under 150 Hz, a
-// band of noise in the low mids), the carriage's wooden kick, and the tail: a
-// rumble, rolled on by the sea's and the air's slap back. Each kind tells by
-// its own: the cannon's full boom; the scatter's rattle of shot; the repeater's
-// short dry snap (it fires ten a second); the harpoon's thrum of a loosed cable
-// over a soft cough; the mortar's hollow tube note and its long low tail.
-
 import type { GunKind } from '../../player.ts';
 import {
   ar,
@@ -37,18 +22,6 @@ import {
 
 export type { GunKind };
 
-/**
- * A gun's report:
- *   crack   the muzzle's crack, 0…1
- *   thump   where the thump's sine starts, Hz (it falls to 45% of it)
- *   body    the low-mid band the blast's weight sits in, Hz (what a phone's speaker carries)
- *   blast   seconds the blast's body takes to fall (its time constant)
- *   tail    seconds of rumble after
- *   rattle  grains of a scattered charge (0 for one ball)
- *   drive   how hard the whole is saturated (density)
- *   ring    a note it rings with, Hz, and the seconds it rings (the harpoon's cable, the mortar's tube; 0 none)
- *   bend    how far the ring's note falls as it rings, a share of it
- */
 interface Report {
   crack: number;
   thump: number;
@@ -125,7 +98,6 @@ export const GUNS: Record<GunKind, Report> = {
   },
 };
 
-/** The report of a gun of kind `g`. */
 export const report =
   (g: Report) =>
   (rate: number, seed: number): Samples => {
@@ -135,8 +107,6 @@ export const report =
     filter(crack, 'highpass', 900);
     mix(t, crack, 0, 1.3 * g.crack);
     if (g.ring) {
-      // its note: a fundamental and its overtones, falling a little as it
-      // rings, a buzz of the cable or the tube on it
       for (const [k, a] of [
         [1, 0.9],
         [2, 0.45],
@@ -158,12 +128,10 @@ export const report =
       filter(buzz, 'bandpass', g.ring * 7, 2);
       mix(t, buzz, 0, 0.5);
     }
-    // the blast: noise through a lowpass falling from bright to dull
     const blast = layer(t, 0.8);
     noise(blast, ar(0.0015, g.blast));
     filter(blast, 'lowpass', (s) => 260 + 5200 * Math.exp(-s / 0.028), 0.9);
     mix(t, blast, 0, 1.5);
-    // weight: the falling sine, and the low mids a phone can carry
     tone(
       t,
       (s) => g.thump * (0.45 + 0.55 * Math.exp(-s / 0.06)),
@@ -176,7 +144,6 @@ export const report =
     filter(body, 'bandpass', g.body, 1.1);
     filter(body, 'peak', g.body * 1.9, 1.5, 5);
     mix(t, body, 0, 3.4);
-    // the carriage's kick
     modes(
       t,
       [
@@ -192,8 +159,6 @@ export const report =
       filter(shot, 'bandpass', 2600, 0.8);
       mix(t, shot, 0, 0.6);
     }
-    // the tail: a rumble, and the slap back off the sea and the air rolling it
-    // on
     const tail = layer(t);
     brown(tail, (s) => ar(0.05, g.tail * 0.32)(s));
     filter(tail, 'lowpass', 700);
@@ -221,7 +186,6 @@ export const report =
     return normal(finish(t, 0.0005, 0.3)).x;
   };
 
-/** Iron and wood: the breech's latch and the gun's seat, struck at `at`. */
 const latch = (t: Take, at: number, gain: number) => {
   modes(
     t,
@@ -249,10 +213,6 @@ const latch = (t: Take, at: number, gain: number) => {
   mix(t, click, at, 0.8 * gain);
 };
 
-/**
- * The gun come ready: the latch drawn home, and the breech seated a moment
- * after.
- */
 export function ready(rate: number, seed: number): Samples {
   const t = take(0.45, rate, seed);
   latch(t, 0, 1);
@@ -260,10 +220,6 @@ export function ready(rate: number, seed: number): Samples {
   return normal(finish(t)).x;
 }
 
-/**
- * A gun swapped onto her plinth: dragged a moment, then a heavy THUNK of iron
- * on oak, its chain settling after.
- */
 export function swap(rate: number, seed: number): Samples {
   const t = take(1, rate, seed);
   const drag = layer(t, 0.2);
@@ -271,8 +227,6 @@ export function swap(rate: number, seed: number): Samples {
   filter(drag, 'bandpass', (s) => 1500 - 5000 * s, 1.4);
   mix(t, drag, 0, 0.25);
   const at = 0.11;
-  // the mass of it: oak's low modes, a falling thump, and the low mids weighted
-  // for a phone
   modes(
     t,
     [
@@ -306,7 +260,6 @@ export function swap(rate: number, seed: number): Samples {
     at,
     0.02
   );
-  // the chain settling
   const chain = layer(t, 0.5);
   crackle(chain, 14, 0, 0.28, 0.6, 0.003);
   filter(chain, 'bandpass', 3400, 1.2);
@@ -316,11 +269,6 @@ export function swap(rate: number, seed: number): Samples {
   return normal(finish(t)).x;
 }
 
-/**
- * A gun wound up to fire (the harpoon's cable drawn, the mortar's charge
- * rammed): a ratchet's pawl clicking quicker over some 0.6 s, iron on iron,
- * ending in a catch.
- */
 export function wind(rate: number, seed: number): Samples {
   const t = take(0.8, rate, seed);
   const pawl = layer(t, 0.7);
@@ -348,7 +296,6 @@ export function wind(rate: number, seed: number): Samples {
   return normal(finish(t)).x;
 }
 
-/** A reload begun: the spent breech knocked open, and the shot rolled in. */
 export function reload(rate: number, seed: number): Samples {
   const t = take(0.5, rate, seed);
   latch(t, 0, 0.6);
@@ -366,7 +313,6 @@ export function reload(rate: number, seed: number): Samples {
   return normal(finish(t)).x;
 }
 
-/** A slot of the hotbar taken in hand: a light wooden knock. */
 export function select(rate: number, seed: number): Samples {
   const t = take(0.18, rate, seed);
   modes(

@@ -1,5 +1,3 @@
-// A bot's ear (sim/hunter.ts): the guns the sea keeps ringing, and a bot going
-// to them.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { armed, crewOf, type Shot } from '../src/sim/battle.ts';
@@ -23,7 +21,6 @@ import {
 
 const DEEP: Depth = () => 30;
 const c0 = fromLatLon(0.3, 0.1);
-/** The point `m` metres east of c0. */
 const east = (m: number) => along(c0, frameAt(c0).east, m).p;
 const shot = (shooter: number, at: Vec3): Shot => ({
   shooter,
@@ -39,19 +36,13 @@ test('the sea keeps each ship’s last shot ringing for a few seconds, then lets
     r.map((x) => x.by),
     [3, 4]
   );
-  // a later shot of 3's takes the place of her first
   r = heard(r, [shot(3, east(40))], 2);
   assert.equal(r.filter((x) => x.by === 3).length, 1);
   assert.ok(distance(r.find((x) => x.by === 3)!.at, east(40)) < 1e-6);
   assert.equal(r.find((x) => x.by === 3)!.t, 2);
-  // silent long enough, both are gone
   assert.deepEqual(heard(r, [], 30), []);
 });
 
-/**
- * A lone bot, armed or not, sailed `seconds` with the guns `gunfire` ringing
- * the while: her modes in turn, and where she ends.
- */
 function sail(gunned: boolean, gunfire: readonly Report[], seconds: number) {
   const crew = gunned ? crewOf(0, gunOf('cannon', 1)) : crewOf(0);
   let fleet: Vessel[] = [afloat(0, shipAt(c0, frameAt(c0).north))];
@@ -84,7 +75,6 @@ test('armed, a bot goes to the guns she hears; unarmed, she lets them be', () =>
   );
   const bare = sail(false, guns, 12);
   assert.ok(!bare.modes.includes('hunt'), bare.modes.join(' '));
-  // guns out of earshot draw no one
   const far = sail(true, [{ at: east(900), by: 7, t: 0 }], 6);
   assert.ok(!far.modes.includes('hunt'), far.modes.join(' '));
 });

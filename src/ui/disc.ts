@@ -1,29 +1,13 @@
-// How the minimap lays the sphere flat: an azimuthal equidistant chart round
-// her (every point at its true distance and bearing from her), north up. Shared
-// by what draws on the disc (minimap.ts, held.ts, ground.ts).
-//
-// Read many times a redraw, so nothing here makes a new array: the disc is laid
-// into one kept by its drawer, and place, metres and laid each answer in one of
-// their own, good until the next call.
-
 import { R, type Vec3 } from '../world/sphere.ts';
 
 export type Mutable = [number, number, number];
 
-/**
- * A point and the way up and right from it (unit tangents there): where a flat
- * chart is drawn from.
- */
 export interface Spot {
   at: Vec3;
   ahead: Vec3;
   right: Vec3;
 }
 
-/**
- * The disc as drawn now: her point, the way up (north) and right, the canvas's
- * centre and its pixels a metre.
- */
 export interface Lay extends Spot {
   at: Mutable;
   ahead: Mutable;
@@ -32,11 +16,6 @@ export interface Lay extends Spot {
   k: number;
 }
 
-/**
- * Sets the canvas's transform to lay an image drawn on `o`'s own flat chart
- * (its x along `e`, its rows down along −n, `w` × `h` texels, `m` metres a
- * texel, centred on `o`) onto the disc (laid).
- */
 export type LayOnto = (
   o: Vec3,
   e: Vec3,
@@ -46,7 +25,6 @@ export type LayOnto = (
   m: number
 ) => void;
 
-/** A disc to lay. */
 export const newLay = (): Lay => ({
   at: [0, 0, 1],
   ahead: [0, 1, 0],
@@ -55,14 +33,8 @@ export const newLay = (): Lay => ({
   k: 1,
 });
 
-/**
- * Lays `l` round `at` (a unit vector), north up as frameAt has it, centred at
- * `c` px, `k` px a metre.
- */
 export function layAt(l: Lay, at: Vec3, c: number, k: number): Lay {
   const [x, y, z] = at;
-  // north: the pole's way along the surface; at the pole itself, frameAt's (up
-  // × −z)
   let nx = -y * x,
     ny = 1 - y * y,
     nz = -y * z;
@@ -75,7 +47,6 @@ export function layAt(l: Lay, at: Vec3, c: number, k: number): Lay {
   l.ahead[0] = nx;
   l.ahead[1] = ny;
   l.ahead[2] = nz;
-  // right: ahead × at
   l.right[0] = ny * z - nz * y;
   l.right[1] = nz * x - nx * z;
   l.right[2] = nx * y - ny * x;
@@ -84,12 +55,8 @@ export function layAt(l: Lay, at: Vec3, c: number, k: number): Lay {
   return l;
 }
 
-/** metres' and place's answers. */
 const xy: [number, number] = [0, 0];
 
-/**
- * Metres right and up of her, along the surface, of a point q (a unit vector).
- */
 export function metres(l: Lay, q: Vec3): readonly [number, number] {
   const a = l.at,
     cos = Math.min(1, Math.max(-1, q[0] * a[0] + q[1] * a[1] + q[2] * a[2]));
@@ -107,7 +74,6 @@ export function metres(l: Lay, q: Vec3): readonly [number, number] {
   return xy;
 }
 
-/** A point on the canvas, px. */
 export function place(l: Lay, q: Vec3): readonly [number, number] {
   const m = metres(l, q);
   xy[0] = l.c + m[0] * l.k;
@@ -115,10 +81,6 @@ export function place(l: Lay, q: Vec3): readonly [number, number] {
   return xy;
 }
 
-/**
- * Into `q`, the point `x` metres right and `y` up from the spot, the surface's
- * own way; held.ts and ground.ts read their samples by it.
- */
 export function outInto(q: Mutable, s: Spot, x: number, y: number): Vec3 {
   const { at: o, right: e, ahead: n } = s;
   const d = Math.sqrt(x * x + y * y) || 1e-9,
@@ -130,16 +92,10 @@ export function outInto(q: Mutable, s: Spot, x: number, y: number): Vec3 {
   return q;
 }
 
-/** laid's scratch: the image's spot, a point out from it, its answer. */
 const from: Spot = { at: [0, 0, 1], ahead: [0, 1, 0], right: [1, 0, 0] };
 const out: Mutable = [0, 0, 0];
 const T: [number, number, number, number, number, number] = [0, 0, 0, 0, 0, 0];
 
-/**
- * The canvas transform that lays an image drawn on `o`'s own flat chart (its x
- * along `e`, its rows down along −n, `m` metres a texel, centred on `o`) onto
- * the disc: as setTransform's a, b, c, d, e, f.
- */
 export function laid(
   l: Lay,
   o: Vec3,

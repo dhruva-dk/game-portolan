@@ -1,33 +1,3 @@
-// Loot on the water: guns and things to mend with, strewn over the whole planet
-// at the start of a match and spilled from every ship that sinks; a ship
-// sailing over a piece picks it up. For two gun slots and three item slots:
-// - strewn: LOOT.spots spots laid evenly over the planet (four a ship for a
-//   match of 80), each moved off land and shallows to the nearest water open
-//   all round it, each with a piece and LOOT.second of them a second 4 m off;
-//   and a gun laid near any berth with none in reach (berthed), so the match
-//   opens on a scramble for the nearest. A piece is a gun LOOT.gun of the
-//   time, its kind drawn by LOOT.kinds (the cannon commonest, the harpoon and
-//   the mortar rarest) and its rarity by LOOT.weights, else a consumable by
-//   LOOT.shares, in its counts;
-// - picked up: a ship takes every piece within PIECE.reach that fits: a gun
-//   into an empty gun slot (the one in hand first), things to mend with that
-//   go on a stack or into an empty slot. What doesn't fit is offered: the
-//   nearest gun with both gun slots full, the nearest other piece with her
-//   slots full. Asked to (a take: her gun in hand, or a slot of items), she
-//   swaps it for what she has there, which goes over the side where she is;
-// - spilled: a ship sinking puts both her guns and her slots over the side,
-//   kicked out a few m/s each a different way and drifting to a stop; what a
-//   ship put over the side she can't pick up again until it has lain
-//   PIECE.settle s and she has sailed clear of it;
-// - cached: as each phase of the storm after the first begins, a few of the
-//   rarer pieces dropped round the heart of the cap it closes to (LOOT.cache).
-//
-// What is laid is the match's (its rules' loot table: laying); how a piece
-// lies and is taken up is the same in every match (PIECE).
-//
-// Pure arithmetic: no three, so it runs in node for the tests; deterministic
-// for the same inputs.
-
 import { random, hash } from '../world/random.ts';
 import {
   R,
@@ -49,36 +19,12 @@ import type { Depth } from './shoal.ts';
 import { toEdge, type Cap } from './storm.ts';
 import { weighed, type Widen } from './tables.ts';
 
-/**
- * The loot table: what a match lays, and where (a match's rules may lay other:
- * rules.ts). How a piece lies on the water and is taken up is PIECE's, the
- * same in every match.
- */
 export const LOOT = {
-  /**
-   * Spots strewn over the planet, and the share with a second piece: some 900
-   * pieces (it was 320 spots, some 440; before that 200, some 280; and before
-   * that 400, some 570), for fights fed by what they mend with.
-   */
   spots: 640,
   second: 0.4,
-  /**
-   * The share of pieces that are guns (brought down from 0.62, then from 0.5 as
-   * the spots grew, so the first is still a scramble, most ships armed by
-   * 20–30 s: tools/sim; then from 0.42 as they doubled, so the guns grew
-   * by some 70% and the mending by 2.2 times), their kinds' weights (in
-   * kinds.ts KINDS' order: cannon, scatter, repeater, harpoon, mortar), and
-   * their rarities' weights, common to legendary.
-   */
   gun: 0.36,
   kinds: [36, 22, 22, 10, 10],
   weights: [42, 30, 17, 8, 3],
-  /**
-   * The share of the rest of each consumable, how many come together, and the
-   * rarity each reads as. The hull's mending leans the larger (it was 0.36,
-   * 0.22, 0.28, 0.14): with loot plenty, ships' slots full of shields mended
-   * no more hull (tools/sim).
-   */
   shares: {
     smallShield: 0.26,
     repairKit: 0.32,
@@ -91,21 +37,9 @@ export const LOOT = {
     repairKit: 5,
     fullRepair: 1,
   } satisfies Record<Use, number>,
-  /**
-   * Every berth has a gun within `berth` m at the start (some 12 s at her top
-   * speed): one is laid `near` m to `far` m off any that has none.
-   */
   berth: 160,
   near: 90,
   far: 150,
-  /**
-   * A cache dropped as each phase of the storm after the first begins: `pieces`
-   * pieces, and `more` again for each cache before it, within `within`
-   * of the next cap's radius of its centre, on roomy water inside it, `gun` of
-   * them guns of the rarer tiers (`weights`, common to legendary), the rest a
-   * big shield or a full repair. The calm's heart is where the fleet is making
-   * anyway, and something worth fighting over there meets them.
-   */
   cache: {
     pieces: 8,
     more: 0,
@@ -115,55 +49,32 @@ export const LOOT = {
   },
 } as const;
 
-/** The loot table as a match holds it (rules.ts). */
 export type LootTable = Widen<typeof LOOT>;
 
-/** A piece on the water, in every match. */
 export const PIECE = {
-  /** The rarity each consumable reads as (its colour). */
   rarity: {
     smallShield: 1,
     bigShield: 2,
     repairKit: 1,
     fullRepair: 3,
   } satisfies Record<Use, number>,
-  /**
-   * Metres from her centre she picks a piece up within; seconds a piece put
-   * over the side lies before its ship may take it back; how fast a kicked
-   * piece's way dies, per second; and the kick a spilled piece is given, m/s,
-   * more for each slot down.
-   */
   reach: 9.5,
   settle: 0.6,
   drift: 2.2,
   kick: 3,
-  /**
-   * A spot lies over this much water past her draught, and so does the water
-   * `room` m round it every way; one that doesn't is moved to the nearest that
-   * does in rings `ring` m apart, out to `shore` m.
-   */
   open: 1,
   room: 14,
   ring: 8,
   shore: 240,
 } as const;
 
-/** A piece: a gun of a kind and a rarity, or a count of one consumable. */
 export type Goods =
   | { kind: GunKind; rarity: number }
   | { kind: Use; count: number };
-/** A gun lying on the water, as goods. */
 export type Arms = Extract<Goods, { rarity: number }>;
 
-/** Whether a piece is a gun. */
 export const isArms = (g: Goods): g is Arms => isGun(g.kind);
 
-/**
- * A piece on the water: its id, where it lies (a unit vector), what it is, the
- * ship that put it over the side (-1: none), seconds it has lain while hers to
- * leave (counted only then: swept reads it for nothing else), and its way (m/s,
- * a tangent), dying away.
- */
 export interface Loot {
   id: number;
   at: Vec3;
@@ -173,7 +84,6 @@ export interface Loot {
   way: Vec3;
 }
 
-/** All the loot on the water, and the next piece's id. */
 export interface Flotsam {
   pieces: readonly Loot[];
   next: number;
@@ -181,17 +91,9 @@ export interface Flotsam {
 
 const STILL: Vec3 = [0, 0, 0];
 
-/**
- * The rarity a piece reads as (its colour): a gun's own, a consumable's by
- * kind.
- */
 export const rarityOf = (g: Goods) =>
   isArms(g) ? g.rarity : PIECE.rarity[g.kind];
 
-/**
- * A gun of the kind and rarity a loot table's kinds and `weights` (its own, or
- * its cache's) give uniform draws `u` and `v`.
- */
 const gunned = (
   t: LootTable,
   u: number,
@@ -202,7 +104,6 @@ const gunned = (
   rarity: Math.min(weighed(weights, v), GUN.rarities.length - 1),
 });
 
-/** A piece drawn at random, by the loot table `t`. */
 export function rolled(draw: () => number, t: LootTable = LOOT): Goods {
   if (draw() < t.gun) return gunned(t, draw(), draw());
   let r = draw();
@@ -213,15 +114,8 @@ export function rolled(draw: () => number, t: LootTable = LOOT): Goods {
   return { kind: 'fullRepair', count: t.counts.fullRepair };
 }
 
-/** Whether a piece at p lies where a ship can come to it. */
 const open = (depth: Depth, p: Vec3) => depth(p) >= SHIP.draught + PIECE.open;
 
-/**
- * Whether a piece laid at p lies where a ship can come to it and come about
- * after: open water there and PIECE.room m round it every way. (Laid at the
- * head of a cove narrower than her turning circle, a piece draws a ship on to
- * the shore, where she wedges: the bots' harness found most of them stuck so.)
- */
 function roomy(depth: Depth, p: Vec3): boolean {
   if (!open(depth, p)) return false;
   for (let k = 0; k < 8; k++)
@@ -230,10 +124,6 @@ function roomy(depth: Depth, p: Vec3): boolean {
   return true;
 }
 
-/**
- * p, or the roomy water nearest it, or null if there is none within
- * PIECE.shore.
- */
 function opened(depth: Depth, p: Vec3): Vec3 | null {
   if (roomy(depth, p)) return p;
   for (let d = PIECE.ring; d <= PIECE.shore; d += PIECE.ring) {
@@ -246,13 +136,6 @@ function opened(depth: Depth, p: Vec3): Vec3 | null {
   return null;
 }
 
-/**
- * The loot a match lays by its loot table `table` (its rules': rules.ts), drawn
- * from its `seed`, over the sea floor `depth`: what it opens with (strewn), the
- * cache each phase of its storm drops (cached), and a gun near every berth with
- * none (berthed). Each draws from the seed on its own, so the order they are
- * asked in changes nothing.
- */
 export function laying(seed: number, depth: Depth, table: LootTable = LOOT) {
   return {
     strewn: () => strewn(seed, depth, table),
@@ -263,16 +146,10 @@ export function laying(seed: number, depth: Depth, table: LootTable = LOOT) {
   };
 }
 
-/**
- * The loot a match of `seed` opens with, over the sea floor `depth`: t.spots
- * spots on a lattice spread evenly over the planet (turned and each spot
- * jittered by the seed), on open water, each with a piece or two.
- */
 function strewn(seed: number, depth: Depth, t: LootTable): Flotsam {
   const spots = t.spots,
     draw = random(hash(seed, 0x100f));
   const pieces: Loot[] = [];
-  // the lattice turned at random: a random axis-angle applied to each point
   const axis = normalize([draw() - 0.5, draw() - 0.5, draw() - 0.5]),
     turn = draw() * 2 * Math.PI;
   const spin = (v: Vec3): Vec3 => rotateAbout(v, axis, turn);
@@ -309,11 +186,6 @@ function strewn(seed: number, depth: Depth, t: LootTable): Flotsam {
   return { pieces, next: pieces.length };
 }
 
-/**
- * The loot `f` with the cache of phase `phase` dropped in `cap` (the cap the
- * storm closes to next; t.cache), drawn from the match's `seed` and the phase.
- * A piece whose roomy water lies outside the cap isn't laid.
- */
 function cached(
   f: Flotsam,
   cap: Cap,
@@ -346,12 +218,6 @@ function cached(
   return { pieces, next };
 }
 
-/**
- * The loot `f` with a gun within t.berth of each of `berths` (where the ships
- * lie at the start): for a berth with none, one of a rarity drawn by t.weights
- * laid t.near to t.far m off on open water, its bearing drawn from `seed`. So
- * no ship opens the match with no gun in reach.
- */
 function berthed(
   f: Flotsam,
   berths: readonly Vec3[],
@@ -368,8 +234,6 @@ function berthed(
       r = draw(),
       k = draw();
     if (pieces.some((l) => isArms(l.goods) && dot(l.at, b) > within)) continue;
-    // the first of eight bearings round from the one drawn that lies on open
-    // water, else the open water nearest it
     const round = Array.from(
       { length: 8 },
       (_, k) => along(b, tangentAt(b, a + (k * Math.PI) / 4), d).p
@@ -388,10 +252,6 @@ function berthed(
   return { pieces, next: f.next + pieces.length - f.pieces.length };
 }
 
-/**
- * Pieces put over the side at `at` by ship `from`, the k-th kicked out at
- * PIECE.kick + k m/s on a bearing drawn from `seed`.
- */
 export function overboard(
   f: Flotsam,
   at: Vec3,
@@ -413,14 +273,7 @@ export function overboard(
   return { pieces: [...f.pieces, ...thrown], next: f.next + goods.length };
 }
 
-/**
- * dt seconds of the pieces lying: older (while some ship's to leave), and those
- * with way on carried along it as it dies, stopped by shoal water. A piece
- * lying still and no ship's is left as it is.
- */
 export function drifted(f: Flotsam, dt: number, depth: Depth): Flotsam {
-  // (most steps, every piece lies still and no ship's: the flotsam stands as it
-  // is)
   if (f.pieces.every((l) => l.way === STILL && l.from < 0)) return f;
   const k = Math.max(0, 1 - dt * PIECE.drift);
   const pieces = f.pieces.map((l): Loot => {
@@ -435,49 +288,23 @@ export function drifted(f: Flotsam, dt: number, depth: Depth): Flotsam {
   return { ...f, pieces };
 }
 
-/**
- * The cosine of PIECE.reach along the surface: a piece within reach of p has
- * dot(p, at) above it.
- */
 const REACH = Math.cos(PIECE.reach / R);
 
-/**
- * The empty gun slot a gun picked up goes to: the one in hand if it is empty,
- * else the other; -1 if both are full.
- */
 const emptySlot = (c: Crew) =>
   c.guns[c.hand] === null ? c.hand : c.guns.findIndex((g) => g === null);
 
-/**
- * Her crew with gun slot `slot` holding `g`, its magazine full; taken into her
- * hand, it fires only after EQUIP.
- */
 const armedWith = (c: Crew, slot: number, g: Arms): Crew => ({
   ...c,
   guns: c.guns.map((k, i) => (i === slot ? gunOf(g.kind, g.rarity) : k)),
   equip: slot === c.hand ? EQUIP : c.equip,
 });
 
-/**
- * What she would take now from where she is: whether `l` fits her (a gun into
- * an empty gun slot, things that go in her item slots).
- */
 const fits = (c: Crew, g: Goods) =>
   isArms(g) ? emptySlot(c) >= 0 : roomFor(c.hold, g.kind) >= 0;
 
-/**
- * Whether ship `id` at p may pick `l` up: it lies within reach, and she didn't
- * put it over the side (until it has settled and she has sailed clear of it:
- * swept).
- */
 const reachable = (id: number, p: Vec3, l: Loot) =>
   dot(p, l.at) > REACH && l.from !== id;
 
-/**
- * What is offered her where she lies (what doesn't fit, within reach): the
- * nearest gun with both gun slots full, and the nearest other piece with no
- * room for it; each null if none.
- */
 export function offered(
   c: Crew,
   at: Vec3,
@@ -496,11 +323,6 @@ export function offered(
   return { gun, item };
 }
 
-/**
- * A piece taken up: which (its id), by which ship, what of it (a stack taken
- * only in part, the part), where it lay, and the slot it went to (a gun's: her
- * gun slot, 0 or 1; else an item slot, 1–3).
- */
 export interface Taken {
   id: number;
   ship: number;
@@ -509,14 +331,6 @@ export interface Taken {
   slot: number;
 }
 
-/**
- * The fleet sweeping up loot, in order of their ids: every ship afloat takes
- * what fits within her reach; one asked to take (`takes`: her id to the slot
- * she offers, 0 her gun in hand or 1–3 an item slot) swaps what is offered
- * there for what she has in it, which goes over the side. A piece put over the
- * side lies under its ship until she has sailed clear. The flotsam and the
- * crews after, and what was taken.
- */
 export function swept(
   f: Flotsam,
   crews: readonly Crew[],
@@ -532,9 +346,6 @@ export function swept(
     let c = by.get(v.id);
     if (!c || c.health.hull <= 0) continue;
     const p = v.ship.at;
-    // (most ships, most steps, take nothing and leave nothing of their own: the
-    // pieces stand as they are. Nothing is taken unless something within reach
-    // fits her as she is; nothing of hers changes but a piece settled and clear)
     let near = false;
     for (let i = 0; i < pieces.length && !near; i++) {
       const l = pieces[i];
@@ -546,8 +357,6 @@ export function swept(
     if (near) {
       const kept: Loot[] = [];
       for (const l of pieces) {
-        // a piece she put over the side is hers to leave until it has settled
-        // and she is clear of it
         if (l.from === v.id) {
           kept.push(
             l.age >= PIECE.settle && dot(p, l.at) <= REACH
@@ -591,8 +400,6 @@ export function swept(
       }
       pieces = kept;
     }
-    // a swap asked for: what is offered there for what she has in it, which
-    // goes over the side where she is
     const slot = takes.get(v.id);
     if (slot !== undefined) {
       const o = offered(c, p, { pieces, next });
@@ -652,10 +459,6 @@ export function swept(
   };
 }
 
-/**
- * What a ship sinking puts over the side: her guns and every stack in her
- * slots.
- */
 export function cargo(c: Crew): Goods[] {
   const goods: Goods[] = c.guns.flatMap((g) =>
     g ? [{ kind: g.kind, rarity: g.rarity }] : []

@@ -1,7 +1,3 @@
-// How the guns take the light, on a ship's plinth (arms.ts) and floating as
-// loot (loot/loot.ts); their shapes are gun-shape.ts's (plain arithmetic that
-// runs in node).
-
 import { mix, select, vec3 } from 'three/tsl';
 import {
   CREAM,
@@ -15,14 +11,6 @@ import type { Light } from '../sky/light.ts';
 import type { FloatNode, Vec3Node } from '../tsl.ts';
 import { METAL } from './gun-shape.ts';
 
-/**
- * A gun's colour at world place `p`, normal `n` (unit), its part made of `made`
- * (METAL), lit as everything is (sky/light.ts), in two tones: the bronze gilded
- * and the iron gunmetal, each with its hard highlight; the oak timber, with
- * none. Its bronze is cast `tint`'s `share` of the way toward its colour, if
- * given (a ship's gun in her rarity's light: arms.ts). For a material's
- * colorNode, inside its Fn.
- */
 export function gunSurface(
   light: Light,
   p: Vec3Node,
@@ -52,5 +40,4 @@ export function gunSurface(
   );
 }
 
-/** A tinted bronze's shadow, of its lit tone (as GILDING's is, near enough). */
 const SHADE = 0.5;

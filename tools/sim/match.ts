@@ -1,15 +1,3 @@
-// One match, sailed headless on the game's own state (play/state.ts start and
-// advance), every ship a bot, and recorded: events.jsonl and ships.jsonl as it
-// goes (log.ts), summary.json at its end (the account, metrics.ts, with what
-// the record kept). The same scenario sails the same match, to the bit,
-// wherever it runs: summary.hash says so.
-//
-// Two kinds of fleet: the match the game deals (SHIPS ships, the brains named
-// round them), or a race of `race.teams` teams of `race.ships` spec ships
-// (play/race.ts specField: a duel is two teams of one), sailed by its card.
-//
-// Node only (tools/).
-
 import { join } from 'node:path';
 import { RIDE } from '../../src/sim/ride.ts';
 import { createMatches } from '../../src/play/setup.ts';
@@ -35,18 +23,6 @@ import { ruledBy } from './rules.ts';
 import { typeNamed } from './types.ts';
 import { worldOf } from './world.ts';
 
-/**
- * A match to sail. `planet`: its seed (the game's if not given); `match`: the
- * match dealt on it (1 the first after the lobby's); `race`: sail a race of
- * spec ships on that match's seed instead (`close`: berthed together, the
- * first of the match's berths and those nearest it, so they meet at once). For a dealt match only: `brains`
- * by name (brains.ts; ship id sails brains[(id + match) % length]), `type`
- * (types.ts), `rules` (rules.ts), every `players`-th ship's gun laid by a
- * stand-in for a player with `thumb` (player.ts). `seconds`: the most it runs
- * (the storm's course and two minutes more if not given). `sea`: flat (as the
- * bots are tuned on) or the swell the game draws (slower; its cost shows in
- * the step's `ride`).
- */
 export interface MatchScenario {
   kind: 'match';
   planet?: number;
@@ -63,13 +39,11 @@ export interface MatchScenario {
 
 export type State = ReturnType<typeof createState>;
 
-/** The swell as play/game.ts builds it, on a planet. */
 function swellOf(seed: number, height: (p: Vec3) => number): Hull {
   const sea = anchors(icosphere(FREQUENCY), createWind(seed), CASCADES[0]);
   return createSwell(sea, height, MEAN.wind, { shortest: RIDE.shortest }).hull;
 }
 
-/** A race of `teams` teams of `ships` spec ships, numbered afresh. */
 function cardOf(seed: number, teams: number, ships: number): RaceCard {
   const full = specField(seed, teams);
   const kept = full.ships.filter(
@@ -78,10 +52,8 @@ function cardOf(seed: number, teams: number, ships: number): RaceCard {
   return { ...full, ships: kept.map((s, id) => ({ ...s, id })) };
 }
 
-/** What sailing a match comes to: its summary (also summary.json, if written). */
 export type Summary = ReturnType<typeof summaryOf>;
 
-/** The scenario sailed; its logs and summary written into `dir`, if given. */
 export function runMatch(sc: MatchScenario, dir?: string): Summary {
   const w = worldOf(sc.planet),
     n = sc.match ?? 1;
@@ -195,7 +167,6 @@ function sail(
 const r2 = (x: number) => Math.round(x * 100) / 100,
   rate = (hits: number, shots: number) => (shots ? r2(hits / shots) : null);
 
-/** The summary of a match sailed: the headline figures first, then the account. */
 function summaryOf(
   sc: MatchScenario,
   m: Match,
@@ -302,7 +273,6 @@ function summaryOf(
   };
 }
 
-/** FNV-1a over the bits of every number given, as eight hex digits. */
 export function fingerprint(numbers: readonly number[]): string {
   const bytes = new Uint8Array(new Float64Array(numbers).buffer);
   let h = 0x811c9dc5;
@@ -310,10 +280,6 @@ export function fingerprint(numbers: readonly number[]): string {
   return h.toString(16).padStart(8, '0');
 }
 
-/**
- * What the hash is of: the match's clock, the loot left, and every ship's
- * place, heading, speed, health, share and whether she floats.
- */
 export function numbersOf(state: State): number[] {
   const numbers: number[] = [state.time(), state.loot().pieces.length];
   for (const v of state.vessels())

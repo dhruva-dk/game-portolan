@@ -1,5 +1,3 @@
-// world/scalar.ts: the single numbers' arithmetic, at its ends and in its
-// middle.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -35,7 +33,6 @@ test('smoothstep is 3t² − 2t³ between its edges and held past them', () => {
   assert.equal(smoothstep(1, 3, 4), 1);
   assert.equal(smoothstep(1, 3, 2), 0.5);
   near(smoothstep(0, 1, 0.25), 0.15625);
-  // edges reversed: falling
   assert.equal(smoothstep(3, 1, 0), 1);
 });
 
@@ -45,11 +42,9 @@ test('smoother is eased at both ends, symmetric, and its integral is its area', 
   assert.equal(smoother(0.5), 0.5);
   for (const t of [0.1, 0.3, 0.7])
     near(smoother(t) + smoother(1 - t), 1, 1e-12, `t ${t}`);
-  // the slope at the ends is nil
   near((smoother(1e-4) - smoother(0)) / 1e-4, 0, 1e-6, 'slope at 0');
   assert.equal(smootherIntegral(0), 0);
   assert.equal(smootherIntegral(1), 0.5);
-  // its derivative is smoother
   for (const t of [0.2, 0.5, 0.9])
     near(
       (smootherIntegral(t + 1e-6) - smootherIntegral(t - 1e-6)) / 2e-6,

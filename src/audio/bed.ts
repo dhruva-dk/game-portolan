@@ -1,28 +1,6 @@
-// The bed: the sea and the air about her, never still and never a tune. Every
-// layer is noise of one loop, shaped by filters and set each frame from what
-// she does (listen.ts Bed):
-//   swell   the open sea's low wash, rising with her heave
-//   wash    the water along her sides, brighter as she makes way
-//   hiss    her bow wave, with her speed, louder as her bow comes down
-//   wind    the wind in her rig, with her way and a gust; and the rigging's own higher sigh over it (rig)
-//   surf    breakers on a shore, by the nearest coast, in sets that come and go on the world's clock
-//   gale    the storm's wall of wind, heard from afar as a low roar, loud and open inside it; rain with it inside
-//   strain  her hull working under her when it is low: a groan in the timbers, moving with her roll
-// The bed as a whole is as present as the sea is (none from space) and muffled
-// under the full map and at her end; and it goes as the screens cover the world
-// (the way home from a match), following the cover closely, and comes back as
-// it lifts.
-//
-// The levels are pure (levels: a Bed in, numbers out); the nodes (createBed)
-// are made once and only set after.
-
 import { clamp } from '../world/scalar.ts';
 import type { Bed } from './listen.ts';
 
-/**
- * Every number the bed's nodes are set to: each layer's gain, and the filters
- * that move.
- */
 interface Levels {
   swell: number;
   swellHz: number;
@@ -65,17 +43,8 @@ export const levels = (): Levels => ({
   uncovered: 1,
 });
 
-/**
- * Seconds the bed's gain under the screens' cover takes to follow it: well
- * inside the cover's own fade, so the sea is all but gone once the world is
- * covered.
- */
 const COVER = 0.04;
 
-/**
- * Breakers on a shore, 0…1: sets of three swells of their own periods, on the
- * world's clock.
- */
 export const breakers = (t: number) =>
   clamp(
     Math.max(0, Math.sin((2 * Math.PI * t) / 6.7)) ** 6 +
@@ -83,18 +52,9 @@ export const breakers = (t: number) =>
       0.5 * Math.max(0, Math.sin((2 * Math.PI * t) / 4.3 + 1)) ** 10
   );
 
-/**
- * Metres from the storm's wall at which the gale is first heard, and how far
- * into the storm it is all about her.
- */
 const GALE_HEARD = 380,
   GALE_INSIDE = 45;
 
-/**
- * The gale's share for `wall` m to the storm's wall (+ inside the calm), 0…1: a
- * low roar rising as she nears it, all about her once in it. And the share of
- * it that is about her (rain, the highs), 0…1.
- */
 export const galeOf = (wall: number) =>
   wall >= GALE_HEARD
     ? 0
@@ -103,7 +63,6 @@ export const galeOf = (wall: number) =>
       : 0.6 + 0.4 * clamp(-wall / GALE_INSIDE);
 const insideOf = (wall: number) => clamp(-wall / GALE_INSIDE + 0.15);
 
-/** The bed's levels for `b`, written into `out`. */
 export function levelsOf(b: Bed, out: Levels): Levels {
   const heave = clamp(Math.abs(b.heave) / 1.5),
     speed = clamp(b.speed, 0, 1.6),
@@ -133,26 +92,21 @@ export function levelsOf(b: Bed, out: Levels): Levels {
     clamp((0.45 - b.hull) / 0.45) *
     (0.5 + 0.5 * clamp(Math.abs(b.roll) / 0.06));
   out.presence = clamp(b.presence);
-  // the whole muffled: open to 18 kHz, down to 450 Hz under the full map
   out.open = 18000 * (450 / 18000) ** clamp(b.muffle);
   out.uncovered = 1 - clamp(b.covered);
   return out;
 }
 
-/** A layer: its gain, and the filters of it that move. */
 interface Layer {
   gain: GainNode;
   moving: BiquadFilterNode | null;
 }
 
-/** The bed's nodes on `out`, fed by the looped noise `noise` (stereo). */
 export function createBed(
   ctx: BaseAudioContext,
   noise: AudioBuffer,
   out: AudioNode
 ) {
-  // the sea's highs fall away as a real sea's do (a tilt down over 3 kHz), and
-  // the whole is muffled as it is asked
   const open = new BiquadFilterNode(ctx, {
     type: 'lowpass',
     frequency: 18000,
@@ -166,10 +120,6 @@ export function createBed(
   const presence = new GainNode(ctx, { gain: 0 }),
     uncovered = new GainNode(ctx, { gain: 1 });
   open.connect(tilt).connect(presence).connect(uncovered).connect(out);
-  /**
-   * Three loops of the one noise, each at its own rate and from its own point,
-   * so no two layers share it.
-   */
   const loops = [1, 0.83, 1.13].map((rate, i) => {
     const src = new AudioBufferSourceNode(ctx, {
       buffer: noise,
@@ -179,10 +129,6 @@ export function createBed(
     src.start(0, i * 2);
     return src;
   });
-  /**
-   * A layer from loop `from`, through `chain` (the first of them the one that
-   * moves, if `moves`).
-   */
   const layer = (
     from: number,
     chain: BiquadFilterOptions[],
@@ -257,16 +203,7 @@ export function createBed(
     false
   );
 
-  /**
-   * Each param as last asked for: a param is asked again only once what it is
-   * to be has moved by more than a part in a hundred (or from nothing), so a
-   * steady bed adds nothing to the params' timelines frame after frame.
-   */
   const asked = new Map<AudioParam, number>();
-  /**
-   * Glides a param to `v` from `at` (s on the context's clock), over about
-   * `tau` s.
-   */
   const glide = (p: AudioParam, v: number, at: number, tau: number) => {
     const was = asked.get(p);
     if (
@@ -290,7 +227,6 @@ export function createBed(
   };
 
   return {
-    /** Sets every layer to `v` from `at`, gliding (none of it steps). */
     steer(v: Levels, at: number) {
       set(swell, v.swell, v.swellHz, at, 0.4);
       set(wash, v.wash, v.washHz, at, 0.5);

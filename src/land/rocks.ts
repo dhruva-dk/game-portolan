@@ -1,17 +1,3 @@
-// The land's rocks (world/terrain-scatter.ts says where): big masses heaped
-// into outcrops and the boulders round them. A handful of shapes of each
-// (rock-shape.ts), each drawn once for all its rocks on the tiles in view
-// (site.ts).
-//
-// Terracotta in the sun and plum out of it (palette.ts), each facet one flat
-// tone: the facets' own normals, never the shape's smoothed ones. Darker in a
-// band where the sea wets them. Lit like everything else (sky/light.ts).
-//
-// Triangles: 20 × (detail + 1)² a shape: 2880 for a mass, 500 for a boulder; on
-// the tiles far from the eye (groves.ts), where a mass is a few pixels across,
-// each shape at a coarser level of the same lumps: 720 and 180; from space,
-// 320 and 80.
-
 import {
   Euler,
   Matrix4,
@@ -44,35 +30,16 @@ import { rockShape } from './rock-shape.ts';
 import { createInstances, standing, type Placed } from './site.ts';
 import { cut } from '../tsl.ts';
 
-/** How many shapes of each kind. */
 export const KINDS = { big: { shapes: 4 }, boulder: { shapes: 4 } };
-/**
- * Each level of detail, nearest first (groves.ts says how far off each is
- * drawn): how finely each kind's shapes are made (rock-shape.ts), and how many
- * of them it is drawn in (distant, from space, a mass a few pixels across, all
- * as the first).
- */
 const LEVELS = [
   { name: 'rocks', big: 11, boulder: 4, shapes: 4 },
   { name: 'rocks far', big: 5, boulder: 2, shapes: 4 },
   { name: 'rocks distant', big: 3, boulder: 1, shapes: 4 },
 ];
-/**
- * A rock is wet up to this many metres over the sea, and darker there by this
- * much.
- */
 const WET_TO = 0.3,
   WET = 0.72;
-/**
- * How deep in a crack (0…1) a rock is drawn in its shadow tone whatever the
- * sun.
- */
 const CAVITY = 0.5;
 
-/**
- * rocks[i]: those on tile i, whose chart is charts[i]. For each level of
- * detail (LEVELS, nearest first), the instances of each of its shapes.
- */
 export function createRocks(
   rocks: Rock[][],
   charts: Chart[],
@@ -82,16 +49,12 @@ export function createRocks(
   const material = new MeshBasicNodeMaterial();
   material.colorNode = Fn(() => {
     const p = positionWorld;
-    // each face one tone: its own normal, from how the surface lies across the
-    // pixel, turned the way the shape faces
     const across = cross(dFdx(p), dFdy(p));
     const face = across.div(max(length(across), 1e-12));
     const n = face.mul(
       select(dot(face, normalWorld).lessThan(0), float(-1), float(1))
     );
     const wet = mix(float(WET), float(1), cut(view.altitude(p), WET_TO));
-    // deep in a crack or under a ledge (rock-shape.ts cavity) the sun never
-    // reaches: the shadow tone, lit or not
     const shadow = vec3(...ROCK.shadow).mul(wet);
     return light.toon(
       p,
@@ -111,7 +74,6 @@ export function createRocks(
     s = new Vector3(),
     zero = new Vector3();
   const place = (r: Rock, chart: Chart): Placed => {
-    // a slight lean, as if settled
     e.set(Math.sin(r.yaw * 3) * 0.12, r.yaw, Math.cos(r.yaw * 5) * 0.12);
     m.compose(zero, q.setFromEuler(e), s.setScalar(r.size));
     return { matrix: standing(chart, r.x, r.y, r.z, m, new Matrix4()) };
@@ -123,7 +85,6 @@ export function createRocks(
     [true, false].flatMap((big) =>
       Array.from({ length: level.shapes }, (_, k) =>
         createInstances(
-          // (numbered in turn, the masses' shapes and then the boulders')
           `${level.name} ${k + (big ? 0 : level.shapes)}`,
           rockShape(k + (big ? 1 : 51), big ? level.big : level.boulder, big),
           material,

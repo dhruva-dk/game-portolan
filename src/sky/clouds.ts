@@ -1,15 +1,3 @@
-// The clouds on screen and on the sea: the cloud field (cloud-field.ts) marched
-// a fraction of the pixels each frame and accumulated over frames, and a map of
-// their shadow.
-//
-// Each frame marches a quarter-resolution grid, each texel taking one of the
-// 2×2 half-resolution pixels it covers in turn; a resolve pass at half
-// resolution keeps the rest from earlier frames, moved to where the camera now
-// sees them (reprojected by the cloud's distance, the eye's step and the wind's
-// carry, read with a Catmull-Rom filter so moving doesn't blur them) and held
-// to the new samples' range. After four frames every half-resolution pixel is
-// fresh.
-
 import { Matrix4, NearestFilter, StorageTexture, Vector3 } from 'three/webgpu';
 import {
   Fn,
@@ -59,13 +47,8 @@ import {
   type Vec4Node,
 } from '../tsl.ts';
 
-/**
- * Most steps a screen ray takes (a grazing one; one looking up needs about 30).
- */
 const MAX_STEPS = 64;
-/** How much of a fresh sample goes into the history. */
 const BLEND = 0.25;
-/** The 2×2 cell each frame takes, in an order that spreads them. */
 const LATTICE = [
   [0, 0],
   [1, 1],
@@ -73,10 +56,6 @@ const LATTICE = [
   [0, 1],
 ];
 
-/**
- * A texture read at uv with a Catmull-Rom filter, from five bilinear reads
- * (Jimenez 2016); size in texels.
- */
 function catmullRom(
   tex: StorageTexture,
   uv: Vec2Node,
@@ -110,26 +89,17 @@ function catmullRom(
   return sum.div(weight);
 }
 
-/** Per-frame camera inputs the passes share. */
 function cameraInputs() {
   return {
     projectionInverse: uniform(new Matrix4()),
     cameraWorld: uniform(new Matrix4()),
     previousViewProjection: uniform(new Matrix4()),
-    /**
-     * The eye's frame and its horizon's dip last frame, for finding where a
-     * cloud was seen then.
-     */
     previousFrame: {
       east: uniform(new Vector3(1, 0, 0)),
       up: uniform(new Vector3(0, 1, 0)),
       south: uniform(new Vector3(0, 0, 1)),
       dip: uniform(0),
     },
-    /**
-     * Where a cloud now at q (km from the eye) was last frame, from the eye
-     * then: q + shift.
-     */
     shift: uniform(new Vector3()),
     frameIndex: uniform(0, 'uint'),
   };
@@ -142,7 +112,6 @@ function createPasses(
   field: CloudField,
   cam: ReturnType<typeof cameraInputs>
 ) {
-  /** The sky's direction through the screen at uv. */
   const rayAt = (uv: Vec2Node): Vec3Node => {
     const ndc = vec4(uv.x.mul(2).sub(1), float(1).sub(uv.y.mul(2)), 1, 1);
     const camera = cam.projectionInverse.mul(ndc);
@@ -169,9 +138,6 @@ function createPasses(
     const x = instanceIndex.mod(MW),
       y = instanceIndex.div(MW);
     const px = vec2(x, y).mul(2).add(cell.xy);
-    // each visit's ray through its own point of the pixel (an R2 sequence), so
-    // the history gathers how much of the pixel a cloud's edge covers, not one
-    // hard step a pixel wide
     const f = float(cam.frameIndex.div(4).mod(4096));
     const d = rayAt(
       px
@@ -179,8 +145,6 @@ function createPasses(
         .div(vec2(HW, HH))
     );
     const distance = float(0).toVar();
-    // the march's start: interleaved gradient noise (Jimenez 2014), stepped on
-    // by the golden ratio each frame
     const start = fract(
       interleavedGradientNoise(px).add(float(cam.frameIndex).mul(0.618034))
     );
@@ -189,11 +153,6 @@ function createPasses(
     textureStore(marchedDistance, uvec2(x, y), vec4(distance, 0, 0, 1));
   })().compute(MW * MH, [64]);
 
-  /**
-   * This frame's march at the half-resolution pixel p, between the four samples
-   * round it (each taken near 2m + cell + ½): for a pixel with no history, so a
-   * cloud just come into view is soft, not in blocks of four.
-   */
   const spread = (p: Vec2Node): Vec4Node => {
     const q = p.sub(cell.xy).mul(0.5),
       base = floor(q),
@@ -207,7 +166,6 @@ function createPasses(
     return mix(mix(at(0, 0), at(1, 0), t.x), mix(at(0, 1), at(1, 1), t.x), t.y);
   };
 
-  // two resolves, one per direction of the history ping-pong
   const resolveKernels = [0, 1].map((write) => {
     const read = 1 - write;
     return Fn(() => {
@@ -221,10 +179,6 @@ function createPasses(
       const current = textureLoad(marched, m).toVar();
       const out = spread(vec2(x, y)).toVar();
       const outDistance = textureLoad(marchedDistance, m).x.toVar();
-      // where this pixel's cloud was last frame, found by its distance now:
-      // seen from where the eye was over the map then, the wind's carry undone,
-      // and turned from that frame's sky back into the world, where last
-      // frame's camera saw it
       const uv = vec2(x, y).add(0.5).div(vec2(HW, HH));
       const then = rayAt(uv).mul(outDistance).add(cam.shift);
       const clip = cam.previousViewProjection.mul(
@@ -242,10 +196,6 @@ function createPasses(
         .and(clip.w.greaterThan(0));
       If(onScreen, () => {
         const old = catmullRom(history[read], prev, vec2(HW, HH));
-        // the history is held to the range of this frame's samples round it (a
-        // little widened, since the samples themselves are noisy), which
-        // rejects cloud that has moved or changed without pulling settled cloud
-        // about
         const lo = vec4(1e4).toVar(),
           hi = vec4(-1e4).toVar();
         for (let j = -1; j <= 1; j++)
@@ -259,8 +209,6 @@ function createPasses(
           }
         const margin = hi.sub(lo).mul(0.1);
         const held = clamp(old, lo.sub(margin), hi.add(margin));
-        // a fresh sample is blended in, so its noise averages away over visits;
-        // the others keep the history
         out.assign(select(fresh, mix(held, current, BLEND), held));
       });
       textureStore(history[write], uvec2(x, y), out);
@@ -278,7 +226,6 @@ function createPasses(
     cell,
     marchKernel,
     resolveKernels,
-    /** Frees the textures and the kernels' pipelines (for a new size). */
     dispose() {
       for (const t of [
         marched,
@@ -292,10 +239,6 @@ function createPasses(
   };
 }
 
-// ------------------------------------------------------------------ cloud
-// shadows
-
-/** The shadow map covers this many km round the eye. */
 const SHADOW_EXTENT = 8;
 const SHADOW_N = 256;
 const SHADOW_STEPS = 12;
@@ -303,7 +246,6 @@ const SHADOW_STEPS = 12;
 function createShadow(view: View, field: CloudField) {
   const { eye, sunDir } = field.inputs;
   const map = storageTable(SHADOW_N, SHADOW_N);
-  /** Where the shadow map was centred when last drawn, km. */
   const centre = uniform(new Vector3());
 
   const kernel = Fn(() => {
@@ -314,8 +256,6 @@ function createShadow(view: View, field: CloudField) {
       .div(SHADOW_N)
       .sub(0.5)
       .mul(SHADOW_EXTENT);
-    // from the sea point up toward the sun, through the shell; positions
-    // relative to the eye
     const sea = vec3(
       ground.x.add(centre.x).sub(eye.x),
       eye.y.negate(),
@@ -327,8 +267,6 @@ function createShadow(view: View, field: CloudField) {
     const dt = t1.sub(t0).div(SHADOW_STEPS);
     const tau = float(0).toVar();
     loop('ss', SHADOW_STEPS, (i) => {
-      // the cloud as the eye sees it (eroded: the uneroded one is far fatter,
-      // and its shadow covers the sea)
       tau.addAssign(
         field
           .density(sea.add(sunDir.mul(t0.add(float(i).add(0.5).mul(dt)))))
@@ -336,9 +274,6 @@ function createShadow(view: View, field: CloudField) {
           .mul(dt)
       );
     });
-    // the sun's light through the cloud, direct and diffused forward together
-    // (the two-stream slab's 1/(1 + ¾(1−g)τ)): a fair-weather cumulus (τ 10–30)
-    // still lets a quarter to a half through, a thick one little
     textureStore(
       map,
       uvec2(x, y),
@@ -349,10 +284,6 @@ function createShadow(view: View, field: CloudField) {
   return {
     kernel,
     centre,
-    /**
-     * Fraction of the sun's light the clouds let through to world position p
-     * (metres), read where p lies on the eye's chart.
-     */
     at: (p: Vec3Node): FloatNode => {
       const uv = view
         .local(p)
@@ -371,20 +302,12 @@ function createShadow(view: View, field: CloudField) {
   };
 }
 
-// ------------------------------------------------------------------ the system
-
 export interface CloudInputs {
   coverage: number;
-  /** m/s, east (x) and south (y). */
   wind: { x: number; y: number };
-  /** Toward the sun, as the eye's sky shows it (view.toSky). */
   sunDirection: Vector3;
 }
 
-/**
- * tables: the air's (tables.ts), which light the clouds and the air in front of
- * them.
- */
 export function createClouds(view: View, tables: Tables) {
   const noise = createCloudNoise();
   const field = createCloudField(tables, noise);
@@ -393,15 +316,10 @@ export function createClouds(view: View, tables: Tables) {
   const shadow = createShadow(view, field);
 
   let passes = createPasses(1, 1, view, field, cam);
-  /** The screen's size the passes were made for, CSS pixels. */
   let wide = 0,
     high = 0;
   let frame = 0;
   let last: readonly number[] | null = null;
-  /**
-   * Where the camera looked from last frame, and the eye's frame then (the
-   * uniforms' own values before the first).
-   */
   const seen = {
     viewProjection: new Matrix4(),
     east: new Vector3(1, 0, 0),
@@ -409,16 +327,11 @@ export function createClouds(view: View, tables: Tables) {
     south: new Vector3(0, 0, 1),
     dip: 0,
   };
-  /** The passes due this frame (update's, laid afresh each time). */
   const due: Compute[] = [];
   const historyTexture = texture(passes.history[0]);
   const historyDistanceTexture = texture(passes.historyDistance[0]);
 
   return {
-    /**
-     * The clouds seen through the screen at uv, at half resolution: their light
-     * (rgb) and what survives behind them (a); and metres to them.
-     */
     at(uv: Vec2Node): { color: Vec4Node; metres: FloatNode } {
       return {
         color: historyTexture.sample(uv),
@@ -426,23 +339,10 @@ export function createClouds(view: View, tables: Tables) {
       };
     },
     shadow: shadow.at,
-    /** The clouds along a sky direction, coarser, for the reflection. */
     along: field.along,
-    /**
-     * The passes that fill the clouds' patterns, to be run once before the
-     * first frame.
-     */
     bake: noise.bake,
-    /**
-     * Their Perlin-Worley volume (cloud-noise.ts), which the storm's cloud and
-     * rain are drawn from too.
-     */
     shape: noise.shape,
 
-    /**
-     * Readies this frame's march, and returns the passes due: the march, its
-     * resolve, and every fourth frame the shadow map.
-     */
     update(
       inputs: CloudInputs,
       dt: number,
@@ -452,8 +352,6 @@ export function createClouds(view: View, tables: Tables) {
       if (width !== wide || height !== high) {
         wide = width;
         high = height;
-        // (three frees a texture's memory and a kernel's pipeline and bindings
-        // once it is disposed)
         passes.dispose();
         passes = createPasses(width, height, view, field, cam);
         frame = 0;
@@ -463,10 +361,8 @@ export function createClouds(view: View, tables: Tables) {
         carryZ = (inputs.wind.y * dt) / 1000;
       drift.value.x += carryX;
       drift.value.z += carryZ;
-      drift.value.y += dt * 0.002; // the billows slowly turn over
+      drift.value.y += dt * 0.002;
       sunDir.value.copy(inputs.sunDirection);
-      // the eye slides over the map as it moves over the planet, by its step
-      // along its own east and south
       const { position, frame: f, height: h } = view.eye;
       let stepX = 0,
         stepZ = 0;
@@ -482,13 +378,10 @@ export function createClouds(view: View, tables: Tables) {
       const climb = h / 1000 - eye.value.y;
       eye.value.y = h / 1000;
       last = position;
-      // a cloud at q now was at q + step − carry from where the eye was then
       cam.shift.value.set(stepX - carryX, climb, stepZ - carryZ);
       cam.projectionInverse.value.copy(view.eye.projectionInverse);
       cam.cameraWorld.value.copy(view.eye.world);
       cam.frameIndex.value = frame;
-      // last frame's camera and eye, for the resolve to find where a cloud was
-      // seen then; and this frame's, for the next
       const then = cam.previousFrame;
       cam.previousViewProjection.value.copy(seen.viewProjection);
       then.east.value.copy(seen.east);

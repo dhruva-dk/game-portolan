@@ -1,5 +1,3 @@
-// Her place for a phase (placing.ts, PLAN layer 2): she picks a place inside
-// the cap the storm closes to next, keeps it, and makes for it when it is time.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mind, think } from '../src/sim/bot.ts';
@@ -42,12 +40,9 @@ test('she picks a place inside the next cap, keeps it, and makes for it when it 
     const place = m.place;
     assert.ok(place, `${seed}: no place`);
     assert.ok(distance(place, centre) <= 400, `${seed}: outside the cap`);
-    // weighed again with nothing changed, she keeps it
     for (let k = 0; k < 7 * 12; k++)
       m = think(own, [], sea, m, nature(seed)).memory;
     assert.deepEqual(m.place, place, `${seed}: moved`);
-    // long before the cap closes she roams freely; near it, her next mark (a
-    // mark is kept 9 s; a step is 1/30 s) is by her place
     assert.equal(m.mode, 'roam');
     const late = { depth: deep, storm: storm(5) };
     for (let k = 0; k < 360; k++)
