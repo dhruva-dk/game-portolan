@@ -190,10 +190,10 @@ export async function scenario(
       ? [{ at: number('leave', 0), act: () => p.flow.tap('leave') }]
       : []),
     ...(params.has('sink')
-      ? [{ at: number('sink', 0), act: () => sinkHer(p.game) }]
+      ? [{ at: number('sink', 0), act: () => sinkPlayerShip(p.game) }]
       : []),
     ...(params.has('win')
-      ? [{ at: number('win', 0), act: () => winHer(p.game) }]
+      ? [{ at: number('win', 0), act: () => winPlayerShip(p.game) }]
       : []),
     ...(params.has('down')
       ? [{ at: number('down', 0), act: () => downOne(p.game) }]
@@ -250,10 +250,10 @@ function open(p: Played, others: readonly Berth[], s: Stage) {
     drive(game, params.get('drive') ?? '');
     referee.begin();
     if (screen === 'sunk' || screen === 'spectate' || screen === 'result')
-      sinkHer(game);
+      sinkPlayerShip(game);
     if (screen === 'result')
       others.forEach((_, i) => i > 0 && game.debug.sink(i + 1, 1));
-    if (screen === 'won') winHer(game);
+    if (screen === 'won') winPlayerShip(game);
     flow.go('match');
     if (screen === 'spectate') {
       referee.update(0);
@@ -270,7 +270,7 @@ function open(p: Played, others: readonly Berth[], s: Stage) {
   if (screen === 'map' || params.has('map')) p.map();
 }
 
-function sinkHer(game: Game) {
+function sinkPlayerShip(game: Game) {
   const by = game.alive().find((id) => id !== PLAYER);
   game.debug.sink(
     PLAYER,
@@ -283,7 +283,7 @@ function downOne(game: Game) {
   if (one !== undefined) game.debug.sink(one, PLAYER);
 }
 
-function winHer(game: Game) {
+function winPlayerShip(game: Game) {
   const others = game.alive().filter((id) => id !== PLAYER);
   others.forEach((id, i) =>
     game.debug.sink(

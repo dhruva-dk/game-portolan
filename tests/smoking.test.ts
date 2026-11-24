@@ -2,13 +2,13 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { SEED } from '../src/world/environment.ts';
 import { createState } from '../src/play/state.ts';
-import { wearOf } from '../src/sim/health.ts';
+import { HEALTH } from '../src/sim/handling.ts';
+import { SMOKE, wearOf } from '../src/sim/health.ts';
 import { watersAt } from '../src/sim/waters.ts';
 import type { ShipDraw } from '../src/render/snapshot.ts';
 import {
   CLOSE,
   LIFE_SPREAD,
-  MOST_RATE,
   SMOKING,
   WORN,
   smokers,
@@ -116,9 +116,8 @@ test('all of it together keeps no more than SMOKING.alive puffs alive, a quarter
   const all = plan(ships, 0.5),
     sum = all.reduce((s, m) => s + m.wear, 0);
   assert.equal(all.length, SMOKING.most);
-  assert.ok(sum <= MOST_RATE + 1e-9, `${sum} a second`);
   const longest = (WORN[2]?.life ?? 0) * LIFE_SPREAD;
-  assert.ok(MOST_RATE * longest <= SMOKING.alive + 1e-9);
+  assert.ok(sum * longest <= SMOKING.alive, `${sum} a second`);
   assert.ok(SMOKING.alive <= 4096 / 4);
   const one = plan([ship(1, SMOKING.near - 1, 2)], 0.5)[0];
   assert.ok(one);
@@ -139,4 +138,16 @@ test("in the game's own match, every ship drawn shows its wear", () => {
     }
   }
   assert.ok(worn, 'a ship was worn');
+});
+
+test('a ship smokes lightly below SMOKE.light of its full hull, heavily below SMOKE.heavy', () => {
+  const most = HEALTH.hull * 1.5,
+    by = 0.01;
+  const at = (share: number) => wearOf({ hull: most * share, shield: 0, most });
+  assert.equal(at(1), 0);
+  assert.equal(at(SMOKE.light + by), 0);
+  assert.equal(at(SMOKE.light - by), 1);
+  assert.equal(at(SMOKE.heavy + by), 1);
+  assert.equal(at(SMOKE.heavy - by), 2);
+  assert.equal(at(by), 2);
 });

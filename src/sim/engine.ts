@@ -533,7 +533,6 @@ function createSea(waters: Waters, first: Course) {
     last: (): Stepped => last,
     seed: (): number => match.seed,
     standing,
-    mode: (id: number) => aboard.get(id)?.mind?.mode,
     order: (): number[] => finishing(view.alive(), sinkings, view.share),
     teams: (): readonly number[] | undefined => teams,
     marks: (id: number): readonly Vessel[] => marksOf(battle, id, fleet),

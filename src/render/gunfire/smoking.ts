@@ -42,12 +42,6 @@ export const SMOKING = {
 } as const;
 export const CLOSE = { rate: 0.4, rise: 0.5, size: 0.7 } as const;
 
-const LONGEST = Math.max(
-  (WORN[2]?.life ?? 0) * LIFE_SPREAD,
-  (WORN[1]?.life ?? 0) * LIFE_SPREAD
-);
-export const MOST_RATE = SMOKING.alive / LONGEST;
-
 export interface Smoker {
   ship: ShipDraw;
   away: number;
@@ -93,7 +87,6 @@ export function smokers(
     spare.away = d;
     if (!full) n++;
   }
-  let sum = 0;
   for (let i = 0; i < n; i++) {
     const m = out[i];
     if (!m) continue;
@@ -105,15 +98,6 @@ export function smokers(
       share = closeShare(close) / far;
     m.close = close;
     m.wear = (WORN[s.wear]?.rate ?? 0) * share;
-    sum += m.wear;
-  }
-  if (sum > MOST_RATE) {
-    const k = MOST_RATE / sum;
-    for (let i = 0; i < n; i++) {
-      const m = out[i];
-      if (!m) continue;
-      m.wear *= k;
-    }
   }
   return n;
 }

@@ -84,7 +84,7 @@ function run(depth: Depth, brain: Brain, seconds: number) {
 
 const isle = islands([at(60, 35), 28]);
 
-test('a bot running from a foe makes for cover behind an island off its bow, out of his sight; told never to, it runs on in plain view', () => {
+test('a bot running from a foe makes for cover behind an island off its bow, out of its sight; told never to, it runs on in plain view', () => {
   const hid = run(isle, DEFAULT_BRAIN, 16),
     plain = run(
       isle,

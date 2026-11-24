@@ -138,8 +138,7 @@ export function createGame(
   let wanted: Readonly<Framing> = WHOLE,
     part: PartType | null = null;
   const framing: Framing = { center: [0, 0], size: 1 },
-    seat = { orbit, focus: { ...LOOSE } },
-    nudge = { x: 0, y: 0, held: false };
+    seat = { orbit, focus: { ...LOOSE } };
   const reframe = () => {
     framing.center[0] = wanted.center[0];
     framing.center[1] = wanted.center[1];
@@ -352,11 +351,6 @@ export function createGame(
       part = PARTS.find((p) => p === to?.focus) ?? null;
       if (cut) reframe();
     },
-    look(x: number, y: number, held: boolean) {
-      nudge.x += x;
-      nudge.y += y;
-      nudge.held = held;
-    },
     step(dt: number, read: Thumbs) {
       const hands = steering() ? read : IDLE;
       if (hands.stick || hands.look.held) held = null;
@@ -405,11 +399,8 @@ export function createGame(
       between = time.between;
       last = state.poseOf(PLAYER, between) ?? last;
       if (anchored) {
-        const drag = { x: read.look.x + nudge.x, y: read.look.y + nudge.y },
-          held = read.look.held || nudge.held;
-        nudge.x = nudge.y = 0;
-        dragged(orbit, drag, orbit);
-        if (!held) relaxed(orbit, dt, orbit);
+        dragged(orbit, read.look, orbit);
+        if (!read.look.held) relaxed(orbit, dt, orbit);
         turned(orbit, aside, dt, orbit);
         focused(seat.focus, part ? FOCI[part] : LOOSE, dt);
         floorAt = state.clock(between);
