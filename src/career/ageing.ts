@@ -5,6 +5,7 @@
 
 import type { Dice } from './dice.ts';
 import { mentors } from './effective.ts';
+import { rated } from './hq.ts';
 import type { Person } from './roles.ts';
 import { SCHOOL, age, grown, retires, stars, type Schooling } from './stars.ts';
 import type { CareerState, Hands, Staff } from './state.ts';
@@ -17,15 +18,14 @@ export function schoolingOf(s: CareerState, g: Person): Schooling {
   const team = g.contract ? s.teams[g.contract.team] : null;
   if (!team) return { school: 1, mentor: false, simulator: 0 };
   const building = SCHOOL[g.role];
-  const level = building ? team.buildings[building].level : 1;
   return {
-    school: level,
+    school: building ? rated(team.buildings[building].level) : 1,
     mentor: mentors(
       staffOf(team)
         .filter((id) => id !== g.id)
         .map((id) => s.people[id])
     ),
-    simulator: team.buildings.simulator.level,
+    simulator: rated(team.buildings.simulator.level),
   };
 }
 

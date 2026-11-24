@@ -8,6 +8,7 @@ import type { PartType } from '../race.ts';
 import type { Building } from '../office/command.ts';
 import { shuffled, type Rand } from './dice.ts';
 import { componentsKnown } from './staff.ts';
+import { TUNING } from './tuning.ts';
 
 /** What a component does to a design. Any effect it lacks is 0. */
 interface Effects {
@@ -172,7 +173,10 @@ export const component = (id: string): Component | null =>
 export const tierOpen = (
   buildings: Readonly<Record<Building, { level: number }>>,
   type: PartType
-): number => buildings[UNLOCKS[type]].level;
+): number => {
+  const { tiers, top } = TUNING.hq;
+  return tiers[Math.min(top, Math.max(0, buildings[UNLOCKS[type]].level))];
+};
 
 /** The sum of some components' effects. */
 export function summed(ids: readonly string[]): Effects {

@@ -22,11 +22,15 @@ import {
 import {
   buildCost,
   buildDays,
+  capOf,
   designSlots,
   factoryPoints,
   fishIncome,
   loftFactor,
+  needs,
   partBuildDays,
+  rated,
+  scoutsOf,
   sponsorGrade,
   upkeep,
   upkeepAt,
@@ -49,7 +53,7 @@ import { founded, invariants, must, refused, withTeam } from './career-kit.ts';
 const ME = () => founded().player!.team;
 
 /** The player's team with every building at a level and a designer who knows every component. */
-function ready(level = 3): CareerState {
+function ready(level = 5): CareerState {
   const s = founded();
   const me = ME();
   const t = withTeam(s, me, (c) => ({
@@ -79,10 +83,14 @@ test('components: 6 types × 3 tiers × 3; a grey one each tier carries risk; ti
       );
     }
   const c = founded().teams[0];
-  assert.equal(tierOpen(c.buildings, 'sails'), c.buildings.towingTank.level);
+  const tiers = TUNING.hq.tiers;
+  assert.equal(
+    tierOpen(c.buildings, 'sails'),
+    tiers[c.buildings.towingTank.level]
+  );
   assert.equal(
     tierOpen(c.buildings, 'hull'),
-    c.buildings.compositesPlant.level
+    tiers[c.buildings.compositesPlant.level]
   );
   assert.equal(component('nothing'), null);
   assert.equal(
@@ -168,7 +176,8 @@ test('the pool: known components of the type, of tiers the buildings unlock', ()
       (id) => component(id)!.type === 'keel' && component(id)!.tier === 1
     )
   );
-  assert.equal(pool(ready(3), me, 'keel').length, 9);
+  assert.equal(pool(ready(3), me, 'keel').length, 6, 'level 3: tiers 1 and 2');
+  assert.equal(pool(ready(5), me, 'keel').length, 9);
 });
 
 test('the projection: best of the type + designer × 8 + components; cost by tier and type; days by Speed and loft', () => {
@@ -327,75 +336,108 @@ test("a rival fits a part it builds where it beats the worse ship's", () => {
   invariants(v);
 });
 
-test("the headquarters: levels' costs, days and upkeep; each level's effect", () => {
+test("the headquarters: levels 0..5, each level's cost, days and upkeep; each level's effect", () => {
   const c = founded().teams[0];
   for (const b of BUILDINGS) {
-    assert.equal(
-      buildCost(b, 1),
-      0,
-      'every team holds each building at level 1'
-    );
-    for (const l of [2, 3])
-      assert.ok(
-        buildCost(b, l) > 0 && buildDays(b, l) > 0 && upkeepAt(b, l) >= 0
-      );
-    assert.ok(
-      buildCost(b, 3) > buildCost(b, 2) && upkeepAt(b, 3) >= upkeepAt(b, 1)
-    );
+    assert.equal(buildCost(b, 0), 0, 'level 0: not built, nothing paid');
+    assert.equal(upkeepAt(b, 0), 0);
+    for (const l of [1, 2, 3, 4, 5]) {
+      assert.ok(buildCost(b, l) > buildCost(b, l - 1), `${b} ${l}: dearer`);
+      assert.ok(buildDays(b, l) > 0 && upkeepAt(b, l) >= upkeepAt(b, l - 1));
+    }
   }
   const at = (b: string, level: number): Team => ({
     ...c,
     buildings: { ...c.buildings, [b]: { level, next: null } },
   });
+  const levels = [0, 1, 2, 3, 4, 5];
+  const K = TUNING.hq;
   assert.deepEqual(
-    [1, 2, 3].map((l) => factoryPoints(at('factory', l))),
-    [10, 20, 30]
+    levels.map((l) => factoryPoints(at('factory', l))),
+    K.points
   );
   assert.deepEqual(
-    [1, 2, 3].map((l) => partBuildDays(at('factory', l))),
-    [6, 5, 4]
+    [1, 2, 5].map((l) => partBuildDays(at('factory', l))),
+    [6, 5, 2]
   );
   assert.deepEqual(
-    [1, 2, 3].map((l) => designSlots(at('designCentre', l))),
-    [2, 3, 4]
+    levels.map((l) => designSlots(at('designCentre', l))),
+    K.slots
   );
   assert.deepEqual(
-    [1, 2, 3].map((l) => loftFactor(at('designCentre', l))),
-    [1, 0.85, 0.7]
+    levels.map((l) => loftFactor(at('designCentre', l))),
+    K.loft
   );
+  assert.equal(fishIncome(at('commercialCentre', 0)), 0, 'none built: none');
   assert.ok(
-    fishIncome(at('commercialCentre', 3)) >
+    fishIncome(at('commercialCentre', 5)) >
       fishIncome(at('commercialCentre', 1))
   );
   assert.deepEqual(
-    [1, 2, 3].map((l) => sponsorGrade(at('hospitality', l))),
-    [1, 2, 3]
+    levels.map((l) => sponsorGrade(at('hospitality', l))),
+    K.grade
   );
+  assert.deepEqual(
+    levels.map((l) => scoutsOf(at('scoutingCentre', l))),
+    K.scouts
+  );
+  assert.deepEqual(levels.map(rated), K.scale);
   assert.equal(
     upkeep(c),
     BUILDINGS.reduce((a, b) => a + upkeepAt(b, c.buildings[b].level), 0)
   );
+  // every team: the core at level 1 at least, none above its tier's cap or more than a level above what it needs
+  for (const t of founded().teams)
+    for (const b of BUILDINGS) {
+      const level = t.buildings[b].level,
+        parent = needs(b);
+      assert.ok(level >= (K.core.some((k) => k === b) ? 1 : 0));
+      assert.ok(level <= capOf(t), `${t.name} ${b} ${level}`);
+      if (parent) assert.ok(level <= t.buildings[parent].level + 1);
+    }
 });
 
-test('Build: refusals; paid; finishes after its days with mail; any number under way', () => {
+test("Build: refusals (the top, the championship's cap, what it needs, the crews, the chairman, the balance); paid; finishes after its days", () => {
   const me = ME();
   const s = withTeam(founded(), me, (c) => ({
     ...c,
+    tier: 0,
     balance: 1e6,
+    budget: 1e6,
+    confidence: 60,
     buildings: {
       ...c.buildings,
       factory: { level: 1, next: null },
-      compositesPlant: { level: 1, next: null },
-      hospitality: { level: 3, next: null },
+      designCentre: { level: 1, next: null },
+      towingTank: { level: 0, next: null },
+      compositesPlant: { level: 0, next: null },
+      commercialCentre: { level: 0, next: null },
+      hospitality: { level: 1, next: null },
+      simulator: { level: 5, next: null },
     },
   }));
   refused(s, { kind: 'Build', building: 'castle' as 'factory' }, 'building');
-  refused(s, { kind: 'Build', building: 'hospitality' }, 'top');
+  refused(s, { kind: 'Build', building: 'simulator' }, 'top');
+  refused(
+    withTeam(s, me, (c) => ({
+      ...c,
+      tier: 2,
+      buildings: {
+        ...c.buildings,
+        pitCentre: { level: TUNING.hq.cap[2], next: null },
+      },
+    })),
+    { kind: 'Build', building: 'pitCentre' },
+    'cap'
+  );
+  refused(s, { kind: 'Build', building: 'hospitality' }, 'requires');
   refused(
     withTeam(s, me, (c) => ({ ...c, balance: c.debtFloor })),
     { kind: 'Build', building: 'factory' },
     'balance'
   );
+  const big = withTeam(s, me, (c) => ({ ...c, budget: 1000, confidence: 10 }));
+  refused(big, { kind: 'Build', building: 'factory' }, 'approve');
   const t = must(must(s, { kind: 'Build', building: 'factory' }), {
     kind: 'Build',
     building: 'compositesPlant',
@@ -403,8 +445,10 @@ test('Build: refusals; paid; finishes after its days with mail; any number under
   refused(t, { kind: 'Build', building: 'factory' }, 'underWay');
   assert.equal(
     t.teams[me].balance,
-    1e6 - buildCost('factory', 2) - buildCost('compositesPlant', 2)
+    1e6 - buildCost('factory', 2) - buildCost('compositesPlant', 1)
   );
+  const u = must(t, { kind: 'Build', building: 'towingTank' });
+  refused(u, { kind: 'Build', building: 'commercialCentre' }, 'crews');
   const done = t.teams[me].buildings.factory.next!.done;
   assert.equal(done, s.day + buildDays('factory', 2));
   const e = t.queue.find(

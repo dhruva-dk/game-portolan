@@ -85,14 +85,14 @@ export function inReach(
   return reach >= S.reachAdjacent && Math.abs(theirs - tier) === 1;
 }
 
-/** Speed: days to scout a person, by the crow's nest's level (1..3). */
+/** Speed: days to scout a person, by the scouting department's level (0..5). */
 export const scoutDays = (speed: number, nestLevel: number): number =>
   Math.max(
     1,
     Math.round(
       S.days *
         lin(S.speed, unit(speed)) *
-        S.nest[Math.min(2, Math.max(0, nestLevel - 1))]
+        S.nest[Math.min(S.nest.length - 1, Math.max(0, nestLevel))]
     )
   );
 

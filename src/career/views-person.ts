@@ -8,6 +8,7 @@ import { view, type Sight } from './knowledge.ts';
 import type { Person } from './roles.ts';
 import { age } from './stars.ts';
 import type { CareerState, Team } from './state.ts';
+import { scoutsOf } from './hq.ts';
 import { TUNING } from './tuning.ts';
 import { TIERS } from './views.ts';
 import { moneyText } from './names.ts';
@@ -138,7 +139,7 @@ export function openPosts(
   });
   if (c.staff.designer === null)
     out.push({ role: 'designer', status: 'staff', label: 'A designer' });
-  const nest = c.buildings.scoutingCentre.level;
+  const nest = scoutsOf(c);
   if (c.staff.scouts.length < nest)
     out.push({
       role: 'scout',

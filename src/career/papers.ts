@@ -25,6 +25,7 @@ import {
   buildCost,
   buildDays,
   designSlots,
+  BUILT,
   sponsorGrade,
   upkeepAt,
 } from './hq.ts';
@@ -33,7 +34,6 @@ import { render } from './mail.ts';
 import { perRace, projection as balanceAt } from './money.ts';
 import { standingOf } from './standings.ts';
 import {
-  BUILT,
   NEWS,
   PARTS,
   championship,

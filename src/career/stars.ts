@@ -50,8 +50,8 @@ function share(g: Person, season: number, i: number): number {
   return 1 + (r() * 2 - 1) * TUNING.growth.spread;
 }
 
-/** What a person's growth reads of their team: the role's building level (1..3; a free agent 1), whether a Mentor is
- *  on her team, and the sailing school's level for a driver's Stamina. */
+/** What a person's growth reads of their team: the role's building as rated (hq.ts rated, 0..3; a free agent 1),
+ *  whether a Mentor is on their team, and the driver simulator's rating for a driver's Stamina. */
 export interface Schooling {
   school: number;
   mentor: boolean;
@@ -82,7 +82,7 @@ export function grown<G extends Person>(
   const keys = Object.keys(g.stats);
   const now: Readonly<Record<string, number>> = g.stats;
   const school =
-    TUNING.growth.school[Math.min(2, Math.max(0, schooling.school - 1))];
+    1 + TUNING.growth.school * (Math.min(3, Math.max(1, schooling.school)) - 1);
   const mentor =
     schooling.mentor && g.role === 'driver' && years < TUNING.growth.mentorAge
       ? 1 + TUNING.growth.mentor

@@ -8,6 +8,7 @@
 import { SHIPS, type Role, type Ship, type Status } from '../office/command.ts';
 import { without } from './ageing.ts';
 import type { Hands, Staff, Team } from './state.ts';
+import { scoutsOf } from './hq.ts';
 import { TUNING } from './tuning.ts';
 
 /** A seat of a team's staff. */
@@ -83,9 +84,7 @@ export function openSeat(c: Team, role: Role, status: Status): Seat | null {
     case 'designer':
       return st.designer === null ? { kind: 'designer' } : null;
     case 'scout':
-      return st.scouts.length < c.buildings.scoutingCentre.level
-        ? { kind: 'scout' }
-        : null;
+      return st.scouts.length < scoutsOf(c) ? { kind: 'scout' } : null;
     case 'pit':
       return st.pit.length < TUNING.world.pit ? { kind: 'pit' } : null;
     case 'manager':

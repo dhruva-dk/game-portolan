@@ -152,26 +152,30 @@ function signed(
   };
 }
 
-/** A building's starting level about a tier's mean, 1..3. */
-const levelAbout = (rand: Rand, mean: number): number =>
-  Math.min(3, Math.max(1, Math.round(mean + (rand() - 0.5) * 1.6)));
-
-/** A team's buildings at the start, each drawn in BUILDINGS' order. */
+/** A team's buildings at the start, each drawn in BUILDINGS' order about its tier's mean: the core at level 1 at
+ *  least, none above the tier's cap, none more than a level above the building it needs (TUNING.hq.requires). */
 function startingBuildings(rand: Rand, tier: number): Record<Building, Works> {
-  const drawn = (): Works => ({
-    level: levelAbout(rand, at(C.buildings, tier)),
-    next: null,
-  });
+  const H = TUNING.hq,
+    cap = H.cap[Math.min(H.cap.length - 1, tier)];
+  const core: readonly Building[] = H.core,
+    levels = new Map<Building, number>();
+  for (const b of BUILDINGS) {
+    const parent = H.requires[b],
+      most = parent ? Math.min(cap, (levels.get(parent) ?? 0) + 1) : cap,
+      drawn = Math.round(at(C.buildings, tier) + (rand() - 0.5) * 2.4);
+    levels.set(b, Math.min(most, Math.max(core.includes(b) ? 1 : 0, drawn)));
+  }
+  const w = (b: Building): Works => ({ level: levels.get(b) ?? 0, next: null });
   return {
-    factory: drawn(),
-    designCentre: drawn(),
-    towingTank: drawn(),
-    compositesPlant: drawn(),
-    simulator: drawn(),
-    pitCentre: drawn(),
-    scoutingCentre: drawn(),
-    commercialCentre: drawn(),
-    hospitality: drawn(),
+    factory: w('factory'),
+    designCentre: w('designCentre'),
+    towingTank: w('towingTank'),
+    compositesPlant: w('compositesPlant'),
+    simulator: w('simulator'),
+    pitCentre: w('pitCentre'),
+    scoutingCentre: w('scoutingCentre'),
+    commercialCentre: w('commercialCentre'),
+    hospitality: w('hospitality'),
   };
 }
 
@@ -260,7 +264,7 @@ function makeTeam(g: Gathering, rand: Rand, m: Making): Team {
   const reserve = sign('driver', about() - 0.5, 'reserve').id;
   const designer = sign('designer', about()).id;
   const scouts = Array.from(
-    { length: buildings.scoutingCentre.level },
+    { length: TUNING.hq.scouts[buildings.scoutingCentre.level] ?? 1 },
     () => sign('scout', about()).id
   );
   const pit = Array.from({ length: W.pit }, () => sign('pit', about()).id);

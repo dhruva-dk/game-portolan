@@ -224,7 +224,7 @@ test("the improvement: factory points plus each mechanic's (Reliability + Perfor
   }
   assert.ok(Math.abs(improvementPoints(s, 0) - want) < 1e-9);
   assert.deepEqual(
-    [1, 2, 3].map((level) =>
+    [1, 3, 5].map((level) =>
       factoryPoints({
         ...c,
         buildings: { ...c.buildings, factory: { level, next: null } },

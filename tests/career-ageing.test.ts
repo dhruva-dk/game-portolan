@@ -11,6 +11,7 @@ import {
 } from '../src/career/ageing.ts';
 import { canonical } from '../src/career/canon.ts';
 import { dice } from '../src/career/dice.ts';
+import { rated } from '../src/career/hq.ts';
 import { YEAR, age, retireRange } from '../src/career/stars.ts';
 import { staffOf } from '../src/career/state.ts';
 import { founded, invariants } from './career-kit.ts';
@@ -22,11 +23,14 @@ test("schooling: the role's building on their team; a free agent as at level 1",
   const s = founded();
   const team = s.teams[0];
   const driver = s.people[team.staff.ships[0].driver!];
-  assert.equal(schoolingOf(s, driver).school, team.buildings.simulator.level);
+  assert.equal(
+    schoolingOf(s, driver).school,
+    rated(team.buildings.simulator.level)
+  );
   const scout = s.people[team.staff.scouts[0]];
   assert.equal(
     schoolingOf(s, scout).school,
-    team.buildings.scoutingCentre.level
+    rated(team.buildings.scoutingCentre.level)
   );
   const free = s.people.find((g) => g.contract === null)!;
   assert.deepEqual(schoolingOf(s, free), {

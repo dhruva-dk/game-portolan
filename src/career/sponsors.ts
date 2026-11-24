@@ -20,7 +20,7 @@ import { sponsor as sponsorName } from './names.ts';
 import { mine, post } from './post.ts';
 import { schedule, type Event } from './queue.ts';
 import { teamMarketability } from './reputation.ts';
-import { sponsorGrade } from './hq.ts';
+import { hosted, sponsorGrade } from './hq.ts';
 import type { CareerState, Team } from './state.ts';
 import { TUNING } from './tuning.ts';
 
@@ -53,7 +53,7 @@ export function sponsorOffers(
   const offers: SponsorOffer[] = [];
   for (let i = 0; i < count; i++) {
     const grade = between(rand, 1, Math.max(1, sponsorGrade(c)));
-    const scale = market * (P.grade[grade - 1] ?? 1);
+    const scale = market * (P.grade[grade - 1] ?? 1) * hosted(c);
     const races = between(rand, P.races[0], P.races[1]);
     const objective = rand() < P.objectiveShare;
     const objectives = objective

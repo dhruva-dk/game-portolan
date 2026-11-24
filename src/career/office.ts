@@ -5,7 +5,7 @@
 // dye by its number.
 
 import { TEAM, type RaceResult } from '../race.ts';
-import { SHIPS, type Building, type MailCategory } from '../office/command.ts';
+import { SHIPS, type MailCategory } from '../office/command.ts';
 import type { HomeView, NewsKind, StandingLine } from '../office/home.ts';
 import type {
   FoundView,
@@ -21,7 +21,7 @@ import type { PartLine } from '../office/papers.ts';
 import type { ShellView } from '../office/shell.ts';
 import { askWage } from './asks.ts';
 import { TYPES } from './components.ts';
-import { buildDays } from './hq.ts';
+import { BUILT, buildDays } from './hq.ts';
 import { grid, lineups, maySail } from './lineup.ts';
 import { prizeAt } from './money.ts';
 import type { Person } from './roles.ts';
@@ -310,17 +310,6 @@ export const NEWS: Readonly<Record<MailCategory, readonly [NewsKind, string]>> =
     chairman: ['vote', 'Chairman'],
   };
 
-export const BUILT: Readonly<Record<Building, string>> = {
-  factory: 'Factory',
-  designCentre: 'Design Centre',
-  towingTank: 'Towing Tank',
-  compositesPlant: 'Composites Plant',
-  simulator: 'Driver Simulator',
-  pitCentre: 'Pit Crew Training Centre',
-  scoutingCentre: 'Scouting Department',
-  commercialCentre: 'Commercial Centre',
-  hospitality: 'Hospitality Suite',
-};
 export const PARTS: Readonly<Record<string, string>> = {
   sails: 'Sails',
   rigging: 'Rigging',

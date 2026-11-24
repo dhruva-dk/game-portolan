@@ -10,6 +10,7 @@ import type { Person } from './roles.ts';
 import { SCHOOL, age } from './stars.ts';
 import type { CareerState, Team } from './state.ts';
 import { levelOf } from './contracts.ts';
+import { rated } from './hq.ts';
 import { TUNING } from './tuning.ts';
 
 const M = TUNING.market;
@@ -68,7 +69,9 @@ export function satisfied(
     1 - M.securityStep * Math.abs(offer.seasons - ask.seasons)
   );
   const building = SCHOOL[g.role];
-  const facilities = building ? cap(team.buildings[building].level / 3) : 1;
+  const facilities = building
+    ? cap(rated(team.buildings[building].level) / 3)
+    : 1;
   const home = team.colony === g.colony ? 1 : M.away;
   // A team's standing, facilities and colony weigh with those who have a post to leave for it. What a person has
   // lived with on their own team is no ground to refuse its renewal, and one out of work weighs the terms and the tier.

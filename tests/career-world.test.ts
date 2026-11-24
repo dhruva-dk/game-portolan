@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { apply, start } from '../src/career/career.ts';
 import { canonical } from '../src/career/canon.ts';
 import { taken } from '../src/career/found.ts';
+import { scoutsOf } from '../src/career/hq.ts';
 import { stars } from '../src/career/stars.ts';
 import { staffOf } from '../src/career/state.ts';
 import { makeWorld, staffStars } from '../src/career/world.ts';
@@ -28,8 +29,8 @@ test('the world: three championships of twenty teams, a full staff each, 300 fre
     assert.equal(count('designer'), 1);
     assert.equal(
       count('scout'),
-      c.buildings.scoutingCentre.level,
-      "one scout a crow's nest level"
+      scoutsOf(c),
+      'scouts by the Scouting Department level'
     );
     assert.equal(count('pit'), TUNING.world.pit);
     assert.equal(world.people[c.staff.reserve!].contract?.status, 'reserve');
@@ -40,7 +41,7 @@ test('the world: three championships of twenty teams, a full staff each, 300 fre
     );
     assert.equal(c.bonds.length, TEAM);
     for (const b of Object.values(c.buildings))
-      assert.ok(b.level >= 1 && b.level <= 3);
+      assert.ok(b.level >= 0 && b.level <= TUNING.hq.cap[c.tier]);
   }
   const free = world.people.filter((g) => g.contract === null);
   assert.equal(free.length, 300);

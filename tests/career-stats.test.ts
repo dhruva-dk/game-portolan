@@ -140,13 +140,14 @@ test("pit members: Speed, Strength and Teamwork raise a member's work, Precision
   assert.equal(pit.fatigueGained(0), 37.5);
 });
 
-test('pit members: fatigue falls 10 × (1 + pit house level) a day, in closed form, never below 0', () => {
+test('pit members: fatigue falls 10 × (1 + the pit crew centre rated) a day, in closed form, never below 0', () => {
   const g = { fatigue: 80, fatigueDay: 10 };
   assert.equal(pit.fatigueOn(g, 10, 1), 80);
   assert.equal(pit.fatigueOn(g, 12, 1), 40);
-  assert.equal(pit.fatigueOn(g, 12, 3), 0);
+  assert.equal(pit.fatigueOn(g, 12, 5), 0);
   assert.equal(pit.fatigueOn(g, 100, 1), 0);
-  assert.ok(pit.recovery(3) > pit.recovery(1));
+  assert.equal(pit.recovery(3), 10 * (1 + 2));
+  assert.ok(pit.recovery(5) > pit.recovery(1));
 });
 
 test("a ship's pit: her mechanic and the pit crew land in the pace and slip the sim reads (race.ts PitCrew)", () => {

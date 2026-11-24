@@ -10,6 +10,7 @@ import type {
 } from '../office/people.ts';
 import { closing } from './contracts.ts';
 import { effective } from './effective.ts';
+import { scoutsOf } from './hq.ts';
 import { championship } from './office.ts';
 import { tierOf } from './knowledge.ts';
 import { askOf } from './market.ts';
@@ -151,7 +152,8 @@ export function scoutingView(
       cancel: { ok: job !== null, why: job ? '' : 'Idle.' },
     };
   });
-  const nest = c.buildings.scoutingCentre.level;
+  const level = c.buildings.scoutingCentre.level,
+    nest = scoutsOf(c);
   return {
     top: topBar(s),
     filter: f,
@@ -165,12 +167,12 @@ export function scoutingView(
     scouts,
     nest: fig(
       nest,
-      `Level ${nest}`,
+      `Level ${level}`,
       rival('scouts', `${c.staff.scouts.length} of ${nest}`),
       {
         title: 'Scouting Department',
         lines: [
-          line('Level', nest),
+          line('Level', level),
           line('Scouts allowed', nest),
           line('Scouts hired', c.staff.scouts.length),
         ],

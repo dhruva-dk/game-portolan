@@ -6,7 +6,7 @@
 // A pair [a, b] is a line in u = stat / 20: a + b × u. A triple by tier is Tier 1's, Two's, Three's.
 
 /** Bump with any change to TUNING (and pin the new hash in the test). */
-export const TUNING_VERSION = 13;
+export const TUNING_VERSION = 14;
 
 const ROLE_YEARS = {
   manager: [40, 55],
@@ -86,7 +86,7 @@ export const TUNING = {
     decline: 0.3, // lost a stat a year past peak, plus
     declineYear: 0.2, //   this for each year past peak
     spread: 0.3, // each stat's share by seed: 1 ± this
-    school: [1, 1.25, 1.5], // the role's building, by level
+    school: 0.25, // growth × 1 + this × (the role's building's rating − 1), its rating 1..3 (hq.ts rated)
     mentor: 0.25, // growth added (as a share) to a Mentor's team's drivers under mentorAge
     mentorAge: 22,
     stamina: 0.2, // a driver's Stamina grows this more a season a driver simulator level
@@ -157,7 +157,7 @@ export const TUNING = {
     days: 14,
     speed: [1.3, -0.6],
     persuasionDays: 30,
-    nest: [1, 0.85, 0.7],
+    nest: [1, 1, 0.92, 0.85, 0.78, 0.7], // days × by the scouting department's level 0..5
   },
   /** The pit crew (career/pit.ts): what a member's stats weigh in their work and their steadiness, and what tiring does. */
   pit: {
@@ -402,7 +402,7 @@ export const TUNING = {
     reputation: [70, 45, 20],
     reputationSpread: 16,
     confidence: 70,
-    buildings: [2, 1.5, 1], // mean level, by seed: each building 1 to 3
+    buildings: [3, 2, 1], // mean level, by seed: each building 0 to 5 (career/world.ts startingBuildings)
     /** Starting parts' performance by tier (0..1000), its spread, the headroom to the maximum, reliability and its headroom. */
     parts: {
       perf: [620, 470, 330],
@@ -479,61 +479,89 @@ export const TUNING = {
     },
     tier: [1, 1.6, 2.4], // the cost × this by the highest tier among its components
   },
-  /** The headquarters: each building's cost, days and upkeep a race, by level 1..3 (level 1 is every
-   *  team's from the start, so its cost and days are never paid). */
+  /** The headquarters: levels 0 (not built) to 5. Each building's cost, days and upkeep a race by level 0..5 (level
+   *  0's are nothing). The core buildings stand at level 1 at least on every team. */
   hq: {
+    top: 5,
+    cap: [5, 4, 3], // the highest level a team may build to, by tier
+    crews: [3, 2, 2], // projects under way at once, by tier
+    approve: { share: 0.15, confidence: 50 }, // a project dearer than this share of the season's budget wants this confidence
+    core: [
+      'factory',
+      'designCentre',
+      'pitCentre',
+      'scoutingCentre',
+      'hospitality',
+    ],
+    requires: {
+      factory: null,
+      designCentre: 'factory',
+      towingTank: 'designCentre',
+      compositesPlant: 'factory',
+      simulator: null,
+      pitCentre: null,
+      scoutingCentre: null,
+      commercialCentre: null,
+      hospitality: 'commercialCentre',
+    },
     works: {
       factory: {
-        cost: [0, 2400, 6000],
-        days: [0, 30, 50],
-        upkeep: [10, 25, 50],
+        cost: [0, 1200, 2400, 5000, 9000, 15000],
+        days: [0, 20, 30, 45, 60, 80],
+        upkeep: [0, 10, 25, 45, 70, 100],
       },
       designCentre: {
-        cost: [0, 2000, 5000],
-        days: [0, 25, 45],
-        upkeep: [8, 20, 40],
+        cost: [0, 1000, 2000, 4200, 7500, 12500],
+        days: [0, 18, 25, 40, 55, 75],
+        upkeep: [0, 8, 20, 36, 56, 80],
       },
       towingTank: {
-        cost: [0, 2200, 5500],
-        days: [0, 30, 50],
-        upkeep: [8, 20, 40],
+        cost: [0, 1100, 2200, 4600, 8200, 13500],
+        days: [0, 20, 30, 45, 60, 80],
+        upkeep: [0, 8, 20, 36, 56, 80],
       },
       compositesPlant: {
-        cost: [0, 2200, 5500],
-        days: [0, 30, 50],
-        upkeep: [8, 20, 40],
+        cost: [0, 1100, 2200, 4600, 8200, 13500],
+        days: [0, 20, 30, 45, 60, 80],
+        upkeep: [0, 8, 20, 36, 56, 80],
       },
       simulator: {
-        cost: [0, 1800, 4500],
-        days: [0, 25, 40],
-        upkeep: [6, 15, 30],
+        cost: [0, 900, 1800, 3800, 6800, 11000],
+        days: [0, 18, 25, 38, 50, 70],
+        upkeep: [0, 6, 15, 27, 42, 60],
       },
       pitCentre: {
-        cost: [0, 1200, 3000],
-        days: [0, 20, 35],
-        upkeep: [5, 12, 25],
+        cost: [0, 600, 1200, 2500, 4500, 7500],
+        days: [0, 14, 20, 32, 45, 60],
+        upkeep: [0, 5, 12, 22, 34, 50],
       },
       scoutingCentre: {
-        cost: [0, 1200, 3000],
-        days: [0, 20, 35],
-        upkeep: [5, 12, 25],
+        cost: [0, 600, 1200, 2500, 4500, 7500],
+        days: [0, 14, 20, 32, 45, 60],
+        upkeep: [0, 5, 12, 22, 34, 50],
       },
       commercialCentre: {
-        cost: [0, 1500, 4000],
-        days: [0, 20, 35],
-        upkeep: [0, 0, 0],
+        cost: [0, 800, 1500, 3300, 6000, 10000],
+        days: [0, 14, 20, 32, 45, 60],
+        upkeep: [0, 0, 0, 0, 0, 0],
       },
       hospitality: {
-        cost: [0, 1600, 4200],
-        days: [0, 25, 40],
-        upkeep: [5, 12, 25],
+        cost: [0, 800, 1600, 3400, 6200, 10500],
+        days: [0, 18, 25, 38, 50, 70],
+        upkeep: [0, 5, 12, 22, 34, 50],
       },
     },
-    points: [10, 20, 30], // the factory's improvement points a day
-    slots: [2, 3, 4], // the design centre's design slots
-    loft: [1, 0.85, 0.7], // the design centre's design days ×
+    // what each level gives, by level 0..5
+    points: [0, 10, 15, 20, 25, 30], // the factory's improvement points a day
+    slots: [2, 2, 3, 3, 4, 4], // the design centre's design slots
+    loft: [1, 1, 0.92, 0.85, 0.78, 0.7], // the design centre's design days ×
+    tiers: [1, 1, 2, 2, 3, 3], // the components' highest tier the towing tank or composites plant opens
+    scale: [0, 1, 1.5, 2, 2.5, 3], // a level as a building's growth, recovery and draw read it (the old 0..3)
+    scouts: [0, 1, 2, 2, 3, 3], // the scouting department's scouts
     fish: [120, 80, 50], // money a race the commercial centre brings at level 1, by tier
-    fishLevel: [1, 1.8, 2.6], //   × this by its level
+    fishLevel: [0, 1, 1.4, 1.8, 2.2, 2.6], //   × this by its level
+    grade: [1, 1, 2, 2, 3, 3], // the hospitality suite's highest sponsor grade
+    hosted: [1, 1, 1, 1.1, 1.1, 1.2], // its sponsors' pay ×
   },
 
   /** Money: each tier's prize pool at the season's end, shared by place by rules.prizeSpread. */

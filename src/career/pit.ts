@@ -6,6 +6,7 @@
 
 import type { PitCrew } from '../race.ts';
 import { unit, type PersonOf } from './roles.ts';
+import { rated } from './hq.ts';
 import { TUNING } from './tuning.ts';
 
 const lin = (pair: readonly [number, number], u: number): number =>
@@ -81,9 +82,9 @@ export const slipOf = (stats: PitStats, fatigue: number): number =>
 export const fatigueGained = (stamina: number): number =>
   P.stamina * (P.staminaOver - unit(stamina));
 
-/** Fatigue recovered a day, by the pit house's level. */
+/** Fatigue recovered a day, by the pit crew centre's level. */
 export const recovery = (houseLevel: number): number =>
-  P.recovery * (1 + houseLevel);
+  P.recovery * (1 + rated(houseLevel));
 
 /** A pit crew member's fatigue on a day, in closed form from what it was on their fatigue day. */
 export const fatigueOn = (
