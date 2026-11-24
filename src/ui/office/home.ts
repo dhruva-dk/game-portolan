@@ -123,7 +123,7 @@ export function createHome(office: Office): Screen<HomeView> {
     lines: 'teams' | 'drivers' = 'teams',
     kind: string | null = null;
 
-  /** The next race: its sea, its planet, the season's rounds, the way to the calendar. */
+  /** The next race: its sea, its planet, the season's rounds, the way to its round in the calendar. */
   function nextRace(v: HomeView) {
     const chart = office.chart();
     if (chart && chart.name !== shown) {
@@ -152,7 +152,7 @@ export function createHome(office: Office): Screen<HomeView> {
       ),
       button(
         'Calendar',
-        () => office.ask({ kind: 'open', screen: 'calendar' }),
+        () => office.ask({ kind: 'round', round: v.next.round - 1 }),
         { kind: 'plain' }
       ),
     ]);

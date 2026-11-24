@@ -36,6 +36,7 @@ const SCREENS = [
   'standings',
   'rival',
   'sponsors',
+  'calendar',
 ];
 
 /** How far apart two edges or centres may be, CSS px. */

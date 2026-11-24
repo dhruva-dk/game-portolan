@@ -29,19 +29,19 @@ business logic given a screen, and the old kit deleted. The battle HUD stays as 
 
 ## Gaps found (career logic with no UI, 2026-11-23)
 
-| Gap                                                                                            | Where                                                                   | Goes to             |
-| ---------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- | ------------------- |
-| `Vote`, `Lobby` never sent; proposals, this season's and next season's rules in no view        | `office/command.ts:138`, `career/admiralty.ts`, `state.ts:180`          | Admiralty (new)     |
-| The strip's Admiralty chip opens nothing                                                       | `ui/office/shell.ts:160`                                                | Shell               |
-| `ChooseSupplier` never sent; supplier cards and window in no view                              | `career/suppliers.ts:181,198,282`                                       | Suppliers (new)     |
-| Race plan fixed: drivers as they stand, `parts: []`, sponsor objective 0; `Forfeit` never sent | `career/office.ts:433`                                                  | Race day            |
-| Can't design for next season (`forNext` false); next season's parts hidden; no part risk shown | `ui/office/yard.ts:655`, `career/papers.ts:339`, `office/papers.ts:114` | Ship                |
-| ~~A sponsor offer's sign check looks at slot 0 only, though three slots are offered (bug)~~ (each slot checked, 2026-11-23) | `career/papers.ts`                                         | Sponsors            |
-| `DeclineJob` never sent; Continue takes the best post unasked                                  | `ui/office/career.ts:75`, `manager.ts:158`                              | Jobs                |
-| ~~Rivals: managers' personalities, their teams; standings rows lead nowhere~~ (Rival, 2026-11-23); their moves kept nowhere | `career/rivals.ts`, `leadership.ts`                    | Rival (new)         |
-| Chairman's temper, own budget and debt floor, sacking rules, team reputation and marketability | `career/chairmen.ts`, `reputation.ts`, `views.ts:210`                   | Board (new)         |
-| Season's end (prize money, promotion, relegation, retirements, the new intake) only as letters | `career/season.ts`, `round.ts`                                          | Season review (new) |
-| Dead builders: `views.ts` `homeView`, `racePanel`, the `tier` blocker                          | `career/views.ts`, `desk.ts:73`                                         | Reuse or delete     |
+| Gap                                                                                                                         | Where                                                                   | Goes to             |
+| --------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- | ------------------- |
+| `Vote`, `Lobby` never sent; proposals, this season's and next season's rules in no view                                     | `office/command.ts:138`, `career/admiralty.ts`, `state.ts:180`          | Admiralty (new)     |
+| The strip's Admiralty chip opens nothing                                                                                    | `ui/office/shell.ts:160`                                                | Shell               |
+| `ChooseSupplier` never sent; supplier cards and window in no view                                                           | `career/suppliers.ts:181,198,282`                                       | Suppliers (new)     |
+| Race plan fixed: drivers as they stand, `parts: []`, sponsor objective 0; `Forfeit` never sent                              | `career/office.ts:433`                                                  | Race day            |
+| Can't design for next season (`forNext` false); next season's parts hidden; no part risk shown                              | `ui/office/yard.ts:655`, `career/papers.ts:339`, `office/papers.ts:114` | Ship                |
+| ~~A sponsor offer's sign check looks at slot 0 only, though three slots are offered (bug)~~ (each slot checked, 2026-11-23) | `career/papers.ts`                                                      | Sponsors            |
+| `DeclineJob` never sent; Continue takes the best post unasked                                                               | `ui/office/career.ts:75`, `manager.ts:158`                              | Jobs                |
+| ~~Rivals: managers' personalities, their teams; standings rows lead nowhere~~ (Rival, 2026-11-23); their moves kept nowhere | `career/rivals.ts`, `leadership.ts`                                     | Rival (new)         |
+| Chairman's temper, own budget and debt floor, sacking rules, team reputation and marketability                              | `career/chairmen.ts`, `reputation.ts`, `views.ts:210`                   | Board (new)         |
+| Season's end (prize money, promotion, relegation, retirements, the new intake) only as letters                              | `career/season.ts`, `round.ts`                                          | Season review (new) |
+| Dead builders: `views.ts` `homeView`, `racePanel`, the `tier` blocker                                                       | `career/views.ts`, `desk.ts:73`                                         | Reuse or delete     |
 
 ## Links: one game, not a stack of spreadsheets (2026-11-23)
 
@@ -58,15 +58,15 @@ team to its page).
 The screens speak to the player as "you" (Your Season, Your team), never "her": "her" is the code's voice for the
 player, not the page's.
 
-| Thing                                     | Opens                             | Ref in the views now                    | Needs                                               |
-| ----------------------------------------- | --------------------------------- | --------------------------------------- | --------------------------------------------------- |
-| A person (driver, staff, scout, chairman) | Profile (built)                   | every built screen, linked (2026-11-23) | mail's senders and subjects (Mail)                  |
-| A team                                    | Rival: the team's page (built)    | every built screen, linked (2026-11-23) | Negotiation's other bidders (names only), mail      |
-| A championship                            | Standings at that championship    | one name for each, `TIERS` (2026-11-23) | Standings opened at a tier, not only at hers        |
-| A planet, a round                         | Calendar at that round (building) | a name                                  | Home's next race, results, the bar's next race      |
-| A part, a building                        | Ship, HQ at it                    | in the yard only                        | ids on Home's work under way, mail links            |
-| A sponsor, a supplier                     | Sponsors, Suppliers at it         | none                                    | ids on Finances' ledger lines, mail                 |
-| A rule, a proposal                        | Admiralty at it                   | none                                    | ids on mail's vote letters, the bar's chip          |
+| Thing                                     | Opens                          | Ref in the views now                    | Needs                                          |
+| ----------------------------------------- | ------------------------------ | --------------------------------------- | ---------------------------------------------- |
+| A person (driver, staff, scout, chairman) | Profile (built)                | every built screen, linked (2026-11-23) | mail's senders and subjects (Mail)             |
+| A team                                    | Rival: the team's page (built) | every built screen, linked (2026-11-23) | Negotiation's other bidders (names only), mail |
+| A championship                            | Standings at that championship | one name for each, `TIERS` (2026-11-23) | Standings opened at a tier, not only at hers   |
+| A planet, a round                         | Calendar at that round (built) | Calendar's rounds, Home's Calendar      | results, the bar's next race                   |
+| A part, a building                        | Ship, HQ at it                 | in the yard only                        | ids on Home's work under way, mail links       |
+| A sponsor, a supplier                     | Sponsors, Suppliers at it      | none                                    | ids on Finances' ledger lines, mail            |
+| A rule, a proposal                        | Admiralty at it                | none                                    | ids on mail's vote letters, the bar's chip     |
 
 What the career does not keep, that a coherent office needs:
 
@@ -113,7 +113,7 @@ Each line: built on the kit from a fixture → in review → approved and live. 
       why once under them); your ship through the brass window, the market under it (what your slots are worth a race,
       marketability, the grade the landing pad receives, the next offers: never shown before); your three slots at
       the right. The brass window is the kit's (`shipWindow`), Home's and Found's too
-- [ ] **Calendar** _(being built, 2026-11-23)_, after MM's: at the left the round chosen (its planet in the brass port,
+- [ ] **Calendar** _(in review, 2026-11-23)_, after MM's: at the left the round chosen (its planet in the brass port,
       charted once you sail for it; its date, how far off, the storm's pace there, the Admiralty's vote closed on it);
       in the middle the season's rounds, a tap choosing one; at the right the season's other days as the career has
       them scheduled (the Admiralty's proposals and votes, the contracts' closing days, the season's end, next

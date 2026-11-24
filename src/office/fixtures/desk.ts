@@ -5,6 +5,7 @@
 import { TEAM, TEAMS as GRID } from '../../race.ts';
 import type { Desk, Views } from '../office.ts';
 import type { ShellView } from '../shell.ts';
+import { CALENDAR } from './calendar.ts';
 import { FINANCES } from './finances.ts';
 import { HOME } from './home.ts';
 import { PROFILE } from './profile.ts';
@@ -98,6 +99,7 @@ const VIEWS: Pick<
   standings: STANDINGS,
   rival: RIVAL,
   sponsors: SPONSORS,
+  calendar: CALENDAR,
 };
 
 export const FIXTURE: Desk = {

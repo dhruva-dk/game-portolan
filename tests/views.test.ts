@@ -27,6 +27,7 @@ import { scoutingView } from '../src/career/views-scouting.ts';
 import { offerView } from '../src/career/views-offer.ts';
 import { profileView } from '../src/career/views-profile.ts';
 import { rivalView } from '../src/career/views-rival.ts';
+import { calendarPaper } from '../src/career/papers.ts';
 import { standingsView } from '../src/career/office.ts';
 import { traitLine } from '../src/career/views-traits.ts';
 import { TRAITS } from '../src/career/traits.ts';
@@ -366,6 +367,27 @@ test('rival: every team page names its own people, stands where the standings ha
   }
   // her own page, when none is named
   assert.equal(rivalView(s, look, null).own, true);
+});
+
+test('calendar: opened at the next round unless one is asked for; each round its storm and days off; the votes and the season’s days in order', () => {
+  const s = sailed(toRaceDay(founded())),
+    v = calendarPaper(s, null);
+  assert.equal(v.races.length, s.calendar!.rounds.length);
+  assert.equal(v.races[v.chosen]?.when, 'ahead', 'the next round chosen');
+  assert.equal(v.races[0]?.when, 'sailed');
+  assert.equal(calendarPaper(s, 6).chosen, 6);
+  assert.equal(calendarPaper(s, 99).chosen, v.races.length - 1);
+  v.races.forEach((r, i) => {
+    const round = s.calendar!.rounds[i]!;
+    assert.equal(r.storm, round.planet.pace);
+    assert.equal(r.days, round.day - s.day);
+  });
+  assert.deepEqual(
+    v.races.filter((r) => r.vote).map((r) => r.round - 1),
+    [3, 7]
+  );
+  assert.equal(v.dates.at(-1)?.what, 'Next season’s first race');
+  assert.ok(v.dates.some((d) => d.what === 'The season ends'));
 });
 
 test('traits: each says what it does in words, when it holds, and whether it helps or hinders its team', () => {

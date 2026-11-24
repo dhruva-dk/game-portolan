@@ -117,6 +117,7 @@ export type Ask =
   | { kind: 'send'; command: Command }
   | { kind: 'person'; id: number; screen: 'profile' | 'offer' }
   | { kind: 'team'; id: number }
+  | { kind: 'round'; round: number }
   | { kind: 'draft'; offer: Offer }
   | { kind: 'filter'; filter: ScoutingFilter }
   | { kind: 'favourite'; id: number }

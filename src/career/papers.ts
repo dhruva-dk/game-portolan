@@ -36,6 +36,7 @@ import {
   PARTS,
   championship,
   dateAt,
+  seasonYear,
   short,
   span,
   titled,
@@ -91,16 +92,56 @@ export function mailPaper(s: CareerState, open: number | null): MailPaper {
   };
 }
 
-/** The season's races. */
-export function calendarPaper(s: CareerState): CalendarPaper {
+/** The season's races, `chosen` the one asked for (null: the next), and its other days as they are scheduled. */
+export function calendarPaper(
+  s: CareerState,
+  chosen: number | null
+): CalendarPaper {
+  const list = fixtures(s),
+    cal = s.calendar,
+    A = TUNING.admiralty;
+  const next = list.findIndex((f) => f.when !== 'sailed');
+  const days = cal
+    ? [
+        ...A.rounds.flatMap((r) => {
+          const day = cal.rounds[r]?.day;
+          return day === undefined
+            ? []
+            : [
+                { day: day - A.open, what: 'The Admiralty puts a proposal' },
+                { day, what: 'The Admiralty votes' },
+              ];
+        }),
+        {
+          day: cal.end - TUNING.market.closingDays,
+          what: 'Contracts ending may be approached',
+        },
+        { day: cal.end, what: 'The season ends' },
+      ].sort((a, b) => a.day - b.day)
+    : [];
   return {
     championship: championship(myTeam(s).tier),
-    races: fixtures(s).map((f) => ({
+    season: seasonYear(s),
+    chosen: Math.min(
+      Math.max(0, chosen ?? (next < 0 ? list.length - 1 : next)),
+      Math.max(0, list.length - 1)
+    ),
+    races: list.map((f) => ({
       round: f.round + 1,
       name: f.planet.name,
       date: dateAt(s, f.day),
       when: f.when,
+      days: f.day - s.day,
+      storm: f.planet.pace,
+      vote: A.rounds.some((r) => r === f.round),
     })),
+    dates: [
+      ...days.map((d) => ({ date: dateAt(s, d.day), what: d.what })),
+      {
+        date: `${TUNING.calendar.gap + 1} March ${seasonYear(s) + 1}`,
+        what: 'Next season’s first race',
+      },
+    ],
   };
 }
 

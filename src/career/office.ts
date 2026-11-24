@@ -63,14 +63,17 @@ const MONTHS: readonly (readonly [string, number])[] = [
   ['September', 30],
 ];
 
+/** The year a career's season is sailed in. */
+export const seasonYear = (s: CareerState): number => YEAR_ONE + s.season;
+
 /** A day of the season as a date: the season's first day is the first of March. */
 export function dateAt(s: CareerState, day: number): string {
   let left = Math.max(0, day - (s.calendar?.start ?? day));
   for (const [month, days] of MONTHS) {
-    if (left < days) return `${left + 1} ${month} ${YEAR_ONE + s.season}`;
+    if (left < days) return `${left + 1} ${month} ${seasonYear(s)}`;
     left -= days;
   }
-  return `${left + 1} October ${YEAR_ONE + s.season}`;
+  return `${left + 1} October ${seasonYear(s)}`;
 }
 
 /** No colours: a team whose dye the page has none for. */

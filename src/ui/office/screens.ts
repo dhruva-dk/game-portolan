@@ -28,7 +28,7 @@ import { createProfile } from './profile.ts';
 import { createPlan } from './raceday.ts';
 import { createResult } from './result.ts';
 import { createRival } from './rival.ts';
-import { createCalendar } from './season.ts';
+import { createCalendar } from './calendar.ts';
 import { createSponsors } from './sponsors.ts';
 import { createStandings } from './standings.ts';
 import { createHq, createShip } from './yard.ts';

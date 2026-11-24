@@ -35,15 +35,27 @@ export interface MailPaper {
     | null;
 }
 
-/** `calendar`: the season's races. */
+/**
+ * `calendar`: the season's races, the one chosen (by index: the next unless
+ * another was asked for), each with how many days off it is (0 or less:
+ * today or sailed), the storm's pace on its planet (× the rules' own), and
+ * whether the Admiralty's vote closes on it; and the season's other days, as
+ * the career has them scheduled.
+ */
 export interface CalendarPaper {
   championship: string;
+  season: number;
+  chosen: number;
   races: readonly {
     round: number;
     name: string;
     date: string;
     when: 'sailed' | 'today' | 'ahead';
+    days: number;
+    storm: number;
+    vote: boolean;
   }[];
+  dates: readonly { date: string; what: string }[];
 }
 
 /** A sum under its name. */

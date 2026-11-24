@@ -86,9 +86,10 @@ export async function createManager(shelf: Shelf, look: Look, page: Page) {
     racing: Racing | null = null,
     waiting = false,
     last: Parameters<typeof resultView>[2] | null = null;
-  /** What the screens are open at: a person and the offer drawn to them, a team's page, the scouting list's filter and shortlist, a letter, the drawing board. */
+  /** What the screens are open at: a person and the offer drawn to them, a team's page, the calendar's round, the scouting list's filter and shortlist, a letter, the drawing board. */
   let person: number | null = null,
     team: number | null = null,
+    round: number | null = null,
     draft: Offer | null = null,
     filter: ScoutingFilter | null = null,
     shortlist: readonly number[] = [],
@@ -224,6 +225,9 @@ export async function createManager(shelf: Shelf, look: Look, page: Page) {
     } else if (a.kind === 'team') {
       team = a.id;
       page.open('rival');
+    } else if (a.kind === 'round') {
+      round = a.round;
+      page.open('calendar');
     } else if (a.kind === 'draft') draft = a.offer;
     else if (a.kind === 'filter') filter = a.filter;
     else if (a.kind === 'favourite')
@@ -267,7 +271,7 @@ export async function createManager(shelf: Shelf, look: Look, page: Page) {
     player: () => dyed(session.desk.career()),
     jobs: () => dyed(session.desk.jobs()),
     mail: () => mailPaper(career(), letter),
-    calendar: () => calendarPaper(career()),
+    calendar: () => calendarPaper(career(), round),
     finances: () => financesPaper(career()),
     sponsors: () => sponsorsPaper(career()),
     hq: () => hqPaper(career()),
