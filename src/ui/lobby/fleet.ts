@@ -122,7 +122,7 @@ const TRAIT_MARKS = [
 ] as const;
 const traitMark = (i: number, x: number, y: number, s: number) =>
   i === 3
-    ? glyph('hud.storm', x, y, s, { ink: 'storm' })
+    ? glyph('storm', x, y, s, { ink: 'storm' })
     : grid(x, y, s, TRAIT_MARKS[i] ?? '');
 
 const TRAITS: readonly {
