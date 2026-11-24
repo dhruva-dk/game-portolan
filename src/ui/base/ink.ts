@@ -68,33 +68,6 @@ const METER = {
   poor: '#f07a5e',
 } as const;
 
-export const OFFICE = {
-  band: '#ead9b4',
-  plate: INK.iron,
-  plateInk: CUT,
-  plateFaint: '#cbb994',
-  panel: '#f2e7cf',
-  dark: '#e4d2ac',
-  light: '#faf3e3',
-  gilt: GILT,
-  sea: WASH.sea,
-  ink: '#241b13',
-  faint: '#5d4b37',
-  onFill: '#fff8ea',
-  go: '#2b4fa0',
-  bad: '#a92c26',
-  good: '#2a7347',
-  fair: '#256f78',
-  warn: '#c7860f',
-  gold: '#c6951a',
-  on: '#c85a12',
-} as const;
-export const CHARTROOM = {
-  label: '#5e4631',
-  plateFaint: METER.label,
-  azurite: '#7fa0cf',
-  purpure: '#a88dc2',
-} as const;
 export const PLUMAGE = {
   white: '#fbf8ef',
   shade: '#c5ccd6',
@@ -104,16 +77,6 @@ export const PLUMAGE = {
   lens: '#15171c',
   glint: '#e9f0f6',
 } as const;
-export type Tone = 'go' | 'bad' | 'good' | 'fair' | 'warn' | 'gold';
-export const toneOf = (share: number): Tone =>
-  share >= 0.75
-    ? 'good'
-    : share >= 0.5
-      ? 'fair'
-      : share >= 0.3
-        ? 'warn'
-        : 'bad';
-export const TYPE = { title: 26, head: 18, body: 15, small: 13 } as const;
 
 export const alpha = (hex: string, a: number) =>
   `${hex}${Math.round(a * 255)
