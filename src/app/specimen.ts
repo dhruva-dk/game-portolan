@@ -1,5 +1,14 @@
 import { SMALLEST, type Glyph } from '../ui/base/glyphs.ts';
-import { INK, figure, glyph, parchment, svgNode } from '../ui/base/ink.ts';
+import {
+  INK,
+  figure,
+  glyph,
+  parchment,
+  slip,
+  svgNode,
+} from '../ui/base/ink.ts';
+import { random } from '../world/random.ts';
+import { JACKETS, SHADES, lookOf, portrait, uncle } from '../ui/base/gull.ts';
 import { die, dyePot, laurel, spyglass } from '../ui/base/marks.ts';
 import { uiLayer } from '../ui/base/ui.ts';
 
@@ -97,8 +106,78 @@ function pages() {
   return out;
 }
 
+const UNIT = W / 680,
+  SMALL = 28,
+  CARD = 80,
+  SEEDS = 2026;
+
+const seedFor = (jacket: number, shades: number) => {
+  for (let seed = 0; ; seed++) {
+    const look = lookOf(seed);
+    if (look.jacket === JACKETS[jacket] && look.shades === SHADES[shades])
+      return seed;
+  }
+};
+
+const placed = (markup: string, x: number, y: number) =>
+  `<g transform="translate(${x} ${y})">${markup}</g>`;
+
+function portraits() {
+  let s = figure(14, 12, `small, ${SMALL} units`, 9, { anchor: 'start' });
+  SHADES.forEach((shades, row) => {
+    const y = 20 + row * (SMALL + 4);
+    s += figure(14, y + SMALL / 2, shades, 8, { anchor: 'start' });
+    JACKETS.forEach((_, col) => {
+      s += placed(
+        portrait(seedFor(col, row), SMALL),
+        56 + col * (SMALL + 4),
+        y
+      );
+    });
+  });
+  s += figure(14, 222, `card, ${CARD} units`, 9, { anchor: 'start' });
+  SHADES.forEach((shades, i) => {
+    for (const [row, jacket] of [0, 7].entries()) {
+      const x = 14 + i * (CARD + 6),
+        y = 230 + row * (CARD + 4);
+      s += placed(
+        portrait(seedFor((jacket + i) % JACKETS.length, i), CARD),
+        x,
+        y
+      );
+    }
+    s += figure(
+      14 + i * (CARD + 6) + CARD / 2,
+      230 + 2 * (CARD + 4) + 4,
+      shades,
+      8
+    );
+  });
+  s += figure(540, 222, 'Uncle', 9, { anchor: 'start' });
+  s += placed(uncle(CARD), 540, 230);
+  s += slip(540, 316, 34, 34) + placed(uncle(SMALL), 543, 319);
+  s += placed(uncle(SMALL), 590, 319);
+  s += figure(480, 12, 'twelve seeds', 9, { anchor: 'start' });
+  const draw = random(SEEDS);
+  for (let i = 0; i < 12; i++) {
+    const seed = Math.floor(draw() * 2 ** 32),
+      x = 480 + (i % 4) * 46,
+      y = 20 + Math.floor(i / 4) * 60;
+    s += slip(x, y, 36, 36) + placed(portrait(seed, SMALL), x + 4, y + 4);
+    s += figure(x + 18, y + 44, seed, 6);
+  }
+  s += figure(14, 433, 'Uncle among the hired', 9, { anchor: 'start' });
+  for (let i = 0; i < 9; i++) {
+    const x = 120 + i * 42;
+    s +=
+      slip(x, 416, 34, 34) +
+      placed(i === 4 ? uncle(SMALL) : portrait(i * 7 + 3, SMALL), x + 3, 419);
+  }
+  return `<g transform="scale(${UNIT.toFixed(4)})">${s}</g>`;
+}
+
 export function specimen(page: number) {
-  const all = pages(),
+  const all = [...pages(), [portraits()]],
     shown = all[Math.min(Math.max(page, 1), all.length) - 1];
   const el = document.createElement('div');
   el.style.cssText = `position:fixed;inset:0;z-index:5;background:${parchment}`;
