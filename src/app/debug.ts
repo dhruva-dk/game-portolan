@@ -12,12 +12,12 @@ import type { Livery } from '../world/livery.ts';
 import { probeMeshes } from './probe.ts';
 import { STEP } from '../sim/fixed.ts';
 import { KINDS, type GunKind } from '../sim/kinds.ts';
-import { GUN, SHIP } from '../sim/handling.ts';
+import { GUN } from '../sim/handling.ts';
 import { PLAYER } from '../sim/match.ts';
 import { SETUP, type Rig } from '../sim/engine.ts';
 import type { MatchSetup } from '../sim/setup.ts';
 import { createStorm } from '../sim/storm.ts';
-import { raceSetup, teamLiveries } from './race.ts';
+import { RACE_SHIP, raceSetup, teamLiveries } from './race.ts';
 import type { ShipDraw, Snapshot, StormDraw } from '../render/snapshot.ts';
 import type { Flow } from './flow.ts';
 import { uiLayer } from '../ui/base/ui.ts';
@@ -497,7 +497,8 @@ function demoShips(
       at: u,
       heading: forward,
       look: lookOf(dealt(seed, i + 1, livery)),
-      lashed: way > 0 ? { course: null, throttle: way / SHIP.top } : null,
+      lashed:
+        way > 0 ? { course: null, throttle: way / RACE_SHIP.topSpeed } : null,
     });
   }
   return others;

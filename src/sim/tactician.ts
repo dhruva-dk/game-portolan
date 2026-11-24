@@ -11,7 +11,6 @@ import {
 } from '../world/sphere.ts';
 import { inHand } from './battle.ts';
 import { gap } from './contact.ts';
-import { SHIP } from './handling.ts';
 import { ring, rushing } from './gunner.ts';
 import {
   inSight,
@@ -52,7 +51,7 @@ function ramCourse(c: Ctx, foe: Seen): Vec3 {
   if (!t) return c.own.ship.heading;
   const r = scale(t, d),
     v = transport(velocity(foe), foe.ship.at, p),
-    s = SHIP.top;
+    s = c.own.crew.values.topSpeed;
   const a = dot(v, v) - s * s,
     b = 2 * dot(r, v),
     disc = b * b - 4 * a * d * d;

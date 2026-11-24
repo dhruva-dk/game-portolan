@@ -9,13 +9,13 @@ import { PLAYER } from '../src/sim/match.ts';
 import { watersAt } from '../src/sim/waters.ts';
 import { LIVERY } from '../src/world/livery.ts';
 import { landOf, planetOf } from '../src/world/land.ts';
-import { setupOf } from './setups.ts';
+import { setupOf, EVEN_SHIP } from './setups.ts';
 
 const planet = planetOf(SEED, landOf(SEED)),
   waters = watersAt(planet);
 function begun() {
   const race = setupOf(SEED, { teams: 6, player: true }),
-    state = createState(waters, planet.start);
+    state = createState(waters, planet.start, EVEN_SHIP);
   state.start(race, [LIVERY]);
   return { race, state };
 }
@@ -28,7 +28,7 @@ function sound(r: Race, ships: number) {
 }
 
 test('at anchor there is no race to read', () => {
-  const state = createState(waters, planet.start);
+  const state = createState(waters, planet.start, EVEN_SHIP);
   state.step(STILL);
   assert.equal(state.race(PLAYER), null);
 });
@@ -47,7 +47,7 @@ test('as a race begins: its team, its mate whole', () => {
   for (const m of r.mates) {
     assert.deepEqual(
       [m.hull, m.hullMax, m.shieldMax],
-      [HEALTH.hull, HEALTH.hull, HEALTH.shield]
+      [EVEN_SHIP.hullPoints, EVEN_SHIP.hullPoints, HEALTH.shield]
     );
   }
   assert.equal(state.race(PLAYER), r);

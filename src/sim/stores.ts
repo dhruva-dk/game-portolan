@@ -1,4 +1,4 @@
-import { fitOf, type Crew, type Cue } from './battle.ts';
+import type { Crew, Cue } from './battle.ts';
 import type { Vessel } from './contact.ts';
 import { reloadOf } from './gun.ts';
 import { spent, stepGust } from './gust.ts';
@@ -67,7 +67,7 @@ function armed(
     crew: {
       ...crew,
       guns: crew.guns.map((k, i) =>
-        i === slot ? { ...g, reload: reloadOf(g, fitOf(crew).reload) } : k
+        i === slot ? { ...g, reload: reloadOf(g, crew.values.reloadFactor) } : k
       ),
     },
     take: false,

@@ -2,7 +2,6 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { SEED } from '../src/world/environment.ts';
 import { createState } from '../src/play/state.ts';
-import { HEALTH } from '../src/sim/handling.ts';
 import { SMOKE, wearOf } from '../src/sim/health.ts';
 import { watersAt } from '../src/sim/waters.ts';
 import type { ShipDraw } from '../src/render/snapshot.ts';
@@ -18,7 +17,7 @@ import { landOf, planetOf } from '../src/world/land.ts';
 import { R } from '../src/world/sphere.ts';
 import { STILL } from '../src/sim/hands.ts';
 import { LIVERY } from '../src/world/livery.ts';
-import { setupOf } from './setups.ts';
+import { setupOf, EVEN_SHIP } from './setups.ts';
 
 const ship = (
   id: number,
@@ -126,7 +125,7 @@ test('all of it together keeps no more than SMOKING.alive puffs alive, a quarter
 
 test("in the game's own match, every ship drawn shows its wear", () => {
   const planet = planetOf(SEED, landOf(SEED)),
-    state = createState(watersAt(planet), planet.start);
+    state = createState(watersAt(planet), planet.start, EVEN_SHIP);
   state.start(setupOf(SEED), [LIVERY]);
   let worn = false;
   while (state.time() < 400 && !worn) {
@@ -141,7 +140,7 @@ test("in the game's own match, every ship drawn shows its wear", () => {
 });
 
 test('a ship smokes lightly below SMOKE.light of its full hull, heavily below SMOKE.heavy', () => {
-  const most = HEALTH.hull * 1.5,
+  const most = EVEN_SHIP.hullPoints * 1.5,
     by = 0.01;
   const at = (share: number) => wearOf({ hull: most * share, shield: 0, most });
   assert.equal(at(1), 0);

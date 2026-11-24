@@ -1,13 +1,13 @@
 import type { World } from '../world/environment.ts';
 import { fixedClock } from '../sim/fixed.ts';
-import { fitOf, inHand, type Crew } from '../sim/battle.ts';
+import { inHand, type Crew } from '../sim/battle.ts';
 import { laid, reloadOf, spreadOf, type Gun, type Laying } from '../sim/gun.ts';
 import { charging } from '../sim/gust.ts';
 import { EQUIP, GUN, GUNS, GUST, HEALTH } from '../sim/handling.ts';
 import { progress } from '../sim/hold.ts';
 import { offered, rarityOf } from '../sim/loot.ts';
 import { toEdge } from '../sim/storm.ts';
-import { hullCap, sunk } from '../sim/health.ts';
+import { sunk } from '../sim/health.ts';
 import { RIDE } from '../sim/ride.ts';
 import { PLAYER } from '../sim/match.ts';
 import type { Vessel } from '../sim/contact.ts';
@@ -66,7 +66,7 @@ import { answerTo, createShake } from './shake.ts';
 import { createStops, stopFor } from './stops.ts';
 import { createState, debugOf, type Berth } from './state.ts';
 import type { Rig } from '../sim/engine.ts';
-import type { MatchSetup } from '../sim/setup.ts';
+import type { MatchSetup, ShipValues } from '../sim/setup.ts';
 import { watered, type Berthed, type Soundings } from '../sim/waters.ts';
 import type { Livery } from '../world/livery.ts';
 
@@ -79,7 +79,7 @@ const DRAWN = 700,
   RIDES = 320;
 const LONG_AGO = 1e3;
 const reloading = (g: Gun, c: Crew): number | null =>
-  g.reload > 0 ? 1 - g.reload / reloadOf(g, fitOf(c).reload) : null;
+  g.reload > 0 ? 1 - g.reload / reloadOf(g, c.values.reloadFactor) : null;
 const ITEM: Record<Use, Item> = {
   smallShield: 'item.smallShield',
   bigShield: 'item.bigShield',
@@ -104,7 +104,8 @@ export function createGame(
   world: World,
   anchors: readonly Anchor[],
   soundings: Soundings,
-  start: { at: Vec3; bearing: number }
+  start: { at: Vec3; bearing: number },
+  moored: ShipValues
 ) {
   const ground = world.planet.height,
     depth = (p: Vec3) => -ground(p),
@@ -112,7 +113,11 @@ export function createGame(
   const sea = createSwell(anchors, ground, world.climate.seaWind, {
     shortest: RIDE.shortest,
   });
-  const state = createState(watered(world.planet, soundings, sea.hull), start);
+  const state = createState(
+    watered(world.planet, soundings, sea.hull),
+    start,
+    moored
+  );
   const chase = createChase(ground, sea.at);
   const clock = fixedClock();
   let pulled = false,
@@ -169,8 +174,9 @@ export function createGame(
     heading: start.at,
     facing: start.at,
     arriving: 0,
+    top: moored.topSpeed,
     hull: 0,
-    hullMax: HEALTH.hull,
+    hullMax: moored.hullPoints,
     shield: 0,
     shieldMax: HEALTH.shield,
     gun: null,
@@ -538,7 +544,8 @@ export function createGame(
         arrival === null ? 0 : Math.max(0, 1 - arrival / ARRIVAL.seconds);
       const w = (watched ? state.crew(view.watch) : c) ?? c;
       report.hull = w.health.hull;
-      report.hullMax = hullCap(w.health);
+      report.top = w.values.topSpeed;
+      report.hullMax = w.health.most;
       report.shield = w.health.shield;
       report.gun = g ? inHandOf(g, c, lay?.target != null) : null;
       report.afloat = state.alive().length;

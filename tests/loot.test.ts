@@ -54,6 +54,7 @@ import {
   scale,
   type Vec3,
 } from '../src/world/sphere.ts';
+import { EVEN_SHIP } from './setups.ts';
 
 const deep: Depth = () => 30;
 const c0 = fromLatLon(0.1, 0.2);
@@ -108,28 +109,41 @@ test('a gust spends a charge, blows its time, and the charges come back one at a
 });
 
 test('in a gust it runs well past its top and turns quicker; after it it sheds the speed back to its top', () => {
-  let s: ShipState = { ...shipAt(c0, east), speed: SHIP.top };
-  const plain = step(s, { course: frameAt(c0).north, throttle: 1 }, STEP, deep);
+  let s: ShipState = { ...shipAt(c0, east), speed: EVEN_SHIP.topSpeed };
+  const plain = step(
+    s,
+    { course: frameAt(c0).north, throttle: 1 },
+    STEP,
+    deep,
+    EVEN_SHIP
+  );
   for (let t = 0; t < GUST.time; t += STEP)
-    s = step(s, { course: null, throttle: 1, gust: true }, STEP, deep);
-  assert.ok(s.speed > SHIP.top + 0.9 * GUST.speed, `${s.speed}`);
+    s = step(
+      s,
+      { course: null, throttle: 1, gust: true },
+      STEP,
+      deep,
+      EVEN_SHIP
+    );
+  assert.ok(s.speed > EVEN_SHIP.topSpeed + 0.9 * GUST.speed, `${s.speed}`);
   const quick = step(
-    { ...shipAt(c0, east), speed: SHIP.top },
+    { ...shipAt(c0, east), speed: EVEN_SHIP.topSpeed },
     { course: frameAt(c0).north, throttle: 1, gust: true },
     STEP,
-    deep
+    deep,
+    EVEN_SHIP
   );
   assert.ok(quick.turn > plain.turn * 1.3);
   for (let t = 0; t < 1; t += STEP)
-    s = step(s, { course: null, throttle: 1 }, STEP, deep);
+    s = step(s, { course: null, throttle: 1 }, STEP, deep, EVEN_SHIP);
   assert.ok(
-    s.speed > SHIP.top + GUST.speed - GUST.shed * 1.1 &&
-      s.speed < SHIP.top + GUST.speed,
+    s.speed > EVEN_SHIP.topSpeed + GUST.speed - GUST.shed * 1.1 &&
+      s.speed < EVEN_SHIP.topSpeed + GUST.speed,
     'shed at its rate'
   );
   for (let t = 0; t < 5; t += STEP)
-    s = step(s, { course: null, throttle: 1 }, STEP, deep);
-  assert.ok(Math.abs(s.speed - SHIP.top) < 1e-9);
+    s = step(s, { course: null, throttle: 1 }, STEP, deep, EVEN_SHIP);
+  assert.ok(Math.abs(s.speed - EVEN_SHIP.topSpeed) < 1e-9);
 });
 
 test('a ball fired in a gust goes off wider', () => {
@@ -140,10 +154,10 @@ test('a ball fired in a gust goes off wider', () => {
       const b = battleOf(
         [
           {
-            ...crewOf(1, gunOf('cannon', 0)),
+            ...crewOf(1, EVEN_SHIP, gunOf('cannon', 0)),
             gust: { charges: 1, recharge: 0, blowing },
           },
-          crewOf(2),
+          crewOf(2, EVEN_SHIP),
         ],
         seed
       );
@@ -182,7 +196,7 @@ test('stacks fill up to their most, then empty slots; what does not fit is left 
 });
 
 test('a tap chooses a slot; a tap on the chosen begins it; done, it mends to its cap and one is gone', () => {
-  const hurt = { hull: 40, shield: 0 };
+  const hurt = { hull: 40, shield: 0, most: 100 };
   let h = stowed(
     stowed(emptyHold(), 'smallShield', 2).hold,
     'repairKit',
@@ -198,16 +212,16 @@ test('a tap chooses a slot; a tap on the chosen begins it; done, it mends to its
   assert.ok(progress(h)! > 0.8 && h.using);
   for (let t = 0; t < 0.2; t += STEP)
     ({ hold: h, health } = stepUse(h, health, STEP));
-  assert.deepEqual(health, { hull: 40, shield: 25 });
+  assert.deepEqual(health, { hull: 40, shield: 25, most: 100 });
   assert.deepEqual(h.items[0], { kind: 'smallShield', count: 1 });
   assert.equal(h.using, null);
-  health = { hull: 40, shield: 40 };
+  health = { hull: 40, shield: 40, most: 100 };
   h = begun(h, 1, health);
   for (let t = 0; t < 1.1; t += STEP)
     ({ hold: h, health } = stepUse(h, health, STEP));
   assert.equal(health.shield, 50);
   assert.equal(h.items[0], null, 'the last one gone empties the slot');
-  health = { hull: 70, shield: 0 };
+  health = { hull: 70, shield: 0, most: 100 };
   h = tapped(tapped(h, 2, health), 2, health);
   for (let t = 0; t < 2; t += STEP)
     ({ hold: h, health } = stepUse(h, health, STEP));
@@ -216,16 +230,22 @@ test('a tap chooses a slot; a tap on the chosen begins it; done, it mends to its
 
 test('nothing is begun that would do nothing, and choosing another slot breaks it off', () => {
   const h = stowed(emptyHold(), 'smallShield', 1).hold;
-  assert.equal(useful({ hull: 100, shield: 50 }, 'smallShield'), false);
-  assert.equal(begun(h, 1, { hull: 100, shield: 50 }).using, null);
   assert.equal(
-    begun(h, 1, { hull: 0, shield: 0 }).using,
+    useful({ hull: 100, shield: 50, most: 100 }, 'smallShield'),
+    false
+  );
+  assert.equal(begun(h, 1, { hull: 100, shield: 50, most: 100 }).using, null);
+  assert.equal(
+    begun(h, 1, { hull: 0, shield: 0, most: 100 }).using,
     null,
     'not when sunk'
   );
-  const using = begun(h, 1, { hull: 100, shield: 0 });
+  const using = begun(h, 1, { hull: 100, shield: 0, most: 100 });
   assert.ok(using.using);
-  assert.equal(tapped(using, 0, { hull: 100, shield: 0 }).using, null);
+  assert.equal(
+    tapped(using, 0, { hull: 100, shield: 0, most: 100 }).using,
+    null
+  );
 });
 
 test('a blow breaks off what it is mending with; the storm does not', () => {
@@ -235,11 +255,15 @@ test('a blow breaks off what it is mending with; the storm does not', () => {
   const h = begun(stowed(emptyHold(), 'bigShield', 1).hold, 1, {
     hull: 100,
     shield: 0,
+    most: 100,
   });
   let b = battleOf(
     [
-      { ...crewOf(1, gunOf('cannon', 4)), health: { hull: 100, shield: 0 } },
-      { ...crewOf(2), hold: h },
+      {
+        ...crewOf(1, EVEN_SHIP, gunOf('cannon', 4)),
+        health: { hull: 100, shield: 0, most: 100 },
+      },
+      { ...crewOf(2, EVEN_SHIP), hold: h },
     ],
     1
   );
@@ -266,7 +290,16 @@ test('a blow breaks off what it is mending with; the storm does not', () => {
   assert.ok(broke);
   const out = { center: frameAt(c0).north, radius: 1, damage: 0.01 };
   const w = weathered(
-    battleOf([{ ...crewOf(2), health: { hull: 100, shield: 0 }, hold: h }], 1),
+    battleOf(
+      [
+        {
+          ...crewOf(2, EVEN_SHIP),
+          health: { hull: 100, shield: 0, most: 100 },
+          hold: h,
+        },
+      ],
+      1
+    ),
     [vessel(2, q)],
     out,
     STEP
@@ -375,7 +408,7 @@ test('it takes what fits within reach: a gun into each empty gun slot, the one i
     piece(2, at(-5), { kind: 'repairKit', count: 4 }),
     piece(3, at(30), { kind: 'harpoon', rarity: 4 })
   );
-  const r = swept(f, [crewOf(1)], [vessel(1, c0)], new Map(), 1);
+  const r = swept(f, [crewOf(1, EVEN_SHIP)], [vessel(1, c0)], new Map(), 1);
   assert.deepEqual(kinds(r.crews[0]), ['scatter 2', null]);
   assert.equal(
     r.crews[0].guns[0]?.rounds,
@@ -416,7 +449,7 @@ test('it takes what fits within reach: a gun into each empty gun slot, the one i
 
 test('asked, it swaps the gun in hand for the one offered, and its own goes over the side and lies until it is clear', () => {
   const both = {
-    ...crewOf(1, gunOf('cannon', 0), gunOf('scatter', 1)),
+    ...crewOf(1, EVEN_SHIP, gunOf('cannon', 0), gunOf('scatter', 1)),
     hand: 1,
   };
   const f = lying(piece(4, at(3), { kind: 'harpoon', rarity: 3 }));
@@ -445,7 +478,7 @@ test('asked, it swaps the gun in hand for the one offered, and its own goes over
 
 test('a tap on its other gun takes it in hand (EQUIP), letting go the wind-up or reload of the one put down; on the one in hand, a reload', () => {
   const g = { ...gunOf('harpoon', 0), windup: 0.4 },
-    c = { ...crewOf(1, g, gunOf('cannon', 2)), hand: 0 };
+    c = { ...crewOf(1, EVEN_SHIP, g, gunOf('cannon', 2)), hand: 0 };
   const ask = (arm: number | null, crew = c) =>
     asked(
       [crew],
@@ -468,21 +501,27 @@ test('a tap on its other gun takes it in hand (EQUIP), letting go the wind-up or
   };
   const b = ask(1, spent);
   assert.ok(
-    Math.abs(b.crews[0].guns[1]!.reload - reloadOf(gunOf('cannon', 2))) < 1e-9
+    Math.abs(
+      b.crews[0].guns[1]!.reload -
+        reloadOf(gunOf('cannon', 2), EVEN_SHIP.reloadFactor)
+    ) < 1e-9
   );
   assert.deepEqual(
     b.cues.map((k) => k.kind),
     ['reloading']
   );
   assert.deepEqual(ask(1, a.crews[0]).cues, []);
-  assert.equal(ask(1, crewOf(1, gunOf('cannon', 0))).crews[0].hand, 0);
+  assert.equal(
+    ask(1, crewOf(1, EVEN_SHIP, gunOf('cannon', 0))).crews[0].hand,
+    0
+  );
 });
 
 test('with its slots full, a take swaps the stack in hand for what is offered', () => {
   let h = emptyHold();
   for (const k of ['smallShield', 'repairKit', 'bigShield'] as const)
     h = stowed(h, k, 1).hold;
-  const c = { ...crewOf(1), hold: h };
+  const c = { ...crewOf(1, EVEN_SHIP), hold: h };
   const f = lying(piece(5, at(2), { kind: 'fullRepair', count: 1 }));
   assert.equal(offered(c, c0, f).item?.id, 5);
   const r = swept(f, [c], [vessel(1, c0)], new Map([[1, 2]]), 1);
@@ -495,7 +534,7 @@ test('with its slots full, a take swaps the stack in hand for what is offered', 
 
 test('a ship sunk spills both its guns and all its stores where it lies, gone from it, kicked out to drift to a stop', () => {
   const c = {
-    ...crewOf(1, gunOf('cannon', 2), gunOf('mortar', 1)),
+    ...crewOf(1, EVEN_SHIP, gunOf('cannon', 2), gunOf('mortar', 1)),
     hold: stowed(stowed(emptyHold(), 'smallShield', 4).hold, 'repairKit', 2)
       .hold,
   };
@@ -542,7 +581,7 @@ test('a ship sunk takes nothing', () => {
   const f = lying(piece(1, c0, { kind: 'cannon', rarity: 1 }));
   const r = swept(
     f,
-    [{ ...crewOf(1), health: { hull: 0, shield: 0 } }],
+    [{ ...crewOf(1, EVEN_SHIP), health: { hull: 0, shield: 0, most: 100 } }],
     [vessel(1, c0)],
     new Map(),
     1

@@ -10,7 +10,7 @@ import {
   type Battle,
   type Crew,
 } from '../src/sim/battle.ts';
-import { mind, think, type Memory, type Seen } from '../src/sim/bot.ts';
+import { mind, think, type Memory, type Own } from '../src/sim/bot.ts';
 import { afloat, stepFleet, type Vessel } from '../src/sim/contact.ts';
 import { STEP } from '../src/sim/fixed.ts';
 import { gunOf } from '../src/sim/gun.ts';
@@ -28,6 +28,7 @@ import {
   fromLatLon,
   type Vec3,
 } from '../src/world/sphere.ts';
+import { EVEN_SHIP, HANDY } from './setups.ts';
 
 const DEEP: Depth = () => 30;
 const c0 = fromLatLon(0.3, 0.1);
@@ -59,7 +60,7 @@ function sail(
   const modes: string[][] = at.map(() => []);
   for (let n = 0; n < Math.round(seconds / STEP); n++) {
     const by = new Map(battle.crews.map((c) => [c.id, c]));
-    const seen: Seen[] = fleet.map((v) => ({
+    const seen: Own[] = fleet.map((v) => ({
       ...v,
       crew: by.get(v.id)!,
       hull: by.get(v.id)!.health.hull,
@@ -86,7 +87,13 @@ function sail(
     fleet.forEach((v, i) => {
       helms[i] = crewed(helms[i], manned.get(v.id));
     });
-    const met = stepFleet(fleet, helms, STEP, deep);
+    const met = stepFleet(
+      fleet,
+      helms,
+      STEP,
+      deep,
+      fleet.map((v) => manned.get(v.id)!.values)
+    );
     fleet = met.fleet;
     const fought = stepBattle(
       { ...battle, crews: w.crews },
@@ -125,7 +132,7 @@ test("her taps: on the gun in hand with a gun in reach, a swap; on the item in h
     { kind: 'fullRepair', count: 1 },
   ] as const;
   const playerCrew: Crew = {
-    ...crewOf(0, gunOf('cannon', 1), gunOf('scatter', 0)),
+    ...crewOf(0, EVEN_SHIP, gunOf('cannon', 1), gunOf('scatter', 0)),
     hold: { ...emptyHold(), items, chosen: 1 },
   };
   const tap = (slot: number, pieces: Loot[], arm: number | null = null) =>
@@ -214,7 +221,11 @@ test('it mends with the slot worth most to it as it is', () => {
   for (const k of ['smallShield', 'repairKit', 'fullRepair'] as const)
     h = stowed(h, k, 1).hold;
   const at = (hull: number, shield: number) =>
-    healSlot({ ...crewOf(0), hold: h, health: { hull, shield } });
+    healSlot({
+      ...crewOf(0, EVEN_SHIP),
+      hold: h,
+      health: { hull, shield, most: 100 },
+    });
   assert.equal(at(100, 0), 1, 'a shield');
   assert.equal(at(60, 60), 2, 'a kit');
   assert.equal(at(30, 0), 3, 'a full repair');
@@ -228,7 +239,7 @@ test('an unarmed bot sails to a gun it sees and takes it; with one, a second kin
     const r = sail(
       [c0],
       [seed],
-      [crewOf(0)],
+      [crewOf(0, EVEN_SHIP)],
       {
         pieces: [piece(1, out(90, 0.7), { kind: 'cannon', rarity: 1 })],
         next: 2,
@@ -243,7 +254,7 @@ test('an unarmed bot sails to a gun it sees and takes it; with one, a second kin
     const o = sail(
       [c0],
       [seed],
-      [crewOf(0, gunOf('cannon', 0))],
+      [crewOf(0, EVEN_SHIP, gunOf('cannon', 0))],
       {
         pieces: [piece(1, out(60, -1), { kind: 'scatter', rarity: 0 })],
         next: 2,
@@ -258,7 +269,7 @@ test('an unarmed bot sails to a gun it sees and takes it; with one, a second kin
     const s = sail(
       [c0],
       [seed],
-      [crewOf(0, gunOf('cannon', 0), gunOf('scatter', 0))],
+      [crewOf(0, EVEN_SHIP, gunOf('cannon', 0), gunOf('scatter', 0))],
       {
         pieces: [piece(1, out(60, -1), { kind: 'cannon', rarity: 3 })],
         next: 2,
@@ -283,7 +294,7 @@ test('a gun abeam, inside the circle it turns at its top speed, it slows to come
     const r = sail(
       [c0],
       [seed],
-      [crewOf(0)],
+      [crewOf(0, EVEN_SHIP)],
       {
         pieces: [piece(1, out(28, 0), { kind: 'cannon', rarity: 1 })],
         next: 2,
@@ -310,9 +321,9 @@ test('a hurt bot with something to mend with uses it', () => {
       [seed],
       [
         {
-          ...crewOf(0, gunOf('cannon', 0)),
+          ...crewOf(0, EVEN_SHIP, gunOf('cannon', 0)),
           hold,
-          health: { hull: 40, shield: 0 },
+          health: { hull: 40, shield: 0, most: 100 },
         },
       ],
       { pieces: [], next: 0 },
@@ -331,7 +342,7 @@ test('bots near one piece do not all pile on it: one takes it, and none goes for
   const r = sail(
     at,
     [1, 2, 3, 4, 5, 6],
-    at.map((_, i) => crewOf(i)),
+    at.map((_, i) => crewOf(i, EVEN_SHIP)),
     { pieces: [piece(1, c0, { kind: 'cannon', rarity: 2 })], next: 2 },
     60
   );
@@ -355,7 +366,7 @@ test('a piece it can not come to it gives up after a while, and leaves be', () =
     const r = sail(
       [c0],
       [seed],
-      [crewOf(0)],
+      [crewOf(0, HANDY)],
       { pieces: [piece(1, lagoon, { kind: 'cannon', rarity: 0 })], next: 2 },
       PURSER.patience + 15,
       reef

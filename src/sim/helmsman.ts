@@ -157,7 +157,11 @@ export function steer(
         ? c.b.helm.leastWay
         : Math.max(
             c.b.helm.leastWay,
-            Math.min(1, (c.b.helm.tighten * r * SHIP.turn) / SHIP.top)
+            Math.min(
+              1,
+              (c.b.helm.tighten * r * c.own.crew.values.turnRate) /
+                c.own.crew.values.topSpeed
+            )
           );
   const s = stuck(c, dt, course);
   m.was = ship.at;

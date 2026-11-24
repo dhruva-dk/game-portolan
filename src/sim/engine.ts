@@ -2,7 +2,6 @@ import {
   armed,
   battleOf,
   crewOf,
-  fitOf,
   inHand,
   marksOf,
   stepBattle,
@@ -21,7 +20,6 @@ import { MIXED, nature, type MatchType, type Nature } from './persona.ts';
 import { afloat, stepFleet, type Vessel } from './contact.ts';
 import { STEP } from './fixed.ts';
 import { gunOf } from './gun.ts';
-import { SHIP, type Handling } from './handling.ts';
 import { sunk } from './health.ts';
 import { regain, type Regained } from './holding.ts';
 import { PLAYER, credited, type Cause, type Sunk } from './match.ts';
@@ -48,7 +46,7 @@ import {
 } from './territory.ts';
 import type { Hands } from './hands.ts';
 import type { MatchResult } from './result.ts';
-import type { MatchSetup, ShipSpec } from './setup.ts';
+import type { MatchSetup, ShipSpec, ShipValues } from './setup.ts';
 import { remembered } from '../world/remembered.ts';
 import type { ShipPose } from '../world/pose.ts';
 import { hash } from '../world/random.ts';
@@ -131,6 +129,7 @@ type Fought = ReturnType<typeof stepBattle>;
 type Kept = ReturnType<typeof stored>;
 
 interface Aboard extends Hand {
+  top: number;
   ride: Ride;
   before: ShipPose;
   after: ShipPose;
@@ -226,7 +225,14 @@ function createSea(waters: Waters, first: Course) {
     vessels.of(fleet).get(id) ?? null;
   let alive: number[] | null = null;
 
-  const fits: Handling[] = [],
+  const specOf = new Map<number, ShipValues>();
+  const valuesOf = (id: number): ShipValues => {
+    const v = specOf.get(id);
+    if (!v) throw new RangeError(`ship ${id} has no spec`);
+    return v;
+  };
+
+  const fits: ShipValues[] = [],
     lost: number[] = [],
     sailing: Vessel[] = [],
     moves: Move[] = [],
@@ -241,9 +247,11 @@ function createSea(waters: Waters, first: Course) {
   ) => {
     fleet.push(afloat(id, ship));
     vessels.stale();
-    const r = settled(ship, sea, tick * STEP, id),
+    const top = valuesOf(id).topSpeed,
+      r = settled(ship, top, sea, tick * STEP, id),
       p = pose(ship, r);
     aboard.set(id, {
+      top,
       mind: bot && !lashed ? mind(seedOf(id), ship.at) : null,
       nature: nature(seedOf(id), brain, match.type.mix),
       steady: lashed ?? AMIDSHIPS,
@@ -257,8 +265,11 @@ function createSea(waters: Waters, first: Course) {
   const clear = (
     ids: readonly number[],
     { loot, held }: { loot: boolean; held: boolean },
+    values: (id: number) => ShipValues,
     by?: readonly number[]
   ) => {
+    specOf.clear();
+    for (const id of ids) specOf.set(id, values(id));
     teams = by;
     tally = by ? createTally(by, closedBy(match.type.rules.storm)) : null;
     loose = false;
@@ -279,7 +290,9 @@ function createSea(waters: Waters, first: Course) {
     const gun = match.gun;
     battle = battleOf(
       ids.map((id) =>
-        gun ? crewOf(id, gunOf(gun.kind, gun.rarity)) : crewOf(id)
+        gun
+          ? crewOf(id, valuesOf(id), gunOf(gun.kind, gun.rarity))
+          : crewOf(id, valuesOf(id))
       ),
       match.seed,
       match.type.rules.aim.assist,
@@ -326,9 +339,8 @@ function createSea(waters: Waters, first: Course) {
     battle.crews = wants.crews;
     const manned = byId(wants.crews);
     for (let i = 0; i < fleet.length; i++) {
-      const c = manned.get(fleet[i].id);
-      helms[i] = crewed(helms[i], c);
-      fits[i] = fitOf(c);
+      helms[i] = crewed(helms[i], manned.get(fleet[i].id));
+      fits[i] = valuesOf(fleet[i].id);
     }
     fits.length = fleet.length;
     from.clear();
@@ -425,6 +437,7 @@ function createSea(waters: Waters, first: Course) {
       a.ride = ride(
         knocked(a.ride, v.ship, met.jolts[i]),
         v.ship,
+        a.top,
         sea,
         tick * STEP,
         STEP
@@ -574,7 +587,7 @@ function createSea(waters: Waters, first: Course) {
     kept = berthed;
     const count = specs.length,
       ids = specs.map((_, id) => id);
-    clear(ids, MATCH, teamsOf(specs));
+    clear(ids, MATCH, (id) => ships[id], teamsOf(specs));
     const open =
       berthed?.match === match.seed && berthed.spawns.length === count
         ? berthed.spawns
@@ -613,21 +626,20 @@ function createSea(waters: Waters, first: Course) {
 
   const debug: Debug = {
     atSea(start: { at: Vec3; bearing: number }, others: readonly Mooring[]) {
-      const ids = [PLAYER, ...others.map((_, i) => i + 1)];
-      clear(
-        ids,
-        MATCH,
-        specs ? teamsOf(specs.slice(0, ids.length)) : undefined
-      );
+      const ids = [PLAYER, ...others.map((_, i) => i + 1)],
+        given = specs;
+      if (!given || given.length < ids.length)
+        throw new RangeError(`${ids.length} ships at sea need as many specs`);
+      clear(ids, MATCH, (id) => given[id], teamsOf(given.slice(0, ids.length)));
       loose = true;
       launch(
         PLAYER,
         shipAt(start.at, bearingAt(start.at, start.bearing)),
         null,
-        specs?.[PLAYER].hands !== 'player'
+        given[PLAYER].hands !== 'player'
       );
       others.forEach((o, i) => {
-        const way = (o.lashed?.throttle ?? 0) * SHIP.top;
+        const way = (o.lashed?.throttle ?? 0) * valuesOf(i + 1).topSpeed;
         launch(
           i + 1,
           { ...shipAt(o.at, o.heading), speed: way },
@@ -692,8 +704,8 @@ function createSea(waters: Waters, first: Course) {
     view,
     played,
     start,
-    anchor(at: { at: Vec3; bearing: number }) {
-      clear([PLAYER], LOBBY);
+    anchor(at: { at: Vec3; bearing: number }, values: ShipValues) {
+      clear([PLAYER], LOBBY, () => values);
       quiet = true;
       launch(PLAYER, shipAt(at.at, bearingAt(at.at, at.bearing)), null, false);
     },
@@ -718,7 +730,8 @@ export function createMatch(setup: MatchSetup, waters: Waters): Match {
 
 export function createMooring(
   waters: Waters,
-  at: { at: Vec3; bearing: number }
+  at: { at: Vec3; bearing: number },
+  values: ShipValues
 ): Match {
   const sea = createSea(waters, {
     seed: 0,
@@ -726,7 +739,7 @@ export function createMooring(
     storm: () => calm(at.at),
     gun: null,
   });
-  sea.anchor(at);
+  sea.anchor(at, values);
   return sea.played;
 }
 

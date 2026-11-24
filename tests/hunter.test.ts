@@ -18,6 +18,7 @@ import {
   scale,
   type Vec3,
 } from '../src/world/sphere.ts';
+import { EVEN_SHIP, aboard } from './setups.ts';
 
 const DEEP: Depth = () => 30;
 const c0 = fromLatLon(0.3, 0.1);
@@ -44,7 +45,9 @@ test('the sea keeps each ship’s last shot ringing for a few seconds, then lets
 });
 
 function sail(gunned: boolean, gunfire: readonly Report[], seconds: number) {
-  const crew = gunned ? crewOf(0, gunOf('cannon', 1)) : crewOf(0);
+  const crew = gunned
+    ? crewOf(0, EVEN_SHIP, gunOf('cannon', 1))
+    : crewOf(0, EVEN_SHIP);
   let fleet: Vessel[] = [afloat(0, shipAt(c0, frameAt(c0).north))];
   let m: Memory = mind(11, c0);
   const modes: string[] = [];
@@ -56,11 +59,17 @@ function sail(gunned: boolean, gunfire: readonly Report[], seconds: number) {
       shield: crew.health.shield,
       armed: armed(crew),
     };
-    const r = think(own, [], { depth: DEEP, gunfire }, m, nature(11));
+    const r = think(aboard(own), [], { depth: DEEP, gunfire }, m, nature(11));
     m = r.memory;
     if (modes.at(-1) !== m.mode) modes.push(m.mode);
     const helms: Helm[] = [r.helm];
-    fleet = stepFleet(fleet, helms, STEP, DEEP).fleet;
+    fleet = stepFleet(
+      fleet,
+      helms,
+      STEP,
+      DEEP,
+      fleet.map(() => EVEN_SHIP)
+    ).fleet;
   }
   return { modes, at: fleet[0].ship.at };
 }

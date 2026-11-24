@@ -14,6 +14,7 @@ import {
   type Intent,
   type Memory,
   type Mode,
+  type Own,
   type Sea,
   type Seen,
 } from './captain.ts';
@@ -60,7 +61,14 @@ export const CHOICE = {
   roam: 1,
 } as const satisfies Record<Mode, number>;
 
-export { BOT, type Memory, type Mode, type Sea, type Seen } from './captain.ts';
+export {
+  BOT,
+  type Memory,
+  type Mode,
+  type Own,
+  type Sea,
+  type Seen,
+} from './captain.ts';
 export { sank } from './fighting.ts';
 
 export interface MindMemory {
@@ -115,7 +123,7 @@ export const shot = (m: Memory, by: number, damage = 0): Memory => ({
 });
 
 export function think(
-  own: Seen,
+  own: Own,
   others: readonly Seen[],
   sea: Sea,
   memory: Memory,
