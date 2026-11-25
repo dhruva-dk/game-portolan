@@ -2,7 +2,7 @@ import type { Cue, Shot, Splash, Strike } from '../sim/battle.ts';
 import type { Taken } from '../sim/loot.ts';
 import type { Mended } from '../sim/stores.ts';
 import { bearingFrom, type Blast, type Eye } from '../render/snapshot.ts';
-import { HOTBAR, LIFT, type Deed, type Moment } from './player.ts';
+import { LIFT, type Deed, type Moment } from './player.ts';
 import { R, normalize, type Vec3 } from '../world/sphere.ts';
 import { placed, type Point, type View } from './lens.ts';
 
@@ -98,7 +98,6 @@ export function deedsOf(
     });
   for (const t of done.took) {
     if (t.ship !== me) continue;
-    const slot = HOTBAR.guns + t.slot;
     out.push({
       seq: next(),
       time,
@@ -106,7 +105,7 @@ export function deedsOf(
       ship: me,
       kind: 'took',
       heal: t.heal,
-      slot,
+      slot: t.slot,
     });
   }
   const own = done.own;

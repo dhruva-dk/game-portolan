@@ -250,6 +250,7 @@ export function createState(
       foundered();
       log.keep(NOTHING_DONE, NOTHING_DONE, NOTHING_DONE, null, clock(1));
     },
+    hurt: (id: number, points: number) => debugOfMatch(match).hurt(id, points),
     mindOf: (id: number) => debugOfMatch(match).mindOf(id),
     standIn: (id: number, sights: Sighter) =>
       debugOfMatch(match).standIn(id, sights),
@@ -267,6 +268,7 @@ interface Debug {
   rig(rig: Rig, setup: MatchSetup, liveries: readonly Livery[]): ShipPose;
   strew(at: Vec3, heals: readonly Rarity[]): void;
   sink(id: number, by: number | null): void;
+  hurt(id: number, points: number): void;
   mindOf(id: number): Readonly<Memory> | null;
   standIn(id: number, sights: Sighter): void;
 }

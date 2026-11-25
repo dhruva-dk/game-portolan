@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { PLAYER_SHIP, HOTBAR, LIFT, type Deed } from '../src/play/player.ts';
+import { PLAYER_SHIP, LIFT, type Deed } from '../src/play/player.ts';
 import { LIVERY } from '../src/world/livery.ts';
 import {
   KEEP,
@@ -135,9 +135,7 @@ test(
     );
     const stores = d[6];
     assert.ok(
-      stores.kind === 'took' &&
-        stores.heal === 'epic' &&
-        stores.slot === HOTBAR.guns + 1
+      stores.kind === 'took' && stores.heal === 'epic' && stores.slot === 1
     );
     assert.deepEqual(
       deedsOf({ ...done, own: null }, 0, counter(), 12).map((x) => x.kind),

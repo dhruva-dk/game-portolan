@@ -155,7 +155,7 @@ async function play(s: Stage): Promise<Played> {
     Object.assign(status, game.status(view.w, view.h), game.kit());
   const map = () => globe.show(hudState());
   const hud = createHud(layer, shores, {
-    slot: input.tap,
+    heal: input.heal,
     gust: input.gust,
     fire: input.fire,
     map,

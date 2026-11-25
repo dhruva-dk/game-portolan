@@ -1,4 +1,5 @@
 import type { GunKind, Rarity } from '../sim/kinds.ts';
+import { GUST_METER, HEAL } from '../sim/tuning.ts';
 import type { Livery } from '../world/livery.ts';
 import type { Vec3 } from '../world/sphere.ts';
 
@@ -6,7 +7,7 @@ export interface Thumbs {
   stick: { x: number; y: number; center: [number, number] | null } | null;
   look: { x: number; y: number; held: boolean };
   fire: boolean;
-  tap: number | null;
+  heal: number | null;
   gust: boolean;
 }
 
@@ -14,7 +15,7 @@ export const IDLE: Thumbs = {
   stick: null,
   look: { x: 0, y: 0, held: false },
   fire: false,
-  tap: null,
+  heal: null,
   gust: false,
 };
 
@@ -71,7 +72,8 @@ export interface Mate {
 export const PLAYER_SHIP = 0;
 
 export type { GunKind } from '../sim/kinds.ts';
-export const HOTBAR = { guns: 1, items: 3 } as const;
+export const HEAL_SLOTS = HEAL.slots;
+export const GUST_NOTCH = GUST_METER.least;
 
 export type Deed = { seq: number; time: number; at: Vec3; ship: number } & (
   | { kind: 'fired' | 'winding' | 'reloading' | 'reloaded'; gun: GunKind }
@@ -156,22 +158,9 @@ export type Moment = Deed & {
   whence: number | null;
 };
 
-export interface Slot {
-  heal: Rarity;
-}
-
-export interface GunSlot {
-  kind: GunKind;
-  rounds: number;
-  mag: number;
-  reload: number | null;
-}
-
 export interface Kit {
-  guns: readonly [GunSlot | null];
-  items: readonly [Slot | null, Slot | null, Slot | null];
-  chosen: number;
-  using: number | null;
+  heals: readonly (Rarity | null)[];
+  using: { slot: number; done: number } | null;
   gust: number;
   blowing: boolean;
 }
