@@ -863,7 +863,7 @@ The seed field, the die and the persona bars of today's seed panel are deleted a
 
 ### 1.12.10 The result flow
 
-Shown on launch whenever the career's `unread` flag is set (§2.9.1), which is the case after every recorded race. It is drawn from the career's `lastRace` report while the next planet builds behind it. Three steps; a tap anywhere advances steps 1 and 2.
+Shown on launch whenever the career's `unread` flag is set (§2.9.1), which is the case after every recorded race. It is drawn from the career's `lastRace` report while the next planet builds behind it; the lobby's slips and buttons are hidden until it ends. Three steps; a tap anywhere advances steps 1 and 2. A tap while a step is still moving finishes its motion at once, and the next tap advances, so nobody waits.
 
 **Step 1, the race.** A sheet across the center.
 
@@ -875,16 +875,20 @@ Shown on launch whenever the career's `unread` flag is set (§2.9.1), which is t
 | Podium | The emblems and names of the teams of the ships placed 1, 2 and 3 |
 | Points | Star-burst glyph and "+n" |
 
-**Step 2, the money.** A sheet across the center. Rows appear one at a time and count up, each with its mark: place (the laurel), sinkings (the gun glyph), sea (the territory glyph), each sponsor (emblem, a tick or cross for its objective, the amount), wages (the small portraits of the people paid; negative), interest if any (the short-balance mark of §1.12.3; negative), then a rule and the total. Below: coin glyph, the balance before, an arrow, the balance after; laurel glyph, the standing before, an arrow, the standing after.
+The sheet lands; each ship row is dealt, its place counts up and stamps, its sinkings punch in one by one, and a ship that was sunk shows who did it with a strike; the podium rises third, second, first, the winner's emblem largest; the points burst last.
+
+**Step 2, the money.** A sheet across the center. Rows appear one at a time and count up, each with its mark: place (the laurel), sinkings (the gun glyph), sea (the territory glyph), each sponsor (emblem, a tick or cross for its objective, the amount), wages (the small portraits of the people paid; negative), interest if any (the short-balance mark of §1.12.3; negative), then a rule and the total. The place, sinkings and sea rows always show; wages show only when someone was paid, and interest only when it is not zero. A sponsor's tick or cross is stamped; the total lands heavier than the rows. Below: coin glyph, the balance before, an arrow, the balance after, rolling from one to the other; laurel glyph, the standing before, an arrow, the standing after, and the places moved.
 
 **Step 3, the paper** (§1.13.1). After race ten the off-season report (§1.12.11) takes this step's place.
 
 | Element | Detail |
 |---|---|
-| Masthead | "The Gullible", the season and race as "Season 2, Race 4" |
-| Headlines | Up to five, most important first |
-| Workshop strip | If you had a designer: the focused line's glyph and its design level before and after as "42 → 44" (for a gun unlock: the kind's glyph and its progress) |
+| Masthead | "The Gullible" between a gull's head and a ship in boxes, over a dateline rule with the season and race as "Season 2, Race 4" |
+| Headlines | Up to five, most important first: the first large across the page, the rest in columns below, with grey bars standing for body copy |
+| Workshop strip | A boxed notice. If you had a designer: the focused line's glyph and its design level before and after as "42 → 44" (for a gun unlock: the kind's glyph and its progress) |
 | Continue | Ribbon button with the word; faint, showing a turning ring, until the world is built. Sends `MarkRead` and goes to the lobby |
+
+The paper is drawn as a newspaper, not a sheet: it spins in and slaps down, then prints its headlines; on Continue it is tossed aside and the lobby rises.
 
 If your team was repossessed this race, steps 1 and 2 show as usual and step 3 is the special edition (§1.13.1).
 
@@ -978,7 +982,7 @@ When your own team is repossessed, the edition is a special: the single headline
 **Names in headlines are links.** A link is drawn underlined.
 - A team's name opens that team's sheet (the team sheet of §1.12.8) over the paper.
 - A person's name opens the sheet of the team they are with now, with their card enlarged. This covers owners and anyone under contract. The name of someone who has retired or is a free agent is plain text.
-- The sheet works exactly as it does in Opponents, including Report and Approach. Its round close button returns to the paper.
+- The sheet works exactly as it does in Opponents, including Report and Approach. It opens in the middle of the screen with the paper faded behind it, and carries its own round close button at its corner, since a flow has none; that button shrinks an enlarged card first and then returns to the paper.
 - Links are active once the Opponents button has appeared (§1.13.2). Before that, and in the special edition, every name is plain text.
 
 ### 1.13.2 Uncle's bubbles
@@ -1616,6 +1620,12 @@ All spacing is a multiple of `STEP`, 4 units.
 | `swap` | In over 340 ms from 64 units right; out over 200 ms, dropping 18 units and turning 1.6° | One team sheet replacing another |
 | `chosen` | 160 ms | The outline of the row whose team is open |
 | `list` | Coasting with a 325 ms time constant; 0.55 give past an end and a spring back; a glide to a row in 520 ms; the thumb lingers 700 ms | Any scrolling list |
+| `landed`, `tossed` | In over 460 ms, dropping 44 units with a slight overshoot; out over 260 ms, thrown 140 units aside | A result sheet arriving and leaving |
+| `ranked` | Rows dealt 150 ms apart; a place counts for 560 ms and stamps for 300 ms; a sinking punches in over 230 ms; the podium rises 190 ms apart; the points burst over 560 ms | Step 1 of the result flow |
+| `ledger` | A row arrives in 240 ms and counts for 380 ms; a stamp takes 300 ms; the total lands in 360 ms and the sheet gives 3 units under it; the balance rolls for 900 ms | Step 2 of the result flow |
+| `thrown` | 760 ms, two turns, growing from 0.16, ending 1.1° askew with a slap | The paper arriving |
+| `printed` | 300 ms, starting after 640 ms, 110 ms apart | Headlines printing |
+| `turning` | 1100 ms a turn | The ring on a faint Continue |
 | `fade` | 180 ms | Anything else that appears or goes |
 
 Rules:
@@ -1723,7 +1733,7 @@ Your team is played by the policy as a sensible team (§1.10.2). Until the polic
 
 ### 2.8.3 Debug states
 
-`app/debug.ts` reads `?debug` switches (used by `npm run browser`). `?debug&screen=<name>&seed=<s>&races=<n>` builds a career from the seed, advances it `n` races with the stand-in and the policy for every team including yours (§1.10.2), and opens that screen. The names are `new`, `lobby`, `ship`, `paint`, `team`, `deal`, `negotiation`, `sponsors`, `opponents`, `planet`, `settings`, `result`, `paper`, `offseason`, `glyphs` (the glyph sheet of §2.5.4, which needs no career). There are no hand-written fixture states. Three more switches change the state built: `balance=<n>` sets your balance to `n` after the career is advanced (no seed reaches debt by itself, and the red money slip needs a state to be drawn on); `signed`, at the off-season stop, finishes the stop so the lobby of the next season shows; `meter` shows the frame meter over a screen; `approach=<roles>` (a comma-separated list) sends `Approach` for a candidate of each named role before the last race, so that several deals are waiting at once. The `deal` and `negotiation` screens also read `role=<role>` (whose deal to open; the scouted role if left out). `sponsors` reads `sponsors=<n>`, which signs the first `n` offers into the slots with real `SignSponsor` commands. `opponents` reads `team=<place>` (whose team sheet is open) and `card=<seat>` (which of `owner`, `driver`, `designer`, `mechanic` is enlarged). `negotiation` reads four more: `pick=<n>` (which candidate of the deal, from 0), `report` (buy a report on them first), `renew` (negotiate with the holder of the seat instead of a candidate), and `offers=<answers>` (a comma-separated list of `refuse`, `counter` and `sign`: offers are sent, in order, that get those answers; the helper searches for terms that really get each answer and fails, naming the person, when none do). These states are reached by sending real commands, never by writing the state. `screen=new` shows New Career with no career unless `seed=` is given, and with one when it is; `name=`, `dye=`, `pattern=` and `emblem=` then set that career's team name and livery. `screen=ship` reads `stop=<n>` (which stop to open on, from 0) and, as the one exception to reaching states by commands, `unlocked=<kinds>&progress=<n>`, which writes unlocked gun kinds and unlock progress into the state the way `balance` writes the balance (the policy playing your seat keeps moving the focus, so no seed gets there).
+`app/debug.ts` reads `?debug` switches (used by `npm run browser`). `?debug&screen=<name>&seed=<s>&races=<n>` builds a career from the seed, advances it `n` races with the stand-in and the policy for every team including yours (§1.10.2), and opens that screen. The names are `new`, `lobby`, `ship`, `paint`, `team`, `deal`, `negotiation`, `sponsors`, `opponents`, `planet`, `settings`, `result`, `paper`, `offseason`, `glyphs` (the glyph sheet of §2.5.4, which needs no career). There are no hand-written fixture states. Three more switches change the state built: `balance=<n>` sets your balance to `n` after the career is advanced (no seed reaches debt by itself, and the red money slip needs a state to be drawn on); `signed`, at the off-season stop, finishes the stop so the lobby of the next season shows; `meter` shows the frame meter over a screen; `approach=<roles>` (a comma-separated list) sends `Approach` for a candidate of each named role before the last race, so that several deals are waiting at once. The `deal` and `negotiation` screens also read `role=<role>` (whose deal to open; the scouted role if left out). `sponsors` reads `sponsors=<n>`, which signs the first `n` offers into the slots with real `SignSponsor` commands. `opponents` reads `team=<place>` (whose team sheet is open) and `card=<seat>` (which of `owner`, `driver`, `designer`, `mechanic` is enlarged). `result` and `paper` sail the last of the `n` races and leave it unread; `result` reads `step=<1|2|3>` and `paper` reads `special` (your team is repossessed in that race, reached by owing before it). On these two screens `balance` and `sponsors` apply before the last race, so that interest and sponsor objectives show in the money. The old match-end debug screen is now `screen=over`. `negotiation` reads four more: `pick=<n>` (which candidate of the deal, from 0), `report` (buy a report on them first), `renew` (negotiate with the holder of the seat instead of a candidate), and `offers=<answers>` (a comma-separated list of `refuse`, `counter` and `sign`: offers are sent, in order, that get those answers; the helper searches for terms that really get each answer and fails, naming the person, when none do). These states are reached by sending real commands, never by writing the state. `screen=new` shows New Career with no career unless `seed=` is given, and with one when it is; `name=`, `dye=`, `pattern=` and `emblem=` then set that career's team name and livery. `screen=ship` reads `stop=<n>` (which stop to open on, from 0) and, as the one exception to reaching states by commands, `unlocked=<kinds>&progress=<n>`, which writes unlocked gun kinds and unlock progress into the state the way `balance` writes the balance (the policy playing your seat keeps moving the focus, so no seed gets there).
 
 `npm run browser` (headless Chromium, iPad Air size) takes screenshots and reads frame cost. It is never part of `npm test`. Its existing budget stands: 100 draws, 900,000 triangles and 20 passes a frame.
 
@@ -1860,7 +1870,7 @@ Goal: every screen of §1.12 exists and can be opened on a debug state.
 - [x] **M5.12 Sponsors.** §1.12.7.
 - [x] **M5.13 Opponents.** §1.12.8.
 - [x] **M5.14 Planet.** §1.12.9.
-- [ ] **M5.15 The result flow and the paper.** §1.12.10, §1.13.1.
+- [x] **M5.15 The result flow and the paper.** §1.12.10, §1.13.1. The launch path that shows the flow when a career is unread is step M6.1; until then it is reached through `screen=result` and `screen=paper`.
 - [ ] **M5.16 The off-season report.** §1.12.11.
 - [ ] **M5.17 The HUD and pause.** §1.12.14, §1.12.12.
 - [ ] **M5.18 Settings.** §1.12.12.
