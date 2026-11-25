@@ -1,5 +1,13 @@
 import { SAIL_MARKS } from '../../render/snapshot.ts';
-import { DYES, EMBLEMS, PATTERNS, type Livery } from '../../world/livery.ts';
+import {
+  DEVICES,
+  DEVICE_BOX,
+  DYES,
+  EMBLEMS,
+  PATTERNS,
+  deviceOf,
+  type Livery,
+} from '../../world/livery.ts';
 import { pressable } from './button.ts';
 import { emblemAt, liveryColors } from './emblem.ts';
 import { FAINT, SPACE } from './house.ts';
@@ -66,23 +74,6 @@ export const daub = (x: number, y: number, fill: string, seed: number) =>
   `<path d="${roughCircle(x, y, ROWS.dye.r, seed, 2.2)}" style="fill:${fill}" stroke="${INK.iron}" stroke-width="1"/>` +
   `<path d="M${r2(x - 6.5)} ${r2(y - 3)}Q${r2(x - 5.5)} ${r2(y - 7.5)} ${r2(x - 1)} ${r2(y - 8.5)}" fill="none" stroke="${INK.white}" stroke-width="1.6" stroke-linecap="round" opacity=".55"/>`;
 
-function cross(x: number, y: number, w: number, h: number, d: number) {
-  const { arm, flare, reach } = SAIL_MARKS;
-  const limb = (ux: number, uy: number, along: number, across: number) => {
-    const p = (t: number, s: number) =>
-      `${r2(x + ux * along * t - uy * across * s)} ${r2(y + uy * along * t + ux * across * s)}`;
-    return `M${p(0, arm + d)}L${p(1 + d, flare + d)}L${p(1 + d, -flare - d)}L${p(0, -arm - d)}Z`;
-  };
-  const ax = (reach * w) / 2,
-    ay = (reach * h) / 2;
-  return (
-    limb(1, 0, ax, ay) +
-    limb(-1, 0, ax, ay) +
-    limb(0, 1, ay, ax) +
-    limb(0, -1, ay, ax)
-  );
-}
-
 function marks(pattern: number, l: number, t: number, w: number, h: number) {
   const { band, stripes } = SAIL_MARKS;
   if (pattern === 1)
@@ -98,13 +89,29 @@ function marks(pattern: number, l: number, t: number, w: number, h: number) {
   return s;
 }
 
+function device(
+  x: number,
+  y: number,
+  h: number,
+  emblem: number,
+  style: string
+) {
+  const k = (SAIL_MARKS.device * h) / 2 / DEVICE_BOX.half;
+  return (
+    `<g transform="translate(${r2(x - DEVICE_BOX.x * k)} ${r2(y - DEVICE_BOX.y * k)}) scale(${r2(k * 100) / 100})">` +
+    `<path class="sw-device" d="${DEVICES[deviceOf(emblem)]}" ${style}/></g>`
+  );
+}
+
 export function sailSwatch(
   x: number,
   y: number,
   dye: string,
   mark: string,
   pattern: number,
-  scale = 1
+  scale = 1,
+  emblem = 0,
+  clip = `sw-${pattern}`
 ) {
   const w = 40 * scale,
     h = 34 * scale,
@@ -113,14 +120,26 @@ export function sailSwatch(
     cy = t + h / 2,
     bow = 2.5 * scale;
   const shape = `M${r2(l)} ${r2(t)}Q${r2(x)} ${r2(t + 3)} ${r2(l + w)} ${r2(t)}Q${r2(l + w + bow)} ${r2(cy)} ${r2(l + w)} ${r2(t + h)}Q${r2(x)} ${r2(t + h + 4)} ${r2(l)} ${r2(t + h)}Q${r2(l - bow)} ${r2(cy)} ${r2(l)} ${r2(t)}Z`;
+  const { band } = SAIL_MARKS,
+    fringe = 2 * SAIL_MARKS.fringe * DEVICE_BOX.half;
   return (
     `<path d="M${r2(l - 6)} ${r2(t - 1)}H${r2(l + w + 6)}" stroke="${INK.iron}" stroke-width="2.4" stroke-linecap="round"/>` +
     `<path d="${shape}" style="fill:${dye}"/>` +
     `<g style="fill:${mark}">${marks(pattern, l, t, w, h)}</g>` +
     (pattern === 2
-      ? `<path d="${cross(x, cy, w, h, SAIL_MARKS.fringe)}" style="fill:${dye}"/>`
+      ? device(
+          x,
+          cy,
+          h,
+          emblem,
+          `style="fill:${dye};stroke:${dye}" stroke-width="${fringe}" stroke-linejoin="round"`
+        )
       : '') +
-    `<path d="${cross(x, cy, w, h, 0)}" style="fill:${mark}"/>` +
+    device(x, cy, h, emblem, `style="fill:${mark}"`) +
+    (pattern === 1
+      ? `<clipPath id="${clip}"><rect x="${r2(l)}" y="${r2(t + h * band[0])}" width="${r2(w)}" height="${r2(h * (band[1] - band[0]))}"/></clipPath>` +
+        `<g clip-path="url(#${clip})">${device(x, cy, h, emblem, `style="fill:${dye}"`)}</g>`
+      : '') +
     `<path d="${shape}" fill="none" stroke="${INK.iron}" stroke-width="1.2" stroke-linejoin="round"/>`
   );
 }
@@ -175,7 +194,7 @@ export function liveryFace(id: string, w: number, c: LiveryChoices) {
       mid = centerOf('pattern', w, i);
     s +=
       `<g id="${id}-pattern-${i}" opacity="${faintness(c.patterns[i])}"><rect x="${r2(x)}" y="${r2(y)}" width="${r2(cw)}" height="${h}" fill="transparent"/>` +
-      `<g class="face dyed">${sailSwatch(mid.x, mid.y, 'var(--dye)', 'var(--mark)', i, 0.95)}</g></g>`;
+      `<g class="face dyed">${sailSwatch(mid.x, mid.y, 'var(--dye)', 'var(--mark)', i, 0.95, c.emblem, `${id}-band-${i}`)}</g></g>`;
   });
   for (let i = 0; i < EMBLEMS; i++) {
     const { x, y, w: cw, h } = cell('emblem', w, i),
@@ -199,6 +218,10 @@ export function setLivery(
   const [dye, mark] = liveryColors(c.livery);
   root.style.setProperty('--dye', dye);
   root.style.setProperty('--mark', mark);
+  const outline = DEVICES[deviceOf(c.emblem)];
+  root.querySelectorAll('.sw-device').forEach((path) => {
+    if (path.getAttribute('d') !== outline) path.setAttribute('d', outline);
+  });
   for (const kind of KINDS) {
     swatchOf(c, kind).forEach((s, i) =>
       svg
