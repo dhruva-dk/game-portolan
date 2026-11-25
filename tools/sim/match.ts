@@ -13,7 +13,7 @@ import { STILL } from '../../src/sim/hands.ts';
 import { rulesOf } from '../../src/sim/rules.ts';
 import type { MatchSetup } from '../../src/sim/setup.ts';
 import { closedBy } from '../../src/sim/storm.ts';
-import { RACE } from '../../src/sim/teams.ts';
+import { MATCH_END } from '../../src/sim/tuning.ts';
 import { berths } from '../../src/sim/spawn.ts';
 import type { Waters } from '../../src/sim/waters.ts';
 import { CASCADES } from '../../src/world/cascades.ts';
@@ -136,7 +136,7 @@ function sail(
         debugOf(m).standIn(k.id, standIn(hash(seed, k.id), sc.thumb));
       }
   const rules = rulesOf(setup.storm),
-    end = sc.seconds ?? closedBy(rules.storm) + RACE.overtime + 60;
+    end = sc.seconds ?? closedBy(rules.storm) + MATCH_END.overtime + 60;
   const events = dir ? lines(join(dir, 'events.jsonl')) : null,
     ships = dir ? lines(join(dir, 'ships.jsonl')) : null;
   const seen = watch(state, brainOf, waters.depth, players),

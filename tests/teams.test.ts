@@ -11,7 +11,8 @@ import {
   type Strike,
 } from '../src/sim/battle.ts';
 import { mind, think } from '../src/sim/bot.ts';
-import { RACE, mates, over } from '../src/sim/teams.ts';
+import { mates, over } from '../src/sim/teams.ts';
+import { MATCH_END } from '../src/sim/tuning.ts';
 import { afloat, stepFleet, type Vessel } from '../src/sim/contact.ts';
 import { STEP } from '../src/sim/fixed.ts';
 import { gunOf, laid } from '../src/sim/gun.ts';
@@ -316,8 +317,8 @@ test('a race is over when every ship afloat is of one team, or none is; or calle
   assert.equal(over(teams, [2, 3], -400), true, 'one team, both ships');
   assert.equal(over(teams, [5], -400), true);
   assert.equal(over(teams, [], -400), true, 'none afloat');
-  assert.equal(over(teams, [1, 2], RACE.overtime - STEP), false);
-  assert.equal(over(teams, [1, 2], RACE.overtime), true, 'called');
+  assert.equal(over(teams, [1, 2], MATCH_END.overtime - STEP), false);
+  assert.equal(over(teams, [1, 2], MATCH_END.overtime), true, 'called');
 });
 
 test('the finishing order: the afloat by sinkings, then share, then id; the sunk, last sunk first', () => {
@@ -337,7 +338,7 @@ test('the finishing order: the afloat by sinkings, then share, then id; the sunk
 
 test("a race's tally: shots fired and landed (a ram is no shot), damage dealt and taken (a ram's too), the places", () => {
   const teams = [0, 0, 0, 0, 1, 1, 1, 1];
-  const tally = () => createTally(teams, 400),
+  const tally = () => createTally(teams, [400]),
     t = tally();
   assert.deepEqual(t.teams, teams);
   const strike = (shooter: number, struck: number, ram: boolean): Strike => ({
@@ -365,6 +366,8 @@ test("a race's tally: shots fired and landed (a ram is no shot), damage dealt an
     ].filter((s) => !alive.includes(s.id)),
     loot,
     share: (id: number) => id / 100,
+    teamShare: (id: number) => id / 100,
+    shares: () => [0.5, 0.25],
   });
   t.settle(
     [shot, shot, { ...shot, shooter: 4 }],
@@ -406,14 +409,20 @@ test("a race's tally: shots fired and landed (a ram is no shot), damage dealt an
   assert.deepEqual(tallied(6), [0, 0, 0, 0]);
   assert.equal(r.seconds, 61);
   assert.match(r.hash, /^[0-9a-f]{8}$/);
-  const hashOf = (loot: number) => {
+  const hashOf = (loot: number, fired = 3) => {
     const again = tally();
-    again.settle([], [], standing([0, 1, 2, 3], loot));
+    again.settle(
+      [shot, shot, { ...shot, shooter: 4 }].slice(0, fired),
+      [strike(1, 4, false)],
+      standing([0, 1, 2, 3, 4], 9)
+    );
+    again.settle([], last, standing([0, 1, 2, 3], loot));
     return again.made()?.hash;
   };
   assert.equal(hashOf(9), r.hash);
-  assert.notEqual(hashOf(8), r.hash);
-  const late = createTally(teams, 61 - RACE.overtime);
+  assert.notEqual(hashOf(8), r.hash, 'the state is in it');
+  assert.notEqual(hashOf(9, 2), r.hash, 'and the tally');
+  const late = createTally(teams, [61 - MATCH_END.overtime]);
   late.settle([], [], standing([0, 1, 2, 3, 4], 9));
   assert.deepEqual(
     late

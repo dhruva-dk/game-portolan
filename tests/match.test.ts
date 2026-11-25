@@ -1,7 +1,7 @@
 import { test } from 'node:test';
+import { MATCH_END } from '../src/sim/tuning.ts';
 import assert from 'node:assert/strict';
 import {
-  CREDIT,
   PLAYER,
   credited,
   startMatch,
@@ -207,8 +207,8 @@ test('its share of the water is what it held afloat, kept once it has sunk and i
 
 test("the Storm's sinking goes to the ship that last struck it, within CREDIT seconds; a ball's or a ram's always", () => {
   assert.equal(credited('storm', null), null);
-  assert.equal(credited('storm', { by: 3, ago: CREDIT - 0.1 }), 3);
-  assert.equal(credited('storm', { by: 3, ago: CREDIT + 0.1 }), null);
+  assert.equal(credited('storm', { by: 3, ago: MATCH_END.credit - 0.1 }), 3);
+  assert.equal(credited('storm', { by: 3, ago: MATCH_END.credit + 0.1 }), null);
   assert.equal(credited('shot', { by: 5, ago: 0 }), 5);
   assert.equal(credited('ram', { by: 5, ago: 60 }), 5);
 });
