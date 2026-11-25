@@ -9,6 +9,7 @@ import {
   runCareer,
   stateHash,
   table,
+  type TableRow,
   type CareerRun,
   type CareerScenario,
   type RaceLine,
@@ -17,6 +18,7 @@ import {
   type Told,
 } from './career.ts';
 import { runCareers } from './career-pool.ts';
+import { targets, type Targets } from './targets.ts';
 
 export type CareerFlags = {
   seed?: string;
@@ -43,6 +45,17 @@ const seasonText = (f: SeasonFigures) =>
     `  league (least / median / most): balances ${spreadOf(f.balances, coins)} · design levels ${spreadOf(f.levels, one)} · staff stars ${spreadOf(f.staff, one)} · repossessions ${f.repossessions}`,
     `  teams that have hired / built / signed a sponsor: ${f.acted.hired} / ${f.acted.built} / ${f.acted.signed} of ${LEAGUE.teams} · policy commands refused: 0`,
   ].join('\n');
+
+const targetLines = (t: Targets) => [
+  `figures over ${t.careers} career${t.careers === 1 ? '' : 's'} of ${t.seasons} season${t.seasons === 1 ? '' : 's'}:`,
+  `  seasons to reach the top 10: ${t.top10.each.map((s) => s ?? 'never').join(', ')} · median ${t.top10.median ?? 'never'}`,
+  `  your standing after each season: ${t.standing.map((s) => `${s.season}: ${s.each.join(' ')}`).join(' · ')}`,
+  `  your lowest balance in the first ${t.lowest.races} races: ${t.lowest.each.map(coins).join(', ')} · least ${coins(t.lowest.least)}`,
+  `  rival teams repossessed a season: ${t.rivals.toFixed(2)}`,
+  `  richest team's balance: ${t.richest.each.map(coins).join(', ')} · most ${coins(t.richest.most)}`,
+  `  mean design level: top five ${one(t.levels.top)} · bottom five ${one(t.levels.bottom)}`,
+  `  mean staff stars: top five ${t.stars.top.toFixed(2)}`,
+];
 
 function printTable(state: CareerState) {
   console.log(' pos  team                            points   balance  level');
@@ -97,8 +110,10 @@ export async function runCareerScenario(
     ? runs.map((run, k) => runCareer(run, (t) => tell(k, t)))
     : await runCareers(runs, workers, tell);
   const wall = performance.now() - began;
+  const tables: TableRow[][] = [];
   states.forEach((state, k) => {
     const hash = stateHash(state);
+    tables.push(table(state));
     if (sc.kind === 'season') {
       console.log(runs.length > 1 ? `table for ${seeds[k]}:` : 'table:');
       printTable(state);
@@ -107,10 +122,17 @@ export async function runCareerScenario(
       seed: seeds[k],
       hash,
       told: told[k],
-      table: table(state),
+      table: tables[k],
     });
     writeJson(join(dir, `state-${k + 1}.json`), state);
     console.log(`final state hash ${hash}  (seed ${seeds[k]})`);
   });
+  if (sc.kind === 'career') {
+    const t = targets(
+      told.map((lines, k) => ({ told: lines, table: tables[k] }))
+    );
+    writeJson(join(dir, 'targets.json'), t);
+    for (const line of targetLines(t)) console.log(line);
+  }
   console.log(`wall: ${one(wall / 1000)} s  ${dir}`);
 }

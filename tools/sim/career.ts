@@ -127,6 +127,7 @@ export type SeasonFigures = {
   levels: Spread;
   staff: Spread;
   repossessions: number;
+  rivals: number;
   acted: { hired: number; built: number; signed: number };
 };
 
@@ -176,6 +177,7 @@ function raceLine(state: CareerState, ms: number): RaceLine {
 function seasonFigures(
   state: CareerState,
   repossessions: number,
+  rivals: number,
   acted: Acted
 ): SeasonFigures {
   const yours = state.teams[YOURS];
@@ -189,6 +191,7 @@ function seasonFigures(
     levels: spread(state.teams.map(designLevel)),
     staff: spread(state.teams.map((team) => staffStars(state, team))),
     repossessions,
+    rivals,
     acted: {
       hired: acted.hired.length,
       built: acted.built.length,
@@ -219,6 +222,7 @@ export type TableRow = {
   points: number;
   balance: number;
   level: number;
+  stars: number;
 };
 
 export const table = (state: CareerState): TableRow[] =>
@@ -229,6 +233,7 @@ export const table = (state: CareerState): TableRow[] =>
     points: state.points[team],
     balance: state.teams[team].balance,
     level: designLevel(state.teams[team]),
+    stars: staffStars(state, state.teams[team]),
   }));
 
 export function stateHash(state: CareerState): string {
@@ -245,7 +250,8 @@ export function runCareer(
   tell: (told: Told) => void = () => {}
 ): CareerState {
   let state = startCareer(run.seed);
-  let repossessions = 0;
+  let repossessions = 0,
+    rivals = 0;
   const acted: Acted = { hired: [], built: [], signed: [] };
   const ashore = (command: Command): void => {
     const before = state;
@@ -261,7 +267,9 @@ export function runCareer(
     const result = run.standin ? standInResult(setup) : sailed(setup);
     state = accepted(state, { type: 'RecordRace', team: YOURS, result });
     state = accepted(state, { type: 'MarkRead', team: YOURS });
-    repossessions += state.news.filter((e) => e.kind === 'repossessed').length;
+    const taken = state.news.filter((e) => e.kind === 'repossessed');
+    repossessions += taken.length;
+    rivals += taken.filter((e) => e.team !== YOURS).length;
     acted.hired = including(
       acted.hired,
       teamsTold(state, ['hired', 'poached'])
@@ -271,9 +279,10 @@ export function runCareer(
     if (state.phase === 'offseason') {
       tell({
         kind: 'season',
-        figures: seasonFigures(state, repossessions, acted),
+        figures: seasonFigures(state, repossessions, rivals, acted),
       });
       repossessions = 0;
+      rivals = 0;
     }
   }
   return state;
