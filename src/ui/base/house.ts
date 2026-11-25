@@ -42,6 +42,21 @@ export const MOTION = {
   stamp: { ms: 280, ease: POP, from: 1.9 },
   refuse: { ms: 280, shift: 3 },
   dealt: { from: 0.55, turn: -9 },
+  hold: {
+    delay: 380,
+    first: 150,
+    least: 40,
+    quicken: 0.86,
+    burst: [
+      { after: 60, times: 25 },
+      { after: 26, times: 5 },
+    ],
+  },
+  tick: { ms: 140, ease: OUT, rise: 3 },
+  bar: { ms: 160, ease: OUT },
+  suspense: { ms: 520 },
+  signed: { hold: 1000 },
+  seated: { ms: 420, ease: POP, drop: 22 },
   fade: { ms: 180, ease: 'ease' },
 } as const;
 
