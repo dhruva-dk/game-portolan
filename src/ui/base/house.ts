@@ -85,6 +85,17 @@ export const MOTION = {
   paid: { after: 560, ms: 1500, rise: 24 },
   inked: { ms: 300, ease: POP, after: 120, stagger: 80 },
   planet: { rise: 1700, fall: 950, slip: 1050, ink: 520 },
+  list: {
+    glide: 325,
+    rubber: 0.55,
+    bounce: 60,
+    settle: 95,
+    rest: 0.01,
+    sampled: 5,
+    margin: 3,
+    to: { ms: 520 },
+    thumb: { fade: 260, linger: 700 },
+  },
   fade: { ms: 180, ease: 'ease' },
 } as const;
 
