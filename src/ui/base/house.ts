@@ -137,7 +137,7 @@ export const MOTION = {
       shift: 70,
       turn: -5,
     },
-    place: { ms: 560, after: 120, stagger: 170, stamp: 300, from: 1.75 },
+    place: { ms: 560, after: 120, stagger: 170, stamp: 300 },
     punch: { ms: 230, ease: POP, from: 2.1, after: 90 },
     strike: { ms: 190, ease: OUT, after: 60, stagger: 210 },
     share: { ms: 420, after: 60 },

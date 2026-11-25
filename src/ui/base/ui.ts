@@ -246,8 +246,7 @@ const STYLE = `
 @keyframes tossed { to { transform: translate(-${MOTION.tossed.shift}px, ${MOTION.tossed.drop}px) rotate(${MOTION.tossed.turn}deg); opacity: 0 } }
 .ui .dealt-row { transform-box: fill-box; transform-origin: left center; animation: dealt-row ${MOTION.ranked.dealt.ms}ms ${MOTION.ranked.dealt.ease} var(--d, 0ms) both; }
 @keyframes dealt-row { from { transform: translateX(-${MOTION.ranked.dealt.shift}px) rotate(${MOTION.ranked.dealt.turn}deg); opacity: 0 } }
-.ui .stamped { transform-box: fill-box; transform-origin: center; animation: stamped ${MOTION.ranked.place.stamp}ms ${MOTION.stamp.ease} var(--d, 0ms) both; }
-@keyframes stamped { 0% { transform: none; opacity: .5 } 1% { transform: scale(${MOTION.ranked.place.from}); opacity: 1 } 100% { transform: none; opacity: 1 } }
+.ui .stamped { transform-box: fill-box; transform-origin: center; animation: stamp ${MOTION.ranked.place.stamp}ms ${MOTION.stamp.ease} var(--d, 0ms) both; }
 .ui .punched { transform-box: fill-box; transform-origin: center; animation: punched ${MOTION.ranked.punch.ms}ms ${MOTION.ranked.punch.ease} var(--d, 0ms) var(--n, 1) both; }
 @keyframes punched { 0% { transform: none } 1% { transform: scale(${MOTION.ranked.punch.from}) } 100% { transform: none } }
 .ui .struck-in { stroke-dasharray: 1; animation: struck-in ${MOTION.ranked.strike.ms}ms ${MOTION.ranked.strike.ease} var(--d, 0ms) both; }
@@ -354,9 +353,8 @@ const STYLE = `
 .ui #r-sea, .ui #r-wing-face, .ui #r-wing-cross { transform-box: fill-box; transform-origin: center; }
 .ui .wing-fill { transform-box: fill-box; transform-origin: 0 50%; transition: transform ${MOTION.bar.ms}ms ${MOTION.bar.ease}; }
 .ui #r-wing-cross { opacity: 0; }
-.ui #r-wing.sunk #r-wing-cross { opacity: 1; animation: stamped ${MOTION.stamp.ms}ms ${MOTION.stamp.ease} both; }
+.ui #r-wing.sunk #r-wing-cross { opacity: 1; animation: stamp ${MOTION.stamp.ms}ms ${MOTION.stamp.ease} both; }
 .ui #r-wing.sunk #r-wing-face { opacity: .45; filter: grayscale(1); }
-@keyframes stamped { from { opacity: 0; transform: scale(${MOTION.stamp.from}) rotate(-12deg) } }
 .ui .gust .on, .ui .gust .halo { opacity: 0; }
 .ui .gust .sign { opacity: .4; transition: opacity ${MOTION.fade.ms}ms ease; }
 .ui .gust.ready .sign { opacity: 1; }
