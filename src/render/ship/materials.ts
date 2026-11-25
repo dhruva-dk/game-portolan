@@ -28,7 +28,9 @@ import {
   sin,
   smoothstep,
   storage,
+  texture,
   varying,
+  vec2,
   vec3,
 } from 'three/tsl';
 import { read } from './instance.ts';
@@ -44,16 +46,21 @@ import { braced, bracedAbout, breath, type Cloth } from './cloth.ts';
 import { CLOTH } from './kit.ts';
 import { DYE_GLOW, TAR } from '../palette.ts';
 import { SAIL_MARKS } from '../snapshot.ts';
-import { MARKS } from '../../world/livery.ts';
+import { DEVICE_BOX, MARKS } from '../../world/livery.ts';
+import { ATLAS, ATLAS_ROWS, emblemAtlas } from './emblems.ts';
+import { YARDS, type Yard } from './sails.ts';
 import { createWood, shaded } from './wood.ts';
 import { line, type FloatNode, type Vec3Node } from '../tsl.ts';
 
 export const THROUGH = 0.55;
-const { arm: ARM, flare: FLARE, reach: REACH } = SAIL_MARKS,
+const { device: DEVICE } = SAIL_MARKS,
   PAINTED = 0.35;
 const CLOTHS = 26;
 const { stripes: STRIPES, fringe: FRINGE, band: BAND } = SAIL_MARKS;
 const UNSEEN = 0.06;
+const BLEED = 1.5;
+const widthOf = (yard: Yard) =>
+  (yard.len - 0.7 + yard.sail.foot) / 2 / yard.sail.drop;
 const ABACK = 0.3;
 const FLAP = 2.2,
   WAVES = 1.6;
@@ -72,6 +79,7 @@ export function createShipMaterials(
   canvas: Cloth
 ): ShipMaterials {
   const wood = createWood(light);
+  const atlas = emblemAtlas();
   const particles = storage(
     canvas.positions,
     'vec4',
@@ -247,6 +255,9 @@ export function createShipMaterials(
     turn(direction(mix(drawnNormal, simulatedNormal, share)))
   );
   const clothKind = varying(kind);
+  const sheet = varying(nrm.w.mul(127).round()),
+    device = varying(ship.emblem),
+    inked = varying(ship.ink);
   clothMaterial.colorNode = Fn(() => {
     const uvs = attribute('uv', 'vec2').mul(UV_RANGE);
     const seams = select(
@@ -275,20 +286,38 @@ export function createShipMaterials(
       smoothstep(ws.negate(), ws, float(0.5).sub(wave)),
       float(0)
     );
-    const c = abs(uvs.sub(0.5)).mul(2).div(REACH);
-    const pattee = (d: number) => {
-      const armX = c.y
-        .lessThan(mix(float(ARM + d), float(FLARE + d), c.x))
-        .and(c.x.lessThan(1 + d));
-      const armY = c.x
-        .lessThan(mix(float(ARM + d), float(FLARE + d), c.y))
-        .and(c.y.lessThan(1 + d));
-      return select(square.and(armX.or(armY)), float(1), float(0));
-    };
-    const mark = pattee(0);
+    const wide = YARDS.reduce<FloatNode>(
+      (w, yard, i) => select(sheet.lessThan(i + 0.5), w, float(widthOf(yard))),
+      float(widthOf(YARDS[0]))
+    );
+    const c = uvs
+      .sub(0.5)
+      .mul(2 / DEVICE)
+      .mul(vec2(wide, 1));
+    const p = c.mul(DEVICE_BOX.half).add(vec2(DEVICE_BOX.x, DEVICE_BOX.y));
+    const e = 0.5 / ATLAS.tile;
+    const tile = device.round().max(0);
+    const at = vec2(
+      tile.mod(ATLAS.columns).add(clamp(p.x.div(DEVICE_BOX.size), e, 1 - e)),
+      tile
+        .div(ATLAS.columns)
+        .floor()
+        .add(clamp(p.y.div(DEVICE_BOX.size), e, 1 - e))
+    ).div(vec2(ATLAS.columns, ATLAS_ROWS));
+    const field = select(
+      square.and(device.greaterThan(-0.5)),
+      float(0.5)
+        .sub(texture(atlas, at).r)
+        .mul(2 * ATLAS.spread),
+      float(ATLAS.spread)
+    ).sub(inked.sub(1).mul(BLEED));
+    const aa = max(fwidth(field), 1e-3);
+    const inside = (grow: number) =>
+      float(1).sub(smoothstep(aa.negate(), aa, field.sub(grow)));
+    const mark = inside(0).mul(inked);
     const marked = max(
-      band,
-      max(mark, stripe.mul(float(1).sub(pattee(FRINGE))))
+      band.mul(float(1).sub(mark)).add(mark.mul(float(1).sub(band))),
+      stripe.mul(float(1).sub(inside(FRINGE * DEVICE_BOX.half)))
     );
     const ink = select(
       abs(luminance(ship.paint).sub(luminance(ship.sail))).lessThan(UNSEEN),

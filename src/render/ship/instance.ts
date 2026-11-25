@@ -23,6 +23,8 @@ export interface Instance {
   phase: number;
   berth: number;
   share: number;
+  emblem: number;
+  ink: number;
 }
 
 export function pack(a: Float32Array, o: number, s: Instance) {
@@ -40,7 +42,8 @@ export function pack(a: Float32Array, o: number, s: Instance) {
   a[o + 19] = s.phase;
   a[o + 20] = s.berth;
   a[o + 21] = s.share;
-  a[o + 22] = a[o + 23] = 0;
+  a[o + 22] = s.emblem;
+  a[o + 23] = s.ink;
 }
 
 export function read() {
@@ -62,5 +65,7 @@ export function read() {
     phase: cloth.w,
     berth: berth.x,
     share: berth.y,
+    emblem: berth.z,
+    ink: berth.w,
   };
 }

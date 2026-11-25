@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createState, debugOf } from '../src/play/state.ts';
 import { lookOf } from '../src/play/colors.ts';
 import { teamLiveries } from '../src/app/race.ts';
-import { COLORS, LIVERY } from '../src/world/livery.ts';
+import { COLORS, EMBLEMS, LIVERY } from '../src/world/livery.ts';
 import { STILL } from '../src/sim/hands.ts';
 import { PLAYER } from '../src/sim/match.ts';
 import { watersAt } from '../src/sim/waters.ts';
@@ -55,18 +55,18 @@ function loop(at: number, state = createState(waters, start, EVEN_SHIP)) {
   return { closed: null, did: null, state };
 }
 
-test('its livery: worn at anchor at once; its ship in it at sea, every team in the livery of its index round it, its water its dye', () => {
+test('its livery: worn at anchor at once; its ship in it at sea, every team in the livery and emblem of its index round it, its water its dye', () => {
   const state = createState(waters, start, EVEN_SHIP),
     chosen = { dye: 4, pattern: 2 };
   const playerLook = () => state.drawn(1).find((d) => d.id === PLAYER)!.look;
   state.anchor(start);
   assert.deepEqual(
     playerLook(),
-    lookOf(LIVERY),
-    'vermilion, plain, till it is chosen'
+    lookOf(LIVERY, 0),
+    'vermilion, plain, the first emblem, till it is chosen'
   );
   state.wear(chosen);
-  assert.deepEqual(playerLook(), lookOf(chosen), 'at anchor, in it at once');
+  assert.deepEqual(playerLook(), lookOf(chosen, 0), 'at anchor, in it at once');
   const liveries = teamLiveries(race, state.worn());
   state.start(race, liveries);
   const drawn = state.drawn(1);
@@ -74,10 +74,10 @@ test('its livery: worn at anchor at once; its ship in it at sea, every team in t
   for (const d of drawn)
     assert.deepEqual(
       d.look,
-      lookOf(liveries[race.ships[d.id].team]),
+      lookOf(liveries[race.ships[d.id].team], race.ships[d.id].team % EMBLEMS),
       `ship ${d.id}`
     );
-  assert.deepEqual(playerLook(), lookOf(chosen));
+  assert.deepEqual(playerLook(), lookOf(chosen, 0));
   for (const d of drawn)
     assert.equal(
       race.ships[d.id].team === race.ships[PLAYER].team,
@@ -89,10 +89,10 @@ test('its livery: worn at anchor at once; its ship in it at sea, every team in t
   assert.deepEqual(sea.colors[PLAYER], COLORS[chosen.dye]);
   drawn.forEach((d) => assert.deepEqual(sea.colors[d.id], d.look.sail));
   state.wear(LIVERY);
-  assert.deepEqual(playerLook(), lookOf(chosen));
+  assert.deepEqual(playerLook(), lookOf(chosen, 0));
   state.anchor(start);
   state.wear({ dye: 99, pattern: 1 });
-  assert.deepEqual(playerLook(), lookOf({ dye: 0, pattern: 1 }));
+  assert.deepEqual(playerLook(), lookOf({ dye: 0, pattern: 1 }, 0));
 });
 
 test('a ship sunk in a step lays, closes and cuts nothing in it: its water only drains', () => {

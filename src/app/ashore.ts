@@ -22,7 +22,7 @@ import {
   winterView,
 } from '../career/views/offseason.ts';
 import { moneyView, resultView } from '../career/views/result.ts';
-import { lookOf } from '../play/colors.ts';
+import { dressOf, lookOf } from '../play/colors.ts';
 import { createGame } from '../play/game.ts';
 import { PARTS, openingPose, type Framing } from '../play/anchorage.ts';
 import { sunAt } from '../world/sun.ts';
@@ -142,9 +142,9 @@ export async function ashore(
   const { game, input } = crew;
   const repaint = painter(
     (look) => game.paint(look),
-    lookOf(career.teams[YOURS].livery)
+    lookOf(dressOf(career.teams[YOURS]))
   );
-  game.wear(career.teams[YOURS].livery);
+  game.wear(dressOf(career.teams[YOURS]));
   game.arm(career.teams[YOURS].ships[0].gun);
   uiLayer();
 
@@ -310,7 +310,7 @@ export async function ashore(
       if (painting) {
         painting = false;
         rise(paint.el, false);
-        repaint(lookOf(state.teams[YOURS].livery));
+        repaint(lookOf(dressOf(state.teams[YOURS])));
         fade(ship.el, true);
         atStop(ship.stop());
         return;
@@ -382,8 +382,14 @@ export async function ashore(
         if (index === null) game.stage(null, true);
         else atStop(index);
       },
-      wear(livery) {
-        repaint(lookOf(livery ?? state.teams[YOURS].livery));
+      wear(livery, emblem) {
+        repaint(
+          lookOf(
+            livery === null
+              ? dressOf(state.teams[YOURS])
+              : { ...livery, emblem: emblem ?? state.teams[YOURS].emblem }
+          )
+        );
       },
       planet(on) {
         aloft = on;
@@ -391,7 +397,7 @@ export async function ashore(
       jolt(kind) {
         game.jolt(kind);
         if (kind === 'painted')
-          repaint(lookOf(state.teams[YOURS].livery), true);
+          repaint(lookOf(dressOf(state.teams[YOURS])), true);
       },
     },
     chart: () => chart,
@@ -433,14 +439,18 @@ export async function ashore(
         founding = null;
         rise(leaving, false);
         window.setTimeout(() => leaving.remove(), MOTION.sheet.leave);
-        repaint(lookOf(state.teams[YOURS].livery));
+        repaint(lookOf(dressOf(state.teams[YOURS])));
         game.stage(null, true);
         fade(lobby.el, true);
         settingsScreen.open();
       },
       scene: {
-        wear(livery) {
-          repaint(livery === null ? PLAIN : lookOf(livery));
+        wear(livery, emblem) {
+          repaint(
+            livery === null
+              ? { ...PLAIN, emblem: emblem ?? PLAIN.emblem }
+              : lookOf({ ...livery, emblem: emblem ?? undefined })
+          );
         },
       },
     };

@@ -26,7 +26,7 @@ import type { Hull } from '../world/swell.ts';
 import type { PoseOut, ShipPose } from '../world/pose.ts';
 import { hash } from '../world/random.ts';
 import { R, add, scale, type Vec3 } from '../world/sphere.ts';
-import { LIVERY, type Livery } from '../world/livery.ts';
+import { EMBLEMS, LIVERY, type Livery } from '../world/livery.ts';
 import type { Race } from './player.ts';
 import { lookOf, worn } from './colors.ts';
 import { createDrawing } from './drawing.ts';
@@ -128,7 +128,13 @@ export function createState(
   const dressed = (setup: MatchSetup, liveries: readonly Livery[]) => {
     cleared(false);
     for (const { id } of view().vessels())
-      dress(id, lookOf(liveries[setup.ships[id].team] ?? LIVERY));
+      dress(
+        id,
+        lookOf(
+          liveries[setup.ships[id].team] ?? LIVERY,
+          setup.ships[id].team % EMBLEMS
+        )
+      );
   };
 
   const state = {
@@ -250,7 +256,7 @@ export function createState(
     anchor(start: { at: Vec3; bearing: number }): ShipPose {
       next((w) => createMooring(w, start, moored));
       cleared(true);
-      dress(PLAYER, lookOf(livery));
+      dress(PLAYER, lookOf(livery, 0));
       return view().after(PLAYER)!;
     },
     moor(id: number, berth: { at: Vec3; heading: Vec3 } | null) {
@@ -263,7 +269,7 @@ export function createState(
         p = pose(ship, r);
       consort = {
         id,
-        look: lookOf(livery),
+        look: lookOf(livery, 0),
         ship,
         ride: r,
         before: p,
@@ -272,8 +278,9 @@ export function createState(
     },
     wear(l: Livery): Livery {
       livery = worn(l);
-      if (anchored && view().poses(PLAYER)) looks.set(PLAYER, lookOf(livery));
-      if (consort) consort.look = lookOf(livery);
+      if (anchored && view().poses(PLAYER))
+        looks.set(PLAYER, lookOf(livery, 0));
+      if (consort) consort.look = lookOf(livery, 0);
       return livery;
     },
     worn: (): Livery => livery,
@@ -296,7 +303,7 @@ export function createState(
       if (rig) debugOfMatch(match).rig(rig);
       debugOfMatch(match).atSea(start, others);
       cleared(false);
-      dress(PLAYER, lookOf(livery));
+      dress(PLAYER, lookOf(livery, 0));
       others.forEach((o, i) => dress(i + 1, o.look));
       return view().after(PLAYER)!;
     },

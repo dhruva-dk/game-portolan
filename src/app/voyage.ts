@@ -2,6 +2,7 @@ import type { Hearing } from '../audio/listen.ts';
 import { matchSetup } from '../career/fit.ts';
 import { seatHolder } from '../career/lookup.ts';
 import { YOURS, type CareerState } from '../career/state.ts';
+import { dressOf } from '../play/colors.ts';
 import { IDLE, type End, type Screen } from '../play/player.ts';
 import { createReferee } from '../play/referee.ts';
 import { loaded } from '../render/load.ts';
@@ -44,7 +45,7 @@ export async function voyage(
   const { game, input, audio, berth } = crew;
   const setup = matchSetup(career, { hands: 'player' });
   const berthed = await berth(setup.match, setup.ships.length);
-  const liveries = career.teams.map((t) => t.livery);
+  const liveries = career.teams.map(dressOf);
   const device = deviceStore();
   let settings = keptSettings(device);
   input.fire(false);

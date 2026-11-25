@@ -143,6 +143,8 @@ export function createFleet(light: Light, wind: Wind, capacity: number) {
     wind: [0, 0],
     paint: [0, 0, 0],
     sail: [0, 0, 0],
+    emblem: -1,
+    ink: 1,
     pattern: 0,
     phase: 0,
     berth: 0,
@@ -261,6 +263,8 @@ export function createFleet(light: Light, wind: Wind, capacity: number) {
       drawn.paint = look.paint;
       drawn.sail = look.sail;
       drawn.pattern = PATTERNS[look.pattern];
+      drawn.emblem = look.emblem;
+      drawn.ink = look.ink ?? 1;
       drawn.phase = phaseOf(i);
       drawn.berth = drawn.share = 0;
       for (let b = 0; b < BERTHS; b++) {
@@ -313,6 +317,7 @@ export function createFleet(light: Light, wind: Wind, capacity: number) {
         r.look.paint = looks[i].paint;
         r.look.sail = looks[i].sail;
         r.look.pattern = looks[i].pattern;
+        r.look.emblem = looks[i].emblem;
         r.look.brace = braces[i];
         afloat.push(r);
       }

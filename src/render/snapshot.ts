@@ -20,12 +20,15 @@ export interface Look {
   paint: Vec3;
   sail: Vec3;
   pattern: 'plain' | 'band' | 'stripes';
+  emblem: number;
+  ink?: number;
 }
 
 export const SAIL_MARKS = {
   arm: 0.13,
   flare: 0.34,
   reach: 0.66,
+  device: 0.8,
   band: [0.36, 0.64],
   stripes: 5,
   fringe: 0.2,
