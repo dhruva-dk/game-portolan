@@ -85,15 +85,3 @@ export function onPressed(layer: HTMLElement, act: () => void) {
     true
   );
 }
-
-export function region(
-  el: SVGSVGElement,
-  id: string,
-  act: (e: PointerEvent) => void
-): SVGElement | null {
-  const r = el.querySelector<SVGElement>(`#${id}`);
-  if (!r) return null;
-  r.classList.add('press');
-  onTap(r, act);
-  return r;
-}

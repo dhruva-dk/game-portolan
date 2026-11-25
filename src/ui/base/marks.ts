@@ -160,11 +160,6 @@ export const ram = (x: number, y: number, s = 1) =>
   `<path d="M-17 -2L-3 -2L1 2L-3 7L-15 7Z" fill="url(#h-iron)"/><path d="M17 -2L3 -2L-1 2L3 7L15 7Z" fill="url(#h-iron)" transform="scale(1 -1) translate(0 -5)"/>` +
   `<path d="M0 -12l2 6l5 -4l-2 6l6 1l-6 2l3 5" fill="none" stroke="${INK.rubric}" stroke-width="1.6"/></g>`;
 
-export const pencil = (x: number, y: number, s: number) =>
-  `<g transform="translate(${x} ${y}) rotate(-45) scale(${s / 24})" stroke="${INK.iron}" stroke-width="1.3" stroke-linejoin="round">` +
-  `<path d="M-6 -3.2H9V3.2H-6Z" fill="${WASH.ochre}"/><path d="M9 -3.2H12.5V3.2H9Z" fill="${WASH.vermilion}"/>` +
-  `<path d="M-6 -3.2L-12 0L-6 3.2Z" fill="${PAPER}"/><path d="M-10 -1.1L-12 0L-10 1.1Z" fill="${INK.iron}"/></g>`;
-
 export const dyePot = (x: number, y: number, s: number, dye: string) =>
   `<g transform="translate(${x} ${y}) scale(${s / 24})" stroke="${INK.iron}" stroke-linejoin="round" stroke-linecap="round">` +
   `<path d="M3 -3L10 -12" stroke-width="2.2"/>` +
