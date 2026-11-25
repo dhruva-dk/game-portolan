@@ -215,6 +215,47 @@ const STYLE = `
 .ui .inked { transform-box: fill-box; transform-origin: center; animation: inked ${MOTION.inked.ms}ms ${MOTION.inked.ease} calc(${MOTION.inked.after}ms + var(--i, 0) * ${MOTION.inked.stagger}ms) both; }
 @keyframes inked { from { transform: scale(1.9) rotate(-30deg); opacity: 0 } }
 @keyframes needle { from { transform: rotate(-38deg) } to { transform: rotate(52deg) } }
+.ui .landed { animation: landed ${MOTION.landed.ms}ms ${MOTION.landed.ease} var(--d, 0ms) both; }
+@keyframes landed { from { transform: translateY(-${MOTION.landed.drop}px) rotate(${MOTION.landed.turn}deg) scale(${MOTION.landed.from}); opacity: 0 } 40% { opacity: 1 } }
+.ui .tossed, .ui .tossed * { pointer-events: none !important; }
+.ui .tossed { animation: tossed ${MOTION.tossed.ms}ms ${MOTION.tossed.ease} both; }
+@keyframes tossed { to { transform: translate(-${MOTION.tossed.shift}px, ${MOTION.tossed.drop}px) rotate(${MOTION.tossed.turn}deg); opacity: 0 } }
+.ui .dealt-row { transform-box: fill-box; transform-origin: left center; animation: dealt-row ${MOTION.ranked.dealt.ms}ms ${MOTION.ranked.dealt.ease} var(--d, 0ms) both; }
+@keyframes dealt-row { from { transform: translateX(-${MOTION.ranked.dealt.shift}px) rotate(${MOTION.ranked.dealt.turn}deg); opacity: 0 } }
+.ui .stamped { transform-box: fill-box; transform-origin: center; animation: stamped ${MOTION.ranked.place.stamp}ms ${MOTION.stamp.ease} var(--d, 0ms) both; }
+@keyframes stamped { 0% { transform: none; opacity: .5 } 1% { transform: scale(${MOTION.ranked.place.from}); opacity: 1 } 100% { transform: none; opacity: 1 } }
+.ui .punched { transform-box: fill-box; transform-origin: center; animation: punched ${MOTION.ranked.punch.ms}ms ${MOTION.ranked.punch.ease} var(--d, 0ms) var(--n, 1) both; }
+@keyframes punched { 0% { transform: none } 1% { transform: scale(${MOTION.ranked.punch.from}) } 100% { transform: none } }
+.ui .struck-in { stroke-dasharray: 1; animation: struck-in ${MOTION.ranked.strike.ms}ms ${MOTION.ranked.strike.ease} var(--d, 0ms) both; }
+@keyframes struck-in { from { stroke-dashoffset: 1 } to { stroke-dashoffset: 0 } }
+.ui .stamp-in { transform-box: fill-box; transform-origin: center; animation: stamp ${MOTION.stamp.ms}ms ${MOTION.stamp.ease} var(--d, 0ms) both; }
+.ui .appear { animation: appear ${MOTION.fade.ms}ms ease var(--d, 0ms) both; }
+@keyframes appear { from { opacity: 0 } }
+.ui .risen { animation: risen ${MOTION.ranked.podium.ms}ms ${MOTION.ranked.podium.ease} var(--d, 0ms) both; }
+@keyframes risen { from { transform: translateY(var(--rise, 0px)) } }
+.ui .burst-in { transform-box: fill-box; transform-origin: center; animation: burst-in ${MOTION.ranked.burst.ms}ms ${MOTION.ranked.burst.ease} var(--d, 0ms) both; }
+@keyframes burst-in { from { transform: scale(0) rotate(-120deg); opacity: 0 } 60% { transform: scale(1.3) rotate(8deg); opacity: 1 } }
+.ui .ring-out { transform-box: fill-box; transform-origin: center; animation: ring-out ${MOTION.ranked.burst.ring}ms ${MOTION.ranked.dealt.ease} var(--d, 0ms) both; }
+@keyframes ring-out { from { transform: scale(.4); opacity: 0 } 15% { opacity: .9 } to { transform: scale(1.7); opacity: 0 } }
+.ui .sealed-in { transform-box: fill-box; transform-origin: center; transform: rotate(${MOTION.ledger.seal.rest}deg); animation: sealed-in ${MOTION.ledger.seal.ms}ms ${MOTION.ledger.seal.ease} var(--d, 0ms) both; }
+@keyframes sealed-in { from { transform: scale(${MOTION.ledger.seal.from}) rotate(${MOTION.ledger.seal.turn}deg); opacity: 0 } }
+.ui .ruled { transform-box: fill-box; transform-origin: left center; animation: ruled ${MOTION.ledger.rule.ms}ms ${MOTION.ledger.rule.ease} var(--d, 0ms) both; }
+@keyframes ruled { from { transform: scaleX(0) } }
+.ui .totaled { transform-box: fill-box; transform-origin: center; animation: totaled ${MOTION.ledger.total.ms}ms ${MOTION.ledger.total.ease} var(--d, 0ms) both; }
+@keyframes totaled { from { transform: translateY(-${MOTION.ledger.total.drop}px) scale(${MOTION.ledger.total.from}); opacity: 0 } }
+.ui .thud { animation: thud ${MOTION.ledger.thud.ms}ms ease-out var(--d, 0ms) both; }
+@keyframes thud { 30% { transform: translateY(${MOTION.ledger.thud.drop}px) scale(${MOTION.ledger.thud.give}) } }
+.ui .thrown { transform: rotate(${MOTION.thrown.rest}deg); animation: thrown ${MOTION.thrown.ms}ms ${MOTION.thrown.ease} both; }
+@keyframes thrown { from { transform: rotate(${-360 * MOTION.thrown.turns}deg) scale(${MOTION.thrown.from}); opacity: 0 } 12% { opacity: 1 }
+  76% { transform: rotate(${MOTION.thrown.rest - 4}deg) scale(1.08) } 88% { transform: rotate(${MOTION.thrown.rest}deg) scale(${MOTION.thrown.slap}) } to { transform: rotate(${MOTION.thrown.rest}deg) } }
+.ui .puff { animation: puff ${MOTION.thrown.ms * 0.6}ms ease-out ${MOTION.thrown.ms * 0.8}ms both; }
+@keyframes puff { from { transform: scale(.92); opacity: 0 } 25% { opacity: .55 } to { transform: scale(1.12); opacity: 0 } }
+.ui .printed { animation: printed ${MOTION.printed.ms}ms ${MOTION.printed.ease} calc(${MOTION.printed.after}ms + var(--i, 0) * ${MOTION.printed.stagger}ms) both; }
+@keyframes printed { from { transform: translateY(${MOTION.printed.shift}px); opacity: 0; filter: blur(1.2px) } }
+.ui .turning { transform-box: fill-box; transform-origin: center; animation: turning ${MOTION.turning.ms}ms linear infinite; }
+@keyframes turning { to { transform: rotate(360deg) } }
+.ui .link .under { transition: stroke-width ${MOTION.press.ms}ms ease; }
+.ui .link.down .under { stroke-width: 2.4; }
 `;
 
 export function show(el: HTMLElement, on: boolean) {

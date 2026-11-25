@@ -13,13 +13,16 @@ export type ScreenName =
   | 'opponents'
   | 'teamSheet'
   | 'planet'
-  | 'settings';
+  | 'settings'
+  | 'result'
+  | 'paper';
 
 export type ScreenArgument = {
   role?: Role;
   person?: number;
   team?: number;
   stop?: number;
+  step?: number;
 };
 
 export type LobbyPort = {
