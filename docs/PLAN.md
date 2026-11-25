@@ -1922,27 +1922,27 @@ Goal: the numbers. Only tuning files change in this milestone.
 
 ### Targets
 
-| Target | Measured by | Band | At the start (M7.1) |
-|---|---|---|---|
-| Time to sink, two ships at level-50 values, stats 10 | `duel`, median over 20 seeds | 8 to 12 s | 17.48 s |
-| Match length at a 3-star storm | `match`, median over 10 seeds | 270 to 330 s | 291.1 s |
-| A level-100 ship against a level-0 ship, equal stats | `duel`, 10 seeds | at least 9 wins | 10 |
-| A stats-18 driver at level 30 against a stats-6 driver at level 60 | `duel`, 20 seeds | 6 to 14 wins | 18.5 |
-| Hit rate of Gunnery-20 ships over Gunnery-1 ships, in a match where teams alternate between the two | `match` on `evenSetup` | at least 3× | 2.23× (78% against 35%) |
-| Seasons for your seat (sensible policy, stats-10 bot) to reach the top 10 from 40th | `career`, median over 5 seeds | 4 to 6 | never (never, 9, 9, never, never in 10 seasons) |
-| Your seat's standing after 5 seasons with your policy off | `career`, 5 seeds | 36th or worse | 34th, 38th, 35th, 39th, 40th |
-| Your balance in the first five races under the sensible policy | `career`, 5 seeds | never below 0 | lowest 1,634 |
-| Rival teams repossessed per season | `career`, mean over 10 seasons | 0.2 to 3 | 0.00 |
-| Richest team's balance after 10 seasons | `career` | under 300,000 | 1,040,483 |
-| Mean design level after 10 seasons | `career` | top five teams 70 to 95; bottom five teams 5 to 30 | top five 64.4; bottom five 45.9 |
-| Mean staff stars after 10 seasons | `career` | top five teams 3.5 to 4.5 | 2.79 |
+| Target | Measured by | Band | At the start (M7.1) | After tuning |
+|---|---|---|---|---|
+| Time to sink, two ships at level-50 values, stats 10 | `duel`, median over 20 seeds | 8 to 12 s | 17.48 s | 8.8 s (8.65 s over 60 seeds) |
+| Match length at a 3-star storm | `match`, median over 10 seeds | 270 to 330 s | 291.1 s | 290.6 s |
+| A level-100 ship against a level-0 ship, equal stats | `duel`, 10 seeds | at least 9 wins | 10 | 10 |
+| A stats-18 driver at level 30 against a stats-6 driver at level 60 | `duel`, 20 seeds | 6 to 14 wins | 18.5 | 14 (13.3 in 20 over 60 seeds) |
+| Hit rate of Gunnery-20 ships over Gunnery-1 ships, in a match where teams alternate between the two | `match` on `evenSetup` | at least 3× | 2.23× (78% against 35%) | 3.46× (3.68× over 30 matches: 81% against 22%) |
+| Seasons for your seat (sensible policy, stats-10 bot) to reach the top 10 from 40th | `career`, median over 5 seeds | 4 to 6 | never (never, 9, 9, never, never in 10 seasons) | |
+| Your seat's standing after 5 seasons with your policy off | `career`, 5 seeds | 36th or worse | 34th, 38th, 35th, 39th, 40th | |
+| Your balance in the first five races under the sensible policy | `career`, 5 seeds | never below 0 | lowest 1,634 | |
+| Rival teams repossessed per season | `career`, mean over 10 seasons | 0.2 to 3 | 0.00 | |
+| Richest team's balance after 10 seasons | `career` | under 300,000 | 1,040,483 | |
+| Mean design level after 10 seasons | `career` | top five teams 70 to 95; bottom five teams 5 to 30 | top five 64.4; bottom five 45.9 | |
+| Mean staff stars after 10 seasons | `career` | top five teams 3.5 to 4.5 | 2.79 | |
 
 The starting figures were measured at commit `6946e2e3`. The harness sails each duel seed twice, with the two ships' places swapped, so a count of wins out of 20 seeds is half the duels won out of 40. The career figures are from stand-in results on seeds `1` to `1-5`: `npm run sim -- career --seasons 10 --runs 5 --standin`, and `npm run sim -- idle --runs 5 --standin` for the policy switched off.
 
 ### Procedure
 
 - [x] **M7.1 Record the starting figures** for every target.
-- [ ] **M7.2 Tune the sea** (the first five targets), changing only `sim/tuning.ts` and the §1.4.1 table in `career/tuning.ts`.
+- [x] **M7.2 Tune the sea** (the first five targets), changing only `sim/tuning.ts` and the §1.4.1 table in `career/tuning.ts`. Done by two numbers: the Gun line's damage factor runs 0.6 to 4.6 (it ran 0.8 to 1.4), and a driver's aim skill runs −0.55 at Gunnery 1 to 1 at Gunnery 20 (it ran 0 to 1). The steeper damage is what lets level 60 stand against a far better driver at level 30; the lower aim is what opens the gap between Gunnery 1 and 20. Other levers were tried and did not move the targets: hull, reload, spread and keel lines, `react`, `helm`, `breakOff`, `notice`, and the trick thresholds. What it costs, for M7.3 to judge: at level 50 a cannon ball takes 52 of a hull of 140 (it took 22), a scatter's full blast or a harpoon sinks an unshielded ship of its own level from level 20 up, bots use fewer heals because fights are shorter, and a stats-10 bot lands about one shot in twenty-five on a steady ship at 100 m. Level 5 hits as it did. Six tests pinned the old numbers and follow the new ones in the same commit.
 - [ ] **M7.3 The user tunes feel by hand** on the iPad: top speed across levels, turn rate, the five muzzle speeds against the new top speeds, Gust, aim sensitivity.
 - [ ] **M7.4 Tune the money and the league** (the last seven targets), changing only `career/tuning.ts`. Work with `--standin` runs, which take seconds. Before finishing, confirm every one of these targets once with real matches on parallel workers.
 - [ ] **M7.5 Re-check the sea targets** after M7.3 and M7.4.
