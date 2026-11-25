@@ -3,7 +3,7 @@ import { INK, figure, glyph, roughRect, slip } from './ink.ts';
 import { portrait, uncle } from './gull.ts';
 import { ROLE, STAT, least, type StatName } from './lexicon.ts';
 import { STATS, rangeBar } from './rangebar.ts';
-import { statRose } from './rose.ts';
+import { roseReach, statRose } from './rose.ts';
 import { fitted, label, measured, word } from './word.ts';
 
 export type Span = { lo: number; hi: number };
@@ -221,21 +221,34 @@ export function cardLarge(
   if (face.wage) s += wageRow(left, below, colW - 4, face.wage);
   if (face.racesLeft !== null)
     s += pips(left, below + 22, face.racesLeft, colW - 8);
-  const roseX = 296;
-  s += `<path d="M${colW + 20} ${pad}V${h - pad}M${w - 236} ${pad}V${h - pad}" stroke="${INK.iron}" stroke-width=".6" opacity=".3"/>`;
-  s += statRose(roseX, h / 2 - 2, 60, rosePoints(face), {
-    glyph: least('stat.helm'),
+  const ruleA = colW + 20,
+    ruleB = w - 236,
+    g = least('stat.helm'),
+    n = face.stats.length;
+  const fits = (R: number) => {
+    const r = roseReach(n, R, g, true);
+    return (
+      r.left + r.right + 2 * SPACE.gap <= ruleB - ruleA &&
+      Math.max(r.up, r.down) <= h / 2 - SIZE.rule - 1 - SPACE.gap
+    );
+  };
+  let R = 60;
+  while (R > 30 && !fits(R)) R -= 1;
+  const reach = roseReach(n, R, g, true),
+    roseX = (ruleA + ruleB) / 2 + (reach.left - reach.right) / 2,
+    roseY = h / 2 + (reach.up - reach.down) / 2;
+  s += `<path d="M${ruleA} ${pad}V${h - pad}M${ruleB} ${pad}V${h - pad}" stroke="${INK.iron}" stroke-width=".6" opacity=".3"/>`;
+  s += statRose(roseX, roseY, R, rosePoints(face), {
+    glyph: g,
     numerals: true,
   });
   const rowsX = w - 222,
     rowsW = 206,
-    n = face.stats.length,
     acting = face.who === 'person',
     rowH = Math.min(acting ? 34 : 38, (h - 2 * pad - (acting ? 52 : 0)) / n),
     first = acting ? pad + 4 : (h - rowH * n) / 2;
   face.stats.forEach((st, i) => {
-    const cy = first + rowH * (i + 0.5),
-      g = least('stat.helm');
+    const cy = first + rowH * (i + 0.5);
     const value =
       st.value.lo === st.value.hi
         ? `${st.value.lo}`

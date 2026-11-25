@@ -44,12 +44,14 @@ import {
   WHOLE,
   anchorageEye,
   consortBerth,
+  type Side,
   dragged,
   eyeOut,
   focused,
   framed,
   relaxed,
   turned,
+  type Focus,
   type Framing,
   type Orbit,
   type PartType,
@@ -128,7 +130,11 @@ export function createGame(
   let wanted: Readonly<Framing> = WHOLE,
     part: PartType | null = null;
   const framing: Framing = { center: [0, 0], size: 1 },
-    seat = { orbit, focus: { ...LOOSE } };
+    seat: { orbit: Orbit; focus: Focus; side: Side } = {
+      orbit,
+      focus: { ...LOOSE },
+      side: 1,
+    };
   const reframe = () => {
     framing.center[0] = wanted.center[0];
     framing.center[1] = wanted.center[1];
@@ -518,9 +524,10 @@ export function createGame(
     anchor() {
       restart(state.anchor(start), true);
     },
-    moor(two: boolean) {
+    moor(two: boolean, side: Side = 1) {
+      seat.side = side;
       const berth = two
-        ? consortBerth(normalize(last.position), last.forward, depth)
+        ? consortBerth(normalize(last.position), last.forward, depth, side)
         : null;
       state.moor(CONSORT.id, berth);
     },

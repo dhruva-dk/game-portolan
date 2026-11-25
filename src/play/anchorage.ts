@@ -1,10 +1,13 @@
 import { AIR_FOV, type Eye } from '../render/snapshot.ts';
 import type { ShipPose } from '../world/pose.ts';
 import { clamp, lerp, smoother, wrapAngle } from '../world/scalar.ts';
+import { inFrame, trim } from '../render/ship/motion.ts';
+import { port } from '../render/ship/mount.ts';
 import {
+  add,
   along,
+  bearingAt,
   dot,
-  frameAt,
   normalize,
   place,
   rotateAbout,
@@ -43,7 +46,7 @@ export const ORBIT = {
 
 const CLEAR = 1.5;
 
-interface Focus {
+export interface Focus {
   ahead: number;
   height: number;
   quarter: number;
@@ -215,19 +218,23 @@ const end: CourseOut = { p: [0, 0, 0], t: [0, 0, 0] },
 
 export function anchorageEye(
   pose: ShipPose,
-  on: { orbit: Readonly<Orbit>; focus: Readonly<Focus> },
+  on: { orbit: Readonly<Orbit>; focus: Readonly<Focus>; side?: Side },
   clock: number,
   floor: (p: Vec3) => number,
   out = eyeOut()
 ): Eye {
-  const { orbit: o, focus } = on;
+  const { orbit: o, focus } = on,
+    side = on.side ?? 1;
   normalize(pose.position, up);
   normalize(tangent(pose.forward, up, ahead), ahead);
   const b = smoother(clamp(o.broadside));
   const yaw =
     Math.PI -
-    lerp(focus.quarter, BROADSIDE.quarter, b) +
-    (1 - b) * focus.drift * Math.sin((clock / LOBBY.period) * Math.PI * 2) +
+    side *
+      (lerp(focus.quarter, BROADSIDE.quarter, b) -
+        (1 - b) *
+          focus.drift *
+          Math.sin((clock / LOBBY.period) * Math.PI * 2)) +
     o.yaw;
   const pitch = focus.pitch + o.pitch,
     boom = lerp(focus.boom, BROADSIDE.boom, b),
@@ -264,23 +271,49 @@ export const CONSORT = {
     [-116, 50],
     [-50, 20],
   ],
-  turn: 0.4,
   depth: 3,
   reach: 16,
 } as const;
 
-export const LIT = { behind: 0.6 } as const;
+export type Side = 1 | -1;
 
-export function litBearing(sun: Vec3, at: Vec3): number {
-  const f = frameAt(at);
-  const sunward = Math.atan2(dot(sun, f.east), dot(sun, f.north));
-  return wrapAngle(sunward + LIT.behind - LOBBY.quarter);
+export const OPENING = { steps: 72 } as const;
+
+export function openingPose(
+  at: Vec3,
+  wind: Vec3,
+  sun: Vec3
+): { bearing: number; side: Side } {
+  const u = normalize(at),
+    away = normalize(tangent(scale(sun, -1), u));
+  let best: { bearing: number; side: Side; score: number } = {
+    bearing: 0,
+    side: 1,
+    score: -Infinity,
+  };
+  for (const side of [1, -1] as const)
+    for (let i = 0; i < OPENING.steps; i++) {
+      const bearing = (i / OPENING.steps) * Math.PI * 2,
+        forward = bearingAt(u, bearing),
+        pose = { position: u, forward, up: u };
+      const brace = trim(inFrame(pose, wind), 0, 0);
+      const sail = add(
+        scale(forward, Math.cos(brace)),
+        port(pose),
+        Math.sin(brace)
+      );
+      const look = rotateAbout(forward, u, Math.PI - side * LOBBY.quarter);
+      const score = Math.abs(dot(look, sail)) + dot(look, away);
+      if (score > best.score) best = { bearing, side, score };
+    }
+  return { bearing: best.bearing, side: best.side };
 }
 
 export function consortBerth(
   at: Vec3,
   heading: Vec3,
-  depth: (p: Vec3) => number
+  depth: (p: Vec3) => number,
+  side: Side = 1
 ): { at: Vec3; heading: Vec3 } | null {
   const up = normalize(at),
     ahead = normalize(tangent(heading, up));
@@ -291,13 +324,9 @@ export function consortBerth(
   for (const [astern, abeam] of CONSORT.berths) {
     const fore = along(up, ahead, astern);
     const abeamWay = normalize(rotateAbout(fore.t, fore.p, Math.PI / 2));
-    const side = along(fore.p, abeamWay, abeam);
-    const t = normalize(tangent(ahead, side.p));
-    if (deep(side.p, t))
-      return {
-        at: side.p,
-        heading: normalize(rotateAbout(t, side.p, CONSORT.turn)),
-      };
+    const beside = along(fore.p, abeamWay, abeam * side);
+    const t = normalize(tangent(ahead, beside.p));
+    if (deep(beside.p, t)) return { at: beside.p, heading: t };
   }
   return null;
 }
