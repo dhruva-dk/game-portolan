@@ -96,11 +96,9 @@ export async function home(
   if (launch.kind === 'race') {
     const device = deviceStore();
     const crew = await anchorage(s, false, () => keptSettings(device));
-    await sail(
-      { ...crew, audio: createAudio(s.world.planet.height) },
-      launch.state,
-      false
-    );
+    const audio = createAudio(s.world.planet.height);
+    audio.level(keptSettings(device).sound);
+    await sail({ ...crew, audio }, launch.state, false);
     void s.ready.then(() => loading.show(false));
     return;
   }
