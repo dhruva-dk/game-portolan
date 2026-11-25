@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { askingWage } from '../src/career/rules/hiring.ts';
 import {
   STANDINGS,
   income,
@@ -15,12 +16,14 @@ import {
   standingMerit,
   starMerit,
 } from '../src/career/rules/money.ts';
+import { ROLES } from '../src/career/state.ts';
 import {
   ECONOMY,
   LEAGUE,
   RACE_MONEY,
   SHIPS,
   STARS,
+  WANTS,
 } from '../src/career/tuning.ts';
 
 const SHIP_COUNT = LEAGUE.teams * LEAGUE.shipsPerTeam;
@@ -104,4 +107,16 @@ test('the whole sea and a race’s every sinking each pay half the deeds share o
   const sinkings = SHIP_COUNT - 1;
   close(sinkingMoney(sinkings), half, sinkings / 2, 'sinkings');
   close(seaMoney(whole) + sinkingMoney(sinkings), 2 * half, sinkings / 2 + 1);
+});
+
+test('three people of par stars at wage factor 1 ask the wage share of income, at every standing', () => {
+  for (const standing of STANDINGS) {
+    const merit = standingMerit(standing);
+    close(
+      ROLES.length * askingWage(parStars(merit), 1),
+      ECONOMY.wages * income(merit),
+      (ROLES.length * WANTS.askStep) / 2,
+      `standing ${standing}`
+    );
+  }
 });

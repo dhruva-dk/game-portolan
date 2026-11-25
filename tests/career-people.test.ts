@@ -23,9 +23,11 @@ import {
   standardClause,
   standingScore,
 } from '../src/career/rules/hiring.ts';
+import { income, starMerit } from '../src/career/rules/money.ts';
 import { DRIVER_STATS, ROLES, STATS } from '../src/career/state.ts';
 import {
   AGEING,
+  ECONOMY,
   HEADCOUNT,
   NEGOTIATION,
   OWNERS,
@@ -204,18 +206,21 @@ test('what a person wants follows §1.6.4', () => {
     }
 });
 
-test('the asking wage is 60 × stars³ × f on the 10 grid, at least 10', () => {
-  const most = WANTS.askPerStar * STARS.most ** WANTS.askPower;
-  assert.equal(askingWage(STARS.most, 1), most);
-  assert.equal(
-    askingWage(STARS.most, WANTS.wageFactor.hi),
-    most * WANTS.wageFactor.hi
+test('the asking wage is the wage share of income at the stars’ merit, split three ways, × f on the 10 grid', () => {
+  for (let half = 0; half <= 2 * STARS.most; half++) {
+    const starCount = half / 2;
+    const share = (ECONOMY.wages * income(starMerit(starCount))) / ROLES.length;
+    for (const f of [WANTS.wageFactor.lo, 1, WANTS.wageFactor.hi])
+      assert.equal(
+        askingWage(starCount, f),
+        Math.round((share * f) / WANTS.askStep) * WANTS.askStep
+      );
+  }
+  assert.deepEqual(
+    [0, 1, 2, 3, 4, 5].map((starCount) => askingWage(starCount, 1)),
+    [170, 270, 570, 1070, 1770, 2670]
   );
-  assert.equal(askingWage(1, 1), WANTS.askPerStar);
-  assert.equal(askingWage(2.5, 1), 940);
-  assert.equal(askingWage(0, 1), askingWage(WANTS.askLeastStars, 1));
-  assert.equal(askingWage(0, WANTS.wageFactor.lo), WANTS.leastAsk);
-  assert.equal(askingWage(0, 0.01), WANTS.leastAsk);
+  assert.equal(askingWage(STARS.most, WANTS.wageFactor.hi), 3470);
   assert.ok(
     askingWage(STARS.most, WANTS.wageFactor.hi) <= NEGOTIATION.wage.most
   );
