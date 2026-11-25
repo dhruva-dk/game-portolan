@@ -11,7 +11,7 @@ import {
 } from '../state.ts';
 import { RIVAL_SHIPS } from '../tuning.ts';
 
-export type ShipLines = Record<Line, Range>[];
+type ShipLines = Record<Line, Range>[];
 
 type Drawing = {
   seed: string;

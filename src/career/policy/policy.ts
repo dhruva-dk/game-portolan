@@ -187,10 +187,8 @@ function sponsor({ state, team }: Deciding): Command | null {
 
 const STEPS = [marker, renew, sign, approach, focus, fit, build, sponsor];
 
-export const temperamentOfTeam = (
-  state: CareerState,
-  team: number
-): Temperament => ownerTemperament(state.teams[team].owner);
+const temperamentOfTeam = (state: CareerState, team: number): Temperament =>
+  ownerTemperament(state.teams[team].owner);
 
 export function policy(
   state: CareerState,

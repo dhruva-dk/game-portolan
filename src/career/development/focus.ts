@@ -23,4 +23,13 @@ export const setFocus = (
   state: CareerState,
   team: number,
   focus: Focus
-): CareerState => updateTeam(state, team, (t) => ({ ...t, focus }));
+): CareerState =>
+  updateTeam(state, team, (t) => ({
+    ...t,
+    focus:
+      focus === null
+        ? null
+        : 'line' in focus
+          ? { line: focus.line }
+          : { gun: focus.gun },
+  }));

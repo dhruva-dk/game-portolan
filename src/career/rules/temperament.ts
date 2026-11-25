@@ -16,7 +16,7 @@ export function temperamentOf(nerve: number): Temperament {
   return nerve <= OWNERS.sensible.hi ? 'sensible' : 'bold';
 }
 
-export const ownerNerve = (owner: Owner): number =>
+const ownerNerve = (owner: Owner): number =>
   owner.stats[DRIVER_STATS.indexOf('nerve')];
 
 export const ownerTemperament = (owner: Owner | null): Temperament =>

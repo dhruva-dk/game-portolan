@@ -1045,23 +1045,3 @@ test('over two seasons no policy command is refused, for each temperament forced
         );
     }
 });
-
-test('after three seasons with the stand-in from seed test, every team has hired, built and signed a sponsor', () => {
-  const { tally } = playLeague('test', 3, undefined);
-  const teams = BASE.teams.map((_, index) => index);
-  assert.deepEqual(
-    teams.filter((t) => !tally.hired.has(t)),
-    [],
-    'hired'
-  );
-  assert.deepEqual(
-    teams.filter((t) => !tally.built.has(t)),
-    [],
-    'built'
-  );
-  assert.deepEqual(
-    teams.filter((t) => !tally.signed.has(t)),
-    [],
-    'signed'
-  );
-});

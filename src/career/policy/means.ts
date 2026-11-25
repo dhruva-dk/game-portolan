@@ -11,7 +11,7 @@ export type Means = { build: number; share: number; reserve: number };
 
 export const meansOf = (temperament: Temperament): Means => POLICY[temperament];
 
-export const affordableSigning = (
+const affordableSigning = (
   state: CareerState,
   team: number,
   person: Person,

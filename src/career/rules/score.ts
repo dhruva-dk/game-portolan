@@ -2,7 +2,7 @@ import type { Person, Terms } from '../state.ts';
 import { LEAGUE, NEGOTIATION } from '../tuning.ts';
 import { standardClause } from './clause.ts';
 
-export type Wanting = Pick<Person, 'wants' | 'preferred'>;
+type Wanting = Pick<Person, 'wants' | 'preferred'>;
 
 export const moneyScore = (terms: Terms, ask: number): number =>
   (terms.wage +

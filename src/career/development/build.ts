@@ -5,7 +5,7 @@ import { buildCost, fitCost } from '../rules/build-cost.ts';
 import type { CareerState, Line } from '../state.ts';
 import { updateShip, updateTeam } from '../teams.ts';
 
-export const teamThrift = (state: CareerState, team: number): number | null =>
+const teamThrift = (state: CareerState, team: number): number | null =>
   seatStat(state, team, 'mechanic', 'thrift');
 
 export function buildPrice(

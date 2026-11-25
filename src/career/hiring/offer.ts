@@ -10,10 +10,10 @@ import { sign } from './sign.ts';
 import { talkWith, withTalk } from './talks.ts';
 import { willingness } from './willingness.ts';
 
-export const isCandidate = (team: Team, person: Person): boolean =>
+const isCandidate = (team: Team, person: Person): boolean =>
   team.deals[person.role]?.candidates.includes(person.id) ?? false;
 
-export const isRenewable = (person: Person, team: number): boolean =>
+const isRenewable = (person: Person, team: number): boolean =>
   isRenewal(person, team) &&
   (person.contract?.racesLeft ?? 0) <= CONTRACTS.renewWithin;
 
@@ -57,7 +57,7 @@ function lockTo(team: Team, person: Person): Team {
   };
 }
 
-export function counterTerms(
+function counterTerms(
   state: CareerState,
   team: number,
   person: Person,
@@ -68,7 +68,9 @@ export function counterTerms(
     (w) => score({ ...terms, wage: w }),
     NEGOTIATION.counterTarget
   );
-  return wage === null ? null : { ...terms, wage };
+  return wage === null
+    ? null
+    : { wage, seasons: terms.seasons, fee: terms.fee, clause: terms.clause };
 }
 
 function answered(talk: Talk, counter: Terms | null): Talk {

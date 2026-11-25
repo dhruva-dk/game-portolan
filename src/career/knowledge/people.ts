@@ -12,11 +12,7 @@ export const isExact = (state: CareerState, id: number): boolean =>
   state.knowledge.reports.includes(id) ||
   personOf(state, id)?.contract?.team === YOURS;
 
-export const rangeOffset = (
-  state: CareerState,
-  id: number,
-  stat: number
-): number =>
+const rangeOffset = (state: CareerState, id: number, stat: number): number =>
   uniform(
     KNOWLEDGE.offset.lo,
     KNOWLEDGE.offset.hi,

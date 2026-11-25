@@ -1,7 +1,7 @@
 import type { CareerState } from '../state.ts';
 import { NEWS } from '../tuning.ts';
 
-export type Streak = CareerState['winStreak'];
+type Streak = CareerState['winStreak'];
 
 export const nextStreak = (
   streak: Streak,

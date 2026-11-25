@@ -221,7 +221,7 @@ export function edition(state: CareerState): Edition {
   };
 }
 
-export const templateOf = (kind: EditionKind, headline: Headline): string =>
+const templateOf = (kind: EditionKind, headline: Headline): string =>
   kind === 'special'
     ? SPECIAL_WORDING
     : WORDINGS[headline.kind][headline.variant];

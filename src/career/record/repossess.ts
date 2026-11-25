@@ -4,7 +4,7 @@ import { emptyTeam, newYard } from '../start.ts';
 import type { CareerState, Team } from '../state.ts';
 import { REPOSSESSION } from '../tuning.ts';
 
-export type Repossession = { state: CareerState; teams: readonly number[] };
+type Repossession = { state: CareerState; teams: readonly number[] };
 
 export const isRepossessed = (balance: number): boolean =>
   balance < REPOSSESSION.below;

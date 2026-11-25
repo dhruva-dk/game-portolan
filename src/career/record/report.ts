@@ -15,7 +15,7 @@ import { RACE_REPORT } from '../tuning.ts';
 import { placedTeam, teamOfShip, teamShips } from './finish.ts';
 import { racePoints } from './score.ts';
 
-export type RaceRecord = {
+type RaceRecord = {
   before: CareerState;
   paid: CareerState;
   after: CareerState;
