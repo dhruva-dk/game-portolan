@@ -66,6 +66,14 @@ export interface Strike {
   gun: GunKind | null;
 }
 
+export interface Hit {
+  shooter: number;
+  struck: number;
+  damage: number;
+  gun: GunKind | null;
+  round: number | null;
+}
+
 export interface Splash {
   shooter: number;
   gun: GunKind;
@@ -167,6 +175,7 @@ export function stepBattle(
   battle: Battle;
   shots: Shot[];
   strikes: Strike[];
+  hits: Hit[];
   splashes: Splash[];
   cues: Cue[];
   sunk: number[];
@@ -177,6 +186,7 @@ export function stepBattle(
     return !!c && !sunk(c.health);
   };
   const strikes: Strike[] = [],
+    hits: Hit[] = [],
     sunkNow: number[] = [];
   const ships = new Map(fleet.map((v) => [v.id, v.ship]));
   const deal = (
@@ -184,7 +194,8 @@ export function stepBattle(
     id: number,
     damage: number,
     at: Vec3,
-    gun: GunKind | null
+    gun: GunKind | null,
+    round: number | null
   ) => {
     const ram = gun === null;
     const c = crews.get(id),
@@ -193,6 +204,13 @@ export function stepBattle(
     const harm = harmed(c.health, damage);
     c.health = harm.health;
     if (gun) c.cut = Math.max(c.cut, GUNS[gun].cuts);
+    hits.push({
+      shooter: by,
+      struck: id,
+      damage: harm.shield + harm.hull,
+      gun,
+      round,
+    });
     const broke = harm.shield > 0 && c.health.shield <= 0;
     const same = ram
       ? undefined
@@ -219,8 +237,22 @@ export function stepBattle(
 
   for (const blow of blows) {
     if (mates(b.teams, blow.striker.id, blow.struck.id)) continue;
-    deal(blow.struck.id, blow.striker.id, blow.striker.damage, blow.at, null);
-    deal(blow.striker.id, blow.struck.id, blow.struck.damage, blow.at, null);
+    deal(
+      blow.struck.id,
+      blow.striker.id,
+      blow.striker.damage,
+      blow.at,
+      null,
+      null
+    );
+    deal(
+      blow.striker.id,
+      blow.struck.id,
+      blow.struck.damage,
+      blow.at,
+      null,
+      null
+    );
   }
 
   const marks = fleet
@@ -229,7 +261,7 @@ export function stepBattle(
   const flight = fly(b.balls, marks, dt, depth);
   const splashes: Splash[] = [];
   for (const f of flight.falls) {
-    const { shooter, kind } = f.ball,
+    const { shooter, kind, round } = f.ball,
       splash = GUNS[kind].splash;
     const damage = f.ball.damage * falloff(kind, distance(f.ball.from, f.at));
     if (splash > 0) {
@@ -241,11 +273,12 @@ export function stepBattle(
             m.id,
             damage * (1 - (FALLOFF.edge * d) / splash),
             f.at,
-            kind
+            kind,
+            round
           );
       }
     } else if (f.struck !== null && !mates(b.teams, shooter, f.struck))
-      deal(shooter, f.struck, damage, f.at, kind);
+      deal(shooter, f.struck, damage, f.at, kind, round);
     if (f.struck === null)
       splashes.push({ shooter, gun: kind, at: f.at, land: f.land });
   }
@@ -290,7 +323,8 @@ export function stepBattle(
               dir,
               lay.speed,
               damageOf(gun.kind, values.damageFactor),
-              lay.fall
+              lay.fall,
+              gun.fired
             )
           );
         shots.push({
@@ -314,6 +348,7 @@ export function stepBattle(
     },
     shots,
     strikes,
+    hits,
     splashes,
     cues,
     sunk: sunkNow,

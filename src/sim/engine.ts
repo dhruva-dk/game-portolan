@@ -568,7 +568,7 @@ function createSea(waters: Waters, first: Course) {
     founderAll(fought);
     tally?.settle(
       fought.shots,
-      fought.strikes,
+      fought.hits,
       standing,
       !loose || sinkings.length > 0
     );

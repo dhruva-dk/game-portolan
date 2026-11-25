@@ -11,7 +11,8 @@ import type { MatchSetup } from '../src/sim/setup.ts';
 import { calm, closings } from '../src/sim/storm.ts';
 import { MATCH_END } from '../src/sim/tuning.ts';
 import { startCareer } from '../tools/sim/career.ts';
-import { EVEN_SHIP, setupOf } from './setups.ts';
+import { KINDS } from '../src/sim/kinds.ts';
+import { EVEN_SHIP, setupOf, valuesAt } from './setups.ts';
 import { OPEN, sail, waters } from './small.ts';
 
 interface Watched {
@@ -108,6 +109,10 @@ function sound(w: Watched) {
       assert.notEqual(team(s.sunkBy), team(id), 'never by a mate');
     }
     if (s.sunkAt !== null) assert.ok(s.sunkAt >= 0 && s.sunkAt <= r.seconds);
+    assert.ok(
+      s.shotsLanded <= s.shotsFired,
+      `ship ${id} (${setup.ships[id].gun}) landed ${s.shotsLanded} of ${s.shotsFired}`
+    );
   }
   for (const k of w.storms)
     assert.equal(
@@ -163,6 +168,10 @@ const SMALL: MatchSetup[] = [
   setupOf(22, { teams: 8, perTeam: 1 }),
   setupOf(23, { teams: 2, perTeam: 1, storm: 5 }),
   setupOf(24, { teams: 3, storm: 1 }),
+  setupOf(25, {
+    teams: 5,
+    values: (ship) => valuesAt(50, KINDS[Math.floor(ship / 2) % KINDS.length]),
+  }),
 ];
 
 const WATCHED = SMALL.map(watched);
