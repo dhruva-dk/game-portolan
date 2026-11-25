@@ -5,6 +5,7 @@ import type {
   ResultView,
   TeamMark,
 } from '../../career/views/result.ts';
+import { coinTicks, createBeats, type Beat } from '../base/beat.ts';
 import { emblemAt, liveryColors } from '../base/emblem.ts';
 import { grouped } from '../base/grouped.ts';
 import { portrait, uncle } from '../base/gull.ts';
@@ -107,7 +108,13 @@ function sailor(ship: ResultShip, cx: number, cy: number) {
 const teamEmblem = (mark: TeamMark, x: number, y: number, size: number) =>
   emblemAt(mark.emblem, liveryColors(mark.livery), x, y, size);
 
-type Timed = { art: string; counts: Count[]; ends: number; thud: number };
+type Timed = {
+  art: string;
+  counts: Count[];
+  ends: number;
+  thud: number;
+  beats: readonly { beat: Beat; at: number }[];
+};
 
 function raceTimes(v: ResultView) {
   const { dealt, place, punch, strike, share, podium, burst } = MOTION.ranked;
@@ -287,7 +294,7 @@ function raceArt(v: ResultView): Timed {
     counted('shots', t.shareAt, share.ms, 0, v.shots, percent),
     counted('sea', t.shareAt, share.ms, 0, v.sea, percent),
   ];
-  return { art, counts, ends: t.ends, thud: t.burstAt };
+  return { art, counts, ends: t.ends, thud: t.burstAt, beats: [] };
 }
 
 function markArt(mark: MoneyMark, cy: number) {
@@ -441,6 +448,12 @@ function ledgerArt(v: MoneyView): Timed {
     counts,
     ends: t.ends,
     thud: t.totalAt + MOTION.ledger.total.ms * 0.4,
+    beats: coinTicks(
+      t.rollAt,
+      MOTION.ledger.roll.ms,
+      v.balance.before,
+      v.balance.after
+    ).map((at) => ({ beat: 'coin', at })),
   };
 }
 
@@ -474,9 +487,11 @@ export function createResult(port: LobbyPort) {
     done = true,
     timer = 0;
   const ticker = createTicker(() => node);
+  const beats = createBeats();
 
   function finish() {
     window.clearTimeout(timer);
+    beats.stop();
     node?.getAnimations({ subtree: true }).forEach((a) => a.finish());
     ticker.finish();
     done = true;
@@ -507,6 +522,8 @@ export function createResult(port: LobbyPort) {
     node = next;
     done = false;
     ticker.run(timed.counts);
+    beats.stop();
+    beats.play(timed.beats);
     window.clearTimeout(timer);
     timer = window.setTimeout(
       () => (done = true),

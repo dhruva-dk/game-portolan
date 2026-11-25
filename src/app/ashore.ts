@@ -60,6 +60,7 @@ import { createAudio } from '../audio/audio.ts';
 import { loaded } from '../render/load.ts';
 import type { Hearing } from '../audio/listen.ts';
 import { view } from '../ui/base/ui.ts';
+import { onBeats } from '../ui/base/beat.ts';
 import { onPressed } from '../ui/base/touch.ts';
 import { deviceStore, keepSettings, keptSettings } from './kept.ts';
 import { begun, type Founded } from './launch.ts';
@@ -549,10 +550,12 @@ export async function ashore(
     redraw();
   });
 
+  let uncovered = flowing !== null;
   if (flowing !== null) o.ready();
   else
     void s.ready.then(() => {
       o.ready();
+      uncovered = true;
       lobby.arrive();
     });
   const audio = createAudio(s.world.planet.height);
@@ -566,6 +569,10 @@ export async function ashore(
   onPressed(uiLayer(), () => {
     if (!gone) audio.tap(hearing.screen);
   });
+  onBeats(uiLayer(), (b) => {
+    if (uncovered) audio.cue(b);
+  });
+  audio.level(settings.sound);
   void s.draw((dt) => {
     game.step(dt, input.read());
     const scene = game.snapshot();

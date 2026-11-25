@@ -1,3 +1,4 @@
+import { beat } from '../base/beat.ts';
 import type { PaintEdit, PaintView } from '../../career/views/paint.ts';
 import { pressable, ribbon } from '../base/button.ts';
 import { grouped } from '../base/grouped.ts';
@@ -173,6 +174,7 @@ export function createPaint(port: LobbyPort) {
     }
     replay(target?.querySelector('.lively'), 'answer');
     port.scene.jolt('painted');
+    beat('painted');
     window.setTimeout(() => port.close(), MOTION.painted.hold);
   }
 
