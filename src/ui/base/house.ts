@@ -139,6 +139,13 @@ export const MOTION = {
   thrown: { ms: 760, ease: OUT, turns: 2, from: 0.16, rest: -1.1, slap: 0.965 },
   printed: { ms: 300, ease: OUT, after: 640, stagger: 110, shift: 8 },
   turning: { ms: 1100 },
+  slider: {
+    grab: { ms: 110, ease: OUT, swell: 1.22, lift: 2 },
+    settle: { ms: 320, ease: POP },
+    shade: 0.3,
+  },
+  flip: { ms: 240, ease: POP, dye: 280, squash: 0.8, mark: 120 },
+  copied: { hold: 1100 },
   leafed: { ms: 420, ease: IN, rise: 46, turn: 4, swell: 1.05 },
   ceremony: {
     champion: { after: 200, ms: 620, ease: POP, from: 2.6 },
