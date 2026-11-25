@@ -191,7 +191,14 @@ export const MOTION = {
   glow: { ms: 1200, low: 0.35, high: 0.85 },
   paused: { dim: 0.42, ms: 260, release: 650, duck: 0.15 },
   settling: { dim: 0.5, spin: 900, ms: 220, ease: POP, tick: 1.25, hold: 700 },
-  loading: { fade: 260, turn: 1600 },
+  loading: {
+    fade: 260,
+    swing: 1600,
+    from: -38,
+    to: 52,
+    settle: 260,
+    ease: 'cubic-bezier(.3,1.6,.5,1)',
+  },
   casting: { leave: 420 },
   leafed: { ms: 420, ease: IN, rise: 46, turn: 4, swell: 1.05 },
   ceremony: {
