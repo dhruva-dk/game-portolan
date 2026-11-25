@@ -1,8 +1,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { apply, newCareer, type Applied } from '../src/career/apply.ts';
+import {
+  apply,
+  newCareer,
+  runPolicies,
+  type Applied,
+} from '../src/career/apply.ts';
 import type { Command } from '../src/career/commands.ts';
 import { matchSetup } from '../src/career/fit.ts';
+import { personOf } from '../src/career/lookup.ts';
 import { releaseExpired, turnSeason } from '../src/career/offseason/finish.ts';
 import { ageLeague } from '../src/career/offseason/people.ts';
 import { payPrizes } from '../src/career/offseason/prize.ts';
@@ -32,7 +38,6 @@ import {
   WINTER,
 } from '../src/career/tuning.ts';
 import type { MatchResult } from '../src/sim/result.ts';
-import type { ShipSpec } from '../src/sim/setup.ts';
 
 const TEAMS = LEAGUE.teams;
 const SEASON = LEAGUE.racesPerSeason;
@@ -206,6 +211,20 @@ test('the season prize and winter loss follow §1.8.2 and §1.9', () => {
   assert.equal(wintered(100, winterLoss(null)), 100 - WINTER.lossWithout);
 });
 
+test('the season prize and winter loss at hand-worked points', () => {
+  assert.equal(seasonPrize(1), 60000);
+  assert.equal(seasonPrize(11), 33750);
+  assert.equal(seasonPrize(21), 15000);
+  assert.equal(seasonPrize(31), 3750);
+  assert.equal(seasonPrize(40), 38);
+  assert.equal(winterLoss(null), 11);
+  assert.equal(winterLoss(1), 9.7);
+  assert.equal(winterLoss(10), 7);
+  assert.equal(winterLoss(20), 4);
+  assert.equal(wintered(50, 4), 46);
+  assert.equal(wintered(12, 11), 5);
+});
+
 test('step 1 pays every team the prize for its final standing and nothing else', () => {
   for (const seed of SEEDS) {
     const ready = lastRaceOf(seed);
@@ -224,6 +243,7 @@ test('step 1 pays every team the prize for its final standing and nothing else',
         rows.place +
           rows.sinkings +
           rows.sea +
+          rows.sponsors.reduce((sum, row) => sum + row.amount, 0) +
           rows.wages +
           rows.interest +
           expectedPrize(final[team]),
@@ -444,8 +464,21 @@ const countedDown = (person: Person): Person =>
 
 test('FinishOffseason releases expired contracts, turns the season and opens the lobby', () => {
   for (const seed of SEEDS) {
-    const stop = { ...atStop(seed), winStreak: { team: 3, n: 4 } };
+    const base = atStop(seed);
+    const stop = {
+      ...base,
+      winStreak: { team: 3, n: 4 },
+      people: base.people.map((p) =>
+        p.contract?.team === YOURS
+          ? { ...p, contract: { ...p.contract, racesLeft: 0 } }
+          : p
+      ),
+    };
     const next = send(stop, { type: 'FinishOffseason', team: YOURS });
+    const ran = runPolicies(stop);
+    assert.deepEqual(ran.refused, []);
+    assert.ok(ran.sent.length > 0, 'the rivals act at the stop');
+    const acted = ran.state;
     const final = expectedStandings(stop);
     assert.equal(next.phase, 'lobby');
     assert.equal(next.season, stop.season + 1);
@@ -465,10 +498,10 @@ test('FinishOffseason releases expired contracts, turns the season and opens the
     assert.deepEqual(next.lastOffseason, stop.lastOffseason);
     assert.deepEqual(next.lastRace, stop.lastRace);
     assert.equal(next.unread, stop.unread);
-    const expired = stop.people.filter((p) => p.contract?.racesLeft === 0);
+    const expired = acted.people.filter((p) => p.contract?.racesLeft === 0);
     assert.ok(expired.length > 0);
     const leaving = new Set(expired.map((p) => p.id));
-    stop.people.forEach((person, i) => {
+    acted.people.forEach((person, i) => {
       const now = next.people[i];
       assert.equal(now.id, person.id);
       assert.deepEqual(
@@ -476,7 +509,7 @@ test('FinishOffseason releases expired contracts, turns the season and opens the
         leaving.has(person.id) ? null : person.contract
       );
     });
-    stop.teams.forEach((team, t) => {
+    acted.teams.forEach((team, t) => {
       for (const role of ROLES) {
         const id = team.seats[role];
         assert.equal(
@@ -506,9 +539,6 @@ test('releaseExpired and turnSeason each do only their own part', () => {
   assert.equal(turned.phase, stop.phase);
 });
 
-const sameSpec = (a: ShipSpec, b: ShipSpec): boolean =>
-  JSON.stringify(a) === JSON.stringify(b);
-
 test('the race set up during the stop is the race the lobby sails after FinishOffseason', () => {
   for (const seed of SEEDS) {
     const stop = atStop(seed);
@@ -520,21 +550,20 @@ test('the race set up during the stop is the race the lobby sails after FinishOf
     assert.equal(during.storm, after.storm);
     assert.equal(during.heals, after.heals);
     assert.equal(during.ships.length, after.ships.length);
-    const leaving = new Set(
-      stop.people.filter((p) => p.contract?.racesLeft === 0).map((p) => p.id)
-    );
+    const holders = (state: CareerState, team: number): unknown[] =>
+      ROLES.map((role) => {
+        const id = state.teams[team].seats[role];
+        return id === null ? null : personOf(state, id)?.stats;
+      });
+    const unchanged = (team: number): boolean =>
+      JSON.stringify([stop.teams[team], holders(stop, team)]) ===
+      JSON.stringify([next.teams[team], holders(next, team)]);
     let same = 0;
     during.ships.forEach((ship, id) => {
       assert.equal(ship.standing, after.ships[id].standing);
-      const seats = stop.teams[ship.team].seats;
-      const touched = ROLES.some((role) => {
-        const holder = seats[role];
-        return holder !== null && leaving.has(holder);
-      });
-      if (!touched) {
-        assert.deepEqual(ship, after.ships[id], `ship ${id}`);
-        same += 1;
-      } else if (sameSpec(ship, after.ships[id])) same += 1;
+      if (!unchanged(ship.team)) return;
+      assert.deepEqual(ship, after.ships[id], `ship ${id}`);
+      same += 1;
     });
     assert.ok(same > 0);
   }

@@ -5,26 +5,53 @@ import {
   YOURS_ONLY,
   type Command,
   type Reason,
+  type Refusal,
 } from './commands.ts';
+import {
+  build,
+  buildRefusal,
+  fitGun,
+  fitRefusal,
+} from './development/build.ts';
+import { focusRefusal, setFocus } from './development/focus.ts';
 import { fieldsValid, isIndex } from './fields.ts';
+import { approach, approachRefusal } from './hiring/approach.ts';
+import { acceptCounter, counterRefusal } from './hiring/counter.ts';
+import { dealAfterRace, dealOffseason } from './hiring/deal.ts';
+import { offer, offerRefusal } from './hiring/offer.ts';
+import { release, releaseRefusal } from './hiring/release.ts';
+import { scoutRefusal, setScoutSeat } from './hiring/scout.ts';
+import { buyReport, reportRefusal } from './knowledge/report.ts';
+import { narrowShipLines, redrawBuilt } from './knowledge/ships.ts';
+import { redrawKnowledge } from './knowledge/year.ts';
 import { known } from './lookup.ts';
 import { releaseExpired, turnSeason } from './offseason/finish.ts';
 import { ageLeague } from './offseason/people.ts';
+import { seasonEvents } from './offseason/news.ts';
 import { payPrizes } from './offseason/prize.ts';
 import { fileOffseasonReport, offseasonReport } from './offseason/report.ts';
 import { winter } from './offseason/winter.ts';
 import { enterPhase, nextRaceLobby, seasonOver } from './record/advance.ts';
 import { countDownContracts } from './record/contracts.ts';
+import { develop } from './record/develop.ts';
+import { raceEvents } from './record/events.ts';
+import { countDownSponsors } from './record/sponsors.ts';
 import { publishNews } from './record/news.ts';
+import { runLeague, runTeam, type PolicyRun } from './policy/run.ts';
 import { payRace, raceMoney } from './record/pay.ts';
 import { fileReport, raceReport } from './record/report.ts';
+import { repossess } from './record/repossess.ts';
 import { scoreRace } from './record/score.ts';
-import type { CareerState } from './state.ts';
+import { repaint, repaintRefusal } from './repaint.ts';
+import type { Temperament } from './rules/temperament.ts';
+import { dealOffers } from './sponsors/offers.ts';
+import { signRefusal, signSponsor } from './sponsors/sign.ts';
+import { YOURS, type CareerState } from './state.ts';
 
 export { newCareer, type CareerOptions } from './start.ts';
 
 export type Applied =
-  | { ok: true; state: CareerState }
+  | { ok: true; state: CareerState; refused: Refusal[] }
   | { ok: false; reason: Reason };
 
 export function apply(state: CareerState, command: Command): Applied {
@@ -43,30 +70,34 @@ function refusal(state: CareerState, command: Command): Reason | null {
   return null;
 }
 
-const notYet = (state: CareerState): Applied => ({ ok: true, state });
+const accepted = (state: CareerState): Applied => ({
+  ok: true,
+  state,
+  refused: [],
+});
 
-const seam = (state: CareerState): CareerState => state;
+export const runPolicy = (
+  state: CareerState,
+  team: number,
+  temperament?: Temperament
+): PolicyRun => runTeam(state, team, apply, temperament);
 
-type Repossession = { state: CareerState; teams: readonly number[] };
+export const runPolicies = (state: CareerState): PolicyRun =>
+  runLeague(state, apply);
 
-const runPolicies = seam;
-const repossess = (state: CareerState): Repossession => ({ state, teams: [] });
-const develop = seam;
-const countDownSponsors = seam;
-const narrowRanges = seam;
-const raceEvents = seam;
-const dealAfterRace = seam;
-const offerSponsors = seam;
-const seasonEvents = seam;
-const redrawKnowledge = seam;
-const dealOffseason = seam;
+function afterPolicies(
+  state: CareerState,
+  then: (state: CareerState) => CareerState
+): Applied {
+  const run = runPolicies(state);
+  return { ok: true, state: then(run.state), refused: run.refused };
+}
 
-const YOURS = 0;
-
-const accepted = (state: CareerState): Applied => ({ ok: true, state });
+const unless = (reason: Reason | null, run: () => CareerState): Applied =>
+  reason === null ? accepted(run()) : { ok: false, reason };
 
 const startRace = (state: CareerState): Applied =>
-  accepted(enterPhase(runPolicies(state), 'racing'));
+  afterPolicies(state, (ran) => enterPhase(ran, 'racing'));
 
 function recordRace(state: CareerState, result: MatchResult): Applied {
   const scored = scoreRace(state, result);
@@ -75,8 +106,8 @@ function recordRace(state: CareerState, result: MatchResult): Applied {
   const repossession = repossess(paid);
   const developed = develop(repossession.state);
   const counted = countDownSponsors(countDownContracts(developed));
-  const narrowed = narrowRanges(counted);
-  const told = raceEvents(narrowed);
+  const narrowed = narrowShipLines(counted);
+  const told = raceEvents(narrowed, state, result);
   const filed = fileReport(
     told,
     raceReport({
@@ -90,23 +121,24 @@ function recordRace(state: CareerState, result: MatchResult): Applied {
   );
   const advanced = seasonOver(filed)
     ? enterOffseason(filed)
-    : offerSponsors(dealAfterRace(nextRaceLobby(filed)));
+    : dealOffers(dealAfterRace(nextRaceLobby(filed)));
   return accepted(publishNews(advanced));
 }
 
 function enterOffseason(state: CareerState): CareerState {
-  const stopped = enterPhase(state, 'offseason');
+  const stopped = seasonEvents(enterPhase(state, 'offseason'));
   const prized = payPrizes(stopped);
   const wintered = winter(prized);
   const aged = ageLeague(wintered);
   const redrawn = redrawKnowledge(aged);
-  const dealt = dealOffseason(redrawn);
-  const told = seasonEvents(dealt);
-  return fileOffseasonReport(told, offseasonReport(stopped, told));
+  const dealt = dealOffers(dealOffseason(redrawn));
+  return fileOffseasonReport(dealt, offseasonReport(stopped, dealt));
 }
 
 const finishOffseason = (state: CareerState): Applied =>
-  accepted(enterPhase(turnSeason(releaseExpired(runPolicies(state))), 'lobby'));
+  afterPolicies(state, (ran) =>
+    enterPhase(turnSeason(releaseExpired(ran)), 'lobby')
+  );
 
 const markRead = (state: CareerState): Applied =>
   accepted({ ...state, unread: false });
@@ -124,33 +156,69 @@ function effect(state: CareerState, command: Command): Applied {
     case 'MarkSeen':
       return markSeen(state, command.id);
     case 'SetFocus':
-      return notYet(state);
+      return unless(focusRefusal(state, command.team, command.focus), () =>
+        setFocus(state, command.team, command.focus)
+      );
     case 'Build':
-      return notYet(state);
+      return unless(
+        buildRefusal(state, command.team, command.slot, command.line),
+        () =>
+          redrawBuilt(
+            build(state, command.team, command.slot, command.line),
+            command.team,
+            command.slot,
+            command.line
+          )
+      );
     case 'FitGun':
-      return notYet(state);
+      return unless(
+        fitRefusal(state, command.team, command.slot, command.kind),
+        () =>
+          redrawBuilt(
+            fitGun(state, command.team, command.slot, command.kind),
+            command.team,
+            command.slot,
+            'gun'
+          )
+      );
     case 'Repaint':
-      return notYet(state);
+      return unless(
+        repaintRefusal(state, command.team, command.livery, command.emblem),
+        () => repaint(state, command.team, command.livery, command.emblem)
+      );
     case 'SetScoutSeat':
-      return notYet(state);
+      return unless(scoutRefusal(state, command.team, command.role), () =>
+        setScoutSeat(state, command.team, command.role)
+      );
     case 'BuyReport':
-      return notYet(state);
+      return unless(reportRefusal(state, command.team, command.person), () =>
+        buyReport(state, command.team, command.person)
+      );
     case 'Approach':
-      return notYet(state);
+      return unless(approachRefusal(state, command.team, command.person), () =>
+        approach(state, command.team, command.person)
+      );
     case 'Offer':
-      return notYet(state);
+      return unless(
+        offerRefusal(state, command.team, command.person, command.terms),
+        () => offer(state, command.team, command.person, command.terms)
+      );
     case 'AcceptCounter':
-      return notYet(state);
+      return unless(counterRefusal(state, command.team, command.person), () =>
+        acceptCounter(state, command.team, command.person)
+      );
     case 'Release':
-      return notYet(state);
+      return unless(releaseRefusal(state, command.team, command.person), () =>
+        release(state, command.team, command.person)
+      );
     case 'SignSponsor':
-      return notYet(state);
+      return unless(signRefusal(state, command.team, command.slot), () =>
+        signSponsor(state, command.team, command.offer, command.slot)
+      );
   }
 }
 
-const markSeen = (state: CareerState, id: string): Applied => ({
-  ok: true,
-  state: state.seen.includes(id)
-    ? state
-    : { ...state, seen: [...state.seen, id] },
-});
+const markSeen = (state: CareerState, id: string): Applied =>
+  accepted(
+    state.seen.includes(id) ? state : { ...state, seen: [...state.seen, id] }
+  );

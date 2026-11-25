@@ -1,19 +1,9 @@
-import { seatHolder } from '../lookup.ts';
+import { seatStat } from '../lookup.ts';
 import { winterLoss, wintered } from '../rules/winter.ts';
-import {
-  MECHANIC_STATS,
-  perLine,
-  type CareerState,
-  type Levels,
-  type Ship,
-} from '../state.ts';
+import { perLine, type CareerState, type Levels, type Ship } from '../state.ts';
 
-const UPKEEP = MECHANIC_STATS.indexOf('upkeep');
-
-export function teamLoss(state: CareerState, team: number): number {
-  const mechanic = seatHolder(state, team, 'mechanic');
-  return winterLoss(mechanic === null ? null : mechanic.stats[UPKEEP]);
-}
+export const teamLoss = (state: CareerState, team: number): number =>
+  winterLoss(seatStat(state, team, 'mechanic', 'upkeep'));
 
 const lose = (levels: Levels, loss: number): Levels =>
   perLine((line) => wintered(levels[line], loss));

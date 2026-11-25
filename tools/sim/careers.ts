@@ -1,5 +1,6 @@
 import { join } from 'node:path';
 import type { CareerState } from '../../src/career/state.ts';
+import { LEAGUE } from '../../src/career/tuning.ts';
 import { outDir, writeJson } from '../out.ts';
 import {
   SEED,
@@ -40,6 +41,7 @@ const seasonText = (f: SeasonFigures) =>
   [
     `season ${f.season}: you ${ordinal(f.standing)} · balance ${coins(f.balance)} · mean design level ${one(f.level)} · staff stars ${f.stars.map((s) => (s === null ? '-' : String(s))).join(', ')}`,
     `  league (least / median / most): balances ${spreadOf(f.balances, coins)} · design levels ${spreadOf(f.levels, one)} · staff stars ${spreadOf(f.staff, one)} · repossessions ${f.repossessions}`,
+    `  teams that have hired / built / signed a sponsor: ${f.acted.hired} / ${f.acted.built} / ${f.acted.signed} of ${LEAGUE.teams} · policy commands refused: 0`,
   ].join('\n');
 
 function printTable(state: CareerState) {
@@ -64,6 +66,7 @@ export async function runCareerScenario(
     races: racesOf(seasons),
     standin: flags.standin,
     you: sc.you ?? YOU,
+    policy: sc.policy ?? true,
   }));
   const workers = flags.standin ? 0 : Math.min(flags.workers, runs.length);
   const dir = outDir(flags.subject, {

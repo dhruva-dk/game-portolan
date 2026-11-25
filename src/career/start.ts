@@ -1,7 +1,6 @@
 import { KINDS, perKind, type GunKind } from '../sim/kinds.ts';
 import { DYES, EMBLEMS, PATTERNS, type Livery } from '../world/livery.ts';
 import {
-  draw,
   knowledgeYear,
   ordered,
   pick,
@@ -9,6 +8,7 @@ import {
   whole,
   type Key,
 } from './draw.ts';
+import { leagueLines } from './knowledge/ships.ts';
 import { TEAM_NAMES } from './names.ts';
 import { ask } from './rules/ask.ts';
 import { standardClause } from './rules/clause.ts';
@@ -23,17 +23,18 @@ import {
 import { lineLeader } from './rules/line-leader.ts';
 import { generateOwner } from './rules/owner.ts';
 import { generatePerson, type Origin } from './rules/person.ts';
-import { shipRange } from './rules/ship-range.ts';
+import { drawOffers } from './sponsors/offers.ts';
+import { slotsOf } from './sponsors/slots.ts';
 import {
+  FIRST_RACE,
+  FIRST_SEASON,
   ROLES,
   VERSION,
   perLine,
   perRole,
   type CareerState,
   type Levels,
-  type Line,
   type Person,
-  type Range,
   type Role,
   type Ship,
   type Team,
@@ -42,7 +43,6 @@ import {
   HEADCOUNT,
   LEAGUE,
   LEAGUE_START,
-  RIVAL_SHIPS,
   STANDING,
   START,
   YOUR_START,
@@ -55,15 +55,13 @@ export type CareerOptions = {
   emblem: number;
 };
 
-const START_SEASON = 1;
-const START_RACE = 1;
 const CANNON: GunKind = 'cannon';
 
 const LIVERIES: readonly Livery[] = DYES.flatMap((_, dye) =>
   PATTERNS.map((_, pattern) => ({ dye, pattern }))
 );
 
-const sameLivery = (a: Livery, b: Livery): boolean =>
+export const sameLivery = (a: Livery, b: Livery): boolean =>
   a.dye === b.dye && a.pattern === b.pattern;
 
 function distinct<T>(
@@ -88,7 +86,7 @@ type Untouched =
   | 'sponsors'
   | 'offers';
 
-const emptyTeam = (): Pick<Team, Untouched> => ({
+export const emptyTeam = (): Pick<Team, Untouched> => ({
   unlockProgress: perKind(() => 0),
   focus: null,
   scoutSeat: 'designer',
@@ -102,23 +100,29 @@ const emptyTeam = (): Pick<Team, Untouched> => ({
 const tasteOf = (seed: string, team: number): GunKind[] =>
   ordered(KINDS, (kind) => kind, seed, 'team', team, 'taste');
 
-function yourTeam(options: CareerOptions): Team {
+type Yard = 'design' | 'unlocked' | 'ships' | 'seats';
+
+export function newYard(): Pick<Team, Yard> {
   const level = (): Levels => perLine(() => START.level);
   const ship = (): Ship => ({ fitted: level(), gun: CANNON });
   return {
-    ...emptyTeam(),
-    name: options.name,
-    livery: options.livery,
-    emblem: options.emblem,
-    taste: tasteOf(options.seed, 0),
-    owner: null,
-    balance: YOUR_START.balance,
     design: level(),
     unlocked: [CANNON],
     ships: [ship(), ship()],
     seats: perRole(() => null),
   };
 }
+
+const yourTeam = (options: CareerOptions): Team => ({
+  ...emptyTeam(),
+  name: options.name,
+  livery: options.livery,
+  emblem: options.emblem,
+  taste: tasteOf(options.seed, 0),
+  owner: null,
+  balance: YOUR_START.balance,
+  ...newYard(),
+});
 
 type Identity = {
   name: string;
@@ -165,6 +169,17 @@ function rivalTeam(seed: string, index: number, identity: Identity): Team {
     unlocked,
     ships: [ship(0), ship(1)],
     seats: identity.seats,
+    sponsors: slotsOf(
+      drawOffers({
+        seed,
+        season: FIRST_SEASON,
+        race: FIRST_RACE,
+        team: index,
+        reputation: index,
+        held: [],
+        races: LEAGUE_START.sponsorRaces,
+      })
+    ),
   };
 }
 
@@ -195,23 +210,6 @@ function staffMember(
       ),
     },
   };
-}
-
-function shipRanges(
-  seed: string,
-  team: Team,
-  index: number
-): Record<Line, Range>[] {
-  const year = knowledgeYear({ season: START_SEASON, phase: 'lobby' });
-  return team.ships.map((ship, slot) =>
-    perLine((line) =>
-      shipRange(
-        ship.fitted[line],
-        RIVAL_SHIPS.width,
-        draw(seed, 'line', year, index, slot, line)
-      )
-    )
-  );
 }
 
 export function newCareer(options: CareerOptions): CareerState {
@@ -255,8 +253,8 @@ export function newCareer(options: CareerOptions): CareerState {
   return {
     version: VERSION,
     seed,
-    season: START_SEASON,
-    race: START_RACE,
+    season: FIRST_SEASON,
+    race: FIRST_RACE,
     phase: 'lobby',
     unread: false,
     teams,
@@ -270,8 +268,10 @@ export function newCareer(options: CareerOptions): CareerState {
     lineLeaders: perLine((line) => lineLeader(teams, line)),
     knowledge: {
       reports: [],
-      lines: teams.map((team, index) =>
-        index === 0 ? [] : shipRanges(seed, team, index)
+      lines: leagueLines(
+        seed,
+        teams,
+        knowledgeYear({ season: FIRST_SEASON, phase: 'lobby' })
       ),
     },
     lastRace: null,
