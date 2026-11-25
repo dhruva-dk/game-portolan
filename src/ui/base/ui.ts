@@ -112,6 +112,14 @@ const STYLE = `
 @keyframes fan { from { transform: rotate(var(--r)) translateX(var(--x)); } }
 .ui .glide { animation: glide ${MOTION.glide.ms}ms ${MOTION.glide.ease} both; }
 @keyframes glide { from { transform: translateX(var(--x)); } }
+.ui .stamp { transform-box: fill-box; transform-origin: center;
+  animation: stamp ${MOTION.stamp.ms}ms ${MOTION.stamp.ease} both; }
+@keyframes stamp { from { transform: scale(${MOTION.stamp.from}) rotate(-12deg); opacity: 0 } }
+.ui .refuse { animation: refuse ${MOTION.refuse.ms}ms ease-in-out both; }
+@keyframes refuse { 20% { transform: translateX(-${MOTION.refuse.shift}px) } 45% { transform: translateX(${MOTION.refuse.shift}px) }
+  70% { transform: translateX(-${MOTION.refuse.shift / 2}px) } }
+.ui .dealt { transform-origin: 0 0; animation: dealt ${MOTION.deal.ms}ms ${MOTION.deal.ease} both; }
+@keyframes dealt { from { transform: translate(var(--x), var(--y)) rotate(${MOTION.dealt.turn}deg) scale(${MOTION.dealt.from}); opacity: 0 } }
 @keyframes needle { from { transform: rotate(-38deg) } to { transform: rotate(52deg) } }
 `;
 
@@ -229,5 +237,18 @@ export function piece(
   if (sized)
     el.style.transformOrigin = `${has('left') ? '0' : has('right') ? '100%' : '50%'} ${has('top') ? '0' : has('bottom') ? '100%' : '50%'}`;
   parent.appendChild(el);
+  return el;
+}
+
+export function placed(
+  parent: HTMLElement,
+  x: number,
+  y: number,
+  w: number,
+  h: number
+) {
+  const el = document.createElement('div');
+  el.style.cssText = `position:absolute;left:${x}px;top:${y}px;width:${w}px;height:${h}px`;
+  parent.append(el);
   return el;
 }

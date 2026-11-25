@@ -39,6 +39,9 @@ export const MOTION = {
   fan: { ms: 320, ease: POP, after: 90 },
   glide: { ms: 300, ease: OUT },
   arm: { ms: 160, ease: POP, from: 0.9 },
+  stamp: { ms: 280, ease: POP, from: 1.9 },
+  refuse: { ms: 280, shift: 3 },
+  dealt: { from: 0.55, turn: -9 },
   fade: { ms: 180, ease: 'ease' },
 } as const;
 

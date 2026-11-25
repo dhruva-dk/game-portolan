@@ -2,7 +2,7 @@ import { figure, glyph, INK, WASH } from './ink.ts';
 import type { Glyph } from './glyphs.ts';
 import { measured } from './word.ts';
 
-export type RosePoint = { glyph: Glyph; lo: number; hi: number };
+export type RosePoint = { glyph: Glyph; lo: number; hi: number; ink?: string };
 
 interface RoseStyle {
   glyph: number;
@@ -86,14 +86,16 @@ export function statRose(
     hi = points.map((p) => p.hi),
     exact = points.every((p) => p.lo === p.hi);
   if (!exact)
-    s += `<path d="${shape(hi)}" fill="url(#h-iron)" opacity=".55" stroke="${INK.iron}" stroke-width=".8" stroke-dasharray="2 1.6" stroke-linejoin="round"/>`;
+    s +=
+      `<path d="${shape(hi)}${shape(lo)}" fill="${wash}" fill-opacity=".3" fill-rule="evenodd"/>` +
+      `<path d="${shape(hi)}${shape(lo)}" fill="url(#h-open)" fill-rule="evenodd" stroke="${INK.iron}" stroke-width=".7" stroke-linejoin="round"/>`;
   s += `<path d="${shape(lo)}" fill="${wash}" fill-opacity=".62" stroke="${INK.iron}" stroke-width="1.3" stroke-linejoin="round"/>`;
   for (let i = 0; i < n; i++) {
     const [x, y] = at(i, Math.max(0.6, lo[i]));
     s += `<circle cx="${r2(x)}" cy="${r2(y)}" r="1.5" fill="${INK.iron}"/>`;
   }
   if (o.compare)
-    s += `<path d="${shape(o.compare)}" fill="none" stroke="${INK.blue}" stroke-width="1.2" stroke-linejoin="round"/>`;
+    s += `<path d="${shape(o.compare)}" fill="none" stroke="${INK.blue}" stroke-width="1.1" stroke-dasharray="3 1.8" stroke-linejoin="round"/>`;
   const out = R + o.glyph * 0.62;
   points.forEach((p, i) => {
     const a = angle(i),
@@ -104,10 +106,12 @@ export function statRose(
       const side = flank(a);
       const nx = gx + side * o.glyph * 0.78,
         ny = gy + (Math.abs(Math.cos(a)) < 0.2 ? 0 : o.glyph * 0.05);
-      const value = p.lo === p.hi ? `${p.lo}` : `${p.lo}–${p.hi}`;
-      s += figure(nx, ny, value, o.glyph * 0.62, {
+      const lo = Math.round(p.lo),
+        hi = Math.round(p.hi);
+      s += figure(nx, ny, lo === hi ? `${lo}` : `${lo}–${hi}`, o.glyph * 0.62, {
         anchor: side > 0 ? 'start' : 'end',
         weight: 600,
+        fill: p.ink,
       });
     }
   });
