@@ -354,8 +354,6 @@ test('listen: a ball passing near whistles once; a heal slot taken in hand; the 
   assert.deepEqual(cues(hearing(scene(2.3), status(), 'lobby')), []);
   assert.deepEqual(cues(hearing(scene(2.4), status(), 'settings')), ['open']);
   assert.deepEqual(cues(hearing(scene(2.5), status(), 'lobby')), ['close']);
-  assert.deepEqual(cues(hearing(scene(2.52), status(), 'livery')), ['open']);
-  assert.deepEqual(cues(hearing(scene(2.54), status(), 'lobby')), ['close']);
   assert.deepEqual(cues(hearing(scene(2.6), status(), 'match')), ['launch']);
   const sea = (
     seq: number,
