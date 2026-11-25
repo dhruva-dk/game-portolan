@@ -1,4 +1,4 @@
-import { approachRefusal } from '../hiring/approach.ts';
+import { approachRefusal } from '../hiring/talks.ts';
 import {
   isExact,
   knownAsk,

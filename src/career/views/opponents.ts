@@ -1,4 +1,4 @@
-import { approachRefusal } from '../hiring/approach.ts';
+import { approachRefusal } from '../hiring/talks.ts';
 import { isExact, knownStars, knownStats } from '../knowledge/people.ts';
 import { reportPrice, reportRefusal } from '../knowledge/report.ts';
 import { seatHolder } from '../lookup.ts';

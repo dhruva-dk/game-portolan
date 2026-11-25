@@ -1,17 +1,41 @@
 import { announce, named } from '../announce.ts';
+import type { Reason } from '../commands.ts';
+import { ownerOf, personOf } from '../lookup.ts';
 import { racesLeftOnSigning, renewedRacesLeft } from '../rules/hiring.ts';
 import type {
   CareerState,
   Contract,
   NewsEvent,
   Person,
+  Role,
+  Talk,
   Team,
   Terms,
 } from '../state.ts';
 import { updateTeam } from '../teams.ts';
 import { vacate } from '../vacate.ts';
-import { clauseOwed, costToSign, isRenewal, outgoing } from './cost.ts';
-import { talkWith, withTalk } from './talks.ts';
+import {
+  clauseOwed,
+  costToSign,
+  isRenewal,
+  outgoing,
+  releaseCostOf,
+} from './cost.ts';
+
+export const talkWith = (team: Team, person: number): Talk =>
+  team.talks.find((talk) => talk.person === person) ?? {
+    person,
+    attempts: 0,
+    answer: null,
+    counter: null,
+  };
+
+export const withTalk = (team: Team, talk: Talk): Team => ({
+  ...team,
+  talks: team.talks.some((t) => t.person === talk.person)
+    ? team.talks.map((t) => (t.person === talk.person ? talk : t))
+    : [...team.talks, talk],
+});
 
 const signedWith = (team: Team, person: number): Team =>
   withTalk(team, {
@@ -105,3 +129,45 @@ export const sign = (
   isRenewal(person, team)
     ? renew(state, team, person, terms)
     : signNew(state, team, person, terms);
+
+export function releaseRefusal(
+  state: CareerState,
+  team: number,
+  id: number
+): Reason | null {
+  if (ownerOf(state, id) !== null) return 'fixed';
+  return personOf(state, id)?.contract?.team === team ? null : 'seat';
+}
+
+export function release(
+  state: CareerState,
+  team: number,
+  id: number
+): CareerState {
+  const person = personOf(state, id);
+  if (person === null) return state;
+  const cost = releaseCostOf(person);
+  const paid = updateTeam(state, team, (t) => ({
+    ...t,
+    balance: t.balance - cost,
+  }));
+  return {
+    ...paid,
+    teams: vacate(paid.teams, new Set([id])),
+    people: state.people.map((p) =>
+      p.id === id ? { ...p, contract: null } : p
+    ),
+  };
+}
+
+export const scoutRefusal = (
+  state: CareerState,
+  team: number,
+  role: Role
+): Reason | null => (state.teams[team].scoutSeat === role ? 'same' : null);
+
+export const setScoutSeat = (
+  state: CareerState,
+  team: number,
+  role: Role
+): CareerState => updateTeam(state, team, (t) => ({ ...t, scoutSeat: role }));

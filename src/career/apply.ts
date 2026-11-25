@@ -15,15 +15,27 @@ import {
 } from './development/build.ts';
 import { focusRefusal, setFocus } from './development/focus.ts';
 import { fieldsValid, isIndex } from './fields.ts';
-import { approach, approachRefusal } from './hiring/approach.ts';
-import { acceptCounter, counterRefusal } from './hiring/counter.ts';
+import {
+  acceptCounter,
+  approach,
+  approachRefusal,
+  counterRefusal,
+  offer,
+  offerRefusal,
+} from './hiring/talks.ts';
 import { dealAfterRace, dealOffseason } from './hiring/deal.ts';
-import { offer, offerRefusal } from './hiring/offer.ts';
-import { release, releaseRefusal } from './hiring/release.ts';
-import { scoutRefusal, setScoutSeat } from './hiring/scout.ts';
+import {
+  release,
+  releaseRefusal,
+  scoutRefusal,
+  setScoutSeat,
+} from './hiring/sign.ts';
 import { buyReport, reportRefusal } from './knowledge/report.ts';
-import { narrowShipLines, redrawBuilt } from './knowledge/ships.ts';
-import { redrawKnowledge } from './knowledge/year.ts';
+import {
+  narrowShipLines,
+  redrawBuilt,
+  redrawKnowledge,
+} from './knowledge/ships.ts';
 import { known } from './lookup.ts';
 import {
   ageLeague,
