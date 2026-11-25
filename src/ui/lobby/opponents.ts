@@ -218,7 +218,7 @@ function small(c: SheetCard, i: number) {
   if (c.helm)
     return (
       paper(w, h, seed) +
-      glyph('stat.helm', w / 2 - 22, h / 2, least('stat.helm') + 8) +
+      glyph('role.owner', w / 2 - 22, h / 2, least('role.owner') + 8) +
       word(w / 2 + 6, h / 2, ROLE.owner.word, TYPE.word + 1, {
         anchor: 'start',
         weight: 600,
