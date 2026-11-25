@@ -14,6 +14,8 @@ import { startCareer } from '../tools/sim/career.ts';
 import { KINDS } from '../src/sim/kinds.ts';
 import { EVEN_SHIP, setupOf, valuesAt } from './setups.ts';
 import { OPEN, sail, waters } from './small.ts';
+import { loosed } from '../src/sim/shot.ts';
+import { R, along, bearingAt, scale } from '../src/world/sphere.ts';
 
 interface Watched {
   setup: MatchSetup;
@@ -37,8 +39,8 @@ function watched(setup: MatchSetup): Watched {
   while (!m.done) {
     m.step(STILL);
     const now = view.time();
-    for (const s of view.last().strikes)
-      hit.set(s.struck, { by: s.shooter, time: now });
+    for (const h of view.happened()?.fought.hits ?? [])
+      hit.set(h.struck, { by: h.shooter, time: now });
     const sunk = view.sinkings();
     for (; read < sunk.length; read++) {
       const k = sunk[read],
@@ -242,6 +244,56 @@ test('places, arranged: sinkings first, then the team’s sea, then the ship id;
   assert.equal(r.ships[2].sinkings, 1);
   assert.equal(r.ships[7].sunkBy, 2);
   assert.equal(r.ships[6].sunkBy, null);
+});
+
+test('two ships hit a third in one step: the sinking goes to the ship and gun whose hit took its hull to 0', () => {
+  const setup = setupOf(33, {
+      teams: 3,
+      perTeam: 1,
+      values: (ship) => valuesAt(50, ship === 1 ? 'scatter' : 'cannon'),
+    }),
+    m = createMatch(setup, waters),
+    debug = debugOf(m),
+    [V, A, B] = [0, 1, 2];
+  debug.rig({ storm: () => calm(OPEN) });
+  debug.atSea(
+    { at: OPEN, bearing: 0 },
+    [80, -80].map((x) => {
+      const at = along(OPEN, bearingAt(OPEN, Math.PI / 2), x).p;
+      return { at, heading: bearingAt(at, 0), lashed: null };
+    })
+  );
+  const hull = setup.ships[V].hullPoints;
+  debug.hurt(V, hull - 25);
+  const on = m.view.vessel(V)!.ship.at,
+    falling = (shooter: number, round: number) =>
+      loosed(
+        shooter,
+        setup.ships[shooter].gun,
+        scale(on, R + 3),
+        scale(on, -1),
+        90,
+        10,
+        on,
+        round
+      );
+  debug.volley([falling(A, 0), falling(B, 0), falling(A, 0)]);
+  m.step(STILL);
+  assert.deepEqual(
+    m.view.last().strikes.map((s) => [s.shooter, s.hull]),
+    [
+      [A, 15],
+      [B, 10],
+    ],
+    "A's pellet, B's ball, A's second pellet"
+  );
+  const r = m.result(),
+    k = m.view.sinking(V);
+  assert.equal(r.ships[V].sunkBy, A, 'A struck last');
+  assert.equal(k?.cause, 'shot');
+  assert.equal(k?.gun, 'scatter', "with A's gun");
+  assert.equal(r.ships[A].sinkings, 1);
+  assert.equal(r.ships[B].sinkings, 0);
 });
 
 test('a match always ends: where nobody can sink anybody, 180 s after the last phase closes', () => {

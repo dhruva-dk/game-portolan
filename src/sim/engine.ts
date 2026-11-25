@@ -39,6 +39,7 @@ import type { MatchResult } from './result.ts';
 import type { DriverStats, MatchSetup, ShipSpec, ShipValues } from './setup.ts';
 import { driver } from './driver.ts';
 import { rulesOf } from './rules.ts';
+import type { Ball } from './shot.ts';
 import { remembered } from '../world/remembered.ts';
 import type { ShipPose } from '../world/pose.ts';
 import { hash } from '../world/random.ts';
@@ -428,8 +429,8 @@ function createSea(waters: Waters, first: Course) {
       depth,
       rises
     );
+    for (const h of fought.hits) struck.set(h.struck, { by: h.shooter, tick });
     for (const s of fought.strikes) {
-      struck.set(s.struck, { by: s.shooter, tick });
       const a = aboard.get(s.struck);
       if (a?.mind)
         a.mind = s.ram
@@ -507,9 +508,9 @@ function createSea(waters: Waters, first: Course) {
   const founderAll = (fought: Fought) => {
     for (const id of lost) {
       const blow = fought.sunk.includes(id)
-        ? fought.strikes.findLast((s) => s.struck === id)
+        ? fought.hits.findLast((h) => h.struck === id)
         : undefined;
-      const cause: Cause = blow ? (blow.ram ? 'ram' : 'shot') : 'storm',
+      const cause: Cause = blow ? (blow.gun ? 'shot' : 'ram') : 'storm',
         last = struck.get(id);
       founder({
         id,
@@ -730,6 +731,9 @@ function createSea(waters: Waters, first: Course) {
         gun: held ? held.gun.kind : null,
       });
     },
+    volley(balls: readonly Ball[]) {
+      battle = { ...battle, balls: [...battle.balls, ...balls] };
+    },
     hurt(id: number, points: number) {
       const hurt = (c: Crew): Crew =>
         c.id === id && !sunk(c.health)
@@ -804,6 +808,7 @@ interface Debug {
   rig(rig: Rig): void;
   strew(at: Vec3, heals: readonly Rarity[]): void;
   sink(id: number, by: number | null): void;
+  volley(balls: readonly Ball[]): void;
   hurt(id: number, points: number): void;
   mindOf(id: number): Readonly<Memory> | null;
   standIn(id: number, sights: Sighter): void;
