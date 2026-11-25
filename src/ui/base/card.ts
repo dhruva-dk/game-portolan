@@ -12,7 +12,7 @@ import { grouped } from './grouped.ts';
 
 export type Span = { lo: number; hi: number };
 
-export type CardRole = 'driver' | 'designer' | 'mechanic';
+export type CardRole = 'driver' | 'designer' | 'mechanic' | 'owner';
 
 export type CardFace = {
   who: 'person' | 'uncle';

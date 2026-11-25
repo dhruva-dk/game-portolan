@@ -43,7 +43,7 @@ export type CardView = {
   person: number | null;
   name: string;
   portrait: number | null;
-  role: Role;
+  role: Role | 'owner';
   age: number | null;
   stars: Span;
   stats: StatView[];

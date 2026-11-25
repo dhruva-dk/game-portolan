@@ -74,7 +74,7 @@ export function rivalOf(state: CareerState, person: Person): RivalView | null {
 const why = (reason: string | null): Why | null =>
   reason === null ? null : reason === 'funds' ? 'funds' : 'held';
 
-function action(cost: number, reason: string | null): ActionView {
+export function action(cost: number, reason: string | null): ActionView {
   const held = why(reason);
   return { cost, faint: held !== null, why: held };
 }
