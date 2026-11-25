@@ -17,6 +17,7 @@ import { piece, placed, screen } from '../base/ui.ts';
 import { measured, word, type Word } from '../base/word.ts';
 import type { LobbyPort } from './port.ts';
 import { SHEET } from './team.ts';
+import { grouped } from '../base/grouped.ts';
 
 const PAD = SPACE.pad;
 const AREA = { x: PAD + CARD.w + 20, y: PAD } as const;
@@ -39,7 +40,6 @@ const STEPPED: readonly { key: Stepped; word: Word; row: number }[] = [
 ];
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
-const grouped = (n: number) => n.toLocaleString('en-US');
 const rowY = (row: number) => TERMS.first + row * TERMS.step;
 
 type Zone = 0 | 1 | 2;
