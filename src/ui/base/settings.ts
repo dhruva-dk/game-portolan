@@ -1,4 +1,10 @@
-import type { Word } from './word.ts';
+import { pressable, ribbon } from './button.ts';
+import { MOTION, SPACE, TYPE } from './house.ts';
+import { WASH, glyph, slip, svgNode } from './ink.ts';
+import { sheet } from './sheet.ts';
+import { bindSlider, sliderFace, type Track } from './slider.ts';
+import { bindSwitch, switchFace, SWITCH } from './switch.ts';
+import { fitted, label, measured, word, type Word } from './word.ts';
 
 export type Settings = {
   sound: number;
@@ -99,5 +105,188 @@ export function settled(fields: ReadonlyMap<string, unknown>): Settings {
     music: level('music', fields.get('music')),
     leftHanded: typeof left === 'boolean' ? left : SETTINGS.leftHanded,
     sensitivity: level('sensitivity', fields.get('sensitivity')),
+  };
+}
+
+export type SettingsPort = {
+  get(): Settings;
+  set(settings: Settings): void;
+  heard?(id: Level): void;
+};
+
+export type LobbyRows = { seed: string; newCareer(): void };
+
+export const SETTINGS_SHEET = {
+  w: 340,
+  top: 42,
+  row: 50,
+  ribbon: 36,
+  foot: 42,
+  below: 70,
+  words: 28,
+  control: 150,
+  seed: 32,
+  newCareer: 196,
+} as const;
+
+const WASHES: Record<Level, string> = {
+  sound: WASH.azure,
+  music: WASH.viridian,
+  sensitivity: WASH.ochre,
+};
+
+const S = SETTINGS_SHEET;
+
+const sheetHeight = (lobby: boolean) =>
+  lobby ? S.top + 4 * S.row + S.below : S.top + 3 * S.row + S.foot;
+
+const track = (): Track => ({
+  x: S.control - 4,
+  w: S.w - S.control - S.words + 8,
+});
+
+function rowFace(row: SettingsRow, cy: number) {
+  const right = S.w - S.words;
+  switch (row.kind) {
+    case 'slider':
+      return (
+        word(S.words, cy, row.word, TYPE.name, {
+          anchor: 'start',
+          weight: 600,
+        }) +
+        sliderFace(row.id, track(), cy, row.share, {
+          wash: WASHES[row.id],
+          mark: row.mark,
+        })
+      );
+    case 'switch':
+      return (
+        word(S.words, cy, row.word, TYPE.name, {
+          anchor: 'start',
+          weight: 600,
+        }) + switchFace(row.id, right - SWITCH.w, cy, row.on)
+      );
+    case 'seed': {
+      const w = right - S.control,
+        size = fitted(row.seed, TYPE.name + 1, w - 2 * SPACE.pad - 18);
+      return (
+        word(S.words, cy, row.word, TYPE.name, {
+          anchor: 'start',
+          weight: 600,
+        }) +
+        `<g id="seed">${slip(S.control, cy - S.seed / 2, w, S.seed)}` +
+        label(S.control + SPACE.pad, cy + 0.5, row.seed, size, {
+          anchor: 'start',
+        }) +
+        '</g>' +
+        `<g id="copied" class="answer" opacity="0">${glyph('tick', right - 13, cy, 18, { ink: 'green' })}</g>`
+      );
+    }
+    case 'newCareer': {
+      const said = measured(row.word, TYPE.ribbon - 4, { weight: 600 });
+      return (
+        '<g id="new-career">' +
+        ribbon(
+          S.w / 2,
+          cy,
+          S.newCareer,
+          word(S.w / 2 - said / 2, cy - 1, row.word, TYPE.ribbon - 4, {
+            anchor: 'start',
+            weight: 600,
+          })
+        ) +
+        '</g>'
+      );
+    }
+  }
+}
+
+const copier = () => {
+  try {
+    const clip = navigator.clipboard;
+    return typeof clip?.writeText === 'function' ? clip : null;
+  } catch {
+    return null;
+  }
+};
+
+export function createSettingsSheet(port: SettingsPort, lobby?: LobbyRows) {
+  const h = sheetHeight(lobby !== undefined),
+    tall = lobby ? h + S.ribbon : h,
+    el = document.createElement('div');
+  el.style.cssText = `position:relative;width:${S.w}px;height:${tall}px`;
+  let timer = 0;
+
+  function draw() {
+    const v = settingsView(port.get(), lobby ? { seed: lobby.seed } : null),
+      clip = copier();
+    let art = sheet(0, 0, S.w, h, { seed: 29 });
+    v.rows.forEach((row, i) => {
+      art += rowFace(row, row.kind === 'newCareer' ? h : S.top + i * S.row);
+    });
+    const svg = svgNode(S.w, tall, art);
+    el.replaceChildren(svg);
+    for (const row of v.rows) {
+      if (row.kind === 'slider') {
+        const id = row.id;
+        bindSlider(svg, id, track(), {
+          move: (share) => port.set(moved(port.get(), id, share)),
+          done(share) {
+            const next = moved(port.get(), id, share);
+            port.set(next);
+            port.heard?.(id);
+            return shareOf(id, next[id]);
+          },
+        });
+      }
+      if (row.kind === 'switch')
+        bindSwitch(svg, row.id, () => {
+          const next = thrown(port.get());
+          port.set(next);
+          return next.leftHanded;
+        });
+    }
+    if (lobby) {
+      pressable(
+        svg.querySelector<SVGElement>('#new-career'),
+        () => lobby.newCareer(),
+        'new-career'
+      );
+      if (clip)
+        pressable(
+          svg.querySelector<SVGElement>('#seed'),
+          () => {
+            const seed = svg.querySelector<SVGElement>('#seed');
+            const refused = () => {
+              seed?.classList.remove('refuse');
+              void seed?.getBoundingClientRect();
+              seed?.classList.add('refuse');
+            };
+            clip.writeText(lobby.seed).then(() => {
+              const answer = svg.querySelector<SVGElement>('#copied');
+              if (!answer) return;
+              answer.classList.remove('copied');
+              void answer.getBoundingClientRect();
+              answer.classList.add('copied');
+              window.clearTimeout(timer);
+              timer = window.setTimeout(
+                () => answer.classList.remove('copied'),
+                MOTION.copied.hold
+              );
+            }, refused);
+          },
+          'seed'
+        );
+    }
+    return svg;
+  }
+
+  return {
+    el,
+    w: S.w,
+    h: tall,
+    show() {
+      draw();
+    },
   };
 }
