@@ -1,6 +1,8 @@
 import type { Chart, PlanetMarks } from '../../play/player.ts';
 import type { Command, Livery, Reason, Role } from '../../career/commands.ts';
 
+export type Jolt = 'built' | 'focused' | 'painted';
+
 export type ScreenName =
   | 'ship'
   | 'paint'
@@ -13,7 +15,12 @@ export type ScreenName =
   | 'planet'
   | 'settings';
 
-export type ScreenArgument = { role?: Role; person?: number; team?: number };
+export type ScreenArgument = {
+  role?: Role;
+  person?: number;
+  team?: number;
+  stop?: number;
+};
 
 export type LobbyPort = {
   send(command: Command): Reason | null;
@@ -23,6 +30,7 @@ export type LobbyPort = {
     stop(index: number | null): void;
     wear(livery: Livery | null, emblem: number | null): void;
     planet(on: boolean): void;
+    jolt(kind: Jolt): void;
   };
   chart(): Chart | null;
   marks(): PlanetMarks | null;
