@@ -25,11 +25,15 @@ export const recordOf = (result: MatchResult): Command => ({
   result,
 });
 
-export type Founded = { state: CareerState; options: CareerOptions };
+export type Founded = {
+  before: CareerState;
+  state: CareerState;
+  options: CareerOptions;
+};
 
 export function begun(options: CareerOptions): Founded {
   const created = newCareer(options),
     raced = apply(created, { type: 'StartRace', team: YOURS });
   if (!raced.ok) throw new Error(`StartRace refused (${raced.reason})`);
-  return { state: raced.state, options };
+  return { before: created, state: raced.state, options };
 }

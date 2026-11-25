@@ -161,6 +161,9 @@ export const MOTION = {
   kick: { ms: 220, ease: POP, give: 0.86, back: 3 },
   glow: { ms: 1200, low: 0.35, high: 0.85 },
   paused: { dim: 0.42, ms: 260, release: 650, duck: 0.15 },
+  settling: { dim: 0.5, spin: 900, ms: 220, ease: POP, tick: 1.25, hold: 700 },
+  loading: { fade: 260, turn: 1600 },
+  casting: { leave: 420 },
   leafed: { ms: 420, ease: IN, rise: 46, turn: 4, swell: 1.05 },
   ceremony: {
     champion: { after: 200, ms: 620, ease: POP, from: 2.6 },
