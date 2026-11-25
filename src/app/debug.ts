@@ -17,7 +17,15 @@ import {
   type Haggle,
 } from './rehearse.ts';
 import { ROLES, YOURS, type CareerState, type Role } from '../career/state.ts';
-import { memoryStore } from './save.ts';
+import {
+  BACKUP_KEY,
+  CAREER_KEY,
+  indexedStore,
+  memoryStore,
+  saveQueue,
+} from './save.ts';
+import { sailOrders } from '../career/views/lobby.ts';
+import { apply } from '../career/apply.ts';
 import { planetSeed } from '../career/fit.ts';
 import { REPOSSESSION } from '../career/tuning.ts';
 import {
@@ -84,7 +92,7 @@ export interface Stage {
   gun: GunKind;
   stats(on: boolean): void;
   draw(
-    next: (dt: number) => Snapshot,
+    next: (dt: number) => Snapshot | null,
     drawn?: (canvas: HTMLCanvasElement) => void
   ): Promise<void>;
 }
@@ -155,12 +163,38 @@ function setupOf(release: Setup): Setup {
   };
 }
 
+const SAVED = ['none', 'racing', 'unread', 'lobby'] as const;
+
+function savedState(kind: (typeof SAVED)[number]): CareerState | null {
+  const seed = params.get('seed') ?? undefined,
+    races = Math.max(0, Math.floor(number('races', 0)));
+  if (kind === 'none') return null;
+  if (kind === 'unread')
+    return recorded(rehearsed(seed, Math.max(1, races) - 1));
+  const lobby = rehearsed(seed, races);
+  if (kind === 'lobby') return lobby;
+  return sailOrders(lobby).reduce((now, order) => {
+    const applied = apply(now, order);
+    if (!applied.ok)
+      throw new Error(`${order.type} refused (${applied.reason})`);
+    return applied.state;
+  }, lobby);
+}
+
+async function kept(name: string) {
+  const kind = SAVED.find((k) => k === name) ?? 'none',
+    state = JSON.stringify(savedState(kind));
+  await indexedStore().write({ [CAREER_KEY]: state, [BACKUP_KEY]: state });
+  location.replace(location.pathname);
+}
+
 export async function scenario(
   release: Setup,
   stage: (setup: Setup) => Promise<Stage>,
   play: (s: Stage) => Promise<Played>,
   title: { show(on: boolean): void }
 ) {
+  if (params.has('saved')) return kept(params.get('saved') ?? 'none');
   if (params.get('screen') === 'glyphs') return specimen(number('page', 1));
   if (params.get('screen') === 'new') return founder(release, stage, title);
   const career = CAREER_SCREENS.find((c) => c === params.get('screen'));
@@ -432,7 +466,7 @@ async function harbor(
   });
   safeArea(uiLayer());
   const shore = await ashore(s, career, {
-    store: memoryStore(),
+    queue: saveQueue(memoryStore()),
     ready: () => title.show(false),
     founded({ options }) {
       const at = new URL(location.href);

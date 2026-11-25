@@ -22,7 +22,7 @@ import { shoresOf } from '../ui/base/coasts.ts';
 import { createGlobe } from '../ui/base/globe.ts';
 import { createFlow } from './flow.ts';
 import { createHud, type HudState } from '../ui/sea/hud.ts';
-import { createTitle } from '../ui/base/screens.ts';
+import { createTitle, type Title } from '../ui/base/screens.ts';
 import { createInput } from '../ui/sea/input.ts';
 import { createStick } from '../ui/sea/stick.ts';
 import { createPause } from '../ui/sea/pause.ts';
@@ -36,8 +36,7 @@ import { MEAN, SWING } from '../world/weather.ts';
 
 const SEA: readonly string[] = ['match', 'spectate'];
 
-const DEBUG =
-  import.meta.env.DEV || new URLSearchParams(location.search).has('debug');
+const DEBUG = new URLSearchParams(location.search).has('debug');
 
 const NAME = launched(() => (DEBUG ? String(SEED) : roll()));
 
@@ -61,13 +60,8 @@ const RELEASE: Setup = {
 
 loaded('script');
 
-const title = createTitle();
-title.show(true, 0);
-await new Promise((go) => {
-  requestAnimationFrame(() => setTimeout(go));
-  setTimeout(go, 250);
-});
-loaded('title shown');
+let shown: Title | null = null;
+const titled = () => (shown ??= createTitle());
 
 const meterEl = document.getElementById('meter')!;
 const say = (text: string) => {
@@ -110,7 +104,7 @@ async function stage(setup: Setup): Promise<Stage> {
     rig: rigOf(setup, world),
     gun: setup.gun,
     async draw(
-      next: (dt: number) => Snapshot,
+      next: (dt: number) => Snapshot | null,
       drawn?: (canvas: HTMLCanvasElement) => void
     ) {
       console.info(`ground baked in ${(await frame.ready).toFixed(0)} ms`);
@@ -125,6 +119,7 @@ async function stage(setup: Setup): Promise<Stage> {
         const dt = Math.min((now - last) / 1000, 0.1);
         last = now;
         const snapshot = next(dt);
+        if (!snapshot) return;
         const begun = performance.now();
         frame.render(snapshot, dt);
         const rendered = performance.now() - begun;
@@ -216,7 +211,7 @@ async function play(s: Stage): Promise<Played> {
         broadside: game.broadside,
       },
     },
-    title
+    titled()
   );
   kept = flow.settings;
   let left: boolean | null = null,
@@ -305,10 +300,16 @@ async function play(s: Stage): Promise<Played> {
 }
 
 if (DEBUG) {
+  const title = titled();
+  title.show(true, 0);
+  await new Promise((go) => {
+    requestAnimationFrame(() => setTimeout(go));
+    setTimeout(go, 250);
+  });
+  loaded('title shown');
   const { scenario } = await import('./debug.ts');
   await scenario(RELEASE, stage, play, title);
 } else {
-  const s = await stage(RELEASE);
-  const p = await play(s);
-  await s.draw(p.next, p.drawn);
+  const { home } = await import('./home.ts');
+  await home(RELEASE, stage);
 }

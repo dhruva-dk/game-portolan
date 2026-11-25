@@ -57,6 +57,7 @@ import type { Settings } from '../ui/base/settings.ts';
 import { PLAIN } from '../play/colors.ts';
 import { rolled } from '../world/seeds.ts';
 import { createAudio } from '../audio/audio.ts';
+import { loaded } from '../render/load.ts';
 import type { Hearing } from '../audio/listen.ts';
 import { view } from '../ui/base/ui.ts';
 import { onPressed } from '../ui/base/touch.ts';
@@ -66,7 +67,7 @@ import { createInput } from '../ui/sea/input.ts';
 import type { Stage } from './debug.ts';
 import { painter } from './painter.ts';
 import { RACE_SHIP } from './race.ts';
-import { saveQueue, sendAndSave, type Store } from './save.ts';
+import { sendAndSave, type SaveQueue } from './save.ts';
 
 const LIFTED: Framing = { center: [0, -0.5], size: 0.86 };
 const ASIDE: Framing = { center: [-0.3, 0.02], size: 0.82 };
@@ -76,9 +77,18 @@ export type Ashore = {
   open(screen: ScreenName, argument?: ScreenArgument): void;
   state(): CareerState;
   settled: Promise<void>;
+  leave(): Crew;
 };
 
-export async function anchorage(s: Stage, two: boolean) {
+export type Crew = Awaited<ReturnType<typeof anchorage>> & {
+  audio: ReturnType<typeof createAudio>;
+};
+
+export async function anchorage(
+  s: Stage,
+  two: boolean,
+  hands?: () => { leftHanded: boolean; sensitivity: number }
+) {
   const { waters, berth } = await watersOf(s.world.seed, s.world.land);
   const { climate } = s.world,
     sun = sunAt(climate.sunPlaces, climate.timeOfDay, s.start.at);
@@ -86,7 +96,7 @@ export async function anchorage(s: Stage, two: boolean) {
   const start = { at: s.start.at, bearing: opening.bearing };
   const game = createGame(s.world, s.anchors, waters, start, RACE_SHIP);
   game.moor(two, opening.side);
-  const input = createInput(s.canvas, () => game.steering());
+  const input = createInput(s.canvas, () => game.steering(), hands);
   return { game, input, berth };
 }
 
@@ -119,13 +129,17 @@ export async function ashore(
   s: Stage,
   career: CareerState,
   o: {
-    store: Store;
+    queue: SaveQueue;
     sailed(state: CareerState): void;
     ready(): void;
     founded?(founded: Founded): void;
   }
 ): Promise<Ashore> {
-  const { game, input, berth } = await anchorage(s, true);
+  const device = deviceStore();
+  let settings: Settings = keptSettings(device),
+    gone = false;
+  const crew = await anchorage(s, true, () => settings);
+  const { game, input } = crew;
   const repaint = painter(
     (look) => game.paint(look),
     lookOf(career.teams[YOURS].livery)
@@ -134,7 +148,7 @@ export async function ashore(
   game.arm(career.teams[YOURS].ships[0].gun);
   uiLayer();
 
-  const queue = saveQueue(o.store);
+  const { queue } = o;
   let state = career,
     chart: Chart | null = null,
     marks: PlanetMarks | null = null,
@@ -393,8 +407,6 @@ export async function ashore(
   const sponsors = createSponsors(port);
   const planet = createPlanet(port);
   const opponents = createOpponents(port);
-  const device = deviceStore();
-  let settings: Settings = keptSettings(device);
   const settingsScreen = createSettingsScreen(
     {
       get: () => settings,
@@ -513,9 +525,12 @@ export async function ashore(
     rise(lobby.el, true);
   }
 
-  if (flowing === 'result') flow('result');
+  if (flowing === 'result') {
+    flow('result');
+    loaded('result flow');
+  }
 
-  const marked = markedOn(s, state, berth).then((m) => {
+  const marked = markedOn(s, state, crew.berth).then((m) => {
     marks = m;
   });
 
@@ -535,7 +550,9 @@ export async function ashore(
     map: false,
     covered: 0,
   };
-  onPressed(uiLayer(), () => audio.tap(hearing.screen));
+  onPressed(uiLayer(), () => {
+    if (!gone) audio.tap(hearing.screen);
+  });
   void s.draw((dt) => {
     game.step(dt, input.read());
     const scene = game.snapshot();
@@ -561,5 +578,15 @@ export async function ashore(
     open: (name, argument) => port.open(name, argument),
     state: () => state,
     settled,
+    leave() {
+      gone = true;
+      const layer = uiLayer();
+      Array.from(layer.children).forEach((el) => {
+        if (!(el instanceof HTMLElement)) return;
+        fade(el, false, MOTION.casting.leave);
+        window.setTimeout(() => el.remove(), MOTION.casting.leave);
+      });
+      return { ...crew, audio };
+    },
   };
 }
