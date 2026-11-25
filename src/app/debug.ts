@@ -96,6 +96,9 @@ export interface Played {
   race: MatchSetup;
   play(): void;
   map(): void;
+  pause(): void;
+  hand(left: boolean): void;
+  wingman(seed: number | null): void;
   next(dt: number): Snapshot;
   drawn(canvas: HTMLCanvasElement): void;
 }
@@ -185,12 +188,16 @@ export async function scenario(
   safeArea(uiLayer());
   if (params.has('livery')) p.game.wear(asked);
   open(p, demoShips(s.start.at, room - 1, s.world.seed, p.game.worn()), s);
+  if (params.has('left')) p.hand(params.get('left') !== '0');
+  if (params.has('wingman')) p.wingman(number('wingman', 0) || null);
   const paused = params.has('pause'),
     slow = number('slow', 1);
   const swing = params.get('swing')?.split(',').map(Number);
   const [slot, use] = (params.get('use') ?? '').split(',').map(Number),
     gusts = params.get('gust')?.split(',').map(Number) ?? [];
-  const [hurt, hurtAt] = (params.get('hurt') ?? '').split(',').map(Number);
+  const [hurt, hurtAt, hurtWho] = (params.get('hurt') ?? '')
+    .split(',')
+    .map(Number);
   const [fireAt, held] = (params.get('fire') ?? '').split(',').map(Number);
   const timed: { at: number; hands: Partial<Thumbs> }[] = [
     ...(slot > 0 ? [{ at: use || 0, hands: { heal: slot - 1 } }] : []),
@@ -225,8 +232,33 @@ export async function scenario(
     ...(params.get('kit')
       ? [{ at: number('kit', 0), act: () => kit(p.game) }]
       : []),
+    ...(params.has('paused')
+      ? [{ at: number('paused', 0), act: () => p.pause() }]
+      : []),
+    ...(params.has('forfeit')
+      ? [{ at: number('forfeit', 0), act: () => p.game.forfeit() }]
+      : []),
+    ...(params.get('shot') ?? '').split(';').flatMap((one) => {
+      const [damage, at, who] = one.split(',').map(Number);
+      return damage > 0
+        ? [
+            {
+              at: at || 0,
+              act: () => p.game.debug.shoot(who || PLAYER, damage),
+            },
+          ]
+        : [];
+    }),
+    ...(params.has('mate')
+      ? [{ at: number('mate', 0), act: () => sinkMate(p.game) }]
+      : []),
     ...(hurt > 0
-      ? [{ at: hurtAt || 0, act: () => p.game.debug.hurt(PLAYER, hurt) }]
+      ? [
+          {
+            at: hurtAt || 0,
+            act: () => p.game.debug.hurt(hurtWho || PLAYER, hurt),
+          },
+        ]
       : []),
     ...(damage && number('worn', 0) > 0
       ? [{ at: number('worn', 0), act: () => p.game.debug.wear(damage) }]
@@ -527,6 +559,11 @@ function sinkPlayerShip(game: Game) {
   );
 }
 
+function sinkMate(game: Game) {
+  const mate = game.status().race?.mates[0];
+  if (mate) game.debug.sink(mate.id, null);
+}
+
 function downOne(game: Game) {
   const one = game.alive().find((id) => id !== PLAYER);
   if (one !== undefined) game.debug.sink(one, PLAYER);
@@ -554,6 +591,13 @@ function kit(game: Game) {
 function stock(game: Game) {
   const { at, heading, facing } = game.status();
   if (params.get('kit') === '') kit(game);
+  const held = (params.get('heals') ?? '')
+    .split(',')
+    .flatMap((r) => RARITIES.filter((k) => k === r));
+  if (held.length) {
+    game.debug.strew(at, held);
+    game.step(STEP, IDLE);
+  }
   const row = params.has('loot') ? number('loot', 0) : 0;
   if (row > 0) {
     RARITIES.forEach((g, i) => {
