@@ -1,9 +1,7 @@
 import type { Reason } from '../commands.ts';
 import { costToSign, isRenewal, signingFunds } from '../hiring/cost.ts';
-import { counterRefusal } from '../hiring/counter.ts';
-import { offerRefusal } from '../hiring/offer.ts';
-import { talkWith } from '../hiring/talks.ts';
-import { willingness } from '../hiring/willingness.ts';
+import { talkWith } from '../hiring/sign.ts';
+import { counterRefusal, offerRefusal, willingness } from '../hiring/talks.ts';
 import { isExact, knownAsk, knownStars } from '../knowledge/people.ts';
 import { personOf } from '../lookup.ts';
 import {

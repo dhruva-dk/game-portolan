@@ -5,7 +5,7 @@ import type { Command, Reason } from '../src/career/commands.ts';
 import { ordered } from '../src/career/draw.ts';
 import { matchSetup } from '../src/career/fit.ts';
 import { costToSign } from '../src/career/hiring/cost.ts';
-import { willingness } from '../src/career/hiring/willingness.ts';
+import { willingness } from '../src/career/hiring/talks.ts';
 import { personOf } from '../src/career/lookup.ts';
 import { enterPhase } from '../src/career/record/race.ts';
 import { wageBill } from '../src/career/record/pay.ts';

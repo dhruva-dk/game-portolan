@@ -14,7 +14,7 @@ import {
   costToSign,
   releaseCostOf,
 } from '../src/career/hiring/cost.ts';
-import { willingness } from '../src/career/hiring/willingness.ts';
+import { willingness } from '../src/career/hiring/talks.ts';
 import {
   isExact,
   knownAsk,

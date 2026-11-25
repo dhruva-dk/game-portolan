@@ -2,22 +2,66 @@ import type { Command } from '../commands.ts';
 import { buildPrice, fitPrice } from '../development/build.ts';
 import { sameFocus } from '../development/focus.ts';
 import { draw, raceKey } from '../draw.ts';
-import { employees, personOf } from '../lookup.ts';
-import { reputationOf, standings } from '../rules/standing.ts';
+import { employees, personOf, seatHolder } from '../lookup.ts';
+import { focusValue, focusWeight, wantsGun } from '../rules/development.ts';
 import { ownerTemperament, stars, type Temperament } from '../rules/person.ts';
+import { reputationOf, standings } from '../rules/standing.ts';
 import {
   LINES,
   ROLES,
+  STATS,
   type CareerState,
+  type Focus,
   type Line,
   type Person,
   type Role,
   type Terms,
 } from '../state.ts';
 import { LEAGUE, POLICY, SCOUTING } from '../tuning.ts';
-import { wantedFocus } from './focus.ts';
 import { meansOf, purchasable, signableTerms, type Means } from './means.ts';
-import { holderStars, weakSeat } from './seats.ts';
+
+export function wantedFocus(state: CareerState, team: number): Focus {
+  const designer = seatHolder(state, team, 'designer');
+  if (designer === null) return null;
+  const { design, taste, unlocked } = state.teams[team];
+  const locked = taste.filter((kind) => !unlocked.includes(kind));
+  if (locked.length > 0 && wantsGun(design.gun, unlocked.length))
+    return { gun: locked[0] };
+  const mean =
+    LINES.reduce((sum, line) => sum + design[line], 0) / LINES.length;
+  let best = LINES[0];
+  let top = -Infinity;
+  for (const line of LINES) {
+    const skill = designer.stats[STATS.designer.indexOf(line)];
+    const value = focusValue(
+      skill,
+      design[line],
+      focusWeight(design[line], mean)
+    );
+    if (value > top) {
+      top = value;
+      best = line;
+    }
+  }
+  return { line: best };
+}
+
+export function holderStars(
+  state: CareerState,
+  team: number,
+  role: Role
+): number {
+  const holder = seatHolder(state, team, role);
+  return holder === null ? POLICY.emptySeatStars : stars(holder.stats);
+}
+
+export function weakSeat(state: CareerState, team: number): Role {
+  let weak = ROLES[0];
+  for (const role of ROLES)
+    if (holderStars(state, team, role) < holderStars(state, team, weak))
+      weak = role;
+  return weak;
+}
 
 type Choice = { person: Person; terms: Terms };
 

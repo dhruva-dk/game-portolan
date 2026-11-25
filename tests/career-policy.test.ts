@@ -12,15 +12,17 @@ import { buildPrice, fitPrice } from '../src/career/development/build.ts';
 import { draw } from '../src/career/draw.ts';
 import { matchSetup } from '../src/career/fit.ts';
 import { costToSign, clauseOwed } from '../src/career/hiring/cost.ts';
-import { willingness } from '../src/career/hiring/willingness.ts';
+import { willingness } from '../src/career/hiring/talks.ts';
 import { knownStats, trueStats } from '../src/career/knowledge/people.ts';
 import { personOf } from '../src/career/lookup.ts';
-import { wantedFocus } from '../src/career/policy/focus.ts';
-import { meansOf } from '../src/career/policy/means.ts';
-import { policy } from '../src/career/policy/policy.ts';
+import {
+  holderStars,
+  policy,
+  wantedFocus,
+  weakSeat,
+} from '../src/career/policy/policy.ts';
+import { meansOf, minimumTerms } from '../src/career/policy/means.ts';
 import { runTeam, worstFirst, type Send } from '../src/career/policy/run.ts';
-import { holderStars, weakSeat } from '../src/career/policy/seats.ts';
-import { minimumTerms } from '../src/career/policy/terms.ts';
 import { moneyTotal, teamMoney, wageBill } from '../src/career/record/pay.ts';
 import { scoreRace } from '../src/career/record/race.ts';
 import { ask, standardClause } from '../src/career/rules/hiring.ts';

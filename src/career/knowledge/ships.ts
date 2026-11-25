@@ -9,6 +9,7 @@ import {
   type Team,
 } from '../state.ts';
 import { RIVAL_SHIPS } from '../tuning.ts';
+import { discardReports } from './report.ts';
 
 type ShipLines = Record<Line, Range>[];
 
@@ -158,3 +159,6 @@ export function narrowShipLines(state: CareerState): CareerState {
     )
   );
 }
+
+export const redrawKnowledge = (state: CareerState): CareerState =>
+  redrawShipLines(discardReports(state));

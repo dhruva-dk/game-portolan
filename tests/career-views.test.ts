@@ -28,7 +28,7 @@ import { reportCost } from '../src/career/rules/knowledge.ts';
 import { stars } from '../src/career/rules/person.ts';
 import { SCOUTING } from '../src/career/tuning.ts';
 import { dismissed, haggled, owing, rehearsed } from '../src/app/rehearse.ts';
-import { talkWith } from '../src/career/hiring/talks.ts';
+import { talkWith } from '../src/career/hiring/sign.ts';
 
 const YOURS = 0;
 const FRESH = rehearsed('views', 0);

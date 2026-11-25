@@ -1,10 +1,29 @@
 import { billAfter, costToSign } from '../hiring/cost.ts';
+import { willingness } from '../hiring/talks.ts';
 import { wageBill } from '../record/pay.ts';
+import { ask, lowestWage, standardClause } from '../rules/hiring.ts';
 import { affordablePurchase, leavesReserve } from '../rules/money.ts';
 import type { Temperament } from '../rules/person.ts';
 import type { CareerState, Person, Terms } from '../state.ts';
-import { POLICY } from '../tuning.ts';
-import { minimumTerms } from './terms.ts';
+import { NEGOTIATION, POLICY } from '../tuning.ts';
+
+export function minimumTerms(
+  state: CareerState,
+  team: number,
+  person: Person
+): Terms | null {
+  const score = willingness(state, team, person);
+  const rest = {
+    seasons: person.preferred,
+    fee: NEGOTIATION.fee.least,
+    clause: standardClause(ask(person)),
+  };
+  const wage = lowestWage(
+    (w) => score({ ...rest, wage: w }),
+    NEGOTIATION.signs
+  );
+  return wage === null ? null : { wage, ...rest };
+}
 
 export type Means = { build: number; share: number; reserve: number };
 
