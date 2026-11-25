@@ -127,6 +127,16 @@ const STYLE = `
 @keyframes ticked { from { transform: translateY(-${MOTION.tick.rise}px); opacity: .55 } }
 .ui .ping { transform-box: fill-box; transform-origin: center; animation: ping ${MOTION.dot.ms}ms ${MOTION.dot.ease}; }
 @keyframes ping { 40% { transform: scale(1.5, 1.25) } }
+.ui .sealed { transform-box: view-box; transform: rotate(${MOTION.seal.rest}deg);
+  animation: sealed ${MOTION.seal.ms}ms ${MOTION.seal.ease} ${MOTION.seal.after}ms both; }
+@keyframes sealed { from { transform: scale(${MOTION.seal.from}) rotate(${MOTION.seal.turn}deg); opacity: 0 } }
+.ui .flourish { transform-box: view-box; opacity: 0;
+  animation: flourish ${MOTION.flourish.ms}ms ${MOTION.flourish.ease} ${MOTION.flourish.after}ms both; }
+@keyframes flourish { from { transform: scale(${MOTION.flourish.from}); opacity: 1 } 40% { opacity: .9 } to { transform: scale(${MOTION.flourish.reach}); opacity: 0 } }
+.ui .flourish.rays { animation-name: rays; }
+@keyframes rays { from { transform: scale(${MOTION.flourish.from}); opacity: 0 } 25% { opacity: 1 } to { transform: scale(${MOTION.flourish.reach} ); opacity: 0 } }
+.ui .struck { animation: struck ${MOTION.blow.ms}ms ${MOTION.blow.ease} ${MOTION.blow.after}ms; }
+@keyframes struck { 30% { transform: translateY(${MOTION.blow.drop}px) scale(${MOTION.blow.give}) rotate(-.7deg) } 70% { transform: scale(1.012) } }
 .ui .seated { animation: seated ${MOTION.seated.ms}ms ${MOTION.seated.ease} both; }
 @keyframes seated { from { transform: translateY(-${MOTION.seated.drop}px) scale(1.04) rotate(-2deg); opacity: 0 } }
 .ui .waiting { transform-box: fill-box; transform-origin: center; animation: waiting ${MOTION.suspense.ms}ms ease-in-out infinite; }

@@ -3,7 +3,14 @@ import type { Command, Role } from '../career/commands.ts';
 import { matchSetup } from '../career/fit.ts';
 import { TEAM_NAMES } from '../career/names.ts';
 import { standInResult } from '../career/standin.ts';
-import { YOURS, type CareerState } from '../career/state.ts';
+import {
+  YOURS,
+  type CareerState,
+  type Talk,
+  type Terms,
+} from '../career/state.ts';
+import { talkWith } from '../career/hiring/talks.ts';
+import { answerTo, type Answer } from '../career/rules/answer.ts';
 import { willingness } from '../career/hiring/willingness.ts';
 import { personOf } from '../career/lookup.ts';
 import { standardClause } from '../career/rules/clause.ts';
@@ -92,46 +99,55 @@ export function owing(state: CareerState, balance: number): CareerState {
 
 export type Haggle = 'refuse' | 'counter' | 'sign';
 
-const THRESHOLD: Record<Haggle, number> = {
-  refuse: -Infinity,
-  counter: NEGOTIATION.counters,
-  sign: NEGOTIATION.signs,
+const HEARD: Record<Haggle, Answer> = {
+  refuse: 'refuses',
+  counter: 'counters',
+  sign: 'signs',
 };
 
-function wageFor(state: CareerState, id: number, want: Haggle): number | null {
-  const person = personOf(state, id);
-  if (person === null) return null;
-  const score = willingness(state, YOURS, person),
-    { least, most, step } = NEGOTIATION.wage;
-  for (let wage = least; wage <= most; wage += step)
-    if (
-      score({ wage, seasons: 2, fee: 0, clause: standardClause(wage) }) >=
-      THRESHOLD[want]
-    )
-      return wage;
-  return null;
+const SAID: Record<Haggle, Talk['answer']> = {
+  refuse: 'refused',
+  counter: 'countered',
+  sign: 'signed',
+};
+
+function* termsToTry(): Generator<Terms> {
+  const { wage, fee, clause } = NEGOTIATION;
+  const fees = [0, 1000, 5000, 20000].filter((f) => f <= fee.most),
+    clauses = [null, clause.least, 5000, 50000, clause.most];
+  for (const seasons of [2, 1, 3] as const)
+    for (const f of fees)
+      for (const c of clauses)
+        for (let w = wage.least; w <= wage.most; w += wage.step)
+          yield { wage: w, seasons, fee: f, clause: c ?? standardClause(w) };
 }
 
-export function haggled(
-  state: CareerState,
-  id: number,
-  plan: readonly Haggle[]
-): CareerState {
-  let now = state;
-  for (const want of plan) {
-    const wage = wageFor(now, id, want);
-    if (wage === null) break;
-    const applied = apply(now, {
+function haggle(state: CareerState, id: number, want: Haggle): CareerState {
+  const person = personOf(state, id);
+  if (person === null) throw new Error(`haggled: no person ${id}`);
+  const score = willingness(state, YOURS, person);
+  for (const terms of termsToTry()) {
+    if (answerTo(score(terms)) !== HEARD[want]) continue;
+    const applied = apply(state, {
       type: 'Offer',
       team: YOURS,
       person: id,
-      terms: { wage, seasons: 2, fee: 0, clause: standardClause(wage) },
+      terms,
     });
-    if (!applied.ok) break;
-    now = applied.state;
+    if (
+      applied.ok &&
+      talkWith(applied.state.teams[YOURS], id).answer === SAID[want]
+    )
+      return applied.state;
   }
-  return now;
+  throw new Error(`haggled: no terms make ${person.name} answer ${want}`);
 }
+
+export const haggled = (
+  state: CareerState,
+  id: number,
+  plan: readonly Haggle[]
+): CareerState => plan.reduce((now, want) => haggle(now, id, want), state);
 
 export function reported(state: CareerState, id: number): CareerState {
   const applied = apply(state, { type: 'BuyReport', team: YOURS, person: id });

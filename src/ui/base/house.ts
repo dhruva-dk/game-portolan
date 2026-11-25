@@ -56,6 +56,9 @@ export const MOTION = {
   bar: { ms: 160, ease: OUT },
   suspense: { ms: 520 },
   signed: { hold: 1000 },
+  seal: { after: 140, ms: 300, ease: POP, from: 2.4, turn: -26, rest: -9 },
+  blow: { after: 330, ms: 300, ease: OUT, give: 0.955, drop: 2 },
+  flourish: { after: 330, ms: 480, ease: OUT, from: 0.55, reach: 1.65 },
   seated: { ms: 420, ease: POP, drop: 22 },
   fade: { ms: 180, ease: 'ease' },
 } as const;
