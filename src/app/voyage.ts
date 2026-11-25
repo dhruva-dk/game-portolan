@@ -78,6 +78,7 @@ export async function voyage(
     heal: input.heal,
     gust: input.gust,
     fire: input.fire,
+    aim: input.aim,
     map: () => globe.show(hudState()),
     pause: pauseMatch,
   });

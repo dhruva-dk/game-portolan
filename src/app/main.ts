@@ -175,6 +175,7 @@ async function play(s: Stage): Promise<Played> {
     heal: input.heal,
     gust: input.gust,
     fire: input.fire,
+    aim: input.aim,
     map,
     pause: pauseMatch,
   });
