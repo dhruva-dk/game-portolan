@@ -784,7 +784,12 @@ A sheet over the Team sheet, the same size, replacing the deal sheet while open.
 | Answer | Empty at first. Then the last answer: a large tick (signed), a large cross (refused), or a counter mark with their wage numeral and a round tick button that sends `AcceptCounter` |
 | Offer | Round button with the word; sends `Offer`. Faint when the signing would be refused for funds or all three attempts are used |
 
-Holding a stepper's button repeats it, faster the longer it is held. The steppers start at the asking wage (the low end if a range), 2 seasons, no fee, and the standard clause for the wage (§1.6.5). The clause follows the wage as its standard clause until you change the clause yourself. A signing shows the tick for one second, then closes the sheet and returns to Team.
+Holding a stepper's button repeats it, faster the longer it is held. The steppers start at the asking wage (the low end if a range), 2 seasons, no fee, and the standard clause for the wage (§1.6.5). The clause follows the wage as its standard clause until you change the clause yourself. A signing shows the tick for one second, then closes the sheet and returns to Team, where the new card drops into its seat.
+
+- An answer does not appear at once: an hourglass shows for half a second, then the answer is stamped in. The terms and the money slip stay as they were until it lands.
+- The large cross of a refusal is red.
+- A held stepper button moves in larger steps the longer it is held: 5 steps at a time, then 25.
+- The card in this sheet cannot be enlarged.
 
 ### 1.12.7 Sponsors
 
@@ -896,7 +901,7 @@ The lobby is then in the off-season stop (§1.9): the race slip shows the winter
 The stat shape on every person card.
 - One point per stat, at equal angles, the first at the top, going clockwise in the stat order of §1.2.
 - Each point's length is the stat on a 0 to 20 scale. The points are joined into a filled shape over faint rings at 5, 10, 15 and 20.
-- The stat's glyph sits at each tip. On an enlarged card the numeral sits beside it.
+- The web fills the room the card gives it. The stat's glyph sits at each tip. On an enlarged card the numeral sits above or below the glyph, away from the web.
 - A range is drawn as a band between the shapes of the low and high ends.
 - A comparison overlays a second shape as a thin outline.
 
@@ -1394,7 +1399,7 @@ All UI is DOM elements placed over the canvas and filled with inline SVG produce
 
 ### 2.5.3 Screens, views and the port
 
-1. Each screen in `ui/lobby/` is a function `create(port) → { el, show(view) }`. The lobby also has `cover(on)`, which hides its bottom buttons, SAIL and the next-race slip and turns its Settings button into the close button while a screen is open (§1.12.0 item 2).
+1. Each screen in `ui/lobby/` is a function `create(port) → { el, show(view) }`. The lobby also has `cover(on)`, which hides its bottom buttons, SAIL and the next-race slip and turns its Settings button into the close button while a screen is open (§1.12.0 item 2). The negotiation sheet's `show` takes a function from the terms being edited to its view, not a view, because every step of a stepper needs a new view.
 2. Each screen has a matching **view function** in `career/views/` that takes `CareerState` (and screen arguments such as the current stop, the role whose deal is open, or the terms being edited) and returns plain data holding exactly what the screen draws: every number, name, glyph id, range and faint flag.
 3. A screen draws only from its view and acts only through its port. It never reads `CareerState` and never computes a rule.
 4. A screen may keep local state that no rule depends on: which card is enlarged, the terms being edited, a lifted sponsor offer, scroll position, the page of a flow.
@@ -1555,6 +1560,15 @@ All spacing is a multiple of `STEP`, 4 units.
 | `fan` | 320 ms, with a slight overshoot | A hand of small cards fanning out from a stack |
 | `glide` | 300 ms | A marker traveling to its new place |
 | `arm` | 160 ms, from 0.9 scale | A two-tap button changing face |
+| `stamp` | 280 ms, from 1.9 scale, with a slight overshoot | A mark pressed onto paper: the pin, a report's tick, an answer |
+| `refuse` | 280 ms, 3 points side to side | A piece shaking its head: a faint button tapped, a stepper at its limit, a refused offer |
+| `dealt` | From 0.55 scale, turned 9° | How a card of a deal starts its `deal` arrival |
+| `hold` | First repeat after 380 ms, then 150 ms apart, each gap 0.86 of the last down to 40 ms; 5 steps a repeat after 26 repeats and 25 after 60 | A held stepper button |
+| `tick` | 140 ms, rising 3 points | A numeral changing by a step |
+| `bar` | 160 ms | A bar following the value it shows |
+| `suspense` | 520 ms | The wait between an offer and its answer |
+| `signed` | 1,000 ms hold | A signing staying on screen before the sheet leaves |
+| `seated` | 420 ms, dropping 22 points, with a slight overshoot | A newly signed card landing in its seat |
 | `fade` | 180 ms | Anything else that appears or goes |
 
 Rules:
@@ -1662,7 +1676,7 @@ Your team is played by the policy as a sensible team (§1.10.2). Until the polic
 
 ### 2.8.3 Debug states
 
-`app/debug.ts` reads `?debug` switches (used by `npm run browser`). `?debug&screen=<name>&seed=<s>&races=<n>` builds a career from the seed, advances it `n` races with the stand-in and the policy for every team including yours (§1.10.2), and opens that screen. The names are `new`, `lobby`, `ship`, `paint`, `team`, `deal`, `negotiation`, `sponsors`, `opponents`, `planet`, `settings`, `result`, `paper`, `offseason`, `glyphs` (the glyph sheet of §2.5.4, which needs no career). There are no hand-written fixture states. Three more switches change the state built: `balance=<n>` sets your balance to `n` after the career is advanced (no seed reaches debt by itself, and the red money slip needs a state to be drawn on); `signed`, at the off-season stop, finishes the stop so the lobby of the next season shows; `meter` shows the frame meter over a screen; `approach=<roles>` (a comma-separated list) sends `Approach` for a candidate of each named role before the last race, so that several deals are waiting at once.
+`app/debug.ts` reads `?debug` switches (used by `npm run browser`). `?debug&screen=<name>&seed=<s>&races=<n>` builds a career from the seed, advances it `n` races with the stand-in and the policy for every team including yours (§1.10.2), and opens that screen. The names are `new`, `lobby`, `ship`, `paint`, `team`, `deal`, `negotiation`, `sponsors`, `opponents`, `planet`, `settings`, `result`, `paper`, `offseason`, `glyphs` (the glyph sheet of §2.5.4, which needs no career). There are no hand-written fixture states. Three more switches change the state built: `balance=<n>` sets your balance to `n` after the career is advanced (no seed reaches debt by itself, and the red money slip needs a state to be drawn on); `signed`, at the off-season stop, finishes the stop so the lobby of the next season shows; `meter` shows the frame meter over a screen; `approach=<roles>` (a comma-separated list) sends `Approach` for a candidate of each named role before the last race, so that several deals are waiting at once. The `deal` and `negotiation` screens also read `role=<role>` (whose deal to open; the scouted role if left out). `negotiation` reads four more: `pick=<n>` (which candidate of the deal, from 0), `report` (buy a report on them first), `renew` (negotiate with the holder of the seat instead of a candidate), and `offers=<answers>` (a comma-separated list of `refuse`, `counter` and `sign`: offers are sent, in order, that get those answers). These states are reached by sending real commands, never by writing the state.
 
 `npm run browser` (headless Chromium, iPad Air size) takes screenshots and reads frame cost. It is never part of `npm test`. Its existing budget stands: 100 draws, 900,000 triangles and 20 passes a frame.
 
@@ -1793,9 +1807,9 @@ Goal: every screen of §1.12 exists and can be opened on a debug state.
 - [ ] **M5.6 New Career.** §1.12.1.
 - [ ] **M5.7 Lobby.** §1.12.2, including the two-ship anchorage scene and the orbit drag.
 - [ ] **M5.8 Ship.** §1.12.3, including the seventh camera stop and the paint picker.
-- [ ] **M5.9 Team.** §1.12.4.
-- [ ] **M5.10 The deal.** §1.12.5.
-- [ ] **M5.11 Negotiation.** §1.12.6.
+- [x] **M5.9 Team.** §1.12.4.
+- [x] **M5.10 The deal.** §1.12.5.
+- [x] **M5.11 Negotiation.** §1.12.6.
 - [ ] **M5.12 Sponsors.** §1.12.7.
 - [ ] **M5.13 Opponents.** §1.12.8.
 - [ ] **M5.14 Planet.** §1.12.9.
