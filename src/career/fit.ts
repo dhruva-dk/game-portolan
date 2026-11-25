@@ -11,6 +11,7 @@ import { PLANET_NAMES } from './names.ts';
 import { standings } from './rules/standing.ts';
 import {
   DRIVER_STATS,
+  FIRST_RACE,
   MECHANIC_STATS,
   type CareerState,
   type Team,
@@ -108,20 +109,17 @@ function seated(state: CareerState, id: number | null): number[] | null {
   return personOf(state, id)?.stats ?? null;
 }
 
-export function teamMechanic(
-  state: CareerState,
-  team: number
-): MechanicStats | null {
+function teamMechanic(state: CareerState, team: number): MechanicStats | null {
   const stats = seated(state, state.teams[team].seats.mechanic);
   return stats === null ? null : mechanicStats(stats);
 }
 
-export function slotOneHands(state: CareerState, team: number): DriverStats {
+function slotOneHands(state: CareerState, team: number): DriverStats {
   const stats = seated(state, state.teams[team].seats.driver);
   return stats === null ? STAND_IN : driverStats(stats);
 }
 
-export function slotZeroHands(
+function slotZeroHands(
   state: CareerState,
   team: number,
   { hands }: FitOptions
@@ -171,7 +169,9 @@ export const teamSpecs = (
   specsAt(state, team, standings(state)[team], options);
 
 export const nextRace = ({ season, race, phase }: RaceOf): Race =>
-  phase === 'offseason' ? { season: season + 1, race: 1 } : { season, race };
+  phase === 'offseason'
+    ? { season: season + 1, race: FIRST_RACE }
+    : { season, race };
 
 export function planetSeed(state: CareerState): string {
   const { season, race } = nextRace(state);

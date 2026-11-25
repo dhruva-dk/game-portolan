@@ -259,7 +259,8 @@ test('every rival team is generated as §1.10.1 says', () => {
       assert.deepEqual([...team.unlocked].sort(), expected.sort());
       const first = team.taste.find((k) => team.unlocked.includes(k));
       for (const ship of team.ships) assert.equal(ship.gun, first);
-      assert.deepEqual(team.sponsors, [null, null, null]);
+      assert.equal(team.sponsors.length, 3);
+      assert.ok(team.sponsors.every((sponsor) => sponsor !== null));
       assert.deepEqual(team.offers, []);
       assert.equal(team.focus, null);
       assert.equal(team.scoutSeat, 'designer');
@@ -375,6 +376,28 @@ test('the league formulas of §1.10.1 at their ends', () => {
   assert.equal(unlockCount(0), 0);
   assert.equal(unlockCount(strength(20)), 2);
   assert.equal(unlockCount(strength(21)), 1);
+});
+
+test('the league formulas of §1.10.1 at hand-worked points', () => {
+  assert.equal(strength(1), 1);
+  assert.equal(strength(20), 0.5);
+  assert.equal(strength(39), 0);
+  assert.equal(startDesign(1, 0), 80);
+  assert.equal(startDesign(0.5, 3), 48);
+  assert.equal(startDesign(0, -8), 5);
+  assert.equal(startDesign(1, 8), 88);
+  assert.equal(startFitted(48, 6), 42);
+  assert.equal(startFitted(9, 6), 5);
+  assert.deepEqual(staffLevel(1), { lo: 14, hi: 18 });
+  assert.deepEqual(staffLevel(0.5), { lo: 8, hi: 12 });
+  assert.deepEqual(staffLevel(0), { lo: 2, hi: 6 });
+  assert.equal(startBalance(1), 32000);
+  assert.equal(startBalance(0.5), 17000);
+  assert.equal(startBalance(0), 2000);
+  assert.equal(unlockCount(1), 4);
+  assert.equal(unlockCount(0.75), 3);
+  assert.equal(unlockCount(0.5), 2);
+  assert.equal(unlockCount(0.24), 0);
 });
 
 test('a ship range is width wide from true − width × u, clamped to 0 to 100', () => {

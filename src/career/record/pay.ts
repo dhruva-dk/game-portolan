@@ -6,13 +6,12 @@ import {
   seaMoney,
   sinkingMoney,
 } from '../rules/race-money.ts';
-import type { CareerState, MoneyRows, SponsorRow } from '../state.ts';
+import type { CareerState, MoneyRows } from '../state.ts';
 import { teamShips } from './finish.ts';
+import { sponsorRows } from './sponsors.ts';
 
 const sum = (values: readonly number[]): number =>
   values.reduce((total, value) => total + value, 0);
-
-const sponsorRowsNotYet = (): SponsorRow[] => [];
 
 export const moneyTotal = (rows: MoneyRows): number =>
   rows.place +
@@ -37,7 +36,7 @@ export function teamMoney(
     place: sum(ships.map((ship) => placePrize(ship.place))),
     sinkings: sum(ships.map((ship) => sinkingMoney(ship.sinkings))),
     sea: seaMoney(result.sea[team]),
-    sponsors: sponsorRowsNotYet(),
+    sponsors: sponsorRows(state, result, team),
     wages: charge(wageBill(state, team)),
     paid: employees(state, team).map((person) => person.portrait),
     interest: 0,

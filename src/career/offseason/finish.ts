@@ -1,9 +1,7 @@
 import { standings } from '../rules/standing.ts';
-import type { CareerState, Person } from '../state.ts';
+import { FIRST_RACE, type CareerState, type Person } from '../state.ts';
 import { STANDING } from '../tuning.ts';
 import { vacate } from '../vacate.ts';
-
-const FIRST_RACE = 1;
 
 const expired = (person: Person): boolean => person.contract?.racesLeft === 0;
 

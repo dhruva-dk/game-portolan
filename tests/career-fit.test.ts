@@ -209,6 +209,48 @@ test('the mechanic sets both ships, and an empty seat gives the no-mechanic colu
   }
 });
 
+test('the mechanic values of §1.5.2 at hand-worked points', () => {
+  const near = (a: number, b: number) =>
+    assert.ok(Math.abs(a - b) < 1e-9, `${a} is not ${b}`);
+  const levels = {
+    sails: 50,
+    rigging: 50,
+    rudder: 50,
+    hull: 50,
+    keel: 50,
+    mounts: 50,
+    gun: 50,
+  };
+  const none = shipValues(levels, 'cannon', null);
+  near(none.shieldRate, 1.5);
+  near(none.healTime, 2.5);
+  near(none.healFactor, 0.8);
+  const worst = shipValues(levels, 'cannon', {
+    shield: 1,
+    healSpeed: 1,
+    healAmount: 1,
+  });
+  near(worst.shieldRate, 2.2);
+  near(worst.healTime, 2.13);
+  near(worst.healFactor, 0.93);
+  const middle = shipValues(levels, 'cannon', {
+    shield: 10,
+    healSpeed: 10,
+    healAmount: 10,
+  });
+  near(middle.shieldRate, 4);
+  near(middle.healTime, 1.5);
+  near(middle.healFactor, 1.2);
+  const best = shipValues(levels, 'cannon', {
+    shield: 20,
+    healSpeed: 20,
+    healAmount: 20,
+  });
+  near(best.shieldRate, 6);
+  near(best.healTime, 0.8);
+  near(best.healFactor, 1.5);
+});
+
 test('every standing from 1 to 40 is carried by exactly the two ships of its team', () => {
   for (const state of CAREERS) {
     const { ships } = matchSetup(state, { hands: 'player' });

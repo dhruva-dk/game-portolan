@@ -46,10 +46,12 @@ function focus(value: unknown): boolean {
 }
 
 const livery = (value: unknown): boolean =>
+  keyCount(value) === 2 &&
   isIndex(field(value, 'dye'), DYES.length) &&
   isIndex(field(value, 'pattern'), PATTERNS.length);
 
 const terms = (value: unknown): boolean =>
+  keyCount(value) === 4 &&
   stepped(field(value, 'wage'), NEGOTIATION.wage) &&
   stepped(field(value, 'seasons'), { ...NEGOTIATION.seasons, step: 1 }) &&
   stepped(field(value, 'fee'), NEGOTIATION.fee) &&

@@ -14,3 +14,8 @@ export function lineLeader(
   });
   return leader;
 }
+
+export const leaderAfter = (
+  stored: number | null,
+  current: number | null
+): number | null => current ?? stored;

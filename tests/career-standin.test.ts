@@ -293,6 +293,44 @@ test('sea: seven samples per team, shares by weight summing to 0.8', () => {
   }
 });
 
+test('sea: three one-ship teams share by hand-worked weights', () => {
+  const at = (n: number): Ship => ({
+    level: LEVEL_SPAN.least,
+    stats: statsAt(n),
+  });
+  const crews = [at(20), at(10), at(4)];
+  const weightOf = [2, 1, 0.4];
+  for (const match of MATCHES) {
+    const setup = setupOf(sizesOf(3, 1), match, (id) => crews[id]);
+    const { ships, sea } = standInResult(setup);
+    const first = ships.findIndex((ship) => ship.place === 1);
+    const second = ships.findIndex((ship) => ship.place === 2);
+    const third = ships.findIndex((ship) => ship.place === 3);
+    assert.equal(ships[third].sunkAt, 30);
+    assert.equal(ships[second].sunkAt, 240);
+    const shares: Record<string, [number, number]> = {
+      '2,1': [0.8 * (2 / 3), 0.8 * (1 / 3)],
+      '1,2': [0.8 * (1 / 3), 0.8 * (2 / 3)],
+      '2,0.4': [0.8 * (2 / 2.4), 0.8 * (0.4 / 2.4)],
+      '0.4,2': [0.8 * (0.4 / 2.4), 0.8 * (2 / 2.4)],
+      '1,0.4': [0.8 * (1 / 1.4), 0.8 * (0.4 / 1.4)],
+      '0.4,1': [0.8 * (0.4 / 1.4), 0.8 * (1 / 1.4)],
+    };
+    const [firstShare, secondShare] =
+      shares[`${weightOf[first]},${weightOf[second]}`];
+    for (let k = 0; k < 3; k++) {
+      close(sea[first][k], firstShare);
+      close(sea[second][k], secondShare);
+      assert.equal(sea[third][k], 0);
+    }
+    for (let k = 3; k < 7; k++) {
+      close(sea[first][k], 0.8);
+      assert.equal(sea[second][k], 0);
+      assert.equal(sea[third][k], 0);
+    }
+  }
+});
+
 test('sea: a team with no ship afloat at a sample holds nothing', () => {
   let seen = 0;
   for (const { setup, result } of CASES)

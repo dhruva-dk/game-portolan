@@ -4,6 +4,12 @@ import type { Livery } from '../world/livery.ts';
 
 export const VERSION = 1;
 
+export const YOURS = 0;
+
+export const FIRST_SEASON = 1;
+
+export const FIRST_RACE = 1;
+
 export type Line =
   | 'sails'
   | 'rigging'

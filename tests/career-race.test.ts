@@ -1,6 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { apply, newCareer, type Applied } from '../src/career/apply.ts';
+import {
+  apply,
+  newCareer,
+  runPolicy,
+  type Applied,
+} from '../src/career/apply.ts';
 import type { Command } from '../src/career/commands.ts';
 import { matchSetup, planetName } from '../src/career/fit.ts';
 import { employees } from '../src/career/lookup.ts';
@@ -201,9 +206,42 @@ const prizeFor = (place: number): number =>
         RACE_MONEY.prizePower
   );
 
+function expectedSponsors(
+  state: CareerState,
+  result: MatchResult,
+  team: number
+) {
+  const ships = shipsOf(result, team);
+  const samples = result.sea[team];
+  const met = (objective: string): boolean => {
+    if (objective === 'top10') return ships.some((s) => s.place <= 10);
+    if (objective === 'sinkTwo')
+      return ships[0].sinkings + ships[1].sinkings >= 2;
+    if (objective === 'sea')
+      return samples.reduce((a, b) => a + b, 0) / samples.length >= 0.03;
+    return ships.every((s) => s.afloatAtPhaseFour);
+  };
+  return state.teams[team].sponsors.flatMap((sponsor) =>
+    sponsor === null
+      ? []
+      : [
+          {
+            sponsor: sponsor.sponsor,
+            objective: sponsor.objective,
+            met: met(sponsor.objective),
+            amount: sponsor.fee + (met(sponsor.objective) ? sponsor.bonus : 0),
+          },
+        ]
+  );
+}
+
 function expectedMoney(state: CareerState, result: MatchResult, team: number) {
   const ships = shipsOf(result, team);
   const samples = result.sea[team];
+  const sponsors = expectedSponsors(state, result, team).reduce(
+    (sum, row) => sum + row.amount,
+    0
+  );
   const place = ships.reduce((sum, s) => sum + prizeFor(s.place), 0);
   const sinkings = ships.reduce(
     (sum, s) => sum + RACE_MONEY.perSinking * s.sinkings,
@@ -215,9 +253,10 @@ function expectedMoney(state: CareerState, result: MatchResult, team: number) {
   const wages = state.people
     .filter((p) => p.contract?.team === team)
     .reduce((sum, p) => sum + (p.contract?.wage ?? 0), 0);
-  const then = state.teams[team].balance + place + sinkings + sea - wages;
+  const then =
+    state.teams[team].balance + place + sinkings + sea + sponsors - wages;
   const interest = then < 0 ? Math.ceil(RACE_MONEY.interest * -then) : 0;
-  return { place, sinkings, sea, wages, interest, then };
+  return { place, sinkings, sea, sponsors, wages, interest, then };
 }
 
 test('place prize, sinkings, sea and interest follow §1.8.1', () => {
@@ -243,6 +282,25 @@ test('place prize, sinkings, sea and interest follow §1.8.1', () => {
   assert.equal(interestOn(-1), 1);
   assert.equal(interestOn(-1000), RACE_MONEY.interest * 1000);
   assert.equal(interestOn(-1001), Math.ceil(RACE_MONEY.interest * 1000) + 1);
+});
+
+test('the race money of §1.8.1 at hand-worked points', () => {
+  assert.equal(placePrize(1), 3000);
+  assert.equal(placePrize(21), 1688);
+  assert.equal(placePrize(41), 750);
+  assert.equal(placePrize(61), 188);
+  assert.equal(placePrize(80), 0);
+  assert.equal(sinkingMoney(1), 150);
+  assert.equal(sinkingMoney(3), 450);
+  assert.equal(seaMoney([1, 1, 1, 1, 1, 1, 1]), 40000);
+  assert.equal(seaMoney([0, 0, 0, 0, 0, 0, 0]), 0);
+  assert.equal(seaMoney([0.03, 0.03, 0.03, 0.03, 0.03, 0.03, 0.03]), 1200);
+  assert.equal(seaMoney([0.25, 0.75, 0.25, 0.75, 0.25, 0.75, 0.25]), 18571);
+  assert.equal(interestOn(-10), 1);
+  assert.equal(interestOn(-1000), 50);
+  assert.equal(interestOn(-1001), 51);
+  assert.equal(interestOn(-10000), 500);
+  assert.equal(interestOn(5000), 0);
 });
 
 test('a team’s ships are 2t and 2t + 1 in a result', () => {
@@ -295,12 +353,17 @@ test('step 2 pays every team its rows, and the change is their sum', () => {
     assert.equal(rows.place, want.place, `place ${team}`);
     assert.equal(rows.sinkings, want.sinkings, `sinkings ${team}`);
     assert.equal(rows.sea, want.sea, `sea ${team}`);
-    assert.deepEqual(rows.sponsors, []);
+    assert.deepEqual(rows.sponsors, expectedSponsors(state, result, team));
     assert.equal(rows.wages, want.wages === 0 ? 0 : -want.wages);
     assert.equal(rows.interest, want.interest === 0 ? 0 : -want.interest);
     assert.deepEqual(rows, teamMoney(state, result, team));
     const sum =
-      rows.place + rows.sinkings + rows.sea + rows.wages + rows.interest;
+      rows.place +
+      rows.sinkings +
+      rows.sea +
+      want.sponsors +
+      rows.wages +
+      rows.interest;
     assert.equal(moneyTotal(rows), sum);
     assert.equal(
       paid.teams[team].balance - state.teams[team].balance,
@@ -326,7 +389,12 @@ test('step 2 pays every team its rows, and the change is their sum', () => {
 test('interest is charged only when the balance after the other rows is negative', () => {
   const result = handResult(0);
   const income = expectedMoney(staffed(1, 'racing', 0), result, YOURS);
-  const net = income.place + income.sinkings + income.sea - income.wages;
+  const net =
+    income.place +
+    income.sinkings +
+    income.sea +
+    income.sponsors -
+    income.wages;
   const just = staffed(1, 'racing', -net);
   assert.equal(teamMoney(just, result, YOURS).interest, 0);
   const under = staffed(1, 'racing', -net - 1);
@@ -427,8 +495,9 @@ test('the workshop strip shows the focus before and after, only with a designer'
 
 test('RecordRace fills the race report with numbers recomputed from the result', () => {
   for (const shift of [0, 1, 40, 79]) {
-    const state = staffed(3, 'racing', -50000);
     const result = handResult(shift);
+    const net = expectedMoney(staffed(3, 'racing', 0), result, YOURS).then;
+    const state = staffed(3, 'racing', -net - 5000);
     const next = record(state, result);
     const report = next.lastRace;
     assert.ok(report);
@@ -585,10 +654,20 @@ test('RecordRace sets unread, MarkRead clears it in the lobby and the stop', () 
   }
 });
 
-test('StartRace moves the lobby to racing and changes nothing else', () => {
+test('StartRace runs each rival’s policy, worst standing first, then moves the lobby to racing', () => {
   const state = staffed(4, 'lobby');
-  const started = accepted(apply(state, { type: 'StartRace', team: YOURS }));
-  assert.deepEqual(started, { ...state, phase: 'racing' });
+  const applied = apply(state, { type: 'StartRace', team: YOURS });
+  assert.ok(applied.ok);
+  assert.deepEqual(applied.refused, []);
+  const table = expectedStandings(state);
+  const order = table
+    .map((_, team) => team)
+    .filter((team) => team !== YOURS)
+    .sort((a, b) => table[b] - table[a]);
+  let expected = state;
+  for (const team of order) expected = runPolicy(expected, team).state;
+  assert.deepEqual(applied.state, { ...expected, phase: 'racing' });
+  assert.deepEqual(applied.state.teams[YOURS], state.teams[YOURS]);
 });
 
 test('refused race commands leave the state untouched', () => {
@@ -680,10 +759,14 @@ test('the report is built from the state before the race and the result alone', 
   );
 });
 
-function sail(state: CareerState): { state: CareerState; result: MatchResult } {
+function sail(state: CareerState): {
+  started: CareerState;
+  state: CareerState;
+  result: MatchResult;
+} {
   const started = accepted(apply(state, { type: 'StartRace', team: YOURS }));
   const result = standInResult(matchSetup(started, { hands: 'player' }));
-  return { state: record(started, result), result };
+  return { started, state: record(started, result), result };
 }
 
 const TABLE_SUM = Array.from({ length: SHIPS }, (_, i) =>
@@ -698,9 +781,6 @@ test('a ten-race season through apply alone, from three seeds', () => {
       livery: { dye: 3, pattern: 1 },
       emblem: 2,
     });
-    const contracts = new Map(
-      state.people.map((p) => [p.id, p.contract?.racesLeft ?? null])
-    );
     for (let race = 1; race <= SEASON; race++) {
       assert.equal(state.race, race);
       const before = state;
@@ -714,13 +794,13 @@ test('a ten-race season through apply alone, from three seeds', () => {
       assert.deepEqual(JSON.parse(JSON.stringify(state)), state);
       assert.equal(state.unread, true);
       if (race < SEASON) {
-        for (const person of state.people) {
-          const start = contracts.get(person.id);
+        sailed.started.people.forEach((person, i) => {
+          assert.equal(state.people[i].id, person.id);
           assert.equal(
-            person.contract?.racesLeft ?? null,
-            start === undefined || start === null ? null : start - race
+            state.people[i].contract?.racesLeft ?? null,
+            person.contract === null ? null : person.contract.racesLeft - 1
           );
-        }
+        });
         state = accepted(apply(state, { type: 'MarkRead', team: YOURS }));
         assert.equal(state.phase, 'lobby');
       }

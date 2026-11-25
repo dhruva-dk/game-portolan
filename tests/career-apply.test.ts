@@ -62,6 +62,20 @@ const THEIRS = seated(RIVAL, 'designer');
 const OWNER = idOf(BASE.teams[4].owner);
 const UNKNOWN = BASE.nextPersonId;
 
+function unworn(): { dye: number; pattern: number } {
+  for (let dye = 0; dye < DYES.length; dye++)
+    for (let pattern = 0; pattern < PATTERNS.length; pattern++)
+      if (
+        !BASE.teams.some(
+          (team) => team.livery.dye === dye && team.livery.pattern === pattern
+        )
+      )
+        return { dye, pattern };
+  throw new Error('every livery is worn');
+}
+
+const UNWORN = unworn();
+
 const OFFER: Sponsor = {
   sponsor: 0,
   fee: 500,
@@ -79,16 +93,32 @@ function yours(team: Team): Team {
   };
 }
 
+function ready(team: Team): Team {
+  const ship = team.ships[1];
+  return {
+    ...team,
+    balance: 1000000,
+    focus: null,
+    design: { ...team.design, keel: 60 },
+    unlocked: ['cannon', 'scatter'],
+    ships: [
+      { ...team.ships[0], gun: 'cannon' },
+      { ...ship, fitted: { ...ship.fitted, keel: 20 } },
+    ],
+    sponsors: [null, null, null],
+    offers: [OFFER],
+  };
+}
+
 function career(phase: Phase): CareerState {
   const state = structuredClone(BASE);
   return {
     ...state,
     phase,
     race: phase === 'offseason' ? LEAGUE.racesPerSeason : 1,
-    teams: state.teams.map((team, t) => {
-      const offered = { ...team, offers: [OFFER] };
-      return t === 0 ? yours(offered) : offered;
-    }),
+    teams: state.teams.map((team, t) =>
+      t === 0 ? yours(ready(team)) : ready(team)
+    ),
     people: state.people.map((p) =>
       p.id === MINE
         ? { ...p, contract: { team: 0, wage: 500, clause: 5000, racesLeft: 5 } }
@@ -135,7 +165,7 @@ function sample(type: CommandType, team: number): Command {
     case 'FitGun':
       return { type, team, slot: 0, kind: 'scatter' };
     case 'Repaint':
-      return { type, team, livery: { dye: 15, pattern: 2 }, emblem: 3 };
+      return { type, team, livery: UNWORN, emblem: 3 };
     case 'SetScoutSeat':
       return { type, team, role: 'driver' };
     case 'BuyReport':
@@ -214,6 +244,14 @@ test('every command in every phase is accepted or refused for phase as the table
   }
 });
 
+const FROM_A_RIVAL: Partial<Record<CommandType, Reason>> = {
+  BuyReport: 'same',
+  Approach: 'fixed',
+  Offer: 'seat',
+  AcceptCounter: 'seat',
+  Release: 'seat',
+};
+
 test('only team 0 may send the first five commands', () => {
   for (const phase of PHASES) {
     const state = career(phase);
@@ -223,7 +261,7 @@ test('only team 0 may send the first five commands', () => {
       else
         assert.equal(
           reason,
-          TABLE[type].includes(phase) ? null : 'phase',
+          TABLE[type].includes(phase) ? (FROM_A_RIVAL[type] ?? null) : 'phase',
           `${type} from a rival in ${phase}`
         );
     }

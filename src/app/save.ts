@@ -1,6 +1,6 @@
 import { apply, type Applied } from '../career/apply.ts';
 import type { Command } from '../career/commands.ts';
-import { VERSION, type CareerState } from '../career/state.ts';
+import { VERSION, YOURS, type CareerState } from '../career/state.ts';
 
 export type Entries = Readonly<Record<string, string>>;
 
@@ -15,7 +15,6 @@ export const BACKUP_KEY = 'career.bak';
 const DATABASE = 'portolan';
 const DATABASE_VERSION = 1;
 const OBJECTS = 'saves';
-const YOURS = 0;
 
 export function memoryStore(initial: Entries = {}): Store {
   const kept = new Map(Object.entries(initial));

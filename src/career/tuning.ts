@@ -8,6 +8,8 @@ export const LEVEL_SPAN = { least: 0, most: 100 } as const;
 
 export const LEAGUE = { teams: 40, shipsPerTeam: 2, racesPerSeason: 10 };
 
+export const RACE_REPORT = { podium: 3 };
+
 export const POINTS = {
   podium: [50, 44, 40],
   lastScoring: 40,
@@ -16,8 +18,6 @@ export const POINTS = {
 };
 
 export const STANDING = { noRaceYet: 81 };
-
-export const REPUTATION = { best: 1, worst: 40 };
 
 export const SHIPS = { leastLevel: 5 };
 
@@ -136,6 +136,7 @@ export const BUILD = {
   perLevel: 30,
   designScale: 25,
   thriftCut: 0.02,
+  noThrift: 0,
   leastFit: 200,
 };
 
@@ -201,6 +202,7 @@ export const POLICY = {
   approachMargin: 1,
   gunPerKind: 25,
   behindWeight: 1.5,
+  aheadWeight: 1,
   sponsorBonusWeight: 0.5,
   cautious: { build: 12, share: 0.25, reserve: 6 },
   sensible: { build: 8, share: 0.4, reserve: 4 },
@@ -208,6 +210,8 @@ export const POLICY = {
 };
 
 export const PAPER = { headlines: 5 };
+
+export const NEWS = { streak: 3 };
 
 export const NAMES = { longest: 16, teams: 60, sponsors: 60, planets: 200 };
 
@@ -219,7 +223,6 @@ export const STAND_IN_RESULT = {
   sinkingSpan: 420,
   teammateAfloatShare: 8,
   phaseFourShare: 4,
-  samples: 7,
   sampleSpacing: 8,
   playerStat: 10,
   shotsFired: 100,
