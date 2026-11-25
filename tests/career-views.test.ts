@@ -25,7 +25,8 @@ import { askingWage } from '../src/career/rules/ask.ts';
 import { reportCost } from '../src/career/rules/report-cost.ts';
 import { stars } from '../src/career/rules/stars.ts';
 import { SCOUTING } from '../src/career/tuning.ts';
-import { dismissed, owing, rehearsed } from '../src/app/rehearse.ts';
+import { dismissed, haggled, owing, rehearsed } from '../src/app/rehearse.ts';
+import { talkWith } from '../src/career/hiring/talks.ts';
 
 const YOURS = 0;
 const FRESH = rehearsed('views', 0);
@@ -770,4 +771,46 @@ test('a renewal costs the fee alone, and is open only at ten races left or fewer
 
 test('a negotiation view is null for no such person', () => {
   assert.equal(negotiationView(DEALT, -1), null);
+});
+
+test('the rehearsal haggles to the answer asked for, and names the person when it cannot', () => {
+  const id = first(DEALT, 'driver').card.person ?? -1;
+  const talk = (state: CareerState) => talkWith(state.teams[YOURS], id);
+  const countered = haggled(DEALT, id, ['refuse', 'counter']);
+  assert.equal(talk(countered).answer, 'countered');
+  assert.equal(talk(countered).attempts, 2);
+  assert.notEqual(talk(countered).counter, null);
+  assert.equal(talk(haggled(DEALT, id, ['refuse'])).answer, 'refused');
+  assert.equal(talk(haggled(DEALT, id, ['sign'])).answer, 'signed');
+  const spent = haggled(DEALT, id, ['refuse', 'refuse', 'refuse']);
+  const name = personAt(DEALT, id).name;
+  assert.throws(
+    () => haggled(spent, id, ['counter']),
+    (e: Error) => e.message.includes(name) && e.message.includes('counter')
+  );
+});
+
+test('a renewal after a signing opens on a talk that already says signed, and signing again keeps it signed', () => {
+  const id = first(DEALT, 'driver').card.person ?? -1;
+  const signs = wageWhere(DEALT, id, (score) => score >= NEGOTIATION.signs);
+  const once = sent(DEALT, {
+    type: 'Offer',
+    team: YOURS,
+    person: id,
+    terms: { ...talking(DEALT, id, terms(signs)).terms, seasons: 1 },
+  });
+  const renewal = talking(once, id);
+  assert.equal(renewal.renewal, true);
+  assert.equal(renewal.answer, 'signed');
+  assert.equal(renewal.offer.faint, false);
+  const wage = wageWhere(once, id, (score) => score >= NEGOTIATION.signs);
+  const twice = offering(once, id, wage);
+  const again = talking(twice, id);
+  assert.equal(again.answer, 'signed');
+  assert.equal(again.attempts.used, renewal.attempts.used);
+  assert.equal(again.counter, null);
+  assert.ok(
+    (personAt(twice, id).contract?.racesLeft ?? 0) >
+      (personAt(once, id).contract?.racesLeft ?? 0)
+  );
 });

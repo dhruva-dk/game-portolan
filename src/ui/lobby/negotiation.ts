@@ -1,3 +1,4 @@
+import type { Command } from '../../career/commands.ts';
 import type { Edit, NegotiationView } from '../../career/views/negotiation.ts';
 import { pressable, roundButton } from '../base/button.ts';
 import {
@@ -8,7 +9,7 @@ import {
   type Candidacy,
 } from '../base/card.ts';
 import { MOTION, SPACE, TYPE } from '../base/house.ts';
-import { INK, WASH, figure, glyph, svgNode } from '../base/ink.ts';
+import { INK, SHADOW, WASH, figure, glyph, svgNode } from '../base/ink.ts';
 import { least } from '../base/lexicon.ts';
 import { bindPicker, pickTo, pickerFace } from '../base/picker.ts';
 import { sheet } from '../base/sheet.ts';
@@ -29,7 +30,8 @@ const ANSWER = { y: 50, big: 56, counter: 28, accept: 19 } as const;
 const PIPS = { y: 124, gap: 24, r: 4.4 } as const;
 const OFFER = { y: 168, r: 25 } as const;
 const COST = { y: 214 } as const;
-const BAR = { y: 258, h: 18, mark: 7 } as const;
+const BAR = { y: 258, h: 18, mark: 7, cap: 13, capGap: 8 } as const;
+const SEAL = { r: 27, x: 0.7, y: 0.4, bumps: 15, wave: 1.8, rays: 9 } as const;
 const H = SHEET.h - 2 * PAD;
 
 type Stepped = 'wage' | 'fee' | 'clause';
@@ -103,11 +105,14 @@ function barFrame(v: NegotiationView) {
   s += `<rect x="0" y="${r2(top)}" width="${W}" height="${BAR.h}" fill="none" stroke="${INK.iron}" stroke-width=".9"/>`;
   s += `<g id="bar-band"><rect class="bar" x="0" y="${r2(top + 1.5)}" width="${W}" height="${BAR.h - 3}" fill="url(#h-open)"/></g>`;
   s += `<g id="bar-fill"><rect class="bar" x="0" y="${r2(top + 1.5)}" width="${W}" height="${BAR.h - 3}" fill="${WASH.ochre}" opacity=".9"/></g>`;
-  for (const [id, score, width] of [
-    ['mark-counters', counters, 1.4],
-    ['mark-signs', signs, 2.4],
+  const capY = top - BAR.mark - BAR.capGap;
+  for (const [id, score, width, cap] of [
+    ['counters', counters, 1.4, 'counter'],
+    ['signs', signs, 2.4, 'tick'],
   ] as const)
-    s += `<g id="${id}"><path d="M${r2(at(score))} ${r2(top - BAR.mark)}V${r2(top + BAR.h + BAR.mark)}" stroke="${INK.iron}" stroke-width="${width}" stroke-linecap="round"/></g>`;
+    s +=
+      `<path d="M${r2(at(score))} ${r2(top - BAR.mark)}V${r2(top + BAR.h + BAR.mark)}" stroke="${INK.iron}" stroke-width="${width}" stroke-linecap="round"/>` +
+      `<g id="cap-${id}">${glyph(cap, at(score), capY, BAR.cap)}</g>`;
   return s;
 }
 
@@ -151,6 +156,35 @@ function answer(v: NegotiationView, landing: boolean) {
   return '';
 }
 
+function seal(cx: number, cy: number) {
+  let edge = '';
+  for (let i = 0; i <= 72; i++) {
+    const a = (i / 72) * Math.PI * 2,
+      r = SEAL.r + SEAL.wave * Math.cos(a * SEAL.bumps) + 0.8 * Math.sin(a * 3);
+    edge += `${i ? 'L' : 'M'}${r2(cx + r * Math.cos(a))} ${r2(cy + r * Math.sin(a))}`;
+  }
+  let rays = '';
+  for (let i = 0; i < SEAL.rays; i++) {
+    const a = (i / SEAL.rays) * Math.PI * 2 + 0.3,
+      from = SEAL.r + 7,
+      to = SEAL.r + 15 + (i % 3) * 4,
+      dot = to + 6;
+    rays +=
+      `<path d="M${r2(cx + from * Math.cos(a))} ${r2(cy + from * Math.sin(a))}L${r2(cx + to * Math.cos(a))} ${r2(cy + to * Math.sin(a))}" stroke="${INK.iron}" stroke-width="1.6" stroke-linecap="round"/>` +
+      `<circle cx="${r2(cx + dot * Math.cos(a + 0.18))}" cy="${r2(cy + dot * Math.sin(a + 0.18))}" r="${i % 2 ? 1.2 : 1.8}" fill="${INK.rubric}"/>`;
+  }
+  const origin = `transform-origin:${r2(cx)}px ${r2(cy)}px`;
+  return (
+    `<g class="flourish" style="${origin}"><circle cx="${r2(cx)}" cy="${r2(cy)}" r="${SEAL.r + 4}" fill="none" stroke="${INK.rubric}" stroke-width="2.2"/></g>` +
+    `<g class="flourish rays" style="${origin}">${rays}</g>` +
+    `<g class="sealed" style="${origin}">` +
+    `<path d="${edge}Z" fill="${INK.rubric}" stroke="${SHADOW}" stroke-opacity=".35" stroke-width="1.2"/>` +
+    `<circle cx="${r2(cx)}" cy="${r2(cy)}" r="${SEAL.r - 6}" fill="none" stroke="${INK.white}" stroke-opacity=".45" stroke-width="1.3"/>` +
+    glyph('tick', cx, cy, SEAL.r + 2, { ink: 'white', paper: INK.rubric }) +
+    '</g>'
+  );
+}
+
 const waiting = () =>
   `<g class="waiting">${glyph('hourglass', SIDE.x + SIDE_W / 2, ANSWER.y, ANSWER.counter + 8)}</g>`;
 
@@ -182,7 +216,9 @@ export function createNegotiation(port: LobbyPort) {
     edit: Edit | null = null,
     svg: SVGSVGElement | null = null,
     person: number | null = null,
-    offered = false,
+    sending: 'offer' | 'accept' | null = null,
+    countered: number | null = null,
+    done = false,
     waitingFor = false,
     pending = 0,
     leaving = 0;
@@ -210,8 +246,8 @@ export function createNegotiation(port: LobbyPort) {
     if (band) band.style.transform = scale(v.willingness.hi);
     if (!before) return;
     for (const [id, line] of [
-      ['mark-counters', v.willingness.counters],
-      ['mark-signs', v.willingness.signs],
+      ['cap-counters', v.willingness.counters],
+      ['cap-signs', v.willingness.signs],
     ] as const) {
       const crossed = (a: number, b: number) => a < line !== b < line;
       if (
@@ -245,10 +281,19 @@ export function createNegotiation(port: LobbyPort) {
     setBar(v, before);
   }
 
-  function setAnswer(v: NegotiationView, landing: boolean) {
+  function send(kind: 'offer' | 'accept', command: Command) {
+    sending = kind;
+    const refused = port.send(command);
+    sending = null;
+    return refused;
+  }
+
+  function setAnswer(v: NegotiationView, landing: boolean, opening = false) {
     const host = part('answer'),
       pips = part('attempts');
-    if (host) host.innerHTML = answer(v, landing);
+    if (host)
+      host.innerHTML =
+        opening && v.answer === 'signed' ? '' : answer(v, landing);
     if (pips) pips.innerHTML = attempts(v, landing);
     const accept = part('accept');
     if (accept && v.counter) {
@@ -258,23 +303,54 @@ export function createNegotiation(port: LobbyPort) {
         accept,
         faint
           ? () => refuse(accept)
-          : () => port.send({ type: 'AcceptCounter', team: 0, person: id }),
+          : () => {
+              countered = v.counter?.wage ?? null;
+              if (
+                send('accept', { type: 'AcceptCounter', team: 0, person: id })
+              )
+                refuse(accept);
+            },
         'accept'
       );
     }
-    if (landing && v.answer === 'signed') {
-      window.clearTimeout(leaving);
-      leaving = window.setTimeout(() => {
-        if (view?.answer === 'signed' && !el.hidden) port.close();
-      }, MOTION.signed.hold);
+  }
+
+  function signing() {
+    done = true;
+    if (countered !== null) {
+      const host = part('wage-value');
+      if (host)
+        host.innerHTML = stepperValue(
+          TERMS.label + TERMS.w / 2,
+          rowY(0),
+          grouped(countered)
+        );
     }
+    const art = cardBox.firstElementChild,
+      tall = Number(art?.getAttribute('height') ?? CARD.h),
+      mark = svgNode(CARD.w, tall, seal(CARD.w * SEAL.x, tall * SEAL.y));
+    mark.style.cssText = 'position:absolute;left:0;top:0;pointer-events:none';
+    cardBox.append(mark);
+    cardBox.classList.remove('struck');
+    void cardBox.getBoundingClientRect();
+    cardBox.classList.add('struck');
+    window.clearTimeout(leaving);
+    leaving = window.setTimeout(() => {
+      if (!el.hidden) port.close();
+    }, MOTION.signed.hold);
+  }
+
+  function land(v: NegotiationView, before: NegotiationView | null) {
+    if (v.answer !== 'signed') setTerms(v, before);
+    setAnswer(v, true);
+    if (v.answer === 'signed') signing();
   }
 
   function edited(
     change: (e: Edit, v: NegotiationView) => Edit,
     from: SVGElement | null
   ) {
-    if (!view || !edit) return;
+    if (!view || !edit || done) return;
     const next = price(change(edit, view));
     if (!next) return;
     const same =
@@ -358,29 +434,33 @@ export function createNegotiation(port: LobbyPort) {
     pressable(
       offer,
       () => {
-        if (!view) return;
+        if (!view || done || waitingFor) return;
         if (view.offer.faint) {
           refuse(offer);
           return;
         }
-        offered = true;
-        port.send({
-          type: 'Offer',
-          team: 0,
-          person: view.person,
-          terms: view.terms,
-        });
+        countered = null;
+        if (
+          send('offer', {
+            type: 'Offer',
+            team: 0,
+            person: view.person,
+            terms: view.terms,
+          })
+        )
+          refuse(offer);
       },
       'offer'
     );
     setTerms(v, null);
-    setAnswer(v, false);
+    setAnswer(v, false, true);
   }
 
   return {
     el,
     show(pricing: Pricing) {
       price = pricing;
+      if (done) return;
       const next = price(edit);
       if (!next) return;
       const before = view;
@@ -388,27 +468,15 @@ export function createNegotiation(port: LobbyPort) {
       if (person !== next.person || !svg) {
         person = next.person;
         edit = next.edit;
-        offered = false;
         window.clearTimeout(pending);
         build(next);
         return;
       }
-      const changed =
-        before !== null &&
-        (before.attempts.used !== next.attempts.used ||
-          before.answer !== next.answer ||
-          before.counter?.wage !== next.counter?.wage);
-      const land = (v: NegotiationView, from: NegotiationView | null) => {
-        if (v.answer !== 'signed') setTerms(v, from);
-        setAnswer(v, true);
-      };
-      if (!changed) {
-        if (!waitingFor) setTerms(next, before);
-        if (!waitingFor) setAnswer(next, false);
+      if (sending === 'accept') {
+        land(next, before);
         return;
       }
-      if (offered) {
-        offered = false;
+      if (sending === 'offer') {
         waitingFor = true;
         const host = part('answer');
         if (host) host.innerHTML = waiting();
@@ -417,12 +485,18 @@ export function createNegotiation(port: LobbyPort) {
           waitingFor = false;
           if (view) land(view, before);
         }, MOTION.suspense.ms);
-      } else land(next, before);
+        return;
+      }
+      if (!waitingFor) setTerms(next, before);
     },
     reset() {
+      done = false;
       waitingFor = false;
+      sending = null;
+      countered = null;
       window.clearTimeout(pending);
       window.clearTimeout(leaving);
+      cardBox.classList.remove('struck');
       person = null;
       view = null;
       edit = null;
