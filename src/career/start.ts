@@ -86,7 +86,7 @@ type Untouched =
   | 'sponsors'
   | 'offers';
 
-const emptyTeam = (): Pick<Team, Untouched> => ({
+export const emptyTeam = (): Pick<Team, Untouched> => ({
   unlockProgress: perKind(() => 0),
   focus: null,
   scoutSeat: 'designer',
@@ -100,23 +100,29 @@ const emptyTeam = (): Pick<Team, Untouched> => ({
 const tasteOf = (seed: string, team: number): GunKind[] =>
   ordered(KINDS, (kind) => kind, seed, 'team', team, 'taste');
 
-function yourTeam(options: CareerOptions): Team {
+type Yard = 'design' | 'unlocked' | 'ships' | 'seats';
+
+export function newYard(): Pick<Team, Yard> {
   const level = (): Levels => perLine(() => START.level);
   const ship = (): Ship => ({ fitted: level(), gun: CANNON });
   return {
-    ...emptyTeam(),
-    name: options.name,
-    livery: options.livery,
-    emblem: options.emblem,
-    taste: tasteOf(options.seed, 0),
-    owner: null,
-    balance: YOUR_START.balance,
     design: level(),
     unlocked: [CANNON],
     ships: [ship(), ship()],
     seats: perRole(() => null),
   };
 }
+
+const yourTeam = (options: CareerOptions): Team => ({
+  ...emptyTeam(),
+  name: options.name,
+  livery: options.livery,
+  emblem: options.emblem,
+  taste: tasteOf(options.seed, 0),
+  owner: null,
+  balance: YOUR_START.balance,
+  ...newYard(),
+});
 
 type Identity = {
   name: string;

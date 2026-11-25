@@ -490,8 +490,9 @@ test('the workshop strip shows the focus before and after, only with a designer'
 
 test('RecordRace fills the race report with numbers recomputed from the result', () => {
   for (const shift of [0, 1, 40, 79]) {
-    const state = staffed(3, 'racing', -50000);
     const result = handResult(shift);
+    const net = expectedMoney(staffed(3, 'racing', 0), result, YOURS).then;
+    const state = staffed(3, 'racing', -net - 5000);
     const next = record(state, result);
     const report = next.lastRace;
     assert.ok(report);

@@ -36,6 +36,7 @@ import { countDownSponsors } from './record/sponsors.ts';
 import { publishNews } from './record/news.ts';
 import { payRace, raceMoney } from './record/pay.ts';
 import { fileReport, raceReport } from './record/report.ts';
+import { repossess } from './record/repossess.ts';
 import { scoreRace } from './record/score.ts';
 import { dealOffers } from './sponsors/offers.ts';
 import { signRefusal, signSponsor } from './sponsors/sign.ts';
@@ -67,10 +68,7 @@ const notYet = (state: CareerState): Applied => ({ ok: true, state });
 
 const seam = (state: CareerState): CareerState => state;
 
-type Repossession = { state: CareerState; teams: readonly number[] };
-
 const runPolicies = seam;
-const repossess = (state: CareerState): Repossession => ({ state, teams: [] });
 const raceEvents = seam;
 const seasonEvents = seam;
 

@@ -53,6 +53,7 @@ export function workshop(
 
 export function raceReport(record: RaceRecord): RaceReport {
   const { before, paid, after, result, money } = record;
+  const repossessed = record.repossessed.includes(YOURS);
   const ships = teamShips(result, YOURS);
   return {
     season: before.season,
@@ -76,8 +77,8 @@ export function raceReport(record: RaceRecord): RaceReport {
       before: standings(before)[YOURS],
       after: standings(after)[YOURS],
     },
-    workshop: workshop(before, after),
-    repossessed: record.repossessed.includes(YOURS),
+    workshop: repossessed ? null : workshop(before, after),
+    repossessed,
   };
 }
 
