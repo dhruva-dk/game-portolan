@@ -1,6 +1,7 @@
 import { apply, newCareer, runPolicy } from '../career/apply.ts';
 import type { Command, Livery, Role } from '../career/commands.ts';
 import { matchSetup } from '../career/fit.ts';
+import { KINDS, perKind, type GunKind } from '../sim/kinds.ts';
 import { TEAM_NAMES } from '../career/names.ts';
 import { standInResult } from '../career/standin.ts';
 import {
@@ -97,6 +98,31 @@ export function owing(state: CareerState, balance: number): CareerState {
   return {
     ...state,
     teams: state.teams.map((t, i) => (i === YOURS ? { ...t, balance } : t)),
+  };
+}
+
+export function armed(
+  state: CareerState,
+  unlocked: readonly GunKind[],
+  progress: number
+): CareerState {
+  return {
+    ...state,
+    teams: state.teams.map((t, i) =>
+      i === YOURS
+        ? {
+            ...t,
+            unlocked: KINDS.filter(
+              (k) => t.unlocked.includes(k) || unlocked.includes(k)
+            ),
+            unlockProgress: perKind((k) =>
+              t.unlocked.includes(k) || unlocked.includes(k)
+                ? t.unlockProgress[k]
+                : progress
+            ),
+          }
+        : t
+    ),
   };
 }
 

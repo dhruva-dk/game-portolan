@@ -7,6 +7,7 @@ import { founding } from './new-career.ts';
 import {
   haggled,
   owing,
+  armed,
   rehearsed,
   reported,
   wintered,
@@ -269,7 +270,14 @@ function talkedTo(career: CareerState, role: Role) {
   return { person, renewal, state: haggled(known, person, plan) };
 }
 
-const CAREER_SCREENS = ['lobby', 'team', 'deal', 'negotiation'] as const;
+const CAREER_SCREENS = [
+  'lobby',
+  'team',
+  'deal',
+  'negotiation',
+  'ship',
+  'paint',
+] as const;
 
 const FIXED_PLANET = 'portolan';
 
@@ -345,7 +353,13 @@ async function harbor(
     ),
     signed = params.has('signed') ? wintered(sailed) : sailed,
     owed = params.get('balance');
-  const priced = owed === null ? signed : owing(signed, Number(owed));
+  const owes = owed === null ? signed : owing(signed, Number(owed));
+  const kinds = (params.get('unlocked') ?? '')
+    .split(',')
+    .flatMap((k) => KINDS.filter((kind) => kind === k));
+  const priced = params.has('unlocked')
+    ? armed(owes, kinds, number('progress', 0))
+    : owes;
   const role = roleOf(priced),
     talk = screen === 'negotiation' ? talkedTo(priced, role) : null,
     career = talk === null ? priced : talk.state;
@@ -368,6 +382,11 @@ async function harbor(
       location.replace(at.href);
     },
   });
+  if (screen === 'ship' || screen === 'paint') {
+    shore.open('ship', { stop: Math.floor(number('stop', 0)) });
+    if (screen === 'paint') shore.open('paint');
+    return;
+  }
   if (screen !== 'lobby') shore.open('team');
   if (screen === 'deal' || (talk !== null && !talk.renewal))
     shore.open('deal', { role });

@@ -21,6 +21,8 @@ const VIEWS: { name: string; q: string; own?: Partial<Budget> }[] = [
     name: 'negotiation',
     q: 'screen=negotiation&seed=test&races=14&offers=refuse,counter',
   },
+  { name: 'ship', q: 'screen=ship&seed=test&races=14&stop=6' },
+  { name: 'paint', q: 'screen=paint&seed=test&races=14' },
   { name: 'map', q: 'screen=match&map' },
   {
     name: 'worst',
