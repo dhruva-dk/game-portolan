@@ -16,7 +16,7 @@ import {
   sponsorFee,
 } from '../src/career/rules/money.ts';
 import { reputations } from '../src/career/rules/standing.ts';
-import { drawOffers } from '../src/career/sponsors/offers.ts';
+import { drawOffers } from '../src/career/sponsors.ts';
 import { standInResult } from '../src/career/standin.ts';
 import {
   OBJECTIVES,

@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { apply, newCareer, type Applied } from '../src/career/apply.ts';
 import type { Command, Reason } from '../src/career/commands.ts';
-import { buildPrice, fitPrice } from '../src/career/development/build.ts';
+import { buildPrice, fitPrice } from '../src/career/development.ts';
 import { matchSetup } from '../src/career/fit.ts';
 import { develop } from '../src/career/record/race.ts';
 import {

@@ -10,7 +10,7 @@ import {
 import { stars } from '../rules/person.ts';
 import { reputationOf } from '../rules/standing.ts';
 import type { CareerState, Person, Talk, Team, Terms } from '../state.ts';
-import { updateTeam } from '../teams.ts';
+import { updateTeam } from '../change.ts';
 import { CONTRACTS, NEGOTIATION, SCOUTING } from '../tuning.ts';
 import { isRenewal, signingFunds } from './cost.ts';
 import { sign, talkWith, withTalk } from './sign.ts';

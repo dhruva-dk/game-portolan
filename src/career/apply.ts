@@ -12,8 +12,9 @@ import {
   buildRefusal,
   fitGun,
   fitRefusal,
-} from './development/build.ts';
-import { focusRefusal, setFocus } from './development/focus.ts';
+  focusRefusal,
+  setFocus,
+} from './development.ts';
 import { fieldsValid, isIndex } from './fields.ts';
 import {
   acceptCounter,
@@ -67,8 +68,7 @@ import { runLeague, runTeam, type PolicyRun } from './policy/run.ts';
 import { fileReport, raceReport } from './record/report.ts';
 import { repaint, repaintRefusal } from './repaint.ts';
 import type { Temperament } from './rules/person.ts';
-import { dealOffers } from './sponsors/offers.ts';
-import { signRefusal, signSponsor } from './sponsors/sign.ts';
+import { dealOffers, signRefusal, signSponsor } from './sponsors.ts';
 import { YOURS, type CareerState } from './state.ts';
 
 export { newCareer, type CareerOptions } from './start.ts';

@@ -1,6 +1,5 @@
 import type { Command } from '../commands.ts';
-import { buildPrice, fitPrice } from '../development/build.ts';
-import { sameFocus } from '../development/focus.ts';
+import { buildPrice, fitPrice, sameFocus } from '../development.ts';
 import { draw, raceKey } from '../draw.ts';
 import { employees, personOf, seatHolder } from '../lookup.ts';
 import { focusValue, focusWeight, wantsGun } from '../rules/development.ts';

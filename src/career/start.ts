@@ -21,8 +21,7 @@ import {
 } from './rules/league.ts';
 import { lineLeader } from './rules/standing.ts';
 import { generateOwner, generatePerson, type Origin } from './rules/person.ts';
-import { drawOffers } from './sponsors/offers.ts';
-import { slotsOf } from './sponsors/slots.ts';
+import { drawOffers, slotsOf } from './sponsors.ts';
 import {
   FIRST_RACE,
   FIRST_SEASON,

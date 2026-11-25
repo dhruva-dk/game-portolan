@@ -1,5 +1,5 @@
 import type { MatchResult } from '../../sim/result.ts';
-import { announce, named } from '../announce.ts';
+import { announce, named } from '../change.ts';
 import { planetName } from '../fit.ts';
 import { seatHolder } from '../lookup.ts';
 import {

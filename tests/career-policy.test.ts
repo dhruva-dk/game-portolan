@@ -8,7 +8,7 @@ import {
   type Applied,
 } from '../src/career/apply.ts';
 import type { Command } from '../src/career/commands.ts';
-import { buildPrice, fitPrice } from '../src/career/development/build.ts';
+import { buildPrice, fitPrice } from '../src/career/development.ts';
 import { draw } from '../src/career/draw.ts';
 import { matchSetup } from '../src/career/fit.ts';
 import { costToSign, clauseOwed } from '../src/career/hiring/cost.ts';

@@ -13,7 +13,7 @@ import {
   type Levels,
   type Team,
 } from '../src/career/state.ts';
-import { updateShip, updateTeam } from '../src/career/teams.ts';
+import { updateShip, updateTeam } from '../src/career/change.ts';
 import { BUILD, GAIN, REPAINT, UNLOCK } from '../src/career/tuning.ts';
 import { paintView } from '../src/career/views/paint.ts';
 import { shipView } from '../src/career/views/ship.ts';

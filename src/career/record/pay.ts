@@ -1,5 +1,5 @@
 import type { MatchResult } from '../../sim/result.ts';
-import { announce } from '../announce.ts';
+import { announce } from '../change.ts';
 import { redrawRepossessed } from '../knowledge/ships.ts';
 import { employees } from '../lookup.ts';
 import {
@@ -9,7 +9,7 @@ import {
   seaMoney,
   sinkingMoney,
 } from '../rules/money.ts';
-import { mapSlots, signed } from '../sponsors/slots.ts';
+import { mapSlots, signed } from '../sponsors.ts';
 import { emptyTeam, newYard } from '../start.ts';
 import type { CareerState, MoneyRows, SponsorRow, Team } from '../state.ts';
 import { REPOSSESSION } from '../tuning.ts';

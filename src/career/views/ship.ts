@@ -4,7 +4,7 @@ import {
   buildRefusal,
   fitPrice,
   fitRefusal,
-} from '../development/build.ts';
+} from '../development.ts';
 import { seatHolder, seatStat } from '../lookup.ts';
 import { designGain } from '../rules/development.ts';
 import {

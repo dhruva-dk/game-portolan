@@ -1,9 +1,9 @@
-import type { GunKind } from '../../sim/kinds.ts';
-import type { Reason } from '../commands.ts';
-import { seatStat } from '../lookup.ts';
-import { buildCost, fitCost } from '../rules/development.ts';
-import type { CareerState, Line } from '../state.ts';
-import { updateShip, updateTeam } from '../teams.ts';
+import type { GunKind } from '../sim/kinds.ts';
+import { updateShip, updateTeam } from './change.ts';
+import type { Reason } from './commands.ts';
+import { seatStat } from './lookup.ts';
+import { buildCost, fitCost } from './rules/development.ts';
+import type { CareerState, Focus, Line } from './state.ts';
 
 const teamThrift = (state: CareerState, team: number): number | null =>
   seatStat(state, team, 'mechanic', 'thrift');
@@ -87,3 +87,35 @@ export function fitGun(
     })),
   }));
 }
+
+export function sameFocus(a: Focus, b: Focus): boolean {
+  if (a === null || b === null) return a === b;
+  if ('line' in a) return 'line' in b && a.line === b.line;
+  return 'gun' in b && a.gun === b.gun;
+}
+
+export function focusRefusal(
+  state: CareerState,
+  team: number,
+  focus: Focus
+): Reason | null {
+  const { unlocked, focus: current } = state.teams[team];
+  if (focus !== null && 'gun' in focus && unlocked.includes(focus.gun))
+    return 'locked';
+  return sameFocus(current, focus) ? 'same' : null;
+}
+
+export const setFocus = (
+  state: CareerState,
+  team: number,
+  focus: Focus
+): CareerState =>
+  updateTeam(state, team, (t) => ({
+    ...t,
+    focus:
+      focus === null
+        ? null
+        : 'line' in focus
+          ? { line: focus.line }
+          : { gun: focus.gun },
+  }));

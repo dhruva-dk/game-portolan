@@ -1,4 +1,4 @@
-import { announce, named } from '../announce.ts';
+import { announce, named, updateTeam, vacate } from '../change.ts';
 import type { Reason } from '../commands.ts';
 import { ownerOf, personOf } from '../lookup.ts';
 import { racesLeftOnSigning, renewedRacesLeft } from '../rules/hiring.ts';
@@ -12,8 +12,6 @@ import type {
   Team,
   Terms,
 } from '../state.ts';
-import { updateTeam } from '../teams.ts';
-import { vacate } from '../vacate.ts';
 import {
   clauseOwed,
   costToSign,

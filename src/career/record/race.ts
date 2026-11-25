@@ -1,6 +1,6 @@
 import { perKind, type GunKind } from '../../sim/kinds.ts';
 import type { MatchResult, ShipResult } from '../../sim/result.ts';
-import { announce } from '../announce.ts';
+import { announce } from '../change.ts';
 import { seatHolder } from '../lookup.ts';
 import {
   advancedUnlock,
