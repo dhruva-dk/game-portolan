@@ -15,6 +15,8 @@ import { paintView, type PaintEdit } from '../career/views/paint.ts';
 import { shipView } from '../career/views/ship.ts';
 import { sponsorsView } from '../career/views/sponsors.ts';
 import { opponentsView, teamSheetView } from '../career/views/opponents.ts';
+import { paperView } from '../career/views/paper.ts';
+import { moneyView, resultView } from '../career/views/result.ts';
 import { lookOf } from '../play/colors.ts';
 import { createGame } from '../play/game.ts';
 import { PARTS, openingPose, type Framing } from '../play/anchorage.ts';
@@ -38,6 +40,8 @@ import { createShip } from '../ui/lobby/ship.ts';
 import { createSponsors } from '../ui/lobby/sponsors.ts';
 import { createPlanet } from '../ui/lobby/planet.ts';
 import { createOpponents } from '../ui/lobby/opponents.ts';
+import { createPaper } from '../ui/lobby/paper.ts';
+import { createResult } from '../ui/lobby/result.ts';
 import { createTeam } from '../ui/lobby/team.ts';
 import { createInput } from '../ui/sea/input.ts';
 import type { Stage } from './debug.ts';
@@ -114,14 +118,18 @@ export async function ashore(
     open: ScreenName | null = null,
     dealt: Role | null = null,
     talking: number | null = null,
-    painting = false;
+    painting = false,
+    flowing: 'result' | 'paper' | null =
+      career.unread && career.lastRace !== null ? 'result' : null,
+    built = false;
 
   const pricing = (person: number) => (edit: Edit | null) =>
     negotiationView(state, person, edit);
 
   let held = false;
   const redraw = () => {
-    if (!held) lobby.show(lobbyView(state));
+    if (!held && flowing === null) lobby.show(lobbyView(state));
+    if (flowing === 'paper') paper.update(sheetOf);
     if (open === 'team') team.show(teamView(state));
     if (dealt !== null) deal.show(dealView(state, dealt));
     if (talking !== null) negotiation.show(pricing(talking));
@@ -153,6 +161,7 @@ export async function ashore(
           redraw();
         }, MOTION.suspense.ms);
       }
+      if (command.type === 'MarkRead' && flowing !== null) ended();
       redraw();
       if (state.phase === 'racing') void saved.then(() => o.sailed(state));
       return null;
@@ -160,6 +169,10 @@ export async function ashore(
     open(name, argument) {
       const role = argument?.role;
       const person = argument?.person;
+      if (flowing !== null) {
+        flow(name, argument);
+        return;
+      }
       if (open === 'team' && talking === null && name === 'negotiation') {
         if (person === undefined) return;
         talking = person;
@@ -238,6 +251,11 @@ export async function ashore(
       }
     },
     close() {
+      if (flowing === 'paper') {
+        paper.back();
+        return;
+      }
+      if (flowing !== null) return;
       if (painting) {
         painting = false;
         rise(paint.el, false);
@@ -338,7 +356,46 @@ export async function ashore(
   const sponsors = createSponsors(port);
   const planet = createPlanet(port);
   const opponents = createOpponents(port);
+  const result = createResult(port);
+  const paper = createPaper(port);
   redraw();
+
+  function flow(name: ScreenName, argument?: ScreenArgument) {
+    const race = resultView(state),
+      money = moneyView(state);
+    if (flowing === 'result' && name === 'result' && race && money) {
+      result.show(race, money, argument?.step ?? 1);
+      return;
+    }
+    if (flowing === 'result' && name === 'paper') {
+      flowing = 'paper';
+      result.hide();
+      paper.show(paperView(state));
+      if (built) paper.ready();
+      return;
+    }
+    const team = argument?.team;
+    if (
+      flowing === 'paper' &&
+      name === 'teamSheet' &&
+      team !== undefined &&
+      team >= 0 &&
+      team < state.teams.length
+    )
+      paper.sheet(sheetOf(team), {
+        person: argument?.person,
+        seat: argument?.role,
+      });
+  }
+
+  function ended() {
+    flowing = null;
+    result.hide();
+    paper.hide();
+    rise(lobby.el, true);
+  }
+
+  if (flowing === 'result') flow('result');
 
   const marked = markedOn(s, state, berth).then((m) => {
     marks = m;
@@ -349,7 +406,8 @@ export async function ashore(
     redraw();
   });
 
-  void s.ready.then(() => o.ready());
+  if (flowing !== null) o.ready();
+  else void s.ready.then(() => o.ready());
   void s.draw((dt) => {
     game.step(dt, input.read());
     const scene = game.snapshot();
@@ -358,9 +416,14 @@ export async function ashore(
     return scene;
   });
 
+  const settled = Promise.all([marked, s.ready]).then(() => {
+    built = true;
+    if (flowing === 'paper') paper.ready();
+  });
+
   return {
     open: (name, argument) => port.open(name, argument),
     state: () => state,
-    settled: Promise.all([marked, s.ready]).then(() => undefined),
+    settled,
   };
 }
