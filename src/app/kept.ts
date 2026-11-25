@@ -1,9 +1,8 @@
-import { LIVERY, PATTERNS, type Livery } from '../world/livery.ts';
 import { settled, type Settings } from '../ui/base/settings.ts';
 
 export type Store = Pick<Storage, 'getItem' | 'setItem'>;
 
-const KEYS = { settings: 'portolan.settings', livery: 'portolan.livery' };
+const KEYS = { settings: 'portolan.settings' };
 
 export type Kept = Settings & { stats: boolean };
 
@@ -36,25 +35,3 @@ export function keptSettings(store: Store | null): Kept {
 }
 export const keepSettings = (store: Store | null, s: Settings | Kept) =>
   keep(store, KEYS.settings, { ...keptSettings(store), ...s });
-
-export function keptLivery(
-  store: Store | null,
-  dyes: readonly string[]
-): Livery {
-  const f = fields(store, KEYS.livery),
-    dye = dyes.findIndex((d) => d === f.get('dye')),
-    pattern = PATTERNS.findIndex((p) => p === f.get('pattern'));
-  return {
-    dye: dye < 0 ? LIVERY.dye : dye,
-    pattern: pattern < 0 ? LIVERY.pattern : pattern,
-  };
-}
-export const keepLivery = (
-  store: Store | null,
-  l: Livery,
-  dyes: readonly string[]
-) =>
-  keep(store, KEYS.livery, {
-    dye: dyes[l.dye] ?? dyes[LIVERY.dye],
-    pattern: PATTERNS[l.pattern] ?? PATTERNS[LIVERY.pattern],
-  });
