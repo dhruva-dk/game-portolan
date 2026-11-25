@@ -1,3 +1,4 @@
+import { fireDrag } from './aim.ts';
 import {
   GUST_NOTCH,
   HEAL_SLOTS,
@@ -53,6 +54,7 @@ interface HudActions {
   gust(): void;
   map(): void;
   fire(down: boolean): void;
+  aim(dx: number, dy: number, held: boolean): void;
   pause(): void;
 }
 
@@ -111,6 +113,22 @@ export function createHud(layer: HTMLElement, shores: Shores, act: HudActions) {
     `box-shadow:inset 0 0 calc(80px * var(--k)) calc(18px * var(--k)) ${alpha(DUSK, 0.6)}`;
   body.prepend(rim);
   onHold(fire, act.fire);
+  fire.setAttribute('data-tap', 'fire');
+  const drag = fireDrag();
+  fire.addEventListener('pointerdown', (e) => drag.down(e.clientX, e.clientY));
+  fire.addEventListener('pointermove', (e) => {
+    const d = drag.move(e.clientX, e.clientY);
+    if (d) act.aim(d[0], d[1], true);
+  });
+  for (const lift of [
+    'pointerup',
+    'pointercancel',
+    'lostpointercapture',
+  ] as const)
+    fire.addEventListener(lift, () => {
+      drag.up();
+      act.aim(0, 0, false);
+    });
   const hotbar = piece(body, 'bottom center', false, true);
 
   const drawMap = createMinimap(map, MINIMAP, shores);

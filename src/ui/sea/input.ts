@@ -1,6 +1,7 @@
 import type { Thumbs } from '../../play/player.ts';
 import { clamp } from '../../world/scalar.ts';
 import { view } from '../base/ui.ts';
+import { aimed } from './aim.ts';
 
 export const STICK = 56;
 const LEFT = 0.45;
@@ -33,7 +34,8 @@ export function createInput(
     fired = false,
     holding = false,
     healed: number | null = null,
-    gusted = false;
+    gusted = false,
+    aiming = false;
 
   element.addEventListener('pointerdown', (e) => {
     element.setPointerCapture(e.pointerId);
@@ -77,6 +79,7 @@ export function createInput(
     looks.clear();
     thumb.id = -1;
     holding = false;
+    aiming = false;
   };
   addEventListener('keydown', down);
   addEventListener('keyup', up);
@@ -102,7 +105,7 @@ export function createInput(
         const size = Math.hypot(x, y);
         if (size > 0) stick = { x: x / size, y: y / size, center: null };
       }
-      const look = { x: lookX, y: lookY, held: looks.size > 0 };
+      const look = { x: lookX, y: lookY, held: looks.size > 0 || aiming };
       lookX = lookY = 0;
       const fire = fired || holding || keys.has('Space'),
         heal = healed,
@@ -114,6 +117,12 @@ export function createInput(
     fire(down: boolean) {
       holding = down;
       if (down) fired = true;
+    },
+    aim(dx: number, dy: number, held: boolean) {
+      const [x, y] = aimed([dx, dy], hands().sensitivity);
+      lookX += x;
+      lookY += y;
+      aiming = held;
     },
     heal(slot: number) {
       healed = slot;
