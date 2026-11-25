@@ -209,7 +209,7 @@ test('the mechanic sets both ships, and an empty seat gives the no-mechanic colu
   }
 });
 
-test('the mechanic values of §1.5.2 at hand-worked points', () => {
+test('the mechanic values at hand-worked points', () => {
   const near = (a: number, b: number) =>
     assert.ok(Math.abs(a - b) < 1e-9, `${a} is not ${b}`);
   const levels = {

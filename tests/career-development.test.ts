@@ -181,7 +181,7 @@ function acceptedPlain(state: CareerState, command: Command): CareerState {
   return next;
 }
 
-test('the gain of §1.7.2 at hand-worked points', () => {
+test('the design gain at hand-worked points', () => {
   close(unfocusedRate(), 0.085);
   close(focusedRate(), 0.17);
   close(designGain(20, focusedRate()), 3.4);
@@ -198,7 +198,7 @@ test('the gain of §1.7.2 at hand-worked points', () => {
   assert.equal(gainRate({ gun: 'mortar' }, 'gun'), unfocusedRate());
 });
 
-test('unlock progress of §1.7.3 at hand-worked points', () => {
+test('unlock progress at hand-worked points', () => {
   assert.equal(unlockGain(20), 5);
   assert.equal(unlockGain(1), 0.25);
   assert.equal(unlockGain(8), 2);
@@ -209,7 +209,7 @@ test('unlock progress of §1.7.3 at hand-worked points', () => {
   assert.equal(unlockDone(20), true);
 });
 
-test('the build and fit costs of §1.7.4 at hand-worked points', () => {
+test('the build and fit costs at hand-worked points', () => {
   assert.equal(buildCost(15, 5, null), 107);
   assert.equal(buildCost(50, 5, null), 1081);
   assert.equal(buildCost(6, 5, null), 11);
@@ -292,7 +292,7 @@ test('SetFocus is refused for the cannon, an unlocked kind, the same focus and a
   assert.deepEqual(back, state);
 });
 
-test('Build sets the fitted level to the design level and charges the §1.7.4 cost', () => {
+test('Build sets the fitted level to the design level and charges the build cost', () => {
   const state = shaped(BASE, YOURS, {
     balance: 5000,
     design: { ...levels(5), hull: 15, keel: 50 },

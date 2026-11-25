@@ -213,7 +213,7 @@ const atStop = (seed: string): CareerState => {
   });
 };
 
-test('the season prize and winter loss follow §1.8.2 and §1.9', () => {
+test('the season prize follows income at every standing, and winter keeps its shares', () => {
   for (const standing of STANDINGS)
     assert.equal(seasonPrize(standing), expectedPrize(standing));
   for (let s = 1; s < TEAMS; s++)

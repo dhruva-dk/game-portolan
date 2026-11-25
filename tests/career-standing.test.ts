@@ -25,7 +25,7 @@ const STATE = newCareer({
   emblem: 0,
 });
 
-test('place points follow §1.3.1 at every edge', () => {
+test('place points follow their table at every edge', () => {
   assert.equal(placePoints(1), POINTS.podium[0]);
   assert.equal(placePoints(2), POINTS.podium[1]);
   assert.equal(placePoints(3), POINTS.podium[2]);

@@ -80,7 +80,7 @@ test('a new career: seven stops, every level at 5, Build faint with a tick, Uncl
   assert.equal(shipView(FRESH, 'gun').stop, 6);
 });
 
-test('Build costs what §1.7.4 says and gains design minus fitted; Build is faint for funds when short', () => {
+test('Build costs the build cost and gains design minus fitted; Build is faint for funds when short', () => {
   const state = rich(levels(FRESH, { hull: 40 }));
   const row = shipView(state, 'hull').rows[0];
   assert.equal(row.build.cost, buildCost(40, 5, thrift(state)));

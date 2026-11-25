@@ -185,7 +185,7 @@ test('ordinal: 1st, 2nd, 3rd, 4th, the teens, and on', () => {
   for (const [n, text] of cases) assert.equal(ordinal(n), text);
 });
 
-test('every wording uses only the placeholders of §1.13.1, and every kind has its wordings', () => {
+test('every wording uses only the known placeholders, and every kind has its wordings', () => {
   assert.deepEqual(Object.keys(WORDINGS).sort(), [...NEWS_KINDS].sort());
   const counts = NEWS_KINDS.map((kind) => WORDINGS[kind].length);
   assert.deepEqual(counts, [3, 2, 2, 2, 2, 2, 1, 2, 1, 1, 1, 1, 1]);

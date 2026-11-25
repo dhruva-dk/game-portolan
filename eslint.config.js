@@ -167,7 +167,7 @@ export default [
             THREE_SOURCE,
             ...banned.map((regex) => ({
               regex,
-              message: `${folder}/ may import ${may} (§2.1)`,
+              message: `${folder}/ may import ${may}`,
             })),
           ],
         },

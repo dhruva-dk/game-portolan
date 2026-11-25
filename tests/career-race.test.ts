@@ -259,7 +259,7 @@ function expectedMoney(state: CareerState, result: MatchResult, team: number) {
   return { place, sinkings, sea, sponsors, wages, interest, then };
 }
 
-test('place prize, sinkings, sea and interest follow §1.8.1', () => {
+test('place prize, sinkings, sea and interest follow their formulas', () => {
   for (let place = 1; place <= SHIPS; place++)
     assert.equal(placePrize(place), prizeFor(place));
   for (let place = 1; place < SHIPS; place++)
@@ -280,7 +280,7 @@ test('place prize, sinkings, sea and interest follow §1.8.1', () => {
   assert.equal(interestOn(-1001), Math.ceil(RACE_MONEY.interest * 1000) + 1);
 });
 
-test('the race money of §1.8.1 at hand-worked points', () => {
+test('the race money at hand-worked points', () => {
   assert.equal(placePrize(1), 3200);
   assert.equal(placePrize(21), 1873);
   assert.equal(placePrize(41), 931);

@@ -95,7 +95,7 @@ test('the generated order is team 1 to 39, then yours 40th', () => {
   }
 });
 
-test('the counts of §1.5.8 hold', () => {
+test('the counts of owners, staff and free agents hold', () => {
   for (const state of CAREERS) {
     const owners = state.teams.flatMap((team) =>
       team.owner === null ? [] : [team.owner]
@@ -186,7 +186,7 @@ test('your name may equal a rival name and your livery is never dealt to a rival
     }
 });
 
-test('your team starts as §1.7.5 and §1.8.7 say', () => {
+test('your team starts with its options, no owner, the starting balance and every level 5', () => {
   for (const [state, seed] of CAREERS.map((s, i): [CareerState, string] => [
     s,
     SEEDS[i],
@@ -229,7 +229,7 @@ test('your team starts as §1.7.5 and §1.8.7 say', () => {
   }
 });
 
-test('every rival team is generated as §1.10.1 says', () => {
+test('every rival team is generated from the merit of its standing', () => {
   const jitter = LEAGUE_START.designJitter;
   for (const state of CAREERS)
     for (const [team, index] of rivals(state)) {
@@ -294,7 +294,7 @@ test('every contract and wage is within the plan ranges', () => {
     }
 });
 
-test('people are generated with the levels and ages of §1.5.8 and §1.10.1', () => {
+test('people are generated with the levels and ages of the pool or of their team', () => {
   for (const state of CAREERS)
     for (const person of state.people) {
       const level =
@@ -350,7 +350,7 @@ test('the state survives a JSON round trip', () => {
     assert.deepEqual(JSON.parse(JSON.stringify(state)), state);
 });
 
-test('the league formulas of §1.10.1 at their ends', () => {
+test('the league-start formulas at their ends', () => {
   const { designJitter, staffJitter, balanceRaces } = LEAGUE_START;
   const pool = HEADCOUNT.freeAgentLevel;
   assert.equal(startDesign(1, 0), parLevel(1));
@@ -380,7 +380,7 @@ test('the league formulas of §1.10.1 at their ends', () => {
   assert.equal(unlockCount(standingMerit(21)), 1);
 });
 
-test('the league formulas of §1.10.1 at hand-worked points', () => {
+test('the league-start formulas at hand-worked points', () => {
   assert.equal(startDesign(1, 0), 90);
   assert.equal(startDesign(0.5, 3), 50.5);
   assert.equal(startDesign(0, -8), 5);
