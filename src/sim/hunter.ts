@@ -1,17 +1,9 @@
-import {
-  R,
-  along,
-  distance,
-  dot,
-  normalize,
-  toward,
-  type Vec3,
-} from '../world/sphere.ts';
+import { R, distance, dot, normalize, type Vec3 } from '../world/sphere.ts';
 import type { Shot } from './battle.ts';
 import { toEdge } from './storm.ts';
 import { ramp, utility } from './utility.ts';
 import { aggroOf, type Ctx } from './captain.ts';
-import { hurtNear, prey, shunned } from './logbook.ts';
+import { prey, shunned } from './logbook.ts';
 
 const RINGS = 6;
 
@@ -46,23 +38,17 @@ export const HUNTING = {
   arrive: 45,
   rest: 15,
   edge: 20,
-  standoff: 0,
-  stand: 250,
-  wait: 25,
-  by: 150,
 } as const;
 
 export interface HuntMemory {
   hunt: Vec3 | null;
   huntT: number;
-  waitT: number;
   restT: number;
 }
 
 export const huntMemory = (): HuntMemory => ({
   hunt: null,
   huntT: -Infinity,
-  waitT: -Infinity,
   restT: -Infinity,
 });
 
@@ -96,7 +82,6 @@ export function huntUrge(c: Ctx): number {
   if (c.foe || m.clock - m.restT < h.rest) return 0;
   const r = nearest(c);
   if (r) {
-    if (!m.hunt) m.waitT = m.clock;
     [m.hunt, m.huntT] = [r.at, m.clock];
   } else if (
     m.hunt &&
@@ -105,7 +90,7 @@ export function huntUrge(c: Ctx): number {
     giveUp(c);
   if (!m.hunt && !r) {
     const w = prey(c);
-    if (w) [m.hunt, m.huntT, m.waitT] = [w.at, m.clock, -Infinity];
+    if (w) [m.hunt, m.huntT] = [w.at, m.clock];
   }
   if (!m.hunt) return 0;
   const strength = own.hull + own.shield;
@@ -116,17 +101,4 @@ export function huntUrge(c: Ctx): number {
   );
 }
 
-export function huntAct(c: Ctx): Vec3 {
-  const { m } = c,
-    h = c.b.hunting,
-    p = c.own.ship.at;
-  if (!m.hunt) return m.goal;
-  const waiting =
-    h.standoff > 0 &&
-    m.huntT === m.clock &&
-    m.clock - m.waitT < h.wait &&
-    !hurtNear(c, m.hunt, h.by);
-  if (!waiting) return m.hunt;
-  const from = toward(m.hunt, p);
-  return from ? along(m.hunt, from, h.stand).p : m.hunt;
-}
+export const huntAct = (c: Ctx): Vec3 => c.m.hunt ?? c.m.goal;

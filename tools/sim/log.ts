@@ -108,20 +108,16 @@ export function record(
     emit('invariant', { what, ship, detail });
   };
 
-  const start = (seed: number, type: string, rules: unknown) =>
+  const start = (seed: number, rules: unknown) =>
     emit('start', {
       seed,
-      matchType: type,
       rules,
       ships: state.ships().map((k) => {
         const v = where(k.id),
-          n = debugOf(state).natureOf(k.id),
           c = state.crew(k.id);
         return {
           id: k.id,
           brain: brainOf(k.id),
-          persona: n?.persona ?? null,
-          skill: n ? r2(n.temper.skill) : null,
           at: v ? latLon(v.ship.at) : null,
           heading: v ? compass(v.ship.at, v.ship.heading) : null,
           hull: r1(k.hull),

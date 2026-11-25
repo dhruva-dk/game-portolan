@@ -1,7 +1,13 @@
 import type { Crew, Order } from './battle.ts';
 import type { Sight } from './sight.ts';
-import { think, type Memory, type Own, type Sea, type Seen } from './bot.ts';
-import type { Nature } from './persona.ts';
+import {
+  think,
+  type Bot,
+  type Memory,
+  type Own,
+  type Sea,
+  type Seen,
+} from './bot.ts';
 import { building, type Chart } from './route.ts';
 import type { Vessel } from './contact.ts';
 import type { Holdings } from './claimer.ts';
@@ -17,7 +23,7 @@ export type Sighter = (own: Seen, foe: Seen | null) => Sight;
 
 export interface Hand {
   mind: Memory | null;
-  nature: Nature;
+  bot: Bot | null;
   steady: Helm;
   sights?: Sighter;
   team?: number;
@@ -129,13 +135,13 @@ export function createOrders(depth: (p: Vec3) => number, chart: Chart) {
         helms.push(helm);
         orders.push(gun);
         asks.set(id, ask);
-      } else if (!a.mind) {
+      } else if (!a.mind || !a.bot) {
         helms.push(a.steady);
         orders.push(HOLD_FIRE);
       } else {
         others.length = 0;
         for (const o of seen) if (o.id !== id) others.push(o);
-        const r = think(seen[i], others, sea, a.mind, a.nature);
+        const r = think(seen[i], others, sea, a.mind, a.bot);
         a.mind = r.memory;
         helms.push(r.helm);
         if (a.sights) {

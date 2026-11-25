@@ -20,7 +20,6 @@ import { thrown } from './shot.ts';
 import type { Sight } from './sight.ts';
 
 const GUNNER = {
-  react: [2.2, 0.3] as const,
   error: 0.2,
   wander: [0.6, 1.4] as const,
   unsteady: 6,
@@ -102,11 +101,8 @@ const between = (draw: () => number, [lo, hi]: readonly [number, number]) =>
 export const spreadBy = (skill: number, kind: GunKind = 'cannon') =>
   1 + GUNNER.unsteady * GUNNER.shake[kind] * (1 - skill) ** 2;
 
-export const reactTime = (skill: number) =>
-  GUNNER.react[0] + (GUNNER.react[1] - GUNNER.react[0]) * skill;
-
-export const sighted = (g: Gunner, clock: number, skill: number) => {
-  g.react = clock + reactTime(skill);
+export const sighted = (g: Gunner, clock: number, react: number) => {
+  g.react = clock + react;
 };
 
 const loaded = (c: Ctx) => {
@@ -161,7 +157,9 @@ export function aimAndFire(
     from: eye,
     dir: normalize(add(scale(p, R), eye, -1)),
   });
-  if (!foe) return { aim: { from: eye, dir: own.heading }, fire: false };
+  const leads = c.t.tricks.lead;
+  if (!foe)
+    return { aim: { from: eye, dir: own.heading }, fire: false, lead: leads };
   const d = distance(own.at, foe.ship.at);
   const time =
     thrown(kind, Math.max(bore.least, Math.min(d, bore.range)))?.time ?? 0;
@@ -171,7 +169,7 @@ export function aimAndFire(
     ),
     speed = length(way);
   const lead =
-    speed > 1e-9
+    c.t.tricks.lead && speed > 1e-9
       ? along(foe.ship.at, scale(way, 1 / speed), speed * time).p
       : foe.ship.at;
   g.errT -= dt;
@@ -192,16 +190,16 @@ export function aimAndFire(
     clock < g.react ||
     hold
   )
-    return { aim, fire: false };
+    return { aim, fire: false, lead: leads };
   if (!t.pauses[kind])
-    return { aim, fire: true, spread: spreadBy(skill, kind) };
+    return { aim, fire: true, spread: spreadBy(skill, kind), lead: leads };
   if (g.burst > 0) {
     g.burst -= dt;
     if (g.burst <= 0) g.burst = -between(draw, t.pause);
   } else if (g.burst < 0) {
     g.burst += dt;
     if (g.burst >= 0) g.burst = between(draw, t.burst);
-    return { aim, fire: false };
+    return { aim, fire: false, lead: leads };
   } else g.burst = between(draw, t.burst);
-  return { aim, fire: true, spread: spreadBy(skill, kind) };
+  return { aim, fire: true, spread: spreadBy(skill, kind), lead: leads };
 }

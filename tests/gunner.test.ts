@@ -1,5 +1,4 @@
 import { test } from 'node:test';
-import { nature } from '../src/sim/persona.ts';
 import assert from 'node:assert/strict';
 import type { GunKind } from '../src/sim/kinds.ts';
 import { SHIELD } from '../src/sim/tuning.ts';
@@ -14,15 +13,15 @@ import { mind, shot, think, type Memory } from '../src/sim/bot.ts';
 import { afloat, stepFleet, type Vessel } from '../src/sim/contact.ts';
 import { STEP } from '../src/sim/fixed.ts';
 import { asked, type Ask } from '../src/sim/stores.ts';
-import { reactTime, spreadBy } from '../src/sim/gunner.ts';
+import { spreadBy } from '../src/sim/gunner.ts';
+import { driver } from '../src/sim/driver.ts';
+import type { DriverStats } from '../src/sim/setup.ts';
 import type { Depth } from '../src/sim/shoal.ts';
 import { shipAt, type Helm } from '../src/sim/ship.ts';
 import { along, bearingAt, distance, fromLatLon } from '../src/world/sphere.ts';
-import { temper } from '../src/sim/temper.ts';
-import { eye } from '../src/sim/lookout.ts';
 import { sunk } from '../src/sim/health.ts';
 import type { Storm } from '../src/sim/storm.ts';
-import { WORST } from './setups.ts';
+import { WORST, botOf, statsWith } from './setups.ts';
 
 const deep: Depth = () => 30;
 const start = fromLatLon(0.2, 0.3);
@@ -37,18 +36,19 @@ const placed = (
   const at = along(start, bearingAt(start, bearing), meters).p;
   return afloat(id, { ...shipAt(at, bearingAt(at, heading)), speed });
 };
-const bold = (() => {
-  const out: number[] = [];
-  for (let s = 1; out.length < 3; s++) if (temper(s).fight > 0.7) out.push(s);
-  return out;
-})();
+const bold = [1, 2, 3],
+  BOLD = statsWith({ nerve: 20 });
 
 function battle(
   fleet: Vessel[],
   seeds: (number | null)[],
   seconds: number,
   held: Helm = { course: null, throttle: 0 },
-  { storm, fire = false }: { storm?: Storm; fire?: boolean } = {}
+  {
+    storm,
+    fire = false,
+    stats = BOLD,
+  }: { storm?: Storm; fire?: boolean; stats?: DriverStats } = {}
 ) {
   const minds: (Memory | null)[] = fleet.map((v, i) =>
     seeds[i] === null ? null : mind(seeds[i]!, v.ship.at)
@@ -88,7 +88,7 @@ function battle(
         seen.filter((o) => o.id !== v.id),
         { depth: deep, storm },
         m,
-        nature(seeds[i]!)
+        botOf(seeds[i]!, stats)
       );
       minds[i] = r.memory;
       helms.push(r.helm);
@@ -151,7 +151,7 @@ test('an armed bot holds its fire till it has got over first seeing its foe', ()
     );
     assert.ok(r.fired.length > 0, `${seed}: never fired`);
     assert.ok(
-      r.fired[0].t >= reactTime(temper(seed).skill) - 0.25,
+      r.fired[0].t >= driver(BOLD).react - 0.25,
       `${seed}: fired at ${r.fired[0].t.toFixed(2)} s`
     );
   }
@@ -184,12 +184,8 @@ const stormIn = (phase: number): Storm => ({
   final: phase >= 7,
   damage: 0,
 });
-const mild = (() => {
-  const out: number[] = [];
-  for (let s = 1; out.length < 3; s++)
-    if (temper(s).fight < 0.35 && eye(temper(s)) > 125) out.push(s);
-  return out;
-})();
+const mild = [1, 2, 3],
+  MILD = statsWith({ nerve: 1 });
 
 test('early in a match a mild armed bot keeps out of a fight it would take up late in it', () => {
   for (const seed of mild) {
@@ -199,7 +195,7 @@ test('early in a match a mild armed bot keeps out of a fight it would take up la
         [seed, null],
         30,
         undefined,
-        { storm: stormIn(phase) }
+        { storm: stormIn(phase), stats: MILD }
       );
     const early = fights(0),
       late = fights(7);
@@ -218,7 +214,7 @@ test('holding back, it still fires back at a ship close by that is shooting it',
       [seed, null],
       30,
       undefined,
-      { storm: stormIn(0), fire: true }
+      { storm: stormIn(0), fire: true, stats: MILD }
     );
     const back = r.fired.filter((f) => f.id === 0).length;
     console.log(`# seed ${seed}: ${back} shots back`);
@@ -227,24 +223,20 @@ test('holding back, it still fires back at a ship close by that is shooting it',
 });
 
 test("a green bot's balls spread wider than a sharp one's, and hit less", () => {
-  const by = (ok: (skill: number) => boolean) => {
-    const out: number[] = [];
-    for (let s = 1; out.length < 8; s++)
-      if (ok(temper(s).skill) && temper(s).fight > 0.5) out.push(s);
-    return out;
-  };
-  const green = by((k) => k < 0.5),
-    sharp = by((k) => k > 0.8);
+  const seeds = [1, 2, 3, 4, 5, 6, 7, 8],
+    green = statsWith({ nerve: 20, gunnery: 1 }),
+    sharp = statsWith({ nerve: 20, gunnery: 20 });
   assert.ok(
-    spreadBy(temper(green[0]).skill) > 2 * spreadBy(1) && spreadBy(1) === 1
+    spreadBy(driver(green).gunnery) > 2 * spreadBy(1) && spreadBy(1) === 1
   );
-  const share = (seeds: number[]) => {
+  const share = (stats: DriverStats) => {
     const rs = seeds.map((seed) =>
       battle(
         [placed(0, 0, 0, 90 * deg), placed(1, 0, 150, 0)],
         [seed, null],
         15,
-        { course: null, throttle: 0.4 }
+        { course: null, throttle: 0.4 },
+        { stats }
       )
     );
     return (

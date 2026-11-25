@@ -8,6 +8,7 @@ import { NOTHING, type Ask } from './stores.ts';
 import { toEdge } from './storm.ts';
 import { ramp, utility } from './utility.ts';
 import type { Ctx } from './captain.ts';
+import { underFire } from './lookout.ts';
 import { clearAt } from './route.ts';
 
 export const PURSER = {
@@ -68,7 +69,7 @@ export function lootUrge(c: Ctx): number {
   if (m.mode === 'loot' && m.target >= 0 && m.lootT > c.b.purser.patience)
     [m.shun, m.target] = [m.target, -1];
   const p = own.ship.at,
-    within = Math.cos(t.lootReach / R),
+    within = Math.cos(t.notice / R),
     s = c.sea.storm,
     ch = c.sea.chart;
   let best: Loot | null = null,
@@ -141,13 +142,17 @@ export function purse(c: Ctx): Ask {
   if (!crew) return NOTHING;
   let heal: number | null = null,
     gust = false;
-  if (m.mode === 'heal' && !crew.hold.using) {
+  const fire = underFire(c),
+    bold = c.t.tricks.healUnderFire;
+  const mending = m.mode === 'heal' || (bold && fire && mendNeed(c, crew) >= 1);
+  if (mending && !crew.hold.using && (bold || !fire)) {
     const s = healSlot(crew);
     if (s >= 0) heal = s;
   }
   const wants =
     m.mode === 'flee' ||
-    m.mode === 'storm' ||
+    (m.mode === 'storm' && c.t.tricks.outrun) ||
+    (fire && c.t.tricks.dodge) ||
     (m.mode === 'fight' && distance(c.own.ship.at, m.goal) > c.b.purser.far);
   if (wants !== crew.gust.on) gust = true;
   return heal === null && !gust ? NOTHING : { heal, gust };

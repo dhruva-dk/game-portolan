@@ -4,8 +4,9 @@ import { mind, sank, shot } from '../src/sim/bot.ts';
 import { DEFAULT_BRAIN } from '../src/sim/brain.ts';
 import { aggroOf, type Ctx } from '../src/sim/captain.ts';
 import { mood, MIND } from '../src/sim/fighting.ts';
-import { temper } from '../src/sim/temper.ts';
+import { driver } from '../src/sim/driver.ts';
 import { fromLatLon } from '../src/world/sphere.ts';
+import { TENS } from './setups.ts';
 
 const ctx = (m = mind(7, fromLatLon(0.1, 0.2))): Ctx => ({
   own: null as never,
@@ -13,7 +14,7 @@ const ctx = (m = mind(7, fromLatLon(0.1, 0.2))): Ctx => ({
   sea: null as never,
   m,
   b: DEFAULT_BRAIN,
-  t: temper(7),
+  t: driver(TENS),
   foe: null,
   foeD: Infinity,
   seed: 7,

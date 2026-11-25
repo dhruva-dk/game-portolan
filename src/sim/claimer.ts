@@ -6,7 +6,6 @@ import { between, mate, open, rotate, type Ctx } from './captain.ts';
 
 export const CLAIMER = {
   depth: [30, 90] as const,
-  width: [30, 80] as const,
   probe: 5,
   edgeMost: 200,
   inside: 10,
@@ -47,7 +46,7 @@ const nearest = (c: Ctx) =>
 
 export function claimUrge(c: Ctx): number {
   const { m } = c;
-  if (!c.sea.holdings) return 0;
+  if (!c.sea.holdings || !c.t.tricks.loops) return 0;
   if (m.bite) return c.b.claimer.out;
   if (m.clock < m.rested || c.sea.storm?.final) return 0;
   const safe = ramp(nearest(c), c.b.claimer.danger, c.b.claimer.clear);
@@ -64,11 +63,7 @@ function plan(c: Ctx, p: Vec3): Vec3[] | null {
     (c.b.claimer.depth[1] - c.b.claimer.depth[0]) *
       greed *
       between(c.m, 0.6, 1);
-  const width =
-    c.b.claimer.width[0] +
-    (c.b.claimer.width[1] - c.b.claimer.width[0]) *
-      greed *
-      between(c.m, 0.6, 1);
+  const width = c.t.loop;
   const ch = c.sea.chart,
     kept = (q: Vec3) =>
       open(c, q) &&

@@ -115,6 +115,12 @@ function lead(kind: GunKind, from: Vec3, target: Vessel): Vec3 | null {
   return thrown(kind, distance(up, at)) === null ? null : at;
 }
 
+function now(kind: GunKind, from: Vec3, target: Vessel): Vec3 | null {
+  return thrown(kind, distance(normalize(from), target.ship.at)) === null
+    ? null
+    : target.ship.at;
+}
+
 const BEYOND = 1000;
 
 interface Lay {
@@ -123,6 +129,7 @@ interface Lay {
   spread: number;
   cone: number;
   rises?: readonly Rise[];
+  lead?: boolean;
 }
 
 export function laid(
@@ -147,7 +154,11 @@ export function laid(
     g.range,
     land ? meet! : Infinity
   );
-  const at = mark && lead(gun.kind, from, mark);
+  const at =
+    mark &&
+    (lay.lead === false
+      ? now(gun.kind, from, mark)
+      : lead(gun.kind, from, mark));
   const point = at ?? normalize(pointOn(s, meet ?? BEYOND));
   const t = toward(up, point) ?? toward(up, s.dir) ?? shooter.ship.heading;
   const d = distance(up, point),

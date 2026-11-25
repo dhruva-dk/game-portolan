@@ -1,12 +1,5 @@
-import {
-  R,
-  along,
-  distance,
-  dot,
-  tangentAt,
-  type Vec3,
-} from '../world/sphere.ts';
-import { knownNear, shunned } from './logbook.ts';
+import { R, along, distance, tangentAt, type Vec3 } from '../world/sphere.ts';
+import { shunned } from './logbook.ts';
 import { fieldAt, openAt } from './route.ts';
 import { toEdge, type Cap } from './storm.ts';
 import { open, rotate, unitHash, type Ctx } from './captain.ts';
@@ -16,16 +9,9 @@ export const PLACING = {
   each: 2,
   keep: 1.2,
   round: 50,
-  loot: 90,
-  plenty: 4,
   deep: 1,
   near: 0.6,
-  cover: 0,
-  strait: 0,
   open: 0.2,
-  plunder: 0,
-  foes: 0,
-  crowd: 2,
   shun: 1,
   early: 30,
 } as const;
@@ -71,24 +57,10 @@ function worth(c: Ctx, cap: Cap, q: Vec3): number {
   for (let i = 0; i < 8; i++)
     ways.push(water(c, along(q, rotate(q, t, (i * Math.PI) / 4), pl.round).p));
   const land = ways.filter((w) => !w).length;
-  const cover = land > 0 && land <= 5 ? Math.min(1, land / 2.5) : 0;
-  let strait = 0;
-  for (let i = 0; i < 4; i++)
-    if (!ways[i] && !ways[i + 4] && ways[(i + 2) % 8] && ways[(i + 6) % 8])
-      strait = 1;
-  let pieces = 0;
-  if (pl.plunder > 0 && c.sea.loot) {
-    const within = Math.cos(pl.loot / R);
-    for (const l of c.sea.loot) if (dot(q, l.at) > within) pieces++;
-  }
   return (
     pl.deep * deep +
     pl.near * near +
-    pl.cover * cover +
-    pl.strait * strait +
-    pl.open * (1 - land / 8) +
-    pl.plunder * Math.min(1, pieces / pl.plenty) +
-    pl.foes * Math.min(1, knownNear(c, q, 4 * pl.round) / pl.crowd) -
+    pl.open * (1 - land / 8) -
     (shunned(c, q) ? pl.shun : 0)
   );
 }

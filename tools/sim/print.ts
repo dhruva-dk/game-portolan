@@ -23,13 +23,13 @@ export function printMatch(s: Summary, dir: string) {
   const fleet = `race of ${sc.teams ?? EVEN.teams.most}×${sc.perTeam ?? 2}`;
   const c = s.combat;
   console.log(
-    `match ${sc.match ?? 1} on planet ${sc.planet ?? 'default'} · ${s.type} · ${fleet} · ${sc.sea ?? 'flat'} sea · seed ${s.seed}`
+    `match ${sc.match ?? 1} on planet ${sc.planet ?? 'default'} · ${fleet} · ${sc.sea ?? 'flat'} sea · seed ${s.seed}`
   );
   console.log(
     `ended: ${s.end} at ${s.seconds} s (${s.steps} steps, ${(s.wallMs / 1000).toFixed(1)} s wall) · hash ${s.hash}`
   );
   console.log(
-    `left: ${win.map((p) => `#${p.id} (${p.brain}, ${p.persona}, ${p.kills} kills)`).join(', ') || 'none'}`
+    `left: ${win.map((p) => `#${p.id} (${p.brain}, ${p.kills} kills)`).join(', ') || 'none'}`
   );
   console.log(
     `combat: ${c.shots} shots, ${c.hits} home (${pc(c.hitRate)}) · ` +
@@ -137,7 +137,6 @@ export function pooled(all: readonly Summary[]) {
     msPerStep: r2(mean(all.map((s) => s.cost.parts.step.mean))),
     invariants: all.reduce((n, s) => n + s.invariants.broken, 0),
     byBrain: group((p) => p.brain),
-    byPersona: group((p) => p.persona),
     hashes: all.map((s) => ({ match: s.scenario.match, hash: s.hash })),
   };
 }
@@ -151,10 +150,7 @@ export function printPooled(p: ReturnType<typeof pooled>, dir: string) {
       .map(([b, k]) => `${b} ${pc(k.rate)} of ${k.shots}`)
       .join(' · ')} · ttk median ${p.ttk} s`
   );
-  for (const [title, rows] of [
-    ['brain', p.byBrain],
-    ['persona', p.byPersona],
-  ] as const) {
+  for (const [title, rows] of [['brain', p.byBrain]] as const) {
     console.log(
       `by ${title}:  ships  wins  place  kills  dealt  taken  hit%  pinned s`
     );

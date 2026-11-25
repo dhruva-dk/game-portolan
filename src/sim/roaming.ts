@@ -1,12 +1,4 @@
-import {
-  R,
-  add,
-  along,
-  distance,
-  dot,
-  normalize,
-  type Vec3,
-} from '../world/sphere.ts';
+import { add, along, distance, normalize, type Vec3 } from '../world/sphere.ts';
 import { toEdge } from './storm.ts';
 import { between, open, rotate, type Ctx } from './captain.ts';
 import { deepest } from './helmsman.ts';
@@ -21,15 +13,7 @@ export const ROAMING = {
   drift: 600,
   drawn: 0.4,
   home: 50,
-  shy: 0,
 } as const;
-
-function loud(c: Ctx, q: Vec3): boolean {
-  const shy = c.b.roaming.shy;
-  if (shy <= 0 || !c.sea.gunfire) return false;
-  const within = Math.cos(shy / R);
-  return c.sea.gunfire.some((r) => r.by !== c.own.id && dot(q, r.at) > within);
-}
 
 export function roamGoal(c: Ctx): Vec3 {
   const p = c.own.ship.at,
@@ -53,8 +37,7 @@ export function roamGoal(c: Ctx): Vec3 {
         ).p;
     if (!home && s && reach(s) < c.b.roaming.drift)
       q = normalize(add(q, add(s.center, q, -1), c.b.roaming.drawn));
-    if (open(c, q) && (!keep || toEdge(q, keep) > margin) && !loud(c, q))
-      return q;
+    if (open(c, q) && (!keep || toEdge(q, keep) > margin)) return q;
   }
   if (s && toEdge(p, s) < 2 * margin)
     return inward(c, p, s.center, Math.max(0, reach(s) - 2 * margin));

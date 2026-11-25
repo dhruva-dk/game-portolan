@@ -43,6 +43,7 @@ export interface Order {
   aim: Sight | null;
   fire: boolean;
   spread?: number;
+  lead?: boolean;
 }
 
 export interface Shot {
@@ -271,7 +272,14 @@ export function stepBattle(
           gun,
           order?.aim ?? null,
           marksOf(b, v.id, targets),
-          { seed: b.seed, depth, spread, cone: values.assistCone, rises }
+          {
+            seed: b.seed,
+            depth,
+            spread,
+            cone: values.assistCone,
+            rises,
+            lead: order?.lead ?? true,
+          }
         );
         for (const dir of lay.dirs)
           balls.push(

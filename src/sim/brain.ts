@@ -11,8 +11,7 @@ import { PURSER } from './purser.ts';
 import { ROAMING } from './roaming.ts';
 import { STORMING } from './storming.ts';
 import { RAMMING } from './tactician.ts';
-import { merged, type Changes, type Widen } from './tables.ts';
-import { STYLES } from './temper.ts';
+import type { Widen } from './tables.ts';
 
 export interface Brain {
   readonly choice: Widen<typeof CHOICE>;
@@ -28,7 +27,6 @@ export interface Brain {
   readonly gunnery: Widen<typeof GUNNERY>;
   readonly placing: Widen<typeof PLACING>;
   readonly logbook: Widen<typeof LOGBOOK>;
-  readonly styles: Widen<typeof STYLES>;
 }
 
 export const DEFAULT_BRAIN: Brain = {
@@ -45,28 +43,4 @@ export const DEFAULT_BRAIN: Brain = {
   gunnery: GUNNERY,
   placing: PLACING,
   logbook: LOGBOOK,
-  styles: STYLES,
 };
-
-export type Over = Changes<Omit<Brain, 'styles'>> & {
-  readonly styles?: Brain['styles'];
-};
-
-export function variant(over: Over, base: Brain = DEFAULT_BRAIN): Brain {
-  return {
-    choice: merged('choice', base.choice, over.choice),
-    sight: merged('sight', base.sight, over.sight),
-    mind: merged('mind', base.mind, over.mind),
-    roaming: merged('roaming', base.roaming, over.roaming),
-    storming: merged('storming', base.storming, over.storming),
-    ramming: merged('ramming', base.ramming, over.ramming),
-    helm: merged('helm', base.helm, over.helm),
-    purser: merged('purser', base.purser, over.purser),
-    claimer: merged('claimer', base.claimer, over.claimer),
-    hunting: merged('hunting', base.hunting, over.hunting),
-    gunnery: merged('gunnery', base.gunnery, over.gunnery),
-    placing: merged('placing', base.placing, over.placing),
-    logbook: merged('logbook', base.logbook, over.logbook),
-    styles: over.styles ?? base.styles,
-  };
-}

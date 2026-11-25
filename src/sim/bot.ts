@@ -1,7 +1,7 @@
 import { distance, type Vec3 } from '../world/sphere.ts';
 import type { Order } from './battle.ts';
 import type { Brain } from './brain.ts';
-import type { Nature } from './persona.ts';
+import type { Temper } from './temper.ts';
 import { STEP } from './fixed.ts';
 import { aimAndFire, gunner } from './gunner.ts';
 import type { Helm } from './ship.ts';
@@ -48,7 +48,6 @@ import { placeMemory, survey } from './placing.ts';
 import { roamGoal } from './roaming.ts';
 import { keptInside, stormGoal, stormUrge } from './storming.ts';
 import { NOTHING, type Ask } from './stores.ts';
-import { tempered } from './temper.ts';
 
 export const CHOICE = {
   storm: 6,
@@ -70,6 +69,12 @@ export {
   type Seen,
 } from './captain.ts';
 export { sank } from './fighting.ts';
+
+export interface Bot {
+  readonly seed: number;
+  readonly brain: Brain;
+  readonly temper: Temper;
+}
 
 export interface MindMemory {
   clock: number;
@@ -127,7 +132,7 @@ export function think(
   others: readonly Seen[],
   sea: Sea,
   memory: Memory,
-  who: Nature,
+  who: Bot,
   dt = STEP
 ): { helm: Helm; order: Order; ask: Ask; memory: Memory } {
   const m: Memory = {
@@ -142,7 +147,7 @@ export function think(
     sea,
     m,
     b: who.brain,
-    t: tempered(who.temper, m.clock),
+    t: who.temper,
     foe: null,
     foeD: Infinity,
     seed: who.seed,
@@ -213,19 +218,24 @@ const OPTIONS: readonly Omit<Choice, 'weight'>[] = [
   roam,
 ];
 
-const weighed = new WeakMap<Brain['choice'], readonly Choice[]>();
-function optionsOf(b: Brain): readonly Choice[] {
-  let o = weighed.get(b.choice);
-  if (!o) {
-    o = OPTIONS.map((x) => ({ ...x, weight: b.choice[x.mode] }));
-    weighed.set(b.choice, o);
-  }
-  return o;
+const weighed = new WeakMap<
+  Temper['wants'],
+  { choice: Brain['choice']; options: readonly Choice[] }
+>();
+function optionsOf(b: Brain, t: Temper): readonly Choice[] {
+  const had = weighed.get(t.wants);
+  if (had?.choice === b.choice) return had.options;
+  const options = OPTIONS.map((x) => ({
+    ...x,
+    weight: b.choice[x.mode] * t.wants[x.mode],
+  }));
+  weighed.set(t.wants, { choice: b.choice, options });
+  return options;
 }
 
 function decide(c: Ctx): void {
   const { m } = c,
-    options = optionsOf(c.b);
+    options = optionsOf(c.b, c.t);
   c.foe =
     m.foe >= 0 && inSight(c)
       ? (c.others.find((o) => o.id === m.foe) ?? null)

@@ -1,5 +1,4 @@
 import { test } from 'node:test';
-import { nature } from '../src/sim/persona.ts';
 import assert from 'node:assert/strict';
 import { mind, think, type Memory } from '../src/sim/bot.ts';
 import { ROAMING } from '../src/sim/roaming.ts';
@@ -30,7 +29,7 @@ import {
   type Vec3,
 } from '../src/world/sphere.ts';
 import { random } from '../src/world/random.ts';
-import { EVEN_SHIP, aboard } from './setups.ts';
+import { EVEN_SHIP, aboard, botOf } from './setups.ts';
 
 const start = fromLatLon(0.2, 0.3);
 const { east, north } = frameAt(start);
@@ -149,13 +148,7 @@ function voyage(
     least = Infinity;
   for (let n = 1; n <= most / STEP; n++) {
     m = { ...m, goal: mark, since: 0 };
-    const r = think(
-      aboard(fleet[0]),
-      [],
-      { depth, chart: ch },
-      m,
-      nature(seed)
-    );
+    const r = think(aboard(fleet[0]), [], { depth, chart: ch }, m, botOf(seed));
     m = r.memory;
     fleet = stepFleet(
       fleet,
@@ -325,7 +318,7 @@ test('on the real planet: the chart, a route and 16 routed bots, timed', () => {
           fleet.filter((o) => o.id !== v.id).map((o) => aboard(o)),
           { depth, chart: ch },
           minds[i],
-          nature(v.id + 1)
+          botOf(v.id + 1)
         );
         minds[i] = r.memory;
         return r.helm;
