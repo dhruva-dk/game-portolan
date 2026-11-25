@@ -68,13 +68,14 @@ The rule: **a picture for a thing, a word for an idea, a number for an amount.**
 | Driver stats | Gunnery, Helm, Nerve, Territory, Stormcraft, Lookout |
 | Mechanic stats | Shield, Heal speed, Heal amount, Thrift, Upkeep |
 | Ship actions | Build, Focus, Paint |
+| Hiring | Scouting, Candidates |
 | People actions | Report, Approach, Negotiate, Offer, Renew, Release |
-| Contract terms | Wage, Seasons, Fee, Clause |
+| Contract terms | Contract, Wage, Seasons, Fee, Clause |
 | Race conditions | Storm, Heals |
 | Sea | Watch, Result, Resume, Forfeit |
 | Settings | Settings, Sound, Music, Left-handed, Sensitivity, Seed, New Career |
 | New Career | Name, Start |
-| Other | Age, Continue |
+| Other | Age, Continue, Confirm? |
 
 Designer stats use the seven line words. **Stat order** everywhere (cards, the compass rose, arrays in code) is the order in this table.
 
@@ -639,8 +640,9 @@ All screens use the sea UI's drawing system (§2.5): paper slips, round ink butt
 2. **A screen** opens over the lobby: Ship, Team, Sponsors, Opponents, Planet or Settings. One is open at a time. While a screen is open the lobby's four bottom-left buttons and SAIL are hidden, the three top-right slips (money, standing, race) stay, and the Settings button's place at the far top right is taken by a round **close button** that returns to the lobby.
 3. **A sheet** is a paper panel. It never covers the whole screen; the ship stays visible beside or behind it.
 4. **A sheet may open over a screen:** the deal and negotiation over Team; the team sheet beside the standings in Opponents; the paint picker over Ship. Each has its own round close button at its top right corner, which goes back one step. Nothing closes on a tap outside it.
-5. **A person card** can be enlarged in place by a tap and shrunk by a second tap.
+5. **A person card** can be enlarged in place by a tap and shrunk by a second tap. While a card is enlarged, the round close button shrinks it; with no card enlarged it goes back one step as usual.
 6. **Flows** take over the whole interface until finished and offer no way out except forward: New Career (§1.12.1), the result flow (§1.12.10) and the off-season report (§1.12.11). The one thing that opens over a flow is a team sheet from a link in the paper (§1.13.1); closing it returns to the paper.
+7. **A two-tap button** guards an action that cannot be undone. The first tap arms it: its face changes to the word Confirm? with a tick glyph. A second tap on it acts. A tap anywhere else disarms it and does nothing more.
 
 ### 1.12.1 New Career
 
@@ -659,7 +661,7 @@ Shown when no career is saved, and when opened from Settings in the lobby.
 | Close | Round button at the sheet's corner, only when a career exists; returns to Settings |
 
 - **Start** creates the career with `newCareer` (§2.2.3), sends `StartRace`, saves and reloads the page; the match for race one then begins (§2.9.3). The lobby is not shown first.
-- If a career already exists, the first tap on Start turns it into a tick, and a second tap confirms.
+- If a career already exists, Start is a two-tap button (§1.12.0 item 7).
 
 ### 1.12.2 Lobby
 
@@ -678,7 +680,7 @@ The home screen whenever a career exists, no race is under way and no flow is sh
 | | Team button | Round, gull glyph, the word Team | Opens the Team screen |
 | | Sponsors button | Round, pennant glyph, the word Sponsors | Opens the Sponsors screen |
 | | Opponents button | Round, table glyph, the word Opponents | Opens the Opponents screen |
-| Bottom right | SAIL | Ribbon button with the word SAIL | Starts the race (§2.9.2) |
+| Bottom right | SAIL | Ribbon button with a galleon on waves and the word SAIL | Starts the race (§2.9.2) |
 
 **Dots.** A button shows a small red dot while a condition holds. They are computed from the career state alone.
 - Team: a seat is empty (Uncle counts as empty) and its role has a deal with at least one candidate; or an employee has 3 or fewer races left on their contract.
@@ -726,18 +728,18 @@ A sheet across the lower two-thirds of the screen with three **person cards** in
 | Stars | Five star glyphs, filled to the half |
 | Compass rose | §1.12.13 |
 | Wage | The word Wage, coin glyph, wage per race |
-| Contract | Pips, one per race left, in rows of ten, up to 30 |
+| Contract | The word Contract, flag glyph and the races left as a numeral; beneath them pips, one per race left, in rows of ten, up to 30 |
 
 - **Empty seat:** a card outline with the role's glyph and word.
-- **Uncle** (in your driver seat when it is empty) shows no age, no wage and no pips.
-- **An owner's card** (§1.12.8) shows the word Owner and the helm glyph as its role, and no age, no wage and no pips.
-- **Scouting marker:** a spyglass glyph on the top left corner of one seat's card. The same corner of the other two cards shows a faint spyglass; tapping it moves the marker (`SetScoutSeat`).
-- **A deal waiting** for a role: its candidates' small portraits fanned above that seat's card. Tapping them opens that role's deal (§1.12.5).
+- **Uncle** (in your driver seat when it is empty) shows no age, no wage and no contract.
+- **An owner's card** (§1.12.8) shows the word Owner and the helm glyph as its role, and no age, no wage and no contract.
+- **Scouting marker:** a paper tab on the top edge of one seat's card, at its left, with the spyglass glyph and the word Scouting. The same place on the other two cards shows a faint tab with the spyglass alone; tapping it moves the marker (`SetScoutSeat`).
+- **A deal waiting** for a role: a **candidates slip** at the top left of the screen, above the sheet. It shows the word Candidates, the candidates' small portraits fanned like a hand of cards and shown whole, and the role's glyph. Tapping it opens that role's deal (§1.12.5). With deals for several roles the slips stand side by side in seat order, and the fans narrow so that three slips stay clear of the money slip. The slips are hidden while a card is enlarged.
 
 **Enlarged** (§1.12.0 item 5), a card covers the other two and adds:
 - every stat as its glyph, its word, a numeral and a 1 to 20 bar;
 - **Renew** (opens negotiation with that person, §1.12.6); faint while they have more than 10 races left;
-- **Release**, showing its cost with a coin glyph; the first tap turns it into a tick and a second tap sends `Release`.
+- **Release**, showing its cost with a coin glyph; a two-tap button (§1.12.0 item 7) that sends `Release`.
 
 Uncle's enlarged card has neither button.
 
@@ -887,7 +889,7 @@ The lobby is then in the off-season stop (§1.9): the race slip shows the winter
 | Seed | The word and the career seed as text (lobby only) |
 | New Career | Ribbon button (lobby only); opens New Career (§1.12.1) |
 
-**Pause.** At sea, a small round pause button sits in the top center group of the HUD (§1.12.14). It stops the match and opens a sheet at the center with three round buttons: Resume, Settings, Forfeit. Settings opens the same sheet (`ui/base/settings.ts`, §2.5.3 item 9) without its last two rows. The first tap on Forfeit turns it into a tick and a second tap confirms. Putting the app in the background pauses the match the same way.
+**Pause.** At sea, a small round pause button sits in the top center group of the HUD (§1.12.14). It stops the match and opens a sheet at the center with three round buttons: Resume, Settings, Forfeit. Settings opens the same sheet (`ui/base/settings.ts`, §2.5.3 item 9) without its last two rows. Forfeit is a two-tap button (§1.12.0 item 7). Putting the app in the background pauses the match the same way.
 
 ### 1.12.13 The compass rose
 
@@ -1371,7 +1373,10 @@ All UI is DOM elements placed over the canvas and filled with inline SVG produce
 
 | File | Piece |
 |---|---|
-| `word.ts` | A short text label in the house face |
+| `house.ts` | The shared sizes, spacing and motion of §2.5.5 |
+| `word.ts` | A short text label in the house face; the `Word` type is the word list of §1.2, so a word outside it does not compile |
+| `lexicon.ts` | The glyph and word of every stat and role, and the smallest size each glyph may be drawn at |
+| `button.ts` | The round button, the ribbon, the close button, the red dot, press feedback, and the two-tap button (§1.12.0 item 7) |
 | `sheet.ts` | A paper panel with a round close button (built from `sheet` in today's `screens.ts`) |
 | `field.ts` | A text field on a slip (taken from today's seed field in `panel.ts`) |
 | `stepper.ts` | Minus button, numeral slip, plus button, with hold-to-repeat |
@@ -1389,7 +1394,7 @@ All UI is DOM elements placed over the canvas and filled with inline SVG produce
 
 ### 2.5.3 Screens, views and the port
 
-1. Each screen in `ui/lobby/` is a function `create(port) → { el, show(view) }`.
+1. Each screen in `ui/lobby/` is a function `create(port) → { el, show(view) }`. The lobby also has `cover(on)`, which hides its bottom buttons, SAIL and the next-race slip and turns its Settings button into the close button while a screen is open (§1.12.0 item 2).
 2. Each screen has a matching **view function** in `career/views/` that takes `CareerState` (and screen arguments such as the current stop, the role whose deal is open, or the terms being edited) and returns plain data holding exactly what the screen draws: every number, name, glyph id, range and faint flag.
 3. A screen draws only from its view and acts only through its port. It never reads `CareerState` and never computes a rule.
 4. A screen may keep local state that no rule depends on: which card is enlarged, the terms being edited, a lifted sponsor offer, scroll position, the page of a flow.
@@ -1492,7 +1497,7 @@ Glyphs carry meanings that words used to carry, so they are drawn richer than to
 | `flag` | A square signal flag on a staff, quartered | iron | 40 | new |
 | `winter` | A bare mast and yard with snow on the yard | iron | 40 | new |
 | `starburst` | A star of twelve thin points | iron | 24 | new |
-| `coin` | A coin with a rim and a gull's head | gold | 24 | new |
+| `coin` | A solid coin with a heavy rim, a milled edge and a stamped star | gold | 24 | new |
 | `star`, `starHalf` | A five-pointed star; the same with only its left half filled | iron | 24 | new |
 | `plus` | A plus sign | blue | 24 | new |
 | `tick` | A tick | iron | 24 | new |
@@ -1507,6 +1512,57 @@ Glyphs carry meanings that words used to carry, so they are drawn richer than to
 `cross` is the one glyph whose ink the caller chooses, between iron and rubric. In §1.12 the "helm glyph" is `role.owner`, the "gun glyph" is `part.gun`, the "star-burst" is `starburst`, the "counter mark" is `counter`, the "short-balance mark" is `coin` drawn faint with a rubric `cross` over it, and the "gull glyph" on the Team button is the gull's head drawn by `gull.ts`, not a glyph.
 
 **The glyph sheet.** The debug screen `glyphs` (§2.8.3) draws every glyph in the table and every mark of rule 6 on paper, each at its smallest size, at 40 units if that is larger, and at 64 units, with its name beneath, once inked and once faint. The agent drawing or changing a glyph screenshots this sheet with `npm run browser`, looks at the picture, and redraws until each glyph plainly shows what its row says and no two glyphs could be confused at their smallest sizes. Nobody else approves the glyphs.
+
+### 2.5.5 House rules
+
+Every screen takes its type sizes, spacing, sizes of shared pieces and motion from `ui/base/house.ts`. A screen uses these rather than restating them; a layout number that belongs to one screen alone stays a named constant beside its use (§2.6 item 3). All lengths are UI units (§2.5.4 rule 4).
+
+| Type, `TYPE` | Units | Used for |
+|---|---|---|
+| `ribbon` | 26 | The word on a ribbon button |
+| `figure` | 21 | Numerals on slips and cards |
+| `name` | 14 | Names of people, teams, sponsors and planets |
+| `speech` | 13 | Uncle's bubbles |
+| `word` | 11 | Words from the list of §1.2 |
+| `small` | 9.5 | The smallest text allowed |
+
+| Spacing, `SPACE` | Units | Used for |
+|---|---|---|
+| `margin` | 16 | From the screen's edge to a piece |
+| `pad` | 12 | Inside a sheet, card or button |
+| `gap` | 8 | Between neighboring pieces |
+| `hair` | 4 | Between a glyph and its word or numeral |
+
+All spacing is a multiple of `STEP`, 4 units.
+
+| Size, `SIZE` | Units | Used for |
+|---|---|---|
+| `slip` | 38 | Height of a slip |
+| `disc` | 26 | Radius of a round button |
+| `close` | 19 | Radius of the close button |
+| `rule` | 3 | Inset of the inner frame line on a card or sheet |
+| `corner` | 7 | Corner radius of a bubble |
+| `dot` | 5.5 | Radius of the red dot |
+
+| Motion, `MOTION` | Time | Used for |
+|---|---|---|
+| `sheet` | 300 ms in, 200 ms out | A sheet arriving and leaving |
+| `card` | 240 ms | A card enlarging and shrinking |
+| `press` | 80 ms down to 0.94 scale, 160 ms back | Every tappable piece under the finger |
+| `number` | 450 ms | A numeral counting to a new value |
+| `dot` | 220 ms, with a slight overshoot | The red dot appearing |
+| `deal` | 240 ms, the first 100 ms after the screen opens and each next one 70 ms later | Like pieces arriving one after another |
+| `fan` | 320 ms, with a slight overshoot | A hand of small cards fanning out from a stack |
+| `glide` | 300 ms | A marker traveling to its new place |
+| `arm` | 160 ms, from 0.9 scale | A two-tap button changing face |
+| `fade` | 180 ms | Anything else that appears or goes |
+
+Rules:
+1. **Faint** means drawn at `FAINT`, 0.32 of full strength, and not tappable unless §1.12 says a faint piece can be tapped.
+2. **Every tappable piece** is at least 44 points across, gives the `press` feedback, and sets `touch-action: manipulation` so that two quick taps are two taps.
+3. **The interface answers the hand.** Every tap gets feedback within one frame. A piece that arrives, leaves or changes state moves there rather than swapping: sheets rise, cards grow, numerals count, a marker travels to its new place, a group of like pieces arrives staggered. No motion delays a tap from taking effect.
+4. **Idle motion is rare and means something is waiting:** the red dot, a deal not yet opened. Nothing else moves while the screen is idle.
+5. A new timing or easing is added to `MOTION` by name, never written as a literal in a screen.
 
 ## 2.6 Code conventions
 
@@ -1606,7 +1662,7 @@ Your team is played by the policy as a sensible team (§1.10.2). Until the polic
 
 ### 2.8.3 Debug states
 
-`app/debug.ts` reads `?debug` switches (used by `npm run browser`). `?debug&screen=<name>&seed=<s>&races=<n>` builds a career from the seed, advances it `n` races with the stand-in and the policy for every team including yours (§1.10.2), and opens that screen. The names are `new`, `lobby`, `ship`, `paint`, `team`, `deal`, `negotiation`, `sponsors`, `opponents`, `planet`, `settings`, `result`, `paper`, `offseason`, `glyphs` (the glyph sheet of §2.5.4, which needs no career). There are no hand-written fixture states.
+`app/debug.ts` reads `?debug` switches (used by `npm run browser`). `?debug&screen=<name>&seed=<s>&races=<n>` builds a career from the seed, advances it `n` races with the stand-in and the policy for every team including yours (§1.10.2), and opens that screen. The names are `new`, `lobby`, `ship`, `paint`, `team`, `deal`, `negotiation`, `sponsors`, `opponents`, `planet`, `settings`, `result`, `paper`, `offseason`, `glyphs` (the glyph sheet of §2.5.4, which needs no career). There are no hand-written fixture states. Three more switches change the state built: `balance=<n>` sets your balance to `n` after the career is advanced (no seed reaches debt by itself, and the red money slip needs a state to be drawn on); `signed`, at the off-season stop, finishes the stop so the lobby of the next season shows; `meter` shows the frame meter over a screen; `approach=<roles>` (a comma-separated list) sends `Approach` for a candidate of each named role before the last race, so that several deals are waiting at once.
 
 `npm run browser` (headless Chromium, iPad Air size) takes screenshots and reads frame cost. It is never part of `npm test`. Its existing budget stands: 100 draws, 900,000 triangles and 20 passes a frame.
 
@@ -1729,7 +1785,7 @@ Goal: every rule of §1.6 to §1.10 works, and rivals play.
 
 Goal: every screen of §1.12 exists and can be opened on a debug state.
 
-- [ ] **M5.1 The first two screens.** Build the lobby (§1.12.2, with its anchorage scene) and the Team screen (§1.12.4) to the finished standard on the real code path: the base pieces they need (§2.5.2), their view functions and tests (§2.5.3), the port with the screen stack of §1.12.0 and the debug screens (§2.8.3). They are drawn from a real career state (`?debug&screen=lobby` and `screen=team`, `seed=test&races=14`), never from hard-coded data. The user judges them on the iPad through the dev server before any other screen is built. Changes to §1.12 that follow need the user's approval. Steps M5.2, M5.4, M5.5, M5.7 and M5.9 then cover only what this step left.
+- [x] **M5.1 The first two screens.** Build the lobby (§1.12.2, with its anchorage scene) and the Team screen (§1.12.4) to the finished standard on the real code path: the base pieces they need (§2.5.2), their view functions and tests (§2.5.3), the port with the screen stack of §1.12.0 and the debug screens (§2.8.3). They are drawn from a real career state (`?debug&screen=lobby` and `screen=team`, `seed=test&races=14`), never from hard-coded data. The user judges them on the iPad through the dev server before any other screen is built. Changes to §1.12 that follow need the user's approval. Steps M5.2, M5.4, M5.5, M5.7 and M5.9 then cover only what this step left.
 - [ ] **M5.2 Base pieces and glyphs.** §2.5.2 and §2.5.4: extend the glyph format, draw and redraw the full set, delete the rest, and add the `glyphs` debug screen. Check the glyph sheet as §2.5.4 says before ticking. The glyph half is done (the format, the set, the sheet); the `ui/base/` pieces of §2.5.2 remain.
 - [x] **M5.3 Portraits.** Jacket color and six sunglasses styles from the portrait seed; Uncle's fixed portrait (§1.5.9).
 - [ ] **M5.4 Views.** Every view function and its test (§2.5.3).
