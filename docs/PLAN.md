@@ -869,7 +869,7 @@ Shown on launch whenever the career's `unread` flag is set (§2.9.1), which is t
 
 | Element | Detail |
 |---|---|
-| Two ship rows | For slot 0 and slot 1: who sailed it (helm glyph, or the driver's or Uncle's portrait), laurel glyph with place as "12/80", a gun glyph with sinkings, and either an afloat glyph or the emblem and name of the team that sank it (a storm glyph if nobody was credited) |
+| Two ship rows | For slot 0 and slot 1: who sailed it (helm glyph, or the driver's or Uncle's portrait), laurel glyph with place as "12/80", a gun glyph with sinkings, and either an afloat glyph or the emblem and name of the team that sank it (a storm glyph if nobody was credited; the pause sheet's flag glyph and the word "Forfeit" on your own row if you forfeited) |
 | Shots | Target glyph and the share of your team's shots that landed, as a percentage |
 | Sea | Territory glyph and the mean of your seven sea-share samples, as a percentage |
 | Podium | The emblems and names of the teams of the ships placed 1, 2 and 3 |
@@ -1281,7 +1281,7 @@ export type Applied =
 | Command | Fields | Valid in phase | Effect |
 |---|---|---|---|
 | `StartRace` | | lobby | Runs the policy for every rival (§1.10.2); phase becomes `racing` |
-| `RecordRace` | result | racing | §2.2.5 |
+| `RecordRace` | result, and an optional `forfeited: true` when you chose Forfeit (the engine's result cannot tell a forfeit from a storm sinking, so the app carries it; the report marks slot 0 forfeited only if it sank with nobody credited) | racing | §2.2.5 |
 | `FinishOffseason` | | offseason | §1.9 |
 | `MarkRead` | | lobby, offseason | Clears `unread` |
 | `MarkSeen` | id | any | Adds a bubble id to `seen` |
