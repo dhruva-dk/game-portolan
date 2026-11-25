@@ -12,7 +12,7 @@ import {
 import { growFrom, shrinkBack } from '../base/enlarge.ts';
 import { portrait } from '../base/gull.ts';
 import { FAINT, MOTION, SPACE, TYPE } from '../base/house.ts';
-import { figure, glyph, slip, svgNode } from '../base/ink.ts';
+import { figure, glyph, r2, slip, svgNode } from '../base/ink.ts';
 import { ROLE, least } from '../base/lexicon.ts';
 import { spyglass } from '../base/marks.ts';
 import { sheet } from '../base/sheet.ts';
@@ -34,8 +34,6 @@ const FAN = {
   room: 248,
 } as const;
 const LIFT = TAB.h;
-
-const r2 = (n: number) => Math.round(n * 100) / 100;
 
 const cardX = (i: number) => PAD + i * (CARD.w + GAP);
 

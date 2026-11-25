@@ -9,7 +9,16 @@ import { pressable, roundButton } from '../base/button.ts';
 import { grouped } from '../base/grouped.ts';
 import { portrait, uncle } from '../base/gull.ts';
 import { FAINT, MOTION, SIZE, SPACE, TYPE } from '../base/house.ts';
-import { GILT, INK, WASH, figure, glyph, slip, svgNode } from '../base/ink.ts';
+import {
+  GILT,
+  INK,
+  WASH,
+  figure,
+  glyph,
+  r2,
+  slip,
+  svgNode,
+} from '../base/ink.ts';
 import { STAT, least } from '../base/lexicon.ts';
 import { dyePot } from '../base/marks.ts';
 import { sheet } from '../base/sheet.ts';
@@ -50,8 +59,6 @@ const LINES: readonly Line[] = [
   'mounts',
   'gun',
 ];
-
-const r2 = (n: number) => Math.round(n * 100) / 100;
 
 const kindGlyph = (kind: GunKind) => `weapon.${kind}` as const;
 

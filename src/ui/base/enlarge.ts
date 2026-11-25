@@ -1,7 +1,6 @@
 import { LARGE } from './card.ts';
 import { MOTION } from './house.ts';
-
-const r2 = (n: number) => Math.round(n * 100) / 100;
+import { r2 } from './ink.ts';
 
 export type Enlarging = {
   large: HTMLElement;

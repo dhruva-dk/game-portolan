@@ -1,5 +1,5 @@
 import { SIZE, SPACE, TYPE } from './house.ts';
-import { INK, PAPER, uid } from './ink.ts';
+import { INK, PAPER, r2, uid } from './ink.ts';
 import { uncle } from './gull.ts';
 import { measured, spoken } from './word.ts';
 
@@ -27,8 +27,6 @@ export type Bubble = {
 const PORTRAIT = 40,
   POINTER = 11,
   LONGEST = 220;
-
-const r2 = (n: number) => Math.round(n * 100) / 100;
 
 function broken(line: string): string[] {
   if (measured(line, TYPE.speech, { italic: true }) <= LONGEST) return [line];

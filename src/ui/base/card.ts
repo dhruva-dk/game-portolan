@@ -2,7 +2,7 @@ import type { Livery } from '../../world/livery.ts';
 import { emblemAt, liveryColors } from './emblem.ts';
 import { GLYPHS } from './glyphs.ts';
 import { FAINT, SIZE, SPACE, TYPE } from './house.ts';
-import { INK, PAPER, WASH, figure, glyph, roughRect, slip } from './ink.ts';
+import { INK, PAPER, WASH, figure, glyph, r2, roughRect, slip } from './ink.ts';
 import { portrait, uncle } from './gull.ts';
 import { ROLE, STAT, least, type StatName } from './lexicon.ts';
 import { STATS, rangeBar } from './rangebar.ts';
@@ -39,7 +39,6 @@ export const LARGE = { w: 624, h: 300 } as const;
 
 const PIPS = { row: 10, most: 30, r: 2.4, rise: 7.4, step: 8, split: 5 };
 const STARS = 5;
-const r2 = (n: number) => Math.round(n * 100) / 100;
 const at = (x: number, y: number, inner: string) =>
   `<g transform="translate(${r2(x)} ${r2(y)})">${inner}</g>`;
 

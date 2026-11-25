@@ -11,9 +11,7 @@ import {
 import { pressable } from './button.ts';
 import { emblemAt, liveryColors } from './emblem.ts';
 import { FAINT, SPACE } from './house.ts';
-import { GILT, INK, roughCircle, slip } from './ink.ts';
-
-const r2 = (n: number) => Math.round(n * 100) / 100;
+import { GILT, INK, r2, roughCircle, slip } from './ink.ts';
 
 export type Swatch = { chosen: boolean; faint: boolean };
 

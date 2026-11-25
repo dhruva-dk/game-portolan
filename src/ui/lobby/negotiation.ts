@@ -9,7 +9,7 @@ import {
   type Candidacy,
 } from '../base/card.ts';
 import { MOTION, SPACE, TYPE } from '../base/house.ts';
-import { INK, WASH, figure, glyph, svgNode } from '../base/ink.ts';
+import { INK, WASH, figure, glyph, r2, svgNode } from '../base/ink.ts';
 import { least } from '../base/lexicon.ts';
 import { bindPicker, pickTo, pickerFace } from '../base/picker.ts';
 import { seal } from '../base/seal.ts';
@@ -42,7 +42,6 @@ const STEPPED: readonly { key: Stepped; word: Word; row: number }[] = [
   { key: 'clause', word: 'Clause', row: 3 },
 ];
 
-const r2 = (n: number) => Math.round(n * 100) / 100;
 const rowY = (row: number) => TERMS.first + row * TERMS.step;
 
 type Zone = 0 | 1 | 2;

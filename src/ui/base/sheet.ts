@@ -1,8 +1,6 @@
 import { closeButton } from './button.ts';
 import { MOTION, SIZE } from './house.ts';
-import { INK, roughRect } from './ink.ts';
-
-const r2 = (n: number) => Math.round(n * 100) / 100;
+import { INK, r2, roughRect } from './ink.ts';
 
 export const RISE = 28;
 

@@ -9,7 +9,7 @@ import {
 } from '../base/button.ts';
 import { gullHead } from '../base/gull.ts';
 import { FAINT, MOTION, SIZE, SPACE, TYPE } from '../base/house.ts';
-import { INK, figure, galleon, glyph, slip, svgNode } from '../base/ink.ts';
+import { INK, figure, galleon, glyph, r2, slip, svgNode } from '../base/ink.ts';
 import { least } from '../base/lexicon.ts';
 import { laurel } from '../base/marks.ts';
 import { rise } from '../base/sheet.ts';
@@ -23,8 +23,6 @@ const NEXT = { orb: 30, h: 82, text: 82 } as const;
 const BUTTON = { r: SIZE.disc, step: 74, word: 13 } as const;
 const SAIL = { w: 232, h: 96, ship: 58 } as const;
 const STARS = 5;
-
-const r2 = (n: number) => Math.round(n * 100) / 100;
 
 const BUTTONS: Record<
   LobbyButton,

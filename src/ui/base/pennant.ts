@@ -1,8 +1,6 @@
 import { linearToHex } from '../../world/color.ts';
 import { DYES } from '../../world/livery.ts';
-import { BRASS, INK, SHADOW, WASH, alpha, uid } from './ink.ts';
-
-const r2 = (n: number) => Math.round(n * 100) / 100;
+import { BRASS, INK, SHADOW, WASH, alpha, r2, uid } from './ink.ts';
 
 export const PENNANT = {
   w: 176,

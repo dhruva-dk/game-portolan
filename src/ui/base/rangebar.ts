@@ -1,4 +1,4 @@
-import { INK, PAPER, WASH } from './ink.ts';
+import { INK, PAPER, WASH, r2 } from './ink.ts';
 
 export type Scale = { least: number; most: number };
 
@@ -13,8 +13,6 @@ interface RangeStyle {
   wash?: string;
   notches?: number;
 }
-
-const r2 = (n: number) => Math.round(n * 100) / 100;
 
 export function rangeBar(
   x: number,

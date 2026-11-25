@@ -1,7 +1,16 @@
 import type { Status } from '../../play/player.ts';
 import { clamp } from '../../world/scalar.ts';
 import { MOTION } from '../base/house.ts';
-import { INK, PAPER, WASH, figure, glyph, slip, svgNode } from '../base/ink.ts';
+import {
+  INK,
+  PAPER,
+  WASH,
+  figure,
+  glyph,
+  r2,
+  slip,
+  svgNode,
+} from '../base/ink.ts';
 
 export const VITALS = { w: 116, h: 60 } as const;
 
@@ -40,8 +49,6 @@ export function vitalsOf(s: Status): Vitals {
 }
 
 type Row = keyof typeof ROWS;
-
-const r2 = (n: number) => Math.round(n * 100) / 100;
 
 function barFace(row: Row) {
   const { cy, h, size, ink, wash } = ROWS[row],

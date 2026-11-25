@@ -4,7 +4,7 @@ import { pressable, ribbon } from '../base/button.ts';
 import { grouped } from '../base/grouped.ts';
 import { MOTION, SPACE, TYPE } from '../base/house.ts';
 import { liveryColors } from '../base/emblem.ts';
-import { INK, figure, glyph, svgNode } from '../base/ink.ts';
+import { INK, figure, glyph, r2, svgNode } from '../base/ink.ts';
 import { least } from '../base/lexicon.ts';
 import {
   LIVERY_HEIGHT,
@@ -30,8 +30,6 @@ const REPAINT = {
   size: TYPE.figure,
 } as const;
 const H = REPAINT.y + 30;
-
-const r2 = (n: number) => Math.round(n * 100) / 100;
 
 export type PaintPricing = (edit: PaintEdit | null) => PaintView;
 

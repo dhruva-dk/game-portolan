@@ -6,7 +6,7 @@ import type {
 import { pressable } from '../base/button.ts';
 import { emblemAt, liveryColors } from '../base/emblem.ts';
 import { MOTION, SPACE, TYPE } from '../base/house.ts';
-import { GILT, INK, figure, glyph, svgNode } from '../base/ink.ts';
+import { GILT, INK, figure, glyph, r2, svgNode } from '../base/ink.ts';
 import { least } from '../base/lexicon.ts';
 import { createList } from '../base/list.ts';
 import { LEVELS, rangeBar } from '../base/rangebar.ts';
@@ -40,8 +40,6 @@ const COLS = {
   barH: 7,
   end: LIST.w - 16,
 } as const;
-
-const r2 = (n: number) => Math.round(n * 100) / 100;
 
 function arrow(moved: number, x: number, cy: number) {
   if (moved === 0) return '';

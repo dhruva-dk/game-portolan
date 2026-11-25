@@ -1,7 +1,5 @@
 import { MOTION, SIZE, SPACE, TYPE } from './house.ts';
-import { figure, paperDisc, slip } from './ink.ts';
-
-const r2 = (n: number) => Math.round(n * 100) / 100;
+import { figure, paperDisc, r2, slip } from './ink.ts';
 
 export const STEPPER = { r: SIZE.slip / 2, sign: TYPE.figure } as const;
 

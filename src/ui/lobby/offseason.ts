@@ -17,7 +17,7 @@ import {
 import { emblemAt, liveryColors } from '../base/emblem.ts';
 import { grouped } from '../base/grouped.ts';
 import { FAINT, MOTION, SPACE, TYPE } from '../base/house.ts';
-import { INK, PAPER, WASH, figure, glyph, svgNode } from '../base/ink.ts';
+import { INK, PAPER, WASH, figure, glyph, r2, svgNode } from '../base/ink.ts';
 import { STAT, least } from '../base/lexicon.ts';
 import { laurel, type LaurelCue } from '../base/marks.ts';
 import { sheet } from '../base/sheet.ts';
@@ -84,8 +84,6 @@ const WINTER = {
   bar: 108,
   barH: 12,
 } as const;
-
-const r2 = (n: number) => Math.round(n * 100) / 100;
 
 const delay = (ms: number) => `--d:${Math.round(ms)}ms`;
 

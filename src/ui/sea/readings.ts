@@ -12,6 +12,7 @@ import {
   figure,
   glyph,
   paperDisc,
+  r2,
   slip,
   svgNode,
 } from '../base/ink.ts';
@@ -48,8 +49,6 @@ export function wingmanOf(race: Race | null): Wingman | null {
     sunk: m.hull <= 0,
   };
 }
-
-const r2 = (n: number) => Math.round(n * 100) / 100;
 
 function layout(wing: boolean) {
   const { gap, clock: c, afloat, sea, wing: w, pause } = READINGS;
