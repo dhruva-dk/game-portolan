@@ -106,21 +106,35 @@ export function rose(
   return s;
 }
 
-export function laurel(cx: number, cy: number, r: number) {
+export type LaurelCue = (
+  part: 'stem' | 'leaf',
+  side: number,
+  i: number
+) => string;
+
+export function laurel(
+  cx: number,
+  cy: number,
+  r: number,
+  cue: LaurelCue = () => ''
+) {
   let s = '';
   for (const side of [-1, 1]) {
-    s += `<path d="${side < 0 ? arcPath(0, 0, 48, Math.PI * 0.58, Math.PI * 1.32) : arcPath(0, 0, 48, -Math.PI * 0.32, Math.PI * 0.42)}" fill="none" stroke-width="2.4"/>`;
+    s += `<path${cue('stem', side, 0)} d="${side < 0 ? arcPath(0, 0, 48, Math.PI * 0.58, Math.PI * 1.32) : arcPath(0, 0, 48, -Math.PI * 0.32, Math.PI * 0.42)}" fill="none" stroke-width="2.4"/>`;
     for (let i = 0; i < 12; i++) {
       const a =
         side < 0 ? Math.PI * (0.6 + i * 0.06) : Math.PI * (0.4 - i * 0.06);
       const px = Math.cos(a) * 48,
         py = Math.sin(a) * 48,
         deg = (a * 180) / Math.PI + (side < 0 ? 90 : -90);
+      let pair = '';
       for (const o of [-1, 1]) {
         const ex = r2(px + Math.cos(a) * o * 7),
           ey = r2(py + Math.sin(a) * o * 7);
-        s += `<ellipse cx="${ex}" cy="${ey}" rx="3.4" ry="8" transform="rotate(${r2(deg + o * 28 * side)} ${ex} ${ey})" fill="url(#h-iron)"/>`;
+        pair += `<ellipse cx="${ex}" cy="${ey}" rx="3.4" ry="8" transform="rotate(${r2(deg + o * 28 * side)} ${ex} ${ey})" fill="url(#h-iron)"/>`;
       }
+      const cued = cue('leaf', side, i);
+      s += cued ? `<g${cued}>${pair}</g>` : pair;
     }
   }
   return `<g transform="translate(${cx} ${cy}) scale(${r2(r / 48)})" stroke="${INK.iron}" stroke-width="1" stroke-linejoin="round">${s}</g>`;
