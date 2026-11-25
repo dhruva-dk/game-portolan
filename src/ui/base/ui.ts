@@ -115,11 +115,22 @@ const STYLE = `
 .ui .stamp { transform-box: fill-box; transform-origin: center;
   animation: stamp ${MOTION.stamp.ms}ms ${MOTION.stamp.ease} both; }
 @keyframes stamp { from { transform: scale(${MOTION.stamp.from}) rotate(-12deg); opacity: 0 } }
+.ui .denied { animation: refuse ${MOTION.refuse.ms}ms ease-in-out ${MOTION.stamp.ms}ms both; }
 .ui .refuse { animation: refuse ${MOTION.refuse.ms}ms ease-in-out both; }
 @keyframes refuse { 20% { transform: translateX(-${MOTION.refuse.shift}px) } 45% { transform: translateX(${MOTION.refuse.shift}px) }
   70% { transform: translateX(-${MOTION.refuse.shift / 2}px) } }
 .ui .dealt { transform-origin: 0 0; animation: dealt ${MOTION.deal.ms}ms ${MOTION.deal.ease} both; }
 @keyframes dealt { from { transform: translate(var(--x), var(--y)) rotate(${MOTION.dealt.turn}deg) scale(${MOTION.dealt.from}); opacity: 0 } }
+.ui .picked { pointer-events: none; transition: transform ${MOTION.glide.ms}ms ${MOTION.glide.ease}; }
+.ui .bar { transform-box: fill-box; transform-origin: left center; transition: transform ${MOTION.bar.ms}ms ${MOTION.bar.ease}; }
+.ui .ticked { animation: ticked ${MOTION.tick.ms}ms ${MOTION.tick.ease}; }
+@keyframes ticked { from { transform: translateY(-${MOTION.tick.rise}px); opacity: .55 } }
+.ui .ping { transform-box: fill-box; transform-origin: center; animation: ping ${MOTION.dot.ms}ms ${MOTION.dot.ease}; }
+@keyframes ping { 40% { transform: scale(1.5, 1.25) } }
+.ui .seated { animation: seated ${MOTION.seated.ms}ms ${MOTION.seated.ease} both; }
+@keyframes seated { from { transform: translateY(-${MOTION.seated.drop}px) scale(1.04) rotate(-2deg); opacity: 0 } }
+.ui .waiting { transform-box: fill-box; transform-origin: center; animation: waiting ${MOTION.suspense.ms}ms ease-in-out infinite; }
+@keyframes waiting { 50% { transform: rotate(180deg) } 100% { transform: rotate(180deg) } }
 @keyframes needle { from { transform: rotate(-38deg) } to { transform: rotate(52deg) } }
 `;
 
