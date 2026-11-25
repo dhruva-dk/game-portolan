@@ -74,6 +74,9 @@ export const MOTION = {
     ease: OUT,
     pop: POP,
   },
+  turn: { ms: 280, ease: OUT, shift: 16 },
+  built: { burst: 620, float: 760, rise: 26, ease: OUT },
+  painted: { hold: 320 },
   fade: { ms: 180, ease: 'ease' },
 } as const;
 

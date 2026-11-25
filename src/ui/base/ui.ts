@@ -87,6 +87,7 @@ const STYLE = `
 .ui .left { left: ${edge('left')}; }
 .ui .right { right: ${edge('right')}; }
 .ui .center { left: 50%; translate: -50% 0; }
+.ui .middle { top: 50%; translate: 0 -50%; }
 .ui .sized { scale: var(--k); }
 .ui .mark { position: absolute; transform: translate(-50%, -50%) scale(var(--k)); }
 .ui .screen { position: absolute; inset: 0; }
@@ -158,6 +159,15 @@ const STYLE = `
 .ui .inked-rule { transform-box: fill-box; transform-origin: center;
   animation: inked-rule ${MOTION.title.rule}ms ${MOTION.title.ease} ${MOTION.title.after * 4}ms both; }
 @keyframes inked-rule { from { transform: scaleX(0); opacity: 0 } }
+.ui .bar.level { transition-duration: ${MOTION.number.ms}ms; }
+.ui .turn-next, .ui .turn-prev { animation: turn ${MOTION.turn.ms}ms ${MOTION.turn.ease} both; }
+.ui .turn-next { --from: ${MOTION.turn.shift}px; }
+.ui .turn-prev { --from: -${MOTION.turn.shift}px; }
+@keyframes turn { from { transform: translateX(var(--from)); opacity: 0 } }
+.ui .burst { transform-box: view-box; animation: burst ${MOTION.built.burst}ms ${MOTION.built.ease} both; }
+@keyframes burst { from { transform: scale(.35); opacity: 1 } 55% { opacity: .95 } to { transform: scale(1.25); opacity: 0 } }
+.ui .floated { transform-box: fill-box; animation: floated ${MOTION.built.float}ms ${MOTION.built.ease} both; }
+@keyframes floated { from { transform: translateY(0) scale(.7); opacity: 0 } 18% { transform: translateY(-4px) scale(1.15); opacity: 1 } to { transform: translateY(-${MOTION.built.rise}px); opacity: 0 } }
 .ui .seated { animation: seated ${MOTION.seated.ms}ms ${MOTION.seated.ease} both; }
 @keyframes seated { from { transform: translateY(-${MOTION.seated.drop}px) scale(1.04) rotate(-2deg); opacity: 0 } }
 .ui .waiting { transform-box: fill-box; transform-origin: center; animation: waiting ${MOTION.suspense.ms}ms ease-in-out infinite; }
