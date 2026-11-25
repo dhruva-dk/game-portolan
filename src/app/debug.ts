@@ -177,7 +177,10 @@ function savedState(kind: (typeof SAVED)[number]): CareerState | null {
   if (kind === 'none') return null;
   if (kind === 'unread')
     return recorded(rehearsed(seed, Math.max(1, races) - 1));
-  const lobby = rehearsed(seed, races);
+  const sailed = rehearsed(seed, races),
+    lobby = params.has('balance')
+      ? owing(sailed, number('balance', 0))
+      : sailed;
   if (kind === 'lobby') return lobby;
   return sailOrders(lobby).reduce((now, order) => {
     const applied = apply(now, order);
