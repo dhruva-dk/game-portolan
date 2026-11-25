@@ -69,6 +69,7 @@ export const PARTS = [
   'hull',
   'keel',
   'mounts',
+  'gun',
 ] as const;
 export type PartType = (typeof PARTS)[number];
 
@@ -121,6 +122,7 @@ export const FOCI: Readonly<Record<PartType, Readonly<Focus>>> = {
     pitch: 0.55,
     drift: 0,
   },
+  gun: { ahead: 2, height: 2.2, quarter: 2.5, boom: 14, pitch: 0.36, drift: 0 },
 };
 const FOCUSED = 3;
 

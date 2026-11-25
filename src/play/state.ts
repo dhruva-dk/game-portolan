@@ -14,7 +14,7 @@ import { shipAt, type ShipState } from '../sim/ship.ts';
 import type { Hands } from '../sim/hands.ts';
 import { wearOf } from '../sim/health.ts';
 import { indexed } from '../sim/indexed.ts';
-import type { Rarity } from '../sim/kinds.ts';
+import type { GunKind, Rarity } from '../sim/kinds.ts';
 import { PLAYER } from '../sim/match.ts';
 import type { Memory } from '../sim/bot.ts';
 import type { Sighter } from '../sim/orders.ts';
@@ -79,7 +79,8 @@ export function createState(
     anchored = true,
     generation = 0;
   let standings: ReturnType<typeof createStandings> | null = null;
-  let consort: Consort | null = null;
+  let consort: Consort | null = null,
+    fitted: { kind: GunKind } | null = null;
   const drawing = createDrawing();
 
   const clock = (between: number) => offset + view().clock(between);
@@ -178,7 +179,12 @@ export function createState(
         const d = drawing.slot(n++, id, look, true);
         blendPose(a.before, a.after, between, d.pose);
         add(scale(ship.heading, ship.speed, d.velocity), shove, 1, d.velocity);
-        if (c) d.gun = drawing.armed(d, c.gun, v.aim(id) ?? ship.heading);
+        if (c)
+          d.gun = drawing.armed(
+            d,
+            anchored && id === PLAYER && fitted ? fitted : c.gun,
+            v.aim(id) ?? ship.heading
+          );
         if (c) d.wear = wearOf(c.health);
       }
       for (const w of wrecks)
@@ -269,6 +275,9 @@ export function createState(
       return livery;
     },
     worn: (): Livery => livery,
+    arm(kind: GunKind | null) {
+      fitted = kind === null ? null : { kind };
+    },
     paint(look: Look) {
       if (anchored && view().poses(PLAYER)) looks.set(PLAYER, look);
       if (consort) consort.look = look;

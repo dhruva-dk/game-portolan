@@ -87,6 +87,16 @@ export const CAMERA = {
     fov: { deg: 9, attack: 0.12, hold: 0.35, release: 0.7 },
   },
   repair: { fov: { deg: 1, attack: 0.1, hold: 0.1, release: 0.4 } },
+  built: {
+    shake: 0.34,
+    kick: { back: 0.3, pitch: -0.9, up: -0.2 },
+    fov: { deg: -2.6, attack: 0.04, hold: 0.06, release: 0.4 },
+  },
+  focused: { fov: { deg: -1, attack: 0.08, hold: 0.05, release: 0.35 } },
+  painted: {
+    kick: { up: 0.25, roll: 0.5 },
+    fov: { deg: 1.6, attack: 0.14, hold: 0.12, release: 0.55 },
+  },
   pickup: [
     {},
     {},
