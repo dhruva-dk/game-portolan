@@ -233,7 +233,7 @@ Each is a unit test of pure functions over all 40 standings or all levels. A tes
 - [x] **B6. People and the league's start** (§3.9).
 - [x] **B7. The policy's means** (§3.10). Test 11.
 - [x] **B8. Clear out.** Delete every number and name this plan made unused. Remove the old plan's section marks (`§`) from the test names and from the ESLint message. The harness's `career` scenario keeps printing its figures; nothing judges them.
-- [ ] **B9. See that nothing breaks.** The gates and the browser budget. One two-season career with the quick result model: it finishes, no rival command is refused, no figure is not a number. One browser drive through a race, the result flow and the Sponsors screen, with shots saved.
+- [x] **B9. See that nothing breaks.** The gates and the browser budget. One two-season career with the quick result model: it finishes, no rival command is refused, no figure is not a number. One browser drive through a race, the result flow and the Sponsors screen, with shots saved.
 
 ## 8. Before the rebase onto `main`
 
