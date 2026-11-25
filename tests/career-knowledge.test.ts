@@ -29,7 +29,11 @@ import {
 } from '../src/career/knowledge/ships.ts';
 import { ownerOf, personOf } from '../src/career/lookup.ts';
 import { enterPhase, scoreRace } from '../src/career/record/race.ts';
-import { moneyTotal, teamMoney } from '../src/career/record/pay.ts';
+import {
+  isRepossessed,
+  moneyTotal,
+  teamMoney,
+} from '../src/career/record/pay.ts';
 import {
   ask,
   askingWage,
@@ -59,7 +63,7 @@ import {
   type Team,
   type Terms,
 } from '../src/career/state.ts';
-import { LEAGUE } from '../src/career/tuning.ts';
+import { LEAGUE, REPOSSESSION } from '../src/career/tuning.ts';
 
 const YOURS = 0;
 const RIVAL = 17;
@@ -556,9 +560,10 @@ function raceMoneyOf(started: CareerState): (after: CareerState) => void {
     const final = standings(scored);
     started.teams.forEach((team, index) => {
       const prize = started.race === SEASON ? seasonPrize(final[index]) : 0;
+      const paid = team.balance + moneyTotal(teamMoney(started, raced, index));
       assert.equal(
-        after.teams[index].balance - team.balance,
-        moneyTotal(teamMoney(started, raced, index)) + prize,
+        after.teams[index].balance,
+        (isRepossessed(paid) ? REPOSSESSION.balance : paid) + prize,
         `team ${index} after race ${started.race}`
       );
     });
@@ -628,8 +633,14 @@ function checkNarrowing(before: CareerState, after: CareerState): void {
     );
     return;
   }
+  const reclaimed = new Set(
+    after.lastRace === before.lastRace
+      ? []
+      : after.news.flatMap((e) => (e.kind === 'repossessed' ? [e.team] : []))
+  );
   after.knowledge.lines.forEach((ships, team) =>
     ships.forEach((ranges, slot) => {
+      if (reclaimed.has(team)) return;
       for (const line of LINES)
         assert.ok(
           inside(ranges[line], before.knowledge.lines[team][slot][line]),

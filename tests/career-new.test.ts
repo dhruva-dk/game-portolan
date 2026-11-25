@@ -8,9 +8,9 @@ import {
   startDesign,
   startFitted,
   staffLevel,
-  strength,
   unlockCount,
 } from '../src/career/rules/league.ts';
+import { income, parLevel, standingMerit } from '../src/career/rules/money.ts';
 import { lineLeader } from '../src/career/rules/standing.ts';
 import { shipRange } from '../src/career/rules/knowledge.ts';
 import {
@@ -230,15 +230,15 @@ test('your team starts as §1.7.5 and §1.8.7 say', () => {
 });
 
 test('every rival team is generated as §1.10.1 says', () => {
-  const { jitter } = LEAGUE_START.design;
+  const jitter = LEAGUE_START.designJitter;
   for (const state of CAREERS)
     for (const [team, index] of rivals(state)) {
-      const t = strength(index);
+      const merit = standingMerit(index);
       for (const line of LINES) {
         within(
           team.design[line],
-          startDesign(t, -jitter),
-          startDesign(t, jitter),
+          startDesign(merit, -jitter),
+          startDesign(merit, jitter),
           line
         );
         for (const ship of team.ships) {
@@ -251,10 +251,10 @@ test('every rival team is generated as §1.10.1 says', () => {
           assert.ok(ship.fitted[line] >= SHIPS.leastLevel);
         }
       }
-      assert.equal(team.balance, startBalance(t));
+      assert.equal(team.balance, startBalance(merit));
       assert.deepEqual([...team.taste].sort(), [...KINDS].sort());
       const others = team.taste.filter((k) => k !== 'cannon');
-      const expected = ['cannon', ...others.slice(0, unlockCount(t))];
+      const expected = ['cannon', ...others.slice(0, unlockCount(merit))];
       assert.deepEqual([...team.unlocked].sort(), expected.sort());
       const first = team.taste.find((k) => team.unlocked.includes(k));
       for (const ship of team.ships) assert.equal(ship.gun, first);
@@ -300,7 +300,7 @@ test('people are generated with the levels and ages of §1.5.8 and §1.10.1', ()
       const level =
         person.contract === null
           ? HEADCOUNT.freeAgentLevel
-          : staffLevel(strength(person.contract.team));
+          : staffLevel(standingMerit(person.contract.team));
       const age =
         person.contract === null ? HEADCOUNT.freeAgentAge : HEADCOUNT.staffAge;
       within(person.age, age.lo, Math.min(age.hi, person.retireAge - 1), 'age');
@@ -351,48 +351,49 @@ test('the state survives a JSON round trip', () => {
 });
 
 test('the league formulas of §1.10.1 at their ends', () => {
-  const { design, balance, staffLevel: staff } = LEAGUE_START;
-  assert.equal(strength(1), 1);
-  assert.equal(strength(RIVALS), 0);
-  assert.equal(strength(20), 0.5);
-  assert.equal(startDesign(1, 0), design.base + design.perStrength);
-  assert.equal(startDesign(0, -design.jitter), SHIPS.leastLevel);
+  const { designJitter, staffJitter, balanceRaces } = LEAGUE_START;
+  const pool = HEADCOUNT.freeAgentLevel;
+  assert.equal(startDesign(1, 0), parLevel(1));
+  assert.equal(startDesign(0, 0), SHIPS.leastLevel);
+  assert.equal(startDesign(0, -designJitter), SHIPS.leastLevel);
   assert.equal(startDesign(1, 100), LEVEL_SPAN.most);
+  for (let index = 1; index <= RIVALS; index++) {
+    const merit = standingMerit(index);
+    assert.equal(startDesign(merit, 0), parLevel(merit));
+    assert.equal(startBalance(merit), Math.round(balanceRaces * income(merit)));
+  }
   assert.equal(startFitted(50, 6), 44);
   assert.equal(startFitted(8, 6), SHIPS.leastLevel);
   assert.deepEqual(staffLevel(1), {
-    lo: staff.base + staff.perStrength - staff.jitter,
-    hi: staff.base + staff.perStrength + staff.jitter,
+    lo: pool.hi - staffJitter,
+    hi: pool.hi + staffJitter,
   });
   assert.deepEqual(staffLevel(0), {
-    lo: staff.base - staff.jitter,
-    hi: staff.base + staff.jitter,
+    lo: pool.lo - staffJitter,
+    hi: pool.lo + staffJitter,
   });
-  assert.equal(startBalance(1), balance.base + balance.perStrength);
-  assert.equal(startBalance(0), balance.base);
-  assert.equal(startBalance(strength(2)), 31211);
+  assert.equal(startBalance(1), balanceRaces * income(1));
+  assert.equal(startBalance(0), balanceRaces * income(0));
   assert.equal(unlockCount(1), KINDS.length - 1);
   assert.equal(unlockCount(0), 0);
-  assert.equal(unlockCount(strength(20)), 2);
-  assert.equal(unlockCount(strength(21)), 1);
+  assert.equal(unlockCount(standingMerit(20)), 2);
+  assert.equal(unlockCount(standingMerit(21)), 1);
 });
 
 test('the league formulas of §1.10.1 at hand-worked points', () => {
-  assert.equal(strength(1), 1);
-  assert.equal(strength(20), 0.5);
-  assert.equal(strength(39), 0);
-  assert.equal(startDesign(1, 0), 80);
-  assert.equal(startDesign(0.5, 3), 48);
+  assert.equal(startDesign(1, 0), 90);
+  assert.equal(startDesign(0.5, 3), 50.5);
   assert.equal(startDesign(0, -8), 5);
-  assert.equal(startDesign(1, 8), 88);
+  assert.equal(startDesign(1, 8), 98);
   assert.equal(startFitted(48, 6), 42);
   assert.equal(startFitted(9, 6), 5);
-  assert.deepEqual(staffLevel(1), { lo: 14, hi: 18 });
-  assert.deepEqual(staffLevel(0.5), { lo: 8, hi: 12 });
-  assert.deepEqual(staffLevel(0), { lo: 2, hi: 6 });
+  assert.deepEqual(staffLevel(1), { lo: 18, hi: 22 });
+  assert.deepEqual(staffLevel(0.5), { lo: 9, hi: 13 });
+  assert.deepEqual(staffLevel(0), { lo: 0, hi: 4 });
   assert.equal(startBalance(1), 32000);
-  assert.equal(startBalance(0.5), 17000);
+  assert.equal(startBalance(0.5), 9500);
   assert.equal(startBalance(0), 2000);
+  assert.equal(startBalance(standingMerit(2)), 30481);
   assert.equal(unlockCount(1), 4);
   assert.equal(unlockCount(0.75), 3);
   assert.equal(unlockCount(0.5), 2);

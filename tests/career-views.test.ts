@@ -367,6 +367,8 @@ test('Release empties the seat, and an empty driver seat brings Uncle back', () 
   else assert.equal(after.card, null);
 });
 
+const PURSE = 50000;
+
 function dealtWith(state: CareerState, scout: Role, rival: Role): CareerState {
   const target = state.people.find(
     (p) => p.role === rival && p.contract !== null && p.contract.team !== YOURS
@@ -375,6 +377,7 @@ function dealtWith(state: CareerState, scout: Role, rival: Role): CareerState {
   return dealAfterRace(
     mine(state, (t) => ({
       ...t,
+      balance: PURSE,
       scoutSeat: scout,
       approached: { ...t.approached, [rival]: target.id },
     }))

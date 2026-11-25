@@ -16,9 +16,9 @@ import {
   startDesign,
   startFitted,
   staffLevel,
-  strength,
   unlockCount,
 } from './rules/league.ts';
+import { standingMerit } from './rules/money.ts';
 import { lineLeader } from './rules/standing.ts';
 import { generateOwner, generatePerson, type Origin } from './rules/person.ts';
 import { drawOffers, slotsOf } from './sponsors.ts';
@@ -129,18 +129,18 @@ type Identity = {
 };
 
 function rivalTeam(seed: string, index: number, identity: Identity): Team {
-  const t = strength(index);
-  const { jitter } = LEAGUE_START.design;
+  const merit = standingMerit(index);
+  const jitter = LEAGUE_START.designJitter;
   const design = perLine((line) =>
     startDesign(
-      t,
+      merit,
       uniform(-jitter, jitter, seed, 'team', index, 'design', line)
     )
   );
   const taste = tasteOf(seed, index);
   const others = taste
     .filter((kind) => kind !== CANNON)
-    .slice(0, unlockCount(t));
+    .slice(0, unlockCount(merit));
   const unlocked = taste.filter(
     (kind) => kind === CANNON || others.includes(kind)
   );
@@ -161,7 +161,7 @@ function rivalTeam(seed: string, index: number, identity: Identity): Team {
     emblem: whole(0, EMBLEMS - 1, seed, 'team', index, 'emblem'),
     taste,
     owner: generateOwner(seed, identity.ownerId),
-    balance: startBalance(t),
+    balance: startBalance(merit),
     design,
     unlocked,
     ships: [ship(0), ship(1)],
@@ -187,7 +187,7 @@ function staffMember(
   team: number
 ): Person {
   const origin: Origin = {
-    level: staffLevel(strength(team)),
+    level: staffLevel(standingMerit(team)),
     age: HEADCOUNT.staffAge,
   };
   const person = generatePerson(seed, id, role, origin);

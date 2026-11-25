@@ -45,6 +45,7 @@ import {
   AGEING,
   LEAGUE,
   ECONOMY,
+  NEGOTIATION,
   SHIPS,
   STANDING,
   STAT_SPAN,
@@ -169,7 +170,12 @@ function withYourStaff(state: CareerState): CareerState {
         ? p
         : {
             ...p,
-            contract: { team: YOURS, wage: 100, clause: 0, racesLeft: races },
+            contract: {
+              team: YOURS,
+              wage: 100,
+              clause: NEGOTIATION.clause.most,
+              racesLeft: races,
+            },
           };
     }),
   };
