@@ -388,8 +388,12 @@ async function harbor(
       location.replace(at.href);
     },
   });
-  if (screen === 'sponsors' || screen === 'planet') {
+  if (screen === 'sponsors') {
     shore.open(screen);
+    return;
+  }
+  if (screen === 'planet') {
+    void shore.settled.then(() => shore.open(screen));
     return;
   }
   if (screen === 'ship' || screen === 'paint') {
