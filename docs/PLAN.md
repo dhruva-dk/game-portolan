@@ -621,6 +621,7 @@ Berths are found as today (`sim/spawn.ts`). They are then assigned by standing: 
 1. The match ends when ships of at most one team are afloat, or 180 s after the last storm phase finishes closing, as today's team-race rule does.
 2. Places are today's order (`finishing` in `play/result.ts`): ships afloat first, ordered by sinkings, then their team's current sea share, then ship id; then sunk ships, last sunk first.
 3. A storm sinking is credited to the last ship that hit the victim within 8 s, as today. A sinking with no such ship is credited to nobody.
+4. In the result, a team's sea share is its claimed area over the whole area inside the ring, land included, as the shield rule reads it. A sample that the match ended before taking holds the team's share at the end, or 0 with no ship afloat; `afloatAtPhaseFour` is then afloat at the end. If a team's two specs carry different standings, berths use the better one.
 
 ### 1.11.11 When you sink or forfeit
 
@@ -1681,9 +1682,9 @@ Goal: the match engine is in `sim/`; a match is created from a `MatchSetup` of 2
 - [x] **M2.7 Shield.** §1.11.6 item 3.
 - [x] **M2.8 Gust meter.** §1.11.7.
 - [x] **M2.9 Drivers from stats.** §1.11.8: add `sim/driver.ts`; delete `sim/persona.ts` (`sim/driven.ts` went in step M2.3), the styles and seeded draws of `sim/temper.ts` (keep the parameter type), and the match types.
-- [ ] **M2.10 Race conditions.** Storm scaling and the two ratings (§1.11.2, §1.11.3).
-- [ ] **M2.11 Berths by standing.** §1.11.9.
-- [ ] **M2.12 The result.** Sea samples, `afloatAtPhaseFour`, the end rule and places (§1.11.6, §1.11.10); `result()` returns a `MatchResult`.
+- [x] **M2.10 Race conditions.** Storm scaling and the two ratings (§1.11.2, §1.11.3).
+- [x] **M2.11 Berths by standing.** §1.11.9.
+- [x] **M2.12 The result.** Sea samples, `afloatAtPhaseFour`, the end rule and places (§1.11.6, §1.11.10); `result()` returns a `MatchResult`.
 - [ ] **M2.13 Harness.** `duel` and `match` run on `evenSetup`. Remove the persona and distinctness metrics. Print the figures of §2.8.1.
 - [ ] **M2.14 Minimum HUD.** Remove the gun slots; show three heal slots; make Gust a toggle with its ring. Enough for the browser game to be played; the full HUD is step M5.17.
 
