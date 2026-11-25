@@ -98,8 +98,12 @@ export function pips(x: number, y: number, n: number, w: number) {
   return s;
 }
 
+const grouped = (n: number) => n.toLocaleString('en-US');
+
 const money = (span: Span) =>
-  span.lo === span.hi ? `${span.lo}` : `${span.lo}–${span.hi}`;
+  span.lo === span.hi
+    ? grouped(span.lo)
+    : `${grouped(span.lo)}–${grouped(span.hi)}`;
 
 function wageRow(x: number, y: number, w: number, span: Span) {
   const coin = least('coin'),
@@ -196,7 +200,7 @@ export function cardLarge(
       });
   s += starRow(
     pad + 2 + 2.5 * least('star') * 1.06 - least('star') * 0.53,
-    pad + shot + 98,
+    pad + shot + (face.age === null ? 76 : 98),
     face.stars
   );
   if (face.wage) s += wageRow(pad, pad + shot + 128, colW - 16, face.wage);
