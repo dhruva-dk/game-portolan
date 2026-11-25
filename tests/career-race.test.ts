@@ -32,8 +32,12 @@ import {
 } from '../src/career/record/pay.ts';
 import { raceReport, workshop } from '../src/career/record/report.ts';
 import {
+  deedPrize,
+  income,
   interestOn,
   meanShare,
+  perSinking,
+  placeMerit,
   placePrize,
   seaMoney,
   sinkingMoney,
@@ -48,7 +52,7 @@ import {
   type Phase,
   type Role,
 } from '../src/career/state.ts';
-import { LEAGUE, POINTS, RACE_MONEY } from '../src/career/tuning.ts';
+import { ECONOMY, LEAGUE, POINTS, RACE_MONEY } from '../src/career/tuning.ts';
 import type { MatchResult, ShipResult } from '../src/sim/result.ts';
 
 const TEAMS = LEAGUE.teams;
@@ -200,9 +204,7 @@ function expectedStandings(state: CareerState): number[] {
 
 const prizeFor = (place: number): number =>
   Math.round(
-    RACE_MONEY.placePrize *
-      ((RACE_MONEY.prizeFrom - place) / RACE_MONEY.prizeSpan) **
-        RACE_MONEY.prizePower
+    (ECONOMY.shares.place * income(placeMerit(place))) / LEAGUE.shipsPerTeam
   );
 
 function expectedSponsors(
@@ -242,12 +244,9 @@ function expectedMoney(state: CareerState, result: MatchResult, team: number) {
     0
   );
   const place = ships.reduce((sum, s) => sum + prizeFor(s.place), 0);
-  const sinkings = ships.reduce(
-    (sum, s) => sum + RACE_MONEY.perSinking * s.sinkings,
-    0
-  );
+  const sinkings = ships.reduce((sum, s) => sum + perSinking() * s.sinkings, 0);
   const sea = Math.round(
-    (RACE_MONEY.seaPrize * samples.reduce((a, b) => a + b, 0)) / samples.length
+    (deedPrize() * samples.reduce((a, b) => a + b, 0)) / samples.length
   );
   const wages = state.people
     .filter((p) => p.contract?.team === team)
@@ -259,23 +258,19 @@ function expectedMoney(state: CareerState, result: MatchResult, team: number) {
 }
 
 test('place prize, sinkings, sea and interest follow §1.8.1', () => {
-  assert.equal(placePrize(1), RACE_MONEY.placePrize);
-  assert.equal(placePrize(SHIPS), prizeFor(SHIPS));
-  assert.equal(placePrize(41), Math.round(RACE_MONEY.placePrize / 4));
+  for (let place = 1; place <= SHIPS; place++)
+    assert.equal(placePrize(place), prizeFor(place));
   for (let place = 1; place < SHIPS; place++)
     assert.ok(placePrize(place) >= placePrize(place + 1));
   assert.equal(sinkingMoney(0), 0);
-  assert.equal(sinkingMoney(3), 3 * RACE_MONEY.perSinking);
+  assert.equal(sinkingMoney(3), 3 * perSinking());
   const none = Array.from({ length: RACE_MONEY.seaSamples }, () => 0);
   const all = none.map(() => 1);
   const half = none.map((_, k) => (k % 2 === 0 ? 0.25 : 0.75));
   assert.equal(seaMoney(none), 0);
-  assert.equal(seaMoney(all), RACE_MONEY.seaPrize);
+  assert.equal(seaMoney(all), Math.round(deedPrize()));
   assert.equal(meanShare(half), (4 * 0.25 + 3 * 0.75) / 7);
-  assert.equal(
-    seaMoney(half),
-    Math.round(RACE_MONEY.seaPrize * meanShare(half))
-  );
+  assert.equal(seaMoney(half), Math.round(deedPrize() * meanShare(half)));
   assert.equal(interestOn(1000), 0);
   assert.equal(interestOn(0), 0);
   assert.equal(interestOn(-1), 1);
@@ -284,17 +279,17 @@ test('place prize, sinkings, sea and interest follow §1.8.1', () => {
 });
 
 test('the race money of §1.8.1 at hand-worked points', () => {
-  assert.equal(placePrize(1), 3000);
-  assert.equal(placePrize(21), 1688);
-  assert.equal(placePrize(41), 750);
-  assert.equal(placePrize(61), 188);
-  assert.equal(placePrize(80), 0);
-  assert.equal(sinkingMoney(1), 150);
-  assert.equal(sinkingMoney(3), 450);
-  assert.equal(seaMoney([1, 1, 1, 1, 1, 1, 1]), 40000);
+  assert.equal(placePrize(1), 3200);
+  assert.equal(placePrize(21), 1873);
+  assert.equal(placePrize(41), 931);
+  assert.equal(placePrize(61), 374);
+  assert.equal(placePrize(80), 200);
+  assert.equal(sinkingMoney(1), 154);
+  assert.equal(sinkingMoney(3), 462);
+  assert.equal(seaMoney([1, 1, 1, 1, 1, 1, 1]), 12128);
   assert.equal(seaMoney([0, 0, 0, 0, 0, 0, 0]), 0);
-  assert.equal(seaMoney([0.03, 0.03, 0.03, 0.03, 0.03, 0.03, 0.03]), 1200);
-  assert.equal(seaMoney([0.25, 0.75, 0.25, 0.75, 0.25, 0.75, 0.25]), 18571);
+  assert.equal(seaMoney([0.03, 0.03, 0.03, 0.03, 0.03, 0.03, 0.03]), 364);
+  assert.equal(seaMoney([0.25, 0.75, 0.25, 0.75, 0.25, 0.75, 0.25]), 5631);
   assert.equal(interestOn(-10), 1);
   assert.equal(interestOn(-1000), 50);
   assert.equal(interestOn(-1001), 51);

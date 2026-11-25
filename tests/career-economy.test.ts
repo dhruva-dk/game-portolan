@@ -8,10 +8,23 @@ import {
   parLevel,
   parStars,
   placeMerit,
+  placePrize,
+  seaMoney,
+  seasonPrize,
+  sinkingMoney,
   standingMerit,
   starMerit,
 } from '../src/career/rules/money.ts';
-import { ECONOMY, LEAGUE, SHIPS, STARS } from '../src/career/tuning.ts';
+import {
+  ECONOMY,
+  LEAGUE,
+  RACE_MONEY,
+  SHIPS,
+  STARS,
+} from '../src/career/tuning.ts';
+
+const SHIP_COUNT = LEAGUE.teams * LEAGUE.shipsPerTeam;
+const PLACES = Array.from({ length: SHIP_COUNT }, (_, index) => index + 1);
 
 const close = (actual: number, expected: number, within: number, note = '') =>
   assert.ok(
@@ -25,10 +38,9 @@ test('the four income shares sum to 1', () => {
 });
 
 test('the four merits run from 0 to 1 at their ends', () => {
-  const ships = LEAGUE.teams * LEAGUE.shipsPerTeam;
   assert.equal(standingMerit(LEAGUE.teams), 0);
   assert.equal(standingMerit(1), 1);
-  assert.equal(placeMerit(ships), 0);
+  assert.equal(placeMerit(SHIP_COUNT), 0);
   assert.equal(placeMerit(1), 1);
   assert.equal(starMerit(0), 0);
   assert.equal(starMerit(STARS.most), 1);
@@ -61,4 +73,35 @@ test('league income is the sum of income over the standings', () => {
   );
   close(leagueIncome(), sum, 1e-9);
   close(leagueIncome(), 242564, 1);
+});
+
+test('two ships at a place’s merit earn the place share of income, at every place', () => {
+  for (const place of PLACES)
+    close(
+      LEAGUE.shipsPerTeam * placePrize(place),
+      ECONOMY.shares.place * income(placeMerit(place)),
+      LEAGUE.shipsPerTeam / 2,
+      `place ${place}`
+    );
+});
+
+test('ten races of the season share equal the season prize, at every standing', () => {
+  for (const standing of STANDINGS)
+    close(
+      seasonPrize(standing),
+      LEAGUE.racesPerSeason *
+        ECONOMY.shares.season *
+        income(standingMerit(standing)),
+      0.5,
+      `standing ${standing}`
+    );
+});
+
+test('the whole sea and a race’s every sinking each pay half the deeds share of league income', () => {
+  const half = (ECONOMY.shares.deeds * leagueIncome()) / 2;
+  const whole = Array.from({ length: RACE_MONEY.seaSamples }, () => 1);
+  close(seaMoney(whole), half, 0.5, 'sea');
+  const sinkings = SHIP_COUNT - 1;
+  close(sinkingMoney(sinkings), half, sinkings / 2, 'sinkings');
+  close(seaMoney(whole) + sinkingMoney(sinkings), 2 * half, sinkings / 2 + 1);
 });

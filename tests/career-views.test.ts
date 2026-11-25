@@ -29,6 +29,7 @@ import { stars } from '../src/career/rules/person.ts';
 import { SCOUTING } from '../src/career/tuning.ts';
 import { dismissed, haggled, owing, rehearsed } from '../src/app/rehearse.ts';
 import { talkWith } from '../src/career/hiring/sign.ts';
+import { dealAfterRace } from '../src/career/hiring/deal.ts';
 
 const YOURS = 0;
 const FRESH = rehearsed('views', 0);
@@ -365,7 +366,21 @@ test('Release empties the seat, and an empty driver seat brings Uncle back', () 
   else assert.equal(after.card, null);
 });
 
-const DEALT = rehearsed('views', 14, ['mechanic']);
+function dealtWith(state: CareerState, scout: Role, rival: Role): CareerState {
+  const target = state.people.find(
+    (p) => p.role === rival && p.contract !== null && p.contract.team !== YOURS
+  );
+  if (target === undefined) throw new Error(`no rival ${rival}`);
+  return dealAfterRace(
+    mine(state, (t) => ({
+      ...t,
+      scoutSeat: scout,
+      approached: { ...t.approached, [rival]: target.id },
+    }))
+  );
+}
+
+const DEALT = dealtWith(rehearsed('views', 14), 'driver', 'mechanic');
 
 function dealtRole(state: CareerState): Role {
   const role = ROLES.find(

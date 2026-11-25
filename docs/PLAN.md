@@ -226,7 +226,7 @@ Each is a unit test of pure functions over all 40 standings or all levels. A tes
 ## 7. Steps
 
 - [x] **B1. The anchor.** `ECONOMY`, the four merits, `income`, `leagueIncome` and par, with test 1.
-- [ ] **B2. Income.** Place prize, season prize, sea prize and sinking money from the anchor. Tests 2 and 5.
+- [x] **B2. Income.** Place prize, season prize, sea prize and sinking money from the anchor. Tests 2 and 5.
 - [ ] **B3. Wages.** The asking wage from the anchor. Test 3.
 - [ ] **B4. Development.** Gain, the two winter shares, the build cost, the policy's focus value. Tests 6, 7, 8 and 9.
 - [ ] **B5. Sponsors.** Wealth, fee, figures, the `target` field, the two renames, `VERSION` 2, the sponsor view and the Sponsors screen. Tests 4 and 10.

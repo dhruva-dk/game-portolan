@@ -156,18 +156,7 @@ export const START = { level: 5 };
 
 export const RIVAL_SHIPS = { width: 30, builtWidth: 20, narrowing: 0.25 };
 
-export const RACE_MONEY = {
-  placePrize: 3000,
-  prizeFrom: 81,
-  prizeSpan: 80,
-  prizePower: 2,
-  perSinking: 150,
-  seaPrize: 40000,
-  seaSamples: 7,
-  interest: 0.05,
-};
-
-export const SEASON_PRIZE = { prize: 60000, from: 41, span: 40, power: 2 };
+export const RACE_MONEY = { deeds: 2, seaSamples: 7, interest: 0.05 };
 
 export const REPOSSESSION = { below: -10000, balance: 1500 };
 
