@@ -1736,7 +1736,7 @@ Career and view tests, debug screens and screenshots use it. The harness uses it
 
 ## 2.8 The harness
 
-`npm run sim -- <scenario> [--seed s] [--runs n] [--seasons n] [--workers n] [--standin] [--subject name]` runs the game headless and writes to `captures/<date>-<subject>/`. Long runs print one line per race. Every run prints a final state hash; wall-clock times are printed separately and are not part of it.
+`npm run sim -- <scenario> [--seed s] [--runs n] [--seasons n] [--workers n] [--standin] [--subject name] [--levels a,b] [--stats a,b] [--gunnery a,b]` runs the game headless and writes to `captures/<date>-<subject>/`. Long runs print one line per race. Every run prints a final state hash; wall-clock times are printed separately and are not part of it.
 
 ### 2.8.1 Scenarios
 
@@ -1747,6 +1747,8 @@ Career and view tests, debug screens and screenshots use it. The harness uses it
 | `season` | Ten races with all 40 teams on the policy | Per race: your place, balance, standing. At the end: the table |
 | `career` | `--seasons n` seasons | Per season: your standing, balance, mean level, staff stars; the league's spread of balances, levels and staff stars; repossessions |
 | `terrain` | Planet surveys | As today |
+
+`duel` takes `--levels a,b` and `--stats a,b` for its two ships. `match --gunnery a,b` sails an even race whose teams alternate between the two Gunnery values and prints each side's hit rate and their ratio. A `career` run ends with the tuning figures of milestone 7 (seasons to the top 10, your standing by season, your lowest balance in the first five races, rival repossessions a season, the richest balance, and the design levels and staff stars of the top and bottom five teams); the `idle` scenario is a five-season career with your policy off.
 
 `season` and `career` run real matches unless `--standin` is given. A real match costs about 10 s on one core, so a real season costs about two minutes. Each race's setup depends on the standings the race before it left, so one career runs on one worker; `--workers` spreads the `--runs` careers, whose seeds are `s`, `s-2`, `s-3` and so on.
 
@@ -1909,7 +1911,7 @@ Goal: the game is played from first launch through seasons by hand.
 - [x] **M6.3 Fire drag.** A drag that starts on Fire moves the aim (§1.12.14).
 - [x] **M6.4 Uncle's bubbles** and the lobby buttons appearing in step (§1.13.2).
 - [x] **M6.5 Going broke on screen.** The red money slip and the special edition (§1.12.2, §1.13.1). In debt, builds, the repaint and Report are faint and shake when tapped; SAIL, signing a sponsor and Release still work. The slip stamps red and throbs twice when the lobby comes into view, then is still.
-- [ ] **M6.6 Remove what the old flow leaves behind.** The title screen, the seed panel (`panel.ts`, `fleet.ts`, `play/fleet.ts`, `play/survey.ts` if nothing else uses it), the old end screens, the old lobby in `screens.ts`, and any transition code nothing uses.
+- [x] **M6.6 Remove what the old flow leaves behind.** The title screen, the seed panel (`panel.ts`, `fleet.ts`, `play/fleet.ts`, `play/survey.ts` if nothing else uses it), the old end screens, the old lobby in `screens.ts`, and any transition code nothing uses. Gone: `app/flow.ts`, `app/address.ts`, `ui/sea/ends.ts`, `ui/lobby/panel.ts`, `ui/lobby/livery.ts`, `ui/base/passage.ts`, `ui/base/screens.ts`, `ui/base/ways.ts`, the broadside camera and the kept livery. `play/survey.ts` stays, since the lobby's preview uses it. `screen=match` and its switches run on `app/bench.ts`, which wires the game, HUD, pause and the after-sinking buttons as the real race does, so its sunk and over states show the real Watch and Result buttons.
 - [ ] **M6.7 iOS.** `npm run ios` builds and runs on the iPad. Measure the reload between races; if the wait before the result flow's first step is over two seconds, tell the user.
 
 **Harness check:** `npm run sim -- career --seasons 1 --standin` still passes, and the user has played one full season by hand on the iPad.
