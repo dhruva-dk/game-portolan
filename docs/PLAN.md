@@ -703,7 +703,8 @@ The home screen whenever a career exists, no race is under way and no flow is sh
 ### 1.12.3 Ship
 
 - **Entering:** the camera eases to the first stop.
-- **Stops:** seven, in the order sails, rigging, rudder, hull, keel, mounts, gun. Each has a fixed camera pose on slot 0 (the existing `FOCI` in `play/anchorage.ts` has six; add one for the gun, looking along the gun deck).
+- **Stops:** seven, in the order sails, rigging, rudder, hull, keel, mounts, gun. Each has a fixed camera pose on slot 0 (the existing `FOCI` in `play/anchorage.ts` has six; add one for the gun, looking along the gun deck from the stern quarter). Your anchored ships carry the gun kind fitted to them, so a fitted mortar stands on deck.
+- **Motion:** changing stop slides the sidebar in from the side the stops moved toward while the ring glides along the stop row and the camera moves. A build puts an ink burst over the ship and a camera kick; the fitted numeral counts up as its bar grows, a green "+N" floats up, the tick stamps in and the money slip counts down. Setting the focus glides the designer's portrait along the stop row to the line and pulses the camera.
 
 | Position | Element | Shows | Tap |
 |---|---|---|---|
@@ -720,10 +721,10 @@ The home screen whenever a career exists, no race is under way and no flow is sh
 4. **Focus button:** the word Focus, the designer's small portrait and this line's gain per race at the focused rate, to one decimal, as "+2.4". When this line is the focus it is drawn pressed, and a tap clears the focus (`SetFocus` with nothing). Otherwise a tap makes it the focus. With no designer it is faint and shows an empty portrait outline.
 
 **The gun stop adds:**
-- Between items 2 and 3, a **kinds row** of five gun-kind glyphs. Unlocked kinds are inked. Locked kinds are faint with their unlock progress beneath as "12/20". Tapping a locked kind makes its unlocking the focus (tapping the one being unlocked clears the focus). The kind being unlocked carries the designer's small portrait. Tapping an unlocked kind does nothing.
-- In each ship row, before the Build button, a **fit row** of the unlocked kinds as small glyphs with the ship's fitted kind ringed. Tapping another kind selects it for that row: the Build button then shows the `FitGun` cost and sends `FitGun` for that kind. Tapping the fitted kind returns the button to Build.
+- Between items 2 and 3, a **kinds row** of five gun-kind glyphs. Unlocked kinds are inked. Locked kinds are faint with their unlock progress beneath as "12/20". Tapping a locked kind makes its unlocking the focus (tapping the one being unlocked clears the focus); with no designer the tap is refused with a shake. The kind being unlocked carries the designer's small portrait. Tapping an unlocked kind does nothing.
+- In each ship row, before the Build button and right of the sailor's column, a **fit row** of the unlocked kinds as small glyphs with the ship's fitted kind ringed. Tapping another kind selects it for that row: the Build button then shows the `FitGun` cost and sends `FitGun` for that kind. Tapping the fitted kind returns the button to Build.
 
-**Paint picker.** A sheet in the left third: §1.12.1's Livery element, with liveries worn by other teams drawn faint. The ship in the scene shows the selection as it changes. A ribbon button shows a coin glyph and 1,000; it is faint when nothing has changed or the balance is short. Tap sends `Repaint` and closes the picker. The picker's close button discards the selection.
+**Paint picker.** A sheet at the left, as wide as New Career's (272 units, so that every swatch keeps its 44 points): the word Paint beside a dye pot that takes the selected dye, then §1.12.1's Livery element, with liveries worn by other teams drawn faint along the row that would make them. A tap on a faint swatch is refused with a shake. While the picker is open the camera shows the whole ship beside the sheet, and the ship shows the selected dye and pattern as they change (the emblem shows on the ship from step M6.1). A ribbon button shows a coin glyph and 1,000; it is faint when nothing has changed or the balance is short. Tap sends `Repaint` and closes the picker. The picker's corner close button discards the selection and the ship returns to what it wore.
 
 ### 1.12.4 Team
 
@@ -1593,6 +1594,9 @@ All spacing is a multiple of `STEP`, 4 units.
 | `repaint` | 700 ms, through a midpoint lifted 0.22 toward paper | The ship in the scene changing livery |
 | `wake` | 360 ms, swelling to 1.08 scale, with a slight overshoot | A button coming out of faint |
 | `title` | Starts 90 ms after the sheet; the rose 720 ms, the rhumb lines 900 ms, the word 560 ms, the rule 460 ms | The game's name inking in on New Career |
+| `turn` | 280 ms, a 16-unit slide | The Ship sidebar changing stop |
+| `built` | An ink burst of 620 ms; the "+N" floats 26 units up over 760 ms | A build or a fit on the Ship screen |
+| `painted` | The picker holds 320 ms before it closes | Repaint |
 | `fade` | 180 ms | Anything else that appears or goes |
 
 Rules:
@@ -1700,7 +1704,7 @@ Your team is played by the policy as a sensible team (§1.10.2). Until the polic
 
 ### 2.8.3 Debug states
 
-`app/debug.ts` reads `?debug` switches (used by `npm run browser`). `?debug&screen=<name>&seed=<s>&races=<n>` builds a career from the seed, advances it `n` races with the stand-in and the policy for every team including yours (§1.10.2), and opens that screen. The names are `new`, `lobby`, `ship`, `paint`, `team`, `deal`, `negotiation`, `sponsors`, `opponents`, `planet`, `settings`, `result`, `paper`, `offseason`, `glyphs` (the glyph sheet of §2.5.4, which needs no career). There are no hand-written fixture states. Three more switches change the state built: `balance=<n>` sets your balance to `n` after the career is advanced (no seed reaches debt by itself, and the red money slip needs a state to be drawn on); `signed`, at the off-season stop, finishes the stop so the lobby of the next season shows; `meter` shows the frame meter over a screen; `approach=<roles>` (a comma-separated list) sends `Approach` for a candidate of each named role before the last race, so that several deals are waiting at once. The `deal` and `negotiation` screens also read `role=<role>` (whose deal to open; the scouted role if left out). `negotiation` reads four more: `pick=<n>` (which candidate of the deal, from 0), `report` (buy a report on them first), `renew` (negotiate with the holder of the seat instead of a candidate), and `offers=<answers>` (a comma-separated list of `refuse`, `counter` and `sign`: offers are sent, in order, that get those answers; the helper searches for terms that really get each answer and fails, naming the person, when none do). These states are reached by sending real commands, never by writing the state. `screen=new` shows New Career with no career unless `seed=` is given, and with one when it is; `name=`, `dye=`, `pattern=` and `emblem=` then set that career's team name and livery.
+`app/debug.ts` reads `?debug` switches (used by `npm run browser`). `?debug&screen=<name>&seed=<s>&races=<n>` builds a career from the seed, advances it `n` races with the stand-in and the policy for every team including yours (§1.10.2), and opens that screen. The names are `new`, `lobby`, `ship`, `paint`, `team`, `deal`, `negotiation`, `sponsors`, `opponents`, `planet`, `settings`, `result`, `paper`, `offseason`, `glyphs` (the glyph sheet of §2.5.4, which needs no career). There are no hand-written fixture states. Three more switches change the state built: `balance=<n>` sets your balance to `n` after the career is advanced (no seed reaches debt by itself, and the red money slip needs a state to be drawn on); `signed`, at the off-season stop, finishes the stop so the lobby of the next season shows; `meter` shows the frame meter over a screen; `approach=<roles>` (a comma-separated list) sends `Approach` for a candidate of each named role before the last race, so that several deals are waiting at once. The `deal` and `negotiation` screens also read `role=<role>` (whose deal to open; the scouted role if left out). `negotiation` reads four more: `pick=<n>` (which candidate of the deal, from 0), `report` (buy a report on them first), `renew` (negotiate with the holder of the seat instead of a candidate), and `offers=<answers>` (a comma-separated list of `refuse`, `counter` and `sign`: offers are sent, in order, that get those answers; the helper searches for terms that really get each answer and fails, naming the person, when none do). These states are reached by sending real commands, never by writing the state. `screen=new` shows New Career with no career unless `seed=` is given, and with one when it is; `name=`, `dye=`, `pattern=` and `emblem=` then set that career's team name and livery. `screen=ship` reads `stop=<n>` (which stop to open on, from 0) and, as the one exception to reaching states by commands, `unlocked=<kinds>&progress=<n>`, which writes unlocked gun kinds and unlock progress into the state the way `balance` writes the balance (the policy playing your seat keeps moving the focus, so no seed gets there).
 
 `npm run browser` (headless Chromium, iPad Air size) takes screenshots and reads frame cost. It is never part of `npm test`. Its existing budget stands: 100 draws, 900,000 triangles and 20 passes a frame.
 
@@ -1830,7 +1834,7 @@ Goal: every screen of §1.12 exists and can be opened on a debug state.
 - [ ] **M5.5 The port and the debug screens.** `ui/lobby/port.ts`, its implementation in `app/` with the screen stack of §1.12.0, and `?debug&screen=` (§2.8.3); update the screen list in `tools/browser.ts`.
 - [x] **M5.6 New Career.** §1.12.1. Start builds the career with `newCareer` and sends `StartRace` through the port; saving, the reload and showing New Career at launch are step M6.1 (under `?debug` Start reloads into the new career's lobby).
 - [ ] **M5.7 Lobby.** §1.12.2, including the two-ship anchorage scene and the orbit drag.
-- [ ] **M5.8 Ship.** §1.12.3, including the seventh camera stop and the paint picker.
+- [x] **M5.8 Ship.** §1.12.3, including the seventh camera stop and the paint picker.
 - [x] **M5.9 Team.** §1.12.4.
 - [x] **M5.10 The deal.** §1.12.5.
 - [x] **M5.11 Negotiation.** §1.12.6.
@@ -1848,7 +1852,7 @@ Goal: every screen of §1.12 exists and can be opened on a debug state.
 
 Goal: the game is played from first launch through seasons by hand.
 
-- [ ] **M6.1 The flow.** §2.9: launch from the saved state, New Career, SAIL, `RecordRace`, the save queue and the reload. Team liveries now come from the career. For New Career this step saves the state `port.start` hands over, waits for the save, reloads so that launch case 3 starts race one, shows New Career at launch when no career is saved, and routes its close button to Settings.
+- [ ] **M6.1 The flow.** §2.9: launch from the saved state, New Career, SAIL, `RecordRace`, the save queue and the reload. Team liveries now come from the career, and ships wear their team's emblem (§1.13.4) on the mainsail in place of the cross every ship wears today, in the lobby, on New Career, in the paint picker and at sea. For New Career this step saves the state `port.start` hands over, waits for the save, reloads so that launch case 3 starts race one, shows New Career at launch when no career is saved, and routes its close button to Settings.
 - [ ] **M6.2 After sinking.** Watch, and the Result fast-forward (§1.11.11).
 - [ ] **M6.3 Fire drag.** A drag that starts on Fire moves the aim (§1.12.14).
 - [ ] **M6.4 Uncle's bubbles** and the lobby buttons appearing in step (§1.13.2).
