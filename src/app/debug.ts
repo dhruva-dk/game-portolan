@@ -2,6 +2,11 @@ import type { Anchor } from '../world/lattice.ts';
 import type { World } from '../world/environment.ts';
 import type { FrameOptions } from '../render/frame.ts';
 import { createFly } from './fly.ts';
+import { ashore } from './ashore.ts';
+import { rehearsed } from './rehearse.ts';
+import { memoryStore } from './save.ts';
+import { planetSeed } from '../career/fit.ts';
+import { seedOf } from '../world/seeds.ts';
 import { specimen } from './specimen.ts';
 import type { DebugDamage, Game } from '../play/game.ts';
 import type { Referee } from '../play/referee.ts';
@@ -135,6 +140,8 @@ export async function scenario(
   title: { show(on: boolean): void }
 ) {
   if (params.get('screen') === 'glyphs') return specimen(number('page', 1));
+  const career = CAREER_SCREENS.find((c) => c === params.get('screen'));
+  if (career) return harbor(career, release, stage, title);
   const setup = setupOf(release);
   const s = await stage(setup);
   const room = Math.max(SETUP.most, number('ships', 0) + 1);
@@ -221,6 +228,36 @@ export async function scenario(
     drawn += dt;
     return frame;
   }, p.drawn);
+}
+
+const CAREER_SCREENS = ['lobby', 'team'] as const;
+
+async function harbor(
+  screen: (typeof CAREER_SCREENS)[number],
+  release: Setup,
+  stage: (setup: Setup) => Promise<Stage>,
+  title: { show(on: boolean): void }
+) {
+  const races = Math.max(0, Math.floor(number('races', 0)));
+  const career = rehearsed(params.get('seed') ?? undefined, races);
+  const planet = planetSeed(career);
+  const s = await stage({
+    ...setupOf(release),
+    seed: seedOf(planet),
+    name: planet,
+    meter: params.has('meter'),
+  });
+  safeArea(uiLayer());
+  const shore = await ashore(s, career, {
+    store: memoryStore(),
+    ready: () => title.show(false),
+    sailed() {
+      const at = new URL(location.href);
+      at.searchParams.set('races', String(races + 1));
+      location.replace(at.href);
+    },
+  });
+  if (screen === 'team') shore.open('team');
 }
 
 function open(p: Played, others: readonly Berth[], s: Stage) {

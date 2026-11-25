@@ -36,12 +36,14 @@ import {
   type Status,
 } from './player.ts';
 import {
+  CONSORT,
   FOCI,
   LOOSE,
   PARTS,
   REST,
   WHOLE,
   anchorageEye,
+  consortBerth,
   dragged,
   eyeOut,
   focused,
@@ -307,8 +309,11 @@ export function createGame(
     broadside(on: boolean) {
       aside = on;
     },
-    stage(to: { framing: Readonly<Framing>; focus?: string | null } | null) {
-      const cut = wanted === WHOLE;
+    stage(
+      to: { framing: Readonly<Framing>; focus?: string | null } | null,
+      eased = false
+    ) {
+      const cut = wanted === WHOLE && !eased;
       wanted = to?.framing ?? WHOLE;
       part = PARTS.find((p) => p === to?.focus) ?? null;
       if (cut) reframe();
@@ -512,6 +517,12 @@ export function createGame(
     },
     anchor() {
       restart(state.anchor(start), true);
+    },
+    moor(two: boolean) {
+      const berth = two
+        ? consortBerth(normalize(last.position), last.forward, depth)
+        : null;
+      state.moor(CONSORT.id, berth);
     },
     view(next: View) {
       if (next.watch !== view.watch) chase.fly();

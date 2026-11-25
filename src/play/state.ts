@@ -9,6 +9,8 @@ import {
   type Stepped,
 } from '../sim/engine.ts';
 import { STEP, blendPose } from '../sim/fixed.ts';
+import { pose, ride, settled, type Ride } from '../sim/ride.ts';
+import { shipAt, type ShipState } from '../sim/ship.ts';
 import type { Hands } from '../sim/hands.ts';
 import { wearOf } from '../sim/health.ts';
 import { indexed } from '../sim/indexed.ts';
@@ -34,6 +36,15 @@ import { sinking } from './sinking.ts';
 
 export interface Berth extends Mooring {
   look: Look;
+}
+
+interface Consort {
+  id: number;
+  look: Look;
+  ship: ShipState;
+  ride: Ride;
+  before: ShipPose;
+  after: ShipPose;
 }
 
 interface Wreck {
@@ -68,6 +79,7 @@ export function createState(
     anchored = true,
     generation = 0;
   let standings: ReturnType<typeof createStandings> | null = null;
+  let consort: Consort | null = null;
   const drawing = createDrawing();
 
   const clock = (between: number) => offset + view().clock(between);
@@ -86,6 +98,7 @@ export function createState(
     log.clear();
     generation++;
     anchored = lobby;
+    consort = null;
     const teams = view().teams();
     standings = teams ? createStandings(teams) : null;
   };
@@ -119,6 +132,19 @@ export function createState(
   const state = {
     step(hands: Hands): Stepped {
       match.step(hands);
+      if (consort) {
+        const c = consort;
+        c.ride = ride(
+          c.ride,
+          c.ship,
+          moored.topSpeed,
+          waters.sea,
+          clock(1),
+          STEP
+        );
+        c.before = c.after;
+        c.after = pose(c.ship, c.ride);
+      }
       const v = view();
       foundered();
       while (wrecks.length && !wreckAt(wrecks[0], clock(0))) wrecks.shift();
@@ -157,6 +183,10 @@ export function createState(
       }
       for (const w of wrecks)
         if (wreckAt(w, now, drawing.slot(n, w.id, w.look, false).pose)) n++;
+      if (consort) {
+        const d = drawing.slot(n++, consort.id, consort.look, true);
+        blendPose(consort.before, consort.after, between, d.pose);
+      }
       return drawing.ships(n);
     },
     poseOf(id: number, between: number): ShipPose | null {
@@ -215,9 +245,27 @@ export function createState(
       dress(PLAYER, lookOf(livery));
       return view().after(PLAYER)!;
     },
+    moor(id: number, berth: { at: Vec3; heading: Vec3 } | null) {
+      if (!anchored || !berth) {
+        consort = null;
+        return;
+      }
+      const ship = shipAt(berth.at, berth.heading),
+        r = settled(ship, moored.topSpeed, waters.sea, clock(1)),
+        p = pose(ship, r);
+      consort = {
+        id,
+        look: lookOf(livery),
+        ship,
+        ride: r,
+        before: p,
+        after: p,
+      };
+    },
     wear(l: Livery): Livery {
       livery = worn(l);
       if (anchored && view().poses(PLAYER)) looks.set(PLAYER, lookOf(livery));
+      if (consort) consort.look = lookOf(livery);
       return livery;
     },
     worn: (): Livery => livery,

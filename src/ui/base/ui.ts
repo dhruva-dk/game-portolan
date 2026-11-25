@@ -1,4 +1,5 @@
 import { DEFS, cssInks, svgNode } from './ink.ts';
+import { MOTION } from './house.ts';
 import { FADE } from './ways.ts';
 
 const DRAWN = {
@@ -91,6 +92,13 @@ const STYLE = `
 .ui .screen { position: absolute; inset: 0; }
 .ui .screen.press { pointer-events: auto; }
 .ui .gone, .ui .gone * { pointer-events: none !important; }
+.ui .tap { transform-box: fill-box; transform-origin: center;
+  transition: transform ${MOTION.press.release}ms ${MOTION.press.ease}, filter ${MOTION.press.release}ms ease; }
+.ui .tap.down { transform: scale(${MOTION.press.scale}); filter: brightness(.93);
+  transition-duration: ${MOTION.press.ms}ms; }
+.ui .pop { transform-box: fill-box; transform-origin: center;
+  animation: pop ${MOTION.dot.ms}ms ${MOTION.dot.ease} both; }
+@keyframes pop { from { transform: scale(0); opacity: 0 } }
 @keyframes needle { from { transform: rotate(-38deg) } to { transform: rotate(52deg) } }
 `;
 
