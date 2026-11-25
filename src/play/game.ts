@@ -51,7 +51,6 @@ import {
   focused,
   framed,
   relaxed,
-  turned,
   type Focus,
   type Framing,
   type Orbit,
@@ -126,8 +125,7 @@ export function createGame(
   let held: ((s: ShipState) => Helm) | null = null;
   let anchored = false,
     berth: Eye | null = null,
-    floorAt = 0,
-    aside = false;
+    floorAt = 0;
   const orbit: Orbit = { ...REST },
     berthed = eyeOut(),
     floor = (p: Vec3) => Math.max(ground(p), sea.at(p, floorAt));
@@ -323,9 +321,6 @@ export function createGame(
     jolt(kind: Jolt) {
       shake.play(CAMERA[kind], 1);
     },
-    broadside(on: boolean) {
-      aside = on;
-    },
     stage(
       to: { framing: Readonly<Framing>; focus?: string | null } | null,
       eased = false
@@ -399,7 +394,6 @@ export function createGame(
       if (anchored) {
         dragged(orbit, read.look, orbit);
         if (!read.look.held) relaxed(orbit, dt, orbit);
-        turned(orbit, aside, dt, orbit);
         focused(seat.focus, part ? FOCI[part] : LOOSE, dt);
         floorAt = state.clock(between);
         framed(framing, wanted, dt);

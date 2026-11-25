@@ -1,7 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  BROADSIDE,
   LOBBY,
   LOOSE,
   ORBIT,
@@ -9,7 +8,6 @@ import {
   anchorageEye,
   dragged,
   relaxed,
-  turned,
 } from '../src/play/anchorage.ts';
 import {
   R,
@@ -74,66 +72,19 @@ test('a drag turns it freely round the ship, and tilts it only within its limits
 test('it never goes under the sea or into the land, at any turn and tilt', () => {
   for (let yaw = -Math.PI; yaw <= Math.PI; yaw += 0.3) {
     for (const pitch of ORBIT.pitch) {
-      for (const broadside of [0, 0.5, 1]) {
-        const o = { yaw, pitch, broadside };
-        assert.ok(
-          where(
-            anchorageEye(pose, { orbit: o, focus: LOOSE }, 37, flat).position
-          ).height > 1.5
-        );
-        assert.ok(
-          where(
-            anchorageEye(pose, { orbit: o, focus: LOOSE }, 37, () => 20)
-              .position
-          ).height >=
-            21.5 - 1e-9
-        );
-      }
+      const o = { yaw, pitch };
+      assert.ok(
+        where(anchorageEye(pose, { orbit: o, focus: LOOSE }, 37, flat).position)
+          .height > 1.5
+      );
+      assert.ok(
+        where(
+          anchorageEye(pose, { orbit: o, focus: LOOSE }, 37, () => 20).position
+        ).height >=
+          21.5 - 1e-9
+      );
     }
   }
-});
-
-test("her livery folio open, it eases round to the ship's broadside and stays there; closed, it eases back to its rest", () => {
-  let o = REST;
-  for (let i = 0; i < 90; i++) o = turned(o, true, 1 / 30);
-  assert.ok(o.broadside > 0.99 && o.broadside <= 1, `${o.broadside}`);
-  for (let i = 0; i < 300; i++) o = turned(o, true, 1 / 30);
-  assert.equal(o.broadside, 1);
-  for (const clock of [0, 22.5, 45]) {
-    const w = where(
-      anchorageEye(pose, { orbit: o, focus: LOOSE }, clock, flat).position
-    );
-    assert.ok(Math.abs(w.off - BROADSIDE.quarter) < 0.01, `${w.off}`);
-  }
-  const e = anchorageEye(pose, { orbit: o, focus: LOOSE }, 0, flat),
-    look = rotate([0, 0, -1], e.orientation),
-    pivot = normalize(add(scale(up, R + LOBBY.height), e.position, -1));
-  assert.ok(dot(look, up) < dot(pivot, up));
-  const off = dragged(o, { x: 200, y: 0 });
-  assert.notEqual(
-    where(anchorageEye(pose, { orbit: off, focus: LOOSE }, 0, flat).position)
-      .off,
-    where(anchorageEye(pose, { orbit: o, focus: LOOSE }, 0, flat).position).off
-  );
-  let back = off;
-  for (let i = 0; i < 300; i++)
-    back = turned(relaxed(back, 1 / 30), true, 1 / 30);
-  assert.equal(back.broadside, 1);
-  assert.ok(
-    Math.abs(
-      where(anchorageEye(pose, { orbit: back, focus: LOOSE }, 0, flat).position)
-        .off - BROADSIDE.quarter
-    ) < 0.01,
-    JSON.stringify(back)
-  );
-  for (let i = 0; i < 300; i++) o = turned(o, false, 1 / 30);
-  assert.equal(o.broadside, 0);
-  assert.ok(
-    Math.abs(
-      where(anchorageEye(pose, { orbit: o, focus: LOOSE }, 0, flat).position)
-        .off - LOBBY.quarter
-    ) < 0.01
-  );
 });
 
 test('let go, it eases home, the short way round', () => {

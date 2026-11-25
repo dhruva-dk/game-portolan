@@ -1,6 +1,5 @@
 import type { GunKind, Rarity } from '../sim/kinds.ts';
 import { GUST_METER, HEAL } from '../sim/tuning.ts';
-import type { Livery } from '../world/livery.ts';
 import type { Vec3 } from '../world/sphere.ts';
 
 export interface Thumbs {
@@ -122,13 +121,6 @@ export const SCREENS = [
 ] as const;
 export type Screen = (typeof SCREENS)[number];
 
-export interface Wardrobe {
-  dyes: readonly { name: string; dye: string; mark: string }[];
-  worn(): Livery;
-  wear(l: Livery): Livery;
-  broadside(on: boolean): void;
-}
-
 export interface Chart {
   name: string;
   points: Float32Array;
@@ -141,13 +133,6 @@ export interface Chart {
 export interface PlanetMarks {
   berths: readonly [Vec3, Vec3];
   storm: { center: Vec3; radius: number };
-}
-
-export interface Seeds {
-  name: string;
-  chart(name: string): Promise<Chart | null>;
-  roll(): string;
-  sail(name: string): void;
 }
 
 export type Blow = 'broke' | 'hull' | 'shield';
