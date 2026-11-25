@@ -289,6 +289,7 @@ const CAREER_SCREENS = [
   'planet',
   'opponents',
   'result',
+  'offseason',
   'paper',
 ] as const;
 
@@ -358,7 +359,8 @@ async function harbor(
   const roles = (params.get('approach') ?? '')
     .split(',')
     .flatMap((r) => ROLES.filter((role) => role === r));
-  const flowing = screen === 'result' || screen === 'paper';
+  const flowing =
+    screen === 'result' || screen === 'offseason' || screen === 'paper';
   const sailed = rehearsed(
       params.get('seed') ?? undefined,
       flowing ? Math.max(1, races) - 1 : races,
@@ -411,10 +413,14 @@ async function harbor(
     shore.open(screen);
     return;
   }
+  if (screen === 'offseason') {
+    shore.open('offseason', { page: Math.floor(number('page', 1)) });
+    return;
+  }
   if (screen === 'result' || screen === 'paper') {
     const step = screen === 'paper' ? 3 : Math.floor(number('step', 1));
     if (step === 2) shore.open('result', { step });
-    if (step === 3) shore.open('paper');
+    if (step === 3) shore.open('offseason', { page: 4 });
     return;
   }
   if (screen === 'planet') {

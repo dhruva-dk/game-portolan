@@ -28,6 +28,7 @@ const VIEWS: { name: string; q: string; own?: Partial<Budget> }[] = [
   { name: 'opponents', q: 'screen=opponents&seed=test&races=14&team=1' },
   { name: 'result', q: 'screen=result&seed=test&races=2' },
   { name: 'paper', q: 'screen=paper&seed=test&races=4' },
+  { name: 'offseason', q: 'screen=offseason&seed=test&races=10&page=2' },
   { name: 'map', q: 'screen=match&map' },
   {
     name: 'worst',
