@@ -1,5 +1,5 @@
 import { apply, newCareer, runPolicy } from '../career/apply.ts';
-import type { Command, Role } from '../career/commands.ts';
+import type { Command, Livery, Role } from '../career/commands.ts';
 import { matchSetup } from '../career/fit.ts';
 import { TEAM_NAMES } from '../career/names.ts';
 import { standInResult } from '../career/standin.ts';
@@ -60,16 +60,19 @@ function approached(state: CareerState, roles: readonly Role[]) {
   return now;
 }
 
+export type Founding = { name?: string; livery?: Livery; emblem?: number };
+
 export function rehearsed(
   seed: string = REHEARSAL.seed,
   races = 0,
-  approach: readonly Role[] = []
+  approach: readonly Role[] = [],
+  founding: Founding = {}
 ): CareerState {
   let state = newCareer({
     seed,
-    name: TEAM_NAMES[0],
-    livery: REHEARSAL.livery,
-    emblem: REHEARSAL.emblem,
+    name: founding.name ?? TEAM_NAMES[0],
+    livery: founding.livery ?? REHEARSAL.livery,
+    emblem: founding.emblem ?? REHEARSAL.emblem,
   });
   for (let n = 0; n < races; n++) {
     state = dismissed(state);
