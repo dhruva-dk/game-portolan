@@ -1,6 +1,7 @@
 import { random } from '../world/random.ts';
 import { R, along, bearingAt, scale, type Vec3 } from '../world/sphere.ts';
 import { SHIP } from './handling.ts';
+import type { ShipSpec } from './setup.ts';
 import type { Depth } from './shoal.ts';
 
 export const SPAWN = {
@@ -63,13 +64,53 @@ function run(p: Vec3, t: Vec3, depth: Depth): number {
 const apart = (a: Vec3, b: Vec3) =>
   (a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2;
 
-export function drawn(at: readonly Spawn[], seed: number): Spawn[] {
+export function pathOf(at: readonly Spawn[], seed: number): Spawn[] {
   const rand = random(seed * 40503 + 7),
-    out = [...at];
-  for (let i = out.length - 1; i > 0; i--) {
-    const j = Math.floor(rand() * (i + 1));
-    [out[i], out[j]] = [out[j], out[i]];
+    left = [...at],
+    out: Spawn[] = [];
+  let next = Math.floor(rand() * left.length);
+  while (left.length > 0) {
+    const [here] = left.splice(next, 1);
+    out.push(here);
+    let near = Infinity;
+    for (let k = 0; k < left.length; k++) {
+      const d = apart(left[k].at, here.at);
+      if (d < near) [next, near] = [k, d];
+    }
   }
+  return out;
+}
+
+type Seat = Pick<ShipSpec, 'team' | 'slot' | 'standing'>;
+
+export function byStanding(ships: readonly Seat[]): number[] {
+  const standing = new Map<number, number>();
+  for (const s of ships)
+    standing.set(
+      s.team,
+      Math.min(standing.get(s.team) ?? s.standing, s.standing)
+    );
+  const of = (id: number) => standing.get(ships[id].team) ?? 0;
+  return ships
+    .map((_, id) => id)
+    .sort(
+      (a, b) =>
+        of(a) - of(b) ||
+        ships[a].team - ships[b].team ||
+        ships[a].slot - ships[b].slot
+    );
+}
+
+export function assigned(
+  at: readonly Spawn[],
+  seed: number,
+  ships: readonly Seat[]
+): Spawn[] {
+  const path = pathOf(at, seed),
+    out: Spawn[] = new Array<Spawn>(ships.length);
+  byStanding(ships).forEach((id, k) => {
+    out[id] = path[k];
+  });
   return out;
 }
 

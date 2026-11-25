@@ -5,8 +5,10 @@ import { SETUP, createMatch } from '../src/sim/engine.ts';
 import {
   SPAWN,
   berthing,
+  assigned,
   berths,
-  drawn,
+  byStanding,
+  pathOf,
   type Spawn,
 } from '../src/sim/spawn.ts';
 import { shipAt } from '../src/sim/ship.ts';
@@ -113,7 +115,7 @@ test('each match is berthed ahead of its start (off the main thread in the game)
   const own = berths(water, SEED, count, depth),
     other = berths(water, SEED + 1, count, depth);
   const placed = (spawns: readonly Spawn[]) =>
-    drawn(spawns, SEED).map((b) => shipAt(b.at, b.heading).at);
+    assigned(spawns, SEED, setup.ships).map((b) => shipAt(b.at, b.heading).at);
   assert.deepEqual(at(), placed(own), 'worked out at the start without them');
   assert.deepEqual(
     at({ match: SEED, spawns: other }),
@@ -124,5 +126,99 @@ test('each match is berthed ahead of its start (off the main thread in the game)
     at({ match: SEED + 1, spawns: other }),
     placed(own),
     "another match's are not"
+  );
+});
+
+const SEEDS = [3, 17, 4242];
+
+const shuffledStandings = (seed: number): number[] => {
+  const s = Array.from({ length: SETUP.most / 2 }, (_, t) => t + 1);
+  let x = seed;
+  for (let i = s.length - 1; i > 0; i--) {
+    x = (x * 1103515245 + 12345) % 2147483648;
+    const j = x % (i + 1);
+    [s[i], s[j]] = [s[j], s[i]];
+  }
+  return s;
+};
+
+function started(seed: number) {
+  const setup = setupOf(seed, { standings: shuffledStandings(seed) }),
+    m = createMatch(setup, watersAt(planet)),
+    at = m.view.vessels().map((v) => v.ship.at),
+    path = pathOf(berths(water, seed, setup.ships.length, depth), seed).map(
+      (b) => shipAt(b.at, b.heading).at
+    );
+  const onPath = at.map((p) => path.findIndex((q) => distance(p, q) < 1e-9));
+  return { setup, at, path, onPath };
+}
+
+test('berths go by standing: each ship its own; a team two in a row along the path, slot 0 first; the best team at its start', () => {
+  for (const seed of SEEDS) {
+    const { setup, onPath } = started(seed);
+    assert.ok(
+      onPath.every((k) => k >= 0),
+      'every ship on a berth'
+    );
+    assert.equal(new Set(onPath).size, setup.ships.length, 'no two share one');
+    const teams = setup.ships.length / 2;
+    for (let t = 0; t < teams; t++) {
+      const [a, b] = [2 * t, 2 * t + 1];
+      assert.equal(setup.ships[a].slot, 0);
+      assert.equal(onPath[b], onPath[a] + 1, `team ${t}: in a row`);
+      assert.equal(
+        onPath[a],
+        2 * (setup.ships[a].standing - 1),
+        `team ${t}: in the order of standing`
+      );
+    }
+  }
+});
+
+test('teams close in standing start nearer each other than teams far apart in it', () => {
+  const near: number[] = [],
+    far: number[] = [];
+  for (const seed of SEEDS) {
+    const { setup, at } = started(seed);
+    const lead = new Map<number, number>();
+    setup.ships.forEach((s, id) => {
+      if (s.slot === 0) lead.set(s.standing, id);
+    });
+    for (const [a, i] of lead)
+      for (const [b, j] of lead) {
+        if (b <= a) continue;
+        const d = distance(at[i], at[j]);
+        if (b - a === 1) near.push(d);
+        if (b - a >= 20) far.push(d);
+      }
+  }
+  const mean = (xs: number[]) => xs.reduce((s, x) => s + x, 0) / xs.length;
+  assert.ok(
+    mean(near) < mean(far),
+    `${mean(near).toFixed(3)} against ${mean(far).toFixed(3)}`
+  );
+});
+
+test("a match's seed fixes its path: the same seed the same berths for every ship, another seed starts the path elsewhere", () => {
+  const a = started(SEEDS[0]);
+  assert.deepEqual(started(SEEDS[0]).at, a.at);
+  const spawns = berths(water, SEEDS[0], SETUP.most, depth);
+  const starts = new Set(
+    [1, 2, 3, 4, 5, 6].map((seed) => pathOf(spawns, seed)[0].at.join())
+  );
+  assert.ok(starts.size > 1, 'the path starts where the seed says');
+  assert.deepEqual(
+    [...pathOf(spawns, 1)].sort((x, y) => x.at[0] - y.at[0]),
+    [...spawns].sort((x, y) => x.at[0] - y.at[0]),
+    'every berth on the path once'
+  );
+  assert.deepEqual(
+    byStanding([
+      { team: 1, slot: 1, standing: 4 },
+      { team: 0, slot: 0, standing: 9 },
+      { team: 1, slot: 0, standing: 4 },
+      { team: 0, slot: 1, standing: 9 },
+    ]),
+    [2, 0, 1, 3]
   );
 });
