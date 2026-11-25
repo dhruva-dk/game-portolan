@@ -254,6 +254,26 @@ const STYLE = `
 @keyframes printed { from { transform: translateY(${MOTION.printed.shift}px); opacity: 0; filter: blur(1.2px) } }
 .ui .turning { transform-box: fill-box; transform-origin: center; animation: turning ${MOTION.turning.ms}ms linear infinite; }
 @keyframes turning { to { transform: rotate(360deg) } }
+.ui .leafed, .ui .leafed * { pointer-events: none !important; }
+.ui .leafed { animation: leafed ${MOTION.leafed.ms}ms ${MOTION.leafed.ease} both; }
+@keyframes leafed { 30% { transform: translateY(-${MOTION.leafed.rise * 0.3}px) rotate(${MOTION.leafed.turn * 0.3}deg) scale(${MOTION.leafed.swell}); opacity: 1 } to { transform: translate(${MOTION.leafed.rise}px, -${MOTION.leafed.rise * 2}px) rotate(${MOTION.leafed.turn}deg) scale(${MOTION.leafed.swell}); opacity: 0 } }
+.ui .traced { stroke-dasharray: 1; animation: struck-in var(--ms, ${MOTION.ranked.strike.ms}ms) ${MOTION.ranked.strike.ease} var(--d, 0ms) both; }
+.ui .traced-back { stroke-dasharray: 1; animation: traced-back var(--ms, ${MOTION.ranked.strike.ms}ms) ${MOTION.ranked.strike.ease} var(--d, 0ms) both; }
+@keyframes traced-back { from { stroke-dashoffset: -1 } to { stroke-dashoffset: 0 } }
+.ui .crowned { transform-box: fill-box; transform-origin: center; animation: crowned ${MOTION.ceremony.champion.ms}ms ${MOTION.ceremony.champion.ease} var(--d, 0ms) both; }
+@keyframes crowned { from { transform: scale(${MOTION.ceremony.champion.from}) rotate(-14deg); opacity: 0 } 35% { opacity: 1 } }
+.ui .leaf { transform-box: fill-box; transform-origin: center; animation: leaf ${MOTION.ceremony.wreath.leaf}ms ${MOTION.ceremony.champion.ease} var(--d, 0ms) both; }
+@keyframes leaf { from { transform: scale(${MOTION.ceremony.wreath.from}); opacity: 0 } }
+.ui .flanked { transform-box: fill-box; transform-origin: center; animation: flanked ${MOTION.ceremony.flank.ms}ms ${MOTION.ceremony.flank.ease} var(--d, 0ms) both; }
+@keyframes flanked { from { transform: translateX(var(--shift, 0px)) scale(.7); opacity: 0 } 50% { opacity: 1 } }
+.ui .slid { animation: slid ${MOTION.ceremony.row.ms}ms ${MOTION.ceremony.row.ease} var(--d, 0ms) both; }
+@keyframes slid { from { transform: translateX(-${MOTION.ceremony.row.shift}px); opacity: 0 } 40% { opacity: 1 } }
+.ui .dealt-card { transform-box: fill-box; transform-origin: center; animation: dealt-card ${MOTION.season.deal.ms}ms ${MOTION.season.deal.ease} var(--d, 0ms) both; }
+@keyframes dealt-card { from { transform: translateY(-${MOTION.season.deal.drop}px) rotate(var(--turn, ${MOTION.season.deal.turn}deg)) scale(1.08); opacity: 0 } 40% { opacity: 1 } }
+.ui .aside { transform-box: fill-box; transform-origin: center; animation: aside ${MOTION.season.aside.ms}ms ${MOTION.season.aside.ease} var(--d, 0ms) both; }
+@keyframes aside { from { transform: none } to { transform: translate(-${MOTION.season.aside.shift}px, -${MOTION.season.aside.drop}px) rotate(${MOTION.season.aside.turn}deg) } }
+.ui .frost { transform-box: fill-box; transform-origin: center; animation: frost ${MOTION.frost.glyph.ms}ms ${MOTION.frost.glyph.ease} var(--d, 0ms) both; }
+@keyframes frost { from { transform: translateY(-${MOTION.frost.glyph.drop}px) rotate(${MOTION.frost.glyph.turn}deg) scale(${MOTION.frost.glyph.from}); opacity: 0; filter: blur(${MOTION.frost.glyph.blur}px) } 60% { opacity: 1; filter: blur(.6px) } }
 .ui .link .under { transition: stroke-width ${MOTION.press.ms}ms ease; }
 .ui .link.down .under { stroke-width: 2.4; }
 `;
