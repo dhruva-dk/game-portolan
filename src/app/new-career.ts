@@ -26,8 +26,12 @@ export async function founding(
     start: (options) => o.started(begun(options)),
     close: () => o.closed(),
     scene: {
-      wear(livery) {
-        repaint(livery === null ? PLAIN : lookOf(livery));
+      wear(livery, emblem) {
+        repaint(
+          livery === null
+            ? { ...PLAIN, emblem: emblem ?? PLAIN.emblem }
+            : lookOf({ ...livery, emblem: emblem ?? undefined })
+        );
       },
     },
   };

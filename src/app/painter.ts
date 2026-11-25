@@ -12,8 +12,12 @@ const mix = (a: Vec3, b: Vec3, t: number): Vec3 => [
 
 const eased = (t: number) => 1 - (1 - t) ** 3;
 
+const inked = (t: number) =>
+  t < 0.5 ? 1 - eased(t * 2) : eased((t - 0.5) * 2);
+
 const same = (a: Look, b: Look) =>
   a.pattern === b.pattern &&
+  a.emblem === b.emblem &&
   a.paint.every((c, i) => c === b.paint[i]) &&
   a.sail.every((c, i) => c === b.sail[i]);
 
@@ -32,6 +36,8 @@ export function painter(paint: (look: Look) => void, first: Look) {
       paint: mix(mix(from.paint, to.paint, e), PAPER_LIFT, lift),
       sail: mix(mix(from.sail, to.sail, e), PAPER_LIFT, lift * sails),
       pattern: t < 0.5 ? from.pattern : to.pattern,
+      emblem: t < 0.5 ? from.emblem : to.emblem,
+      ink: from.emblem === to.emblem ? 1 : inked(t),
     };
     paint(shown);
     if (t < 1) frame = requestAnimationFrame(step);

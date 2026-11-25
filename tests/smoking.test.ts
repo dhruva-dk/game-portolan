@@ -33,7 +33,12 @@ const ship = (
       forward: [0, 0, 1],
       up: [Math.sin(a), Math.cos(a), 0],
     },
-    look: { paint: [0.5, 0.4, 0.3], sail: [0.8, 0.1, 0.1], pattern: 'plain' },
+    look: {
+      paint: [0.5, 0.4, 0.3],
+      sail: [0.8, 0.1, 0.1],
+      pattern: 'plain',
+      emblem: 0,
+    },
     velocity: [0, 0, 0],
     afloat,
     gun: null,

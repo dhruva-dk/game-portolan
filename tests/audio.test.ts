@@ -259,7 +259,7 @@ function scene(
   const playerShip: ShipDraw = {
     id: 0,
     pose: { position: scale(at, R), forward: [1, 0, 0], up: at },
-    look: { paint: [1, 0, 0], sail: [1, 1, 1], pattern: 'plain' },
+    look: { paint: [1, 0, 0], sail: [1, 1, 1], pattern: 'plain', emblem: 0 },
     velocity: [6, 0, 0],
     afloat: true,
     gun: null,

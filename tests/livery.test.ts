@@ -14,6 +14,7 @@ import {
 import {
   COLORS,
   DYES,
+  EMBLEMS,
   LIVERY,
   MARKS,
   PATTERNS,
@@ -149,7 +150,10 @@ test("a livery's look: its dye as paint and canvas, its pattern; one past the se
 
 test('the seed deals every bot its own from the set, the same every time for the same seed', () => {
   assert.deepEqual(
-    [1, 2, 3, 4, 5, 6].map((id) => dealt(1234, id, LIVERY)),
+    [1, 2, 3, 4, 5, 6].map((id) => {
+      const { dye, pattern } = dealt(1234, id, LIVERY);
+      return { dye, pattern };
+    }),
     [
       { dye: 12, pattern: 1 },
       { dye: 4, pattern: 2 },
@@ -233,4 +237,15 @@ test('until the career, every team wears the livery of its index, the player’s
       assert.ok(t === 0 || same(l, liveryAt(t)) || same(liveryAt(t), chosen))
     );
   });
+});
+
+test('a look wears the emblem its livery carries, the one it is given otherwise, and none for an emblem out of the set', () => {
+  assert.equal(lookOf({ dye: 2, pattern: 1, emblem: 7 }, 3).emblem, 7);
+  assert.equal(lookOf({ dye: 2, pattern: 1 }, 3).emblem, 3);
+  assert.equal(lookOf({ dye: 2, pattern: 1 }).emblem, -1);
+  assert.equal(lookOf({ dye: 2, pattern: 1, emblem: 12 }).emblem, -1);
+  const seen = new Set(
+    Array.from({ length: 79 }, (_, i) => dealt(99, i + 1, LIVERY).emblem)
+  );
+  assert.equal(seen.size, EMBLEMS);
 });
