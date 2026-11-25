@@ -1,6 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { apply, newCareer, type Applied } from '../src/career/apply.ts';
+import {
+  apply,
+  newCareer,
+  runPolicy,
+  type Applied,
+} from '../src/career/apply.ts';
 import type { Command } from '../src/career/commands.ts';
 import { matchSetup, planetName } from '../src/career/fit.ts';
 import { employees } from '../src/career/lookup.ts';
@@ -649,10 +654,20 @@ test('RecordRace sets unread, MarkRead clears it in the lobby and the stop', () 
   }
 });
 
-test('StartRace moves the lobby to racing and changes nothing else', () => {
+test('StartRace runs each rival’s policy, worst standing first, then moves the lobby to racing', () => {
   const state = staffed(4, 'lobby');
-  const started = accepted(apply(state, { type: 'StartRace', team: YOURS }));
-  assert.deepEqual(started, { ...state, phase: 'racing' });
+  const applied = apply(state, { type: 'StartRace', team: YOURS });
+  assert.ok(applied.ok);
+  assert.deepEqual(applied.refused, []);
+  const table = expectedStandings(state);
+  const order = table
+    .map((_, team) => team)
+    .filter((team) => team !== YOURS)
+    .sort((a, b) => table[b] - table[a]);
+  let expected = state;
+  for (const team of order) expected = runPolicy(expected, team).state;
+  assert.deepEqual(applied.state, { ...expected, phase: 'racing' });
+  assert.deepEqual(applied.state.teams[YOURS], state.teams[YOURS]);
 });
 
 test('refused race commands leave the state untouched', () => {
@@ -744,10 +759,14 @@ test('the report is built from the state before the race and the result alone', 
   );
 });
 
-function sail(state: CareerState): { state: CareerState; result: MatchResult } {
+function sail(state: CareerState): {
+  started: CareerState;
+  state: CareerState;
+  result: MatchResult;
+} {
   const started = accepted(apply(state, { type: 'StartRace', team: YOURS }));
   const result = standInResult(matchSetup(started, { hands: 'player' }));
-  return { state: record(started, result), result };
+  return { started, state: record(started, result), result };
 }
 
 const TABLE_SUM = Array.from({ length: SHIPS }, (_, i) =>
@@ -762,9 +781,6 @@ test('a ten-race season through apply alone, from three seeds', () => {
       livery: { dye: 3, pattern: 1 },
       emblem: 2,
     });
-    const contracts = new Map(
-      state.people.map((p) => [p.id, p.contract?.racesLeft ?? null])
-    );
     for (let race = 1; race <= SEASON; race++) {
       assert.equal(state.race, race);
       const before = state;
@@ -778,13 +794,13 @@ test('a ten-race season through apply alone, from three seeds', () => {
       assert.deepEqual(JSON.parse(JSON.stringify(state)), state);
       assert.equal(state.unread, true);
       if (race < SEASON) {
-        for (const person of state.people) {
-          const start = contracts.get(person.id);
+        sailed.started.people.forEach((person, i) => {
+          assert.equal(state.people[i].id, person.id);
           assert.equal(
-            person.contract?.racesLeft ?? null,
-            start === undefined || start === null ? null : start - race
+            state.people[i].contract?.racesLeft ?? null,
+            person.contract === null ? null : person.contract.racesLeft - 1
           );
-        }
+        });
         state = accepted(apply(state, { type: 'MarkRead', team: YOURS }));
         assert.equal(state.phase, 'lobby');
       }

@@ -2,7 +2,7 @@ import type { Reason } from '../commands.ts';
 import type { CareerState, Focus } from '../state.ts';
 import { updateTeam } from '../teams.ts';
 
-function sameFocus(a: Focus, b: Focus): boolean {
+export function sameFocus(a: Focus, b: Focus): boolean {
   if (a === null || b === null) return a === b;
   if ('line' in a) return 'line' in b && a.line === b.line;
   return 'gun' in b && a.gun === b.gun;

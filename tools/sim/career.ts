@@ -1,5 +1,5 @@
-import { apply, newCareer } from '../../src/career/apply.ts';
-import type { Command } from '../../src/career/commands.ts';
+import { apply, newCareer, runPolicy } from '../../src/career/apply.ts';
+import type { Command, Refusal } from '../../src/career/commands.ts';
 import { matchSetup } from '../../src/career/fit.ts';
 import { personOf } from '../../src/career/lookup.ts';
 import { stars } from '../../src/career/rules/stars.ts';
@@ -28,6 +28,7 @@ export interface CareerScenario {
   seed?: string;
   seasons?: number;
   you?: DriverStats;
+  policy?: boolean;
 }
 
 export interface CareerRun {
@@ -35,6 +36,7 @@ export interface CareerRun {
   races: number;
   standin: boolean;
   you: DriverStats;
+  policy?: boolean;
 }
 
 export const SEED = '1';
@@ -59,13 +61,31 @@ const TEAM = {
 export const startCareer = (seed: string): CareerState =>
   newCareer({ seed, ...TEAM });
 
+const where = (state: CareerState): string =>
+  `season ${state.season} ${state.phase === 'offseason' ? 'off-season stop' : `race ${state.race}`}`;
+
+function policyRefused(state: CareerState, refused: readonly Refusal[]): void {
+  if (refused.length > 0)
+    throw new Error(
+      `policy command refused at ${where(state)}: ${refused.map((r) => `${JSON.stringify(r.command)} (${r.reason})`).join('; ')}`
+    );
+}
+
 function accepted(state: CareerState, command: Command): CareerState {
   const applied = apply(state, command);
   if (!applied.ok)
     throw new Error(
-      `${command.type} refused (${applied.reason}) at season ${state.season} race ${state.race}`
+      `${command.type} refused (${applied.reason}) at ${where(state)}`
     );
+  policyRefused(state, applied.refused);
   return applied.state;
+}
+
+function yourTurn(state: CareerState, run: CareerRun): CareerState {
+  if (run.policy === false) return state;
+  const played = runPolicy(state, YOURS);
+  policyRefused(state, played.refused);
+  return played.state;
 }
 
 export function firstRace(
@@ -204,9 +224,12 @@ export function runCareer(
   let repossessions = 0;
   for (let n = 0; n < run.races; n++) {
     if (state.phase === 'offseason')
-      state = accepted(state, { type: 'FinishOffseason', team: YOURS });
+      state = accepted(yourTurn(state, run), {
+        type: 'FinishOffseason',
+        team: YOURS,
+      });
     const began = performance.now();
-    state = accepted(state, { type: 'StartRace', team: YOURS });
+    state = accepted(yourTurn(state, run), { type: 'StartRace', team: YOURS });
     const setup = matchSetup(state, { hands: run.you });
     const result = run.standin ? standInResult(setup) : sailed(setup);
     state = accepted(state, { type: 'RecordRace', team: YOURS, result });

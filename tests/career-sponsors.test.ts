@@ -1,6 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { apply, newCareer, type Applied } from '../src/career/apply.ts';
+import {
+  apply,
+  newCareer,
+  runPolicies,
+  type Applied,
+} from '../src/career/apply.ts';
 import type { Command, Reason } from '../src/career/commands.ts';
 import { matchSetup } from '../src/career/fit.ts';
 import { SPONSOR_ROSTER } from '../src/career/names.ts';
@@ -429,7 +434,7 @@ test('three offers are dealt to every team after every race, replacing the unsig
   const finished = send(state, { type: 'FinishOffseason', team: YOURS });
   assert.deepEqual(
     finished.teams.map((t) => t.offers),
-    state.teams.map((t) => t.offers)
+    runPolicies(state).state.teams.map((t) => t.offers)
   );
 });
 
@@ -504,17 +509,24 @@ test('the rivals’ starting sponsors pay for their length and then leave', () =
     t.sponsors.map((s) => (s === null ? 0 : s.racesLeft))
   );
   for (let n = 1; n <= SEASON; n++) {
-    const { after } = sail(state);
+    const { before, after } = sail(state);
     for (let team = 1; team < TEAMS; team++)
       after.teams[team].sponsors.forEach((sponsor, slot) => {
         const left = lengths[team][slot] - n;
-        if (left <= 0) assert.equal(sponsor, null);
-        else assert.equal(sponsor?.racesLeft, left);
+        const held = before.teams[team].sponsors[slot];
+        if (left > 0) {
+          assert.equal(sponsor?.racesLeft, left);
+          assert.equal(
+            sponsor?.sponsor,
+            BASE.teams[team].sponsors[slot]?.sponsor
+          );
+        } else if (left === 0 || held === null || held.racesLeft <= 1)
+          assert.equal(sponsor, null);
+        else
+          assert.deepEqual(sponsor, { ...held, racesLeft: held.racesLeft - 1 });
       });
     state = n < SEASON ? send(after, { type: 'MarkRead', team: YOURS }) : after;
   }
-  for (let team = 1; team < TEAMS; team++)
-    assert.deepEqual(state.teams[team].sponsors, [null, null, null]);
 });
 
 test('dealing and signing are deterministic and never mutate their input', () => {

@@ -45,6 +45,8 @@ export type Reason =
   | 'same'
   | 'funds';
 
+export type Refusal = { command: Command; reason: Reason };
+
 export const REASONS: readonly Reason[] = [
   'team',
   'phase',

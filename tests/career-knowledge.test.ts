@@ -1,6 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { apply, newCareer, type Applied } from '../src/career/apply.ts';
+import {
+  apply,
+  newCareer,
+  runPolicies,
+  type Applied,
+} from '../src/career/apply.ts';
 import type { Command, Reason } from '../src/career/commands.ts';
 import { draw, knowledgeYear, uniform } from '../src/career/draw.ts';
 import { matchSetup } from '../src/career/fit.ts';
@@ -23,6 +28,7 @@ import {
   redrawRepossessed,
 } from '../src/career/knowledge/ships.ts';
 import { ownerOf, personOf } from '../src/career/lookup.ts';
+import { enterPhase } from '../src/career/record/advance.ts';
 import { moneyTotal, teamMoney } from '../src/career/record/pay.ts';
 import { scoreRace } from '../src/career/record/score.ts';
 import { ask, askingWage } from '../src/career/rules/ask.ts';
@@ -130,7 +136,10 @@ function ownerId(state: CareerState, team: number): number {
 }
 
 function sail(state: CareerState): CareerState {
-  const started = send(state, { type: 'StartRace', team: YOURS });
+  return finishRace(send(state, { type: 'StartRace', team: YOURS }));
+}
+
+function finishRace(started: CareerState): CareerState {
   const raced = standInResult(matchSetup(started, { hands: 'player' }));
   const after = send(started, {
     type: 'RecordRace',
@@ -360,11 +369,12 @@ test('BuyReport is refused as the table says, in its order', () => {
 test('after each race every rival ship range narrows by keyed amounts and keeps the true level', () => {
   let state = BASE;
   for (let race = 1; race <= 3; race++) {
-    const next = sail(state);
+    const started = send(state, { type: 'StartRace', team: YOURS });
+    const next = finishRace(started);
     for (let team = 1; team < LEAGUE.teams; team++)
       for (let slot = 0; slot < 2; slot++)
         for (const line of LINES) {
-          const before = state.knowledge.lines[team][slot][line];
+          const before = started.knowledge.lines[team][slot][line];
           const after = next.knowledge.lines[team][slot][line];
           const level = next.teams[team].ships[slot].fitted[line];
           const a = draw(BASE.seed, 'narrow', 1, race, team, slot, line, 'a');
@@ -397,7 +407,10 @@ test('at the off-season stop the rival ranges are redrawn after winter for the n
     })
   );
   const next = send(state, { type: 'FinishOffseason', team: YOURS });
-  assert.deepEqual(next.knowledge.lines, state.knowledge.lines);
+  assert.deepEqual(
+    next.knowledge.lines,
+    runPolicies(state).state.knowledge.lines
+  );
 });
 
 test('a rival’s build or gun fitting redraws that one range with width 20', () => {
@@ -748,9 +761,7 @@ function play(
         steps.push({ before, after, command });
         state = after;
       }
-      const started = deepFreeze(
-        send(state, { type: 'StartRace', team: YOURS })
-      );
+      const started = deepFreeze(enterPhase(state, 'racing'));
       const money = raceMoneyOf(started);
       const raced = standInResult(matchSetup(started, { hands: 'player' }));
       const after = deepFreeze(
@@ -780,7 +791,7 @@ function play(
     const finished = deepFreeze(
       send(state, { type: 'FinishOffseason', team: YOURS })
     );
-    checked(state, finished, gone);
+    checked(runPolicies(state).state, finished, gone);
     state = finished;
   }
   return { state, steps };

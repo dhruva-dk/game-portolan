@@ -202,6 +202,7 @@ export const POLICY = {
   approachMargin: 1,
   gunPerKind: 25,
   behindWeight: 1.5,
+  aheadWeight: 1,
   sponsorBonusWeight: 0.5,
   cautious: { build: 12, share: 0.25, reserve: 6 },
   sensible: { build: 8, share: 0.4, reserve: 4 },

@@ -5,6 +5,7 @@ import {
   YOURS_ONLY,
   type Command,
   type Reason,
+  type Refusal,
 } from './commands.ts';
 import {
   build,
@@ -34,11 +35,13 @@ import { countDownContracts } from './record/contracts.ts';
 import { develop } from './record/develop.ts';
 import { countDownSponsors } from './record/sponsors.ts';
 import { publishNews } from './record/news.ts';
+import { runLeague, runTeam, type PolicyRun } from './policy/run.ts';
 import { payRace, raceMoney } from './record/pay.ts';
 import { fileReport, raceReport } from './record/report.ts';
 import { repossess } from './record/repossess.ts';
 import { scoreRace } from './record/score.ts';
 import { repaint, repaintRefusal } from './repaint.ts';
+import type { Temperament } from './rules/temperament.ts';
 import { dealOffers } from './sponsors/offers.ts';
 import { signRefusal, signSponsor } from './sponsors/sign.ts';
 import { YOURS, type CareerState } from './state.ts';
@@ -46,7 +49,7 @@ import { YOURS, type CareerState } from './state.ts';
 export { newCareer, type CareerOptions } from './start.ts';
 
 export type Applied =
-  | { ok: true; state: CareerState }
+  | { ok: true; state: CareerState; refused: Refusal[] }
   | { ok: false; reason: Reason };
 
 export function apply(state: CareerState, command: Command): Applied {
@@ -67,17 +70,37 @@ function refusal(state: CareerState, command: Command): Reason | null {
 
 const seam = (state: CareerState): CareerState => state;
 
-const runPolicies = seam;
 const raceEvents = seam;
 const seasonEvents = seam;
 
-const accepted = (state: CareerState): Applied => ({ ok: true, state });
+const accepted = (state: CareerState): Applied => ({
+  ok: true,
+  state,
+  refused: [],
+});
+
+export const runPolicy = (
+  state: CareerState,
+  team: number,
+  temperament?: Temperament
+): PolicyRun => runTeam(state, team, apply, temperament);
+
+export const runPolicies = (state: CareerState): PolicyRun =>
+  runLeague(state, apply);
+
+function afterPolicies(
+  state: CareerState,
+  then: (state: CareerState) => CareerState
+): Applied {
+  const run = runPolicies(state);
+  return { ok: true, state: then(run.state), refused: run.refused };
+}
 
 const unless = (reason: Reason | null, run: () => CareerState): Applied =>
   reason === null ? accepted(run()) : { ok: false, reason };
 
 const startRace = (state: CareerState): Applied =>
-  accepted(enterPhase(runPolicies(state), 'racing'));
+  afterPolicies(state, (ran) => enterPhase(ran, 'racing'));
 
 function recordRace(state: CareerState, result: MatchResult): Applied {
   const scored = scoreRace(state, result);
@@ -117,7 +140,9 @@ function enterOffseason(state: CareerState): CareerState {
 }
 
 const finishOffseason = (state: CareerState): Applied =>
-  accepted(enterPhase(turnSeason(releaseExpired(runPolicies(state))), 'lobby'));
+  afterPolicies(state, (ran) =>
+    enterPhase(turnSeason(releaseExpired(ran)), 'lobby')
+  );
 
 const markRead = (state: CareerState): Applied =>
   accepted({ ...state, unread: false });
@@ -197,9 +222,7 @@ function effect(state: CareerState, command: Command): Applied {
   }
 }
 
-const markSeen = (state: CareerState, id: string): Applied => ({
-  ok: true,
-  state: state.seen.includes(id)
-    ? state
-    : { ...state, seen: [...state.seen, id] },
-});
+const markSeen = (state: CareerState, id: string): Applied =>
+  accepted(
+    state.seen.includes(id) ? state : { ...state, seen: [...state.seen, id] }
+  );

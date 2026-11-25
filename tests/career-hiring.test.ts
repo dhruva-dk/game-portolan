@@ -7,6 +7,7 @@ import { matchSetup } from '../src/career/fit.ts';
 import { costToSign } from '../src/career/hiring/cost.ts';
 import { willingness } from '../src/career/hiring/willingness.ts';
 import { personOf } from '../src/career/lookup.ts';
+import { enterPhase } from '../src/career/record/advance.ts';
 import { wageBill } from '../src/career/record/pay.ts';
 import { answerTo } from '../src/career/rules/answer.ts';
 import { ask } from '../src/career/rules/ask.ts';
@@ -116,7 +117,7 @@ function holderId(state: CareerState, team: number, role: Role): number {
 }
 
 function sail(state: CareerState): CareerState {
-  const started = send(state, { type: 'StartRace', team: YOURS });
+  const started = enterPhase(state, 'racing');
   const raced = standInResult(matchSetup(started, { hands: 'player' }));
   const after = send(started, {
     type: 'RecordRace',

@@ -64,6 +64,7 @@ export async function runCareerScenario(
     races: racesOf(seasons),
     standin: flags.standin,
     you: sc.you ?? YOU,
+    policy: sc.policy ?? true,
   }));
   const workers = flags.standin ? 0 : Math.min(flags.workers, runs.length);
   const dir = outDir(flags.subject, {
