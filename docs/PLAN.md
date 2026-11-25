@@ -656,12 +656,15 @@ Shown when no career is saved, and when opened from Settings in the lobby.
 | The game's name | "Portolan", as a title |
 | Name | The word and a text field for the team name, 1 to 16 characters; prefilled with a team name from the list (§1.13.3) |
 | Seed | The word and a text field, 1 to 24 characters; beside it a round die button that fills in a random word (`rolled` in `world/seeds.ts`). Prefilled the same way |
-| Livery | A row of 16 dye swatches, a row of 3 pattern swatches and a row of 12 emblems (§1.13.4). One of each is always selected; the first of each at the start |
+| Livery | 16 dye swatches in two rows of 8, a row of 3 pattern swatches and 12 emblems in two rows of 6 (§1.13.4), every swatch at least 44 points across. One of each is always selected; the first of each at the start. The pattern and emblem swatches are drawn in the selected dye |
 | Start | Ribbon button; faint until Name and Seed are non-empty |
 | Close | Round button at the sheet's corner, only when a career exists; returns to Settings |
 
 - **Start** creates the career with `newCareer` (§2.2.3), sends `StartRace`, saves and reloads the page; the match for race one then begins (§2.9.3). The lobby is not shown first.
 - If a career already exists, Start is a two-tap button (§1.12.0 item 7).
+- The ship stays gray until a dye swatch is tapped, the already selected one included; picking a pattern or an emblem first leaves it gray. It then repaints as each choice is made.
+- The die tumbles, then the seed word types itself into the field.
+- The Name and Seed fields sit in the upper 40% of the sheet so that the iPad keyboard does not cover them, and the layout does not move while a field has focus.
 
 ### 1.12.2 Lobby
 
@@ -712,7 +715,7 @@ The home screen whenever a career exists, no race is under way and no flow is sh
 - Between items 2 and 3, a **kinds row** of five gun-kind glyphs. Unlocked kinds are inked. Locked kinds are faint with their unlock progress beneath as "12/20". Tapping a locked kind makes its unlocking the focus (tapping the one being unlocked clears the focus). The kind being unlocked carries the designer's small portrait. Tapping an unlocked kind does nothing.
 - In each ship row, before the Build button, a **fit row** of the unlocked kinds as small glyphs with the ship's fitted kind ringed. Tapping another kind selects it for that row: the Build button then shows the `FitGun` cost and sends `FitGun` for that kind. Tapping the fitted kind returns the button to Build.
 
-**Paint picker.** A sheet in the left third: the three rows of §1.12.1's Livery element, with liveries worn by other teams drawn faint. The ship in the scene shows the selection as it changes. A ribbon button shows a coin glyph and 1,000; it is faint when nothing has changed or the balance is short. Tap sends `Repaint` and closes the picker. The picker's close button discards the selection.
+**Paint picker.** A sheet in the left third: §1.12.1's Livery element, with liveries worn by other teams drawn faint. The ship in the scene shows the selection as it changes. A ribbon button shows a coin glyph and 1,000; it is faint when nothing has changed or the balance is short. Tap sends `Repaint` and closes the picker. The picker's close button discards the selection.
 
 ### 1.12.4 Team
 
@@ -779,7 +782,7 @@ A sheet over the Team sheet, the same size, replacing the deal sheet while open.
 | Fee | The word, a stepper in steps of 100 |
 | Clause | The word, a stepper in steps of 500 |
 | Cost | Coin glyph and the cost to sign now (§1.6.6); an arrow; the balance after. Red when the signing would be refused for funds |
-| Willingness bar | §1.6.5: a bar with marks at 0.85 and 1, filled to the score, or a band for a range. It follows the steppers as they change |
+| Willingness bar | §1.6.5: a bar with marks at 0.85 and 1, filled to the score, or a band for a range. It follows the steppers as they change. Over the mark at 0.85 sits a small counter mark and over the mark at 1 a small tick, so each says what it is for |
 | Attempts | Three pips; a used attempt is a cross |
 | Answer | Empty at first. Then the last answer: a large tick (signed), a large cross (refused), or a counter mark with their wage numeral and a round tick button that sends `AcceptCounter` |
 | Offer | Round button with the word; sends `Offer`. Faint when the signing would be refused for funds or all three attempts are used |
@@ -790,6 +793,9 @@ Holding a stepper's button repeats it, faster the longer it is held. The stepper
 - The large cross of a refusal is red.
 - A held stepper button moves in larger steps the longer it is held: 5 steps at a time, then 25.
 - The card in this sheet cannot be enlarged.
+- A signing also presses a red seal with a tick onto the person's card; the card gives under it and ink spreads from it. All of it ends inside the one second.
+- Accepting a counter ticks the Wage numeral to the countered wage before the signing lands.
+- Reopening the sheet on a talk that has already ended in a signing shows an empty answer corner.
 
 ### 1.12.7 Sponsors
 
@@ -1383,7 +1389,9 @@ All UI is DOM elements placed over the canvas and filled with inline SVG produce
 | `lexicon.ts` | The glyph and word of every stat and role, and the smallest size each glyph may be drawn at |
 | `button.ts` | The round button, the ribbon, the close button, the red dot, press feedback, and the two-tap button (§1.12.0 item 7) |
 | `sheet.ts` | A paper panel (built from `sheet` in today's `screens.ts`), with a round close button of its own only where no screen's close button exists: a sheet opened over a flow (§1.12.0 item 6) |
-| `field.ts` | A text field on a slip (taken from today's seed field in `panel.ts`) |
+| `field.ts` | A text field on a slip (taken from today's seed field in `panel.ts`); it can type a word into itself |
+| `livery.ts` | The Livery element of §1.12.1: the dye, pattern and emblem swatches with their marks, shared by New Career and the paint picker. It can draw any swatch faint; a faint swatch can still be tapped, and the screen decides what a tap on it does |
+| `grouped.ts` | `grouped`: a whole number with grouped thousands and a true minus sign (U+2212). Every numeral on a screen goes through it |
 | `stepper.ts` | Minus button, numeral slip, plus button, with hold-to-repeat |
 | `picker.ts` | A row of mutually exclusive choices |
 | `slider.ts`, `switch.ts` | For Settings (built from today's settings controls in `screens.ts`) |
@@ -1405,7 +1413,7 @@ All UI is DOM elements placed over the canvas and filled with inline SVG produce
 4. A screen may keep local state that no rule depends on: which card is enlarged, the terms being edited, a lifted sponsor offer, scroll position, the page of a flow.
 5. `career/commands.ts` defines `Command` and `Reason` and re-exports the state types that commands and views are written in (`Role`, `Line`, `Terms`, `Focus`, `GunKind`, `Livery`). Screens import career types from it and from `career/views/` and from nowhere else in `career/`.
 
-   View functions: `newCareerView` (the one view that takes no career state: the prefilled team name, which is the first name in the team list, and the dyes, patterns and emblems to choose from), `lobbyView` (which also carries the career seed for the settings sheet), `shipView`, `paintView`, `teamView`, `dealView`, `negotiationView` (takes the terms being edited and returns the willingness and cost), `sponsorsView`, `opponentsView`, `teamSheetView`, `planetView`, `resultView`, `offseasonView`, `paperView`.
+   View functions: `newCareerView` (the one view that takes no career state: it takes the form being edited, the rolled seed and whether a career exists, and returns the prefilled team name, which is the first name in the team list, the dyes, patterns and emblems to choose from, the livery the ship wears, and Start's faint and two-tap flags), `lobbyView` (which also carries the career seed for the settings sheet), `shipView`, `paintView`, `teamView`, `dealView`, `negotiationView` (takes the terms being edited and returns the willingness and cost), `sponsorsView`, `opponentsView`, `teamSheetView`, `planetView`, `resultView`, `offseasonView`, `paperView`.
 6. **The port** is defined in `ui/lobby/port.ts` and implemented in `app/`:
 
 ```ts
@@ -1568,7 +1576,15 @@ All spacing is a multiple of `STEP`, 4 units.
 | `bar` | 160 ms | A bar following the value it shows |
 | `suspense` | 520 ms | The wait between an offer and its answer |
 | `signed` | 1,000 ms hold | A signing staying on screen before the sheet leaves |
+| `seal` | Starts 140 ms after the answer and takes 300 ms, from 2.4 scale and turned 26°, coming to rest turned 9° | The seal of a signing pressed onto the card |
+| `blow` | Starts at 330 ms and takes 300 ms, to 0.955 scale and 2 points down | The card giving under the seal |
+| `flourish` | Starts at 330 ms and takes 480 ms, from 0.55 to 1.65 scale | Ink spreading from the seal |
 | `seated` | 420 ms, dropping 22 points, with a slight overshoot | A newly signed card landing in its seat |
+| `answer` | 260 ms, swelling to 1.16 scale, with a slight overshoot | A swatch answering the tap that picked it |
+| `roll` | 520 ms, hopping 9 points and turning 400°; the word lands at 300 ms and types in at 34 ms a letter | The die and the seed it rolls |
+| `repaint` | 700 ms, through a midpoint lifted 0.22 toward paper | The ship in the scene changing livery |
+| `wake` | 360 ms, swelling to 1.08 scale, with a slight overshoot | A button coming out of faint |
+| `title` | Starts 90 ms after the sheet; the rose 720 ms, the rhumb lines 900 ms, the word 560 ms, the rule 460 ms | The game's name inking in on New Career |
 | `fade` | 180 ms | Anything else that appears or goes |
 
 Rules:
@@ -1676,7 +1692,7 @@ Your team is played by the policy as a sensible team (§1.10.2). Until the polic
 
 ### 2.8.3 Debug states
 
-`app/debug.ts` reads `?debug` switches (used by `npm run browser`). `?debug&screen=<name>&seed=<s>&races=<n>` builds a career from the seed, advances it `n` races with the stand-in and the policy for every team including yours (§1.10.2), and opens that screen. The names are `new`, `lobby`, `ship`, `paint`, `team`, `deal`, `negotiation`, `sponsors`, `opponents`, `planet`, `settings`, `result`, `paper`, `offseason`, `glyphs` (the glyph sheet of §2.5.4, which needs no career). There are no hand-written fixture states. Three more switches change the state built: `balance=<n>` sets your balance to `n` after the career is advanced (no seed reaches debt by itself, and the red money slip needs a state to be drawn on); `signed`, at the off-season stop, finishes the stop so the lobby of the next season shows; `meter` shows the frame meter over a screen; `approach=<roles>` (a comma-separated list) sends `Approach` for a candidate of each named role before the last race, so that several deals are waiting at once. The `deal` and `negotiation` screens also read `role=<role>` (whose deal to open; the scouted role if left out). `negotiation` reads four more: `pick=<n>` (which candidate of the deal, from 0), `report` (buy a report on them first), `renew` (negotiate with the holder of the seat instead of a candidate), and `offers=<answers>` (a comma-separated list of `refuse`, `counter` and `sign`: offers are sent, in order, that get those answers). These states are reached by sending real commands, never by writing the state.
+`app/debug.ts` reads `?debug` switches (used by `npm run browser`). `?debug&screen=<name>&seed=<s>&races=<n>` builds a career from the seed, advances it `n` races with the stand-in and the policy for every team including yours (§1.10.2), and opens that screen. The names are `new`, `lobby`, `ship`, `paint`, `team`, `deal`, `negotiation`, `sponsors`, `opponents`, `planet`, `settings`, `result`, `paper`, `offseason`, `glyphs` (the glyph sheet of §2.5.4, which needs no career). There are no hand-written fixture states. Three more switches change the state built: `balance=<n>` sets your balance to `n` after the career is advanced (no seed reaches debt by itself, and the red money slip needs a state to be drawn on); `signed`, at the off-season stop, finishes the stop so the lobby of the next season shows; `meter` shows the frame meter over a screen; `approach=<roles>` (a comma-separated list) sends `Approach` for a candidate of each named role before the last race, so that several deals are waiting at once. The `deal` and `negotiation` screens also read `role=<role>` (whose deal to open; the scouted role if left out). `negotiation` reads four more: `pick=<n>` (which candidate of the deal, from 0), `report` (buy a report on them first), `renew` (negotiate with the holder of the seat instead of a candidate), and `offers=<answers>` (a comma-separated list of `refuse`, `counter` and `sign`: offers are sent, in order, that get those answers; the helper searches for terms that really get each answer and fails, naming the person, when none do). These states are reached by sending real commands, never by writing the state. `screen=new` shows New Career with no career unless `seed=` is given, and with one when it is; `name=`, `dye=`, `pattern=` and `emblem=` then set that career's team name and livery.
 
 `npm run browser` (headless Chromium, iPad Air size) takes screenshots and reads frame cost. It is never part of `npm test`. Its existing budget stands: 100 draws, 900,000 triangles and 20 passes a frame.
 
@@ -1804,7 +1820,7 @@ Goal: every screen of §1.12 exists and can be opened on a debug state.
 - [x] **M5.3 Portraits.** Jacket color and six sunglasses styles from the portrait seed; Uncle's fixed portrait (§1.5.9).
 - [ ] **M5.4 Views.** Every view function and its test (§2.5.3).
 - [ ] **M5.5 The port and the debug screens.** `ui/lobby/port.ts`, its implementation in `app/` with the screen stack of §1.12.0, and `?debug&screen=` (§2.8.3); update the screen list in `tools/browser.ts`.
-- [ ] **M5.6 New Career.** §1.12.1.
+- [x] **M5.6 New Career.** §1.12.1. Start builds the career with `newCareer` and sends `StartRace` through the port; saving, the reload and showing New Career at launch are step M6.1 (under `?debug` Start reloads into the new career's lobby).
 - [ ] **M5.7 Lobby.** §1.12.2, including the two-ship anchorage scene and the orbit drag.
 - [ ] **M5.8 Ship.** §1.12.3, including the seventh camera stop and the paint picker.
 - [x] **M5.9 Team.** §1.12.4.
@@ -1824,7 +1840,7 @@ Goal: every screen of §1.12 exists and can be opened on a debug state.
 
 Goal: the game is played from first launch through seasons by hand.
 
-- [ ] **M6.1 The flow.** §2.9: launch from the saved state, New Career, SAIL, `RecordRace`, the save queue and the reload. Team liveries now come from the career.
+- [ ] **M6.1 The flow.** §2.9: launch from the saved state, New Career, SAIL, `RecordRace`, the save queue and the reload. Team liveries now come from the career. For New Career this step saves the state `port.start` hands over, waits for the save, reloads so that launch case 3 starts race one, shows New Career at launch when no career is saved, and routes its close button to Settings.
 - [ ] **M6.2 After sinking.** Watch, and the Result fast-forward (§1.11.11).
 - [ ] **M6.3 Fire drag.** A drag that starts on Fire moves the aim (§1.12.14).
 - [ ] **M6.4 Uncle's bubbles** and the lobby buttons appearing in step (§1.13.2).
