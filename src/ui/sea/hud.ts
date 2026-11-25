@@ -78,14 +78,20 @@ export function createHud(layer: HTMLElement, shores: Shores, act: HudActions) {
   const readings = piece(body, 'top center', false, true);
   const map = piece(body, 'top right', true, true);
   const thumb = piece(body, 'right bottom', false, true);
-  const corner = (c: Corner) =>
-    `right:${c.right}px;bottom:${c.bottom}px;width:${c.width}px;height:${c.height}px`;
+  const corner = (c: Corner, left: boolean) =>
+    `${left ? 'left' : 'right'}:${c.right}px;bottom:${c.bottom}px;width:${c.width}px;height:${c.height}px`;
   thumb.style.width = `${THUMB.width}px`;
   thumb.style.height = `${THUMB.height}px`;
   const gust = piece(thumb, '', true);
-  gust.style.cssText = corner(THUMB.gust);
   const fire = piece(thumb, '', true);
-  fire.style.cssText = corner(THUMB.fire);
+  const hand = (left: boolean) => {
+    thumb.classList.toggle('left', left);
+    thumb.classList.toggle('right', !left);
+    thumb.style.transformOrigin = `${left ? '0' : '100%'} 100%`;
+    gust.style.cssText = corner(THUMB.gust, left);
+    fire.style.cssText = corner(THUMB.fire, left);
+  };
+  hand(false);
   const reticle = piece(body, 'mark');
   reticle.style.cssText = 'left:50%;top:50%';
   const fall = piece(body, 'mark');
@@ -130,6 +136,7 @@ export function createHud(layer: HTMLElement, shores: Shores, act: HudActions) {
 
   return {
     root,
+    hand,
     watch(on: boolean) {
       watching = on;
       for (const el of aboard) show(el, !on);

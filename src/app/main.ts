@@ -141,7 +141,12 @@ async function play(s: Stage): Promise<Played> {
   const game = createGame(s.world, s.anchors, waters, s.start, RACE_SHIP);
   const referee = createReferee(game);
 
-  const input = createInput(s.canvas, () => game.steering());
+  let kept: { leftHanded: boolean; sensitivity: number } | null = null;
+  const input = createInput(
+    s.canvas,
+    () => game.steering(),
+    () => kept ?? { leftHanded: false, sensitivity: 1 }
+  );
   const layer = uiLayer();
   const stick = createStick(layer);
   const shores = shoresOf(
@@ -192,6 +197,8 @@ async function play(s: Stage): Promise<Played> {
     },
     title
   );
+  kept = flow.settings;
+  let left: boolean | null = null;
   onPressed(layer, () => audio.tap(flow.screen));
   void s.ready.then(() => {
     flow.ready();
@@ -228,6 +235,8 @@ async function play(s: Stage): Promise<Played> {
       hearing.map = globe.open;
       hearing.covered = flow.covered;
       audio.update(hearing, flow.settings.sound, dt);
+      kept = flow.settings;
+      if (kept.leftHanded !== left) hud.hand((left = kept.leftHanded));
       if (flow.settings.stats !== stats) s.stats((stats = flow.settings.stats));
       scene.eye = globe.step(dt, scene.storm) ?? scene.eye;
       return scene;
