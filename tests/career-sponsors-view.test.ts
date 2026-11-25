@@ -19,8 +19,9 @@ const offer = (
   sponsor: number,
   objective: Sponsor['objective'],
   fee = 120,
-  racesLeft = 7
-): Sponsor => ({ sponsor, fee, bonus: 2 * fee, objective, racesLeft });
+  racesLeft = 7,
+  target: number | null = objective === 'bothAfloat' ? null : 3
+): Sponsor => ({ sponsor, fee, bonus: 2 * fee, objective, target, racesLeft });
 
 const signed = (state: CareerState, offerAt: number, slot: number) => {
   const done = apply(state, {
@@ -57,13 +58,13 @@ test('offers dealt after a race carry the roster name, emblem and terms', () => 
   });
 });
 
-test('each objective carries its figure', () => {
+test('each objective carries its own figure, the one it was dealt with', () => {
   const state = yours(DEALT, (t) => ({
     ...t,
     offers: [
-      offer(3, 'top10'),
-      offer(4, 'sinkTwo'),
-      offer(5, 'sea'),
+      offer(3, 'place', 120, 7, 37),
+      offer(4, 'sinkings', 120, 7, 3),
+      offer(5, 'sea', 120, 7, 2),
       offer(6, 'bothAfloat'),
     ],
   }));
@@ -73,11 +74,17 @@ test('each objective carries its figure', () => {
     card.percent,
   ]);
   assert.deepEqual(figures, [
-    ['top10', 10, false],
-    ['sinkTwo', 2, false],
-    ['sea', 3, true],
+    ['place', 37, false],
+    ['sinkings', 3, false],
+    ['sea', 2, true],
     ['bothAfloat', null, false],
   ]);
+  for (const card of sponsorsView(DEALT).offers) {
+    const held = DEALT.teams[YOURS].offers.find(
+      (o) => o.sponsor === card.sponsor
+    );
+    assert.equal(card.figure, held?.target);
+  }
 });
 
 test('signing fills the slot and leaves the other offers', () => {
@@ -96,7 +103,7 @@ test('with every slot filled the offers wait but cannot be signed', () => {
   const full = signed(signed(signed(DEALT, 0, 0), 0, 1), 0, 2);
   const refreshed = yours(full, (t) => ({
     ...t,
-    offers: [offer(40, 'sea'), offer(41, 'top10')],
+    offers: [offer(40, 'sea'), offer(41, 'place')],
   }));
   const view = sponsorsView(refreshed);
   assert.deepEqual(view.open, []);
@@ -115,7 +122,7 @@ test('with every slot filled the offers wait but cannot be signed', () => {
 test('a slot counts its races down and empties at the end', () => {
   const state = yours(DEALT, (t) => ({
     ...t,
-    sponsors: [offer(9, 'sea', 200, 1), null, offer(11, 'top10', 90, 10)],
+    sponsors: [offer(9, 'sea', 200, 1), null, offer(11, 'place', 90, 10)],
   }));
   const view = sponsorsView(state);
   assert.equal(view.slots[0]?.racesLeft, 1);

@@ -151,18 +151,10 @@ export const REPOSSESSION = { below: -10000, balance: 1500 };
 export const SPONSORS = {
   slots: 3,
   offers: 3,
-  base: 100,
-  top: 1400,
-  from: 40,
-  span: 39,
-  power: 1.5,
-  factor: { lo: 0.8, hi: 1.2 },
+  wealth: { lo: 0.8, hi: 1.2 },
   step: 10,
   bonus: 2,
   races: { lo: 5, hi: 10 },
-  topPlaces: 10,
-  sinkings: 2,
-  seaShare: 0.03,
 };
 
 export const REPAINT = { cost: 1000 };

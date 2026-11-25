@@ -251,7 +251,8 @@ test('the Sponsors dot: an empty slot and an offer waiting', () => {
     sponsor: 1,
     fee: 100,
     bonus: 200,
-    objective: 'top10',
+    objective: 'place',
+    target: 10,
     racesLeft: 5,
   } as const;
   const open = mine(seen, (t) => ({

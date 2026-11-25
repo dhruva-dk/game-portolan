@@ -12,11 +12,12 @@ import { SPONSOR_ROSTER } from '../src/career/names.ts';
 import { moneyTotal, teamMoney } from '../src/career/record/pay.ts';
 import {
   objectiveMet,
+  objectiveTarget,
   sponsorBonus,
   sponsorFee,
 } from '../src/career/rules/money.ts';
 import { reputations } from '../src/career/rules/standing.ts';
-import { drawOffers } from '../src/career/sponsors.ts';
+import { drawOffers, sponsorWealth } from '../src/career/sponsors.ts';
 import { standInResult } from '../src/career/standin.ts';
 import {
   OBJECTIVES,
@@ -25,7 +26,7 @@ import {
   type Sponsor,
   type Team,
 } from '../src/career/state.ts';
-import { LEAGUE } from '../src/career/tuning.ts';
+import { LEAGUE, SPONSORS } from '../src/career/tuning.ts';
 import type { MatchResult, ShipResult } from '../src/sim/result.ts';
 
 const YOURS = 0;
@@ -86,17 +87,32 @@ function refusedUntouched(
   assert.deepEqual(state, before);
 }
 
+const TARGETS: Record<Objective, number | null> = {
+  place: 10,
+  sinkings: 2,
+  sea: 3,
+  bothAfloat: null,
+};
+
 const offer = (
   sponsor: number,
   objective: Objective,
   fee: number,
   racesLeft: number
-): Sponsor => ({ sponsor, fee, bonus: 2 * fee, objective, racesLeft });
+): Sponsor => ({
+  sponsor,
+  fee,
+  bonus: 2 * fee,
+  objective,
+  target: TARGETS[objective],
+  racesLeft,
+});
 
 const signedSponsors = (team: Team): Sponsor[] =>
   team.sponsors.filter((sponsor) => sponsor !== null);
 
 function checkOffers(
+  seed: string,
   team: Team,
   offers: readonly Sponsor[],
   reputation: number
@@ -111,9 +127,12 @@ function checkOffers(
       !signedSponsors(team).some((s) => s.sponsor === o.sponsor),
       'not already signed'
     );
-    assert.ok(o.fee >= sponsorFee(reputation, 0.8), `${o.fee} low`);
-    assert.ok(o.fee <= sponsorFee(reputation, 1.2), `${o.fee} high`);
+    const { lo, hi } = SPONSORS.wealth;
+    assert.ok(o.fee >= sponsorFee(reputation, lo), `${o.fee} low`);
+    assert.ok(o.fee <= sponsorFee(reputation, hi), `${o.fee} high`);
+    assert.equal(o.fee, sponsorFee(reputation, sponsorWealth(seed, o.sponsor)));
     assert.equal(o.fee % 10, 0);
+    assert.equal(o.target, objectiveTarget(o.objective, reputation));
     assert.equal(o.bonus, 2 * o.fee);
     assert.ok(OBJECTIVES.includes(o.objective));
     assert.ok(Number.isInteger(o.racesLeft));
@@ -122,16 +141,15 @@ function checkOffers(
 }
 
 test('the sponsor fee of §1.8.5 at hand-worked points', () => {
-  assert.equal(sponsorFee(40, 1), 100);
-  assert.equal(sponsorFee(40, 0.8), 80);
-  assert.equal(sponsorFee(40, 1.2), 120);
-  assert.equal(sponsorFee(40, 0.83), 80);
-  assert.equal(sponsorFee(40, 0.86), 90);
-  assert.equal(sponsorFee(1, 1), 1500);
-  assert.equal(sponsorFee(1, 0.8), 1200);
-  assert.equal(sponsorFee(1, 1.2), 1800);
-  assert.equal(sponsorFee(30.25, 1), 280);
-  assert.equal(sponsorFee(30.25, 1.2), 330);
+  assert.equal(sponsorFee(40, 1), 50);
+  assert.equal(sponsorFee(40, 0.8), 40);
+  assert.equal(sponsorFee(40, 1.2), 60);
+  assert.equal(sponsorFee(1, 1), 800);
+  assert.equal(sponsorFee(1, 0.8), 640);
+  assert.equal(sponsorFee(1, 1.2), 960);
+  assert.equal(sponsorFee(10, 1), 490);
+  assert.equal(sponsorFee(30.25, 1), 100);
+  assert.equal(sponsorFee(30.25, 1.2), 120);
   assert.equal(sponsorBonus(100), 200);
   assert.equal(sponsorBonus(1500), 3000);
   for (let r = 1; r < 40; r++)
@@ -157,49 +175,109 @@ const ship = (
 const flat = (share: number): number[] =>
   Array.from({ length: 7 }, () => share);
 
+const goal = (objective: Objective, target: number | null = null) => ({
+  objective,
+  target,
+});
+
 test('each objective is met exactly as the table of §1.8.5 says', () => {
   const sea = flat(0);
+  const place = goal('place', 10);
   assert.equal(
-    objectiveMet('top10', [ship(10, 0, false), ship(80, 0, false)], sea),
+    objectiveMet(place, [ship(10, 0, false), ship(80, 0, false)], sea),
     true
   );
   assert.equal(
-    objectiveMet('top10', [ship(40, 0, false), ship(1, 0, false)], sea),
+    objectiveMet(place, [ship(40, 0, false), ship(1, 0, false)], sea),
     true
   );
   assert.equal(
-    objectiveMet('top10', [ship(11, 0, true), ship(12, 0, true)], sea),
+    objectiveMet(place, [ship(11, 0, true), ship(12, 0, true)], sea),
     false
   );
+  const deep = goal('place', 37);
   assert.equal(
-    objectiveMet('sinkTwo', [ship(50, 1, false), ship(60, 1, false)], sea),
+    objectiveMet(deep, [ship(37, 0, false), ship(80, 0, false)], sea),
     true
   );
   assert.equal(
-    objectiveMet('sinkTwo', [ship(50, 2, false), ship(60, 0, false)], sea),
+    objectiveMet(deep, [ship(38, 0, false), ship(79, 0, false)], sea),
+    false
+  );
+  const sinkings = goal('sinkings', 2);
+  assert.equal(
+    objectiveMet(sinkings, [ship(50, 1, false), ship(60, 1, false)], sea),
     true
   );
   assert.equal(
-    objectiveMet('sinkTwo', [ship(1, 1, true), ship(2, 0, true)], sea),
+    objectiveMet(sinkings, [ship(50, 2, false), ship(60, 0, false)], sea),
+    true
+  );
+  assert.equal(
+    objectiveMet(sinkings, [ship(1, 1, true), ship(2, 0, true)], sea),
+    false
+  );
+  const three = goal('sinkings', 3);
+  assert.equal(
+    objectiveMet(three, [ship(50, 2, false), ship(60, 1, false)], sea),
+    true
+  );
+  assert.equal(
+    objectiveMet(three, [ship(50, 2, false), ship(60, 0, false)], sea),
     false
   );
   const two = [ship(50, 0, false), ship(60, 0, false)];
-  assert.equal(objectiveMet('sea', two, flat(0.03)), true);
-  assert.equal(objectiveMet('sea', two, [0, 0, 0, 0, 0, 0, 0.21]), true);
-  assert.equal(objectiveMet('sea', two, flat(0.029)), false);
-  assert.equal(objectiveMet('sea', two, [0, 0, 0, 0, 0, 0, 0.2]), false);
+  const held = goal('sea', 3);
+  assert.equal(objectiveMet(held, two, flat(0.03)), true);
+  assert.equal(objectiveMet(held, two, [0, 0, 0, 0, 0, 0, 0.21]), true);
+  assert.equal(objectiveMet(held, two, flat(0.029)), false);
+  assert.equal(objectiveMet(held, two, [0, 0, 0, 0, 0, 0, 0.2]), false);
+  assert.equal(objectiveMet(goal('sea', 2), two, flat(0.02)), true);
+  assert.equal(objectiveMet(goal('sea', 2), two, flat(0.019)), false);
+  const afloat = goal('bothAfloat');
   assert.equal(
-    objectiveMet('bothAfloat', [ship(70, 0, true), ship(80, 0, true)], sea),
+    objectiveMet(afloat, [ship(70, 0, true), ship(80, 0, true)], sea),
     true
   );
   assert.equal(
-    objectiveMet('bothAfloat', [ship(1, 5, true), ship(2, 5, false)], sea),
+    objectiveMet(afloat, [ship(1, 5, true), ship(2, 5, false)], sea),
     false
   );
   assert.equal(
-    objectiveMet('bothAfloat', [ship(1, 0, false), ship(2, 0, true)], sea),
+    objectiveMet(afloat, [ship(1, 0, false), ship(2, 0, true)], sea),
     false
   );
+});
+
+test('an objective’s figure follows the reputation it is dealt at', () => {
+  const at = (r: number) =>
+    OBJECTIVES.map((objective) => objectiveTarget(objective, r));
+  assert.deepEqual(at(1), [1, 4, 5, null]);
+  assert.deepEqual(at(1.3), [2, 4, 5, null]);
+  assert.deepEqual(at(10), [19, 3, 4, null]);
+  assert.deepEqual(at(19), [37, 2, 3, null]);
+  assert.deepEqual(at(30), [59, 1, 1, null]);
+  assert.deepEqual(at(40), [79, 1, 1, null]);
+  for (let r = 1; r < TEAMS; r++)
+    for (const objective of OBJECTIVES) {
+      const here = objectiveTarget(objective, r);
+      const below = objectiveTarget(objective, r + 1);
+      if (here === null || below === null) continue;
+      if (objective === 'place') assert.ok(here < below);
+      else assert.ok(here >= below && below >= 1);
+    }
+});
+
+test('a sponsor’s wealth is the same for the whole career, and differs between sponsors', () => {
+  const { lo, hi } = SPONSORS.wealth;
+  const wealths = SPONSOR_ROSTER.map((_, sponsor) => {
+    const wealth = sponsorWealth('pennant', sponsor);
+    assert.equal(wealth, sponsorWealth('pennant', sponsor));
+    assert.ok(wealth >= lo && wealth <= hi);
+    return wealth;
+  });
+  assert.ok(new Set(wealths).size > 1);
+  assert.notEqual(sponsorWealth('pennant', 0), sponsorWealth('gullet', 0));
 });
 
 test('newCareer gives each rival three sponsors dealt as offers for a reputation of its index', () => {
@@ -211,7 +289,12 @@ test('newCareer gives each rival three sponsors dealt as offers for a reputation
       const team = state.teams[index];
       const sponsors = signedSponsors(team);
       assert.equal(sponsors.length, 3);
-      checkOffers({ ...team, sponsors: [null, null, null] }, sponsors, index);
+      checkOffers(
+        seed,
+        { ...team, sponsors: [null, null, null] },
+        sponsors,
+        index
+      );
       assert.deepEqual(
         sponsors,
         drawOffers({
@@ -277,7 +360,7 @@ function race(state: CareerState, raced: MatchResult): CareerState {
 test('SignSponsor puts an offer in an empty slot at no cost and keeps the other offers', () => {
   for (const phase of ['lobby', 'offseason'] as const) {
     const offers = [
-      offer(3, 'top10', 400, 6),
+      offer(3, 'place', 400, 6),
       offer(8, 'sea', 500, 5),
       offer(13, 'bothAfloat', 600, 10),
     ];
@@ -314,7 +397,7 @@ test('SignSponsor puts an offer in an empty slot at no cost and keeps the other 
 });
 
 test('SignSponsor is refused into a filled slot, for no such offer, a bad field and in a race', () => {
-  const offers = [offer(3, 'top10', 400, 6), offer(8, 'sea', 500, 5)];
+  const offers = [offer(3, 'place', 400, 6), offer(8, 'sea', 500, 5)];
   const state = send(withOffers(BASE, offers), {
     type: 'SignSponsor',
     team: YOURS,
@@ -344,10 +427,10 @@ test('SignSponsor is refused into a filled slot, for no such offer, a bad field 
 
 test('a sponsor pays its fee every race and its bonus only when the objective is met', () => {
   const cases: [Objective, ShipResult[], number[], boolean][] = [
-    ['top10', [ship(9, 0, false), ship(70, 0, false)], flat(0), true],
-    ['top10', [ship(11, 0, true), ship(70, 0, true)], flat(0.5), false],
-    ['sinkTwo', [ship(30, 1, false), ship(31, 1, false)], flat(0), true],
-    ['sinkTwo', [ship(1, 1, true), ship(31, 0, false)], flat(0), false],
+    ['place', [ship(9, 0, false), ship(70, 0, false)], flat(0), true],
+    ['place', [ship(11, 0, true), ship(70, 0, true)], flat(0.5), false],
+    ['sinkings', [ship(30, 1, false), ship(31, 1, false)], flat(0), true],
+    ['sinkings', [ship(1, 1, true), ship(31, 0, false)], flat(0), false],
     ['sea', [ship(60, 0, false), ship(61, 0, false)], flat(0.04), true],
     ['sea', [ship(1, 3, true), ship(2, 3, true)], flat(0.02), false],
     ['bothAfloat', [ship(30, 0, true), ship(40, 0, true)], flat(0), true],
@@ -377,7 +460,7 @@ test('a sponsor pays its fee every race and its bonus only when the objective is
 });
 
 test('a sponsor counts down after each race and its slot empties at 0', () => {
-  const offers = [offer(1, 'top10', 300, 2), offer(2, 'sea', 200, 1)];
+  const offers = [offer(1, 'place', 300, 2), offer(2, 'sea', 200, 1)];
   let state = withOffers(BASE, offers);
   state = send(state, { type: 'SignSponsor', team: YOURS, offer: 0, slot: 0 });
   state = send(state, { type: 'SignSponsor', team: YOURS, offer: 0, slot: 2 });
@@ -403,7 +486,7 @@ test('a sponsor counts down after each race and its slot empties at 0', () => {
 });
 
 test('three offers are dealt to every team after every race, replacing the unsigned ones', () => {
-  let state = withOffers(BASE, [offer(59, 'top10', 100, 5)]);
+  let state = withOffers(BASE, [offer(59, 'place', 100, 5)]);
   state = send(state, { type: 'SignSponsor', team: YOURS, offer: 0, slot: 0 });
   state = withOffers(state, [offer(58, 'sea', 100, 5)]);
   for (let n = 1; n <= SEASON; n++) {
@@ -417,7 +500,7 @@ test('three offers are dealt to every team after every race, replacing the unsig
     const reputation = reputations(next);
     for (let team = 0; team < TEAMS; team++) {
       const t = next.teams[team];
-      checkOffers(t, t.offers, reputation[team]);
+      checkOffers(BASE.seed, t, t.offers, reputation[team]);
       assert.deepEqual(
         t.offers,
         drawOffers({
@@ -463,7 +546,7 @@ test('over a season every team’s money changes by exactly its rows, sponsors i
     let state = careerOf(seed);
     state = changeTeam(state, YOURS, (t) => ({
       ...t,
-      offers: [offer(40, 'sea', 900, 10), offer(41, 'top10', 900, 10)],
+      offers: [offer(40, 'sea', 900, 10), offer(41, 'place', 900, 10)],
     }));
     state = send(state, {
       type: 'SignSponsor',

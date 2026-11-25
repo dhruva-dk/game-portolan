@@ -22,7 +22,7 @@ const sponsorRows = (
 ): SponsorRow[] =>
   signed(state.teams[team].sponsors).map((sponsor) => {
     const met = objectiveMet(
-      sponsor.objective,
+      sponsor,
       teamShips(result, team),
       result.sea[team]
     );

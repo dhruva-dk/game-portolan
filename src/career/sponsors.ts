@@ -2,7 +2,7 @@ import { announce, updateTeam } from './change.ts';
 import type { Reason } from './commands.ts';
 import { pick, raceKey, uniform, whole, type Key } from './draw.ts';
 import { SPONSOR_ROSTER } from './names.ts';
-import { sponsorBonus, sponsorFee } from './rules/money.ts';
+import { objectiveTarget, sponsorBonus, sponsorFee } from './rules/money.ts';
 import type { Span } from './rules/person.ts';
 import { reputations } from './rules/standing.ts';
 import {
@@ -47,6 +47,16 @@ export type Dealing = {
 
 const ROSTER = SPONSOR_ROSTER.map((_, index) => index);
 
+export const sponsorWealth = (seed: string, sponsor: number): number =>
+  uniform(
+    SPONSORS.wealth.lo,
+    SPONSORS.wealth.hi,
+    seed,
+    'sponsor',
+    sponsor,
+    'wealth'
+  );
+
 export function drawOffers(dealing: Dealing): Sponsor[] {
   const { seed, season, race, team, reputation, races } = dealing;
   const offers: Sponsor[] = [];
@@ -54,13 +64,15 @@ export function drawOffers(dealing: Dealing): Sponsor[] {
     const key: Key[] = ['offer', season, race, team, index];
     const taken = [...dealing.held, ...offers.map((offer) => offer.sponsor)];
     const free = ROSTER.filter((sponsor) => !taken.includes(sponsor));
-    const { lo, hi } = SPONSORS.factor;
-    const fee = sponsorFee(reputation, uniform(lo, hi, seed, ...key, 'fee'));
+    const sponsor = pick(free, seed, ...key, 'sponsor');
+    const fee = sponsorFee(reputation, sponsorWealth(seed, sponsor));
+    const objective = pick(OBJECTIVES, seed, ...key, 'objective');
     offers.push({
-      sponsor: pick(free, seed, ...key, 'sponsor'),
+      sponsor,
       fee,
       bonus: sponsorBonus(fee),
-      objective: pick(OBJECTIVES, seed, ...key, 'objective'),
+      objective,
+      target: objectiveTarget(objective, reputation),
       racesLeft: whole(races.lo, races.hi, seed, ...key, 'racesLeft'),
     });
   }

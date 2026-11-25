@@ -81,7 +81,7 @@ function goal(card: SponsorCard, x: number, y: number): [string, number] {
       w,
     ];
   }
-  if (card.objective === 'top10') {
+  if (card.objective === 'place') {
     const r = g * 0.44,
       edge = r * 0.45;
     return [
@@ -90,7 +90,7 @@ function goal(card: SponsorCard, x: number, y: number): [string, number] {
       2 * (r + edge),
     ];
   }
-  const name = card.objective === 'sinkTwo' ? 'part.gun' : 'territory';
+  const name = card.objective === 'sinkings' ? 'part.gun' : 'territory';
   return [
     glyph(name, x + g / 2, y, g) +
       figure(x + g + SPACE.hair, y, fig, SIZES.bonus, {

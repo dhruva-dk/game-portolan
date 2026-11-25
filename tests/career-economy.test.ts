@@ -15,12 +15,16 @@ import {
   leagueIncome,
   levelMerit,
   parLevel,
+  parSea,
+  parSinkings,
   parStars,
   placeMerit,
   placePrize,
   seaMoney,
   seasonPrize,
   sinkingMoney,
+  sponsorBonus,
+  sponsorFee,
   standingMerit,
   starMerit,
 } from '../src/career/rules/money.ts';
@@ -32,6 +36,7 @@ import {
   LEVEL_SPAN,
   RACE_MONEY,
   SHIPS,
+  SPONSORS,
   STARS,
   STAT_SPAN,
   WANTS,
@@ -225,4 +230,28 @@ test('refitting winter’s loss with par staff, plus par wages, leaves a margin 
     const margin = 1 - (refit + wages) / income(merit);
     assert.ok(margin >= 0.29, `standing ${standing}: margin ${margin}`);
   }
+});
+
+test('three sponsors of wealth 1, each met half the time, pay the sponsors share of income, at every standing', () => {
+  const { slots, bonus, step } = SPONSORS;
+  for (const standing of STANDINGS) {
+    const fee = sponsorFee(standing, 1);
+    close(
+      slots * (fee + ECONOMY.met * sponsorBonus(fee)),
+      ECONOMY.shares.sponsors * income(standingMerit(standing)),
+      (slots * (1 + bonus * ECONOMY.met) * step) / 2,
+      `standing ${standing}`
+    );
+  }
+});
+
+test('the par figures of sinkings and sea, before rounding, sum over the standings to a race’s sinkings and the whole sea', () => {
+  const sum = (f: (merit: number) => number) =>
+    STANDINGS.reduce(
+      (total, standing) => total + f(standingMerit(standing)),
+      0
+    );
+  const sinkings = SHIP_COUNT - 1;
+  close(sum(parSinkings), sinkings, 0.02 * sinkings, 'sinkings');
+  close(sum(parSea), 100, 0.02 * 100, 'sea');
 });

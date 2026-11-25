@@ -1,5 +1,5 @@
 import type { ShipResult } from '../../sim/result.ts';
-import type { Objective } from '../state.ts';
+import type { Objective, Sponsor } from '../state.ts';
 import {
   CONTRACTS,
   ECONOMY,
@@ -87,28 +87,61 @@ export const affordablePurchase = (
 ): boolean =>
   cost <= share * balance && leavesReserve(balance, cost, bill, races);
 
-export function sponsorFee(reputation: number, factor: number): number {
-  const { base, top, from, span, power, step } = SPONSORS;
-  const fee = (base + top * ((from - reputation) / span) ** power) * factor;
+const meritSum = (): number =>
+  STANDINGS.reduce((sum, standing) => sum + standingMerit(standing), 0);
+
+export function sponsorFee(reputation: number, wealth: number): number {
+  const { slots, bonus, step } = SPONSORS;
+  const fee =
+    (ECONOMY.shares.sponsors / slots / (1 + bonus * ECONOMY.met)) *
+    income(standingMerit(reputation)) *
+    wealth;
   return Math.round(fee / step) * step;
 }
 
 export const sponsorBonus = (fee: number): number => SPONSORS.bonus * fee;
 
-export function objectiveMet(
+const parPlace = (reputation: number): number =>
+  LEAGUE.shipsPerTeam * reputation - 1;
+
+export const parSinkings = (merit: number): number =>
+  ((SHIP_COUNT - 1) * merit) / meritSum();
+
+export const parSea = (merit: number): number => (100 * merit) / meritSum();
+
+export function objectiveTarget(
   objective: Objective,
+  reputation: number
+): number | null {
+  const merit = standingMerit(reputation);
+  switch (objective) {
+    case 'place':
+      return Math.ceil(parPlace(reputation));
+    case 'sinkings':
+      return Math.max(1, Math.round(parSinkings(merit)));
+    case 'sea':
+      return Math.max(1, Math.round(parSea(merit)));
+    case 'bothAfloat':
+      return null;
+  }
+}
+
+export function objectiveMet(
+  goal: Pick<Sponsor, 'objective' | 'target'>,
   ships: readonly ShipResult[],
   samples: readonly number[]
 ): boolean {
+  const { objective, target } = goal;
   switch (objective) {
-    case 'top10':
-      return ships.some((ship) => ship.place <= SPONSORS.topPlaces);
-    case 'sinkTwo':
+    case 'place':
+      return target !== null && ships.some((ship) => ship.place <= target);
+    case 'sinkings':
       return (
-        ships.reduce((sum, ship) => sum + ship.sinkings, 0) >= SPONSORS.sinkings
+        target !== null &&
+        ships.reduce((sum, ship) => sum + ship.sinkings, 0) >= target
       );
     case 'sea':
-      return meanShare(samples) >= SPONSORS.seaShare;
+      return target !== null && meanShare(samples) >= target / 100;
     case 'bothAfloat':
       return ships.every((ship) => ship.afloatAtPhaseFour);
   }

@@ -51,6 +51,7 @@ import {
   type Person,
   type Phase,
   type Role,
+  type Sponsor,
 } from '../src/career/state.ts';
 import { ECONOMY, LEAGUE, POINTS, RACE_MONEY } from '../src/career/tuning.ts';
 import type { MatchResult, ShipResult } from '../src/sim/result.ts';
@@ -214,12 +215,13 @@ function expectedSponsors(
 ) {
   const ships = shipsOf(result, team);
   const samples = result.sea[team];
-  const met = (objective: string): boolean => {
-    if (objective === 'top10') return ships.some((s) => s.place <= 10);
-    if (objective === 'sinkTwo')
-      return ships[0].sinkings + ships[1].sinkings >= 2;
+  const met = ({ objective, target }: Sponsor): boolean => {
+    const n = target ?? 0;
+    if (objective === 'place') return ships.some((s) => s.place <= n);
+    if (objective === 'sinkings')
+      return ships[0].sinkings + ships[1].sinkings >= n;
     if (objective === 'sea')
-      return samples.reduce((a, b) => a + b, 0) / samples.length >= 0.03;
+      return samples.reduce((a, b) => a + b, 0) / samples.length >= n / 100;
     return ships.every((s) => s.afloatAtPhaseFour);
   };
   return state.teams[team].sponsors.flatMap((sponsor) =>
@@ -229,8 +231,8 @@ function expectedSponsors(
           {
             sponsor: sponsor.sponsor,
             objective: sponsor.objective,
-            met: met(sponsor.objective),
-            amount: sponsor.fee + (met(sponsor.objective) ? sponsor.bonus : 0),
+            met: met(sponsor),
+            amount: sponsor.fee + (met(sponsor) ? sponsor.bonus : 0),
           },
         ]
   );
