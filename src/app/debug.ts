@@ -4,6 +4,7 @@ import type { FrameOptions } from '../render/frame.ts';
 import { createFly } from './fly.ts';
 import { ashore } from './ashore.ts';
 import { owing, rehearsed, wintered } from './rehearse.ts';
+import { ROLES } from '../career/state.ts';
 import { memoryStore } from './save.ts';
 import { planetSeed } from '../career/fit.ts';
 import { seedOf } from '../world/seeds.ts';
@@ -239,7 +240,10 @@ async function harbor(
   title: { show(on: boolean): void }
 ) {
   const races = Math.max(0, Math.floor(number('races', 0)));
-  const sailed = rehearsed(params.get('seed') ?? undefined, races),
+  const roles = (params.get('approach') ?? '')
+    .split(',')
+    .flatMap((r) => ROLES.filter((role) => role === r));
+  const sailed = rehearsed(params.get('seed') ?? undefined, races, roles),
     signed = params.has('signed') ? wintered(sailed) : sailed,
     owed = params.get('balance');
   const career = owed === null ? signed : owing(signed, Number(owed));

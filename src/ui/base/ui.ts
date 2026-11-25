@@ -99,8 +99,19 @@ const STYLE = `
 .ui .pop { transform-box: fill-box; transform-origin: center;
   animation: pop ${MOTION.dot.ms}ms ${MOTION.dot.ease} both; }
 @keyframes pop { from { transform: scale(0); opacity: 0 } }
-.ui .two .sure, .ui .two.armed .unsure { display: none; }
-.ui .two.armed .sure { display: inline; }
+.ui .two .sure, .ui .two .unsure { transform-box: fill-box; transform-origin: center;
+  transition: opacity ${MOTION.fade.ms}ms ${MOTION.fade.ease}, transform ${MOTION.arm.ms}ms ${MOTION.arm.ease}; }
+.ui .two .sure { opacity: 0; transform: scale(${MOTION.arm.from}); }
+.ui .two.armed .sure { opacity: 1; transform: none; }
+.ui .two.armed .unsure { opacity: 0; transform: scale(${2 - MOTION.arm.from}); }
+.ui .arrive { transform-box: fill-box; transform-origin: center top;
+  animation: arrive ${MOTION.deal.ms}ms ${MOTION.deal.ease} both; }
+@keyframes arrive { from { transform: translateY(-10px); opacity: 0 } }
+.ui .fan { transform-box: fill-box; transform-origin: center;
+  animation: fan ${MOTION.fan.ms}ms ${MOTION.fan.ease} both; }
+@keyframes fan { from { transform: rotate(var(--r)) translateX(var(--x)); } }
+.ui .glide { animation: glide ${MOTION.glide.ms}ms ${MOTION.glide.ease} both; }
+@keyframes glide { from { transform: translateX(var(--x)); } }
 @keyframes needle { from { transform: rotate(-38deg) } to { transform: rotate(52deg) } }
 `;
 
