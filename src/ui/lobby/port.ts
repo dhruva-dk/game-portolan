@@ -27,3 +27,14 @@ export type LobbyPort = {
   chart(): Chart | null;
   marks(): PlanetMarks | null;
 };
+
+export type NewCareerPort = {
+  start(options: {
+    seed: string;
+    name: string;
+    livery: Livery;
+    emblem: number;
+  }): void;
+  close(): void;
+  scene: { wear(livery: Livery | null, emblem: number | null): void };
+};

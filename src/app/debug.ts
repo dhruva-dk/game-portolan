@@ -3,12 +3,14 @@ import type { World } from '../world/environment.ts';
 import type { FrameOptions } from '../render/frame.ts';
 import { createFly } from './fly.ts';
 import { ashore } from './ashore.ts';
+import { founding } from './new-career.ts';
 import {
   haggled,
   owing,
   rehearsed,
   reported,
   wintered,
+  type Founding,
   type Haggle,
 } from './rehearse.ts';
 import { ROLES, YOURS, type CareerState, type Role } from '../career/state.ts';
@@ -148,6 +150,7 @@ export async function scenario(
   title: { show(on: boolean): void }
 ) {
   if (params.get('screen') === 'glyphs') return specimen(number('page', 1));
+  if (params.get('screen') === 'new') return founder(release, stage, title);
   const career = CAREER_SCREENS.find((c) => c === params.get('screen'));
   if (career) return harbor(career, release, stage, title);
   const setup = setupOf(release);
@@ -268,6 +271,62 @@ function talkedTo(career: CareerState, role: Role) {
 
 const CAREER_SCREENS = ['lobby', 'team', 'deal', 'negotiation'] as const;
 
+const FIXED_PLANET = 'portolan';
+
+function founded(): Founding {
+  const name = params.get('name'),
+    dye = params.get('dye'),
+    pattern = params.get('pattern'),
+    emblem = params.get('emblem');
+  return {
+    ...(name === null ? {} : { name }),
+    ...(dye === null && pattern === null
+      ? {}
+      : { livery: { dye: Number(dye ?? 0), pattern: Number(pattern ?? 0) } }),
+    ...(emblem === null ? {} : { emblem: Number(emblem) }),
+  };
+}
+
+async function founder(
+  release: Setup,
+  stage: (setup: Setup) => Promise<Stage>,
+  title: { show(on: boolean): void }
+) {
+  const seed = params.get('seed'),
+    races = Math.max(0, Math.floor(number('races', 0)));
+  const existing = seed === null ? null : rehearsed(seed, races);
+  const planet = existing === null ? FIXED_PLANET : planetSeed(existing);
+  const s = await stage({
+    ...setupOf(release),
+    seed: seedOf(planet),
+    name: planet,
+    meter: params.has('meter'),
+  });
+  safeArea(uiLayer());
+  const lobbyOf = (q: Record<string, string>) => {
+    const at = new URL(location.href);
+    at.search = new URLSearchParams({ debug: '', screen: 'lobby', ...q })
+      .toString()
+      .replace('debug=', 'debug');
+    location.replace(at.href);
+  };
+  await founding(s, existing, {
+    ready: () => title.show(false),
+    started({ options }) {
+      lobbyOf({
+        seed: options.seed,
+        name: options.name,
+        dye: String(options.livery.dye),
+        pattern: String(options.livery.pattern),
+        emblem: String(options.emblem),
+      });
+    },
+    closed() {
+      if (seed !== null) lobbyOf({ seed, races: String(races) });
+    },
+  });
+}
+
 async function harbor(
   screen: (typeof CAREER_SCREENS)[number],
   release: Setup,
@@ -278,7 +337,12 @@ async function harbor(
   const roles = (params.get('approach') ?? '')
     .split(',')
     .flatMap((r) => ROLES.filter((role) => role === r));
-  const sailed = rehearsed(params.get('seed') ?? undefined, races, roles),
+  const sailed = rehearsed(
+      params.get('seed') ?? undefined,
+      races,
+      roles,
+      founded()
+    ),
     signed = params.has('signed') ? wintered(sailed) : sailed,
     owed = params.get('balance');
   const priced = owed === null ? signed : owing(signed, Number(owed));

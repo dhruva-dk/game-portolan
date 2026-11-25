@@ -34,6 +34,7 @@ export type NewCareerView = {
   dyes: readonly Swatch[];
   patterns: readonly Swatch[];
   emblems: readonly Swatch[];
+  livery: Livery;
   wearing: Livery | null;
   emblem: number;
   start: { faint: boolean; twoTap: boolean };
@@ -101,6 +102,7 @@ export function newCareerView(
     dyes: swatches(DYES.length, livery.dye),
     patterns: swatches(PATTERNS.length, livery.pattern),
     emblems: swatches(EMBLEMS, emblem),
+    livery,
     wearing: asked.dyed ? livery : null,
     emblem,
     start: { faint: !ready, twoTap: o.existing },
