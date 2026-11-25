@@ -113,6 +113,23 @@ function swing(s: ShipState, angle: number, depth: Depth): Vec3 {
   return kick;
 }
 
+function ease(s: ShipState, dt: number, depth: Depth): Vec3 {
+  let off: Vec3 = [0, 0, 0],
+    most = 0;
+  for (const point of HULL) {
+    const p = hullAt(s.at, s.heading, point),
+      c = depth(p) - SHIP.draft;
+    if (c >= NEAR) continue;
+    const n = deeper(p, depth);
+    if (!n) continue;
+    const w = 1 - Math.max(c, 0) / NEAR;
+    off = add(off, normalize(add(n, s.at, -dot(n, s.at))), w);
+    most = Math.max(most, w);
+  }
+  const size = length(off);
+  return size > 1e-9 ? scale(off, (EASE * dt * most) / size) : off;
+}
+
 export function moved(
   at: Vec3,
   heading: Vec3,
@@ -132,10 +149,11 @@ export function navigate(
 ): ShipState {
   const before = clearance(s.at, s.heading, depth);
   let move = scale(heading, s.speed * dt),
-    push: Vec3 = [0, 0, 0],
+    kick: Vec3 = [0, 0, 0],
+    off: Vec3 = [0, 0, 0],
     speed = s.speed;
   if (before.least < WARNING) {
-    push = swing(
+    kick = swing(
       s,
       Math.atan2(dot(cross(s.heading, heading), s.at), dot(s.heading, heading)),
       depth
@@ -149,20 +167,23 @@ export function navigate(
         move = add(move, n, taken);
         speed *= Math.exp((-GRIND * taken) / s.speed);
       }
-      if (before.least < NEAR)
-        push = add(push, n, EASE * dt * (1 - Math.max(before.least, 0) / NEAR));
     }
+    off = ease(s, dt, depth);
   }
   const fine = (to: { at: Vec3; heading: Vec3 }) => {
     const c = under(to.at, to.heading, depth);
     return c >= 0 || c >= before.least;
   };
-  const turning = moved(s.at, heading, add(move, push));
+  const swung = add(kick, off);
+  const turning = moved(s.at, heading, add(move, swung));
   if (fine(turning)) return { ...turning, speed, turn: s.turn };
-  const straight = moved(s.at, s.heading, add(move, push));
+  const straight = moved(s.at, s.heading, add(move, swung));
   if (fine(straight)) return { ...straight, speed, turn: 0 };
-  const stopped = Math.min(speed, s.speed) * Math.exp(-GRIND * dt);
-  const eased = moved(s.at, s.heading, push);
-  if (fine(eased)) return { ...eased, speed: stopped, turn: 0 };
-  return { at: s.at, heading: s.heading, speed: stopped, turn: 0 };
+  const pivoted = moved(s.at, heading, swung);
+  if (fine(pivoted)) return { ...pivoted, speed: 0, turn: s.turn };
+  const eased = moved(s.at, s.heading, off);
+  if (fine(eased)) return { ...eased, speed: 0, turn: 0 };
+  const swiveled = moved(s.at, heading, kick);
+  if (fine(swiveled)) return { ...swiveled, speed: 0, turn: s.turn };
+  return { at: s.at, heading: s.heading, speed: 0, turn: 0 };
 }

@@ -8,7 +8,7 @@ import { runMatch, type MatchScenario } from '../tools/sim/match.ts';
 const MATCH: MatchScenario = { kind: 'match', match: 1, seconds: 60 };
 const DUEL: MatchScenario = {
   kind: 'match',
-  match: 2,
+  match: 4,
   teams: 2,
   perTeam: 1,
   close: true,

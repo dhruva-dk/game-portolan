@@ -211,11 +211,9 @@ function sideOf(c: Ctx, want: number, dt: number): number {
     [m.side, m.head, m.sideT] = [s, heading, 0];
     return s;
   }
-  m.sideT += dt;
-  if (
-    m.sideT >= c.b.helm.budge &&
-    dot(m.head, heading) > Math.cos(c.b.helm.swing)
-  ) {
+  if (dot(m.head, heading) <= Math.cos(c.b.helm.swing))
+    [m.head, m.sideT] = [heading, 0];
+  else if ((m.sideT += dt) >= c.b.helm.budge) {
     m.blocked = s;
     [m.side, m.head, m.sideT] = [-s, heading, 0];
   }
@@ -240,7 +238,7 @@ function stuck(
   }
   const crawling = distance(m.was, ship.at) < c.b.helm.crawl * dt;
   const held =
-    crawling &&
+    (crawling || m.backT < 0) &&
     !open(c, along(ship.at, ship.heading, 0.4 * SHIP.length + c.b.helm.bow).p);
   if (held && m.backT > -(c.b.helm.wade + c.b.helm.most)) {
     m.backT -= dt;
