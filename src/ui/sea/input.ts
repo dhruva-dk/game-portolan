@@ -16,7 +16,15 @@ interface Finger {
   y: number;
 }
 
-export function createInput(element: HTMLElement, steers: () => boolean) {
+export type Hands = { leftHanded: boolean; sensitivity: number };
+
+const RIGHT_HANDED: Hands = { leftHanded: false, sensitivity: 1 };
+
+export function createInput(
+  element: HTMLElement,
+  steers: () => boolean,
+  hands: () => Hands = () => RIGHT_HANDED
+) {
   const looks = new Map<number, Finger>();
   const thumb = { id: -1, x: 0, y: 0, cx: 0, cy: 0 };
   const keys = new Set<string>();
@@ -29,7 +37,10 @@ export function createInput(element: HTMLElement, steers: () => boolean) {
 
   element.addEventListener('pointerdown', (e) => {
     element.setPointerCapture(e.pointerId);
-    if (thumb.id < 0 && steers() && e.clientX < view.w * LEFT) {
+    const side = hands().leftHanded
+      ? e.clientX > view.w * (1 - LEFT)
+      : e.clientX < view.w * LEFT;
+    if (thumb.id < 0 && steers() && side) {
       const reach = STICK * view.k,
         within = (v: number, size: number) => clamp(v, reach, size - reach);
       [thumb.id, thumb.x, thumb.y] = [e.pointerId, e.clientX, e.clientY];
@@ -47,8 +58,9 @@ export function createInput(element: HTMLElement, steers: () => boolean) {
     }
     const f = looks.get(e.pointerId);
     if (!f) return;
-    lookX += e.clientX - f.x;
-    lookY += e.clientY - f.y;
+    const k = hands().sensitivity;
+    lookX += (e.clientX - f.x) * k;
+    lookY += (e.clientY - f.y) * k;
     f.x = e.clientX;
     f.y = e.clientY;
   });
