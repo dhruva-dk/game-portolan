@@ -61,7 +61,7 @@ const LIVERIES: readonly Livery[] = DYES.flatMap((_, dye) =>
   PATTERNS.map((_, pattern) => ({ dye, pattern }))
 );
 
-const sameLivery = (a: Livery, b: Livery): boolean =>
+export const sameLivery = (a: Livery, b: Livery): boolean =>
   a.dye === b.dye && a.pattern === b.pattern;
 
 function distinct<T>(

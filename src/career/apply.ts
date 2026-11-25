@@ -38,6 +38,7 @@ import { payRace, raceMoney } from './record/pay.ts';
 import { fileReport, raceReport } from './record/report.ts';
 import { repossess } from './record/repossess.ts';
 import { scoreRace } from './record/score.ts';
+import { repaint, repaintRefusal } from './repaint.ts';
 import { dealOffers } from './sponsors/offers.ts';
 import { signRefusal, signSponsor } from './sponsors/sign.ts';
 import { YOURS, type CareerState } from './state.ts';
@@ -63,8 +64,6 @@ function refusal(state: CareerState, command: Command): Reason | null {
   if (!known(state, command)) return 'unknown';
   return null;
 }
-
-const notYet = (state: CareerState): Applied => ({ ok: true, state });
 
 const seam = (state: CareerState): CareerState => state;
 
@@ -162,7 +161,10 @@ function effect(state: CareerState, command: Command): Applied {
           )
       );
     case 'Repaint':
-      return notYet(state);
+      return unless(
+        repaintRefusal(state, command.team, command.livery, command.emblem),
+        () => repaint(state, command.team, command.livery, command.emblem)
+      );
     case 'SetScoutSeat':
       return unless(scoutRefusal(state, command.team, command.role), () =>
         setScoutSeat(state, command.team, command.role)

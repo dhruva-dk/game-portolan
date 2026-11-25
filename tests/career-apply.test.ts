@@ -62,6 +62,20 @@ const THEIRS = seated(RIVAL, 'designer');
 const OWNER = idOf(BASE.teams[4].owner);
 const UNKNOWN = BASE.nextPersonId;
 
+function unworn(): { dye: number; pattern: number } {
+  for (let dye = 0; dye < DYES.length; dye++)
+    for (let pattern = 0; pattern < PATTERNS.length; pattern++)
+      if (
+        !BASE.teams.some(
+          (team) => team.livery.dye === dye && team.livery.pattern === pattern
+        )
+      )
+        return { dye, pattern };
+  throw new Error('every livery is worn');
+}
+
+const UNWORN = unworn();
+
 const OFFER: Sponsor = {
   sponsor: 0,
   fee: 500,
@@ -151,7 +165,7 @@ function sample(type: CommandType, team: number): Command {
     case 'FitGun':
       return { type, team, slot: 0, kind: 'scatter' };
     case 'Repaint':
-      return { type, team, livery: { dye: 15, pattern: 2 }, emblem: 3 };
+      return { type, team, livery: UNWORN, emblem: 3 };
     case 'SetScoutSeat':
       return { type, team, role: 'driver' };
     case 'BuyReport':
