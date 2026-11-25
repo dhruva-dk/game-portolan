@@ -233,3 +233,5 @@ export const MOTION = {
 export const FAINT = 0.32;
 
 export const FADE = 320;
+
+export const BEAT = { apart: 45, coin: { gap: 70, most: 9 } } as const;
