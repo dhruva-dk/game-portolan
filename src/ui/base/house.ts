@@ -35,6 +35,10 @@ export const MOTION = {
   press: { ms: 80, release: 160, scale: 0.94, ease: OUT },
   number: { ms: 450 },
   dot: { ms: 220, ease: POP },
+  deal: { ms: 240, ease: OUT, after: 100, stagger: 70 },
+  fan: { ms: 320, ease: POP, after: 90 },
+  glide: { ms: 300, ease: OUT },
+  arm: { ms: 160, ease: POP, from: 0.9 },
   fade: { ms: 180, ease: 'ease' },
 } as const;
 

@@ -12,7 +12,7 @@ import {
 import { portrait } from '../base/gull.ts';
 import { FAINT, MOTION, SPACE, TYPE } from '../base/house.ts';
 import { figure, glyph, slip, svgNode } from '../base/ink.ts';
-import { least } from '../base/lexicon.ts';
+import { ROLE, least } from '../base/lexicon.ts';
 import { spyglass } from '../base/marks.ts';
 import { sheet } from '../base/sheet.ts';
 import { piece, screen } from '../base/ui.ts';
@@ -22,9 +22,16 @@ import type { LobbyPort } from './port.ts';
 const PAD = SPACE.pad;
 const SHEET = { w: 648, h: CARD.h + 2 * PAD } as const;
 const GAP = (SHEET.w - 2 * PAD - 3 * CARD.w) / 2;
-const TAB = { h: 26, join: 3, poke: 28, inset: 6, glass: 30 } as const;
-const FAN = { size: 26, spread: 21, tilt: 9 } as const;
-const LIFT = TAB.h + TAB.poke - TAB.join;
+const TAB = { h: 26, join: 3, inset: 6, glass: 30 } as const;
+const FAN = {
+  size: 30,
+  frame: 3,
+  spread: 18,
+  least: 12,
+  tilt: 7,
+  room: 248,
+} as const;
+const LIFT = TAB.h;
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
 
@@ -69,54 +76,78 @@ function scoutTab(on: boolean) {
   );
 }
 
-function candidatesTab(portraits: readonly number[]) {
-  if (portraits.length === 0) return '';
-  const said = measured('Candidates', TYPE.word, { weight: 600 }),
-    w = said + 2 * PAD,
-    x = CARD.w - TAB.inset - w,
-    mid = x + w / 2,
+function candidates(
+  role: Role,
+  portraits: readonly number[],
+  at: number,
+  roles: number
+) {
+  const { size, frame, tilt, room } = FAN,
+    card = size + 2 * frame,
+    pad = SPACE.gap - 2,
+    share = (room - (roles - 1) * SPACE.gap) / roles,
+    spread = Math.max(
+      FAN.least,
+      Math.min(FAN.spread, (share - 2 * pad - card) / 2)
+    ),
     n = portraits.length,
-    { size, spread, tilt } = FAN;
+    mark = least(ROLE[role].glyph),
+    said = measured('Candidates', TYPE.small, { weight: 600 }),
+    w = Math.ceil(Math.max(said, card + 2 * spread) + 2 * pad),
+    mid = w / 2,
+    wordY = pad + TYPE.small / 2,
+    fanY = wordY + TYPE.small / 2 + SPACE.hair + card / 2,
+    markY = fanY + card / 2 + 2 + mark / 2,
+    h = Math.round(markY + mark / 2 + pad),
+    { after, stagger } = MOTION.deal,
+    early = after + at * stagger,
+    late = early + MOTION.fan.after;
   let fan = '';
-  portraits.forEach((seed, i) => {
-    const off = i - (n - 1) / 2,
+  [...portraits].reverse().forEach((seed, back) => {
+    const off = n - 1 - back - (n - 1) / 2,
       cx = mid + off * spread,
-      cy = tabTop - size / 2 + 3 + Math.abs(off) * 3;
+      cy = fanY + Math.abs(off) * 2,
+      turn = r2(off * tilt);
     fan +=
-      `<g transform="rotate(${r2(off * tilt)} ${r2(cx)} ${r2(cy)})">` +
-      slip(cx - size / 2 - 2.5, cy - size / 2 - 2.5, size + 5, size + 5, {
-        rule: false,
-      }) +
-      `<g transform="translate(${r2(cx - size / 2)} ${r2(cy - size / 2)})">${portrait(seed, size)}</g></g>`;
+      `<g transform="rotate(${turn} ${r2(cx)} ${r2(cy)})">` +
+      `<g class="fan" style="--r:${-turn}deg;--x:${r2(-off * spread)}px;animation-delay:${late}ms">` +
+      slip(cx - card / 2, cy - card / 2, card, card, { rule: false }) +
+      `<g transform="translate(${r2(cx - size / 2)} ${r2(cy - size / 2)})">${portrait(seed, size)}</g></g></g>`;
   });
-  return (
-    `<g id="candidates">${fan}` +
-    slip(x, tabTop, w, TAB.h + TAB.join, { rule: false }) +
-    word(mid, tabTop + TAB.h / 2, 'Candidates', TYPE.word, { weight: 600 }) +
-    '</g>'
-  );
+  return {
+    w,
+    h,
+    svg:
+      `<g class="arrive" style="animation-delay:${early}ms"><g id="deal-${role}">` +
+      slip(0, 0, w, h) +
+      word(mid, wordY, 'Candidates', TYPE.small, { weight: 600 }) +
+      fan +
+      glyph(ROLE[role].glyph, mid, markY, mark) +
+      '</g></g>',
+  };
 }
 
 function actions(seat: SeatView, at: Actions) {
   if (!seat.renew || !seat.release) return '';
-  const h = 36,
-    y = at.y + at.h - h,
-    gap = SPACE.gap,
-    renewW = 64,
-    releaseW = at.w - renewW - gap;
-  const cost = `${seat.release.cost.toLocaleString('en-US')}`;
-  const coin = least('coin'),
-    costW = measured(cost, TYPE.name + 1, { italic: true, weight: 600 });
-  const rx = at.x + renewW + gap,
+  const h = at.h,
+    y = at.y,
+    label = TYPE.word + 1,
+    renewW = Math.ceil(measured('Renew', label, { weight: 600 }) + 2 * PAD),
+    rx = at.x + renewW + SPACE.gap,
+    releaseW = at.w - renewW - SPACE.gap,
+    mid = rx + releaseW / 2,
     cy = y + h / 2;
-  const label = TYPE.word + 1,
-    said = measured('Release', label, { weight: 600 }),
-    group = said + SPACE.gap + coin + 2 + costW,
-    gx = rx + (releaseW - group) / 2;
+  const cost = seat.release.cost.toLocaleString('en-US'),
+    size = TYPE.name,
+    coin = least('coin'),
+    costW = measured(cost, size, { italic: true, weight: 600 }),
+    amount = coin + SPACE.hair + costW,
+    ax = mid - amount / 2,
+    line = SPACE.gap;
   const idle =
-    word(gx, cy, 'Release', label, { anchor: 'start', weight: 600 }) +
-    glyph('coin', gx + said + SPACE.gap + coin / 2, cy, coin) +
-    figure(gx + group, cy, cost, TYPE.name + 1, { anchor: 'end', weight: 600 });
+    word(mid, cy - line, 'Release', label, { weight: 600 }) +
+    glyph('coin', ax + coin / 2, cy + line, coin) +
+    figure(ax + amount, cy + line, cost, size, { anchor: 'end', weight: 600 });
   return (
     `<g id="renew"${seat.renew.faint ? ` opacity="${FAINT + 0.1}"` : ''}>` +
     slip(at.x, y, renewW, h) +
@@ -143,6 +174,7 @@ export function createTeam(port: LobbyPort) {
     layer(body, cardX(i), PAD - LIFT, CARD.w, LIFT + TAB.join)
   );
   const large = layer(body, PAD, PAD, LARGE.w, LARGE.h);
+  const deals = piece(el, 'top left', false, true);
   large.hidden = true;
 
   let view: TeamView | null = null,
@@ -151,7 +183,7 @@ export function createTeam(port: LobbyPort) {
   const seatAt = (role: Role) =>
     view?.seats.find((s) => s.role === role) ?? null;
 
-  function drawCard(i: number, seat: SeatView) {
+  function drawCard(i: number, seat: SeatView, was: number) {
     const face = seat.card
       ? cardFront(seat.card, 3 + i * 7)
       : cardEmpty(seat.role, 3 + i * 7);
@@ -163,11 +195,15 @@ export function createTeam(port: LobbyPort) {
         () => enlarge(seat.role),
         `card-${seat.role}`
       );
-    const tabs = svgNode(
-      CARD.w,
-      LIFT + TAB.join,
-      scoutTab(seat.scouting) + candidatesTab(seat.deal)
-    );
+    const left = seat.scouting && was >= 0 && was !== i,
+      handed = !seat.scouting && was === i,
+      tab = scoutTab(seat.scouting),
+      drawn = left
+        ? `<g class="glide" style="--x:${r2(cardX(was) - cardX(i))}px">${tab}</g>`
+        : handed
+          ? `<g class="pop">${tab}</g>`
+          : tab;
+    const tabs = svgNode(CARD.w, LIFT + TAB.join, drawn);
     fans[i].replaceChildren(tabs);
     const scout = tabs.querySelector<SVGElement>('#scout');
     if (seat.scouting) scout?.setAttribute('data-tap', `scout-${seat.role}`);
@@ -177,11 +213,33 @@ export function createTeam(port: LobbyPort) {
         () => port.send({ type: 'SetScoutSeat', team: 0, role: seat.role }),
         `scout-${seat.role}`
       );
-    pressable(
-      tabs.querySelector<SVGElement>('#candidates'),
-      () => port.open('deal', { role: seat.role }),
-      `deal-${seat.role}`
-    );
+  }
+
+  let dealt: string | null = null;
+
+  function drawDeals(v: TeamView) {
+    const waiting = v.seats.filter((seat) => seat.deal.length > 0);
+    const key = waiting.map((seat) => `${seat.role}${seat.deal}`).join('|');
+    if (key === dealt) return;
+    dealt = key;
+    let x = 0,
+      h = 0,
+      body = '';
+    waiting.forEach((seat, i) => {
+      const one = candidates(seat.role, seat.deal, i, waiting.length);
+      body += `<g transform="translate(${x} 0)">${one.svg}</g>`;
+      x += one.w + SPACE.gap;
+      h = Math.max(h, one.h);
+    });
+    const svg = svgNode(Math.max(1, x - SPACE.gap), Math.max(1, h), body);
+    deals.replaceChildren(svg);
+    deals.hidden = waiting.length === 0;
+    for (const seat of waiting)
+      pressable(
+        svg.querySelector<SVGElement>(`#deal-${seat.role}`),
+        () => port.open('deal', { role: seat.role }),
+        `deal-${seat.role}`
+      );
   }
 
   function drawLarge() {
@@ -223,7 +281,7 @@ export function createTeam(port: LobbyPort) {
     large.style.transition = `transform ${ms}ms ${ease}, opacity ${ms * 0.6}ms ease`;
     large.style.transform = '';
     large.style.opacity = '1';
-    for (const c of [...cards, ...fans]) {
+    for (const c of [...cards, ...fans, deals]) {
       c.style.transition = `opacity ${ms}ms ease`;
       c.style.opacity = '0';
       c.style.pointerEvents = 'none';
@@ -240,7 +298,7 @@ export function createTeam(port: LobbyPort) {
     if (enlarged === null) return;
     enlarged = null;
     const { ms, ease } = MOTION.card;
-    for (const c of [...cards, ...fans]) {
+    for (const c of [...cards, ...fans, deals]) {
       c.style.transition = instant ? 'none' : `opacity ${ms}ms ease`;
       c.style.opacity = '1';
       c.style.pointerEvents = '';
@@ -261,8 +319,10 @@ export function createTeam(port: LobbyPort) {
     el,
     show(v: TeamView) {
       const before = enlarged ? seatAt(enlarged)?.card?.person : null;
+      const was = view?.seats.findIndex((seat) => seat.scouting) ?? -1;
       view = v;
-      v.seats.forEach((seat, i) => drawCard(i, seat));
+      v.seats.forEach((seat, i) => drawCard(i, seat, was));
+      drawDeals(v);
       if (enlarged) {
         const now = seatAt(enlarged)?.card;
         if (!now || now.person !== before) shrink(true);
@@ -271,6 +331,7 @@ export function createTeam(port: LobbyPort) {
     },
     reset() {
       shrink(true);
+      dealt = null;
     },
     back(): boolean {
       if (enlarged === null) return false;

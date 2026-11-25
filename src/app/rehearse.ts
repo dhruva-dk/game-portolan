@@ -1,5 +1,5 @@
 import { apply, newCareer, runPolicy } from '../career/apply.ts';
-import type { Command } from '../career/commands.ts';
+import type { Command, Role } from '../career/commands.ts';
 import { matchSetup } from '../career/fit.ts';
 import { TEAM_NAMES } from '../career/names.ts';
 import { standInResult } from '../career/standin.ts';
@@ -32,9 +32,27 @@ export function dismissed(state: CareerState): CareerState {
   return now;
 }
 
+function approached(state: CareerState, roles: readonly Role[]) {
+  let now = state;
+  for (const role of roles) {
+    const person = now.people.find(
+      (p) => p.role === role && p.contract !== null && p.contract.team !== YOURS
+    );
+    if (!person) continue;
+    const applied = apply(now, {
+      type: 'Approach',
+      team: YOURS,
+      person: person.id,
+    });
+    if (applied.ok) now = applied.state;
+  }
+  return now;
+}
+
 export function rehearsed(
   seed: string = REHEARSAL.seed,
-  races = 0
+  races = 0,
+  approach: readonly Role[] = []
 ): CareerState {
   let state = newCareer({
     seed,
@@ -46,6 +64,7 @@ export function rehearsed(
     state = dismissed(state);
     if (state.phase === 'offseason')
       state = ashore(state, { type: 'FinishOffseason', team: YOURS });
+    if (n === races - 1) state = approached(state, approach);
     state = ashore(state, { type: 'StartRace', team: YOURS });
     const result = standInResult(matchSetup(state, { hands: 'player' }));
     state = sent(state, { type: 'RecordRace', team: YOURS, result });
