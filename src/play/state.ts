@@ -1,3 +1,4 @@
+import { loosed } from '../sim/shot.ts';
 import type { Crew } from '../sim/battle.ts';
 import {
   createMatch,
@@ -24,7 +25,7 @@ import type { BallDraw, Look, Sea, ShipDraw } from '../render/snapshot.ts';
 import type { Hull } from '../world/swell.ts';
 import type { PoseOut, ShipPose } from '../world/pose.ts';
 import { hash } from '../world/random.ts';
-import { add, scale, type Vec3 } from '../world/sphere.ts';
+import { R, add, scale, type Vec3 } from '../world/sphere.ts';
 import { LIVERY, type Livery } from '../world/livery.ts';
 import type { Race } from './player.ts';
 import { lookOf, worn } from './colors.ts';
@@ -219,6 +220,7 @@ export function createState(
         : undefined;
     },
     share: (id: number) => view().share(id),
+    teamShare: (id: number) => view().teamShare(id),
 
     done: () => match.done,
     result: () => match.result(),
@@ -312,6 +314,17 @@ export function createState(
       log.keep(NOTHING_DONE, NOTHING_DONE, NOTHING_DONE, null, clock(1));
     },
     hurt: (id: number, points: number) => debugOfMatch(match).hurt(id, points),
+    shoot(id: number, damage: number) {
+      const on = view().vessel(id)?.ship.at,
+        sides = view().teams(),
+        by = view()
+          .alive()
+          .find((k) => k !== id && (!sides || sides[k] !== sides[id]));
+      if (!on || by === undefined) return;
+      debugOfMatch(match).volley([
+        loosed(by, 'cannon', scale(on, R + 3), scale(on, -1), 90, damage, on),
+      ]);
+    },
     mindOf: (id: number) => debugOfMatch(match).mindOf(id),
     standIn: (id: number, sights: Sighter) =>
       debugOfMatch(match).standIn(id, sights),
@@ -330,6 +343,7 @@ interface Debug {
   strew(at: Vec3, heals: readonly Rarity[]): void;
   sink(id: number, by: number | null): void;
   hurt(id: number, points: number): void;
+  shoot(id: number, damage: number): void;
   mindOf(id: number): Readonly<Memory> | null;
   standIn(id: number, sights: Sighter): void;
 }

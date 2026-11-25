@@ -5,6 +5,7 @@ import { createState, debugOf } from '../src/play/state.ts';
 import type { Race } from '../src/play/player.ts';
 import { STILL } from '../src/sim/hands.ts';
 import { SHIELD } from '../src/sim/tuning.ts';
+import { calmShare } from '../src/sim/holding.ts';
 import { PLAYER } from '../src/sim/match.ts';
 import { watersAt } from '../src/sim/waters.ts';
 import { LIVERY } from '../src/world/livery.ts';
@@ -87,4 +88,14 @@ test('through a whole race the standings hold, and at its end they are the resul
   sound(r, race.ships.length);
   assert.equal(r.place, result.ships[PLAYER].place);
   for (const m of r.mates) assert.equal(m.place, result.ships[m.id].place);
+});
+
+test('a team’s sea is its ships’ water together, and its share inside the ring is between 0 and 1', () => {
+  const { state } = begun();
+  for (let i = 0; i < 30; i++) state.step(STILL);
+  const team = state.teamShare(PLAYER);
+  assert.ok(team > 0);
+  assert.ok(Math.abs(team - (state.share(0) + state.share(1))) < 1e-12);
+  const inside = calmShare(team, state.storm(1));
+  assert.ok(inside >= team && inside <= 1);
 });

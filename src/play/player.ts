@@ -29,6 +29,7 @@ export interface Status {
   hullMax: number;
   shield: number;
   shieldMax: number;
+  refilling: boolean;
   gun: {
     kind: GunKind;
     rounds: number;
@@ -37,6 +38,7 @@ export interface Status {
     locked: boolean;
   } | null;
   afloat: number;
+  sea: number;
   sunk: boolean;
   storm: number;
   closing: boolean;
