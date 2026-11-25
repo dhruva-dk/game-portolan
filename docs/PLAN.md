@@ -635,7 +635,7 @@ When your ship sinks, or you choose Forfeit from the pause sheet (which sinks yo
 A ship cannot sail into water shallower than its draft (2.2 m); the bank stops it. One change from today gets it off again:
 
 1. **Backing off.** A ship that is stopped (under 1 m/s) with a bank within 3 m of its bow, steered more than 1 radian off its bow with any throttle, goes astern at up to one fifth of its top speed, turning as it goes, until its bow is within 1 radian of the course it is steered on; then it goes ahead as usual. Nowhere else does a ship go astern: in open water a stopped ship steered astern turns and goes ahead.
-2. **Bots.** A bot held by a bank looks for the deepest water round it. If that lies more than half a radian off its bow it stops its engine and pivots toward it one way, giving a pivot 8 seconds without swinging 0.15 rad before trying something else, and when that water is abaft its beam it backs off by rule 1.
+2. **Bots.** A bot held by a bank looks for the deepest water round it. If that lies more than half a radian off its bow it stops its engine and pivots toward it one way, giving a pivot 8 seconds without swinging 0.15 rad (1.5 seconds when the hull is not turning at all) before it pivots the other way, and only gives the pivot up when both ways have failed; when that water is abaft its beam it backs off by rule 1. A held bot with another hull within 3 m lies stopped as today, unless that hull is ahead of its beam and it is aground, when it backs away by rule 1.
 3. Both are in `sim/handling.ts` (`SHIP.astern`, `aback`, `ahead`, `stopped`) and `sim/helmsman.ts` (`HELM.pivot`, `patience`), and count as tuning numbers for Milestone 7.
 
 ## 1.12 Screens
