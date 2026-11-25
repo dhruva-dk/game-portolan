@@ -72,32 +72,34 @@ function ratingRow(x: number, y: number, mark: string, rating: number) {
 function nextSlip(view: LobbyView) {
   const name = view.next.planet,
     nameSize = TYPE.name + 1;
+  const mark = least('heal'),
+    star = least('star'),
+    stars = NEXT.text + mark + SPACE.gap + star / 2;
   const textW = Math.max(
     measured(name, nameSize, { weight: 600 }),
-    least('heal') + 6 + STARS * least('star') * 0.98
+    mark + SPACE.gap + (STARS - 1) * star * 0.98 + star
   );
   const w = Math.ceil(NEXT.text + textW + SPACE.pad),
     h = NEXT.h,
     oy = 4;
-  const storm = least('storm'),
-    heal = least('heal'),
-    gx = NEXT.text + heal / 2 - 2;
+  const gx = NEXT.text + mark / 2,
+    rows = [oy + 44, oy + 66];
   const svg =
     `<g id="next">${slip(1, oy, w, h)}` +
     `<circle id="orb" cx="${SPACE.pad + NEXT.orb}" cy="${oy + h / 2}" r="${NEXT.orb}" fill="${INK.white}" stroke="none"/>` +
     `<circle cx="${SPACE.pad + NEXT.orb}" cy="${oy + h / 2}" r="${NEXT.orb + 1.2}" fill="none" stroke="${INK.iron}" stroke-width="1.6"/>` +
     `<circle cx="${SPACE.pad + NEXT.orb}" cy="${oy + h / 2}" r="${NEXT.orb + 3.6}" fill="none" stroke="${INK.iron}" stroke-width=".5" opacity=".6"/>` +
-    label(NEXT.text - 2, oy + 19, name, nameSize, { anchor: 'start' }) +
+    label(NEXT.text, oy + 20, name, nameSize, { anchor: 'start' }) +
     ratingRow(
-      NEXT.text + heal + 4,
-      oy + 42,
-      glyph('storm', gx, oy + 42, storm),
+      stars,
+      rows[0],
+      glyph('storm', gx, rows[0], mark),
       view.next.storm
     ) +
     ratingRow(
-      NEXT.text + heal + 4,
-      oy + 65,
-      glyph('heal', gx, oy + 65, heal),
+      stars,
+      rows[1],
+      glyph('heal', gx, rows[1], mark),
       view.next.heals
     ) +
     '</g>';
