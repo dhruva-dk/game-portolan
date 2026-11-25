@@ -274,6 +274,24 @@ const STYLE = `
 @keyframes thrown { from { transform: rotate(${-360 * MOTION.thrown.turns}deg) scale(${MOTION.thrown.from}); opacity: 0 } 12% { opacity: 1 }
   76% { transform: rotate(${MOTION.thrown.rest - 4}deg) scale(1.08) } 88% { transform: rotate(${MOTION.thrown.rest}deg) scale(${MOTION.thrown.slap}) } to { transform: rotate(${MOTION.thrown.rest}deg) } }
 .ui .puff { animation: puff ${MOTION.thrown.ms * 0.6}ms ease-out ${MOTION.thrown.ms * 0.8}ms both; }
+@keyframes heavy { from { transform: translateY(-${MOTION.repossessed.drop}px) rotate(${-360 * MOTION.repossessed.turns}deg) scale(${MOTION.repossessed.from}); opacity: 0 } 10% { opacity: 1 }
+  ${MOTION.repossessed.lands * 92}% { transform: rotate(${MOTION.repossessed.rest - 5}deg) scale(1.03) } ${MOTION.repossessed.lands * 100}% { transform: rotate(${MOTION.repossessed.rest}deg) scale(${MOTION.repossessed.slap}) }
+  ${MOTION.repossessed.lands * 100 + 12}% { transform: rotate(${MOTION.repossessed.rest}deg) scale(1.02) } to { transform: rotate(${MOTION.repossessed.rest}deg) } }
+.ui .thrown.heavy { transform: rotate(${MOTION.repossessed.rest}deg); animation: heavy ${MOTION.repossessed.ms}ms ${MOTION.sheet.leaveEase} both; }
+.ui .heavy .puff { animation: puff-heavy ${MOTION.repossessed.quake * 1.6}ms ease-out ${MOTION.repossessed.ms * MOTION.repossessed.lands}ms both; }
+@keyframes puff-heavy { from { transform: scale(.95); opacity: 0 } 20% { opacity: .8 } to { transform: scale(1.3); opacity: 0 } }
+.ui .quaking { animation: quake ${MOTION.repossessed.quake}ms ease-out ${MOTION.repossessed.ms * MOTION.repossessed.lands}ms both; }
+@keyframes quake { 12% { transform: translate(-${MOTION.repossessed.shift}px, ${MOTION.repossessed.shift * 0.6}px) } 28% { transform: translate(${MOTION.repossessed.shift * 0.8}px, -${MOTION.repossessed.shift * 0.4}px) }
+  45% { transform: translate(-${MOTION.repossessed.shift * 0.45}px, ${MOTION.repossessed.shift * 0.25}px) } 65% { transform: translate(${MOTION.repossessed.shift * 0.2}px, 0) } }
+.ui .stamp-in.slam { animation-name: slam; animation-duration: ${MOTION.stamp.ms * 1.4}ms; }
+@keyframes slam { from { transform: scale(${MOTION.repossessed.stamp}) rotate(-7deg); opacity: 0 } 55% { transform: scale(.95); opacity: 1 } 75% { transform: scale(1.02) } }
+.ui .said .sitter.peek { animation-delay: ${MOTION.repossessed.ms + MOTION.repossessed.peek}ms; }
+.ui .said .peek .lid, .ui .said .peek .tilt { animation-delay: ${MOTION.repossessed.ms + MOTION.repossessed.peek + MOTION.uncle.ms}ms; }
+@keyframes debt-stamp { from { transform: scale(${MOTION.debt.from}) rotate(${MOTION.debt.turn}deg); opacity: 0 } 60% { transform: scale(.94) rotate(1deg); opacity: 1 } }
+@keyframes debt-throb { 0%, 100% { filter: none } 14% { filter: drop-shadow(0 0 ${MOTION.debt.glow}px ${INK.rubric}) } 38% { filter: none }
+  52% { filter: drop-shadow(0 0 ${MOTION.debt.glow / 2}px ${INK.rubric}) } 70% { filter: none } }
+.ui .debt-in { transform-box: fill-box; transform-origin: center;
+  animation: debt-stamp ${MOTION.debt.stamp}ms ${MOTION.stamp.ease} both, debt-throb ${MOTION.debt.throb}ms ease-out ${MOTION.debt.stamp}ms both; }
 @keyframes puff { from { transform: scale(.92); opacity: 0 } 25% { opacity: .55 } to { transform: scale(1.12); opacity: 0 } }
 .ui .printed { animation: printed ${MOTION.printed.ms}ms ${MOTION.printed.ease} calc(${MOTION.printed.after}ms + var(--i, 0) * ${MOTION.printed.stagger}ms) both; }
 @keyframes printed { from { transform: translateY(${MOTION.printed.shift}px); opacity: 0; filter: blur(1.2px) } }
