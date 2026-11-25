@@ -62,3 +62,26 @@ test('a match writes its record: events from start to end, every ship each secon
   assert.equal(summary.hash, s.hash);
   assert.equal(summary.files.events, events.length);
 });
+
+test('a match split by Gunnery counts each side: the sides share every shot, and the split changes the match', () => {
+  const even: MatchScenario = {
+      kind: 'match',
+      match: 3,
+      teams: 8,
+      close: true,
+      seconds: 90,
+    },
+    plain = runMatch(even),
+    split = runMatch({ ...even, gunnery: [20, 1] });
+  assert.equal(plain.sides, null);
+  assert.ok(split.sides);
+  assert.deepEqual(
+    split.sides.map((k) => k.gunnery),
+    [20, 1]
+  );
+  const [sharp, green] = split.sides;
+  assert.equal(sharp.shots + green.shots, split.figures.hitRate.shots);
+  assert.equal(sharp.landed + green.landed, split.figures.hitRate.landed);
+  assert.ok(sharp.shots > 0 && green.shots > 0);
+  assert.notEqual(split.hash, plain.hash);
+});

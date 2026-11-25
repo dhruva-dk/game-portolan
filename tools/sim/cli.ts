@@ -33,13 +33,14 @@ const { values: a, positionals } = parseArgs({
     standin: { type: 'boolean', default: false },
     levels: { type: 'string' },
     stats: { type: 'string' },
+    gunnery: { type: 'string' },
   },
 });
 
 const named = positionals[0];
 if (!named) {
   console.error(
-    'usage: npm run sim -- <scenario | file.json> [--seed n] [--planet n] [--runs n] [--seconds n] [--seasons n] [--workers n] [--standin] [--subject name] [--levels a,b] [--stats a,b]'
+    'usage: npm run sim -- <scenario | file.json> [--seed n] [--planet n] [--runs n] [--seconds n] [--seasons n] [--workers n] [--standin] [--subject name] [--levels a,b] [--stats a,b] [--gunnery a,b]'
   );
   process.exit(2);
 }
@@ -62,6 +63,10 @@ if (sc.kind === 'match') {
     ...(word !== undefined && { seed: word }),
     ...(a.planet !== undefined && { planet: Number(a.planet) }),
     ...(a.seconds !== undefined && { seconds: Number(a.seconds) }),
+    ...(a.gunnery !== undefined && {
+      career: false,
+      gunnery: a.gunnery.split(',').map(Number) as [number, number],
+    }),
   };
   const dir = outDir(subject, { scenario: one, runs });
   if (runs <= 1) {
