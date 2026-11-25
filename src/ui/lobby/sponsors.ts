@@ -292,8 +292,8 @@ export function createSponsors(port: LobbyPort) {
       PAID.w,
       PAID.h,
       `<g class="paid">${glyph('coin', x + coin / 2, y, coin)}` +
-        figure(x + w, y, '+0', TYPE.figure + 2, {
-          anchor: 'end',
+        figure(x + coin + SPACE.hair, y, '+0', TYPE.figure + 2, {
+          anchor: 'start',
           weight: 700,
           fill: INK.iron,
           halo: INK.white,
