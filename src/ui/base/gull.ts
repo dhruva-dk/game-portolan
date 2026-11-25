@@ -1,5 +1,5 @@
 import { hash } from '../../world/random.ts';
-import { INK, PLUMAGE, blend, svgNode } from './ink.ts';
+import { INK, PLUMAGE, blend } from './ink.ts';
 
 export type Jacket = readonly [string, string];
 
@@ -204,19 +204,6 @@ export function uncle(size: number) {
       face(pen) +
       cap(pen)
   );
-}
-
-export function bust(jacket: Jacket, size: number): Element {
-  const pen = penFor(size),
-    svg = svgNode(
-      BOX,
-      BOX,
-      `<g transform="translate(1 -5)">${body(jacket[0], jacket[1], pen)}${head(pen, jacket[1])}${EYEWEAR.wayfarer(pen)}</g>`
-    );
-  svg.setAttribute('width', String(size));
-  svg.setAttribute('height', String(size));
-  svg.setAttribute('overflow', 'hidden');
-  return svg;
 }
 
 export function gullHead(size: number) {

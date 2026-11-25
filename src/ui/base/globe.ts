@@ -685,5 +685,3 @@ export function createGlobe(coasts: readonly Coast[]) {
     },
   };
 }
-
-export type Globe = ReturnType<typeof createGlobe>;

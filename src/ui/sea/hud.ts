@@ -429,5 +429,3 @@ export function createHud(
     },
   };
 }
-
-export type Hud = ReturnType<typeof createHud>;
