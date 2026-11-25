@@ -19,7 +19,6 @@ interface Levels {
   strain: number;
   presence: number;
   open: number;
-  uncovered: number;
 }
 
 export const levels = (): Levels => ({
@@ -40,10 +39,7 @@ export const levels = (): Levels => ({
   strain: 0,
   presence: 0,
   open: 0,
-  uncovered: 1,
 });
-
-const COVER = 0.04;
 
 export const breakers = (t: number) =>
   clamp(
@@ -93,7 +89,6 @@ export function levelsOf(b: Bed, out: Levels): Levels {
     (0.5 + 0.5 * clamp(Math.abs(b.roll) / 0.06));
   out.presence = clamp(b.presence);
   out.open = 18000 * (450 / 18000) ** clamp(b.muffle);
-  out.uncovered = 1 - clamp(b.covered);
   return out;
 }
 
@@ -117,9 +112,8 @@ export function createBed(
     frequency: 3000,
     gain: -8,
   });
-  const presence = new GainNode(ctx, { gain: 0 }),
-    uncovered = new GainNode(ctx, { gain: 1 });
-  open.connect(tilt).connect(presence).connect(uncovered).connect(out);
+  const presence = new GainNode(ctx, { gain: 0 });
+  open.connect(tilt).connect(presence).connect(out);
   const loops = [1, 0.83, 1.13].map((rate, i) => {
     const src = new AudioBufferSourceNode(ctx, {
       buffer: noise,
@@ -239,7 +233,6 @@ export function createBed(
       set(strain, v.strain, null, at, 0.6);
       glide(presence.gain, v.presence, at, 0.5);
       glide(open.frequency, v.open, at, 0.25);
-      glide(uncovered.gain, v.uncovered, at, COVER);
     },
   };
 }

@@ -316,9 +316,8 @@ const hearing = (
   s: Snapshot,
   st: Status & Kit,
   screen: Hearing['screen'] = 'match',
-  map = false,
-  covered = 0
-): Hearing => ({ scene: s, status: st, screen, map, covered });
+  map = false
+): Hearing => ({ scene: s, status: st, screen, map });
 
 test('listen: a ball passing near whistles once; a heal slot taken in hand; the screens; its water', () => {
   const l = createListen(() => -20),
@@ -390,15 +389,6 @@ test('listen: a ball passing near whistles once; a heal slot taken in hand; the 
     [],
     'each change heard once'
   );
-  assert.equal(
-    l.listen(hearing(scene(3.5), status(), 'result', false, 0.4), dt, out)
-      .covered,
-    0.4
-  );
-  assert.equal(
-    l.listen(hearing(scene(3.6), status(), 'lobby', false, 0), dt, out).covered,
-    0
-  );
 });
 
 test('the bed hears its speed as a share of its own top', () => {
@@ -445,13 +435,9 @@ test('the bed: the storm heard from afar and all about it inside; surf only near
     hull: 1,
     presence: 1,
     muffle: 0,
-    covered: 0,
     clock: 3,
   };
   assert.equal(levelsOf(bed, levels()).surf, 0);
-  assert.equal(levelsOf(bed, levels()).uncovered, 1);
-  assert.equal(levelsOf({ ...bed, covered: 1 }, levels()).uncovered, 0);
-  assert.equal(levelsOf({ ...bed, covered: 0.25 }, levels()).uncovered, 0.75);
   assert.ok(levelsOf({ ...bed, coast: 25 }, levels()).surf > 0);
   assert.equal(levelsOf(bed, levels()).strain, 0, 'its hull whole, no strain');
   assert.ok(levelsOf({ ...bed, hull: 0.1 }, levels()).strain > 0);

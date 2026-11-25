@@ -562,7 +562,6 @@ export async function ashore(
     status,
     screen: 'lobby',
     map: false,
-    covered: 0,
   };
   onPressed(uiLayer(), () => {
     if (!gone) audio.tap(hearing.screen);
