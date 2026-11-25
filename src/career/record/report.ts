@@ -12,8 +12,7 @@ import {
   type Workshop,
 } from '../state.ts';
 import { RACE_REPORT } from '../tuning.ts';
-import { placedTeam, teamOfShip, teamShips } from './finish.ts';
-import { racePoints } from './score.ts';
+import { placedTeam, racePoints, teamOfShip, teamShips } from './race.ts';
 
 type RaceRecord = {
   before: CareerState;

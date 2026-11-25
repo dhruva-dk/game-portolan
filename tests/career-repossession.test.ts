@@ -4,13 +4,15 @@ import { apply, newCareer, type Applied } from '../src/career/apply.ts';
 import { draw, knowledgeYear } from '../src/career/draw.ts';
 import { matchSetup } from '../src/career/fit.ts';
 import { redrawRepossessed } from '../src/career/knowledge/ships.ts';
-import { moneyTotal, payRace, raceMoney } from '../src/career/record/pay.ts';
 import {
   isRepossessed,
+  moneyTotal,
+  payRace,
+  raceMoney,
   repossess,
   repossessTeam,
-} from '../src/career/record/repossess.ts';
-import { scoreRace } from '../src/career/record/score.ts';
+} from '../src/career/record/pay.ts';
+import { scoreRace } from '../src/career/record/race.ts';
 import { shipRange } from '../src/career/rules/knowledge.ts';
 import { standings } from '../src/career/rules/standing.ts';
 import { standInResult } from '../src/career/standin.ts';

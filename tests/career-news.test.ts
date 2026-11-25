@@ -11,8 +11,8 @@ import { matchSetup, planetName } from '../src/career/fit.ts';
 import { personOf } from '../src/career/lookup.ts';
 import { SPONSOR_ROSTER } from '../src/career/names.ts';
 import { minimumTerms } from '../src/career/policy/terms.ts';
-import { publishNews } from '../src/career/record/news.ts';
-import { repossess } from '../src/career/record/repossess.ts';
+import { publishNews } from '../src/career/record/race.ts';
+import { repossess } from '../src/career/record/pay.ts';
 import {
   isStreak,
   lineLeader,

@@ -22,7 +22,7 @@ import { runTeam, worstFirst, type Send } from '../src/career/policy/run.ts';
 import { holderStars, weakSeat } from '../src/career/policy/seats.ts';
 import { minimumTerms } from '../src/career/policy/terms.ts';
 import { moneyTotal, teamMoney, wageBill } from '../src/career/record/pay.ts';
-import { scoreRace } from '../src/career/record/score.ts';
+import { scoreRace } from '../src/career/record/race.ts';
 import { ask, standardClause } from '../src/career/rules/hiring.ts';
 import {
   focusValue,

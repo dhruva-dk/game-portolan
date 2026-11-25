@@ -10,20 +10,20 @@ import type { Command } from '../src/career/commands.ts';
 import { matchSetup, planetName } from '../src/career/fit.ts';
 import { employees } from '../src/career/lookup.ts';
 import {
+  bestPlaceOf,
   enterPhase,
   nextRaceLobby,
-  seasonOver,
-} from '../src/career/record/advance.ts';
-import { countDownContracts } from '../src/career/record/contracts.ts';
-import {
-  bestPlaceOf,
   placedTeam,
+  publishNews,
+  racePoints,
+  scoreRace,
+  seasonOver,
   shipOf,
   teamOfShip,
   teamShips,
-} from '../src/career/record/finish.ts';
-import { publishNews } from '../src/career/record/news.ts';
+} from '../src/career/record/race.ts';
 import {
+  countDownContracts,
   moneyTotal,
   payRace,
   raceMoney,
@@ -31,7 +31,6 @@ import {
   wageBill,
 } from '../src/career/record/pay.ts';
 import { raceReport, workshop } from '../src/career/record/report.ts';
-import { racePoints, scoreRace } from '../src/career/record/score.ts';
 import {
   interestOn,
   meanShare,

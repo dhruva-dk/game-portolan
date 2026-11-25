@@ -9,11 +9,15 @@ import {
 import type { Command } from '../src/career/commands.ts';
 import { matchSetup } from '../src/career/fit.ts';
 import { personOf } from '../src/career/lookup.ts';
-import { releaseExpired, turnSeason } from '../src/career/offseason/finish.ts';
-import { ageLeague } from '../src/career/offseason/people.ts';
-import { payPrizes } from '../src/career/offseason/prize.ts';
-import { offseasonReport } from '../src/career/offseason/report.ts';
-import { teamLoss, winter } from '../src/career/offseason/winter.ts';
+import {
+  ageLeague,
+  offseasonReport,
+  payPrizes,
+  releaseExpired,
+  teamLoss,
+  turnSeason,
+  winter,
+} from '../src/career/offseason.ts';
 import { teamMoney } from '../src/career/record/pay.ts';
 import { currentStats, rookie } from '../src/career/rules/person.ts';
 import { seasonPrize } from '../src/career/rules/money.ts';

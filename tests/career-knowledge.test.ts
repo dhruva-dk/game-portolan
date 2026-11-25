@@ -28,9 +28,8 @@ import {
   redrawRepossessed,
 } from '../src/career/knowledge/ships.ts';
 import { ownerOf, personOf } from '../src/career/lookup.ts';
-import { enterPhase } from '../src/career/record/advance.ts';
+import { enterPhase, scoreRace } from '../src/career/record/race.ts';
 import { moneyTotal, teamMoney } from '../src/career/record/pay.ts';
-import { scoreRace } from '../src/career/record/score.ts';
 import {
   ask,
   askingWage,

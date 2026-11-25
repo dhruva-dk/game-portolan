@@ -17,7 +17,7 @@ import {
   type Owner,
   type Person,
 } from '../state.ts';
-import { bestPlaceOf, placedTeam, shipOf } from './finish.ts';
+import { bestPlaceOf, placedTeam, shipOf } from './race.ts';
 
 function winnerHelm(
   before: CareerState,
