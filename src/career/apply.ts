@@ -67,7 +67,6 @@ import { raceEvents } from './record/events.ts';
 import { runLeague, runTeam, type PolicyRun } from './policy/run.ts';
 import { fileReport, raceReport } from './record/report.ts';
 import { repaint, repaintRefusal } from './repaint.ts';
-import type { Temperament } from './rules/person.ts';
 import { dealOffers, signRefusal, signSponsor } from './sponsors.ts';
 import { YOURS, type CareerState } from './state.ts';
 
@@ -102,8 +101,8 @@ const accepted = (state: CareerState): Applied => ({
 export const runPolicy = (
   state: CareerState,
   team: number,
-  temperament?: Temperament
-): PolicyRun => runTeam(state, team, apply, temperament);
+  nerve?: number
+): PolicyRun => runTeam(state, team, apply, nerve);
 
 export const runPolicies = (state: CareerState): PolicyRun =>
   runLeague(state, apply);

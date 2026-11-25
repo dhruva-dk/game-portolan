@@ -3,7 +3,7 @@ import { buildPrice, fitPrice, sameFocus } from '../development.ts';
 import { draw, raceKey } from '../draw.ts';
 import { employees, personOf, seatHolder } from '../lookup.ts';
 import { focusValue, focusWeight, wantsGun } from '../rules/development.ts';
-import { ownerTemperament, stars, type Temperament } from '../rules/person.ts';
+import { ownerNerve, stars } from '../rules/person.ts';
 import { reputationOf, standings } from '../rules/standing.ts';
 import {
   LINES,
@@ -224,15 +224,12 @@ function sponsor({ state, team }: Deciding): Command | null {
 
 const STEPS = [marker, renew, sign, approach, focus, fit, build, sponsor];
 
-const temperamentOfTeam = (state: CareerState, team: number): Temperament =>
-  ownerTemperament(state.teams[team].owner);
-
 export function policy(
   state: CareerState,
   team: number,
-  temperament: Temperament = temperamentOfTeam(state, team)
+  nerve: number = ownerNerve(state.teams[team].owner)
 ): Command | null {
-  const deciding: Deciding = { state, team, means: meansOf(temperament) };
+  const deciding: Deciding = { state, team, means: meansOf(nerve) };
   for (const step of STEPS) {
     const command = step(deciding);
     if (command !== null) return command;
