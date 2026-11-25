@@ -4,7 +4,8 @@ import { YOURS, type CareerState } from '../career/state.ts';
 import { lobbyView } from '../career/views/lobby.ts';
 import { teamView } from '../career/views/team.ts';
 import { createGame } from '../play/game.ts';
-import { PARTS, WHOLE, type Framing } from '../play/anchorage.ts';
+import { PARTS, WHOLE, litBearing, type Framing } from '../play/anchorage.ts';
+import { sunAt } from '../world/sun.ts';
 import type { Chart } from '../play/player.ts';
 import { surveyor } from '../play/preview.ts';
 import { watersOf } from '../play/setup.ts';
@@ -28,7 +29,10 @@ export async function ashore(
   o: { store: Store; sailed(state: CareerState): void; ready(): void }
 ): Promise<Ashore> {
   const { waters } = await watersOf(s.world.seed, s.world.land);
-  const game = createGame(s.world, s.anchors, waters, s.start, RACE_SHIP);
+  const { climate } = s.world,
+    sun = sunAt(climate.sunPlaces, climate.timeOfDay, s.start.at);
+  const start = { at: s.start.at, bearing: litBearing(sun, s.start.at) };
+  const game = createGame(s.world, s.anchors, waters, start, RACE_SHIP);
   game.wear(career.teams[YOURS].livery);
   game.moor(true);
   const input = createInput(s.canvas, () => game.steering());

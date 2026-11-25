@@ -3,6 +3,8 @@ import type { ShipPose } from '../world/pose.ts';
 import { clamp, lerp, smoother, wrapAngle } from '../world/scalar.ts';
 import {
   along,
+  dot,
+  frameAt,
   normalize,
   place,
   rotateAbout,
@@ -257,14 +259,23 @@ export const CONSORT = {
   id: 1,
   berths: [
     [-78, 34],
-    [-95, 22],
-    [-110, 10],
-    [-128, 30],
-    [-78, -34],
+    [-96, 42],
+    [-62, 26],
+    [-116, 50],
+    [-50, 20],
   ],
+  turn: 0.4,
   depth: 3,
   reach: 16,
 } as const;
+
+export const LIT = { behind: 0.6 } as const;
+
+export function litBearing(sun: Vec3, at: Vec3): number {
+  const f = frameAt(at);
+  const sunward = Math.atan2(dot(sun, f.east), dot(sun, f.north));
+  return wrapAngle(sunward + LIT.behind - LOBBY.quarter);
+}
 
 export function consortBerth(
   at: Vec3,
@@ -282,7 +293,11 @@ export function consortBerth(
     const abeamWay = normalize(rotateAbout(fore.t, fore.p, Math.PI / 2));
     const side = along(fore.p, abeamWay, abeam);
     const t = normalize(tangent(ahead, side.p));
-    if (deep(side.p, t)) return { at: side.p, heading: t };
+    if (deep(side.p, t))
+      return {
+        at: side.p,
+        heading: normalize(rotateAbout(t, side.p, CONSORT.turn)),
+      };
   }
   return null;
 }

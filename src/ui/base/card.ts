@@ -34,10 +34,7 @@ const at = (x: number, y: number, inner: string) =>
 
 export function paper(w: number, h: number, seed = 3, empty = false) {
   if (empty)
-    return (
-      `<path d="${roughRect(1, 1, w - 2, h - 2, seed)}" fill="rgba(241,228,200,.38)" stroke="${INK.iron}" stroke-width="1.1" stroke-dasharray="5 4" opacity=".75"/>` +
-      `<rect x="6" y="6" width="${w - 12}" height="${h - 12}" fill="none" stroke="${INK.iron}" stroke-width=".5" opacity=".3"/>`
-    );
+    return `<path d="${roughRect(1, 1, w - 2, h - 2, seed)}" fill="rgba(241,228,200,.38)" stroke="${INK.iron}" stroke-width="1.1" stroke-dasharray="5 4" opacity=".75"/>`;
   return (
     `<path d="${roughRect(1, 1, w - 2, h - 2, seed)}" fill="url(#pg)" stroke="${INK.iron}" stroke-width="1.1" filter="url(#sh)"/>` +
     `<rect x="${SIZE.rule + 1}" y="${SIZE.rule + 1}" width="${w - 2 * SIZE.rule - 2}" height="${h - 2 * SIZE.rule - 2}" fill="none" stroke="${INK.iron}" stroke-width=".5" opacity=".5"/>`
@@ -153,8 +150,9 @@ export function cardFront(face: CardFace, seed = 3) {
         anchor: 'start',
         weight: 600,
       });
-  s += starRow(w / 2, 96, face.stars);
-  s += statRose(w / 2, 178, 42, rosePoints(face), {
+  const low = face.wage === null && face.racesLeft === null ? 1 : 0;
+  s += starRow(w / 2, 96 + low * 10, face.stars);
+  s += statRose(w / 2, 178 + low * 26, 42 + low * 6, rosePoints(face), {
     glyph: least('stat.helm'),
   });
   if (face.wage) s += wageRow(pad + 2, 257, w - 2 * pad - 4, face.wage);
@@ -181,31 +179,48 @@ export function cardLarge(
 ): { svg: string; actions: Actions } {
   const { w, h } = LARGE,
     pad = SPACE.pad + 4,
-    shot = 96;
+    shot = 80,
+    frame = shot * 0.05,
+    colW = 176,
+    left = pad + 2;
+  const beside = left + shot + 2 * frame + 10,
+    lines = face.age === null ? [26, 56] : [14, 40, 66];
+  const block =
+    24 +
+    shot +
+    2 * frame +
+    (face.wage ? 34 : 0) +
+    (face.racesLeft === null
+      ? 0
+      : 6 +
+        PIPS.rise * Math.ceil(Math.min(face.racesLeft, PIPS.most) / PIPS.row));
+  const top = Math.round((h - block) / 2),
+    shotTop = top + 24 + frame;
   let s = paper(w, h, seed);
-  s += framed(face, pad + 2, pad + 2, shot);
-  const colW = 176;
   const nameSize = fitted(face.name, TYPE.name + 4, colW - 4);
-  s += label(pad, pad + shot + 22, face.name, nameSize, { anchor: 'start' });
-  s += roleRow(pad - 2, pad + shot + 48, face.role);
+  s += label(left, top + 8, face.name, nameSize, { anchor: 'start' });
+  s += framed(face, left + frame, shotTop, shot);
+  s += roleRow(beside, shotTop + lines[0], face.role);
   if (face.age !== null)
     s +=
-      word(pad, pad + shot + 74, 'Age', TYPE.word, {
+      word(beside, shotTop + lines[1], 'Age', TYPE.word, {
         anchor: 'start',
         opacity: 0.8,
       }) +
-      figure(pad + 28, pad + shot + 74, face.age, TYPE.name + 2, {
+      figure(beside + 28, shotTop + lines[1], face.age, TYPE.name + 2, {
         anchor: 'start',
         weight: 600,
       });
+  const star = least('star');
   s += starRow(
-    pad + 2 + 2.5 * least('star') * 1.06 - least('star') * 0.53,
-    pad + shot + (face.age === null ? 76 : 98),
+    beside + star / 2 + 2 * star * 1.06,
+    shotTop + lines[lines.length - 1],
     face.stars
   );
-  if (face.wage) s += wageRow(pad, pad + shot + 128, colW - 16, face.wage);
+  const below = shotTop + shot + frame + 22;
+  if (face.wage) s += wageRow(left, below, colW - 4, face.wage);
   if (face.racesLeft !== null)
-    s += pips(pad + 2, pad + shot + 150, face.racesLeft, colW - 8);
+    s += pips(left, below + 22, face.racesLeft, colW - 8);
   const roseX = 296;
   s += `<path d="M${colW + 20} ${pad}V${h - pad}M${w - 236} ${pad}V${h - pad}" stroke="${INK.iron}" stroke-width=".6" opacity=".3"/>`;
   s += statRose(roseX, h / 2 - 2, 60, rosePoints(face), {
@@ -215,10 +230,11 @@ export function cardLarge(
   const rowsX = w - 222,
     rowsW = 206,
     n = face.stats.length,
-    top = pad + 4,
-    rowH = Math.min(34, (h - 2 * pad - 52) / n);
+    acting = face.who === 'person',
+    rowH = Math.min(acting ? 34 : 38, (h - 2 * pad - (acting ? 52 : 0)) / n),
+    first = acting ? pad + 4 : (h - rowH * n) / 2;
   face.stats.forEach((st, i) => {
-    const cy = top + rowH * (i + 0.5),
+    const cy = first + rowH * (i + 0.5),
       g = least('stat.helm');
     const value =
       st.value.lo === st.value.hi
