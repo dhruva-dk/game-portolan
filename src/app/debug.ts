@@ -8,6 +8,7 @@ import {
   haggled,
   owing,
   armed,
+  recorded,
   rehearsed,
   sponsored,
   reported,
@@ -18,6 +19,7 @@ import {
 import { ROLES, YOURS, type CareerState, type Role } from '../career/state.ts';
 import { memoryStore } from './save.ts';
 import { planetSeed } from '../career/fit.ts';
+import { REPOSSESSION } from '../career/tuning.ts';
 import {
   SEATS,
   opponentsView,
@@ -286,6 +288,8 @@ const CAREER_SCREENS = [
   'sponsors',
   'planet',
   'opponents',
+  'result',
+  'paper',
 ] as const;
 
 const FIXED_PLANET = 'portolan';
@@ -354,10 +358,11 @@ async function harbor(
   const roles = (params.get('approach') ?? '')
     .split(',')
     .flatMap((r) => ROLES.filter((role) => role === r));
+  const flowing = screen === 'result' || screen === 'paper';
   const sailed = rehearsed(
       params.get('seed') ?? undefined,
-      races,
-      roles,
+      flowing ? Math.max(1, races) - 1 : races,
+      flowing ? [] : roles,
       founded()
     ),
     signed = params.has('signed') ? wintered(sailed) : sailed,
@@ -374,7 +379,15 @@ async function harbor(
     : fitted;
   const role = roleOf(priced),
     talk = screen === 'negotiation' ? talkedTo(priced, role) : null,
-    career = talk === null ? priced : talk.state;
+    talked = talk === null ? priced : talk.state,
+    career = flowing
+      ? recorded(
+          params.has('special')
+            ? owing(talked, REPOSSESSION.below * 4)
+            : talked,
+          roles
+        )
+      : talked;
   const planet = planetSeed(career);
   const s = await stage({
     ...setupOf(release),
@@ -396,6 +409,12 @@ async function harbor(
   });
   if (screen === 'sponsors') {
     shore.open(screen);
+    return;
+  }
+  if (screen === 'result' || screen === 'paper') {
+    const step = screen === 'paper' ? 3 : Math.floor(number('step', 1));
+    if (step === 2) shore.open('result', { step });
+    if (step === 3) shore.open('paper');
     return;
   }
   if (screen === 'planet') {
@@ -457,9 +476,9 @@ function open(p: Played, others: readonly Berth[], s: Stage) {
     game.debug.atSea(p.race, others, s.rig ?? undefined);
     drive(game, params.get('drive') ?? '');
     referee.begin();
-    if (screen === 'sunk' || screen === 'spectate' || screen === 'result')
+    if (screen === 'sunk' || screen === 'spectate' || screen === 'over')
       sinkPlayerShip(game);
-    if (screen === 'result')
+    if (screen === 'over')
       others.forEach((_, i) => i > 0 && game.debug.sink(i + 1, 1));
     if (screen === 'won') winPlayerShip(game);
     flow.go('match');
