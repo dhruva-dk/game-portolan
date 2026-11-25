@@ -60,6 +60,20 @@ export const MOTION = {
   blow: { after: 330, ms: 300, ease: OUT, give: 0.955, drop: 2 },
   flourish: { after: 330, ms: 480, ease: OUT, from: 0.55, reach: 1.65 },
   seated: { ms: 420, ease: POP, drop: 22 },
+  answer: { ms: 260, ease: POP, swell: 1.16 },
+  roll: { ms: 520, ease: POP, hop: 9, turn: 400, land: 300, letter: 34 },
+  repaint: { ms: 700, lift: 0.22 },
+  wake: { ms: 360, ease: POP, swell: 1.08 },
+  title: {
+    after: 90,
+    rose: 720,
+    rhumbs: 900,
+    word: 560,
+    rule: 460,
+    turn: -140,
+    ease: OUT,
+    pop: POP,
+  },
   fade: { ms: 180, ease: 'ease' },
 } as const;
 

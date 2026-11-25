@@ -24,8 +24,8 @@ const charge = (device: number) =>
   DEVICES[((device % EMBLEMS) + EMBLEMS) % EMBLEMS] ?? '';
 
 const shield = (device: number, colors: Jacket) =>
-  `<path d="${SHIELD}" fill="${colors[0]}" stroke="${INK.iron}" stroke-width="1.3" stroke-linejoin="round"/>` +
-  `<g fill="${colors[1]}" transform="translate(12 11.5) scale(.72) translate(-12 -11.5)">${charge(device)}</g>`;
+  `<path d="${SHIELD}" style="fill:${colors[0]}" stroke="${INK.iron}" stroke-width="1.3" stroke-linejoin="round"/>` +
+  `<g style="fill:${colors[1]}" transform="translate(12 11.5) scale(.72) translate(-12 -11.5)">${charge(device)}</g>`;
 
 export function liveryColors(livery: Livery): Jacket {
   const dye = DYES[livery.dye] ?? DYES[0];

@@ -137,6 +137,27 @@ const STYLE = `
 @keyframes rays { from { transform: scale(${MOTION.flourish.from}); opacity: 0 } 25% { opacity: 1 } to { transform: scale(${MOTION.flourish.reach} ); opacity: 0 } }
 .ui .struck { animation: struck ${MOTION.blow.ms}ms ${MOTION.blow.ease} ${MOTION.blow.after}ms; }
 @keyframes struck { 30% { transform: translateY(${MOTION.blow.drop}px) scale(${MOTION.blow.give}) rotate(-.7deg) } 70% { transform: scale(1.012) } }
+.ui .field .lit { opacity: 0; transition: opacity ${MOTION.fade.ms}ms ease; }
+.ui .field.typing .lit { opacity: 1; }
+.ui .dyed * { transition: fill ${MOTION.glide.ms}ms ${MOTION.glide.ease}; }
+.ui .answer { transform-box: fill-box; transform-origin: center; animation: answer ${MOTION.answer.ms}ms ${MOTION.answer.ease}; }
+@keyframes answer { 35% { transform: scale(${MOTION.answer.swell}) } }
+.ui .rolling { transform-box: fill-box; transform-origin: center; animation: rolling ${MOTION.roll.ms}ms ${MOTION.roll.ease}; }
+@keyframes rolling { 45% { transform: translateY(-${MOTION.roll.hop}px) rotate(${MOTION.roll.turn * 0.7}deg) scale(1.1) } to { transform: rotate(${MOTION.roll.turn}deg) } }
+.ui .waking { transform-box: fill-box; transform-origin: center; animation: waking ${MOTION.wake.ms}ms ${MOTION.wake.ease}; }
+@keyframes waking { 40% { transform: scale(${MOTION.wake.swell}) rotate(-1.5deg) } }
+.ui .lively { transition: opacity ${MOTION.wake.ms}ms ease; }
+.ui .inked-rose { transform-box: fill-box; transform-origin: center;
+  animation: inked-rose ${MOTION.title.rose}ms ${MOTION.title.pop} ${MOTION.title.after}ms both; }
+@keyframes inked-rose { from { transform: rotate(${MOTION.title.turn}deg) scale(.4); opacity: 0 } }
+.ui .inked-rhumbs { transform-box: view-box; animation: inked-rhumbs ${MOTION.title.rhumbs}ms ${MOTION.title.ease} ${MOTION.title.after}ms both; }
+@keyframes inked-rhumbs { from { transform: scale(.15); opacity: 0 } }
+.ui .inked-word { transform-box: fill-box; transform-origin: center;
+  animation: inked-word ${MOTION.title.word}ms ${MOTION.title.ease} ${MOTION.title.after * 2}ms both; }
+@keyframes inked-word { from { transform: translateY(6px) scaleX(1.18); opacity: 0; filter: blur(1.5px) } }
+.ui .inked-rule { transform-box: fill-box; transform-origin: center;
+  animation: inked-rule ${MOTION.title.rule}ms ${MOTION.title.ease} ${MOTION.title.after * 4}ms both; }
+@keyframes inked-rule { from { transform: scaleX(0); opacity: 0 } }
 .ui .seated { animation: seated ${MOTION.seated.ms}ms ${MOTION.seated.ease} both; }
 @keyframes seated { from { transform: translateY(-${MOTION.seated.drop}px) scale(1.04) rotate(-2deg); opacity: 0 } }
 .ui .waiting { transform-box: fill-box; transform-origin: center; animation: waiting ${MOTION.suspense.ms}ms ease-in-out infinite; }
@@ -203,6 +224,8 @@ export function uiLayer(): HTMLElement {
   document.body.appendChild(el);
   layer = el;
   const resized = () => {
+    const typing = document.activeElement instanceof HTMLInputElement;
+    if (typing && innerWidth === view.w && innerHeight < view.h) return;
     [view.w, view.h, view.k, view.dpr] = [
       innerWidth,
       innerHeight,
