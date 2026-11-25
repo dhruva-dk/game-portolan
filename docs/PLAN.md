@@ -335,7 +335,7 @@ where `skill` is the designer's stat for that line and `rate` is 1 for the focus
 
 ### 1.7.3 Unlocking a gun kind
 
-If the focus is a gun kind, then after each race its unlock progress rises by `designer's Gun stat / 4`, and no line gets the focused rate. At 20 the kind is unlocked for that team for good, and the focus becomes nothing. The cannon and kinds already unlocked cannot be focused.
+If the focus is a gun kind, then after each race its unlock progress rises by `designer's Gun stat / 4`, and no line gets the focused rate. At 20 the kind is unlocked for that team for good, and the focus becomes nothing; progress stops at 20. The cannon and kinds already unlocked cannot be focused.
 
 ### 1.7.4 Building
 
@@ -344,7 +344,7 @@ If the focus is a gun kind, then after each race its unlock progress rises by `d
 | `Build {slot, line}` | Sets that ship's fitted level for the line to the team's design level | `ceil(30 × (design − fitted) × (1 + design / 25) × (1 − 0.02 × Thrift))`; Thrift is 0 with no mechanic |
 | `FitGun {slot, kind}` | Changes that ship's gun to an unlocked kind and sets its fitted `gun` level to the design level | The `Build` cost of the `gun` line for that ship, minimum 200 |
 
-`Build` is refused (`same`) if the fitted level already equals the design level. `FitGun` is refused (`same`) if the ship already carries that kind, and (`locked`) if the kind is not unlocked. Both take effect at once.
+`Build` is refused (`same`) if the fitted level is at or above the design level. `FitGun` is refused (`same`) if the ship already carries that kind, and (`locked`) if the kind is not unlocked. Both take effect at once.
 
 ### 1.7.5 The start
 
@@ -502,7 +502,7 @@ Terms used below:
 
 The policy never releases anyone. A rival whose income falls below its wages runs into debt and may be repossessed (§1.8.4).
 
-The policy must never issue a command the reducer refuses (§2.7.2). The harness plays your seat with the policy, as a sensible team (§2.8.2).
+The policy must never issue a command the reducer refuses (§2.7.2); if one is refused, that team's run stops and the refusal is listed in the accepted result's `refused` field, which the harness treats as a failure. Ties among sponsor offers and approach targets go to the earliest offer and the lowest id. The harness plays your seat with the policy, as a sensible team (§2.8.2).
 
 ## 1.11 The match
 
@@ -1305,7 +1305,7 @@ Events are appended to `pendingEvents` as they happen:
 | `title`, `yourSeason` | The start of the off-season stop |
 | `retired`, `rookie` | The start of the off-season stop |
 
-At the end of `RecordRace`, `news` is replaced by `pendingEvents` and `pendingEvents` is emptied. `career/paper.ts` exports a function from the state to an edition: at most five items, each a kind, a variant index and its placeholder values, each value carrying the team to open and the person to enlarge when it is a link (§1.13.1). The paper opens the sheet with the port's `open`. The wordings table lives in `ui/lobby/`.
+At the end of `RecordRace`, `news` is replaced by `pendingEvents` and `pendingEvents` is emptied. `career/paper.ts` exports a function from the state to an edition: at most five items, each a kind, a variant index and its placeholder values, each value carrying the team to open and the person to enlarge when it is a link (§1.13.1). The paper opens the sheet with the port's `open`. The wordings table lives in `career/wordings.ts`, because the paper picks a variant by its placeholders and `career/` may not import `ui/`.
 
 ### 2.2.5 What `RecordRace` does
 
@@ -1321,7 +1321,7 @@ In this order:
 9. If `race` is less than 10: `race` rises by 1, the phase becomes `lobby`, and each team is dealt its deals (§1.6.2) and sponsor offers (§1.8.5). If `race` is 10: the phase becomes `offseason` and the five steps of §1.9 run, filling in `lastOffseason`.
 10. `news` is replaced (§2.2.4).
 
-In the reports a money row that takes money (wages, interest) is stored negative, so a balance's change is the sum of its rows. The race report's balance "after" is taken after step 2. `paid` holds portrait seeds, not ids, because a person may retire in the same step. The report's shots are both your ships' totals and its sea share the mean of your seven samples.
+A sponsor has one money row, its fee plus its bonus when the objective is met. After race 10 offers and deals are dealt once, at the off-season stop. An approach is used up whenever its role is dealt, even when its person is left out. A rival's `BuyReport` is refused `same`. A person you release goes from exact back to a range. If you are repossessed in race 10 the paper is the special edition. A streak is told on every race at three wins or more. In the reports a money row that takes money (wages, interest) is stored negative, so a balance's change is the sum of its rows. The race report's balance "after" is taken after step 2. `paid` holds portrait seeds, not ids, because a person may retire in the same step. The report's shots are both your ships' totals and its sea share the mean of your seven samples.
 
 ## 2.3 Seeds and determinism
 
@@ -1685,8 +1685,8 @@ Goal: the match engine is in `sim/`; a match is created from a `MatchSetup` of 2
 - [x] **M2.10 Race conditions.** Storm scaling and the two ratings (§1.11.2, §1.11.3).
 - [x] **M2.11 Berths by standing.** §1.11.9.
 - [x] **M2.12 The result.** Sea samples, `afloatAtPhaseFour`, the end rule and places (§1.11.6, §1.11.10); `result()` returns a `MatchResult`.
-- [ ] **M2.13 Harness.** `duel` and `match` run on `evenSetup`. Remove the persona and distinctness metrics. Print the figures of §2.8.1.
-- [ ] **M2.14 Minimum HUD.** Remove the gun slots; show three heal slots; make Gust a toggle with its ring. Enough for the browser game to be played; the full HUD is step M5.17.
+- [x] **M2.13 Harness.** `duel` runs on `evenSetup`; `match` is race one of a career since milestone 3 (§2.8.1). Remove the persona and distinctness metrics. Print the figures of §2.8.1.
+- [x] **M2.14 Minimum HUD.** Remove the gun slots; show three heal slots; make Gust a toggle with its ring. Enough for the browser game to be played; the full HUD is step M5.17.
 
 **Harness check:** `npm run sim -- match` runs 80 ships in 40 teams to an end and prints every figure in §2.8.1. `npm run sim -- duel`, with one ship given the level-100 physical values of §1.4.1 and the other the level-0 values, is won by the first.
 
@@ -1713,15 +1713,15 @@ Goal: a career can be created from a seed and played for whole seasons in the ha
 
 Goal: every rule of §1.6 to §1.10 works, and rivals play.
 
-- [ ] **M4.1 Development.** `SetFocus`, gains, unlocks, `Build`, `FitGun` (§1.7.1 to §1.7.5).
-- [ ] **M4.2 Sponsors.** Offers, `SignSponsor`, fees, objectives, and the rivals' starting sponsors (§1.8.5, §1.10.1).
-- [ ] **M4.3 Hiring.** Deals, `SetScoutSeat`, `Approach`, `Offer`, `AcceptCounter`, talks, contracts, renewing, `Release`, buying out another team's contract (§1.6.2 to §1.6.7).
-- [ ] **M4.4 Knowledge.** People's ranges, `BuyReport`, rival ship ranges (§1.6.1, §1.7.6).
-- [ ] **M4.5 Repossession.** §1.8.4.
-- [ ] **M4.6 `Repaint`.** §1.8.6.
-- [ ] **M4.7 The policy.** §1.10.2, the three temperaments derived from owners' Nerve (§1.5.6), run inside `StartRace` and `FinishOffseason`. The harness plays your seat with it.
-- [ ] **M4.8 News.** Every event of §2.2.4, and `career/paper.ts` (§1.13.1).
-- [ ] **M4.9 Harness figures.** The `career` scenario prints everything in §2.8.1.
+- [x] **M4.1 Development.** `SetFocus`, gains, unlocks, `Build`, `FitGun` (§1.7.1 to §1.7.5).
+- [x] **M4.2 Sponsors.** Offers, `SignSponsor`, fees, objectives, and the rivals' starting sponsors (§1.8.5, §1.10.1).
+- [x] **M4.3 Hiring.** Deals, `SetScoutSeat`, `Approach`, `Offer`, `AcceptCounter`, talks, contracts, renewing, `Release`, buying out another team's contract (§1.6.2 to §1.6.7).
+- [x] **M4.4 Knowledge.** People's ranges, `BuyReport`, rival ship ranges (§1.6.1, §1.7.6).
+- [x] **M4.5 Repossession.** §1.8.4.
+- [x] **M4.6 `Repaint`.** §1.8.6.
+- [x] **M4.7 The policy.** §1.10.2, the three temperaments derived from owners' Nerve (§1.5.6), run inside `StartRace` and `FinishOffseason`. The harness plays your seat with it.
+- [x] **M4.8 News.** Every event of §2.2.4, and `career/paper.ts` (§1.13.1).
+- [x] **M4.9 Harness figures.** The `career` scenario prints everything in §2.8.1.
 
 **Harness check:** `npm run sim -- career --seasons 3 --seed test --standin` completes; every team has hired, built and signed a sponsor at least once; no command from the policy was refused. `npm run sim -- season --seed test` (real matches) still completes.
 
