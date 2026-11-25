@@ -4,7 +4,7 @@ import type { FrameOptions } from '../render/frame.ts';
 import { createFly } from './fly.ts';
 import { ashore } from './ashore.ts';
 import { owing, rehearsed, wintered } from './rehearse.ts';
-import { ROLES } from '../career/state.ts';
+import { ROLES, YOURS } from '../career/state.ts';
 import { memoryStore } from './save.ts';
 import { planetSeed } from '../career/fit.ts';
 import { seedOf } from '../world/seeds.ts';
@@ -231,7 +231,7 @@ export async function scenario(
   }, p.drawn);
 }
 
-const CAREER_SCREENS = ['lobby', 'team'] as const;
+const CAREER_SCREENS = ['lobby', 'team', 'deal'] as const;
 
 async function harbor(
   screen: (typeof CAREER_SCREENS)[number],
@@ -266,7 +266,17 @@ async function harbor(
       location.replace(at.href);
     },
   });
-  if (screen === 'team') shore.open('team');
+  if (screen !== 'lobby') shore.open('team');
+  if (screen === 'deal') {
+    const deals = career.teams[YOURS].deals,
+      asked = ROLES.find((role) => role === params.get('role')),
+      scout = career.teams[YOURS].scoutSeat,
+      role =
+        asked ??
+        [scout, ...ROLES].find((r) => (deals[r]?.candidates.length ?? 0) > 0) ??
+        scout;
+    shore.open('deal', { role });
+  }
 }
 
 function open(p: Played, others: readonly Berth[], s: Stage) {

@@ -1,7 +1,8 @@
 import type { Command, Reason } from '../career/commands.ts';
 import { planetSeed } from '../career/fit.ts';
-import { YOURS, type CareerState } from '../career/state.ts';
+import { YOURS, type CareerState, type Role } from '../career/state.ts';
 import { lobbyView } from '../career/views/lobby.ts';
+import { dealView } from '../career/views/deal.ts';
 import { teamView } from '../career/views/team.ts';
 import { createGame } from '../play/game.ts';
 import { PARTS, WHOLE, openingPose, type Framing } from '../play/anchorage.ts';
@@ -10,9 +11,14 @@ import type { Chart } from '../play/player.ts';
 import { surveyor } from '../play/preview.ts';
 import { watersOf } from '../play/setup.ts';
 import { rise } from '../ui/base/sheet.ts';
-import { uiLayer } from '../ui/base/ui.ts';
+import { fade, uiLayer } from '../ui/base/ui.ts';
 import { createLobby } from '../ui/lobby/lobby.ts';
-import type { LobbyPort, ScreenName } from '../ui/lobby/port.ts';
+import { createDeal } from '../ui/lobby/deal.ts';
+import type {
+  LobbyPort,
+  ScreenArgument,
+  ScreenName,
+} from '../ui/lobby/port.ts';
 import { createTeam } from '../ui/lobby/team.ts';
 import { createInput } from '../ui/sea/input.ts';
 import type { Stage } from './debug.ts';
@@ -21,7 +27,10 @@ import { saveQueue, sendAndSave, type Store } from './save.ts';
 
 const LIFTED: Framing = { center: [0, -0.5], size: 0.86 };
 
-export type Ashore = { open(screen: ScreenName): void; state(): CareerState };
+export type Ashore = {
+  open(screen: ScreenName, argument?: ScreenArgument): void;
+  state(): CareerState;
+};
 
 export async function ashore(
   s: Stage,
@@ -42,11 +51,13 @@ export async function ashore(
   const queue = saveQueue(o.store);
   let state = career,
     chart: Chart | null = null,
-    open: ScreenName | null = null;
+    open: ScreenName | null = null,
+    dealt: Role | null = null;
 
   const redraw = () => {
     lobby.show(lobbyView(state));
     if (open === 'team') team.show(teamView(state));
+    if (dealt !== null) deal.show(dealView(state, dealt));
   };
 
   const port: LobbyPort = {
@@ -58,7 +69,16 @@ export async function ashore(
       if (state.phase === 'racing') void saved.then(() => o.sailed(state));
       return null;
     },
-    open(name) {
+    open(name, argument) {
+      const role = argument?.role;
+      if (open === 'team' && dealt === null && name === 'deal' && role) {
+        dealt = role;
+        deal.open();
+        deal.show(dealView(state, role));
+        rise(deal.el, true);
+        fade(team.el, false);
+        return;
+      }
       if (open === null && name === 'team') {
         open = name;
         team.show(teamView(state));
@@ -68,6 +88,13 @@ export async function ashore(
       }
     },
     close() {
+      if (dealt !== null) {
+        if (deal.back()) return;
+        dealt = null;
+        rise(deal.el, false);
+        fade(team.el, true);
+        return;
+      }
       if (open === null || team.back()) return;
       open = null;
       rise(team.el, false);
@@ -91,6 +118,7 @@ export async function ashore(
 
   const lobby = createLobby(port);
   const team = createTeam(port);
+  const deal = createDeal(port);
   redraw();
 
   void surveyor()(planetSeed(state)).then((c) => {
@@ -104,5 +132,8 @@ export async function ashore(
     return game.snapshot();
   });
 
-  return { open: (name) => port.open(name), state: () => state };
+  return {
+    open: (name, argument) => port.open(name, argument),
+    state: () => state,
+  };
 }
