@@ -48,7 +48,7 @@ export const DRIVER = {
   stat: { least: 1, most: 20 },
   want: { base: 0.25, slope: 1.5, over: 20, flip: 21 },
   react: [2.2, 0.3],
-  aim: [0, 1],
+  aim: [-0.55, 1],
   helm: [0, 1],
   breakOff: [0.6, 0.15],
   loop: [60, 250],

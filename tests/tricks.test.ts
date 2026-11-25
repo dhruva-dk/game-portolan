@@ -20,7 +20,7 @@ import {
   toward,
   type Vec3,
 } from '../src/world/sphere.ts';
-import { EVEN_SHIP, setupOf, statsWith } from './setups.ts';
+import { EVEN_SHIP, setupOf, statsWith, valuesAt } from './setups.ts';
 import { OPEN, fighting, sail, waters } from './small.ts';
 import { createMatch } from '../src/sim/engine.ts';
 
@@ -33,8 +33,9 @@ const below = (trick: keyof typeof TRICKS) => TRICKS[trick].needs - 1,
 function duel(
   seed: number,
   stats: DriverStats,
-  o: { spread?: number; storm?: (t: number) => Storm } = {}
+  o: { spread?: number; storm?: (t: number) => Storm; level?: number } = {}
 ): Match {
+  const even = o.level === undefined ? EVEN_SHIP : valuesAt(o.level);
   const m = createMatch(
     setupOf(seed, {
       teams: 2,
@@ -43,8 +44,8 @@ function duel(
       stats,
       values: (ship) =>
         ship === BOT && o.spread !== undefined
-          ? { ...EVEN_SHIP, spreadFactor: o.spread }
-          : EVEN_SHIP,
+          ? { ...even, spreadFactor: o.spread }
+          : even,
     }),
     waters
   );
@@ -304,7 +305,10 @@ test('a bot uses a heal while under fire from Nerve 12, never below it', () => {
     let n = 0;
     for (const seed of SEEDS) {
       const m = facing(
-        duel(seed, statsWith({ nerve, lookout: 1 }), { storm: stormy(4) }),
+        duel(seed, statsWith({ nerve, lookout: 1 }), {
+          storm: stormy(4),
+          level: 5,
+        }),
         80,
         seed
       );

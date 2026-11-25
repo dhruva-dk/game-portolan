@@ -29,7 +29,7 @@ export const LEVEL_VALUES = {
   hullPoints: { line: 'hull', atZero: 80, atHundred: 200 },
   spreadFactor: { line: 'keel', atZero: 1.3, atHundred: 0.6 },
   reloadFactor: { line: 'mounts', atZero: 1.2, atHundred: 0.6 },
-  damageFactor: { line: 'gun', atZero: 0.8, atHundred: 1.4 },
+  damageFactor: { line: 'gun', atZero: 0.6, atHundred: 4.6 },
   assistCone: { line: 'gun', atZero: 0.06, atHundred: 0.1 },
 } as const;
 
