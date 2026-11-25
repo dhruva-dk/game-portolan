@@ -80,7 +80,8 @@ const OFFER: Sponsor = {
   sponsor: 0,
   fee: 500,
   bonus: 1000,
-  objective: 'top10',
+  objective: 'place',
+  target: 10,
   racesLeft: 6,
 };
 

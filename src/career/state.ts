@@ -2,7 +2,7 @@ import type { GunKind } from '../sim/kinds.ts';
 import type { DriverStats } from '../sim/setup.ts';
 import type { Livery } from '../world/livery.ts';
 
-export const VERSION = 1;
+export const VERSION = 2;
 
 export const YOURS = 0;
 
@@ -65,12 +65,13 @@ export type Talk = {
   answer: 'signed' | 'refused' | 'countered' | null;
   counter: Terms | null;
 };
-export type Objective = 'top10' | 'sinkTwo' | 'sea' | 'bothAfloat';
+export type Objective = 'place' | 'sinkings' | 'sea' | 'bothAfloat';
 export type Sponsor = {
   sponsor: number;
   fee: number;
   bonus: number;
   objective: Objective;
+  target: number | null;
   racesLeft: number;
 };
 export type Ship = { fitted: Levels; gun: GunKind };
@@ -280,8 +281,8 @@ export const STATS: Record<Role, readonly string[]> = {
 export const PHASES: readonly Phase[] = ['lobby', 'racing', 'offseason'];
 
 export const OBJECTIVES: readonly Objective[] = [
-  'top10',
-  'sinkTwo',
+  'place',
+  'sinkings',
   'sea',
   'bothAfloat',
 ];

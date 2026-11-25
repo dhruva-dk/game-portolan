@@ -636,7 +636,7 @@ test('step 7, build: the largest affordable gap of at least B, slot 0 and earlie
 });
 
 function offer(sponsor: number, fee: number, bonus: number): Sponsor {
-  return { sponsor, fee, bonus, objective: 'sea', racesLeft: 6 };
+  return { sponsor, fee, bonus, objective: 'sea', target: 3, racesLeft: 6 };
 }
 
 test('step 8, sponsors: the offer worth most by fee + 0.5 × bonus goes in the first empty slot', () => {

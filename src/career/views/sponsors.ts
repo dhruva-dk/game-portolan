@@ -5,7 +5,6 @@ import {
   type Objective,
   type Sponsor,
 } from '../state.ts';
-import { SPONSORS } from '../tuning.ts';
 
 export type { Objective };
 
@@ -30,13 +29,6 @@ export type SponsorsView = {
   open: readonly number[];
 };
 
-const GOALS: Record<Objective, { figure: number | null; percent: boolean }> = {
-  top10: { figure: SPONSORS.topPlaces, percent: false },
-  sinkTwo: { figure: SPONSORS.sinkings, percent: false },
-  sea: { figure: Math.round(SPONSORS.seaShare * 100), percent: true },
-  bothAfloat: { figure: null, percent: false },
-};
-
 function card(sponsor: Sponsor): SponsorCard {
   const named = SPONSOR_ROSTER[sponsor.sponsor];
   return {
@@ -46,7 +38,8 @@ function card(sponsor: Sponsor): SponsorCard {
     fee: sponsor.fee,
     bonus: sponsor.bonus,
     objective: sponsor.objective,
-    ...GOALS[sponsor.objective],
+    figure: sponsor.target,
+    percent: sponsor.objective === 'sea',
     racesLeft: sponsor.racesLeft,
     pays: sponsor.fee * sponsor.racesLeft,
   };
