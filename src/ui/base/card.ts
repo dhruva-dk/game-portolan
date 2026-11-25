@@ -2,11 +2,11 @@ import type { Livery } from '../../world/livery.ts';
 import { emblemAt, liveryColors } from './emblem.ts';
 import { GLYPHS } from './glyphs.ts';
 import { FAINT, SIZE, SPACE, TYPE } from './house.ts';
-import { INK, figure, glyph, roughRect, slip } from './ink.ts';
+import { INK, PAPER, WASH, figure, glyph, roughRect, slip } from './ink.ts';
 import { portrait, uncle } from './gull.ts';
 import { ROLE, STAT, least, type StatName } from './lexicon.ts';
 import { STATS, rangeBar } from './rangebar.ts';
-import { roseReach, statRose } from './rose.ts';
+import { roseReach, roseShape, statRose } from './rose.ts';
 import { fitted, label, measured, word } from './word.ts';
 import { grouped } from './grouped.ts';
 
@@ -52,7 +52,12 @@ export function paper(w: number, h: number, seed = 3, empty = false) {
   );
 }
 
-export function framed(face: CardFace, x: number, y: number, size: number) {
+export function framed(
+  face: Pick<CardFace, 'portrait'>,
+  x: number,
+  y: number,
+  size: number
+) {
   const pad = Math.max(3, size * 0.05);
   return (
     slip(x - pad, y - pad, size + 2 * pad, size + 2 * pad, {
@@ -188,24 +193,35 @@ const versus = (lo: number, hi: number, held: number | undefined) =>
 
 type Box = { x0: number; y0: number; x1: number; y1: number };
 
-function roseIn(
-  face: CardFace,
-  box: Box,
-  numerals: boolean,
-  holder: readonly number[] | null = null
-) {
-  const g = least('stat.helm'),
-    n = face.stats.length,
-    ranged = face.stats.some((st) => st.value.lo !== st.value.hi),
-    widest = ranged ? '20–20' : '20';
+function roseFit(n: number, box: Box, numerals: boolean, widest: string) {
+  const g = least('stat.helm');
   let R = Math.min(box.x1 - box.x0, box.y1 - box.y0) / 2;
   let reach = roseReach(n, R, g, numerals, widest);
   const fits = () =>
     reach.left + reach.right <= box.x1 - box.x0 &&
     reach.up + reach.down <= box.y1 - box.y0;
   while (R > 12 && !fits()) reach = roseReach(n, --R, g, numerals, widest);
-  const cx = (box.x0 + box.x1) / 2 + (reach.left - reach.right) / 2,
-    cy = (box.y0 + box.y1) / 2 + (reach.up - reach.down) / 2;
+  return {
+    cx: (box.x0 + box.x1) / 2 + (reach.left - reach.right) / 2,
+    cy: (box.y0 + box.y1) / 2 + (reach.up - reach.down) / 2,
+    R,
+    g,
+  };
+}
+
+function roseIn(
+  face: CardFace,
+  box: Box,
+  numerals: boolean,
+  holder: readonly number[] | null = null
+) {
+  const ranged = face.stats.some((st) => st.value.lo !== st.value.hi),
+    { cx, cy, R, g } = roseFit(
+      face.stats.length,
+      box,
+      numerals,
+      ranged ? '20–20' : '20'
+    );
   return statRose(cx, cy, R, rosePoints(face, holder), {
     glyph: g,
     numerals,
@@ -296,13 +312,22 @@ export function cardCandidate(face: CardFace, c: Candidacy, seed = 3) {
   return s;
 }
 
-export function cardEmpty(role: CardRole, seed = 3) {
-  const { w, h } = CARD,
+export function cardEmpty(
+  role: CardRole,
+  seed = 3,
+  size: { w: number; h: number } = CARD,
+  worded = true
+) {
+  const { w, h } = size,
     g = 46;
   return (
     paper(w, h, seed, true) +
-    glyph(ROLE[role].glyph, w / 2, h / 2 - 16, g, { opacity: 0.55 }) +
-    word(w / 2, h / 2 + 22, ROLE[role].word, TYPE.name, { opacity: 0.6 })
+    glyph(ROLE[role].glyph, w / 2, h / 2 - (worded ? 16 : 0), g, {
+      opacity: 0.55,
+    }) +
+    (worded
+      ? word(w / 2, h / 2 + 22, ROLE[role].word, TYPE.name, { opacity: 0.6 })
+      : '')
   );
 }
 
@@ -428,4 +453,148 @@ export function cardLarge(
       }
     : { x: rowsX, y: h - pad - 40, w: rowsW, h: 40 };
   return { svg: s, actions };
+}
+
+export type SeasonFace = {
+  name: string;
+  role: Exclude<CardRole, 'owner'>;
+  portrait: number;
+  age: { before: number; after: number };
+  stars: number;
+  stats: { stat: StatName; before: number; after: number }[];
+  racesLeft: number;
+};
+
+export type SeasonPart =
+  | 'was'
+  | 'now'
+  | 'age'
+  | 'aged'
+  | 'stat'
+  | 'change'
+  | 'spent';
+
+export type SeasonCue = (part: SeasonPart, i: number) => string;
+
+export const SEASON = { w: 196, h: 356 } as const;
+
+const CELL = {
+  top: 212,
+  h: 25,
+  bar: 6,
+  figure: 13,
+  gap: 8,
+  rose: 78,
+  flag: 318,
+} as const;
+
+const tagged = (svg: string, id: string) =>
+  svg.replace('<text', `<text id="${id}"`);
+
+const change = (n: number) => (n > 0 ? `+${n}` : `−${-n}`);
+
+function seasonBar(v: number, w: number) {
+  return r2(Math.max(0, (w * Math.min(STATS.most, v)) / STATS.most));
+}
+
+function seasonCell(
+  st: SeasonFace['stats'][number],
+  i: number,
+  x: number,
+  cy: number,
+  w: number,
+  id: string,
+  cue: SeasonCue
+) {
+  const g = least('stat.helm'),
+    left = x + g + 4,
+    barW = w - g - 6,
+    top = cy - 5,
+    moved = st.after - st.before;
+  let s = glyph(STAT[st.stat].glyph, x + g / 2, cy, g);
+  s += `<g${cue('stat', i)}>${tagged(figure(left, top, st.after, CELL.figure, { anchor: 'start', weight: 600 }), `${id}-n${i}`)}</g>`;
+  if (moved !== 0)
+    s += `<g${cue('change', i)}>${figure(left + 22, top, change(moved), TYPE.word, { anchor: 'start', weight: 700, fill: moved > 0 ? INK.blue : INK.rubric })}</g>`;
+  const by = cy + 7;
+  s += `<rect x="${r2(left)}" y="${r2(by - CELL.bar / 2)}" width="${r2(barW)}" height="${CELL.bar}" fill="${PAPER}" stroke="${INK.iron}" stroke-width=".8"/>`;
+  s += `<rect id="${id}-b${i}" x="${r2(left + 1)}" y="${r2(by - CELL.bar / 2 + 1)}" width="${seasonBar(st.after, barW - 2)}" height="${CELL.bar - 2}" fill="${WASH.ochre}" opacity=".9"/>`;
+  return s;
+}
+
+export function cardSeason(
+  face: SeasonFace,
+  o: { id: string; seed?: number; cue?: SeasonCue }
+) {
+  const { w, h } = SEASON,
+    pad = SPACE.pad,
+    cue = o.cue ?? (() => ''),
+    id = o.id,
+    shot = 56,
+    right = pad + shot + 10,
+    nameSize = fitted(face.name, TYPE.name + 1, w - right - pad),
+    rg = least('role.driver'),
+    star = least('star');
+  let s = paper(w, h, o.seed ?? 3);
+  s += framed(face, pad + 1, pad + 1, shot);
+  s += label(right, pad + 8, face.name, nameSize, { anchor: 'start' });
+  s += glyph(ROLE[face.role].glyph, right + rg / 2 - 2, pad + 32, rg);
+  s += `<g${cue('age', 0)}>${tagged(figure(right + rg + 4, pad + 32, face.age.after, TYPE.name + 1, { anchor: 'start', weight: 600 }), `${id}-age`)}</g>`;
+  s += `<g${cue('aged', 0)}>${figure(right + rg + 28, pad + 32, `+${face.age.after - face.age.before}`, TYPE.word, { anchor: 'start', weight: 700, fill: INK.sepia })}</g>`;
+  s += starRow(right + 2 * star * 1.06 + star / 2 - 2, pad + 54, {
+    lo: face.stars,
+    hi: face.stars,
+  });
+  const fit = roseFit(
+    face.stats.length,
+    { x0: pad, y0: CELL.rose, x1: w - pad, y1: CELL.top - 14 },
+    false,
+    '20'
+  );
+  s += statRose(
+    fit.cx,
+    fit.cy,
+    fit.R,
+    face.stats.map((st) => ({
+      glyph: STAT[st.stat].glyph,
+      lo: st.after,
+      hi: st.after,
+    })),
+    {
+      glyph: fit.g,
+      was: face.stats.map((st) => st.before),
+      cue: (part) => (part === 'now' ? ` id="${id}-now"` : '') + cue(part, 0),
+    }
+  );
+  const rows = Math.ceil(face.stats.length / 2),
+    colW = (w - 2 * pad - CELL.gap) / 2;
+  face.stats.forEach((st, i) => {
+    const col = Math.floor(i / rows),
+      row = i % rows;
+    s += seasonCell(
+      st,
+      i,
+      pad + col * (colW + CELL.gap),
+      CELL.top + row * CELL.h,
+      colW,
+      id,
+      cue
+    );
+  });
+  const flag = least('flag'),
+    y = CELL.flag;
+  s += `<path d="M${pad} ${y - 16}H${w - pad}" stroke="${INK.iron}" stroke-width=".6" opacity=".3"/>`;
+  s += glyph('flag', pad + flag / 2, y, flag);
+  s += figure(pad + flag + 4, y, face.racesLeft, TYPE.name + 2, {
+    anchor: 'start',
+    weight: 600,
+  });
+  if (face.racesLeft === 0)
+    s += `<g${cue('spent', 0)}>${glyph('hourglass', w - pad - 14, y, least('hourglass') + 10, { ink: 'rubric' })}</g>`;
+  s += pips(pad + 2, y + 16, face.racesLeft, w - 2 * pad);
+  return {
+    svg: s,
+    shape: (values: readonly number[]) =>
+      roseShape(fit.cx, fit.cy, fit.R, values),
+    bar: (v: number) => String(seasonBar(v, colW - least('stat.helm') - 8)),
+  };
 }

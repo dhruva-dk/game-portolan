@@ -9,6 +9,8 @@ interface RoseStyle {
   numerals?: boolean;
   compare?: readonly number[] | null;
   wash?: string;
+  was?: readonly number[] | null;
+  cue?: (part: 'was' | 'now') => string;
 }
 
 const TOP = 20,
@@ -58,6 +60,24 @@ export function roseReach(
   return reach;
 }
 
+export function roseShape(
+  cx: number,
+  cy: number,
+  R: number,
+  values: readonly number[]
+) {
+  const n = values.length;
+  return (
+    values
+      .map((v, i) => {
+        const a = turnOf(i, n),
+          k = R * (Math.max(0.6, v) / TOP);
+        return `${i ? 'L' : 'M'}${r2(cx + Math.cos(a) * k)} ${r2(cy + Math.sin(a) * k)}`;
+      })
+      .join('') + 'Z'
+  );
+}
+
 export function statRose(
   cx: number,
   cy: number,
@@ -72,13 +92,8 @@ export function statRose(
     cx + Math.cos(angle(i)) * R * (v / TOP),
     cy + Math.sin(angle(i)) * R * (v / TOP),
   ];
-  const shape = (vs: readonly number[]) =>
-    vs
-      .map((v, i) => {
-        const [x, y] = at(i, Math.max(0.6, v));
-        return `${i ? 'L' : 'M'}${r2(x)} ${r2(y)}`;
-      })
-      .join('') + 'Z';
+  const shape = (vs: readonly number[]) => roseShape(cx, cy, R, vs),
+    cue = o.cue ?? (() => '');
   let s = '';
   for (const ring of RINGS) {
     const d = points.map((_, i) => {
@@ -98,11 +113,14 @@ export function statRose(
     s +=
       `<path d="${shape(hi)}${shape(lo)}" fill="${wash}" fill-opacity=".3" fill-rule="evenodd"/>` +
       `<path d="${shape(hi)}${shape(lo)}" fill="url(#h-open)" fill-rule="evenodd" stroke="${INK.iron}" stroke-width=".7" stroke-linejoin="round"/>`;
-  s += `<path d="${shape(lo)}" fill="${wash}" fill-opacity=".62" stroke="${INK.iron}" stroke-width="1.3" stroke-linejoin="round"/>`;
-  for (let i = 0; i < n; i++) {
-    const [x, y] = at(i, Math.max(0.6, lo[i]));
-    s += `<circle cx="${r2(x)}" cy="${r2(y)}" r="1.5" fill="${INK.iron}"/>`;
-  }
+  if (o.was)
+    s += `<path${cue('was')} d="${shape(o.was)}" fill="none" stroke="${INK.iron}" stroke-width="1.1" stroke-linejoin="round" opacity=".8"/>`;
+  s += `<path${cue('now')} d="${shape(lo)}" fill="${wash}" fill-opacity=".62" stroke="${INK.iron}" stroke-width="1.3" stroke-linejoin="round"/>`;
+  if (!o.was)
+    for (let i = 0; i < n; i++) {
+      const [x, y] = at(i, Math.max(0.6, lo[i]));
+      s += `<circle cx="${r2(x)}" cy="${r2(y)}" r="1.5" fill="${INK.iron}"/>`;
+    }
   if (o.compare)
     s += `<path d="${shape(o.compare)}" fill="none" stroke="${INK.blue}" stroke-width="1.6" stroke-linejoin="round"/>`;
   points.forEach((p, i) => {
