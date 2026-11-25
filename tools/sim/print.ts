@@ -106,7 +106,7 @@ const named = (sc: DuelScenario, i: number) => {
 
 export function printDuelStart(sc: DuelScenario, runs: number) {
   console.log(
-    `duel on planet ${sc.planet ?? 'default'} · ${named(sc, 0)} against ${named(sc, 1)} · ${runs} seeds, each sailed from both berths`
+    `duel on planet ${sc.planet ?? 'default'} · ${named(sc, 0)} against ${named(sc, 1)} · ${runs} seed${runs === 1 ? '' : 's'}, each sailed from both berths`
   );
 }
 
