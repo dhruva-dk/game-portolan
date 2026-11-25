@@ -15,7 +15,6 @@ import { indexed } from '../sim/indexed.ts';
 import type { Rarity } from '../sim/kinds.ts';
 import { PLAYER } from '../sim/match.ts';
 import type { Memory } from '../sim/bot.ts';
-import type { Nature } from '../sim/persona.ts';
 import type { Sighter } from '../sim/orders.ts';
 import type { MatchSetup, ShipValues } from '../sim/setup.ts';
 import type { Berthed, Waters } from '../sim/waters.ts';
@@ -252,7 +251,6 @@ export function createState(
       log.keep(NOTHING_DONE, NOTHING_DONE, NOTHING_DONE, null, clock(1));
     },
     mindOf: (id: number) => debugOfMatch(match).mindOf(id),
-    natureOf: (id: number) => debugOfMatch(match).natureOf(id),
     standIn: (id: number, sights: Sighter) =>
       debugOfMatch(match).standIn(id, sights),
   });
@@ -270,7 +268,6 @@ interface Debug {
   strew(at: Vec3, heals: readonly Rarity[]): void;
   sink(id: number, by: number | null): void;
   mindOf(id: number): Readonly<Memory> | null;
-  natureOf(id: number): Nature | null;
   standIn(id: number, sights: Sighter): void;
 }
 

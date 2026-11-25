@@ -1,5 +1,4 @@
 import { test } from 'node:test';
-import { nature } from '../src/sim/persona.ts';
 import assert from 'node:assert/strict';
 import {
   battleOf,
@@ -19,7 +18,6 @@ import { healSlot, PURSER } from '../src/sim/purser.ts';
 import { shipAt, turned, type Helm } from '../src/sim/ship.ts';
 import type { Depth } from '../src/sim/shoal.ts';
 import { asked, crewed, stored, type Ask } from '../src/sim/stores.ts';
-import { temper } from '../src/sim/temper.ts';
 import {
   along,
   distance,
@@ -27,7 +25,7 @@ import {
   fromLatLon,
   type Vec3,
 } from '../src/world/sphere.ts';
-import { EVEN_SHIP, HANDY } from './setups.ts';
+import { EVEN_SHIP, HANDY, botOf } from './setups.ts';
 
 const DEEP: Depth = () => 30;
 const c0 = fromLatLon(0.3, 0.1);
@@ -77,7 +75,7 @@ function sail(
         seen.filter((o) => o.id !== v.id),
         { depth: deep, loot: f.pieces },
         minds[v.id],
-        nature(seeds[v.id])
+        botOf(seeds[v.id])
       );
       minds[v.id] = r.memory;
       helms[i] = r.helm;
@@ -151,7 +149,7 @@ test('it heals with the least heal that fills its hull, else with its greatest; 
 const stowedOf = (c: Crew) => c.hold.items.flatMap((k) => (k ? [k] : []));
 
 test('a piece abeam, inside the circle it turns at its top speed, it slows to come round to it, not sail round it', () => {
-  for (const seed of seeds((s) => temper(s).lootReach >= 110, 4)) {
+  for (const seed of seeds(() => true, 4)) {
     const r = sail(
       [c0],
       [seed],
@@ -209,15 +207,12 @@ test('bots near one piece do not all pile on it: one takes it, and none goes for
 });
 
 test('a piece it can not come to it gives up after a while, and leaves be', () => {
-  const lagoon = out(100),
+  const lagoon = out(70),
     reef: Depth = (p) => {
       const d = distance(p, lagoon);
       return d > 15 && d < 45 ? -2 : 30;
     };
-  for (const seed of seeds(
-    (s) => temper(s).loot >= 0.5 && temper(s).lootReach > 100,
-    3
-  )) {
+  for (const seed of seeds(() => true, 3)) {
     const r = sail(
       [c0],
       [seed],

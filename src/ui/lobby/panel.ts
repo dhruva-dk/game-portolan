@@ -1,6 +1,5 @@
 import type { Chart, Seeds } from '../../play/player.ts';
 import { named } from '../../world/seeds.ts';
-import { CARD, fleetCard } from './fleet.ts';
 import {
   FIGURES,
   INK,
@@ -13,16 +12,15 @@ import {
 import { die } from '../base/marks.ts';
 import { createOrb } from './orb.ts';
 import { banner, folio } from '../base/screens.ts';
-import { keep, onHold, region } from '../base/touch.ts';
+import { keep, region } from '../base/touch.ts';
 import { boxOf, view } from '../base/ui.ts';
 
 const BOX = { x: 160, y: 18, w: 636, h: 398 };
 const FIELD = { x: 186, y: 44, w: 246, h: 40 },
   DISC = { x: 336, y: 250, r: 136 },
-  CARD_AT = { x: 506, y: 40 };
+  SAIL = { x: 638, y: 358 };
 const LONGEST = 24;
-const PAUSE = { fleet: 90, chart: 380 };
-const HOLD = 350;
+const PAUSE = { chart: 380 };
 
 function disc() {
   const { x, y, r } = DISC,
@@ -68,32 +66,10 @@ export function createSeedPanel(
   input.addEventListener('focus', () => (typing = true));
   input.addEventListener('blur', () => (typing = false));
 
-  let card: SVGGElement | null = null,
-    chart: Chart | null = null;
-  const timers = { fleet: 0, chart: 0 };
+  let chart: Chart | null = null;
+  const timers = { chart: 0 };
   const text = () => named(input.value);
 
-  let traits = false,
-    holding = 0;
-  const fleet = () => {
-    const name = text();
-    if (card)
-      card.innerHTML = name
-        ? fleetCard(CARD_AT.x, CARD_AT.y, seeds.fleet(name), traits)
-        : '';
-  };
-  const hold = (on: boolean) => {
-    clearTimeout(holding);
-    if (on)
-      holding = window.setTimeout(() => {
-        traits = true;
-        fleet();
-      }, HOLD);
-    else if (traits) {
-      traits = false;
-      fleet();
-    }
-  };
   const survey = () => {
     const name = text();
     if (!name || chart?.name === name) return orb.show(chart, false);
@@ -105,14 +81,11 @@ export function createSeedPanel(
     });
   };
   const preview = (now = false) => {
-    clearTimeout(timers.fleet);
     clearTimeout(timers.chart);
     if (now) {
-      fleet();
       survey();
       return;
     }
-    timers.fleet = window.setTimeout(fleet, PAUSE.fleet);
     timers.chart = window.setTimeout(survey, PAUSE.chart);
   };
   input.addEventListener('input', () => preview());
@@ -128,20 +101,13 @@ export function createSeedPanel(
         `<rect id="sp-field" x="${FIELD.x + 6}" y="${FIELD.y + 4}" width="${FIELD.w - 12}" height="${FIELD.h - 8}" fill="transparent"/>` +
         `<g id="sp-roll">${paperDisc(FIELD.x + FIELD.w + 28, FIELD.y + 20, 22)}${die(FIELD.x + FIELD.w + 28, FIELD.y + 19, 30)}</g>` +
         disc() +
-        `<g id="sp-card"></g>` +
-        `<g id="sp-sail">${banner(CARD_AT.x + CARD / 2, 358, 190, galleon(CARD_AT.x + CARD / 2, 354, 70, { waves: true }), true)}</g>`,
+        `<g id="sp-sail">${banner(SAIL.x, SAIL.y, 190, galleon(SAIL.x, SAIL.y - 4, 70, { waves: true }), true)}</g>`,
       (el) => {
         region(el, 'sp-roll', () => {
           input.value = seeds.roll();
           preview(true);
         });
         region(el, 'sp-sail', () => act.sail(text() || seeds.name));
-        card = el.querySelector<SVGGElement>('#sp-card');
-        if (card) {
-          card.classList.add('press');
-          onHold(card, hold);
-        }
-        fleet();
         f.root.append(input, orb.el);
         const field = el.querySelector('#sp-field'),
           round = el.querySelector('#sp-disc');
@@ -171,9 +137,7 @@ export function createSeedPanel(
         draw();
         preview(true);
       } else {
-        clearTimeout(timers.fleet);
         clearTimeout(timers.chart);
-        hold(false);
         input.blur();
       }
     },

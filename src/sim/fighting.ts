@@ -3,7 +3,7 @@ import { toEdge } from './storm.ts';
 import { logistic, ramp, utility } from './utility.ts';
 import { aggroOf, mate, open, rotate, type Ctx, type Seen } from './captain.ts';
 import { ranFromShip } from './logbook.ts';
-import { hidden } from './lookout.ts';
+import { answers, hidden, underFire } from './lookout.ts';
 import { keptInside } from './storming.ts';
 
 export const MIND = {
@@ -28,6 +28,7 @@ export const MIND = {
   lastFew: 3,
   more: 0.4,
   shotFresh: 5,
+  breaking: [0.08, 0.04] as const,
   won: 0.2,
   hurt: 0.45,
   settle: 45,
@@ -119,20 +120,17 @@ function holdBack(c: Ctx): number {
 export const holdsFire = (c: Ctx) =>
   c.m.mode !== 'fight' &&
   holdBack(c) > 0 &&
-  !(
-    c.foe &&
-    c.m.shotBy === c.foe.id &&
-    c.m.clock - c.m.shotT < c.b.mind.shotFresh &&
-    c.foeD < c.b.mind.letGo
-  );
+  !(c.foe && c.m.shotBy === c.foe.id && underFire(c) && answers(c, c.foeD));
 
-const losing = (c: Ctx) =>
-  c.foe
-    ? utility(
-        ramp(c.own.hull, c.t.run + 8, c.t.run - 4),
-        ramp(c.foeD, 160, 130)
-      )
-    : 0;
+const losing = (c: Ctx) => {
+  if (!c.foe) return 0;
+  const share = c.own.hull / c.own.crew.health.most,
+    [above, below] = c.b.mind.breaking;
+  return utility(
+    ramp(share, c.t.run + above, c.t.run - below),
+    ramp(c.foeD, 160, 130)
+  );
+};
 
 function evading(c: Ctx): number {
   const { m } = c;

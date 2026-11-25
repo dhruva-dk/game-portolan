@@ -5,7 +5,6 @@ import { ramp } from './utility.ts';
 import { open, rotate, type Ctx } from './captain.ts';
 
 export const STORMING = {
-  late: 25,
   ease: [0.55, 0.3] as const,
   inNext: 0.5,
   nearEdge: 0.4,
@@ -22,7 +21,7 @@ export const reach = (cap: Cap) => cap.radius * R;
 
 export const late = (c: Ctx) =>
   !!c.sea.storm &&
-  (c.sea.storm.closing || c.sea.storm.secondsToNext < c.b.storming.late);
+  (c.sea.storm.closing || c.sea.storm.secondsToNext < c.t.setOff);
 
 export function stormUrge(c: Ctx): number {
   const s = c.sea.storm;

@@ -1,11 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mind, think } from '../src/sim/bot.ts';
-import { nature } from '../src/sim/persona.ts';
 import type { Depth } from '../src/sim/shoal.ts';
 import { shipAt } from '../src/sim/ship.ts';
 import { along, frameAt, fromLatLon } from '../src/world/sphere.ts';
-import { aboard } from './setups.ts';
+import { aboard, botOf } from './setups.ts';
 
 const here = fromLatLon(0.2, 0.3),
   { north } = frameAt(here);
@@ -29,7 +28,7 @@ test('a wounded ship it saw and lost, it goes back for, to where it saw that shi
         [weak(seenAt)],
         { depth: deep },
         m,
-        nature(seed)
+        botOf(seed)
       ).memory;
     assert.ok(
       m.log.some((s) => s.id === 2 && s.strength === 20),
@@ -41,7 +40,7 @@ test('a wounded ship it saw and lost, it goes back for, to where it saw that shi
         [weak(goneTo)],
         { depth: deep },
         m,
-        nature(seed)
+        botOf(seed)
       ).memory;
     assert.equal(m.foe, -1, `${seed}: still in its eye`);
     assert.deepEqual(m.hunt, seenAt, `${seed}: not back for it`);
@@ -52,7 +51,7 @@ test('a wounded ship it saw and lost, it goes back for, to where it saw that shi
         [weak(seenAt)],
         { depth: deep },
         { ...ran, mode: 'flee' },
-        nature(seed)
+        botOf(seed)
       ).memory;
     for (let k = 0; k < 30 * 6; k++)
       ran = think(
@@ -60,7 +59,7 @@ test('a wounded ship it saw and lost, it goes back for, to where it saw that shi
         [weak(goneTo)],
         { depth: deep },
         ran,
-        nature(seed)
+        botOf(seed)
       ).memory;
     assert.equal(ran.hunt, null, `${seed}: back for one it ran from`);
   }

@@ -10,7 +10,6 @@ import { SEED, createWorld } from '../world/environment.ts';
 import { createFrame } from '../render/frame.ts';
 import { loaded } from '../render/load.ts';
 import { createMeter } from './meter.ts';
-import { fleetOf } from '../play/fleet.ts';
 import { createGame } from '../play/game.ts';
 import { surveyor } from '../play/preview.ts';
 import { createReferee } from '../play/referee.ts';
@@ -179,13 +178,7 @@ async function play(s: Stage): Promise<Played> {
       again: () => sail(s.name),
       watch: () => referee.watch(),
       switch: (by) => referee.switch(by),
-      seeds: {
-        name: s.name,
-        fleet: (name) => fleetOf(raceSetup(name, seedOf(name))),
-        chart: survey,
-        roll,
-        sail,
-      },
+      seeds: { name: s.name, chart: survey, roll, sail },
       wardrobe: {
         dyes: DYES.map((d) => ({
           name: d.name,

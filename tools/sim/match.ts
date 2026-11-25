@@ -10,7 +10,7 @@ import {
 import { evenSetup } from '../../src/sim/even.ts';
 import { STEP } from '../../src/sim/fixed.ts';
 import { STILL } from '../../src/sim/hands.ts';
-import { MIXED } from '../../src/sim/persona.ts';
+import { DEFAULT_RULES } from '../../src/sim/rules.ts';
 import type { MatchSetup } from '../../src/sim/setup.ts';
 import { berths } from '../../src/sim/spawn.ts';
 import type { Waters } from '../../src/sim/waters.ts';
@@ -133,16 +133,16 @@ function sail(
         players.add(k.id);
         debugOf(m).standIn(k.id, standIn(hash(seed, k.id), sc.thumb));
       }
-  const course = MIXED.rules.storm.phases.reduce(
+  const course = DEFAULT_RULES.storm.phases.reduce(
       (t, p) => t + p.wait + p.close,
       0
     ),
     end = sc.seconds ?? course + 120;
   const events = dir ? lines(join(dir, 'events.jsonl')) : null,
     ships = dir ? lines(join(dir, 'ships.jsonl')) : null;
-  const seen = watch(state, brainOf, waters.depth, MIXED.name, players),
+  const seen = watch(state, brainOf, waters.depth, players),
     log = record(state, (p) => -waters.depth(p), brainOf, events, ships);
-  log.start(seed, MIXED.name, MIXED.rules);
+  log.start(seed, DEFAULT_RULES);
   debugOf(m).lap(log.lap);
   const each = Math.round(1 / STEP);
   let steps = 0;
@@ -214,7 +214,6 @@ function summaryOf(
   return {
     scenario: sc,
     seed,
-    type: a.type,
     end: end.why,
     hash: end.hash,
     seconds: r2(a.seconds),
@@ -227,8 +226,6 @@ function summaryOf(
         place: s.place,
         id: s.id,
         brain: s.brain,
-        persona: s.persona,
-        skill: r2(s.skill),
         player: s.player,
         sunk: s.sunk,
         afloat: s.afloat,

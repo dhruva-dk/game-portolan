@@ -1,6 +1,8 @@
 import { shipValues } from '../src/career/fit.ts';
 import { crewOf } from '../src/sim/battle.ts';
-import type { Own, Seen } from '../src/sim/bot.ts';
+import type { Bot, Own, Seen } from '../src/sim/bot.ts';
+import { DEFAULT_BRAIN, type Brain } from '../src/sim/brain.ts';
+import { driver } from '../src/sim/driver.ts';
 import { evenSetup, type EvenOptions } from '../src/sim/even.ts';
 import type { GunKind } from '../src/sim/kinds.ts';
 import type { DriverStats, MatchSetup, ShipValues } from '../src/sim/setup.ts';
@@ -77,3 +79,14 @@ export const setupOf = (
     stats: TENS,
     ...over,
   });
+
+export const statsWith = (over: Partial<DriverStats> = {}): DriverStats => ({
+  ...TENS,
+  ...over,
+});
+
+export const botOf = (
+  seed: number,
+  stats: DriverStats = TENS,
+  brain: Brain = DEFAULT_BRAIN
+): Bot => ({ seed, brain, temper: driver(stats) });

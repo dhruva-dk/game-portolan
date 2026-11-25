@@ -125,31 +125,6 @@ export interface Wardrobe {
   broadside(on: boolean): void;
 }
 
-export interface Spread {
-  mean: number;
-  spread: number;
-}
-
-export interface Standout {
-  id: number;
-  persona: number;
-  by: number;
-}
-
-export interface Fleet {
-  type: number;
-  name: string;
-  counts: readonly number[];
-  common: number;
-  skill: Spread;
-  aggression: Spread;
-  notice: Spread;
-  margin: Spread;
-  flee: Spread;
-  sharpest: Standout;
-  reckless: Standout;
-}
-
 export interface Chart {
   name: string;
   points: Float32Array;
@@ -161,7 +136,6 @@ export interface Chart {
 
 export interface Seeds {
   name: string;
-  fleet(name: string): Fleet;
   chart(name: string): Promise<Chart | null>;
   roll(): string;
   sail(name: string): void;

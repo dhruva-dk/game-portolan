@@ -1,7 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { crewOf, type Shot } from '../src/sim/battle.ts';
-import { nature } from '../src/sim/persona.ts';
 import { mind, think, type Memory, type Seen } from '../src/sim/bot.ts';
 import { afloat, stepFleet, type Vessel } from '../src/sim/contact.ts';
 import { STEP } from '../src/sim/fixed.ts';
@@ -17,7 +16,7 @@ import {
   scale,
   type Vec3,
 } from '../src/world/sphere.ts';
-import { EVEN_SHIP, aboard } from './setups.ts';
+import { EVEN_SHIP, aboard, botOf } from './setups.ts';
 
 const DEEP: Depth = () => 30;
 const c0 = fromLatLon(0.3, 0.1);
@@ -55,7 +54,7 @@ function sail(gunfire: readonly Report[], seconds: number) {
       hull: crew.health.hull,
       shield: crew.health.shield,
     };
-    const r = think(aboard(own), [], { depth: DEEP, gunfire }, m, nature(11));
+    const r = think(aboard(own), [], { depth: DEEP, gunfire }, m, botOf(11));
     m = r.memory;
     if (modes.at(-1) !== m.mode) modes.push(m.mode);
     const helms: Helm[] = [r.helm];

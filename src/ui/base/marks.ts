@@ -146,13 +146,6 @@ export const ram = (x: number, y: number, s = 1) =>
   `<path d="M-17 -2L-3 -2L1 2L-3 7L-15 7Z" fill="url(#h-iron)"/><path d="M17 -2L3 -2L-1 2L3 7L15 7Z" fill="url(#h-iron)" transform="scale(1 -1) translate(0 -5)"/>` +
   `<path d="M0 -12l2 6l5 -4l-2 6l6 1l-6 2l3 5" fill="none" stroke="${INK.rubric}" stroke-width="1.6"/></g>`;
 
-export const badge = (x: number, y: number, body: string) =>
-  `<g stroke="${INK.iron}" stroke-width=".9" stroke-linejoin="round">` +
-  `<path d="M${x - 7} ${y + 6}L${x - 10} ${y + 19}L${x - 5} ${y + 15}L${x - 2} ${y + 19}L${x - 1} ${y + 8}Z" fill="${WASH.vermilion}"/>` +
-  `<path d="M${x + 7} ${y + 6}L${x + 10} ${y + 19}L${x + 5} ${y + 15}L${x + 2} ${y + 19}L${x + 1} ${y + 8}Z" fill="${WASH.vermilion}"/>` +
-  `<circle cx="${x}" cy="${y}" r="12.5" fill="${WASH.gold}" stroke-width="1.2" stroke-dasharray="2.6 1.4"/>` +
-  `<circle cx="${x}" cy="${y}" r="9.5" fill="${PAPER}" stroke-width=".8"/></g>${body}`;
-
 export const pencil = (x: number, y: number, s: number) =>
   `<g transform="translate(${x} ${y}) rotate(-45) scale(${s / 24})" stroke="${INK.iron}" stroke-width="1.3" stroke-linejoin="round">` +
   `<path d="M-6 -3.2H9V3.2H-6Z" fill="${WASH.ochre}"/><path d="M9 -3.2H12.5V3.2H9Z" fill="${WASH.vermilion}"/>` +

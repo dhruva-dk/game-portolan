@@ -1,20 +1,19 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mind, think, type Memory } from '../src/sim/bot.ts';
-import { nature } from '../src/sim/persona.ts';
 import { afloat, stepFleet, type Vessel } from '../src/sim/contact.ts';
 import { STEP } from '../src/sim/fixed.ts';
 import type { Depth } from '../src/sim/shoal.ts';
 import { shipAt, type Helm } from '../src/sim/ship.ts';
 import type { Storm } from '../src/sim/storm.ts';
-import { temper } from '../src/sim/temper.ts';
+import type { DriverStats } from '../src/sim/setup.ts';
 import {
   createTerritory,
   type Outcome,
   type Territory,
 } from '../src/sim/territory.ts';
 import { along, bearingAt, distance, fromLatLon } from '../src/world/sphere.ts';
-import { EVEN_SHIP, aboard } from './setups.ts';
+import { EVEN_SHIP, aboard, botOf, statsWith } from './setups.ts';
 
 const start = fromLatLon(0.2, 0.3);
 const deep: Depth = () => 30;
@@ -29,11 +28,6 @@ const placed = (
   const at = along(start, bearingAt(start, bearing), meters).p;
   return afloat(id, shipAt(at, bearingAt(at, heading)));
 };
-const seedWhere = (ok: (t: ReturnType<typeof temper>) => boolean) => {
-  let s = 1;
-  while (!ok(temper(s))) s++;
-  return s;
-};
 
 type Seen = Vessel & { shield?: number; hull?: number };
 
@@ -43,6 +37,7 @@ function voyage(
   seconds: number,
   t: Territory,
   o: {
+    stats?: DriverStats;
     minds?: (Memory | null)[];
     storm?: Storm;
     since?: number;
@@ -64,7 +59,7 @@ function voyage(
         fleet.filter((k) => k.id !== v.id).map((k) => aboard(k)),
         { depth: deep, storm: o.storm ?? null, holdings: t },
         m,
-        nature(seeds[i]!)
+        botOf(seeds[i]!, o.stats)
       );
       minds[i] = r.memory;
       return r.helm;
@@ -89,7 +84,7 @@ function voyage(
 }
 
 test('a bot sails out of its water on a loop and back into it, and takes the water it closes', () => {
-  const seed = seedWhere((k) => k.claim > 0.8),
+  const seed = 1,
     t = createTerritory(1);
   t.begin([start], 0);
   const home = t.share(0);
@@ -97,6 +92,7 @@ test('a bot sails out of its water on a loop and back into it, and takes the wat
     closed = 0,
     back = 0;
   voyage([placed(0, 0, 0, 0)], [seed], 120, t, {
+    stats: statsWith({ territory: 20 }),
     each: (fleet, _, did) => {
       out = Math.max(out, distance(fleet[0].ship.at, start));
       closed += did.claimed.filter((k) => k.id === 0).length;

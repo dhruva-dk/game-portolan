@@ -18,7 +18,6 @@ import { gunOf, laid } from '../src/sim/gun.ts';
 import { SHIP } from '../src/sim/handling.ts';
 import { SHIELD } from '../src/sim/tuning.ts';
 import { startMatch, stepMatch, type Report } from '../src/sim/match.ts';
-import { nature } from '../src/sim/persona.ts';
 import type { Depth } from '../src/sim/shoal.ts';
 import { shipAt, turned } from '../src/sim/ship.ts';
 import { loosed, type Ball } from '../src/sim/shot.ts';
@@ -35,7 +34,7 @@ import {
   scale,
   type Vec3,
 } from '../src/world/sphere.ts';
-import { EVEN_SHIP, WORST, aboard } from './setups.ts';
+import { EVEN_SHIP, WORST, aboard, botOf } from './setups.ts';
 
 const deep: Depth = () => 30;
 const center = fromLatLon(0.2, 0.3),
@@ -219,14 +218,14 @@ test('a bot never takes a mate for its foe, nor notes it in its log; a ship of a
         [other],
         { depth: deep },
         foe,
-        nature(seed)
+        botOf(seed)
       ).memory;
       mate = think(
         aboard(own(0)),
         [other],
         { depth: deep },
         mate,
-        nature(seed)
+        botOf(seed)
       ).memory;
     }
     assert.equal(foe.foe, 2, `${seed}: another team's ship is in its eye`);

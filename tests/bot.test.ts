@@ -1,8 +1,6 @@
 import { test } from 'node:test';
-import { nature } from '../src/sim/persona.ts';
 import assert from 'node:assert/strict';
 import { mind, rammed, think, type Memory } from '../src/sim/bot.ts';
-import { temper } from '../src/sim/temper.ts';
 import {
   afloat,
   stepFleet,
@@ -24,8 +22,8 @@ import {
   normalize,
   type Vec3,
 } from '../src/world/sphere.ts';
-import { EVEN_SHIP, WORST, aboard } from './setups.ts';
-import type { ShipValues } from '../src/sim/setup.ts';
+import { EVEN_SHIP, WORST, aboard, botOf, statsWith } from './setups.ts';
+import type { DriverStats, ShipValues } from '../src/sim/setup.ts';
 
 const deg = Math.PI / 180;
 const start = fromLatLon(0.2, 0.3);
@@ -47,7 +45,8 @@ function sail(
   held?: (v: Vessel, fleet: Vessel[]) => Helm,
   each?: (f: Vessel[], t: number) => void,
   storm?: (t: number) => Storm,
-  values: ShipValues = EVEN_SHIP
+  values: ShipValues = EVEN_SHIP,
+  stats: DriverStats = statsWith()
 ) {
   let minds: (Memory | null)[] = fleet.map((v, i) =>
     seeds[i] === null ? null : mind(seeds[i]!, v.ship.at)
@@ -62,7 +61,7 @@ function sail(
         fleet.filter((o) => o.id !== v.id).map((o) => aboard(o, values)),
         { depth, storm: storm?.(n * STEP) },
         m,
-        nature(seeds[i]!)
+        botOf(seeds[i]!, stats)
       );
       minds[i] = r.memory;
       return r.helm;
@@ -95,14 +94,6 @@ const placed = (
 ): Vessel => {
   const at = along(start, bearingAt(start, bearing), meters).p;
   return afloat(id, { ...shipAt(at, bearingAt(at, heading)), speed });
-};
-const seedsWhere = (
-  ok: (t: ReturnType<typeof temper>) => boolean,
-  n: number
-) => {
-  const out: number[] = [];
-  for (let s = 1; out.length < n; s++) if (ok(temper(s))) out.push(s);
-  return out;
 };
 
 test('the same bots from the same places sail the same voyage, to the bit', () => {
@@ -188,12 +179,11 @@ test('the same seed sails the same way; different seeds, different ways', () => 
       apart(track(a), track(b)) > 30,
       `${a}, ${b}: ${apart(track(a), track(b))} m`
     );
-  const tempers = Array.from({ length: 16 }, (_, s) => temper(s));
-  assert.ok(new Set(tempers.map((t) => t.notice.toFixed(1))).size === 16);
 });
 
 test('a bot answering a ram takes less of it than a ship holding its course', () => {
-  const sharp = seedsWhere((t) => t.skill > 0.8 && t.fight < 0.4, 3);
+  const sharp = [1, 2, 3],
+    deft = statsWith({ helm: 20, nerve: 1 });
   let answered = 0,
     holding = 0;
   for (const from of [60, 90, 120])
@@ -230,7 +220,17 @@ test('a bot answering a ram takes less of it than a ship holding its course', ()
           0
         );
       answered += taken(
-        sail([rammer, victim], [null, seed], 20, deep, chase).blows
+        sail(
+          [rammer, victim],
+          [null, seed],
+          20,
+          deep,
+          chase,
+          undefined,
+          undefined,
+          EVEN_SHIP,
+          deft
+        ).blows
       );
       holding += taken(
         sail([rammer, victim], [null, null], 20, deep, chase).blows
@@ -287,15 +287,21 @@ function closing(
     };
   };
 }
-const captains = [
-  ...seedsWhere((t) => t.skill < 0.5, 3),
-  ...seedsWhere((t) => t.skill > 0.8, 3),
-  ...seedsWhere((t) => t.margin > 40, 2),
-  ...seedsWhere((t) => t.margin < 15, 2),
+const captains: readonly (readonly [number, DriverStats])[] = [
+  [1, statsWith({ stormcraft: 1, helm: 1 })],
+  [2, statsWith({ stormcraft: 1, helm: 1 })],
+  [3, statsWith({ stormcraft: 1 })],
+  [4, statsWith({ stormcraft: 20, helm: 20 })],
+  [5, statsWith({ stormcraft: 20, helm: 20 })],
+  [6, statsWith({ stormcraft: 20 })],
+  [7, statsWith()],
+  [8, statsWith()],
+  [9, statsWith({ lookout: 1, nerve: 1 })],
+  [10, statsWith({ lookout: 20, nerve: 20 })],
 ];
 
 test('a bot outside the next cap makes for it in time, and is never caught outside the closing one', () => {
-  for (const [k, seed] of captains.entries()) {
+  for (const [k, [seed, stats]] of captains.entries()) {
     const center = along(start, bearingAt(start, k * 0.9), 400).p,
       storm = closing(center, 600, 120, 20, 70);
     let worst = Infinity;
@@ -309,11 +315,12 @@ test('a bot outside the next cap makes for it in time, and is never caught outsi
         worst = Math.min(worst, toEdge(f[0].ship.at, storm(t)));
       },
       storm,
-      WORST
+      WORST,
+      stats
     );
     const inside = toEdge(r.fleet[0].ship.at, storm(100).next);
     console.log(
-      `# seed ${seed} (margin ${temper(seed).margin.toFixed(0)} m, skill ${temper(seed).skill.toFixed(2)}):` +
+      `# seed ${seed} (Stormcraft ${stats.stormcraft}, Helm ${stats.helm}):` +
         ` ${inside.toFixed(0)} m inside, never less than ${worst.toFixed(0)} m inside the closing cap`
     );
     assert.ok(worst > 0, `${seed}: caught ${(-worst).toFixed(0)} m outside`);
@@ -324,13 +331,14 @@ test('a bot outside the next cap makes for it in time, and is never caught outsi
   }
   const free = sail(
     [placed(1, 0, 30, 0)],
-    [captains[0]],
+    [captains[0][0]],
     70,
     deep,
     undefined,
     undefined,
     undefined,
-    WORST
+    WORST,
+    captains[0][1]
   );
   assert.ok(
     toEdge(free.fleet[0].ship.at, {
@@ -341,7 +349,7 @@ test('a bot outside the next cap makes for it in time, and is never caught outsi
 });
 
 test('a bot inside the cap never leaves it, roaming or with the next one closing round it', () => {
-  for (const seed of captains) {
+  for (const [seed, stats] of captains) {
     const holding = closing(start, 260, 260, Infinity, 1),
       shrinking = closing(start, 260, 200, 0, 30);
     for (const storm of [holding, shrinking]) {
@@ -356,13 +364,14 @@ test('a bot inside the cap never leaves it, roaming or with the next one closing
           worst = Math.min(worst, toEdge(f[0].ship.at, storm(t)));
         },
         storm,
-        WORST
+        WORST,
+        stats
       );
       assert.ok(worst > 0, `${seed}: ${(-worst).toFixed(0)} m outside`);
     }
   }
   let out = 0;
-  for (const seed of captains) {
+  for (const [seed, stats] of captains) {
     sail(
       [placed(1, seed, 40, seed * 2.3)],
       [seed],
@@ -373,7 +382,8 @@ test('a bot inside the cap never leaves it, roaming or with the next one closing
         if (toEdge(f[0].ship.at, { center: start, radius: 260 / R }) < 0) out++;
       },
       undefined,
-      WORST
+      WORST,
+      stats
     );
   }
   assert.ok(out > 0);

@@ -2,7 +2,6 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { crewOf } from '../src/sim/battle.ts';
 import { DEFAULT_BRAIN, type Brain } from '../src/sim/brain.ts';
-import { nature } from '../src/sim/persona.ts';
 import {
   mind,
   think,
@@ -20,8 +19,6 @@ import {
   openAt,
 } from '../src/sim/route.ts';
 import { shipAt } from '../src/sim/ship.ts';
-import { eye } from '../src/sim/lookout.ts';
-import { temper } from '../src/sim/temper.ts';
 import type { Depth } from '../src/sim/shoal.ts';
 import {
   along,
@@ -31,7 +28,7 @@ import {
   toward,
   type Vec3,
 } from '../src/world/sphere.ts';
-import { WORST } from './setups.ts';
+import { TENS, WORST, botOf } from './setups.ts';
 
 const c0 = fromLatLon(0.3, 0.1);
 const { east, north } = frameAt(c0);
@@ -50,11 +47,7 @@ function blocked(depth: Depth, a: Vec3, b: Vec3): boolean {
   return false;
 }
 
-const SEED = (() => {
-  let s = 1;
-  while (eye(temper(s)) < 150) s++;
-  return s;
-})();
+const SEED = 1;
 
 function run(depth: Depth, brain: Brain, seconds: number) {
   const ch = chart(depth),
@@ -83,7 +76,13 @@ function run(depth: Depth, brain: Brain, seconds: number) {
       was = here;
     }
     const own: Own = { ...fleet[0], crew, hull: 12, shield: 0 };
-    const r = think(own, [foe], { depth, chart: ch }, m, nature(SEED, brain));
+    const r = think(
+      own,
+      [foe],
+      { depth, chart: ch },
+      m,
+      botOf(SEED, TENS, brain)
+    );
     m = r.memory;
     if (modes.at(-1) !== m.mode) modes.push(m.mode);
     fleet = stepFleet(

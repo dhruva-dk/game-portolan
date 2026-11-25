@@ -1,5 +1,5 @@
 import type { Rarity } from './kinds.ts';
-import type { MatchSetup } from './setup.ts';
+import type { DriverStats, MatchSetup } from './setup.ts';
 
 export const HEAL = {
   restores: { common: 0.15, rare: 0.3, epic: 0.5, legendary: 1 },
@@ -31,3 +31,26 @@ export const HEAL_COUNT: Readonly<Record<MatchSetup['heals'], number>> = {
   4: 1.25,
   5: 1.5,
 };
+
+export const DRIVER = {
+  stat: { least: 1, most: 20 },
+  want: { base: 0.25, slope: 1.5, over: 20, flip: 21 },
+  react: [2.2, 0.3],
+  aim: [0, 1],
+  helm: [0, 1],
+  breakOff: [0.6, 0.15],
+  loop: [60, 250],
+  setOff: [0, 25],
+  notice: [60, 300],
+} as const;
+
+export const TRICKS = {
+  lead: { stat: 'gunnery', needs: 8 },
+  returnFire: { stat: 'lookout', needs: 10 },
+  dodge: { stat: 'helm', needs: 12 },
+  outrun: { stat: 'stormcraft', needs: 10 },
+  loops: { stat: 'territory', needs: 8 },
+  healUnderFire: { stat: 'nerve', needs: 12 },
+} as const satisfies Record<string, { stat: keyof DriverStats; needs: number }>;
+
+export const RETURN_FIRE = { beyond: 90 } as const;

@@ -37,8 +37,6 @@ export interface Fighting {
 export interface ShipResult {
   id: number;
   brain: string;
-  persona: string;
-  skill: number;
   player: boolean;
   aim: Partial<Record<GunKind, Record<Band, Count>>>;
   fell: Record<Band, Fell>;
@@ -79,7 +77,6 @@ export interface Episode {
 }
 
 export interface MatchResult {
-  type: string;
   seconds: number;
   steps: number;
   msPerStep: number;
@@ -163,7 +160,6 @@ export function watch(
   state: State,
   brainOf: (id: number) => string,
   depth: (p: Vec3) => number,
-  type: string,
   players: ReadonlySet<number> = new Set()
 ) {
   const ships = new Map<number, Watch>();
@@ -179,8 +175,6 @@ export function watch(
       r: {
         id: k.id,
         brain: brainOf(k.id),
-        persona: debugOf(state).natureOf(k.id)?.persona ?? '',
-        skill: debugOf(state).natureOf(k.id)?.temper.skill ?? 0,
         player: players.has(k.id),
         aim: {},
         fell: {
@@ -422,7 +416,6 @@ export function watch(
         w.r.share = state.share(w.r.id);
       }
       return {
-        type,
         seconds: state.time(),
         steps,
         msPerStep: ms / Math.max(1, steps),

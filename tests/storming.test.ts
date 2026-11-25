@@ -2,7 +2,6 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mind, think } from '../src/sim/bot.ts';
 import { afloat } from '../src/sim/contact.ts';
-import { nature } from '../src/sim/persona.ts';
 import { building, chart, fieldAt } from '../src/sim/route.ts';
 import type { Depth } from '../src/sim/shoal.ts';
 import { shipAt } from '../src/sim/ship.ts';
@@ -15,7 +14,7 @@ import {
   frameAt,
   fromLatLon,
 } from '../src/world/sphere.ts';
-import { aboard } from './setups.ts';
+import { aboard, botOf } from './setups.ts';
 
 const center = fromLatLon(0.2, 0.3),
   { north, east } = frameAt(center);
@@ -55,7 +54,7 @@ test('a bot behind a wall inside the next cap reckons itself outside it by water
     const own = afloat(1, shipAt(at, north));
     let m = mind(seed, at);
     for (let k = 0; k < 7; k++)
-      m = think(aboard(own), [], sea, m, nature(seed)).memory;
+      m = think(aboard(own), [], sea, m, botOf(seed)).memory;
     assert.equal(m.mode, 'storm', `${seed}: ${m.mode}`);
     const here = fieldAt(ch, found.field, at),
       there = fieldAt(ch, found.field, m.goal);
@@ -67,7 +66,7 @@ test('a bot behind a wall inside the next cap reckons itself outside it by water
         [],
         { depth: walled, chart: ch, storm },
         free,
-        nature(seed)
+        botOf(seed)
       ).memory;
     assert.notEqual(free.mode, 'storm');
   }

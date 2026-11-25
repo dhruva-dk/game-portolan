@@ -14,7 +14,6 @@ import {
 import { bruised, mind, rammed, sank, shot, type Memory } from './bot.ts';
 import { DEFAULT_BRAIN, type Brain } from './brain.ts';
 import { mates, teamsOf } from './teams.ts';
-import { MIXED, nature, type MatchType, type Nature } from './persona.ts';
 import { afloat, stepFleet, type Vessel } from './contact.ts';
 import { STEP } from './fixed.ts';
 import { sunk } from './health.ts';
@@ -37,7 +36,9 @@ import {
 } from './territory.ts';
 import type { Hands } from './hands.ts';
 import type { MatchResult } from './result.ts';
-import type { MatchSetup, ShipSpec, ShipValues } from './setup.ts';
+import type { DriverStats, MatchSetup, ShipSpec, ShipValues } from './setup.ts';
+import { driver } from './driver.ts';
+import { DEFAULT_RULES } from './rules.ts';
 import { remembered } from '../world/remembered.ts';
 import type { ShipPose } from '../world/pose.ts';
 import { hash } from '../world/random.ts';
@@ -62,7 +63,6 @@ export interface Rig {
 
 interface Course {
   seed: number;
-  type: MatchType;
   heals: MatchSetup['heals'] | null;
   storm: (seconds: number) => Storm;
 }
@@ -161,10 +161,12 @@ function checked(setup: MatchSetup): MatchSetup {
 
 const courseOf = (setup: MatchSetup, depth: (p: Vec3) => number): Course => ({
   seed: setup.match,
-  type: MIXED,
   heals: setup.heals,
-  storm: createStorm(setup.match, depth, MIXED.rules.storm),
+  storm: createStorm(setup.match, depth, DEFAULT_RULES.storm),
 });
+
+const statsOf = (spec: ShipSpec): DriverStats | null =>
+  spec.hands === 'player' ? null : spec.hands;
 
 const helmOf = (h: Hands): Helm => ({ course: h.course, throttle: h.throttle });
 const orderOf = (h: Hands): Order => ({ aim: h.aim, fire: h.fire });
@@ -227,7 +229,7 @@ function createSea(waters: Waters, first: Course) {
     id: number,
     ship: ShipState,
     lashed: Helm | null,
-    bot: boolean
+    stats: DriverStats | null
   ) => {
     fleet.push(afloat(id, ship));
     vessels.stale();
@@ -236,8 +238,8 @@ function createSea(waters: Waters, first: Course) {
       p = pose(ship, r);
     aboard.set(id, {
       top,
-      mind: bot && !lashed ? mind(seedOf(id), ship.at) : null,
-      nature: nature(seedOf(id), brain, match.type.mix),
+      mind: stats && !lashed ? mind(seedOf(id), ship.at) : null,
+      bot: stats && { seed: seedOf(id), brain, temper: driver(stats) },
       steady: lashed ?? AMIDSHIPS,
       ride: r,
       before: p,
@@ -255,7 +257,7 @@ function createSea(waters: Waters, first: Course) {
     specOf.clear();
     for (const id of ids) specOf.set(id, values(id));
     teams = by;
-    tally = by ? createTally(by, closedBy(match.type.rules.storm)) : null;
+    tally = by ? createTally(by, closedBy(DEFAULT_RULES.storm)) : null;
     loose = false;
     lay =
       loot && match.heals !== null
@@ -567,12 +569,7 @@ function createSea(waters: Waters, first: Course) {
         : berths(water, match.seed, count, depth);
     const at: Spawn[] = drawn(open, match.seed);
     for (const id of ids)
-      launch(
-        id,
-        shipAt(at[id].at, at[id].heading),
-        null,
-        specs[id].hands !== 'player'
-      );
+      launch(id, shipAt(at[id].at, at[id].heading), null, statsOf(specs[id]));
     territory?.begin(
       at.map((b, id) => (aboard.has(id) ? b.at : null)),
       tick * STEP
@@ -605,7 +602,7 @@ function createSea(waters: Waters, first: Course) {
         PLAYER,
         shipAt(start.at, bearingAt(start.at, start.bearing)),
         null,
-        given[PLAYER].hands !== 'player'
+        statsOf(given[PLAYER])
       );
       others.forEach((o, i) => {
         const way = (o.lashed?.throttle ?? 0) * valuesOf(i + 1).topSpeed;
@@ -613,7 +610,7 @@ function createSea(waters: Waters, first: Course) {
           i + 1,
           { ...shipAt(o.at, o.heading), speed: way },
           o.lashed,
-          true
+          statsOf(given[i + 1])
         );
       });
       territory?.begin(
@@ -652,7 +649,6 @@ function createSea(waters: Waters, first: Course) {
     },
     mindOf: (id: number): Readonly<Memory> | null =>
       aboard.get(id)?.mind ?? null,
-    natureOf: (id: number): Nature | null => aboard.get(id)?.nature ?? null,
     standIn: (id: number, sights: Sighter) => {
       const a = aboard.get(id);
       if (a?.mind) a.sights = sights;
@@ -671,7 +667,7 @@ function createSea(waters: Waters, first: Course) {
     anchor(at: { at: Vec3; bearing: number }, values: ShipValues) {
       clear([PLAYER], LOBBY, () => values);
       quiet = true;
-      launch(PLAYER, shipAt(at.at, bearingAt(at.at, at.bearing)), null, false);
+      launch(PLAYER, shipAt(at.at, bearingAt(at.at, at.bearing)), null, null);
     },
   };
 }
@@ -699,7 +695,6 @@ export function createMooring(
 ): Match {
   const sea = createSea(waters, {
     seed: 0,
-    type: MIXED,
     heals: null,
     storm: () => calm(at.at),
   });
@@ -713,7 +708,6 @@ interface Debug {
   strew(at: Vec3, heals: readonly Rarity[]): void;
   sink(id: number, by: number | null): void;
   mindOf(id: number): Readonly<Memory> | null;
-  natureOf(id: number): Nature | null;
   standIn(id: number, sights: Sighter): void;
   lap(on: ((part: Part) => void) | undefined): void;
 }
