@@ -26,7 +26,6 @@ import {
   FIRST_RACE,
   FIRST_SEASON,
   ROLES,
-  VERSION,
   perLine,
   perRole,
   type CareerState,
@@ -248,7 +247,6 @@ export function newCareer(options: CareerOptions): CareerState {
     index === 0 ? LEAGUE.teams : index
   );
   return {
-    version: VERSION,
     seed,
     season: FIRST_SEASON,
     race: FIRST_RACE,

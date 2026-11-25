@@ -17,7 +17,6 @@ import {
   LINES,
   ROLES,
   STATS,
-  VERSION,
   perLine,
   type CareerState,
   type Team,
@@ -63,7 +62,6 @@ test('the same seed gives the same career and different seeds differ', () => {
 
 test('a new career is in the lobby at season 1, race 1, unread false', () => {
   for (const state of CAREERS) {
-    assert.equal(state.version, VERSION);
     assert.equal(state.phase, 'lobby');
     assert.equal(state.season, 1);
     assert.equal(state.race, 1);
