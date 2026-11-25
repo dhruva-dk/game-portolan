@@ -11,7 +11,7 @@ import {
   repossessTeam,
 } from '../src/career/record/repossess.ts';
 import { scoreRace } from '../src/career/record/score.ts';
-import { shipRange } from '../src/career/rules/ship-range.ts';
+import { shipRange } from '../src/career/rules/knowledge.ts';
 import { standings } from '../src/career/rules/standing.ts';
 import { standInResult } from '../src/career/standin.ts';
 import {

@@ -1,5 +1,5 @@
 import { seatHolder } from '../lookup.ts';
-import { focusValue, focusWeight, wantsGun } from '../rules/focus-value.ts';
+import { focusValue, focusWeight, wantsGun } from '../rules/development.ts';
 import { LINES, STATS, type CareerState, type Focus } from '../state.ts';
 
 export function wantedFocus(state: CareerState, team: number): Focus {

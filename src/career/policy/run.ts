@@ -1,6 +1,6 @@
 import type { Command, Reason, Refusal } from '../commands.ts';
 import { standingOrder } from '../rules/standing.ts';
-import type { Temperament } from '../rules/temperament.ts';
+import type { Temperament } from '../rules/person.ts';
 import { YOURS, type CareerState } from '../state.ts';
 import { POLICY } from '../tuning.ts';
 import { policy } from './policy.ts';

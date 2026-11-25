@@ -3,19 +3,15 @@ import assert from 'node:assert/strict';
 import { newCareer } from '../src/career/apply.ts';
 import {
   placePoints,
-  shipPoints,
-  teamPoints,
-} from '../src/career/rules/points.ts';
-import {
   racesDone,
   reputation,
   reputationOf,
   reputations,
-} from '../src/career/rules/reputation.ts';
-import {
+  shipPoints,
   standingOf,
   standingOrder,
   standings,
+  teamPoints,
   type Table,
 } from '../src/career/rules/standing.ts';
 import type { CareerState } from '../src/career/state.ts';

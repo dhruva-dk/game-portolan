@@ -1,7 +1,11 @@
 import { knowledgeYear, uniform } from '../draw.ts';
 import { ownerOf, personOf } from '../lookup.ts';
-import { askRange, starRange } from '../rules/star-range.ts';
-import { exactRange, statRange } from '../rules/stat-range.ts';
+import {
+  askRange,
+  exactRange,
+  starRange,
+  statRange,
+} from '../rules/knowledge.ts';
 import { YOURS, type CareerState, type Range } from '../state.ts';
 import { KNOWLEDGE } from '../tuning.ts';
 

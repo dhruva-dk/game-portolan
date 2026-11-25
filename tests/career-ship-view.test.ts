@@ -2,8 +2,11 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { apply } from '../src/career/apply.ts';
 import { seatHolder, seatStat } from '../src/career/lookup.ts';
-import { buildCost, fitCost } from '../src/career/rules/build-cost.ts';
-import { designGain } from '../src/career/rules/gain.ts';
+import {
+  buildCost,
+  designGain,
+  fitCost,
+} from '../src/career/rules/development.ts';
 import {
   LINES,
   type CareerState,

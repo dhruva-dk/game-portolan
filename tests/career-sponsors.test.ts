@@ -10,9 +10,12 @@ import type { Command, Reason } from '../src/career/commands.ts';
 import { matchSetup } from '../src/career/fit.ts';
 import { SPONSOR_ROSTER } from '../src/career/names.ts';
 import { moneyTotal, teamMoney } from '../src/career/record/pay.ts';
-import { objectiveMet } from '../src/career/rules/objective.ts';
-import { reputations } from '../src/career/rules/reputation.ts';
-import { sponsorBonus, sponsorFee } from '../src/career/rules/sponsor-fee.ts';
+import {
+  objectiveMet,
+  sponsorBonus,
+  sponsorFee,
+} from '../src/career/rules/money.ts';
+import { reputations } from '../src/career/rules/standing.ts';
 import { drawOffers } from '../src/career/sponsors/offers.ts';
 import { standInResult } from '../src/career/standin.ts';
 import {

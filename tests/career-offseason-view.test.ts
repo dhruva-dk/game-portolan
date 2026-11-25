@@ -2,9 +2,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { apply } from '../src/career/apply.ts';
 import type { Command } from '../src/career/commands.ts';
-import { seasonPrize } from '../src/career/rules/season-prize.ts';
+import { seasonPrize } from '../src/career/rules/money.ts';
 import { standingOrder, standings } from '../src/career/rules/standing.ts';
-import { stars } from '../src/career/rules/stars.ts';
+import { stars } from '../src/career/rules/person.ts';
 import {
   LINES,
   type CareerState,

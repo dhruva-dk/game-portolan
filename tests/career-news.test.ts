@@ -13,9 +13,13 @@ import { SPONSOR_ROSTER } from '../src/career/names.ts';
 import { minimumTerms } from '../src/career/policy/terms.ts';
 import { publishNews } from '../src/career/record/news.ts';
 import { repossess } from '../src/career/record/repossess.ts';
-import { lineLeader } from '../src/career/rules/line-leader.ts';
-import { standingOrder, standings } from '../src/career/rules/standing.ts';
-import { isStreak, nextStreak } from '../src/career/rules/streak.ts';
+import {
+  isStreak,
+  lineLeader,
+  nextStreak,
+  standingOrder,
+  standings,
+} from '../src/career/rules/standing.ts';
 import { standInResult } from '../src/career/standin.ts';
 import {
   LINES,

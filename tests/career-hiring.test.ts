@@ -9,25 +9,23 @@ import { willingness } from '../src/career/hiring/willingness.ts';
 import { personOf } from '../src/career/lookup.ts';
 import { enterPhase } from '../src/career/record/advance.ts';
 import { wageBill } from '../src/career/record/pay.ts';
-import { answerTo } from '../src/career/rules/answer.ts';
-import { ask } from '../src/career/rules/ask.ts';
-import { standardClause } from '../src/career/rules/clause.ts';
 import {
-  racesLeftOnSigning,
-  renewedRacesLeft,
-} from '../src/career/rules/contract-length.ts';
-import { eligible } from '../src/career/rules/eligible.ts';
-import { lowestWage } from '../src/career/rules/lowest-wage.ts';
-import { releaseCost } from '../src/career/rules/release-cost.ts';
-import { reputations } from '../src/career/rules/reputation.ts';
-import { leavesReserve } from '../src/career/rules/reserve.ts';
-import {
+  answerTo,
+  ask,
   clausePenalty,
+  eligible,
+  lowestWage,
   moneyScore,
   offerScore,
+  racesLeftOnSigning,
+  releaseCost,
+  renewedRacesLeft,
   securityScore,
-} from '../src/career/rules/score.ts';
-import { stars } from '../src/career/rules/stars.ts';
+  standardClause,
+} from '../src/career/rules/hiring.ts';
+import { reputations } from '../src/career/rules/standing.ts';
+import { leavesReserve } from '../src/career/rules/money.ts';
+import { stars } from '../src/career/rules/person.ts';
 import { standInResult } from '../src/career/standin.ts';
 import {
   ROLES,

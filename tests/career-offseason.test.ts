@@ -15,10 +15,9 @@ import { payPrizes } from '../src/career/offseason/prize.ts';
 import { offseasonReport } from '../src/career/offseason/report.ts';
 import { teamLoss, winter } from '../src/career/offseason/winter.ts';
 import { teamMoney } from '../src/career/record/pay.ts';
-import { currentStats } from '../src/career/rules/ageing.ts';
-import { rookie } from '../src/career/rules/person.ts';
-import { seasonPrize } from '../src/career/rules/season-prize.ts';
-import { winterLoss, wintered } from '../src/career/rules/winter.ts';
+import { currentStats, rookie } from '../src/career/rules/person.ts';
+import { seasonPrize } from '../src/career/rules/money.ts';
+import { winterLoss, wintered } from '../src/career/rules/development.ts';
 import { standInResult } from '../src/career/standin.ts';
 import {
   LINES,

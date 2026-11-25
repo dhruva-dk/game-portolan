@@ -1,8 +1,8 @@
 import type { Command } from '../commands.ts';
 import { healRating, nextRace, planetName, stormRating } from '../fit.ts';
 import { seatHolder, seatStat } from '../lookup.ts';
-import { buildCost } from '../rules/build-cost.ts';
-import { interestOn } from '../rules/race-money.ts';
+import { buildCost } from '../rules/development.ts';
+import { interestOn } from '../rules/money.ts';
 import { standings } from '../rules/standing.ts';
 import { LINES, ROLES, YOURS, type CareerState } from '../state.ts';
 import { DOTS, LEAGUE, LOBBY_BUBBLES } from '../tuning.ts';

@@ -38,7 +38,7 @@ import {
   placePrize,
   seaMoney,
   sinkingMoney,
-} from '../src/career/rules/race-money.ts';
+} from '../src/career/rules/money.ts';
 import { standInResult } from '../src/career/standin.ts';
 import {
   ROLES,

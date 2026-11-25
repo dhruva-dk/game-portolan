@@ -1,7 +1,7 @@
 import type { MatchResult, ShipResult } from '../../sim/result.ts';
 import { planetName } from '../fit.ts';
 import { seatHolder } from '../lookup.ts';
-import { meanShare } from '../rules/race-money.ts';
+import { meanShare } from '../rules/money.ts';
 import { standings } from '../rules/standing.ts';
 import {
   YOURS,

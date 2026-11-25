@@ -1,7 +1,6 @@
 import type { Reason } from '../commands.ts';
 import { ownerOf, personOf } from '../lookup.ts';
-import { answerTo } from '../rules/answer.ts';
-import { lowestWage } from '../rules/lowest-wage.ts';
+import { answerTo, lowestWage } from '../rules/hiring.ts';
 import type { CareerState, Person, Talk, Team, Terms } from '../state.ts';
 import { updateTeam } from '../teams.ts';
 import { CONTRACTS, NEGOTIATION } from '../tuning.ts';

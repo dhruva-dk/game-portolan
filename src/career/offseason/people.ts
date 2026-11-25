@@ -1,6 +1,5 @@
 import { announce, named } from '../announce.ts';
-import { aged, retires } from '../rules/ageing.ts';
-import { rookie } from '../rules/person.ts';
+import { aged, retires, rookie } from '../rules/person.ts';
 import type { CareerState, NewsEvent, Person } from '../state.ts';
 import { vacate } from '../vacate.ts';
 

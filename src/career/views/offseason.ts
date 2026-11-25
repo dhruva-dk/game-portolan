@@ -1,4 +1,4 @@
-import { stars } from '../rules/stars.ts';
+import { stars } from '../rules/person.ts';
 import {
   LINES,
   ROLES,

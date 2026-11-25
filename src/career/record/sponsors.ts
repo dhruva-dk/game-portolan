@@ -1,5 +1,5 @@
 import type { MatchResult } from '../../sim/result.ts';
-import { objectiveMet } from '../rules/objective.ts';
+import { objectiveMet } from '../rules/money.ts';
 import { mapSlots, signed } from '../sponsors/slots.ts';
 import type { CareerState, SponsorRow } from '../state.ts';
 import { teamShips } from './finish.ts';

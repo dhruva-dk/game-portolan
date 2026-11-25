@@ -1,7 +1,7 @@
 import type { GunKind } from '../../sim/kinds.ts';
 import type { Reason } from '../commands.ts';
 import { seatStat } from '../lookup.ts';
-import { buildCost, fitCost } from '../rules/build-cost.ts';
+import { buildCost, fitCost } from '../rules/development.ts';
 import type { CareerState, Line } from '../state.ts';
 import { updateShip, updateTeam } from '../teams.ts';
 

@@ -1,6 +1,5 @@
 import { draw, knowledgeYear, raceKey, type Key } from '../draw.ts';
-import { narrowed } from '../rules/narrow.ts';
-import { shipRange } from '../rules/ship-range.ts';
+import { narrowed, shipRange } from '../rules/knowledge.ts';
 import {
   YOURS,
   perLine,

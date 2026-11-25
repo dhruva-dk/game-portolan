@@ -5,7 +5,7 @@ import {
   placePrize,
   seaMoney,
   sinkingMoney,
-} from '../rules/race-money.ts';
+} from '../rules/money.ts';
 import type { CareerState, MoneyRows } from '../state.ts';
 import { teamShips } from './finish.ts';
 import { sponsorRows } from './sponsors.ts';

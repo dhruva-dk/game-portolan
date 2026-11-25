@@ -1,8 +1,6 @@
-import { ask } from '../rules/ask.ts';
-import { standingScore } from '../rules/eligible.ts';
-import { reputationOf } from '../rules/reputation.ts';
-import { offerScore } from '../rules/score.ts';
-import { stars } from '../rules/stars.ts';
+import { ask, offerScore, standingScore } from '../rules/hiring.ts';
+import { reputationOf } from '../rules/standing.ts';
+import { stars } from '../rules/person.ts';
 import type { CareerState, Person, Terms } from '../state.ts';
 
 export function willingness(

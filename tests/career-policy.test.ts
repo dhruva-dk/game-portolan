@@ -23,24 +23,21 @@ import { holderStars, weakSeat } from '../src/career/policy/seats.ts';
 import { minimumTerms } from '../src/career/policy/terms.ts';
 import { moneyTotal, teamMoney, wageBill } from '../src/career/record/pay.ts';
 import { scoreRace } from '../src/career/record/score.ts';
-import { ask } from '../src/career/rules/ask.ts';
-import { standardClause } from '../src/career/rules/clause.ts';
+import { ask, standardClause } from '../src/career/rules/hiring.ts';
 import {
   focusValue,
   focusWeight,
   wantsGun,
-} from '../src/career/rules/focus-value.ts';
-import { affordablePurchase } from '../src/career/rules/purchase.ts';
-import { reputations } from '../src/career/rules/reputation.ts';
-import { seasonPrize } from '../src/career/rules/season-prize.ts';
-import { stars } from '../src/career/rules/stars.ts';
-import { standings } from '../src/career/rules/standing.ts';
+} from '../src/career/rules/development.ts';
+import { affordablePurchase, seasonPrize } from '../src/career/rules/money.ts';
+import { reputations, standings } from '../src/career/rules/standing.ts';
 import {
   TEMPERAMENTS,
   ownerTemperament,
+  stars,
   temperamentOf,
   type Temperament,
-} from '../src/career/rules/temperament.ts';
+} from '../src/career/rules/person.ts';
 import { standInResult } from '../src/career/standin.ts';
 import {
   DRIVER_STATS,

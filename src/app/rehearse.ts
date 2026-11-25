@@ -11,10 +11,13 @@ import {
   type Terms,
 } from '../career/state.ts';
 import { talkWith } from '../career/hiring/talks.ts';
-import { answerTo, type Answer } from '../career/rules/answer.ts';
+import {
+  answerTo,
+  standardClause,
+  type Answer,
+} from '../career/rules/hiring.ts';
 import { willingness } from '../career/hiring/willingness.ts';
 import { personOf } from '../career/lookup.ts';
-import { standardClause } from '../career/rules/clause.ts';
 import { NEGOTIATION } from '../career/tuning.ts';
 import { lobbyView } from '../career/views/lobby.ts';
 

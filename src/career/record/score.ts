@@ -1,6 +1,5 @@
 import type { MatchResult } from '../../sim/result.ts';
-import { teamPoints } from '../rules/points.ts';
-import { standings } from '../rules/standing.ts';
+import { standings, teamPoints } from '../rules/standing.ts';
 import type { CareerState } from '../state.ts';
 import { bestPlaceOf, teamShips } from './finish.ts';
 
