@@ -42,3 +42,10 @@ export const WORDINGS: Record<NewsKind, readonly string[]> = {
 
 export const SPECIAL_WORDING =
   'Creditors take everything from {team} except Uncle.';
+
+export const MASTHEAD = 'The Gullible';
+
+export const DATELINES = {
+  race: 'Season {season}, Race {race}',
+  season: 'Season {season}',
+} as const;

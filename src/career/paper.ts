@@ -230,3 +230,24 @@ export const headlineText = (kind: EditionKind, headline: Headline): string =>
   templateOf(kind, headline).replace(PLACEHOLDER, (whole, name: string) =>
     isSlot(name) ? (headline.values[name]?.text ?? whole) : whole
   );
+
+export type Run = PaperValue;
+
+const joined = (runs: readonly Run[], run: Run): Run[] => {
+  const last = runs.at(-1);
+  if (run.text === '') return [...runs];
+  if (last && last.team === null && run.team === null)
+    return [...runs.slice(0, -1), { ...last, text: last.text + run.text }];
+  return [...runs, run];
+};
+
+export function headlineRuns(kind: EditionKind, headline: Headline): Run[] {
+  const parts = templateOf(kind, headline).split(PLACEHOLDER);
+  return parts
+    .map((part, index) => {
+      if (index % 2 === 0) return plain(part);
+      const value = isSlot(part) ? headline.values[part] : undefined;
+      return value ?? plain(`{${part}}`);
+    })
+    .reduce<Run[]>(joined, []);
+}

@@ -75,17 +75,24 @@ export function rehearsed(
     livery: founding.livery ?? REHEARSAL.livery,
     emblem: founding.emblem ?? REHEARSAL.emblem,
   });
-  for (let n = 0; n < races; n++) {
-    state = dismissed(state);
-    if (state.phase === 'offseason')
-      state = ashore(state, { type: 'FinishOffseason', team: YOURS });
-    if (n === races - 1) state = approached(state, approach);
-    state = ashore(state, { type: 'StartRace', team: YOURS });
-    const result = standInResult(matchSetup(state, { hands: 'player' }));
-    state = sent(state, { type: 'RecordRace', team: YOURS, result });
-    state = sent(state, { type: 'MarkRead', team: YOURS });
-  }
+  for (let n = 0; n < races; n++)
+    state = sent(recorded(state, n === races - 1 ? approach : []), {
+      type: 'MarkRead',
+      team: YOURS,
+    });
   return state;
+}
+
+export function recorded(
+  state: CareerState,
+  approach: readonly Role[] = []
+): CareerState {
+  let now = dismissed(state);
+  if (now.phase === 'offseason')
+    now = ashore(now, { type: 'FinishOffseason', team: YOURS });
+  now = ashore(approached(now, approach), { type: 'StartRace', team: YOURS });
+  const result = standInResult(matchSetup(now, { hands: 'player' }));
+  return sent(now, { type: 'RecordRace', team: YOURS, result });
 }
 
 export function wintered(state: CareerState): CareerState {
