@@ -7,6 +7,7 @@ import { GUN, GUNS } from '../sim/handling.ts';
 import { SHIELD } from '../sim/tuning.ts';
 import { progress } from '../sim/hold.ts';
 import { toEdge } from '../sim/storm.ts';
+import { calmShare, regainRate } from '../sim/holding.ts';
 import { sunk } from '../sim/health.ts';
 import { RIDE } from '../sim/ride.ts';
 import { PLAYER } from '../sim/match.ts';
@@ -172,8 +173,10 @@ export function createGame(
     hullMax: moored.hullPoints,
     shield: 0,
     shieldMax: SHIELD.most,
+    refilling: false,
     gun: null,
     afloat: 0,
+    sea: 0,
     sunk: false,
     storm: 0,
     closing: false,
@@ -492,6 +495,12 @@ export function createGame(
       report.gun = inHandOf(g, c, lay?.target != null);
       report.afloat = state.alive().length;
       report.sunk = sunk(c.health);
+      report.sea = report.sunk ? 0 : calmShare(state.teamShare(PLAYER), s);
+      report.refilling =
+        !sunk(w.health) &&
+        w.health.shield < SHIELD.most &&
+        regainRate(calmShare(state.teamShare(w.id), s), w.values.shieldRate) >
+          0;
       report.storm = Number.isFinite(s.secondsToNext) ? s.secondsToNext : 0;
       report.closing = s.closing;
       report.eye = calm;
@@ -509,6 +518,7 @@ export function createGame(
       return report;
     },
     sinkings: state.sinkings,
+    forfeit: () => debugOf(state).sink(PLAYER, null),
     share: () => state.share(PLAYER),
     ships: state.ships,
     alive: state.alive,
@@ -555,6 +565,7 @@ export function createGame(
         held = helm;
       },
       sink: debugOf(state).sink,
+      shoot: debugOf(state).shoot,
       strew: debugOf(state).strew,
       hurt: debugOf(state).hurt,
       wear(w: DebugDamage | null) {
