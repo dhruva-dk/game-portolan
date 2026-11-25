@@ -343,7 +343,7 @@ export function createShip(port: LobbyPort) {
     if (row.sailor.who === 'you')
       return (
         slip(cx - 14, cy - 14, 28, 28, { rule: false, flat: true }) +
-        glyph('stat.helm', cx, cy, ROW.sailor - 2)
+        glyph('role.owner', cx, cy, ROW.sailor - 2)
       );
     return tile(
       row.sailor.who === 'driver' ? row.sailor.portrait : null,
