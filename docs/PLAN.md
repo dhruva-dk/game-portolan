@@ -1922,24 +1922,26 @@ Goal: the numbers. Only tuning files change in this milestone.
 
 ### Targets
 
-| Target | Measured by | Band |
-|---|---|---|
-| Time to sink, two ships at level-50 values, stats 10 | `duel`, median over 20 seeds | 8 to 12 s |
-| Match length at a 3-star storm | `match`, median over 10 seeds | 270 to 330 s |
-| A level-100 ship against a level-0 ship, equal stats | `duel`, 10 seeds | at least 9 wins |
-| A stats-18 driver at level 30 against a stats-6 driver at level 60 | `duel`, 20 seeds | 6 to 14 wins |
-| Hit rate of Gunnery-20 ships over Gunnery-1 ships, in a match where teams alternate between the two | `match` on `evenSetup` | at least 3× |
-| Seasons for your seat (sensible policy, stats-10 bot) to reach the top 10 from 40th | `career`, median over 5 seeds | 4 to 6 |
-| Your seat's standing after 5 seasons with your policy off | `career`, 5 seeds | 36th or worse |
-| Your balance in the first five races under the sensible policy | `career`, 5 seeds | never below 0 |
-| Rival teams repossessed per season | `career`, mean over 10 seasons | 0.2 to 3 |
-| Richest team's balance after 10 seasons | `career` | under 300,000 |
-| Mean design level after 10 seasons | `career` | top five teams 70 to 95; bottom five teams 5 to 30 |
-| Mean staff stars after 10 seasons | `career` | top five teams 3.5 to 4.5 |
+| Target | Measured by | Band | At the start (M7.1) |
+|---|---|---|---|
+| Time to sink, two ships at level-50 values, stats 10 | `duel`, median over 20 seeds | 8 to 12 s | 17.48 s |
+| Match length at a 3-star storm | `match`, median over 10 seeds | 270 to 330 s | 291.1 s |
+| A level-100 ship against a level-0 ship, equal stats | `duel`, 10 seeds | at least 9 wins | 10 |
+| A stats-18 driver at level 30 against a stats-6 driver at level 60 | `duel`, 20 seeds | 6 to 14 wins | 18.5 |
+| Hit rate of Gunnery-20 ships over Gunnery-1 ships, in a match where teams alternate between the two | `match` on `evenSetup` | at least 3× | 2.23× (78% against 35%) |
+| Seasons for your seat (sensible policy, stats-10 bot) to reach the top 10 from 40th | `career`, median over 5 seeds | 4 to 6 | never (never, 9, 9, never, never in 10 seasons) |
+| Your seat's standing after 5 seasons with your policy off | `career`, 5 seeds | 36th or worse | 34th, 38th, 35th, 39th, 40th |
+| Your balance in the first five races under the sensible policy | `career`, 5 seeds | never below 0 | lowest 1,634 |
+| Rival teams repossessed per season | `career`, mean over 10 seasons | 0.2 to 3 | 0.00 |
+| Richest team's balance after 10 seasons | `career` | under 300,000 | 1,040,483 |
+| Mean design level after 10 seasons | `career` | top five teams 70 to 95; bottom five teams 5 to 30 | top five 64.4; bottom five 45.9 |
+| Mean staff stars after 10 seasons | `career` | top five teams 3.5 to 4.5 | 2.79 |
+
+The starting figures were measured at commit `6946e2e3`. The harness sails each duel seed twice, with the two ships' places swapped, so a count of wins out of 20 seeds is half the duels won out of 40. The career figures are from stand-in results on seeds `1` to `1-5`: `npm run sim -- career --seasons 10 --runs 5 --standin`, and `npm run sim -- idle --runs 5 --standin` for the policy switched off.
 
 ### Procedure
 
-- [ ] **M7.1 Record the starting figures** for every target.
+- [x] **M7.1 Record the starting figures** for every target.
 - [ ] **M7.2 Tune the sea** (the first five targets), changing only `sim/tuning.ts` and the §1.4.1 table in `career/tuning.ts`.
 - [ ] **M7.3 The user tunes feel by hand** on the iPad: top speed across levels, turn rate, the five muzzle speeds against the new top speeds, Gust, aim sensitivity.
 - [ ] **M7.4 Tune the money and the league** (the last seven targets), changing only `career/tuning.ts`. Work with `--standin` runs, which take seconds. Before finishing, confirm every one of these targets once with real matches on parallel workers.
