@@ -610,6 +610,8 @@ A bot's behavior comes only from its six stats. `sim/driver.ts` turns a `DriverS
 
 If a stat's effect is not visible when comparing 20 against 1, widen that stat's range in the tables above (§2.7.4). Do not add special cases.
 
+"Under fire" means hit in the last 5 s. The notice distance also lifts today's 240 m limit of sight, so Lookout 20 sees to 300 m. Each bot keeps a seed made from the match seed and its ship id for tie-breaks, aim wander and route choices; no personality is drawn from it.
+
 ### 1.11.9 Where ships start
 
 Berths are found as today (`sim/spawn.ts`). They are then assigned by standing: order the berths along a path that starts at a berth chosen by the match seed and repeatedly visits the nearest unvisited berth; order the teams by the standing in their ship specs; give each team consecutive berths for its ships, slot 0 first. Teams of similar standing therefore start near each other, and the bottom of the league starts far from the top.
@@ -1678,7 +1680,7 @@ Goal: the match engine is in `sim/`; a match is created from a `MatchSetup` of 2
 - [x] **M2.6 Heals.** §1.11.5.
 - [x] **M2.7 Shield.** §1.11.6 item 3.
 - [x] **M2.8 Gust meter.** §1.11.7.
-- [ ] **M2.9 Drivers from stats.** §1.11.8: add `sim/driver.ts`; delete `sim/persona.ts` (`sim/driven.ts` went in step M2.3), the styles and seeded draws of `sim/temper.ts` (keep the parameter type), and the match types.
+- [x] **M2.9 Drivers from stats.** §1.11.8: add `sim/driver.ts`; delete `sim/persona.ts` (`sim/driven.ts` went in step M2.3), the styles and seeded draws of `sim/temper.ts` (keep the parameter type), and the match types.
 - [ ] **M2.10 Race conditions.** Storm scaling and the two ratings (§1.11.2, §1.11.3).
 - [ ] **M2.11 Berths by standing.** §1.11.9.
 - [ ] **M2.12 The result.** Sea samples, `afloatAtPhaseFour`, the end rule and places (§1.11.6, §1.11.10); `result()` returns a `MatchResult`.
