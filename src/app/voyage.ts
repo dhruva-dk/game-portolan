@@ -3,15 +3,17 @@ import { matchSetup } from '../career/fit.ts';
 import { seatHolder } from '../career/lookup.ts';
 import { YOURS, type CareerState } from '../career/state.ts';
 import { dressOf } from '../play/colors.ts';
-import { IDLE, type End, type Screen, type SeaBubble } from '../play/player.ts';
+import { IDLE, type End, type SeaBubble } from '../play/player.ts';
 import { createUncle } from '../play/uncle.ts';
 import { createReferee } from '../play/referee.ts';
 import { loaded } from '../render/load.ts';
 import type { Snapshot } from '../render/snapshot.ts';
+import { PLAYER } from '../sim/match.ts';
 import type { MatchResult } from '../sim/result.ts';
 import { shoresOf } from '../ui/base/coasts.ts';
 import { createGlobe } from '../ui/base/globe.ts';
 import { MOTION } from '../ui/base/house.ts';
+import { onBeats } from '../ui/base/beat.ts';
 import { onPressed } from '../ui/base/touch.ts';
 import { fade, uiLayer, view } from '../ui/base/ui.ts';
 import { createVeil } from '../ui/base/veil.ts';
@@ -23,11 +25,10 @@ import { createStick } from '../ui/sea/stick.ts';
 import { clamp, lerp } from '../world/scalar.ts';
 import type { Crew } from './ashore.ts';
 import type { Stage } from './debug.ts';
+import { seaScreen, teamWon, type SeaPhase } from './heard.ts';
 import { deviceStore, keepSettings, keptSettings } from './kept.ts';
 
 export const SETTLE = { slice: 12 } as const;
-
-type Phase = 'sailing' | 'sunk' | 'watching' | 'settling' | 'over';
 
 export type Voyage = {
   next(real: number): Snapshot | null;
@@ -68,10 +69,11 @@ export async function voyage(
   );
   const hudState = (): HudState =>
     Object.assign(status, game.status(view.w, view.h), game.kit());
-  let phase: Phase = 'sailing',
+  let phase: SeaPhase = 'sailing',
     paused = false,
     released = -Infinity,
     offered = false,
+    judged = false,
     begun = false,
     left: boolean | null = null,
     stats: boolean | null = null;
@@ -91,7 +93,10 @@ export async function voyage(
       fire: input.fire,
       aim: input.aim,
       map: () => globe.show(hudState()),
-      pause: pauseMatch,
+      pause() {
+        if (!paused && phase === 'sailing') audio.cue('tap');
+        pauseMatch();
+      },
     },
     (id) => uncle.seen(o.seen(id))
   );
@@ -176,6 +181,12 @@ export async function voyage(
   };
 
   const ended = (end: End) => {
+    if (!judged && (end.how === 'won' || end.over)) {
+      judged = true;
+      const race = game.race();
+      if (race && teamWon(game.result().ships, race.teams, PLAYER))
+        audio.cue('salute');
+    }
     if (phase === 'over' || phase === 'settling') return;
     if (end.how === 'won') {
       if (end.settled) finish();
@@ -205,11 +216,11 @@ export async function voyage(
     screen: 'match',
     map: false,
   };
-  const screenOf = (): Screen =>
-    phase === 'sailing' ? 'match' : phase === 'watching' ? 'spectate' : 'sunk';
+  const screenOf = () => seaScreen(phase, { offered, paused: pause.state });
   onPressed(layer, () =>
     audio.tap(pause.state === 'playing' ? screenOf() : 'settings')
   );
+  onBeats(layer, (b) => audio.cue(b));
 
   const settle = (real: number): null => {
     const dt = game.hasten(SETTLE.slice);

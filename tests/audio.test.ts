@@ -7,8 +7,10 @@ import {
   DEEDS,
   cueOf,
   soundOf,
+  type Cue,
   type Happening,
 } from '../src/audio/cues.ts';
+import { BEATS } from '../src/ui/base/beat.ts';
 import { createListen, type Call, type Hearing } from '../src/audio/listen.ts';
 import {
   FALL,
@@ -349,7 +351,6 @@ test('listen: a ball passing near whistles once; a heal slot taken in hand; the 
   );
   assert.deepEqual(cues(hearing(scene(2.12), status({ using: null }))), []);
   cues(hearing(scene(2.15), status()));
-  assert.deepEqual(cues(hearing(scene(2.2), status(), 'won')), ['salute']);
   assert.deepEqual(cues(hearing(scene(2.3), status(), 'lobby')), []);
   assert.deepEqual(cues(hearing(scene(2.4), status(), 'settings')), ['open']);
   assert.deepEqual(cues(hearing(scene(2.5), status(), 'lobby')), ['close']);
@@ -389,6 +390,42 @@ test('listen: a ball passing near whistles once; a heal slot taken in hand; the 
     [],
     'each change heard once'
   );
+});
+
+test('listen at sea: Settings from the pause opens and closes it; sinking settles into lost', () => {
+  const l = createListen(() => -20),
+    out: Call[] = [];
+  const cues = (screen: Hearing['screen'], t: number) => {
+    out.length = 0;
+    l.listen(hearing(scene(t), status(), screen), 1 / 30, out);
+    return out.map((c) => c.cue);
+  };
+  assert.deepEqual(cues('lobby', 0), []);
+  assert.deepEqual(cues('match', 0.1), ['launch']);
+  assert.deepEqual(cues('settings', 0.2), ['open']);
+  assert.deepEqual(cues('match', 0.3), ['close']);
+  assert.deepEqual(cues('sinking', 0.4), []);
+  assert.deepEqual(cues('sinking', 0.5), []);
+  assert.deepEqual(cues('sunk', 0.6), ['lost']);
+  assert.deepEqual(cues('spectate', 0.7), []);
+  assert.deepEqual(cues('settings', 0.8), ['open']);
+  assert.deepEqual(cues('spectate', 0.9), ['close']);
+});
+
+test('every beat the interface asks for is a cue on the interface bus, and the sound it plays is short', () => {
+  for (const b of BEATS) {
+    assert.ok(
+      CUE_NAMES.some((c) => c === b),
+      b
+    );
+    const cue = CUES[b as Cue];
+    assert.equal(cue.bus, 'ui', b);
+    const x = SOUNDS[soundOf(cue, null)].make(48000, 1);
+    assert.ok(
+      x.length / 48000 <= (b === 'slam' ? 0.9 : 0.45),
+      `${b} ${x.length / 48000} s`
+    );
+  }
 });
 
 test('the bed hears its speed as a share of its own top', () => {
