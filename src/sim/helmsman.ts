@@ -69,6 +69,8 @@ export const HELM = {
   slow: 0.6,
   budge: 1.5,
   swing: 0.15,
+  pivot: 0.5,
+  patience: 8,
   tighten: 0.8,
   leastWay: 0.35,
   cramp: Math.PI / 2,
@@ -221,6 +223,18 @@ function sideOf(c: Ctx, want: number, dt: number): number {
   return m.side;
 }
 
+function pivoting(c: Ctx, deep: number, dt: number): number {
+  const { m } = c,
+    heading = c.own.ship.heading,
+    want = deep >= 0 ? 1 : -1;
+  if (m.side === 0 || (m.side !== want && Math.abs(deep) <= Math.PI / 2))
+    [m.side, m.head, m.sideT, m.blocked] = [want, heading, 0, 0];
+  else if (dot(m.head, heading) <= Math.cos(c.b.helm.swing))
+    [m.head, m.sideT] = [heading, 0];
+  else if ((m.sideT += dt) >= c.b.helm.patience) m.side = 0;
+  return m.side;
+}
+
 function stuck(
   c: Ctx,
   dt: number,
@@ -229,11 +243,8 @@ function stuck(
   const { m } = c,
     ship = c.own.ship;
   const pinned = () => c.others.some((o) => gap(ship, o.ship) < RAM.rearm);
-  const order = (turn: number, lost = false) => ({
-    helm: {
-      course: turned(ship, turn),
-      throttle: pinned() ? 0 : c.b.helm.slow,
-    },
+  const order = (turn: number, lost = false, way: number = c.b.helm.slow) => ({
+    helm: { course: turned(ship, turn), throttle: pinned() ? 0 : way },
     lost,
   });
   const steady = { helm: null, lost: false };
@@ -248,16 +259,22 @@ function stuck(
   if (held && m.backT > -(c.b.helm.wade + c.b.helm.most)) {
     m.backT -= dt;
     if (m.backT > -c.b.helm.wade) return steady;
-    const deep = deepest(c);
-    const holding = Math.abs(deep) > Math.PI / 2 && ship.turn * deep < 0;
-    const turn = holding
-      ? Math.sign(ship.turn) * c.b.helm.full
-      : Math.max(-c.b.helm.full, Math.min(c.b.helm.full, 2 * deep));
+    const deep = deepest(c),
+      first = m.backT + dt > -c.b.helm.wade;
+    if (Math.abs(deep) > c.b.helm.pivot) {
+      const round = pivoting(c, deep, dt);
+      if (round !== 0) {
+        if (!first) m.backT += dt;
+        return Math.abs(deep) > Math.PI / 2
+          ? order(deep, first)
+          : order(round * c.b.helm.full, first, 0);
+      }
+      m.backT = -(c.b.helm.wade + c.b.helm.most);
+      return order(Math.sign(deep) * c.b.helm.full);
+    }
+    const turn = Math.max(-c.b.helm.full, Math.min(c.b.helm.full, 2 * deep));
     const side = sideOf(c, turn >= 0 ? 1 : -1, dt);
-    return order(
-      side * turn > 0 ? turn : side * c.b.helm.full,
-      m.backT + dt > -c.b.helm.wade
-    );
+    return order(side * turn > 0 ? turn : side * c.b.helm.full, first);
   }
   const gaveUp = m.backT <= -(c.b.helm.wade + c.b.helm.most);
   m.backT = 0;

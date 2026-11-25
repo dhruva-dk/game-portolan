@@ -62,7 +62,7 @@ function water(at: Vec3, heading: Vec3, sea: Sea, time: number): Water {
 }
 
 const lean = (s: ShipState, top: number) =>
-  -RIDE.heel * s.turn * Math.min(1, s.speed / top);
+  -RIDE.heel * s.turn * Math.min(1, Math.abs(s.speed) / top);
 
 export function settled(
   s: ShipState,

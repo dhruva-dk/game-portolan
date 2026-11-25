@@ -9,7 +9,7 @@ import {
 } from '../world/sphere.ts';
 import { GUST, SHIP } from './handling.ts';
 import type { ShipValues } from './setup.ts';
-import { navigate, type Depth } from './shoal.ts';
+import { aground, navigate, type Depth } from './shoal.ts';
 
 export type Sailing = Pick<ShipValues, 'topSpeed' | 'gather' | 'turnRate'>;
 
@@ -65,19 +65,27 @@ export function step(
   depth: Depth,
   fit: Sailing
 ): ShipState {
-  const rudder =
-    helm.course && length(helm.course) > 0
-      ? Math.max(-1, Math.min(1, SHIP.steer * offCourse(s, helm.course)))
-      : 0;
+  const off =
+      helm.course && length(helm.course) > 0 ? offCourse(s, helm.course) : 0,
+    rudder = Math.max(-1, Math.min(1, SHIP.steer * off)),
+    power = Math.max(0, Math.min(1, helm.throttle));
+  const astern =
+    power > 0 &&
+    !helm.gust &&
+    (s.speed < 0
+      ? Math.abs(off) > SHIP.ahead
+      : Math.abs(off) > SHIP.aback &&
+        s.speed < SHIP.stopped &&
+        aground(s, depth));
   const turn =
     s.turn +
     (rudder *
       fit.turnRate *
       (helm.gust ? GUST.turn : 1) *
-      bite(s.speed, fit.topSpeed) -
+      bite(Math.abs(s.speed), fit.topSpeed) -
       s.turn) *
       close(SHIP.answer, dt);
-  const want = Math.max(0, Math.min(1, helm.throttle)) * fit.topSpeed;
+  const want = (astern ? -SHIP.astern : 1) * power * fit.topSpeed;
   let speed: number;
   if (helm.gust)
     speed =
@@ -91,6 +99,10 @@ export function step(
   else
     speed =
       s.speed +
-      (want - s.speed) * close(want > s.speed ? fit.gather : SHIP.drag, dt);
+      (want - s.speed) *
+        close(
+          (astern ? want < s.speed : want > s.speed) ? fit.gather : SHIP.drag,
+          dt
+        );
   return navigate({ ...s, speed, turn }, turned(s, turn * dt), dt, depth);
 }

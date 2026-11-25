@@ -85,6 +85,11 @@ export function clearance(
   };
 }
 
+const STEM: readonly [number, number] = [0.4 * SHIP.length + 3, 0];
+
+export const aground = (s: ShipState, depth: Depth): boolean =>
+  depth(hullAt(s.at, s.heading, STEM, sounded)) - SHIP.draft < NEAR;
+
 function deeper(p: Vec3, depth: Depth): Vec3 | null {
   const f = frameAt(p);
   const slope = (t: Vec3) =>
@@ -165,7 +170,7 @@ export function navigate(
       if (into > 0) {
         const taken = into * (1 - smoothstep(0, WARNING, before.least));
         move = add(move, n, taken);
-        speed *= Math.exp((-GRIND * taken) / s.speed);
+        speed *= Math.exp((-GRIND * taken) / Math.abs(s.speed));
       }
     }
     off = ease(s, dt, depth);
