@@ -1,6 +1,13 @@
 import type { Look } from '../render/snapshot.ts';
 import { COLORS, LIVERY, PATTERNS, type Livery } from '../world/livery.ts';
+import { hexToLinear } from '../world/color.ts';
 import { hash } from '../world/random.ts';
+
+export const PLAIN: Look = {
+  paint: [...hexToLinear('#8C8E91')],
+  sail: [...hexToLinear('#F4F0E6')],
+  pattern: 'plain',
+};
 
 export const worn = (l: Livery): Livery => ({
   dye: within(l.dye, COLORS.length) ? l.dye : LIVERY.dye,

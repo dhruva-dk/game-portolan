@@ -36,20 +36,25 @@ export type Ashore = {
   state(): CareerState;
 };
 
-export async function ashore(
-  s: Stage,
-  career: CareerState,
-  o: { store: Store; sailed(state: CareerState): void; ready(): void }
-): Promise<Ashore> {
+export async function anchorage(s: Stage, two: boolean) {
   const { waters } = await watersOf(s.world.seed, s.world.land);
   const { climate } = s.world,
     sun = sunAt(climate.sunPlaces, climate.timeOfDay, s.start.at);
   const opening = openingPose(s.start.at, s.world.wind(s.start.at), sun);
   const start = { at: s.start.at, bearing: opening.bearing };
   const game = createGame(s.world, s.anchors, waters, start, RACE_SHIP);
-  game.wear(career.teams[YOURS].livery);
-  game.moor(true, opening.side);
+  game.moor(two, opening.side);
   const input = createInput(s.canvas, () => game.steering());
+  return { game, input };
+}
+
+export async function ashore(
+  s: Stage,
+  career: CareerState,
+  o: { store: Store; sailed(state: CareerState): void; ready(): void }
+): Promise<Ashore> {
+  const { game, input } = await anchorage(s, true);
+  game.wear(career.teams[YOURS].livery);
   uiLayer();
 
   const queue = saveQueue(o.store);

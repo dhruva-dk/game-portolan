@@ -269,6 +269,10 @@ export function createState(
       return livery;
     },
     worn: (): Livery => livery,
+    paint(look: Look) {
+      if (anchored && view().poses(PLAYER)) looks.set(PLAYER, look);
+      if (consort) consort.look = look;
+    },
   };
   DEBUG.set(state, {
     atSea(
