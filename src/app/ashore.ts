@@ -8,6 +8,7 @@ import { negotiationView } from '../career/views/negotiation.ts';
 import { teamView } from '../career/views/team.ts';
 import { paintView, type PaintEdit } from '../career/views/paint.ts';
 import { shipView } from '../career/views/ship.ts';
+import { sponsorsView } from '../career/views/sponsors.ts';
 import { lookOf } from '../play/colors.ts';
 import { createGame } from '../play/game.ts';
 import { PARTS, openingPose, type Framing } from '../play/anchorage.ts';
@@ -28,6 +29,7 @@ import type {
 } from '../ui/lobby/port.ts';
 import { createPaint } from '../ui/lobby/paint.ts';
 import { createShip } from '../ui/lobby/ship.ts';
+import { createSponsors } from '../ui/lobby/sponsors.ts';
 import { createTeam } from '../ui/lobby/team.ts';
 import { createInput } from '../ui/sea/input.ts';
 import type { Stage } from './debug.ts';
@@ -88,6 +90,7 @@ export async function ashore(
     if (dealt !== null) deal.show(dealView(state, dealt));
     if (talking !== null) negotiation.show(pricing(talking));
     if (open === 'ship') ship.show((line) => shipView(state, line));
+    if (open === 'sponsors') sponsors.show(sponsorsView(state));
     if (painting)
       paint.show((edit: PaintEdit | null) => paintView(state, edit));
   };
@@ -151,6 +154,15 @@ export async function ashore(
         atStop(ship.stop());
         return;
       }
+      if (open === null && name === 'sponsors') {
+        open = name;
+        sponsors.open();
+        sponsors.show(sponsorsView(state));
+        rise(sponsors.el, true);
+        lobby.cover(true);
+        game.stage({ framing: LIFTED }, true);
+        return;
+      }
       if (open === null && name === 'team') {
         open = name;
         team.show(teamView(state));
@@ -172,6 +184,14 @@ export async function ashore(
         open = null;
         rise(ship.el, false);
         ship.reset();
+        lobby.cover(false);
+        game.stage(null, true);
+        return;
+      }
+      if (open === 'sponsors') {
+        open = null;
+        rise(sponsors.el, false);
+        sponsors.reset();
         lobby.cover(false);
         game.stage(null, true);
         return;
@@ -230,6 +250,7 @@ export async function ashore(
   const negotiation = createNegotiation(port);
   const ship = createShip(port);
   const paint = createPaint(port);
+  const sponsors = createSponsors(port);
   redraw();
 
   void surveyor()(planetSeed(state)).then((c) => {
