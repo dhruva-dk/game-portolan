@@ -274,6 +274,22 @@ const STYLE = `
 @keyframes aside { from { transform: none } to { transform: translate(-${MOTION.season.aside.shift}px, -${MOTION.season.aside.drop}px) rotate(${MOTION.season.aside.turn}deg) } }
 .ui .frost { transform-box: fill-box; transform-origin: center; animation: frost ${MOTION.frost.glyph.ms}ms ${MOTION.frost.glyph.ease} var(--d, 0ms) both; }
 @keyframes frost { from { transform: translateY(-${MOTION.frost.glyph.drop}px) rotate(${MOTION.frost.glyph.turn}deg) scale(${MOTION.frost.glyph.from}); opacity: 0; filter: blur(${MOTION.frost.glyph.blur}px) } 60% { opacity: 1; filter: blur(.6px) } }
+.ui .slider .knob { transition: transform ${MOTION.slider.settle.ms}ms ${MOTION.slider.settle.ease}; }
+.ui .slider.held .knob { transform: translateY(-${MOTION.slider.grab.lift}px) scale(${MOTION.slider.grab.swell}); transition: transform ${MOTION.slider.grab.ms}ms ${MOTION.slider.grab.ease}; }
+.ui .slider .lifted-shade { opacity: 0; transform: translateY(${MOTION.slider.grab.lift}px); transition: opacity ${MOTION.slider.grab.ms}ms ease; }
+.ui .slider.held .lifted-shade { opacity: ${MOTION.slider.shade}; }
+.ui .switch .throw { transition: transform ${MOTION.flip.ms}ms ${MOTION.flip.ease}; }
+.ui .switch.on .throw { transform: translateX(var(--throw)); }
+.ui .switch .nub { transform-box: fill-box; transform-origin: center; }
+.ui .switch.snap .nub { animation: snap ${MOTION.flip.ms}ms ${MOTION.flip.ease}; }
+@keyframes snap { 35% { transform: scaleX(${1 / MOTION.flip.squash}) scaleY(${MOTION.flip.squash}) } }
+.ui .switch .dye { transform-box: fill-box; transform-origin: left center; transform: scaleX(.25); opacity: 0; transition: transform ${MOTION.flip.dye}ms ${MOTION.flip.ease}, opacity ${MOTION.flip.dye}ms ease; }
+.ui .switch.on .dye { transform: none; opacity: .9; }
+.ui .switch .lit { opacity: 0; transition: opacity ${MOTION.flip.mark}ms ease; }
+.ui .switch.on .lit { opacity: 1; transition-delay: ${MOTION.flip.ms * 0.5}ms; }
+.ui .answer { transform-box: fill-box; transform-origin: center; }
+.ui .answer.copied { animation: copied ${MOTION.copied.hold}ms ease both; }
+@keyframes copied { 0% { opacity: 0; transform: scale(${MOTION.stamp.from}) rotate(-20deg) } 20% { opacity: 1; transform: none } 75% { opacity: 1 } to { opacity: 0 } }
 .ui .link .under { transition: stroke-width ${MOTION.press.ms}ms ease; }
 .ui .link.down .under { stroke-width: 2.4; }
 `;
