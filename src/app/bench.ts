@@ -1,7 +1,7 @@
 import { createAudio } from '../audio/audio.ts';
 import type { Hearing } from '../audio/listen.ts';
 import { createGame } from '../play/game.ts';
-import { IDLE, type End, type Screen, type SeaBubble } from '../play/player.ts';
+import { IDLE, type End, type SeaBubble } from '../play/player.ts';
 import { createReferee } from '../play/referee.ts';
 import { watersOf } from '../play/setup.ts';
 import { loaded } from '../render/load.ts';
@@ -9,8 +9,10 @@ import type { Snapshot } from '../render/snapshot.ts';
 import { shoresOf } from '../ui/base/coasts.ts';
 import { createGlobe } from '../ui/base/globe.ts';
 import { MOTION } from '../ui/base/house.ts';
+import { onBeats } from '../ui/base/beat.ts';
 import { onPressed } from '../ui/base/touch.ts';
 import { fade, uiLayer, view } from '../ui/base/ui.ts';
+import { PLAYER } from '../sim/match.ts';
 import { createAfter } from '../ui/sea/after.ts';
 import { createHud, type HudState } from '../ui/sea/hud.ts';
 import { createInput } from '../ui/sea/input.ts';
@@ -19,11 +21,10 @@ import { createSettling } from '../ui/sea/settling.ts';
 import { createStick } from '../ui/sea/stick.ts';
 import { clamp, lerp } from '../world/scalar.ts';
 import type { Played, Stage } from './debug.ts';
+import { seaScreen, teamWon, type SeaPhase } from './heard.ts';
 import { deviceStore, keepSettings, keptSettings } from './kept.ts';
 import { RACE_SHIP, raceSetup } from './race.ts';
 import { SETTLE } from './voyage.ts';
-
-type Phase = 'sailing' | 'sunk' | 'watching' | 'settling' | 'over';
 
 export async function bench(s: Stage): Promise<Played> {
   const { waters, ms } = await watersOf(s.world.seed, s.world.land);
@@ -54,7 +55,8 @@ export async function bench(s: Stage): Promise<Played> {
   );
   const globe = createGlobe(shores.coasts);
   let said: SeaBubble | null = null,
-    phase: Phase = 'sailing',
+    phase: SeaPhase = 'sailing',
+    judged = false,
     paused = false,
     released = -Infinity,
     offered = false;
@@ -83,7 +85,10 @@ export async function bench(s: Stage): Promise<Played> {
       fire: input.fire,
       aim: input.aim,
       map,
-      pause: pauseMatch,
+      pause() {
+        if (!paused && phase === 'sailing') audio.cue('tap');
+        pauseMatch();
+      },
     },
     () => {
       said = null;
@@ -112,6 +117,7 @@ export async function bench(s: Stage): Promise<Played> {
     if (document.hidden) pauseMatch();
   });
   const audio = createAudio(s.world.planet.height);
+  audio.level(settings.sound);
   const pause = createPause(
     {
       get: () => settings,
@@ -136,6 +142,12 @@ export async function bench(s: Stage): Promise<Played> {
     }
   );
   const ended = (end: End) => {
+    if (!judged && (end.how === 'won' || end.over)) {
+      judged = true;
+      const race = game.race();
+      if (race && teamWon(game.result().ships, race.teams, PLAYER))
+        audio.cue('salute');
+    }
     if (phase === 'sailing' && end.how !== 'won') {
       phase = 'sunk';
       paused = false;
@@ -149,11 +161,11 @@ export async function bench(s: Stage): Promise<Played> {
   };
   const pace = () =>
     paused ? 0 : clamp((performance.now() - released) / MOTION.paused.release);
-  const screenOf = (): Screen =>
-    phase === 'sailing' ? 'match' : phase === 'watching' ? 'spectate' : 'sunk';
+  const screenOf = () => seaScreen(phase, { offered, paused: pause.state });
   onPressed(layer, () =>
     audio.tap(pause.state === 'playing' ? screenOf() : 'settings')
   );
+  onBeats(layer, (b) => audio.cue(b));
   const hearing: Hearing = {
     scene: game.snapshot(),
     status,

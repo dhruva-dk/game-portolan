@@ -113,8 +113,6 @@ const SCREENS = [
   'sinking',
   'sunk',
   'spectate',
-  'won',
-  'result',
 ] as const;
 export type Screen = (typeof SCREENS)[number];
 
