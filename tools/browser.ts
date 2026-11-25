@@ -321,7 +321,10 @@ try {
           ? page.locator(what).nth(Number(nth))
           : page.getByText(what, { exact: true }).nth(Number(nth));
         try {
-          await target.click({ timeout: 10000 });
+          await target.click({ timeout: 4000 }).catch(async () => {
+            await target.waitFor({ state: 'visible', timeout: 6000 });
+            await target.click({ timeout: 6000, force: true });
+          });
         } catch (e) {
           await shot(`failed-tap-${what}`);
           console.log(
