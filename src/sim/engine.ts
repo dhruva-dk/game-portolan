@@ -19,7 +19,7 @@ import { STEP } from './fixed.ts';
 import { sunk } from './health.ts';
 import { regain, type Regained } from './holding.ts';
 import { PLAYER, credited, type Cause, type Sunk } from './match.ts';
-import { berths, drawn, type Spawn } from './spawn.ts';
+import { assigned, berths, type Spawn } from './spawn.ts';
 import { hopped, knocked, pose, ride, settled, type Ride } from './ride.ts';
 import { laying, overboard, type Flotsam, type Taken } from './loot.ts';
 import { asked, crewed, spilled, stored, type Ask } from './stores.ts';
@@ -572,7 +572,7 @@ function createSea(waters: Waters, first: Course) {
       berthed?.match === match.seed && berthed.spawns.length === count
         ? berthed.spawns
         : berths(water, match.seed, count, depth);
-    const at: Spawn[] = drawn(open, match.seed);
+    const at: Spawn[] = assigned(open, match.seed, ships);
     for (const id of ids)
       launch(id, shipAt(at[id].at, at[id].heading), null, statsOf(specs[id]));
     territory?.begin(
