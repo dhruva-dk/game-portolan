@@ -236,10 +236,10 @@ test('an affordable purchase is at most S of the balance and leaves R races of w
   assert.equal(affordablePurchase(-500, 200, 0, 0.6, 3), false);
 });
 
-test('the focus value is skill × (1 − design / 110) × w, w 1.5 below the mean', () => {
-  assert.equal(focusValue(12, 55, 1.5), 9);
-  assert.equal(focusValue(20, 0, 1), 20);
-  assert.equal(focusValue(1, 110, 1.5), 0);
+test('the focus value is skill × w, w 1.5 below the mean', () => {
+  assert.equal(focusValue(12, 1.5), 18);
+  assert.equal(focusValue(20, 1), 20);
+  assert.equal(focusValue(1, 1.5), 1.5);
   assert.equal(focusWeight(40, 50), 1.5);
   assert.equal(focusWeight(50, 50), 1);
   assert.equal(focusWeight(60, 50), 1);
@@ -476,7 +476,6 @@ test('step 5, focus: the line with the best weighted gain, or nothing without a 
   state = changeTeam(state, QUIET, (t) => {
     const design = { ...t.design };
     for (const line of LINES) design[line] = 50;
-    design.hull = 30;
     design.gun = 24;
     const ship = { ...t.ships[0], fitted: { ...design } };
     return {

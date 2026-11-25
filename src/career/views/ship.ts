@@ -6,7 +6,7 @@ import {
   fitRefusal,
 } from '../development.ts';
 import { seatHolder, seatStat } from '../lookup.ts';
-import { designGain } from '../rules/development.ts';
+import { designGain, focusedRate } from '../rules/development.ts';
 import {
   LINES,
   YOURS,
@@ -14,7 +14,7 @@ import {
   type Line,
   type Team,
 } from '../state.ts';
-import { GAIN, LEVEL_SPAN, UNLOCK } from '../tuning.ts';
+import { LEVEL_SPAN, UNLOCK } from '../tuning.ts';
 
 export type Sailor =
   | { who: 'you' }
@@ -149,8 +149,7 @@ export function shipView(state: CareerState, line: Line): ShipView {
   const team = state.teams[YOURS],
     designer = seatHolder(state, YOURS, 'designer'),
     skill = seatStat(state, YOURS, 'designer', line);
-  const gain =
-    skill === null ? 0 : designGain(team.design[line], skill, GAIN.focused);
+  const gain = skill === null ? 0 : designGain(skill, focusedRate());
   return {
     line,
     stop: LINES.indexOf(line),
