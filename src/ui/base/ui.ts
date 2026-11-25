@@ -79,7 +79,7 @@ const STYLE = `
   -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; font-family: "Iowan Old Style", Georgia, serif; }
 .ui * { pointer-events: none; }
 .ui [hidden] { display: none !important; }
-.ui .press, .ui .press * { pointer-events: auto; cursor: pointer; }
+.ui .press, .ui .press * { pointer-events: auto; cursor: pointer; touch-action: manipulation; }
 .ui .piece { position: absolute; }
 .ui svg { display: block; }
 .ui .top { top: ${edge('top')}; }
@@ -99,6 +99,8 @@ const STYLE = `
 .ui .pop { transform-box: fill-box; transform-origin: center;
   animation: pop ${MOTION.dot.ms}ms ${MOTION.dot.ease} both; }
 @keyframes pop { from { transform: scale(0); opacity: 0 } }
+.ui .two .sure, .ui .two.armed .unsure { display: none; }
+.ui .two.armed .sure { display: inline; }
 @keyframes needle { from { transform: rotate(-38deg) } to { transform: rotate(52deg) } }
 `;
 

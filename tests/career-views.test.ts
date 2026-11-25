@@ -254,7 +254,7 @@ test('the Sponsors dot: an empty slot and an offer waiting', () => {
   assert.equal(dot(full, 'sponsors'), false);
 });
 
-test('Uncle sits in the empty driver seat with the stand-in stats and no age, wage or pips', () => {
+test('Uncle sits in the empty driver seat with the stand-in stats and no age, wage or contract', () => {
   const driver = seat(FRESH, 'driver');
   assert.equal(driver.card?.who, 'uncle');
   assert.equal(driver.card?.age, null);
@@ -279,7 +279,7 @@ test('an empty designer or mechanic seat has no card', () => {
   }
 });
 
-test('an employee card is exact, in the stat order of the role, with pips for races left', () => {
+test('an employee card is exact, in the stat order of the role, with its contract in races left', () => {
   const role = hiredRole(MID);
   const person = employee(MID, role);
   const card = seat(MID, role).card;
@@ -328,7 +328,7 @@ test('the scouting marker is on one seat and moves with SetScoutSeat', () => {
   assert.deepEqual(marked(moved), ['mechanic']);
 });
 
-test('a deal waiting shows its candidates portraits above the seat', () => {
+test('a deal waiting gives the seat its candidates, by portrait', () => {
   const role = ROLES.find(
     (r) => (MID.teams[YOURS].deals[r]?.candidates.length ?? 0) > 0
   );

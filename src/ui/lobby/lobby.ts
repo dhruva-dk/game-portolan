@@ -9,7 +9,7 @@ import {
 } from '../base/button.ts';
 import { gullHead } from '../base/gull.ts';
 import { FAINT, MOTION, SIZE, SPACE, TYPE } from '../base/house.ts';
-import { INK, figure, glyph, slip, svgNode } from '../base/ink.ts';
+import { INK, figure, galleon, glyph, slip, svgNode } from '../base/ink.ts';
 import { least } from '../base/lexicon.ts';
 import { laurel } from '../base/marks.ts';
 import { rise } from '../base/sheet.ts';
@@ -20,7 +20,7 @@ import type { LobbyPort, ScreenName } from './port.ts';
 
 const NEXT = { orb: 30, h: 82, text: 82 } as const;
 const BUTTON = { r: SIZE.disc, step: 74, word: 13 } as const;
-const SAIL = { w: 196, h: 92 } as const;
+const SAIL = { w: 232, h: 96, ship: 58 } as const;
 const STARS = 5;
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
@@ -313,17 +313,22 @@ export function createLobby(port: LobbyPort) {
   }
 
   function drawSail(v: LobbyView) {
-    const { w, h } = SAIL;
+    const { w, h } = SAIL,
+      ship = SAIL.ship,
+      said = measured('SAIL', TYPE.ribbon, { weight: 700, spacing: 0.16 }),
+      x0 = w / 2 - (ship + SPACE.hair + said) / 2 - 3;
     const s =
       `<g id="sail">` +
       ribbon(
         w / 2,
         h / 2,
         w - 10,
-        word(w / 2 - 4, h / 2 + 1, 'SAIL', TYPE.ribbon, {
-          weight: 700,
-          spacing: 0.16,
-        }),
+        galleon(x0 + ship / 2, h / 2 - 3, ship, { waves: true }) +
+          word(x0 + ship + SPACE.hair, h / 2 + 1, 'SAIL', TYPE.ribbon, {
+            anchor: 'start',
+            weight: 700,
+            spacing: 0.16,
+          }),
         true
       ) +
       '</g>';
