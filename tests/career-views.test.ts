@@ -18,6 +18,9 @@ import { CONTRACTS, DOTS, STAND_IN } from '../src/career/tuning.ts';
 import { lobbyView, type LobbyButton } from '../src/career/views/lobby.ts';
 import { teamView, type SeatView } from '../src/career/views/team.ts';
 import { dealView, type CandidateView } from '../src/career/views/deal.ts';
+import { negotiationView, type Edit } from '../src/career/views/negotiation.ts';
+import { standardClause } from '../src/career/rules/clause.ts';
+import { NEGOTIATION } from '../src/career/tuning.ts';
 import { askingWage } from '../src/career/rules/ask.ts';
 import { reportCost } from '../src/career/rules/report-cost.ts';
 import { stars } from '../src/career/rules/stars.ts';
@@ -557,4 +560,214 @@ test('a role with no deal, or a deal emptied by the draw, shows no candidates', 
     deals: { ...t.deals, [role]: { candidates: [], locked: null } },
   }));
   assert.deepEqual(dealView(emptied, role).candidates, []);
+});
+
+const talking = (state: CareerState, id: number, edit: Edit | null = null) => {
+  const view = negotiationView(state, id, edit);
+  if (view === null) throw new Error(`no person ${id}`);
+  return view;
+};
+
+const terms = (wage: number, clause: number | null = null): Edit => ({
+  wage,
+  seasons: 2,
+  fee: 0,
+  clause,
+});
+
+function wageWhere(
+  state: CareerState,
+  id: number,
+  fits: (score: number) => boolean
+): number {
+  const { least, most, step } = NEGOTIATION.wage;
+  for (let wage = least; wage <= most; wage += step)
+    if (fits(talking(state, id, terms(wage)).willingness.lo)) return wage;
+  throw new Error('no such wage');
+}
+
+function reportedDriver(): { state: CareerState; id: number } {
+  const id = first(DEALT, 'driver').card.person ?? -1;
+  return {
+    state: sent(DEALT, { type: 'BuyReport', team: YOURS, person: id }),
+    id,
+  };
+}
+
+const offering = (state: CareerState, id: number, wage: number) =>
+  sent(state, {
+    type: 'Offer',
+    team: YOURS,
+    person: id,
+    terms: talking(state, id, terms(wage)).terms,
+  });
+
+test('a negotiation starts at the low asking wage, two seasons, no fee and the standard clause', () => {
+  const c = first(DEALT, 'driver');
+  const view = talking(DEALT, c.card.person ?? -1);
+  const wage = c.card.wage?.lo ?? -1;
+  assert.deepEqual(view.terms, {
+    wage,
+    seasons: 2,
+    fee: 0,
+    clause: standardClause(wage),
+  });
+  assert.equal(view.clause.following, true);
+  assert.deepEqual(view.seasons.choices, [1, 2, 3]);
+  assert.deepEqual(
+    [view.wage.step, view.fee.step, view.clause.step],
+    [NEGOTIATION.wage.step, NEGOTIATION.fee.step, NEGOTIATION.clause.step]
+  );
+  assert.equal(view.renewal, false);
+  assert.deepEqual(view.attempts, { used: 0, most: NEGOTIATION.attempts });
+  assert.equal(view.answer, null);
+  assert.equal(view.counter, null);
+});
+
+test('the clause follows the wage until set by hand, and terms stay within their limits', () => {
+  const id = first(DEALT, 'driver').card.person ?? -1;
+  assert.equal(
+    talking(DEALT, id, terms(1230)).terms.clause,
+    standardClause(1230)
+  );
+  const set = talking(DEALT, id, terms(1230, 2000));
+  assert.equal(set.terms.clause, 2000);
+  assert.equal(set.clause.following, false);
+  const wild = talking(DEALT, id, {
+    wage: 99999,
+    seasons: 3,
+    fee: -5,
+    clause: 999999,
+  }).terms;
+  assert.deepEqual(wild, {
+    wage: NEGOTIATION.wage.most,
+    seasons: 3,
+    fee: 0,
+    clause: NEGOTIATION.clause.most,
+  });
+});
+
+test('willingness is a band without a report and a known score with one', () => {
+  const id = first(DEALT, 'driver').card.person ?? -1;
+  const band = talking(DEALT, id, terms(400)).willingness;
+  assert.equal(band.exact, false);
+  assert.ok(band.lo < band.hi);
+  const { state } = reportedDriver();
+  const known = talking(state, id, terms(400)).willingness;
+  assert.equal(known.exact, true);
+  assert.equal(known.lo, known.hi);
+  assert.ok(band.lo <= known.lo && known.lo <= band.hi);
+  assert.deepEqual(
+    [known.least, known.most, known.counters, known.signs],
+    [
+      NEGOTIATION.bar.lo,
+      NEGOTIATION.bar.hi,
+      NEGOTIATION.counters,
+      NEGOTIATION.signs,
+    ]
+  );
+});
+
+test('the three answers: a refusal and a counter use attempts, a signing takes the seat', () => {
+  const { state, id } = reportedDriver();
+  const refused = offering(
+    state,
+    id,
+    wageWhere(state, id, () => true)
+  );
+  const after = talking(refused, id);
+  assert.equal(after.answer, 'refused');
+  assert.equal(after.attempts.used, 1);
+  const countering = wageWhere(state, id, (s) => s >= NEGOTIATION.counters);
+  const countered = talking(offering(refused, id, countering), id);
+  assert.equal(countered.answer, 'countered');
+  assert.equal(countered.attempts.used, 2);
+  assert.ok(countered.counter !== null && countered.counter.wage > countering);
+  assert.equal(countered.counter?.faint, false);
+  const signing = wageWhere(state, id, (s) => s >= NEGOTIATION.signs);
+  const signed = offering(state, id, signing);
+  assert.equal(talking(signed, id).answer, 'signed');
+  assert.equal(signed.teams[YOURS].seats.driver, id);
+});
+
+test('with three attempts used Offer is faint, and an open counter can still be accepted', () => {
+  const { state, id } = reportedDriver();
+  const low = wageWhere(state, id, () => true);
+  const countering = wageWhere(state, id, (s) => s >= NEGOTIATION.counters);
+  const twice = offering(offering(state, id, low), id, low);
+  const used = offering(twice, id, countering);
+  const view = talking(used, id);
+  assert.equal(view.attempts.used, 3);
+  assert.deepEqual(view.offer, { faint: true, why: 'attempts' });
+  assert.deepEqual([view.counter?.faint, view.counter?.why], [false, null]);
+  const accepted = sent(used, {
+    type: 'AcceptCounter',
+    team: YOURS,
+    person: id,
+  });
+  assert.equal(talking(accepted, id).answer, 'signed');
+  assert.equal(accepted.teams[YOURS].seats.driver, id);
+});
+
+test('the cost to sign adds the fee, a rival clause and the release of the holder', () => {
+  const id = first(DEALT, 'driver').card.person ?? -1;
+  const holder = employee(DEALT, 'driver');
+  const release = releaseCost(
+    holder.contract?.wage ?? 0,
+    holder.contract?.racesLeft ?? 0
+  );
+  const view = talking(DEALT, id, { ...terms(300), fee: 700 });
+  assert.equal(view.cost.cost, 700 + release);
+  assert.equal(view.cost.after, DEALT.teams[YOURS].balance - view.cost.cost);
+  const rival = dealView(DEALT, 'mechanic').candidates[0];
+  const rid = rival.card.person ?? -1;
+  const buyout = talking(DEALT, rid, terms(3000));
+  const mechanic = employee(DEALT, 'mechanic');
+  assert.equal(
+    buyout.cost.cost,
+    (rival.rival?.clause ?? 0) +
+      releaseCost(
+        mechanic.contract?.wage ?? 0,
+        mechanic.contract?.racesLeft ?? 0
+      )
+  );
+  assert.deepEqual(buyout.rival, rival.rival);
+});
+
+test('funds: the cost turns red and Offer goes faint, whatever the answer would be', () => {
+  const id = first(DEALT, 'driver').card.person ?? -1;
+  const poor = owing(DEALT, 50);
+  const view = talking(poor, id, terms(300));
+  assert.equal(view.cost.funds, true);
+  assert.deepEqual(view.offer, { faint: true, why: 'funds' });
+  assert.equal(talking(DEALT, id, terms(300)).cost.funds, false);
+});
+
+test('a renewal costs the fee alone, and is open only at ten races left or fewer', () => {
+  const role = hiredRole(MID);
+  const person = employee(MID, role);
+  const at = (racesLeft: number) =>
+    MID.people.map((p) =>
+      p.id === person.id && p.contract
+        ? { ...p, contract: { ...p.contract, racesLeft } }
+        : p
+    );
+  const near = { ...MID, people: at(CONTRACTS.renewWithin) };
+  const view = talking(near, person.id, { ...terms(500), fee: 1200 });
+  assert.equal(view.renewal, true);
+  assert.equal(view.card.who, 'person');
+  assert.deepEqual(
+    view.card.stats,
+    teamView(near).seats.find((s) => s.role === role)?.card?.stats
+  );
+  assert.equal(view.holder, null);
+  assert.equal(view.cost.cost, 1200);
+  assert.equal(view.willingness.exact, true);
+  assert.equal(view.offer.faint, false);
+  const far = { ...MID, people: at(CONTRACTS.renewWithin + 1) };
+  assert.deepEqual(talking(far, person.id).offer, { faint: true, why: 'seat' });
+});
+
+test('a negotiation view is null for no such person', () => {
+  assert.equal(negotiationView(DEALT, -1), null);
 });

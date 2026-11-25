@@ -40,7 +40,7 @@ export type DealView = {
   candidates: CandidateView[];
 };
 
-function candidateCard(state: CareerState, person: Person): CardView {
+export function candidateCard(state: CareerState, person: Person): CardView {
   const stats = knownStats(state, person.id) ?? [],
     stars = knownStars(state, person.id) ?? { lo: 0, hi: 0 },
     wage = knownAsk(state, person.id);
@@ -58,7 +58,7 @@ function candidateCard(state: CareerState, person: Person): CardView {
   };
 }
 
-function rivalOf(state: CareerState, person: Person): RivalView | null {
+export function rivalOf(state: CareerState, person: Person): RivalView | null {
   const contract = person.contract;
   if (contract === null || contract.team === YOURS) return null;
   const team = state.teams[contract.team];
@@ -102,7 +102,7 @@ function candidateOf(
   };
 }
 
-function holderOf(state: CareerState, role: Role): CardView | null {
+export function holderOf(state: CareerState, role: Role): CardView | null {
   const holder = seatHolder(state, YOURS, role);
   if (holder !== null) return exactCard(holder);
   return role === 'driver' ? uncleCard() : null;
