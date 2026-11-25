@@ -1,6 +1,5 @@
 import { DEFS, INK, WASH, cssInks, svgNode } from './ink.ts';
-import { MOTION } from './house.ts';
-import { FADE } from './ways.ts';
+import { FADE, MOTION } from './house.ts';
 
 const DRAWN = {
   w: 956,

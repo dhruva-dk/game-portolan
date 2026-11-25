@@ -1,4 +1,4 @@
-import { FADE } from './ways.ts';
+import { FADE } from './house.ts';
 import { fade, reflow, uiLayer } from './ui.ts';
 
 export function createVeil() {
