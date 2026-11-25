@@ -32,12 +32,7 @@ export type Edit = {
   clause: number | null;
 };
 
-export type StepView = {
-  value: number;
-  least: number;
-  most: number;
-  step: number;
-};
+type StepView = { value: number; least: number; most: number; step: number };
 
 export type NegotiationView = {
   person: number;

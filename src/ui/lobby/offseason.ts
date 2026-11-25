@@ -27,7 +27,7 @@ import { piece, placed, screen } from '../base/ui.ts';
 import { fitted, label, measured, word } from '../base/word.ts';
 import type { LobbyPort } from './port.ts';
 
-export type OffseasonPages = {
+type OffseasonPages = {
   table: TableView;
   people: PeopleView;
   winter: WinterView;

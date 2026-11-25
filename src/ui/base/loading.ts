@@ -2,7 +2,7 @@ import { MOTION } from './house.ts';
 import { INK, PAPER, WASH, galleon } from './ink.ts';
 import { rhumbs, rose } from './marks.ts';
 
-export const LOADING = {
+const LOADING = {
   page: { w: 960, h: 640 },
   rose: 126,
   lift: 52,

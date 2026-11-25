@@ -15,7 +15,7 @@ export type NewCareerForm = {
   dyed: boolean;
 };
 
-export type NewCareerOptions = {
+type NewCareerOptions = {
   seed: string;
   name: string;
   livery: Livery;
@@ -24,7 +24,7 @@ export type NewCareerOptions = {
 
 export type Swatch = { chosen: boolean; faint: boolean };
 
-export type TextView = { value: string; least: number; most: number };
+type TextView = { value: string; least: number; most: number };
 
 export type NewCareerView = {
   title: string;

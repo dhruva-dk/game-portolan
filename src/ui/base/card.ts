@@ -12,9 +12,9 @@ import { grouped } from './grouped.ts';
 
 export type Span = { lo: number; hi: number };
 
-export type CardRole = 'driver' | 'designer' | 'mechanic' | 'owner';
+type CardRole = 'driver' | 'designer' | 'mechanic' | 'owner';
 
-export type CardFace = {
+type CardFace = {
   who: 'person' | 'uncle';
   person: number | null;
   name: string;

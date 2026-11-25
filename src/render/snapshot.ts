@@ -71,7 +71,7 @@ export interface LootDraw {
   born: number;
 }
 
-export type SeaChange =
+type SeaChange =
   | { seq: number; time: number; kind: 'paint'; ship: number; cells: ReadCells }
   | {
       seq: number;

@@ -1,6 +1,6 @@
 import { INK, PAPER, WASH, r2 } from './ink.ts';
 
-export type Scale = { least: number; most: number };
+type Scale = { least: number; most: number };
 
 export const LEVELS: Scale = { least: 0, most: 100 };
 export const STATS: Scale = { least: 1, most: 20 };

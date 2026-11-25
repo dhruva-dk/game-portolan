@@ -1,6 +1,6 @@
 export const FIRE_DRAG = { slop: 8 } as const;
 
-export type Delta = [number, number];
+type Delta = [number, number];
 
 export const aimed = ([dx, dy]: Delta, sensitivity: number): Delta => [
   dx * sensitivity,

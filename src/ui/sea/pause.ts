@@ -14,7 +14,7 @@ import { rise, sheet } from '../base/sheet.ts';
 import { piece, screen } from '../base/ui.ts';
 import { word, type Word } from '../base/word.ts';
 
-export const PAUSE = { w: 312, h: 156, r: 29, cy: 66, words: 118 } as const;
+const PAUSE = { w: 312, h: 156, r: 29, cy: 66, words: 118 } as const;
 
 export type Paused = 'playing' | 'paused' | 'settings';
 
@@ -156,5 +156,3 @@ export function createPause(
     resume: () => close(() => act.resume()),
   };
 }
-
-export type Pause = ReturnType<typeof createPause>;

@@ -15,7 +15,7 @@ import { GILT, INK, r2, roughCircle, slip } from './ink.ts';
 
 export type Swatch = { chosen: boolean; faint: boolean };
 
-export type LiveryChoices = {
+type LiveryChoices = {
   dyes: readonly Swatch[];
   patterns: readonly Swatch[];
   emblems: readonly Swatch[];
@@ -68,7 +68,7 @@ const centerOf = (kind: LiveryPick, w: number, i: number) => {
 
 const dyeHex = (dye: number) => liveryColors({ dye, pattern: 0 });
 
-export const daub = (x: number, y: number, fill: string, seed: number) =>
+const daub = (x: number, y: number, fill: string, seed: number) =>
   `<path d="${roughCircle(x, y, ROWS.dye.r, seed, 2.2)}" style="fill:${fill}" stroke="${INK.iron}" stroke-width="1"/>` +
   `<path d="M${r2(x - 6.5)} ${r2(y - 3)}Q${r2(x - 5.5)} ${r2(y - 7.5)} ${r2(x - 1)} ${r2(y - 8.5)}" fill="none" stroke="${INK.white}" stroke-width="1.6" stroke-linecap="round" opacity=".55"/>`;
 
@@ -101,7 +101,7 @@ function device(
   );
 }
 
-export function sailSwatch(
+function sailSwatch(
   x: number,
   y: number,
   dye: string,

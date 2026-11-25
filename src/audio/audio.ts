@@ -19,10 +19,7 @@ import { LIFT, type Screen } from '../play/player.ts';
 
 const LOOP = 6;
 
-export function createEngine(
-  ctx: BaseAudioContext,
-  ground: (p: Vec3) => number
-) {
+function createEngine(ctx: BaseAudioContext, ground: (p: Vec3) => number) {
   const mixer = createMixer(ctx);
   const r = random(0x5ea);
   const noise = ctx.createBuffer(

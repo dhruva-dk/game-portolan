@@ -35,7 +35,7 @@ export const PAPER = '#f1e4c8',
   BRASS = '#5b3a1e';
 export const SHADOW = '#1a1008',
   DUSK = '#3e1860';
-export const PARCHMENT = ['#f7eedb', '#f0e2c4', '#dcc396'] as const;
+const PARCHMENT = ['#f7eedb', '#f0e2c4', '#dcc396'] as const;
 export const LIGHT = {
   warm: '#ffd9a0',
   white: '#fff1d8',

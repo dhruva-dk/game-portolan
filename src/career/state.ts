@@ -97,7 +97,7 @@ export type Team = {
 };
 
 export type Range = { lo: number; hi: number };
-export type Knowledge = { reports: number[]; lines: Record<Line, Range>[][] };
+type Knowledge = { reports: number[]; lines: Record<Line, Range>[][] };
 
 export type Change<T> = { before: T; after: T };
 

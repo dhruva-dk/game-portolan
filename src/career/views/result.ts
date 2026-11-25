@@ -21,7 +21,7 @@ export type TeamMark = {
   yours: boolean;
 };
 
-export type Fate =
+type Fate =
   | { kind: 'afloat' }
   | { kind: 'sunk'; by: TeamMark }
   | { kind: 'storm' }
@@ -59,7 +59,7 @@ export type MoneyMark =
   | { kind: 'wages'; paid: number[] }
   | { kind: 'interest' };
 
-export type MoneyRow = { mark: MoneyMark; amount: number };
+type MoneyRow = { mark: MoneyMark; amount: number };
 
 export type MoneyView = {
   rows: MoneyRow[];

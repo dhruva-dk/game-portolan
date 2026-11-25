@@ -31,7 +31,7 @@ export const RACE_SHIP = raceShip('cannon');
 
 export const RACE_STORM = rulesOf(RATING).storm;
 
-export const RACE_DRIVER = {
+const RACE_DRIVER = {
   gunnery: STAT,
   helm: STAT,
   nerve: STAT,

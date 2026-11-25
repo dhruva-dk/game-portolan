@@ -118,7 +118,7 @@ export const FAMILY_END = [
   'ock',
 ];
 
-export type SponsorName = { name: string; emblem: number };
+type SponsorName = { name: string; emblem: number };
 
 const capital = (word: string): string =>
   word.charAt(0).toUpperCase() + word.slice(1);

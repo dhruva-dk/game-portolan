@@ -35,7 +35,7 @@ const isRenewable = (person: Person, team: number): boolean =>
   isRenewal(person, team) &&
   (person.contract?.racesLeft ?? 0) <= CONTRACTS.renewWithin;
 
-export const isOfferable = (
+const isOfferable = (
   state: CareerState,
   team: number,
   person: Person

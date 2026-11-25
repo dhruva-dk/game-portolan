@@ -2,8 +2,8 @@ import { RARITIES, type Rarity } from '../../sim/kinds.ts';
 import { clamp } from '../../world/scalar.ts';
 import { GILT, INK, WASH, alpha, glyph, paperDisc, slip } from '../base/ink.ts';
 
-export const SLOT = 50,
-  SLOT_GAP = 10,
+export const SLOT = 50;
+const SLOT_GAP = 10,
   HEAL_SIZE = 31,
   BORDER = 3.2,
   USE_WIDTH = 4,

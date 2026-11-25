@@ -21,7 +21,7 @@ import { personOf } from '../career/lookup.ts';
 import { NEGOTIATION } from '../career/tuning.ts';
 import { lobbyView } from '../career/views/lobby.ts';
 
-export const REHEARSAL = {
+const REHEARSAL = {
   seed: 'test',
   livery: { dye: 0, pattern: 0 },
   emblem: 0,

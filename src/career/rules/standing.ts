@@ -54,7 +54,7 @@ export const reputationOf = (
   team: number
 ): number => reputations(state)[team];
 
-export type Finish = { place: number; sinkings: number };
+type Finish = { place: number; sinkings: number };
 
 export function placePoints(place: number): number {
   if (place >= 1 && place <= POINTS.podium.length)

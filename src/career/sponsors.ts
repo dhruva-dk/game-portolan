@@ -26,7 +26,7 @@ export const mapSlots = (
   f: (sponsor: Sponsor | null) => Sponsor | null
 ): Slots => perSlot((slot) => f(slots[slot]));
 
-export const fillSlot = (slots: Slots, slot: number, sponsor: Sponsor): Slots =>
+const fillSlot = (slots: Slots, slot: number, sponsor: Sponsor): Slots =>
   perSlot((i) => (i === slot ? sponsor : slots[i]));
 
 export const slotsOf = (sponsors: readonly Sponsor[]): Slots =>

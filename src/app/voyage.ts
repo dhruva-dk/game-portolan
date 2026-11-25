@@ -30,7 +30,7 @@ import { deviceStore, keepSettings, keptSettings } from './kept.ts';
 
 export const SETTLE = { slice: 12 } as const;
 
-export type Voyage = {
+type Voyage = {
   next(real: number): Snapshot | null;
   drawn(canvas: HTMLCanvasElement): void;
 };
