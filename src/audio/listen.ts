@@ -44,9 +44,8 @@ const PASS = 30,
   WHISTLE = 0.3,
   APART = 0.12;
 function screenCue(from: Screen, to: Screen): Cue | null {
-  if (to === 'settings' || to === 'livery') return 'open';
-  if ((from === 'settings' || from === 'livery') && to === 'lobby')
-    return 'close';
+  if (to === 'settings') return 'open';
+  if (from === 'settings' && to === 'lobby') return 'close';
   if (from === 'lobby' && to === 'match') return 'launch';
   if (to === 'sunk' && from === 'sinking') return 'lost';
   if (to === 'won') return 'salute';
@@ -211,7 +210,7 @@ export function createListen(ground: (p: Vec3) => number) {
       sound(s.at);
       bed.wall = s.eye.radius - distance(s.at, s.eye.center);
       bed.hull = s.hullMax > 0 ? s.hull / s.hullMax : 1;
-      bed.presence = (1 - s.arriving) * (shown === 'title' ? 0.6 : 1);
+      bed.presence = 1 - s.arriving;
       bed.muffle = open
         ? 1
         : shown === 'sinking' || shown === 'sunk'

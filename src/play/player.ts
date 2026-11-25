@@ -106,12 +106,9 @@ export const LIFT: Record<Deed['kind'], number> = {
   gust: 2,
 };
 
-export const SCREENS = [
-  'title',
+const SCREENS = [
   'lobby',
   'settings',
-  'seed',
-  'livery',
   'match',
   'sinking',
   'sunk',
