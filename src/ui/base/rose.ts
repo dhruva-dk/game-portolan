@@ -1,5 +1,6 @@
 import { figure, glyph, INK, WASH } from './ink.ts';
 import type { Glyph } from './glyphs.ts';
+import { measured } from './word.ts';
 
 export type RosePoint = { glyph: Glyph; lo: number; hi: number };
 
@@ -15,6 +16,39 @@ const TOP = 20,
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
 
+const turnOf = (i: number, n: number) => -Math.PI / 2 + (i * 2 * Math.PI) / n;
+
+const flank = (a: number) =>
+  Math.abs(Math.cos(a)) < 0.2 ? 1 : Math.sign(Math.cos(a));
+
+export type Reach = { left: number; right: number; up: number; down: number };
+
+export function roseReach(
+  n: number,
+  R: number,
+  g: number,
+  numerals: boolean,
+  widest = `${TOP}`
+): Reach {
+  const out = R + g * 0.62,
+    wide = numerals
+      ? measured(widest, g * 0.62, { italic: true, weight: 600 })
+      : 0;
+  const reach = { left: 0, right: 0, up: 0, down: 0 };
+  for (let i = 0; i < n; i++) {
+    const a = turnOf(i, n),
+      gx = Math.cos(a) * out,
+      gy = Math.sin(a) * out,
+      label = numerals ? g * 0.78 + wide : 0,
+      side = flank(a);
+    reach.right = Math.max(reach.right, gx + g / 2, side > 0 ? gx + label : 0);
+    reach.left = Math.max(reach.left, -gx + g / 2, side < 0 ? -gx + label : 0);
+    reach.up = Math.max(reach.up, -gy + g / 2);
+    reach.down = Math.max(reach.down, gy + g / 2);
+  }
+  return reach;
+}
+
 export function statRose(
   cx: number,
   cy: number,
@@ -24,7 +58,7 @@ export function statRose(
 ) {
   const n = points.length,
     wash = o.wash ?? WASH.ochre;
-  const angle = (i: number) => -Math.PI / 2 + (i * 2 * Math.PI) / n;
+  const angle = (i: number) => turnOf(i, n);
   const at = (i: number, v: number): [number, number] => [
     cx + Math.cos(angle(i)) * R * (v / TOP),
     cy + Math.sin(angle(i)) * R * (v / TOP),
@@ -67,7 +101,7 @@ export function statRose(
       gy = cy + Math.sin(a) * out;
     s += glyph(p.glyph, gx, gy, o.glyph);
     if (o.numerals) {
-      const side = Math.abs(Math.cos(a)) < 0.2 ? 1 : Math.sign(Math.cos(a));
+      const side = flank(a);
       const nx = gx + side * o.glyph * 0.78,
         ny = gy + (Math.abs(Math.cos(a)) < 0.2 ? 0 : o.glyph * 0.05);
       const value = p.lo === p.hi ? `${p.lo}` : `${p.lo}–${p.hi}`;
