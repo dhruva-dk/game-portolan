@@ -117,6 +117,9 @@ export const DEFS = (() => {
         `<rect width="${size}" height="${size}" fill="${c}" opacity=".12"/><rect width="${size}" height="${line}" fill="${c}"/></pattern>`;
     }
   }
+  d +=
+    `<pattern id="h-open" patternUnits="userSpaceOnUse" width="3.6" height="3.6" patternTransform="rotate(-45)">` +
+    `<rect width="3.6" height="1" fill="${INK.iron}" opacity=".8"/></pattern>`;
   return `<defs>${d}</defs>`;
 })();
 

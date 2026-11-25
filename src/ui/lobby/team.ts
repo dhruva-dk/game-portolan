@@ -9,18 +9,19 @@ import {
   cardLarge,
   type Actions,
 } from '../base/card.ts';
+import { growFrom, shrinkBack } from '../base/enlarge.ts';
 import { portrait } from '../base/gull.ts';
 import { FAINT, MOTION, SPACE, TYPE } from '../base/house.ts';
 import { figure, glyph, slip, svgNode } from '../base/ink.ts';
 import { ROLE, least } from '../base/lexicon.ts';
 import { spyglass } from '../base/marks.ts';
 import { sheet } from '../base/sheet.ts';
-import { piece, screen } from '../base/ui.ts';
+import { piece, placed, screen } from '../base/ui.ts';
 import { measured, word } from '../base/word.ts';
 import type { LobbyPort } from './port.ts';
 
 const PAD = SPACE.pad;
-const SHEET = { w: 648, h: CARD.h + 2 * PAD } as const;
+export const SHEET = { w: 648, h: CARD.h + 2 * PAD } as const;
 const GAP = (SHEET.w - 2 * PAD - 3 * CARD.w) / 2;
 const TAB = { h: 26, join: 3, inset: 6, glass: 30 } as const;
 const FAN = {
@@ -36,19 +37,6 @@ const LIFT = TAB.h;
 const r2 = (n: number) => Math.round(n * 100) / 100;
 
 const cardX = (i: number) => PAD + i * (CARD.w + GAP);
-
-function layer(
-  parent: HTMLElement,
-  x: number,
-  y: number,
-  w: number,
-  h: number
-) {
-  const el = document.createElement('div');
-  el.style.cssText = `position:absolute;left:${x}px;top:${y}px;width:${w}px;height:${h}px`;
-  parent.append(el);
-  return el;
-}
 
 const tabTop = LIFT - TAB.h + TAB.join;
 
@@ -163,17 +151,17 @@ export function createTeam(port: LobbyPort) {
   const body = piece(el, 'bottom center', false, true);
   body.style.width = `${SHEET.w}px`;
   body.style.height = `${SHEET.h}px`;
-  const ground = layer(body, 0, 0, SHEET.w, SHEET.h);
+  const ground = placed(body, 0, 0, SHEET.w, SHEET.h);
   ground.append(
     svgNode(SHEET.w, SHEET.h, sheet(0, 0, SHEET.w, SHEET.h, { seed: 29 }))
   );
   const cards = [0, 1, 2].map((i) =>
-    layer(body, cardX(i), PAD, CARD.w, CARD.h)
+    placed(body, cardX(i), PAD, CARD.w, CARD.h)
   );
   const fans = [0, 1, 2].map((i) =>
-    layer(body, cardX(i), PAD - LIFT, CARD.w, LIFT + TAB.join)
+    placed(body, cardX(i), PAD - LIFT, CARD.w, LIFT + TAB.join)
   );
-  const large = layer(body, PAD, PAD, LARGE.w, LARGE.h);
+  const large = placed(body, PAD, PAD, LARGE.w, LARGE.h);
   const deals = piece(el, 'top left', false, true);
   large.hidden = true;
 
@@ -205,6 +193,15 @@ export function createTeam(port: LobbyPort) {
           : tab;
     const tabs = svgNode(CARD.w, LIFT + TAB.join, drawn);
     fans[i].replaceChildren(tabs);
+    tabs
+      .querySelectorAll('.glide, .pop')
+      .forEach((moving) =>
+        moving.addEventListener(
+          'animationend',
+          () => moving.classList.remove('glide', 'pop'),
+          { once: true }
+        )
+      );
     const scout = tabs.querySelector<SVGElement>('#scout');
     if (seat.scouting) scout?.setAttribute('data-tap', `scout-${seat.role}`);
     else
@@ -268,51 +265,23 @@ export function createTeam(port: LobbyPort) {
       );
   }
 
-  function grow(role: Role) {
-    const i = view?.seats.findIndex((s) => s.role === role) ?? 0;
-    const origin = cardX(i) + CARD.w / 2 - PAD;
-    const { ms, ease } = MOTION.card;
-    large.style.transformOrigin = `${r2(origin)}px ${CARD.h / 2}px`;
-    large.style.transition = 'none';
-    large.style.transform = `scale(${r2(CARD.w / LARGE.w + 0.12)}, .94)`;
-    large.style.opacity = '0';
-    large.hidden = false;
-    void large.offsetWidth;
-    large.style.transition = `transform ${ms}ms ${ease}, opacity ${ms * 0.6}ms ease`;
-    large.style.transform = '';
-    large.style.opacity = '1';
-    for (const c of [...cards, ...fans, deals]) {
-      c.style.transition = `opacity ${ms}ms ease`;
-      c.style.opacity = '0';
-      c.style.pointerEvents = 'none';
-    }
-  }
+  const enlarging = { large, under: () => [...cards, ...fans, deals] };
 
   function enlarge(role: Role) {
     enlarged = role;
     drawLarge();
-    grow(role);
+    const i = view?.seats.findIndex((s) => s.role === role) ?? 0;
+    growFrom(
+      enlarging,
+      { x: cardX(i) + CARD.w / 2 - PAD, y: CARD.h / 2 },
+      CARD.w
+    );
   }
 
   function shrink(instant = false) {
     if (enlarged === null) return;
     enlarged = null;
-    const { ms, ease } = MOTION.card;
-    for (const c of [...cards, ...fans, deals]) {
-      c.style.transition = instant ? 'none' : `opacity ${ms}ms ease`;
-      c.style.opacity = '1';
-      c.style.pointerEvents = '';
-    }
-    if (instant) {
-      large.hidden = true;
-      return;
-    }
-    large.style.transition = `transform ${ms * 0.8}ms ${ease}, opacity ${ms * 0.6}ms ease`;
-    large.style.transform = `scale(${r2(CARD.w / LARGE.w + 0.12)}, .94)`;
-    large.style.opacity = '0';
-    window.setTimeout(() => {
-      if (enlarged === null) large.hidden = true;
-    }, ms);
+    shrinkBack(enlarging, CARD.w, instant, () => enlarged !== null);
   }
 
   return {

@@ -17,7 +17,7 @@ export function sheet(
   return (
     `<path d="${roughRect(x, y, w, h, o.seed ?? 17)}" fill="url(#pg)" stroke="${INK.iron}" stroke-width="1.3" filter="url(#sh)"/>` +
     `<rect x="${r2(x + rule)}" y="${r2(y + rule)}" width="${r2(w - 2 * rule)}" height="${r2(h - 2 * rule)}" fill="none" stroke="${INK.iron}" stroke-width=".6" opacity=".55"/>` +
-    (o.close ? `<g id="${o.close}">${closeButton(x + w - 6, y + 6)}</g>` : '')
+    (o.close ? `<g id="${o.close}">${closeButton(x + w + 2, y - 2)}</g>` : '')
   );
 }
 
