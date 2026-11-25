@@ -11,14 +11,19 @@ import type { MatchSetup } from '../src/sim/setup.ts';
 import { calm, closings } from '../src/sim/storm.ts';
 import { MATCH_END } from '../src/sim/tuning.ts';
 import { startCareer } from '../tools/sim/career.ts';
-import { EVEN_SHIP, setupOf } from './setups.ts';
+import { KINDS } from '../src/sim/kinds.ts';
+import { EVEN_SHIP, setupOf, valuesAt } from './setups.ts';
 import { OPEN, sail, waters } from './small.ts';
+import { loosed } from '../src/sim/shot.ts';
+import { R, along, bearingAt, scale } from '../src/world/sphere.ts';
 
 interface Watched {
   setup: MatchSetup;
   result: MatchResult;
   closed: readonly number[];
   sampled: (readonly number[])[];
+  held: (readonly number[])[];
+  ended: readonly number[];
   storms: { id: number; credit: number | null }[];
   teamShare: number[];
   alive: readonly number[];
@@ -30,14 +35,16 @@ function watched(setup: MatchSetup): Watched {
     view = m.view,
     closed = closings(rulesOf(setup.storm).storm);
   const sampled: (readonly number[])[] = [],
+    held: (readonly number[])[] = [],
+    holding = () => view.territory()!.inside(view.storm(1)),
     hit = new Map<number, { by: number; time: number }>(),
     storms: Watched['storms'] = [];
   let read = 0;
   while (!m.done) {
     m.step(STILL);
     const now = view.time();
-    for (const s of view.last().strikes)
-      hit.set(s.struck, { by: s.shooter, time: now });
+    for (const h of view.happened()?.fought.hits ?? [])
+      hit.set(h.struck, { by: h.shooter, time: now });
     const sunk = view.sinkings();
     for (; read < sunk.length; read++) {
       const k = sunk[read],
@@ -48,14 +55,18 @@ function watched(setup: MatchSetup): Watched {
           credit: h && k.time - h.time + STEP < MATCH_END.credit ? h.by : null,
         });
     }
-    while (sampled.length < closed.length && now >= closed[sampled.length])
+    while (sampled.length < closed.length && now >= closed[sampled.length]) {
       sampled.push([...view.alive()]);
+      held.push(holding());
+    }
   }
   return {
     setup,
     result: m.result(),
     closed,
     sampled,
+    held,
+    ended: holding(),
     storms,
     teamShare: setup.ships.map((_, id) => view.teamShare(id)),
     alive: [...view.alive()],
@@ -108,6 +119,10 @@ function sound(w: Watched) {
       assert.notEqual(team(s.sunkBy), team(id), 'never by a mate');
     }
     if (s.sunkAt !== null) assert.ok(s.sunkAt >= 0 && s.sunkAt <= r.seconds);
+    assert.ok(
+      s.shotsLanded <= s.shotsFired,
+      `ship ${id} (${setup.ships[id].gun}) landed ${s.shotsLanded} of ${s.shotsFired}`
+    );
   }
   for (const k of w.storms)
     assert.equal(
@@ -135,13 +150,15 @@ function sound(w: Watched) {
       if (!at.some((id) => team(id) === t))
         assert.equal(r.sea[t][k], 0, `team ${t}, none afloat, at sample ${k}`);
   }
-  for (let t = 0; t < teams; t++) {
-    const missing = r.sea[t].slice(w.sampled.length);
-    assert.ok(
-      missing.every((x) => x === missing[0]),
-      'every missing sample the share at the end'
+  const ending = new Set(w.alive.map(team));
+  for (let t = 0; t < teams; t++)
+    assert.deepEqual(
+      r.sea[t],
+      closed.map((_, k) =>
+        k < w.held.length ? w.held[k][t] : ending.has(t) ? w.ended[t] : 0
+      ),
+      `team ${t}: what it held inside the ring as each phase closed, then at the end`
     );
-  }
   assert.ok(
     r.sea.some((t) => t.some((x) => x > 0)),
     'some team held sea'
@@ -163,6 +180,10 @@ const SMALL: MatchSetup[] = [
   setupOf(22, { teams: 8, perTeam: 1 }),
   setupOf(23, { teams: 2, perTeam: 1, storm: 5 }),
   setupOf(24, { teams: 3, storm: 1 }),
+  setupOf(25, {
+    teams: 5,
+    values: (ship) => valuesAt(50, KINDS[Math.floor(ship / 2) % KINDS.length]),
+  }),
 ];
 
 const WATCHED = SMALL.map(watched);
@@ -233,6 +254,56 @@ test('places, arranged: sinkings first, then the team’s sea, then the ship id;
   assert.equal(r.ships[2].sinkings, 1);
   assert.equal(r.ships[7].sunkBy, 2);
   assert.equal(r.ships[6].sunkBy, null);
+});
+
+test('two ships hit a third in one step: the sinking goes to the ship and gun whose hit took its hull to 0', () => {
+  const setup = setupOf(33, {
+      teams: 3,
+      perTeam: 1,
+      values: (ship) => valuesAt(50, ship === 1 ? 'scatter' : 'cannon'),
+    }),
+    m = createMatch(setup, waters),
+    debug = debugOf(m),
+    [V, A, B] = [0, 1, 2];
+  debug.rig({ storm: () => calm(OPEN) });
+  debug.atSea(
+    { at: OPEN, bearing: 0 },
+    [80, -80].map((x) => {
+      const at = along(OPEN, bearingAt(OPEN, Math.PI / 2), x).p;
+      return { at, heading: bearingAt(at, 0), lashed: null };
+    })
+  );
+  const hull = setup.ships[V].hullPoints;
+  debug.hurt(V, hull - 25);
+  const on = m.view.vessel(V)!.ship.at,
+    falling = (shooter: number, round: number) =>
+      loosed(
+        shooter,
+        setup.ships[shooter].gun,
+        scale(on, R + 3),
+        scale(on, -1),
+        90,
+        10,
+        on,
+        round
+      );
+  debug.volley([falling(A, 0), falling(B, 0), falling(A, 0)]);
+  m.step(STILL);
+  assert.deepEqual(
+    m.view.last().strikes.map((s) => [s.shooter, s.hull]),
+    [
+      [A, 15],
+      [B, 10],
+    ],
+    "A's pellet, B's ball, A's second pellet"
+  );
+  const r = m.result(),
+    k = m.view.sinking(V);
+  assert.equal(r.ships[V].sunkBy, A, 'A struck last');
+  assert.equal(k?.cause, 'shot');
+  assert.equal(k?.gun, 'scatter', "with A's gun");
+  assert.equal(r.ships[A].sinkings, 1);
+  assert.equal(r.ships[B].sinkings, 0);
 });
 
 test('a match always ends: where nobody can sink anybody, 180 s after the last phase closes', () => {

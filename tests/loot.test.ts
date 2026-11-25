@@ -279,6 +279,26 @@ test('its slots full, a rarer heal takes the place of its lowest, which goes ove
   assert.equal(stowed(c.hold, 'common'), null);
 });
 
+test('the heal in use is never the one replaced: a legendary swept up takes the rare, not the common being used', () => {
+  const using = { slot: 0, left: 1, of: 1.5 },
+    c = {
+      ...hurt(crewOf(1, EVEN_SHIP), 50),
+      hold: { items: ['common', 'rare', 'epic'], using },
+    } satisfies Crew;
+  const r = swept(lying(piece(5, at(2), 'legendary')), [c], [vessel(1, c0)]);
+  assert.deepEqual(held(r.crews[0]), ['common', 'legendary', 'epic']);
+  assert.deepEqual(r.crews[0].hold.using, using, 'the common still in use');
+  assert.deepEqual(
+    r.took.map((t) => [t.heal, t.slot]),
+    [['legendary', 1]]
+  );
+  assert.deepEqual(
+    r.flotsam.pieces.map((l) => l.heal),
+    ['rare'],
+    'the rare goes over'
+  );
+});
+
 test('heals are found in their shares of rarity; a cache’s are never common', () => {
   const draw = random(7),
     n = 20000;

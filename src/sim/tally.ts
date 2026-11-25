@@ -1,4 +1,4 @@
-import type { Crew, Shot, Strike } from './battle.ts';
+import type { Crew, Hit, Shot } from './battle.ts';
 import type { Vessel } from './contact.ts';
 import { sunk } from './health.ts';
 import type { Sunk } from './match.ts';
@@ -55,22 +55,21 @@ export function createTally(
     closes = closed.at(-1) ?? Infinity,
     zeros = () => new Array<number>(count).fill(0);
   const fired = zeros(),
-    landed = zeros(),
     taken = zeros(),
-    dealt = zeros();
+    dealt = zeros(),
+    landed = teams.map(() => new Set<number>());
   const sea: number[][] = Array.from({ length: sides }, () => []);
   let got = 0,
     fourth: ReadonlySet<number> | null = null,
     made: MatchResult | null = null;
 
-  const fought = (shots: readonly Shot[], strikes: readonly Strike[]) => {
+  const fought = (shots: readonly Shot[], hits: readonly Hit[]) => {
     for (const s of shots) fired[s.shooter]++;
-    for (const s of strikes) {
-      if (s.shooter === s.struck) continue;
-      dealt[s.shooter] += s.damage;
-      taken[s.struck] += s.damage;
-      if (s.ram) continue;
-      landed[s.shooter]++;
+    for (const h of hits) {
+      if (h.shooter === h.struck) continue;
+      dealt[h.shooter] += h.damage;
+      taken[h.struck] += h.damage;
+      if (h.round !== null) landed[h.shooter].add(h.round);
     }
   };
 
@@ -107,7 +106,7 @@ export function createTally(
         sunkBy: sank ? sank.by : null,
         sinkings: s.sunk.filter((k) => k.by === id).length,
         shotsFired: fired[id],
-        shotsLanded: landed[id],
+        shotsLanded: landed[id].size,
         damageDealt: dealt[id],
         damageTaken: taken[id],
         afloatAtPhaseFour: (fourth ?? new Set(s.alive)).has(id),
@@ -127,12 +126,12 @@ export function createTally(
     teams,
     settle(
       shots: readonly Shot[],
-      strikes: readonly Strike[],
+      hits: readonly Hit[],
       standing: () => Standing,
       decides = true
     ) {
       if (made) return;
-      fought(shots, strikes);
+      fought(shots, hits);
       const s = standing();
       while (got < closed.length && s.seconds >= closed[got]) sample(s);
       if (decides && over(teams, s.alive, s.seconds - closes)) made = result(s);

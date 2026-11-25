@@ -21,7 +21,7 @@ export type Depth = (p: Vec3) => number;
 
 const WARNING = 2;
 const NEAR = 0.3;
-const EASE = 0.6;
+export const EASE = 0.6;
 const GRIND = 1.5;
 const HULL: readonly (readonly [number, number])[] = [
   [0.4 * SHIP.length, 0],

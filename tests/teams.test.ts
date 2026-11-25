@@ -8,6 +8,7 @@ import {
   marksOf,
   stepBattle,
   type Battle,
+  type Hit,
   type Strike,
 } from '../src/sim/battle.ts';
 import { mind, think } from '../src/sim/bot.ts';
@@ -341,16 +342,12 @@ test("a race's tally: shots fired and landed (a ram is no shot), damage dealt an
   const tally = () => createTally(teams, [400]),
     t = tally();
   assert.deepEqual(t.teams, teams);
-  const strike = (shooter: number, struck: number, ram: boolean): Strike => ({
+  const strike = (shooter: number, struck: number, ram: boolean): Hit => ({
     shooter,
     struck,
     damage: 10,
-    shield: 4,
-    hull: 6,
-    broke: false,
-    at: center,
-    ram,
     gun: ram ? null : KINDS[0],
+    round: ram ? null : struck,
   });
   const shot = { shooter: 1, gun: KINDS[0], from: center, dirs: [], target: 4 };
   const standing = (alive: number[], loot: number) => () => ({
@@ -431,6 +428,101 @@ test("a race's tally: shots fired and landed (a ram is no shot), damage dealt an
       .map((s) => s.place),
     [5, 1, 4, 3, 2]
   );
+});
+
+const ARMED = [
+  lying(0, -60, 0),
+  lying(1, 60, 0),
+  lying(2, 60, 9),
+  lying(3, -60, 40),
+];
+
+const dropped = (
+  shooter: number,
+  kind: 'scatter' | 'mortar',
+  x: number,
+  y: number,
+  height: number,
+  round: number
+): Ball => {
+  const p = at(x, y);
+  return loosed(
+    shooter,
+    kind,
+    scale(p, R + height),
+    scale(p, -1),
+    90,
+    10,
+    p,
+    round
+  );
+};
+
+function landedOf(balls: readonly Ball[]) {
+  const tally = createTally([0, 1, 2, 3], [400]);
+  let b: Battle = {
+    ...battleOf(
+      ARMED.map((v) => crewOf(v.id, EVEN_SHIP)),
+      0,
+      [0, 1, 2, 3]
+    ),
+    balls: [...balls],
+  };
+  const steps: Hit[][] = [];
+  for (let i = 0; i < 10 && b.balls.length; i++) {
+    const r = stepBattle(b, ARMED, still(ARMED), [], STEP, deep);
+    b = r.battle;
+    steps.push(r.hits);
+    tally.settle([], r.hits, () => ({
+      seconds: i * STEP,
+      alive: [0, 1, 2, 3],
+      fleet: [],
+      crews: [],
+      sunk: [],
+      loot: 0,
+      share: () => 0,
+      teamShare: () => 0,
+      shares: () => [],
+    }));
+  }
+  const r = tally.result({
+    seconds: 1,
+    alive: [0, 1, 2, 3],
+    fleet: [],
+    crews: [],
+    sunk: [],
+    loot: 0,
+    share: () => 0,
+    teamShare: () => 0,
+    shares: () => [],
+  });
+  return { landed: r.ships.map((s) => s.shotsLanded), steps };
+}
+
+test('a shot lands once, however many of its pellets strike, over however many steps and ships; two shots land twice', () => {
+  const late = landedOf([
+    dropped(0, 'scatter', 60, 0, 3, 0),
+    dropped(0, 'scatter', 60, 1, 8, 0),
+  ]);
+  assert.deepEqual(
+    late.steps.map((h) => h.map((x) => [x.shooter, x.struck, x.round])),
+    [[[0, 1, 0]], [[0, 1, 0]]],
+    'its pellets strike in two steps'
+  );
+  assert.equal(late.landed[0], 1, 'pellets of one shot over two steps');
+  const splash = landedOf([dropped(3, 'mortar', 60, 4.5, 1, 4)]);
+  assert.deepEqual(
+    splash.steps.flat().map((x) => x.struck),
+    [1, 2],
+    'one ball splashes two ships'
+  );
+  assert.equal(splash.landed[3], 1, 'one shot on two ships');
+  const pair = landedOf([
+    dropped(0, 'scatter', 60, 0, 3, 0),
+    dropped(0, 'scatter', 60, 1, 3, 1),
+  ]);
+  assert.equal(pair.steps.length, 1);
+  assert.equal(pair.landed[0], 2, 'two shots in one step');
 });
 
 test("a race's flow: afloat as it ends it has its place there; sunk, it watches a mate first; it is over when the game says", () => {
