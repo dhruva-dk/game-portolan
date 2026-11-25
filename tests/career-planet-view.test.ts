@@ -14,6 +14,7 @@ test('the planet of the next race with its ratings out of five stars', () => {
     assert.equal(view.storm, stormRating(state));
     assert.equal(view.heals, healRating(state));
     assert.equal(view.stars, 5);
+    assert.deepEqual(view.livery, state.teams[0].livery);
     assert.ok(RACE_RATINGS.includes(view.storm as 1));
     assert.ok(RACE_RATINGS.includes(view.heals as 1));
   }

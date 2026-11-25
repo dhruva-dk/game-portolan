@@ -24,6 +24,7 @@ const VIEWS: { name: string; q: string; own?: Partial<Budget> }[] = [
   { name: 'ship', q: 'screen=ship&seed=test&races=14&stop=6' },
   { name: 'paint', q: 'screen=paint&seed=test&races=14' },
   { name: 'sponsors', q: 'screen=sponsors&seed=test&races=1&sponsors=1' },
+  { name: 'planet', q: 'screen=planet&seed=test&races=14' },
   { name: 'map', q: 'screen=match&map' },
   {
     name: 'worst',

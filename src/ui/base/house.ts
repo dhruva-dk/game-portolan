@@ -84,6 +84,7 @@ export const MOTION = {
   flown: { ms: 680, ease: OUT, furl: 0.16, rise: 18 },
   paid: { after: 560, ms: 1500, rise: 24 },
   inked: { ms: 300, ease: POP, after: 120, stagger: 80 },
+  planet: { rise: 1700, fall: 950, slip: 1050, ink: 520 },
   fade: { ms: 180, ease: 'ease' },
 } as const;
 

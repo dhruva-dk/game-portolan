@@ -1,5 +1,6 @@
 import { healRating, planetName, stormRating } from '../fit.ts';
-import type { CareerState } from '../state.ts';
+import { YOURS, type CareerState } from '../state.ts';
+import type { Livery } from '../../world/livery.ts';
 import { RACE_RATINGS } from '../tuning.ts';
 
 export type PlanetView = {
@@ -7,6 +8,7 @@ export type PlanetView = {
   storm: number;
   heals: number;
   stars: number;
+  livery: Livery;
 };
 
 export const planetView = (state: CareerState): PlanetView => ({
@@ -14,4 +16,5 @@ export const planetView = (state: CareerState): PlanetView => ({
   storm: stormRating(state),
   heals: healRating(state),
   stars: Math.max(...RACE_RATINGS),
+  livery: state.teams[YOURS].livery,
 });

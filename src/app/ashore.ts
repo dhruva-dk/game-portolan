@@ -1,5 +1,10 @@
 import type { Command, Reason } from '../career/commands.ts';
-import { planetSeed } from '../career/fit.ts';
+import { matchSetup, planetSeed } from '../career/fit.ts';
+import { planetView } from '../career/views/planet.ts';
+import { assigned } from '../sim/spawn.ts';
+import { rulesOf } from '../sim/rules.ts';
+import { planStorm } from '../sim/storm.ts';
+import { R } from '../world/sphere.ts';
 import { YOURS, type CareerState, type Role } from '../career/state.ts';
 import type { Edit } from '../career/views/negotiation.ts';
 import { lobbyView } from '../career/views/lobby.ts';
@@ -13,9 +18,9 @@ import { lookOf } from '../play/colors.ts';
 import { createGame } from '../play/game.ts';
 import { PARTS, openingPose, type Framing } from '../play/anchorage.ts';
 import { sunAt } from '../world/sun.ts';
-import type { Chart } from '../play/player.ts';
+import type { Chart, PlanetMarks } from '../play/player.ts';
 import { surveyor } from '../play/preview.ts';
-import { watersOf } from '../play/setup.ts';
+import { watersOf, type Berther } from '../play/setup.ts';
 import { rise } from '../ui/base/sheet.ts';
 import { MOTION } from '../ui/base/house.ts';
 import { fade, uiLayer } from '../ui/base/ui.ts';
@@ -30,6 +35,7 @@ import type {
 import { createPaint } from '../ui/lobby/paint.ts';
 import { createShip } from '../ui/lobby/ship.ts';
 import { createSponsors } from '../ui/lobby/sponsors.ts';
+import { createPlanet } from '../ui/lobby/planet.ts';
 import { createTeam } from '../ui/lobby/team.ts';
 import { createInput } from '../ui/sea/input.ts';
 import type { Stage } from './debug.ts';
@@ -44,10 +50,11 @@ const BESIDE: Framing = { center: [0.34, -0.04], size: 0.66 };
 export type Ashore = {
   open(screen: ScreenName, argument?: ScreenArgument): void;
   state(): CareerState;
+  settled: Promise<void>;
 };
 
 export async function anchorage(s: Stage, two: boolean) {
-  const { waters } = await watersOf(s.world.seed, s.world.land);
+  const { waters, berth } = await watersOf(s.world.seed, s.world.land);
   const { climate } = s.world,
     sun = sunAt(climate.sunPlaces, climate.timeOfDay, s.start.at);
   const opening = openingPose(s.start.at, s.world.wind(s.start.at), sun);
@@ -55,7 +62,32 @@ export async function anchorage(s: Stage, two: boolean) {
   const game = createGame(s.world, s.anchors, waters, start, RACE_SHIP);
   game.moor(two, opening.side);
   const input = createInput(s.canvas, () => game.steering());
-  return { game, input };
+  return { game, input, berth };
+}
+
+async function markedOn(
+  s: Stage,
+  state: CareerState,
+  berth: Berther
+): Promise<PlanetMarks> {
+  const setup = matchSetup(state, { hands: 'player' });
+  const { spawns } = await berth(setup.match, setup.ships.length);
+  const at = assigned(spawns, setup.match, setup.ships);
+  const ours = setup.ships.flatMap((ship, id) =>
+    ship.team === YOURS && at[id] ? [at[id].at] : []
+  );
+  const table = rulesOf(setup.storm).storm,
+    first = table.phases[0];
+  const center = planStorm(
+    setup.match,
+    (p) => -s.world.planet.height(p),
+    table
+  )[0];
+  const home = ours[0] ?? s.start.at;
+  return {
+    berths: [home, ours[1] ?? home],
+    storm: { center, radius: first.radius / R },
+  };
 }
 
 export async function ashore(
@@ -63,7 +95,7 @@ export async function ashore(
   career: CareerState,
   o: { store: Store; sailed(state: CareerState): void; ready(): void }
 ): Promise<Ashore> {
-  const { game, input } = await anchorage(s, true);
+  const { game, input, berth } = await anchorage(s, true);
   const repaint = painter(
     (look) => game.paint(look),
     lookOf(career.teams[YOURS].livery)
@@ -75,6 +107,8 @@ export async function ashore(
   const queue = saveQueue(o.store);
   let state = career,
     chart: Chart | null = null,
+    marks: PlanetMarks | null = null,
+    aloft = false,
     open: ScreenName | null = null,
     dealt: Role | null = null,
     talking: number | null = null,
@@ -91,6 +125,7 @@ export async function ashore(
     if (talking !== null) negotiation.show(pricing(talking));
     if (open === 'ship') ship.show((line) => shipView(state, line));
     if (open === 'sponsors') sponsors.show(sponsorsView(state));
+    if (open === 'planet') planet.show(planetView(state));
     if (painting)
       paint.show((edit: PaintEdit | null) => paintView(state, edit));
   };
@@ -154,6 +189,13 @@ export async function ashore(
         atStop(ship.stop());
         return;
       }
+      if (open === null && name === 'planet') {
+        open = name;
+        planet.show(planetView(state));
+        planet.open();
+        lobby.cover(true);
+        return;
+      }
       if (open === null && name === 'sponsors') {
         open = name;
         sponsors.open();
@@ -186,6 +228,14 @@ export async function ashore(
         ship.reset();
         lobby.cover(false);
         game.stage(null, true);
+        return;
+      }
+      if (open === 'planet') {
+        planet.close(() => {
+          if (open !== 'planet') return;
+          open = null;
+          lobby.cover(false);
+        });
         return;
       }
       if (open === 'sponsors') {
@@ -233,7 +283,9 @@ export async function ashore(
       wear(livery) {
         repaint(lookOf(livery ?? state.teams[YOURS].livery));
       },
-      planet() {},
+      planet(on) {
+        aloft = on;
+      },
       jolt(kind) {
         game.jolt(kind);
         if (kind === 'painted')
@@ -241,7 +293,7 @@ export async function ashore(
       },
     },
     chart: () => chart,
-    marks: () => null,
+    marks: () => marks,
   };
 
   const lobby = createLobby(port);
@@ -251,7 +303,12 @@ export async function ashore(
   const ship = createShip(port);
   const paint = createPaint(port);
   const sponsors = createSponsors(port);
+  const planet = createPlanet(port);
   redraw();
+
+  const marked = markedOn(s, state, berth).then((m) => {
+    marks = m;
+  });
 
   void surveyor()(planetSeed(state)).then((c) => {
     chart = c;
@@ -261,11 +318,15 @@ export async function ashore(
   void s.ready.then(() => o.ready());
   void s.draw((dt) => {
     game.step(dt, input.read());
-    return game.snapshot();
+    const scene = game.snapshot();
+    const sky = aloft ? planet.step(dt, scene.eye) : null;
+    if (sky) scene.eye = sky;
+    return scene;
   });
 
   return {
     open: (name, argument) => port.open(name, argument),
     state: () => state,
+    settled: Promise.all([marked, s.ready]).then(() => undefined),
   };
 }
