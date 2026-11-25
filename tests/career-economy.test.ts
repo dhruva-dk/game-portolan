@@ -1,5 +1,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import {
+  buildCost,
+  designGain,
+  focusedRate,
+  unfocusedRate,
+  wintered,
+  winteredFitted,
+} from '../src/career/rules/development.ts';
 import { askingWage } from '../src/career/rules/hiring.ts';
 import {
   STANDINGS,
@@ -16,18 +24,33 @@ import {
   standingMerit,
   starMerit,
 } from '../src/career/rules/money.ts';
-import { ROLES } from '../src/career/state.ts';
+import { LINES, ROLES } from '../src/career/state.ts';
 import {
+  BUILD,
   ECONOMY,
   LEAGUE,
+  LEVEL_SPAN,
   RACE_MONEY,
   SHIPS,
   STARS,
+  STAT_SPAN,
   WANTS,
 } from '../src/career/tuning.ts';
 
 const SHIP_COUNT = LEAGUE.teams * LEAGUE.shipsPerTeam;
 const PLACES = Array.from({ length: SHIP_COUNT }, (_, index) => index + 1);
+const LEVELS = Array.from(
+  { length: LEVEL_SPAN.most - SHIPS.leastLevel + 1 },
+  (_, index) => SHIPS.leastLevel + index
+);
+const UPKEEPS = [
+  null,
+  ...Array.from(
+    { length: STAT_SPAN.most - STAT_SPAN.least + 1 },
+    (_, index) => STAT_SPAN.least + index
+  ),
+];
+const parSkill = (merit: number): number => STAT_SPAN.most * merit;
 
 const close = (actual: number, expected: number, within: number, note = '') =>
   assert.ok(
@@ -118,5 +141,88 @@ test('three people of par stars at wage factor 1 ask the wage share of income, a
       (ROLES.length * WANTS.askStep) / 2,
       `standing ${standing}`
     );
+  }
+});
+
+test('ten races of unfocused gain from a designer of par skill equal winter’s design loss at par, and the focused line holds twice the height', () => {
+  for (const standing of STANDINGS) {
+    const merit = standingMerit(standing);
+    const level = parLevel(merit);
+    close(
+      LEAGUE.racesPerSeason * designGain(parSkill(merit), unfocusedRate()),
+      level - wintered(level, ECONOMY.winter),
+      1e-9,
+      `standing ${standing}`
+    );
+    const twice = SHIPS.leastLevel + 2 * (level - SHIPS.leastLevel);
+    close(
+      LEAGUE.racesPerSeason * designGain(parSkill(merit), focusedRate()),
+      twice - wintered(twice, ECONOMY.winter),
+      1e-9,
+      `focused, standing ${standing}`
+    );
+  }
+});
+
+test('a build costs the same in one step as in two, within the rounding up of each step', () => {
+  for (const fitted of LEVELS)
+    for (const design of LEVELS.filter((level) => level > fitted)) {
+      const middle = Math.floor((fitted + design) / 2);
+      const split =
+        buildCost(design, middle, null) + buildCost(middle, fitted, null);
+      const whole = buildCost(design, fitted, null);
+      assert.ok(
+        split >= whole && split <= whole + 1,
+        `${fitted} to ${design} through ${middle}`
+      );
+    }
+});
+
+test('one level costs the level-cost share of a race’s income at its merit, within the curve’s change over that level', () => {
+  for (const level of LEVELS.slice(1)) {
+    const cost = buildCost(level, level - 1, null);
+    const below = ECONOMY.levelCost * income(levelMerit(level - 1));
+    const at = ECONOMY.levelCost * income(levelMerit(level));
+    assert.ok(cost >= below && cost <= Math.ceil(at), `level ${level}`);
+  }
+  close(buildCost(ECONOMY.parTop, SHIPS.leastLevel, null), 5100, 0);
+});
+
+test('a build’s cost falls by the thrift cut for each point of Thrift', () => {
+  for (const design of LEVELS)
+    for (let thrift = STAT_SPAN.least; thrift <= STAT_SPAN.most; thrift++) {
+      const full = buildCost(design, SHIPS.leastLevel, null);
+      close(
+        buildCost(design, SHIPS.leastLevel, thrift),
+        full * (1 - BUILD.thriftCut * thrift),
+        1,
+        `level ${design}, Thrift ${thrift}`
+      );
+    }
+});
+
+test('after winter no fitted level is above its design level, for every Upkeep and for none', () => {
+  for (const design of LEVELS)
+    for (const fitted of LEVELS)
+      for (const upkeep of UPKEEPS)
+        assert.ok(
+          winteredFitted(fitted, design, upkeep) <=
+            wintered(design, ECONOMY.winter),
+          `fitted ${fitted}, design ${design}, Upkeep ${upkeep}`
+        );
+});
+
+test('refitting winter’s loss with par staff, plus par wages, leaves a margin of at least 0.29 at every standing', () => {
+  const ships = LEAGUE.shipsPerTeam * LINES.length;
+  for (const standing of STANDINGS) {
+    const merit = standingMerit(standing);
+    const level = parLevel(merit);
+    const upkeep = STARS.perStar * parStars(merit);
+    const refit =
+      (ships * buildCost(level, winteredFitted(level, level, upkeep), null)) /
+      LEAGUE.racesPerSeason;
+    const wages = ROLES.length * askingWage(parStars(merit), 1);
+    const margin = 1 - (refit + wages) / income(merit);
+    assert.ok(margin >= 0.29, `standing ${standing}: margin ${margin}`);
   }
 });

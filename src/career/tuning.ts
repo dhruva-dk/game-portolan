@@ -136,17 +136,9 @@ export const CONTRACTS = {
   reserveRaces: 3,
 };
 
-export const GAIN = { focused: 1, unfocused: 0.5, perSkill: 4, falloff: 110 };
-
 export const UNLOCK = { perSkill: 4, needed: 20 };
 
-export const BUILD = {
-  perLevel: 30,
-  designScale: 25,
-  thriftCut: 0.02,
-  noThrift: 0,
-  leastFit: 200,
-};
+export const BUILD = { thriftCut: 0.02, noThrift: 0, leastFit: 200 };
 
 export const START = { level: 5 };
 
@@ -176,8 +168,6 @@ export const SPONSORS = {
 export const REPAINT = { cost: 1000 };
 
 export const YOUR_START = { balance: 1500 };
-
-export const WINTER = { loss: 10, perUpkeep: 0.3, lossWithout: 11 };
 
 export const LEAGUE_START = {
   strengthSpan: 38,

@@ -10,9 +10,11 @@ import {
   buildCost,
   designGain,
   fitCost,
+  focusedRate,
   gainRate,
   gainedLevel,
   unlockDone,
+  unfocusedRate,
   unlockGain,
 } from '../src/career/rules/development.ts';
 import { standInResult } from '../src/career/standin.ts';
@@ -180,21 +182,20 @@ function acceptedPlain(state: CareerState, command: Command): CareerState {
 }
 
 test('the gain of §1.7.2 at hand-worked points', () => {
-  assert.equal(designGain(0, 20, 1), 5);
-  assert.equal(designGain(55, 8, 1), 1);
-  assert.equal(designGain(55, 8, 0.5), 0.5);
-  assert.equal(designGain(0, 1, 0.5), 0.125);
-  assert.equal(designGain(0, 4, 1), 1);
-  close(designGain(100, 20, 1), 5 / 11);
-  close(designGain(5, 4, 1), 1 - 5 / 110);
-  assert.equal(gainedLevel(55, 8, 1), 56);
-  assert.equal(gainedLevel(0, 20, 0.5), 2.5);
-  assert.equal(gainedLevel(99.9, 20, 1), 100);
-  assert.equal(gainedLevel(100, 20, 1), 100);
-  assert.equal(gainRate({ line: 'hull' }, 'hull'), 1);
-  assert.equal(gainRate({ line: 'hull' }, 'keel'), 0.5);
-  assert.equal(gainRate(null, 'hull'), 0.5);
-  assert.equal(gainRate({ gun: 'mortar' }, 'gun'), 0.5);
+  close(unfocusedRate(), 0.085);
+  close(focusedRate(), 0.17);
+  close(designGain(20, focusedRate()), 3.4);
+  close(designGain(8, unfocusedRate()), 0.68);
+  close(designGain(1, unfocusedRate()), 0.085);
+  close(gainedLevel(55, 8, focusedRate()), 56.36);
+  close(gainedLevel(95, 8, focusedRate()), 96.36);
+  close(gainedLevel(5, 20, unfocusedRate()), 6.7);
+  assert.equal(gainedLevel(99.9, 20, focusedRate()), 100);
+  assert.equal(gainedLevel(100, 20, focusedRate()), 100);
+  assert.equal(gainRate({ line: 'hull' }, 'hull'), focusedRate());
+  assert.equal(gainRate({ line: 'hull' }, 'keel'), unfocusedRate());
+  assert.equal(gainRate(null, 'hull'), unfocusedRate());
+  assert.equal(gainRate({ gun: 'mortar' }, 'gun'), unfocusedRate());
 });
 
 test('unlock progress of §1.7.3 at hand-worked points', () => {
@@ -209,18 +210,20 @@ test('unlock progress of §1.7.3 at hand-worked points', () => {
 });
 
 test('the build and fit costs of §1.7.4 at hand-worked points', () => {
-  assert.equal(buildCost(15, 5, null), 480);
-  assert.equal(buildCost(50, 5, null), 4050);
-  assert.equal(buildCost(6, 5, null), 38);
-  assert.equal(buildCost(25, 5, 10), 960);
-  assert.equal(buildCost(30, 20, 5), 594);
-  assert.equal(buildCost(100, 5, 1), 13965);
-  assert.equal(buildCost(100, 5, 20), 8550);
+  assert.equal(buildCost(15, 5, null), 107);
+  assert.equal(buildCost(50, 5, null), 1081);
+  assert.equal(buildCost(6, 5, null), 11);
+  assert.equal(buildCost(25, 5, 10), 205);
+  assert.equal(buildCost(30, 20, 5), 167);
+  assert.equal(buildCost(90, 5, null), 5100);
+  assert.equal(buildCost(100, 5, 1), 6746);
+  assert.equal(buildCost(100, 5, 20), 4131);
   assert.equal(buildCost(40, 40, null), 0);
   assert.equal(fitCost(5, 5, null), 200);
   assert.equal(fitCost(6, 5, null), 200);
-  assert.equal(fitCost(20, 10, null), 540);
-  assert.equal(fitCost(100, 5, 20), 8550);
+  assert.equal(fitCost(20, 10, null), 200);
+  assert.equal(fitCost(50, 5, null), 1081);
+  assert.equal(fitCost(100, 5, 20), 4131);
   assert.ok(buildCost(60, 10, 20) < buildCost(60, 10, 1));
   assert.ok(buildCost(60, 10, 1) < buildCost(60, 10, null));
 });
@@ -302,14 +305,14 @@ test('Build sets the fitted level to the design level and charges the §1.7.4 co
     line: 'hull',
   });
   const team = built.teams[YOURS];
-  assert.equal(team.balance, 5000 - 480);
+  assert.equal(team.balance, 5000 - 107);
   assert.equal(team.ships[1].fitted.hull, 15);
   assert.deepEqual(team.ships[0], state.teams[YOURS].ships[0]);
   assert.deepEqual(
     built,
     changeTeam(state, YOURS, (t) => ({
       ...t,
-      balance: 4520,
+      balance: 4893,
       ships: [
         t.ships[0],
         { ...t.ships[1], fitted: { ...t.ships[1].fitted, hull: 15 } },
@@ -322,7 +325,7 @@ test('Build sets the fitted level to the design level and charges the §1.7.4 co
     slot: 0,
     line: 'keel',
   });
-  assert.equal(keel.teams[YOURS].balance, 4520 - 4050);
+  assert.equal(keel.teams[YOURS].balance, 4893 - 1081);
   assert.equal(keel.teams[YOURS].ships[0].fitted.keel, 50);
 });
 
@@ -333,20 +336,20 @@ test('a mechanic’s Thrift makes building cheaper, and none counts as 0', () =>
     fitted: levels(5),
   });
   const thrifty = hire(base, YOURS, 'mechanic', mechanicWithThrift(10));
-  assert.equal(buildPrice(base, YOURS, 0, 'keel'), 1200);
-  assert.equal(buildPrice(thrifty, YOURS, 0, 'keel'), 960);
+  assert.equal(buildPrice(base, YOURS, 0, 'keel'), 256);
+  assert.equal(buildPrice(thrifty, YOURS, 0, 'keel'), 205);
   const built = send(thrifty, {
     type: 'Build',
     team: YOURS,
     slot: 0,
     line: 'keel',
   });
-  assert.equal(built.teams[YOURS].balance, 5000 - 960);
+  assert.equal(built.teams[YOURS].balance, 5000 - 205);
 });
 
 test('Build is refused when nothing would change, when short of funds and for a bad field', () => {
   const state = shaped(BASE, YOURS, {
-    balance: 479,
+    balance: 106,
     design: { ...levels(5), hull: 15 },
     fitted: levels(5),
   });
@@ -368,7 +371,7 @@ test('Build is refused when nothing would change, when short of funds and for a 
   refusedUntouched(state, raw(0, 'deck'), 'invalid');
   refusedUntouched(state, raw(-1, 'hull'), 'invalid');
   refusedUntouched({ ...state, phase: 'racing' }, build(0, 'hull'), 'phase');
-  const exact = shaped(state, YOURS, { balance: 480 });
+  const exact = shaped(state, YOURS, { balance: 107 });
   const built = acceptedPlain(exact, build(0, 'hull'));
   assert.equal(built.teams[YOURS].balance, 0);
   refusedUntouched(built, build(0, 'hull'), 'same');
@@ -403,10 +406,10 @@ test('FitGun changes the gun, fits the gun line to the design level and charges 
   const state = shaped(BASE, YOURS, {
     balance: 1000,
     unlocked: ['cannon', 'scatter', 'mortar'],
-    design: { ...levels(5), gun: 20 },
+    design: { ...levels(5), gun: 40 },
     fitted: { ...levels(5), gun: 10 },
   });
-  assert.equal(fitPrice(state, YOURS, 0), 540);
+  assert.equal(fitPrice(state, YOURS, 0), 596);
   const fitted = acceptedPlain(state, {
     type: 'FitGun',
     team: YOURS,
@@ -415,9 +418,9 @@ test('FitGun changes the gun, fits the gun line to the design level and charges 
   });
   const ship = fitted.teams[YOURS].ships[0];
   assert.equal(ship.gun, 'scatter');
-  assert.equal(ship.fitted.gun, 20);
-  assert.deepEqual(ship.fitted, { ...levels(5), gun: 20 });
-  assert.equal(fitted.teams[YOURS].balance, 460);
+  assert.equal(ship.fitted.gun, 40);
+  assert.deepEqual(ship.fitted, { ...levels(5), gun: 40 });
+  assert.equal(fitted.teams[YOURS].balance, 404);
   assert.deepEqual(fitted.teams[YOURS].ships[1], state.teams[YOURS].ships[1]);
   assert.equal(fitPrice(fitted, YOURS, 0), 200);
   const again = acceptedPlain(fitted, {
@@ -426,7 +429,7 @@ test('FitGun changes the gun, fits the gun line to the design level and charges 
     slot: 0,
     kind: 'mortar',
   });
-  assert.equal(again.teams[YOURS].balance, 260);
+  assert.equal(again.teams[YOURS].balance, 204);
   assert.equal(again.teams[YOURS].ships[0].gun, 'mortar');
 });
 
@@ -485,10 +488,10 @@ test('step 4 gains every line at the focused or unfocused rate, only with a desi
   });
   const developed = develop(start);
   const design = developed.teams[YOURS].design;
-  assert.equal(design.hull, 56);
-  close(design.sails, 5 + 0.5 * 5 * (1 - 5 / 110));
-  close(design.gun, 5 + 0.5 * 1 * (1 - 5 / 110));
-  close(design.keel, 5 + 0.5 * 2.5 * (1 - 5 / 110));
+  close(design.hull, 55 + 8 * focusedRate());
+  close(design.sails, 5 + 20 * unfocusedRate());
+  close(design.gun, 5 + 4 * unfocusedRate());
+  close(design.keel, 5 + 10 * unfocusedRate());
   for (const line of LINES)
     assert.equal(
       design[line],
@@ -540,7 +543,7 @@ test('a gun focus raises its progress by Gun / 4, gives no line the focused rate
   for (const line of LINES)
     assert.equal(
       once.design[line],
-      gainedLevel(5, skills[LINES.indexOf(line)], 0.5)
+      gainedLevel(5, skills[LINES.indexOf(line)], unfocusedRate())
     );
   assert.deepEqual(once.focus, { gun: 'harpoon' });
   assert.deepEqual(once.unlocked, ['cannon']);

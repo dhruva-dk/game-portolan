@@ -14,7 +14,6 @@ import {
   offseasonReport,
   payPrizes,
   releaseExpired,
-  teamLoss,
   turnSeason,
   winter,
 } from '../src/career/offseason.ts';
@@ -26,12 +25,17 @@ import {
   seasonPrize,
   standingMerit,
 } from '../src/career/rules/money.ts';
-import { winterLoss, wintered } from '../src/career/rules/development.ts';
+import {
+  fittedWinter,
+  wintered,
+  winteredFitted,
+} from '../src/career/rules/development.ts';
 import { standInResult } from '../src/career/standin.ts';
 import {
   LINES,
   MECHANIC_STATS,
   ROLES,
+  perLine,
   type CareerState,
   type Levels,
   type Person,
@@ -43,7 +47,7 @@ import {
   ECONOMY,
   SHIPS,
   STANDING,
-  WINTER,
+  STAT_SPAN,
 } from '../src/career/tuning.ts';
 import type { MatchResult } from '../src/sim/result.ts';
 
@@ -208,15 +212,23 @@ test('the season prize and winter loss follow §1.8.2 and §1.9', () => {
     assert.equal(seasonPrize(standing), expectedPrize(standing));
   for (let s = 1; s < TEAMS; s++)
     assert.ok(seasonPrize(s) > seasonPrize(s + 1));
-  assert.equal(winterLoss(null), WINTER.lossWithout);
-  assert.equal(winterLoss(1), WINTER.loss - WINTER.perUpkeep);
-  assert.equal(winterLoss(20), WINTER.loss - WINTER.perUpkeep * 20);
-  assert.ok(winterLoss(20) < winterLoss(1));
-  assert.ok(winterLoss(1) < winterLoss(null));
-  assert.equal(wintered(80, 7), 73);
-  assert.equal(wintered(SHIPS.leastLevel + 1, 7), SHIPS.leastLevel);
-  assert.equal(wintered(SHIPS.leastLevel, 4), SHIPS.leastLevel);
-  assert.equal(wintered(100, winterLoss(null)), 100 - WINTER.lossWithout);
+  assert.equal(fittedWinter(null), ECONOMY.winter + ECONOMY.winterFitted);
+  for (let upkeep = STAT_SPAN.least; upkeep <= STAT_SPAN.most; upkeep++) {
+    assert.equal(fittedWinter(upkeep), upkeepShare(upkeep));
+    assert.ok(fittedWinter(upkeep) < fittedWinter(null));
+    assert.ok(fittedWinter(upkeep) >= ECONOMY.winter);
+  }
+  assert.ok(fittedWinter(STAT_SPAN.most) < fittedWinter(STAT_SPAN.least));
+  for (let level = SHIPS.leastLevel; level <= 100; level++) {
+    const kept = (level - SHIPS.leastLevel) * (1 - ECONOMY.winter);
+    assert.ok(
+      Math.abs(wintered(level, ECONOMY.winter) - SHIPS.leastLevel - kept) < 1e-9
+    );
+  }
+  assert.equal(
+    wintered(SHIPS.leastLevel, fittedWinter(null)),
+    SHIPS.leastLevel
+  );
 });
 
 test('the season prize and winter loss at hand-worked points', () => {
@@ -225,12 +237,14 @@ test('the season prize and winter loss at hand-worked points', () => {
   assert.equal(seasonPrize(21), 9120);
   assert.equal(seasonPrize(31), 3598);
   assert.equal(seasonPrize(40), 2000);
-  assert.equal(winterLoss(null), 11);
-  assert.equal(winterLoss(1), 9.7);
-  assert.equal(winterLoss(10), 7);
-  assert.equal(winterLoss(20), 4);
-  assert.equal(wintered(50, 4), 46);
-  assert.equal(wintered(12, 11), 5);
+  assert.equal(fittedWinter(null), 0.4);
+  assert.ok(Math.abs(fittedWinter(10) - 0.3) < 1e-12);
+  assert.equal(fittedWinter(20), 0.2);
+  assert.equal(wintered(90, 0.2), 73);
+  assert.equal(wintered(50, 0.4), 32);
+  assert.equal(wintered(5, 0.4), 5);
+  assert.equal(winteredFitted(50, 50, null), 32);
+  assert.equal(winteredFitted(50, 40, 10), 33);
 });
 
 test('step 1 pays every team the prize for its final standing and nothing else', () => {
@@ -265,25 +279,29 @@ test('step 1 pays every team the prize for its final standing and nothing else',
   }
 });
 
-function lossOf(state: CareerState, team: number): number {
+const upkeepShare = (upkeep: number): number =>
+  ECONOMY.winter + ECONOMY.winterFitted * (1 - upkeep / STAT_SPAN.most);
+
+function shareOf(state: CareerState, team: number): number {
   const id = state.teams[team].seats.mechanic;
   const mechanic = state.people.find((p) => p.id === id);
   return mechanic === undefined
-    ? WINTER.lossWithout
-    : WINTER.loss - WINTER.perUpkeep * mechanic.stats[UPKEEP];
+    ? ECONOMY.winter + ECONOMY.winterFitted
+    : upkeepShare(mechanic.stats[UPKEEP]);
 }
 
-const lost = (levels: Levels, loss: number): Levels => ({
-  sails: Math.max(SHIPS.leastLevel, levels.sails - loss),
-  rigging: Math.max(SHIPS.leastLevel, levels.rigging - loss),
-  rudder: Math.max(SHIPS.leastLevel, levels.rudder - loss),
-  hull: Math.max(SHIPS.leastLevel, levels.hull - loss),
-  keel: Math.max(SHIPS.leastLevel, levels.keel - loss),
-  mounts: Math.max(SHIPS.leastLevel, levels.mounts - loss),
-  gun: Math.max(SHIPS.leastLevel, levels.gun - loss),
-});
+const keep = (level: number, share: number): number =>
+  SHIPS.leastLevel + (level - SHIPS.leastLevel) * (1 - share);
 
-test('step 2 takes every level of every team down by its winter loss, not below 5', () => {
+const designAfter = (design: Levels): Levels =>
+  perLine((line) => keep(design[line], ECONOMY.winter));
+
+const fittedAfter = (fitted: Levels, design: Levels, share: number): Levels =>
+  perLine((line) =>
+    Math.min(keep(fitted[line], share), keep(design[line], ECONOMY.winter))
+  );
+
+test('step 2 keeps four fifths of every design level above 5, and less of each fitted level by the mechanic’s Upkeep, never above its design', () => {
   const ready = lastRaceOf('ebb');
   const unmanned: CareerState = {
     ...ready,
@@ -293,24 +311,28 @@ test('step 2 takes every level of every team down by its winter loss, not below 
   };
   const after = winter(unmanned);
   for (let team = 0; team < TEAMS; team++) {
-    const loss = lossOf(unmanned, team);
-    assert.equal(teamLoss(unmanned, team), loss);
+    const share = shareOf(unmanned, team);
     const { design, ships } = unmanned.teams[team];
-    assert.deepEqual(after.teams[team].design, lost(design, loss));
+    assert.deepEqual(after.teams[team].design, designAfter(design));
     for (let slot = 0; slot < 2; slot++) {
       assert.deepEqual(
         after.teams[team].ships[slot].fitted,
-        lost(ships[slot].fitted, loss)
+        fittedAfter(ships[slot].fitted, design, share)
       );
       assert.equal(after.teams[team].ships[slot].gun, ships[slot].gun);
+      for (const line of LINES)
+        assert.ok(
+          after.teams[team].ships[slot].fitted[line] <=
+            after.teams[team].design[line]
+        );
     }
     for (const line of LINES) {
       assert.ok(after.teams[team].design[line] >= SHIPS.leastLevel);
       assert.ok(after.teams[team].design[line] <= design[line]);
     }
   }
-  assert.equal(teamLoss(unmanned, RIVAL), WINTER.lossWithout);
-  assert.equal(teamLoss(unmanned, YOURS) < WINTER.lossWithout, true);
+  assert.equal(shareOf(unmanned, RIVAL), fittedWinter(null));
+  assert.ok(shareOf(unmanned, YOURS) < fittedWinter(null));
   assert.deepEqual(after.people, unmanned.people);
 });
 
@@ -376,11 +398,14 @@ test('winter uses the mechanic in the seat before that mechanic retires', () => 
   const mechanic = ready.people.find((p) => p.id === mechanicId);
   assert.ok(mechanic);
   const stop = atStop('ebb');
-  const loss = WINTER.loss - WINTER.perUpkeep * mechanic.stats[UPKEEP];
-  assert.deepEqual(
-    stop.teams[YOURS].design,
-    lost(ready.teams[YOURS].design, loss)
-  );
+  const share = upkeepShare(mechanic.stats[UPKEEP]);
+  const { design, ships } = ready.teams[YOURS];
+  assert.deepEqual(stop.teams[YOURS].design, designAfter(design));
+  for (let slot = 0; slot < 2; slot++)
+    assert.deepEqual(
+      stop.teams[YOURS].ships[slot].fitted,
+      fittedAfter(ships[slot].fitted, design, share)
+    );
   assert.equal(stop.teams[YOURS].seats.mechanic, null);
   assert.equal(
     stop.people.some((p) => p.id === mechanicId),

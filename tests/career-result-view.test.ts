@@ -7,6 +7,7 @@ import { matchSetup } from '../src/career/fit.ts';
 import { personOf } from '../src/career/lookup.ts';
 import { moneyTotal } from '../src/career/record/pay.ts';
 import type { CareerState, RaceReport } from '../src/career/state.ts';
+import type { MatchResult } from '../src/sim/result.ts';
 import { LEAGUE, REPOSSESSION } from '../src/career/tuning.ts';
 import { paperView } from '../src/career/views/paper.ts';
 import {
@@ -31,22 +32,34 @@ function sent(state: CareerState, command: Command): CareerState {
   return applied.state;
 }
 
-function won(state: CareerState): CareerState {
+type Ships = MatchResult['ships'];
+
+function raced(state: CareerState, change: (ships: Ships) => Ships) {
   const started = sent(dismissed(state), { type: 'StartRace', team: YOURS });
   const result = standInResult(matchSetup(started, { hands: 'player' }));
-  const first = result.ships.findIndex((ship) => ship.place === 1);
-  const ships = result.ships.map((ship, i) =>
-    i === 0 ? result.ships[first] : i === first ? result.ships[0] : ship
-  );
   return sent(started, {
     type: 'RecordRace',
     team: YOURS,
-    result: { ...result, ships },
+    result: { ...result, ships: change(result.ships) },
   });
 }
 
-const WON = won(rehearsed('test', 41));
-const BOTH_AFLOAT = rehearsed('test6', 19);
+const firstPlace = (ships: Ships): Ships => {
+  const first = ships.findIndex((ship) => ship.place === 1);
+  return ships.map((ship, i) =>
+    i === 0 ? ships[first] : i === first ? ships[0] : ship
+  );
+};
+
+const bothAfloat = (ships: Ships): Ships =>
+  ships.map((ship, i) =>
+    i < LEAGUE.shipsPerTeam
+      ? { ...ship, sunkAt: null, sunkBy: null, afloatAtPhaseFour: true }
+      : ship
+  );
+
+const WON = raced(rehearsed('test', 41), firstPlace);
+const BOTH_AFLOAT = raced(rehearsed('test6', 19), bothAfloat);
 const FIFTH = rehearsed('test', 5);
 const SHORT = recorded(owing(FIFTH, -4000));
 const BROKE = recorded(owing(FIFTH, REPOSSESSION.below * 4));

@@ -6,6 +6,7 @@ import {
   buildCost,
   designGain,
   fitCost,
+  focusedRate,
 } from '../src/career/rules/development.ts';
 import {
   LINES,
@@ -14,7 +15,7 @@ import {
   type Team,
 } from '../src/career/state.ts';
 import { updateShip, updateTeam } from '../src/career/change.ts';
-import { BUILD, GAIN, REPAINT, UNLOCK } from '../src/career/tuning.ts';
+import { BUILD, REPAINT, UNLOCK } from '../src/career/tuning.ts';
 import { paintView } from '../src/career/views/paint.ts';
 import { shipView } from '../src/career/views/ship.ts';
 import { rehearsed } from '../src/app/rehearse.ts';
@@ -83,7 +84,7 @@ test('Build costs what §1.7.4 says and gains design minus fitted; Build is fain
   const state = rich(levels(FRESH, { hull: 40 }));
   const row = shipView(state, 'hull').rows[0];
   assert.equal(row.build.cost, buildCost(40, 5, thrift(state)));
-  assert.equal(row.build.cost, Math.ceil(30 * 35 * (1 + 40 / 25)));
+  assert.equal(row.build.cost, 647);
   assert.equal(row.build.gain, 35);
   assert.equal(row.build.faint, false);
   assert.equal(row.build.why, null);
@@ -134,7 +135,7 @@ test('Focus: the gain at the focused rate to one decimal, pressed when this line
   const line = 'rigging';
   const skill = seatStat(MID, YOURS, 'designer', line) ?? 0;
   const view = shipView(MID, line);
-  const gain = designGain(MID.teams[YOURS].design[line], skill, GAIN.focused);
+  const gain = designGain(skill, focusedRate());
   assert.equal(view.focus.gain, Math.round(gain * 10) / 10);
   assert.equal(view.focus.faint, false);
   assert.equal(view.designer, seatHolder(MID, YOURS, 'designer')?.portrait);

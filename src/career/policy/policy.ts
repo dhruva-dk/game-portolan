@@ -32,11 +32,7 @@ export function wantedFocus(state: CareerState, team: number): Focus {
   let top = -Infinity;
   for (const line of LINES) {
     const skill = designer.stats[STATS.designer.indexOf(line)];
-    const value = focusValue(
-      skill,
-      design[line],
-      focusWeight(design[line], mean)
-    );
+    const value = focusValue(skill, focusWeight(design[line], mean));
     if (value > top) {
       top = value;
       best = line;

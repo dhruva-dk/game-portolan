@@ -1,6 +1,6 @@
 import { announce, named, vacate } from './change.ts';
 import { seatHolder, seatStat } from './lookup.ts';
-import { winterLoss, wintered } from './rules/development.ts';
+import { wintered, winteredFitted } from './rules/development.ts';
 import { seasonPrize } from './rules/money.ts';
 import { aged, retires, rookie } from './rules/person.ts';
 import { standingOrder, standings } from './rules/standing.ts';
@@ -17,7 +17,7 @@ import {
   type SeasonCard,
   type Ship,
 } from './state.ts';
-import { STANDING } from './tuning.ts';
+import { ECONOMY, STANDING } from './tuning.ts';
 
 const expired = (person: Person): boolean => person.contract?.racesLeft === 0;
 
@@ -94,26 +94,29 @@ export function payPrizes(state: CareerState): CareerState {
   };
 }
 
-export const teamLoss = (state: CareerState, team: number): number =>
-  winterLoss(seatStat(state, team, 'mechanic', 'upkeep'));
-
-const lose = (levels: Levels, loss: number): Levels =>
-  perLine((line) => wintered(levels[line], loss));
-
-const loseShip = (ship: Ship, loss: number): Ship => ({
+const winterShip = (
+  ship: Ship,
+  design: Levels,
+  upkeep: number | null
+): Ship => ({
   ...ship,
-  fitted: lose(ship.fitted, loss),
+  fitted: perLine((line) =>
+    winteredFitted(ship.fitted[line], design[line], upkeep)
+  ),
 });
 
 export function winter(state: CareerState): CareerState {
   return {
     ...state,
     teams: state.teams.map((team, index) => {
-      const loss = teamLoss(state, index);
+      const upkeep = seatStat(state, index, 'mechanic', 'upkeep');
       return {
         ...team,
-        design: lose(team.design, loss),
-        ships: [loseShip(team.ships[0], loss), loseShip(team.ships[1], loss)],
+        design: perLine((line) => wintered(team.design[line], ECONOMY.winter)),
+        ships: [
+          winterShip(team.ships[0], team.design, upkeep),
+          winterShip(team.ships[1], team.design, upkeep),
+        ],
       };
     }),
   };
