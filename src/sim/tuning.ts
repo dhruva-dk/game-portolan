@@ -24,6 +24,16 @@ export const GUST_METER = { drain: 1, refill: 0.5, least: 0.3 } as const;
 
 export const SHIELD = { start: 0, most: 100, held: 0.01 } as const;
 
+export const STORM_SCHEDULE = { today: 458, race: 300 } as const;
+
+export const STORM_FACTOR: Readonly<Record<MatchSetup['storm'], number>> = {
+  1: 1.3,
+  2: 1.15,
+  3: 1,
+  4: 0.85,
+  5: 0.7,
+};
+
 export const HEAL_COUNT: Readonly<Record<MatchSetup['heals'], number>> = {
   1: 0.5,
   2: 0.75,

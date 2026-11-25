@@ -99,6 +99,7 @@ function closingOn(center: Vec3, wait: number, close: number, to: number) {
       next,
       closing: t >= wait && !done,
       secondsToNext: t < wait ? wait - t : done ? Infinity : wait + close - t,
+      secondsToShut: done ? Infinity : wait + close - t,
       phase: done ? 1 : 0,
       final: false,
       damage: 0.02,

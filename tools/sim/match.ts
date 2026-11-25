@@ -10,8 +10,10 @@ import {
 import { evenSetup } from '../../src/sim/even.ts';
 import { STEP } from '../../src/sim/fixed.ts';
 import { STILL } from '../../src/sim/hands.ts';
-import { DEFAULT_RULES } from '../../src/sim/rules.ts';
+import { rulesOf } from '../../src/sim/rules.ts';
 import type { MatchSetup } from '../../src/sim/setup.ts';
+import { closedBy } from '../../src/sim/storm.ts';
+import { RACE } from '../../src/sim/teams.ts';
 import { berths } from '../../src/sim/spawn.ts';
 import type { Waters } from '../../src/sim/waters.ts';
 import { CASCADES } from '../../src/world/cascades.ts';
@@ -133,16 +135,13 @@ function sail(
         players.add(k.id);
         debugOf(m).standIn(k.id, standIn(hash(seed, k.id), sc.thumb));
       }
-  const course = DEFAULT_RULES.storm.phases.reduce(
-      (t, p) => t + p.wait + p.close,
-      0
-    ),
-    end = sc.seconds ?? course + 120;
+  const rules = rulesOf(setup.storm),
+    end = sc.seconds ?? closedBy(rules.storm) + RACE.overtime + 60;
   const events = dir ? lines(join(dir, 'events.jsonl')) : null,
     ships = dir ? lines(join(dir, 'ships.jsonl')) : null;
   const seen = watch(state, brainOf, waters.depth, players),
     log = record(state, (p) => -waters.depth(p), brainOf, events, ships);
-  log.start(seed, DEFAULT_RULES);
+  log.start(seed, rules);
   debugOf(m).lap(log.lap);
   const each = Math.round(1 / STEP);
   let steps = 0;

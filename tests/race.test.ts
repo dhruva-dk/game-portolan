@@ -5,7 +5,7 @@ import { createMatch, type Match } from '../src/sim/engine.ts';
 import { STILL, type Hands } from '../src/sim/hands.ts';
 import { PLAYER } from '../src/sim/match.ts';
 import type { MatchResult } from '../src/sim/result.ts';
-import { DEFAULT_RULES } from '../src/sim/rules.ts';
+import { rulesOf } from '../src/sim/rules.ts';
 import type { MatchSetup } from '../src/sim/setup.ts';
 import { closedBy } from '../src/sim/storm.ts';
 import { watersAt } from '../src/sim/waters.ts';
@@ -48,7 +48,7 @@ function sound(setup: MatchSetup, r: MatchResult) {
       assert.ok(r.ships[a].place < r.ships[d].place, 'the afloat first');
   assert.ok(
     new Set(afloat.map(team)).size <= 1 ||
-      r.seconds >= closedBy(DEFAULT_RULES.storm),
+      r.seconds >= closedBy(rulesOf(setup.storm).storm),
     'one team afloat at the end, or none (or the race was called)'
   );
   for (const id of down) {
@@ -84,7 +84,7 @@ test('a race is sailed to its end: one team afloat, every ship placed, the tally
 
 test('the same setup on the same planet gives the same result, hash and all; another match seed another', () => {
   assert.deepEqual(sailed(short()), FIRST);
-  assert.equal(FIRST.hash, '3587dadb');
+  assert.equal(FIRST.hash, '10e0d747');
   const other = sailed(short(SEED + 1));
   assert.notEqual(other.hash, FIRST.hash);
 });

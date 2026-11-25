@@ -13,7 +13,6 @@ export const STORMING = {
   ring: 6.8,
   deeper: 0.5,
   ahead: 40,
-  closing: 20,
   most: 40,
 } as const;
 
@@ -86,8 +85,7 @@ function downCalm(c: Ctx, s: Storm): Vec3 | null {
   const k = calmOf(c, s.next);
   if (!k) return null;
   const st = c.b.storming,
-    left = s.secondsToNext + (s.closing ? 0 : st.closing),
-    deep = st.deeper * Math.min(1, left / st.ahead),
+    deep = st.deeper * Math.min(1, s.secondsToShut / st.ahead),
     until = Math.max(0, k.gap - c.t.margin) * (1 - deep),
     p = c.own.ship.at;
   if (fieldAt(k.ch, k.field, p) <= until) return p;

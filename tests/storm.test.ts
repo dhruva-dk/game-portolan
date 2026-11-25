@@ -1,8 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { stormFor } from '../src/sim/rules.ts';
 import {
   STORM,
   calm,
+  closedBy,
   createStorm,
   outside,
   planStorm,
@@ -23,7 +25,8 @@ import {
 } from '../src/world/sphere.ts';
 
 const SEEDS = [1, 2, 3, 4, 5, 6];
-const DURATION = STORM.phases.reduce((s, p) => s + p.wait + p.close, 0);
+const TABLE = stormFor(3);
+const DURATION = closedBy(TABLE);
 const planet = planetOf(SEED, landOf(SEED));
 const depth = (p: Vec3) => -planet.height(p);
 const between = (a: Vec3, b: Vec3) =>
@@ -31,28 +34,28 @@ const between = (a: Vec3, b: Vec3) =>
 const holds = (a: Cap, b: Cap) =>
   between(a.center, b.center) + b.radius <= a.radius + 0.01 / R;
 const match = (seed: number, step = 0.5) => {
-  const storm = createStorm(seed, depth);
+  const storm = createStorm(seed, depth, TABLE);
   return Array.from({ length: Math.ceil((DURATION + 30) / step) }, (_, i) =>
     storm(i * step)
   );
 };
 
 test('the same seed gives the same storm', () => {
-  const a = createStorm(3, depth),
-    b = createStorm(3, depth);
+  const a = createStorm(3, depth, TABLE),
+    b = createStorm(3, depth, TABLE);
   for (const t of [0, 61, 200, 333.3, DURATION, DURATION + 25])
     assert.deepEqual(a(t), b(t));
   assert.notDeepEqual(
-    createStorm(4, depth)(DURATION).center,
+    createStorm(4, depth, TABLE)(DURATION).center,
     a(DURATION).center
   );
 });
 
-test('the match runs six to eight minutes, and its phases add up to it', () => {
-  assert.ok(DURATION >= 360 && DURATION <= 480, `${DURATION} s`);
-  const storm = createStorm(3, depth);
+test('at three stars the storm closes in 300 s, and its phases add up to it', () => {
+  assert.ok(Math.abs(DURATION - 300) < 1e-9, `${DURATION} s`);
+  const storm = createStorm(3, depth, TABLE);
   let t = 0;
-  STORM.phases.forEach((p, k) => {
+  TABLE.phases.forEach((p, k) => {
     assert.deepEqual(
       [storm(t + 0.01).phase, storm(t + 0.01).closing],
       [k, false]
@@ -68,13 +71,13 @@ test('the match runs six to eight minutes, and its phases add up to it', () => {
     );
     t += p.close;
   });
-  assert.equal(t, DURATION);
-  assert.equal(storm(t + 0.01).phase, STORM.phases.length);
+  assert.ok(Math.abs(t - DURATION) < 1e-9);
+  assert.equal(storm(t + 0.01).phase, TABLE.phases.length);
   assert.equal(storm(t + 0.01).secondsToNext, Infinity);
 });
 
 test('it starts as the whole planet and closes to a cap small enough to force a fight, wide enough for the eye', () => {
-  const storm = createStorm(3, depth);
+  const storm = createStorm(3, depth, TABLE);
   assert.equal(storm(0).radius, Math.PI);
   assert.ok(!outside([0, -R, 0], storm(0)) && !outside([0, R, 0], storm(0)));
   assert.ok(storm(DURATION).radius * R <= 100);
@@ -103,7 +106,7 @@ test('each cap lies within the last, and holds the one it closes to; the radius 
 
 test('every center lies over water, the last over open water with water all round its rim', () => {
   for (const seed of SEEDS) {
-    const centers = planStorm(seed, depth),
+    const centers = planStorm(seed, depth, TABLE),
       last = centers[centers.length - 1];
     centers.forEach((c, k) =>
       assert.ok(depth(scale(c, R)) > 0, `seed ${seed}: center ${k} on land`)
@@ -116,14 +119,14 @@ test('every center lies over water, the last over open water with water all roun
 });
 
 test('damage rises by phase, and keeps rising once the last cap has closed', () => {
-  const storm = createStorm(3, depth);
+  const storm = createStorm(3, depth, TABLE);
   const d = match(3, 1).map((s) => s.damage);
   for (let i = 1; i < d.length; i++) assert.ok(d[i] >= d[i - 1]);
   assert.ok(storm(DURATION + 25).damage > storm(DURATION - 1).damage);
 });
 
 test('outside is past the edge and inside short of it', () => {
-  const storm = createStorm(5, depth)(200),
+  const storm = createStorm(5, depth, TABLE)(200),
     c = storm.center;
   const t = normalize(add([0, 1, 0], c, -dot([0, 1, 0], c)));
   const edge = storm.radius * R;
