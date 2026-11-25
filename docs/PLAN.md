@@ -1605,7 +1605,7 @@ Your team is played by the policy as a sensible team (§1.10.2). Until the polic
 
 ### 2.8.3 Debug states
 
-`app/debug.ts` reads `?debug` switches (used by `npm run browser`). `?debug&screen=<name>&seed=<s>&races=<n>` builds a career from the seed, advances it `n` races with the stand-in and the policy for every team including yours (§1.10.2), and opens that screen. The names are `new`, `lobby`, `ship`, `paint`, `team`, `deal`, `negotiation`, `sponsors`, `opponents`, `planet`, `settings`, `result`, `paper`, `offseason`, `glyphs` (the glyph sheet of §2.5.4, which needs no career) and `mockup` (step M5.1 only). There are no hand-written fixture states.
+`app/debug.ts` reads `?debug` switches (used by `npm run browser`). `?debug&screen=<name>&seed=<s>&races=<n>` builds a career from the seed, advances it `n` races with the stand-in and the policy for every team including yours (§1.10.2), and opens that screen. The names are `new`, `lobby`, `ship`, `paint`, `team`, `deal`, `negotiation`, `sponsors`, `opponents`, `planet`, `settings`, `result`, `paper`, `offseason`, `glyphs` (the glyph sheet of §2.5.4, which needs no career). There are no hand-written fixture states.
 
 `npm run browser` (headless Chromium, iPad Air size) takes screenshots and reads frame cost. It is never part of `npm test`. Its existing budget stands: 100 draws, 900,000 triangles and 20 passes a frame.
 
@@ -1728,7 +1728,7 @@ Goal: every rule of §1.6 to §1.10 works, and rivals play.
 
 Goal: every screen of §1.12 exists and can be opened on a debug state.
 
-- [ ] **M5.1 Mock-up.** Build the base pieces needed for the lobby and the Team screen and draw both from hard-coded view data behind `?debug&screen=mockup`. The user judges them on the iPad through the dev server. Changes to §1.12 that follow need the user's approval. Delete the hard-coded data afterwards.
+- [ ] **M5.1 The first two screens.** Build the lobby (§1.12.2, with its anchorage scene) and the Team screen (§1.12.4) to the finished standard on the real code path: the base pieces they need (§2.5.2), their view functions and tests (§2.5.3), the port with the screen stack of §1.12.0 and the debug screens (§2.8.3). They are drawn from a real career state (`?debug&screen=lobby` and `screen=team`, `seed=test&races=14`), never from hard-coded data. The user judges them on the iPad through the dev server before any other screen is built. Changes to §1.12 that follow need the user's approval. Steps M5.2, M5.4, M5.5, M5.7 and M5.9 then cover only what this step left.
 - [ ] **M5.2 Base pieces and glyphs.** §2.5.2 and §2.5.4: extend the glyph format, draw and redraw the full set, delete the rest, and add the `glyphs` debug screen. Check the glyph sheet as §2.5.4 says before ticking. The glyph half is done (the format, the set, the sheet); the `ui/base/` pieces of §2.5.2 remain.
 - [x] **M5.3 Portraits.** Jacket color and six sunglasses styles from the portrait seed; Uncle's fixed portrait (§1.5.9).
 - [ ] **M5.4 Views.** Every view function and its test (§2.5.3).
@@ -1747,7 +1747,7 @@ Goal: every screen of §1.12 exists and can be opened on a debug state.
 - [ ] **M5.17 The HUD and pause.** §1.12.14, §1.12.12.
 - [ ] **M5.18 Settings.** §1.12.12.
 
-**Harness check:** `npm run browser` saves a screenshot of every screen name in §2.8.3 except `mockup` on the state `seed=test&races=14`, and the frame budget holds on the lobby and at sea.
+**Harness check:** `npm run browser` saves a screenshot of every screen name in §2.8.3 on the state `seed=test&races=14`, and the frame budget holds on the lobby and at sea.
 
 ## Milestone 6. Joining up
 
