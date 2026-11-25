@@ -1,4 +1,5 @@
 import type { GunKind } from './kinds.ts';
+import { MATCH_END } from './tuning.ts';
 
 type Phase = 'fighting' | 'spectating' | 'won';
 
@@ -13,13 +14,11 @@ export interface Sunk {
   gun: GunKind | null;
 }
 
-export const CREDIT = 8;
-
 export const credited = (
   cause: Cause,
   last: { by: number; ago: number } | null
 ): number | null =>
-  last && (cause !== 'storm' || last.ago < CREDIT) ? last.by : null;
+  last && (cause !== 'storm' || last.ago < MATCH_END.credit) ? last.by : null;
 
 export interface MatchState {
   phase: Phase;

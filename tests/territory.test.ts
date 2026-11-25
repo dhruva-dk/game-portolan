@@ -373,3 +373,26 @@ test('the worst loop to close (half the planet) takes half the planet', () => {
     t.step([{ id: 0, from: path[k - 1], to: path[k] }], k, WHOLE);
   assert.ok(t.share(0) > 0.45 && t.share(0) < 0.55);
 });
+
+test("a team's share inside a ring: its water there over the ring's area; none outside it counts", () => {
+  const a = normalize([0.2, 0.9, 0.1]),
+    b = normalize([-0.6, 0.2, 0.7]),
+    c = normalize([0.25, 0.88, 0.12]);
+  const t = createTerritory(3, [0, 1, 0]);
+  t.begin([a, b, c], 0);
+  const whole = t.inside(WHOLE);
+  assert.equal(whole.length, 2);
+  assert.ok(Math.abs(whole[0] - t.teamShare(0)) < 1e-12);
+  assert.ok(Math.abs(whole[1] - t.teamShare(1)) < 1e-12);
+  const ring: Cap = { center: a, radius: 200 / R },
+    inRing = t.inside(ring),
+    ringShare = (1 - Math.cos(ring.radius)) / 2;
+  assert.equal(inRing[1], 0, 'its water lies outside');
+  assert.ok(
+    Math.abs(inRing[0] - t.teamShare(0) / ringShare) < 0.02 * inRing[0],
+    `${inRing[0]} against ${t.teamShare(0) / ringShare}`
+  );
+  assert.ok(inRing[0] + inRing[1] <= 1);
+  const tight = t.inside({ center: a, radius: 10 / R });
+  assert.ok(tight[0] > 0.99 && tight[0] <= 1, 'all its own');
+});

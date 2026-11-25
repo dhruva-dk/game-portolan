@@ -2,8 +2,9 @@ import type { Crew, Shot, Strike } from './battle.ts';
 import type { Vessel } from './contact.ts';
 import { sunk } from './health.ts';
 import type { Sunk } from './match.ts';
-import type { MatchResult, ShipResult } from './result.ts';
+import { sealed, type MatchResult, type ShipResult } from './result.ts';
 import { over } from './teams.ts';
+import { MATCH_END } from './tuning.ts';
 
 export function finishing(
   alive: readonly number[],
@@ -17,13 +18,6 @@ export function finishing(
   return [...top, ...sunk.map((s) => s.id).reverse()];
 }
 
-function fingerprint(numbers: readonly number[]): string {
-  const bytes = new Uint8Array(new Float64Array(numbers).buffer);
-  let h = 0x811c9dc5;
-  for (const b of bytes) h = Math.imul(h ^ b, 0x01000193) >>> 0;
-  return h.toString(16).padStart(8, '0');
-}
-
 export interface Standing {
   seconds: number;
   alive: readonly number[];
@@ -32,6 +26,8 @@ export interface Standing {
   sunk: readonly (Sunk & { time: number })[];
   loot: number;
   share: (id: number) => number;
+  teamShare: (id: number) => number;
+  shares: () => readonly number[];
 }
 
 function numbers(s: Standing): number[] {
@@ -50,15 +46,22 @@ function numbers(s: Standing): number[] {
   return n;
 }
 
-export function createTally(teams: readonly number[], closes: number) {
+export function createTally(
+  teams: readonly number[],
+  closed: readonly number[]
+) {
   const count = teams.length,
     sides = Math.max(-1, ...teams) + 1,
+    closes = closed.at(-1) ?? Infinity,
     zeros = () => new Array<number>(count).fill(0);
   const fired = zeros(),
     landed = zeros(),
     taken = zeros(),
     dealt = zeros();
-  let made: MatchResult | null = null;
+  const sea: number[][] = Array.from({ length: sides }, () => []);
+  let got = 0,
+    fourth: ReadonlySet<number> | null = null,
+    made: MatchResult | null = null;
 
   const fought = (shots: readonly Shot[], strikes: readonly Strike[]) => {
     for (const s of shots) fired[s.shooter]++;
@@ -71,9 +74,29 @@ export function createTally(teams: readonly number[], closes: number) {
     }
   };
 
+  const sample = (s: Standing) => {
+    const shares = s.shares();
+    sea.forEach((samples, t) => samples.push(shares[t] ?? 0));
+    got++;
+    if (got === MATCH_END.afloatAt) fourth = new Set(s.alive);
+  };
+
+  const samples = (s: Standing): number[][] => {
+    const missing = closed.length - got;
+    if (missing === 0) return sea.map((t) => [...t]);
+    const now = s.shares(),
+      afloat = new Set(s.alive.map((id) => teams[id]));
+    return sea.map((t, side) => [
+      ...t,
+      ...new Array<number>(missing).fill(
+        afloat.has(side) ? (now[side] ?? 0) : 0
+      ),
+    ]);
+  };
+
   const result = (s: Standing): MatchResult => {
     const place = zeros();
-    finishing(s.alive, s.sunk, s.share).forEach((id, i) => {
+    finishing(s.alive, s.sunk, s.teamShare).forEach((id, i) => {
       place[id] = i + 1;
     });
     const ship = (id: number): ShipResult => {
@@ -87,15 +110,17 @@ export function createTally(teams: readonly number[], closes: number) {
         shotsLanded: landed[id],
         damageDealt: dealt[id],
         damageTaken: taken[id],
-        afloatAtPhaseFour: !sank,
+        afloatAtPhaseFour: (fourth ?? new Set(s.alive)).has(id),
       };
     };
-    return {
-      seconds: s.seconds,
-      hash: fingerprint(numbers(s)),
-      ships: teams.map((_, id) => ship(id)),
-      sea: Array.from({ length: sides }, () => []),
-    };
+    return sealed(
+      {
+        seconds: s.seconds,
+        ships: teams.map((_, id) => ship(id)),
+        sea: samples(s),
+      },
+      numbers(s)
+    );
   };
 
   return {
@@ -108,9 +133,9 @@ export function createTally(teams: readonly number[], closes: number) {
     ) {
       if (made) return;
       fought(shots, strikes);
-      if (!decides) return;
       const s = standing();
-      if (over(teams, s.alive, s.seconds - closes)) made = result(s);
+      while (got < closed.length && s.seconds >= closed[got]) sample(s);
+      if (decides && over(teams, s.alive, s.seconds - closes)) made = result(s);
     },
     made: (): MatchResult | null => made,
     result: (s: Standing): MatchResult => made ?? result(s),

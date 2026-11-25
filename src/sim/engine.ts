@@ -262,7 +262,7 @@ function createSea(waters: Waters, first: Course) {
     specOf.clear();
     for (const id of ids) specOf.set(id, values(id));
     teams = by;
-    tally = by ? createTally(by, match.closed.at(-1) ?? Infinity) : null;
+    tally = by ? createTally(by, match.closed) : null;
     loose = false;
     lay =
       loot && match.heals !== null
@@ -456,6 +456,8 @@ function createSea(waters: Waters, first: Course) {
     sunk: sinkings,
     loot: flotsam.pieces.length,
     share: view.share,
+    teamShare: view.teamShare,
+    shares: () => territory?.inside(stormAt(time())) ?? [],
   });
 
   const advance = (helm: Helm, gun: Order, ask: Ask): Stepped => {
@@ -528,7 +530,8 @@ function createSea(waters: Waters, first: Course) {
     last: (): Stepped => last,
     seed: (): number => match.seed,
     standing,
-    order: (): number[] => finishing(view.alive(), sinkings, view.share),
+    teamShare: (id: number) => territory?.teamShare(id) ?? 0,
+    order: (): number[] => finishing(view.alive(), sinkings, view.teamShare),
     teams: (): readonly number[] | undefined => teams,
     marks: (id: number): readonly Vessel[] => marksOf(battle, id, fleet),
     vessels: (): readonly Vessel[] => fleet,
@@ -590,7 +593,7 @@ function createSea(waters: Waters, first: Course) {
     },
     result(): MatchResult {
       const by = teams ?? [PLAYER];
-      return (tally ?? createTally(by, Infinity)).result(standing());
+      return (tally ?? createTally(by, [])).result(standing());
     },
     view,
   };

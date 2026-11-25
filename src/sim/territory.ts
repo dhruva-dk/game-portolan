@@ -72,6 +72,7 @@ type Logged = Change extends infer C
 
 export function createTerritory(count: number, teams?: readonly number[]) {
   const owner = new Uint8Array(CELLS);
+  const sides = teams ? Math.max(-1, ...teams) + 1 : count;
   const when = new Int32Array(CELLS);
   const area = new Float64Array(count);
   const walked = new Int32Array(count).fill(TERRITORY.grace + 1);
@@ -211,6 +212,7 @@ export function createTerritory(count: number, teams?: readonly number[]) {
   return {
     owner: held,
     ships: count,
+    sides,
 
     begin(berths: readonly (Vec3 | null)[], time: number) {
       berths.forEach((at, id) => {
@@ -279,6 +281,20 @@ export function createTerritory(count: number, teams?: readonly number[]) {
       return all / PLANET_QUANTA;
     },
     holds: (id: number) => area[id] > 0,
+    inside(cap: Cap): number[] {
+      const kept = new Array<number>(sides).fill(0),
+        whole = cap.radius >= Math.PI,
+        cos = Math.cos(cap.radius);
+      let all = 0;
+      for (let c = 0; c < CELLS; c++) {
+        if (!whole && cosTo(c, cap.center) < cos) continue;
+        const a = areaQuanta(c),
+          o = owner[c] - 1;
+        all += a;
+        if (o >= 0) kept[teams?.[o] ?? o] += a;
+      }
+      return kept.map((k) => (all > 0 ? k / all : 0));
+    },
     changes: (): readonly Change[] => (handed ??= changes.slice()),
     last: () => seq,
 

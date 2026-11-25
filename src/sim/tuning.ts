@@ -34,6 +34,8 @@ export const STORM_FACTOR: Readonly<Record<MatchSetup['storm'], number>> = {
   5: 0.7,
 };
 
+export const MATCH_END = { overtime: 180, credit: 8, afloatAt: 4 } as const;
+
 export const HEAL_COUNT: Readonly<Record<MatchSetup['heals'], number>> = {
   1: 0.5,
   2: 0.75,

@@ -1,4 +1,4 @@
-export const RACE = { overtime: 180 } as const;
+import { MATCH_END } from './tuning.ts';
 
 export const teamsOf = (ships: readonly { team: number }[]): number[] =>
   ships.map((s) => s.team);
@@ -8,7 +8,7 @@ export function over(
   alive: readonly number[],
   closed: number
 ): boolean {
-  if (closed >= RACE.overtime) return true;
+  if (closed >= MATCH_END.overtime) return true;
   for (let i = 1; i < alive.length; i++)
     if (teams[alive[i]] !== teams[alive[0]]) return false;
   return true;

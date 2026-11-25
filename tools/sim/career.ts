@@ -19,7 +19,6 @@ import type { DriverStats, MatchSetup } from '../../src/sim/setup.ts';
 import type { Waters } from '../../src/sim/waters.ts';
 import { hash } from '../../src/world/random.ts';
 import { seedOf } from '../../src/world/seeds.ts';
-import { fillMissingSea } from './sea-gap.ts';
 import { worldOf } from './world.ts';
 
 export interface CareerScenario {
@@ -81,7 +80,7 @@ export function firstRace(
 export function sailed(setup: MatchSetup): MatchResult {
   const match = createMatch(setup, worldOf(seedOf(setup.planet)).waters);
   while (!match.done) match.step(STILL);
-  return fillMissingSea(match.result());
+  return match.result();
 }
 
 export type Spread = { least: number; median: number; most: number };
