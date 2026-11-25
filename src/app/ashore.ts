@@ -61,7 +61,7 @@ import type { Hearing } from '../audio/listen.ts';
 import { view } from '../ui/base/ui.ts';
 import { onPressed } from '../ui/base/touch.ts';
 import { deviceStore, keepSettings, keptSettings } from './kept.ts';
-import { begun, type Founded } from './new-career.ts';
+import { begun, type Founded } from './launch.ts';
 import { createInput } from '../ui/sea/input.ts';
 import type { Stage } from './debug.ts';
 import { painter } from './painter.ts';
