@@ -61,7 +61,9 @@ import { createChase } from './chase.ts';
 import { placed, type Point, type View as Viewport } from './lens.ts';
 import { finale, type Ending } from './finale.ts';
 import { see, seenOf } from './moments.ts';
-import { answerTo, createShake } from './shake.ts';
+import { CAMERA, answerTo, createShake } from './shake.ts';
+
+export type Jolt = 'built' | 'focused' | 'painted';
 import { createStops, stopFor } from './stops.ts';
 import { createState, debugOf, type Berth } from './state.ts';
 import type { Rig } from '../sim/engine.ts';
@@ -313,6 +315,10 @@ export function createGame(
     wear: state.wear,
     worn: state.worn,
     paint: state.paint,
+    arm: state.arm,
+    jolt(kind: Jolt) {
+      shake.play(CAMERA[kind], 1);
+    },
     broadside(on: boolean) {
       aside = on;
     },
@@ -405,7 +411,7 @@ export function createGame(
         time = state.clock(between),
         near = normalize(last.position);
       const seen = anchored
-        ? (berth ?? anchorageEye(last, seat, time, ground, berthed))
+        ? (berth ?? shake.on(anchorageEye(last, seat, time, ground, berthed)))
         : (arrival !== null && arriving(arrival, last, eye)) || shake.on(eye);
       let n = 0;
       for (const l of state.loot().pieces) {
