@@ -3,21 +3,26 @@ import assert from 'node:assert/strict';
 import {
   aged,
   currentStats,
+  drawnPeak,
+  drawnWants,
   form,
+  generateOwner,
+  generatePerson,
+  peakStat,
   retires,
-} from '../src/career/rules/ageing.ts';
-import { ask, askingWage } from '../src/career/rules/ask.ts';
-import { standardClause } from '../src/career/rules/clause.ts';
+  rookie,
+  shape,
+  stars,
+  wantsOf,
+} from '../src/career/rules/person.ts';
 import {
+  ask,
+  askingWage,
   eligible,
   expectedReputation,
+  standardClause,
   standingScore,
-} from '../src/career/rules/eligible.ts';
-import { generateOwner } from '../src/career/rules/owner.ts';
-import { drawnPeak, peakStat, shape } from '../src/career/rules/peak.ts';
-import { generatePerson, rookie } from '../src/career/rules/person.ts';
-import { stars } from '../src/career/rules/stars.ts';
-import { drawnWants, wantsOf } from '../src/career/rules/wants.ts';
+} from '../src/career/rules/hiring.ts';
 import { DRIVER_STATS, ROLES, STATS } from '../src/career/state.ts';
 import {
   AGEING,

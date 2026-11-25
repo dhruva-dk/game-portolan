@@ -1,5 +1,5 @@
 import { seatHolder } from '../lookup.ts';
-import { stars } from '../rules/stars.ts';
+import { stars } from '../rules/person.ts';
 import { ROLES, type CareerState, type Role } from '../state.ts';
 import { POLICY } from '../tuning.ts';
 

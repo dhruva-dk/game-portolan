@@ -31,16 +31,23 @@ import { ownerOf, personOf } from '../src/career/lookup.ts';
 import { enterPhase } from '../src/career/record/advance.ts';
 import { moneyTotal, teamMoney } from '../src/career/record/pay.ts';
 import { scoreRace } from '../src/career/record/score.ts';
-import { ask, askingWage } from '../src/career/rules/ask.ts';
-import { standardClause } from '../src/career/rules/clause.ts';
-import { lowestWage } from '../src/career/rules/lowest-wage.ts';
-import { narrowed } from '../src/career/rules/narrow.ts';
-import { reportCost } from '../src/career/rules/report-cost.ts';
-import { seasonPrize } from '../src/career/rules/season-prize.ts';
-import { shipRange } from '../src/career/rules/ship-range.ts';
-import { askRange, starRange } from '../src/career/rules/star-range.ts';
-import { stars } from '../src/career/rules/stars.ts';
-import { exactRange, statRange } from '../src/career/rules/stat-range.ts';
+import {
+  ask,
+  askingWage,
+  lowestWage,
+  standardClause,
+} from '../src/career/rules/hiring.ts';
+import {
+  askRange,
+  exactRange,
+  narrowed,
+  reportCost,
+  shipRange,
+  starRange,
+  statRange,
+} from '../src/career/rules/knowledge.ts';
+import { seasonPrize } from '../src/career/rules/money.ts';
+import { stars } from '../src/career/rules/person.ts';
 import { standings } from '../src/career/rules/standing.ts';
 import { standInResult } from '../src/career/standin.ts';
 import {

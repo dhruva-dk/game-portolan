@@ -1,8 +1,7 @@
 import { billAfter, costToSign } from '../hiring/cost.ts';
 import { wageBill } from '../record/pay.ts';
-import { affordablePurchase } from '../rules/purchase.ts';
-import { leavesReserve } from '../rules/reserve.ts';
-import type { Temperament } from '../rules/temperament.ts';
+import { affordablePurchase, leavesReserve } from '../rules/money.ts';
+import type { Temperament } from '../rules/person.ts';
 import type { CareerState, Person, Terms } from '../state.ts';
 import { POLICY } from '../tuning.ts';
 import { minimumTerms } from './terms.ts';

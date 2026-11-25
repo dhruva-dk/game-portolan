@@ -2,8 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { newCareer, type CareerOptions } from '../src/career/apply.ts';
 import { TEAM_NAMES } from '../src/career/names.ts';
-import { ask } from '../src/career/rules/ask.ts';
-import { standardClause } from '../src/career/rules/clause.ts';
+import { ask, standardClause } from '../src/career/rules/hiring.ts';
 import {
   startBalance,
   startDesign,
@@ -12,8 +11,8 @@ import {
   strength,
   unlockCount,
 } from '../src/career/rules/league.ts';
-import { lineLeader } from '../src/career/rules/line-leader.ts';
-import { shipRange } from '../src/career/rules/ship-range.ts';
+import { lineLeader } from '../src/career/rules/standing.ts';
+import { shipRange } from '../src/career/rules/knowledge.ts';
 import {
   LINES,
   ROLES,

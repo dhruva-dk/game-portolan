@@ -1,8 +1,8 @@
 import { pick, raceKey, uniform, whole, type Key } from '../draw.ts';
 import { SPONSOR_ROSTER } from '../names.ts';
-import type { Span } from '../rules/peak.ts';
-import { reputations } from '../rules/reputation.ts';
-import { sponsorBonus, sponsorFee } from '../rules/sponsor-fee.ts';
+import type { Span } from '../rules/person.ts';
+import { reputations } from '../rules/standing.ts';
+import { sponsorBonus, sponsorFee } from '../rules/money.ts';
 import { OBJECTIVES, type CareerState, type Sponsor } from '../state.ts';
 import { SPONSORS } from '../tuning.ts';
 import { signed } from './slots.ts';

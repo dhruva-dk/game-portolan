@@ -1,8 +1,12 @@
 import { perKind, type GunKind } from '../../sim/kinds.ts';
 import { announce } from '../announce.ts';
 import { seatHolder } from '../lookup.ts';
-import { gainRate, gainedLevel } from '../rules/gain.ts';
-import { advancedUnlock, unlockDone } from '../rules/unlock.ts';
+import {
+  advancedUnlock,
+  gainRate,
+  gainedLevel,
+  unlockDone,
+} from '../rules/development.ts';
 import {
   STATS,
   perLine,

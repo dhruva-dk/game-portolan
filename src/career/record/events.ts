@@ -2,8 +2,12 @@ import type { MatchResult } from '../../sim/result.ts';
 import { announce, named } from '../announce.ts';
 import { planetName } from '../fit.ts';
 import { seatHolder } from '../lookup.ts';
-import { leaderAfter, lineLeader } from '../rules/line-leader.ts';
-import { isStreak, nextStreak } from '../rules/streak.ts';
+import {
+  isStreak,
+  leaderAfter,
+  lineLeader,
+  nextStreak,
+} from '../rules/standing.ts';
 import {
   LINES,
   YOURS,

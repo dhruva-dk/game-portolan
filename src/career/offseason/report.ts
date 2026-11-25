@@ -1,6 +1,6 @@
 import { seatHolder } from '../lookup.ts';
-import { aged, retires } from '../rules/ageing.ts';
-import { seasonPrize } from '../rules/season-prize.ts';
+import { aged, retires } from '../rules/person.ts';
+import { seasonPrize } from '../rules/money.ts';
 import { standingOrder, standings } from '../rules/standing.ts';
 import {
   YOURS,

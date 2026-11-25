@@ -6,7 +6,7 @@ import {
   fitRefusal,
 } from '../development/build.ts';
 import { seatHolder, seatStat } from '../lookup.ts';
-import { designGain } from '../rules/gain.ts';
+import { designGain } from '../rules/development.ts';
 import {
   LINES,
   YOURS,

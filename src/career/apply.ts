@@ -43,7 +43,7 @@ import { fileReport, raceReport } from './record/report.ts';
 import { repossess } from './record/repossess.ts';
 import { scoreRace } from './record/score.ts';
 import { repaint, repaintRefusal } from './repaint.ts';
-import type { Temperament } from './rules/temperament.ts';
+import type { Temperament } from './rules/person.ts';
 import { dealOffers } from './sponsors/offers.ts';
 import { signRefusal, signSponsor } from './sponsors/sign.ts';
 import { YOURS, type CareerState } from './state.ts';

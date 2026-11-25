@@ -1,7 +1,5 @@
 import { willingness } from '../hiring/willingness.ts';
-import { ask } from '../rules/ask.ts';
-import { standardClause } from '../rules/clause.ts';
-import { lowestWage } from '../rules/lowest-wage.ts';
+import { ask, lowestWage, standardClause } from '../rules/hiring.ts';
 import type { CareerState, Person, Terms } from '../state.ts';
 import { NEGOTIATION } from '../tuning.ts';
 

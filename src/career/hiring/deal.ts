@@ -1,8 +1,8 @@
 import { ordered, raceKey } from '../draw.ts';
 import { personOf } from '../lookup.ts';
-import { eligible } from '../rules/eligible.ts';
-import { reputations } from '../rules/reputation.ts';
-import { stars } from '../rules/stars.ts';
+import { eligible } from '../rules/hiring.ts';
+import { reputations } from '../rules/standing.ts';
+import { stars } from '../rules/person.ts';
 import {
   perRole,
   type CareerState,

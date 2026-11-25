@@ -5,13 +5,16 @@ import type { Command, Reason } from '../src/career/commands.ts';
 import { buildPrice, fitPrice } from '../src/career/development/build.ts';
 import { matchSetup } from '../src/career/fit.ts';
 import { develop } from '../src/career/record/develop.ts';
-import { buildCost, fitCost } from '../src/career/rules/build-cost.ts';
-import { designGain, gainRate, gainedLevel } from '../src/career/rules/gain.ts';
 import {
   advancedUnlock,
+  buildCost,
+  designGain,
+  fitCost,
+  gainRate,
+  gainedLevel,
   unlockDone,
   unlockGain,
-} from '../src/career/rules/unlock.ts';
+} from '../src/career/rules/development.ts';
 import { standInResult } from '../src/career/standin.ts';
 import {
   LINES,

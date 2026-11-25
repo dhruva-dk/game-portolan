@@ -10,8 +10,7 @@ import {
 } from './draw.ts';
 import { leagueLines } from './knowledge/ships.ts';
 import { TEAM_NAMES } from './names.ts';
-import { ask } from './rules/ask.ts';
-import { standardClause } from './rules/clause.ts';
+import { ask, standardClause } from './rules/hiring.ts';
 import {
   startBalance,
   startDesign,
@@ -20,9 +19,8 @@ import {
   strength,
   unlockCount,
 } from './rules/league.ts';
-import { lineLeader } from './rules/line-leader.ts';
-import { generateOwner } from './rules/owner.ts';
-import { generatePerson, type Origin } from './rules/person.ts';
+import { lineLeader } from './rules/standing.ts';
+import { generateOwner, generatePerson, type Origin } from './rules/person.ts';
 import { drawOffers } from './sponsors/offers.ts';
 import { slotsOf } from './sponsors/slots.ts';
 import {

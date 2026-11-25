@@ -1,6 +1,6 @@
 import { clamp } from '../../world/scalar.ts';
 import { LEAGUE_START, LEVEL_SPAN, SHIPS } from '../tuning.ts';
-import type { Span } from './peak.ts';
+import type { Span } from './person.ts';
 
 export const strength = (index: number): number =>
   1 - (index - 1) / LEAGUE_START.strengthSpan;

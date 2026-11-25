@@ -6,11 +6,13 @@ import { talkWith } from '../hiring/talks.ts';
 import { willingness } from '../hiring/willingness.ts';
 import { isExact, knownAsk, knownStars } from '../knowledge/people.ts';
 import { personOf } from '../lookup.ts';
-import { askingWage } from '../rules/ask.ts';
-import { standardClause } from '../rules/clause.ts';
-import { standingScore } from '../rules/eligible.ts';
-import { reputationOf } from '../rules/reputation.ts';
-import { offerScore } from '../rules/score.ts';
+import {
+  askingWage,
+  offerScore,
+  standardClause,
+  standingScore,
+} from '../rules/hiring.ts';
+import { reputationOf } from '../rules/standing.ts';
 import {
   YOURS,
   type CareerState,

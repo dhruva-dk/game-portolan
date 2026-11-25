@@ -1,5 +1,5 @@
 import { seatStat } from '../lookup.ts';
-import { winterLoss, wintered } from '../rules/winter.ts';
+import { winterLoss, wintered } from '../rules/development.ts';
 import { perLine, type CareerState, type Levels, type Ship } from '../state.ts';
 
 export const teamLoss = (state: CareerState, team: number): number =>

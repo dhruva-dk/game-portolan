@@ -1,4 +1,4 @@
-import { seasonPrize } from '../rules/season-prize.ts';
+import { seasonPrize } from '../rules/money.ts';
 import { standings } from '../rules/standing.ts';
 import type { CareerState } from '../state.ts';
 

@@ -2,9 +2,13 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { apply } from '../src/career/apply.ts';
 import type { Command } from '../src/career/commands.ts';
-import { buildCost } from '../src/career/rules/build-cost.ts';
-import { interestOn } from '../src/career/rules/race-money.ts';
-import { releaseCost } from '../src/career/rules/release-cost.ts';
+import { buildCost } from '../src/career/rules/development.ts';
+import { interestOn } from '../src/career/rules/money.ts';
+import {
+  askingWage,
+  releaseCost,
+  standardClause,
+} from '../src/career/rules/hiring.ts';
 import { standings } from '../src/career/rules/standing.ts';
 import {
   ROLES,
@@ -19,11 +23,9 @@ import { lobbyView, type LobbyButton } from '../src/career/views/lobby.ts';
 import { teamView, type SeatView } from '../src/career/views/team.ts';
 import { dealView, type CandidateView } from '../src/career/views/deal.ts';
 import { negotiationView, type Edit } from '../src/career/views/negotiation.ts';
-import { standardClause } from '../src/career/rules/clause.ts';
 import { NEGOTIATION } from '../src/career/tuning.ts';
-import { askingWage } from '../src/career/rules/ask.ts';
-import { reportCost } from '../src/career/rules/report-cost.ts';
-import { stars } from '../src/career/rules/stars.ts';
+import { reportCost } from '../src/career/rules/knowledge.ts';
+import { stars } from '../src/career/rules/person.ts';
 import { SCOUTING } from '../src/career/tuning.ts';
 import { dismissed, haggled, owing, rehearsed } from '../src/app/rehearse.ts';
 import { talkWith } from '../src/career/hiring/talks.ts';

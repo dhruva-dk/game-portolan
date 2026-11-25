@@ -2,7 +2,7 @@ import { apply, newCareer, runPolicy } from '../../src/career/apply.ts';
 import type { Command, Refusal } from '../../src/career/commands.ts';
 import { matchSetup } from '../../src/career/fit.ts';
 import { personOf } from '../../src/career/lookup.ts';
-import { stars } from '../../src/career/rules/stars.ts';
+import { stars } from '../../src/career/rules/person.ts';
 import { standingOrder, standings } from '../../src/career/rules/standing.ts';
 import { standInResult } from '../../src/career/standin.ts';
 import {

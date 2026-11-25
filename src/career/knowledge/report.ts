@@ -1,6 +1,6 @@
 import type { Reason } from '../commands.ts';
 import { personOf } from '../lookup.ts';
-import { reportCost } from '../rules/report-cost.ts';
+import { reportCost } from '../rules/knowledge.ts';
 import { YOURS, type CareerState } from '../state.ts';
 import { updateTeam } from '../teams.ts';
 import { knownStars } from './people.ts';

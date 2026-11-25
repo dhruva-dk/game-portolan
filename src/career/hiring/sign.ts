@@ -1,8 +1,5 @@
 import { announce, named } from '../announce.ts';
-import {
-  racesLeftOnSigning,
-  renewedRacesLeft,
-} from '../rules/contract-length.ts';
+import { racesLeftOnSigning, renewedRacesLeft } from '../rules/hiring.ts';
 import type {
   CareerState,
   Contract,

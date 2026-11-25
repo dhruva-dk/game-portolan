@@ -1,8 +1,8 @@
 import type { Reason } from '../commands.ts';
 import { seatHolder } from '../lookup.ts';
 import { wageBill } from '../record/pay.ts';
-import { releaseCost } from '../rules/release-cost.ts';
-import { leavesReserve } from '../rules/reserve.ts';
+import { releaseCost } from '../rules/hiring.ts';
+import { leavesReserve } from '../rules/money.ts';
 import type { CareerState, Person, Terms } from '../state.ts';
 
 export const isRenewal = (person: Person, team: number): boolean =>

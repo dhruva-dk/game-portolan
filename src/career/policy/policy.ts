@@ -3,10 +3,8 @@ import { buildPrice, fitPrice } from '../development/build.ts';
 import { sameFocus } from '../development/focus.ts';
 import { draw, raceKey } from '../draw.ts';
 import { employees, personOf } from '../lookup.ts';
-import { reputationOf } from '../rules/reputation.ts';
-import { standings } from '../rules/standing.ts';
-import { stars } from '../rules/stars.ts';
-import { ownerTemperament, type Temperament } from '../rules/temperament.ts';
+import { reputationOf, standings } from '../rules/standing.ts';
+import { ownerTemperament, stars, type Temperament } from '../rules/person.ts';
 import {
   LINES,
   ROLES,
