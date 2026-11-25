@@ -20,7 +20,12 @@ import {
 } from '../src/career/offseason.ts';
 import { teamMoney } from '../src/career/record/pay.ts';
 import { currentStats, rookie } from '../src/career/rules/person.ts';
-import { seasonPrize } from '../src/career/rules/money.ts';
+import {
+  STANDINGS,
+  income,
+  seasonPrize,
+  standingMerit,
+} from '../src/career/rules/money.ts';
 import { winterLoss, wintered } from '../src/career/rules/development.ts';
 import { standInResult } from '../src/career/standin.ts';
 import {
@@ -35,7 +40,7 @@ import {
 import {
   AGEING,
   LEAGUE,
-  SEASON_PRIZE,
+  ECONOMY,
   SHIPS,
   STANDING,
   WINTER,
@@ -82,8 +87,9 @@ function expectedStandings(state: CareerState): number[] {
 
 const expectedPrize = (standing: number): number =>
   Math.round(
-    SEASON_PRIZE.prize *
-      ((SEASON_PRIZE.from - standing) / SEASON_PRIZE.span) ** SEASON_PRIZE.power
+    ECONOMY.shares.season *
+      LEAGUE.racesPerSeason *
+      income(standingMerit(standing))
   );
 
 const resultOf = (state: CareerState): MatchResult =>
@@ -198,9 +204,8 @@ const atStop = (seed: string): CareerState => {
 };
 
 test('the season prize and winter loss follow §1.8.2 and §1.9', () => {
-  assert.equal(seasonPrize(1), SEASON_PRIZE.prize);
-  assert.equal(seasonPrize(TEAMS), expectedPrize(TEAMS));
-  assert.equal(seasonPrize(21), expectedPrize(21));
+  for (const standing of STANDINGS)
+    assert.equal(seasonPrize(standing), expectedPrize(standing));
   for (let s = 1; s < TEAMS; s++)
     assert.ok(seasonPrize(s) > seasonPrize(s + 1));
   assert.equal(winterLoss(null), WINTER.lossWithout);
@@ -215,11 +220,11 @@ test('the season prize and winter loss follow §1.8.2 and §1.9', () => {
 });
 
 test('the season prize and winter loss at hand-worked points', () => {
-  assert.equal(seasonPrize(1), 60000);
-  assert.equal(seasonPrize(11), 33750);
-  assert.equal(seasonPrize(21), 15000);
-  assert.equal(seasonPrize(31), 3750);
-  assert.equal(seasonPrize(40), 38);
+  assert.equal(seasonPrize(1), 32000);
+  assert.equal(seasonPrize(11), 18588);
+  assert.equal(seasonPrize(21), 9120);
+  assert.equal(seasonPrize(31), 3598);
+  assert.equal(seasonPrize(40), 2000);
   assert.equal(winterLoss(null), 11);
   assert.equal(winterLoss(1), 9.7);
   assert.equal(winterLoss(10), 7);

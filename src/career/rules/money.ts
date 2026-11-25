@@ -5,7 +5,6 @@ import {
   ECONOMY,
   LEAGUE,
   RACE_MONEY,
-  SEASON_PRIZE,
   SHIPS,
   SPONSORS,
   STARS,
@@ -44,27 +43,32 @@ export const leagueIncome = (): number =>
 
 export const placePrize = (place: number): number =>
   Math.round(
-    RACE_MONEY.placePrize *
-      ((RACE_MONEY.prizeFrom - place) / RACE_MONEY.prizeSpan) **
-        RACE_MONEY.prizePower
+    (ECONOMY.shares.place * income(placeMerit(place))) / LEAGUE.shipsPerTeam
   );
 
+export const deedPrize = (): number =>
+  (ECONOMY.shares.deeds / RACE_MONEY.deeds) * leagueIncome();
+
+export const perSinking = (): number =>
+  Math.round(deedPrize() / (SHIP_COUNT - 1));
+
 export const sinkingMoney = (sinkings: number): number =>
-  RACE_MONEY.perSinking * sinkings;
+  perSinking() * sinkings;
 
 export const meanShare = (samples: readonly number[]): number =>
   samples.reduce((sum, share) => sum + share, 0) / samples.length;
 
 export const seaMoney = (samples: readonly number[]): number =>
-  Math.round(RACE_MONEY.seaPrize * meanShare(samples));
+  Math.round(deedPrize() * meanShare(samples));
 
 export const interestOn = (balance: number): number =>
   Math.ceil(RACE_MONEY.interest * Math.max(0, -balance));
 
 export const seasonPrize = (standing: number): number =>
   Math.round(
-    SEASON_PRIZE.prize *
-      ((SEASON_PRIZE.from - standing) / SEASON_PRIZE.span) ** SEASON_PRIZE.power
+    ECONOMY.shares.season *
+      LEAGUE.racesPerSeason *
+      income(standingMerit(standing))
   );
 
 export const leavesReserve = (
