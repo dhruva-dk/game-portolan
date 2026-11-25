@@ -232,3 +232,5 @@ export const MOTION = {
 } as const;
 
 export const FAINT = 0.32;
+
+export const FADE = 320;
