@@ -288,6 +288,7 @@ const CAREER_SCREENS = [
   'sponsors',
   'planet',
   'opponents',
+  'settings',
   'result',
   'offseason',
   'paper',
@@ -401,6 +402,21 @@ async function harbor(
   const shore = await ashore(s, career, {
     store: memoryStore(),
     ready: () => title.show(false),
+    founded({ options }) {
+      const at = new URL(location.href);
+      at.search = new URLSearchParams({
+        debug: '',
+        screen: 'lobby',
+        seed: options.seed,
+        name: options.name,
+        dye: String(options.livery.dye),
+        pattern: String(options.livery.pattern),
+        emblem: String(options.emblem),
+      })
+        .toString()
+        .replace('debug=', 'debug');
+      location.replace(at.href);
+    },
     sailed() {
       const at = new URL(location.href);
       at.searchParams.set('races', String(races + 1));
@@ -409,7 +425,7 @@ async function harbor(
       location.replace(at.href);
     },
   });
-  if (screen === 'sponsors') {
+  if (screen === 'sponsors' || screen === 'settings') {
     shore.open(screen);
     return;
   }
