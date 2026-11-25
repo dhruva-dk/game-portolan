@@ -10,6 +10,10 @@ export const SHIP = {
   length: 26,
   beam: 6.5,
   rig: 21.5,
+  astern: 0.2,
+  aback: 1,
+  ahead: 1,
+  stopped: 1,
 } as const;
 
 export const RAM = {

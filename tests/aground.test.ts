@@ -132,6 +132,79 @@ test('a bot wedged on a bank it faces turns away and leaves within seconds, neve
   }
 });
 
+const BEACHED: readonly Pose[] = [
+  {
+    at: normalize([
+      -0.33963586235757187, 0.9382132549611137, -0.06635788736767144,
+    ]),
+    bearing: -0.37906316662053346,
+  },
+  {
+    at: normalize([
+      -0.6649081310359423, -0.34606838864106965, 0.6619167981443468,
+    ]),
+    bearing: -1.1173313225049704,
+  },
+];
+
+test('beached bow on, a ship steered astern backs off the bank, comes round and sails away, never over land', () => {
+  for (const [i, pose] of BEACHED.entries()) {
+    const course = bearingAt(pose.at, pose.bearing + Math.PI),
+      m = aground(pose, true);
+    let sternmost = 0;
+    const v = voyage(m, 20, () => {
+      sternmost = Math.min(sternmost, own(m).speed);
+      return { ...STILL, course, throttle: 1 };
+    });
+    assert.ok(dry(v), `${i}: ${v.least} m under its keel`);
+    assert.ok(sternmost < -1, `${i}: it never backed, ${sternmost} m/s`);
+    assert.ok(v.out < 12, `${i}: 30 m off only after ${v.out} s`);
+    assert.ok(own(m).speed > 5, `${i}: it ends at ${own(m).speed} m/s`);
+  }
+});
+
+test('with open water under its bow, a stopped ship steered astern turns and goes ahead, never astern', () => {
+  const m = aground({ at: OPEN, bearing: 0 }, true),
+    course = bearingAt(OPEN, Math.PI);
+  let sternmost = 0;
+  const v = voyage(m, 10, () => {
+    sternmost = Math.min(sternmost, own(m).speed);
+    return { ...STILL, course, throttle: 1 };
+  });
+  assert.equal(sternmost, 0);
+  assert.ok(v.out < 10, `30 m off only after ${v.out} s`);
+});
+
+const SHORES: readonly Pose[] = [
+  {
+    at: normalize([
+      -0.2834627713119093, -0.32729126888455207, 0.9014040617792403,
+    ]),
+    bearing: -2.3279030355808086,
+  },
+  {
+    at: normalize([
+      -0.12576671462620378, 0.9174394091607652, -0.37747538199315367,
+    ]),
+    bearing: 0.8186890042310919,
+  },
+  {
+    at: normalize([
+      -0.2025300985208878, -0.7643670556103203, -0.6121475014167166,
+    ]),
+    bearing: 1.4634253439593166,
+  },
+];
+
+test('where duels were lost to the storm: a bot aground on a shore with deep water abaft comes off within seconds, never over land', () => {
+  for (const [i, pose] of SHORES.entries())
+    for (const match of [1, 2, 3, 4]) {
+      const v = voyage(aground(pose, false, match), 30, () => STILL);
+      assert.ok(dry(v), `${i}/${match}: ${v.least} m under its keel`);
+      assert.ok(v.out < 20, `${i}/${match}: 30 m off only after ${v.out} s`);
+    }
+});
+
 const inlet = seedOf('11/1/1'),
   narrow = watersAt(planetOf(inlet, landOf(inlet)));
 const LOCKED = [
