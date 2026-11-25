@@ -33,7 +33,7 @@ import {
   opponentsView,
   teamSheetView,
 } from '../career/views/opponents.ts';
-import { seedOf } from '../world/seeds.ts';
+import { named, seedOf } from '../world/seeds.ts';
 import { specimen } from './specimen.ts';
 import type { DebugDamage, Game } from '../play/game.ts';
 import type { Referee } from '../play/referee.ts';
@@ -55,7 +55,7 @@ import type { MatchSetup } from '../sim/setup.ts';
 import { createStorm } from '../sim/storm.ts';
 import { RACE_SHIP, RACE_STORM, raceSetup, teamLiveries } from './race.ts';
 import type { ShipDraw, Snapshot, StormDraw } from '../render/snapshot.ts';
-import type { Flow } from './flow.ts';
+import { bench } from './bench.ts';
 import { uiLayer } from '../ui/base/ui.ts';
 import type { Weather } from '../world/weather.ts';
 import {
@@ -105,9 +105,8 @@ export interface Stage {
 export interface Played {
   game: Game;
   referee: Referee;
-  flow: Flow;
   race: MatchSetup;
-  play(): void;
+  go(to: 'match' | 'sunk' | 'spectate' | 'over'): void;
   map(): void;
   pause(): void;
   hand(left: boolean): void;
@@ -146,10 +145,11 @@ function setupOf(release: Setup): Setup {
     swing = { ...release.swing };
   for (const k of ['wind', 'cloud', 'haze'] as const)
     if (params.has(k)) [mean[k], swing[k]] = [number(k, 0), 0];
-  const sea = params.get('debug');
+  const sea = params.get('debug'),
+    name = named(params.get('seed') ?? '') || release.name;
   return {
-    seed: release.seed,
-    name: release.name,
+    seed: seedOf(name),
+    name,
     mean,
     swing,
     hours: number('t', mood?.hours ?? release.hours),
@@ -200,19 +200,21 @@ async function kept(name: string) {
 export async function scenario(
   release: Setup,
   stage: (setup: Setup) => Promise<Stage>,
-  play: (s: Stage) => Promise<Played>,
-  title: { show(on: boolean): void }
+  cover: { show(on: boolean): void }
 ) {
   if (params.has('saved')) return kept(params.get('saved') ?? 'none');
-  if (params.get('screen') === 'glyphs') return specimen(number('page', 1));
-  if (params.get('screen') === 'new') return founder(release, stage, title);
+  if (params.get('screen') === 'glyphs') {
+    cover.show(false);
+    return specimen(number('page', 1));
+  }
+  if (params.get('screen') === 'new') return founder(release, stage, cover);
   const career = CAREER_SCREENS.find((c) => c === params.get('screen'));
-  if (career) return harbor(career, release, stage, title);
+  if (career) return harbor(career, release, stage, cover);
   const setup = setupOf(release);
   const s = await stage(setup);
   const room = Math.max(SETUP.most, number('ships', 0) + 1);
   if (flying) {
-    void s.ready.then(() => title.show(false));
+    void s.ready.then(() => cover.show(false));
     const closing = createStorm(
       s.world.seed,
       (p) => -s.world.planet.height(p),
@@ -227,7 +229,8 @@ export async function scenario(
       )
     );
   }
-  const p = await play(s);
+  const p = await bench(s);
+  void s.ready.then(() => cover.show(false));
   safeArea(uiLayer());
   if (params.has('livery')) p.game.wear(asked);
   open(p, demoShips(s.start.at, room - 1, s.world.seed, p.game.worn()), s);
@@ -262,9 +265,6 @@ export async function scenario(
       : []),
   ];
   const ends = [
-    ...(params.has('leave')
-      ? [{ at: number('leave', 0), act: () => p.flow.tap('leave') }]
-      : []),
     ...(params.has('sink')
       ? [{ at: number('sink', 0), act: () => sinkPlayerShip(p.game) }]
       : []),
@@ -390,7 +390,7 @@ function founded(): Founding {
 async function founder(
   release: Setup,
   stage: (setup: Setup) => Promise<Stage>,
-  title: { show(on: boolean): void }
+  cover: { show(on: boolean): void }
 ) {
   const seed = params.get('seed'),
     races = Math.max(0, Math.floor(number('races', 0)));
@@ -411,7 +411,7 @@ async function founder(
     location.replace(at.href);
   };
   await founding(s, existing, {
-    ready: () => title.show(false),
+    ready: () => cover.show(false),
     started({ options }) {
       lobbyOf({
         seed: options.seed,
@@ -431,7 +431,7 @@ async function harbor(
   screen: (typeof CAREER_SCREENS)[number],
   release: Setup,
   stage: (setup: Setup) => Promise<Stage>,
-  title: { show(on: boolean): void }
+  cover: { show(on: boolean): void }
 ) {
   const races = Math.max(0, Math.floor(number('races', 0)));
   const roles = (params.get('approach') ?? '')
@@ -478,7 +478,7 @@ async function harbor(
   safeArea(uiLayer());
   const shore = await ashore(s, career, {
     queue: saveQueue(memoryStore()),
-    ready: () => title.show(false),
+    ready: () => cover.show(false),
     founded({ options }) {
       const at = new URL(location.href);
       at.search = new URLSearchParams({
@@ -550,27 +550,16 @@ async function harbor(
 }
 
 function open(p: Played, others: readonly Berth[], s: Stage) {
-  const { game, referee, flow } = p;
+  const { game, referee } = p;
   const screen = params.get('screen') ?? 'match';
-  if (
-    screen === 'title' ||
-    screen === 'lobby' ||
-    screen === 'settings' ||
-    screen === 'seed' ||
-    screen === 'livery'
-  )
-    flow.go(screen);
-  else if (params.has('race')) {
+  if (params.has('race')) {
     const teams = number('race', 0) || undefined,
       race = raceSetup(s.name, s.world.seed, teams, s.gun),
       liveries = teamLiveries(race, game.worn());
     game.start(race, liveries);
     if (s.rig) game.debug.rig(s.rig, race, liveries);
     referee.begin();
-    flow.go('match');
-  } else if (screen === 'play') {
-    p.play();
-    flow.go('match');
+    p.go('match');
   } else {
     game.debug.atSea(p.race, others, s.rig ?? undefined);
     drive(game, params.get('drive') ?? '');
@@ -580,12 +569,12 @@ function open(p: Played, others: readonly Berth[], s: Stage) {
     if (screen === 'over')
       others.forEach((_, i) => i > 0 && game.debug.sink(i + 1, 1));
     if (screen === 'won') winPlayerShip(game);
-    flow.go('match');
-    if (screen === 'spectate') {
-      referee.update(0);
-      referee.watch();
-      flow.go('spectate');
-    }
+    if (screen === 'spectate') referee.update(0);
+    p.go(
+      screen === 'sunk' || screen === 'spectate' || screen === 'over'
+        ? screen
+        : 'match'
+    );
   }
   if (screen === 'match') stock(game);
   if (params.get('fire') === '') game.step(0, { ...IDLE, fire: true });

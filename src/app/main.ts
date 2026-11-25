@@ -1,45 +1,20 @@
 import { WebGPUCoordinateSystem, WebGPURenderer } from 'three/webgpu';
-import { createAudio } from '../audio/audio.ts';
-import type { Hearing } from '../audio/listen.ts';
-import type { Played, Setup, Stage } from './debug.ts';
-
-import { launched, roll, sail } from './address.ts';
-import { linearToHex } from '../world/color.ts';
-import { DYES } from '../world/livery.ts';
+import type { Setup, Stage } from './debug.ts';
 import { SEED, createWorld } from '../world/environment.ts';
 import { createFrame } from '../render/frame.ts';
 import { loaded } from '../render/load.ts';
 import { createMeter } from './meter.ts';
-import { createGame } from '../play/game.ts';
-import { surveyor } from '../play/preview.ts';
-import { createReferee } from '../play/referee.ts';
-import { watersOf } from '../play/setup.ts';
 import { SETUP } from '../sim/engine.ts';
-import type { Berthed } from '../sim/waters.ts';
-import { RACE_SHIP, raceSetup, rigOf, teamLiveries } from './race.ts';
+import { rigOf } from './race.ts';
 import type { Snapshot } from '../render/snapshot.ts';
-import { shoresOf } from '../ui/base/coasts.ts';
-import { createGlobe } from '../ui/base/globe.ts';
-import { createFlow } from './flow.ts';
-import { createHud, type HudState } from '../ui/sea/hud.ts';
-import { createTitle, type Title } from '../ui/base/screens.ts';
-import { createInput } from '../ui/sea/input.ts';
-import { createStick } from '../ui/sea/stick.ts';
-import { createPause } from '../ui/sea/pause.ts';
-import { IDLE, type SeaBubble } from '../play/player.ts';
-import { createAfter } from '../ui/sea/after.ts';
-import { MOTION } from '../ui/base/house.ts';
-import { clamp, lerp } from '../world/scalar.ts';
-import { onPressed } from '../ui/base/touch.ts';
+import { createLoading } from '../ui/base/loading.ts';
 import { onResize, uiLayer, view } from '../ui/base/ui.ts';
 import { seedOf } from '../world/seeds.ts';
 import { MEAN, SWING } from '../world/weather.ts';
 
-const SEA: readonly string[] = ['match', 'spectate'];
-
 const DEBUG = new URLSearchParams(location.search).has('debug');
 
-const NAME = launched(() => (DEBUG ? String(SEED) : roll()));
+const NAME = String(SEED);
 
 const RELEASE: Setup = {
   seed: seedOf(NAME),
@@ -60,9 +35,6 @@ const RELEASE: Setup = {
 };
 
 loaded('script');
-
-let shown: Title | null = null;
-const titled = () => (shown ??= createTitle());
 
 const meterEl = document.getElementById('meter')!;
 const say = (text: string) => {
@@ -133,208 +105,16 @@ async function stage(setup: Setup): Promise<Stage> {
   };
 }
 
-async function play(s: Stage): Promise<Played> {
-  const { waters, ms, berth } = await watersOf(s.world.seed, s.world.land);
-  console.info(`water sounded in ${ms.toFixed(0)} ms`);
-  loaded('sounded');
-  const race = raceSetup(s.name, s.world.seed, undefined, s.gun);
-  let berthed: Berthed | undefined;
-  void berth(race.match, race.ships.length).then((b) => (berthed = b));
-  const game = createGame(s.world, s.anchors, waters, s.start, RACE_SHIP);
-  const referee = createReferee(game);
-
-  let kept: { leftHanded: boolean; sensitivity: number } | null = null;
-  const input = createInput(
-    s.canvas,
-    () => game.steering(),
-    () => ({
-      leftHanded: forced ?? kept?.leftHanded ?? false,
-      sensitivity: kept?.sensitivity ?? 1,
-    })
-  );
-  const layer = uiLayer();
-  const stick = createStick(layer);
-  const shores = shoresOf(
-    s.world.planet,
-    s.world.coasts,
-    s.world.land.stats.summit
-  );
-  const globe = createGlobe(shores.coasts);
-  let said: SeaBubble | null = null;
-  const status: HudState = Object.assign(
-    { bubble: said },
-    game.status(),
-    game.kit()
-  );
-  const hudState = (): HudState =>
-    Object.assign(status, game.status(view.w, view.h), game.kit(), {
-      bubble: said,
-    });
-  const map = () => globe.show(hudState());
-  let paused = false,
-    released = -Infinity;
-  const pauseMatch = () => {
-    if (paused || flow.covered || !SEA.includes(flow.screen)) return;
-    paused = true;
-    input.fire(false);
-    pause.open();
-  };
-  const hud = createHud(
-    layer,
-    shores,
-    {
-      heal: input.heal,
-      gust: input.gust,
-      fire: input.fire,
-      aim: input.aim,
-      map,
-      pause: pauseMatch,
-    },
-    () => {
-      said = null;
-      after.show(false);
-    }
-  );
-  const after = createAfter({
-    watch: () => undefined,
-    result: () => undefined,
-  });
-  if (after.result) hud.beside('sunk', after.result);
-  document.addEventListener('visibilitychange', () => {
-    if (document.hidden) pauseMatch();
-  });
-  const audio = createAudio(s.world.planet.height);
-  const survey = surveyor();
-  const deal = () => {
-    const liveries = teamLiveries(race, game.worn());
-    game.start(race, liveries, berthed);
-    if (s.rig) game.debug.rig(s.rig, race, liveries);
-    referee.begin();
-  };
-  const flow = createFlow(
-    hud,
-    globe,
-    'title',
-    {
-      play: deal,
-      home: () => sail(roll()),
-      again: () => sail(s.name),
-      watch: () => referee.watch(),
-      switch: (by) => referee.switch(by),
-      seeds: { name: s.name, chart: survey, roll, sail },
-      wardrobe: {
-        dyes: DYES.map((d) => ({
-          name: d.name,
-          dye: linearToHex(d.color),
-          mark: linearToHex(d.mark),
-        })),
-        worn: game.worn,
-        wear: game.wear,
-        broadside: game.broadside,
-      },
-    },
-    titled()
-  );
-  kept = flow.settings;
-  let left: boolean | null = null,
-    forced: boolean | null = null;
-  const pause = createPause(
-    {
-      get: () => flow.settings,
-      set: (next) => flow.keep(next),
-      heard: (id) => {
-        if (id === 'sound') audio.sample();
-      },
-    },
-    {
-      resume() {
-        paused = false;
-        released = performance.now();
-      },
-      forfeit() {
-        paused = false;
-        released = -Infinity;
-        game.forfeit();
-      },
-    }
-  );
-  const pace = () =>
-    paused ? 0 : clamp((performance.now() - released) / MOTION.paused.release);
-  onPressed(layer, () =>
-    audio.tap(pause.state === 'playing' ? flow.screen : 'settings')
-  );
-  void s.ready.then(() => {
-    flow.ready();
-    loaded('title');
-  });
-  loaded('play');
-  const hearing: Hearing = {
-    scene: game.snapshot(),
-    status,
-    screen: flow.screen,
-    map: false,
-    covered: 0,
-  };
-  let stats: boolean | null = null;
-
-  return {
-    game,
-    referee,
-    flow,
-    race,
-    play: deal,
-    map,
-    drawn: (canvas) => flow.drawn(canvas),
-    pause: pauseMatch,
-    hand: (on: boolean) => (forced = on),
-    wingman: (seed: number | null) => hud.wingman(seed),
-    say(id: SeaBubble | null) {
-      said = id;
-      after.show(id === 'sunk');
-    },
-    next(real: number): Snapshot {
-      const k = pace(),
-        dt = real * k,
-        read = input.read(),
-        hands = paused ? IDLE : read;
-      stick(game.steering() && !paused ? hands.stick : null);
-      game.step(dt, hands);
-      const end = referee.update(dt);
-      flow.end(end);
-      const scene = game.snapshot();
-      flow.update(hudState(), scene.sea, scene.own);
-      hearing.scene = scene;
-      hearing.screen = flow.screen;
-      hearing.map = globe.open;
-      hearing.covered = flow.covered;
-      audio.update(
-        hearing,
-        flow.settings.sound * lerp(MOTION.paused.duck, 1, k),
-        real
-      );
-      kept = flow.settings;
-      const lefty = forced ?? kept.leftHanded;
-      if (lefty !== left) {
-        hud.hand((left = lefty));
-        meterEl.classList.toggle('right', lefty);
-      }
-      if (flow.settings.stats !== stats) s.stats((stats = flow.settings.stats));
-      scene.eye = globe.step(dt, scene.storm) ?? scene.eye;
-      return scene;
-    },
-  };
-}
-
 if (DEBUG) {
-  const title = titled();
-  title.show(true, 0);
+  const cover = createLoading();
+  cover.show(true, true);
   await new Promise((go) => {
     requestAnimationFrame(() => setTimeout(go));
     setTimeout(go, 250);
   });
-  loaded('title shown');
+  loaded('cover shown');
   const { scenario } = await import('./debug.ts');
-  await scenario(RELEASE, stage, play, title);
+  await scenario(RELEASE, stage, cover);
 } else {
   const { home } = await import('./home.ts');
   await home(RELEASE, stage);
