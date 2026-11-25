@@ -171,6 +171,15 @@ export function createTeam(port: LobbyPort) {
   const seatAt = (role: Role) =>
     view?.seats.find((s) => s.role === role) ?? null;
 
+  function seated(card: HTMLElement) {
+    card.classList.add('seated');
+    card.addEventListener(
+      'animationend',
+      () => card.classList.remove('seated'),
+      { once: true }
+    );
+  }
+
   function drawCard(i: number, seat: SeatView, was: number) {
     const face = seat.card
       ? cardFront(seat.card, 3 + i * 7)
@@ -289,8 +298,13 @@ export function createTeam(port: LobbyPort) {
     show(v: TeamView) {
       const before = enlarged ? seatAt(enlarged)?.card?.person : null;
       const was = view?.seats.findIndex((seat) => seat.scouting) ?? -1;
+      const sat = view?.seats.map((seat) => seat.card?.person ?? null) ?? null;
       view = v;
-      v.seats.forEach((seat, i) => drawCard(i, seat, was));
+      v.seats.forEach((seat, i) => {
+        drawCard(i, seat, was);
+        const now = seat.card?.person ?? null;
+        if (sat !== null && now !== null && now !== sat[i]) seated(cards[i]);
+      });
       drawDeals(v);
       if (enlarged) {
         const now = seatAt(enlarged)?.card;

@@ -4,6 +4,10 @@ import { matchSetup } from '../career/fit.ts';
 import { TEAM_NAMES } from '../career/names.ts';
 import { standInResult } from '../career/standin.ts';
 import { YOURS, type CareerState } from '../career/state.ts';
+import { willingness } from '../career/hiring/willingness.ts';
+import { personOf } from '../career/lookup.ts';
+import { standardClause } from '../career/rules/clause.ts';
+import { NEGOTIATION } from '../career/tuning.ts';
 import { lobbyView } from '../career/views/lobby.ts';
 
 export const REHEARSAL = {
@@ -84,4 +88,52 @@ export function owing(state: CareerState, balance: number): CareerState {
     ...state,
     teams: state.teams.map((t, i) => (i === YOURS ? { ...t, balance } : t)),
   };
+}
+
+export type Haggle = 'refuse' | 'counter' | 'sign';
+
+const THRESHOLD: Record<Haggle, number> = {
+  refuse: -Infinity,
+  counter: NEGOTIATION.counters,
+  sign: NEGOTIATION.signs,
+};
+
+function wageFor(state: CareerState, id: number, want: Haggle): number | null {
+  const person = personOf(state, id);
+  if (person === null) return null;
+  const score = willingness(state, YOURS, person),
+    { least, most, step } = NEGOTIATION.wage;
+  for (let wage = least; wage <= most; wage += step)
+    if (
+      score({ wage, seasons: 2, fee: 0, clause: standardClause(wage) }) >=
+      THRESHOLD[want]
+    )
+      return wage;
+  return null;
+}
+
+export function haggled(
+  state: CareerState,
+  id: number,
+  plan: readonly Haggle[]
+): CareerState {
+  let now = state;
+  for (const want of plan) {
+    const wage = wageFor(now, id, want);
+    if (wage === null) break;
+    const applied = apply(now, {
+      type: 'Offer',
+      team: YOURS,
+      person: id,
+      terms: { wage, seasons: 2, fee: 0, clause: standardClause(wage) },
+    });
+    if (!applied.ok) break;
+    now = applied.state;
+  }
+  return now;
+}
+
+export function reported(state: CareerState, id: number): CareerState {
+  const applied = apply(state, { type: 'BuyReport', team: YOURS, person: id });
+  return applied.ok ? applied.state : state;
 }

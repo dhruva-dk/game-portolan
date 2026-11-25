@@ -3,8 +3,15 @@ import type { World } from '../world/environment.ts';
 import type { FrameOptions } from '../render/frame.ts';
 import { createFly } from './fly.ts';
 import { ashore } from './ashore.ts';
-import { owing, rehearsed, wintered } from './rehearse.ts';
-import { ROLES, YOURS } from '../career/state.ts';
+import {
+  haggled,
+  owing,
+  rehearsed,
+  reported,
+  wintered,
+  type Haggle,
+} from './rehearse.ts';
+import { ROLES, YOURS, type CareerState, type Role } from '../career/state.ts';
 import { memoryStore } from './save.ts';
 import { planetSeed } from '../career/fit.ts';
 import { seedOf } from '../world/seeds.ts';
@@ -231,7 +238,35 @@ export async function scenario(
   }, p.drawn);
 }
 
-const CAREER_SCREENS = ['lobby', 'team', 'deal'] as const;
+function roleOf(career: CareerState): Role {
+  const deals = career.teams[YOURS].deals,
+    asked = ROLES.find((role) => role === params.get('role')),
+    scout = career.teams[YOURS].scoutSeat;
+  return (
+    asked ??
+    [scout, ...ROLES].find((r) => (deals[r]?.candidates.length ?? 0) > 0) ??
+    scout
+  );
+}
+
+const HAGGLES: readonly Haggle[] = ['refuse', 'counter', 'sign'];
+
+function talkedTo(career: CareerState, role: Role) {
+  const team = career.teams[YOURS],
+    renewal = params.has('renew'),
+    picked = Math.floor(number('pick', 0)),
+    person = renewal
+      ? team.seats[role]
+      : (team.deals[role]?.candidates[picked] ?? null);
+  if (person === null) return null;
+  const plan = (params.get('offers') ?? '')
+    .split(',')
+    .flatMap((h) => HAGGLES.filter((want) => want === h));
+  const known = params.has('report') ? reported(career, person) : career;
+  return { person, renewal, state: haggled(known, person, plan) };
+}
+
+const CAREER_SCREENS = ['lobby', 'team', 'deal', 'negotiation'] as const;
 
 async function harbor(
   screen: (typeof CAREER_SCREENS)[number],
@@ -246,7 +281,10 @@ async function harbor(
   const sailed = rehearsed(params.get('seed') ?? undefined, races, roles),
     signed = params.has('signed') ? wintered(sailed) : sailed,
     owed = params.get('balance');
-  const career = owed === null ? signed : owing(signed, Number(owed));
+  const priced = owed === null ? signed : owing(signed, Number(owed));
+  const role = roleOf(priced),
+    talk = screen === 'negotiation' ? talkedTo(priced, role) : null,
+    career = talk === null ? priced : talk.state;
   const planet = planetSeed(career);
   const s = await stage({
     ...setupOf(release),
@@ -267,16 +305,9 @@ async function harbor(
     },
   });
   if (screen !== 'lobby') shore.open('team');
-  if (screen === 'deal') {
-    const deals = career.teams[YOURS].deals,
-      asked = ROLES.find((role) => role === params.get('role')),
-      scout = career.teams[YOURS].scoutSeat,
-      role =
-        asked ??
-        [scout, ...ROLES].find((r) => (deals[r]?.candidates.length ?? 0) > 0) ??
-        scout;
+  if (screen === 'deal' || (talk !== null && !talk.renewal))
     shore.open('deal', { role });
-  }
+  if (talk !== null) shore.open('negotiation', { person: talk.person });
 }
 
 function open(p: Played, others: readonly Berth[], s: Stage) {
