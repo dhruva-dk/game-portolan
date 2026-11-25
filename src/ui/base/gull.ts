@@ -183,8 +183,8 @@ function cap(pen: Pen) {
 function face(pen: Pen) {
   const { line } = pen;
   return (
-    `<path d="M70.5 48C71.5 44.5 75.5 43 78.5 44.8C80.5 46.5 80 50.5 77.5 51.8C74.5 53 71 51.5 70.5 48Z" fill="${PLUMAGE.white}" ${line}/>` +
-    `<circle cx="76" cy="48.5" r="2.5" fill="${PLUMAGE.lens}"/>` +
+    `<g class="lid"><path d="M70.5 48C71.5 44.5 75.5 43 78.5 44.8C80.5 46.5 80 50.5 77.5 51.8C74.5 53 71 51.5 70.5 48Z" fill="${PLUMAGE.white}" ${line}/>` +
+    `<circle cx="76" cy="48.5" r="2.5" fill="${PLUMAGE.lens}"/></g>` +
     `<path d="M70 46.8C73 44.8 77 44.3 80 46.2" fill="none" ${line}/>` +
     `<path d="M60 43C63 37 72 35.5 79 38C82 39 85 40.5 85.5 43C83 44.5 80 42.5 76 42.5C71 42.5 66 43.5 62.5 45.5C60.5 46 59 45 60 43Z" fill="${UNCLE.whisker}" ${line}/>` +
     `<path d="M80.5 55C75 56.5 71 61 70.5 68C74 67.5 77.5 65 80.5 62.5C83.5 66 88 68.5 92.5 68C92.5 61.5 88 56 80.5 55Z" fill="${UNCLE.whisker}" ${line}/>` +

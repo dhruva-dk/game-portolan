@@ -4,6 +4,8 @@ import {
   HEAL_SLOTS,
   type GunKind,
   type Kit,
+  type SeaBubble,
+  type Spoken,
   type Status,
 } from '../../play/player.ts';
 import type { Sea } from '../../render/snapshot.ts';
@@ -14,6 +16,7 @@ import type { Glyph } from '../base/glyphs.ts';
 import {
   DUSK,
   INK,
+  PAPER,
   WASH,
   alpha,
   figure,
@@ -46,8 +49,10 @@ import {
 } from './controls.ts';
 import { createReadings } from './readings.ts';
 import { VITALS, createVitals } from './vitals.ts';
+import { STICK } from './input.ts';
+import { createUncleAtSea, type Beside } from './uncle.ts';
 
-export type HudState = Status & Kit;
+export type HudState = Status & Kit & Spoken;
 
 interface HudActions {
   heal(slot: number): void;
@@ -67,8 +72,14 @@ const RETICLE = 10,
 const RIM = [0.35, 1] as const,
   RIM_DEEP = 80;
 const FADE = 0.25;
+const GHOST = { side: 90, up: 70 } as const;
 
-export function createHud(layer: HTMLElement, shores: Shores, act: HudActions) {
+export function createHud(
+  layer: HTMLElement,
+  shores: Shores,
+  act: HudActions,
+  onBubbleSeen: (id: SeaBubble) => void = () => undefined
+) {
   const root = document.createElement('div');
   root.className = 'screen';
   root.hidden = true;
@@ -96,7 +107,15 @@ export function createHud(layer: HTMLElement, shores: Shores, act: HudActions) {
   thumb.style.height = `${THUMB.height}px`;
   const gust = piece(thumb, '', true);
   const fire = piece(thumb, '', true);
+  const rest = piece(body, 'left bottom', false, true);
+  rest.style.cssText = `width:${2 * STICK}px;height:${2 * STICK}px;margin:0 calc(${GHOST.side}px * var(--k)) calc(${GHOST.up}px * var(--k));border:2px solid ${alpha(INK.iron, 0.55)};border-radius:50%;box-sizing:border-box;background:${alpha(PAPER, 0.18)}`;
+  rest.hidden = true;
+  let lefty = false;
   const hand = (left: boolean) => {
+    lefty = left;
+    rest.classList.toggle('left', !left);
+    rest.classList.toggle('right', left);
+    rest.style.transformOrigin = `${left ? '100%' : '0'} 100%`;
     thumb.classList.toggle('left', left);
     thumb.classList.toggle('right', !left);
     thumb.style.transformOrigin = `${left ? '0' : '100%'} 100%`;
@@ -163,6 +182,35 @@ export function createHud(layer: HTMLElement, shores: Shores, act: HudActions) {
   gust.innerHTML = svg(2 * GUST.r, 2 * GUST.r, gustButton(GUST_NOTCH));
   const meter = gust.querySelector('.meter');
   const juice = createJuice(body, { vitals: face, fire, gust, slots });
+  const uncle = createUncleAtSea<SeaBubble>(body, onBubbleSeen);
+  const elsewhere: Partial<Record<SeaBubble, Element>> = {};
+  const besideOf = (id: SeaBubble | null, s: HudState): Beside | null => {
+    const inward = lefty ? 'left' : 'right';
+    switch (id) {
+      case 'steer':
+        return { el: rest, side: 'down' };
+      case 'fire':
+        return { el: fire, side: inward };
+      case 'gust':
+        return { el: gust, side: inward };
+      case 'heal': {
+        const at = s.heals.findIndex((h) => h !== null);
+        return { el: slots[at] ?? hotbar, side: 'down' };
+      }
+      case 'home':
+        return { el: face, side: 'up', aim: 0.12 };
+      case 'storm':
+        return {
+          el: readings.querySelector('#r-storm') ?? readings,
+          side: 'up',
+          aim: 0.08,
+        };
+      case 'sunk':
+        return elsewhere.sunk ? { el: elsewhere.sunk, side: 'down' } : null;
+      default:
+        return null;
+    }
+  };
 
   const changed = createChanged<HTMLElement>();
   const rings = new Map<HTMLElement, number>();
@@ -191,6 +239,9 @@ export function createHud(layer: HTMLElement, shores: Shores, act: HudActions) {
   return {
     root,
     hand,
+    beside(id: SeaBubble, el: Element) {
+      elsewhere[id] = el;
+    },
     wingman: (seed: number | null) => drawReadings.portrait(seed),
     watch(on: boolean) {
       watching = on;
@@ -355,6 +406,8 @@ export function createHud(layer: HTMLElement, shores: Shores, act: HudActions) {
       }
 
       juice.update(s, !watching && s.arriving <= 0);
+      show(rest, s.bubble === 'steer' && !watching);
+      uncle.say(s.bubble, besideOf(s.bubble, s));
 
       const deep =
         s.outside > 0 && !watching

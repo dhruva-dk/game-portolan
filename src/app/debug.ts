@@ -39,7 +39,12 @@ import type { DebugDamage, Game } from '../play/game.ts';
 import type { Referee } from '../play/referee.ts';
 import { dealt, lookOf, worn } from '../play/colors.ts';
 import type { Berth } from '../play/state.ts';
-import { IDLE, type Thumbs } from '../play/player.ts';
+import {
+  IDLE,
+  SEA_BUBBLES,
+  type SeaBubble,
+  type Thumbs,
+} from '../play/player.ts';
 import type { Livery } from '../world/livery.ts';
 import { probeMeshes } from './probe.ts';
 import { STEP } from '../sim/fixed.ts';
@@ -107,6 +112,7 @@ export interface Played {
   pause(): void;
   hand(left: boolean): void;
   wingman(seed: number | null): void;
+  say(id: SeaBubble | null): void;
   next(dt: number): Snapshot;
   drawn(canvas: HTMLCanvasElement): void;
 }
@@ -224,6 +230,8 @@ export async function scenario(
   open(p, demoShips(s.start.at, room - 1, s.world.seed, p.game.worn()), s);
   if (params.has('left')) p.hand(params.get('left') !== '0');
   if (params.has('wingman')) p.wingman(number('wingman', 0) || null);
+  const said = SEA_BUBBLES.find((id) => id === params.get('bubble'));
+  if (said) p.say(said);
   const paused = params.has('pause'),
     slow = number('slow', 1);
   const swing = params.get('swing')?.split(',').map(Number);

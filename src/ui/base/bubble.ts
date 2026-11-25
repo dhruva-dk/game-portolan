@@ -47,57 +47,89 @@ function broken(line: string): string[] {
   return best;
 }
 
-export function bubble(line: string, aim: number): Bubble {
+export type Side = 'down' | 'up' | 'left' | 'right';
+
+export function bubble(
+  line: string,
+  aim: number,
+  side: Side = 'down',
+  facing: 'left' | 'right' = side === 'left' ? 'right' : 'left'
+): Bubble {
   const lines = broken(line.replace(/'/g, '\u2019')),
     leading = TYPE.speech * 1.3;
   const textW = Math.max(
     ...lines.map((l) => measured(l, TYPE.speech, { italic: true }))
   );
   const pad = SPACE.pad,
-    left = PORTRAIT * 0.62;
+    left = PORTRAIT * 0.62,
+    over = PORTRAIT * 0.38;
   const w = Math.ceil(left + pad + textW + pad),
     h = Math.ceil(
       Math.max(PORTRAIT * 0.86, lines.length * leading + 2 * pad - 4)
     );
-  const ox = PORTRAIT * 0.38,
-    oy = 4;
-  const tipX =
-      ox +
-      Math.min(
-        w - SIZE.corner - POINTER,
-        Math.max(SIZE.corner + POINTER, aim * w)
-      ),
-    tipY = oy + h + POINTER;
-  const x0 = ox,
-    y0 = oy,
+  const x0 = (facing === 'left' ? over : 0) + (side === 'left' ? POINTER : 0),
+    y0 = 4 + (side === 'up' ? POINTER : 0),
     c = SIZE.corner,
-    b = y0 + h;
+    b = y0 + h,
+    r = x0 + w;
+  const along = (span: number, room: number) =>
+    Math.min(span - c - room, Math.max(c + room, aim * span));
+  const tipX = x0 + along(w, POINTER),
+    tipY = y0 + along(h, POINTER * 0.5);
+  const tip: [number, number] =
+    side === 'down'
+      ? [tipX, b + POINTER]
+      : side === 'up'
+        ? [tipX, y0 - POINTER]
+        : side === 'right'
+          ? [r + POINTER, tipY]
+          : [x0 - POINTER, tipY];
+  const top =
+    side === 'up'
+      ? `H${r2(tipX - POINTER * 0.5)}L${r2(tip[0])} ${r2(tip[1])}L${r2(tipX + POINTER * 0.7)} ${y0}H${r - c}`
+      : `H${r - c}`;
+  const right =
+    side === 'right'
+      ? `V${r2(tipY - POINTER * 0.5)}L${r2(tip[0])} ${r2(tip[1])}L${r} ${r2(tipY + POINTER * 0.6)}V${b - c}`
+      : `V${b - c}`;
+  const bottom =
+    side === 'down'
+      ? `H${r2(tipX + POINTER * 0.7)}L${r2(tip[0])} ${r2(tip[1])}L${r2(tipX - POINTER * 0.5)} ${b}H${x0 + c}`
+      : `H${x0 + c}`;
+  const leftEdge =
+    side === 'left'
+      ? `V${r2(tipY + POINTER * 0.6)}L${r2(tip[0])} ${r2(tip[1])}L${x0} ${r2(tipY - POINTER * 0.5)}V${y0 + c}`
+      : `V${y0 + c}`;
   const body =
-    `M${x0 + c} ${y0}H${x0 + w - c}Q${x0 + w} ${y0} ${x0 + w} ${y0 + c}V${b - c}Q${x0 + w} ${b} ${x0 + w - c} ${b}` +
-    `H${r2(tipX + POINTER * 0.7)}L${r2(tipX)} ${r2(tipY)}L${r2(tipX - POINTER * 0.5)} ${b}` +
-    `H${x0 + c}Q${x0} ${b} ${x0} ${b - c}V${y0 + c}Q${x0} ${y0} ${x0 + c} ${y0}Z`;
-  const tx = x0 + left + pad,
+    `M${x0 + c} ${y0}${top}Q${r} ${y0} ${r} ${y0 + c}${right}` +
+    `Q${r} ${b} ${r - c} ${b}${bottom}Q${x0} ${b} ${x0} ${b - c}${leftEdge}Q${x0} ${y0} ${x0 + c} ${y0}Z`;
+  const tx = facing === 'left' ? x0 + left + pad : x0 + pad,
     ty = y0 + h / 2 - ((lines.length - 1) * leading) / 2;
   const words = lines
     .map((l, i) =>
       spoken(tx, ty + i * leading, l, TYPE.speech, { anchor: 'start' })
     )
     .join('');
-  const px = 0,
-    py = y0 + h / 2 - PORTRAIT / 2;
+  const px = facing === 'left' ? x0 - over : r - left,
+    py = y0 + h / 2 - PORTRAIT / 2,
+    cx = r2(px + PORTRAIT / 2),
+    cy = r2(py + PORTRAIT / 2);
   const clip = uid('uncle');
   const face =
     `<clipPath id="${clip}"><circle cx="${PORTRAIT / 2}" cy="${PORTRAIT / 2}" r="${PORTRAIT / 2 - 1.2}"/></clipPath>` +
-    `<circle cx="${px + PORTRAIT / 2}" cy="${r2(py + PORTRAIT / 2)}" r="${PORTRAIT / 2}" fill="${PAPER}" stroke="${INK.iron}" stroke-width="1.4" filter="url(#sh)"/>` +
-    `<g transform="translate(${px} ${r2(py)})"><g clip-path="url(#${clip})">${uncle(PORTRAIT)}</g></g>` +
-    `<circle cx="${px + PORTRAIT / 2}" cy="${r2(py + PORTRAIT / 2)}" r="${PORTRAIT / 2}" fill="none" stroke="${INK.iron}" stroke-width="1.4"/>`;
+    `<circle cx="${cx}" cy="${cy}" r="${PORTRAIT / 2}" fill="${PAPER}" stroke="${INK.iron}" stroke-width="1.4" filter="url(#sh)"/>` +
+    `<g transform="translate(${r2(px)} ${r2(py)})"><g clip-path="url(#${clip})"><g class="tilt">${uncle(PORTRAIT)}</g></g></g>` +
+    `<circle cx="${cx}" cy="${cy}" r="${PORTRAIT / 2}" fill="none" stroke="${INK.iron}" stroke-width="1.4"/>`;
   return {
     svg:
-      `<path d="${body}" fill="${PAPER}" stroke="${INK.iron}" stroke-width="1.2" stroke-linejoin="round" filter="url(#sh)"/>` +
-      words +
-      face,
-    w: ox + w + 2,
-    h: tipY + 2,
-    tip: [tipX, tipY],
+      `<g class="said ${facing}"><g class="scroll"><path d="${body}" fill="${PAPER}" stroke="${INK.iron}" stroke-width="1.2" stroke-linejoin="round" filter="url(#sh)"/>` +
+      `<g class="words">${words}</g></g><g class="sitter">${face}</g></g>`,
+    w:
+      r +
+      (facing === 'right' ? over : 0) +
+      (side === 'right' ? POINTER : 0) +
+      2,
+    h: b + (side === 'down' ? POINTER + 2 : 4),
+    tip,
   };
 }

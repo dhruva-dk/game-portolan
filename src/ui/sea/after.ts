@@ -24,14 +24,12 @@ export function createAfter(act: { watch(): void; result(): void }) {
   body.append(art);
   const watch = art.querySelector<SVGGElement>('#watch');
   pressable(watch, () => act.watch(), 'watch');
-  pressable(
-    art.querySelector<SVGGElement>('#result'),
-    () => act.result(),
-    'settle'
-  );
+  const result = art.querySelector<SVGGElement>('#result');
+  pressable(result, () => act.result(), 'settle');
   let shown = false;
   return {
     el,
+    result,
     show(on: boolean, watching = false) {
       if (watch) watch.style.opacity = watching ? '0' : '1';
       watch?.classList.toggle('gone', watching);
