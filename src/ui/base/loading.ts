@@ -1,31 +1,75 @@
 import { MOTION } from './house.ts';
-import { INK, PAPER, glyph, svg } from './ink.ts';
+import { INK, PAPER, WASH, galleon } from './ink.ts';
+import { rhumbs, rose } from './marks.ts';
 
-export const LOADING = { size: 54 } as const;
+export const LOADING = {
+  page: { w: 960, h: 640 },
+  rose: 126,
+  lift: 52,
+  galleon: { drop: 170, size: 74 },
+  rhumbs: { reach: 1100, opacity: 0.3 },
+} as const;
 
 export function createLoading() {
   const el = document.createElement('div');
   el.style.cssText =
-    `position:fixed;inset:0;z-index:20;background:${PAPER};display:flex;` +
-    `align-items:center;justify-content:center;pointer-events:none;` +
-    `transition:opacity ${MOTION.loading.fade}ms ease`;
-  const s = LOADING.size;
-  el.innerHTML = svg(s, s, glyph('wheel', s / 2, s / 2, s));
-  const mark = el.firstElementChild;
-  mark?.animate([{ rotate: '0deg' }, { rotate: '360deg' }], {
-    duration: MOTION.loading.turn,
-    iterations: Infinity,
-    easing: 'ease-in-out',
-  });
+    `position:fixed;inset:0;z-index:20;background:${PAPER};overflow:hidden;` +
+    `pointer-events:none;transition:opacity ${MOTION.loading.fade}ms ease`;
+  const { page, lift } = LOADING,
+    y = -lift;
+  el.innerHTML =
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${-page.w / 2} ${-page.h / 2} ${page.w} ${page.h}" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" overflow="visible">` +
+    rhumbs(0, y, LOADING.rhumbs.reach, LOADING.rhumbs.opacity) +
+    `<g class="mark">${rose(0, y, LOADING.rose, 0)}` +
+    `${galleon(0, y + LOADING.galleon.drop, LOADING.galleon.size, { hull: WASH.gold })}</g></svg>`;
+  const needle = el.querySelector<SVGGElement>('.needle'),
+    inked = Array.from(
+      el.querySelectorAll<SVGElement>('.mark [stroke]')
+    ).filter((p) => p.getAttribute('stroke') === INK.iron);
+  let swing: Animation | null = null;
+  const swung = (on: boolean, instant: boolean) => {
+    if (!needle) return;
+    if (on) {
+      swing?.cancel();
+      needle.style.transition = 'none';
+      needle.style.transform = 'rotate(0deg)';
+      swing = needle.animate(
+        [
+          { transform: `rotate(${MOTION.loading.from}deg)` },
+          { transform: `rotate(${MOTION.loading.to}deg)` },
+        ],
+        {
+          duration: MOTION.loading.swing,
+          iterations: Infinity,
+          direction: 'alternate',
+          easing: 'ease-in-out',
+        }
+      );
+      return;
+    }
+    if (!swing) return;
+    if (!instant) swing.commitStyles();
+    swing.cancel();
+    swing = null;
+    void needle.getBoundingClientRect();
+    needle.style.transition = instant
+      ? 'none'
+      : `transform ${MOTION.loading.settle}ms ${MOTION.loading.ease}`;
+    needle.style.transform = 'rotate(0deg)';
+  };
+  swung(true, true);
   document.body.append(el);
-  let timer = 0;
+  let timer = 0,
+    shown = true;
   return {
     show(on: boolean, instant = false) {
       window.clearTimeout(timer);
       if (on) el.hidden = false;
+      if (on !== shown || instant) swung(on, instant);
+      shown = on;
       el.style.transition = instant
         ? 'none'
-        : `opacity ${MOTION.loading.fade}ms ease`;
+        : `opacity ${MOTION.loading.fade}ms ${on ? 'ease' : 'ease-in'}`;
       void el.offsetWidth;
       el.style.opacity = on ? '1' : '0';
       if (!on)
@@ -35,11 +79,8 @@ export function createLoading() {
         );
     },
     refused(on: boolean) {
-      el.style.color = on ? INK.rubric : '';
-      mark?.querySelectorAll('path').forEach((p) => {
-        if (p.getAttribute('stroke'))
-          p.setAttribute('stroke', on ? INK.rubric : INK.iron);
-      });
+      for (const p of inked)
+        p.setAttribute('stroke', on ? INK.rubric : INK.iron);
     },
   };
 }
