@@ -814,11 +814,13 @@ A sheet across the lower two-thirds.
 
 | State | Shows |
 |---|---|
-| Filled | The sponsor's emblem and name; coin glyph and fee; the objective's glyph (a laurel with "10", a gun with "2", a territory glyph with "3%", or two ship glyphs); coin glyph and bonus; pips for races left |
-| Empty | A pennant outline |
+| Filled | The sponsor's emblem and name; coin glyph and fee; the objective's glyph (a laurel with "10", a gun with "2", a territory glyph with "3%", or two ship glyphs); coin glyph and bonus; one knot on a line for each race left; a wax seal with a tick |
+| Empty | A dashed pennant outline with a ghost shield |
 
-- **Lower row: up to three offers**, drawn as smaller pennants with the same contents.
-- **Signing:** tap an offer (it lifts), then tap an empty slot; that sends `SignSponsor`. Tapping the lifted offer again puts it down. Filled slots do nothing.
+- **Lower row: up to three offers**, drawn as smaller pennants on hooks with the same contents and no seal. An offer that cannot be signed is faint. With no offers the row shows a faint hourglass.
+- **Colors:** a sponsor has no colors in the roster. Its pennant takes a dye from the livery list by the sponsor's place in the roster, and its roster emblem is drawn on a shield in that dye and its mark color.
+- **Signing:** tap an offer (it lifts), then tap an empty slot; that sends `SignSponsor`. Tapping the lifted offer again puts it down. A filled slot, a faint offer, and an empty slot with no offer lifted shake as a refusal.
+- **Motion:** pennants sway on their staffs when the sheet opens, and offers that can be signed keep drifting in a light breeze. A lifted offer rises with a shadow while the empty slots breathe. On signing, the offer furls, flies to its slot and unfurls there; the seal is pressed with a burst; a coin with "+N" counts up above the sheet, N being the fee times the races left, which is what the deal pays if it runs its length. The money slip does not change, since fees are paid race by race.
 
 ### 1.12.8 Opponents
 
@@ -850,11 +852,12 @@ Tapping a small card enlarges it as a candidate card (§1.12.5), with **Report**
 
 Opened from the next-race slip.
 
-- **Scene:** the live planet seen from space, using the existing full-map view (`globe.ts`): one finger spins it, two fingers pinch.
-- **Marks:** your two berths, each a ring in your dye; the storm's first ring.
-- **Top left slip:** the planet's name; storm glyph with stars and the word Storm; heal glyph with stars and the word Heals.
+- **Scene:** the live planet seen from space among stars, with a soft glow at its limb, using the existing full-map view (`globe.ts`): one finger spins it with inertia, two fingers pinch. The spin and pinch are one base piece that the sea map uses as well.
+- **Marks:** your two berths, each a pulsing ring in your dye; the storm's first ring, drawn as a dashed line with a purple band and turning swirls on its stormy side. Berths and ring come from the next race's setup and reach the screen through the port.
+- **Top left slip:** the planet's name; storm glyph with stars and the word Storm; heal glyph with stars and the word Heals. The stars ink in one after another.
+- **Motion:** opening from the next-race slip, the camera pulls back from the anchorage to the planet; the corner close flies back down.
 
-The seed field, the die and the persona bars of today's seed panel are deleted.
+The seed field, the die and the persona bars of today's seed panel are deleted at step M6.1, when the career flow replaces the flow that still uses them.
 
 ### 1.12.10 The result flow
 
@@ -1597,6 +1600,14 @@ All spacing is a multiple of `STEP`, 4 units.
 | `turn` | 280 ms, a 16-unit slide | The Ship sidebar changing stop |
 | `built` | An ink burst of 620 ms; the "+N" floats 26 units up over 760 ms | A build or a fit on the Ship screen |
 | `painted` | The picker holds 320 ms before it closes | Repaint |
+| `sway` | 1500 ms, swinging 3.2° and dying away, 90 ms between pennants | Pennants when the Sponsors sheet opens or one lands |
+| `breeze` | 3400 ms each way, 0.8° | An offer that can be signed, all the time |
+| `lift` | 200 ms, rising 8 units and swelling to 1.05 | An offer picked up |
+| `invite` | 1100 ms each way | Empty slots while an offer is lifted |
+| `flown` | 680 ms, furled to 0.16 of its width and lifted 18 units | A signed offer flying to its slot |
+| `paid` | Starts 560 ms after the tap; counts up over 1500 ms and rises 24 units | What a new sponsor deal pays |
+| `inked` | 300 ms with a slight overshoot, starting after 120 ms, 80 ms apart | Stars inking in on the Planet slip |
+| `planet` | The camera rises in 1700 ms and falls in 950 ms; the slip arrives at 1050 ms | Opening and closing the Planet screen |
 | `fade` | 180 ms | Anything else that appears or goes |
 
 Rules:
@@ -1704,7 +1715,7 @@ Your team is played by the policy as a sensible team (§1.10.2). Until the polic
 
 ### 2.8.3 Debug states
 
-`app/debug.ts` reads `?debug` switches (used by `npm run browser`). `?debug&screen=<name>&seed=<s>&races=<n>` builds a career from the seed, advances it `n` races with the stand-in and the policy for every team including yours (§1.10.2), and opens that screen. The names are `new`, `lobby`, `ship`, `paint`, `team`, `deal`, `negotiation`, `sponsors`, `opponents`, `planet`, `settings`, `result`, `paper`, `offseason`, `glyphs` (the glyph sheet of §2.5.4, which needs no career). There are no hand-written fixture states. Three more switches change the state built: `balance=<n>` sets your balance to `n` after the career is advanced (no seed reaches debt by itself, and the red money slip needs a state to be drawn on); `signed`, at the off-season stop, finishes the stop so the lobby of the next season shows; `meter` shows the frame meter over a screen; `approach=<roles>` (a comma-separated list) sends `Approach` for a candidate of each named role before the last race, so that several deals are waiting at once. The `deal` and `negotiation` screens also read `role=<role>` (whose deal to open; the scouted role if left out). `negotiation` reads four more: `pick=<n>` (which candidate of the deal, from 0), `report` (buy a report on them first), `renew` (negotiate with the holder of the seat instead of a candidate), and `offers=<answers>` (a comma-separated list of `refuse`, `counter` and `sign`: offers are sent, in order, that get those answers; the helper searches for terms that really get each answer and fails, naming the person, when none do). These states are reached by sending real commands, never by writing the state. `screen=new` shows New Career with no career unless `seed=` is given, and with one when it is; `name=`, `dye=`, `pattern=` and `emblem=` then set that career's team name and livery. `screen=ship` reads `stop=<n>` (which stop to open on, from 0) and, as the one exception to reaching states by commands, `unlocked=<kinds>&progress=<n>`, which writes unlocked gun kinds and unlock progress into the state the way `balance` writes the balance (the policy playing your seat keeps moving the focus, so no seed gets there).
+`app/debug.ts` reads `?debug` switches (used by `npm run browser`). `?debug&screen=<name>&seed=<s>&races=<n>` builds a career from the seed, advances it `n` races with the stand-in and the policy for every team including yours (§1.10.2), and opens that screen. The names are `new`, `lobby`, `ship`, `paint`, `team`, `deal`, `negotiation`, `sponsors`, `opponents`, `planet`, `settings`, `result`, `paper`, `offseason`, `glyphs` (the glyph sheet of §2.5.4, which needs no career). There are no hand-written fixture states. Three more switches change the state built: `balance=<n>` sets your balance to `n` after the career is advanced (no seed reaches debt by itself, and the red money slip needs a state to be drawn on); `signed`, at the off-season stop, finishes the stop so the lobby of the next season shows; `meter` shows the frame meter over a screen; `approach=<roles>` (a comma-separated list) sends `Approach` for a candidate of each named role before the last race, so that several deals are waiting at once. The `deal` and `negotiation` screens also read `role=<role>` (whose deal to open; the scouted role if left out). `sponsors` reads `sponsors=<n>`, which signs the first `n` offers into the slots with real `SignSponsor` commands. `negotiation` reads four more: `pick=<n>` (which candidate of the deal, from 0), `report` (buy a report on them first), `renew` (negotiate with the holder of the seat instead of a candidate), and `offers=<answers>` (a comma-separated list of `refuse`, `counter` and `sign`: offers are sent, in order, that get those answers; the helper searches for terms that really get each answer and fails, naming the person, when none do). These states are reached by sending real commands, never by writing the state. `screen=new` shows New Career with no career unless `seed=` is given, and with one when it is; `name=`, `dye=`, `pattern=` and `emblem=` then set that career's team name and livery. `screen=ship` reads `stop=<n>` (which stop to open on, from 0) and, as the one exception to reaching states by commands, `unlocked=<kinds>&progress=<n>`, which writes unlocked gun kinds and unlock progress into the state the way `balance` writes the balance (the policy playing your seat keeps moving the focus, so no seed gets there).
 
 `npm run browser` (headless Chromium, iPad Air size) takes screenshots and reads frame cost. It is never part of `npm test`. Its existing budget stands: 100 draws, 900,000 triangles and 20 passes a frame.
 
@@ -1838,9 +1849,9 @@ Goal: every screen of §1.12 exists and can be opened on a debug state.
 - [x] **M5.9 Team.** §1.12.4.
 - [x] **M5.10 The deal.** §1.12.5.
 - [x] **M5.11 Negotiation.** §1.12.6.
-- [ ] **M5.12 Sponsors.** §1.12.7.
+- [x] **M5.12 Sponsors.** §1.12.7.
 - [ ] **M5.13 Opponents.** §1.12.8.
-- [ ] **M5.14 Planet.** §1.12.9.
+- [x] **M5.14 Planet.** §1.12.9.
 - [ ] **M5.15 The result flow and the paper.** §1.12.10, §1.13.1.
 - [ ] **M5.16 The off-season report.** §1.12.11.
 - [ ] **M5.17 The HUD and pause.** §1.12.14, §1.12.12.
@@ -1852,7 +1863,7 @@ Goal: every screen of §1.12 exists and can be opened on a debug state.
 
 Goal: the game is played from first launch through seasons by hand.
 
-- [ ] **M6.1 The flow.** §2.9: launch from the saved state, New Career, SAIL, `RecordRace`, the save queue and the reload. Team liveries now come from the career, and ships wear their team's emblem (§1.13.4) on the mainsail in place of the cross every ship wears today, in the lobby, on New Career, in the paint picker and at sea. For New Career this step saves the state `port.start` hands over, waits for the save, reloads so that launch case 3 starts race one, shows New Career at launch when no career is saved, and routes its close button to Settings.
+- [ ] **M6.1 The flow.** §2.9: launch from the saved state, New Career, SAIL, `RecordRace`, the save queue and the reload. Team liveries now come from the career, and ships wear their team's emblem (§1.13.4) on the mainsail in place of the cross every ship wears today, in the lobby, on New Career, in the paint picker and at sea. Today's seed panel (`ui/lobby/panel.ts`) is deleted with the flow that uses it. For New Career this step saves the state `port.start` hands over, waits for the save, reloads so that launch case 3 starts race one, shows New Career at launch when no career is saved, and routes its close button to Settings.
 - [ ] **M6.2 After sinking.** Watch, and the Result fast-forward (§1.11.11).
 - [ ] **M6.3 Fire drag.** A drag that starts on Fire moves the aim (§1.12.14).
 - [ ] **M6.4 Uncle's bubbles** and the lobby buttons appearing in step (§1.13.2).
