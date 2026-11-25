@@ -12,7 +12,7 @@ import {
 } from '../world/sphere.ts';
 import { RAM, SHIP } from './handling.ts';
 import { step, type Helm, type Sailing, type ShipState } from './ship.ts';
-import { hullAt, moved, under, type Depth } from './shoal.ts';
+import { EASE, hullAt, moved, under, type Depth } from './shoal.ts';
 
 export interface Vessel {
   id: number;
@@ -46,6 +46,7 @@ export const afloat = (id: number, ship: ShipState): Vessel => ({
 export const RADIUS = SHIP.beam / 2;
 export const KEEL = SHIP.length / 2 - RADIUS;
 const PASSES = 8;
+const SLIDE = 0.25;
 
 type P = readonly [number, number];
 const sub = (a: P, b: P): P => [a[0] - b[0], a[1] - b[1]];
@@ -252,6 +253,11 @@ function strike(a: Working, b: Working, m: Meeting): Blow | null {
     : { striker: hb, struck: ha, closing, at };
 }
 
+const dry = (to: ShipState, from: ShipState, depth: Depth) => {
+  const c = under(to.at, to.heading, depth);
+  return c >= 0 || c >= under(from.at, from.heading, depth);
+};
+
 function pushed(
   s: ShipState,
   m: Meeting,
@@ -262,9 +268,8 @@ function pushed(
   if (meters === 0) return s;
   let d = add(scale(m.east, u[0]), m.north, u[1]);
   d = normalize(add(d, s.at, -dot(d, s.at)));
-  const to = moved(s.at, s.heading, scale(d, meters));
-  const c = under(to.at, to.heading, depth);
-  return c >= 0 || c >= under(s.at, s.heading, depth) ? { ...s, ...to } : null;
+  const to = { ...s, ...moved(s.at, s.heading, scale(d, meters)) };
+  return dry(to, s, depth) ? to : null;
 }
 
 function heldApart(a: Working, b: Working, m: Meeting, depth: Depth): void {
@@ -273,13 +278,35 @@ function heldApart(a: Working, b: Working, m: Meeting, depth: Depth): void {
     wb = yields(m.b, m.n);
   const sa = pushed(a.ship, m, m.n, -want * (wa / (wa + wb)), depth);
   const sb = pushed(b.ship, m, m.n, want * (wb / (wa + wb)), depth);
+  const whole = (w: Working, meters: number) => {
+    const to = pushed(w.ship, m, m.n, meters, depth);
+    if (to) w.ship = to;
+    return to !== null;
+  };
   if (sa && sb) [a.ship, b.ship] = [sa, sb];
-  else if (sb) {
-    const all = pushed(b.ship, m, m.n, want, depth);
-    if (all) b.ship = all;
-  } else if (sa) {
-    const all = pushed(a.ship, m, m.n, -want, depth);
-    if (all) a.ship = all;
+  else if (!(sb && whole(b, want)) && !(sa && whole(a, -want)))
+    slid(a, b, m, want, depth);
+}
+
+function slid(
+  a: Working,
+  b: Working,
+  m: Meeting,
+  want: number,
+  depth: Depth
+): void {
+  const ways = [
+    { w: a, ahead: m.a.ahead, along: -dot2(m.a.ahead, m.n) },
+    { w: b, ahead: m.b.ahead, along: dot2(m.b.ahead, m.n) },
+  ]
+    .filter((k) => Math.abs(k.along) >= SLIDE)
+    .sort((x, y) => Math.abs(y.along) - Math.abs(x.along));
+  for (const k of ways) {
+    const to = pushed(k.w.ship, m, k.ahead, want / k.along, depth);
+    if (to) {
+      k.w.ship = to;
+      return;
+    }
   }
 }
 
@@ -304,6 +331,11 @@ function sailed(
   shove = scale(shove, Math.exp(-RAM.ease * dt));
   if (length(shove) < RAM.still) shove = [0, 0, 0];
   return { id: v.id, ship, shove, engaged: [...v.engaged], jolt: [0, 0, 0] };
+}
+
+function astern(s: ShipState, dt: number, depth: Depth): ShipState {
+  const to = { ...s, ...moved(s.at, s.heading, scale(s.heading, -EASE * dt)) };
+  return { ...(dry(to, s, depth) ? to : s), speed: 0, turn: 0 };
 }
 
 export function stepFleet(
@@ -336,20 +368,24 @@ export function stepFleet(
       again = true;
     });
   }
-  const was = new Map(fleet.map((v) => [v.id, v]));
-  const back = new Set<number>();
+  const was = new Map(fleet.map((v) => [v.id, v.ship])),
+    backed = new Map<number, number>();
+  const backs = [
+    (s: ShipState) => astern(s, dt, depth),
+    (s: ShipState) => ({ ...s, speed: 0, turn: 0 }),
+  ];
   for (let again = true; again; ) {
     again = false;
     pairs((a, b) => {
-      if ((back.has(a.id) && back.has(b.id)) || gap(a.ship, b.ship) >= 0)
-        return;
-      for (const w of [a, b])
-        if (!back.has(w.id)) {
-          back.add(w.id);
-          w.ship = { ...was.get(w.id)!.ship, speed: 0, turn: 0 };
-          w.shove = [0, 0, 0];
-          again = true;
-        }
+      if (gap(a.ship, b.ship) >= 0) return;
+      for (const w of [a, b]) {
+        const level = backed.get(w.id) ?? 0;
+        if (level >= backs.length) continue;
+        backed.set(w.id, level + 1);
+        w.ship = backs[level](was.get(w.id)!);
+        w.shove = [0, 0, 0];
+        again = true;
+      }
     });
   }
   const byId = new Map(ws.map((w) => [w.id, w]));
