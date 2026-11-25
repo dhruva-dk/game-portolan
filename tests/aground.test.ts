@@ -205,6 +205,76 @@ test('where duels were lost to the storm: a bot aground on a shore with deep wat
     }
 });
 
+const JAMMED: readonly Pose[] = [
+  {
+    at: normalize([
+      0.9481628706792141, 0.2815670757439626, -0.14733347386913062,
+    ]),
+    bearing: -2.8893389587246383,
+  },
+  {
+    at: normalize([
+      -0.057735877512159674, -0.6646186167715132, 0.744948765143363,
+    ]),
+    bearing: -0.9070422438599245,
+  },
+  {
+    at: normalize([
+      -0.7624543856383511, 0.04499153791653575, -0.6454758487633364,
+    ]),
+    bearing: -2.9335331959570716,
+  },
+];
+
+test('where bots lay frozen in full races: jammed bow and quarter with one way to turn, a bot finds that way and leaves, never over land', () => {
+  for (const [i, pose] of JAMMED.entries())
+    for (const match of [1, 2, 3, 4]) {
+      const v = voyage(aground(pose, false, match), 40, () => STILL);
+      assert.ok(dry(v), `${i}/${match}: ${v.least} m under its keel`);
+      assert.ok(v.out < 30, `${i}/${match}: 30 m off only after ${v.out} s`);
+    }
+});
+
+function fouled(pose: Pose, off: number, meters: number, match: number): Match {
+  const m = createMatch(
+      setupOf(match, { teams: 2, perTeam: 1, player: false }),
+      waters
+    ),
+    at = along(pose.at, bearingAt(pose.at, pose.bearing + off), meters).p;
+  debugOf(m).rig({ storm: () => calm(OPEN) });
+  debugOf(m).atSea(pose, [
+    {
+      at,
+      heading: bearingAt(at, pose.bearing),
+      lashed: { course: bearingAt(pose.at, pose.bearing), throttle: 0 },
+    },
+  ]);
+  return m;
+}
+
+const FOULED: readonly (readonly [Pose, number, number])[] = [
+  [SHORES[0], -0.6, 12],
+  [SHORES[2], 0.6, 12],
+  [JAMMED[0], 0.6, 12],
+  [JAMMED[0], 0.9, 10],
+  [JAMMED[1], -0.9, 12],
+];
+
+test('aground with a moored hull lying against its bow, a bot still works its way off and leaves, never over land', () => {
+  for (const [i, [pose, off, meters]] of FOULED.entries())
+    for (const match of [1, 2]) {
+      const m = fouled(pose, off, meters, match),
+        between = gap(own(m), m.view.vessel(1)!.ship);
+      assert.ok(
+        between > 0 && between < RAM.rearm,
+        `${i}/${match}: ${between} m between the hulls`
+      );
+      const v = voyage(m, 30, () => STILL);
+      assert.ok(dry(v), `${i}/${match}: ${v.least} m under its keel`);
+      assert.ok(v.out < 25, `${i}/${match}: 30 m off only after ${v.out} s`);
+    }
+});
+
 const inlet = seedOf('11/1/1'),
   narrow = watersAt(planetOf(inlet, landOf(inlet)));
 const LOCKED = [

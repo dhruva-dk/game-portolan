@@ -15,6 +15,7 @@ import {
 import { gap } from './contact.ts';
 import { RAM, SHIP } from './handling.ts';
 import { offCourse, turned, type Helm } from './ship.ts';
+import { aground } from './shoal.ts';
 import {
   between,
   open,
@@ -227,11 +228,17 @@ function pivoting(c: Ctx, deep: number, dt: number): number {
   const { m } = c,
     heading = c.own.ship.heading,
     want = deep >= 0 ? 1 : -1;
-  if (m.side === 0 || (m.side !== want && Math.abs(deep) <= Math.PI / 2))
+  const wait = c.own.ship.turn === 0 ? c.b.helm.budge : c.b.helm.patience;
+  if (
+    m.side === 0 ||
+    (m.blocked === 0 && m.side !== want && Math.abs(deep) <= Math.PI / 2)
+  )
     [m.side, m.head, m.sideT, m.blocked] = [want, heading, 0, 0];
   else if (dot(m.head, heading) <= Math.cos(c.b.helm.swing))
     [m.head, m.sideT] = [heading, 0];
-  else if ((m.sideT += dt) >= c.b.helm.patience) m.side = 0;
+  else if ((m.sideT += dt) >= wait)
+    [m.blocked, m.side, m.head, m.sideT] =
+      m.blocked === 0 ? [m.side, -m.side, heading, 0] : [0, 0, heading, 0];
   return m.side;
 }
 
@@ -242,11 +249,23 @@ function stuck(
 ): { helm: Helm | null; lost: boolean } {
   const { m } = c,
     ship = c.own.ship;
-  const pinned = () => c.others.some((o) => gap(ship, o.ship) < RAM.rearm);
-  const order = (turn: number, lost = false, way: number = c.b.helm.slow) => ({
-    helm: { course: turned(ship, turn), throttle: pinned() ? 0 : way },
-    lost,
-  });
+  const order = (turn: number, lost = false, way: number = c.b.helm.slow) => {
+    const by = c.others.find((o) => gap(ship, o.ship) < RAM.rearm);
+    if (!by)
+      return { helm: { course: turned(ship, turn), throttle: way }, lost };
+    const clear =
+      dot(by.ship.at, ship.heading) > 0 && aground(ship, c.sea.depth);
+    return {
+      helm: {
+        course: turned(
+          ship,
+          clear ? (turn < 0 ? -1 : 1) * c.b.helm.full : turn
+        ),
+        throttle: clear ? c.b.helm.slow : 0,
+      },
+      lost,
+    };
+  };
   const steady = { helm: null, lost: false };
   if (m.backT > 0) {
     m.backT -= dt;
@@ -266,7 +285,7 @@ function stuck(
       if (round !== 0) {
         if (!first) m.backT += dt;
         return Math.abs(deep) > Math.PI / 2
-          ? order(deep, first)
+          ? order(round * Math.abs(deep), first)
           : order(round * c.b.helm.full, first, 0);
       }
       m.backT = -(c.b.helm.wade + c.b.helm.most);
