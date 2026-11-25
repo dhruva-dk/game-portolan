@@ -287,14 +287,16 @@ test('SignSponsor puts an offer in an empty slot at no cost and keeps the other 
       slot: 2,
     });
     assert.deepEqual(state, before);
-    assert.deepEqual(
-      next,
-      changeTeam(state, YOURS, (t) => ({
+    assert.deepEqual(next, {
+      ...changeTeam(state, YOURS, (t) => ({
         ...t,
         sponsors: [null, null, offers[1]],
         offers: [offers[0], offers[2]],
-      }))
-    );
+      })),
+      pendingEvents: [
+        { kind: 'sponsorSigned', team: YOURS, sponsor: SPONSOR_ROSTER[8].name },
+      ],
+    });
     const again = send(next, {
       type: 'SignSponsor',
       team: YOURS,

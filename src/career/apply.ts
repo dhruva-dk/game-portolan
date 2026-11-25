@@ -27,12 +27,14 @@ import { redrawKnowledge } from './knowledge/year.ts';
 import { known } from './lookup.ts';
 import { releaseExpired, turnSeason } from './offseason/finish.ts';
 import { ageLeague } from './offseason/people.ts';
+import { seasonEvents } from './offseason/news.ts';
 import { payPrizes } from './offseason/prize.ts';
 import { fileOffseasonReport, offseasonReport } from './offseason/report.ts';
 import { winter } from './offseason/winter.ts';
 import { enterPhase, nextRaceLobby, seasonOver } from './record/advance.ts';
 import { countDownContracts } from './record/contracts.ts';
 import { develop } from './record/develop.ts';
+import { raceEvents } from './record/events.ts';
 import { countDownSponsors } from './record/sponsors.ts';
 import { publishNews } from './record/news.ts';
 import { runLeague, runTeam, type PolicyRun } from './policy/run.ts';
@@ -67,11 +69,6 @@ function refusal(state: CareerState, command: Command): Reason | null {
   if (!known(state, command)) return 'unknown';
   return null;
 }
-
-const seam = (state: CareerState): CareerState => state;
-
-const raceEvents = seam;
-const seasonEvents = seam;
 
 const accepted = (state: CareerState): Applied => ({
   ok: true,
@@ -110,7 +107,7 @@ function recordRace(state: CareerState, result: MatchResult): Applied {
   const developed = develop(repossession.state);
   const counted = countDownSponsors(countDownContracts(developed));
   const narrowed = narrowShipLines(counted);
-  const told = raceEvents(narrowed);
+  const told = raceEvents(narrowed, state, result);
   const filed = fileReport(
     told,
     raceReport({
@@ -129,14 +126,13 @@ function recordRace(state: CareerState, result: MatchResult): Applied {
 }
 
 function enterOffseason(state: CareerState): CareerState {
-  const stopped = enterPhase(state, 'offseason');
+  const stopped = seasonEvents(enterPhase(state, 'offseason'));
   const prized = payPrizes(stopped);
   const wintered = winter(prized);
   const aged = ageLeague(wintered);
   const redrawn = redrawKnowledge(aged);
   const dealt = dealOffers(dealOffseason(redrawn));
-  const told = seasonEvents(dealt);
-  return fileOffseasonReport(told, offseasonReport(stopped, told));
+  return fileOffseasonReport(dealt, offseasonReport(stopped, dealt));
 }
 
 const finishOffseason = (state: CareerState): Applied =>

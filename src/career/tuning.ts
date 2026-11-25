@@ -211,6 +211,8 @@ export const POLICY = {
 
 export const PAPER = { headlines: 5 };
 
+export const NEWS = { streak: 3 };
+
 export const NAMES = { longest: 16, teams: 60, sponsors: 60, planets: 200 };
 
 export const RACE_RATINGS = [1, 2, 3, 4, 5] as const;

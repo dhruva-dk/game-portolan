@@ -1,8 +1,16 @@
+import { announce, named } from '../announce.ts';
 import {
   racesLeftOnSigning,
   renewedRacesLeft,
 } from '../rules/contract-length.ts';
-import type { CareerState, Contract, Person, Team, Terms } from '../state.ts';
+import type {
+  CareerState,
+  Contract,
+  NewsEvent,
+  Person,
+  Team,
+  Terms,
+} from '../state.ts';
 import { updateTeam } from '../teams.ts';
 import { vacate } from '../vacate.ts';
 import { clauseOwed, costToSign, isRenewal, outgoing } from './cost.ts';
@@ -40,6 +48,15 @@ function renew(
   return { ...signed, people: withContract(state.people, person.id, contract) };
 }
 
+const signingNews = (
+  team: number,
+  person: Person,
+  from: number | null
+): NewsEvent =>
+  from === null
+    ? { kind: 'hired', team, ...named(person) }
+    : { kind: 'poached', team, team2: from, ...named(person) };
+
 function signNew(
   state: CareerState,
   team: number,
@@ -76,11 +93,10 @@ function signNew(
     holder === null
       ? state.people
       : withContract(state.people, holder.id, null);
-  return {
-    ...state,
-    teams,
-    people: withContract(released, person.id, contract),
-  };
+  return announce(
+    { ...state, teams, people: withContract(released, person.id, contract) },
+    signingNews(team, person, from)
+  );
 }
 
 export const sign = (

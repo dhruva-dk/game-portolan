@@ -1,3 +1,4 @@
+import { announce } from '../announce.ts';
 import { redrawRepossessed } from '../knowledge/ships.ts';
 import { emptyTeam, newYard } from '../start.ts';
 import type { CareerState, Team } from '../state.ts';
@@ -23,7 +24,10 @@ export function repossessTeam(state: CareerState, index: number): CareerState {
       person.contract?.team === index ? { ...person, contract: null } : person
     ),
   };
-  return redrawRepossessed(reclaimed, index);
+  return announce(redrawRepossessed(reclaimed, index), {
+    kind: 'repossessed',
+    team: index,
+  });
 }
 
 export function repossess(state: CareerState): Repossession {
