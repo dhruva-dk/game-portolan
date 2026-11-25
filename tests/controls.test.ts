@@ -7,7 +7,9 @@ import {
   RARITY_INK,
   THUMB,
   around,
+  dash,
   gustButton,
+  gustReady,
   healSlot,
   healTapped,
   meterFill,
@@ -16,7 +18,7 @@ import {
   slotsWidth,
   type Box,
 } from '../src/ui/sea/controls.ts';
-import { INK, ring } from '../src/ui/base/ink.ts';
+import { INK } from '../src/ui/base/ink.ts';
 
 const POINTS_PER_UNIT = 1.735,
   TOUCH = 44 / POINTS_PER_UNIT;
@@ -54,38 +56,40 @@ test('the Gust toggle is its own hit area above Fire, within the thumb', () => {
   }
 });
 
-test('a tap on a held heal uses that slot; a tap on an empty slot does nothing', () => {
+test('a tap on a held heal uses that slot; an empty slot, a heal in use or a whole hull refuse it', () => {
   const heals = ['rare', null, 'legendary'] as const;
   assert.equal(healTapped(heals, 0), 0);
   assert.equal(healTapped(heals, 1), null);
   assert.equal(healTapped(heals, 2), 2);
   assert.equal(healTapped([null, null, null], 0), null);
+  assert.equal(healTapped(heals, 0, true), null);
 });
 
 test('a held heal is drawn with its rarity’s border; an empty slot shows no heal', () => {
   for (const r of ['common', 'rare', 'epic', 'legendary'] as const)
-    assert.ok(healSlot(r, null).includes(`stroke="${RARITY_INK[r]}"`), r);
+    assert.ok(healSlot(r, false).includes(`stroke="${RARITY_INK[r]}"`), r);
   assert.deepEqual(
     [RARITY_INK.common, RARITY_INK.rare, RARITY_INK.epic, RARITY_INK.legendary],
     [INK.silver, INK.blue, INK.storm, INK.gold]
   );
   assert.equal(new Set(Object.values(RARITY_INK)).size, 4);
-  const empty = healSlot(null, null);
+  const empty = healSlot(null, false);
   assert.ok(!empty.includes(INK.green), 'no heal glyph');
-  assert.equal(healSlot('rare', 0.5), healSlot('rare', 0.5));
+  assert.ok(!empty.includes('class="use"'), 'no ring');
+  assert.ok(healSlot('rare', true).includes('class="use"'));
+  assert.notEqual(healSlot('rare', true), healSlot('rare', false));
 });
 
-test('the ring round a slot in use fills as the use goes on', () => {
-  assert.equal(around(0), '');
-  const half = around(0.5),
-    most = around(0.9);
-  assert.ok(half.includes('stroke-dasharray="0.5000 1"'));
-  assert.ok(most.includes('stroke-dasharray="0.9000 1"'));
-  assert.ok(healSlot('epic', 0.5).includes(half));
-  assert.ok(!healSlot('epic', null).includes('stroke-dasharray'));
+test('the ring round a slot in use is one path whose dash fills as the use goes on', () => {
+  assert.ok(around(0).includes('opacity="0"'));
+  assert.ok(around(0.5).includes('stroke-dasharray="0.5000 1"'));
+  assert.ok(around(0.9).includes('stroke-dasharray="0.9000 1"'));
+  assert.equal(dash(1.4), '1.0000 1');
+  assert.equal(dash(-1), '0.0000 1');
+  assert.ok(healSlot('epic', true).includes(around(0)));
 });
 
-test('the Gust ring’s fill tracks the meter', () => {
+test('the Gust ring’s fill tracks the meter, drawn once and dashed to it', () => {
   assert.equal(meterFill(0), 0);
   assert.equal(meterFill(1), 1);
   assert.equal(meterFill(1.2), 1);
@@ -96,14 +100,14 @@ test('the Gust ring’s fill tracks the meter', () => {
     assert.ok(f >= last && Math.abs(f - m) < 1 / 40);
     last = f;
   }
-  const arc = (m: number) =>
-    ring(GUST.r, GUST.r, GUST.ring, meterFill(m), INK.iron, GUST.width);
-  assert.equal(arc(0), '', 'an empty meter draws no arc');
-  for (const m of [0.1, 0.4, 0.8, 1])
-    assert.ok(gustButton(m, GUST_NOTCH, false).includes(arc(m)), `${m}`);
-  assert.notEqual(arc(0.4), arc(0.8));
-  assert.ok(arc(0.4).includes(' 0 0 1 '), 'under half: the short way');
-  assert.ok(arc(0.8).includes(' 0 1 1 '), 'over half: the long way');
+  const face = gustButton(GUST_NOTCH);
+  assert.ok(face.includes('class="meter"'));
+  assert.ok(face.includes('pathLength="1"'));
+  assert.equal(
+    face,
+    gustButton(GUST_NOTCH),
+    'the face does not move with the meter'
+  );
 });
 
 test('the notch sits at 30% of the way round, clockwise from the top', () => {
@@ -117,16 +121,14 @@ test('the notch sits at 30% of the way round, clockwise from the top', () => {
   assert.deepEqual([Math.round(top.x), Math.round(top.y)], [c, c - 10]);
   const outer = notchAt(c, c, GUST.notch[1], GUST_NOTCH);
   assert.ok(
-    gustButton(0.5, GUST_NOTCH, false).includes(
+    gustButton(GUST_NOTCH).includes(
       `L${outer.x.toFixed(2)} ${outer.y.toFixed(2)}`
     )
   );
 });
 
-test('below the notch an idle Gust is drawn faint; on, or above it, in full', () => {
-  const faint = (m: number, on: boolean) =>
-    gustButton(m, GUST_NOTCH, on).includes('opacity="0.4"');
-  assert.ok(faint(0.2, false));
-  assert.ok(!faint(0.2, true));
-  assert.ok(!faint(GUST_NOTCH, false));
+test('below the notch an idle Gust is not ready; on, or above it, it is', () => {
+  assert.ok(!gustReady(0.2, GUST_NOTCH, false));
+  assert.ok(gustReady(0.2, GUST_NOTCH, true));
+  assert.ok(gustReady(GUST_NOTCH, GUST_NOTCH, false));
 });

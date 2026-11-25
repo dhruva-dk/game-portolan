@@ -14,6 +14,7 @@ import {
 } from './kept.ts';
 import { createLobby, createSettings, type Title } from '../ui/base/screens.ts';
 import { fade } from '../ui/base/ui.ts';
+import type { Settings } from '../ui/base/settings.ts';
 import { INK, dyeOn } from '../ui/base/ink.ts';
 import { createPassage } from '../ui/base/passage.ts';
 import { createVeil } from '../ui/base/veil.ts';
@@ -144,6 +145,10 @@ export function createFlow(
     },
     get settings() {
       return settings;
+    },
+    keep(next: Settings) {
+      settings = { ...settings, ...next };
+      keepSettings(store, settings);
     },
     ready() {
       title.ready();

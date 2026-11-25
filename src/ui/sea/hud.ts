@@ -6,11 +6,10 @@ import {
   type Status,
 } from '../../play/player.ts';
 import type { Sea } from '../../render/snapshot.ts';
-import { clock } from '../base/clock.ts';
 import { clamp, lerp } from '../../world/scalar.ts';
 import type { Shores } from '../base/coasts.ts';
 import { createChanged } from '../base/drawn.ts';
-import { stormMark, type Glyph } from '../base/glyphs.ts';
+import type { Glyph } from '../base/glyphs.ts';
 import {
   DUSK,
   INK,
@@ -20,7 +19,6 @@ import {
   glyph,
   paperDisc,
   ring as sweep,
-  slip,
   svg,
 } from '../base/ink.ts';
 import { createJuice } from './juice.ts';
@@ -31,17 +29,22 @@ import {
   FIRE,
   GUST,
   THUMB,
+  glints,
   gustButton,
+  gustReady,
   healSlot,
   healTapped,
   meterFill,
+  meterRing,
+  setRing,
   slotBox,
   slotsWidth,
   SLOT,
   useFill,
   type Corner,
 } from './controls.ts';
-import { createVitals } from './vitals.ts';
+import { createReadings } from './readings.ts';
+import { VITALS, createVitals } from './vitals.ts';
 
 export type HudState = Status & Kit;
 
@@ -50,6 +53,7 @@ interface HudActions {
   gust(): void;
   map(): void;
   fire(down: boolean): void;
+  pause(): void;
 }
 
 const mark = (k: GunKind): Glyph => `weapon.${k}`;
@@ -76,6 +80,12 @@ export function createHud(layer: HTMLElement, shores: Shores, act: HudActions) {
   vitals.appendChild(face);
   const drawVitals = createVitals(face);
   const readings = piece(body, 'top center', false, true);
+  readings.style.left = `calc(50% + ${(VITALS.w - MINIMAP) / 2}px * var(--k))`;
+  const drawReadings = createReadings(
+    readings,
+    { portrait: null },
+    { pause: () => act.pause() }
+  );
   const map = piece(body, 'top right', true, true);
   const thumb = piece(body, 'right bottom', false, true);
   const corner = (c: Corner, left: boolean) =>
@@ -107,24 +117,50 @@ export function createHud(layer: HTMLElement, shores: Shores, act: HudActions) {
   onTap(map, () => act.map());
   onTap(gust, () => act.gust());
 
-  let heals: HudState['heals'] = [];
+  let heals: HudState['heals'] = [],
+    busy = false;
+  const shake = (el: Element) => {
+    el.classList.remove('refuse');
+    void el.getBoundingClientRect();
+    el.classList.add('refuse');
+  };
   const slots = Array.from({ length: HEAL_SLOTS }, (_, i) => {
     const el = document.createElement('div'),
       box = slotBox(i);
-    el.className = 'press';
+    el.className = 'press slot';
+    el.setAttribute('data-tap', `heal-${i + 1}`);
     el.style.cssText = `position:absolute;left:${box.left}px;top:${box.top}px;width:${box.width}px;height:${box.height}px`;
     hotbar.appendChild(el);
     onTap(el, () => {
-      const slot = healTapped(heals, i);
+      const slot = healTapped(heals, i, busy);
       if (slot !== null) act.heal(slot);
+      else shake(el);
     });
     return el;
   });
+  hotbar.insertAdjacentHTML('afterbegin', svg(0, 0, glints()));
   hotbar.style.width = `${slotsWidth(HEAL_SLOTS)}px`;
   hotbar.style.height = `${SLOT}px`;
+  gust.classList.add('gust');
+  gust.innerHTML = svg(2 * GUST.r, 2 * GUST.r, gustButton(GUST_NOTCH));
+  const meter = gust.querySelector('.meter');
   const juice = createJuice(body, { vitals: face, fire, gust, slots });
 
   const changed = createChanged<HTMLElement>();
+  const rings = new Map<HTMLElement, number>();
+  const ringTo = (host: HTMLElement, cls: string, fill: number) => {
+    const key = host.querySelector(`.${cls}`);
+    if (!key) return;
+    const was = rings.get(host);
+    if (was === fill) return;
+    rings.set(host, fill);
+    setRing(key, fill);
+  };
+  let filled = -1,
+    blowing: boolean | null = null,
+    ready: boolean | null = null,
+    reload = -1,
+    wind = -1;
   let strength = -1,
     wash = -1,
     fallX = NaN,
@@ -137,6 +173,7 @@ export function createHud(layer: HTMLElement, shores: Shores, act: HudActions) {
   return {
     root,
     hand,
+    wingman: (seed: number | null) => drawReadings.portrait(seed),
     watch(on: boolean) {
       watching = on;
       for (const el of aboard) show(el, !on);
@@ -151,38 +188,30 @@ export function createHud(layer: HTMLElement, shores: Shores, act: HudActions) {
       }
       show(body, now > 0 && !covered);
       drawVitals.update(s);
+      drawReadings.update(s);
 
-      const closing = s.closing || s.storm < 30;
-      if (changed(readings, Math.ceil(s.storm), s.afloat, closing, s.closing)) {
-        const time = clock(s.storm);
-        readings.innerHTML = svg(
-          184,
-          38,
-          slip(1, 2, 88, 34) +
-            glyph(stormMark(s.closing), 20, 19, 24, {
-              ink: closing ? 'storm' : 'iron',
-            }) +
-            figure(60, 19, time, 23, { fill: closing ? INK.storm : INK.iron }) +
-            slip(95, 2, 88, 34) +
-            glyph('ship', 116, 19, 22) +
-            figure(154, 19, s.afloat, 23)
-        );
+      const fill = meterFill(s.gust),
+        lit = gustReady(s.gust, GUST_NOTCH, s.blowing);
+      if (fill !== filled) {
+        filled = fill;
+        setRing(meter, fill);
       }
-
-      const ready = s.blowing || s.gust >= GUST_NOTCH;
-      if (changed(gust, meterFill(s.gust), s.blowing, ready))
-        gust.innerHTML = svg(
-          2 * GUST.r,
-          2 * GUST.r,
-          gustButton(s.gust, GUST_NOTCH, s.blowing)
-        );
+      if (s.blowing !== blowing) {
+        blowing = s.blowing;
+        gust.classList.toggle('blowing', blowing);
+      }
+      if (lit !== ready) {
+        if (lit && ready === false && !s.blowing) juice.wake(gust);
+        ready = lit;
+        gust.classList.toggle('ready', lit);
+      }
 
       const g = s.gun,
         c = FIRE + 2,
         step = (v: number) => Math.floor(clamp(v) * 48);
       const loaded = g ? step(g.ready) : -1,
         wound = g && g.charge !== null ? step(g.charge) : -1;
-      if (changed(fire, g?.kind, g?.rounds, loaded, wound)) {
+      if (changed(fire, g?.kind, g?.rounds)) {
         fire.innerHTML = svg(
           2 * c,
           2 * c,
@@ -202,14 +231,21 @@ export function createHud(layer: HTMLElement, shores: Shores, act: HudActions) {
             (!g
               ? `<path d="M${c - 24} ${c + 24}L${c + 24} ${c - 24}" stroke="${INK.rubric}" stroke-width="3" stroke-linecap="round"/>`
               : '') +
-            (loaded >= 0 && loaded < 48
-              ? sweep(c, c, FIRE - 1, loaded / 48, INK.rubric, 3.5)
-              : '') +
-            (wound >= 0
-              ? sweep(c, c, FIRE - 1, wound / 48, WASH.gold, 4.5)
-              : '') +
+            meterRing('reload', c, c, FIRE - 1, INK.rubric, 3.5) +
+            meterRing('charge', c, c, FIRE - 1, WASH.gold, 4.5) +
             '</g>'
         );
+        reload = wind = -1;
+      }
+      const spin = loaded >= 0 && loaded < 48 ? loaded : 0,
+        coil = wound >= 0 ? wound : 0;
+      if (spin !== reload) {
+        reload = spin;
+        setRing(fire.querySelector('.reload'), spin / 48);
+      }
+      if (coil !== wind) {
+        wind = coil;
+        setRing(fire.querySelector('.charge'), coil / 48);
       }
 
       const k = view.k,
@@ -289,11 +325,15 @@ export function createHud(layer: HTMLElement, shores: Shores, act: HudActions) {
       }
 
       heals = s.heals;
+      busy = s.using !== null || s.hull >= s.hullMax;
       for (let i = 0; i < HEAL_SLOTS; i++) {
         const heal = s.heals[i] ?? null,
-          done = s.using?.slot === i ? useFill(s.using.done) : null;
-        if (changed(slots[i], heal, done))
-          slots[i].innerHTML = svg(SLOT, SLOT, healSlot(heal, done));
+          using = s.using?.slot === i;
+        if (changed(slots[i], heal, using)) {
+          slots[i].innerHTML = svg(SLOT, SLOT, healSlot(heal, using));
+          rings.delete(slots[i]);
+        }
+        ringTo(slots[i], 'use', using && s.using ? useFill(s.using.done) : 0);
       }
 
       juice.update(s, !watching && s.arriving <= 0);
