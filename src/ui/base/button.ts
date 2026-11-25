@@ -1,10 +1,23 @@
 import { FAINT, SIZE, SPACE, TYPE } from './house.ts';
 import { GILT, INK, PAPER, glyph, paperDisc, slip } from './ink.ts';
-import { banner } from './screens.ts';
 import { onTap } from './touch.ts';
 import { measured, word } from './word.ts';
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
+
+function banner(x: number, y: number, w: number, mark: string, gilt = false) {
+  const k = w / 210,
+    l = x - w / 2,
+    r = x + w / 2,
+    t = y - 40 * k,
+    b = y + 42 * k;
+  const d = `M${l} ${t + 4 * k}Q${x} ${t - 8 * k} ${r} ${t}L${r - 26 * k} ${y}L${r} ${b}Q${x} ${b - 6 * k} ${l} ${b + 2 * k}L${l + 26 * k} ${y}Z`;
+  return (
+    `<path d="${d}" fill="${gilt ? GILT : 'url(#pg)'}" stroke="${INK.iron}" stroke-width="1.6" filter="url(#sh)"/>` +
+    `<path d="${d}" fill="none" stroke="${INK.iron}" stroke-width=".5" opacity=".5" transform="translate(${x} ${y}) scale(.93) translate(${-x} ${-y})"/>` +
+    mark
+  );
+}
 
 export function roundButton(
   cx: number,
