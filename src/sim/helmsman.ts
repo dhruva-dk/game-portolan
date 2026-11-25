@@ -12,6 +12,7 @@ import {
   transport,
   type Vec3,
 } from '../world/sphere.ts';
+import { gap } from './contact.ts';
 import { RAM, SHIP } from './handling.ts';
 import { offCourse, turned, type Helm } from './ship.ts';
 import {
@@ -227,8 +228,12 @@ function stuck(
 ): { helm: Helm | null; lost: boolean } {
   const { m } = c,
     ship = c.own.ship;
+  const pinned = () => c.others.some((o) => gap(ship, o.ship) < RAM.rearm);
   const order = (turn: number, lost = false) => ({
-    helm: { course: turned(ship, turn), throttle: c.b.helm.slow },
+    helm: {
+      course: turned(ship, turn),
+      throttle: pinned() ? 0 : c.b.helm.slow,
+    },
     lost,
   });
   const steady = { helm: null, lost: false };

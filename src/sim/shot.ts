@@ -22,6 +22,7 @@ export interface Ball {
   from: Vec3;
   to: Vec3;
   age: number;
+  round: number;
 }
 
 interface Fall {
@@ -97,7 +98,8 @@ export const loosed = (
   dir: Vec3,
   speed: number,
   damage: number,
-  to?: Vec3
+  to?: Vec3,
+  round = 0
 ): Ball => ({
   shooter,
   kind,
@@ -107,6 +109,7 @@ export const loosed = (
   from: normalize(from),
   to: to ?? normalize(from),
   age: 0,
+  round,
 });
 
 const pull = (p: Vec3, mu: number): Vec3 => {

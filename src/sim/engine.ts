@@ -23,7 +23,7 @@ import { assigned, berths, type Spawn } from './spawn.ts';
 import { hopped, knocked, pose, ride, settled, type Ride } from './ride.ts';
 import { laying, overboard, type Flotsam, type Taken } from './loot.ts';
 import { asked, crewed, spilled, stored, type Ask } from './stores.ts';
-import type { Rarity } from './kinds.ts';
+import { KINDS, type Rarity } from './kinds.ts';
 import type { Berthed, Waters } from './waters.ts';
 import { shipAt, type Helm, type ShipState } from './ship.ts';
 import { calm, closings, createStorm, type Storm } from './storm.ts';
@@ -39,6 +39,7 @@ import type { MatchResult } from './result.ts';
 import type { DriverStats, MatchSetup, ShipSpec, ShipValues } from './setup.ts';
 import { driver } from './driver.ts';
 import { rulesOf } from './rules.ts';
+import type { Ball } from './shot.ts';
 import { remembered } from '../world/remembered.ts';
 import type { ShipPose } from '../world/pose.ts';
 import { hash } from '../world/random.ts';
@@ -46,6 +47,8 @@ import { bearingAt, type Vec3 } from '../world/sphere.ts';
 import { indexed } from './indexed.ts';
 import { createOrders, type Hand, type Sighter } from './orders.ts';
 import { createTally, finishing, type Standing, type Tally } from './tally.ts';
+import { EVEN } from './even.ts';
+import { HEAL_COUNT, STORM_FACTOR } from './tuning.ts';
 
 const AMIDSHIPS: Helm = { course: null, throttle: 0 };
 const MATCH = { loot: true, held: true },
@@ -142,23 +145,94 @@ export const SETUP = { least: 2, most: 80 } as const;
 
 const HURT_LEAST = 1;
 
+const STATS = [
+  'gunnery',
+  'helm',
+  'nerve',
+  'territory',
+  'stormcraft',
+  'lookout',
+] as const satisfies readonly (keyof DriverStats)[];
+
+const VALUES = [
+  'topSpeed',
+  'gather',
+  'turnRate',
+  'hullPoints',
+  'spreadFactor',
+  'reloadFactor',
+  'damageFactor',
+  'assistCone',
+  'gustCapacity',
+  'shieldRate',
+  'healTime',
+  'healFactor',
+] as const satisfies readonly Exclude<keyof ShipValues, 'gun'>[];
+
+const isWhole = (n: unknown, least: number, most: number): boolean =>
+  Number.isInteger(n) && Number(n) >= least && Number(n) <= most;
+
+const rated = (table: object, rating: unknown): boolean =>
+  Number.isInteger(rating) && Object.hasOwn(table, String(rating));
+
+function checkedShip(s: ShipSpec, id: number): void {
+  if (!Number.isInteger(s.team) || s.team < 0)
+    throw new RangeError(`ship ${id}'s team is ${s.team}`);
+  if (s.slot !== 0 && s.slot !== 1)
+    throw new RangeError(`ship ${id}'s slot is ${s.slot}`);
+  const { best, worst } = EVEN.standing;
+  if (!isWhole(s.standing, best, worst))
+    throw new RangeError(
+      `ship ${id}'s standing is ${s.standing}, not ${best} to ${worst}`
+    );
+  if (!KINDS.includes(s.gun))
+    throw new RangeError(`ship ${id}'s gun is ${s.gun}`);
+  for (const k of VALUES)
+    if (!Number.isFinite(s[k]))
+      throw new RangeError(`ship ${id}'s ${k} is ${s[k]}`);
+  if (s.hands === 'player') {
+    if (id !== PLAYER)
+      throw new RangeError(`ship ${id} has the player's hands`);
+    return;
+  }
+  const hands: unknown = s.hands;
+  if (typeof hands !== 'object' || hands === null)
+    throw new RangeError(`ship ${id}'s hands are ${String(hands)}`);
+  for (const k of STATS)
+    if (!Number.isFinite(s.hands[k]))
+      throw new RangeError(`ship ${id}'s ${k} is ${s.hands[k]}`);
+}
+
 function checked(setup: MatchSetup): MatchSetup {
   const { ships } = setup;
+  if (typeof setup.planet !== 'string')
+    throw new RangeError(`the planet is ${String(setup.planet)}`);
+  if (!Number.isFinite(setup.match))
+    throw new RangeError(`the match seed is ${setup.match}`);
+  if (!rated(STORM_FACTOR, setup.storm))
+    throw new RangeError(
+      `the storm rating is ${setup.storm}, not one of ${Object.keys(STORM_FACTOR).join(', ')}`
+    );
+  if (!rated(HEAL_COUNT, setup.heals))
+    throw new RangeError(
+      `the heal rating is ${setup.heals}, not one of ${Object.keys(HEAL_COUNT).join(', ')}`
+    );
   if (ships.length < SETUP.least || ships.length > SETUP.most)
     throw new RangeError(
       `a match has ${SETUP.least} to ${SETUP.most} ships, not ${ships.length}`
     );
-  const sizes: number[] = [];
+  const slots: (0 | 1)[][] = [];
   ships.forEach((s, id) => {
-    if (!Number.isInteger(s.team) || s.team < 0)
-      throw new RangeError(`ship ${id}'s team is ${s.team}`);
-    sizes[s.team] = (sizes[s.team] ?? 0) + 1;
-    if (s.hands === 'player' && id !== PLAYER)
-      throw new RangeError(`ship ${id} has the player's hands`);
+    checkedShip(s, id);
+    (slots[s.team] ??= []).push(s.slot);
   });
-  for (let t = 0; t < sizes.length; t++)
-    if (!(sizes[t] >= 1 && sizes[t] <= 2))
-      throw new RangeError(`team ${t} has ${sizes[t] ?? 0} ships`);
+  for (let t = 0; t < slots.length; t++) {
+    const taken = slots[t] ?? [];
+    if (taken.length < 1 || taken.length > 2)
+      throw new RangeError(`team ${t} has ${taken.length} ships`);
+    if (taken[0] === taken[1])
+      throw new RangeError(`team ${t} has two ships in slot ${taken[0]}`);
+  }
   return setup;
 }
 
@@ -355,8 +429,8 @@ function createSea(waters: Waters, first: Course) {
       depth,
       rises
     );
+    for (const h of fought.hits) struck.set(h.struck, { by: h.shooter, tick });
     for (const s of fought.strikes) {
-      struck.set(s.struck, { by: s.shooter, tick });
       const a = aboard.get(s.struck);
       if (a?.mind)
         a.mind = s.ram
@@ -434,9 +508,9 @@ function createSea(waters: Waters, first: Course) {
   const founderAll = (fought: Fought) => {
     for (const id of lost) {
       const blow = fought.sunk.includes(id)
-        ? fought.strikes.findLast((s) => s.struck === id)
+        ? fought.hits.findLast((h) => h.struck === id)
         : undefined;
-      const cause: Cause = blow ? (blow.ram ? 'ram' : 'shot') : 'storm',
+      const cause: Cause = blow ? (blow.gun ? 'shot' : 'ram') : 'storm',
         last = struck.get(id);
       founder({
         id,
@@ -495,7 +569,7 @@ function createSea(waters: Waters, first: Course) {
     founderAll(fought);
     tally?.settle(
       fought.shots,
-      fought.strikes,
+      fought.hits,
       standing,
       !loose || sinkings.length > 0
     );
@@ -657,6 +731,9 @@ function createSea(waters: Waters, first: Course) {
         gun: held ? held.gun.kind : null,
       });
     },
+    volley(balls: readonly Ball[]) {
+      battle = { ...battle, balls: [...battle.balls, ...balls] };
+    },
     hurt(id: number, points: number) {
       const hurt = (c: Crew): Crew =>
         c.id === id && !sunk(c.health)
@@ -731,6 +808,7 @@ interface Debug {
   rig(rig: Rig): void;
   strew(at: Vec3, heals: readonly Rarity[]): void;
   sink(id: number, by: number | null): void;
+  volley(balls: readonly Ball[]): void;
   hurt(id: number, points: number): void;
   mindOf(id: number): Readonly<Memory> | null;
   standIn(id: number, sights: Sighter): void;

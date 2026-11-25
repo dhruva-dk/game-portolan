@@ -4,11 +4,15 @@ import { createMatch, debugOf, type Match } from '../src/sim/engine.ts';
 import { STILL, type Hands } from '../src/sim/hands.ts';
 import { PLAYER } from '../src/sim/match.ts';
 import type { ShipValues } from '../src/sim/setup.ts';
-import { calm, type Storm } from '../src/sim/storm.ts';
+import { STEP } from '../src/sim/fixed.ts';
+import type { Rarity } from '../src/sim/kinds.ts';
+import { rulesOf } from '../src/sim/rules.ts';
+import { calm, closings, planStorm, type Storm } from '../src/sim/storm.ts';
+import { HEAL } from '../src/sim/tuning.ts';
 import { watersAt } from '../src/sim/waters.ts';
 import { SEED } from '../src/world/environment.ts';
 import { landOf, planetOf } from '../src/world/land.ts';
-import { scale } from '../src/world/sphere.ts';
+import { along, bearingAt, scale } from '../src/world/sphere.ts';
 import { EVEN_SHIP, TENDED, UNTENDED, setupOf } from './setups.ts';
 
 const planet = planetOf(SEED, landOf(SEED)),
@@ -106,4 +110,55 @@ test('Hands.gust is a tap: one turns it on and the ship runs faster on its meter
   assert.ok(on.speed > plain.speed + 1, `${on.speed} ${plain.speed}`);
   assert.ok(crew(on.m).gust.meter < EVEN_SHIP.gustCapacity - 0.9);
   assert.equal(crew(plain.m).gust.meter, EVEN_SHIP.gustCapacity);
+});
+
+test('a cache of eight heals drops at the start of each storm phase after the first, and none when the final ring closes', () => {
+  const setup = setupOf(SEED, { teams: 2, perTeam: 1, player: true, storm: 5 }),
+    m = createMatch(setup, waters),
+    table = rulesOf(setup.storm).storm,
+    closed = closings(table),
+    heart = planStorm(setup.match, waters.depth, table).at(-1)!,
+    rim = 0.9 * table.phases.at(-1)!.radius,
+    berth = (a: number) => along(heart, bearingAt(heart, a), rim).p;
+  const debug = debugOf(m);
+  debug.atSea({ at: berth(0), bearing: Math.PI / 2 }, [
+    {
+      at: berth(Math.PI),
+      heading: bearingAt(berth(Math.PI), Math.PI / 2),
+      lashed: { course: null, throttle: 0 },
+    },
+  ]);
+  const full: Rarity[] = Array.from({ length: HEAL.slots }, () => 'legendary');
+  for (const a of [0, Math.PI]) debug.strew(berth(a), full);
+  m.step(STILL);
+  assert.deepEqual(
+    m.view.crews().map((c) => c.hold.items),
+    [full, full],
+    'holds full of the rarest, so nothing more is swept up'
+  );
+  const drops: { time: number; heals: Rarity[] }[] = [];
+  let took = 0;
+  while (m.view.time() < closed.at(-1)! + 20) {
+    const before = m.view.loot().next;
+    m.step(STILL);
+    took += m.view.last().took.length;
+    const fresh = m.view.loot().pieces.filter((l) => l.id >= before);
+    assert.equal(fresh.length, m.view.loot().next - before);
+    if (fresh.length > 0)
+      drops.push({ time: m.view.time(), heals: fresh.map((l) => l.heal) });
+  }
+  assert.equal(took, 0, 'nothing swept up');
+  assert.equal(m.view.alive().length, 2, 'nothing sunk, so nothing spilled');
+  assert.deepEqual(
+    drops.map((d) => d.heals.length),
+    closed.slice(0, -1).map(() => HEAL.cache.count),
+    'eight a phase, six phases'
+  );
+  drops.forEach((d, k) => {
+    assert.ok(
+      d.time > closed[k] && d.time <= closed[k] + 2 * STEP + 1e-9,
+      `cache ${k + 1} at ${d.time} s, as phase ${k + 1} begins at ${closed[k]} s`
+    );
+    assert.ok(d.heals.every((h) => h !== 'common'));
+  });
 });
