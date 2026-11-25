@@ -1,5 +1,5 @@
 import { createAudio } from '../audio/audio.ts';
-import type { CareerState } from '../career/state.ts';
+import { YOURS, type CareerState } from '../career/state.ts';
 import type { Snapshot } from '../render/snapshot.ts';
 import { MOTION } from '../ui/base/house.ts';
 import { createLoading } from '../ui/base/loading.ts';
@@ -62,9 +62,19 @@ export async function home(
   };
   const founded = (f: Founded) => void reload(queue.save(f.before, f.state));
 
-  const sail = async (crew: Crew, state: CareerState, casting: boolean) => {
+  const sail = async (crew: Crew, start: CareerState, casting: boolean) => {
+    let state = start;
     const v = await voyage(s, crew, state, {
       casting,
+      seen(id) {
+        const { applied } = sendAndSave(queue, state, {
+          type: 'MarkSeen',
+          team: YOURS,
+          id,
+        });
+        if (applied.ok) state = applied.state;
+        return state.seen;
+      },
       ended({ result, settle }) {
         const { saved } = sendAndSave(queue, state, recordOf(result));
         void settle().then(() => reload(saved));

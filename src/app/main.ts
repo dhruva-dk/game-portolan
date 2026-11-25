@@ -26,7 +26,8 @@ import { createTitle, type Title } from '../ui/base/screens.ts';
 import { createInput } from '../ui/sea/input.ts';
 import { createStick } from '../ui/sea/stick.ts';
 import { createPause } from '../ui/sea/pause.ts';
-import { IDLE } from '../play/player.ts';
+import { IDLE, type SeaBubble } from '../play/player.ts';
+import { createAfter } from '../ui/sea/after.ts';
 import { MOTION } from '../ui/base/house.ts';
 import { clamp, lerp } from '../world/scalar.ts';
 import { onPressed } from '../ui/base/touch.ts';
@@ -159,9 +160,16 @@ async function play(s: Stage): Promise<Played> {
     s.world.land.stats.summit
   );
   const globe = createGlobe(shores.coasts);
-  const status: HudState = Object.assign({}, game.status(), game.kit());
+  let said: SeaBubble | null = null;
+  const status: HudState = Object.assign(
+    { bubble: said },
+    game.status(),
+    game.kit()
+  );
   const hudState = (): HudState =>
-    Object.assign(status, game.status(view.w, view.h), game.kit());
+    Object.assign(status, game.status(view.w, view.h), game.kit(), {
+      bubble: said,
+    });
   const map = () => globe.show(hudState());
   let paused = false,
     released = -Infinity;
@@ -171,14 +179,27 @@ async function play(s: Stage): Promise<Played> {
     input.fire(false);
     pause.open();
   };
-  const hud = createHud(layer, shores, {
-    heal: input.heal,
-    gust: input.gust,
-    fire: input.fire,
-    aim: input.aim,
-    map,
-    pause: pauseMatch,
+  const hud = createHud(
+    layer,
+    shores,
+    {
+      heal: input.heal,
+      gust: input.gust,
+      fire: input.fire,
+      aim: input.aim,
+      map,
+      pause: pauseMatch,
+    },
+    () => {
+      said = null;
+      after.show(false);
+    }
+  );
+  const after = createAfter({
+    watch: () => undefined,
+    result: () => undefined,
   });
+  if (after.result) hud.beside('sunk', after.result);
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) pauseMatch();
   });
@@ -267,6 +288,10 @@ async function play(s: Stage): Promise<Played> {
     pause: pauseMatch,
     hand: (on: boolean) => (forced = on),
     wingman: (seed: number | null) => hud.wingman(seed),
+    say(id: SeaBubble | null) {
+      said = id;
+      after.show(id === 'sunk');
+    },
     next(real: number): Snapshot {
       const k = pace(),
         dt = real * k,

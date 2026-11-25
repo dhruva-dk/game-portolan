@@ -1,4 +1,4 @@
-import { DEFS, WASH, cssInks, svgNode } from './ink.ts';
+import { DEFS, INK, WASH, cssInks, svgNode } from './ink.ts';
 import { MOTION } from './house.ts';
 import { FADE } from './ways.ts';
 
@@ -100,6 +100,31 @@ const STYLE = `
 .ui .pop { transform-box: fill-box; transform-origin: center;
   animation: pop ${MOTION.dot.ms}ms ${MOTION.dot.ease} both; }
 @keyframes pop { from { transform: scale(0); opacity: 0 } }
+@keyframes uncle-in { from { transform: translateY(${MOTION.uncle.bob}px) scale(0); opacity: 0 }
+  55% { transform: translateY(-${MOTION.uncle.bob}px) scale(${MOTION.uncle.swell}); opacity: 1 }
+  80% { transform: translateY(${MOTION.uncle.bob * 0.3}px) scale(.98) } }
+@keyframes uncle-out { to { transform: translateY(${MOTION.uncle.bob}px) scale(0); opacity: 0 } }
+@keyframes uncle-unroll { from { transform: scaleX(0); opacity: 0 } 30% { opacity: 1 } }
+@keyframes uncle-furl { to { transform: scaleX(0); opacity: 0 } }
+@keyframes uncle-words { from { opacity: 0 } }
+@keyframes uncle-blink { 0%, 94%, 100% { transform: none } 96.5% { transform: scaleY(${MOTION.uncle.shut}) } }
+@keyframes uncle-tilt { 0%, 72%, 100% { transform: none } 78%, 90% { transform: rotate(${MOTION.uncle.turn}deg) } }
+.ui .said .sitter { transform-box: fill-box; transform-origin: 50% 100%;
+  animation: uncle-in ${MOTION.uncle.ms}ms ${MOTION.uncle.ease} both; }
+.ui .said .scroll { transform-box: fill-box; transform-origin: 0 50%;
+  animation: uncle-unroll ${MOTION.uncle.unroll}ms ${MOTION.sheet.ease} ${MOTION.uncle.after}ms both; }
+.ui .said.right .scroll { transform-origin: 100% 50%; }
+.ui .said .words { animation: uncle-words ${MOTION.uncle.words}ms ease ${MOTION.uncle.after + MOTION.uncle.unroll * 0.6}ms both; }
+.ui .said .lid { transform-box: fill-box; transform-origin: center;
+  animation: uncle-blink ${MOTION.uncle.blink}ms linear ${MOTION.uncle.ms}ms infinite; }
+.ui .said .tilt { transform-box: fill-box; transform-origin: 50% 90%;
+  animation: uncle-tilt ${MOTION.uncle.tilt}ms ease-in-out ${MOTION.uncle.ms * 3}ms infinite; }
+.ui .folding .said .scroll { animation: uncle-furl ${MOTION.uncle.fold}ms ${MOTION.sheet.leaveEase} both; }
+.ui .folding .said .sitter { animation: uncle-out ${MOTION.uncle.away}ms ${MOTION.sheet.leaveEase} ${MOTION.uncle.fold * 0.6}ms both; }
+.ui .folding { pointer-events: none !important; }
+.ui .said.settled .sitter, .ui .said.settled .scroll, .ui .said.settled .words { animation: none; }
+@keyframes beckon { 50% { filter: drop-shadow(0 0 ${MOTION.beckon.glow}px ${INK.gold}) drop-shadow(0 0 ${MOTION.beckon.glow / 3}px ${INK.gold}); } }
+.ui .beckon { animation: beckon ${MOTION.beckon.ms}ms ease-in-out infinite; }
 .ui .two .sure, .ui .two .unsure { transform-box: fill-box; transform-origin: center;
   transition: opacity ${MOTION.fade.ms}ms ${MOTION.fade.ease}, transform ${MOTION.arm.ms}ms ${MOTION.arm.ease}; }
 .ui .two .sure { opacity: 0; transform: scale(${MOTION.arm.from}); }

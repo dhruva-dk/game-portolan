@@ -293,7 +293,7 @@ export function createLobby(port: LobbyPort) {
       const b = bubble(line, Math.min(0.85, Math.max(0.08, target / wide)));
       const dx = target - b.tip[0],
         dy = top - 2 - b.tip[1];
-      speech = `<g id="bubble" class="pop"><g transform="translate(${r2(dx)} ${r2(dy)})">${b.svg}</g></g>`;
+      speech = `<g id="bubble"><g transform="translate(${r2(dx)} ${r2(dy)})">${b.svg}</g></g>`;
     }
     const svg = svgNode(w, h, s + speech);
     buttons.replaceChildren(svg);
@@ -305,7 +305,13 @@ export function createLobby(port: LobbyPort) {
       bound(
         svg,
         'bubble',
-        () => port.send({ type: 'MarkSeen', team: 0, id: said }),
+        () => {
+          svg.querySelector('#bubble')?.classList.add('folding');
+          window.setTimeout(
+            () => port.send({ type: 'MarkSeen', team: 0, id: said }),
+            MOTION.uncle.fold + MOTION.uncle.away
+          );
+        },
         'bubble'
       );
   }

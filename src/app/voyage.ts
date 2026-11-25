@@ -3,7 +3,8 @@ import { matchSetup } from '../career/fit.ts';
 import { seatHolder } from '../career/lookup.ts';
 import { YOURS, type CareerState } from '../career/state.ts';
 import { dressOf } from '../play/colors.ts';
-import { IDLE, type End, type Screen } from '../play/player.ts';
+import { IDLE, type End, type Screen, type SeaBubble } from '../play/player.ts';
+import { createUncle } from '../play/uncle.ts';
 import { createReferee } from '../play/referee.ts';
 import { loaded } from '../render/load.ts';
 import type { Snapshot } from '../render/snapshot.ts';
@@ -39,6 +40,7 @@ export async function voyage(
   career: CareerState,
   o: {
     casting: boolean;
+    seen(id: SeaBubble): readonly string[];
     ended(end: { result: MatchResult; settle(): Promise<void> }): void;
   }
 ): Promise<Voyage> {
@@ -58,13 +60,19 @@ export async function voyage(
     s.world.land.stats.summit
   );
   const globe = createGlobe(shores.coasts);
-  const status: HudState = Object.assign({}, game.status(), game.kit());
+  const uncle = createUncle(career.seen);
+  const status: HudState = Object.assign(
+    { bubble: null },
+    game.status(),
+    game.kit()
+  );
   const hudState = (): HudState =>
     Object.assign(status, game.status(view.w, view.h), game.kit());
   let phase: Phase = 'sailing',
     paused = false,
     released = -Infinity,
     offered = false,
+    begun = false,
     left: boolean | null = null,
     stats: boolean | null = null;
 
@@ -74,14 +82,19 @@ export async function voyage(
     input.fire(false);
     pause.open();
   };
-  const hud = createHud(layer, shores, {
-    heal: input.heal,
-    gust: input.gust,
-    fire: input.fire,
-    aim: input.aim,
-    map: () => globe.show(hudState()),
-    pause: pauseMatch,
-  });
+  const hud = createHud(
+    layer,
+    shores,
+    {
+      heal: input.heal,
+      gust: input.gust,
+      fire: input.fire,
+      aim: input.aim,
+      map: () => globe.show(hudState()),
+      pause: pauseMatch,
+    },
+    (id) => uncle.seen(o.seen(id))
+  );
   fade(hud.root, false, 0);
   hud.wingman(seatHolder(career, YOURS, 'driver')?.portrait ?? null);
   document.addEventListener('visibilitychange', () => {
@@ -127,12 +140,14 @@ export async function voyage(
       settling.show(true);
     },
   });
+  if (after.result) hud.beside('sunk', after.result);
   const settling = createSettling();
   const veil = createVeil();
 
   const begin = () => {
     game.start(setup, liveries, berthed);
     referee.begin();
+    begun = true;
     hud.watch(false);
     fade(hud.root, true);
   };
@@ -220,7 +235,13 @@ export async function voyage(
       const end = referee.update(dt);
       if (end) ended(end);
       const scene = game.snapshot();
-      hud.update(hudState(), scene.sea, scene.own, globe.open);
+      const now = hudState();
+      now.bubble = uncle.update(dt, now, {
+        live: begun && phase === 'sailing',
+        rival: game.rival(),
+        offered,
+      });
+      hud.update(now, scene.sea, scene.own, globe.open);
       globe.update(status);
       hearing.scene = scene;
       hearing.screen = screenOf();
