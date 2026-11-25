@@ -1,5 +1,5 @@
 import { join } from 'node:path';
-import { shipValues } from '../../src/career/fit.ts';
+import { shipValues, type FittedLevels } from '../../src/career/fit.ts';
 import { RIDE } from '../../src/sim/ride.ts';
 import {
   SETUP,
@@ -11,7 +11,13 @@ import { evenSetup } from '../../src/sim/even.ts';
 import { STEP } from '../../src/sim/fixed.ts';
 import { STILL } from '../../src/sim/hands.ts';
 import { rulesOf } from '../../src/sim/rules.ts';
-import type { MatchSetup } from '../../src/sim/setup.ts';
+import type { MatchResult } from '../../src/sim/result.ts';
+import type {
+  DriverStats,
+  MatchSetup,
+  ShipValues,
+} from '../../src/sim/setup.ts';
+import type { GunKind } from '../../src/sim/kinds.ts';
 import { closedBy } from '../../src/sim/storm.ts';
 import { MATCH_END } from '../../src/sim/tuning.ts';
 import { berths } from '../../src/sim/spawn.ts';
@@ -26,9 +32,10 @@ import { createWind } from '../../src/world/wind.ts';
 import { lines, writeJson } from '../out.ts';
 import { firstRace } from './career.ts';
 import { record } from './log.ts';
-import { watch, type MatchResult } from './metrics.ts';
+import { matchFigures } from './figures.ts';
+import { watch, type MatchResult as Account } from './metrics.ts';
 import { standIn, type Thumb } from './player.ts';
-import { worldOf } from './world.ts';
+import { worldOf, type World } from './world.ts';
 
 export interface MatchScenario {
   kind: 'match';
@@ -51,35 +58,63 @@ const LEVEL = 50,
   STAT = 10,
   RATING = 3;
 
-const EVEN_SHIP = shipValues(
-  {
-    sails: LEVEL,
-    rigging: LEVEL,
-    rudder: LEVEL,
-    hull: LEVEL,
-    keel: LEVEL,
-    mounts: LEVEL,
-    gun: LEVEL,
-  },
-  'cannon',
-  { shield: STAT, healSpeed: STAT, healAmount: STAT }
-);
+export type Levels = number | Partial<FittedLevels>;
 
-const EVEN_DRIVER = {
-  gunnery: STAT,
-  helm: STAT,
-  nerve: STAT,
-  territory: STAT,
-  stormcraft: STAT,
-  lookout: STAT,
-};
+export function valuesAt(levels: Levels, gun: GunKind = 'cannon'): ShipValues {
+  const at = (line: keyof FittedLevels) =>
+    typeof levels === 'number' ? levels : (levels[line] ?? LEVEL);
+  return shipValues(
+    {
+      sails: at('sails'),
+      rigging: at('rigging'),
+      rudder: at('rudder'),
+      hull: at('hull'),
+      keel: at('keel'),
+      mounts: at('mounts'),
+      gun: at('gun'),
+    },
+    gun,
+    { shield: STAT, healSpeed: STAT, healAmount: STAT }
+  );
+}
+
+export type Stats = number | Partial<DriverStats>;
+
+export function statsAt(stats: Stats): DriverStats {
+  const at = (stat: keyof DriverStats) =>
+    typeof stats === 'number' ? stats : (stats[stat] ?? STAT);
+  return {
+    gunnery: at('gunnery'),
+    helm: at('helm'),
+    nerve: at('nerve'),
+    territory: at('territory'),
+    stormcraft: at('stormcraft'),
+    lookout: at('lookout'),
+  };
+}
 
 function swellOf(seed: number, height: (p: Vec3) => number): Hull {
   const sea = anchors(icosphere(FREQUENCY), createWind(seed), CASCADES[0]);
   return createSwell(sea, height, MEAN.wind, { shortest: RIDE.shortest }).hull;
 }
 
+export function closeBerths(w: World, seed: number, count: number): Waters {
+  const all = berths(w.waters.water, seed, SETUP.most, w.depth),
+    first = all[0].at;
+  const near = [...all].sort(
+    (x, y) => distance(x.at, first) - distance(y.at, first)
+  );
+  return {
+    ...w.waters,
+    berthed: { match: seed, spawns: near.slice(0, count) },
+  };
+}
+
 export type Summary = ReturnType<typeof summaryOf>;
+
+export function matchSeed(w: World, match: number): number {
+  return w.seed + STRIDE * match;
+}
 
 export function runMatch(sc: MatchScenario, dir?: string): Summary {
   if (sc.career) {
@@ -87,8 +122,7 @@ export function runMatch(sc: MatchScenario, dir?: string): Summary {
     return sail(race.setup, race.waters, sc, dir);
   }
   const w = worldOf(sc.planet),
-    n = sc.match ?? 1,
-    seed = w.seed + STRIDE * n;
+    seed = matchSeed(w, sc.match ?? 1);
   const setup = evenSetup({
     planet: String(w.seed),
     match: seed,
@@ -96,38 +130,25 @@ export function runMatch(sc: MatchScenario, dir?: string): Summary {
     heals: RATING,
     teams: sc.teams,
     perTeam: sc.perTeam,
-    values: EVEN_SHIP,
-    stats: EVEN_DRIVER,
+    values: valuesAt(LEVEL),
+    stats: statsAt(STAT),
   });
-  const count = setup.ships.length;
-  let waters: Waters = {
-    ...w.waters,
+  const waters: Waters = {
+    ...(sc.close ? closeBerths(w, seed, setup.ships.length) : w.waters),
     ...(sc.sea === 'swell' && { sea: swellOf(w.seed, w.planet.height) }),
   };
-  if (sc.close) {
-    const all = berths(w.waters.water, seed, SETUP.most, w.depth),
-      first = all[0].at;
-    const near = [...all].sort(
-      (x, y) => distance(x.at, first) - distance(y.at, first)
-    );
-    waters = {
-      ...waters,
-      berthed: { match: seed, spawns: near.slice(0, count) },
-    };
-  }
   return sail(setup, waters, sc, dir);
 }
 
-function sail(
+export function sail(
   setup: MatchSetup,
   waters: Waters,
-  sc: MatchScenario,
+  sc: Pick<MatchScenario, 'match' | 'players' | 'thumb' | 'seconds'>,
   dir: string | undefined
 ) {
   const m = createMatch(setup, waters),
     state = m.view,
-    seed = setup.match,
-    brainOf = () => 'default';
+    seed = setup.match;
   const players = new Set<number>();
   if (sc.players)
     for (const k of state.ships())
@@ -139,8 +160,8 @@ function sail(
     end = sc.seconds ?? closedBy(rules.storm) + MATCH_END.overtime + 60;
   const events = dir ? lines(join(dir, 'events.jsonl')) : null,
     ships = dir ? lines(join(dir, 'ships.jsonl')) : null;
-  const seen = watch(state, brainOf, waters.depth, players),
-    log = record(state, (p) => -waters.depth(p), brainOf, events, ships);
+  const seen = watch(state, waters.depth, players),
+    log = record(state, (p) => -waters.depth(p), events, ships);
   log.start(seed, rules);
   debugOf(m).lap(log.lap);
   const each = Math.round(1 / STEP);
@@ -171,16 +192,18 @@ function sail(
     left: state.alive(),
     hash: result.hash,
   });
-  const summary = summaryOf(sc, seed, account, kept, {
+  const summary = summaryOf(seed, account, kept, {
     why,
     hash: result.hash,
     wallMs: ms,
     result,
+    setup,
   });
   if (dir) {
     events?.close();
     ships?.close();
     writeJson(join(dir, 'summary.json'), {
+      scenario: sc,
       ...summary,
       files: { events: events?.count(), ships: ships?.count() },
     });
@@ -192,26 +215,31 @@ const r2 = (x: number) => Math.round(x * 100) / 100,
   rate = (hits: number, shots: number) => (shots ? r2(hits / shots) : null);
 
 function summaryOf(
-  sc: MatchScenario,
   seed: number,
-  a: MatchResult,
+  a: Account,
   kept: ReturnType<ReturnType<typeof record>['end']>,
   end: {
     why: string;
     hash: string;
     wallMs: number;
-    result: ReturnType<ReturnType<typeof createMatch>['result']>;
+    result: MatchResult;
+    setup: MatchSetup;
   }
 ) {
   const ships = a.ships,
-    afloat = ships.filter((s) => s.afloat > 0);
-  const shots = Object.values(a.shots.band).reduce((n, c) => n + c.shots, 0),
-    hits = Object.values(a.shots.band).reduce((n, c) => n + c.hits, 0);
+    afloat = ships.filter((s) => s.afloat > 0),
+    { result, setup } = end;
   const dps = afloat
     .map((s) => s.fighting.dealt / s.afloat)
     .sort((x, y) => x - y);
+  const figures = matchFigures({
+    ships: setup.ships,
+    result,
+    shots: a.fired,
+    fights: a.sunk.flatMap((k) => (k.fight === null ? [] : [k.fight])),
+    heals: a.heals,
+  });
   return {
-    scenario: sc,
     seed,
     end: end.why,
     hash: end.hash,
@@ -219,12 +247,13 @@ function summaryOf(
     steps: a.steps,
     wallMs: Math.round(end.wallMs),
     left: ships.filter((s) => s.sunk === null).map((s) => s.id),
-    placements: [...ships]
-      .sort((x, y) => x.place - y.place || x.id - y.id)
+    figures,
+    placements: ships
       .map((s) => ({
-        place: s.place,
+        place: result.ships[s.id].place,
         id: s.id,
-        brain: s.brain,
+        team: setup.ships[s.id].team,
+        standing: setup.ships[s.id].standing,
         player: s.player,
         sunk: s.sunk,
         afloat: s.afloat,
@@ -236,18 +265,11 @@ function summaryOf(
           0
         ),
         hits: s.fighting.hits,
+        heals: { taken: s.took, healed: r2(s.healed) },
         pinned: s.pinned,
-      })),
+      }))
+      .sort((x, y) => x.place - y.place || x.id - y.id),
     combat: {
-      shots,
-      hits,
-      hitRate: rate(hits, shots),
-      byRange: Object.fromEntries(
-        Object.entries(a.shots.band).map(([b, c]) => [
-          b,
-          { ...c, rate: rate(c.hits, c.shots) },
-        ])
-      ),
       byGun: Object.fromEntries(
         Object.entries(a.shots.kind).map(([g, c]) => [
           g,
@@ -261,7 +283,6 @@ function summaryOf(
           },
         ])
       ),
-      ttk: kept.ttk,
       dps: {
         median: dps.length ? r2(dps[dps.length >> 1]) : null,
         mean: dps.length
@@ -289,7 +310,7 @@ function summaryOf(
     loot: a.loot,
     cost: { msPerStep: r2(a.msPerStep), parts: kept.cost },
     invariants: kept.invariants,
-    result: end.result,
+    result,
     account: a,
   };
 }

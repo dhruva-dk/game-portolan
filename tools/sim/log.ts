@@ -69,7 +69,6 @@ export interface Break {
 export function record(
   state: State,
   height: (p: Vec3) => number,
-  brainOf: (id: number) => string,
   events: Lines | null,
   ships: Lines | null
 ) {
@@ -91,7 +90,6 @@ export function record(
     alive = state.alive().length,
     last = state.time();
   const firstBlow = new Map<string, number>();
-  const ttk: { by: number; on: number; seconds: number }[] = [];
   const breaks: Break[] = [];
   let broken = 0;
   const onLand = new Set<number>();
@@ -117,7 +115,6 @@ export function record(
           c = state.crew(k.id);
         return {
           id: k.id,
-          brain: brainOf(k.id),
           at: v ? latLon(v.ship.at) : null,
           heading: v ? compass(v.ship.at, v.ship.heading) : null,
           hull: r1(k.hull),
@@ -255,8 +252,6 @@ export function record(
       for (; sunk < sinkings.length; sunk++) {
         const k = sinkings[sunk],
           lasted = k.by === null ? undefined : firstBlow.get(`${k.by}>${k.id}`);
-        if (k.by !== null && k.by !== k.id && lasted !== undefined)
-          ttk.push({ by: k.by, on: k.id, seconds: r2(k.time - lasted) });
         emit('sunk', {
           ship: k.id,
           by: k.by,
@@ -397,16 +392,7 @@ export function record(
       }
     },
     end() {
-      const kills = ttk.map((k) => k.seconds).sort((a, b) => a - b);
       return {
-        ttk: {
-          kills: ttk.length,
-          median: kills.length ? kills[kills.length >> 1] : null,
-          mean: kills.length
-            ? r2(kills.reduce((a, b) => a + b, 0) / kills.length)
-            : null,
-          each: ttk,
-        },
         invariants: { broken, first: breaks },
         cost: Object.fromEntries([...parts].map(([k, xs]) => [k, costOf(xs)])),
       };
