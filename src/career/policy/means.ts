@@ -3,9 +3,8 @@ import { willingness } from '../hiring/talks.ts';
 import { wageBill } from '../record/pay.ts';
 import { ask, lowestWage, standardClause } from '../rules/hiring.ts';
 import { affordablePurchase, leavesReserve } from '../rules/money.ts';
-import type { Temperament } from '../rules/person.ts';
 import type { CareerState, Person, Terms } from '../state.ts';
-import { NEGOTIATION, POLICY } from '../tuning.ts';
+import { NEGOTIATION, POLICY, STAT_SPAN } from '../tuning.ts';
 
 export function minimumTerms(
   state: CareerState,
@@ -27,7 +26,17 @@ export function minimumTerms(
 
 export type Means = { build: number; share: number; reserve: number };
 
-export const meansOf = (temperament: Temperament): Means => POLICY[temperament];
+export function meansOf(nerve: number): Means {
+  const n = (nerve - STAT_SPAN.least) / (STAT_SPAN.most - STAT_SPAN.least);
+  const { leastNerve, mostNerve } = POLICY;
+  const along = (key: keyof Means): number =>
+    leastNerve[key] * (1 - n) + mostNerve[key] * n;
+  return {
+    build: along('build'),
+    share: along('share'),
+    reserve: along('reserve'),
+  };
+}
 
 const affordableSigning = (
   state: CareerState,

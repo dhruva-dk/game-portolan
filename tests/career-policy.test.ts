@@ -33,13 +33,7 @@ import {
 } from '../src/career/rules/development.ts';
 import { affordablePurchase, seasonPrize } from '../src/career/rules/money.ts';
 import { reputations, standings } from '../src/career/rules/standing.ts';
-import {
-  TEMPERAMENTS,
-  ownerTemperament,
-  stars,
-  temperamentOf,
-  type Temperament,
-} from '../src/career/rules/person.ts';
+import { ownerNerve, stars } from '../src/career/rules/person.ts';
 import { standInResult } from '../src/career/standin.ts';
 import {
   DRIVER_STATS,
@@ -52,7 +46,13 @@ import {
   type Sponsor,
   type Team,
 } from '../src/career/state.ts';
-import { LEAGUE, REPOSSESSION, SCOUTING } from '../src/career/tuning.ts';
+import {
+  LEAGUE,
+  POLICY,
+  REPOSSESSION,
+  SCOUTING,
+  STAT_SPAN,
+} from '../src/career/tuning.ts';
 
 const YOURS = 0;
 const QUIET = 20;
@@ -204,27 +204,39 @@ function minimumOffer(state: CareerState, team: number, id: number): Command {
   };
 }
 
-test('the temperament bands of §1.5.6: cautious 1 to 8, sensible 9 to 11, bold 12 to 20', () => {
-  assert.equal(temperamentOf(1), 'cautious');
-  assert.equal(temperamentOf(8), 'cautious');
-  assert.equal(temperamentOf(9), 'sensible');
-  assert.equal(temperamentOf(11), 'sensible');
-  assert.equal(temperamentOf(12), 'bold');
-  assert.equal(temperamentOf(20), 'bold');
-  assert.equal(ownerTemperament(null), 'sensible');
+test('a team’s Nerve is its owner’s, and 10 with no owner', () => {
+  assert.equal(ownerNerve(null), POLICY.ownerlessNerve);
+  assert.equal(ownerNerve(null), 10);
   const owner = BASE.teams[QUIET].owner;
   assert.ok(owner);
-  assert.equal(
-    ownerTemperament(owner),
-    temperamentOf(owner.stats[DRIVER_STATS.indexOf('nerve')])
-  );
-  assert.deepEqual(TEMPERAMENTS, ['cautious', 'sensible', 'bold']);
+  assert.equal(ownerNerve(owner), owner.stats[DRIVER_STATS.indexOf('nerve')]);
 });
 
-test('B, S and R for each temperament are the table of §1.10.2', () => {
-  assert.deepEqual(meansOf('cautious'), { build: 12, share: 0.25, reserve: 6 });
-  assert.deepEqual(meansOf('sensible'), { build: 8, share: 0.4, reserve: 4 });
-  assert.deepEqual(meansOf('bold'), { build: 5, share: 0.6, reserve: 3 });
+const TEN = 10;
+const THREE = [1, TEN, 20];
+
+const NERVES = Array.from(
+  { length: STAT_SPAN.most - STAT_SPAN.least + 1 },
+  (_, i) => STAT_SPAN.least + i
+);
+
+test('the three means meet the table of §3.10 at Nerve 1 and 20 and move one way as Nerve rises', () => {
+  assert.deepEqual(meansOf(1), { build: 12, share: 0.25, reserve: 6 });
+  assert.deepEqual(meansOf(20), { build: 5, share: 0.6, reserve: 3 });
+  for (const nerve of NERVES.slice(1)) {
+    const before = meansOf(nerve - 1);
+    const now = meansOf(nerve);
+    assert.ok(now.build < before.build, `build at ${nerve}`);
+    assert.ok(now.share > before.share, `share at ${nerve}`);
+    assert.ok(now.reserve < before.reserve, `reserve at ${nerve}`);
+  }
+  const middle = meansOf(10.5);
+  const ends = [meansOf(1), meansOf(20)];
+  for (const key of ['build', 'share', 'reserve'] as const)
+    assert.ok(
+      Math.abs(middle[key] - (ends[0][key] + ends[1][key]) / 2) < 1e-12,
+      key
+    );
 });
 
 test('an affordable purchase is at most S of the balance and leaves R races of wages', () => {
@@ -283,9 +295,9 @@ test('holder stars are −1 for an empty seat; the weak seat breaks ties driver,
   assert.equal(weakSeat(state, QUIET), 'mechanic');
 });
 
-test('a settled team wants nothing in any temperament', () => {
-  for (const temperament of TEMPERAMENTS)
-    assert.equal(policy(QUIET_BASE, QUIET, temperament), null, temperament);
+test('a settled team wants nothing at any Nerve', () => {
+  for (const nerve of NERVES)
+    assert.equal(policy(QUIET_BASE, QUIET, nerve), null, `Nerve ${nerve}`);
   assert.equal(policy(QUIET_BASE, QUIET), null);
 });
 
@@ -571,8 +583,8 @@ test('step 6, fit: each ship gets the favorite unlocked gun when affordable', ()
     kind: taste[0],
   });
   const price = fitPrice(state, QUIET, 0);
-  const poor = funded(state, QUIET, Math.floor(price / 0.4) - 1);
-  assert.equal(policy(poor, QUIET, 'sensible'), null);
+  const poor = funded(state, QUIET, Math.floor(price / meansOf(TEN).share) - 1);
+  assert.equal(policy(poor, QUIET, TEN), null);
 });
 
 function gapped(
@@ -596,7 +608,7 @@ test('step 7, build: the largest affordable gap of at least B, slot 0 and earlie
     [0, 'hull', 15],
     [0, 'sails', 9],
   ]);
-  assert.deepEqual(policy(state, QUIET, 'sensible'), {
+  assert.deepEqual(policy(state, QUIET, TEN), {
     type: 'Build',
     team: QUIET,
     slot: 0,
@@ -608,14 +620,14 @@ test('step 7, build: the largest affordable gap of at least B, slot 0 and earlie
     slot: 0,
     line: 'hull',
   });
-  assert.deepEqual(policy(hull, QUIET, 'sensible'), {
+  assert.deepEqual(policy(hull, QUIET, TEN), {
     type: 'Build',
     team: QUIET,
     slot: 1,
     line: 'keel',
   });
   const small = gapped(QUIET_BASE, [[1, 'rudder', 7]]);
-  assert.equal(policy(small, QUIET, 'sensible'), null);
+  assert.equal(policy(small, QUIET, TEN), null);
   const cheap = cheapStaff(
     gapped(QUIET_BASE, [
       [0, 'hull', 15],
@@ -626,8 +638,12 @@ test('step 7, build: the largest affordable gap of at least B, slot 0 and earlie
   const hullPrice = buildPrice(cheap, QUIET, 0, 'hull');
   const sailsPrice = buildPrice(cheap, QUIET, 0, 'sails');
   assert.ok(hullPrice > sailsPrice);
-  const tight = funded(cheap, QUIET, Math.ceil(sailsPrice / 0.4));
-  assert.deepEqual(policy(tight, QUIET, 'sensible'), {
+  const tight = funded(
+    cheap,
+    QUIET,
+    Math.ceil(sailsPrice / meansOf(TEN).share)
+  );
+  assert.deepEqual(policy(tight, QUIET, TEN), {
     type: 'Build',
     team: QUIET,
     slot: 0,
@@ -665,18 +681,18 @@ test('step 8, sponsors: the offer worth most by fee + 0.5 × bonus goes in the f
   assert.equal(policy(none, QUIET), null);
 });
 
-test('B: a bold team builds a gap of 6, a sensible one 9, a cautious one only 12', () => {
-  const built = (gap: number, temperament: Temperament): boolean =>
-    policy(gapped(QUIET_BASE, [[0, 'hull', gap]]), QUIET, temperament) !== null;
+test('B: a team of Nerve 20 builds a gap of 6, of Nerve 10 one of 9, of Nerve 1 only 12', () => {
+  const built = (gap: number, nerve: number): boolean =>
+    policy(gapped(QUIET_BASE, [[0, 'hull', gap]]), QUIET, nerve) !== null;
   assert.deepEqual(
-    [6, 9, 12].map((gap) => TEMPERAMENTS.map((t) => built(gap, t))),
+    [6, 9, 12].map((gap) => THREE.map((nerve) => built(gap, nerve))),
     [
       [false, false, true],
       [false, true, true],
       [true, true, true],
     ]
   );
-  assert.equal(built(4, 'bold'), false);
+  assert.equal(built(4, 20), false);
 });
 
 function cheapStaff(state: CareerState, team: number): CareerState {
@@ -690,17 +706,14 @@ function cheapStaff(state: CareerState, team: number): CareerState {
   };
 }
 
-test('S: a bold team spends a larger share of its balance than a sensible one, and that than a cautious one', () => {
+test('S: a team of Nerve 20 spends a larger share of its balance than one of Nerve 10, and that than one of Nerve 1', () => {
   const state = cheapStaff(gapped(QUIET_BASE, [[0, 'hull', 15]]), QUIET);
   const price = buildPrice(state, QUIET, 0, 'hull');
-  const builds = (share: number, temperament: Temperament): boolean =>
-    policy(
-      funded(state, QUIET, Math.ceil(price / share)),
-      QUIET,
-      temperament
-    ) !== null;
+  const builds = (share: number, nerve: number): boolean =>
+    policy(funded(state, QUIET, Math.ceil(price / share)), QUIET, nerve) !==
+    null;
   assert.deepEqual(
-    [0.5, 0.3, 0.2].map((share) => TEMPERAMENTS.map((t) => builds(share, t))),
+    [0.5, 0.3, 0.2].map((share) => THREE.map((n) => builds(share, n))),
     [
       [false, false, true],
       [false, true, true],
@@ -709,7 +722,7 @@ test('S: a bold team spends a larger share of its balance than a sensible one, a
   );
 });
 
-test('R: a cautious team keeps more races of wages in hand than a sensible one, and that than a bold one', () => {
+test('R: a team of Nerve 1 keeps more races of wages in hand than one of Nerve 10, and that than one of Nerve 20', () => {
   const mechanic = holder(BASE, QUIET, 'mechanic');
   let state = changeTeam(QUIET_BASE, QUIET, (t) => ({
     ...t,
@@ -728,10 +741,10 @@ test('R: a cautious team keeps more races of wages in hand than a sensible one, 
   const terms = minimumTerms(state, QUIET, candidate);
   assert.ok(terms);
   const bill = wageBill(state, QUIET) + terms.wage;
-  const signs = (races: number, temperament: Temperament): boolean =>
-    policy(funded(state, QUIET, races * bill), QUIET, temperament) !== null;
+  const signs = (races: number, nerve: number): boolean =>
+    policy(funded(state, QUIET, races * bill), QUIET, nerve) !== null;
   assert.deepEqual(
-    [3, 4, 6].map((races) => TEMPERAMENTS.map((t) => signs(races, t))),
+    [3, 5, 6].map((races) => THREE.map((n) => signs(races, n))),
     [
       [false, false, true],
       [false, true, true],
@@ -741,13 +754,13 @@ test('R: a cautious team keeps more races of wages in hand than a sensible one, 
   assert.equal(costToSign(state, QUIET, candidate, terms), 0);
 });
 
-test('the temperament comes from the owner’s Nerve', () => {
+test('the means come from the owner’s Nerve', () => {
   const state = gapped(QUIET_BASE, [[0, 'hull', 9]]);
-  assert.equal(policy(withNerve(state, QUIET, 8), QUIET), null);
-  assert.notEqual(policy(withNerve(state, QUIET, 9), QUIET), null);
+  assert.equal(policy(withNerve(state, QUIET, 9), QUIET), null);
+  assert.notEqual(policy(withNerve(state, QUIET, 10), QUIET), null);
   const six = gapped(QUIET_BASE, [[0, 'hull', 6]]);
-  assert.equal(policy(withNerve(six, QUIET, 11), QUIET), null);
-  assert.notEqual(policy(withNerve(six, QUIET, 12), QUIET), null);
+  assert.equal(policy(withNerve(six, QUIET, 17), QUIET), null);
+  assert.notEqual(policy(withNerve(six, QUIET, 18), QUIET), null);
 });
 
 test('the policy and its run are deterministic and never mutate the state', () => {
@@ -931,12 +944,12 @@ function sendChecked(
 function policyLoop(
   state: CareerState,
   team: number,
-  temperament: Temperament | undefined,
+  nerve: number | undefined,
   tally: Tally
 ): CareerState {
   let current = state;
   for (let n = 0; n < 40; n++) {
-    const command = policy(current, team, temperament);
+    const command = policy(current, team, nerve);
     if (command === null) break;
     current = sendChecked(current, command, tally);
   }
@@ -945,18 +958,17 @@ function policyLoop(
 
 function rivalsActed(
   state: CareerState,
-  temperament: Temperament | undefined,
+  nerve: number | undefined,
   tally: Tally
 ): CareerState {
   let current = state;
   for (const team of worstFirst(state))
-    current = policyLoop(current, team, temperament, tally);
+    current = policyLoop(current, team, nerve, tally);
   return current;
 }
 
-function forced(state: CareerState, temperament: Temperament | undefined) {
-  if (temperament === undefined) return state;
-  const nerve = { cautious: 4, sensible: 10, bold: 16 }[temperament];
+function forced(state: CareerState, nerve: number | undefined) {
+  if (nerve === undefined) return state;
   let current = state;
   for (let team = 1; team < state.teams.length; team++)
     current = withNerve(current, team, nerve);
@@ -988,7 +1000,7 @@ function raceChecked(started: CareerState, tally: Tally): CareerState {
 function playLeague(
   seed: string,
   seasons: number,
-  temperament: Temperament | undefined
+  nerve: number | undefined
 ): { state: CareerState; tally: Tally } {
   const tally: Tally = {
     hired: new Set(),
@@ -997,11 +1009,11 @@ function playLeague(
     commands: 0,
     repossessed: 0,
   };
-  let state = forced(careerOf(seed), temperament);
+  let state = forced(careerOf(seed), nerve);
   for (let race = 0; race < seasons * SEASON; race++) {
     if (state.phase === 'offseason') {
-      state = policyLoop(state, YOURS, temperament, tally);
-      const acted = rivalsActed(state, temperament, tally);
+      state = policyLoop(state, YOURS, nerve, tally);
+      const acted = rivalsActed(state, nerve, tally);
       const finished = send(deepFreeze(state), {
         type: 'FinishOffseason',
         team: YOURS,
@@ -1014,8 +1026,8 @@ function playLeague(
       checkRanges(finished);
       state = finished;
     }
-    state = policyLoop(state, YOURS, temperament, tally);
-    const acted = rivalsActed(state, temperament, tally);
+    state = policyLoop(state, YOURS, nerve, tally);
+    const acted = rivalsActed(state, nerve, tally);
     const started = send(deepFreeze(state), { type: 'StartRace', team: YOURS });
     assert.deepEqual(started, { ...acted, phase: 'racing' });
     checkLeague(started);
@@ -1026,19 +1038,19 @@ function playLeague(
   return { state, tally };
 }
 
-test('over two seasons no policy command is refused, for each temperament forced on every team and for the natural mix, from three seeds', () => {
-  const runs: (Temperament | undefined)[] = [...TEMPERAMENTS, undefined];
+test('over two seasons no policy command is refused, for Nerve 1, 10 and 20 forced on every team and for the natural mix, from three seeds', () => {
+  const runs: (number | undefined)[] = [...THREE, undefined];
   for (const seed of ['tide', 'squall', 'doldrums'])
-    for (const temperament of runs) {
-      const { state, tally } = playLeague(seed, 2, temperament);
+    for (const nerve of runs) {
+      const { state, tally } = playLeague(seed, 2, nerve);
       assert.equal(state.season, 2);
       assert.equal(state.phase, 'offseason');
       assert.ok(tally.commands > 0);
-      if (temperament !== undefined)
+      if (nerve !== undefined)
         state.teams.forEach((team) =>
           assert.equal(
-            ownerTemperament(team.owner),
-            team.owner === null ? 'sensible' : temperament
+            ownerNerve(team.owner),
+            team.owner === null ? POLICY.ownerlessNerve : nerve
           )
         );
     }

@@ -9,6 +9,7 @@ import {
   LINES,
   ROLES,
   type CareerState,
+  type Person,
   type SeasonCard,
 } from '../src/career/state.ts';
 import { AGEING, LEAGUE } from '../src/career/tuning.ts';
@@ -37,6 +38,32 @@ function done(state: CareerState, command: Command): CareerState {
   if (!result.ok) throw new Error(result.reason);
   return result.state;
 }
+
+const seatedAt = (
+  state: CareerState,
+  age: (p: Person) => number
+): CareerState => {
+  const seated = new Set(Object.values(state.teams[YOURS].seats));
+  return {
+    ...state,
+    people: state.people.map((p) =>
+      seated.has(p.id)
+        ? {
+            ...p,
+            age: age(p),
+            retireAge: Math.max(p.retireAge, age(p) + 2 * AGEING.perStop),
+          }
+        : p
+    ),
+  };
+};
+
+const RISING = recorded(
+  seatedAt(rehearsed('test', 19), (p) => p.peakAge - 4 * AGEING.perStop)
+);
+const FALLING = recorded(
+  seatedAt(rehearsed('test', 29), (p) => p.peakAge + AGEING.prime + 1)
+);
 
 const NINTH = rehearsed('test', 9);
 const driver = NINTH.teams[YOURS].seats.driver;
@@ -204,12 +231,12 @@ test('a retirement is marked on its card', () => {
 });
 
 test('a stat that rose and a stat that fell show as changes', () => {
-  const rose = people(SECOND)
+  const rose = people(RISING)
     .seats.map(held)
     .flatMap((p) => p.stats)
     .filter((s) => s.change > 0);
   assert.ok(rose.length > 0);
-  const fell = people(THIRD)
+  const fell = people(FALLING)
     .seats.map(held)
     .flatMap((p) => p.stats)
     .filter((s) => s.change < 0);

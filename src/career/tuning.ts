@@ -70,12 +70,7 @@ export const AGEING = {
   rookieLevel: { lo: 2, hi: 20 },
 };
 
-export const OWNERS = {
-  level: { lo: 6, hi: 14 },
-  cautious: { lo: 1, hi: 8 },
-  sensible: { lo: 9, hi: 11 },
-  bold: { lo: 12, hi: 20 },
-};
+export const OWNERS = { level: { lo: 6, hi: 14 } };
 
 export const STAND_IN: DriverStats = {
   gunnery: 2,
@@ -182,9 +177,9 @@ export const POLICY = {
   behindWeight: 1.5,
   aheadWeight: 1,
   sponsorBonusWeight: 0.5,
-  cautious: { build: 12, share: 0.25, reserve: 6 },
-  sensible: { build: 8, share: 0.4, reserve: 4 },
-  bold: { build: 5, share: 0.6, reserve: 3 },
+  leastNerve: { build: 12, share: 0.25, reserve: 6 },
+  mostNerve: { build: 5, share: 0.6, reserve: 3 },
+  ownerlessNerve: 10,
 };
 
 export const PAPER = { headlines: 5 };

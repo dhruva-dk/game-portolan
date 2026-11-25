@@ -1,6 +1,5 @@
 import type { Command, Reason, Refusal } from '../commands.ts';
 import { standingOrder } from '../rules/standing.ts';
-import type { Temperament } from '../rules/person.ts';
 import { YOURS, type CareerState } from '../state.ts';
 import { POLICY } from '../tuning.ts';
 import { policy } from './policy.ts';
@@ -21,12 +20,12 @@ export function runTeam(
   state: CareerState,
   team: number,
   send: Send,
-  temperament?: Temperament
+  nerve?: number
 ): PolicyRun {
   let current = state;
   const sent: Command[] = [];
   for (let n = 0; n < POLICY.most; n++) {
-    const command = policy(current, team, temperament);
+    const command = policy(current, team, nerve);
     if (command === null) break;
     const applied = send(current, command);
     if (!applied.ok)
