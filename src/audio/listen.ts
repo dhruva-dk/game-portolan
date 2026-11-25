@@ -14,7 +14,6 @@ export interface Hearing {
   status: Status & Kit;
   screen: Screen;
   map: boolean;
-  covered: number;
 }
 
 export interface Call {
@@ -34,7 +33,6 @@ export interface Bed {
   hull: number;
   presence: number;
   muffle: number;
-  covered: number;
   clock: number;
 }
 
@@ -65,7 +63,6 @@ export function createListen(ground: (p: Vec3) => number) {
     hull: 1,
     presence: 0,
     muffle: 0,
-    covered: 0,
     clock: 0,
   };
   let screen: Screen | null = null,
@@ -117,7 +114,7 @@ export function createListen(ground: (p: Vec3) => number) {
 
   return {
     listen(
-      { scene, status: s, screen: shown, map: open, covered }: Hearing,
+      { scene, status: s, screen: shown, map: open }: Hearing,
       dt: number,
       out: Call[]
     ): Bed {
@@ -216,7 +213,6 @@ export function createListen(ground: (p: Vec3) => number) {
         : shown === 'sinking' || shown === 'sunk'
           ? 0.45
           : 0;
-      bed.covered = clamp(covered);
       bed.clock = scene.clock;
       return bed;
     },

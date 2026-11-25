@@ -204,7 +204,6 @@ export async function voyage(
     status,
     screen: 'match',
     map: false,
-    covered: 0,
   };
   const screenOf = (): Screen =>
     phase === 'sailing' ? 'match' : phase === 'watching' ? 'spectate' : 'sunk';

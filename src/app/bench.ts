@@ -159,7 +159,6 @@ export async function bench(s: Stage): Promise<Played> {
     status,
     screen: 'match',
     map: false,
-    covered: 0,
   };
   void s.ready.then(() => loaded('title'));
   loaded('play');
