@@ -90,7 +90,6 @@ export const MOTION = {
     ease: OUT,
     pop: POP,
   },
-  turn: { ms: 280, ease: OUT, shift: 16 },
   built: { burst: 620, float: 760, rise: 26, ease: OUT },
   painted: { hold: 320 },
   sway: { ms: 1500, swing: 3.2, stagger: 90 },
