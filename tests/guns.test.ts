@@ -119,7 +119,7 @@ test('each gun sinks a ship at its best range in a band: 1–5 s against its hul
 test("a scatter's grape cuts the rigging of the ship it strikes: it sails at RIGGING of the speed it asks till it is mended; a cannon's ball cuts none", () => {
   const struck = (kind: GunKind) =>
     fight(
-      [crewOf(1, valuesAt(50, kind)), crewOf(2, EVEN_SHIP)],
+      [crewOf(1, valuesAt(20, kind)), crewOf(2, EVEN_SHIP)],
       [
         afloat(1, lying(center, 0)),
         afloat(2, lying(east(BEST.scatter), Math.PI / 2)),

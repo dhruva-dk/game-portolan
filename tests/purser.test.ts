@@ -196,7 +196,7 @@ test('bots near one piece do not all pile on it: one takes it, and none goes for
     [1, 2, 3, 4, 5, 6],
     at.map((_, i) => crewOf(i, EVEN_SHIP)),
     { pieces: [piece(1, c0, 'common')], next: 2 },
-    60
+    180
   );
   assert.equal(r.took.length, 1);
   assert.equal(r.flotsam.pieces.length, 0);

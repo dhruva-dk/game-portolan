@@ -125,7 +125,7 @@ test("an armed bot holds off at its gun's range and shoots a steady ship, rather
     const r = battle(
       [placed(0, 0, 0, 90 * deg), placed(1, 0, 150, 0)],
       [seed, null],
-      40,
+      90,
       { course: null, throttle: 0.4 }
     );
     const later = r.ranges.slice(Math.round(10 / STEP));

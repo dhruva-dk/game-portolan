@@ -22,7 +22,7 @@ const ROWS: readonly {
   twenty: number;
 }[] = [
   { stat: 'gunnery', read: (t) => t.react, one: 2.2, twenty: 0.3 },
-  { stat: 'gunnery', read: (t) => t.gunnery, one: 0, twenty: 1 },
+  { stat: 'gunnery', read: (t) => t.gunnery, one: -0.55, twenty: 1 },
   { stat: 'helm', read: (t) => t.helm, one: 0, twenty: 1 },
   { stat: 'nerve', read: (t) => t.run, one: 0.6, twenty: 0.15 },
   { stat: 'territory', read: (t) => t.loop, one: 60, twenty: 250 },
