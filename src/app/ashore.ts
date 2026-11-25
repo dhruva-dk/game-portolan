@@ -1,8 +1,10 @@
 import type { Command, Reason } from '../career/commands.ts';
 import { planetSeed } from '../career/fit.ts';
 import { YOURS, type CareerState, type Role } from '../career/state.ts';
+import type { Edit } from '../career/views/negotiation.ts';
 import { lobbyView } from '../career/views/lobby.ts';
 import { dealView } from '../career/views/deal.ts';
+import { negotiationView } from '../career/views/negotiation.ts';
 import { teamView } from '../career/views/team.ts';
 import { createGame } from '../play/game.ts';
 import { PARTS, WHOLE, openingPose, type Framing } from '../play/anchorage.ts';
@@ -11,9 +13,11 @@ import type { Chart } from '../play/player.ts';
 import { surveyor } from '../play/preview.ts';
 import { watersOf } from '../play/setup.ts';
 import { rise } from '../ui/base/sheet.ts';
+import { MOTION } from '../ui/base/house.ts';
 import { fade, uiLayer } from '../ui/base/ui.ts';
 import { createLobby } from '../ui/lobby/lobby.ts';
 import { createDeal } from '../ui/lobby/deal.ts';
+import { createNegotiation } from '../ui/lobby/negotiation.ts';
 import type {
   LobbyPort,
   ScreenArgument,
@@ -52,12 +56,18 @@ export async function ashore(
   let state = career,
     chart: Chart | null = null,
     open: ScreenName | null = null,
-    dealt: Role | null = null;
+    dealt: Role | null = null,
+    talking: number | null = null;
 
+  const pricing = (person: number) => (edit: Edit | null) =>
+    negotiationView(state, person, edit);
+
+  let held = false;
   const redraw = () => {
-    lobby.show(lobbyView(state));
+    if (!held) lobby.show(lobbyView(state));
     if (open === 'team') team.show(teamView(state));
     if (dealt !== null) deal.show(dealView(state, dealt));
+    if (talking !== null) negotiation.show(pricing(talking));
   };
 
   const port: LobbyPort = {
@@ -65,12 +75,28 @@ export async function ashore(
       const { applied, saved } = sendAndSave(queue, state, command);
       if (!applied.ok) return applied.reason;
       state = applied.state;
+      if (command.type === 'Offer') {
+        held = true;
+        window.setTimeout(() => {
+          held = false;
+          redraw();
+        }, MOTION.suspense.ms);
+      }
       redraw();
       if (state.phase === 'racing') void saved.then(() => o.sailed(state));
       return null;
     },
     open(name, argument) {
       const role = argument?.role;
+      const person = argument?.person;
+      if (open === 'team' && talking === null && name === 'negotiation') {
+        if (person === undefined) return;
+        talking = person;
+        negotiation.show(pricing(person));
+        rise(negotiation.el, true);
+        fade(dealt === null ? team.el : deal.el, false);
+        return;
+      }
       if (open === 'team' && dealt === null && name === 'deal' && role) {
         dealt = role;
         deal.open();
@@ -88,6 +114,21 @@ export async function ashore(
       }
     },
     close() {
+      if (talking !== null) {
+        talking = null;
+        rise(negotiation.el, false);
+        negotiation.reset();
+        if (dealt !== null && state.teams[YOURS].deals[dealt] !== null) {
+          fade(deal.el, true);
+          return;
+        }
+        if (dealt !== null) {
+          dealt = null;
+          rise(deal.el, false, true);
+        }
+        fade(team.el, true);
+        return;
+      }
       if (dealt !== null) {
         if (deal.back()) return;
         dealt = null;
@@ -119,6 +160,7 @@ export async function ashore(
   const lobby = createLobby(port);
   const team = createTeam(port);
   const deal = createDeal(port);
+  const negotiation = createNegotiation(port);
   redraw();
 
   void surveyor()(planetSeed(state)).then((c) => {
