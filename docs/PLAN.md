@@ -630,6 +630,14 @@ When your ship sinks, or you choose Forfeit from the pause sheet (which sinks yo
 - **Watch** follows your other ship if afloat, otherwise the best-placed ship afloat, at normal speed, with the Result button still on screen.
 - **Result** finishes the match without drawing it: the app steps the sim in slices of at most 12 ms per display frame until it ends, drawing no 3D frame, only the ships-afloat count and the storm clock running fast. The match always ends (§1.11.10), so this is bounded. Then the app goes on as after any race (§2.9.2).
 
+### 1.11.12 Aground
+
+A ship cannot sail into water shallower than its draft (2.2 m); the bank stops it. One change from today gets it off again:
+
+1. **Backing off.** A ship that is stopped (under 1 m/s) with a bank within 3 m of its bow, steered more than 1 radian off its bow with any throttle, goes astern at up to one fifth of its top speed, turning as it goes, until its bow is within 1 radian of the course it is steered on; then it goes ahead as usual. Nowhere else does a ship go astern: in open water a stopped ship steered astern turns and goes ahead.
+2. **Bots.** A bot held by a bank looks for the deepest water round it. If that lies more than half a radian off its bow it stops its engine and pivots toward it one way, giving a pivot 8 seconds without swinging 0.15 rad before trying something else, and when that water is abaft its beam it backs off by rule 1.
+3. Both are in `sim/handling.ts` (`SHIP.astern`, `aback`, `ahead`, `stopped`) and `sim/helmsman.ts` (`HELM.pivot`, `patience`), and count as tuning numbers for Milestone 7.
+
 ## 1.12 Screens
 
 All screens use the sea UI's drawing system (§2.5): paper slips, round ink buttons, drawn glyphs, italic numerals. Positions below are for the 1180 × 820 point landscape screen and sit inside the safe area. "Round button" means the existing paper-disc button; "ribbon button" means the existing SAIL ribbon. Every lobby screen is drawn only from its view data (§2.5.3). A control that cannot be used is drawn faint and does nothing when tapped.
