@@ -3,7 +3,7 @@ import type { World } from '../world/environment.ts';
 import type { FrameOptions } from '../render/frame.ts';
 import { createFly } from './fly.ts';
 import { ashore } from './ashore.ts';
-import { rehearsed } from './rehearse.ts';
+import { owing, rehearsed, wintered } from './rehearse.ts';
 import { memoryStore } from './save.ts';
 import { planetSeed } from '../career/fit.ts';
 import { seedOf } from '../world/seeds.ts';
@@ -239,7 +239,10 @@ async function harbor(
   title: { show(on: boolean): void }
 ) {
   const races = Math.max(0, Math.floor(number('races', 0)));
-  const career = rehearsed(params.get('seed') ?? undefined, races);
+  const sailed = rehearsed(params.get('seed') ?? undefined, races),
+    signed = params.has('signed') ? wintered(sailed) : sailed,
+    owed = params.get('balance');
+  const career = owed === null ? signed : owing(signed, Number(owed));
   const planet = planetSeed(career);
   const s = await stage({
     ...setupOf(release),
@@ -254,6 +257,8 @@ async function harbor(
     sailed() {
       const at = new URL(location.href);
       at.searchParams.set('races', String(races + 1));
+      at.searchParams.delete('signed');
+      at.searchParams.delete('balance');
       location.replace(at.href);
     },
   });

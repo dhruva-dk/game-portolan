@@ -53,3 +53,16 @@ export function rehearsed(
   }
   return state;
 }
+
+export function wintered(state: CareerState): CareerState {
+  return state.phase === 'offseason'
+    ? ashore(dismissed(state), { type: 'FinishOffseason', team: YOURS })
+    : state;
+}
+
+export function owing(state: CareerState, balance: number): CareerState {
+  return {
+    ...state,
+    teams: state.teams.map((t, i) => (i === YOURS ? { ...t, balance } : t)),
+  };
+}
