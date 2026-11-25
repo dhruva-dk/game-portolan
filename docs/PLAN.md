@@ -639,7 +639,7 @@ All screens use the sea UI's drawing system (§2.5): paper slips, round ink butt
 1. **The lobby** is the base: the 3D scene with slips and buttons over it (§1.12.2).
 2. **A screen** opens over the lobby: Ship, Team, Sponsors, Opponents, Planet or Settings. One is open at a time. While a screen is open the lobby's four bottom-left buttons and SAIL are hidden, the three top-right slips (money, standing, race) stay, and the Settings button's place at the far top right is taken by a round **close button** that returns to the lobby.
 3. **A sheet** is a paper panel. It never covers the whole screen; the ship stays visible beside or behind it.
-4. **A sheet may open over a screen:** the deal and negotiation over Team; the team sheet beside the standings in Opponents; the paint picker over Ship. Each has its own round close button at its top right corner, which goes back one step. Nothing closes on a tap outside it.
+4. **A sheet may open over a screen:** the deal and negotiation over Team; the team sheet beside the standings in Opponents; the paint picker over Ship. There is still one close button, the round one at the far top right, and it always goes back one step: from an enlarged card to its sheet, from a sheet to the screen under it, from a screen to the lobby. While a sheet is open the screen under it fades out, so that nothing of it shows round the sheet. Nothing closes on a tap outside it.
 5. **A person card** can be enlarged in place by a tap and shrunk by a second tap. While a card is enlarged, the round close button shrinks it; with no card enlarged it goes back one step as usual.
 6. **Flows** take over the whole interface until finished and offer no way out except forward: New Career (§1.12.1), the result flow (§1.12.10) and the off-season report (§1.12.11). The one thing that opens over a flow is a team sheet from a link in the paper (§1.13.1); closing it returns to the paper.
 7. **A two-tap button** guards an action that cannot be undone. The first tap arms it: its face changes to the word Confirm? with a tick glyph. A second tap on it acts. A tap anywhere else disarms it and does nothing more.
@@ -753,21 +753,21 @@ A sheet over the Team sheet, the same size, showing one role's deal: up to three
 | Compass rose | Each point drawn as a band between the low and high ends of that stat. The current holder of the seat is overlaid as a thin outline; an empty seat shows none; Uncle counts as a holder |
 | Wage | The asking wage, as two numerals if it is a range |
 | Current team | If employed by another team: that team's emblem and the word Clause with a coin glyph and the amount |
-| Pin | A pin glyph at the top right corner if you approached them |
+| Pin | A pin glyph at the top right corner while you hold an approach on them |
 
 **Under each card, three buttons:**
 
 | Button | Shows | Tap | Faint when |
 |---|---|---|---|
-| Report | The word, coin glyph, cost | `BuyReport`; the ranges on that card become exact | You hold a report on them, or the balance is short |
-| Approach | The word, coin glyph, cost | `Approach`; the card gains the pin | You hold an approach on them, or the balance is short |
+| Report | The word, coin glyph, cost | `BuyReport`; the ranges on that card become exact | You hold a report on them (a tick in place of the cost), or the balance is short (the short-balance mark over the coin) |
+| Approach | The word, coin glyph, cost | `Approach`; the card gains the pin | You hold an approach on them (the pin in place of the cost), or the balance is short (the short-balance mark over the coin) |
 | Negotiate | The word | Opens negotiation | Another candidate in this deal has been sent an offer |
 
 **Enlarged**, a candidate card shows every stat with its glyph, word and range as two numerals on a 1 to 20 bar (one numeral when exact), with the current holder's value as a tick on the same bar. The numerals are blue where the candidate's low end is above the holder's value and red where the high end is below it.
 
 ### 1.12.6 Negotiation
 
-A sheet over the Team sheet, the same size, replacing the deal sheet while open. Its close button returns to the deal (for a candidate) or to Team (for a renewal). Closing it loses nothing: the talks are in the career state.
+A sheet over the Team sheet, the same size, replacing the deal sheet while open. The close button returns to the deal (for a candidate) or to Team (for a renewal). Closing it loses nothing: the talks are in the career state.
 
 - **Left third:** the person's card (candidate form if not yours).
 - **Right two-thirds, top to bottom:**
@@ -1377,7 +1377,7 @@ All UI is DOM elements placed over the canvas and filled with inline SVG produce
 | `word.ts` | A short text label in the house face; the `Word` type is the word list of §1.2, so a word outside it does not compile |
 | `lexicon.ts` | The glyph and word of every stat and role, and the smallest size each glyph may be drawn at |
 | `button.ts` | The round button, the ribbon, the close button, the red dot, press feedback, and the two-tap button (§1.12.0 item 7) |
-| `sheet.ts` | A paper panel with a round close button (built from `sheet` in today's `screens.ts`) |
+| `sheet.ts` | A paper panel (built from `sheet` in today's `screens.ts`), with a round close button of its own only where no screen's close button exists: a sheet opened over a flow (§1.12.0 item 6) |
 | `field.ts` | A text field on a slip (taken from today's seed field in `panel.ts`) |
 | `stepper.ts` | Minus button, numeral slip, plus button, with hold-to-repeat |
 | `picker.ts` | A row of mutually exclusive choices |
