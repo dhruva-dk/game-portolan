@@ -64,7 +64,7 @@ export function createList(parent: HTMLElement, box: Box, row: number): List {
     tween: { from: number; to: number; at: number } | null = null,
     hide = 0;
 
-  const most = () => Math.max(0, rows.length * row - box.h);
+  const most = () => Math.max(0, rows.length * row + 2 * EDGE - box.h);
 
   const stretched = (over: number) =>
     Math.sign(over) * (1 - 1 / ((Math.abs(over) * rubber) / box.h + 1)) * box.h;
@@ -75,11 +75,11 @@ export function createList(parent: HTMLElement, box: Box, row: number): List {
     strip.style.transform = `translateY(${r2(-y)}px)`;
     const reach = margin * row;
     rows.forEach((r, i) => {
-      const top = i * row - y,
+      const top = EDGE + i * row - y,
         far = top + row < -reach || top > box.h + reach;
       if (r.hidden !== far) r.hidden = far;
     });
-    const content = rows.length * row;
+    const content = rows.length * row + 2 * EDGE;
     if (content <= box.h) return;
     const size = Math.max(THUMB.least, (box.h * box.h) / content),
       over = y < 0 ? y : y > most() ? y - most() : 0,
@@ -91,7 +91,8 @@ export function createList(parent: HTMLElement, box: Box, row: number): List {
 
   function wake() {
     clearTimeout(hide);
-    if (rows.length * row > box.h) thumb.style.opacity = `${THUMB.opacity}`;
+    if (rows.length * row + 2 * EDGE > box.h)
+      thumb.style.opacity = `${THUMB.opacity}`;
   }
 
   function sleep() {
@@ -159,7 +160,6 @@ export function createList(parent: HTMLElement, box: Box, row: number): List {
       last = e.timeStamp;
       raw = y;
       samples = [];
-      wake();
     },
     true
   );
@@ -235,16 +235,16 @@ export function createList(parent: HTMLElement, box: Box, row: number): List {
         r.style.position = 'absolute';
         r.style.left = '0';
         r.style.right = '0';
-        r.style.top = `${i * row}px`;
+        r.style.top = `${EDGE + i * row}px`;
         r.style.height = `${row}px`;
       });
       strip.replaceChildren(...next);
-      strip.style.height = `${next.length * row}px`;
+      strip.style.height = `${next.length * row + 2 * EDGE}px`;
       if (!moving && !frame) y = bounded(y);
       place();
     },
     to(index, instant = false) {
-      const target = bounded(index * row - (box.h - row) / 2);
+      const target = bounded(EDGE + index * row - (box.h - row) / 2);
       stop();
       if (instant) {
         y = target;
@@ -256,7 +256,7 @@ export function createList(parent: HTMLElement, box: Box, row: number): List {
       run();
     },
     near(index) {
-      const top = index * row - y;
+      const top = EDGE + index * row - y;
       return top + row > 0 && top < box.h;
     },
   };
