@@ -77,6 +77,13 @@ export const MOTION = {
   turn: { ms: 280, ease: OUT, shift: 16 },
   built: { burst: 620, float: 760, rise: 26, ease: OUT },
   painted: { hold: 320 },
+  sway: { ms: 1500, swing: 3.2, stagger: 90 },
+  breeze: { ms: 3400, swing: 0.8 },
+  lift: { ms: 200, ease: OUT, rise: 8, swell: 1.05 },
+  invite: { ms: 1100 },
+  flown: { ms: 680, ease: OUT, furl: 0.16, rise: 18 },
+  paid: { after: 560, ms: 1500, rise: 24 },
+  inked: { ms: 300, ease: POP, after: 120, stagger: 80 },
   fade: { ms: 180, ease: 'ease' },
 } as const;
 
