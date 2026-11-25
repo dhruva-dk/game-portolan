@@ -220,7 +220,7 @@ export function setLivery(
 export function bindLivery(
   svg: SVGSVGElement,
   id: string,
-  pick: (kind: LiveryPick, index: number) => void
+  pick: (kind: LiveryPick, index: number) => boolean | void
 ) {
   for (const kind of KINDS)
     for (let i = 0; i < countOf(kind); i++) {
@@ -228,11 +228,11 @@ export function bindLivery(
       pressable(
         el,
         () => {
-          const face = el?.querySelector<SVGElement>('.face');
-          face?.classList.remove('answer');
+          const face = el?.querySelector<SVGElement>('.face'),
+            answer = pick(kind, i) === false ? 'refuse' : 'answer';
+          face?.classList.remove('answer', 'refuse');
           void face?.getBoundingClientRect();
-          face?.classList.add('answer');
-          pick(kind, i);
+          face?.classList.add(answer);
         },
         `${kind}-${i}`
       );
