@@ -22,6 +22,8 @@ interface Watched {
   result: MatchResult;
   closed: readonly number[];
   sampled: (readonly number[])[];
+  held: (readonly number[])[];
+  ended: readonly number[];
   storms: { id: number; credit: number | null }[];
   teamShare: number[];
   alive: readonly number[];
@@ -33,6 +35,8 @@ function watched(setup: MatchSetup): Watched {
     view = m.view,
     closed = closings(rulesOf(setup.storm).storm);
   const sampled: (readonly number[])[] = [],
+    held: (readonly number[])[] = [],
+    holding = () => view.territory()!.inside(view.storm(1)),
     hit = new Map<number, { by: number; time: number }>(),
     storms: Watched['storms'] = [];
   let read = 0;
@@ -51,14 +55,18 @@ function watched(setup: MatchSetup): Watched {
           credit: h && k.time - h.time + STEP < MATCH_END.credit ? h.by : null,
         });
     }
-    while (sampled.length < closed.length && now >= closed[sampled.length])
+    while (sampled.length < closed.length && now >= closed[sampled.length]) {
       sampled.push([...view.alive()]);
+      held.push(holding());
+    }
   }
   return {
     setup,
     result: m.result(),
     closed,
     sampled,
+    held,
+    ended: holding(),
     storms,
     teamShare: setup.ships.map((_, id) => view.teamShare(id)),
     alive: [...view.alive()],
@@ -142,13 +150,15 @@ function sound(w: Watched) {
       if (!at.some((id) => team(id) === t))
         assert.equal(r.sea[t][k], 0, `team ${t}, none afloat, at sample ${k}`);
   }
-  for (let t = 0; t < teams; t++) {
-    const missing = r.sea[t].slice(w.sampled.length);
-    assert.ok(
-      missing.every((x) => x === missing[0]),
-      'every missing sample the share at the end'
+  const ending = new Set(w.alive.map(team));
+  for (let t = 0; t < teams; t++)
+    assert.deepEqual(
+      r.sea[t],
+      closed.map((_, k) =>
+        k < w.held.length ? w.held[k][t] : ending.has(t) ? w.ended[t] : 0
+      ),
+      `team ${t}: what it held inside the ring as each phase closed, then at the end`
     );
-  }
   assert.ok(
     r.sea.some((t) => t.some((x) => x > 0)),
     'some team held sea'
