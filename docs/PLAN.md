@@ -1663,13 +1663,13 @@ Rules:
 1. **No comments.** The only comments allowed are ESLint directives with their reason (`// eslint-disable-next-line rule -- why`). Names carry the meaning. History belongs in commits.
 2. **US English** in identifiers, file names and on-screen text.
 3. **Every number from Part 1 lives in a tuning file** and nowhere else: `sim/tuning.ts` for §1.11, `career/tuning.ts` for everything else. Formulas read from these; no literal from a Part 1 table appears in logic. The one exception is a number used only where `career/` may not be imported (the sea bubbles' timings of §1.13.2, the six sunglasses styles of §1.5.9, the layout numbers of §1.12): it lives as a named constant beside its use.
-4. **Every formula in Part 1 is a named pure function** in `career/rules/` (or `sim/` for §1.11), one concept per file.
+4. **Every formula in Part 1 is a named pure function** in `career/rules/` (or `sim/` for §1.11). The rules are grouped by subject, one file a subject (`person`, `hiring`, `standing`, `money`, `development`, `knowledge`, `league`), not one file a formula: a reader should find every formula about a subject in one place.
 5. **Units are those of §1.1.** Do not put units in names.
 6. **A ship is "it"**, in code and on screen. No gendered pronouns for ships anywhere.
 7. **TypeScript strict.** No `any`, no type assertions in `src/`, no `@ts-ignore` (already enforced by lint).
 8. **`apply` never throws**; refusals are codes (§2.2.3).
 9. **No fixture data files.** Any state needed for a test, a debug screen or a screenshot is produced by running commands from a seed (§2.8.3).
-10. **Files hold one concept.** There is no size limit.
+10. **Files hold one concept.** There is no size limit, and no file exists only to hold one small function that a single caller uses: it lives with its caller or with its subject. A name is exported only if another file uses it (`tests/exports.test.ts`).
 11. **No new documents.** This plan and the README are the only docs.
 12. **Deleting a feature** means deleting its files and then every use the compiler and the linter report, until both are clean. A test of a deleted thing is deleted. A test of a kept thing is kept and made to pass.
 
