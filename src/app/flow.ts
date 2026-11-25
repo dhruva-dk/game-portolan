@@ -6,11 +6,11 @@ import { createSeedPanel } from '../ui/lobby/panel.ts';
 import type { Sea } from '../render/snapshot.ts';
 import { createResult, createWatching } from '../ui/sea/ends.ts';
 import {
+  deviceStore,
   keepLivery,
   keepSettings,
   keptLivery,
   keptSettings,
-  type Store,
 } from './kept.ts';
 import { createLobby, createSettings, type Title } from '../ui/base/screens.ts';
 import { fade } from '../ui/base/ui.ts';
@@ -29,14 +29,6 @@ import {
 
 const DRY = 600;
 
-function device(): Store | null {
-  try {
-    return localStorage;
-  } catch {
-    return null;
-  }
-}
-
 interface FlowActions {
   play(): void;
   home(): void;
@@ -54,7 +46,7 @@ export function createFlow(
   act: FlowActions,
   title: Title
 ) {
-  const store = device(),
+  const store = deviceStore(),
     names = act.wardrobe.dyes.map((d) => d.name);
   let screen: Screen = start,
     settings = keptSettings(store);
@@ -88,8 +80,8 @@ export function createFlow(
   const settingsFolio = createSettings(
     () => settings,
     (s) => {
-      settings = s;
-      keepSettings(store, s);
+      settings = { ...settings, ...s };
+      keepSettings(store, settings);
     },
     () => tap('close')
   );

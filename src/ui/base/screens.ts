@@ -20,9 +20,8 @@ import { dyePot, pencil, rhumbs, rose } from './marks.ts';
 import { keep, onTap, region } from './touch.ts';
 import { at, boxOf, fade, onResize, page, screen, type Page } from './ui.ts';
 
-export interface Settings {
+export interface Folio {
   sound: number;
-  look: number;
   stats: boolean;
 }
 
@@ -199,14 +198,14 @@ export function folio(
 }
 
 export function createSettings(
-  get: () => Settings,
-  set: (s: Settings) => void,
+  get: () => Folio,
+  set: (s: Folio) => void,
   close: () => void
 ) {
   const x = 540,
     y = 86,
     w = 332,
-    h = 208;
+    h = 150;
   const f = folio({ x, y, w, h }, ['right', 'top'], close);
   const draw = () => {
     const v = get();
@@ -218,15 +217,6 @@ export function createSettings(
       wash: string
     ) =>
       `<g id="${id}">${icon}<rect x="${x + 90}" y="${cy - 22}" width="214" height="44" fill="transparent"/>${bar(x + 96, cy, 200, 22, value, wash)}</g>`;
-    const look = (cy: number) => {
-      const c = x + 54;
-      return (
-        `<g stroke="${INK.iron}" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round">` +
-        `<path d="M${c - 11} ${cy}Q${c} ${cy - 11} ${c + 11} ${cy}Q${c} ${cy + 11} ${c - 11} ${cy}Z" fill="${PAPER}"/>` +
-        `<circle cx="${c}" cy="${cy}" r="4.2" fill="${WASH.azure}"/><circle cx="${c}" cy="${cy}" r="1.6" fill="${INK.iron}" stroke="none"/>` +
-        `<path d="M${c - 15} ${cy - 5}L${c - 20} ${cy}L${c - 15} ${cy + 5}M${c + 15} ${cy - 5}L${c + 20} ${cy}L${c + 15} ${cy + 5}" fill="none"/></g>`
-      );
-    };
     const graph = (cy: number) => {
       const l = x + 42,
         b = cy + 13;
@@ -242,7 +232,7 @@ export function createSettings(
       (on
         ? `<path d="M${x + 102} ${cy}L${x + 108} ${cy + 7}L${x + 119} ${cy - 7}" fill="none" stroke="${INK.white}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>`
         : '');
-    const stats = `<g id="stats">${graph(234)}<rect x="${x + 30}" y="${234 - 24}" width="${w - 60}" height="48" fill="transparent"/>${box(234, v.stats)}</g>`;
+    const stats = `<g id="stats">${graph(176)}<rect x="${x + 30}" y="${176 - 24}" width="${w - 60}" height="48" fill="transparent"/>${box(176, v.stats)}</g>`;
     f.draw(
       row(
         'sound',
@@ -250,15 +240,13 @@ export function createSettings(
         glyph('menu.speaker', x + 54, 118, 30),
         v.sound,
         WASH.azure
-      ) +
-        row('look', 176, look(176), v.look, WASH.ochre) +
-        stats,
+      ) + stats,
       (el) => {
         region(el, 'stats', () => {
           set({ ...get(), stats: !get().stats });
           draw();
         });
-        for (const id of ['sound', 'look'] as const) {
+        for (const id of ['sound'] as const) {
           const row = region(el, id, (e) => {
             const bar = boxOf(row!),
               bx = 6 / 214;
