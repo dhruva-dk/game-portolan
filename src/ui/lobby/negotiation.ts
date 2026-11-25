@@ -9,9 +9,10 @@ import {
   type Candidacy,
 } from '../base/card.ts';
 import { MOTION, SPACE, TYPE } from '../base/house.ts';
-import { INK, SHADOW, WASH, figure, glyph, svgNode } from '../base/ink.ts';
+import { INK, WASH, figure, glyph, svgNode } from '../base/ink.ts';
 import { least } from '../base/lexicon.ts';
 import { bindPicker, pickTo, pickerFace } from '../base/picker.ts';
+import { seal } from '../base/seal.ts';
 import { sheet } from '../base/sheet.ts';
 import { holdable, stepperFace, stepperValue } from '../base/stepper.ts';
 import { piece, placed, screen } from '../base/ui.ts';
@@ -31,7 +32,7 @@ const PIPS = { y: 124, gap: 24, r: 4.4 } as const;
 const OFFER = { y: 168, r: 25 } as const;
 const COST = { y: 214 } as const;
 const BAR = { y: 258, h: 18, mark: 7, cap: 13, capGap: 8 } as const;
-const SEAL = { r: 27, x: 0.7, y: 0.4, bumps: 15, wave: 1.8, rays: 9 } as const;
+const SEAL = { x: 0.7, y: 0.4 } as const;
 const H = SHEET.h - 2 * PAD;
 
 type Stepped = 'wage' | 'fee' | 'clause';
@@ -154,35 +155,6 @@ function answer(v: NegotiationView, landing: boolean) {
     );
   }
   return '';
-}
-
-function seal(cx: number, cy: number) {
-  let edge = '';
-  for (let i = 0; i <= 72; i++) {
-    const a = (i / 72) * Math.PI * 2,
-      r = SEAL.r + SEAL.wave * Math.cos(a * SEAL.bumps) + 0.8 * Math.sin(a * 3);
-    edge += `${i ? 'L' : 'M'}${r2(cx + r * Math.cos(a))} ${r2(cy + r * Math.sin(a))}`;
-  }
-  let rays = '';
-  for (let i = 0; i < SEAL.rays; i++) {
-    const a = (i / SEAL.rays) * Math.PI * 2 + 0.3,
-      from = SEAL.r + 7,
-      to = SEAL.r + 15 + (i % 3) * 4,
-      dot = to + 6;
-    rays +=
-      `<path d="M${r2(cx + from * Math.cos(a))} ${r2(cy + from * Math.sin(a))}L${r2(cx + to * Math.cos(a))} ${r2(cy + to * Math.sin(a))}" stroke="${INK.iron}" stroke-width="1.6" stroke-linecap="round"/>` +
-      `<circle cx="${r2(cx + dot * Math.cos(a + 0.18))}" cy="${r2(cy + dot * Math.sin(a + 0.18))}" r="${i % 2 ? 1.2 : 1.8}" fill="${INK.rubric}"/>`;
-  }
-  const origin = `transform-origin:${r2(cx)}px ${r2(cy)}px`;
-  return (
-    `<g class="flourish" style="${origin}"><circle cx="${r2(cx)}" cy="${r2(cy)}" r="${SEAL.r + 4}" fill="none" stroke="${INK.rubric}" stroke-width="2.2"/></g>` +
-    `<g class="flourish rays" style="${origin}">${rays}</g>` +
-    `<g class="sealed" style="${origin}">` +
-    `<path d="${edge}Z" fill="${INK.rubric}" stroke="${SHADOW}" stroke-opacity=".35" stroke-width="1.2"/>` +
-    `<circle cx="${r2(cx)}" cy="${r2(cy)}" r="${SEAL.r - 6}" fill="none" stroke="${INK.white}" stroke-opacity=".45" stroke-width="1.3"/>` +
-    glyph('tick', cx, cy, SEAL.r + 2, { ink: 'white', paper: INK.rubric }) +
-    '</g>'
-  );
 }
 
 const waiting = () =>
