@@ -184,10 +184,6 @@ const STYLE = `
   animation: inked-rule ${MOTION.title.rule}ms ${MOTION.title.ease} ${MOTION.title.after * 4}ms both; }
 @keyframes inked-rule { from { transform: scaleX(0); opacity: 0 } }
 .ui .bar.level { transition-duration: ${MOTION.number.ms}ms; }
-.ui .turn-next, .ui .turn-prev { animation: turn ${MOTION.turn.ms}ms ${MOTION.turn.ease} both; }
-.ui .turn-next { --from: ${MOTION.turn.shift}px; }
-.ui .turn-prev { --from: -${MOTION.turn.shift}px; }
-@keyframes turn { from { transform: translateX(var(--from)); opacity: 0 } }
 .ui .burst { transform-box: view-box; animation: burst ${MOTION.built.burst}ms ${MOTION.built.ease} both; }
 @keyframes burst { from { transform: scale(.35); opacity: 1 } 55% { opacity: .95 } to { transform: scale(1.25); opacity: 0 } }
 .ui .floated { transform-box: fill-box; animation: floated ${MOTION.built.float}ms ${MOTION.built.ease} both; }
@@ -238,7 +234,6 @@ const STYLE = `
 .ui .tied .knot { transform-box: fill-box; transform-origin: center; animation: inked ${MOTION.inked.ms}ms ${MOTION.inked.ease} calc(${MOTION.flown.ms}ms + var(--i, 0) * ${MOTION.inked.stagger / 2}ms) both; }
 .ui .inked { transform-box: fill-box; transform-origin: center; animation: inked ${MOTION.inked.ms}ms ${MOTION.inked.ease} calc(${MOTION.inked.after}ms + var(--i, 0) * ${MOTION.inked.stagger}ms) both; }
 @keyframes inked { from { transform: scale(1.9) rotate(-30deg); opacity: 0 } }
-@keyframes needle { from { transform: rotate(-38deg) } to { transform: rotate(52deg) } }
 .ui .landed { animation: landed ${MOTION.landed.ms}ms ${MOTION.landed.ease} var(--d, 0ms) both; }
 @keyframes landed { from { transform: translateY(-${MOTION.landed.drop}px) rotate(${MOTION.landed.turn}deg) scale(${MOTION.landed.from}); opacity: 0 } 40% { opacity: 1 } }
 .ui .tossed, .ui .tossed * { pointer-events: none !important; }
