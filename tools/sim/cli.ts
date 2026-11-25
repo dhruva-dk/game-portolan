@@ -4,12 +4,21 @@ import { parseArgs } from 'node:util';
 import { outDir, writeJson } from '../out.ts';
 import type { CareerScenario } from './career.ts';
 import { runCareerScenario } from './careers.ts';
+import { runDuels, type DuelScenario } from './duel.ts';
+import { joinedHash } from './figures.ts';
 import { runMatch, type MatchScenario, type Summary } from './match.ts';
 import { CORES, runPool } from './pool.ts';
-import { pooled, printMatch, printPooled } from './print.ts';
+import {
+  pooled,
+  printDuel,
+  printDuelStart,
+  printDuelTally,
+  printMatch,
+  printPooled,
+} from './print.ts';
 import { runTerrain, type TerrainScenario } from './terrain.ts';
 
-type Scenario = MatchScenario | TerrainScenario | CareerScenario;
+type Scenario = MatchScenario | DuelScenario | TerrainScenario | CareerScenario;
 
 const { values: a, positionals } = parseArgs({
   allowPositionals: true,
@@ -22,13 +31,15 @@ const { values: a, positionals } = parseArgs({
     subject: { type: 'string' },
     seasons: { type: 'string' },
     standin: { type: 'boolean', default: false },
+    levels: { type: 'string' },
+    stats: { type: 'string' },
   },
 });
 
 const named = positionals[0];
 if (!named) {
   console.error(
-    'usage: npm run sim -- <scenario | file.json> [--seed n] [--planet n] [--runs n] [--seconds n] [--seasons n] [--workers n] [--standin] [--subject name]'
+    'usage: npm run sim -- <scenario | file.json> [--seed n] [--planet n] [--runs n] [--seconds n] [--seasons n] [--workers n] [--standin] [--subject name] [--levels a,b] [--stats a,b]'
   );
   process.exit(2);
 }
@@ -55,7 +66,7 @@ if (sc.kind === 'match') {
   const dir = outDir(subject, { scenario: one, runs });
   if (runs <= 1) {
     const s = runMatch(one, dir);
-    printMatch(s, dir);
+    printMatch(one, s, dir);
     failed = s.invariants.broken > 0;
   } else {
     const from = one.match ?? 1;
@@ -78,19 +89,46 @@ if (sc.kind === 'match') {
     console.log(
       `${runs} matches on ${Math.min(Number(a.workers), runs)} workers`
     );
+    const began = performance.now();
     const all: Summary[] = await runPool(jobs, {
       workers: Number(a.workers),
       done: (s, job, n) =>
         console.log(
           `  ${n}/${runs} match ${job.scenario.match}: ${s.end} at ${s.seconds} s, ${s.left.length} left, hash ${s.hash}, ` +
-            `${s.cost.msPerStep} ms/step, ${s.invariants.broken} broken  ${job.dir}`
+            `${s.invariants.broken} broken  ${job.dir}`
         ),
     });
     const p = pooled(all);
     writeJson(join(dir, 'pooled.json'), p);
-    printPooled(p, dir);
+    printPooled(p, joinedHash(p.hashes), performance.now() - began, dir);
     failed = all.some((s) => s.invariants.broken > 0);
   }
+} else if (sc.kind === 'duel') {
+  const levels = a.levels?.split(',').map(Number),
+    stats = a.stats?.split(',').map(Number);
+  const ship = (i: number) => ({
+    ...sc.ships[i],
+    ...(levels && { levels: levels[i] }),
+    ...(stats && { stats: stats[i] }),
+  });
+  const one: DuelScenario = {
+    ...sc,
+    ...(seed !== undefined && { match: seed }),
+    ...(a.planet !== undefined && { planet: Number(a.planet) }),
+    ships: [ship(0), ship(1)],
+  };
+  const dir = outDir(subject, { scenario: one, runs });
+  printDuelStart(one, runs);
+  const began = performance.now();
+  const { duels, tally } = runDuels(one, runs, dir, printDuel);
+  writeJson(join(dir, 'duels.json'), { tally, duels });
+  printDuelTally(
+    one,
+    tally,
+    joinedHash(duels.map((d) => d.hash)),
+    performance.now() - began,
+    dir
+  );
 } else if (sc.kind === 'season' || sc.kind === 'career') {
   await runCareerScenario(sc, {
     seed: a.seed,
@@ -108,7 +146,7 @@ if (sc.kind === 'match') {
   const dir = outDir(subject, { scenario: one });
   failed = !runTerrain(one, dir);
 } else {
-  console.error(`${path}: no kind (match or terrain)`);
+  console.error(`${path}: no kind (match, duel, season, career or terrain)`);
   process.exit(2);
 }
 process.exit(failed ? 1 : 0);

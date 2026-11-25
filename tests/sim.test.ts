@@ -34,7 +34,7 @@ test('a match writes its record: events from start to end, every ship each secon
   const s = runMatch(DUEL, dir);
   assert.equal(s.end, 'race decided');
   assert.equal(s.invariants.broken, 0);
-  assert.ok(s.combat.shots > 0, 'the two fought');
+  assert.ok(s.figures.hitRate.shots > 0, 'the two fought');
   const events = jsonl(join(dir, 'events.jsonl'));
   assert.equal(events[0].type, 'start');
   assert.equal(events.at(-1)!.type, 'end');

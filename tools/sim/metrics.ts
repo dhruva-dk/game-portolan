@@ -1,10 +1,11 @@
-import type { GunKind } from '../../src/sim/kinds.ts';
+import type { GunKind, Rarity } from '../../src/sim/kinds.ts';
 import { debugOf, type Stepped } from '../../src/sim/engine.ts';
 import type { Memory } from '../../src/sim/bot.ts';
 import { BOT, type Mode } from '../../src/sim/captain.ts';
 import { GUNS, SHIP } from '../../src/sim/handling.ts';
 import { PIECE } from '../../src/sim/loot.ts';
 import { distance, type Vec3 } from '../../src/world/sphere.ts';
+import { bandOf, type Band, type Fired, type Sunk } from './figures.ts';
 import type { State } from './match.ts';
 
 export const STUCK = 15,
@@ -14,11 +15,6 @@ export const HELD = [30, 60, 120, 240] as const;
 
 const MOVING = 4,
   ABOUT = 40;
-
-export const BANDS = ['close', 'mid', 'far'] as const;
-export type Band = (typeof BANDS)[number];
-const bandOf = (m: number): Band =>
-  m < GUNS.scatter.range ? 'close' : m < GUNS.repeater.range ? 'mid' : 'far';
 
 export interface Count {
   shots: number;
@@ -36,15 +32,12 @@ export interface Fighting {
 
 export interface ShipResult {
   id: number;
-  brain: string;
   player: boolean;
   aim: Partial<Record<GunKind, Record<Band, Count>>>;
   fell: Record<Band, Fell>;
-  place: number;
   sunk: { time: number; cause: string; by: number | null } | null;
   fighting: Fighting;
-  hand: Partial<Record<GunKind, number>>;
-  took: { stores: number };
+  took: number;
   modes: Partial<Record<Mode, number>>;
   stuck: Partial<Record<Mode, number>>;
   aground: number;
@@ -57,7 +50,7 @@ export interface ShipResult {
   loops: number;
   regained: number;
   afloat: number;
-  mended: { hull: number; shield: number };
+  healed: number;
   low: number | null;
   comeback: boolean;
 }
@@ -83,7 +76,6 @@ export interface MatchResult {
   left: number;
   causes: Record<string, number>;
   shots: {
-    band: Record<Band, Count>;
     kind: Partial<
       Record<
         GunKind,
@@ -106,6 +98,9 @@ export interface MatchResult {
     kinds: Record<string, number>;
   };
   ships: ShipResult[];
+  fired: Fired[];
+  heals: Rarity[];
+  sunk: Sunk[];
 }
 
 interface Watch {
@@ -120,7 +115,7 @@ interface Watch {
     kind: GunKind;
     band: Band;
     target: number | null;
-    home: boolean;
+    shot: Fired;
   } | null;
 }
 
@@ -158,7 +153,6 @@ export const FOUGHT = 150;
 
 export function watch(
   state: State,
-  brainOf: (id: number) => string,
   depth: (p: Vec3) => number,
   players: ReadonlySet<number> = new Set()
 ) {
@@ -174,7 +168,6 @@ export function watch(
       last: null,
       r: {
         id: k.id,
-        brain: brainOf(k.id),
         player: players.has(k.id),
         aim: {},
         fell: {
@@ -182,7 +175,6 @@ export function watch(
           mid: { astern: 0, ahead: 0 },
           far: { astern: 0, ahead: 0 },
         },
-        place: 0,
         sunk: null,
         fighting: {
           shots: {},
@@ -192,8 +184,7 @@ export function watch(
           taken: 0,
           kills: 0,
         },
-        hand: {},
-        took: { stores: 0 },
+        took: 0,
         modes: {},
         stuck: {},
         aground: 0,
@@ -206,7 +197,7 @@ export function watch(
         loops: 0,
         regained: 0,
         afloat: 0,
-        mended: { hull: 0, shield: 0 },
+        healed: 0,
         low: null,
         comeback: false,
       },
@@ -221,12 +212,16 @@ export function watch(
   const born = new Map<number, number>(),
     firstLater = state.loot().next;
   let seenNext = firstLater;
-  const shots: MatchResult['shots'] = { band: bands(), kind: {} };
+  const shots: MatchResult['shots'] = { kind: {} };
   let lastShot = 0,
     quiet = 0,
     lastBlow = 0,
     lull = 0;
-  const regainedNow = new Map<number, number>();
+  const fired: Fired[] = [],
+    heals: Rarity[] = [],
+    sunk: Sunk[] = [],
+    firstBlow = new Map<string, number>();
+  let counted = 0;
   const where = (id: number) =>
     state.vessels().find((v) => v.id === id)?.ship.at ?? null;
   const fell = (w: Watch, at: Vec3) => {
@@ -255,11 +250,12 @@ export function watch(
             (s.target === null || v.id === s.target)
           )
             range = Math.min(range, distance(from, v.ship.at));
-        const band = bandOf(range);
-        w.last = { kind: s.gun, band, target: s.target, home: false };
+        const band = bandOf(range),
+          shot: Fired = { ship: s.shooter, range, landed: false };
+        fired.push(shot);
+        w.last = { kind: s.gun, band, target: s.target, shot };
         bump(w.r.fighting.shots, s.gun);
         (w.r.aim[s.gun] ??= bands())[band].shots++;
-        shots.band[band].shots++;
         const k = (shots.kind[s.gun] ??= {
           ...count(),
           balls: 0,
@@ -278,6 +274,8 @@ export function watch(
         lastBlow = now;
       }
       for (const s of did.strikes) {
+        const key = `${s.shooter}>${s.struck}`;
+        if (!s.ram && !firstBlow.has(key)) firstBlow.set(key, now);
         const by = ships.get(s.shooter),
           on = ships.get(s.struck);
         if (on) on.r.fighting.taken += s.damage;
@@ -292,12 +290,11 @@ export function watch(
         if (s.struck === l.target) fell(by, s.at);
         const k = shots.kind[l.kind];
         if (k) k.dealt += s.damage;
-        if (l.home) continue;
-        l.home = true;
+        if (l.shot.landed) continue;
+        l.shot.landed = true;
         by.r.fighting.hits++;
         const mine = by.r.aim[l.kind];
         if (mine) mine[l.band].hits++;
-        shots.band[l.band].hits++;
         if (k) {
           k.hits++;
           k.bands[l.band].hits++;
@@ -324,7 +321,21 @@ export function watch(
         bump(loot.kinds, t.heal);
         const w = ships.get(t.ship);
         if (!w) continue;
-        w.r.took.stores++;
+        w.r.took++;
+      }
+      for (const k of state.happened()?.kept.mended ?? []) heals.push(k.heal);
+      const sinkings = state.sinkings();
+      for (; counted < sinkings.length; counted++) {
+        const k = sinkings[counted],
+          first =
+            k.by === null || k.by === k.id
+              ? undefined
+              : firstBlow.get(`${k.by}>${k.id}`);
+        sunk.push({
+          ship: k.id,
+          cause: k.cause,
+          fight: first === undefined ? null : k.time - first,
+        });
       }
       const f = state.loot();
       if (f.next > seenNext) {
@@ -335,20 +346,16 @@ export function watch(
         const w = ships.get(k.id);
         if (w) w.r.loops++;
       }
-      regainedNow.clear();
       for (const k of did.regained) {
         const w = ships.get(k.id);
         if (w) w.r.regained += k.shield;
-        regainedNow.set(k.id, k.shield);
       }
       for (const v of state.vessels()) {
         const w = ships.get(v.id);
         if (!w) continue;
         const h = state.crew(v.id).health,
-          hull = h.hull - w.health.hull,
-          shield = h.shield - w.health.shield - (regainedNow.get(v.id) ?? 0);
-        if (hull > 1e-6) w.r.mended.hull += hull;
-        if (shield > 1e-6) w.r.mended.shield += shield;
+          hull = h.hull - w.health.hull;
+        if (hull > 1e-6) w.r.healed += hull;
         if (w.r.low === null && h.hull < LOW) w.r.low = now;
         else if (w.r.low !== null && h.hull > BACK) w.r.comeback = true;
         w.health.hull = h.hull;
@@ -361,12 +368,10 @@ export function watch(
         const w = ships.get(v.id);
         if (!w) continue;
         const mind = debugOf(state).mindOf(v.id),
-          mode = mind?.mode ?? 'roam',
-          crew = state.crew(v.id);
+          mode = mind?.mode ?? 'roam';
         w.afloat++;
         w.speedSum += v.ship.speed;
         bump(w.r.modes, mode);
-        bump(w.r.hand, crew.gun.kind);
         if (at >= 0) w.r.held[at] = state.share(v.id);
         w.path.push(v.ship.at);
         w.speeds.push(v.ship.speed);
@@ -395,13 +400,12 @@ export function watch(
       }
     },
     end(steps: number, ms: number): MatchResult {
-      const sunk = state.sinkings(),
+      const sinkings = state.sinkings(),
         left = state.alive();
       const causes: Record<string, number> = {};
-      sunk.forEach((k, i) => {
+      sinkings.forEach((k) => {
         const w = ships.get(k.id)!;
         w.r.sunk = { time: k.time, cause: k.cause, by: k.by };
-        w.r.place = ships.size - i;
         bump(causes, k.cause);
         const by = k.by === null ? undefined : ships.get(k.by);
         if (by && k.by !== k.id) {
@@ -410,7 +414,6 @@ export function watch(
         }
       });
       for (const w of ships.values()) {
-        if (!w.r.sunk) w.r.place = 1;
         w.r.speed = w.afloat ? w.speedSum / w.afloat : 0;
         w.r.afloat = w.afloat;
         w.r.share = state.share(w.r.id);
@@ -426,6 +429,9 @@ export function watch(
         lull: Math.max(lull, state.time() - Math.max(30, lastBlow)),
         loot: { ...loot, end: state.loot().pieces.length },
         ships: [...ships.values()].map((w) => w.r),
+        fired,
+        heals,
+        sunk,
       };
     },
   };
