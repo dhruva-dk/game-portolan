@@ -10,7 +10,7 @@ import {
 } from '../base/card.ts';
 import { growFrom, shrinkBack } from '../base/enlarge.ts';
 import { MOTION, SPACE } from '../base/house.ts';
-import { svgNode } from '../base/ink.ts';
+import { r2, svgNode } from '../base/ink.ts';
 import { sheet } from '../base/sheet.ts';
 import { piece, placed, screen } from '../base/ui.ts';
 import type { LobbyPort } from './port.ts';
@@ -23,8 +23,6 @@ const GAP = SPACE.pad;
 const ROW = { h: SHEET.h - 2 * PAD - CANDIDATE.h - SPACE.gap };
 const COLUMN = CANDIDATE.h + SPACE.gap + ROW.h;
 const DEALT = { rise: 150 } as const;
-
-const r2 = (n: number) => Math.round(n * 100) / 100;
 
 const slotX = (i: number, n: number) =>
   (SHEET.w - n * CANDIDATE.w - (n - 1) * GAP) / 2 + i * (CANDIDATE.w + GAP);

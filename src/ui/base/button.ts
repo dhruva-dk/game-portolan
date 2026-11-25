@@ -1,9 +1,7 @@
 import { FAINT, SIZE, SPACE, TYPE } from './house.ts';
-import { GILT, INK, PAPER, glyph, paperDisc, slip } from './ink.ts';
+import { GILT, INK, PAPER, glyph, paperDisc, r2, slip } from './ink.ts';
 import { onTap } from './touch.ts';
 import { measured, word } from './word.ts';
-
-const r2 = (n: number) => Math.round(n * 100) / 100;
 
 function banner(x: number, y: number, w: number, mark: string, gilt = false) {
   const k = w / 210,

@@ -1,8 +1,6 @@
 import { pressable } from './button.ts';
 import { SIZE, SPACE, TYPE } from './house.ts';
-import { GILT, figure, slip } from './ink.ts';
-
-const r2 = (n: number) => Math.round(n * 100) / 100;
+import { GILT, figure, r2, slip } from './ink.ts';
 
 const width = (w: number, count: number) =>
   (w - (count - 1) * SPACE.hair) / count;

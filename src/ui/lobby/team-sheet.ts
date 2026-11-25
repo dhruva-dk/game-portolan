@@ -18,7 +18,7 @@ import {
 import { emblemAt, liveryColors } from '../base/emblem.ts';
 import { growFrom, shrinkBack } from '../base/enlarge.ts';
 import { MOTION, SIZE, SPACE, TYPE } from '../base/house.ts';
-import { INK, figure, glyph, svgNode } from '../base/ink.ts';
+import { INK, figure, glyph, r2, svgNode } from '../base/ink.ts';
 import { ROLE, STAT, least } from '../base/lexicon.ts';
 import { laurel } from '../base/marks.ts';
 import { LEVELS, rangeBar } from '../base/rangebar.ts';
@@ -56,8 +56,6 @@ const BIG = {
   w: CARD.w,
   h: CARD.h,
 } as const;
-
-const r2 = (n: number) => Math.round(n * 100) / 100;
 
 const columnX = (slot: number) => {
   const left = PAD + SHIP.glyph + 6,

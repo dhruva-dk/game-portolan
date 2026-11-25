@@ -7,7 +7,7 @@ import { pressable } from '../base/button.ts';
 import { emblemAt, shieldOutline } from '../base/emblem.ts';
 import { grouped } from '../base/grouped.ts';
 import { FAINT, MOTION, SPACE, TYPE } from '../base/house.ts';
-import { BRASS, INK, WASH, figure, glyph, svgNode } from '../base/ink.ts';
+import { BRASS, INK, WASH, figure, glyph, r2, svgNode } from '../base/ink.ts';
 import { least } from '../base/lexicon.ts';
 import { laurel } from '../base/marks.ts';
 import {
@@ -36,7 +36,6 @@ const SEAL = { r: 11, inset: 17 } as const;
 const PAID = { w: 150, h: 40, y: -46 } as const;
 const LINE = { gap: 13.5, room: PENNANT.w - 2 * PAD } as const;
 
-const r2 = (n: number) => Math.round(n * 100) / 100;
 const big = (n: number) => Math.ceil(n / SMALL);
 const columnX = (i: number) => PAD + (i + 0.5) * COLUMN;
 const middle = RIGGED.w / 2;

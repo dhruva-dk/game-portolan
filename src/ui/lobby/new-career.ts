@@ -6,7 +6,7 @@ import { rolled } from '../../world/seeds.ts';
 import { pressable, ribbon, roundButton } from '../base/button.ts';
 import { field, type Field } from '../base/field.ts';
 import { MOTION, SIZE, SPACE, TYPE } from '../base/house.ts';
-import { INK, glyph, svgNode } from '../base/ink.ts';
+import { INK, glyph, r2, svgNode } from '../base/ink.ts';
 import {
   bindLivery,
   liveryFace,
@@ -28,8 +28,6 @@ const DIE = { r: SIZE.slip / 2, size: 26 } as const;
 const CHOOSER = { y: 178 } as const;
 const START = { y: 400, w: 150, confirm: TYPE.name + 3, tick: 20 } as const;
 const RISE = 24;
-
-const r2 = (n: number) => Math.round(n * 100) / 100;
 
 export type NewCareerPricing = (form: NewCareerForm | null) => NewCareerView;
 

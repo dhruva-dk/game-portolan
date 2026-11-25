@@ -1,4 +1,4 @@
-import { FIGURES, INK } from './ink.ts';
+import { FIGURES, INK, r2 } from './ink.ts';
 
 export const WORDS = [
   'Ship',
@@ -80,7 +80,6 @@ interface TextStyle {
 
 const esc = (s: string) =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-const r2 = (n: number) => Math.round(n * 100) / 100;
 
 function text(x: number, y: number, s: string, size: number, o: TextStyle) {
   const op =

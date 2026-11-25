@@ -1,4 +1,4 @@
-import { figure, glyph, INK, WASH } from './ink.ts';
+import { INK, WASH, figure, glyph, r2 } from './ink.ts';
 import type { Glyph } from './glyphs.ts';
 import { measured } from './word.ts';
 
@@ -15,8 +15,6 @@ interface RoseStyle {
 
 const TOP = 20,
   RINGS = [5, 10, 15, 20];
-
-const r2 = (n: number) => Math.round(n * 100) / 100;
 
 const turnOf = (i: number, n: number) => -Math.PI / 2 + (i * 2 * Math.PI) / n;
 

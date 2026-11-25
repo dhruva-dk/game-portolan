@@ -1,5 +1,5 @@
 import { MOTION, SPACE } from './house.ts';
-import { INK } from './ink.ts';
+import { INK, r2 } from './ink.ts';
 import { dragged } from './touch.ts';
 import { view } from './ui.ts';
 
@@ -16,8 +16,6 @@ type Sample = { dy: number; ms: number };
 
 const THUMB = { w: 3, inset: 2, least: 18, opacity: 0.4 } as const;
 const EDGE = SPACE.gap;
-
-const r2 = (n: number) => Math.round(n * 100) / 100;
 
 const easeOut = (t: number) => 1 - (1 - t) ** 3;
 

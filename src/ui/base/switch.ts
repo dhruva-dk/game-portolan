@@ -1,9 +1,7 @@
 import { pressable } from './button.ts';
-import { INK, PAPER, WASH, paperDisc } from './ink.ts';
+import { INK, PAPER, WASH, paperDisc, r2 } from './ink.ts';
 
 export const SWITCH = { w: 56, h: 28, hit: 44 } as const;
-
-const r2 = (n: number) => Math.round(n * 100) / 100;
 
 export function switchFace(
   id: string,

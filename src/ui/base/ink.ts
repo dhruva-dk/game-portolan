@@ -140,7 +140,7 @@ export const DEFS = (() => {
   return `<defs>${d}</defs>`;
 })();
 
-const r2 = (n: number) => Math.round(n * 100) / 100;
+export const r2 = (n: number) => Math.round(n * 100) / 100;
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
 
 export function roughRect(

@@ -1,6 +1,4 @@
-import { INK, SHADOW, glyph } from './ink.ts';
-
-const r2 = (n: number) => Math.round(n * 100) / 100;
+import { INK, SHADOW, glyph, r2 } from './ink.ts';
 
 const SEAL = { r: 27, bumps: 15, wave: 1.8, rays: 9 } as const;
 

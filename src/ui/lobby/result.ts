@@ -10,7 +10,7 @@ import { emblemAt, liveryColors } from '../base/emblem.ts';
 import { grouped } from '../base/grouped.ts';
 import { portrait, uncle } from '../base/gull.ts';
 import { FAINT, MOTION, SPACE, TYPE } from '../base/house.ts';
-import { GILT, INK, figure, glyph, svgNode } from '../base/ink.ts';
+import { GILT, INK, figure, glyph, r2, svgNode } from '../base/ink.ts';
 import { least } from '../base/lexicon.ts';
 import { laurel } from '../base/marks.ts';
 import { sponsorCloth } from '../base/pennant.ts';
@@ -76,8 +76,6 @@ const FOOT = {
   after: 212,
   moved: 300,
 } as const;
-
-const r2 = (n: number) => Math.round(n * 100) / 100;
 
 const squeezed = (name: string, room: number) =>
   Math.max(

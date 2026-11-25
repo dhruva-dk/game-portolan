@@ -1,6 +1,4 @@
-import { INK, PAPER, WASH, alpha, arcPath } from './ink.ts';
-
-const r2 = (n: number) => Math.round(n * 100) / 100;
+import { INK, PAPER, WASH, alpha, arcPath, r2 } from './ink.ts';
 
 const WINDS = [INK.iron, WASH.vermilion, INK.green, WASH.vermilion] as const;
 

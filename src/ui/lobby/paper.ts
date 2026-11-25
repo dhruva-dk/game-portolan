@@ -9,7 +9,15 @@ import { pressable, ribbon } from '../base/button.ts';
 import { uncleFace } from '../base/bubble.ts';
 import { gullHead } from '../base/gull.ts';
 import { FAINT, MOTION, SPACE, TYPE } from '../base/house.ts';
-import { FIGURES, INK, galleon, glyph, figure, svgNode } from '../base/ink.ts';
+import {
+  FIGURES,
+  INK,
+  figure,
+  galleon,
+  glyph,
+  r2,
+  svgNode,
+} from '../base/ink.ts';
 import { STAT, least } from '../base/lexicon.ts';
 import { fade, piece, placed, screen } from '../base/ui.ts';
 import { label, measured, word } from '../base/word.ts';
@@ -49,8 +57,6 @@ const UNCLE_PEEK = { size: 84, out: 26, turn: 8 } as const;
 
 const INNER = PAGE.w - 2 * PAGE.pad;
 const BODY = { w: PAGE.w + 24, h: PAGE.h + CONTINUE.gap + 34 } as const;
-
-const r2 = (n: number) => Math.round(n * 100) / 100;
 
 type Fragment = { text: string; link: number | null };
 type Segment = Fragment & { x: number; w: number };

@@ -1,8 +1,6 @@
-import { INK, PAPER, WASH, paperDisc, roughRect } from './ink.ts';
+import { INK, PAPER, WASH, paperDisc, r2, roughRect } from './ink.ts';
 
 export const SLIDER = { h: 44, track: 10, knob: 12.5, notch: 5 } as const;
-
-const r2 = (n: number) => Math.round(n * 100) / 100;
 
 const clamp01 = (n: number) => Math.min(1, Math.max(0, n));
 
