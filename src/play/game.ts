@@ -551,6 +551,20 @@ export function createGame(
         null
       );
     },
+    rival(): number | null {
+      const mine = state.mine(),
+        teams = state.teams(),
+        alive = state.alive();
+      if (!mine) return null;
+      let nearest: number | null = null;
+      for (const v of state.vessels()) {
+        if (v.id === PLAYER || !alive.includes(v.id)) continue;
+        if (teams && teams[v.id] === teams[PLAYER]) continue;
+        const m = distance(v.ship.at, mine.ship.at);
+        if (nearest === null || m < nearest) nearest = m;
+      }
+      return nearest;
+    },
     race() {
       const teams = state.teams();
       if (!teams) return null;

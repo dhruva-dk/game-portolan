@@ -172,6 +172,21 @@ export interface Kit {
   blowing: boolean;
 }
 
+export const SEA_BUBBLES = [
+  'steer',
+  'fire',
+  'gust',
+  'heal',
+  'home',
+  'storm',
+  'sunk',
+] as const;
+export type SeaBubble = (typeof SEA_BUBBLES)[number];
+
+export interface Spoken {
+  bubble: SeaBubble | null;
+}
+
 export interface End {
   how: 'won' | 'shot' | 'ram' | 'storm';
   gun: GunKind | null;
