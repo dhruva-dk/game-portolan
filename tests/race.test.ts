@@ -12,7 +12,7 @@ import { watersAt } from '../src/sim/waters.ts';
 import { landOf, planetOf } from '../src/world/land.ts';
 import { KINDS, RARITIES } from '../src/sim/kinds.ts';
 import type { Loot } from '../src/sim/loot.ts';
-import { setupOf, valuesAt } from './setups.ts';
+import { TENS, setupOf, valuesAt } from './setups.ts';
 
 const planet = planetOf(SEED, landOf(SEED)),
   waters = watersAt(planet);
@@ -163,6 +163,49 @@ test('a setup the sim cannot sail is refused: too few ships, a team of three, th
         waters
       ),
     /ship 1 has the player's hands/
+  );
+});
+
+test('a setup outside its contract is refused: the ratings, the slots, the standings, the gun, the hands, the values', () => {
+  const two = short(SEED, { teams: 2 }),
+    refused = (setup: unknown, why: RegExp) =>
+      assert.throws(
+        () => createMatch(setup as MatchSetup, waters),
+        why,
+        String(why)
+      ),
+    ship = (id: number, over: Record<string, unknown>) => ({
+      ...two,
+      ships: two.ships.map((s, i) => (i === id ? { ...s, ...over } : s)),
+    });
+  for (const storm of [0, 6, 2.5, NaN])
+    refused({ ...two, storm }, /storm rating/);
+  for (const heals of [0, 6, 3.5]) refused({ ...two, heals }, /heal rating/);
+  refused({ ...two, match: NaN }, /match seed/);
+  refused({ ...two, planet: 3 }, /planet/);
+  refused(ship(1, { slot: 0 }), /team 0 has two ships in slot 0/);
+  refused(ship(3, { slot: 2 }), /ship 3's slot is 2/);
+  for (const standing of [0, 41, 1.5])
+    refused(ship(2, { standing }), /ship 2's standing/);
+  refused(ship(1, { gun: 'sling' }), /ship 1's gun is sling/);
+  refused(ship(2, { hands: 'bot' }), /ship 2's hands/);
+  refused(
+    ship(2, { hands: { ...TENS, gunnery: undefined } }),
+    /ship 2's gunnery/
+  );
+  refused(ship(3, { topSpeed: NaN }), /ship 3's topSpeed/);
+  refused(ship(0, { hullPoints: undefined }), /ship 0's hullPoints/);
+  for (const [storm, heals] of [
+    [1, 5],
+    [5, 1],
+  ] as const) {
+    const m = createMatch({ ...two, storm, heals }, waters);
+    m.step(STILL);
+    assert.ok(Number.isFinite(m.view.storm(0).radius));
+  }
+  const fine = ship(1, { standing: 40 });
+  assert.doesNotThrow(() =>
+    createMatch({ ...fine, ships: fine.ships.slice(0, 3) }, waters)
   );
 });
 
