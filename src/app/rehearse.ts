@@ -182,3 +182,14 @@ export function reported(state: CareerState, id: number): CareerState {
   const applied = apply(state, { type: 'BuyReport', team: YOURS, person: id });
   return applied.ok ? applied.state : state;
 }
+
+export function sponsored(state: CareerState, count: number): CareerState {
+  let now = state;
+  for (let n = 0; n < count; n++) {
+    const team = now.teams[YOURS],
+      slot = team.sponsors.findIndex((held) => held === null);
+    if (slot < 0 || team.offers.length === 0) break;
+    now = sent(now, { type: 'SignSponsor', team: YOURS, offer: 0, slot });
+  }
+  return now;
+}

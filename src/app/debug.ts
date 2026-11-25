@@ -9,6 +9,7 @@ import {
   owing,
   armed,
   rehearsed,
+  sponsored,
   reported,
   wintered,
   type Founding,
@@ -277,6 +278,8 @@ const CAREER_SCREENS = [
   'negotiation',
   'ship',
   'paint',
+  'sponsors',
+  'planet',
 ] as const;
 
 const FIXED_PLANET = 'portolan';
@@ -357,9 +360,12 @@ async function harbor(
   const kinds = (params.get('unlocked') ?? '')
     .split(',')
     .flatMap((k) => KINDS.filter((kind) => kind === k));
-  const priced = params.has('unlocked')
+  const fitted = params.has('unlocked')
     ? armed(owes, kinds, number('progress', 0))
     : owes;
+  const priced = params.has('sponsors')
+    ? sponsored(fitted, Math.floor(number('sponsors', 0)))
+    : fitted;
   const role = roleOf(priced),
     talk = screen === 'negotiation' ? talkedTo(priced, role) : null,
     career = talk === null ? priced : talk.state;
@@ -382,6 +388,10 @@ async function harbor(
       location.replace(at.href);
     },
   });
+  if (screen === 'sponsors' || screen === 'planet') {
+    shore.open(screen);
+    return;
+  }
   if (screen === 'ship' || screen === 'paint') {
     shore.open('ship', { stop: Math.floor(number('stop', 0)) });
     if (screen === 'paint') shore.open('paint');
