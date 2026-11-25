@@ -34,6 +34,21 @@ const knownLines = (state: CareerState, team: number): Range[] =>
     LINES.map((line) => ranges[line])
   );
 
+const RIVAL = 7;
+
+function emptied(state: CareerState): CareerState {
+  const id = state.teams[RIVAL].seats.mechanic;
+  return {
+    ...state,
+    teams: state.teams.map((team, i) =>
+      i === RIVAL ? { ...team, seats: { ...team.seats, mechanic: null } } : team
+    ),
+    people: state.people.map((p) =>
+      p.id === id ? { ...p, contract: null } : p
+    ),
+  };
+}
+
 const rivalWithEmpty = (state: CareerState) =>
   state.teams.findIndex(
     (team, i) => i !== YOURS && ROLES.some((role) => team.seats[role] === null)
@@ -187,7 +202,7 @@ test("a rival's staff compare against whoever holds the same seat in your team",
 });
 
 test('an empty seat is an outline with nothing to buy', () => {
-  for (const state of [THIRD, SECOND_SEASON]) {
+  for (const state of [THIRD, SECOND_SEASON].map(emptied)) {
     const team = rivalWithEmpty(state);
     assert.ok(team > 0);
     const sheet = teamSheetView(state, team);

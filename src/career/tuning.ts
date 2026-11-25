@@ -67,7 +67,7 @@ export const AGEING = {
   old: { perYear: 0.04, floor: 0.3 },
   perStop: 1,
   rookieAge: { lo: 18, hi: 21 },
-  rookieLevel: { lo: 3, hi: 17 },
+  rookieLevel: { lo: 2, hi: 20 },
 };
 
 export const OWNERS = {
@@ -89,7 +89,7 @@ export const STAND_IN: DriverStats = {
 export const HEADCOUNT = {
   staffAge: { lo: 20, hi: 37 },
   freeAgentsPerRole: 60,
-  freeAgentLevel: { lo: 3, hi: 17 },
+  freeAgentLevel: { lo: 2, hi: 20 },
   freeAgentAge: { lo: 20, hi: 37 },
   belowRetirement: 1,
 };
@@ -162,13 +162,12 @@ export const REPAINT = { cost: 1000 };
 export const YOUR_START = { balance: 1500 };
 
 export const LEAGUE_START = {
-  strengthSpan: 38,
-  design: { base: 10, perStrength: 70, jitter: 8 },
+  designJitter: 8,
   fittedShortfall: { lo: 0, hi: 6 },
-  staffLevel: { base: 4, perStrength: 12, jitter: 2 },
+  staffJitter: 2,
   contractRaces: [10, 20, 30],
-  balance: { base: 2000, perStrength: 30000 },
-  unlocksPerStrength: 4,
+  balanceRaces: 2,
+  unlocksAtTop: 4,
   sponsorRaces: { lo: 5, hi: 10 },
 };
 

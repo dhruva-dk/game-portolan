@@ -1,28 +1,23 @@
 import { clamp } from '../../world/scalar.ts';
-import { LEAGUE_START, LEVEL_SPAN, SHIPS } from '../tuning.ts';
+import { HEADCOUNT, LEAGUE_START, LEVEL_SPAN, SHIPS } from '../tuning.ts';
+import { income, parLevel } from './money.ts';
 import type { Span } from './person.ts';
 
-export const strength = (index: number): number =>
-  1 - (index - 1) / LEAGUE_START.strengthSpan;
-
-export const startDesign = (t: number, jitter: number): number =>
-  clamp(
-    LEAGUE_START.design.base + LEAGUE_START.design.perStrength * t + jitter,
-    SHIPS.leastLevel,
-    LEVEL_SPAN.most
-  );
+export const startDesign = (merit: number, jitter: number): number =>
+  clamp(parLevel(merit) + jitter, SHIPS.leastLevel, LEVEL_SPAN.most);
 
 export const startFitted = (design: number, shortfall: number): number =>
   Math.max(SHIPS.leastLevel, design - shortfall);
 
-export function staffLevel(t: number): Span {
-  const { base, perStrength, jitter } = LEAGUE_START.staffLevel;
-  const level = base + perStrength * t;
+export function staffLevel(merit: number): Span {
+  const { lo, hi } = HEADCOUNT.freeAgentLevel;
+  const level = lo + (hi - lo) * merit;
+  const jitter = LEAGUE_START.staffJitter;
   return { lo: level - jitter, hi: level + jitter };
 }
 
-export const startBalance = (t: number): number =>
-  Math.round(LEAGUE_START.balance.base + LEAGUE_START.balance.perStrength * t);
+export const startBalance = (merit: number): number =>
+  Math.round(LEAGUE_START.balanceRaces * income(merit));
 
-export const unlockCount = (t: number): number =>
-  Math.floor(LEAGUE_START.unlocksPerStrength * t);
+export const unlockCount = (merit: number): number =>
+  Math.floor(LEAGUE_START.unlocksAtTop * merit);
