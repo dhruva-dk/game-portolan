@@ -1,6 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { edition, headlineText } from '../src/career/paper.ts';
+import { apply } from '../src/career/apply.ts';
+import type { Command } from '../src/career/commands.ts';
+import { matchSetup } from '../src/career/fit.ts';
 import { personOf } from '../src/career/lookup.ts';
 import { moneyTotal } from '../src/career/record/pay.ts';
 import type { CareerState, RaceReport } from '../src/career/state.ts';
@@ -12,7 +15,8 @@ import {
   type MoneyView,
   type ResultView,
 } from '../src/career/views/result.ts';
-import { owing, recorded, rehearsed } from '../src/app/rehearse.ts';
+import { standInResult } from '../src/career/standin.ts';
+import { dismissed, owing, recorded, rehearsed } from '../src/app/rehearse.ts';
 
 const YOURS = 0;
 const FRESH = rehearsed('test', 0);
@@ -21,7 +25,27 @@ const SANK = rehearsed('test', 2);
 const THIRD = rehearsed('test', 3);
 const LINKED = rehearsed('test', 4);
 const SEASON_END = rehearsed('test', 10);
-const WON = rehearsed('test', 41);
+function sent(state: CareerState, command: Command): CareerState {
+  const applied = apply(state, command);
+  if (!applied.ok) throw new Error(`refused for ${applied.reason}`);
+  return applied.state;
+}
+
+function won(state: CareerState): CareerState {
+  const started = sent(dismissed(state), { type: 'StartRace', team: YOURS });
+  const result = standInResult(matchSetup(started, { hands: 'player' }));
+  const first = result.ships.findIndex((ship) => ship.place === 1);
+  const ships = result.ships.map((ship, i) =>
+    i === 0 ? result.ships[first] : i === first ? result.ships[0] : ship
+  );
+  return sent(started, {
+    type: 'RecordRace',
+    team: YOURS,
+    result: { ...result, ships },
+  });
+}
+
+const WON = won(rehearsed('test', 41));
 const BOTH_AFLOAT = rehearsed('test6', 19);
 const FIFTH = rehearsed('test', 5);
 const SHORT = recorded(owing(FIFTH, -4000));

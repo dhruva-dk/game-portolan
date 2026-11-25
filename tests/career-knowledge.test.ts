@@ -191,9 +191,9 @@ test('star and asking-wage ranges of §1.6.1 at hand-worked points', () => {
     lo: 2,
     hi: 2,
   });
-  assert.deepEqual(askRange({ lo: 1, hi: 2 }, 1), { lo: 60, hi: 480 });
-  assert.deepEqual(askRange({ lo: 1, hi: 2 }, 0.7), { lo: 40, hi: 340 });
-  assert.deepEqual(askRange({ lo: 0, hi: 5 }, 1.3), { lo: 10, hi: 9750 });
+  assert.deepEqual(askRange({ lo: 1, hi: 2 }, 1), { lo: 270, hi: 570 });
+  assert.deepEqual(askRange({ lo: 1, hi: 2 }, 0.7), { lo: 190, hi: 400 });
+  assert.deepEqual(askRange({ lo: 0, hi: 5 }, 1.3), { lo: 220, hi: 3470 });
 });
 
 test('the report cost of §1.6.3 at hand-worked points', () => {

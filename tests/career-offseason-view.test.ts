@@ -7,10 +7,11 @@ import { standingOrder, standings } from '../src/career/rules/standing.ts';
 import { stars } from '../src/career/rules/person.ts';
 import {
   LINES,
+  ROLES,
   type CareerState,
   type SeasonCard,
 } from '../src/career/state.ts';
-import { LEAGUE } from '../src/career/tuning.ts';
+import { AGEING, LEAGUE } from '../src/career/tuning.ts';
 import { STAT_IDS } from '../src/career/views/card.ts';
 import {
   peopleView,
@@ -38,6 +39,13 @@ function done(state: CareerState, command: Command): CareerState {
 }
 
 const NINTH = rehearsed('test', 9);
+const driver = NINTH.teams[YOURS].seats.driver;
+const RETIRING = recorded({
+  ...NINTH,
+  people: NINTH.people.map((p) =>
+    p.id === driver ? { ...p, age: p.retireAge - AGEING.perStop } : p
+  ),
+});
 const designer = NINTH.teams[YOURS].seats.designer;
 const VACANT = recorded(
   designer === null
@@ -187,11 +195,11 @@ test('the second winter follows the first', () => {
 });
 
 test('a retirement is marked on its card', () => {
-  const faces = people(FIRST).seats.map(held);
+  const faces = people(RETIRING).seats.map(held);
   const gone = faces.filter((p) => p.retired);
   assert.ok(gone.length > 0);
   assert.equal(gone[0].role, 'driver');
-  assert.equal(FIRST.teams[YOURS].seats.driver, null);
+  assert.equal(RETIRING.teams[YOURS].seats.driver, null);
   assert.ok(faces.some((p) => !p.retired));
 });
 
@@ -210,17 +218,20 @@ test('a stat that rose and a stat that fell show as changes', () => {
 });
 
 test('a contract with no races left shows none', () => {
-  const spent = people(SECOND)
-    .seats.map(held)
-    .filter((p) => p.racesLeft === 0);
-  assert.deepEqual(
-    spent.map((p) => p.role),
-    ['driver', 'mechanic']
-  );
+  for (const state of [FIRST, SECOND]) {
+    const faces = people(state).seats.map(held);
+    assert.deepEqual(
+      faces.map((p) => p.racesLeft),
+      ROLES.map((role) => {
+        const id = state.teams[YOURS].seats[role];
+        return state.people.find((p) => p.id === id)?.contract?.racesLeft;
+      })
+    );
+  }
   assert.ok(
-    people(FIRST)
+    people(SECOND)
       .seats.map(held)
-      .every((p) => p.racesLeft > 0)
+      .some((p) => p.racesLeft === 0)
   );
 });
 

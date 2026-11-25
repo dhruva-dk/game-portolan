@@ -1,17 +1,21 @@
 import { clamp } from '../../world/scalar.ts';
-import type { Person, Terms } from '../state.ts';
-import { CONTRACTS, LEAGUE, NEGOTIATION, STARS, WANTS } from '../tuning.ts';
+import { ROLES, type Person, type Terms } from '../state.ts';
+import {
+  CONTRACTS,
+  ECONOMY,
+  LEAGUE,
+  NEGOTIATION,
+  STARS,
+  WANTS,
+} from '../tuning.ts';
+import { income, starMerit } from './money.ts';
 import { stars } from './person.ts';
 
 export function askingWage(starCount: number, wageFactor: number): number {
   const raw =
-    WANTS.askPerStar *
-    Math.max(starCount, WANTS.askLeastStars) ** WANTS.askPower *
+    ((ECONOMY.wages * income(starMerit(starCount))) / ROLES.length) *
     wageFactor;
-  return Math.max(
-    WANTS.leastAsk,
-    Math.round(raw / WANTS.askStep) * WANTS.askStep
-  );
+  return Math.round(raw / WANTS.askStep) * WANTS.askStep;
 }
 
 export const ask = (person: Pick<Person, 'stats' | 'wageFactor'>): number =>
