@@ -19,6 +19,7 @@ import { sheet } from '../base/sheet.ts';
 import { piece, placed, screen } from '../base/ui.ts';
 import { measured, word } from '../base/word.ts';
 import type { LobbyPort } from './port.ts';
+import { grouped } from '../base/grouped.ts';
 
 const PAD = SPACE.pad;
 export const SHEET = { w: 648, h: CARD.h + 2 * PAD } as const;
@@ -125,7 +126,7 @@ function actions(seat: SeatView, at: Actions) {
     releaseW = at.w - renewW - SPACE.gap,
     mid = rx + releaseW / 2,
     cy = y + h / 2;
-  const cost = seat.release.cost.toLocaleString('en-US'),
+  const cost = grouped(seat.release.cost),
     size = TYPE.name,
     coin = least('coin'),
     costW = measured(cost, size, { italic: true, weight: 600 }),

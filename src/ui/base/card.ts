@@ -8,6 +8,7 @@ import { ROLE, STAT, least, type StatName } from './lexicon.ts';
 import { STATS, rangeBar } from './rangebar.ts';
 import { roseReach, statRose } from './rose.ts';
 import { fitted, label, measured, word } from './word.ts';
+import { grouped } from './grouped.ts';
 
 export type Span = { lo: number; hi: number };
 
@@ -119,8 +120,6 @@ export function pips(x: number, y: number, n: number, w: number) {
   }
   return s;
 }
-
-const grouped = (n: number) => n.toLocaleString('en-US');
 
 const money = (span: Span) => {
   const lo = Math.round(span.lo / 10) * 10,

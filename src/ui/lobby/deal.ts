@@ -21,6 +21,7 @@ import { piece, placed, screen } from '../base/ui.ts';
 import { measured, word, type Word } from '../base/word.ts';
 import type { LobbyPort } from './port.ts';
 import { SHEET } from './team.ts';
+import { grouped } from '../base/grouped.ts';
 
 const PAD = SPACE.pad;
 const GAP = SPACE.pad;
@@ -46,7 +47,6 @@ const candidacy = (c: CandidateView, holder: CardView | null): Candidacy => ({
   holder: holder ? holder.stats.map((s) => s.value.lo) : null,
 });
 
-const costText = (cost: number) => cost.toLocaleString('en-US');
 const COST = TYPE.word + 2;
 const PINNED = 20;
 
@@ -54,7 +54,7 @@ function costWidth(a: ActionView) {
   return (
     least('coin') +
     SPACE.hair +
-    measured(costText(a.cost), COST, { italic: true, weight: 600 })
+    measured(grouped(a.cost), COST, { italic: true, weight: 600 })
   );
 }
 
@@ -78,7 +78,7 @@ function costRow(a: ActionView, act: Act, cx: number, cy: number) {
   return {
     faint:
       glyph('coin', x + coin / 2, cy, coin) +
-      figure(x + w, cy, costText(a.cost), COST, { anchor: 'end', weight: 600 }),
+      figure(x + w, cy, grouped(a.cost), COST, { anchor: 'end', weight: 600 }),
     mark:
       a.why === 'funds'
         ? glyph('cross', x + coin / 2, cy, coin + 2, { ink: 'rubric' })

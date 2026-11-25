@@ -17,6 +17,7 @@ import { boxOf, onResize, piece, screen } from '../base/ui.ts';
 import { label, measured, word, type Word } from '../base/word.ts';
 import { createOrb } from './orb.ts';
 import type { LobbyPort, ScreenName } from './port.ts';
+import { grouped } from '../base/grouped.ts';
 
 const NEXT = { orb: 30, h: 82, text: 82 } as const;
 const BUTTON = { r: SIZE.disc, step: 74, word: 13 } as const;
@@ -51,9 +52,6 @@ const BUTTONS: Record<
     mark: (x, y) => glyph('table', x, y, 30),
   },
 };
-
-const thousands = (n: number) =>
-  `${n < 0 ? '−' : ''}${Math.abs(n).toLocaleString('en-US')}`;
 
 const figureWidth = (s: string, size: number) =>
   measured(s, size, { italic: true, weight: 600 });
@@ -110,7 +108,7 @@ type Slip = { svg: string; w: number };
 
 function moneySlip(view: LobbyView, shown: number): Slip {
   const debt = view.money.interest !== null,
-    text = thousands(shown),
+    text = grouped(shown),
     size = TYPE.figure;
   const coin = least('coin') + 4;
   const w = Math.ceil(
@@ -141,7 +139,7 @@ function moneySlip(view: LobbyView, shown: number): Slip {
           figure(
             w - SPACE.pad,
             line + 25,
-            thousands(-(view.money.interest ?? 0)),
+            grouped(-(view.money.interest ?? 0)),
             TYPE.name,
             { anchor: 'end', weight: 600, fill: INK.rubric }
           )
@@ -349,7 +347,7 @@ export function createLobby(port: LobbyPort) {
         k = 1 - (1 - t) ** 3;
       shown = Math.round(from + (to - from) * k);
       const text = corner.querySelector('#balance');
-      if (text) text.textContent = thousands(shown);
+      if (text) text.textContent = grouped(shown);
       if (t < 1) tween = requestAnimationFrame(step);
       else if (view) drawCorner(view);
     };
