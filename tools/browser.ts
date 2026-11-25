@@ -46,12 +46,13 @@ const VIEWS: {
 
 type Action =
   | { tap: string }
-  | { drag: [number, number] }
+  | { drag: [number, number]; from: string | null }
   | { wait: string }
   | { hold: number };
 const argv = process.argv.slice(2);
 const actions: Action[] = [];
 const opt: Record<string, string> = {};
+let from: string | null = null;
 let query: string | null = null,
   budget = false,
   early = false,
@@ -64,15 +65,17 @@ for (let i = 0; i < argv.length; i++) {
   else if (a === '--wait') actions.push({ wait: argv[++i] });
   else if (a === '--hold') actions.push({ hold: Number(argv[++i]) });
   else if (a === '--tap') actions.push({ tap: argv[++i] });
+  else if (a === '--from') from = argv[++i];
   else if (a === '--drag') {
     const [dx, dy] = argv[++i].split(',').map(Number);
-    actions.push({ drag: [dx, dy] });
+    actions.push({ drag: [dx, dy], from });
+    from = null;
   } else if (a.startsWith('--')) opt[a.slice(2)] = argv[++i];
   else query = a;
 }
 if (query === null && !budget && !bare) {
   console.error(
-    'usage: npm run browser -- "<query>" [--tap what]... [--drag dx,dy]... [--wait what]... [--hold ms]... [--shots n] [--every ms] [--settle ms] [--patience ms] [--early] [--bare] [--dpr n] [--subject name]\n       npm run browser -- --budget'
+    'usage: npm run browser -- "<query>" [--tap what]... [--from what] [--drag dx,dy]... [--wait what]... [--hold ms]... [--shots n] [--every ms] [--settle ms] [--patience ms] [--early] [--bare] [--dpr n] [--subject name]\n       npm run browser -- --budget'
   );
   process.exit(2);
 }
@@ -400,12 +403,29 @@ try {
         await page.waitForTimeout(a.hold);
         await shot(`hold-${a.hold}`);
       } else {
-        const [dx, dy] = a.drag,
-          x = VIEW.width / 2,
-          y = VIEW.height / 2;
+        const [dx, dy] = a.drag;
+        const box = a.from
+          ? await (
+              /^[.#[]|^[a-z][\w-]*[.#[:]/.test(a.from)
+                ? page.locator(a.from)
+                : page.getByText(a.from, { exact: true })
+            )
+              .first()
+              .boundingBox()
+          : null;
+        const x = box ? box.x + box.width / 2 : VIEW.width / 2,
+          y = box ? box.y + box.height / 2 : VIEW.height / 2;
         await page.mouse.move(x, y);
         await page.mouse.down();
-        await page.mouse.move(x + dx, y + dy, { steps: 12 });
+        if (a.from) {
+          await page.waitForTimeout(600);
+          await shot(`held-${a.from}`);
+        }
+        await page.mouse.move(x + dx, y + dy, { steps: 24 });
+        if (a.from) {
+          await page.waitForTimeout(300);
+          await shot(`dragged-${dx},${dy}`);
+        }
         await page.mouse.up();
         await page.waitForTimeout(1500);
         await shot(`drag-${dx},${dy}`);
