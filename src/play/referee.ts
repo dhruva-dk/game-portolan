@@ -13,7 +13,9 @@ import type { Game } from './game.ts';
 export function createReferee(game: Game) {
   let m: MatchState | null = null,
     of = 0,
-    watching = false;
+    watching = false,
+    pick: (() => number | null) | null = null,
+    followed: number | null = null;
   const report: Report = {
     sinkings: [],
     alive: [],
@@ -22,7 +24,7 @@ export function createReferee(game: Game) {
   };
   const aim = (s: MatchState) =>
     game.view({
-      watch: watching ? s.watch : PLAYER,
+      watch: watching ? (followed ?? s.watch) : PLAYER,
       hands: s.phase === 'fighting',
       look: s.phase === 'fighting' || watching,
       end:
@@ -37,14 +39,18 @@ export function createReferee(game: Game) {
       m = startMatch();
       of = game.alive().length;
       watching = false;
+      pick = null;
+      followed = null;
       aim(m);
     },
     end() {
       m = null;
     },
-    watch() {
+    watch(chosen?: () => number | null) {
       if (!m || m.phase !== 'spectating') return;
       watching = true;
+      pick = chosen ?? null;
+      followed = pick?.() ?? null;
       aim(m);
     },
     switch(by: number) {
@@ -61,7 +67,10 @@ export function createReferee(game: Game) {
       report.share = game.share();
       report.race = race;
       m = stepMatch(m, report, dt);
-      if (m.watch !== was.watch || m.phase !== was.phase) aim(m);
+      const lost =
+        pick !== null && followed !== null && !report.alive.includes(followed);
+      if (lost) followed = pick?.() ?? null;
+      if (lost || m.watch !== was.watch || m.phase !== was.phase) aim(m);
       if (m.phase === 'fighting' || m.place === null) return null;
       const how = m.phase === 'won' ? 'won' : (m.sunk?.cause ?? 'shot');
       return {

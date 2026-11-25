@@ -71,6 +71,7 @@ import type { Rig } from '../sim/engine.ts';
 import type { MatchSetup, ShipValues } from '../sim/setup.ts';
 import { watered, type Berthed, type Soundings } from '../sim/waters.ts';
 import type { Livery } from '../world/livery.ts';
+import { STEP } from '../sim/fixed.ts';
 
 export interface DebugDamage {
   wear: 0 | 1 | 2;
@@ -334,6 +335,22 @@ export function createGame(
       part = PARTS.find((p) => p === to?.focus) ?? null;
       if (cut) reframe();
     },
+    hasten(ms: number): number {
+      const until = performance.now() + ms;
+      let steps = 0;
+      while (!state.done() && performance.now() < until) {
+        state.step({
+          course: null,
+          throttle: 0,
+          aim: chase.sight(),
+          fire: false,
+          gust: false,
+          heal: null,
+        });
+        steps++;
+      }
+      return steps * STEP;
+    },
     step(dt: number, read: Thumbs) {
       const hands = steering() ? read : IDLE;
       if (hands.stick || hands.look.held) held = null;
@@ -522,6 +539,18 @@ export function createGame(
     share: () => state.share(PLAYER),
     ships: state.ships,
     alive: state.alive,
+    leader(): number | null {
+      const alive = state.alive(),
+        teams = state.teams();
+      const mate = alive.find(
+        (id) => id !== PLAYER && teams?.[id] === teams?.[PLAYER]
+      );
+      return (
+        mate ??
+        state.order().find((id) => id !== PLAYER && alive.includes(id)) ??
+        null
+      );
+    },
     race() {
       const teams = state.teams();
       if (!teams) return null;
