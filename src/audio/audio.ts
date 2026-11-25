@@ -3,7 +3,14 @@ import { R, type Vec3 } from '../world/sphere.ts';
 import { NAMES, SOUNDS, type SoundName } from './bank.ts';
 import type { Ask, Made } from './maker.ts';
 import { createBed, levels, levelsOf } from './bed.ts';
-import { CUES, cueOf, soundOf, type Happening } from './cues.ts';
+import {
+  CUES,
+  CUE_NAMES,
+  cueOf,
+  soundOf,
+  type Cue,
+  type Happening,
+} from './cues.ts';
 import { db } from './dsp.ts';
 import { createListen, type Call, type Hearing } from './listen.ts';
 import { createMixer } from './mixer.ts';
@@ -31,7 +38,15 @@ export function createEngine(
   const listen = createListen(ground);
   let heardTo = 0;
   const bank = new Map<SoundName, AudioBuffer[]>();
-  const queue = NAMES.flatMap((name) =>
+  const first = new Set<SoundName>(
+    CUE_NAMES.filter((c) => CUES[c].bus === 'ui').map((c) =>
+      soundOf(CUES[c], null)
+    )
+  );
+  const queue = [
+    ...NAMES.filter((n) => first.has(n)),
+    ...NAMES.filter((n) => !first.has(n)),
+  ].flatMap((name) =>
     Array.from({ length: SOUNDS[name].takes }, (_, i) => ({
       name,
       seed: 1 + i * STRIDE,
@@ -47,14 +62,18 @@ export function createEngine(
     bank.set(name, [...(bank.get(name) ?? []), b]);
   };
 
-  const play = (call: Call, eye: Hearing['scene']['eye'], at: number) => {
+  const play = (
+    call: Call,
+    eye: Hearing['scene']['eye'] | null,
+    at: number
+  ) => {
     const c = CUES[call.cue],
       name = soundOf(c, call.gun ?? null),
       sound = SOUNDS[name],
       takes = bank.get(name);
     if (!takes?.length) return;
     if (c.bus === 'world' && call.at) {
-      if (!hear(eye, call.at, sound.reach, h).audible) return;
+      if (!eye || !hear(eye, call.at, sound.reach, h).audible) return;
     } else close(h);
     const gain = db(sound.level + c.level + (r() - 0.5) * 2) * call.gain;
     mixer.play(
@@ -118,7 +137,7 @@ export function createEngine(
       bed.steer(levelsOf(b, lv), at);
       for (const call of calls) play(call, scene.eye, at);
     },
-    tap(screen: Screen, eye: Hearing['scene']['eye'], at: number) {
+    tap(screen: Screen, eye: Hearing['scene']['eye'] | null, at: number) {
       if (screen !== 'match') play({ cue: 'tap', at: null, gain: 1 }, eye, at);
     },
   };
@@ -165,12 +184,18 @@ export function createAudio(ground: (p: Vec3) => number) {
       engine.update(hearing, level, ctx.currentTime, dt, running);
     },
     tap(screen: Screen) {
-      if (eye && ctx.state === 'running')
-        engine.tap(screen, eye, ctx.currentTime);
+      if (ctx.state === 'running') engine.tap(screen, eye, ctx.currentTime);
     },
     sample() {
-      if (eye && ctx.state === 'running')
+      if (ctx.state === 'running')
         engine.cue({ cue: 'ready', at: null, gain: 1 }, eye, ctx.currentTime);
+    },
+    cue(cue: Cue) {
+      if (ctx.state === 'running')
+        engine.cue({ cue, at: null, gain: 1 }, eye, ctx.currentTime);
+    },
+    level(v: number) {
+      engine.level(v, ctx.currentTime);
     },
   };
 }

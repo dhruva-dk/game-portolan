@@ -19,7 +19,31 @@ import {
   whistle,
 } from './sounds/blows.ts';
 import { claim, closing, gust, mendHull, thunder, took } from './sounds/sea.ts';
-import { close, launch, lost, open, salute, tap } from './sounds/ui.ts';
+import {
+  built,
+  card,
+  close,
+  coin,
+  debt,
+  frost,
+  furl,
+  knock,
+  landed,
+  launch,
+  laurel,
+  lost,
+  open,
+  painted,
+  row,
+  salute,
+  seal,
+  slam,
+  stamp,
+  standing,
+  tap,
+  tossed,
+  unroll,
+} from './sounds/ui.ts';
 
 interface Sound {
   make: (rate: number, seed: number) => Samples;
@@ -92,6 +116,23 @@ const SOUND = {
   launch: { make: launch, takes: 1, level: -7, priority: 9, reach: 0 },
   lost: { make: lost, takes: 1, level: -6, priority: 9, reach: 0 },
   salute: { make: salute, takes: 1, level: -5, priority: 9, reach: 0 },
+  stamp: { make: stamp, takes: 2, level: -17, priority: 4, reach: 0 },
+  row: { make: row, takes: 2, level: -19, priority: 4, reach: 0 },
+  coin: { make: coin, takes: 3, level: -22, priority: 4, reach: 0 },
+  standing: { make: standing, takes: 1, level: -20, priority: 4, reach: 0 },
+  landed: { make: landed, takes: 2, level: -15, priority: 4, reach: 0 },
+  tossed: { make: tossed, takes: 2, level: -18, priority: 4, reach: 0 },
+  slam: { make: slam, takes: 1, level: -15.5, priority: 4, reach: 0 },
+  seal: { make: seal, takes: 1, level: -17, priority: 4, reach: 0 },
+  built: { make: built, takes: 1, level: -15, priority: 4, reach: 0 },
+  painted: { make: painted, takes: 1, level: -17, priority: 4, reach: 0 },
+  knock: { make: knock, takes: 2, level: -17.5, priority: 4, reach: 0 },
+  unroll: { make: unroll, takes: 2, level: -19, priority: 4, reach: 0 },
+  furl: { make: furl, takes: 2, level: -19, priority: 4, reach: 0 },
+  laurel: { make: laurel, takes: 1, level: -18, priority: 4, reach: 0 },
+  card: { make: card, takes: 2, level: -17, priority: 4, reach: 0 },
+  frost: { make: frost, takes: 1, level: -22, priority: 4, reach: 0 },
+  debt: { make: debt, takes: 1, level: -16.5, priority: 4, reach: 0 },
 } as const satisfies Record<string, Sound>;
 
 export type SoundName = GunKind | keyof typeof SOUND;
