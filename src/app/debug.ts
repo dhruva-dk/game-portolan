@@ -7,7 +7,7 @@ import type { DebugDamage, Game } from '../play/game.ts';
 import type { Referee } from '../play/referee.ts';
 import { dealt, lookOf, worn } from '../play/colors.ts';
 import type { Berth } from '../play/state.ts';
-import { HOTBAR, IDLE, type Thumbs } from '../play/player.ts';
+import { IDLE, type Thumbs } from '../play/player.ts';
 import type { Livery } from '../world/livery.ts';
 import { probeMeshes } from './probe.ts';
 import { STEP } from '../sim/fixed.ts';
@@ -160,16 +160,15 @@ export async function scenario(
   open(p, demoShips(s.start.at, room - 1, s.world.seed, p.game.worn()), s);
   const paused = params.has('pause'),
     slow = number('slow', 1);
-  const swing = params.get('swing')?.split(',').map(Number),
-    item = HOTBAR.guns - 1;
+  const swing = params.get('swing')?.split(',').map(Number);
   const [slot, use] = (params.get('use') ?? '').split(',').map(Number),
-    tap = params.get('tap')?.split(',').map(Number);
+    gusts = params.get('gust')?.split(',').map(Number) ?? [];
+  const [hurt, hurtAt] = (params.get('hurt') ?? '').split(',').map(Number);
   const [fireAt, held] = (params.get('fire') ?? '').split(',').map(Number);
   const timed: { at: number; hands: Partial<Thumbs> }[] = [
-    ...(slot > 0 ? [{ at: use || 0, hands: { tap: item + slot } }] : []),
-    ...(tap ? [{ at: tap[1] || 0, hands: { tap: tap[0] || 0 } }] : []),
+    ...(slot > 0 ? [{ at: use || 0, hands: { heal: slot - 1 } }] : []),
     ...(params.has('gust')
-      ? [{ at: number('gust', 0), hands: { gust: true } }]
+      ? gusts.map((at) => ({ at: at || 0, hands: { gust: true } }))
       : []),
     ...(params.get('fire') ? [{ at: fireAt || 0, hands: { fire: true } }] : []),
     ...(swing
@@ -198,6 +197,9 @@ export async function scenario(
       : []),
     ...(params.get('kit')
       ? [{ at: number('kit', 0), act: () => kit(p.game) }]
+      : []),
+    ...(hurt > 0
+      ? [{ at: hurtAt || 0, act: () => p.game.debug.hurt(PLAYER, hurt) }]
       : []),
     ...(damage && number('worn', 0) > 0
       ? [{ at: number('worn', 0), act: () => p.game.debug.wear(damage) }]

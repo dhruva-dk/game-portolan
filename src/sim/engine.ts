@@ -140,6 +140,8 @@ export interface Founded {
 
 export const SETUP = { least: 2, most: 80 } as const;
 
+const HURT_LEAST = 1;
+
 function checked(setup: MatchSetup): MatchSetup {
   const { ships } = setup;
   if (ships.length < SETUP.least || ships.length > SETUP.most)
@@ -655,6 +657,19 @@ function createSea(waters: Waters, first: Course) {
         gun: held ? held.gun.kind : null,
       });
     },
+    hurt(id: number, points: number) {
+      const hurt = (c: Crew): Crew =>
+        c.id === id && !sunk(c.health)
+          ? {
+              ...c,
+              health: {
+                ...c.health,
+                hull: Math.max(HURT_LEAST, c.health.hull - points),
+              },
+            }
+          : c;
+      battle = { ...battle, crews: battle.crews.map(hurt) };
+    },
     mindOf: (id: number): Readonly<Memory> | null =>
       aboard.get(id)?.mind ?? null,
     standIn: (id: number, sights: Sighter) => {
@@ -716,6 +731,7 @@ interface Debug {
   rig(rig: Rig): void;
   strew(at: Vec3, heals: readonly Rarity[]): void;
   sink(id: number, by: number | null): void;
+  hurt(id: number, points: number): void;
   mindOf(id: number): Readonly<Memory> | null;
   standIn(id: number, sights: Sighter): void;
   lap(on: ((part: Part) => void) | undefined): void;

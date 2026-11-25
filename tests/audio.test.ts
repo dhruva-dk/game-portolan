@@ -24,12 +24,7 @@ import {
 import { VOICES, claim, pool, type Pool } from '../src/audio/voices.ts';
 import { breakers, galeOf, levels, levelsOf } from '../src/audio/bed.ts';
 import { KINDS } from '../src/sim/kinds.ts';
-import {
-  HOTBAR,
-  type GunKind,
-  type Kit,
-  type Status,
-} from '../src/play/player.ts';
+import { type GunKind, type Kit, type Status } from '../src/play/player.ts';
 import type {
   BallDraw,
   Blast,
@@ -308,9 +303,7 @@ const status = (over: Partial<Status & Kit> = {}): Status & Kit => ({
   reticle: null,
   moments: [],
   race: null,
-  guns: [{ kind: 'cannon', rounds: 8, mag: 8, reload: null }],
-  items: [null, null, null],
-  chosen: 0,
+  heals: [null, null, null],
   using: null,
   gust: 1,
   blowing: false,
@@ -325,7 +318,7 @@ const hearing = (
   covered = 0
 ): Hearing => ({ scene: s, status: st, screen, map, covered });
 
-test('listen: a ball passing near whistles once; a slot of its stores taken in hand, not its gun; the screens; its water', () => {
+test('listen: a ball passing near whistles once; a heal slot taken in hand; the screens; its water', () => {
   const l = createListen(() => -20),
     out: Call[] = [];
   const dt = 1 / 30,
@@ -349,10 +342,11 @@ test('listen: a ball passing near whistles once; a slot of its stores taken in h
     l.listen(h, dt, out);
     return out.map((c) => c.cue);
   };
-  assert.deepEqual(cues(hearing(scene(2.1), status({ chosen: HOTBAR.guns }))), [
-    'select',
-  ]);
-  assert.deepEqual(cues(hearing(scene(2.12), status({ chosen: 0 }))), []);
+  assert.deepEqual(
+    cues(hearing(scene(2.1), status({ using: { slot: 0, done: 0 } }))),
+    ['select']
+  );
+  assert.deepEqual(cues(hearing(scene(2.12), status({ using: null }))), []);
   cues(hearing(scene(2.15), status()));
   assert.deepEqual(cues(hearing(scene(2.2), status(), 'won')), ['salute']);
   assert.deepEqual(cues(hearing(scene(2.3), status(), 'lobby')), []);

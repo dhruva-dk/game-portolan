@@ -28,14 +28,11 @@ import {
 } from '../world/sphere.ts';
 import {
   PLAYER_SHIP,
-  HOTBAR,
   IDLE,
   type Deed,
-  type GunSlot,
   type Thumbs,
   type Kit,
   type Moment,
-  type Slot,
   type Status,
 } from './player.ts';
 import {
@@ -78,9 +75,6 @@ const DRAWN = 700,
 const LONG_AGO = 1e3;
 const reloading = (g: Gun, c: Crew): number | null =>
   g.reload > 0 ? 1 - g.reload / reloadOf(g.kind, c.values.reloadFactor) : null;
-const itemSlot = (n: number) => HOTBAR.guns + n;
-const tapOf = (tapped: number | null) =>
-  tapped === null || tapped < HOTBAR.guns ? null : tapped - HOTBAR.guns;
 
 interface View {
   watch: number;
@@ -199,22 +193,8 @@ export function createGame(
     center: start.at,
     radius: 0,
   };
-  const gunSlots: GunSlot[] = [],
-    itemSlots: Slot[] = [];
-  const carried: Kit & {
-    guns: [GunSlot | null];
-    items: [Slot | null, Slot | null, Slot | null];
-  } = {
-    guns: [null],
-    items: [null, null, null],
-    chosen: 0,
-    using: null,
-    gust: 1,
-    blowing: false,
-  };
-  for (let i = 0; i < HOTBAR.guns; i++)
-    gunSlots.push({ kind: 'cannon', rounds: 0, mag: 0, reload: null });
-  for (let i = 0; i < HOTBAR.items; i++) itemSlots.push({ heal: 'common' });
+  const using = { slot: 0, done: 0 };
+  const carried: Kit = { heals: [], using: null, gust: 1, blowing: false };
   const moments: Moment[] = [];
 
   const inHandOf = (g: Gun, c: Crew, locked: boolean) => {
@@ -338,7 +318,7 @@ export function createGame(
       if (hands.stick || hands.look.held) held = null;
       pulled ||= hands.fire;
       gusted ||= hands.gust;
-      if (hands.tap !== null) tapped = hands.tap;
+      if (hands.heal !== null) tapped = hands.heal;
       const me = view.watch,
         lens = chase.eye();
       for (const d of state.deeds()) {
@@ -371,7 +351,7 @@ export function createGame(
           aim: chase.sight(),
           fire: !!v && pulled,
           gust: gusted,
-          heal: tapOf(tapped),
+          heal: tapped,
         });
         [tapped, gusted] = [null, false];
       }
@@ -448,23 +428,13 @@ export function createGame(
     kit(): Kit {
       const c = state.crew(PLAYER),
         h = c.hold,
-        slots = carried.guns,
-        items = carried.items;
-      const g = c.gun,
-        slot = gunSlots[0];
-      slot.kind = g.kind;
-      slot.rounds = g.rounds;
-      slot.mag = GUNS[g.kind].mag;
-      slot.reload = reloading(g, c);
-      slots[0] = slot;
-      for (let i = 0; i < items.length; i++) {
-        const k = h.items[i],
-          slot = itemSlots[i];
-        if (k) slot.heal = k;
-        items[i] = k ? slot : null;
-      }
-      carried.chosen = h.using ? itemSlot(h.using.slot) : 0;
-      carried.using = progress(h);
+        done = progress(h);
+      carried.heals = h.items;
+      if (h.using && done !== null) {
+        using.slot = h.using.slot;
+        using.done = done;
+        carried.using = using;
+      } else carried.using = null;
       carried.gust = charged(c.gust, c.values.gustCapacity);
       carried.blowing = c.gust.on;
       return carried;
@@ -561,6 +531,7 @@ export function createGame(
       },
       sink: debugOf(state).sink,
       strew: debugOf(state).strew,
+      hurt: debugOf(state).hurt,
       wear(w: DebugDamage | null) {
         worn = w;
       },

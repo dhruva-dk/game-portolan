@@ -1,5 +1,6 @@
 import {
-  HOTBAR,
+  GUST_NOTCH,
+  HEAL_SLOTS,
   type GunKind,
   type Kit,
   type Status,
@@ -12,7 +13,6 @@ import { createChanged } from '../base/drawn.ts';
 import { stormMark, type Glyph } from '../base/glyphs.ts';
 import {
   DUSK,
-  GILT,
   INK,
   WASH,
   alpha,
@@ -27,27 +27,33 @@ import { createJuice } from './juice.ts';
 import { createMinimap, type More } from './minimap.ts';
 import { onHold, onTap } from '../base/touch.ts';
 import { piece, show, view } from '../base/ui.ts';
+import {
+  FIRE,
+  GUST,
+  THUMB,
+  gustButton,
+  healSlot,
+  healTapped,
+  meterFill,
+  slotBox,
+  slotsWidth,
+  SLOT,
+  useFill,
+  type Corner,
+} from './controls.ts';
 import { createVitals } from './vitals.ts';
 
 export type HudState = Status & Kit;
 
 interface HudActions {
-  slot(i: number): void;
+  heal(slot: number): void;
   gust(): void;
   map(): void;
   fire(down: boolean): void;
 }
 
-const SLOT = 50,
-  GAP = 6,
-  APART = 16;
-const SLOTS = HOTBAR.guns + HOTBAR.items,
-  LEFT = (i: number) => i * (SLOT + GAP) + (i >= HOTBAR.guns ? APART - GAP : 0);
 const mark = (k: GunKind): Glyph => `weapon.${k}`;
 const MINIMAP = 198;
-const FIRE = 40,
-  GUST_RIGHT = 6,
-  GUST_UP = 86;
 const RETICLE = 10,
   LOCKED = 0.75,
   FALL = 4,
@@ -72,13 +78,14 @@ export function createHud(layer: HTMLElement, shores: Shores, act: HudActions) {
   const readings = piece(body, 'top center', false, true);
   const map = piece(body, 'top right', true, true);
   const thumb = piece(body, 'right bottom', false, true);
-  const disc = 2 * FIRE + 4;
-  thumb.style.width = `${disc}px`;
-  thumb.style.height = `${disc / 2 + GUST_UP + 30}px`;
+  const corner = (c: Corner) =>
+    `right:${c.right}px;bottom:${c.bottom}px;width:${c.width}px;height:${c.height}px`;
+  thumb.style.width = `${THUMB.width}px`;
+  thumb.style.height = `${THUMB.height}px`;
   const gust = piece(thumb, '', true);
-  gust.style.cssText = `right:${disc / 2 + GUST_RIGHT - 30}px;bottom:${disc / 2 + GUST_UP - 30}px`;
+  gust.style.cssText = corner(THUMB.gust);
   const fire = piece(thumb, '', true);
-  fire.style.cssText = `right:0;bottom:0;width:${disc}px;height:${disc}px`;
+  fire.style.cssText = corner(THUMB.fire);
   const reticle = piece(body, 'mark');
   reticle.style.cssText = 'left:50%;top:50%';
   const fall = piece(body, 'mark');
@@ -94,16 +101,20 @@ export function createHud(layer: HTMLElement, shores: Shores, act: HudActions) {
   onTap(map, () => act.map());
   onTap(gust, () => act.gust());
 
-  const slots = Array.from({ length: SLOTS }, (_, i) => {
-    const el = document.createElement('div');
+  let heals: HudState['heals'] = [];
+  const slots = Array.from({ length: HEAL_SLOTS }, (_, i) => {
+    const el = document.createElement('div'),
+      box = slotBox(i);
     el.className = 'press';
-    el.style.cssText = `position:absolute;left:${LEFT(i)}px;top:0;width:${SLOT}px;height:${SLOT}px`;
+    el.style.cssText = `position:absolute;left:${box.left}px;top:${box.top}px;width:${box.width}px;height:${box.height}px`;
     hotbar.appendChild(el);
-    onTap(el, () => act.slot(i));
+    onTap(el, () => {
+      const slot = healTapped(heals, i);
+      if (slot !== null) act.heal(slot);
+    });
     return el;
   });
-  const raised = slots.map(() => false);
-  hotbar.style.width = `${LEFT(SLOTS - 1) + SLOT}px`;
+  hotbar.style.width = `${slotsWidth(HEAL_SLOTS)}px`;
   hotbar.style.height = `${SLOT}px`;
   const juice = createJuice(body, { vitals: face, fire, gust, slots });
 
@@ -151,23 +162,13 @@ export function createHud(layer: HTMLElement, shores: Shores, act: HudActions) {
         );
       }
 
-      const meter = Math.floor(clamp(s.gust) * 48);
-      if (changed(gust, meter, s.blowing)) {
+      const ready = s.blowing || s.gust >= GUST_NOTCH;
+      if (changed(gust, meterFill(s.gust), s.blowing, ready))
         gust.innerHTML = svg(
-          60,
-          60,
-          `<g>${paperDisc(30, 30, 28, s.blowing ? WASH.gold : INK.iron)}` +
-            sweep(
-              30,
-              30,
-              25,
-              meter / 48,
-              s.blowing ? WASH.gold : INK.iron,
-              2.4
-            ) +
-            `${glyph('gust', 30, 30, 32)}</g>`
+          2 * GUST.r,
+          2 * GUST.r,
+          gustButton(s.gust, GUST_NOTCH, s.blowing)
         );
-      }
 
       const g = s.gun,
         c = FIRE + 2,
@@ -280,7 +281,13 @@ export function createHud(layer: HTMLElement, shores: Shores, act: HudActions) {
         );
       }
 
-      for (let i = 0; i < SLOTS; i++) drawSlot(s, i);
+      heals = s.heals;
+      for (let i = 0; i < HEAL_SLOTS; i++) {
+        const heal = s.heals[i] ?? null,
+          done = s.using?.slot === i ? useFill(s.using.done) : null;
+        if (changed(slots[i], heal, done))
+          slots[i].innerHTML = svg(SLOT, SLOT, healSlot(heal, done));
+      }
 
       juice.update(s, !watching && s.arriving <= 0);
 
@@ -303,70 +310,6 @@ export function createHud(layer: HTMLElement, shores: Shores, act: HudActions) {
       drawMap(s.at, s.heading, more);
     },
   };
-
-  function drawSlot(s: HudState, i: number) {
-    const gun = i < HOTBAR.guns,
-      k = gun ? s.guns[i] : null,
-      item = gun ? null : s.items[i - HOTBAR.guns];
-    const chosen = s.chosen === i,
-      full = gun ? !!k : !!item;
-    const reload = k && k.reload !== null ? Math.floor(k.reload * 32) : -1;
-    const used = chosen && s.using !== null ? Math.floor(s.using * 32) : reload;
-    const name = k ? k.kind : item ? item.heal : null,
-      count = k ? k.rounds : null;
-    const el = slots[i];
-    if (changed(el, name, count, chosen, used)) {
-      if (!full) {
-        el.innerHTML = svg(
-          SLOT,
-          SLOT,
-          `<rect x="2" y="2" width="${SLOT - 4}" height="${SLOT - 4}" fill="${alpha(INK.iron, 0.12)}" stroke="${INK.iron}" stroke-width="3" opacity=".45"/>` +
-            `<rect x="2" y="2" width="${SLOT - 4}" height="${SLOT - 4}" fill="none" stroke="${INK.white}" stroke-width="1.2" opacity=".85"/>` +
-            (gun
-              ? `<g opacity=".5">${glyph('weapon.cannon', SLOT / 2, SLOT / 2, 28, { ink: 'white' })}</g>`
-              : '')
-        );
-      } else {
-        const low = !!k && k.rounds === 0,
-          mine: Glyph = k ? mark(k.kind) : 'heal';
-        el.innerHTML = svg(
-          SLOT,
-          SLOT,
-          slip(0, 0, SLOT, SLOT, {
-            fill: chosen ? GILT : 'url(#pg)',
-            bold: chosen,
-          }) +
-            (chosen
-              ? `<rect x="2" y="2" width="${SLOT - 4}" height="${SLOT - 4}" fill="none" stroke="${WASH.gold}" stroke-width="${gun ? 2.6 : 1.6}"/>`
-              : '') +
-            glyph(mine, SLOT / 2 - 3, SLOT / 2, 31) +
-            (count != null
-              ? figure(SLOT - 4, SLOT / 2 + 12, count, 17, {
-                  fill: low ? INK.rubric : INK.iron,
-                  anchor: 'end',
-                })
-              : '') +
-            (used >= 0
-              ? sweep(
-                  SLOT / 2,
-                  SLOT / 2,
-                  SLOT / 2 - 6,
-                  used / 32,
-                  reload >= 0 && !(chosen && s.using !== null)
-                    ? INK.rubric
-                    : WASH.gold,
-                  3.5
-                )
-              : '')
-        );
-      }
-    }
-    const up = chosen && gun && full;
-    if (up !== raised[i]) {
-      raised[i] = up;
-      el.style.transform = up ? 'translateY(-6px)' : '';
-    }
-  }
 }
 
 export type Hud = ReturnType<typeof createHud>;

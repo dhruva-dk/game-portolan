@@ -24,7 +24,7 @@ export function createInput(element: HTMLElement, steers: () => boolean) {
     lookY = 0,
     fired = false,
     holding = false,
-    tapped: number | null = null,
+    healed: number | null = null,
     gusted = false;
 
   element.addEventListener('pointerdown', (e) => {
@@ -93,18 +93,18 @@ export function createInput(element: HTMLElement, steers: () => boolean) {
       const look = { x: lookX, y: lookY, held: looks.size > 0 };
       lookX = lookY = 0;
       const fire = fired || holding || keys.has('Space'),
-        tap = tapped,
+        heal = healed,
         gust = gusted;
       fired = gusted = false;
-      tapped = null;
-      return { stick, look, fire, tap, gust };
+      healed = null;
+      return { stick, look, fire, heal, gust };
     },
     fire(down: boolean) {
       holding = down;
       if (down) fired = true;
     },
-    tap(i: number) {
-      tapped = i;
+    heal(slot: number) {
+      healed = slot;
     },
     gust() {
       gusted = true;

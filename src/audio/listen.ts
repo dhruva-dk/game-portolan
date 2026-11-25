@@ -1,5 +1,4 @@
 import {
-  HOTBAR,
   type GunKind,
   type Kit,
   type Screen,
@@ -75,7 +74,7 @@ export function createListen(ground: (p: Vec3) => number) {
     generation = -1,
     seq = 0,
     closing = false;
-  let chosen = 0;
+  let using: number | null = null;
   let lift = NaN,
     roll = 0,
     whistled = -Infinity;
@@ -143,9 +142,9 @@ export function createListen(ground: (p: Vec3) => number) {
         lift = NaN;
       }
 
-      if (!fresh && s.chosen !== chosen && s.chosen >= HOTBAR.guns)
-        call(out, 'select');
-      chosen = s.chosen;
+      const slot = s.using?.slot ?? null;
+      if (!fresh && slot !== using && slot !== null) call(out, 'select');
+      using = slot;
 
       if (sea && scene.own !== null) {
         for (const c of sea.changes)
