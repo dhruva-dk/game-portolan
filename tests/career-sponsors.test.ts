@@ -140,7 +140,7 @@ function checkOffers(
   }
 }
 
-test('the sponsor fee of §1.8.5 at hand-worked points', () => {
+test('the sponsor fee at hand-worked points', () => {
   assert.equal(sponsorFee(40, 1), 50);
   assert.equal(sponsorFee(40, 0.8), 40);
   assert.equal(sponsorFee(40, 1.2), 60);
@@ -180,7 +180,7 @@ const goal = (objective: Objective, target: number | null = null) => ({
   target,
 });
 
-test('each objective is met exactly as the table of §1.8.5 says', () => {
+test('each objective is met exactly when its figure is reached', () => {
   const sea = flat(0);
   const place = goal('place', 10);
   assert.equal(

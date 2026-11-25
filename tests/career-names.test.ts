@@ -23,7 +23,7 @@ const LISTS: [string, readonly string[]][] = [
   ['planets', PLANET_NAMES],
 ];
 
-test('the lists have the sizes of §1.13.3', () => {
+test('the name lists have their set sizes', () => {
   assert.ok(TEAM_NAMES.length >= NAMES.teams);
   assert.ok(TEAM_NAMES.length >= LEAGUE.teams - 1);
   assert.equal(SPONSOR_ROSTER.length, NAMES.sponsors);

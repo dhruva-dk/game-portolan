@@ -216,7 +216,7 @@ const FIRST_FIVE: readonly CommandType[] = [
   'MarkSeen',
 ];
 
-test('there are sixteen commands and eleven reasons in the order of §2.2.3', () => {
+test('there are sixteen commands and eleven reasons, each in its set order', () => {
   assert.equal(COMMANDS.length, 16);
   assert.deepEqual(Object.keys(TABLE), [...COMMANDS]);
   assert.deepEqual(REASONS, [
@@ -413,7 +413,7 @@ test('no such person, owner, offer or bubble is refused for unknown', () => {
     );
 });
 
-test('when several reasons apply the first in the order of §2.2.3 is given', () => {
+test('when several reasons apply the first in their set order is given', () => {
   const lobby = career('lobby');
   const racing = career('racing');
   const cases: [CareerState, unknown, Reason][] = [

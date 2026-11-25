@@ -141,7 +141,7 @@ test('ageing adds a year and recomputes the stats; retirement is at the retireme
   assert.ok(declining.stats.every((s, i) => s <= person.peak[i]));
 });
 
-test('a person is generated with every field of §1.5.4 in its range', () => {
+test('a person is generated with every field in its range', () => {
   for (const seed of SEEDS)
     for (const role of ROLES)
       for (const id of IDS) {
@@ -183,7 +183,7 @@ test('a rookie is 18 to 21', () => {
     }
 });
 
-test('what a person wants follows §1.6.4', () => {
+test('what a person wants is drawn within its ranges and sums to 1', () => {
   assert.deepEqual(wantsOf(0.5, 0.3), {
     money: 0.5,
     standing: 0.3,

@@ -220,7 +220,7 @@ const NERVES = Array.from(
   (_, i) => STAT_SPAN.least + i
 );
 
-test('the three means meet the table of §3.10 at Nerve 1 and 20 and move one way as Nerve rises', () => {
+test('the three means meet their ends at Nerve 1 and 20 and move one way as Nerve rises', () => {
   assert.deepEqual(meansOf(1), { build: 12, share: 0.25, reserve: 6 });
   assert.deepEqual(meansOf(20), { build: 5, share: 0.6, reserve: 3 });
   for (const nerve of NERVES.slice(1)) {

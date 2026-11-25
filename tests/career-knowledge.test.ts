@@ -167,7 +167,7 @@ const within = (value: number, range: Range): boolean =>
 const inside = (inner: Range, outer: Range): boolean =>
   inner.lo >= outer.lo && inner.hi <= outer.hi;
 
-test('a stat range of §1.6.1 at hand-worked points', () => {
+test('a stat range at hand-worked points', () => {
   assert.deepEqual(statRange(10, 0), { lo: 7, hi: 13 });
   assert.deepEqual(statRange(10, 1), { lo: 4, hi: 10 });
   assert.deepEqual(statRange(10, -1), { lo: 10, hi: 16 });
@@ -186,7 +186,7 @@ test('a stat range of §1.6.1 at hand-worked points', () => {
     }
 });
 
-test('star and asking-wage ranges of §1.6.1 at hand-worked points', () => {
+test('star and asking-wage ranges at hand-worked points', () => {
   const ranges = (lo: number, hi: number, n: number): Range[] =>
     Array.from({ length: n }, () => ({ lo, hi }));
   assert.deepEqual(starRange(ranges(4, 8, 6)), { lo: 1, hi: 2 });
@@ -200,7 +200,7 @@ test('star and asking-wage ranges of §1.6.1 at hand-worked points', () => {
   assert.deepEqual(askRange({ lo: 0, hi: 5 }, 1.3), { lo: 220, hi: 3470 });
 });
 
-test('the report cost of §1.6.3 at hand-worked points', () => {
+test('the report cost at hand-worked points', () => {
   assert.equal(reportCost(0), 100);
   assert.equal(reportCost(0.5), 100);
   assert.equal(reportCost(1), 200);
@@ -208,7 +208,7 @@ test('the report cost of §1.6.3 at hand-worked points', () => {
   assert.equal(reportCost(5), 1000);
 });
 
-test('rival ship ranges of §1.7.6 at hand-worked points', () => {
+test('rival ship ranges at hand-worked points', () => {
   assert.deepEqual(shipRange(50, 30, 0), { lo: 50, hi: 80 });
   assert.deepEqual(shipRange(50, 30, 1), { lo: 20, hi: 50 });
   assert.deepEqual(shipRange(10, 30, 0.5), { lo: 0, hi: 25 });

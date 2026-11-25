@@ -184,7 +184,7 @@ function richestCandidate(state: CareerState, role: Role): number {
   );
 }
 
-test('the score of §1.6.5 at hand-worked points', () => {
+test('the offer score at hand-worked points', () => {
   const terms: Terms = { wage: 1000, seasons: 2, fee: 0, clause: 10000 };
   assert.equal(moneyScore(terms, 1000), 1);
   assert.equal(moneyScore({ ...terms, wage: 900, fee: 2000 }, 1000), 1.05);
@@ -268,7 +268,7 @@ test('contract lengths, renewals, release costs and the reserve at hand-worked p
   assert.equal(leavesReserve(10000, 1000, 2250, 4), true);
 });
 
-test('with no fee and a standard clause, 2.5 times the asking wage always signs (§1.6.5 rule 5)', () => {
+test('with no fee and a standard clause, 2.5 times the asking wage always signs', () => {
   for (const seed of ['pennant', 'gullet']) {
     const state = careerOf(seed);
     for (const team of [0, 1, 20, 39])

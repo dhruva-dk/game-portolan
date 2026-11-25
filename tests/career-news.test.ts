@@ -603,7 +603,7 @@ const ORDER_IN_RECORD: readonly NewsKind[] = [
   'rookie',
 ];
 
-test('news: the lobby’s events, then RecordRace’s in the order of §2.2.5, and pending is emptied', () => {
+test('news: the lobby’s events, then RecordRace’s in their set order, and pending is emptied', () => {
   const kind = BASE.teams[OTHER].taste.find(
     (k) => !BASE.teams[OTHER].unlocked.includes(k)
   );
