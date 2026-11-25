@@ -17,7 +17,12 @@ import { updateTeam } from '../src/career/teams.ts';
 import { CONTRACTS, DOTS, STAND_IN } from '../src/career/tuning.ts';
 import { lobbyView, type LobbyButton } from '../src/career/views/lobby.ts';
 import { teamView, type SeatView } from '../src/career/views/team.ts';
-import { dismissed, rehearsed } from '../src/app/rehearse.ts';
+import { dealView, type CandidateView } from '../src/career/views/deal.ts';
+import { askingWage } from '../src/career/rules/ask.ts';
+import { reportCost } from '../src/career/rules/report-cost.ts';
+import { stars } from '../src/career/rules/stars.ts';
+import { SCOUTING } from '../src/career/tuning.ts';
+import { dismissed, owing, rehearsed } from '../src/app/rehearse.ts';
 
 const YOURS = 0;
 const FRESH = rehearsed('views', 0);
@@ -352,4 +357,204 @@ test('Release empties the seat, and an empty driver seat brings Uncle back', () 
   const after = seat(released, role);
   if (role === 'driver') assert.equal(after.card?.who, 'uncle');
   else assert.equal(after.card, null);
+});
+
+const DEALT = rehearsed('views', 14, ['mechanic']);
+
+function dealtRole(state: CareerState): Role {
+  const role = ROLES.find(
+    (r) => (state.teams[YOURS].deals[r]?.candidates.length ?? 0) >= 3
+  );
+  if (role === undefined) throw new Error('no full deal');
+  return role;
+}
+
+const personAt = (state: CareerState, id: number | null): Person => {
+  const person = state.people.find((p) => p.id === id);
+  if (person === undefined) throw new Error(`no person ${id}`);
+  return person;
+};
+
+const first = (state: CareerState, role: Role): CandidateView => {
+  const found = dealView(state, role).candidates[0];
+  if (found === undefined) throw new Error(`no ${role} candidate`);
+  return found;
+};
+
+test('a deal shows its candidates in order, as ranges that hold the true stats', () => {
+  const role = dealtRole(DEALT);
+  const view = dealView(DEALT, role);
+  assert.equal(view.role, role);
+  assert.deepEqual(
+    view.candidates.map((c) => c.card.person),
+    DEALT.teams[YOURS].deals[role]?.candidates
+  );
+  let ranged = 0;
+  for (const c of view.candidates) {
+    const person = personAt(DEALT, c.card.person);
+    assert.equal(c.exact, false);
+    assert.equal(c.card.racesLeft, null);
+    assert.equal(c.card.age, person.age);
+    c.card.stats.forEach((s, i) => {
+      assert.ok(s.value.lo <= person.stats[i] && person.stats[i] <= s.value.hi);
+      assert.ok(s.value.lo >= 1 && s.value.hi <= 20);
+      if (s.value.lo < s.value.hi) ranged++;
+    });
+    const lo = stars(c.card.stats.map((s) => s.value.lo)),
+      hi = stars(c.card.stats.map((s) => s.value.hi));
+    assert.deepEqual(c.card.stars, { lo, hi });
+    assert.deepEqual(c.card.wage, {
+      lo: askingWage(lo, person.wageFactor),
+      hi: askingWage(hi, person.wageFactor),
+    });
+    assert.deepEqual(c.report, {
+      cost: reportCost(hi),
+      faint: false,
+      why: null,
+    });
+    assert.deepEqual(c.approach, {
+      cost: SCOUTING.approach,
+      faint: false,
+      why: null,
+    });
+    assert.deepEqual(c.negotiate, { faint: false, why: null });
+    assert.equal(c.pinned, false);
+  }
+  assert.ok(ranged > 0);
+});
+
+test('a report makes one candidate exact, at a cost, and its Report faint', () => {
+  const role = dealtRole(DEALT);
+  const before = first(DEALT, role);
+  const id = before.card.person ?? -1;
+  const reported = sent(DEALT, { type: 'BuyReport', team: YOURS, person: id });
+  const after = first(reported, role);
+  const person = personAt(reported, id);
+  assert.equal(
+    reported.teams[YOURS].balance,
+    DEALT.teams[YOURS].balance - before.report.cost
+  );
+  assert.equal(after.exact, true);
+  assert.deepEqual(
+    after.card.stats.map((s) => s.value),
+    person.stats.map((v) => ({ lo: v, hi: v }))
+  );
+  const exactStars = stars(person.stats);
+  assert.deepEqual(after.card.stars, { lo: exactStars, hi: exactStars });
+  const asked = askingWage(exactStars, person.wageFactor);
+  assert.deepEqual(after.card.wage, { lo: asked, hi: asked });
+  assert.equal(after.report.faint, true);
+  assert.equal(after.report.why, 'held');
+  assert.equal(dealView(reported, role).candidates[1]?.exact, false);
+});
+
+test('an approach pins the candidate and makes its Approach faint', () => {
+  const role = dealtRole(DEALT);
+  const id = first(DEALT, role).card.person ?? -1;
+  const approached = sent(DEALT, { type: 'Approach', team: YOURS, person: id });
+  const after = first(approached, role);
+  assert.equal(after.pinned, true);
+  assert.deepEqual(after.approach, {
+    cost: SCOUTING.approach,
+    faint: true,
+    why: 'held',
+  });
+  assert.equal(dealView(approached, role).candidates[1]?.pinned, false);
+  assert.equal(
+    approached.teams[YOURS].balance,
+    DEALT.teams[YOURS].balance - SCOUTING.approach
+  );
+});
+
+test('an offer locks the deal: Negotiate goes faint for the other candidates', () => {
+  const role = dealtRole(DEALT);
+  const [one, two] = dealView(DEALT, role).candidates;
+  const id = one.card.person ?? -1;
+  const offered = sent(DEALT, {
+    type: 'Offer',
+    team: YOURS,
+    person: id,
+    terms: { wage: 10, seasons: 1, fee: 0, clause: 0 },
+  });
+  const after = dealView(offered, role).candidates;
+  assert.deepEqual(after[0].negotiate, { faint: false, why: null });
+  assert.deepEqual(after[1].negotiate, { faint: true, why: 'locked' });
+  assert.equal(two.negotiate.faint, false);
+  assert.equal(after[1].report.faint, false);
+});
+
+test('a short balance makes Report and Approach faint for funds', () => {
+  const role = dealtRole(DEALT);
+  const short = owing(DEALT, SCOUTING.leastReport - 1);
+  for (const c of dealView(short, role).candidates) {
+    assert.deepEqual(
+      [c.report.faint, c.report.why, c.approach.faint, c.approach.why],
+      [true, 'funds', true, 'funds']
+    );
+    assert.equal(c.negotiate.faint, false);
+  }
+  const between = owing(DEALT, SCOUTING.approach - 1);
+  const cheap = dealView(between, role).candidates.find(
+    (c) => c.report.cost < SCOUTING.approach
+  );
+  if (cheap !== undefined) {
+    assert.equal(cheap.report.faint, false);
+    assert.equal(cheap.approach.why, 'funds');
+  }
+});
+
+test('the holder is the seat holder, Uncle in an empty driver seat, or no one', () => {
+  for (const role of ROLES) {
+    const holder = dealView(STOP, role).holder;
+    const person = employee(STOP, role);
+    assert.equal(holder?.person, person.id);
+    assert.deepEqual(
+      holder?.stats.map((s) => s.value.lo),
+      person.stats
+    );
+    const released = sent(STOP, {
+      type: 'Release',
+      team: YOURS,
+      person: person.id,
+    });
+    const after = dealView(released, role).holder;
+    if (role === 'driver') {
+      assert.equal(after?.who, 'uncle');
+      assert.deepEqual(
+        after?.stats.map((s) => s.value.lo),
+        teamView(released).seats[0].card?.stats.map((s) => s.value.lo)
+      );
+    } else assert.equal(after, null);
+    assert.ok(dealView(released, role).candidates.length > 0);
+  }
+});
+
+test('an approached rival makes a deal of one, with its team and clause', () => {
+  const view = dealView(DEALT, 'mechanic');
+  assert.equal(view.candidates.length, 1);
+  const [only] = view.candidates;
+  const person = personAt(DEALT, only.card.person);
+  const contract = person.contract;
+  assert.ok(contract !== null && contract.team !== YOURS);
+  const team = DEALT.teams[contract.team];
+  assert.deepEqual(only.rival, {
+    team: contract.team,
+    name: team.name,
+    emblem: team.emblem,
+    livery: team.livery,
+    clause: contract.clause,
+  });
+  assert.equal(only.pinned, false);
+  assert.equal(only.approach.faint, false);
+});
+
+test('a role with no deal, or a deal emptied by the draw, shows no candidates', () => {
+  const role = ROLES.find((r) => DEALT.teams[YOURS].deals[r] === null);
+  assert.ok(role !== undefined);
+  assert.deepEqual(dealView(DEALT, role).candidates, []);
+  const emptied = mine(DEALT, (t) => ({
+    ...t,
+    deals: { ...t.deals, [role]: { candidates: [], locked: null } },
+  }));
+  assert.deepEqual(dealView(emptied, role).candidates, []);
 });
