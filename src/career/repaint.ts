@@ -2,7 +2,7 @@ import type { Livery } from '../world/livery.ts';
 import type { Reason } from './commands.ts';
 import { sameLivery } from './start.ts';
 import type { CareerState } from './state.ts';
-import { updateTeam } from './teams.ts';
+import { updateTeam } from './change.ts';
 import { REPAINT } from './tuning.ts';
 
 export function repaintRefusal(

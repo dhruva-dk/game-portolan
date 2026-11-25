@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { apply } from '../src/career/apply.ts';
 import { SPONSOR_ROSTER } from '../src/career/names.ts';
 import type { CareerState, Sponsor, Team } from '../src/career/state.ts';
-import { updateTeam } from '../src/career/teams.ts';
+import { updateTeam } from '../src/career/change.ts';
 import { SPONSORS } from '../src/career/tuning.ts';
 import { sponsorsView } from '../src/career/views/sponsors.ts';
 import { rehearsed } from '../src/app/rehearse.ts';

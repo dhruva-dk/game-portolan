@@ -17,7 +17,7 @@ import {
   type Role,
   type Team,
 } from '../src/career/state.ts';
-import { updateTeam } from '../src/career/teams.ts';
+import { updateTeam } from '../src/career/change.ts';
 import { CONTRACTS, DOTS, STAND_IN } from '../src/career/tuning.ts';
 import { lobbyView, type LobbyButton } from '../src/career/views/lobby.ts';
 import { teamView, type SeatView } from '../src/career/views/team.ts';

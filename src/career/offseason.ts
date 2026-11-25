@@ -1,4 +1,4 @@
-import { announce, named } from './announce.ts';
+import { announce, named, vacate } from './change.ts';
 import { seatHolder, seatStat } from './lookup.ts';
 import { winterLoss, wintered } from './rules/development.ts';
 import { seasonPrize } from './rules/money.ts';
@@ -18,7 +18,6 @@ import {
   type Ship,
 } from './state.ts';
 import { STANDING } from './tuning.ts';
-import { vacate } from './vacate.ts';
 
 const expired = (person: Person): boolean => person.contract?.racesLeft === 0;
 
