@@ -18,8 +18,20 @@ const r2 = (n: number) => Math.round(n * 100) / 100;
 
 const turnOf = (i: number, n: number) => -Math.PI / 2 + (i * 2 * Math.PI) / n;
 
-const flank = (a: number) =>
-  Math.abs(Math.cos(a)) < 0.2 ? 1 : Math.sign(Math.cos(a));
+const TIP = { out: 0.4, numeral: 0.62, lift: 1 } as const;
+
+const upper = (a: number) => Math.sin(a) < 0;
+
+function tipAt(a: number, R: number, g: number) {
+  const out = R + g * TIP.out,
+    gx = Math.cos(a) * out,
+    gy = Math.sin(a) * out,
+    nh = g * TIP.numeral,
+    ny = upper(a)
+      ? gy - g / 2 - nh / 2 - TIP.lift
+      : gy + g / 2 + nh / 2 + TIP.lift;
+  return { gx, gy, ny, nh };
+}
 
 export type Reach = { left: number; right: number; up: number; down: number };
 
@@ -30,21 +42,18 @@ export function roseReach(
   numerals: boolean,
   widest = `${TOP}`
 ): Reach {
-  const out = R + g * 0.62,
-    wide = numerals
-      ? measured(widest, g * 0.62, { italic: true, weight: 600 })
-      : 0;
+  const wide = numerals
+    ? measured(widest, g * TIP.numeral, { italic: true, weight: 600 })
+    : 0;
   const reach = { left: 0, right: 0, up: 0, down: 0 };
   for (let i = 0; i < n; i++) {
     const a = turnOf(i, n),
-      gx = Math.cos(a) * out,
-      gy = Math.sin(a) * out,
-      label = numerals ? g * 0.78 + wide : 0,
-      side = flank(a);
-    reach.right = Math.max(reach.right, gx + g / 2, side > 0 ? gx + label : 0);
-    reach.left = Math.max(reach.left, -gx + g / 2, side < 0 ? -gx + label : 0);
-    reach.up = Math.max(reach.up, -gy + g / 2);
-    reach.down = Math.max(reach.down, gy + g / 2);
+      { gx, gy, ny, nh } = tipAt(a, R, g),
+      half = Math.max(g, wide) / 2;
+    reach.right = Math.max(reach.right, gx + (numerals ? half : g / 2));
+    reach.left = Math.max(reach.left, -gx + (numerals ? half : g / 2));
+    reach.up = Math.max(reach.up, -gy + g / 2, numerals ? -ny + nh / 2 : 0);
+    reach.down = Math.max(reach.down, gy + g / 2, numerals ? ny + nh / 2 : 0);
   }
   return reach;
 }
@@ -95,24 +104,20 @@ export function statRose(
     s += `<circle cx="${r2(x)}" cy="${r2(y)}" r="1.5" fill="${INK.iron}"/>`;
   }
   if (o.compare)
-    s += `<path d="${shape(o.compare)}" fill="none" stroke="${INK.blue}" stroke-width="1.1" stroke-dasharray="3 1.8" stroke-linejoin="round"/>`;
-  const out = R + o.glyph * 0.62;
+    s += `<path d="${shape(o.compare)}" fill="none" stroke="${INK.blue}" stroke-width="1.6" stroke-linejoin="round"/>`;
   points.forEach((p, i) => {
-    const a = angle(i),
-      gx = cx + Math.cos(a) * out,
-      gy = cy + Math.sin(a) * out;
-    s += glyph(p.glyph, gx, gy, o.glyph);
+    const { gx, gy, ny } = tipAt(angle(i), R, o.glyph);
+    s += glyph(p.glyph, cx + gx, cy + gy, o.glyph);
     if (o.numerals) {
-      const side = flank(a);
-      const nx = gx + side * o.glyph * 0.78,
-        ny = gy + (Math.abs(Math.cos(a)) < 0.2 ? 0 : o.glyph * 0.05);
       const lo = Math.round(p.lo),
         hi = Math.round(p.hi);
-      s += figure(nx, ny, lo === hi ? `${lo}` : `${lo}–${hi}`, o.glyph * 0.62, {
-        anchor: side > 0 ? 'start' : 'end',
-        weight: 600,
-        fill: p.ink,
-      });
+      s += figure(
+        cx + gx,
+        cy + ny,
+        lo === hi ? `${lo}` : `${lo}–${hi}`,
+        o.glyph * TIP.numeral,
+        { weight: 600, fill: p.ink }
+      );
     }
   });
   return s;

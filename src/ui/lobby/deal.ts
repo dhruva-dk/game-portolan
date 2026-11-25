@@ -48,6 +48,7 @@ const candidacy = (c: CandidateView, holder: CardView | null): Candidacy => ({
 
 const costText = (cost: number) => cost.toLocaleString('en-US');
 const COST = TYPE.word + 2;
+const PINNED = 20;
 
 function costWidth(a: ActionView) {
   return (
@@ -69,7 +70,7 @@ function costRow(a: ActionView, act: Act, cx: number, cy: number) {
       faint: '',
       mark:
         act === 'approach'
-          ? glyph('pin', cx, cy, least('pin'), { ink: 'rubric' })
+          ? glyph('pin', cx, cy, PINNED)
           : glyph('tick', cx, cy, least('tick')),
     };
   const w = costWidth(a),
@@ -145,14 +146,9 @@ export function createDeal(port: LobbyPort) {
   const paper = svgNode(
     SHEET.w,
     SHEET.h,
-    sheet(0, 0, SHEET.w, SHEET.h, { seed: 31, close: 'close' })
+    sheet(0, 0, SHEET.w, SHEET.h, { seed: 31 })
   );
   ground.append(paper);
-  pressable(
-    paper.querySelector<SVGElement>('#close'),
-    () => port.close(),
-    'deal-close'
-  );
   const hand = placed(body, 0, 0, SHEET.w, SHEET.h);
   const large = placed(body, PAD, PAD, LARGE.w, LARGE.h);
   large.hidden = true;

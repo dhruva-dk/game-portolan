@@ -176,7 +176,7 @@ function clauseRow(
 const PIN = { size: 26, tilt: 14, inset: 13 } as const;
 
 const pinAt = (x: number, y: number) =>
-  `<g id="pin"><g transform="rotate(${PIN.tilt} ${x} ${y})">${glyph('pin', x, y, PIN.size, { ink: 'rubric' })}</g></g>`;
+  `<g id="pin"><g transform="rotate(${PIN.tilt} ${x} ${y})">${glyph('pin', x, y, PIN.size)}</g></g>`;
 
 const versus = (lo: number, hi: number, held: number | undefined) =>
   held === undefined
