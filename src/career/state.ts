@@ -2,8 +2,6 @@ import type { GunKind } from '../sim/kinds.ts';
 import type { DriverStats } from '../sim/setup.ts';
 import type { Livery } from '../world/livery.ts';
 
-export const VERSION = 2;
-
 export const YOURS = 0;
 
 export const FIRST_SEASON = 1;
@@ -204,7 +202,6 @@ export type NewsEvent = {
 export type Phase = 'lobby' | 'racing' | 'offseason';
 
 export type CareerState = {
-  version: number;
   seed: string;
   season: number;
   race: number;

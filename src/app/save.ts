@@ -1,6 +1,6 @@
 import { apply, type Applied } from '../career/apply.ts';
 import type { Command } from '../career/commands.ts';
-import { VERSION, YOURS, type CareerState } from '../career/state.ts';
+import { YOURS, type CareerState } from '../career/state.ts';
 
 export type Entries = Readonly<Record<string, string>>;
 
@@ -144,31 +144,27 @@ export function sendAndSave(
   return { applied, saved };
 }
 
-type Parsed = { value: object };
+const isCareer = (value: unknown): value is CareerState =>
+  typeof value === 'object' &&
+  value !== null &&
+  'teams' in value &&
+  Array.isArray(value.teams);
 
-async function parsedAt(store: Store, key: string): Promise<Parsed | null> {
-  let text: string | null;
+async function careerAt(
+  store: Store,
+  key: string
+): Promise<CareerState | null> {
   try {
-    text = await store.read(key);
-  } catch {
-    return null;
-  }
-  if (text === null) return null;
-  try {
-    const value: unknown = JSON.parse(text);
-    return typeof value === 'object' && value !== null && !Array.isArray(value)
-      ? { value }
-      : null;
+    const text = await store.read(key);
+    const value: unknown = text === null ? null : JSON.parse(text);
+    return isCareer(value) ? value : null;
   } catch {
     return null;
   }
 }
 
-const isCurrent = (value: object): value is CareerState =>
-  'version' in value && value.version === VERSION;
-
 export async function loadCareer(store: Store): Promise<CareerState | null> {
-  const saved =
-    (await parsedAt(store, CAREER_KEY)) ?? (await parsedAt(store, BACKUP_KEY));
-  return saved !== null && isCurrent(saved.value) ? saved.value : null;
+  return (
+    (await careerAt(store, CAREER_KEY)) ?? (await careerAt(store, BACKUP_KEY))
+  );
 }

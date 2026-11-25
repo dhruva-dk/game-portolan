@@ -12,7 +12,7 @@ import {
 } from '../src/app/save.ts';
 import { apply, newCareer } from '../src/career/apply.ts';
 import type { Command } from '../src/career/commands.ts';
-import { VERSION, type CareerState } from '../src/career/state.ts';
+import type { CareerState } from '../src/career/state.ts';
 
 const FIRST = newCareer({
   seed: 'save',
@@ -213,7 +213,7 @@ test('an accepted command from team 0 is saved; a refused one is not', async () 
   assert.equal(held.started.length, 1);
 });
 
-const GARBAGE = ['', '{"version":', 'not json', '42', 'null', '[1, 2]'];
+const GARBAGE = ['', '{"seed":', 'not json', '42', 'null', '[1, 2]', '{}'];
 
 test('load falls back to the backup when the career is missing or does not parse', async () => {
   const backup = JSON.stringify(FIRST);
@@ -245,7 +245,7 @@ test('load falls back to the backup when the career is missing or does not parse
   );
 });
 
-test('load finds no career when both keys are bad, or when the version differs', async () => {
+test('load finds no career when both keys are bad', async () => {
   assert.equal(await loadCareer(memoryStore()), null);
   for (const garbage of GARBAGE)
     assert.equal(
@@ -260,21 +260,6 @@ test('load finds no career when both keys are bad, or when the version differs',
       storeOf(async () => {
         throw new Error('unreadable');
       })
-    ),
-    null
-  );
-  const old = JSON.stringify({ ...SECOND, version: VERSION + 1 });
-  assert.equal(
-    await loadCareer(
-      memoryStore({ [CAREER_KEY]: old, [BACKUP_KEY]: JSON.stringify(FIRST) })
-    ),
-    null
-  );
-  assert.equal(await loadCareer(memoryStore({ [BACKUP_KEY]: old })), null);
-  const { version: _, ...unversioned } = SECOND;
-  assert.equal(
-    await loadCareer(
-      memoryStore({ [CAREER_KEY]: JSON.stringify(unversioned) })
     ),
     null
   );
