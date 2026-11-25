@@ -312,6 +312,7 @@ export function createGame(
     steering,
     wear: state.wear,
     worn: state.worn,
+    paint: state.paint,
     broadside(on: boolean) {
       aside = on;
     },
