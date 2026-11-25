@@ -1,6 +1,6 @@
 import { AIR_FOV, type Eye } from '../render/snapshot.ts';
 import type { ShipPose } from '../world/pose.ts';
-import { clamp, lerp, smoother, wrapAngle } from '../world/scalar.ts';
+import { clamp, wrapAngle } from '../world/scalar.ts';
 import { inFrame, trim } from '../render/ship/motion.ts';
 import { port } from '../render/ship/mount.ts';
 import {
@@ -26,13 +26,6 @@ export const LOBBY = {
   height: 7,
   drift: 0.26,
   period: 90,
-} as const;
-
-export const BROADSIDE = {
-  quarter: Math.PI / 2,
-  boom: 44,
-  height: 4,
-  ease: 2.4,
 } as const;
 
 const VIEWPORT = { width: 1180, height: 820 } as const;
@@ -140,10 +133,9 @@ export function focused(a: Focus, to: Readonly<Focus>, dt: number): Focus {
 export interface Orbit {
   yaw: number;
   pitch: number;
-  broadside: number;
 }
 
-export const REST: Orbit = { yaw: 0, pitch: 0, broadside: 0 };
+export const REST: Orbit = { yaw: 0, pitch: 0 };
 
 export const dragged = (
   o: Orbit,
@@ -163,21 +155,6 @@ export const relaxed = (o: Orbit, dt: number, out: Orbit = { ...o }): Orbit => {
   const k = Math.exp(-ORBIT.back * dt);
   out.yaw = o.yaw * k;
   out.pitch = o.pitch * k;
-  out.broadside = o.broadside;
-  return out;
-};
-
-export const turned = (
-  o: Orbit,
-  on: boolean,
-  dt: number,
-  out: Orbit = { ...o }
-): Orbit => {
-  out.yaw = o.yaw;
-  out.pitch = o.pitch;
-  const to = on ? 1 : 0;
-  out.broadside = to + (o.broadside - to) * Math.exp(-BROADSIDE.ease * dt);
-  if (Math.abs(out.broadside - to) < 1e-4) out.broadside = to;
   return out;
 };
 
@@ -229,18 +206,14 @@ export function anchorageEye(
     side = on.side ?? 1;
   normalize(pose.position, up);
   normalize(tangent(pose.forward, up, ahead), ahead);
-  const b = smoother(clamp(o.broadside));
   const yaw =
     Math.PI -
     side *
-      (lerp(focus.quarter, BROADSIDE.quarter, b) -
-        (1 - b) *
-          focus.drift *
-          Math.sin((clock / LOBBY.period) * Math.PI * 2)) +
+      (focus.quarter -
+        focus.drift * Math.sin((clock / LOBBY.period) * Math.PI * 2)) +
     o.yaw;
   const pitch = focus.pitch + o.pitch,
-    boom = lerp(focus.boom, BROADSIDE.boom, b),
-    height = lerp(focus.height, BROADSIDE.height, b);
+    { boom, height } = focus;
   const middle = along(up, ahead, focus.ahead, pivot).p;
   const under = along(
     middle,
