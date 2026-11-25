@@ -42,7 +42,11 @@ export async function voyage(
   o: {
     casting: boolean;
     seen(id: SeaBubble): readonly string[];
-    ended(end: { result: MatchResult; settle(): Promise<void> }): void;
+    ended(end: {
+      result: MatchResult;
+      forfeited: boolean;
+      settle(): Promise<void>;
+    }): void;
   }
 ): Promise<Voyage> {
   const { game, input, audio, berth } = crew;
@@ -74,6 +78,7 @@ export async function voyage(
     released = -Infinity,
     offered = false,
     judged = false,
+    forfeited = false,
     begun = false,
     left: boolean | null = null,
     stats: boolean | null = null;
@@ -125,6 +130,7 @@ export async function voyage(
       forfeit() {
         paused = false;
         released = -Infinity;
+        forfeited = true;
         game.forfeit();
       },
     }
@@ -169,6 +175,7 @@ export async function voyage(
     loaded('race ended');
     o.ended({
       result,
+      forfeited,
       async settle() {
         if (was === 'settling') {
           settling.settled();

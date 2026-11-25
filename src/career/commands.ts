@@ -14,7 +14,7 @@ export type { Focus, GunKind, Line, Livery, Role, Terms };
 
 export type Command =
   | { type: 'StartRace'; team: number }
-  | { type: 'RecordRace'; team: number; result: MatchResult }
+  | { type: 'RecordRace'; team: number; result: MatchResult; forfeited?: true }
   | { type: 'FinishOffseason'; team: number }
   | { type: 'MarkRead'; team: number }
   | { type: 'MarkSeen'; team: number; id: string }

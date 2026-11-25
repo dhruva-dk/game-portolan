@@ -6,6 +6,7 @@ import { standInResult } from '../src/career/standin.ts';
 import { YOURS, type CareerState } from '../src/career/state.ts';
 import { FIRST_PLANET, begun, launchOf, recordOf } from '../src/app/launch.ts';
 import { sailOrders } from '../src/career/views/lobby.ts';
+import { resultView } from '../src/career/views/result.ts';
 import { recorded, rehearsed } from '../src/app/rehearse.ts';
 
 const options = {
@@ -82,4 +83,51 @@ test('a finished match records its real result for team 0, and the career is unr
   const after = sent(racing, record);
   assert.equal(after.unread, true);
   assert.equal(launchOf(after).kind, 'flow');
+});
+
+test('a forfeit is recorded as one: your first ship reads forfeited, with its flag, where a sinking by nobody reads the storm', () => {
+  const racing = sent(
+    rehearsed('harbor', 2),
+    ...sailOrders(rehearsed('harbor', 2))
+  );
+  const raced = standInResult(matchSetup(racing, { hands: 'player' }));
+  const result = {
+    ...raced,
+    ships: raced.ships.map((ship, id) =>
+      id === 0 ? { ...ship, sunkAt: 30, sunkBy: null } : ship
+    ),
+  };
+  assert.deepEqual(recordOf(result, true), {
+    type: 'RecordRace',
+    team: YOURS,
+    result,
+    forfeited: true,
+  });
+  const forfeited = sent(racing, recordOf(result, true));
+  assert.equal(forfeited.lastRace?.ships[0].forfeited, true);
+  assert.equal(forfeited.lastRace?.ships[1].forfeited, undefined);
+  assert.deepEqual(resultView(forfeited)?.ships[0].fate, { kind: 'forfeit' });
+  const stormed = sent(racing, recordOf(result));
+  assert.equal(stormed.lastRace?.ships[0].forfeited, undefined);
+  assert.deepEqual(resultView(stormed)?.ships[0].fate, { kind: 'storm' });
+});
+
+test('a forfeit is told only of a ship that sank with nobody credited, and must be true when told', () => {
+  const racing = sent(
+    rehearsed('harbor', 2),
+    ...sailOrders(rehearsed('harbor', 2))
+  );
+  const result = standInResult(matchSetup(racing, { hands: 'player' }));
+  const sunkBy = result.ships[0].sunkBy;
+  const told = sent(racing, recordOf(result, true));
+  assert.equal(
+    told.lastRace?.ships[0].forfeited,
+    sunkBy === null && result.ships[0].sunkAt !== null ? true : undefined
+  );
+  if (sunkBy !== null)
+    assert.equal(resultView(told)?.ships[0].fate.kind, 'sunk');
+  assert.deepEqual(
+    apply(racing, { ...recordOf(result), forfeited: 'yes' } as never),
+    { ok: false, reason: 'invalid' }
+  );
 });

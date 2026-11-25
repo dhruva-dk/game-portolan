@@ -113,7 +113,10 @@ export function fieldsValid(state: CareerState, command: Command): boolean {
     case 'MarkRead':
       return true;
     case 'RecordRace':
-      return result(command.result, state.teams.length);
+      return (
+        result(command.result, state.teams.length) &&
+        (command.forfeited === undefined || command.forfeited === true)
+      );
     case 'MarkSeen':
       return typeof command.id === 'string';
     case 'SetFocus':

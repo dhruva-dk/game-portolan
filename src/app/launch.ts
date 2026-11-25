@@ -19,10 +19,11 @@ export function launchOf(state: CareerState | null): Launch {
   return { kind: 'lobby', planet, state };
 }
 
-export const recordOf = (result: MatchResult): Command => ({
+export const recordOf = (result: MatchResult, forfeited = false): Command => ({
   type: 'RecordRace',
   team: YOURS,
   result,
+  ...(forfeited ? { forfeited: true as const } : {}),
 });
 
 export type Founded = {

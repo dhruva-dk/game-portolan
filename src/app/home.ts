@@ -75,8 +75,12 @@ export async function home(
         if (applied.ok) state = applied.state;
         return state.seen;
       },
-      ended({ result, settle }) {
-        const { saved } = sendAndSave(queue, state, recordOf(result));
+      ended({ result, forfeited, settle }) {
+        const { saved } = sendAndSave(
+          queue,
+          state,
+          recordOf(result, forfeited)
+        );
         void settle().then(() => reload(saved));
       },
     });
