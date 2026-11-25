@@ -210,7 +210,11 @@ const copier = () => {
   }
 };
 
-export function createSettingsSheet(port: SettingsPort, lobby?: LobbyRows) {
+export function createSettingsSheet(
+  port: SettingsPort,
+  lobby?: LobbyRows,
+  back?: () => void
+) {
   const h = sheetHeight(lobby !== undefined),
     tall = lobby ? h + S.ribbon : h,
     el = document.createElement('div');
@@ -220,7 +224,10 @@ export function createSettingsSheet(port: SettingsPort, lobby?: LobbyRows) {
   function draw() {
     const v = settingsView(port.get(), lobby ? { seed: lobby.seed } : null),
       clip = copier();
-    let art = sheet(0, 0, S.w, h, { seed: 29 });
+    let art = sheet(0, 0, S.w, h, {
+      seed: 29,
+      close: back ? 'back' : undefined,
+    });
     v.rows.forEach((row, i) => {
       art += rowFace(row, row.kind === 'newCareer' ? h : S.top + i * S.row);
     });
@@ -246,6 +253,8 @@ export function createSettingsSheet(port: SettingsPort, lobby?: LobbyRows) {
           return next.leftHanded;
         });
     }
+    if (back)
+      pressable(svg.querySelector<SVGElement>('#back'), () => back(), 'back');
     if (lobby) {
       pressable(
         svg.querySelector<SVGElement>('#new-career'),

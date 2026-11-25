@@ -12,6 +12,8 @@ import { createHits } from './hits.ts';
 import { LIGHT, glyph, svgNode } from '../base/ink.ts';
 import type { Glyph } from '../base/glyphs.ts';
 import { boxOf, view } from '../base/ui.ts';
+import { MOTION } from '../base/house.ts';
+import { INK } from '../base/ink.ts';
 
 interface Parts {
   vitals: HTMLElement;
@@ -35,7 +37,8 @@ export function createJuice(body: HTMLElement, parts: Parts) {
     hits = createHits(body);
   let heard = 0,
     then = performance.now(),
-    fired = -Infinity;
+    fired = -Infinity,
+    using: number | null = null;
 
   const pop = (el: HTMLElement, k: number, ms = 260) =>
     el.animate(
@@ -57,6 +60,73 @@ export function createJuice(body: HTMLElement, parts: Parts) {
       ],
       { duration: 250, easing: 'cubic-bezier(.2,.7,.3,1)' }
     );
+
+  const kick = (el: HTMLElement) => {
+    const { ms, ease, give, back } = MOTION.kick;
+    el.animate(
+      [
+        { scale: '1', translate: '0 0' },
+        { scale: String(give), translate: `${back}px ${back}px`, offset: 0.25 },
+        { scale: '1', translate: '0 0' },
+      ],
+      { duration: ms, easing: ease, composite: 'replace' }
+    );
+  };
+  const drop = (slot: HTMLElement) => {
+    const { ms, drop: d, glint } = MOTION.pickup;
+    slot.animate(
+      [
+        { translate: `0 ${-d}px`, scale: '1.12' },
+        { translate: '0 0', scale: '0.94', offset: 0.45 },
+        { translate: `0 ${-d * 0.25}px`, scale: '1.03', offset: 0.7 },
+        { translate: '0 0', scale: '1' },
+      ],
+      { duration: ms, easing: 'ease-out' }
+    );
+    slot
+      .querySelector('.glint')
+      ?.animate(
+        [{ opacity: 0 }, { opacity: 1, offset: 0.35 }, { opacity: 0 }],
+        { duration: glint, delay: ms * 0.3, easing: 'ease-in-out' }
+      );
+  };
+  const puff = (slot: HTMLElement) => {
+    const { ms, ease, reach, motes } = MOTION.puff,
+      size = 2 * reach + 20,
+      c = size / 2;
+    const away = Array.from({ length: motes }, (_, i) => {
+      const a = (i / motes) * 2 * Math.PI + 0.4;
+      return [Math.cos(a) * reach, Math.sin(a) * reach];
+    });
+    const el = svgNode(
+      size,
+      size,
+      away
+        .map(
+          (_, i) =>
+            `<circle cx="${c}" cy="${c}" r="${4 + (i % 3)}" fill="${INK.white}" stroke="${INK.green}" stroke-width="1.4" style="transform-box:fill-box;transform-origin:center"/>`
+        )
+        .join('')
+    );
+    el.style.cssText = `position:absolute;left:50%;top:50%;margin:${-c}px 0 0 ${-c}px;pointer-events:none`;
+    slot.appendChild(el);
+    let left = motes;
+    el.querySelectorAll<SVGCircleElement>('circle').forEach((dot, i) => {
+      const [x, y] = away[i];
+      dot.animate(
+        [
+          { transform: 'translate(0px, 0px) scale(.6)', opacity: 0.95 },
+          {
+            transform: `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) scale(1.3)`,
+            opacity: 0,
+          },
+        ],
+        { duration: ms, easing: ease }
+      ).onfinish = () => {
+        if (--left === 0) el.remove();
+      };
+    });
+  };
 
   const fly = (
     name: Glyph,
@@ -93,7 +163,7 @@ export function createJuice(body: HTMLElement, parts: Parts) {
     );
     a.onfinish = () => {
       el.remove();
-      pop(slot, 1.25, 320);
+      drop(slot);
     };
   };
 
@@ -106,7 +176,7 @@ export function createJuice(body: HTMLElement, parts: Parts) {
         if (m.ship !== PLAYER_SHIP || then - fired < FIRED_APART) return;
         fired = then;
         flash.flash(SCREEN.fire.flash);
-        pop(parts.fire, 0.86, 220);
+        kick(parts.fire);
         return;
       case 'struck': {
         const points = m.shield + m.hull;
@@ -173,6 +243,7 @@ export function createJuice(body: HTMLElement, parts: Parts) {
         flash.flash(SCREEN.repair.flash);
         flash.vignette(SCREEN.repair.vignette);
         pop(parts.vitals, 1.08, 300);
+        if (using !== null && parts.slots[using]) puff(parts.slots[using]);
         return;
       }
       case 'gust':
@@ -186,7 +257,10 @@ export function createJuice(body: HTMLElement, parts: Parts) {
   };
 
   return {
-    update(s: Status, shown: boolean) {
+    wake(el: HTMLElement) {
+      pop(el, MOTION.wake.swell * 1.1, MOTION.wake.ms);
+    },
+    update(s: Status & { using?: { slot: number } | null }, shown: boolean) {
       const t = performance.now(),
         dt = Math.min(0.1, (t - then) / 1000);
       then = t;
@@ -195,6 +269,7 @@ export function createJuice(body: HTMLElement, parts: Parts) {
         heard = m.seq;
         if (shown) answer(m);
       }
+      using = s.using?.slot ?? using;
       if (!shown) hits.clear();
       hits.show(shown);
       flash.update(

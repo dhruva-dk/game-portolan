@@ -25,10 +25,16 @@ import { createHud, type HudState } from '../ui/sea/hud.ts';
 import { createTitle } from '../ui/base/screens.ts';
 import { createInput } from '../ui/sea/input.ts';
 import { createStick } from '../ui/sea/stick.ts';
+import { createPause } from '../ui/sea/pause.ts';
+import { IDLE } from '../play/player.ts';
+import { MOTION } from '../ui/base/house.ts';
+import { clamp, lerp } from '../world/scalar.ts';
 import { onPressed } from '../ui/base/touch.ts';
 import { onResize, uiLayer, view } from '../ui/base/ui.ts';
 import { seedOf } from '../world/seeds.ts';
 import { MEAN, SWING } from '../world/weather.ts';
+
+const SEA: readonly string[] = ['match', 'spectate'];
 
 const DEBUG =
   import.meta.env.DEV || new URLSearchParams(location.search).has('debug');
@@ -145,7 +151,10 @@ async function play(s: Stage): Promise<Played> {
   const input = createInput(
     s.canvas,
     () => game.steering(),
-    () => kept ?? { leftHanded: false, sensitivity: 1 }
+    () => ({
+      leftHanded: forced ?? kept?.leftHanded ?? false,
+      sensitivity: kept?.sensitivity ?? 1,
+    })
   );
   const layer = uiLayer();
   const stick = createStick(layer);
@@ -159,11 +168,23 @@ async function play(s: Stage): Promise<Played> {
   const hudState = (): HudState =>
     Object.assign(status, game.status(view.w, view.h), game.kit());
   const map = () => globe.show(hudState());
+  let paused = false,
+    released = -Infinity;
+  const pauseMatch = () => {
+    if (paused || flow.covered || !SEA.includes(flow.screen)) return;
+    paused = true;
+    input.fire(false);
+    pause.open();
+  };
   const hud = createHud(layer, shores, {
     heal: input.heal,
     gust: input.gust,
     fire: input.fire,
     map,
+    pause: pauseMatch,
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) pauseMatch();
   });
   const audio = createAudio(s.world.planet.height);
   const survey = surveyor();
@@ -198,8 +219,33 @@ async function play(s: Stage): Promise<Played> {
     title
   );
   kept = flow.settings;
-  let left: boolean | null = null;
-  onPressed(layer, () => audio.tap(flow.screen));
+  let left: boolean | null = null,
+    forced: boolean | null = null;
+  const pause = createPause(
+    {
+      get: () => flow.settings,
+      set: (next) => flow.keep(next),
+      heard: (id) => {
+        if (id === 'sound') audio.sample();
+      },
+    },
+    {
+      resume() {
+        paused = false;
+        released = performance.now();
+      },
+      forfeit() {
+        paused = false;
+        released = -Infinity;
+        game.forfeit();
+      },
+    }
+  );
+  const pace = () =>
+    paused ? 0 : clamp((performance.now() - released) / MOTION.paused.release);
+  onPressed(layer, () =>
+    audio.tap(pause.state === 'playing' ? flow.screen : 'settings')
+  );
   void s.ready.then(() => {
     flow.ready();
     loaded('title');
@@ -222,9 +268,15 @@ async function play(s: Stage): Promise<Played> {
     play: deal,
     map,
     drawn: (canvas) => flow.drawn(canvas),
-    next(dt: number): Snapshot {
-      const hands = input.read();
-      stick(game.steering() ? hands.stick : null);
+    pause: pauseMatch,
+    hand: (on: boolean) => (forced = on),
+    wingman: (seed: number | null) => hud.wingman(seed),
+    next(real: number): Snapshot {
+      const k = pace(),
+        dt = real * k,
+        read = input.read(),
+        hands = paused ? IDLE : read;
+      stick(game.steering() && !paused ? hands.stick : null);
       game.step(dt, hands);
       const end = referee.update(dt);
       flow.end(end);
@@ -234,9 +286,17 @@ async function play(s: Stage): Promise<Played> {
       hearing.screen = flow.screen;
       hearing.map = globe.open;
       hearing.covered = flow.covered;
-      audio.update(hearing, flow.settings.sound, dt);
+      audio.update(
+        hearing,
+        flow.settings.sound * lerp(MOTION.paused.duck, 1, k),
+        real
+      );
       kept = flow.settings;
-      if (kept.leftHanded !== left) hud.hand((left = kept.leftHanded));
+      const lefty = forced ?? kept.leftHanded;
+      if (lefty !== left) {
+        hud.hand((left = lefty));
+        meterEl.classList.toggle('right', lefty);
+      }
       if (flow.settings.stats !== stats) s.stats((stats = flow.settings.stats));
       scene.eye = globe.step(dt, scene.storm) ?? scene.eye;
       return scene;

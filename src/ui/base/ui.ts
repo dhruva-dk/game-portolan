@@ -1,4 +1,4 @@
-import { DEFS, cssInks, svgNode } from './ink.ts';
+import { DEFS, WASH, cssInks, svgNode } from './ink.ts';
 import { MOTION } from './house.ts';
 import { FADE } from './ways.ts';
 
@@ -290,6 +290,39 @@ const STYLE = `
 .ui .answer { transform-box: fill-box; transform-origin: center; }
 .ui .answer.copied { animation: copied ${MOTION.copied.hold}ms ease both; }
 @keyframes copied { 0% { opacity: 0; transform: scale(${MOTION.stamp.from}) rotate(-20deg) } 20% { opacity: 1; transform: none } 75% { opacity: 1 } to { opacity: 0 } }
+.ui .vitals { transform-origin: 30% 50%; }
+.ui .vitals .fill, .ui .vitals .lost { transform-box: fill-box; transform-origin: 0 50%; }
+.ui .vitals .fill { transition: transform ${MOTION.bar.ms}ms ${MOTION.bar.ease}; }
+.ui .vitals .sheen { opacity: 0; }
+.ui .vitals.refilling .sheen { opacity: 1; animation: sheen ${MOTION.vitals.shimmer.ms}ms linear infinite; }
+@keyframes sheen { from { transform: translateX(-${Math.round(57 * MOTION.vitals.shimmer.band)}px) } to { transform: translateX(57px) } }
+.ui .vitals .plus { opacity: 0; transform-box: fill-box; transform-origin: center; transition: opacity ${MOTION.fade.ms}ms ease; }
+.ui .vitals.refilling .plus { opacity: 1; animation: plus ${MOTION.vitals.plus.ms}ms ease-in-out infinite; }
+@keyframes plus { 50% { transform: scale(${MOTION.vitals.plus.swell}) } }
+.ui .vitals .crack { opacity: 0; stroke-dasharray: 1; stroke-dashoffset: 1; }
+.ui .vitals .cracked .crack { animation: crack ${MOTION.vitals.crack.ms}ms ${MOTION.vitals.crack.ease} both; }
+.ui .vitals .cracked { animation: cracked ${MOTION.vitals.crack.ms * 0.5}ms ease-out; }
+@keyframes crack { 0% { opacity: 1; stroke-dashoffset: 1 } 25% { opacity: 1; stroke-dashoffset: 0 } 100% { opacity: 0; stroke-dashoffset: 0 } }
+@keyframes cracked { 20% { transform: translate(-${MOTION.vitals.crack.shake}px, 1px) } 45% { transform: translate(${MOTION.vitals.crack.shake}px, -1px) } 70% { transform: translate(-1px, 0) } }
+.ui .vitals .alarm { opacity: 0; }
+.ui .vitals.low { animation: throb ${MOTION.vitals.throb.ms}ms ease-in-out infinite; }
+.ui .vitals.low .alarm { animation: alarm ${MOTION.vitals.throb.ms}ms ease-in-out infinite; }
+@keyframes throb { 50% { transform: scale(${MOTION.vitals.throb.swell}) } }
+@keyframes alarm { 0%, 100% { opacity: .2 } 50% { opacity: .95 } }
+.ui #r-sea, .ui #r-wing-face, .ui #r-wing-cross { transform-box: fill-box; transform-origin: center; }
+.ui .wing-fill { transform-box: fill-box; transform-origin: 0 50%; transition: transform ${MOTION.bar.ms}ms ${MOTION.bar.ease}; }
+.ui #r-wing-cross { opacity: 0; }
+.ui #r-wing.sunk #r-wing-cross { opacity: 1; animation: stamped ${MOTION.stamp.ms}ms ${MOTION.stamp.ease} both; }
+.ui #r-wing.sunk #r-wing-face { opacity: .45; filter: grayscale(1); }
+@keyframes stamped { from { opacity: 0; transform: scale(${MOTION.stamp.from}) rotate(-12deg) } }
+.ui .gust .on, .ui .gust .halo { opacity: 0; }
+.ui .gust .sign { opacity: .4; transition: opacity ${MOTION.fade.ms}ms ease; }
+.ui .gust.ready .sign { opacity: 1; }
+.ui .gust.blowing .on { opacity: 1; }
+.ui .gust.blowing .meter { stroke: ${WASH.gold}; }
+.ui .gust.blowing .halo { animation: glow ${MOTION.glow.ms}ms ease-in-out infinite; }
+@keyframes glow { 0%, 100% { opacity: ${MOTION.glow.low} } 50% { opacity: ${MOTION.glow.high} } }
+.ui .slot .glint { opacity: 0; }
 .ui .link .under { transition: stroke-width ${MOTION.press.ms}ms ease; }
 .ui .link.down .under { stroke-width: 2.4; }
 `;
