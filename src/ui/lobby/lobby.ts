@@ -219,6 +219,7 @@ export function createLobby(port: LobbyPort) {
   let view: LobbyView | null = null,
     covered = false,
     shown = 0,
+    wasRed = false,
     tween = 0;
 
   const placeOrb = () => {
@@ -248,7 +249,7 @@ export function createLobby(port: LobbyPort) {
       s = '';
     const ids = ['money', 'standing', 'race'];
     slips.forEach((one, i) => {
-      s += `<g id="${ids[i]}" transform="translate(${r2(x)} ${(disc * 2 - SIZE.slip) / 2})">${one.svg}</g>`;
+      s += `<g id="${ids[i]}" transform="translate(${r2(x)} ${(disc * 2 - SIZE.slip) / 2})"><g>${one.svg}</g></g>`;
       x += one.w + gap;
     });
     const cx = w - disc - 2,
@@ -258,6 +259,10 @@ export function createLobby(port: LobbyPort) {
       : `<g id="settings">${roundButton(cx, cy, disc, glyph('wheel', cx, cy, 30))}</g>`;
     const svg = svgNode(w, disc * 2 + 24, s);
     corner.replaceChildren(svg);
+    const red = shown < 0;
+    if (red && !wasRed)
+      svg.querySelector('#money > g')?.classList.add('debt-in');
+    wasRed = red;
     if (v.standing.opens)
       bound(svg, 'standing', () => port.open('opponents'), 'standing');
     if (covered) bound(svg, 'close', () => port.close(), 'close');
@@ -381,6 +386,15 @@ export function createLobby(port: LobbyPort) {
       if (!first && before !== v.money.balance) count(v.money.balance);
       layout();
       el.hidden = false;
+    },
+    arrive() {
+      window.setTimeout(() => {
+        const slip = corner.querySelector('#money > g');
+        if (!slip || shown >= 0) return;
+        slip.classList.remove('debt-in');
+        void slip.getBoundingClientRect();
+        slip.classList.add('debt-in');
+      }, MOTION.loading.fade);
     },
     cover(on: boolean) {
       if (on === covered) return;

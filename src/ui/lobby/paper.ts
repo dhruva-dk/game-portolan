@@ -6,6 +6,7 @@ import type {
   WorkshopStrip,
 } from '../../career/views/paper.ts';
 import { pressable, ribbon } from '../base/button.ts';
+import { uncleFace } from '../base/bubble.ts';
 import { gullHead } from '../base/gull.ts';
 import { FAINT, MOTION, SPACE, TYPE } from '../base/house.ts';
 import { FIGURES, INK, galleon, glyph, figure, svgNode } from '../base/ink.ts';
@@ -44,6 +45,7 @@ const SPECIAL = { size: 50, line: 56, room: 500 } as const;
 const STRIP = { h: 84, glyph: 30, bar: 7 } as const;
 const CONTINUE = { gap: 24, w: 176, ring: 7.5, size: TYPE.ribbon - 2 } as const;
 const HIT = 26;
+const UNCLE_PEEK = { size: 84, out: 26, turn: 8 } as const;
 
 const INNER = PAGE.w - 2 * PAGE.pad;
 const BODY = { w: PAGE.w + 24, h: PAGE.h + CONTINUE.gap + 34 } as const;
@@ -385,7 +387,7 @@ function specialEdition(v: PaperView, links: Links) {
   return (
     `<path d="M${PAGE.pad} ${top + 2}H${PAGE.w - PAGE.pad}" stroke="${INK.iron}" stroke-width="5"/>` +
     `<path d="M${PAGE.pad} ${bottom - 2}H${PAGE.w - PAGE.pad}" stroke="${INK.iron}" stroke-width="5"/>` +
-    `<g class="stamp-in" style="--d:${MOTION.printed.after}ms">` +
+    `<g class="stamp-in slam" style="--d:${Math.round(MOTION.repossessed.ms * MOTION.repossessed.lands)}ms">` +
     set(lines, {
       x: PAGE.w / 2,
       y,
@@ -397,6 +399,14 @@ function specialEdition(v: PaperView, links: Links) {
       links,
     }) +
     '</g>'
+  );
+}
+
+function survivor() {
+  const size = UNCLE_PEEK.size;
+  return (
+    `<g class="said" transform="translate(${PAGE.w - size + UNCLE_PEEK.out} ${PAGE.h - size + UNCLE_PEEK.out}) rotate(${UNCLE_PEEK.turn} ${size / 2} ${size / 2})">` +
+    `<g class="sitter peek">${uncleFace(0, 0, size)}</g></g>`
   );
 }
 
@@ -487,10 +497,17 @@ export function createPaper(port: LobbyPort) {
           newsprint() +
           masthead(v) +
           dateline(v) +
-          inner
+          inner +
+          (v.kind === 'special' ? survivor() : '')
       )
     );
     next.classList.add('thrown');
+    next.classList.toggle('heavy', v.kind === 'special');
+    body.classList.remove('quaking');
+    if (v.kind === 'special') {
+      void body.getBoundingClientRect();
+      body.classList.add('quaking');
+    }
     next.querySelectorAll<SVGElement>('.link').forEach((link) => {
       const id = Number(link.dataset.link),
         run = runs[id];

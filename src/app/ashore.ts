@@ -550,7 +550,11 @@ export async function ashore(
   });
 
   if (flowing !== null) o.ready();
-  else void s.ready.then(() => o.ready());
+  else
+    void s.ready.then(() => {
+      o.ready();
+      lobby.arrive();
+    });
   const audio = createAudio(s.world.planet.height);
   const status = Object.assign({}, game.status(), game.kit());
   const hearing: Hearing = {

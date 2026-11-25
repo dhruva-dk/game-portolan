@@ -47,6 +47,19 @@ function broken(line: string): string[] {
   return best;
 }
 
+export function uncleFace(x: number, y: number, size: number): string {
+  const clip = uid('uncle'),
+    r = size / 2,
+    cx = r2(x + r),
+    cy = r2(y + r);
+  return (
+    `<clipPath id="${clip}"><circle cx="${r}" cy="${r}" r="${r - 1.2}"/></clipPath>` +
+    `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${PAPER}" stroke="${INK.iron}" stroke-width="1.4" filter="url(#sh)"/>` +
+    `<g transform="translate(${r2(x)} ${r2(y)})"><g clip-path="url(#${clip})"><g class="tilt">${uncle(size)}</g></g></g>` +
+    `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${INK.iron}" stroke-width="1.4"/>`
+  );
+}
+
 export type Side = 'down' | 'up' | 'left' | 'right';
 
 export function bubble(
@@ -111,15 +124,8 @@ export function bubble(
     )
     .join('');
   const px = facing === 'left' ? x0 - over : r - left,
-    py = y0 + h / 2 - PORTRAIT / 2,
-    cx = r2(px + PORTRAIT / 2),
-    cy = r2(py + PORTRAIT / 2);
-  const clip = uid('uncle');
-  const face =
-    `<clipPath id="${clip}"><circle cx="${PORTRAIT / 2}" cy="${PORTRAIT / 2}" r="${PORTRAIT / 2 - 1.2}"/></clipPath>` +
-    `<circle cx="${cx}" cy="${cy}" r="${PORTRAIT / 2}" fill="${PAPER}" stroke="${INK.iron}" stroke-width="1.4" filter="url(#sh)"/>` +
-    `<g transform="translate(${r2(px)} ${r2(py)})"><g clip-path="url(#${clip})"><g class="tilt">${uncle(PORTRAIT)}</g></g></g>` +
-    `<circle cx="${cx}" cy="${cy}" r="${PORTRAIT / 2}" fill="none" stroke="${INK.iron}" stroke-width="1.4"/>`;
+    py = y0 + h / 2 - PORTRAIT / 2;
+  const face = uncleFace(px, py, PORTRAIT);
   return {
     svg:
       `<g class="said ${facing}"><g class="scroll"><path d="${body}" fill="${PAPER}" stroke="${INK.iron}" stroke-width="1.2" stroke-linejoin="round" filter="url(#sh)"/>` +
