@@ -207,8 +207,6 @@ type Shown = {
   tween: (() => void) | null;
 };
 
-export type TeamSheet = ReturnType<typeof createTeamSheet>;
-
 export function createTeamSheet(
   port: LobbyPort,
   host: HTMLElement,

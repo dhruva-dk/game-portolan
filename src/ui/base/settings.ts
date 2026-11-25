@@ -30,7 +30,7 @@ export const RANGES: Readonly<
   sensitivity: { least: 0.5, most: 2, step: 0.05 },
 };
 
-export type SettingsRow =
+type SettingsRow =
   | {
       kind: 'slider';
       id: Level;
@@ -42,7 +42,7 @@ export type SettingsRow =
   | { kind: 'seed'; word: Word; seed: string }
   | { kind: 'newCareer'; word: Word };
 
-export type SettingsView = { rows: SettingsRow[] };
+type SettingsView = { rows: SettingsRow[] };
 
 const clamp01 = (n: number) => Math.min(1, Math.max(0, n));
 
@@ -116,7 +116,7 @@ export type SettingsPort = {
 
 export type LobbyRows = { seed: string; newCareer(): void };
 
-export const SETTINGS_SHEET = {
+const SETTINGS_SHEET = {
   w: 340,
   top: 42,
   row: 50,

@@ -2,7 +2,7 @@ import { INK, WASH, figure, glyph, r2 } from './ink.ts';
 import type { Glyph } from './glyphs.ts';
 import { measured } from './word.ts';
 
-export type RosePoint = { glyph: Glyph; lo: number; hi: number; ink?: string };
+type RosePoint = { glyph: Glyph; lo: number; hi: number; ink?: string };
 
 interface RoseStyle {
   glyph: number;

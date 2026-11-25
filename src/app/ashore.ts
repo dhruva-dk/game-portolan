@@ -74,7 +74,7 @@ const LIFTED: Framing = { center: [0, -0.5], size: 0.86 };
 const ASIDE: Framing = { center: [-0.3, 0.02], size: 0.82 };
 const BESIDE: Framing = { center: [0.34, -0.04], size: 0.66 };
 
-export type Ashore = {
+type Ashore = {
   open(screen: ScreenName, argument?: ScreenArgument): void;
   state(): CareerState;
   settled: Promise<void>;

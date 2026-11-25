@@ -15,7 +15,7 @@ import type { CareerState, MoneyRows, SponsorRow, Team } from '../state.ts';
 import { REPOSSESSION } from '../tuning.ts';
 import { teamShips } from './race.ts';
 
-export const sponsorRows = (
+const sponsorRows = (
   state: CareerState,
   result: MatchResult,
   team: number

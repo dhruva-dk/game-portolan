@@ -21,7 +21,7 @@ export type Sailor =
   | { who: 'driver'; portrait: number }
   | { who: 'uncle' };
 
-export type BuildWhy = 'same' | 'funds';
+type BuildWhy = 'same' | 'funds';
 
 export type BuildView = {
   fit: GunKind | null;
@@ -31,7 +31,7 @@ export type BuildView = {
   why: BuildWhy | null;
 };
 
-export type FitView = { kind: GunKind; fitted: boolean; build: BuildView };
+type FitView = { kind: GunKind; fitted: boolean; build: BuildView };
 
 export type ShipRowView = {
   slot: 0 | 1;
@@ -50,7 +50,7 @@ export type KindView = {
   faint: boolean;
 };
 
-export type StopView = { line: Line; focused: boolean };
+type StopView = { line: Line; focused: boolean };
 
 export type ShipView = {
   line: Line;

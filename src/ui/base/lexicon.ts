@@ -21,7 +21,7 @@ export type StatName =
   | 'thrift'
   | 'upkeep';
 
-export type RoleName = 'driver' | 'designer' | 'mechanic' | 'owner';
+type RoleName = 'driver' | 'designer' | 'mechanic' | 'owner';
 
 type Mark = { glyph: Glyph; word: Word };
 

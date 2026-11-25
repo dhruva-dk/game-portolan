@@ -4,7 +4,7 @@ import { DUSK, INK, alpha, figure, glyph, svgNode } from '../base/ink.ts';
 import { rise, sheet } from '../base/sheet.ts';
 import { piece, screen } from '../base/ui.ts';
 
-export const SETTLING = { w: 300, h: 120, size: 40, glyph: 40 } as const;
+const SETTLING = { w: 300, h: 120, size: 40, glyph: 40 } as const;
 
 export function createSettling() {
   const el = screen(true);

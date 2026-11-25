@@ -17,12 +17,7 @@ export const LINES: Readonly<Record<string, string>> = {
   opponents: "That's everyone better than us.",
 };
 
-export type Bubble = {
-  svg: string;
-  w: number;
-  h: number;
-  tip: [number, number];
-};
+type Bubble = { svg: string; w: number; h: number; tip: [number, number] };
 
 const PORTRAIT = 40,
   POINTER = 11,

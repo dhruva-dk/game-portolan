@@ -6,7 +6,7 @@ import type { MatchResult } from '../sim/result.ts';
 
 export const FIRST_PLANET = 'portolan';
 
-export type Launch =
+type Launch =
   | { kind: 'new'; planet: string }
   | { kind: 'race' | 'flow' | 'lobby'; planet: string; state: CareerState };
 

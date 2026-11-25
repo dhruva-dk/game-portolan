@@ -252,7 +252,7 @@ export const CONSORT = {
 
 export type Side = 1 | -1;
 
-export const OPENING = { steps: 72 } as const;
+const OPENING = { steps: 72 } as const;
 
 export function openingPose(
   at: Vec3,

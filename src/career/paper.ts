@@ -24,12 +24,8 @@ export const SLOTS = [
 ] as const;
 export type Slot = (typeof SLOTS)[number];
 
-export type PaperValue = {
-  text: string;
-  team: number | null;
-  person: number | null;
-};
-export type Values = Partial<Record<Slot, PaperValue>>;
+type PaperValue = { text: string; team: number | null; person: number | null };
+type Values = Partial<Record<Slot, PaperValue>>;
 export type Headline = { kind: NewsKind; variant: number; values: Values };
 export type EditionKind = 'race' | 'season' | 'special';
 export type Edition = { kind: EditionKind; items: Headline[] };

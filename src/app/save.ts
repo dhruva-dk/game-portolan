@@ -79,7 +79,7 @@ export type SaveQueue = {
   settled(): Promise<void>;
 };
 
-export type Persist = {
+type Persist = {
   retry(attempt: number): Promise<void>;
   failing(on: boolean): void;
 };

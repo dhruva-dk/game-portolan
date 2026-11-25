@@ -1,6 +1,6 @@
 import { INK, PAPER, WASH, paperDisc, r2, roughRect } from './ink.ts';
 
-export const SLIDER = { h: 44, track: 10, knob: 12.5, notch: 5 } as const;
+const SLIDER = { h: 44, track: 10, knob: 12.5, notch: 5 } as const;
 
 const clamp01 = (n: number) => Math.min(1, Math.max(0, n));
 
@@ -41,12 +41,7 @@ export function sliderFace(
   );
 }
 
-export function placeSlider(
-  svg: SVGSVGElement,
-  id: string,
-  t: Track,
-  share: number
-) {
+function placeSlider(svg: SVGSVGElement, id: string, t: Track, share: number) {
   const { left, len } = reach(t),
     th = SLIDER.track,
     at = left + len * clamp01(share);

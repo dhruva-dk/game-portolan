@@ -31,7 +31,7 @@ const REPAINT = {
 } as const;
 const H = REPAINT.y + 30;
 
-export type PaintPricing = (edit: PaintEdit | null) => PaintView;
+type PaintPricing = (edit: PaintEdit | null) => PaintView;
 
 function titleLeft() {
   const said = measured('Paint', TITLE.size, { weight: 600 });

@@ -27,7 +27,7 @@ export const SHADES = [
   'catEye',
   'star',
 ] as const;
-export type Shades = (typeof SHADES)[number];
+type Shades = (typeof SHADES)[number];
 
 const MIRROR = '#3d4b5e';
 const UNCLE = {

@@ -3,7 +3,7 @@ import { FIGURES, GILT, INK, slip, svgNode } from './ink.ts';
 import { keep } from './touch.ts';
 import { placed } from './ui.ts';
 
-export const FIELD = { h: SIZE.slip, inset: 8, size: TYPE.figure - 2 } as const;
+const FIELD = { h: SIZE.slip, inset: 8, size: TYPE.figure - 2 } as const;
 
 export type Field = {
   el: HTMLDivElement;

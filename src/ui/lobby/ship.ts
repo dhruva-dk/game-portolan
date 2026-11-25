@@ -168,7 +168,7 @@ function burstArt() {
 
 type Act = { slot: 0 | 1; build: BuildView } | 'focus' | null;
 
-export type ShipPricing = (line: Line) => ShipView;
+type ShipPricing = (line: Line) => ShipView;
 
 const stopX = (i: number) => STOPS.r + 6 + i * STOPS.step;
 const STOP_Y = STOPS.portrait + STOPS.r - 2;

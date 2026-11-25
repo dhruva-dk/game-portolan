@@ -55,9 +55,9 @@ export type SheetCard = {
   approach: ActionView | null;
 };
 
-export type LineRow = { line: Line; level: Range; yours: number };
+type LineRow = { line: Line; level: Range; yours: number };
 
-export type ShipColumn = { gun: GunKind; lines: LineRow[] };
+type ShipColumn = { gun: GunKind; lines: LineRow[] };
 
 export type TeamSheetView = {
   team: number;

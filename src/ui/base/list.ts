@@ -5,7 +5,7 @@ import { view } from './ui.ts';
 
 export type Box = { x: number; y: number; w: number; h: number };
 
-export type List = {
+type List = {
   el: HTMLElement;
   show(rows: readonly HTMLElement[]): void;
   to(index: number, instant?: boolean): void;

@@ -9,7 +9,7 @@ import { DOTS, LEAGUE, LOBBY_BUBBLES } from '../tuning.ts';
 
 export type LobbyButton = 'ship' | 'team' | 'sponsors' | 'opponents';
 
-export type LobbyBubble = 'team' | 'ship' | 'sponsors' | 'opponents';
+type LobbyBubble = 'team' | 'ship' | 'sponsors' | 'opponents';
 
 export type LobbyView = {
   seed: string;
@@ -24,7 +24,7 @@ export type LobbyView = {
 
 const ORDER: readonly LobbyButton[] = ['ship', 'team', 'sponsors', 'opponents'];
 
-export const racesSailed = (state: CareerState): number =>
+const racesSailed = (state: CareerState): number =>
   state.phase === 'offseason'
     ? state.season * LEAGUE.racesPerSeason
     : (state.season - 1) * LEAGUE.racesPerSeason + state.race - 1;

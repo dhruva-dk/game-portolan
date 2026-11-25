@@ -29,7 +29,7 @@ const CHOOSER = { y: 178 } as const;
 const START = { y: 400, w: 150, confirm: TYPE.name + 3, tick: 20 } as const;
 const RISE = 24;
 
-export type NewCareerPricing = (form: NewCareerForm | null) => NewCareerView;
+type NewCareerPricing = (form: NewCareerForm | null) => NewCareerView;
 
 function title(v: NewCareerView) {
   const size = TITLE.size,

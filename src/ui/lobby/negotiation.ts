@@ -168,7 +168,7 @@ const offerFace = (v: NegotiationView) =>
     { faint: v.offer.faint }
   );
 
-export type Pricing = (edit: Edit | null) => NegotiationView | null;
+type Pricing = (edit: Edit | null) => NegotiationView | null;
 
 export function createNegotiation(port: LobbyPort) {
   const el = screen();

@@ -45,7 +45,7 @@ import { rhumbs } from './marks.ts';
 import { dragged, onTap } from './touch.ts';
 import { insets, onResize, screen, view, type Insets } from './ui.ts';
 
-export type GlobeState = Pick<
+type GlobeState = Pick<
   Status,
   'at' | 'heading' | 'afloat' | 'storm' | 'closing' | 'eye' | 'next'
 >;
@@ -56,7 +56,7 @@ const PANEL = 0.8,
   CLOSE = 50;
 const MARK = 10;
 const WAY_STEP = 12;
-export const FARTHEST = 3.2,
+const FARTHEST = 3.2,
   NEAREST = 1 + 380 / R;
 const FLY = 12,
   DRAG = 2.5;
@@ -70,7 +70,7 @@ const INKS = {
 } as const;
 const DEGREES = 180 / Math.PI;
 
-export const SWIRLS: Vec3[] = Array.from({ length: 60 }, (_, i) => {
+const SWIRLS: Vec3[] = Array.from({ length: 60 }, (_, i) => {
   const n = 60,
     y = 1 - (2 * (i + 0.5)) / n,
     r = Math.sqrt(1 - y * y),
@@ -89,7 +89,7 @@ export const SWIRL = (() => {
   return path;
 })();
 
-export interface Spin {
+interface Spin {
   lat: number;
   lon: number;
   vLat: number;

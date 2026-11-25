@@ -6,7 +6,7 @@ import { view } from '../base/ui.ts';
 
 export type Beside = { el: Element; side: Side; aim?: number };
 
-export const SPOKEN = {
+const SPOKEN = {
   gap: 4,
   edge: 10,
   clear: 70,
@@ -17,7 +17,7 @@ export const SPOKEN = {
 
 type Placed = { left: number; top: number; html: string };
 
-export function placeBubble(
+function placeBubble(
   line: string,
   target: { left: number; top: number; right: number; bottom: number },
   side: Side,

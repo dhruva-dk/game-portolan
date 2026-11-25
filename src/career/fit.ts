@@ -37,9 +37,9 @@ export type MechanicStats = Readonly<
 
 export type Hands = ShipSpec['hands'];
 
-export type FitOptions = { hands: Hands };
+type FitOptions = { hands: Hands };
 
-export type RaceOf = Pick<CareerState, 'season' | 'race' | 'phase'>;
+type RaceOf = Pick<CareerState, 'season' | 'race' | 'phase'>;
 
 export type Race = { season: number; race: number };
 

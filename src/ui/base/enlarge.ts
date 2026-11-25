@@ -2,10 +2,7 @@ import { LARGE } from './card.ts';
 import { MOTION } from './house.ts';
 import { r2 } from './ink.ts';
 
-export type Enlarging = {
-  large: HTMLElement;
-  under: () => readonly HTMLElement[];
-};
+type Enlarging = { large: HTMLElement; under: () => readonly HTMLElement[] };
 
 const squeezed = (cardW: number) => `scale(${r2(cardW / LARGE.w + 0.12)}, .94)`;
 

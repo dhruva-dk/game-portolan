@@ -23,11 +23,7 @@ export type TableView = {
   prize: number;
 };
 
-export type SeasonStat = {
-  stat: StatId;
-  value: Change<number>;
-  change: number;
-};
+type SeasonStat = { stat: StatId; value: Change<number>; change: number };
 
 export type SeasonFace =
   | {
@@ -45,7 +41,7 @@ export type SeasonFace =
 
 export type PeopleView = { seats: SeasonFace[] };
 
-export type WinterLine = { line: Line; bars: Change<number>[] };
+type WinterLine = { line: Line; bars: Change<number>[] };
 
 export type WinterView = { lines: WinterLine[] };
 

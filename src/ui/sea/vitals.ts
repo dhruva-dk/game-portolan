@@ -23,7 +23,7 @@ const BAR = { x: 11, w: 57 },
   PLUS = { x: 106, size: 13 },
   LOW = 0.25;
 
-export type Vitals = {
+type Vitals = {
   shield: number;
   hull: number;
   shieldShare: number;

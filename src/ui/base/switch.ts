@@ -24,7 +24,7 @@ export function switchFace(
   );
 }
 
-export function throwSwitch(svg: SVGSVGElement, id: string, on: boolean) {
+function throwSwitch(svg: SVGSVGElement, id: string, on: boolean) {
   const el = svg.querySelector(`#${id}`);
   if (!el) return;
   el.classList.toggle('on', on);

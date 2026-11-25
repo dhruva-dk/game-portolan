@@ -18,7 +18,7 @@ import {
 } from './save.ts';
 import { voyage } from './voyage.ts';
 
-export const RETRY = { first: 500, most: 8000 } as const;
+const RETRY = { first: 500, most: 8000 } as const;
 
 const wait = (ms: number) =>
   new Promise<void>((go) => window.setTimeout(go, ms));

@@ -17,7 +17,7 @@ import {
   svgNode,
 } from '../base/ink.ts';
 
-export const READINGS = {
+const READINGS = {
   h: 34,
   gap: 5,
   clock: 66,
@@ -38,7 +38,7 @@ export const seaShown = (share: number) => {
 
 export const seaTenths = (share: number) => Math.round(clamp(share) * 1000);
 
-export type Wingman = { id: number; share: number; sunk: boolean };
+type Wingman = { id: number; share: number; sunk: boolean };
 
 export function wingmanOf(race: Race | null): Wingman | null {
   const m = race?.mates[0];

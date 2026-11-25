@@ -124,7 +124,7 @@ export type Origin = { level: Span; age: Span };
 
 const PORTRAIT_SEEDS = 2 ** 31;
 
-export const portraitOf = (seed: string, id: number): number =>
+const portraitOf = (seed: string, id: number): number =>
   whole(0, PORTRAIT_SEEDS - 1, seed, 'person', id, 'portrait');
 
 export function generatePerson(

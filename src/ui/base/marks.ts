@@ -11,7 +11,7 @@ export function rhumbs(cx: number, cy: number, reach: number, opacity = 0.3) {
   return `<g opacity="${opacity}">${s}</g>`;
 }
 
-export interface RoseInks {
+interface RoseInks {
   face: string;
   line: string;
   ring: string;

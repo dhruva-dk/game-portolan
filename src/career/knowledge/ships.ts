@@ -83,7 +83,7 @@ const changeLines = (
     )
   );
 
-export const redrawShipLines = (state: CareerState): CareerState =>
+const redrawShipLines = (state: CareerState): CareerState =>
   withLines(state, leagueLines(state.seed, state.teams, knowledgeYear(state)));
 
 export function redrawRepossessed(

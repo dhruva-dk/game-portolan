@@ -36,7 +36,7 @@ export const STAT_IDS: Readonly<Record<Role, readonly StatId[]>> = {
 
 export type Span = Range;
 
-export type StatView = { stat: StatId; value: Span };
+type StatView = { stat: StatId; value: Span };
 
 export type CardView = {
   who: 'person' | 'uncle';
