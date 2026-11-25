@@ -16,6 +16,11 @@ import { shipView } from '../career/views/ship.ts';
 import { sponsorsView } from '../career/views/sponsors.ts';
 import { opponentsView, teamSheetView } from '../career/views/opponents.ts';
 import { paperView } from '../career/views/paper.ts';
+import {
+  peopleView,
+  tableView,
+  winterView,
+} from '../career/views/offseason.ts';
 import { moneyView, resultView } from '../career/views/result.ts';
 import { lookOf } from '../play/colors.ts';
 import { createGame } from '../play/game.ts';
@@ -40,6 +45,7 @@ import { createShip } from '../ui/lobby/ship.ts';
 import { createSponsors } from '../ui/lobby/sponsors.ts';
 import { createPlanet } from '../ui/lobby/planet.ts';
 import { createOpponents } from '../ui/lobby/opponents.ts';
+import { createOffseason } from '../ui/lobby/offseason.ts';
 import { createPaper } from '../ui/lobby/paper.ts';
 import { createResult } from '../ui/lobby/result.ts';
 import { createTeam } from '../ui/lobby/team.ts';
@@ -119,7 +125,7 @@ export async function ashore(
     dealt: Role | null = null,
     talking: number | null = null,
     painting = false,
-    flowing: 'result' | 'paper' | null =
+    flowing: 'result' | 'offseason' | 'paper' | null =
       career.unread && career.lastRace !== null ? 'result' : null,
     built = false;
 
@@ -357,6 +363,7 @@ export async function ashore(
   const planet = createPlanet(port);
   const opponents = createOpponents(port);
   const result = createResult(port);
+  const offseason = createOffseason(port);
   const paper = createPaper(port);
   redraw();
 
@@ -367,9 +374,30 @@ export async function ashore(
       result.show(race, money, argument?.step ?? 1);
       return;
     }
-    if (flowing === 'result' && name === 'paper') {
+    const pages = winterPages();
+    if (flowing === 'result' && name === 'paper' && pages) {
+      flow('offseason', { page: 1 });
+      return;
+    }
+    const page = argument?.page ?? 1;
+    if (
+      (flowing === 'result' || flowing === 'offseason') &&
+      name === 'offseason' &&
+      pages &&
+      page < 4
+    ) {
+      flowing = 'offseason';
+      result.hide();
+      offseason.show(pages, Math.max(1, page));
+      return;
+    }
+    if (
+      (flowing === 'result' || flowing === 'offseason') &&
+      (name === 'paper' || name === 'offseason')
+    ) {
       flowing = 'paper';
       result.hide();
+      offseason.hide();
       paper.show(paperView(state));
       if (built) paper.ready();
       return;
@@ -388,9 +416,18 @@ export async function ashore(
       });
   }
 
+  function winterPages() {
+    if (state.phase !== 'offseason') return null;
+    const table = tableView(state),
+      people = peopleView(state),
+      winter = winterView(state);
+    return table && people && winter ? { table, people, winter } : null;
+  }
+
   function ended() {
     flowing = null;
     result.hide();
+    offseason.hide();
     paper.hide();
     rise(lobby.el, true);
   }

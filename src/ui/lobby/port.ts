@@ -15,6 +15,7 @@ export type ScreenName =
   | 'planet'
   | 'settings'
   | 'result'
+  | 'offseason'
   | 'paper';
 
 export type ScreenArgument = {
@@ -23,6 +24,7 @@ export type ScreenArgument = {
   team?: number;
   stop?: number;
   step?: number;
+  page?: number;
 };
 
 export type LobbyPort = {
