@@ -1872,9 +1872,9 @@ Goal: every screen of §1.12 exists and can be opened on a debug state.
 - [x] **M5.2 Base pieces and glyphs.** §2.5.2 and §2.5.4: extend the glyph format, draw and redraw the full set, delete the rest, and add the `glyphs` debug screen. Check the glyph sheet as §2.5.4 says before ticking. The glyph half is done (the format, the set, the sheet); the `ui/base/` pieces of §2.5.2 remain.
 - [x] **M5.3 Portraits.** Jacket color and six sunglasses styles from the portrait seed; Uncle's fixed portrait (§1.5.9).
 - [x] **M5.4 Views.** Every view function and its test (§2.5.3).
-- [ ] **M5.5 The port and the debug screens.** `ui/lobby/port.ts`, its implementation in `app/` with the screen stack of §1.12.0, and `?debug&screen=` (§2.8.3); update the screen list in `tools/browser.ts`.
+- [x] **M5.5 The port and the debug screens.** `ui/lobby/port.ts`, its implementation in `app/` with the screen stack of §1.12.0, and `?debug&screen=` (§2.8.3); update the screen list in `tools/browser.ts`.
 - [x] **M5.6 New Career.** §1.12.1. Start builds the career with `newCareer` and sends `StartRace` through the port; saving, the reload and showing New Career at launch are step M6.1 (under `?debug` Start reloads into the new career's lobby).
-- [ ] **M5.7 Lobby.** §1.12.2, including the two-ship anchorage scene and the orbit drag.
+- [x] **M5.7 Lobby.** §1.12.2, including the two-ship anchorage scene and the orbit drag. SAIL starting the race is step M6.1.
 - [x] **M5.8 Ship.** §1.12.3, including the seventh camera stop and the paint picker.
 - [x] **M5.9 Team.** §1.12.4.
 - [x] **M5.10 The deal.** §1.12.5.
