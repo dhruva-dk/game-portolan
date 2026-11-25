@@ -233,3 +233,9 @@ export const STAND_IN_RESULT = {
   damageAfloat: 50,
   sea: 0.8,
 };
+
+export const DOTS = { racesLeft: 3, buildGap: 8 };
+
+export const LOBBY_BUBBLES = { sponsorsAfter: 2, opponentsAfter: 3 };
+
+export const UNCLE = { name: 'Uncle' };
