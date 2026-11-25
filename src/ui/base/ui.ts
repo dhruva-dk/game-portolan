@@ -192,6 +192,25 @@ const STYLE = `
 .ui .still .sealed, .ui .still .flourish { animation: none; }
 .ui .landing .sealed { animation-delay: ${MOTION.flown.ms}ms; }
 .ui .landing .flourish { animation-delay: ${MOTION.flown.ms + MOTION.blow.after - MOTION.seal.after}ms; }
+.ui .inked-row { animation: inked-row ${MOTION.rows.ms}ms ${MOTION.rows.ease} var(--d, 0ms) both; }
+@keyframes inked-row { from { transform: translateX(-${MOTION.rows.shift}px); opacity: 0 } }
+.ui .moved { transform-box: fill-box; transform-origin: center; animation: moved ${MOTION.moved.ms}ms ${MOTION.moved.ease} calc(var(--d, 0ms) + ${MOTION.moved.after}ms) both; }
+@keyframes moved { from { transform: translateY(var(--hop, 0px)) scale(.55); opacity: 0 } }
+.ui .drawn { transform-box: fill-box; transform-origin: left center; animation: drawn ${MOTION.drawn.ms}ms ${MOTION.drawn.ease} calc(var(--d, 0ms) + ${MOTION.drawn.after}ms) both; }
+@keyframes drawn { from { transform: scaleX(0); opacity: .4 } }
+.ui .ticked-in { animation: ticked-in ${MOTION.drawn.ms}ms ease calc(var(--d, 0ms) + ${MOTION.drawn.after + MOTION.drawn.ms * 0.6}ms) both; }
+@keyframes ticked-in { from { opacity: 0 } }
+.ui .swap-in { animation: swap-in ${MOTION.swap.ms}ms ${MOTION.swap.ease} var(--d, 0ms) both; }
+@keyframes swap-in { from { transform: translateX(${MOTION.swap.shift}px); opacity: 0 } 35% { opacity: 1 } }
+.ui .swap-out { pointer-events: none; animation: swap-out ${MOTION.swap.leave}ms ${MOTION.swap.leaveEase} both; }
+.ui .swap-out * { pointer-events: none !important; }
+@keyframes swap-out { to { transform: translate(-${MOTION.swap.shift / 4}px, ${MOTION.swap.drop}px) rotate(${MOTION.swap.turn}deg) scale(.96); opacity: 0; filter: brightness(.85) } }
+.ui .swap-away { pointer-events: none; animation: swap-away ${MOTION.swap.leave}ms ${MOTION.swap.leaveEase} both; }
+@keyframes swap-away { to { transform: translateX(${MOTION.swap.shift}px); opacity: 0 } }
+.ui .row .chosen { opacity: 0; transition: opacity ${MOTION.chosen.ms}ms ${MOTION.chosen.ease}; }
+.ui .row .chosen .point { transform-box: fill-box; transition: transform ${MOTION.chosen.ms}ms ${MOTION.chosen.ease}; transform: translateX(-6px); }
+.ui .row.on .chosen { opacity: 1; }
+.ui .row.on .chosen .point { transform: none; }
 .ui .tied .knot { transform-box: fill-box; transform-origin: center; animation: inked ${MOTION.inked.ms}ms ${MOTION.inked.ease} calc(${MOTION.flown.ms}ms + var(--i, 0) * ${MOTION.inked.stagger / 2}ms) both; }
 .ui .inked { transform-box: fill-box; transform-origin: center; animation: inked ${MOTION.inked.ms}ms ${MOTION.inked.ease} calc(${MOTION.inked.after}ms + var(--i, 0) * ${MOTION.inked.stagger}ms) both; }
 @keyframes inked { from { transform: scale(1.9) rotate(-30deg); opacity: 0 } }
