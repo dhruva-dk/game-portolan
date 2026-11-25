@@ -14,6 +14,7 @@ import { least } from '../base/lexicon.ts';
 import { laurel } from '../base/marks.ts';
 import { sponsorCloth } from '../base/pennant.ts';
 import { sheet } from '../base/sheet.ts';
+import { counted, createTicker, type Count } from '../base/ticker.ts';
 import { onTap } from '../base/touch.ts';
 import { piece, placed, screen } from '../base/ui.ts';
 import { fitted, label, measured } from '../base/word.ts';
@@ -77,31 +78,6 @@ const FOOT = {
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
 
-type Count = {
-  id: string;
-  at: number;
-  ms: number;
-  before: string;
-  value(k: number): string;
-};
-
-const eased = (k: number) => 1 - (1 - k) ** 3;
-
-const counted = (
-  id: string,
-  at: number,
-  ms: number,
-  from: number,
-  to: number,
-  shown: (n: number) => string
-): Count => ({
-  id,
-  at,
-  ms,
-  before: shown(from),
-  value: (k) => shown(Math.round(from + (to - from) * eased(k))),
-});
-
 const squeezed = (name: string, room: number) =>
   Math.max(
     TYPE.small,
@@ -116,44 +92,6 @@ const signed = (n: number) => (n > 0 ? `+${grouped(n)}` : grouped(n));
 const percent = (n: number) => `${n}%`;
 
 const delay = (ms: number) => `--d:${Math.round(ms)}ms`;
-
-function createTicker(host: () => Element | null) {
-  let counts: Count[] = [],
-    start = 0,
-    frame = 0;
-  const set = (c: Count, text: string) => {
-    const node = host()?.querySelector(`#${c.id}`);
-    if (node && node.textContent !== text) node.textContent = text;
-  };
-  const step = (now: number) => {
-    const t = now - start;
-    let live = false;
-    for (const c of counts) {
-      if (t < c.at) {
-        live = true;
-        set(c, c.before);
-        continue;
-      }
-      const k = Math.min(1, (t - c.at) / c.ms);
-      if (k < 1) live = true;
-      set(c, c.value(k));
-    }
-    if (live) frame = requestAnimationFrame(step);
-  };
-  return {
-    run(next: Count[]) {
-      cancelAnimationFrame(frame);
-      counts = next;
-      start = performance.now();
-      counts.forEach((c) => set(c, c.before));
-      frame = requestAnimationFrame(step);
-    },
-    finish() {
-      cancelAnimationFrame(frame);
-      counts.forEach((c) => set(c, c.value(1)));
-    },
-  };
-}
 
 function sailor(ship: ResultShip, cx: number, cy: number) {
   const size = ROWS.face;
