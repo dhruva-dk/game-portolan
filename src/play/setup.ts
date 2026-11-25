@@ -17,12 +17,19 @@ export function watersOf(
   const worker = new Worker(new URL('./sounding.ts', import.meta.url), {
     type: 'module',
   });
-  const asked = new Map<number, (spawns: Spawn[]) => void>();
-  const berth: Berther = (match, count) =>
-    new Promise((resolve) => {
+  const asked = new Map<number, (spawns: Spawn[]) => void>(),
+    berths = new Map<string, Promise<Berthed>>();
+  const berth: Berther = (match, count) => {
+    const key = `${match}/${count}`,
+      known = berths.get(key);
+    if (known) return known;
+    const berthed = new Promise<Berthed>((resolve) => {
       asked.set(match, (spawns) => resolve({ match, spawns }));
       worker.postMessage({ match, count });
     });
+    berths.set(key, berthed);
+    return berthed;
+  };
   const vec = (b: Float64Array, i: number): Vec3 => [b[i], b[i + 1], b[i + 2]];
   return new Promise((resolve, reject) => {
     worker.onmessage = (e: MessageEvent<Sounded>) => {
