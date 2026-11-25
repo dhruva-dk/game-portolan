@@ -218,3 +218,9 @@ export function bust(jacket: Jacket, size: number): Element {
   svg.setAttribute('overflow', 'hidden');
   return svg;
 }
+
+export function gullHead(size: number) {
+  const pen = penFor(size),
+    collar = trimOf(JACKETS[0]);
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="24 10 94 94" width="${size}" height="${size}" overflow="visible"><g transform="translate(1 -5)">${head(pen, collar)}${EYEWEAR.wayfarer(pen)}</g></svg>`;
+}

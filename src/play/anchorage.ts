@@ -252,3 +252,37 @@ export function anchorageEye(
   out.fov = AIR_FOV;
   return out;
 }
+
+export const CONSORT = {
+  id: 1,
+  berths: [
+    [-78, 34],
+    [-95, 22],
+    [-110, 10],
+    [-128, 30],
+    [-78, -34],
+  ],
+  depth: 3,
+  reach: 16,
+} as const;
+
+export function consortBerth(
+  at: Vec3,
+  heading: Vec3,
+  depth: (p: Vec3) => number
+): { at: Vec3; heading: Vec3 } | null {
+  const up = normalize(at),
+    ahead = normalize(tangent(heading, up));
+  const deep = (p: Vec3, t: Vec3) =>
+    [0, CONSORT.reach, -CONSORT.reach].every(
+      (m) => depth(along(p, t, m).p) > CONSORT.depth
+    );
+  for (const [astern, abeam] of CONSORT.berths) {
+    const fore = along(up, ahead, astern);
+    const abeamWay = normalize(rotateAbout(fore.t, fore.p, Math.PI / 2));
+    const side = along(fore.p, abeamWay, abeam);
+    const t = normalize(tangent(ahead, side.p));
+    if (deep(side.p, t)) return { at: side.p, heading: t };
+  }
+  return null;
+}

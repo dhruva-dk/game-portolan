@@ -1,0 +1,57 @@
+import { FAINT, SIZE } from './house.ts';
+import { INK, PAPER, glyph, paperDisc } from './ink.ts';
+import { banner } from './screens.ts';
+import { onTap } from './touch.ts';
+
+const r2 = (n: number) => Math.round(n * 100) / 100;
+
+export function roundButton(
+  cx: number,
+  cy: number,
+  r: number,
+  inner: string,
+  o: { faint?: boolean; down?: boolean } = {}
+) {
+  const sunk = o.down
+    ? `<circle cx="${cx}" cy="${cy}" r="${r2(r - 3.2)}" fill="${INK.iron}" opacity=".1"/>`
+    : '';
+  return `<g${o.faint ? ` opacity="${FAINT + 0.1}"` : ''}>${paperDisc(cx, cy, r)}${sunk}${inner}</g>`;
+}
+
+export const dot = (cx: number, cy: number, r: number = SIZE.dot) =>
+  `<g class="pop"><circle cx="${r2(cx)}" cy="${r2(cy)}" r="${r2(r + 1.6)}" fill="${PAPER}"/>` +
+  `<circle cx="${r2(cx)}" cy="${r2(cy)}" r="${r2(r)}" fill="${INK.rubric}" stroke="${INK.iron}" stroke-width=".8"/></g>`;
+
+export const closeButton = (cx: number, cy: number, r: number = SIZE.close) =>
+  roundButton(cx, cy, r, glyph('cross', cx, cy, Math.round(r * 0.95)));
+
+export const ribbon = (
+  cx: number,
+  cy: number,
+  w: number,
+  inner: string,
+  gilt = false
+) => banner(cx, cy, w, inner, gilt);
+
+export function pressable(
+  el: HTMLElement | SVGElement | null,
+  act: () => void,
+  name?: string
+): void {
+  if (!el) return;
+  el.classList.add('press', 'tap');
+  if (name) el.setAttribute('data-tap', name);
+  el.addEventListener('pointerdown', () => el.classList.add('down'));
+  for (const up of ['pointerup', 'pointercancel', 'pointerleave'] as const)
+    el.addEventListener(up, () => el.classList.remove('down'));
+  onTap(el, () => act());
+}
+
+export function bound(
+  svg: SVGSVGElement,
+  id: string,
+  act: () => void,
+  name: string = id
+): void {
+  pressable(svg.querySelector<SVGElement>(`#${id}`), act, name);
+}

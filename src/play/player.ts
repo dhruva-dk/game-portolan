@@ -136,6 +136,11 @@ export interface Chart {
   ms: number;
 }
 
+export interface PlanetMarks {
+  berths: readonly [Vec3, Vec3];
+  storm: { center: Vec3; radius: number };
+}
+
 export interface Seeds {
   name: string;
   chart(name: string): Promise<Chart | null>;
