@@ -14,6 +14,7 @@ import { teamView } from '../career/views/team.ts';
 import { paintView, type PaintEdit } from '../career/views/paint.ts';
 import { shipView } from '../career/views/ship.ts';
 import { sponsorsView } from '../career/views/sponsors.ts';
+import { opponentsView, teamSheetView } from '../career/views/opponents.ts';
 import { lookOf } from '../play/colors.ts';
 import { createGame } from '../play/game.ts';
 import { PARTS, openingPose, type Framing } from '../play/anchorage.ts';
@@ -36,6 +37,7 @@ import { createPaint } from '../ui/lobby/paint.ts';
 import { createShip } from '../ui/lobby/ship.ts';
 import { createSponsors } from '../ui/lobby/sponsors.ts';
 import { createPlanet } from '../ui/lobby/planet.ts';
+import { createOpponents } from '../ui/lobby/opponents.ts';
 import { createTeam } from '../ui/lobby/team.ts';
 import { createInput } from '../ui/sea/input.ts';
 import type { Stage } from './debug.ts';
@@ -126,9 +128,12 @@ export async function ashore(
     if (open === 'ship') ship.show((line) => shipView(state, line));
     if (open === 'sponsors') sponsors.show(sponsorsView(state));
     if (open === 'planet') planet.show(planetView(state));
+    if (open === 'opponents') opponents.show(opponentsView(state), sheetOf);
     if (painting)
       paint.show((edit: PaintEdit | null) => paintView(state, edit));
   };
+
+  const sheetOf = (team: number) => teamSheetView(state, team);
 
   const atStop = (index: number) => {
     const focus = PARTS[index] ?? null;
@@ -196,6 +201,25 @@ export async function ashore(
         lobby.cover(true);
         return;
       }
+      if (open === 'opponents' && name === 'teamSheet') {
+        const team = argument?.team;
+        if (team === undefined || team < 0 || team >= state.teams.length)
+          return;
+        opponents.sheet(team, {
+          person: argument?.person,
+          seat: argument?.role,
+        });
+        return;
+      }
+      if (open === null && name === 'opponents') {
+        open = name;
+        opponents.open();
+        opponents.show(opponentsView(state), sheetOf);
+        rise(opponents.el, true);
+        lobby.cover(true);
+        game.stage({ framing: BESIDE }, true);
+        return;
+      }
       if (open === null && name === 'sponsors') {
         open = name;
         sponsors.open();
@@ -236,6 +260,15 @@ export async function ashore(
           open = null;
           lobby.cover(false);
         });
+        return;
+      }
+      if (open === 'opponents') {
+        if (opponents.back()) return;
+        open = null;
+        rise(opponents.el, false);
+        opponents.reset();
+        lobby.cover(false);
+        game.stage(null, true);
         return;
       }
       if (open === 'sponsors') {
@@ -304,6 +337,7 @@ export async function ashore(
   const paint = createPaint(port);
   const sponsors = createSponsors(port);
   const planet = createPlanet(port);
+  const opponents = createOpponents(port);
   redraw();
 
   const marked = markedOn(s, state, berth).then((m) => {

@@ -18,6 +18,11 @@ import {
 import { ROLES, YOURS, type CareerState, type Role } from '../career/state.ts';
 import { memoryStore } from './save.ts';
 import { planetSeed } from '../career/fit.ts';
+import {
+  SEATS,
+  opponentsView,
+  teamSheetView,
+} from '../career/views/opponents.ts';
 import { seedOf } from '../world/seeds.ts';
 import { specimen } from './specimen.ts';
 import type { DebugDamage, Game } from '../play/game.ts';
@@ -280,6 +285,7 @@ const CAREER_SCREENS = [
   'paint',
   'sponsors',
   'planet',
+  'opponents',
 ] as const;
 
 const FIXED_PLANET = 'portolan';
@@ -394,6 +400,24 @@ async function harbor(
   }
   if (screen === 'planet') {
     void shore.settled.then(() => shore.open(screen));
+    return;
+  }
+  if (screen === 'opponents') {
+    shore.open(screen);
+    const place = Number(params.get('team')),
+      row = opponentsView(career).rows.find((r) => r.place === place);
+    if (!row) return;
+    const seat = SEATS.find((s) => s === params.get('card')),
+      card = teamSheetView(career, row.team).cards.find((c) => c.seat === seat),
+      person = card?.card?.person ?? null;
+    shore.open('teamSheet', {
+      team: row.team,
+      ...(person !== null
+        ? { person }
+        : seat !== undefined && seat !== 'owner'
+          ? { role: seat }
+          : {}),
+    });
     return;
   }
   if (screen === 'ship' || screen === 'paint') {
