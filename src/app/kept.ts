@@ -1,11 +1,19 @@
 import { LIVERY, PATTERNS, type Livery } from '../world/livery.ts';
-import type { Settings } from '../ui/base/screens.ts';
+import { settled, type Settings } from '../ui/base/settings.ts';
 
 export type Store = Pick<Storage, 'getItem' | 'setItem'>;
 
 const KEYS = { settings: 'portolan.settings', livery: 'portolan.livery' };
 
-const SETTINGS: Settings = { sound: 0.8, look: 0.5, stats: false };
+export type Kept = Settings & { stats: boolean };
+
+export function deviceStore(): Store | null {
+  try {
+    return localStorage;
+  } catch {
+    return null;
+  }
+}
 
 function fields(store: Store | null, key: string): Map<string, unknown> {
   try {
@@ -21,20 +29,13 @@ function keep(store: Store | null, key: string, value: object) {
   } catch {}
 }
 
-const share = (v: unknown, or: number) =>
-  typeof v === 'number' && v >= 0 && v <= 1 ? v : or;
-
-export function keptSettings(store: Store | null): Settings {
+export function keptSettings(store: Store | null): Kept {
   const f = fields(store, KEYS.settings),
     stats = f.get('stats');
-  return {
-    sound: share(f.get('sound'), SETTINGS.sound),
-    look: share(f.get('look'), SETTINGS.look),
-    stats: typeof stats === 'boolean' ? stats : SETTINGS.stats,
-  };
+  return { ...settled(f), stats: typeof stats === 'boolean' ? stats : false };
 }
-export const keepSettings = (store: Store | null, s: Settings) =>
-  keep(store, KEYS.settings, s);
+export const keepSettings = (store: Store | null, s: Settings | Kept) =>
+  keep(store, KEYS.settings, { ...keptSettings(store), ...s });
 
 export function keptLivery(
   store: Store | null,

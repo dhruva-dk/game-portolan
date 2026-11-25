@@ -10,7 +10,20 @@ import {
 import { LIVERY } from '../src/world/livery.ts';
 
 const NAMES = ['vermilion', 'coral', 'lemon', 'charcoal'];
-const DEFAULT = { sound: 0.8, look: 0.5, stats: false };
+const DEFAULT = {
+  sound: 0.8,
+  music: 0.6,
+  leftHanded: false,
+  sensitivity: 1,
+  stats: false,
+};
+const HERS = {
+  sound: 0.3,
+  music: 0.15,
+  leftHanded: true,
+  sensitivity: 1.65,
+  stats: true,
+};
 
 function memory(): Store & { items: Map<string, string> } {
   const items = new Map<string, string>();
@@ -31,8 +44,8 @@ const refusing: Store = {
 
 test('her settings and her livery, kept, read back as she left them', () => {
   const store = memory();
-  keepSettings(store, { sound: 0.3, look: 1, stats: true });
-  assert.deepEqual(keptSettings(store), { sound: 0.3, look: 1, stats: true });
+  keepSettings(store, HERS);
+  assert.deepEqual(keptSettings(store), HERS);
   for (let dye = 0; dye < NAMES.length; dye++)
     for (let pattern = 0; pattern < 3; pattern++) {
       keepLivery(store, { dye, pattern }, NAMES);
@@ -59,7 +72,7 @@ test('nothing kept, or a store that refuses: hers by default, and keeping does n
   for (const store of [memory(), refusing, null]) {
     assert.deepEqual(keptSettings(store), DEFAULT);
     assert.deepEqual(keptLivery(store, NAMES), LIVERY);
-    keepSettings(store, { sound: 0, look: 0, stats: true });
+    keepSettings(store, { ...HERS, sound: 0 });
     keepLivery(store, { dye: 1, pattern: 2 }, NAMES);
   }
 });
@@ -82,9 +95,31 @@ test('what cannot be read is hers by default: not JSON, not a record, out of the
   }
   store.items.set(
     'portolan.settings',
-    JSON.stringify({ sound: 7, look: 0.25, stats: 'yes' })
+    JSON.stringify({ sound: 7, look: 0.25, stats: 'yes', sensitivity: 0.5 })
   );
-  assert.deepEqual(keptSettings(store), { ...DEFAULT, look: 0.25 });
+  assert.deepEqual(keptSettings(store), { ...DEFAULT, sensitivity: 0.5 });
   keepLivery(store, { dye: 99, pattern: -1 }, NAMES);
   assert.deepEqual(keptLivery(store, NAMES), LIVERY);
+});
+
+test('the settings sheet keeps its four under the same key without losing the meter switch', () => {
+  const store = memory();
+  keepSettings(store, { ...DEFAULT, stats: true });
+  keepSettings(store, {
+    sound: 0.45,
+    music: 0,
+    leftHanded: true,
+    sensitivity: 0.75,
+  });
+  assert.deepEqual(keptSettings(store), {
+    sound: 0.45,
+    music: 0,
+    leftHanded: true,
+    sensitivity: 0.75,
+    stats: true,
+  });
+  assert.deepEqual(
+    Object.keys(JSON.parse(store.items.get('portolan.settings') ?? '')).sort(),
+    ['leftHanded', 'music', 'sensitivity', 'sound', 'stats']
+  );
 });
