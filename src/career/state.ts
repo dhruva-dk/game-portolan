@@ -106,6 +106,7 @@ export type ShipReport = {
   sinkings: number;
   sunk: boolean;
   sunkBy: number | null;
+  forfeited?: true;
 };
 
 export type SponsorRow = {

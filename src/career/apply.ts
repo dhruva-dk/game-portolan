@@ -99,7 +99,11 @@ const unless = (reason: Reason | null, run: () => CareerState): Applied =>
 const startRace = (state: CareerState): Applied =>
   afterPolicies(state, (ran) => enterPhase(ran, 'racing'));
 
-function recordRace(state: CareerState, result: MatchResult): Applied {
+function recordRace(
+  state: CareerState,
+  result: MatchResult,
+  forfeited: boolean
+): Applied {
   const scored = scoreRace(state, result);
   const money = raceMoney(scored, result);
   const paid = payRace(scored, money);
@@ -117,6 +121,7 @@ function recordRace(state: CareerState, result: MatchResult): Applied {
       result,
       money: money[YOURS],
       repossessed: repossession.teams,
+      forfeited,
     })
   );
   const advanced = seasonOver(filed)
@@ -148,7 +153,7 @@ function effect(state: CareerState, command: Command): Applied {
     case 'StartRace':
       return startRace(state);
     case 'RecordRace':
-      return recordRace(state, command.result);
+      return recordRace(state, command.result, command.forfeited === true);
     case 'FinishOffseason':
       return finishOffseason(state);
     case 'MarkRead':

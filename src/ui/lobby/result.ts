@@ -18,7 +18,7 @@ import { sheet } from '../base/sheet.ts';
 import { counted, createTicker, type Count } from '../base/ticker.ts';
 import { onTap } from '../base/touch.ts';
 import { piece, placed, screen } from '../base/ui.ts';
-import { fitted, label, measured } from '../base/word.ts';
+import { fitted, label, measured, word } from '../base/word.ts';
 import type { LobbyPort } from './port.ts';
 
 const RACE = { w: 520, h: 340 } as const;
@@ -198,6 +198,12 @@ function fate(ship: ResultShip, cy: number, at: number) {
   const landed = delay(at + strike.ms);
   if (f.kind === 'storm')
     return `${slash}<g class="stamp-in" style="${landed}">${glyph('storm', ROWS.fate, cy, least('storm') + 12)}</g>`;
+  if (f.kind === 'forfeit')
+    return (
+      slash +
+      `<g class="stamp-in" style="${landed}">${glyph('flag', ROWS.fate, cy, least('flag') + 12)}</g>` +
+      `<g class="appear" style="${landed}">${word(ROWS.name, cy + 0.5, 'Forfeit', TYPE.name, { anchor: 'start', weight: 600 })}</g>`
+    );
   const room = RACE.w - PAD - ROWS.name;
   return (
     slash +

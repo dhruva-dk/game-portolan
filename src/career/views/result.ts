@@ -24,7 +24,8 @@ export type TeamMark = {
 export type Fate =
   | { kind: 'afloat' }
   | { kind: 'sunk'; by: TeamMark }
-  | { kind: 'storm' };
+  | { kind: 'storm' }
+  | { kind: 'forfeit' };
 
 export type ResultShip = {
   slot: number;
@@ -89,6 +90,7 @@ const sailorOf = (report: RaceReport, slot: number): Sailor =>
 
 function fateOf(state: CareerState, ship: ShipReport): Fate {
   if (!ship.sunk) return { kind: 'afloat' };
+  if (ship.forfeited) return { kind: 'forfeit' };
   return ship.sunkBy === null
     ? { kind: 'storm' }
     : { kind: 'sunk', by: teamMark(state, ship.sunkBy) };

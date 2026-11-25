@@ -22,13 +22,17 @@ type RaceRecord = {
   result: MatchResult;
   money: MoneyRows;
   repossessed: readonly number[];
+  forfeited?: boolean;
 };
 
-const shipReport = (ship: ShipResult): ShipReport => ({
+const shipReport = (ship: ShipResult, forfeited = false): ShipReport => ({
   place: ship.place,
   sinkings: ship.sinkings,
   sunk: ship.sunkAt !== null,
   sunkBy: ship.sunkBy === null ? null : teamOfShip(ship.sunkBy),
+  ...(forfeited && ship.sunkAt !== null && ship.sunkBy === null
+    ? { forfeited: true as const }
+    : {}),
 });
 
 export function workshop(
@@ -59,7 +63,7 @@ export function raceReport(record: RaceRecord): RaceReport {
     season: before.season,
     race: before.race,
     planet: planetName(before),
-    ships: [shipReport(ships[0]), shipReport(ships[1])],
+    ships: [shipReport(ships[0], record.forfeited), shipReport(ships[1])],
     driver: seatHolder(before, YOURS, 'driver')?.portrait ?? null,
     shotsFired: ships.reduce((sum, ship) => sum + ship.shotsFired, 0),
     shotsLanded: ships.reduce((sum, ship) => sum + ship.shotsLanded, 0),
