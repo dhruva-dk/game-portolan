@@ -41,6 +41,10 @@ export const emblemAt = (
 ) =>
   `<g transform="translate(${Math.round((x - size / 2) * 100) / 100} ${Math.round((y - size / 2) * 100) / 100}) scale(${Math.round((size / 24) * 1000) / 1000})">${shield(device, colors)}</g>`;
 
+export const shieldOutline = (x: number, y: number, size: number) =>
+  `<g transform="translate(${Math.round((x - size / 2) * 100) / 100} ${Math.round((y - size / 2) * 100) / 100}) scale(${Math.round((size / 24) * 1000) / 1000})">` +
+  `<path d="${SHIELD}" fill="none" stroke="${INK.iron}" stroke-width="1.3" stroke-dasharray="2.6 2" stroke-linejoin="round"/></g>`;
+
 export function emblem(device: number, colors: Jacket, size: number) {
   const svg = svgNode(24, 24, shield(device, colors));
   svg.setAttribute('width', String(size));

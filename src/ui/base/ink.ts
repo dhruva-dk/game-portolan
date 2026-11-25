@@ -106,6 +106,23 @@ export const DEFS = (() => {
   let d =
     `<radialGradient id="pg" cx="50%" cy="45%" r="75%"><stop offset="0" stop-color="${PARCHMENT[0]}"/>` +
     `<stop offset=".7" stop-color="${PARCHMENT[1]}"/><stop offset="1" stop-color="${PARCHMENT[2]}"/></radialGradient>`;
+  d +=
+    `<linearGradient id="fold" x1="0" x2="1" y1="0" y2="0">` +
+    [
+      [0, SHADOW, 0.2],
+      [0.14, SHADOW, 0],
+      [0.32, INK.white, 0.16],
+      [0.5, SHADOW, 0.07],
+      [0.68, INK.white, 0.12],
+      [0.86, SHADOW, 0],
+      [1, SHADOW, 0.22],
+    ]
+      .map(
+        ([at, c, a]) =>
+          `<stop offset="${at}" stop-color="${c}" stop-opacity="${a}"/>`
+      )
+      .join('') +
+    '</linearGradient>';
   d += `<filter id="sh" x="-20%" y="-20%" width="140%" height="150%"><feDropShadow dx="0" dy="1.5" stdDeviation="1.6" flood-color="${SHADOW}" flood-opacity=".45"/></filter>`;
   for (const [k, c] of Object.entries(INK)) {
     for (const [tag, size, line] of [

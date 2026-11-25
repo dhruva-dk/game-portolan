@@ -172,6 +172,29 @@ const STYLE = `
 @keyframes seated { from { transform: translateY(-${MOTION.seated.drop}px) scale(1.04) rotate(-2deg); opacity: 0 } }
 .ui .waiting { transform-box: fill-box; transform-origin: center; animation: waiting ${MOTION.suspense.ms}ms ease-in-out infinite; }
 @keyframes waiting { 50% { transform: rotate(180deg) } 100% { transform: rotate(180deg) } }
+.ui .pennant { transform-origin: 50% 0; transition: transform ${MOTION.press.release}ms ${MOTION.press.ease}, translate ${MOTION.lift.ms}ms ${MOTION.lift.ease}, scale ${MOTION.lift.ms}ms ${MOTION.lift.ease}, filter ${MOTION.lift.ms}ms ease, opacity ${MOTION.fade.ms}ms ease; }
+.ui .pennant.swing { animation: swing ${MOTION.sway.ms}ms cubic-bezier(.35,.5,.45,1) var(--d, 0ms) both; }
+.ui .pennant.breeze { animation: breeze ${MOTION.breeze.ms}ms ease-in-out var(--d, 0ms) infinite; }
+.ui .pennant.swing.breeze { animation: swing ${MOTION.sway.ms}ms cubic-bezier(.35,.5,.45,1) var(--d, 0ms) both, breeze ${MOTION.breeze.ms}ms ease-in-out calc(var(--d, 0ms) + ${MOTION.sway.ms}ms) infinite; }
+@keyframes swing { 0% { rotate: var(--a, ${MOTION.sway.swing}deg) } 24% { rotate: calc(var(--a, ${MOTION.sway.swing}deg) * -.6) } 48% { rotate: calc(var(--a, ${MOTION.sway.swing}deg) * .32) } 72% { rotate: calc(var(--a, ${MOTION.sway.swing}deg) * -.12) } 100% { rotate: 0deg } }
+@keyframes breeze { 0%, 100% { rotate: 0deg } 25% { rotate: ${MOTION.breeze.swing}deg } 75% { rotate: -${MOTION.breeze.swing}deg } }
+.ui .pennant.lifted { translate: 0 -${MOTION.lift.rise}px; scale: ${MOTION.lift.swell}; filter: drop-shadow(0 ${MOTION.lift.rise}px 7px rgba(26,16,8,.38)); animation: none; }
+.ui .pennant.inviting .hollow { animation: invite ${MOTION.invite.ms}ms ease-in-out infinite; }
+.ui .pennant.inviting { animation: breathe ${MOTION.invite.ms}ms ease-in-out infinite; }
+@keyframes invite { 0%, 100% { stroke-opacity: .45; fill-opacity: .4; stroke-dashoffset: 0 } 50% { stroke-opacity: 1; fill-opacity: 1.6; stroke-dashoffset: -9 } }
+@keyframes breathe { 50% { scale: 1.025 } }
+.ui .pennant.flown { animation: flown ${MOTION.flown.ms}ms ${MOTION.flown.ease} both; }
+@keyframes flown { from { translate: var(--fx) var(--fy); scale: var(--fs) } 30% { translate: calc(var(--fx) * .78) calc(var(--fy) * .78 - ${MOTION.flown.rise}px); scale: calc(var(--fs) * .92 + .08) } to { translate: 0 0; scale: 1 } }
+.ui .pennant.flown .furl { transform-box: view-box; animation: furl ${MOTION.flown.ms + MOTION.sway.ms * 0.3}ms ${MOTION.flown.ease} both; }
+@keyframes furl { 0% { transform: none } 18% { transform: scaleY(${MOTION.flown.furl}) } 58% { transform: scaleY(${MOTION.flown.furl}) } 80% { transform: scaleY(1.07) } 100% { transform: none } }
+.ui .paid { transform-box: fill-box; animation: paid ${MOTION.paid.ms}ms ${MOTION.built.ease} ${MOTION.paid.after}ms both; }
+@keyframes paid { from { transform: translateY(6px) scale(.6); opacity: 0 } 14% { transform: translateY(0) scale(1.12); opacity: 1 } 70% { transform: translateY(-${MOTION.paid.rise * 0.5}px); opacity: 1 } to { transform: translateY(-${MOTION.paid.rise}px); opacity: 0 } }
+.ui .still .sealed, .ui .still .flourish { animation: none; }
+.ui .landing .sealed { animation-delay: ${MOTION.flown.ms}ms; }
+.ui .landing .flourish { animation-delay: ${MOTION.flown.ms + MOTION.blow.after - MOTION.seal.after}ms; }
+.ui .tied .knot { transform-box: fill-box; transform-origin: center; animation: inked ${MOTION.inked.ms}ms ${MOTION.inked.ease} calc(${MOTION.flown.ms}ms + var(--i, 0) * ${MOTION.inked.stagger / 2}ms) both; }
+.ui .inked { transform-box: fill-box; transform-origin: center; animation: inked ${MOTION.inked.ms}ms ${MOTION.inked.ease} calc(${MOTION.inked.after}ms + var(--i, 0) * ${MOTION.inked.stagger}ms) both; }
+@keyframes inked { from { transform: scale(1.9) rotate(-30deg); opacity: 0 } }
 @keyframes needle { from { transform: rotate(-38deg) } to { transform: rotate(52deg) } }
 `;
 
