@@ -28,6 +28,20 @@ const parts = (s: Summary) =>
 const decimal = (x: number | null, unit = '') =>
   x === null ? '-' : `${Math.round(x * 100) / 100}${unit}`;
 
+type Side = Aim & { gunnery: number };
+
+function sidesLine(sides: readonly Side[]) {
+  const [a, b] = sides,
+    ratio = a.rate !== null && b.rate ? `${r2(a.rate / b.rate)}×` : 'no ratio';
+  return (
+    `hit rate by Gunnery: ` +
+    sides
+      .map((k) => `Gunnery ${k.gunnery} ${pc(k.rate)} of ${k.shots}`)
+      .join(' · ') +
+    ` · ${ratio}`
+  );
+}
+
 export function figureLines(f: MatchFigures): string[] {
   const aim = (a: Aim) => `${pc(a.rate)} of ${a.shots}`;
   const heals = RARITIES.map((r) => `${r} ${f.heals.by[r]}`).join(', ');
@@ -58,6 +72,7 @@ export function printMatch(sc: MatchScenario, s: Summary, dir: string) {
   );
   console.log(`ended: ${s.end} at ${s.seconds} s (${s.steps} steps)`);
   for (const line of figureLines(s.figures)) console.log(line);
+  if (s.sides) console.log(sidesLine(s.sides));
   const c = s.combat;
   console.log(
     `  sunk by ${
@@ -165,6 +180,19 @@ export function pooled(all: readonly Summary[]) {
       BANDS.map((b) => [b, aimOf(shots.filter((k) => bandOf(k.range) === b))])
     ),
     heals: r2(mean(all.map((s) => s.figures.heals.used))),
+    sides: all[0]?.sides
+      ? all[0].sides.map((side, i) => {
+          const each = all.flatMap((s) => (s.sides ? [s.sides[i]] : [])),
+            shots = each.reduce((n, k) => n + k.shots, 0),
+            landed = each.reduce((n, k) => n + k.landed, 0);
+          return {
+            gunnery: side.gunnery,
+            shots,
+            landed,
+            rate: shots ? r2(landed / shots) : null,
+          };
+        })
+      : null,
     msPerStep: r2(mean(all.map((s) => s.cost.parts.step.mean))),
     invariants: all.reduce((n, s) => n + s.invariants.broken, 0),
     hashes: all.map((s) => s.hash),
@@ -187,6 +215,7 @@ export function printPooled(
       .map(([b, k]) => `${b} ${pc(k.rate)} of ${k.shots}`)
       .join(' · ')} · heals used ${p.heals} a match`
   );
+  if (p.sides) console.log(sidesLine(p.sides));
   console.log(
     `cost: ${p.msPerStep} ms a step · invariants: ${p.invariants ? `${p.invariants} BROKEN` : 'none broken'}`
   );

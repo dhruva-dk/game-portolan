@@ -32,7 +32,7 @@ import { createWind } from '../../src/world/wind.ts';
 import { lines, writeJson } from '../out.ts';
 import { firstRace } from './career.ts';
 import { record } from './log.ts';
-import { matchFigures } from './figures.ts';
+import { aimOf, matchFigures } from './figures.ts';
 import { watch, type MatchResult as Account } from './metrics.ts';
 import { standIn, type Thumb } from './player.ts';
 import { worldOf, type World } from './world.ts';
@@ -50,6 +50,7 @@ export interface MatchScenario {
   sea?: 'flat' | 'swell';
   career?: boolean;
   seed?: string;
+  gunnery?: readonly [number, number];
 }
 
 export type State = MatchView;
@@ -123,7 +124,7 @@ export function runMatch(sc: MatchScenario, dir?: string): Summary {
   }
   const w = worldOf(sc.planet),
     seed = matchSeed(w, sc.match ?? 1);
-  const setup = evenSetup({
+  const even = evenSetup({
     planet: String(w.seed),
     match: seed,
     storm: RATING,
@@ -133,6 +134,17 @@ export function runMatch(sc: MatchScenario, dir?: string): Summary {
     values: valuesAt(LEVEL),
     stats: statsAt(STAT),
   });
+  const { gunnery } = sc;
+  const setup: MatchSetup = gunnery
+    ? {
+        ...even,
+        ships: even.ships.map((s) =>
+          s.hands === 'player'
+            ? s
+            : { ...s, hands: { ...s.hands, gunnery: gunnery[s.team % 2] } }
+        ),
+      }
+    : even;
   const waters: Waters = {
     ...(sc.close ? closeBerths(w, seed, setup.ships.length) : w.waters),
     ...(sc.sea === 'swell' && { sea: swellOf(w.seed, w.planet.height) }),
@@ -143,7 +155,10 @@ export function runMatch(sc: MatchScenario, dir?: string): Summary {
 export function sail(
   setup: MatchSetup,
   waters: Waters,
-  sc: Pick<MatchScenario, 'match' | 'players' | 'thumb' | 'seconds'>,
+  sc: Pick<
+    MatchScenario,
+    'match' | 'players' | 'thumb' | 'seconds' | 'gunnery'
+  >,
   dir: string | undefined
 ) {
   const m = createMatch(setup, waters),
@@ -198,6 +213,7 @@ export function sail(
     wallMs: ms,
     result,
     setup,
+    gunnery: sc.gunnery,
   });
   if (dir) {
     events?.close();
@@ -224,6 +240,7 @@ function summaryOf(
     wallMs: number;
     result: MatchResult;
     setup: MatchSetup;
+    gunnery?: readonly [number, number];
   }
 ) {
   const ships = a.ships,
@@ -312,5 +329,13 @@ function summaryOf(
     invariants: kept.invariants,
     result,
     account: a,
+    sides: end.gunnery
+      ? end.gunnery.map((gunnery, side) => ({
+          gunnery,
+          ...aimOf(
+            a.fired.filter((k) => setup.ships[k.ship].team % 2 === side)
+          ),
+        }))
+      : null,
   };
 }
