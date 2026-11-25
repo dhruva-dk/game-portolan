@@ -913,12 +913,14 @@ The lobby is then in the off-season stop (§1.9): the race slip shows the winter
 
 | Element | Detail |
 |---|---|
-| Sound | The word and a slider, 0 to 1, default 0.8 |
-| Music | The word and a slider, 0 to 1, default 0.6 |
+| Sound | The word and a slider, 0 to 1, default 0.8. The level reaches the audio as the thumb moves, and letting go plays the ready cue at the chosen level |
+| Music | The word and a slider, 0 to 1, default 0.6. The game has no music yet, so the level is only stored |
 | Left-handed | The word and a switch, default off; swaps the stick with Fire and Gust |
-| Sensitivity | The word and a slider for aim drag, 0.5 to 2, default 1 |
-| Seed | The word and the career seed as text (lobby only) |
-| New Career | Ribbon button (lobby only); opens New Career (§1.12.1) |
+| Sensitivity | The word and a slider for aim drag, 0.5 to 2, default 1, with a notch at the default |
+| Seed | The word and the career seed as text on a slip (lobby only). A tap copies it and a green tick answers; if the clipboard refuses, the seed shakes |
+| New Career | Ribbon button across the sheet's foot (lobby only); opens New Career (§1.12.1), whose close button returns to Settings |
+
+A slider's thumb swells and lifts when grabbed and settles with a slight overshoot; the fill follows it with no lag; a tap on the track moves the thumb there. The switch throws with a snap and its track dyes over, showing a tick when on. The lobby's Settings button becomes the close button while the sheet is open.
 
 **Pause.** At sea, a small round pause button sits in the top center group of the HUD (§1.12.14). It stops the match and opens a sheet at the center with three round buttons: Resume, Settings, Forfeit. Settings opens the same sheet (`ui/base/settings.ts`, §2.5.3 item 9) without its last two rows. Forfeit is a two-tap button (§1.12.0 item 7). Putting the app in the background pauses the match the same way.
 
@@ -1469,7 +1471,7 @@ export type ScreenArgument = { role?: Role; person?: number; team?: number };
 
 7. New Career is a screen in `ui/lobby/` that takes a smaller port: `start(options)`, `close()` and `scene.wear`. It draws from `newCareerView`.
 8. The HUD keeps its existing view contract, `play/player.ts`, with two additions for Uncle's bubbles at sea (§1.13.2). The HUD data carries `bubble`: the id of the sea bubble to show now, or null. The HUD is created with a callback `onBubbleSeen(id)`, called when the bubble is dismissed. `play/` chooses the bubble from what happens in the match and from the ids already seen, which `app/` passes in when the match starts; `app/` implements the callback by sending `MarkSeen` and passing the new list back. The sea bubble ids are a type in `play/player.ts`.
-9. **The settings sheet** is `ui/base/settings.ts`, because both the lobby and the pause sheet at sea open it. It is created with its own port, `{ get(): Settings; set(settings: Settings): void }`, implemented in `app/` over `localStorage` (§2.4 item 7), and an optional pair of lobby rows `{ seed: string; newCareer(): void }`. The `Settings` type is defined in that file. Settings are not career state and changing one is not a command.
+9. **The settings sheet** is `ui/base/settings.ts`, because both the lobby and the pause sheet at sea open it. It is created with its own port, `{ get(): Settings; set(settings: Settings): void; heard?(id): void }` (`heard` is called when a slider is let go, so that the app can play the sample sound), implemented in `app/` over `localStorage` (§2.4 item 7), and an optional pair of lobby rows `{ seed: string; newCareer(): void }`. The `Settings` type is defined in that file. Settings are not career state and changing one is not a command.
 
 ### 2.5.4 Glyphs
 
@@ -1629,6 +1631,9 @@ All spacing is a multiple of `STEP`, 4 units.
 | `thrown` | 760 ms, two turns, growing from 0.16, ending 1.1° askew with a slap | The paper arriving |
 | `printed` | 300 ms, starting after 640 ms, 110 ms apart | Headlines printing |
 | `turning` | 1100 ms a turn | The ring on a faint Continue |
+| `slider` | The thumb swells to 1.22 in 110 ms when grabbed and settles in 320 ms with a slight overshoot | A slider |
+| `flip` | 240 ms with a slight overshoot; the track dyes over in 280 ms | A switch |
+| `copied` | The tick holds 1100 ms | The seed in Settings |
 | `leafed` | 420 ms, rising 46 units with a slight turn | A page of the off-season report lifting away |
 | `ceremony` | The champion lands in 620 ms from 2.6 times its size; the laurel's stems draw in 520 ms and its leaves 34 ms apart; second and third step in 180 ms apart; your row slides in over 460 ms; the prize counts for 1000 ms | Page 1 of the off-season report |
 | `season` | Cards dealt 170 ms apart; last season's outline draws in 560 ms and this season's shape grows in 700 ms; bars run for 640 ms, 45 ms apart; a strike draws in 360 ms and the card slides aside in 420 ms | Page 2 of the off-season report |
@@ -1864,9 +1869,9 @@ Goal: every rule of §1.6 to §1.10 works, and rivals play.
 Goal: every screen of §1.12 exists and can be opened on a debug state.
 
 - [x] **M5.1 The first two screens.** Build the lobby (§1.12.2, with its anchorage scene) and the Team screen (§1.12.4) to the finished standard on the real code path: the base pieces they need (§2.5.2), their view functions and tests (§2.5.3), the port with the screen stack of §1.12.0 and the debug screens (§2.8.3). They are drawn from a real career state (`?debug&screen=lobby` and `screen=team`, `seed=test&races=14`), never from hard-coded data. The user judges them on the iPad through the dev server before any other screen is built. Changes to §1.12 that follow need the user's approval. Steps M5.2, M5.4, M5.5, M5.7 and M5.9 then cover only what this step left.
-- [ ] **M5.2 Base pieces and glyphs.** §2.5.2 and §2.5.4: extend the glyph format, draw and redraw the full set, delete the rest, and add the `glyphs` debug screen. Check the glyph sheet as §2.5.4 says before ticking. The glyph half is done (the format, the set, the sheet); the `ui/base/` pieces of §2.5.2 remain.
+- [x] **M5.2 Base pieces and glyphs.** §2.5.2 and §2.5.4: extend the glyph format, draw and redraw the full set, delete the rest, and add the `glyphs` debug screen. Check the glyph sheet as §2.5.4 says before ticking. The glyph half is done (the format, the set, the sheet); the `ui/base/` pieces of §2.5.2 remain.
 - [x] **M5.3 Portraits.** Jacket color and six sunglasses styles from the portrait seed; Uncle's fixed portrait (§1.5.9).
-- [ ] **M5.4 Views.** Every view function and its test (§2.5.3).
+- [x] **M5.4 Views.** Every view function and its test (§2.5.3).
 - [ ] **M5.5 The port and the debug screens.** `ui/lobby/port.ts`, its implementation in `app/` with the screen stack of §1.12.0, and `?debug&screen=` (§2.8.3); update the screen list in `tools/browser.ts`.
 - [x] **M5.6 New Career.** §1.12.1. Start builds the career with `newCareer` and sends `StartRace` through the port; saving, the reload and showing New Career at launch are step M6.1 (under `?debug` Start reloads into the new career's lobby).
 - [ ] **M5.7 Lobby.** §1.12.2, including the two-ship anchorage scene and the orbit drag.
@@ -1880,7 +1885,7 @@ Goal: every screen of §1.12 exists and can be opened on a debug state.
 - [x] **M5.15 The result flow and the paper.** §1.12.10, §1.13.1. The launch path that shows the flow when a career is unread is step M6.1; until then it is reached through `screen=result` and `screen=paper`.
 - [x] **M5.16 The off-season report.** §1.12.11.
 - [ ] **M5.17 The HUD and pause.** §1.12.14, §1.12.12.
-- [ ] **M5.18 Settings.** §1.12.12.
+- [x] **M5.18 Settings.** §1.12.12. Starting a new career from Settings joins the launch flow at step M6.1; until then it founds the career and shows its lobby in the debug build only.
 
 **Harness check:** `npm run browser` saves a screenshot of every screen name in §2.8.3 on the state `seed=test&races=14`, and the frame budget holds on the lobby and at sea.
 
