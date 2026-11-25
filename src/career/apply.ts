@@ -25,23 +25,34 @@ import { buyReport, reportRefusal } from './knowledge/report.ts';
 import { narrowShipLines, redrawBuilt } from './knowledge/ships.ts';
 import { redrawKnowledge } from './knowledge/year.ts';
 import { known } from './lookup.ts';
-import { releaseExpired, turnSeason } from './offseason/finish.ts';
-import { ageLeague } from './offseason/people.ts';
-import { seasonEvents } from './offseason/news.ts';
-import { payPrizes } from './offseason/prize.ts';
-import { fileOffseasonReport, offseasonReport } from './offseason/report.ts';
-import { winter } from './offseason/winter.ts';
-import { enterPhase, nextRaceLobby, seasonOver } from './record/advance.ts';
-import { countDownContracts } from './record/contracts.ts';
-import { develop } from './record/develop.ts';
+import {
+  ageLeague,
+  fileOffseasonReport,
+  offseasonReport,
+  payPrizes,
+  releaseExpired,
+  seasonEvents,
+  turnSeason,
+  winter,
+} from './offseason.ts';
+import {
+  develop,
+  enterPhase,
+  nextRaceLobby,
+  publishNews,
+  scoreRace,
+  seasonOver,
+} from './record/race.ts';
+import {
+  countDownContracts,
+  countDownSponsors,
+  payRace,
+  raceMoney,
+  repossess,
+} from './record/pay.ts';
 import { raceEvents } from './record/events.ts';
-import { countDownSponsors } from './record/sponsors.ts';
-import { publishNews } from './record/news.ts';
 import { runLeague, runTeam, type PolicyRun } from './policy/run.ts';
-import { payRace, raceMoney } from './record/pay.ts';
 import { fileReport, raceReport } from './record/report.ts';
-import { repossess } from './record/repossess.ts';
-import { scoreRace } from './record/score.ts';
 import { repaint, repaintRefusal } from './repaint.ts';
 import type { Temperament } from './rules/person.ts';
 import { dealOffers } from './sponsors/offers.ts';
