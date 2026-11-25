@@ -1916,6 +1916,8 @@ Goal: the game is played from first launch through seasons by hand.
 
 **Harness check:** `npm run sim -- career --seasons 1 --standin` still passes, and the user has played one full season by hand on the iPad.
 
+**Added outside the plan, for the user to judge by ear:** the interface's sounds. The new flow plays the cues the old one had (`launch` on SAIL, `lost` when a sinking settles, `salute` once when your team takes the race, `open` and `close` for Settings, `tap`), and seventeen short cues were added in the family of `tap`: `stamp`, `row`, `coin`, `standing`, `landed`, `tossed`, `slam`, `seal`, `built`, `painted`, `knock`, `unroll`, `furl`, `laurel`, `card`, `frost` and `debt`. `ui/base/beat.ts` plays each on the stroke of the animation that carries it. `npm run sounds` renders every interface cue to a WAV in `captures/` (`--to` names another folder), prints its length, peak, RMS, loudest 50 ms against `tap` and spectral centroid, and flags a cue that runs long, peaks above −3 dB, carries DC, clicks at either end or stands more than 4 dB over `tap`.
+
 ## Milestone 7. Tuning
 
 Goal: the numbers. Only tuning files change in this milestone.
