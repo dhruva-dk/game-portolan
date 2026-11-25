@@ -136,6 +136,46 @@ test('a failed write rejects its own save and the queue carries on', async () =>
   await queue.settled();
 });
 
+test('with a way to persist, a failed write is retried until it lands, in order, and the trouble is surfaced while it lasts', async () => {
+  const held = heldStore();
+  const said: boolean[] = [];
+  let again: () => void = () => undefined;
+  const queue = saveQueue(held.store, {
+    retry: () => new Promise((go) => (again = go)),
+    failing: (on) => said.push(on),
+  });
+  const third = { ...SECOND, unread: true };
+  let landed = false;
+  const saved = queue.save(FIRST, SECOND).then(() => (landed = true));
+  const next = queue.save(SECOND, third);
+  let settled = false;
+  void queue.settled().then(() => (settled = true));
+  await turn();
+  held.finish(true);
+  await turn();
+  assert.deepEqual(said, [true]);
+  assert.equal(held.started.length, 1);
+  again();
+  await turn();
+  held.finish(true);
+  await turn();
+  again();
+  await turn();
+  held.finish();
+  await saved;
+  assert.equal(landed, true);
+  assert.deepEqual(said, [true, false]);
+  assert.equal(settled, false);
+  await turn();
+  held.finish();
+  await next;
+  await queue.settled();
+  assert.deepEqual(
+    held.writes.map((entries) => JSON.parse(entries[CAREER_KEY])),
+    [SECOND, third]
+  );
+});
+
 test('settled waits for every queued write, including those queued while it waits', async () => {
   const held = heldStore();
   const queue = saveQueue(held.store);

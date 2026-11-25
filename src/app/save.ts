@@ -79,10 +79,34 @@ export type SaveQueue = {
   settled(): Promise<void>;
 };
 
-export function saveQueue(store: Store): SaveQueue {
+export type Persist = {
+  retry(attempt: number): Promise<void>;
+  failing(on: boolean): void;
+};
+
+async function persisted(
+  store: Store,
+  entries: Entries,
+  persist: Persist
+): Promise<void> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      await store.write(entries);
+      if (attempt > 1) persist.failing(false);
+      return;
+    } catch {
+      if (attempt === 1) persist.failing(true);
+      await persist.retry(attempt);
+    }
+  }
+}
+
+export function saveQueue(store: Store, persist?: Persist): SaveQueue {
   let last: Promise<void> = Promise.resolve();
   const enqueue = (entries: Entries): Promise<void> => {
-    const written = last.then(() => store.write(entries));
+    const written = last.then(() =>
+      persist ? persisted(store, entries, persist) : store.write(entries)
+    );
     last = written.then(
       () => undefined,
       () => undefined
