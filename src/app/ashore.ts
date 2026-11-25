@@ -68,7 +68,7 @@ export async function ashore(
       }
     },
     close() {
-      if (open === null) return;
+      if (open === null || team.back()) return;
       open = null;
       rise(team.el, false);
       team.reset();

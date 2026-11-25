@@ -1,7 +1,8 @@
-import { FAINT, SIZE } from './house.ts';
-import { INK, PAPER, glyph, paperDisc } from './ink.ts';
+import { FAINT, SIZE, SPACE, TYPE } from './house.ts';
+import { GILT, INK, PAPER, glyph, paperDisc, slip } from './ink.ts';
 import { banner } from './screens.ts';
 import { onTap } from './touch.ts';
+import { measured, word } from './word.ts';
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
 
@@ -54,4 +55,56 @@ export function bound(
   name: string = id
 ): void {
   pressable(svg.querySelector<SVGElement>(`#${id}`), act, name);
+}
+
+export function twoTapFace(
+  id: string,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  idle: string
+) {
+  const cy = y + h / 2,
+    size = TYPE.word + 1,
+    tick = 18,
+    said = measured('Confirm?', size, { weight: 600 }),
+    left = x + (w - said - SPACE.hair - tick) / 2;
+  return (
+    `<g id="${id}" class="two">` +
+    `<g class="unsure">${slip(x, y, w, h)}${idle}</g>` +
+    `<g class="sure">${slip(x, y, w, h, { fill: GILT, bold: true })}` +
+    word(left, cy, 'Confirm?', size, { anchor: 'start', weight: 600 }) +
+    glyph('tick', left + said + SPACE.hair + tick / 2, cy, tick) +
+    '</g></g>'
+  );
+}
+
+export function twoTap(
+  el: SVGElement | null,
+  act: () => void,
+  name: string
+): void {
+  if (!el) return;
+  const elsewhere = (e: PointerEvent) => {
+    if (e.target instanceof Node && el.contains(e.target)) return;
+    disarm();
+  };
+  const disarm = () => {
+    el.classList.remove('armed');
+    document.removeEventListener('pointerdown', elsewhere, true);
+  };
+  pressable(
+    el,
+    () => {
+      if (!el.classList.contains('armed')) {
+        el.classList.add('armed');
+        document.addEventListener('pointerdown', elsewhere, true);
+        return;
+      }
+      disarm();
+      act();
+    },
+    name
+  );
 }

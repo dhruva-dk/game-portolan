@@ -114,6 +114,34 @@ function wageRow(x: number, y: number, w: number, span: Span) {
   );
 }
 
+function contractRow(x: number, y: number, w: number, races: number) {
+  const flag = least('flag'),
+    size = TYPE.name + 2,
+    text = `${races}`;
+  const wide = measured(text, size, { italic: true, weight: 600 });
+  return (
+    word(x, y, 'Contract', TYPE.word, { anchor: 'start' }) +
+    figure(x + w, y, text, size, { anchor: 'end', weight: 600 }) +
+    glyph('flag', x + w - wide - 3 - flag / 2, y, flag)
+  );
+}
+
+type Box = { x0: number; y0: number; x1: number; y1: number };
+
+function roseIn(face: CardFace, box: Box, numerals: boolean) {
+  const g = least('stat.helm'),
+    n = face.stats.length;
+  let R = Math.min(box.x1 - box.x0, box.y1 - box.y0) / 2;
+  let reach = roseReach(n, R, g, numerals);
+  const fits = () =>
+    reach.left + reach.right <= box.x1 - box.x0 &&
+    reach.up + reach.down <= box.y1 - box.y0;
+  while (R > 12 && !fits()) reach = roseReach(n, --R, g, numerals);
+  const cx = (box.x0 + box.x1) / 2 + (reach.left - reach.right) / 2,
+    cy = (box.y0 + box.y1) / 2 + (reach.up - reach.down) / 2;
+  return statRose(cx, cy, R, rosePoints(face), { glyph: g, numerals });
+}
+
 function roleRow(x: number, y: number, role: CardRole) {
   const g = least('role.driver');
   return (
@@ -150,14 +178,28 @@ export function cardFront(face: CardFace, seed = 3) {
         anchor: 'start',
         weight: 600,
       });
-  const low = face.wage === null && face.racesLeft === null ? 1 : 0;
-  s += starRow(w / 2, 96 + low * 10, face.stars);
-  s += statRose(w / 2, 178 + low * 26, 42 + low * 6, rosePoints(face), {
-    glyph: least('stat.helm'),
-  });
-  if (face.wage) s += wageRow(pad + 2, 257, w - 2 * pad - 4, face.wage);
-  if (face.racesLeft !== null)
-    s += pips(pad + 2, 273, face.racesLeft, w - 2 * pad);
+  s += starRow(w / 2, 94, face.stars);
+  const rows = (face.wage ? 1 : 0) + (face.racesLeft === null ? 0 : 1),
+    floor = rows === 0 ? h - pad : 216 + (2 - rows) * 21;
+  s += roseIn(
+    face,
+    {
+      x0: pad,
+      y0: 94 + least('star') / 2 + SPACE.hair,
+      x1: w - pad,
+      y1: floor,
+    },
+    false
+  );
+  let y = floor + 14;
+  if (face.wage) {
+    s += wageRow(pad + 2, y, w - 2 * pad - 4, face.wage);
+    y += 21;
+  }
+  if (face.racesLeft !== null) {
+    s += contractRow(pad + 2, y, w - 2 * pad - 4, face.racesLeft);
+    s += pips(pad + 2, y + 17, face.racesLeft, w - 2 * pad);
+  }
   return s;
 }
 
@@ -179,12 +221,12 @@ export function cardLarge(
 ): { svg: string; actions: Actions } {
   const { w, h } = LARGE,
     pad = SPACE.pad + 4,
-    shot = 80,
+    shot = 72,
     frame = shot * 0.05,
-    colW = 176,
+    colW = 168,
     left = pad + 2;
-  const beside = left + shot + 2 * frame + 10,
-    lines = face.age === null ? [26, 56] : [14, 40, 66];
+  const beside = left + shot + 2 * frame + SPACE.gap,
+    lines = face.age === null ? [22, 50] : [12, 36, 60];
   const block =
     24 +
     shot +
@@ -192,7 +234,7 @@ export function cardLarge(
     (face.wage ? 34 : 0) +
     (face.racesLeft === null
       ? 0
-      : 6 +
+      : 28 +
         PIPS.rise * Math.ceil(Math.min(face.racesLeft, PIPS.most) / PIPS.row));
   const top = Math.round((h - block) / 2),
     shotTop = top + 24 + frame;
@@ -220,30 +262,22 @@ export function cardLarge(
   const below = shotTop + shot + frame + 22;
   if (face.wage) s += wageRow(left, below, colW - 4, face.wage);
   if (face.racesLeft !== null)
-    s += pips(left, below + 22, face.racesLeft, colW - 8);
+    s +=
+      contractRow(left, below + 22, colW - 4, face.racesLeft) +
+      pips(left, below + 40, face.racesLeft, colW - 8);
   const ruleA = colW + 20,
-    ruleB = w - 236,
+    ruleB = w - 216,
+    n = face.stats.length,
     g = least('stat.helm'),
-    n = face.stats.length;
-  const fits = (R: number) => {
-    const r = roseReach(n, R, g, true);
-    return (
-      r.left + r.right + 2 * SPACE.gap <= ruleB - ruleA &&
-      Math.max(r.up, r.down) <= h / 2 - SIZE.rule - 1 - SPACE.gap
-    );
-  };
-  let R = 60;
-  while (R > 30 && !fits(R)) R -= 1;
-  const reach = roseReach(n, R, g, true),
-    roseX = (ruleA + ruleB) / 2 + (reach.left - reach.right) / 2,
-    roseY = h / 2 + (reach.up - reach.down) / 2;
+    inset = SIZE.rule + 1 + SPACE.gap;
   s += `<path d="M${ruleA} ${pad}V${h - pad}M${ruleB} ${pad}V${h - pad}" stroke="${INK.iron}" stroke-width=".6" opacity=".3"/>`;
-  s += statRose(roseX, roseY, R, rosePoints(face), {
-    glyph: g,
-    numerals: true,
-  });
-  const rowsX = w - 222,
-    rowsW = 206,
+  s += roseIn(
+    face,
+    { x0: ruleA + SPACE.gap, y0: inset, x1: ruleB - SPACE.gap, y1: h - inset },
+    true
+  );
+  const rowsX = w - 202,
+    rowsW = 186,
     acting = face.who === 'person',
     rowH = Math.min(acting ? 34 : 38, (h - 2 * pad - (acting ? 52 : 0)) / n),
     first = acting ? pad + 4 : (h - rowH * n) / 2;
