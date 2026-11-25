@@ -1,9 +1,12 @@
 import type { Status } from '../../play/player.ts';
 import { lookingAt, type Eye, type StormDraw } from '../../render/snapshot.ts';
-import { clamp } from '../../world/scalar.ts';
+import { clamp, smoother } from '../../world/scalar.ts';
+import { rotate } from '../../world/turn.ts';
 import {
   R,
+  add,
   along,
+  arc,
   cross,
   dot,
   length,
@@ -53,7 +56,7 @@ const PANEL = 0.8,
   CLOSE = 50;
 const MARK = 10;
 const WAY_STEP = 12;
-const FARTHEST = 3.2,
+export const FARTHEST = 3.2,
   NEAREST = 1 + 380 / R;
 const FLY = 12,
   DRAG = 2.5;
@@ -67,14 +70,14 @@ const INKS = {
 } as const;
 const DEGREES = 180 / Math.PI;
 
-const SWIRLS: Vec3[] = Array.from({ length: 60 }, (_, i) => {
+export const SWIRLS: Vec3[] = Array.from({ length: 60 }, (_, i) => {
   const n = 60,
     y = 1 - (2 * (i + 0.5)) / n,
     r = Math.sqrt(1 - y * y),
     a = i * Math.PI * (3 - Math.sqrt(5));
   return [r * Math.cos(a), y, r * Math.sin(a)];
 });
-const SWIRL = (() => {
+export const SWIRL = (() => {
   const path = new Path2D();
   for (const p of GLYPHS.storm) {
     const turn = Number(/rotate\((\d+)/.exec(p.tr ?? '')?.[1] ?? 0);
@@ -86,7 +89,7 @@ const SWIRL = (() => {
   return path;
 })();
 
-interface Spin {
+export interface Spin {
   lat: number;
   lon: number;
   vLat: number;
@@ -99,7 +102,7 @@ const under = (t: Spin): Vec3 => [
   -Math.cos(t.lat) * Math.sin(t.lon),
 ];
 
-interface Sight {
+export interface Sight {
   at: Vec3;
   c: Vec3;
   right: Vec3;
@@ -158,14 +161,14 @@ function eyeFor(t: Spin, d: number, l: Layout): Sight {
   };
 }
 
-interface Seen {
+export interface Seen {
   x: number;
   y: number;
   facing: number;
 }
 const toward: [number, number, number] = [0, 0, 0];
 
-function project(e: Sight, q: Vec3, out: Seen): Seen {
+export function project(e: Sight, q: Vec3, out: Seen): Seen {
   const n = length(q),
     s = R / n;
   toward[0] = q[0] * s - e.at[0];
@@ -176,6 +179,198 @@ function project(e: Sight, q: Vec3, out: Seen): Seen {
   out.y = e.cy - (e.f * dot(toward, e.up)) / z;
   out.facing = (dot(q, e.c) / n) * e.d - 1;
   return out;
+}
+
+export const focal = (radius: number) =>
+  (radius * Math.sqrt(FARTHEST * FARTHEST - 1)) / 1.03;
+
+export const seenRadius = (sight: Sight) =>
+  sight.f / Math.sqrt(sight.d * sight.d - 1);
+
+export function sightOf(
+  orbit: Orbit,
+  f: number,
+  cx: number,
+  cy: number
+): Sight {
+  const c = under(orbit.spin),
+    fwd = scale(c, -1);
+  const right = normalize(cross(fwd, [0, 1, 0]));
+  return {
+    at: scale(c, orbit.d * R),
+    c,
+    right,
+    up: cross(right, fwd),
+    f,
+    cx,
+    cy,
+    d: orbit.d,
+  };
+}
+
+export function spaceEye(
+  sight: Sight,
+  h: number,
+  center: readonly [number, number]
+): Eye {
+  return {
+    kind: 'space',
+    position: sight.at,
+    orientation: lookingAt(sight.at, [0, 0, 0], sight.up),
+    fov: 2 * Math.atan(h / 2 / sight.f) * DEGREES,
+    center,
+  };
+}
+
+const AIR = 200;
+
+export function flight(from: Eye, to: Eye, s: number): Eye {
+  const r0 = Math.log(length(from.position)),
+    r1 = Math.log(length(to.position)),
+    r = r0 + (r1 - r0) * s;
+  const position = scale(
+    arc(normalize(from.position), normalize(to.position), s),
+    Math.exp(r)
+  );
+  const ahead = rotate([0, 0, -1], from.orientation),
+    target0 = add(from.position, ahead, 60),
+    look = smoother(clamp((s - 0.1) / 0.75)),
+    target = scale(target0, 1 - look);
+  const up = normalize(
+    add(
+      scale(normalize(from.position), 1 - look),
+      rotate([0, 1, 0], to.orientation),
+      look
+    )
+  );
+  const c0 = from.center ?? [0, 0],
+    c1 = to.center ?? [0, 0],
+    k0 = from.size ?? 1,
+    k1 = to.size ?? 1;
+  return {
+    kind: Math.exp(r) - R > AIR ? 'space' : 'air',
+    position,
+    orientation: lookingAt(position, target, up),
+    fov: from.fov + (to.fov - from.fov) * s,
+    center: [c0[0] + (c1[0] - c0[0]) * s, c0[1] + (c1[1] - c0[1]) * s],
+    size: k0 + (k1 - k0) * s,
+  };
+}
+
+export interface Orbit {
+  readonly spin: Spin;
+  readonly d: number;
+  readonly held: boolean;
+  aim(at: Vec3): void;
+  reset(at: Vec3): void;
+  clear(): void;
+  step(dt: number): void;
+}
+
+export function createOrbit(
+  root: HTMLElement,
+  o: { f(): number; tap?(x: number, y: number): void }
+): Orbit {
+  const spin: Spin = { lat: 0, lon: 0, vLat: 0, vLon: 0 };
+  let want = FARTHEST,
+    d = FARTHEST;
+  const fingers = new Map<number, { x: number; y: number; t: number }>();
+  let tap: { id: number; x: number; y: number } | null = null;
+  const perRadian = () => o.f() / (d - 1);
+  const carry = (dx: number, dy: number) => {
+    const rp = perRadian(),
+      lon = -dx / (rp * Math.max(0.2, Math.cos(spin.lat))),
+      lat = dy / rp;
+    spin.lon += lon;
+    spin.lat = latitude(spin.lat + lat);
+    return { lon, lat };
+  };
+
+  root.addEventListener('pointerdown', (e) => {
+    root.setPointerCapture(e.pointerId);
+    fingers.set(e.pointerId, { x: e.clientX, y: e.clientY, t: e.timeStamp });
+    tap =
+      fingers.size === 1
+        ? { id: e.pointerId, x: e.clientX, y: e.clientY }
+        : null;
+    spin.vLat = spin.vLon = 0;
+  });
+  root.addEventListener('pointermove', (e) => {
+    const f = fingers.get(e.pointerId);
+    if (!f) return;
+    if (tap && dragged(tap.x, tap.y, e.clientX, e.clientY)) tap = null;
+    if (fingers.size === 1 && !tap) {
+      const moved = carry(e.clientX - f.x, e.clientY - f.y),
+        s = Math.max(0.004, (e.timeStamp - f.t) / 1000);
+      spin.vLon = spin.vLon * 0.5 + (moved.lon / s) * 0.5;
+      spin.vLat = spin.vLat * 0.5 + (moved.lat / s) * 0.5;
+    } else if (fingers.size === 2) {
+      let other = f;
+      for (const [k, q] of fingers) if (k !== e.pointerId) other = q;
+      const d0 = Math.hypot(f.x - other.x, f.y - other.y),
+        d1 = Math.hypot(e.clientX - other.x, e.clientY - other.y);
+      if (d0 > 8 && d1 > 8) want = reach(1 + ((want - 1) * d0) / d1);
+      carry((e.clientX - f.x) / 2, (e.clientY - f.y) / 2);
+    }
+    f.x = e.clientX;
+    f.y = e.clientY;
+    f.t = e.timeStamp;
+  });
+  const lift = (e: PointerEvent) => {
+    const f = fingers.get(e.pointerId);
+    if (!f) return;
+    fingers.delete(e.pointerId);
+    if (e.timeStamp - f.t > 80 || fingers.size) spin.vLat = spin.vLon = 0;
+    if (tap && tap.id === e.pointerId && e.type === 'pointerup')
+      o.tap?.(tap.x, tap.y);
+    tap = null;
+  };
+  root.addEventListener('pointerup', lift);
+  root.addEventListener('pointercancel', lift);
+  root.addEventListener(
+    'wheel',
+    (e) => {
+      e.preventDefault();
+      want = reach(1 + (want - 1) * Math.exp(e.deltaY * 0.002));
+    },
+    { passive: false }
+  );
+
+  const aim = (at: Vec3) => {
+    const u = normalize(at);
+    spin.lat = latitude(Math.asin(u[1]));
+    spin.lon = Math.atan2(-u[2], u[0]);
+    spin.vLat = spin.vLon = 0;
+  };
+
+  return {
+    spin,
+    get d() {
+      return d;
+    },
+    get held() {
+      return fingers.size > 0;
+    },
+    aim,
+    reset(at) {
+      aim(at);
+      want = d = FARTHEST;
+    },
+    clear() {
+      fingers.clear();
+      tap = null;
+    },
+    step(dt) {
+      if (!fingers.size) {
+        spin.lon += spin.vLon * dt;
+        spin.lat = latitude(spin.lat + spin.vLat * dt);
+        const k = Math.exp(-DRAG * dt);
+        spin.vLon *= k;
+        spin.vLat *= k;
+      }
+      d += (want - d) * (1 - Math.exp(-FLY * dt));
+    },
+  };
 }
 
 export function createGlobe(coasts: readonly Coast[]) {
@@ -224,10 +419,7 @@ export function createGlobe(coasts: readonly Coast[]) {
   );
   onTap(shut, () => close());
 
-  const spin: Spin = { lat: 0, lon: 0, vLat: 0, vLon: 0 };
   let state: GlobeState | null = null,
-    want = FARTHEST,
-    d = FARTHEST,
     read = '';
   let L = layoutFor(1, 1, 1, { top: 0, right: 0, bottom: 0, left: 0 });
   const seen: Seen = { x: 0, y: 0, facing: 0 };
@@ -429,83 +621,24 @@ export function createGlobe(coasts: readonly Coast[]) {
     );
   }
 
-  const fingers = new Map<number, { x: number; y: number; t: number }>();
-  let tap: { id: number; x: number; y: number; off: boolean } | null = null;
-  const perRadian = () => L.f / (d - 1);
   const off = (x: number, y: number) =>
     x < L.panel.x ||
     x > L.panel.x + L.panel.w ||
     y < L.panel.y ||
     y > L.panel.y + L.panel.h;
-  const carry = (dx: number, dy: number) => {
-    const rp = perRadian(),
-      lon = -dx / (rp * Math.max(0.2, Math.cos(spin.lat))),
-      lat = dy / rp;
-    spin.lon += lon;
-    spin.lat = latitude(spin.lat + lat);
-    return { lon, lat };
-  };
-
-  root.addEventListener('pointerdown', (e) => {
-    root.setPointerCapture(e.pointerId);
-    fingers.set(e.pointerId, { x: e.clientX, y: e.clientY, t: e.timeStamp });
-    tap =
-      fingers.size === 1
-        ? {
-            id: e.pointerId,
-            x: e.clientX,
-            y: e.clientY,
-            off: off(e.clientX, e.clientY),
-          }
-        : null;
-    spin.vLat = spin.vLon = 0;
-  });
-  root.addEventListener('pointermove', (e) => {
-    const f = fingers.get(e.pointerId);
-    if (!f) return;
-    if (tap && dragged(tap.x, tap.y, e.clientX, e.clientY)) tap = null;
-    if (fingers.size === 1 && !tap) {
-      const moved = carry(e.clientX - f.x, e.clientY - f.y),
-        s = Math.max(0.004, (e.timeStamp - f.t) / 1000);
-      spin.vLon = spin.vLon * 0.5 + (moved.lon / s) * 0.5;
-      spin.vLat = spin.vLat * 0.5 + (moved.lat / s) * 0.5;
-    } else if (fingers.size === 2) {
-      let o = f;
-      for (const [k, q] of fingers) if (k !== e.pointerId) o = q;
-      const d0 = Math.hypot(f.x - o.x, f.y - o.y),
-        d1 = Math.hypot(e.clientX - o.x, e.clientY - o.y);
-      if (d0 > 8 && d1 > 8) want = reach(1 + ((want - 1) * d0) / d1);
-      carry((e.clientX - f.x) / 2, (e.clientY - f.y) / 2);
-    }
-    f.x = e.clientX;
-    f.y = e.clientY;
-    f.t = e.timeStamp;
-  });
-  const lift = (e: PointerEvent) => {
-    const f = fingers.get(e.pointerId);
-    if (!f) return;
-    fingers.delete(e.pointerId);
-    if (e.timeStamp - f.t > 80 || fingers.size) spin.vLat = spin.vLon = 0;
-    if (tap && tap.off && tap.id === e.pointerId && e.type === 'pointerup')
-      close();
-    tap = null;
-  };
-  root.addEventListener('pointerup', lift);
-  root.addEventListener('pointercancel', lift);
-  root.addEventListener(
-    'wheel',
-    (e) => {
-      e.preventDefault();
-      want = reach(1 + (want - 1) * Math.exp(e.deltaY * 0.002));
+  const orbit = createOrbit(root, {
+    f: () => L.f,
+    tap: (x, y) => {
+      if (off(x, y)) close();
     },
-    { passive: false }
-  );
+  });
+  const perRadian = () => L.f / (orbit.d - 1);
 
   function close() {
     root.hidden = true;
     state = null;
     held = null;
-    fingers.clear();
+    orbit.clear();
   }
 
   return {
@@ -514,10 +647,7 @@ export function createGlobe(coasts: readonly Coast[]) {
     },
     show(s: GlobeState) {
       state = s;
-      spin.lat = latitude(Math.asin(s.at[1]));
-      spin.lon = Math.atan2(-s.at[2], s.at[0]);
-      spin.vLat = spin.vLon = 0;
-      want = d = FARTHEST;
+      orbit.reset(s.at);
       read = '';
       held = null;
       lay();
@@ -543,15 +673,8 @@ export function createGlobe(coasts: readonly Coast[]) {
     },
     step(dt: number, cap: StormDraw): Eye | null {
       if (!state || !held) return null;
-      if (!fingers.size) {
-        spin.lon += spin.vLon * dt;
-        spin.lat = latitude(spin.lat + spin.vLat * dt);
-        const k = Math.exp(-DRAG * dt);
-        spin.vLon *= k;
-        spin.vLat *= k;
-      }
-      d += (want - d) * (1 - Math.exp(-FLY * dt));
-      const e = eyeFor(spin, d, L);
+      orbit.step(dt);
+      const e = eyeFor(orbit.spin, orbit.d, L);
       ink(e, cap);
       return {
         kind: 'space',
