@@ -1,6 +1,46 @@
 import type { ShipResult } from '../../sim/result.ts';
 import type { Objective } from '../state.ts';
-import { CONTRACTS, RACE_MONEY, SEASON_PRIZE, SPONSORS } from '../tuning.ts';
+import {
+  CONTRACTS,
+  ECONOMY,
+  LEAGUE,
+  RACE_MONEY,
+  SEASON_PRIZE,
+  SHIPS,
+  SPONSORS,
+  STARS,
+} from '../tuning.ts';
+
+const SHIP_COUNT = LEAGUE.teams * LEAGUE.shipsPerTeam;
+
+export const standingMerit = (standing: number): number =>
+  (LEAGUE.teams - standing) / (LEAGUE.teams - 1);
+
+export const placeMerit = (place: number): number =>
+  (SHIP_COUNT - place) / (SHIP_COUNT - 1);
+
+export const starMerit = (starCount: number): number => starCount / STARS.most;
+
+const LEVEL_SPREAD = ECONOMY.parTop - SHIPS.leastLevel;
+
+export const levelMerit = (level: number): number =>
+  (level - SHIPS.leastLevel) / LEVEL_SPREAD;
+
+export const parStars = (merit: number): number => STARS.most * merit;
+
+export const parLevel = (merit: number): number =>
+  SHIPS.leastLevel + LEVEL_SPREAD * merit;
+
+export const income = (merit: number): number =>
+  ECONOMY.income.floor + ECONOMY.income.rise * merit ** ECONOMY.income.power;
+
+export const STANDINGS: readonly number[] = Array.from(
+  { length: LEAGUE.teams },
+  (_, index) => index + 1
+);
+
+export const leagueIncome = (): number =>
+  STANDINGS.reduce((sum, standing) => sum + income(standingMerit(standing)), 0);
 
 export const placePrize = (place: number): number =>
   Math.round(

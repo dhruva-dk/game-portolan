@@ -8,6 +8,18 @@ export const LEVEL_SPAN = { least: 0, most: 100 } as const;
 
 export const LEAGUE = { teams: 40, shipsPerTeam: 2, racesPerSeason: 10 };
 
+export const ECONOMY = {
+  income: { floor: 1000, rise: 15000, power: 2 },
+  shares: { place: 0.4, season: 0.2, sponsors: 0.3, deeds: 0.1 },
+  wages: 0.5,
+  levelCost: 0.01,
+  parTop: 90,
+  winter: 0.2,
+  winterFitted: 0.2,
+  focus: 2,
+  met: 0.5,
+};
+
 export const RACE_REPORT = { podium: 3 };
 
 export const POINTS = {
