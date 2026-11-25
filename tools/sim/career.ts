@@ -9,6 +9,7 @@ import {
   LINES,
   ROLES,
   type CareerState,
+  type NewsKind,
   type Team,
   YOURS,
 } from '../../src/career/state.ts';
@@ -115,6 +116,8 @@ export type RaceLine = {
   ms: number;
 };
 
+export type Acted = { hired: number[]; built: number[]; signed: number[] };
+
 export type SeasonFigures = {
   season: number;
   standing: number;
@@ -125,6 +128,7 @@ export type SeasonFigures = {
   levels: Spread;
   staff: Spread;
   repossessions: number;
+  acted: { hired: number; built: number; signed: number };
 };
 
 export type Told =
@@ -172,7 +176,8 @@ function raceLine(state: CareerState, ms: number): RaceLine {
 
 function seasonFigures(
   state: CareerState,
-  repossessions: number
+  repossessions: number,
+  acted: Acted
 ): SeasonFigures {
   const yours = state.teams[YOURS];
   return {
@@ -185,8 +190,28 @@ function seasonFigures(
     levels: spread(state.teams.map(designLevel)),
     staff: spread(state.teams.map((team) => staffStars(state, team))),
     repossessions,
+    acted: {
+      hired: acted.hired.length,
+      built: acted.built.length,
+      signed: acted.signed.length,
+    },
   };
 }
+
+const including = (teams: number[], more: readonly number[]): number[] =>
+  [...new Set([...teams, ...more])].sort((a, b) => a - b);
+
+const builders = (before: CareerState, after: CareerState): number[] =>
+  after.teams.flatMap((team, index) =>
+    JSON.stringify(team.ships) === JSON.stringify(before.teams[index].ships)
+      ? []
+      : [index]
+  );
+
+const teamsTold = (state: CareerState, kinds: readonly NewsKind[]): number[] =>
+  state.news.flatMap((event) =>
+    kinds.includes(event.kind) && event.team !== undefined ? [event.team] : []
+  );
 
 export type TableRow = {
   standing: number;
@@ -222,22 +247,33 @@ export function runCareer(
 ): CareerState {
   let state = startCareer(run.seed);
   let repossessions = 0;
+  const acted: Acted = { hired: [], built: [], signed: [] };
+  const ashore = (command: Command): void => {
+    const before = state;
+    state = accepted(yourTurn(state, run), command);
+    acted.built = including(acted.built, builders(before, state));
+  };
   for (let n = 0; n < run.races; n++) {
     if (state.phase === 'offseason')
-      state = accepted(yourTurn(state, run), {
-        type: 'FinishOffseason',
-        team: YOURS,
-      });
+      ashore({ type: 'FinishOffseason', team: YOURS });
     const began = performance.now();
-    state = accepted(yourTurn(state, run), { type: 'StartRace', team: YOURS });
+    ashore({ type: 'StartRace', team: YOURS });
     const setup = matchSetup(state, { hands: run.you });
     const result = run.standin ? standInResult(setup) : sailed(setup);
     state = accepted(state, { type: 'RecordRace', team: YOURS, result });
     state = accepted(state, { type: 'MarkRead', team: YOURS });
     repossessions += state.news.filter((e) => e.kind === 'repossessed').length;
+    acted.hired = including(
+      acted.hired,
+      teamsTold(state, ['hired', 'poached'])
+    );
+    acted.signed = including(acted.signed, teamsTold(state, ['sponsorSigned']));
     tell({ kind: 'race', line: raceLine(state, performance.now() - began) });
     if (state.phase === 'offseason') {
-      tell({ kind: 'season', figures: seasonFigures(state, repossessions) });
+      tell({
+        kind: 'season',
+        figures: seasonFigures(state, repossessions, acted),
+      });
       repossessions = 0;
     }
   }
