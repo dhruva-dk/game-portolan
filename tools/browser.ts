@@ -10,7 +10,12 @@ const VIEW = { width: 1180, height: 820 } as const,
 const BUDGET = { draws: 100, triangles: 900_000, passes: 20 };
 type Budget = typeof BUDGET;
 
-const VIEWS: { name: string; q: string; own?: Partial<Budget> }[] = [
+const VIEWS: {
+  name: string;
+  q: string;
+  own?: Partial<Budget>;
+  flat?: boolean;
+}[] = [
   { name: 'sea', q: 'screen=match&drive=150,1,14' },
   { name: 'coast', q: 'screen=match' },
   { name: 'ships', q: 'screen=match&ships=12' },
@@ -29,6 +34,9 @@ const VIEWS: { name: string; q: string; own?: Partial<Budget> }[] = [
   { name: 'result', q: 'screen=result&seed=test&races=2' },
   { name: 'paper', q: 'screen=paper&seed=test&races=4' },
   { name: 'offseason', q: 'screen=offseason&seed=test&races=10&page=2' },
+  { name: 'settings', q: 'screen=settings&seed=test&races=14' },
+  { name: 'team', q: 'screen=team&seed=test&races=14' },
+  { name: 'glyphs', q: 'screen=glyphs', flat: true },
   { name: 'map', q: 'screen=match&map' },
   {
     name: 'worst',
@@ -221,9 +229,23 @@ try {
     await probe.close();
     const log = lines(join(dir, 'console.jsonl'));
     const results = [];
-    for (const [k, { name, q, own }] of VIEWS.entries()) {
+    for (const [k, { name, q, own, flat }] of VIEWS.entries()) {
       const limit: Budget = { ...BUDGET, ...own };
       const { page, errors } = await open(`${q}&pause`, log, 1);
+      if (flat) {
+        await page.waitForLoadState('networkidle');
+        await page.screenshot({
+          path: join(dir, `${String(k + 1).padStart(2, '0')}-${name}.png`),
+        });
+        await page.close();
+        failed ||= errors.length > 0;
+        results.push({ name, q, limit, seen: null, over: [], errors });
+        console.log(
+          `${errors.length ? 'OVER' : 'ok  '} ${name.padEnd(6)} no world drawn: page errors only` +
+            (errors.length ? `  PAGE ERRORS: ${errors.join(' | ')}` : '')
+        );
+        continue;
+      }
       await firstReading(page);
       const first = await page.getAttribute('#meter', 'data-line');
       await page.waitForFunction(

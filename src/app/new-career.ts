@@ -14,6 +14,13 @@ import type { Stage } from './debug.ts';
 const BESIDE: Framing = { center: [0.34, -0.04], size: 0.66 };
 export type Founded = { state: CareerState; options: CareerOptions };
 
+export function begun(options: CareerOptions): Founded {
+  const created = newCareer(options),
+    raced = apply(created, { type: 'StartRace', team: YOURS });
+  if (!raced.ok) throw new Error(`StartRace refused (${raced.reason})`);
+  return { state: raced.state, options };
+}
+
 export async function founding(
   s: Stage,
   existing: CareerState | null,
@@ -25,12 +32,7 @@ export async function founding(
   uiLayer();
   const repaint = painter((look) => game.paint(look), PLAIN);
   const port: NewCareerPort = {
-    start(options) {
-      const created = newCareer(options),
-        raced = apply(created, { type: 'StartRace', team: YOURS });
-      if (!raced.ok) throw new Error(`StartRace refused (${raced.reason})`);
-      o.started({ state: raced.state, options });
-    },
+    start: (options) => o.started(begun(options)),
     close: () => o.closed(),
     scene: {
       wear(livery) {

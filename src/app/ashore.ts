@@ -49,6 +49,19 @@ import { createOffseason } from '../ui/lobby/offseason.ts';
 import { createPaper } from '../ui/lobby/paper.ts';
 import { createResult } from '../ui/lobby/result.ts';
 import { createTeam } from '../ui/lobby/team.ts';
+import { createSettingsScreen } from '../ui/lobby/settings.ts';
+import { createNewCareer } from '../ui/lobby/new-career.ts';
+import { newCareerView } from '../career/views/new-career.ts';
+import type { NewCareerPort } from '../ui/lobby/port.ts';
+import type { Settings } from '../ui/base/settings.ts';
+import { PLAIN } from '../play/colors.ts';
+import { rolled } from '../world/seeds.ts';
+import { createAudio } from '../audio/audio.ts';
+import type { Hearing } from '../audio/listen.ts';
+import { view } from '../ui/base/ui.ts';
+import { onPressed } from '../ui/base/touch.ts';
+import { deviceStore, keepSettings, keptSettings } from './kept.ts';
+import { begun, type Founded } from './new-career.ts';
 import { createInput } from '../ui/sea/input.ts';
 import type { Stage } from './debug.ts';
 import { painter } from './painter.ts';
@@ -105,7 +118,12 @@ async function markedOn(
 export async function ashore(
   s: Stage,
   career: CareerState,
-  o: { store: Store; sailed(state: CareerState): void; ready(): void }
+  o: {
+    store: Store;
+    sailed(state: CareerState): void;
+    ready(): void;
+    founded?(founded: Founded): void;
+  }
 ): Promise<Ashore> {
   const { game, input, berth } = await anchorage(s, true);
   const repaint = painter(
@@ -125,6 +143,7 @@ export async function ashore(
     dealt: Role | null = null,
     talking: number | null = null,
     painting = false,
+    founding: { el: HTMLElement } | null = null,
     flowing: 'result' | 'offseason' | 'paper' | null =
       career.unread && career.lastRace !== null ? 'result' : null,
     built = false;
@@ -248,6 +267,12 @@ export async function ashore(
         game.stage({ framing: LIFTED }, true);
         return;
       }
+      if (open === null && name === 'settings') {
+        open = name;
+        settingsScreen.open();
+        lobby.cover(true);
+        return;
+      }
       if (open === null && name === 'team') {
         open = name;
         team.show(teamView(state));
@@ -261,7 +286,13 @@ export async function ashore(
         paper.back();
         return;
       }
-      if (flowing !== null) return;
+      if (flowing !== null || founding !== null) return;
+      if (open === 'settings') {
+        open = null;
+        settingsScreen.close();
+        lobby.cover(false);
+        return;
+      }
       if (painting) {
         painting = false;
         rise(paint.el, false);
@@ -362,6 +393,56 @@ export async function ashore(
   const sponsors = createSponsors(port);
   const planet = createPlanet(port);
   const opponents = createOpponents(port);
+  const device = deviceStore();
+  let settings: Settings = keptSettings(device);
+  const settingsScreen = createSettingsScreen(
+    {
+      get: () => settings,
+      set(next) {
+        settings = next;
+        keepSettings(device, next);
+      },
+      heard(id) {
+        if (id === 'sound') audio.sample();
+      },
+    },
+    { seed: state.seed, newCareer: startOver }
+  );
+
+  function startOver() {
+    if (founding !== null) return;
+    const ncPort: NewCareerPort = {
+      start(options) {
+        o.founded?.(begun(options));
+      },
+      close() {
+        if (founding === null) return;
+        const leaving = founding.el;
+        founding = null;
+        rise(leaving, false);
+        window.setTimeout(() => leaving.remove(), MOTION.sheet.leave);
+        repaint(lookOf(state.teams[YOURS].livery));
+        game.stage(null, true);
+        fade(lobby.el, true);
+        settingsScreen.open();
+      },
+      scene: {
+        wear(livery) {
+          repaint(livery === null ? PLAIN : lookOf(livery));
+        },
+      },
+    };
+    const screen = createNewCareer(ncPort),
+      seed = rolled(Math.random);
+    founding = { el: screen.el };
+    settingsScreen.close();
+    fade(lobby.el, false);
+    game.stage({ framing: BESIDE }, true);
+    screen.show((form) =>
+      newCareerView(form, { rolled: seed, existing: true })
+    );
+  }
+
   const result = createResult(port);
   const offseason = createOffseason(port);
   const paper = createPaper(port);
@@ -445,11 +526,29 @@ export async function ashore(
 
   if (flowing !== null) o.ready();
   else void s.ready.then(() => o.ready());
+  const audio = createAudio(s.world.planet.height);
+  const status = Object.assign({}, game.status(), game.kit());
+  const hearing: Hearing = {
+    scene: game.snapshot(),
+    status,
+    screen: 'lobby',
+    map: false,
+    covered: 0,
+  };
+  onPressed(uiLayer(), () => audio.tap(hearing.screen));
   void s.draw((dt) => {
     game.step(dt, input.read());
     const scene = game.snapshot();
     const sky = aloft ? planet.step(dt, scene.eye) : null;
     if (sky) scene.eye = sky;
+    hearing.scene = scene;
+    hearing.status = Object.assign(
+      status,
+      game.status(view.w, view.h),
+      game.kit()
+    );
+    hearing.screen = open === 'settings' ? 'settings' : 'lobby';
+    audio.update(hearing, settings.sound, dt);
     return scene;
   });
 

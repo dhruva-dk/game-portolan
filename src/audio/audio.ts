@@ -168,5 +168,9 @@ export function createAudio(ground: (p: Vec3) => number) {
       if (eye && ctx.state === 'running')
         engine.tap(screen, eye, ctx.currentTime);
     },
+    sample() {
+      if (eye && ctx.state === 'running')
+        engine.cue({ cue: 'ready', at: null, gain: 1 }, eye, ctx.currentTime);
+    },
   };
 }
