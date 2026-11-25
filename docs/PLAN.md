@@ -857,7 +857,7 @@ Opened from the next-race slip.
 - **Top left slip:** the planet's name; storm glyph with stars and the word Storm; heal glyph with stars and the word Heals. The stars ink in one after another.
 - **Motion:** opening from the next-race slip, the camera pulls back from the anchorage to the planet; the corner close flies back down.
 
-The seed field, the die and the persona bars of today's seed panel are deleted at step M6.1, when the career flow replaces the flow that still uses them.
+The seed field, the die and the persona bars of today's seed panel are deleted at step M6.6, once the career flow has replaced the flow that still uses them.
 
 ### 1.12.10 The result flow
 
@@ -1863,7 +1863,7 @@ Goal: every screen of §1.12 exists and can be opened on a debug state.
 
 Goal: the game is played from first launch through seasons by hand.
 
-- [ ] **M6.1 The flow.** §2.9: launch from the saved state, New Career, SAIL, `RecordRace`, the save queue and the reload. Team liveries now come from the career, and ships wear their team's emblem (§1.13.4) on the mainsail in place of the cross every ship wears today, in the lobby, on New Career, in the paint picker and at sea. Today's seed panel (`ui/lobby/panel.ts`) is deleted with the flow that uses it. For New Career this step saves the state `port.start` hands over, waits for the save, reloads so that launch case 3 starts race one, shows New Career at launch when no career is saved, and routes its close button to Settings.
+- [ ] **M6.1 The flow.** §2.9: launch from the saved state, New Career, SAIL, `RecordRace`, the save queue and the reload. Team liveries now come from the career, and ships wear their team's emblem (§1.13.4) on the mainsail in place of the cross every ship wears today, in the lobby, on New Career, in the paint picker and at sea. For New Career this step saves the state `port.start` hands over, waits for the save, reloads so that launch case 3 starts race one, shows New Career at launch when no career is saved, and routes its close button to Settings.
 - [ ] **M6.2 After sinking.** Watch, and the Result fast-forward (§1.11.11).
 - [ ] **M6.3 Fire drag.** A drag that starts on Fire moves the aim (§1.12.14).
 - [ ] **M6.4 Uncle's bubbles** and the lobby buttons appearing in step (§1.13.2).
