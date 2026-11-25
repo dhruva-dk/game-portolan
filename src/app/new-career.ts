@@ -1,5 +1,4 @@
-import { apply, newCareer, type CareerOptions } from '../career/apply.ts';
-import { YOURS, type CareerState } from '../career/state.ts';
+import type { CareerState } from '../career/state.ts';
 import { newCareerView } from '../career/views/new-career.ts';
 import type { Framing } from '../play/anchorage.ts';
 import { PLAIN, lookOf } from '../play/colors.ts';
@@ -9,18 +8,10 @@ import { createNewCareer } from '../ui/lobby/new-career.ts';
 import type { NewCareerPort } from '../ui/lobby/port.ts';
 import { anchorage } from './ashore.ts';
 import { painter } from './painter.ts';
+import { begun, type Founded } from './launch.ts';
 import type { Stage } from './debug.ts';
 
 const BESIDE: Framing = { center: [0.34, -0.04], size: 0.66 };
-export type Founded = { state: CareerState; options: CareerOptions };
-
-export function begun(options: CareerOptions): Founded {
-  const created = newCareer(options),
-    raced = apply(created, { type: 'StartRace', team: YOURS });
-  if (!raced.ok) throw new Error(`StartRace refused (${raced.reason})`);
-  return { state: raced.state, options };
-}
-
 export async function founding(
   s: Stage,
   existing: CareerState | null,

@@ -333,8 +333,7 @@ export function createLobby(port: LobbyPort) {
     const svg = svgNode(w, h, s);
     sail.replaceChildren(svg);
     bound(svg, 'sail', () => {
-      if (v.race === null) port.send({ type: 'FinishOffseason', team: 0 });
-      port.send({ type: 'StartRace', team: 0 });
+      for (const order of v.sail) port.send(order);
     });
   }
 

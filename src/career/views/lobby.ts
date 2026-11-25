@@ -1,3 +1,4 @@
+import type { Command } from '../commands.ts';
 import { healRating, nextRace, planetName, stormRating } from '../fit.ts';
 import { seatHolder, seatStat } from '../lookup.ts';
 import { buildCost } from '../rules/build-cost.ts';
@@ -17,6 +18,7 @@ export type LobbyView = {
   standing: { place: number; moved: number; opens: boolean };
   race: { race: number; of: number } | null;
   buttons: { id: LobbyButton; dot: boolean }[];
+  sail: Command[];
   bubble: LobbyBubble | null;
 };
 
@@ -91,6 +93,7 @@ export function lobbyView(state: CareerState): LobbyView {
     id === 'team' || state.seen.includes(id) || bubble === id;
   const place = standings(state)[YOURS];
   return {
+    sail: sailOrders(state),
     seed: state.seed,
     next: {
       planet: planetName(state),
@@ -114,3 +117,10 @@ export function lobbyView(state: CareerState): LobbyView {
     bubble,
   };
 }
+
+export const sailOrders = (state: CareerState): Command[] => [
+  ...(state.phase === 'offseason'
+    ? [{ type: 'FinishOffseason', team: YOURS } as const]
+    : []),
+  { type: 'StartRace', team: YOURS },
+];
