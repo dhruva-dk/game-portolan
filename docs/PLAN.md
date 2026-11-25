@@ -647,7 +647,7 @@ All screens use the sea UI's drawing system (§2.5): paper slips, round ink butt
 1. **The lobby** is the base: the 3D scene with slips and buttons over it (§1.12.2).
 2. **A screen** opens over the lobby: Ship, Team, Sponsors, Opponents, Planet or Settings. One is open at a time. While a screen is open the lobby's four bottom-left buttons and SAIL are hidden, the three top-right slips (money, standing, race) stay, and the Settings button's place at the far top right is taken by a round **close button** that returns to the lobby.
 3. **A sheet** is a paper panel. It never covers the whole screen; the ship stays visible beside or behind it.
-4. **A sheet may open over a screen:** the deal and negotiation over Team; the team sheet beside the standings in Opponents; the paint picker over Ship. There is still one close button, the round one at the far top right, and it always goes back one step: from an enlarged card to its sheet, from a sheet to the screen under it, from a screen to the lobby. While a sheet is open the screen under it fades out, so that nothing of it shows round the sheet. Nothing closes on a tap outside it.
+4. **A sheet may open over a screen:** the deal and negotiation over Team; the team sheet beside the standings in Opponents; the paint picker over Ship. There is still one close button, the round one at the far top right, and it always goes back one step: from an enlarged card to its sheet, from a sheet to the screen under it, from a screen to the lobby. While a sheet is open the screen under it fades out, so that nothing of it shows round the sheet; the team sheet in Opponents is the exception, since it sits beside the standings and both stay. Nothing closes on a tap outside it.
 5. **A person card** can be enlarged in place by a tap and shrunk by a second tap. While a card is enlarged, the round close button shrinks it; with no card enlarged it goes back one step as usual.
 6. **Flows** take over the whole interface until finished and offer no way out except forward: New Career (§1.12.1), the result flow (§1.12.10) and the off-season report (§1.12.11). The one thing that opens over a flow is a team sheet from a link in the paper (§1.13.1); closing it returns to the paper.
 7. **A two-tap button** guards an action that cannot be undone. The first tap arms it: its face changes to the word Confirm? with a tick glyph. A second tap on it acts. A tap anywhere else disarms it and does nothing more.
@@ -824,7 +824,7 @@ A sheet across the lower two-thirds.
 
 ### 1.12.8 Opponents
 
-A sheet over the left 55% of the screen holding the standings; a team sheet opens over the right 45%.
+A sheet over the left 55% of the screen holding the standings; a team sheet opens over the right 45%. Both are 360 units tall and sit at the bottom, and the camera stands as it does for the paint picker, so the ship shows above them.
 
 **Standings:** a vertically scrolling list of 40 rows, with no header row. This is the only table in the game.
 
@@ -836,17 +836,19 @@ A sheet over the left 55% of the screen holding the standings; a team sheet open
 | Points | Numeral with a small star-burst glyph |
 | Strength | A 0 to 100 bar showing the range of the mean of that team's 14 fitted levels (the mean of the low ends to the mean of the high ends); your own team's mean as a tick on every row |
 
-Your row is highlighted. The list opens scrolled so your row is in view.
+Your row is highlighted in gilt with a stripe in your dye. The list opens scrolled so your row is in view. A team that has not moved shows no arrow. The row whose team sheet is open is outlined, with a pointer toward the sheet; tapping it again shakes it.
 
 **Team sheet** (tap a row; tapping another row replaces it):
 
 | Element | Detail |
 |---|---|
 | Header | Emblem, name, laurel glyph and place |
-| Two ship columns | For each ship: seven rows, one per line, each the line's glyph and a 0 to 100 range bar with your own slot 0 fitted level as a tick; and the ship's gun-kind glyph |
-| Four small cards | Owner, driver, designer, mechanic: portrait, name, role glyph, star range. An empty seat is an outline |
+| Two ship columns | Seven rows, one per line: the line's glyph once, then for each ship a 0 to 100 range bar with your own slot 0 fitted level as a tick. Each ship's gun-kind glyph stands at the end of its gun row. The columns have no headings |
+| Four small cards | Owner, driver, designer, mechanic, two by two: name, portrait, star range, role glyph and the role's word. An empty seat is an outline; your own empty driver seat shows Uncle |
 
-Tapping a small card enlarges it as a candidate card (§1.12.5), with **Report** beneath it, and **Approach** as well unless it is the owner. The holder overlaid and compared is whoever holds the same seat in your team: Uncle for your empty driver seat, nobody for another empty seat. An owner's card has no holder outline, no ticks, no blue or red, no wage and no clause. Your own row opens your team with exact values and no buttons; its owner card is a helm glyph.
+Tapping a small card enlarges it as a candidate card (§1.12.5), the 196-unit card and not the wide one, with **Report** beneath it, and **Approach** as well unless it is the owner. The holder overlaid and compared is whoever holds the same seat in your team: Uncle for your empty driver seat, nobody for another empty seat. An owner's card has no holder outline, no ticks, no blue or red, no wage and no clause. Your own row opens your team with exact values and no buttons; its owner card is the helm glyph and the word Owner, and your staff enlarge as the front of their card.
+
+**Motion:** the rows ink in outward from your row, the arrows bounce in and the strength bars draw out. A tapped row answers at once; its team sheet slides in from the right over the one before, which drops away, and its small cards deal in. The list moves like paper under a finger: a drag takes over from a row's tap once it travels, it coasts, and it gives softly past either end.
 
 ### 1.12.9 Planet
 
@@ -1408,7 +1410,7 @@ All UI is DOM elements placed over the canvas and filled with inline SVG produce
 | `picker.ts` | A row of mutually exclusive choices |
 | `slider.ts`, `switch.ts` | For Settings (built from today's settings controls in `screens.ts`) |
 | `rangebar.ts` | A 0 to 100 or 1 to 20 bar showing a value or a range, with an optional tick |
-| `list.ts` | A vertically scrolling list of rows |
+| `list.ts` | A vertically scrolling list of rows: touch drag with inertia and a soft give past either end, a thin thumb, faded edges, rows far from the window hidden, and opening at or gliding to a row |
 | `card.ts` | The person card: front, small and enlarged, in exact and candidate forms |
 | `rose.ts` | The compass rose (§1.12.13) |
 | `bubble.ts` | Uncle's portrait and speech bubble with a pointer |
@@ -1608,6 +1610,12 @@ All spacing is a multiple of `STEP`, 4 units.
 | `paid` | Starts 560 ms after the tap; counts up over 1500 ms and rises 24 units | What a new sponsor deal pays |
 | `inked` | 300 ms with a slight overshoot, starting after 120 ms, 80 ms apart | Stars inking in on the Planet slip |
 | `planet` | The camera rises in 1700 ms and falls in 950 ms; the slip arrives at 1050 ms | Opening and closing the Planet screen |
+| `rows` | 280 ms and a 12-unit slide, starting after 140 ms, 30 ms apart | List rows inking in |
+| `moved` | 460 ms with a 7-unit hop and a slight overshoot | Movement arrows in the standings |
+| `drawn` | 460 ms, 26 ms apart | Range bars drawing out |
+| `swap` | In over 340 ms from 64 units right; out over 200 ms, dropping 18 units and turning 1.6° | One team sheet replacing another |
+| `chosen` | 160 ms | The outline of the row whose team is open |
+| `list` | Coasting with a 325 ms time constant; 0.55 give past an end and a spring back; a glide to a row in 520 ms; the thumb lingers 700 ms | Any scrolling list |
 | `fade` | 180 ms | Anything else that appears or goes |
 
 Rules:
@@ -1715,7 +1723,7 @@ Your team is played by the policy as a sensible team (§1.10.2). Until the polic
 
 ### 2.8.3 Debug states
 
-`app/debug.ts` reads `?debug` switches (used by `npm run browser`). `?debug&screen=<name>&seed=<s>&races=<n>` builds a career from the seed, advances it `n` races with the stand-in and the policy for every team including yours (§1.10.2), and opens that screen. The names are `new`, `lobby`, `ship`, `paint`, `team`, `deal`, `negotiation`, `sponsors`, `opponents`, `planet`, `settings`, `result`, `paper`, `offseason`, `glyphs` (the glyph sheet of §2.5.4, which needs no career). There are no hand-written fixture states. Three more switches change the state built: `balance=<n>` sets your balance to `n` after the career is advanced (no seed reaches debt by itself, and the red money slip needs a state to be drawn on); `signed`, at the off-season stop, finishes the stop so the lobby of the next season shows; `meter` shows the frame meter over a screen; `approach=<roles>` (a comma-separated list) sends `Approach` for a candidate of each named role before the last race, so that several deals are waiting at once. The `deal` and `negotiation` screens also read `role=<role>` (whose deal to open; the scouted role if left out). `sponsors` reads `sponsors=<n>`, which signs the first `n` offers into the slots with real `SignSponsor` commands. `negotiation` reads four more: `pick=<n>` (which candidate of the deal, from 0), `report` (buy a report on them first), `renew` (negotiate with the holder of the seat instead of a candidate), and `offers=<answers>` (a comma-separated list of `refuse`, `counter` and `sign`: offers are sent, in order, that get those answers; the helper searches for terms that really get each answer and fails, naming the person, when none do). These states are reached by sending real commands, never by writing the state. `screen=new` shows New Career with no career unless `seed=` is given, and with one when it is; `name=`, `dye=`, `pattern=` and `emblem=` then set that career's team name and livery. `screen=ship` reads `stop=<n>` (which stop to open on, from 0) and, as the one exception to reaching states by commands, `unlocked=<kinds>&progress=<n>`, which writes unlocked gun kinds and unlock progress into the state the way `balance` writes the balance (the policy playing your seat keeps moving the focus, so no seed gets there).
+`app/debug.ts` reads `?debug` switches (used by `npm run browser`). `?debug&screen=<name>&seed=<s>&races=<n>` builds a career from the seed, advances it `n` races with the stand-in and the policy for every team including yours (§1.10.2), and opens that screen. The names are `new`, `lobby`, `ship`, `paint`, `team`, `deal`, `negotiation`, `sponsors`, `opponents`, `planet`, `settings`, `result`, `paper`, `offseason`, `glyphs` (the glyph sheet of §2.5.4, which needs no career). There are no hand-written fixture states. Three more switches change the state built: `balance=<n>` sets your balance to `n` after the career is advanced (no seed reaches debt by itself, and the red money slip needs a state to be drawn on); `signed`, at the off-season stop, finishes the stop so the lobby of the next season shows; `meter` shows the frame meter over a screen; `approach=<roles>` (a comma-separated list) sends `Approach` for a candidate of each named role before the last race, so that several deals are waiting at once. The `deal` and `negotiation` screens also read `role=<role>` (whose deal to open; the scouted role if left out). `sponsors` reads `sponsors=<n>`, which signs the first `n` offers into the slots with real `SignSponsor` commands. `opponents` reads `team=<place>` (whose team sheet is open) and `card=<seat>` (which of `owner`, `driver`, `designer`, `mechanic` is enlarged). `negotiation` reads four more: `pick=<n>` (which candidate of the deal, from 0), `report` (buy a report on them first), `renew` (negotiate with the holder of the seat instead of a candidate), and `offers=<answers>` (a comma-separated list of `refuse`, `counter` and `sign`: offers are sent, in order, that get those answers; the helper searches for terms that really get each answer and fails, naming the person, when none do). These states are reached by sending real commands, never by writing the state. `screen=new` shows New Career with no career unless `seed=` is given, and with one when it is; `name=`, `dye=`, `pattern=` and `emblem=` then set that career's team name and livery. `screen=ship` reads `stop=<n>` (which stop to open on, from 0) and, as the one exception to reaching states by commands, `unlocked=<kinds>&progress=<n>`, which writes unlocked gun kinds and unlock progress into the state the way `balance` writes the balance (the policy playing your seat keeps moving the focus, so no seed gets there).
 
 `npm run browser` (headless Chromium, iPad Air size) takes screenshots and reads frame cost. It is never part of `npm test`. Its existing budget stands: 100 draws, 900,000 triangles and 20 passes a frame.
 
@@ -1850,7 +1858,7 @@ Goal: every screen of §1.12 exists and can be opened on a debug state.
 - [x] **M5.10 The deal.** §1.12.5.
 - [x] **M5.11 Negotiation.** §1.12.6.
 - [x] **M5.12 Sponsors.** §1.12.7.
-- [ ] **M5.13 Opponents.** §1.12.8.
+- [x] **M5.13 Opponents.** §1.12.8.
 - [x] **M5.14 Planet.** §1.12.9.
 - [ ] **M5.15 The result flow and the paper.** §1.12.10, §1.13.1.
 - [ ] **M5.16 The off-season report.** §1.12.11.
