@@ -26,7 +26,7 @@ import { asked, crewed, spilled, stored, type Ask } from './stores.ts';
 import type { Rarity } from './kinds.ts';
 import type { Berthed, Waters } from './waters.ts';
 import { shipAt, type Helm, type ShipState } from './ship.ts';
-import { calm, closedBy, createStorm, type Storm } from './storm.ts';
+import { calm, closings, createStorm, type Storm } from './storm.ts';
 import { heard, type Report } from './hunter.ts';
 import {
   createTerritory,
@@ -38,7 +38,7 @@ import type { Hands } from './hands.ts';
 import type { MatchResult } from './result.ts';
 import type { DriverStats, MatchSetup, ShipSpec, ShipValues } from './setup.ts';
 import { driver } from './driver.ts';
-import { DEFAULT_RULES } from './rules.ts';
+import { rulesOf } from './rules.ts';
 import { remembered } from '../world/remembered.ts';
 import type { ShipPose } from '../world/pose.ts';
 import { hash } from '../world/random.ts';
@@ -65,6 +65,7 @@ interface Course {
   seed: number;
   heals: MatchSetup['heals'] | null;
   storm: (seconds: number) => Storm;
+  closed: readonly number[];
 }
 
 interface Sinking extends Sunk {
@@ -159,11 +160,15 @@ function checked(setup: MatchSetup): MatchSetup {
   return setup;
 }
 
-const courseOf = (setup: MatchSetup, depth: (p: Vec3) => number): Course => ({
-  seed: setup.match,
-  heals: setup.heals,
-  storm: createStorm(setup.match, depth, DEFAULT_RULES.storm),
-});
+function courseOf(setup: MatchSetup, depth: (p: Vec3) => number): Course {
+  const table = rulesOf(setup.storm).storm;
+  return {
+    seed: setup.match,
+    heals: setup.heals,
+    storm: createStorm(setup.match, depth, table),
+    closed: closings(table),
+  };
+}
 
 const statsOf = (spec: ShipSpec): DriverStats | null =>
   spec.hands === 'player' ? null : spec.hands;
@@ -257,7 +262,7 @@ function createSea(waters: Waters, first: Course) {
     specOf.clear();
     for (const id of ids) specOf.set(id, values(id));
     teams = by;
-    tally = by ? createTally(by, closedBy(DEFAULT_RULES.storm)) : null;
+    tally = by ? createTally(by, match.closed.at(-1) ?? Infinity) : null;
     loose = false;
     lay =
       loot && match.heals !== null
@@ -697,6 +702,7 @@ export function createMooring(
     seed: 0,
     heals: null,
     storm: () => calm(at.at),
+    closed: [],
   });
   sea.anchor(at, values);
   return sea.played;

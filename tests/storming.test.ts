@@ -37,6 +37,7 @@ const storm: Storm = {
   next,
   closing: false,
   secondsToNext: 10,
+  secondsToShut: 30,
   phase: 2,
   final: false,
   damage: 0.03,

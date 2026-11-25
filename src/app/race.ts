@@ -3,6 +3,7 @@ import type { Rig } from '../sim/engine.ts';
 import { evenSetup } from '../sim/even.ts';
 import type { GunKind } from '../sim/kinds.ts';
 import type { MatchSetup } from '../sim/setup.ts';
+import { rulesOf } from '../sim/rules.ts';
 import { createStorm } from '../sim/storm.ts';
 import type { World } from '../world/environment.ts';
 import { liveryAt, type Livery } from '../world/livery.ts';
@@ -27,6 +28,8 @@ const raceShip = (gun: GunKind) =>
   );
 
 export const RACE_SHIP = raceShip('cannon');
+
+export const RACE_STORM = rulesOf(RATING).storm;
 
 export const RACE_DRIVER = {
   gunnery: STAT,
@@ -70,6 +73,10 @@ export function rigOf(
   world: World
 ): Rig | null {
   if (hold === null) return null;
-  const closing = createStorm(world.seed, (p) => -world.planet.height(p));
+  const closing = createStorm(
+    world.seed,
+    (p) => -world.planet.height(p),
+    RACE_STORM
+  );
   return { storm: () => closing(hold) };
 }

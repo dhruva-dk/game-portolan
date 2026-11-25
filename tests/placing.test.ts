@@ -24,6 +24,7 @@ const storm = (secondsToNext: number): Storm => ({
   next,
   closing: false,
   secondsToNext,
+  secondsToShut: secondsToNext + 20,
   phase: 2,
   final: false,
   damage: 0.03,

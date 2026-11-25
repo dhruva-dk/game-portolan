@@ -52,6 +52,7 @@ export interface Storm extends Cap {
   next: Cap;
   closing: boolean;
   secondsToNext: number;
+  secondsToShut: number;
   phase: number;
   final: boolean;
   damage: number;
@@ -66,6 +67,7 @@ export const calm = (center: Vec3): Storm => ({
   next: { center, radius: WHOLE },
   closing: false,
   secondsToNext: Infinity,
+  secondsToShut: Infinity,
   phase: 0,
   final: false,
   damage: 0,
@@ -84,7 +86,7 @@ function slerp(a: Vec3, b: Vec3, f: number): Vec3 {
 export function planStorm(
   seed: number,
   depth: Depth,
-  table: StormTable = STORM
+  table: StormTable
 ): Vec3[] {
   const rand = random(seed * 48271 + 7),
     phases = table.phases;
@@ -134,11 +136,7 @@ export function planStorm(
   return centers;
 }
 
-export function createStorm(
-  seed: number,
-  depth: Depth,
-  table: StormTable = STORM
-) {
+export function createStorm(seed: number, depth: Depth, table: StormTable) {
   const centers = planStorm(seed, depth, table),
     phases = table.phases,
     n = phases.length;
@@ -162,6 +160,7 @@ export function createStorm(
           next: to,
           closing: false,
           secondsToNext: p.wait - t,
+          secondsToShut: p.wait - t + p.close,
           phase: k,
           final: false,
           damage: p.damage,
@@ -177,6 +176,7 @@ export function createStorm(
           next: to,
           closing: true,
           secondsToNext: p.close - t,
+          secondsToShut: p.close - t,
           phase: k,
           final: false,
           damage: p.damage,
@@ -192,6 +192,7 @@ export function createStorm(
       next: last,
       closing: false,
       secondsToNext: Infinity,
+      secondsToShut: Infinity,
       phase: n,
       final: true,
       damage,
@@ -199,8 +200,13 @@ export function createStorm(
   };
 }
 
+export const closings = (table: StormTable): number[] => {
+  let t = 0;
+  return table.phases.map((p) => (t += p.wait + p.close));
+};
+
 export const closedBy = (table: StormTable): number =>
-  table.phases.reduce((t, p) => t + p.wait + p.close, 0);
+  closings(table).at(-1) ?? 0;
 
 export const toEdge = (p: Vec3, cap: Cap) =>
   (cap.radius - between(normalize(p), cap.center)) * R;

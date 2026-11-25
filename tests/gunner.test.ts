@@ -180,6 +180,7 @@ const stormIn = (phase: number): Storm => ({
   next: { center: start, radius: Math.PI },
   closing: false,
   secondsToNext: phase < 7 ? 60 : Infinity,
+  secondsToShut: phase < 7 ? 80 : Infinity,
   phase,
   final: phase >= 7,
   damage: 0,

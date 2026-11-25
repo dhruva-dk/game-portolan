@@ -16,7 +16,7 @@ import { PLAYER } from '../sim/match.ts';
 import { SETUP, type Rig } from '../sim/engine.ts';
 import type { MatchSetup } from '../sim/setup.ts';
 import { createStorm } from '../sim/storm.ts';
-import { RACE_SHIP, raceSetup, teamLiveries } from './race.ts';
+import { RACE_SHIP, RACE_STORM, raceSetup, teamLiveries } from './race.ts';
 import type { ShipDraw, Snapshot, StormDraw } from '../render/snapshot.ts';
 import type { Flow } from './flow.ts';
 import { uiLayer } from '../ui/base/ui.ts';
@@ -140,7 +140,11 @@ export async function scenario(
   const room = Math.max(SETUP.most, number('ships', 0) + 1);
   if (flying) {
     void s.ready.then(() => title.show(false));
-    const closing = createStorm(s.world.seed, (p) => -s.world.planet.height(p));
+    const closing = createStorm(
+      s.world.seed,
+      (p) => -s.world.planet.height(p),
+      RACE_STORM
+    );
     return s.draw(
       flyer(
         s.canvas,
