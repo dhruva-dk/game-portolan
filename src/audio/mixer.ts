@@ -5,8 +5,13 @@ import type { Heard } from './space.ts';
 import { claim, clear, pool, VOICES } from './voices.ts';
 
 const CEILING = db(-1);
-const GAIN = 4;
-const BUS: Record<Bus | 'bed', number> = { bed: -4, world: -2, own: 0, ui: -3 };
+export const GAIN = 4;
+export const BUS: Record<Bus | 'bed', number> = {
+  bed: -4,
+  world: -2,
+  own: 0,
+  ui: -3,
+};
 
 interface Slot {
   air: BiquadFilterNode;
