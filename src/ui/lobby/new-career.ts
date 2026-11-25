@@ -221,7 +221,7 @@ export function createNewCareer(port: NewCareerPort) {
     body.replaceChildren();
     let s = sheet(0, 0, SHEET.w, SHEET.h, {
       seed: 61,
-      close: v.close ? 'close' : undefined,
+      close: v.close ? 'back' : undefined,
     });
     s += title(v);
     s += `<g ${arriving(0)}>${word(PAD, ROW.name, 'Name', TYPE.word, { anchor: 'start', weight: 600 })}</g>`;
@@ -257,7 +257,7 @@ export function createNewCareer(port: NewCareerPort) {
     arrive(fields.seed.el, 1);
     pressable(part('roll'), roll, 'roll');
     pressable(part('start'), start, 'start');
-    if (v.close) pressable(part('close'), () => port.close(), 'close');
+    if (v.close) pressable(part('back'), () => port.close(), 'back');
     if (svg) bindLivery(svg, 'livery', picked);
     setStart(v, null);
   }
