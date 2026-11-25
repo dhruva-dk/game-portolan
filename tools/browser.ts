@@ -44,17 +44,25 @@ const VIEWS: {
   },
 ];
 
-type Action = { tap: string } | { drag: [number, number] };
+type Action =
+  | { tap: string }
+  | { drag: [number, number] }
+  | { wait: string }
+  | { hold: number };
 const argv = process.argv.slice(2);
 const actions: Action[] = [];
 const opt: Record<string, string> = {};
 let query: string | null = null,
   budget = false,
-  early = false;
+  early = false,
+  bare = false;
 for (let i = 0; i < argv.length; i++) {
   const a = argv[i];
   if (a === '--budget') budget = true;
   else if (a === '--early') early = true;
+  else if (a === '--bare') bare = true;
+  else if (a === '--wait') actions.push({ wait: argv[++i] });
+  else if (a === '--hold') actions.push({ hold: Number(argv[++i]) });
   else if (a === '--tap') actions.push({ tap: argv[++i] });
   else if (a === '--drag') {
     const [dx, dy] = argv[++i].split(',').map(Number);
@@ -62,9 +70,9 @@ for (let i = 0; i < argv.length; i++) {
   } else if (a.startsWith('--')) opt[a.slice(2)] = argv[++i];
   else query = a;
 }
-if (query === null && !budget) {
+if (query === null && !budget && !bare) {
   console.error(
-    'usage: npm run browser -- "<query>" [--tap what]... [--drag dx,dy]... [--shots n] [--every ms] [--settle ms] [--early] [--dpr n] [--subject name]\n       npm run browser -- --budget'
+    'usage: npm run browser -- "<query>" [--tap what]... [--drag dx,dy]... [--wait what]... [--hold ms]... [--shots n] [--every ms] [--settle ms] [--patience ms] [--early] [--bare] [--dpr n] [--subject name]\n       npm run browser -- --budget'
   );
   process.exit(2);
 }
@@ -102,7 +110,10 @@ async function adapterOf(page: Page) {
   });
 }
 
-async function open(q: string, log: Lines | null, dpr = DPR) {
+const addressOf = (q: string, plain: boolean) =>
+  plain ? (q ? `?${q}` : '') : `?${['debug', q].filter(Boolean).join('&')}`;
+
+async function open(q: string, log: Lines | null, dpr = DPR, plain = false) {
   const page = await browser.newPage({
     viewport: VIEW,
     deviceScaleFactor: dpr,
@@ -141,7 +152,7 @@ async function open(q: string, log: Lines | null, dpr = DPR) {
     if (r.status() >= 400)
       log?.write({ t: at(), type: 'http', url: r.url(), status: r.status() });
   });
-  await page.goto(`${url}?${q}`);
+  await page.goto(`${url}${addressOf(q, plain)}`);
   return { page, errors, at };
 }
 
@@ -318,7 +329,7 @@ try {
     await probe.close();
     const log = lines(join(dir, 'console.jsonl')),
       meter = lines(join(dir, 'meter.jsonl'));
-    const { page, errors, at } = await open(q, log, dpr);
+    const { page, errors, at } = await open(q, log, dpr, bare);
     const stop = watchMeter(page, meter, at);
     if (!early) {
       await firstReading(page);
@@ -364,6 +375,30 @@ try {
         }
         await page.waitForTimeout(800);
         await shot(`tap-${what}`);
+      } else if ('wait' in a) {
+        const css = /^[.#[]|^[a-z][\w-]*[.#[:]/.test(a.wait);
+        const target = css
+          ? page.locator(a.wait).first()
+          : page.getByText(a.wait, { exact: true }).first();
+        const begun = at();
+        try {
+          await target.waitFor({
+            state: 'visible',
+            timeout: num('patience', 120000),
+          });
+        } catch (e) {
+          await shot(`failed-wait-${a.wait}`);
+          console.log(
+            `WAIT FAILED: "${a.wait}": ${(e instanceof Error ? e.message : String(e)).split('\n')[0]}`
+          );
+          failed = true;
+          break;
+        }
+        console.log(`waited ${at() - begun} ms for ${a.wait}`);
+        await shot(`wait-${a.wait}`);
+      } else if ('hold' in a) {
+        await page.waitForTimeout(a.hold);
+        await shot(`hold-${a.hold}`);
       } else {
         const [dx, dy] = a.drag,
           x = VIEW.width / 2,
